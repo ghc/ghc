@@ -83,7 +83,7 @@ test_artifact = Artifact('source-tarball'
                         , 'ghc-{version}-testsuite.tar.xz'
                         , 'ghc-{version}/testsuite' )
 
-def debian(arch, n):
+def debian(n, arch='x86_64'):
     return linux_platform(arch, "{arch}-linux-deb{n}".format(arch=arch, n=n))
 
 def darwin(arch):
@@ -93,20 +93,20 @@ def darwin(arch):
 windowsArtifact = PlatformSpec ( 'x86_64-windows'
                                , 'ghc-{version}-x86_64-unknown-mingw32' )
 
-def centos(n):
-    return linux_platform("x86_64", "x86_64-linux-centos{n}".format(n=n))
+def centos(n, arch='x86_64'):
+    return linux_platform(arch, "x86_64-linux-centos{n}".format(n=n))
 
-def fedora(n):
-    return linux_platform("x86_64", "x86_64-linux-fedora{n}".format(n=n))
+def fedora(n, arch='x86_64'):
+    return linux_platform(arch, "x86_64-linux-fedora{n}".format(n=n))
 
-def alpine(n):
-    return linux_platform("x86_64", "x86_64-linux-alpine{n}".format(n=n))
+def alpine(n, arch='x86_64'):
+    return linux_platform(arch, "x86_64-linux-alpine{n}".format(n=n))
 
-def rocky(n):
-    return linux_platform("x86_64", "x86_64-linux-rocky{n}".format(n=n))
+def rocky(n, arch='x86_64'):
+    return linux_platform(arch, "x86_64-linux-rocky{n}".format(n=n))
 
-def ubuntu(n):
-    return linux_platform("x86_64", "x86_64-linux-ubuntu{n}".format(n=n))
+def ubuntu(n, arch='x86_64'):
+    return linux_platform(arch, "x86_64-linux-ubuntu{n}".format(n=n))
 
 def linux_platform(arch, opsys):
     return PlatformSpec( opsys, 'ghc-{version}-{arch}-unknown-linux'.format(version="{version}", arch=arch) )
@@ -114,8 +114,7 @@ def linux_platform(arch, opsys):
 
 base_url = 'https://gitlab.haskell.org/api/v4/projects/1/jobs/{job_id}/artifacts/{artifact_name}'
 
-
-hash_cache = {}
+hash_cache = {} # type: Dict[str, str]
 
 # Download a URL and return its hash
 def download_and_hash(url):
@@ -189,21 +188,25 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
         eprint("\n=== " + platform.name + " " + ('=' * (75 - len(platform.name))))
         return mk_one_metadata(release_mode, version, job_map, mk_from_platform(pipeline_type, platform))
 
+    # Here are all the bindists we can distribute
     ubuntu1804 = mk(ubuntu("18_04"))
     ubuntu2004 = mk(ubuntu("20_04"))
     rocky8 = mk(rocky("8"))
-    # Here are all the bindists we can distribute
     centos7 = mk(centos(7))
     fedora33 = mk(fedora(33))
     darwin_x86 = mk(darwin("x86_64"))
     darwin_arm64 = mk(darwin("aarch64"))
     windows = mk(windowsArtifact)
     alpine3_12 = mk(alpine("3_12"))
-    deb9 = mk(debian("x86_64", 9))
-    deb10 = mk(debian("x86_64", 10))
-    deb11 = mk(debian("x86_64", 11))
-    deb10_arm64 = mk(debian("aarch64", 10))
-    deb10_i386 = mk(debian("i386", 10))
+    alpine3_18 = mk(alpine("3_18"))
+    alpine3_18_arm64 = mk(alpine("3_18"), arch='aarch64')
+    deb9 = mk(debian(9, "x86_64"))
+    deb10 = mk(debian(10, "x86_64"))
+    deb11 = mk(debian(11, "x86_64"))
+    deb12 = mk(debian(12, "x86_64"))
+    deb10_arm64 = mk(debian(10, "aarch64"))
+    deb11_arm64 = mk(debian(11, "aarch64"))
+    deb10_i386 = mk(debian(10, "i386"))
 
     source = mk_one_metadata(release_mode, version, job_map, source_artifact)
     test = mk_one_metadata(release_mode, version, job_map, test_artifact)
@@ -212,25 +215,27 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     # developers want.
 
     a64 = { "Linux_Debian": { "< 10": deb9
-                           , "(>= 10 && < 11)": deb10
-                           , ">= 11": deb11
+                           , "( >= 10 && < 11 )": deb10
+                           , "( >= 11 && < 12 )": deb11
+                           , ">= 11": deb12
                            , "unknown_versioning": deb11 }
           , "Linux_Ubuntu" : { "unknown_versioning": ubuntu2004
                              , "( >= 16 && < 18 )": deb9
-                             , "( >= 18 && < 19 )": ubuntu1804
-                             }
+                             , "( >= 18 && < 19 )": ubuntu1804 }
           , "Linux_Mint"   : { "< 20": ubuntu1804
-                             , ">= 20": ubuntu2004 }
+                             , ">= 20": ubuntu2004
+                             , "unknown_versioning": ubuntu2004 }
           , "Linux_CentOS"  : { "( >= 7 && < 8 )" : centos7
                               , "unknown_versioning" : centos7  }
           , "Linux_Fedora"  : { ">= 33": fedora33
                               , "unknown_versioning": centos7 }
           , "Linux_RedHat"  : { "unknown_versioning": centos7 }
-          #MP: Replace here with Rocky8 when that job is in the pipeline
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
           , "Windows" : { "unknown_versioning" :  windows }
-          , "Linux_Alpine" : { "unknown_versioning": alpine3_12 }
+          , "Linux_Alpine" : { "( >= 3.12 && < 3.18 )": alpine_3_12
+                             , ">= 3.18": alpine_3_18
+                             , "unknown_versioning": alpine3_12 }
 
           }
 
@@ -241,6 +246,11 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
           }
 
     arm64 = { "Linux_UnknownLinux": { "unknown_versioning": deb10_arm64 }
+            , "Linux_Alpine" : { "unknown_versioning": alpine3_18_arm64 }
+            , "Linux_Debian": { "( >= 10 && < 11 )": deb10_arm64
+                              , "( >= 11 && < 12 )": deb11_arm64
+                              , "unknown_versioning": deb10_arm64
+                              }
             , "Darwin": { "unknown_versioning": darwin_arm64 }
             }
 
