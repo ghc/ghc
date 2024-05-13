@@ -27,7 +27,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evDFunApp,  evDictApp, mkNewTypeDictApp, evSelector,
+  evId, evCoercion, evCast, evDFunApp,  evDictApp, evSelector,
   mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
 
   evTermCoercion, evTermCoercion_maybe,
@@ -538,46 +538,6 @@ evDictApp cls tys args
                  evDFunApp (dataConWrapId dc) tys args
       Nothing -> pprPanic "evDictApp" (ppr cls)
 
-mkNewTypeDictApp :: Name -> Class -> [Type] -> EvExpr -> EvTerm
-mkNewTypeDictApp _df_name cls tys arg
---  | not (isNewTyCon tycon)
-  = evDictApp cls tys [arg]
-{-
-  | otherwise
-  = EvExpr $ Let (NonRec dfun dict_app) (Var dfun)
-  where
-    tycon     = classTyCon cls
-    dict_con  = tyConSingleDataCon tycon
-    pred_ty   = mkClassPred cls tys
-    dict_args = map Type tys ++ [arg]
-    dict_app  = mkConApp dict_con dict_args
-    dfun      = mkLocalVar (DFunId True) df_name ManyTy pred_ty dfun_info
-    unf       = mkDFunUnfolding [] dict_con dict_args
-    dfun_info = vanillaIdInfo `setUnfoldingInfo`  unf
-                              `setInlinePragInfo` dfunInlinePragma
--}
-
-{- Here is what we are making:
-     let $fKnownNat :: KnownNat 17
-           {-# Unfolding = DFun :DKnownNat @17 (UnsafeSNat @17 17) #-}
-         $fKnownNat = :DKnownNat @17 (UnsafeSNat @17 17)
-     in $fKnownNat
-
-Here we have introduced a funny extra binding:
-
-* KnownNat is a newtype class
-
-* $fKnownNat is a full DFun, with a DFun unfolding.  So
-    - it does not inline;
-    - it interacts nicely with the class selector
-
-* :DKnowNat, the data construtor, will inline to a cast right away
-  But we don't want that to be visible to clients of this constraint
-
-All this is important for any newtype class; so evDictApp checks
-that it is not used for newtype classes.
--}
-
 -- Selector id plus the types at which it
 -- should be instantiated, used for HasField
 -- dictionaries; see Note [HasField instances]
@@ -1039,24 +999,18 @@ instance Outputable EvTypeable where
 -- Helper functions for dealing with IP newtype-dictionaries
 ----------------------------------------------------------------------
 
--- | Create a 'Coercion' that unwraps an implicit-parameter
--- dictionary to expose the underlying value.
--- We expect the 'Type' to have the form `IP sym ty`,
--- and return a 'Coercion' `co :: IP sym ty ~ ty`
-unwrapIP :: Type -> CoercionR
-unwrapIP ty =
-  case unwrapNewTyCon_maybe tc of
-    Just (_,_,ax) -> mkUnbranchedAxInstCo Representational ax tys []
-    Nothing       -> pprPanic "unwrapIP" $
-                       text "The dictionary for" <+> quotes (ppr tc)
-                         <+> text "is not a newtype!"
+-- | Take a type (IP sym ty), where IP is the built in IP class
+-- and return (ip, MkIP, [sym,ty]), where
+--    `ip` is the class-op for class IP
+--    `MkIP` is the data constructor for class IP
+decomposeIP :: Type -> (Id, DataCon, [Type])
+decomposeIP ty
+  = assertPpr (isIPTyCon tc && isUnaryClassTyCon tc) (ppr tc) $
+    case classOpMethods (classTyCon tc) of
+      [ip_op] -> (ip_op, tyConSingleDataCon tc, tys)
+      _ -> pprPanic "unwrapIP" (ppr tc)
   where
-  (tc, tys) = splitTyConApp ty
-
--- | Create a 'Coercion' that wraps a value in an implicit-parameter
--- dictionary. See 'unwrapIP'.
-wrapIP :: Type -> CoercionR
-wrapIP ty = mkSymCo (unwrapIP ty)
+    (tc, tys) = splitTyConApp ty
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

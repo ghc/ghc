@@ -476,16 +476,16 @@ mkDictSelId :: Name          -- Name of one of the *value* selectors
                              -- (dictionary superclass or method)
             -> Class -> Id
 mkDictSelId name clas
-  = mkGlobalId (ClassOpId clas val_index terminating) name sel_ty info
+  = mkGlobalId (ClassOpId clas terminating) name sel_ty info
   where
     tycon          = classTyCon clas
     sel_names      = map idName (classAllSelIds clas)
-    new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
     tyvars         = dataConUserTyVarBinders data_con
     n_ty_args      = length tyvars
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
+    unary_cls      = isUnaryClassTyCon tycon
 
     pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
     res_ty  = scaledThing (getNth arg_tys val_index)
@@ -502,7 +502,9 @@ mkDictSelId name clas
                 `setDmdSigInfo` strict_sig
                 `setCprSigInfo` topCprSig
 
-    info | new_tycon  -- Same as non-new case; ToDo: explain
+    info = base_info `setRuleInfo` mkRuleInfo [rule]
+{-
+    info | unary_cls  -- Same as non-new case; ToDo: explain
          = base_info `setRuleInfo` mkRuleInfo [rule]
                      `setInlinePragInfo` neverInlinePragma
                    -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
@@ -518,6 +520,7 @@ mkDictSelId name clas
                    -- Add a magic BuiltinRule, but no unfolding
                    -- so that the rule is always available to fire.
                    -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
+-}
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2
@@ -533,7 +536,7 @@ mkDictSelId name clas
         -- even if the selector isn't inlined
 
     strict_sig = mkClosedDmdSig [arg_dmd] topDiv
-    arg_dmd | new_tycon = evalDmd
+    arg_dmd | unary_cls = evalDmd
             | otherwise = C_1N :* mkProd Unboxed dict_field_dmds
             where
               -- The evalDmd below is just a placeholder and will be replaced in
@@ -548,7 +551,7 @@ mkDictSelRhs clas val_index
   = mkLams tyvars (Lam dict_id rhs_body)
   where
     tycon          = classTyCon clas
-    new_tycon      = isNewTyCon tycon
+    unary_cls      = isUnaryClassTyCon tycon
     [data_con]     = tyConDataCons tycon
     tyvars         = dataConUnivTyVars data_con
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
@@ -558,8 +561,12 @@ mkDictSelRhs clas val_index
     dict_id        = mkTemplateLocal 1 pred
     arg_ids        = mkTemplateLocalsNum 2 (map scaledThing arg_tys)
 
-    rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
-                                                   (Var dict_id)
+    rhs_body | unary_cls = assertPpr (val_index == 0) (ppr clas) $
+                           case arg_tys of
+                             [arg_ty] ->  mkCast (Var dict_id) $
+                                          mkUnivCo UnaryClassProv Representational
+                                                   pred (scaledThing arg_ty)
+                             _ -> pprPanic "mkDictSelRhs" (ppr clas)
              | otherwise = mkSingleAltCase (Var dict_id) dict_id (DataAlt data_con)
                                            arg_ids (varToCoreExpr the_arg_id)
                                 -- varToCoreExpr needed for equality superclass selectors
@@ -1808,12 +1815,12 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
 -- See Note [Dict funs and default methods]
 
 mkDictFunId dfun_name tvs theta clas tys
-  = mkExportedLocalId (DFunId is_nt)
+  = mkExportedLocalId (DFunId is_unary)
                       dfun_name
                       dfun_ty
   where
-    is_nt = isNewTyCon (classTyCon clas)
-    dfun_ty = TcType.tcMkDFunSigmaTy tvs theta (mkClassPred clas tys)
+    is_unary = isUnaryClassTyCon (classTyCon clas)
+    dfun_ty  = TcType.tcMkDFunSigmaTy tvs theta (mkClassPred clas tys)
 
 {-
 ************************************************************************

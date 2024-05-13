@@ -47,7 +47,7 @@ module GHC.Core.TyCon(
 
         -- ** Predicates on TyCons
         isAlgTyCon, isVanillaAlgTyCon,
-        isClassTyCon, isFamInstTyCon,
+        isClassTyCon, isUnaryClassTyCon, isFamInstTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isUnboxedSumTyCon, isPromotedTupleTyCon,
@@ -1126,6 +1126,10 @@ data AlgTyConRhs
                         -- in tcHasFixedRuntimeRep.
     }
 
+  | UnaryClass {     -- See Note [Unary classes]
+      data_con :: DataCon
+      }
+
 mkSumTyConRhs :: [DataCon] -> AlgTyConRhs
 mkSumTyConRhs data_cons = SumTyCon data_cons (length data_cons)
 
@@ -1184,6 +1188,7 @@ visibleDataCons :: AlgTyConRhs -> [DataCon]
 visibleDataCons (AbstractTyCon {})            = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
+visibleDataCons (UnaryClass{ data_con = c })  = [c]
 visibleDataCons (TupleTyCon{ data_con = c })  = [c]
 visibleDataCons (SumTyCon{ data_cons = cs })  = cs
 
@@ -1323,6 +1328,13 @@ branches, stored in the 'ClosedSynFamilyTyCon' constructor.  A closed
 type family with no equations does not have an axiom, because there is
 nothing for the axiom to prove!
 
+
+Note [Unary classes]
+~~~~~~~~~~~~~~~~~~~~
+ToDo!!
+isInjectiveTyCon:
+  -- ToDo: Lint and pushDataCon both check for injective TyCons in SelCo
+  -- So newtype classes need to pretend to be injective.
 
 Note [Promoted data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2019,6 +2031,7 @@ isDataTyCon (TyCon { tyConDetails = details })
             -- See Note [Type data declarations] in GHC.Rename.Module.
         DataTyCon { is_type_data = type_data } -> not type_data
         NewTyCon {}        -> False
+        UnaryClass {}      -> False
         AbstractTyCon {}   -> False      -- We don't know, so return False
 isDataTyCon _ = False
 
@@ -2041,9 +2054,9 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
   where
     go _ | Phantom <- role = True -- Vacuously; (t1 ~P t2) holds for all t1, t2!
 
-    go (AlgTyCon {algTcRhs = rhs, algTcFlavour = flav})
+    go (AlgTyCon {algTcRhs = rhs})
        | Nominal <- role                                = True
-       | Representational <- role                       = go_alg_rep rhs flav
+       | Representational <- role                       = go_alg_rep rhs
 
     go (FamilyTyCon { famTcFlav = DataFamilyTyCon _ })
        | Nominal <- role                                = True
@@ -2059,19 +2072,12 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
        -- See (W1) in Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.TyCl
 
     -- go_alg_rep used only at Representational role
-    go_alg_rep (TupleTyCon {})    _               = True
-    go_alg_rep (SumTyCon {})      _               = True
-    go_alg_rep (DataTyCon {})     _               = True
-    go_alg_rep (AbstractTyCon {}) _               = False
-    go_alg_rep (NewTyCon {})      (ClassTyCon {}) = True -- See Note [Newtype classes]
-       -- ToDo: Lint and pushDataCon both check for injective TyCons in SelCo
-       -- So newtype classes need to pretend to be injective.
-    go_alg_rep (NewTyCon {})      _               = False
-
-{- Note [Newtype classes]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-ToDo: write this up
--}
+    go_alg_rep (TupleTyCon {})    = True
+    go_alg_rep (SumTyCon {})      = True
+    go_alg_rep (DataTyCon {})     = True
+    go_alg_rep (AbstractTyCon {}) = False
+    go_alg_rep (UnaryClass {})    = True -- See Note [Unary classes]
+    go_alg_rep (NewTyCon {})      = False
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where r is the role passed in):
@@ -2090,7 +2096,6 @@ isGenerativeTyCon tc@(TyCon { tyConDetails = details }) role
 
     -- In all other cases, injectivity implies generativity
     go r _ = isInjectiveTyCon tc r
-
 
 -- | Is this 'TyCon' that for a @newtype@
 isNewTyCon :: TyCon -> Bool
@@ -2468,6 +2473,8 @@ tcHasFixedRuntimeRep tc@(TyCon { tyConDetails = details })
 
        SumTyCon {} -> False   -- only unboxed sums here
 
+       UnaryClass {} -> True  -- Always boxed
+
        NewTyCon { nt_fixed_rep = fixed_rep } -> fixed_rep
               -- A newtype might not have a fixed runtime representation
               -- with UnliftedNewtypes (#17360)
@@ -2601,6 +2608,7 @@ tyConDataCons_maybe (TyCon { tyConDetails = details })
   = case rhs of
        DataTyCon { data_cons = cons } -> Just cons
        NewTyCon { data_con = con }    -> Just [con]
+       UnaryClass { data_con = con }  -> Just [con]
        TupleTyCon { data_con = con }  -> Just [con]
        SumTyCon { data_cons = cons }  -> Just cons
        _                              -> Nothing
@@ -2617,6 +2625,7 @@ tyConSingleDataCon_maybe (TyCon { tyConDetails = details })
       DataTyCon { data_cons = [c] } -> Just c
       TupleTyCon { data_con = c }   -> Just c
       NewTyCon { data_con = c }     -> Just c
+      UnaryClass { data_con = c }   -> Just c
       _                             -> Nothing
   | otherwise                        = Nothing
 
@@ -2630,8 +2639,8 @@ tyConSingleDataCon tc
 -- | Like 'tyConSingleDataCon_maybe', but returns 'Nothing' for newtypes.
 tyConSingleAlgDataCon_maybe :: TyCon -> Maybe DataCon
 tyConSingleAlgDataCon_maybe tycon
-  | isNewTyCon tycon = Nothing
-  | otherwise        = tyConSingleDataCon_maybe tycon
+  | isDataTyCon tycon  = tyConSingleDataCon_maybe tycon
+  | otherwise          = Nothing
 
 -- | Returns @Just dcs@ if the given 'TyCon' is a @data@ type, a tuple type
 -- or a sum type with data constructors dcs. If the 'TyCon' has more than one
@@ -2641,8 +2650,9 @@ tyConSingleAlgDataCon_maybe tycon
 -- Like 'tyConDataCons_maybe', but returns 'Nothing' for newtypes.
 tyConAlgDataCons_maybe :: TyCon -> Maybe [DataCon]
 tyConAlgDataCons_maybe tycon
-  | isNewTyCon tycon = Nothing
-  | otherwise        = tyConDataCons_maybe tycon
+  | isNewTyCon tycon        = Nothing
+  | isUnaryClassTyCon tycon = Nothing
+  | otherwise               = tyConDataCons_maybe tycon
 
 -- | Determine the number of value constructors a 'TyCon' has. Panics if the
 -- 'TyCon' is not algebraic or a tuple
@@ -2652,6 +2662,7 @@ tyConFamilySize tc@(TyCon { tyConDetails = details })
   = case rhs of
       DataTyCon { data_cons_size = size } -> size
       NewTyCon {}                    -> 1
+      UnaryClass {}                  -> 1
       TupleTyCon {}                  -> 1
       SumTyCon { data_cons_size = size }  -> size
       _                              -> pprPanic "tyConFamilySize 1" (ppr tc)
@@ -2739,6 +2750,14 @@ famTyConFlav_maybe :: TyCon -> Maybe FamTyConFlav
 famTyConFlav_maybe (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = flav} <- details = Just flav
   | otherwise                                 = Nothing
+
+isUnaryClassTyCon :: TyCon -> Bool
+isUnaryClassTyCon tc@(TyCon { tyConDetails = details })
+  | AlgTyCon { algTcFlavour = flav, algTcRhs = UnaryClass {} } <- details
+  = assertPpr (case flav of { ClassTyCon {} -> True; _ -> False }) (ppr tc) $
+    True
+  | otherwise
+  = False
 
 -- | Is this 'TyCon' that for a class instance?
 isClassTyCon :: TyCon -> Bool
@@ -2854,6 +2873,7 @@ tyConFlavour (TyCon { tyConDetails = details })
                   SumTyCon {}        -> SumFlavour
                   DataTyCon {}       -> DataTypeFlavour
                   NewTyCon {}        -> NewtypeFlavour
+                  UnaryClass {}      -> ClassFlavour
                   AbstractTyCon {}   -> AbstractTypeFlavour
 
   | FamilyTyCon { famTcFlav = flav, famTcParent = parent } <- details

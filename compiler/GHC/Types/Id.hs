@@ -510,8 +510,8 @@ isClassOpId id = case Var.idDetails id of
                         _other       -> False
 
 isClassOpId_maybe id = case Var.idDetails id of
-                        ClassOpId cls _ _ -> Just cls
-                        _other            -> Nothing
+                        ClassOpId cls _ -> Just cls
+                        _other          -> Nothing
 
 isPrimOpId id = case Var.idDetails id of
                         PrimOpId {} -> True

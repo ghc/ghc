@@ -38,7 +38,9 @@ import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCon
+import GHC.Core.Class( classTyCon )
 import GHC.Core.DataCon
+import GHC.Core.TyCo.Rep( UnivCoProvenance(..), scaledThing )
 import GHC.Core.Opt.OccurAnal
 
 import GHC.Data.Maybe
@@ -57,7 +59,7 @@ import GHC.Types.Demand
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( realWorldPrimId, wrapNewTypeBody )
+import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName, OccName )
 import GHC.Types.Name.Occurrence (occNameString)
@@ -300,13 +302,6 @@ mkDataConWorkers generate_debug_info mod_loc tycon
     | data_con <- tyConDataCons tycon
     , let id = dataConWorkId data_con
     ]
-
-{-
-  | isClassTyCon tycon
-  , let data_con = tyConSingleDataCon tycon
-        id       = dataConWorkId data_con
-  = [ NonRec id (unfoldingTemplate (idUnfolding id)) ]
--}
 
   | otherwise
   = []  -- No worker for newtypes and family tycons
@@ -1187,7 +1182,7 @@ cpeApp top_env expr
              ; return (floats1 `appFloats` floats2 `snocFloat` float, tup) }
 
     cpe_app env (Var v) args
-      | Just (payload, args') <- isNewTypeClassApp v args
+      | Just (payload, args') <- isUnaryClassApp v args
       = cpe_app env payload args'
 
     cpe_app env (Var v) args
@@ -1336,23 +1331,42 @@ isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
 isLazyExpr _                       = False
 
-isNewTypeClassApp :: Id -> [ArgInfo] -> Maybe (CoreExpr, [ArgInfo])
-isNewTypeClassApp v args
+isUnaryClassApp :: Id -> [ArgInfo] -> Maybe (CoreExpr, [ArgInfo])
+-- If we have class C a b c where { op :: ty }
+-- Transform
+--    op  ta tb tc dict_arg  --> dict_arg |> co
+--    MkC ta tb tc meth_arg  --> meth_arg |> sym co
+-- where co :: C ta tb tc ~ ty[t1/a,tb/b,tc/c]
+isUnaryClassApp v args
   | Just data_con <- isDataConWorkId_maybe v
   , let tycon = dataConTyCon data_con
-  , isNewTyCon tycon
-  , let get_payload 0 rev_arg_tys (AIApp payload : args')
-          = Just (wrapNewTypeBody tycon (reverse rev_arg_tys) payload, args')
-        get_payload n rev_arg_tys (AIApp (Type ty) : args)
-          = get_payload (n-1) (ty:rev_arg_tys) args
-        get_payload _ _ _
-          = Nothing
-  = assertPpr (isClassTyCon tycon) (ppr v) $
-      -- Newtype data constructors are already inlined
-      -- /except/ for newtype classes
-    get_payload (tyConArity tycon) [] args
+  , Just (dict_arg, ty_args, rest) <- getUnaryClassPayload tycon args
+  = Just (mkCast dict_arg (mkSymCo (mk_co tycon ty_args)), rest)
 
-  | otherwise = Nothing
+  | Just cls <- isClassOpId_maybe v
+  , let tycon = classTyCon cls
+  , Just (meth_arg, ty_args, rest) <- getUnaryClassPayload tycon args
+  = Just (mkCast meth_arg (mk_co tycon ty_args), rest)
+
+  | otherwise
+  = Nothing
+  where
+    -- mk_co makes a coercion of kind (C ta tb tc ~ ty[t1/a,tb/b,tc/c])
+    mk_co tycon ty_args
+      = mkUnivCo UnaryClassProv Representational
+                 (mkTyConApp tycon ty_args)
+                 (scaledThing meth_ty)
+      where
+        [meth_ty] = dataConInstOrigArgTys (tyConSingleDataCon tycon) ty_args
+
+getUnaryClassPayload :: TyCon -> [ArgInfo] -> Maybe (CoreExpr, [Type], [ArgInfo])
+getUnaryClassPayload tc args
+  | isUnaryClassTyCon tc = go (tyConArity tc) [] args
+  | otherwise            = Nothing
+  where
+    go n rev_ty_args (AIApp (Type ty) : args) = go (n-1) (ty:rev_ty_args) args
+    go 0 rev_ty_args (AIApp payload : args)  = Just (payload, reverse rev_ty_args, args)
+    go _ _ _ = Nothing
 
 {- Note [runRW magic]
 ~~~~~~~~~~~~~~~~~~~~~

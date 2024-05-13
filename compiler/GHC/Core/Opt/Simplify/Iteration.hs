@@ -2260,46 +2260,9 @@ simplIdF env var cont
 
 simplCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplCall env var cont
-{-
-  | ClassOpId clas idx _     <- idDetails var
-  , Just (env', arg', cont') <- classOpDictApp_maybe env clas idx cont
-  = simplExprF env' arg' cont'
-  | otherwise
--}
-
   = do { rule_base <- getSimplRules
        ; let info  = mkArgInfo env rule_base var cont
        ; rebuildCall env info cont }
-
-{-
-classOpDictApp_maybe :: SimplEnv -> Class -> Int -> SimplCont
-                     -> Maybe (SimplEnv, InExpr, SimplCont)
-classOpDictApp_maybe env cls idx cont
-  = go cont
-  where
-    go (ApplyToTy { sc_cont = cont })
-      = go cont  -- Discard leading type args
-    go (ApplyToVal { sc_arg = dict_arg, sc_env = dict_se, sc_cont = cont })
-      | Just (dfun, dfun_args) <- splitInApp dict_se dict_arg [] -- dfun_args :: [InExpr]
-      , DFunUnfolding { df_bndrs = bndrs, df_args = dict_args } <- idUnfolding dfun
-      , bndrs `equalLength` dfun_args        -- See Note [DFun arity check]
-      , let arg_env = extendSubstForDFun (zapSubstEnv env) bndrs dfun_args
-            the_arg = getNth (drop (classArity cls) dict_args) idx   -- An OutExpr
-      = Just (arg_env, the_arg, cont)
-    go _ = Nothing
-
-    splitInApp :: StaticEnv -> InExpr -> [(InExpr,StaticEnv)]
-               -> Maybe (OutVar, [(InExpr,StaticEnv)])
-    splitInApp env (App fun arg) args
-      = splitInApp env fun ((arg,env):args)
-    splitInApp env (Var v) args
-      = case substId env v of
-          DoneId v'            -> Just (v', args)
-          ContEx tvs cvs ids e -> splitInApp (setSubstEnv env tvs cvs ids) e args
-          DoneEx e _           -> splitInApp (zapSubstEnv env)             e args
-    splitInApp _ _ _
-       = Nothing
--}
 
 ---------------------------------------------------------
 --      Dealing with a call site

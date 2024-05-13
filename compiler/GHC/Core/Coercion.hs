@@ -1475,6 +1475,7 @@ setNominalRole_maybe r co
       | case prov of PhantomProv {}    -> False  -- should always be phantom
                      ProofIrrelProv {} -> True   -- it's always safe
                      PluginProv {}     -> False  -- who knows? This choice is conservative.
+                     UnaryClassProv {} -> False  -- who knows? This choice is conservative.
       = Just $ co { uco_role = Nominal }
     setNominalRole_maybe_helper _ = Nothing
 

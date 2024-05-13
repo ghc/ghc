@@ -1851,9 +1851,9 @@ app_ok fun_ok primop_ok fun args
 
   | otherwise
   = case idDetails fun of
-      DFunId new_type -> not new_type
+      DFunId unary_class -> not unary_class
          -- DFuns terminate, unless the dict is implemented
-         -- with a newtype in which case they may not
+         -- by a no-op in which case they may not
 
       DataConWorkId dc
         | isLazyDataConRep dc
@@ -1861,7 +1861,7 @@ app_ok fun_ok primop_ok fun args
         | otherwise
         -> fields_ok (dataConRepStrictness dc)
 
-      ClassOpId _ _ is_terminating_result
+      ClassOpId _ is_terminating_result
         | is_terminating_result -- See Note [exprOkForSpeculation and type classes]
         -> assertPpr (n_val_args == 1) (ppr fun $$ ppr args) $
            True

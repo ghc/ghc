@@ -34,9 +34,8 @@ import GHC.Builtin.PrimOps.Ids ( primOpId )
 
 import GHC.Types.FieldLabel
 import GHC.Types.SafeHaskell
-import GHC.Types.Name   ( Name, getOccName )
+import GHC.Types.Name   ( Name )
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence( occNameString, mkVarOcc )
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -414,9 +413,8 @@ makeLitDict clas lit_ty lit_expr
                   -- If the method type is forall n. KnownNat n => SNat n
                   -- then rep_tc :: TyCon is SNat
   , [rep_con]  <- tyConDataCons rep_tc
-  = do { df_name <- newNTDFName clas
-       ; let mk_ev _ = mkNewTypeDictApp df_name clas [lit_ty] $
-                       mkConApp rep_con [Type lit_ty, lit_expr]
+  = do { let mk_ev _ = evDictApp clas [lit_ty] $
+                       [mkConApp rep_con [Type lit_ty, lit_expr]]
        ; return $ OneInst { cir_new_theta   = []
                           , cir_mk_ev       = mk_ev
                           , cir_canonical   = EvCanonical
@@ -461,9 +459,8 @@ matchWithDict [cls, mty]
                  (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
 
        ; wd_cls <- tcLookupClass withDictClassName
-       ; dfun_name <- newNTDFName wd_cls
-       ; let mk_ev [c] = mkNewTypeDictApp dfun_name wd_cls [cls, mty] $
-                         evWithDict (evTermCoercion (EvExpr c))
+       ; let mk_ev [c] = evDictApp wd_cls [cls, mty] $
+                         [evWithDict (evTermCoercion (EvExpr c))]
              mk_ev e   = pprPanic "matchWithDict" (ppr e)
 
        ; return $ OneInst { cir_new_theta   = [mkNomEqPred mty inst_meth_ty]
@@ -933,9 +930,8 @@ matchDataToTag dataToTagClass [levity, dty] = do
                                (mkSymCo repCo)
                                (mkReflCo Representational intPrimTy)
      -> do { addUsedDataCons rdr_env repTyCon   -- See wrinkles DTW2 and DTW3
-           ; df_name <- newNTDFName dataToTagClass
-           ; let mk_ev _ = mkNewTypeDictApp df_name dataToTagClass [levity, dty] $
-                           methodRep `Cast` methodCo
+           ; let mk_ev _ = evDictApp dataToTagClass [levity, dty] $
+                           [methodRep `Cast` methodCo]
            ; pure (OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
                            , cir_mk_ev     = mk_ev
                            , cir_canonical = EvCanonical
@@ -944,12 +940,6 @@ matchDataToTag dataToTagClass [levity, dty] = do
 
 matchDataToTag _ _ = pure NoInstance
 
-
-newNTDFName :: Class -> TcM Name
-newNTDFName cls = newName (mkVarOcc dfun_occ_str)
-  where
-    dfun_occ_str :: String
-    dfun_occ_str = "$f" ++ occNameString (getOccName cls)
 
 {- ********************************************************************
 *                                                                     *

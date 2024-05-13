@@ -1568,13 +1568,16 @@ data UnivCoProvenance
       -- ^ From a plugin, which asserts that this coercion is sound.
       --   The string and the variable set are for the use by the plugin.
 
+  | UnaryClassProv
+
   deriving (Eq, Ord, Data.Data)
   -- Why Ord?  See Note [Ord instance of IfaceType] in GHC.Iface.Type
 
 instance Outputable UnivCoProvenance where
-  ppr PhantomProv      = text "(phantom)"
-  ppr ProofIrrelProv   = text "(proof irrel)"
-  ppr (PluginProv str) = parens (text "plugin" <+> brackets (text str))
+  ppr (PhantomProv _)      = text "(phantom)"
+  ppr (ProofIrrelProv _)   = text "(proof irrel.)"
+  ppr (PluginProv str cvs) = parens (text "plugin" <+> brackets (text str) <+> ppr cvs)
+  ppr UnaryClassProv       = text "(unary-class)"
 
 instance NFData UnivCoProvenance where
   rnf p = p `seq` ()

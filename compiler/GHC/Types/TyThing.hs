@@ -266,9 +266,9 @@ tyThingParent_maybe (AnId id)     = case idDetails id of
                                           Just (ATyCon tc)
                                       RecSelId { sel_tycon = RecSelPatSyn ps } ->
                                           Just (AConLike (PatSynCon ps))
-                                      ClassOpId cls _ _           ->
+                                      ClassOpId cls _  ->
                                           Just (ATyCon (classTyCon cls))
-                                      _other                      -> Nothing
+                                      _other           -> Nothing
 tyThingParent_maybe _other = Nothing
 
 tyThingsTyCoVars :: [TyThing] -> TyCoVarSet
