@@ -1,4 +1,4 @@
-setTestOpts(when(arch('wasm32'), run_timeout_multiplier(2)))
+setTestOpts(when(arch('wasm32'), run_timeout_multiplier(5)))
 
 test('PartialDownsweep',
      [ extra_run_opts('"' + config.libdir + '"')
