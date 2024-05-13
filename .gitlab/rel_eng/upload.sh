@@ -77,6 +77,7 @@ fi
 function hash_files() {
     echo $(find -maxdepth 1 \
          -iname '*.xz' \
+      -o -iname '*.gz' \
       -o -iname '*.lz' \
       -o -iname '*.bz2' \
       -o -iname '*.zip' \
