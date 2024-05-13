@@ -533,7 +533,7 @@ mkDictSelId name clas
         -- The strictness signature is of the form U(AAAVAAAA) -> T
         -- where the V depends on which item we are selecting
         -- It's worth giving one, so that absence info etc is generated
-        -- even if the selector isn't inlined
+        -- even if the selector isn't inlined, which of course it isn't!
 
     strict_sig = mkClosedDmdSig [arg_dmd] topDiv
     arg_dmd | unary_cls = evalDmd
@@ -928,6 +928,9 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
         -- Their data constructors only live at the type level, in the
         -- form of PromotedDataCon, and therefore do not need wrappers.
         -- See wrinkle (W0) in Note [Type data declarations] in GHC.Rename.Module.
+      = False
+
+      | isUnaryClassTyCon tycon   -- See Note [Unary class magic]
       = False
 
       | otherwise

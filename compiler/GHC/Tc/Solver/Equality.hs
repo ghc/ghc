@@ -2954,7 +2954,7 @@ tryFunDeps eq_rel work_item@(EqCt { eq_lhs = lhs, eq_ev = ev })
 --------------------
 improveTopFunEqs :: TyCon -> [TcType] -> EqCt -> TcS Bool
 -- TyCon is definitely a type family
--- See Note [FunDep and implicit parameter reactions]
+-- See Note [FunDep and implicit parameter reactions] in GHC.Tc.Solver.Dict
 improveTopFunEqs fam_tc args (EqCt { eq_ev = ev, eq_rhs = rhs_ty })
   | isGiven ev = improveGivenTopFunEqs  fam_tc args ev rhs_ty
   | otherwise  = improveWantedTopFunEqs fam_tc args ev rhs_ty
@@ -3140,7 +3140,7 @@ improveWantedLocalFunEqs
 -- the current work item with inert CFunEqs (boh Given and Wanted)
 -- E.g.   x + y ~ z,   x + y' ~ z   =>   [W] y ~ y'
 --
--- See Note [FunDep and implicit parameter reactions]
+-- See Note [FunDep and implicit parameter reactions] in GHC.Tc.Solver.Dict
 improveWantedLocalFunEqs funeqs_for_tc fam_tc args work_ev rhs
   | null improvement_eqns
   = return False

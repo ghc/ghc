@@ -27,8 +27,9 @@ module GHC.Tc.Types.Evidence (
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evDFunApp,  evDictApp, evSelector,
+  evId, evCoercion, evCast, evDFunApp,  evDictApp, evSelector, evDelayedError,
   mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
+  decomposeIP, evWrapIP, evUnwrapIP,
 
   evTermCoercion, evTermCoercion_maybe,
   EvCallStack(..),
@@ -42,7 +43,6 @@ module GHC.Tc.Types.Evidence (
   TcMCoercion, TcMCoercionN, TcMCoercionR,
   Role(..), LeftOrRight(..), pickLR,
   maybeSymCo,
-  unwrapIP, wrapIP,
 
   -- * QuoteWrapper
   QuoteWrapper(..), applyQuoteWrapper, quoteWrapperTyVarTy
@@ -58,8 +58,9 @@ import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Core.Type
 import GHC.Core.TyCon
-import GHC.Core.Class( classTyCon )
-import GHC.Core.DataCon ( dataConWrapId )
+import GHC.Core.Make    ( mkWildCase, mkRuntimeErrorApp, tYPE_ERROR_ID )
+import GHC.Core.Class   ( classTyCon, classMethods )
+import GHC.Core.DataCon ( DataCon, dataConWrapId )
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 import GHC.Core.InstEnv ( Canonical )
@@ -73,9 +74,9 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate
 import GHC.Types.Basic
-import GHC.Types.Name( Name )
 
 import GHC.Builtin.Names
+import GHC.Builtin.Types( unitTy )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -851,6 +852,16 @@ evTermCoercion tm = case evTermCoercion_maybe tm of
                       Just co -> co
                       Nothing -> pprPanic "evTermCoercion" (ppr tm)
 
+-- Used with Opt_DeferTypeErrors
+-- See Note [Deferring coercion errors to runtime]
+-- in GHC.Tc.Solver
+evDelayedError :: Type -> String -> EvTerm
+evDelayedError ty msg
+  = EvExpr $
+    let fail_expr = mkRuntimeErrorApp tYPE_ERROR_ID unitTy msg
+    in mkWildCase fail_expr (unrestricted unitTy) ty []
+       -- See Note [Incompleteness and linearity] in GHC.HsToCore.Utils
+       -- c.f. mkErrorAppDs in GHC.HsToCore.Utils
 
 {- *********************************************************************
 *                                                                      *
@@ -1005,12 +1016,31 @@ instance Outputable EvTypeable where
 --    `MkIP` is the data constructor for class IP
 decomposeIP :: Type -> (Id, DataCon, [Type])
 decomposeIP ty
-  = assertPpr (isIPTyCon tc && isUnaryClassTyCon tc) (ppr tc) $
-    case classOpMethods (classTyCon tc) of
-      [ip_op] -> (ip_op, tyConSingleDataCon tc, tys)
-      _ -> pprPanic "unwrapIP" (ppr tc)
+  | Just cls <- tyConClass_maybe tc
+  , [ip_op] <- classMethods cls
+  = assertPpr (isIPClass cls && isUnaryClassTyCon tc) (ppr tc) $
+    (ip_op, tyConSingleDataCon tc, tys)
+  | otherwise = pprPanic "decomposeIP" (ppr tc)
   where
     (tc, tys) = splitTyConApp ty
+
+evWrapIP :: PredType -> EvExpr -> EvExpr
+-- Given  pred = IP s ty
+  --      et_tm :: ty
+-- Return an EvTerm of type (IP s ty)
+evWrapIP pred ev_tm
+  = mkConApp con (map Type tys ++ [ev_tm])
+  where
+    (_, con, tys) = decomposeIP pred
+
+evUnwrapIP :: PredType -> EvExpr -> EvExpr
+-- Given  pred = IP s ty
+  --      et_tm :: (IP s ty)
+-- Return an EvTerm of type ty
+evUnwrapIP pred ev_tm
+  = mkApps (Var ip_sel) (map Type tys ++ [ev_tm])
+  where
+    (ip_sel, _, tys) = decomposeIP pred
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

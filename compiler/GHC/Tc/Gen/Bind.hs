@@ -58,6 +58,7 @@ import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
+import GHC.Core.DataCon ( dataConWorkId )
 import GHC.Core.Coercion( mkSymCo )
 import GHC.Core.Type (mkStrLitTy, tidyOpenTypeX, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
@@ -262,11 +263,11 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
            -> LHsExpr GhcTc   -- def'n of IP variable
            -> LHsExpr GhcTc   -- dictionary for IP
     toDict dict_ty (L loc expr)
-      = L loc $ HsApp (L loc inst_con) (L loc expr)
+      = L loc $ HsApp noExtField (L loc inst_con) (L loc expr)
       where
-        (_, con, tys) = dcomposeIP dict_ty
+        (_, con, tys) = decomposeIP dict_ty
         inst_con = mkHsWrap (mkWpTyApps tys) $
-                   HsVar noExtField (L loc (dataConWorkId con)))
+                   HsVar noExtField (noLocA (dataConWorkId con))
 
 tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]

@@ -1926,7 +1926,7 @@ emitFunDepWanteds :: CtEvidence  -- The work item
                   -> TcS Bool  -- True <=> some unification happened
 
 emitFunDepWanteds _ [] = return False -- common case noop
--- See Note [FunDep and implicit parameter reactions]
+-- See Note [FunDep and implicit parameter reactions] in GHC.Tc.Solver.Dict
 
 emitFunDepWanteds ev fd_eqns
   = unifyFunDeps ev Nominal do_fundeps
