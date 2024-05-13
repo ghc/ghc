@@ -2,8 +2,7 @@ hpc: can not parse ./.hpc/NoParse.mix
 CallStack (from HasCallStack):
   error, called at libraries/hpc/Trace/Hpc/Mix.hs:94:43 in hpc-0.7.0.1-inplace:Trace.Hpc.Mix
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:128:3 in ghc-internal:GHC.Internal.Exception
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:127:5 in ghc-internal:GHC.Internal.Exception
+  error, called at libraries/hpc/Trace/Hpc/Mix.hs:94:43 in hpc-0.7.0.1-inplace:Trace.Hpc.Mix
 

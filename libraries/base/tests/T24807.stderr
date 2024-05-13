@@ -1,8 +1,9 @@
-T12368a: This is good!
+T24807: hi
 CallStack (from HasCallStack):
-  error, called at T12368a.hs:22:17 in main:Main
+  error, called at T24807.hs:1:8 in main:Main
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:127:5 in ghc-internal:GHC.Internal.Exception
-  error, called at T12368a.hs:22:17 in main:Main
+  error, called at T24807.hs:1:8 in main:Main
+
 
