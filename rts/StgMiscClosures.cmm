@@ -51,8 +51,8 @@ INFO_TABLE_RET (stg_orig_thunk_info_frame, RET_SMALL,
                 W_ thunk_info_ptr)
     /* no args => explicit stack */
 {
-    unwind Sp = W_[Sp + WDS(2)];
-    Sp_adj(2);
+    unwind Sp = W_[Sp + SIZEOF_StgOrigThunkInfoFrame];
+    Sp = Sp + SIZEOF_StgOrigThunkInfoFrame;
     jump %ENTRY_CODE(Sp(0)) [*]; // NB. all registers live!
 }
 
