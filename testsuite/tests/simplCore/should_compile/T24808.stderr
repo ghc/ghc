@@ -1,0 +1,151 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 121, types: 42, coercions: 23, joins: 0/0}
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+T24808.getMaybe1 :: MyMaybe -> MyMaybe
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+T24808.getMaybe1 = \ (ds_dFC :: MyMaybe) -> ds_dFC
+
+-- RHS size: {terms: 1, types: 0, coercions: 4, joins: 0/0}
+getMaybe :: MyMaybe -> Maybe Int
+[GblId[[RecSel]],
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+getMaybe
+  = T24808.getMaybe1
+    `cast` (<MyMaybe>_R %<Many>_N ->_R T24808.N:MyMaybe[0]
+            :: (MyMaybe -> MyMaybe) ~R# (MyMaybe -> Maybe Int))
+
+-- RHS size: {terms: 37, types: 9, coercions: 5, joins: 0/0}
+myFunction :: MyMaybe -> MyMaybe
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [30] 161 20}]
+myFunction
+  = \ (ds_dFw :: MyMaybe) ->
+      case ds_dFw `cast` (T24808.N:MyMaybe[0] :: MyMaybe ~R# Maybe Int)
+      of {
+        Nothing ->
+          (GHC.Internal.Maybe.Nothing @Int)
+          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe);
+        Just n_axK ->
+          (GHC.Internal.Maybe.Just
+             @Int
+             (case n_axK of { GHC.Types.I# x1_aFS ->
+              case x1_aFS of wild2_aFU {
+                __DEFAULT -> GHC.Types.I# (GHC.Prim.+# 10# wild2_aFU);
+                9223372036854775798# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775799# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775800# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775801# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775802# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775803# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775804# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775805# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775806# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775807# -> GHC.Internal.Enum.$fEnumInt2
+              }
+              }))
+          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe)
+      }
+
+-- RHS size: {terms: 37, types: 9, coercions: 5, joins: 0/0}
+bar :: MyMaybe -> MyMaybe
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [30] 161 20}]
+bar
+  = \ (ds_dFw :: MyMaybe) ->
+      case ds_dFw `cast` (T24808.N:MyMaybe[0] :: MyMaybe ~R# Maybe Int)
+      of {
+        Nothing ->
+          (GHC.Internal.Maybe.Nothing @Int)
+          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe);
+        Just n_axK ->
+          (GHC.Internal.Maybe.Just
+             @Int
+             (case n_axK of { GHC.Types.I# x1_aFS ->
+              case x1_aFS of wild2_aFU {
+                __DEFAULT -> GHC.Types.I# (GHC.Prim.+# 10# wild2_aFU);
+                9223372036854775798# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775799# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775800# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775801# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775802# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775803# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775804# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775805# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775806# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775807# -> GHC.Internal.Enum.$fEnumInt2
+              }
+              }))
+          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe)
+      }
+
+-- RHS size: {terms: 37, types: 9, coercions: 5, joins: 0/0}
+T24808.foo1 :: MyMaybe -> MyMaybe
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [30] 161 20}]
+T24808.foo1
+  = \ (ds_dFw :: MyMaybe) ->
+      case ds_dFw `cast` (T24808.N:MyMaybe[0] :: MyMaybe ~R# Maybe Int)
+      of {
+        Nothing ->
+          (GHC.Internal.Maybe.Nothing @Int)
+          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe);
+        Just n_axK ->
+          (GHC.Internal.Maybe.Just
+             @Int
+             (case n_axK of { GHC.Types.I# x1_aFS ->
+              case x1_aFS of wild2_aFU {
+                __DEFAULT -> GHC.Types.I# (GHC.Prim.+# 10# wild2_aFU);
+                9223372036854775798# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775799# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775800# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775801# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775802# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775803# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775804# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775805# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775806# -> GHC.Internal.Enum.$fEnumInt2;
+                9223372036854775807# -> GHC.Internal.Enum.$fEnumInt2
+              }
+              }))
+          `cast` (Sym (T24808.N:MyMaybe[0]) :: Maybe Int ~R# MyMaybe)
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 4, joins: 0/0}
+foo :: MyMaybe -> Maybe Int
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+foo
+  = T24808.foo1
+    `cast` (<MyMaybe>_R %<Many>_N ->_R T24808.N:MyMaybe[0]
+            :: (MyMaybe -> MyMaybe) ~R# (MyMaybe -> Maybe Int))
+
+
+
