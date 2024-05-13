@@ -23,7 +23,7 @@
   * Exceptions now capture backtrace information via their `ExceptionContext`. GHC
     supports several mechanisms by which backtraces can be collected which can be
     individually enabled and disabled via
-    `GHC.Exception.Backtrace.setEnabledBacktraceMechanisms`.
+    `GHC.Exception.Backtrace.setBacktraceMechanismState`.
   * Update to [Unicode 15.1.0](https://www.unicode.org/versions/Unicode15.1.0/).
   * Fix `withFile`, `withFileBlocking`, and `withBinaryFile` to not incorrectly annotate exceptions raised in wrapped computation. ([CLC proposal #237](https://github.com/haskell/core-libraries-committee/issues/237))
   * Fix `fdIsNonBlocking` to always be `0` for regular files and block devices on unix, regardless of `O_NONBLOCK`
