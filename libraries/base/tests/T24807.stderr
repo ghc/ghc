@@ -1,15 +1,11 @@
-strun002: Exception:
-
-Variable not found: (2) hello
+T24807: Exception:
+hi
 CallStack (from HasCallStack):
-  error, called at strun002.hs:7:11 in main:Main
-
+  error, called at T24807.hs:1:8 in main:Main
 Package: ghc-internal
 Module: GHC.Internal.Exception
 Type: ErrorCall
-
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:127:5 in ghc-internal:GHC.Internal.Exception
-  error, called at strun002.hs:7:11 in main:Main
-
+  error, called at T24807.hs:1:8 in main:Main

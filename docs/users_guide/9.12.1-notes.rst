@@ -156,6 +156,8 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Propagate HasCallStack from `errorCallWithCallStackException` to exception backtraces, fixing a bug in the implementation of `CLC proposal 164 <https://github.com/haskell/core-libraries-committee/issues/164>`.
+
 - Add exception type metadata to SomeException's displayException and
   "Exception:" header to the default handler
   (i.e. ``GHC.Conc.Sync.uncaughtExceptionHandler``):
