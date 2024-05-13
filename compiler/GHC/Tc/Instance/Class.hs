@@ -12,8 +12,6 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 
-import GHC.Core.TyCo.Rep
-
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
@@ -24,6 +22,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, CtOrigin(GetFieldOrigin) )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst, FamInstEnvs )
+
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
 import GHC.Builtin.Types
@@ -41,6 +40,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var
 
+import GHC.Core.TyCo.Rep
 import GHC.Core.Predicate
 import GHC.Core.Coercion
 import GHC.Core.InstEnv
@@ -441,29 +441,27 @@ matchWithDict [cls, mty]
   | Just (dict_tc, dict_args) <- tcSplitTyConApp_maybe cls
     -- Check that C is a class of the form
     -- `class C a_1 ... a_n where op :: meth_ty`
-    -- and in that case let
-    -- co :: C t1 ..tn ~R# inst_meth_ty
-  , Just (inst_meth_ty, co) <- tcInstNewTyCon_maybe dict_tc dict_args
+  , Just dict_dc <- isUnaryClassTyCon_maybe dict_tc
+  , [inst_meth_ty] <- dataConInstOrigArgTys dict_dc dict_args
   = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
        ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls openAlphaTy)
+       ; wd_cls <- tcLookupClass withDictClassName
 
-       -- Given co2 : mty ~N# inst_meth_ty, construct the method of
+       -- Given ev_expr : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:
        --
        --   \@(r :: RuntimeRep) @(a :: TYPE r) (sv :: mty) (k :: cls => a) ->
-       --     k (sv |> (sub co ; sym co2))
-       ; let evWithDict co2 =
-               mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
-                 Var k
-                   `App`
-                 (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
+       --     k (MkC tys (sv |> sub co2))
+       ; let evWithDict ev_expr
+               = mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
+                 Var k `App` (evWrapUnaryDict dict_tc dict_args meth_arg)
+               where
+                 meth_arg = Var sv `Cast` mkSubCo (evExprCoercion ev_expr)
 
-       ; wd_cls <- tcLookupClass withDictClassName
-       ; let mk_ev [c] = evDictApp wd_cls [cls, mty] $
-                         [evWithDict (evTermCoercion (EvExpr c))]
+       ; let mk_ev [c] = evDictApp wd_cls [cls, mty] [evWithDict c]
              mk_ev e   = pprPanic "matchWithDict" (ppr e)
 
-       ; return $ OneInst { cir_new_theta   = [mkNomEqPred mty inst_meth_ty]
+       ; return $ OneInst { cir_new_theta   = [mkNomEqPred mty (scaledThing inst_meth_ty)]
                           , cir_mk_ev       = mk_ev
                           , cir_canonical   = EvNonCanonical -- See (WD6) in Note [withDict]
                           , cir_what        = BuiltinInstance }
@@ -516,11 +514,11 @@ as if the following instance declaration existed:
 
 instance (mty ~# inst_meth_ty) => WithDict (C t1..tn) mty where
   withDict = \@{rr} @(r :: TYPE rr) (sv :: mty) (k :: C t1..tn => r) ->
-    k (sv |> (sub co2 ; sym co))
+    k (MkC (sv |> sub co)))
 
 That is, it matches on the first (constraint) argument of C; if C is
 a single-method class, the instance "fires" and emits an equality
-constraint `mty ~ inst_meth_ty`, where `inst_meth_ty` is `meth_ty[ti/ai]`.
+constraint `mty ~# inst_meth_ty`, where `inst_meth_ty` is `meth_ty[ti/ai]`.
 The coercion `co2` witnesses the equality `mty ~ inst_meth_ty`.
 
 The coercion `co` is a newtype coercion that coerces from `C t1 ... tn`
@@ -1258,16 +1256,13 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                          theta = mkNomEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
-                         -- type (r -> a), then use the newtype coercion to cast
-                         -- it to a HasField dictionary.
-                         mk_ev (ev1:evs) = evSelector sel_id tvs evs `evCast` co
-                           where
-                             co = mkSubCo (evTermCoercion (EvExpr ev1))
-                                      `mkTransCo` mkSymCo co2
+                         -- type (r -> a), then use evWrapUnaryDict to turn it
+                         -- into a HasField dictionary.
+                         mk_ev (ev1:evs) = EvExpr                                $
+                                           evWrapUnaryDict (classTyCon clas) tys $
+                                           evCast (evSelector sel_id tvs evs)
+                                                  (mkSubCo (evExprCoercion ev1))
                          mk_ev [] = panic "matchHasField.mk_ev"
-
-                         (_, co2) = expectJust "matchHasField" $
-                             tcInstNewTyCon_maybe (classTyCon clas) tys
 
                      -- The selector must not be "naughty" (i.e. the field
                      -- cannot have an existentially quantified type),

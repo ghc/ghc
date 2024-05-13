@@ -29,9 +29,10 @@ module GHC.Tc.Types.Evidence (
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDictApp, evSelector, evDelayedError,
   mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
-  decomposeIP, evWrapIP, evUnwrapIP,
+  decomposeIP, evWrapIP, evUnwrapIP, evWrapUnaryDict,
 
   evTermCoercion, evTermCoercion_maybe,
+  evExprCoercion, evExprCoercion_maybe,
   EvCallStack(..),
   EvTypeable(..),
 
@@ -523,20 +524,18 @@ evCoercion :: TcCoercion -> EvTerm
 evCoercion co = EvExpr (Coercion co)
 
 -- | d |> co
-evCast :: EvExpr -> TcCoercion -> EvTerm
-evCast et tc | isReflCo tc = EvExpr et
-             | otherwise   = EvExpr (Cast et tc)
+evCast :: EvExpr -> TcCoercion -> EvExpr
+evCast et tc | isReflCo tc = et
+             | otherwise   = Cast et tc
 
 -- Dictionary instance application
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
 evDFunApp df tys ets = EvExpr $ Var df `mkTyApps` tys `mkApps` ets
 
 evDictApp :: Class -> [Type] -> [EvExpr] -> EvTerm
--- Only for classes that are not represented by a newtype
 evDictApp cls tys args
   = case tyConSingleDataCon_maybe (classTyCon cls) of
-      Just dc -> -- assertPpr (not (isNewDataCon dc)) (ppr cls) $
-                 evDFunApp (dataConWrapId dc) tys args
+      Just dc -> evDFunApp (dataConWrapId dc) tys args
       Nothing -> pprPanic "evDictApp" (ppr cls)
 
 -- Selector id plus the types at which it
@@ -806,13 +805,12 @@ Important Details:
 
 -}
 
-mkEvCast :: EvExpr -> TcCoercion -> EvTerm
+mkEvCast :: EvExpr -> TcCoercion -> EvExpr
 mkEvCast ev lco
   | assertPpr (coercionRole lco == Representational)
               (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]) $
-    isReflCo lco = EvExpr ev
+    isReflCo lco = ev
   | otherwise    = evCast ev lco
-
 
 mkEvScSelectors         -- Assume   class (..., D ty, ...) => C a b
   :: Class -> [TcType]  -- C ty1 ty2
@@ -833,19 +831,26 @@ isEmptyTcEvBinds :: TcEvBinds -> Bool
 isEmptyTcEvBinds (EvBinds b)    = isEmptyBag b
 isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 
+evExprCoercion_maybe :: EvExpr -> Maybe TcCoercion
+-- Applied only to EvExprs of type (s~t)
+-- See Note [Coercion evidence terms]
+evExprCoercion_maybe (Var v)       = return (mkCoVarCo v)
+evExprCoercion_maybe (Coercion co) = return co
+evExprCoercion_maybe (Cast tm co)  = do { co' <- evExprCoercion_maybe tm
+                                        ; return (mkCoCast co' co) }
+evExprCoercion_maybe _             = Nothing
+
+evExprCoercion :: EvExpr -> TcCoercion
+evExprCoercion tm = case evExprCoercion_maybe tm of
+                      Just co -> co
+                      Nothing -> pprPanic "evExprCoercion" (ppr tm)
+
 evTermCoercion_maybe :: EvTerm -> Maybe TcCoercion
 -- Applied only to EvTerms of type (s~t)
 -- See Note [Coercion evidence terms]
 evTermCoercion_maybe ev_term
-  | EvExpr e <- ev_term = go e
+  | EvExpr e <- ev_term = evExprCoercion_maybe e
   | otherwise           = Nothing
-  where
-    go :: EvExpr -> Maybe TcCoercion
-    go (Var v)       = return (mkCoVarCo v)
-    go (Coercion co) = return co
-    go (Cast tm co)  = do { co' <- go tm
-                          ; return (mkCoCast co' co) }
-    go _             = Nothing
 
 evTermCoercion :: EvTerm -> TcCoercion
 evTermCoercion tm = case evTermCoercion_maybe tm of
@@ -1029,9 +1034,9 @@ evWrapIP :: PredType -> EvExpr -> EvExpr
   --      et_tm :: ty
 -- Return an EvTerm of type (IP s ty)
 evWrapIP pred ev_tm
-  = mkConApp con (map Type tys ++ [ev_tm])
+  = evWrapUnaryDict tc tys ev_tm
   where
-    (_, con, tys) = decomposeIP pred
+    (tc, tys) = splitTyConApp pred
 
 evUnwrapIP :: PredType -> EvExpr -> EvExpr
 -- Given  pred = IP s ty
@@ -1041,6 +1046,13 @@ evUnwrapIP pred ev_tm
   = mkApps (Var ip_sel) (map Type tys ++ [ev_tm])
   where
     (ip_sel, _, tys) = decomposeIP pred
+
+evWrapUnaryDict :: TyCon -> [Type] -> EvExpr -> EvExpr
+evWrapUnaryDict tc tys meth
+  | Just dc <- isUnaryClassTyCon_maybe tc
+  = Var (dataConWrapId dc) `mkTyApps` tys `App` meth
+  | otherwise
+  = pprPanic "evWrapUnaryDict" (ppr tc)
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

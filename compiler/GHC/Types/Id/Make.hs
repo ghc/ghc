@@ -503,24 +503,7 @@ mkDictSelId name clas
                 `setCprSigInfo` topCprSig
 
     info = base_info `setRuleInfo` mkRuleInfo [rule]
-{-
-    info | unary_cls  -- Same as non-new case; ToDo: explain
-         = base_info `setRuleInfo` mkRuleInfo [rule]
-                     `setInlinePragInfo` neverInlinePragma
-                   -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
-                   -- for why alwaysInlinePragma
-                   -- TODO Fix this comment!
-
-         | otherwise
-         = base_info `setRuleInfo` mkRuleInfo [rule]
-                     `setInlinePragInfo` neverInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
-                                           StableSystemSrc 1
-                                           (mkDictSelRhs clas val_index)
-                   -- Add a magic BuiltinRule, but no unfolding
-                   -- so that the rule is always available to fire.
-                   -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
--}
+           -- No unfolding for dictionary selectors
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2

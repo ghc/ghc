@@ -256,18 +256,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [p, ty]
             ; expr' <- tcCheckMonoExpr expr ty
-            ; let d = toDict (idType ip_id) expr'
-            ; return (ip_id, (IPBind ip_id l_name d)) }
-
-    toDict :: Type   -- IP "x" t
-           -> LHsExpr GhcTc   -- def'n of IP variable
-           -> LHsExpr GhcTc   -- dictionary for IP
-    toDict dict_ty (L loc expr)
-      = L loc $ HsApp noExtField (L loc inst_con) (L loc expr)
-      where
-        (_, con, tys) = decomposeIP dict_ty
-        inst_con = mkHsWrap (mkWpTyApps tys) $
-                   HsVar noExtField (noLocA (dataConWorkId con))
+            ; return (ip_id, IPBind ip_id l_name expr') }
 
 tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]

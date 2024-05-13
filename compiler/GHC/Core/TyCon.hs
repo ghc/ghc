@@ -46,8 +46,9 @@ module GHC.Core.TyCon(
         noTcTyConScopedTyVars,
 
         -- ** Predicates on TyCons
-        isAlgTyCon, isVanillaAlgTyCon,
-        isClassTyCon, isUnaryClassTyCon, isFamInstTyCon,
+        isAlgTyCon, isVanillaAlgTyCon, isClassTyCon,
+        isUnaryClassTyCon, isUnaryClassTyCon_maybe,
+        isFamInstTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isUnboxedSumTyCon, isPromotedTupleTyCon,
@@ -2752,12 +2753,15 @@ famTyConFlav_maybe (TyCon { tyConDetails = details })
   | otherwise                                 = Nothing
 
 isUnaryClassTyCon :: TyCon -> Bool
-isUnaryClassTyCon tc@(TyCon { tyConDetails = details })
-  | AlgTyCon { algTcFlavour = flav, algTcRhs = UnaryClass {} } <- details
+isUnaryClassTyCon tc = isJust (isUnaryClassTyCon_maybe tc)
+
+isUnaryClassTyCon_maybe :: TyCon -> Maybe DataCon
+isUnaryClassTyCon_maybe tc@(TyCon { tyConDetails = details })
+  | AlgTyCon { algTcFlavour = flav, algTcRhs = UnaryClass { data_con = dc } } <- details
   = assertPpr (case flav of { ClassTyCon {} -> True; _ -> False }) (ppr tc) $
-    True
+    Just dc
   | otherwise
-  = False
+  = Nothing
 
 -- | Is this 'TyCon' that for a class instance?
 isClassTyCon :: TyCon -> Bool
