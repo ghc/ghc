@@ -21,6 +21,7 @@
     ([CLC proposal #231](https://github.com/haskell/core-libraries-committee/issues/231)
     and [CLC proposal #261](https://github.com/haskell/core-libraries-committee/issues/261))
   * The [deprecation process of GHC.Pack](https://gitlab.haskell.org/ghc/ghc/-/issues/21461) has come its term. The module has now been removed from `base`.
+  * Propagate HasCallStack from `errorCallWithCallStackException` to exception backtraces, fixing a bug in the implementation of [CLC proposal #164](https://github.com/haskell/core-libraries-committee/issues/164).
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1

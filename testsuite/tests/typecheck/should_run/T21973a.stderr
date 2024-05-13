@@ -9,8 +9,7 @@ Module: GHC.Internal.Exception
 Type: ErrorCall
 
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:128:3 in ghc-internal:GHC.Internal.Exception
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:127:5 in ghc-internal:GHC.Internal.Exception
+  error, called at T21973a.hs:42:23 in main:Main
 

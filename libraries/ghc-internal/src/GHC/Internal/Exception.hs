@@ -120,12 +120,12 @@ errorCallException s = toException (ErrorCall s)
 
 errorCallWithCallStackException :: String -> CallStack -> SomeException
 errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
-  ccsStack <- currentCallStack
-  let
-    implicitParamCallStack = prettyCallStackLines stk
-    ccsCallStack = showCCSStack ccsStack
-    stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
-  toExceptionWithBacktrace (ErrorCallWithLocation s stack)
+    ccsStack <- currentCallStack
+    let implicitParamCallStack = prettyCallStackLines stk
+        ccsCallStack = showCCSStack ccsStack
+        stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
+    toExceptionWithBacktrace (ErrorCallWithLocation s stack)
+  where ?callStack = stk
 
 showCCSStack :: [String] -> [String]
 showCCSStack [] = []
