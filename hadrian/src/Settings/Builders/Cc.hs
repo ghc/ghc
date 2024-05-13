@@ -16,7 +16,6 @@ ccBuilderArgs = do
             , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ]
             , arg "-c", arg =<< getInput
             , arg "-o", arg =<< getOutput ]
-
         , builder (Cc (FindCDependencies CDep)) ? findCDepExpr CDep
         , builder (Cc (FindCDependencies CxxDep)) ? findCDepExpr CxxDep
         ]
@@ -30,5 +29,9 @@ ccBuilderArgs = do
                     , case depType of CDep -> mempty; CxxDep -> arg "-std=c++11"
                     , cIncludeArgs
                     , arg "-x", arg (case depType of CDep -> "c"; CxxDep -> "c++")
+                    , case depType of CDep -> mempty; CxxDep -> getContextData cxxOpts
+                    -- Pass 'ghcversion.h' to give sources access to the
+                    -- `MIN_VERSION_GLASGOW_HASKELL` macro.
+                    , notStage0 ? arg "-include" <> arg "rts/include/ghcversion.h"
                     , arg =<< getInput
                     ]
