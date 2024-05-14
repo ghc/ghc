@@ -415,10 +415,19 @@ left hand side of an equation can be explicitly bound, such as in: ::
 A closed type family may be declared with no equations. Such closed type
 families are opaque type-level definitions that will never reduce, are
 not necessarily injective (unlike empty data types), and cannot be given
-any instances. This is different from omitting the equations of a closed
-type family in a ``hs-boot`` file, which uses the syntax ``where ..``,
-as in that case there may or may not be equations given in the ``hs``
-file.
+any instances.
+
+In an ``hs-boot`` file, closed type families must either have the same
+equations as those in the source file, or you can use the following syntax to
+omit the equations (note the literal ``..``) ::
+
+  type family R a where ..
+
+In this case, the closed type family ``R`` matching this "boot" declaration may
+have any number of equations given in the source ``hs`` file (including zero).
+For more information on mutual recursive modules with ``hs-boot`` modules
+(including type families) see :ref:`mutual-recursion`.
+
 
 .. _type-family-examples:
 

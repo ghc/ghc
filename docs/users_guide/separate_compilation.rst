@@ -729,8 +729,8 @@ be recompiled.
 
 .. _mutual-recursion:
 
-How to compile mutually recursive modules
------------------------------------------
+Mutually recursive modules and hs-boot files
+--------------------------------------------
 
 .. index::
    single: module system, recursion
@@ -851,8 +851,9 @@ A hs-boot file is written in a subset of Haskell:
 
 -  Open type and data family declarations are exactly as in Haskell.
 
--  A closed type family may optionally omit its equations, as in the
-   following example: ::
+-  A closed type family may either be given in full (where all equations must
+   match the source module), or it can be given abstractly using the ``where ..``
+   syntax (thus omitting the equations), as in the following example: ::
 
         type family ClosedFam a where ..
 
