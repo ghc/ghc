@@ -6,6 +6,7 @@
 import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
+import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Utils.Outputable
 import GHC.Utils.Exception (ExceptionMonad)
 import GHC.Data.Bag
@@ -168,7 +169,7 @@ go label mods cnd =
     setTargets [tgt]
 
     hsc_env <- getSession
-    (_, nodes) <- liftIO $ downsweep hsc_env [] [] False
+    (_, nodes) <- liftIO $ downsweep hsc_env mkUnknownDiagnostic Nothing [] [] False
 
     it label $ cnd (mapMaybe moduleGraphNodeModSum nodes)
 

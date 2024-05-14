@@ -86,6 +86,20 @@ type BaseName = OsPath  -- Basename of file
 -- -----------------------------------------------------------------------------
 -- The finder's cache
 
+{-
+[Note: Monotonic addToFinderCache]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+addToFinderCache is only used by functions that return the cached value
+if there is one, or by functions that always write an InstalledFound value.
+Without multithreading it is then safe to always directly write the value
+without checking the previously cached value.
+
+However, with multithreading, it is possible that another function has
+written a value into cache between the lookup and the addToFinderCache call.
+in this case we should check to not overwrite an InstalledFound with an
+InstalledNotFound.
+-}
 
 initFinderCache :: IO FinderCache
 initFinderCache = do
@@ -100,7 +114,12 @@ initFinderCache = do
 
       addToFinderCache :: InstalledModuleWithIsBoot -> InstalledFindResult -> IO ()
       addToFinderCache key val =
-        atomicModifyIORef' mod_cache $ \c -> (extendInstalledModuleWithIsBootEnv c key val, ())
+        atomicModifyIORef' mod_cache $ \c ->
+          case (lookupInstalledModuleWithIsBootEnv c key, val) of
+            -- Don't overwrite an InstalledFound with an InstalledNotFound
+            -- See [Note Monotonic addToFinderCache]
+            (Just InstalledFound{}, InstalledNotFound{}) -> (c, ())
+            _ -> (extendInstalledModuleWithIsBootEnv c key val, ())
 
       lookupFinderCache :: InstalledModuleWithIsBoot -> IO (Maybe InstalledFindResult)
       lookupFinderCache key = do

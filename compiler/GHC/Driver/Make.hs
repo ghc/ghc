@@ -5,6 +5,8 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE BlockArguments #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -122,7 +124,7 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
 import Data.Time
-import Data.List (sortOn)
+import Data.List (sortOn, unfoldr)
 import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
@@ -169,7 +171,7 @@ depanal :: GhcMonad m =>
         -> Bool          -- ^ allow duplicate roots
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
-    (errs, mod_graph) <- depanalE excluded_mods allow_dup_roots
+    (errs, mod_graph) <- depanalE mkUnknownDiagnostic Nothing excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then pure mod_graph
       else throwErrors (fmap GhcDriverMessage errs)
@@ -177,12 +179,14 @@ depanal excluded_mods allow_dup_roots = do
 -- | Perform dependency analysis like in 'depanal'.
 -- In case of errors, the errors and an empty module graph are returned.
 depanalE :: GhcMonad m =>     -- New for #17459
-            [ModuleName]      -- ^ excluded modules
+               (GhcMessage -> AnyGhcDiagnostic)
+            -> Maybe Messager
+            -> [ModuleName]      -- ^ excluded modules
             -> Bool           -- ^ allow duplicate roots
             -> m (DriverMessages, ModuleGraph)
-depanalE excluded_mods allow_dup_roots = do
+depanalE diag_wrapper msg excluded_mods allow_dup_roots = do
     hsc_env <- getSession
-    (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
+    (errs, mod_graph) <- depanalPartial diag_wrapper msg excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then do
         hsc_env <- getSession
@@ -220,11 +224,13 @@ depanalE excluded_mods allow_dup_roots = do
 -- new module graph.
 depanalPartial
     :: GhcMonad m
-    => [ModuleName]  -- ^ excluded modules
+    => (GhcMessage -> AnyGhcDiagnostic)
+    -> Maybe Messager
+    -> [ModuleName]  -- ^ excluded modules
     -> Bool          -- ^ allow duplicate roots
     -> m (DriverMessages, ModuleGraph)
     -- ^ possibly empty 'Bag' of errors and a module graph.
-depanalPartial excluded_mods allow_dup_roots = do
+depanalPartial diag_wrapper msg excluded_mods allow_dup_roots = do
   hsc_env <- getSession
   let
          targets = hsc_targets hsc_env
@@ -243,7 +249,7 @@ depanalPartial excluded_mods allow_dup_roots = do
     liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
 
     (errs, graph_nodes) <- liftIO $ downsweep
-      hsc_env (mgModSummaries old_graph)
+      hsc_env diag_wrapper msg (mgModSummaries old_graph)
       excluded_mods allow_dup_roots
     let
       mod_graph = mkModuleGraph graph_nodes
@@ -497,8 +503,8 @@ loadWithCache :: GhcMonad m => Maybe ModIfaceCache -- ^ Instructions about how t
                             -> LoadHowMuch -- ^ How much `loadWithCache` should load
                             -> m SuccessFlag
 loadWithCache cache diag_wrapper how_much = do
-    (errs, mod_graph) <- depanalE [] False                        -- #17459
     msg <- mkBatchMsg <$> getSession
+    (errs, mod_graph) <- depanalE diag_wrapper (Just msg) [] False                        -- #17459
     success <- load' cache how_much diag_wrapper (Just msg) mod_graph
     if isEmptyMessages errs
       then pure success
@@ -506,7 +512,7 @@ loadWithCache cache diag_wrapper how_much = do
 
 -- Note [Unused packages]
 -- ~~~~~~~~~~~~~~~~~~~~~~
--- Cabal passes `--package-id` flag for each direct dependency. But GHC
+-- Cabal passes `-package-id` flag for each direct dependency. But GHC
 -- loads them lazily, so when compilation is done, we have a list of all
 -- actually loaded packages. All the packages, specified on command line,
 -- but never loaded, are probably unused dependencies.
@@ -1553,6 +1559,8 @@ type DownsweepCache = M.Map (UnitId, PkgQual, ModuleNameWithIsBoot) [Either Driv
 -- module, plus one for any hs-boot files.  The imports of these nodes
 -- are all there, including the imports of non-home-package modules.
 downsweep :: HscEnv
+          -> (GhcMessage -> AnyGhcDiagnostic)
+          -> Maybe Messager
           -> [ModSummary]
           -- ^ Old summaries
           -> [ModuleName]       -- Ignore dependencies on these; treat
@@ -1564,17 +1572,38 @@ downsweep :: HscEnv
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
-downsweep hsc_env old_summaries excl_mods allow_dup_roots
+downsweep hsc_env diag_wrapper msg old_summaries excl_mods allow_dup_roots = do
+  n_jobs <- mkWorkerLimit (hsc_dflags hsc_env)
+  new <- rootSummariesParallel n_jobs hsc_env diag_wrapper msg summary
+  downsweep_imports hsc_env old_summary_map excl_mods allow_dup_roots new
+  where
+    summary = getRootSummary excl_mods old_summary_map
+
+    -- A cache from file paths to the already summarised modules. The same file
+    -- can be used in multiple units so the map is also keyed by which unit the
+    -- file was used in.
+    -- Reuse these if we can because the most expensive part of downsweep is
+    -- reading the headers.
+    old_summary_map :: M.Map (UnitId, FilePath) ModSummary
+    old_summary_map =
+      M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
+
+downsweep_imports :: HscEnv
+                  -> M.Map (UnitId, FilePath) ModSummary
+                  -> [ModuleName]
+                  -> Bool
+                  -> ([(UnitId, DriverMessages)], [ModSummary])
+                  -> IO ([DriverMessages], [ModuleGraphNode])
+downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, rootSummariesOk)
    = do
-       (root_errs, rootSummariesOk) <- partitionWithM getRootSummary roots -- #17549
        let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
        (deps, map0) <- loopSummaries rootSummariesOk (M.empty, root_map)
-       let closure_errs = checkHomeUnitsClosed (hsc_unit_env hsc_env)
-       let unit_env = hsc_unit_env hsc_env
-       let tmpfs    = hsc_tmpfs    hsc_env
+       let closure_errs = checkHomeUnitsClosed unit_env
+           unit_env = hsc_unit_env hsc_env
+           tmpfs    = hsc_tmpfs    hsc_env
 
-       let downsweep_errs = lefts $ concat $ M.elems map0
+           downsweep_errs = lefts $ concat $ M.elems map0
            downsweep_nodes = M.elems deps
 
            (other_errs, unit_nodes) = partitionEithers $ unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) [] (hsc_HUG hsc_env)
@@ -1606,46 +1635,6 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
           [(ms_unitid ms, b, c) | (b, c) <- msDeps ms ]
 
         logger = hsc_logger hsc_env
-        roots  = hsc_targets hsc_env
-
-        -- A cache from file paths to the already summarised modules. The same file
-        -- can be used in multiple units so the map is also keyed by which unit the
-        -- file was used in.
-        -- Reuse these if we can because the most expensive part of downsweep is
-        -- reading the headers.
-        old_summary_map :: M.Map (UnitId, FilePath) ModSummary
-        old_summary_map = M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
-
-        getRootSummary :: Target -> IO (Either (UnitId, DriverMessages) ModSummary)
-        getRootSummary Target { targetId = TargetFile file mb_phase
-                              , targetContents = maybe_buf
-                              , targetUnitId = uid
-                              }
-           = do let offset_file = augmentByWorkingDirectory dflags file
-                exists <- liftIO $ doesFileExist offset_file
-                if exists || isJust maybe_buf
-                    then first (uid,) <$>
-                        summariseFile hsc_env home_unit old_summary_map offset_file mb_phase
-                                       maybe_buf
-                    else return $ Left $ (uid,) $ singleMessage
-                                $ mkPlainErrorMsgEnvelope noSrcSpan (DriverFileNotFound offset_file)
-            where
-              dflags = homeUnitEnv_dflags (ue_findHomeUnitEnv uid (hsc_unit_env hsc_env))
-              home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
-        getRootSummary Target { targetId = TargetModule modl
-                              , targetContents = maybe_buf
-                              , targetUnitId = uid
-                              }
-           = do maybe_summary <- summariseModule hsc_env home_unit old_summary_map NotBoot
-                                           (L rootLoc modl) (ThisPkg (homeUnitId home_unit))
-                                           maybe_buf excl_mods
-                case maybe_summary of
-                   FoundHome s  -> return (Right s)
-                   FoundHomeWithError err -> return (Left err)
-                   _ -> return $ Left $ (uid, moduleNotFoundErr modl)
-            where
-              home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
-        rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
         -- In a root module, the filename is allowed to diverge from the module
         -- name, so we have to check that there aren't multiple root files
@@ -1713,7 +1702,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 loopImports ss done summarised
           | otherwise
           = do
-               mb_s <- summariseModule hsc_env home_unit old_summary_map
+               mb_s <- summariseModule hsc_env home_unit old_summaries
                                        is_boot wanted_mod mb_pkg
                                        Nothing excl_mods
                case mb_s of
@@ -1737,6 +1726,90 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
             home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
             GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
             wanted_mod = L loc mod
+
+getRootSummary ::
+  [ModuleName] ->
+  M.Map (UnitId, FilePath) ModSummary ->
+  HscEnv ->
+  Target ->
+  IO (Either (UnitId, DriverMessages) ModSummary)
+getRootSummary excl_mods old_summary_map hsc_env target
+  | TargetFile file mb_phase <- targetId
+  = do
+    let offset_file = augmentByWorkingDirectory dflags file
+    exists <- liftIO $ doesFileExist offset_file
+    if exists || isJust maybe_buf
+    then first (uid,) <$>
+         summariseFile hsc_env home_unit old_summary_map offset_file mb_phase
+         maybe_buf
+    else
+      return $ Left $ (uid,) $ singleMessage $
+      mkPlainErrorMsgEnvelope noSrcSpan (DriverFileNotFound offset_file)
+  | TargetModule modl <- targetId
+  = do
+    maybe_summary <- summariseModule hsc_env home_unit old_summary_map NotBoot
+                     (L rootLoc modl) (ThisPkg (homeUnitId home_unit))
+                     maybe_buf excl_mods
+    pure case maybe_summary of
+      FoundHome s  -> Right s
+      FoundHomeWithError err -> Left err
+      _ -> Left (uid, moduleNotFoundErr modl)
+    where
+      Target {targetId, targetContents = maybe_buf, targetUnitId = uid} = target
+      home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
+      rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
+      dflags = homeUnitEnv_dflags (ue_findHomeUnitEnv uid (hsc_unit_env hsc_env))
+
+-- | Execute 'getRootSummary' for the 'Target's using the parallelism pipeline
+-- system.
+-- Create bundles of 'Target's wrapped in a 'MakeAction' that uses
+-- 'withAbstractSem' to wait for a free slot, limiting the number of
+-- concurrently computed summaries to the value of the @-j@ option or the slots
+-- allocated by the job server, if that is used.
+--
+-- The 'MakeAction' returns 'Maybe', which is not handled as an error, because
+-- 'runLoop' only sets it to 'Nothing' when an exception was thrown, so the
+-- result won't be read anyway here.
+--
+-- To emulate the current behavior, we funnel exceptions past the concurrency
+-- barrier and rethrow the first one afterwards.
+rootSummariesParallel ::
+  WorkerLimit ->
+  HscEnv ->
+  (GhcMessage -> AnyGhcDiagnostic) ->
+  Maybe Messager ->
+  (HscEnv -> Target -> IO (Either (UnitId, DriverMessages) ModSummary)) ->
+  IO ([(UnitId, DriverMessages)], [ModSummary])
+rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
+  (actions, get_results) <- unzip <$> mapM action_and_result (zip [1..] bundles)
+  runPipelines n_jobs hsc_env diag_wrapper msg actions
+  (sequence . catMaybes <$> sequence get_results) >>= \case
+    Right results -> pure (partitionEithers (concat results))
+    Left exc -> throwIO exc
+  where
+    bundles = mk_bundles targets
+
+    mk_bundles = unfoldr \case
+      [] -> Nothing
+      ts -> Just (splitAt bundle_size ts)
+
+    bundle_size = 20
+
+    targets = hsc_targets hsc_env
+
+    action_and_result (log_queue_id, ts) = do
+      res_var <- liftIO newEmptyMVar
+      pure $! (MakeAction (action log_queue_id ts) res_var, readMVar res_var)
+
+    action log_queue_id target_bundle = do
+      env@MakeEnv {compile_sem} <- ask
+      lift $ lift $
+        withAbstractSem compile_sem $
+        withLoggerHsc log_queue_id env \ lcl_hsc_env ->
+          MC.try (mapM (get_summary lcl_hsc_env) target_bundle) >>= \case
+            Left e | Just (_ :: SomeAsyncException) <- fromException e ->
+              throwIO e
+            a -> pure a
 
 -- | This function checks then important property that if both p and q are home units
 -- then any dependency of p, which transitively depends on q is also a home unit.
@@ -2455,12 +2528,12 @@ wrapAction msg_wrapper hsc_env k = do
   let lcl_logger = hsc_logger hsc_env
       lcl_dynflags = hsc_dflags hsc_env
       print_config = initPrintConfig lcl_dynflags
-  let logg err = printMessages lcl_logger print_config (initDiagOpts lcl_dynflags) (msg_wrapper <$> srcErrorMessages err)
+      logg err = printMessages lcl_logger print_config (initDiagOpts lcl_dynflags) (msg_wrapper <$> srcErrorMessages err)
   -- MP: It is a bit strange how prettyPrintGhcErrors handles some errors but then we handle
   -- SourceError and ThreadKilled differently directly below. TODO: Refactor to use `catches`
   -- directly. MP should probably use safeTry here to not catch async exceptions but that will regress performance due to
   -- internally using forkIO.
-  mres <- MC.try $ liftIO $ prettyPrintGhcErrors lcl_logger $ k
+  mres <- MC.try $ prettyPrintGhcErrors lcl_logger $ k
   case mres of
     Right res -> return $ Just res
     Left exc -> do
@@ -2659,7 +2732,7 @@ R.hs:        module R where
 == Why we need to rehydrate A's ModIface before compiling R.hs
 
 After compiling A.hs we'll have a TypeEnv in which the Id for `f` has a type
-type uses the AbstractTyCon T; and a TyCon for `S` that also mentions that same
+that uses the AbstractTyCon T; and a TyCon for `S` that also mentions that same
 AbstractTyCon. (Abstract because it came from R.hs-boot; we know nothing about
 it.)
 
