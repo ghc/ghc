@@ -23,3 +23,5 @@ test('inferTags003', [ only_ways(['optasm']),
                        grep_errmsg(r'(call stg\_ap\_0)', [1])
                      ], compile, ['-ddump-cmm -dno-typeable-binds -O'])
 test('inferTags004', normal, compile, ['-O -ddump-stg-tags -dno-typeable-binds -dsuppress-uniques'])
+
+test('T24806', grep_errmsg('^\\(T24806\\.\\$wgo'), compile, ['-O -ddump-stg-tags -dno-typeable-binds -dsuppress-uniques'])
