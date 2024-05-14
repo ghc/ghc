@@ -16,6 +16,7 @@ import GHC.Types.Id.Info (tagSigInfo)
 import GHC.Types.Name
 import GHC.Stg.Syntax
 import GHC.Types.Basic ( CbvMark (..) )
+import GHC.Types.Demand (isDeadEndAppSig)
 import GHC.Types.Unique.Supply (mkSplitUniqSupply)
 import GHC.Types.RepType (dataConRuntimeRepStrictness)
 import GHC.Core (AltCon(..))
@@ -301,12 +302,14 @@ inferTagExpr env (StgApp fun args)
     (info, StgApp fun args)
   where
     !fun_arity = idArity fun
-    info | fun_arity == 0 -- Unknown arity => Thunk or unknown call
-         = TagDunno
+    info
+         -- It's important that we check for bottoms before all else.
+         -- See Note [Bottom functions are TagTagged] and #24806 for why.
+         | isDeadEndAppSig (idDmdSig fun) (length args)
+         = TagTagged
 
-         | isDeadEndId fun
-         , fun_arity == length args -- Implies we will simply call the function.
-         = TagTagged -- See Note [Bottom functions are TagTagged]
+         | fun_arity == 0 -- Unknown arity => Thunk or unknown call
+         = TagDunno
 
          | Just (TagSig res_info) <- tagSigInfo (idInfo fun)
          , fun_arity == length args  -- Saturated
@@ -499,6 +502,11 @@ as it's applied to arguments. Since the function will never return we can give
 it safely any tag sig we like.
 So we give it TagTagged, as it allows the combined tag sig of the case expression
 to be the combination of all non-bottoming branches.
+
+NB: After the analysis is done we go back to treating bottoming functions as
+untagged to ensure they are evaluated as expected in code like:
+
+  case bottom_id of { ...}
 
 -}
 

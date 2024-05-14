@@ -241,7 +241,10 @@ indicates a bug in the tag inference implementation.
 For this reason we assert that we are running in interactive mode if a lookup fails.
 -}
 isTagged :: Id -> RM Bool
-isTagged v = do
+isTagged v
+    -- See Note [Bottom functions are TagTagged]
+    | isDeadEndId v = pure False
+    | otherwise = do
     this_mod <- getMod
     -- See Note [Tag inference for interactive contexts]
     let lookupDefault v = assertPpr (isInteractiveModule this_mod)

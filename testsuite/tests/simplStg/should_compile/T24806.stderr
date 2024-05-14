@@ -1,0 +1,99 @@
+
+==================== CodeGenAnal STG: ====================
+lvl6 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []] =
+    "T24806.hs"#;
+
+lvl4 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []] =
+    "T24806"#;
+
+lvl2 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []] =
+    "main"#;
+
+lvl :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []] =
+    "undefined"#;
+
+(T24806.$WTup2, <TagProper>) =
+    {} \r [(conrep, <TagDunno>) (conrep1, <TagDunno>)]
+        case conrep of (conrep2, <TagProper>) {
+        __DEFAULT ->
+        case conrep1 of (conrep3, <TagProper>) {
+        __DEFAULT -> T24806.Tup2 [conrep2 conrep3];
+        };
+        };
+
+(T24806.$WCons, <TagProper>) =
+    {} \r [(conrep, <TagDunno>) (conrep1, <TagDunno>)]
+        case conrep1 of (conrep2, <TagProper>) {
+        __DEFAULT -> T24806.Cons [conrep conrep2];
+        };
+
+(lvl1, <TagDunno>) = {} \u [] GHC.CString.unpackCString# lvl;
+
+(lvl3, <TagDunno>) = {} \u [] GHC.CString.unpackCString# lvl2;
+
+(lvl5, <TagDunno>) = {} \u [] GHC.CString.unpackCString# lvl4;
+
+(lvl7, <TagDunno>) = {} \u [] GHC.CString.unpackCString# lvl6;
+
+(lvl8, <TagProper>) = GHC.Types.I#! [17#];
+
+(lvl9, <TagProper>) = GHC.Types.I#! [12#];
+
+(lvl10, <TagProper>) = GHC.Types.I#! [21#];
+
+(lvl11, <TagProper>) =
+    GHC.Internal.Stack.Types.SrcLoc! [lvl3
+                                      lvl5
+                                      lvl7
+                                      lvl8
+                                      lvl9
+                                      lvl8
+                                      lvl10];
+
+(lvl12, <TagProper>) =
+    GHC.Internal.Stack.Types.PushCallStack! [lvl1
+                                             lvl11
+                                             GHC.Internal.Stack.Types.EmptyCallStack];
+
+(lvl13, <TagDunno>) = {} \u [] GHC.Internal.Err.undefined lvl12;
+
+(T24806.Tup2, <TagDunno>) =
+    {} \r [(eta, <TagDunno>) (eta, <TagDunno>)] T24806.Tup2 [eta eta];
+
+(T24806.Nil, <TagProper>) = T24806.Nil! [];
+
+Rec {
+(T24806.$wgo, <TagTuple[TagProper, TagProper]>) =
+    {} \r [(ds, <TagProper>) (ys, <TagProper>)]
+        case ds of (wild, <TagProper>) {
+          T24806.Nil ->
+              case ys of (conrep, <TagProper>) {
+              __DEFAULT -> (#,#) [conrep T24806.Nil];
+              };
+          T24806.Cons (ds1, <TagDunno>) (xs, <TagProper>) ->
+              case ys of (wild1, <TagProper>) {
+                T24806.Nil -> lvl13;
+                T24806.Cons (y, <TagDunno>) (ys', <TagProper>) ->
+                    case T24806.$wgo xs ys' of (wild2, <TagProper>) {
+                    (#,#) (ww, <TagProper>) (ww1, <TagProper>) ->
+                    let { (sat, <TagProper>) = T24806.Cons! [y ww1];
+                    } in  (#,#) [ww sat];
+                    };
+              };
+        };
+end Rec }
+
+(T24806.go, <TagProper>) =
+    {} \r [(ds, <TagDunno>) (ys, <TagDunno>)]
+        case T24806.$wgo ds ys of (wild, <TagProper>) {
+        (#,#) (ww, <TagProper>) (ww1, <TagProper>) -> T24806.Tup2 [ww ww1];
+        };
+
+(T24806.Cons, <TagDunno>) =
+    {} \r [(eta, <TagDunno>) (eta, <TagDunno>)] T24806.Cons [eta eta];
+
+
