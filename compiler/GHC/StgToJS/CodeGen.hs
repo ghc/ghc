@@ -95,7 +95,7 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
       $ vcat (fmap (jsToDoc . oiStat . luObjBlock) lus)
 
   -- Write the object file
-  bh <- openBinMem (4 * 1024 * 1000) -- a bit less than 4kB
+  bh <- openBinMem (4 * 1000) -- a bit less than 4kB
   Object.putObject bh (moduleName this_mod) deps (map luObjBlock lus)
 
   createDirectoryIfMissing True (takeDirectory output_fn)
