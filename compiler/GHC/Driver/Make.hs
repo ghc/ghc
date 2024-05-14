@@ -5,6 +5,8 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE BlockArguments #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -119,7 +121,7 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
 import Data.Time
-import Data.List (sortOn)
+import Data.List (sortOn, unfoldr)
 import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
@@ -1560,9 +1562,22 @@ downsweep :: HscEnv
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
-downsweep hsc_env old_summaries excl_mods allow_dup_roots
+downsweep hsc_env old_summaries excl_mods allow_dup_roots = do
+  worker_limit <- liftIO $ mkWorkerLimit (hsc_dflags hsc_env)
+  downsweep_workers worker_limit hsc_env old_summaries excl_mods allow_dup_roots
+
+downsweep_workers :: WorkerLimit
+                  -- ^ The number of workers we wish to run in parallel
+                  -> HscEnv
+                  -> [ModSummary]
+                  -> [ModuleName]
+                  -> Bool
+                  -> IO ([DriverMessages], [ModuleGraphNode])
+downsweep_workers n_jobs hsc_env old_summaries excl_mods allow_dup_roots
    = do
-       (root_errs, rootSummariesOk) <- partitionWithM getRootSummary roots -- #17549
+       (root_errs, rootSummariesOk) <-
+         rootSummariesParallel n_jobs hsc_env
+         (getRootSummary excl_mods old_summary_map) roots
        let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
        (deps, map0) <- loopSummaries rootSummariesOk (M.empty, root_map)
@@ -1611,37 +1626,6 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         -- reading the headers.
         old_summary_map :: M.Map (UnitId, FilePath) ModSummary
         old_summary_map = M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
-
-        getRootSummary :: Target -> IO (Either (UnitId, DriverMessages) ModSummary)
-        getRootSummary Target { targetId = TargetFile file mb_phase
-                              , targetContents = maybe_buf
-                              , targetUnitId = uid
-                              }
-           = do let offset_file = augmentByWorkingDirectory dflags file
-                exists <- liftIO $ doesFileExist offset_file
-                if exists || isJust maybe_buf
-                    then first (uid,) <$>
-                        summariseFile hsc_env home_unit old_summary_map offset_file mb_phase
-                                       maybe_buf
-                    else return $ Left $ (uid,) $ singleMessage
-                                $ mkPlainErrorMsgEnvelope noSrcSpan (DriverFileNotFound offset_file)
-            where
-              dflags = homeUnitEnv_dflags (ue_findHomeUnitEnv uid (hsc_unit_env hsc_env))
-              home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
-        getRootSummary Target { targetId = TargetModule modl
-                              , targetContents = maybe_buf
-                              , targetUnitId = uid
-                              }
-           = do maybe_summary <- summariseModule hsc_env home_unit old_summary_map NotBoot
-                                           (L rootLoc modl) (ThisPkg (homeUnitId home_unit))
-                                           maybe_buf excl_mods
-                case maybe_summary of
-                   FoundHome s  -> return (Right s)
-                   FoundHomeWithError err -> return (Left err)
-                   _ -> return $ Left $ (uid, moduleNotFoundErr modl)
-            where
-              home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
-        rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
         -- In a root module, the filename is allowed to diverge from the module
         -- name, so we have to check that there aren't multiple root files
@@ -1733,6 +1717,86 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
             home_unit = ue_unitHomeUnit home_uid (hsc_unit_env hsc_env)
             GWIB { gwib_mod = L loc mod, gwib_isBoot = is_boot } = gwib
             wanted_mod = L loc mod
+
+getRootSummary ::
+  [ModuleName] ->
+  M.Map (UnitId, FilePath) ModSummary ->
+  HscEnv ->
+  Target ->
+  IO (Either (UnitId, DriverMessages) ModSummary)
+getRootSummary excl_mods old_summary_map hsc_env target
+  | TargetFile file mb_phase <- targetId
+  = do
+    let offset_file = augmentByWorkingDirectory dflags file
+    exists <- liftIO $ doesFileExist offset_file
+    if exists || isJust maybe_buf
+    then first (uid,) <$>
+         summariseFile hsc_env home_unit old_summary_map offset_file mb_phase
+         maybe_buf
+    else
+      return $ Left $ (uid,) $ singleMessage $
+      mkPlainErrorMsgEnvelope noSrcSpan (DriverFileNotFound offset_file)
+  | TargetModule modl <- targetId
+  = do
+    maybe_summary <- summariseModule hsc_env home_unit old_summary_map NotBoot
+                     (L rootLoc modl) (ThisPkg (homeUnitId home_unit))
+                     maybe_buf excl_mods
+    pure case maybe_summary of
+      FoundHome s  -> Right s
+      FoundHomeWithError err -> Left err
+      _ -> Left (uid, moduleNotFoundErr modl)
+    where
+      Target {targetId, targetContents = maybe_buf, targetUnitId = uid} = target
+      home_unit = ue_unitHomeUnit uid (hsc_unit_env hsc_env)
+      rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
+      dflags = homeUnitEnv_dflags (ue_findHomeUnitEnv uid (hsc_unit_env hsc_env))
+
+-- | Execute 'getRootSummary' for the 'Target's using the parallelism pipeline
+-- system.
+-- Create bundles of 'MakeAction's for each 'Target' that uses 'withAbstractSem'
+-- to wait for a free slot, limiting the number of concurrently computed
+-- summaries to the value of the @-j@ option or the slots allocated by the job
+-- server, if that is used.
+--
+-- The bundle size for @n@ targets on a machine with @c@ capabilites (threads)
+-- is computed as @n / (2 c)@.
+-- This is a best guess based on benchmarking some synthetic sets of modules
+-- with @ghc -M@.
+-- If you can come up with a more rigorously determined optimum, feel free to
+-- change it!
+--
+-- The 'MakeAction' returns 'Maybe', which is not handled as an error, because
+-- 'runLoop' only sets it to 'Nothing' when an exception was thrown, so the
+-- result won't be read anyway here.
+rootSummariesParallel ::
+  WorkerLimit ->
+  HscEnv ->
+  (HscEnv -> Target -> IO (Either (UnitId, DriverMessages) ModSummary)) ->
+  [Target] ->
+  IO ([(UnitId, DriverMessages)], [ModSummary])
+rootSummariesParallel n_jobs hsc_env get_summary targets = do
+  n_cap <- getNumCapabilities
+  let bundle_size = max 1 (length targets `div` (n_cap * 2))
+      bundles = mk_bundles bundle_size targets
+  (actions, results) <- unzip <$> mapM action_and_result (zip [1..] bundles)
+  runPipelines n_jobs hsc_env mkUnknownDiagnostic Nothing actions
+  partitionEithers . concat . catMaybes <$!> sequence results
+  where
+    mk_bundles sz = unfoldr \case
+      [] -> Nothing
+      ts -> Just (splitAt sz ts)
+
+    action_and_result (log_queue_id, ts) = do
+      res_var <- liftIO newEmptyMVar
+      pure $! (MakeAction (action log_queue_id ts) res_var, readMVar res_var)
+
+    action log_queue_id target_bundle = do
+      env@MakeEnv {diag_wrapper, compile_sem} <- ask
+      lift $ MaybeT $
+        withAbstractSem compile_sem $
+        withLoggerHsc log_queue_id env \ lcl_hsc_env ->
+          wrapAction diag_wrapper lcl_hsc_env $
+          mapM (get_summary lcl_hsc_env) target_bundle
 
 -- | This function checks then important property that if both p and q are home units
 -- then any dependency of p, which transitively depends on q is also a home unit.
@@ -2663,7 +2727,7 @@ R.hs:        module R where
 == Why we need to rehydrate A's ModIface before compiling R.hs
 
 After compiling A.hs we'll have a TypeEnv in which the Id for `f` has a type
-type uses the AbstractTyCon T; and a TyCon for `S` that also mentions that same
+that uses the AbstractTyCon T; and a TyCon for `S` that also mentions that same
 AbstractTyCon. (Abstract because it came from R.hs-boot; we know nothing about
 it.)
 
