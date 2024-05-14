@@ -565,10 +565,8 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
   where
     cls_tc_occ = occName cls_tc_name
     n_ctxt = length sc_ctxt
-    n_sigs = length sigs
     dcww_occ = mkDataConWorkerOcc dc_occ
     dc_occ = mkClassDataConOcc cls_tc_occ
-    is_newtype = n_sigs + n_ctxt == 1 -- Sigh (keep this synced with buildClass)
 
 ifaceDeclImplicitBndrs _ = []
 
