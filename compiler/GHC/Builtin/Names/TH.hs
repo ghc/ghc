@@ -179,21 +179,23 @@ templateHaskellNames = [
     -- Quasiquoting
     quoteDecName, quoteTypeName, quoteExpName, quotePatName]
 
-thSyn, thLib, qqLib :: Module
-thSyn = mkTHModule (fsLit "Language.Haskell.TH.Lib.Syntax")
-thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib.Internal")
-qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
+thSyn, thLib, qqLib, liftLib :: Module
+thSyn = mkTHModule (fsLit "GHC.Internal.TH.Syntax")
+thLib = mkTHModule (fsLit "GHC.Internal.TH.Lib")
+qqLib = mkTHModule (fsLit "GHC.Internal.TH.Quote")
+liftLib = mkTHModule (fsLit "GHC.Internal.TH.Lift")
 
 mkTHModule :: FastString -> Module
-mkTHModule m = mkModule thUnit (mkModuleNameFS m)
+mkTHModule m = mkModule ghcInternalUnit (mkModuleNameFS m)
 
-libFun, libTc, thFun, thTc, thCls, thCon :: FastString -> Unique -> Name
+libFun, libTc, thFun, thTc, thCls, thCon, liftFun :: FastString -> Unique -> Name
 libFun = mk_known_key_name varName  thLib
 libTc  = mk_known_key_name tcName   thLib
 thFun  = mk_known_key_name varName  thSyn
 thTc   = mk_known_key_name tcName   thSyn
 thCls  = mk_known_key_name clsName  thSyn
 thCon  = mk_known_key_name dataName thSyn
+liftFun = mk_known_key_name varName liftLib
 
 thFld :: FastString -> FastString -> Unique -> Name
 thFld con = mk_known_key_name (fieldName con) thSyn
@@ -203,7 +205,7 @@ qqFld = mk_known_key_name (fieldName (fsLit "QuasiQuoter")) qqLib
 
 -------------------- TH.Syntax -----------------------
 liftClassName :: Name
-liftClassName = thCls (fsLit "Lift") liftClassKey
+liftClassName = mk_known_key_name clsName liftLib (fsLit "Lift") liftClassKey
 
 quoteClassName :: Name
 quoteClassName = thCls (fsLit "Quote") quoteClassKey
@@ -239,8 +241,6 @@ returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
 newNameName    = thFun (fsLit "newName")   newNameIdKey
-liftName       = thFun (fsLit "lift")      liftIdKey
-liftStringName = thFun (fsLit "liftString")  liftStringIdKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
 mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
@@ -253,7 +253,9 @@ mkModNameName  = thFun (fsLit "mkModName")  mkModNameIdKey
 unTypeName     = thFld (fsLit "TExp") (fsLit "unType") unTypeIdKey
 unTypeCodeName    = thFun (fsLit "unTypeCode") unTypeCodeIdKey
 unsafeCodeCoerceName = thFun (fsLit "unsafeCodeCoerce") unsafeCodeCoerceIdKey
-liftTypedName = thFun (fsLit "liftTyped") liftTypedIdKey
+liftName       = liftFun (fsLit "lift")      liftIdKey
+liftStringName = liftFun (fsLit "liftString")  liftStringIdKey
+liftTypedName = liftFun (fsLit "liftTyped") liftTypedIdKey
 
 
 -------------------- TH.Lib -----------------------

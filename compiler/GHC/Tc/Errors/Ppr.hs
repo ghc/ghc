@@ -35,7 +35,12 @@ module GHC.Tc.Errors.Ppr
 
 import GHC.Prelude
 
-import qualified Language.Haskell.TH as TH
+import qualified GHC.Internal.TH.Syntax as TH
+-- In stage1: import "ghc-boot-th-next" qualified GHC.Internal.TH.Syntax as TH
+-- In stage2: import "ghc-boot-th"      qualified GHC.Internal.TH.Syntax as TH
+--            which resolves to
+--            import "ghc-internal"     qualified GHC.Internal.TH.Syntax as TH
+import qualified GHC.Internal.TH.Ppr as TH
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, filterCTuple, pretendNameIsInScope )

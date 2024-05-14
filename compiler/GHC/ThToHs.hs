@@ -59,8 +59,7 @@ import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe( catMaybes, isNothing )
 import Data.Word (Word64)
-import Language.Haskell.TH as TH hiding (sigP)
-import Language.Haskell.TH.Syntax as TH
+import GHC.Internal.TH.Syntax as TH
 import Foreign.ForeignPtr
 import Foreign.Ptr
 import System.IO.Unsafe
@@ -1775,7 +1774,7 @@ cvtTypeKind typeOrKind ty
              -> mk_apps (HsExplicitListTy noAnn IsPromoted []) tys'
 
            PromotedConsT  -- See Note [Representing concrete syntax in types]
-                          -- in Language.Haskell.TH.Syntax
+                          -- in GHC.Internal.TH.Syntax
               | Just normals <- m_normals
               , [ty1, L _ (HsExplicitListTy _ ip tys2)] <- normals
               -> returnLA (HsExplicitListTy noAnn ip (ty1:tys2))

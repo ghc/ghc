@@ -183,7 +183,6 @@ _darcs/
 /libraries/synopsis.png
 /libraries/stamp/
 /libraries/template-haskell/template-haskell.cabal
-/libraries/template-haskell-next/template-haskell-next.cabal
 /linter.log
 /mk/are-validating.mk
 /mk/build.mk

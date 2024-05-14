@@ -85,8 +85,8 @@ Flag hadrian-stage0
 Flag bootstrap
         Description:
           Enabled when building the stage1 compiler in order to vendor the in-tree
-          `template-haskell` library (including its dependency `ghc-boot-th`), while
-          allowing dependencies to depend on the boot `template-haskell` library.
+          `ghc-boot-th` library, and through that the in-tree TH AST defintions from
+          `ghc-internal`.
           See Note [Bootstrapping Template Haskell]
         Default: False
         Manual: True
@@ -135,10 +135,10 @@ Library
 
     if flag(bootstrap)
       Build-Depends:
-        template-haskell-next 
+        ghc-boot-th-next     == @ProjectVersionMunged@
     else
       Build-Depends:
-        template-haskell      == 2.22.*
+        ghc-boot-th          == @ProjectVersionMunged@
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.15

@@ -26,15 +26,49 @@ source-repository head
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/ghc-boot-th
 
+Flag bootstrap
+        Description:
+          Enabled when building the stage1 compiler in order to vendor the in-tree
+          `ghc-boot-th` library, and through that the in-tree TH AST defintions from
+          `ghc-internal`.
+          See Note [Bootstrapping Template Haskell]
+        Default: False
+        Manual: True
+
 Library
-    hs-source-dirs: @SourceRoot@
     default-language: Haskell2010
     other-extensions: DeriveGeneric
     default-extensions: NoImplicitPrelude
 
     exposed-modules:
-            GHC.LanguageExtensions.Type
             GHC.ForeignSrcLang.Type
+            GHC.Internal.TH.Lib.Map
+            GHC.Internal.TH.Ppr
+            GHC.Internal.TH.PprLib
+            GHC.LanguageExtensions.Type
             GHC.Lexeme
 
-    build-depends: base       >= 4.7 && < 4.21
+    build-depends:
+        base       >= 4.7 && < 4.21,
+        ghc-prim,
+        pretty      == 1.1.*
+
+    if flag(bootstrap)
+        cpp-options: -DBOOTSTRAP_TH
+        hs-source-dirs: @SourceRoot@ ../ghc-internal/src
+        exposed-modules:
+            GHC.Internal.TH.Lib
+            GHC.Internal.TH.Syntax
+        other-modules:
+            GHC.Internal.ForeignSrcLang
+            GHC.Internal.LanguageExtensions
+            GHC.Internal.Lexeme
+    else
+        hs-source-dirs: @SourceRoot@
+        build-depends:
+            ghc-internal
+        reexported-modules:
+            GHC.Internal.TH.Lib,
+            GHC.Internal.TH.Lift,
+            GHC.Internal.TH.Quote,
+            GHC.Internal.TH.Syntax

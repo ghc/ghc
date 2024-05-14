@@ -1,11 +1,10 @@
-
 T15321.hs:9:9: error: [GHC-88464]
-    • Found hole: _ :: String -> Language.Haskell.TH.Lib.Internal.ExpQ
+    • Found hole: _ :: String -> GHC.Internal.TH.Lib.ExpQ
     • In the expression: _ "baz"
       In the untyped splice: $(_ "baz")
     • Valid hole fits include
         fail :: forall (m :: * -> *) a. MonadFail m => String -> m a
-          with fail @Language.Haskell.TH.Lib.Syntax.Q
-                    @Language.Haskell.TH.Lib.Syntax.Exp
+          with fail @GHC.Internal.TH.Syntax.Q @GHC.Internal.TH.Syntax.Exp
           (imported from ‘Prelude’ at T15321.hs:3:8-13
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
+

@@ -13932,7 +13932,6 @@ module Unsafe.Coerce where
 
 
 -- Instances:
-instance Control.Monad.IO.Class.MonadIO GHC.Types.IO -- Defined in ‘Control.Monad.IO.Class’
 instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Ord.Down -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Monoid.First -- Defined in ‘Control.Monad.Zip’
@@ -14426,6 +14425,7 @@ instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.First -- Defined
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
+instance GHC.Internal.Control.Monad.IO.Class.MonadIO GHC.Types.IO -- Defined in ‘GHC.Internal.Control.Monad.IO.Class’
 instance forall (a :: * -> * -> *) b c. (ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable b, ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable c, GHC.Internal.Data.Data.Data (a b c)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Control.Applicative’
 instance forall (m :: * -> *) a. (ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable m, ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Data.Data (m a)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedMonad m a) -- Defined in ‘Control.Applicative’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.Functor.ZipList’
@@ -15567,6 +15567,8 @@ instance [safe] GHC.Internal.Show.Show System.Timeout.Timeout -- Defined in ‘S
 instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance GHC.Internal.StaticPtr.IsStatic GHC.Internal.StaticPtr.StaticPtr -- Defined in ‘GHC.Internal.StaticPtr’
+instance GHC.Internal.TH.Lift.Lift Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
+instance forall k (a :: k). GHC.Internal.TH.Lift.Lift (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Classes.Eq GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
 instance forall a k (b :: k). GHC.Classes.Eq a => GHC.Classes.Eq (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’

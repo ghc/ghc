@@ -66,7 +66,7 @@ import GHC.Tc.Utils.TcType (TcType, TcTyVar)
 import {-# SOURCE #-} GHC.Tc.Types.LclEnv (TcLclEnv)
 
 import GHCi.RemoteTypes ( ForeignRef )
-import qualified Language.Haskell.TH as TH (Q)
+import qualified GHC.Internal.TH.Syntax as TH (Q)
 
 -- libraries:
 import Data.Data hiding (Fixity(..))

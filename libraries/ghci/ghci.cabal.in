@@ -25,8 +25,8 @@ Flag internal-interpreter
 Flag bootstrap
         Description:
           Enabled when building the stage1 compiler in order to vendor the in-tree
-          `template-haskell` library (including its dependency `ghc-boot-th`), while
-          allowing dependencies to depend on the boot `template-haskell` library.
+          `ghc-boot-th` library, and through that the in-tree TH AST defintions from
+          `ghc-internal`.
           See Note [Bootstrapping Template Haskell]
         Default: False
         Manual: True
@@ -97,10 +97,10 @@ library
 
     if flag(bootstrap)
       build-depends:
-            template-haskell-next == 2.22.*
+            ghc-boot-th-next  == @ProjectVersionMunged@
     else
       build-depends:
-            template-haskell      == 2.22.*
+            ghc-boot-th       == @ProjectVersionMunged@
 
     if !os(windows)
         Build-Depends: unix >= 2.7 && < 2.9

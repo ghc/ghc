@@ -1,7 +1,7 @@
 <interactive>:3:9: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘[Dec]’ with ‘Exp’
       Expected: Q Exp
-        Actual: Q Language.Haskell.TH.Lib.Internal.Decs
+        Actual: Q GHC.Internal.TH.Lib.Decs
     • In the expression: [d| a = () |] :: Q Exp
       In an equation for ‘x’: x = [d| a = () |] :: Q Exp
 
@@ -10,7 +10,7 @@
         <interactive>:3:9: error: [GHC-83865]
     • Couldn't match type ‘[Dec]’ with ‘Exp’
       Expected: Q Exp
-        Actual: Q Language.Haskell.TH.Lib.Internal.Decs
+        Actual: Q GHC.Internal.TH.Lib.Decs
     • In the expression: [d| a = () |] :: Q Exp
       In an equation for ‘x’: x = [d| a = () |] :: Q Exp
 (deferred type error)

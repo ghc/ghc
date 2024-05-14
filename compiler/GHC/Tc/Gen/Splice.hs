@@ -131,9 +131,9 @@ import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
 
-import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
-import qualified Language.Haskell.TH.Syntax as TH
+import qualified GHC.Internal.TH.Syntax as TH
+import qualified GHC.Internal.TH.Ppr    as TH
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 -- Because GHC.Desugar might not be in the base library of the bootstrapping compiler
@@ -2921,7 +2921,9 @@ tcGetInterp = do
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Staged Metaprogramming as implemented in Template Haskell introduces a whole
 -- new dimension of staging to the already staged bootstrapping process.
--- The `template-haskell` library plays a crucial role in this process.
+-- While users depend on the user-facing `template-haskell` library, the TH
+-- interface (all wired-in identifiers) is defined in `ghc-internal` and for
+-- bootstrapping purposes, re-exported from `ghc-boot-th`.
 --
 -- Nomenclature:
 --
@@ -2929,29 +2931,28 @@ tcGetInterp = do
 --   stage(N+1) compiler: The result of compiling GHC from source with stage(N)
 --       Recall that any code compiled by the stage1 compiler should be binary
 --       identical to the same code compiled by later stages.
---   boot TH: the `template-haskell` that comes with (and is linked to) the
+--   boot `ghc-boot-th`: the `ghc-boot-th` that comes with (and is linked to) the
 --       boot/stage0 compiler
---   in-tree TH: the `template-haskell` library that lives in GHC's repository.
---       Recall that building in-tree TH with the stage1 compiler yields a binary
---       that is identical to the in-tree TH compiled by stage2.
---   boot library: A library such as bytestring or containers that GHC depends on.
---       CONFUSINGLY, we build these libraries with the boot compiler as well as
---       the stage1 compiler; thus the "boot" in boot library does not refer to a
---       stage.
+--   in-tree `ghc-boot-th`: the `ghc-boot-th` library that lives in GHC's repository.
 --
--- Here is how we bootstrap `template-haskell` in tandem with GHC:
+-- Here is how we bootstrap TH in tandem with GHC:
 --
---  1. Link the stage1 compiler against the boot TH library.
---  2. When building the stage1 compiler, build a CPP'd version of the in-tree
---     TH using the boot compiler under a different package-id,
---     `template-haskell-next`, and build stage1 GHC against that.
---  3. Build the in-tree TH with the stage1 compiler.
---  4. Build and link the stage2 compiler against the in-tree TH.
+--  1. Build the stage1 compiler with the boot compiler.
+--     The latter comes with its own boot `ghc-boot-th` library, but we do not import it.
+--  2. Instead, the stage1 compiler depends on the in-tree `ghc-boot-th`.
+--       * To avoid clashes with the boot `ghc-boot-th`, we change its
+--         package-id `ghc-boot-th-next`.
+--       * There is a bit of CPP to vendor the stage1 TH AST defined in
+--         `ghc-internal`, which we cannot build with the boot compiler.
+--  3. Build `ghc-internal` and in-tree `ghc-boot-th` with the stage1 compiler.
+--     From here on `ghc-boot-th` re-exposes the TH modules from `ghc-internal`.
+--  4. Build and link the stage2 compiler against the in-tree `ghc-boot-th`.
+--     NB: No dependency on `ghc-boot-th-next`.
 --
 -- Observations:
 --
 --  A. The vendoring in (2) means that the fully qualified name of the in-tree TH
---     AST will be, e.g., `template-haskell-next:...VarE`, not `template-haskell:...VarE`.
+--     AST will be, e.g., `ghc-boot-th-next:...VarE`, not `ghc-internal:...VarE`.
 --     That is OK, because we need it just for the `Binary` instance and to
 --     convert TH ASTs returned by splices into the Hs AST, both of which do not
 --     depend on the fully qualified name of the type to serialise! Importantly,
@@ -2959,7 +2960,10 @@ tcGetInterp = do
 --     unaffected, because the desugaring refers to names in the in-tree TH
 --     library, which is built in the next stage, stage1, and later.
 --
--- (Rejected) alternative designs:
+-- When we decided in favour of the current design, `template-haskell`
+-- still contained the wired-in Ids that meanwhile were moved to
+-- `ghc-internal`.
+-- These were the (rejected) alternative designs back then:
 --
 --  1b. Build the in-tree TH with the stage0 compiler and link the stage1 compiler
 --      against it. This is what we did until Apr 24 and it is problematic (#23536):
@@ -2994,7 +2998,7 @@ tcGetInterp = do
 --           thus rejected.)
 --        * We have thus made it impossible to refactor in-tree TH.
 --          This problem was discussed in #23536.
---  1c. Do not build the stage1 compiler against any template-haskell library.
+--  1c. Do not build the stage1 compiler against any library exposing the in-tree TH AST.
 --      This is viable because no splices need to be run as part of the
 --      bootstrapping process, so we could CPP away all the code in the stage1
 --      compiler that refers to template-haskell types. However,
@@ -3018,7 +3022,7 @@ tcGetInterp = do
 -- Note [Hard-wiring in-tree template-haskell for desugaring quotes]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- To desugar Template Haskell quotes, GHC needs to wire in a bunch of Names in the
--- `template-haskell` library as Note [Known-key names], in GHC.Builtin.Names.TH.
+-- `ghc-internal` library as Note [Known-key names], in GHC.Builtin.Names.TH.
 -- Consider
 -- > foo :: Q Exp
 -- > foo = [| unwords ["hello", "world"] |]
@@ -3026,6 +3030,6 @@ tcGetInterp = do
 -- > varE (mkNameS "unwords") `appE` listE [litE (stringE "hello"), litE (stringE "world")]
 -- And all these smart constructors are known-key.
 -- NB: Since the constructors are known-key, it is impossible to link this program
--- against another template-haskell library in which, e.g., `varE` was moved into a
+-- against another `ghc-internal` library in which, e.g., `varE` was moved into a
 -- different module. So effectively, GHC is hard-wired against the in-tree
--- template-haskell library.
+-- `ghc-internal` library.

@@ -344,14 +344,6 @@ templateRules = do
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
   templateRule "libraries/template-haskell/template-haskell.cabal" $ mconcat
     [ projectVersion
-    , interpolateVar "Suffix" $ pure ""
-    , interpolateVar "SourceRoot" $ pure "."
-    ]
-  templateRuleFrom "libraries/template-haskell/template-haskell.cabal.in"
-                   "libraries/template-haskell-next/template-haskell-next.cabal" $ mconcat
-    [ projectVersion
-    , interpolateVar "Suffix" $ pure "-next"
-    , interpolateVar "SourceRoot" $ pure "../template-haskell"
     ]
   templateRule "libraries/prologue.txt" $ packageVersions
   templateRule "rts/include/ghcversion.h" $ mconcat

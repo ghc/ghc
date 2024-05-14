@@ -218,7 +218,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
 import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
-import qualified Language.Haskell.TH.Syntax as TH
+import qualified GHC.Internal.TH.Syntax as TH
 
 import GHC.Generics ( Generic )
 import GHC.Types.Name.Env (NameEnv)

@@ -186,8 +186,8 @@ packageArgs = do
         , package haddock ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
-        ---------------------------- template-haskell --------------------------
-        , package templateHaskellNext ?
+        ---------------------------- ghc-boot-th-next --------------------------
+        , package ghcBootThNext ?
             builder (Cabal Flags) ? stage0 `cabalFlag` "bootstrap"
 
         ---------------------------------- text --------------------------------

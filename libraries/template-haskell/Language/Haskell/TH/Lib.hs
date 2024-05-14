@@ -139,7 +139,7 @@ module Language.Haskell.TH.Lib (
 
    ) where
 
-import Language.Haskell.TH.Lib.Internal hiding
+import GHC.Internal.TH.Lib hiding
   ( tySynD
   , dataD
   , newtypeD
@@ -179,7 +179,7 @@ import Language.Haskell.TH.Lib.Internal hiding
   , Role
   , InjectivityAnn
   )
-import qualified Language.Haskell.TH.Lib.Internal as Internal
+import qualified GHC.Internal.TH.Lib as Internal
 import Language.Haskell.TH.Syntax
 
 import Control.Applicative (Applicative(..))

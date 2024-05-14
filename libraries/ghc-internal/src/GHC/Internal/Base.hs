@@ -416,12 +416,15 @@ W3:
    * Do-notation introduces references to GHC.Internal.Base for Monad stuff.
      * Likewise arrow-notation to GHC.Internal.Control.Arrow
      * Likewise RecursiveDo stuff to GHC.Internal.Control.Monad.Fix
-   * (Does TemplateHaskellQuotes fall into this category as well?)
+   * TemplateHaskell quotes introduce references to GHC.Internal.TH.Lib.
 
-  These are not problematic in practice.  For example, a program
-  that uses arrow-notation but does not otherwise import the Arrow
-  type class will almost certainly fail to type-check anyway.
-  (The "Arrow m" constraint will be very hard to solve!)
+  These are not problematic in practice, because we do not make use of
+  overloaded notation during bootstrap of GHC. Yet! If in the future we
+  we decide to use TemplateHaskell in GHC or `ghc-internal`, we need to
+  add explicit imports. To demonstrate that these errors can occur, consider
+    e n = [| True |]
+  which compiles with -XTemplateHaskell *without* requiring the user to
+  import GHC.Internal.TH.Lib.
 
 W4:
   Stock derived instances introduce references to various things.
@@ -430,15 +433,12 @@ W4:
   as long as the module which defines Eq imports GHC.Magic this cannot
   cause trouble.
 
-  Things are a bit more complex for the Lift class (see #22229).
-  * Derived Lift instances refer to machinery in
-  Language.Haskell.TH.Lib.Internal, which is not imported by the module
-  Language.Haskell.TH.Lib.Syntax that defines the Lift class.
-  * Language.Haskell.TH.Lib.Internal imports Language.Haskell.TH.Lib.Syntax, so
-  we can't add the reverse dependency without using a .hs-boot file
-  * What we do instead is that we expose a module Language.Haskell.TH.Syntax
-  importing both Language.Haskell.TH.Lib.{Syntax,Internal). Users are expected
-  to import this module.
+  A similar solution concerns the deriving of Lift instances with
+  -XTemplateHaskell: A derived Lift instance must (transitively)
+  import GHC.Internal.TH.Lift, where the Lift class is defined.
+  The derived Lift instance references various identifiers in
+  GHC.Internal.TH.Lib, so it is an import of GHC.Internal.TH.Lift.
+
 
 W5:
   If no explicit "default" declaration is present, the assumed

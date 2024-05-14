@@ -13,6 +13,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Data.Array.Byte (
   ByteArray(..),
@@ -30,6 +31,9 @@ import GHC.Num.Integer (Integer(..))
 import GHC.Internal.Show (intToDigit)
 import GHC.Internal.ST (ST(..), runST)
 import GHC.Internal.Word (Word8(..))
+import GHC.Internal.TH.Syntax
+import GHC.Internal.TH.Lift
+import GHC.Internal.ForeignPtr
 import Prelude
 
 -- | Lifted wrapper for 'ByteArray#'.
@@ -195,6 +199,35 @@ instance Show ByteArray where
         where
           comma | i == 0    = id
                 | otherwise = showString ", "
+
+instance Lift ByteArray where
+  liftTyped x = unsafeCodeCoerce (lift x)
+  lift (ByteArray b) = return
+    (AppE (AppE (VarE addrToByteArrayName) (LitE (IntegerL (fromIntegral len))))
+      (LitE (BytesPrimL (Bytes ptr 0 (fromIntegral len)))))
+    where
+      len# = sizeofByteArray# b
+      len = I# len#
+      pb :: ByteArray#
+      !(ByteArray pb)
+        | isTrue# (isByteArrayPinned# b) = ByteArray b
+        | otherwise = runST $ ST $
+          \s -> case newPinnedByteArray# len# s of
+            (# s', mb #) -> case copyByteArray# b 0# mb 0# len# s' of
+              s'' -> case unsafeFreezeByteArray# mb s'' of
+                (# s''', ret #) -> (# s''', ByteArray ret #)
+      ptr :: ForeignPtr Word8
+      ptr = ForeignPtr (byteArrayContents# pb) (PlainPtr (unsafeCoerce# pb))
+
+addrToByteArrayName :: Name
+addrToByteArrayName = 'addrToByteArray
+
+addrToByteArray :: Int -> Addr# -> ByteArray
+addrToByteArray (I# len) addr = runST $ ST $
+  \s -> case newByteArray# len s of
+    (# s', mb #) -> case copyAddrToByteArray# addr mb 0# len s' of
+      s'' -> case unsafeFreezeByteArray# mb s'' of
+        (# s''', ret #) -> (# s''', ByteArray ret #)
 
 -- | Compare prefixes of given length.
 compareByteArraysFromBeginning :: ByteArray -> ByteArray -> Int -> Ordering

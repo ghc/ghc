@@ -1,4 +1,3 @@
-
 T11452.hs:6:12: error: [GHC-94642]
     • Illegal polytype: (forall a. a -> a) -> ()
       The type of a Typed Template Haskell expression must not have any quantification.
@@ -8,12 +7,13 @@ T11452.hs:6:12: error: [GHC-94642]
 
 T11452.hs:6:14: error: [GHC-91028]
     • Couldn't match type ‘p0’ with ‘forall a. a -> a’
-      Expected: Language.Haskell.TH.Lib.Syntax.Code
-                  Language.Haskell.TH.Lib.Syntax.Q ((forall a. a -> a) -> ())
-        Actual: Language.Haskell.TH.Lib.Syntax.Code
-                  Language.Haskell.TH.Lib.Syntax.Q (p0 -> ())
+      Expected: GHC.Internal.TH.Syntax.Code
+                  GHC.Internal.TH.Syntax.Q ((forall a. a -> a) -> ())
+        Actual: GHC.Internal.TH.Syntax.Code
+                  GHC.Internal.TH.Syntax.Q (p0 -> ())
       Cannot instantiate unification variable ‘p0’
       with a type involving polytypes: forall a. a -> a
     • In the Template Haskell quotation [|| \ _ -> () ||]
       In the expression: [|| \ _ -> () ||]
       In the Template Haskell splice $$([|| \ _ -> () ||])
+

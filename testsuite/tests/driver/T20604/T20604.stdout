@@ -1,11 +1,5 @@
 A1
 A
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHSghc-prim-0.10.0-inplace-ghc9.9.20230815.so" 1403aed32fb9af243c4cc949007c846c
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHSghc-bignum-1.3-inplace-ghc9.9.20230815.so" 54293f8faab737bac998f6e1a1248db8
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHSghc-internal-0.1.0.0-inplace-ghc9.9.20230815.so" a5c0e962d84d9044d44df4698becddcc
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHSbase-4.19.0.0-inplace-ghc9.9.20230815.so" 4a90ed136fe0f89e5d0360daded517bd
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHSghc-boot-th-9.9-inplace-ghc9.9.20230815.so" e338655f71b1d37fdfdd2504b7de6e76
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHSarray-0.5.6.0-inplace-ghc9.9.20230815.so" 6943478e8adaa043abf7a2b38dd435a2
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHSdeepseq-1.5.0.0-inplace-ghc9.9.20230815.so" 9974eb196694990ac6bb3c2591405de0
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHSpretty-1.1.3.6-inplace-ghc9.9.20230815.so" 1eefc21514f5584086f62b70aa554b7d
-addDependentFile "/home/ben/ghc/ghc-compare-2/_build/stage1/lib/../lib/x86_64-linux-ghc-9.9.20230815/libHStemplate-haskell-2.21.0.0-inplace-ghc9.9.20230815.so" f85c86eb94dcce1eacd739b6e991ba2d
+addDependentFile "/home/teo/git/ghc/_build/stage1/lib/../lib/x86_64-linux-ghc-9.11.20240508/libHSghc-prim-0.11.0-inplace-ghc9.11.20240508.so" a63ccfcae8455a0abc22cfbd2ee0fee4
+addDependentFile "/home/teo/git/ghc/_build/stage1/lib/../lib/x86_64-linux-ghc-9.11.20240508/libHSghc-bignum-1.3-inplace-ghc9.11.20240508.so" fe8ae214b210d7ae50739f9b74c6d3bc
+addDependentFile "/home/teo/git/ghc/_build/stage1/lib/../lib/x86_64-linux-ghc-9.11.20240508/libHSghc-internal-9.1001.0-inplace-ghc9.11.20240508.so" cce9e35d3fb6c65a080cdb8a570f3caf

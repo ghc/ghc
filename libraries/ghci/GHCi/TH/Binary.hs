@@ -12,8 +12,7 @@ import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
 import GHC.Serialized
-import qualified Language.Haskell.TH        as TH
-import qualified Language.Haskell.TH.Syntax as TH
+import qualified GHC.Internal.TH.Syntax as TH
 -- Put these in a separate module because they take ages to compile
 
 instance Binary TH.Loc

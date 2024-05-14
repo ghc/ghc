@@ -102,7 +102,6 @@ stage0Packages = do
              , process -- depends on filepath
              , runGhc
              , semaphoreCompat -- depends on
-             , templateHaskellNext
              , time -- depends on win32
              , unlit
              , if windowsHost then win32 else unix
@@ -127,7 +126,6 @@ stage1Packages = do
           | p == unix         = False
           -- These packages are only needed for bootstrapping.
           -- See Note [Bootstrapping Template Haskell]
-          | p == templateHaskellNext = False
           | p == ghcBootThNext = False
           | otherwise         = True
 

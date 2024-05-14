@@ -53,8 +53,7 @@ import Data.Map (Map)
 import Foreign
 import GHC.Generics
 import GHC.Stack.CCS
-import qualified Language.Haskell.TH        as TH
-import qualified Language.Haskell.TH.Syntax as TH
+import qualified GHC.Internal.TH.Syntax        as TH
 import System.Exit
 import System.IO
 import System.IO.Error

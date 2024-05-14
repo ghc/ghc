@@ -52,12 +52,10 @@ Derived class instances:
     GHC.Internal.Generics.to1 (GHC.Internal.Generics.M1 x)
       = case x of x -> case x of {}
   
-  instance Language.Haskell.TH.Lib.Syntax.Lift
-             (DrvEmptyData.Void a) where
-    Language.Haskell.TH.Lib.Syntax.lift z
-      = GHC.Internal.Base.pure (case z of {})
-    Language.Haskell.TH.Lib.Syntax.liftTyped z
-      = Language.Haskell.TH.Lib.Syntax.unsafeCodeCoerce
+  instance GHC.Internal.TH.Lift.Lift (DrvEmptyData.Void a) where
+    GHC.Internal.TH.Lift.lift z = GHC.Internal.Base.pure (case z of {})
+    GHC.Internal.TH.Lift.liftTyped z
+      = GHC.Internal.TH.Syntax.unsafeCodeCoerce
           (GHC.Internal.Base.pure (case z of {}))
   
   $tVoid :: GHC.Internal.Data.Data.DataType

@@ -11,7 +11,7 @@ import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
 import GHC.Hs.Extension ( GhcRn, GhcPs, GhcTc )
 
 import GHC.Hs ( HsQuote, HsExpr, LHsExpr, LHsType, LPat, LHsDecl, ThModFinalizers, HsUntypedSpliceResult )
-import qualified Language.Haskell.TH as TH
+import qualified GHC.Internal.TH.Syntax as TH
 
 tcTypedSplice :: Name
               -> LHsExpr GhcRn

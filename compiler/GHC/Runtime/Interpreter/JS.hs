@@ -303,7 +303,6 @@ jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root = do
         }
 
   let units = preloadUnits (ue_units unit_env)
-              ++ [thUnitId] -- don't forget TH which is an implicit dep
 
   -- compute dependencies
   let link_spec = LinkSpec

@@ -154,7 +154,6 @@ toolTargets = [ cabalSyntax
               , hpc
               , hpcBin  -- # executable
               , time
-              , templateHaskellNext
               , semaphoreCompat
               , unlit  -- # executable
               ] ++ if windowsHost then [ win32 ] else [ unix ]

@@ -100,6 +100,7 @@ Library
         GHC.Internal.Control.Monad
         GHC.Internal.Control.Monad.Fail
         GHC.Internal.Control.Monad.Fix
+        GHC.Internal.Control.Monad.IO.Class
         GHC.Internal.Control.Monad.ST
         GHC.Internal.Control.Monad.ST.Lazy
         GHC.Internal.Control.Monad.ST.Imp
@@ -160,6 +161,7 @@ Library
         GHC.Internal.Foreign.Ptr
         GHC.Internal.Foreign.StablePtr
         GHC.Internal.Foreign.Storable
+        GHC.Internal.ForeignSrcLang
         GHC.Internal.Arr
         GHC.Internal.ArrayArray
         GHC.Internal.Base
@@ -229,6 +231,8 @@ Library
         GHC.Internal.Integer.Logarithms
         GHC.Internal.IsList
         GHC.Internal.Ix
+        GHC.Internal.LanguageExtensions
+        GHC.Internal.Lexeme
         GHC.Internal.List
         GHC.Internal.Maybe
         GHC.Internal.MVar
@@ -255,6 +259,10 @@ Library
         GHC.Internal.Stack.Types
         GHC.Internal.Stats
         GHC.Internal.Storable
+        GHC.Internal.TH.Syntax
+        GHC.Internal.TH.Lib
+        GHC.Internal.TH.Lift
+        GHC.Internal.TH.Quote
         GHC.Internal.TopHandler
         GHC.Internal.TypeError
         GHC.Internal.TypeLits

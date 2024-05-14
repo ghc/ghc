@@ -42,8 +42,7 @@ import GHC.HsToCore.Match.Literal
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Binds
 
-import qualified Language.Haskell.TH as TH
-import qualified Language.Haskell.TH.Syntax as TH
+import qualified GHC.Internal.TH.Syntax as TH
 
 import GHC.Hs
 
@@ -1008,7 +1007,7 @@ rep_sig d@(L _ (XSig {}))             = pprPanic "rep_sig IdSig" (ppr d)
 -- See Note [Scoped type variables in quotes]
 -- and Note [Don't quantify implicit type variables in quotes]
 rep_ty_sig_tvs :: [LHsTyVarBndr Specificity GhcRn]
-               -> MetaM (Core [M TH.TyVarBndrSpec])
+               -> MetaM (Core [M (TH.TyVarBndr TH.Specificity)])
 rep_ty_sig_tvs explicit_tvs
   = repListM tyVarBndrSpecTyConName repTyVarBndr
              explicit_tvs
@@ -1018,7 +1017,7 @@ rep_ty_sig_tvs explicit_tvs
 -- See Note [Scoped type variables in quotes]
 -- and Note [Don't quantify implicit type variables in quotes]
 rep_ty_sig_outer_tvs :: HsOuterSigTyVarBndrs GhcRn
-                     -> MetaM (Core [M TH.TyVarBndrSpec])
+                     -> MetaM (Core [M (TH.TyVarBndr TH.Specificity)])
 rep_ty_sig_outer_tvs (HsOuterImplicit{}) =
   coreListM tyVarBndrSpecTyConName []
 rep_ty_sig_outer_tvs (HsOuterExplicit{hso_bndrs = explicit_tvs}) =
@@ -1208,7 +1207,7 @@ rep_bndr_vis (HsBndrInvisible _) = rep2_nw bndrInvisName []
 
 addHsOuterFamEqnTyVarBinds ::
      HsOuterFamEqnTyVarBndrs GhcRn
-  -> (Core (Maybe [M TH.TyVarBndrUnit]) -> MetaM (Core (M a)))
+  -> (Core (Maybe [M (TH.TyVarBndr ())]) -> MetaM (Core (M a)))
   -> MetaM (Core (M a))
 addHsOuterFamEqnTyVarBinds outer_bndrs thing_inside = do
   elt_ty <- wrapName tyVarBndrUnitTyConName
@@ -1222,7 +1221,7 @@ addHsOuterFamEqnTyVarBinds outer_bndrs thing_inside = do
 
 addHsOuterSigTyVarBinds ::
      HsOuterSigTyVarBndrs GhcRn
-  -> (Core [M TH.TyVarBndrSpec] -> MetaM (Core (M a)))
+  -> (Core [M (TH.TyVarBndr TH.Specificity)] -> MetaM (Core (M a)))
   -> MetaM (Core (M a))
 addHsOuterSigTyVarBinds outer_bndrs thing_inside = case outer_bndrs of
   HsOuterImplicit{hso_ximplicit = imp_tvs} ->
