@@ -100,6 +100,7 @@ test('simd003', when(unregisterised(), skip), compile_and_run, [''])
 test('simd004', when(unregisterised(), skip), compile_and_run, [''])
 test('simd005', when(unregisterised(), skip), compile_and_run, [''])
 test('simd006', when(unregisterised(), skip), compile_and_run, [''])
+test('simd007', when(unregisterised(), skip), compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
