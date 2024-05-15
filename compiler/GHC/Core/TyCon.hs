@@ -2408,7 +2408,9 @@ tcHasFixedRuntimeRep tc@(TyCon { tyConDetails = details })
                -- the representation be fully-known, including levity variables.
                -- This might be relaxed in the future (#15532).
 
-       TupleTyCon { tup_sort = tuple_sort } -> isBoxed (tupleSortBoxity tuple_sort)
+       TupleTyCon { tup_sort = tuple_sort } -> isBoxed (tupleSortBoxity tuple_sort) ||
+                                               -- (# #) also has fixed rep.
+                                               tyConArity tc == 0
 
        SumTyCon {} -> False   -- only unboxed sums here
 
