@@ -3,6 +3,8 @@ test('size_hello_obj', [collect_size(5, 'size_hello_obj.o')], compile, [''])
 test('size_hello_artifact', [collect_size(5, 'size_hello_artifact' + exe_extension())],
                              compile_artifact, [''])
 
+test('size_hello_unicode', [collect_size(5, 'size_hello_unicode' + exe_extension())], compile_artifact, [''])
+
 size_acceptance_threshold = 100
 
 test('array_dir'           ,[collect_size_ghc_pkg(size_acceptance_threshold , 'array')]           , static_stats , [] )
