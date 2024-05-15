@@ -85,6 +85,7 @@ import Control.Monad.Trans.Class
   ( lift )
 import Data.Maybe (isJust)
 import GHC.Builtin.Types (unitTyCon)
+import GHC.Types.RepType (typePrimRep1)
 
 -- Defines a binding
 isForeignImport :: forall name. UnXRec name => LForeignDecl name -> Bool
@@ -297,7 +298,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh l@(CLabel
        return (CImport src (L lc cconv') safety mh l)
 
 tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh CWrapper) = do
-        -- Foreign wrapper (former f.e.d.)
+        -- Foreign wrapper (former foreign export dynamic)
         -- The type must be of the form ft -> IO (FunPtr ft), where ft is a valid
         -- foreign type.  For legacy reasons ft -> IO (Ptr ft) is accepted, too.
         -- The use of the latter form is DEPRECATED, though.
@@ -463,6 +464,21 @@ tcCheckFEType sig_ty edecl@(CExport src (L l (CExportStatic esrc str cconv))) = 
 
 ------------ Checking argument types for foreign import ----------------------
 checkForeignArgs :: (Type -> Validity' IllegalForeignTypeReason) -> [Scaled Type] -> TcM ()
+checkForeignArgs _pred [(Scaled mult ty)]
+  -- If there is a single argument allow:
+  --    foo :: (# #) -> T
+  | isUnboxedTupleType ty
+  , VoidRep <- typePrimRep1 ty
+  = do
+    checkNoLinearFFI mult
+    dflags <- getDynFlags
+    case (validIfUnliftedFFITypes dflags) of
+      IsValid -> checkNoLinearFFI mult
+      NotValid needs_uffi -> addErrTc $
+        TcRnIllegalForeignType
+          (Just Arg)
+          (TypeCannotBeMarshaled ty needs_uffi)
+  -- = check (validIfUnliftedFFITypes dflags) (TypeCannotBeMarshaled (Just Arg)) >> checkNoLinearFFI mult
 checkForeignArgs pred tys = mapM_ go tys
   where
     go (Scaled mult ty) = checkNoLinearFFI mult >>

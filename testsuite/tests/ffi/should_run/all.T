@@ -272,3 +272,4 @@ test('T24314',
 test('T24598', req_cmm, compile_and_run, ['T24598_cmm.cmm'])
 test('T24598b', req_cmm, compile_and_run, ['T24598b_cmm.cmm'])
 test('T24598c', req_cmm, compile_and_run, ['T24598c_cmm.cmm'])
+test('T24818', [req_cmm, req_c], compile_and_run, ['-XUnliftedFFITypes T24818_cmm.cmm T24818_c.c'])

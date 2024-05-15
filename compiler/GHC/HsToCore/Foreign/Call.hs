@@ -47,6 +47,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Maybe
+import GHC.Types.RepType (typePrimRep1)
 
 {-
 Desugaring of @ccall@s consists of adding some state manipulation,
@@ -137,7 +138,9 @@ unboxArg :: CoreExpr                    -- The supplied argument, not representa
 
 unboxArg arg
   -- Primitive types: nothing to unbox
-  | isPrimitiveType arg_ty
+  | isPrimitiveType arg_ty ||
+    -- Same for (# #)
+    (isUnboxedTupleType arg_ty && typePrimRep1 arg_ty == VoidRep)
   = return (arg, \body -> body)
 
   -- Recursive newtypes

@@ -121,9 +121,13 @@ Unlifted FFI Types
 The following unlifted unboxed types may be used as basic foreign
 types (see FFI Chapter, Section 8.6) for both ``safe`` and
 ``unsafe`` foreign calls: ``Int#``, ``Word#``, ``Char#``, ``Float#``,
-``Double#``, ``Addr#``, and ``StablePtr# a``. Several unlifted boxed
-types may be used as arguments to FFI calls, subject to these
-restrictions:
+``Double#``, ``Addr#``, and ``StablePtr# a``.
+Additionally ``(# #)`` can be used if it's the first and only function argument.
+This allows more flexible importing of functions which don't require ordering
+through IO.
+
+Several unlifted boxed types may be used as arguments to FFI calls,
+subject to these restrictions:
 
 * Valid arguments for ``foreign import unsafe`` FFI calls: ``Array#``,
   ``SmallArray#``, ``ByteArray#``, and the mutable

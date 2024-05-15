@@ -32,6 +32,9 @@ Language
 - Unboxed Float#/Double# literals now support the HexFloatLiterals extension
   (`#22155 <https://gitlab.haskell.org/ghc/ghc/-/issues/22155>`_).
 
+- UnliftedFFITypes: GHC will now accept ffi types like: ``(# #) -> T`` where ``(# #)``
+  is used as the one and only function argument.
+
 Compiler
 ~~~~~~~~
 
