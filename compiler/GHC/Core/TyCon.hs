@@ -155,7 +155,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
 import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConFieldLabels
    , dataConTyCon, dataConFullSig
-   , isUnboxedSumDataCon, isTypeDataCon )
+   , isUnboxedSumDataCon, isTypeDataCon, dataConSourceArity )
 import {-# SOURCE #-} GHC.Core.Type
    ( isLiftedTypeKind )
 import GHC.Builtin.Uniques
@@ -1534,7 +1534,7 @@ See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
 
 
 -- | A 'PrimRep' is an abstraction of a /non-void/ type.
--- (Use 'PrimRepOrVoidRep' if you want void types too.)
+-- (Use 'PrimOrVoidRep' if you want void types too.)
 -- It contains information that the code generator needs
 -- in order to pass arguments, return results,
 -- and store values of this type. See also Note [RuntimeRep and PrimRep] in
@@ -2408,7 +2408,10 @@ tcHasFixedRuntimeRep tc@(TyCon { tyConDetails = details })
                -- the representation be fully-known, including levity variables.
                -- This might be relaxed in the future (#15532).
 
-       TupleTyCon { tup_sort = tuple_sort } -> isBoxed (tupleSortBoxity tuple_sort)
+       TupleTyCon { tup_sort = tuple_sort, data_con = tup_con }
+          -> isBoxed (tupleSortBoxity tuple_sort)
+          -- Also (# #)
+          || dataConSourceArity tup_con == 0
 
        SumTyCon {} -> False   -- only unboxed sums here
 
