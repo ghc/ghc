@@ -58,7 +58,6 @@ import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
-import GHC.Core.DataCon ( dataConWorkId )
 import GHC.Core.Coercion( mkSymCo )
 import GHC.Core.Type (mkStrLitTy, tidyOpenTypeX, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
