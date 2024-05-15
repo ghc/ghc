@@ -362,7 +362,7 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
 
     go us (cmm : cmms) ngs count = do
         let fileIds = ngs_dwarfFiles ngs
-        (us', fileIds', native, imports, colorStats, linearStats, unwinds)
+        (us', fileIds', native, imports, colorStats, linearStats, unwinds, mcfg)
           <- {-# SCC "cmmNativeGen" #-}
              cmmNativeGen logger ncgImpl us fileIds dbgMap
                           cmm count
@@ -390,7 +390,13 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
         {-# SCC "seqString" #-} evaluate $ seqList (showSDocUnsafe $ vcat $ map (pprAsmLabel platform) imports) ()
 
         let !labels' = if ncgDwarfEnabled config
-                       then cmmDebugLabels isMetaInstr native else []
+                       then cmmDebugLabels is_valid_label isMetaInstr native else []
+            is_valid_label
+              -- filter dead labels: asm-shortcutting may remove some blocks
+              -- (#22792)
+              | Just cfg <- mcfg = hasNode cfg
+              | otherwise        = const True
+
             !natives' = if logHasDumpFlag logger Opt_D_dump_asm_stats
                         then native : ngs_natives ngs else []
 
@@ -436,6 +442,7 @@ cmmNativeGen
                 , Maybe [Color.RegAllocStats statics instr] -- stats for the coloring register allocator
                 , Maybe [Linear.RegAllocStats]              -- stats for the linear register allocators
                 , LabelMap [UnwindPoint]                    -- unwinding information for blocks
+                , Maybe CFG                                 -- final CFG
                 )
 
 cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
@@ -673,7 +680,9 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 , lastMinuteImports ++ imports
                 , ppr_raStatsColor
                 , ppr_raStatsLinear
-                , unwinds )
+                , unwinds
+                , optimizedCFG
+                )
 
 maybeDumpCfg :: Logger -> Maybe CFG -> String -> SDoc -> IO ()
 maybeDumpCfg _logger Nothing _ _ = return ()

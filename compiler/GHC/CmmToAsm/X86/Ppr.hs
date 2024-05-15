@@ -71,45 +71,74 @@ pprNatCmmDecl :: IsDoc doc => NCGConfig -> NatCmmDecl (Alignment, RawCmmStatics)
 pprNatCmmDecl config (CmmData section dats) =
   pprSectionAlign config section $$ pprDatas config dats
 
-pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
-  let platform = ncgPlatform config in
-  case topInfoTable proc of
-    Nothing ->
-        -- special case for code without info table:
-        pprSectionAlign config (Section Text lbl) $$
-        pprProcAlignment config $$
-        pprProcLabel config lbl $$
-        pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
-        vcat (map (pprBasicBlock config top_info) blocks) $$
-        ppWhen (ncgDwarfEnabled config) (line (pprBlockEndLabel platform lbl) $$ line (pprProcEndLabel platform lbl)) $$
-        pprSizeDecl platform lbl
+pprNatCmmDecl config proc@(CmmProc top_info entry_lbl _ (ListGraph blocks)) =
+  let platform = ncgPlatform config
+      top_info_table = topInfoTable proc
+      -- we need a label to delimit the proc code (e.g. in debug builds). When
+      -- we have an info table, we reuse the info table label. Otherwise we make
+      -- a fresh "entry" label from the label of the entry block. We can't reuse
+      -- the entry block label as-is, otherwise we get redundant labels:
+      -- delimiters for the entry block and for the whole proc are the same (see
+      -- #22792).
+      proc_lbl = case top_info_table of
+        Just (CmmStaticsRaw info_lbl _) -> info_lbl
+        Nothing                         -> toProcDelimiterLbl entry_lbl
 
-    Just (CmmStaticsRaw info_lbl _) ->
-      pprSectionAlign config (Section Text info_lbl) $$
-      pprProcAlignment config $$
-      pprProcLabel config lbl $$
-      (if platformHasSubsectionsViaSymbols platform
-          then line (pprAsmLabel platform (mkDeadStripPreventer info_lbl) <> colon)
-          else empty) $$
-      vcat (map (pprBasicBlock config top_info) blocks) $$
-      ppWhen (ncgDwarfEnabled config) (line (pprProcEndLabel platform info_lbl)) $$
-      -- above: Even the first block gets a label, because with branch-chain
+      -- handle subsections_via_symbols when enabled and when we have an
+      -- info-table to link to. See Note [Subsections Via Symbols]
+      (sub_via_sym_label,sub_via_sym_offset)
+        | platformHasSubsectionsViaSymbols platform
+        , Just (CmmStaticsRaw info_lbl _) <- top_info_table
+        , info_dsp_lbl <- pprAsmLabel platform (mkDeadStripPreventer info_lbl)
+        = ( line (info_dsp_lbl <> colon)
+          , line $ text "\t.long " <+> pprAsmLabel platform info_lbl <+> char '-' <+> info_dsp_lbl
+          )
+        | otherwise = (empty,empty)
+
+  in vcat
+    [ -- section directive. Requires proc_lbl when split-section is enabled to
+      -- use as a subsection name.
+      pprSectionAlign config (Section Text proc_lbl)
+
+      -- section alignment. Note that when there is an info table, we align the
+      -- info table and not the entry code!
+    , pprProcAlignment config
+
+      -- Special label when ncgExposeInternalSymbols is enabled. See Note
+      -- [Internal proc labels] in GHC.Cmm.Label
+    , pprExposedInternalProcLabel config entry_lbl
+
+      -- Subsections-via-symbols label. See Note [Subsections Via Symbols]
+    , sub_via_sym_label
+
+      -- We need to print a label indicating the beginning of the entry code:
+      -- 1. Without tables-next-to-code, we just print it here
+      -- 2. With tables-next-to-code, the proc_lbl is the info-table label and it
+      -- will be printed in pprBasicBlock after the info-table itself.
+    , case top_info_table of
+        Nothing -> pprLabel platform proc_lbl
+        Just _  -> empty
+
+      -- Proc's basic blocks
+    , vcat (map (pprBasicBlock config top_info) blocks)
+      -- Note that even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
-      (if platformHasSubsectionsViaSymbols platform
-       then -- See Note [Subsections Via Symbols]
-                line
-              $ text "\t.long "
-            <+> pprAsmLabel platform info_lbl
-            <+> char '-'
-            <+> pprAsmLabel platform (mkDeadStripPreventer info_lbl)
-       else empty) $$
-      pprSizeDecl platform info_lbl
+
+      -- Print the proc end label when debugging is enabled
+    , ppWhen (ncgDwarfEnabled config) $ line (pprProcEndLabel platform proc_lbl)
+
+      -- Subsections-via-symbols offset. See Note [Subsections Via Symbols]
+    , sub_via_sym_offset
+
+      -- ELF .size directive (size of the entry code function)
+    , pprSizeDecl platform proc_lbl
+    ]
 {-# SPECIALIZE pprNatCmmDecl :: NCGConfig -> NatCmmDecl (Alignment, RawCmmStatics) Instr -> SDoc #-}
 {-# SPECIALIZE pprNatCmmDecl :: NCGConfig -> NatCmmDecl (Alignment, RawCmmStatics) Instr -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Output an internal proc label. See Note [Internal proc labels] in CLabel.
-pprProcLabel :: IsDoc doc => NCGConfig -> CLabel -> doc
-pprProcLabel config lbl
+pprExposedInternalProcLabel :: IsDoc doc => NCGConfig -> CLabel -> doc
+pprExposedInternalProcLabel config lbl
   | ncgExposeInternalSymbols config
   , Just lbl' <- ppInternalProcLabel (ncgThisModule config) lbl
   = line (lbl' <> colon)
@@ -118,8 +147,7 @@ pprProcLabel config lbl
 
 pprProcEndLabel :: IsLine doc => Platform -> CLabel -- ^ Procedure name
                 -> doc
-pprProcEndLabel platform lbl =
-    pprAsmLabel platform (mkAsmTempProcEndLabel lbl) <> colon
+pprProcEndLabel platform lbl = pprAsmLabel platform (mkAsmTempProcEndLabel lbl) <> colon
 
 pprBlockEndLabel :: IsLine doc => Platform -> CLabel -- ^ Block name
                  -> doc
@@ -136,16 +164,16 @@ pprSizeDecl platform lbl
 pprBasicBlock :: IsDoc doc => NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> doc
 pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $
-    pprLabel platform asmLbl $$
+    pprLabel platform block_label $$
     vcat (map (pprInstr platform) instrs) $$
     ppWhen (ncgDwarfEnabled config) (
       -- Emit both end labels since this may end up being a standalone
       -- top-level block
-      line (pprBlockEndLabel platform asmLbl
-         <> pprProcEndLabel platform asmLbl)
+      line (pprBlockEndLabel platform block_label) $$
+      line (pprProcEndLabel platform block_label)
     )
   where
-    asmLbl = blockLbl blockid
+    block_label = blockLbl blockid
     platform = ncgPlatform config
     maybe_infotable c = case mapLookup blockid info_env of
        Nothing -> c
@@ -155,7 +183,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            vcat (map (pprData config) info) $$
            pprLabel platform infoLbl $$
            c $$
-           ppWhen (ncgDwarfEnabled config) (line (pprAsmLabel platform (mkAsmTempEndLabel infoLbl) <> colon))
+           ppWhen (ncgDwarfEnabled config) (line (pprBlockEndLabel platform infoLbl))
 
     -- Make sure the info table has the right .loc for the block
     -- coming right after it. See Note [Info Offset]

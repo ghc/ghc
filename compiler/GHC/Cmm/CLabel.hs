@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 -----------------------------------------------------------------------------
 --
 -- Object-file symbols (called CLabel for historical reasons).
@@ -123,6 +125,7 @@ module GHC.Cmm.CLabel (
         toSlowEntryLbl,
         toEntryLbl,
         toInfoLbl,
+        toProcDelimiterLbl,
 
         -- * Pretty-printing
         LabelStyle (..),
@@ -923,6 +926,16 @@ toEntryLbl platform lbl = case lbl of
    CmmLabel m ext str CmmRetInfo -> CmmLabel m ext str CmmRet
    _                             -> pprPanic "toEntryLbl" (pprDebugCLabel platform lbl)
 
+-- | Generate a CmmProc delimiter label from the actual entry label.
+--
+-- This delimiter label might be the entry label itself, except when the entry
+-- label is a LocalBlockLabel. If we reused the entry label to delimit the proc,
+-- we would generate redundant labels (see #22792)
+toProcDelimiterLbl :: CLabel -> CLabel
+toProcDelimiterLbl lbl = case lbl of
+  LocalBlockLabel {} -> mkAsmTempDerivedLabel lbl (fsLit "_entry")
+  _                  -> lbl
+
 toInfoLbl :: Platform -> CLabel -> CLabel
 toInfoLbl platform lbl = case lbl of
    IdLabel n c LocalEntry      -> IdLabel n c LocalInfoTable
@@ -1457,10 +1470,17 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
       -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
 
    AsmTempDerivedLabel l suf
-      -> asmTempLabelPrefix platform
-         <> case l of AsmTempLabel u    -> pprUniqueAlways u
-                      LocalBlockLabel u -> pprUniqueAlways u
-                      _other            -> pprCLabelStyle platform sty l
+         -- we print a derived label, so we just print the parent label
+         -- recursively. However we don't want to print the temp prefix (e.g.
+         -- ".L") twice, so we must explicitely handle these cases.
+      -> let skipTempPrefix = \case
+                AsmTempLabel u            -> pprUniqueAlways u
+                AsmTempDerivedLabel l suf -> skipTempPrefix l <> ftext suf
+                LocalBlockLabel u         -> pprUniqueAlways u
+                lbl                       -> pprAsmLabel platform lbl
+         in
+         asmTempLabelPrefix platform
+         <> skipTempPrefix l
          <> ftext suf
 
    DynamicLinkerLabel info lbl

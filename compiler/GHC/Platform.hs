@@ -75,6 +75,9 @@ data Platform = Platform
    , platformHasGnuNonexecStack       :: !Bool
    , platformHasIdentDirective        :: !Bool
    , platformHasSubsectionsViaSymbols :: !Bool
+      -- ^ Enable Darwin .subsections_via_symbols directive
+      --
+      -- See Note [Subsections Via Symbols] in GHC.CmmToAsm.X86.Ppr
    , platformIsCrossCompiling         :: !Bool
    , platformLeadingUnderscore        :: !Bool             -- ^ Symbols need underscore prefix
    , platformTablesNextToCode         :: !Bool
