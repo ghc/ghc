@@ -32,6 +32,7 @@ import GHC.Toolchain.Tools.Nm
 import GHC.Toolchain.Tools.MergeObjs
 import GHC.Toolchain.Tools.Readelf
 import GHC.Toolchain.NormaliseTriple (normaliseTriple)
+import Text.Read (readMaybe)
 
 data Opts = Opts
     { optTriple    :: String
@@ -257,9 +258,12 @@ doFormat args = do
   case errs of
     [] -> do
       let opts = foldr (.) id opts0 emptyFormatOpts
-      tgt <- read @Target <$> System.IO.readFile (view _formatOptInput opts)
-      let file = formatOptOutput opts
-      System.IO.writeFile file (show tgt)
+      tgtFile <- System.IO.readFile (view _formatOptInput opts)
+      case readMaybe @Target tgtFile of
+        Nothing -> error $ "Failed to read a valid Target value from " ++ view _formatOptInput opts ++ ":\n" ++ tgtFile
+        Just tgt -> do
+          let file = formatOptOutput opts
+          System.IO.writeFile file (show tgt)
     _ -> do
       mapM_ putStrLn errs
       putStrLn $ usageInfo "ghc-toolchain" formatOpts
