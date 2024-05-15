@@ -442,7 +442,7 @@ matchWithDict [cls, mty]
     -- Check that C is a class of the form
     -- `class C a_1 ... a_n where op :: meth_ty`
   , Just dict_dc <- isUnaryClassTyCon_maybe dict_tc
-  , [inst_meth_ty] <- dataConInstOrigArgTys dict_dc dict_args
+  , [inst_meth_ty] <- dataConInstArgTys dict_dc dict_args
   = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
        ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls openAlphaTy)
        ; wd_cls <- tcLookupClass withDictClassName

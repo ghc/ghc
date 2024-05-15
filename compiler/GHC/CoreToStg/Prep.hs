@@ -1357,7 +1357,7 @@ isUnaryClassApp v args
                  (mkTyConApp tycon ty_args)
                  (scaledThing meth_ty)
       where
-        [meth_ty] = dataConInstOrigArgTys (tyConSingleDataCon tycon) ty_args
+        [meth_ty] = dataConInstArgTys (tyConSingleDataCon tycon) ty_args
 
 getUnaryClassPayload :: TyCon -> [ArgInfo] -> Maybe (CoreExpr, [Type], [ArgInfo])
 getUnaryClassPayload tc args
