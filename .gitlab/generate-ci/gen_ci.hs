@@ -752,6 +752,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , "BUILD_FLAVOUR" =: flavourString jobFlavour
       , "BIGNUM_BACKEND" =: bignumString (bignumBackend buildConfig)
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
+      , "INSTALL_CONFIGURE_ARGS" =: "--enable-strict-ghc-toolchain-check"
       , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
       , maybe mempty ("CROSS_TARGET" =:) (crossTarget buildConfig)
       , case crossEmulator buildConfig of
