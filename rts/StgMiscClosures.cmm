@@ -939,6 +939,13 @@ INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN_
 INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY", "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY")
 { foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN_DIRTY object (%p) entered!", R1) never returns; }
 
+/* empty arrays */
+
+CLOSURE(stg_EMPTY_ARR_WORDS_closure, stg_ARR_WORDS, 0);
+CLOSURE(stg_EMPTY_SMALL_ARR_PTRS_closure, stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN, 0);
+CLOSURE(stg_EMPTY_ARR_PTRS_closure, stg_MUT_ARR_PTRS_FROZEN_CLEAN, 0, 0);
+
+
 /* ----------------------------------------------------------------------------
    Mutable Variables
    ------------------------------------------------------------------------- */

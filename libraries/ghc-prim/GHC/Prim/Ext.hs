@@ -4,6 +4,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 
 {-# OPTIONS_GHC -Wno-orphans -Wno-inline-rule-shadowing #-}
 
@@ -39,12 +43,16 @@ module GHC.Prim.Ext
   , asyncWrite#
   , asyncDoProc#
 #endif
+  -- * Empty Arrays
+  , newEmptyByteArray#
+  , newEmptySmallArray#
+  , newEmptyArray#
   ) where
 
 import GHC.Prim
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Types ()
+import GHC.Types (RuntimeRep(..), Levity)
 
 default () -- Double and Integer aren't available yet
 
@@ -89,6 +97,24 @@ foreign import prim "stg_asyncDoProczh" asyncDoProc#
 foreign import prim "stg_getThreadAllocationCounterzh" getThreadAllocationCounter#
   :: State# RealWorld
   -> (# State# RealWorld, Int64# #)
+
+------------------------------------------------------------------------
+-- Empty Arrays
+------------------------------------------------------------------------
+
+-- | Always returns the same pre-allocated empty array on invocation.
+foreign import prim "stg_newEmptyByteArrayzh"
+  newEmptyByteArray# :: (# #) -> ByteArray#
+
+-- | Always returns the same pre-allocated empty array on invocation.
+foreign import prim "stg_newEmptySmallArrayzh"
+  newEmptySmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)).
+  (# #) -> SmallArray# a
+
+-- | Always returns the same pre-allocated empty array on invocation.
+foreign import prim "stg_newEmptyArrayzh"
+  newEmptyArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)).
+  (# #) -> Array# a
 
 ------------------------------------------------------------------------
 -- Rules for primops that don't need to be built-in

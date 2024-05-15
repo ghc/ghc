@@ -256,6 +256,12 @@ RTS_CLOSURE(stg_END_STM_WATCH_QUEUE_closure);
 RTS_CLOSURE(stg_END_STM_CHUNK_LIST_closure);
 RTS_CLOSURE(stg_NO_TREC_closure);
 
+/* empty array closures */
+RTS_CLOSURE(stg_EMPTY_ARR_WORDS_closure);
+RTS_CLOSURE(stg_EMPTY_SMALL_ARR_PTRS_closure);
+RTS_CLOSURE(stg_EMPTY_ARR_PTRS_closure);
+
+
 RTS_ENTRY(stg_NO_FINALIZER);
 
 #if IN_STG_CODE

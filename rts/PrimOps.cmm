@@ -63,6 +63,12 @@ import CLOSURE stg_C_FINALIZER_LIST_info;
 import CLOSURE stg_DEAD_WEAK_info;
 import CLOSURE stg_END_STM_WATCH_QUEUE_closure;
 import CLOSURE stg_END_TSO_QUEUE_closure;
+
+// Empty Arrays
+import CLOSURE stg_EMPTY_ARR_WORDS_closure;
+import CLOSURE stg_EMPTY_SMALL_ARR_PTRS_closure;
+import CLOSURE stg_EMPTY_ARR_PTRS_closure;
+
 import CLOSURE stg_IND_info;
 import CLOSURE stg_MSG_NULL_info;
 import CLOSURE stg_MUT_ARR_PTRS_DIRTY_info;
@@ -197,6 +203,12 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(p) = n;
     return (p);
+}
+
+stg_newEmptyByteArrayzh ( )
+// (# #) -> ByteArray#
+{
+    return (stg_EMPTY_ARR_WORDS_closure);
 }
 
 stg_isByteArrayPinnedzh ( gcptr ba )
@@ -424,6 +436,12 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     return (arr);
 }
 
+stg_newEmptyArrayzh ( )
+// (# #) -> Array# a
+{
+    return (stg_EMPTY_ARR_PTRS_closure);
+}
+
 stg_unsafeThawArrayzh ( gcptr arr )
 {
     // A MUT_ARR_PTRS always lives on a mut_list, but a MUT_ARR_PTRS_FROZEN
@@ -538,6 +556,12 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     }
 
     return (arr);
+}
+
+stg_newEmptySmallArrayzh ( )
+// (# #) -> Array# a
+{
+    return (stg_EMPTY_SMALL_ARR_PTRS_closure);
 }
 
 stg_unsafeThawSmallArrayzh ( gcptr arr )

@@ -731,7 +731,13 @@ legalOutgoingTyCon dflags _ tc
 -- but there are no values of type RealWorld or TYPE LiftedRep,
 -- so it doesn't make sense to use them in FFI.
 marshalablePrimTyCon :: TyCon -> Bool
-marshalablePrimTyCon tc = isPrimTyCon tc && not (isLiftedTypeKind (tyConResKind tc))
+marshalablePrimTyCon tc =
+  not (isLiftedTypeKind (tyConResKind tc)) &&
+  ( -- Int#, Char# etc.
+    isPrimTyCon tc ||
+    -- Check for (# #)
+    (isUnboxedTupleTyCon tc && tyConArity tc == 0)
+  )
 
 marshalableTyCon :: DynFlags -> TyCon -> Validity' TypeCannotBeMarshaledReason
 marshalableTyCon dflags tc

@@ -741,11 +741,19 @@ loop:
       case CONSTR_0_1:
       case CONSTR_0_2:
       case CONSTR_NOCAF:
+      case ARR_WORDS:
           /* no need to put these on the static linked list, they don't need
            * to be scavenged.
            */
           return;
 
+      case MUT_ARR_PTRS_CLEAN:
+      case MUT_ARR_PTRS_DIRTY:
+      case MUT_ARR_PTRS_FROZEN_DIRTY:
+      case MUT_ARR_PTRS_FROZEN_CLEAN:
+          /* Currently only empty arrows hit this case. We might want to support
+             off-heap array in the future so separating those out.
+          */
       default:
           barf("evacuate(static): strange closure type %d", (int)(info->type));
       }
