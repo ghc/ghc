@@ -1564,6 +1564,7 @@ data PrimRep
 
 data PrimOrVoidRep = VoidRep | NVRep PrimRep
   -- See Note [VoidRep] in GHC.Types.RepType
+  deriving (Data.Data, Eq, Ord, Show)
 
 data PrimElemRep
   = Int8ElemRep
