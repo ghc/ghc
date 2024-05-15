@@ -58,6 +58,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
@@ -122,6 +123,7 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-validate"
     }
@@ -183,6 +185,7 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-validate+llvm",
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb12-validate+llvm"
     }
@@ -244,6 +247,7 @@
       "BIN_DIST_NAME": "ghc-i386-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb10-validate"
     }
@@ -306,6 +310,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
@@ -372,7 +377,7 @@
       "BROKEN_TESTS": "encoding004 T10458",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-alpine3_18-validate",
       "XZ_OPT": "-9"
@@ -435,6 +440,7 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-validate",
       "XZ_OPT": "-9"
@@ -497,6 +503,7 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb11-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb11-validate",
       "XZ_OPT": "-9"
@@ -559,6 +566,7 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-validate+llvm",
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb12-validate+llvm",
       "XZ_OPT": "-9"
@@ -621,6 +629,7 @@
       "BIN_DIST_NAME": "ghc-i386-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb10-validate",
       "XZ_OPT": "-9"
@@ -684,6 +693,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "10.13",
       "NIX_SYSTEM": "x86_64-darwin",
@@ -753,7 +763,7 @@
       "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static",
       "XZ_OPT": "-9"
@@ -817,7 +827,7 @@
       "BROKEN_TESTS": "encoding004 T10458",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate",
       "XZ_OPT": "-9"
@@ -881,7 +891,7 @@
       "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static",
       "XZ_OPT": "-9"
@@ -945,7 +955,7 @@
       "BROKEN_TESTS": "encoding004 T10458",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-validate",
       "XZ_OPT": "-9"
@@ -1202,6 +1212,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=no-sphinx",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-centos7-validate",
       "XZ_OPT": "-9"
@@ -1264,6 +1275,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-int_native-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-int_native-validate",
       "XZ_OPT": "-9"
@@ -1326,6 +1338,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-no_tntc-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-tables-next-to-code --enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate",
       "XZ_OPT": "-9"
@@ -1389,6 +1402,7 @@
       "BUILD_FLAVOUR": "slow-validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "ENABLE_NUMA": "1",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate",
       "XZ_OPT": "-9"
@@ -1451,6 +1465,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-unreg-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-unregisterised --enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-unreg-validate",
       "XZ_OPT": "-9"
@@ -1513,6 +1528,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate",
       "XZ_OPT": "-9"
@@ -1575,6 +1591,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+debug_info",
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+debug_info",
       "XZ_OPT": "-9"
@@ -1637,6 +1654,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-zstd-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-ipe-data-compression --enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-zstd-validate",
       "XZ_OPT": "-9"
@@ -1701,6 +1719,7 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
       "XZ_OPT": "-9"
@@ -1766,6 +1785,7 @@
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
       "XZ_OPT": "-9"
@@ -1828,6 +1848,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-validate",
       "XZ_OPT": "-9"
@@ -1890,6 +1911,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-validate+boot_nonmoving_gc",
       "BUILD_FLAVOUR": "validate+boot_nonmoving_gc",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity",
       "TEST_ENV": "x86_64-linux-deb11-validate+boot_nonmoving_gc",
       "XZ_OPT": "-9"
@@ -1952,6 +1974,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate",
       "XZ_OPT": "-9"
@@ -2014,6 +2037,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-validate+llvm",
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+llvm",
       "XZ_OPT": "-9"
@@ -2077,6 +2101,7 @@
       "BUILD_FLAVOUR": "validate+thread_sanitizer_cmm",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=none",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+thread_sanitizer_cmm",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions",
@@ -2140,6 +2165,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb9-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb9-validate",
       "XZ_OPT": "-9"
@@ -2202,6 +2228,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
@@ -2267,6 +2294,7 @@
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--haddock-for-hackage",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
@@ -2331,6 +2359,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-validate+debug_info",
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
@@ -2395,6 +2424,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora38-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora38-validate",
       "XZ_OPT": "-9"
@@ -2457,6 +2487,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-rocky8-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-rocky8-validate",
       "XZ_OPT": "-9"
@@ -2519,6 +2550,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu18_04-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu18_04-validate",
       "XZ_OPT": "-9"
@@ -2581,6 +2613,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu20_04-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu20_04-validate",
       "XZ_OPT": "-9"
@@ -2641,6 +2674,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "GHC_VERSION": "9.6.4",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
@@ -2703,6 +2737,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "GHC_VERSION": "9.6.4",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
@@ -2769,6 +2804,7 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx-pdfs",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
@@ -2837,7 +2873,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-alpine3_18-release+no_split_sections",
       "XZ_OPT": "-9"
@@ -2902,6 +2938,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-release+no_split_sections",
       "XZ_OPT": "-9"
@@ -2966,6 +3003,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb11-release+no_split_sections",
       "XZ_OPT": "-9"
@@ -3030,6 +3068,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb10-release+no_split_sections",
       "XZ_OPT": "-9"
@@ -3094,6 +3133,7 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx-pdfs",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "10.13",
       "NIX_SYSTEM": "x86_64-darwin",
@@ -3165,7 +3205,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-release+fully_static",
       "XZ_OPT": "-9"
@@ -3231,7 +3271,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-release+fully_static+no_split_sections",
       "XZ_OPT": "-9"
@@ -3297,7 +3337,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-release+no_split_sections",
       "XZ_OPT": "-9"
@@ -3363,7 +3403,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-release+no_split_sections",
       "XZ_OPT": "-9"
@@ -3429,6 +3469,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-centos7-release+no_split_sections",
       "XZ_OPT": "-9"
@@ -3493,6 +3534,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-release",
       "XZ_OPT": "-9"
@@ -3557,6 +3599,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-release+debug_info",
       "XZ_OPT": "-9"
@@ -3621,6 +3664,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-release",
       "XZ_OPT": "-9"
@@ -3685,6 +3729,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-release",
       "XZ_OPT": "-9"
@@ -3749,6 +3794,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb9-release+no_split_sections",
       "XZ_OPT": "-9"
@@ -3813,6 +3859,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
@@ -3879,6 +3926,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
@@ -3945,6 +3993,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--haddock-for-hackage --hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
@@ -4011,6 +4060,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora38-release",
       "XZ_OPT": "-9"
@@ -4075,6 +4125,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-rocky8-release",
       "XZ_OPT": "-9"
@@ -4139,6 +4190,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu18_04-release",
       "XZ_OPT": "-9"
@@ -4203,6 +4255,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu20_04-release",
       "XZ_OPT": "-9"
@@ -4264,6 +4317,7 @@
       "GHC_VERSION": "9.6.4",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx-pdfs",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
@@ -4327,6 +4381,7 @@
       "GHC_VERSION": "9.6.4",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx-pdfs",
       "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
@@ -4392,6 +4447,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "10.13",
       "NIX_SYSTEM": "x86_64-darwin",
@@ -4460,7 +4516,7 @@
       "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static"
     }
@@ -4713,6 +4769,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-int_native-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-int_native-validate"
     }
@@ -4775,6 +4832,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-no_tntc-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-tables-next-to-code --enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate"
     }
@@ -4837,6 +4895,7 @@
       "BUILD_FLAVOUR": "slow-validate",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "ENABLE_NUMA": "1",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate"
     }
@@ -4898,6 +4957,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-unreg-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-unregisterised --enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-unreg-validate"
     }
@@ -4959,6 +5019,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+debug_info",
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+debug_info"
     }
@@ -5020,6 +5081,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-zstd-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-ipe-data-compression --enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-zstd-validate"
     }
@@ -5083,6 +5145,7 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
     }
@@ -5147,6 +5210,7 @@
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate"
     }
@@ -5208,6 +5272,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-validate+boot_nonmoving_gc",
       "BUILD_FLAVOUR": "validate+boot_nonmoving_gc",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity",
       "TEST_ENV": "x86_64-linux-deb11-validate+boot_nonmoving_gc"
     }
@@ -5269,6 +5334,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-validate+llvm",
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+llvm"
     }
@@ -5332,6 +5398,7 @@
       "BUILD_FLAVOUR": "validate+thread_sanitizer_cmm",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=none",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb12-validate+thread_sanitizer_cmm",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
@@ -5394,6 +5461,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-release",
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
       "RUNTEST_ARGS": "",
@@ -5455,6 +5523,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "GHC_VERSION": "9.6.4",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
+      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
