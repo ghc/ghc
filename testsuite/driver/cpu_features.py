@@ -17,6 +17,11 @@ SUPPORTED_CPU_FEATURES = {
 cpu_feature_cache = None
 
 def get_cpu_features():
+    # we're testing a cross ghc, don't attempt to detect host cpu
+    # configuration
+    if config.target_wrapper is not None:
+        return {}
+
     if config.os in ['mingw32', 'linux'] and os.path.exists('/proc/cpuinfo'):
         with open('/proc/cpuinfo') as x:
             f = x.read()
