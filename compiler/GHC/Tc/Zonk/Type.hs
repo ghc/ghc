@@ -600,8 +600,6 @@ zonkIdBndr :: TcId -> ZonkTcM Id
 zonkIdBndr v
   = do { Scaled w' ty' <- zonkScaledTcTypeToTypeX (idScaledType v)
        ; return $ setIdMult (setIdType v ty') w' }
-  where
-    unf = realIdUnfolding v
 
 zonkIdBndrs :: [TcId] -> ZonkTcM [Id]
 zonkIdBndrs ids = mapM zonkIdBndr ids
