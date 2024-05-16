@@ -67,7 +67,7 @@ module GHC.Tc.Utils.TcType (
   --------------------------------
   -- Splitters
   getTyVar, getTyVar_maybe, getCastedTyVar_maybe,
-  tcSplitForAllTyVarBinder_maybe,
+  tcSplitForAllTyVarBinder_maybe, tcSplitForAllTyVarsReqTVBindersN,
   tcSplitForAllTyVars, tcSplitForAllInvisTyVars, tcSplitSomeForAllTyVars,
   tcSplitForAllReqTVBinders, tcSplitForAllInvisTVBinders,
   tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllTyVarBinders,
@@ -1409,6 +1409,18 @@ tcSplitSomeForAllTyVars argf_pred ty
       | argf_pred argf                             = split ty ty (tv:tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
+
+tcSplitForAllTyVarsReqTVBindersN :: Arity -> Type -> (Arity, [ForAllTyBinder], Type)
+-- Split off at most N /required/ (aka visible) binders, plus any invisible ones
+-- in the way, /and/ any trailing invisible ones
+tcSplitForAllTyVarsReqTVBindersN n_req ty
+  = split n_req ty ty []
+  where
+    split n_req _orig_ty (ForAllTy b@(Bndr _ argf) ty) bs
+      | isVisibleForAllTyFlag argf, n_req > 0           = split (n_req - 1) ty ty (b:bs)
+      | otherwise                                       = split n_req       ty ty (b:bs)
+    split n_req orig_ty ty bs | Just ty' <- coreView ty = split n_req orig_ty ty' bs
+    split n_req orig_ty _ty bs                          = (n_req, reverse bs, orig_ty)
 
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. All split tyvars are annotated with '()'.

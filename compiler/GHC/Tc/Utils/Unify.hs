@@ -350,8 +350,8 @@ Some wrinkles
       The implication constraint will look like
           forall a b. (Eq a, Ord b) => <constraints>
       See the loop in GHC.Tc.Utils.Instantiate.topSkolemise.
-      This is just an optimisation; it would be fine to generate one implication
-      constraint for each nesting layer.
+      and Note [Skolemisation en-bloc] in that module
+
 
 Some examples:
 
@@ -777,29 +777,40 @@ matchExpectedFunTys herald _ arity (Infer inf_res) thing_inside
        ; return (mkWpCastN co, result) }
 
 matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
-  = check 0 [] top_ty
+  = check arity [] top_ty
   where
     check :: VisArity -> [ExpPatType] -> TcSigmaType -> TcM (HsWrapper, a)
     -- `check` is called only in the Check{} case
     -- It collects rev_pat_tys in reversed order
-    -- n_so_far is the number of /visible/ arguments seen so far:
-    --     i.e. length (filterOut isExpForAllPatTyInvis rev_pat_tys)
+    -- n_req is the number of /visible/ arguments still needed
 
-    -- Do shallow skolemisation if there are top-level invisible quantifiers
-    check n_so_far rev_pat_tys ty
-      | isSigmaTy ty  -- Type has invisible quantifiers
-      = do { (wrap_gen, (wrap_res, result))
-                 <- tcSkolemiseGeneral Shallow ctx top_ty ty $ \tv_bndrs ty' ->
-                    let rev_pat_tys' = reverse (map (mkInvisExpPatType . snd) tv_bndrs)
-                                       ++ rev_pat_tys
-                    in check n_so_far rev_pat_tys' ty'
-           ; return (wrap_gen <.> wrap_res, result) }
+    ----------------------------
+    -- Skolemise quantifiers, both visible (up to n_req) and invisible
+    -- See Note [Visible type application and abstraction] in GHC.Tc.Gen.App
+    check n_req rev_pat_tys ty
+      | isSigmaTy ty                     -- An invisible quantifier at the top
+        || (n_req > 0 && isForAllTy ty)  -- A visible quantifier at top, and we need it
+      = do { rec { (n_req', wrap_gen, tv_nms, bndrs, given, inner_ty) <- skolemiseRequired skol_info n_req ty
+                 ; let sig_skol = SigSkol ctx top_ty (tv_nms `zip` skol_tvs)
+                       skol_tvs = binderVars bndrs
+                 ; skol_info <- mkSkolemInfo sig_skol }
+             -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
+             --           in GHC.Tc.Utils.TcType
+           ; (ev_binds, (wrap_res, result))
+                  <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
+                     check n_req'
+                           (reverse (map ExpForAllPatTy bndrs) ++ rev_pat_tys)
+                           inner_ty
+           ; assertPpr (not (null bndrs && null given)) (ppr ty) $
+                       -- The guard ensures that we made some progress
+             return (wrap_gen <.> mkWpLet ev_binds <.> wrap_res, result) }
 
-    -- (n_so_far == arity): no more args
-    -- rho_ty has no top-level quantifiers
-    -- If there is deep subsumption, do deep skolemisation
-    check n_so_far rev_pat_tys rho_ty
-      | n_so_far == arity
+    ----------------------------
+    -- Base case: (n_req == 0): no more args
+    --    The earlier skolemisation ensurs that rho_ty has no top-level invisible quantifiers
+    --    If there is deep subsumption, do deep skolemisation now
+    check n_req rev_pat_tys rho_ty
+      | n_req == 0
       = do { let pat_tys = reverse rev_pat_tys
            ; ds_flag <- getDeepSubsumptionFlag
            ; case ds_flag of
@@ -810,52 +821,34 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
                           -- They do not line up with binders in the Match
                           thing_inside pat_tys (mkCheckExpType rho_ty) }
 
-    -- NOW do coreView.  We didn't do it before, so that we do not unnecessarily
-    -- unwrap a synonym in the returned rho_ty
-    check n_so_far rev_pat_tys ty
-      | Just ty' <- coreView ty = check n_so_far rev_pat_tys ty'
-
-    -- Decompose /visible/ (forall a -> blah), to give an ExpForAllPat
-    -- NB: invisible binders are handled by tcSplitSigmaTy/tcTopSkolemise above
-    -- NB: visible foralls "count" for the Arity argument; they correspond
-    --     to syntactically visible patterns in the source program
-    -- See Note [Visible type application and abstraction] in GHC.Tc.Gen.App
-    check n_so_far rev_pat_tys ty
-      | Just (Bndr tv vis, body_ty) <- splitForAllForAllTyBinder_maybe ty
-      = assertPpr (isVisibleForAllTyFlag vis) (ppr ty) $
-        -- isSigmaTy case above has dealt with /invisible/ quantifiers,
-        -- so this one must be /visible/ (= Required)
-        do { let init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
-             -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
-             --           in GHC.Tc.Utils.TcType
-           ; rec { (subst', [tv']) <- tcInstSkolTyVarsX skol_info init_subst [tv]
-                 ; let tv_prs = [(tyVarName tv, tv')]
-                 ; skol_info <- mkSkolemInfo (SigSkol ctx top_ty tv_prs) }
-           ; let body_ty' = substTy subst' body_ty
-                 pat_ty   = ExpForAllPatTy (mkForAllTyBinder Required tv')
-           ; (ev_binds, (wrap_res, result)) <- checkConstraints (getSkolemInfo skol_info) [tv'] [] $
-                                               check (n_so_far+1) (pat_ty : rev_pat_tys) body_ty'
-           ; let wrap_gen = mkWpVisTyLam tv' body_ty' <.> mkWpLet ev_binds
-           ; return (wrap_gen <.> wrap_res, result) }
-
-    check n_so_far rev_pat_tys (FunTy { ft_af = af, ft_mult = mult
-                                      , ft_arg = arg_ty, ft_res = res_ty })
+    ----------------------------
+    -- Function types
+    check n_req rev_pat_tys (FunTy { ft_af = af, ft_mult = mult
+                                   , ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
-        do { let arg_pos = n_so_far + 1
+        do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
-           ; (wrap_res, result) <- check arg_pos
+           ; (wrap_res, result) <- check (n_req - 1)
                                          (mkCheckExpFunPatTy (Scaled mult arg_ty) : rev_pat_tys)
                                          res_ty
            ; let wrap_arg = mkWpCastN arg_co
                  fun_wrap = mkWpFun wrap_arg wrap_res (Scaled mult arg_ty) res_ty
            ; return (fun_wrap, result) }
 
-    check n_so_far rev_pat_tys ty@(TyVarTy tv)
+    ----------------------------
+    -- Type variables
+    check n_req rev_pat_tys ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> check n_so_far rev_pat_tys ty'
-               Flexi        -> defer n_so_far rev_pat_tys ty }
+               Indirect ty' -> check n_req rev_pat_tys ty'
+               Flexi        -> defer n_req rev_pat_tys ty }
+
+    ----------------------------
+    -- NOW do coreView.  We didn't do it before, so that we do not unnecessarily
+    -- unwrap a synonym in the returned rho_ty
+    check n_req rev_pat_tys ty
+      | Just ty' <- coreView ty = check n_req rev_pat_tys ty'
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -872,14 +865,14 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    check n_so_far rev_pat_tys res_ty
+    check n_req rev_pat_tys res_ty
       = addErrCtxtM (mkFunTysMsg herald (arity, top_ty))  $
-        defer n_so_far rev_pat_tys res_ty
+        defer n_req rev_pat_tys res_ty
 
     ------------
     defer :: VisArity -> [ExpPatType] -> TcRhoType -> TcM (HsWrapper, a)
-    defer n_so_far rev_pat_tys fun_ty
-      = do { more_arg_tys <- mapM (new_check_arg_ty herald) [n_so_far + 1 .. arity]
+    defer n_req rev_pat_tys fun_ty
+      = do { more_arg_tys <- mapM (new_check_arg_ty herald) [arity - n_req + 1 .. arity]
            ; let all_pats = reverse rev_pat_tys ++ map mkCheckExpFunPatTy more_arg_tys
            ; res_ty <- newOpenFlexiTyVarTy
            ; result <- thing_inside all_pats (mkCheckExpType res_ty)
@@ -894,7 +887,7 @@ new_infer_arg_ty herald arg_pos -- position for error messages only
        ; return (mkScaled mult inf_hole) }
 
 new_check_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled TcType)
-new_check_arg_ty herald arg_pos -- Position for error messages only
+new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first arg
   = do { mult   <- newFlexiTyVarTy multiplicityTy
        ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy herald arg_pos)
        ; return (mkScaled mult arg_ty) }

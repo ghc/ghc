@@ -11,7 +11,7 @@
 -}
 
 module GHC.Tc.Utils.Instantiate (
-     topSkolemise,
+     topSkolemise, skolemiseRequired,
      topInstantiate,
      instantiateSigma,
      instCall, instDFunType, instStupidTheta, instTyVarsWith,
@@ -75,7 +75,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Zonk.Monad ( ZonkM )
 
 import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Types.Basic ( TypeOrKind(..), Arity )
+import GHC.Types.Basic ( TypeOrKind(..), Arity, VisArity )
 import GHC.Types.Error
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
@@ -145,22 +145,16 @@ newMethodFromName origin name ty_args
 Note [Skolemisation]
 ~~~~~~~~~~~~~~~~~~~~
 topSkolemise decomposes and skolemises a type, returning a type
-with no top level foralls or (=>)
+with no top level foralls or (=>).
 
 Examples:
 
   topSkolemise (forall a. Ord a => a -> a)
     =  ( wp, [a], [d:Ord a], a->a )
-    where wp = /\a. \(d:Ord a). <hole> a d
+    where
+      wp = /\a. \(d:Ord a). <hole> a d
 
-  topSkolemise  (forall a. Ord a => forall b. Eq b => a->b->b)
-    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], a->b->b )
-    where wp = /\a.\(d1:Ord a)./\b.\(d2:Ord b). <hole> a d1 b d2
-
-This second example is the reason for the recursive 'go' function in
-topSkolemise: we remove successive layers of foralls and (=>).  This
-is really just an optimisation; see wrinkle (SK1) in GHC.Tc.Utils.Unify
-Note [Skolemisation overview].
+For nested foralls, see Note [Skolemisation en-bloc]
 
 In general,
   if      topSkolemise ty = (wrap, tvs, evs, rho)
@@ -168,6 +162,41 @@ In general,
   then    wrap e :: ty
     and   'wrap' binds {tvs, evs}
 
+Note [Skolemisation en-bloc]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this case:
+
+  topSkolemise  (forall a. Ord a => forall b. Eq b => a->b->b)
+
+We /could/ return just
+  (wp, [a], [d:Ord a, forall b. Eq b => a -> b -> b)
+
+But in fact we skolemise "en-bloc", looping around (in `topSkolemise` for
+example) to skolemise the (forall b. Eq b =>).  So in fact
+
+  topSkolemise  (forall a. Ord a => forall b. Eq b => a->b->b)
+    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], a->b->b )
+    where
+      wp = /\a.\(d1:Ord a)./\b.\(d2:Ord b). <hole> a d1 b d2
+
+This applies regardless of DeepSubsumption.
+
+Why do we do this "en-bloc" loopy thing?  It is /nearly/ just an optimisation.
+But not quite!  At the call site of `topSkolemise` (and its cousins) we
+use `checkConstraints` to gather constraints and build an implication
+constraint.   So skolemising just one level at a time would lead to nested
+implication constraints. That is a bit less efficient, but there is /also/ a small
+user-visible effect: see Note [Let-bound skolems] in GHC.Tc.Solver.InertSet.
+Specifically, consider
+
+   forall a. Eq a => forall b. (a ~ [b]) => blah
+
+If we skolemise en-bloc, the equality (a~[b]) is like a let-binding and we
+don't treat it like a GADT pattern match, limiting unification. With nested
+implications, the inner one would be treated as having-given-equalities.
+
+This is also relevant when Required foralls are involved; see #24810, and
+the loop in `skolemiseRequired`.
 -}
 
 topSkolemise :: SkolemInfo
@@ -182,7 +211,7 @@ topSkolemise skolem_info ty
   where
     init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
 
-    -- Why recursive?  See Note [Skolemisation]
+    -- Why recursive?  See Note [Skolemisation en-bloc]
     go subst wrap tv_prs ev_vars ty
       | (bndrs, theta, inner_ty) <- tcSplitSigmaTyBndrs ty
       , let tvs = binderVars bndrs
@@ -200,6 +229,51 @@ topSkolemise skolem_info ty
 
       | otherwise
       = return (wrap, tv_prs, ev_vars, substTy subst ty)
+        -- substTy is a quick no-op on an empty substitution
+
+skolemiseRequired :: SkolemInfo -> VisArity -> TcSigmaType
+                  -> TcM (VisArity, HsWrapper, [Name], [ForAllTyBinder], [EvVar], TcRhoType)
+-- Skolemise up to N required (visible) binders,
+--    plus any invisible ones "in the way",
+--    /and/ any trailing invisible ones.
+-- So the result has no top-level invisible quantifiers.
+-- Return the depleted arity.
+skolemiseRequired skolem_info n_req sigma
+  = go n_req init_subst idHsWrapper [] [] [] sigma
+  where
+    init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType sigma))
+
+    -- Why recursive?  See Note [Skolemisation en-bloc]
+    go n_req subst wrap acc_nms acc_bndrs ev_vars ty
+      | (n_req', bndrs, inner_ty) <- tcSplitForAllTyVarsReqTVBindersN n_req ty
+      , not (null bndrs)
+      = do { (subst', bndrs1) <- tcInstSkolTyVarBndrsX skolem_info subst bndrs
+           ; let tvs1 = binderVars bndrs1
+                 -- fix_up_vis: see Note [Required foralls in Core]
+                 --             in GHC.Core.TyCo.Rep
+                 fix_up_vis | n_req == n_req'
+                            = idHsWrapper
+                            | otherwise
+                            = mkWpForAllCast bndrs1 (substTy subst' inner_ty)
+           ; go n_req' subst'
+                (wrap <.> fix_up_vis <.> mkWpTyLams tvs1)
+                (acc_nms   ++ map (tyVarName . binderVar) bndrs)
+                (acc_bndrs ++ bndrs1)
+                ev_vars
+                inner_ty }
+
+      | (theta, inner_ty) <- tcSplitPhiTy ty
+      , not (null theta)
+      = do { ev_vars1 <- newEvVars (substTheta subst theta)
+           ; go n_req subst
+                (wrap <.> mkWpEvLams ev_vars1)
+                acc_nms
+                acc_bndrs
+                (ev_vars ++ ev_vars1)
+                inner_ty }
+
+      | otherwise
+      = return (n_req, wrap, acc_nms, acc_bndrs, ev_vars, substTy subst ty)
         -- substTy is a quick no-op on an empty substitution
 
 topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
