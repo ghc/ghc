@@ -54,6 +54,8 @@ import GHC.Data.FastString
 import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
+import GHC.Builtin.Types.Prim (fUNTyCon)
+import GHC.Core.Multiplicity
 
 {-
 
@@ -211,6 +213,7 @@ tc_match_tys_x bind_me match_kis (Subst in_scope id_env tv_env cv_env) tys1 tys2
                       False  -- Matching, not unifying
                       False  -- Not an injectivity check
                       match_kis
+                      RespectMultiplicities
                       (mkRnEnv2 in_scope) tv_env cv_env tys1 tys2 of
       Unifiable (tv_env', cv_env')
         -> Just $ Subst in_scope id_env tv_env' cv_env'
@@ -229,6 +232,7 @@ ruleMatchTyKiX tmpl_tvs rn_env tenv tmpl target
 -- See Note [Kind coercions in Unify]
   = case tc_unify_tys (matchBindFun tmpl_tvs) False False
                       True -- <-- this means to match the kinds
+                      IgnoreMultiplicities
                       rn_env tenv emptyCvSubstEnv [tmpl] [target] of
       Unifiable (tenv', _) -> Just tenv'
       _                    -> Nothing
@@ -394,6 +398,34 @@ types are apart. This has practical consequences for the ability for closed
 type family applications to reduce. See test case
 indexed-types/should_compile/Overlap14.
 
+Note [Rewrite rules ignore multiplicities in FunTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following (higher-order) rule:
+
+m :: Bool -> Bool -> Bool
+{-# RULES "m" forall f. m (f True) = f #-}
+
+let x = m ((,) @Bool @Bool True True)
+
+The rewrite rule expects an `f :: Bool -> Bool`, but `(,) @Bool @Bool True ::
+Bool %1 -> Bool` is linear (see Note [Data constructors are linear by default]
+in GHC.Core.Multiplicity) Should the rule match? Yes! According to the
+principles laid out in Note [Linting linearity] in GHC.Core.Lint, optimisation
+shouldn't be constrained by linearity.
+
+However, when matching the template variable `f` to `(,) True`, we do check that
+their types unify (see Note [Matching variable types] in GHC.Core.Rules). So
+when unifying types for the sake of rule-matching, the unification algorithm
+must be able to ignore multiplicities altogether.
+
+The way we implement this deserves a comment. In unify_ty, `FunTy` is handled as
+if it was a regular type constructor. In this case, and when the types being
+unified are *function* arrows, but not constraint arrows, then the first
+argument is a multiplicity.
+
+We select this situation by comparing the type constructor with fUNTyCon. In
+this case, and this case only, we can safely drop the first argument (using the
+tail function) and unify the rest.
 -}
 
 -- | Simple unification of two types; all type variables are bindable
@@ -421,7 +453,7 @@ tcUnifyTyWithTFs :: Bool  -- ^ True <=> do two-way unification;
 -- The code is incorporated with the standard unifier for convenience, but
 -- its operation should match the specification in the paper.
 tcUnifyTyWithTFs twoWay in_scope t1 t2
-  = case tc_unify_tys alwaysBindFun twoWay True False
+  = case tc_unify_tys alwaysBindFun twoWay True False RespectMultiplicities
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
                        [t1] [t2] of
       Unifiable          (tv_subst, _cv_subst) -> Just $ maybe_fix tv_subst
@@ -530,7 +562,7 @@ tc_unify_tys_fg :: Bool
                 -> [Type] -> [Type]
                 -> UnifyResult
 tc_unify_tys_fg match_kis bind_fn tys1 tys2
-  = do { (env, _) <- tc_unify_tys bind_fn True False match_kis rn_env
+  = do { (env, _) <- tc_unify_tys bind_fn True False match_kis RespectMultiplicities rn_env
                                   emptyTvSubstEnv emptyCvSubstEnv
                                   tys1 tys2
        ; return $ niFixSubst in_scope env }
@@ -544,6 +576,7 @@ tc_unify_tys :: BindFun
              -> AmIUnifying -- ^ True <=> unify; False <=> match
              -> Bool        -- ^ True <=> doing an injectivity check
              -> Bool        -- ^ True <=> treat the kinds as well
+             -> MultiplicityFlag -- ^ see Note [Rewrite rules ignore multiplicities in FunTy] in GHC.Core.Unify
              -> RnEnv2
              -> TvSubstEnv  -- ^ substitution to extend
              -> CvSubstEnv
@@ -560,7 +593,7 @@ tc_unify_tys :: BindFun
 -- pair equal. Yet, we still don't need a separate pass to unify the kinds
 -- of these types, so it's appropriate to use the Ty variant of unification.
 -- See also Note [tcMatchTy vs tcMatchTyKi].
-tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
+tc_unify_tys bind_fn unif inj_check match_kis match_mults rn_env tv_env cv_env tys1 tys2
   = initUM tv_env cv_env $
     do { when match_kis $
          unify_tys env kis1 kis2
@@ -571,6 +604,7 @@ tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
                 , um_skols    = emptyVarSet
                 , um_unif     = unif
                 , um_inj_tf   = inj_check
+                , um_arr_mult = match_mults
                 , um_rn_env   = rn_env }
 
     kis1 = map typeKind tys1
@@ -1144,7 +1178,7 @@ unify_ty env ty1 ty2 _kco
   , Just (tc2, tys2) <- mb_tc_app2
   , tc1 == tc2
   = do { massertPpr (isInjectiveTyCon tc1 Nominal) (ppr tc1)
-       ; unify_tys env tys1 tys2
+       ; unify_tc_app tc1 tys1 tys2
        }
 
   -- TYPE and CONSTRAINT are not Apart
@@ -1174,6 +1208,20 @@ unify_ty env ty1 ty2 _kco
   where
     mb_tc_app1 = splitTyConApp_maybe ty1
     mb_tc_app2 = splitTyConApp_maybe ty2
+    unify_tc_app tc tys1 tys2
+      | tc == fUNTyCon
+      , IgnoreMultiplicities <- um_arr_mult env
+      , (_ : no_mult_tys1) <- tys1
+      , (_ : no_mult_tys2) <- tys2
+      = -- We're comparing function arrow types here (not constraint arrow
+        -- types!), and they have at least one argument, which is the arrow's
+        -- multiplicity annotation. The flag `um_arr_mult` instructs us to
+        -- ignore multiplicities in this very case. This is a little tricky: see
+        -- Note [Rewrite rules ignore multiplicities in FunTy].
+         unify_tys env no_mult_tys1 no_mult_tys2
+      | otherwise
+      = unify_tys env tys1 tys2
+
 
         -- Applications need a bit of care!
         -- They can match FunTy and TyConApp, so use splitAppTy_maybe
@@ -1409,6 +1457,10 @@ data UMEnv
           , um_inj_tf :: Bool
             -- Checking for injectivity?
             -- See (end of) Note [Specification of unification]
+
+          , um_arr_mult :: MultiplicityFlag
+            -- Whether to unify multiplicity arguments when unifying arrows.
+            -- See Note [Rewrite rules ignore multiplicities in FunTy]
 
           , um_rn_env :: RnEnv2
             -- Renaming InTyVars to OutTyVars; this eliminates

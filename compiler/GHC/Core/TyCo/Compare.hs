@@ -8,9 +8,10 @@
 module GHC.Core.TyCo.Compare (
 
     -- * Type comparison
-    eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
+    eqType, eqTypeOpt, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
     nonDetCmpTypesX, nonDetCmpTc,
     eqVarBndrs,
+    CmpTypeOpt (..), defaultCmpTypeOpt,
 
     pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck,
     tcEqTyConApps,
@@ -41,6 +42,7 @@ import GHC.Utils.Panic
 import GHC.Base (reallyUnsafePtrEquality#)
 
 import qualified Data.Semigroup as S
+import GHC.Core.Multiplicity
 
 {- GHC.Core.TyCo.Compare overview
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -500,9 +502,12 @@ eqType t1 t2 = isEqual $ nonDetCmpType t1 t2
   -- It's OK to use nonDetCmpType here and eqType is deterministic,
   -- nonDetCmpType does equality deterministically
 
+eqTypeOpt :: CmpTypeOpt -> Type -> Type -> Bool
+eqTypeOpt opt t1 t2 = isEqual $ nonDetCmpTypeOpt opt t1 t2
+
 -- | Compare types with respect to a (presumably) non-empty 'RnEnv2'.
 eqTypeX :: RnEnv2 -> Type -> Type -> Bool
-eqTypeX env t1 t2 = isEqual $ nonDetCmpTypeX env t1 t2
+eqTypeX env t1 t2 = isEqual $ nonDetCmpTypeX defaultCmpTypeOpt env t1 t2
   -- It's OK to use nonDetCmpType here and eqTypeX is deterministic,
   -- nonDetCmpTypeX does equality deterministically
 
@@ -536,17 +541,19 @@ comparing type variables is nondeterministic, note the call to nonDetCmpVar in
 nonDetCmpTypeX.
 See Note [Unique Determinism] for more details.
 -}
-
 nonDetCmpType :: Type -> Type -> Ordering
-nonDetCmpType !t1 !t2
+nonDetCmpType = nonDetCmpTypeOpt defaultCmpTypeOpt
+
+nonDetCmpTypeOpt :: CmpTypeOpt -> Type -> Type -> Ordering
+nonDetCmpTypeOpt _ !t1 !t2
   -- See Note [Type comparisons using object pointer comparisons]
   | 1# <- reallyUnsafePtrEquality# t1 t2
   = EQ
-nonDetCmpType (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2
+nonDetCmpTypeOpt _ (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2
   = EQ
-nonDetCmpType t1 t2
+nonDetCmpTypeOpt opt t1 t2
   -- we know k1 and k2 have the same kind, because they both have kind *.
-  = nonDetCmpTypeX rn_env t1 t2
+  = nonDetCmpTypeX opt rn_env t1 t2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes [t1, t2]))
 {-# INLINE nonDetCmpType #-}
@@ -566,10 +573,10 @@ data TypeOrdering = TLT  -- ^ @t1 < t2@
                   | TGT  -- ^ @t1 > t2@
                   deriving (Eq, Ord, Enum, Bounded)
 
-nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
+nonDetCmpTypeX :: CmpTypeOpt -> RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
     -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
     -- See Note [Computing equality on types]
-nonDetCmpTypeX env orig_t1 orig_t2 =
+nonDetCmpTypeX opt env orig_t1 orig_t2 =
     case go env orig_t1 orig_t2 of
       -- If there are casts then we also need to do a comparison of
       -- the kinds of the types being compared
@@ -628,9 +635,13 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     go env (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
         -- NB: nonDepCmpTypeX does the kind check requested by
         -- Note [Equality on FunTys] in GHC.Core.TyCo.Rep
-      = liftOrdering (nonDetCmpTypeX env s1 s2 S.<> nonDetCmpTypeX env t1 t2)
-          `thenCmpTy` go env w1 w2
+      = liftOrdering (nonDetCmpTypeX opt env s1 s2 S.<> nonDetCmpTypeX opt env t1 t2)
+          `thenCmpTy` cmp_mults
         -- Comparing multiplicities last because the test is usually true
+        where
+          cmp_mults = case cmp_multiplicity_in_funty opt of
+            RespectMultiplicities -> go env w1 w2
+            IgnoreMultiplicities -> TEQ
 
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
@@ -661,10 +672,33 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     gos _   _          []         = TGT
     gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
 
+{- Note [Respecting multiplicity when comparing types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally speaking, we respect multiplicities (i.e. the linear part of the type
+system) when comparing types.  Doing so is of course crucial during typechecking.
+
+But for reasons described in Note [Linting linearity] in GHC.Core.Lint, it is hard
+to ensure that Core is always type-correct when it comes to linearity.  So
+* `CmpTypeOpt` provides a way to compare types that /ignores/ multiplicities
+* We use this multiplicity-blind comparison very occasionally, notably
+    - in Core Lint: see Note [Linting linearity] in GHC.Core.Lint
+    - in rule matching: see Note [Rewrite rules ignore multiplicities in FunTy]
+      in GHC.Core.Unify
+-}
+data CmpTypeOpt = CmpTypeOpt
+  { -- Whether to consider `a -> b` and `a %1 -> b` distinct or equal. Default:
+    -- RespectMultiplicities. See Note [Respecting multiplicity when comparing types].
+    cmp_multiplicity_in_funty :: MultiplicityFlag
+  }
+
+defaultCmpTypeOpt :: CmpTypeOpt
+defaultCmpTypeOpt = CmpTypeOpt
+  { cmp_multiplicity_in_funty = RespectMultiplicities }
+
 -------------
 nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
 nonDetCmpTypesX _   []        []        = EQ
-nonDetCmpTypesX env (t1:tys1) (t2:tys2) = nonDetCmpTypeX env t1 t2 S.<>
+nonDetCmpTypesX env (t1:tys1) (t2:tys2) = nonDetCmpTypeX defaultCmpTypeOpt env t1 t2 S.<>
                                           nonDetCmpTypesX env tys1 tys2
 nonDetCmpTypesX _   []        _         = LT
 nonDetCmpTypesX _   _         []        = GT

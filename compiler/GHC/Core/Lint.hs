@@ -53,7 +53,7 @@ import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
-import GHC.Core.TyCo.Compare ( eqType, eqForAllVis )
+import GHC.Core.TyCo.Compare ( eqType, eqTypeOpt, defaultCmpTypeOpt, CmpTypeOpt (..), eqForAllVis )
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
@@ -3098,84 +3098,96 @@ we behave as follows (#15057, #T15664):
 
 Note [Linting linearity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Core understands linear types: linearity is checked with the flag
-`-dlinear-core-lint`. Why not make `-dcore-lint` check linearity?  Because
+Lint ignores linearity unless `-dlinear-core-lint` is set.  For why, see below.
+
+But first, "ignore linearity" specifically means two things. When ignoring linearity:
+* In `ensureEqTypes`, use `eqTypeOpt` with instructions to ignore multiplicities in FunTy.
+* In `ensureSubMult`, do nothing
+
+The behaviour of functions such as eqTypeOpt which may or may not ignore
+linearity is governed by a flag of type GHC.Core.Multiplicity.MultiplicityFlag.
+
+But why make `-dcore-lint` ignore linearity?  Because
 optimisation passes are not (yet) guaranteed to maintain linearity.  They should
 do so semantically (GHC is careful not to duplicate computation) but it is much
 harder to ensure that the statically-checkable constraints of Linear Core are
 maintained. The current Linear Core is described in the wiki at:
 https://gitlab.haskell.org/ghc/ghc/-/wikis/linear-types/implementation.
 
-Why don't the optimisation passes maintain the static types of Linear Core?
-Because doing so would cripple some important optimisations.  Here is an
-example:
+Here are some examples of how the optimiser can break linearity checking.  Other
+examples are documented in the linear-type implementation wiki page
+[https://gitlab.haskell.org/ghc/ghc/-/wikis/linear-types/implementation#core-to-core-passes]
 
-  data T = MkT {-# UNPACK #-} !Int
+* EXAMPLE 1: the binder swap transformation
+    Consider
 
-The wrapper for MkT is
+      data T = MkT {-# UNPACK #-} !Int
 
-  $wMkT :: Int %1 -> T
-  $wMkT n = case %1 n of
-    I# n' -> MkT n'
+    The wrapper for MkT is
 
-This introduces, in particular, a `case %1` (this is not actual Haskell or Core
-syntax), where the `%1` means that the `case` expression consumes its scrutinee
-linearly.
+      $wMkT :: Int %1 -> T
+      $wMkT n = case %1 n of
+        I# n' -> MkT n'
 
-Now, `case %1` interacts with the binder swap optimisation in a non-trivial
-way. Take a slightly modified version of the code for $wMkT:
+    This introduces, in particular, a `case %1` (this is not actual Haskell or
+    Core syntax), where the `%1` means that the `case` expression consumes its
+    scrutinee linearly.
 
-  case %1 x of z {
-    I# n' -> (x, n')
-  }
+    Now, `case %1` interacts with the binder swap optimisation in a non-trivial
+    way. Take a slightly modified version of the code for $wMkT:
 
-Binder-swap wants to change this to
+      case %1 x of z {
+        I# n' -> (x, n')
+      }
 
-  case %1 x of z {
-    I# n' -> let x = z in (x, n')
-  }
+    Binder-swap changes this to
 
-Now, this is not something that a linear type checker usually considers
-well-typed. It is not something that `-dlinear-core-lint` considers to be
-well-typed either. But it's only because `-dlinear-core-lint` is not good
-enough. However, making `-dlinear-core-lint` recognise this expression as valid
-is not obvious. There are many such interactions between a linear type system
-and GHC optimisations documented in the linear-type implementation wiki page
-[https://gitlab.haskell.org/ghc/ghc/-/wikis/linear-types/implementation#core-to-core-passes].
+      case %1 x of z {
+        I# n' -> let x = z in (x, n')
+      }
 
-PRINCIPLE: The type system bends to the optimisation, not the other way around.
+    This is rejected by `-dlinear-core-lint` because 1/ n' must be used linearly
+    2/ `-dlinear-core-lint` recognises a use of `z` as a use of `n'`. So it sees
+    two uses of n' where there should be a single one.
 
-In the original linear-types implementation, we had tried to make every
-optimisation pass produce code that passes `-dlinear-core-lint`. It had proved
-very difficult. And we kept finding corner case after corner case.  Plus, we
-used to restrict transformations when `-dlinear-core-lint` couldn't typecheck
-the result. There are still occurrences of such restrictions in the code. But
-our current stance is that such restrictions can be removed.
+* EXAMPLE 2: letrec
+    Some optimisations can create a letrec which uses a variable
+    linearly, e.g.
 
-For instance, some optimisations can create a letrec which uses a variable
-linearly, e.g.
+      letrec f True = f False
+             f False = x
+      in f True
 
-  letrec f True = f False
-         f False = x
-  in f True
+    uses 'x' linearly, but this is not seen by the linter, which considers,
+    conservatively, that a letrec always has multiplicity Many (in particular
+    that every captured free variable must have multiplicity Many). This issue
+    is discussed in ticket #18694.
 
-uses 'x' linearly, but this is not seen by the linter. This issue is discussed
-in  ticket #18694.
+* EXAMPLE 3: rewrite rules
+    Ignoring linearity means in particular that `a -> b` and `a %1 -> b` must be
+    treated the same by rewrite rules (see also Note [Rewrite rules ignore
+    multiplicities in FunTy] in GHC.Core.Unify). Consider
 
-Plus in many cases, in order to make a transformation compatible with linear
-linting, we ended up restricting to avoid producing patterns that were not
-recognised as linear by the linter. This violates the above principle.
+      m :: Bool -> A
+      m' :: (Bool -> Bool) -> A
+      {- RULES "ex" forall f. m (f True) = m' f -}
+
+      f :: Bool %1 -> A
+      x = m (f True)
+
+    The rule "ex" must match . So the linter must accept `m' f`.
+
+Historical note: In the original linear-types implementation, we had tried to
+make every optimisation pass produce code that passes `-dlinear-core-lint`. It
+had proved very difficult. We kept finding corner case after corner
+case. Furthermore, to attempt to achieve that goal we ended up restricting
+transformations when `-dlinear-core-lint` couldn't typecheck the result.
 
 In the future, we may be able to lint the linearity of the output of
-Core-to-Core passes (#19165). But right now, we can't. Therefore, in virtue of
-the principle above, after the desguarer, the optimiser should take no special
-pains to preserve linearity (in the type system sense).
+Core-to-Core passes (#19165). But this shouldn't be done at the expense of
+producing efficient code. Therefore we lay the following principle.
 
-In general the optimiser tries hard not to lose sharing, so it probably doesn't
-actually make linear things non-linear. We postulate that any program
-transformation which breaks linearity would negatively impact performance, and
-therefore wouldn't be suitable for an optimiser. An alternative to linting
-linearity after each pass is to prove this statement.
+PRINCIPLE: The type system bends to the optimisation, not the other way around.
 
 There is a useful discussion at https://gitlab.haskell.org/ghc/ghc/-/issues/22123
 
@@ -3483,7 +3495,17 @@ ensureEqTys :: LintedType -> LintedType -> SDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
 -- Assumes ty1,ty2 are have already had the substitution applied
-ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
+ensureEqTys ty1 ty2 msg = do
+  flags <- getLintFlags
+  -- When `-dlinear-core-lint` is off, then consider `a -> b` and `a %1 -> b` to
+  -- be equal. See Note [Linting linearity].
+  lintL (eqTypeOpt (opt flags) ty1 ty2) msg
+  where
+    opt flags =
+      if lf_check_linearity flags then
+        defaultCmpTypeOpt { cmp_multiplicity_in_funty = RespectMultiplicities }
+      else
+        defaultCmpTypeOpt { cmp_multiplicity_in_funty = IgnoreMultiplicities }
 
 ensureSubUsage :: Usage -> Mult -> SDoc -> LintM ()
 ensureSubUsage Bottom     _              _ = return ()
