@@ -7,7 +7,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * HsWrapper
   HsWrapper(..),
-  (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpVisTyLam,
+  (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpForAllCast,
   mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta,
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
@@ -258,20 +258,20 @@ mkWpEvVarApps vs = mk_co_app_fn WpEvApp (map (EvExpr . evId) vs)
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 
--- Construct a type lambda and cast its type
--- from `forall tv. res` to `forall tv -> res`.
+-- mkWpForAllCast [tv{vis}] constructs a cast
+--   forall tv. res  ~R#   forall tv{vis} res`.
+-- See Note [Required foralls in Core] in GHC.Core.TyCo.Rep
 --
--- (\ @tv -> e )
---    `cast` (forall (tv[spec]~[req] :: <*>_N). <res>_R       -- ForAllCo is the evidence that...
---              :: (forall tv. res) ~R# (forall tv -> res))   -- invisible and visible foralls are representationally equal
---
-mkWpVisTyLam :: TyVar -> Type -> HsWrapper
-mkWpVisTyLam tv res =
-  WpCast (mkForAllCo tv coreTyLamForAllTyFlag Required kind_co body_co)
-  <.> WpTyLam tv
+-- It's a no-op if all binders are invisible;
+-- but in that case we refrain from calling it.
+mkWpForAllCast :: [ForAllTyBinder] -> Type -> HsWrapper
+mkWpForAllCast bndrs res_ty
+  = mkWpCastR (go bndrs)
   where
-    kind_co = mkNomReflCo (varType tv)
-    body_co = mkRepReflCo res
+    go []                 = mkRepReflCo res_ty
+    go (Bndr tv vis : bs) = mkForAllCo tv coreTyLamForAllTyFlag vis kind_co (go bs)
+      where
+        kind_co = mkNomReflCo (varType tv)
 
 mkWpEvLams :: [Var] -> HsWrapper
 mkWpEvLams ids = mk_co_lam_fn WpEvLam ids

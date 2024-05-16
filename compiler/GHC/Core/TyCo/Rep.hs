@@ -1190,6 +1190,24 @@ among branches, but that doesn't quite concern us here.)
 The Int in the AxiomInstCo constructor is the 0-indexed number
 of the chosen branch.
 
+Note [Required foralls in Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the CoreExpr (Lam a e) where `a` is a TyVar, and (e::e_ty).
+It has type
+   forall a. e_ty
+Note the Specified visibility of (forall a. e_ty); the Core type just isn't able
+to express more than one visiblity, and we pick `Specified`.  See `exprType` and
+`mkLamType` in GHC.Core.Utils, and `GHC.Type.Var.coreLamForAllTyFlag`.
+
+So how can we ever get a term of type (forall a -> e_ty)?  Answer: /only/ via a
+cast built with ForAllCo.  See `GHC.Tc.Types.Evidence.mkWpForAllCast`.  This does
+not seem very satisfying, but it does the job.
+
+An alternative would be to put a visibility flag into `Lam` (a huge change),
+or into a `TyVar` (a more plausible change), but we leave that for the future.
+
+See also Note [ForAllTy and type equality] in GHC.Core.TyCo.Compare.
+
 Note [ForAllCo]
 ~~~~~~~~~~~~~~~
 See also Note [ForAllTy and type equality] in GHC.Core.TyCo.Compare.
@@ -1246,10 +1264,7 @@ Several things to note here
   in the typing rule.  See also Note [ForAllTy and type equality] in
   GHC.Core.TyCo.Compare.
 
-(FC4) A lambda term (Lam a e) has type (forall a. ty), with visibility
-  flag `GHC.Type.Var.coreTyLamForAllTyFlag`, not (forall a -> ty).
-  See `GHC.Type.Var.coreTyLamForAllTyFlag` and `GHC.Core.Utils.mkLamType`.
-  The only way to get a term of type (forall a -> ty) is to cast a lambda.
+(FC4) See Note [Required foralls in Core].
 
 (FC5) In a /type/, in (ForAllTy cv ty) where cv is a CoVar, we insist that
   `cv` must appear free in `ty`; see Note [Unused coercion variable in ForAllTy]

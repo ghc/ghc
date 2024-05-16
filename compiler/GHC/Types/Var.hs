@@ -503,7 +503,7 @@ isSpecifiedForAllTyFlag _                         = False
 coreTyLamForAllTyFlag :: ForAllTyFlag
 -- ^ The ForAllTyFlag on a (Lam a e) term, where `a` is a type variable.
 -- If you want other ForAllTyFlag, use a cast.
--- See Note [ForAllCo] in GHC.Core.TyCo.Rep
+-- See Note [Required foralls in Core] in GHC.Core.TyCo.Rep
 coreTyLamForAllTyFlag = Specified
 
 instance Outputable ForAllTyFlag where
