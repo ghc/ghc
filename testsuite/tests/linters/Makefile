@@ -39,6 +39,7 @@ whitespace:
 				utils/hp2ps\
 				utils/hpc\
 				utils/unlit\
+				utils/haddock\
 			--ignore-files\
 				libraries/base/GHC/IO/Encoding/CodePage/Table.hs\
 				libraries/base/Control/Concurrent/QSem.hs\
