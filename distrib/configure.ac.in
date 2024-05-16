@@ -119,6 +119,22 @@ if test "$HostOS" = "darwin"; then
     fi
 fi
 
+AC_ARG_ENABLE(ghc-toolchain,
+[AS_HELP_STRING([--enable-ghc-toolchain],
+                [Whether to use the newer ghc-toolchain tool to configure ghc targets])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableGhcToolchain])],
+  [EnableGhcToolchain=NO]
+)
+AC_SUBST([EnableGhcToolchain])
+
+AC_ARG_ENABLE(strict-ghc-toolchain-check,
+[AS_HELP_STRING([--enable-strict-ghc-toolchain-check],
+                [Whether to raise an error if the output of ghc-toolchain differs from configure])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableStrictGhcToolchainCheck])],
+  [EnableStrictGhcToolchainCheck=NO]
+)
+AC_SUBST([EnableStrictGhcToolchainCheck])
+
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])
