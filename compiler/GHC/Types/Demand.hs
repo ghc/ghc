@@ -2410,20 +2410,18 @@ dmdTransformDataConSig str_marks sd = case viewProd arity body_sd of
 -- on the result into the indicated dictionary component (if saturated).
 -- See Note [Demand transformer for a dictionary selector].
 dmdTransformDictSelSig :: DmdSig -> DmdTransformer
+
+
 dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* dict_dmd])) call_sd
    -- NB: dict_dmd comes from the demand signature of the class-op
    --     which is created in GHC.Types.Id.Make.mkDictSelId
    | (n, sd') <- peelCallDmd call_sd
+   , Prod _ sig_ds <- dict_dmd
    = multDmdType n $
-     DmdType nopDmdEnv [enhance_dict_dmd sd' dict_dmd]
+     DmdType nopDmdEnv [C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)]
+   | otherwise
+   = nopDmdType -- See Note [Demand transformer for a dictionary selector
   where
-    enhance_dict_dmd sd' dict_dmd
-       | Prod _ sig_ds <- dict_dmd
-       = C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)
-
-       | otherwise    -- Newtype dictionary
-       = C_11 :* sd'  -- Apply sd' to the dictionary
-
     enhance _   AbsDmd   = AbsDmd
     enhance _   BotDmd   = BotDmd
     enhance sd' _dmd_var = C_11 :* sd'  -- This is the one!
@@ -2471,21 +2469,8 @@ demand, really) by the demand 'd'. The '1' acts as if it was a demand variable,
 the whole signature really means `\d. P(AAAdAAAAA)` for any incoming
 demand 'd'.
 
-For single-method classes, which are represented by newtypes the signature
-of 'op' won't look like P(...), so matching on Prod will fail.
-That's fine: if we are doing strictness analysis we are also doing inlining,
-so we'll have inlined 'op' into a cast.  So we can bale out in a conservative
-way, returning nopDmdType. SG: Although we then probably want to apply the eval
-demand 'd' directly to 'op' rather than turning it into 'topSubDmd'...
-
-It is (just.. #8329) possible to be running strictness analysis *without*
-having inlined class ops from single-method classes.  Suppose you are using
-ghc --make; and the first module has a local -O0 flag.  So you may load a class
-without interface pragmas, ie (currently) without an unfolding for the class
-ops.   Now if a subsequent module in the --make sweep has a local -O flag
-you might do strictness analysis, but there is no inlining for the class op.
-This is weird, so I'm not worried about whether this optimises brilliantly; but
-it should not fall over.
+NB: even unary classes behave as if there was a data constructor, and so do
+not need special handling here. See Note [Unary class magic].
 -}
 
 zapDmdEnv :: DmdEnv -> DmdEnv

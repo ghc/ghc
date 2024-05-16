@@ -485,7 +485,6 @@ mkDictSelId name clas
     n_ty_args      = length tyvars
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
-    unary_cls      = isUnaryClassTyCon tycon
 
     pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
     res_ty  = scaledThing (getNth arg_tys val_index)
@@ -519,8 +518,7 @@ mkDictSelId name clas
         -- even if the selector isn't inlined, which of course it isn't!
 
     strict_sig = mkClosedDmdSig [arg_dmd] topDiv
-    arg_dmd | unary_cls = evalDmd
-            | otherwise = C_1N :* mkProd Unboxed dict_field_dmds
+    arg_dmd = C_1N :* mkProd Unboxed dict_field_dmds
             where
               -- The evalDmd below is just a placeholder and will be replaced in
               -- GHC.Types.Demand.dmdTransformDictSel
