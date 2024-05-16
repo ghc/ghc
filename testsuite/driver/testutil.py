@@ -77,6 +77,11 @@ def lndir(srcdir: Path, dstdir: Path, force_copy=False):
 def testing_metrics():
     return { 'bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used' }
 
+# All performance counters we consider to be stable enough in CI to
+# test for.
+def stable_perf_counters():
+    return { 'instructions:u' }
+
 # Metrics which are testing residency information
 def residency_testing_metrics():
     return { 'peak_megabytes_allocated', 'max_bytes_used' }
