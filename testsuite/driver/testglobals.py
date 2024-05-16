@@ -49,6 +49,9 @@ class TestConfig:
         # Path to Ghostscript
         self.gs = None # type: Optional[Path]
 
+        # Path to Linux `perf` tool
+        self.perf_path = None # type: Optional[Path]
+
         # Run tests requiring Haddock
         self.haddock = False
 
@@ -471,6 +474,9 @@ class TestOptions:
 
        # The extra hadrian dependencies we need for this particular test
        self.hadrian_deps = set(["test:ghc"]) # type: Set[str]
+
+       # Record these `perf-events` counters when compiling this test, if `perf` is available
+       self.compiler_perf_counters = [] # type: List[str]
 
    @property
    def testdir(self) -> Path:
