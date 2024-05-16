@@ -30,7 +30,8 @@ module GHC.Core.Multiplicity
   , IsSubmult(..)
   , submult
   , mapScaledType
-  , pprArrowWithMultiplicity ) where
+  , pprArrowWithMultiplicity
+  , MultiplicityFlag(..)) where
 
 import GHC.Prelude
 
@@ -395,3 +396,8 @@ pprArrowWithMultiplicity af pp_mult
   | otherwise
   = ppr (funTyFlagTyCon af)
 
+-- | In Core, without `-dlinear-core-lint`, some function must ignore
+-- multiplicities. See Note [Linting linearity] in GHC.Core.Lint.
+data MultiplicityFlag
+  = RespectMultiplicities
+  | IgnoreMultiplicities

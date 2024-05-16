@@ -1366,6 +1366,8 @@ funTyConAppTy_maybe :: FunTyFlag -> Type -> Type -> Type
 funTyConAppTy_maybe af mult arg res
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
+  -- If you're changing the lines below, you'll probably want to adapt the
+  -- `fUNTyCon` case of GHC.Core.Unify.unify_ty correspondingly.
   , let args | isFUNArg af = [mult, arg_rep, res_rep, arg, res]
              | otherwise   = [      arg_rep, res_rep, arg, res]
   = Just $ (funTyFlagTyCon af, args)
