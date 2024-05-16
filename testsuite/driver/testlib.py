@@ -3,6 +3,7 @@
 # (c) Simon Marlow 2002
 #
 
+import csv
 import io
 import shutil
 import os
@@ -748,7 +749,7 @@ def find_so(lib):
 def find_non_inplace_so(lib):
     return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),False)
 
-# Define a generic stat test, which computes the statistic by calling the function
+# Define the a generic stat test, which computes the statistic by calling the function
 # given as the third argument.
 def collect_generic_stat ( metric, deviation, get_stat ):
     return collect_generic_stats ( { metric: { 'deviation': deviation, 'current': get_stat } } )
@@ -797,15 +798,24 @@ def collect_stats(metric='all', deviation=20, static_stats_file=None):
 def statsFile(comp_test: bool, name: str) -> str:
     return name + ('.comp' if comp_test else '') + '.stats'
 
+def perfStatsFile(comp_test: bool, name: str) -> str:
+    return name + ('.comp' if comp_test else '') + '.perf.csv'
+
 # This is an internal function that is used only in the implementation.
 # 'is_compiler_stats_test' is somewhat of an unfortunate name.
 # If the boolean is set to true, it indicates that this test is one that
 # measures the performance numbers of the compiler.
 # As this is a fairly rare case in the testsuite, it defaults to false to
 # indicate that it is a 'normal' performance test.
-def _collect_stats(name: TestName, opts, metrics, deviation, static_stats_file, is_compiler_stats_test=False):
+def _collect_stats(name: TestName, opts, metrics, deviation, static_stats_file, is_compiler_stats_test=False, is_compiler_perf_test=False):
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         failBecause('This test has an invalid name.')
+
+    if is_compiler_perf_test and config.perf_path is None:
+        # If we are doing a 'perf' run but no 'perf' is configured,
+        # don't try to read the results.
+        # This is a bit weird, though.
+        return
 
     # Normalize metrics to a list of strings.
     if isinstance(metrics, str):
@@ -861,11 +871,47 @@ def _collect_stats(name: TestName, opts, metrics, deviation, static_stats_file, 
             assert val is not None
             return int(val)
 
+    # How to read the result of the performance test
+    def read_perf_stats_file(way, metric_name):
+        FIELDS = ['value','unit','event','runtime','percent']
+        # Confusingly compile time ghci tests are actually runtime tests, so we have
+        # to go and look for the name.stats file rather than name.comp.stats file.
+        compiler_stats_test = is_compiler_stats_test and not (way == "ghci" or way == "ghci-opt")
+
+        perf_stats_file = Path(in_testdir(perfStatsFile(compiler_stats_test, name)))
+        perf_metrics = {}
+        try:
+            perf_csv_lines = perf_stats_file.read_text().splitlines()
+            # Output looks like:
+            # """
+            # # Started on <date>
+            #
+            # <value>,<unit>,<event>,<runtime>,<percent>,...
+            # """
+            #
+            # Ignore empty lines and lines starting with '#'
+            perf_csv = [l for l in perf_csv_lines if l and not l.startswith('#')]
+
+            perf_stats_csv_reader = csv.DictReader(perf_csv, fieldnames=FIELDS, delimiter=";", quotechar="\"")
+            for fields in perf_stats_csv_reader:
+                perf_metrics[fields['event']] = float(fields['value'])
+
+        except IOError as e:
+            raise StatsException(str(e))
+
+        val = perf_metrics[metric_name]
+        if val is None:
+            print('Failed to find metric: ', metric_name)
+            raise StatsException("No such metric")
+        else:
+            assert val is not None
+            return int(val)
 
     collect_stat = {}
     for metric_name in metrics:
         def action_generator(mn):
-            return lambda way: read_stats_file(way, mn)
+            read_stats = read_perf_stats_file if is_compiler_perf_test else read_stats_file
+            return lambda way: read_stats(way, mn)
         metric = '{}/{}'.format(tag, metric_name)
         collect_stat[metric] = { "deviation": deviation
                                 , "current": action_generator(metric_name) }
@@ -1000,7 +1046,17 @@ def have_thread_sanitizer( ) -> bool:
 def gcc_as_cmmp() -> bool:
     return config.cmm_cpp_is_gcc
 
-# ---
+# -----
+
+def collect_compiler_perf_counters(counters: List[str], deviation: int = 20):
+    """
+    Record the given event counters using `perf stat` when available.
+    """
+    def f(name, opts):
+        opts.compiler_perf_counters += counters
+        _collect_stats(name, opts, set(counters), deviation, False, True, True)
+    return f
+
 
 # Note [Measuring residency]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1591,11 +1647,12 @@ async def do_test(name: TestName,
     if opts.pre_cmd:
         stdout_path = in_testdir(name, 'pre_cmd_stdout')
         stderr_path = in_testdir(name, 'pre_cmd_stderr')
-        exit_code = await runCmd('cd "{0}" && {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
+        exit_code = await runCmd(override_options(opts.pre_cmd),
                            stdout = stdout_path,
                            stderr = stderr_path,
                            print_output = config.verbose >= 3,
                            timeout_multiplier = opts.pre_cmd_timeout_multiplier,
+                           working_dir = opts.testdir
                            )
 
         # If user used expect_broken then don't record failures of pre_cmd
@@ -2027,9 +2084,14 @@ def report_stats(name, way, metric, gen_stat):
 # -----------------------------------------------------------------------------
 # Build a single-module program
 
-async def extras_build( way, extra_mods, extra_hc_opts ):
+async def extras_build(way: WayName, extra_mods: List[str], extra_hc_opts: str) -> PassFail:
     for mod, opts in extra_mods:
-        result = await simple_build(mod, way, opts + ' ' + extra_hc_opts, False, None, [], False, False)
+        result = await simple_build(mod, way, opts + ' ' + extra_hc_opts,
+                should_fail=False,
+                top_mod=None,
+                units=[],
+                link=False,
+                addsuf=False)
         if not (mod.endswith('.hs') or mod.endswith('.lhs')):
             extra_hc_opts += ' %s' % Path(mod).with_suffix('.o')
         if badResult(result):
@@ -2047,9 +2109,7 @@ async def simple_build(name: Union[TestName, str],
                  addsuf: bool,
                  backpack: bool = False,
                  suppress_stdout: bool = False,
-                 filter_with: str = '',
-                 # Override auto-detection of whether to use --make or -c etc.
-                 mode: Optional[str] = None) -> Any:
+                 filter_with: str = '') -> Any:
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
@@ -2066,9 +2126,7 @@ async def simple_build(name: Union[TestName, str],
     else:
         srcname = Path(name)
 
-    if mode is not None:
-        to_do = mode
-    elif top_mod is not None:
+    if top_mod is not None:
         to_do = '--make '
         if link:
             to_do = to_do + '-o ' + name
@@ -2111,14 +2169,22 @@ async def simple_build(name: Union[TestName, str],
 
     flags = ' '.join(get_compiler_flags() + config.way_flags[way])
 
-    cmd = ('cd "{opts.testdir}" && {cmd_prefix} '
+    cmd = ('{cmd_prefix} '
            '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts}'
           ).format(**locals())
 
     if filter_with != '':
         cmd = cmd + ' | ' + filter_with
 
-    exit_code = await runCmd(cmd, None, stdout, stderr, opts.compile_timeout_multiplier)
+    output_file = perfStatsFile(True, name)
+
+    exit_code = await runCmdPerf(
+            opts.compiler_perf_counters,
+            cmd,
+            output_file,
+            working_dir=opts.testdir,
+            stdin=None, stdout=stdout, stderr=stderr,
+            timeout_multiplier=opts.compile_timeout_multiplier)
 
     actual_stderr_path = in_testdir(name, 'comp.stderr')
 
@@ -2137,7 +2203,6 @@ async def simple_build(name: Union[TestName, str],
         if exit_code != 0:
             stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
             return failBecause('exit code non-0', stderr=stderr_contents)
-
 
     return passed()
 
@@ -2190,10 +2255,10 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
 
-    cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
+    output_file = perfStatsFile(False, name)
 
     # run the command
-    exit_code = await runCmd(cmd, stdin_arg, stdout_arg, stderr_arg, opts.run_timeout_multiplier)
+    exit_code = await runCmdPerf(opts.compiler_perf_counters, cmd, output_file, opts.testdir, stdin_arg, stdout_arg, stderr_arg, opts.run_timeout_multiplier)
 
     # check the exit code
     if exit_code != opts.exit_code:
@@ -2289,9 +2354,7 @@ async def interpreter_run(name: TestName,
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd);
 
-    cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
-
-    exit_code = await runCmd(cmd, script, stdout, stderr, opts.run_timeout_multiplier)
+    exit_code = await runCmd(cmd, script, stdout, stderr, opts.run_timeout_multiplier, working_dir=opts.testdir)
 
     # split the stdout into compilation/program output
     split_file(stdout, delimiter,
@@ -2467,9 +2530,9 @@ async def check_hp_ok(name: TestName) -> bool:
     opts = getTestOpts()
 
     # do not qualify for hp2ps because we should be in the right directory
-    hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {name}'.format(**locals())
+    hp2psCmd = '{{hp2ps}} {name}'.format(**locals())
 
-    hp2psResult = await runCmd(hp2psCmd, print_output=True)
+    hp2psResult = await runCmd(hp2psCmd, print_output=True, working_dir=opts.testdir)
 
     actual_ps_path = in_testdir(name, 'ps')
 
@@ -2949,12 +3012,55 @@ def dump_file(f: Path):
     except Exception:
         print('')
 
+# -----------------------------------------------------------------------------
+# Run a program in the interpreter and check its output
+
+async def runCmdPerf(
+        perf_counters: List[str],
+        cmd: str,
+        output_file: str,
+        working_dir: Union[str|None] = None,
+        **kwargs)  -> int:
+    """
+    Run a command under `perf stat`, collecting the given counters.
+
+    Returns the exit code and a dictionary of the collected counter values.
+
+    If given a 'working_dir', we generate a command looking like:
+
+    .. code-block:: text
+
+        cd $working_dir && perf stat ... $cmd
+
+    This allows users to find the test directory by looking at the execution logs,
+    and allows us to write 'perf' output files in the test directory.
+    """
+    if len(perf_counters) == 0 or config.perf_path is None:
+        if working_dir:
+            cmd = f"cd \"{working_dir}\" && {cmd}"
+
+        exit_code = await runCmd(cmd, **kwargs)
+        return exit_code
+
+    perf_cmd_args = [config.perf_path, 'stat', '-x\;', '-o', output_file, '-e', ','.join(perf_counters), cmd]
+    cmd = ' '.join(perf_cmd_args)
+    if working_dir:
+        cmd = f"cd \"{working_dir}\" && {cmd}"
+
+    exit_code = await runCmd(cmd, **kwargs)
+    return exit_code
+
 async def runCmd(cmd: str,
            stdin: Union[None, Path]=None,
            stdout: Union[None, Path]=None,
            stderr: Union[None, int, Path]=None,
+           working_dir : Union[None, Path]=None,
            timeout_multiplier=1.0,
            print_output=False) -> int:
+    """
+    Run a command enforcing a timeout and returning the exit code.
+    """
+
     timeout_prog = strip_quotes(config.timeout_prog)
     timeout = str(int(ceil(config.timeout * timeout_multiplier)))
 
@@ -2976,7 +3082,13 @@ async def runCmd(cmd: str,
         # Hence it must ultimately be run by a Bourne shell. It's timeout's job
         # to invoke the Bourne shell
 
-        proc = await asyncio.create_subprocess_exec(timeout_prog, timeout, cmd, stdin=stdin_file, stdout=asyncio.subprocess.PIPE, stderr=hStdErr, env=ghc_env)
+        proc = await asyncio.create_subprocess_exec(timeout_prog, timeout, cmd,
+                                                   stdin=stdin_file,
+                                                   stdout=asyncio.subprocess.PIPE,
+                                                   stderr=hStdErr,
+                                                   env=ghc_env,
+                                                   cwd=working_dir
+                                                   )
 
         stdout_buffer, stderr_buffer = await proc.communicate()
     finally:
