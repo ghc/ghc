@@ -797,8 +797,6 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
   | otherwise
   = go floaters (initDropBox here_fvs) (map initDropBox fork_fvs)
   where
-    n_alts = length fork_fvs
-
     go :: RevFloatInBinds -> DropBox -> [DropBox]
        -> (RevFloatInBinds, [RevFloatInBinds])
         -- The *first* one in the pair is the drop_here set
@@ -821,12 +819,31 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
 
           -- some_benefit is used only if (n_used_alts > 1) and (not used_here)
           -- So some duplication is going to occur
+          -- We want to push even if the thing is used in all branches. e.g.
+          --    let x = Just y in
+          --    case z of
+          --       True  -> case p of { True  -> x; False -> Nothing }
+          --       False -> case p of { False -> x; True  -> Nothing }
+          -- Here `x` is used in the both branches of the outer `case`,
+          -- but we still really want to push it in
           some_benefit = small_enough &&
                          no_work_duplication &&
-                         (saves_alloc || not not_thunky)
+                         not strict_thunk
 
-          saves_alloc = n_used_alts < n_alts
           small_enough = floatIsDupable platform bind
+
+          -- no_work_duplication includes no duplication of /allocation/
+          -- For case-expressions this is true by construction (is_case)
+          -- But in all other situations we need to be careful e.g.
+          --     let x = Just y in f x x
+          -- Don't duplicate the (x = Just y) into the two arguments!
+          --
+          -- But if occurence analysis says "used once", we /can/ float in.  e.g.
+          --     let x = Just y in
+          --     join $j z = ...x...
+          --     in case v of { A -> $j 1; B -> $j 2; C -> x }
+          -- Here we can float into the RHS of the join point and the arms of the case
+          -- See Note [Occurrence analysis for join points] in GHC.Core.Opt.OccurAnal
           no_work_duplication = is_case || case bind of
                                   FloatCase {}          -> True   -- Always a primop
                                   FloatLet (NonRec b _) -> isOneOcc (idOccInfo b)
@@ -843,30 +860,12 @@ sepBindsByDropPoint platform is_case floaters here_fvs fork_fvs
 
           n_used_alts = count id used_in_flags -- returns number of Trues in list.
 
-          not_thunky = case bind of
-                         FloatCase{}           -> True
-                         FloatLet (NonRec b r) -> isStrUsedDmd (idDemandInfo b)
-                                                  || exprIsHNF r
-                         FloatLet (Rec prs)    -> all (exprIsHNF . snd) prs
+          strict_thunk = case bind of
+                           FloatCase{}           -> False
+                           FloatLet (Rec {})     -> False
+                           FloatLet (NonRec b r) -> isStrUsedDmd (idDemandInfo b)
+                                                    && not (exprIsHNF r)
 
-{-
-          cant_push
-            | is_case
-            = -- The alternatives of a case expresison
-              dont_float_into_alts
-
-            | otherwise
-            = -- Not the alternatives of a case expression
-              -- floatIsCase: see Note [Floating primops]
-              floatIsCase bind || n_used_alts > 1
-
-          -- See Note [Duplicating floats into case alternatives]
-          dont_float_into_alts
-            = (n_used_alts == n_alts && not_thunky) ||
-                 -- Don't float in if used in all alternatives and not a thunk
-              (n_used_alts > 1 && not (floatIsDupable platform bind))
-                 -- Nor if used in multiple alts and not small
--}
           new_fork_boxes = zipWithEqual "FloatIn.sepBinds" insert_maybe
                                         fork_boxes used_in_flags
 
