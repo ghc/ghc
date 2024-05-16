@@ -210,10 +210,12 @@ install_docs:
 install_data:
 	@echo "Copying data to $(DESTDIR)share"
 	$(INSTALL_DIR) "$(DESTDIR)$(datadir)"
-	cd share; $(FIND) . -type f -exec sh -c \
-		'$(INSTALL_DIR) "$(DESTDIR)$(datadir)/`dirname $$1`" && \
-		$(INSTALL_DATA) "$$1" "$(DESTDIR)$(datadir)/`dirname $$1`"' \
-		sh '{}' ';';
+	if [ -d share ]; then \
+		cd share; $(FIND) . -type f -exec sh -c \
+			'$(INSTALL_DIR) "$(DESTDIR)$(datadir)/`dirname $$1`" && \
+			$(INSTALL_DATA) "$$1" "$(DESTDIR)$(datadir)/`dirname $$1`"' \
+			sh '{}' ';'; \
+	fi
 
 MAN_SECTION := 1
 MAN_PAGES := manpage/ghc.1
