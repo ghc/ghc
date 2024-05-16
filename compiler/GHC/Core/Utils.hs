@@ -170,7 +170,7 @@ mkLamTypes :: [Var] -> Type -> Type
 mkLamType v body_ty
    | isTyVar v
    = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
-     -- coreTyLamForAllTyFlag: see (FC4) in Note [ForAllCo]
+     -- coreTyLamForAllTyFlag: see Note [Required foralls in Core]
      --                        in GHC.Core.TyCo.Rep
 
    | isCoVar v

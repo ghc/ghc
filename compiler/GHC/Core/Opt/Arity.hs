@@ -2369,8 +2369,8 @@ mkEtaForAllMCo (Bndr tcv vis) ty mco
                                 (mkNomReflCo (varType tcv)) co)
     -- coreTyLamForAllTyFlag: See Note [The EtaInfo mechanism], particularly
     -- the (EtaInfo Invariant).  (sym co) wraps a lambda that always has
-    -- a ForAllTyFlag of coreTyLamForAllTyFlag; see wrinkle (FC4) in
-    -- Note [ForAllCo] in GHC.Core.TyCo.Rep
+    -- a ForAllTyFlag of coreTyLamForAllTyFlag; see Note [Required foralls in Core]
+    -- in GHC.Core.TyCo.Rep
 
 {-
 ************************************************************************
