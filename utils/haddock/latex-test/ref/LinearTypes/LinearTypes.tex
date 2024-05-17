@@ -1,0 +1,30 @@
+\haddockmoduleheading{LinearTypes}
+\label{module:LinearTypes}
+\haddockbeginheader
+{\haddockverb\begin{verbatim}
+module LinearTypes (
+    unrestricted, linear, poly
+  ) where\end{verbatim}}
+\haddockendheader
+
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+unrestricted :: a -> b
+\end{tabular}]
+{\haddockbegindoc
+Does something unrestricted.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+linear :: a {\char '45}1 -> b
+\end{tabular}]
+{\haddockbegindoc
+Does something linear.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+poly :: forall a (m :: Multiplicity) b. a {\char '45}m -> b
+\end{tabular}]
+{\haddockbegindoc
+Does something polymorphic.\par}
+\end{haddockdesc}

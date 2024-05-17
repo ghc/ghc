@@ -1,0 +1,443 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >Hash</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>Hash</p
+	></div
+      ><div id="table-of-contents"
+      ><div id="contents-list"
+	><p class="caption" onclick="window.scrollTo(0,0)"
+	  >Contents</p
+	  ><ul
+	  ><li
+	    ><a href="#"
+	      >The <code
+		>HashTable</code
+		> type</a
+	      ><ul
+	      ><li
+		><a href="#"
+		  >Operations on <code
+		    >HashTable</code
+		    >s</a
+		  ></li
+		></ul
+	      ></li
+	    ><li
+	    ><a href="#"
+	      >The <code
+		>Hash</code
+		> class</a
+	      ></li
+	    ></ul
+	  ></div
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >Implementation of fixed-size hash tables, with a type
+  class for constructing hash values for structured types.</p
+	  ></div
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >HashTable</a
+	      > key val</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >new</a
+	      > :: (<a href="#" title="Data.Eq"
+	      >Eq</a
+	      > key, <a href="#" title="Hash"
+	      >Hash</a
+	      > key) =&gt; <a href="#" title="Data.Int"
+	      >Int</a
+	      > -&gt; <a href="#" title="Prelude"
+	      >IO</a
+	      > (<a href="#" title="Hash"
+	      >HashTable</a
+	      > key val)</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >insert</a
+	      > :: (<a href="#" title="Data.Eq"
+	      >Eq</a
+	      > key, <a href="#" title="Hash"
+	      >Hash</a
+	      > key) =&gt; key -&gt; val -&gt; <a href="#" title="Prelude"
+	      >IO</a
+	      > ()</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >lookup</a
+	      > :: <a href="#" title="Hash"
+	      >Hash</a
+	      > key =&gt; key -&gt; <a href="#" title="Prelude"
+	      >IO</a
+	      > (<a href="#" title="Data.Maybe"
+	      >Maybe</a
+	      > val)</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > <a href="#"
+	      >Hash</a
+	      > a <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><a href="#"
+		  >hash</a
+		  > :: a -&gt; <a href="#" title="Data.Int"
+		  >Int</a
+		  ></li
+		></ul
+	      ></li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><a href="#" id="g:1"
+	><h1
+	  >The <code
+	    >HashTable</code
+	    > type</h1
+	  ></a
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:HashTable" class="def"
+	    >HashTable</a
+	    > key val <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >A hash table with keys of type <code
+	      >key</code
+	      > and values of type <code
+	      >val</code
+	      >.
+ The type <code
+	      >key</code
+	      > should be an instance of <code
+	      ><a href="#" title="Data.Eq"
+		>Eq</a
+		></code
+	      >.</p
+	    ></div
+	  ></div
+	><a href="#" id="g:2"
+	><h2
+	  >Operations on <code
+	    >HashTable</code
+	    >s</h2
+	  ></a
+	><div class="top"
+	><p class="src"
+	  ><a id="v:new" class="def"
+	    >new</a
+	    > :: (<a href="#" title="Data.Eq"
+	    >Eq</a
+	    > key, <a href="#" title="Hash"
+	    >Hash</a
+	    > key) =&gt; <a href="#" title="Data.Int"
+	    >Int</a
+	    > -&gt; <a href="#" title="Prelude"
+	    >IO</a
+	    > (<a href="#" title="Hash"
+	    >HashTable</a
+	    > key val) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Builds a new hash table with a given size</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:insert" class="def"
+	    >insert</a
+	    > :: (<a href="#" title="Data.Eq"
+	    >Eq</a
+	    > key, <a href="#" title="Hash"
+	    >Hash</a
+	    > key) =&gt; key -&gt; val -&gt; <a href="#" title="Prelude"
+	    >IO</a
+	    > () <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Inserts a new element into the hash table</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:lookup" class="def"
+	    >lookup</a
+	    > :: <a href="#" title="Hash"
+	    >Hash</a
+	    > key =&gt; key -&gt; <a href="#" title="Prelude"
+	    >IO</a
+	    > (<a href="#" title="Data.Maybe"
+	    >Maybe</a
+	    > val) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Looks up a key in the hash table, returns <code
+	      ><code
+		><a href="#" title="Data.Maybe"
+		  >Just</a
+		  ></code
+		> val</code
+	      > if the key
+ was found, or <code
+	      ><a href="#" title="Data.Maybe"
+		>Nothing</a
+		></code
+	      > otherwise.</p
+	    ></div
+	  ></div
+	><a href="#" id="g:3"
+	><h1
+	  >The <code
+	    >Hash</code
+	    > class</h1
+	  ></a
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > <a id="t:Hash" class="def"
+	    >Hash</a
+	    > a <span class="keyword"
+	    >where</span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >A class of types which can be hashed.</p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a id="v:hash" class="def"
+	      >hash</a
+	      > :: a -&gt; <a href="#" title="Data.Int"
+	      >Int</a
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ><div class="doc"
+	    ><p
+	      >hashes the value of type <code
+		>a</code
+		> into an <code
+		><a href="#" title="Data.Int"
+		  >Int</a
+		  ></code
+		></p
+	      ></div
+	    ></div
+	  ><div class="subs instances"
+	  ><h4 class="instances details-toggle-control details-toggle" data-details-id="i:Hash"
+	    >Instances</h4
+	    ><details id="i:Hash" open="open"
+	    ><summary class="hide-when-js-enabled"
+	      >Instances details</summary
+	      ><table
+	      ><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Hash:Hash:1"
+		      ></span
+		      > <a href="#" title="Hash"
+		      >Hash</a
+		      > <a href="#" title="GHC.Exts"
+		      >Float</a
+		      ></span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:ic:Hash:Hash:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Hash</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >hash</a
+			  > :: <a href="#" title="GHC.Exts"
+			  >Float</a
+			  > -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Hash:Hash:2"
+		      ></span
+		      > <a href="#" title="Hash"
+		      >Hash</a
+		      > <a href="#" title="Data.Int"
+		      >Int</a
+		      ></span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:ic:Hash:Hash:2"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Hash</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >hash</a
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Hash:Hash:3"
+		      ></span
+		      > (<a href="#" title="Hash"
+		      >Hash</a
+		      > a, <a href="#" title="Hash"
+		      >Hash</a
+		      > b) =&gt; <a href="#" title="Hash"
+		      >Hash</a
+		      > (a, b)</span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:ic:Hash:Hash:3"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Hash</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >hash</a
+			  > :: (a, b) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		></table
+	      ></details
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

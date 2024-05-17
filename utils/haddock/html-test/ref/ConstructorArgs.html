@@ -1,0 +1,728 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >ConstructorArgs</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>ConstructorArgs</p
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Foo</a
+	      ><ul class="subs"
+	      ><li
+		>= <a href="#"
+		  >Rec</a
+		  > { <ul class="subs"
+		  ><li
+		    ><a href="#"
+		      >x</a
+		      > :: <a href="#" title="Data.String"
+		      >String</a
+		      ></li
+		    ><li
+		    ><a href="#"
+		      >y</a
+		      > :: <a href="#" title="Data.String"
+		      >String</a
+		      ></li
+		    ></ul
+		  > }</li
+		><li
+		>| <a href="#"
+		  >Baz</a
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></li
+		><li
+		>| <a href="#"
+		  >Boa</a
+		  > !<a href="#" title="Data.Int"
+		  >Int</a
+		  > !<a href="#" title="Data.String"
+		  >String</a
+		  ></li
+		><li
+		>| <a href="#" title="Data.Int"
+		  >Int</a
+		  > <a href="#"
+		  >:|</a
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></li
+		><li
+		>| <a href="#" title="Data.Int"
+		  >Int</a
+		  > <a href="#"
+		  >:*</a
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Boo</a
+	      > <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><a href="#"
+		  >Foo</a
+		  > :: <a href="#" title="Data.Int"
+		  >Int</a
+		  > -&gt; <a href="#" title="Data.String"
+		  >String</a
+		  > -&gt; <a href="#" title="ConstructorArgs"
+		  >Boo</a
+		  ></li
+		><li
+		><a href="#"
+		  >Foa</a
+		  > :: <a href="#" title="Data.Int"
+		  >Int</a
+		  > -&gt; <a href="#" title="ConstructorArgs"
+		  >Boo</a
+		  ></li
+		><li
+		><span class="keyword"
+		  >pattern</span
+		  > <a href="#"
+		  >Fo</a
+		  > :: <a href="#" title="Data.Int"
+		  >Int</a
+		  > -&gt; <a href="#" title="Data.String"
+		  >String</a
+		  > -&gt; <a href="#" title="ConstructorArgs"
+		  >Boo</a
+		  ></li
+		><li
+		><span class="keyword"
+		  >pattern</span
+		  > <a href="#"
+		  >Fo'</a
+		  > :: <a href="#" title="ConstructorArgs"
+		  >Boo</a
+		  ></li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Bo</a
+	      > :: <a href="#" title="Data.Int"
+	      >Int</a
+	      > -&gt; <a href="#" title="Data.String"
+	      >String</a
+	      > -&gt; <a href="#" title="ConstructorArgs"
+	      >Boo</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Bo'</a
+	      > :: <a href="#" title="Data.Int"
+	      >Int</a
+	      > -&gt; <a href="#" title="Data.String"
+	      >String</a
+	      > -&gt; <a href="#" title="ConstructorArgs"
+	      >Boo</a
+	      ></li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:Foo" class="def"
+	    >Foo</a
+	    > <span class="fixity"
+	    >infixr 1</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:Rec" class="def"
+		  >Rec</a
+		  ></td
+		><td class="doc"
+		><p
+		  >doc on a record</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td colspan="2"
+		><div class="subs fields"
+		  ><p class="caption"
+		    >Fields</p
+		    ><ul
+		    ><li
+		      ><dfn class="src"
+			><a id="v:x" class="def"
+			  >x</a
+			  > :: <a href="#" title="Data.String"
+			  >String</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >doc on the <code
+			    ><a href="#" title="Data.String"
+			      >String</a
+			      ></code
+			    > field of <code
+			    ><a href="#" title="ConstructorArgs"
+			      >Rec</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			><a id="v:y" class="def"
+			  >y</a
+			  > :: <a href="#" title="Data.String"
+			  >String</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >doc on the <code
+			    ><a href="#" title="Data.String"
+			      >String</a
+			      ></code
+			    > field of <code
+			    ><a href="#" title="ConstructorArgs"
+			      >Rec</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ></ul
+		    ></div
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:Baz" class="def"
+		  >Baz</a
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></td
+		><td class="doc"
+		><p
+		  >old prefix doc style</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:Boa" class="def"
+		  >Boa</a
+		  > <span class="fixity"
+		  >infixr 2</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
+		><td class="doc"
+		><p
+		  >doc on the <code
+		    ><a href="#" title="ConstructorArgs"
+		      >Boa</a
+		      ></code
+		    > constrictor</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td colspan="2"
+		><div class="subs fields"
+		  ><p class="caption"
+		    >Fields</p
+		    ><ul
+		    ><li
+		      ><dfn class="src"
+			>!<a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >doc on the <code
+			    ><a href="#" title="Data.Int"
+			      >Int</a
+			      ></code
+			    > field of <code
+			    ><a href="#" title="ConstructorArgs"
+			      >Boa</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>!<a href="#" title="Data.String"
+			  >String</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >doc on the <code
+			    ><a href="#" title="Data.String"
+			      >String</a
+			      ></code
+			    > field of <code
+			    ><a href="#" title="ConstructorArgs"
+			      >Boa</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ></ul
+		    ></div
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a href="#" title="Data.Int"
+		  >Int</a
+		  > <a id="v::-124-" class="def"
+		  >:|</a
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></td
+		><td class="doc"
+		><p
+		  >old infix doc style</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v::-42-" class="def"
+		  >(:*)</a
+		  > <span class="fixity"
+		  >infixr 3</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
+		><td class="doc"
+		><p
+		  >doc on the <code
+		    ><a href="#" title="ConstructorArgs"
+		      >:*</a
+		      ></code
+		    > constructor</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td colspan="2"
+		><div class="subs fields"
+		  ><p class="caption"
+		    >Fields</p
+		    ><ul
+		    ><li
+		      ><dfn class="src"
+			><a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >doc on the <code
+			    ><a href="#" title="Data.Int"
+			      >Int</a
+			      ></code
+			    > field of the <code
+			    ><a href="#" title="ConstructorArgs"
+			      >:*</a
+			      ></code
+			    > constructor</p
+			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			><a href="#" title="Data.String"
+			  >String</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >doc on the <code
+			    ><a href="#" title="Data.String"
+			      >String</a
+			      ></code
+			    > field of the <code
+			    ><a href="#" title="ConstructorArgs"
+			      >:*</a
+			      ></code
+			    > constructor</p
+			  ></div
+			></li
+		      ></ul
+		    ></div
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:Boo" class="def"
+	    >Boo</a
+	    > <span class="keyword"
+	    >where</span
+	    > <span class="fixity"
+	    >infixr 4</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:Foo" class="def"
+		  >Foo</a
+		  > <span class="fixity"
+		  >infixr 1</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
+		><td class="doc"
+		><p
+		  >Info about a <code
+		    ><a href="#" title="ConstructorArgs"
+		      >Foo</a
+		      ></code
+		    ></p
+		  ></td
+		></tr
+	      ><tr
+	      ><td colspan="2"
+		><div class="subs fields"
+		  ><p class="caption"
+		    >Fields</p
+		    ><ul
+		    ><li
+		      ><dfn class="src"
+			>:: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  ><code
+			    ><a href="#" title="Data.Int"
+			      >Int</a
+			      ></code
+			    > field of <code
+			    ><a href="#" title="ConstructorArgs"
+			      >Foo</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>-&gt; <a href="#" title="Data.String"
+			  >String</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  ><code
+			    ><a href="#" title="Data.String"
+			      >String</a
+			      ></code
+			    > field of <code
+			    ><a href="#" title="ConstructorArgs"
+			      >Foo</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>-&gt; <a href="#" title="ConstructorArgs"
+			  >Boo</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >Make a <code
+			    ><a href="#" title="ConstructorArgs"
+			      >Boo</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ></ul
+		    ></div
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:Foa" class="def"
+		  >Foa</a
+		  > :: <a href="#" title="Data.Int"
+		  >Int</a
+		  > -&gt; <a href="#" title="ConstructorArgs"
+		  >Boo</a
+		  ></td
+		><td class="doc"
+		><p
+		  >no argument docs GADT</p
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ><div class="subs bundled-patterns"
+	  ><p class="caption"
+	    >Bundled Patterns</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><span class="keyword"
+		  >pattern</span
+		  > <a id="v:Fo" class="def"
+		  >Fo</a
+		  > <span class="fixity"
+		  >infixr 5</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
+		><td class="doc"
+		><p
+		  >Info about bundled <code
+		    ><a href="#" title="ConstructorArgs"
+		      >Fo</a
+		      ></code
+		    ></p
+		  ></td
+		></tr
+	      ><tr
+	      ><td colspan="2"
+		><div class="subs fields"
+		  ><p class="caption"
+		    >Fields</p
+		    ><ul
+		    ><li
+		      ><dfn class="src"
+			>:: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >an <code
+			    ><a href="#" title="Data.Int"
+			      >Int</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>-&gt; <a href="#" title="Data.String"
+			  >String</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >a <code
+			    ><a href="#" title="Data.String"
+			      >String</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>-&gt; <a href="#" title="ConstructorArgs"
+			  >Boo</a
+			  ></dfn
+			><div class="doc"
+			><p
+			  >a <code
+			    ><a href="#" title="ConstructorArgs"
+			      >Boo</a
+			      ></code
+			    ></p
+			  ></div
+			></li
+		      ></ul
+		    ></div
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><span class="keyword"
+		  >pattern</span
+		  > <a id="v:Fo-39-" class="def"
+		  >Fo'</a
+		  > :: <a href="#" title="ConstructorArgs"
+		  >Boo</a
+		  ></td
+		><td class="doc"
+		><p
+		  >Bundled and no argument docs</p
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:Bo" class="def"
+	    >Bo</a
+	    > <span class="fixity"
+	    >infixr 6</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="subs arguments"
+	  ><p class="caption"
+	    >Arguments</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		>:: <a href="#" title="Data.Int"
+		  >Int</a
+		  ></td
+		><td class="doc"
+		><p
+		  >an <code
+		    ><a href="#" title="Data.Int"
+		      >Int</a
+		      ></code
+		    ></p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		>-&gt; <a href="#" title="Data.String"
+		  >String</a
+		  ></td
+		><td class="doc"
+		><p
+		  >a <code
+		    ><a href="#" title="Data.String"
+		      >String</a
+		      ></code
+		    ></p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		>-&gt; <a href="#" title="ConstructorArgs"
+		  >Boo</a
+		  ></td
+		><td class="doc"
+		><p
+		  >a <code
+		    ><a href="#" title="ConstructorArgs"
+		      >Boo</a
+		      ></code
+		    > pattern</p
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ><div class="doc"
+	  ><p
+	    >Info about not-bundled <code
+	      ><a href="#" title="ConstructorArgs"
+		>Bo</a
+		></code
+	      ></p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:Bo-39-" class="def"
+	    >Bo'</a
+	    > :: <a href="#" title="Data.Int"
+	    >Int</a
+	    > -&gt; <a href="#" title="Data.String"
+	    >String</a
+	    > -&gt; <a href="#" title="ConstructorArgs"
+	    >Boo</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Not bundled and no argument docs</p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

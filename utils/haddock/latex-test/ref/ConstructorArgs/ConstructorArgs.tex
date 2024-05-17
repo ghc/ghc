@@ -1,0 +1,71 @@
+\haddockmoduleheading{ConstructorArgs}
+\label{module:ConstructorArgs}
+\haddockbeginheader
+{\haddockverb\begin{verbatim}
+module ConstructorArgs (
+    Foo((:|), Rec, x, y, Baz, Boa, (:*)), Boo(Foo, Foa, Fo, Fo'), pattern Bo,
+    pattern Bo'
+  ) where\end{verbatim}}
+\haddockendheader
+
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data Foo
+\end{tabular}]
+{\haddockbegindoc
+\enspace \emph{Constructors}\par
+\haddockbeginconstrs
+\haddockdecltt{=} & \haddockdecltt{Rec} & doc on a record \\
+                                          & \haddocktt{\qquad \{} \haddockdecltt{x :: String} & doc on the \haddockid{String} field of \haddockid{Rec} \\
+                                          & \haddocktt{\qquad ,} \haddockdecltt{y :: String} & doc on the \haddockid{String} field of \haddockid{Rec} \\ & \haddocktt{\qquad \}} \\
+\haddockdecltt{|} & \haddockdecltt{Baz Int String} & old prefix doc style \\
+\haddockdecltt{|} & \haddockdecltt{Boa} & doc on the \haddockid{Boa} constrictor \\
+                                          & \qquad \haddockdecltt{!Int} & doc on the \haddockid{Int} field of \haddockid{Boa} \\
+                                          & \qquad \haddockdecltt{!String} & doc on the \haddockid{String} field of \haddockid{Boa} \\
+\haddockdecltt{|} & \haddockdecltt{Int :| String} & old infix doc style \\
+\haddockdecltt{|} & \haddockdecltt{(:*)} & doc on the \haddockid{:*} constructor \\
+                                           & \qquad \haddockdecltt{Int} & doc on the \haddockid{Int} field of the \haddockid{:*} constructor \\
+                                           & \qquad \haddockdecltt{String} & doc on the \haddockid{String} field of the \haddockid{:*} constructor \\
+\end{tabulary}\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data Boo where
+\end{tabular}]
+{\haddockbegindoc
+\enspace \emph{Constructors}\par
+\haddockbeginconstrs
+& \haddockdecltt{Foo} & Info about a \haddockid{Foo} \\
+                        & \qquad \haddockdecltt{::} \enspace \haddockdecltt{Int} & \haddockid{Int} field of \haddockid{Foo} \\
+                        & \qquad \haddockdecltt{->} \enspace \haddockdecltt{String} & \haddockid{String} field of \haddockid{Foo} \\
+                        & \qquad \haddockdecltt{->} \enspace \haddockdecltt{Boo} & Make a \haddockid{Boo} \\
+& \haddockdecltt{Foa :: Int -> Boo} & no argument docs GADT \\
+\end{tabulary}\par
+\enspace \emph{Bundled Patterns}\par
+\haddockbeginconstrs
+& \haddockdecltt{pattern Fo} & Info about bundled \haddockid{Fo} \\
+                               & \qquad \haddockdecltt{::} \enspace \haddockdecltt{Int} & an \haddockid{Int} \\
+                               & \qquad \haddockdecltt{->} \enspace \haddockdecltt{String} & a \haddockid{String} \\
+                               & \qquad \haddockdecltt{->} \enspace \haddockdecltt{Boo} & a \haddockid{Boo} \\
+& \haddockdecltt{pattern Fo' :: Boo} & Bundled and no argument docs \\
+\end{tabulary}\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+pattern Bo
+\end{tabular}]
+{\haddockbegindoc
+\haddockbeginargs
+\haddockdecltt{::} & \haddockdecltt{Int} & an \haddockid{Int} \\
+\haddockdecltt{->} & \haddockdecltt{String} & a \haddockid{String} \\
+\haddockdecltt{->} & \haddockdecltt{Boo} & a \haddockid{Boo} pattern \\
+\end{tabulary}\par
+Info about not-bundled \haddockid{Bo}\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+pattern Bo' :: Int -> String -> Boo
+\end{tabular}]
+{\haddockbegindoc
+Not bunded and no argument docs\par}
+\end{haddockdesc}

@@ -1,0 +1,240 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><link rel="stylesheet" type="text/css" href="style.css"
+     /><script type="text/javascript" src="highlight.js"
+    ></script
+    ></head
+  ><body
+  ><pre
+    ><span class="hs-pragma"
+      >{-# LANGUAGE Haskell2010 #-}</span
+      ><span
+      >
+</span
+      ><span id="line-2"
+      ></span
+      ><span class="hs-pragma"
+      >{-# LANGUAGE TemplateHaskell #-}</span
+      ><span
+      >
+</span
+      ><span id="line-3"
+      ></span
+      ><span class="hs-keyword"
+      >module</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><a href="TemplateHaskellSplices.html"
+	><span class="hs-identifier"
+	  >TemplateHaskellSplices</span
+	  ></a
+	></span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >where</span
+      ><span
+      >
+</span
+      ><span id="line-4"
+      ></span
+      ><span
+      >
+</span
+      ><span id="line-5"
+      ></span
+      ><span class="hs-keyword"
+      >import</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><a href="TemplateHaskellQuasiquotes.html"
+	><span class="hs-identifier"
+	  >TemplateHaskellQuasiquotes</span
+	  ></a
+	></span
+      ><span
+      >
+</span
+      ><span id="line-6"
+      ></span
+      ><span
+      >
+</span
+      ><span id="line-7"
+      ></span
+      ><span class="hs-special"
+      >$</span
+      ><span id="bar"
+      ><span class="hs-special"
+	>(</span
+	><span class="hs-identifier"
+	>aDecl</span
+	><span class="hs-special"
+	>)</span
+	></span
+      ><span
+      >
+</span
+      ><span id="line-8"
+      ></span
+      ><span
+      >
+</span
+      ><span id="line-9"
+      ></span
+      ><span id="foo"
+      ><span class="annot"
+	><span class="annottext"
+	  >foo :: Integer
+</span
+	  ><a href="TemplateHaskellSplices.html#foo"
+	  ><span class="hs-identifier hs-var hs-var"
+	    >foo</span
+	    ></a
+	  ></span
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><span class="annottext"
+	>Integer -&gt; Integer
+forall a. a -&gt; a
+</span
+	><span class="hs-identifier hs-var"
+	>id</span
+	></span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >$</span
+      ><span class="hs-special"
+      >(</span
+      ><span class="annot"
+      ><a href="TemplateHaskellQuasiquotes.html#anExpression2"
+	><span class="hs-identifier hs-type"
+	  >anExpression2</span
+	  ></a
+	></span
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><span id="line-10"
+      ></span
+      ><span
+      >
+</span
+      ><span id="line-11"
+      ></span
+      ><span id="pat"
+      ><span class="annot"
+	><span class="annottext"
+	  >pat :: [(a, String)] -&gt; ()
+</span
+	  ><a href="TemplateHaskellSplices.html#pat"
+	  ><span class="hs-identifier hs-var hs-var"
+	    >pat</span
+	    ></a
+	  ></span
+	></span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >$</span
+      ><span id=""
+      ><span id=""
+	><span id=""
+	  ><span id=""
+	    ><span id=""
+	      ><span id=""
+		><span class="hs-special"
+		  >(</span
+		  ><span class="annot"
+		  ><a href="TemplateHaskellQuasiquotes.html#aPattern"
+		    ><span class="hs-identifier hs-type"
+		      >aPattern</span
+		      ></a
+		    ></span
+		  ><span class="hs-special"
+		  >)</span
+		  ></span
+		></span
+	      ></span
+	    ></span
+	  ></span
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><span id="line-12"
+      ></span
+      ><span
+      >
+</span
+      ><span id="line-13"
+      ></span
+      ><span id="qux"
+      ><span class="annot"
+	><span class="annottext"
+	  >qux :: ()
+</span
+	  ><a href="TemplateHaskellSplices.html#qux"
+	  ><span class="hs-identifier hs-var hs-var"
+	    >qux</span
+	    ></a
+	  ></span
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><span class="annottext"
+	>() -&gt; ()
+forall a. a -&gt; a
+</span
+	><span class="hs-identifier hs-var"
+	>id</span
+	></span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >$$</span
+      ><span class="hs-special"
+      >(</span
+      ><span class="annot"
+      ><a href="TemplateHaskellQuasiquotes.html#typedExpr"
+	><span class="hs-identifier hs-type"
+	  >typedExpr</span
+	  ></a
+	></span
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><span id="line-14"
+      ></span
+      ></pre
+    ></body
+  ></html
+>

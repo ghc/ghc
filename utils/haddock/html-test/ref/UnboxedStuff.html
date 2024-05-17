@@ -1,0 +1,206 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >UnboxedStuff</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>UnboxedStuff</p
+	></div
+      ><div id="table-of-contents"
+      ><div id="contents-list"
+	><p class="caption" onclick="window.scrollTo(0,0)"
+	  >Contents</p
+	  ><ul
+	  ><li
+	    ><a href="#"
+	      >Unboxed type constructors</a
+	      ></li
+	    ></ul
+	  ></div
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >X</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Y</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Z</a
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >unboxedUnit</a
+	      > :: (# #) -&gt; (# #)</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >unboxedTuple</a
+	      > :: (# <a href="#" title="UnboxedStuff"
+	      >X</a
+	      >, <a href="#" title="UnboxedStuff"
+	      >Y</a
+	      > #) -&gt; (# <a href="#" title="UnboxedStuff"
+	      >X</a
+	      >, <a href="#" title="UnboxedStuff"
+	      >Y</a
+	      >, <a href="#" title="UnboxedStuff"
+	      >Z</a
+	      > #)</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >unboxedSum</a
+	      > :: (# <a href="#" title="UnboxedStuff"
+	      >X</a
+	      > |  <a href="#" title="UnboxedStuff"
+	      >Y</a
+	      > #) -&gt; (# <a href="#" title="UnboxedStuff"
+	      >X</a
+	      > |  <a href="#" title="UnboxedStuff"
+	      >Y</a
+	      > |  <a href="#" title="UnboxedStuff"
+	      >Z</a
+	      > #)</li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:X" class="def"
+	    >X</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:Y" class="def"
+	    >Y</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:Z" class="def"
+	    >Z</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	><a href="#" id="g:1"
+	><h1
+	  >Unboxed type constructors</h1
+	  ></a
+	><div class="top"
+	><p class="src"
+	  ><a id="v:unboxedUnit" class="def"
+	    >unboxedUnit</a
+	    > :: (# #) -&gt; (# #) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:unboxedTuple" class="def"
+	    >unboxedTuple</a
+	    > :: (# <a href="#" title="UnboxedStuff"
+	    >X</a
+	    >, <a href="#" title="UnboxedStuff"
+	    >Y</a
+	    > #) -&gt; (# <a href="#" title="UnboxedStuff"
+	    >X</a
+	    >, <a href="#" title="UnboxedStuff"
+	    >Y</a
+	    >, <a href="#" title="UnboxedStuff"
+	    >Z</a
+	    > #) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:unboxedSum" class="def"
+	    >unboxedSum</a
+	    > :: (# <a href="#" title="UnboxedStuff"
+	    >X</a
+	    > |  <a href="#" title="UnboxedStuff"
+	    >Y</a
+	    > #) -&gt; (# <a href="#" title="UnboxedStuff"
+	    >X</a
+	    > |  <a href="#" title="UnboxedStuff"
+	    >Y</a
+	    > |  <a href="#" title="UnboxedStuff"
+	    >Z</a
+	    > #) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

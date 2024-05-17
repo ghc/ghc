@@ -1,0 +1,292 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >Bug613</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>Bug613</p
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > <a href="#"
+	      >Functor</a
+	      > (f :: <a href="#" title="Data.Kind"
+	      >Type</a
+	      > -&gt; <a href="#" title="Data.Kind"
+	      >Type</a
+	      >) <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><a href="#"
+		  >fmap</a
+		  > :: (a -&gt; b) -&gt; f a -&gt; f b</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >ThreeVars</a
+	      > a0 a b = <a href="#"
+	      >ThreeVars</a
+	      > a b</li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > <a id="t:Functor" class="def"
+	    >Functor</a
+	    > (f :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) <span class="keyword"
+	    >where</span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a id="v:fmap" class="def"
+	      >fmap</a
+	      > :: (a -&gt; b) -&gt; f a -&gt; f b <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ></div
+	  ><div class="subs instances"
+	  ><h4 class="instances details-toggle-control details-toggle" data-details-id="i:Functor"
+	    >Instances</h4
+	    ><details id="i:Functor" open="open"
+	    ><summary class="hide-when-js-enabled"
+	      >Instances details</summary
+	      ><table
+	      ><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Functor:Functor:1"
+		      ></span
+		      > <a href="#" title="Bug613"
+		      >Functor</a
+		      > (<a href="#" title="Data.Either"
+		      >Either</a
+		      > a)</span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:ic:Functor:Functor:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Bug613</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >fmap</a
+			  > :: (a0 -&gt; b) -&gt; <a href="#" title="Data.Either"
+			  >Either</a
+			  > a a0 -&gt; <a href="#" title="Data.Either"
+			  >Either</a
+			  > a b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Functor:Functor:2"
+		      ></span
+		      > <a href="#" title="Bug613"
+		      >Functor</a
+		      > (<a href="#" title="Bug613"
+		      >ThreeVars</a
+		      > a0 a)</span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:ic:Functor:Functor:2"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Bug613</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >fmap</a
+			  > :: (a1 -&gt; b) -&gt; <a href="#" title="Bug613"
+			  >ThreeVars</a
+			  > a0 a a1 -&gt; <a href="#" title="Bug613"
+			  >ThreeVars</a
+			  > a0 a b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		></table
+	      ></details
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:ThreeVars" class="def"
+	    >ThreeVars</a
+	    > a0 a b <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Phantom type a0 is added to block the first renaming from a to a0. This ensures that the renamer doesn't create a new conflict</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:ThreeVars" class="def"
+		  >ThreeVars</a
+		  > a b</td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ><div class="subs instances"
+	  ><h4 class="instances details-toggle-control details-toggle" data-details-id="i:ThreeVars"
+	    >Instances</h4
+	    ><details id="i:ThreeVars" open="open"
+	    ><summary class="hide-when-js-enabled"
+	      >Instances details</summary
+	      ><table
+	      ><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:ThreeVars:Functor:1"
+		      ></span
+		      > <a href="#" title="Bug613"
+		      >Functor</a
+		      > (<a href="#" title="Bug613"
+		      >ThreeVars</a
+		      > a0 a)</span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:id:ThreeVars:Functor:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Bug613</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >fmap</a
+			  > :: (a1 -&gt; b) -&gt; <a href="#" title="Bug613"
+			  >ThreeVars</a
+			  > a0 a a1 -&gt; <a href="#" title="Bug613"
+			  >ThreeVars</a
+			  > a0 a b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		></table
+	      ></details
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

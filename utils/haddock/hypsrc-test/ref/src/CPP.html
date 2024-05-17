@@ -1,0 +1,247 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><link rel="stylesheet" type="text/css" href="style.css"
+     /><script type="text/javascript" src="highlight.js"
+    ></script
+    ></head
+  ><body
+  ><pre
+    ><span class="hs-pragma"
+      >{-# LANGUAGE Haskell2010 #-}</span
+      ><span
+      >
+</span
+      ><span id="line-2"
+      ></span
+      ><span class="hs-pragma"
+      >{-# LANGUAGE CPP #-}</span
+      ><span
+      >
+</span
+      ><span id="line-3"
+      ></span
+      ><span class="hs-keyword"
+      >module</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><a href="CPP.html"
+	><span class="hs-identifier"
+	  >CPP</span
+	  ></a
+	></span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >where</span
+      ><span class="hs-cpp"
+      >
+
+#define SOMETHING1
+</span
+      ><span
+      >
+</span
+      ><span id="line-7"
+      ></span
+      ><span class="annot"
+      ><a href="CPP.html#foo"
+	><span class="hs-identifier hs-type"
+	  >foo</span
+	  ></a
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><span class="hs-identifier hs-type"
+	>String</span
+	></span
+      ><span
+      >
+</span
+      ><span id="line-8"
+      ></span
+      ><span id="foo"
+      ><span class="annot"
+	><span class="annottext"
+	  >foo :: String
+</span
+	  ><a href="CPP.html#foo"
+	  ><span class="hs-identifier hs-var hs-var"
+	    >foo</span
+	    ></a
+	  ></span
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-comment"
+      >{-  &quot; single quotes are fine in block comments
+          {- nested block comments are fine -}
+       -}</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><span class="annottext"
+	>String
+</span
+	><span class="hs-string"
+	>&quot;foo&quot;</span
+	></span
+      ><span class="hs-cpp"
+      >
+
+#define SOMETHING2
+</span
+      ><span
+      >
+</span
+      ><span id="line-14"
+      ></span
+      ><span class="annot"
+      ><a href="CPP.html#bar"
+	><span class="hs-identifier hs-type"
+	  >bar</span
+	  ></a
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><span class="hs-identifier hs-type"
+	>String</span
+	></span
+      ><span
+      >
+</span
+      ><span id="line-15"
+      ></span
+      ><span id="bar"
+      ><span class="annot"
+	><span class="annottext"
+	  >bar :: String
+</span
+	  ><a href="CPP.html#bar"
+	  ><span class="hs-identifier hs-var hs-var"
+	    >bar</span
+	    ></a
+	  ></span
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><span class="annottext"
+	>String
+</span
+	><span class="hs-string"
+	>&quot;block comment in a string is not a comment {- &quot;</span
+	></span
+      ><span class="hs-cpp"
+      >
+
+#define SOMETHING3
+</span
+      ><span
+      >
+</span
+      ><span id="line-19"
+      ></span
+      ><span class="hs-comment"
+      >-- &quot; single quotes are fine in line comments</span
+      ><span
+      >
+</span
+      ><span id="line-20"
+      ></span
+      ><span class="hs-comment"
+      >-- {- unclosed block comments are fine in line comments</span
+      ><span
+      >
+</span
+      ><span id="line-21"
+      ></span
+      ><span
+      >
+</span
+      ><span id="line-22"
+      ></span
+      ><span class="hs-comment"
+      >-- Multiline CPP is also fine</span
+      ><span class="hs-cpp"
+      >
+#define FOO\
+  1
+</span
+      ><span
+      >
+</span
+      ><span id="line-26"
+      ></span
+      ><span class="annot"
+      ><a href="CPP.html#baz"
+	><span class="hs-identifier hs-type"
+	  >baz</span
+	  ></a
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><span class="hs-identifier hs-type"
+	>String</span
+	></span
+      ><span
+      >
+</span
+      ><span id="line-27"
+      ></span
+      ><span id="baz"
+      ><span class="annot"
+	><span class="annottext"
+	  >baz :: String
+</span
+	  ><a href="CPP.html#baz"
+	  ><span class="hs-identifier hs-var hs-var"
+	    >baz</span
+	    ></a
+	  ></span
+	></span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="annot"
+      ><span class="annottext"
+	>String
+</span
+	><span class="hs-string"
+	>&quot;line comment in a string is not a comment --&quot;</span
+	></span
+      ><span
+      >
+</span
+      ><span id="line-28"
+      ></span
+      ></pre
+    ></body
+  ></html
+>

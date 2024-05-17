@@ -1,0 +1,37 @@
+\haddockmoduleheading{NamespacedIdentifiers}
+\label{module:NamespacedIdentifiers}
+\haddockbeginheader
+{\haddockverb\begin{verbatim}
+module NamespacedIdentifiers (
+    Foo(Bar), Bar
+  ) where\end{verbatim}}
+\haddockendheader
+
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data Foo
+\end{tabular}]
+{\haddockbegindoc
+A link to:\par
+\vbox{\begin{itemize}
+\item
+the type \haddockid{Bar}\par
+\item
+the constructor \haddockid{Bar}\par
+\item
+the unimported but qualified type \haddockid{A}\par
+\item
+the unimported but qualified value \haddockid{A}\par
+\end{itemize}}
+\enspace \emph{Constructors}\par
+\haddockbeginconstrs
+\haddockdecltt{=} & \haddockdecltt{Bar} & \\
+\end{tabulary}\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data Bar
+\end{tabular}]
+{\haddockbegindoc
+A link to the value \haddocktt{Foo} (which shouldn't exist).\par}
+\end{haddockdesc}

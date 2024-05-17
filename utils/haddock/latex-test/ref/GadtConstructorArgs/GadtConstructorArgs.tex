@@ -1,0 +1,26 @@
+\haddockmoduleheading{GadtConstructorArgs}
+\label{module:GadtConstructorArgs}
+\haddockbeginheader
+{\haddockverb\begin{verbatim}
+module GadtConstructorArgs (
+    Boo(Fot, x, y, Fob, w, z)
+  ) where\end{verbatim}}
+\haddockendheader
+
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data Boo where
+\end{tabular}]
+{\haddockbegindoc
+\enspace \emph{Constructors}\par
+\haddockbeginconstrs
+& \haddockdecltt{Fot} & \\
+                        & \qquad \haddockdecltt{:: {\char '173}} \enspace \haddockdecltt{x :: Int} & an \haddockid{x} \\
+                        & \qquad \haddockdecltt{\ \ \ \ ,} \enspace \haddockdecltt{y :: Int} & a \haddockid{y} \\
+                        & \qquad \haddockdecltt{\ \ \ \ {\char '175} ->} \enspace \haddockdecltt{Boo} & \\
+& \haddockdecltt{Fob} & Record GADT with docs \\
+                        & \qquad \haddockdecltt{:: {\char '173}} \enspace \haddockdecltt{w :: Int} & a \haddockid{w} \\
+                        & \qquad \haddockdecltt{\ \ \ \ ,} \enspace \haddockdecltt{z :: Int} & a \haddockid{z} \\
+                        & \qquad \haddockdecltt{\ \ \ \ {\char '175} ->} \enspace \haddockdecltt{Boo} & a \haddockid{Boo} \\
+\end{tabulary}\par}
+\end{haddockdesc}

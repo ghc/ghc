@@ -1,0 +1,350 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >QuasiExpr</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>QuasiExpr</p
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:Expr" class="def"
+	    >Expr</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:IntExpr" class="def"
+		  >IntExpr</a
+		  > <a href="#" title="Prelude"
+		  >Integer</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:AntiIntExpr" class="def"
+		  >AntiIntExpr</a
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:BinopExpr" class="def"
+		  >BinopExpr</a
+		  > <a href="#" title="QuasiExpr"
+		  >BinOp</a
+		  > <a href="#" title="QuasiExpr"
+		  >Expr</a
+		  > <a href="#" title="QuasiExpr"
+		  >Expr</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:AntiExpr" class="def"
+		  >AntiExpr</a
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ><div class="subs instances"
+	  ><h4 class="instances details-toggle-control details-toggle" data-details-id="i:Expr"
+	    >Instances</h4
+	    ><details id="i:Expr" open="open"
+	    ><summary class="hide-when-js-enabled"
+	      >Instances details</summary
+	      ><table
+	      ><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Expr:Show:1"
+		      ></span
+		      > <a href="#" title="Prelude"
+		      >Show</a
+		      > <a href="#" title="QuasiExpr"
+		      >Expr</a
+		      ></span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:id:Expr:Show:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>QuasiExpr</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >showsPrec</a
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="QuasiExpr"
+			  >Expr</a
+			  > -&gt; <a href="#" title="Prelude"
+			  >ShowS</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >show</a
+			  > :: <a href="#" title="QuasiExpr"
+			  >Expr</a
+			  > -&gt; <a href="#" title="Data.String"
+			  >String</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >showList</a
+			  > :: [<a href="#" title="QuasiExpr"
+			  >Expr</a
+			  >] -&gt; <a href="#" title="Prelude"
+			  >ShowS</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		></table
+	      ></details
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:BinOp" class="def"
+	    >BinOp</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:AddOp" class="def"
+		  >AddOp</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:SubOp" class="def"
+		  >SubOp</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:MulOp" class="def"
+		  >MulOp</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a id="v:DivOp" class="def"
+		  >DivOp</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ><div class="subs instances"
+	  ><h4 class="instances details-toggle-control details-toggle" data-details-id="i:BinOp"
+	    >Instances</h4
+	    ><details id="i:BinOp" open="open"
+	    ><summary class="hide-when-js-enabled"
+	      >Instances details</summary
+	      ><table
+	      ><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:BinOp:Show:1"
+		      ></span
+		      > <a href="#" title="Prelude"
+		      >Show</a
+		      > <a href="#" title="QuasiExpr"
+		      >BinOp</a
+		      ></span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:id:BinOp:Show:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>QuasiExpr</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >showsPrec</a
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="QuasiExpr"
+			  >BinOp</a
+			  > -&gt; <a href="#" title="Prelude"
+			  >ShowS</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >show</a
+			  > :: <a href="#" title="QuasiExpr"
+			  >BinOp</a
+			  > -&gt; <a href="#" title="Data.String"
+			  >String</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >showList</a
+			  > :: [<a href="#" title="QuasiExpr"
+			  >BinOp</a
+			  >] -&gt; <a href="#" title="Prelude"
+			  >ShowS</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		></table
+	      ></details
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:eval" class="def"
+	    >eval</a
+	    > :: <a href="#" title="QuasiExpr"
+	    >Expr</a
+	    > -&gt; <a href="#" title="Prelude"
+	    >Integer</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:expr" class="def"
+	    >expr</a
+	    > :: <a href="#" title="Language.Haskell.TH.Quote"
+	    >QuasiQuoter</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:parseExprExp" class="def"
+	    >parseExprExp</a
+	    > :: <a href="#" title="Data.String"
+	    >String</a
+	    > -&gt; <a href="#" title="Language.Haskell.TH"
+	    >Q</a
+	    > <a href="#" title="Language.Haskell.TH"
+	    >Exp</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

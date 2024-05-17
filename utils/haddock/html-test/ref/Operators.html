@@ -1,0 +1,544 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >Operators</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>Operators</p
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >Test operators with or without fixity declarations</p
+	  ></div
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><a href="#"
+	      >(+-)</a
+	      > :: a -&gt; a -&gt; a</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >(*/)</a
+	      > :: a -&gt; a -&gt; a</li
+	    ><li class="src short"
+	    ><a href="#"
+	      >foo</a
+	      > :: a -&gt; a -&gt; a</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Foo</a
+	      ><ul class="subs"
+	      ><li
+		>= <a href="#" title="Operators"
+		  >Foo</a
+		  > <a href="#"
+		  >`Bar`</a
+		  > <a href="#" title="Operators"
+		  >Foo</a
+		  ></li
+		><li
+		>| <a href="#" title="Operators"
+		  >Foo</a
+		  > <a href="#"
+		  >:-</a
+		  > <a href="#" title="Operators"
+		  >Foo</a
+		  ></li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >(:+)</a
+	      > :: a -&gt; a -&gt; [a]</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > a <a href="#"
+	      >&lt;-&gt;</a
+	      > b <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><a href="#"
+		  >(:&lt;-&gt;)</a
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a b. a -&gt; b -&gt; a <a href="#" title="Operators"
+		  >&lt;-&gt;</a
+		  > b</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type family</span
+	      > a <a href="#"
+	      >++</a
+	      > b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data family</span
+	      > a <a href="#"
+	      >**</a
+	      > b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >class</span
+	      > a <a href="#"
+	      >&gt;&lt;&gt;</a
+	      > b | a -&gt; b <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><span class="keyword"
+		  >type</span
+		  > a <a href="#"
+		  >&lt;&gt;&lt;</a
+		  > b</li
+		><li
+		><span class="keyword"
+		  >data</span
+		  > a <a href="#"
+		  >&gt;&lt;&lt;</a
+		  > b</li
+		><li
+		><a href="#"
+		  >(&gt;&gt;&lt;)</a
+		  > :: a -&gt; b -&gt; ()</li
+		><li
+		><a href="#"
+		  >(&lt;&lt;&gt;)</a
+		  > :: a -&gt; b -&gt; ()</li
+		><li
+		><a href="#"
+		  >(**&gt;)</a
+		  > :: a -&gt; a -&gt; ()</li
+		><li
+		><a href="#"
+		  >(**&lt;)</a
+		  > :: a -&gt; a -&gt; ()</li
+		><li
+		><a href="#"
+		  >(&gt;**)</a
+		  > :: a -&gt; a -&gt; ()</li
+		><li
+		><a href="#"
+		  >(&lt;**)</a
+		  > :: a -&gt; a -&gt; ()</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type</span
+	      > <a href="#"
+	      >(&gt;-&lt;)</a
+	      > a b = a <a href="#" title="Operators"
+	      >&lt;-&gt;</a
+	      > b</li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><a id="v:-43--45-" class="def"
+	    >(+-)</a
+	    > :: a -&gt; a -&gt; a <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Operator with no fixity</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:-42--47-" class="def"
+	    >(*/)</a
+	    > :: a -&gt; a -&gt; a <span class="fixity"
+	    >infixr 7</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Operator with infixr 7</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:foo" class="def"
+	    >foo</a
+	    > :: a -&gt; a -&gt; a <span class="fixity"
+	    >infixl 3</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Named function with infixl 3</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:Foo" class="def"
+	    >Foo</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Data type with operator constructors</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a href="#" title="Operators"
+		  >Foo</a
+		  > <a id="v:Bar" class="def"
+		  >`Bar`</a
+		  > <a href="#" title="Operators"
+		  >Foo</a
+		  > <span class="fixity"
+		  >infixl 3</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
+		><td class="doc"
+		><p
+		  >Has infixl 3</p
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a href="#" title="Operators"
+		  >Foo</a
+		  > <a id="v::-45-" class="def"
+		  >:-</a
+		  > <a href="#" title="Operators"
+		  >Foo</a
+		  > <span class="fixity"
+		  >infixr 5</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
+		><td class="doc"
+		><p
+		  >Has infixr 5</p
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v::-43-" class="def"
+	    >(:+)</a
+	    > :: a -&gt; a -&gt; [a] <span class="fixity"
+	    >infixr 3</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym, infixr 3</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > a <a id="t:-60--45--62-" class="def"
+	    >&lt;-&gt;</a
+	    > b <span class="keyword"
+	    >where</span
+	    > <span class="fixity"
+	    >infixl 6</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Type name, infixl 6 and GADT constructor</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v::-60--45--62-" class="def"
+		  >(:&lt;-&gt;)</a
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a b. a -&gt; b -&gt; a <a href="#" title="Operators"
+		  >&lt;-&gt;</a
+		  > b <span class="fixity"
+		  >infixr 6</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type family</span
+	    > a <a id="t:-43--43-" class="def"
+	    >++</a
+	    > b <span class="fixity"
+	    >infix 3</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Type family with fixity</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data family</span
+	    > a <a id="t:-42--42-" class="def"
+	    >**</a
+	    > b <span class="fixity"
+	    >infix 9</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Data family with fixity</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >class</span
+	    > a <a id="t:-62--60--62-" class="def"
+	    >&gt;&lt;&gt;</a
+	    > b | a -&gt; b <span class="keyword"
+	    >where</span
+	    > <span class="fixity"
+	    >infixr 1</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Class with fixity, including associated types</p
+	    ></div
+	  ><div class="subs associated-types"
+	  ><p class="caption"
+	    >Associated Types</p
+	    ><p class="src"
+	    ><span class="keyword"
+	      >type</span
+	      > a <a id="t:-60--62--60-" class="def"
+	      >&lt;&gt;&lt;</a
+	      > b <span class="fixity"
+	      >infixl 2</span
+	      ><span class="rightedge"
+	      ></span
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ><p class="src"
+	    ><span class="keyword"
+	      >data</span
+	      > a <a id="t:-62--60--60-" class="def"
+	      >&gt;&lt;&lt;</a
+	      > b <span class="fixity"
+	      >infixl 3</span
+	      ><span class="rightedge"
+	      ></span
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ></div
+	  ><div class="subs methods"
+	  ><p class="caption"
+	    >Methods</p
+	    ><p class="src"
+	    ><a id="v:-62--62--60-" class="def"
+	      >(&gt;&gt;&lt;)</a
+	      > :: a -&gt; b -&gt; () <span class="fixity"
+	      >infixr 4</span
+	      ><span class="rightedge"
+	      ></span
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ><p class="src"
+	    ><a id="v:-60--60--62-" class="def"
+	      >(&lt;&lt;&gt;)</a
+	      > :: a -&gt; b -&gt; () <span class="fixity"
+	      >infixl 5</span
+	      ><span class="rightedge"
+	      ></span
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ><p class="src"
+	    ><a id="v:-42--42--62-" class="def"
+	      >(**&gt;)</a
+	      > :: a -&gt; a -&gt; () <span class="fixity"
+	      >infixr 8</span
+	      ><span class="rightedge"
+	      ></span
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ><div class="doc"
+	    ><p
+	      >Multiple fixities</p
+	      ></div
+	    ><p class="src"
+	    ><a id="v:-42--42--60-" class="def"
+	      >(**&lt;)</a
+	      > :: a -&gt; a -&gt; () <span class="fixity"
+	      >infixl 8</span
+	      ><span class="rightedge"
+	      ></span
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ><div class="doc"
+	    ><p
+	      >Multiple fixities</p
+	      ></div
+	    ><p class="src"
+	    ><a id="v:-62--42--42-" class="def"
+	      >(&gt;**)</a
+	      > :: a -&gt; a -&gt; () <span class="fixity"
+	      >infixr 8</span
+	      ><span class="rightedge"
+	      ></span
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ><div class="doc"
+	    ><p
+	      >Multiple fixities</p
+	      ></div
+	    ><p class="src"
+	    ><a id="v:-60--42--42-" class="def"
+	      >(&lt;**)</a
+	      > :: a -&gt; a -&gt; () <span class="fixity"
+	      >infixl 8</span
+	      ><span class="rightedge"
+	      ></span
+	      > <a href="#" class="selflink"
+	      >#</a
+	      ></p
+	    ><div class="doc"
+	    ><p
+	      >Multiple fixities</p
+	      ></div
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type</span
+	    > <a id="t:-62--45--60-" class="def"
+	    >(&gt;-&lt;)</a
+	    > a b = a <a href="#" title="Operators"
+	    >&lt;-&gt;</a
+	    > b <span class="fixity"
+	    >infixl 6</span
+	    ><span class="rightedge"
+	    ></span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Type synonym with fixity</p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

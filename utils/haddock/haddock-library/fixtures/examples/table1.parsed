@@ -1,0 +1,68 @@
+DocTable
+  Table
+    {tableBodyRows = [TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "body row 1, column 1",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "column 2",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "column 3",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "column 4",
+                            tableCellRowspan = 1}],
+                      TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "body row 2",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 3,
+                            tableCellContents = DocString "Cells may span columns.",
+                            tableCellRowspan = 1}],
+                      TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "body row 3",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString
+                                                  (concat ["Cells may\n", "span rows.\n"]),
+                            tableCellRowspan = 2},
+                         TableCell
+                           {tableCellColspan = 2,
+                            tableCellContents = DocMathDisplay
+                                                  (concat ["\n", "f(n) = \\sum_{i=1}\n"]),
+                            tableCellRowspan = 2}],
+                      TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "body row 4",
+                            tableCellRowspan = 1}]],
+     tableHeaderRows = [TableRow
+                          [TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString
+                                                    (concat
+                                                       ["Header row, column 1\n",
+                                                        "(header rows optional)"]),
+                              tableCellRowspan = 1},
+                           TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString "Header 2\n",
+                              tableCellRowspan = 1},
+                           TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString "Header 3\n",
+                              tableCellRowspan = 1},
+                           TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString "Header 4\n",
+                              tableCellRowspan = 1}]]}

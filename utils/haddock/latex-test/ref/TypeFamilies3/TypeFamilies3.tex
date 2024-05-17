@@ -1,0 +1,44 @@
+\haddockmoduleheading{TypeFamilies3}
+\label{module:TypeFamilies3}
+\haddockbeginheader
+{\haddockverb\begin{verbatim}
+module TypeFamilies3 (
+    Foo, Bar, Baz(Baz3, Baz2, Baz1)
+  ) where\end{verbatim}}
+\haddockendheader
+
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+type family Foo a where
+\end{tabular}]
+{\haddockbegindoc
+\haddockbeginargs
+\haddockdecltt{Foo () = Int} \\
+\haddockdecltt{Foo {\char '137}1 = ()} \\
+\end{tabulary}\par
+A closed type family\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+type family Bar a
+\end{tabular}]
+{\haddockbegindoc
+An open family\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+type instance Bar () = Int\\type instance Bar Int = ()
+\end{tabular}]
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data family Baz a
+\end{tabular}]
+{\haddockbegindoc
+A data family\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+data instance Baz ()\\newtype instance Baz Double\\data instance Baz Int
+\end{tabular}]
+\end{haddockdesc}

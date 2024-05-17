@@ -1,0 +1,26 @@
+name: hlint
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build:
+    name: hlint
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+
+    - uses: rwe/actions-hlint-setup@v1
+      name: Set up HLint
+      with:
+        version: "3.4.1"
+
+    - uses: rwe/actions-hlint-run@v2
+      name: hlint
+      with:
+        path: '[ "haddock-library/", "haddock-api/", "haddock-test/", "hoogle-test/", "html-test/", "hypsrc-test/", "latex-test/" ]'
+        fail-on: suggestion

@@ -1,0 +1,29 @@
+DocTable
+  Table
+    {tableBodyRows = [TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "row",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocIdentifier "test",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString
+                                                  "'test table cell with  .. whitepspace '",
+                            tableCellRowspan = 1}]],
+     tableHeaderRows = [TableRow
+                          [TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString "C1",
+                              tableCellRowspan = 1},
+                           TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString "C2",
+                              tableCellRowspan = 1},
+                           TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString "C3",
+                              tableCellRowspan = 1}]]}

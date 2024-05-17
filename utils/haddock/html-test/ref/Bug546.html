@@ -1,0 +1,281 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >Bug546</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>Bug546</p
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><a href="#"
+	      >x</a
+	      > :: <a href="#" title="Prelude"
+	      >Integer</a
+	      ></li
+	    ><li class="src short"
+	    ><a href="#"
+	      >compile</a
+	      > :: <a href="#" title="Data.String"
+	      >String</a
+	      > -&gt; <a href="#" title="Data.String"
+	      >String</a
+	      ></li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><a id="v:x" class="def"
+	    >x</a
+	    > :: <a href="#" title="Prelude"
+	    >Integer</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Test:</p
+	    ><dl
+	    ><dt
+	      ><code
+		>[code with square \ brackets]</code
+		></dt
+	      ><dd
+	      >lorem ipsum</dd
+	      ></dl
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a id="v:compile" class="def"
+	    >compile</a
+	    > :: <a href="#" title="Data.String"
+	    >String</a
+	    > -&gt; <a href="#" title="Data.String"
+	    >String</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><dl
+	    ><dt
+	      ><code
+		>[..]</code
+		></dt
+	      ><dd
+	      >Matches any of the enclosed characters. Ranges of characters can
+            be specified by separating the endpoints with a <code
+		>'-'</code
+		>. <code
+		>'-'</code
+		> or
+            <code
+		>']'</code
+		> can be matched by including them as the first character(s)
+            in the list. Never matches path separators: <code
+		>[/]</code
+		> matches
+            nothing at all. Named character classes can also be matched:
+            <code
+		>[:x:]</code
+		> within <code
+		>[]</code
+		> specifies the class named <code
+		>x</code
+		>, which matches
+            certain predefined characters. See below for a full list.</dd
+	      ><dt
+	      ><code
+		>[^..]</code
+		> or <code
+		>[!..]</code
+		></dt
+	      ><dd
+	      >Like <code
+		>[..]</code
+		>, but matches any character <em
+		>not</em
+		> listed.
+                        Note that <code
+		>[^-x]</code
+		> is not the inverse of <code
+		>[-x]</code
+		>, but
+                        the range <code
+		>[^-x]</code
+		>.</dd
+	      ><dt
+	      ><code
+		>&lt;m-n&gt;</code
+		></dt
+	      ><dd
+	      >Matches any integer in the range m to n, inclusive. The range may
+            be open-ended by leaving out either number: <code
+		>&quot;&lt;-&gt;&quot;</code
+		>, for
+            instance, matches any integer.</dd
+	      ><dt
+	      ><code
+		>**/</code
+		></dt
+	      ><dd
+	      >Matches any number of characters, including path separators,
+            excluding the empty string.</dd
+	      ></dl
+	    ><p
+	    >Supported character classes:</p
+	    ><dl
+	    ><dt
+	      ><code
+		>[:alnum:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;0-9A-Za-z&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:alpha:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;A-Za-z&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:blank:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;\t &quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:cntrl:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;\0-\x1f\x7f&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:digit:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;0-9&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:graph:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;!-~&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:lower:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;a-z&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:print:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot; -~&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:punct:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;!-/:-@[-`{-~&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:space:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;\t-\r &quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:upper:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;A-Z&quot;</code
+		>.</dd
+	      ><dt
+	      ><code
+		>[:xdigit:]</code
+		></dt
+	      ><dd
+	      >Equivalent to <code
+		>&quot;0-9A-Fa-f&quot;</code
+		>.</dd
+	      ></dl
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

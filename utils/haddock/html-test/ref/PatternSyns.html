@@ -1,0 +1,373 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >PatternSyns</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>PatternSyns</p
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >Testing some pattern synonyms</p
+	  ></div
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >FooType</a
+	      > x = <a href="#"
+	      >FooCtor</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Foo</a
+	      > :: x -&gt; <a href="#" title="PatternSyns"
+	      >FooType</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Bar</a
+	      > :: x -&gt; <a href="#" title="PatternSyns"
+	      >FooType</a
+	      > (<a href="#" title="PatternSyns"
+	      >FooType</a
+	      > x)</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >(:&lt;-&gt;)</a
+	      > :: x1 -&gt; x2 -&gt; (<a href="#" title="PatternSyns"
+	      >FooType</a
+	      > x1, <a href="#" title="PatternSyns"
+	      >FooType</a
+	      > (<a href="#" title="PatternSyns"
+	      >FooType</a
+	      > x2))</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >BlubType</a
+	      > = <a href="#" title="Prelude"
+	      >Show</a
+	      > x =&gt;  <a href="#"
+	      >BlubCtor</a
+	      > x</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >Blub</a
+	      > :: () =&gt; <a href="#" title="Prelude"
+	      >Show</a
+	      > x =&gt; x -&gt; <a href="#" title="PatternSyns"
+	      >BlubType</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > a <a href="#"
+	      >&gt;&lt;</a
+	      > (b :: k) = <a href="#"
+	      >Empty</a
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >E</a
+	      > :: a <a href="#" title="PatternSyns"
+	      >&gt;&lt;</a
+	      > b</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >pattern</span
+	      > <a href="#"
+	      >PatWithExplicitSig</a
+	      > :: <a href="#" title="Data.Eq"
+	      >Eq</a
+	      > somex =&gt; somex -&gt; <a href="#" title="PatternSyns"
+	      >FooType</a
+	      > somex</li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:FooType" class="def"
+	    >FooType</a
+	    > x <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >FooType doc</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:FooCtor" class="def"
+		  >FooCtor</a
+		  > x</td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:Foo" class="def"
+	    >Foo</a
+	    > :: x -&gt; <a href="#" title="PatternSyns"
+	    >FooType</a
+	    > x <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for <code
+	      ><a href="#" title="PatternSyns"
+		>Foo</a
+		></code
+	      > x</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:Bar" class="def"
+	    >Bar</a
+	    > :: x -&gt; <a href="#" title="PatternSyns"
+	    >FooType</a
+	    > (<a href="#" title="PatternSyns"
+	    >FooType</a
+	    > x) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for <code
+	      ><a href="#" title="PatternSyns"
+		>Bar</a
+		></code
+	      > x</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v::-60--45--62-" class="def"
+	    >(:&lt;-&gt;)</a
+	    > :: x1 -&gt; x2 -&gt; (<a href="#" title="PatternSyns"
+	    >FooType</a
+	    > x1, <a href="#" title="PatternSyns"
+	    >FooType</a
+	    > (<a href="#" title="PatternSyns"
+	    >FooType</a
+	    > x2)) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for (<code
+	      ><a href="#" title="PatternSyns"
+		>:&lt;-&gt;</a
+		></code
+	      >)</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:BlubType" class="def"
+	    >BlubType</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >BlubType is existentially quantified</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a href="#" title="Prelude"
+		  >Show</a
+		  > x =&gt;  <a id="v:BlubCtor" class="def"
+		  >BlubCtor</a
+		  > x</td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:Blub" class="def"
+	    >Blub</a
+	    > :: () =&gt; <a href="#" title="Prelude"
+	    >Show</a
+	    > x =&gt; x -&gt; <a href="#" title="PatternSyns"
+	    >BlubType</a
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern synonym for <code
+	      ><a href="#" title="PatternSyns"
+		>Blub</a
+		></code
+	      > x</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > a <a id="t:-62--60-" class="def"
+	    >&gt;&lt;</a
+	    > (b :: k) <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Doc for (<code
+	      >&gt;&lt;</code
+	      >)</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:Empty" class="def"
+		  >Empty</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:E" class="def"
+	    >E</a
+	    > :: a <a href="#" title="PatternSyns"
+	    >&gt;&lt;</a
+	    > b <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Pattern for <code
+	      ><a href="#" title="PatternSyns"
+		>Empty</a
+		></code
+	      ></p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >pattern</span
+	    > <a id="v:PatWithExplicitSig" class="def"
+	    >PatWithExplicitSig</a
+	    > :: <a href="#" title="Data.Eq"
+	    >Eq</a
+	    > somex =&gt; somex -&gt; <a href="#" title="PatternSyns"
+	    >FooType</a
+	    > somex <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Earlier ghc versions didn't allow explicit signatures
+ on pattern synonyms.</p
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

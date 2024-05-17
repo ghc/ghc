@@ -1,0 +1,9 @@
+source_paths:
+-  ./driver         
+-  ./haddock-api    
+-  ./haddock-library
+-  ./haddock-test   
+-  ./hoogle-test    
+-  ./html-test      
+-  ./hypsrc-test    
+-  ./latex-test     

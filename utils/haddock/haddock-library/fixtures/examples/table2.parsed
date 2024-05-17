@@ -1,0 +1,46 @@
+DocTable
+  Table
+    {tableBodyRows = [TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "row 1, col 1",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "column 2",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "column 3",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "column 4",
+                            tableCellRowspan = 1}],
+                      TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "row 2",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 3,
+                            tableCellContents = DocEmpty,
+                            tableCellRowspan = 1}],
+                      TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString "row 3",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocEmpty,
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocEmpty,
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocEmpty,
+                            tableCellRowspan = 1}]],
+     tableHeaderRows = []}

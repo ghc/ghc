@@ -1,0 +1,33 @@
+{
+  "name": "haddock-quick-jump",
+  "version": "0.1.0",
+  "description": "A drop-down search on Haddock docs for navigating quickly to definitions of Haskell functions and types in the current package",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "gulp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/haskell/haddock.git"
+  },
+  "author": "Tim Baumann <tim@timbaumann.info>",
+  "contributors": [
+    "Mark Lentczner <markl@glyphic.com>",
+    "Moritz Drexl <mdrexl@fastmail.fm>",
+    "Alex Biehl <alexbiehl@gmail.com>"
+  ],
+  "dependencies": {
+    "fuse.js": "^3.3.0",
+    "preact": "^8.3.1"
+  },
+  "devDependencies": {
+    "browserify": "^14.5.0",
+    "gulp": "^4.0.2",
+    "gulp-sourcemaps": "^2.6.4",
+    "gulp-uglify": "^3.0.1",
+    "tsify": "^3.0.4",
+    "typescript": "^2.9.2",
+    "vinyl-buffer": "^1.0.1",
+    "vinyl-source-stream": "^2.0.0"
+  }
+}

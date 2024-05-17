@@ -1,0 +1,29 @@
+cabal-version:        3.0
+name:                 haddock-test
+version:              0.0.1
+synopsis:             Test utilities for Haddock
+license:              BSD-2-Clause
+author:               Simon Marlow, David Waern
+maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
+homepage:             http://www.haskell.org/haddock/
+bug-reports:          https://github.com/haskell/haddock/issues
+copyright:            (c) Simon Marlow, David Waern
+category:             Documentation
+build-type:           Simple
+tested-with:          GHC==9.6.*
+stability:            experimental
+
+library
+  default-language: Haskell2010
+  ghc-options: -Wall
+  hs-source-dirs:   src
+  build-depends:    base >= 4.3 && < 4.20, bytestring, directory, process, filepath, Cabal
+
+  exposed-modules:
+    Test.Haddock
+    Test.Haddock.Config
+    Test.Haddock.Utils
+    Test.Haddock.Xhtml
+
+  other-modules:
+    Test.Haddock.Process

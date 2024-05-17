@@ -1,0 +1,368 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >TypeFamilies3</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>TypeFamilies3</p
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >type family</span
+	      > <a href="#"
+	      >Foo</a
+	      > a <span class="keyword"
+	      >where ...</span
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >type family</span
+	      > <a href="#"
+	      >Bar</a
+	      > a</li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data family</span
+	      > <a href="#"
+	      >Baz</a
+	      > a</li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type family</span
+	    > <a id="t:Foo" class="def"
+	    >Foo</a
+	    > a <span class="keyword"
+	    >where ...</span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >A closed type family</p
+	    ></div
+	  ><div class="subs equations"
+	  ><p class="caption"
+	    >Equations</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a href="#" title="TypeFamilies3"
+		  >Foo</a
+		  > () = <a href="#" title="Data.Int"
+		  >Int</a
+		  ></td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><a href="#" title="TypeFamilies3"
+		  >Foo</a
+		  > _1 = ()</td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >type family</span
+	    > <a id="t:Bar" class="def"
+	    >Bar</a
+	    > a <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >An open family</p
+	    ></div
+	  ><div class="subs instances"
+	  ><h4 class="instances details-toggle-control details-toggle" data-details-id="i:Bar"
+	    >Instances</h4
+	    ><details id="i:Bar" open="open"
+	    ><summary class="hide-when-js-enabled"
+	      >Instances details</summary
+	      ><table
+	      ><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Bar:Bar:1"
+		      ></span
+		      > <span class="keyword"
+		      >type</span
+		      > <a href="#" title="TypeFamilies3"
+		      >Bar</a
+		      > ()</span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:if:Bar:Bar:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>TypeFamilies3</a
+			></p
+		      > <div class="src"
+		      ><span class="keyword"
+			>type</span
+			> <a href="#" title="TypeFamilies3"
+			>Bar</a
+			> () = <a href="#" title="Data.Int"
+			>Int</a
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Bar:Bar:2"
+		      ></span
+		      > <span class="keyword"
+		      >type</span
+		      > <a href="#" title="TypeFamilies3"
+		      >Bar</a
+		      > <a href="#" title="Data.Int"
+		      >Int</a
+		      ></span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:if:Bar:Bar:2"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>TypeFamilies3</a
+			></p
+		      > <div class="src"
+		      ><span class="keyword"
+			>type</span
+			> <a href="#" title="TypeFamilies3"
+			>Bar</a
+			> <a href="#" title="Data.Int"
+			>Int</a
+			> = ()</div
+		      ></details
+		    ></td
+		  ></tr
+		></table
+	      ></details
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data family</span
+	    > <a id="t:Baz" class="def"
+	    >Baz</a
+	    > a <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >A data family</p
+	    ></div
+	  ><div class="subs instances"
+	  ><h4 class="instances details-toggle-control details-toggle" data-details-id="i:Baz"
+	    >Instances</h4
+	    ><details id="i:Baz" open="open"
+	    ><summary class="hide-when-js-enabled"
+	      >Instances details</summary
+	      ><table
+	      ><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Baz:Baz:1"
+		      ></span
+		      > <span class="keyword"
+		      >data</span
+		      > <a href="#" title="TypeFamilies3"
+		      >Baz</a
+		      > ()</span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:if:Baz:Baz:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>TypeFamilies3</a
+			></p
+		      > <div class="src"
+		      ><span class="keyword"
+			>data</span
+			> <a href="#" title="TypeFamilies3"
+			>Baz</a
+			> () = <a id="v:Baz1" class="def"
+			>Baz1</a
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Baz:Baz:2"
+		      ></span
+		      > <span class="keyword"
+		      >newtype</span
+		      > <a href="#" title="TypeFamilies3"
+		      >Baz</a
+		      > <a href="#" title="GHC.Exts"
+		      >Double</a
+		      ></span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:if:Baz:Baz:2"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>TypeFamilies3</a
+			></p
+		      > <div class="src"
+		      ><span class="keyword"
+			>newtype</span
+			> <a href="#" title="TypeFamilies3"
+			>Baz</a
+			> <a href="#" title="GHC.Exts"
+			>Double</a
+			> = <a id="v:Baz3" class="def"
+			>Baz3</a
+			> <a href="#" title="GHC.Exts"
+			>Float</a
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Baz:Baz:3"
+		      ></span
+		      > <span class="keyword"
+		      >data</span
+		      > <a href="#" title="TypeFamilies3"
+		      >Baz</a
+		      > <a href="#" title="Data.Int"
+		      >Int</a
+		      ></span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:if:Baz:Baz:3"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>TypeFamilies3</a
+			></p
+		      > <div class="src"
+		      ><span class="keyword"
+			>data</span
+			> <a href="#" title="TypeFamilies3"
+			>Baz</a
+			> <a href="#" title="Data.Int"
+			>Int</a
+			> = <a id="v:Baz2" class="def"
+			>Baz2</a
+			> <a href="#" title="Data.Bool"
+			>Bool</a
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		></table
+	      ></details
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

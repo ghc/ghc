@@ -1,0 +1,519 @@
+* {
+	margin: 0;
+	padding: 0;
+}
+
+.extension-list {
+    list-style-type: none;
+    margin-left: 0;
+    padding-left: 0;
+}
+
+body {
+  	background-color: #ffffff;
+  	color: #000000;
+  	font-size: 100%;
+	font-family: sans-serif;
+	padding: 8px;
+}
+
+a:link    { color: #0000e0; text-decoration: none }
+a:visited { color: #0000a0; text-decoration: none }
+a:hover   { background-color: #e0e0ff; text-decoration: none }
+
+/* <tt> font is a little too small in MSIE */
+tt  { font-size: 100%; }
+pre { font-size: 100%; }
+.keyword { text-decoration: underline; }
+.caption {
+	font-weight: bold;
+	margin: 0;
+	padding: 0;
+}
+
+h1 {
+  padding-top: 15px;
+  font-weight: bold;
+  font-size: 150%;
+}
+
+h2 {
+  padding-top: 10px;
+  font-weight: bold;
+  font-size: 130%
+  }
+
+h3 {
+  padding-top: 5px;
+  font-weight: bold;
+  font-size: 110%
+  }
+
+h4, h5 {
+  font-weight: bold;
+  font-size: 100%
+  }
+
+h1, h2, h3, h4, h5 {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+p  {
+	padding-top: 2px;
+	padding-left: 10px;
+}
+
+ul, ol, dl {
+	padding-top: 2px;
+	padding-left: 10px;
+	margin-left: 2.5em;
+}
+
+pre  {
+	padding-top: 2px;
+	padding-left: 20px;
+}
+
+* + p, * + pre {
+	margin-top: 1em;
+}
+.caption + p, .src + p {
+	margin-top: 0;
+}
+
+.def {
+	font-weight: bold;
+}
+
+ul.links {
+	list-style: none;
+	text-align: left;
+	float: right;
+	display: inline-table;
+	padding: 0;
+}
+
+ul.links li {
+	display: inline;
+	border-left-width: 1px;
+	border-left-color: #ffffff;
+	border-left-style: solid;
+	white-space: nowrap;
+	padding: 1px 5px;
+}
+
+.hide {	display: none; }
+.show { }
+.collapser {
+  background: url(minus.gif) no-repeat 0 0.3em;
+}
+.expander {
+  background: url(plus.gif) no-repeat 0 0.3em;
+}
+.collapser, .expander {
+  padding-left: 14px;
+  cursor: pointer;
+}
+
+@media print {
+  #footer { display: none; }
+}
+
+#package-header {
+	color: #ffffff;
+	padding: 5px 5px 5px 31px;
+	margin: 0 0 1px;
+	background: #000099 url(haskell_icon.gif) no-repeat 5px 6px;
+	position: relative;
+}
+
+#package-header .caption {
+	font-weight: normal;
+	font-style: normal;
+}
+#package-header a:link    { color: #ffffff }
+#package-header a:visited { color: #ffff00 }
+#package-header a:hover   { background-color: #6060ff; }
+#package-header ul.links li:hover { background-color: #6060ff; }
+
+div#style-menu-holder {
+	position: relative;
+	z-index: 2;
+	display: inline;
+}
+
+#style-menu {
+	position: absolute;
+	z-index: 1;
+	overflow: visible;
+	background-color: #000099;
+	margin: 0;
+	width: 6em;
+	text-align: center;
+	right: 0;
+	padding: 2px 2px 1px;
+	top: 1.25em;
+}
+
+#style-menu li {
+	display: list-item;
+	border-style: none;
+	margin: 0;
+	padding: 3px;
+	color: #000;
+	list-style-type: none;
+	border-top: 1px solid #ffffff;
+}
+
+#module-header {
+	overflow: hidden; /* makes sure info float is properly contained */
+	display: inline-block; /* triggers hasLayout in IE*/
+}
+
+#module-header {
+	display: block; /* back to block */
+	background-color: #0077dd;
+	padding: 5px;
+}
+
+#module-header .caption {
+	font-size: 200%;
+	padding: .35em 0;
+	font-weight: normal;
+	font-style: normal;
+}
+
+table.info {
+	color: #ffffff;
+	display: block;
+	float: right;
+	max-width: 50%;
+}
+
+.info th, .info td {
+	text-align: left;
+	padding: 0 10px 0 0;
+}
+
+
+#table-of-contents {
+	margin-top: 1em;
+	margin-bottom: 2em;
+}
+
+#table-of-contents ul {
+	margin-top: 1em;
+	margin-bottom: 1em;
+	margin-left: 0;
+	list-style-type: none;
+	padding: 0;
+}
+
+#table-of-contents ul ul {
+	margin-left: 2.5em;
+}
+
+#description .caption,
+#synopsis .caption,
+#module-list .caption,
+#index .caption {
+  padding-top: 15px;
+  font-weight: bold;
+  font-size: 150%
+}
+
+#synopsis {
+	margin-bottom: 2em;
+}
+
+#synopsis .expander,
+#synopsis .collapser {
+  background: none;
+  padding-left: inherit;
+}
+
+#synopsis .hide {
+  display: inherit;
+}
+
+#synopsis ul {
+	margin: 0;
+	padding-top: 0;
+	padding-left: 20px;
+	list-style-type: none;
+}
+
+#synopsis li {
+	margin-top: 8px;
+	margin-bottom: 8px;
+	padding: 3px;
+}
+
+#synopsis li li {
+	padding: 0;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+
+div.top {
+	margin-top: 1em;
+	clear: left;
+	margin-bottom: 1em;
+}
+
+div.top h5 {
+	margin-left: 10px;
+}
+
+
+.src {
+	padding: 3px;
+	background-color: #f0f0f0;
+	font-family: monospace;
+	margin-bottom: 0;
+}
+
+
+.src a.link {
+	float: right;
+	border-left-width: 1px;
+	border-left-color: #000099;
+	border-left-style: solid;
+	white-space: nowrap;
+	font-size: small;
+	padding: 0 8px 2px 5px;
+	margin-right: -3px;
+	background-color: #f0f0f0;
+	-moz-user-select: none;
+}
+
+div.subs {
+	margin-left: 10px;
+	clear: both;
+	margin-top: 2px;
+}
+
+.subs dl {
+	margin-left: 0;
+}
+
+.subs dl dl {
+	padding-left: 0;
+	padding-top: 4px;
+}
+
+.subs dd
+{
+  margin: 2px 0 9px 2em;
+}
+
+.subs dd.empty {
+  display: none;
+}
+
+.subs table {
+	margin-left: 10px;
+	border-spacing: 1px 1px;
+	margin-top: 4px;
+	margin-bottom: 4px;
+}
+
+.subs table table {
+	margin-left: 0;
+}
+
+.arguments .caption,
+.fields .caption {
+	display: none;
+}
+
+/* need extra .subs in the selector to make it override the rules for .subs and .subs table */
+
+.subs.arguments {
+	margin: 0;
+}
+
+.subs.arguments table {
+	border-spacing: 0;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+.subs.arguments td.src {
+	white-space: nowrap;
+}
+
+.subs.arguments + p {
+	margin-top: 0;
+}
+
+.subs.associated-types,
+.subs.methods {
+	margin-left: 20px;
+}
+
+.subs.associated-types .caption,
+.subs.methods .caption {
+	margin-top: 0.5em;
+	margin-left: -10px;
+}
+
+.subs.associated-types .src + .src,
+.subs.methods .src + .src {
+	margin-top: 8px;
+}
+
+p.arg {
+	margin-bottom: 0;
+}
+p.arg span {
+  background-color: #f0f0f0;
+  font-family: monospace;
+  white-space: nowrap;
+	float: none;
+}
+
+
+img.coll {
+	width : 0.75em; height: 0.75em; margin-bottom: 0; margin-right: 0.5em
+}
+
+
+td.arg {
+  padding: 3px;
+  background-color: #f0f0f0;
+  font-family: monospace;
+  margin-bottom: 0;
+}
+
+td.rdoc p {
+	margin-bottom: 0;
+}
+
+
+.doc table {
+  border-collapse: collapse;
+  border-spacing: 0px;
+}
+
+.doc th,
+.doc td {
+  padding: 5px;
+  border: 1px solid #ddd;
+}
+
+.doc th {
+  background-color: #f0f0f0;
+}
+
+#footer {
+  background-color: #000099;
+  color: #ffffff;
+  padding: 4px
+  }
+
+#footer p {
+	padding: 1px;
+	margin: 0;
+}
+
+#footer  a:link {
+  color: #ffffff;
+  text-decoration: underline
+  }
+#footer  a:visited {
+  color: #ffff00
+  }
+#footer  a:hover {
+  background-color: #6060ff
+  }
+
+
+#module-list ul {
+	list-style: none;
+	padding-bottom: 15px;
+	padding-left: 2px;
+	margin: 0;
+}
+
+#module-list ul ul {
+	padding-bottom: 0;
+	padding-left: 20px;
+}
+
+#module-list li .package {
+	float: right;
+}
+#mini #module-list .caption {
+	display: none;
+}
+
+#index .caption {
+}
+
+#alphabet ul {
+	list-style: none;
+	padding: 0;
+	margin: 0.5em 0 0;
+}
+
+#alphabet li {
+	display: inline;
+	margin: 0 0.2em;
+}
+
+#index .src {
+	background: none;
+	font-family: inherit;
+}
+
+#index td.alt {
+	padding-left: 2em;
+}
+
+#index td {
+	padding-top: 2px;
+	padding-bottom: 1px;
+	padding-right: 1em;
+}
+
+
+#mini h1 { font-size: 130%; }
+#mini h2 { font-size: 110%; }
+#mini h3 { font-size: 100%; }
+#mini h1, #mini h2, #mini h3 {
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+  padding: 0 0;
+}
+
+#mini h1 { border-bottom: 1px solid #ccc; }
+
+#mini #module-header {
+	margin: 0;
+	padding: 0;
+}
+#mini #module-header .caption {
+  font-size: 130%;
+  background: #0077dd;
+  padding: 0.25em;
+  height: inherit;
+  margin: 0;
+}
+
+#mini #interface .top {
+	margin: 0;
+	padding: 0;
+}
+#mini #interface .src {
+	margin: 0;
+	padding: 0;
+	font-family: inherit;
+	background: inherit;
+}
+
+.warning {
+  color: red;
+}

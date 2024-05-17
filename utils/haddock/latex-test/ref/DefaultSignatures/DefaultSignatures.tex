@@ -1,0 +1,48 @@
+\haddockmoduleheading{DefaultSignatures}
+\label{module:DefaultSignatures}
+\haddockbeginheader
+{\haddockverb\begin{verbatim}
+module DefaultSignatures (
+    Foo(baz', baz, bar)
+  ) where\end{verbatim}}
+\haddockendheader
+
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+class Foo a where
+\end{tabular}]
+{\haddockbegindoc
+Documentation for Foo.\par
+\haddockpremethods{}\emph{Methods}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+bar :: a -> String
+\end{tabular}]
+{\haddockbegindoc
+Documentation for bar and baz.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+default bar :: Show a => a -> String
+\end{tabular}]
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+baz :: a -> String
+\end{tabular}]
+{\haddockbegindoc
+Documentation for bar and baz.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+baz' :: String -> a
+\end{tabular}]
+{\haddockbegindoc
+Documentation for baz'.\par}
+\end{haddockdesc}
+\begin{haddockdesc}
+\item[\begin{tabular}{@{}l}
+default baz' :: Read a => String -> a
+\end{tabular}]
+\end{haddockdesc}}
+\end{haddockdesc}

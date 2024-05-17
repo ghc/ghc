@@ -1,0 +1,468 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >BundledPatterns</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>BundledPatterns</p
+	></div
+      ><div id="synopsis"
+      ><details id="syn"
+	><summary
+	  >Synopsis</summary
+	  ><ul class="details-toggle" data-details-id="syn"
+	  ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >Vec</a
+	      > (a :: <a href="#" title="GHC.TypeLits"
+	      >Nat</a
+	      >) b <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><a href="#"
+		  >Nil</a
+		  > :: <span class="keyword"
+		  >forall</span
+		  > b. <a href="#" title="BundledPatterns"
+		  >Vec</a
+		  > 0 b</li
+		><li
+		><span class="keyword"
+		  >pattern</span
+		  > <a href="#"
+		  >(:&gt;)</a
+		  > :: a -&gt; <a href="#" title="BundledPatterns"
+		  >Vec</a
+		  > n a -&gt; <a href="#" title="BundledPatterns"
+		  >Vec</a
+		  > (n <a href="#" title="Bug310"
+		  >+</a
+		  > 1) a</li
+		></ul
+	      ></li
+	    ><li class="src short"
+	    ><span class="keyword"
+	      >data</span
+	      > <a href="#"
+	      >RTree</a
+	      > (a :: <a href="#" title="GHC.TypeLits"
+	      >Nat</a
+	      >) b <span class="keyword"
+	      >where</span
+	      ><ul class="subs"
+	      ><li
+		><span class="keyword"
+		  >pattern</span
+		  > <a href="#"
+		  >LR</a
+		  > :: a -&gt; <a href="#" title="BundledPatterns"
+		  >RTree</a
+		  > 0 a</li
+		><li
+		><span class="keyword"
+		  >pattern</span
+		  > <a href="#"
+		  >BR</a
+		  > :: <a href="#" title="BundledPatterns"
+		  >RTree</a
+		  > d a -&gt; <a href="#" title="BundledPatterns"
+		  >RTree</a
+		  > d a -&gt; <a href="#" title="BundledPatterns"
+		  >RTree</a
+		  > (d <a href="#" title="Bug310"
+		  >+</a
+		  > 1) a</li
+		></ul
+	      ></li
+	    ></ul
+	  ></details
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:Vec" class="def"
+	    >Vec</a
+	    > (a :: <a href="#" title="GHC.TypeLits"
+	    >Nat</a
+	    >) b <span class="keyword"
+	    >where</span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Fixed size vectors.</p
+	    ><ul
+	    ><li
+	      >Lists with their length encoded in their type</li
+	      ><li
+	      ><code
+		><a href="#" title="BundledPatterns"
+		  >Vec</a
+		  ></code
+		>tor elements have an <strong
+		>ASCENDING</strong
+		> subscript starting from 0 and
+   ending at <code
+		><code
+		  ><a href="#" title="Data.Foldable"
+		    >length</a
+		    ></code
+		  > - 1</code
+		>.</li
+	      ></ul
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a id="v:Nil" class="def"
+		  >Nil</a
+		  > :: <span class="keyword"
+		  >forall</span
+		  > b. <a href="#" title="BundledPatterns"
+		  >Vec</a
+		  > 0 b</td
+		><td class="doc empty"
+		>&nbsp;</td
+		></tr
+	      ></table
+	    ></div
+	  ><div class="subs bundled-patterns"
+	  ><p class="caption"
+	    >Bundled Patterns</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><span class="keyword"
+		  >pattern</span
+		  > <a id="v::-62-" class="def"
+		  >(:&gt;)</a
+		  > :: a -&gt; <a href="#" title="BundledPatterns"
+		  >Vec</a
+		  > n a -&gt; <a href="#" title="BundledPatterns"
+		  >Vec</a
+		  > (n <a href="#" title="Bug310"
+		  >+</a
+		  > 1) a <span class="fixity"
+		  >infixr 5</span
+		  ><span class="rightedge"
+		  ></span
+		  ></td
+		><td class="doc"
+		><p
+		  >Add an element to the head of a vector.</p
+		  ><pre class="screen"
+		  ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >3:&gt;4:&gt;5:&gt;Nil
+</code
+		      ></strong
+		    >&lt;3,4,5&gt;
+<code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >let x = 3:&gt;4:&gt;5:&gt;Nil
+</code
+		      ></strong
+		    ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >:t x
+</code
+		      ></strong
+		    >x :: Num a =&gt; Vec 3 a
+</pre
+		  ><p
+		  >Can be used as a pattern:</p
+		  ><pre class="screen"
+		  ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >let f (x :&gt; y :&gt; _) = x + y
+</code
+		      ></strong
+		    ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >:t f
+</code
+		      ></strong
+		    >f :: Num a =&gt; Vec ((n + 1) + 1) a -&gt; a
+<code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >f (3:&gt;4:&gt;5:&gt;6:&gt;7:&gt;Nil)
+</code
+		      ></strong
+		    >7
+</pre
+		  ><p
+		  >Also in conjunctions with (<code
+		    >:&lt;</code
+		    >):</p
+		  ><pre class="screen"
+		  ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >let g (a :&gt; b :&gt; (_ :&lt; y :&lt; x)) = a + b +  x + y
+</code
+		      ></strong
+		    ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >:t g
+</code
+		      ></strong
+		    >g :: Num a =&gt; Vec ((((n + 1) + 1) + 1) + 1) a -&gt; a
+<code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >g (1:&gt;2:&gt;3:&gt;4:&gt;5:&gt;Nil)
+</code
+		      ></strong
+		    >12
+</pre
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:RTree" class="def"
+	    >RTree</a
+	    > (a :: <a href="#" title="GHC.TypeLits"
+	    >Nat</a
+	    >) b <span class="keyword"
+	    >where</span
+	    > <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Perfect depth binary tree.</p
+	    ><ul
+	    ><li
+	      >Only has elements at the leaf of the tree</li
+	      ><li
+	      >A tree of depth <em
+		>d</em
+		> has <em
+		>2^d</em
+		> elements.</li
+	      ></ul
+	    ></div
+	  ><div class="subs bundled-patterns"
+	  ><p class="caption"
+	    >Bundled Patterns</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><span class="keyword"
+		  >pattern</span
+		  > <a id="v:LR" class="def"
+		  >LR</a
+		  > :: a -&gt; <a href="#" title="BundledPatterns"
+		  >RTree</a
+		  > 0 a</td
+		><td class="doc"
+		><p
+		  >Leaf of a perfect depth tree</p
+		  ><pre class="screen"
+		  ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >LR 1
+</code
+		      ></strong
+		    >1
+<code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >let x = LR 1
+</code
+		      ></strong
+		    ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >:t x
+</code
+		      ></strong
+		    >x :: Num a =&gt; RTree 0 a
+</pre
+		  ><p
+		  >Can be used as a pattern:</p
+		  ><pre class="screen"
+		  ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >let f (LR a) (LR b) = a + b
+</code
+		      ></strong
+		    ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >:t f
+</code
+		      ></strong
+		    >f :: Num a =&gt; RTree 0 a -&gt; RTree 0 a -&gt; a
+<code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >f (LR 1) (LR 2)
+</code
+		      ></strong
+		    >3
+</pre
+		  ></td
+		></tr
+	      ><tr
+	      ><td class="src"
+		><span class="keyword"
+		  >pattern</span
+		  > <a id="v:BR" class="def"
+		  >BR</a
+		  > :: <a href="#" title="BundledPatterns"
+		  >RTree</a
+		  > d a -&gt; <a href="#" title="BundledPatterns"
+		  >RTree</a
+		  > d a -&gt; <a href="#" title="BundledPatterns"
+		  >RTree</a
+		  > (d <a href="#" title="Bug310"
+		  >+</a
+		  > 1) a</td
+		><td class="doc"
+		><p
+		  >Branch of a perfect depth tree</p
+		  ><pre class="screen"
+		  ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >BR (LR 1) (LR 2)
+</code
+		      ></strong
+		    >&lt;1,2&gt;
+<code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >let x = BR (LR 1) (LR 2)
+</code
+		      ></strong
+		    ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >:t x
+</code
+		      ></strong
+		    >x :: Num a =&gt; RTree 1 a
+</pre
+		  ><p
+		  >Case be used a pattern:</p
+		  ><pre class="screen"
+		  ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >let f (BR (LR a) (LR b)) = LR (a + b)
+</code
+		      ></strong
+		    ><code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >:t f
+</code
+		      ></strong
+		    >f :: Num a =&gt; RTree 1 a -&gt; RTree 0 a
+<code class="prompt"
+		    >&gt;&gt;&gt; </code
+		    ><strong class="userinput"
+		    ><code
+		      >f (BR (LR 1) (LR 2))
+</code
+		      ></strong
+		    >3
+</pre
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>

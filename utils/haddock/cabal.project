@@ -1,0 +1,23 @@
+with-compiler: ghc-9.7
+
+packages: ./
+          ./haddock-api
+          ./haddock-library
+          ./haddock-test
+
+test-show-details: direct
+
+allow-newer:
+  ghc-paths:Cabal,
+  *:base,
+  *:ghc-prim,
+  tree-diff:time
+
+package haddock-library
+  tests: False
+
+package haddock-api
+  tests: False
+
+-- Pinning the index-state helps to make reasonably CI deterministic
+index-state: 2023-05-22T15:14:29Z

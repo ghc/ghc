@@ -1,0 +1,250 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="viewport" content="width=device-width, initial-scale=1"
+     /><title
+    >SpuriousSuperclassConstraints</title
+    ><link href="#" rel="stylesheet" type="text/css" title="Linuwial"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><link rel="stylesheet" type="text/css" href="#"
+     /><script src="haddock-bundle.min.js" async="async" type="text/javascript"
+    ></script
+    ><script type="text/x-mathjax-config"
+    >MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script
+    ><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"
+    ></script
+    ></head
+  ><body
+  ><div id="package-header"
+    ><span class="caption empty"
+      >&nbsp;</span
+      ><ul class="links" id="page-menu"
+      ><li
+	><a href="#"
+	  >Contents</a
+	  ></li
+	><li
+	><a href="#"
+	  >Index</a
+	  ></li
+	></ul
+      ></div
+    ><div id="content"
+    ><div id="module-header"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >Safe-Inferred</td
+	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
+	  ></table
+	><p class="caption"
+	>SpuriousSuperclassConstraints</p
+	></div
+      ><div id="description"
+      ><p class="caption"
+	>Description</p
+	><div class="doc"
+	><p
+	  >What is tested here:</p
+	  ><p
+	  >Due to a change in GHC 7.6.1 we had a bug that superclass contraints were
+ included in the instances list.  Edward K. repported it here:</p
+	  ><p
+	  ><a href="#"
+	    >http://www.haskell.org/pipermail/haskell-cafe/2012-September/103600.html</a
+	    ></p
+	  ><p
+	  >And here is the corresponding thread on glasgow-haskell-users:</p
+	  ><p
+	  ><a href="#"
+	    >http://www.haskell.org/pipermail/glasgow-haskell-users/2012-September/022914.html</a
+	    ></p
+	  ><p
+	  >It has been fixed in:</p
+	  ><pre
+	  >6ccf78e15a525282fef61bc4f58a279aa9c21771
+Fix spurious superclass constraints bug.</pre
+	  ></div
+	></div
+      ><div id="interface"
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    > <a id="t:SomeType" class="def"
+	    >SomeType</a
+	    > (f :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) a <a href="#" class="selflink"
+	    >#</a
+	    ></p
+	  ><div class="subs instances"
+	  ><h4 class="instances details-toggle-control details-toggle" data-details-id="i:SomeType"
+	    >Instances</h4
+	    ><details id="i:SomeType" open="open"
+	    ><summary class="hide-when-js-enabled"
+	      >Instances details</summary
+	      ><table
+	      ><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:SomeType:Applicative:1"
+		      ></span
+		      > <a href="#" title="Control.Applicative"
+		      >Applicative</a
+		      > f =&gt; <a href="#" title="Control.Applicative"
+		      >Applicative</a
+		      > (<a href="#" title="SpuriousSuperclassConstraints"
+		      >SomeType</a
+		      > f)</span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:id:SomeType:Applicative:1"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>SpuriousSuperclassConstraints</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >pure</a
+			  > :: a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >(&lt;*&gt;)</a
+			  > :: <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f (a -&gt; b) -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >liftA2</a
+			  > :: (a -&gt; b -&gt; c) -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f b -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f c <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >(*&gt;)</a
+			  > :: <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f b -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >(&lt;*)</a
+			  > :: <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f b -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:SomeType:Functor:2"
+		      ></span
+		      > <a href="#" title="Control.Monad"
+		      >Functor</a
+		      > (<a href="#" title="SpuriousSuperclassConstraints"
+		      >SomeType</a
+		      > f)</span
+		    > <a href="#" class="selflink"
+		    >#</a
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:id:SomeType:Functor:2"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>SpuriousSuperclassConstraints</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >fmap</a
+			  > :: (a -&gt; b) -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >(&lt;$)</a
+			  > :: a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f b -&gt; <a href="#" title="SpuriousSuperclassConstraints"
+			  >SomeType</a
+			  > f a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		></table
+	      ></details
+	    ></div
+	  ></div
+	></div
+      ></div
+    ></body
+  ></html
+>
