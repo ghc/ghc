@@ -7,9 +7,9 @@
 
 -- | Bridge impedance mismatch of different @base@ versions back till @base-4.5@ (GHC 7.4.2)
 module CompatPrelude
-    ( ($>)
-    , isSymbolChar
-    ) where
+  ( ($>)
+  , isSymbolChar
+  ) where
 
 #if MIN_VERSION_base(4,7,0)
 import           Data.Functor                ( ($>) )
@@ -22,7 +22,6 @@ import           Text.Read.Lex                      (isSymbolChar)
 #else
 import           Data.Char (GeneralCategory(..), generalCategory)
 #endif
-
 
 #if !MIN_VERSION_base(4,7,0)
 infixl 4 $>

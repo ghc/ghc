@@ -5,7 +5,7 @@ import Haddock.Version
 
 import Data.ByteString.Builder (hPutBuilder)
 import System.FilePath ((</>))
-import System.IO (withFile, IOMode (WriteMode))
+import System.IO (IOMode (WriteMode), withFile)
 
 -- | Everytime breaking changes to the Quckjump api
 -- happen this needs to be modified.
@@ -19,10 +19,13 @@ writeHaddockMeta :: FilePath -> Bool -> IO ()
 writeHaddockMeta odir withQuickjump = do
   let
     meta_json :: Value
-    meta_json = object (concat [
-        [ "haddock_version"   .= String projectVersion ]
-      , [ "quickjump_version" .= quickjumpVersion | withQuickjump ]
-      ])
+    meta_json =
+      object
+        ( concat
+            [ ["haddock_version" .= String projectVersion]
+            , ["quickjump_version" .= quickjumpVersion | withQuickjump]
+            ]
+        )
 
   withFile (odir </> "meta.json") WriteMode $ \h ->
     hPutBuilder h (encodeToBuilder meta_json)

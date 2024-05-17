@@ -1,5 +1,5 @@
 module Haddock.Utils.Json.Types
-  ( Value(..)
+  ( Value (..)
   , typeOf
   , Pair
   , Object
@@ -11,22 +11,23 @@ import Data.String
 -- TODO: We may want to replace 'String' with 'Text' or 'ByteString'
 
 -- | A JSON value represented as a Haskell value.
-data Value = Object !Object
-           | Array  [Value]
-           | String  String
-           | Number !Double
-           | Bool   !Bool
-           | Null
-           deriving (Eq, Read, Show)
+data Value
+  = Object !Object
+  | Array [Value]
+  | String String
+  | Number !Double
+  | Bool !Bool
+  | Null
+  deriving (Eq, Read, Show)
 
 typeOf :: Value -> String
 typeOf v = case v of
-    Object _ -> "Object"
-    Array _  -> "Array"
-    String _ -> "String"
-    Number _ -> "Number"
-    Bool _   -> "Boolean"
-    Null     -> "Null"
+  Object _ -> "Object"
+  Array _ -> "Array"
+  String _ -> "String"
+  Number _ -> "Number"
+  Bool _ -> "Boolean"
+  Null -> "Null"
 
 -- | A key\/value pair for an 'Object'
 type Pair = (String, Value)

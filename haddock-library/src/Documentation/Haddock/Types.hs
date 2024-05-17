@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, DeriveTraversable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 -- |
 -- Module      :  Documentation.Haddock.Types
@@ -31,23 +32,27 @@ import Data.Bitraversable
 #endif
 
 -- | A @\@since@ declaration.
-data MetaSince =
-  MetaSince { sincePackage :: Maybe Package
-              -- ^ optional package qualification
-            , sinceVersion :: Version
-            } deriving (Eq, Show)
+data MetaSince = MetaSince
+  { sincePackage :: Maybe Package
+  -- ^ optional package qualification
+  , sinceVersion :: Version
+  }
+  deriving (Eq, Show)
 
 -- | With the advent of 'Version', we may want to start attaching more
 -- meta-data to comments. We make a structure for this ahead of time
 -- so we don't have to gut half the core each time we want to add such
 -- info.
-data Meta = Meta { _metaSince :: Maybe MetaSince
-                 } deriving (Eq, Show)
+data Meta = Meta
+  { _metaSince :: Maybe MetaSince
+  }
+  deriving (Eq, Show)
 
-data MetaDoc mod id =
-  MetaDoc { _meta :: Meta
-          , _doc :: DocH mod id
-          } deriving (Eq, Show, Functor, Foldable, Traversable)
+data MetaDoc mod id = MetaDoc
+  { _meta :: Meta
+  , _doc :: DocH mod id
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 #if MIN_VERSION_base(4,8,0)
 -- | __NOTE__: Only defined for @base >= 4.8.0@
@@ -66,53 +71,62 @@ instance Bitraversable MetaDoc where
 #endif
 
 overDoc :: (DocH a b -> DocH c d) -> MetaDoc a b -> MetaDoc c d
-overDoc f d = d { _doc = f $ _doc d }
+overDoc f d = d{_doc = f $ _doc d}
 
 overDocF :: Functor f => (DocH a b -> f (DocH c d)) -> MetaDoc a b -> f (MetaDoc c d)
-overDocF f d = (\x -> d { _doc = x }) <$> f (_doc d)
+overDocF f d = (\x -> d{_doc = x}) <$> f (_doc d)
 
 type Version = [Int]
 type Package = String
 
 data Hyperlink id = Hyperlink
-  { hyperlinkUrl   :: String
+  { hyperlinkUrl :: String
   , hyperlinkLabel :: Maybe id
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data ModLink id = ModLink
-  { modLinkName   :: String
+  { modLinkName :: String
   , modLinkLabel :: Maybe id
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Picture = Picture
-  { pictureUri   :: String
+  { pictureUri :: String
   , pictureTitle :: Maybe String
-  } deriving (Eq, Show)
+  }
+  deriving (Eq, Show)
 
 data Header id = Header
-  { headerLevel :: Int  -- ^ between 1 and 6 inclusive
+  { headerLevel :: Int
+  -- ^ between 1 and 6 inclusive
   , headerTitle :: id
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Example = Example
   { exampleExpression :: String
-  , exampleResult     :: [String]
-  } deriving (Eq, Show)
+  , exampleResult :: [String]
+  }
+  deriving (Eq, Show)
 
 data TableCell id = TableCell
-  { tableCellColspan  :: Int
-  , tableCellRowspan  :: Int
+  { tableCellColspan :: Int
+  , tableCellRowspan :: Int
   , tableCellContents :: id
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 newtype TableRow id = TableRow
   { tableRowCells :: [TableCell id]
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Table id = Table
   { tableHeaderRows :: [TableRow id]
-  , tableBodyRows   :: [TableRow id]
-  } deriving (Eq, Show, Functor, Foldable, Traversable)
+  , tableBodyRows :: [TableRow id]
+  }
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data DocH mod id
   = DocEmpty
@@ -120,12 +134,12 @@ data DocH mod id
   | DocString String
   | DocParagraph (DocH mod id)
   | DocIdentifier id
-  | DocIdentifierUnchecked mod
-  -- ^ A qualified identifier that couldn't be resolved.
-  | DocModule (ModLink (DocH mod id))
-  -- ^ A link to a module, with an optional label.
-  | DocWarning (DocH mod id)
-  -- ^ This constructor has no counterpart in Haddock markup.
+  | -- | A qualified identifier that couldn't be resolved.
+    DocIdentifierUnchecked mod
+  | -- | A link to a module, with an optional label.
+    DocModule (ModLink (DocH mod id))
+  | -- | This constructor has no counterpart in Haddock markup.
+    DocWarning (DocH mod id)
   | DocEmphasis (DocH mod id)
   | DocMonospaced (DocH mod id)
   | DocBold (DocH mod id)
@@ -137,8 +151,8 @@ data DocH mod id
   | DocPic Picture
   | DocMathInline String
   | DocMathDisplay String
-  | DocAName String
-  -- ^ A (HTML) anchor. It must not contain any spaces.
+  | -- | A (HTML) anchor. It must not contain any spaces.
+    DocAName String
   | DocProperty String
   | DocExamples [Example]
   | DocHeader (Header (DocH mod id))
@@ -231,7 +245,6 @@ renderNs Value = "v"
 renderNs Type = "t"
 renderNs None = ""
 
-
 -- | 'DocMarkupH' is a set of instructions for marking up documentation.
 -- In fact, it's really just a mapping from 'Doc' to some other
 -- type [a], where [a] is usually the type of the output (HTML, say).
@@ -239,30 +252,29 @@ renderNs None = ""
 -- a 'DocH'.
 --
 -- @since 1.4.5
---
 data DocMarkupH mod id a = Markup
-  { markupEmpty                :: a
-  , markupString               :: String -> a
-  , markupParagraph            :: a -> a
-  , markupAppend               :: a -> a -> a
-  , markupIdentifier           :: id -> a
-  , markupIdentifierUnchecked  :: mod -> a
-  , markupModule               :: ModLink a -> a
-  , markupWarning              :: a -> a
-  , markupEmphasis             :: a -> a
-  , markupBold                 :: a -> a
-  , markupMonospaced           :: a -> a
-  , markupUnorderedList        :: [a] -> a
-  , markupOrderedList          :: [(Int,a)] -> a
-  , markupDefList              :: [(a,a)] -> a
-  , markupCodeBlock            :: a -> a
-  , markupHyperlink            :: Hyperlink a -> a
-  , markupAName                :: String -> a
-  , markupPic                  :: Picture -> a
-  , markupMathInline           :: String -> a
-  , markupMathDisplay          :: String -> a
-  , markupProperty             :: String -> a
-  , markupExample              :: [Example] -> a
-  , markupHeader               :: Header a -> a
-  , markupTable                :: Table a -> a
+  { markupEmpty :: a
+  , markupString :: String -> a
+  , markupParagraph :: a -> a
+  , markupAppend :: a -> a -> a
+  , markupIdentifier :: id -> a
+  , markupIdentifierUnchecked :: mod -> a
+  , markupModule :: ModLink a -> a
+  , markupWarning :: a -> a
+  , markupEmphasis :: a -> a
+  , markupBold :: a -> a
+  , markupMonospaced :: a -> a
+  , markupUnorderedList :: [a] -> a
+  , markupOrderedList :: [(Int, a)] -> a
+  , markupDefList :: [(a, a)] -> a
+  , markupCodeBlock :: a -> a
+  , markupHyperlink :: Hyperlink a -> a
+  , markupAName :: String -> a
+  , markupPic :: Picture -> a
+  , markupMathInline :: String -> a
+  , markupMathDisplay :: String -> a
+  , markupProperty :: String -> a
+  , markupExample :: [Example] -> a
+  , markupHeader :: Header a -> a
+  , markupTable :: Table a -> a
   }

@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+
 -- |
 -- Module      :  Documentation.Haddock.Parser.Identifier
 -- Copyright   :  (c) Alec Theriault 2019,
@@ -9,26 +10,28 @@
 -- Portability :  portable
 --
 -- Functionality for parsing identifiers and operators
+module Documentation.Haddock.Parser.Identifier
+  ( Identifier (..)
+  , parseValid
+  ) where
 
-module Documentation.Haddock.Parser.Identifier (
-  Identifier(..),
-  parseValid,
-) where
-
-import Documentation.Haddock.Types           ( Namespace(..) )
 import Documentation.Haddock.Parser.Monad
+import Documentation.Haddock.Types (Namespace (..))
+import Text.Parsec
+  ( State (..)
+  , getParserState
+  , setParserState
+  )
 import qualified Text.Parsec as Parsec
-import           Text.Parsec.Pos             ( updatePosChar )
-import           Text.Parsec                 ( State(..)
-                                             , getParserState, setParserState )
+import Text.Parsec.Pos (updatePosChar)
 
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import           Data.Char (isAlpha, isAlphaNum)
-import Control.Monad (guard)
-import Data.Maybe
 import CompatPrelude
+import Control.Monad (guard)
+import Data.Char (isAlpha, isAlphaNum)
+import Data.Maybe
 
 -- | Identifier string surrounded with namespace, opening, and closing quotes/backticks.
 data Identifier = Identifier !Namespace !Char String !Char
@@ -36,7 +39,7 @@ data Identifier = Identifier !Namespace !Char String !Char
 
 parseValid :: Parser Identifier
 parseValid = do
-  s@State{ stateInput = inp, statePos = pos } <- getParserState
+  s@State{stateInput = inp, statePos = pos} <- getParserState
 
   case takeIdentifier inp of
     Nothing -> Parsec.parserFail "parseValid: Failed to match a valid identifier"
@@ -44,9 +47,8 @@ parseValid = do
       let posOp = updatePosChar pos op
           posIdent = T.foldl updatePosChar posOp ident
           posCl = updatePosChar posIdent cl
-          s' = s{ stateInput = inp', statePos = posCl }
-      in setParserState s' $> Identifier ns op (T.unpack ident) cl
-
+          s' = s{stateInput = inp', statePos = posCl}
+       in setParserState s' $> Identifier ns op (T.unpack ident) cl
 
 -- | Try to parse a delimited identifier off the front of the given input.
 --
@@ -64,96 +66,105 @@ parseValid = do
 -- This function should make /O(1)/ allocations
 takeIdentifier :: Text -> Maybe (Namespace, Char, Text, Char, Text)
 takeIdentifier input = listToMaybe $ do
+  -- Optional namespace
+  let (ns, input') = case T.uncons input of
+        Just ('v', i) -> (Value, i)
+        Just ('t', i) -> (Type, i)
+        _ -> (None, input)
 
-    -- Optional namespace
-    let (ns, input') = case T.uncons input of
-                         Just ('v', i) -> (Value, i)
-                         Just ('t', i) -> (Type, i)
-                         _             -> (None, input)
+  -- Opening tick
+  (op, input'') <- maybeToList (T.uncons input')
+  guard (op == '\'' || op == '`')
 
-    -- Opening tick
-    (op, input'') <- maybeToList (T.uncons input')
-    guard (op == '\'' || op == '`')
+  -- Identifier/operator
+  (ident, input''') <- wrapped input''
 
-    -- Identifier/operator
-    (ident, input''') <- wrapped input''
+  -- Closing tick
+  (cl, input'''') <- maybeToList (T.uncons input''')
+  guard (cl == '\'' || cl == '`')
 
-    -- Closing tick
-    (cl, input'''') <- maybeToList (T.uncons input''')
-    guard (cl == '\'' || cl == '`')
-
-    return (ns, op, ident, cl, input'''')
-
+  return (ns, op, ident, cl, input'''')
   where
-
-    -- | Parse out a wrapped, possibly qualified, operator or identifier
+    -- \| Parse out a wrapped, possibly qualified, operator or identifier
     wrapped t = do
-      (c, t'  ) <- maybeToList (T.uncons t)
+      (c, t') <- maybeToList (T.uncons t)
       -- Tuples
       case c of
-        '(' | Just (c', _) <- T.uncons t'
-            , c' == ',' || c' == ')'
-            -> do let (commas, t'') = T.span (== ',') t'
-                  (')', t''') <- maybeToList (T.uncons t'')
-                  return (T.take (T.length commas + 2) t, t''')
+        '('
+          | Just (c', _) <- T.uncons t'
+          , c' == ',' || c' == ')' ->
+              do
+                let (commas, t'') = T.span (== ',') t'
+                (')', t''') <- maybeToList (T.uncons t'')
+                return (T.take (T.length commas + 2) t, t''')
 
         -- Parenthesized
-        '(' -> do (n,   t'' ) <- general False 0 [] t'
-                  (')', t''') <- maybeToList (T.uncons t'')
-                  return (T.take (n + 2) t, t''')
+        '(' -> do
+          (n, t'') <- general False 0 [] t'
+          (')', t''') <- maybeToList (T.uncons t'')
+          return (T.take (n + 2) t, t''')
 
         -- Backticked
-        '`' -> do (n,   t'' ) <- general False 0 [] t'
-                  ('`', t''') <- maybeToList (T.uncons t'')
-                  return (T.take (n + 2) t, t''')
+        '`' -> do
+          (n, t'') <- general False 0 [] t'
+          ('`', t''') <- maybeToList (T.uncons t'')
+          return (T.take (n + 2) t, t''')
 
         -- Unadorned
-        _   -> do (n,   t'' ) <- general False 0 [] t
-                  return (T.take n t, t'')
+        _ -> do
+          (n, t'') <- general False 0 [] t
+          return (T.take n t, t'')
 
-    -- | Parse out a possibly qualified operator or identifier
-    general :: Bool           -- ^ refuse inputs starting with operators
-            -> Int            -- ^ total characters \"consumed\" so far
-            -> [(Int, Text)]  -- ^ accumulated results
-            -> Text           -- ^ current input
-            -> [(Int, Text)]  -- ^ total characters parsed & what remains
+    -- \| Parse out a possibly qualified operator or identifier
+    general
+      :: Bool
+      -- \^ refuse inputs starting with operators
+      -> Int
+      -- \^ total characters \"consumed\" so far
+      -> [(Int, Text)]
+      -- \^ accumulated results
+      -> Text
+      -- \^ current input
+      -> [(Int, Text)]
+    -- \^ total characters parsed & what remains
     general !identOnly !i acc t
       -- Starts with an identifier (either just an identifier, or a module qual)
-      | Just (n, rest) <- identLike t
-      = if T.null rest
-          then acc
-          else case T.head rest of
-                 '`' -> (n + i, rest) : acc
-                 ')' -> (n + i, rest) : acc
-                 '.' -> general False (n + i + 1) acc (T.tail rest)
-                 '\'' -> let (m, rest') = quotes rest
-                         in general True (n + m + 1 + i) ((n + m + i, rest') : acc) (T.tail rest')
-                 _ -> acc
-
+      | Just (n, rest) <- identLike t =
+          if T.null rest
+            then acc
+            else case T.head rest of
+              '`' -> (n + i, rest) : acc
+              ')' -> (n + i, rest) : acc
+              '.' -> general False (n + i + 1) acc (T.tail rest)
+              '\'' ->
+                let (m, rest') = quotes rest
+                 in general True (n + m + 1 + i) ((n + m + i, rest') : acc) (T.tail rest')
+              _ -> acc
       -- An operator
       | Just (n, rest) <- optr t
-      , not identOnly
-      = (n + i, rest) : acc
-
+      , not identOnly =
+          (n + i, rest) : acc
       -- Anything else
-      | otherwise
-      = acc
+      | otherwise =
+          acc
 
-    -- | Parse an identifier off the front of the input
+    -- \| Parse an identifier off the front of the input
     identLike t
       | T.null t = Nothing
-      | isAlpha (T.head t) || '_' == T.head t
-      = let !(idt, rest) = T.span (\c -> isAlphaNum c || c == '_') t
-            !(octos, rest') = T.span (== '#') rest
-      in Just (T.length idt + T.length octos, rest')
+      | isAlpha (T.head t) || '_' == T.head t =
+          let !(idt, rest) = T.span (\c -> isAlphaNum c || c == '_') t
+              !(octos, rest') = T.span (== '#') rest
+           in Just (T.length idt + T.length octos, rest')
       | otherwise = Nothing
 
-    -- | Parse all but the last quote off the front of the input
+    -- \| Parse all but the last quote off the front of the input
     -- PRECONDITION: T.head t `elem` ['\'', '`']
     quotes :: Text -> (Int, Text)
-    quotes t = let !n = T.length (T.takeWhile (`elem` ['\'', '`']) t) - 1
-               in (n, T.drop n t)
+    quotes t =
+      let !n = T.length (T.takeWhile (`elem` ['\'', '`']) t) - 1
+       in (n, T.drop n t)
 
-    -- | Parse an operator off the front of the input
-    optr t = let !(op, rest) = T.span isSymbolChar t
-             in if T.null op then Nothing else Just (T.length op, rest)
+    -- \| Parse an operator off the front of the input
+    optr t =
+      let !(op, rest) = T.span isSymbolChar t
+       in if T.null op then Nothing else Just (T.length op, rest)

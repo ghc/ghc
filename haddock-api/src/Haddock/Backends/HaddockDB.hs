@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Haddock.Backends.HaddockDB
 -- Copyright   :  (c) Simon Marlow 2003
@@ -7,7 +10,6 @@
 -- Maintainer  :  haddock@projects.haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
------------------------------------------------------------------------------
 module Haddock.Backends.HaddockDB (ppDocBook) where
 
 {-
@@ -23,6 +25,7 @@ import Text.PrettyPrint
 
 ppDocBook :: a
 ppDocBook = error "not working"
+
 {-
 ppDocBook :: FilePath -> [(Module, Interface)] -> String
 ppDocBook odir mods = render (ppIfaces mods)

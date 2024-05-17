@@ -1,33 +1,39 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Haddock.Backends.Hyperlinker.Utils
-    ( hypSrcDir, hypSrcModuleFile, hypSrcModuleFile'
-    , hypSrcModuleUrl, hypSrcModuleUrl'
-    , hypSrcNameUrl
-    , hypSrcLineUrl
-    , hypSrcModuleNameUrl, hypSrcModuleLineUrl
-    , hypSrcModuleUrlFormat
-    , hypSrcModuleNameUrlFormat, hypSrcModuleLineUrlFormat
-    , spliceURL, spliceURL'
+  ( hypSrcDir
+  , hypSrcModuleFile
+  , hypSrcModuleFile'
+  , hypSrcModuleUrl
+  , hypSrcModuleUrl'
+  , hypSrcNameUrl
+  , hypSrcLineUrl
+  , hypSrcModuleNameUrl
+  , hypSrcModuleLineUrl
+  , hypSrcModuleUrlFormat
+  , hypSrcModuleNameUrlFormat
+  , hypSrcModuleLineUrlFormat
+  , spliceURL
+  , spliceURL'
 
     -- * HIE file processing
-    , PrintedType
-    , recoverFullIfaceTypes
-    ) where
+  , PrintedType
+  , recoverFullIfaceTypes
+  ) where
 
-import Haddock.Utils
 import Haddock.Backends.Xhtml.Utils
+import Haddock.Utils
 
 import GHC
-import GHC.Iface.Ext.Types ( HieAST(..), HieType(..), HieArgs(..), TypeIndex, HieTypeFlat )
+import GHC.Driver.Ppr (showSDoc)
+import GHC.Iface.Ext.Types (HieAST (..), HieArgs (..), HieType (..), HieTypeFlat, TypeIndex)
 import GHC.Iface.Type
-import GHC.Types.Name      ( getOccFS, getOccString )
-import GHC.Driver.Ppr      ( showSDoc )
-import GHC.Types.Var       ( VarBndr(..), visArg, invisArg, TypeOrConstraint(..) )
+import GHC.Types.Name (getOccFS, getOccString)
+import GHC.Types.Var (TypeOrConstraint (..), VarBndr (..), invisArg, visArg)
 
-import System.FilePath.Posix ((</>), (<.>))
+import System.FilePath.Posix ((<.>), (</>))
 
 import qualified Data.Array as A
-
 
 {-# INLINE hypSrcDir #-}
 hypSrcDir :: FilePath
@@ -38,8 +44,12 @@ hypSrcModuleFile :: Module -> FilePath
 hypSrcModuleFile m = moduleNameString (moduleName m) <.> "html"
 
 hypSrcModuleFile' :: ModuleName -> FilePath
-hypSrcModuleFile' mdl = spliceURL'
-    (Just mdl) Nothing Nothing moduleFormat
+hypSrcModuleFile' mdl =
+  spliceURL'
+    (Just mdl)
+    Nothing
+    Nothing
+    moduleFormat
 
 hypSrcModuleUrl :: Module -> String
 hypSrcModuleUrl = hypSrcModuleFile
@@ -81,7 +91,6 @@ nameFormat = "%{NAME}"
 lineFormat :: String
 lineFormat = "line-%{LINE}"
 
-
 -- * HIE file processing
 
 -- This belongs in GHC.Iface.Ext.Utils...
@@ -106,12 +115,14 @@ type PrintedType = String
 -- function fixes that.
 recoverFullIfaceTypes
   :: DynFlags
-  -> A.Array TypeIndex HieTypeFlat -- ^ flat types
-  -> HieAST TypeIndex              -- ^ flattened AST
-  -> HieAST PrintedType       -- ^ full AST
+  -> A.Array TypeIndex HieTypeFlat
+  -- ^ flat types
+  -> HieAST TypeIndex
+  -- ^ flattened AST
+  -> HieAST PrintedType
+  -- ^ full AST
 recoverFullIfaceTypes df flattened ast = fmap (printed A.!) ast
-    where
-
+  where
     -- Splitting this out into its own array is also important: we don't want
     -- to pretty print the same type many times
     printed :: A.Array TypeIndex PrintedType
@@ -127,10 +138,11 @@ recoverFullIfaceTypes df flattened ast = fmap (printed A.!) ast
     go (HTyVarTy n) = IfaceTyVar (mkIfLclName $ getOccFS n)
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
     go (HLitTy l) = IfaceLitTy l
-    go (HForAllTy ((n,k),af) t) = let b = (mkIfLclName $ getOccFS n, k)
-                                  in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
-    go (HFunTy w a b)  = IfaceFunTy (visArg TypeLike)   w a b          -- t1 -> t2
-    go (HQualTy con b) = IfaceFunTy (invisArg TypeLike) many_ty con b  -- c => t
+    go (HForAllTy ((n, k), af) t) =
+      let b = (mkIfLclName $ getOccFS n, k)
+       in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
+    go (HFunTy w a b) = IfaceFunTy (visArg TypeLike) w a b -- t1 -> t2
+    go (HQualTy con b) = IfaceFunTy (invisArg TypeLike) many_ty con b -- c => t
     go (HCastTy a) = a
     go HCoercionTy = IfaceTyVar $ mkIfLclName "<coercion type>"
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)
@@ -140,5 +152,5 @@ recoverFullIfaceTypes df flattened ast = fmap (printed A.!) ast
     hieToIfaceArgs (HieArgs args) = go' args
       where
         go' [] = IA_Nil
-        go' ((True ,x):xs) = IA_Arg x Required $ go' xs
-        go' ((False,x):xs) = IA_Arg x Specified $ go' xs
+        go' ((True, x) : xs) = IA_Arg x Required $ go' xs
+        go' ((False, x) : xs) = IA_Arg x Specified $ go' xs

@@ -1,10 +1,11 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module Documentation.Haddock.Parser.UtilSpec (main, spec) where
 
+import Data.Either (isLeft)
 import Documentation.Haddock.Parser.Monad
 import Documentation.Haddock.Parser.Util
-import Data.Either (isLeft)
 import Test.Hspec
 #if !(MIN_VERSION_base(4,8,0))
 import Control.Applicative

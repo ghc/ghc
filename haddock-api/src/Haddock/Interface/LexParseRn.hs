@@ -1,8 +1,12 @@
-{-# LANGUAGE BangPatterns     #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ViewPatterns     #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wwarn #-}
-  -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Haddock.Interface.LexParseRn
 -- Copyright   :  (c) Isaac Dupree 2009,
@@ -12,7 +16,6 @@
 -- Maintainer  :  haddock@projects.haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
------------------------------------------------------------------------------
 module Haddock.Interface.LexParseRn
   ( processDocString
   , processDocStringParas
@@ -24,14 +27,15 @@ import Control.Arrow
 import Control.Monad
 import Control.Monad.State.Strict
 import Data.Functor
-import Data.List ((\\), maximumBy)
+import Data.List (maximumBy, (\\))
 import Data.Ord
 import qualified Data.Set as Set
 import GHC
 import GHC.Data.EnumSet as EnumSet
-import GHC.Data.FastString ( unpackFS )
-import GHC.Driver.Ppr ( showPpr, showSDoc )
+import GHC.Data.FastString (unpackFS)
+import GHC.Driver.Ppr (showPpr, showSDoc)
 import GHC.Driver.Session
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.PostProcess
 import GHC.Types.Avail
 import GHC.Types.Name
@@ -42,7 +46,6 @@ import GHC.Utils.Outputable (Outputable)
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
-import qualified GHC.LanguageExtensions as LangExt
 
 processDocStringsParas
   :: MonadIO m
@@ -91,28 +94,32 @@ processModuleHeader dflags pkgName safety mayLang extSet mayStr = do
             (hmi, doc) = parseModuleHeader dflags pkgName str
             renamer = hsDocRenamer hsDoc
         !descr <- case hmi_description hmi of
-                    Just hmi_descr -> Just <$> rename dflags renamer hmi_descr
-                    Nothing        -> pure Nothing
-        let hmi' = hmi { hmi_description = descr }
-        doc'  <- overDocF (rename dflags renamer) doc
+          Just hmi_descr -> Just <$> rename dflags renamer hmi_descr
+          Nothing -> pure Nothing
+        let hmi' = hmi{hmi_description = descr}
+        doc' <- overDocF (rename dflags renamer) doc
         return (hmi', Just doc')
 
   let flags :: [LangExt.Extension]
       -- We remove the flags implied by the language setting and we display the language instead
       flags = EnumSet.toList extSet \\ languageExtensions mayLang
   return
-    (hmi { hmi_safety = Just $ showPpr dflags safety
-         , hmi_language = language dflags
-         , hmi_extensions = flags
-         }
+    ( hmi
+        { hmi_safety = Just $ showPpr dflags safety
+        , hmi_language = language dflags
+        , hmi_extensions = flags
+        }
     , doc
     )
   where
     failure = (emptyHaddockModInfo, Nothing)
 
 traverseSnd :: (Traversable t, Applicative f) => (a -> f b) -> t (x, a) -> f (t (x, b))
-traverseSnd f = traverse (\(x, a) ->
-                             (\b -> (x, b)) <$> f a)
+traverseSnd f =
+  traverse
+    ( \(x, a) ->
+        (\b -> (x, b)) <$> f a
+    )
 
 -- | Takes a 'GlobalRdrEnv' which (hopefully) contains all the
 -- definitions and a parsed comment and we attempt to make sense of
@@ -136,25 +143,26 @@ rename dflags renamer = rn
       DocIdentifier i -> do
         let NsRdrName ns x = unwrap i
             occ = rdrNameOcc x
-        let valueNsChoices | isDataOcc occ = isDataConNameSpace
-                           | otherwise     = isTermVarOrFieldNameSpace
-            typeNsChoices  | isDataOcc occ = isTcClsNameSpace
-                           | otherwise     = isTvNameSpace
+        let valueNsChoices
+              | isDataOcc occ = isDataConNameSpace
+              | otherwise = isTermVarOrFieldNameSpace
+            typeNsChoices
+              | isDataOcc occ = isTcClsNameSpace
+              | otherwise = isTvNameSpace
         -- Generate the choices for the possible kind of thing this
         -- is. We narrow down the possibilities with the namespace (if
         -- there is one).
         let choices = case ns of
-                        Value -> valueNsChoices
-                        Type  -> typeNsChoices
-                        None  -> valueNsChoices <||> typeNsChoices
+              Value -> valueNsChoices
+              Type -> typeNsChoices
+              None -> valueNsChoices <||> typeNsChoices
         case renamer (showPpr dflags x) choices of
-          [] ->  case ns of
+          [] -> case ns of
             Type -> outOfScope dflags ns (i $> setRdrNameSpace x tcName)
             _ -> outOfScope dflags ns (i $> x)
           [a] -> pure (DocIdentifier $ i $> a)
           -- There are multiple names available.
           names -> ambiguous dflags i names
-
       DocWarning dw -> DocWarning <$> rn dw
       DocEmphasis de -> DocEmphasis <$> rn de
       DocBold db -> DocBold <$> rn db
@@ -187,11 +195,11 @@ rename dflags renamer = rn
 -- default we pick in 'rename'.
 outOfScope :: MonadIO m => DynFlags -> Namespace -> Wrap RdrName -> IfM m (Doc a)
 outOfScope dflags ns x =
-    case unwrap x of
-      Unqual occ -> warnAndMonospace (x $> occ)
-      Qual mdl occ -> pure (DocIdentifierUnchecked (x $> (mdl, occ)))
-      Orig _ occ -> warnAndMonospace (x $> occ)
-      Exact name -> warnAndMonospace (x $> name)  -- Shouldn't happen since x is out of scope
+  case unwrap x of
+    Unqual occ -> warnAndMonospace (x $> occ)
+    Qual mdl occ -> pure (DocIdentifierUnchecked (x $> (mdl, occ)))
+    Orig _ occ -> warnAndMonospace (x $> occ)
+    Exact name -> warnAndMonospace (x $> name) -- Shouldn't happen since x is out of scope
   where
     prefix =
       case ns of
@@ -207,9 +215,13 @@ outOfScope dflags ns x =
       firstWarn <- Set.notMember a' <$> gets ifeOutOfScopeNames
       when firstWarn $ do
         warn $
-          "Warning: " ++ prefix ++ "'" ++ a' ++ "' is out of scope.\n" ++
-          "    If you qualify the identifier, haddock can try to link it anyway."
-        modify' (\env -> env { ifeOutOfScopeNames = Set.insert a' (ifeOutOfScopeNames env) })
+          "Warning: "
+            ++ prefix
+            ++ "'"
+            ++ a'
+            ++ "' is out of scope.\n"
+            ++ "    If you qualify the identifier, haddock can try to link it anyway."
+        modify' (\env -> env{ifeOutOfScopeNames = Set.insert a' (ifeOutOfScopeNames env)})
 
       pure (monospaced a')
     monospaced = DocMonospaced . DocString
@@ -223,33 +235,38 @@ ambiguous
   :: MonadIO m
   => DynFlags
   -> Wrap NsRdrName
-  -> [Name] -- ^ More than one @gre@s sharing the same `RdrName` above.
+  -> [Name]
+  -- ^ More than one @gre@s sharing the same `RdrName` above.
   -> IfM m (Doc Name)
 ambiguous dflags x names = do
-    let noChildren = map availName (nubAvails (map Avail names))
-        dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
-        nameStr = showNsRdrName dflags x
-        msg = "Warning: " ++ nameStr ++ " is ambiguous. It is defined\n" ++
-              concatMap (\n -> "    * " ++ defnLoc n ++ "\n") names ++
-              "    You may be able to disambiguate the identifier by qualifying it or\n" ++
-              "    by specifying the type/value namespace explicitly.\n" ++
-              "    Defaulting to the one defined " ++ defnLoc dflt
+  let noChildren = map availName (nubAvails (map Avail names))
+      dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
+      nameStr = showNsRdrName dflags x
+      msg =
+        "Warning: "
+          ++ nameStr
+          ++ " is ambiguous. It is defined\n"
+          ++ concatMap (\n -> "    * " ++ defnLoc n ++ "\n") names
+          ++ "    You may be able to disambiguate the identifier by qualifying it or\n"
+          ++ "    by specifying the type/value namespace explicitly.\n"
+          ++ "    Defaulting to the one defined "
+          ++ defnLoc dflt
 
-    -- TODO: Once we have a syntax for namespace qualification (#667) we may also
-    -- want to emit a warning when an identifier is a data constructor for a type
-    -- of the same name, but not the only constructor.
-    -- For example, for @data D = C | D@, someone may want to reference the @D@
-    -- constructor.
+  -- TODO: Once we have a syntax for namespace qualification (#667) we may also
+  -- want to emit a warning when an identifier is a data constructor for a type
+  -- of the same name, but not the only constructor.
+  -- For example, for @data D = C | D@, someone may want to reference the @D@
+  -- constructor.
 
-    -- If we have already warned for this name, do not warn again
-    firstWarn <- Set.notMember nameStr <$> gets ifeAmbiguousNames
-    when (length noChildren > 1 && firstWarn) $ do
-      warn msg
-      modify' (\env -> env { ifeAmbiguousNames = Set.insert nameStr (ifeAmbiguousNames env) })
+  -- If we have already warned for this name, do not warn again
+  firstWarn <- Set.notMember nameStr <$> gets ifeAmbiguousNames
+  when (length noChildren > 1 && firstWarn) $ do
+    warn msg
+    modify' (\env -> env{ifeAmbiguousNames = Set.insert nameStr (ifeAmbiguousNames env)})
 
-    pure (DocIdentifier (x $> dflt))
+  pure (DocIdentifier (x $> dflt))
   where
-    isLocalName (nameSrcLoc -> RealSrcLoc {}) = True
+    isLocalName (nameSrcLoc -> RealSrcLoc{}) = True
     isLocalName _ = False
     defnLoc = showSDoc dflags . pprNameDefnLoc
 
@@ -266,4 +283,4 @@ hsDocRenamer hsDoc = \s cands -> nameSetElemsStable $ filterNameSet (nameMatches
     !env = hsDocIds hsDoc
     nameMatches s ok_ns n =
       let occ = occName n
-      in ok_ns (occNameSpace occ) && s == unpackFS (occNameFS occ)
+       in ok_ns (occNameSpace occ) && s == unpackFS (occNameFS occ)

@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE ViewPatterns #-}
+
 -- |
 -- Module      :  Documentation.Haddock.Parser
 -- Copyright   :  (c) Mateusz Kowalczyk 2013-2014,
@@ -15,37 +16,36 @@
 -- to be
 --
 -- @'toRegular' . '_doc' . 'parseParas'@
-module Documentation.Haddock.Parser (
-  parseString,
-  parseParas,
-  overIdentifier,
-  toRegular,
-  Identifier
-) where
+module Documentation.Haddock.Parser
+  ( parseString
+  , parseParas
+  , overIdentifier
+  , toRegular
+  , Identifier
+  ) where
 
-import           Control.Applicative
-import           Control.Arrow (first)
-import           Control.Monad
-import           Data.Char (chr, isUpper, isAlpha, isSpace)
-import           Data.List (intercalate, unfoldr, elemIndex)
-import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Monoid
+import Control.Applicative
+import Control.Arrow (first)
+import Control.Monad
+import Data.Char (chr, isAlpha, isSpace, isUpper)
+import Data.List (elemIndex, intercalate, unfoldr)
+import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Monoid
 import qualified Data.Set as Set
-import           Documentation.Haddock.Doc
-import           Documentation.Haddock.Markup ( markup, plainMarkup )
-import           Documentation.Haddock.Parser.Monad
-import           Documentation.Haddock.Parser.Util
-import           Documentation.Haddock.Parser.Identifier
-import           Documentation.Haddock.Types
-import           Prelude hiding (takeWhile)
+import Documentation.Haddock.Doc
+import Documentation.Haddock.Markup (markup, plainMarkup)
+import Documentation.Haddock.Parser.Identifier
+import Documentation.Haddock.Parser.Monad
+import Documentation.Haddock.Parser.Util
+import Documentation.Haddock.Types
+import Prelude hiding (takeWhile)
 import qualified Prelude as P
 
+import Text.Parsec (try)
 import qualified Text.Parsec as Parsec
-import           Text.Parsec (try)
 
+import Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text (Text)
-
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -59,9 +59,10 @@ toRegular = fmap (\(Identifier _ _ x _) -> x)
 -- conversion using user-supplied function. If the conversion fails,
 -- the identifier is deemed to not be valid and is treated as a
 -- regular string.
-overIdentifier :: (Namespace -> String -> Maybe a)
-               -> DocH mod Identifier
-               -> DocH mod a
+overIdentifier
+  :: (Namespace -> String -> Maybe a)
+  -> DocH mod Identifier
+  -> DocH mod a
 overIdentifier f d = g d
   where
     g (DocIdentifier (Identifier ns o x e)) = case f ns x of
@@ -91,7 +92,6 @@ overIdentifier f d = g d
     g (DocHeader (Header l x)) = DocHeader . Header l $ g x
     g (DocTable (Table h b)) = DocTable (Table (map (fmap g) h) (map (fmap g) b))
 
-
 choice' :: [Parser a] -> Parser a
 choice' [] = empty
 choice' [p] = p
@@ -104,15 +104,18 @@ parse p = either err id . parseOnly (p <* Parsec.eof)
 
 -- | Main entry point to the parser. Appends the newline character
 -- to the input string.
-parseParas :: Maybe Package
-           -> String -- ^ String to parse
-           -> MetaDoc mod Identifier
+parseParas
+  :: Maybe Package
+  -> String
+  -- ^ String to parse
+  -> MetaDoc mod Identifier
 parseParas pkg input = case parseParasState input of
   (state, a) ->
-    let defaultPackage s = s { sincePackage = sincePackage s <|> pkg }
-    in MetaDoc { _meta = Meta { _metaSince = defaultPackage <$> parserStateSince state }
-               , _doc = a
-               }
+    let defaultPackage s = s{sincePackage = sincePackage s <|> pkg}
+     in MetaDoc
+          { _meta = Meta{_metaSince = defaultPackage <$> parserStateSince state}
+          , _doc = a
+          }
 
 parseParasState :: String -> (ParserState, DocH mod Identifier)
 parseParasState = parse (emptyLines *> p) . T.pack . (++ "\n") . filter (/= '\r')
@@ -140,22 +143,27 @@ parseParagraph :: Text -> DocH mod Identifier
 parseParagraph = snd . parse p
   where
     p :: Parser (DocH mod Identifier)
-    p = docConcat <$> many (choice' [ monospace
-                                    , anchor
-                                    , identifier
-                                    , moduleName
-                                    , picture
-                                    , mathDisplay
-                                    , mathInline
-                                    , markdownImage
-                                    , markdownLink
-                                    , hyperlink
-                                    , bold
-                                    , emphasis
-                                    , encodedChar
-                                    , string'
-                                    , skipSpecialChar
-                                    ])
+    p =
+      docConcat
+        <$> many
+          ( choice'
+              [ monospace
+              , anchor
+              , identifier
+              , moduleName
+              , picture
+              , mathDisplay
+              , mathInline
+              , markdownImage
+              , markdownLink
+              , hyperlink
+              , bold
+              , emphasis
+              , encodedChar
+              , string'
+              , skipSpecialChar
+              ]
+          )
 
 -- | Parses and processes
 -- <https://en.wikipedia.org/wiki/Numeric_character_reference Numeric character references>
@@ -182,8 +190,8 @@ string' :: Parser (DocH mod a)
 string' = DocString . unescape . T.unpack <$> takeWhile1_ (`notElem` specialChar)
   where
     unescape "" = ""
-    unescape ('\\':x:xs) = x : unescape xs
-    unescape (x:xs) = x : unescape xs
+    unescape ('\\' : x : xs) = x : unescape xs
+    unescape (x : xs) = x : unescape xs
 
 -- | Skips a single special character and treats it as a plain string.
 -- This is done to skip over any special characters belonging to other
@@ -196,8 +204,9 @@ skipSpecialChar = DocString . return <$> Parsec.oneOf specialChar
 -- >>> parseString "/Hello world/"
 -- DocEmphasis (DocString "Hello world")
 emphasis :: Parser (DocH mod Identifier)
-emphasis = DocEmphasis . parseParagraph <$>
-  disallowNewline ("/" *> takeWhile1_ (/= '/') <* "/")
+emphasis =
+  DocEmphasis . parseParagraph
+    <$> disallowNewline ("/" *> takeWhile1_ (/= '/') <* "/")
 
 -- | Bold parser.
 --
@@ -227,16 +236,18 @@ takeWhile1_ = mfilter (not . T.null) . takeWhile_
 -- >>> parseString "#Hello world#"
 -- DocAName "Hello world"
 anchor :: Parser (DocH mod a)
-anchor = DocAName . T.unpack <$>
-         ("#" *> takeWhile1_ (\x -> x /= '#' && not (isSpace x)) <* "#")
+anchor =
+  DocAName . T.unpack
+    <$> ("#" *> takeWhile1_ (\x -> x /= '#' && not (isSpace x)) <* "#")
 
 -- | Monospaced strings.
 --
 -- >>> parseString "@cruel@"
 -- DocMonospaced (DocString "cruel")
 monospace :: Parser (DocH mod Identifier)
-monospace = DocMonospaced . parseParagraph
-            <$> ("@" *> takeWhile1_ (/= '@') <* "@")
+monospace =
+  DocMonospaced . parseParagraph
+    <$> ("@" *> takeWhile1_ (/= '@') <* "@")
 
 -- | Module names.
 --
@@ -246,20 +257,21 @@ moduleName :: Parser (DocH mod a)
 moduleName = DocModule . flip ModLink Nothing <$> ("\"" *> moduleNameString <* "\"")
 
 -- | A module name, optionally with an anchor
---
 moduleNameString :: Parser String
 moduleNameString = modid `maybeFollowedBy` anchor_
   where
     modid = intercalate "." <$> conid `Parsec.sepBy1` "."
-    anchor_ = (++)
-      <$> (Parsec.string "#" <|> Parsec.string "\\#")
-      <*> many (Parsec.satisfy (\c -> c /= '"' && not (isSpace c)))
+    anchor_ =
+      (++)
+        <$> (Parsec.string "#" <|> Parsec.string "\\#")
+        <*> many (Parsec.satisfy (\c -> c /= '"' && not (isSpace c)))
 
     maybeFollowedBy pre suf = (\x -> maybe x (x ++)) <$> pre <*> optional suf
     conid :: Parser String
-    conid = (:)
-      <$> Parsec.satisfy (\c -> isAlpha c && isUpper c)
-      <*> many conChar
+    conid =
+      (:)
+        <$> Parsec.satisfy (\c -> isAlpha c && isUpper c)
+        <*> many conChar
 
     conChar = Parsec.alphaNum <|> Parsec.char '_'
 
@@ -268,12 +280,17 @@ moduleNameString = modid `maybeFollowedBy` anchor_
 markdownLink :: Parser (DocH mod Identifier)
 markdownLink = do
   lbl <- markdownLinkText
-  choice' [ markdownModuleName lbl, markdownURL lbl ]
+  choice' [markdownModuleName lbl, markdownURL lbl]
   where
     markdownModuleName lbl = do
-      mn <- "(" *> skipHorizontalSpace *>
-            "\"" *> moduleNameString <* "\""
-            <* skipHorizontalSpace <* ")"
+      mn <-
+        "("
+          *> skipHorizontalSpace
+          *> "\""
+          *> moduleNameString
+          <* "\""
+          <* skipHorizontalSpace
+          <* ")"
       pure $ DocModule (ModLink mn (Just lbl))
 
     markdownURL lbl = do
@@ -288,24 +305,27 @@ markdownLink = do
 -- >>> parseString "<<hello.png world>>"
 -- DocPic (Picture {pictureUri = "hello.png", pictureTitle = Just "world"})
 picture :: Parser (DocH mod a)
-picture = DocPic . makeLabeled Picture
-          <$> disallowNewline ("<<" *> takeUntil ">>")
+picture =
+  DocPic . makeLabeled Picture
+    <$> disallowNewline ("<<" *> takeUntil ">>")
 
 -- | Inline math parser, surrounded by \\( and \\).
 --
 -- >>> parseString "\\(\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}\\)"
 -- DocMathInline "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
 mathInline :: Parser (DocH mod a)
-mathInline = DocMathInline . T.unpack
-             <$> disallowNewline  ("\\(" *> takeUntil "\\)")
+mathInline =
+  DocMathInline . T.unpack
+    <$> disallowNewline ("\\(" *> takeUntil "\\)")
 
 -- | Display math parser, surrounded by \\[ and \\].
 --
 -- >>> parseString "\\[\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}\\]"
 -- DocMathDisplay "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
 mathDisplay :: Parser (DocH mod a)
-mathDisplay = DocMathDisplay . T.unpack
-              <$> ("\\[" *> takeUntil "\\]")
+mathDisplay =
+  DocMathDisplay . T.unpack
+    <$> ("\\[" *> takeUntil "\\]")
 
 -- | Markdown image parser. As per the commonmark reference recommendation, the
 -- description text for an image converted to its a plain string representation.
@@ -323,21 +343,25 @@ markdownImage = do
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
-paragraph = choice' [ examples
-                    , table
-                    , do indent <- takeIndent
-                         choice' [ since
-                                 , unorderedList indent
-                                 , orderedList indent
-                                 , birdtracks
-                                 , codeblock
-                                 , property
-                                 , header
-                                 , textParagraphThatStartsWithMarkdownLink
-                                 , definitionList indent
-                                 , docParagraph <$> textParagraph
-                                 ]
-                    ]
+paragraph =
+  choice'
+    [ examples
+    , table
+    , do
+        indent <- takeIndent
+        choice'
+          [ since
+          , unorderedList indent
+          , orderedList indent
+          , birdtracks
+          , codeblock
+          , property
+          , header
+          , textParagraphThatStartsWithMarkdownLink
+          , definitionList indent
+          , docParagraph <$> textParagraph
+          ]
+    ]
 
 -- | Provides support for grid tables.
 --
@@ -354,134 +378,150 @@ paragraph = choice' [ examples
 --
 -- Algorithms loosely follows ideas in
 -- http://docutils.sourceforge.net/docutils/parsers/rst/tableparser.py
---
 table :: Parser (DocH mod Identifier)
 table = do
-    -- first we parse the first row, which determines the width of the table
-    firstRow <- parseFirstRow
-    let len = T.length firstRow
+  -- first we parse the first row, which determines the width of the table
+  firstRow <- parseFirstRow
+  let len = T.length firstRow
 
-    -- then we parse all consecutive rows starting and ending with + or |,
-    -- of the width `len`.
-    restRows <- many (try (parseRestRows len))
+  -- then we parse all consecutive rows starting and ending with + or |,
+  -- of the width `len`.
+  restRows <- many (try (parseRestRows len))
 
-    -- Now we gathered the table block, the next step is to split the block
-    -- into cells.
-    DocTable <$> tableStepTwo len (firstRow : restRows)
+  -- Now we gathered the table block, the next step is to split the block
+  -- into cells.
+  DocTable <$> tableStepTwo len (firstRow : restRows)
   where
     parseFirstRow :: Parser Text
     parseFirstRow = do
-        skipHorizontalSpace
-        cs <- takeWhile (\c -> c == '-' || c == '+')
+      skipHorizontalSpace
+      cs <- takeWhile (\c -> c == '-' || c == '+')
 
-        -- upper-left and upper-right corners are `+`
-        guard (T.length cs >= 2 &&
-               T.head cs == '+' &&
-               T.last cs == '+')
+      -- upper-left and upper-right corners are `+`
+      guard
+        ( T.length cs >= 2
+            && T.head cs == '+'
+            && T.last cs == '+'
+        )
 
-        -- trailing space
-        skipHorizontalSpace
-        _ <- Parsec.newline
+      -- trailing space
+      skipHorizontalSpace
+      _ <- Parsec.newline
 
-        return cs
+      return cs
 
     parseRestRows :: Int -> Parser Text
     parseRestRows l = do
-        skipHorizontalSpace
-        bs <- scan predicate l
+      skipHorizontalSpace
+      bs <- scan predicate l
 
-        -- Left and right edges are `|` or `+`
-        guard (T.length bs >= 2 &&
-               (T.head bs == '|' || T.head bs == '+') &&
-               (T.last bs == '|' || T.last bs == '+'))
+      -- Left and right edges are `|` or `+`
+      guard
+        ( T.length bs >= 2
+            && (T.head bs == '|' || T.head bs == '+')
+            && (T.last bs == '|' || T.last bs == '+')
+        )
 
-        -- trailing space
-        skipHorizontalSpace
-        _ <- Parsec.newline
+      -- trailing space
+      skipHorizontalSpace
+      _ <- Parsec.newline
 
-        return bs
+      return bs
       where
         predicate n c
-            | n <= 0    = Nothing
-            | c == '\n' = Nothing
-            | otherwise = Just (n - 1)
+          | n <= 0 = Nothing
+          | c == '\n' = Nothing
+          | otherwise = Just (n - 1)
 
 -- Second step searchs for row of '+' and '=' characters, records it's index
 -- and changes to '=' to '-'.
 tableStepTwo
-    :: Int              -- ^ width
-    -> [Text]           -- ^ rows
-    -> Parser (Table (DocH mod Identifier))
-tableStepTwo width = go 0 [] where
+  :: Int
+  -- ^ width
+  -> [Text]
+  -- ^ rows
+  -> Parser (Table (DocH mod Identifier))
+tableStepTwo width = go 0 []
+  where
     go _ left [] = tableStepThree width (reverse left) Nothing
     go n left (r : rs)
-        | T.all (`elem` ['+', '=']) r =
-            tableStepThree width (reverse left ++ r' : rs) (Just n)
-        | otherwise =
-            go (n + 1) (r :  left) rs
+      | T.all (`elem` ['+', '=']) r =
+          tableStepThree width (reverse left ++ r' : rs) (Just n)
+      | otherwise =
+          go (n + 1) (r : left) rs
       where
         r' = T.map (\c -> if c == '=' then '-' else c) r
 
 -- Third step recognises cells in the table area, returning a list of TC, cells.
 tableStepThree
-    :: Int              -- ^ width
-    -> [Text]           -- ^ rows
-    -> Maybe Int        -- ^ index of header separator
-    -> Parser (Table (DocH mod Identifier))
+  :: Int
+  -- ^ width
+  -> [Text]
+  -- ^ rows
+  -> Maybe Int
+  -- ^ index of header separator
+  -> Parser (Table (DocH mod Identifier))
 tableStepThree width rs hdrIndex = do
-    cells <- loop (Set.singleton (0, 0))
-    tableStepFour rs hdrIndex cells
+  cells <- loop (Set.singleton (0, 0))
+  tableStepFour rs hdrIndex cells
   where
     height = length rs
 
     loop :: Set.Set (Int, Int) -> Parser [TC]
     loop queue = case Set.minView queue of
-        Nothing -> return []
-        Just ((y, x), queue')
-            | y + 1 >= height || x + 1 >= width -> loop queue'
-            | otherwise -> case scanRight x y of
-                Nothing -> loop queue'
-                Just (x2, y2) -> do
-                    let tc = TC y x y2 x2
-                    fmap (tc :) $ loop $ queue' `Set.union` Set.fromList
-                        [(y, x2), (y2, x), (y2, x2)]
+      Nothing -> return []
+      Just ((y, x), queue')
+        | y + 1 >= height || x + 1 >= width -> loop queue'
+        | otherwise -> case scanRight x y of
+            Nothing -> loop queue'
+            Just (x2, y2) -> do
+              let tc = TC y x y2 x2
+              fmap (tc :) $
+                loop $
+                  queue'
+                    `Set.union` Set.fromList
+                      [(y, x2), (y2, x), (y2, x2)]
 
     -- scan right looking for +, then try scan down
     --
     -- do we need to record + saw on the way left and down?
     scanRight :: Int -> Int -> Maybe (Int, Int)
-    scanRight x y = go (x + 1) where
+    scanRight x y = go (x + 1)
+      where
         bs = rs !! y
-        go x' | x' >= width          = fail "overflow right "
-              | T.index bs x' == '+' = scanDown x y x' <|> go (x' + 1)
-              | T.index bs x' == '-' = go (x' + 1)
-              | otherwise            = fail $ "not a border (right) " ++ show (x,y,x')
+        go x'
+          | x' >= width = fail "overflow right "
+          | T.index bs x' == '+' = scanDown x y x' <|> go (x' + 1)
+          | T.index bs x' == '-' = go (x' + 1)
+          | otherwise = fail $ "not a border (right) " ++ show (x, y, x')
 
     -- scan down looking for +
     scanDown :: Int -> Int -> Int -> Maybe (Int, Int)
-    scanDown x y x2 = go (y + 1) where
-        go y' | y' >= height                 = fail "overflow down"
-              | T.index (rs !! y') x2 == '+' = scanLeft x y x2 y' <|> go (y' + 1)
-              | T.index (rs !! y') x2 == '|' = go (y' + 1)
-              | otherwise                    = fail $ "not a border (down) " ++ show (x,y,x2,y')
+    scanDown x y x2 = go (y + 1)
+      where
+        go y'
+          | y' >= height = fail "overflow down"
+          | T.index (rs !! y') x2 == '+' = scanLeft x y x2 y' <|> go (y' + 1)
+          | T.index (rs !! y') x2 == '|' = go (y' + 1)
+          | otherwise = fail $ "not a border (down) " ++ show (x, y, x2, y')
 
     -- check that at y2 x..x2 characters are '+' or '-'
     scanLeft :: Int -> Int -> Int -> Int -> Maybe (Int, Int)
     scanLeft x y x2 y2
-        | all (\x' -> T.index bs x' `elem` ['+', '-']) [x..x2] = scanUp x y x2 y2
-        | otherwise                                            = fail $ "not a border (left) " ++ show (x,y,x2,y2)
+      | all (\x' -> T.index bs x' `elem` ['+', '-']) [x .. x2] = scanUp x y x2 y2
+      | otherwise = fail $ "not a border (left) " ++ show (x, y, x2, y2)
       where
         bs = rs !! y2
 
     -- check that at y2 x..x2 characters are '+' or '-'
     scanUp :: Int -> Int -> Int -> Int -> Maybe (Int, Int)
     scanUp x y x2 y2
-        | all (\y' -> T.index (rs !! y') x `elem` ['+', '|']) [y..y2] = return (x2, y2)
-        | otherwise                                                   = fail $ "not a border (up) " ++ show (x,y,x2,y2)
+      | all (\y' -> T.index (rs !! y') x `elem` ['+', '|']) [y .. y2] = return (x2, y2)
+      | otherwise = fail $ "not a border (up) " ++ show (x, y, x2, y2)
 
 -- | table cell: top left bottom right
 data TC = TC !Int !Int !Int !Int
-  deriving Show
+  deriving (Show)
 
 tcXS :: TC -> [Int]
 tcXS (TC _ x _ x2) = [x, x2]
@@ -491,11 +531,11 @@ tcYS (TC y _ y2 _) = [y, y2]
 
 -- | Fourth step. Given the locations of cells, forms 'Table' structure.
 tableStepFour :: [Text] -> Maybe Int -> [TC] -> Parser (Table (DocH mod Identifier))
-tableStepFour rs hdrIndex cells =  case hdrIndex of
+tableStepFour rs hdrIndex cells = case hdrIndex of
+  Nothing -> return $ Table [] rowsDoc
+  Just i -> case elemIndex i yTabStops of
     Nothing -> return $ Table [] rowsDoc
-    Just i  -> case elemIndex i yTabStops of
-        Nothing -> return $ Table [] rowsDoc
-        Just i' -> return $ uncurry Table $ splitAt i' rowsDoc
+    Just i' -> return $ uncurry Table $ splitAt i' rowsDoc
   where
     xTabStops = sortNub $ concatMap tcXS cells
     yTabStops = sortNub $ concatMap tcYS cells
@@ -504,8 +544,8 @@ tableStepFour rs hdrIndex cells =  case hdrIndex of
     sortNub = Set.toList . Set.fromList
 
     init' :: [a] -> [a]
-    init' []       = []
-    init' [_]      = []
+    init' [] = []
+    init' [_] = []
     init' (x : xs) = x : init' xs
 
     rowsDoc = (fmap . fmap) parseParagraph rows
@@ -514,15 +554,17 @@ tableStepFour rs hdrIndex cells =  case hdrIndex of
       where
         makeRow y = TableRow $ mapMaybe (makeCell y) cells
         makeCell y (TC y' x y2 x2)
-            | y /= y' = Nothing
-            | otherwise = Just $ TableCell xts yts (extract (x + 1) (y + 1) (x2 - 1) (y2 - 1))
+          | y /= y' = Nothing
+          | otherwise = Just $ TableCell xts yts (extract (x + 1) (y + 1) (x2 - 1) (y2 - 1))
           where
             xts = length $ P.takeWhile (< x2) $ dropWhile (< x) xTabStops
             yts = length $ P.takeWhile (< y2) $ dropWhile (< y) yTabStops
 
     -- extract cell contents given boundaries
     extract :: Int -> Int -> Int -> Int -> Text
-    extract x y x2 y2 = T.intercalate "\n"
+    extract x y x2 y2 =
+      T.intercalate
+        "\n"
         [ T.stripEnd $ T.stripStart $ T.take (x2 - x + 1) $ T.drop x $ rs !! y'
         | y' <- [y .. y2]
         ]
@@ -563,8 +605,11 @@ textParagraphThatStartsWithMarkdownLink :: Parser (DocH mod Identifier)
 textParagraphThatStartsWithMarkdownLink = docParagraph <$> (docAppend <$> markdownLink <*> optionalTextParagraph)
   where
     optionalTextParagraph :: Parser (DocH mod Identifier)
-    optionalTextParagraph = choice' [ docAppend <$> whitespace <*> textParagraph
-                                    , pure DocEmpty ]
+    optionalTextParagraph =
+      choice'
+        [ docAppend <$> whitespace <*> textParagraph
+        , pure DocEmpty
+        ]
 
     whitespace :: Parser (DocH mod a)
     whitespace = DocString <$> (f <$> takeHorizontalSpace <*> optional "\n")
@@ -591,9 +636,11 @@ orderedList indent = DocOrderedList <$> p
     paren = "(" *> decimal <* ")"
 
 -- | Like 'innerList' but takes the parsed index of the list item
-innerList' :: Text -> Parser [(Int, DocH mod Identifier)]
-           -> Int
-           -> Parser [(Int, DocH mod Identifier)]
+innerList'
+  :: Text
+  -> Parser [(Int, DocH mod Identifier)]
+  -> Int
+  -> Parser [(Int, DocH mod Identifier)]
 innerList' indent item index = do
   c <- takeLine
   (cs, items) <- more indent item
@@ -607,8 +654,10 @@ innerList' indent item index = do
 -- same paragraph. Usually used as
 --
 -- > someListFunction = listBeginning *> innerList someListFunction
-innerList :: Text -> Parser [DocH mod Identifier]
-          -> Parser [DocH mod Identifier]
+innerList
+  :: Text
+  -> Parser [DocH mod Identifier]
+  -> Parser [DocH mod Identifier]
 innerList indent item = do
   c <- takeLine
   (cs, items) <- more indent item
@@ -637,39 +686,50 @@ dropNLs = T.dropWhileEnd (== '\n')
 -- | Main worker for 'innerList' and 'definitionList'.
 -- We need the 'Either' here to be able to tell in the respective functions
 -- whether we're dealing with the next list or a nested paragraph.
-more :: Monoid a => Text -> Parser a
-     -> Parser ([Text], Either (DocH mod Identifier) a)
-more indent item = choice' [ innerParagraphs indent
-                           , moreListItems indent item
-                           , moreContent indent item
-                           , pure ([], Right mempty)
-                           ]
+more
+  :: Monoid a
+  => Text
+  -> Parser a
+  -> Parser ([Text], Either (DocH mod Identifier) a)
+more indent item =
+  choice'
+    [ innerParagraphs indent
+    , moreListItems indent item
+    , moreContent indent item
+    , pure ([], Right mempty)
+    ]
 
 -- | Used by 'innerList' and 'definitionList' to parse any nested paragraphs.
-innerParagraphs :: Text
-                -> Parser ([Text], Either (DocH mod Identifier) a)
+innerParagraphs
+  :: Text
+  -> Parser ([Text], Either (DocH mod Identifier) a)
 innerParagraphs indent = (,) [] . Left <$> ("\n" *> indentedParagraphs indent)
 
 -- | Attempts to fetch the next list if possibly. Used by 'innerList' and
 -- 'definitionList' to recursively grab lists that aren't separated by a whole
 -- paragraph.
-moreListItems :: Text -> Parser a
-              -> Parser ([Text], Either (DocH mod Identifier) a)
+moreListItems
+  :: Text
+  -> Parser a
+  -> Parser ([Text], Either (DocH mod Identifier) a)
 moreListItems indent item = (,) [] . Right <$> indentedItem
   where
     indentedItem = string indent *> Parsec.spaces *> item
 
 -- | Helper for 'innerList' and 'definitionList' which simply takes
 -- a line of text and attempts to parse more list content with 'more'.
-moreContent :: Monoid a => Text -> Parser a
-            -> Parser ([Text], Either (DocH mod Identifier) a)
+moreContent
+  :: Monoid a
+  => Text
+  -> Parser a
+  -> Parser ([Text], Either (DocH mod Identifier) a)
 moreContent indent item = first . (:) <$> nonEmptyLine <*> more indent item
 
 -- | Parses an indented paragraph.
 -- The indentation is 4 spaces.
 indentedParagraphs :: Text -> Parser (DocH mod Identifier)
 indentedParagraphs indent =
-    (T.unpack . T.concat <$> dropFrontOfPara indent') >>= parseParagraphs
+  (T.unpack . T.concat <$> dropFrontOfPara indent') >>= parseParagraphs
   where
     indent' = string $ indent <> "    "
 
@@ -678,10 +738,11 @@ dropFrontOfPara :: Parser Text -> Parser [Text]
 dropFrontOfPara sp = do
   currentParagraph <- some (try (sp *> takeNonEmptyLine))
   followingParagraphs <-
-    choice' [ skipHorizontalSpace *> nextPar -- we have more paragraphs to take
-            , skipHorizontalSpace *> nlList -- end of the ride, remember the newline
-            , Parsec.eof *> return []       -- nothing more to take at all
-            ]
+    choice'
+      [ skipHorizontalSpace *> nextPar -- we have more paragraphs to take
+      , skipHorizontalSpace *> nlList -- end of the ride, remember the newline
+      , Parsec.eof *> return [] -- nothing more to take at all
+      ]
   return (currentParagraph ++ followingParagraphs)
   where
     nextPar = (++) <$> nlList <*> dropFrontOfPara sp
@@ -697,9 +758,9 @@ nonSpace xs
 --  Doesn't discard the trailing newline.
 takeNonEmptyLine :: Parser Text
 takeNonEmptyLine = do
-    l <- takeWhile1 (/= '\n') >>= nonSpace
-    _ <- "\n"
-    pure (l <> "\n")
+  l <- takeWhile1 (/= '\n') >>= nonSpace
+  _ <- "\n"
+  pure (l <> "\n")
 
 -- | Takes indentation of first non-empty line.
 --
@@ -708,16 +769,16 @@ takeNonEmptyLine = do
 takeIndent :: Parser Text
 takeIndent = do
   indent <- takeHorizontalSpace
-  choice' [ "\n" *> takeIndent
-          , return indent
-          ]
+  choice'
+    [ "\n" *> takeIndent
+    , return indent
+    ]
 
 -- | Blocks of text of the form:
 --
 -- >> foo
 -- >> bar
 -- >> baz
---
 birdtracks :: Parser (DocH mod a)
 birdtracks = DocCodeBlock . DocString . T.unpack . T.intercalate "\n" . stripSpace <$> some line
   where
@@ -727,9 +788,9 @@ stripSpace :: [Text] -> [Text]
 stripSpace = fromMaybe <*> mapM strip'
   where
     strip' t = case T.uncons t of
-                 Nothing -> Just ""
-                 Just (' ',t') -> Just t'
-                 _ -> Nothing
+      Nothing -> Just ""
+      Just (' ', t') -> Just t'
+      _ -> Nothing
 
 -- | Parses examples. Examples are a paragraph level entity (separated by an empty line).
 -- Consecutive examples are accepted.
@@ -744,7 +805,7 @@ examples = DocExamples <$> (many (try (skipHorizontalSpace *> "\n")) *> go)
       return (makeExample prefix expr rs : es)
       where
         resultAndMoreExamples :: Parser ([Text], [Example])
-        resultAndMoreExamples = choice' [ moreExamples, result, pure ([], []) ]
+        resultAndMoreExamples = choice' [moreExamples, result, pure ([], [])]
           where
             moreExamples :: Parser ([Text], [Example])
             moreExamples = (,) [] <$> go
@@ -785,30 +846,33 @@ property = DocProperty . T.unpack . T.strip <$> ("prop>" *> takeWhile1 (/= '\n')
 codeblock :: Parser (DocH mod Identifier)
 codeblock =
   DocCodeBlock . parseParagraph . dropSpaces
-  <$> ("@" *> skipHorizontalSpace *> "\n" *> block' <* "@")
+    <$> ("@" *> skipHorizontalSpace *> "\n" *> block' <* "@")
   where
     dropSpaces xs =
       case splitByNl xs of
         [] -> xs
         ys -> case T.uncons (last ys) of
-          Just (' ',_) -> case mapM dropSpace ys of
-                            Nothing -> xs
-                            Just zs -> T.intercalate "\n" zs
+          Just (' ', _) -> case mapM dropSpace ys of
+            Nothing -> xs
+            Just zs -> T.intercalate "\n" zs
           _ -> xs
 
     -- This is necessary because ‘lines’ swallows up a trailing newline
     -- and we lose information about whether the last line belongs to @ or to
     -- text which we need to decide whether we actually want to be dropping
     -- anything at all.
-    splitByNl = unfoldr (\x -> case T.uncons x of
-                                 Just ('\n',x') -> Just (T.span (/= '\n') x')
-                                 _ -> Nothing)
-                . ("\n" <>)
+    splitByNl =
+      unfoldr
+        ( \x -> case T.uncons x of
+            Just ('\n', x') -> Just (T.span (/= '\n') x')
+            _ -> Nothing
+        )
+        . ("\n" <>)
 
     dropSpace t = case T.uncons t of
-                    Nothing -> Just ""
-                    Just (' ',t') -> Just t'
-                    _ -> Nothing
+      Nothing -> Just ""
+      Just (' ', t') -> Just t'
+      _ -> Nothing
 
     block' = scan p False
       where
@@ -818,11 +882,11 @@ codeblock =
           | otherwise = Just $ c == '\n'
 
 hyperlink :: Parser (DocH mod Identifier)
-hyperlink = choice' [ angleBracketLink, autoUrl ]
+hyperlink = choice' [angleBracketLink, autoUrl]
 
 angleBracketLink :: Parser (DocH mod a)
 angleBracketLink =
-    DocHyperlink . makeLabeled (\s -> Hyperlink s . fmap DocString)
+  DocHyperlink . makeLabeled (\s -> Hyperlink s . fmap DocString)
     <$> disallowNewline ("<" *> takeUntil ">")
 
 -- | The text for a markdown link, enclosed in square brackets.
@@ -850,16 +914,15 @@ markdownLinkTarget = whitespace *> url
 autoUrl :: Parser (DocH mod a)
 autoUrl = mkLink <$> url
   where
-    url = mappend <$> choice' [ "http://", "https://", "ftp://"] <*> takeWhile1 (not . isSpace)
+    url = mappend <$> choice' ["http://", "https://", "ftp://"] <*> takeWhile1 (not . isSpace)
 
     mkLink :: Text -> DocH mod a
     mkLink s = case T.unsnoc s of
-      Just (xs,x) | x `elem` (",.!?" :: String) -> DocHyperlink (mkHyperlink xs) `docAppend` DocString [x]
+      Just (xs, x) | x `elem` (",.!?" :: String) -> DocHyperlink (mkHyperlink xs) `docAppend` DocString [x]
       _ -> DocHyperlink (mkHyperlink s)
 
     mkHyperlink :: Text -> Hyperlink (DocH mod a)
     mkHyperlink lnk = Hyperlink (T.unpack lnk) Nothing
-
 
 -- | Parses identifiers with help of 'parseValid'.
 identifier :: Parser (DocH mod Identifier)
