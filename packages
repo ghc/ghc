@@ -39,7 +39,6 @@
 ghc-tarballs                 windows     ghc-tarballs.git                -
 libffi-tarballs              -           -                               -
 utils/hsc2hs                 -           -                               ssh://git@github.com/haskell/hsc2hs.git
-utils/haddock                -           -                               ssh://git@github.com/haskell/haddock.git
 libraries/array              -           -                               -
 libraries/binary             -           -                               https://github.com/kolmodin/binary.git
 libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
