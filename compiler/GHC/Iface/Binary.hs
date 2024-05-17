@@ -97,6 +97,10 @@ data CompressionIFace
   -- ^ Try to compress as much as possible.
   --
   -- Yields the smallest '.hi' files but at the cost of additional run-time.
+  deriving (Show, Eq, Ord, Bounded, Enum)
+
+instance Outputable CompressionIFace where
+  ppr = text . show
 
 -- | Read an interface file header, checking the magic number, version, and
 -- way. Returns the hash of the source file and a BinHandle which points at the
@@ -227,6 +231,11 @@ getTables name_cache bh = do
 -- See Note [Deduplication during iface binary serialisation] for details.
 writeBinIface :: Profile -> TraceBinIFace -> CompressionIFace -> FilePath -> ModIface -> IO ()
 writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
+    case traceBinIface of
+      QuietBinIFace -> pure ()
+      TraceBinIFace printer -> do
+        printer (text "writeBinIface compression level:" <+> ppr compressionLevel)
+
     bh <- openBinMem initBinMemSize
     let platform = profilePlatform profile
     put_ bh (binaryInterfaceMagic platform)
@@ -266,7 +275,7 @@ putWithUserData traceBinIface compressionLevel bh payload = do
        printer (text "writeBinIface:" <+> int fs_count
                                       <+> text "dict entries")
        printer (text "writeBinIface:" <+> int ifacetype_count
-                                      <+> text "dict entries")
+                                      <+> text "iface type entries")
 
 -- | Write name/symbol/ifacetype tables
 --
