@@ -1,0 +1,11 @@
+indentation: 2
+comma-style: leading # for lists, tuples etc. - can also be 'leading'
+import-export-style: leading
+record-brace-space: false # rec {x = 1} vs. rec{x = 1}
+indent-wheres: true # 'false' means save space by only half-indenting the 'where' keyword
+respectful: true # don't be too opinionated about newlines etc.
+haddock-style: single-line # '--' vs. '{-'
+newlines-between-decls: 1 # number of newlines between top-level declarations
+fixities: []
+function-arrows: leading
+single-constraint-parens: never
