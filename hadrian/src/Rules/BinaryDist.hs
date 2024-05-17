@@ -135,8 +135,6 @@ bindistRules = do
         let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         let prefix = cwd -/- root -/- "reloc-bindist" -/- ghcVersionPretty
         installTo Relocatable prefix
-        copyDirectory (root -/- "mingw") prefix
-        liftIO $ IO.removeDirectoryRecursive (prefix -/- "lib" -/- "mingw")
 
     phony "install" $ do
         need ["binary-dist-dir"]
