@@ -2400,7 +2400,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                 stg_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
-    _ <- liftIO $ loadDecls interp hsc_env src_span cbc
+    _ <- liftIO $ loadDecls interp hsc_env undefined src_span cbc
 
     {- Load static pointer table entries -}
     liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)
@@ -2676,7 +2676,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
                 [] Nothing
 
       {- load it -}
-      (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan bcos
+      (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env (initWholeCoreBindings hsc_env) srcspan bcos
       {- Get the HValue for the root -}
       return (expectJust "hscCompileCoreExpr'"
          $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)

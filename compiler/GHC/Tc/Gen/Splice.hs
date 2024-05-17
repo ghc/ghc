@@ -29,6 +29,7 @@ module GHC.Tc.Gen.Splice(
      finishTH, runTopSplice
       ) where
 
+import GHC.Linker.Loader (showLoaderState)
 import GHC.Prelude
 
 import GHC.Driver.Errors
@@ -1259,6 +1260,11 @@ runMeta' show_code ppr_hs run_and_convert expr
                 --
                 -- See Note [Exceptions in TH]
           let expr_span = getLocA expr
+        ; interp <- tcGetInterp
+        ; liftIO $ putStrLn (showSDocUnsafe (hang (text "\ESC[35mrunMeta'\ESC[m:") 2 (vcat [
+            text "needed_mods:" <+> ppr needed_mods
+            ])))
+        ; liftIO (putStrLn . showSDocUnsafe =<< showLoaderState interp)
         ; recordThNeededRuntimeDeps needed_mods needed_pkgs
         ; either_tval <- tryAllM $
                          setSrcSpan expr_span $ -- Set the span so that qLocation can
