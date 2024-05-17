@@ -133,6 +133,7 @@ INSTALL_DIR     = $(INSTALL) -m 755 -d
 CrossCompiling        = @CrossCompiling@
 CrossCompilePrefix    = @CrossCompilePrefix@
 GhcUnregisterised     = @Unregisterised@
+EnableDistroToolchain = @SettingsUseDistroMINGW@
 
 # ArchSupportsSMP should be set iff there is support for that arch in
 # rts/include/stg/SMP.h
@@ -236,4 +237,5 @@ SettingsLlcCommand = @SettingsLlcCommand@
 SettingsOptCommand = @SettingsOptCommand@
 SettingsLlvmAsCommand = @SettingsLlvmAsCommand@
 SettingsUseDistroMINGW = @SettingsUseDistroMINGW@
+
 

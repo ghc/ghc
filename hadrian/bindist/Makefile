@@ -55,10 +55,11 @@ show:
 
 .PHONY: install_extra
 ifeq "$(EnableDistroToolchain)" "NO"
+ifeq "$(Windows_Host)" "YES"
 install_extra: install_mingw
-else
-install_extra:
 endif
+endif
+install_extra:
 
 .PHONY: install_bin
 ifeq "$(RelocatableBuild)" "YES"
