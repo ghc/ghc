@@ -245,6 +245,9 @@ runTestBuilderArgs = builder Testsuite ? do
     let asBool :: String -> Bool -> String
         asBool s b = s ++ show b
 
+
+    perfPathM <- expr $ liftIO (findExecutable "perf")
+
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg "-Wdefault"  -- see #22727
             , arg $ "testsuite/driver/runtests.py"
@@ -293,6 +296,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "config.platform=" ++ show platform
             , arg "-e", arg $ "config.stage="    ++ show (stageNumber (C.stage ctx))
 
+            , emitWhenSet perfPathM $ \perf -> arg "--config" <> arg ("perf_path=" ++ perf)
             , arg "--config", arg $ "gs=gs"                           -- Use the default value as in test.mk
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
             , arg "--config", arg $ "stats_files_dir=" ++ statsFilesDir
