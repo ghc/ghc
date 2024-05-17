@@ -90,6 +90,7 @@ import GHC.Linker.Types
 
 -- Standard libraries
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
 
 import qualified Data.Set as Set
 import Data.Char (isSpace)
@@ -110,6 +111,16 @@ import System.Win32.Info (getSystemDirectory)
 #endif
 
 import GHC.Utils.Exception
+import GHC.Unit.Module.ModIface (ModIface, ModIface_ (..))
+import GHC.Unit.Finder (findExactModule, InstalledFindResult (..))
+import GHC.Unit.Module.ModSummary (ModSummary(..))
+import GHC.Unit.Module.WholeCoreBindings (WholeCoreBindings(..))
+import Control.Monad.Trans.State.Strict (StateT(..), state)
+import GHC.Utils.Misc (modificationTimeIfExists)
+import qualified Data.Map.Strict as Map
+import Data.Foldable (toList)
+import GHC.Iface.Syntax
+import GHC.Types.Name.Set (unionNameSets, mkNameSet, intersectsNameSet, intersectNameSet, elemNameSet)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -243,6 +254,55 @@ loadDependencies interp hsc_env pls span needed_mods = do
                                                                   ])
    return (pls2, succ, ldAllLinkables deps, this_pkgs_loaded)
 
+loadByteCodeDependencies
+  :: Interp
+  -> HscEnv
+  -> LoaderState
+  -> (ModIface -> Linkable -> IO Linkable)
+  -> SrcSpan
+  -> [Unlinked]
+  -> IO (LoaderState, SuccessFlag, [Linkable], PkgsLoaded)
+loadByteCodeDependencies interp hsc_env pls hydrate span needed = do
+  -- Load bytecode from interface files in the package db
+  (hydrated, CBLoaderState {cbl_loader = pls1, cbl_unavailable}) <-
+    initIfaceCheck (text "loader") hsc_env $
+    runStateT (loadDepsFromCoreBindings handlers needed) s0
+
+  -- TODO call loadDependencies here with the modules we couldn't hydrate
+  -- Find what packages and linkables are required
+  let opts = initLinkDepsOpts hsc_env
+  deps <- getLinkDeps opts interp pls span (uniqDSetToList cbl_unavailable)
+  dbg "loadByteCodeDependencies" [
+    ("unavailable modules", ppr cbl_unavailable),
+    ("needed linkables native", ppr (ldNeededLinkables deps)),
+    ("hydrated", ppr hydrated),
+    ("ldUnits", ppr (ldUnits deps))
+    ]
+
+  let this_pkgs_needed = ldNeededUnits deps
+      links_needed = hydrated ++ ldNeededLinkables deps
+
+  -- Link the packages and modules required
+  pls2 <- loadPackages' interp hsc_env (ldUnits deps) pls1
+  (pls3, succ) <- loadModuleLinkables interp hsc_env pls2 links_needed
+  let this_pkgs_loaded = udfmRestrictKeys all_pkgs_loaded $ getUniqDSet trans_pkgs_needed
+      all_pkgs_loaded = pkgs_loaded pls3
+      trans_pkgs_needed = unionManyUniqDSets (this_pkgs_needed : [ loaded_pkg_trans_deps pkg
+                                                                | pkg_id <- uniqDSetToList this_pkgs_needed
+                                                                , Just pkg <- [lookupUDFM all_pkgs_loaded pkg_id]
+                                                                ])
+  dbg "loadByteCodeDependencies end" [
+    ("objs_loaded", ppr (objs_loaded pls3))
+    ]
+  return (pls3, succ, links_needed, this_pkgs_loaded)
+  where
+    s0 =
+      CBLoaderState {
+        cbl_loader = pls,
+        cbl_seen = emptyUniqDSet,
+        cbl_unavailable = emptyUniqDSet
+      }
+    handlers = cbl_handlers hsc_env hydrate
 
 -- | Temporarily extend the loaded env.
 withExtendedLoadedEnv
@@ -264,6 +324,12 @@ withExtendedLoadedEnv interp new_env action
           reset_old_env = liftIO $
             deleteFromLoadedEnv interp (map fst new_env)
 
+pprLoaderState :: LoaderState -> SDoc
+pprLoaderState pls =
+  vcat [ text "Pkgs:" <+> ppr (map loaded_pkg_uid $ eltsUDFM $ pkgs_loaded pls)
+       , text "Objs:" <+> ppr (moduleEnvElts $ objs_loaded pls)
+       , text "BCOs:" <+> ppr (moduleEnvElts $ bcos_loaded pls)
+       ]
 
 -- | Display the loader state.
 showLoaderState :: Interp -> IO SDoc
@@ -278,6 +344,225 @@ showLoaderState interp = do
 
   return $ withPprStyle defaultDumpStyle
          $ vcat (text "----- Loader state -----":docs)
+
+{- **********************************************************************
+
+                        Loading whole core bindings
+
+  ********************************************************************* -}
+
+cbload_mod_summary ::
+  Module ->
+  ModLocation ->
+  ModIface ->
+  IO ModSummary
+cbload_mod_summary mod loc@ModLocation {..} ModIface {..} = do
+  hi_date <- modificationTimeIfExists ml_hi_file
+  hie_date <- modificationTimeIfExists ml_hie_file
+  o_mod <- modificationTimeIfExists ml_obj_file
+  dyn_o_mod <- modificationTimeIfExists ml_dyn_obj_file
+  pure ModSummary {
+    ms_mod       = mod,
+    ms_hsc_src   = mi_hsc_src,
+    ms_hspp_file = undefined,
+    ms_hspp_opts = undefined,
+    ms_hspp_buf  = undefined,
+    ms_location  = loc,
+    ms_hs_hash   = mi_src_hash,
+    ms_obj_date  = o_mod,
+    ms_dyn_obj_date = dyn_o_mod,
+    ms_parsed_mod   = Nothing,
+    ms_iface_date   = hi_date,
+    ms_hie_date     = hie_date,
+    -- TODO this needs imports parsing and is accessed by our new logic
+    ms_ghc_prim_import = False,
+    ms_textual_imps = [],
+    ms_srcimps      = []
+  }
+
+loadByteCode :: ModLocation -> ModIface -> ModSummary -> IO (Maybe Linkable)
+loadByteCode loc iface mod_sum = do
+    let
+      this_mod   = mi_module iface
+      if_date    = fromJust $ ms_iface_date mod_sum
+    case mi_extra_decls iface of
+      Just extra_decls -> do
+          let fi = WholeCoreBindings extra_decls this_mod loc
+          return (Just (LM if_date this_mod [CoreBindings fi]))
+      _ -> pure Nothing
+
+data CBLoaderState =
+  CBLoaderState {
+    cbl_loader :: LoaderState,
+    cbl_seen :: UniqDSet Name,
+    cbl_unavailable :: UniqDSet Module
+  }
+
+data CBLoaderHandlers =
+  CBLoaderHandlers {
+    cbl_find :: Module -> IO InstalledFindResult,
+    cbl_hydrate :: ModIface -> Linkable -> IO Linkable
+  }
+
+cbl_handlers ::
+  HscEnv ->
+  (ModIface -> Linkable -> IO Linkable) ->
+  CBLoaderHandlers
+cbl_handlers hsc_env cbl_hydrate =
+  CBLoaderHandlers {cbl_find, cbl_hydrate}
+  where
+    unit_state = hsc_units hsc_env
+    fc = hsc_FC hsc_env
+    mhome_unit = hsc_home_unit_maybe hsc_env
+    dflags = hsc_dflags hsc_env
+    fopts = initFinderOpts dflags
+    other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
+
+    cbl_find mod =
+      findExactModule fc fopts other_fopts unit_state mhome_unit
+      (mkModule (moduleUnitId mod) (moduleName mod))
+
+wcb_closure ::
+  MonadIO m =>
+  [Name] ->
+  WholeCoreBindings ->
+  m WholeCoreBindings
+wcb_closure names (WholeCoreBindings cbs m l) = do
+  dbg "wcb_closure" [
+    ("cbs", ppr cbs),
+    ("names", ppr names),
+    ("top_names", ppr top_names),
+    ("used_top_names", ppr used_top_names),
+    ("all_used_names", ppr all_used_names),
+    ("all_used_binders", ppr all_used_binders),
+    ("wcb_c", ppr wcb_c)
+    ]
+  pure (WholeCoreBindings wcb_c m l)
+  where
+    wcb_c = fst <$> all_used_binders
+    all_used_binders = filter (has_used_name . snd) cbsn
+    has_used_name used = intersectsNameSet used all_used_names
+
+    all_used_names = unionNameSets (used_top_names : (used_names_iface_binder . fst <$> used_top_binders))
+    used_names_iface_binder = \case
+      IfaceNonRec _ r -> used_names r
+      IfaceRec bs -> unionNameSets (used_names . snd <$> bs)
+    used_names = \case
+      IfRhs r -> freeNamesIfExpr r
+      _ -> mempty
+
+    used_top_binders = filter (is_used_iface_binder . fst) cbsn
+    is_used_iface_binder = \case
+      IfaceNonRec b _ -> is_used_binder b
+      IfaceRec bs -> any (is_used_binder . fst) bs
+    is_used_binder = \case
+      IfGblTopBndr name -> elemNameSet name used_top_names
+      IfLclTopBndr {} -> False
+
+    cbsn = with_names <$> cbs
+    with_names ib = case ib of
+      IfaceNonRec b _ -> (ib, mkNameSet (binder_names b))
+      IfaceRec bs -> (ib, mkNameSet (concatMap (binder_names . fst) bs))
+
+    used_top_names = intersectNameSet names_set top_names
+    top_names = mkNameSet (concatMap binder_names (concatMap toList cbs))
+    binder_names = \case
+      IfGblTopBndr name -> [name]
+      IfLclTopBndr {} -> []
+    names_set = mkNameSet names
+
+loadModuleNamesFromCoreBindings ::
+  CBLoaderHandlers ->
+  Module ->
+  [Name] ->
+  StateT CBLoaderState IfG [Linkable]
+loadModuleNamesFromCoreBindings handlers@CBLoaderHandlers {..} mod names = do
+  iface <- lift $ loadSysInterface load_doc mod
+  find_res <- liftIO (cbl_find mod)
+  dbg "loadIfaceByteCode" [
+    ("mod", ppr mod),
+    ("iface", ppr (mi_module iface))
+    ]
+  loaded <- case find_res of
+    InstalledFound loc _ -> do
+      summ <- liftIO $ cbload_mod_summary mod loc iface
+      liftIO (loadByteCode loc iface summ) >>= \case
+        Just wcb_linkable@LM {linkableUnlinked = [CoreBindings wcb]} -> do
+          wcb' <- wcb_closure names wcb
+          hydrated <- liftIO $ cbl_hydrate iface (wcb_linkable { linkableUnlinked = [CoreBindings wcb']})
+          let hydrated_bcos = unwrap_hydrated (linkableUnlinked hydrated)
+          complete <- loadDepsFromCoreBindings handlers hydrated_bcos
+          dbg "loadIfaceByteCode found" [
+            ("hi", text (ml_hi_file loc)),
+            ("hydrated", ppr wcb_linkable),
+            ("hydrated_bcos", ppr hydrated_bcos),
+            ("complete", ppr complete)
+            ]
+          pure (Just (hydrated : complete))
+        _ -> do
+          dbg "loadIfaceByteCode no whole core bindings" []
+          pure Nothing
+    result -> do
+      dbg "loadIfaceByteCode not found" [("result", debugFr result)]
+      pure Nothing
+  case loaded of
+    Just lnks -> pure lnks
+    Nothing ->
+      state $ \ s ->
+        ([], s {cbl_unavailable = addOneToUniqDSet (cbl_unavailable s) mod})
+  where
+    load_doc = text "Loading core bindings of splice dependencies"
+
+    debugFr = \case
+      InstalledFound _ _ -> text "found"
+      InstalledNoPackage u -> text "NoPackage " <+> ppr u
+      InstalledNotFound paths pkg -> vcat [
+        text "paths:" <+> brackets (hsep (text <$> paths)),
+        text "pkg:" <+> ppr pkg
+        ]
+
+    unwrap_hydrated = concatMap $ \case
+      LoadedBCOs u -> unwrap_hydrated u
+      u -> [u]
+
+byte_code_deps :: [Unlinked] -> UniqDSet Name
+byte_code_deps code =
+  filterUniqDSet loadable (unionManyUniqDSets (linkables_deps code))
+  where
+    linkables_deps = concatMap linkable_deps
+
+    linkable_deps = \case
+      BCOs cbc _ -> [bco_free_names cbc]
+      LoadedBCOs l -> linkables_deps l
+      _ -> [emptyUniqDSet]
+
+    loadable n =
+      isExternalName n &&
+      not (isWiredInName n)
+
+    bco_free_names cbc =
+      foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet (bc_bcos cbc)
+
+loadNamesFromCoreBindings ::
+  CBLoaderHandlers ->
+  UniqDSet Name ->
+  StateT CBLoaderState IfG [Linkable]
+loadNamesFromCoreBindings handlers all_names = do
+  names <- state (filter_deps all_names)
+  let
+    with_module = [(nameModule n, [n]) | n <- uniqDSetToList names]
+    by_module = Map.toList (Map.fromListWith (++) with_module)
+  concat <$> traverse (uncurry (loadModuleNamesFromCoreBindings handlers)) by_module
+  where
+    filter_deps new s@CBLoaderState {cbl_seen} =
+      (minusUniqDSet new cbl_seen, s {cbl_seen = unionUniqDSets new cbl_seen})
+
+loadDepsFromCoreBindings ::
+  CBLoaderHandlers ->
+  [Unlinked] ->
+  StateT CBLoaderState IfG [Linkable]
+loadDepsFromCoreBindings handlers code =
+  loadNamesFromCoreBindings handlers (byte_code_deps code)
 
 
 {- **********************************************************************
@@ -661,15 +946,24 @@ initLinkDepsOpts hsc_env = opts
 
   ********************************************************************* -}
 
-loadDecls :: Interp -> HscEnv -> SrcSpan -> CompiledByteCode -> IO ([(Name, ForeignHValue)], [Linkable], PkgsLoaded)
-loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
+loadDecls ::
+  Interp ->
+  HscEnv ->
+  (ModIface -> Linkable -> IO Linkable) ->
+  SrcSpan ->
+  CompiledByteCode ->
+  IO ([(Name, ForeignHValue)], [Linkable], PkgsLoaded)
+loadDecls interp hsc_env hydrate span cbc@CompiledByteCode{..} = do
+    putStrLn "\ESC[36mstart loadDecls\ESC[m"
     -- Initialise the linker (if it's not been done already)
     initLoaderState interp hsc_env
+    putStrLn . showSDocUnsafe =<< showLoaderState interp
 
     -- Take lock for the actual work.
     modifyLoaderState interp $ \pls0 -> do
       -- Link the packages and modules required
-      (pls, ok, links_needed, units_needed) <- loadDependencies interp hsc_env pls0 span needed_mods
+      (pls, ok, links_needed, units_needed) <-
+        loadByteCodeDependencies interp hsc_env pls0 hydrate span [BCOs cbc []]
       if failed ok
         then throwGhcExceptionIO (ProgramError "")
         else do
@@ -684,19 +978,6 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
           let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
               !pls2 = pls { linker_env = le2 { closure_env = ce2 } }
           return (pls2, (nms_fhvs, links_needed, units_needed))
-  where
-    free_names = uniqDSetToList $
-      foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet bc_bcos
-
-    needed_mods :: [Module]
-    needed_mods = [ nameModule n | n <- free_names,
-                    isExternalName n,       -- Names from other modules
-                    not (isWiredInName n)   -- Exclude wired-in names
-                  ]                         -- (see note below)
-    -- Exclude wired-in names because we may not have read
-    -- their interface files, so getLinkDeps will fail
-    -- All wired-in names are in the base package, which we link
-    -- by default, so we can safely ignore them here.
 
 {- **********************************************************************
 
@@ -731,10 +1012,16 @@ loadModuleLinkables interp hsc_env pls linkables
                 -- Load objects first; they can't depend on BCOs
         (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
 
+        dbg "loadModuleLinkables" [
+          ("objs", ppr objs),
+          ("bcos", ppr bcos)
+          ]
+
         if failed ok_flag then
                 return (pls1, Failed)
           else do
                 pls2 <- dynLinkBCOs interp pls1 bcos
+                dbg "loadModuleLinkables, after dynLinkBCOs" [("loader state", pprLoaderState pls2)]
                 return (pls2, Succeeded)
 
 
@@ -886,6 +1173,7 @@ rmDupLinkables already ls
 
 dynLinkBCOs :: Interp -> LoaderState -> [Linkable] -> IO LoaderState
 dynLinkBCOs interp pls bcos = do
+        dbg "start dynLinkBCOs" []
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -910,6 +1198,13 @@ dynLinkBCOs interp pls bcos = do
         freeHValueRefs interp (map snd to_drop)
         -- Wrap finalizers on the ones we want to keep
         new_binds <- makeForeignNamedHValueRefs interp to_add
+
+        putStrLn (showSDocUnsafe (hang (text "\ESC[35mdynLinkBCOs\ESC[m:") 2 (vcat [
+          text "names_and_refs:" <+> ppr (fst <$> names_and_refs),
+          text "to_add:" <+> ppr (fst <$> to_add),
+          text "to_drop:" <+> ppr (fst <$> to_drop),
+          text "new_binds:" <+> ppr (fst <$> new_binds)
+          ])))
 
         let ce2 = extendClosureEnv (closure_env le2) new_binds
         return $! pls1 { linker_env = le2 { closure_env = ce2 } }
@@ -1088,6 +1383,11 @@ loadPackages' interp hsc_env new_pks pls = do
          foldM link_one pkgs new_pkgs
 
      link_one pkgs new_pkg
+        | new_pkg == stringToUnitId "dep-1.0"
+        = do
+          putStrLn "\ESC[31mskip loading dep!!\ESC[m"
+          pure pkgs
+
         | new_pkg `elemUDFM` pkgs   -- Already linked
         = return pkgs
 

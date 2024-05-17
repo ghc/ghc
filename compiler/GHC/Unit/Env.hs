@@ -547,14 +547,14 @@ pprHomeUnitEnv uid env =
 Note [Multiple Home Units]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 The basic idea of multiple home units is quite simple. Instead of allowing one
-home unit, you can multiple home units
+home unit, you can have multiple home units.
 
 The flow:
 
 1. Dependencies between units are specified between each other in the normal manner,
    a unit is identified by the -this-unit-id flag and dependencies specified by
    the normal -package-id flag.
-2. Downsweep is augmented to know to know how to look for dependencies in any home unit.
+2. Downsweep is augmented to know how to look for dependencies in any home unit.
 3. The rest of the compiler is modified appropriately to offset paths to the right places.
 4. --make mode can parallelise between home units and multiple units are allowed to produce linkables.
 

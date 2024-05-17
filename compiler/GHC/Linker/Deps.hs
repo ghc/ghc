@@ -11,6 +11,7 @@ module GHC.Linker.Deps
   ( LinkDepsOpts (..)
   , LinkDeps (..)
   , getLinkDeps
+  , dbg
   )
 where
 
@@ -56,7 +57,17 @@ import Data.List (isSuffixOf)
 
 import System.FilePath
 import System.Directory
+import Debug.Trace (trace)
+import Control.Monad.IO.Class (MonadIO (liftIO))
 
+dbg ::
+  MonadIO m =>
+  String ->
+  [(String, SDoc)] ->
+  m ()
+dbg desc xs =
+  liftIO $ putStrLn $ showSDocUnsafe $
+  hang (text ("\ESC[35m" ++ desc ++ "\ESC[m:")) 2 (vcat [text ("\ESC[33m" ++ desc ++ "\ESC[m:") <+> x | (desc, x) <- xs])
 
 data LinkDepsOpts = LinkDepsOpts
   { ldObjSuffix   :: !String                        -- ^ Suffix of .o files
@@ -143,6 +154,18 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         --     compilation) we may need to use maybe_getFileLinkable
       lnks_needed <- mapM (get_linkable (ldObjSuffix opts)) mods_needed
 
+      dbg "get_link_deps" [
+        ("mods", ppr mods),
+        ("all_deps", ppr all_deps),
+        ("mods_s", ppr mods_s),
+        ("mods_needed", ppr mods_needed),
+        ("all_home_mods", ppr all_home_mods),
+        ("init_pkg_set", ppr init_pkg_set),
+        ("pkgs_needed", ppr pkgs_needed),
+        ("pkgs_s", ppr pkgs_s),
+        ("lnks_needed", ppr lnks_needed)
+        ]
+
       return $ LinkDeps
         { ldNeededLinkables = lnks_needed
         , ldAllLinkables    = links_got ++ lnks_needed
@@ -160,7 +183,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     -- calculation than to compute the transitive dependency set in the same manner as oneShot mode.
 
     -- It is also a matter of correctness to use the module graph so that dependencies between home units
-    -- is resolved correctly.
+    -- are resolved correctly.
     make_deps_loop :: (UniqDSet UnitId, Set.Set NodeKey) -> [ModNodeKeyWithUid] -> (UniqDSet UnitId, Set.Set NodeKey)
     make_deps_loop found [] = found
     make_deps_loop found@(found_units, found_mods) (nk:nexts)
@@ -172,7 +195,12 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                   -- See #936 and the ghci.prog007 test for why we have to continue traversing through
                   -- boot modules.
                   todo_boot_mods = [ModNodeKeyWithUid (GWIB mn NotBoot) uid | NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid) <- Set.toList trans_deps]
-              in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
+              in
+              trace (showSDocUnsafe (hang (text "\ESC[35mmake_deps_loop\ESC[m:") 2 (vcat [
+                text "trans_deps:" <+> ppr trans_deps,
+                text "deps:" <+> ppr deps
+                ]))) $
+              make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
             Nothing ->
               let (ModNodeKeyWithUid _ uid) = nk
               in make_deps_loop (addOneToUniqDSet found_units uid, found_mods) nexts
@@ -185,12 +213,19 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     get_mod_info (ModNodeKeyWithUid gwib uid) =
       case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
         Just hmi ->
-          let iface = (hm_iface hmi)
+          let iface = hm_iface hmi
               mmod = case mi_hsc_src iface of
                       HsBootFile -> link_boot_mod_error (mi_module iface)
                       _          -> return $ Just (mi_module iface)
 
-          in (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface),) <$>  mmod
+              f mod = trace (showSDocUnsafe (hang (text "\ESC[35mget_mod_info\ESC[m:") 2 (vcat [
+                        text "uid:" <+> ppr uid,
+                        text "iface:" <+> ppr (mi_module iface),
+                        text "dep_direct_pkgs:" <+> ppr (dep_direct_pkgs (mi_deps iface)),
+                        text "mod:" <+> ppr mod
+                        ]))) (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface), mod)
+
+          in f <$> mmod
         Nothing -> throwProgramError opts $
           text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
 

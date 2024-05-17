@@ -277,7 +277,7 @@ data GenInstantiatedUnit unit
         -- an InstantiatedUnit. This string is completely private to GHC
         -- and is just used to get a unique.
         instUnitFS :: !FastString,
-        -- | Cached unique of 'unitFS'.
+        -- | Cached unique of 'instUnitFS'.
         instUnitKey :: !Unique,
         -- | The (indefinite) unit being instantiated.
         instUnitInstanceOf :: !unit,

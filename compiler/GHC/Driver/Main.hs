@@ -161,7 +161,7 @@ import GHC.StgToJS.Ids
 import GHC.StgToJS.Types
 import GHC.JS.Syntax
 
-import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
+import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings, tcIfaceDecls )
 
 import GHC.Iface.Load   ( ifaceStats, writeIface, flagsToIfCompression )
 import GHC.Iface.Make
@@ -1003,6 +1003,20 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM 
                   trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
                   generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
     go ul = return ul
+
+hydrateOpaqueMinimal :: HscEnv -> ModIface -> Linkable -> IO Linkable
+hydrateOpaqueMinimal hsc_env mod_iface linkable = do
+  names_w_things <- initIfaceCheck (text "hydrate") hsc_env $
+    initIfaceLcl (mi_semantic_module mod_iface) (text "typecheckIface") (mi_boot mod_iface) $
+    tcIfaceDecls False (mi_decls mod_iface)
+  let type_env = mkNameEnv names_w_things
+      det = emptyModDetails {md_types = type_env}
+  initWholeCoreBindings hsc_env mod_iface det linkable
+
+hydrateOpaque :: HscEnv -> ModIface -> Linkable -> IO Linkable
+hydrateOpaque hsc_env mod_iface linkable = do
+  det <- initModDetails hsc_env mod_iface
+  initWholeCoreBindings hsc_env mod_iface det linkable
 
 {-
 Note [ModDetails and --make mode]
@@ -2400,7 +2414,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                 stg_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
-    _ <- liftIO $ loadDecls interp hsc_env src_span cbc
+    _ <- liftIO $ loadDecls interp hsc_env undefined src_span cbc
 
     {- Load static pointer table entries -}
     liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)
@@ -2676,7 +2690,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
                 [] Nothing
 
       {- load it -}
-      (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan bcos
+      (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env (hydrateOpaque hsc_env) srcspan bcos
       {- Get the HValue for the root -}
       return (expectJust "hscCompileCoreExpr'"
          $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)

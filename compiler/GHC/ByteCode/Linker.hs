@@ -148,10 +148,14 @@ resolvePtr
 resolvePtr interp pkgs_loaded le bco_ix ptr = case ptr of
   BCOPtrName nm
     | Just ix <- lookupNameEnv bco_ix nm
-    -> return (ResolvedBCORef ix) -- ref to another BCO in this group
+    -> do
+      putStrLn ("\ESC[34mresolve\ESC[m: name in env: " ++ showPprUnsafe nm)
+      return (ResolvedBCORef ix) -- ref to another BCO in this group
 
     | Just (_, rhv) <- lookupNameEnv (closure_env le) nm
-    -> return (ResolvedBCOPtr (unsafeForeignRefToRemoteRef rhv))
+    -> do
+      putStrLn ("\ESC[34mresolve\ESC[m: name in closure env: " ++ showPprUnsafe nm)
+      return (ResolvedBCOPtr (unsafeForeignRefToRemoteRef rhv))
 
     | otherwise
     -> assertPpr (isExternalName nm) (ppr nm) $
@@ -159,14 +163,20 @@ resolvePtr interp pkgs_loaded le bco_ix ptr = case ptr of
           let sym_to_find = nameToCLabel nm "closure"
           m <- lookupHsSymbol interp pkgs_loaded nm "closure"
           case m of
-            Just p -> return (ResolvedBCOStaticPtr (toRemotePtr p))
+            Just p -> do
+              putStrLn ("\ESC[34mresolve\ESC[m: name in libs: " ++ showPprUnsafe nm)
+              return (ResolvedBCOStaticPtr (toRemotePtr p))
             Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE" (unpackFS sym_to_find)
 
   BCOPtrPrimOp op
-    -> ResolvedBCOStaticPtr <$> lookupPrimOp interp pkgs_loaded op
+    -> do
+      putStrLn ("\ESC[34mresolve\ESC[m: primop: " ++ showPprUnsafe op)
+      ResolvedBCOStaticPtr <$> lookupPrimOp interp pkgs_loaded op
 
   BCOPtrBCO bco
-    -> ResolvedBCOPtrBCO <$> linkBCO interp pkgs_loaded le bco_ix bco
+    -> do
+      putStrLn "\ESC[34mresolve\ESC[m: bco"
+      ResolvedBCOPtrBCO <$> linkBCO interp pkgs_loaded le bco_ix bco
 
   BCOPtrBreakArray breakarray
     -> withForeignRef breakarray $ \ba -> return (ResolvedBCOPtrBreakArray ba)
@@ -177,6 +187,7 @@ resolvePtr interp pkgs_loaded le bco_ix ptr = case ptr of
 -- See Note [Looking up symbols in the relevant objects].
 lookupHsSymbol :: Interp -> PkgsLoaded -> Name -> String -> IO (Maybe (Ptr ()))
 lookupHsSymbol interp pkgs_loaded nm sym_suffix = do
+  putStrLn (showSDocUnsafe (text "\ESC[35mlookupHsSymbol\ESC[m:" <+> ppr nm))
   massertPpr (isExternalName nm) (ppr nm)
   let sym_to_find = nameToCLabel nm sym_suffix
       pkg_id = moduleUnitId $ nameModule nm

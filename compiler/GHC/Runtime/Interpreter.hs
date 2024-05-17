@@ -442,7 +442,8 @@ initObjLinker :: Interp -> IO ()
 initObjLinker interp = interpCmd interp InitLinker
 
 lookupSymbol :: Interp -> FastString -> IO (Maybe (Ptr ()))
-lookupSymbol interp str = withSymbolCache interp str $
+lookupSymbol interp str = withSymbolCache interp str $ do
+  putStrLn ("\ESC[35mlookupSymbol\ESC[m: " ++ unpackFS str)
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
@@ -454,7 +455,8 @@ lookupSymbol interp str = withSymbolCache interp str $
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
 
 lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> FastString -> IO (Maybe (Ptr ()))
-lookupSymbolInDLL interp dll str = withSymbolCache interp str $
+lookupSymbolInDLL interp dll str = withSymbolCache interp str $ do
+  putStrLn ("\ESC[35mlookupSymbolInDLL\ESC[m: " ++ unpackFS str)
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS str))
@@ -518,6 +520,7 @@ loadDLL interp str = interpCmd interp (LoadDLL str)
 
 loadArchive :: Interp -> String -> IO ()
 loadArchive interp path = do
+  putStrLn ("\ESC[35mloadArchive\ESC[m: " ++ path)
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
   interpCmd interp (LoadArchive path')
 
