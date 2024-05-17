@@ -153,6 +153,7 @@ data BuildConfig
                 , threadSanitiser :: Bool
                 , noSplitSections :: Bool
                 , validateNonmovingGc :: Bool
+                , testsuiteUsePerf :: Bool
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -211,6 +212,7 @@ vanilla = BuildConfig
   , threadSanitiser = False
   , noSplitSections = False
   , validateNonmovingGc = False
+  , testsuiteUsePerf = False
   }
 
 splitSectionsBroken :: BuildConfig -> BuildConfig
@@ -761,6 +763,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
                 | validateNonmovingGc buildConfig
                 ]
         in "RUNTEST_ARGS" =: unwords runtestArgs
+      , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
       ]
 
     jobArtifacts = Artifacts

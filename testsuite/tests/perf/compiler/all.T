@@ -5,6 +5,7 @@ setTestOpts(no_lint)
 test('T1969',
      [# expect_broken(12437),
       collect_compiler_residency(20),
+      collect_compiler_perf_counters(['instructions:u', 'cycles:u']),
       extra_run_opts('+RTS -A64k -RTS'),
           # The default RESIDENCY_OPTS is 256k and we need higher sampling
           # frequency. Incurs a slow-down by about 2.
