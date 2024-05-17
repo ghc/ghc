@@ -565,9 +565,12 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   -- prim_{float,double} work with signed literals
   @floating_point                  \# / { ifExtension MagicHashBit }        { tok_frac 1 tok_primfloat }
   @floating_point               \# \# / { ifExtension MagicHashBit }        { tok_frac 2 tok_primdouble }
-
   @negative @floating_point        \# / { negHashLitPred MagicHashBit }     { tok_frac 1 tok_primfloat }
   @negative @floating_point     \# \# / { negHashLitPred MagicHashBit }     { tok_frac 2 tok_primdouble }
+  0[xX] @numspc @hex_floating_point \# / { ifExtension MagicHashBit `alexAndPred` ifExtension HexFloatLiteralsBit } { tok_frac 1 tok_prim_hex_float }
+  0[xX] @numspc @hex_floating_point \# \# / { ifExtension MagicHashBit `alexAndPred` ifExtension HexFloatLiteralsBit } { tok_frac 2 tok_prim_hex_double }
+  @negative 0[xX] @numspc @hex_floating_point \# / { ifExtension HexFloatLiteralsBit `alexAndPred` negHashLitPred MagicHashBit } { tok_frac 1 tok_prim_hex_float }
+  @negative 0[xX] @numspc @hex_floating_point \# \# / { ifExtension HexFloatLiteralsBit `alexAndPred` negHashLitPred MagicHashBit } { tok_frac 2 tok_prim_hex_double }
 
   @decimal                  \#"Int8"   / { ifExtension ExtendedLiteralsBit } { tok_primint8 positive 0 decimal }
   @binarylit                \#"Int8"   / { ifExtension ExtendedLiteralsBit `alexAndPred`
@@ -1989,11 +1992,13 @@ tok_frac drop f span buf len _buf2 = do
     addError $ mkPlainErrorMsgEnvelope (mkSrcSpanPs (last_loc pState)) msg
   return (L span $! (f $! src))
 
-tok_float, tok_primfloat, tok_primdouble :: String -> Token
+tok_float, tok_primfloat, tok_primdouble, tok_prim_hex_float, tok_prim_hex_double :: String -> Token
 tok_float        str = ITrational   $! readFractionalLit str
 tok_hex_float    str = ITrational   $! readHexFractionalLit str
 tok_primfloat    str = ITprimfloat  $! readFractionalLit str
 tok_primdouble   str = ITprimdouble $! readFractionalLit str
+tok_prim_hex_float  str = ITprimfloat $! readHexFractionalLit str
+tok_prim_hex_double str = ITprimdouble $! readHexFractionalLit str
 
 readFractionalLit, readHexFractionalLit :: String -> FractionalLit
 readHexFractionalLit = readFractionalLitX readHexSignificandExponentPair Base2
