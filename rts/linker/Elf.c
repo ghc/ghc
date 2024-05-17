@@ -707,7 +707,7 @@ ocGetNames_ELF ( ObjectCode* oc )
 
    ASSERT(symhash != NULL);
 
-   sections = (Section*)stgCallocBytes(sizeof(Section), shnum,
+   sections = (Section*)stgCallocBytes(shnum, sizeof(Section),
                                        "ocGetNames_ELF(sections)");
    oc->sections = sections;
    oc->n_sections = shnum;
