@@ -62,7 +62,9 @@ getArray = do
               copyAddrToByteArray ptr arr# off n
             go (remaining - n) (off + n)
           where n = min chunkSize remaining
-    go (I# (sizeofMutableByteArray# arr#)) 0
+    sz <- return $ unsafeDupablePerformIO $ IO $ \s -> case getSizeofMutableByteArray# arr# s of
+            (# s2, n #) -> (# s2, I# n #)
+    go sz 0
     return $! unsafeDupablePerformIO $ unsafeFreezeIOUArray arr
   where
     chunkSize = 10*1024
