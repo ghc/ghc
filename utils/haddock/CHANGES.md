@@ -1,3 +1,6 @@
+## Changes in 2.32.0
+ * add highlighting for inline-code-blocks (sections enclosed in @'s)
+
 ## Changes in 2.28.0
  * `hi-haddock` is integrated, which means docstrings are no longer extracted
    through typchecked module results. Instead, docstrings are taken from Haskell

@@ -47,7 +47,7 @@ dd {
 }
 
 a { text-decoration: none; }
-a[href]:link { color: #9E358F; }
+a[href]:link { color: #BE55AF; }
 a[href]:visited {color: #6F5F9C; }
 a[href]:hover { text-decoration:underline; }
 
@@ -731,6 +731,12 @@ table.info {
   border-bottom: 3px solid #e5e5e5;
   line-height: 2rem;
   margin-bottom: 1em;
+}
+
+.inline-code {
+  background-color: #f2f2f2;
+  border-radius: 5px;
+  padding: 1px 4px;
 }
 
 .warning {

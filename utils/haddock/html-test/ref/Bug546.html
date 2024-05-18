@@ -87,7 +87,7 @@
 	    >Test:</p
 	    ><dl
 	    ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[code with square \ brackets]</code
 		></dt
 	      ><dd
@@ -109,63 +109,63 @@
 	  ><div class="doc"
 	  ><dl
 	    ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[..]</code
 		></dt
 	      ><dd
 	      >Matches any of the enclosed characters. Ranges of characters can
-            be specified by separating the endpoints with a <code
+            be specified by separating the endpoints with a <code class="inline-code"
 		>'-'</code
-		>. <code
+		>. <code class="inline-code"
 		>'-'</code
 		> or
-            <code
+            <code class="inline-code"
 		>']'</code
 		> can be matched by including them as the first character(s)
-            in the list. Never matches path separators: <code
+            in the list. Never matches path separators: <code class="inline-code"
 		>[/]</code
 		> matches
             nothing at all. Named character classes can also be matched:
-            <code
+            <code class="inline-code"
 		>[:x:]</code
-		> within <code
+		> within <code class="inline-code"
 		>[]</code
-		> specifies the class named <code
+		> specifies the class named <code class="inline-code"
 		>x</code
 		>, which matches
             certain predefined characters. See below for a full list.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[^..]</code
-		> or <code
+		> or <code class="inline-code"
 		>[!..]</code
 		></dt
 	      ><dd
-	      >Like <code
+	      >Like <code class="inline-code"
 		>[..]</code
 		>, but matches any character <em
 		>not</em
 		> listed.
-                        Note that <code
+                        Note that <code class="inline-code"
 		>[^-x]</code
-		> is not the inverse of <code
+		> is not the inverse of <code class="inline-code"
 		>[-x]</code
 		>, but
-                        the range <code
+                        the range <code class="inline-code"
 		>[^-x]</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>&lt;m-n&gt;</code
 		></dt
 	      ><dd
 	      >Matches any integer in the range m to n, inclusive. The range may
-            be open-ended by leaving out either number: <code
+            be open-ended by leaving out either number: <code class="inline-code"
 		>&quot;&lt;-&gt;&quot;</code
 		>, for
             instance, matches any integer.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>**/</code
 		></dt
 	      ><dd
@@ -176,99 +176,99 @@
 	    >Supported character classes:</p
 	    ><dl
 	    ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:alnum:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;0-9A-Za-z&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:alpha:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;A-Za-z&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:blank:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;\t &quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:cntrl:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;\0-\x1f\x7f&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:digit:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;0-9&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:graph:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;!-~&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:lower:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;a-z&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:print:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot; -~&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:punct:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;!-/:-@[-`{-~&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:space:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;\t-\r &quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:upper:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;A-Z&quot;</code
 		>.</dd
 	      ><dt
-	      ><code
+	      ><code class="inline-code"
 		>[:xdigit:]</code
 		></dt
 	      ><dd
-	      >Equivalent to <code
+	      >Equivalent to <code class="inline-code"
 		>&quot;0-9A-Fa-f&quot;</code
 		>.</dd
 	      ></dl
