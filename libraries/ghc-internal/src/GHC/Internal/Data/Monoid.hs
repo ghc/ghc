@@ -29,6 +29,7 @@
 --
 -- The 'Sum' monoid is defined by the numerical addition operator and `0` as neutral element:
 --
+-- >>> import Data.Int (Int)
 -- >>> mempty :: Sum Int
 -- Sum {getSum = 0}
 -- >>> Sum 1 <> Sum 2 <> Sum 3 <> Sum 4 :: Sum Int
@@ -77,6 +78,9 @@ module GHC.Internal.Data.Monoid (
         -- * 'Applicative' wrapper
         Ap(..)
   ) where
+
+-- $setup
+-- >>> import Data.Int
 
 -- Push down the module in the dependency hierarchy.
 import GHC.Internal.Base hiding (Any)
@@ -299,6 +303,3 @@ prop_mconcatLast x =
         where listLastToMaybe [] = Nothing
               listLastToMaybe lst = Just (last lst)
 -- -}
-
--- $setup
--- >>> import Prelude

@@ -971,7 +971,7 @@ for an explanation.
 class Functor f where
     -- | 'fmap' is used to apply a function of type @(a -> b)@ to a value of type @f a@,
     -- where f is a functor, to produce a value of type @f b@.
-    -- Note that for any type constructor with more than one parameter (e.g., `Either`),
+    -- Note that for any type constructor with more than one parameter (e.g., 'Either'),
     -- only the last type parameter can be modified with `fmap` (e.g., `b` in `Either a b`).
     --
     -- Some type constructors with two parameters or more have a @'Data.Bifunctor'@ instance that allows

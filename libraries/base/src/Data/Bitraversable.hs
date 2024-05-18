@@ -179,8 +179,8 @@ bisequence = bitraverse id id
 --
 -- >>> (bitraverse pure pure undefined :: IO (Int, Word)) `seq` ()
 -- ()
--- >>> (traverse pure undefined :: IO (Int, Word)) `seq` ()
--- *** Exception: Prelude.undefined
+-- >>> (traverse pure (errorWithoutStackTrace "error!") :: IO (Int, Word)) `seq` ()
+-- *** Exception: error!
 --
 -- @since 4.10.0.0
 instance Bitraversable (,) where

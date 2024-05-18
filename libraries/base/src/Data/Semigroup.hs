@@ -38,10 +38,14 @@
 -- can never be empty:
 --
 -- >>> (1 :| [])
--- 1 :| []               -- equivalent to [1] but guaranteed to be non-empty.
+-- 1 :| []
+--
+-- -- equivalent to [1] but guaranteed to be non-empty.
 --
 -- >>> (1 :| [2, 3, 4])
--- 1 :| [2,3,4]          -- equivalent to [1,2,3,4] but guaranteed to be non-empty.
+-- 1 :| [2,3,4]
+--
+-- -- equivalent to [1,2,3,4] but guaranteed to be non-empty.
 --
 -- Equipped with this guaranteed to be non-empty data structure, we can combine
 -- values using 'sconcat' and a 'Semigroup' of our choosing. We can try the 'Min'
@@ -122,6 +126,7 @@ import qualified GHC.Internal.List as List
 -- $setup
 -- >>> import Prelude
 -- >>> import Data.List.NonEmpty (NonEmpty (..))
+-- >>> import GHC.Internal.Data.Semigroup.Internal
 
 -- | A generalization of 'GHC.Internal.Data.List.cycle' to an arbitrary 'Semigroup'.
 -- May fail to terminate for some values in some semigroups.
@@ -135,7 +140,7 @@ import qualified GHC.Internal.List as List
 -- Right 1
 --
 -- >>> cycle1 (Left 1)
--- * hangs forever *
+-- * Hangs forever *
 cycle1 :: Semigroup m => m -> m
 cycle1 xs = xs' where xs' = xs <> xs'
 
@@ -143,7 +148,7 @@ cycle1 xs = xs' where xs' = xs <> xs'
 --
 -- ==== __Examples__
 --
--- > let hello = diff "Hello, "
+-- >>> let hello = diff "Hello, "
 --
 -- >>> appEndo hello "World!"
 -- "Hello, World!"
@@ -154,8 +159,8 @@ cycle1 xs = xs' where xs' = xs <> xs'
 -- >>> appEndo (mempty <> hello) "World!"
 -- "Hello, World!"
 --
--- > let world = diff "World"
--- > let excl = diff "!"
+-- >>> let world = diff "World"
+-- >>> let excl = diff "!"
 --
 -- >>> appEndo (hello <> (world <> excl)) mempty
 -- "Hello, World!"
@@ -171,7 +176,7 @@ diff = Endo . (<>)
 -- ==== __Examples__
 --
 -- >>> Min 42 <> Min 3
--- Min 3
+-- Min {getMin = 3}
 --
 -- >>> sconcat $ Min 1 :| [ Min n | n <- [2 .. 100]]
 -- Min {getMin = 1}
@@ -256,7 +261,7 @@ instance Num a => Num (Min a) where
 -- ==== __Examples__
 --
 -- >>> Max 42 <> Max 3
--- Max 42
+-- Max {getMax = 42}
 --
 -- >>> sconcat $ Max 1 :| [ Max n | n <- [2 .. 100]]
 -- Max {getMax = 100}
@@ -428,10 +433,10 @@ instance Bifoldable Arg where
 -- ==== __Examples__
 --
 -- >>> First 0 <> First 10
--- First 0
+-- First {getFirst = 0}
 --
 -- >>> sconcat $ First 1 :| [ First n | n <- [2 ..] ]
--- First 1
+-- First {getFirst = 1}
 newtype First a = First { getFirst :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -502,7 +507,7 @@ instance MonadFix First where
 -- Last {getLast = 10}
 --
 -- >>> sconcat $ Last 1 :| [ Last n | n <- [2..]]
--- Last {getLast = * hangs forever *
+-- * Hangs forever *
 newtype Last a = Last { getLast :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -629,7 +634,7 @@ instance Enum a => Enum (WrappedMonoid a) where
 -- ==== __Examples__
 --
 -- >>> mtimesDefault 0 "bark"
--- []
+-- ""
 --
 -- >>> mtimesDefault 3 "meow"
 -- "meowmeowmeow"

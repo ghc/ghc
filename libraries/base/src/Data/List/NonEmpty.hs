@@ -120,7 +120,9 @@ import           GHC.Internal.Stack.Types     (HasCallStack)
 infixr 5 <|
 
 -- $setup
--- >>> import Prelude (negate)
+-- >>> import Prelude
+-- >>> import qualified Data.List as List
+-- >>> import Data.Ord (comparing)
 
 -- | Number of elements in 'NonEmpty' list.
 length :: NonEmpty a -> Int
@@ -205,7 +207,7 @@ sort = lift List.sort
 -- >>> sortOn fst $ (2, "world") :| [(4, "!"), (1, "Hello")]
 -- (1,"Hello") :| [(2,"world"),(4,"!")]
 --
--- >>> sortOn length $ "jim" :| ["creed", "pam", "michael", "dwight", "kevin"]
+-- >>> sortOn List.length ("jim" :| ["creed", "pam", "michael", "dwight", "kevin"])
 -- "jim" :| ["pam","creed","kevin","dwight","michael"]
 --
 -- ==== __Performance notes__
@@ -437,7 +439,7 @@ partition p = List.partition p . toList
 -- For example, in list notation:
 --
 -- >>> group "Mississippi"
--- ["M", "i", "ss", "i", "ss", "i", "pp", "i"]
+-- ['M' :| "",'i' :| "",'s' :| "s",'i' :| "",'s' :| "s",'i' :| "",'p' :| "p",'i' :| ""]
 group :: (Foldable f, Eq a) => f a -> [NonEmpty a]
 group = groupBy (==)
 

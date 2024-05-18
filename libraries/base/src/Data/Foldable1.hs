@@ -61,6 +61,9 @@ import GHC.Internal.Data.Coerce (Coercible, coerce)
 
 -- $setup
 -- >>> import Prelude hiding (foldr1, foldl1, head, last, minimum, maximum)
+-- >>> import Data.List.NonEmpty (NonEmpty(..))
+-- >>> import Data.Monoid (Sum(..))
+-- >>> import Data.Functor.Identity
 
 -------------------------------------------------------------------------------
 -- Foldable1 type class

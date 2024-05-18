@@ -31,6 +31,9 @@ import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
 import Prelude
 
+-- $setup
+-- >>> import Prelude
+
 -- | Lifted product of functors.
 --
 -- ==== __Examples__

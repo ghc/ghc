@@ -212,7 +212,7 @@ import GHC.Internal.System.IO
 --
 -- ==== __Example__
 --
--- >>> foo
+-- ghci> foo
 -- > input
 -- output
 -- > input^D

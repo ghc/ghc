@@ -47,6 +47,9 @@ import Control.Monad.Zip (MonadZip(..))
 
 infix  6  :+
 
+-- $setup
+-- >>> import Prelude
+
 -- -----------------------------------------------------------------------------
 -- The Complex type
 
@@ -85,6 +88,7 @@ infix  6  :+
 -- >>> mapM print (1 :+ 2)
 -- 1
 -- 2
+-- () :+ ()
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.

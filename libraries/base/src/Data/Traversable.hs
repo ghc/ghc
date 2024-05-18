@@ -86,6 +86,13 @@ module Data.Traversable (
 
 import GHC.Internal.Data.Traversable
 
+-- $setup
+-- >>> import Prelude
+-- >>> import Data.Maybe
+-- >>> import Data.Either
+-- >>> import qualified Data.List as List
+-- >>> :set -XExplicitForAll
+
 -- $overview
 --
 -- #overview#
@@ -201,13 +208,13 @@ import GHC.Internal.Data.Traversable
 -- __@a@__), the result of __@mapM g ts@__ will contain multiple structures of
 -- the same shape as __@ts@__:
 --
--- prop> length (mapM g ts) == product (fmap (length . g) ts)
+-- prop> List.length (mapM g ts) == List.product (fmap (List.length . g) ts)
 --
 -- For example:
 --
--- >>> length $ mapM (\n -> [1..n]) [1..6]
+-- >>> List.length $ mapM (\n -> [1..n]) [1..6]
 -- 720
--- >>> product $ length . (\n -> [1..n]) <$> [1..6]
+-- >>> List.product $ List.length . (\n -> [1..n]) <$> [1..6]
 -- 720
 --
 -- In other words, a traversal with a function __@g :: a -> [b]@__, over an
@@ -1006,14 +1013,16 @@ import GHC.Internal.Data.Traversable
 -- used to implicitly wrap and unwrap the @ZipList@ @newtype@ as needed, giving
 -- a function that operates on a list of lists:
 --
--- >>> {-# LANGUAGE ScopedTypeVariables #-}
+-- >>> :set -XScopedTypeVariables
 -- >>> import Control.Applicative (ZipList(..))
 -- >>> import Data.Coerce (coerce)
 -- >>>
--- >>> transpose :: forall a. [[a]] -> [[a]]
--- >>> transpose = coerce (sequenceA :: [ZipList a] -> ZipList [a])
--- >>>
--- >>> transpose [[1,2,3],[4..],[7..]]
+-- >>> :{
+-- >>> let
+-- >>>     transpose :: forall a. [[a]] -> [[a]]
+-- >>>     transpose = coerce (sequenceA :: [ZipList a] -> ZipList [a])
+-- >>> in transpose [[1,2,3],[4..],[7..]]
+-- >>> :}
 -- [[1,4,7],[2,5,8],[3,6,9]]
 --
 -- The use of [coercion](#coercion) avoids the need to explicitly wrap and

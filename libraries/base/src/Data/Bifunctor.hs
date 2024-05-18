@@ -140,8 +140,8 @@ class (forall a. Functor (p a)) => Bifunctor p where
 -- ()
 -- >>> second id (undefined :: (Int, Word)) `seq` ()
 -- ()
--- >>> id (undefined :: (Int, Word)) `seq` ()
--- *** Exception: Prelude.undefined
+-- >>> id (errorWithoutStackTrace "error!" :: (Int, Word)) `seq` ()
+-- *** Exception: error!
 --
 -- @since 4.8.0.0
 instance Bifunctor (,) where

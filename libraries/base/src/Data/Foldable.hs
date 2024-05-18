@@ -98,6 +98,10 @@ module Data.Foldable (
 
 import GHC.Internal.Data.Foldable
 
+-- $setup
+-- >>> import Prelude
+-- >>> import qualified Data.List as List
+
 -- $overview
 --
 -- #overview#
@@ -141,7 +145,7 @@ import GHC.Internal.Data.Foldable
 --
 -- >>> foldl' (+) 0 [1..100]
 -- 5050
--- >>> foldr (&&) True (repeat False)
+-- >>> foldr (&&) True (List.repeat False)
 -- False
 --
 -- The first argument of both is an explicit /operator/ that merges the
@@ -405,7 +409,7 @@ import GHC.Internal.Data.Foldable
 -- segment.
 --
 -- >>> myconcat = foldr (\x z -> foldr (:) z x) []
--- >>> take 15 $ myconcat $ map (\i -> [0..i]) [0..]
+-- >>> List.take 15 $ myconcat $ List.map (\i -> [0..i]) [0..]
 -- [0,0,1,0,1,2,0,1,2,3,0,1,2,3,4]
 --
 -- Of course in this case another way to achieve the same result is via a
@@ -536,13 +540,13 @@ import GHC.Internal.Data.Foldable
 --     then the evaluated effects will be from an initial portion of the
 --     element sequence.
 --
---     >>> :set -XBangPatterns
---     >>> import Control.Monad
---     >>> import Control.Monad.Trans.Class
---     >>> import Control.Monad.Trans.Maybe
---     >>> import Data.Foldable
---     >>> let f !_ e = when (e > 3) mzero >> lift (print e)
---     >>> runMaybeT $ foldlM f () [0..]
+--     > :set -XBangPatterns
+--     > import Control.Monad
+--     > import Control.Monad.Trans.Class
+--     > import Control.Monad.Trans.Maybe
+--     > import Data.Foldable
+--     > let f !_ e = when (e > 3) mzero >> lift (print e)
+--     > runMaybeT $ foldlM f () [0..]
 --     0
 --     1
 --     2
@@ -553,16 +557,16 @@ import GHC.Internal.Data.Foldable
 --     to left, and therefore diverges when folding an unbounded input
 --     structure without ever having the opportunity to short-circuit.
 --
---     >>> let f e _ = when (e > 3) mzero >> lift (print e)
---     >>> runMaybeT $ foldrM f () [0..]
+--     > let f e _ = when (e > 3) mzero >> lift (print e)
+--     > runMaybeT $ foldrM f () [0..]
 --     ...hangs...
 --
 --     When the structure is finite `foldrM` performs the monadic effects from
 --     right to left, possibly short-circuiting after processing a tail portion
 --     of the element sequence.
 --
---     >>> let f e _ = when (e < 3) mzero >> lift (print e)
---     >>> runMaybeT $ foldrM f () [0..5]
+--     > let f e _ = when (e < 3) mzero >> lift (print e)
+--     > runMaybeT $ foldrM f () [0..5]
 --     5
 --     4
 --     3
@@ -614,14 +618,16 @@ import GHC.Internal.Data.Foldable
 -- Below we construct a @Foldable@ instance for a data type representing a
 -- (finite) binary tree with depth-first traversal.
 --
--- > data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a)
+-- >>> data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a)
 --
 -- a suitable instance would be:
 --
--- > instance Foldable Tree where
--- >    foldr f z Empty = z
--- >    foldr f z (Leaf x) = f x z
--- >    foldr f z (Node l k r) = foldr f (f k (foldr f z r)) l
+-- >>> :{
+-- instance Foldable Tree where
+--    foldr f z Empty = z
+--    foldr f z (Leaf x) = f x z
+--    foldr f z (Node l k r) = foldr f (f k (foldr f z r)) l
+-- :}
 --
 -- The 'Node' case is a right fold of the left subtree whose initial
 -- value is a right fold of the rest of the tree.

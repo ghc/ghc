@@ -238,8 +238,8 @@ class Bifoldable p where
 --
 -- >>> bifoldr (flip const) (:) [] (undefined :: (Int, Word)) `seq` ()
 -- ()
--- >>> foldr (:) [] (undefined :: (Int, Word)) `seq` ()
--- *** Exception: Prelude.undefined
+-- >>> foldr (:) [] (errorWithoutStackTrace "error!" :: (Int, Word)) `seq` ()
+-- *** Exception: error!
 --
 -- @since 4.10.0.0
 instance Bifoldable (,) where

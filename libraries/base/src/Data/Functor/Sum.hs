@@ -28,6 +28,9 @@ import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
 import Prelude
 
+-- $setup
+-- >>> import Prelude
+
 -- | Lifted sum of functors.
 --
 -- ==== __Examples__

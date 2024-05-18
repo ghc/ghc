@@ -40,6 +40,9 @@ import Prelude
 
 infixr 9 `Compose`
 
+-- $setup
+-- >>> import Prelude
+
 -- | Right-to-left composition of functors.
 -- The composition of applicative functors is always applicative,
 -- but the composition of monads is not always a monad.

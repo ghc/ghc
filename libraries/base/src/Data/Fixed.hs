@@ -93,6 +93,9 @@ import GHC.Internal.Text.Read.Lex
 import Data.Typeable
 import Prelude
 
+-- $setup
+-- >>> import Prelude
+
 default () -- avoid any defaulting shenanigans
 
 -- | Generalisation of 'div' to any instance of 'Real'
