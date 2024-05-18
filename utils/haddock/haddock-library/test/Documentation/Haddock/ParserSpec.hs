@@ -26,12 +26,6 @@ instance IsString (Doc String) where
 instance IsString a => IsString (Maybe a) where
   fromString = Just . fromString
 
-emptyMeta :: Meta
-emptyMeta =
-  Meta
-    { _metaSince = Nothing
-    }
-
 parseParas :: String -> MetaDoc () String
 parseParas = overDoc Parse.toRegular . Parse.parseParas Nothing
 
@@ -543,21 +537,21 @@ spec = do
       it "adds specified version to the result" $ do
         parseParas "@since 0.5.0"
           `shouldBe` MetaDoc
-            { _meta = emptyMeta{_version = Just [0, 5, 0]}
+            { _meta = Meta{_metaSince = Just (MetaSince{sincePackage = Nothing, sinceVersion = [0, 5, 0]})}
             , _doc = DocEmpty
             }
 
       it "ignores trailing whitespace" $ do
         parseParas "@since 0.5.0 \t "
           `shouldBe` MetaDoc
-            { _meta = emptyMeta{_version = Just [0, 5, 0]}
+            { _meta = Meta{_metaSince = Just (MetaSince{sincePackage = Nothing, sinceVersion = [0, 5, 0]})}
             , _doc = DocEmpty
             }
 
       it "does not allow trailing input" $ do
         parseParas "@since 0.5.0 foo"
           `shouldBe` MetaDoc
-            { _meta = emptyMeta{_version = Nothing}
+            { _meta = Meta{_metaSince = Nothing}
             , _doc = DocParagraph "@since 0.5.0 foo"
             }
 
@@ -565,7 +559,7 @@ spec = do
         parseParas "@since foo-bar-0.5.0"
           `shouldBe` MetaDoc
             { _meta =
-                emptyMeta
+                Meta
                   { _metaSince =
                       Just $
                         MetaSince
@@ -573,7 +567,7 @@ spec = do
                           , sinceVersion = [0, 5, 0]
                           }
                   }
-            , _doc = DocParagraph "@since 0.5.0 foo"
+            , _doc = DocParagraph "@since foo-bar-0.5.0"
             }
 
       context "when given multiple times" $ do
@@ -586,7 +580,7 @@ spec = do
               ]
             `shouldBe` MetaDoc
               { _meta =
-                  emptyMeta
+                  Meta
                     { _metaSince =
                         Just $
                           MetaSince
