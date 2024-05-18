@@ -96,10 +96,120 @@ inTreeOutTree inTree outTree = do
       Just stg -> inTree stg
       Nothing -> outTree
 
+-- Used by top-level targets "test:all_deps" and "test". Returns an
+-- action only executed by the "test" target. The point of factoring
+-- out this logic from the "test" target is to enable reuse and ensure
+-- "test:all_deps" actually build all dependencies required to run the
+-- tests.
+testAction :: FilePath -> Action (Action ())
+testAction root = do
+  args <- userSetting defaultTestArgs
+  let testCompilerArg = testCompiler args
+  let stg = fromMaybe Stage2 $ stageOf testCompilerArg
+  let test_target tt = target (vanillaContext stg compiler) (Testsuite tt) [] []
+
+  -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
+  -- tests it is going to run,
+  -- for example "docs_haddock"
+  -- We then need to go and build these dependencies
+  extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
+  let ok_to_build = filter (isOkToBuild args) extra_targets
+  putVerbose $ " | ExtraTargets: " ++ intercalate ", " extra_targets
+  putVerbose $ " | ExtraTargets (ok-to-build): " ++ intercalate ", " ok_to_build
+  need ok_to_build
+
+  -- Prepare Ghc configuration file for input compiler.
+  need [root -/- timeoutPath]
+
+  cross <- flag CrossCompiling
+
+  -- get relative path for the given program in the given stage
+  let relative_path_stage s p = programPath =<< programContext s p
+  let make_absolute rel_path = do
+        abs_path <- liftIO (IO.makeAbsolute rel_path)
+        fixAbsolutePathOnWindows abs_path
+
+  rel_ghc_pkg     <- relative_path_stage Stage1 ghcPkg
+  rel_hsc2hs      <- relative_path_stage Stage1 hsc2hs
+  rel_hp2ps       <- relative_path_stage Stage1 hp2ps
+  rel_haddock     <- relative_path_stage (Stage0 InTreeLibs) haddock
+  rel_hpc         <- relative_path_stage (Stage0 InTreeLibs) hpc
+  rel_runghc      <- relative_path_stage (Stage0 InTreeLibs) runGhc
+
+  -- force stage0 program building for cross
+  when cross $ need [rel_hpc, rel_haddock, rel_runghc]
+
+  pure $ do
+    prog_ghc_pkg     <- make_absolute rel_ghc_pkg
+    prog_hsc2hs      <- make_absolute rel_hsc2hs
+    prog_hp2ps       <- make_absolute rel_hp2ps
+    prog_haddock     <- make_absolute rel_haddock
+    prog_hpc         <- make_absolute rel_hpc
+    prog_runghc      <- make_absolute rel_runghc
+
+    ghcPath <- getCompilerPath testCompilerArg
+
+    makePath        <- builderPath $ Make ""
+    top             <- topDirectory
+    ghcFlags        <- runTestGhcFlags
+    let ghciFlags = ghcFlags ++ unwords
+          [ "--interactive", "-v0", "-ignore-dot-ghci"
+          , "-fno-ghci-history", "-fprint-error-index-links=never"
+          ]
+    ccPath          <- queryTargetTarget (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+    ccFlags         <- queryTargetTarget (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+
+    pythonPath      <- builderPath Python
+
+    -- Set environment variables for test's Makefile.
+    -- TODO: Ideally we would define all those env vars in 'env', so that
+    --       Shake can keep track of them, but it is not as easy as it seems
+    --       to get that to work.
+    liftIO $ do
+        -- Many of those env vars are used by Makefiles in the
+        -- test infrastructure, or from tests or their
+        -- Makefiles.
+        setEnv "MAKE" makePath
+        setEnv "PYTHON" pythonPath
+        setEnv "TEST_HC" ghcPath
+        setEnv "TEST_HC_OPTS" ghcFlags
+        setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
+        setEnv "TEST_CC" ccPath
+        setEnv "TEST_CC_OPTS" ccFlags
+
+        when cross $ do
+          setEnv "GHC_PKG"   prog_ghc_pkg
+          setEnv "HSC2HS"    prog_hsc2hs
+          setEnv "HP2PS_ABS" prog_hp2ps
+          setEnv "HPC"       prog_hpc
+          setEnv "HADDOCK"   prog_haddock
+          setEnv "RUNGHC"    prog_runghc
+
+        setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
+        setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
+        setEnv "DUMP_DECLS" (top -/- root -/- dumpDeclsProgPath)
+        setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
+        setEnv "LINT_NOTES" (top -/- root -/- noteLinterProgPath)
+        setEnv "LINT_CODES" (top -/- root -/- codeLinterProgPath)
+        setEnv "LINT_WHITESPACE" (top -/- root -/- whitespaceLinterProgPath)
+
+        -- This lets us bypass the need to generate a config
+        -- through Make, which happens in testsuite/mk/boilerplate.mk
+        -- which is in turn included by all test 'Makefile's.
+        setEnv "ghc_config_mk" (top -/- root -/- ghcConfigPath)
+
+
+    -- Execute the test target.
+    -- We override the verbosity setting to make sure the user can see
+    -- the test output: https://gitlab.haskell.org/ghc/ghc/issues/15951.
+    withVerbosity Diagnostic $ buildWithCmdOptions [] $ test_target RunTest
+
 testsuiteDeps :: Rules ()
 testsuiteDeps = do
   root <- buildRootRules
   "test:all_deps" ~> do
+    -- don't actually run the tests
+    _ <- testAction root
     need ("test:ghc" : map cp_target checkPrograms)
 
   "test:ghc" ~> inTreeOutTree
@@ -170,107 +280,7 @@ testRules = do
 
     root -/- timeoutPath %> \_ -> timeoutProgBuilder
 
-    "test" ~> do
-
-        args <- userSetting defaultTestArgs
-        let testCompilerArg = testCompiler args
-        let stg = fromMaybe Stage2 $ stageOf testCompilerArg
-        let test_target tt = target (vanillaContext stg compiler) (Testsuite tt) [] []
-
-        -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
-        -- tests it is going to run,
-        -- for example "docs_haddock"
-        -- We then need to go and build these dependencies
-        extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
-        let ok_to_build = filter (isOkToBuild args) extra_targets
-        putVerbose $ " | ExtraTargets: " ++ intercalate ", " extra_targets
-        putVerbose $ " | ExtraTargets (ok-to-build): " ++ intercalate ", " ok_to_build
-        need ok_to_build
-
-        -- Prepare Ghc configuration file for input compiler.
-        need [root -/- timeoutPath]
-
-        cross <- flag CrossCompiling
-
-        -- get relative path for the given program in the given stage
-        let relative_path_stage s p = programPath =<< programContext s p
-        let make_absolute rel_path = do
-              abs_path <- liftIO (IO.makeAbsolute rel_path)
-              fixAbsolutePathOnWindows abs_path
-
-        rel_ghc_pkg     <- relative_path_stage Stage1 ghcPkg
-        rel_hsc2hs      <- relative_path_stage Stage1 hsc2hs
-        rel_hp2ps       <- relative_path_stage Stage1 hp2ps
-        rel_haddock     <- relative_path_stage (Stage0 InTreeLibs) haddock
-        rel_hpc         <- relative_path_stage (Stage0 InTreeLibs) hpc
-        rel_runghc      <- relative_path_stage (Stage0 InTreeLibs) runGhc
-
-        -- force stage0 program building for cross
-        when cross $ need [rel_hpc, rel_haddock, rel_runghc]
-
-        prog_ghc_pkg     <- make_absolute rel_ghc_pkg
-        prog_hsc2hs      <- make_absolute rel_hsc2hs
-        prog_hp2ps       <- make_absolute rel_hp2ps
-        prog_haddock     <- make_absolute rel_haddock
-        prog_hpc         <- make_absolute rel_hpc
-        prog_runghc      <- make_absolute rel_runghc
-
-        ghcPath <- getCompilerPath testCompilerArg
-
-        makePath        <- builderPath $ Make ""
-        top             <- topDirectory
-        ghcFlags        <- runTestGhcFlags
-        let ghciFlags = ghcFlags ++ unwords
-              [ "--interactive", "-v0", "-ignore-dot-ghci"
-              , "-fno-ghci-history", "-fprint-error-index-links=never"
-              ]
-        ccPath          <- queryTargetTarget (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
-        ccFlags         <- queryTargetTarget (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
-
-        pythonPath      <- builderPath Python
-
-        -- Set environment variables for test's Makefile.
-        -- TODO: Ideally we would define all those env vars in 'env', so that
-        --       Shake can keep track of them, but it is not as easy as it seems
-        --       to get that to work.
-        liftIO $ do
-            -- Many of those env vars are used by Makefiles in the
-            -- test infrastructure, or from tests or their
-            -- Makefiles.
-            setEnv "MAKE" makePath
-            setEnv "PYTHON" pythonPath
-            setEnv "TEST_HC" ghcPath
-            setEnv "TEST_HC_OPTS" ghcFlags
-            setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
-            setEnv "TEST_CC" ccPath
-            setEnv "TEST_CC_OPTS" ccFlags
-
-            when cross $ do
-              setEnv "GHC_PKG"   prog_ghc_pkg
-              setEnv "HSC2HS"    prog_hsc2hs
-              setEnv "HP2PS_ABS" prog_hp2ps
-              setEnv "HPC"       prog_hpc
-              setEnv "HADDOCK"   prog_haddock
-              setEnv "RUNGHC"    prog_runghc
-
-            setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
-            setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
-            setEnv "DUMP_DECLS" (top -/- root -/- dumpDeclsProgPath)
-            setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
-            setEnv "LINT_NOTES" (top -/- root -/- noteLinterProgPath)
-            setEnv "LINT_CODES" (top -/- root -/- codeLinterProgPath)
-            setEnv "LINT_WHITESPACE" (top -/- root -/- whitespaceLinterProgPath)
-
-            -- This lets us bypass the need to generate a config
-            -- through Make, which happens in testsuite/mk/boilerplate.mk
-            -- which is in turn included by all test 'Makefile's.
-            setEnv "ghc_config_mk" (top -/- root -/- ghcConfigPath)
-
-
-        -- Execute the test target.
-        -- We override the verbosity setting to make sure the user can see
-        -- the test output: https://gitlab.haskell.org/ghc/ghc/issues/15951.
-        withVerbosity Diagnostic $ buildWithCmdOptions [] $ test_target RunTest
+    "test" ~> join (testAction root)
 
 -- | Given a test compiler and a hadrian dependency (target), check if we
 -- can build the target with the compiler
