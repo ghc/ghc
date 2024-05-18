@@ -374,8 +374,12 @@ data Instr
         | VDIV       Format Operand Reg Reg
 
         -- Shuffle
-        | VPSHUFD    Format Operand Operand Reg
-        | PSHUFD     Format Operand Operand Reg
+        | VPSHUFD    Format Imm Operand Reg
+        | PSHUFD     Format Imm Operand Reg
+        | SHUFPS     Format Imm Operand Reg
+        | VSHUFPS    Format Imm Operand Reg
+        | SHUFPD     Format Imm Operand Reg
+        | VSHUFPD    Format Imm Operand Reg
 
         -- Shift
         | PSLLDQ     Format Operand Reg
@@ -506,10 +510,18 @@ regUsageOfInstr platform instr
     VMUL         _ s1 s2 dst -> mkRU ((use_R s1 []) ++ [s2]) [dst]
     VDIV         _ s1 s2 dst -> mkRU ((use_R s1 []) ++ [s2]) [dst]
 
-    VPSHUFD      _ off src dst
-      -> mkRU (concatMap (\op -> use_R op []) [off, src]) [dst]
-    PSHUFD       _ off src dst
-      -> mkRU (concatMap (\op -> use_R op []) [off, src]) [dst]
+    VPSHUFD      _ _off src dst
+      -> mkRU (use_R src []) [dst]
+    PSHUFD       _ _off src dst
+      -> mkRU (use_R src []) [dst]
+    SHUFPD      _ _off src dst
+      -> mkRU (use_R src [dst]) [dst]
+    SHUFPS      _ _off src dst
+      -> mkRU (use_R src [dst]) [dst]
+    VSHUFPD     _ _off src dst
+      -> mkRU (use_R src [dst]) [dst]
+    VSHUFPS     _ _off src dst
+      -> mkRU (use_R src [dst]) [dst]
 
     PSLLDQ       _ off dst -> mkRU (use_R off []) [dst]
 
@@ -704,9 +716,18 @@ patchRegsOfInstr instr env
     VDIV       fmt s1 s2 dst -> VDIV fmt (patchOp s1) (env s2) (env dst)
 
     VPSHUFD      fmt off src dst
-      -> VPSHUFD fmt (patchOp off) (patchOp src) (env dst)
+      -> VPSHUFD fmt off (patchOp src) (env dst)
     PSHUFD       fmt off src dst
-      -> PSHUFD  fmt (patchOp off) (patchOp src) (env dst)
+      -> PSHUFD  fmt off (patchOp src) (env dst)
+    SHUFPS      fmt off src dst
+      -> SHUFPS fmt off (patchOp src) (env dst)
+    SHUFPD      fmt off src dst
+      -> SHUFPD fmt off (patchOp src) (env dst)
+    VSHUFPS      fmt off src dst
+      -> VSHUFPS fmt off (patchOp src) (env dst)
+    VSHUFPD      fmt off src dst
+      -> VSHUFPD fmt off (patchOp src) (env dst)
+
     PSLLDQ       fmt off dst
       -> PSLLDQ  fmt (patchOp off) (env dst)
     PSRLDQ       fmt off dst

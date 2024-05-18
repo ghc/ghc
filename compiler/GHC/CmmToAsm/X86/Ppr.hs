@@ -942,6 +942,14 @@ pprInstr platform i = case i of
      -> pprShuf (text "vpshufd") format offset src dst
    PSHUFD format offset src dst
      -> pprShuf (text "pshufd") format offset src dst
+   SHUFPS format offset src dst
+     -> pprShuf (text "shufps") format offset src dst
+   SHUFPD format offset src dst
+     -> pprShuf (text "shufpd") format offset src dst
+   VSHUFPS format offset src dst
+     -> pprShuf (text "vshufps") format offset src dst
+   VSHUFPD format offset src dst
+     -> pprShuf (text "vshufpd") format offset src dst
    PSLLDQ format offset dst
      -> pprShiftLeft (text "pslldq") format offset dst
    PSRLDQ format offset dst
@@ -1202,11 +1210,11 @@ pprInstr platform i = case i of
            pprReg platform format dst
        ]
 
-   pprShuf :: Line doc -> Format -> Operand -> Operand -> Reg -> doc
-   pprShuf name format op1 op2 reg3
+   pprShuf :: Line doc -> Format -> Imm -> Operand -> Reg -> doc
+   pprShuf name format imm1 op2 reg3
      = line $ hcat [
            pprGenMnemonic name format,
-           pprOperand platform format op1,
+           pprDollImm imm1,
            comma,
            pprOperand platform format op2,
            comma,

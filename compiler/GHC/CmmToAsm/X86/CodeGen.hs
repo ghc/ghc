@@ -1539,7 +1539,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
           code dst
             = case lit of
                 CmmInt 0 _ -> exp `snocOL` (VMOVU format (OpReg r) (OpReg dst))
-                CmmInt _ _ -> exp `snocOL` (VPSHUFD format (OpImm imm) (OpReg r) dst)
+                CmmInt _ _ -> exp `snocOL` (VPSHUFD format imm (OpReg r) dst)
                 _          -> panic "Error in offset while unpacking"
       return (Any format code)
     vector_float_unpack l W64 expr (CmmLit lit)
@@ -1574,7 +1574,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
           code dst
             = case lit of
                 CmmInt 0 _ -> exp `snocOL` (MOVU format (OpReg r) (OpReg dst))
-                CmmInt _ _ -> exp `snocOL` (PSHUFD format (OpImm imm) (OpReg r) dst)
+                CmmInt _ _ -> exp `snocOL` (PSHUFD format imm (OpReg r) dst)
                 _          -> panic "Error in offset while unpacking"
       return (Any format code)
     vector_float_unpack_sse _ w c e
@@ -1657,9 +1657,7 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
   where
     -- SIMD NCG TODO:
     --
-    --   - add support for FloatX8, FloatX16, DoubleX4, DoubleX8;
-    --   - fix DoubleX2 vector insert code: not allowed to use MOVL/MOVH
-    --     instructions for a register to register move.
+    --   - add support for FloatX8, FloatX16, DoubleX4, DoubleX8.
     vector_float_insert :: Length
                         -> Width
                         -> CmmExpr
@@ -1667,35 +1665,36 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
                         -> CmmExpr
                         -> NatM Register
     -- FloatX4
-    vector_float_insert len@4 W32 expr1 expr2 (CmmLit offset)
+    vector_float_insert len@4 W32 vecExpr valExpr (CmmLit offset)
       = do
-      fn          <- getAnyReg expr1
-      (r, exp)    <- getSomeReg expr2
-      let f        = VecFormat len FmtFloat W32
+      fn          <- getAnyReg vecExpr
+      (r, exp)    <- getSomeReg valExpr
+      let fmt      = VecFormat len FmtFloat W32
           imm      = litToImm offset
           code dst = exp `appOL`
                      (fn dst) `snocOL`
-                     (INSERTPS f (OpImm imm) (OpReg r) dst)
-       in return $ Any f code
+                     (INSERTPS fmt (OpImm imm) (OpReg r) dst)
+       in return $ Any fmt code
     -- DoubleX2
-    -- SIMD NCG TODO: use SHUFPD instead of MOVL/MOVH (which don't support reg-2-reg)?
-    -- For 4-wide: use VSHUFPD.
-    -- For 8-wide: use something like vinsertf64x2 followed by vpblendd?
-    vector_float_insert len@2 W64 expr1 expr2 (CmmLit offset)
+    vector_float_insert len@2 W64 vecExpr valExpr (CmmLit offset)
       = do
-        fn <- getAnyReg expr1
-        (r, exp) <- getSomeReg expr2
-        let f = VecFormat len FmtDouble W64
+        (valReg, valExp) <- getSomeReg valExpr
+        (vecReg, vecExp) <- getSomeReg vecExpr
+        let fmt = VecFormat len FmtDouble W64
             code dst
               = case offset of
-                  CmmInt 0  _ -> exp `appOL`
-                                 (fn dst) `snocOL`
-                                 (MOVL f (OpReg r) (OpReg dst))
-                  CmmInt 16 _ -> exp `appOL`
-                                 (fn dst) `snocOL`
-                                 (MOVH f (OpReg r) (OpReg dst))
+                  CmmInt 0  _ -> valExp `appOL`
+                                 vecExp `snocOL`
+                                 (MOV fmt (OpReg valReg) (OpReg dst)) `snocOL`
+                                 (SHUFPD fmt (ImmInt 0b00) (OpReg vecReg) dst)
+                  CmmInt 16 _ -> valExp `appOL`
+                                 vecExp `snocOL`
+                                 (MOV fmt (OpReg vecReg) (OpReg dst)) `snocOL`
+                                 (SHUFPD fmt (ImmInt 0b00) (OpReg valReg) dst)
                   _ -> pprPanic "MO_VF_Insert DoubleX2: unsupported offset" (ppr offset)
-         in return $ Any f code
+         in return $ Any fmt code
+    -- For DoubleX4: use VSHUFPD.
+    -- For DoubleX8: use something like vinsertf64x2 followed by vpblendd?
     vector_float_insert len width _ _ offset
       = pprPanic "Unsupported vector insert operation" $
           vcat
