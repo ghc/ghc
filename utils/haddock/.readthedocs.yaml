@@ -1,0 +1,14 @@
+# Documentation lives at https://haskell-haddock.readthedocs.io/latest/
+version: 2
+
+sphinx:
+  configuration: doc/conf.py
+
+build:
+  os: "ubuntu-22.04"
+  tools:
+    python: "3.8"
+
+python:
+  install:
+    - requirements: doc/requirements.txt
