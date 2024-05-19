@@ -70,7 +70,6 @@ module GHC.Parser.Annotation (
 
   -- ** Querying annotations
   getLocAnn,
-  epAnnAnns,
   annParen2AddEpAnn,
   epAnnComments,
 
@@ -1138,9 +1137,6 @@ widenLocatedAn (EpAnn (EpaSpan l) a cs) as = EpAnn (spanAsAnchor l') a cs
   where
     l' = widenSpan l as
 widenLocatedAn (EpAnn anc a cs) _as = EpAnn anc a cs
-
-epAnnAnns :: EpAnn [AddEpAnn] -> [AddEpAnn]
-epAnnAnns (EpAnn _ anns _) = anns
 
 annParen2AddEpAnn :: AnnParen -> [AddEpAnn]
 annParen2AddEpAnn (AnnParen pt o c)
