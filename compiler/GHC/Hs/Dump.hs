@@ -59,16 +59,10 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `ext1Q` list
               `extQ` list_addEpAnn
               `extQ` string `extQ` fastString `extQ` srcSpan `extQ` realSrcSpan
-              `extQ` annotation
               `extQ` annotationModule
-              `extQ` annotationAddEpAnn
               `extQ` annotationGrhsAnn
-              `extQ` annotationEpAnnHsCase
               `extQ` annotationAnnList
               `extQ` annotationEpAnnImportDecl
-              `extQ` annotationAnnParen
-              `extQ` annotationTrailingAnn
-              `extQ` annotationEpaLocation
               `extQ` annotationNoEpAnns
               `extQ` addEpAnn
               `extQ` annParen
@@ -235,35 +229,17 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             -- -------------------------
 
-            annotation :: EpAnn [AddEpAnn] -> SDoc
-            annotation = annotation' (text "EpAnn [AddEpAnn]")
-
             annotationModule :: EpAnn AnnsModule -> SDoc
             annotationModule = annotation' (text "EpAnn AnnsModule")
 
-            annotationAddEpAnn :: EpAnn AddEpAnn -> SDoc
-            annotationAddEpAnn = annotation' (text "EpAnn AddEpAnn")
-
             annotationGrhsAnn :: EpAnn GrhsAnn -> SDoc
             annotationGrhsAnn = annotation' (text "EpAnn GrhsAnn")
-
-            annotationEpAnnHsCase :: EpAnn EpAnnHsCase -> SDoc
-            annotationEpAnnHsCase = annotation' (text "EpAnn EpAnnHsCase")
 
             annotationAnnList :: EpAnn AnnList -> SDoc
             annotationAnnList = annotation' (text "EpAnn AnnList")
 
             annotationEpAnnImportDecl :: EpAnn EpAnnImportDecl -> SDoc
             annotationEpAnnImportDecl = annotation' (text "EpAnn EpAnnImportDecl")
-
-            annotationAnnParen :: EpAnn AnnParen -> SDoc
-            annotationAnnParen = annotation' (text "EpAnn AnnParen")
-
-            annotationTrailingAnn :: EpAnn TrailingAnn -> SDoc
-            annotationTrailingAnn = annotation' (text "EpAnn TrailingAnn")
-
-            annotationEpaLocation :: EpAnn EpaLocation -> SDoc
-            annotationEpaLocation = annotation' (text "EpAnn EpaLocation")
 
             annotationNoEpAnns :: EpAnn NoEpAnns -> SDoc
             annotationNoEpAnns = annotation' (text "EpAnn NoEpAnns")
