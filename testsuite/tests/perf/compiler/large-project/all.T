@@ -7,7 +7,7 @@ def large_project_makedepend(num):
     return test(
         f'large-project-makedepend-{num}',
         [
-            collect_compiler_stats('bytes allocated', 1),
+            collect_compiler_stats('bytes allocated'),
             pre_cmd(f'./large-project.sh {num}'),
             extra_files(['large-project.sh']),
             ignore_stderr,
