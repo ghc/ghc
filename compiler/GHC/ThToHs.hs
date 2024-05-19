@@ -1442,7 +1442,8 @@ cvtp (ListP ps)        = do { ps' <- cvtPats ps
                             ; return
                                    $ ListPat noAnn ps'}
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
-                            ; return $ SigPat noAnn p' (mkHsPatSigType noAnn t') }
+                            ; let pp = parenthesizePat sigPrec p'
+                            ; return $ SigPat noAnn pp (mkHsPatSigType noAnn t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat noAnn e' p'}
 
