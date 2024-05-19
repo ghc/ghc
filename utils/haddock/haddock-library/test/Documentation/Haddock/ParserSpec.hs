@@ -567,7 +567,7 @@ spec = do
                           , sinceVersion = [0, 5, 0]
                           }
                   }
-            , _doc = DocParagraph "@since foo-bar-0.5.0"
+            , _doc = DocEmpty
             }
 
       context "when given multiple times" $ do

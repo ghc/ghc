@@ -28,7 +28,7 @@ import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
 import Data.Char (chr, isAlpha, isSpace, isUpper)
-import Data.List (elemIndex, intercalate, unfoldr)
+import Data.List (elemIndex, intercalate, unfoldr, intersperse)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid
 import qualified Data.Set as Set
@@ -576,11 +576,12 @@ since = do
   return DocEmpty
   where
     version = do
-      pkg <- Parsec.optionMaybe $ Parsec.try $ package <* Parsec.char '-'
+      pkg <- Parsec.optionMaybe $ Parsec.try $ package
       ver <- decimal `Parsec.sepBy1` "."
       return (MetaSince pkg ver)
 
-    package = Parsec.many1 $ Parsec.alphaNum <|> Parsec.oneOf "_-"
+    package = combine <$> (Parsec.many1 (Parsec.letter <|> Parsec.char '_')) `Parsec.endBy1` (Parsec.char '-')
+    combine = concat . intersperse "-"
 
 -- | Headers inside the comment denoted with @=@ signs, up to 6 levels
 -- deep.
