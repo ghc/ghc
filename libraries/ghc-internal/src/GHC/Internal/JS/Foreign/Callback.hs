@@ -23,14 +23,12 @@ import           GHC.Internal.JS.Prim
 
 import qualified GHC.Internal.Exts as Exts
 
-import           GHC.Internal.Data.Typeable
-
 import           GHC.Internal.Unsafe.Coerce
 import           GHC.Internal.Base
 
 data OnBlocked = ContinueAsync | ThrowWouldBlock deriving (Eq)
 
-newtype Callback a = Callback JSVal deriving Typeable
+newtype Callback a = Callback JSVal
 
 {- |
      When you create a callback, the Haskell runtime stores a reference to

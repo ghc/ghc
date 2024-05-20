@@ -138,6 +138,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wunused-do-bind`
         * :ghc-flag:`-Wunused-record-wildcards`
         * :ghc-flag:`-Wincomplete-export-warnings`
+        * :ghc-flag:`-Wderiving-typeable`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC

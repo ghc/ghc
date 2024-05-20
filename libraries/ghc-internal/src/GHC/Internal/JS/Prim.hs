@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE JavaScriptFFI #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
@@ -40,7 +39,6 @@ module GHC.Internal.JS.Prim ( JSVal(..), JSVal#
 #endif
                   ) where
 
-import           GHC.Internal.Data.Typeable (Typeable)
 import           GHC.Internal.Unsafe.Coerce (unsafeCoerce)
 
 import           GHC.Prim
@@ -71,7 +69,6 @@ type JSVal# = Addr#
   to a JSException
  -}
 data JSException = JSException JSVal String
-  deriving (Typeable)
 
 instance Ex.Exception JSException
 
@@ -326,7 +323,6 @@ foreign import javascript unsafe "(($1, $2) => { return $1($2); })"
      continue asynchronously, it receives this exception.
  -}
 data WouldBlockException = WouldBlockException
-  deriving (Typeable)
 
 instance Show WouldBlockException where
   show _ = "thread would block"

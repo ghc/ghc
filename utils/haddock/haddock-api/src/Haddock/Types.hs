@@ -50,7 +50,6 @@ import Control.Monad.State.Strict
 import Data.Data (Data)
 import Data.Map (Map)
 import qualified Data.Set as Set
-import Data.Typeable (Typeable)
 import Documentation.Haddock.Types
 import qualified GHC.Data.Strict as Strict
 import GHC.Types.Fixity (Fixity (..))
@@ -764,7 +763,6 @@ type Renamer = String -> (NameSpace -> Bool) -> [Name]
 data HaddockException
   = HaddockException String
   | WithContext [String] SomeException
-  deriving (Typeable)
 
 instance Show HaddockException where
   show (HaddockException str) = str

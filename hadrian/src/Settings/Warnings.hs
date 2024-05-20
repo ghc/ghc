@@ -26,9 +26,17 @@ ghcWarningsArgs = do
     mconcat
         [ stage0 ? mconcat
         [ libraryPackage       ? pure [ "-fno-warn-deprecated-flags" ]
-        , package terminfo     ? pure [ "-fno-warn-unused-imports" ]
+        , package terminfo     ? pure [ "-fno-warn-unused-imports", "-Wno-deriving-typeable"]
         , package transformers ? pure [ "-fno-warn-unused-matches"
-                                      , "-fno-warn-unused-imports" ] ]
+                                      , "-fno-warn-unused-imports" ]
+        , package stm          ? pure [ "-Wno-deriving-typeable" ]
+        , package osString     ? pure [ "-Wno-deriving-typeable" ]
+        , package parsec       ? pure [ "-Wno-deriving-typeable" ]
+        , package cabal        ? pure [ "-Wno-deriving-typeable" ]
+        , package cabalSyntax  ? pure [ "-Wno-deriving-typeable" ]
+        , package time         ? pure [ "-Wno-deriving-typeable" ]
+        , package unix         ? pure [ "-Wno-deriving-typeable" ]
+          ]
         , notStage0 ? mconcat
         [ libraryPackage       ? pure [ "-Wno-deprecated-flags" ]
         , package ghcInternal  ? pure [ "-Wno-trustworthy-safe" ]
@@ -51,19 +59,27 @@ ghcWarningsArgs = do
                                       , "-Wno-x-partial"
                                       , "-Wno-unused-imports"
                                       , "-Wno-redundant-constraints"
-                                      , "-Wno-simplifiable-class-constraints" ]
+                                      , "-Wno-simplifiable-class-constraints"
+                                      , "-Wno-deriving-typeable" ]
         , package pretty       ? pure [ "-Wno-unused-imports" ]
         , package primitive    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" ]
         , package rts          ? pure [ "-Wcpp-undef" ]
-        , package text         ? pure [ "-Wno-deprecations" ]
-        , package terminfo     ? pure [ "-Wno-unused-imports" ]
+        , package text         ? pure [ "-Wno-deprecations", "-Wno-deriving-typeable" ]
+        , package terminfo     ? pure [ "-Wno-unused-imports", "-Wno-deriving-typeable" ]
+        , package stm          ? pure [ "-Wno-deriving-typeable" ]
+        , package osString     ? pure [ "-Wno-deriving-typeable" ]
+        , package parsec       ? pure [ "-Wno-deriving-typeable" ]
+        , package cabal        ? pure [ "-Wno-deriving-typeable" ]
+        , package cabalSyntax  ? pure [ "-Wno-deriving-typeable" ]
+        , package time         ? pure [ "-Wno-deriving-typeable" ]
         , package transformers ? pure [ "-Wno-unused-matches"
                                       , "-Wno-unused-imports"
                                       , "-Wno-redundant-constraints"
                                       , "-Wno-orphans" ]
-        , package unix         ? pure [ "-Wno-deprecations" ]
+        , package unix         ? pure [ "-Wno-deprecations", "-Wno-deriving-typeable" ]
         , package win32        ? pure [ "-Wno-trustworthy-safe"
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
+                                      , "-Wno-deriving-typeable"
                                       ]
         , package xhtml        ? pure [ "-Wno-unused-imports" ] ] ]
