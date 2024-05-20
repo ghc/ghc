@@ -1,10 +1,10 @@
-
 T15743c.hs:10:1: error: [GHC-87279]
     • The kind of ‘T’ is ill-scoped
         Inferred kind: T :: forall {d :: k}.
                             forall k (c :: k) (a :: Proxy c) (b :: Proxy d) ->
                             SimilarKind a b -> *
-      NB: Inferred variables (namely: (d :: k)) always come first
+      Note: Inferred variables (namely: (d :: k))
+            always come first.
       Perhaps try this order instead:
         k
         (d :: k)
@@ -13,3 +13,4 @@ T15743c.hs:10:1: error: [GHC-87279]
         (b :: Proxy d)
         (x :: SimilarKind a b)
     • In the data type declaration for ‘T’
+

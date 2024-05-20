@@ -1,13 +1,13 @@
-
 T1900.hs:8:3: error: [GHC-83865]
     • Couldn't match type: Depend s0
                      with: Depend s
       Expected: Depend s -> Depend s
         Actual: Depend s0 -> Depend s0
-        NB: ‘Depend’ is a non-injective type family
-        The type variable ‘s0’ is ambiguous
+      Note: ‘Depend’ is a non-injective type family.
+      The type variable ‘s0’ is ambiguous
     • In the ambiguity check for ‘trans’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
         trans :: forall s. Bug s => Depend s -> Depend s
       In the class declaration for ‘Bug’
+

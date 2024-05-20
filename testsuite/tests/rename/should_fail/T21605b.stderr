@@ -1,9 +1,9 @@
-
 T21605b.hs:6:13: error: [GHC-76037]
     Not in scope: ‘Prelude.true’
-    NB: the module ‘Prelude’ does not export ‘true’.
+    Note: The module ‘Prelude’ does not export ‘true’.
     Suggested fix:
       Perhaps use one of these:
         data constructor ‘Prelude.True’ (imported from Prelude),
         type constructor or class ‘Prelude.Num’ (imported from Prelude),
         type constructor or class ‘Prelude.Ord’ (imported from Prelude)
+

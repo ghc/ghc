@@ -1,8 +1,8 @@
-
 T21946.hs:11:7: error: [GHC-33238]
     • No data constructor of type constructor ‘Int’
       has all of the fields:
         ‘fld’
-      NB: type-directed disambiguation is not supported for pattern synonym record fields.
+      Note: Type-directed disambiguation is not supported for pattern synonym record fields.
     • In the expression: (r :: Int) {fld = undefined}
       In an equation for ‘f’: f r = (r :: Int) {fld = undefined}
+

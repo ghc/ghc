@@ -1,8 +1,7 @@
 [1 of 1] Processing p
-  [1 of 3] Compiling H1[sig]          ( p\H1.hsig, nothing )
-  [2 of 3] Compiling H2[sig]          ( p\H2.hsig, nothing )
-  [3 of 3] Compiling M                ( p\M.hs, nothing )
-
+  [1 of 3] Compiling H1[sig]          ( p/H1.hsig, nothing )
+  [2 of 3] Compiling H2[sig]          ( p/H2.hsig, nothing )
+  [3 of 3] Compiling M                ( p/M.hs, nothing )
 bkpfail24.bkp:14:15: error: [GHC-25897]
     • Could not deduce ‘a ~ b’
       from the context: {H1.T} ~ {H2.T}
@@ -25,7 +24,8 @@ bkpfail24.bkp:14:15: error: [GHC-25897]
 
 bkpfail24.bkp:19:15: error: [GHC-83865]
     • Couldn't match expected type ‘{H2.T}’ with actual type ‘{H1.T}’
-      NB: ‘{H2.T}’ is defined at bkpfail24.bkp:6:9-14
-          ‘{H1.T}’ is defined at bkpfail24.bkp:4:9-14
+      Note: ‘{H2.T}’ is defined at bkpfail24.bkp:6:9-14
+            ‘{H1.T}’ is defined at bkpfail24.bkp:4:9-14.
     • In the expression: x
       In an equation for ‘g’: g x = x
+

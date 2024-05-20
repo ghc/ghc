@@ -1,20 +1,19 @@
-
 T11071.hs:19:12: error: [GHC-76037]
     Not in scope: ‘NoSuchModule.foo’
-    NB: no module named ‘NoSuchModule’ is imported.
+    Note: No module named ‘NoSuchModule’ is imported.
 
 T11071.hs:20:12: error: [GHC-76037]
     Not in scope: ‘Data.List.foobar’
-    NB: the module ‘Data.List’ does not export ‘foobar’.
+    Note: The module ‘Data.List’ does not export ‘foobar’.
 
 T11071.hs:21:12: error: [GHC-76037]
     Not in scope: ‘M.foobar’
-    NB: neither ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
+    Note: Neither ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
 
 T11071.hs:22:12: error: [GHC-76037]
     Not in scope: ‘M'.foobar’
-    NB: neither ‘System.IO’,
-                ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
+    Note: Neither ‘System.IO’,
+                  ‘Data.IntMap’ nor ‘Data.Map’ export ‘foobar’.
 
 T11071.hs:23:12: error: [GHC-76037]
     Not in scope: ‘Data.List.sort’
@@ -57,3 +56,4 @@ T11071.hs:28:12: error: [GHC-76037]
       Remove ‘size’ from the hiding clauses in one of these imports:
         ‘Data.IntMap’ (at T11071.hs:12:1-48)
         ‘Data.Map’ (at T11071.hs:10:1-53)
+

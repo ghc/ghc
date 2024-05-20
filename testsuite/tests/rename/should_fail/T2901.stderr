@@ -1,4 +1,4 @@
-
 T2901.hs:6:5: error: [GHC-76037]
     Not in scope: data constructor ‘F.Foo’
-    NB: no module named ‘F’ is imported.
+    Note: No module named ‘F’ is imported.
+

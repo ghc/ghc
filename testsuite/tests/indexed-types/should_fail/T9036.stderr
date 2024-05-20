@@ -1,12 +1,12 @@
-
 T9036.hs:18:17: error: [GHC-83865]
     • Couldn't match type: GetMonad t0
                      with: GetMonad t
       Expected: Maybe (GetMonad t after) -> Curried t [t]
         Actual: Maybe (GetMonad t0 after) -> Curried t0 [t0]
-        NB: ‘GetMonad’ is a non-injective type family
-        The type variable ‘t0’ is ambiguous
+      Note: ‘GetMonad’ is a non-injective type family.
+      The type variable ‘t0’ is ambiguous
     • In the ambiguity check for ‘simpleLogger’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:
         simpleLogger :: Maybe (GetMonad t after) -> t `Curried` [t]
+

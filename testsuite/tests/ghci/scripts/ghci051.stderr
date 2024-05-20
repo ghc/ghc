@@ -1,9 +1,9 @@
-
 <interactive>:6:9: error: [GHC-83865]
     • Couldn't match type ‘T’ with ‘Ghci1.T’
       Expected: T'
         Actual: T
-      NB: ‘Ghci1.T’ is defined at <interactive>:2:1-14
-          ‘T’ is defined at <interactive>:5:1-16
+      Note: ‘Ghci1.T’ is defined at <interactive>:2:1-14
+            ‘T’ is defined at <interactive>:5:1-16.
     • In the expression: C :: T'
       In an equation for ‘c’: c = C :: T'
+

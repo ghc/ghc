@@ -1,5 +1,5 @@
-
 <interactive>:1:1: error: [GHC-76037]
     Not in scope: ‘H.bit’
-    NB: no module named ‘H’ is imported.
+    Note: No module named ‘H’ is imported.
     Suggested fix: Perhaps use ‘Q.bit’ (imported from T8639)
+

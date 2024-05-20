@@ -1,4 +1,3 @@
-
 T15368.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: (F a b, F a0 b0)
       Where: ‘a0’ is an ambiguous type variable
@@ -19,8 +18,8 @@ T15368.hs:11:30: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
                      with: F b a
       Expected: (F a0 b0, F b a)
         Actual: (F a0 b0, F b0 a0)
-        NB: ‘F’ is a non-injective type family
-        The type variables ‘b0’, ‘a0’ are ambiguous
+      Note: ‘F’ is a non-injective type family.
+      The type variables ‘b0’, ‘a0’ are ambiguous
     • In the second argument of ‘transitive’, namely ‘trigger _ _’
       In the expression: _ `transitive` trigger _ _
       In an equation for ‘trigger’:
@@ -45,3 +44,4 @@ T15368.hs:11:40: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
       In the expression: _ `transitive` trigger _ _
     • Relevant bindings include
         trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
+

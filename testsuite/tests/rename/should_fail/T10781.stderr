@@ -1,4 +1,4 @@
-
 T10781.hs:12:5: error: [GHC-76037]
     Not in scope: ‘Foo._name’
-    NB: no module named ‘Foo’ is imported.
+    Note: No module named ‘Foo’ is imported.
+

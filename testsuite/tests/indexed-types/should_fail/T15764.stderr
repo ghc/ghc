@@ -1,11 +1,11 @@
-
 T15764.hs:14:2: error: [GHC-87279]
     • The kind of ‘T6’ is ill-scoped
         Inferred kind: T6 :: forall {a :: k} k (b :: Proxy a).
                              Proxy '(k, b) -> *
-      NB: Inferred variables
-        (namely: (a :: k)) always come first
-        then Specified variables (namely: k (b :: Proxy a))
+      Note: Inferred variables (namely: (a :: k))
+            always come first
+            then specified variables (namely: k (b :: Proxy a)).
       Perhaps try this order instead:
         k (a :: k) (b :: Proxy a) (proxy :: Proxy '(k, b))
     • In the associated type family declaration for ‘T6’
+

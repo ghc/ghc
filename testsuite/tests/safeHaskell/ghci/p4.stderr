@@ -1,9 +1,9 @@
-
 <interactive>:6:9: error: [GHC-76037]
     Not in scope: ‘System.IO.Unsafe.unsafePerformIO’
-    NB: no module named ‘System.IO.Unsafe’ is imported.
+    Note: No module named ‘System.IO.Unsafe’ is imported.
 
 <interactive>:7:9: error: [GHC-88464]
     Variable not in scope: x :: IO b0 -> t
 
 <interactive>:8:1: error: [GHC-88464] Variable not in scope: y
+

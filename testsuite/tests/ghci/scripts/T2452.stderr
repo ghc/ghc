@@ -1,8 +1,8 @@
+<interactive>:1:1: error: [GHC-76037]
+    Not in scope: ‘System.IO.hPutStrLn’
+    Note: No module named ‘System.IO’ is imported.
 
 <interactive>:1:1: error: [GHC-76037]
     Not in scope: ‘System.IO.hPutStrLn’
-    NB: no module named ‘System.IO’ is imported.
+    Note: No module named ‘System.IO’ is imported.
 
-<interactive>:1:1: error: [GHC-76037]
-    Not in scope: ‘System.IO.hPutStrLn’
-    NB: no module named ‘System.IO’ is imported.

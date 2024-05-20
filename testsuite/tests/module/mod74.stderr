@@ -1,4 +1,4 @@
-
 mod74.hs:3:7: error: [GHC-76037]
     Not in scope: ‘N.g’
-    NB: no module named ‘N’ is imported.
+    Note: No module named ‘N’ is imported.
+

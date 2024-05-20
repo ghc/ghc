@@ -1,8 +1,9 @@
-
 T15591b.hs:9:3: error: [GHC-87279]
     • The kind of ‘T4’ is ill-scoped
         Inferred kind: T4 :: forall {b :: Proxy a}.
                              forall a -> Proxy b -> *
-      NB: Inferred variables (namely: (b :: Proxy a)) always come first
+      Note: Inferred variables (namely: (b :: Proxy a))
+            always come first.
       Perhaps try this order instead: a (b :: Proxy a) (c :: Proxy b)
     • In the associated type family declaration for ‘T4’
+

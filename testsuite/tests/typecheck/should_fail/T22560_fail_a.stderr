@@ -1,8 +1,8 @@
-
 T22560_fail_a.hs:9:1: error: [GHC-57916]
     • Invalid invisible type variable binder: @k
       There is no matching forall-bound variable
       in the standalone kind signature for ‘P’.
-      NB. Only ‘forall a.’ -quantification matches invisible binders,
-          whereas ‘forall {a}.’ and ‘forall a ->’ do not.
+      Note: Only ‘forall a.’ -quantification matches invisible binders,
+            whereas ‘forall {a}.’ and ‘forall a ->’ do not.
     • In the data type declaration for ‘P’
+

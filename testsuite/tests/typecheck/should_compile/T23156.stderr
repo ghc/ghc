@@ -1,11 +1,10 @@
-
 T23156.hs:51:6: warning: [GHC-05617] [-Wdeferred-type-errors (in -Wdefault)]
     • Could not deduce ‘BooleanOf2 (TensorOf2 1 r0) ~ BooleanOf2 r0’
       from the context: ADReady r
         bound by the type signature for:
                    f :: forall r. ADReady r => ()
         at T23156.hs:51:6-33
-      NB: ‘BooleanOf2’ is a non-injective type family
+      Note: ‘BooleanOf2’ is a non-injective type family.
       The type variables ‘r0’, ‘r0’ are ambiguous
     • In the ambiguity check for ‘f’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
@@ -19,7 +18,8 @@ T23156.hs:56:5: warning: [GHC-18872] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type: BooleanOf2 (TensorOf2 1 r0)
                      with: BooleanOf2 r0
         arising from a use of ‘f’
-      NB: ‘BooleanOf2’ is a non-injective type family
+      Note: ‘BooleanOf2’ is a non-injective type family.
       The type variables ‘r0’, ‘r0’ are ambiguous
     • In the expression: f
       In an equation for ‘g’: g = f
+

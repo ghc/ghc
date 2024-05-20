@@ -1,12 +1,12 @@
-
 T9171.hs:10:20: error: [GHC-83865]
     • Couldn't match expected type: GetParam
                                       @(*) @k2 @(*) Base (GetParam @(*) @(*) @k2 Base Int)
                   with actual type: GetParam
                                       @(*) @k20 @(*) Base (GetParam @(*) @(*) @k20 Base Int)
-        NB: ‘GetParam’ is a non-injective type family
-        The type variable ‘k20’ is ambiguous
+      Note: ‘GetParam’ is a non-injective type family.
+      The type variable ‘k20’ is ambiguous
     • In the ambiguity check for an expression type signature
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In an expression type signature: GetParam Base (GetParam Base Int)
       In the expression: undefined :: GetParam Base (GetParam Base Int)
+

@@ -1,4 +1,3 @@
-
 <interactive>:1:1: error: [GHC-88464] Variable not in scope: nubBy
 
 <interactive>:1:1: error: [GHC-88464] Variable not in scope: nub
@@ -13,6 +12,7 @@
 
 <interactive>:1:1: error: [GHC-76037]
     Not in scope: ‘L.nub’
-    NB: no module named ‘L’ is imported.
+    Note: No module named ‘L’ is imported.
 
 <interactive>:1:1: error: [GHC-88464] Variable not in scope: nub
+

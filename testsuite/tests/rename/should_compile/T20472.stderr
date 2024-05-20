@@ -1,11 +1,11 @@
-
 T20472.hs:5:5: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
     Variable not in scope: nonexistent
 
 T20472.hs:6:5: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
     Variable not in scope: Prelude.nonexistent
-    NB: the module ‘Prelude’ does not export ‘nonexistent’.
+    Note: The module ‘Prelude’ does not export ‘nonexistent’.
 
 T20472.hs:8:5: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
     Variable not in scope: Nonexistent.x
-    NB: no module named ‘Nonexistent’ is imported.
+    Note: No module named ‘Nonexistent’ is imported.
+
