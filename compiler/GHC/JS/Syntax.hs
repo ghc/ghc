@@ -129,7 +129,7 @@ data JStat
   | BreakStat (Maybe JLabel)           -- ^ Break
   | ContinueStat (Maybe JLabel)        -- ^ Continue
   | FuncStat   !Ident [Ident] JStat    -- ^ an explicit function definition
-  deriving (Eq, Typeable, Generic)
+  deriving (Eq, Generic)
 
 -- | A Label used for 'JStat', specifically 'BreakStat', 'ContinueStat' and of
 -- course 'LabelStat'
@@ -168,7 +168,7 @@ data JExpr
   | UOpExpr    UOp JExpr         -- ^ Unary Expressions
   | IfExpr     JExpr JExpr JExpr -- ^ If-expression
   | ApplExpr   JExpr [JExpr]     -- ^ Application
-  deriving (Eq, Typeable, Generic)
+  deriving (Eq, Generic)
 
 -- * Useful pattern synonyms to ease programming with the deeply embedded JS
 --   AST. Each pattern wraps @UOp@ and @Op@ into a @JExpr@s to save typing and
@@ -274,7 +274,7 @@ data JVal
   | JBool    Bool         -- ^ A Boolean
   | JHash    (UniqMap FastString JExpr) -- ^ A JS HashMap: @{"foo": 0}@
   | JFunc    [Ident] JStat             -- ^ A function
-  deriving (Eq, Typeable, Generic)
+  deriving (Eq, Generic)
 
 
 --------------------------------------------------------------------------------
@@ -307,7 +307,7 @@ data Op
   | LOrOp           -- ^ Logical Or:             ||
   | InstanceofOp    -- ^ @instanceof@
   | InOp            -- ^ @in@
-  deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
+  deriving (Show, Eq, Ord, Enum, Data, Generic)
 
 instance NFData Op
 
@@ -326,7 +326,7 @@ data UOp
   | PostIncOp       -- ^ Postfix Increment: @x++@
   | PreDecOp        -- ^ Prefix Decrement:  @--x@
   | PostDecOp       -- ^ Postfix Decrement: @x--@
-  deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
+  deriving (Show, Eq, Ord, Enum, Data, Generic)
 
 instance NFData UOp
 
@@ -335,7 +335,7 @@ data AOp
   = AssignOp    -- ^ Vanilla  Assignment: =
   | AddAssignOp -- ^ Addition Assignment: +=
   | SubAssignOp -- ^ Subtraction Assignment: -=
-  deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
+  deriving (Show, Eq, Ord, Enum, Data, Generic)
 
 instance NFData AOp
 

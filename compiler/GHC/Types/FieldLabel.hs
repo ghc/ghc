@@ -99,7 +99,7 @@ instance Uniquable FieldLabelString where
 data DuplicateRecordFields
     = DuplicateRecordFields   -- ^ Fields may be duplicated in a single module
     | NoDuplicateRecordFields -- ^ Fields must be unique within a module (the default)
-  deriving (Show, Eq, Typeable, Data)
+  deriving (Show, Eq, Data)
 
 instance Binary DuplicateRecordFields where
     put_ bh f = put_ bh (f == DuplicateRecordFields)
@@ -118,7 +118,7 @@ instance NFData DuplicateRecordFields where
 data FieldSelectors
     = FieldSelectors   -- ^ Selector functions are available (the default)
     | NoFieldSelectors -- ^ Selector functions are not available
-  deriving (Show, Eq, Typeable, Data)
+  deriving (Show, Eq, Data)
 
 instance Binary FieldSelectors where
     put_ bh f = put_ bh (f == FieldSelectors)

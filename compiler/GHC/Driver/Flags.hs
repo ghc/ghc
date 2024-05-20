@@ -1345,7 +1345,8 @@ minusWallOpts
         Opt_WarnRedundantRecordWildcards,
         Opt_WarnIncompleteUniPatterns,
         Opt_WarnIncompletePatternsRecUpd,
-        Opt_WarnIncompleteExportWarnings
+        Opt_WarnIncompleteExportWarnings,
+        Opt_WarnDerivingTypeable
       ]
 
 -- | Things you get with -Weverything, i.e. *all* known warnings flags

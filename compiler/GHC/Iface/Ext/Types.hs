@@ -34,7 +34,7 @@ import qualified Data.Array as A
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.ByteString            ( ByteString )
-import Data.Data                  ( Typeable, Data )
+import Data.Data                  ( Data )
 import Data.Semigroup             ( Semigroup(..) )
 import Data.Word                  ( Word8 )
 import Control.Applicative        ( (<|>) )
@@ -668,7 +668,7 @@ data Scope
   = NoScope
   | LocalScope Span
   | ModuleScope
-    deriving (Eq, Ord, Typeable, Data)
+    deriving (Eq, Ord, Data)
 
 instance Outputable Scope where
   ppr NoScope = text "NoScope"

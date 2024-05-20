@@ -105,7 +105,7 @@ data JStgStat
   | BreakStat (Maybe JsLabel)                   -- ^ Break
   | ContinueStat (Maybe JsLabel)                -- ^ Continue
   | FuncStat   !Ident [Ident] JStgStat          -- ^ an explicit function definition
-  deriving (Eq, Typeable, Generic)
+  deriving (Eq, Generic)
 
 -- | A Label used for 'JStgStat', specifically 'BreakStat', 'ContinueStat' and of
 -- course 'LabelStat'
@@ -144,7 +144,7 @@ data JStgExpr
   | UOpExpr    UOp JStgExpr               -- ^ Unary Expressions
   | IfExpr     JStgExpr JStgExpr JStgExpr  -- ^ If-expression
   | ApplExpr   JStgExpr [JStgExpr]         -- ^ Application
-  deriving (Eq, Typeable, Generic)
+  deriving (Eq, Generic)
 
 instance Outputable JStgExpr where
   ppr x = case x of
@@ -265,7 +265,7 @@ data JVal
   | JBool    Bool                       -- ^ A Boolean
   | JHash    (UniqMap FastString JStgExpr) -- ^ A JS HashMap: @{"foo": 0}@
   | JFunc    [Ident] JStgStat              -- ^ A function
-  deriving (Eq, Typeable, Generic)
+  deriving (Eq, Generic)
 
 --------------------------------------------------------------------------------
 --                            Operators
@@ -296,7 +296,7 @@ data Op
   | LOrOp           -- ^ Logical Or:             ||
   | InstanceofOp    -- ^ @instanceof@
   | InOp            -- ^ @in@
-  deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
+  deriving (Show, Eq, Ord, Enum, Data, Generic)
 
 instance NFData Op
 
@@ -315,7 +315,7 @@ data UOp
   | PostIncOp       -- ^ Postfix Increment: @x++@
   | PreDecOp        -- ^ Prefix Decrement:  @--x@
   | PostDecOp       -- ^ Postfix Decrement: @x--@
-  deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
+  deriving (Show, Eq, Ord, Enum, Data, Generic)
 
 instance NFData UOp
 
@@ -324,7 +324,7 @@ data AOp
   = AssignOp    -- ^ Vanilla  Assignment: =
   | AddAssignOp -- ^ Addition Assignment: +=
   | SubAssignOp -- ^ Subtraction Assignment: -=
-  deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
+  deriving (Show, Eq, Ord, Enum, Data, Generic)
 
 instance NFData AOp
 
