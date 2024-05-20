@@ -1,10 +1,10 @@
 [1 of 2] Processing p
-  [1 of 1] Compiling A[sig]           ( p\A.hsig, nothing )
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
 [2 of 2] Processing q
-  [1 of 3] Compiling A[sig]           ( q\A.hsig, nothing )
-  [2 of 3] Compiling M                ( q\M.hs, nothing )
-
+  [1 of 3] Compiling A[sig]           ( q/A.hsig, nothing )
+  [2 of 3] Compiling M                ( q/M.hs, nothing )
 bkpfail49.bkp:11:13: error: [GHC-76037]
     Not in scope: data constructor ‘A.True’
-    NB: the module ‘A’ does not export ‘True’.
+    Note: The module ‘A’ does not export ‘True’.
+
   [3 of 3] Instantiating p

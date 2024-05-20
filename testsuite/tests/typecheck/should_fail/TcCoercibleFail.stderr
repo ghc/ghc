@@ -1,4 +1,3 @@
-
 TcCoercibleFail.hs:11:8: error: [GHC-18872]
     • Couldn't match representation of type ‘Int’ with that of ‘()’
         arising from a use of ‘coerce’
@@ -10,8 +9,8 @@ TcCoercibleFail.hs:14:8: error: [GHC-18872]
     • Couldn't match representation of type: m Int
                                with that of: m Age
         arising from a use of ‘coerce’
-      NB: We cannot know what roles the parameters to ‘m’ have;
-        we must assume that the role is nominal
+      Note: We cannot know what roles the parameters to ‘m’ have;
+            we must assume that the role is nominal.
     • In the first argument of ‘($)’, namely ‘coerce’
       In the expression: coerce $ (return one :: m Int)
       In an equation for ‘foo2’: foo2 = coerce $ (return one :: m Int)
@@ -67,3 +66,4 @@ TcCoercibleFail.hs:36:8: error: [GHC-18872]
         arising from a use of ‘coerce’
     • In the expression: coerce :: Fix (Either Int) -> ()
       In an equation for ‘foo7’: foo7 = coerce :: Fix (Either Int) -> ()
+

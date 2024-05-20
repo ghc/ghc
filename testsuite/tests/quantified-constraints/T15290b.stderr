@@ -1,4 +1,3 @@
-
 T15290b.hs:28:49: error: [GHC-18872]
     • Couldn't match representation of type: f (m b)
                                with that of: f (T1 m b)
@@ -9,6 +8,7 @@ T15290b.hs:28:49: error: [GHC-18872]
             to type ‘forall (f :: * -> *) a b.
                      Applicative' f =>
                      (a -> f b) -> T1 m a -> f (T1 m b)’
-      NB: We cannot know what roles the parameters to ‘f’ have;
-        we must assume that the role is nominal
+      Note: We cannot know what roles the parameters to ‘f’ have;
+            we must assume that the role is nominal.
     • When deriving the instance for (Traversable' (T1 m))
+

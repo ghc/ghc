@@ -1,4 +1,3 @@
-
 T3208b.hs:15:10: error: [GHC-05617]
     • Could not deduce ‘STerm o0 ~ OTerm a’ arising from a use of ‘fce’
       from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
@@ -23,7 +22,7 @@ T3208b.hs:15:15: error: [GHC-05617]
                            (OTerm a ~ STerm a, OBJECT a, SUBST a) =>
                            a -> c
         at T3208b.hs:14:1-56
-      NB: ‘OTerm’ is a non-injective type family
+      Note: ‘OTerm’ is a non-injective type family.
       The type variable ‘o0’ is ambiguous
     • In the first argument of ‘fce’, namely ‘(apply f)’
       In the expression: fce (apply f)
@@ -31,3 +30,4 @@ T3208b.hs:15:15: error: [GHC-05617]
     • Relevant bindings include
         f :: a (bound at T3208b.hs:15:6)
         fce' :: a -> c (bound at T3208b.hs:15:1)
+

@@ -1,9 +1,9 @@
-
 T14066g.hs:9:1: error: [GHC-87279]
     • The kind of ‘Q’ is ill-scoped
         Inferred kind: Q :: forall (c :: a).
                             forall a (b :: a) -> SameKind c b -> *
-      NB: Specified variables (namely: (c :: a)) always come first
+      Note: Specified variables (namely: (c :: a)) always come first.
       Perhaps try this order instead:
         a (c :: a) (b :: a) (d :: SameKind c b)
     • In the data type declaration for ‘Q’
+

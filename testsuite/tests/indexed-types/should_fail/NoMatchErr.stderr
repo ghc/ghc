@@ -1,11 +1,11 @@
-
 NoMatchErr.hs:19:7: error: [GHC-83865]
     • Couldn't match type: Memo d0
                      with: Memo d
       Expected: Memo d a -> Memo d a
         Actual: Memo d0 a -> Memo d0 a
-        NB: ‘Memo’ is a non-injective type family
-        The type variable ‘d0’ is ambiguous
+      Note: ‘Memo’ is a non-injective type family.
+      The type variable ‘d0’ is ambiguous
     • In the ambiguity check for ‘f’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature: f :: (Fun d) => Memo d a -> Memo d a
+

@@ -1,9 +1,8 @@
-
 T8030.hs:9:3: error: [GHC-83865]
     • Couldn't match expected type: Pr a
                   with actual type: Pr a0
-        NB: ‘Pr’ is a non-injective type family
-        The type variable ‘a0’ is ambiguous
+      Note: ‘Pr’ is a non-injective type family.
+      The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘op1’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
@@ -15,10 +14,11 @@ T8030.hs:10:3: error: [GHC-83865]
                      with: Pr a
       Expected: Pr a -> Pr a -> Pr a
         Actual: Pr a0 -> Pr a0 -> Pr a0
-        NB: ‘Pr’ is a non-injective type family
-        The type variable ‘a0’ is ambiguous
+      Note: ‘Pr’ is a non-injective type family.
+      The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘op2’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
         op2 :: forall k (a :: k). C a => Pr a -> Pr a -> Pr a
       In the class declaration for ‘C’
+

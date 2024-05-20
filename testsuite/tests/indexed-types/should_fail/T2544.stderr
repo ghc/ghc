@@ -1,11 +1,10 @@
-
 T2544.hs:19:18: error: [GHC-83865]
     • Couldn't match type: IxMap i0
                      with: IxMap l
       Expected: IxMap l [Int]
         Actual: IxMap i0 [Int]
-        NB: ‘IxMap’ is a non-injective type family
-        The type variable ‘i0’ is ambiguous
+      Note: ‘IxMap’ is a non-injective type family.
+      The type variable ‘i0’ is ambiguous
     • In the first argument of ‘BiApp’, namely ‘empty’
       In the expression: BiApp empty empty
       In an equation for ‘empty’: empty = BiApp empty empty
@@ -17,10 +16,11 @@ T2544.hs:19:24: error: [GHC-83865]
                      with: IxMap r
       Expected: IxMap r [Int]
         Actual: IxMap i1 [Int]
-        NB: ‘IxMap’ is a non-injective type family
-        The type variable ‘i1’ is ambiguous
+      Note: ‘IxMap’ is a non-injective type family.
+      The type variable ‘i1’ is ambiguous
     • In the second argument of ‘BiApp’, namely ‘empty’
       In the expression: BiApp empty empty
       In an equation for ‘empty’: empty = BiApp empty empty
     • Relevant bindings include
         empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:19:4)
+

@@ -22,7 +22,7 @@ RnFail055.hs-boot:9:1: error: [GHC-15843]
         Boot file: type S2 :: * -> * -> *
                    type S2 a b = forall b1. (a, b1)
       The roles do not match.
-      NB: roles on abstract types default to ‘representational’ in hs-boot files.
+      Note: Roles on abstract types default to ‘representational’ in hs-boot files.
     • In the type synonym declaration for ‘S2’
 
 RnFail055.hs-boot:13:1: error: [GHC-15843]
@@ -45,7 +45,7 @@ RnFail055.hs-boot:15:1: error: [GHC-15843]
                    type T2 :: * -> * -> *
                    data Eq a => T2 a b = T2 a
       The roles do not match.
-      NB: roles on abstract types default to ‘representational’ in hs-boot files.
+      Note: Roles on abstract types default to ‘representational’ in hs-boot files.
       The datatype contexts do not match.
       The constructors do not match: The types for ‘T2’ differ.
     • In the data type declaration for ‘T2’
@@ -101,7 +101,7 @@ RnFail055.hs-boot:26:1: error: [GHC-15843]
         Boot file: type T7 :: * -> *
                    data T7 a = forall b. T7 a
       The roles do not match.
-      NB: roles on abstract types default to ‘representational’ in hs-boot files.
+      Note: Roles on abstract types default to ‘representational’ in hs-boot files.
       The constructors do not match: The types for ‘T7’ differ.
     • In the data type declaration for ‘T7’
 
@@ -144,3 +144,4 @@ RnFail055.hs-boot:30:1: error: [GHC-15843]
                    class (Ord a, Eq a) => C3 a
       The superclass constraints do not match.
     • In the class declaration for ‘C3’
+

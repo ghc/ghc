@@ -1,9 +1,8 @@
-
 T4099.hs:11:30: error: [GHC-83865]
     • Couldn't match expected type: T a0
                   with actual type: T b
-        NB: ‘T’ is a non-injective type family
-        The type variable ‘a0’ is ambiguous
+      Note: ‘T’ is a non-injective type family.
+      The type variable ‘a0’ is ambiguous
     • In the second argument of ‘foo’, namely ‘x’
       In the expression: foo (error "urk") x
       In an equation for ‘bar1’: bar1 a x = foo (error "urk") x
@@ -15,7 +14,7 @@ T4099.hs:11:30: error: [GHC-83865]
 T4099.hs:14:30: error: [GHC-83865]
     • Couldn't match expected type: T a1
                   with actual type: Maybe b
-        The type variable ‘a1’ is ambiguous
+      The type variable ‘a1’ is ambiguous
     • In the second argument of ‘foo’, namely ‘x’
       In the expression: foo (error "urk") x
       In an equation for ‘bar2’: bar2 a x = foo (error "urk") x
@@ -23,3 +22,4 @@ T4099.hs:14:30: error: [GHC-83865]
         x :: Maybe b (bound at T4099.hs:14:8)
         a :: b (bound at T4099.hs:14:6)
         bar2 :: b -> Maybe b -> Int (bound at T4099.hs:14:1)
+

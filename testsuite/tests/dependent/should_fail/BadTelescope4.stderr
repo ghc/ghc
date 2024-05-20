@@ -1,12 +1,11 @@
-
 BadTelescope4.hs:9:1: error: [GHC-87279]
     • The kind of ‘Bad’ is ill-scoped
         Inferred kind: Bad :: forall {k} (b :: Proxy a).
                               forall (a :: k) ->
                               Proxy b -> forall (d :: Proxy a) -> SameKind b d -> *
-      NB: Inferred variables
-        (namely: k) always come first
-        then Specified variables (namely: (b :: Proxy a))
+      Note: Inferred variables (namely: k)
+            always come first
+            then specified variables (namely: (b :: Proxy a)).
       Perhaps try this order instead:
         k
         (a :: k)
@@ -15,3 +14,4 @@ BadTelescope4.hs:9:1: error: [GHC-87279]
         (d :: Proxy a)
         (x :: SameKind b d)
     • In the data type declaration for ‘Bad’
+

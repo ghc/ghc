@@ -1,4 +1,4 @@
-
 T19843k.hs:5:8: error: [GHC-76037]
     Not in scope: ‘M.doesn'tExist’
-    NB: the module ‘Data.Monoid’ does not export ‘doesn'tExist’.
+    Note: The module ‘Data.Monoid’ does not export ‘doesn'tExist’.
+

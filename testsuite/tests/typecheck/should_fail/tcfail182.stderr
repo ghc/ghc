@@ -1,12 +1,12 @@
-
 tcfail182.hs:9:3: error: [GHC-83865]
     • Couldn't match expected type: Prelude.Maybe a
                   with actual type: Maybe a0
-      NB: ‘Prelude.Maybe’
-            is defined in ‘GHC.Internal.Maybe’
-                in package ‘ghc-internal-0.1.0.0’
-          ‘Maybe’ is defined at tcfail182.hs:6:1-18
+      Note: ‘Prelude.Maybe’
+              is defined in ‘GHC.Internal.Maybe’
+                  in package ‘ghc-internal-9.1001.0’
+            ‘Maybe’ is defined at tcfail182.hs:6:1-18.
     • In the pattern: Foo
       In an equation for ‘f’: f Foo = 3
     • Relevant bindings include
         f :: Prelude.Maybe a -> Int (bound at tcfail182.hs:9:1)
+

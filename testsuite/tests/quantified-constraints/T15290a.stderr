@@ -1,10 +1,9 @@
-
 T15290a.hs:25:12: error: [GHC-18872]
     • Couldn't match representation of type: m (Int, IntStateT m a1)
                                with that of: m (Int, StateT Int m a1)
         arising from a use of ‘coerce’
-      NB: We cannot know what roles the parameters to ‘m’ have;
-        we must assume that the role is nominal
+      Note: We cannot know what roles the parameters to ‘m’ have;
+            we must assume that the role is nominal.
     • In the expression:
         coerce
           @(forall a. StateT Int m (StateT Int m a) -> StateT Int m a)
@@ -18,3 +17,4 @@ T15290a.hs:25:12: error: [GHC-18872]
     • Relevant bindings include
         join :: IntStateT m (IntStateT m a) -> IntStateT m a
           (bound at T15290a.hs:25:5)
+

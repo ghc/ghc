@@ -1,4 +1,3 @@
-
 T19627.hs:108:3: error: [GHC-05617]
     • Could not deduce ‘Not (p0 a b) ~ Not (p a b)’
       from the context: Lol p
@@ -9,8 +8,8 @@ T19627.hs:108:3: error: [GHC-05617]
         at T19627.hs:108:3-34
       Expected: Not (p a b) -> b <#- a
         Actual: Not (p0 a b) -> b <#- a
-        NB: ‘Not’ is a non-injective type family
-        The type variable ‘p0’ is ambiguous
+      Note: ‘Not’ is a non-injective type family.
+      The type variable ‘p0’ is ambiguous
     • In the ambiguity check for ‘apartR’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
@@ -35,7 +34,7 @@ T19627.hs:108:3: error: [GHC-05617]
         at T19627.hs:108:3-34
       or from: (Prop a1, Prop b1)
         bound by a quantified context at T19627.hs:108:3-34
-        The type variable ‘p0’ is ambiguous
+      The type variable ‘p0’ is ambiguous
     • In the ambiguity check for ‘apartR’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
@@ -43,3 +42,4 @@ T19627.hs:108:3: error: [GHC-05617]
                   Lol p =>
                   Not (p a b) -> b <#- a
       In the class declaration for ‘Lol’
+

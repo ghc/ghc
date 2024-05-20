@@ -7,6 +7,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
 {-# LANGUAGE InstanceSigs #-}
@@ -733,7 +734,7 @@ instance Diagnostic TcRnMessage where
               what = text "type constructor" <+> quotes (ppr (RecSelData tc))
               pat_syn_msg
                 | any (\case { RecSelPatSyn {} -> True; _ -> False}) pars
-                = text "NB: type-directed disambiguation is not supported for pattern synonym record fields."
+                = note "Type-directed disambiguation is not supported for pattern synonym record fields"
                 | otherwise
                 = empty
     TcRnStaticFormNotClosed name reason
@@ -793,9 +794,9 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated
            [ text "The" <+> quotes (text "~") <+> text "operator is out of scope." $$
              text "Assuming it to stand for an equality constraint."
-           , text "NB:" <+> (quotes (text "~") <+> text "used to be built-in syntax but now is a regular type operator" $$
-                             text "exported from Data.Type.Equality and Prelude.") $$
-             text "If you are using a custom Prelude, consider re-exporting it."
+           , note $ quotes "~" <+> "used to be built-in syntax but now is a regular type operator" $$
+                      "exported from Data.Type.Equality and Prelude." $$
+                      "If you are using a custom Prelude, consider re-exporting it"
            , text "This will become an error in a future GHC release." ]
     TcRnTypeEqualityRequiresOperators
       -> mkSimpleDecorated $
@@ -1539,15 +1540,14 @@ instance Diagnostic TcRnMessage where
           | null inferred_tvs && null specified_tvs
           = empty
           | null inferred_tvs
-          = hang (text "NB: Specified variables")
-               2 (sep [pp_spec, text "always come first"])
+          = note $ "Specified variables" <+> pp_spec <+> "always come first"
           | null specified_tvs
-          = hang (text "NB: Inferred variables")
-               2 (sep [pp_inf, text "always come first"])
+          = note inf_always_first
           | otherwise
-          = hang (text "NB: Inferred variables")
-               2 (vcat [ sep [ pp_inf, text "always come first"]
-                       , sep [text "then Specified variables", pp_spec]])
+          = note $ inf_always_first $$
+              "then specified variables" <+> pp_spec
+
+        inf_always_first = "Inferred variables" <+> pp_inf $$ "always come first"
 
         pp_inf  = parens (text "namely:" <+> pprTyVars inferred_tvs)
         pp_spec = parens (text "namely:" <+> pprTyVars specified_tvs)
@@ -1859,9 +1859,9 @@ instance Diagnostic TcRnMessage where
                   2 (ppr hs_bndr)
              , text "There is no matching forall-bound variable"
              , text "in the standalone kind signature for" <+> quotes (ppr name) <> dot
-             , text "NB." <+> vcat [
-                text "Only" <+> quotes (text "forall a.") <+> text "-quantification matches invisible binders,",
-                text "whereas" <+> quotes (text "forall {a}.") <+> text "and" <+> quotes (text "forall a ->") <+> text "do not."
+             , note $ vcat [
+                "Only" <+> quotes "forall a." <+> "-quantification matches invisible binders,",
+                "whereas" <+> quotes "forall {a}." <+> "and" <+> quotes "forall a ->" <+> "do not"
              ]]
 
     TcRnDeprecatedInvisTyArgInConPat ->
@@ -3250,6 +3250,10 @@ instance Diagnostic TcRnMessage where
 
   diagnosticCode = constructorCode
 
+
+note :: SDoc -> SDoc
+note note = "Note" <> colon <+> note <> dot
+
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
 -- and so on.  The `and` stands for any `conjunction`, which is passed in.
 commafyWith :: SDoc -> [SDoc] -> [SDoc]
@@ -4274,7 +4278,7 @@ pprMismatchMsg ctxt
           _ -> Nothing -- Must be TupleRep [r1..rn]
       | otherwise = Nothing
 
-    starts_with_vowel (c:_) = c `elem` "AEIOU"
+    starts_with_vowel (c:_) = c `elem` ("AEIOU" :: String)
     starts_with_vowel []    = False
 
 pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
@@ -4585,13 +4589,10 @@ pprExpectedActualInfo _
 
 pprCoercibleMsg :: CoercibleMsg -> SDoc
 pprCoercibleMsg (UnknownRoles ty) =
-  hang (text "NB: We cannot know what roles the parameters to" <+>
-          quotes (ppr ty) <+> text "have;")
-       2 (text "we must assume that the role is nominal")
+  note $ "We cannot know what roles the parameters to" <+> quotes (ppr ty) <+> "have;" $$
+           "we must assume that the role is nominal"
 pprCoercibleMsg (TyConIsAbstract tc) =
-  hsep [ text "NB: The type constructor"
-       , quotes (pprSourceTyCon tc)
-       , text "is abstract" ]
+  note $ "The type constructor" <+> quotes (pprSourceTyCon tc) <+> "is abstract"
 pprCoercibleMsg (OutOfScopeNewtypeConstructor tc dc) =
   hang (text "The data constructor" <+> quotes (ppr $ dataConName dc))
     2 (sep [ text "of newtype" <+> quotes (pprSourceTyCon tc)
@@ -4653,12 +4654,11 @@ pprAmbiguityInfo (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
 pprAmbiguityInfo (NonInjectiveTyFam tc) =
-  text "NB:" <+> quotes (ppr tc)
-  <+> text "is a non-injective type family"
+  note $ quotes (ppr tc) <+> text "is a non-injective type family"
 
 pprSameOccInfo :: SameOccInfo -> SDoc
 pprSameOccInfo (SameOcc same_pkg n1 n2) =
-  text "NB:" <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
+  note (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
   where
     ppr_from same_pkg nm
       | isGoodSrcSpan loc
@@ -4934,25 +4934,14 @@ This initially came up in #8968, concerning pattern synonyms.
 **********************************************************************-}
 
 instance Outputable ImportError where
-  ppr (MissingModule mod_name) =
-    hsep
-      [ text "NB: no module named"
-      , quotes (ppr mod_name)
-      , text "is imported."
-      ]
-  ppr  (ModulesDoNotExport mods occ_name)
-    | mod NE.:| [] <- mods
-    = hsep
-        [ text "NB: the module"
-        , quotes (ppr mod)
-        , text "does not export"
-        , quotes (ppr occ_name) <> dot ]
-    | otherwise
-    = hsep
-        [ text "NB: neither"
-        , quotedListWithNor (map ppr $ NE.toList mods)
-        , text "export"
-        , quotes (ppr occ_name) <> dot ]
+  ppr err = note $ case err of
+      MissingModule mod_name -> "No module named" <+> quoted mod_name <+> "is imported"
+      ModulesDoNotExport mods occ_name
+        | mod NE.:| [] <- mods -> "The module" <+> quoted mod <+> "does not export" <+> quoted occ_name
+        | otherwise -> "Neither" <+> quotedListWithNor (map ppr $ NE.toList mods) <+> "export" <+> quoted occ_name
+    where
+      quoted :: Outputable a => a -> SDoc
+      quoted = quotes . ppr
 
 {- *********************************************************************
 *                                                                      *
@@ -5914,8 +5903,7 @@ pprBootTyConMismatch boot_or_sig tc1 tc2 = \case
     else
       text "The roles do not match." $$
       if boot_or_sig == HsBoot
-      then text "NB: roles on abstract types default to" <+>
-           quotes (text "representational") <+> text "in hs-boot files."
+      then note $ "Roles on abstract types default to" <+> quotes "representational" <+> "in hs-boot files"
       else empty
   TyConSynonymMismatch {} -> empty -- nothing interesting to say
   TyConFlavourMismatch fam_flav1 fam_flav2 ->

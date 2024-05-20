@@ -1,4 +1,3 @@
-
 T9204.hs:7:1: error: [GHC-15843]
     • Type constructor ‘D’ has conflicting definitions in the module
       and its hs-boot file.
@@ -8,5 +7,6 @@ T9204.hs:7:1: error: [GHC-15843]
         Boot file: type D :: * -> *
                    data D a
       The roles do not match.
-      NB: roles on abstract types default to ‘representational’ in hs-boot files.
+      Note: Roles on abstract types default to ‘representational’ in hs-boot files.
     • In the data type declaration for ‘D’
+

@@ -1,7 +1,7 @@
-
 T5657.hs:3:8: error: [GHC-76037]
     Not in scope: ‘LT..’
-    NB: no module named ‘LT’ is imported.
+    Note: No module named ‘LT’ is imported.
 
 T5657.hs:3:8: error: [GHC-95880]
     A section must be enclosed in parentheses thus: (LT.. GT)
+
