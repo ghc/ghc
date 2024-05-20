@@ -1065,7 +1065,7 @@ pages:
       <meta charset="UTF-8">
       <meta http-equiv="refresh" content="1; url=doc/">
       EOF
-    - cp -f index.html public/doc
+    - cp -f docs/index.html public/doc
   rules:
     # N.B. only run this on ghc/ghc since the deployed pages are quite large
     # and we only serve GitLab Pages for ghc/ghc.
