@@ -934,10 +934,14 @@ pprInstr platform i = case i of
      -> pprFormatOpOp (text "movh") format from to
    VPXOR format s1 s2 dst
      -> pprXor (text "vpxor") format s1 s2 dst
-   VEXTRACT format offset from to
-     -> pprFormatOpRegOp (text "vextract") format offset from to
+   VEXTRACTF128 format offset from to
+     -> pprFormatImmRegOp (text "vextractf128") format offset from to
    INSERTPS format offset addr dst
-     -> pprInsert (text "insertps") format offset addr dst
+     -> pprFormatImmOpReg (text "insertps") format offset addr dst
+   VINSERTPS format offset src1 src2 dst
+     -> pprVInsert (text "vinsertps") format offset src1 src2 dst
+   VPERM2F128 format offset s1 s2 dst
+     -> pprVPerm2F128 format offset s1 s2 dst
    VPSHUFD format offset src dst
      -> pprShuf (text "vpshufd") format offset src dst
    PSHUFD format offset src dst
@@ -1041,17 +1045,6 @@ pprInstr platform i = case i of
      = line $ hcat [
            pprMnemonic name format,
            pprOperand platform format op1,
-           comma,
-           pprOperand platform format op2
-       ]
-
-   pprFormatOpRegOp :: Line doc -> Format -> Operand -> Reg -> Operand -> doc
-   pprFormatOpRegOp name format off reg1 op2
-     = line $ hcat [
-           pprMnemonic name format,
-           pprOperand platform format off,
-           comma,
-           pprReg platform format reg1,
            comma,
            pprOperand platform format op2
        ]
@@ -1199,16 +1192,53 @@ pprInstr platform i = case i of
            pprReg platform format reg3
        ]
 
-   pprInsert :: Line doc -> Format -> Operand -> Operand -> Reg -> doc
-   pprInsert name format off src dst
+   pprFormatImmOpReg :: Line doc -> Format -> Imm -> Operand -> Reg -> doc
+   pprFormatImmOpReg name format off src dst
      = line $ hcat [
            pprGenMnemonic name format,
-           pprOperand platform format off,
+           pprDollImm off,
            comma,
            pprOperand platform format src,
            comma,
            pprReg platform format dst
        ]
+
+   pprFormatImmRegOp :: Line doc -> Format -> Imm -> Reg -> Operand -> doc
+   pprFormatImmRegOp name format off src dst
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprDollImm off,
+           comma,
+           pprReg platform format src,
+           comma,
+           pprOperand platform format dst
+       ]
+
+   pprVInsert :: Line doc -> Format -> Imm -> Operand -> Reg -> Reg -> doc
+   pprVInsert name format off src1 src2 dst
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprDollImm off,
+           comma,
+           pprOperand platform format src1,
+           comma,
+           pprReg platform format src2,
+           comma,
+           pprReg platform format dst
+       ]
+
+   pprVPerm2F128 :: Format -> Imm -> Operand -> Reg -> Reg -> doc
+   pprVPerm2F128 fmt off s1 s2 dst
+     = line $ hcat [
+          pprGenMnemonic (text "vperm2f128") fmt,
+          pprDollImm off,
+          comma,
+          pprOperand platform fmt s1,
+          comma,
+          pprReg platform fmt s2,
+          comma,
+          pprReg platform fmt dst
+      ]
 
    pprShuf :: Line doc -> Format -> Imm -> Operand -> Reg -> doc
    pprShuf name format imm1 op2 reg3

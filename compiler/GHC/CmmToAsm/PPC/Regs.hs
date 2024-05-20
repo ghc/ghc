@@ -28,7 +28,6 @@ module GHC.CmmToAsm.PPC.Regs (
         callClobberedRegs,
         allMachRegNos,
         classOfRealReg,
-        showReg,
         toRegNo,
 
         -- machine specific
@@ -237,12 +236,6 @@ classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
         | i < 32        = RcInteger
         | otherwise     = RcDouble
-
-showReg :: RegNo -> String
-showReg n
-    | n >= 0 && n <= 31   = "%r" ++ show n
-    | n >= 32 && n <= 63  = "%f" ++ show (n - 32)
-    | otherwise           = "%unknown_powerpc_real_reg_" ++ show n
 
 toRegNo :: Reg -> RegNo
 toRegNo (RegReal (RealRegSingle n)) = n

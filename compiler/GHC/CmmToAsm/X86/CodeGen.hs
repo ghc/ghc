@@ -1258,9 +1258,13 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                             | sse       -> vector_float_unpack_sse l W32 x y
                             | otherwise
                               -> sorry "Please enable the -mavx or -msse flag"
+      MO_VF_Extract _ W32
+        -> sorry "FloatX8# and FloatX16# vector extraction requires -fllvm"
 
       MO_VF_Extract l W64   | sse2      -> vector_float_unpack l W64 x y
                             | otherwise -> sorry "Please enable the -msse2 flag"
+      MO_VF_Extract _ W64
+        -> sorry "DoubleX4# and DoubleX8# vector extraction requires -fllvm"
 
       MO_VF_Add l w         | avx              -> vector_float_op_avx VA_Add l w x y
                             | sse  && w == W32 -> vector_float_op_sse VA_Add l w x y
@@ -1557,8 +1561,12 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                               (MOV FF64 (OpAddr addr) (OpReg dst))
                 _          -> panic "Error in offset while unpacking"
       return (Any format code)
-    vector_float_unpack _ w c e
-      = pprPanic "Unpack not supported for : " (pdoc platform c $$ pdoc platform e $$ ppr w)
+    vector_float_unpack l w _ off
+      = pprPanic "Unsupported vector unpack operation" $ vcat
+        [ text "l:" <+> ppr l
+        , text "w:" <+> ppr w
+        , text "off:" <+> pdoc platform off ]
+
     -----------------------
 
     vector_float_unpack_sse :: Length
@@ -1629,35 +1637,52 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                      (insertps 48)
             where
               insertps off =
-                INSERTPS f (OpImm $ litToImm $ CmmInt off W32) (OpAddr addr) dst
+                INSERTPS f (litToImm $ CmmInt off W32) (OpAddr addr) dst
 
        in return $ Any f code
     vector_float_broadcast_sse _ _ c _
       = pprPanic "Broadcast not supported for : " (pdoc platform c)
 
-getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
+getRegister' _platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
   sse4_1 <- sse4_1Enabled
   sse2   <- sse2Enabled
   sse    <- sseEnabled
+  avx    <- avxEnabled
   case mop of
       -- Floating point fused multiply-add operations @ ± x*y ± z@
       MO_FMA var w -> genFMA3Code w var x y z
 
       -- Ternary vector operations
-      MO_VF_Insert l W32  | sse4_1 && sse -> vector_float_insert l W32 x y z
-                          | otherwise
-                          -> sorry "Please enable the -msse4 and -msse flag"
-      MO_VF_Insert l W64  | sse2   && sse -> vector_float_insert l W64 x y z
-                          | otherwise
-                          -> sorry "Please enable the -msse2 and -msse flag"
+      MO_VF_Insert 4 W32
+        | sse4_1 && sse
+        -> vector_float_insert 4 W32 x y z
+        | otherwise
+        -> sorry "Please enable the -msse4 and -msse flags"
+      MO_VF_Insert 8 W32
+        | avx
+        -> vector_float_insert 8 W32 x y z
+        | otherwise
+        -> sorry "Please enable the -mavx flag"
+      MO_VF_Insert 16 W32
+        -> sorry "FloatX16# vector operations require -fllvm"
+      MO_VF_Insert 2 W64
+        | sse2 && sse
+        -> vector_float_insert 2 W64 x y z
+        | otherwise
+        -> sorry "Please enable the -msse2 and -msse flags"
+      MO_VF_Insert 4 W64
+        | avx
+        -> vector_float_insert 4 W64 x y z
+        | otherwise
+        -> sorry "Please enable the -mavx flag"
+      MO_VF_Insert 8 W64
+        -> sorry "DoubleX8# vector operations require -fllvm"
+      -- SIMD NCG TODO: add support for FloatX16 and DoubleX8.
 
       _other -> pprPanic "getRegister(x86) - ternary CmmMachOp (1)"
                   (pprMachOp mop)
 
   where
-    -- SIMD NCG TODO:
-    --
-    --   - add support for FloatX8, FloatX16, DoubleX4, DoubleX8.
     vector_float_insert :: Length
                         -> Width
                         -> CmmExpr
@@ -1672,8 +1697,26 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
       let fmt      = VecFormat len FmtFloat W32
           imm      = litToImm offset
           code dst = exp `appOL`
-                     (fn dst) `snocOL`
-                     (INSERTPS fmt (OpImm imm) (OpReg r) dst)
+                     fn dst `snocOL`
+                     INSERTPS fmt imm (OpReg r) dst
+       in return $ Any fmt code
+    -- FloatX8
+    vector_float_insert len@8 W32 vecExpr valExpr (CmmLit offset@(CmmInt off wd))
+      = do
+      fn          <- getAnyReg vecExpr
+      (r, exp)    <- getSomeReg valExpr
+      let fmt      = VecFormat len FmtFloat W32
+          code dst
+            | off < 64
+            = exp `appOL`
+              fn dst `snocOL`
+              VINSERTPS fmt (litToImm offset) (OpReg r) r dst
+            | otherwise
+            = exp `appOL`
+              fn dst `snocOL`
+              VPERM2F128 fmt (ImmInt 0b01) (OpReg dst) dst dst `snocOL`
+              VINSERTPS fmt (litToImm $ CmmInt (off - 64) wd) (OpReg r) dst dst `snocOL`
+              VPERM2F128 fmt (ImmInt 0b01) (OpReg dst) dst dst
        in return $ Any fmt code
     -- DoubleX2
     vector_float_insert len@2 W64 vecExpr valExpr (CmmLit offset)
@@ -1681,6 +1724,8 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
         (valReg, valExp) <- getSomeReg valExpr
         (vecReg, vecExp) <- getSomeReg vecExpr
         let fmt = VecFormat len FmtDouble W64
+            -- SIMD NCG TODO: avoid the uses of MOV below by computing the
+            -- appropriate value directly into the destination register if possible.
             code dst
               = case offset of
                   CmmInt 0  _ -> valExp `appOL`
@@ -1695,12 +1740,9 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
          in return $ Any fmt code
     -- For DoubleX4: use VSHUFPD.
     -- For DoubleX8: use something like vinsertf64x2 followed by vpblendd?
-    vector_float_insert len width _ _ offset
-      = pprPanic "Unsupported vector insert operation" $
-          vcat
-            [ text "len:" <+> ppr len
-            , text "width:" <+> ppr width
-            , text "offset:" <+> pdoc platform offset ]
+    vector_float_insert _ _ _ _ _
+      = sorry "FloatX16# and DoubleX8# vector operations require LLVM"
+
 
 getRegister' _ _ (CmmLoad mem pk _)
   | isVecType pk = do

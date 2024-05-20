@@ -23,7 +23,6 @@ module GHC.CmmToAsm.X86.Regs (
         instrClobberedRegs,
         allMachRegNos,
         classOfRealReg,
-        showReg,
 
         -- machine specific
         EABase(..), EAIndex(..), addrModeRegs,
@@ -245,14 +244,6 @@ classOfRealReg platform reg
             | i <= lastint platform -> RcInteger
             | i <= lastxmm platform -> RcDouble
             | otherwise             -> panic "X86.Reg.classOfRealReg registerSingle too high"
-
--- | Get the name of the register with this number.
--- NOTE: fixme, we don't track which "way" the XMM registers are used
-showReg :: Platform -> RegNo -> String
-showReg platform n
-        | n >= firstxmm && n <= lastxmm  platform = "%xmm" ++ show (n-firstxmm)
-        | n >= 8   && n < firstxmm      = "%r" ++ show n
-        | otherwise      = regNames platform A.! n
 
 regNames :: Platform -> A.Array Int String
 regNames platform

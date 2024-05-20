@@ -354,9 +354,12 @@ data Instr
         -- Vector Instructions --
         -- NOTE: Instructions follow the AT&T syntax
         -- Constructors and deconstructors
-        | VBROADCAST  Format AddrMode Reg
-        | VEXTRACT    Format Operand Reg Operand
-        | INSERTPS    Format Operand Operand Reg
+        | VBROADCAST   Format AddrMode Reg
+        | VEXTRACTF128 Format Imm Reg Operand
+        | INSERTPS     Format Imm Operand Reg
+        | VINSERTPS    Format Imm Operand Reg Reg
+
+        | VPERM2F128  Format Imm Operand Reg Reg
 
         -- move operations
         | VMOVU       Format Operand Operand
@@ -495,9 +498,14 @@ regUsageOfInstr platform instr
 
     -- vector instructions
     VBROADCAST _ src dst   -> mkRU (use_EA src []) [dst]
-    VEXTRACT     _ off src dst -> mkRU ((use_R off []) ++ [src]) (use_R dst [])
-    INSERTPS     _ off src dst
-      -> mkRU ((use_R off []) ++ (use_R src []) ++ [dst]) [dst]
+    VEXTRACTF128 _ _off src dst -> mkRU [src] (use_R dst [])
+    INSERTPS     _ _off src dst
+      -> mkRU (use_R src []) [dst]
+    VINSERTPS     _ _off src1 src2 dst
+      -> mkRU (use_R src1 [src2]) [dst]
+
+    VPERM2F128   _ _off src1 src2 dst
+      -> mkRU (use_R src1 [src2]) [dst]
 
     VMOVU        _ src dst   -> mkRU (use_R src []) (use_R dst [])
     MOVU         _ src dst   -> mkRU (use_R src []) (use_R dst [])
@@ -699,10 +707,15 @@ patchRegsOfInstr instr env
 
     -- vector instructions
     VBROADCAST   fmt src dst   -> VBROADCAST fmt (lookupAddr src) (env dst)
-    VEXTRACT     fmt off src dst
-      -> VEXTRACT fmt (patchOp off) (env src) (patchOp dst)
+    VEXTRACTF128 fmt off src dst
+      -> VEXTRACTF128 fmt off (env src) (patchOp dst)
     INSERTPS    fmt off src dst
-      -> INSERTPS fmt (patchOp off) (patchOp src) (env dst)
+      -> INSERTPS fmt off (patchOp src) (env dst)
+    VINSERTPS    fmt off src1 src2 dst
+      -> VINSERTPS fmt off (patchOp src1) (env src2) (env dst)
+
+    VPERM2F128   fmt off src1 src2 dst
+      -> VPERM2F128 fmt off (patchOp src1) (env src2) (env dst)
 
     VMOVU      fmt src dst   -> VMOVU fmt (patchOp src) (patchOp dst)
     MOVU       fmt src dst   -> MOVU  fmt (patchOp src) (patchOp dst)
