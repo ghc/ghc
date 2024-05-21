@@ -1,0 +1,180 @@
+flowchart TD
+    node_0[Haddock.Backends.HaddockDB]
+    node_1[Haddock.Backends.Hyperlinker.Types]
+    node_29[Haddock.Backends.Hyperlinker.Parser]
+    node_55[Haddock.Backends.Hyperlinker.Utils]
+    node_78[Haddock.Backends.Hyperlinker.Renderer]
+    node_134[Haddock.Backends.Xhtml.Types]
+    node_141[Haddock.Backends.Xhtml.Themes]
+    node_183[Haddock.Backends.Xhtml.Utils]
+    node_233[Haddock.Backends.Xhtml.Names]
+    node_270[Haddock.Backends.Xhtml.DocMarkup]
+    node_325[Haddock.Backends.Xhtml.Layout]
+    node_401[Haddock.Backends.Xhtml.Decl]
+    node_623[Haddock.Backends.Xhtml.Meta]
+    node_626[Haddock.Backends.LaTeX]
+    node_852[Haddock.Backends.Hyperlinker]
+    node_870[Haddock.Backends.Hoogle]
+    node_960[Haddock.Backends.Xhtml]
+    node_1099[Haddock.Syb]
+    node_1106[Haddock.Types]
+    node_1314[Haddock.Parser]
+    node_1319[Haddock.ModuleTree]
+    node_1332[Haddock.Interface.ParseModuleHeader]
+    node_1362[Haddock.Interface.LexParseRn]
+    node_1396[Haddock.Interface.Specialize]
+    node_1474[Haddock.Interface.AttachInstances]
+    node_1525[Haddock.Interface.Json]
+    node_1555[Haddock.Interface.Rename]
+    node_1641[Haddock.Interface.Create]
+    node_1781[Haddock.GhcUtils]
+    node_1874[Haddock.Convert]
+    node_2034[Haddock.Utils]
+    node_2087[Haddock.Options]
+    node_2183[Haddock.InterfaceFile]
+    node_2223[Haddock.Doc]
+    node_2225[Haddock.Interface]
+    node_2263[Haddock.Utils.Json.Types]
+    node_2274[Haddock.Utils.Json.Parser]
+    node_2290[Haddock.Utils.Json]
+    node_2371[Haddock.Version]
+    node_2374[Paths_haddock_api]
+    node_2392[Haddock]
+    node_2487[Documentation.Haddock]
+    node_1314 --> node_1106
+    node_1319 --> node_1106
+    node_1332 --> node_1106
+    node_1332 --> node_1314
+    node_1362 --> node_1106
+    node_1362 --> node_1314
+    node_1362 --> node_1332
+    node_1396 --> node_1099
+    node_1396 --> node_1106
+    node_1396 --> node_1781
+    node_141 --> node_134
+    node_141 --> node_2087
+    node_1474 --> node_1106
+    node_1474 --> node_1781
+    node_1474 --> node_1874
+    node_1525 --> node_1106
+    node_1525 --> node_2183
+    node_1555 --> node_1106
+    node_1555 --> node_1781
+    node_1555 --> node_870
+    node_1641 --> node_1106
+    node_1641 --> node_1362
+    node_1641 --> node_1474
+    node_1641 --> node_1781
+    node_1641 --> node_1874
+    node_1641 --> node_2034
+    node_1641 --> node_2087
+    node_1641 --> node_870
+    node_183 --> node_2034
+    node_1874 --> node_1106
+    node_1874 --> node_1396
+    node_1874 --> node_1781
+    node_2087 --> node_1106
+    node_2087 --> node_2034
+    node_2183 --> node_1106
+    node_2183 --> node_2087
+    node_2223 --> node_1106
+    node_2223 --> node_2034
+    node_2225 --> node_1106
+    node_2225 --> node_1474
+    node_2225 --> node_1555
+    node_2225 --> node_1641
+    node_2225 --> node_1781
+    node_2225 --> node_2034
+    node_2225 --> node_2087
+    node_2225 --> node_2183
+    node_2274 --> node_2263
+    node_2290 --> node_2263
+    node_2290 --> node_2274
+    node_233 --> node_1106
+    node_233 --> node_1781
+    node_233 --> node_183
+    node_233 --> node_2034
+    node_2371 --> node_2374
+    node_2392 --> node_1
+    node_2392 --> node_1106
+    node_2392 --> node_1314
+    node_2392 --> node_141
+    node_2392 --> node_1525
+    node_2392 --> node_1781
+    node_2392 --> node_2034
+    node_2392 --> node_2087
+    node_2392 --> node_2183
+    node_2392 --> node_2225
+    node_2392 --> node_2371
+    node_2392 --> node_2374
+    node_2392 --> node_55
+    node_2392 --> node_623
+    node_2392 --> node_626
+    node_2392 --> node_852
+    node_2392 --> node_870
+    node_2392 --> node_960
+    node_2487 --> node_2392
+    node_270 --> node_1106
+    node_270 --> node_183
+    node_270 --> node_2034
+    node_270 --> node_2223
+    node_270 --> node_233
+    node_29 --> node_1
+    node_29 --> node_1781
+    node_325 --> node_1106
+    node_325 --> node_183
+    node_325 --> node_2034
+    node_325 --> node_270
+    node_401 --> node_1106
+    node_401 --> node_134
+    node_401 --> node_1781
+    node_401 --> node_183
+    node_401 --> node_2223
+    node_401 --> node_233
+    node_401 --> node_270
+    node_401 --> node_325
+    node_55 --> node_183
+    node_55 --> node_2034
+    node_623 --> node_2263
+    node_623 --> node_2290
+    node_623 --> node_2371
+    node_626 --> node_1106
+    node_626 --> node_1781
+    node_626 --> node_2034
+    node_626 --> node_2223
+    node_78 --> node_1
+    node_78 --> node_183
+    node_78 --> node_55
+    node_852 --> node_1
+    node_852 --> node_1106
+    node_852 --> node_183
+    node_852 --> node_2034
+    node_852 --> node_2183
+    node_852 --> node_29
+    node_852 --> node_55
+    node_852 --> node_78
+    node_870 --> node_1106
+    node_870 --> node_1781
+    node_870 --> node_2034
+    node_960 --> node_1106
+    node_960 --> node_1319
+    node_960 --> node_134
+    node_960 --> node_141
+    node_960 --> node_1781
+    node_960 --> node_183
+    node_960 --> node_2034
+    node_960 --> node_2087
+    node_960 --> node_2183
+    node_960 --> node_2290
+    node_960 --> node_233
+    node_960 --> node_2371
+    node_960 --> node_270
+    node_960 --> node_325
+    node_960 --> node_401
+    node_1781 -.-> node_1106
+    node_2034 -.-> node_1106
+    node_2487 -.-> node_1106
+    node_2487 -.-> node_2087
+    node_325 -.-> node_134
+    node_960 -.-> node_2263
+    classDef default fill-opacity:0,stroke:#777;

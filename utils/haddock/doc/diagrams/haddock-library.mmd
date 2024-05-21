@@ -1,0 +1,21 @@
+flowchart TD
+    node_0[Documentation.Haddock.Types]
+    node_100[Documentation.Haddock.Parser.Monad]
+    node_127[Documentation.Haddock.Parser.Util]
+    node_138[Documentation.Haddock.Parser.Identifier]
+    node_152[Documentation.Haddock.Markup]
+    node_156[Documentation.Haddock.Doc]
+    node_166[Documentation.Haddock.Parser]
+    node_100 --> node_0
+    node_127 --> node_100
+    node_138 --> node_0
+    node_152 --> node_0
+    node_156 --> node_0
+    node_166 --> node_0
+    node_166 --> node_100
+    node_166 --> node_127
+    node_166 --> node_138
+    node_166 --> node_152
+    node_166 --> node_156
+    node_138 -.-> node_100
+    classDef default fill-opacity:0,stroke:#777;
