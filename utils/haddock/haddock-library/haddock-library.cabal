@@ -17,13 +17,7 @@ maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <ale
 homepage:             http://www.haskell.org/haddock/
 bug-reports:          https://github.com/haskell/haddock/issues
 category:             Documentation
-tested-with:          GHC == 7.4.2
-                    , GHC == 7.6.3
-                    , GHC == 7.8.4
-                    , GHC == 7.10.3
-                    , GHC == 8.0.2
-                    , GHC == 8.2.2
-                    , GHC == 8.4.4
+tested-with:          GHC == 8.4.4
                     , GHC == 8.6.5
                     , GHC == 8.8.3
                     , GHC == 8.10.1
@@ -41,14 +35,15 @@ common lib-defaults
   default-language: Haskell2010
 
   build-depends:
-    , base         >= 4.5     && < 4.20
+    , base         >= 4.10     && < 4.20
     , containers   ^>= 0.4.2.1 || ^>= 0.5.0.0 || ^>= 0.6.0.1 || ^>= 0.7
     , text         ^>= 1.2.3.0 || ^>= 2.0 || ^>= 2.1
     , parsec       ^>= 3.1.13.0
 
-  ghc-options: -funbox-strict-fields -Wall
-  if impl(ghc >= 8.0)
-    ghc-options: -Wcompat -Wnoncanonical-monad-instances
+  ghc-options: -funbox-strict-fields
+               -Wall
+               -Wcompat
+               -Wnoncanonical-monad-instances
 
 library
   import: lib-defaults
@@ -62,7 +57,6 @@ library
     Documentation.Haddock.Types
 
   other-modules:
-    CompatPrelude
     Documentation.Haddock.Parser.Util
     Documentation.Haddock.Parser.Monad
     Documentation.Haddock.Parser.Identifier
@@ -76,7 +70,6 @@ test-suite spec
     src
 
   other-modules:
-    CompatPrelude
     Documentation.Haddock.Doc
     Documentation.Haddock.Markup
     Documentation.Haddock.Parser

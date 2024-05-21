@@ -24,9 +24,9 @@ import Text.Parsec
   , setParserState
   )
 import qualified Text.Parsec as Parsec
-import qualified Text.Parsec.Char as Parsec
 import Text.Parsec.Pos (updatePosChar)
 
+import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -39,7 +39,6 @@ import Data.String (IsString (..))
 
 import Documentation.Haddock.Types (MetaSince (..))
 
-import CompatPrelude
 import Prelude hiding (takeWhile)
 
 -- | The only bit of information we really care about trudging along with us

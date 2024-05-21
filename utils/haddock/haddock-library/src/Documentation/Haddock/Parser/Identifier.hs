@@ -24,11 +24,12 @@ import Text.Parsec
   )
 import qualified Text.Parsec as Parsec
 import Text.Parsec.Pos (updatePosChar)
+import Text.Read.Lex (isSymbolChar)
 
+import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import CompatPrelude
 import Control.Monad (guard)
 import Data.Char (isAlpha, isAlphaNum)
 import Data.Maybe

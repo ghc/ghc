@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveTraversable #-}
 
 -- |
@@ -15,21 +14,10 @@
 -- Exposes documentation data types used for (some) of Haddock.
 module Documentation.Haddock.Types where
 
-#if !MIN_VERSION_base(4,8,0)
-import Control.Applicative
-import Data.Foldable
-import Data.Traversable
-#endif
-
-#if MIN_VERSION_base(4,8,0)
 import Control.Arrow ((***))
-import Data.Bifunctor
-#endif
-
-#if MIN_VERSION_base(4,10,0)
 import Data.Bifoldable
+import Data.Bifunctor
 import Data.Bitraversable
-#endif
 
 -- | A @\@since@ declaration.
 data MetaSince = MetaSince
@@ -54,21 +42,14 @@ data MetaDoc mod id = MetaDoc
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-#if MIN_VERSION_base(4,8,0)
--- | __NOTE__: Only defined for @base >= 4.8.0@
 instance Bifunctor MetaDoc where
   bimap f g (MetaDoc m d) = MetaDoc m (bimap f g d)
-#endif
 
-#if MIN_VERSION_base(4,10,0)
--- | __NOTE__: Only defined for @base >= 4.10.0@
 instance Bifoldable MetaDoc where
   bifoldr f g z d = bifoldr f g z (_doc d)
 
--- | __NOTE__: Only defined for @base >= 4.10.0@
 instance Bitraversable MetaDoc where
   bitraverse f g (MetaDoc m d) = MetaDoc m <$> bitraverse f g d
-#endif
 
 overDoc :: (DocH a b -> DocH c d) -> MetaDoc a b -> MetaDoc c d
 overDoc f d = d{_doc = f $ _doc d}
@@ -159,8 +140,6 @@ data DocH mod id
   | DocTable (Table (DocH mod id))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-#if MIN_VERSION_base(4,8,0)
--- | __NOTE__: Only defined for @base >= 4.8.0@
 instance Bifunctor DocH where
   bimap _ _ DocEmpty = DocEmpty
   bimap f g (DocAppend docA docB) = DocAppend (bimap f g docA) (bimap f g docB)
@@ -186,10 +165,7 @@ instance Bifunctor DocH where
   bimap _ _ (DocExamples examples) = DocExamples examples
   bimap f g (DocHeader (Header level title)) = DocHeader (Header level (bimap f g title))
   bimap f g (DocTable (Table header body)) = DocTable (Table (map (fmap (bimap f g)) header) (map (fmap (bimap f g)) body))
-#endif
 
-#if MIN_VERSION_base(4,10,0)
--- | __NOTE__: Only defined for @base >= 4.10.0@
 instance Bifoldable DocH where
   bifoldr f g z (DocAppend docA docB) = bifoldr f g (bifoldr f g z docA) docB
   bifoldr f g z (DocParagraph doc) = bifoldr f g z doc
@@ -207,7 +183,6 @@ instance Bifoldable DocH where
   bifoldr f g z (DocTable (Table header body)) = foldr (\r acc -> foldr (flip (bifoldr f g)) acc r) (foldr (\r acc -> foldr (flip (bifoldr f g)) acc r) z body) header
   bifoldr _ _ z _ = z
 
--- | __NOTE__: Only defined for @base >= 4.10.0@
 instance Bitraversable DocH where
   bitraverse _ _ DocEmpty = pure DocEmpty
   bitraverse f g (DocAppend docA docB) = DocAppend <$> bitraverse f g docA <*> bitraverse f g docB
@@ -222,7 +197,8 @@ instance Bitraversable DocH where
   bitraverse f g (DocBold doc) = DocBold <$> bitraverse f g doc
   bitraverse f g (DocUnorderedList docs) = DocUnorderedList <$> traverse (bitraverse f g) docs
   bitraverse f g (DocOrderedList docs) = DocOrderedList <$> traverseSnd (bitraverse f g) docs
-    where traverseSnd f' = traverse (\(x, a) -> (\b -> (x, b)) <$> f' a)
+    where
+      traverseSnd f' = traverse (\(x, a) -> (\b -> (x, b)) <$> f' a)
   bitraverse f g (DocDefList docs) = DocDefList <$> traverse (bitraverse (bitraverse f g) (bitraverse f g)) docs
   bitraverse f g (DocCodeBlock doc) = DocCodeBlock <$> bitraverse f g doc
   bitraverse f g (DocHyperlink (Hyperlink url lbl)) = DocHyperlink <$> (Hyperlink url <$> traverse (bitraverse f g) lbl)
@@ -234,7 +210,6 @@ instance Bitraversable DocH where
   bitraverse _ _ (DocExamples examples) = pure (DocExamples examples)
   bitraverse f g (DocHeader (Header level title)) = (DocHeader . Header level) <$> bitraverse f g title
   bitraverse f g (DocTable (Table header body)) = (\h b -> DocTable (Table h b)) <$> traverse (traverse (bitraverse f g)) header <*> traverse (traverse (bitraverse f g)) body
-#endif
 
 -- | The namespace qualification for an identifier.
 data Namespace = Value | Type | None deriving (Eq, Ord, Enum, Show)

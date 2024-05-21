@@ -91,7 +91,6 @@ executable haddock
       mtl
 
     other-modules:
-      CompatPrelude
       Documentation.Haddock.Parser
       Documentation.Haddock.Parser.Monad
       Documentation.Haddock.Parser.Identifier
