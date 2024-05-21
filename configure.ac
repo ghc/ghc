@@ -709,9 +709,6 @@ AC_SUBST(TargetHasIdentDirective)
 GHC_GNU_NONEXEC_STACK
 AC_SUBST(TargetHasGnuNonexecStack)
 
-dnl ** figure out how to do context diffs
-FP_PROG_CONTEXT_DIFF
-
 dnl Let's make sure install-sh is executable here.  If we got it from
 dnl a darcs repo, it might not be (see bug #978).
 chmod +x install-sh
