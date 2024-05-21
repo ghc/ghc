@@ -679,12 +679,25 @@ function test_hadrian() {
 }
 
 function summarise_hi_files() {
-  for iface in $(find . -type f -name "*.hi" | sort); do echo "$iface  $($HC --show-iface $iface | grep "  ABI hash:")"; done | tee $OUT/abis
-  for iface in $(find . -type f -name "*.hi" | sort); do echo "$iface  $($HC --show-iface $iface | grep "  interface hash:")"; done | tee $OUT/interfaces
-  for iface in $(find . -type f -name "*.hi" | sort); do
-      fname="$OUT/$(dirname $iface)"
-      mkdir -p $fname
-      $HC --show-iface $iface > "$OUT/$iface"
+  hi_files=$(find . -type f -name "*.hi" | sort)
+  for iface in $hi_files; do echo "$iface  $($HC --show-iface "$iface" | grep "  ABI hash:")"; done | tee $OUT/abis
+  for iface in $hi_files; do echo "$iface  $($HC --show-iface "$iface" | grep "  interface hash:")"; done | tee $OUT/interfaces
+  for iface in $hi_files; do
+      fname="$OUT/$(dirname "$iface")"
+      mkdir -p "$fname"
+      $HC --show-iface "$iface" > "$OUT/$iface"
+  done
+}
+
+function summarise_o_files() {
+  OBJDUMP=$(if test "$(uname)" == "Darwin"; then echo "objdump -m"; else echo "objdump"; fi)
+  o_files=$(find . -type f -name "*.o" | sort)
+  for o in $o_files; do
+      fname="$OUT/objs/$(dirname "$o")"
+      mkdir -p "$fname"
+      # To later compare object dumps except for the first line which prints the file path
+      $OBJDUMP --all-headers "$o" | tail -n+2 > "$OUT/objs/$o.all-headers"
+      $OBJDUMP --disassemble-all "$o" | tail -n+2 > "$OUT/objs/$o.disassemble-all"
   done
 }
 
@@ -704,6 +717,7 @@ function cabal_abi_test() {
     -iCabal/Cabal/src -XNoPolyKinds Distribution.Simple -j"$cores" \
     "$@" 2>&1 | tee $OUT/log
   summarise_hi_files
+  summarise_o_files
   popd
   end_section "Cabal test: $OUT"
 }
@@ -748,8 +762,34 @@ function check_interfaces(){
      for line in $(echo "$difference" | tr ' ' '\n' | grep ".hi" | sort | uniq); do
        diff "$1/$line" "$2/$line"
      done
-     fail "$3"
+     fail "$4"
   fi
+}
+
+function check_objects(){
+
+  # Big fast check
+  if diff -r "$1" "$2"
+  then
+    echo "Objects are the same"
+  else
+    echo "--------------------------------------------------------------------------------"
+    echo "Comparing all objects (1. headers, 2. disassembly). Stopping at first failure..."
+    echo "--------------------------------------------------------------------------------"
+
+    pushd "$1" >/dev/null
+    OBJ_DUMPS=$(find . -type f -name "*.all-headers" -or -name "*.disassemble-all")
+    popd >/dev/null
+
+    for dump in $OBJ_DUMPS
+    do
+      if diff "$1/$dump" "$2/$dump"
+      then
+        fail "Mismatched object: $dump"
+      fi
+    done
+  fi
+
 }
 
 function abi_test() {
@@ -765,6 +805,7 @@ function run_abi_test() {
   OUT="$PWD/out/run2" DIR=$(mktemp -d XXXX-short) cabal_abi_test -O0
   check_interfaces out/run1 out/run2 abis "Mismatched ABI hash"
   check_interfaces out/run1 out/run2 interfaces "Mismatched interface hashes"
+  check_objects out/run1 out/run2
 }
 
 function save_test_output() {
