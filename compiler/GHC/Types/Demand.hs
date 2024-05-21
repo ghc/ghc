@@ -981,18 +981,10 @@ strictifyDmd = plusDmd seqDmd
 strictifyDictDmd :: Type -> Demand -> Demand
 strictifyDictDmd ty (n :* Prod b ds)
   | not (isAbs n)
-  , Just field_tys <- as_non_newtype_dict ty
-  = C_1N :* mkProd b (zipWith strictifyDictDmd field_tys ds)
+  , isTerminatingType ty
+  , Just (_tc, _arg_tys, _data_con, field_tys) <- splitDataProductType_maybe ty
+  = C_1N :* mkProd b (zipWith strictifyDictDmd (map scaledThing field_tys) ds)
       -- main idea: ensure it's strict
-  where
-    -- Return a TyCon and a list of field types if the given
-    -- type is a non-newtype dictionary type
-    as_non_newtype_dict ty
-      | isTerminatingType ty
-      , Just (_tc, _arg_tys, _data_con, field_tys) <- splitDataProductType_maybe ty
-      = Just (map scaledThing field_tys)
-      | otherwise
-      = Nothing
 strictifyDictDmd _  dmd = dmd
 
 -- | Make a 'Demand' lazy.

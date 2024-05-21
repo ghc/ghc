@@ -611,11 +611,64 @@ Some further observations about `withDict`:
       overloaded function `f` (e.g. with a type such as `f :: Eq a => ...`).
 
       See test-case T21575b.
+-}
 
 
+{- ********************************************************************
+*                                                                     *
+                   Class lookup for DataToTag
+*                                                                     *
+***********************************************************************-}
 
-Note [DataToTag overview]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+matchDataToTag :: Class -> [Type] -> TcM ClsInstResult
+-- See Note [DataToTag overview]
+matchDataToTag dataToTagClass [levity, dty] = do
+  famEnvs <- tcGetFamInstEnvs
+  (gbl_env, _lcl_env) <- getEnvs
+  platform <- getPlatform
+  if | isConcreteType levity -- condition C3
+     , Just (rawTyCon, rawTyConArgs) <- tcSplitTyConApp_maybe dty
+     , let (repTyCon, repArgs, repCo)
+             = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
+
+     , not (isTypeDataTyCon repTyCon)
+     , Just constrs <- tyConDataCons_maybe repTyCon
+         -- condition C1
+
+     , let  rdr_env = tcg_rdr_env gbl_env
+            inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
+     , all inScope constrs -- condition C2
+
+     , let  repTy = mkTyConApp repTyCon repArgs
+            numConstrs = tyConFamilySize repTyCon
+            !whichOp -- see wrinkle DTW4
+              | isSmallFamily platform numConstrs
+                = primOpId DataToTagSmallOp
+              | otherwise
+                = primOpId DataToTagLargeOp
+
+            -- See wrinkle DTW1; we must apply the underlying
+            -- operation at the representation type and cast it
+            methodRep = Var whichOp `App` Type levity `App` Type repTy
+            methodCo = mkFunCo Representational
+                               FTF_T_T
+                               (mkNomReflCo ManyTy)
+                               (mkSymCo repCo)
+                               (mkReflCo Representational intPrimTy)
+     -> do { addUsedDataCons rdr_env repTyCon   -- See wrinkles DTW2 and DTW3
+           ; let mk_ev _ = evDictApp dataToTagClass [levity, dty] $
+                           [methodRep `Cast` methodCo]
+           ; pure (OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
+                           , cir_mk_ev     = mk_ev
+                           , cir_canonical = EvCanonical
+                           , cir_what = BuiltinInstance })}
+     | otherwise -> pure NoInstance
+
+matchDataToTag _ _ = pure NoInstance
+
+
+{- Note [DataToTag overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Class `DataToTag` is defined like this, in GHC.Magic:
 
   type DataToTag :: forall {lev :: Levity}.
@@ -882,62 +935,7 @@ argument, unless tag inference determines the argument was already
 evaluated and correctly tagged.  Getting here was a long journey, with
 many similarities to the story behind Note [Evaluated and Properly Tagged] in
 GHC.Stg.EnforceEpt.  See also #15696.
-
 -}
-
-
-{- ********************************************************************
-*                                                                     *
-                   Class lookup for DataToTag
-*                                                                     *
-***********************************************************************-}
-
-matchDataToTag :: Class -> [Type] -> TcM ClsInstResult
--- See Note [DataToTag overview]
-matchDataToTag dataToTagClass [levity, dty] = do
-  famEnvs <- tcGetFamInstEnvs
-  (gbl_env, _lcl_env) <- getEnvs
-  platform <- getPlatform
-  if | isConcreteType levity -- condition C3
-     , Just (rawTyCon, rawTyConArgs) <- tcSplitTyConApp_maybe dty
-     , let (repTyCon, repArgs, repCo)
-             = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
-
-     , not (isTypeDataTyCon repTyCon)
-     , Just constrs <- tyConAlgDataCons_maybe repTyCon
-         -- condition C1
-
-     , let  rdr_env = tcg_rdr_env gbl_env
-            inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
-     , all inScope constrs -- condition C2
-
-     , let  repTy = mkTyConApp repTyCon repArgs
-            numConstrs = tyConFamilySize repTyCon
-            !whichOp -- see wrinkle DTW4
-              | isSmallFamily platform numConstrs
-                = primOpId DataToTagSmallOp
-              | otherwise
-                = primOpId DataToTagLargeOp
-
-            -- See wrinkle DTW1; we must apply the underlying
-            -- operation at the representation type and cast it
-            methodRep = Var whichOp `App` Type levity `App` Type repTy
-            methodCo = mkFunCo Representational
-                               FTF_T_T
-                               (mkNomReflCo ManyTy)
-                               (mkSymCo repCo)
-                               (mkReflCo Representational intPrimTy)
-     -> do { addUsedDataCons rdr_env repTyCon   -- See wrinkles DTW2 and DTW3
-           ; let mk_ev _ = evDictApp dataToTagClass [levity, dty] $
-                           [methodRep `Cast` methodCo]
-           ; pure (OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
-                           , cir_mk_ev     = mk_ev
-                           , cir_canonical = EvCanonical
-                           , cir_what = BuiltinInstance })}
-     | otherwise -> pure NoInstance
-
-matchDataToTag _ _ = pure NoInstance
-
 
 {- ********************************************************************
 *                                                                     *

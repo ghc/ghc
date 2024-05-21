@@ -296,7 +296,7 @@ mkDataConWorkers :: Bool -> ModLocation -> TyCon -> [CoreBind]
 -- See Note [Data constructor workers]
 -- c.f. Note [Injecting implicit bindings] in GHC.Iface.Tidy
 mkDataConWorkers generate_debug_info mod_loc tycon
-  | isDataTyCon tycon
+  | isBoxedDataTyCon tycon
   = [ NonRec id (tick_it (getName data_con) (Var id))
       -- The ice is thin here, but it works: CorePrep will eta-expand it
     | data_con <- tyConDataCons tycon

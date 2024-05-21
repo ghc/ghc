@@ -60,7 +60,7 @@ module GHC.Core.TyCon(
         isKindTyCon, isKindName, isLiftedTypeKindTyConName,
         isTauTyCon, isFamFreeTyCon, isForgetfulSynTyCon,
 
-        isDataTyCon,
+        isBoxedDataTyCon,
         isTypeDataTyCon,
         isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
@@ -87,8 +87,6 @@ module GHC.Core.TyCon(
         tyConCType_maybe,
         tyConDataCons, tyConDataCons_maybe,
         tyConSingleDataCon_maybe, tyConSingleDataCon,
-        tyConAlgDataCons_maybe,
-        tyConSingleAlgDataCon_maybe,
         tyConFamilySize,
         tyConStupidTheta,
         tyConArity,
@@ -2007,21 +2005,26 @@ isVanillaAlgTyCon (TyCon { tyConDetails = details })
 -- satisfies condition DTT2 of Note [DataToTag overview] in
 -- GHC.Tc.Instance.Class
 isValidDTT2TyCon :: TyCon -> Bool
-isValidDTT2TyCon = isDataTyCon
+isValidDTT2TyCon = isBoxedDataTyCon
 
-isDataTyCon :: TyCon -> Bool
+isBoxedDataTyCon :: TyCon -> Bool
 -- ^ Returns @True@ for data types that are /definitely/ represented by
 -- heap-allocated constructors.  These are scrutinised by Core-level
 -- @case@ expressions, and they get info tables allocated for them.
 --
--- Generally, the function will be true for all @data@ types and false
--- for @newtype@s, unboxed tuples, unboxed sums and type family
--- 'TyCon's. But it is not guaranteed to return @True@ in all cases
+-- Generally, the function will be
+-- true for all `data` types and
+-- false for  newtype
+--            unboxed tuples
+--            unboxed sums
+--            type family
+--            type data
+-- 'TyCon's. But it is not guaranteed to return `True` in all cases
 -- that it could.
 --
 -- NB: for a data type family, only the /instance/ 'TyCon's
 --     get an info table.  The family declaration 'TyCon' does not
-isDataTyCon (TyCon { tyConDetails = details })
+isBoxedDataTyCon (TyCon { tyConDetails = details })
   | AlgTyCon {algTcRhs = rhs} <- details
   = case rhs of
         TupleTyCon { tup_sort = sort }
@@ -2034,7 +2037,7 @@ isDataTyCon (TyCon { tyConDetails = details })
         NewTyCon {}        -> False
         UnaryClass {}      -> False
         AbstractTyCon {}   -> False      -- We don't know, so return False
-isDataTyCon _ = False
+isBoxedDataTyCon _ = False
 
 -- | Was this 'TyCon' declared as "type data"?
 -- See Note [Type data declarations] in GHC.Rename.Module.
@@ -2636,24 +2639,6 @@ tyConSingleDataCon tc
   = case tyConSingleDataCon_maybe tc of
       Just c  -> c
       Nothing -> pprPanic "tyConDataCon" (ppr tc)
-
--- | Like 'tyConSingleDataCon_maybe', but returns 'Nothing' for newtypes.
-tyConSingleAlgDataCon_maybe :: TyCon -> Maybe DataCon
-tyConSingleAlgDataCon_maybe tycon
-  | isDataTyCon tycon  = tyConSingleDataCon_maybe tycon
-  | otherwise          = Nothing
-
--- | Returns @Just dcs@ if the given 'TyCon' is a @data@ type, a tuple type
--- or a sum type with data constructors dcs. If the 'TyCon' has more than one
--- constructor, or represents a primitive or function type constructor then
--- @Nothing@ is returned.
---
--- Like 'tyConDataCons_maybe', but returns 'Nothing' for newtypes.
-tyConAlgDataCons_maybe :: TyCon -> Maybe [DataCon]
-tyConAlgDataCons_maybe tycon
-  | isNewTyCon tycon        = Nothing
-  | isUnaryClassTyCon tycon = Nothing
-  | otherwise               = tyConDataCons_maybe tycon
 
 -- | Determine the number of value constructors a 'TyCon' has. Panics if the
 -- 'TyCon' is not algebraic or a tuple
