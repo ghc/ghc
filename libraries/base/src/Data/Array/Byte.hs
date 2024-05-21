@@ -41,6 +41,22 @@ import Prelude
 -- but wrap and unwrap 'ByteArray' internally as they please
 -- and use functions from "GHC.Exts".
 --
+-- The memory representation of a 'ByteArray' is:
+--
+-- > ╭─────────────┬───╮  ╭────────┬──────┬─────────╮
+-- > │ Constructor │ * ┼─➤│ Header │ Size │ Payload │
+-- > ╰─────────────┴───╯  ╰────────┴──────┴─────────╯
+--
+-- And its overhead is the following:
+--
+-- * 'ByteArray' constructor: 1 word
+-- * Pointer to 'ByteArray#': 1 word
+-- * 'ByteArray#' Header: 1 word
+-- * 'ByteArray#' Size: 1 word
+--
+-- Where a word is the unit of heap allocation,
+-- measuring 8 bytes on 64-bit systems, and 4 bytes on 32-bit systems.
+--
 -- @since 4.17.0.0
 data ByteArray = ByteArray ByteArray#
 
