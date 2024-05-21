@@ -7,7 +7,7 @@ To re-generate the diagrams, run the following command on the distributed versio
 ```
 # In the haddock-library directory
 $ calligraphy --output-mermaid ~/haddock-library.mmd --collapse-modules
-# In teh haddock-api directory
+# In the haddock-api directory
 $ calligraphy --output-mermaid ~/haddock-api.mmd --collapse-modules
 ```
 
