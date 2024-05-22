@@ -283,11 +283,43 @@ data Symbol
 *                                                                      *
 ********************************************************************* -}
 
--- | The type constructor 'Any' is type to which you can unsafely coerce any
--- lifted type, and back. More concretely, for a lifted type @t@ and
--- value @x :: t@, @unsafeCoerce (unsafeCoerce x :: Any) :: t@ is equivalent
--- to @x@.
+-- | The type constructor @Any :: forall k. k@ is a type to which you can unsafely coerce any type, and back.
 --
+-- For @unsafeCoerce@ this means for all lifted types @t@ that
+-- @unsafeCoerce (unsafeCoerce x :: Any) :: t@ is equivalent to @x@ and safe.
+--
+-- The same is true for *all* types when using
+-- @
+--   unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+--                   (a :: TYPE r1) (b :: TYPE r2).
+--                   a -> b
+-- @
+-- but /only/ if you instantiate @r1@ and @r2@ to the /same/ runtime representation.
+-- For example using @(unsafeCoerce# :: forall (a :: TYPE IntRep) (b :: TYPE IntRep). a -> b) x@
+-- is fine, but @(unsafeCoerce# :: forall (a :: TYPE IntRep) (b :: TYPE FloatRep). a -> b)@
+-- will likely cause seg-faults or worse.
+-- For this resason, users should always prefer unsafeCoerce over unsafeCoerce# when possible.
+--
+-- Here are some more examples:
+-- @
+--    bad_a1 :: Any @(TYPE 'IntRep)
+--    bad_a1 = unsafeCoerce# True
+--
+--    bad_a2 :: Any @(TYPE ('BoxedRep 'UnliftedRep))
+--    bad_a2 = unsafeCoerce# True
+-- @
+-- Here @bad_a1@ is bad because we started with @True :: (Bool :: Type)@, represented by a boxed heap pointer,
+-- and coerced it to @a1 :: Any @(TYPE 'IntRep)@, whose representation is a non-pointer integer.
+-- That's why we had to use `unsafeCoerce#`; it is really unsafe because it can change representations.
+-- Similarly @bad_a2@ is bad because although both @True@ and @bad_a2@ are represented by a heap pointer,
+-- @True@ is lifted but @bad_a2@ is not; bugs here may be rather subtle.
+--
+-- If you must use unsafeCoerce# to cast to `Any`, type annotations are recommended
+-- to make sure that @Any@ has the correct kind. As casting between different runtimereps is
+-- unsound. For example to cast a @ByteArray#@ to @Any@ you might use:
+-- @
+--    unsafeCoerce# b :: (Any :: TYPE ('BoxedRep 'Unlifted))
+-- @
 type family Any :: k where { }
 -- See Note [Any types] in GHC.Builtin.Types. Also, for a bit of history on Any see
 -- #10886. Note that this must be a *closed* type family: we need to ensure

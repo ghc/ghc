@@ -336,6 +336,10 @@ unsafeCoerceAddr x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 -- to another. Misuse of this function can invite the garbage collector
 -- to trounce upon your data and then laugh in your face. You don't want
 -- this function. Really.
+--
+-- This becomes more obvious when looking at its actual type:
+-- @forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)  (a :: TYPE r1) (b :: TYPE r2). a -> b@
+-- Which often get's rendered as @a -> b@ in haddock for technical reasons.
 unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                         (a :: TYPE r1) (b :: TYPE r2).
                  a -> b

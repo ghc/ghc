@@ -445,7 +445,15 @@ It has these properties:
   * When instantiated at a lifted type it is inhabited by at least one value,
     namely bottom
 
-  * You can safely coerce any /lifted/ type to Any, and back with unsafeCoerce.
+  * You can safely coerce any /lifted/ type to Any and back with unsafeCoerce.
+    You can safely coerce any /unlifted/ type to Any and back with unsafeCoerceUnlifted.
+    You can coerce /any/ type to Any and back with unsafeCoerce#, but it's only safe when
+    the kinds of both the type and Any match.
+
+    For lifted/unlifted types unsafeCoerce[Unlifted] should be preferred over unsafeCoerce#
+    as they prevent accidentally coercing between types with kinds that don't match.
+
+    See examples in ghc-prim:GHC.Types
 
   * It does not claim to be a *data* type, and that's important for
     the code generator, because the code gen may *enter* a data value
