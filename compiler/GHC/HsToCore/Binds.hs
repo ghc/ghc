@@ -63,7 +63,6 @@ import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
 import GHC.Tc.Types.Evidence
 
 import GHC.Types.Id
-import GHC.Types.Id.Make ( nospecId )
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -204,33 +203,25 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = (co_fn, tick)
                            })
- = do   { dsHsWrapper co_fn $ \core_wrap -> do
-        { (args, body) <- addTyCs FromSource (hsWrapDictBinders co_fn) $
-                          -- FromSource might not be accurate (we don't have any
-                          -- origin annotations for things in this module), but at
-                          -- worst we do superfluous calls to the pattern match
-                          -- oracle.
-                          -- addTyCs: Add type evidence to the refinement type
-                          --            predicate of the coverage checker
-                          -- See Note [Long-distance information] in "GHC.HsToCore.Pmc"
-                          matchWrapper (mkPrefixFunRhs (L loc (idName fun)) noAnn) Nothing matches
+ = dsHsWrapper co_fn $ \core_wrap ->
+   do { (args, body) <- matchWrapper (mkPrefixFunRhs (L loc (idName fun)) noAnn) Nothing matches
 
-        ; let body' = mkOptTickBox tick body
-              rhs   = core_wrap (mkLams args body')
-              core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
-              force_var
-                  -- Bindings are strict when -XStrict is enabled
-                | xopt LangExt.Strict dflags
-                , matchGroupArity matches == 0 -- no need to force lambdas
-                = [id]
-                | isBangedHsBind b
-                = [id]
-                | otherwise
-                = []
-        ; --pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
-          --                          , ppr (mg_alts matches)
-          --                          , ppr args, ppr core_binds, ppr body']) $
-          return (force_var, [core_binds]) } }
+      ; let body' = mkOptTickBox tick body
+            rhs   = core_wrap (mkLams args body')
+            core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
+            force_var
+                -- Bindings are strict when -XStrict is enabled
+              | xopt LangExt.Strict dflags
+              , matchGroupArity matches == 0 -- no need to force lambdas
+              = [id]
+              | isBangedHsBind b
+              = [id]
+              | otherwise
+              = []
+      ; --pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
+        --                          , ppr (mg_alts matches)
+        --                          , ppr args, ppr core_binds, ppr body']) $
+        return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                          , pat_ext = (ty, (rhs_tick, var_ticks))
@@ -253,15 +244,15 @@ dsHsBind
                         , abs_exports = exports
                         , abs_ev_binds = ev_binds
                         , abs_binds = binds, abs_sig = has_sig }))
-  = dsTcEvBinds_s ev_binds $ \ds_ev_binds -> do
-    { ds_binds <- addTyCs FromSource (listToBag dicts) $
-                     dsLHsBinds binds
+  = addTyCs FromSource (listToBag dicts) $
              -- addTyCs: push type constraints deeper
              --            for inner pattern match check
              -- See Check, Note [Long-distance information]
-
-    -- dsAbsBinds does the hard work
-    ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds (isSingleton binds) has_sig }
+    dsTcEvBinds_s ev_binds $ \ds_ev_binds -> do
+    do { ds_binds <- dsLHsBinds binds
+         -- dsAbsBinds does the hard work
+       ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds
+                    (isSingleton binds) has_sig }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 
@@ -840,7 +831,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                -- perhaps with the body of the lambda wrapped in some WpLets
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
 
-       ; dsHsWrapperForRuleLHS spec_app $ \core_app -> do
+       ; dsHsWrapper spec_app $ \core_app -> do
 
        { let ds_lhs  = core_app (Var poly_id)
              spec_ty = mkLamTypes spec_bndrs (exprType ds_lhs)
@@ -1312,49 +1303,6 @@ evidence that is used in `e`.
 
 This question arose when thinking about deep subsumption; see
 https://github.com/ghc-proposals/ghc-proposals/pull/287#issuecomment-1125419649).
-
-Note [Desugaring non-canonical evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the evidence is canonical, we desugar WpEvApp by simply passing
-core_tm directly to k:
-
-  k core_tm
-
-If the evidence is not canonical, we mark the application with nospec:
-
-  nospec @(cls => a) k core_tm
-
-where  nospec :: forall a. a -> a  ensures that the typeclass specialiser
-doesn't attempt to common up this evidence term with other evidence terms
-of the same type (see Note [nospecId magic] in GHC.Types.Id.Make).
-
-See Note [Coherence and specialisation: overview] for why we shouldn't
-specialise incoherent evidence.
-
-We can find out if a given evidence is canonical or not during the
-desugaring of its WpLet wrapper: an evidence is non-canonical if its
-own resolution was incoherent (see Note [Incoherent instances]), or
-if its definition refers to other non-canonical evidence. dsEvBinds is
-the convenient place to compute this, since it already needs to do
-inter-evidence dependency analysis to generate well-scoped
-bindings. We then record this specialisability information in the
-dsl_unspecables field of DsM's local environment.
-
-Wrinkle:
-
-(NC1) Don't do this in the LHS of a RULE.  In paritcular, if we have
-     f :: (Num a, HasCallStack) => a -> a
-     {-# SPECIALISE f :: Int -> Int #-}
-  then making a rule like
-        RULE   forall d1:Num Int, d2:HasCallStack.
-               f @Int d1 d2 = $sf
-  is pretty dodgy, because $sf won't get the call stack passed in d2.
-  But that's what you asked for in the SPECIALISE pragma, so we'll obey.
-
-  We definitely can't desugar that LHS into this!
-      nospec (f @Int d1) d2
-
-  Hence the `is_rule_lhs` flag in `ds_hs_wrapper`.
 -}
 
 dsHsWrappers :: [HsWrapper] -> ([CoreExpr -> CoreExpr] -> DsM a) -> DsM a
@@ -1362,17 +1310,22 @@ dsHsWrappers (wp:wps) k = dsHsWrapper wp $ \wrap -> dsHsWrappers wps $ \wraps ->
 dsHsWrappers []       k = k []
 
 dsHsWrapper :: HsWrapper -> ((CoreExpr -> CoreExpr) -> DsM a) -> DsM a
-dsHsWrapper = ds_hs_wrapper False
+dsHsWrapper hs_wrap thing_inside
+  = ds_hs_wrapper hs_wrap $ \ core_wrap ->
+    addTyCs FromSource (hsWrapDictBinders hs_wrap) $
+       -- addTyCs: Add type evidence to the refinement type
+       --            predicate of the coverage checker
+       --   See Note [Long-distance information] in "GHC.HsToCore.Pmc"
+       -- FromSource might not be accurate (we don't have any
+       -- origin annotations for things in this module), but at
+       -- worst we do superfluous calls to the pattern match
+       -- oracle.
+    thing_inside core_wrap
 
-dsHsWrapperForRuleLHS :: HsWrapper -> ((CoreExpr -> CoreExpr) -> DsM a) -> DsM a
-dsHsWrapperForRuleLHS = ds_hs_wrapper True
-
-ds_hs_wrapper :: Bool    -- True <=> LHS of a RULE
-                         -- See (NC1) in Note [Desugaring non-canonical evidence]
-              -> HsWrapper
+ds_hs_wrapper :: HsWrapper
               -> ((CoreExpr -> CoreExpr) -> DsM a)
               -> DsM a
-ds_hs_wrapper is_rule_lhs wrap = go wrap
+ds_hs_wrapper wrap = go wrap
   where
     go WpHole            k = k $ \e -> e
     go (WpTyApp ty)      k = k $ \e -> App e (Type ty)
@@ -1380,6 +1333,8 @@ ds_hs_wrapper is_rule_lhs wrap = go wrap
     go (WpTyLam tv)      k = k $ Lam tv
     go (WpCast co)       k = assert (coercionRole co == Representational) $
                              k $ \e -> mkCastDs e co
+    go (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
+                                ; k $ \e -> e `App` core_tm }
     go (WpLet ev_binds)  k = dsTcEvBinds ev_binds $ \bs ->
                              k (mkCoreLets bs)
     go (WpCompose c1 c2) k = go c1 $ \w1 ->
@@ -1389,32 +1344,9 @@ ds_hs_wrapper is_rule_lhs wrap = go wrap
                              do { x <- newSysLocalDs st
                                 ; go c1 $ \w1 ->
                                   go c2 $ \w2 ->
-                                  let app f a = mkCoreAppDs (text "dsHsWrapper") f a
+                                  let app f a = mkCoreApp (text "dsHsWrapper") f a
                                       arg     = w1 (Var x)
                                   in k (\e -> (Lam x (w2 (app e arg)))) }
-    go (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
-
-                                  -- See Note [Desugaring non-canonical evidence]
-                                ; unspecables <- getUnspecables
-                                ; let vs = exprFreeVarsList core_tm
-                                      is_unspecable_var v = v `S.member` unspecables
-                                      is_specable
-                                        | is_rule_lhs = True
-                                        | otherwise   = not $ any (is_unspecable_var) vs
-
-                                ; k (\e -> app_ev is_specable e core_tm) }
-
--- We are about to construct an evidence application `f dict`.  If the dictionary is
--- non-specialisable, instead construct
---     nospec f dict
--- See Note [nospecId magic] in GHC.Types.Id.Make for what `nospec` does.
-app_ev :: Bool -> CoreExpr -> CoreExpr -> CoreExpr
-app_ev is_specable k core_tm
-    | not is_specable
-    = Var nospecId `App` Type (exprType k) `App` k `App` core_tm
-
-    | otherwise
-    = k `App` core_tm
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> ([CoreBind] -> DsM a) -> DsM a

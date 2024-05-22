@@ -231,7 +231,6 @@ data CtLocEnv = CtLocEnv { ctl_ctxt :: ![ErrCtxt]
                          , ctl_in_gen_code :: !Bool
                          , ctl_rdr :: !LocalRdrEnv }
 
-
 getCtLocEnvLoc :: CtLocEnv -> RealSrcSpan
 getCtLocEnvLoc = ctl_loc
 

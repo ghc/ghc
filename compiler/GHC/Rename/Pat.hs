@@ -1183,9 +1183,9 @@ rnOverLit origLit
               lit' = lit { ol_ext = OverLitRn { ol_rebindable = rebindable
                                               , ol_from_fun = L (noAnnSrcSpan loc) from_thing_name } }
         ; if isNegativeZeroOverLit lit'
-          then do { (negate_name, fvs2) <- lookupSyntaxExpr negateName
-                  ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_name)
-                                  , fvs1 `plusFV` fvs2) }
+          then do { (negate_expr, fvs2) <- lookupSyntaxExpr negateName
+                  ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_expr)
+                           , fvs1 `plusFV` fvs2) }
           else return ((lit', Nothing), fvs1) }
 
 

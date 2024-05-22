@@ -1,6 +1,6 @@
-
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# LANGUAGE LambdaCase #-}
@@ -30,44 +30,53 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc
+import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Errors.Types
-import GHC.Types.SourceText
-import GHC.Types.Name hiding (varName)
-import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.HsToCore.Quote
 import GHC.HsToCore.Ticks (stripTicksTopHsExpr)
 import GHC.Hs
+
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Instance.Class (lookupHasFieldLabel)
+
+import GHC.Core
+import GHC.Core.FVs( exprsFreeVarsList )
+import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
-import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.PatSyn
 
 import GHC.Driver.Session
+
+import GHC.Types.SourceText
+import GHC.Types.Name hiding (varName)
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make
+import GHC.Types.Var( isInvisibleAnonPiTyBinder )
+import GHC.Types.Basic
+import GHC.Types.SrcLoc
+import GHC.Types.Tickish
+
 import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Builtin.Types
 import GHC.Builtin.Names
-import GHC.Types.Basic
-import GHC.Types.SrcLoc
-import GHC.Types.Tickish
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Core.PatSyn
 import Control.Monad
-import GHC.Types.Error
+import qualified Data.Set as S
 
 {-
 ************************************************************************
@@ -226,8 +235,8 @@ dsUnliftedBind (FunBind { fun_id = L l fun
                -- so must be simply unboxed
   = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun) noAnn) Nothing matches
        ; massert (null args) -- Functions aren't unlifted
-       ; dsHsWrapper co_fn $ \core_wrap -> do -- Can be non-identity (#21516)
-       { let rhs' = core_wrap (mkOptTickBox tick rhs)
+       ; dsHsWrapper co_fn $ \core_wrap ->  -- Can be non-identity (#21516)
+    do { let rhs' = core_wrap (mkOptTickBox tick rhs)
        ; return (bindNonRec fun rhs' body) } }
 
 dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
@@ -259,19 +268,16 @@ dsLExpr (L loc e) = putSrcSpanDsA loc $ dsExpr e
 
 -- | Desugar a typechecked expression.
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
-dsExpr (HsVar    _ (L _ id))           = dsHsVar id
 
+dsExpr e@(HsVar {})                 = dsApp e
+dsExpr e@(HsApp {})                 = dsApp e
+dsExpr e@(HsAppType {})             = dsApp e
 
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
 
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
-
-dsExpr (HsIPVar x _)          = dataConCantHappen x
-
-dsExpr (HsGetField x _ _)     = dataConCantHappen x
-dsExpr (HsProjection x _)     = dataConCantHappen x
 
 dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit
@@ -283,12 +289,14 @@ dsExpr (HsOverLit _ lit)
 
 dsExpr e@(XExpr ext_expr_tc)
   = case ext_expr_tc of
+      HsRecSelTc {} -> dsApp e
+      WrapExpr {}   -> dsApp e
+      ConLikeTc {}  -> dsApp e
+
       ExpandedThingTc o e
         | OrigStmt (L loc _) <- o
         -> putSrcSpanDsA loc $ dsExpr e
         | otherwise -> dsExpr e
-      WrapExpr {}                    -> dsHsWrapped e
-      ConLikeTc con tvs tys          -> dsConLike con tvs tys
       -- Hpc Support
       HsTick tickish e -> do
         e' <- dsLExpr e
@@ -306,34 +314,6 @@ dsExpr e@(XExpr ext_expr_tc)
         do { assert (exprType e2 `eqType` boolTy)
             mkBinaryTickBox ixT ixF e2
           }
-        {- Record selectors are warned about if they are not
-        present in all of the parent data type's constructor,
-        or always in case of pattern synonym record selectors
-        (regulated by a flag). However, this only produces
-        a warning if it's not a part of a record selector
-        application. For example:
-
-                data T = T1 | T2 {s :: Bool}
-                f x = s x -- the warning from this case will be supressed
-
-        See the `HsApp` case for where it is filtered out
-        -}
-      (HsRecSelTc (FieldOcc _ (L _ id))) ->
-        do { let  name = getName id
-                  RecSelId {sel_cons = (_, cons_wo_field)} = idDetails id
-            ; cons_trimmed <- trim_cons cons_wo_field
-            ; unless (null cons_wo_field) $ diagnosticDs
-                  $ DsIncompleteRecordSelector name cons_trimmed (cons_trimmed /= cons_wo_field)
-                      -- This only produces a warning if it's not a part of a
-                      -- record selector application (e.g. `s a` where `s` is a selector)
-                      -- See the `HsApp` case for where it is filtered out
-            ; dsHsVar id }
-          where
-            trim_cons :: [ConLike] -> DsM [ConLike]
-            trim_cons cons_wo_field = do
-              dflags <- getDynFlags
-              let maxConstructors = maxUncoveredPatterns dflags
-              return $ take maxConstructors cons_wo_field
 
 
 -- Strip ticks due to #21701, need to be invariant about warnings we produce whether
@@ -346,7 +326,6 @@ dsExpr (NegApp _ (L loc
                 -- See Note [Checking "negative literals"]
               (lit { ol_val = HsIntegral (negateIntegralLit i) })
           ; dsOverLit lit }
-       ;
        ; dsSyntaxExpr neg_expr [mkTicks ts expr'] }
 
 dsExpr (NegApp _ expr neg_expr)
@@ -356,31 +335,6 @@ dsExpr (NegApp _ expr neg_expr)
 dsExpr (HsLam _ variant a_Match)
   = uncurry mkCoreLams <$> matchWrapper (LamAlt variant) Nothing a_Match
 
-dsExpr e@(HsApp _ fun arg)
-         -- We want to have a special case that uses the PMC information to filter
-         -- out some of the incomplete record selectors warnings and not trigger
-         -- the warning emitted during the desugaring of dsExpr(HsRecSel)
-         -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
-  = do { (msgs, fun') <- captureMessagesDs $ dsLExpr fun
-             -- Make sure to filter out the generic incomplete record selector warning
-             -- if it's a raw record selector
-       ; arg' <- dsLExpr arg
-       ; case getIdFromTrivialExpr_maybe fun' of
-           Just fun_id | isRecordSelector fun_id
-             -> do { let msgs' = filterMessages is_incomplete_rec_sel_msg msgs
-                   ; addMessagesDs msgs'
-                   ; pmcRecSel fun_id arg' }
-           _ -> addMessagesDs msgs
-       ; warnUnusedBindValue fun arg (exprType arg')
-       ; return $ mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg' }
-  where
-    is_incomplete_rec_sel_msg :: MsgEnvelope DsMessage -> Bool
-    is_incomplete_rec_sel_msg (MsgEnvelope {errMsgDiagnostic = DsIncompleteRecordSelector{}})
-                                = False
-    is_incomplete_rec_sel_msg _ = True
-
-
-dsExpr e@(HsAppType {}) = dsHsWrapped e
 
 {-
 Note [Checking "negative literals"]
@@ -441,13 +395,17 @@ dsExpr (ExplicitTuple _ tup_args boxity)
 dsExpr (ExplicitSum types alt arity expr)
   = mkCoreUnboxedSum arity alt types <$> dsLExpr expr
 
-dsExpr (HsPragE _ prag expr) =
-  ds_prag_expr prag expr
-
-dsExpr (HsEmbTy x _) = dataConCantHappen x
-dsExpr (HsQual x _ _) = dataConCantHappen x
-dsExpr (HsForAll x _ _) = dataConCantHappen x
-dsExpr (HsFunArr x _ _ _) = dataConCantHappen x
+dsExpr (HsPragE _ (HsPragSCC _ cc) expr)
+  = do { dflags <- getDynFlags
+       ; if sccProfilingEnabled dflags && gopt Opt_ProfManualCcs dflags
+         then do
+            mod_name <- getModule
+            count <- goptM Opt_ProfCountEntries
+            let nm = sl_fs cc
+            flavour <- mkExprCCFlavour <$> getCCIndexDsM nm
+            Tick (ProfNote (mkUserCC nm mod_name (getLocA expr) flavour) count True)
+                 <$> dsLExpr expr
+         else dsLExpr expr }
 
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
@@ -463,11 +421,11 @@ dsExpr (HsLet _ binds body) = do
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
-dsExpr (HsDo res_ty ListComp (L _ stmts)) = dsListComp stmts res_ty
+dsExpr (HsDo res_ty ListComp          (L _ stmts)) = dsListComp stmts res_ty
+dsExpr (HsDo _      MonadComp         (L _ stmts)) = dsMonadComp stmts
 dsExpr (HsDo res_ty ctx@DoExpr{}      (L _ stmts)) = dsDo ctx stmts res_ty
 dsExpr (HsDo res_ty ctx@GhciStmtCtxt  (L _ stmts)) = dsDo ctx stmts res_ty
 dsExpr (HsDo res_ty ctx@MDoExpr{}     (L _ stmts)) = dsDo ctx stmts res_ty
-dsExpr (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
 
 dsExpr (HsIf _ guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
@@ -489,12 +447,6 @@ dsExpr (HsMultiIf res_ty alts)
     mkErrorExpr = mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID res_ty
                                (text "multi-way if")
 
-{-
-\noindent
-\underline{\bf Various data construction things}
-             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--}
-
 dsExpr (ExplicitList elt_ty xs) = dsExplicitList elt_ty xs
 
 dsExpr (ArithSeq expr witness seq)
@@ -503,41 +455,35 @@ dsExpr (ArithSeq expr witness seq)
      Just fl -> do { newArithSeq <- dsArithSeq expr seq
                    ; dsSyntaxExpr fl [newArithSeq] }
 
-{-
-Static Pointers
-~~~~~~~~~~~~~~~
-
-See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable for an overview.
-
+{- Note [Desugaring static pointers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
+for an overview.
     g = ... static f ...
 ==>
     g = ... makeStatic loc f ...
 -}
 
-dsExpr (HsStatic (_, whole_ty) expr@(L loc _)) = do
-    expr_ds <- dsLExpr expr
-    let (_, [ty]) = splitTyConApp whole_ty
-    makeStaticId <- dsLookupGlobalId makeStaticName
+dsExpr (HsStatic (_, whole_ty) expr@(L loc _))
+  = do { expr_ds <- dsLExpr expr
+       ; let (_, [ty]) = splitTyConApp whole_ty
+       ; makeStaticId <- dsLookupGlobalId makeStaticName
 
-    dflags <- getDynFlags
-    let platform = targetPlatform dflags
-    let (line, col) = case locA loc of
-           RealSrcSpan r _ ->
-                            ( srcLocLine $ realSrcSpanStart r
-                            , srcLocCol  $ realSrcSpanStart r
-                            )
-           _             -> (0, 0)
-        srcLoc = mkCoreTup [ mkIntExprInt platform line
-                           , mkIntExprInt platform col
-                           ]
+       ; dflags <- getDynFlags
+       ;  let platform = targetPlatform dflags
+              (line, col) = case locA loc of
+                  RealSrcSpan r _ -> ( srcLocLine $ realSrcSpanStart r
+                                     , srcLocCol  $ realSrcSpanStart r )
+                  _               -> (0, 0)
+              srcLoc = mkCoreTup [ mkIntExprInt platform line
+                                 , mkIntExprInt platform col
+                                 ]
 
-    putSrcSpanDsA loc $ return $
-      mkCoreApps (Var makeStaticId) [ Type ty, srcLoc, expr_ds ]
+       ; putSrcSpanDsA loc $ return $
+         mkCoreApps (Var makeStaticId) [ Type ty, srcLoc, expr_ds ] }
 
-{-
-\noindent
-\underline{\bf Record construction and update}
-             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Desugaring record construction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For record construction we do this (assuming T has three arguments)
 \begin{verbatim}
         T { op2 = e }
@@ -560,6 +506,7 @@ constructor @C@, setting all of @C@'s fields to bottom.
 dsExpr (RecordCon { rcon_con  = L _ con_like
                   , rcon_flds = rbinds
                   , rcon_ext  = con_expr })
+-- See Note [Desugaring record construction]
   = do { con_expr' <- dsExpr con_expr
        ; let
              (arg_tys, _) = tcSplitFunTys (exprType con_expr')
@@ -581,7 +528,6 @@ dsExpr (RecordCon { rcon_con  = L _ con_like
 
        ; return (mkCoreApps con_expr' con_args) }
 
-dsExpr (RecordUpd x _ _) = dataConCantHappen x
 
 -- Here is where we desugar the Template Haskell brackets and escapes
 
@@ -596,27 +542,357 @@ dsExpr (HsUntypedSplice ext _) = dataConCantHappen ext
 -- Arrow notation extension
 dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd
 
-
 -- HsSyn constructs that just shouldn't be here, because
--- the renamer removed them.  See GHC.Rename.Expr.
+-- the renamer or typechecker removed them.  See GHC.Rename.Expr.
 -- Note [Handling overloaded and rebindable constructs]
-dsExpr (HsOverLabel x _) = dataConCantHappen x
-dsExpr (OpApp x _ _ _)     = dataConCantHappen x
-dsExpr (SectionL x _ _)    = dataConCantHappen x
-dsExpr (SectionR x _ _)    = dataConCantHappen x
+dsExpr (HsIPVar x _)      = dataConCantHappen x
+dsExpr (HsGetField x _ _) = dataConCantHappen x
+dsExpr (HsProjection x _) = dataConCantHappen x
+dsExpr (RecordUpd x _ _)  = dataConCantHappen x
+dsExpr (HsEmbTy x _)      = dataConCantHappen x
+dsExpr (HsQual x _ _)     = dataConCantHappen x
+dsExpr (HsForAll x _ _)   = dataConCantHappen x
+dsExpr (HsFunArr x _ _ _) = dataConCantHappen x
+dsExpr (HsOverLabel x _)  = dataConCantHappen x
+dsExpr (OpApp x _ _ _)    = dataConCantHappen x
+dsExpr (SectionL x _ _)   = dataConCantHappen x
+dsExpr (SectionR x _ _)   = dataConCantHappen x
 
-ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
-ds_prag_expr (HsPragSCC _ cc) expr = do
-    dflags <- getDynFlags
-    if sccProfilingEnabled dflags && gopt Opt_ProfManualCcs dflags
-      then do
-        mod_name <- getModule
-        count <- goptM Opt_ProfCountEntries
-        let nm = sl_fs cc
-        flavour <- mkExprCCFlavour <$> getCCIndexDsM nm
-        Tick (ProfNote (mkUserCC nm mod_name (getLocA expr) flavour) count True)
-               <$> dsLExpr expr
-      else dsLExpr expr
+
+{- *********************************************************************
+*                                                                      *
+*              Desugaring applications
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Desugaring applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we come across an application (f e1 .. en) we collect up
+all the desugared arguments, and then dispatch on the function f.
+(Including the nullary case where n=0.)
+
+There are several special cases to handle
+
+* HsRecSel: a record selector gets warnings if it might fail.
+* HsVar:    special magic for `noinline`
+* HsVar:    special magic for `seq`
+
+Note [Desugaring seq]
+~~~~~~~~~~~~~~~~~~~~~
+There are a few subtleties in the desugaring of `seq`, all
+implemented in the `seqId` case of `ds_app_var`:
+
+ 1. (as described in #1031)
+
+    Consider,
+       f x y = x `seq` (y `seq` (# x,y #))
+
+    Because the argument to the outer 'seq' has an unlifted type, we'll use
+    call-by-value, and compile it as if we had
+
+       f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
+
+    But that is bad, because we now evaluate y before x!
+
+    Seq is very, very special!  So we recognise it right here, and desugar to
+            case x of _ -> case y of _ -> (# x,y #)
+
+ 2. (as described in #2273)
+
+    Consider
+       let chp = case b of { True -> fst x; False -> 0 }
+       in chp `seq` ...chp...
+    Here the seq is designed to plug the space leak of retaining (snd x)
+    for too long.
+
+    If we rely on the ordinary inlining of seq, we'll get
+       let chp = case b of { True -> fst x; False -> 0 }
+       case chp of _ { I# -> ...chp... }
+
+    But since chp is cheap, and the case is an alluring context, we'll
+    inline chp into the case scrutinee.  Now there is only one use of chp,
+    so we'll inline a second copy.  Alas, we've now ruined the purpose of
+    the seq, by re-introducing the space leak:
+        case (case b of {True -> fst x; False -> 0}) of
+          I# _ -> ...case b of {True -> fst x; False -> 0}...
+
+    We can try to avoid doing this by ensuring that the binder-swap in the
+    case happens, so we get this at an early stage:
+       case chp of chp2 { I# -> ...chp2... }
+    But this is fragile.  The real culprit is the source program.  Perhaps we
+    should have said explicitly
+       let !chp2 = chp in ...chp2...
+
+    But that's painful.  So the code here does a little hack to make seq
+    more robust: a saturated application of 'seq' is turned *directly* into
+    the case expression, thus:
+       x  `seq` e2 ==> case x of x -> e2    -- Note shadowing!
+       e1 `seq` e2 ==> case x of _ -> e2
+
+    So we desugar our example to:
+       let chp = case b of { True -> fst x; False -> 0 }
+       case chp of chp { I# -> ...chp... }
+    And now all is well.
+
+    The reason it's a hack is because if you define mySeq=seq, the hack
+    won't work on mySeq.
+
+ 3. (as described in #2409)
+
+    The isInternalName ensures that we don't turn
+            True `seq` e
+    into
+            case True of True { ... }
+    which stupidly tries to bind the datacon 'True'.
+-}
+
+dsApp :: HsExpr GhcTc -> DsM CoreExpr
+dsApp e = ds_app e [] []
+
+----------------------
+ds_lapp :: LHsExpr GhcTc -> [LHsExpr GhcTc] -> [CoreExpr] -> DsM CoreExpr
+-- The [LHsExpr] args correspond to the [CoreExpr] args,
+-- but there may be more of the latter because they include
+-- type and dictionary arguments
+ds_lapp (L loc e) hs_args core_args
+  = putSrcSpanDsA loc $
+    ds_app e hs_args core_args
+
+ds_app :: HsExpr GhcTc -> [LHsExpr GhcTc] -> [CoreExpr] -> DsM CoreExpr
+-- The work-horse
+ds_app (HsPar _ e) hs_args core_args = ds_lapp e hs_args core_args
+
+ds_app (HsApp _ fun arg) hs_args core_args
+  = do { core_arg <- dsLExpr arg
+       ; ds_lapp fun (arg : hs_args) (core_arg : core_args) }
+
+ds_app (HsAppType arg_ty fun _) hs_args core_args
+  = ds_lapp fun hs_args (Type arg_ty : core_args)
+
+ds_app (XExpr (WrapExpr hs_wrap fun)) hs_args core_args
+  = do { (fun_wrap, all_args) <- splitHsWrapperArgs hs_wrap core_args
+       ; if isIdHsWrapper fun_wrap
+         then ds_app fun hs_args all_args
+         else do { core_fun <- dsHsWrapper fun_wrap $ \core_wrap ->
+                               do { core_fun <- dsExpr fun
+                                  ; return (core_wrap core_fun) }
+                 ; return (mkCoreApps core_fun all_args) } }
+
+ds_app (XExpr (ConLikeTc con tvs tys)) _hs_args core_args
+-- Desugar desugars 'ConLikeTc': it eta-expands
+-- data constructors to make linear types work.
+-- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
+  = do { ds_con <- dsHsConLike con
+       ; ids    <- newSysLocalsDs tys
+           -- NB: these 'Id's may be representation-polymorphic;
+           -- see Wrinkle [Representation-polymorphic lambda] in
+           -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
+       ; let core_fun = mkLams tvs $ mkLams ids $
+                        ds_con `mkTyApps` mkTyVarTys tvs
+                               `mkVarApps` ids
+       ; return (mkApps core_fun core_args) }
+
+ds_app (XExpr (HsRecSelTc (FieldOcc { foLabel = L _ sel_id }))) _hs_args core_args
+  = ds_app_rec_sel sel_id sel_id core_args
+
+ds_app (HsVar _ lfun) hs_args core_args
+  = do { tracePm "ds_app" (ppr lfun <+> ppr core_args)
+       ; ds_app_var lfun hs_args core_args }
+
+ds_app e _hs_args core_args
+  = do { core_e <- dsExpr e
+       ; return (mkCoreApps core_e core_args) }
+
+---------------
+ds_app_var :: LocatedN Id -> [LHsExpr GhcTc] -> [CoreExpr] -> DsM CoreExpr
+-- Desugar an application with HsVar at the head
+ds_app_var (L loc fun_id) hs_args core_args
+
+  -----------------------
+  -- Deal with getField applications. General form:
+  --   getField
+  --     @GHC.Types.Symbol                        {k}
+  --     @"sel"                                   x_ty
+  --     @T                                       r_ty
+  --     @Int                                     a_ty
+  --     ($dHasField :: HasField "sel" T Int)     dict
+  --     :: T -> Int
+  -- where
+  --  $dHasField = sel |> (co :: T -> Int ~R# HasField "sel" T Int)
+  -- Alas, we cannot simply look at the unfolding of $dHasField below because it
+  -- has not been set yet, so we have to reconstruct the selector Id from the types.
+  | fun_id `hasKey` getFieldClassOpKey
+  = do {  -- Look up the field named x/"sel" in the type r/T
+         fam_inst_envs <- dsGetFamInstEnvs
+       ; rdr_env       <- dsGetGlobalRdrEnv
+       ; let core_arg_tys :: [Type] = [ty | Type ty <- core_args]
+       ; case lookupHasFieldLabel fam_inst_envs rdr_env core_arg_tys of
+           Just (sel_name,_,_,_)
+             -> do { sel_id <- dsLookupGlobalId sel_name
+                   ; tracePm "getfield2" (ppr sel_id)
+                   ; ds_app_rec_sel sel_id fun_id core_args }
+           _ -> ds_app_finish fun_id core_args }
+
+  -----------------------
+  -- Warn about identities for (fromInteger :: Integer -> Integer) etc
+  -- They all have a type like:  forall <tvs>. <cxt> => arg_ty -> res_ty
+  | idName fun_id `elem` numericConversionNames
+  , let (conv_ty, _) = apply_invis_args fun_id core_args
+  , Just (arg_ty, res_ty) <- splitVisibleFunTy_maybe conv_ty
+  = do { dflags <- getDynFlags
+       ; when (wopt Opt_WarnIdentities dflags
+               && arg_ty `eqType` res_ty)  $
+         -- So we are converting  ty -> ty
+         diagnosticDs (DsIdentitiesFound fun_id conv_ty)
+
+       ; ds_app_finish fun_id core_args }
+
+  -----------------------
+  -- Warn about unused return value in
+  --    do { ...; e; ... } when e returns (say) an Int
+  | fun_id `hasKey` thenMClassOpKey    -- It is the built-in Prelude.(>>)
+    -- (>>) :: forall m. Monad m => forall a b. m a -> (b->m b) -> m b
+  , Type m_ty : _dict : Type arg_ty : _ <- core_args
+  , hs_arg : _ <- hs_args
+  = do { tracePm ">>" (ppr loc $$ ppr arg_ty $$ ppr (isGeneratedSrcSpan (locA loc)))
+       ; when (isGeneratedSrcSpan (locA loc)) $      -- It is a compiler-generated (>>)
+         warnDiscardedDoBindings hs_arg m_ty arg_ty
+       ; ds_app_finish fun_id core_args }
+
+  -----------------------
+  -- Deal with `noinline`
+  -- See Note [noinlineId magic] in GHC.Types.Id.Make
+  | fun_id `hasKey` noinlineIdKey
+  , Type _ : arg1 : rest_args <- core_args
+  , (inner_fun, inner_args) <- collectArgs arg1
+  = return (Var fun_id `App` Type (exprType inner_fun) `App` inner_fun
+            `mkCoreApps` inner_args `mkCoreApps` rest_args)
+
+  -----------------------
+  -- Deal with `seq`
+  -- See Note [Desugaring seq], points (1) and (2)
+  | fun_id `hasKey` seqIdKey
+  , Type _r : Type ty1 : Type ty2 : arg1 : arg2 : rest_args <- core_args
+  , let case_bndr = case arg1 of
+            Var v1 | isInternalName (idName v1)
+                  -> v1        -- Note [Desugaring seq], points (2) and (3)
+            _     -> mkWildValBinder ManyTy ty1
+  = return (Case arg1 case_bndr ty2 [Alt DEFAULT [] arg2]
+            `mkCoreApps` rest_args)
+
+  -----------------------
+  -- Phew!  No more special cases.  Just build an applications
+  | otherwise
+  = ds_app_finish fun_id core_args
+
+---------------
+ds_app_finish :: Id -> [CoreExpr] -> DsM CoreExpr
+-- We are about to construct an application that may include evidence applications
+-- `f dict`.  If the dictionary is non-specialisable, instead construct
+--     nospec f dict
+-- See Note [nospecId magic] in GHC.Types.Id.Make for what `nospec` does.
+-- See Note [Desugaring non-canonical evidence]
+ds_app_finish fun_id core_args
+  = do { unspecables <- getUnspecables
+       ; let fun_ty = idType fun_id
+             free_dicts = exprsFreeVarsList
+                            [ e | (e,pi_bndr) <- core_args `zip` fst (splitPiTys fun_ty)
+                                , isInvisibleAnonPiTyBinder pi_bndr ]
+             is_unspecable_var v = v `S.member` unspecables
+
+             fun | not (S.null unspecables)  -- Fast path
+                 , any (is_unspecable_var) free_dicts
+                 = Var nospecId `App` Type fun_ty `App` Var fun_id
+                 | otherwise
+                 = Var fun_id
+
+       ; return (mkCoreApps fun core_args) }
+
+---------------
+ds_app_rec_sel :: Id             -- The record selector Id itself
+               -> Id             -- The function at the the head
+               -> [CoreExpr]     -- Its arguments
+               -> DsM CoreExpr
+-- Desugar an application with HsRecSelId at the head
+ds_app_rec_sel sel_id fun_id core_args
+  | RecSelId{ sel_cons = rec_sel_info } <- idDetails sel_id
+  , RSI { rsi_undef = cons_wo_field } <- rec_sel_info
+  = do { -- Record selectors are warned about if they are not present in all of the
+         -- parent data type's constructors, or always in case of pattern synonym record
+         -- selectors (regulated by a flag). However, this only produces a warning if
+         -- it's not a part of a record selector application. For example:
+         --         data T = T1 | T2 {s :: Bool}
+         --         g y = map s y   -- Warn here
+         --         f x = s x       -- No warning here
+       ; let (fun_ty, val_args) = apply_invis_args fun_id core_args
+
+       ; tracePm "ds_app_rec_sel" (ppr fun_ty $$ ppr val_args)
+       ; case val_args of
+
+           -- There is a value argument
+           -- See (IRS2) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+           (arg:_) -> pmcRecSel sel_id arg
+
+           -- No value argument, but the selector is
+           -- applied to all its type arguments
+           -- See (IRS3) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+           [] | Just (val_arg_ty, _) <- splitVisibleFunTy_maybe fun_ty
+              -> do { dummy <- newSysLocalDs (Scaled ManyTy val_arg_ty)
+                    ; pmcRecSel sel_id (Var dummy) }
+
+           -- Not even applied to all its type args
+           -- See (IRS4) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+           _ -> unless (null cons_wo_field) $
+                do { dflags <- getDynFlags
+                   ; let maxCons = maxUncoveredPatterns dflags
+                   ; diagnosticDs $ DsIncompleteRecordSelector (idName sel_id) cons_wo_field maxCons }
+
+       ; ds_app_finish fun_id core_args }
+
+  | otherwise
+  = pprPanic "ds_app_rec_sel" (ppr sel_id $$ ppr (idDetails sel_id))
+  where
+
+apply_invis_args :: Id -> [CoreExpr] -> (Type, [CoreExpr])
+-- Apply function to the initial /type/ args;
+-- return the type of the instantiated function,
+-- and the remaining args
+--   e.g.  apply_type_args (++) [Type Int, Var xs]
+--         = ([Int] -> [Int] -> [Int], [Var xs])
+apply_invis_args fun_id args
+  = (applyTypeToArgs fun_ty invis_args, rest_args)
+  where
+    fun_ty = idType fun_id
+    (invis_args, rest_args) = splitAt (invisibleBndrCount fun_ty) args
+
+------------------------------
+splitHsWrapperArgs :: HsWrapper -> [CoreArg] -> DsM (HsWrapper, [CoreArg])
+-- Splits the wrapper into the trailing arguments, and leftover bit
+splitHsWrapperArgs wrap args = go wrap args
+  where
+    go (WpTyApp ty) args = return (WpHole, Type ty : args)
+    go (WpEvApp tm) args = do { core_tm <- dsEvTerm tm
+                              ; return (WpHole, core_tm : args)}
+    go (WpCompose w1 w2) args
+      = do { (w1', args') <- go w1 args
+           ; if isIdHsWrapper w1'
+             then go w2 args'
+             else return (w1' <.> w2, args') }
+    go wrap args = return (wrap, args)
+
+------------------------------
+dsHsConLike :: ConLike -> DsM CoreExpr
+dsHsConLike (RealDataCon dc)
+  = return (varToCoreExpr (dataConWrapId dc))
+dsHsConLike (PatSynCon ps)
+  | Just (builder_name, _, add_void) <- patSynBuilder ps
+  = do { builder_id <- dsLookupGlobalId builder_name
+       ; return (if add_void
+                 then mkCoreApp (text "dsConLike" <+> ppr ps)
+                                (Var builder_id) unboxedUnitExpr
+                 else Var builder_id) }
+  | otherwise
+  = pprPanic "dsConLike" (ppr ps)
 
 ------------------------------
 dsSyntaxExpr :: SyntaxExpr GhcTc -> [CoreExpr] -> DsM CoreExpr
@@ -624,11 +900,11 @@ dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
                            , syn_arg_wraps = arg_wraps
                            , syn_res_wrap  = res_wrap })
              arg_exprs
-  = do { fun            <- dsExpr expr
-       ; dsHsWrappers arg_wraps $ \core_arg_wraps -> do
-       { dsHsWrapper res_wrap $ \core_res_wrap -> do
-       { let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
-       ; return $ core_res_wrap (mkCoreApps fun wrapped_args) } } }
+  = do { fun <- dsExpr expr
+       ; dsHsWrappers arg_wraps $ \core_arg_wraps ->
+         dsHsWrapper res_wrap   $ \core_res_wrap ->
+    do { let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
+       ; return $ core_res_wrap (mkCoreApps fun wrapped_args) } }
 dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
 
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
@@ -638,6 +914,52 @@ findField rbinds sel
 
 {-
 %--------------------------------------------------------------------
+
+Note [Desugaring non-canonical evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When constructing an application
+    f @ty1 ty2 .. dict1 dict2 .. arg1 arg2 ..
+if the evidence `dict_i` is canonical, we simply build that application.
+But if any of the `dict_i` are /non-canonical/, we wrap the appication in `nospec`,
+thus
+    nospec @fty f @ty1 @ty2 .. dict1 dict2 .. arg1 arg2 ..
+where  nospec :: forall a. a -> a  ensures that the typeclass specialiser
+doesn't attempt to common up this evidence term with other evidence terms
+of the same type (see Note [nospecId magic] in GHC.Types.Id.Make).
+
+See Note [Coherence and specialisation: overview] in GHC.Core.InstEnv for
+what a "non-canonical" dictionary is, and whe shouldn't specialise on it.
+
+How do we decide if the arguments are non-canonical dictionaries?
+
+* In `ds_app_finish` we look for dictionary arguments (invisible value args)
+
+* In the DsM monad we track the "unspecables" (i.e. non-canonical dictionaries)
+  in the `dsl_unspecable` field of `DsLclEnv`
+
+* We extend that unspecable set via `addUnspecables`, in `dsEvBinds`.
+  A dictionary is non-canonical if its own resolution was incoherent (see
+  Note [Incoherent instances]), or if its definition refers to other non-canonical
+  evidence. `dsEvBinds` is the convenient place to compute this, since it already
+  needs to do inter-evidence dependency analysis to generate well-scoped
+  bindings.
+
+Wrinkle:
+
+(NC1) We don't do this in the LHS of a RULE.  In paritcular, if we have
+     f :: (Num a, HasCallStack) => a -> a
+     {-# SPECIALISE f :: Int -> Int #-}
+  then making a rule like
+        RULE   forall d1:Num Int, d2:HasCallStack.
+               f @Int d1 d2 = $sf
+  is pretty dodgy, because $sf won't get the call stack passed in d2.
+  But that's what you asked for in the SPECIALISE pragma, so we'll obey.
+
+  We definitely can't desugar that LHS into this!
+      nospec (f @Int d1) d2
+
+  This is done by zapping the unspecables in `dsRule`.
+
 
 Note [Desugaring explicit lists]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -745,10 +1067,12 @@ Haskell 98 report:
 -}
 
 dsDo :: HsDoFlavour -> [ExprLStmt GhcTc] -> Type -> DsM CoreExpr
--- SG: Surprisingly, this code path seems inactive for regular Do,
+-- This code path seems inactive for regular Do,
 --     which is expanded in GHC.Tc.Gen.Do.
---     It's all used for ApplicativeDo (even the BindStmt case), which is *very*
+-- It is used only for ApplicativeDo (even the BindStmt case), which is *very*
 --     annoying because it is a lot of duplicated code that is seldomly tested.
+-- But we are on course to expane Applicative in GHC.Tc.Gen.Do, at which
+-- point all this will go away
 dsDo ctx stmts res_ty
   = goL stmts
   where
@@ -761,7 +1085,9 @@ dsDo ctx stmts res_ty
 
     go _ (BodyStmt _ rhs then_expr _) stmts
       = do { rhs2 <- dsLExpr rhs
-           ; warnDiscardedDoBindings rhs (exprType rhs2)
+           ; case  tcSplitAppTy_maybe (exprType rhs2) of
+               Just (m_ty, elt_ty) -> warnDiscardedDoBindings rhs m_ty elt_ty
+               Nothing             -> return ()  -- Odd, but not warning
            ; rest <- goL stmts
            ; dsSyntaxExpr then_expr [rhs2, rest] }
 
@@ -904,49 +1230,7 @@ Other places that requires from the same treatment:
     because we already know 'y' is of the form "Just ...".
     See test case T21360b.
 
-************************************************************************
-*                                                                      *
-   Desugaring Variables
-*                                                                      *
-************************************************************************
--}
 
-dsHsVar :: Id -> DsM CoreExpr
--- We could just call dsHsUnwrapped; but this is a short-cut
--- for the very common case of a variable with no wrapper.
-dsHsVar var
-  = return (varToCoreExpr var) -- See Note [Desugaring vars]
-
-dsHsConLike :: ConLike -> DsM CoreExpr
-dsHsConLike (RealDataCon dc)
-  = return (varToCoreExpr (dataConWrapId dc))
-dsHsConLike (PatSynCon ps)
-  | Just (builder_name, _, add_void) <- patSynBuilder ps
-  = do { builder_id <- dsLookupGlobalId builder_name
-       ; return (if add_void
-                 then mkCoreApp (text "dsConLike" <+> ppr ps)
-                                (Var builder_id) unboxedUnitExpr
-                 else Var builder_id) }
-  | otherwise
-  = pprPanic "dsConLike" (ppr ps)
-
--- | This function desugars 'ConLikeTc': it eta-expands
--- data constructors to make linear types work.
---
--- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
-dsConLike :: ConLike -> [TcTyVar] -> [Scaled Type] -> DsM CoreExpr
-dsConLike con tvs tys
-  = do { ds_con <- dsHsConLike con
-       ; ids    <- newSysLocalsDs tys
-           -- NB: these 'Id's may be representation-polymorphic;
-           -- see Wrinkle [Representation-polymorphic lambda] in
-           -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
-       ; return (mkLams tvs $
-                 mkLams ids $
-                 ds_con `mkTyApps` mkTyVarTys tvs
-                        `mkVarApps` ids) }
-
-{-
 ************************************************************************
 *                                                                      *
 \subsection{Errors and contexts}
@@ -955,31 +1239,8 @@ dsConLike con tvs tys
 -}
 
 -- Warn about certain types of values discarded in monadic bindings (#3263)
-warnUnusedBindValue :: LHsExpr GhcTc -> LHsExpr GhcTc -> Type -> DsM ()
-warnUnusedBindValue fun arg@(L loc _) arg_ty
-  | Just (l, f) <- fish_var fun
-  , f `hasKey` thenMClassOpKey    -- it is a (>>)
-  = when (isGeneratedSrcSpan l) $ -- it is compiler generated (>>)
-         putSrcSpanDs (locA loc) $ warnDiscardedDoBindings arg arg_ty
-  where
-    -- Retrieve the location info and the head of the application
-    -- It is important that we /do not/ look through HsApp to avoid
-    -- generating duplicate warnings
-    -- See Part 2. of Note [Expanding HsDo with XXExprGhcRn]
-    fish_var :: LHsExpr GhcTc -> Maybe (SrcSpan , Id)
-    fish_var (L l (HsVar _ id)) = return (locA l, unLoc id)
-    fish_var (L _ (HsAppType _ e _)) = fish_var e
-    fish_var (L l (XExpr (WrapExpr _ e))) = do (l, e') <- fish_var (L l e)
-                                               return (l, e')
-    fish_var (L l (XExpr (ExpandedThingTc _ e))) = fish_var (L l e)
-    fish_var _ = Nothing
-
-warnUnusedBindValue _ _ _  = return ()
-
--- Warn about certain types of values discarded in monadic bindings (#3263)
-warnDiscardedDoBindings :: LHsExpr GhcTc -> Type -> DsM ()
-warnDiscardedDoBindings rhs rhs_ty
-  | Just (m_ty, elt_ty) <- tcSplitAppTy_maybe rhs_ty
+warnDiscardedDoBindings :: LHsExpr GhcTc -> Type -> Type -> DsM ()
+warnDiscardedDoBindings rhs m_ty elt_ty
   = do { warn_unused <- woptM Opt_WarnUnusedDoBind
        ; warn_wrong <- woptM Opt_WarnWrongDoBind
        ; when (warn_unused || warn_wrong) $
@@ -993,46 +1254,11 @@ warnDiscardedDoBindings rhs rhs_ty
 
            -- Warn about discarding m a things in 'monadic' binding of the same type,
            -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
+           -- Example:   do { return 3; blah }
+           -- We get   (>>) @m d @(m Int) (return 3) blah
            when warn_wrong $
-                case tcSplitAppTy_maybe norm_elt_ty of
-                      Just (elt_m_ty, _)
-                         | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
-                         -> diagnosticDs (DsWrongDoBind rhs elt_ty)
-                      _ -> return () } }
-
-  | otherwise   -- RHS does have type of form (m ty), which is weird
-  = return ()   -- but at least this warning is irrelevant
-
-{-
-************************************************************************
-*                                                                      *
-            dsHsWrapped
-*                                                                      *
-************************************************************************
--}
-
-------------------------------
-dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
-dsHsWrapped orig_hs_expr
-  = go idHsWrapper orig_hs_expr
-  where
-    go wrap (HsPar _ (L _ hs_e))
-       = go wrap hs_e
-    go wrap1 (XExpr (WrapExpr wrap2 hs_e))
-       = go (wrap1 <.> wrap2) hs_e
-    go wrap (HsAppType ty (L _ hs_e) _)
-       = go (wrap <.> WpTyApp ty) hs_e
-
-    go wrap (HsVar _ (L _ var))
-      = do { dsHsWrapper wrap $ \wrap' -> do
-           { let expr = wrap' (varToCoreExpr var)
-                 ty   = exprType expr
-           ; dflags <- getDynFlags
-           ; warnAboutIdentities dflags var ty
-           ; return expr } }
-
-    go wrap hs_e
-       = do { dsHsWrapper wrap $ \wrap' -> do
-            { addTyCs FromSource (hsWrapDictBinders wrap) $
-              do { e <- dsExpr hs_e
-                 ; return (wrap' e) } } }
+           case tcSplitAppTy_maybe norm_elt_ty of
+             Just (elt_m_ty, _)
+                | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
+                -> diagnosticDs (DsWrongDoBind rhs elt_ty)
+             _ -> return () } }

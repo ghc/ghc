@@ -91,7 +91,7 @@ import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Module
 import GHC.Rename.Doc
-import GHC.Rename.Utils ( mkNameClashErr )
+import GHC.Rename.Utils ( mkNameClashErr, mkRnSyntaxExpr )
 
 import GHC.Iface.Decl    ( coAxiomToIfaceDecl )
 import GHC.Iface.Env     ( externaliseName )

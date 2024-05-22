@@ -2334,7 +2334,7 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
     report_no_fieldnames item
        | Just (EvVarDest evvar) <- ei_evdest item
        -- we can assume that here we have a `HasField @Symbol x r a` instance
-       -- because of HasFieldOrigin in record_field
+       -- because of GetFieldOrigin in record_field
        , Just (_, [_symbol, x, r, a]) <- tcSplitTyConApp_maybe (varType evvar)
        , Just (r_tycon, _) <- tcSplitTyConApp_maybe r
        , Just x_name <- isStrLitTy x
@@ -2349,7 +2349,7 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
       isNothing (lookupLocalRdrOcc lcl_env occ_name)
 
     record_field = case orig of
-      HasFieldOrigin name -> Just (mkVarOccFS name)
+      GetFieldOrigin name -> Just (mkVarOccFS name)
       _                   -> Nothing
 
     cannot_resolve_msg :: ErrorItem -> [ClsInst] -> RelevantBindings

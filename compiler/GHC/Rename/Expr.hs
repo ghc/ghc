@@ -30,32 +30,27 @@ module GHC.Rename.Expr (
    ) where
 
 import GHC.Prelude
-import GHC.Data.FastString
-
-import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
-                        , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import GHC.Hs
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env ( isBrackStage )
 import GHC.Tc.Utils.Monad
-import GHC.Unit.Module ( getModule, isInteractiveModule )
+
+import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
+                       , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import GHC.Rename.Env
 import GHC.Rename.Fixity
-import GHC.Rename.Utils ( bindLocalNamesFV, checkDupNames
-                        , bindLocalNames
-                        , mapMaybeFvRn, mapFvRn
-                        , warnUnusedLocalBinds, typeAppErr
-                        , checkUnusedRecordWildcard
-                        , wrapGenSpan, genHsIntegralLit, genHsTyLit
-                        , genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps'
-                        , genAppType )
+import GHC.Rename.Utils
 import GHC.Rename.Unbound ( reportUnboundName )
-import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice, rnUntypedSpliceExpr, checkThLocalName )
+import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice
+                          , rnUntypedSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
+
 import GHC.Driver.DynFlags
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( nilDataConName )
+import GHC.Unit.Module ( getModule, isInteractiveModule )
 
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.FieldLabel
@@ -67,12 +62,15 @@ import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
+
 import GHC.Utils.Misc
-import GHC.Data.List.SetOps ( removeDupsOn )
-import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
+
+import GHC.Data.FastString
+import GHC.Data.List.SetOps ( removeDupsOn )
+import GHC.Data.Maybe
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1414,7 +1412,7 @@ lookupQualifiedDoStmtName ctxt n
   = case qualifiedDoModuleName_maybe ctxt of
       Nothing -> lookupStmtName ctxt n
       Just modName ->
-        first (mkSyntaxExpr . nl_HsVar) <$> lookupNameWithQualifier n modName
+        first mkRnSyntaxExpr <$> lookupNameWithQualifier n modName
 
 lookupStmtName :: HsStmtContextRn -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
 -- Like lookupSyntax, but respects contexts
@@ -2031,10 +2029,9 @@ rearrangeForApplicativeDo _ [] = return ([], emptyNameSet)
 rearrangeForApplicativeDo ctxt [(one,_)] = do
   (return_name, _) <- lookupQualifiedDoName (HsDoStmt ctxt) returnMName
   (pure_name, _)   <- lookupQualifiedDoName (HsDoStmt ctxt) pureAName
-  let pure_expr = nl_HsVar pure_name
   let monad_names = MonadNames { return_name = return_name
                                , pure_name   = pure_name }
-  return $ case needJoin monad_names [one] (Just pure_expr) of
+  return $ case needJoin monad_names [one] (Just pure_name) of
     (False, one') -> (one', emptyNameSet)
     (True, _) -> ([one], emptyNameSet)
 rearrangeForApplicativeDo ctxt stmts0 = do
@@ -2196,8 +2193,8 @@ stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ _),_))
        }] False tail'
 stmtTreeToStmts monad_names ctxt (StmtTreeOne (let_stmt@(L _ LetStmt{}),_))
                 tail _tail_fvs = do
-  (pure_expr, _) <- lookupQualifiedDoExpr (HsDoStmt ctxt) pureAName
-  return $ case needJoin monad_names tail (Just pure_expr) of
+  (pure_name, _) <- lookupQualifiedDoName (HsDoStmt ctxt) pureAName
+  return $ case needJoin monad_names tail (Just pure_name) of
     (False, tail') -> (let_stmt : tail', emptyNameSet)
     (True, _) -> (let_stmt : tail, emptyNameSet)
 
@@ -2255,8 +2252,8 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
            | otherwise -> do
              -- Need 'pureAName' and not 'returnMName' here, so that it requires
              -- 'Applicative' and not 'Monad' whenever possible (until #20540 is fixed).
-             (ret, _) <- lookupQualifiedDoExpr (HsDoStmt ctxt) pureAName
-             let expr = HsApp noExtField (noLocA ret) tup
+             (pure_name, _) <- lookupQualifiedDoName (HsDoStmt ctxt) pureAName
+             let expr = HsApp noExtField (noLocA (genHsVar pure_name)) tup
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
               { xarg_app_arg_many = noExtField
@@ -2522,7 +2519,7 @@ needJoin :: MonadNames
          -> [ExprLStmt GhcRn]
             -- If this is @Just pure@, replace return by pure
             -- If this is @Nothing@, strip the return/pure
-         -> Maybe (HsExpr GhcRn)
+         -> Maybe Name
          -> (Bool, [ExprLStmt GhcRn])
 needJoin _monad_names [] _mb_pure = (False, [])  -- we're in an ApplicativeArg
 needJoin monad_names  [L loc (LastStmt _ e _ t)] mb_pure
@@ -2543,18 +2540,18 @@ isReturnApp :: MonadNames
             -> LHsExpr GhcRn
             -- If this is @Just pure@, replace return by pure
             -- If this is @Nothing@, strip the return/pure
-            -> Maybe (HsExpr GhcRn)
+            -> Maybe Name
             -> Maybe (LHsExpr GhcRn, Maybe Bool)
 isReturnApp monad_names (L _ (HsPar _ expr)) mb_pure =
   isReturnApp monad_names expr mb_pure
 isReturnApp monad_names (L loc e) mb_pure = case e of
   OpApp x l op r
-    | Just pure_expr <- mb_pure, is_return l, is_dollar op ->
-        Just (L loc (OpApp x (to_pure l pure_expr) op r), Nothing)
+    | Just pure_name <- mb_pure, is_return l, is_dollar op ->
+        Just (L loc (OpApp x (to_pure l pure_name) op r), Nothing)
     | is_return l, is_dollar op -> Just (r, Just True)
   HsApp x f arg
-    | Just pure_expr <- mb_pure, is_return f ->
-        Just (L loc (HsApp x (to_pure f pure_expr) arg), Nothing)
+    | Just pure_name <- mb_pure, is_return f ->
+        Just (L loc (HsApp x (to_pure f pure_name) arg), Nothing)
     | is_return f -> Just (arg, Just False)
   _otherwise -> Nothing
  where
@@ -2566,7 +2563,7 @@ isReturnApp monad_names (L loc e) mb_pure = case e of
 
   is_return = is_var (\n -> n == return_name monad_names
                          || n == pure_name monad_names)
-  to_pure (L loc _) pure_expr = L loc pure_expr
+  to_pure (L loc _) pure_name = L loc (genHsVar pure_name)
   is_dollar = is_var (`hasKey` dollarIdKey)
 
 {-
@@ -2792,13 +2789,13 @@ getMonadFailOp ctxt
 
     reallyGetMonadFailOp rebindableSyntax overloadedStrings
       | (isQualifiedDo || rebindableSyntax) && overloadedStrings = do
-        (failExpr, failFvs) <- lookupQualifiedDoExpr ctxt failMName
+        (failName, failFvs) <- lookupQualifiedDoName ctxt failMName
         (fromStringExpr, fromStringFvs) <- lookupSyntaxExpr fromStringName
         let arg_lit = mkVarOccFS (fsLit "arg")
         arg_name <- newSysName arg_lit
         let arg_syn_expr = nlHsVar arg_name
             body :: LHsExpr GhcRn =
-              nlHsApp (noLocA failExpr)
+              nlHsApp (noLocA (genHsVar failName))
                       (nlHsApp (noLocA $ fromStringExpr) arg_syn_expr)
         let failAfterFromStringExpr :: HsExpr GhcRn =
               unLoc $ mkHsLam (noLocA [noLocA $ VarPat noExtField $ noLocA arg_name]) body

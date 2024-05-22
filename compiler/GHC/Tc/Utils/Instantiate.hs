@@ -71,6 +71,8 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 import GHC.Tc.Zonk.Monad ( ZonkM )
 
+import GHC.Rename.Utils( mkRnSyntaxExpr )
+
 import GHC.Types.Id.Make( mkDictFunId )
 import GHC.Types.Basic ( TypeOrKind(..), Arity, VisArity )
 import GHC.Types.Error
@@ -487,7 +489,11 @@ tcInstInvisibleTyBinders ty kind
   = do { (extra_args, kind') <- tcInstInvisibleTyBindersN n_invis kind
        ; return (mkAppTys ty extra_args, kind') }
   where
-    n_invis = invisibleTyBndrCount kind
+    n_invis = invisibleBndrCount kind
+       -- We are re-using tcInstInvisibleTyBindersN, which is
+       -- needed elsewhere; so all that matters is that n_invis
+       -- is big enough! Does not matter if it is too big.
+       -- 10,000 would do equally well :-)
 
 tcInstInvisibleTyBindersN :: Int -> TcKind -> TcM ([TcType], TcKind)
 -- Called only to instantiate kinds, in user-written type signatures

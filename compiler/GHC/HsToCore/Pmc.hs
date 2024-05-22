@@ -201,84 +201,196 @@ pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-} do
 {-
 Note [Detecting incomplete record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A record selector occurrence is incomplete iff. it could fail due to
-being applied to a data type constructor not present for this record field.
+This Note describes the implementation of
+GHC proposal 516 "Add warning for incomplete record selectors".
 
-e.g.
-  data T = T1 | T2 {x :: Int}
-  d = x someComputation -- `d` may fail
+A **partial field** is a field that does not belong to every constructor of the
+corresponding datatype.
+A **partial selector occurrence** is a use of a record selector for a partial
+field, either as a selector function in an expression, or as the solution to a
+HasField constraint.
 
-There are 4 parts to detecting and warning about
-incomplete record selectors to consider:
+Partial selector occurrences desugar to case expressions which may crash at
+runtime:
 
-  - Computing which constructors a general application of a record field will succeed on,
-    and which ones it will fail on. This is stored in the `sel_cons` field of
-    `IdDetails` datatype, which is a part of an `Id` and calculated when renaming a
-    record selector in `mkOneRecordSelector`
+  data T a where
+    T1 :: T Int
+    T2 {sel :: Int} :: T Bool
 
-  - Emitting a warning whenever a `HasField` constraint is solved.
-    This is checked in `matchHasField` and emitted only for when
-    the constraint is resolved with an implicit instance rather than a
-    custom one (since otherwise the warning will be emitted in
-      the custom implementation anyways)
+  urgh :: T a -> Int
+  urgh x = sel x
+  ===>
+  urgh x = case x of
+    T1 -> error "no record field sel"
+    T2 f -> f
 
-    e.g.
-      g :: HasField "x" t Int => t -> Int
-      g = getField @"x"
+As such, it makes sense to warn about such potential crashes.
+We do so whenever -Wincomplete-record-selectors is present, and we utilise
+the pattern-match coverage checker for precise results, because there are many
+uses of selectors for partial fields which are in fact dynamically safe.
 
-      f :: T -> Int
-      f = g -- warning will be emitted here
+Pmc can detect two very common safe uses for which we will not warn:
 
-  - Emitting a warning for a general occurrence of the record selector
-    This is done during the renaming of a `HsRecSel` expression in `dsExpr`
-    and simply pulls the information about incompleteness from the `Id`
+ (LDI) Ambient pattern-matches unleash Note [Long-distance information] that
+       render a naively flagged partial selector occurrence safe, as in
+         ldi :: T a -> Int
+         ldi T1  = 0
+         ldi arg = sel arg
+       We should not warn here, because `arg` cannot be `T1`.
 
-    e.g.
-      l :: T -> Int
-      l a = x a -- warning will be emitted here
+ (RES) Constraining the result type of a GADT such as T might render
+       naively flagged partial selector occurrences safe, as in
+         resTy :: T Bool -> Int
+         resTy = sel
+       Here, `T1 :: T Int` is ruled out because it has the wrong result type.
 
-  - Emitting a warning for a record selector `sel` applied to a variable `y`.
-    In that case we want to use the long-distance information from the
-    pattern match checker to rule out impossible constructors
-    (See Note [Long-distance information]). We first add constraints to
-    the long-distance `Nablas` that `y` cannot be one of the constructors that
-    contain `sel` (function `checkRecSel` in GHC.HsToCore.Pmc.Check). If the
-    `Nablas` are still inhabited, we emit a warning with the inhabiting constructors
-    as examples of where `sel` may fail.
+Additionally, we want to support incomplete -XOverloadedRecordDot access as
+well, in either the (LDI) use case or the (RES) use case:
 
-    e.g.
-      z :: T -> Int
-      z T1 = 0
-      z a = x a -- warning will not be emitted here since `a` can only be `T2`
+  data Dot = No | Yes { sel2 :: Int }
+  dot d = d.sel2      -- should warn
+  ldiDot No = 0
+  ldiDot d  = d.sel2  -- should not warn
+  resTyDot :: T Bool -> Int
+  resTyDot x = x.sel  -- should not warn
+
+From a user's point of view, function `ldiDot` looks very like example `ldi` and
+`resTyDot` looks very like `resTy`. But from an /implementation/ point of view
+they are very different: both `ldiDot` and `resTyDot` simply emit `HasField`
+constraints, and it is those constraints that the implementation must use to
+determine incompleteness.
+
+Furthermore, HasField constraints allow to delay the completeness check from
+the field access site to a caller, as in test cases TcIncompleteRecSel and T24891:
+
+  accessDot :: HasField "sel2" t Int => t -> Int
+  accessDot x = x.sel2   -- getField @Symbol @"sel2" @t @Int x
+  solveDot :: Dot -> Int
+  solveDot = accessDot
+
+We should warn in `solveDot`, but not in `accessDot`.
+
+Here is how we achieve all this in the implementation:
+
+(IRS1) When renaming a record selector in `mkOneRecordSelector`,
+    we precompute the constructors the selector succeeds on.
+    That would be `T2` for `sel` because `sel (T2 42)` succeeds,
+    and `Yes` for `sel2` because `sel2 (Yes 13)` succeeds.
+    We store this information in the `sel_cons` field of `RecSelId`.
+    (Remember, the same field may occur in several constructors of the data
+    type; hence the selector may succeed on more than one constructor.)
+
+We generate warnings for incomplete record selectors in two places:
+* Mainly: in GHC.HsToCore.Expr.ds_app (see (IRS2-5) below)
+* Plus: in GHC.Tc.Instance.Class.matchHassField (see (IRS6-7) below)
+
+(IRS2) In function `ldi`, we have a record selector application `sel arg`.
+    This situation is detected `GHC.HsToCore.Expr.ds_app_rec_sel`, when the
+    record selector is applied to at least one argument. We call out to the
+    pattern-match checker to determine whether use of the selector is safe,
+    by calling GHC.HsToCore.Pmc.pmcRecSel, passing the `RecSelId` `sel` as
+    well as `arg`.
+
+    The pattern-match checker reduces the partial-selector-occurrence problem to
+    a complete-match problem by adding a negative constructor constraint such as
+    `arg /~ T2` for every constructor in the precomputed `rsi_def . sel_cons` of
+    `sel`. (Recall that these were exactly the constructors which define a field
+    `sel`.) `pmcRecSel` then tests
+      case arg of {}
+    for completeness. Any incomplete match, such as in the original `urgh`, must
+    reference a constructor that does not have field `sel`, such as `T1`.
+
+    In case of `urgh`, `T1` is indeed the case that we report as inexhaustive.
+
+    However, in function `ldi`, we have *both* the result type of
+    `arg::T a` (boring, but see (IRS3)) as well as Note [Long-distance information]
+    about `arg` from the ambient match, and the latter lists the constraint
+    `arg /~ T1`. Consequently, since `arg` is neither `T1` nor `T2` in the
+    reduced problem, the match is exhaustive and the use of the record selector
+    safe.
+
+(IRS3) In function `resTy`, the record selector is unsaturated, but the result type
+    ensures a safe use of the selector.
+
+    This situation is also detected in `GHC.HsToCore.Expr.ds_app_rec_sel`.
+    THe selector is elaborated with its type arguments; we simply match on
+    desugared Core `sel @Bool :: T Bool -> Int` to learn the result type `T Bool`.
+    We again call `pmcRecSel`, but this time with a fresh dummy Id `ds::T Bool`.
+
+(IRS4) In case of an unsaturated record selector that is *not* applied to any type
+  argument after elaboration (e.g. in `urgh2 = sel2 :: Dot -> Int`), we simply
+  produce a warning about all `sel_cons`; no need to call `pmcRecSel`.
+  This happens in `ds_app_rec_sel`
+
+Finally, there are two more items addressing -XOverloadedRecordDot:
+
+(IRS5) With -XOverloadedDot, all occurrences of (r.x), such as in `ldiDot` and
+  `accessDot` above, are warned about as follows.  `r.x` is parsed as
+  `HsGetField` in `HsExpr`; which is then expanded (in `rnExpr`) to a call to
+  `getField`.  For example, consider:
+         ldiDot No = 0
+         ldiDot x  = x.sel2  -- should not warn
+  The `d.sel2` in the RHS generates
+      getField @GHC.Types.Symbol @"sel2" @Dot @Int
+               ($dHasField :: HasField "sel2" Dot Int) x
+  where
+      $dHasField = sel2 |> (co :: Dot -> Int ~R# HasField "sel2" Dot Int)
+  We spot this `getField` application in `GHC.HsToCore.Expr.ds_app_var`,
+  and treat it exactly like (IRS2) and (IRS3).
+
+  Note carefully that doing this in the desugarer allows us to account for the
+  long-distance info about `x`; even though `sel2` is partial, we don't want
+  to warn about `x.sel2` in this example.
+
+(IRS6) Finally we have
+          solveDot :: Dot -> Int
+          solveDot = accessDot
+  No field-accesses or selectors in sight!  From the RHS we get the constraint
+      [W] HasField @"sel2" @Dot @Int`
+  The only time we can generate a warning is when we solve this constraint,
+  in `GHC.Tc.Instance.Class.matchHasField`, generating a call to the (partial)
+  selector.  We have no hope of exploiting long-distance info here.
+
+(IRS7) BUT, look back at `ldiDot`.  Doesn't `matchHasField` /also/ generate a
+  warning for the `HasField` constraint arising from `x.sel2`?  We don't
+  want that, because the desugarer will catch it: see (IRS5).  So we suppress
+  the (IRS6) warning in the typechecker for a `HasField` constraint that
+  arises from a record-dot HsGetField occurrence.  Happily, this is easy to do
+  by looking at its `CtOrigin`. Tested in T24891.
 -}
 
 pmcRecSel :: Id       -- ^ Id of the selector
           -> CoreExpr -- ^ Core expression of the argument to the selector
           -> DsM ()
+-- See (IRS2,3) in Note [Detecting incomplete record selectors]
 pmcRecSel sel_id arg
-  | RecSelId{ sel_cons = (cons_w_field, _ : _) } <- idDetails sel_id = do
-      !missing <- getLdiNablas
+  | RecSelId{ sel_cons = rec_sel_info } <- idDetails sel_id
+  , RSI { rsi_def = cons_w_field, rsi_undef = cons_wo_field } <- rec_sel_info
+  , not (null cons_wo_field)
+  = do { !missing <- getLdiNablas
 
-      tracePm "pmcRecSel {" (ppr sel_id)
-      CheckResult{ cr_ret = PmRecSel{ pr_arg_var = arg_id }, cr_uncov = uncov_nablas }
-        <- unCA (checkRecSel (PmRecSel () arg cons_w_field)) missing
-      tracePm "}: " $ ppr uncov_nablas
+       ; tracePm "pmcRecSel {" (ppr sel_id)
+       ; CheckResult{ cr_ret = PmRecSel{ pr_arg_var = arg_id }, cr_uncov = uncov_nablas }
+           <- unCA (checkRecSel (PmRecSel () arg cons_w_field)) missing
+       ; tracePm "}: " $ ppr uncov_nablas
 
-      inhabited <- isInhabited uncov_nablas
-      when inhabited $ warn_incomplete arg_id uncov_nablas
-        where
-          sel_name = varName sel_id
-          warn_incomplete arg_id uncov_nablas = do
-            dflags <- getDynFlags
-            let maxConstructors = maxUncoveredPatterns dflags
-            unc_examples <- getNFirstUncovered MinimalCover [arg_id] (maxConstructors + 1) uncov_nablas
-            let cons = [con | unc_example <- unc_examples
-                      , Just (PACA (PmAltConLike con) _ _) <- [lookupSolution unc_example arg_id]]
-                not_full_examples = length cons == (maxConstructors + 1)
-                cons' = take maxConstructors cons
-            diagnosticDs $ DsIncompleteRecordSelector sel_name cons' not_full_examples
+       ; inhabited <- isInhabited uncov_nablas
+       ; when inhabited $ warn_incomplete arg_id uncov_nablas }
 
-pmcRecSel _ _ = return ()
+  | otherwise
+  = return ()
+
+  where
+     sel_name = varName sel_id
+     warn_incomplete arg_id uncov_nablas = do
+       dflags <- getDynFlags
+       let maxPatterns = maxUncoveredPatterns dflags
+       unc_examples <- getNFirstUncovered MinimalCover [arg_id] (maxPatterns + 1) uncov_nablas
+       let cons = [con | unc_example <- unc_examples
+                 , Just (PACA (PmAltConLike con) _ _) <- [lookupSolution unc_example arg_id]]
+       tracePm "unc-ex" (ppr cons $$ ppr unc_examples)
+       diagnosticDs $ DsIncompleteRecordSelector sel_name cons maxPatterns
+
 
 {- Note [pmcPatBind doesn't warn on pattern guards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -512,8 +624,8 @@ getNFirstUncovered mode vars n (MkNablas nablas) = go n (bagToList nablas)
 
 -- | Locally update 'dsl_nablas' with the given action, but defer evaluation
 -- with 'unsafeInterleaveM' in order not to do unnecessary work.
-locallyExtendPmNablas :: (Nablas -> DsM Nablas) -> DsM a -> DsM a
-locallyExtendPmNablas ext k = do
+locallyExtendPmNablas :: DsM a -> (Nablas -> DsM Nablas) -> DsM a
+locallyExtendPmNablas k ext = do
   nablas <- getLdiNablas
   nablas' <- unsafeInterleaveM $ ext nablas
   updPmNablas nablas' k
@@ -521,12 +633,15 @@ locallyExtendPmNablas ext k = do
 -- | Add in-scope type constraints if the coverage checker might run and then
 -- run the given action.
 addTyCs :: Origin -> Bag EvVar -> DsM a -> DsM a
-addTyCs origin ev_vars m = do
-  dflags <- getDynFlags
-  applyWhen (needToRunPmCheck dflags origin)
-            (locallyExtendPmNablas $ \nablas ->
-              addPhiCtsNablas nablas (PhiTyCt . evVarPred <$> ev_vars))
-            m
+addTyCs origin ev_vars thing_inside
+  | isEmptyBag ev_vars
+  = thing_inside  -- Very common fast path
+  | otherwise
+  = do { dflags <- getDynFlags
+       ; if needToRunPmCheck dflags origin
+         then locallyExtendPmNablas thing_inside $ \nablas ->
+              addPhiCtsNablas nablas (PhiTyCt . evVarPred <$> ev_vars)
+         else thing_inside }
 
 -- | Add equalities for the 'CoreExpr' scrutinees to the local 'DsM' environment,
 -- e.g. when checking a case expression:
@@ -537,8 +652,8 @@ addTyCs origin ev_vars m = do
 -- to be added for multiple scrutinees rather than just one.
 addCoreScrutTmCs :: [CoreExpr] -> [Id] -> DsM a -> DsM a
 addCoreScrutTmCs []         _      k = k
-addCoreScrutTmCs (scr:scrs) (x:xs) k =
-  flip locallyExtendPmNablas (addCoreScrutTmCs scrs xs k) $ \nablas ->
+addCoreScrutTmCs (scr:scrs) (x:xs) k
+  = locallyExtendPmNablas (addCoreScrutTmCs scrs xs k) $ \nablas ->
     addPhiCtsNablas nablas (unitBag (PhiCoreCt x scr))
 addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: numbers of scrutinees and match ids differ"
 

@@ -507,7 +507,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
                            fst $ splitForAllForAllTyBinders dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
 
-        ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs)
+        ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleBndrCount dfun_ty) $$ ppr skol_tvs)
 
         -- Next, process any associated types.
         ; (datafam_stuff, tyfam_insts)

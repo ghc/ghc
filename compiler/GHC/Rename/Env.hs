@@ -51,8 +51,7 @@ module GHC.Rename.Env (
         lookupIfThenElse,
 
         -- QualifiedDo
-        lookupQualifiedDoExpr, lookupQualifiedDo,
-        lookupQualifiedDoName, lookupNameWithQualifier,
+        lookupQualifiedDo, lookupQualifiedDoName, lookupNameWithQualifier,
 
         -- Constructing usage information
         DeprecationWarnings(..),
@@ -2350,14 +2349,14 @@ lookupSyntaxExpr :: Name                          -- ^ The standard name
                  -> RnM (HsExpr GhcRn, FreeVars)  -- ^ Possibly a non-standard name
 lookupSyntaxExpr std_name
   = do { (name, fvs) <- lookupSyntaxName std_name
-       ; return (nl_HsVar name, fvs) }
+       ; return (genHsVar name, fvs) }
 
 lookupSyntax :: Name                             -- The standard name
              -> RnM (SyntaxExpr GhcRn, FreeVars) -- Possibly a non-standard
                                                  -- name
 lookupSyntax std_name
-  = do { (expr, fvs) <- lookupSyntaxExpr std_name
-       ; return (mkSyntaxExpr expr, fvs) }
+  = do { (name, fvs) <- lookupSyntaxName std_name
+       ; return (mkRnSyntaxExpr name, fvs) }
 
 lookupSyntaxNames :: [Name]                         -- Standard names
      -> RnM ([HsExpr GhcRn], FreeVars) -- See comments with HsExpr.ReboundNames
@@ -2387,15 +2386,9 @@ by the Opt_QualifiedDo dynamic flag.
 
 -- Lookup operations for a qualified do. If the context is not a qualified
 -- do, then use lookupSyntaxExpr. See Note [QualifiedDo].
-lookupQualifiedDoExpr :: HsStmtContext fn -> Name -> RnM (HsExpr GhcRn, FreeVars)
-lookupQualifiedDoExpr ctxt std_name
-  = first nl_HsVar <$> lookupQualifiedDoName ctxt std_name
-
--- Like lookupQualifiedDoExpr but for producing SyntaxExpr.
--- See Note [QualifiedDo].
 lookupQualifiedDo :: HsStmtContext fn -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
 lookupQualifiedDo ctxt std_name
-  = first mkSyntaxExpr <$> lookupQualifiedDoExpr ctxt std_name
+  = first mkRnSyntaxExpr <$> lookupQualifiedDoName ctxt std_name
 
 lookupNameWithQualifier :: Name -> ModuleName -> RnM (Name, FreeVars)
 lookupNameWithQualifier std_name modName
@@ -2406,7 +2399,7 @@ lookupNameWithQualifier std_name modName
 lookupQualifiedDoName :: HsStmtContext fn -> Name -> RnM (Name, FreeVars)
 lookupQualifiedDoName ctxt std_name
   = case qualifiedDoModuleName_maybe ctxt of
-      Nothing -> lookupSyntaxName std_name
+      Nothing      -> lookupSyntaxName std_name
       Just modName -> lookupNameWithQualifier std_name modName
 
 --------------------------------------------------------------------------------

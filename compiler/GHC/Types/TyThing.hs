@@ -355,12 +355,12 @@ tyThingGREInfo = \case
             RecSelPatSyn ps -> unitUniqSet $ PatSynName (patSynName ps)
             RecSelData   tc ->
               let dcs = map RealDataCon $ tyConDataCons tc in
-              case conLikesWithFields dcs [flLabel fl] of
-                ([], _) -> pprPanic "tyThingGREInfo: no DataCons with this FieldLabel" $
+              case rsi_def (conLikesRecSelInfo dcs [flLabel fl]) of
+                []   -> pprPanic "tyThingGREInfo: no DataCons with this FieldLabel" $
                         vcat [ text "id:"  <+> ppr id
                              , text "fl:"  <+> ppr fl
                              , text "dcs:" <+> ppr dcs ]
-                (cons, _) -> mkUniqSet $ map conLikeConLikeName cons
+                cons -> mkUniqSet $ map conLikeConLikeName cons
        in IAmRecField $
             RecFieldInfo
               { recFieldLabel = fl

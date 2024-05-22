@@ -26,7 +26,7 @@ module GHC.HsToCore.Monad (
         mkNamePprCtxDs,
         newUnique,
         UniqSupply, newUniqueSupply,
-        getGhcModeDs, dsGetFamInstEnvs,
+        getGhcModeDs, dsGetFamInstEnvs, dsGetGlobalRdrEnv,
         dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
         dsLookupDataCon, dsLookupConLike,
         getCCIndexDsM,
@@ -37,7 +37,7 @@ module GHC.HsToCore.Monad (
         getPmNablas, updPmNablas,
 
         -- Tracking evidence variable coherence
-        addUnspecables, getUnspecables,
+        addUnspecables, getUnspecables, zapUnspecables,
 
         -- Get COMPLETE sets of a TyCon
         dsGetCompleteMatches,
@@ -45,7 +45,6 @@ module GHC.HsToCore.Monad (
         -- Warnings and errors
         DsWarning, diagnosticDs, errDsCoreExpr,
         failWithDs, failDs, discardWarningsDs,
-        addMessagesDs, captureMessagesDs,
 
         -- Data types
         DsMatchContext(..),
@@ -472,6 +471,9 @@ updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 addUnspecables :: S.Set EvId -> DsM a -> DsM a
 addUnspecables unspecables = updLclEnv (\env -> env{ dsl_unspecables = unspecables `mappend` dsl_unspecables env })
 
+zapUnspecables :: DsM a -> DsM a
+zapUnspecables = updLclEnv (\env -> env{ dsl_unspecables = mempty })
+
 getUnspecables :: DsM (S.Set EvId)
 getUnspecables = dsl_unspecables <$> getLclEnv
 
@@ -499,12 +501,6 @@ diagnosticDs dsMessage
        ; let msg = mkMsgEnvelope diag_opts loc (ds_name_ppr_ctx env) dsMessage
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
-addMessagesDs :: Messages DsMessage -> DsM ()
-addMessagesDs msgs1
-  = do { msg_var <- ds_msgs <$> getGblEnv
-       ; msgs0 <- liftIO $ readIORef msg_var
-       ; liftIO $ writeIORef msg_var (msgs0 `unionMessages` msgs1) }
-
 -- | Issue an error, but return the expression for (), so that we can continue
 -- reporting errors.
 errDsCoreExpr :: DsMessage -> DsM CoreExpr
@@ -519,13 +515,6 @@ failWithDs msg
 
 failDs :: DsM a
 failDs = failM
-
-captureMessagesDs :: DsM a -> DsM (Messages DsMessage, a)
-captureMessagesDs thing_inside
-  = do { msg_var <- liftIO $ newIORef emptyMessages
-       ; res <- updGblEnv (\gbl -> gbl {ds_msgs = msg_var}) thing_inside
-       ; msgs <- liftIO $ readIORef msg_var
-       ; return (msgs, res) }
 
 mkNamePprCtxDs :: DsM NamePprCtx
 mkNamePprCtxDs = ds_name_ppr_ctx <$> getGblEnv
@@ -566,6 +555,9 @@ dsGetFamInstEnvs
 
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
+
+dsGetGlobalRdrEnv :: DsM GlobalRdrEnv
+dsGetGlobalRdrEnv = ds_gbl_rdr_env <$> getGblEnv
 
 -- | The @COMPLETE@ pragmas that are in scope.
 dsGetCompleteMatches :: DsM DsCompleteMatches

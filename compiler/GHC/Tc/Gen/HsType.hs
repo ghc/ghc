@@ -1984,11 +1984,11 @@ checkExpectedKind hs_ty ty act_kind exp_kind
                 ; return (res_ty `mkCastTy` co_k) } }
     where
       -- We need to make sure that both kinds have the same number of implicit
-      -- foralls out front. If the actual kind has more, instantiate accordingly.
-      -- Otherwise, just pass the type & kind through: the errors are caught
-      -- in unifyType.
-      n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
-      n_act_invis_bndrs = invisibleTyBndrCount act_kind
+      -- foralls and constraints out front. If the actual kind has more, instantiate
+      -- accordingly. Otherwise, just pass the type & kind through: the errors
+      -- are caught in unifyType.
+      n_exp_invis_bndrs = invisibleBndrCount exp_kind
+      n_act_invis_bndrs = invisibleBndrCount act_kind
       n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
 
 
@@ -2724,8 +2724,8 @@ checkExpectedResKind sig_kind res_ki
 
        ; let -- Drop invisible binders from sig_kind until they match up
              -- with res_ki.  By analogy with checkExpectedKind.
-             n_res_invis_bndrs = invisibleTyBndrCount actual_res_ki
-             n_sig_invis_bndrs = invisibleTyBndrCount sig_kind
+             n_res_invis_bndrs = invisibleBndrCount actual_res_ki
+             n_sig_invis_bndrs = invisibleBndrCount sig_kind
              n_to_inst         = n_sig_invis_bndrs - n_res_invis_bndrs
 
              (_, sig_kind') = splitInvisPiTysN n_to_inst sig_kind

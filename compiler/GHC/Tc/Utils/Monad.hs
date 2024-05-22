@@ -1664,7 +1664,6 @@ add_diagnostic msg
        ; mkTcRnMessage loc (TcRnMessageWithInfo unit_state msg) >>= reportDiagnostic
        }
 
-
 {-
 -----------------------------------
         Other helper functions

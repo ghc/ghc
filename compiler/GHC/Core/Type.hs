@@ -33,7 +33,7 @@ module GHC.Core.Type (
         mkScaledFunTys,
         mkInvisFunTy, mkInvisFunTys,
         tcMkVisFunTy, tcMkScaledFunTys, tcMkInvisFunTy,
-        splitFunTy, splitFunTy_maybe,
+        splitFunTy, splitFunTy_maybe, splitVisibleFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
         funTyConAppTy_maybe, funTyFlagTyCon,
         tyConAppFunTy_maybe, tyConAppFunCo_maybe,
@@ -82,8 +82,7 @@ module GHC.Core.Type (
         coAxNthLHS,
         stripCoercionTy,
 
-        splitInvisPiTys, splitInvisPiTysN,
-        invisibleTyBndrCount,
+        splitInvisPiTys, splitInvisPiTysN, invisibleBndrCount,
         filterOutInvisibleTypes, filterOutInferredTypes,
         partitionInvisibleTypes, partitionInvisibles,
         tyConForAllTyFlags, appTyForAllTyFlags,
@@ -1443,6 +1442,15 @@ splitFunTy_maybe ty
   | FunTy af w arg res <- coreFullView ty = Just (af, w, arg, res)
   | otherwise                             = Nothing
 
+{-# INLINE splitVisibleFunTy_maybe #-}
+splitVisibleFunTy_maybe :: Type -> Maybe (Type, Type)
+-- ^ Works on visible function types only (t1 -> t2), and
+--   returns t1 and t2, but not the multiplicity
+splitVisibleFunTy_maybe ty
+  | FunTy af _ arg res <- coreFullView ty
+  , isVisibleFunArg af = Just (arg, res)
+  | otherwise          = Nothing
+
 splitFunTys :: Type -> ([Scaled Type], Type)
 splitFunTys ty = split [] ty ty
   where
@@ -2088,12 +2096,12 @@ getRuntimeArgTys = go
       | otherwise
       = []
 
-invisibleTyBndrCount :: Type -> Int
+invisibleBndrCount :: Type -> Int
 -- Returns the number of leading invisible forall'd binders in the type
 -- Includes invisible predicate arguments; e.g. for
 --    e.g.  forall {k}. (k ~ *) => k -> k
 -- returns 2 not 1
-invisibleTyBndrCount ty = length (fst (splitInvisPiTys ty))
+invisibleBndrCount ty = length (fst (splitInvisPiTys ty))
 
 -- | Like 'splitPiTys', but returns only *invisible* binders, including constraints.
 -- Stops at the first visible binder.

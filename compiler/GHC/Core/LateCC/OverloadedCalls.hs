@@ -26,7 +26,6 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Types.Var
-import GHC.Utils.Outputable
 
 type OverloadedCallsCCState = Strict.Maybe SrcSpan
 
@@ -80,7 +79,7 @@ overloadedCallsCC =
           -- check if any of the arguments v1 ... vN are dictionaries.
           let
             (f, xs) = collectArgs app
-            resultTy = applyTypeToArgs empty (exprType f) xs
+            resultTy = applyTypeToArgs (exprType f) xs
 
           -- Recursively process the arguments first for no particular reason
           args <- mapM processExpr xs

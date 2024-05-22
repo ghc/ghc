@@ -544,7 +544,7 @@ data CtOrigin
                         -- IMPORTANT: These constraints will never cause errors;
                         -- See Note [Constraints to ignore] in GHC.Tc.Errors
   | SectionOrigin
-  | HasFieldOrigin FastString
+  | GetFieldOrigin FastString
   | TupleOrigin         -- (..,..)
   | ExprSigOrigin       -- e :: ty
   | PatSigOrigin        -- p :: ty
@@ -716,7 +716,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
-exprCtOrigin (HsGetField _ _ (L _ f)) = HasFieldOrigin (field_label $ unLoc $ dfoLabel f)
+exprCtOrigin (HsGetField _ _ (L _ f)) = GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
 exprCtOrigin (HsUnboundVar {})    = Shouldn'tHappenOrigin "unbound variable"
 exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
 exprCtOrigin (ExplicitList {})    = ListOrigin
@@ -915,7 +915,7 @@ pprCtO ViewPatOrigin         = text "a view pattern"
 pprCtO (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
 pprCtO (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
 pprCtO SectionOrigin         = text "an operator section"
-pprCtO (HasFieldOrigin f)    = hsep [text "selecting the field", quotes (ppr f)]
+pprCtO (GetFieldOrigin f)    = hsep [text "selecting the field", quotes (ppr f)]
 pprCtO AssocFamPatOrigin     = text "the LHS of a family instance"
 pprCtO TupleOrigin           = text "a tuple"
 pprCtO NegateOrigin          = text "a use of syntactic negation"

@@ -119,7 +119,6 @@ data TcLclCtxt
 
         tcl_env  :: TcTypeEnv    -- The local type environment:
                                  -- Ids and TyVars defined in this module
-
     }
 
 getLclEnvThStage :: TcLclEnv -> ThStage

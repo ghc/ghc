@@ -23,7 +23,7 @@ module GHC.Tc.Gen.Head
        , leadingValArgs, isVisibleArg
 
        , tcInferAppHead, tcInferAppHead_maybe
-       , tcInferId, tcCheckId, obviousSig
+       , tcInferId, tcCheckId, tcInferConLike, obviousSig
        , tyConOf, tyConOfET, fieldNotInType
        , nonBidirectionalErr
 
@@ -58,7 +58,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( singleUsageUE )
-import GHC.Core.PatSyn( PatSyn )
+import GHC.Core.PatSyn( PatSyn, patSynName )
 import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -566,7 +566,7 @@ tcInferAppHead_maybe :: HsExpr GhcRn
 -- Returns Nothing for a complicated head
 tcInferAppHead_maybe fun
   = case fun of
-      HsVar _ (L _ nm)          -> Just <$> tcInferId nm
+      HsVar _ nm                -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)      -> Just <$> tcInferRecSelId f
       ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
@@ -792,7 +792,7 @@ tcInferOverLit lit@(OverLit { ol_val = val
 
 tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcCheckId name res_ty
-  = do { (expr, actual_res_ty) <- tcInferId name
+  = do { (expr, actual_res_ty) <- tcInferId (noLocA name)
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
        ; addFunResCtxt expr [] actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOf name) rn_fun expr actual_res_ty res_ty }
@@ -800,33 +800,33 @@ tcCheckId name res_ty
     rn_fun = HsVar noExtField (noLocA name)
 
 ------------------------
-tcInferId :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferId :: LocatedN Name -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Look up an occurrence of an Id
 -- Do not instantiate its type
-tcInferId id_name
+tcInferId lname@(L _ id_name)
   | id_name `hasKey` assertIdKey
   = do { dflags <- getDynFlags
        ; if gopt Opt_IgnoreAsserts dflags
-         then tc_infer_id id_name
-         else tc_infer_assert id_name }
+         then tc_infer_id lname
+         else tc_infer_assert lname }
 
   | otherwise
-  = do { (expr, ty) <- tc_infer_id id_name
+  = do { (expr, ty) <- tc_infer_id lname
        ; traceTc "tcInferId" (ppr id_name <+> dcolon <+> ppr ty)
        ; return (expr, ty) }
 
-tc_infer_assert :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
+tc_infer_assert :: LocatedN Name -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Deal with an occurrence of 'assert'
 -- See Note [Adding the implicit parameter to 'assert']
-tc_infer_assert assert_name
+tc_infer_assert (L loc assert_name)
   = do { assert_error_id <- tcLookupId assertErrorName
        ; (wrap, id_rho) <- topInstantiate (OccurrenceOf assert_name)
                                           (idType assert_error_id)
-       ; return (mkHsWrap wrap (HsVar noExtField (noLocA assert_error_id)), id_rho)
+       ; return (mkHsWrap wrap (HsVar noExtField (L loc assert_error_id)), id_rho)
        }
 
-tc_infer_id :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
-tc_infer_id id_name
+tc_infer_id :: LocatedN Name -> TcM (HsExpr GhcTc, TcSigmaType)
+tc_infer_id (L loc id_name)
  = do { thing <- tcLookup id_name
       ; case thing of
              ATcId { tct_id = id }
@@ -838,14 +838,14 @@ tc_infer_id id_name
                -- nor does it need the 'lifting' treatment
                -- Hence no checkTh stuff here
 
-             AGlobal (AConLike (RealDataCon con)) -> tcInferDataCon con
-             AGlobal (AConLike (PatSynCon ps)) -> tcInferPatSyn id_name ps
+             AGlobal (AConLike cl) -> tcInferConLike cl
+
              (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Anything (tyConName tc)
              ATyVar name _ -> failIllegalTyVal name
 
              _ -> failWithTc $ TcRnExpectedValueId thing }
   where
-    return_id id = return (HsVar noExtField (noLocA id), idType id)
+    return_id id = return (HsVar noExtField (L loc id), idType id)
 
 {- Note [Suppress hints with RequiredTypeArguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -902,6 +902,10 @@ check_naughty lbl id
   | isNaughtyRecordSelector id = failWithTc (TcRnRecSelectorEscapedTyVar lbl)
   | otherwise                  = return ()
 
+tcInferConLike :: ConLike -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferConLike (RealDataCon con) = tcInferDataCon con
+tcInferConLike (PatSynCon ps)    = tcInferPatSyn  ps
+
 tcInferDataCon :: DataCon -> TcM (HsExpr GhcTc, TcSigmaType)
 -- See Note [Typechecking data constructors]
 tcInferDataCon con
@@ -933,11 +937,11 @@ tcInferDataCon con
                                           ; return (Scaled mul_var ty) }
     linear_to_poly scaled_ty         = return scaled_ty
 
-tcInferPatSyn :: Name -> PatSyn -> TcM (HsExpr GhcTc, TcSigmaType)
-tcInferPatSyn id_name ps
+tcInferPatSyn :: PatSyn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferPatSyn ps
   = case patSynBuilderOcc ps of
        Just (expr,ty) -> return (expr,ty)
-       Nothing        -> failWithTc (nonBidirectionalErr id_name)
+       Nothing        -> failWithTc (nonBidirectionalErr (patSynName ps))
 
 nonBidirectionalErr :: Name -> TcRnMessage
 nonBidirectionalErr = TcRnPatSynNotBidirectional

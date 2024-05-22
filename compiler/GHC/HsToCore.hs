@@ -448,7 +448,8 @@ dsRule (L loc (HsRule { rd_name = name
     do  { let bndrs' = [var | L _ (RuleBndr _ (L _ var)) <- vars]
 
         ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
-                  unsetWOptM Opt_WarnIdentities $
+                  unsetWOptM Opt_WarnIdentities     $
+                  zapUnspecables                    $
                   dsLExpr lhs   -- Note [Desugaring RULE left hand sides]
 
         ; rhs' <- dsLExpr rhs
@@ -548,6 +549,9 @@ That keeps the desugaring of list comprehensions simple too.
 Nor do we want to warn of conversion identities on the LHS;
 the rule is precisely to optimise them:
   {-# RULES "fromRational/id" fromRational = id :: Rational -> Rational #-}
+
+Finally, the `zapUnspecables` is to implement (NC1) of
+Note [Desugaring non-canonical evidence] in GHC.HsToCore.Expr
 
 Note [Desugaring coerce as cast]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

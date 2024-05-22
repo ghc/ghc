@@ -2001,7 +2001,7 @@
                     (NoExtField)
                     (L
                      (EpAnn
-                      (EpaSpan { <no location info> })
+                      (EpaSpan { DumpTypecheckedAst.hs:20:8-15 })
                       (NameAnnTrailing
                        [])
                       (EpaComments

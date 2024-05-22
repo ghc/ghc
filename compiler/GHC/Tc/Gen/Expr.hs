@@ -565,7 +565,7 @@ tcExpr expr@(RecordCon { rcon_con = L loc con_name
                        , rcon_flds = rbinds }) res_ty
   = do  { con_like <- tcLookupConLike con_name
 
-        ; (con_expr, con_sigma) <- tcInferId con_name
+        ; (con_expr, con_sigma) <- tcInferConLike con_like
         ; (con_wrap, con_tau)   <- topInstantiate orig con_sigma
               -- a shallow instantiation should really be enough for
               -- a data constructor.
