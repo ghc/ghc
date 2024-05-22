@@ -290,6 +290,7 @@ runGenericAsPhase :: (Logger -> DynFlags -> [Option] -> IO ()) -> [Option] -> Bo
 runGenericAsPhase run_as extra_opts with_cpp pipe_env hsc_env location input_fn = do
         let dflags     = hsc_dflags   hsc_env
         let logger     = hsc_logger   hsc_env
+        let unit_env   = hsc_unit_env hsc_env
 
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
@@ -300,16 +301,21 @@ runGenericAsPhase run_as extra_opts with_cpp pipe_env hsc_env location input_fn 
         -- might be a hierarchical module.
         createDirectoryIfMissing True (takeDirectory output_fn)
 
-        let global_includes = [ GHC.SysTools.Option ("-I" ++ p)
-                              | p <- includePathsGlobal cmdline_include_paths ]
-        let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
-                             | p <- includePathsQuote cmdline_include_paths ++
-                                includePathsQuoteImplicit cmdline_include_paths]
+        -- add package include paths
+        all_includes <- if not with_cpp
+          then pure []
+          else do
+            pkg_include_dirs <- mayThrowUnitErr (collectIncludeDirs <$> preloadUnitsInfo unit_env)
+            let global_includes = [ GHC.SysTools.Option ("-I" ++ p)
+                                  | p <- includePathsGlobal cmdline_include_paths ++ pkg_include_dirs]
+            let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
+                                 | p <- includePathsQuote cmdline_include_paths ++ includePathsQuoteImplicit cmdline_include_paths]
+            pure (local_includes ++ global_includes)
         let runAssembler inputFilename outputFilename
               = withAtomicRename outputFilename $ \temp_outputFilename ->
                     run_as
                        logger dflags
-                       (local_includes ++ global_includes
+                       (all_includes
                        -- See Note [-fPIC for assembler]
                        ++ map GHC.SysTools.Option pic_c_flags
                        -- See Note [Produce big objects on Windows]
