@@ -277,23 +277,83 @@ load_target_into_temp (ForeignTarget expr conv) = do
 load_target_into_temp other_target@(PrimTarget _) =
   return other_target
 
+-- Note [Saving foreign call target to local]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
 -- What we want to do here is create a new temporary for the foreign
 -- call argument if it is not safe to use the expression directly,
 -- because the expression mentions caller-saves GlobalRegs (see
 -- Note [Register parameter passing]).
 --
 -- However, we can't pattern-match on the expression here, because
--- this is used in a loop by GHC.Cmm.Parser, and testing the expression
--- results in a black hole.  So we always create a temporary, and rely
--- on GHC.Cmm.Sink to clean it up later.  (Yuck, ToDo).  The generated code
--- ends up being the same, at least for the RTS .cmm code.
+-- this is used in a loop by GHC.Cmm.Parser, and testing the
+-- expression results in a black hole.  So when there exist
+-- caller-saves GlobalRegs, we create a temporary, and rely on
+-- GHC.Cmm.Sink to clean it up later. The generated code ends up being
+-- the same if -fcmm-sink is enabled (implied by -O).
 --
+-- When there doesn't exist caller-save GlobalRegs, keep the original
+-- target in place. This matters for the wasm backend, otherwise it
+-- cannot infer the target symbol's correct foreign function type in
+-- unoptimized Cmm. For instance:
+--
+-- foreign import ccall unsafe "foo" c_foo :: IO ()
+--
+-- Without optimization, previously this would lower to something like:
+--
+-- [Test.c_foo_entry() { //  []
+--          { []
+--          }
+--      {offset
+--        cDk:
+--            goto cDm;
+--        cDm:
+--            _cDj::I32 = foo;
+--            call "ccall" arg hints:  []  result hints:  [] (_cDj::I32)();
+--            R1 = GHC.Tuple.()_closure+1;
+--            call (I32[P32[Sp]])(R1) args: 4, res: 0, upd: 4;
+--      }
+--  },
+--
+-- The wasm backend only sees "foo" being assigned to a local, but
+-- there's no type signature associated with a CLabel! So it has to
+-- emit a dummy .functype directive and fingers crossed that wasm-ld
+-- tolerates function type mismatch. THis is horrible, not future
+-- proof against upstream toolchain upgrades, and already known to
+-- break in certain cases (e.g. when LTO objects are involved).
+--
+-- Therefore, on wasm as well as other targets that don't risk
+-- mentioning caller-saved GlobalRegs in a foreign call target, just
+-- keep the original call target in place and don't assign it to a
+-- local. So this would now lower to something like:
+--
+-- [Test.c_foo_entry() { //  []
+--          { []
+--          }
+--      {offset
+--        cDo:
+--            goto cDq;
+--        cDq:
+--            call "ccall" arg hints:  []  result hints:  [] foo();
+--            R1 = GHC.Tuple.()_closure+1;
+--            call (I32[P32[Sp]])(R1) args: 4, res: 0, upd: 4;
+--      }
+--  },
+--
+-- Since "foo" appears at call site directly, the wasm backend would
+-- now be able to infer its type signature correctly.
+
 maybe_assign_temp :: CmmExpr -> FCode CmmExpr
 maybe_assign_temp e = do
-  platform <- getPlatform
-  reg <- newTemp (cmmExprType platform e)
-  emitAssign (CmmLocal reg) e
-  return (CmmReg (CmmLocal reg))
+  do_save <- stgToCmmSaveFCallTargetToLocal <$> getStgToCmmConfig
+  if do_save
+    then do
+      platform <- getPlatform
+      reg <- newTemp (cmmExprType platform e)
+      emitAssign (CmmLocal reg) e
+      return (CmmReg (CmmLocal reg))
+    else
+      pure e
 
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO
