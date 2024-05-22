@@ -17,6 +17,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -36,11 +37,14 @@ module GHC.Internal.TypeNats
   , sameNat
   , decideNat
     -- ** Singleton values
-  , SNat (..)
+  , SNat (UnsafeSNat)
+      -- We export a pattern synonym instead of the real constructor:
+      -- See Note [Preventing unsafe coercions for singleton types].
   , pattern SNat
   , fromSNat
   , withSomeSNat
   , withKnownNat
+  , unsafeWithSNatCo
 
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
@@ -344,8 +348,59 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 --    number.
 --
 -- @since base-4.18.0.0
-newtype SNat (n :: Nat) = UnsafeSNat Natural
+newtype SNat (n :: Nat) = UnsafeSNat_ Natural
+-- nominal role: See Note [Preventing unsafe coercions for singleton types]
 type role SNat nominal
+
+{-
+Note [Preventing unsafe coercions for singleton types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a singleton type like this one:
+
+  newtype SNat (n :: Nat) = UnsafeSNat_ Natural
+
+We operate under the fiction that a (non-bottom) value
+``UnsafeSNat_ v :: SNat n`` also contains evidence that the value
+``v :: Natural`` is the same as the type ``n :: Natural``.
+Such evidence can only be safely ``coerce``d to evidence that the
+value ``v`` is the same as some other type ``n2`` if we know that
+``n ~ n2``, at nominal role. (This is #23454.)
+
+So, to preserve that fiction, we:
+
+ 1. Provide a role annotation indicating that ``SNat``'s type argument has
+    nominal role rather than the phantom role that would be inferred.
+ 2. Ensure that the real newtype constructor ``UnsafeSNat_`` is not
+    exported even from ghc-internal.  Whenever that constructor is in
+    scope, typechecking of ``coerce`` will ignore the role annotation
+    and just unwrap the newtype.
+
+But users may wish to write functions like this one (#23478):
+
+  plusSNat :: SNat a -> SNat b -> SNat (a + b)
+
+We could ask them to use ``unsafeCoerce``, but it seems a bit more polite
+to provide a pattern synonym ``UnsafeSNat :: forall n. Natural -> SNat n``
+as an escape hatch (exported from ghc-internal only), so that such a function
+can be written as follows:
+
+  plusSNat (UnsafeSNat x) (UnsafeSNat y) = UnsafeSNat (x + y)
+
+Crucially, these pattern synonyms (unlike real newtype constructors) do not
+cause ``coerce`` to bypass our role annotation when they are in scope.
+
+To allow casting data structures containing SNats, we provide a
+further escape hatch in ``unsafeWithSNatCo``, which enables ``coerce`` to
+bypass our role annotation on ``SNat``, but /only within its argument/:
+
+  unsafeWithSNatCo
+    :: forall r. ((forall n. Coercible (SNat n) Natural) => r) -> r
+
+
+The above reasoning applies identically for the other singleton types
+'SChar' and 'SSymbol' as well.
+-}
+
 
 -- | A explicitly bidirectional pattern synonym relating an 'SNat' to a
 -- 'KnownNat' constraint.
@@ -380,6 +435,25 @@ data KnownNatInstance (n :: Nat) where
 -- synonym.
 knownNatInstance :: SNat n -> KnownNatInstance n
 knownNatInstance sn = withKnownNat sn KnownNatInstance
+
+-- | A pattern that can be used to manipulate the
+-- 'Natural' that an @SNat n@ contains under the hood.
+--
+-- When using this pattern to construct an @SNat n@, the actual
+-- @Natural@ being stored in the @SNat n@ /must/ be equal to @n@.
+-- The compiler will not help you verify this, hence the \'unsafe\' name.
+pattern UnsafeSNat :: forall n. Natural -> SNat n
+pattern UnsafeSNat guts = UnsafeSNat_ guts
+{-# COMPLETE UnsafeSNat #-}
+
+-- | 'unsafeWithSNatCo' allows uses of @coerce@ in its argument to see the
+-- real representation of @SNat n@, without undermining the type-safety of
+-- @coerce@ elsewhere in the module.
+--
+-- See also the documentation for 'UnsafeSNat'.
+unsafeWithSNatCo
+  :: forall r. ((forall n. Coercible (SNat n) Natural) => r) -> r
+unsafeWithSNatCo v = v
 
 -- | @since base-4.19.0.0
 instance Eq (SNat n) where

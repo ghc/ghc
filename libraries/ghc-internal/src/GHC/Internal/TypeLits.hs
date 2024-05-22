@@ -16,6 +16,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 
 {-|
 GHC's @DataKinds@ language extension lifts data constructors, natural
@@ -49,11 +50,18 @@ module GHC.Internal.TypeLits
   , OrderingI(..)
   , N.cmpNat, cmpSymbol, cmpChar
     -- ** Singleton values
-  , N.SNat (..), SSymbol (..), SChar (..)
+  , N.SNat (..)
+  , SSymbol (UnsafeSSymbol)
+      -- We export a pattern synonym instead of the real constructor:
+      -- See Note [Preventing unsafe coercions for singleton types].
+  , SChar (UnsafeSChar)
+      -- We export a pattern synonym instead of the real constructor:
+      -- See Note [Preventing unsafe coercions for singleton types].
   , pattern N.SNat, pattern SSymbol, pattern SChar
   , fromSNat, fromSSymbol, fromSChar
   , withSomeSNat, withSomeSSymbol, withSomeSChar
   , N.withKnownNat, withKnownSymbol, withKnownChar
+  , N.unsafeWithSNatCo, unsafeWithSSymbolCo, unsafeWithSCharCo
 
     -- * Functions on type literals
   , type (N.<=), type (N.<=?), type (N.+), type (N.*), type (N.^), type (N.-)
@@ -72,7 +80,7 @@ module GHC.Internal.TypeLits
 import GHC.Internal.Base ( Bool(..), Eq(..), Functor(..), Ord(..), Ordering(..), String
                 , (.), otherwise, withDict, Void, (++)
                 , errorWithoutStackTrace)
-import GHC.Types(Symbol, Char, TYPE)
+import GHC.Types(Symbol, Char, TYPE, Coercible)
 import GHC.Internal.TypeError(ErrorMessage(..), TypeError)
 import GHC.Internal.Num(Integer, fromInteger)
 import GHC.Internal.Show(Show(..), appPrec, appPrec1, showParen, showString)
@@ -340,7 +348,9 @@ withSomeSNat n k
 --    'String'.
 --
 -- @since base-4.18.0.0
-newtype SSymbol (s :: Symbol) = UnsafeSSymbol String
+newtype SSymbol (s :: Symbol) = UnsafeSSymbol_ String
+-- nominal role: See Note [Preventing unsafe coercions for singleton types]
+-- in GHC.Internal.TypeNats
 type role SSymbol nominal
 
 -- | A explicitly bidirectional pattern synonym relating an 'SSymbol' to a
@@ -376,6 +386,26 @@ data KnownSymbolInstance (s :: Symbol) where
 -- synonym.
 knownSymbolInstance :: SSymbol s -> KnownSymbolInstance s
 knownSymbolInstance ss = withKnownSymbol ss KnownSymbolInstance
+
+-- | A pattern that can be used to manipulate the
+-- 'String' that an @SSymbol s@ contains under the hood.
+--
+-- When using this pattern to construct an @SSymbol s@, the actual
+-- @String@ being stored in the @SSymbol@ /must/ be equal to (the
+-- contents of) @s@.  The compiler will not help you verify this,
+-- hence the \'unsafe\' name.
+pattern UnsafeSSymbol :: forall s. String -> SSymbol s
+pattern UnsafeSSymbol guts = UnsafeSSymbol_ guts
+{-# COMPLETE UnsafeSSymbol #-}
+
+-- | 'unsafeWithSSymbolCo' allows uses of @coerce@ in its argument to see the
+-- real representation of @SSymbol s@, without undermining the type-safety of
+-- @coerce@ elsewhere in the module.
+--
+-- See also the documentation for 'UnsafeSSymbol'.
+unsafeWithSSymbolCo
+  :: forall r. ((forall s. Coercible (SSymbol s) String) => r) -> r
+unsafeWithSSymbolCo v = v
 
 -- | @since base-4.19.0.0
 instance Eq (SSymbol s) where
@@ -443,7 +473,9 @@ withSomeSSymbol s k = k (UnsafeSSymbol s)
 -- 3. The 'withSomeSChar' function, which creates an 'SChar' from a 'Char'.
 --
 -- @since base-4.18.0.0
-newtype SChar (s :: Char) = UnsafeSChar Char
+newtype SChar (s :: Char) = UnsafeSChar_ Char
+-- nominal role: See Note [Preventing unsafe coercions for singleton types]
+-- in GHC.Internal.TypeNats
 type role SChar nominal
 
 -- | A explicitly bidirectional pattern synonym relating an 'SChar' to a
@@ -479,6 +511,25 @@ data KnownCharInstance (n :: Char) where
 -- synonym.
 knownCharInstance :: SChar c -> KnownCharInstance c
 knownCharInstance sc = withKnownChar sc KnownCharInstance
+
+-- | A pattern that can be used to manipulate the
+-- 'Char' that an @SChar c@ contains under the hood.
+--
+-- When using this pattern to construct an @SChar c@, the actual
+-- @Char@ being stored in the @SChar c@ /must/ be equal to @c@.
+-- The compiler will not help you verify this, hence the \'unsafe\' name.
+pattern UnsafeSChar :: forall c. Char -> SChar c
+pattern UnsafeSChar guts = UnsafeSChar_ guts
+{-# COMPLETE UnsafeSChar #-}
+
+-- | 'unsafeWithSCharCo' allows uses of @coerce@ in its argument to see the
+-- real representation of @SChar c@, without undermining the type-safety of
+-- @coerce@ elsewhere in the module.
+--
+-- See also the documentation for 'UnsafeSChar'.
+unsafeWithSCharCo
+  :: forall r. ((forall c. Coercible (SChar c) Char) => r) -> r
+unsafeWithSCharCo v = v
 
 -- | @since base-4.19.0.0
 instance Eq (SChar c) where
