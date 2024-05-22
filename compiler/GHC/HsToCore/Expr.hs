@@ -1,6 +1,6 @@
-
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# LANGUAGE LambdaCase #-}
@@ -33,6 +33,7 @@ import GHC.HsToCore.Pmc
 import GHC.HsToCore.Errors.Types
 import GHC.Types.SourceText
 import GHC.Types.Name hiding (varName)
+import GHC.Types.Name.Reader
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.HsToCore.Quote
 import GHC.HsToCore.Ticks (stripTicksTopHsExpr)
@@ -43,6 +44,7 @@ import GHC.Hs
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Instance.Class (lookupHasFieldLabel)
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core
@@ -67,7 +69,6 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Core.PatSyn
 import Control.Monad
-import GHC.Types.Error
 
 {-
 ************************************************************************
@@ -261,35 +262,18 @@ dsLExpr (L loc e) = putSrcSpanDsA loc $ dsExpr e
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
 
-{- Record selectors are warned about if they are not
-present in all of the parent data type's constructor,
-or always in case of pattern synonym record selectors
-(regulated by a flag). However, this only produces
-a warning if it's not a part of a record selector
-application. For example:
-
-        data T = T1 | T2 {s :: Bool}
-        f x = s x -- the warning from this case will be supressed
-
-See the `HsApp` case for where it is filtered out
--}
+-- See of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
 dsExpr (HsRecSel _ (FieldOcc id _))
   = do { let name = getName id
              RecSelId {sel_cons = (_, cons_wo_field)}
                   = idDetails id
-       ; cons_trimmed <- trim_cons cons_wo_field
-       ; unless (null cons_wo_field) $ diagnosticDs
-             $ DsIncompleteRecordSelector name cons_trimmed (cons_trimmed /= cons_wo_field)
-                 -- This only produces a warning if it's not a part of a
-                 -- record selector application (e.g. `s a` where `s` is a selector)
-                 -- See the `HsApp` case for where it is filtered out
+       ; suppress_here <- getSuppressIncompleteRecSelsDs
+         -- See (4) and (5) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+       ; unless (suppress_here || null cons_wo_field) $ do
+           dflags <- getDynFlags
+           let maxCons = maxUncoveredPatterns dflags
+           diagnosticDs $ DsIncompleteRecordSelector name cons_wo_field maxCons
        ; dsHsVar id }
-  where
-    trim_cons :: [ConLike] -> DsM [ConLike]
-    trim_cons cons_wo_field = do
-      dflags <- getDynFlags
-      let maxConstructors = maxUncoveredPatterns dflags
-      return $ take maxConstructors cons_wo_field
 
 
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
@@ -358,28 +342,17 @@ dsExpr (HsLam _ variant a_Match)
   = uncurry mkCoreLams <$> matchWrapper (LamAlt variant) Nothing a_Match
 
 dsExpr e@(HsApp _ fun arg)
-         -- We want to have a special case that uses the PMC information to filter
-         -- out some of the incomplete record selectors warnings and not trigger
-         -- the warning emitted during the desugaring of dsExpr(HsRecSel)
-         -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
-  = do { (msgs, fun') <- captureMessagesDs $ dsLExpr fun
-             -- Make sure to filter out the generic incomplete record selector warning
-             -- if it's a raw record selector
+  = do { fun' <- suppressIncompleteRecSelsDs $ dsLExpr fun
+         -- See (5) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
        ; arg' <- dsLExpr arg
-       ; case getIdFromTrivialExpr_maybe fun' of
-           Just fun_id | isRecordSelector fun_id
-             -> do { let msgs' = filterMessages is_incomplete_rec_sel_msg msgs
-                   ; addMessagesDs msgs'
-                   ; pmcRecSel fun_id arg' }
-           _ -> addMessagesDs msgs
+       ; mb_rec_sel <- decomposeRecSelHead fun'
+       ; case mb_rec_sel of
+           -- See (2) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+           Just sel_id
+             -> pmcRecSel sel_id arg'
+           _ -> return ()
        ; warnUnusedBindValue fun arg (exprType arg')
        ; return $ mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg' }
-  where
-    is_incomplete_rec_sel_msg :: MsgEnvelope DsMessage -> Bool
-    is_incomplete_rec_sel_msg (MsgEnvelope {errMsgDiagnostic = DsIncompleteRecordSelector{}})
-                                = False
-    is_incomplete_rec_sel_msg _ = True
-
 
 dsExpr e@(HsAppType {}) = dsHsWrapped e
 
@@ -1015,7 +988,19 @@ warnDiscardedDoBindings rhs rhs_ty
 ------------------------------
 dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
 dsHsWrapped orig_hs_expr
-  = go idHsWrapper orig_hs_expr
+  = do { res <- suppressIncompleteRecSelsDs $ go idHsWrapper orig_hs_expr
+       ; suppress_here <- getSuppressIncompleteRecSelsDs
+         -- See (5) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+       ; if | not suppress_here
+            , Just fun_id <- getIdFromTrivialExpr_maybe res
+            , isRecordSelector fun_id
+            , Just (FTF_T_T, _, arg_ty,_res_ty) <- splitFunTy_maybe (exprType res)
+            -> do { dummy <- newSysLocalDs (Scaled ManyTy arg_ty)
+                  -- See (3) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+                  ; pmcRecSel fun_id (Var dummy) }
+            | otherwise
+            -> return ()
+       ; return res }
   where
     go wrap (HsPar _ (L _ hs_e))
        = go wrap hs_e
@@ -1037,3 +1022,48 @@ dsHsWrapped orig_hs_expr
             { addTyCs FromSource (hsWrapDictBinders wrap) $
               do { e <- dsExpr hs_e
                  ; return (wrap' e) } } }
+
+decomposeRecSelHead :: CoreExpr -> DsM (Maybe Id)
+-- ^ Detect whether the given CoreExpr is
+--  * a record selector, or
+--  * a resolved getField application listing the record selector
+-- See (6) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc.
+decomposeRecSelHead fun
+  -- First plain record selectors; `sel |> co`. Easy:
+  | Just sel_id <- getIdFromTrivialExpr_maybe fun
+  , isRecordSelector sel_id
+  = pure (Just sel_id)
+
+  -- Now resolved getField applications. General form:
+  --   getField
+  --     @GHC.Types.Symbol                        {k}
+  --     @"sel"                                   x
+  --     @T                                       r
+  --     @Int                                     a
+  --     ($dHasField :: HasField "sel" T Int)
+  --     :: T -> Int
+  -- where
+  --  $dHasField = sel |> (co :: T -> Int ~R# HasField "sel" T Int)
+  -- Alas, we cannot simply look at the unfolding of $dHasField below because it
+  -- has not been set yet, so we have to reconstruct the selector from the types.
+  | App fun2 dict <- fun
+     -- cheap test first
+  , Just _dict_id <- getIdFromTrivialExpr_maybe dict
+     -- looks good so far. Now match deeper
+  , get_field `App` _k `App` Type x_ty `App` Type r_ty `App` _a_ty <- fun2
+  , Just get_field_id <- getIdFromTrivialExpr_maybe get_field
+  , get_field_id `hasKey` getFieldClassOpKey
+     -- Checks out! Now get a hold of the record selector.
+  = do fam_inst_envs <- dsGetFamInstEnvs
+       rdr_env       <- dsGetGlobalRdrEnv
+       -- Look up the field named x/"sel" in the type r/T
+       case lookupHasFieldLabel fam_inst_envs x_ty r_ty of
+        Just fl
+          | Just _ <- lookupGRE_FieldLabel rdr_env fl
+            -- Make sure the field is actually visible in this module;
+            -- otherwise this might not be the implicit HasField instance
+          -> Just <$> dsLookupGlobalId (flSelector fl)
+        _ -> pure Nothing
+
+  | otherwise
+  = pure Nothing

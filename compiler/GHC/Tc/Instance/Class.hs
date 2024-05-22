@@ -5,7 +5,8 @@ module GHC.Tc.Instance.Class (
      matchGlobalInst, matchEqualityInst,
      ClsInstResult(..),
      InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
-     AssocInstInfo(..), isNotAssociated
+     AssocInstInfo(..), isNotAssociated,
+     lookupHasFieldLabel
   ) where
 
 import GHC.Prelude
@@ -22,7 +23,7 @@ import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin (InstanceWhat (..), SafeOverlapping)
-import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
+import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst, FamInstEnvs )
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
 import GHC.Builtin.Types
@@ -1252,15 +1253,9 @@ matchHasField dflags short_cut clas tys
        ; case tys of
            -- We are matching HasField {k} {r_rep} {a_rep} x r a...
            [_k_ty, _r_rep, _a_rep, x_ty, r_ty, a_ty]
-               -- x should be a literal string
-             | Just x <- isStrLitTy x_ty
-               -- r should be an applied type constructor
-             , Just (tc, args) <- tcSplitTyConApp_maybe r_ty
-               -- use representation tycon (if data family); it has the fields
-             , let r_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs tc args)
-               -- x should be a field of r
-             , Just fl <- lookupTyConFieldLabel (FieldLabelString x) r_tc
-               -- the field selector should be in scope
+               -- Look up the field named x in the type r
+             | Just fl <- lookupHasFieldLabel fam_inst_envs x_ty r_ty
+               -- and ensure the field selector is in scope
              , Just gre <- lookupGRE_FieldLabel rdr_env fl
 
              -> do { let name = flSelector fl
@@ -1295,10 +1290,10 @@ matchHasField dflags short_cut clas tys
                      then do { -- See Note [Unused name reporting and HasField]
                                addUsedGRE AllDeprecationWarnings gre
                              ; keepAlive name
-                             ; unless (null $ snd $ sel_cons $ idDetails sel_id)
-                                 $ addDiagnostic $ TcRnHasFieldResolvedIncomplete name
-                                 -- Only emit an incomplete selector warning if it's an implicit instance
-                                 -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+                             ; suppress <- getSuppressIncompleteRecSelsTc
+                               -- See (7) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+                             ; unless (null (snd $ sel_cons $ idDetails sel_id) || suppress) $ do
+                                 addDiagnostic $ TcRnHasFieldResolvedIncomplete name
                              ; return OneInst { cir_new_theta   = theta
                                               , cir_mk_ev       = mk_ev
                                               , cir_canonical   = EvCanonical
@@ -1306,3 +1301,21 @@ matchHasField dflags short_cut clas tys
                      else matchInstEnv dflags short_cut clas tys }
 
            _ -> matchInstEnv dflags short_cut clas tys }
+
+lookupHasFieldLabel :: FamInstEnvs -> Type -> Type -> Maybe FieldLabel
+-- The call (lookupHasFieldLabel fam_envs (LitTy "fld") (T t1..tn))
+-- returns the `FieldLabel` of field "fld" in the data type T.
+-- A complication is that `T` might be a data family, so we need to
+-- look it up in the `fam_envs` to find its representation tycon.
+lookupHasFieldLabel fam_inst_envs x_ty r_ty
+    -- x should be a literal string
+  | Just x <- isStrLitTy x_ty
+    -- r should be an applied type constructor
+  , Just (tc, args) <- tcSplitTyConApp_maybe r_ty
+    -- use representation tycon (if data family); it has the fields
+  , let r_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs tc args)
+    -- x should be a field of r
+  = lookupTyConFieldLabel (FieldLabelString x) r_tc
+
+  | otherwise
+  = Nothing

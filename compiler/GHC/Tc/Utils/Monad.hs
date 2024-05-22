@@ -94,6 +94,7 @@ module GHC.Tc.Utils.Monad(
   mkTcRnMessage, reportDiagnostic, reportDiagnostics,
   warnIf, diagnosticTc, diagnosticTcM,
   addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt,
+  getSuppressIncompleteRecSelsTc, setSuppressIncompleteRecSelsTc,
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
@@ -398,7 +399,8 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
-                tcl_tclvl      = topTcLevel
+                tcl_tclvl      = topTcLevel,
+                tcl_suppress_incomplete_rec_sel = False
                 },
                 tcl_usage      = usage_var,
                 tcl_lie        = lie_var,
@@ -1273,6 +1275,7 @@ mkCtLocEnv lcl_env =
            , ctl_tclvl = getLclEnvTcLevel lcl_env
            , ctl_in_gen_code = lclEnvInGeneratedCode lcl_env
            , ctl_rdr = getLclEnvRdrEnv lcl_env
+           , ctl_suppress_incomplete_rec_sels = getLclEnvSuppressIncompleteRecSels lcl_env
            }
 
 setCtLocM :: CtLoc -> TcM a -> TcM a
@@ -1281,6 +1284,7 @@ setCtLocM (CtLoc { ctl_env = lcl }) thing_inside
   = updLclEnv (\env -> setLclEnvLoc (ctl_loc lcl)
                      $ setLclEnvErrCtxt (ctl_ctxt lcl)
                      $ setLclEnvBinderStack (ctl_bndrs lcl)
+                     $ setLclEnvSuppressIncompleteRecSels (ctl_suppress_incomplete_rec_sels lcl)
                      $ env) thing_inside
 
 {- *********************************************************************
@@ -1661,6 +1665,12 @@ add_diagnostic msg
        ; unit_state <- hsc_units <$> getTopEnv
        ; mkTcRnMessage loc (TcRnMessageWithInfo unit_state msg) >>= reportDiagnostic
        }
+
+getSuppressIncompleteRecSelsTc :: TcRn Bool
+getSuppressIncompleteRecSelsTc = getLclEnvSuppressIncompleteRecSels <$> getLclEnv
+
+setSuppressIncompleteRecSelsTc :: Bool -> TcRn a -> TcRn a
+setSuppressIncompleteRecSelsTc b = updLclEnv (setLclEnvSuppressIncompleteRecSels b)
 
 
 {-

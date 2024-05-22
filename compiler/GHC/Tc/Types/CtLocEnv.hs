@@ -29,7 +29,8 @@ data CtLocEnv = CtLocEnv { ctl_ctxt :: ![ErrCtxt]
                          , ctl_bndrs :: !TcBinderStack
                          , ctl_tclvl :: !TcLevel
                          , ctl_in_gen_code :: !Bool
-                         , ctl_rdr :: !LocalRdrEnv }
+                         , ctl_rdr :: !LocalRdrEnv
+                         , ctl_suppress_incomplete_rec_sels :: !Bool }
 
 
 getCtLocEnvLoc :: CtLocEnv -> RealSrcSpan

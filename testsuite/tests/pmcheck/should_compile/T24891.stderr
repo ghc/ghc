@@ -1,0 +1,9 @@
+T24891.hs:13:7: warning: [GHC-17335] [-Wincomplete-record-selectors]
+    The application of the record field ‘sel’ may fail for the following constructors: T3
+
+T24891.hs:25:12: warning: [GHC-86894] [-Wincomplete-record-selectors]
+    The invocation of `getField` on the record field ‘sel2’ may produce an error since it is not defined for all data constructors
+
+T24891.hs:30:16: warning: [GHC-17335] [-Wincomplete-record-selectors]
+    The application of the record field ‘sel3’ may fail for the following constructors: No2
+

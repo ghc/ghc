@@ -403,10 +403,18 @@ tcApp rn_expr exp_res_ty
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; let tc_head = (tc_fun, fun_ctxt)
 
+       ; let supp_incomplete_rec_sel
+               | XExpr (ExpandedThingRn (OrigExpr HsGetField{}) _) <- rn_expr
+               -- See (7) of Note [Detecting incomplete record selectors]
+               = setSuppressIncompleteRecSelsTc True
+               | otherwise
+               = id
+
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
-              <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
+              <- supp_incomplete_rec_sel $
+                 setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
                                          -- Note [tcApp: typechecking applications]
                  tcInstFun do_ql True tc_head fun_sigma rn_args
 
@@ -764,7 +772,9 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
            ; go (pos+1) (addArgWrap wrap acc) inst_body rest_args }
 
     go1 pos acc fun_ty (EWrap w : args)
-      = go1 pos (EWrap w : acc) fun_ty args
+      = setSuppressIncompleteRecSelsTc False $
+        -- See (7) of Note [Detecting incomplete record selectors]
+        go1 pos (EWrap w : acc) fun_ty args
 
     go1 pos acc fun_ty (EPrag sp prag : args)
       = go1 pos (EPrag sp prag : acc) fun_ty args
@@ -2269,4 +2279,3 @@ rejectRepPolyNewtypes (fun,_) app_res_rho = case fun of
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 ann) = HsPragSCC x1 ann
-

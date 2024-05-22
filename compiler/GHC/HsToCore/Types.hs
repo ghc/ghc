@@ -11,7 +11,7 @@ module GHC.HsToCore.Types (
         DsMetaEnv, DsMetaVal(..), CompleteMatches
     ) where
 
-import GHC.Prelude (Int)
+import GHC.Prelude (Int, Bool)
 
 import Data.IORef
 import qualified Data.Set as S
@@ -80,6 +80,9 @@ data DsLclEnv
   -- ^ See Note [Long-distance information] in "GHC.HsToCore.Pmc".
   -- The set of reaching values Nablas is augmented as we walk inwards, refined
   -- through each pattern match in turn
+  , dsl_suppress_incomplete_rec_sel :: Bool
+  -- ^ Whether to suppress -Wincomplete-record-selectors warnings.
+  -- See (5) of Note [Detecting incomplete record selectors]
   , dsl_unspecables :: S.Set EvVar
   -- ^ See Note [Desugaring non-canonical evidence]: this field collects
   -- all un-specialisable evidence variables in scope.

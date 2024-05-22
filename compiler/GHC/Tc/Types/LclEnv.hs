@@ -12,6 +12,7 @@ module GHC.Tc.Types.LclEnv (
   , getLclEnvRdrEnv
   , getLclEnvTcLevel
   , getLclEnvThStage
+  , getLclEnvSuppressIncompleteRecSels
   , setLclEnvTcLevel
   , setLclEnvLoc
   , setLclEnvRdrEnv
@@ -19,6 +20,7 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvErrCtxt
   , setLclEnvThStage
   , setLclEnvTypeEnv
+  , setLclEnvSuppressIncompleteRecSels
   , modifyLclEnvTcLevel
 
   , lclEnvInGeneratedCode
@@ -117,9 +119,11 @@ data TcLclCtxt
 
         tcl_arrow_ctxt :: ArrowCtxt,       -- Arrow-notation context
 
-        tcl_env  :: TcTypeEnv    -- The local type environment:
+        tcl_env  :: TcTypeEnv,   -- The local type environment:
                                  -- Ids and TyVars defined in this module
 
+        tcl_suppress_incomplete_rec_sel :: Bool -- True <=> Suppress warnings about incomplete record selectors
+                                                -- See (7) of Note [Detecting incomplete record selectors]
     }
 
 getLclEnvThStage :: TcLclEnv -> ThStage
@@ -178,6 +182,12 @@ getLclEnvRdrEnv = tcl_rdr . tcl_lcl_ctxt
 
 setLclEnvRdrEnv :: LocalRdrEnv -> TcLclEnv -> TcLclEnv
 setLclEnvRdrEnv rdr_env = modifyLclCtxt (\env -> env { tcl_rdr = rdr_env })
+
+getLclEnvSuppressIncompleteRecSels :: TcLclEnv -> Bool
+getLclEnvSuppressIncompleteRecSels = tcl_suppress_incomplete_rec_sel . tcl_lcl_ctxt
+
+setLclEnvSuppressIncompleteRecSels :: Bool -> TcLclEnv -> TcLclEnv
+setLclEnvSuppressIncompleteRecSels suppress = modifyLclCtxt (\env -> env { tcl_suppress_incomplete_rec_sel = suppress })
 
 modifyLclCtxt :: (TcLclCtxt -> TcLclCtxt) -> TcLclEnv -> TcLclEnv
 modifyLclCtxt upd env =
