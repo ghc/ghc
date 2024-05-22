@@ -201,10 +201,11 @@ instance Show ByteArray where
                 | otherwise = showString ", "
 
 instance Lift ByteArray where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (ByteArray b) = return
-    (AppE (AppE (VarE addrToByteArrayName) (LitE (IntegerL (fromIntegral len))))
-      (LitE (BytesPrimL (Bytes ptr 0 (fromIntegral len)))))
+  liftTyped = unsafeCodeCoerce . lift
+  lift (ByteArray b) =
+    [| addrToByteArray $(lift len)
+                       $(pure . LitE . BytesPrimL $ Bytes ptr 0 (fromIntegral len))
+    |]
     where
       len# = sizeofByteArray# b
       len = I# len#
@@ -218,9 +219,6 @@ instance Lift ByteArray where
                 (# s''', ret #) -> (# s''', ByteArray ret #)
       ptr :: ForeignPtr Word8
       ptr = ForeignPtr (byteArrayContents# pb) (PlainPtr (unsafeCoerce# pb))
-
-addrToByteArrayName :: Name
-addrToByteArrayName = 'addrToByteArray
 
 addrToByteArray :: Int -> Addr# -> ByteArray
 addrToByteArray (I# len) addr = runST $ ST $
