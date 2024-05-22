@@ -961,6 +961,8 @@ entry counters to the eventlog.
    :field String: argument kinds. This is the same as the synonymous field in the
      textual ticky summary.
    :field String: counter name
+   :field Word64: info table address
+   :field String: json encoded information about the counter
 
    Defines a ticky counter.
 
