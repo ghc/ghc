@@ -220,6 +220,7 @@ instance Lift ByteArray where
       ptr :: ForeignPtr Word8
       ptr = ForeignPtr (byteArrayContents# pb) (PlainPtr (unsafeCoerce# pb))
 
+{-# NOINLINE addrToByteArray #-}
 addrToByteArray :: Int -> Addr# -> ByteArray
 addrToByteArray (I# len) addr = runST $ ST $
   \s -> case newByteArray# len s of
