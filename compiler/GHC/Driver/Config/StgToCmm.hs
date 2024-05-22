@@ -14,6 +14,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Platform.Profile
+import GHC.Platform.Regs
 import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Utils.Outputable
@@ -84,6 +85,8 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmAvx2          = isAvx2Enabled                  dflags
   , stgToCmmAvx512f       = isAvx512fEnabled               dflags
   , stgToCmmTickyAP       = gopt Opt_Ticky_AP dflags
+  -- See Note [Saving foreign call target to local]
+  , stgToCmmSaveFCallTargetToLocal = any (callerSaves platform) $ activeStgRegs platform
   } where profile  = targetProfile dflags
           platform = profilePlatform profile
           bk_end  = backend dflags
