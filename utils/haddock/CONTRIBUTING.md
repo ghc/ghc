@@ -32,7 +32,7 @@ $ ./hadrian/build -j --flavour=Quick --freeze1 _build/stage1/bin/haddock
 
 The project provides a Makefile with rules to accompany you during development:
 
-* `make style` runs the code formatter. You need `fourmolu` 0.15.0.0 installed.
+* `make style` runs the code formatter. You need `fourmolu` 0.15.0.0 and `cabal-fmt` 0.1.12 installed.
 * `make tags` run the generation of etags/ctags, to enable you to browse to definitions without HLS. You need `ghc-tags` 1.8 installed.
 
 
