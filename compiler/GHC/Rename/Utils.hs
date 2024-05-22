@@ -25,10 +25,9 @@ module GHC.Rename.Utils (
         genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
         genSimpleFunBind, genFunBind,
+        genHsLamDoExp, genHsCaseAltDoExp, genSimpleMatch, genHsLet,
 
-        genHsLamDoExp, genHsCaseAltDoExp, genSimpleMatch,
-
-        genHsLet,
+        mkRnSyntaxExpr,
 
         newLocalBndrRn, newLocalBndrsRn,
 
@@ -713,6 +712,14 @@ wrapGenSpan :: (HasAnnotation an) => a -> GenLocated an a
 -- See Note [Rebindable syntax and XXExprGhcRn]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
 
+-- | Make a 'SyntaxExpr' from a 'Name' (the "rn" is because this is used in the
+-- renamer).
+mkRnSyntaxExpr :: Name -> SyntaxExprRn
+mkRnSyntaxExpr = SyntaxExprRn . genHsVar
+
+genHsVar :: Name -> HsExpr GhcRn
+genHsVar n = HsVar noExtField (wrapGenSpan n)
+
 genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
 genHsApps fun args = foldl genHsApp (genHsVar fun) args
 
@@ -732,9 +739,6 @@ genLHsApp fun arg = wrapGenSpan (genHsApp fun arg)
 
 genLHsVar :: Name -> LHsExpr GhcRn
 genLHsVar nm = wrapGenSpan $ genHsVar nm
-
-genHsVar :: Name -> HsExpr GhcRn
-genHsVar nm = HsVar noExtField $ wrapGenSpan nm
 
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) (mkEmptyWildCardBndrs (wrapGenSpan ty))

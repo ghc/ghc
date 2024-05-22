@@ -23,7 +23,8 @@ import GHC.Prelude
 
 import GHC.Rename.Utils ( wrapGenSpan, genHsExpApps, genHsApp, genHsLet,
                           genHsLamDoExp, genHsCaseAltDoExp, genWildPat )
-import GHC.Rename.Env ( irrefutableConLikeRn )
+import GHC.Rename.Env   ( irrefutableConLikeRn )
+
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 

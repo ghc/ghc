@@ -1400,7 +1400,7 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
                 -- (Coercible a b) to (a ~R# b)
 
   | otherwise
-  = do { result <- matchGlobalInst dflags False cls tys
+  = do { result <- matchGlobalInst dflags False cls tys Nothing
        ; case result of
            OneInst { cir_what = what }
               -> addDiagnosticTc (TcRnSimplifiableConstraint pred what)

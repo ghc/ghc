@@ -142,7 +142,7 @@ exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
   = case collectArgs e of
-        (fun, args) -> applyTypeToArgs (pprCoreExpr e) (exprType fun) args
+        (fun, args) -> applyTypeToArgs (exprType fun) args
 exprType (Type ty) = pprPanic "exprType" (ppr ty)
 
 coreAltType :: CoreAlt -> Type
@@ -221,11 +221,10 @@ Various possibilities suggest themselves:
 Note that there might be existentially quantified coercion variables, too.
 -}
 
-applyTypeToArgs :: HasDebugCallStack => SDoc -> Type -> [CoreExpr] -> Type
+applyTypeToArgs :: HasDebugCallStack => Type -> [CoreExpr] -> Type
 -- ^ Determines the type resulting from applying an expression with given type
 --- to given argument expressions.
--- The first argument is just for debugging, and gives some context
-applyTypeToArgs pp_e op_ty args
+applyTypeToArgs op_ty args
   = go op_ty args
   where
     go op_ty []                   = op_ty
@@ -244,8 +243,7 @@ applyTypeToArgs pp_e op_ty args
     go_ty_args op_ty rev_tys args
        = go (piResultTys op_ty (reverse rev_tys)) args
 
-    panic_msg as = vcat [ text "Expression:" <+> pp_e
-                        , text "Type:" <+> ppr op_ty
+    panic_msg as = vcat [ text "Type:" <+> ppr op_ty
                         , text "Args:" <+> ppr args
                         , text "Args':" <+> ppr as ]
 

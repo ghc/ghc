@@ -71,7 +71,12 @@ ghcWarningsArgs = do
         , package stm          ? pure [ "-Wno-deriving-typeable" ]
         , package osString     ? pure [ "-Wno-deriving-typeable" ]
         , package parsec       ? pure [ "-Wno-deriving-typeable" ]
-        , package cabal        ? pure [ "-Wno-deriving-typeable" ]
+
+        , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors" ]
+             -- The -Wno-incomplete-record-selectors is due to
+             -- https://github.com/haskell/cabal/issues/10402
+             -- If that ticket is fixed, bwe can remove the flag again
+
         , package cabalSyntax  ? pure [ "-Wno-deriving-typeable" ]
         , package time         ? pure [ "-Wno-deriving-typeable" ]
         , package transformers ? pure [ "-Wno-unused-matches"

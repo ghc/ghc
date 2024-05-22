@@ -5,7 +5,8 @@ module GHC.Tc.Instance.Class (
      matchGlobalInst, matchEqualityInst,
      ClsInstResult(..),
      InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
-     AssocInstInfo(..), isNotAssociated
+     AssocInstInfo(..), isNotAssociated,
+     lookupHasFieldLabel
   ) where
 
 import GHC.Prelude
@@ -21,8 +22,9 @@ import GHC.Tc.Utils.Instantiate(instDFunType, tcInstType)
 import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.Origin (InstanceWhat (..), SafeOverlapping)
-import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
+import GHC.Tc.Types.CtLoc
+import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, CtOrigin(GetFieldOrigin) )
+import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst, FamInstEnvs )
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
 import GHC.Builtin.Types
@@ -64,7 +66,6 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Types.Id.Info
 import GHC.Tc.Errors.Types
-import Control.Monad
 
 import Data.Functor
 import Data.Maybe
@@ -137,11 +138,12 @@ instanceReturnsDictCon LocalInstance       = False
 matchGlobalInst :: DynFlags
                 -> Bool      -- True <=> caller is the short-cut solver
                              -- See Note [Shortcut solving: overlap]
-                -> Class -> [Type] -> TcM ClsInstResult
+                -> Class -> [Type] -> Maybe CtLoc
+                -> TcM ClsInstResult
 -- Precondition: Class does not satisfy GHC.Core.Predicate.isEqualityClass
 -- (That is handled by a separate code path: see GHC.Tc.Solver.Dict.solveDict,
 --  which calls solveEqualityDict for equality classes.)
-matchGlobalInst dflags short_cut clas tys
+matchGlobalInst dflags short_cut clas tys mb_loc
   | cls_name == knownNatClassName      = matchKnownNat    dflags short_cut clas tys
   | cls_name == knownSymbolClassName   = matchKnownSymbol dflags short_cut clas tys
   | cls_name == knownCharClassName     = matchKnownChar   dflags short_cut clas tys
@@ -149,12 +151,16 @@ matchGlobalInst dflags short_cut clas tys
   | cls_name == typeableClassName      = matchTypeable                     clas tys
   | cls_name == withDictClassName      = matchWithDict                          tys
   | cls_name == dataToTagClassName     = matchDataToTag                    clas tys
-  | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys
-  | cls_name == unsatisfiableClassName = return NoInstance -- See (B) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors
+  | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys mb_loc
+  | cls_name == unsatisfiableClassName = matchUnsatisfiable
   | otherwise                          = matchInstEnv     dflags short_cut clas tys
   where
     cls_name = className clas
 
+matchUnsatisfiable :: TcM ClsInstResult
+-- See (B) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors
+matchUnsatisfiable
+  = return NoInstance
 
 {- ********************************************************************
 *                                                                     *
@@ -1222,12 +1228,12 @@ which is the new wanted, and
 
 which can be derived from the newtype coercion.
 
-If `foo` is not in scope, or has a higher-rank or existentially
-quantified type, then the constraint is not solved automatically, but
-may be solved by a user-supplied HasField instance.  Similarly, if we
-encounter a HasField constraint where the field is not a literal
-string, or does not belong to the type, then we fall back on the
-normal constraint solver behaviour.
+(HF1) If `foo` is not in scope, or has a higher-rank or existentially
+  quantified type, then the constraint is not solved automatically, but
+  may be solved by a user-supplied HasField instance.  Similarly, if we
+  encounter a HasField constraint where the field is not a literal
+  string, or does not belong to the type, then we fall back on the
+  normal constraint solver behaviour.
 
 
 Note [Unused name reporting and HasField]
@@ -1245,26 +1251,15 @@ addUsedGRE extends tcg_used_gres with imported GREs only.
 -}
 
 -- See Note [HasField instances]
-matchHasField :: DynFlags -> Bool -> Class -> [Type] -> TcM ClsInstResult
-matchHasField dflags short_cut clas tys
+matchHasField :: DynFlags -> Bool -> Class -> [Type]
+              -> Maybe CtLoc        -- Nothing used only during type validity checking
+              -> TcM ClsInstResult
+matchHasField dflags short_cut clas tys mb_ct_loc
   = do { fam_inst_envs <- tcGetFamInstEnvs
        ; rdr_env       <- getGlobalRdrEnv
-       ; case tys of
-           -- We are matching HasField {k} {r_rep} {a_rep} x r a...
-           [_k_ty, _r_rep, _a_rep, x_ty, r_ty, a_ty]
-               -- x should be a literal string
-             | Just x <- isStrLitTy x_ty
-               -- r should be an applied type constructor
-             , Just (tc, args) <- tcSplitTyConApp_maybe r_ty
-               -- use representation tycon (if data family); it has the fields
-             , let r_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs tc args)
-               -- x should be a field of r
-             , Just fl <- lookupTyConFieldLabel (FieldLabelString x) r_tc
-               -- the field selector should be in scope
-             , Just gre <- lookupGRE_FieldLabel rdr_env fl
-
-             -> do { let name = flSelector fl
-                   ; sel_id <- tcLookupId name
+       ; case lookupHasFieldLabel fam_inst_envs rdr_env tys of
+            Just (sel_name, gre, r_ty, a_ty) ->
+                do { sel_id <- tcLookupId sel_name
                    ; (tv_prs, preds, sel_ty) <- tcInstType newMetaTyVars sel_id
 
                          -- The first new wanted constraint equates the actual
@@ -1272,7 +1267,8 @@ matchHasField dflags short_cut clas tys
                          -- the HasField x r a dictionary.  The preds will
                          -- typically be empty, but if the datatype has a
                          -- "stupid theta" then we have to include it here.
-                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
+                   ; let tvs   = mkTyVarTys (map snd tv_prs)
+                         theta = mkPrimEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use the newtype coercion to cast
@@ -1283,26 +1279,83 @@ matchHasField dflags short_cut clas tys
                                       `mkTransCo` mkSymCo co2
                          mk_ev [] = panic "matchHasField.mk_ev"
 
-                         Just (_, co2) = tcInstNewTyCon_maybe (classTyCon clas)
-                                                              tys
-
-                         tvs = mkTyVarTys (map snd tv_prs)
+                         Just (_, co2) = tcInstNewTyCon_maybe (classTyCon clas) tys
 
                      -- The selector must not be "naughty" (i.e. the field
-                     -- cannot have an existentially quantified type), and
-                     -- it must not be higher-rank.
-                   ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
-                     then do { -- See Note [Unused name reporting and HasField]
-                               addUsedGRE AllDeprecationWarnings gre
-                             ; keepAlive name
-                             ; unless (null $ snd $ sel_cons $ idDetails sel_id)
-                                 $ addDiagnostic $ TcRnHasFieldResolvedIncomplete name
-                                 -- Only emit an incomplete selector warning if it's an implicit instance
-                                 -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
-                             ; return OneInst { cir_new_theta   = theta
-                                              , cir_mk_ev       = mk_ev
-                                              , cir_canonical   = EvCanonical
-                                              , cir_what        = BuiltinInstance } }
-                     else matchInstEnv dflags short_cut clas tys }
+                     -- cannot have an existentially quantified type),
+                     -- and it must not be higher-rank.
+                   ; if (isNaughtyRecordSelector sel_id) || not (isTauTy sel_ty)
+                     then try_user_instances
+                     else
+                do { case mb_ct_loc of
+                       Nothing -> return ()  -- Nothing: happens when type-validity checking
+                       Just loc ->  setCtLocM loc $  -- Set location for warnings
+                         do { -- See Note [Unused name reporting and HasField]
+                              addUsedGRE AllDeprecationWarnings gre
+                            ; keepAlive sel_name
 
-           _ -> matchInstEnv dflags short_cut clas tys }
+                              -- Warn about incomplete record selection
+                           ; warnIncompleteRecSel dflags sel_id loc }
+
+                   ; return OneInst { cir_new_theta   = theta
+                                    , cir_mk_ev       = mk_ev
+                                    , cir_canonical   = EvCanonical
+                                    , cir_what        = BuiltinInstance } } }
+
+            Nothing -> try_user_instances }
+   where
+     -- See (HF1) in Note [HasField instances]
+     try_user_instances = matchInstEnv dflags short_cut clas tys
+
+warnIncompleteRecSel :: DynFlags -> Id -> CtLoc -> TcM ()
+-- Warn about incomplete record selectors
+-- See (IRS6) in Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+warnIncompleteRecSel dflags sel_id ct_loc
+  | not (isGetFieldOrigin (ctLocOrigin ct_loc))
+      -- isGetFieldOrigin: see (IRS7) in
+      -- Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+  , not (null fallible_cons)
+  = addDiagnostic $
+    TcRnHasFieldResolvedIncomplete (idName sel_id) fallible_cons maxCons
+
+  | otherwise
+  = return ()
+  where
+    maxCons = maxUncoveredPatterns dflags
+    fallible_cons = rsi_undef $ sel_cons $ idDetails sel_id
+
+    -- GHC.Tc.Gen.App.tcInstFun arranges that the CtOrigin of (r.x) is GetFieldOrigin,
+    -- despite the expansion to (getField @"x" r)
+    isGetFieldOrigin (GetFieldOrigin {}) = True
+    isGetFieldOrigin _                   = False
+
+lookupHasFieldLabel
+  :: FamInstEnvs -> GlobalRdrEnv -> [Type]
+  -> Maybe ( Name          -- Name of the record selector
+           , GlobalRdrElt  -- GRE for the selector
+           , Type          -- Type of the record value
+           , Type )        -- Type of the field of the record
+-- If possible, decompose application
+--     (HasField @k @rrep @arep @"fld" @(T t1..tn) @fld-ty),
+--  or (getField @k @rrep @arep @"fld" @(T t1..tn) @fld-ty)
+-- and return the pieces, if the record selector is in scope
+--
+-- A complication is that `T` might be a data family, so we need to
+-- look it up in the `fam_envs` to find its representation tycon.
+lookupHasFieldLabel fam_inst_envs rdr_env arg_tys
+  |  -- We are matching HasField {k} {r_rep} {a_rep} x r a...
+    (_k : _rec_rep : _fld_rep : x_ty : rec_ty : fld_ty : _) <- arg_tys
+    -- x should be a literal string
+  , Just x <- isStrLitTy x_ty
+    -- r should be an applied type constructor
+  , Just (tc, args) <- tcSplitTyConApp_maybe rec_ty
+    -- Use the representation tycon (if data family); it has the fields
+  , let r_tc = fstOf3 (tcLookupDataFamInst fam_inst_envs tc args)
+    -- x should be a field of r
+  , Just fl <- lookupTyConFieldLabel (FieldLabelString x) r_tc
+    -- Ensure the field selector is in scope
+  , Just gre <- lookupGRE_FieldLabel rdr_env fl
+  = Just (flSelector fl, gre, rec_ty, fld_ty)
+
+  | otherwise
+  = Nothing

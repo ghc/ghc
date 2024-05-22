@@ -82,7 +82,8 @@ module GHC.Types.Var (
 
         -- * PiTyBinder
         PiTyBinder(..), PiTyVarBinder,
-        isInvisiblePiTyBinder, isVisiblePiTyBinder,
+        isInvisiblePiTyBinder, isInvisibleAnonPiTyBinder,
+        isVisiblePiTyBinder,
         isTyBinder, isNamedPiTyBinder, isAnonPiTyBinder,
         namedPiTyBinder_maybe, anonPiTyBinderType_maybe, piTyBinderType,
 
@@ -751,7 +752,6 @@ instance Outputable PiTyBinder where
   ppr (Named (Bndr v Specified)) = char '@' <> ppr v
   ppr (Named (Bndr v Inferred))  = braces (ppr v)
 
-
 -- | 'PiTyVarBinder' is like 'PiTyBinder', but there can only be 'TyVar'
 -- in the 'Named' field.
 type PiTyVarBinder = PiTyBinder
@@ -760,6 +760,10 @@ type PiTyVarBinder = PiTyBinder
 isInvisiblePiTyBinder :: PiTyBinder -> Bool
 isInvisiblePiTyBinder (Named (Bndr _ vis)) = isInvisibleForAllTyFlag vis
 isInvisiblePiTyBinder (Anon _ af)          = isInvisibleFunArg af
+
+isInvisibleAnonPiTyBinder :: PiTyBinder -> Bool
+isInvisibleAnonPiTyBinder (Named {})  = False
+isInvisibleAnonPiTyBinder (Anon _ af) = isInvisibleFunArg af
 
 -- | Does this binder bind a visible argument?
 isVisiblePiTyBinder :: PiTyBinder -> Bool

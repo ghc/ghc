@@ -23,7 +23,6 @@ module GHC.Core.ConLike (
         , conLikeFullSig
         , conLikeResTy
         , conLikeFieldType
-        , conLikesWithFields
         , conLikeIsInfix
         , conLikeHasBuilder
     ) where
@@ -48,7 +47,6 @@ import GHC.Utils.Outputable
 
 import Data.Maybe( isJust )
 import qualified Data.Data as Data
-import qualified Data.List as List
 
 {-
 ************************************************************************
@@ -230,15 +228,6 @@ conLikeFullSig (PatSynCon pat_syn) =
 conLikeFieldType :: ConLike -> FieldLabelString -> Type
 conLikeFieldType (PatSynCon ps) label = patSynFieldType ps label
 conLikeFieldType (RealDataCon dc) label = dataConFieldType dc label
-
-
--- | The ConLikes that have *all* the given fields
-conLikesWithFields :: [ConLike] -> [FieldLabelString]
-                   -> ( [ConLike]   -- ConLikes containing the fields
-                      , [ConLike] ) -- ConLikes not containing the fields
-conLikesWithFields con_likes lbls = List.partition has_flds con_likes
-  where has_flds dc = all (has_fld dc) lbls
-        has_fld dc lbl = any (\ fl -> flLabel fl == lbl) (conLikeFieldLabels dc)
 
 conLikeIsInfix :: ConLike -> Bool
 conLikeIsInfix (RealDataCon dc) = dataConIsInfix dc

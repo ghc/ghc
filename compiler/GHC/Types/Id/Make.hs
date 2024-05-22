@@ -2199,7 +2199,7 @@ But actually we give 'noinline' a wired-in name for three distinct reasons:
 
    Solution: in the desugarer, rewrite
       noinline (f x y)  ==>  noinline f x y
-   This is done in GHC.HsToCore.Utils.mkCoreAppDs.
+   This is done in the `noinlineId` case of `GHC.HsToCore.Expr.ds_app_var`
    This is only needed for noinlineId, not noInlineConstraintId (wrinkle
    (W1) below), because the latter never shows up in user code.
 

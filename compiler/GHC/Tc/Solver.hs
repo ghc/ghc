@@ -3613,10 +3613,8 @@ Wrinkle (W1)
   When inferring most-general types (in simplifyInfer), we
   do *not* float an equality constraint if the implication binds
   equality constraints, because that defeats the OutsideIn story.
-  Consider data T a where TInt :: T Int MkT :: T a
-
+  Consider data T a where { TInt :: T Int;  MkT :: T a }
          f TInt = 3::Int
-
   We get the implication (a ~ Int => res ~ Int), where so far we've decided
      f :: T a -> res
   We don't want to float (res~Int) out because then we'll infer

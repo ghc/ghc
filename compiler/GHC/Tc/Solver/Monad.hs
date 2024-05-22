@@ -1663,7 +1663,7 @@ matchGlobalInst :: DynFlags
                              -- See Note [Shortcut solving: overlap]
                 -> Class -> [Type] -> CtLoc -> TcS TcM.ClsInstResult
 matchGlobalInst dflags short_cut cls tys loc
-  = wrapTcS $ TcM.setCtLocM loc $ TcM.matchGlobalInst dflags short_cut cls tys
+  = wrapTcS $ TcM.matchGlobalInst dflags short_cut cls tys (Just loc)
 
 tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcS (Subst, [TcTyVar])
 tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_info subst tvs

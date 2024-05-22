@@ -1,3 +1,3 @@
 
-LinearTHFail2.hs:7:2: error: [GHC-65904]
+LinearTHFail2.hs:7:3: error: [GHC-65904]
     Non-linear fields in data constructors not (yet) handled by Template Haskell

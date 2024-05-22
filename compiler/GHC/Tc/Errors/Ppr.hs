@@ -1549,9 +1549,12 @@ instance Diagnostic TcRnMessage where
       vcat [ sep [ text "Definition of partial record field" <> colon
                  , nest 2 $ quotes (ppr (occName fld)) ]
            , text "Record selection and update using this field will be partial." ]
-    TcRnHasFieldResolvedIncomplete name -> mkSimpleDecorated $
-      text "The invocation of `getField` on the record field" <+> quotes (ppr name)
-      <+> text "may produce an error since it is not defined for all data constructors"
+    TcRnHasFieldResolvedIncomplete name cons maxCons -> mkSimpleDecorated $
+      hang (text "Selecting the record field" <+> quotes (ppr name)
+              <+> text "may fail for the following constructors:")
+           2
+           (hsep $ punctuate comma $
+            map ppr (take maxCons cons) ++ [ text "..." | lengthExceeds cons maxCons ])
     TcRnBadFieldAnnotation n con reason -> mkSimpleDecorated $
       hang (pprBadFieldAnnotationReason reason)
          2 (text "on the" <+> speakNth n

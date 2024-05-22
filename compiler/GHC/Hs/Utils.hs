@@ -53,10 +53,10 @@ module GHC.Hs.Utils(
   mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
   mkHsCmdIf, mkConLikeTc,
 
-  nlHsTyApp, nlHsTyApps, nlHsVar, nl_HsVar, nlHsDataCon,
+  nlHsTyApp, nlHsTyApps, nlHsVar, nlHsDataCon,
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
   nlHsIntLit, nlHsVarApps,
-  nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
+  nlHsDo, nlHsOpApp, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
   mkLocatedList, nlAscribe,
 
@@ -504,10 +504,6 @@ nlHsVar :: IsSrcSpanAnn p a
         => IdP (GhcPass p) -> LHsExpr (GhcPass p)
 nlHsVar n = noLocA (HsVar noExtField (noLocA n))
 
-nl_HsVar :: IsSrcSpanAnn p a
-        => IdP (GhcPass p) -> HsExpr (GhcPass p)
-nl_HsVar n = HsVar noExtField (noLocA n)
-
 -- | NB: Only for 'LHsExpr' 'Id'.
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
 nlHsDataCon con = noLocA (mkConLikeTc (RealDataCon con))
@@ -602,15 +598,10 @@ nlHsDo ctxt stmts = noLocA (mkHsDo ctxt (noLocA stmts))
 nlHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsOpApp e1 op e2 = noLocA (mkHsOpApp e1 op e2)
 
-nlHsLam  :: LMatch GhcPs (LHsExpr GhcPs) -> LHsExpr GhcPs
 nlHsPar  :: IsPass p => LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
          -> LHsExpr GhcPs
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
-
--- AZ:Is this used?
-nlHsLam match = noLocA $ HsLam noAnn LamSingle
-                  $ mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [match])
 
 nlHsPar e     = noLocA (gHsPar e)
 

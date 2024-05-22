@@ -1356,6 +1356,7 @@ minusWallOpts
         Opt_WarnIncompleteUniPatterns,
         Opt_WarnIncompletePatternsRecUpd,
         Opt_WarnIncompleteExportWarnings,
+        Opt_WarnIncompleteRecordSelectors,
         Opt_WarnDerivingTypeable
       ]
 

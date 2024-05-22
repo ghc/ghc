@@ -28,8 +28,7 @@ module GHC.HsToCore.Utils (
         mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult, mkCoSynCaseMatchResult,
         wrapBind, wrapBinds,
 
-        mkErrorAppDs, mkCoreAppDs, mkCoreAppsDs, mkCastDs,
-        mkFailExpr,
+        mkErrorAppDs, mkCastDs, mkFailExpr,
 
         seqVar,
 
@@ -73,7 +72,6 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
 import GHC.Unit.Module
 import GHC.Builtin.Names
-import GHC.Types.Name( isInternalName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
@@ -333,7 +331,7 @@ mkPatSynCase var ty alt fail = do
     matcher <- dsLExpr $ mkLHsWrap wrapper $
                          nlHsTyApp matcher_id [getRuntimeRep ty, ty]
     cont <- mkCoreLams bndrs <$> runMatchResult fail match_result
-    return $ mkCoreAppsDs (text "patsyn" <+> ppr var) matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
+    return $ mkCoreApps matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
   where
     MkCaseAlt{ alt_pat = psyn,
                alt_bndrs = bndrs,
@@ -464,102 +462,6 @@ is disabled.
 mkFailExpr :: HsMatchContextRn -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
   = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
-
-{-
-'mkCoreAppDs' and 'mkCoreAppsDs' handle the special-case desugaring of 'seq'.
-
-Note [Desugaring seq]
-~~~~~~~~~~~~~~~~~~~~~
-
-There are a few subtleties in the desugaring of `seq`:
-
- 1. (as described in #1031)
-
-    Consider,
-       f x y = x `seq` (y `seq` (# x,y #))
-
-    Because the argument to the outer 'seq' has an unlifted type, we'll use
-    call-by-value, and compile it as if we had
-
-       f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
-
-    But that is bad, because we now evaluate y before x!
-
-    Seq is very, very special!  So we recognise it right here, and desugar to
-            case x of _ -> case y of _ -> (# x,y #)
-
- 2. (as described in #2273)
-
-    Consider
-       let chp = case b of { True -> fst x; False -> 0 }
-       in chp `seq` ...chp...
-    Here the seq is designed to plug the space leak of retaining (snd x)
-    for too long.
-
-    If we rely on the ordinary inlining of seq, we'll get
-       let chp = case b of { True -> fst x; False -> 0 }
-       case chp of _ { I# -> ...chp... }
-
-    But since chp is cheap, and the case is an alluring context, we'll
-    inline chp into the case scrutinee.  Now there is only one use of chp,
-    so we'll inline a second copy.  Alas, we've now ruined the purpose of
-    the seq, by re-introducing the space leak:
-        case (case b of {True -> fst x; False -> 0}) of
-          I# _ -> ...case b of {True -> fst x; False -> 0}...
-
-    We can try to avoid doing this by ensuring that the binder-swap in the
-    case happens, so we get this at an early stage:
-       case chp of chp2 { I# -> ...chp2... }
-    But this is fragile.  The real culprit is the source program.  Perhaps we
-    should have said explicitly
-       let !chp2 = chp in ...chp2...
-
-    But that's painful.  So the code here does a little hack to make seq
-    more robust: a saturated application of 'seq' is turned *directly* into
-    the case expression, thus:
-       x  `seq` e2 ==> case x of x -> e2    -- Note shadowing!
-       e1 `seq` e2 ==> case x of _ -> e2
-
-    So we desugar our example to:
-       let chp = case b of { True -> fst x; False -> 0 }
-       case chp of chp { I# -> ...chp... }
-    And now all is well.
-
-    The reason it's a hack is because if you define mySeq=seq, the hack
-    won't work on mySeq.
-
- 3. (as described in #2409)
-
-    The isInternalName ensures that we don't turn
-            True `seq` e
-    into
-            case True of True { ... }
-    which stupidly tries to bind the datacon 'True'.
--}
-
--- NB: Make sure the argument is not representation-polymorphic
-mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
-mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
-  | f `hasKey` seqIdKey            -- Note [Desugaring seq], points (1) and (2)
-  = Case arg1 case_bndr ty2 [Alt DEFAULT [] arg2]
-  where
-    case_bndr = case arg1 of
-                   Var v1 | isInternalName (idName v1)
-                          -> v1        -- Note [Desugaring seq], points (2) and (3)
-                   _      -> mkWildValBinder ManyTy ty1
-
-mkCoreAppDs _ (Var f `App` Type _r) arg
-  | f `hasKey` noinlineIdKey   -- See Note [noinlineId magic] in GHC.Types.Id.Make
-  , (fun, args) <- collectArgs arg
-  , not (null args)
-  = (Var f `App` Type (exprType fun) `App` fun)
-    `mkCoreApps` args
-
-mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in GHC.Core.Make
-
--- NB: No argument can be representation-polymorphic
-mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
-mkCoreAppsDs s fun args = foldl' (mkCoreAppDs s) fun args
 
 mkCastDs :: CoreExpr -> Coercion -> CoreExpr
 -- We define a desugarer-specific version of GHC.Core.Utils.mkCast,

@@ -2258,7 +2258,7 @@ etaInfoAppTy :: Type -> EtaInfo -> Type
 -- If                    e :: ty
 -- then   etaInfoApp e eis :: etaInfoApp ty eis
 etaInfoAppTy ty (EI bs mco)
-  = applyTypeToArgs (text "etaInfoAppTy") ty1 (map varToCoreExpr bs)
+  = applyTypeToArgs ty1 (map varToCoreExpr bs)
   where
     ty1 = case mco of
              MRefl  -> ty

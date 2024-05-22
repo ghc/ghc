@@ -881,15 +881,17 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     sel_id = mkExportedLocalId rec_details sel_name sel_ty
 
     -- Find a representative constructor, con1
-    cons_partitioned@(cons_w_field, _) = conLikesWithFields all_cons [lbl]
+    rec_sel_info@(RSI { rsi_def = cons_w_field })
+         = conLikesRecSelInfo all_cons [lbl]
     con1 = assert (not (null cons_w_field)) $ head cons_w_field
 
     -- Construct the IdDetails
     rec_details = RecSelId { sel_tycon      = idDetails
                            , sel_naughty    = is_naughty
                            , sel_fieldLabel = fl
-                           , sel_cons       = cons_partitioned }
-                               -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+                           , sel_cons       = rec_sel_info }
+                             -- See (IRS1) in Note [Detecting incomplete record selectors]
+                             -- in GHC.HsToCore.Pmc
 
 
     -- Selector type; Note [Polymorphic selectors]

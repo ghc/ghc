@@ -1713,14 +1713,13 @@ tcIdDetails nm _ (IfRecSelId tc _first_con naughty fl)
   = do { tc' <- either (fmap RecSelData . tcIfaceTyCon)
                        (fmap (RecSelPatSyn . tyThingPatSyn) . tcIfaceDecl False)
                        tc
-       ; let all_cons = recSelParentCons tc'
-             cons_partitioned
-                 = conLikesWithFields all_cons [flLabel fl]
+       ; let all_cons         = recSelParentCons tc'
+             cons_partitioned = conLikesRecSelInfo all_cons [flLabel fl]
        ; return (RecSelId
-                   { sel_tycon = tc'
-                   , sel_naughty = naughty
+                   { sel_tycon      = tc'
+                   , sel_naughty    = naughty
                    , sel_fieldLabel = fl { flSelector = nm }
-                   , sel_cons = cons_partitioned }
+                   , sel_cons       = cons_partitioned }
                        -- Reconstructed here since we don't want Uniques in the Iface file
                 ) }
   where

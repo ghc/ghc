@@ -2269,4 +2269,3 @@ rejectRepPolyNewtypes (fun,_) app_res_rho = case fun of
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 ann) = HsPragSCC x1 ann
-

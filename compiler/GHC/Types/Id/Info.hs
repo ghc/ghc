@@ -21,8 +21,10 @@ module GHC.Types.Id.Info (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
         JoinArity, isJoinIdDetails_maybe,
+
         RecSelParent(..), recSelParentName, recSelFirstConName,
         recSelParentCons, idDetailsConcreteTvs,
+        RecSelInfo(..), conLikesRecSelInfo,
 
         -- * The IdInfo type
         IdInfo,         -- Abstract
@@ -116,6 +118,7 @@ import GHC.StgToCmm.Types (LambdaFormInfo)
 
 import Data.Data ( Data )
 import Data.Word
+import Data.List as List( partition )
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -151,12 +154,9 @@ data IdDetails
     , sel_naughty    :: Bool    -- True <=> a "naughty" selector which can't actually exist, for example @x@ in:
                                 --    data T = forall a. MkT { x :: a }
                                 -- See Note [Naughty record selectors] in GHC.Tc.TyCl
-    , sel_cons       :: ([ConLike], [ConLike])
-                                -- If record selector is not defined for all constructors
-                                -- of a parent type, this is the pair of lists of constructors that
-                                -- it is and is not defined for. Otherwise, it's Nothing.
-                                -- Cached here based on the RecSelParent.
-    }                           -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+    , sel_cons       :: RecSelInfo
+                        -- Partiality info, cached here based on the RecSelParent.
+    }
 
   | DataConWorkId DataCon       -- ^ The 'Id' is for a data constructor /worker/
   | DataConWrapId DataCon       -- ^ The 'Id' is for a data constructor /wrapper/
@@ -224,6 +224,11 @@ data IdDetails
         -- The [CbvMark] is always empty (and ignored) until after Tidy for ids from the current
         -- module.
 
+data RecSelInfo
+  = RSI { rsi_def   :: [ConLike]   -- Record selector defined for these
+        , rsi_undef :: [ConLike]   -- Record selector not defined for these
+        }
+
 idDetailsConcreteTvs :: IdDetails -> ConcreteTyVars
 idDetailsConcreteTvs = \ case
     PrimOpId _ conc_tvs -> conc_tvs
@@ -231,6 +236,16 @@ idDetailsConcreteTvs = \ case
     DataConWorkId dc    -> dataConConcreteTyVars dc
     DataConWrapId dc    -> dataConConcreteTyVars dc
     _                   -> noConcreteTyVars
+
+-- | The ConLikes that have *all* the given fields
+conLikesRecSelInfo :: [ConLike] -> [FieldLabelString] -> RecSelInfo
+conLikesRecSelInfo con_likes lbls
+  = RSI { rsi_def = defs, rsi_undef = undefs }
+  where
+    !(defs,undefs) = List.partition has_flds con_likes
+
+    has_flds dc = all (has_fld dc) lbls
+    has_fld dc lbl = any (\ fl -> flLabel fl == lbl) (conLikeFieldLabels dc)
 
 
 {- Note [CBV Function Ids]
