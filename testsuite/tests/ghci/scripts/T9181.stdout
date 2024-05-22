@@ -99,7 +99,7 @@ pattern GHC.Internal.TypeLits.SChar
 type role GHC.Internal.TypeLits.SChar nominal
 type GHC.Internal.TypeLits.SChar :: Char -> *
 newtype GHC.Internal.TypeLits.SChar s
-  = GHC.Internal.TypeLits.UnsafeSChar Char
+  = GHC.Internal.TypeLits.UnsafeSChar_ Char
 pattern GHC.Internal.TypeNats.SNat
   :: () =>
      GHC.Internal.TypeNats.KnownNat n =>
@@ -107,7 +107,7 @@ pattern GHC.Internal.TypeNats.SNat
 type role GHC.Internal.TypeNats.SNat nominal
 type GHC.Internal.TypeNats.SNat :: GHC.Internal.TypeNats.Nat -> *
 newtype GHC.Internal.TypeNats.SNat n
-  = GHC.Internal.TypeNats.UnsafeSNat GHC.Num.Natural.Natural
+  = GHC.Internal.TypeNats.UnsafeSNat_ GHC.Num.Natural.Natural
 pattern GHC.Internal.TypeLits.SSymbol
   :: () =>
      GHC.Internal.TypeLits.KnownSymbol s =>
@@ -115,7 +115,7 @@ pattern GHC.Internal.TypeLits.SSymbol
 type role GHC.Internal.TypeLits.SSymbol nominal
 type GHC.Internal.TypeLits.SSymbol :: GHC.Types.Symbol -> *
 newtype GHC.Internal.TypeLits.SSymbol s
-  = GHC.Internal.TypeLits.UnsafeSSymbol String
+  = GHC.Internal.TypeLits.UnsafeSSymbol_ String
 type GHC.Internal.TypeLits.SomeChar :: *
 data GHC.Internal.TypeLits.SomeChar
   = forall (n :: Char).
