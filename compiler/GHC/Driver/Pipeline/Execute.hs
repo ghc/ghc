@@ -487,6 +487,13 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
                     , not $ target32Bit (targetPlatform dflags)
                     ]
 
+                 -- if -fsplit-sections is enabled, we should also
+                 -- build with these flags.
+                 ++ (if gopt Opt_SplitSections dflags &&
+                      platformOS (targetPlatform dflags) /= OSDarwin
+                        then ["-ffunction-sections", "-fdata-sections"]
+                        else [])
+
           -- Stub files generated for foreign exports references the runIO_closure
           -- and runNonIO_closure symbols, which are defined in the base package.
           -- These symbols are imported into the stub.c file via RtsAPI.h, and the
