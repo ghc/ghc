@@ -64,7 +64,7 @@ module GHC.Builtin.Types (
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon_RDR, consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
-        mkListTy, mkPromotedListTy,
+        mkListTy, mkPromotedListTy, extractPromotedList,
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
