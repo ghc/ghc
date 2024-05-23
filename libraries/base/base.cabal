@@ -19,6 +19,8 @@ description:    Haskell's base library provides, among other things, core types 
                 [Set](https://hackage.haskell.org/package/containers/docs/Data-Set.html) are available in the [containers](https://hackage.haskell.org/package/containers) library.
                 To work with textual data, use the [text](https://hackage.haskell.org/package/text/docs/Data-Text.html) library.
 
+extra-source-files:
+    CHANGELOG.md
 
 Library
     default-language: Haskell2010
