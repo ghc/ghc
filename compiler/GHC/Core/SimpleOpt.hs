@@ -228,7 +228,7 @@ enterRecGroupRHSs env bndrs k
     (env', r) = k env{soe_rec_ids = extendUnVarSetList bndrs (soe_rec_ids env)}
 
 ---------------
-simple_opt_clo :: HasCallStack
+simple_opt_clo :: HasDebugCallStack
                => InScopeSet
                -> SimpleClo
                -> OutExpr
@@ -398,7 +398,7 @@ simple_app env (Let bind body) args
 simple_app env e as
   = finish_app env (simple_opt_expr env e) as
 
-finish_app :: HasCallStack
+finish_app :: HasDebugCallStack
            => SimpleOptEnv -> OutExpr -> [SimpleClo] -> OutExpr
 -- See Note [Eliminate casts in function position]
 finish_app env (Cast (Lam x e) co) as@(_:_)
