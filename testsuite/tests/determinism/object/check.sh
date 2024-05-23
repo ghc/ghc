@@ -18,8 +18,8 @@ fi
 
 # Guarantee object files were written
 
-S1=`find out1 -name "*.o" | wc -l`
-S2=`find out2 -name "*.o" | wc -l`
+S1=`find Cabal-3.12.0.0/out1 -name "*.o" | wc -l`
+S2=`find Cabal-3.12.0.0/out2 -name "*.o" | wc -l`
 
 test $S1 > 0
 test $S1 == $S2
@@ -32,15 +32,15 @@ compareObjs() {
         echo $OBJDUMP $2 $o
         echo "--------------------------------------------------------------------------------"
         # Compare the object dumps except for the first line which prints the file path
-        $OBJDUMP $2 out1/$o | tail -n+2 > dump1
-        $OBJDUMP $2 out2/$o | tail -n+2 > dump2
+        $OBJDUMP $2 Cabal-3.12.0.0/out1/$o | tail -n+2 > dump1
+        $OBJDUMP $2 Cabal-3.12.0.0/out2/$o | tail -n+2 > dump2
         diff dump1 dump2
         echo "--------------------------------------------------------------------------------"
     done
 }
 
 # Big fast check
-if diff -r out1 out2
+if diff -r Cabal-3.12.0.0/out1 Cabal-3.12.0.0/out2
 then
     echo "OK"
 else
@@ -49,7 +49,7 @@ else
     echo "--------------------------------------------------------------------------------"
 
 
-    pushd out1 >/dev/null
+    pushd Cabal-3.12.0.0/out1 >/dev/null
     OBJS=$(find . -type f)
     popd >/dev/null
 
