@@ -160,5 +160,8 @@ def shorten_metric_name(name: str) -> str:
         "compile_time/bytes allocated": "ghc/alloc",
         "compile_time/peak_megabytes_allocated": "ghc/peak",
         "compile_time/max_bytes_used": "ghc/max",
+        "binary_size/if_compression(1)": "size/1",
+        "binary_size/if_compression(2)": "size/2",
+        "binary_size/if_compression(3)": "size/3",
     }
     return dic.get(name, name)
