@@ -75,7 +75,7 @@ static void sortInitFiniList(struct InitFiniList **slist, enum SortOrder order)
         while (*last != NULL && (*last)->next != NULL) {
             struct InitFiniList *s0 = *last;
             struct InitFiniList *s1 = s0->next;
-            bool flip;
+            bool flip = false;
             switch (order) {
                 case INCREASING: flip = s0->priority > s1->priority; break;
                 case DECREASING: flip = s0->priority < s1->priority; break;

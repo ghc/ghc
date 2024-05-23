@@ -692,7 +692,7 @@ checkCompactObjects(bdescr *bd)
         ASSERT((W_)str == (W_)block + sizeof(StgCompactNFDataBlock));
 
         StgWord totalW = 0;
-        StgCompactNFDataBlock *last;
+        StgCompactNFDataBlock *last = block;
         for ( ; block ; block = block->next) {
             last = block;
             ASSERT(block->owner == str);
