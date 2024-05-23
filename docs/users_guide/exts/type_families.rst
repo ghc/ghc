@@ -1166,7 +1166,7 @@ extension.  This extension implies ``-XTypeFamilies``.
 
 For full details on injective type families refer to the Haskell Symposium
 2015 paper `Injective type families for
-Haskell <https://ics.p.lodz.pl/~stolarek/_media/pl:research:stolarek_peyton-jones_eisenberg_injectivity_extended.pdf>`__.
+Haskell <https://richarde.dev/papers/2015/injective/injective-type-families.pdf>`__.
 
 .. _injective-ty-fams-syntax:
 
