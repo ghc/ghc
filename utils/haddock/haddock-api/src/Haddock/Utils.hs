@@ -111,7 +111,7 @@ deafening = Deafening
 parseVerbosity :: String -> Either String Verbosity
 parseVerbosity "0" = Right Silent
 parseVerbosity "1" = Right Normal
-parseVerbosity "2" = Right Silent
+parseVerbosity "2" = Right Verbose
 parseVerbosity "3" = Right Deafening
 parseVerbosity "silent" = return Silent
 parseVerbosity "normal" = return Normal
