@@ -31,6 +31,7 @@
 #define __STDC_LIMIT_MACROS
 #include <inttypes.h>
 
+#include "ghcconfig.h"
 
 /*
  * This module should define types *only*, all beginning with "Stg".
@@ -181,8 +182,14 @@ typedef StgWord8*          StgByteArray;
   C only allows that if you're defining a struct or union.
 */
 
+
+#if defined(HAS_MUSTTAIL)
+typedef void (*StgFunPtr)(void);
+typedef void StgFun(void);
+#else
 typedef void  *(*(*StgFunPtr)(void))(void);
 typedef StgFunPtr StgFun(void);
+#endif
 
 /*
  * Forward declarations for the unregisterised backend, which

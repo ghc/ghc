@@ -326,10 +326,6 @@ typedef StgFunPtr       F_;
 /* read-only data (does not require alignment): */
 #define ERO_(X)   extern const StgWordArray (X)
 #define IRO_(X)   static const StgWordArray (X)
-/* stg-native functions: */
-#define IF_(f)    static StgFunPtr GNUC3_ATTRIBUTE(used) f(void)
-#define FN_(f)           StgFunPtr f(void)
-#define EF_(f)           StgFunPtr f(void) /* External Cmm functions */
 /* foreign functions: */
 #define EFF_(f)   void f() /* See Note [External function prototypes] */
 
@@ -381,8 +377,16 @@ external prototype return neither of these types to workaround #11395.
    -------------------------------------------------------------------------- */
 
 #if defined(HAS_MUSTTAIL)
-#define JMP_(cont) { StgFunPtr (*_f)(void) = (StgFunPtr (*)(void))(cont); __attribute__((musttail)) return _f(); }
+/* stg-native functions: */
+#define IF_(f)    static void GNUC3_ATTRIBUTE(used) f(void)
+#define FN_(f)           void f(void)
+#define EF_(f)           void f(void) /* External Cmm functions */
+#define JMP_(cont) { __attribute__((musttail)) return ((StgFunPtr)(cont))(); }
 #else
+/* stg-native functions: */
+#define IF_(f)    static StgFunPtr GNUC3_ATTRIBUTE(used) f(void)
+#define FN_(f)           StgFunPtr f(void)
+#define EF_(f)           StgFunPtr f(void) /* External Cmm functions */
 #define JMP_(cont) return (StgFunPtr)(cont)
 #endif
 

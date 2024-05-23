@@ -77,6 +77,18 @@
    any architecture (using miniinterpreter)
    -------------------------------------------------------------------------- */
 
+#if defined(HAS_MUSTTAIL)
+
+StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
+{
+    f();
+    return (StgRegTable *)R1.p;
+}
+
+void StgReturn(void) { }
+
+#else
+
 StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 {
     while (f) {
@@ -94,6 +106,8 @@ StgFunPtr StgReturn(void)
 {
     return 0;
 }
+
+#endif
 
 #else /* !USE_MINIINTERPRETER */
 /* -----------------------------------------------------------------------------
