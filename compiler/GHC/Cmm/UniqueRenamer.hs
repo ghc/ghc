@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, UnicodeSyntax #-}
 module GHC.Cmm.UniqueRenamer
   ( detRenameUniques
 
@@ -14,8 +14,10 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Switch
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
+import GHC.Utils.Outputable as Outputable
 import Data.Tuple (swap)
 
 {-
@@ -38,6 +40,11 @@ data DetUniqFM = DetUniqFM
   { mapping :: UniqFM Unique Unique
   , supply :: !Word64
   }
+
+instance Outputable DetUniqFM where
+  ppr DetUniqFM{mapping, supply} =
+    ppr mapping $$
+    text "supply:" Outputable.<> ppr supply
 
 type DetRnM = State DetUniqFM
 
@@ -77,12 +84,18 @@ detRenameCLabel = mapInternalNonDetUniques renameDetUniq
 class UniqRenamable a where
   uniqRename :: a -> DetRnM a
 
+instance UniqRenamable Unique where
+  uniqRename = renameDetUniq
+
 instance UniqRenamable CLabel where
   -- The most important renaming. The rest are just traversals.
   uniqRename = detRenameCLabel
 
 instance UniqRenamable LocalReg where
   uniqRename (LocalReg uq t) = LocalReg <$> renameDetUniq uq <*> pure t
+
+instance UniqRenamable Label where
+  uniqRename lbl = mkHooplLabel . getKey <$> renameDetUniq (getUnique lbl)
 
 instance UniqRenamable CmmTickScope where
   -- ROMES:TODO: We may have to change this to get deterministic objects with ticks.
@@ -119,15 +132,16 @@ instance UniqRenamable CmmLit where
     CmmLabelOff lbl i -> CmmLabelOff <$> uniqRename lbl <*> pure i
     CmmLabelDiffOff lbl1 lbl2 i w ->
       CmmLabelDiffOff <$> uniqRename lbl1 <*> uniqRename lbl2 <*> pure i <*> pure w
-    CmmBlock bid -> pure $ CmmBlock bid
+    CmmBlock bid -> CmmBlock <$> uniqRename bid
     CmmHighStackMark -> pure CmmHighStackMark
 
 instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
   => UniqRenamable (LabelMap a) where
-  uniqRename = traverse uniqRename
+    -- ROMES:TODO: Can a rename of the map have collisions and we lose values? Think harder...
+  uniqRename lm = mapFromList <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
 
 instance UniqRenamable CmmGraph where
-  uniqRename (CmmGraph e g) = CmmGraph e <$> uniqRename g
+  uniqRename (CmmGraph e g) = CmmGraph <$> uniqRename e <*> uniqRename g
 
 instance UniqRenamable (Graph CmmNode n m) where
   uniqRename = \case
@@ -153,7 +167,7 @@ instance UniqRenamable (Block CmmNode n m) where
 
 instance UniqRenamable (CmmNode n m) where
   uniqRename = \case
-    CmmEntry l t -> CmmEntry l <$> uniqRename t
+    CmmEntry l t -> CmmEntry <$> uniqRename l <*> uniqRename t
     CmmComment fs -> pure $ CmmComment fs
     CmmTick tickish -> pure $ CmmTick tickish
     CmmUnwind xs -> CmmUnwind <$> mapM uniqRename xs
@@ -161,16 +175,16 @@ instance UniqRenamable (CmmNode n m) where
     CmmStore e1 e2 align -> CmmStore <$> uniqRename e1 <*> uniqRename e2 <*> pure align
     CmmUnsafeForeignCall ftgt cmmformal cmmactual ->
       CmmUnsafeForeignCall <$> uniqRename ftgt <*> mapM uniqRename cmmformal <*> mapM uniqRename cmmactual
-    CmmBranch l -> pure $ CmmBranch l
+    CmmBranch l -> CmmBranch <$> uniqRename l
     CmmCondBranch pred t f likely ->
-      CmmCondBranch <$> uniqRename pred <*> pure t <*> pure f <*> pure likely
-    CmmSwitch e sts -> CmmSwitch <$> uniqRename e <*> pure sts
+      CmmCondBranch <$> uniqRename pred <*> uniqRename t <*> uniqRename f <*> pure likely
+    CmmSwitch e sts -> CmmSwitch <$> uniqRename e <*> mapSwitchTargetsA uniqRename sts
     CmmCall tgt cont regs args retargs retoff ->
-      CmmCall <$> uniqRename tgt <*> pure cont <*> mapM uniqRename regs
+      CmmCall <$> uniqRename tgt <*> uniqRename cont <*> mapM uniqRename regs
               <*> pure args <*> pure retargs <*> pure retoff
     CmmForeignCall tgt res args succ retargs retoff intrbl ->
       CmmForeignCall <$> uniqRename tgt <*> mapM uniqRename res <*> mapM uniqRename args
-                     <*> pure succ <*> pure retargs <*> pure retoff <*> pure intrbl
+                     <*> uniqRename succ <*> pure retargs <*> pure retoff <*> pure intrbl
 
 instance UniqRenamable GlobalReg where
   uniqRename = pure
@@ -181,8 +195,12 @@ instance UniqRenamable CmmExpr where
     CmmLoad e t a -> CmmLoad <$> uniqRename e <*> pure t <*> pure a
     CmmReg r -> CmmReg <$> uniqRename r
     CmmMachOp mop es -> CmmMachOp mop <$> mapM uniqRename es
-    CmmStackSlot a i -> pure $ CmmStackSlot a i
+    CmmStackSlot a i -> CmmStackSlot <$> uniqRename a <*> pure i
     CmmRegOff r i -> CmmRegOff <$> uniqRename r <*> pure i
+
+instance UniqRenamable Area where
+  uniqRename Old = pure Old
+  uniqRename (Young l) = Young <$> uniqRename l
 
 instance UniqRenamable ForeignTarget where
   uniqRename = \case

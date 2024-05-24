@@ -101,10 +101,12 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
         -- For example, the fix-up action in the ASM NCG should use determinist names for potential new blocks it has to create.
         -- Therefore, in the ASM NCG `NatM` Monad we use a deterministic `UniqSuply` (which won't be shared about multiple threads)
         -- TODO: Put these all into notes carefully organized
-        ; let renamed_cmm_stream =
+        ; let renamed_cmm_stream = do
                 -- if gopt Opt_DeterministicObjects dflags
 
-                snd  <$> Stream.mapAccumL_ (fmap pure . detRenameUniques) emptyDetUFM cmm_stream
+                (rn_mapping, stream) <- Stream.mapAccumL_ (fmap pure . detRenameUniques) emptyDetUFM cmm_stream
+                Stream.liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
+                return stream
 
         -- Lint each CmmGroup as it goes past
         ; let linted_cmm_stream =
