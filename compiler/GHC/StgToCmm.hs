@@ -14,6 +14,7 @@ module GHC.StgToCmm ( codeGen ) where
 
 import GHC.Prelude as Prelude
 
+import GHC.Cmm.UniqueRenamer
 import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
@@ -86,18 +87,31 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
               -- we would need to add a state monad layer which regresses
               -- allocations by 0.5-2%.
         ; cgref <- liftIO $ initC >>= \s -> newIORef s
+        ; uniqRnRef <- liftIO $ newIORef emptyDetUFM
+        ; let fstate = initFCodeState $ stgToCmmPlatform cfg
         ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
                 (a, cmm) <- liftIO . withTimingSilent logger (text "STG -> Cmm") (`seq` ()) $ do
                          st <- readIORef cgref
-                         let fstate = initFCodeState $ stgToCmmPlatform cfg
-                         let (a,st') = runC cfg fstate st (getCmm fcode)
+
+                         -- To produce deterministic object code, we alpha-rename all Uniques to deterministic uniques before Cmm linting.
+                         -- From here on out, the backend code generation can't use (non-deterministic) Uniques, or risk producing non-deterministic code.
+                         -- For example, the fix-up action in the ASM NCG should use determinist names for potential new blocks it has to create.
+                         -- Therefore, in the ASM NCG `NatM` Monad we use a deterministic `UniqSuply` (which won't be shared about multiple threads)
+                         -- TODO: Put these all into notes carefully organized
+                         rnm0 <- readIORef uniqRnRef
+
+                         let
+                           ((a, cmm), st') = runC cfg fstate st (getCmm fcode)
+                           (rnm1, cmm_renamed) = detRenameUniques rnm0 cmm -- The yielded cmm will already be renamed.
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
                          -- This is observed by the #3294 test
                          writeIORef cgref $! (st'{ cgs_tops = nilOL, cgs_stmts = mkNop })
-                         return a
+                         writeIORef uniqRnRef $! rnm1
+
+                         return (a, cmm_renamed)
                 yield cmm
                 return a
 
@@ -137,6 +151,10 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
                 = emptyNameEnv
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (nonDetEltsUFM cg_id_infos))
+
+          -- if gopt Opt_DeterministicObjects dflags
+        ; rn_mapping <- liftIO (readIORef uniqRnRef)
+        ; liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
 
         ; return generatedInfo
         }

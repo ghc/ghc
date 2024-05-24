@@ -45,3 +45,4 @@ blockLbl label = mkLocalBlockLabel (getUnique label)
 infoTblLbl :: BlockId -> CLabel
 infoTblLbl label
   = mkBlockInfoTableLabel (mkFCallName (getUnique label) (fsLit "block")) NoCafRefs
+

@@ -249,6 +249,8 @@ use `deriving' because we want {\em precise} control of ordering
 -- the interface files are created, in particular we don't care about
 -- register allocation and code generation.
 -- To track progress on bit-for-bit determinism see #12262.
+--
+-- ROMES:TODO: Will need to update this ^ !
 
 eqUnique :: Unique -> Unique -> Bool
 eqUnique (MkUnique u1) (MkUnique u2) = u1 == u2

@@ -95,6 +95,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
   cmm_stream
   =
     do  {
+
         -- Lint each CmmGroup as it goes past
         ; let linted_cmm_stream =
                  if gopt Opt_DoCmmLinting dflags
@@ -398,3 +399,4 @@ ipInitCode do_info_table platform this_mod
 
    ipe_buffer_decl =
        text "extern IpeBufferListNode" <+> ipe_buffer_label <> text ";"
+

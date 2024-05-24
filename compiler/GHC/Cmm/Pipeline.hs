@@ -55,7 +55,6 @@ cmmPipeline logger cmm_config srtInfo prog = do
 
      return (srtInfo, cmms)
 
-
 -- | The Cmm pipeline for a single 'CmmDecl'. Returns:
 --
 --   - in the case of a 'CmmProc': 'Left' of the resulting (possibly
@@ -65,7 +64,10 @@ cmmPipeline logger cmm_config srtInfo prog = do
 --
 --   - in the case of a `CmmData`, the unmodified 'CmmDecl' and a 'CAFSet' containing
 cpsTop :: Logger -> Platform -> CmmConfig -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDataDecl))
-cpsTop _logger platform _ (CmmData section statics) = return (Right (cafAnalData platform statics, CmmData section statics))
+cpsTop logger platform _ (CmmData section statics) = do
+      dumpWith logger Opt_D_dump_cmm_verbose "Pre CPS Data" FormatCMM (pdoc platform (CmmData section statics :: CmmDataDecl))
+      dumpWith logger  Opt_D_dump_cmm_verbose "Post CPS Data" FormatCMM (pdoc platform (cafAnalData platform statics))
+      return (Right (cafAnalData platform statics, CmmData section statics))
 cpsTop logger platform cfg proc =
     do
       ----------- Control-flow optimisations ----------------------------------
@@ -76,7 +78,7 @@ cpsTop logger platform cfg proc =
       --
       CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
            return $ cmmCfgOptsProc splitting_proc_points proc
-      dump Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+      dump Opt_D_dump_cmm_cfg "Post control-flow optimisations (1)" g
 
       let !TopInfo {stack_info=StackInfo { arg_space = entry_off
                                          , do_layout = do_layout }} = h
@@ -166,7 +168,7 @@ cpsTop logger platform cfg proc =
                     else g
       g <- return $ map (removeUnreachableBlocksProc platform) g
            -- See Note [unreachable blocks]
-      dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+      dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations (2)" g
 
       return (Left (cafEnv, g))
 

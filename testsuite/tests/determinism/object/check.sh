@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+# set -e
 
 if test -z "$1"
 then
@@ -34,7 +34,7 @@ compareObjs() {
         # Compare the object dumps except for the first line which prints the file path
         $OBJDUMP $2 Cabal-3.12.0.0/out1/$o | tail -n+2 > dump1
         $OBJDUMP $2 Cabal-3.12.0.0/out2/$o | tail -n+2 > dump2
-        diff dump1 dump2
+        diff dump1 dump2 && echo "OK"
         echo "--------------------------------------------------------------------------------"
     done
 }

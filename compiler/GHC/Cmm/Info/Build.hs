@@ -9,6 +9,10 @@ module GHC.Cmm.Info.Build
   ( CAFSet, CAFEnv, cafAnal, cafAnalData
   , doSRTs, ModuleSRTInfo (..), emptySRT
   , SRTMap, srtMapNonCAFs
+
+  -- * Some internal bits
+  , SRTEntry(..)
+  , CAFfyLabel(..)
   ) where
 
 import GHC.Prelude hiding (succ)
@@ -883,7 +887,7 @@ doSRTs
   -> IO (ModuleSRTInfo, [CmmDeclSRTs])
 
 doSRTs cfg moduleSRTInfo procs data_ = do
-  us <- mkSplitUniqSupply 'u'
+  us <- mkSplitUniqSupply 'u' -- ROMES:TODO: We could use a deterministic supply here? All names from here on out should be deterministic. Perhaps I could also grep for all supplies created after this point in its closure or somethinkg...
 
   let profile = cmmProfile cfg
 

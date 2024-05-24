@@ -279,6 +279,7 @@ mapToList (LM m) = [(mkHooplLabel k, v) | (k, v) <- M.toList m]
 mapFromList :: [(Label, v)] -> LabelMap v
 mapFromList assocs = LM (M.fromList [(lblToUnique k, v) | (k, v) <- assocs])
 
+{-# INLINE mapFromListWith #-}
 mapFromListWith :: (v -> v -> v) -> [(Label, v)] -> LabelMap v
 mapFromListWith f assocs = LM (M.fromListWith f [(lblToUnique k, v) | (k, v) <- assocs])
 
