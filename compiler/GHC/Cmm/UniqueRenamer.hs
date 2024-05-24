@@ -49,7 +49,13 @@ instance Outputable DetUniqFM where
 type DetRnM = State DetUniqFM
 
 emptyDetUFM :: DetUniqFM
-emptyDetUFM = DetUniqFM { mapping = emptyUFM, supply = 1 }
+emptyDetUFM = DetUniqFM
+  { mapping = emptyUFM
+  -- NB: A lower initial value can get us label `Lsl` which is not parsed
+  -- correctly in older versions of LLVM assembler (llvm-project#80571)
+  -- So we use a x s.t. w64ToBase62 x > "R" > "L" > "r" > "l"
+  , supply = 54
+  }
 
 renameDetUniq :: Unique -> DetRnM Unique
 renameDetUniq uq = do
@@ -61,7 +67,10 @@ renameDetUniq uq = do
           det_uniq = mkUnique tag new_w
       modify' (\DetUniqFM{mapping, supply} ->
         -- Update supply and mapping
-        DetUniqFM{mapping = addToUFM mapping uq det_uniq, supply = supply + 1})
+        DetUniqFM
+          { mapping = addToUFM mapping uq det_uniq
+          , supply = supply + 1
+          })
       return det_uniq
     Just det_uniq ->
       return det_uniq
@@ -138,7 +147,7 @@ instance UniqRenamable CmmLit where
 instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
   => UniqRenamable (LabelMap a) where
     -- ROMES:TODO: Can a rename of the map have collisions and we lose values? Think harder...
-  uniqRename lm = mapFromList <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
+  uniqRename lm = mapFromListWith (\_ _ -> error "very bad") <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
 
 instance UniqRenamable CmmGraph where
   uniqRename (CmmGraph e g) = CmmGraph <$> uniqRename e <*> uniqRename g
@@ -158,7 +167,6 @@ instance UniqRenamable (Block CmmNode n m) where
     BlockCO n bn -> BlockCO <$> uniqRename n <*> uniqRename bn
     BlockCC n1 bn n2 -> BlockCC <$> uniqRename n1 <*> uniqRename bn <*> uniqRename n2
     BlockOC bn n -> BlockOC <$> uniqRename bn <*> uniqRename n
-                                                             
     BNil    -> pure BNil
     BMiddle n -> BMiddle <$> uniqRename n
     BCat    b1 b2 -> BCat <$> uniqRename b1 <*> uniqRename b2

@@ -1862,7 +1862,7 @@ mapInternalNonDetUniques f = \case
   -- ROMES:TODO: what about `RtsApFast NonDetFastString`?
   RtsLabel rtsLblInfo -> pure $ RtsLabel rtsLblInfo
   LocalBlockLabel unique -> LocalBlockLabel <$> f unique
-  fl@ForeignLabel{} -> pure fl 
+  fl@ForeignLabel{} -> pure fl
   AsmTempLabel unique -> AsmTempLabel <$> f unique
   AsmTempDerivedLabel clbl fs -> AsmTempDerivedLabel <$> mapInternalNonDetUniques f clbl <*> pure fs
   StringLitLabel unique -> StringLitLabel <$> f unique
