@@ -43,8 +43,8 @@ library
   default-language: Haskell2010
 
   -- this package typically supports only single major versions
-  build-depends: base             >= 4.16 && < 4.20
-               , ghc             ^>= 9.9
+  build-depends: base             >= 4.16 && < 4.21
+               , ghc             ^>= 9.11
                , ghc-paths       ^>= 0.1.0.12
                , haddock-library ^>= 1.11
                , xhtml           ^>= 3000.2.2
