@@ -1041,6 +1041,17 @@ We really should never rely on matching the structure of a coercion
 -}
 
 ----------------------
+
+tryFloatIn :: CoreExpr -> Maybe CoreExpr
+tryFloatIn = go emptyVarSet False id where
+  go vs _ c (Let bind e) = go (extendVarSetList vs (bindersOf bind)) True (c . Let bind) e
+  go vs _ c (Case scrut case_bndr ty [Alt con alt_bndrs rhs]) = go (extendVarSetList vs alt_bndrs) True (c . (\x -> Case scrut case_bndr (exprType x) [Alt con alt_bndrs x])) rhs
+  go vs True c (App e1 e2) = App <$> go vs True c e1 <*> pure (c e2)
+  go vs True c e@(Var v) | not (v `elemVarSet` vs) = Just e
+  go vs True _ e@Type{} = Just e
+  go vs True _ e@Lit{} = Just e
+  go _ _ _ _ = Nothing
+
 match :: RuleMatchEnv
       -> RuleSubst              -- Substitution applies to template only
       -> CoreExpr               -- Template
@@ -1058,7 +1069,6 @@ match :: RuleMatchEnv
 --
 -- See the notes with Unify.match, which matches types
 -- Everything is very similar for terms
-
 
 ------------------------ Ticks ---------------------
 -- We look through certain ticks. See Note [Tick annotations in RULE matching]
@@ -1305,8 +1315,6 @@ match renv subst e1 (Let bind e2) mco
           (subst { rs_binds = rs_binds subst . Let bind'
                  , rs_bndrs = new_bndrs ++ rs_bndrs subst })
           e1 e2 mco
-  | otherwise
-  = Nothing
   where
     in_scope  = rnInScopeSet (rv_lcl renv) `extendInScopeSetList` rs_bndrs subst
                 -- in_scope: see (4) in Note [Matching lets]
@@ -1384,6 +1392,11 @@ match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2) mco
         ; let renv' = rnMatchBndr2 renv x1 x2
         ; match_alts renv' subst2 alts1 alts2 mco   -- Alts are both sorted
         }
+
+-- try floating in let and (single-branch) case expressions
+match renv subst e1 e2 mco
+  | Just e2' <- tryFloatIn e2
+  = match renv subst e1 e2' mco
 
 -- Everything else fails
 match _ _ _e1 _e2 _mco = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $
