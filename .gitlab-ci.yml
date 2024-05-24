@@ -1041,6 +1041,7 @@ abi-test:
       - out
   rules:
     - *full-ci
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-abi.*/'
 
 
 ############################################################
