@@ -150,7 +150,6 @@ ppHtml
         maybe_index_url
         maybe_source_url
         maybe_wiki_url
-        withQuickjump
         [ PackageInterfaces
             { piPackageInfo = packageInfo
             , piVisibility = Visible
@@ -175,7 +174,6 @@ ppHtml
         maybe_contents_url
         maybe_source_url
         maybe_wiki_url
-        withQuickjump
         (map toInstalledIface visible_ifaces ++ reexported_ifaces)
         debug
 
@@ -201,7 +199,6 @@ ppHtml
           maybe_base_url
           maybe_contents_url
           maybe_index_url
-          withQuickjump
           unicode
           pkg
           qual
@@ -258,21 +255,6 @@ headHtml docTitle themes mathjax_url base_url =
         , "});"
         ]
 
-quickJumpButtonLi
-  :: Bool
-  -- ^ With Quick Jump?
-  -> Maybe Html
--- The TypeScript should replace this <li> element, given its id. However, in
--- case it does not, the element is given content here too.
-quickJumpButtonLi True =
-  Just $
-    li
-      ! [identifier "quick-jump-button"]
-      << anchor
-      ! [href "#"]
-      << "Quick Jump"
-quickJumpButtonLi False = Nothing
-
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _, _) Nothing =
   Just (anchor ! [href src_base_url] << "Source")
@@ -310,8 +292,6 @@ bodyHtml
   -> WikiURLs
   -> Maybe String
   -> Maybe String
-  -> Bool
-  -- ^ With Quick Jump?
   -> Html
   -> Html
 bodyHtml
@@ -321,14 +301,16 @@ bodyHtml
   maybe_wiki_url
   maybe_contents_url
   maybe_index_url
-  withQuickjump
   pageContent =
     body
       << [ divPackageHeader
             << [ nonEmptySectionName << doctitle
-               , ulist
-                  ! [theclass "links", identifier "page-menu"]
-                  << catMaybes (quickJumpButtonLi withQuickjump : otherButtonLis)
+               , unordList (catMaybes [
+                   srcButton maybe_source_url iface,
+                   wikiButton maybe_wiki_url (ifaceMod <$> iface),
+                   contentsButton maybe_contents_url,
+                   indexButton maybe_index_url])
+                       ! [theclass "links", identifier "page-menu"]
                ]
          , divContent << pageContent
          , divFooter
@@ -338,15 +320,6 @@ bodyHtml
                   +++ (" version " ++ projectVersion)
                )
          ]
-    where
-      otherButtonLis =
-        (fmap . fmap)
-          (li <<)
-          [ srcButton maybe_source_url iface
-          , wikiButton maybe_wiki_url (ifaceMod <$> iface)
-          , contentsButton maybe_contents_url
-          , indexButton maybe_index_url
-          ]
 
 moduleInfo :: Interface -> Html
 moduleInfo iface =
@@ -415,8 +388,6 @@ ppHtmlContents
   -> Maybe String
   -> SourceURLs
   -> WikiURLs
-  -> Bool
-  -- ^ With Quick Jump?
   -> [PackageInterfaces]
   -> Bool
   -> Maybe (MDoc GHC.RdrName)
@@ -436,7 +407,6 @@ ppHtmlContents
   maybe_index_url
   maybe_source_url
   maybe_wiki_url
-  withQuickjump
   packages
   showPkgs
   prologue
@@ -476,7 +446,6 @@ ppHtmlContents
               maybe_wiki_url
               Nothing
               maybe_index_url
-              withQuickjump
             << [ ppPrologue pkg qual doctitle prologue
                , ppSignatureTrees pkg qual sig_trees
                , ppModuleTrees pkg qual trees
@@ -718,8 +687,6 @@ ppHtmlIndex
   -> Maybe String
   -> SourceURLs
   -> WikiURLs
-  -> Bool
-  -- ^ With Quick Jump?
   -> [InstalledInterface]
   -> Bool
   -> IO ()
@@ -732,7 +699,6 @@ ppHtmlIndex
   maybe_contents_url
   maybe_source_url
   maybe_wiki_url
-  withQuickjump
   ifaces
   debug = do
     let html =
@@ -760,7 +726,6 @@ ppHtmlIndex
             maybe_wiki_url
             maybe_contents_url
             Nothing
-            withQuickjump
           << [ if showLetters then indexInitialLetterLinks else noHtml
              , if null items
                 then noHtml
@@ -902,8 +867,6 @@ ppHtmlModule
   -> Maybe String
   -> Maybe String
   -> Bool
-  -- ^ With Quick Jump?
-  -> Bool
   -> Maybe Package
   -> QualOption
   -> Bool
@@ -919,7 +882,6 @@ ppHtmlModule
   maybe_base_url
   maybe_contents_url
   maybe_index_url
-  withQuickjump
   unicode
   pkg
   qual
@@ -952,7 +914,6 @@ ppHtmlModule
             maybe_wiki_url
             maybe_contents_url
             maybe_index_url
-            withQuickjump
           << [ divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str_linked))
              , ifaceToHtml maybe_source_url maybe_wiki_url iface unicode pkg real_qual
              ]

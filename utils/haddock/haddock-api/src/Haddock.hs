@@ -457,7 +457,6 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
       _ <- {-# SCC ppHtmlIndex #-}
            ppHtmlIndex odir title pkgStr
                   themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
-                  withQuickjump
                   (concatMap piInstalledInterfaces allVisiblePackages) pretty
       return ()
 
@@ -469,7 +468,6 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
       _ <- {-# SCC ppHtmlContents #-}
            ppHtmlContents unit_state odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
-                     withQuickjump
                      allVisiblePackages True prologue pretty
                      sincePkg (makeContentsQual qual)
       return ()

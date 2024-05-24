@@ -45,12 +45,11 @@ class PageMenuButton extends Component<any, any> {
 
 }
 
-function addSearchPageMenuButton(quickJumpButton: HTMLLIElement) {
-  const showHide = function(action: () => void) {
-    const pageMenu = document.querySelector('#page-menu') as HTMLUListElement;
-    preact.render(<PageMenuButton onClick={action} title="Quick Jump" />, pageMenu, quickJumpButton);
-  };
-  return showHide;
+function addSearchPageMenuButton(action: () => void) {
+  const pageMenu = document.querySelector('#page-menu') as HTMLUListElement;
+  const dummy = document.createElement('li');
+  pageMenu.insertBefore(dummy, pageMenu.firstChild);
+  preact.render(<PageMenuButton onClick={action} title="Quick Jump" />, pageMenu, dummy);
 }
 
 // -------------------------------------------------------------------------- //
@@ -411,14 +410,10 @@ function NoResultsMsg(props: { searchString: string }) {
 }
 
 export function init(docBaseUrl?: string, showHide?: (action: () => void) => void) {
-  // A <li> element with this id should exist if --quickjump was set
-  const quickJumpButton = document.getElementById('quick-jump-button');
-  if (quickJumpButton)
-    preact.render(
-      <QuickJump baseUrl={docBaseUrl || "."} showHideTrigger={showHide ||
-        addSearchPageMenuButton(quickJumpButton as HTMLLIElement)} />,
-      document.body
-    );
+  preact.render(
+    <QuickJump baseUrl={docBaseUrl || "."} showHideTrigger={showHide || addSearchPageMenuButton} />,
+    document.body
+  );
 }
 
 // export to global object

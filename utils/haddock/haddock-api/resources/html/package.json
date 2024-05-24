@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "browserify": "^14.5.0",
-    "gulp": "^4.0.2",
+    "gulp": "^4.0.0",
     "gulp-sourcemaps": "^2.6.4",
     "gulp-uglify": "^3.0.1",
     "tsify": "^3.0.4",
