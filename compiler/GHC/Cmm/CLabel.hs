@@ -343,7 +343,8 @@ newtype NeedExternDecl
 -- code-generation. See Note [Unique Determinism and code generation]
 instance Ord CLabel where
   compare (IdLabel a1 b1 c1) (IdLabel a2 b2 c2) =
-    compare a1 a2 S.<>
+    -- Note [...TODO]: Use stable name comparison to guarantee non-determinism of uniques doesn't influence the order of IdLabels in eg data sections or symbol table.
+    stableNameCmp a1 a2 S.<>
     compare b1 b2 S.<>
     compare c1 c2
   compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
