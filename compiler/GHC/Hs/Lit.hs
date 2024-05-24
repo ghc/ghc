@@ -30,6 +30,7 @@ import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
 import GHC.Core.Type
+import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
 import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
@@ -199,14 +200,7 @@ instance Outputable (HsLit (GhcPass p)) where
     ppr (HsMultilineString st s) =
       case st of
         NoSourceText -> pprHsString s
-        SourceText src ->
-          vcat $ map text $ splitOn '\n' (unpackFS src)
-      where
-        splitOn c s =
-          let (firstLine, rest) = break (== c) s
-           in case rest of
-                "" -> [firstLine]
-                _ : rest -> firstLine : splitOn c rest
+        SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))

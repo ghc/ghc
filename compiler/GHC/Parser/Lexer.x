@@ -2256,7 +2256,7 @@ lex_string strType = do
             '\\' -> do
               case alexGetChar' i1 of
                 Just (c1, i2)
-                  | is_space' c1 -> lexStringGap (LexedChar c1 i1 : acc1) i2
+                  | is_space c1 -> lexStringGap (LexedChar c1 i1 : acc1) i2
                   | otherwise -> lexString (LexedChar c1 i1 : acc1) i2
                 Nothing -> Left (LexStringCharLit, acc, i1)
             _ | isAny c0 -> lexString acc1 i1
@@ -2283,7 +2283,7 @@ lex_string strType = do
           let acc1 = LexedChar c0 i0 : acc0
           case c0 of
             '\\' -> lexString acc1 i1
-            _ | is_space' c0 -> lexStringGap acc1 i1
+            _ | is_space c0 -> lexStringGap acc1 i1
             _ -> Left (LexStringCharLit, acc, i0)
         Nothing -> Left (LexStringCharLitEOF, acc, i0)
 
@@ -2375,13 +2375,6 @@ lex_magic_hash i = do
 isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
         | otherwise  = is_any c
-
--- is_space only works for <= '\x7f' (#3751, #5425)
---
--- TODO: why not put this logic in is_space directly?
-is_space' :: Char -> Bool
-is_space' c | c > '\x7f' = False
-            | otherwise  = is_space c
 
 -- | Returns a LexedString that, when iterated, lazily streams
 -- successive characters from the AlexInput.

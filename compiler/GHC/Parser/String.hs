@@ -17,7 +17,7 @@ import GHC.Prelude
 
 import Control.Monad (forM_, guard, unless, when, (>=>))
 import Data.Char (chr, isSpace, ord)
-import Data.List.NonEmpty (NonEmpty)
+import qualified Data.Foldable1 as Foldable1
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (listToMaybe, mapMaybe, maybeToList)
 import GHC.Parser.CharClass (
@@ -337,7 +337,7 @@ resolveMultilineString = pure . process
               case NonEmpty.nonEmpty (excludeWsOnlyLines strLines) of
                 Nothing -> 0
                 Just strLines' ->
-                  minimum1 $
+                  Foldable1.minimum $
                     flip NonEmpty.map strLines' $ \(LexedLine line _) ->
                       length $ takeWhile isLexedSpace line
          in firstLine : mapLines (drop commonWSPrefix) strLines
@@ -349,10 +349,6 @@ resolveMultilineString = pure . process
     rmFirstNewline = \case
       LexedChar '\n' _ : s -> s
       s -> s
-
-    -- TODO: replace with Foldable1.minimum when GHC 9.6+ required to build
-    minimum1 :: Ord a => NonEmpty a -> a
-    minimum1 = minimum
 
 -- -----------------------------------------------------------------------------
 -- Helpers
