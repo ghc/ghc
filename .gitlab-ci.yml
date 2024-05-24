@@ -1017,10 +1017,6 @@ abi-test:
       optional: true
   dependencies: null
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
-  rules:
-    - if: $CI_MERGE_REQUEST_ID
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
   tags:
     - x86_64-linux
   script:
@@ -1041,6 +1037,7 @@ abi-test:
       - out
   rules:
     - *full-ci
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-abi.*/'
 
 
 ############################################################
