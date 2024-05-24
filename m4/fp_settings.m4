@@ -123,19 +123,10 @@ AC_DEFUN([FP_SETTINGS],
     fi
 
     # LLVM backend tools
-    if test -z "$LlcCmd"; then
-        LlcCmd="llc"
-    fi
     SettingsLlcCommand="$LlcCmd"
 
-    if test -z "$OptCmd"; then
-        OptCmd="opt"
-    fi
     SettingsOptCommand="$OptCmd"
 
-    if test -z "$LlvmAsCmd"; then
-        LlvmAsCmd="clang"
-    fi
     SettingsLlvmAsCommand="$LlvmAsCmd"
 
     # Mac-only tools
