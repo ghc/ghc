@@ -494,6 +494,8 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 FormatCMM
                 (vcat $ map (pprLiveCmmDecl platform) withLiveness)
 
+        -- ROMES:TODO: RENAME VIRTUAL REGISTERS DETERMINISTICALLY
+
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
          if ( ncgRegsGraph config || ncgRegsIterative config )
@@ -555,6 +557,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                         , [], stack_updt_blks)
 
           else do
+
                 -- do linear register allocation
                 let reg_alloc proc = do
                        (alloced, maybe_more_stack, ra_stats) <-

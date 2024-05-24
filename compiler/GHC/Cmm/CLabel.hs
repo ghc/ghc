@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 -----------------------------------------------------------------------------
 --
 -- Object-file symbols (called CLabel for historical reasons).
@@ -132,7 +133,8 @@ module GHC.Cmm.CLabel (
         ppInternalProcLabel,
 
         -- * Others
-        dynamicLinkerLabelInfo
+        dynamicLinkerLabelInfo,
+        mapInternalNonDetUniques
     ) where
 
 import GHC.Prelude
@@ -1844,3 +1846,37 @@ The transformation is performed because
      T15155.a_closure `mayRedirectTo` a1_rXq_closure+1
 returns True.
 -}
+
+-- | A utility for renaming uniques in CLabels to produce deterministic object.
+-- Note that not all Uniques are mapped over. Only those that can be safely alpha
+-- renamed, eg uniques of local symbols or of system names.
+-- See Note [....TODO]
+mapInternalNonDetUniques :: Applicative m => (Unique -> m Unique) -> CLabel -> m CLabel
+mapInternalNonDetUniques f = \case
+  il@(IdLabel name cafInfo idLabelInfo)
+    | isInternalName name
+    -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
+    | otherwise
+    -> pure il
+  cl@CmmLabel{} -> pure cl
+  -- ROMES:TODO: what about `RtsApFast NonDetFastString`?
+  RtsLabel rtsLblInfo -> pure $ RtsLabel rtsLblInfo
+  LocalBlockLabel unique -> LocalBlockLabel <$> f unique
+  fl@ForeignLabel{} -> pure fl 
+  AsmTempLabel unique -> AsmTempLabel <$> f unique
+  AsmTempDerivedLabel clbl fs -> AsmTempDerivedLabel <$> mapInternalNonDetUniques f clbl <*> pure fs
+  StringLitLabel unique -> StringLitLabel <$> f unique
+  CC_Label  cc -> pure $ CC_Label cc
+  CCS_Label ccs -> pure $ CCS_Label ccs
+  IPE_Label ipe@InfoProvEnt{infoTablePtr} ->
+    (\cl' -> IPE_Label ipe{infoTablePtr = cl'}) <$> mapInternalNonDetUniques f infoTablePtr
+  ml@ModuleLabel{} -> pure ml
+  -- ROMES:TODO: Suspicious, maybe we shouldn't rename these.
+  DynamicLinkerLabel dlli clbl -> DynamicLinkerLabel dlli <$> mapInternalNonDetUniques f clbl
+  PicBaseLabel -> pure PicBaseLabel
+  DeadStripPreventer clbl -> DeadStripPreventer <$> mapInternalNonDetUniques f clbl
+  HpcTicksLabel mod -> pure $ HpcTicksLabel mod
+  SRTLabel unique -> SRTLabel <$> f unique
+  LargeBitmapLabel unique -> LargeBitmapLabel <$> f unique
+
+
