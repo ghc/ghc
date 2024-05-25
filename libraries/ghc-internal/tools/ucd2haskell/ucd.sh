@@ -52,7 +52,7 @@ download_files() {
     done
 }
 
-GHC_MODULE_PATH=$(realpath "$SCRIPT_DIR/../../")
+GHC_MODULE_PATH=$(realpath "$SCRIPT_DIR/../../src")
 
 # Generate the Haskell files.
 run_generator() {
@@ -63,7 +63,7 @@ run_generator() {
           --core-prop Uppercase \
           --core-prop Lowercase
         # [NOTE] disabled generator
-        #   --core-prop Alphabetic 
+        #   --core-prop Alphabetic
         #   --core-prop White_Space \
         #   --core-prop ID_Start \
         #   --core-prop ID_Continue \
