@@ -21,7 +21,6 @@ module Parser.Text (genModules) where
 
 import Control.Exception (catch, IOException)
 import Control.Monad (void)
-import Control.Monad.IO.Class (MonadIO(liftIO))
 import Data.Bits (Bits(..))
 import Data.Word (Word8)
 import Data.Char (chr, ord, isSpace)
@@ -31,19 +30,20 @@ import Data.List (intersperse, unfoldr)
 import Data.List.Split (splitWhen)
 import Numeric (showHex)
 import Streamly.Data.Fold (Fold)
-import Streamly.Prelude (IsStream, SerialT)
 import System.Directory (createDirectoryIfMissing)
 import System.Environment (getEnv)
 import System.FilePath ((</>), (<.>))
 
 -- import qualified Data.Set as Set
-import qualified Streamly.Prelude as Stream
+import Streamly.Data.Stream (Stream)
+import qualified Streamly.Data.Stream.Prelude as Stream
 import qualified Streamly.Data.Fold as Fold
 import qualified Streamly.Internal.Data.Fold as Fold
 import qualified Streamly.Data.Unfold as Unfold
 import qualified Streamly.FileSystem.Handle as Handle
-import qualified System.IO as Sys
 import qualified Streamly.Unicode.Stream as Unicode
+import qualified Streamly.Internal.Unicode.Stream as Unicode
+import qualified System.IO as Sys
 
 import Prelude hiding (pred)
 
@@ -271,7 +271,7 @@ genUnicodeVersion outdir = do
               (\(_ :: IOException) -> return "<unknown>")
   Stream.fold f (Stream.fromList (body version))
   where
-    moduleName = "GHC.Unicode.Internal.Version"
+    moduleName = "GHC.Internal.Unicode.Version"
     f = moduleFileEmitter Nothing outdir
           (moduleName, \_ -> Fold.foldMap (<> "\n"))
     body :: String -> [String]
@@ -284,12 +284,12 @@ genUnicodeVersion outdir = do
       , "(unicodeVersion)"
       , "where"
       , ""
-      , "import {-# SOURCE #-} Data.Version"
+      , "import {-# SOURCE #-} GHC.Internal.Data.Version"
       , ""
       , "-- | Version of Unicode standard used by @base@:"
       , "-- [" <> version <> "](https://www.unicode.org/versions/Unicode" <> version <> "/)."
       , "--"
-      , "-- @since 4.15.0.0"
+      , "-- @since base-4.15.0.0"
       , "unicodeVersion :: Version"
       , "unicodeVersion = makeVersion [" <> mkVersion version <> "]" ]
     mkVersion = foldr (\c acc -> case c of {'.' -> ',':' ':acc; _ -> c:acc}) mempty
@@ -331,8 +331,8 @@ genGeneralCategoryModule moduleName =
         , "(generalCategory)"
         , "where"
         , ""
-        , "import GHC.Base (Char, Int, Ord(..), ord)"
-        , "import GHC.Unicode.Internal.Bits (lookupIntN)"
+        , "import GHC.Internal.Base (Char, Int, Ord(..), ord)"
+        , "import GHC.Internal.Unicode.Bits (lookupIntN)"
         , ""
         , genEnumBitmap "generalCategory" Cn (reverse acc)
         ]
@@ -415,7 +415,7 @@ genDecomposableModule moduleName dtype =
             , "where"
             , ""
             , "import Data.Char (ord)"
-            , "import GHC.Unicode.Internal.Bits (lookupBit64)"
+            , "import GHC.Internal.Unicode.Bits (lookupBit64)"
             , ""
             , genBitmap "isDecomposable" (reverse st)
             ]
@@ -443,7 +443,7 @@ genCombiningClassModule moduleName =
             , "where"
             , ""
             , "import Data.Char (ord)"
-            , "import GHC.Unicode.Internal.Bits (lookupBit64)"
+            , "import GHC.Internal.Unicode.Bits (lookupBit64)"
             , ""
             , "combiningClass :: Char -> Int"
             , unlines (reverse st1)
@@ -566,8 +566,8 @@ genCompositionsModule moduleName compExclu non0CC =
         , "(compose, composeStarters, isSecondStarter)"
         , "where"
         , ""
-        , "import GHC.Base (Char, ord)"
-        , "import GHC.Unicode.Internal.Bits (lookupBit64)"
+        , "import GHC.Internal.Base (Char, ord)"
+        , "import GHC.Internal.Unicode.Bits (lookupBit64)"
         , ""
         ]
 
@@ -616,7 +616,7 @@ genSimpleCaseMappingModule moduleName funcName field =
         , "(" <> funcName <> ")"
         , "where"
         , ""
-        , "import GHC.Base (Char)"
+        , "import GHC.Internal.Base (Char)"
         , ""
         ]
     genSign =
@@ -670,8 +670,8 @@ genCorePropertiesModule moduleName isProp =
         , "(" <> unwords (intersperse "," (map prop2FuncName exports)) <> ")"
         , "where"
         , ""
-        , "import GHC.Base (Bool, Char, Ord(..), (&&), ord)"
-        , "import GHC.Unicode.Internal.Bits (lookupBit64)"
+        , "import GHC.Internal.Base (Bool, Char, Ord(..), (&&), ord)"
+        , "import GHC.Internal.Unicode.Bits (lookupBit64)"
         , ""
         ]
 
@@ -818,7 +818,7 @@ parsePropertyLine ln
 isDivider :: String -> Bool
 isDivider x = x == "# ================================================"
 
-parsePropertyLines :: (IsStream t, Monad m) => t m String -> t m PropertyLine
+parsePropertyLines :: (Monad m) => Stream m String -> Stream m PropertyLine
 parsePropertyLines =
     Stream.splitOn isDivider
         $ Fold.lmap parsePropertyLine
@@ -843,11 +843,11 @@ Parse ranges according to https://www.unicode.org/reports/tr44/#Code_Point_Range
 __Note:__ this does /not/ fill missing char entries,
 i.e. entries with no explicit entry nor within a range.
 -}
-parseUnicodeDataLines :: forall t m. (IsStream t, Monad m) => t m String -> t m DetailedChar
+parseUnicodeDataLines :: forall m. (Monad m) => Stream m String -> Stream m DetailedChar
 parseUnicodeDataLines
     = Stream.unfoldMany (Unfold.unfoldr unitToRange)
     . Stream.foldMany ( Fold.lmap parseDetailedChar
-                      $ Fold.mkFold_ step initial )
+                      $ Fold.foldt' step initial id)
 
     where
 
@@ -913,19 +913,14 @@ parseDetailedChar line = case splitWhen (== ';') line of
 -- Generation
 -------------------------------------------------------------------------------
 
-readLinesFromFile :: String -> SerialT IO String
+readLinesFromFile :: String -> Stream IO String
 readLinesFromFile file =
     withFile file Sys.ReadMode
-        $ \h ->
-              Stream.unfold Handle.read h & Unicode.decodeUtf8
-                  & unicodeLines Fold.toList
+        $ \h -> Handle.read h & Unicode.decodeUtf8 & Unicode.lines Fold.toList
 
     where
-
-    unicodeLines = Stream.splitOnSuffix (== '\n')
-
     withFile file_ mode =
-        Stream.bracket (liftIO $ Sys.openFile file_ mode) (liftIO . Sys.hClose)
+        Stream.bracketIO (Sys.openFile file_ mode) (Sys.hClose)
 
 
 moduleToFileName :: String -> String
@@ -995,7 +990,7 @@ testOutputFileEmitter outdir (name, fldGen) = Fold.rmapM action fldGen
 runGenerator ::
        FilePath
     -> FilePath
-    -> (SerialT IO String -> SerialT IO a)
+    -> (Stream IO String -> Stream IO a)
     -> FilePath
     -> GeneratorRecipe a
     -> IO ()
@@ -1067,64 +1062,64 @@ genModules indir outdir props = do
 
     -- [NOTE] Disabled generator
     -- propList =
-    --     ("GHC.Unicode.Internal.Char.PropList"
+    --     ("GHC.Internal.Unicode.Char.PropList"
     --     , (`genCorePropertiesModule` (`elem` props)))
 
     derivedCoreProperties =
-        ("GHC.Unicode.Internal.Char.DerivedCoreProperties"
+        ("GHC.Internal.Unicode.Char.DerivedCoreProperties"
         , (`genCorePropertiesModule` (`elem` props)))
 
     -- [NOTE] Disabled generator
     -- compositions exc non0 =
-    --     ( "GHC.Unicode.Internal.Char.UnicodeData.Compositions"
+    --     ( "GHC.Internal.Unicode.Char.UnicodeData.Compositions"
     --     , \m -> genCompositionsModule m exc non0)
 
     -- [NOTE] Disabled generator
     -- combiningClass =
-    --     ( "GHC.Unicode.Internal.Char.UnicodeData.CombiningClass"
+    --     ( "GHC.Internal.Unicode.Char.UnicodeData.CombiningClass"
     --     , genCombiningClassModule)
 
     -- [NOTE] Disabled generator
     -- decomposable =
-    --     ( "GHC.Unicode.Internal.Char.UnicodeData.Decomposable"
+    --     ( "GHC.Internal.Unicode.Char.UnicodeData.Decomposable"
     --     , (`genDecomposableModule` Canonical))
 
     -- [NOTE] Disabled generator
     -- decomposableK =
-    --     ( "GHC.Unicode.Internal.Char.UnicodeData.DecomposableK"
+    --     ( "GHC.Internal.Unicode.Char.UnicodeData.DecomposableK"
     --     , (`genDecomposableModule` Kompat))
 
     -- [NOTE] Disabled generator
     -- decompositions =
-    --     ( "GHC.Unicode.Internal.Char.UnicodeData.Decompositions"
+    --     ( "GHC.Internal.Unicode.Char.UnicodeData.Decompositions"
     --     , \m -> genDecomposeDefModule m [] [] Canonical (const True))
 
     -- [NOTE] Disabled generator
     -- decompositionsK2 =
-    --     ( "GHC.Unicode.Internal.Char.UnicodeData.DecompositionsK2"
+    --     ( "GHC.Internal.Unicode.Char.UnicodeData.DecompositionsK2"
     --     , \m -> genDecomposeDefModule m [] [] Kompat (>= 60000))
 
     -- [NOTE] Disabled generator
     -- decompositionsK =
     --     let pre = ["import qualified " <> fst decompositionsK2 <> " as DK2", ""]
     --         post = ["decompose c = DK2.decompose c"]
-    --      in ( "GHC.Unicode.Internal.Char.UnicodeData.DecompositionsK"
+    --      in ( "GHC.Internal.Unicode.Char.UnicodeData.DecompositionsK"
     --         , \m -> genDecomposeDefModule m pre post Kompat (< 60000))
 
     generalCategory =
-         ( "GHC.Unicode.Internal.Char.UnicodeData.GeneralCategory"
+         ( "GHC.Internal.Unicode.Char.UnicodeData.GeneralCategory"
          , genGeneralCategoryModule)
 
     simpleUpperCaseMapping =
-         ( "GHC.Unicode.Internal.Char.UnicodeData.SimpleUpperCaseMapping"
+         ( "GHC.Internal.Unicode.Char.UnicodeData.SimpleUpperCaseMapping"
          , \m -> genSimpleCaseMappingModule m "toSimpleUpperCase" _simpleUppercaseMapping)
 
     simpleLowerCaseMapping =
-         ( "GHC.Unicode.Internal.Char.UnicodeData.SimpleLowerCaseMapping"
+         ( "GHC.Internal.Unicode.Char.UnicodeData.SimpleLowerCaseMapping"
          , \m -> genSimpleCaseMappingModule m "toSimpleLowerCase" _simpleLowercaseMapping)
 
     simpleTitleCaseMapping =
-         ( "GHC.Unicode.Internal.Char.UnicodeData.SimpleTitleCaseMapping"
+         ( "GHC.Internal.Unicode.Char.UnicodeData.SimpleTitleCaseMapping"
          , \m -> genSimpleCaseMappingModule m "toSimpleTitleCase" _simpleTitlecaseMapping)
 
     -- unicode002Test =

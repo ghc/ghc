@@ -1,6 +1,6 @@
 # Generating GHC’s Unicode modules
 
-`GHC.Unicode.Internal.*` modules are generated with the internal tool `ucd2haskell`.
+`GHC.Internal.Unicode.*` modules are generated with the internal tool `ucd2haskell`.
 
 ```bash
 cd ucd2haskell
@@ -13,7 +13,7 @@ cd ucd2haskell
 2. _Comment_ the line in `ucd.sh` with `VERIFY_CHECKSUM=y`.
 3. Run `./ucd.sh download`.
 4. Update the checksums in `ucd.sh` and _uncomment_ `VERIFY_CHECKSUM=y`.
-5. Run `./ucd.sh generate`. This will generate the `GHC.Unicode.Internal.*` 
+5. Run `./ucd.sh generate`. This will generate the `GHC.Internal.Unicode.*`
    modules.
 6. Check and update the output of the tests `base/tests/unicodeXXX.hs`.
 7. Compare with Python (see hereinafter) and fix any error.
@@ -32,7 +32,7 @@ __Warning:__ A Python version with the _exact same Unicode version_ is required.
 Check the properties of all the characters.
 
 ```bash
-ghc -O2 tests/export_all_chars.hs 
+ghc -O2 tests/export_all_chars.hs
 ./tests/export_all_chars > tests/all_chars.csv
 python3 tests/check_all_chars.py tests/all_chars.csv
 ```
