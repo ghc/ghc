@@ -88,72 +88,92 @@ import GHC.Internal.LanguageExtensions
 -----------------------------------------------------
 
 class (MonadIO m, MonadFail m) => Quasi m where
+  -- | Fresh names. See 'newName'.
   qNewName :: String -> m Name
-        -- ^ Fresh names
 
-        -- Error reporting and recovery
-  qReport  :: Bool -> String -> m ()    -- ^ Report an error (True) or warning (False)
-                                        -- ...but carry on; use 'fail' to stop
+  ------- Error reporting and recovery -------
+  -- | Report an error (True) or warning (False)
+  -- ...but carry on; use 'fail' to stop. See 'report'.
+  qReport  :: Bool -> String -> m ()
+
+  -- | See 'recover'.
   qRecover :: m a -- ^ the error handler
            -> m a -- ^ action which may fail
-           -> m a               -- ^ Recover from the monadic 'fail'
+           -> m a -- ^ Recover from the monadic 'fail'
 
-        -- Inspect the type-checker's environment
+  ------- Inspect the type-checker's environment -------
+  -- | True <=> type namespace, False <=> value namespace. See 'lookupName'.
   qLookupName :: Bool -> String -> m (Maybe Name)
-       -- True <=> type namespace, False <=> value namespace
+  -- | See 'reify'.
   qReify          :: Name -> m Info
+  -- | See 'reifyFixity'.
   qReifyFixity    :: Name -> m (Maybe Fixity)
+  -- | See 'reifyType'.
   qReifyType      :: Name -> m Type
+  -- | Is (n tys) an instance? Returns list of matching instance Decs (with
+  -- empty sub-Decs) Works for classes and type functions. See 'reifyInstances'.
   qReifyInstances :: Name -> [Type] -> m [Dec]
-       -- Is (n tys) an instance?
-       -- Returns list of matching instance Decs
-       --    (with empty sub-Decs)
-       -- Works for classes and type functions
+  -- | See 'reifyRoles'.
   qReifyRoles         :: Name -> m [Role]
+  -- | See 'reifyAnnotations'.
   qReifyAnnotations   :: Data a => AnnLookup -> m [a]
+  -- | See 'reifyModule'.
   qReifyModule        :: Module -> m ModuleInfo
+  -- | See 'reifyConStrictness'.
   qReifyConStrictness :: Name -> m [DecidedStrictness]
 
+  -- | See 'location'.
   qLocation :: m Loc
 
+  -- | Input/output (dangerous). See 'runIO'.
   qRunIO :: IO a -> m a
   qRunIO = liftIO
-  -- ^ Input/output (dangerous)
+  -- | See 'getPackageRoot'.
   qGetPackageRoot :: m FilePath
 
+  -- | See 'addDependentFile'.
   qAddDependentFile :: FilePath -> m ()
 
+  -- | See 'addTempFile'.
   qAddTempFile :: String -> m FilePath
 
+  -- | See 'addTopDecls'.
   qAddTopDecls :: [Dec] -> m ()
 
+  -- | See 'addForeignFilePath'.
   qAddForeignFilePath :: ForeignSrcLang -> String -> m ()
 
+  -- | See 'addModFinalizer'.
   qAddModFinalizer :: Q () -> m ()
 
+  -- | See 'addCorePlugin'.
   qAddCorePlugin :: String -> m ()
 
+  -- | See 'getQ'.
   qGetQ :: Typeable a => m (Maybe a)
 
+  -- | See 'putQ'.
   qPutQ :: Typeable a => a -> m ()
 
+  -- | See 'isExtEnabled'.
   qIsExtEnabled :: Extension -> m Bool
+  -- | See 'extsEnabled'.
   qExtsEnabled :: m [Extension]
 
+  -- | See 'putDoc'.
   qPutDoc :: DocLoc -> String -> m ()
+  -- | See 'getDoc'.
   qGetDoc :: DocLoc -> m (Maybe String)
 
 -----------------------------------------------------
 --      The IO instance of Quasi
---
---  This instance is used only when running a Q
+-----------------------------------------------------
+
+--  | This instance is used only when running a Q
 --  computation in the IO monad, usually just to
 --  print the result.  There is no interesting
 --  type environment, so reification isn't going to
 --  work.
---
------------------------------------------------------
-
 instance Quasi IO where
   qNewName = newNameIO
 
@@ -208,9 +228,19 @@ counter = unsafePerformIO (newIORef 0)
 --
 -----------------------------------------------------
 
+-- | In short, 'Q' provides the 'Quasi' operations in one neat monad for the
+-- user.
+--
+-- The longer story, is that 'Q' wraps an arbitrary 'Quasi'-able monad.
+-- The perceptive reader notices that 'Quasi' has only two instances, 'Q'
+-- itself and 'IO', neither of which have concrete implementations.'Q' plays
+-- the trick of [dependency
+-- inversion](https://en.wikipedia.org/wiki/Dependency_inversion_principle),
+-- providing an abstract interface for the user which is later concretely
+-- fufilled by an concrete 'Quasi' instance, internal to GHC.
 newtype Q a = Q { unQ :: forall m. Quasi m => m a }
 
--- \"Runs\" the 'Q' monad. Normal users of Template Haskell
+-- | \"Runs\" the 'Q' monad. Normal users of Template Haskell
 -- should not need this function, as the splice brackets @$( ... )@
 -- are the usual way of running a 'Q' computation.
 --
@@ -464,13 +494,13 @@ hoistCode :: forall m n (r :: RuntimeRep) (a :: TYPE r) . Monad m
 hoistCode f (Code a) = Code (f a)
 
 
--- | Variant of (>>=) which allows effectful computations to be injected
+-- | Variant of '(>>=)' which allows effectful computations to be injected
 -- into code generation.
 bindCode :: forall m a (r :: RuntimeRep) (b :: TYPE r) . Monad m
          => m a -> (a -> Code m b) -> Code m b
 bindCode q k = liftCode (q >>= examineCode . k)
 
--- | Variant of (>>) which allows effectful computations to be injected
+-- | Variant of '(>>)' which allows effectful computations to be injected
 -- into code generation.
 bindCode_ :: forall m a (r :: RuntimeRep) (b :: TYPE r) . Monad m
           => m a -> Code m b -> Code m b
@@ -963,13 +993,16 @@ instance Quasi Q where
 -- desugaring brackets. They are not necessary for the user, who can use
 -- ordinary return and (>>=) etc
 
+-- | This function is only used in 'GHC.HsToCore.Quote' when desugaring
+-- brackets. This is not necessary for the user, who can use the ordinary
+-- 'return' and '(>>=)' operations.
 sequenceQ :: forall m . Monad m => forall a . [m a] -> m [a]
 sequenceQ = sequence
 
-
-
 oneName, manyName :: Name
+-- | Synonym for @''GHC.Types.One'@, from @ghc-prim@.
 oneName  = mkNameG DataName "ghc-prim" "GHC.Types" "One"
+-- | Synonym for @''GHC.Types.Many'@, from @ghc-prim@.
 manyName = mkNameG DataName "ghc-prim" "GHC.Types" "Many"
 
 
@@ -977,9 +1010,11 @@ manyName = mkNameG DataName "ghc-prim" "GHC.Types" "Many"
 --              Names and uniques
 -----------------------------------------------------
 
+-- | The name of a module.
 newtype ModName = ModName String        -- Module name
  deriving (Show,Eq,Ord,Data,Generic)
 
+-- | The name of a package.
 newtype PkgName = PkgName String        -- package name
  deriving (Show,Eq,Ord,Data,Generic)
 
@@ -987,19 +1022,23 @@ newtype PkgName = PkgName String        -- package name
 data Module = Module PkgName ModName -- package qualified module name
  deriving (Show,Eq,Ord,Data,Generic)
 
+-- | An "Occurence Name".
 newtype OccName = OccName String
  deriving (Show,Eq,Ord,Data,Generic)
 
+-- | Smart constructor for 'ModName'
 mkModName :: String -> ModName
 mkModName s = ModName s
 
+-- | Accessor for 'ModName'
 modString :: ModName -> String
 modString (ModName m) = m
 
-
+-- | Smart constructor for 'PkgName'
 mkPkgName :: String -> PkgName
 mkPkgName s = PkgName s
 
+-- | Accessor for 'PkgName'
 pkgString :: PkgName -> String
 pkgString (PkgName m) = m
 
@@ -1008,9 +1047,11 @@ pkgString (PkgName m) = m
 --              OccName
 -----------------------------------------------------
 
+-- | Smart constructor for 'OccName'
 mkOccName :: String -> OccName
 mkOccName s = OccName s
 
+-- | Accessor for 'OccName'
 occString :: OccName -> String
 occString (OccName occ) = occ
 
@@ -1295,7 +1336,9 @@ mkNameG_fld :: String -- ^ package
             -> Name
 mkNameG_fld pkg modu con occ = mkNameG (FldName con) pkg modu occ
 
-data NameIs = Alone | Applied | Infix
+data NameIs = Alone    -- ^ @name@
+            | Applied  -- ^ @(name)@
+            | Infix    -- ^ @\`name\`@
 
 showName :: Name -> String
 showName = showName' Alone
@@ -1422,6 +1465,7 @@ unboxedSumTypeName arity
 --              Locations
 -----------------------------------------------------
 
+-- | A location within a source file.
 data Loc
   = Loc { loc_filename :: String
         , loc_package  :: String
@@ -1551,8 +1595,11 @@ type Unlifted = Bool
 --   * 'TySynInstD'
 type InstanceDec = Dec
 
+-- | Fixity, as specified in a @infix[lr] n@ declaration.
 data Fixity          = Fixity Int FixityDirection
     deriving( Eq, Ord, Show, Data, Generic )
+
+-- | The associativity of an operator, as in an @infix@ declaration.
 data FixityDirection = InfixL | InfixR | InfixN
     deriving( Eq, Ord, Show, Data, Generic )
 
@@ -1581,7 +1628,7 @@ But how should we parse @a + b * c@? If we don't know the fixities of
 + b) * c@.
 
 In cases like this, use 'UInfixE', 'UInfixP', 'UInfixT', or 'PromotedUInfixT',
-which stand for \"unresolved infix expression/pattern/type/promoted
+which stand for \"unresolved infix expression / pattern / type / promoted
 constructor\", respectively. When the compiler is given a splice containing a
 tree of @UInfixE@ applications such as
 
@@ -1637,20 +1684,23 @@ reassociate the tree as necessary.
 --
 -----------------------------------------------------
 
-data Lit = CharL Char
-         | StringL String
-         | IntegerL Integer     -- ^ Used for overloaded and non-overloaded
+-- | A Haskell literal. Note that the numeric types are all in terms of either
+-- 'Integer' or 'Rational', regardless of the type they represent. The extra
+-- precision reflects the textual representation in source code.
+data Lit = CharL Char           -- ^ @\'c\'@
+         | StringL String       -- ^ @"string"@
+         | IntegerL Integer     -- ^ @123@. Used for overloaded and non-overloaded
                                 -- literals. We don't have a good way to
                                 -- represent non-overloaded literals at
                                 -- the moment. Maybe that doesn't matter?
-         | RationalL Rational   -- Ditto
-         | IntPrimL Integer
-         | WordPrimL Integer
-         | FloatPrimL Rational
-         | DoublePrimL Rational
-         | StringPrimL [Word8]  -- ^ A primitive C-style string, type 'Addr#'
+         | RationalL Rational   -- ^ @1.23@. See above comment on 'IntegerL'.
+         | IntPrimL Integer     -- ^ @123#@
+         | WordPrimL Integer    -- ^ @123##@
+         | FloatPrimL Rational  -- ^ @1.23#@
+         | DoublePrimL Rational -- ^ @1.23##@
+         | StringPrimL [Word8]  -- ^ @"string"#@. A primitive C-style string, type 'Addr#'
          | BytesPrimL Bytes     -- ^ Some raw bytes, type 'Addr#':
-         | CharPrimL Char
+         | CharPrimL Char       -- ^ @\'c\'#@
     deriving( Show, Eq, Ord, Data, Generic )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,
@@ -1741,15 +1791,22 @@ data Pat
   | InvisP Type                     -- ^ @{ @p }@
   deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A (field name, pattern) pair. See 'RecP'.
 type FieldPat = (Name,Pat)
 
+-- | A @case@-alternative
 data Match = Match Pat Body [Dec] -- ^ @case e of { pat -> body where decs }@
     deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A clause consists of patterns, guards, a body expression, and a list of
+-- declarations under a @where@. Clauses are seen in equations for function
+-- definitions, @case@-experssions, explicitly-bidirectional pattern synonyms,
+-- etc.
 data Clause = Clause [Pat] Body [Dec]
                                   -- ^ @f { p1 p2 = body where decs }@
     deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A Haskell expression.
 data Exp
   = VarE Name                          -- ^ @{ x }@
   | ConE Name                          -- ^ @data T1 = C1 t1 t2; p = {C1} e1 e2  @
@@ -1841,10 +1898,13 @@ data Exp
   | TypeE Type                         -- ^ @{ type t }@
   deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A (field name, expression) pair. See 'RecConE' and 'RecUpdE'.
 type FieldExp = (Name,Exp)
 
 -- Omitted: implicit parameters
 
+-- | A potentially guarded expression, as in function definitions or case
+-- alternatives.
 data Body
   = GuardedB [(Guard,Exp)]   -- ^ @f p { | e1 = e2
                                  --      | e3 = e4 }
@@ -1852,11 +1912,13 @@ data Body
   | NormalB Exp              -- ^ @f p { = e } where ds@
   deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A single guard.
 data Guard
   = NormalG Exp -- ^ @f x { | odd x } = x@
   | PatG [Stmt] -- ^ @f x { | Just y <- x, Just z <- y } = z@
   deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A single statement, as in @do@-notation.
 data Stmt
   = BindS Pat Exp -- ^ @p <- e@
   | LetS [ Dec ]  -- ^ @{ let { x=e1; y=e2 } }@
@@ -1865,10 +1927,14 @@ data Stmt
   | RecS [Stmt]   -- ^ @rec { s1; s2 }@
   deriving( Show, Eq, Ord, Data, Generic )
 
-data Range = FromR Exp | FromThenR Exp Exp
-           | FromToR Exp Exp | FromThenToR Exp Exp Exp
-          deriving( Show, Eq, Ord, Data, Generic )
+-- | A list/enum range expression.
+data Range = FromR Exp               -- ^ @[n ..]@
+           | FromThenR Exp Exp       -- ^ @[n, m ..]@
+           | FromToR Exp Exp         -- ^ @[n .. m]@
+           | FromThenToR Exp Exp Exp -- ^ @[n, m .. k]@
+           deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A single declaration.
 data Dec
   = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
   | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
@@ -1976,16 +2042,17 @@ data Overlap = Overlappable   -- ^ May be overlapped by more specific instances
                               -- available.
   deriving( Show, Eq, Ord, Data, Generic )
 
--- | A single @deriving@ clause at the end of a datatype.
+-- | A single @deriving@ clause at the end of a datatype declaration.
 data DerivClause = DerivClause (Maybe DerivStrategy) Cxt
     -- ^ @{ deriving stock (Eq, Ord) }@
   deriving( Show, Eq, Ord, Data, Generic )
 
--- | What the user explicitly requests when deriving an instance.
-data DerivStrategy = StockStrategy    -- ^ A \"standard\" derived instance
-                   | AnyclassStrategy -- ^ @-XDeriveAnyClass@
-                   | NewtypeStrategy  -- ^ @-XGeneralizedNewtypeDeriving@
-                   | ViaStrategy Type -- ^ @-XDerivingVia@
+-- | What the user explicitly requests when deriving an instance with
+-- @-XDerivingStrategies@.
+data DerivStrategy = StockStrategy    -- ^ @deriving {stock} C@
+                   | AnyclassStrategy -- ^ @deriving {anyclass} C@, @-XDeriveAnyClass@
+                   | NewtypeStrategy  -- ^ @deriving {newtype} C@, @-XGeneralizedNewtypeDeriving@
+                   | ViaStrategy Type -- ^ @deriving C {via T}@, @-XDerivingVia@
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | A pattern synonym's type. Note that a pattern synonym's /fully/
@@ -2064,56 +2131,91 @@ data TypeFamilyHead =
 data TySynEqn = TySynEqn (Maybe [TyVarBndr ()]) Type Type
   deriving( Show, Eq, Ord, Data, Generic )
 
-data FunDep = FunDep [Name] [Name]
+-- | [Functional dependency](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/functional_dependencies.html)
+-- syntax, as in a class declaration.
+data FunDep = FunDep [Name] [Name] -- ^ @class C a b {| a -> b}@
   deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A @foreign@ declaration.
 data Foreign = ImportF Callconv Safety String Name Type
+             -- ^ @foreign import callconv safety "foreign_name" haskellName :: type@
              | ExportF Callconv        String Name Type
+             -- ^ @foreign export callconv "foreign_name" haskellName :: type@
          deriving( Show, Eq, Ord, Data, Generic )
 
 -- keep Callconv in sync with module ForeignCall in ghc/compiler/GHC/Types/ForeignCall.hs
+-- | A calling convention identifier, as in a 'Foreign' declaration.
 data Callconv = CCall | StdCall | CApi | Prim | JavaScript
           deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A safety level, as in a 'Foreign' declaration.
 data Safety = Unsafe | Safe | Interruptible
         deriving( Show, Eq, Ord, Data, Generic )
 
 data Pragma = InlineP         Name Inline RuleMatch Phases
+            -- ^ @{ {\-\# [inline] [rule match] [phases] [phases] name #-} }@. See
+            -- 'Inline' and 'RuleMatch'.
             | OpaqueP         Name
+            -- ^ @{ {\-\# OPAQUE T #-} }@
             | SpecialiseP     Name Type (Maybe Inline) Phases
+            -- ^ @{ {\-\# SPECIALISE [INLINE] [phases] T #-} }@
             | SpecialiseInstP Type
+            -- ^ @{ {\-\# SPECIALISE instance I #-} }@
             | RuleP           String (Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases
+            -- ^ @{ {\-\# RULES "name" [phases] [forall t_1 ... t_i]. [forall b_1 ... b_j] rules... e_1 = e_2 #-} }@
             | AnnP            AnnTarget Exp
+            -- ^ @{ {\-\# ANN target exp #-} }@
             | LineP           Int String
+            -- ^ @{ {\-\# LINE n "file name" #-} }@
             | CompleteP       [Name] (Maybe Name)
                 -- ^ @{ {\-\# COMPLETE C_1, ..., C_i [ :: T ] \#-} }@
             | SCCP            Name (Maybe String)
                 -- ^ @{ {\-\# SCC fun "optional_name" \#-} }@
         deriving( Show, Eq, Ord, Data, Generic )
 
+-- | An inline pragma.
 data Inline = NoInline
+            -- ^ @{ {\-\# NOINLINE ... #-} }@
             | Inline
+            -- ^ @{ {\-\# INLINE ... #-} }@
             | Inlinable
+            -- ^ @{ {\-\# INLINABLE ... #-} }@
             deriving (Show, Eq, Ord, Data, Generic)
 
+-- | A @CONLIKE@ modifier, as in one of the various inline pragmas, or lack
+-- thereof ('FunLike').
 data RuleMatch = ConLike
+               -- ^ @{ {\-\# CONLIKE [inline] ... #-} }@
                | FunLike
+               -- ^ @{ {\-\# [inline] ... #-} }@
                deriving (Show, Eq, Ord, Data, Generic)
 
+-- | Phase control syntax.
 data Phases = AllPhases
+            -- ^ The default when unspecified
             | FromPhase Int
+            -- ^ @[n]@
             | BeforePhase Int
+            -- ^ @[~n]@
             deriving (Show, Eq, Ord, Data, Generic)
 
+-- | A binder found in the @forall@ of a @RULES@ pragma.
 data RuleBndr = RuleVar Name
+              -- ^ @forall {a} ... .@
               | TypedRuleVar Name Type
+              -- ^ @forall {(a :: t)} ... .@
               deriving (Show, Eq, Ord, Data, Generic)
 
+-- | The target of an @ANN@ pragma
 data AnnTarget = ModuleAnnotation
+               -- ^ @{\-\# ANN {module} ... #-}@
                | TypeAnnotation Name
+               -- ^ @{\-\# ANN type {name} ... #-}@
                | ValueAnnotation Name
+               -- ^ @{\-\# ANN {name} ... #-}@
               deriving (Show, Eq, Ord, Data, Generic)
 
+-- | A context, as found on the left side of a @=>@ in a type.
 type Cxt = [Pred]                 -- ^ @(Eq a, Ord b)@
 
 -- | Since the advent of @ConstraintKinds@, constraints are really just types.
@@ -2245,11 +2347,15 @@ data Con =
 -- That is why we allow the return type stored by a constructor to be an
 -- arbitrary type. See also #11341
 
+-- | Strictness information in a data constructor's argument.
 data Bang = Bang SourceUnpackedness SourceStrictness
          -- ^ @C { {\-\# UNPACK \#-\} !}a@
         deriving (Show, Eq, Ord, Data, Generic)
 
+-- | A type with a strictness annotation, as in data constructors. See 'Con'.
 type BangType    = (Bang, Type)
+
+-- | 'BangType', but for record fields. See 'Con'.
 type VarBangType = (Name, Bang, Type)
 
 -- | As of @template-haskell-2.11.0.0@, 'Strict' has been replaced by 'Bang'.
@@ -2277,6 +2383,7 @@ data PatSynArgs
   | RecordPatSyn [Name]        -- ^ @pattern P { {x,y,z} } = p@
   deriving( Show, Eq, Ord, Data, Generic )
 
+-- | A Haskell type.
 data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
           | ForallVisT [TyVarBndr ()] Type -- ^ @forall \<vars\> -> \<type\>@
           | AppT Type Type                 -- ^ @T a b@
@@ -2315,6 +2422,7 @@ data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ct
           | ImplicitParamT String Type     -- ^ @?x :: t@
       deriving( Show, Eq, Ord, Data, Generic )
 
+-- | The specificity of a type variable in a @forall ...@.
 data Specificity = SpecifiedSpec          -- ^ @a@
                  | InferredSpec           -- ^ @{a}@
       deriving( Show, Eq, Ord, Data, Generic )
@@ -2329,6 +2437,7 @@ data TyVarBndr flag = PlainTV  Name flag      -- ^ @a@
                     | KindedTV Name flag Kind -- ^ @(a :: k)@
       deriving( Show, Eq, Ord, Data, Generic, Functor, Foldable, Traversable )
 
+-- | Visibility of a type variable. See [Inferred vs. specified type variables](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html#inferred-vs-specified-type-variables).
 data BndrVis = BndrReq                    -- ^ @a@
              | BndrInvis                  -- ^ @\@a@
       deriving( Show, Eq, Ord, Data, Generic )
@@ -2339,10 +2448,11 @@ data FamilyResultSig = NoSig              -- ^ no signature
                      | TyVarSig (TyVarBndr ()) -- ^ @= r, = (r :: k)@
       deriving( Show, Eq, Ord, Data, Generic )
 
--- | Injectivity annotation
+-- | Injectivity annotation as in an [injective type family](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_families.html)
 data InjectivityAnn = InjectivityAnn Name [Name]
   deriving ( Show, Eq, Ord, Data, Generic )
 
+-- | Type-level literals.
 data TyLit = NumTyLit Integer             -- ^ @2@
            | StrTyLit String              -- ^ @\"Hello\"@
            | CharTyLit Char               -- ^ @\'C\'@, @since 4.16.0.0
@@ -2415,14 +2525,17 @@ data DocLoc
 --              Internal helper functions
 -----------------------------------------------------
 
+-- | Internal helper function.
 cmpEq :: Ordering -> Bool
 cmpEq EQ = True
 cmpEq _  = False
 
+-- | Internal helper function.
 thenCmp :: Ordering -> Ordering -> Ordering
 thenCmp EQ o2 = o2
 thenCmp o1 _  = o1
 
+-- | Internal helper function.
 get_cons_names :: Con -> [Name]
 get_cons_names (NormalC n _)     = [n]
 get_cons_names (RecC n _)        = [n]
