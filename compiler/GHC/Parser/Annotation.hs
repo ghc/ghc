@@ -487,7 +487,7 @@ instance Outputable AddEpAnn where
 -- | The exact print annotations (EPAs) are kept in the HsSyn AST for
 --   the GhcPs phase. We do not always have EPAs though, only for code
 --   that has been parsed as they do not exist for generated
---   code. This type captures that they may be missing.
+--   code.
 --
 -- A goal of the annotations is that an AST can be edited, including
 -- moving subtrees from one place to another, duplicating them, and so
@@ -503,17 +503,19 @@ instance Outputable AddEpAnn where
 -- specialised to the specific set of locations of original exact
 -- print annotation elements.  So for 'HsLet' we have
 --
---    type instance XLet GhcPs = EpAnn AnnsLet
---    data AnnsLet
---      = AnnsLet {
---          alLet :: EpaLocation,
---          alIn :: EpaLocation
---          } deriving Data
+-- @
+-- type instance XLet GhcPs = EpAnn AnnsLet
+-- data AnnsLet
+--   = AnnsLet {
+--       alLet :: EpaLocation,
+--       alIn :: EpaLocation
+--       } deriving Data
+-- @
 --
 -- The spacing between the items under the scope of a given EpAnn is
 -- normally derived from the original 'Anchor'.  But if a sub-element
--- is not in its original position, the required spacing can be
--- directly captured in the 'anchor_op' field of the 'entry' Anchor.
+-- is not in its original position, the required spacing ~can be
+-- directly captured in the 'anchor_op' field of the 'entry' Anchor~.
 -- This allows us to freely move elements around, and stitch together
 -- new AST fragments out of old ones, and have them still printed out
 -- in a precise way.
@@ -534,8 +536,8 @@ data EpAnn ann
 -- of reference for calculating delta positions for contained
 -- annotations.
 -- It is also normally used as the reference point for the spacing of
--- the element relative to its container. If the AST element is moved,
--- that relationship is tracked in the 'anchor_op' instead.
+-- the element relative to its container. ~If the AST element is moved,
+-- that relationship is tracked in the 'anchor_op' instead.~
 type Anchor = EpaLocation -- Transitional
 
 anchor :: (EpaLocation' a) -> RealSrcSpan
@@ -553,7 +555,7 @@ noSpanAnchor =  EpaDelta (SameLine 0) noAnn
 
 -- ---------------------------------------------------------------------
 
--- | When we are parsing we add comments that belong a particular AST
+-- | When we are parsing we add comments that belong to a particular AST
 -- element, and print them together with the element, interleaving
 -- them into the output stream.  But when editing the AST to move
 -- fragments around it is useful to be able to first separate the
@@ -603,7 +605,7 @@ Note [XRec and Anno in the AST]
 The exact print annotations are captured directly inside the AST, using
 TTG extension points. However certain annotations need to be captured
 on the Located versions too.  While there is a general form for these,
-captured in the type SrcSpanAnn', there are also specific usages in
+~captured in the type SrcSpanAnn'~, there are also specific usages in
 different contexts.
 
 Some of the particular use cases are
@@ -615,8 +617,8 @@ to its usage inside a list.
 
 See the section above this note for the rest.
 
-The Anno type family maps the specific SrcSpanAnn' variant for a given
-item.
+~The Anno type family maps the specific SrcSpanAnn' variant for a given
+item.~
 
 So
 
@@ -639,7 +641,7 @@ data TrailingAnn
   | AddCommaAnn   { ta_location :: EpaLocation }  -- ^ Trailing ','
   | AddVbarAnn    { ta_location :: EpaLocation }  -- ^ Trailing '|'
   | AddDarrowAnn  { ta_location :: EpaLocation }  -- ^ Trailing '=>'
-  | AddDarrowUAnn { ta_location :: EpaLocation }  -- ^ Trailing  "⇒"
+  | AddDarrowUAnn { ta_location :: EpaLocation }  -- ^ Trailing '⇒'
   deriving (Data, Eq)
 
 instance Outputable TrailingAnn where
@@ -730,7 +732,7 @@ data NameAnn
       nann_close     :: EpaLocation,
       nann_trailing  :: [TrailingAnn]
       }
-  -- | Used for @(,,,)@, or @(#,,,#)#
+  -- | Used for @(,,,)@, or @(#,,,#)@
   | NameAnnCommas {
       nann_adornment :: NameAdornment,
       nann_open      :: EpaLocation,
@@ -769,7 +771,7 @@ data NameAnn
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used when adding a 'TrailingAnn' to an existing 'LocatedN'
-  -- which has no Api Annotation (via the 'EpAnnNotUsed' constructor.
+  -- which has no Api Annotation (via the 'EpAnnNotUsed' constructor).
   | NameAnnTrailing {
       nann_trailing  :: [TrailingAnn]
       }
@@ -893,7 +895,7 @@ So for the first example we have
 
   binds: fa = 1 , fb = 'c'
   sigs:  fa :: Int, fb :: Char
-  tags: SigTag, BindTag, SigTag, BindTag
+  tags: SigDTag, BindTag, SigDTag, BindTag
 
 so we draw first from the signatures, then the binds, and same again.
 
@@ -901,7 +903,7 @@ For the second example we have
 
   binds: fb = 'c', fa = 1
   sigs:  fa :: Int, fb :: Char
-  tags: SigTag, SigTag, BindTag, BindTag
+  tags: SigDTag, SigDTag, BindTag, BindTag
 
 so we draw two signatures, then two binds.
 
