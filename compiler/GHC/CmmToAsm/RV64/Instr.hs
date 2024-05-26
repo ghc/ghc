@@ -828,12 +828,13 @@ isFloatReg _ = False
 -- condition, do a far jump in the fall-through case or a short jump when the
 -- (inverted) condition is true.
 makeFarBranches ::
+  Platform ->
   LabelMap RawCmmStatics ->
   [NatBasicBlock Instr] ->
-  [NatBasicBlock Instr]
-makeFarBranches info_env blocks
-  | NE.last blockAddresses < nearLimit = blocks
-  | otherwise = zipWith handleBlock blockAddressList blocks
+  UniqSM [NatBasicBlock Instr]
+makeFarBranches _platform info_env blocks
+  | NE.last blockAddresses < nearLimit = pure blocks
+  | otherwise = pure $ zipWith handleBlock blockAddressList blocks
   where
     blockAddresses = NE.scanl (+) 0 $ map blockLen blocks
     blockAddressList = toList blockAddresses
@@ -842,6 +843,7 @@ makeFarBranches info_env blocks
     handleBlock addr (BasicBlock id instrs) =
       BasicBlock id (zipWith (makeFar id) [addr ..] instrs)
 
+    -- TODO: Use UniqSM to generate unique block ids.
     makeFar :: BlockId -> Int -> Instr -> Instr
     makeFar bid addr orig@(BCOND cond op1 op2 tgt@(TBlock tgtBid))
       | abs (addr - targetAddr) >= nearLimit =
