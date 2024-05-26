@@ -667,7 +667,7 @@ getMonoBindAll (d : ds) = d : getMonoBindAll ds
 
 has_args :: [LMatch GhcPs (LHsExpr GhcPs)] -> Bool
 has_args []                                  = panic "GHC.Parser.PostProcess.has_args"
-has_args (L _ (Match { m_pats = args }) : _) = not (null args)
+has_args (L _ (Match { m_pats = L _ args }) : _) = not (null args)
         -- Don't group together FunBinds if they have
         -- no arguments.  This is necessary now that variable bindings
         -- with no arguments are now treated as FunBinds rather
@@ -741,18 +741,20 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                wrongNameBindingErr (locA loc) decl
            ; match <- case details of
                PrefixCon _ pats -> return $ Match { m_ext = noAnn
-                                                  , m_ctxt = ctxt, m_pats = pats
+                                                  , m_ctxt = ctxt, m_pats = L l pats
                                                   , m_grhss = rhs }
                    where
+                     l = listLocation pats
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Prefix
                                    , mc_strictness = NoSrcStrict }
 
                InfixCon p1 p2 -> return $ Match { m_ext = noAnn
                                                 , m_ctxt = ctxt
-                                                , m_pats = [p1, p2]
+                                                , m_pats = L l [p1, p2]
                                                 , m_grhss = rhs }
                    where
+                     l = listLocation [p1, p2]
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Infix
                                    , mc_strictness = NoSrcStrict }
@@ -1333,9 +1335,10 @@ checkValDef loc lhs (mult_ann, Nothing) grhss
   | HsNoMultAnn{} <- mult_ann
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
-            Just (fun, is_infix, pats, ann) ->
+            Just (fun, is_infix, pats, ann) -> do
+              let l = listLocation pats
               checkFunBind NoSrcStrict loc ann
-                           fun is_infix pats grhss
+                           fun is_infix (L l pats) grhss
             Nothing -> do
               lhs' <- checkPattern lhs
               checkPatBind loc lhs' grhss mult_ann }
@@ -1350,10 +1353,10 @@ checkFunBind :: SrcStrictness
              -> [AddEpAnn]
              -> LocatedN RdrName
              -> LexicalFixity
-             -> [LocatedA (ArgPatBuilder GhcPs)]
+             -> LocatedE [LocatedA (ArgPatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
-checkFunBind strictness locF ann (L lf fun) is_infix pats (L _ grhss)
+checkFunBind strictness locF ann (L lf fun) is_infix (L lp pats) (L _ grhss)
   = do  ps <- runPV_details extraDetails (mapM checkLArgPat pats)
         let match_span = noAnnSrcSpan $ locF
         return (makeFunBind (L (l2l lf) fun) (L (noAnnSrcSpan $ locA match_span)
@@ -1362,7 +1365,7 @@ checkFunBind strictness locF ann (L lf fun) is_infix pats (L _ grhss)
                                           { mc_fun    = L lf fun
                                           , mc_fixity = is_infix
                                           , mc_strictness = strictness }
-                                      , m_pats = ps
+                                      , m_pats = L lp ps
                                       , m_grhss = grhss })]))
         -- The span of the match covers the entire equation.
         -- That isn't quite right, but it'll do for now.
@@ -1394,7 +1397,7 @@ checkPatBind loc (L _ (BangPat ans (L _ (VarPat _ v))))
                   , m_ctxt = FunRhs { mc_fun    = v
                                     , mc_fixity = Prefix
                                     , mc_strictness = SrcStrict }
-                  , m_pats = []
+                  , m_pats = noLocA []
                  , m_grhss = grhss }
 
 checkPatBind _loc lhs (L _ grhss) mult = do

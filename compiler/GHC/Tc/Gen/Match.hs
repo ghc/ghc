@@ -275,7 +275,7 @@ tcMatch tc_body pat_tys rhs_ty match
        ; return (wrapper, L loc r) }
   where
     tc_match pat_tys rhs_ty
-             match@(Match { m_ctxt = ctxt, m_pats = pats, m_grhss = grhss })
+             match@(Match { m_ctxt = ctxt, m_pats = L l pats, m_grhss = grhss })
       = add_match_ctxt $
         do { (pats', (wrapper, grhss')) <- tcMatchPats ctxt pats pat_tys $
                                            tcGRHSs ctxt tc_body grhss rhs_ty
@@ -284,7 +284,7 @@ tcMatch tc_body pat_tys rhs_ty match
 
            ; return (wrapper, Match { m_ext   = noAnn
                                     , m_ctxt  = ctxt
-                                    , m_pats  = pats'
+                                    , m_pats  = L l pats'
                                     , m_grhss = grhss' }) }
       where
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
@@ -1232,4 +1232,4 @@ checkArgCounts (MG { mg_alts = L _ (match1:matches) })
 
     reqd_args_in_match :: LocatedA (Match GhcRn body1) -> VisArity
     -- Counts the number of /required/ (aka visible) args in the match
-    reqd_args_in_match (L _ (Match { m_pats = pats })) = count (isVisArgPat . unLoc) pats
+    reqd_args_in_match (L _ (Match { m_pats = L _ pats })) = count (isVisArgPat . unLoc) pats

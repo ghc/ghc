@@ -948,24 +948,26 @@
               {OccName: qux}))
             (Prefix)
             (NoSrcStrict))
-           [(L
-             (EpAnn
-              (EpaSpan { KindSigs.hs:23:5 })
-              (AnnListItem
-               [])
-              (EpaComments
-               []))
-             (WildPat
-              (NoExtField)))
-           ,(L
-             (EpAnn
-              (EpaSpan { KindSigs.hs:23:7 })
-              (AnnListItem
-               [])
-              (EpaComments
-               []))
-             (WildPat
-              (NoExtField)))]
+           (L
+            (EpaSpan { KindSigs.hs:23:5-7 })
+            [(L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:23:5 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (WildPat
+               (NoExtField)))
+            ,(L
+              (EpAnn
+               (EpaSpan { KindSigs.hs:23:7 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (WildPat
+               (NoExtField)))])
            (GRHSs
             (EpaComments
              [])
@@ -1607,7 +1609,9 @@
               {OccName: true}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])

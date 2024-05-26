@@ -1539,9 +1539,9 @@ checkPrecMatch :: Name -> MatchGroup GhcRn body -> RnM ()
 checkPrecMatch op (MG { mg_alts = (L _ ms) })
   = mapM_ check ms
   where
-    check (L _ (Match { m_pats = (L l1 p1)
-                               : (L l2 p2)
-                               : _ }))
+    check (L _ (Match { m_pats = L _ ( (L l1 p1)
+                                     : (L l2 p2)
+                                     : _) }))
       = setSrcSpan (locA $ combineSrcSpansA l1 l2) $
         do checkPrec op p1 False
            checkPrec op p2 True

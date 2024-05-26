@@ -423,7 +423,7 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       = emptyBag
 
     negate_expr = nlHsApp (nlHsVar not_RDR)
-    pats = [a_Pat, b_Pat]
+    pats = noLocA [a_Pat, b_Pat]
     lE = mkSimpleGeneratedFunBind loc le_RDR pats $
         negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr)
     gT = mkSimpleGeneratedFunBind loc gt_RDR pats $
@@ -448,7 +448,7 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     mkOrdOp :: OrdOp -> LHsBind GhcPs
     -- Returns a binding   op a b = ... compares a and b according to op ....
     mkOrdOp op
-      = mkSimpleGeneratedFunBind loc (ordMethRdr op) [a_Pat, b_Pat]
+      = mkSimpleGeneratedFunBind loc (ordMethRdr op) (noLocA [a_Pat, b_Pat])
                         (mkOrdOpRhs op)
 
     mkOrdOpRhs :: OrdOp -> LHsExpr GhcPs
@@ -677,7 +677,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     occ_nm = getOccString tycon
 
     succ_enum tag2con_RDR maxtag_RDR
-      = mkSimpleGeneratedFunBind loc succ_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc succ_RDR (noLocA [a_Pat]) $
         untag_Expr [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsVar maxtag_RDR,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -687,7 +687,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
                                         nlHsIntLit 1]))
 
     pred_enum tag2con_RDR
-      = mkSimpleGeneratedFunBind loc pred_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc pred_RDR (noLocA [a_Pat]) $
         untag_Expr [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -699,7 +699,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
                                                 (mkIntegralLit (-1 :: Int)))]))
 
     to_enum tag2con_RDR maxtag_RDR
-      = mkSimpleGeneratedFunBind loc toEnum_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc toEnum_RDR (noLocA [a_Pat]) $
         nlHsIf (nlHsApps and_RDR
                 [nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
                  nlHsApps le_RDR [ nlHsVar a_RDR
@@ -708,7 +708,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
              (illegal_toEnum_tag occ_nm maxtag_RDR)
 
     enum_from tag2con_RDR maxtag_RDR
-      = mkSimpleGeneratedFunBind loc enumFrom_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc enumFrom_RDR (noLocA [a_Pat]) $
           untag_Expr [(a_RDR, ah_RDR)] $
           nlHsApps map_RDR
                 [nlHsVar tag2con_RDR,
@@ -717,7 +717,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
                             (nlHsVar maxtag_RDR))]
 
     enum_from_then tag2con_RDR maxtag_RDR
-      = mkSimpleGeneratedFunBind loc enumFromThen_RDR [a_Pat, b_Pat] $
+      = mkSimpleGeneratedFunBind loc enumFromThen_RDR (noLocA [a_Pat, b_Pat]) $
           untag_Expr [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
           nlHsApp (nlHsVarApps map_RDR [tag2con_RDR]) $
             nlHsPar (enum_from_then_to_Expr
@@ -730,7 +730,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
                            ))
 
     from_enum
-      = mkSimpleGeneratedFunBind loc fromEnum_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc fromEnum_RDR (noLocA [a_Pat]) $
           untag_Expr [(a_RDR, ah_RDR)] $
           (nlHsVarApps intDataCon_RDR [ah_RDR])
 
@@ -849,7 +849,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
       ]
 
     enum_range tag2con_RDR
-      = mkSimpleGeneratedFunBind loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
+      = mkSimpleGeneratedFunBind loc range_RDR (noLocA [nlTuplePat [a_Pat, b_Pat] Boxed]) $
           untag_Expr [(a_RDR, ah_RDR)] $
           untag_Expr [(b_RDR, bh_RDR)] $
           nlHsApp (nlHsVarApps map_RDR [tag2con_RDR]) $
@@ -859,9 +859,9 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
 
     enum_index
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
-                [noLocA (AsPat noAnn (noLocA c_RDR)
-                           (nlTuplePat [a_Pat, nlWildPat] Boxed)),
-                                d_Pat] (
+                (noLocA [noLocA (AsPat noAnn (noLocA c_RDR)
+                                  (nlTuplePat [a_Pat, nlWildPat] Boxed)),
+                                       d_Pat]) (
            untag_Expr [(a_RDR, ah_RDR)] (
            untag_Expr [(d_RDR, dh_RDR)] (
            let
@@ -875,7 +875,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
 
     -- This produces something like `(ch >= ah) && (ch <= bh)`
     enum_inRange
-      = mkSimpleGeneratedFunBind loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
+      = mkSimpleGeneratedFunBind loc inRange_RDR (noLocA [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat]) $
           untag_Expr [(a_RDR, ah_RDR)] (
           untag_Expr [(b_RDR, bh_RDR)] (
           untag_Expr [(c_RDR, ch_RDR)] (
@@ -909,7 +909,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     --------------------------------------------------------------
     single_con_range
       = mkSimpleGeneratedFunBind loc range_RDR
-          [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] $
+          (noLocA [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed]) $
         noLocA (mkHsComp ListComp stmts con_expr)
       where
         stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
@@ -921,8 +921,8 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     ----------------
     single_con_index
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
-                [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
-                 con_pat cs_needed]
+                (noLocA [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
+                        con_pat cs_needed])
         -- We need to reverse the order we consider the components in
         -- so that
         --     range (l,u) !! index (l,u) i == i   -- when i is in range
@@ -947,8 +947,8 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     ------------------
     single_con_inRange
       = mkSimpleGeneratedFunBind loc inRange_RDR
-                [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
-                 con_pat cs_needed] $
+                (noLocA [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
+                         con_pat cs_needed]) $
           if con_arity == 0
              -- If the product type has no fields, inRange is trivially true
              -- (see #12853).
@@ -1415,7 +1415,7 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
         ------------ gunfold
     gunfold_bind = mkSimpleGeneratedFunBind loc
                      gunfold_RDR
-                     [k_Pat, z_Pat, if n_cons == 1 then nlWildPat else c_Pat]
+                     (noLocA [k_Pat, z_Pat, if n_cons == 1 then nlWildPat else c_Pat])
                      gunfold_rhs
 
     gunfold_rhs
@@ -1429,7 +1429,7 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
                            (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
 
     eta_expand_data_con dc =
-        mkHsLam eta_expand_pats
+        mkHsLam (noLocA eta_expand_pats)
           (foldl nlHsApp (nlHsVar (getRdrName dc)) eta_expand_hsvars)
       where
         eta_expand_pats = map nlVarPat eta_expand_vars
@@ -1456,7 +1456,7 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
       = mkSimpleGeneratedFunBind
           loc
           dataTypeOf_RDR
-          [nlWildPat]
+          (noLocA [nlWildPat])
           (nlHsVar dataT_RDR)
 
         ------------ gcast1/2
@@ -1480,7 +1480,7 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
                 | tycon_kind `tcEqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
                 | otherwise                 = emptyBag
     mk_gcast dataCast_RDR gcast_RDR
-      = unitBag (mkSimpleGeneratedFunBind loc dataCast_RDR [nlVarPat f_RDR]
+      = unitBag (mkSimpleGeneratedFunBind loc dataCast_RDR (noLocA [nlVarPat f_RDR])
                                  (nlHsVar gcast_RDR `nlHsApp` nlHsVar f_RDR))
 
 
@@ -2008,7 +2008,7 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
           --               op
           mkRdrFunBind loc_meth_RDR [mkSimpleMatch
                                         (mkPrefixFunRhs loc_meth_RDR)
-                                        [] rhs_expr]
+                                        (noLocA []) rhs_expr]
         , -- The derived instance signature, e.g.,
           --
           --   op :: forall c. a -> [T x] -> c -> Int
@@ -2286,7 +2286,7 @@ mkFunBindSE arity loc fun pats_and_exprs
   = mkRdrFunBindSE arity (L (noAnnSrcSpan loc) fun) matches
   where
     matches = [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
-                               (map (parenthesizePat appPrec) p) e
+                              (noLocA (map (parenthesizePat appPrec) p)) e
                                emptyLocalBinds
               | (p,e) <-pats_and_exprs]
 
@@ -2307,7 +2307,7 @@ mkFunBindEC arity loc fun catch_all pats_and_exprs
   = mkRdrFunBindEC arity catch_all (L (noAnnSrcSpan loc) fun) matches
   where
     matches = [ mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
-                                (map (parenthesizePat appPrec) p) e
+                                (noLocA (map (parenthesizePat appPrec) p)) e
                                 emptyLocalBinds
               | (p,e) <- pats_and_exprs ]
 
@@ -2334,7 +2334,7 @@ mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
    -- See #4302
    matches' = if null matches
               then [mkMatch (mkPrefixFunRhs fun)
-                            (replicate (arity - 1) (nlWildPat) ++ [z_Pat])
+                            (noLocA (replicate (arity - 1) (nlWildPat) ++ [z_Pat]))
                             (catch_all $ nlHsCase z_Expr [])
                             emptyLocalBinds]
               else matches
@@ -2354,7 +2354,7 @@ mkRdrFunBindSE arity fun@(L loc fun_rdr) matches
    -- See #4302
    matches' = if null matches
               then [mkMatch (mkPrefixFunRhs fun)
-                            (replicate arity nlWildPat)
+                            (noLocA (replicate arity nlWildPat))
                             (error_Expr str) emptyLocalBinds]
               else matches
    str = fsLit "Void " `appendFS` occNameFS (rdrNameOcc fun_rdr)

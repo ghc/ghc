@@ -114,7 +114,9 @@
               {OccName: bar}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])
@@ -225,7 +227,9 @@
               {OccName: foo}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])
@@ -368,7 +372,9 @@
               {OccName: main}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])

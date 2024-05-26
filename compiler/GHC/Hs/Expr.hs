@@ -1491,7 +1491,7 @@ matchGroupArity (MG { mg_alts = alts })
 
 
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
-hsLMatchPats (L _ (Match { m_pats = pats })) = pats
+hsLMatchPats (L _ (Match { m_pats = L _ pats })) = pats
 
 -- We keep the type checker happy by providing EpAnnComments.  They
 -- can only be used if they follow a `where` keyword with no binds,
@@ -1537,7 +1537,7 @@ pprPatBind pat grhss
 
 pprMatch :: (OutputableBndrId idR, Outputable body)
          => Match (GhcPass idR) body -> SDoc
-pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
+pprMatch (Match { m_pats = L _ pats, m_ctxt = ctxt, m_grhss = grhss })
   = sep [ sep (herald : map (nest 2 . pprParendLPat appPrec) other_pats)
         , nest 2 (pprGRHSs ctxt grhss) ]
   where
@@ -2391,6 +2391,7 @@ type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
 type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
+type instance Anno [LocatedA (Pat (GhcPass p))] = EpaLocation
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = EpAnnCO
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = EpAnnCO
 type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))) = SrcSpanAnnA

@@ -2564,12 +2564,12 @@ exactMatch (Match an mctxt pats grhss) = do
             return (an', FunRhs fun' fixity strictness, pats')
           Infix ->
             case pats of
-              (p1:p2:rest)
+              L l (p1:p2:rest)
                 | null rest -> do
                     p1'  <- markAnnotated p1
                     fun' <- markAnnotated fun
                     p2'  <- markAnnotated p2
-                    return (an0', FunRhs fun' fixity strictness, [p1',p2'])
+                    return (an0', FunRhs fun' fixity strictness, L l [p1',p2'])
                 | otherwise -> do
                     an0  <- markEpAnnL an0' lidl AnnOpenP
                     p1'  <- markAnnotated p1
@@ -2577,7 +2577,7 @@ exactMatch (Match an mctxt pats grhss) = do
                     p2'  <- markAnnotated p2
                     an1  <- markEpAnnL an0 lidl AnnCloseP
                     rest' <- mapM markAnnotated rest
-                    return (an1, FunRhs fun' fixity strictness, p1':p2':rest')
+                    return (an1, FunRhs fun' fixity strictness, L l (p1':p2':rest'))
               _ -> panic "FunRhs"
 
       -- ToDo: why is LamSingle treated differently?

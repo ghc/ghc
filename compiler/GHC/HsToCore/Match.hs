@@ -526,7 +526,7 @@ tidy1 _ _ (OrPat ty lpats)
     match_false :: LPat GhcTc -> LMatch GhcTc (LHsExpr GhcTc)
     match_false lpat = mk_match lpat (hs_var falseDataConId)
     mk_match :: LPat GhcTc -> LHsExpr GhcTc -> LMatch GhcTc (LHsExpr GhcTc)
-    mk_match lpat body = noLocA $ Match [] CaseAlt [lpat] (single_grhs body)
+    mk_match lpat body = noLocA $ Match [] CaseAlt (noLocA [lpat]) (single_grhs body)
 
     hs_var :: Var -> LHsExpr GhcTc
     hs_var v = (noLocA $ HsVar noExtField (noLocA v))
@@ -838,7 +838,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
   where
     -- Called once per equation in the match, or alternative in the case
     mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
-    mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
+    mk_eqn_info (L _ (Match { m_pats = L _ pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
            ; let upats = map (decideBangHood dflags) pats
            -- pat_nablas is the covered set *after* matching the pattern, but

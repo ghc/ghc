@@ -94,7 +94,9 @@
               {OccName: bar}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])
@@ -214,7 +216,9 @@
               {OccName: foo}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])
@@ -324,7 +328,9 @@
                           {OccName: doStuff}))
                         (Prefix)
                         (NoSrcStrict))
-                       []
+                       (L
+                        (EpaSpan { <no location info> })
+                        [])
                        (GRHSs
                         (EpaComments
                          [])
@@ -502,7 +508,9 @@
               {OccName: bar}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])
@@ -610,7 +618,9 @@
               {OccName: foo}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])
@@ -714,7 +724,9 @@
                           {OccName: doStuff}))
                         (Prefix)
                         (NoSrcStrict))
-                       []
+                       (L
+                        (EpaSpan { <no location info> })
+                        [])
                        (GRHSs
                         (EpaComments
                          [])

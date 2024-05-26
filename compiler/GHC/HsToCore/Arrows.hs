@@ -529,7 +529,7 @@ multiple scrutinees)
 -}
 dsCmd ids local_vars stack_ty res_ty
         (HsCmdLam _ LamSingle (MG { mg_alts
-          = (L _ [L _ (Match { m_pats  = pats
+          = (L _ [L _ (Match { m_pats  = L _ pats
                              , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })]) }))
         env_ids
   = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
@@ -1205,7 +1205,7 @@ matchSimplys _ _ _ _ _ = panic "matchSimplys"
 
 leavesMatch :: LMatch GhcTc (LocatedA (body GhcTc))
             -> [(LocatedA (body GhcTc), IdSet)]
-leavesMatch (L _ (Match { m_pats = pats
+leavesMatch (L _ (Match { m_pats = L _ pats
                         , m_grhss = GRHSs _ grhss binds }))
   = let
         defined_vars = mkVarSet (collectPatsBinders CollWithDictBinders pats)

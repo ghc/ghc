@@ -1325,14 +1325,14 @@ rnMatch' :: (AnnoBody body)
          -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
          -> Match GhcPs (LocatedA (body GhcPs))
          -> RnM (Match GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
+rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = L l pats, m_grhss = grhss })
   = rnPats ctxt pats $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt, mf) of
                       (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
                                             -> mf { mc_fun = L lf funid }
                       _                     -> ctxt
-        ; return (Match { m_ext = noAnn, m_ctxt = mf', m_pats = pats'
+        ; return (Match { m_ext = noAnn, m_ctxt = mf', m_pats = L l pats'
                         , m_grhss = grhss'}, grhss_fvs ) }
 
 

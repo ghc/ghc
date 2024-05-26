@@ -811,7 +811,7 @@ dsDo ctx stmts res_ty
         mfix_arg     = noLocA $ HsLam noAnn LamSingle
                            (MG { mg_alts = noLocA [mkSimpleMatch
                                                     (LamAlt LamSingle)
-                                                    [mfix_pat] body]
+                                                    (noLocA [mfix_pat]) body]
                                , mg_ext = match_group
                                })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats

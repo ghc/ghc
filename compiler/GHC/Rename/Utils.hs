@@ -710,7 +710,7 @@ checkCTupSize tup_size
 *                                                                      *
 ********************************************************************* -}
 
-wrapGenSpan :: (NoAnn an) => a -> LocatedAn an a
+wrapGenSpan :: (HasAnnotation an) => a -> GenLocated an a
 -- Wrap something in a "generatedSrcSpan"
 -- See Note [Rebindable syntax and XXExprGhcRn]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
@@ -766,15 +766,9 @@ genWildPat = wrapGenSpan $ WildPat noExtField
 genSimpleFunBind :: Name -> [LPat GhcRn]
                  -> LHsExpr GhcRn -> LHsBind GhcRn
 genSimpleFunBind fun pats expr
-  = L genA $ genFunBind (L genN fun)
-        [mkMatch (mkPrefixFunRhs (L genN fun)) pats expr
+  = noLocA $ genFunBind (noLocA fun)
+        [mkMatch (mkPrefixFunRhs (noLocA fun)) (noLocA pats) expr
                  emptyLocalBinds]
-  where
-    genA :: SrcSpanAnnA
-    genA = noAnnSrcSpan generatedSrcSpan
-
-    genN :: SrcSpanAnnN
-    genN = noAnnSrcSpan generatedSrcSpan
 
 genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn
@@ -822,5 +816,5 @@ genSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 genSimpleMatch ctxt pats rhs
   = wrapGenSpan $
-    Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = pats
+    Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = noLocA pats
           , m_grhss = unguardedGRHSs generatedSrcSpan rhs noAnn }

@@ -67,6 +67,7 @@ module GHC.Parser.Annotation (
   -- ** Building up annotations
   reAnnL, reAnnC,
   addAnns, addAnnsA, widenSpan, widenAnchor, widenAnchorS, widenLocatedAn,
+  listLocation,
 
   -- ** Querying annotations
   getLocAnn,
@@ -1116,6 +1117,15 @@ bufSpanFromAnns as =  go Strict.Nothing as
     go acc [] = acc
     go acc (AddEpAnn _ (EpaSpan (RealSrcSpan _ (Strict.Just mb))):rest) = go (combine acc mb) rest
     go acc (AddEpAnn _ _:rest) = go acc rest
+
+listLocation :: [LocatedAn an a] -> EpaLocation
+listLocation as = EpaSpan (go noSrcSpan as)
+  where
+    combine l r = combineSrcSpans l r
+
+    go acc [] = acc
+    go acc (L (EpAnn (EpaSpan s) _ _) _:rest) = go (combine acc s) rest
+    go acc (_:rest) = go acc rest
 
 widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
 widenAnchor (EpaSpan (RealSrcSpan s mb)) as

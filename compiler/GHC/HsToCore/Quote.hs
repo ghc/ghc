@@ -1726,7 +1726,7 @@ the choice in ExpandedThingRn, but it seems simpler to consult the flag (again).
 -- Building representations of auxiliary structures like Match, Clause, Stmt,
 
 repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
-repMatchTup (L _ (Match { m_pats = [p]
+repMatchTup (L _ (Match { m_pats = L _ [p]
                         , m_grhss = GRHSs _ guards wheres })) =
   do { ss1 <- mkGenSyms (collectPatBinders CollNoDictBinders p)
      ; addBinds ss1 $ do {
@@ -1739,7 +1739,7 @@ repMatchTup (L _ (Match { m_pats = [p]
 repMatchTup _ = panic "repMatchTup: case alt with more than one arg or with invisible pattern"
 
 repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
-repClauseTup (L _ (Match { m_pats = ps
+repClauseTup (L _ (Match { m_pats = L _ ps
                          , m_grhss = GRHSs _ guards  wheres })) =
   do { ss1 <- mkGenSyms (collectPatsBinders CollNoDictBinders ps)
      ; addBinds ss1 $ do {
@@ -1933,7 +1933,7 @@ rep_bind (L loc (FunBind
                  { fun_id = fn,
                    fun_matches = MG { mg_alts
                            = (L _ [L _ (Match
-                                   { m_pats = []
+                                   { m_pats = L _ []
                                    , m_grhss = GRHSs _ guards wheres
                                    -- For a variable declaration I'm pretty
                                    -- sure we always have a FunRhs
@@ -2073,7 +2073,7 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 -- (\ p1 .. pn -> exp) by causing an error.
 
 repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
-repLambda (L _ (Match { m_pats = ps
+repLambda (L _ (Match { m_pats = L _ ps
                       , m_grhss = GRHSs _ [L _ (GRHS _ [] e)]
                                               (EmptyLocalBinds _) } ))
  = do { let bndrs = collectPatsBinders CollNoDictBinders ps ;
