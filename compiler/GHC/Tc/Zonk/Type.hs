@@ -883,11 +883,11 @@ zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
           => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
           -> LMatch GhcTc (LocatedA (body GhcTc))
           -> ZonkTcM (LMatch GhcTc (LocatedA (body GhcTc)))
-zonkMatch zBody (L loc match@(Match { m_pats = pats
+zonkMatch zBody (L loc match@(Match { m_pats = L l pats
                                     , m_grhss = grhss }))
   = runZonkBndrT (zonkPats pats) $ \ new_pats ->
   do  { new_grhss <- zonkGRHSs zBody grhss
-      ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
+      ; return (L loc (match { m_pats = L l new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
 zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO

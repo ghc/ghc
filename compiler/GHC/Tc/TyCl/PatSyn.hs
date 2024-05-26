@@ -786,7 +786,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
 
              fail' = nlHsApps fail [nlHsDataCon unboxedUnitDataCon]
 
-             args = map nlVarPat [scrutinee, cont, fail]
+             args = noLocA $ map nlVarPat [scrutinee, cont, fail]
              lwpat = noLocA $ WildPat pat_ty
              cases = if isIrrefutableHsPat dflags lpat
                      then [mkHsCaseAlt lpat  cont']
@@ -806,7 +806,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                                                          body]
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty gen
                        }
-             match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id))) []
+             match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id))) (noLocA [])
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
                              (EmptyLocalBinds noExtField)
@@ -944,8 +944,8 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [builder_match])
           where
-            builder_args  = [(L (l2l loc) (VarPat noExtField (L loc n)))
-                            | L loc n <- args]
+            builder_args  = noLocA [(L (l2l loc) (VarPat noExtField (L loc n)))
+                                   | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname)
                                     builder_args body
                                     (EmptyLocalBinds noExtField)
@@ -958,8 +958,8 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     add_dummy_arg :: MatchGroup GhcRn (LHsExpr GhcRn)
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
     add_dummy_arg mg@(MG { mg_alts =
-                           (L l [L loc match@(Match { m_pats = pats })]) })
-      = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
+                           (L l [L loc match@(Match { m_pats = L lp pats })]) })
+      = mg { mg_alts = L l [L loc (match { m_pats = L lp $ nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 

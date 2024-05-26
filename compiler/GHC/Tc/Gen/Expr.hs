@@ -1392,7 +1392,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
              -- we let-bind x' = e1, y' = e2 and generate the equation:
              --
              --   T1 _ _ z -> T1 x' y' z
-             make_pat conLike = mkSimpleMatch RecUpd [pat] rhs
+             make_pat conLike = mkSimpleMatch RecUpd (noLocA [pat]) rhs
                where
                  (lhs_con_pats, rhs_con_args)
                     = zipWithAndUnzip mk_con_arg [1..] con_fields

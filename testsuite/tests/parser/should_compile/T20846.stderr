@@ -115,7 +115,9 @@
               {OccName: ++++}))
             (Prefix)
             (NoSrcStrict))
-           []
+           (L
+            (EpaSpan { <no location info> })
+            [])
            (GRHSs
             (EpaComments
              [])

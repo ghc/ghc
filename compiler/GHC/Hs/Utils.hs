@@ -187,11 +187,11 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ EpAnn NoEpAnns)
               => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
-              -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
+              -> LocatedE [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
-mkSimpleMatch ctxt pats rhs
+mkSimpleMatch ctxt (L l pats) rhs
   = L loc $
-    Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = pats
+    Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = L l pats
           , m_grhss = unguardedGRHSs (locA loc) rhs noAnn }
   where
     loc = case pats of
@@ -270,13 +270,13 @@ mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
 
 mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
-        => [LPat (GhcPass p)]
+        => LocatedE [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> LHsExpr (GhcPass p)
-mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noAnn LamSingle matches))
+mkHsLam (L l pats) body = mkHsPar (L (getLoc body) (HsLam noAnn LamSingle matches))
   where
     matches = mkMatchGroup (Generated OtherExpansion SkipPmc)
-                           (noLocA [mkSimpleMatch (LamAlt LamSingle) pats' body])
+                           (noLocA [mkSimpleMatch (LamAlt LamSingle) (L l pats') body])
     pats' = map (parenthesizePat appPrec) pats
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
@@ -302,8 +302,8 @@ mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA)
             => LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
             -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
-mkHsCaseAlt pat expr
-  = mkSimpleMatch CaseAlt [pat] expr
+mkHsCaseAlt (L l pat) expr
+  = mkSimpleMatch CaseAlt (L (l2l l) [L l pat]) expr
 
 nlHsTyApp :: Id -> [Type] -> LHsExpr GhcTc
 nlHsTyApp fun_id tys
@@ -843,7 +843,7 @@ mkTopFunBind origin fn ms = FunBind { fun_id = fn
                                     }
 
 mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr GhcPs -> LHsBind GhcPs
-mkHsVarBind loc var rhs = mkSimpleGeneratedFunBind loc var [] rhs
+mkHsVarBind loc var rhs = mkSimpleGeneratedFunBind loc var (noLocA []) rhs
 
 mkVarBind :: IdP GhcTc -> LHsExpr GhcTc -> LHsBind GhcTc
 mkVarBind var rhs = L (getLoc rhs) $
@@ -890,7 +890,7 @@ spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
 ------------
 -- | Convenience function using 'mkFunBind'.
 -- This is for generated bindings only, do not use for user-written code.
-mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
+mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> LocatedE [LPat GhcPs]
                          -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
   = L (noAnnSrcSpan loc) $ mkFunBind (Generated OtherExpansion SkipPmc) (L (noAnnSrcSpan loc) fun)
@@ -908,7 +908,7 @@ mkPrefixFunRhs n = FunRhs { mc_fun        = n
 ------------
 mkMatch :: forall p. IsPass p
         => HsMatchContext (LIdP (NoGhcTc (GhcPass p)))
-        -> [LPat (GhcPass p)]
+        -> LocatedE [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> HsLocalBinds (GhcPass p)
         -> LMatch (GhcPass p) (LHsExpr (GhcPass p))

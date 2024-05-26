@@ -331,7 +331,7 @@ desugarMatches vars matches =
 
 -- Desugar a single match
 desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
-desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
+desugarMatch vars (L match_loc (Match { m_pats = L _ pats, m_grhss = grhss })) = do
   dflags <- getDynFlags
   -- decideBangHood: See Note [Desugaring -XStrict matches in Pmc]
   let banged_pats = map (decideBangHood dflags) pats
@@ -390,7 +390,7 @@ desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
     go (L _ FunBind{fun_id = L _ x, fun_matches = mg})
       -- See Note [Long-distance information for HsLocalBinds] for why this
       -- pattern match is so very specific.
-      | L _ [L _ Match{m_pats = [], m_grhss = grhss}] <- mg_alts mg
+      | L _ [L _ Match{m_pats = L _ [], m_grhss = grhss}] <- mg_alts mg
       , GRHSs{grhssGRHSs = [L _ (GRHS _ _grds rhs)]} <- grhss = do
           core_rhs <- dsLExpr rhs
           return (GdOne (PmLet x core_rhs))

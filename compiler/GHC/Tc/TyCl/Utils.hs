@@ -62,7 +62,7 @@ import GHC.Data.FastString
 
 import GHC.Unit.Module
 
-import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genWildPat)
+import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genWildPat, wrapGenSpan)
 
 import GHC.Types.Basic
 import GHC.Types.FieldLabel
@@ -937,10 +937,10 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     --    where cons_w_field = [C2,C7]
     sel_bind = mkTopFunBind (Generated OtherExpansion SkipPmc) sel_lname alts
       where
-        alts | is_naughty = [mkSimpleMatch match_ctxt [] unit_rhs]
+        alts | is_naughty = [mkSimpleMatch match_ctxt (noLocA []) unit_rhs]
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch match_ctxt
-                                 [L loc' (mk_sel_pat con)]
+                                 (L (l2l loc') [L loc' (mk_sel_pat con)])
                                  (L loc' (HsVar noExtField (L locn field_var)))
     mk_sel_pat con = ConPat NoExtField (L locn (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
@@ -958,7 +958,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     -- We do this explicitly so that we get a nice error message that
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
-          | otherwise = [mkSimpleMatch match_ctxt [genWildPat]
+          | otherwise = [mkSimpleMatch match_ctxt (wrapGenSpan [genWildPat])
                             (genLHsApp
                                 (genHsVar (getName rEC_SEL_ERROR_ID))
                                 (genLHsLit msg_lit))]

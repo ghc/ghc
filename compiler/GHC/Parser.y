@@ -2925,7 +2925,7 @@ aexp    :: { ECP }
                             [sLLa $1 $>
                                          $ Match { m_ext = []
                                                  , m_ctxt = LamAlt LamSingle
-                                                 , m_pats = $2
+                                                 , m_pats = L (listLocation $2) $2
                                                  , m_grhss = unguardedGRHSs (comb2 $3 $4) $4 (EpAnn (glR $3) (GrhsAnn Nothing (mu AnnRarrow $3)) emptyComments) }])
                             [mj AnnLam $1] }
         | '\\' 'lcase' altslist(pats1)
@@ -3390,7 +3390,7 @@ alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
                          amsA' (sLLAsl $1 $>
                                          (Match { m_ext = []
                                                 , m_ctxt = CaseAlt -- for \case and \cases, this will be changed during post-processing
-                                                , m_pats = $1
+                                                , m_pats = L (listLocation $1) $1
                                                 , m_grhss = unLoc $2 }))}
 
 alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }

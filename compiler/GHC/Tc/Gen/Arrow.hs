@@ -347,14 +347,14 @@ tcCmdMatchLambda env ctxt arity
        ; return (mkWpCastN co, mg') }
   where
     -- Check the patterns, and the GRHSs inside
-    tc_match arg_tys cmd_stk' (L mtch_loc (Match { m_pats = pats, m_grhss = grhss }))
+    tc_match arg_tys cmd_stk' (L mtch_loc (Match { m_pats = L l pats, m_grhss = grhss }))
       = do { (pats', grhss') <- setSrcSpanA mtch_loc           $
                                 tcMatchPats match_ctxt pats (map ExpFunPatTy arg_tys) $
                                 tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
            ; return $ L mtch_loc (Match { m_ext = noAnn
                                         , m_ctxt = match_ctxt
-                                        , m_pats = pats'
+                                        , m_pats = L l pats'
                                         , m_grhss = grhss' }) }
 
     match_ctxt = ArrowMatchCtxt ctxt

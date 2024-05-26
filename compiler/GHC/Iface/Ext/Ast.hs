@@ -931,7 +931,7 @@ instance ( HiePass p
          , ToHie (LocatedA (body (GhcPass p)))
          ) => ToHie (LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))) where
   toHie (L span m ) = concatM $ makeNodeA m span : case m of
-    Match{m_ctxt=mctx, m_pats = pats, m_grhss =  grhss } ->
+    Match{m_ctxt=mctx, m_pats = L _ pats, m_grhss = grhss } ->
       [ toHieHsMatchContext @p mctx
       , let rhsScope = mkScope $ grhss_span grhss
           in toHie $ patScopes Nothing rhsScope NoScope pats
