@@ -1621,6 +1621,7 @@ genCCall target dest_regs arg_regs bid = do
           , [dst_reg] <- dest_regs -> do
               (p, _fmt_p, code_p) <- getSomeReg p_reg
               platform <- getPlatform
+              -- TODO: Check if these fence usages are correct.
               -- See __atomic_load_n (in C)
               let instrs = case ord of
                       MemOrderRelaxed -> unitOL $ ann moDescr (LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p))
