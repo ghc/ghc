@@ -913,10 +913,7 @@ mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Strict.Just b)
 -- in the parsed source.  This can be replaced by the @'EpaDelta'@
 -- version, to provide a position for the item relative to the end of
 -- the previous item in the source.  This is useful when editing an
--- AST prior to exact printing the changed one. ~The list of comments
--- in the @'EpaDelta'@ variant captures any comments between the prior
--- output and the thing being marked here, since we cannot otherwise
--- sort the relative order.~
+-- AST prior to exact printing the changed one.
 
 data EpaLocation' a = EpaSpan !SrcSpan
                     | EpaDelta !DeltaPos !a
