@@ -358,14 +358,7 @@ if test "x$UseLibdw" = "xYES" ; then
 fi
 AC_SUBST(UseLibdw)
 
-
 FP_SETTINGS
-
-AC_CONFIG_FILES([config.mk])
-AC_CONFIG_FILES([default.host.target])
-AC_CONFIG_FILES([default.target])
-AC_CONFIG_FILES([mk/hsc2hs])
-AC_OUTPUT
 
 # We get caught by
 #     http://savannah.gnu.org/bugs/index.php?1516
@@ -390,6 +383,12 @@ checkMake380 gmake
 FIND_GHC_TOOLCHAIN_BIN([YES])
 PREP_TARGET_FILE
 FIND_GHC_TOOLCHAIN([.])
+
+AC_CONFIG_FILES([config.mk])
+AC_CONFIG_FILES([default.host.target])
+AC_CONFIG_FILES([default.target])
+AC_CONFIG_FILES([mk/hsc2hs])
+AC_OUTPUT
 
 VALIDATE_GHC_TOOLCHAIN([default.target],[default.target.ghc-toolchain])
 
