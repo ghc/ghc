@@ -91,9 +91,8 @@ raspbianHack arch@(ArchARM ARMv6 _ abi) = do
     raspbian <- isRaspbian
     armv7 <- isARMv7Host
     if raspbian && armv7
-      then do logInfo $ unlines [ "Found compiler which claims to target ARMv6 running in Raspbian on ARMv7."
-                                , "Assuming we should actually target ARMv7 (see GHC #17856)"
-                                ]
+      then do logInfo "Found compiler which claims to target ARMv6 running in Raspbian on ARMv7."
+              logInfo "Assuming we should actually target ARMv7 (see GHC #17856)"
               return $ ArchARM ARMv7 [VFPv2] abi
       else return arch
   where

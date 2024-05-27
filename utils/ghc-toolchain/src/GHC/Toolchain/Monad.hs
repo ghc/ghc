@@ -7,7 +7,7 @@ module GHC.Toolchain.Monad
     , runM
     , getEnv
     , makeM
-    , throwE
+    , throwE, throwEs
     , ifCrossCompiling
 
       -- * File I/O
@@ -64,10 +64,17 @@ data Error = Error { errorMessage :: String
     deriving (Show)
 
 throwE :: String -> M a
-throwE msg = do
+throwE msg = throwEs [msg]
+
+-- | Throw an error with multiple lines.
+-- This should be used rather than `throwE . unlines` to preserve proper
+-- logging indentation.
+throwEs :: [String] -> M a
+throwEs msgs = do
     e <- getEnv
-    logInfo msg
-    let err = Error { errorMessage = msg
+    forM_ msgs $ \msg -> do
+      logInfo msg
+    let err = Error { errorMessage = unlines msgs
                     , errorLogContexts = logContexts e
                     }
     M (Except.throwE [err])
