@@ -37,7 +37,9 @@ main = do
         parseMode "unreferenced" = Just $ printNoteDefs . S.toList . unreferencedNotes
         parseMode "defs"         = Just $ printNoteDefs . allNoteDefs
         parseMode "refs"         = Just $ printNoteRefs . allNoteRefs
-        parseMode "broken-refs"  = Just $ printNoteRefs . map fst . brokenNoteRefs
+        parseMode "broken-refs"  = Just $ \notedb -> do
+          putStrLn "Broken note references (target note not found!):"
+          printNoteRefs . map fst . brokenNoteRefs $ notedb
         parseMode "broken-refs-suggest" = Just $ mapM_ printNoteRefsSugg . brokenNoteRefs
         parseMode _              = Nothing
 
