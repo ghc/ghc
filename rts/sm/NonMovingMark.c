@@ -918,7 +918,7 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
         // The entry may not be a MARK_CLOSURE but it doesn't matter, our
         // MarkQueueEnt encoding always places the pointer to the object to be
         // marked first.
-        prefetchForRead(&new.mark_closure.p->header.info);
+        prefetchForRead(&(UNTAG_CLOSURE(new.mark_closure.p)->header.info));
         prefetchForRead(Bdescr((StgPtr) new.mark_closure.p));
         q->prefetch_queue[i] = new;
         i = (i + 1) % MARK_PREFETCH_QUEUE_DEPTH;
