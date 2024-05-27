@@ -75,10 +75,10 @@ callProgram prog args = do
     code <- runProgram prog args
     case code of
       ExitSuccess -> return ()
-      ExitFailure n -> throwE (err n)
+      ExitFailure n -> throwEs (err n)
   where
     cmdline = [prgPath prog] ++ prgFlags prog ++ args
-    err n = unlines
+    err n =
         [ "Command failed: " ++ unwords cmdline
         , "Exited with code " ++ show n
         ]
@@ -135,11 +135,11 @@ findProgram :: String
             -> M Program
 findProgram description userSpec candidates
   | Just path <- poPath userSpec = do
-      let err = unlines
+      let err =
             [ "Failed to find " ++ description ++ "."
             , "Looked for user-specified program '" ++ path ++ "' in the system search path."
             ]
-      toProgram <$> find_it path <|> throwE err
+      toProgram <$> find_it path <|> throwEs err
 
   | otherwise = do
       env <- getEnv
@@ -148,11 +148,11 @@ findProgram description userSpec candidates
                 Just prefix -> map (prefix++) candidates
                 Nothing     -> []
           candidates' = prefixedCandidates ++ candidates
-          err = unlines
+          err =
             [ "Failed to find " ++ description ++ "."
             , "Looked for one of " ++ show candidates' ++ " in the system search path."
             ]
-      toProgram <$> oneOf err (map find_it candidates') <|> throwE err
+      toProgram <$> oneOf' err (map find_it candidates') <|> throwEs err
   where
       toProgram path = Program { prgPath = path, prgFlags = fromMaybe [] (poFlags userSpec) }
 

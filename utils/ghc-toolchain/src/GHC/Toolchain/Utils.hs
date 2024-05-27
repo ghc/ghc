@@ -6,6 +6,7 @@ module GHC.Toolchain.Utils
     , expectFileExists
     , withTempDir
     , oneOf
+    , oneOf'
     , isSuccess
     ) where
 
@@ -52,7 +53,12 @@ expectFileExists path err = do
     unless exists $ throwE err
 
 oneOf :: String -> [M b] -> M b
-oneOf err = foldr (<|>) (throwE err)
+oneOf err = oneOf' [err]
+
+-- | Like 'oneOf' but takes a multi-line error message if none of the checks
+-- succeed.
+oneOf' :: [String] -> [M b] -> M b
+oneOf' err = foldr (<|>) (throwEs err)
 
 isSuccess :: ExitCode -> Bool
 isSuccess = \case
