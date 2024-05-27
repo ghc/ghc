@@ -108,7 +108,7 @@
 
 /* Compute offsets of struct fields
  */
-#define STG_FIELD_OFFSET(s_type, field) ((StgWord)&(((s_type*)0)->field))
+#define STG_FIELD_OFFSET(s_type, field) __builtin_offsetof(s_type, field)
 
 /*
  * 'Portable' inlining:
