@@ -436,7 +436,7 @@ test('MultiLayerModulesDefsGhciReload',
      [ collect_compiler_residency(15),
        pre_cmd('./genMultiLayerModulesDefs'),
        extra_files(['genMultiLayerModulesDefs']),
-       compile_timeout_multiplier(5)
+       compile_timeout_multiplier(10)
        # this is _a lot_
        # but this test has been failing every now and then,
        # especially on i386. Let's just give it some room
