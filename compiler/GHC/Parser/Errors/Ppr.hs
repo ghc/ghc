@@ -202,7 +202,7 @@ instance Diagnostic PsMessage where
              NumUnderscore_Integral -> "Illegal underscores in integer literals"
              NumUnderscore_Float    -> "Illegal underscores in floating literals"
     PsErrIllegalBangPattern e
-      -> mkSimpleDecorated $ text "Illegal bang-pattern" $$ ppr e
+      -> mkSimpleDecorated $ text "Illegal bang-pattern or strict binding" $$ ppr e
     PsErrOverloadedRecordDotInvalid
       -> mkSimpleDecorated $
            text "Use of OverloadedRecordDot '.' not valid ('.' isn't allowed when constructing records or in record patterns)"

@@ -1,6 +1,6 @@
-
 proposal-229c.hs:6:3: error: [GHC-79767]
-    Illegal bang-pattern
+    Illegal bang-pattern or strict binding
     !x
     Suggested fix:
       Perhaps you intended to use the ‘BangPatterns’ extension
+
