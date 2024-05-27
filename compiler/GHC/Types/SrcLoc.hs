@@ -908,7 +908,7 @@ mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Strict.Just b)
 -- ---------------------------------------------------------------------
 
 
--- | ~The anchor for an @'AnnKeywordId'@.~ The Parser inserts the
+-- | The anchor for an exact print annotation. The Parser inserts the
 -- @'EpaSpan'@ variant, giving the exact location of the original item
 -- in the parsed source.  This can be replaced by the @'EpaDelta'@
 -- version, to provide a position for the item relative to the end of

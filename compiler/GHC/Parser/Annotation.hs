@@ -485,9 +485,9 @@ instance Outputable AddEpAnn where
 -- ---------------------------------------------------------------------
 
 -- | The exact print annotations (EPAs) are kept in the HsSyn AST for
---   the GhcPs phase. We do not always have EPAs though, only for code
---   that has been parsed as they do not exist for generated
---   code.
+--   the GhcPs phase. They are usually inserted into the AST by the parser,
+--   and in case of generated code (e.g. by TemplateHaskell) they are usually
+--   initialized using 'NoAnn' type class.
 --
 -- A goal of the annotations is that an AST can be edited, including
 -- moving subtrees from one place to another, duplicating them, and so
@@ -501,7 +501,7 @@ instance Outputable AddEpAnn where
 --
 -- The 'ann' type parameter allows this general structure to be
 -- specialised to the specific set of locations of original exact
--- print annotation elements.  So for 'HsLet' we have
+-- print annotation elements.  For example for 'HsLet' we have
 --
 -- @
 -- type instance XLet GhcPs = EpAnn AnnsLet
@@ -514,8 +514,8 @@ instance Outputable AddEpAnn where
 --
 -- The spacing between the items under the scope of a given EpAnn is
 -- normally derived from the original 'Anchor'.  But if a sub-element
--- is not in its original position, the required spacing ~can be
--- directly captured in the 'anchor_op' field of the 'entry' Anchor~.
+-- is not in its original position, the required spacing can be
+-- captured using an appropriate 'EpaDelta' value for the 'entry' Anchor.
 -- This allows us to freely move elements around, and stitch together
 -- new AST fragments out of old ones, and have them still printed out
 -- in a precise way.
@@ -536,8 +536,8 @@ data EpAnn ann
 -- of reference for calculating delta positions for contained
 -- annotations.
 -- It is also normally used as the reference point for the spacing of
--- the element relative to its container. ~If the AST element is moved,
--- that relationship is tracked in the 'anchor_op' instead.~
+-- the element relative to its container. If the AST element is moved,
+-- that relationship is tracked using the 'EpaDelta' constructor instead.
 type Anchor = EpaLocation -- Transitional
 
 anchor :: (EpaLocation' a) -> RealSrcSpan
@@ -604,9 +604,9 @@ Note [XRec and Anno in the AST]
 
 The exact print annotations are captured directly inside the AST, using
 TTG extension points. However certain annotations need to be captured
-on the Located versions too.  While there is a general form for these,
-~captured in the type SrcSpanAnn'~, there are also specific usages in
-different contexts.
+on the Located versions too.  There is a general form for these,
+captured in the type 'EpAnn ann' with the specific usage captured in
+the 'ann' parameter in different contexts.
 
 Some of the particular use cases are
 
@@ -617,8 +617,8 @@ to its usage inside a list.
 
 See the section above this note for the rest.
 
-~The Anno type family maps the specific SrcSpanAnn' variant for a given
-item.~
+The Anno type family maps to the specific EpAnn variant for a given
+item.
 
 So
 
@@ -771,7 +771,7 @@ data NameAnn
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used when adding a 'TrailingAnn' to an existing 'LocatedN'
-  -- which has no Api Annotation (via the 'EpAnnNotUsed' constructor).
+  -- which has no Api Annotation.
   | NameAnnTrailing {
       nann_trailing  :: [TrailingAnn]
       }
