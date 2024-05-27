@@ -55,6 +55,7 @@
 #include "NonMoving.h"
 #include "Ticky.h"
 
+#include <stdalign.h>
 #include <string.h> // for memset()
 #include <unistd.h>
 
@@ -1242,8 +1243,9 @@ initGcThreads (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 
     for (i = from; i < to; i++) {
         gc_threads[i] =
-            stgMallocBytes(sizeof(gc_thread) +
+            stgMallocAlignedBytes(sizeof(gc_thread) +
                            RtsFlags.GcFlags.generations * sizeof(gen_workspace),
+                           alignof(gc_thread),
                            "alloc_gc_threads");
 
         new_gc_thread(i, gc_threads[i]);
@@ -1268,7 +1270,7 @@ freeGcThreads (void)
             {
                 freeWSDeque(gc_threads[i]->gens[g].todo_q);
             }
-            stgFree (gc_threads[i]);
+            stgFreeAligned (gc_threads[i]);
         }
         closeCondition(&gc_running_cv);
         closeMutex(&gc_running_mutex);
