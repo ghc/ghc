@@ -359,7 +359,8 @@ checkClosure( const StgClosure* p )
     load_load_barrier();
 
     if (IS_FORWARDING_PTR(info)) {
-        barf("checkClosure: found EVACUATED closure %d", info->type);
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(info));
+        barf("checkClosure: found EVACUATED closure %u", GET_INFO((StgClosure*)UN_FORWARDING_PTR(info))->type);
     }
 
 #if defined(PROFILING)
