@@ -7,6 +7,7 @@ module Flavour
   , addArgs
   , splitSections
   , enableThreadSanitizer
+  , enableUBSan
   , enableLateCCS
   , enableHashUnitIds
   , enableDebugInfo, enableTickyGhc
@@ -33,6 +34,9 @@ import Data.Either
 import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as Set
+import GHC.Platform.ArchOS
+import Oracles.Flag
+import Oracles.Setting
 import Packages
 import Flavour.Type
 import Settings.Parser
@@ -53,6 +57,7 @@ flavourTransformers = M.fromList
     , "no_split_sections" =: noSplitSections
     , "thread_sanitizer" =: enableThreadSanitizer False
     , "thread_sanitizer_cmm" =: enableThreadSanitizer True
+    , "ubsan"            =: enableUBSan
     , "llvm"             =: viaLlvmBackend
     , "profiled_ghc"     =: enableProfiledGhc
     , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
@@ -257,6 +262,51 @@ enableThreadSanitizer instrumentCmm = addArgs $ notStage0 ? mconcat
         | pkg <- [base, ghcInternal, array, rts]
         ]
     ]
+
+-- | Whether or not -shared-libsan should be passed to clang at
+-- link-time.
+--
+-- See
+-- https://github.com/llvm/llvm-project/blob/llvmorg-21.1.6/clang/lib/Driver/SanitizerArgs.cpp#L1008,
+-- clang defaults to -shared-libsan on darwin/windows and
+-- -static-libsan on linux. In general, -static-libsan is incredibly
+-- problematic when multiple copies of the sanitizer runtimes coexist
+-- in the same address space due to being linked into multiple Haskell
+-- libraries. So we should explicitly specify `-shared-libsan` if
+-- needed.
+--
+-- A small downside of -shared-libsan is the clang-specific sanitizer
+-- runtime shared library path needs to be manually specified via
+-- @export LD_LIBRARY_PATH=$(dirname $(clang -print-libgcc-file-name
+-- -rtlib=compiler-rt))@ for ld.so to find it at runtime.
+needSharedLibSAN :: Action Bool
+needSharedLibSAN = do
+  is_clang <- flag CcLlvmBackend
+  is_default_shared_libsan <- anyTargetOs [OSDarwin, OSMinGW32]
+  pure $ is_clang && not is_default_shared_libsan
+
+-- | Build all stage1+ C/C++ code with UndefinedBehaviorSanitizer
+-- support:
+-- https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+enableUBSan :: Flavour -> Flavour
+enableUBSan =
+  addArgs $
+    notStage0
+      ? mconcat
+        [ package rts
+            ? builder (Cabal Flags)
+            ? arg "+ubsan"
+            <> (needSharedLibSAN ? arg "+shared-libsan"),
+          builder (Ghc CompileHs) ? arg "-optc-fsanitize=undefined",
+          builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=undefined",
+          builder (Ghc CompileCppWithGhc) ? arg "-optcxx-fsanitize=undefined",
+          builder (Ghc LinkHs)
+            ? arg "-optc-fsanitize=undefined"
+            <> arg "-optl-fsanitize=undefined"
+            <> (needSharedLibSAN ? arg "-optl-shared-libsan"),
+          builder (Cc CompileC) ? arg "-fsanitize=undefined",
+          builder Testsuite ? arg "--config=have_ubsan=True"
+        ]
 
 -- | Use the LLVM backend in stages 1 and later.
 viaLlvmBackend :: Flavour -> Flavour
