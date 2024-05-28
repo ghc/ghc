@@ -183,7 +183,7 @@ packageArgs = do
           [ builder (Ghc LinkHs) ? arg "-optl-Wl,--export-dynamic" ]
 
         -------------------------------- haddock -------------------------------
-        , package haddock ?
+        , package haddockApi ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ---------------------------- ghc-boot-th-next --------------------------
