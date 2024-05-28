@@ -523,6 +523,7 @@ void wakeupIOManager(void)
     }
 }
 
+__attribute__((no_sanitize("function")))
 void markCapabilityIOManager(evac_fn evac, void *user, Capability *cap)
 {
     switch (iomgr_type) {

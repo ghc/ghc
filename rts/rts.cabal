@@ -103,6 +103,9 @@ flag thread-sanitizer
     in @rts/include/rts/TSANUtils.h@.
   default: False
   manual: True
+flag ubsan
+  default: False
+  manual: True
 
 library
     -- rts is a wired in package and
@@ -211,6 +214,9 @@ library
       if flag(thread-sanitizer)
         cc-options: -fsanitize=thread
         ld-options: -fsanitize=thread
+
+      if flag(ubsan)
+        ld-options: -fsanitize=undefined -shared-libsan -Wl,-rpath,/usr/lib/llvm-20/lib/clang/20/lib/linux --rtlib=compiler-rt
 
       if os(linux)
          -- the RTS depends upon libc. while this dependency is generally

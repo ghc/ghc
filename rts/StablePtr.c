@@ -347,6 +347,7 @@ getStablePtr(StgPtr p)
         }                                                               \
     } while(0)
 
+__attribute__((no_sanitize("function")))
 void
 markStablePtrTable(evac_fn evac, void *user)
 {

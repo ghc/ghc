@@ -416,6 +416,7 @@ workerTaskStop (Task *task)
 
 #if defined(THREADED_RTS)
 
+__attribute__((no_sanitize("function")))
 static void* OSThreadProcAttr
 workerStart(Task *task)
 {

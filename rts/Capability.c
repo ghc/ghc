@@ -1317,6 +1317,7 @@ freeCapabilities (void)
    for which (c `mod` n == 0), for Capability c and thread n.
    ------------------------------------------------------------------------ */
 
+__attribute__((no_sanitize("function")))
 void
 markCapability (evac_fn evac, void *user, Capability *cap,
                 bool no_mark_sparks USED_IF_THREADS)

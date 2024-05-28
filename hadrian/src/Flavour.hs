@@ -9,6 +9,7 @@ module Flavour
   , enableThreadSanitizer
   , enableLateCCS
   , enableHashUnitIds
+  , enableUBSan
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
   , enableProfiledGhc
@@ -52,6 +53,7 @@ flavourTransformers = M.fromList
     , "no_split_sections" =: noSplitSections
     , "thread_sanitizer" =: enableThreadSanitizer False
     , "thread_sanitizer_cmm" =: enableThreadSanitizer True
+    , "ubsan"            =: enableUBSan
     , "llvm"             =: viaLlvmBackend
     , "profiled_ghc"     =: enableProfiledGhc
     , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
@@ -254,6 +256,23 @@ enableThreadSanitizer instrumentCmm = addArgs $ notStage0 ? mconcat
         | pkg <- [base, ghcInternal, array, rts]
         ]
     ]
+
+enableUBSan :: Flavour -> Flavour
+enableUBSan =
+  addArgs $
+    notStage0
+      ? mconcat
+        [ package rts ? builder (Cabal Flags) ? arg "ubsan",
+          builder (Ghc CompileHs) ? arg "-optc-fsanitize=undefined",
+          builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=undefined",
+          builder (Ghc CompileCppWithGhc) ? arg "optcxx-fsanitize=undefined",
+          builder (Ghc LinkHs) ? arg "-optc-fsanitize=undefined"
+            <> arg "-optl-fsanitize=undefined"
+            <> arg "-optl-shared-libsan"
+            <> arg "-optl-Wl,-rpath,/usr/lib/llvm-20/lib/clang/20/lib/linux"
+            <> arg "-optl--rtlib=compiler-rt",
+          builder (Cc CompileC) ? arg "-fsanitize=undefined"
+        ]
 
 -- | Use the LLVM backend in stages 1 and later.
 viaLlvmBackend :: Flavour -> Flavour

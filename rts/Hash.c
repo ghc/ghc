@@ -431,6 +431,7 @@ removeStrHashTable(StrHashTable *table, const char * key, const void *data)
  * us how to do it.
  * -------------------------------------------------------------------------- */
 
+__attribute__((no_sanitize("function")))
 void
 freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
 {
@@ -470,6 +471,7 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
  * Map a function over all the keys/values in a HashTable
  * -------------------------------------------------------------------------- */
 
+__attribute__((no_sanitize("function")))
 void
 mapHashTable(HashTable *table, void *data, MapHashFn fn)
 {
