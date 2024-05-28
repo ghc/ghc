@@ -501,16 +501,14 @@ instance Outputable AddEpAnn where
 --
 -- The 'ann' type parameter allows this general structure to be
 -- specialised to the specific set of locations of original exact
--- print annotation elements.  For example for 'HsLet' we have
+-- print annotation elements.  For example
 --
 -- @
--- type instance XLet GhcPs = EpAnn AnnsLet
--- data AnnsLet
---   = AnnsLet {
---       alLet :: EpaLocation,
---       alIn :: EpaLocation
---       } deriving Data
+-- type SrcSpannAnnA = EpAnn AnnListItem
 -- @
+--
+-- is a commonly used type alias that specializes the 'ann' type parameter to
+-- 'AnnListItem'.
 --
 -- The spacing between the items under the scope of a given EpAnn is
 -- normally derived from the original 'Anchor'.  But if a sub-element
