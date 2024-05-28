@@ -16,5 +16,3 @@ function h$clock_gettime(when, p_d, p_o) {
   }
   return 0;
 }
-
-function h$CLOCK_REALTIME() { return 0; }
