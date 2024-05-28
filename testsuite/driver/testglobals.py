@@ -186,6 +186,9 @@ class TestConfig:
         # Are we running in a ThreadSanitizer-instrumented build?
         self.have_thread_sanitizer = False
 
+        # Are we running with UndefinedBehaviorSanitizer enabled?
+        self.have_ubsan = False
+
         # Do symbols use leading underscores?
         self.leading_underscore = False
 

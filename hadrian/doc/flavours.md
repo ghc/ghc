@@ -239,6 +239,10 @@ The supported transformers are listed below:
         <td>Build the runtime system with ThreadSanitizer support</td>
     </tr>
     <tr>
+        <td><code>ubsan</code></td>
+        <td>Build all stage1+ C/C++ code with UndefinedBehaviorSanitizer support</td>
+    </tr>
+    <tr>
         <td><code>llvm</code></td>
         <td>Use GHC's LLVM backend (`-fllvm`) for all stage1+ compilation.</td>
     </tr>

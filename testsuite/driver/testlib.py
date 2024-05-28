@@ -1090,6 +1090,8 @@ def llvm_build ( ) -> bool:
 def have_thread_sanitizer( ) -> bool:
     return config.have_thread_sanitizer
 
+def have_ubsan( ) -> bool:
+    return config.have_ubsan
 
 def gcc_as_cmmp() -> bool:
     return config.cmm_cpp_is_gcc

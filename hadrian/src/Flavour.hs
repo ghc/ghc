@@ -7,6 +7,7 @@ module Flavour
   , addArgs
   , splitSections
   , enableThreadSanitizer
+  , enableUBSan
   , enableLateCCS
   , enableHashUnitIds
   , enableDebugInfo, enableTickyGhc
@@ -33,6 +34,7 @@ import Data.Either
 import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as Set
+import Oracles.Flag
 import Packages
 import Flavour.Type
 import Settings.Parser
@@ -53,6 +55,7 @@ flavourTransformers = M.fromList
     , "no_split_sections" =: noSplitSections
     , "thread_sanitizer" =: enableThreadSanitizer False
     , "thread_sanitizer_cmm" =: enableThreadSanitizer True
+    , "ubsan"            =: enableUBSan
     , "llvm"             =: viaLlvmBackend
     , "profiled_ghc"     =: enableProfiledGhc
     , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
@@ -257,6 +260,48 @@ enableThreadSanitizer instrumentCmm = addArgs $ notStage0 ? mconcat
         | pkg <- [base, ghcInternal, array, rts]
         ]
     ]
+
+-- | Whether or not @-shared-libsan@ should be passed to clang at
+-- link-time.
+--
+-- clang defaults to @-static-libsan@ on linux. In general,
+-- @-static-libsan@ is problematic when multiple copies of the
+-- sanitizer runtimes coexist in the same address space due to being
+-- linked into multiple Haskell libraries. So we should explicitly
+-- specify @-shared-libsan@ when using clang; it doesn't hurt on other
+-- platforms where it's already the default. gcc doesn't support this
+-- flag though.
+--
+-- On Linux, a small downside of @-shared-libsan@ is the
+-- clang-specific sanitizer runtime shared library path needs to be
+-- manually specified via
+-- @export LD_LIBRARY_PATH=$(dirname $(clang -print-libgcc-file-name -rtlib=compiler-rt))@
+-- for @ld.so@ to find it at runtime.
+needSharedLibSAN :: Action Bool
+needSharedLibSAN = flag CcLlvmBackend
+
+-- | Build all stage1+ C/C++ code with UndefinedBehaviorSanitizer
+-- support:
+-- https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+enableUBSan :: Flavour -> Flavour
+enableUBSan =
+  addArgs $
+    notStage0
+      ? mconcat
+        [ package rts
+            ? builder (Cabal Flags)
+            ? arg "+ubsan"
+            <> (needSharedLibSAN ? arg "+shared-libsan"),
+          builder (Ghc CompileHs) ? arg "-optc-fsanitize=undefined",
+          builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=undefined",
+          builder (Ghc CompileCppWithGhc) ? arg "-optcxx-fsanitize=undefined",
+          builder (Ghc LinkHs)
+            ? arg "-optc-fsanitize=undefined"
+            <> arg "-optl-fsanitize=undefined"
+            <> (needSharedLibSAN ? arg "-optl-shared-libsan"),
+          builder (Cc CompileC) ? arg "-fsanitize=undefined",
+          builder Testsuite ? arg "--config=have_ubsan=True"
+        ]
 
 -- | Use the LLVM backend in stages 1 and later.
 viaLlvmBackend :: Flavour -> Flavour
