@@ -52,9 +52,10 @@ ghcWarningsArgs = do
                                       , "-Wincomplete-record-updates"
                                       ]
         , package ghcPrim      ? pure [ "-Wno-trustworthy-safe" ]
-        , package haddock      ? pure [ "-Wno-unused-imports"
-                                      , "-Wno-deprecations"
-                                      , "-Wno-x-partial" ]
+        , package haddockLibrary ? pure [ "-Wno-unused-imports" ]
+        , package haddockApi     ? pure [ "-Wno-unused-imports"
+                                        , "-Wno-deprecations"
+                                        , "-Wno-x-partial" ]
         , package haskeline    ? pure [ "-Wno-deprecations"
                                       , "-Wno-x-partial"
                                       , "-Wno-unused-imports"
