@@ -91,6 +91,19 @@ flag thread-sanitizer
     in @rts/include/rts/TSANUtils.h@.
   default: False
   manual: True
+flag ubsan
+  description:
+    Link with -fsanitize=undefined, to be enabled when building with
+    UndefinedBehaviorSanitizer.
+  default: False
+  manual: True
+flag shared-libsan
+  description:
+    Link with -shared-libsan, to guarantee only one copy of the
+    sanitizer runtimes exist in the address space. See
+    needSharedLibSAN in hadrian/src/Flavour.hs.
+  default: False
+  manual: True
 
 library
     -- rts is a wired in package and
@@ -199,6 +212,12 @@ library
       if flag(thread-sanitizer)
         cc-options: -fsanitize=thread
         ld-options: -fsanitize=thread
+
+      if flag(ubsan)
+        ld-options: -fsanitize=undefined
+
+      if flag(shared-libsan)
+        ld-options: -shared-libsan
 
       if os(linux)
          -- the RTS depends upon libc. while this dependency is generally
