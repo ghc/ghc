@@ -104,7 +104,9 @@ logExecute prog args =
     logDebug $ "Execute: " ++ intercalate " " ([prgPath prog] ++ prgFlags prog ++ args)
 
 -- | Program specifier from the command-line.
-data ProgOpt = ProgOpt { poPath :: Maybe FilePath
+data ProgOpt = ProgOpt { poPath :: Maybe String
+                       -- ^ Refers to the path to an executable, or simply the
+                       -- executable name.
                        , poFlags :: Maybe [String]
                        }
 
@@ -160,7 +162,9 @@ findProgram description userSpec candidates
           r <- liftIO $ findExecutable name
           case r of
             Nothing -> throwE $ name ++ " not found in search path"
-            Just x -> return x
+            -- Use the given `prgPath` or candidate name rather than the
+            -- absolute path returned by `findExecutable`.
+            Just _x -> return name
 
 -------------------- Compiling utilities --------------------
 
