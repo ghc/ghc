@@ -155,6 +155,7 @@ data BuildConfig
                 , noSplitSections :: Bool
                 , validateNonmovingGc :: Bool
                 , textWithSIMDUTF :: Bool
+                , testsuiteUsePerf :: Bool
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -216,6 +217,7 @@ vanilla = BuildConfig
   , noSplitSections = False
   , validateNonmovingGc = False
   , textWithSIMDUTF = False
+  , testsuiteUsePerf = False
   }
 
 splitSectionsBroken :: BuildConfig -> BuildConfig
@@ -268,6 +270,9 @@ tsan = vanilla { threadSanitiser = True }
 noTntc :: BuildConfig
 noTntc = vanilla { tablesNextToCode = False }
 
+usePerfProfilingTestsuite :: BuildConfig -> BuildConfig
+usePerfProfilingTestsuite bc = bc { testsuiteUsePerf = True }
+
 -----------------------------------------------------------------------------
 -- Platform specific variables
 -----------------------------------------------------------------------------
@@ -287,6 +292,9 @@ runnerTag _ _ = error "Invalid arch/opsys"
 
 tags :: Arch -> Opsys -> BuildConfig -> [String]
 tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
+
+runnerPerfTag :: Arch -> Opsys -> String
+runnerPerfTag arch sys = runnerTag arch sys ++ "-perf"
 
 -- These names are used to find the docker image so they have to match what is
 -- in the docker registry.
@@ -775,6 +783,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
                 | validateNonmovingGc buildConfig
                 ]
         in "RUNTEST_ARGS" =: unwords runtestArgs
+      , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
       ]
 
     jobArtifacts = Artifacts
@@ -897,6 +906,12 @@ highCompression = addVariable "XZ_OPT" "-9"
 useHashUnitIds :: Job -> Job
 useHashUnitIds = addVariable "HADRIAN_ARGS" "--hash-unit-ids"
 
+-- | Change the tag of the job to make sure the job is scheduled on a
+-- runner that has the necessary capabilties to run the job with 'perf'
+-- profiling counters.
+perfProfilingJobTag :: Arch -> Opsys -> Job -> Job
+perfProfilingJobTag arch opsys j = j { jobTags = [ runnerPerfTag arch opsys ] }
+
 -- | Mark the validate job to run in fast-ci mode
 -- This is default way, to enable all jobs you have to apply the `full-ci` label.
 fastCI :: JobGroup Job -> JobGroup Job
@@ -1000,6 +1015,8 @@ debian_x86 =
   , modifyNightlyJobs allowFailure (modifyValidateJobs (allowFailure . manual) tsan_jobs)
   , -- Nightly allowed to fail: #22343
     modifyNightlyJobs allowFailure (modifyValidateJobs manual (validateBuilds Amd64 (Linux validate_debian) noTntc))
+  -- Run the 'perf' profiling nightly job in the release config.
+  , perfProfilingJob Amd64 (Linux Debian12) releaseConfig
 
   , onlyRule LLVMBackend (validateBuilds Amd64 (Linux validate_debian) llvm)
   , addValidateRule TestPrimops (standardBuilds Amd64 (Linux validate_debian))
@@ -1009,6 +1026,12 @@ debian_x86 =
   ]
   where
     validate_debian = Debian12
+
+    perfProfilingJob arch sys buildConfig =
+        -- Rename the job to avoid conflicts
+        rename (<> "-perf")
+          $ modifyJobs (perfProfilingJobTag arch sys)
+          $ disableValidate (validateBuilds arch sys $ usePerfProfilingTestsuite buildConfig)
 
     tsan_jobs =
       modifyJobs
