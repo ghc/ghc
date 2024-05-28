@@ -8,6 +8,7 @@ module Haddock.Backends.Hyperlinker
   , module Haddock.Backends.Hyperlinker.Utils
   ) where
 
+import Control.Monad (unless)
 import Data.Map as M
 import Data.Maybe
 import GHC.Data.FastString (mkFastString)
@@ -40,6 +41,8 @@ import Haddock.Utils (Verbosity, out, verbose, writeUtf8File)
 -- produced source.
 ppHyperlinkedSource
   :: Verbosity
+  -> Bool
+  -- ^ In one-shot mode
   -> FilePath
   -- ^ Output directory
   -> FilePath
@@ -53,12 +56,13 @@ ppHyperlinkedSource
   -> [Interface]
   -- ^ Interfaces for which we create source
   -> IO ()
-ppHyperlinkedSource verbosity outdir libdir mstyle pretty srcs' ifaces = do
+ppHyperlinkedSource verbosity isOneShot outdir libdir mstyle pretty srcs' ifaces = do
   createDirectoryIfMissing True srcdir
-  let cssFile = fromMaybe (defaultCssFile libdir) mstyle
-  copyFile cssFile $ srcdir </> srcCssFile
-  copyFile (libdir </> "html" </> highlightScript) $
-    srcdir </> highlightScript
+  unless isOneShot $ do
+    let cssFile = fromMaybe (defaultCssFile libdir) mstyle
+    copyFile cssFile $ srcdir </> srcCssFile
+    copyFile (libdir </> "html" </> highlightScript) $
+      srcdir </> highlightScript
   mapM_ (ppHyperlinkedModuleSource verbosity srcdir pretty srcs) ifaces
   where
     srcdir = outdir </> hypSrcDir

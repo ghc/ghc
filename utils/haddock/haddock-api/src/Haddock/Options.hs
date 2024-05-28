@@ -33,6 +33,7 @@ module Haddock.Options
   , optShowInterfaceFile
   , optLaTeXStyle
   , optMathjax
+  , optOneShot
   , qualification
   , sinceQualification
   , verbosity
@@ -122,6 +123,7 @@ data Flag
   | Flag_IgnoreLinkSymbol String
   | Flag_ParCount (Maybe Int)
   | Flag_TraceArgs
+  | Flag_OneShot String
   deriving (Eq, Show)
 
 options :: Bool -> [OptDescr Flag]
@@ -156,6 +158,11 @@ options backwardsCompat =
       ["show-interface"]
       (ReqArg Flag_ShowInterface "FILE")
       "print the interface in a human readable form"
+  , Option
+      []
+      ["incremental"]
+      (ReqArg Flag_OneShot "MODULE")
+      "generate documentation for a single module only, given its module name"
   , --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
     --  "output in DocBook XML",
     Option
@@ -473,6 +480,9 @@ optDumpInterfaceFile flags = optLast [str | Flag_DumpInterface str <- flags]
 optShowInterfaceFile :: [Flag] -> Maybe FilePath
 optShowInterfaceFile flags = optLast [str | Flag_ShowInterface str <- flags]
 
+optOneShot :: [Flag] -> Maybe String
+optOneShot flags = optLast [str | Flag_OneShot str <- flags]
+
 optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [str | Flag_LaTeXStyle str <- flags]
 
@@ -551,7 +561,7 @@ reexportFlags :: [Flag] -> [String]
 reexportFlags flags = [option | Flag_Reexport option <- flags]
 
 data Visibility = Visible | Hidden
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 readIfaceArgs :: [Flag] -> [(DocPaths, Visibility, FilePath)]
 readIfaceArgs flags = [parseIfaceOption s | Flag_ReadInterface s <- flags]

@@ -4,7 +4,7 @@
 module Test.Haddock.Config
     ( TestPackage(..), CheckConfig(..), DirConfig(..), Config(..)
     , defaultDirConfig
-    , cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir
+    , cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir, cfgOneShotOutDir
     , parseArgs, checkOpt, loadConfig
     ) where
 
@@ -57,8 +57,10 @@ data DirConfig = DirConfig
     { dcfgSrcDir :: FilePath
     , dcfgRefDir :: FilePath
     , dcfgOutDir :: FilePath
+    , dcfgOneShotOutDir :: FilePath
     , dcfgResDir :: FilePath
     , dcfgCheckIgnore :: FilePath -> Bool
+    , dcfgCheckIgnoreOneShot :: FilePath -> Bool
     }
 
 
@@ -67,8 +69,10 @@ defaultDirConfig baseDir = DirConfig
     { dcfgSrcDir = baseDir </> "src"
     , dcfgRefDir = baseDir </> "ref"
     , dcfgOutDir = baseDir </> "out"
+    , dcfgOneShotOutDir = baseDir </> "one-shot-out"
     , dcfgResDir = rootDir </> "resources"
     , dcfgCheckIgnore = const False
+    , dcfgCheckIgnoreOneShot = const False
     }
   where
     rootDir = baseDir </> ".."
@@ -76,6 +80,7 @@ defaultDirConfig baseDir = DirConfig
 
 data Config c = Config
     { cfgHaddockPath :: FilePath
+    , cfgGhcPath :: FilePath
     , cfgPackages :: [TestPackage]
     , cfgHaddockArgs :: [String]
     , cfgHaddockStdOut :: FilePath
@@ -84,14 +89,16 @@ data Config c = Config
     , cfgAccept :: Bool
     , cfgCheckConfig :: CheckConfig c
     , cfgDirConfig :: DirConfig
+    , cfgSkipOneShot :: Bool
     }
 
 
-cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir :: Config c -> FilePath
+cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir, cfgOneShotOutDir :: Config c -> FilePath
 cfgSrcDir = dcfgSrcDir . cfgDirConfig
 cfgRefDir = dcfgRefDir . cfgDirConfig
 cfgOutDir = dcfgOutDir . cfgDirConfig
 cfgResDir = dcfgResDir . cfgDirConfig
+cfgOneShotOutDir = dcfgOneShotOutDir . cfgDirConfig
 
 
 
@@ -196,7 +203,7 @@ loadConfig ccfg dcfg flags files = do
                         , queriedGhcPath
                         ]
 
-    ghcPath <- case ghc_path of
+    cfgGhcPath <- case ghc_path of
         Just path -> pure path
         Nothing   -> do
           hPutStrLn stderr "GHC executable not found; consider using the `--ghc-path` flag."
@@ -213,7 +220,7 @@ loadConfig ccfg dcfg flags files = do
         , pure ["--optghc=-w"]
         , pure ["--optghc=-hide-all-packages"]
         , pure $ flagsHaddockOptions flags
-        , baseDependencies ghcPath
+        , baseDependencies cfgGhcPath
         ]
 
     let cfgHaddockStdOut = fromMaybe defaultStdOut (flagsHaddockStdOut flags)
@@ -226,6 +233,7 @@ loadConfig ccfg dcfg flags files = do
 
     let cfgCheckConfig = ccfg
     let cfgDirConfig   = dcfg
+    let cfgSkipOneShot = False
 
     return $ Config { .. }
 
@@ -307,7 +315,7 @@ baseDependencies ghcPath = do
             htmlDirOpt = listToMaybe (haddockHTMLs pkg)
 
         pure (unitId, ifaceOpt, htmlDirOpt)
-    
+
 
 defaultDiffTool :: IO (Maybe FilePath)
 defaultDiffTool =

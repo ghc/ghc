@@ -166,12 +166,14 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   qual <- rightOrThrowE (qualification flags)
   sinceQual <- rightOrThrowE (sinceQualification flags)
 
+  let isOneShotMode = isJust (optOneShot flags)
+
   -- Inject dynamic-too into ghc options if the ghc we are using was built with
-  -- dynamic linking
+  -- dynamic linking (except when in one-shot mode)
   flags'' <- ghc flags $ do
         df <- getDynFlags
         case lookup "GHC Dynamic" (compilerInfo df) of
-          Just "YES" -> return $ Flag_OptGhc "-dynamic-too" : flags
+          Just "YES" | not isOneShotMode -> return $ Flag_OptGhc "-dynamic-too" : flags
           _ -> return flags
 
   -- Inject `-j` into ghc options, if given to Haddock
@@ -190,6 +192,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   -- to compute output file names that are stored in the 'DynFlags' of the
   -- resulting 'ModSummary's.
   let withDir | Flag_NoTmpCompDir `elem` flags = id
+              | isOneShotMode = id
               | otherwise = withTempOutputDir
 
   -- Output warnings about potential misuse of some flags
@@ -218,7 +221,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
         putMsg logger $ renderJson (jsonInterfaceFile ifaceFile)
 
     -- If we were given source files to generate documentation from, do it
-    if not (null files) then do
+    if not (null files) || isJust (optOneShot flags) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
       let packageInfo = PackageInfo { piPackageName =
                                         fromMaybe (PackageName mempty) (optPackageName flags)
@@ -514,7 +517,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
                   opt_contents_url opt_index_url unicode sincePkg packageInfo
                   qual pretty withQuickjump
       return ()
-    unless withBaseURL $ do
+    unless (withBaseURL || isJust (optOneShot flags)) $ do
       copyHtmlBits odir libDir themes withQuickjump
       writeHaddockMeta odir withQuickjump
 
@@ -551,7 +554,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
   when (Flag_HyperlinkedSource `elem` flags && not (null ifaces)) $ do
     withTiming logger "ppHyperlinkedSource" (const ()) $ do
       _ <- {-# SCC ppHyperlinkedSource #-}
-           ppHyperlinkedSource (verbosity flags) odir libDir opt_source_css pretty srcMap ifaces
+           ppHyperlinkedSource (verbosity flags) (isJust (optOneShot flags)) odir libDir opt_source_css pretty srcMap ifaces
       return ()
 
 

@@ -20,11 +20,13 @@ checkConfig = CheckConfig
     , ccfgEqual = (==) `on` dumpXml
     }
   where
-    strip _ = stripAnchors' . stripLinks' . stripIds' . stripFooter
-    
+    strip _ = fixPaths . stripAnchors' . stripLinks' . stripIds' . stripFooter
+
     stripLinks' = stripLinksWhen $ \href -> "#local-" `isPrefixOf` href
     stripAnchors' = stripAnchorsWhen $ \name -> "local-" `isPrefixOf` name
     stripIds' = stripIdsWhen $ \name -> "local-" `isPrefixOf` name
+    -- One-shot hyperlinked source links to other modules as if they are in another package
+    fixPaths = fixAttrValueWhen "href" (drop 7) ("../src/" `isPrefixOf`)
 
 
 dirConfig :: DirConfig

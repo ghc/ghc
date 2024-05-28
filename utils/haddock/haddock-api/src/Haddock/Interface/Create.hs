@@ -29,7 +29,7 @@
 -- This module provides a single function 'createInterface',
 -- which creates a Haddock 'Interface' from the typechecking
 -- results 'TypecheckedModule' from GHC.
-module Haddock.Interface.Create (IfM, runIfM, createInterface1) where
+module Haddock.Interface.Create (IfM, runIfM, createInterface1, createInterface1') where
 
 import Control.Arrow (first, (&&&))
 import Control.DeepSeq
@@ -84,7 +84,7 @@ createInterface1
   -> InstIfaceMap
   -> ([ClsInst], [FamInst])
   -> IfM m Interface
-createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instances, fam_instances) = do
+createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instances, fam_instances) =
   let
     ModSummary
       { -- Cached flags from OPTIONS, INCLUDE and LANGUAGE
@@ -93,9 +93,23 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
       ms_hspp_opts
       , ms_location = modl
       } = mod_sum
+   in
+    createInterface1' flags unit_state ms_hspp_opts (ml_hie_file modl) mod_iface ifaces inst_ifaces (instances, fam_instances)
 
+createInterface1'
+  :: MonadIO m
+  => [Flag]
+  -> UnitState
+  -> DynFlags
+  -> FilePath
+  -> ModIface
+  -> IfaceMap
+  -> InstIfaceMap
+  -> ([ClsInst], [FamInst])
+  -> IfM m Interface
+createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces (instances, fam_instances) = do
+  let
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
-    dflags = ms_hspp_opts
     mLanguage = language dflags
     parserOpts = Parser.initParserOpts dflags
     mdl = mi_module mod_iface
@@ -230,7 +244,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
     Interface
       { ifaceMod = mdl
       , ifaceIsSig = is_sig
-      , ifaceHieFile = ml_hie_file modl
+      , ifaceHieFile = hie_file
       , ifaceInfo = info
       , ifaceDoc = Documentation header_doc mod_warning
       , ifaceRnDoc = Documentation Nothing Nothing

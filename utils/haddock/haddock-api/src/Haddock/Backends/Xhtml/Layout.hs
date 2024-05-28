@@ -193,8 +193,7 @@ subTableSrc pkg qual lnks splice decls = Just $ table << aboves (concatMap subRo
         : map (cell . (td <<)) subs
 
     linkHtml :: SrcSpan -> Maybe Module -> DocName -> Html
-    linkHtml loc@(RealSrcSpan _ _) mdl dn = links lnks loc splice mdl dn
-    linkHtml _ _ _ = noHtml
+    linkHtml loc mdl dn = links lnks loc splice mdl dn
 
 subBlock :: [Html] -> Maybe Html
 subBlock [] = Nothing

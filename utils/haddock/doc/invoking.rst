@@ -542,6 +542,11 @@ The following options are available:
     ``cabal`` uses temporary `response files
     <https://gcc.gnu.org/wiki/Response_Files>`_ to pass arguments to Haddock.
 
+.. option:: --incremental=<module>
+
+    Use Haddock in :ref:`incremental mode<incremental-mode>`. Haddock will generate
+    documentation for the given module only.
+
 Using literate or pre-processed source
 --------------------------------------
 
@@ -604,3 +609,28 @@ files.
 Following the steps above will allow you to take full advantage of "hi-haddock"
 and generate Haddock documentation from existing build results without requiring
 any further compilation.
+
+.. _incremental-mode:
+
+Incremental mode
+----------------
+
+In incremental mode Haddock generates documentation for only one module, making it
+possible to generate documentation incrementally. It is useful when working on
+the documentation, and especially in big packages, since your changes get
+rendered quickly. Incremental mode takes full advantage of "hi-haddock": the
+compiler is never invoked so it's guaranteed that no recompilation will occur.
+
+There are two major downsides to this method:
+
+#. The procedure to get links between modules in incremental mode is the same as
+   for links between packages in normal mode, using :option:`--dump-interface`
+   and :option:`--read-interface`. So for each dependency you will have to
+   pass the location of the ``.haddock`` file with :option:`--read-interface`.
+   It is therefore recommended to use incremental mode in conjunction with a
+   build system like Bazel or Buck to track build dependencies at file level.
+#. Class instances from other modules than where the class is defined are not
+   available in incremental mode. This is because the module where the class is
+   defined has to be rendered before the module with the instance, since that
+   module depends on the former. So it is recommended to do a final pass in
+   normal mode before publishing the documentation to f.e. Hackage.

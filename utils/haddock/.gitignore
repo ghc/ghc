@@ -7,6 +7,10 @@
 /hypsrc-test/out/
 /latex-test/out/
 /hoogle-test/out/
+/html-test/one-shot-out/
+/hypsrc-test/one-shot-out/
+/latex-test/one-shot-out/
+/hoogle-test/one-shot-out/
 
 *.o
 *.hi

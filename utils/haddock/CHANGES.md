@@ -1,5 +1,7 @@
 ## Changes in 2.32.0
- * add highlighting for inline-code-blocks (sections enclosed in @'s)
+ * Add highlighting for inline-code-blocks (sections enclosed in @'s)
+
+ * Add incremental mode to support rendering documentation one module at a time.
 
 ## Changes in 2.28.0
  * `hi-haddock` is integrated, which means docstrings are no longer extracted

@@ -24,6 +24,7 @@ module Haddock.Interface.AttachInstances (attachInstances, instHead) where
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
 import Control.DeepSeq (force)
+import Control.Monad (unless)
 import Data.Foldable (toList)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -69,8 +70,8 @@ type Modules = Set.Set Module
 type ExportInfo = (ExportedNames, Modules)
 
 -- Also attaches fixities
-attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Ghc [Interface]
-attachInstances expInfo ifaces instIfaceMap = do
+attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Bool -> Ghc [Interface]
+attachInstances expInfo ifaces instIfaceMap isOneShot = do
   -- We need to keep load modules in which we will look for instances. We've
   -- somewhat arbitrarily decided to load all modules which are available -
   -- either directly or from a re-export.
@@ -97,8 +98,10 @@ attachInstances expInfo ifaces instIfaceMap = do
   (_msgs, mb_index) <- do
     hsc_env <- getSession
     liftIO $ runTcInteractive hsc_env $ do
-      let doc = text "Need interface for haddock"
-      initIfaceTcRn $ mapM_ (loadSysInterface doc) mods_to_load
+      -- In one shot mode we don't want to load anything more than is already loaded
+      unless isOneShot $ do
+        let doc = text "Need interface for haddock"
+        initIfaceTcRn $ mapM_ (loadSysInterface doc) mods_to_load
       cls_env@InstEnvs{ie_global, ie_local} <- tcGetInstEnvs
       fam_env@(pkg_fie, home_fie) <- tcGetFamInstEnvs
       -- We use Data.Sequence.Seq because we are creating left associated

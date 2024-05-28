@@ -17,9 +17,14 @@ checkConfig = CheckConfig
     , ccfgEqual = (==) `on` crlfToLf
     }
 
+multiModuleTests :: [String]
+multiModuleTests = ["modules", "type-sigs"]
 
 dirConfig :: DirConfig
-dirConfig = defaultDirConfig $ takeDirectory __FILE__
+dirConfig = (defaultDirConfig $ takeDirectory __FILE__)
+    -- Multi-module hoogle tests don't make sense for one-shot mode
+    { dcfgCheckIgnoreOneShot = (`elem` (fmap (</> "test.txt") multiModuleTests))
+    }
 
 
 main :: IO ()

@@ -7,6 +7,7 @@ module Test.Haddock.Xhtml
   , stripAnchorsWhen
   , stripIdsWhen
   , stripFooter
+  , fixAttrValueWhen
   ) where
 
 {-
@@ -48,7 +49,32 @@ type Value = String
 --
 --    * match an attribute key
 --    * check something about the value
---    * if the check succeeded, replace the value with a dummy value
+--    * if the check succeeded, apply a function to the value
+fixAttrValueWhen
+  :: Attr
+  -- ^ attribute key
+  -> (Value -> Value)
+  -- ^ update attribute value function
+  -> (Value -> Bool)
+  -- ^ determine whether we should modify the attribute
+  -> Xml
+  -- ^ input XML
+  -> Xml
+  -- ^ output XML
+fixAttrValueWhen key f p (Xml body) = Xml (filterAttrs body)
+  where
+    keyEq = key ++ "=\""
+
+    filterAttrs "" = ""
+    filterAttrs b@(c : cs)
+      | Just valRest <- stripPrefix keyEq b
+      , Just (val, rest) <- spanToEndOfString valRest =
+          if p val
+            then keyEq ++ f val ++ "\"" ++ filterAttrs rest
+            else keyEq ++ val ++ "\"" ++ filterAttrs rest
+      | otherwise =
+          c : filterAttrs cs
+
 stripAttrValueWhen
   :: Attr
   -- ^ attribute key
@@ -60,19 +86,7 @@ stripAttrValueWhen
   -- ^ input XML
   -> Xml
   -- ^ output XML
-stripAttrValueWhen key fallback p (Xml body) = Xml (filterAttrs body)
-  where
-    keyEq = key ++ "=\""
-
-    filterAttrs "" = ""
-    filterAttrs b@(c : cs)
-      | Just valRest <- stripPrefix keyEq b
-      , Just (val, rest) <- spanToEndOfString valRest =
-          if p val
-            then keyEq ++ fallback ++ "\"" ++ filterAttrs rest
-            else keyEq ++ val ++ "\"" ++ filterAttrs rest
-      | otherwise =
-          c : filterAttrs cs
+stripAttrValueWhen key fallback = fixAttrValueWhen key (const fallback)
 
 -- | Spans to the next (unescaped) @\"@ character.
 --

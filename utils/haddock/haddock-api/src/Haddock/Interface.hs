@@ -37,6 +37,7 @@ module Haddock.Interface (
 
 import Control.Monad
 import Data.List (isPrefixOf)
+import qualified Data.List as List
 import Data.Traversable (for)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -44,6 +45,8 @@ import Debug.Trace (traceMarkerIO)
 import System.Exit (exitFailure ) -- TODO use Haddock's die
 import Text.Printf
 import GHC hiding (verbosity, SuccessFlag(..))
+import GHC.Builtin.Names (mkMainModule_)
+import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
@@ -56,16 +59,20 @@ import qualified GHC.Driver.DynFlags as DynFlags
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session hiding (verbosity)
 import GHC.HsToCore.Docs (getMainDeclBinder)
+import GHC.Iface.Load (loadSysInterface)
+import GHC.IfaceToCore (tcIfaceInst, tcIfaceFamInst)
+import GHC.Tc.Utils.Monad (initIfaceLoad, initIfaceLcl)
+import GHC.Tc.Utils.Env (lookupGlobal_maybe)
 import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Types.Name.Occurrence (emptyOccEnv)
+import GHC.Unit.Finder (findImportedModule, FindResult(Found))
+import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module.Graph (ModuleGraphNode (..))
 import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
 import GHC.Unit.Module.ModSummary (isBootSummary)
-import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName)
+import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text)
 import GHC.Utils.Error (withTiming)
-import GHC.Unit.Home.ModInfo
-import GHC.Tc.Utils.Env (lookupGlobal_maybe)
-import qualified Data.List as List
 
 #if defined(mingw32_HOST_OS)
 import System.IO
@@ -75,7 +82,7 @@ import GHC.IO.Encoding.Failure (CodingFailureMode(TransliterateCodingFailure))
 
 import Haddock.GhcUtils (moduleString, pretty)
 import Haddock.Interface.AttachInstances (attachInstances)
-import Haddock.Interface.Create (createInterface1)
+import Haddock.Interface.Create (createInterface1, createInterface1')
 import Haddock.Interface.Rename (renameInterface)
 import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
@@ -108,8 +115,12 @@ processModules verbosity modules flags extIfaces = do
         | ext <- extIfaces
         , iface <- ifInstalledIfaces ext
         ]
+      oneShotHiFile = optOneShot flags
 
-  interfaces <- createIfaces verbosity modules flags instIfaceMap
+  interfaces <- maybe
+    (createIfaces verbosity modules flags instIfaceMap)
+    (createOneShotIface verbosity flags instIfaceMap)
+    oneShotHiFile
 
   let exportedNames =
         Set.unions $ map (Set.fromList . ifaceExports) $
@@ -118,7 +129,7 @@ processModules verbosity modules flags extIfaces = do
 
   interfaces' <- {-# SCC attachInstances #-}
                  withTimingM "attachInstances" (const ()) $ do
-                   attachInstances (exportedNames, mods) interfaces instIfaceMap
+                   attachInstances (exportedNames, mods) interfaces instIfaceMap (isJust oneShotHiFile)
 
   -- Combine the link envs of the external packages into one
   let extLinks  = Map.unions (map ifLinkEnv extIfaces)
@@ -312,6 +323,67 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap = do
 
   return (Just interface)
 
+
+-- | Create a single interface from a single module in one-shot mode.
+createOneShotIface
+    :: Verbosity
+    -- ^ Verbosity requested by the caller
+    -> [Flag]
+    -- ^ Command line flags which Hadddock was invoked with
+    -> InstIfaceMap
+    -- ^ Map from module to corresponding installed interface file
+    -> String
+    -- ^ Name of the module
+    -> Ghc [Interface]
+    -- ^ Resulting interfaces
+createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
+
+  let moduleNm = mkModuleName moduleNameStr
+      doc = text "createOneShotIface"
+
+  out verbosity verbose $ "Checking interface " ++ moduleNameStr ++ "..."
+
+  -- Turn on GHC's one-shot mode
+  dflags <- (\df -> df{ ghcMode = OneShot }) <$> getDynFlags
+  modifySession $ hscSetFlags dflags
+  hsc_env <- getSession
+
+  (iface, insts) <- liftIO $ initIfaceLoad hsc_env $ do
+
+    iface <- loadSysInterface doc $ mkMainModule_ moduleNm
+
+    insts <- initIfaceLcl (mi_semantic_module iface) doc (mi_boot iface) $ do
+
+      new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
+      new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+
+      pure (new_eps_insts, new_eps_fam_insts)
+
+    pure (iface, insts)
+
+  -- Update the DynFlags with the extensions from the source file (as stored in the interface file)
+  -- This is instead of ms_hspp_opts from ModSummary, which is not available in one-shot mode.
+  let dflags' = case mi_docs iface of
+                  Just docs -> setExtensions $ setLanguage dflags
+                    where
+                      setLanguage df = lang_set df (docs_language docs)
+                      setExtensions df = List.foldl' xopt_set df $ EnumSet.toList (docs_extensions docs)
+                  Nothing -> dflags
+
+  -- We should find the module here, otherwise there would have been an error earlier.
+  res <- liftIO $ findImportedModule hsc_env moduleNm NoPkgQual
+  let hieFilePath = case res of
+                      Found ml _ -> ml_hie_file ml
+                      _ -> throwE "createOneShotIface: module not found"
+
+  !interface <- do
+    logger <- getLogger
+    {-# SCC createInterface #-}
+      withTiming logger "createInterface" (const ()) $
+        runIfM (liftIO . fmap dropErr . lookupGlobal_maybe hsc_env) $
+          createInterface1' flags (hsc_units hsc_env) dflags' hieFilePath iface mempty instIfaceMap insts
+
+  pure [interface]
 
 --------------------------------------------------------------------------------
 -- * Building of cross-linking environment
