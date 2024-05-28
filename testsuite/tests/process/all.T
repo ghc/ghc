@@ -7,7 +7,7 @@ test('process002', [fragile_for(16547, concurrent_ways), req_process], compile_a
 test('process003', [fragile_for(17245, concurrent_ways), req_process], compile_and_run, [''])
 test('process004', [normalise_exec, normalise_exe, req_process], compile_and_run, [''])
 test('T1780', [req_process], compile_and_run, [''])
-test('process005', [omit_ghci, req_process], compile_and_run, [''])
+test('process005', [omit_ghci, req_process, when(js_arch(), fragile(24373))], compile_and_run, [''])
 test('process006', [req_process], compile_and_run, [''])
 
 test('process007',
