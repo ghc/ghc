@@ -299,16 +299,16 @@ if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
     FP_INSTALL_WINDOWS_TOOLCHAIN
     FP_SETUP_WINDOWS_TOOLCHAIN([$hardtop/inplace/mingw], [$hardtop/inplace/mingw])
 else
-    AC_PATH_TOOL([CC],[gcc], [clang])
-    AC_PATH_TOOL([CXX],[g++], [clang++])
-    AC_PATH_TOOL([NM],[nm])
+    AC_CHECK_TOOL([CC],[gcc], [clang])
+    AC_CHECK_TOOL([CXX],[g++], [clang++])
+    AC_CHECK_TOOL([NM],[nm])
     # N.B. we don't probe for LD here but instead
     # do so in FIND_LD to avoid #21778.
-    AC_PATH_TOOL([AR],[ar])
-    AC_PATH_TOOL([RANLIB],[ranlib])
-    AC_PATH_TOOL([OBJDUMP],[objdump])
-    AC_PATH_TOOL([WindresCmd],[windres])
-    AC_PATH_TOOL([Genlib],[genlib])
+    AC_CHECK_TOOL([AR],[ar])
+    AC_CHECK_TOOL([RANLIB],[ranlib])
+    AC_CHECK_TOOL([OBJDUMP],[objdump])
+    AC_CHECK_TOOL([WindresCmd],[windres])
+    AC_CHECK_TOOL([Genlib],[genlib])
 
     if test "$HostOS" = "mingw32"; then
         AC_CHECK_TARGET_TOOL([WindresCmd],[windres])

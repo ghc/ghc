@@ -26,7 +26,7 @@ AC_DEFUN([FIND_MERGE_OBJECTS],[
 
     if test -z ${MergeObjsCmd+x}; then
         AC_MSG_NOTICE([Setting cmd])
-        MergeObjsCmd="$(command -v $LD)"
+        MergeObjsCmd="$LD"
     fi
     if test -z ${MergeObjsArgs+x}; then
         MergeObjsArgs="-r"
@@ -45,7 +45,7 @@ AC_DEFUN([FIND_MERGE_OBJECTS],[
       if test "$result" = "1"; then
           AC_MSG_NOTICE([$MergeObjsCmd is broken due to binutils 22266, looking for another linker...])
           MergeObjsCmd=""
-          AC_PATH_TARGET_TOOL([MergeObjsCmd], [ld])
+          AC_CHECK_TARGET_TOOL([MergeObjsCmd], [ld])
           CHECK_FOR_GOLD_T22266($MergeObjsCmd)
           if test "$result" = "1"; then
               AC_MSG_ERROR([Linker is affected by binutils 22266 but couldn't find another unaffected linker. Please set the MergeObjsCmd variable to a functional linker.])
