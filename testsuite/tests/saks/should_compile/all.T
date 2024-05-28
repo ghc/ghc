@@ -37,5 +37,5 @@ test('T16721', normal, ghci_script, ['T16721.script'])
 test('T16756a', normal, compile, [''])
 
 test('saks027', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
-test('saks028', req_th, compile, [''])
+test('saks028', [req_th, js_broken(24886)], compile, [''])
 test('T17164',  req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
