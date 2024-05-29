@@ -2092,9 +2092,14 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
           putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm"
             FormatCMM (pdoc platform cmmgroup)
 
-        rawCmms <- case cmmToRawCmmHook hooks of
+        rawCmms0 <- case cmmToRawCmmHook hooks of
           Nothing -> cmmToRawCmm logger profile (Stream.yield cmmgroup)
           Just h  -> h           dflags Nothing (Stream.yield cmmgroup)
+
+        let dump a = do
+              unless (null a) $ putDumpFileMaybe logger Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
+              return a
+            rawCmms = Stream.mapM dump rawCmms0
 
         let foreign_stubs _
               | not $ null ipe_ents =
