@@ -2,8 +2,6 @@ module Rules.Docspec
   ( docspecRules
   ) where
 
-import System.Directory (findExecutable)
-
 import Base
 import Context.Path
 import Settings.Builders.Common

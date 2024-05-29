@@ -16,7 +16,6 @@ import Settings.Builders.Common
 import qualified Data.Set    as Set
 import Flavour
 import qualified Context.Type as C
-import System.Directory (findExecutable)
 import Settings.Program
 import qualified Context.Type
 
