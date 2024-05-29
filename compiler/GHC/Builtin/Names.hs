@@ -568,9 +568,8 @@ gHC_PRIMOPWRAPPERS = mkPrimModule (fsLit "GHC.PrimopWrappers")
 
 gHC_INTERNAL_TUPLE                  = mkPrimModule (fsLit "GHC.Tuple")
 
-pRELUDE, dATA_LIST, cONTROL_MONAD_ZIP :: Module
+pRELUDE, cONTROL_MONAD_ZIP :: Module
 pRELUDE            = mkBaseModule_ pRELUDE_NAME
-dATA_LIST          = mkBaseModule (fsLit "Data.List")
 cONTROL_MONAD_ZIP  = mkBaseModule (fsLit "Control.Monad.Zip")
 
 gHC_INTERNAL_NUM_INTEGER, gHC_INTERNAL_NUM_NATURAL, gHC_INTERNAL_NUM_BIGNAT :: Module

@@ -1027,7 +1027,6 @@ data WarningFlag =
    | Opt_WarnUnusedPackages                          -- Since 8.10
    | Opt_WarnInferredSafeImports                     -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode                  -- Since 8.10
-   | Opt_WarnCompatUnqualifiedImports                -- Since 8.10
    | Opt_WarnDerivingDefaults
    | Opt_WarnInvalidHaddock                          -- Since 9.0
    | Opt_WarnOperatorWhitespaceExtConflict           -- Since 9.2
@@ -1149,7 +1148,6 @@ warnFlagNames wflag = case wflag of
   Opt_WarnPartialFields                           -> "partial-fields" :| []
   Opt_WarnPrepositiveQualifiedModule              -> "prepositive-qualified-module" :| []
   Opt_WarnUnusedPackages                          -> "unused-packages" :| []
-  Opt_WarnCompatUnqualifiedImports                -> "compat-unqualified-imports" :| []
   Opt_WarnInvalidHaddock                          -> "invalid-haddock" :| []
   Opt_WarnOperatorWhitespaceExtConflict           -> "operator-whitespace-ext-conflict" :| []
   Opt_WarnOperatorWhitespace                      -> "operator-whitespace" :| []
@@ -1359,8 +1357,7 @@ minusWeverythingOpts = [ toEnum 0 .. ]
 -- code future compatible to fix issues before they even generate warnings.
 minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
-    = [ Opt_WarnCompatUnqualifiedImports
-      , Opt_WarnImplicitRhsQuantification
+    = [ Opt_WarnImplicitRhsQuantification
       , Opt_WarnDeprecatedTypeAbstractions
       ]
 

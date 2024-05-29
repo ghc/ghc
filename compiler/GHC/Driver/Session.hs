@@ -2326,7 +2326,6 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnPartialFields -> warnSpec x
   Opt_WarnPrepositiveQualifiedModule -> warnSpec x
   Opt_WarnUnusedPackages -> warnSpec x
-  Opt_WarnCompatUnqualifiedImports -> warnSpec x
   Opt_WarnInvalidHaddock -> warnSpec x
   Opt_WarnOperatorWhitespaceExtConflict -> warnSpec x
   Opt_WarnOperatorWhitespace -> warnSpec x

@@ -69,7 +69,6 @@ library
   ghc-options: -funbox-strict-fields -O2
                -Wall
                -Wcompat
-               -Wcompat-unqualified-imports
                -Widentities
                -Wredundant-constraints
                -Wnoncanonical-monad-instances

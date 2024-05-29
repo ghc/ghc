@@ -168,7 +168,6 @@ as ``-Wno-...`` for every individual warning in the group.
     .. hlist::
         :columns: 3
 
-        * :ghc-flag:`-Wcompat-unqualified-imports`
         * :ghc-flag:`-Wimplicit-rhs-quantification`
         * :ghc-flag:`-Wdeprecated-type-abstractions`
 
@@ -293,27 +292,6 @@ of ``-W(no-)*``.
 
     Enables warnings when the compiler encounters a ``-W...`` flag that is not
     recognised.
-
-.. ghc-flag:: -Wcompat-unqualified-imports
-    :shortdesc: Report unqualified imports of core libraries which are expected
-      to cause compatibility problems in future releases.
-    :type: dynamic
-    :reverse: -Wno-compat-unqualified-imports
-    :category:
-
-    :since: 8.10
-
-    Warns on unqualified imports of core library modules which are subject to
-    change in future GHC releases. Currently the following modules are covered
-    by this warning:
-
-     - ``Data.List`` due to the future addition of ``Data.List.singleton`` and
-       specialisation of exports to the ``[]`` type. See the
-       `mailing list <https://groups.google.com/forum/#!topic/haskell-core-libraries/q3zHLmzBa5E>`_
-       for details.
-
-    This warning can be addressed by either adding an explicit import list or
-    using a ``qualified`` import.
 
 .. ghc-flag:: -Wprepositive-qualified-module
     :shortdesc: Report imports with a leading/prepositive "qualified"
