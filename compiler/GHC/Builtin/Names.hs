@@ -669,10 +669,6 @@ gHC_INTERNAL_OVER_LABELS = mkGhcInternalModule (fsLit "GHC.Internal.OverloadedLa
 gHC_INTERNAL_RECORDS :: Module
 gHC_INTERNAL_RECORDS = mkGhcInternalModule (fsLit "GHC.Internal.Records")
 
-dATA_TUPLE_EXPERIMENTAL, dATA_SUM_EXPERIMENTAL :: Module
-dATA_TUPLE_EXPERIMENTAL = mkExperimentalModule (fsLit "Data.Tuple.Experimental")
-dATA_SUM_EXPERIMENTAL = mkExperimentalModule (fsLit "Data.Sum.Experimental")
-
 rOOT_MAIN :: Module
 rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
 
@@ -713,9 +709,6 @@ mkMainModule m = mkModule mainUnit (mkModuleNameFS m)
 
 mkMainModule_ :: ModuleName -> Module
 mkMainModule_ m = mkModule mainUnit m
-
-mkExperimentalModule :: FastString -> Module
-mkExperimentalModule m = mkModule experimentalUnit (mkModuleNameFS m)
 
 {-
 ************************************************************************
