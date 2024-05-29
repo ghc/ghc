@@ -93,17 +93,35 @@ class Category a => Arrow a where
     {-# MINIMAL arr, (first | (***)) #-}
 
     -- | Lift a function to an arrow.
+    --
+    -- >   b ╭───╮ c
+    -- > >───┤ f ├───>
+    -- >     ╰───╯
     arr :: (b -> c) -> a b c
 
     -- | Send the first component of the input through the argument
     --   arrow, and copy the rest unchanged to the output.
-    first :: a b c -> a (b,d) (c,d)
-    first = (*** id)
-
-    -- | A mirror image of 'first'.
     --
     --   The default definition may be overridden with a more efficient
     --   version if desired.
+    --
+    -- >   b ╭─────╮ c
+    -- > >───┼─ f ─┼───>
+    -- > >───┼─────┼───>
+    -- >   d ╰─────╯ d
+    first :: a b c -> a (b,d) (c,d)
+    first = (*** id)
+
+    -- | Send the second component of the input through the argument
+    --   arrow, and copy the rest unchanged to the output.
+    --
+    --   The default definition may be overridden with a more efficient
+    --   version if desired.
+    --
+    -- >   d ╭─────╮ d
+    -- > >───┼─────┼───>
+    -- > >───┼─ f ─┼───>
+    -- >   b ╰─────╯ c
     second :: a b c -> a (d,b) (d,c)
     second = (id ***)
 
@@ -112,6 +130,11 @@ class Category a => Arrow a where
     --
     --   The default definition may be overridden with a more efficient
     --   version if desired.
+    --
+    -- >   b ╭─────╮ b'
+    -- > >───┼─ f ─┼───>
+    -- > >───┼─ g ─┼───>
+    -- >   c ╰─────╯ c'
     (***) :: a b c -> a b' c' -> a (b,b') (c,c')
     f *** g = first f >>> arr swap >>> first g >>> arr swap
       where swap ~(x,y) = (y,x)
@@ -121,6 +144,12 @@ class Category a => Arrow a where
     --
     --   The default definition may be overridden with a more efficient
     --   version if desired.
+    --
+    -- >     ╭───────╮ c
+    -- >   b │ ┌─ f ─┼───>
+    -- > >───┼─┤     │
+    -- >     │ └─ g ─┼───>
+    -- >     ╰───────╯ c'
     (&&&) :: a b c -> a b c' -> a b (c,c')
     f &&& g = arr (\b -> (b,b)) >>> f *** g
 
@@ -204,6 +233,9 @@ instance Monad m => Arrow (Kleisli m) where
     second (Kleisli f) = Kleisli (\ ~(d,b) -> f b >>= \c -> return (d,c))
 
 -- | The identity arrow, which plays the role of 'return' in arrow notation.
+--
+-- >   b
+-- > >───>
 returnA :: Arrow a => a b b
 returnA = id
 
@@ -416,6 +448,15 @@ leftApp f = arr ((\b -> (arr (\() -> b) >>> f >>> arr Left, ())) |||
 -- > unassoc (a,(b,c)) = ((a,b),c)
 --
 class Arrow a => ArrowLoop a where
+    -- |
+    --
+    -- >     ╭──────────────╮
+    -- >   b │     ╭───╮    │ c
+    -- > >───┼─────┤   ├────┼───>
+    -- >     │   ┌─┤   ├─┐  │
+    -- >     │ d │ ╰───╯ │  │
+    -- >     │   └───<───┘  │
+    -- >     ╰──────────────╯
     loop :: a (b,d) (c,d) -> a b c
 
 -- | @since base-2.01
