@@ -77,7 +77,6 @@ dsJsFExport
   -> DsM ( CHeader      -- contents of Module_stub.h
          , CStub        -- contents of Module_stub.c
          , String       -- string describing type to pass to createAdj.
-         , Int          -- size of args to stub function
          )
 
 dsJsFExport fn_id co ext_name cconv isDyn = do
@@ -114,20 +113,10 @@ mkFExportJSBits
   -> CCallConv
   -> (CHeader,
       CStub,
-      String,      -- the argument reps
-      Int          -- total size of arguments
+      String       -- the argument reps
      )
 mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
- = (header_bits, js_bits, type_string,
-    sum [ widthInBytes (typeWidth rep) | (_,_,_,rep) <- arg_info] -- all the args
-         -- NB. the calculation here isn't strictly speaking correct.
-         -- We have a primitive Haskell type (eg. Int#, Double#), and
-         -- we want to know the size, when passed on the C stack, of
-         -- the associated C type (eg. HsInt, HsDouble).  We don't have
-         -- this information to hand, but we know what GHC's conventions
-         -- are for passing around the primitive Haskell types, so we
-         -- use that instead.  I hope the two coincide --SDM
-    )
+ = (header_bits, js_bits, type_string)
  where
   -- list the arguments to the JS function
   arg_info :: [(SDoc,           -- arg name
@@ -242,7 +231,7 @@ dsJsImport
   -> Safety
   -> Maybe Header
   -> DsM ([Binding], CHeader, CStub)
-dsJsImport id co (CLabel cid) cconv _ _ = do
+dsJsImport id co (CLabel cid) _ _ _ = do
    let ty = coercionLKind co
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
@@ -251,9 +240,8 @@ dsJsImport id co (CLabel cid) cconv _ _ = do
              _ -> IsData
    (_resTy, foRhs) <- jsResultWrapper ty
 --   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
-   let rhs = foRhs (Lit (LitLabel cid stdcall_info fod))
+   let rhs = foRhs (Lit (LitLabel cid fod))
        rhs' = Cast rhs co
-       stdcall_info = fun_type_arg_stdcall_info cconv ty
 
    return ([(id, rhs')], mempty, mempty)
 
@@ -280,7 +268,6 @@ dsJsFExportDynamic id co0 cconv = do
                                         -- Must have an IO type; hence Just
                                         $ tcSplitIOType_maybe fn_res_ty
     mod <- getModule
-    platform <- targetPlatform <$> getDynFlags
     let fe_nm = mkFastString $ zEncodeString
             ("h$" ++ moduleStableString mod ++ "$" ++ toJsName id)
         -- Construct the label based on the passed id, don't use names
@@ -293,30 +280,22 @@ dsJsFExportDynamic id co0 cconv = do
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalDs ManyTy stable_ptr_ty
-    (h_code, c_code, typestring, args_size) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv True
+    (h_code, c_code, typestring) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
           The arguments to the external function which will
           create a little bit of (template) code on the fly
           for allowing the (stable pointed) Haskell closure
           to be entered using an external calling convention
-          (stdcall, ccall).
+          (ccall).
          -}
-        adj_args      = [ mkIntLit platform (toInteger (ccallConvToInt cconv))
-                        , Var stbl_value
-                        , Lit (LitLabel fe_nm mb_sz_args IsFunction)
+        adj_args      = [ Var stbl_value
+                        , Lit (LitLabel fe_nm IsFunction)
                         , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.)
         adjustor   = fsLit "createAdjustor"
-
-          -- Determine the number of bytes of arguments to the stub function,
-          -- so that we can attach the '@N' suffix to its label if it is a
-          -- stdcall on Windows.
-        mb_sz_args = case cconv of
-                        StdCallConv -> Just args_size
-                        _           -> Nothing
 
     ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
         -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -567,10 +546,6 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
         ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]
         the_alt      = Alt (DataAlt (tupleDataCon Unboxed 2)) [state_id, result_id] the_rhs
     return (ccall_res_ty, the_alt)
-
-fun_type_arg_stdcall_info :: CCallConv -> Type -> Maybe Int
-fun_type_arg_stdcall_info _other_conv _ = Nothing
-
 
 jsResultWrapper
   :: Type

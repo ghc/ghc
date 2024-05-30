@@ -136,7 +136,7 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
             (Var unsafeDupablePerformIO_id)
             [Type arg_ty, mkApps (Var deRefStablePtr_id) [Type arg_ty, Var sp_id]]
       work_ty = exprType work_rhs
-  (work_h, work_c, _, _, work_ids, work_bs) <-
+  (work_h, work_c, _, work_ids, work_bs) <-
     dsWasmJSExport
       work_id
       (mkRepReflCo work_ty)
@@ -597,7 +597,7 @@ dsWasmJSExport ::
   Id ->
   Coercion ->
   CLabelString ->
-  DsM (CHeader, CStub, String, Int, [Id], [Binding])
+  DsM (CHeader, CStub, String, [Id], [Binding])
 dsWasmJSExport fn_id co ext_name = do
   work_uniq <- newUnique
   let ty = coercionRKind co
@@ -697,7 +697,6 @@ dsWasmJSExport fn_id co ext_name = do
     ( CHeader commonCDecls,
       CStub cstub [] [],
       "",
-      -1,
       [work_id],
       [(work_id, work_rhs)]
     )

@@ -557,11 +557,7 @@ checkCConv :: Either (ForeignExport GhcRn) (ForeignImport GhcRn)
 checkCConv _ CCallConv    = return CCallConv
 checkCConv _ CApiConv     = return CApiConv
 checkCConv decl StdCallConv = do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
-  if platformArch platform == ArchX86
-      then return StdCallConv
-      else do -- This is a warning, not an error. see #3336
+              -- This is a warning, not an error. see #3336
               let msg = TcRnUnsupportedCallConv decl StdCallConvUnsupported
               addDiagnosticTc msg
               return CCallConv
@@ -798,4 +794,3 @@ validIfUnliftedFFITypes :: DynFlags -> Validity' TypeCannotBeMarshaledReason
 validIfUnliftedFFITypes dflags
   | xopt LangExt.UnliftedFFITypes dflags =  IsValid
   | otherwise = NotValid UnliftedFFITypesNeeded
-

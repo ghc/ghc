@@ -33,7 +33,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Core.TyCon
-import GHC.Data.FastString
 import GHC.Data.FlatBag
 import GHC.Data.SizedSeq
 
@@ -526,12 +525,7 @@ assembleI platform i = case i of
                                                   ]
 
   where
-    literal (LitLabel fs (Just sz) _)
-     | platformOS platform == OSMinGW32
-         = litlabel (appendFS fs (mkFastString ('@':show sz)))
-     -- On Windows, stdcall labels have a suffix indicating the no. of
-     -- arg words, e.g. foo@8.  testcase: ffi012(ghci)
-    literal (LitLabel fs _ _) = litlabel fs
+    literal (LitLabel fs _)   = litlabel fs
     literal LitNullAddr       = word 0
     literal (LitFloat r)      = float (fromRational r)
     literal (LitDouble r)     = double (fromRational r)

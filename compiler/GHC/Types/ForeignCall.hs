@@ -13,7 +13,7 @@ module GHC.Types.ForeignCall (
         CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
         CCallSpec(..),
         CCallTarget(..), isDynamicTarget,
-        CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
+        CCallConv(..), defaultCCallConv, ccallConvAttribute,
 
         Header(..), CType(..),
     ) where
@@ -146,10 +146,6 @@ Stuff to do with calling convention:
 
 ccall:          Caller allocates parameters, *and* deallocates them.
 
-stdcall:        Caller allocates parameters, callee deallocates.
-                Function name has @N after it, where N is number of arg bytes
-                e.g.  _Foo@8. This convention is x86 (win32) specific.
-
 See: http://www.programmersheaven.com/2/Calling-conventions
 -}
 
@@ -172,20 +168,13 @@ instance Outputable CCallConv where
 defaultCCallConv :: CCallConv
 defaultCCallConv = CCallConv
 
-ccallConvToInt :: CCallConv -> Int
-ccallConvToInt StdCallConv = 0
-ccallConvToInt CCallConv   = 1
-ccallConvToInt CApiConv    = panic "ccallConvToInt CApiConv"
-ccallConvToInt (PrimCallConv {}) = panic "ccallConvToInt PrimCallConv"
-ccallConvToInt JavaScriptCallConv = panic "ccallConvToInt JavaScriptCallConv"
-
 {-
 Generate the gcc attribute corresponding to the given
 calling convention (used by PprAbsC):
 -}
 
 ccallConvAttribute :: CCallConv -> SDoc
-ccallConvAttribute StdCallConv       = text "__attribute__((__stdcall__))"
+ccallConvAttribute StdCallConv       = panic "ccallConvAttribute StdCallConv"
 ccallConvAttribute CCallConv         = empty
 ccallConvAttribute CApiConv          = empty
 ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"

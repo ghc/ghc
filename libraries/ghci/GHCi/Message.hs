@@ -103,7 +103,7 @@ data Message a where
   MallocStrings :: [ByteString] -> Message [RemotePtr ()]
 
   -- | Calls 'GHCi.FFI.prepareForeignCall'
-  PrepFFI :: FFIConv -> [FFIType] -> FFIType -> Message (RemotePtr C_ffi_cif)
+  PrepFFI :: [FFIType] -> FFIType -> Message (RemotePtr C_ffi_cif)
 
   -- | Free data previously created by 'PrepFFI'
   FreeFFI :: RemotePtr C_ffi_cif -> Message ()
@@ -526,7 +526,7 @@ getMessage = do
       13 -> Msg <$> FreeHValueRefs <$> get
       14 -> Msg <$> MallocData <$> get
       15 -> Msg <$> MallocStrings <$> get
-      16 -> Msg <$> (PrepFFI <$> get <*> get <*> get)
+      16 -> Msg <$> (PrepFFI <$> get <*> get)
       17 -> Msg <$> FreeFFI <$> get
       18 -> Msg <$> (MkConInfoTable <$> get <*> get <*> get <*> get <*> get <*> get)
       19 -> Msg <$> (EvalStmt <$> get <*> get)
@@ -572,7 +572,7 @@ putMessage m = case m of
   FreeHValueRefs val          -> putWord8 13 >> put val
   MallocData bs               -> putWord8 14 >> put bs
   MallocStrings bss           -> putWord8 15 >> put bss
-  PrepFFI conv args res       -> putWord8 16 >> put conv >> put args >> put res
+  PrepFFI args res            -> putWord8 16 >> put args >> put res
   FreeFFI p                   -> putWord8 17 >> put p
   MkConInfoTable tc p n t pt d -> putWord8 18 >> put tc >> put p >> put n >> put t >> put pt >> put d
   EvalStmt opts val           -> putWord8 19 >> put opts >> put val

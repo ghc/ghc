@@ -2628,7 +2628,7 @@ genLibCCall bid lbl_txt dsts args = do
   -- Assume we can call these functions directly, and that they're not in a dynamic library.
   -- TODO: Why is this ok? Under linux this code will be in libm.so
   --       Is it because they're really implemented as a primitive instruction by the assembler??  -- BL 2009/12/31
-  let lbl = mkForeignLabel lbl_txt Nothing ForeignLabelInThisPackage IsFunction
+  let lbl = mkForeignLabel lbl_txt ForeignLabelInThisPackage IsFunction
   addr <- cmmMakeDynamicReference config CallReference lbl
   let conv = ForeignConvention CCallConv [] [] CmmMayReturn
   genCCall bid addr conv dsts args
@@ -2643,7 +2643,7 @@ genRTSCCall
 genRTSCCall bid lbl_txt dsts args = do
   config <- getConfig
   -- Assume we can call these functions directly, and that they're not in a dynamic library.
-  let lbl = mkForeignLabel lbl_txt Nothing ForeignLabelInThisPackage IsFunction
+  let lbl = mkForeignLabel lbl_txt ForeignLabelInThisPackage IsFunction
   addr <- cmmMakeDynamicReference config CallReference lbl
   let conv = ForeignConvention CCallConv [] [] CmmMayReturn
   genCCall bid addr conv dsts args
@@ -2669,7 +2669,7 @@ genCCall32 :: CmmExpr           -- ^ address of the function to call
            -> [CmmFormal]       -- ^ where to put the result
            -> [CmmActual]       -- ^ arguments (of mixed type)
            -> NatM InstrBlock
-genCCall32 addr conv dest_regs args = do
+genCCall32 addr _ dest_regs args = do
         config <- getConfig
         let platform = ncgPlatform config
             prom_args = map (maybePromoteCArg platform W32) args
@@ -2748,16 +2748,15 @@ genCCall32 addr conv dest_regs args = do
         massert (delta == delta0 - tot_arg_size)
 
         -- deal with static vs dynamic call targets
-        (callinsns,cconv) <-
+        callinsns <-
           case addr of
             CmmLit (CmmLabel lbl)
-               -> -- ToDo: stdcall arg sizes
-                  return (unitOL (CALL (Left fn_imm) []), conv)
+               -> return $ unitOL (CALL (Left fn_imm) [])
                where fn_imm = ImmCLbl lbl
             _
                -> do { (dyn_r, dyn_c) <- getSomeReg addr
                      ; massert (isWord32 (cmmExprType platform addr))
-                     ; return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
+                     ; return $ dyn_c `snocOL` CALL (Right dyn_r) [] }
         let push_code
                 | arg_pad_size /= 0
                 = toOL [SUB II32 (OpImm (ImmInt arg_pad_size)) (OpReg esp),
@@ -2766,19 +2765,10 @@ genCCall32 addr conv dest_regs args = do
                 | otherwise
                 = concatOL push_codes
 
-              -- Deallocate parameters after call for ccall;
-              -- but not for stdcall (callee does it)
-              --
-              -- We have to pop any stack padding we added
-              -- even if we are doing stdcall, though (#5052)
-            pop_size
-               | ForeignConvention StdCallConv _ _ _ <- cconv = arg_pad_size
-               | otherwise = tot_arg_size
-
             call = callinsns `appOL`
                    toOL (
-                      (if pop_size==0 then [] else
-                       [ADD II32 (OpImm (ImmInt pop_size)) (OpReg esp)])
+                      (if tot_arg_size == 0 then [] else
+                       [ADD II32 (OpImm (ImmInt tot_arg_size)) (OpReg esp)])
                       ++
                       [DELTA delta0]
                    )
@@ -3011,7 +3001,6 @@ genCCall64 addr conv dest_regs args = do
     -- deal with static vs dynamic call targets
     (callinsns,_cconv) <- case addr of
       CmmLit (CmmLabel lbl) ->
-        -- ToDo: stdcall arg sizes
         return (unitOL (CALL (Left (ImmCLbl lbl)) arg_regs), conv)
       _ -> do
         (dyn_r, dyn_c) <- getSomeReg addr
@@ -3030,9 +3019,7 @@ genCCall64 addr conv dest_regs args = do
 
     let call = callinsns `appOL`
                toOL (
-                    -- Deallocate parameters after call for ccall;
-                    -- stdcall has callee do it, but is not supported on
-                    -- x86_64 target (see #3336)
+                    -- Deallocate parameters after call for ccall
                   (if real_size==0 then [] else
                    [ADD (intFormat (platformWordWidth platform)) (OpImm (ImmInt real_size)) (OpReg esp)])
                   ++

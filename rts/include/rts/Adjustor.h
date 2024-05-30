@@ -14,8 +14,7 @@
 #pragma once
 
 /* Creating and destroying an adjustor thunk */
-void* createAdjustor (int cconv,
-                      StgStablePtr hptr,
+void* createAdjustor (StgStablePtr hptr,
                       StgFunPtr wptr,
                       char *typeString);
 

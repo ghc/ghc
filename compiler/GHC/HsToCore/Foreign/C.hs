@@ -73,7 +73,6 @@ dsCFExport:: Id                 -- Either the exported Id,
           -> DsM ( CHeader      -- contents of Module_stub.h
                  , CStub        -- contents of Module_stub.c
                  , String       -- string describing type to pass to createAdj.
-                 , Int          -- size of args to stub function
                  )
 
 dsCFExport fn_id co ext_name cconv isDyn = do
@@ -108,10 +107,8 @@ dsCImport :: Id
           -> Safety
           -> Maybe Header
           -> DsM ([Binding], CHeader, CStub)
-dsCImport id co (CLabel cid) cconv _ _ = do
-   dflags <- getDynFlags
+dsCImport id co (CLabel cid) _ _ _ = do
    let ty  = coercionLKind co
-       platform = targetPlatform dflags
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
@@ -120,9 +117,8 @@ dsCImport id co (CLabel cid) cconv _ _ = do
    (resTy, foRhs) <- resultWrapper ty
    assert (fromJust resTy `eqType` addrPrimTy) $    -- typechecker ensures this
     let
-        rhs = foRhs (Lit (LitLabel cid stdcall_info fod))
+        rhs = foRhs (Lit (LitLabel cid fod))
         rhs' = Cast rhs co
-        stdcall_info = fun_type_arg_stdcall_info platform cconv ty
     in
     return ([(id, rhs')], mempty, mempty)
 
@@ -175,8 +171,6 @@ dsCFExportDynamic :: Id
                  -> DsM ([Binding], CHeader, CStub)
 dsCFExportDynamic id co0 cconv = do
     mod <- getModule
-    dflags <- getDynFlags
-    let platform = targetPlatform dflags
     let fe_nm = mkFastString $ zEncodeString
             (moduleStableString mod ++ "$" ++ toCName id)
         -- Construct the label based on the passed id, don't use names
@@ -189,30 +183,22 @@ dsCFExportDynamic id co0 cconv = do
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalDs ManyTy stable_ptr_ty
-    (h_code, c_code, typestring, args_size) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv True
+    (h_code, c_code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
           The arguments to the external function which will
           create a little bit of (template) code on the fly
           for allowing the (stable pointed) Haskell closure
           to be entered using an external calling convention
-          (stdcall, ccall).
+          (ccall).
          -}
-        adj_args      = [ mkIntLit platform (fromIntegral (ccallConvToInt cconv))
-                        , Var stbl_value
-                        , Lit (LitLabel fe_nm mb_sz_args IsFunction)
+        adj_args      = [ Var stbl_value
+                        , Lit (LitLabel fe_nm IsFunction)
                         , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.)
         adjustor   = fsLit "createAdjustor"
-
-          -- Determine the number of bytes of arguments to the stub function,
-          -- so that we can attach the '@N' suffix to its label if it is a
-          -- stdcall on Windows.
-        mb_sz_args = case cconv of
-                        StdCallConv -> Just args_size
-                        _           -> Nothing
 
     ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
         -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -396,15 +382,13 @@ mkFExportCBits :: DynFlags
                -> CCallConv
                -> (CHeader,
                    CStub,
-                   String,      -- the argument reps
-                   Int          -- total size of arguments
+                   String       -- the argument reps
                   )
 mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
  =
    ( header_bits
    , CStub body [] []
-   , type_string,
-    aug_arg_size
+   , type_string
     )
  where
   platform = targetPlatform dflags
@@ -442,19 +426,6 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   aug_arg_info
     | isNothing maybe_target = stable_ptr_arg : insertRetAddr platform cc arg_info
     | otherwise              = arg_info
-
-  aug_arg_size = sum [ widthInBytes (typeWidth rep) | (_,_,_,rep) <- aug_arg_info]
-         -- NB. the calculation here isn't strictly speaking correct.
-         -- We have a primitive Haskell type (eg. Int#, Double#), and
-         -- we want to know the size, when passed on the C stack, of
-         -- the associated C type (eg. HsInt, HsDouble).  We don't have
-         -- this information to hand, but we know what GHC's conventions
-         -- are for passing around the primitive Haskell types, so we
-         -- use that instead.  I hope the two coincide --SDM
-         -- AK: This seems just wrong, the code here uses widthInBytes, but when
-         -- we pass args on the haskell stack we always extend to multiples of 8
-         -- to my knowledge. Not sure if it matters though so I won't touch this
-         -- for now.
 
   stable_ptr_arg =
         (text "the_stableptr", text "StgStablePtr", undefined,
@@ -625,17 +596,3 @@ insertRetAddr _ _ args = args
 ret_addr_arg :: Platform -> (SDoc, SDoc, Type, CmmType)
 ret_addr_arg platform = (text "original_return_addr", text "void*", undefined,
                          typeCmmType platform addrPrimTy)
-
--- For stdcall labels, if the type was a FunPtr or newtype thereof,
--- then we need to calculate the size of the arguments in order to add
--- the @n suffix to the label.
-fun_type_arg_stdcall_info :: Platform -> CCallConv -> Type -> Maybe Int
-fun_type_arg_stdcall_info platform StdCallConv ty
-  | Just (tc,[arg_ty]) <- splitTyConApp_maybe ty,
-    tyConUnique tc == funPtrTyConKey
-  = let
-       (bndrs, _) = tcSplitPiTys arg_ty
-       fe_arg_tys = mapMaybe anonPiTyBinderType_maybe bndrs
-    in Just $ sum (map (widthInBytes . typeWidth . typeCmmType platform . getPrimTyOf) fe_arg_tys)
-fun_type_arg_stdcall_info _ _other_conv _
-  = Nothing

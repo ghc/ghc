@@ -132,9 +132,7 @@ module GHC.Cmm.CLabel (
         ppInternalProcLabel,
 
         -- * Others
-        dynamicLinkerLabelInfo,
-        addLabelSize,
-        foreignLabelStdcallInfo
+        dynamicLinkerLabelInfo
     ) where
 
 import GHC.Prelude
@@ -234,10 +232,6 @@ data CLabel
   --
   | ForeignLabel
         FastString              -- ^ name of the imported label.
-
-        (Maybe Int)             -- ^ possible '@n' suffix for stdcall functions
-                                -- When generating C, the '@n' suffix is omitted, but when
-                                -- generating assembler we must add it to the label.
 
         ForeignLabelSource      -- ^ what package the foreign label is in.
 
@@ -359,11 +353,10 @@ instance Ord CLabel where
     compare d1 d2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
   compare (LocalBlockLabel u1) (LocalBlockLabel u2) = nonDetCmpUnique u1 u2
-  compare (ForeignLabel a1 b1 c1 d1) (ForeignLabel a2 b2 c2 d2) =
+  compare (ForeignLabel a1 b1 c1) (ForeignLabel a2 b2 c2) =
     uniqCompareFS a1 a2 S.<>
     compare b1 b2 S.<>
-    compare c1 c2 S.<>
-    compare d1 d2
+    compare c1 c2
   compare (AsmTempLabel u1) (AsmTempLabel u2) = nonDetCmpUnique u1 u2
   compare (AsmTempDerivedLabel a1 b1) (AsmTempDerivedLabel a2 b2) =
     compare a1 a2 S.<>
@@ -465,8 +458,8 @@ pprDebugCLabel platform lbl = pprAsmLabel platform lbl <> parens extra
          RtsLabel{}
             -> text "RtsLabel"
 
-         ForeignLabel _name mSuffix src funOrData
-             -> text "ForeignLabel" <+> ppr mSuffix <+> ppr src <+> ppr funOrData
+         ForeignLabel _name src funOrData
+             -> text "ForeignLabel" <+> ppr src <+> ppr funOrData
 
          _  -> text "other CLabel"
 
@@ -647,7 +640,7 @@ mkDirty_MUT_VAR_Label,
     mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel,
     mkOutOfBoundsAccessLabel, mkMemcpyRangeOverlapLabel,
     mkMUT_VAR_CLEAN_infoLabel :: CLabel
-mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
+mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") ForeignLabelInExternalPackage IsFunction
 mkNonmovingWriteBarrierEnabledLabel
                                 = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "nonmoving_write_barrier_enabled") CmmData
 mkOrigThunkInfoLabel            = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_orig_thunk_info_frame") CmmInfo
@@ -665,8 +658,8 @@ mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnitId (NeedExternDecl False) (fsL
 mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
 mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
 mkBadAlignmentLabel             = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_badAlignment")      CmmEntry
-mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess")  Nothing ForeignLabelInExternalPackage IsFunction
-mkMemcpyRangeOverlapLabel       = mkForeignLabel (fsLit "rtsMemcpyRangeOverlap") Nothing ForeignLabelInExternalPackage IsFunction
+mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess") ForeignLabelInExternalPackage IsFunction
+mkMemcpyRangeOverlapLabel       = mkForeignLabel (fsLit "rtsMemcpyRangeOverlap") ForeignLabelInExternalPackage IsFunction
 mkMUT_VAR_CLEAN_infoLabel       = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_MUT_VAR_CLEAN")     CmmInfo
 
 mkSRTInfoLabel :: Int -> CLabel
@@ -750,20 +743,11 @@ mkPrimCallLabel (PrimCall str pkg)
 -- | Make a foreign label
 mkForeignLabel
         :: FastString           -- name
-        -> Maybe Int            -- size prefix
         -> ForeignLabelSource   -- what package it's in
         -> FunctionOrData
         -> CLabel
 
 mkForeignLabel = ForeignLabel
-
-
--- | Update the label size field in a ForeignLabel
-addLabelSize :: CLabel -> Int -> CLabel
-addLabelSize (ForeignLabel str _ src  fod) sz
-    = ForeignLabel str (Just sz) src fod
-addLabelSize label _
-    = label
 
 -- | Whether label is a top-level string literal
 isBytesLabel :: CLabel -> Bool
@@ -772,7 +756,7 @@ isBytesLabel _lbl = False
 
 -- | Whether label is a non-haskell label (defined in C code)
 isForeignLabel :: CLabel -> Bool
-isForeignLabel (ForeignLabel _ _ _ _) = True
+isForeignLabel (ForeignLabel _ _ _) = True
 isForeignLabel _lbl = False
 
 -- | Whether label is a static closure label (can come from haskell or cmm)
@@ -814,12 +798,6 @@ isCmmInfoTableLabel _ = False
 isConInfoTableLabel :: CLabel -> Bool
 isConInfoTableLabel (IdLabel _ _ ConInfoTable {})   = True
 isConInfoTableLabel _                            = False
-
--- | Get the label size field from a ForeignLabel
-foreignLabelStdcallInfo :: CLabel -> Maybe Int
-foreignLabelStdcallInfo (ForeignLabel _ info _ _) = info
-foreignLabelStdcallInfo _lbl = Nothing
-
 
 -- Constructing Large*Labels
 mkBitmapLabel   :: Unique -> CLabel
@@ -1052,7 +1030,7 @@ maybeLocalBlockLabel _                     = Nothing
 --      to the C compiler. For these labels we avoid generating our
 --      own C prototypes.
 isMathFun :: CLabel -> Bool
-isMathFun (ForeignLabel fs _ _ _)       = fs `elementOfUniqSet` math_funs
+isMathFun (ForeignLabel fs _ _)       = fs `elementOfUniqSet` math_funs
 isMathFun _ = False
 
 math_funs :: UniqSet FastString
@@ -1217,8 +1195,8 @@ labelType (RtsLabel (RtsPrimOp _))              = CodeLabel
 labelType (RtsLabel (RtsSlowFastTickyCtr _))    = DataLabel
 labelType (LocalBlockLabel _)                   = CodeLabel
 labelType (SRTLabel _)                          = DataLabel
-labelType (ForeignLabel _ _ _ IsFunction)       = CodeLabel
-labelType (ForeignLabel _ _ _ IsData)           = DataLabel
+labelType (ForeignLabel _ _ IsFunction)         = CodeLabel
+labelType (ForeignLabel _ _ IsData)             = DataLabel
 labelType (AsmTempLabel _)                      = panic "labelType(AsmTempLabel)"
 labelType (AsmTempDerivedLabel _ _)             = panic "labelType(AsmTempDerivedLabel)"
 labelType (StringLitLabel _)                    = DataLabel
@@ -1297,7 +1275,7 @@ labelDynamic this_mod platform external_dynamic_refs lbl =
 
    LocalBlockLabel _    -> False
 
-   ForeignLabel _ _ source _  ->
+   ForeignLabel _ source _  ->
        if os == OSMinGW32
        then case source of
             -- Foreign label is in some un-named foreign package (or DLL).
@@ -1424,11 +1402,11 @@ allocation.  Take care if you want to remove them!
 
 -- | Style of label pretty-printing.
 --
--- When we produce C sources or headers, we have to take into account that C
--- compilers transform C labels when they convert them into symbols. For
--- example, they can add prefixes (e.g., "_" on Darwin) or suffixes (size for
--- stdcalls on Windows). So we provide two ways to pretty-print CLabels: C style
--- or Asm style.
+-- When we produce C sources or headers, we have to take into account
+-- that C compilers transform C labels when they convert them into
+-- symbols. For example, they can add prefixes (e.g., "_" on Darwin).
+-- So we provide two ways to pretty-print CLabels: C style or Asm
+-- style.
 --
 data LabelStyle
    = CStyle   -- ^ C label style (used by C and LLVM backends)
@@ -1504,16 +1482,8 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
    StringLitLabel u
       -> maybe_underscore $ pprUniqueAlways u <> text "_str"
 
-   ForeignLabel fs (Just sz) _ _
-      | AsmStyle <- sty
-      , OSMinGW32 <- platformOS platform
-      -> -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
-         -- (The C compiler does this itself).
-         maybe_underscore $ ftext fs <> char '@' <> int sz
-
-   ForeignLabel fs _ _ _
+   ForeignLabel fs _ _
       -> maybe_underscore $ ftext fs
-
 
    IdLabel name _cafs flavor -> case sty of
       AsmStyle -> maybe_underscore $ internalNamePrefix <> pprName name <> ppIdFlavor flavor

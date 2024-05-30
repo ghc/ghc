@@ -1393,7 +1393,7 @@ generatePrimCall d s p target _mb_unit _result_ty args
          prim_args_offsets = mapFst stgArgRepU args_offsets
          shifted_args_offsets = mapSnd (+ d) args_offsets
 
-         push_target = PUSH_UBX (LitLabel target Nothing IsFunction) 1
+         push_target = PUSH_UBX (LitLabel target IsFunction) 1
          push_info = PUSH_UBX (mkNativeCallInfoLit platform args_info) 1
          {-
             compute size to move payload (without stg_primcall_info header)
@@ -1438,7 +1438,7 @@ generateCCall d0 s p (CCallSpec target PrimCallConv _) result_ty args
  = generatePrimCall d0 s p label mb_unit result_ty args
  | otherwise
  = panic "GHC.StgToByteCode.generateCCall: primcall convention only supports static targets"
-generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
+generateCCall d0 s p (CCallSpec target _ safety) result_ty args
  = do
      profile <- getProfile
 
@@ -1546,14 +1546,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
                  StaticTarget _ _ _ False ->
                    panic "generateCCall: unexpected FFI value import"
                  StaticTarget _ target _ True ->
-                   Just (LitLabel target mb_size IsFunction)
-                   where
-                      mb_size
-                          | OSMinGW32 <- platformOS platform
-                          , StdCallConv <- cconv
-                          = Just (fromIntegral a_reps_sizeW * platformWordSizeInBytes platform)
-                          | otherwise
-                          = Nothing
+                   Just (LitLabel target IsFunction)
 
      let
          is_static = isJust maybe_static_target
@@ -1587,12 +1580,6 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          -- is.  See comment in Interpreter.c with the CCALL instruction.
          stk_offset   = bytesToWords platform (d_after_r - s)
 
-         conv = case cconv of
-           CCallConv -> FFICCall
-           CApiConv  -> FFICCall
-           StdCallConv -> FFIStdCall
-           _ -> panic "GHC.StgToByteCode: unexpected calling convention"
-
      -- the only difference in libffi mode is that we prepare a cif
      -- describing the call type by calling libffi, and we attach the
      -- address of this to the CCALL instruction.
@@ -1601,7 +1588,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
      let ffires = primRepToFFIType platform r_rep
          ffiargs = map (primRepToFFIType platform) a_reps
      interp <- hscInterp <$> getHscEnv
-     token <- ioToBc $ interpCmd interp (PrepFFI conv ffiargs ffires)
+     token <- ioToBc $ interpCmd interp (PrepFFI ffiargs ffires)
      recordFFIBc token
 
      let
@@ -2148,7 +2135,7 @@ isFollowableArg _ = False
 isSupportedCConv :: CCallSpec -> Bool
 isSupportedCConv (CCallSpec _ cconv _) = case cconv of
    CCallConv            -> True     -- we explicitly pattern match on every
-   StdCallConv          -> True     -- convention to ensure that a warning
+   StdCallConv          -> False    -- convention to ensure that a warning
    PrimCallConv         -> True     -- is triggered when a new one is added
    JavaScriptCallConv   -> False
    CApiConv             -> True

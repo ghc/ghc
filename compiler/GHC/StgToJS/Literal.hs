@@ -61,7 +61,7 @@ genLit = \case
     LitNumBigNat  -> panic "genLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloat r               -> return [ toJExpr (r2f r) ]
   LitDouble r              -> return [ toJExpr (r2d r) ]
-  LitLabel name _size fod
+  LitLabel name fod
     | fod == IsFunction      -> return [ ApplExpr (var "h$mkFunctionPtr")
                                                   [var (mkRawSymbol True name)]
                                        , ValExpr (JInt 0)
@@ -113,7 +113,7 @@ genStaticLit = \case
     LitNumBigNat  -> panic "genStaticLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloat r               -> return [ DoubleLit . SaneDouble . r2f $ r ]
   LitDouble r              -> return [ DoubleLit . SaneDouble . r2d $ r ]
-  LitLabel name _size fod  -> return [ LabelLit (fod == IsFunction) (mkRawSymbol True name)
+  LitLabel name fod        -> return [ LabelLit (fod == IsFunction) (mkRawSymbol True name)
                                      , IntLit 0 ]
   l -> pprPanic "genStaticLit" (ppr l)
 

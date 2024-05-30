@@ -95,7 +95,7 @@ dsForeigns' fos = do
                           , fd_e_ext = co
                           , fd_fe = CExport _
                               (L _ (CExportStatic _ ext_nm cconv)) }) = do
-      (h, c, _, _, ids, bs) <- dsFExport id co ext_nm cconv False
+      (h, c, _, ids, bs) <- dsFExport id co ext_nm cconv False
       return (h, c, ids, bs)
 
 {-
@@ -173,7 +173,6 @@ dsFExport :: Id                 -- Either the exported Id,
           -> DsM ( CHeader      -- contents of Module_stub.h
                  , CStub        -- contents of Module_stub.c
                  , String       -- string describing type to pass to createAdj.
-                 , Int          -- size of args to stub function
                  , [Id]         -- function closures to be registered as GC roots
                  , [Binding]    -- additional bindings used by desugared foreign export
                  )
@@ -181,13 +180,13 @@ dsFExport fn_id co ext_name cconv is_dyn = do
   platform <- getPlatform
   case (platformArch platform, cconv) of
     (ArchJavaScript, _) -> do
-      (h, c, ts, args) <- dsJsFExport fn_id co ext_name cconv is_dyn
-      pure (h, c, ts, args, [fn_id], [])
+      (h, c, ts) <- dsJsFExport fn_id co ext_name cconv is_dyn
+      pure (h, c, ts, [fn_id], [])
     (ArchWasm32, JavaScriptCallConv) ->
       dsWasmJSExport fn_id co ext_name
     _ -> do
-      (h, c, ts, args) <- dsCFExport fn_id co ext_name cconv is_dyn
-      pure (h, c, ts, args, [fn_id], [])
+      (h, c, ts) <- dsCFExport fn_id co ext_name cconv is_dyn
+      pure (h, c, ts, [fn_id], [])
 
 
 foreignExportsInitialiser :: Platform -> Module -> [Id] -> CStub

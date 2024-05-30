@@ -243,13 +243,6 @@ pprStmt platform stmt =
         fnCall =
             case fn of
               CmmLit (CmmLabel lbl)
-                | StdCallConv <- cconv ->
-                    pprCall platform (pprCLabel platform lbl) cconv hresults hargs
-                        -- stdcall functions must be declared with
-                        -- a function type, otherwise the C compiler
-                        -- doesn't add the @n suffix to the label.  We
-                        -- can't add the @n suffix ourselves, because
-                        -- it isn't valid C.
                 | CmmNeverReturns <- ret ->
                     pprCall platform cast_fn cconv hresults hargs <> semi <> text "__builtin_unreachable();"
                 | not (isMathFun lbl) ->
@@ -1260,7 +1253,6 @@ pprExternDecl :: Platform -> CLabel -> SDoc
 pprExternDecl platform lbl
   -- do not print anything for "known external" things
   | not (needsCDecl lbl) = empty
-  | Just sz <- foreignLabelStdcallInfo lbl = stdcall_decl sz
   | otherwise =
         hcat [ visibility, label_type lbl , lparen, pprCLabel platform lbl, text ");"
              -- occasionally useful to see label type
@@ -1280,14 +1272,6 @@ pprExternDecl platform lbl
   visibility
      | externallyVisibleCLabel lbl = char 'E'
      | otherwise                   = char 'I'
-
-  -- If the label we want to refer to is a stdcall function (on Windows) then
-  -- we must generate an appropriate prototype for it, so that the C compiler will
-  -- add the @n suffix to the label (#2276)
-  stdcall_decl sz =
-        text "extern __attribute__((stdcall)) void " <> pprCLabel platform lbl
-        <> parens (commafy (replicate (sz `quot` platformWordSizeInBytes platform) (machRep_U_CType platform (wordWidth platform))))
-        <> semi
 
 type TEState = (UniqSet LocalReg, Map CLabel ())
 newtype TE a = TE' (State TEState a)

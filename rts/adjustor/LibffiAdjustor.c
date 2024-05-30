@@ -145,8 +145,7 @@ static ffi_type * char_to_ffi_type(char c)
 }
 
 void*
-createAdjustor (int cconv,
-                StgStablePtr hptr,
+createAdjustor (StgStablePtr hptr,
                 StgFunPtr wptr,
                 char *typeString)
 {
@@ -155,7 +154,7 @@ createAdjustor (int cconv,
     uint32_t n_args, i;
     ffi_type *result_type;
     ffi_closure *cl;
-    int r, abi;
+    int r;
     void *code;
 
     n_args = strlen(typeString) - 1;
@@ -166,20 +165,8 @@ createAdjustor (int cconv,
     for (i=0; i < n_args; i++) {
         arg_types[i] = char_to_ffi_type(typeString[i+1]);
     }
-    switch (cconv) {
-#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
-    case 0: /* stdcall */
-        abi = FFI_STDCALL;
-        break;
-#endif /* defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH) */
-    case 1: /* ccall */
-        abi = FFI_DEFAULT_ABI;
-        break;
-    default:
-        barf("createAdjustor: convention %d not supported on this platform", cconv);
-    }
 
-    r = ffi_prep_cif(cif, abi, n_args, result_type, arg_types);
+    r = ffi_prep_cif(cif, FFI_DEFAULT_ABI, n_args, result_type, arg_types);
     if (r != FFI_OK) barf("ffi_prep_cif failed: %d", r);
 
     cl = allocate_adjustor(&code, cif, wptr, hptr);

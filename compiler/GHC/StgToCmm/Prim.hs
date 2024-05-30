@@ -253,7 +253,7 @@ emitPrimOp cfg primop =
     -- later, we might want to inline it.
     emitCCall
         [(res,NoHint)]
-        (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
+        (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") ForeignLabelInExternalPackage IsFunction)))
         [(baseExpr platform, AddrHint), (arg,AddrHint)]
 
   SparkOp -> \[arg] -> opIntoRegs $ \[res] -> do
@@ -264,7 +264,7 @@ emitPrimOp cfg primop =
     tmp2 <- newTemp (bWord platform)
     emitCCall
         [(tmp2,NoHint)]
-        (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
+        (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") ForeignLabelInExternalPackage IsFunction)))
         [(baseExpr platform, AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
     emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))
 
@@ -2289,7 +2289,7 @@ fmaCCall width res arg_x arg_y arg_z =
     (CmmLit (CmmLabel fma_lbl))
     [(arg_x,NoHint), (arg_y,NoHint), (arg_z,NoHint)]
   where
-    fma_lbl = mkForeignLabel fma_op Nothing ForeignLabelInExternalPackage IsFunction
+    fma_lbl = mkForeignLabel fma_op ForeignLabelInExternalPackage IsFunction
     fma_op = case width of
       W32 -> fsLit "fmaf"
       W64 -> fsLit "fma"

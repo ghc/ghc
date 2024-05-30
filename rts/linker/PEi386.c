@@ -1131,7 +1131,6 @@ get_name_string (uint8_t* name, ObjectCode* oc)
     }
 }
 
-/* See Note [mingw-w64 name decoration scheme] */
 #if !defined(x86_64_HOST_ARCH)
 static void
 zapTrailingAtSign ( SymbolName* sym )
@@ -1160,9 +1159,9 @@ lookupSymbolInDLL_PEi386 ( const SymbolName* lbl, HINSTANCE instance, pathchar* 
 
     /* debugBelch("look in %ls for %s\n", dll_name, lbl); */
 
-    sym = GetProcAddress(instance, lbl+STRIP_LEADING_UNDERSCORE);
+    sym = GetProcAddress(instance, lbl);
     if (sym != NULL) {
-        /*debugBelch("found %s in %ls\n", lbl+STRIP_LEADING_UNDERSCORE,dll_name);*/
+        /*debugBelch("found %s in %ls\n", lbl, dll_name);*/
         return sym;
     }
 
@@ -1176,7 +1175,7 @@ lookupSymbolInDLL_PEi386 ( const SymbolName* lbl, HINSTANCE instance, pathchar* 
      */
     if (sym == NULL && strncmp (lbl, "__imp_", 6) == 0) {
         sym = GetProcAddress(instance,
-                             lbl + 6 + STRIP_LEADING_UNDERSCORE);
+                             lbl + 6);
         if (sym != NULL) {
             SymbolAddr** indirect = m32_alloc(dependent->rw_m32, sizeof(SymbolAddr*), 8);
             if (indirect == NULL) {
@@ -1185,7 +1184,7 @@ lookupSymbolInDLL_PEi386 ( const SymbolName* lbl, HINSTANCE instance, pathchar* 
             *indirect = sym;
             IF_DEBUG(linker,
               debugBelch("warning: %s from %S is linked instead of %s\n",
-                         lbl+6+STRIP_LEADING_UNDERSCORE, dll_name, lbl));
+                         lbl+6, dll_name, lbl));
             return (void*) indirect;
            }
     }
@@ -2326,7 +2325,6 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType 
 
         SymbolAddr* sym;
 
-/* See Note [mingw-w64 name decoration scheme] */
 #if !defined(x86_64_HOST_ARCH)
         zapTrailingAtSign ( lbl );
 #endif

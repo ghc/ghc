@@ -523,7 +523,7 @@ gotLabel
         -- HACK: this label isn't really foreign
         = mkForeignLabel
                 (fsLit ".LCTOC1")
-                Nothing ForeignLabelInThisPackage IsData
+                ForeignLabelInThisPackage IsData
 
 
 

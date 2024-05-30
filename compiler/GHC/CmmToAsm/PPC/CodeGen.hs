@@ -1984,7 +1984,7 @@ genCCall' config gcp target dest_regs args
         outOfLineMachOp mop =
             do
                 mopExpr <- cmmMakeDynamicReference config CallReference $
-                              mkForeignLabel functionName Nothing ForeignLabelInThisPackage IsFunction
+                              mkForeignLabel functionName ForeignLabelInThisPackage IsFunction
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
                         _ -> Right mopExpr

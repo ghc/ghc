@@ -42,7 +42,7 @@ void initAdjustors(void)
 }
 
 void*
-createAdjustor(int cconv, StgStablePtr hptr,
+createAdjustor(StgStablePtr hptr,
                StgFunPtr wptr,
                char *typeString
     )
@@ -52,9 +52,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
         .wptr = wptr,
     };
 
-    switch (cconv)
-    {
-    case 1: /* _ccall */
     /*
       stack at call:
                argn
@@ -83,7 +80,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
       See NativeAmd64MingwAsm.S.
     */
-    {
         // determine whether we have 4 or more integer arguments,
         // and therefore need to flush one to the stack.
         if ((typeString[0] == '\0') ||
@@ -102,12 +98,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
                 return alloc_adjustor(complex_nofloat_ccall_pool, &context);
             }
         }
-    }
-
-    default:
-        barf("createAdjustor: Unsupported calling convention");
-        break;
-    }
 }
 
 void freeHaskellFunctionPtr(void* ptr)
@@ -116,4 +106,3 @@ void freeHaskellFunctionPtr(void* ptr)
     free_adjustor(ptr, &context);
     freeStablePtr(context.hptr);
 }
-

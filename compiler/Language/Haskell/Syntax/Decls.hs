@@ -1588,7 +1588,7 @@ data ForeignImport pass = -- import of a C entity
                           --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
                           --
                           CImport  (XCImport pass)
-                                   (XRec pass CCallConv) -- ccall or stdcall
+                                   (XRec pass CCallConv) -- ccall
                                    (XRec pass Safety)  -- interruptible, safe or unsafe
                                    (Maybe Header)       -- name of C header
                                    CImportSpec          -- details of the C entity

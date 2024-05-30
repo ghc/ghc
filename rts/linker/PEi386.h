@@ -62,7 +62,6 @@ bool ocVerifyImage_PEi386 ( ObjectCode* oc );
 SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType *type);
 SymbolAddr *lookupSymbolInDLL_PEi386 (const SymbolName* lbl, HINSTANCE instance, pathchar* dll_name, ObjectCode *dependent);
 
-/* See Note [mingw-w64 name decoration scheme] */
 /* We use myindex to calculate array addresses, rather than
    simply doing the normal subscript thing.  That's because
    some of the above structs have sizes which are not
@@ -150,28 +149,5 @@ uint8_t getSymStorageClass ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint8_t getSymNumberOfAuxSymbols ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint16_t getSymType ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint8_t* getSymShortName ( COFF_HEADER_INFO *info, COFF_symbol* sym );
-
-/* See Note [mingw-w64 name decoration scheme] */
-#if !defined(x86_64_HOST_ARCH)
-#define STRIP_LEADING_UNDERSCORE 1
-#else
-#define STRIP_LEADING_UNDERSCORE 0
-#endif
-
-/*
-Note [mingw-w64 name decoration scheme]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What's going on with name decoration? Well, original code
-have some crufty and ad-hocish paths related mostly to very old
-mingw gcc/binutils/runtime combinations. Now mingw-w64 offers pretty
-uniform and MS-compatible decoration scheme across its tools and runtime.
-
-The scheme is pretty straightforward: on 32 bit objects symbols are exported
-with underscore prepended (and @ + stack size suffix appended for stdcall
-functions), on 64 bits no underscore is prepended and no suffix is appended
-because we have no stdcall convention on 64 bits.
-
-See #9218
-*/
 
 #include "EndPrivate.h"

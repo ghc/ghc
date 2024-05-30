@@ -137,7 +137,7 @@ freeThreadLocalKey (ThreadLocalKey *key)
 }
 
 
-static unsigned __stdcall
+static unsigned
 forkOS_createThreadWrapper ( void * entry )
 {
     Capability *cap;

@@ -1271,7 +1271,7 @@ function h$addExtraRoot() {
   // fixme
 }
 
-function h$createAdjustor(cconv, stbl_d, stbl_o, lbl_d, lbl_o, typeStr_d, typeStr_o) {
+function h$createAdjustor(stbl_d, stbl_o, lbl_d, lbl_o, typeStr_d, typeStr_o) {
   // fixme shouldn't we just use stablePtr for this?
   var func    = lbl_d.arr[lbl_o];
   // var typeStr = h$decodeUtf8z(typeStr_d, typeStr_o);

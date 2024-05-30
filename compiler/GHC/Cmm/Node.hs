@@ -502,7 +502,7 @@ pprForeignTarget platform (PrimTarget op)
  = pdoc platform
                (mkForeignLabel
                           (mkFastString (show op))
-                          Nothing ForeignLabelInThisPackage IsFunction)
+                          ForeignLabelInThisPackage IsFunction)
 
 instance Outputable Convention where
   ppr = pprConvention

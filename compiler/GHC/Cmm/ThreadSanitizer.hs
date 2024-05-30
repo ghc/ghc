@@ -203,7 +203,7 @@ tsanTarget fn formals args =
     ForeignTarget (CmmLit (CmmLabel lbl)) conv
   where
     conv = ForeignConvention CCallConv args formals CmmMayReturn
-    lbl = mkForeignLabel fn Nothing ForeignLabelInExternalPackage IsFunction
+    lbl = mkForeignLabel fn ForeignLabelInExternalPackage IsFunction
 
 tsanStore :: Env
           -> CmmType -> CmmExpr

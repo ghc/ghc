@@ -91,8 +91,8 @@ EXTERN_INLINE int OS_TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
 /* We jump through a hoop here to get a CCall AcquireSRWLockExclusive
    and ReleaseSRWLockExclusive, as that's what C-- wants. */
 
-#define OS_ACQUIRE_LOCK(mutex) foreign "stdcall" AcquireSRWLockExclusive(mutex)
-#define OS_RELEASE_LOCK(mutex) foreign "stdcall" ReleaseSRWLockExclusive(mutex)
+#define OS_ACQUIRE_LOCK(mutex) ccall AcquireSRWLockExclusive((mutex) "ptr")
+#define OS_RELEASE_LOCK(mutex) ccall ReleaseSRWLockExclusive((mutex) "ptr")
 #define OS_ASSERT_LOCK_HELD(mutex) /* nothing */
 
 #else // CMINUSMINUS
@@ -109,7 +109,7 @@ typedef DWORD OSThreadId;
 // many HANDLES to a given thread, so comparison would not work.
 typedef DWORD ThreadLocalKey;
 
-#define OSThreadProcAttr __stdcall
+#define OSThreadProcAttr
 
 #define INIT_COND_VAR  0
 

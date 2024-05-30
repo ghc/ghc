@@ -38,7 +38,7 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
 void initAdjustors(void) { }
 
 void*
-createAdjustor(int cconv, StgStablePtr hptr,
+createAdjustor(StgStablePtr hptr,
                StgFunPtr wptr,
                char *typeString
 #if !defined(powerpc_HOST_ARCH) && !defined(powerpc64_HOST_ARCH) && !defined(x86_64_HOST_ARCH)
@@ -49,9 +49,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
     void *adjustor = NULL;
     void *code = NULL;
 
-    switch (cconv)
-    {
-    case 1: /* _ccall */
 /*
     Up to 8 inputs are passed in registers.  We flush the last two inputs to
     the stack, initially into the 16-byte scratch region left by the caller.
@@ -98,7 +95,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
                                 | (BITS(val,40,23))             \
                                 | (BITS(val,63,1)    << 59))
 
-    {
         StgStablePtr stable;
         IA64FunDesc *wdesc = (IA64FunDesc *)wptr;
         StgWord64 wcode = wdesc->ip;
@@ -139,15 +135,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
         /* save stable pointers in convenient form */
         code[16] = (StgWord64)hptr;
         code[17] = (StgWord64)stable;
-    }
-#else
-    barf("adjustor creation not supported on this platform");
-#endif
-    break;
-
-    default:
-        barf("createAdjustor: Unsupported calling convention");
-    }
 
     return code;
 }

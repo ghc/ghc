@@ -145,19 +145,13 @@ data Literal
   | LitFloat   Rational         -- ^ @Float#@. Create with 'mkLitFloat'
   | LitDouble  Rational         -- ^ @Double#@. Create with 'mkLitDouble'
 
-  | LitLabel   FastString (Maybe Int) FunctionOrData
+  | LitLabel   FastString FunctionOrData
                                 -- ^ A label literal. Parameters:
                                 --
                                 -- 1) The name of the symbol mentioned in the
                                 --    declaration
                                 --
-                                -- 2) The size (in bytes) of the arguments
-                                --    the label expects. Only applicable with
-                                --    @stdcall@ labels. @Just x@ => @\<x\>@ will
-                                --    be appended to label name when emitting
-                                --    assembly.
-                                --
-                                -- 3) Flag indicating whether the symbol
+                                -- 2) Flag indicating whether the symbol
                                 --    references a function or a data
   deriving Data
 
@@ -259,10 +253,9 @@ instance Binary Literal where
     put_ bh (LitNullAddr)    = putByte bh 2
     put_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
     put_ bh (LitDouble ai)   = do putByte bh 4; put_ bh ai
-    put_ bh (LitLabel aj mb fod)
+    put_ bh (LitLabel aj fod)
         = do putByte bh 5
              put_ bh aj
-             put_ bh mb
              put_ bh fod
     put_ bh (LitNumber nt i)
         = do putByte bh 6
@@ -289,9 +282,8 @@ instance Binary Literal where
                     return (LitDouble ai)
               5 -> do
                     aj <- get bh
-                    mb <- get bh
                     fod <- get bh
-                    return (LitLabel aj mb fod)
+                    return (LitLabel aj fod)
               6 -> do
                     nt <- get bh
                     i  <- get bh
@@ -843,7 +835,7 @@ literalType (LitChar _)       = charPrimTy
 literalType (LitString  _)    = addrPrimTy
 literalType (LitFloat _)      = floatPrimTy
 literalType (LitDouble _)     = doublePrimTy
-literalType (LitLabel _ _ _)  = addrPrimTy
+literalType (LitLabel _ _)    = addrPrimTy
 literalType (LitNumber lt _)  = case lt of
    LitNumBigNat  -> byteArrayPrimTy
    LitNumInt     -> intPrimTy
@@ -874,7 +866,7 @@ cmpLit (LitString    a)     (LitString     b)     = a `compare` b
 cmpLit (LitNullAddr)        (LitNullAddr)         = EQ
 cmpLit (LitFloat     a)     (LitFloat      b)     = a `compare` b
 cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
-cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `lexicalCompareFS` b
+cmpLit (LitLabel     a _)   (LitLabel      b _)   = a `lexicalCompareFS` b
 cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
   = (nt1 `compare` nt2) `mappend` (a `compare` b)
 cmpLit (LitRubbish tc1 b1)  (LitRubbish tc2 b2)  = (tc1 `compare` tc2) `mappend`
@@ -908,11 +900,8 @@ pprLiteral _       (LitNumber nt i)
        LitNumWord16  -> pprPrimWord16 i
        LitNumWord32  -> pprPrimWord32 i
        LitNumWord64  -> pprPrimWord64 i
-pprLiteral add_par (LitLabel l mb fod) =
-    add_par (text "__label" <+> b <+> ppr fod)
-    where b = case mb of
-              Nothing -> pprHsString l
-              Just x  -> doubleQuotes (ftext l <> text ('@':show x))
+pprLiteral add_par (LitLabel l fod) =
+    add_par (text "__label" <+> pprHsString l <+> ppr fod)
 pprLiteral _       (LitRubbish torc rep)
   = text "RUBBISH" <> pp_tc <> parens (ppr rep)
   where

@@ -35,7 +35,7 @@ void initAdjustors(void)
 }
 
 void*
-createAdjustor(int cconv, StgStablePtr hptr,
+createAdjustor(StgStablePtr hptr,
                StgFunPtr wptr,
                char *typeString
     )
@@ -45,9 +45,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
         .wptr = wptr,
     };
 
-    switch (cconv)
-    {
-    case 1: /* _ccall */
     /*
       stack at call:
                argn
@@ -75,7 +72,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
       pointer inserted just after the 6th integer argument.
     */
 
-    {
         int n_int_args = 0;
 
         // determine whether we have 6 or more integer arguments,
@@ -94,13 +90,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
         } else {
             return alloc_adjustor(complex_ccall_pool, &context);
         }
-        break;
-    }
-
-    default:
-        barf("createAdjustor: Unsupported calling convention");
-        break;
-    }
 }
 
 void freeHaskellFunctionPtr(void* ptr)

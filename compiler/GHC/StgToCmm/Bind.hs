@@ -861,7 +861,7 @@ link_caf node = do
   { cfg <- getStgToCmmConfig
         -- Call the RTS function newCAF, returning the newly-allocated
         -- blackhole indirection closure
-  ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF") Nothing
+  ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF")
                                     ForeignLabelInExternalPackage IsFunction
   ; let profile  = stgToCmmProfile cfg
   ; let platform = profilePlatform profile

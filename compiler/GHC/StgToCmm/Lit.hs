@@ -97,9 +97,8 @@ mkSimpleLit platform = \case
    (LitNumber LitNumWord64 i)   -> CmmInt i W64
    (LitFloat r)                 -> CmmFloat r W32
    (LitDouble r)                -> CmmFloat r W64
-   (LitLabel fs ms fod)
+   (LitLabel fs fod)
      -> let -- TODO: Literal labels might not actually be in the current package...
             labelSrc = ForeignLabelInThisPackage
-        in CmmLabel (mkForeignLabel fs ms labelSrc fod)
+        in CmmLabel (mkForeignLabel fs labelSrc fod)
    other -> pprPanic "mkSimpleLit" (ppr other)
-

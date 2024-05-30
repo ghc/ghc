@@ -54,19 +54,15 @@ typedef struct AdjustorStub {
 void initAdjustors(void) { }
 
 void*
-createAdjustor(int cconv, StgStablePtr hptr,
+createAdjustor(StgStablePtr hptr,
                StgFunPtr wptr,
                char *typeString
     )
 {
-    switch (cconv)
-    {
-    case 1: /* _ccall */
 #if defined(linux_HOST_OS)
 
 #define OP_LO(op,lo)  ((((unsigned)(op)) << 16) | (((unsigned)(lo)) & 0xFFFF))
 #define OP_HI(op,hi)  ((((unsigned)(op)) << 16) | (((unsigned)(hi)) >> 16))
-    {
         /* The PowerPC Linux (32-bit) calling convention is annoyingly complex.
            We need to calculate all the details of the stack frame layout,
            taking into account the types of all the arguments, and then
@@ -273,13 +269,11 @@ createAdjustor(int cconv, StgStablePtr hptr,
             }
             __asm__ volatile ("sync\n\tisync");
         }
-    }
 
 #else
 
 #define OP_LO(op,lo)  ((((unsigned)(op)) << 16) | (((unsigned)(lo)) & 0xFFFF))
 #define OP_HI(op,hi)  ((((unsigned)(op)) << 16) | (((unsigned)(hi)) >> 16))
-    {
         /* The following code applies to all PowerPC and PowerPC64 platforms
            whose stack layout is based on the AIX ABI.
 
@@ -384,11 +378,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
         adjustorStub->extrawords_plus_one = extra_sz + 1;
 
         return code;
-    }
-
-    default:
-        barf("createAdjustor: Unsupported calling convention");
-    }
 }
 
 void

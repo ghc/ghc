@@ -72,20 +72,7 @@ cgForeignCall :: ForeignCall            -- the op
               -> FCode ReturnKind
 
 cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
-  = do  { platform <- getPlatform
-        ; let -- in the stdcall calling convention, the symbol needs @size appended
-              -- to it, where size is the total number of bytes of arguments.  We
-              -- attach this info to the CLabel here, and the CLabel pretty printer
-              -- will generate the suffix when the label is printed.
-            call_size args
-              | StdCallConv <- cconv = Just (sum (map arg_size args))
-              | otherwise            = Nothing
-
-              -- ToDo: this might not be correct for 64-bit API
-              -- This is correct for the PowerPC ELF ABI version 1 and 2.
-            arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType platform arg)
-                                     (platformWordSizeInBytes platform)
-        ; cmm_args <- getFCallArgs stg_args typ
+  = do  { cmm_args <- getFCallArgs stg_args typ
         -- ; traceM $ show cmm_args
         ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
@@ -97,10 +84,9 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                                 = case mPkgId of
                                         Nothing         -> ForeignLabelInThisPackage
                                         Just pkgId      -> ForeignLabelInPackage (toUnitId pkgId)
-                            size = call_size cmm_args
                         in  ( unzip cmm_args
                             , CmmLit (CmmLabel
-                                        (mkForeignLabel lbl size labelSource IsFunction)))
+                                        (mkForeignLabel lbl labelSource IsFunction)))
 
                    DynamicTarget    ->  case cmm_args of
                                            (fn,_):rest -> (unzip rest, fn)

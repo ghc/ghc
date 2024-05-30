@@ -109,7 +109,7 @@ run m = case m of
     mapM mkRemoteRef =<< getIdValFromApStack aps ix
   MallocData bs -> mkString bs
   MallocStrings bss -> mapM mkString0 bss
-  PrepFFI conv args res -> toRemotePtr <$> prepForeignCall conv args res
+  PrepFFI args res -> toRemotePtr <$> prepForeignCall args res
   FreeFFI p -> freeForeignCallInfo (fromRemotePtr p)
   StartTH -> startTH
   GetClosure ref -> do

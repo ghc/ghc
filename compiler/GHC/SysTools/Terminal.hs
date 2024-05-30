@@ -17,16 +17,6 @@ import qualified System.Win32 as Win32
 
 import System.IO.Unsafe
 
-#if defined(mingw32_HOST_OS) && !defined(WINAPI)
-# if defined(i386_HOST_ARCH)
-#  define WINAPI stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINAPI ccall
-# else
-#  error unknown architecture
-# endif
-#endif
-
 -- | Does the controlling terminal support ANSI color sequences?
 -- This memoized to avoid thread-safety issues in ncurses (see #17922).
 stderrSupportsAnsiColors :: Bool
@@ -84,10 +74,10 @@ setConsoleMode :: Win32.HANDLE -> Win32.DWORD -> IO ()
 setConsoleMode h mode = do
   Win32.failIfFalse_ "SetConsoleMode" (c_SetConsoleMode h mode)
 
-foreign import WINAPI unsafe "windows.h GetConsoleMode" c_GetConsoleMode
+foreign import ccall unsafe "windows.h GetConsoleMode" c_GetConsoleMode
   :: Win32.HANDLE -> Ptr Win32.DWORD -> IO Win32.BOOL
 
-foreign import WINAPI unsafe "windows.h SetConsoleMode" c_SetConsoleMode
+foreign import ccall unsafe "windows.h SetConsoleMode" c_SetConsoleMode
   :: Win32.HANDLE -> Win32.DWORD -> IO Win32.BOOL
 
 #endif

@@ -36,7 +36,6 @@
 {-# LANGUAGE CPP, DeriveGeneric, DeriveAnyClass #-}
 module GHCi.FFI
   ( FFIType(..)
-  , FFIConv(..)
   , C_ffi_cif
   , prepForeignCall
   , freeForeignCallInfo
@@ -66,36 +65,27 @@ data FFIType
   | FFIUInt64
   deriving (Show, Generic, Binary)
 
-data FFIConv
-  = FFICCall
-  | FFIStdCall
-  deriving (Show, Generic, Binary)
-
-
 prepForeignCall
-    :: FFIConv
-    -> [FFIType]          -- arg types
+    :: [FFIType]          -- arg types
     -> FFIType            -- result type
     -> IO (Ptr C_ffi_cif) -- token for making calls (must be freed by caller)
 
 #if !defined(javascript_HOST_ARCH)
-prepForeignCall cconv arg_types result_type = do
+prepForeignCall arg_types result_type = do
   let n_args = length arg_types
   arg_arr <- mallocArray n_args
   pokeArray arg_arr (map ffiType arg_types)
   cif <- mallocBytes (#const sizeof(ffi_cif))
-  let abi = convToABI cconv
-  r <- ffi_prep_cif cif abi (fromIntegral n_args) (ffiType result_type) arg_arr
+  r <- ffi_prep_cif cif fFI_DEFAULT_ABI (fromIntegral n_args) (ffiType result_type) arg_arr
   if r /= fFI_OK then
     throwIO $ ErrorCall $ concat
       [ "prepForeignCallFailed: ", strError r,
-        "(cconv: ", show cconv,
-        " arg tys: ", show arg_types,
+        "(arg tys: ", show arg_types,
         " res ty: ", show result_type, ")" ]
   else
     return (castPtr cif)
 #else
-prepForeignCall _ _ _ =
+prepForeignCall _ _ =
   error "GHCi.FFI.prepForeignCall: Called with JS_HOST_ARCH! Perhaps you need to run configure?"
 #endif
 
@@ -123,14 +113,6 @@ strError r
   = "invalid type description (FFI_BAD_TYPEDEF)"
   | otherwise
   = "unknown error: " ++ show r
-
-convToABI :: FFIConv -> C_ffi_abi
-convToABI FFICCall  = fFI_DEFAULT_ABI
-#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
-convToABI FFIStdCall = fFI_STDCALL
-#endif
--- unknown conventions are mapped to the default, (#3336)
-convToABI _           = fFI_DEFAULT_ABI
 
 ffiType :: FFIType -> Ptr C_ffi_type
 ffiType FFIVoid     = ffi_type_void
@@ -169,10 +151,6 @@ fFI_BAD_TYPEDEF = (#const FFI_BAD_TYPEDEF)
 
 fFI_DEFAULT_ABI :: C_ffi_abi
 fFI_DEFAULT_ABI = (#const FFI_DEFAULT_ABI)
-#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
-fFI_STDCALL     :: C_ffi_abi
-fFI_STDCALL     = (#const FFI_STDCALL)
-#endif
 
 -- ffi_status ffi_prep_cif(ffi_cif *cif,
 --                         ffi_abi abi,
