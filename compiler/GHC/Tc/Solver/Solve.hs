@@ -545,18 +545,21 @@ finish_rewrite ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc })
        ; continueWith new_ev }
   where
     -- mkEvCast optimises ReflCo
-    new_tm = mkEvCast (evId old_evar)
-                (downgradeRole Representational (ctEvRole ev) co)
+    ev_rw_role = ctEvRewriteRole ev
+    new_tm = assert (coercionRole co == ev_rw_role)
+             mkEvCast (evId old_evar)
+                (downgradeRole Representational ev_rw_role co)
 
 finish_rewrite ev@(CtWanted { ctev_dest = dest
                              , ctev_loc = loc
                              , ctev_rewriters = rewriters })
                 (Reduction co new_pred) new_rewriters
   = do { mb_new_ev <- newWanted loc rewriters' new_pred
-       ; massert (coercionRole co == ctEvRole ev)
+       ; let ev_rw_role = ctEvRewriteRole ev
+       ; massert (coercionRole co == ev_rw_role)
        ; setWantedEvTerm dest True $
             mkEvCast (getEvExpr mb_new_ev)
-                     (downgradeRole Representational (ctEvRole ev) (mkSymCo co))
+                     (downgradeRole Representational ev_rw_role (mkSymCo co))
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith new_ev
             Cached _      -> stopWith ev "Cached wanted" }

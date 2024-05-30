@@ -83,7 +83,7 @@ module GHC.Tc.Types.Constraint (
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         ctEvRewriters, ctEvUnique, tcEvDestUnique,
         mkKindEqLoc, toKindLoc, toInvisibleLoc, mkGivenLoc,
-        ctEvRole, setCtEvPredType, setCtEvLoc, arisesFromGivens,
+        ctEvRewriteRole, ctEvRewriteEqRel, setCtEvPredType, setCtEvLoc, arisesFromGivens,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
 
         -- RewriterSet
@@ -1967,6 +1967,18 @@ For Givens we make new EvVars and bind them immediately. Two main reasons:
 
 So a Given has EvVar inside it rather than (as previously) an EvTerm.
 
+Note [The rewrite-role of a constraint]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The rewrite-role of a constraint says what can rewrite that constraint:
+
+* If the rewrite-role = Nominal, only a nominal equality can rewrite it
+
+* If the rewrite-rule = Representational, either a nominal or
+  representational equality can rewrit it.
+
+Notice that the constraint may itself not be an equality at all.
+For example, the rewrite-role of (Eq [a]) is Nominal; only nominal
+equalities can rewrite it.
 -}
 
 -- | A place for type-checking evidence to go after it is generated.
@@ -2006,12 +2018,21 @@ ctEvOrigin :: CtEvidence -> CtOrigin
 ctEvOrigin = ctLocOrigin . ctEvLoc
 
 -- | Get the equality relation relevant for a 'CtEvidence'
-ctEvEqRel :: CtEvidence -> EqRel
+ctEvEqRel :: HasDebugCallStack => CtEvidence -> EqRel
 ctEvEqRel = predTypeEqRel . ctEvPred
 
--- | Get the role relevant for a 'CtEvidence'
-ctEvRole :: CtEvidence -> Role
-ctEvRole = eqRelRole . ctEvEqRel
+-- | Get the rewrite-role relevant for a 'CtEvidence'
+-- See Note [The rewrite-role of a constraint]
+ctEvRewriteRole :: HasDebugCallStack => CtEvidence -> Role
+ctEvRewriteRole = eqRelRole . ctEvRewriteEqRel
+
+ctEvRewriteEqRel :: CtEvidence -> EqRel
+-- ^ Return the rewrite-role of an abitrary CtEvidence
+-- See Note [The rewrite-role of a constraint]
+-- We return ReprEq for (a ~R# b) and NomEq for all other preds
+ctEvRewriteEqRel ev
+  | isReprEqPrimPred (ctEvPred ev) = ReprEq
+  | otherwise                      = NomEq
 
 ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm ev = EvExpr (ctEvExpr ev)
@@ -2167,8 +2188,8 @@ ctEvFlavour (CtGiven {})  = Given
 type CtFlavourRole = (CtFlavour, EqRel)
 
 -- | Extract the flavour, role, and boxity from a 'CtEvidence'
-ctEvFlavourRole :: CtEvidence -> CtFlavourRole
-ctEvFlavourRole ev = (ctEvFlavour ev, ctEvEqRel ev)
+ctEvFlavourRole :: HasDebugCallStack => CtEvidence -> CtFlavourRole
+ctEvFlavourRole ev = (ctEvFlavour ev, ctEvRewriteEqRel ev)
 
 -- | Extract the flavour and role from a 'Ct'
 eqCtFlavourRole :: EqCt -> CtFlavourRole
@@ -2180,7 +2201,7 @@ dictCtFlavourRole (DictCt { di_ev = ev })
   = (ctEvFlavour ev, NomEq)
 
 -- | Extract the flavour and role from a 'Ct'
-ctFlavourRole :: Ct -> CtFlavourRole
+ctFlavourRole :: HasDebugCallStack => Ct -> CtFlavourRole
 -- Uses short-cuts to role for special cases
 ctFlavourRole (CDictCan di_ct) = dictCtFlavourRole di_ct
 ctFlavourRole (CEqCan eq_ct)   = eqCtFlavourRole eq_ct

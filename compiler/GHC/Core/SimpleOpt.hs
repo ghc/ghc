@@ -29,27 +29,32 @@ import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Make ( FloatBind(..), mkWildValBinder )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
+import GHC.Core.DataCon
+import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
+import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
+                            , isInScope, substTyVarBndr, cloneTyVarBndr )
+import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+
 import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
 import GHC.Types.Var      ( isNonCoVarId )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Core.DataCon
 import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
 import GHC.Types.Tickish
-import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
-import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
-                            , isInScope, substTyVarBndr, cloneTyVarBndr )
-import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Types.Basic
+
 import GHC.Builtin.Types
 import GHC.Builtin.Names
-import GHC.Types.Basic
+
 import GHC.Unit.Module ( Module )
 import GHC.Utils.Encoding
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.Graph.UnVar
 import Data.List (mapAccumL)

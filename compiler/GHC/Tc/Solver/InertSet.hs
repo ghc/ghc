@@ -133,9 +133,16 @@ It's very important to process equalities over class constraints:
   E.g. a CIrredCan can be a hetero-kinded (t1 ~ t2), which may become
   homo-kinded when kicked out, and hence we want to prioritise it.
 
-Among the equalities we prioritise ones with an empty rewriter set;
-see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint, wrinkle (W1).
+Further refinements:
 
+* Among the equalities we prioritise ones with an empty rewriter set;
+  see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint, wrinkle (W1).
+
+* Among equalities with an empty rewriter set, we prioritise nominal equalities.
+   * They have more rewriting power, so doing them first is better.
+   * Prioritising them ameliorates the incompleteness of newtype
+     solving: see (Ex2) in Note [Decomposing newtype equalities] in
+     GHC.Tc.Solver.Equality.
 
 Note [Prioritise class equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -168,12 +175,14 @@ See GHC.Tc.Solver.Monad.deferTcSForAllEq
 
 -- See Note [WorkList priorities]
 data WorkList
-  = WL { wl_eqs     :: [Ct]  -- CEqCan, CDictCan, CIrredCan
-                             -- Given and Wanted
-                       -- Contains both equality constraints and their
-                       -- class-level variants (a~b) and (a~~b);
-                       -- See Note [Prioritise equalities]
-                       -- See Note [Prioritise class equalities]
+  = WL { wl_eqs_N :: [Ct]  -- /Nominal/ equalities (s ~#N t), (s ~ t), (s ~~ t)
+                           -- with empty rewriter set
+       , wl_eqs_X :: [Ct]  -- CEqCan, CDictCan, CIrredCan
+                           -- with empty rewriter set
+           -- All other equalities: contains both equality constraints and
+           -- their class-level variants (a~b) and (a~~b);
+           -- See Note [Prioritise equalities]
+           -- See Note [Prioritise class equalities]
 
        , wl_rw_eqs  :: [Ct]  -- Like wl_eqs, but ones that have a non-empty
                              -- rewriter set; or, more precisely, did when
@@ -182,48 +191,69 @@ data WorkList
          -- see Note [Prioritise Wanteds with empty RewriterSet]
          -- in GHC.Tc.Types.Constraint for more details.
 
-       , wl_rest    :: [Ct]
+       , wl_rest :: [Ct]
 
        , wl_implics :: Bag Implication  -- See Note [Residual implications]
     }
 
 appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
-    (WL { wl_eqs = eqs1, wl_rw_eqs = rw_eqs1
+    (WL { wl_eqs_N = eqs1_N, wl_eqs_X = eqs1_X, wl_rw_eqs = rw_eqs1
         , wl_rest = rest1, wl_implics = implics1 })
-    (WL { wl_eqs = eqs2, wl_rw_eqs = rw_eqs2
+    (WL { wl_eqs_N = eqs2_N, wl_eqs_X = eqs2_X, wl_rw_eqs = rw_eqs2
         , wl_rest = rest2, wl_implics = implics2 })
-   = WL { wl_eqs     = eqs1     ++ eqs2
+   = WL { wl_eqs_N   = eqs1_N   ++ eqs2_N
+        , wl_eqs_X   = eqs1_X   ++ eqs2_X
         , wl_rw_eqs  = rw_eqs1  ++ rw_eqs2
         , wl_rest    = rest1    ++ rest2
         , wl_implics = implics1 `unionBags`   implics2 }
 
 workListSize :: WorkList -> Int
-workListSize (WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest })
-  = length eqs + length rw_eqs + length rest
+workListSize (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs, wl_rest = rest })
+  = length eqs_N + length eqs_X + length rw_eqs + length rest
 
 extendWorkListEq :: RewriterSet -> Ct -> WorkList -> WorkList
-extendWorkListEq rewriters ct wl
+extendWorkListEq rewriters ct
+    wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs })
   | isEmptyRewriterSet rewriters      -- A wanted that has not been rewritten
     -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
     --                         in GHC.Tc.Types.Constraint
-  = wl { wl_eqs = ct : wl_eqs wl }
+  = if isNomEqPred (ctPred ct)
+    then wl { wl_eqs_N = ct : eqs_N }
+    else wl { wl_eqs_X = ct : eqs_X }
+
   | otherwise
-  = wl { wl_rw_eqs = ct : wl_rw_eqs wl }
+  = wl { wl_rw_eqs = ct : rw_eqs }
 
 extendWorkListEqs :: RewriterSet -> Bag Ct -> WorkList -> WorkList
 -- Add [eq1,...,eqn] to the work-list
 -- They all have the same rewriter set
 -- The constraints will be solved in left-to-right order:
---   see Note [Work-list ordering] in GHC.Tc.Solved.Equality
-extendWorkListEqs rewriters eqs wl
+--   see Note [Work-list ordering] in GHC.Tc.Solver.Equality
+--
+-- Precondition: new_eqs is non-empty
+extendWorkListEqs rewriters new_eqs
+    wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs })
   | isEmptyRewriterSet rewriters
     -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
     --                         in GHC.Tc.Types.Constraint
-  = wl { wl_eqs = foldr (:) (wl_eqs wl) eqs }
-         -- The foldr just appends wl_eqs to the bag of eqs
+  = case partitionBag is_nominal new_eqs of
+       (new_eqs_N, new_eqs_X)
+          | isEmptyBag new_eqs_N -> wl { wl_eqs_X = new_eqs_X `push_on_front` eqs_X }
+          | isEmptyBag new_eqs_X -> wl { wl_eqs_N = new_eqs_N `push_on_front` eqs_N }
+          | otherwise            -> wl { wl_eqs_N = new_eqs_N `push_on_front` eqs_N
+                                       , wl_eqs_X = new_eqs_X `push_on_front` eqs_X }
+          -- These isEmptyBag tests are just trying
+          -- to avoid creating unnecessary thunks
+
   | otherwise
-  = wl { wl_rw_eqs = foldr (:) (wl_rw_eqs wl) eqs }
+  = wl { wl_rw_eqs = new_eqs `push_on_front` rw_eqs }
+  where
+    push_on_front :: Bag Ct -> [Ct] -> [Ct]
+    -- push_on_front puts the new equlities on the front of the queue
+    push_on_front new_eqs eqs = foldr (:) eqs new_eqs
+
+    is_nominal ct = isNomEqPred (ctPred ct)
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
@@ -255,26 +285,33 @@ extendWorkListCts :: Cts -> WorkList -> WorkList
 extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 
 isEmptyWorkList :: WorkList -> Bool
-isEmptyWorkList (WL { wl_eqs = eqs, wl_rest = rest, wl_implics = implics })
-  = null eqs && null rest && isEmptyBag implics
+isEmptyWorkList (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+                    , wl_rest = rest, wl_implics = implics })
+  = null eqs_N && null eqs_X && null rest && isEmptyBag implics
 
 emptyWorkList :: WorkList
-emptyWorkList = WL { wl_eqs  = [], wl_rw_eqs = [], wl_rest = [], wl_implics = emptyBag }
+emptyWorkList = WL { wl_eqs_N = [], wl_eqs_X = []
+                   , wl_rw_eqs = [], wl_rest = [], wl_implics = emptyBag }
 
 selectWorkItem :: WorkList -> Maybe (Ct, WorkList)
 -- See Note [Prioritise equalities]
-selectWorkItem wl@(WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest })
-  | ct:cts <- eqs    = Just (ct, wl { wl_eqs    = cts })
+selectWorkItem wl@(WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X
+                      , wl_rw_eqs = rw_eqs, wl_rest = rest })
+  | ct:cts <- eqs_N  = Just (ct, wl { wl_eqs_N  = cts })
+  | ct:cts <- eqs_X  = Just (ct, wl { wl_eqs_X  = cts })
   | ct:cts <- rw_eqs = Just (ct, wl { wl_rw_eqs = cts })
   | ct:cts <- rest   = Just (ct, wl { wl_rest   = cts })
   | otherwise        = Nothing
 
 -- Pretty printing
 instance Outputable WorkList where
-  ppr (WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest, wl_implics = implics })
+  ppr (WL { wl_eqs_N = eqs_N, wl_eqs_X = eqs_X, wl_rw_eqs = rw_eqs
+          , wl_rest = rest, wl_implics = implics })
    = text "WL" <+> (braces $
-     vcat [ ppUnless (null eqs) $
-            text "Eqs =" <+> vcat (map ppr eqs)
+     vcat [ ppUnless (null eqs_N) $
+            text "Eqs_N =" <+> vcat (map ppr eqs_N)
+          , ppUnless (null eqs_X) $
+            text "Eqs_X =" <+> vcat (map ppr eqs_X)
           , ppUnless (null rw_eqs) $
             text "RwEqs =" <+> vcat (map ppr rw_eqs)
           , ppUnless (null rest) $

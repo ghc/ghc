@@ -49,6 +49,7 @@ import GHC.Core.DataCon
 import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Core.Type as Type
+import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions

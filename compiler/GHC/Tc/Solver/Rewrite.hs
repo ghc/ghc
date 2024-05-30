@@ -81,7 +81,7 @@ liftTcS thing_inside
 -- the rewriting operation
 runRewriteCtEv :: CtEvidence -> RewriteM a -> TcS (a, RewriterSet)
 runRewriteCtEv ev
-  = runRewrite (ctEvLoc ev) (ctEvFlavour ev) (ctEvEqRel ev)
+  = runRewrite (ctEvLoc ev) (ctEvFlavour ev) (ctEvRewriteEqRel ev)
 
 -- Run thing_inside (which does the rewriting)
 -- Also returns the set of Wanteds which rewrote a Wanted;
@@ -160,10 +160,18 @@ recordRewriter other = pprPanic "recordRewriter" (ppr other)
 Note [Rewriter EqRels]
 ~~~~~~~~~~~~~~~~~~~~~~~
 When rewriting, we need to know which equality relation -- nominal
-or representation -- we should be respecting. The only difference is
-that we rewrite variables by representational equalities when re_eq_rel
-is ReprEq, and that we unwrap newtypes when rewriting w.r.t.
-representational equality.
+or representational -- we should be respecting.  This is controlled
+by the `re_eq_rel` field of RewriteEnv.
+
+* When rewriting primitive /representational/ equalities, (t1 ~# t2),
+  we set re_eq_rel=ReprEq.
+* For all other constraints, we set re_eq_rel=NomEq
+
+See Note [The rewrite-role of a constraint] in GHC.Tc.Types.Constraint.
+
+The only difference is that when re_eq_rel=ReprEq
+* we rewrite variables by representational equalities
+* we unwrap newtypes
 
 Note [Rewriter CtLoc]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -233,7 +241,7 @@ rewriteForErrors ev ty
        ; result@(redn, rewriters) <-
            runRewrite (ctEvLoc ev) (ctEvFlavour ev) NomEq (rewrite_one ty)
        ; traceTcS "rewriteForErrors }" (ppr $ reductionReducedType redn)
-       ; return $ case ctEvEqRel ev of
+       ; return $ case ctEvRewriteEqRel ev of
            NomEq -> result
            ReprEq -> (mkSubRedn redn, rewriters) }
 

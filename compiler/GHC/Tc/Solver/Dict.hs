@@ -84,7 +84,7 @@ solveDict dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
   = solveEqualityDict ev cls tys
 
   | otherwise
-  = assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
+  = assertPpr (ctEvRewriteRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
     do { simpleStage $ traceTcS "solveDict" (ppr dict_ct)
 
        ; tryInertDicts dict_ct
