@@ -708,7 +708,10 @@ test-bootstrap:
     - .gitlab/ci.sh setup
     # Bootstrapping should not depend on HAPPY or ALEX so set them to false
     # so the build fails if they are invoked.
-    - export HAPPY=/bin/false; export ALEX=/bin/false
+    - unset HAPPY; unset ALEX
+    # Check the commands are not available, parens are crucial to start a subshell
+    - (! command -v alex --version)
+    - (! command -v happy --version)
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
     - .gitlab/ci.sh test_hadrian
