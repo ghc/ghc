@@ -1,19 +1,19 @@
 cabal-version:  3.0
 name:           ghc-internal
 version:        9.1001.0
--- NOTE: Don't forget to update ./changelog.md
-
 license:        BSD-3-Clause
 license-file:   LICENSE
-maintainer:     Core Libraries Committee <core-libraries-committee@haskell.org>
-bug-reports:    https://github.com/haskell/core-libraries-committee/issues
+maintainer:     The GHC Developers <ghc-devs@haskell.org>
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/-/issues/new
 synopsis:       Basic libraries
 category:       Prelude
 build-type:     Configure
 description:
-    This package contains the Standard Haskell "Prelude" and its support libraries,
-    and a large collection of useful libraries ranging from data
-    structures to parsing combinators and debugging utilities.
+    This package contains the implementation of GHC's standard libraries and is
+    not intended for use by end-users.
+    .
+    Users should instead use either the @base@ or @ghc-experimental@ packages
+
 
 extra-tmp-files:
     autom4te.cache
