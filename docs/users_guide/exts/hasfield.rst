@@ -131,7 +131,7 @@ string in the type-level list of fields: ::
     Nil  :: Record '[]
     Cons :: Proxy x -> a -> Record xs -> Record ('(x, a) ': xs)
 
-  instance HasField x (Record ('(x, a) ': xs)) a where
+  instance {-# OVERLAPPING #-} HasField x (Record ('(x, a) ': xs)) a where
     getField (Cons _ v _) = v
   instance HasField x (Record xs) a => HasField x (Record ('(y, b) ': xs)) a where
     getField (Cons _ _ r) = getField @x r
