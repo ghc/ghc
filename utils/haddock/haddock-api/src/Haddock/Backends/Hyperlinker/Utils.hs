@@ -13,6 +13,7 @@ module Haddock.Backends.Hyperlinker.Utils
   , hypSrcModuleUrlFormat
   , hypSrcModuleNameUrlFormat
   , hypSrcModuleLineUrlFormat
+  , hypSrcModuleUrlToNameFormat
   , spliceURL
   , spliceURL'
 
@@ -81,6 +82,9 @@ hypSrcModuleNameUrlFormat = hypSrcModuleUrlFormat ++ "#" ++ nameFormat
 
 hypSrcModuleLineUrlFormat :: String
 hypSrcModuleLineUrlFormat = hypSrcModuleUrlFormat ++ "#" ++ lineFormat
+
+hypSrcModuleUrlToNameFormat :: String -> String
+hypSrcModuleUrlToNameFormat url = url ++ "#" ++ nameFormat
 
 moduleFormat :: String
 moduleFormat = "%{MODULE}.html"
