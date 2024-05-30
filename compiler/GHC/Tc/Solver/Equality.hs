@@ -1092,11 +1092,29 @@ There are two ways in which decomposing (N ty1) ~r (N ty2) could be incomplete:
   have a nominal role. Thus, decomposing the wanted will yield [W] Int ~N Age,
   which is unsatisfiable. Unwrapping, though, leads to a solution.
 
-  Conclusion: always unwrap newtypes before attempting to decompose
+  CONCLUSION: always unwrap newtypes before attempting to decompose
   them.  This is done in can_eq_nc.  Of course, we can't unwrap if the data
   constructor isn't in scope.  See Note [Unwrap newtypes first].
 
-* Incompleteness example (EX2): available Givens
+* Incompleteness example (EX2): see #24887
+      data family D a
+      data instance D Int  = MkD1 (D Char)
+      data instance D Bool = MkD2 (D Char)
+  Now suppose we have
+      [W] g1: D Int ~R# D a
+      [W] g2: a ~# Bool
+  If we solve g2 first, giving a:=Bool, then we can solve g1 easily:
+      D Int ~R# D Char ~R# D Bool
+  by newtype unwrapping.
+
+  BUT: if we instead attempt to solve g1 first, we can unwrap the LHS (only)
+  leaving     [W] D Char ~#R D Bool
+  If we decompose now, we'll get (Char ~R# Bool), which is insoluble.
+
+  CONCLUSION: prioritise nominal equalites in the work list.
+  See Note [Prioritise equalities] in GHC.Tc.Solver.InertSet.
+
+* Incompleteness example (EX3): available Givens
       newtype Nt a = Mk Bool         -- NB: a is not used in the RHS,
       type role Nt representational  -- but the user gives it an R role anyway
 
@@ -1110,7 +1128,7 @@ There are two ways in which decomposing (N ty1) ~r (N ty2) could be incomplete:
   Givens for class constraints: see Note [Instance and Given overlap] in
   GHC.Tc.Solver.Dict.
 
-  Conclusion: don't decompose [W] N s ~R N t, if there are any Given
+  CONCLUSION: don't decompose [W] N s ~R N t, if there are any Given
   equalities that could later solve it.
 
   But what precisely does it mean to say "any Given equalities that could
@@ -2536,7 +2554,7 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
   | CtWanted { ctev_dest = dest
              , ctev_rewriters = rewriters } <- old_ev
   , let rewriters' = rewriters S.<> new_rewriters
-  = do { (new_ev, hole_co) <- newWantedEq loc rewriters' (ctEvRole old_ev) nlhs nrhs
+  = do { (new_ev, hole_co) <- newWantedEq loc rewriters' (ctEvRewriteRole old_ev) nlhs nrhs
        ; let co = maybeSymCo swapped $
                   lhs_co `mkTransCo` hole_co `mkTransCo` mkSymCo rhs_co
        ; setWantedEq dest co
@@ -2602,7 +2620,7 @@ tryInertEqs work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
             -> do { setEvBindIfWanted ev True $
                     evCoercion (maybeSymCo swapped $
                                 downgradeRole (eqRelRole eq_rel)
-                                              (ctEvRole ev_i)
+                                              (ctEvRewriteRole ev_i)
                                               (ctEvCoercion ev_i))
                   ; stopWith ev "Solved from inert" }
 

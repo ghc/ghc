@@ -12,7 +12,7 @@ module GHC.Core.Predicate (
 
   -- Equality predicates
   EqRel(..), eqRelRole,
-  isEqPrimPred, isEqPred,
+  isEqPrimPred, isNomEqPred, isReprEqPrimPred, isEqPred, isCoVarType,
   getEqPredTys, getEqPredTys_maybe, getEqPredRole,
   predTypeEqRel,
   mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
@@ -60,7 +60,7 @@ data Pred
   -- | A typeclass predicate.
   = ClassPred Class [Type]
 
-  -- | A type equality predicate.
+  -- | A type equality predicate, (t1 ~#N t2) or (t1 ~#R t2)
   | EqPred EqRel Type Type
 
   -- | An irreducible predicate.
@@ -80,7 +80,7 @@ classifyPredType :: PredType -> Pred
 classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, [_, _, ty1, ty2])
       | tc `hasKey` eqReprPrimTyConKey -> EqPred ReprEq ty1 ty2
-      | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq ty1 ty2
+      | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq  ty1 ty2
 
     Just (tc, tys)
       | Just clas <- tyConClass_maybe tc
@@ -189,16 +189,21 @@ getEqPredTys_maybe ty
       _ -> Nothing
 
 getEqPredRole :: PredType -> Role
+-- Precondition: the PredType is (s ~#N t) or (s ~#R t)
 getEqPredRole ty = eqRelRole (predTypeEqRel ty)
 
 -- | Get the equality relation relevant for a pred type.
-predTypeEqRel :: PredType -> EqRel
+-- Precondition: the PredType is (s ~#N t) or (s ~#R t)
+predTypeEqRel :: HasDebugCallStack => PredType -> EqRel
 predTypeEqRel ty
-  | Just (tc, _) <- splitTyConApp_maybe ty
-  , tc `hasKey` eqReprPrimTyConKey
-  = ReprEq
-  | otherwise
-  = NomEq
+  = case splitTyConApp_maybe ty of
+     Just (tc, _) | tc `hasKey` eqReprPrimTyConKey
+                  -> ReprEq
+                  | otherwise
+                  -> assertPpr (tc `hasKey` eqPrimTyConKey) (ppr ty)
+                     NomEq
+     _ -> pprPanic "predTypeEqRel" (ppr ty)
+
 
 {-------------------------------------------
 Predicates on PredType
@@ -219,12 +224,43 @@ see Note [Equality superclasses in quantified constraints]
 in GHC.Tc.Solver.Dict.
 -}
 
+-- | Does this type classify a core (unlifted) Coercion?
+-- At either role nominal or representational
+--    (t1 ~# t2) or (t1 ~R# t2)
+-- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
+isCoVarType :: Type -> Bool
+  -- ToDo: should we check saturation?
+isCoVarType ty = isEqPrimPred ty
+
 isEvVarType :: Type -> Bool
--- True of (a) predicates, of kind Constraint, such as (Eq a), and (a ~ b)
---         (b) coercion types, such as (t1 ~# t2) or (t1 ~R# t2)
+-- True of (a) predicates, of kind Constraint, such as (Eq t), and (s ~ t)
+--         (b) coercion types, such as (s ~# t) or (s ~R# t)
 -- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
 -- See Note [Evidence for quantified constraints]
 isEvVarType ty = isCoVarType ty || isPredTy ty
+
+isEqPrimPred :: PredType -> Bool
+-- True of (s ~# t) (s ~R# t)
+isEqPrimPred ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
+  | otherwise
+  = False
+
+isReprEqPrimPred :: PredType -> Bool
+isReprEqPrimPred ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` eqReprPrimTyConKey
+  | otherwise
+  = False
+
+isNomEqPred :: PredType -> Bool
+-- A nominal equality, primitive or not  (s ~# t), (s ~ t), or (s ~~ t)
+isNomEqPred ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` eqPrimTyConKey || tc `hasKey` heqTyConKey || tc `hasKey` eqTyConKey
+  | otherwise
+  = False
 
 isClassPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
@@ -232,17 +268,13 @@ isClassPred ty = case tyConAppTyCon_maybe ty of
     _       -> False
 
 isEqPred :: PredType -> Bool
-isEqPred ty  -- True of (a ~ b) and (a ~~ b)
+isEqPred ty  -- True of (s ~ t) and (s ~~ t)
              -- ToDo: should we check saturation?
   | Just tc <- tyConAppTyCon_maybe ty
   , Just cls <- tyConClass_maybe tc
   = isEqualityClass cls
   | otherwise
   = False
-
-isEqPrimPred :: PredType -> Bool
-isEqPrimPred ty = isCoVarType ty
-  -- True of (a ~# b) (a ~R# b)
 
 isEqualityClass :: Class -> Bool
 -- True of (~), (~~), and Coercible

@@ -113,7 +113,7 @@ module GHC.Core.Type (
         isForAllTy_ty, isForAllTy_co,
         isForAllTy_invis_ty,
         isPiTy, isTauTy, isFamFreeTy,
-        isCoVarType, isAtomicTy,
+        isAtomicTy,
 
         isValidJoinPointType,
         tyConAppNeedsKindSig,
@@ -2492,18 +2492,6 @@ isTerminatingType :: HasDebugCallStack => Type -> Bool
 isTerminatingType ty = case tyConAppTyCon_maybe ty of
     Just tc -> isClassTyCon tc && not (isNewTyCon tc)
     _       -> False
-
--- | Does this type classify a core (unlifted) Coercion?
--- At either role nominal or representational
---    (t1 ~# t2) or (t1 ~R# t2)
--- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
-isCoVarType :: Type -> Bool
-  -- ToDo: should we check saturation?
-isCoVarType ty
-  | Just tc <- tyConAppTyCon_maybe ty
-  = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
-  | otherwise
-  = False
 
 isPrimitiveType :: Type -> Bool
 -- ^ Returns true of types that are opaque to Haskell.

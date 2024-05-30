@@ -146,27 +146,32 @@ import GHC.Types.Var( Id, CoVar, JoinId,
 import qualified GHC.Types.Var as Var
 
 import GHC.Core.Type
-import GHC.Types.RepType
+import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.DataCon
+import GHC.Core.Class
+import GHC.Core.Multiplicity
+
+import GHC.Types.RepType
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Name
-import GHC.Unit.Module
-import GHC.Core.Class
-import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.ForeignCall
-import GHC.Data.Maybe
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+
+import GHC.Stg.InferTags.TagSig
+
+import GHC.Unit.Module
+import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Builtin.Uniques (mkBuiltinUnique)
 import GHC.Types.Unique.Supply
+
+import GHC.Data.Maybe
 import GHC.Data.FastString
-import GHC.Core.Multiplicity
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Stg.InferTags.TagSig
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,

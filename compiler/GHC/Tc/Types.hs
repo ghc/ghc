@@ -319,9 +319,8 @@ data RewriteEnv
        -- See Note [Rewriter CtLoc] in GHC.Tc.Solver.Rewrite.
        , re_flavour :: !CtFlavour
        , re_eq_rel  :: !EqRel
-       -- ^ At what role are we rewriting?
-       --
-       -- See Note [Rewriter EqRels] in GHC.Tc.Solver.Rewrite
+          -- ^ At what role are we rewriting?
+          -- See Note [Rewriter EqRels] in GHC.Tc.Solver.Rewrite
 
        , re_rewriters :: !(TcRef RewriterSet)  -- ^ See Note [Wanteds rewrite Wanteds]
        }
