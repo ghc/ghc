@@ -403,6 +403,12 @@ function configure() {
     else
     args+=("--disable-numa")
   fi
+  if [[ -n ${HAPPY:-} ]]; then
+    args+=("HAPPY=$HAPPY")
+  fi
+  if [[ -n ${ALEX:-} ]]; then
+    args+=("ALEX=$ALEX")
+  fi
 
   start_section "configuring"
   # See https://stackoverflow.com/questions/7577052 for a rationale for the
@@ -411,8 +417,6 @@ function configure() {
     --enable-tarballs-autodownload \
     "${args[@]+"${args[@]}"}" \
     GHC="$GHC" \
-    HAPPY="$HAPPY" \
-    ALEX="$ALEX" \
     || ( cat config.log; fail "configure failed" )
   end_section "configuring"
 }
