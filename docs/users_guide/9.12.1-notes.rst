@@ -60,6 +60,15 @@ Compiler
 
 - :ghc-flag:`-Wderiving-typeable` has been added to :ghc-flag:`-Wall`.
 
+- i386 Windows support is now completely removed amid massive cleanup
+  of legacy code to pave way for Arm64 Windows support (`#24883
+  <https://gitlab.haskell.org/ghc/ghc/-/issues/24883>`_). Rest
+  assured, this does not impact existing support for x86_64 Windows or
+  i386 Linux. For end users, the ``stdcall`` C calling convention is
+  now fully deprecated and GHC will unconditionally produce a warning
+  and treat it as ``ccall``. All C import/export declarations on
+  Windows should now use ``ccall``.
+
 GHCi
 ~~~~
 
