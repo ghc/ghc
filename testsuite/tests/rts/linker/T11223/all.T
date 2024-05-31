@@ -5,7 +5,7 @@ import re
 # Python normalization functions
 #--------------------------------------
 def normalise_duplicate_errmsg( msg ):
-     return re.sub(r"((?:[a-z, A-Z]+):|)[\/\\\\]+(?:.+[\/\\\\]+?)?(.+?)[\/\\\\]+", "    ", 
+     return re.sub(r"((?:[a-z, A-Z]+):|)[\/\\\\]+(?:.+[\/\\\\]+?)?(.+?)[\/\\\\]+", "    ",
                re.sub(r"version\s(\d+\.\d+\.\d+)\sfor\s[a-z,A-Z,0-9,_,-]+(?=\))", r"", msg))
 
 #--------------------------------------
@@ -33,7 +33,6 @@ test('T11223_simple_duplicate',
 
 test('T11223_simple_duplicate_lib',
      [extra_files(['bar.c', 'foo.c', 'foo.hs']),
-      when(platform('i386-unknown-mingw32'), expect_broken(13515)),
       when(ghc_dynamic(), skip), normalise_errmsg_fun(normalise_duplicate_errmsg),
       req_c],
      makefile_test, ['t_11223_simple_duplicate_lib'])

@@ -64,16 +64,11 @@ T6006_setup :
 T8124_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8124.hs
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-T7037_CONST = const
-else
-T7037_CONST =
-endif
 .PHONY: T7037
 T7037:
 	$(RM) 7037.o 7037.hi 7037$(exeext)
 	"$(TEST_HC)" $(TEST_HC_OPTS) T7037.hs -v0
-	"$(TEST_HC)" -optc-DT7037_CONST=$(T7037_CONST) $(filter-out -rtsopts, $(TEST_HC_OPTS)) T7037_main.c -v0 -o T7037_main -no-hs-main
+	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) T7037_main.c -v0 -o T7037_main -no-hs-main
 	./T7037_main
 
 T7040_ghci_setup :

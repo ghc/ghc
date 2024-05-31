@@ -61,17 +61,7 @@ else:
 test('ffi010', normal, compile_and_run, [''])
 test('ffi011', normal, compile_and_run, [''])
 
-# The stdcall calling convention works on Windows, and sometimes on
-# Linux, and fails everywhhere else.  For now, we test only on Windows,
-# because it's difficult to discover whether a given Linux supports
-# it.
-
-if config.os == 'mingw32':
-    skip_if_not_windows = normal
-else:
-    skip_if_not_windows = skip
-
-test('ffi012', skip_if_not_windows, compile_and_run, [''])
+test('ffi012', normal, warn_and_run, [''])
 test('ffi013', [normal, js_broken(22363)], compile_and_run, [''])
 
 # threaded2 sometimes gives ffi014: Main_dDu: interrupted

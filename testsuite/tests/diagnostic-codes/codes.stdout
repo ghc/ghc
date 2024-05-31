@@ -56,7 +56,6 @@
 [GHC-63055] is untested (constructor = TcRnFieldUpdateInvalidType)
 [GHC-26133] is untested (constructor = TcRnForeignImportPrimSafeAnn)
 [GHC-03355] is untested (constructor = TcRnIllegalForeignDeclBackend)
-[GHC-01245] is untested (constructor = TcRnUnsupportedCallConv)
 [GHC-01570] is untested (constructor = TcRnExpectedValueId)
 [GHC-96665] is untested (constructor = TcRnMultipleInlinePragmas)
 [GHC-88293] is untested (constructor = TcRnUnexpectedPragmas)
@@ -119,5 +118,3 @@
 [GHC-75721] is untested (constructor = CannotRepresentType)
 [GHC-17599] is untested (constructor = AddTopDeclsUnexpectedDeclarationSplice)
 [GHC-86934] is untested (constructor = ClassPE)
-
-

@@ -1,0 +1,52 @@
+[1 of 2] Compiling Main             ( ffi012.hs, ffi012.o )
+ffi012.hs:11:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "wrapper" wrap_f :: F -> IO (FunPtr F)
+
+ffi012.hs:12:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "wrapper" wrap_f_io
+          :: IOF -> IO (FunPtr IOF)
+
+ffi012.hs:14:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "dynamic" f :: FunPtr F -> F
+
+ffi012.hs:15:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "dynamic" f_io :: FunPtr IOF -> IOF
+
+ffi012.hs:28:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "wrapper" wrap_d :: D -> IO (FunPtr D)
+
+ffi012.hs:29:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "wrapper" wrap_d_io
+          :: IOD -> IO (FunPtr IOD)
+
+ffi012.hs:31:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "dynamic" d :: FunPtr D -> D
+
+ffi012.hs:32:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "dynamic" d_io :: FunPtr IOD -> IOD
+
+[2 of 2] Linking ffi012

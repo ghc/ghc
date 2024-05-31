@@ -239,8 +239,6 @@ def config_T5250(name, opts):
 
 test('T5250', [extra_files(['spalign.c']),
                 config_T5250,
-                # stack ptr is not 16-byte aligned on 32-bit Windows
-                when(platform('i386-unknown-mingw32'), expect_fail),
                 when(platform('i386-unknown-linux'),
                             expect_broken_for(4211,['llvm']))],
               compile_and_run, ['spalign.c'])

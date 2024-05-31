@@ -5,7 +5,7 @@ module Main where
 import Control.Concurrent
 
 #if defined(mingw32_HOST_OS)
-foreign import stdcall safe "Sleep" _sleepBlock :: Int -> IO ()
+foreign import ccall safe "Sleep" _sleepBlock :: Int -> IO ()
 sleepBlock n = _sleepBlock (n*1000)
 #else
 foreign import ccall safe "sleep" sleepBlock :: Int -> IO ()
@@ -24,4 +24,3 @@ main = do
   x <- takeMVar th
   putStrLn x
   putStrLn "\nshutting down"
-  

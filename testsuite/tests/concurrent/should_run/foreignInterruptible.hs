@@ -8,7 +8,7 @@ import System.IO
 
 #if defined(mingw32_HOST_OS)
 sleep n = sleepBlock (n*1000)
-foreign import stdcall interruptible "Sleep" sleepBlock :: Int -> IO ()
+foreign import ccall interruptible "Sleep" sleepBlock :: Int -> IO ()
 #else
 sleep n = sleepBlock n
 foreign import ccall interruptible "sleep" sleepBlock :: Int -> IO ()

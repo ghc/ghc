@@ -1,17 +1,7 @@
-{-# LANGUAGE CPP #-}
-
-#if defined(i386_HOST_ARCH)
-# define WINDOWS_CCONV stdcall
-#elif defined(x86_64_HOST_ARCH)
-# define WINDOWS_CCONV ccall
-#else
-# error Unknown mingw32 arch
-#endif
-
 import Foreign.C.String
 
-foreign import WINDOWS_CCONV "_strdup" strdup :: CString -> IO CString
-foreign import WINDOWS_CCONV "strdup" strdup2 :: CString -> IO CString
+foreign import ccall "_strdup" strdup :: CString -> IO CString
+foreign import ccall "strdup" strdup2 :: CString -> IO CString
 
 dupString :: String -> IO String
 dupString str = newCString str >>= strdup >>= peekCString

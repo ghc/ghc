@@ -3,14 +3,6 @@ module WinCBindings where
 
 #if defined(mingw32_HOST_OS)
 
-##if defined(i386_HOST_ARCH)
-## define WINDOWS_CCONV stdcall
-##elif defined(x86_64_HOST_ARCH)
-## define WINDOWS_CCONV ccall
-##else
-## error Unknown mingw32 arch
-##endif
-
 import Foreign
 import Foreign.C.Types
 import System.Win32.File
@@ -253,7 +245,7 @@ instance Storable JOBOBJECT_ASSOCIATE_COMPLETION_PORT where
             jacpCompletionPort = vCompletionPort}
 
 
-foreign import WINDOWS_CCONV unsafe "windows.h WaitForSingleObject"
+foreign import ccall unsafe "windows.h WaitForSingleObject"
     waitForSingleObject :: HANDLE -> DWORD -> IO DWORD
 
 type JOBOBJECTINFOCLASS = CInt
@@ -294,22 +286,22 @@ cCREATE_SUSPENDED = #const CREATE_SUSPENDED
 cHANDLE_FLAG_INHERIT :: DWORD
 cHANDLE_FLAG_INHERIT = #const HANDLE_FLAG_INHERIT
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetExitCodeProcess"
+foreign import ccall unsafe "windows.h GetExitCodeProcess"
     getExitCodeProcess :: HANDLE -> LPDWORD -> IO BOOL
 
-foreign import WINDOWS_CCONV unsafe "windows.h CloseHandle"
+foreign import ccall unsafe "windows.h CloseHandle"
     closeHandle :: HANDLE -> IO BOOL
 
-foreign import WINDOWS_CCONV unsafe "windows.h TerminateJobObject"
+foreign import ccall unsafe "windows.h TerminateJobObject"
     terminateJobObject :: HANDLE -> UINT -> IO BOOL
 
-foreign import WINDOWS_CCONV unsafe "windows.h AssignProcessToJobObject"
+foreign import ccall unsafe "windows.h AssignProcessToJobObject"
     assignProcessToJobObject :: HANDLE -> HANDLE -> IO BOOL
 
-foreign import WINDOWS_CCONV unsafe "windows.h CreateJobObjectW"
+foreign import ccall unsafe "windows.h CreateJobObjectW"
     createJobObjectW :: LPSECURITY_ATTRIBUTES -> LPCTSTR -> IO HANDLE
 
-foreign import WINDOWS_CCONV unsafe "windows.h CreateProcessW"
+foreign import ccall unsafe "windows.h CreateProcessW"
     createProcessW :: LPCTSTR -> LPTSTR
                    -> LPSECURITY_ATTRIBUTES -> LPSECURITY_ATTRIBUTES
                    -> BOOL -> DWORD -> LPVOID -> LPCTSTR -> LPSTARTUPINFO
@@ -317,16 +309,16 @@ foreign import WINDOWS_CCONV unsafe "windows.h CreateProcessW"
 
 foreign import ccall unsafe "string.h" memset :: Ptr a -> CInt -> CSize -> IO (Ptr a)
 
-foreign import WINDOWS_CCONV unsafe "windows.h SetInformationJobObject"
+foreign import ccall unsafe "windows.h SetInformationJobObject"
     setInformationJobObject :: HANDLE -> JOBOBJECTINFOCLASS -> LPVOID -> DWORD -> IO BOOL
 
-foreign import WINDOWS_CCONV unsafe "windows.h CreateIoCompletionPort"
+foreign import ccall unsafe "windows.h CreateIoCompletionPort"
     createIoCompletionPort :: HANDLE -> HANDLE -> ULONG_PTR -> DWORD -> IO HANDLE
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetQueuedCompletionStatus"
+foreign import ccall unsafe "windows.h GetQueuedCompletionStatus"
     getQueuedCompletionStatus :: HANDLE -> LPDWORD -> PULONG_PTR -> Ptr LPOVERLAPPED -> DWORD -> IO BOOL
 
-foreign import WINDOWS_CCONV unsafe "windows.h SetHandleInformation"
+foreign import ccall unsafe "windows.h SetHandleInformation"
     setHandleInformation :: HANDLE -> DWORD -> DWORD -> IO BOOL
 
 setJobParameters :: HANDLE -> IO BOOL
@@ -394,4 +386,3 @@ waitForJobCompletion _hJob ioPort timeout
                 then False -- Timeout occurred. *dark voice* YOU HAVE FAILED THIS TEST!.
                 else True
 #endif
-

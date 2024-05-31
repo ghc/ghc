@@ -10,7 +10,7 @@ import System.IO
 
 #if defined(mingw32_HOST_OS)
 sleep n = sleepBlock (n*1000)
-foreign import stdcall unsafe "Sleep" sleepBlock :: Int -> IO ()
+foreign import ccall unsafe "Sleep" sleepBlock :: Int -> IO ()
 #else
 sleep n = sleepBlock n
 foreign import ccall unsafe "sleep" sleepBlock :: Int -> IO ()
