@@ -394,11 +394,14 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
       | Flag_HyperlinkedSource `elem` flags = Just hypSrcModuleUrlFormat
       | otherwise = srcModule
 
+    -- These urls have a template for the module %M
     srcMap = Map.union
-      (Map.map SrcExternal extSrcMap)
+      (Map.map (SrcExternal . hypSrcPkgUrlToModuleFormat) extSrcMap)
       (Map.fromList [ (ifaceMod iface, SrcLocal) | iface <- ifaces ])
 
-    pkgSrcMap = Map.mapKeys moduleUnit extSrcMap
+    -- These urls have a template for the module %M and the name %N
+    pkgSrcMap = Map.map (hypSrcModuleUrlToNameFormat . hypSrcPkgUrlToModuleFormat)
+              $ Map.mapKeys moduleUnit extSrcMap
     pkgSrcMap'
       | Flag_HyperlinkedSource `elem` flags
       , Just k <- pkgKey
@@ -408,6 +411,7 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
       = Map.insert k srcNameUrl pkgSrcMap
       | otherwise = pkgSrcMap
 
+    -- These urls have a template for the module %M and the line %L
     -- TODO: Get these from the interface files as with srcMap
     pkgSrcLMap'
       | Flag_HyperlinkedSource `elem` flags
