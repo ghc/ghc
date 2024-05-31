@@ -346,12 +346,6 @@
 
 #include "Rts.h"
 
-#if defined(x86_64_HOST_ARCH)
-#define USED_IF_x86_64_HOST_ARCH    /* Nothing */
-#else
-#define USED_IF_x86_64_HOST_ARCH    STG_UNUSED
-#endif
-
 #if defined(mingw32_HOST_OS)
 
 #include "RtsUtils.h"
@@ -1131,15 +1125,6 @@ get_name_string (uint8_t* name, ObjectCode* oc)
     }
 }
 
-#if !defined(x86_64_HOST_ARCH)
-static void
-zapTrailingAtSign ( SymbolName* sym )
-{
-  char* lst = strrchr (sym, '@');
-  if (lst) lst[0]='\0';
-}
-#endif
-
 SymbolAddr*
 lookupSymbolInDLLs ( const SymbolName* lbl, ObjectCode *dependent )
 {
@@ -1202,12 +1187,7 @@ static bool
 verifyCOFFHeader ( uint16_t machine, IMAGE_FILE_HEADER *hdr,
                    pathchar *fileName )
 {
-#if defined(i386_HOST_ARCH)
-   if (machine != IMAGE_FILE_MACHINE_I386) {
-      errorBelch("%" PATH_FMT ": Not a x86 PE file.", fileName);
-      return false;
-   }
-#elif defined(x86_64_HOST_ARCH)
+#if defined(x86_64_HOST_ARCH)
    if (machine != IMAGE_FILE_MACHINE_AMD64) {
       errorBelch("%" PATH_FMT ": Not a x86_64 PE+ file.", fileName);
       return false;
@@ -2075,40 +2055,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
          /* All supported relocations write at least 4 bytes */
          checkProddableBlock(oc, pP, 4);
          switch (reloc->Type) {
-#if defined(i386_HOST_ARCH)
-            case IMAGE_REL_I386_DIR32:
-            case IMAGE_REL_I386_DIR32NB:
-               *(uint32_t *)pP = S + A;
-               break;
-            case IMAGE_REL_I386_REL32:
-               /* Tricky.  We have to insert a displacement at
-                  pP which, when added to the PC for the _next_
-                  insn, gives the address of the target (S).
-                  Problem is to know the address of the next insn
-                  when we only know pP.  We assume that this
-                  literal field is always the last in the insn,
-                  so that the address of the next insn is pP+4
-                  -- hence the constant 4.
-                  Also I don't know if A should be added, but so
-                  far it has always been zero.
-
-                  SOF 05/2005: 'A' (old contents of *pP) have been observed
-                  to contain values other than zero (the 'wx' object file
-                  that came with wxhaskell-0.9.4; dunno how it was compiled..).
-                  So, add displacement to old value instead of asserting
-                  A to be zero. Fixes wxhaskell-related crashes, and no other
-                  ill effects have been observed.
-
-                  Update: the reason why we're seeing these more elaborate
-                  relocations is due to a switch in how the NCG compiles SRTs
-                  and offsets to them from info tables. SRTs live in .(ro)data,
-                  while info tables live in .text, causing GAS to emit REL32/DISP32
-                  relocations with non-zero values. Adding the displacement is
-                  the right thing to do.
-               */
-               *(uint32_t *)pP = ((uint32_t)S) + A - ((uint32_t)(size_t)pP) - 4;
-               break;
-#elif defined(x86_64_HOST_ARCH)
+#if defined(x86_64_HOST_ARCH)
             case 1: /* R_X86_64_64 (ELF constant 1) - IMAGE_REL_AMD64_ADDR64 (PE constant 1) */
                {
                    uint64_t A;
@@ -2325,9 +2272,6 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType 
 
         SymbolAddr* sym;
 
-#if !defined(x86_64_HOST_ARCH)
-        zapTrailingAtSign ( lbl );
-#endif
         if (type) {
             // Unfortunately we can only assume that this is the case. Ideally
             // the user would have given us an import library, which would allow

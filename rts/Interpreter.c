@@ -35,9 +35,7 @@
 //      want declspec(__dllimport__) on the front of function prototypes
 //      from libffi.
 #if defined(mingw32_HOST_OS)
-#if (defined(i386_HOST_ARCH) && !defined(__PIC__)) || defined(x86_64_HOST_ARCH)
 # define LIBFFI_NOT_DLL
-#endif
 #endif
 
 #include "rts/ghc_ffi.h"

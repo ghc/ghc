@@ -84,12 +84,6 @@ extern char **environ;
 #if defined(mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS  /**/
 
-#if defined(i386_HOST_ARCH)
-#define RTS_WIN32_ONLY(X) X
-#else
-#define RTS_WIN32_ONLY(X) /**/
-#endif
-
 #if defined(x86_64_HOST_ARCH)
 #define RTS_WIN64_ONLY(X) X
 #else
@@ -170,19 +164,16 @@ extern char **environ;
       SymI_HasProto(rts_IOManagerIsWin32Native)          \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_NeedsProto(__mingw_module_is_dll)             \
-      RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
-      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf_s)) \
-      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf)) \
-      RTS_WIN64_ONLY(SymI_HasProto(_errno))  \
+      SymI_HasProto(__stdio_common_vswprintf_s)          \
+      SymI_HasProto(__stdio_common_vswprintf)            \
+      SymI_HasProto(_errno)                              \
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
       SymI_HasProto(_unlock_file)                        \
       /* See Note [_iob_func symbol] */                  \
-      RTS_WIN64_ONLY(SymI_HasProto_redirect(             \
-         __imp___acrt_iob_func, __rts_iob_func, STRENGTH_WEAK, SYM_TYPE_INDIRECT_DATA))   \
-      RTS_WIN32_ONLY(SymI_HasProto_redirect(             \
-         __imp____acrt_iob_func, __rts_iob_func, STRENGTH_WEAK, SYM_TYPE_INDIRECT_DATA))
+      SymI_HasProto_redirect(                            \
+         __imp___acrt_iob_func, __rts_iob_func, STRENGTH_WEAK, SYM_TYPE_INDIRECT_DATA)
 #else
 #define RTS_MINGW_ONLY_SYMBOLS /**/
 #endif

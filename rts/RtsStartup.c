@@ -88,7 +88,7 @@ static void flushStdHandles(void);
 static void
 x86_init_fpu ( void )
 {
-#if defined(mingw32_HOST_OS) && !X86_INIT_FPU
+#if defined(mingw32_HOST_OS) && defined(x86_64_HOST_ARCH) && !X86_INIT_FPU
     /* Mingw-w64 does a stupid thing. They set the FPU precision to extended mode by default.
     The reasoning is that it's for compatibility with GNU Linux ported libraries. However the
     problem is this is incompatible with the standard Windows double precision mode.  In fact,

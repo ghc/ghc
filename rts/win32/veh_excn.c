@@ -287,16 +287,6 @@ void generateStack (EXCEPTION_POINTERS* pExceptionPointers)
 
     stackFrame.AddrStack.Offset = context->Rsp;
     stackFrame.AddrStack.Mode = AddrModeFlat;
-#else
-    machineType = IMAGE_FILE_MACHINE_I386;
-    stackFrame.AddrPC.Offset = context->Eip;
-    stackFrame.AddrPC.Mode = AddrModeFlat;
-
-    stackFrame.AddrFrame.Offset = context->Ebp;
-    stackFrame.AddrFrame.Mode = AddrModeFlat;
-
-    stackFrame.AddrStack.Offset = context->Esp;
-    stackFrame.AddrStack.Mode = AddrModeFlat;
 #endif
     fprintf (stderr, "\n Attempting to reconstruct a stack trace...\n\n");
     if (!SymInitialize (GetCurrentProcess (), NULL, true))
