@@ -4,6 +4,30 @@
  * Copyright (c) The GHC Team, 1994-2002.
  * ---------------------------------------------------------------------------*/
 
+/*
+Note [CBV Functions and the interpreter]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the byte code interpreter loads a reference to a value it often
+ends up as a non-tagged pointers *especially* if we already know a value
+is a certain constructor and therefore don't perform an eval on the reference.
+This causes friction with CBV functions which assume
+their value arguments are properly tagged by the caller.
+
+In order to ensure CBV functions still get passed tagged functions we have
+three options:
+a)  Special case the interpreter behaviour into the tag inference analysis.
+    If we assume the interpreter can't properly tag value references the STG passes
+    would then wrap such calls in appropriate evals which are executed at runtime.
+    This would ensure tags by doing additional evals at runtime.
+b)  When the interpreter pushes references for known constructors instead of
+    pushing the objects address add the tag to the value pushed. This is what
+    the NCG backends do.
+c)  When the interpreter pushes a reference inspect the closure of the object
+    and apply the appropriate tag at runtime.
+
+For now we use approach c). Mostly because it's easiest to implement. We also don't
+tag functions as tag inference currently doesn't rely on those being properly tagged.
+*/
 
 #include "rts/PosixSource.h"
 #include "Rts.h"
@@ -1296,7 +1320,42 @@ run_BCO:
 
         case bci_PUSH_G: {
             W_ o1 = BCO_GET_LARGE_ARG;
-            SpW(-1) = BCO_PTR(o1);
+            StgClosure *tagged_obj = (StgClosure*) BCO_PTR(o1);
+
+            tag_push_g:
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR((StgClosure*) tagged_obj));
+            // Here we make sure references we push are tagged.
+            // See Note [CBV Functions and the interpreter] in Info.hs
+
+            //Safe some memory reads if we already have a tag.
+            if(GET_CLOSURE_TAG(tagged_obj) == 0) {
+                StgClosure *obj = UNTAG_CLOSURE(tagged_obj);
+                switch ( get_itbl(obj)->type ) {
+                    case IND:
+                    case IND_STATIC:
+                    {
+                        tagged_obj = ACQUIRE_LOAD(&((StgInd*)obj)->indirectee);
+                        goto tag_push_g;
+                    }
+                    case CONSTR:
+                    case CONSTR_1_0:
+                    case CONSTR_0_1:
+                    case CONSTR_2_0:
+                    case CONSTR_1_1:
+                    case CONSTR_0_2:
+                    case CONSTR_NOCAF:
+                        // The value is already evaluated, so we can just return it. However,
+                        // before we do, we MUST ensure that the pointer is tagged, because we
+                        // might return to a native `case` expression, which assumes the returned
+                        // pointer is tagged so it can use the tag to select an alternative.
+                        tagged_obj = tagConstr(obj);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            SpW(-1) = (W_) tagged_obj;
             Sp_subW(1);
             goto nextInsn;
         }
