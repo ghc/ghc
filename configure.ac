@@ -1009,6 +1009,7 @@ echo "\
    cmmcpp       : $CmmCPPCmd
    cmmcpp-flags : $CmmCPPArgs
    cmmcpp-g0    : $CmmCPPSupportsG0
+   c++          : $CXX
    ar           : $ArCmd
    nm           : $NmCmd
    objdump      : $ObjdumpCmd
