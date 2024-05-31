@@ -6,11 +6,10 @@ license:              BSD-2-Clause
 author:               Simon Marlow, David Waern
 maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
-bug-reports:          https://github.com/haskell/haddock/issues
+bug-reports:          https://gitlab.haskell.org/ghc/ghc/-/issues/new
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.6.*
 stability:            experimental
 
 library

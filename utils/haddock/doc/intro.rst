@@ -62,9 +62,7 @@ Obtaining Haddock
 Haddock is distributed with GHC distributions, and will automatically be provided if you use 
 `ghcup <https://www.haskell.org/ghcup>`__, for instance.
 
-Up-to-date sources can also be obtained from our public GitHub
-repository. The Haddock sources are at
-``https://github.com/haskell/haddock``.
+Haddock lives in the GHC repository, which you can consult at ``https://gitlab.haskell.org/ghc/ghc``.
 
 License
 -------
@@ -98,12 +96,6 @@ code, except where otherwise indicated.
     THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Contributors
-------------
-
-A list of contributors to the project can be seen at
-``https://github.com/haskell/haddock/graphs/contributors``.
 
 Acknowledgements
 ----------------

@@ -29,13 +29,12 @@ description:
 license:              BSD-3-Clause
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
-maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
+maintainer:           Haddock Team
 homepage:             http://www.haskell.org/haddock/
-bug-reports:          https://github.com/haskell/haddock/issues
+bug-reports:          https://gitlab.haskell.org/ghc/ghc/-/issues/new
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.6.*
 
 extra-source-files:
   CHANGES.md
@@ -64,6 +63,11 @@ flag threaded
   description: Build haddock with the threaded RTS
   default: True
   manual: True
+
+source-repository head
+  type: git
+  location: https://gitlab.haskell.org/ghc/ghc.git
+  subdir: utils/haddock
 
 executable haddock
   default-language:     Haskell2010
@@ -193,7 +197,3 @@ test-suite hoogle-test
   main-is:            Main.hs
   hs-source-dirs:     hoogle-test
   build-depends:      base, filepath, haddock-test == 0.0.1
-
-source-repository head
-  type:     git
-  location: https://github.com/haskell/haddock.git

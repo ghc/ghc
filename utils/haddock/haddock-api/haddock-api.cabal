@@ -7,13 +7,12 @@ description:          Haddock is a documentation-generation tool for Haskell
 license:              BSD-2-Clause
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
-maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
+maintainer:           Haddock Team
 homepage:             http://www.haskell.org/haddock/
-bug-reports:          https://github.com/haskell/haddock/issues
+bug-reports:          https://gitlab.haskell.org/ghc/ghc/-/issues/new
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.6.*
 
 extra-source-files:
   CHANGES.md
@@ -38,6 +37,11 @@ data-files:
   html/Linuwial.std-theme/linuwial.css
   html/Linuwial.std-theme/synopsis.png
   latex/haddock.sty
+
+source-repository head
+  type: git
+  location: https://gitlab.haskell.org/ghc/ghc.git
+  subdir: utils/haddock/haddock-api
 
 library
   default-language: Haskell2010
@@ -203,8 +207,3 @@ test-suite spec
 
   build-tool-depends:
     hspec-discover:hspec-discover ^>= 2.9
-
-source-repository head
-  type:     git
-  subdir:   haddock-api
-  location: https://github.com/haskell/haddock.git
