@@ -1,12 +1,8 @@
 # Download and install the windows toolchain
 AC_DEFUN([FP_INSTALL_WINDOWS_TOOLCHAIN],[
     # Find the mingw-w64 archive file to extract.
-    if test "$HostArch" = "i386"
+    if test "$HostArch" = "x86_64"
     then
-        mingw_arch="i686"
-        tarball_dest_dir="mingw-w64/i686"
-        tarball_mingw_dir="clang32"
-    else
         mingw_arch="x86_64"
         tarball_dest_dir="mingw-w64/x86_64"
         tarball_mingw_dir="clang64"

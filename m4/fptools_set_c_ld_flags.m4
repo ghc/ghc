@@ -33,9 +33,6 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     esac
 
     case $$1 in
-    i386-unknown-mingw32)
-        $2="$$2 -march=i686"
-        ;;
     i386-portbld-freebsd*)
         $2="$$2 -march=i686"
         ;;

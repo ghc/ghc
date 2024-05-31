@@ -24,7 +24,6 @@ case $TargetPlatform in
         i386-*2\.@<:@0-9@:>@ | i386-*3\.@<:@0-3@:>@ ) fptools_cv_leading_underscore=yes ;;
         *) fptools_cv_leading_underscore=no ;;
       esac ;;
-    i386-unknown-mingw32) fptools_cv_leading_underscore=yes;;
     x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
     *) AC_RUN_IFELSE([AC_LANG_SOURCE([[#if defined(HAVE_NLIST_H)
 #include <nlist.h>
