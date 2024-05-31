@@ -898,8 +898,13 @@ extractSpecPragName srcTxt =  case (words $ show srcTxt) of
 
 instance OutputableBndrId p
        => Outputable (FixitySig (GhcPass p)) where
-  ppr (FixitySig _ names fixity) = sep [ppr fixity, pprops]
+  ppr (FixitySig ns_spec names fixity) = sep [ppr fixity, ppr_ns_spec, pprops]
     where
+      ppr_ns_spec =
+        case ghcPass @p of
+          GhcPs -> ppr ns_spec
+          GhcRn -> ppr ns_spec
+          GhcTc -> empty
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)
 
 pragBrackets :: SDoc -> SDoc

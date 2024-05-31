@@ -1,14 +1,14 @@
-
 T14032c.hs:1:1: error: [GHC-78534]
     Illegal use of the ‘type’ keyword:
-      infix 0 $
+      infix 0 type $
     in a fixity signature
     Suggested fix:
       Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
 
 T14032c.hs:1:1: error: [GHC-78534]
     Illegal use of the ‘data’ keyword:
-      infix 0 $
+      infix 0 data $
     in a fixity signature
     Suggested fix:
       Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+
