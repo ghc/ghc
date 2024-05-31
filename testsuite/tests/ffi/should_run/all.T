@@ -33,7 +33,6 @@ test('ffi004', skip, compile_and_run, [''])
 #
 test('ffi005', [ omit_ways(prof_ways),
                  when(arch('i386'), skip),
-                 when(platform('i386-apple-darwin'), expect_broken(4105)),
                  exit_code(3),
                  req_c ],
                compile_and_run, ['ffi005_c.c'])
@@ -101,7 +100,6 @@ test('T1288_ghci',
 
 test('T2276', [req_c], compile_and_run, ['T2276_c.c'])
 test('T2276_ghci', [ only_ghci,
-                     when(opsys('darwin'), skip), # stdcall not supported on OS X
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup') ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
