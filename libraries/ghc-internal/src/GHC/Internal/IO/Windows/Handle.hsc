@@ -53,7 +53,6 @@ module GHC.Internal.IO.Windows.Handle
 #include <windows.h>
 #include <ntstatus.h>
 #include <winnt.h>
-##include "windows_cconv.h"
 
 -- Can't avoid these semantics leaks, they are base constructs
 import GHC.Internal.Data.Bits ((.|.), (.&.), shiftL)
@@ -344,23 +343,23 @@ type PINPUT_RECORD = Ptr ()
 -- Foreign imports
 
 
-foreign import WINDOWS_CCONV safe "windows.h CreateFileW"
+foreign import ccall safe "windows.h CreateFileW"
     c_CreateFile :: LPCTSTR -> DWORD -> DWORD -> LPSECURITY_ATTRIBUTES
                  -> DWORD -> DWORD -> HANDLE
                  -> IO HANDLE
 
-foreign import WINDOWS_CCONV safe "windows.h SetFileCompletionNotificationModes"
+foreign import ccall safe "windows.h SetFileCompletionNotificationModes"
     c_SetFileCompletionNotificationModes :: HANDLE -> UCHAR -> IO BOOL
 
-foreign import WINDOWS_CCONV safe "windows.h ReadFile"
+foreign import ccall safe "windows.h ReadFile"
     c_ReadFile :: HANDLE -> LPVOID -> DWORD -> LPDWORD -> LPOVERLAPPED
                -> IO BOOL
 
-foreign import WINDOWS_CCONV safe "windows.h WriteFile"
+foreign import ccall safe "windows.h WriteFile"
     c_WriteFile :: HANDLE -> LPVOID -> DWORD -> LPDWORD -> LPOVERLAPPED
                 -> IO BOOL
 
-foreign import WINDOWS_CCONV safe "windows.h GetStdHandle"
+foreign import ccall safe "windows.h GetStdHandle"
     c_GetStdHandle :: StdHandleId -> IO HANDLE
 
 foreign import ccall safe "__handle_ready"
@@ -411,18 +410,18 @@ foreign import ccall safe "__get_console_buffer_size"
 foreign import ccall safe "__set_console_buffer_size"
   c_set_console_buffer_size :: HANDLE -> CLong -> IO BOOL
 
-foreign import WINDOWS_CCONV safe "windows.h ReadConsoleW"
+foreign import ccall safe "windows.h ReadConsoleW"
   c_read_console :: HANDLE -> Ptr Word16 -> DWORD -> Ptr DWORD
                  -> PCONSOLE_READCONSOLE_CONTROL -> IO BOOL
 
-foreign import WINDOWS_CCONV safe "windows.h WriteConsoleW"
+foreign import ccall safe "windows.h WriteConsoleW"
   c_write_console :: HANDLE -> Ptr Word16 -> DWORD -> Ptr DWORD -> Ptr ()
                   -> IO BOOL
 
-foreign import WINDOWS_CCONV safe "windows.h ReadConsoleInputW"
+foreign import ccall safe "windows.h ReadConsoleInputW"
   c_read_console_input :: HANDLE -> PINPUT_RECORD -> DWORD -> LPDWORD -> IO BOOL
 
-foreign import WINDOWS_CCONV safe "windows.h GetNumberOfConsoleInputEvents"
+foreign import ccall safe "windows.h GetNumberOfConsoleInputEvents"
   c_get_num_console_inputs :: HANDLE -> LPDWORD -> IO BOOL
 
 type LPSECURITY_ATTRIBUTES = LPVOID

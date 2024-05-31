@@ -97,8 +97,6 @@ import GHC.Internal.System.IO.Error
 
 import qualified GHC.Internal.Numeric
 
-#include "windows_cconv.h"
-
 type BOOL     = Bool
 type LPBOOL   = Ptr BOOL
 type BYTE     = Word8
@@ -222,11 +220,11 @@ foreign import ccall unsafe "maperrno_func"        -- in Win32Utils.c
 foreign import ccall unsafe "base_getErrorMessage" -- in Win32Utils.c
     c_getErrorMessage :: DWORD -> IO LPWSTR
 
-foreign import WINDOWS_CCONV unsafe "windows.h LocalFree"
+foreign import ccall unsafe "windows.h LocalFree"
     localFree :: Ptr a -> IO (Ptr a)
 
 -- | Get the last system error produced in the current thread.
-foreign import WINDOWS_CCONV unsafe "windows.h GetLastError"
+foreign import ccall unsafe "windows.h GetLastError"
     getLastError :: IO ErrCode
 
 ----------------------------------------------------------------

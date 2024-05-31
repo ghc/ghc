@@ -41,9 +41,6 @@ module GHC.Internal.Conc.Windows
        , module GHC.Internal.Event.Windows.ConsoleEvent
        ) where
 
-
-#include "windows_cconv.h"
-
 import GHC.Internal.Base
 import GHC.Internal.Conc.Sync
 import qualified GHC.Internal.Conc.POSIX as POSIX

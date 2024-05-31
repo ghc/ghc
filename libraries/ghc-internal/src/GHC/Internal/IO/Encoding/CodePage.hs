@@ -41,8 +41,6 @@ import GHC.Internal.IO.Encoding.UTF32 (mkUTF32le, mkUTF32be)
 
 import GHC.Internal.Windows (DWORD)
 
-#include "windows_cconv.h"
-
 type CodePage = DWORD
 
 -- note CodePage = UInt which might not work on Win64.  But the Win32 package
@@ -55,10 +53,10 @@ getCurrentCodePage = do
         else getACP
 
 -- Since the Win32 package depends on base, we have to import these ourselves:
-foreign import WINDOWS_CCONV unsafe "windows.h GetConsoleCP"
+foreign import ccall unsafe "windows.h GetConsoleCP"
     getConsoleCP :: IO Word32
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetACP"
+foreign import ccall unsafe "windows.h GetACP"
     getACP :: IO Word32
 
 {-# NOINLINE currentCodePage #-}
@@ -184,4 +182,3 @@ indexChar :: ConvArray Char -> Int -> Char
 indexChar (ConvArray p) (I# i) = C# (chr# (int16ToInt# (indexInt16OffAddr# p i)))
 
 #endif
-

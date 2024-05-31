@@ -62,16 +62,6 @@ import qualified GHC.Internal.System.Posix.Internals
 import GHC.Internal.System.Posix.Internals hiding (FD, setEcho, getEcho)
 import GHC.Internal.System.Posix.Types
 
-#if defined(mingw32_HOST_OS)
-# if defined(i386_HOST_ARCH)
-#  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
-#endif
-
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False
 
@@ -421,7 +411,7 @@ release fd = do _ <- unlockFile (fromIntegral $ fdFD fd)
                 return ()
 
 #if defined(mingw32_HOST_OS)
-foreign import WINDOWS_CCONV unsafe "HsBase.h closesocket"
+foreign import ccall unsafe "HsBase.h closesocket"
    c_closesocket :: CInt -> IO CInt
 #endif
 
@@ -774,10 +764,10 @@ blockingWriteRawBufferPtr loc !fd !buf !off !len
 -- NOTE: "safe" versions of the read/write calls for use by the threaded RTS.
 -- These calls may block, but that's ok.
 
-foreign import WINDOWS_CCONV safe "recv"
+foreign import ccall safe "recv"
    c_safe_recv :: CInt -> Ptr Word8 -> CInt -> CInt{-flags-} -> IO CInt
 
-foreign import WINDOWS_CCONV safe "send"
+foreign import ccall safe "send"
    c_safe_send :: CInt -> Ptr Word8 -> CInt -> CInt{-flags-} -> IO CInt
 
 #endif

@@ -15,16 +15,6 @@ import GHC.Internal.Base
 import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.IO.Encoding
 
-#if defined(mingw32_HOST_OS)
-# if defined(i386_HOST_ARCH)
-#  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
-#endif
-
 -- | Computation 'getFullArgs' is the "raw" version of
 -- 'GHC.Internal.System.Environment.getArgs', similar to @argv@ in other languages. It
 -- returns a list of the program's command line arguments, starting with the

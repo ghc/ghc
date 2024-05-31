@@ -47,8 +47,6 @@ debugIO s
  | c_DEBUG_DUMP = puts s
  | otherwise    = return ()
 
-#include "windows_cconv.h"
-
 type LPCSTR = Ptr Word8
 
 
@@ -88,12 +86,12 @@ pokeArray' msg sz ptr xs | length xs == sz = pokeArray ptr xs
                          | otherwise       = errorWithoutStackTrace $ msg ++ ": expected " ++ show sz ++ " elements in list but got " ++ show (length xs)
 
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetCPInfo"
+foreign import ccall unsafe "windows.h GetCPInfo"
     c_GetCPInfo :: UINT       -- ^ CodePage
                 -> Ptr CPINFO -- ^ lpCPInfo
                 -> IO BOOL
 
-foreign import WINDOWS_CCONV unsafe "windows.h MultiByteToWideChar"
+foreign import ccall unsafe "windows.h MultiByteToWideChar"
     c_MultiByteToWideChar :: UINT   -- ^ CodePage
                           -> DWORD  -- ^ dwFlags
                           -> LPCSTR -- ^ lpMultiByteStr
@@ -102,7 +100,7 @@ foreign import WINDOWS_CCONV unsafe "windows.h MultiByteToWideChar"
                           -> CInt   -- ^ cchWideChar
                           -> IO CInt
 
-foreign import WINDOWS_CCONV unsafe "windows.h WideCharToMultiByte"
+foreign import ccall unsafe "windows.h WideCharToMultiByte"
     c_WideCharToMultiByte :: UINT   -- ^ CodePage
                           -> DWORD  -- ^ dwFlags
                           -> LPWSTR -- ^ lpWideCharStr
@@ -113,7 +111,7 @@ foreign import WINDOWS_CCONV unsafe "windows.h WideCharToMultiByte"
                           -> LPBOOL -- ^ lpUsedDefaultChar
                           -> IO CInt
 
-foreign import WINDOWS_CCONV unsafe "windows.h IsDBCSLeadByteEx"
+foreign import ccall unsafe "windows.h IsDBCSLeadByteEx"
     c_IsDBCSLeadByteEx :: UINT    -- ^ CodePage
                        -> BYTE    -- ^ TestChar
                        -> IO BOOL

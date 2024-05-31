@@ -96,16 +96,6 @@ import System.Posix hiding (fdToHandle)
 import qualified System.Info(os)
 #endif
 
-#if defined(mingw32_HOST_OS)
-# if defined(i386_HOST_ARCH)
-#  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
-#endif
-
 -- | Short-circuit 'any' with a \"monadic predicate\".
 anyM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
 anyM _ [] = return False

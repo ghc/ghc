@@ -14,7 +14,6 @@ module GHC.Internal.IO.Handle.Lock.Windows where
 import GHC.Types ()
 #else
 
-##include <windows_cconv.h>
 #include <windows.h>
 
 import GHC.Internal.Data.Bits
@@ -128,12 +127,12 @@ foreign import ccall unsafe "_get_osfhandle"
   c_get_osfhandle :: CInt -> IO HANDLE
 
 -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa365203.aspx
-foreign import WINDOWS_CCONV interruptible "LockFileEx"
+foreign import ccall interruptible "LockFileEx"
   c_LockFileEx :: HANDLE -> DWORD -> DWORD -> DWORD -> DWORD -> LPOVERLAPPED
                -> IO BOOL
 
 -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa365716.aspx
-foreign import WINDOWS_CCONV interruptible "UnlockFileEx"
+foreign import ccall interruptible "UnlockFileEx"
   c_UnlockFileEx :: HANDLE -> DWORD -> DWORD -> DWORD -> LPOVERLAPPED -> IO BOOL
 
 #endif

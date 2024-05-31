@@ -22,8 +22,6 @@ module GHC.Internal.IO.Windows.Paths
  (getDevicePath
  ) where
 
-#include "windows_cconv.h"
-
 import GHC.Internal.Base
 import GHC.Internal.IO
 

@@ -304,14 +304,6 @@ executablePath = Just (fmap Just getExecutablePath `catch` f)
 
 #elif defined(mingw32_HOST_OS)
 
-# if defined(i386_HOST_ARCH)
-##  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-##  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
-
 getExecutablePath = go 2048  -- plenty, PATH_MAX is 512 under Win32
   where
     go size = allocaArray (fromIntegral size) $ \ buf -> do
@@ -366,13 +358,13 @@ getFinalPath path = withCWString path $ \s ->
         -- is large enough.
         bufSize = 1024
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
+foreign import ccall unsafe "windows.h GetModuleFileNameW"
     c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 
-foreign import WINDOWS_CCONV unsafe "windows.h PathFileExistsW"
+foreign import ccall unsafe "windows.h PathFileExistsW"
     c_pathFileExists :: CWString -> IO Bool
 
-foreign import WINDOWS_CCONV unsafe "windows.h CreateFileW"
+foreign import ccall unsafe "windows.h CreateFileW"
     c_createFile :: CWString
                  -> Word32
                  -> Word32
@@ -391,10 +383,10 @@ createFile file =
                     (#const FILE_ATTRIBUTE_NORMAL)
                     nullPtr
 
-foreign import WINDOWS_CCONV unsafe "windows.h CloseHandle"
+foreign import ccall unsafe "windows.h CloseHandle"
   c_closeHandle  :: Ptr () -> IO Bool
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetFinalPathNameByHandleW"
+foreign import ccall unsafe "windows.h GetFinalPathNameByHandleW"
   c_getFinalPathHandle :: Ptr () -> CWString -> Word32 -> Word32 -> IO Word32
 
 --------------------------------------------------------------------------------

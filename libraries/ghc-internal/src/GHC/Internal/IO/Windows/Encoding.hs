@@ -37,8 +37,6 @@ import GHC.Internal.IO
 import GHC.Internal.Base
 import GHC.Internal.Real
 
-#include "windows_cconv.h"
-
 -- | The "System.IO" output functions (e.g. `putStr`) don't
 -- automatically convert to multibyte string on Windows, so this
 -- function is provided to make the conversion from a Unicode string
@@ -83,7 +81,7 @@ encodeMultiByteRawIO _ "" = return (nullPtr, 0)
 encodeMultiByteRawIO cp s = encodeMultiByteIO' cp s toSizedCString
   where toSizedCString (st,l) = return (st, fromIntegral l)
 
-foreign import WINDOWS_CCONV "WideCharToMultiByte"
+foreign import ccall "WideCharToMultiByte"
   wideCharToMultiByte
         :: CodePage
         -> DWORD   -- dwFlags,
@@ -121,7 +119,7 @@ stringToUnicode cp mbstr =
                 cwstr wchars
       peekCWStringLen (cwstr,fromIntegral wchars')  -- converts UTF-16 to [Char]
 
-foreign import WINDOWS_CCONV unsafe "MultiByteToWideChar"
+foreign import ccall unsafe "MultiByteToWideChar"
   multiByteToWideChar
         :: CodePage
         -> DWORD   -- dwFlags,
@@ -140,7 +138,7 @@ decodeMultiByteIO :: CodePage -> String -> IO String
 decodeMultiByteIO = stringToUnicode
 {-# INLINE decodeMultiByteIO #-}
 
-foreign import WINDOWS_CCONV unsafe "MultiByteToWideChar"
+foreign import ccall unsafe "MultiByteToWideChar"
   multiByteToWideChar'
         :: CodePage
         -> DWORD   -- dwFlags,
@@ -165,7 +163,7 @@ withGhcInternalToUTF16 ptr len fn
                     multiByteToWideChar' cp 0 ptr (fromIntegral len) cwstr wchars
         fn (cwstr, wchars')
 
-foreign import WINDOWS_CCONV "WideCharToMultiByte"
+foreign import ccall "WideCharToMultiByte"
   wideCharToMultiByte'
         :: CodePage
         -> DWORD   -- dwFlags,

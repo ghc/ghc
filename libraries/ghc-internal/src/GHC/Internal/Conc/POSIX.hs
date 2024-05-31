@@ -44,9 +44,6 @@ module GHC.Internal.Conc.POSIX
        , module GHC.Internal.Event.Windows.ConsoleEvent
        ) where
 
-
-#include "windows_cconv.h"
-
 import GHC.Internal.Data.Bits (shiftR)
 import GHC.Internal.Base
 import GHC.Internal.Clock
@@ -302,6 +299,5 @@ foreign import ccall unsafe "readIOManagerEvent" -- in the RTS (ThrIOManager.c)
 foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
   c_sendIOManagerEvent :: Word32 -> IO ()
 
-foreign import WINDOWS_CCONV "WaitForSingleObject"
+foreign import ccall "WaitForSingleObject"
    c_WaitForSingleObject :: HANDLE -> DWORD -> IO DWORD
-

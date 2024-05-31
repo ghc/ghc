@@ -70,8 +70,6 @@ module GHC.Internal.Event.Windows.FFI (
 #include <windows.h>
 #include "winio_structs.h"
 
-##include "windows_cconv.h"
-
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Base
 import GHC.Internal.Num ((*))
@@ -109,7 +107,7 @@ type CompletionKey = ULONG_PTR
 --    cannot be easily changed.  Associating a Handle with a Completion Port
 --    allows the I/O manager's worker threads to handle requests to the given
 --    handle.
-foreign import WINDOWS_CCONV unsafe "windows.h CreateIoCompletionPort"
+foreign import ccall unsafe "windows.h CreateIoCompletionPort"
     c_CreateIoCompletionPort :: HANDLE -> IOCP -> ULONG_PTR -> DWORD
                              -> IO IOCP
 
@@ -124,7 +122,7 @@ associateHandleWithIOCP iocp handle completionKey =
     failIf_ (/= iocp) "associateHandleWithIOCP" $
         c_CreateIoCompletionPort handle iocp completionKey 0
 
-foreign import WINDOWS_CCONV safe "windows.h GetOverlappedResult"
+foreign import ccall safe "windows.h GetOverlappedResult"
     c_GetOverlappedResult :: HANDLE -> LPOVERLAPPED -> Ptr DWORD -> BOOL
                           -> IO BOOL
 
@@ -137,7 +135,7 @@ getOverlappedResult handle lp block
               then fmap Just $ peek bytes
               else return Nothing
 
-foreign import WINDOWS_CCONV safe "windows.h GetQueuedCompletionStatusEx"
+foreign import ccall safe "windows.h GetQueuedCompletionStatusEx"
     c_GetQueuedCompletionStatusEx :: IOCP -> LPOVERLAPPED_ENTRY -> Word32
                                   -> Ptr ULONG -> DWORD -> BOOL -> IO BOOL
 
@@ -215,7 +213,7 @@ overlappedIONumBytes lpol = do
   return bytes
 {-# INLINE overlappedIONumBytes #-}
 
-foreign import WINDOWS_CCONV unsafe "windows.h PostQueuedCompletionStatus"
+foreign import ccall unsafe "windows.h PostQueuedCompletionStatus"
     c_PostQueuedCompletionStatus :: IOCP -> DWORD -> ULONG_PTR -> LPOVERLAPPED
                                  -> IO BOOL
 
@@ -443,11 +441,11 @@ withRequest async offset hdl cb f = do
 
 
 -- | Create an event object for use when the HANDLE isn't asynchronous
-foreign import WINDOWS_CCONV unsafe "windows.h CreateEventW"
+foreign import ccall unsafe "windows.h CreateEventW"
     c_CreateEvent :: Ptr () -> Bool -> Bool -> LPCWSTR -> IO HANDLE
 
 -- | Close a handle object
-foreign import WINDOWS_CCONV unsafe "windows.h CloseHandle"
+foreign import ccall unsafe "windows.h CloseHandle"
     c_CloseHandle :: HANDLE -> IO Bool
 
 ------------------------------------------------------------------------
@@ -455,7 +453,7 @@ foreign import WINDOWS_CCONV unsafe "windows.h CloseHandle"
 
 -- | CancelIo shouldn't block, but cancellation happens infrequently,
 -- so we might as well be on the safe side.
-foreign import WINDOWS_CCONV unsafe "windows.h CancelIoEx"
+foreign import ccall unsafe "windows.h CancelIoEx"
     c_CancelIoEx :: HANDLE -> LPOVERLAPPED -> IO BOOL
 
 -- | Cancel all pending overlapped I/O for the given file that was initiated by
@@ -471,7 +469,7 @@ cancelIoEx' = c_CancelIoEx
 ------------------------------------------------------------------------
 -- Monotonic time
 
-foreign import WINDOWS_CCONV "windows.h GetTickCount64"
+foreign import ccall "windows.h GetTickCount64"
     c_GetTickCount64 :: IO #{type ULONGLONG}
 
 -- | Call the @GetTickCount64@ function, which returns a monotonic time in
@@ -519,10 +517,10 @@ queryPerformanceFrequency = do
 
 type QPFunc = Ptr Int64 -> IO BOOL
 
-foreign import WINDOWS_CCONV "Windows.h QueryPerformanceCounter"
+foreign import ccall "Windows.h QueryPerformanceCounter"
     c_QueryPerformanceCounter :: QPFunc
 
-foreign import WINDOWS_CCONV "Windows.h QueryPerformanceFrequency"
+foreign import ccall "Windows.h QueryPerformanceFrequency"
     c_QueryPerformanceFrequency :: QPFunc
 
 callQP :: QPFunc -> IO (Maybe Int64)
@@ -548,5 +546,5 @@ throwWinErr loc err = do
 setLastError :: ErrCode -> IO ()
 setLastError = c_SetLastError
 
-foreign import WINDOWS_CCONV unsafe "windows.h SetLastError"
+foreign import ccall unsafe "windows.h SetLastError"
     c_SetLastError :: ErrCode -> IO ()

@@ -73,18 +73,6 @@ import GHC.Internal.System.Environment
 import qualified GHC.Internal.System.Environment as Environment
 #endif
 
--- TODO: include windows_cconv.h when it's merged, instead of duplicating
--- this C macro block.
-#if defined(mingw32_HOST_OS)
-# if defined(i386_HOST_ARCH)
-##  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-##  define WINDOWS_CCONV ccall
-# else
-##  error Unknown mingw32 arch
-# endif
-#endif
-
 #include "HsBaseConfig.h"
 
 throwInvalidArgument :: String -> IO a
@@ -142,7 +130,7 @@ setEnv_ key value = withCWString key $ \k -> withCWString value $ \v -> do
   success <- c_SetEnvironmentVariable k v
   unless success (throwGetLastError "setEnv")
 
-foreign import WINDOWS_CCONV unsafe "windows.h SetEnvironmentVariableW"
+foreign import ccall unsafe "windows.h SetEnvironmentVariableW"
   c_SetEnvironmentVariable :: LPTSTR -> LPTSTR -> IO Bool
 #else
 setEnv_ key value =
@@ -179,7 +167,7 @@ unsetEnv key = withCWString key $ \k -> do
 eRROR_ENVVAR_NOT_FOUND :: DWORD
 eRROR_ENVVAR_NOT_FOUND = 203
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetLastError"
+foreign import ccall unsafe "windows.h GetLastError"
   c_GetLastError:: IO DWORD
 #elif HAVE_UNSETENV
 # if !UNSETENV_RETURNS_VOID

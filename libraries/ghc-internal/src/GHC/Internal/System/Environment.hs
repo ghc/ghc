@@ -64,16 +64,6 @@ import GHC.Internal.System.Posix.Internals (withFilePath)
 
 import GHC.Internal.System.Environment.ExecutablePath
 
-#if defined(mingw32_HOST_OS)
-# if defined(i386_HOST_ARCH)
-#  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
-#endif
-
 #include "HsBaseConfig.h"
 
 -- ---------------------------------------------------------------------------
@@ -158,7 +148,7 @@ getEnv name = lookupEnv name >>= maybe handleError return
 eRROR_ENVVAR_NOT_FOUND :: DWORD
 eRROR_ENVVAR_NOT_FOUND = 203
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetLastError"
+foreign import ccall unsafe "windows.h GetLastError"
   c_GetLastError:: IO DWORD
 
 #else
@@ -182,7 +172,7 @@ lookupEnv name = withCWString name $ \s -> try_size s 256
         _ | res > size -> try_size s res -- Rare: size increased between calls to GetEnvironmentVariable
           | otherwise  -> peekCWString p_value >>= return . Just
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetEnvironmentVariableW"
+foreign import ccall unsafe "windows.h GetEnvironmentVariableW"
   c_GetEnvironmentVariable :: LPWSTR -> LPWSTR -> DWORD -> IO DWORD
 #else
 lookupEnv name =
@@ -249,7 +239,7 @@ setEnv_ key value = withCWString key $ \k -> withCWString value $ \v -> do
   success <- c_SetEnvironmentVariable k v
   unless success (throwGetLastError "setEnv")
 
-foreign import WINDOWS_CCONV unsafe "windows.h SetEnvironmentVariableW"
+foreign import ccall unsafe "windows.h SetEnvironmentVariableW"
   c_SetEnvironmentVariable :: LPTSTR -> LPTSTR -> IO Bool
 #else
 
@@ -380,10 +370,10 @@ getEnvironment = bracket c_GetEnvironmentStrings c_FreeEnvironmentStrings $ \pBl
            c <- peek pBlock'
            seekNull pBlock' (c == (0 :: Word8 ))
 
-foreign import WINDOWS_CCONV unsafe "windows.h GetEnvironmentStringsW"
+foreign import ccall unsafe "windows.h GetEnvironmentStringsW"
   c_GetEnvironmentStrings :: IO (Ptr CWchar)
 
-foreign import WINDOWS_CCONV unsafe "windows.h FreeEnvironmentStringsW"
+foreign import ccall unsafe "windows.h FreeEnvironmentStringsW"
   c_FreeEnvironmentStrings :: Ptr CWchar -> IO Bool
 #else
 getEnvironment = do

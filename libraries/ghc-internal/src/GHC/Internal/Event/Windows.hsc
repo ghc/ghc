@@ -72,7 +72,6 @@ module GHC.Internal.Event.Windows (
 
 -- #define DEBUG_TRACE 1
 
-##include "windows_cconv.h"
 #include <windows.h>
 #include <ntstatus.h>
 #include <Rts.h>
@@ -1225,7 +1224,7 @@ foreign import ccall unsafe "ioManagerFinished" -- in the RTS (ThrIOManager.c)
 foreign import ccall unsafe "rtsSupportsBoundThreads" threadedIOMgr :: Bool
 
 -- | Sleep for n ms
-foreign import WINDOWS_CCONV unsafe "Sleep" sleepBlock :: Int -> IO ()
+foreign import ccall unsafe "Sleep" sleepBlock :: Int -> IO ()
 
 -- ---------------------------------------------------------------------------
 -- I/O manager event notifications
