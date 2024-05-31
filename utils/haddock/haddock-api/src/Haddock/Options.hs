@@ -563,7 +563,7 @@ readIfaceArgs flags = [parseIfaceOption s | Flag_ReadInterface s <- flags]
             (src, ',' : rest') ->
               let src' = case src of
                     "" -> Nothing
-                    _  -> Just (src ++ "/%M.html")
+                    _  -> Just src
                   docPaths = DocPaths { docPathsHtml = fpath
                                       , docPathsSources = src'
                                       }
