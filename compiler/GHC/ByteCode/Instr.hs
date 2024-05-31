@@ -83,7 +83,7 @@ data BCInstr
    | PUSH16_W !ByteOff
    | PUSH32_W !ByteOff
 
-   -- Push a ptr  (these all map to PUSH_G really)
+   -- Push a (heap) ptr  (these all map to PUSH_G really)
    | PUSH_G       Name
    | PUSH_PRIMOP  PrimOp
    | PUSH_BCO     (ProtoBCO Name)
