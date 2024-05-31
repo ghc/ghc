@@ -1,6 +1,4 @@
-[("i386-unknown-windows", ("e-m:x-p:32:32-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:32-n8:16:32-a:0:32-S32", "pentium4", ""))
-,("i686-unknown-windows", ("e-m:x-p:32:32-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:32-n8:16:32-a:0:32-S32", "pentium4", ""))
-,("x86_64-unknown-windows", ("e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", "x86-64", ""))
+[("x86_64-unknown-windows", ("e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", "x86-64", ""))
 ,("arm-unknown-linux-gnueabi", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm7tdmi", "+strict-align"))
 ,("arm-unknown-linux-gnueabihf", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm1176jzf-s", "+strict-align"))
 ,("arm-unknown-linux-musleabihf", ("e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64", "arm1176jzf-s", "+strict-align"))
