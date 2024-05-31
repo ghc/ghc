@@ -694,8 +694,7 @@ of ``-W(no-)*``.
 
     Causes a warning to be emitted for foreign declarations that use
     unsupported calling conventions. In particular, if the ``stdcall``
-    calling convention is used on an architecture other than i386 then
-    it will be treated as ``ccall``.
+    calling convention is used then it will be treated as ``ccall``.
 
 .. ghc-flag:: -Wdodgy-foreign-imports
     :shortdesc: warn about dodgy foreign imports

@@ -319,7 +319,7 @@ to call from the outside. For example:
     adder :: Int -> Int -> IO Int  -- gratuitous use of IO
     adder x y = return (x+y)
 
-    foreign export stdcall adder :: Int -> Int -> IO Int
+    foreign export ccall adder :: Int -> Int -> IO Int
 
 Add some helper code that starts up and shuts down the Haskell RTS:
 
