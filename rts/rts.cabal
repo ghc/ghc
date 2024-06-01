@@ -362,11 +362,6 @@ library
           else
             asm-sources: adjustor/NativeAmd64Asm.S
             c-sources: adjustor/NativeAmd64.c
-        if arch(ppc) || arch(ppc64)
-          asm-sources: AdjustorAsm.S
-          c-sources: adjustor/NativePowerPC.c
-        if arch(ia64)
-          c-sources: adjustor/NativeIA64.c
 
       -- Use assembler STG entrypoint on architectures where it is used
       if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
