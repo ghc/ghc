@@ -18,7 +18,6 @@ import GHC.Platform.Reg
 
 import GHC.Platform.Regs
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -35,6 +34,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Foldable
 import GHC.Cmm.Info (maxRetInfoTableSizeW)
 import GHC.Types.Unique.FM (listToUFM, lookupUFM)
+import GHC.Data.FastString (LexicalFastString)
 
 -- | Stack frame header size in bytes.
 --
@@ -529,7 +529,7 @@ data Instr
     | ANN SDoc Instr
 
     -- location pseudo-op (file, line, col, name)
-    | LOCATION Int Int Int String
+    | LOCATION Int Int Int LexicalFastString
 
     -- some static data spat out during code
     -- generation.  Will be extracted before

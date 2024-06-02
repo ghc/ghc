@@ -55,7 +55,6 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain (assert)
 
 -- For an overview of an NCG's structure, see Note [General layout of an NCG]
 
@@ -278,7 +277,7 @@ stmtToInstrs bid stmt = do
       CmmAssign reg src
         | isFloatType ty         -> assignReg_FltCode format reg src
         | otherwise              -> assignReg_IntCode format reg src
-          where ty = cmmRegType platform reg
+          where ty = cmmRegType reg
                 format = cmmTypeFormat ty
 
       CmmStore addr src _alignment
@@ -332,7 +331,7 @@ getRegisterReg _ (CmmLocal (LocalReg u pk))
   = RegVirtual $ mkVirtualReg u (cmmTypeFormat pk)
 
 getRegisterReg platform (CmmGlobal mid)
-  = case globalRegMaybe platform mid of
+  = case globalRegMaybe platform (globalRegUseGlobalReg mid) of
         Just reg -> RegReal reg
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
         -- By this stage, the only MagicIds remaining should be the
@@ -481,7 +480,7 @@ getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i <
 -- Generic case.
 getRegister' config plat expr =
   case expr of
-    CmmReg (CmmGlobal PicBaseReg) ->
+    CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _)) ->
       pprPanic "getRegisterReg-memory" (ppr PicBaseReg)
 
     CmmLit lit ->
@@ -554,21 +553,24 @@ getRegister' config plat expr =
     CmmStackSlot _ _
       -> pprPanic "getRegister' (CmmStackSlot): " (pdoc plat expr)
     CmmReg reg
-      -> return (Fixed (cmmTypeFormat (cmmRegType plat reg))
+      -> return (Fixed (cmmTypeFormat (cmmRegType reg))
                        (getRegisterReg plat reg)
                        nilOL)
     CmmRegOff reg off | isNbitEncodeable 12 (fromIntegral off) -> do
       getRegister' config plat $
             CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
-          where width = typeWidth (cmmRegType plat reg)
+          where width = typeWidth (cmmRegType reg)
 
     CmmRegOff reg off -> do
       (off_r, _off_format, off_code) <- getSomeReg $ CmmLit (CmmInt (fromIntegral off) width)
       (reg, _format, code) <- getSomeReg $ CmmReg reg
       return $ Any (intFormat width) (\dst -> off_code `appOL` code `snocOL` ADD (OpReg width dst) (OpReg width reg) (OpReg width off_r))
-          where width = typeWidth (cmmRegType plat reg)
+          where width = typeWidth (cmmRegType reg)
 
-
+    -- Handle MO_RelaxedRead as a normal CmmLoad, to allow
+    -- non-trivial addressing modes to be used.
+    CmmMachOp (MO_RelaxedRead w) [e] ->
+      getRegister (CmmLoad e (cmmBits w) NaturallyAligned)
 
     -- for MachOps, see GHC.Cmm.MachOp
     -- For CmmMachOp, see GHC.Cmm.Expr
@@ -621,7 +623,7 @@ getRegister' config plat expr =
           reg <- getRegister' config plat e
           addAlignmentCheck align wordWidth reg
 
-        _ -> pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
+        x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
         -- In the case of 16- or 8-bit values we need to sign-extend to 32-bits
         -- See Note [Signed arithmetic on RISCV64].
@@ -676,12 +678,12 @@ getRegister' config plat expr =
     CmmMachOp (MO_Add w) [CmmReg reg, CmmLit (CmmInt n _)]
       | fitsIn12bitImm n -> return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ADD (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       -- TODO: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
-      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+      where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
     CmmMachOp (MO_Sub w) [CmmReg reg, CmmLit (CmmInt n _)]
       | fitsIn12bitImm n -> return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (SUB (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       -- TODO: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
-      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+      where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
 
     CmmMachOp (MO_U_Quot w) [x, y] | w == W8 || w == W16  -> do
@@ -745,12 +747,12 @@ getRegister' config plat expr =
     -- 3. Logic &&, ||
     CmmMachOp (MO_And w) [CmmReg reg, CmmLit (CmmInt n _)] | fitsIn12bitImm n ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
-      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+      where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
 
     CmmMachOp (MO_Or w) [CmmReg reg, CmmLit (CmmInt n _)] | fitsIn12bitImm n ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ORI (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
-      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+      where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
 
     -- Generic case.
@@ -1586,8 +1588,12 @@ genCCall target dest_regs arg_regs bid = do
         -- The related C functions are:
         -- atomic_thread_fence(memory_order_acquire);
         -- atomic_thread_fence(memory_order_release);
-        MO_ReadBarrier      ->  return (unitOL (DMBSY DmbRead DmbRead), Nothing)
-        MO_WriteBarrier     ->  return (unitOL (DMBSY DmbWrite DmbWrite), Nothing)
+--        MO_ReadBarrier      ->  return (unitOL (DMBSY DmbRead DmbRead), Nothing)
+--        MO_WriteBarrier     ->  return (unitOL (DMBSY DmbWrite DmbWrite), Nothing)
+        MO_AcquireFence -> return (unitOL (DMBSY DmbRead DmbReadWrite), Nothing)
+        MO_ReleaseFence -> return (unitOL (DMBSY DmbReadWrite DmbWrite), Nothing)
+        MO_SeqCstFence -> return (unitOL (DMBSY DmbReadWrite DmbReadWrite), Nothing)
+
         MO_Touch            ->  return (nilOL, Nothing) -- Keep variables live (when using interior pointers)
         -- Prefetch
         MO_Prefetch_Data _n -> return (nilOL, Nothing) -- Prefetch hint.
@@ -1763,9 +1769,9 @@ genCCall target dest_regs arg_regs bid = do
     readResults (gpReg:gpRegs) (fpReg:fpRegs) (dst:dsts) accumRegs accumCode = do
       -- gp/fp reg -> dst
       platform <- getPlatform
-      let rep = cmmRegType platform (CmmLocal dst)
+      let rep = cmmRegType (CmmLocal dst)
           format = cmmTypeFormat rep
-          w   = cmmRegWidth platform (CmmLocal dst)
+          w   = cmmRegWidth (CmmLocal dst)
           r_dst = getRegisterReg platform (CmmLocal dst)
       if isFloatFormat format
         then readResults (gpReg:gpRegs) fpRegs dsts (fpReg:accumRegs) (accumCode `snocOL` MOV (OpReg w r_dst) (OpReg w fpReg))
