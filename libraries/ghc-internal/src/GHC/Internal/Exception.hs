@@ -79,7 +79,7 @@ import GHC.Internal.Exception.Type
 -- WARNING: You may want to use 'throwIO' instead so that your pure code
 -- stays exception-free.
 throw :: forall (r :: RuntimeRep). forall (a :: TYPE r). forall e.
-         (?callStack :: CallStack, Exception e) => e -> a
+         (HasCallStack, Exception e) => e -> a
 throw e =
     let !se = unsafePerformIO (toExceptionWithBacktrace e)
     in raise# se
