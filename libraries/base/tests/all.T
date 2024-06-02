@@ -176,6 +176,7 @@ test('T7457', normal, compile_and_run, [''])
 test('T7773',
      [when(opsys('mingw32'), skip),
       js_broken(22261),
+      when(arch('wasm32'), fragile(24928)),
       expect_broken_for(23272, ['ghci-opt']) # unclear
      ],
      compile_and_run,
