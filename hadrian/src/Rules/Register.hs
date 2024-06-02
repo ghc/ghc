@@ -7,6 +7,7 @@ module Rules.Register (
 import Base
 import Context
 import Expression ( getContextData )
+import Flavour
 import Oracles.Setting
 import Hadrian.BuildPath
 import Hadrian.Expression
@@ -51,6 +52,14 @@ configurePackageRules = do
           isGmp <- (== "gmp") <$> interpretInContext ctx getBignumBackend
           when isGmp $
             need [buildP -/- "include/ghc-gmp.h"]
+        when (pkg == text) $ do
+          simdutf <- textWithSIMDUTF <$> flavour
+          when simdutf $ do
+            -- This is required, otherwise you get Error: hadrian:
+            -- Encountered missing or private dependencies:
+            -- system-cxx-std-lib ==1.0
+            cxxStdLib <- systemCxxStdLibConfPath $ PackageDbLoc stage Inplace
+            need [cxxStdLib]
         Cabal.configurePackage ctx
 
     root -/- "**/autogen/cabal_macros.h" %> \out -> do

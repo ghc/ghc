@@ -266,6 +266,10 @@ The supported transformers are listed below:
         <td>Use the native <code>ghc-bignum</code> backend.</td>
     </tr>
     <tr>
+        <td><code>text_simdutf</code></td>
+        <td>Enable building the <code>text</code> package with <code>simdutf</code> support.</td>
+    </tr>
+    <tr>
         <td><code>no_profiled_libs</code></td>
         <td>Disables building of libraries in profiled build ways.</td>
     </tr>

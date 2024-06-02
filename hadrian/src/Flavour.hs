@@ -17,6 +17,7 @@ module Flavour
   , enableHaddock
   , enableHiCore
   , useNativeBignum
+  , enableTextWithSIMDUTF
   , omitPragmas
 
   , completeSetting
@@ -53,6 +54,7 @@ flavourTransformers = M.fromList
     , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
     , "no_dynamic_libs"  =: disableDynamicLibs
     , "native_bignum"    =: useNativeBignum
+    , "text_simdutf"     =: enableTextWithSIMDUTF
     , "no_profiled_libs" =: disableProfiledLibs
     , "omit_pragmas"     =: omitPragmas
     , "ipe"              =: enableIPE
@@ -291,6 +293,12 @@ useNativeBignum :: Flavour -> Flavour
 useNativeBignum flavour =
   flavour { bignumBackend = "native"
           }
+
+-- | Enable building the @text@ package with @simdutf@ support.
+enableTextWithSIMDUTF :: Flavour -> Flavour
+enableTextWithSIMDUTF flavour = flavour {
+  textWithSIMDUTF = True
+}
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.

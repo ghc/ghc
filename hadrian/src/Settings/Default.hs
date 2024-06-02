@@ -267,6 +267,7 @@ defaultFlavour = Flavour
     , packages           = defaultPackages
     , bignumBackend      = defaultBignumBackend
     , bignumCheck        = False
+    , textWithSIMDUTF    = False
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , dynamicGhcPrograms = defaultDynamicGhcPrograms

@@ -191,12 +191,10 @@ packageArgs = do
             builder (Cabal Flags) ? stage0 `cabalFlag` "bootstrap"
 
         ---------------------------------- text --------------------------------
-        , package text ? mconcat
-          -- Disable SIMDUTF by default due to packaging difficulties
-          -- described in #20724.
-          [ builder (Cabal Flags) ? arg "-simdutf"
-          -- https://github.com/haskell/text/issues/415
-          , builder Ghc ? input "**/Data/Text/Encoding.hs"  ? arg "-Wno-unused-imports" ]
+        , package text ?
+            ifM (textWithSIMDUTF <$> expr flavour)
+              (builder (Cabal Flags) ? arg "+simdutf")
+              (builder (Cabal Flags) ? arg "-simdutf")
 
         ------------------------------- haskeline ------------------------------
         -- Hadrian doesn't currently support packages containing both libraries

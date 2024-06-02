@@ -23,6 +23,9 @@ data Flavour = Flavour {
     bignumBackend :: String,
     -- | Check selected bignum backend against native backend
     bignumCheck :: Bool,
+    -- | Build the @text@ package with @simdutf@ support. Disabled by
+    -- default due to packaging difficulties described in #20724.
+    textWithSIMDUTF :: Bool,
     -- | Build libraries these ways.
     libraryWays :: Ways,
     -- | Build RTS these ways.
@@ -70,4 +73,3 @@ type DocTargets = Set DocTarget
 --   distribution.
 data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan | SphinxInfo
   deriving (Eq, Ord, Show, Bounded, Enum)
-
