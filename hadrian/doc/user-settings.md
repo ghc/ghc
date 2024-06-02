@@ -119,22 +119,22 @@ the right names for them:
   * `ghc` refers to GHC commands; the final slot refers to how GHC is invoked:
 
     * `c.opts` for commands that build C files with GHC
-	  * `hs.opts` for commands that compile Haskell modules with GHC
+    * `cpp.opts` for commands that build C++ files with GHC
+	 * `hs.opts` for commands that compile Haskell modules with GHC
 	  * `link.opts` for GHC linking command
 	  * `deps.opts` for commands that figure out dependencies between Haskell modules
 	    (with `ghc -M`)
 	  * `toolargs.opts` for GHC commands that are used to generate the right ghci
 	    argument for `hadrian/ghci` to work
 
-  * `cc` refers to C compiler commands
-  * `cxx` refers to C++ compiler commands
+  * `cc` refers to C/C++ compiler commands
 
-    * `c.opts` for commands that call the C compiler on some C files
-	  * `deps.opts` for commands that call the C compiler for figuring out
-	    dependencies between C files
+    * `c.opts` for commands that call the C compiler on some C/C++ files
+	 * `deps.opts` for commands that call the C compiler for figuring out
+	    dependencies between C files. Note that this doesn't work for C++ files yet.
 
   * `cabal.configure.opts` refers to Cabal configure command line. Note that
-    package flags can be given by adding `--flags=...` arguments.
+    package flags can be given by adding `--flags=...` arguments. Also, for packages with `build-type: Configure`, you can pass additional arguments to the `configure` script like this: `stage1.rts.cabal.configure.opts+=--configure-option=--enable-asserts-all-ways`
 
   * `hsc2hs.run.opts` allows passing options to `Hsc2Hs` invocations.
 
