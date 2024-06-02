@@ -153,6 +153,7 @@ data BuildConfig
                 , threadSanitiser :: Bool
                 , noSplitSections :: Bool
                 , validateNonmovingGc :: Bool
+                , textWithSIMDUTF :: Bool
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -174,7 +175,8 @@ mkJobFlavour BuildConfig{..} = Flavour buildFlavour opts
            [FullyStatic | fullyStatic] ++
            [ThreadSanitiser | threadSanitiser] ++
            [NoSplitSections | noSplitSections, buildFlavour == Release ] ++
-           [BootNonmovingGc | validateNonmovingGc ]
+           [BootNonmovingGc | validateNonmovingGc ] ++
+           [TextWithSIMDUTF | textWithSIMDUTF]
 
 data Flavour = Flavour BaseFlavour [FlavourTrans]
 
@@ -185,6 +187,7 @@ data FlavourTrans =
     | ThreadSanitiser
     | NoSplitSections
     | BootNonmovingGc
+    | TextWithSIMDUTF
 
 data BaseFlavour = Release | Validate | SlowValidate deriving Eq
 
@@ -211,6 +214,7 @@ vanilla = BuildConfig
   , threadSanitiser = False
   , noSplitSections = False
   , validateNonmovingGc = False
+  , textWithSIMDUTF = False
   }
 
 splitSectionsBroken :: BuildConfig -> BuildConfig
@@ -344,6 +348,7 @@ flavourString (Flavour base trans) = base_string base ++ concatMap (("+" ++) . f
     flavour_string ThreadSanitiser = "thread_sanitizer_cmm"
     flavour_string NoSplitSections = "no_split_sections"
     flavour_string BootNonmovingGc = "boot_nonmoving_gc"
+    flavour_string TextWithSIMDUTF = "text_simdutf"
 
 -- The path to the docker image (just for linux builders)
 dockerImage :: Arch -> Opsys -> Maybe String
@@ -1057,6 +1062,7 @@ job_groups =
         {
           fullyStatic = True
           , buildFlavour     = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
+          , textWithSIMDUTF = True
         }
 
 
@@ -1082,10 +1088,10 @@ platform_mapping = Map.map go combined_result
                 , "x86_64-linux-fedora33-release"
                 , "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
                 , "x86_64-windows-validate"
-                , "nightly-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static"
+                , "nightly-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf"
                 , "nightly-x86_64-linux-deb11-validate"
                 , "nightly-x86_64-linux-deb12-validate"
-                , "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static"
+                , "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf"
                 , "x86_64-linux-deb12-validate+thread_sanitizer_cmm"
                 , "nightly-aarch64-linux-deb10-validate"
                 , "nightly-x86_64-linux-alpine3_12-validate"

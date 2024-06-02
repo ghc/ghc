@@ -951,7 +951,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static": {
+  "nightly-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -962,7 +962,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1005,17 +1005,17 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static",
-      "BUILD_FLAVOUR": "release+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static",
+      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf",
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static": {
+  "nightly-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -1026,7 +1026,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1069,17 +1069,17 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static",
-      "BUILD_FLAVOUR": "release+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static",
+      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf",
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static": {
+  "nightly-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -1090,7 +1090,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1133,13 +1133,13 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static",
-      "BUILD_FLAVOUR": "release+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static",
+      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf",
       "XZ_OPT": "-9"
     }
   },
@@ -4465,7 +4465,7 @@
       "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static"
     }
   },
-  "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static": {
+  "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -4476,7 +4476,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4519,16 +4519,16 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static",
-      "BUILD_FLAVOUR": "release+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf"
     }
   },
-  "x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static": {
+  "x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -4539,7 +4539,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4583,16 +4583,16 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static",
-      "BUILD_FLAVOUR": "release+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-int_native-cross_wasm32-wasi-release+fully_static+text_simdutf"
     }
   },
-  "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static": {
+  "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -4603,7 +4603,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "ghc-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4647,13 +4647,13 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static",
-      "BUILD_FLAVOUR": "release+fully_static",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+fully_static+text_simdutf",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static"
+      "TEST_ENV": "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf"
     }
   },
   "x86_64-linux-deb10-int_native-validate": {
