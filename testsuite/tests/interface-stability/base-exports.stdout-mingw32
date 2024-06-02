@@ -292,7 +292,7 @@ module Control.Exception where
   mask_ :: forall a. GHC.Types.IO a -> GHC.Types.IO a
   onException :: forall a b. GHC.Types.IO a -> GHC.Types.IO b -> GHC.Types.IO a
   someExceptionContext :: SomeException -> GHC.Internal.Exception.Context.ExceptionContext
-  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (?callStack::GHC.Internal.Stack.Types.CallStack, Exception e) => e -> a
+  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (GHC.Internal.Stack.Types.HasCallStack, Exception e) => e -> a
   throwIO :: forall e a. (GHC.Internal.Stack.Types.HasCallStack, Exception e) => e -> GHC.Types.IO a
   throwTo :: forall e. Exception e => GHC.Internal.Conc.Sync.ThreadId -> e -> GHC.Types.IO ()
   try :: forall e a. Exception e => GHC.Types.IO a -> GHC.Types.IO (GHC.Internal.Data.Either.Either e a)
@@ -407,7 +407,7 @@ module Control.Exception.Base where
   patError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
   recConError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
   recSelError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
-  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (?callStack::GHC.Internal.Stack.Types.CallStack, Exception e) => e -> a
+  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (GHC.Internal.Stack.Types.HasCallStack, Exception e) => e -> a
   throwIO :: forall e a. (GHC.Internal.Stack.Types.HasCallStack, Exception e) => e -> GHC.Types.IO a
   throwTo :: forall e. Exception e => GHC.Internal.Conc.Sync.ThreadId -> e -> GHC.Types.IO ()
   try :: forall e a. Exception e => GHC.Types.IO a -> GHC.Types.IO (GHC.Internal.Data.Either.Either e a)
@@ -5463,7 +5463,7 @@ module GHC.Exception where
   prettySrcLoc :: SrcLoc -> GHC.Internal.Base.String
   ratioZeroDenomException :: SomeException
   showCCSStack :: [GHC.Internal.Base.String] -> [GHC.Internal.Base.String]
-  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (?callStack::CallStack, Exception e) => e -> a
+  throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (GHC.Internal.Stack.Types.HasCallStack, Exception e) => e -> a
   underflowException :: SomeException
 
 module GHC.Exception.Type where
