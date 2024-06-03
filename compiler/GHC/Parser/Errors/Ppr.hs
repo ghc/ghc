@@ -573,7 +573,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalOrPat pat
       -> mkSimpleDecorated $ vcat [text "Illegal or-pattern:" <+> ppr (unLoc pat)]
 
-    PsErrSpecEpxrMultipleTypeAscription
+    PsErrSpecExprMultipleTypeAscription
       -> mkSimpleDecorated $
         text "SPECIALIZE expression doesn't support multiple specialize type ascriptions"
 
@@ -693,9 +693,15 @@ instance Diagnostic PsMessage where
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
     PsErrUnicodeCharLooksLike{}                   -> ErrorWithoutFlag
     PsErrInvalidPun {}                            -> ErrorWithoutFlag
+<<<<<<< HEAD
     PsErrIllegalOrPat{}                           -> ErrorWithoutFlag
     PsErrTypeSyntaxInPat{}                        -> ErrorWithoutFlag
     PsErrSpecEpxrMultipleTypeAscription{}         -> ErrorWithoutFlag
+||||||| constructed merge base
+    PsErrSpecEpxrMultipleTypeAscription{}         -> ErrorWithoutFlag
+=======
+    PsErrSpecExprMultipleTypeAscription{}         -> ErrorWithoutFlag
+>>>>>>> Wibbles
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -866,6 +872,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalOrPat{}                           -> [suggestExtension LangExt.OrPatterns]
     PsErrTypeSyntaxInPat{}                        -> noHints
     PsErrSpecEpxrMultipleTypeAscription {}        -> noHints
+    PsErrSpecExprMultipleTypeAscription {}        -> noHints
 
   diagnosticCode = constructorCode
 

@@ -492,6 +492,7 @@ data PsMessage
    | PsErrTypeSyntaxInPat !PsErrTypeSyntaxDetails
 
    | PsErrSpecEpxrMultipleTypeAscription
+   | PsErrSpecExprMultipleTypeAscription
 
    deriving Generic
 

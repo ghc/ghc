@@ -1066,7 +1066,7 @@ mkSpecSig prag_start inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr 
       where colon_ann = AddEpAnn (toUnicodeAnn AnnDcolon dcolon) (gl dcolon)
 
     match_on_pragma_structure _ _ _ =
-      ps_err PsErrSpecEpxrMultipleTypeAscription
+      ps_err PsErrSpecExprMultipleTypeAscription
 
 
     gl = srcSpan2e . getLoc

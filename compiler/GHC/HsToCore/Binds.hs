@@ -1061,15 +1061,15 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
             --                                     ]) $
             Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
           | otherwise ->
-             pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-                                                , text "orig_lhs:" <+> ppr orig_lhs
-                                                , text "lhs1:"     <+> ppr lhs1
-                                                , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
-                                                , text "extra_bndrs:" <+> ppr extra_bndrs
-                                                , text "fn_id:" <+> ppr fn_id
-                                                , text "args:"   <+> ppr args
-                                                , text "args fvs:" <+> ppr (exprsFreeVarsList args)
-                                                ]) $
+            -- pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+            --                                    , text "orig_lhs:" <+> ppr orig_lhs
+            --                                    , text "lhs1:"     <+> ppr lhs1
+            --                                    , text "trimmed_bndrs:" <+> ppr trimmed_bndrs
+            --                                    , text "extra_bndrs:" <+> ppr extra_bndrs
+            --                                    , text "fn_id:" <+> ppr fn_id
+            --                                    , text "args:"   <+> ppr args
+            --                                    , text "args fvs:" <+> ppr (exprsFreeVarsList args)
+            --                                    ]) $
             Right (trimmed_bndrs ++ extra_bndrs, fn_id, args)
 
           where -- See Note [Variables unbound on the LHS]
