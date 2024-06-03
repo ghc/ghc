@@ -194,7 +194,6 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         seq :: forall a b. a -> b -> b
         ($!) :: forall a b. (a -> b) -> a -> b
         (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
-        flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
         curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
@@ -202,5 +201,6 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         zip3 :: forall a b c. [a] -> [b] -> [c] -> [(a, b, c)]
         zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
         ($) :: forall a b. (a -> b) -> a -> b
+        flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         zipWith3 :: forall a b c d.
                     (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]

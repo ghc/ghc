@@ -1095,7 +1095,7 @@ module Data.Function where
   applyWhen :: forall a. GHC.Types.Bool -> (a -> a) -> a -> a
   const :: forall a b. a -> b -> a
   fix :: forall a. (a -> a) -> a
-  flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+  flip :: forall (repc :: GHC.Types.RuntimeRep) a b (c :: TYPE repc). (a -> b -> c) -> b -> a -> c
   id :: forall a. a -> a
   on :: forall b c a. (b -> b -> c) -> (a -> b) -> a -> a -> c
 
@@ -3717,7 +3717,7 @@ module GHC.Base where
   fetchXorIntArray# :: forall d. MutableByteArray# d -> Int# -> Int# -> State# d -> (# State# d, Int# #)
   fetchXorWordAddr# :: forall d. Addr# -> Word# -> State# d -> (# State# d, Word# #)
   finalizeWeak# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) b. Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, State# RealWorld -> (# State# RealWorld, b #) #)
-  flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+  flip :: forall (repc :: RuntimeRep) a b (c :: TYPE repc). (a -> b -> c) -> b -> a -> c
   float2Double# :: Float# -> Double#
   float2Int# :: Float# -> Int#
   fmaddDouble# :: Double# -> Double# -> Double# -> Double#
@@ -10413,7 +10413,7 @@ module Prelude where
   errorWithoutStackTrace :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r). [Char] -> a
   even :: forall a. Integral a => a -> Bool
   filter :: forall a. (a -> Bool) -> [a] -> [a]
-  flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+  flip :: forall (repc :: GHC.Types.RuntimeRep) a b (c :: TYPE repc). (a -> b -> c) -> b -> a -> c
   fromIntegral :: forall a b. (Integral a, Num b) => a -> b
   fst :: forall a b. (a, b) -> a
   gcd :: forall a. Integral a => a -> a -> a

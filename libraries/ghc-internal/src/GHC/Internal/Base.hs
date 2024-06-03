@@ -2184,7 +2184,7 @@ const x _               =  x
 --
 -- >>> let (.>) = flip (.) in (+1) .> show $ 5
 -- "6"
-flip                    :: (a -> b -> c) -> b -> a -> c
+flip :: forall repc a b (c :: TYPE repc). (a -> b -> c) -> b -> a -> c
 flip f x y              =  f y x
 
 -- Note: Before base-4.19, ($) was not representation polymorphic
