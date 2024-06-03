@@ -60,10 +60,6 @@ module GHC.Driver.DynFlags (
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
 
-        -- * Linker/compiler information
-        LinkerInfo(..),
-        CompilerInfo(..),
-
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
         addImplicitQuoteInclude,
@@ -757,31 +753,6 @@ data ParMakeCount
   | ParMakeNumProcessors
   -- | Use the specific semaphore @<sem>@ to control parallelism (@-jsem <sem>@ flag).
   | ParMakeSemaphore FilePath
-
--- -----------------------------------------------------------------------------
--- Linker/compiler information
-
--- LinkerInfo contains any extra options needed by the system linker.
-data LinkerInfo
-  = GnuLD    [Option]
-  | Mold     [Option]
-  | GnuGold  [Option]
-  | LlvmLLD  [Option]
-  | DarwinLD [Option]
-  | SolarisLD [Option]
-  | AixLD    [Option]
-  | UnknownLD
-  deriving Eq
-
--- CompilerInfo tells us which C compiler we're using
-data CompilerInfo
-   = GCC
-   | Clang
-   | AppleClang
-   | AppleClang51
-   | Emscripten
-   | UnknownCC
-   deriving Eq
 
 -- | The 'GhcMode' tells us whether we're doing multi-module
 -- compilation (controlled via the "GHC" API) or one-shot

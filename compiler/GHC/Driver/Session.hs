@@ -215,8 +215,6 @@ module GHC.Driver.Session (
         isFmaEnabled,
 
         -- * Linker/compiler information
-        LinkerInfo(..),
-        CompilerInfo(..),
         useXLinkerRPath,
 
         -- * Include specifications
