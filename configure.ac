@@ -314,6 +314,8 @@ else
         AC_CHECK_TARGET_TOOL([WindresCmd],[windres])
         AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
+        WindresCmd="$(cygpath -m $WindresCmd)"
+
         if test "$Genlib" != ""; then
             GenlibCmd="$(cygpath -m $Genlib)"
         fi
@@ -464,7 +466,12 @@ case $HostOS_CPP in
     ;;
 esac
 
-ObjdumpCmd="$OBJDUMP"
+if test "$HostOS" = "mingw32"
+then
+  ObjdumpCmd=$(cygpath -m "$OBJDUMP")
+else
+  ObjdumpCmd="$OBJDUMP"
+fi
 AC_SUBST([ObjdumpCmd])
 
 dnl ** Which ranlib to use?
@@ -473,7 +480,12 @@ AC_PROG_RANLIB
 if test "$RANLIB" = ":"; then
     AC_MSG_ERROR([cannot find ranlib in your PATH])
 fi
-RanlibCmd="$RANLIB"
+if test "$HostOS" = "mingw32"
+then
+  RanlibCmd=$(cygpath -m "$RANLIB")
+else
+  RanlibCmd="$RANLIB"
+fi
 AC_SUBST([RanlibCmd])
 
 dnl ** which strip to use?

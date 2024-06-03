@@ -9,7 +9,12 @@ AC_DEFUN([FP_FIND_NM],
             AC_MSG_ERROR([cannot find nm in your PATH])
         fi
     fi
-    NmCmd="$NM"
+    if test "$HostOS" = "mingw32"
+    then
+      NmCmd=$(cygpath -m "$NM")
+    else
+      NmCmd="$NM"
+    fi
     AC_SUBST([NmCmd])
 
     if test "$TargetOS_CPP" = "darwin"
@@ -37,4 +42,3 @@ AC_DEFUN([FP_FIND_NM],
             esac
     fi
 ])
-
