@@ -34,6 +34,7 @@ import Base
 import Context
 import Oracles.Flag
 import Oracles.Setting (setting, Setting(..))
+import Oracles.Setting (settingsFileSetting, ToolchainSetting(..))
 import Packages
 
 import GHC.IO.Encoding (getFileSystemEncoding)
@@ -239,9 +240,10 @@ instance H.Builder Builder where
         Ghc {} -> do
             root <- buildRoot
             unlitPath  <- builderPath Unlit
+            distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW
 
             return $ [ unlitPath ]
-                  ++ [ root -/- mingwStamp | windowsHost ]
+                  ++ [ root -/- mingwStamp | windowsHost, distro_mingw == "NO" ]
                      -- proxy for the entire mingw toolchain that
                      -- we have in inplace/mingw initially, and then at
                      -- root -/- mingw.
