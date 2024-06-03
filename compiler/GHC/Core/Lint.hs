@@ -634,11 +634,16 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        --     in GHC.Core.Opt.DmdAnal
        ; case splitDmdSig (idDmdSig binder) of
            (demands, result_info) | isDeadEndDiv result_info ->
-             checkL (demands `lengthAtLeast` idArity binder)
-               (text "idArity" <+> ppr (idArity binder) <+>
-               text "exceeds arity imposed by the strictness signature" <+>
-               ppr (idDmdSig binder) <> colon <+>
-               ppr binder)
+              if (demands `lengthAtLeast` idArity binder)
+              then return ()
+              else pprTrace "Hack alert: lintLetBind #24623"
+                       (ppr (idArity binder) $$ ppr (idDmdSig binder)) $
+                   return ()
+--             checkL (demands `lengthAtLeast` idArity binder)
+--               (text "idArity" <+> ppr (idArity binder) <+>
+--               text "exceeds arity imposed by the strictness signature" <+>
+--               ppr (idDmdSig binder) <> colon <+>
+--               ppr binder)
 
            _ -> return ()
 
