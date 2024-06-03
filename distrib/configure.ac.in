@@ -284,6 +284,11 @@ dnl Pass -Qunused-arguments or otherwise GHC will have very noisy invocations of
 FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE1])
 FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE2])
 
+dnl ** look to see if we have a C compiler using an llvm back end.
+dnl
+FP_CC_LLVM_BACKEND
+AC_SUBST(CcLlvmBackend)
+
 # CPP, CPPFLAGS
 # --with-cpp/-with-cpp-flags
 dnl Note that we must do this after setting and using the C99 CPPFLAGS, or

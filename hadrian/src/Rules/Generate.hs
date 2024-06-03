@@ -448,6 +448,7 @@ generateSettings settingsFile = do
         , ("C compiler flags",     queryTarget ccFlags)
         , ("C++ compiler command", queryTarget cxxPath)
         , ("C++ compiler flags",   queryTarget cxxFlags)
+        , ("C compiler is clang",  expr $ yesNo <$> flag CcLlvmBackend)
         , ("C compiler link flags",       queryTarget clinkFlags)
         , ("C compiler supports -no-pie", queryTarget linkSupportsNoPie)
         , ("CPP command",         queryTarget cppPath)

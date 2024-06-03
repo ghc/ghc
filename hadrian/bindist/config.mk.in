@@ -212,6 +212,7 @@ SettingsCmmCPPFlags = @SettingsCmmCPPFlags@
 SettingsCmmCPPSupportsG0 = @SettingsCmmCPPSupportsG0@
 SettingsCCompilerFlags = @SettingsCCompilerFlags@
 SettingsCxxCompilerFlags = @SettingsCxxCompilerFlags@
+CcLlvmBackend = @CcLlvmBackend@
 SettingsCCompilerLinkFlags = @SettingsCCompilerLinkFlags@
 SettingsCCompilerSupportsNoPie = @SettingsCCompilerSupportsNoPie@
 SettingsMergeObjectsCommand = @SettingsMergeObjectsCommand@
@@ -226,5 +227,3 @@ SettingsLlcCommand = @SettingsLlcCommand@
 SettingsOptCommand = @SettingsOptCommand@
 SettingsLlvmAsCommand = @SettingsLlvmAsCommand@
 SettingsUseDistroMINGW = @SettingsUseDistroMINGW@
-
-

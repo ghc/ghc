@@ -89,6 +89,7 @@ lib/settings : config.mk
 	@echo ',("C compiler flags", "$(SettingsCCompilerFlags)")' >> $@
 	@echo ',("C++ compiler command", "$(SettingsCxxCompilerCommand)")' >> $@
 	@echo ',("C++ compiler flags", "$(SettingsCxxCompilerFlags)")' >> $@
+	@echo ',("C compiler is clang", "$(CcLlvmBackend)")' >> $@
 	@echo ',("C compiler link flags", "$(SettingsCCompilerLinkFlags)")' >> $@
 	@echo ',("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)")' >> $@
 	@echo ',("CPP command", "$(SettingsCPPCommand)")' >> $@
