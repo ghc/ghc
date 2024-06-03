@@ -39,14 +39,14 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where const :: forall a b. a -> b -> a
         (.) (_ :: b1 -> Integer) (_ :: [Integer] -> b1)
           where (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
-        flip (_ :: [Integer] -> t0 -> Integer) (_ :: t0)
-          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         curry (_ :: (t0, [Integer]) -> Integer) (_ :: t0)
           where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         ($) (_ :: [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
         ($!) (_ :: [Integer] -> Integer)
           where ($!) :: forall a b. (a -> b) -> a -> b
+        flip (_ :: [Integer] -> t0 -> Integer) (_ :: t0)
+          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         id (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
           where id :: forall a. a -> a
         head (_ :: [t0 -> [Integer] -> Integer]) (_ :: t0)
@@ -160,22 +160,22 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>
                          (a -> b -> b) -> b -> t a -> b
-        flip (_ :: [Integer] -> Integer -> Integer)
-          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         curry (_ :: (Integer, [Integer]) -> Integer)
           where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         const (_ :: [Integer] -> Integer)
           where const :: forall a b. a -> b -> a
+        flip (_ :: [Integer] -> Integer -> Integer)
+          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         (.) (_ :: b1 -> [Integer] -> Integer) (_ :: Integer -> b1)
           where (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
-        flip (_ :: Integer -> t0 -> [Integer] -> Integer) (_ :: t0)
-          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         curry (_ :: (t0, Integer) -> [Integer] -> Integer) (_ :: t0)
           where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         ($) (_ :: Integer -> [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
         ($!) (_ :: Integer -> [Integer] -> Integer)
           where ($!) :: forall a b. (a -> b) -> a -> b
+        flip (_ :: Integer -> t0 -> [Integer] -> Integer) (_ :: t0)
+          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         id (_ :: t0 -> Integer -> [Integer] -> Integer) (_ :: t0)
           where id :: forall a. a -> a
         head (_ :: [t0 -> Integer -> [Integer] -> Integer]) (_ :: t0)

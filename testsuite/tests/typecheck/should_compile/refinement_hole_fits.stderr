@@ -172,11 +172,6 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with foldr @[] @Integer @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Internal.Data.Foldable’))
-        flip (_ :: [Integer] -> Integer -> Integer)
-          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
-          with flip @[Integer] @Integer @Integer
-          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Internal.Base’))
         curry (_ :: (Integer, [Integer]) -> Integer)
           where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
           with curry @Integer @[Integer] @Integer
@@ -185,6 +180,11 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         const (_ :: [Integer] -> Integer)
           where const :: forall a b. a -> b -> a
           with const @([Integer] -> Integer) @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Internal.Base’))
+        flip (_ :: [Integer] -> Integer -> Integer)
+          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+          with flip @GHC.Types.LiftedRep @[Integer] @Integer @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Internal.Base’))
         ($) (_ :: Integer -> [Integer] -> Integer)
