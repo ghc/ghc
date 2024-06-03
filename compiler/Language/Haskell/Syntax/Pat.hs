@@ -57,62 +57,73 @@ import Data.List.NonEmpty (NonEmpty)
 type LPat p = XRec p (Pat p)
 
 -- | Pattern
---
--- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
-
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data Pat p
   =     ------------ Simple patterns ---------------
-    WildPat     (XWildPat p)        -- ^ Wildcard Pattern
-        -- The sole reason for a type on a WildPat is to
-        -- support hsPatType :: Pat Id -> Type
-
-       -- AZ:TODO above comment needs to be updated
+    WildPat     (XWildPat p)
+    -- ^ Wildcard Pattern (@_@)
   | VarPat      (XVarPat p)
-                (LIdP p)     -- ^ Variable Pattern
+                (LIdP p)
+    -- ^ Variable Pattern, e.g. @x@
 
-                             -- See Note [Located RdrNames] in GHC.Hs.Expr
+    -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
-                (LPat p)                -- ^ Lazy Pattern
-    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnTilde'
+                (LPat p)
+    -- ^ Lazy Pattern, e.g. @~x@
+    --
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnTilde'
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
                 (LIdP p)
-                (LPat p)    -- ^ As pattern
-    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
+                (LPat p)
+    -- ^ As pattern, e.g. @x\@pat@
+    --
+    -- - Location of '@' is captured by 'GHC.Parser.Annotation.EpToken' @"\@"@
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | ParPat      (XParPat p)
-                (LPat p)                -- ^ Parenthesised pattern
-                                        -- See Note [Parens in HsSyn] in GHC.Hs.Expr
-    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
-    --                                    'GHC.Parser.Annotation.AnnClose' @')'@
+                (LPat p)
+    -- ^ Parenthesised pattern, e.g. @(x)@
+    --
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' :
+    --       'GHC.Parser.Annotation.AnnOpen' @'('@,
+    --       'GHC.Parser.Annotation.AnnClose' @')'@
+
+    -- See Note [Parens in HsSyn] in GHC.Hs.Expr
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | BangPat     (XBangPat p)
-                (LPat p)                -- ^ Bang pattern
-    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
+                (LPat p)
+    -- ^ Bang pattern, e.g. @!x@
+    --
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
         ------------ Lists, tuples, arrays ---------------
   | ListPat     (XListPat p)
                 [LPat p]
-
-    -- ^ Syntactic List
+    -- ^ Syntactic List, e.g. @[x]@ or @[x,y]@ (but not @[]@ nor @(x:xs)@ which are represented using 'ConPat')
     --
-    -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'['@,
-    --                                    'GHC.Parser.Annotation.AnnClose' @']'@
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' :
+    --      'GHC.Parser.Annotation.AnnOpen' @'['@,
+    --      'GHC.Parser.Annotation.AnnClose' @']'@
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
-  | TuplePat    (XTuplePat p)
-                  -- after typechecking, holds the types of the tuple components
-                [LPat p]         -- Tuple sub-patterns
-                Boxity           -- UnitPat is TuplePat []
+  | -- | Tuple pattern, e.g. @(x, y)@
+    --
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' :
+    --       'GHC.Parser.Annotation.AnnOpen' @'('@ or @'(#'@,
+    --       'GHC.Parser.Annotation.AnnClose' @')'@ or  @'#)'@
+
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+    TuplePat    (XTuplePat p)    -- ^ After typechecking, holds the types of the tuple components
+                [LPat p]         -- ^ Tuple sub-patterns
+                Boxity           -- ^ UnitPat is TuplePat []
+
         -- You might think that the post typechecking Type was redundant,
         -- because we can get the pattern type by getting the types of the
         -- sub-patterns.
@@ -129,11 +140,6 @@ data Pat p
         -- of the tuple is of type 'a' not Int.  See selectMatchVar
         -- (June 14: I'm not sure this comment is right; the sub-patterns
         --           will be wrapped in CoPats, no?)
-    -- ^ Tuple sub-patterns
-    --
-    -- - 'GHC.Parser.Annotation.AnnKeywordId' :
-    --            'GHC.Parser.Annotation.AnnOpen' @'('@ or @'(#'@,
-    --            'GHC.Parser.Annotation.AnnClose' @')'@ or  @'#)'@
 
   | OrPat       (XOrPat p)
                 (NonEmpty (LPat p))
@@ -143,7 +149,8 @@ data Pat p
                 (LPat p)           -- Sum sub-pattern
                 ConTag             -- Alternative (one-based)
                 SumWidth           -- Arity (INVARIANT: ≥ 2)
-    -- ^ Anonymous sum pattern
+
+    -- ^ Anonymous sum pattern, e.g. @(# x | #)@. Used by @-XUnboxedSums@
     --
     -- - 'GHC.Parser.Annotation.AnnKeywordId' :
     --            'GHC.Parser.Annotation.AnnOpen' @'(#'@,
@@ -157,35 +164,40 @@ data Pat p
         pat_con     :: XRec p (ConLikeP p),
         pat_args    :: HsConPatDetails p
     }
-    -- ^ Constructor Pattern
+    -- ^ Constructor Pattern, e.g. @[]@ or @Nothing@
 
         ------------ View patterns ---------------
-  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'
 
-  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | ViewPat       (XViewPat p)
                   (LHsExpr p)
                   (LPat p)
-    -- ^ View Pattern
+    -- ^ View Pattern, e.g. @someFun -> pat@. Used by @-XViewPatterns@
+    --
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'
+
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
         ------------ Pattern splices ---------------
-  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'$('@
-  --        'GHC.Parser.Annotation.AnnClose' @')'@
+
+  | SplicePat       (XSplicePat p)
+                    (HsUntypedSplice p)
+  -- ^ Splice Pattern (Includes quasi-quotes @$(...)@)
+  --
+  -- - 'GHC.Parser.Annotation.AnnKeywordId':
+  --       'GHC.Parser.Annotation.AnnOpen' @'$('@
+  --       'GHC.Parser.Annotation.AnnClose' @')'@
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | SplicePat       (XSplicePat p)
-                    (HsUntypedSplice p)    -- ^ Splice Pattern (Includes quasi-quotes)
 
         ------------ Literal and n+k patterns ---------------
   | LitPat          (XLitPat p)
-                    (HsLit p)           -- ^ Literal Pattern
-                                        -- Used for *non-overloaded* literal patterns:
-                                        -- Int#, Char#, Int, Char, String, etc.
+                    (HsLit p)
+    -- ^ Literal Pattern
+    --
+    -- Used for __non-overloaded__ literal patterns:
+    -- Int#, Char#, Int, Char, String, etc.
 
-  | NPat                -- Natural Pattern
-                        -- Used for all overloaded literals,
-                        -- including overloaded strings with -XOverloadedStrings
-                    (XNPat p)            -- Overall type of pattern. Might be
+  | NPat            (XNPat p)            -- Overall type of pattern. Might be
                                          -- different than the literal's type
                                          -- if (==) or negate changes the type
                     (XRec p (HsOverLit p))     -- ALWAYS positive
@@ -194,7 +206,8 @@ data Pat p
                                            -- otherwise
                     (SyntaxExpr p)       -- Equality checker, of type t->t->Bool
 
-  -- ^ Natural Pattern
+  -- ^ Natural Pattern, used for all overloaded literals, including overloaded Strings
+  -- with @-XOverloadedStrings@
   --
   -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnVal' @'+'@
 
@@ -208,30 +221,35 @@ data Pat p
 
                     (SyntaxExpr p)   -- (>=) function, of type t1->t2->Bool
                     (SyntaxExpr p)   -- Name of '-' (see GHC.Rename.Env.lookupSyntax)
-  -- ^ n+k pattern
+    -- ^ n+k pattern, e.g. @n+1@, enabled by @-XNPlusKPatterns@ extension
 
         ------------ Pattern type signatures ---------------
-  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
-  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | SigPat          (XSigPat p)             -- After typechecker: Type
                     (LPat p)                -- Pattern with a type signature
                     (HsPatSigType (NoGhcTc p)) --  Signature can bind both
                                                --  kind and type vars
 
-    -- ^ Pattern with a type signature
+   -- ^ Pattern with a type signature, e.g. @x :: Int@
+   --
+   -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
-  -- Embed the syntax of types into patterns.
-  -- Used with RequiredTypeArguments, e.g. fn (type t) = rhs
-  | EmbTyPat        (XEmbTyPat p)
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+
+  | -- | Embed the syntax of types into patterns.
+    -- Used with @-XRequiredTypeArguments@, e.g. @fn (type t) = rhs@
+    EmbTyPat        (XEmbTyPat p)
                     (HsTyPat (NoGhcTc p))
 
-  -- See Note [Invisible binders in functions] in GHC.Hs.Pat
   | InvisPat (XInvisPat p) (HsTyPat (NoGhcTc p))
+  -- ^ Type abstraction which brings into scope type variables associated with invisible forall. Used by @-XTypeAbstractions@.
+  --
+  -- The location of @\@@ is captured by 'GHC.Parser.Annotation.EpToken' @"\@"@
 
-  -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
-  | XPat
-      !(XXPat p)
+  -- See Note [Invisible binders in functions] in GHC.Hs.Pat
+
+  | -- | TTG Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
+    XPat !(XXPat p)
 
 type family ConLikeP x
 
@@ -311,7 +329,7 @@ type HsRecUpdField p q  = HsFieldBind (LAmbiguousFieldOcc p) (LHsExpr q)
 
 -- | Haskell Field Binding
 --
--- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual',
+-- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual'
 --
 -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data HsFieldBind lhs rhs = HsFieldBind {
