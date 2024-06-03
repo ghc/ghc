@@ -1051,33 +1051,50 @@ mkSpecSig :: Located Token
           -> Maybe (Located Token, OrdList (LHsSigType GhcPs))
           -> Located Token
           -> P (Sig GhcPs)
-mkSpecSig prag_start inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr prag_end  =
-  match_on_pragma_structure m_rule_binds expr m_sigtypes_ascr
+mkSpecSig prag_start inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr prag_end
+  = case m_sigtypes_ascr of
+      Nothing
+        -- New form, no trailing type signature, e.g {-# SPECIALISE f @Int #-}
+        -> pure $
+           SpecSigE (start_ann:end_ann:activation_anns)
+                    (ruleBndrsOrDef m_rule_binds) expr inl_prag
+
+      Just (dcolon, sigtype_ol)
+
+        -- Singleton, e.g.  {-# SPECIALISE f :: ty #-}
+        -- Use the SpecSigE route
+        | [sigtype] <- sigtype_list
+        -> pure $
+           SpecSigE (start_ann:end_ann:activation_anns)
+                    (ruleBndrsOrDef m_rule_binds)
+                    (L (getLoc expr)  -- ToDo: not really the right location for (e::ty)
+                       (ExprWithTySig [colon_ann] expr (mkHsWildCardBndrs sigtype)))
+                    inl_prag
+
+        -- So we must have the old form  {# SPECIALISE f :: ty1, ty2, ty3 #-}
+        -- Use the old SpecSig route
+        | Nothing <- m_rule_binds
+        , L _ (HsVar _ var) <- expr
+        -> pure $
+           SpecSig (start_ann:colon_ann:end_ann:activation_anns)
+                   var sigtype_list inl_prag
+
+        | otherwise -> ps_err PsErrSpecExprMultipleTypeAscription
+
+        where
+          sigtype_list = fromOL sigtype_ol
+          colon_ann = AddEpAnn (toUnicodeAnn AnnDcolon dcolon) (gl dcolon)
+
   where
-    match_on_pragma_structure _ _ Nothing = pure $
-      SpecSigE (start_ann:end_ann:activation_anns)
-                  (ruleBndrsOrDef m_rule_binds) expr
-                  inl_prag
-
-    match_on_pragma_structure Nothing (L _ (HsVar _ var)) (Just (dcolon, sigtypes)) = pure $
-      SpecSig (start_ann:colon_ann:end_ann:activation_anns)
-                             var (fromOL sigtypes)
-                             inl_prag
-      where colon_ann = AddEpAnn (toUnicodeAnn AnnDcolon dcolon) (gl dcolon)
-
-    match_on_pragma_structure _ _ _ =
-      ps_err PsErrSpecExprMultipleTypeAscription
-
-
-    gl = srcSpan2e . getLoc
+    gl        = srcSpan2e . getLoc
     start_ann = AddEpAnn AnnOpen (gl prag_start)
-    end_ann = AddEpAnn AnnClose (gl prag_end)
+    end_ann   = AddEpAnn AnnClose (gl prag_end)
 
     toUnicodeAnn !a (L _ (ITdcolon UnicodeSyntax)) = unicodeAnn a
     toUnicodeAnn a _ = a
 
     ps_err = addFatalError
-          . mkPlainErrorMsgEnvelope
+           . mkPlainErrorMsgEnvelope
               (getLoc prag_start `combineSrcSpans` getLoc prag_end)
 
 checkRecordSyntax :: (MonadP m, Outputable a) => LocatedA a -> m (LocatedA a)
