@@ -53,9 +53,12 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmExtDynRefs    = gopt Opt_ExternalDynamicRefs   dflags
   , stgToCmmDoBoundsCheck = gopt Opt_DoBoundsChecking      dflags
   , stgToCmmDoTagCheck    = gopt Opt_DoTagInferenceChecks  dflags
-  -- backend flags
-  , stgToCmmAllowBigArith             = not ncg || platformArch platform == ArchWasm32 || platformArch platform == ArchX86
-  , stgToCmmAllowBigQuot              = not ncg || platformArch platform == ArchWasm32
+
+  -- backend flags:
+
+    -- LLVM, C, and some 32-bit NCG backends can also handle some 64-bit primops
+  , stgToCmmAllowArith64              = w64 || not ncg || platformArch platform == ArchWasm32 || platformArch platform == ArchX86
+  , stgToCmmAllowQuot64               = w64 || not ncg || platformArch platform == ArchWasm32
   , stgToCmmAllowQuotRemInstr         = ncg  && (x86ish || ppc)
   , stgToCmmAllowQuotRem2             = (ncg && (x86ish || ppc)) || llvm
   , stgToCmmAllowExtendedAddSubInstrs = (ncg && (x86ish || ppc)) || llvm
@@ -90,6 +93,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   } where profile  = targetProfile dflags
           platform = profilePlatform profile
           bk_end  = backend dflags
+          w64 = platformWordSize platform == PW8
           b_blob  = if not ncg then Nothing else binBlobThreshold dflags
           (ncg, llvm) = case backendPrimitiveImplementation bk_end of
                           GenericPrimitives -> (False, False)
