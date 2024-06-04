@@ -1106,12 +1106,21 @@ cloneTyVarBndr subst@(Subst in_scope id_env tv_env cv_env) tv uniq
     , tv')
   where
     old_ki = tyVarKind tv
+    old_unf = tyVarUnfolding tv
     no_kind_change = noFreeVarsOfType old_ki -- verify that kind is closed
+    no_unf_change = maybe True noFreeVarsOfType old_unf -- verify that kind is closed
 
     tv1 | no_kind_change = tv
         | otherwise      = setTyVarKind tv (substTy subst old_ki)
 
-    tv' = setVarUnique tv1 uniq
+    tv2 | Just unf <- tyVarUnfolding tv1
+        , not no_unf_change
+        = tv2 `setTyVarUnfolding` substTy subst unf
+
+        | otherwise
+        = tv1
+
+    tv' = setVarUnique tv2 uniq
 
 cloneTyVarBndrs :: Subst -> [TyVar] -> UniqSupply -> (Subst, [TyVar])
 cloneTyVarBndrs subst []     _usupply = (subst, [])

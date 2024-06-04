@@ -243,22 +243,22 @@ zonkTcTyVar :: TcTyVar -> ZonkM TcType
 zonkTcTyVar tv
   | isTcTyVar tv
   = case tcTyVarDetails tv of
-      SkolemTv {}   -> zonk_kind_and_return
-      RuntimeUnk {} -> zonk_kind_and_return
+      SkolemTv {}   -> zonk_and_return
+      RuntimeUnk {} -> zonk_and_return
       MetaTv { mtv_ref = ref }
          -> do { cts <- readTcRef ref
                ; case cts of
-                    Flexi       -> zonk_kind_and_return
+                    Flexi       -> zonk_and_return
                     Indirect ty -> do { zty <- zonkTcType ty
-                                      ; writeTcRef ref (Indirect zty)
                                         -- See Note [Sharing in zonking]
+                                      ; writeTcRef ref (Indirect zty)
                                       ; return zty } }
 
   | otherwise -- coercion variable
-  = zonk_kind_and_return
+  = zonk_and_return
   where
-    zonk_kind_and_return = do { z_tv <- zonkTyCoVarKind tv
-                              ; return (mkTyVarTy z_tv) }
+    zonk_and_return = do { z_tv <- updateTyVarKindAndUnfoldingM zonkTcType tv
+                         ; return (mkTyVarTy z_tv) }
 
 -- Variant that assumes that any result of zonking is still a TyVar.
 -- Should be used only on skolems and TyVarTvs

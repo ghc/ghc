@@ -23,7 +23,7 @@ module GHC.Core.TyCo.Compare (
 
 import GHC.Prelude
 
-import GHC.Core.Type( typeKind, coreView, tcSplitAppTyNoView_maybe, splitAppTyNoView_maybe
+import GHC.Core.Type( typeKind, unfoldView, coreView, tcSplitAppTyNoView_maybe, splitAppTyNoView_maybe
                     , isLevityTy, isRuntimeRepTy, isMultiplicityTy )
 
 import GHC.Core.TyCo.Rep
@@ -227,12 +227,17 @@ tc_eq_type keep_syns orig_ty1 orig_ty2
   where
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
+    view
+      | keep_syns = unfoldView
+      | otherwise = coreView
+
     go :: RnEnv2 -> Type -> Type -> Bool
     -- See Note [Comparing nullary type synonyms]
     go _ (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2 = True
+    go _ (TyVarTy tv1) (TyVarTy tv2) | tv1 == tv2 = True
 
-    go env t1 t2 | not keep_syns, Just t1' <- coreView t1 = go env t1' t2
-    go env t1 t2 | not keep_syns, Just t2' <- coreView t2 = go env t1 t2'
+    go env t1 t2 | Just t1' <- view t1 = go env t1' t2
+    go env t1 t2 | Just t2' <- view t2 = go env t1 t2'
 
     go env (TyVarTy tv1)   (TyVarTy tv2)   = rnOccL env tv1 == rnOccR env tv2
     go _   (LitTy lit1)    (LitTy lit2)    = lit1 == lit2
@@ -605,6 +610,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- See Note [Comparing nullary type synonyms]
     go _   (TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
+      = TEQ
+    go _   (TyVarTy tv1) (TyVarTy tv2)
+      | tv1 == tv2
       = TEQ
     go env t1 t2
       | Just t1' <- coreView t1 = go env t1' t2

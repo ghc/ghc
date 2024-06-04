@@ -387,7 +387,7 @@ zonkTyVarOcc tv
                                -- This can happen for RuntimeUnk variables (which
                                -- should stay as RuntimeUnk), but I think it should
                                -- not happen for SkolemTv.
-                               mkTyVarTy <$> updateTyVarKindM zonkTcTypeToTypeX tv
+                               mkTyVarTy <$> updateTyVarKindAndUnfoldingM zonkTcTypeToTypeX tv
 
                    Just tv' -> return (mkTyVarTy tv')
 
