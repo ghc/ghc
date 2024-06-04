@@ -100,14 +100,15 @@ module GHC.Types.Var (
         ExportFlag(..),
 
         -- ** Constructing TyVar's
-        mkTyVar, mkTcTyVar,
+        mkTyVar, mkTyVarWithUnfolding, mkTcTyVar,
 
         -- ** Taking 'TyVar's apart
-        tyVarName, tyVarKind, tcTyVarDetails, setTcTyVarDetails,
+        tyVarName, tyVarKind, tyVarUnfolding, tcTyVarDetails, setTcTyVarDetails,
 
         -- ** Modifying 'TyVar's
-        setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
-        updateTyVarKindM,
+        setTyVarName, setTyVarUnique, setTyVarKind, setTyVarUnfolding,
+        updateTyVarKind, updateTyVarKindM, updateTyVarUnfolding, updateTyVarUnfoldingM,
+        updateTyVarKindAndUnfoldingM,
 
         nonDetCmpVar
         ) where
@@ -251,12 +252,14 @@ in its @VarDetails@.
 data Var
   = TyVar {  -- Type and kind variables
              -- see Note [Kind and type variables]
-        varName    :: !Name,
-        realUnique :: {-# UNPACK #-} !Unique,
-                                     -- ^ Key for fast comparison
-                                     -- Identical to the Unique in the name,
-                                     -- cached here for speed
-        varType    :: Kind           -- ^ The type or kind of the 'Var' in question
+        varName      :: !Name,
+        realUnique   :: {-# UNPACK #-} !Unique,
+                                       -- ^ Key for fast comparison
+                                       -- Identical to the Unique in the name,
+                                       -- cached here for speed
+        varType      :: Kind,          -- ^ The type or kind of the 'Var' in question
+        tv_unfolding :: Maybe Type     -- ^ The type to which the variable is bound to,
+                                       -- if any.
  }
 
   | TcTyVar {                           -- Used only during type inference
@@ -346,6 +349,10 @@ instance Outputable Var where
             getPprStyle $ \sty ->
             let
               ppr_var = case var of
+                  (TyVar { tv_unfolding = Just ty })
+                     | debug
+                     -> brackets (text "unf =" <+> ppr ty)
+
                   (TyVar {})
                      | debug
                      -> brackets (text "tv")
@@ -1085,6 +1092,10 @@ tyVarName = varName
 tyVarKind :: TyVar -> Kind
 tyVarKind = varType
 
+tyVarUnfolding :: TyVar -> Maybe Type
+tyVarUnfolding (TyVar { tv_unfolding = unf }) = unf
+tyVarUnfolding _ = Nothing
+
 setTyVarUnique :: TyVar -> Unique -> TyVar
 setTyVarUnique = setVarUnique
 
@@ -1094,6 +1105,9 @@ setTyVarName   = setVarName
 setTyVarKind :: TyVar -> Kind -> TyVar
 setTyVarKind tv k = tv {varType = k}
 
+setTyVarUnfolding :: TyVar -> Type -> TyVar
+setTyVarUnfolding tv unf = tv {tv_unfolding = Just unf}
+
 updateTyVarKind :: (Kind -> Kind) -> TyVar -> TyVar
 updateTyVarKind update tv = tv {varType = update (tyVarKind tv)}
 
@@ -1102,11 +1116,41 @@ updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
        ; return $ tv {varType = k'} }
 
+updateTyVarUnfolding :: (Type -> Type) -> TyVar -> TyVar
+updateTyVarUnfolding update tv
+  | Just unf <- tyVarUnfolding tv
+  = tv {tv_unfolding = Just (update unf)}
+
+  | otherwise
+  = tv
+
+updateTyVarUnfoldingM :: (Monad m) => (Type -> m Type) -> TyVar -> m TyVar
+updateTyVarUnfoldingM update tv
+  | Just unf <- tyVarUnfolding tv
+  = do { unf' <- update unf
+       ; return $ tv {tv_unfolding = Just unf'} }
+
+  | otherwise
+  = return tv
+
+updateTyVarKindAndUnfoldingM :: (Monad m) => (Type -> m Type) -> TyVar -> m TyVar
+updateTyVarKindAndUnfoldingM update tv
+  = do { tv' <- updateTyVarKindM update tv
+       ; updateTyVarUnfoldingM update tv' }
+
 mkTyVar :: Name -> Kind -> TyVar
-mkTyVar name kind = TyVar { varName    = name
-                          , realUnique = nameUnique name
-                          , varType  = kind
+mkTyVar name kind = TyVar { varName      = name
+                          , realUnique   = nameUnique name
+                          , varType      = kind
+                          , tv_unfolding = Nothing
                           }
+
+mkTyVarWithUnfolding :: Name -> Kind -> Type -> TyVar
+mkTyVarWithUnfolding name kind unf = TyVar { varName      = name
+                                           , realUnique   = nameUnique name
+                                           , varType      = kind
+                                           , tv_unfolding = Just unf
+                                           }
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
