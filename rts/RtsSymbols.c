@@ -1073,11 +1073,5 @@ RtsSymbolVal rtsSyms[] = {
       RTS_LIBFFI_SYMBOLS
       RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
       SymI_HasDataProto(nonmoving_write_barrier_enabled)
-#if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
-      // dyld stub code contains references to this,
-      // but it should never be called because we treat
-      // lazy pointers as nonlazy.
-      { "dyld_stub_binding_helper", (void*)0xDEADBEEF, STRENGTH_NORMAL },
-#endif
       { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
 };

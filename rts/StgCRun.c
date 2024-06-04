@@ -102,13 +102,8 @@ StgFunPtr StgReturn(void)
 
 #if defined(i386_HOST_ARCH)
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
-#define STG_GLOBAL ".globl "
-#define STG_HIDDEN ".private_extern "
-#else
 #define STG_GLOBAL ".global "
 #define STG_HIDDEN ".hidden "
-#endif
 
 /*
  * Note [Stack Alignment on X86]
