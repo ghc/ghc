@@ -40,7 +40,8 @@ import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.TyThing
 
-import GHC.Utils.Panic.Plain
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import GHC.Data.Maybe
@@ -55,12 +56,25 @@ import Data.List ( findIndex, mapAccumL )
 -}
 
 tyThingToIfaceDecl :: TyThing -> IfaceDecl
+tyThingToIfaceDecl (ATyVar tv)    = tyVarToIfaceDecl tv
 tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
 tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
 tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
 tyThingToIfaceDecl (AConLike cl)  = case cl of
     RealDataCon dc -> dataConToIfaceDecl dc
     PatSynCon ps   -> patSynToIfaceDecl ps
+
+--------------------------
+tyVarToIfaceDecl :: TyVar -> IfaceDecl
+tyVarToIfaceDecl tv
+  = IfaceTv { ifName = getName tv
+            , ifTvKind = toIfaceType (tyVarKind tv)
+            , ifTvUnf  = toIfaceType unf }
+  where
+    unf = case tyVarUnfolding_maybe tv of
+            Just ty -> ty
+            Nothing -> pprPanic "tyVarToIfaceDecl" (ppr tv)
+            -- The TyVars in a TyThing always has an unfolding
 
 --------------------------
 idToIfaceDecl :: Id -> IfaceDecl

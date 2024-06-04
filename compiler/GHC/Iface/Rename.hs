@@ -431,6 +431,12 @@ rnIfaceDecl' :: Rename (Fingerprint, IfaceDecl)
 rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
 
 rnIfaceDecl :: Rename IfaceDecl
+rnIfaceDecl (IfaceTv { ifName = name, ifTvKind = kind, ifTvUnf = unf })
+  = do { name' <- rnIfaceGlobal name
+       ; kind' <- rnIfaceType kind
+       ; unf'  <- rnIfaceType unf
+       ; return (IfaceTv { ifName = name', ifTvKind = kind', ifTvUnf = unf' }) }
+
 rnIfaceDecl d@IfaceId{} = do
             name <- case ifIdDetails d of
                       IfDFunId -> rnIfaceNeverExported (ifName d)
@@ -663,6 +669,8 @@ rnIfaceConAlt alt = pure alt
 rnIfaceLetBndr :: Rename IfaceLetBndr
 rnIfaceLetBndr (IfLetBndr fs ty info jpi)
     = IfLetBndr fs <$> rnIfaceType ty <*> rnIfaceIdInfo info <*> pure jpi
+rnIfaceLetBndr (IfTypeLetBndr fs ki)
+    = IfTypeLetBndr fs <$> rnIfaceType ki
 
 rnIfaceLamBndr :: Rename IfaceLamBndr
 rnIfaceLamBndr (bndr, oneshot) = (,) <$> rnIfaceBndr bndr <*> pure oneshot
@@ -711,7 +719,8 @@ rnIfaceIdDetails details
 
 rnIfaceType :: Rename IfaceType
 rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)
-rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
+rnIfaceType (IfaceExtTyVar  n) = pure (IfaceExtTyVar n)
+rnIfaceType (IfaceTyVar     n) = pure (IfaceTyVar n)
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceAppArgs t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)

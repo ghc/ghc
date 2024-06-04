@@ -618,6 +618,8 @@ data GeneralFlag
    | Opt_PrintPotentialInstances
    | Opt_PrintRedundantPromotionTicks
    | Opt_PrintTypecheckerElaboration
+   | Opt_PrintTyVarUnfoldings
+   | Opt_PrintDeadBinders
 
    -- optimisation opts
    | Opt_CallArity

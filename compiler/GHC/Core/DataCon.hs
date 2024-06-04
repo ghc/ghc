@@ -71,10 +71,12 @@ module GHC.Core.DataCon (
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Types.Id.Make ( DataConBoxer )
+import {-# SOURCE #-} GHC.Types.TyThing( TyThing, mkAnId )
+
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Module.Name
 
-import {-# SOURCE #-} GHC.Types.Id.Make ( DataConBoxer )
 import GHC.Core.Type as Type
 import GHC.Core.Coercion
 import GHC.Core.Unify
@@ -82,7 +84,6 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Compare( eqType, eqForAllVis )
 import GHC.Core.Multiplicity
-import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
 import GHC.Types.SourceText
 import GHC.Core.Class

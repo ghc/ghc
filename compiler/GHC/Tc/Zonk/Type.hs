@@ -60,7 +60,7 @@ import GHC.Tc.Zonk.TcType
 import GHC.Core.Coercion
 import GHC.Core.ConLike
 import GHC.Core.PatSyn (PatSyn(..))
-import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCo.Ppr ( pprTyVarWithKind )
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep( CoercionPlusHoles(..) )
@@ -382,7 +382,7 @@ zonkTyVarOcc tv
                                -- This can happen for RuntimeUnk variables (which
                                -- should stay as RuntimeUnk), but I think it should
                                -- not happen for SkolemTv.
-                               mkTyVarTy <$> updateTyVarKindM zonkTcTypeToTypeX tv
+                               mkTyVarTy <$> updateTyVarKindAndUnfoldingM zonkTcTypeToTypeX tv
 
                    Just tv' -> return (mkTyVarTy tv')
 
@@ -446,7 +446,7 @@ commitFlexi (SkolemiseFlexi tvs_ref) tv zonked_kind
        ; return (mkTyVarTy skol_tv) }
 
 commitFlexi RuntimeUnkFlexi tv zonked_kind
-  = do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVar tv)
+  = do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVarWithKind tv)
        ; return (mkTyVarTy (mkTcTyVar (tyVarName tv) zonked_kind RuntimeUnk)) }
             -- This is where RuntimeUnks are born:
             -- otherwise-unconstrained unification variables are
@@ -462,19 +462,19 @@ commitFlexi DefaultFlexi tv zonked_kind
   -- We need *some* known RuntimeRep for the x and undefined, but no one
   -- will choose it until we get here, in the zonker.
   | isRuntimeRepTy zonked_kind
-  = do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
+  = do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVarWithKind tv)
        ; return liftedRepTy }
   | isLevityTy zonked_kind
-  = do { traceTc "Defaulting flexi tyvar to Lifted:" (pprTyVar tv)
+  = do { traceTc "Defaulting flexi tyvar to Lifted:" (pprTyVarWithKind tv)
        ; return liftedDataConTy }
   | isMultiplicityTy zonked_kind
-  = do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
+  = do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVarWithKind tv)
        ; return manyDataConTy }
   | Just (ConcreteFRR origin) <- isConcreteTyVar_maybe tv
   = do { addErr $ TcRnZonkerMessage (ZonkerCannotDefaultConcrete origin)
        ; newZonkAnyType zonked_kind }
   | otherwise
-  = do { traceTc "Defaulting flexi tyvar to ZonkAny:" (pprTyVar tv)
+  = do { traceTc "Defaulting flexi tyvar to ZonkAny:" (pprTyVarWithKind tv)
           -- See Note [Any types] in GHC.Builtin.Types, esp wrinkle (Any4)
        ; newZonkAnyType zonked_kind }
 
@@ -661,11 +661,13 @@ zonkTopDecls :: Bag EvBind
 zonkTopDecls ev_binds binds rules imp_specs fords pat_syns
   = initZonkEnv DefaultFlexi $
     runZonkBndrT (zonkEvBinds ev_binds)   $ \ ev_binds' ->
+    runZonkBndrT (zonkForeignDecls fords) $ \ fords'    ->
+      -- Do foreign decls first; they bring Ids
+      -- into scope that are mentioned in `binds`
     runZonkBndrT (zonkRecMonoBinds binds) $ \ binds'    ->
      -- Top level is implicitly recursive
   do  { rules'    <- zonkRules rules
       ; specs'    <- zonkLTcSpecPrags imp_specs
-      ; fords'    <- zonkForeignExports fords
       ; pat_syns' <- traverse zonkPatSyn pat_syns
       ; ty_env    <- zonkEnvIds <$> getZonkEnv
       ; return (ty_env, ev_binds', binds', fords', specs', rules', pat_syns') }
@@ -1100,12 +1102,10 @@ zonkExpr (XExpr (ExpandedThingTc thing e))
   = do e' <- zonkExpr e
        return $ XExpr (ExpandedThingTc thing e')
 
-
 zonkExpr (XExpr (ConLikeTc con tvs tys))
-  = XExpr . ConLikeTc con tvs <$> mapM zonk_scale tys
-  where
-    zonk_scale (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX m <*> pure ty
-    -- Only the multiplicity can contain unification variables
+  = runZonkBndrT (zonkTyBndrsX tvs) $ \ tvs' ->
+    do { tys' <- mapM zonkScaledTcTypeToTypeX tys
+       ; return (XExpr (ConLikeTc con tvs' tys')) }
     -- The tvs come straight from the data-con, and so are strictly redundant
     -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
 
@@ -1716,19 +1716,21 @@ zonkPatSyn
 ************************************************************************
 -}
 
-zonkForeignExports :: [LForeignDecl GhcTc]
-                   -> ZonkTcM [LForeignDecl GhcTc]
-zonkForeignExports ls = mapM (wrapLocZonkMA zonkForeignExport) ls
+zonkForeignDecls :: [LForeignDecl GhcTc]
+                 -> ZonkBndrTcM [LForeignDecl GhcTc]
+zonkForeignDecls ls = mapM (wrapLocZonkBndrMA zonkForeignDecl) ls
 
-zonkForeignExport :: ForeignDecl GhcTc -> ZonkTcM (ForeignDecl GhcTc)
-zonkForeignExport (ForeignExport { fd_name = i, fd_e_ext = co
-                                 , fd_fe = spec })
-  = do { i' <- zonkLIdOcc i
-       ; return (ForeignExport { fd_name = i'
-                               , fd_sig_ty = undefined, fd_e_ext = co
-                               , fd_fe = spec }) }
-zonkForeignExport for_imp
-  = return for_imp     -- Foreign imports don't need zonking
+zonkForeignDecl :: ForeignDecl GhcTc -> ZonkBndrTcM (ForeignDecl GhcTc)
+-- Zonk foreign decls, even though they are closed, to turn TcTyVars into TyVars
+zonkForeignDecl fd@(ForeignExport { fd_name = i, fd_e_ext = co })
+  = noBinders $
+    do { i'  <- zonkLIdOcc i
+       ; co' <- zonkCoToCo co
+       ; return (fd { fd_name = i', fd_e_ext = co' }) }
+zonkForeignDecl fd@(ForeignImport { fd_name = L loc i, fd_i_ext = co })
+  = do { i'  <- zonkIdBndrX i
+       ; co' <- noBinders $ zonkCoToCo co
+       ; return (fd { fd_name = L loc i', fd_i_ext = co' }) }
 
 zonkRules :: [LRuleDecl GhcTc] -> ZonkTcM [LRuleDecl GhcTc]
 zonkRules rs = mapM (wrapLocZonkMA zonkRule) rs
