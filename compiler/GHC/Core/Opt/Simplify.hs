@@ -272,7 +272,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
            dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1 binds2 rules1 ;
 
            for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
-             lintPassResult logger pass_result_cfg binds2 ;
+             lintPassResult logger pass_result_cfg binds2 rules1 ;
 
                 -- Loop
            do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
@@ -436,8 +436,8 @@ type IndEnv = IdEnv (Id, [CoreTickish]) -- Maps local_id -> exported_id, ticks
 shortOutIndirections :: CoreProgram -> CoreProgram
 shortOutIndirections binds
   | isEmptyVarEnv ind_env = binds
-  | no_need_to_flatten    = binds'                      -- See Note [Rules and indirection-zapping]
-  | otherwise             = [Rec (flattenBinds binds')] -- for this no_need_to_flatten stuff
+  | no_need_to_flatten    = binds'              -- See Note [Rules and indirection-zapping]
+  | otherwise             = glomValBinds binds' -- for this no_need_to_flatten stuff
   where
     ind_env            = makeIndEnv binds
     -- These exported Ids are the subjects  of the indirection-elimination

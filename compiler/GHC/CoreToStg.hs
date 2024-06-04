@@ -47,7 +47,7 @@ import GHC.Builtin.PrimOps
 
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
-import GHC.Utils.Misc (HasDebugCallStack)
+import GHC.Utils.Misc (HasDebugCallStack, HasCallStack)
 import GHC.Utils.Panic
 
 import Control.Monad (ap)
@@ -239,7 +239,7 @@ import Control.Monad (ap)
 -- --------------------------------------------------------------
 
 
-coreToStg :: CoreToStgOpts -> Module -> ModLocation -> CoreProgram
+coreToStg :: HasCallStack => CoreToStgOpts -> Module -> ModLocation -> CoreProgram
           -> ([StgTopBinding], InfoTableProvMap, CollectedCCs)
 coreToStg opts@CoreToStgOpts
   { coreToStg_ways = ways
@@ -271,7 +271,7 @@ coreToStg opts@CoreToStgOpts
     (all_cafs_cc, all_cafs_ccs) = getAllCAFsCC this_mod
 
 coreTopBindsToStg
-    :: CoreToStgOpts
+    :: HasCallStack => CoreToStgOpts
     -> Module
     -> IdEnv HowBound           -- environment for the bindings
     -> CollectedCCs
@@ -281,16 +281,18 @@ coreTopBindsToStg
 coreTopBindsToStg _      _        env ccs []
   = (env, ccs, [])
 coreTopBindsToStg opts this_mod env ccs (b:bs)
+  -- Drop type bindings
   | NonRec _ rhs <- b, isTyCoArg rhs
-  = coreTopBindsToStg opts this_mod env1 ccs1 bs
+  = coreTopBindsToStg opts this_mod env ccs bs
+
   | otherwise
-  = (env2, ccs2, b':bs')
+  = assertPpr (not (isTypeBind b)) (ppr b) $ (env2, ccs2, b':bs')
   where
     (env1, ccs1, b' ) = coreTopBindToStg opts this_mod env ccs b
     (env2, ccs2, bs') = coreTopBindsToStg opts this_mod env1 ccs1 bs
 
 coreTopBindToStg
-        :: CoreToStgOpts
+        :: HasCallStack => CoreToStgOpts
         -> Module
         -> IdEnv HowBound
         -> CollectedCCs
@@ -315,7 +317,7 @@ coreTopBindToStg opts@CoreToStgOpts
 
         (ccs', (id', stg_rhs)) =
             initCts platform env $
-              coreToTopStgRhs opts this_mod ccs (id,rhs)
+            coreToTopStgRhs opts this_mod ccs (id,rhs)
 
         bind = StgTopLifted $ StgNonRec id' stg_rhs
     in
@@ -342,7 +344,7 @@ coreTopBindToStg opts@CoreToStgOpts
     (env', ccs', bind)
 
 coreToTopStgRhs
-        :: CoreToStgOpts
+        :: HasCallStack => CoreToStgOpts
         -> Module
         -> CollectedCCs
         -> (Id,CoreExpr)
@@ -388,7 +390,7 @@ coreToTopStgRhs opts this_mod ccs (bndr, rhs)
 -- handle with the function coreToMkStgRhs.
 
 coreToStgExpr
-        :: HasDebugCallStack => CoreExpr
+        :: HasCallStack => CoreExpr
         -> CtsM StgExpr
 
 -- The second and third components can be derived in a simple bottom up pass, not

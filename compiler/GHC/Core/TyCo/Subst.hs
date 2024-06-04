@@ -60,7 +60,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkInstCo, mkLRCo, mkTyConAppCo
    , mkCoercionType
    , coVarTypesRole )
-import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVarWithKind )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr )
 
@@ -80,7 +80,8 @@ import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Data.List (mapAccumL)
+import Data.List ( mapAccumL )
+import Data.Maybe( isNothing )
 
 {-
 %************************************************************************
@@ -892,7 +893,7 @@ subst_co subst co
                  in cos' `seqList` cos'
 
     -- See Note [Substituting in a coercion hole]
-    go_hole h@(CH { ch_co_var = cv }) = h { ch_co_var = updateVarType go_ty cv }
+    go_hole h@(CH { ch_co_var = cv }) = h { ch_co_var = updateTyCoVarType go_ty cv }
 
 -- | Perform a substitution within a 'DVarSet' of free variables,
 -- returning the shallow free coercion variables.
@@ -944,11 +945,12 @@ substVarBndrUsing subst_fn subst v
 -- | Substitute a tyvar in a binding position, returning an
 -- extended subst and a new tyvar.
 -- Use the supplied function to substitute in the kind
+-- Zap the TyVar unfolding, if any
 substTyVarBndrUsing
   :: (Subst -> Type -> Type)  -- ^ Use this to substitute in the kind
   -> Subst -> TyVar -> (Subst, TyVar)
 substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
-  = assertPpr _no_capture (pprTyVar old_var $$ pprTyVar new_var $$ ppr subst) $
+  = assertPpr _no_capture (pprTyVarWithKind old_var $$ pprTyVarWithKind new_var $$ ppr subst) $
     assert (isTyVar old_var )
     (Subst (in_scope `extendInScopeSet` new_var) idenv new_env cenv, new_var)
   where
@@ -961,7 +963,8 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
     old_ki = tyVarKind old_var
     no_kind_change = isEmptyTCvSubst subst || noFreeVarsOfType old_ki
                      -- isEmptyTCvSubst: see Note [Keeping the substitution empty]
-    no_change = no_kind_change && (new_var == old_var)
+    no_unf_change  = isNothing (tyVarUnfolding_maybe old_var)
+    no_change = no_kind_change && (new_var == old_var) && no_unf_change
         -- no_change means that the new_var is identical in
         -- all respects to the old_var (same unique, same kind)
         -- See Note [Extending the TvSubstEnv and CvSubstEnv]
@@ -972,10 +975,18 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
         --      (\x.e) with id_subst = [x |-> e']
         -- Here we must simply zap the substitution for x
 
-    new_var | no_kind_change = uniqAway in_scope old_var
-            | otherwise = uniqAway in_scope $
-                          setTyVarKind old_var (subst_fn subst old_ki)
+    new_var1 = uniqAway in_scope old_var
         -- The uniqAway part makes sure the new variable is not already in scope
+
+    new_var2 | no_kind_change = new_var1
+             | otherwise      = setTyVarKind new_var1 (subst_fn subst old_ki)
+
+    -- Preserve the unfolding on the TyVar; it is NOT optional
+    -- In particular, when substituting over /terms/, in GHC.Core.Subst.substBindSC,
+    -- we must not lose the type variable's unfolding
+    new_var = case tyVarUnfolding_maybe old_var of
+                Nothing     -> new_var2
+                Just unf_ty -> setTyVarUnfolding new_var2 (subst_fn subst unf_ty)
 
 -- | Substitute a covar in a binding position, returning an
 -- extended subst and a new covar.
@@ -1014,13 +1025,21 @@ cloneTyVarBndr subst@(Subst in_scope id_env tv_env cv_env) tv uniq
             cv_env
     , tv')
   where
-    old_ki = tyVarKind tv
-    no_kind_change = noFreeVarsOfType old_ki -- verify that kind is closed
+    old_ki  = tyVarKind tv
 
-    tv1 | no_kind_change = tv
-        | otherwise      = setTyVarKind tv (substTy subst old_ki)
+    tv1 | not (noFreeVarsOfType old_ki)   -- Kind is not closed
+        = setTyVarKind tv (substTy subst old_ki)
+        | otherwise
+        = tv
 
-    tv' = setVarUnique tv1 uniq
+    tv2 | Just unf <- tyVarUnfolding_maybe tv
+        , not (noFreeVarsOfType unf)  -- Unfolding is not closed
+        = tv1 `setTyVarUnfolding` substTy subst unf
+
+        | otherwise
+        = tv1
+
+    tv' = setVarUnique tv2 uniq
 
 cloneTyVarBndrs :: Subst -> [TyVar] -> UniqSupply -> (Subst, [TyVar])
 cloneTyVarBndrs subst []     _usupply = (subst, [])

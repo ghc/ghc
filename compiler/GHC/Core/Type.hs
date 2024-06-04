@@ -114,6 +114,8 @@ module GHC.Core.Type (
         isValidJoinPointType,
         tyConAppNeedsKindSig,
 
+        typeIsSmallEnoughToInline,
+
         -- * Space-saving construction
         mkTYPEapp, mkTYPEapp_maybe,
         mkCONSTRAINTapp, mkCONSTRAINTapp_maybe,
@@ -169,6 +171,7 @@ module GHC.Core.Type (
         noFreeVarsOfType,
         expandTypeSynonyms, expandSynTyConApp_maybe,
         typeSize, occCheckExpand,
+        expandTyVarUnfoldings, expandSomeTyVarUnfoldings,
 
         -- ** Closing over kinds
         closeOverKindsDSet, closeOverKindsList,
@@ -178,7 +181,7 @@ module GHC.Core.Type (
         seqType, seqTypes,
 
         -- * Other views onto Types
-        coreView, coreFullView, rewriterView,
+        coreView, coreFullView, rewriterView, unfoldView,
 
         tyConsOfType,
 
@@ -273,6 +276,7 @@ import GHC.Data.FastString
 
 import GHC.Data.Maybe   ( orElse, isJust )
 import GHC.List (build)
+import Data.Functor.Identity
 
 -- $type_classification
 -- #type_classification#
@@ -343,6 +347,12 @@ import GHC.List (build)
 ************************************************************************
 -}
 
+unfoldView :: Type -> Maybe Type
+-- Look through type variables, see Note [Type and coercion lets] in GHC.Core
+{-# INLINE unfoldView #-}
+unfoldView (TyVarTy tv) = tyVarUnfolding_maybe tv
+unfoldView _ = Nothing
+
 rewriterView :: Type -> Maybe Type
 -- Unwrap a type synonym only when either:
 --   The type synonym is forgetful, or
@@ -353,6 +363,7 @@ rewriterView (TyConApp tc tys)
   | isTypeSynonymTyCon tc
   , isForgetfulSynTyCon tc || not (isFamFreeTyCon tc)
   = expandSynTyConApp_maybe tc tys
+rewriterView (TyVarTy tv) = tyVarUnfolding_maybe tv
 rewriterView _other
   = Nothing
 
@@ -366,6 +377,7 @@ coreView :: Type -> Maybe Type
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView (TyConApp tc tys) = expandSynTyConApp_maybe tc tys
+coreView (TyVarTy tv)      = tyVarUnfolding_maybe tv  -- c.f. unfoldView
 coreView _                 = Nothing
 -- See Note [Inlining coreView].
 {-# INLINE coreView #-}
@@ -377,6 +389,9 @@ coreFullView, core_full_view :: Type -> Type
 -- See Note [Inlining coreView].
 coreFullView ty@(TyConApp tc _)
   | isTypeSynonymTyCon tc = core_full_view ty
+coreFullView (TyVarTy tv)
+  -- c.f. unfoldView
+  | Just ty <- tyVarUnfolding_maybe tv = core_full_view ty
 coreFullView ty = ty
 {-# INLINE coreFullView #-}
 
@@ -475,6 +490,34 @@ on its fast path must also be inlined, linked back to this Note.
                 expandTypeSynonyms
 *                                                                      *
 ********************************************************************* -}
+
+expandTyVarUnfoldings :: TyVarSet  -> Type -> Type
+-- (expandTyVarUnfoldings tvs ty) replace any occurrences of `tvs` in `ty`
+-- with their unfoldings.  The returned type does not mention any of `tvs`.
+--
+-- There are no substitution or variable-capture issues: if we have (let @a = ty
+-- in body), then at all occurrences of `a` in `body`, the free vars of `ty` are
+-- also in scope, without having been shadowed.
+expandTyVarUnfoldings tvs ty
+  | isEmptyVarSet tvs = ty
+  | otherwise         = expandSomeTyVarUnfoldings (`elemVarSet` tvs) ty
+
+expandSomeTyVarUnfoldings :: (TyVar -> Bool) -> Type -> Type
+expandSomeTyVarUnfoldings expand_me ty
+  = runIdentity (expand ty)
+  where
+    expand :: Type -> Identity Type
+    (expand, _, _, _)
+       = mapTyCo (TyCoMapper { tcm_tyvar = exp_tv, tcm_covar = exp_cv
+                             , tcm_hole = exp_hole, tcm_tycobinder = exp_tcb
+                             , tcm_tycon = pure })
+    exp_tv _ tv = case tyVarUnfolding_maybe tv of
+                    Just ty | expand_me tv -> expand ty
+                    _                      -> pure (TyVarTy tv)
+    exp_cv _   cv = pure (CoVarCo cv)
+    exp_hole _ cv = pprPanic "expand_tv_unf" (ppr cv)
+    exp_tcb :: () -> TyCoVar -> ForAllTyFlag -> (() -> TyCoVar -> Identity r) -> Identity r
+    exp_tcb _ tcv _ k = k () (updateTyCoVarType (runIdentity . expand) tcv)
 
 expandTypeSynonyms :: Type -> Type
 -- ^ Expand out all type synonyms.  Actually, it'd suffice to expand out
@@ -1067,6 +1110,8 @@ mkAppTy (CastTy fun_ty co) arg_ty
   | ([arg_co], res_co) <- decomposePiCos co (coercionKind co) [arg_ty]
   = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
 
+mkAppTy (TyVarTy tv) arg_ty
+  | Just ty <- tyVarUnfolding_maybe tv = mkAppTy ty arg_ty
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
 mkAppTy ty1               ty2 = AppTy ty1 ty2
         -- Note that the TyConApp could be an
@@ -2682,6 +2727,9 @@ sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 --
 -- This is a "hot" function.  Do not call splitTyConApp_maybe here,
 -- to avoid the faff with FunTy
+sORTKind_maybe (TyVarTy tv)
+  | Just ty <- tyVarUnfolding_maybe tv
+  = sORTKind_maybe ty
 sORTKind_maybe (TyConApp tc tys)
   -- First, short-cuts for Type and Constraint that do no allocation
   | tc_uniq == liftedTypeKindTyConKey = assert( null tys ) $ Just (TypeLike,       liftedRepTy)
@@ -2824,7 +2872,9 @@ isConcreteTypeWith :: TyVarSet -> Type -> Bool
 -- the binders are instantiated to concrete types
 isConcreteTypeWith conc_tvs = go
   where
-    go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
+    go (TyVarTy tv)
+      | Just ty <- tyVarUnfolding_maybe tv = go ty
+      | otherwise                          = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
     go (AppTy ty1 ty2)     = go ty1 && go ty2
     go (TyConApp tc tys)   = go_tc tc tys
     go ForAllTy{}          = False

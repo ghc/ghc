@@ -1326,7 +1326,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                 -- extra_dicts: see Note [Free dictionaries on rule LHS]
 -- ToDo: extra_dicts is needed. E.g. the SPECIALISE rules for `ap` in GHC.Base
                 extra_dicts
-                  = [ mkLocalIdOrCoVar (localiseName (idName d)) ManyTy (idType d)
+                  = [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
                     | d <- exprsSomeFreeVarsList is_extra args ]
 
                 is_extra v

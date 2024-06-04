@@ -2,8 +2,8 @@
 module GHC.Types.TyThing
    ( TyThing (..)
    , MonadThings (..)
-   , mkATyCon
-   , mkAnId
+   , mkATyCon, mkAnId
+   , varTyThing
    , pprShortTyThing
    , pprTyThingCategory
    , tyThingCategory
@@ -71,7 +71,8 @@ The Class and its associated TyCon have the same Name.
 -- thing but in the *local* context.  See "GHC.Tc.Utils.Env" for how to retrieve
 -- a 'TyThing' given a 'Name'.
 data TyThing
-  = AnId     Id
+  = ATyVar   TyVar       -- A global TyVar with an unfolding inside it
+  | AnId     Id
   | AConLike ConLike
   | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
   | ACoAxiom (CoAxiom Branched)
@@ -79,9 +80,10 @@ data TyThing
 instance Outputable TyThing where
   ppr = pprShortTyThing
 
-instance NamedThing TyThing where       -- Can't put this with the type
-  getName (AnId id)     = getName id    -- decl, because the DataCon instance
-  getName (ATyCon tc)   = getName tc    -- isn't visible there
+instance NamedThing TyThing where
+  getName (ATyVar tv)   = getName tv
+  getName (AnId id)     = getName id
+  getName (ATyCon tc)   = getName tc
   getName (ACoAxiom cc) = getName cc
   getName (AConLike cl) = conLikeName cl
 
@@ -90,6 +92,10 @@ mkATyCon = ATyCon
 
 mkAnId :: Id -> TyThing
 mkAnId = AnId
+
+varTyThing :: Var -> TyThing
+varTyThing var | isTyVar var = ATyVar var
+               | otherwise   = AnId   var
 
 pprShortTyThing :: TyThing -> SDoc
 -- c.f. GHC.Types.TyThing.Ppr.pprTyThing, which prints all the details
@@ -100,6 +106,7 @@ pprTyThingCategory :: TyThing -> SDoc
 pprTyThingCategory = text . capitalise . tyThingCategory
 
 tyThingCategory :: TyThing -> String
+tyThingCategory (ATyVar {}) = "tyvar"
 tyThingCategory (ATyCon tc)
   | isClassTyCon tc = "class"
   | otherwise       = "type constructor"
@@ -150,8 +157,9 @@ Examples:
 -- Note [Tricky iface loop])
 -- The order of the list does not matter.
 implicitTyThings :: TyThing -> [TyThing]
-implicitTyThings (AnId _)       = []
-implicitTyThings (ACoAxiom _cc) = []
+implicitTyThings (ATyVar {})    = []
+implicitTyThings (AnId {})      = []
+implicitTyThings (ACoAxiom {})  = []
 implicitTyThings (ATyCon tc)    = implicitTyConThings tc
 implicitTyThings (AConLike cl)  = implicitConLikeThings cl
 
@@ -236,6 +244,7 @@ isImplicitTyThing (AConLike cl) = case cl of
 isImplicitTyThing (AnId id)     = isImplicitId id
 isImplicitTyThing (ATyCon tc)   = isImplicitTyCon tc
 isImplicitTyThing (ACoAxiom ax) = isImplicitCoAxiom ax
+isImplicitTyThing (ATyVar {})   = False
 
 -- | tyThingParent_maybe x returns (Just p)
 -- when pprTyThingInContext should print a declaration for p
@@ -275,6 +284,7 @@ tyThingsTyCoVars tts =
     unionVarSets $ map ttToVarSet tts
     where
         ttToVarSet (AnId id)     = tyCoVarsOfType $ idType id
+        ttToVarSet (ATyVar tv)   = tyCoVarsOfType $ tyVarKind tv
         ttToVarSet (AConLike cl) = case cl of
             RealDataCon dc  -> tyCoVarsOfType $ dataConRepType dc
             PatSynCon{}     -> emptyVarSet
@@ -327,9 +337,11 @@ tyThingLocalGREs ty_thing =
     AnId id
       | RecSelId { sel_tycon = RecSelData tc } <- idDetails id
       -> [ myself (ParentIs $ tyConName tc) ]
+
       -- Fallback to NoParent for PatSyn record selectors,
       -- as per Note [Parents] in GHC.Types.Name.Reader.
     _ -> [ myself NoParent ]
+
   where
     tc_GRE :: TyCon -> GlobalRdrElt
     tc_GRE at = mkLocalTyConGRE

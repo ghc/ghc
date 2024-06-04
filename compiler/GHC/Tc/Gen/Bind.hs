@@ -55,7 +55,7 @@ import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
 import GHC.Core.Type (mkStrLitTy, mkCastTy)
-import GHC.Core.TyCo.Ppr( pprTyVars )
+import GHC.Core.TyCo.Ppr( pprTyVarsWithKind )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
 import GHC.Builtin.Types ( mkConstraintTupleTy, multiplicityTy, oneDataConTy  )
@@ -1039,7 +1039,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                               -- NB: qtvs is already in dependency order
 
        ; traceTc "chooseInferredQuantifiers" $
-         vcat [ text "qtvs" <+> pprTyVars qtvs
+         vcat [ text "qtvs" <+> pprTyVarsWithKind qtvs
               , text "psig_qtv_bndrs" <+> ppr psig_qtv_bndrs
               , text "free_tvs" <+> ppr free_tvs
               , text "final_tvs" <+> ppr final_qtvs ]
@@ -1864,8 +1864,8 @@ isClosedBndrGroup type_env binds
     is_closed_type_id name
       | Just thing <- lookupNameEnv type_env name
       = case thing of
-          AGlobal {} -> True
-          ATyVar {}  -> False  -- In-scope type variables are not closed!
+          AGlobal {}  -> True
+          ATcTyVar {} -> False  -- In-scope type variables are not closed!
           ATcId { tct_info = info}
             -> case info of
                    LetBound closed -> closed

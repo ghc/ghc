@@ -49,7 +49,7 @@ import GHC.Core         -- All of it
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, bindFreeVars
-                          , rulesFreeVarsDSet, orphNamesOfExprs )
+                          , orphNamesOfExprs )
 import GHC.Core.Utils     ( exprType, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
                           , isJoinBind, mkCastMCo )
@@ -339,12 +339,10 @@ pprRulesForUser rules
 -}
 
 extendRuleInfo :: RuleInfo -> [CoreRule] -> RuleInfo
-extendRuleInfo (RuleInfo rs1 fvs1) rs2
-  = RuleInfo (rs2 ++ rs1) (rulesFreeVarsDSet rs2 `unionDVarSet` fvs1)
+extendRuleInfo (RuleInfo rs1) rs2 = RuleInfo (rs2 ++ rs1)
 
 addRuleInfo :: RuleInfo -> RuleInfo -> RuleInfo
-addRuleInfo (RuleInfo rs1 fvs1) (RuleInfo rs2 fvs2)
-  = RuleInfo (rs1 ++ rs2) (fvs1 `unionDVarSet` fvs2)
+addRuleInfo (RuleInfo rs1) (RuleInfo rs2) = RuleInfo (rs1 ++ rs2)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
 addIdSpecialisations id rules
@@ -951,6 +949,11 @@ data RuleSubst = RS { -- Substitution; applied only to the template, not the tar
 type BindWrapper = CoreExpr -> CoreExpr
   -- See Notes [Matching lets] and [Matching cases]
   -- we represent the floated bindings as a core-to-core function
+
+instance Outputable RuleSubst where
+  ppr (RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst })
+    = text "RS" <> braces (sep [ text "tv_subst =" <+> ppr tv_subst
+                               , text "id_subst =" <+> ppr id_subst ])
 
 emptyRuleSubst :: RuleSubst
 emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv

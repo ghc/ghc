@@ -849,11 +849,13 @@ idEntityInfo vid = S.fromList $ [EntityTypeVariable | isTyVar vid] <> [EntityFun
 -- | Get the `EntityInfo` for a `TyThing`
 tyThingEntityInfo :: TyThing -> S.Set EntityInfo
 tyThingEntityInfo ty = case ty of
-  AnId vid -> idEntityInfo vid
+  AnId vid  -> idEntityInfo vid
+  ATyVar {} -> S.singleton EntityTypeVariable
   AConLike con -> case con of
     RealDataCon _ -> S.singleton EntityDataConstructor
     PatSynCon _   -> S.singleton EntityPatternSynonym
-  ATyCon tyCon -> S.fromList $ [EntityTypeSynonym | isTypeSynonymTyCon tyCon] <> [EntityTypeFamily | isFamilyTyCon tyCon]
+  ATyCon tyCon -> S.fromList $ [EntityTypeSynonym | isTypeSynonymTyCon tyCon]
+                               <> [EntityTypeFamily | isFamilyTyCon tyCon]
                   <> [EntityTypeClass | isClassTyCon tyCon] <> [EntityTypeConstructor]
   ACoAxiom _ -> S.empty
 
