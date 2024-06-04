@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, ExistentialQuantification #-}
+{-# LANGUAGE BangPatterns, MagicHash #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -----------------------------------------------------------------------------
@@ -41,6 +41,9 @@ module GHC.Internal.List (
    -- * GHC List fusion
    augment, build,
 
+   -- * Enumeration
+   eftInt,
+
  ) where
 
 import GHC.Internal.Data.Maybe
@@ -51,6 +54,927 @@ import GHC.Internal.Stack.Types (HasCallStack)
 
 infixl 9  !?, !!
 infix  4 `elem`, `notElem`
+
+data Tuple a b = !a :!: !b
+data Option a = None | Some !a
+
+eftIntS :: Int# -> Int# -> Stream Int
+eftIntS x y = Stream next (I# x) where
+  next !s
+    | s <= I# y = Yield s (s + 1)
+    | otherwise = Done
+  {-# INLINE next #-}
+{-# INLINE eftIntS #-}
+
+eftInt :: Int# -> Int# -> [Int]
+eftInt = \x y -> cheapUnstream (eftIntS x y)
+{-# INLINE eftInt #-}
+
+-- unfoldrS :: (a -> Maybe (a, b)) -> a -> Stream b
+-- unfoldrS f x0 = Stream next x0 where
+--   next s =
+--     case f s of
+--       Just (s', x) -> Yield x s'
+--       Nothing -> Done
+--   {-# INLINE next #-}
+-- {-# INLINE unfoldrS #-}
+
+data ZipState s1 a s2
+  = ZipState1 !s1   !s2
+  | ZipState2 !s1 a !s2
+
+zipS :: Stream a -> Stream b -> Stream (a, b)
+zipS (Stream next1 s01) (Stream next2 s02) = Stream next' (ZipState1 s01 s02) where
+  next' (ZipState1 s1 s2) =
+    case next1 s1 of
+      Yield x s1' ->
+        case next2 s2 of
+          Yield y s2' ->
+            Yield (x, y) (ZipState1 s1' s2')
+          Skip s2' -> Skip (ZipState2 s1' x s2')
+          Done -> Done
+      Skip s1' -> Skip (ZipState1 s1' s2)
+      Done -> Done
+  next' (ZipState2 s1' x s2) =
+    case next2 s2 of
+      Yield y s2' -> Yield (x, y) (ZipState1 s1' s2')
+      Skip s2' -> Skip (ZipState2 s1' x s2')
+      Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE zipS #-}
+
+data Zip3State s1 a s2 b s3
+  = Zip3State1 !s1   !s2   !s3
+  | Zip3State2 !s1 a !s2   !s3
+  | Zip3State3 !s1 a !s2 b !s3
+
+zip3S :: Stream a -> Stream b -> Stream c -> Stream (a, b, c)
+zip3S (Stream next1 s01) (Stream next2 s02) (Stream next3 s03) = Stream next' (Zip3State1 s01 s02 s03) where
+  next' (Zip3State1 s1 s2 s3) =
+    case next1 s1 of
+      Yield x s1' ->
+        case next2 s2 of
+          Yield y s2' ->
+            case next3 s3 of
+              Yield z s3' -> Yield (x, y, z) (Zip3State1 s1' s2' s3')
+              Skip s3' -> Skip (Zip3State3 s1' x s2' y s3')
+              Done -> Done
+          Skip s2' -> Skip (Zip3State2 s1' x s2' s3)
+          Done -> Done
+      Skip s1' -> Skip (Zip3State1 s1' s2 s3)
+      Done -> Done
+  next' (Zip3State2 s1' x s2 s3) =
+    case next2 s2 of
+      Yield y s2' ->
+        case next3 s3 of
+          Yield z s3' -> Yield (x,y,z) (Zip3State1 s1' s2' s3')
+          Skip s3' -> Skip (Zip3State3 s1' x s2' y s3')
+          Done -> Done
+      Skip s2' -> Skip (Zip3State2 s1' x s2' s3)
+      Done -> Done
+  next' (Zip3State3 s1' x s2' y s3) =
+    case next3 s3 of
+      Yield z s3' -> Yield (x,y,z) (Zip3State1 s1' s2' s3')
+      Skip s3' -> Skip (Zip3State3 s1' x s2' y s3')
+      Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE zip3S #-}
+
+zipWithS :: (a -> b -> c) -> Stream a -> Stream b -> Stream c
+zipWithS f (Stream next1 s01) (Stream next2 s02) = Stream next' (ZipState1 s01 s02) where
+  next' (ZipState1 s1 s2) =
+    case next1 s1 of
+      Yield x s1' ->
+        case next2 s2 of
+          Yield y s2' ->
+            Yield (f x y) (ZipState1 s1' s2')
+          Skip s2' -> Skip (ZipState2 s1' x s2')
+          Done -> Done
+      Skip s1' -> Skip (ZipState1 s1' s2)
+      Done -> Done
+  next' (ZipState2 s1' x s2) =
+    case next2 s2 of
+      Yield y s2' -> Yield (f x y) (ZipState1 s1' s2')
+      Skip s2' -> Skip (ZipState2 s1' x s2')
+      Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE zipWithS #-}
+
+zipWith3S :: (a -> b -> c -> d) -> Stream a -> Stream b -> Stream c -> Stream d
+zipWith3S f (Stream next1 s01) (Stream next2 s02) (Stream next3 s03) = Stream next' (Zip3State1 s01 s02 s03) where
+  next' (Zip3State1 s1 s2 s3) =
+    case next1 s1 of
+      Yield x s1' ->
+        case next2 s2 of
+          Yield y s2' ->
+            case next3 s3 of
+              Yield z s3' -> Yield (f x y z) (Zip3State1 s1' s2' s3')
+              Skip s3' -> Skip (Zip3State3 s1' x s2' y s3')
+              Done -> Done
+          Skip s2' -> Skip (Zip3State2 s1' x s2' s3)
+          Done -> Done
+      Skip s1' -> Skip (Zip3State1 s1' s2 s3)
+      Done -> Done
+  next' (Zip3State2 s1' x s2 s3) =
+    case next2 s2 of
+      Yield y s2' ->
+        case next3 s3 of
+          Yield z s3' -> Yield (f x y z) (Zip3State1 s1' s2' s3')
+          Skip s3' -> Skip (Zip3State3 s1' x s2' y s3')
+          Done -> Done
+      Skip s2' -> Skip (Zip3State2 s1' x s2' s3)
+      Done -> Done
+  next' (Zip3State3 s1' x s2' y s3) =
+    case next3 s3 of
+      Yield z s3' -> Yield (f x y z) (Zip3State1 s1' s2' s3')
+      Skip s3' -> Skip (Zip3State3 s1' x s2' y s3')
+      Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE zipWith3S #-}
+
+-- unzipS :: Stream (a, b) -> (Stream a, Stream b)
+-- unzipS s = (mapS fst s, mapS snd s)
+-- {-# INLINE unzipS #-}
+
+unzipS :: Stream (a, b) -> ([a], [b])
+unzipS (Stream next s0) = go s0 where
+  go s =
+    case next s of
+      Yield (x, y) s' -> let (xs, ys) = go s' in (x:xs, y:ys)
+      Skip s' -> go s'
+      Done -> ([], [])
+{-# INLINE unzipS #-}
+
+-- unzip3S :: Stream (a, b, c) -> (Stream a, Stream b, Stream c)
+-- unzip3S s = (mapS (\(x,_,_) -> x) s, mapS (\(_,x,_) -> x) s, mapS (\(_,_,x) -> x) s)
+-- {-# INLINE unzip3S #-}
+
+unzip3S :: Stream (a, b, c) -> ([a], [b], [c])
+unzip3S (Stream next s0) = go s0 where
+  go !s =
+    case next s of
+      Yield (x, y, z) s' -> let (xs, ys, zs) = go s' in (x:xs, y:ys, z:zs)
+      Skip s' -> go s'
+      Done -> ([], [], [])
+{-# INLINE unzip3S #-}
+
+foldrS' :: (a -> b -> b) -> b -> Stream a -> b
+foldrS' k z (Stream next s0) = go s0 where
+  go !s =
+    case next s of
+      Yield x s' -> k x $! go s'
+      Skip s' -> go s'
+      Done -> z
+{-# INLINE foldrS' #-}
+
+foldr1S :: (a -> a -> a) -> Stream a -> a
+foldr1S f (Stream next s0) = go1 s0 where
+  go1 !s =
+    case next s of
+      Yield x s' -> go2 x s'
+      Skip s' -> go1 s'
+      Done -> errorEmptyList "foldr1"
+  go2 x !s =
+    case next s of
+      Yield y s' -> f x (go2 y s')
+      Skip s' -> go2 x s'
+      Done -> x
+{-# INLINE foldr1S #-}
+
+nullS :: Stream a -> Bool
+nullS (Stream next s0) = go s0 where
+  go !s =
+    case next s of
+      Yield{} -> False
+      Skip s' -> go s'
+      Done -> True
+{-# INLINE nullS #-}
+
+lengthS :: Stream a -> Int
+lengthS (Stream next s0) = go 0 s0 where
+  go !n !s =
+    case next s of
+      Yield _ s' -> go (n + 1) s'
+      Skip s' -> go n s'
+      Done -> n
+{-# INLINE lengthS #-}
+
+elemS :: Eq a => a -> Stream a -> Bool
+elemS x0 (Stream next s0) = go s0 where
+  go s =
+    case next s of
+      Yield x s' -> x == x0 || go s'
+      Skip s' -> go s'
+      Done -> False
+{-# INLINE elemS #-}
+
+notElemS :: Eq a => a -> Stream a -> Bool
+notElemS x0 (Stream next s0) = go s0 where
+  go s =
+    case next s of
+      Yield x s' -> x /= x0 && go s'
+      Skip s' -> go s'
+      Done -> True
+{-# INLINE notElemS #-}
+
+maximumS :: Ord a => Stream a -> a
+maximumS (Stream next s0) = go1 s0 where
+  go1 !s =
+    case next s of
+      Yield x s' -> go2 x s'
+      Skip s' -> go1 s'
+      Done -> errorEmptyList "maximum"
+  go2 x !s =
+    case next s of
+      Yield y s'
+        | y > x -> go2 y s'
+        | otherwise -> go2 x s'
+      Skip s' -> go2 x s'
+      Done -> x
+{-# INLINE maximumS #-}
+
+minimumS :: Ord a => Stream a -> a
+minimumS (Stream next s0) = go1 s0 where
+  go1 !s =
+    case next s of
+      Yield x s' -> go2 x s'
+      Skip s' -> go1 s'
+      Done -> errorEmptyList "minimum"
+  go2 x !s =
+    case next s of
+      Yield y s'
+        | y < x -> go2 y s'
+        | otherwise -> go2 x s'
+      Skip s' -> go2 x s'
+      Done -> x
+{-# INLINE minimumS #-}
+
+takeS :: Int -> Stream a -> Stream a
+takeS n (Stream next s0) = Stream next' (s0 :!: n) where
+  next' (_ :!: 0) = Done
+  next' (s :!: i) =
+    case next s of
+      Yield x s' -> Yield x (s' :!: (i - 1))
+      Skip s' -> Skip (s' :!: i)
+      Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE takeS #-}
+
+-- dropS :: Int -> Stream a -> Stream a
+-- dropS n (Stream next s0) = Stream next (f n s0) where
+--   f i s
+--     | i <= 0 = s
+--     | otherwise =
+--       case next s of
+--         Yield _ s' -> f (i - 1) s'
+--         Skip s' -> f i s'
+--         Done -> s
+-- {-# INLINE dropS #-}
+
+dropS :: Int -> Stream a -> Stream a
+dropS n (Stream next s0) = Stream next' (n :!: s0) where
+  next' (i :!: s)
+    | i > 0 =
+      case next s of
+        Yield _ s' -> Skip ((i - 1) :!: s')
+        Skip s' -> Skip (i :!: s')
+        Done -> Done
+    | otherwise =
+      case next s of
+        Yield x s' -> Yield x (i :!: s')
+        Skip s' -> Skip (i :!: s')
+        Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE dropS #-}
+
+cheapSplitAtS :: Int -> Stream a -> ([a], [a])
+cheapSplitAtS n s = (cheapUnstream (takeS n s), cheapUnstream (dropS n s))
+{-# INLINE cheapSplitAtS #-}
+
+splitAtS :: Int -> Stream a -> ([a], [a])
+splitAtS n (Stream next s0) = go1 n s0 where
+  go1 !i !s
+    | i > 0 =
+      case next s of
+        Yield x s' -> let (xs,ys) = go1 (i - 1) s' in (x : xs, ys)
+        Skip s'    -> go1 i s'
+        Done       -> ([], [])
+    | otherwise = ([], go2 s)
+  go2 !s =
+    case next s of
+      Yield x s' -> x : go2 s'
+      Skip s' -> go2 s'
+      Done -> []
+{-# INLINE splitAtS #-}
+
+takeWhileS :: (a -> Bool) -> Stream a -> Stream a
+takeWhileS p (Stream next s0) = Stream next' s0 where
+  next' !s =
+    case next s of
+      Yield x s'
+        | p x -> Yield x s'
+        | otherwise -> Done
+      Skip s' -> Skip s'
+      Done -> Done
+{-# INLINE takeWhileS #-}
+
+dropWhileS :: (a -> Bool) -> Stream a -> Stream a
+dropWhileS p (Stream next s0) = Stream next' (True :!: s0) where
+  next' (True :!: s) =
+      case next s of
+        Yield x s'
+          | p x -> Skip (True :!: s')
+          | otherwise -> Yield x (False :!: s')
+        Skip s' -> Skip (True :!: s')
+        Done -> Done
+  next' (False :!: s) =
+      case next s of
+        Yield x s' -> Yield x (False :!: s')
+        Skip s' -> Skip (False :!: s')
+        Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE dropWhileS #-}
+
+-- nubS :: Eq a => Stream a -> Stream a
+-- nubS (Stream next s0) = Stream next' ([] :!: s0) where
+--   next' (xs :!: s) =
+--     case next s of
+--       Yield x s'
+--         | x `elem` xs -> Skip (xs :!: s')
+--         | otherwise -> Yield x ((x : xs) :!: s')
+--       Skip s' -> Skip (xs :!: s')
+--       Done -> Done
+--   {-# INLINE next' #-}
+-- {-# INLINE nubS #-}
+
+-- spanS :: (a -> Bool) -> Stream a -> (Stream a, Stream a)
+-- spanS f s = (takeWhileS f s, dropWhileS f s)
+-- {-# INLINE spanS #-}
+
+spanS :: (a -> Bool) -> Stream a -> ([a], [a])
+spanS p (Stream next s0) = go1 s0 where
+  go1 !s =
+    case next s of
+      Yield x s'
+        | p x -> let (xs, ys) = go1 s' in (x : xs, ys)
+        | otherwise -> ([], x : go2 s')
+      Skip s' -> go1 s'
+      Done -> ([],[])
+  go2 !s =
+    case next s of
+      Yield x s' -> x : go2 s'
+      Skip s' -> go2 s'
+      Done -> []
+{-# INLINE spanS #-}
+
+breakS :: (a -> Bool) -> Stream a -> ([a], [a])
+breakS f = spanS (not . f)
+{-# INLINE breakS #-}
+
+reverseS :: Stream a -> [a]
+reverseS = foldlS' (flip (:)) []
+{-# INLINE reverseS #-}
+
+foldlS :: (b -> a -> b) -> b -> Stream a -> b
+foldlS k z (Stream next s0) = go z s0 where
+  go acc !s =
+    case next s of
+      Yield x s' -> go (k acc x) s'
+      Skip s' -> go acc s'
+      Done -> acc
+{-# INLINE foldlS #-}
+
+foldlS' :: (b -> a -> b) -> b -> Stream a -> b
+foldlS' k z (Stream next s0) = go z s0 where
+  go !acc !s =
+    case next s of
+      Yield x s' -> go (k acc x) s'
+      Skip s' -> go acc s'
+      Done -> acc
+{-# INLINE foldlS' #-}
+
+foldl1S :: (a -> a -> a) -> Stream a -> a
+foldl1S f (Stream next s0) = go1 s0 where
+  go1 !s =
+    case next s of
+      Yield x s' -> go2 x s'
+      Skip s' -> go1 s'
+      Done -> errorEmptyList "foldl1"
+  go2 acc !s =
+    case next s of
+      Yield x s' -> go2 (f acc x) s'
+      Skip s' -> go2 acc s'
+      Done -> acc
+{-# INLINE foldl1S #-}
+
+-- consumer
+sumS :: Num a => Stream a -> a
+sumS (Stream next s0) = go 0 s0 where
+  go !acc !s = case next s of
+    Done -> acc
+    Skip s' -> go acc s'
+    Yield x s' -> go (acc + x) s'
+{-# INLINE sumS #-}
+
+productS :: Num a => Stream a -> a
+productS (Stream next s0) = go 1 s0 where
+  go !acc !s = case next s of
+    Done -> acc
+    Skip s' -> go acc s'
+    Yield x s' -> go (acc * x) s'
+{-# INLINE productS #-}
+
+andS :: Stream Bool -> Bool
+andS (Stream next s0) = go True s0 where
+  go !acc !s = case next s of
+    Done -> acc
+    Skip s' -> go acc s'
+    Yield x s' -> go (acc && x) s'
+{-# INLINE andS #-}
+
+orS :: Stream Bool -> Bool
+orS (Stream next s0) = go False s0 where
+  go !acc !s = case next s of
+    Done -> acc
+    Skip s' -> go acc s'
+    Yield x s' -> go (acc || x) s'
+{-# INLINE orS #-}
+
+anyS :: (a -> Bool) -> Stream a -> Bool
+anyS p (Stream next s0) = go False s0 where
+  go !acc !s = case next s of
+    Done -> acc
+    Skip s' -> go acc s'
+    Yield x s' -> go (acc || p x) s'
+{-# INLINE anyS #-}
+
+allS :: (a -> Bool) -> Stream a -> Bool
+allS f (Stream next s0) = go True s0 where
+  go !acc !s = case next s of
+    Done -> acc
+    Skip s' -> go acc s'
+    Yield x s' -> go (acc && f x) s'
+{-# INLINE allS #-}
+
+foldl1S' :: (a -> a -> a) -> Stream a -> a
+foldl1S' f (Stream next s0) = go1 s0 where
+  go1 !s =
+    case next s of
+      Yield x s' -> go2 x s'
+      Skip s' -> go1 s'
+      Done -> errorEmptyList "foldl1"
+  go2 !acc !s =
+    case next s of
+      Yield x s' -> go2 (f acc x) s'
+      Skip s' -> go2 acc s'
+      Done -> acc
+{-# INLINE foldl1S' #-}
+
+filterS :: (a -> Bool) -> Stream a -> Stream a
+filterS p (Stream next s0) = Stream next' s0 where
+  next' !s =
+    case next s of
+      Yield x s'
+        | p x -> Yield x s'
+        | otherwise -> Skip s'
+      Skip s' -> Skip s'
+      Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE filterS #-}
+
+lookupS :: Eq a => a -> Stream (a, b) -> Maybe b
+lookupS x0 (Stream next s0) = go s0 where
+  go !s =
+    case next s of
+      Yield (x,y) s'
+        | x0 == x -> Just y
+        | otherwise -> go s'
+      Skip s' -> go s'
+      Done -> Nothing
+{-# INLINE lookupS #-}
+
+-- findS :: (a -> Bool) -> Stream a -> Maybe a
+-- findS p (Stream next s0) = go s0 where
+--   go !s =
+--     case next s of
+--       Yield x s'
+--         | p x -> Just x
+--         | otherwise -> go s'
+--       Skip s' -> go s'
+--       Done -> Nothing
+-- {-# INLINE findS #-}
+--
+-- findIndexS :: (a -> Bool) -> Stream a -> Maybe Int
+-- findIndexS p (Stream next s0) = go 0 s0 where
+--   go !i !s =
+--     case next s of
+--       Yield x s'
+--         | p x -> Just i
+--         | otherwise -> go (i + 1) s'
+--       Skip s' -> go i s'
+--       Done -> Nothing
+-- {-# INLINE findIndexS #-}
+
+headS :: Stream a -> a
+headS (Stream next s0) = go s0 where
+  go !s =
+    case next s of
+      Yield x _ -> x
+      Skip s' -> go s'
+      Done -> errorEmptyList "head"
+{-# INLINE headS #-}
+
+lastS :: Stream a -> a
+lastS (Stream next s0) = go1 s0 where
+  go1 !s =
+    case next s of
+      Yield x s' -> go2 x s'
+      Skip s' -> go1 s'
+      Done -> errorEmptyList "last"
+  go2 x !s =
+    case next s of
+      Yield x' s' -> go2 x' s'
+      Skip s' -> go2 x s'
+      Done -> x
+{-# INLINE lastS #-}
+
+-- tailS :: Stream a -> Stream a
+-- tailS (Stream next s0) = Stream next (tailF s0) where
+--   tailF !s =
+--     case next s of
+--       Yield _ s' -> s'
+--       Skip s' -> tailF s'
+--       Done -> errorEmptyList "tail"
+--
+-- initS1 :: Stream a -> Stream a
+-- initS1 (Stream next s0) = Stream next' (f s0) where
+--   f !s =
+--     case next s of
+--       Yield x s' -> x :!: s'
+--       Skip s' -> f s'
+--       Done -> errorEmptyList "init"
+--   next' (x :!: s) =
+--     case next s of
+--       Yield y s' -> Yield x (y :!: s')
+--       Skip s' -> Skip (x :!: s')
+--       Done -> Done
+-- {-# INLINE initS1 #-}
+
+initS :: Stream a -> Stream a
+initS (Stream next s0) = Stream next' (Nothing :!: s0) where
+  next' (Nothing :!: s) =
+    case next s of
+      Yield x s' -> Skip (Just x :!: s')
+      Skip s' -> Skip (Nothing :!: s')
+      Done -> errorEmptyList "init"
+  next' (Just x :!: s) =
+    case next s of
+      Yield y s' -> Yield x (Just y :!: s')
+      Skip s' -> Skip (Just x :!: s')
+      Done -> Done
+{-# INLINE initS #-}
+
+unconsS :: Stream a -> Maybe (a, [a])
+unconsS (Stream next s0) = go1 s0 where
+  go1 !s =
+    case next s of
+      Yield x s' -> Just (x, go2 s')
+      Skip s' -> go1 s'
+      Done -> Nothing
+  go2 !s =
+    case next s of
+      Yield x s' -> x : go2 s'
+      Skip s' -> go2 s'
+      Done -> []
+{-# INLINE unconsS #-}
+
+unsnocS :: Stream a -> Maybe ([a], a)
+-- duplicates work:
+-- unsnocS s = if nullS s then Nothing else Just (unstream (initS s), lastS s)
+unsnocS = foldrS (\x xs -> case xs of Nothing -> Just ([], x); Just (ys,y) -> Just (x:ys,y)) Nothing
+{-# INLINE unsnocS #-}
+
+indexHelperS :: Stream a -> Int -> Maybe a
+indexHelperS (Stream next s0) i0 = go i0 s0
+  where
+    go 0 !s =
+      case next s of
+        Yield x _ -> Just x
+        Skip s' -> go 0 s'
+        Done -> Nothing
+    go !i !s =
+      case next s of
+        Yield _ s' -> go (i - 1) s'
+        Skip s' -> go i s'
+        Done -> Nothing
+{-# INLINE indexHelperS #-}
+
+unsafeIndexHelperS :: Stream a -> Int -> a
+unsafeIndexHelperS (Stream next s0) i0 = go i0 s0
+  where
+    go !i !s =
+      case next s of
+        Yield x s' -> if i == 0 then x else go (i - 1) s'
+        Skip s' -> go i s'
+        Done -> tooLarge i
+{-# INLINE unsafeIndexHelperS #-}
+
+scanlS :: (b -> a -> b) -> b -> Stream a -> Stream b
+scanlS k z (Stream next s0) = Stream next' (Just z :!: s0) where
+  next' (Just x :!: s) =
+    case next s of
+      Yield y s' -> Yield x (Just (k x y) :!: s')
+      Skip s' -> Skip (Just x :!: s')
+      Done -> Yield x (Nothing :!: s)
+  next' (Nothing :!: _) = Done
+  {-# INLINE next' #-}
+{-# INLINE scanlS #-}
+
+data Scanl1State a s = Scanl1State1 !s | Scanl1State2 a !s | Scanl1State3
+
+scanl1S :: (a -> a -> a) -> Stream a -> Stream a
+scanl1S k (Stream next s0) = Stream next' (Scanl1State1 s0) where
+  next' (Scanl1State1 s) =
+    case next s of
+      Yield x s' -> Skip (Scanl1State2 x s')
+      Skip s' -> Skip (Scanl1State1 s')
+      Done -> errorEmptyList "scanl1"
+  next' (Scanl1State2 x s) =
+    case next s of
+      Yield y s' -> Yield x (Scanl1State2 (k x y) s')
+      Skip s' -> Skip (Scanl1State2 x s')
+      Done -> Yield x Scanl1State3
+  next' Scanl1State3 = Done
+  {-# INLINE next' #-}
+{-# INLINE scanl1S #-}
+
+scanlS' :: (b -> a -> b) -> b -> Stream a -> Stream b
+scanlS' k z (Stream next s0) = Stream next' (Some (z :!: s0)) where
+  next' (Some (x :!: s)) =
+    case next s of
+      Yield y s' -> Yield x (Some (k x y :!: s'))
+      Skip s' -> Skip (Some (x :!: s'))
+      Done -> Yield x None
+  next' None = Done
+  {-# INLINE next' #-}
+{-# INLINE scanlS' #-}
+
+iterateS :: (a -> a) -> a -> Stream a
+iterateS f = Stream next . L where
+  next (L s) = Yield s (L (f s))
+  {-# INLINE next #-}
+{-# INLINE iterateS #-}
+
+iterateS' :: (a -> a) -> a -> Stream a
+iterateS' f = Stream next where
+  next s = Yield s (f s)
+  {-# INLINE next #-}
+{-# INLINE iterateS' #-}
+
+-- repeatS :: a -> Stream a
+-- repeatS = Stream next . L where
+--   next (L s) = Yield s (L s)
+--   {-# INLINE next #-}
+-- {-# INLINE repeatS #-}
+
+replicateS :: Int -> a -> Stream a
+replicateS n x = Stream next n where
+  next s | s <= 0 = Done
+         | otherwise = Yield x (s - 1)
+  {-# INLINE next #-}
+{-# INLINE replicateS #-}
+
+-- cycleS :: Stream a -> Stream a
+-- cycleS (Stream next s0) = Stream next' s0 where
+--   next' !s =
+--     case next s of
+--       Yield x s' -> Yield x s'
+--       Skip s' -> Skip s'
+--       Done -> Skip s0
+-- {-# INLINE cycleS #-}
+
+concatS :: Stream [a] -> Stream a
+concatS (Stream next s0) = Stream next' (s0 :!: L []) where
+  next' (s :!: L []) =
+    case next s of
+      Yield [] s' -> Skip (s' :!: L [])
+      Yield (x:xs) s' -> Yield x (s' :!: L xs)
+      Skip s' -> Skip (s' :!: L [])
+      Done -> Done
+  next' (s :!: L (x:xs)) = Yield x (s :!: L xs)
+{-# INLINE concatS #-}
+
+scanrS :: (a -> b -> b) -> b -> Stream a -> [b]
+scanrS f q0 = foldrS (\x qs@(q:_) -> f x q : qs) [q0]
+{-# INLINE scanrS #-}
+scanr1S :: (a -> a -> a) -> Stream a -> [a]
+scanr1S f = foldrS (\x qs -> case qs of [] -> [x]; (q:_) -> f x q : qs) []
+{-# INLINE scanr1S #-}
+
+
+-- foldr' :: (a -> b -> b) -> b -> [a] -> b
+-- foldr' k z = foldrS' k z . stream
+-- {-# INLINE foldr' #-}
+-- foldr1 :: (a -> a -> a) -> [a] -> a
+-- foldr1 k = foldr1S k . stream
+-- {-# INLINE foldr1 #-}
+--
+-- foldl :: (b -> a -> b) -> b -> [a] -> b
+-- foldl k z = foldlS k z . stream
+-- {-# INLINE foldl #-}
+-- foldl' :: (b -> a -> b) -> b -> [a] -> b
+-- foldl' k z = foldlS' k z . stream
+-- {-# INLINE foldl' #-}
+-- foldl1 :: (a -> a -> a) -> [a] -> a
+-- foldl1 k = foldl1S k . stream
+-- {-# INLINE foldl1 #-}
+--
+-- null :: [a] -> Bool
+-- null = nullS . stream
+-- {-# INLINE null #-}
+-- length :: [a] -> Int
+-- length = lengthS . stream
+-- {-# INLINE length #-}
+-- elem :: Eq a => a -> [a] -> Bool
+-- elem x = elemS x . stream
+-- {-# INLINE elem #-}
+-- notElem :: Eq a => a -> [a] -> Bool
+-- notElem x = notElemS x . stream
+-- {-# INLINE notElem #-}
+--
+-- maximum :: Ord a => [a] -> a
+-- maximum = maximumS . stream
+-- {-# INLINE maximum #-}
+-- minimum :: Ord a => [a] -> a
+-- minimum = minimumS . stream
+-- {-# INLINE minimum #-}
+-- sum :: Num a => [a] -> a
+-- sum = sumS . stream
+-- {-# INLINE sum #-}
+-- product :: Num a => [a] -> a
+-- product = productS . stream
+-- {-# INLINE product #-}
+-- and :: [Bool] -> Bool
+-- and = andS . stream
+-- {-# INLINE and #-}
+-- or :: [Bool] -> Bool
+-- or = orS . stream
+-- {-# INLINE or #-}
+-- any :: (a -> Bool) -> [a] -> Bool
+-- any p = anyS p . stream
+-- {-# INLINE any #-}
+-- all :: (a -> Bool) -> [a] -> Bool
+-- all p = allS p . stream
+-- {-# INLINE all #-}
+--
+-- foldl1' :: (a -> a -> a) -> [a] -> a
+-- foldl1' f = foldl1S' f . stream
+-- {-# INLINE foldl1' #-}
+-- concat :: [[a]] -> [a]
+-- concat = unstream . concatS . stream
+-- {-# INLINE concat #-}
+-- concatMap :: (a -> [b]) -> [a] -> [b]
+-- concatMap f = unstream . concatMapS (stream . f) . stream
+-- {-# INLINE concatMap #-}
+--
+-- filter :: (a -> Bool) -> [a] -> [a]
+-- filter p = unstream . filterS p . stream
+-- {-# INLINE filter #-}
+-- lookup :: Eq a => a -> [(a, b)] -> Maybe b
+-- lookup x = lookupS x . stream
+-- {-# INLINE lookup #-}
+--
+-- head :: [a] -> a
+-- head = headS . stream
+-- {-# INLINE head #-}
+-- last :: [a] -> a
+-- last = lastS . stream
+-- {-# INLINE last #-}
+-- tail :: [a] -> [a]
+-- -- destoys sharing:
+-- -- tail = unstream . tailS . stream
+-- tail [] = errorEmptyList "tail"
+-- tail (_:xs) = xs
+-- {-# INLINE tail #-}
+-- init :: [a] -> [a]
+-- init = unstream . initS . stream
+-- {-# INLINE init #-}
+-- uncons :: [a] -> Maybe (a, [a])
+-- uncons [] = Nothing
+-- uncons (x:xs) = Just (x, xs)
+-- {-# NOINLINE [1] uncons #-}
+-- -- {-# RULES "uncons/stream" forall s. uncons (unstream s) = unconsS s #-}
+-- -- {-# RULES "uncons/stream" forall s. uncons (cheapUnstream s) = unconsS s #-}
+-- unsnoc :: [a] -> Maybe ([a], a)
+-- unsnoc = unsnocS . stream
+-- {-# INLINE unsnoc #-}
+-- (!?) :: [a] -> Int -> Maybe a
+-- xs !? i = indexS (stream xs) i
+-- {-# INLINE (!?) #-}
+-- (!!) :: [a] -> Int -> a
+-- xs !! i = unsafeIndexS (stream xs) i
+-- {-# INLINE (!!) #-}
+--
+-- scanl :: (b -> a -> b) -> b -> [a] -> [b]
+-- scanl k z = unstream . scanlS k z . stream
+-- {-# INLINE scanl #-}
+-- scanl1 :: (a -> a -> a) -> [a] -> [a]
+-- scanl1 k = unstream . scanl1S k . stream
+-- {-# INLINE scanl1 #-}
+-- scanl' :: (b -> a -> b) -> b -> [a] -> [b]
+-- scanl' k z = unstream . scanlS' k z . stream
+-- {-# INLINE scanl' #-}
+-- scanr :: (a -> b -> b) -> b -> [a] -> [b]
+-- scanr f q0 = foldrS (\x qs@(q:_) -> f x q : qs) [q0] . stream
+-- {-# INLINE scanr #-}
+-- scanr1 :: (a -> a -> a) -> [a] -> [a]
+-- scanr1 f = foldrS (\x qs -> case qs of [] -> [x]; (q:_) -> f x q : qs) [] . stream
+-- {-# INLINE scanr1 #-}
+--
+-- iterate :: (a -> a) -> a -> [a]
+-- iterate f x = cheapUnstream (iterateS f x)
+-- {-# INLINE iterate #-}
+-- iterate' :: (a -> a) -> a -> [a]
+-- iterate' f x = unstream (iterateS' f x)
+-- {-# INLINE iterate' #-}
+-- repeat :: a -> [a]
+-- repeat x = let xs = x : xs in xs
+-- -- repeat = cheapUnstream . repeatS
+-- {-# INLINE repeat #-}
+-- replicate :: Int -> a -> [a]
+-- replicate n x = cheapUnstream (replicateS n x)
+-- {-# INLINE replicate #-}
+-- cycle :: [a] -> [a]
+-- cycle xs = ys where ys = foldrS (:) ys (stream xs)
+-- -- cycle = unstream . cycleS . stream
+-- {-# INLINE cycle #-}
+--
+-- take :: Int -> [a] -> [a]
+-- take n = unstream . takeS n . stream
+-- {-# INLINE take #-}
+-- drop :: Int -> [a] -> [a]
+-- drop 0 xs = xs
+-- drop _ [] = []
+-- drop n (_:xs) = drop (n - 1) xs
+-- {-# NOINLINE [1] drop #-}
+-- -- {-# RULES "drop/stream" forall n s. drop n (unstream s) = unstream (dropS n s) #-}
+-- -- {-# RULES "drop/stream" forall n s. drop n (cheapUnstream s) = cheapUnstream (dropS n s) #-}
+--
+-- splitAt :: Int -> [a] -> ([a], [a])
+-- splitAt 0 xs = ([], xs)
+-- splitAt _ [] = ([],[])
+-- splitAt n (x:xs) = let (xs',ys') = splitAt (n - 1) xs in (x : xs', ys')
+-- {-# NOINLINE [1] splitAt #-}
+-- -- {-# RULES "splitAt/stream" forall n s. splitAt n (unstream s) = splitAtS n s #-}
+-- -- {-# RULES "splitAt/stream" forall n s. splitAt n (cheapUnstream s) = cheapSplitAtS n s #-}
+-- takeWhile :: (a -> Bool) -> [a] -> [a]
+-- takeWhile p = unstream . takeWhileS p . stream
+-- {-# INLINE takeWhile #-}
+-- dropWhile :: (a -> Bool) -> [a] -> [a]
+-- dropWhile _ [] = []
+-- dropWhile p xs@(x:xs')
+--   | p x = dropWhile p xs'
+--   | otherwise = xs
+-- {-# NOINLINE [1] dropWhile #-}
+-- -- {-# RULES "dropWhile/stream" forall p s. dropWhile p (unstream s) = unstream (dropWhileS p s) #-}
+-- -- {-# RULES "dropWhile/stream" forall p s. dropWhile p (cheapUnstream s) = unstream (dropWhileS p s) #-}
+-- span :: (a -> Bool) -> [a] -> ([a], [a])
+-- -- destroys sharing and duplicates work:
+-- -- span p xs = (unstream (takeWhileS p (stream xs)), unstream (dropWhileS p (stream xs)))
+-- span _ [] = ([], [])
+-- span p xs@(x:xs')
+--   | p x = let (ys,zs) = span p xs' in (x:ys,zs)
+--   | otherwise = ([], xs)
+-- {-# NOINLINE [1] span #-}
+-- -- {-# RULES "span/stream" forall p s. span p (unstream s) = spanS p s #-}
+-- -- {-# RULES "span/stream" forall p s. span p (cheapUnstream s) = spanS p s #-}
+-- break :: (a -> Bool) -> [a] -> ([a], [a])
+-- break p = span (not . p)
+-- {-# INLINE break #-}
+-- reverse :: [a] -> [a]
+-- reverse = reverseS . stream
+-- {-# INLINE reverse #-}
+--
+-- zip :: [a] -> [b] -> [(a,b)]
+-- zip xs ys = unstream (zipS (stream xs) (stream ys))
+-- {-# INLINE zip #-}
+-- zip3 :: [a] -> [b] -> [c] -> [(a,b,c)]
+-- zip3 xs ys zs = unstream (zip3S (stream xs) (stream ys) (stream zs))
+-- {-# INLINE zip3 #-}
+-- zipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
+-- zipWith f xs ys = unstream (zipWithS f (stream xs) (stream ys))
+-- {-# INLINE zipWith #-}
+-- zipWith3 :: (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
+-- zipWith3 f xs ys zs = unstream (zipWith3S f (stream xs) (stream ys) (stream zs))
+-- {-# INLINE zipWith3 #-}
+--
+-- unzip :: [(a,b)] -> ([a], [b])
+-- unzip = unzipS . stream
+-- {-# INLINE unzip #-}
+-- unzip3 :: [(a,b,c)] -> ([a], [b], [c])
+-- unzip3 = unzip3S . stream
+-- {-# INLINE unzip3 #-}
+
 
 -- $setup
 -- >>> import GHC.Internal.Base
@@ -98,10 +1022,12 @@ badHead = errorEmptyList "head"
 -- This rule is useful in cases like
 --      head [y | (x,y) <- ps, x==t]
 {-# RULES
-"head/build"    forall (g::forall b.(a->b->b)->b->b) .
-                head (build g) = g (\x _ -> x) badHead
-"head/augment"  forall xs (g::forall b. (a->b->b) -> b -> b) .
-                head (augment g xs) = g (\x _ -> x) (head xs)
+"head/unstream" forall s. head (unstream s) = headS s
+"head/cheapUnstream" forall s. head (cheapUnstream s) = headS s
+-- "head/build"    forall (g::forall b.(a->b->b)->b->b) .
+--                 head (build g) = g (\x _ -> x) badHead
+-- "head/augment"  forall xs (g::forall b. (a->b->b) -> b -> b) .
+--                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
 -- | \(\mathcal{O}(1)\). Decompose a list into its 'head' and 'tail'.
@@ -283,8 +1209,9 @@ lenAcc []     n = n
 lenAcc (_:ys) n = lenAcc ys (n+1)
 
 {-# RULES
-"length" [~1] forall xs . length xs = foldr lengthFB idLength xs 0
-"lengthList" [1] foldr lengthFB idLength = lenAcc
+"length" length = lengthS . stream
+-- "length" [~1] forall xs . length xs = foldr lengthFB idLength xs 0
+-- "lengthList" [1] foldr lengthFB idLength = lenAcc
  #-}
 
 -- The lambda form turns out to be necessary to make this inline
@@ -325,9 +1252,10 @@ filterFB c p x r | p x       = x `c` r
                  | otherwise = r
 
 {-# RULES
-"filter"     [~1] forall p xs.  filter p xs = build (\c n -> foldr (filterFB c p) n xs)
-"filterList" [1]  forall p.     foldr (filterFB (:) p) [] = filter p
-"filterFB"        forall c p q. filterFB (filterFB c p) q = filterFB c (\x -> q x && p x)
+"filter" forall p. filter p = unstream . filterS p . stream
+-- "filter"     [~1] forall p xs.  filter p xs = build (\c n -> foldr (filterFB c p) n xs)
+-- "filterList" [1]  forall p.     foldr (filterFB (:) p) [] = filter p
+-- "filterFB"        forall c p q. filterFB (filterFB c p) q = filterFB c (\x -> q x && p x)
  #-}
 
 -- Note the filterFB rule, which has p and q the "wrong way round" in the RHS.
@@ -359,10 +1287,13 @@ filterFB c p x r | p x       = x `c` r
 -- >>> foldl (+) 0 [1..]
 -- * Hangs forever *
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
-{-# INLINE foldl #-}
-foldl k z0 xs =
-  foldr (\(v::a) (fn::b->b) -> oneShot (\(z::b) -> fn (k z v))) (id :: b -> b) xs z0
-  -- See Note [Left folds via right fold]
+foldl k z0 [] = z0
+foldl k z0 (x:xs) = foldl k (k z0 x) xs
+{-# NOINLINE [0] foldl #-}
+
+{-# RULES
+"foldl" forall k z . foldl k z = foldlS k z . stream
+ #-}
 
 {-
 Note [Left folds via right fold]
@@ -405,9 +1336,14 @@ allocation-free. Also see #13001.
 
 -- | A strict version of 'foldl'.
 foldl' :: forall a b . (b -> a -> b) -> b -> [a] -> b
-{-# INLINE foldl' #-}
-foldl' k z0 = \xs ->
-  foldr (\(v::a) (fn::b->b) -> oneShot (\(z::b) -> z `seq` fn (k z v))) (id :: b -> b) xs z0
+foldl' k !z0 [] = z0
+foldl' k !z0 (x:xs) = foldl' k (k z0 x) xs
+
+{-# NOINLINE [0] foldl' #-}
+{-# RULES
+"foldl'" forall k z. foldl' k z = foldlS' k z . stream
+ #-}
+
 {-
 Note [Definition of foldl']
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -551,10 +1487,11 @@ scanl                   = scanlGo
 
 -- See Note [scanl rewrite rules]
 {-# RULES
-"scanl"  [~1] forall f a bs . scanl f a bs =
-  build (\c n -> a `c` foldr (scanlFB f c) (constScanl n) bs a)
-"scanlList" [1] forall f (a::a) bs .
-    foldr (scanlFB f (:)) (constScanl []) bs a = tail (scanl f a bs)
+"scanl" forall f a. scanl f a = unstream . scanlS f a . stream
+-- "scanl"  [~1] forall f a bs . scanl f a bs =
+--   build (\c n -> a `c` foldr (scanlFB f c) (constScanl n) bs a)
+-- "scanlList" [1] forall f (a::a) bs .
+--     foldr (scanlFB f (:)) (constScanl []) bs a = tail (scanl f a bs)
  #-}
 
 {-# INLINE [0] scanlFB #-} -- See Note [Inline FB functions]
@@ -612,10 +1549,11 @@ scanl' = scanlGo'
 
 -- See Note [scanl rewrite rules]
 {-# RULES
-"scanl'"  [~1] forall f a bs . scanl' f a bs =
-  build (\c n -> a `c` foldr (scanlFB' f c) (flipSeq n) bs a)
-"scanlList'" [1] forall f a bs .
-    foldr (scanlFB' f (:)) (flipSeq []) bs a = tail (scanl' f a bs)
+"scanl'" forall f a. scanl' f a = unstream . scanlS' f a . stream
+-- "scanl'"  [~1] forall f a bs . scanl' f a bs =
+--   build (\c n -> a `c` foldr (scanlFB' f c) (flipSeq n) bs a)
+-- "scanlList'" [1] forall f a bs .
+--     foldr (scanlFB' f (:)) (flipSeq []) bs a = tail (scanl' f a bs)
  #-}
 
 {-# INLINE [0] scanlFB' #-} -- See Note [Inline FB functions]
@@ -680,6 +1618,7 @@ match on everything past the :, which is just the tail of scanl.
 -- >>> foldr' (||) [False, False, True, True] -- Use foldr instead!
 -- True
 foldr' :: (a -> b -> b) -> b -> [a] -> b
+{-# INLINE foldr' #-}
 foldr' f z0 xs = foldl f' id xs z0
   where f' k x z = k $! f x z
 
@@ -704,6 +1643,9 @@ foldr1 f = go
         go (x:xs)         =  f x (go xs)
         go []             =  errorEmptyList "foldr1"
 {-# INLINE [0] foldr1 #-}
+{-# RULES
+"foldr1" forall f . foldr1 f = foldr1S f . stream
+ #-}
 
 -- | \(\mathcal{O}(n)\). 'scanr' is the right-to-left dual of 'scanl'. Note that the order of parameters on the accumulating function are reversed compared to 'scanl'.
 -- Also note that
@@ -746,11 +1688,12 @@ scanrFB f c = \x ~(r, est) -> (f x r, r `c` est)
 -- See Note [scanrFB and evaluation] below
 
 {-# RULES
-"scanr" [~1] forall f q0 ls . scanr f q0 ls =
-  build (\c n -> strictUncurryScanr c (foldr (scanrFB f c) (q0,n) ls))
-"scanrList" [1] forall f q0 ls .
-               strictUncurryScanr (:) (foldr (scanrFB f (:)) (q0,[]) ls) =
-                 scanr f q0 ls
+"scanr" forall f q0. scanr f q0 = scanrS f q0 . stream
+-- "scanr" [~1] forall f q0 ls . scanr f q0 ls =
+--   build (\c n -> strictUncurryScanr c (foldr (scanrFB f c) (q0,n) ls))
+-- "scanrList" [1] forall f q0 ls .
+--                strictUncurryScanr (:) (foldr (scanrFB f (:)) (q0,[]) ls) =
+--                  scanr f q0 ls
  #-}
 
 {-
@@ -805,6 +1748,10 @@ scanr1 _ []             =  []
 scanr1 _ [x]            =  [x]
 scanr1 f (x:xs)         =  f x q : qs
                            where qs@(q:_) = scanr1 f xs
+{-# NOINLINE [0] scanr1 #-}
+{-# RULES
+"scanr1" forall f. scanr1 f = scanr1S f . stream
+ #-}
 
 -- | 'maximum' returns the maximum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
@@ -888,8 +1835,9 @@ iterateFB c f x0 = go x0
   where go x = x `c` go (f x)
 
 {-# RULES
-"iterate"    [~1] forall f x.   iterate f x = build (\c _n -> iterateFB c f x)
-"iterateFB"  [1]                iterateFB (:) = iterate
+"iterate" forall f x. iterate f x = unstream (iterateS f x)
+-- "iterate"    [~1] forall f x.   iterate f x = build (\c _n -> iterateFB c f x)
+-- "iterateFB"  [1]                iterateFB (:) = iterate
  #-}
 
 
@@ -915,8 +1863,9 @@ iterate'FB c f x0 = go x0
             in x' `seq` (x `c` go x')
 
 {-# RULES
-"iterate'"    [~1] forall f x.   iterate' f x = build (\c _n -> iterate'FB c f x)
-"iterate'FB"  [1]                iterate'FB (:) = iterate'
+"iterate'" forall f x. iterate' f x = unstream (iterateS' f x)
+-- "iterate'"    [~1] forall f x.   iterate' f x = build (\c _n -> iterate'FB c f x)
+-- "iterate'FB"  [1]                iterate'FB (:) = iterate'
  #-}
 
 
@@ -939,10 +1888,10 @@ repeatFB :: (a -> b -> b) -> a -> b
 repeatFB c x = xs where xs = x `c` xs
 
 
-{-# RULES
-"repeat"    [~1] forall x. repeat x = build (\c _n -> repeatFB c x)
-"repeatFB"  [1]  repeatFB (:)       = repeat
- #-}
+-- {-# RULES
+-- "repeat"    [~1] forall x. repeat x = build (\c _n -> repeatFB c x)
+-- "repeatFB"  [1]  repeatFB (:)       = repeat
+--  #-}
 
 -- | 'replicate' @n x@ is a list of length @n@ with @x@ the value of
 -- every element.
@@ -959,9 +1908,12 @@ repeatFB c x = xs where xs = x `c` xs
 --
 -- >>> replicate 4 True
 -- [True,True,True,True]
-{-# INLINE replicate #-}
+{-# NOINLINE [0] replicate #-}
 replicate               :: Int -> a -> [a]
 replicate n x           =  take n (repeat x)
+{-# RULES
+"replicate" forall n x . replicate n x = cheapUnstream (replicateS n x)
+#-}
 
 -- | 'cycle' ties a finite list into a circular one, or equivalently,
 -- the infinite repetition of the original list.  It is the identity
@@ -1027,11 +1979,12 @@ takeWhileFB p c n = \x r -> if p x then x `c` r else n
 -- \x r -> if q x && p x then x `c` r else n =
 -- takeWhileFB (\x -> q x && p x) c n
 {-# RULES
-"takeWhile"     [~1] forall p xs. takeWhile p xs =
-                                build (\c n -> foldr (takeWhileFB p c n) n xs)
-"takeWhileList" [1]  forall p.    foldr (takeWhileFB p (:) []) [] = takeWhile p
-"takeWhileFB"        forall c n p q. takeWhileFB q (takeWhileFB p c n) n =
-                        takeWhileFB (\x -> q x && p x) c n
+"takeWhile" forall p. takeWhile p = unstream . takeWhileS p . stream
+-- "takeWhile"     [~1] forall p xs. takeWhile p xs =
+--                                 build (\c n -> foldr (takeWhileFB p c n) n xs)
+-- "takeWhileList" [1]  forall p.    foldr (takeWhileFB p (:) []) [] = takeWhile p
+-- "takeWhileFB"        forall c n p q. takeWhileFB q (takeWhileFB p c n) n =
+--                         takeWhileFB (\x -> q x && p x) c n
  #-}
 
 -- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@.
@@ -1051,6 +2004,12 @@ dropWhile _ []          =  []
 dropWhile p xs@(x:xs')
             | p x       =  dropWhile p xs'
             | otherwise =  xs
+{-# NOINLINE [0] dropWhile #-}
+
+{-# RULES
+"dropWhile/unstream" forall p s. dropWhile p (unstream s) = unstream (dropWhileS p s)
+"dropWhile/cheapUnstream" forall p s. dropWhile p (cheapUnstream s) = cheapUnstream (dropWhileS p s)
+ #-}
 
 -- | 'take' @n@, applied to a list @xs@, returns the prefix of @xs@
 -- of length @n@, or @xs@ itself if @n >= 'length' xs@.
@@ -1109,12 +2068,13 @@ unsafeTake 1   (x: _) = [x]
 unsafeTake m   (x:xs) = x : unsafeTake (m - 1) xs
 
 {-# RULES
-"take"     [~1] forall n xs . take n xs =
-  build (\c nil -> if 0 < n
-                   then foldr (takeFB c nil) (flipSeq nil) xs n
-                   else nil)
-"unsafeTakeList"  [1] forall n xs . foldr (takeFB (:) []) (flipSeq []) xs n
-                                        = unsafeTake n xs
+"take" forall n. take n = unstream . takeS n . stream
+-- "take"     [~1] forall n xs . take n xs =
+--   build (\c nil -> if 0 < n
+--                    then foldr (takeFB c nil) (flipSeq nil) xs n
+--                    else nil)
+-- "unsafeTakeList"  [1] forall n xs . foldr (takeFB (:) []) (flipSeq []) xs n
+--                                         = unsafeTake n xs
  #-}
 
 {-# INLINE [0] flipSeq #-}
@@ -1168,7 +2128,7 @@ drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
 #else /* hack away */
-{-# INLINE drop #-}
+{-# INLINE [1] drop #-}
 drop n ls
   | n <= 0     = ls
   | otherwise  = unsafeDrop n ls
@@ -1179,6 +2139,10 @@ drop n ls
     unsafeDrop !_ []     = []
     unsafeDrop 1  (_:xs) = xs
     unsafeDrop m  (_:xs) = unsafeDrop (m - 1) xs
+{-# RULES
+"drop/unstream" forall n s . drop n (unstream s) = unstream (dropS n s)
+"drop/cheapUnstream" forall n s. drop n (cheapUnstream s) = cheapUnstream (dropS n s)
+ #-}
 #endif
 
 -- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of
@@ -1238,6 +2202,11 @@ splitAt n ls
         splitAt' m  (x:xs) = (x:xs', xs'')
           where
             (xs', xs'') = splitAt' (m - 1) xs
+{-# NOINLINE [0] splitAt #-}
+{-# RULES
+"splitAt/unstream" forall n s. splitAt n (unstream s) = splitAtS n s
+"splitAt/cheapUnstream" forall n s. splitAt n (cheapUnstream s) = cheapSplitAtS n s
+ #-}
 #endif /* USE_REPORT_PRELUDE */
 
 -- | 'span', applied to a predicate @p@ and a list @xs@, returns a tuple where
@@ -1394,8 +2363,9 @@ and (x:xs)      =  x && and xs
 {-# NOINLINE [1] and #-}
 
 {-# RULES
-"and/build"     forall (g::forall b.(Bool->b->b)->b->b) .
-                and (build g) = g (&&) True
+"and" and = andS . stream
+-- "and/build"     forall (g::forall b.(Bool->b->b)->b->b) .
+--                 and (build g) = g (&&) True
  #-}
 #endif
 
@@ -1431,8 +2401,9 @@ or (x:xs)       =  x || or xs
 {-# NOINLINE [1] or #-}
 
 {-# RULES
-"or/build"      forall (g::forall b.(Bool->b->b)->b->b) .
-                or (build g) = g (||) False
+"or" or = orS . stream
+-- "or/build"      forall (g::forall b.(Bool->b->b)->b->b) .
+--                 or (build g) = g (||) False
  #-}
 #endif
 
@@ -1468,8 +2439,9 @@ any p (x:xs)    = p x || any p xs
 {-# NOINLINE [1] any #-}
 
 {-# RULES
-"any/build"     forall p (g::forall b.(a->b->b)->b->b) .
-                any p (build g) = g ((||) . p) False
+"any" forall p . any p = anyS p . stream
+-- "any/build"     forall p (g::forall b.(a->b->b)->b->b) .
+--                 any p (build g) = g ((||) . p) False
  #-}
 #endif
 
@@ -1505,8 +2477,9 @@ all p (x:xs)    =  p x && all p xs
 {-# NOINLINE [1] all #-}
 
 {-# RULES
-"all/build"     forall p (g::forall b.(a->b->b)->b->b) .
-                all p (build g) = g ((&&) . p) True
+"all" forall p . all p = allS p . stream
+-- "all/build"     forall p (g::forall b.(a->b->b)->b->b) .
+--                 all p (build g) = g ((&&) . p) True
  #-}
 #endif
 
@@ -1539,8 +2512,9 @@ elem _ []       = False
 elem x (y:ys)   = x==y || elem x ys
 {-# NOINLINE [1] elem #-}
 {-# RULES
-"elem/build"    forall x (g :: forall b . (a -> b -> b) -> b -> b)
-   . elem x (build g) = g (\ y r -> (x == y) || r) False
+"elem" forall x. elem x = elemS x . stream
+-- "elem/build"    forall x (g :: forall b . (a -> b -> b) -> b -> b)
+--    . elem x (build g) = g (\ y r -> (x == y) || r) False
  #-}
 #endif
 
@@ -1570,8 +2544,9 @@ notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
 {-# NOINLINE [1] notElem #-}
 {-# RULES
-"notElem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
-   . notElem x (build g) = g (\ y r -> (x /= y) && r) True
+"notElem" forall x. notElem x = notElemS x . stream
+-- "notElem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
+--    . notElem x (build g) = g (\ y r -> (x /= y) && r) True
  #-}
 #endif
 
@@ -1596,34 +2571,10 @@ lookup  key ((x,y):xys)
     | otherwise         =  lookup key xys
 {-# NOINLINE [1] lookup #-} -- see Note [Fusion for lookup]
 {-# RULES
-"lookup/build" forall x (g :: forall b. ((k, a) -> b -> b) -> b -> b).
-  lookup x (build g) = g (\(k, v) r -> if x == k then Just v else r) Nothing
+"lookup" forall x. lookup x = lookupS x . stream
+-- "lookup/build" forall x (g :: forall b. ((k, a) -> b -> b) -> b -> b).
+--   lookup x (build g) = g (\(k, v) r -> if x == k then Just v else r) Nothing
 #-}
-
--- | Map a function returning a list over a list and concatenate the results.
--- 'concatMap' can be seen as the composition of 'concat' and 'map'.
---
--- > concatMap f xs == (concat . map f) xs
---
--- ==== __Examples__
---
--- >>> concatMap (\i -> [-i,i]) []
--- []
---
--- >>> concatMap (\i -> [-i, i]) [1, 2, 3]
--- [-1,1,-2,2,-3,3]
---
--- >>> concatMap ('replicate' 3) [0, 2, 4]
--- [0,0,0,2,2,2,4,4,4]
-concatMap               :: (a -> [b]) -> [a] -> [b]
-concatMap f             =  foldr ((++) . f) []
-
-{-# NOINLINE [1] concatMap #-}
-
-{-# RULES
-"concatMap" forall f xs . concatMap f xs =
-    build (\c n -> foldr (\x b -> foldr c b (f x)) n xs)
- #-}
 
 
 -- | Concatenate a list of lists.
@@ -1644,8 +2595,9 @@ concat = foldr (++) []
 {-# NOINLINE [1] concat #-}
 
 {-# RULES
-  "concat" forall xs. concat xs =
-     build (\c n -> foldr (\x y -> foldr c y x) n xs)
+"concat" concat = unstream . concatS . stream
+--   "concat" forall xs. concat xs =
+--      build (\c n -> foldr (\x y -> foldr c y x) n xs)
 -- We don't bother to turn non-fusible applications of concat back into concat
  #-}
 
@@ -1694,9 +2646,17 @@ negIndex = error $ prel_list_str ++ "!!: negative index"
 {-# INLINABLE (!!) #-}
 xs !! n
   | n < 0     = negIndex
-  | otherwise = foldr (\x r k -> case k of
-                                   0 -> x
-                                   _ -> r (k-1)) tooLarge xs n
+  | otherwise = unsafeIndexHelper xs n
+
+unsafeIndexHelper :: [a] -> Int -> a
+unsafeIndexHelper [] i = tooLarge i
+unsafeIndexHelper (x:xs) 0 = x
+unsafeIndexHelper (x:xs) n = unsafeIndexHelper xs (n - 1)
+{-# NOINLINE [1] unsafeIndexHelper #-}
+
+{-# RULES
+"unsafeIndexHelper" forall xs. unsafeIndexHelper xs = unsafeIndexHelperS (stream xs)
+ #-}
 #endif
 
 -- | List index (subscript) operator, starting from 0. Returns 'Nothing'
@@ -1724,9 +2684,16 @@ xs !! n
 {-# INLINABLE (!?) #-}
 xs !? n
   | n < 0     = Nothing
-  | otherwise = foldr (\x r k -> case k of
-                                   0 -> Just x
-                                   _ -> r (k-1)) (const Nothing) xs n
+  | otherwise = indexHelper xs n
+
+indexHelper :: [a] -> Int -> Maybe a
+indexHelper [] _ = Nothing
+indexHelper (x:_) 0 = Just x
+indexHelper (_:xs) n = indexHelper xs (n - 1)
+{-# NOINLINE [1] indexHelper #-}
+{-# RULES
+"indexHelper" forall xs n . indexHelper xs n = indexHelperS (stream xs) n
+ #-}
 
 --------------------------------------------------------------
 -- The zip family
@@ -1879,8 +2846,9 @@ zipFB :: ((a, b) -> c -> d) -> a -> b -> c -> d
 zipFB c = \x y r -> (x,y) `c` r
 
 {-# RULES  -- See Note [Fusion for zipN/zipWithN]
-"zip"      [~1] forall xs ys. zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
-"zipList"  [1]  foldr2 (zipFB (:)) []   = zip
+"zip" forall xs ys. zip xs ys = unstream (zipS (stream xs) (stream ys))
+-- "zip"      [~1] forall xs ys. zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
+-- "zipList"  [1]  foldr2 (zipFB (:)) []   = zip
  #-}
 
 ----------------------------------------------
@@ -1900,8 +2868,9 @@ zip3FB :: ((a,b,c) -> xs -> xs') -> a -> b -> c -> xs -> xs'
 zip3FB cons = \a b c r -> (a,b,c) `cons` r
 
 {-# RULES    -- See Note [Fusion for zipN/zipWithN]
-"zip3"       [~1] forall as bs cs. zip3 as bs cs = build (\c n -> foldr3 (zip3FB c) n as bs cs)
-"zip3List"   [1]          foldr3 (zip3FB (:)) [] = zip3
+"zip3" forall xs ys zs . zip3 xs ys zs = unstream (zip3S (stream xs) (stream ys) (stream zs))
+-- "zip3"       [~1] forall as bs cs. zip3 as bs cs = build (\c n -> foldr3 (zip3FB c) n as bs cs)
+-- "zip3List"   [1]          foldr3 (zip3FB (:)) [] = zip3
  #-}
 
 -- The zipWith family generalises the zip family by zipping with the
@@ -1949,8 +2918,9 @@ zipWithFB :: (a -> b -> c) -> (d -> e -> a) -> d -> e -> b -> c
 zipWithFB c f = \x y r -> (x `f` y) `c` r
 
 {-# RULES       -- See Note [Fusion for zipN/zipWithN]
-"zipWith"       [~1] forall f xs ys.    zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
-"zipWithList"   [1]  forall f.  foldr2 (zipWithFB (:) f) [] = zipWith f
+"zipWith" forall f xs ys. zipWith f xs ys = unstream (zipWithS f (stream xs) (stream ys))
+-- "zipWith"       [~1] forall f xs ys.    zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
+-- "zipWithList"   [1]  forall f.  foldr2 (zipWithFB (:) f) [] = zipWith f
   #-}
 
 -- | \(\mathcal{O}(\min(l,m,n))\). The 'zipWith3' function takes a function which combines three
@@ -1981,8 +2951,9 @@ zipWith3FB :: (d -> xs -> xs') -> (a -> b -> c -> d) -> a -> b -> c -> xs -> xs'
 zipWith3FB cons func = \a b c r -> (func a b c) `cons` r
 
 {-# RULES
-"zipWith3"      [~1] forall f as bs cs.   zipWith3 f as bs cs = build (\c n -> foldr3 (zipWith3FB c f) n as bs cs)
-"zipWith3List"  [1]  forall f.   foldr3 (zipWith3FB (:) f) [] = zipWith3 f
+"zipWith3" forall f xs ys zs . zipWith3 f xs ys zs = unstream (zipWith3S f (stream xs) (stream ys) (stream zs))
+-- "zipWith3"      [~1] forall f as bs cs.   zipWith3 f as bs cs = build (\c n -> foldr3 (zipWith3FB c f) n as bs cs)
+-- "zipWith3List"  [1]  forall f.   foldr3 (zipWith3FB (:) f) [] = zipWith3 f
  #-}
 
 -- | 'unzip' transforms a list of pairs into a list of first components

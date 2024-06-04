@@ -48,7 +48,7 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.System.IO.Error
 #endif
 
-import GHC.Internal.Base
+import GHC.Internal.Base hiding (Stream)
 import GHC.Internal.Bits
 import GHC.Internal.Num
 import GHC.Internal.Real

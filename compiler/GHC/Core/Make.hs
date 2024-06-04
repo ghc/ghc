@@ -37,7 +37,7 @@ module GHC.Core.Make (
 
         -- * Constructing list expressions
         mkNilExpr, mkConsExpr, mkListExpr,
-        mkFoldrExpr, mkBuildExpr,
+        mkFoldrExpr, mkBuildExpr, mkConcatMapExpr,
 
         -- * Constructing Maybe expressions
         mkNothingExpr, mkJustExpr,
@@ -795,6 +795,11 @@ mkFoldrExpr elt_ty result_ty c n list = do
            `App` c
            `App` n
            `App` list)
+
+mkConcatMapExpr :: MonadThings m => Type -> Type -> CoreExpr -> CoreExpr -> m CoreExpr
+mkConcatMapExpr src_ty tgt_ty f xs = do
+    concatMap_id <- lookupId concatMapName
+    return (Var concatMap_id `App` Type src_ty `App` Type tgt_ty `App` f `App` xs)
 
 -- | Make a 'build' expression applied to a locally-bound worker function
 mkBuildExpr :: (MonadFail m, MonadThings m, MonadUnique m)

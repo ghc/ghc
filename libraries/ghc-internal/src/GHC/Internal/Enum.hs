@@ -32,6 +32,7 @@ module GHC.Internal.Enum(
    ) where
 
 import GHC.Internal.Base hiding ( many )
+import GHC.Internal.List (eftInt)
 import GHC.Internal.Char
 import GHC.Num.Integer
 import GHC.Internal.Num
@@ -610,15 +611,15 @@ instance  Enum Int  where
 * Phase 0: optionally inline eftInt
 -}
 
-{-# NOINLINE [1] eftInt #-}
-eftInt :: Int# -> Int# -> [Int]
--- [x1..x2]
-eftInt x0 y | isTrue# (x0 ># y) = []
-            | otherwise         = go x0
-               where
-                 go x = I# x : if isTrue# (x ==# y)
-                               then []
-                               else go (x +# 1#)
+-- {-# NOINLINE [1] eftInt #-}
+-- eftInt :: Int# -> Int# -> [Int]
+-- -- [x1..x2]
+-- eftInt x0 y | isTrue# (x0 ># y) = []
+--             | otherwise         = go x0
+--                where
+--                  go x = I# x : if isTrue# (x ==# y)
+--                                then []
+--                                else go (x +# 1#)
 
 {-# INLINE [0] eftIntFB #-} -- See Note [Inline FB functions] in GHC.Internal.List
 eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r

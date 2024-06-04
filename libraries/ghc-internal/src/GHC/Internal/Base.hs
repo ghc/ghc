@@ -346,6 +346,229 @@ infixl 4 <*>, <*, *>, <**>
 
 default ()              -- Double isn't available yet
 
+data Stream a = forall s. Stream (s -> Step s a) !s
+data Step s a = Yield a !s | Skip !s | Done
+
+unstream :: Stream a -> [a]
+unstream (Stream next s0) = go s0 where
+  go !s = case next s of
+    Yield x s' -> x : go s'
+    Skip s' -> go s'
+    Done -> []
+{-# INLINE [1] unstream #-}
+
+-- This changes an unstream into a cheapUnstream, which means GHC will be free
+-- to duplicate the list producing stream.
+cheap :: [a] -> [a]
+cheap x = x
+{-# INLINE [1] cheap #-}
+
+{-# RULES "cheap/unstream" forall x. cheap (unstream x) = cheapUnstream x #-}
+
+cheapUnstream :: Stream a -> [a]
+cheapUnstream (Stream next s0) = go s0 where
+  go !s = case next s of
+    Yield x s' -> x : go s'
+    Skip s' -> go s'
+    Done -> []
+{-# INLINE CONLIKE [1] cheapUnstream #-}
+
+data Lazy a = L a
+
+streamNext :: Lazy [a] -> Step (Lazy [a]) a
+streamNext (L []) = Done
+streamNext (L (x:xs)) = Yield x (L xs)
+
+stream :: [a] -> Stream a
+stream = Stream streamNext . L where
+{-# INLINE [1] stream #-}
+
+{-# RULES
+"unstream/stream" forall xs. unstream (stream xs) = xs
+"cheapUnstream/stream" forall xs. cheapUnstream (stream xs) = xs
+"stream/unstream" forall xs. stream (unstream xs) = xs
+"stream/cheapUnstream" forall xs. stream (cheapUnstream xs) = xs
+"stream/build" forall (f :: forall b. (a -> b -> b) -> b -> b).
+  stream (build f) = Stream streamNext (L (f (:) []))
+  #-}
+
+data AppendState s1 s2 = AS1 !s1 | AS2 !s2
+
+appendS :: Stream a -> Stream a -> Stream a
+appendS (Stream next1 s01) (Stream next2 s02) = Stream next' (AS1 s01) where
+  next' (AS1 s1) =
+    case next1 s1 of
+      Yield x s1' -> Yield x (AS1 s1')
+      Skip s1' -> Skip (AS1 s1')
+      Done -> Skip (AS2 s02)
+  next' (AS2 s2) =
+    case next2 s2 of
+      Yield x s2' -> Yield x (AS2 s2')
+      Skip s2' -> Skip (AS2 s2')
+      Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE appendS #-}
+
+append1S :: Stream a -> [a] -> [a]
+append1S (Stream next s0) xs = go s0 where
+  go !s =
+    case next s of
+      Yield x s' -> x : go s'
+      Skip s' -> go s'
+      Done -> xs
+{-# INLINE [0] append1S #-}
+
+(++) :: [a] -> [a] -> [a]
+(++) []     ys = ys
+(++) (x:xs) ys = x : xs ++ ys
+{-# NOINLINE [1] (++) #-}
+
+-- NOTE: This is quite subtle as we do not want to copy the last list in
+--
+-- xs1 ++ xs2 ++ ... ++ xsn
+--
+-- Indeed, we don't really want to fuse the above at all unless at least
+-- one of the arguments has the form (unstream s) or the result of the
+-- concatenation is streamed. The rules below do precisely that. Note they
+-- really fuse instead of just rewriting things into a fusible form so there
+-- is no need to rewrite back.
+
+{-# RULES
+"++ -> fused on 1st arg" [~1] forall xs ys.
+    unstream xs ++ ys = append1S xs ys
+"++ -> fused on 2nd arg" [~1] forall xs ys.
+    append1S xs (unstream ys) = unstream (appendS xs ys)
+"++ -> fused (1)" [~1] forall xs ys.
+    stream (xs ++ ys) = appendS (stream xs) (stream ys)
+"++ -> fused (2)" [~1] forall xs ys.
+    stream (append1S xs ys) = appendS xs (stream ys)
+
+"++ -> 1st arg empty" forall xs.
+    [] ++ xs = xs
+"++ -> 2nd arg empty" forall xs.
+    xs ++ [] = xs
+"++ / :" forall x xs ys.
+    (x:xs) ++ ys = x : (xs ++ ys)
+ #-}
+
+foldrS :: (a -> b -> b) -> b -> Stream a -> b
+foldrS k z (Stream next s0) = go s0 where
+  go !s =
+    case next s of
+      Yield x s' -> k x (go s')
+      Skip s' -> go s'
+      Done -> z
+{-# INLINE foldrS #-}
+
+foldr :: (a -> b -> b) -> b -> [a] -> b
+foldr k z = foldrS k z . stream
+{-# INLINE foldr #-}
+
+mapS :: (a -> b) -> Stream a -> Stream b
+mapS f (Stream next s0) = Stream next' s0 where
+  next' !s =
+    case next s of
+      Yield x s' -> Yield (f x) s'
+      Skip s' -> Skip s'
+      Done -> Done
+  {-# INLINE next' #-}
+{-# INLINE mapS #-}
+
+map :: (a -> b) -> [a] -> [b]
+map f = unstream . mapS f . stream
+{-# INLINE map #-}
+
+data ConcatMapState s a = ConcatMapState1 !s | forall is. ConcatMapState2 !s (is -> Step is a) !is
+
+concatMapS :: (a -> Stream b) -> Stream a -> Stream b
+concatMapS f (Stream next s0) = Stream next' (ConcatMapState1 s0)
+  where
+    {-# INLINE next' #-}
+    next' (ConcatMapState1 s) = case next s of
+      Done       -> Done
+      Skip    s' -> Skip (ConcatMapState1 s')
+      Yield x s' ->
+        case f x of
+          Stream inext is0 -> Skip (ConcatMapState2 s' inext is0)
+
+    next' (ConcatMapState2 s inext is) = case inext is of
+      Done        -> Skip    (ConcatMapState1 s)
+      Skip    is' -> Skip    (ConcatMapState2 s inext is')
+      Yield x is' -> Yield x (ConcatMapState2 s inext is')
+{-# INLINE [0] concatMapS #-}
+
+-- {-# RULES
+-- "concatMapS/singleton" forall f. concatMapS (\x -> stream [f x]) = mapS f
+-- #-}
+
+data ConcatMap'State s1 a s2 = CM'S1 !s1 | CM'S2 !s1 a !s2
+
+concatMapS' :: (a -> s -> Step s b) -> (a -> s) -> Stream a -> Stream b
+concatMapS' next2 f (Stream next1 s0) = Stream next' (CM'S1 s0)
+  where
+    {-# INLINE next' #-}
+    next' (CM'S1 s) = case next1 s of
+      Done       -> Done
+      Skip    s' -> Skip (CM'S1 s')
+      Yield x s' -> Skip (CM'S2 s' x (f x))
+
+    next' (CM'S2 s a t) = case next2 a t of
+      Done       -> Skip    (CM'S1 s)
+      Skip    t' -> Skip    (CM'S2 s a t')
+      Yield x t' -> Yield x (CM'S2 s a t')
+{-# INLINE concatMapS' #-}
+
+-- data ConcatMap''State s1 a s2 = CM''S1 !s1 | CM''S2 !s1 !s2
+--
+-- concatMapS'' :: (s -> Step s b) -> (a -> s) -> Stream a -> Stream b
+-- concatMapS'' next2 f (Stream next1 s0) = Stream next (CM''S1 s0)
+--   where
+--     {-# INLINE next #-}
+--     next (CM''S1 s) = case next1 s of
+--       Done       -> Done
+--       Skip    s' -> Skip (CM''S1 s')
+--       Yield x s' -> Skip (CM''S2 s' (f x))
+--
+--     next (CM''S2 s t) = case next2 t of
+--       Done       -> Skip    (CM''S1 s)
+--       Skip    t' -> Skip    (CM''S2 s t')
+--       Yield x t' -> Yield x (CM''S2 s t')
+-- {-# INLINE concatMapS'' #-}
+
+-- {-# RULES
+-- "concatMap" forall step f. concatMapS (\x -> Stream (step x) (f x)) = concatMapS' step f
+--   #-}
+
+-- Shouldn't be necessary, because stream gets inlined anyway in phase 1
+-- "concatMap/stream" [1] forall f. concatMapS (\x -> stream (f x)) = concatMapS' (\_ -> streamStep) f
+
+-- | Map a function returning a list over a list and concatenate the results.
+-- 'concatMap' can be seen as the composition of 'concat' and 'map'.
+--
+-- > concatMap f xs == (concat . map f) xs
+--
+-- ==== __Examples__
+--
+-- >>> concatMap (\i -> [-i,i]) []
+-- []
+--
+-- >>> concatMap (\i -> [-i, i]) [1, 2, 3]
+-- [-1,1,-2,2,-3,3]
+--
+-- >>> concatMap ('replicate' 3) [0, 2, 4]
+-- [0,0,0,2,2,2,4,4,4]
+concatMap               :: (a -> [b]) -> [a] -> [b]
+concatMap f             =  foldr ((++) . f) []
+
+{-# NOINLINE [1] concatMap #-}
+
+{-# RULES
+"concatMap" forall f . concatMap f = unstream . concatMapS (stream . f) . stream
+-- "concatMap" forall f xs . concatMap f xs =
+--     build (\c n -> foldr (\x b -> foldr c b (f x)) n xs)
+ #-}
+
+
 {-
 Note [Tracking dependencies on primitives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1780,17 +2003,17 @@ The rest of the prelude list functions are in GHC.List.
 --
 -- > foldr f z [x1, x2, ..., xn] == x1 `f` (x2 `f` ... (xn `f` z)...)
 
-foldr            :: (a -> b -> b) -> b -> [a] -> b
--- foldr _ z []     =  z
--- foldr f z (x:xs) =  f x (foldr f z xs)
-{-# INLINE [0] foldr #-}
--- Inline only in the final stage, after the foldr/cons rule has had a chance
--- Also note that we inline it when it has *two* parameters, which are the
--- ones we are keen about specialising!
-foldr k z = go
-          where
-            go []     = z
-            go (y:ys) = y `k` go ys
+-- foldr            :: (a -> b -> b) -> b -> [a] -> b
+-- -- foldr _ z []     =  z
+-- -- foldr f z (x:xs) =  f x (foldr f z xs)
+-- {-# INLINE [0] foldr #-}
+-- -- Inline only in the final stage, after the foldr/cons rule has had a chance
+-- -- Also note that we inline it when it has *two* parameters, which are the
+-- -- ones we are keen about specialising!
+-- foldr k z = go
+--           where
+--             go []     = z
+--             go (y:ys) = y `k` go ys
 
 -- | A list producer that can be fused with 'foldr'.
 -- This function is merely
@@ -1825,38 +2048,38 @@ augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
 {-# INLINE [1] augment #-}
 augment g xs = g (:) xs
 
-{-# RULES
-"fold/build"    forall k z (g::forall b. (a->b->b) -> b -> b) .
-                foldr k z (build g) = g k z
-
-"foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) .
-                foldr k z (augment g xs) = g k (foldr k z xs)
-
-"foldr/id"                        foldr (:) [] = \x  -> x
-"foldr/app"     [1] forall ys. foldr (:) ys = \xs -> xs ++ ys
-        -- Only activate this from phase 1, because that's
-        -- when we disable the rule that expands (++) into foldr
-
--- The foldr/cons rule looks nice, but it can give disastrously
--- bloated code when compiling
---      array (a,b) [(1,2), (2,2), (3,2), ...very long list... ]
--- i.e. when there are very very long literal lists
--- So I've disabled it for now. We could have special cases
--- for short lists, I suppose.
--- "foldr/cons" forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
-
-"foldr/single"  forall k z x. foldr k z [x] = k x z
-"foldr/nil"     forall k z.   foldr k z []  = z
-
-"foldr/cons/build" forall k z x (g::forall b. (a->b->b) -> b -> b) .
-                           foldr k z (x:build g) = k x (g k z)
-
-"augment/build" forall (g::forall b. (a->b->b) -> b -> b)
-                       (h::forall b. (a->b->b) -> b -> b) .
-                       augment g (build h) = build (\c n -> g c (h c n))
-"augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .
-                        augment g [] = build g
- #-}
+-- {-# RULES
+-- "fold/build"    forall k z (g::forall b. (a->b->b) -> b -> b) .
+--                 foldr k z (build g) = g k z
+--
+-- "foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) .
+--                 foldr k z (augment g xs) = g k (foldr k z xs)
+--
+-- "foldr/id"                        foldr (:) [] = \x  -> x
+-- "foldr/app"     [1] forall ys. foldr (:) ys = \xs -> xs ++ ys
+--         -- Only activate this from phase 1, because that's
+--         -- when we disable the rule that expands (++) into foldr
+--
+-- -- The foldr/cons rule looks nice, but it can give disastrously
+-- -- bloated code when compiling
+-- --      array (a,b) [(1,2), (2,2), (3,2), ...very long list... ]
+-- -- i.e. when there are very very long literal lists
+-- -- So I've disabled it for now. We could have special cases
+-- -- for short lists, I suppose.
+-- -- "foldr/cons" forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
+--
+-- "foldr/single"  forall k z x. foldr k z [x] = k x z
+-- "foldr/nil"     forall k z.   foldr k z []  = z
+--
+-- "foldr/cons/build" forall k z x (g::forall b. (a->b->b) -> b -> b) .
+--                            foldr k z (x:build g) = k x (g k z)
+--
+-- "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
+--                        (h::forall b. (a->b->b) -> b -> b) .
+--                        augment g (build h) = build (\c n -> g c (h c n))
+-- "augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .
+--                         augment g [] = build g
+--  #-}
 
 -- This rule is true, but not (I think) useful:
 --      augment g (augment h t) = augment (\cn -> g c (h c n)) t
@@ -1883,13 +2106,13 @@ augment g xs = g (:) xs
 --
 -- >>> map (\n -> 3 * n + 1) [1, 2, 3]
 -- [4,7,10]
-map :: (a -> b) -> [a] -> [b]
-{-# NOINLINE [0] map #-}
-  -- We want the RULEs "map" and "map/coerce" to fire first.
-  -- map is recursive, so won't inline anyway,
-  -- but saying so is more explicit, and silences warnings
-map _ []     = []
-map f (x:xs) = f x : map f xs
+-- map :: (a -> b) -> [a] -> [b]
+-- {-# NOINLINE [0] map #-}
+--   -- We want the RULEs "map" and "map/coerce" to fire first.
+--   -- map is recursive, so won't inline anyway,
+--   -- but saying so is more explicit, and silences warnings
+-- map _ []     = []
+-- map f (x:xs) = f x : map f xs
 
 -- Note eta expanded
 mapFB ::  (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
@@ -1931,12 +2154,12 @@ The rules for map work like this.
 * Any similarity to the Functor laws for [] is expected.
 -}
 
-{-# RULES
-"map"       [~1] forall f xs.   map f xs                = build (\c n -> foldr (mapFB c f) n xs)
-"mapList"   [1]  forall f.      foldr (mapFB (:) f) []  = map f
-"mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
-"mapFB/id"  forall c.           mapFB c (\x -> x)       = c
-  #-}
+-- {-# RULES
+-- "map"       [~1] forall f xs.   map f xs                = build (\c n -> foldr (mapFB c f) n xs)
+-- "mapList"   [1]  forall f.      foldr (mapFB (:) f) []  = map f
+-- "mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
+-- "mapFB/id"  forall c.           mapFB c (\x -> x)       = c
+--   #-}
 
 -- See Breitner, Eisenberg, Peyton Jones, and Weirich, "Safe Zero-cost
 -- Coercions for Haskell", section 6.5:
@@ -1976,21 +2199,21 @@ The rules for map work like this.
 --
 -- >>> [3, 2, 1] ++ []
 -- [3,2,1]
-(++) :: [a] -> [a] -> [a]
-{-# NOINLINE [2] (++) #-}
-  -- Give time for the RULEs for (++) to fire in InitialPhase
-  -- It's recursive, so won't inline anyway,
-  -- but saying so is more explicit
-(++) []     ys = ys
-(++) (x:xs) ys = x : xs ++ ys
+-- (++) :: [a] -> [a] -> [a]
+-- {-# NOINLINE [2] (++) #-}
+--   -- Give time for the RULEs for (++) to fire in InitialPhase
+--   -- It's recursive, so won't inline anyway,
+--   -- but saying so is more explicit
+-- (++) []     ys = ys
+-- (++) (x:xs) ys = x : xs ++ ys
 
-{-# RULES
-"++/literal"      forall x. (++) (unpackCString# x)     = unpackAppendCString# x
-"++/literal_utf8" forall x. (++) (unpackCStringUtf8# x) = unpackAppendCStringUtf8# x #-}
-
-{-# RULES
-"++"    [~1] forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
-  #-}
+-- {-# RULES
+-- "++/literal"      forall x. (++) (unpackCString# x)     = unpackAppendCString# x
+-- "++/literal_utf8" forall x. (++) (unpackCStringUtf8# x) = unpackAppendCStringUtf8# x #-}
+--
+-- {-# RULES
+-- "++"    [~1] forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
+--   #-}
 
 
 -- |'otherwise' is defined as the value 'True'.  It helps to make
@@ -2512,20 +2735,20 @@ iShiftRL# :: Int# -> Int# -> Int#
 a `iShiftRL#` b = (a `uncheckedIShiftRL#` b) `andI#` shift_mask WORD_SIZE_IN_BITS# b
 
 -- Rules for C strings (the functions themselves are now in GHC.CString)
-{-# RULES
-"unpack"       [~1] forall a   . unpackCString# a             = build (unpackFoldrCString# a)
-"unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
-"unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
-"unpack-append-nil" forall a   . unpackAppendCString# a []    = unpackCString# a
-
-"unpack-utf8"       [~1] forall a   . unpackCStringUtf8# a             = build (unpackFoldrCStringUtf8# a)
-"unpack-list-utf8"  [1]  forall a   . unpackFoldrCStringUtf8# a (:) [] = unpackCStringUtf8# a
-"unpack-append-utf8"     forall a n . unpackFoldrCStringUtf8# a (:) n  = unpackAppendCStringUtf8# a n
-"unpack-append-nil-utf8" forall a   . unpackAppendCStringUtf8# a []    = unpackCStringUtf8# a
-
--- There's a built-in rule (in GHC.Core.Op.ConstantFold) for
---      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
-
--- See also the Note [String literals in GHC] in CString.hs
-
-  #-}
+-- {-# RULES
+-- "unpack"       [~1] forall a   . unpackCString# a             = build (unpackFoldrCString# a)
+-- "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
+-- "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
+-- "unpack-append-nil" forall a   . unpackAppendCString# a []    = unpackCString# a
+--
+-- "unpack-utf8"       [~1] forall a   . unpackCStringUtf8# a             = build (unpackFoldrCStringUtf8# a)
+-- "unpack-list-utf8"  [1]  forall a   . unpackFoldrCStringUtf8# a (:) [] = unpackCStringUtf8# a
+-- "unpack-append-utf8"     forall a n . unpackFoldrCStringUtf8# a (:) n  = unpackAppendCStringUtf8# a n
+-- "unpack-append-nil-utf8" forall a   . unpackAppendCStringUtf8# a []    = unpackCStringUtf8# a
+--
+-- -- There's a built-in rule (in GHC.Core.Op.ConstantFold) for
+-- --      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
+--
+-- -- See also the Note [String literals in GHC] in CString.hs
+--
+--   #-}

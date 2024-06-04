@@ -356,6 +356,7 @@ basicKnownKeyNames
         -- List operations
         concatName, filterName, mapName,
         zipName, foldrName, buildName, augmentName, appendName,
+        concatMapName,
 
         -- FFI primitive types that are not wired-in.
         stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
@@ -746,13 +747,14 @@ map_RDR, append_RDR :: RdrName
 map_RDR                 = nameRdrName mapName
 append_RDR              = nameRdrName appendName
 
-foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR
+foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR, concatMap_RDR
     :: RdrName
 foldr_RDR               = nameRdrName foldrName
 build_RDR               = nameRdrName buildName
 returnM_RDR             = nameRdrName returnMName
 bindM_RDR               = nameRdrName bindMName
 failM_RDR               = nameRdrName failMName
+concatMap_RDR           = nameRdrName concatMapName
 
 left_RDR, right_RDR :: RdrName
 left_RDR                = nameRdrName leftDataConName
@@ -1123,7 +1125,7 @@ considerAccessibleName = varQual gHC_INTERNAL_EXTS (fsLit "considerAccessible") 
 
 -- Random GHC.Internal.Base functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
-    mapName, appendName, assertName,
+    mapName, concatMapName, appendName, assertName,
     dollarName :: Name
 dollarName        = varQual gHC_INTERNAL_BASE (fsLit "$")          dollarIdKey
 otherwiseIdName   = varQual gHC_INTERNAL_BASE (fsLit "otherwise")  otherwiseIdKey
@@ -1131,6 +1133,7 @@ foldrName         = varQual gHC_INTERNAL_BASE (fsLit "foldr")      foldrIdKey
 buildName         = varQual gHC_INTERNAL_BASE (fsLit "build")      buildIdKey
 augmentName       = varQual gHC_INTERNAL_BASE (fsLit "augment")    augmentIdKey
 mapName           = varQual gHC_INTERNAL_BASE (fsLit "map")        mapIdKey
+concatMapName     = varQual gHC_INTERNAL_BASE (fsLit "concatMap")  concatMapIdKey
 appendName        = varQual gHC_INTERNAL_BASE (fsLit "++")         appendIdKey
 assertName        = varQual gHC_INTERNAL_BASE (fsLit "assert")     assertIdKey
 fromStringName    = varQual gHC_INTERNAL_DATA_STRING (fsLit "fromString") fromStringClassOpKey
@@ -2375,6 +2378,9 @@ assertIdKey                   = mkPreludeMiscIdUnique 44
 leftSectionKey, rightSectionKey :: Unique
 leftSectionKey                = mkPreludeMiscIdUnique 45
 rightSectionKey               = mkPreludeMiscIdUnique 46
+
+concatMapIdKey :: Unique
+concatMapIdKey                = mkPreludeMiscIdUnique 47
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101

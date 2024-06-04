@@ -56,7 +56,7 @@ import GHC.Core.Ppr       ( pprRules )
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Core.Type as Type
    ( Type, extendTvSubst, extendCvSubst
-   , substTy, getTyVar_maybe )
+   , substTy, getTyVar_maybe, tyCoVarsOfType )
 import GHC.Core.TyCo.Ppr( pprParendType )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
@@ -696,12 +696,16 @@ matchRule opts rule_env _is_active fn args _rough_args
         Nothing   -> Nothing
         Just expr -> Just expr
 
-matchRule _ rule_env is_active _ args rough_args
+matchRule _ rule_env is_active _fn args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
                 , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
   | not (is_active act)               = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
-  | otherwise = matchN rule_env rule_name tpl_vars tpl_args args rhs
+  | otherwise =
+      case matchN rule_env rule_name tpl_vars tpl_args args rhs of
+        Just x -> -- pprTrace "match found:" (ppr rule_name <+> ppr _fn <+> ppr args) True
+                    Just x
+        Nothing -> Nothing
 
 
 ---------------------------------------
@@ -1046,9 +1050,9 @@ tryFloatIn :: CoreExpr -> Maybe CoreExpr
 tryFloatIn = go emptyVarSet False id where
   go vs _ c (Let bind e) = go (extendVarSetList vs (bindersOf bind)) True (c . Let bind) e
   go vs _ c (Case scrut case_bndr ty [Alt con alt_bndrs rhs]) = go (extendVarSetList vs alt_bndrs) True (c . (\x -> Case scrut case_bndr (exprType x) [Alt con alt_bndrs x])) rhs
-  go vs True c (App e1 e2) = App <$> go vs True c e1 <*> pure (c e2)
-  go vs True c e@(Var v) | not (v `elemVarSet` vs) = Just e
-  go vs True _ e@Type{} = Just e
+  go vs True c (App e1 e2) = App <$> go vs True c e1 <*> Just (c e2)
+  go vs True _ e@(Var v) | not (v `elemVarSet` vs) = Just e
+  go vs True _ e@(Type ty) | isEmptyVarSet (tyCoVarsOfType ty `intersectVarSet` vs) = Just e
   go vs True _ e@Lit{} = Just e
   go _ _ _ _ = Nothing
 

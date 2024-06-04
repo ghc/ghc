@@ -61,7 +61,7 @@ dsListComp lquals res_ty = do
        || isParallelComp quals
        -- Foldr-style desugaring can't handle parallel list comprehensions
         then deListComp quals (mkNilExpr elt_ty)
-        else mkBuildExpr elt_ty (\(c, _) (n, _) -> dfListComp c n quals)
+        else dfListComp elt_ty quals
              -- Foldr/build should be enabled, so desugar
              -- into foldrs and builds
 
@@ -305,78 +305,73 @@ deBindComp pat core_list1 quals core_list2 = do
 @dfListComp@ are the rules used with foldr/build turned on:
 
 \begin{verbatim}
-TE[ e | ]            c n = c e n
-TE[ e | b , q ]      c n = if b then TE[ e | q ] c n else n
-TE[ e | p <- l , q ] c n = let
-                                f = \ x b -> case x of
-                                                  p -> TE[ e | q ] c b
-                                                  _ -> b
-                           in
-                           foldr f n l
+TE[ e | ] = [e]
+TE[ e | b , q ] = if b then TE[ e | q ] else []
+TE[ e | p <- l , q ] = concatMap (\x -> case x of
+                                             p -> TE[ e | q ]
+                                             _ -> []) l
 \end{verbatim}
 -}
 
-dfListComp :: Id -> Id            -- 'c' and 'n'
+dfListComp :: Type -- element type
            -> [ExprStmt GhcTc]    -- the rest of the qual's
            -> DsM CoreExpr
 
-dfListComp _ _ [] = panic "dfListComp"
+dfListComp _ [] = panic "dfListComp"
 
-dfListComp c_id n_id (LastStmt _ body _ _ : quals)
+dfListComp elt_ty (LastStmt _ body _ _ : quals)
   = assert (null quals) $
     do { core_body <- dsLExpr body
-       ; return (mkApps (Var c_id) [core_body, Var n_id]) }
+       ; return (mkListExpr elt_ty [core_body]) }
 
         -- Non-last: must be a guard
-dfListComp c_id n_id (BodyStmt _ guard _ _  : quals) = do
+dfListComp elt_ty (BodyStmt _ guard _ _  : quals) = do
     core_guard <- dsLExpr guard
-    core_rest <- dfListComp c_id n_id quals
-    return (mkIfThenElse core_guard core_rest (Var n_id))
+    core_rest <- dfListComp elt_ty quals
+    return (mkIfThenElse core_guard core_rest (mkListExpr elt_ty []))
 
-dfListComp c_id n_id (LetStmt _ binds : quals) = do
+dfListComp elt_ty (LetStmt _ binds : quals) = do
     -- new in 1.3, local bindings
-    core_rest <- dfListComp c_id n_id quals
+    core_rest <- dfListComp elt_ty quals
     dsLocalBinds binds core_rest
 
-dfListComp c_id n_id (stmt@(TransStmt {}) : quals) = do
+dfListComp elt_ty (stmt@(TransStmt {}) : quals) = do
     (inner_list_expr, pat) <- dsTransStmt stmt
     -- Anyway, we bind the newly grouped list via the generic binding function
-    dfBindComp c_id n_id (pat, inner_list_expr) quals
+    dfBindComp elt_ty (pat, inner_list_expr) quals
 
-dfListComp c_id n_id (BindStmt _ pat list1 : quals) = do
+dfListComp elt_ty (BindStmt _ pat list1 : quals) = do
     -- evaluate the two lists
     core_list1 <- dsLExpr list1
 
     -- Do the rest of the work in the generic binding builder
-    dfBindComp c_id n_id (pat, core_list1) quals
+    dfBindComp elt_ty (pat, core_list1) quals
 
-dfListComp _ _ (ParStmt {} : _) = panic "dfListComp ParStmt"
-dfListComp _ _ (RecStmt {} : _) = panic "dfListComp RecStmt"
-dfListComp _ _ (XStmtLR ApplicativeStmt {} : _) =
+dfListComp _ (ParStmt {} : _) = panic "dfListComp ParStmt"
+dfListComp _ (RecStmt {} : _) = panic "dfListComp RecStmt"
+dfListComp _ (XStmtLR ApplicativeStmt {} : _) =
   panic "dfListComp ApplicativeStmt"
 
-dfBindComp :: Id -> Id             -- 'c' and 'n'
+dfBindComp :: Type -- element type
            -> (LPat GhcTc, CoreExpr)
            -> [ExprStmt GhcTc]     -- the rest of the qual's
            -> DsM CoreExpr
-dfBindComp c_id n_id (pat, core_list1) quals = do
+dfBindComp elt_ty (pat, core_list1) quals = do
     -- find the required type
     let x_ty   = hsLPatType pat
-    let b_ty   = idType n_id
 
     -- create some new local id's
-    b <- newSysLocalDs ManyTy b_ty
     x <- newSysLocalDs ManyTy x_ty
 
     -- build rest of the comprehension
-    core_rest <- dfListComp c_id b quals
+    core_rest <- dfListComp elt_ty quals
 
     -- build the pattern match
     core_expr <- matchSimply (Var x) (StmtCtxt (HsDoStmt ListComp)) ManyTy
-                pat core_rest (Var b)
+                pat core_rest (mkListExpr elt_ty [])
 
     -- now build the outermost foldr, and return
-    mkFoldrExpr x_ty b_ty (mkLams [x, b] core_expr) (Var n_id) core_list1
+    mkConcatMapExpr x_ty elt_ty (mkLams [x] core_expr) core_list1
 
 {-
 ************************************************************************

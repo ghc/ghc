@@ -64,7 +64,7 @@ import GHC.Internal.Arr  ( Array(..), elems, numElements,
                   foldlElems, foldrElems,
                   foldlElems', foldrElems',
                   foldl1Elems, foldr1Elems)
-import GHC.Internal.Base hiding ( foldr )
+import GHC.Internal.Base hiding ( foldr , concatMap )
 import GHC.Internal.Generics
 import GHC.Tuple (Solo (..))
 import GHC.Internal.Num  ( Num(..) )

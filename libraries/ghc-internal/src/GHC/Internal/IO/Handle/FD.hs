@@ -25,7 +25,7 @@ module GHC.Internal.IO.Handle.FD (
   mkHandleFromFD, fdToHandle, fdToHandle', handleToFd
  ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base hiding (Stream)
 import GHC.Internal.Show
 import GHC.Internal.Control.Exception (try)
 import GHC.Internal.Data.Maybe
