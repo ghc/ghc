@@ -69,6 +69,10 @@ Compiler
   and treat it as ``ccall``. All C import/export declarations on
   Windows should now use ``ccall``.
 
+- 32-bit macOS/iOS support has also been completely removed (`#24921
+  <https://gitlab.haskell.org/ghc/ghc/-/issues/24921>`_). This does
+  not affect existing support of apple systems on x86_64/aarch64.
+
 GHCi
 ~~~~
 
