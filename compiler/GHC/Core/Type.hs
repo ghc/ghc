@@ -185,7 +185,7 @@ module GHC.Core.Type (
         seqType, seqTypes,
 
         -- * Other views onto Types
-        coreView, coreFullView, rewriterView,
+        coreView, coreFullView, rewriterView, unfoldView,
 
         tyConsOfType,
 
@@ -360,6 +360,11 @@ import GHC.Data.Maybe   ( orElse, isJust, firstJust )
 ************************************************************************
 -}
 
+unfoldView :: Type -> Maybe Type
+{-# INLINE unfoldView #-}
+unfoldView (TyVarTy tv) = tyVarUnfolding tv
+unfoldView _ = Nothing
+
 rewriterView :: Type -> Maybe Type
 -- Unwrap a type synonym only when either:
 --   The type synonym is forgetful, or
@@ -370,6 +375,7 @@ rewriterView (TyConApp tc tys)
   | isTypeSynonymTyCon tc
   , isForgetfulSynTyCon tc || not (isFamFreeTyCon tc)
   = expandSynTyConApp_maybe tc tys
+rewriterView (TyVarTy tv) = tyVarUnfolding tv
 rewriterView _other
   = Nothing
 
@@ -383,6 +389,7 @@ coreView :: Type -> Maybe Type
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView (TyConApp tc tys) = expandSynTyConApp_maybe tc tys
+coreView (TyVarTy tv)      = tyVarUnfolding tv
 coreView _                 = Nothing
 -- See Note [Inlining coreView].
 {-# INLINE coreView #-}
@@ -394,6 +401,8 @@ coreFullView, core_full_view :: Type -> Type
 -- See Note [Inlining coreView].
 coreFullView ty@(TyConApp tc _)
   | isTypeSynonymTyCon tc = core_full_view ty
+coreFullView (TyVarTy tv)
+  | Just ty <- tyVarUnfolding tv = core_full_view ty
 coreFullView ty = ty
 {-# INLINE coreFullView #-}
 
@@ -2718,6 +2727,9 @@ sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 --
 -- This is a "hot" function.  Do not call splitTyConApp_maybe here,
 -- to avoid the faff with FunTy
+sORTKind_maybe ty
+  | Just ty <- unfoldView ty
+  = sORTKind_maybe ty
 sORTKind_maybe (TyConApp tc tys)
   -- First, short-cuts for Type and Constraint that do no allocation
   | tc_uniq == liftedTypeKindTyConKey = assert( null tys ) $ Just (TypeLike,       liftedRepTy)
@@ -2866,7 +2878,9 @@ isConcreteTypeWith :: TyVarSet -> Type -> Bool
 -- to concrete types
 isConcreteTypeWith conc_tvs = go
   where
-    go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
+    go (TyVarTy tv)
+      | Just ty <- tyVarUnfolding tv = go ty
+      | otherwise                    = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
     go (AppTy ty1 ty2)     = go ty1 && go ty2
     go (TyConApp tc tys)   = go_tc tc tys
     go ForAllTy{}          = False
