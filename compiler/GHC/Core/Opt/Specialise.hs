@@ -783,10 +783,10 @@ specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
              local_rule_base = extendRuleBaseList emptyRuleBase rules_for_locals
              final_binds
                | null spec_binds = wrapDictBinds dict_binds []
-               | otherwise       = [Rec $ mapFst (addRulesToId local_rule_base) $
-                                          flattenBinds                          $
-                                          wrapDictBinds dict_binds              $
-                                          spec_binds]
+               | otherwise       = glomValBinds $
+                                   wrapDictBinds dict_binds                          $
+                                   map (mapBindBndrs (addRulesToId local_rule_base)) $
+                                   spec_binds
 
        ; return (rules_for_imps, final_binds)
     }
@@ -1188,22 +1188,25 @@ specVar env@(SE { se_subst = Core.Subst in_scope ids _ _ }) v
   --           probably has little effect, but it's the right thing.
   --           We need zapSubst because `e` is an OutExpr
 
-specExpr :: SpecEnv -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
+specExpr, specExpr' :: SpecEnv -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 
 ---------------- First the easy cases --------------------
-specExpr env (Var v)       = specVar env v
-specExpr env (Type ty)     = return (Type     (substTy env ty), emptyUDs)
-specExpr env (Coercion co) = return (Coercion (substCo env co), emptyUDs)
-specExpr _   (Lit lit)     = return (Lit lit,                   emptyUDs)
-specExpr env (Cast e co)
+specExpr env e = -- pprTrace "specExpr" (ppr e) $
+                 specExpr' env e
+
+specExpr' env (Var v)       = specVar env v
+specExpr' env (Type ty)     = return (Type     (substTy env ty), emptyUDs)
+specExpr' env (Coercion co) = return (Coercion (substCo env co), emptyUDs)
+specExpr' _   (Lit lit)     = return (Lit lit,                   emptyUDs)
+specExpr' env (Cast e co)
   = do { (e', uds) <- specExpr env e
        ; return ((mkCast e' (substCo env co)), uds) }
-specExpr env (Tick tickish body)
+specExpr' env (Tick tickish body)
   = do { (body', uds) <- specExpr env body
        ; return (Tick (specTickish env tickish) body', uds) }
 
 ---------------- Applications might generate a call instance --------------------
-specExpr env expr@(App {})
+specExpr' env expr@(App {})
   = do { let (fun_in, args_in) = collectArgs expr
        ; (args_out, uds_args) <- mapAndCombineSM (specExpr env) args_in
        ; let env_args = env `bringFloatedDictsIntoScope` ud_binds uds_args
@@ -1215,7 +1218,7 @@ specExpr env expr@(App {})
        ; return (fun_out' `mkApps` args_out', uds_fun `thenUDs` uds_call `thenUDs` uds_args) }
 
 ---------------- Lambda/case require dumping of usage details --------------------
-specExpr env e@(Lam {})
+specExpr' env e@(Lam {})
   = specLam env' bndrs' body
   where
     (bndrs, body)  = collectBinders e
@@ -1223,7 +1226,7 @@ specExpr env e@(Lam {})
         -- More efficient to collect a group of binders together all at once
         -- and we don't want to split a lambda group with dumped bindings
 
-specExpr env (Case scrut case_bndr ty alts)
+specExpr' env (Case scrut case_bndr ty alts)
   = do { (scrut', scrut_uds) <- specExpr env scrut
        ; (scrut'', case_bndr', alts', alts_uds)
              <- specCase env scrut' case_bndr alts
@@ -1236,7 +1239,7 @@ specExpr env (Case scrut case_bndr ty alts)
                 , scrut_uds `thenUDs` alts_uds) }
 
 ---------------- Finally, let is the interesting case --------------------
-specExpr env (Let bind body)
+specExpr' env (Let bind body)
   = do { (binds', body', uds) <- specBind NotTopLevel env bind $ \body_env ->
                                  -- pprTrace "specExpr:let" (ppr (se_subst body_env) $$ ppr body) $
                                  specExpr body_env body
@@ -1415,9 +1418,27 @@ specBind :: TopLevelFlag
          -> SpecM ( [OutBind]           -- New bindings
                   , body                -- Body
                   , UsageDetails)       -- And info to pass upstream
-
 -- Returned UsageDetails:
 --    No calls for binders of this bind
+
+specBind top_lvl env (NonRec tv (Type rhs_ty)) do_body
+  = assertPpr (isTyVar tv) (ppr tv) $
+    do { (body_env, tv') <- case top_lvl of
+                               TopLevel    -> return (env, tv)
+                               NotTopLevel -> cloneBndrSM env tv
+
+       ; (body', body_uds) <- do_body body_env
+
+       ; let rhs_ty' = substTy env rhs_ty
+             bind' = NonRec tv' (Type rhs_ty')
+             (free_uds, dump_dbs, float_all) = dumpBindUDs [tv'] body_uds
+             final_binds = mkDB bind' : fromOL dump_dbs
+
+       ; if float_all then
+              return ([], body', free_uds `snocDictBinds` final_binds)
+         else
+              return (map db_bind final_binds, body', free_uds) }
+
 specBind top_lvl env (NonRec fn rhs) do_body
   = do { (rhs', rhs_uds) <- specExpr env rhs
 
@@ -3310,16 +3331,20 @@ bind_fvs (Rec prs)         = rhs_fvs `delVarSetList` (map fst prs)
                            where
                              rhs_fvs = unionVarSets (map pair_fvs prs)
 
-pair_fvs :: (Id, CoreExpr) -> VarSet
-pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
-                       `unionVarSet` idFreeVars bndr
-        -- idFreeVars: don't forget variables mentioned in
+pair_fvs :: (Var, CoreExpr) -> VarSet
+pair_fvs (bndr, rhs) = bndr_fvs `unionVarSet` rhs_fvs
+  where
+    bndr_fvs | isTyVar bndr = tyCoVarsOfType (tyVarKind bndr)
+             | otherwise    = idFreeVars bndr
+        -- bndr_fvs: don't forget variables mentioned in
         -- the rules of the bndr.  C.f. OccAnal.addRuleUsage
         -- Also tyvars mentioned in its type; they may not appear
         -- in the RHS
         --      type T a = Int
         --      x :: T a = 3
-  where
+
+    rhs_fvs = exprSomeFreeVars interesting rhs
+
     interesting :: InterestingVarFun
     interesting v = isLocalVar v || (isId v && isDFunId v)
         -- Very important: include DFunIds /even/ if it is imported
@@ -3572,8 +3597,8 @@ cloneBndrSM :: SpecEnv -> Id -> SpecM (SpecEnv, Id)
 -- Return the substitution to use for RHSs, and the one to use for the body
 -- Discards non-Stable unfoldings
 cloneBndrSM env@(SE { se_subst = subst }) bndr
-  = do { us <- getUniqueSupplyM
-       ; let (subst', bndr') = Core.cloneIdBndr subst us bndr
+  = do { uniq <- getUniqueM
+       ; let (subst', bndr') = Core.cloneBndr subst uniq bndr
        ; return (env { se_subst = subst' }, bndr') }
 
 cloneRecBndrsSM :: SpecEnv -> [Id] -> SpecM (SpecEnv, [Id])
