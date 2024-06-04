@@ -32,7 +32,7 @@ import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs
 import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
-import GHC.Types.Var      ( isNonCoVarId )
+import GHC.Types.Var      ( isNonCoVarId, tyVarUnfolding, setTyVarUnfolding )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
@@ -438,6 +438,29 @@ simple_opt_bind env (Rec prs) top_level
          (env', mb_pr) = simple_bind_pair env b (Just b') (env,r) top_level
 
 ----------------------
+simple_bind_type :: SimpleOptEnv
+                 -> InTyVar -> Maybe OutTyVar
+                 -> (SimpleOptEnv, InType)
+                 -> (SimpleOptEnv, Maybe (OutTyVar, OutType))
+simple_bind_type env@(SOE { soe_subst = subst })
+                 in_bndr mb_out_bndr (rhs_env, in_rhs)
+  | Just in_tyvar <- getTyVar_maybe in_rhs
+  , Just unf <- tyVarUnfolding in_tyvar
+  , let out_unf = substTyUnchecked (soe_subst rhs_env) unf
+  , isAtomicTy out_unf
+  = {- pprTrace "simple_bind_type" (ppr in_tyvar) $ -}
+    (env { soe_subst = extendTvSubst subst in_bndr out_unf }, Nothing)
+
+  | otherwise
+  = let
+      out_ty = substTyUnchecked (soe_subst rhs_env) in_rhs
+      (env', bndr1) = case mb_out_bndr of
+                        Just out_bndr -> (env, out_bndr)
+                        Nothing       -> subst_opt_bndr env in_bndr
+      out_bndr = setTyVarUnfolding bndr1 out_ty
+    in (env', Just (out_bndr, out_ty))
+
+----------------------
 simple_bind_pair :: SimpleOptEnv
                  -> InVar -> Maybe OutVar
                  -> SimpleClo
@@ -449,10 +472,15 @@ simple_bind_pair :: SimpleOptEnv
 simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
                  top_level
-  | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
-  , let out_ty = substTyUnchecked (soe_subst rhs_env) ty
-  = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr in_rhs) $
-    (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
+  | Type in_ty <- in_rhs        -- let a::* = TYPE ty in <body>
+  = let
+      (env', mb_out_bind_type) = simple_bind_type env in_bndr mb_out_bndr (rhs_env, in_ty)
+    in
+      case mb_out_bind_type of
+        Just (out_bndr, out_ty)
+          | isAtomicTy out_ty -> (env' { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
+          | otherwise         -> (env', Just (out_bndr, Type out_ty))
+        Nothing -> (env', Nothing)
 
   | Coercion co <- in_rhs
   , let out_co = optCoercion (so_co_opts (soe_opts env)) (soe_subst rhs_env) co
@@ -523,8 +551,8 @@ simple_out_bind :: TopLevelFlag
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind top_level env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
   | Type out_ty <- out_rhs
-  = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr out_ty $$ ppr out_rhs)
-    (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
+  = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr out_ty $$ ppr out_rhs) $
+    (env, Just (in_bndr `setTyVarUnfolding` out_ty, out_rhs))
 
   | Coercion out_co <- out_rhs
   = assert (isCoVar in_bndr)
