@@ -1582,6 +1582,8 @@ whenever possible. See Note [Using synonyms to compress types] in
 GHC.Core.Type for details.
 
 c.f. Note [Comparing type synonyms] in GHC.Core.TyCo.Compare
+ and Note [Comparing type variables] in GHC.Core.TyCo.Compare
+
 -}
 
 -------------- unify_ty: the main workhorse -----------
@@ -1606,9 +1608,20 @@ unify_ty :: UMEnv
 -- See Note [Specification of unification]
 -- Respects newtypes, PredTypes
 -- See Note [Computing equality on types] in GHC.Core.Type
-unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
+
+unify_ty env (TyConApp tc1 tys1) (TyConApp tc2 tys2) _kco
   -- See Note [Unifying type synonyms]
   | tc1 == tc2
+  , not (isForgetfulSynTyCon tc1)
+  , isFamFreeTyCon tc1
+  = unify_tc_app env tc1 tys1 tys2
+
+unify_ty env (TyVarTy tv1) (TyVarTy tv2) _kco
+  -- When unifying a=a, succeeds, regardless of a's (perhaps large)
+  -- unfolding. But only when unifying!  When matching these are
+  -- unrelated variables. See Note [Comparing type variables]
+  -- in GHC.Core.TyCo.Compare
+  | um_unif env, tv1 == tv2
   = return ()
 
 unify_ty env ty1 ty2 kco

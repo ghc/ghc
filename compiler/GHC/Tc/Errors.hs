@@ -63,7 +63,7 @@ import GHC.Core.Class (className)
 import GHC.Core.ConLike (isExistentialRecordField, ConLike (..))
 import GHC.Core.Coercion
 import GHC.Core.DataCon
-import GHC.Core.TyCo.Ppr  ( pprTyVars )
+import GHC.Core.TyCo.Ppr  ( pprTyVarsWithKind )
 import GHC.Core.TyCo.Tidy
 
 import GHC.Core.InstEnv
@@ -245,7 +245,7 @@ report_unsolved type_errors expr_holes
              bound_occs = boundOccNamesOfWC wanted
 
        ; traceTc "reportUnsolved (after zonking):" $
-         vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
+         vcat [ text "Free tyvars:" <+> pprTyVarsWithKind free_tvs
               , text "Bound occs:" <+> ppr bound_occs
               , text "Tidy env:" <+> ppr tidy_env
               , text "Wanted:" <+> ppr wanted ]
@@ -361,8 +361,8 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
   | otherwise
   = do { traceTc "reportImplic" $ vcat
            [ text "tidy env:"   <+> ppr (cec_tidy ctxt)
-           , text "skols:     " <+> pprTyVars tvs
-           , text "tidy skols:" <+> pprTyVars tvs' ]
+           , text "skols:     " <+> pprTyVarsWithKind tvs
+           , text "tidy skols:" <+> pprTyVarsWithKind tvs' ]
 
        ; when bad_telescope $ reportBadTelescope ctxt ct_loc_env info tvs
                -- Do /not/ use the tidied tvs because then are in the

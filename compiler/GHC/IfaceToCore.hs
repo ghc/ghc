@@ -722,6 +722,11 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
         ; info <- tcIdInfo ignore_prags TopLevel name ty info
         ; return (AnId (mkGlobalId details name ty info)) }
 
+tc_iface_decl _ _ (IfaceTv {ifName = name, ifTvKind = if_kind, ifTvUnf = if_type })
+  = do { kind   <- tcIfaceType if_kind
+       ; unf_ty <- forkM (text "IfaceTv" <+> ppr name) $ tcIfaceType if_type
+       ; return (ATyVar (mkTyVarWithUnfolding name kind unf_ty)) }
+
 tc_iface_decl _ _
   (IfaceData {ifName = tc_name,
               ifKind = kind,
@@ -1509,6 +1514,7 @@ tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
     go (IfaceTyVar n)            = TyVarTy <$> tcIfaceTyVar n
+    go (IfaceExtTyVar n)         = TyVarTy <$> tcIfaceExtTyVar n
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
@@ -1689,10 +1695,13 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     let
         scrut_ty   = exprType scrut'
         case_mult  = ManyTy
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name case_mult scrut_ty
-     -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
-     -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
-        tc_app     = splitTyConApp scrut_ty
+
+        case_bndr' = mkLocalId case_bndr_name case_mult scrut_ty
+           -- NB: case_bndr can be a CoVar, since a coercion can be a scrutinee
+           --  with -fdefer-type-errors (e.g. see test T15695).
+           -- Ticket #17291 covers fixing this problem.
+
+        tc_app = splitTyConApp scrut_ty
                 -- NB: Won't always succeed (polymorphic case)
                 --     but won't be demanded in those cases
                 -- NB: not tcSplitTyConApp; we are looking at Core here
@@ -1714,6 +1723,17 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
         ; return (Let (NonRec id rhs') body') }
 
+tcIfaceExpr (IfaceLet (IfaceNonRec (IfTypeLetBndr fs ki) rhs) body)
+  | IfaceType ty <- rhs
+  = do  { name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
+        ; ki'  <- tcIfaceType ki
+        ; ty'  <- tcIfaceType ty
+        ; let tv = mkTyVarWithUnfolding name ki' ty'
+        ; body' <- extendIfaceTyVarEnv [tv] (tcIfaceExpr body)
+        ; return (Let (NonRec tv (Type ty')) body') }
+  | otherwise
+  = pprPanic "tcIfaceExpr:IfaceTypeLet" (ppr rhs)
+
 tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
   = do { ids <- mapM tc_rec_bndr (map fst pairs)
        ; extendIfaceIdEnv ids $ do
@@ -1725,11 +1745,16 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
      = do { name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
           ; ty'  <- tcIfaceType ty
           ; return (mkLocalId name ManyTy ty' `asJoinId_maybe` ji) }
+   tc_rec_bndr (IfTypeLetBndr fs ki)
+     = pprPanic "tcIfaceExpr" (char '@' <> ppr fs <+> dcolon <+> ppr ki)
+
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                                 NotTopLevel (idName id) (idType id) info
           ; return (setIdInfo id id_info, rhs') }
+   tc_pair (IfTypeLetBndr fs ki, ty) tv
+     = pprPanic "tcIfaceExpr" (char '@' <> ppr fs <+> dcolon <+> ppr ki $$ ppr ty $$ ppr tv)
 
 tcIfaceExpr (IfaceTick tickish expr) = do
     expr' <- tcIfaceExpr expr
@@ -2134,6 +2159,13 @@ tcIfaceGlobal name
 -- the constructor (A and B) means that GHC will always typecheck
 -- this expression *after* typechecking T.
 
+tcIfaceExtTyVar :: Name -> IfL TyVar
+tcIfaceExtTyVar name
+  = do { thing <- tcIfaceGlobal name
+       ; case thing of
+           ATyVar tv -> return tv
+           _ -> pprPanic "tcIfaceExtTyVar" (ppr thing) }
+
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon (IfaceTyCon name _info)
   = do { thing <- tcIfaceGlobal name
@@ -2201,8 +2233,7 @@ bindIfaceId (w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
         ; ty' <- tcIfaceType ty
         ; w' <- tcIfaceType w
-        ; let id = mkLocalIdOrCoVar name w' ty'
-          -- We should not have "OrCoVar" here, this is a bug (#17545)
+        ; let id = mkLocalId name w' ty'
         ; extendIfaceIdEnv [id] (thing_inside id) }
 
 bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a

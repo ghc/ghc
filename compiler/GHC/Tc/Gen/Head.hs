@@ -814,7 +814,7 @@ tc_infer_id (L loc (WithUserRdr rdr id_name))
              AGlobal (AConLike cl) -> tcInferConLike cl
 
              (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Term (WithUserRdr rdr (tyConName tc))
-             ATyVar name _ -> failIllegalTyVar (WithUserRdr rdr name)
+             ATcTyVar name _ -> failIllegalTyVar (WithUserRdr rdr name)
 
              _ -> failWithTc $ TcRnExpectedValueId thing
 

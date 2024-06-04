@@ -7,7 +7,7 @@ module GHC.Core.Make (
         mkWildCase, mkIfThenElse,
         mkWildValBinder,
         mkSingleAltCase,
-        sortQuantVars, castBottomExpr,
+        castBottomExpr,
 
         -- * Constructing boxed literals
         mkLitRubbish,
@@ -66,9 +66,9 @@ import GHC.Types.Unique.Supply
 import GHC.Core
 import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec, mkCast )
 import GHC.Core.Type
-import GHC.Core.Predicate    ( scopedSort, isEqPred )
+import GHC.Core.Predicate    ( isEqPred )
 import GHC.Core.TyCo.Compare ( eqType )
-import GHC.Core.Coercion     ( isCoVar, mkRepReflCo, mkForAllVisCos )
+import GHC.Core.Coercion     ( mkRepReflCo, mkForAllVisCos )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
 import GHC.Core.Multiplicity
 
@@ -84,7 +84,6 @@ import GHC.Settings.Constants( mAX_TUPLE_SIZE )
 import GHC.Data.FastString
 import GHC.Data.Maybe ( expectJust )
 
-import Data.List        ( partition )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Char        ( ord )
 
@@ -100,15 +99,6 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 -- | Sort the variables, putting type and covars first, in scoped order,
 -- and then other Ids
 --
--- It is a deterministic sort, meaning it doesn't look at the values of
--- Uniques. For explanation why it's important See Note [Unique Determinism]
--- in GHC.Types.Unique.
-sortQuantVars :: [Var] -> [Var]
-sortQuantVars vs = sorted_tcvs ++ ids
-  where
-    (tcvs, ids) = partition (isTyVar <||> isCoVar) vs
-    sorted_tcvs = scopedSort tcvs
-
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
 -- appropriate (see "GHC.Core#let_can_float_invariant")
 mkCoreLet :: HasDebugCallStack => CoreBind -> CoreExpr -> CoreExpr
@@ -187,9 +177,7 @@ rely on Lint to discover any mis-constructed terms.
 --
 -- See Note [WildCard binders] in "GHC.Core.Opt.Simplify.Env"
 mkWildValBinder :: Mult -> Type -> Id
-mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
-  -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
-  -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
+mkWildValBinder w ty = mkLocalId wildCardName w ty
 
 -- | Make a case expression whose case binder is unused
 -- The alts and res_ty should not have any occurrences of WildId
