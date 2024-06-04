@@ -46,6 +46,7 @@ import GHC.Types.InlinePragma
 import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
+import GHC.Types.Var     ( setTyVarUnfolding, zapTyVarUnfolding )
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Types.Var.Env
@@ -1011,7 +1012,7 @@ initScEnv guts
         -- Acccount for top-level bindings that are not in dependency order;
         -- see Note [Glomming] in GHC.Core.Opt.OccurAnal
         -- Easiest thing is to bring all the top level binders into scope at once,
-        -- as if  at once, as if all the top-level decls were mutually recursive.
+        -- as if all the top-level decls were mutually recursive.
 
 data HowBound = RecFun  -- These are the recursive functions for which
                         -- we seek interesting call patterns
@@ -1059,9 +1060,8 @@ extendScInScope :: ScEnv -> [Var] -> ScEnv
 extendScInScope env qvars
   = env { sc_subst = extendSubstInScopeList (sc_subst env) qvars }
 
-        -- Extend the substitution
-extendScSubst :: ScEnv -> Var -> OutExpr -> ScEnv
-extendScSubst env var expr = env { sc_subst = extendSubst (sc_subst env) var expr }
+extendScTvSubst :: ScEnv -> TyVar -> OutType -> ScEnv
+extendScTvSubst env var ty = env { sc_subst = extendTvSubst (sc_subst env) var ty }
 
 extendScSubstList :: ScEnv -> [(Var,OutExpr)] -> ScEnv
 extendScSubstList env prs = env { sc_subst = extendSubstList (sc_subst env) prs }
@@ -1309,6 +1309,7 @@ data ArgOcc = NoOcc     -- Doesn't occur at all; or a type argument
             | ScrutOcc  -- See Note [ScrutOcc]
                  (DataConEnv [ArgOcc])
                      -- [ArgOcc]: how the sub-components are used
+                     -- /including/ (existential) tyvar binders
 
 deadArgOcc :: ArgOcc -> Bool
 deadArgOcc (ScrutOcc {}) = False
@@ -1391,10 +1392,24 @@ creates specialised versions of functions.
 scBind :: TopLevelFlag -> ScEnv -> InBind
        -> (ScEnv -> UniqSM (ScUsage, a, [SpecFailWarning]))   -- Specialise the scope of the binding
        -> UniqSM (ScUsage, [OutBind], a, [SpecFailWarning])
-scBind top_lvl env (NonRec bndr rhs) do_body
-  | isTyVar bndr         -- Type-lets may be created by doBeta
-  = do { (final_usage, body', warnings) <- do_body (extendScSubst env bndr rhs)
-       ; return (final_usage, [], body', warnings) }
+scBind top_lvl env bind@(NonRec bndr rhs) do_body
+  | Type rhs_ty <- rhs
+  = assertPpr (isTyVar bndr) (ppr bndr) $
+    if isTopLevel top_lvl then
+      -- At top level there is nothing to do; no need to clone,
+      -- and the tyvar is already in scope, with the correct unfolding
+      assertPpr (isEmptySubst (sc_subst env)) (ppr bndr $$ ppr (sc_subst env)) $
+      do { (final_usage, body', warnings) <- do_body env
+         ; return (final_usage, [bind], body', warnings) }
+   else
+      -- Type-lets may be created by doBeta, so the tyvar
+      -- may or may not have a proper TyVarUnfolding
+      do { let (body_env, bndr') = extendBndr env (zapTyVarUnfolding bndr)
+               !(MkSolo rhs_ty') = scSubstTy env rhs_ty
+               bndr'' = setTyVarUnfolding bndr' rhs_ty'
+               body_env' = extendScTvSubst body_env bndr (mkTyVarTy bndr'')
+       ; (final_usage, body', warnings) <- do_body body_env'
+       ; return (final_usage, [NonRec bndr'' (Type rhs_ty')], body', warnings) }
 
   | not (isTopLevel top_lvl)  -- Nested non-recursive value binding
     -- See Note [Specialising local let bindings]
@@ -2052,7 +2067,7 @@ generaliseDictPats qvars pats
        , let pat_ty = exprType pat
        , typeDeterminesValue pat_ty
        , exprFreeVars pat `disjointVarSet` qvar_set
-       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") ManyTy pat_ty
+       = do { id <- mkSysLocalM (fsLit "dict") ManyTy pat_ty
             ; return (id:extra_qvs, Var id) }
        | otherwise
        = return (extra_qvs, pat)
@@ -2696,8 +2711,8 @@ argToPat1 :: ScEnv
   -> ArgOcc
   -> StrictnessMark
   -> UniqSM (Bool, Expr CoreBndr, [Id])
-argToPat1 _env _in_scope _val_env arg@(Type {}) _arg_occ _arg_str
-  = return (False, arg, [])
+argToPat1 _env in_scope _val_env (Type ty) _arg_occ _arg_str
+  = return (False, Type (mkTyPat in_scope ty), [])
 
 argToPat1 env in_scope val_env (Tick _ arg) arg_occ arg_str
   = argToPat env in_scope val_env arg arg_occ arg_str
@@ -2734,24 +2749,27 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
     -- Ignore `_wf` here; see Note [ConVal work-free-ness] (2)
   , not (ignoreDataCon env dc)        -- See Note [NoSpecConstr]
   , Just arg_occs <- mb_scrut dc
-  = do { let (ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) args
-             con_str, matched_str :: [StrictnessMark]
-             -- con_str corresponds 1-1 with the /value/ arguments
-             -- matched_str corresponds 1-1 with /all/ arguments
+  = do { let -- `con_str` corresponds 1-1 with the /value/ arguments
+             -- `all_str` corresponds 1-1 with /all/ arguments
+             con_str, all_str :: [StrictnessMark]
              con_str = dataConRepStrictness dc
-             matched_str = match_vals con_str rest_args
-      --  ; pprTraceM "bangs" (ppr (length rest_args == length con_str) $$
-      --       ppr dc $$
-      --       ppr con_str $$
-      --       ppr rest_args $$
-      --       ppr (map isTypeArg rest_args))
-       ; prs <- zipWith3M (argToPat env in_scope val_env) rest_args arg_occs matched_str
-       ; let args' = map sndOf3 prs :: [CoreArg]
-       ; assertPpr (length con_str == length (filter isRuntimeArg rest_args))
-            ( ppr con_str $$ ppr rest_args $$
-              ppr (length con_str) $$ ppr (length rest_args)
-            ) $ return ()
-       ; return (True, mkConApp dc (ty_args ++ args'), concat (map thdOf3 prs)) }
+             all_str = match_vals con_str args
+
+             -- `arg_occs` corresponnds 1-1 with the binders of a data con
+             -- pattern, which omits the universal tyvars. We extend with
+             -- `UnkOcc` for the universals to get `all_arg_occs`
+             all_arg_occs :: [ArgOcc]
+             all_arg_occs = map (const UnkOcc) (dataConUnivTyVars dc) ++ arg_occs
+
+       ; triples :: [(Bool, CoreArg, [Id])] <- zipWith3M (argToPat env in_scope val_env)
+                                                         args all_arg_occs all_str
+
+       ; let args'   = map sndOf3 triples :: [CoreArg]
+             cbv_ids = concat (map thdOf3 triples) :: [Id]
+
+       ; assertPpr (length con_str == valArgCount args)
+                   (ppr dc $$ ppr args $$ ppr arg_occs) $
+         return (True, mkConApp dc args', cbv_ids) }
   where
     mb_scrut dc = case arg_occ of
                 ScrutOcc bs | Just occs <- lookupUFM bs dc
@@ -2760,6 +2778,8 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
                             -> Just (repeat UnkOcc)
                             | otherwise
                             -> Nothing
+
+    match_vals :: [StrictnessMark] -> [CoreExpr] -> [StrictnessMark]
     match_vals bangs (arg:args)
       | isTypeArg arg
       = NotMarkedStrict : match_vals bangs args
@@ -2836,13 +2856,26 @@ argToPat in_scope val_env arg arg_occ
 
   -- The default case: make a wild-card
   -- We use this for coercions too
-argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
-  = wildCardPat (exprType arg) arg_str
+argToPat1 _env in_scope _val_env arg _arg_occ arg_str
+  = wildCardPat (mkTyPat in_scope (exprType arg)) arg_str
+
+mkTyPat :: InScopeSet -> Type -> Type
+-- Expand unfoldings of any tyvars not in the in-scope set
+-- E.g. call  f @a @b{=a} (K @a)
+-- The tyvars `a` and `b` might have been in scope at the call site,
+-- but not at the definition site.  We want a call pattern
+--            f @a @a (K @a) a
+-- Here we are silently relying on non-shadowing; it's no good if a
+-- /different/ `b` is in scope at the definition site!
+mkTyPat in_scope ty
+  = expandSomeTyVarUnfoldings not_in_scope ty
+  where
+    not_in_scope tv = not (tv `elemInScopeSet` in_scope)
 
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
 wildCardPat ty str
-  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") ManyTy ty
+  = do { id <- mkSysLocalM (fsLit "sc") ManyTy ty
        -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
        ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
 

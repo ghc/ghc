@@ -48,7 +48,7 @@ module GHC.Types.Var (
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType,
-        updateVarType, updateVarTypeM,
+        updateTyCoVarType, updateVarType,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
@@ -60,8 +60,9 @@ module GHC.Types.Var (
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
-        isLocalVar, isLocalId, isLocalId_maybe, isCoVar, isNonCoVarId, isTyCoVar,
-        isGlobalId, isExportedId,
+        isCoVar, isNonCoVarId, isTyCoVar,
+        isLocalVar, isGlobalVar, isGlobalTyVar,
+        isLocalId, isLocalId_maybe, isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
         -- * ForAllTyFlags
@@ -100,14 +101,17 @@ module GHC.Types.Var (
         ExportFlag(..),
 
         -- ** Constructing TyVar's
-        mkTyVar, mkTcTyVar,
+        mkTyVar, mkTyVarWithUnfolding, mkTcTyVar,
 
         -- ** Taking 'TyVar's apart
-        tyVarName, tyVarKind, tcTyVarDetails, setTcTyVarDetails,
+        tyVarName, tyVarKind, tyVarUnfolding_maybe, tyVarOccInfo, tcTyVarDetails, setTcTyVarDetails,
 
         -- ** Modifying 'TyVar's
-        setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
-        updateTyVarKindM,
+        setTyVarName, setTyVarUnique, setTyVarKind,
+        setTyVarUnfolding, zapTyVarUnfolding,
+        setTyVarOccInfo,
+        updateTyVarKind, updateTyVarKindM, updateTyVarUnfolding, updateTyVarUnfoldingM,
+        updateTyVarKindAndUnfoldingM,
 
         nonDetCmpVar
         ) where
@@ -123,7 +127,7 @@ import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , nonDetCmpUnique )
-import GHC.Types.Basic( TypeOrConstraint(..) )
+import GHC.Types.Basic( TypeOrConstraint(..), TyCoOccInfo(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -256,12 +260,15 @@ in its @VarDetails@.
 data Var
   = TyVar {  -- Type and kind variables
              -- see Note [Kind and type variables]
-        varName    :: !Name,
-        realUnique :: {-# UNPACK #-} !Unique,
-                                     -- ^ Key for fast comparison
-                                     -- Identical to the Unique in the name,
-                                     -- cached here for speed
-        varType    :: Kind           -- ^ The type or kind of the 'Var' in question
+        varName      :: !Name,
+        realUnique   :: {-# UNPACK #-} !Unique,
+                                       -- ^ Key for fast comparison
+                                       -- Identical to the Unique in the name,
+                                       -- cached here for speed
+        varType      :: Kind,          -- ^ The type or kind of the 'Var' in question
+        tv_unfolding :: Maybe Type,    -- ^ The type to which the variable is bound to,
+                                       -- if any, see Note [Type and coercion lets] in GHC.Core
+        tv_occ_info  :: TyCoOccInfo
  }
 
   | TcTyVar {                           -- Used only during type inference
@@ -350,30 +357,40 @@ instance Outputable Var where
     where
       -- don't display debug info with Code style (#25255)
       ppr_code = ppr (varName var)
-      ppr_normal sty = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
-            getPprDebug $ \debug ->
-            let
-              ppr_var = case var of
-                  (TyVar {})
-                     | debug
-                     -> brackets (text "tv")
+      ppr_normal sty
+        = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
+          sdocOption sdocPrintTyVarUnfoldings $ \print_tyvar_unf ->
+          getPprDebug $ \debug ->
 
-                  (TcTyVar {tc_tv_details = d})
-                     | dumpStyle sty || debug
-                     -> brackets (pprTcTyVarDetails d)
+          let add_type_sig doc
+                | debug, not supp_var_kinds
+                = parens (doc <+> dcolon <+> pprKind (varType var))
+                | otherwise
+                = doc
 
-                  (Id { idScope = s, id_details = d })
-                     | debug
-                     -> brackets (ppr_id_scope s <> pprIdDetails d)
+              pp_tv_unf | print_tyvar_unf, Just ty <- tyVarUnfolding_maybe var
+                        = braces (equals <> pprKind ty)
+                        | otherwise
+                        = empty
 
-                  _  -> empty
-            in if
-               |  debug && (not supp_var_kinds)
-                 -> parens (ppr (varName var) <+> ppr (varMultMaybe var)
-                                              <+> ppr_var <+>
-                          dcolon <+> pprKind (tyVarKind var))
-               |  otherwise
-                 -> ppr (varName var) <> ppr_var
+          in case var of
+            TyVar {}
+              -> add_type_sig $
+                 ppr (varName var)
+                   <> ppWhen debug (brackets (text "tv"))
+                   <> pp_tv_unf
+
+            TcTyVar {tc_tv_details = d}
+               -> add_type_sig $
+                  ppr (varName var)
+                    <> ppWhen (debug || dumpStyle sty)
+                              (brackets (pprTcTyVarDetails d))
+
+            Id { idScope = s, id_details = d }
+               -> add_type_sig $
+                  ppr (varName var)
+                    <> ppWhen debug
+                       (brackets (ppr_id_scope s <> pprIdDetails d))
 
 ppr_id_scope :: IdScope -> SDoc
 ppr_id_scope GlobalId              = text "gid"
@@ -436,30 +453,21 @@ setVarName var new_name
 setVarType :: Var -> Type -> Var
 setVarType id ty = id { varType = ty }
 
--- | Update a 'Var's type. Does not update the /multiplicity/
--- stored in an 'Id', if any. Because of the possibility for
--- abuse, ASSERTs that there is no multiplicity to update.
+-- | Update a 'TyCoVar's type. Does not update the /multiplicity/
+-- stored in an 'Id' -- CoVars don't have a multiplicity
+updateTyCoVarType :: (Type -> Type) -> TyCoVar -> TyCoVar
+updateTyCoVarType upd var
+  = assertPpr (isTyCoVar var) (ppr var) $
+    var { varType = upd (varType var) }
+
+-- | Update a 'Var's type and multiplicity
 updateVarType :: (Type -> Type) -> Var -> Var
 updateVarType upd var
   = case var of
-      Id { id_details = details } -> assert (isCoVarDetails details) $
-                                     result
-      _ -> result
-  where
-    result = var { varType = upd (varType var) }
-
--- | Update a 'Var's type monadically. Does not update the /multiplicity/
--- stored in an 'Id', if any. Because of the possibility for
--- abuse, ASSERTs that there is no multiplicity to update.
-updateVarTypeM :: Monad m => (Type -> m Type) -> Var -> m Var
-updateVarTypeM upd var
-  = case var of
-      Id { id_details = details } -> assert (isCoVarDetails details) $
-                                     result
-      _ -> result
-  where
-    result = do { ty' <- upd (varType var)
-                ; return (var { varType = ty' }) }
+      Id { varType = ty, varMult = mult }
+             -> var { varType = upd ty, varMult = upd mult }
+      TyVar   { varType = kind } -> var { varType = upd kind }
+      TcTyVar { varType = kind } -> var { varType = upd kind }
 
 {- *********************************************************************
 *                                                                      *
@@ -1019,6 +1027,14 @@ tyVarName = varName
 tyVarKind :: TyVar -> Kind
 tyVarKind = varType
 
+tyVarUnfolding_maybe :: TyVar -> Maybe Type
+tyVarUnfolding_maybe (TyVar { tv_unfolding = unf }) = unf
+tyVarUnfolding_maybe _ = Nothing
+
+tyVarOccInfo :: TyVar -> TyCoOccInfo
+tyVarOccInfo (TcTyVar {}) = TyCoMany
+tyVarOccInfo tv = assertPpr (isTyVar tv) (ppr tv) $ tv_occ_info tv
+
 setTyVarUnique :: TyVar -> Unique -> TyVar
 setTyVarUnique = setVarUnique
 
@@ -1028,6 +1044,27 @@ setTyVarName   = setVarName
 setTyVarKind :: TyVar -> Kind -> TyVar
 setTyVarKind tv k = tv {varType = k}
 
+setTyVarUnfolding :: HasDebugCallStack => TyVar -> Type -> TyVar
+setTyVarUnfolding tv unf = assertPpr (isTyVar tv && not (isTcTyVar tv)) (ppr tv) $
+                           tv {tv_unfolding = Just unf}
+
+zapTyVarUnfolding :: HasDebugCallStack => TyVar -> TyVar
+zapTyVarUnfolding tv@(TyVar { tv_unfolding = mb_unf })
+  = case mb_unf of
+      Nothing -> tv
+      Just {} -> tv { tv_unfolding = Nothing }
+zapTyVarUnfolding tv@(TcTyVar {}) = tv
+  -- We can encounter TcTyVars, which hav no unfolding anyway
+  -- Why: because zapTyVarUnfolding is called by substTyBndr during typechecking
+zapTyVarUnfolding v = pprPanic "zapTyVarUnfolding" (ppr v)
+
+setTyVarOccInfo :: HasDebugCallStack => TyVar -> TyCoOccInfo -> TyVar
+setTyVarOccInfo tv@(TyVar {}) occ_info
+  = tv {tv_occ_info = occ_info}
+setTyVarOccInfo tv            occ_info
+  = pprTrace "setTyVarOccInfo" (ppr tv <+> ppr occ_info $$ callStackDoc) tv
+
+
 updateTyVarKind :: (Kind -> Kind) -> TyVar -> TyVar
 updateTyVarKind update tv = tv {varType = update (tyVarKind tv)}
 
@@ -1036,11 +1073,43 @@ updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
        ; return $ tv {varType = k'} }
 
+updateTyVarUnfolding :: (Type -> Type) -> TyVar -> TyVar
+updateTyVarUnfolding update tv
+  | Just unf <- tyVarUnfolding_maybe tv
+  = tv {tv_unfolding = Just (update unf)}
+
+  | otherwise
+  = tv
+
+updateTyVarUnfoldingM :: (Monad m) => (Type -> m Type) -> TyVar -> m TyVar
+updateTyVarUnfoldingM update tv
+  | Just unf <- tyVarUnfolding_maybe tv
+  = do { unf' <- update unf
+       ; return $ tv {tv_unfolding = Just unf'} }
+
+  | otherwise
+  = return tv
+
+updateTyVarKindAndUnfoldingM :: (Monad m) => (Type -> m Type) -> TyVar -> m TyVar
+updateTyVarKindAndUnfoldingM update tv
+  = do { tv' <- updateTyVarKindM update tv
+       ; updateTyVarUnfoldingM update tv' }
+
 mkTyVar :: Name -> Kind -> TyVar
-mkTyVar name kind = TyVar { varName    = name
-                          , realUnique = nameUnique name
-                          , varType  = kind
+mkTyVar name kind = TyVar { varName      = name
+                          , realUnique   = nameUnique name
+                          , varType      = kind
+                          , tv_unfolding = Nothing
+                          , tv_occ_info  = TyCoMany
                           }
+
+mkTyVarWithUnfolding :: Name -> Kind -> Type -> TyVar
+mkTyVarWithUnfolding name kind unf = TyVar { varName      = name
+                                           , realUnique   = nameUnique name
+                                           , varType      = kind
+                                           , tv_unfolding = Just unf
+                                           , tv_occ_info  = TyCoMany
+                                           }
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
@@ -1073,7 +1142,7 @@ idInfo :: HasDebugCallStack => Id -> IdInfo
 idInfo (Id { id_info = info }) = info
 idInfo other                   = pprPanic "idInfo" (ppr other)
 
-idDetails :: HasCallStack => Id -> IdDetails
+idDetails :: HasDebugCallStack => Id -> IdDetails
 idDetails (Id { id_details = details }) = details
 idDetails other                         = pprPanic "idDetails" (ppr other)
 
@@ -1200,22 +1269,38 @@ isNonCoVarId (Id { id_details = details }) = not (isCoVarDetails details)
 isNonCoVarId _                             = False
 
 isLocalId :: Var -> Bool
+-- True of local Ids only, not of TyVars
 isLocalId (Id { idScope = LocalId _ }) = True
 isLocalId _                            = False
 
 isLocalId_maybe :: Var -> Maybe ExportFlag
+-- (Just export-flag) for local Ids only; Nothing for TyVars
 isLocalId_maybe (Id { idScope = LocalId ef }) = Just ef
 isLocalId_maybe _                             = Nothing
+
+isGlobalId :: Id -> Bool
+isGlobalId (Id { idScope = GlobalId }) = True
+isGlobalId _                           = False
 
 -- | 'isLocalVar' returns @True@ for type variables as well as local 'Id's
 -- These are the variables that we need to pay attention to when finding free
 -- variables, or doing dependency analysis.
 isLocalVar :: Var -> Bool
-isLocalVar v = not (isGlobalId v)
+isLocalVar v = not (isGlobalVar v)
 
-isGlobalId :: Var -> Bool
-isGlobalId (Id { idScope = GlobalId }) = True
-isGlobalId _                           = False
+isGlobalVar :: Var -> Bool
+-- A TyVar with an External Name is always from another module;
+-- but a locally-defined Id can have an External Name (e.g data constructors)
+isGlobalVar (Id { idScope = GlobalId })   = True
+isGlobalVar (Id { idScope = LocalId {} }) = False
+isGlobalVar (TyVar { varName = n })       = isExternalName n
+isGlobalVar (TcTyVar {})                  = False
+
+isGlobalTyVar :: HasDebugCallStack  => Var -> Bool
+-- A TyVar with an External Name is always from another module
+isGlobalTyVar (TyVar { varName = n })       = isExternalName n
+isGlobalTyVar (TcTyVar {})                  = False
+isGlobalTyVar v = pprPanic "isGlobalTyVar" (ppr v)
 
 -- | 'mustHaveLocalBinding' returns @True@ of 'Id's and 'TyVar's
 -- that must have a binding in this module.  The converse

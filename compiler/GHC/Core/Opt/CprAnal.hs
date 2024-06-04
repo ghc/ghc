@@ -39,7 +39,6 @@ import GHC.Data.Graph.UnVar -- for UnVarSet
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
-import GHC.Utils.Panic
 import GHC.Utils.Logger  ( Logger, putDumpFileMaybe, DumpFormat (..) )
 
 import Data.List ( mapAccumL )
@@ -345,22 +344,32 @@ cprTransform env id args
   | Just sig <- lookupSigEnv env id
   = applyCprTy (getCprSig sig) (length args)
   -- See Note [CPR for data structures]
+
   | Just rhs <- cprDataStructureUnfolding_maybe id
   = fst $ cprAnal env rhs
   -- Some (mostly global, known-key) Ids have bespoke CPR transformers
+
   | Just cpr_ty <- cprTransformBespoke id args
   = cpr_ty
   -- Other local Ids that respond True to 'isDataStructure' but don't have an
   -- expandable unfolding, such as NOINLINE bindings. They all get a top sig
+
   | isLocalId id
-  = assertPpr (isDataStructure id) (ppr id) topCprType
+  = topCprType
+    -- We used to assert (isDataStructure id) here, but actually it's not quite true.
+    -- At the /binding/ site of `id`, isDataStructure id will hold (see `cprAnalBind`)
+    -- But the output of the Simplifer does not guarantee that every occurrence of
+    -- an Id has the unfolding from its binding site. Most do, but not all.
+
   -- See Note [CPR for DataCon wrappers]
   | Just rhs <- dataConWrapUnfolding_maybe id
   = fst $ cprAnalApp env rhs args
   -- DataCon worker
+
   | Just con <- isDataConWorkId_maybe id
   = cprTransformDataConWork env con args
   -- Imported function
+
   | otherwise
   = applyCprTy (getCprSig (idCprSig id)) (length args)
 
@@ -536,14 +545,15 @@ cprAnalBind
   -> CoreExpr
   -> (Id, CoreExpr, AnalEnv)
 cprAnalBind env id rhs
+  | isTyVar id
+  = (id, rhs, extendSigEnv env id topCprSig)
   | isDFunId id -- Never give DFuns the CPR property; we'll never save allocs.
   = (id,  rhs,  extendSigEnv env id topCprSig)
   -- See Note [CPR for data structures]
   | isDataStructure id -- Data structure => no code => no need to analyse rhs
   = (id,  rhs,  env)
   | otherwise
-  = -- pprTrace "cprAnalBind" (ppr id <+> ppr sig <+> ppr sig')
-    (id `setIdCprSig` sig',       rhs', env')
+  = (id `setIdCprSig` sig',       rhs', env')
   where
     (rhs_ty, rhs')  = cprAnal env rhs
     -- possibly trim thunk CPR info

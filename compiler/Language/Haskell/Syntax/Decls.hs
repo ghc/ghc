@@ -1398,13 +1398,13 @@ type LForeignDecl pass = XRec pass (ForeignDecl pass)
 -- | Foreign Declaration
 data ForeignDecl pass
   = ForeignImport
-      { fd_i_ext  :: XForeignImport pass   -- Post typechecker, rep_ty ~ sig_ty
+      { fd_i_ext  :: XForeignImport pass   -- Post typechecker, co : rep_ty ~ sig_ty
       , fd_name   :: LIdP pass             -- defines this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
       , fd_fi     :: ForeignImport pass }
 
   | ForeignExport
-      { fd_e_ext  :: XForeignExport pass   -- Post typechecker, rep_ty ~ sig_ty
+      { fd_e_ext  :: XForeignExport pass   -- Post typechecker, co : rep_ty ~ sig_ty
       , fd_name   :: LIdP pass             -- uses this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
       , fd_fe     :: ForeignExport pass }

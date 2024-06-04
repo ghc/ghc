@@ -21,7 +21,7 @@ module GHC.Core.Opt.Simplify.Env (
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
-        setInScopeSet, modifyInScope, addNewInScopeIds,
+        setInScopeSet, modifyInScope, addNewInScopeBndrs,
         getSimplRules, enterRecGroupRHSs,
         reSimplifying,
 
@@ -30,15 +30,16 @@ module GHC.Core.Opt.Simplify.Env (
         -- * Substitution results
         SimplSR(..), mkContEx, substId, lookupRecBndr,
 
-        -- * Simplifying 'Id' binders
-        simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
+        -- * Simplifying binders
+        simplTyVarBndr, simplIdBndr, simplIdBndrs,
+        simplNonRecJoinBndr, simplRecJoinBndrs,
         simplBinder, simplBinders,
         substTy, substTyVar, getFullSubst, getTCvSubst,
         substCo, substCoVar,
 
         -- * Floats
         SimplFloats(..), emptyFloats, isEmptyFloats, mkRecFloats,
-        mkFloatBind, addLetFloats, addJoinFloats, addFloats,
+        mkFloatBind, mkTyVarFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
         isEmptyJoinFloats, isEmptyLetFloats,
         doFloatFromRhs, getTopFloatBinds,
@@ -428,11 +429,13 @@ data SimplFloats
       }
 
 instance Outputable SimplFloats where
-  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = is })
+  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = _is })
     = text "SimplFloats"
       <+> braces (vcat [ text "lets: " <+> ppr lf
                        , text "joins:" <+> ppr jf
-                       , text "in_scope:" <+> ppr is ])
+-- in-scope set can be voluminous
+--                       , text "in_scope:" <+> ppr is
+                       ])
 
 emptyFloats :: SimplEnv -> SimplFloats
 emptyFloats env
@@ -630,7 +633,7 @@ reSimplifying :: SimplEnv -> Bool
 reSimplifying (SimplEnv { seInlineDepth = n }) = n>0
 
 ---------------------
-extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
+extendIdSubst :: HasDebugCallStack => SimplEnv -> Id -> SimplSR -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
   = assertPpr (isId var && not (isCoVar var)) (ppr var) $
     env { seIdSubst = extendVarEnv subst var res }
@@ -645,9 +648,10 @@ extendCvSubst env@(SimplEnv {seCvSubst = csubst}) var co
   = assert (isCoVar var) $
     env {seCvSubst = extendVarEnv csubst var co}
 
-extendCvIdSubst :: SimplEnv -> Id -> OutExpr -> SimplEnv
+extendCvIdSubst :: HasDebugCallStack => SimplEnv -> Id -> OutExpr -> SimplEnv
 extendCvIdSubst env bndr (Coercion co) = extendCvSubst env bndr co
-extendCvIdSubst env bndr rhs           = extendIdSubst env bndr (DoneEx rhs NotJoinPoint)
+extendCvIdSubst env bndr rhs           = assertPpr (not (isCoVar bndr)) (ppr bndr $$ ppr rhs) $
+                                         extendIdSubst env bndr (DoneEx rhs NotJoinPoint)
 
 ---------------------
 getInScope :: SimplEnv -> InScopeSet
@@ -663,20 +667,39 @@ setInScopeFromE rhs_env here_env = rhs_env { seInScope = seInScope here_env }
 setInScopeFromF :: SimplEnv -> SimplFloats -> SimplEnv
 setInScopeFromF env floats = env { seInScope = sfInScope floats }
 
-addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
-        -- The new Ids are guaranteed to be freshly allocated
-addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) vs
--- See Note [Bangs in the Simplifier]
-  = let !in_scope1 = in_scope `extendInScopeSetList` vs
-        !id_subst1 = id_subst `delVarEnvList` vs
-    in
-    env { seInScope = in_scope1,
-          seIdSubst = id_subst1 }
-        -- Why delete?  Consider
-        --      let x = a*b in (x, \x -> x+3)
-        -- We add [x |-> a*b] to the substitution, but we must
-        -- _delete_ it from the substitution when going inside
-        -- the (\x -> ...)!
+addNewInScopeBndrs :: SimplEnv -> [CoreBndr] -> SimplEnv
+        -- The new binders are guaranteed to be freshly allocated
+addNewInScopeBndrs env bndrs
+  = go env bndrs
+  where
+    go env [] = env
+    go env@(SimplEnv { seInScope = in_scope, seTvSubst = tv_subst }) (tv:bndrs)
+      | isTyVar tv
+      = let !in_scope1 = in_scope `extendInScopeSet` tv
+            !tv_subst1 = tv_subst `delVarEnv` tv
+            env1       = env { seInScope = in_scope1,
+                               seTvSubst = tv_subst1 }
+        in go env1 bndrs
+    go env@(SimplEnv { seInScope = in_scope, seCvSubst = cv_subst }) (cv:bndrs)
+      | isCoVar cv
+      = let !in_scope1 = in_scope `extendInScopeSet` cv
+            !cv_subst1 = cv_subst `delVarEnv` cv
+            env1       = env { seInScope = in_scope1,
+                               seCvSubst = cv_subst1 }
+        in go env1 bndrs
+    go env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) (v:bndrs)
+      = -- See Note [Bangs in the Simplifier]
+        let !in_scope1 = in_scope `extendInScopeSet` v
+            !id_subst1 = id_subst `delVarEnv` v
+            -- Why delete?  Consider
+            --      let x = a*b in (x, \x -> x+3)
+            -- We add [x |-> a*b] to the substitution, but we must
+            -- _delete_ it from the substitution when going inside
+            -- the (\x -> ...)!
+            env1       = env { seInScope = in_scope1,
+                               seIdSubst = id_subst1 }
+        in go env1 bndrs
+
 
 modifyInScope :: SimplEnv -> CoreBndr -> SimplEnv
 -- The variable should already be in scope, but
@@ -766,7 +789,8 @@ type JoinFloats = OrdList JoinFloat
 
 data FloatFlag
   = FltLifted   -- All bindings are lifted and lazy *or*
-                --     consist of a single primitive string literal
+                --     consist of a single primitive string literal *or*
+                --     or are a type binding
                 -- Hence ok to float to top level, or recursive
                 -- NB: consequence: all bindings satisfy let-can-float invariant
 
@@ -799,13 +823,15 @@ andFF FltOkSpec  _          = FltOkSpec
 andFF FltLifted  flt        = flt
 
 
-doFloatFromRhs :: FloatEnable -> TopLevelFlag -> RecFlag -> Bool -> SimplFloats -> OutExpr -> Bool
+doFloatFromRhs :: SimplEnv -> TopLevelFlag -> RecFlag -> Bool
+               -> [OutTyVar] -> SimplFloats -> OutExpr -> Bool
 -- If you change this function look also at FloatIn.noFloatIntoRhs
-doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
-  = floatEnabled lvl fe
-      && not (isNilOL fs)
-      && want_to_float
-      && can_float
+doFloatFromRhs env lvl rec strict_bind tvs (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
+  = not (isNilOL fs)
+    && floatEnabled lvl (seFloatEnable env)
+    && want_to_float
+    && can_float
+    && not cant_float_types
   where
      want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs
                      -- See Note [Float when cheap or expandable]
@@ -819,6 +845,19 @@ doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs 
      floatEnabled _ FloatDisabled = False
      floatEnabled lvl FloatNestedOnly = not (isTopLevel lvl)
      floatEnabled _ FloatEnabled = True
+
+     float_bndrs = bindersOfBinds $ fromOL fs
+
+     -- Currently we sadly can't float if we have
+     --   /\a.  let @b = [a] in blah
+     -- becuase we don't have type-lambda
+     cant_float_types
+       | not (null tvs), any isTyCoVar float_bndrs
+       = (pprTraceWhen (any isId float_bndrs)
+            "WARNING-TyCo: skipping abstractFloats" (ppr fs)) $
+         True
+       | otherwise
+       = False
 
 {-
 Note [Float when cheap or expandable]
@@ -851,6 +890,7 @@ unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
   where
     flag (Rec {})                = FltLifted
     flag (NonRec bndr rhs)
+      | isTyVar bndr             = FltLifted
       | not (isStrictId bndr)    = FltLifted
       | exprIsTickedString rhs   = FltLifted
           -- String literals can be floated freely.
@@ -861,6 +901,17 @@ unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
 unitJoinFloat :: OutBind -> JoinFloats
 unitJoinFloat bind = assert (all isJoinId (bindersOf bind)) $
                      unitOL bind
+
+mkTyVarFloatBind :: SimplEnv -> InTyVar -> OutTyVar -> OutType -> (SimplFloats, SimplEnv)
+mkTyVarFloatBind env@(SimplEnv { seTvSubst = tv_subst, seInScope = in_scope })  old_tv new_tv rhs_ty
+  = assertPpr(isTyVar new_tv) (ppr old_tv $$ ppr new_tv) $
+    (floats, env { seTvSubst = tv_subst' })
+  where
+    floats = SimplFloats { sfLetFloats  = unitLetFloat (NonRec new_tv_w_unf (Type rhs_ty))
+                         , sfJoinFloats = emptyJoinFloats
+                         , sfInScope    = in_scope }
+    tv_subst' = extendVarEnv tv_subst old_tv (mkTyVarTy new_tv_w_unf)
+    new_tv_w_unf = new_tv `setTyVarUnfolding` rhs_ty
 
 mkFloatBind :: SimplEnv -> OutBind -> (SimplFloats, SimplEnv)
 -- Make a singleton SimplFloats, and
@@ -941,20 +992,23 @@ addJoinFlts = appOL
 
 mkRecFloats :: SimplFloats -> SimplFloats
 -- Flattens the floats into a single Rec group,
--- They must either all be lifted LetFloats or all JoinFloats
-mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
-                                , sfJoinFloats = jbs
+--   They must either all be lifted LetFloats or all JoinFloats
+-- If any are type bindings they must be non-recursive, so
+--   do not need to be joined into a letrec; indeed they must not
+--   since Rec{} is not allowed to have type binders
+mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats val_bs ff
+                                , sfJoinFloats = join_bs
                                 , sfInScope    = in_scope })
-  = assertPpr (isNilOL bs || isNilOL jbs) (ppr floats) $
-    SimplFloats { sfLetFloats  = floats'
-                , sfJoinFloats = jfloats'
+  = assertPpr (isNilOL val_bs || isNilOL join_bs) (ppr floats) $
+    SimplFloats { sfLetFloats  = LetFloats val_b ff
+                , sfJoinFloats = join_b
                 , sfInScope    = in_scope }
   where
     -- See Note [Bangs in the Simplifier]
-    !floats'  | isNilOL bs  = emptyLetFloats
-              | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
-    !jfloats' | isNilOL jbs = emptyJoinFloats
-              | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
+    !val_b  | isNilOL val_bs  = nilOL
+            | otherwise       = toOL (glomValBinds (fromOL val_bs))
+    !join_b | isNilOL join_bs = nilOL
+            | otherwise       = toOL (glomValBinds (fromOL join_bs))
 
 wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression
@@ -1037,8 +1091,14 @@ refineFromInScope in_scope v
   | otherwise = v
 
 lookupRecBndr :: SimplEnv -> InId -> OutId
--- Look up an Id which has been put into the envt by simplRecBndrs,
+-- Look up an Id which has been put into the envt by simplIdBndrs,
 -- but where we have not yet done its RHS
+-- lookupRecBndr (SimplEnv { seInScope = in_scope, seTvSubst = tvs }) v
+--   | isTyVar v
+--   = case lookupVarEnv tvs v of
+--         Just (DoneId v) -> v
+--         Just _ -> pprPanic "lookupRecBndr" (ppr v)
+--         Nothing -> refineFromInScope in_scope v
 lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of
         Just (DoneId v) -> v
@@ -1097,38 +1157,68 @@ simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- The substitution is extended only if the variable is cloned, because
 -- we *don't* need to use it to track occurrence info.
 simplBinder !env bndr
-  | isTyVar bndr  = do  { let (env', tv) = substTyVarBndr env bndr
-                        ; seqTyVar tv `seq` return (env', tv) }
-  | otherwise     = do  { let (env', id) = substIdBndr env bndr
-                        ; seqId id `seq` return (env', id) }
+  | isTyVar bndr  = simplTyVarBndr env bndr
+  | otherwise     = simplIdBndr    env bndr
 
 ---------------
-simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
+simplTyVarBndr :: HasDebugCallStack
+               => SimplEnv -> InTyVar -> SimplM (SimplEnv, OutTyVar)
+simplTyVarBndr env tv
+  = do  { let (env', tv1) = substTyVarBndr env tv
+        ; seqTyVar tv1 `seq` return (env', tv1) }
+
+---------------
+simplIdBndr :: SimplEnv -> InId -> SimplM (SimplEnv, OutId)
 -- A non-recursive let binder
-simplNonRecBndr !env id
+-- The returned Id has no unfolding or rules; we add those later
+simplIdBndr !env id
   -- See Note [Bangs in the Simplifier]
   = do  { let (!env1, id1) = substIdBndr env id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
-simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
--- Recursive let binders
-simplRecBndrs env@(SimplEnv {}) ids
+simplIdBndrs :: SimplEnv -> [InId] -> SimplM SimplEnv
+-- Used for recursive let binders: Ids only
+-- No fancy knot-tying! We simply go through the binders in
+-- (arbitrary) order.  For each:
+--   - applying the substitution to its type
+--   - clone the Unique if it's already in scope
+-- The returned Ids have no unfolding or rules; we add those later
+simplIdBndrs env@(SimplEnv {}) ids
   -- See Note [Bangs in the Simplifier]
   = assert (all (not . isJoinId) ids) $
     do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
 
 ---------------
-substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+substIdBndr :: HasDebugCallStack => SimplEnv -> InId -> (SimplEnv, OutId)
 -- Might be a coercion variable
 substIdBndr env bndr
   | isCoVar bndr  = substCoVarBndr env bndr
   | otherwise     = substNonCoVarIdBndr env bndr
 
 ---------------
+-- substTyVarBndr :: SimplEnv
+--                -> InBndr
+--                -> (SimplEnv, OutBndr)
+-- substTyVarBndr env@(SimplEnv { seInScope = in_scope, seTvSubst = tv_subst }) old_tv
+--   = assertPpr (isTyVar old_tv) (ppr old_tv)
+--     (env { seInScope = new_in_scope,
+--            seTvSubst = new_subst }, new_tv)
+--   where
+--     !tv1    = uniqAway in_scope old_tv
+--     !tv2    = substTyVarKind env tv1
+--     !new_tv = zapFragileTyVarInfo tv2   -- Zaps unfolding and fragile OccInfo
+--     !new_subst | new_tv /= old_tv
+--                = extendVarEnv tv_subst old_tv (DoneId new_tv)
+--                | otherwise
+--                = delVarEnv tv_subst old_tv
+--
+--     !new_in_scope = in_scope `extendInScopeSet` new_tv
+
+---------------
 substNonCoVarIdBndr
-   :: SimplEnv
+   :: HasDebugCallStack => SimplEnv
    -> InBndr    -- Env and binder to transform
    -> (SimplEnv, OutBndr)
 -- Clone Id if necessary, substitute its type
@@ -1154,7 +1244,7 @@ substNonCoVarIdBndr env id = subst_id_bndr env id (\x -> x)
 -- This is especially important for `substNonCoVarIdBndr` which
 -- passes an identity lambda.
 {-# INLINE subst_id_bndr #-}
-subst_id_bndr :: SimplEnv
+subst_id_bndr :: HasDebugCallStack => SimplEnv
               -> InBndr    -- Env and binder to transform
               -> (OutId -> OutId)  -- Adjust the type
               -> (SimplEnv, OutBndr)
@@ -1364,7 +1454,7 @@ substTy env ty = Type.substTy (getTCvSubst env) ty
 substTyVar :: SimplEnv -> TyVar -> Type
 substTyVar env tv = Type.substTyVar (getTCvSubst env) tv
 
-substTyVarBndr :: SimplEnv -> TyVar -> (SimplEnv, TyVar)
+substTyVarBndr :: HasDebugCallStack => SimplEnv -> TyVar -> (SimplEnv, TyVar)
 substTyVarBndr env tv
   = case Type.substTyVarBndr (getTCvSubst env) tv of
         (Subst in_scope' _ tv_env' cv_env', tv')

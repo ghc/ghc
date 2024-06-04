@@ -18,7 +18,6 @@ import GHC.Types.Demand( seqDemand, seqDmdSig )
 import GHC.Types.Cpr( seqCprSig )
 import GHC.Types.Basic( seqOccInfo )
 import GHC.Types.Tickish
-import GHC.Types.Var.Set( seqDVarSet )
 import GHC.Types.Var( varType, tyVarKind )
 import GHC.Core.Type( seqType, isTyVar )
 import GHC.Core.Coercion( seqCo )
@@ -45,7 +44,7 @@ seqOneShot :: OneShotInfo -> ()
 seqOneShot l = l `seq` ()
 
 seqRuleInfo :: RuleInfo -> ()
-seqRuleInfo (RuleInfo rules fvs) = seqRules rules `seq` seqDVarSet fvs
+seqRuleInfo (RuleInfo rules) = seqRules rules
 
 seqCaf :: CafInfo -> ()
 seqCaf c = c `seq` ()

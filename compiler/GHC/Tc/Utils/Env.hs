@@ -574,8 +574,8 @@ tcLookupTyVar :: Name -> TcM TcTyVar
 tcLookupTyVar name
   = do { thing <- tcLookup name
        ; case thing of
-           ATyVar _ tv -> return tv
-           _           -> pprPanic "tcLookupTyVar" (ppr name) }
+           ATcTyVar _ tv -> return tv
+           _             -> pprPanic "tcLookupTyVar" (ppr name) }
 
 tcLookupId :: Name -> TcM Id
 -- Used when we aren't interested in the binding level, nor refinement.
@@ -659,7 +659,7 @@ tcExtendNameTyVarEnv binds thing_inside
     tv_binds :: [TcBinder]
     tv_binds = [TcTvBndr name tv | (name,tv) <- binds]
 
-    names = [(name, ATyVar name tv) | (name, tv) <- binds]
+    names = [(name, ATcTyVar name tv) | (name, tv) <- binds]
 
 isTypeClosedLetBndr :: Id -> Bool
 -- See Note [Bindings with closed types: ClosedTypeId] in GHC.Tc.Types
@@ -739,7 +739,7 @@ tcExtendIdEnv2 names_w_ids thing_inside
 tc_extend_local_env :: TopLevelFlag -> [(Name, TcTyThing)] -> TcM a -> TcM a
 tc_extend_local_env top_lvl extra_env thing_inside
 -- Precondition: the argument list extra_env has TcTyThings
---               that ATcId or ATyVar, but nothing else
+--               that ATcId or ATcTyVar, but nothing else
 --
 -- Invariant: the ATcIds are fully zonked. Reasons:
 --      (a) The kinds of the forall'd type variables are defaulted

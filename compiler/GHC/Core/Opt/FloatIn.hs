@@ -432,12 +432,27 @@ idRuleAndUnfoldingVars of x.  No need for type variables, hence not using
 idFreeVars.
 -}
 
+fiExpr platform to_drop (_,AnnLet (AnnNonRec bndr (rhs_fvs, rhs)) body)
+  | Just bind' <- is_tyco_rhs rhs -- See Note [Don't float in type or coercion lets]
+  = wrapFloats drop_here $
+    Let bind' (fiExpr platform body_drop body)
+  where
+    is_tyco_rhs :: CoreExprWithFVs' -> Maybe CoreBind
+    is_tyco_rhs  (AnnType     ty) = Just (NonRec bndr (Type ty))
+    is_tyco_rhs  (AnnCoercion co) = Just (NonRec bndr (Coercion co))
+    is_tyco_rhs _ = Nothing
+
+    (drop_here, [body_drop]) = sepBindsByDropPoint platform False to_drop
+                                             rhs_fvs [freeVarsOf body]
+
 fiExpr platform to_drop (_,AnnLet bind body)
+  | otherwise
   = fiExpr platform (after ++ new_float : before) body
            -- to_drop is in reverse dependency order
   where
     (before, new_float, after) = fiBind platform to_drop bind body_fvs
-    body_fvs    = freeVarsOf body
+    body_fvs                   = freeVarsOf body
+
 
 {- Note [Floating primops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -518,6 +533,15 @@ bindings are:
   (a) inside the scrutinee
   (b) inside one of the alternatives/default (default FVs always /first/!).
 
+Note [Don't float in type or coercion lets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't float type-lets or coercion-lets inward. Doing so does not
+save allocation; and if we did we't have to be careful of the variables
+mentioned in the idType of the case-binder.  For example
+    \(x :: Maybe b) -> let a = Maybe b in
+                       case x of (cb :: a) of { Just y -> ... }
+We must not float the `a = Maybe b` into the case alternatives, because
+it is mentioned in the type of `cb`.
 -}
 
 fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs])
@@ -558,7 +582,10 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
 
     scrut_fvs = freeVarsOf scrut
 
-    all_alt_bndrs = foldr (unionDVarSet . ann_alt_bndrs) (unitDVarSet case_bndr) alts
+    -- all_alt_bndrs: see Note [Shadowing and name capture]
+    case_bndr_bndrs = unitDVarSet case_bndr
+    all_alt_bndrs   = foldr (unionDVarSet . ann_alt_bndrs) case_bndr_bndrs alts
+
     ann_alt_bndrs (AnnAlt _ bndrs _) = mkDVarSet bndrs
 
     alts_fvs :: [DVarSet]
@@ -607,8 +634,9 @@ fiBind platform to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
 
         -- Push rhs_binds into the right hand side of the binding
     rhs'     = fiRhs platform rhs_binds id ann_rhs
-    rhs_fvs' = rhs_fvs `unionDVarSet` floatedBindsFVs rhs_binds `unionDVarSet` rule_fvs
-                        -- Don't forget the rule_fvs; the binding mentions them!
+    rhs_fvs' = rhs_fvs                   `unionDVarSet`
+               floatedBindsFVs rhs_binds `unionDVarSet`
+               rule_fvs -- Don't forget the rule_fvs; the binding mentions them!
 
 fiBind platform to_drop (AnnRec bindings) body_fvs
   = ( shared_binds

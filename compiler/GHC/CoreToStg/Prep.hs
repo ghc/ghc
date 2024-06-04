@@ -270,13 +270,13 @@ corePrepTopBinds initialCorePrepEnv binds
   = go initialCorePrepEnv binds
   where
     go _   []             = return emptyFloats
-    go env (bind : binds) = do (env', floats, maybe_new_bind)
-                                 <- cpeBind TopLevel env bind
-                               massert (isNothing maybe_new_bind)
+    go env (bind : binds) = do { (env', floats, maybe_new_bind)
+                                   <- cpeBind TopLevel env bind
+                               ; massert (isNothing maybe_new_bind)
                                  -- Only join points get returned this way by
                                  -- cpeBind, and no join point may float to top
-                               floatss <- go env' binds
-                               return (floats `zipFloats` floatss)
+                               ; floatss <- go env' binds
+                               ; return (floats `zipFloats` floatss) }
 
 {- *********************************************************************
 *                                                                      *
@@ -574,7 +574,12 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
                    Floats,         -- Floating value bindings
                    Maybe CoreBind) -- Just bind' <=> returned new bind; no float
                                    -- Nothing <=> added bind' to floats instead
-cpeBind top_lvl env (NonRec bndr rhs)
+cpeBind top_lvl env bind@(NonRec bndr rhs)
+  | isTyVar bndr
+  , let float = Float bind LetBound TopLvlFloatable
+  = -- A type binding
+    return (env, unitFloat float, Nothing)
+
   | not (isJoinId bndr)
   = do { (env1, bndr1) <- cpCloneBndr env bndr
        ; let dmd = idDemandInfo bndr
@@ -761,16 +766,15 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- For example
 --      f (g x)   ===>   ([v = g x], f v)
 
-cpeRhsE env (Type ty)
-  = return (emptyFloats, Type (cpSubstTy env ty))
-cpeRhsE env (Coercion co)
-  = return (emptyFloats, Coercion (cpSubstCo env co))
-cpeRhsE env expr@(Lit lit)
-  | LitNumber LitNumBigNat i <- lit
-    = cpeBigNatLit env i
-  | otherwise = return (emptyFloats, expr)
+cpeRhsE env (Type ty)      = return (emptyFloats, Type (cpSubstTy env ty))
+cpeRhsE env (Coercion co)  = return (emptyFloats, Coercion (cpSubstCo env co))
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 cpeRhsE env expr@(App {})  = cpeApp env expr
+
+cpeRhsE env expr@(Lit lit)
+  = case lit of
+      LitNumber LitNumBigNat i -> cpeBigNatLit env i
+      _                        -> return (emptyFloats, expr)
 
 cpeRhsE env (Let bind body)
   = do { (env', bind_floats, maybe_bind') <- cpeBind NotTopLevel env bind
@@ -2589,7 +2593,7 @@ cpCloneCoVarBndr env@(CPE { cpe_subst = subst }) covar
   = assertPpr (isCoVar covar) (ppr covar) $
     do { uniq <- getUniqueM
        ; let covar1 = setVarUnique covar uniq
-             covar2 = updateVarType (substTy subst) covar1
+             covar2 = updateTyCoVarType (substTy subst) covar1
              subst1 = extendTCvSubstWithClone subst covar covar2
        ; return (env { cpe_subst = subst1 }, covar2) }
 
@@ -2600,7 +2604,7 @@ cpCloneBndr env@(CPE { cpe_subst = subst }) bndr
   = if isEmptyTCvSubst subst    -- The common case
     then return (env { cpe_subst = extendSubstInScope subst bndr }, bndr)
     else -- No need to clone the Unique; but we must apply the substitution
-         let bndr1  = updateVarType (substTy subst) bndr
+         let bndr1  = updateTyCoVarType (substTy subst) bndr
              subst1 = extendTCvSubstWithClone subst bndr bndr1
          in return (env { cpe_subst = subst1 }, bndr1)
 
@@ -2666,7 +2670,7 @@ fiddleCCall id
 newVar :: CorePrepEnv ->  Type -> UniqSM Id
 newVar env ty
  -- See Note [Binder context]
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit occ) ManyTy ty
+ = seqType ty `seq` mkSysLocalM (fsLit occ) ManyTy ty
    where occ = intercalate "_" (map occNameString $ cpe_context env) ++ "_sat"
 
 {- Note [Binder context]

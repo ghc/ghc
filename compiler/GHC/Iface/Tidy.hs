@@ -53,12 +53,14 @@ import GHC.Core.InstEnv
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Tidy
+import GHC.Core.TyCo.FVs
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 
 import GHC.Iface.Tidy.StaticPtrTable
 import GHC.Iface.Env
 
 import GHC.Utils.Outputable
+import GHC.Utils.FV
 import GHC.Utils.Misc( filterOut )
 import GHC.Utils.Panic
 import GHC.Utils.Logger as Logger
@@ -80,6 +82,7 @@ import GHC.Types.Name.Cache
 import GHC.Types.Avail
 import GHC.Types.Tickish
 import GHC.Types.TypeEnv
+
 import GHC.Tc.Utils.TcType (tcSplitNestedSigmaTys)
 
 import GHC.Unit.Module
@@ -89,7 +92,6 @@ import GHC.Unit.Module.Deps
 
 import GHC.Data.Maybe
 
-import Control.Monad
 import Data.Function
 import Data.List        ( sortBy, mapAccumL )
 import qualified Data.Set as S
@@ -404,7 +406,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           , mg_boot_exports     = boot_exports
                           }) = do
 
-  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules
+  (unfold_env, tidy_occ_env) <- chooseExternalVars opts mod tcs binds imp_rules
   let (trimmed_binds, trimmed_rules) = findExternalRules opts binds imp_rules unfold_env
 
   (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
@@ -422,24 +424,25 @@ tidyProgram opts (ModGuts { mg_module           = mod
 
       -- The completed type environment is gotten from
       --      a) the types and classes defined here (plus implicit things)
-      --      b) adding Ids with correct IdInfo, including unfoldings,
+      --      b) adding Ids/TyVars with correct IdInfo, including unfoldings,
       --              gotten from the bindings
-      -- From (b) we keep only those Ids with External names;
+      -- From (b) we keep only those Ids/TyVars with External names;
       --          the CoreTidy pass makes sure these are all and only
       --          the externally-accessible ones
       -- This truncates the type environment to include only the
       -- exported Ids and things needed from them, which saves space
       --
       -- See Note [Don't attempt to trim data types]
-      final_ids  = [ trimId (opt_trim_ids opts) id
-                   | id <- bindersOfBinds tidy_binds
-                   , isExternalName (idName id)
-                   , not (isWiredIn id)
-                   ]   -- See Note [Drop wired-in things]
+      final_vars  = [ trimVar (opt_trim_ids opts) var
+                    | var <- bindersOfBinds tidy_binds
+                    , let name = varName var
+                    , isExternalName name
+                    , not (isWiredInName name)
+                    ]   -- See Note [Drop wired-in things]
 
       final_tcs      = filterOut isWiredIn tcs
                        -- See Note [Drop wired-in things]
-      tidy_type_env  = typeEnvFromEntities final_ids final_tcs patsyns fam_insts
+      tidy_type_env  = typeEnvFromEntities final_vars final_tcs patsyns fam_insts
       tidy_cls_insts = mkFinalClsInsts tidy_type_env $ mkInstEnv cls_insts
       tidy_rules     = tidyRules tidy_env trimmed_rules
 
@@ -519,11 +522,14 @@ collectCostCentres mod_name binds rules
     go_bind cs (Rec bs) =
       foldl' (\cs' (b, e) -> go (do_binder cs' b) e) cs bs
 
-    do_binder cs b = maybe cs (go cs) (get_unf b)
-
     -- Unfoldings may have cost centres that in the original definion are
     -- optimized away, see #5889.
-    get_unf = maybeUnfoldingTemplate . realIdUnfolding
+    do_binder cs b
+      | isId b
+      , Just unf <- maybeUnfoldingTemplate (realIdUnfolding b)
+      = go cs unf
+      | otherwise
+      = cs
 
     -- Have to look at the RHS of rules as well, as these may contain ticks which
     -- don't appear anywhere else. See #19894
@@ -533,13 +539,13 @@ collectCostCentres mod_name binds rules
     get_rhs BuiltinRule {} = Nothing
 
 --------------------------
-trimId :: Bool -> Id -> Id
+trimVar :: Bool -> Var -> Var
 -- With -O0 we now trim off the arity, one-shot-ness, strictness
 -- etc which tidyTopIdInfo retains for the benefit of the code generator
 -- but which we don't want in the interface file or ModIface for
 -- downstream compilations
-trimId do_trim id
-  | do_trim, not (isImplicitId id)
+trimVar do_trim id
+  | do_trim, isId id, not (isImplicitId id)
   = id `setIdInfo`      vanillaIdInfo
        `setIdUnfolding` idUnfolding id
        -- We respect the final unfolding chosen by tidyTopIdInfo.
@@ -582,9 +588,7 @@ of exceptions, and finally I gave up the battle:
     modest cost in interface file growth, which is limited to the
     bits reqd to describe those data constructors.
 
--}
 
-{-
 ************************************************************************
 *                                                                      *
 \subsection{Step 1: finding externals}
@@ -601,7 +605,7 @@ type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
   --
   -- Bool => expose unfolding or not.
 
-chooseExternalIds :: TidyOpts
+chooseExternalVars :: TidyOpts
                   -> Module
                   -> [TyCon]
                   -> [CoreBind]
@@ -609,7 +613,7 @@ chooseExternalIds :: TidyOpts
                   -> IO (UnfoldEnv, TidyOccEnv)
                   -- Step 1 from the notes above
 
-chooseExternalIds opts mod tcs binds imp_id_rules
+chooseExternalVars opts mod tcs binds imp_id_rules
   = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
@@ -641,8 +645,8 @@ chooseExternalIds opts mod tcs binds imp_id_rules
   binder_set       = mkVarSet binders
 
   avoids   = [ getOccName name | bndr <- binders,
-                                 let name = idName bndr,
-                                 isExternalName name ]
+                               , let name = idName bndr,
+                               ,  isExternalName name ]
           ++ [ getOccName thing | tc <- tcs
                                 , thing <- implicitTyConThings tc ]
                 -- In computing our "avoids" list, we must include
@@ -662,32 +666,32 @@ chooseExternalIds opts mod tcs binds imp_id_rules
   init_occ_env = initTidyOccEnv avoids
 
 
-  search :: [(Id,Id)]    -- The work-list: (external id, referring id)
-                         -- Make a tidy, external Name for the external id,
+  search :: [(Var,Var)]  -- The work-list: (external Var, referring Var)
+                         -- Make a tidy, external Name for the external Var,
                          --   add it to the UnfoldEnv, and do the same for the
-                         --   transitive closure of Ids it refers to
-                         -- The referring id is used to generate a tidy
-                         ---  name for the external id
-         -> UnfoldEnv    -- id -> (new Name, show_unfold)
+                         --   transitive closure of Vars it refers to
+                         -- The referring Var is used to generate a tidy
+                         ---  name for the external Var
+         -> UnfoldEnv    -- Var -> (new Name, show_unfold)
          -> TidyOccEnv   -- occ env for choosing new Names
          -> IO (UnfoldEnv, TidyOccEnv)
 
   search [] unfold_env occ_env = return (unfold_env, occ_env)
 
-  search ((idocc,referrer) : rest) unfold_env occ_env
-    | idocc `elemVarEnv` unfold_env = search rest unfold_env occ_env
+  search ((var_occ,referrer) : rest) unfold_env occ_env
+    | var_occ `elemVarEnv` unfold_env = search rest unfold_env occ_env
     | otherwise = do
-      (occ_env', name') <- tidyTopName mod name_cache (Just referrer) occ_env idocc
+      (occ_env', name') <- tidyTopName mod name_cache (Just referrer) occ_env var_occ
       let
           (new_ids, show_unfold) = addExternal opts refined_id
 
-                -- 'idocc' is an *occurrence*, but we need to see the
+                -- 'var_occ' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
-          refined_id = case lookupVarSet binder_set idocc of
+          refined_id = case lookupVarSet binder_set var_occ of
                          Just id -> id
-                         Nothing -> warnPprTrace True "chooseExternalIds" (ppr idocc) idocc
+                         Nothing -> warnPprTrace True "chooseExternalVars" (ppr var_occ) var_occ
 
-          unfold_env' = extendVarEnv unfold_env idocc (name',show_unfold)
+          unfold_env' = extendVarEnv unfold_env var_occ (name',show_unfold)
           referrer' | isExportedId refined_id = refined_id
                     | otherwise               = referrer
       --
@@ -701,9 +705,18 @@ chooseExternalIds opts mod tcs binds imp_id_rules
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: TidyOpts -> Id -> ([Id], Bool)
+addExternal :: TidyOpts -> Var -> ([Var], Bool)
+addExternal _opts tv
+  | isTyVar tv  -- Always expose unfoldings of TyVars
+  = (new_needed_tvs, True)
+  where
+    new_needed_tvs = case tyVarUnfolding_maybe tv of
+                       Nothing -> []
+                       Just ty -> tyCoVarsOfTypeList ty
+
 addExternal opts id
-  | ExposeNone <- opt_expose_unfoldings opts
+  | assertPpr (isId id) (ppr id) True  -- Previous equation dealt with TyVars
+  , ExposeNone <- opt_expose_unfoldings opts
   , not (isCompulsoryUnfolding unfolding)
   = ([], False)  -- See Note [Always expose compulsory unfoldings]
                  -- in GHC.HsToCore
@@ -712,7 +725,7 @@ addExternal opts id
   = (new_needed_ids, show_unfold)
 
   where
-    new_needed_ids = bndrFvsInOrder show_unfold id
+    new_needed_ids = idBndrFvsInOrder show_unfold id
     idinfo         = idInfo id
     unfolding      = realUnfoldingInfo idinfo
     show_unfold    = show_unfolding unfolding
@@ -825,72 +838,9 @@ the free variables in the order that they are encountered.
 See Note [Choosing external Ids]
 -}
 
-bndrFvsInOrder :: Bool -> Id -> [Id]
-bndrFvsInOrder show_unfold id
-  = run (dffvLetBndr show_unfold id)
-
-run :: DFFV () -> [Id]
-run (DFFV m) = case m emptyVarSet (emptyVarSet, []) of
-                 ((_,ids),_) -> ids
-
-newtype DFFV a
-  = DFFV (VarSet              -- Envt: non-top-level things that are in scope
-                              -- we don't want to record these as free vars
-      -> (VarSet, [Var])      -- Input State: (set, list) of free vars so far
-      -> ((VarSet,[Var]),a))  -- Output state
-    deriving (Functor)
-
-instance Applicative DFFV where
-    pure a = DFFV $ \_ st -> (st, a)
-    (<*>) = ap
-
-instance Monad DFFV where
-  (DFFV m) >>= k = DFFV $ \env st ->
-    case m env st of
-       (st',a) -> case k a of
-                     DFFV f -> f env st'
-
-extendScope :: Var -> DFFV a -> DFFV a
-extendScope v (DFFV f) = DFFV (\env st -> f (extendVarSet env v) st)
-
-extendScopeList :: [Var] -> DFFV a -> DFFV a
-extendScopeList vs (DFFV f) = DFFV (\env st -> f (extendVarSetList env vs) st)
-
-insert :: Var -> DFFV ()
-insert v = DFFV $ \ env (set, ids) ->
-           let keep_me = isLocalId v &&
-                         not (v `elemVarSet` env) &&
-                           not (v `elemVarSet` set)
-           in if keep_me
-              then ((extendVarSet set v, v:ids), ())
-              else ((set,                ids),   ())
-
-
-dffvExpr :: CoreExpr -> DFFV ()
-dffvExpr (Var v)              = insert v
-dffvExpr (App e1 e2)          = dffvExpr e1 >> dffvExpr e2
-dffvExpr (Lam v e)            = extendScope v (dffvExpr e)
-dffvExpr (Tick (Breakpoint _ _ ids) e) = mapM_ insert ids >> dffvExpr e
-dffvExpr (Tick _other e)    = dffvExpr e
-dffvExpr (Cast e _)           = dffvExpr e
-dffvExpr (Let (NonRec x r) e) = dffvBind (x,r) >> extendScope x (dffvExpr e)
-dffvExpr (Let (Rec prs) e)    = extendScopeList (map fst prs) $
-                                (mapM_ dffvBind prs >> dffvExpr e)
-dffvExpr (Case e b _ as)      = dffvExpr e >> extendScope b (mapM_ dffvAlt as)
-dffvExpr _other               = return ()
-
-dffvAlt :: CoreAlt -> DFFV ()
-dffvAlt (Alt _ xs r) = extendScopeList xs (dffvExpr r)
-
-dffvBind :: (Id, CoreExpr) -> DFFV ()
-dffvBind(x,r)
-  | not (isId x) = dffvExpr r
-  | otherwise    = dffvLetBndr False x >> dffvExpr r
-                -- Pass False because we are doing the RHS right here
-                -- If you say True you'll get *exponential* behaviour!
-
-dffvLetBndr :: Bool -> Id -> DFFV ()
--- Gather the free vars of the RULES and unfolding of a binder
+idBndrFvsInOrder :: Bool -> Id -> [Var]
+idBndrFvsInOrder show_unfold id
+-- Gather the free vars of the type, RULES and unfolding of an Id binder
 -- We always get the free vars of a *stable* unfolding, but
 -- for a *vanilla* one (VanillaSrc), the flag controls what happens:
 --   True <=> get fvs of even a *vanilla* unfolding
@@ -899,24 +849,19 @@ dffvLetBndr :: Bool -> Id -> DFFV ()
 --       we are taking the fvs of the RHS anyway
 -- For top-level bindings (call from addExternal, via bndrFvsInOrder)
 --       we say "True" if we are exposing that unfolding
-dffvLetBndr vanilla_unfold id
-  = do { go_unf (realUnfoldingInfo idinfo)
-       ; mapM_ go_rule (ruleInfoRules (ruleInfo idinfo)) }
+  = fvVarList $
+    tyCoFVsOfType (idType id) `unionFV`
+    unf_fvs                   `unionFV`
+    rules_fvs
   where
     idinfo = idInfo id
 
-    go_unf (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
-       | isStableSource src = dffvExpr rhs
-       | vanilla_unfold     = dffvExpr rhs
-       | otherwise          = return ()
+    unf_fvs :: FV
+    unf_fvs | show_unfold = unfoldingFVs (realUnfoldingInfo idinfo)
+            | otherwise   = emptyFV
 
-    go_unf (DFunUnfolding { df_bndrs = bndrs, df_args = args })
-             = extendScopeList bndrs $ mapM_ dffvExpr args
-    go_unf _ = return ()
-
-    go_rule (BuiltinRule {}) = return ()
-    go_rule (Rule { ru_bndrs = bndrs, ru_rhs = rhs })
-      = extendScopeList bndrs (dffvExpr rhs)
+    rules_fvs :: FV
+    rules_fvs = rulesFVs RhsOnly (ruleInfoRules (ruleInfo idinfo))
 
 {-
 ************************************************************************
@@ -941,7 +886,7 @@ The function 'expose_rule' filters out rules that mention, on the LHS,
 Ids that aren't externally visible; these rules can't fire in a client
 module.
 
-The externally-visible binders are computed (by chooseExternalIds)
+The externally-visible binders are computed (by chooseExternalVars)
 assuming that all orphan rules are externalised (see init_ext_ids in
 function 'search'). So in fact it's a bit conservative and we may
 export more than we need.  (It's a sort of mutual recursion.)
@@ -1022,7 +967,7 @@ findExternalRules opts binds imp_id_rules unfold_env
         -- LHS: we have already filtered out rules that mention internal Ids
         --     on LHS but that isn't enough because we might have by now
         --     discarded a binding with an external Id. (How?
-        --     chooseExternalIds is a bit conservative.)
+        --     chooseExternalVars is a bit conservative.)
         --
         -- RHS: the auto rules that might mention a binder that has
         --      been discarded; see Note [Trimming auto-rules]
@@ -1033,9 +978,13 @@ findExternalRules opts binds imp_id_rules unfold_env
                 -- importing module).  NB: ruleLhsFreeIds only returns LocalIds.
                 -- See Note [Which rules to expose]
 
-    is_external_id id = case lookupVarEnv unfold_env id of
-                          Just (name, _) -> isExternalName name && not (isImplicitId id)
-                          Nothing        -> False
+    is_external_id :: Var -> Bool
+    is_external_id id
+      | isId id
+      , Just (name, _) <- lookupVarEnv unfold_env id
+      = isExternalName name && not (isImplicitId id)
+      | otherwise
+      = False
 
     trim_binds :: [CoreBind]
                -> ( [CoreBind]   -- Trimmed bindings
@@ -1062,12 +1011,14 @@ findExternalRules opts binds imp_id_rules unfold_env
          rhss          = rhssOfBind bind
          bndr_set'     = bndr_set `extendVarSetList` bndrs
 
-         needed_fvs'   = needed_fvs                                   `unionVarSet`
-                         mapUnionVarSet idUnfoldingVars   bndrs       `unionVarSet`
-                              -- Ignore type variables in the type of bndrs
-                         mapUnionVarSet exprFreeVars      rhss        `unionVarSet`
+         needed_fvs'   = needed_fvs                              `unionVarSet`
+                         mapUnionVarSet bndr_fvs     bndrs       `unionVarSet`
+                         mapUnionVarSet exprFreeVars rhss        `unionVarSet`
                          mapUnionVarSet user_rule_rhs_fvs local_rules
             -- In needed_fvs', we don't bother to delete binders from the fv set
+
+         bndr_fvs bndr = tyCoVarsOfType (varType bndr) `unionVarSet`
+                         varUnfoldingVars bndr
 
          local_rules  = [ rule
                         | opt_expose_rules opts
@@ -1197,12 +1148,25 @@ tidyTopBind  :: UnfoldEnv
              -> (TidyEnv, CoreBind)
 
 tidyTopBind unfold_env boot_exports
-            (occ_env,subst1) (NonRec bndr rhs)
+            tidy_env@(occ_env,subst1) (NonRec bndr rhs)
+  -- TyVar bindings
+  | isTyVar bndr
+  , let (name',_) = expectJust $ lookupVarEnv unfold_env bndr
+        kind'     = tidyType tidy_env (tyVarKind bndr)
+        bndr'     = case tyVarUnfolding_maybe bndr of
+                      Nothing  -> mkTyVar name' kind'
+                      Just unf -> mkTyVarWithUnfolding name' kind' (tidyType tidy_env unf)
+        rhs'      = tidyExpr tidy_env rhs
+        subst2    = extendVarEnv subst1 bndr bndr'
+        tidy_env2 = (occ_env, subst2)
+  = (tidy_env2, NonRec bndr' rhs')
+
+  -- Id bindings
+  | let (bndr', rhs') = tidyTopPair unfold_env boot_exports tidy_env2 (bndr, rhs)
+        subst2        = extendVarEnv subst1 bndr bndr'
+        tidy_env2     = (occ_env, subst2)
   = (tidy_env2,  NonRec bndr' rhs')
   where
-    (bndr', rhs') = tidyTopPair unfold_env boot_exports tidy_env2 (bndr, rhs)
-    subst2        = extendVarEnv subst1 bndr bndr'
-    tidy_env2     = (occ_env, subst2)
 
 tidyTopBind unfold_env boot_exports (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
@@ -1227,6 +1191,7 @@ tidyTopPair :: UnfoldEnv
 
 tidyTopPair unfold_env boot_exports rhs_tidy_env (bndr, rhs)
   = -- pprTrace "tidyTop" (ppr name' <+> ppr details <+> ppr rhs) $
+    assertPpr (isId bndr) (ppr bndr) $
     (bndr1, rhs1)
 
   where
@@ -1236,7 +1201,7 @@ tidyTopPair unfold_env boot_exports rhs_tidy_env (bndr, rhs)
     !cbv_bndr = tidyCbvInfoTop boot_exports bndr rhs
     bndr1    = mkGlobalId details name' ty' idinfo'
     details  = idDetails cbv_bndr -- Preserve the IdDetails
-    ty'      = tidyTopType (idType cbv_bndr)
+    ty'      = tidyType rhs_tidy_env (idType cbv_bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
     idinfo'  = tidyTopIdInfo rhs_tidy_env name' ty'
                              rhs rhs1 (idInfo cbv_bndr) show_unfold

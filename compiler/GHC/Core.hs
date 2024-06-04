@@ -32,9 +32,8 @@ module GHC.Core (
         mkDoubleLit, mkDoubleLitDouble,
 
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
-        varToCoreExpr, varsToCoreExprs,
+        varToCoreExpr, varsToCoreExprs, mkBinds,
 
-        mkBinds,
 
         isId, cmpAltCon, cmpAlt, ltAlt,
 
@@ -43,7 +42,8 @@ module GHC.Core (
         foldBindersOfBindStrict, foldBindersOfBindsStrict,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
-        collectArgs, collectValArgs, stripNArgs, collectArgsTicks, flattenBinds,
+        collectArgs, collectValArgs, stripNArgs, collectArgsTicks,
+        flattenBinds, glomValBinds, mapBindBndrs,
         collectFunSimple,
 
         exprToType,
@@ -317,17 +317,6 @@ data Bind b = NonRec b (Expr b)
             | Rec [(b, (Expr b))]
   deriving Data
 
--- | Helper function. You can use the result of 'mkBinds' with 'mkLets' for
--- instance.
---
---   * @'mkBinds' 'Recursive' binds@ makes a single mutually-recursive
---     bindings with all the rhs/lhs pairs in @binds@
---   * @'mkBinds' 'NonRecursive' binds@ makes one non-recursive binding
---     for each rhs/lhs pairs in @binds@
-mkBinds :: RecFlag -> [(b, (Expr b))] -> [Bind b]
-mkBinds Recursive binds = [Rec binds]
-mkBinds NonRecursive binds = map (uncurry NonRec) binds
-
 {-
 Note [Literal alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -473,6 +462,32 @@ application is always a variable or a constant.  To allow RULES to work nicely
 we need to allow lots of things in the arguments of a call.
 
 TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
+
+Note [Type and coercion lets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow
+   let @a = TYPE ty in ...
+and similarly for coercions.
+
+   TODO: fill this out
+
+Wrinkles:
+
+(TCL1) In a type let (Let @a = TYPE ty in body), we do /not/ insist that
+  the binder `a` has a TyVarUnfolding.  But it it does not, then `body`
+  must be well-typed without paying atention to the binding. More precisely,
+       let @a = TYPE ty in body
+  where `a` has no TyVarUnfolding, is well-typed iff
+       (/\a. body) ty
+  is well-typed.  This is used during worker/wrapper, which creates type-lets.
+  See GHC.Core.Opt.WorkWrap.Utils.mkAppsBeta.
+
+(TCL2) Consider a beta-redex  ((/\a. blah) ty).  We may turn that into
+         let @a = ty in blah
+  and it's crucial that /every/ occurrence of `a` in `blah` is replaced by
+  `a{=ty}` with an unfolding.  To ensure that, we extend the /substitution/
+  (which is always substituted) with the tyvar-replete-with-unfolding, rather
+  than merely extending the in-scope set as we do for Ids.
 
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1959,6 +1974,17 @@ deTagAlt (Alt con bndrs rhs) = Alt con [b | TB b _ <- bndrs] (deTagExpr rhs)
 ************************************************************************
 -}
 
+-- | Helper function. You can use the result of 'mkBinds' with 'mkLets' for
+-- instance.
+--
+--   * @'mkBinds' 'Recursive' binds@ makes a single mutually-recursive
+--     bindings with all the rhs/lhs pairs in @binds@
+--   * @'mkBinds' 'NonRecursive' binds@ makes one non-recursive binding
+--     for each rhs/lhs pairs in @binds@
+mkBinds :: RecFlag -> [(b, (Expr b))] -> [Bind b]
+mkBinds Recursive binds = [Rec binds]
+mkBinds NonRecursive binds = map (uncurry NonRec) binds
+
 -- | Apply a list of argument expressions to a function expression in a nested fashion. Prefer to
 -- use 'GHC.Core.Make.mkCoreApps' if possible
 mkApps    :: Expr b -> [Arg b]  -> Expr b
@@ -2151,7 +2177,6 @@ foldBindersOfBindsStrict f = \z binds -> foldl' fold_bind z binds
   where
     fold_bind = (foldBindersOfBindStrict f)
 
-
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
@@ -2170,6 +2195,21 @@ flattenBinds :: [Bind b] -> [(b, Expr b)]
 flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
 flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
 flattenBinds []                   = []
+
+glomValBinds :: [Bind b] -> [Bind b]
+-- Glom all the value bindings into a single Rec;
+-- Leave any type bindings as NonRecs, bringing them to the front
+glomValBinds bs = go [] bs
+  where
+    go prs (b@(NonRec _ (Type {})) : bs) = b : go prs bs
+    go prs (NonRec b r : bs) = go ((b,r) : prs) bs
+    go prs (Rec rprs   : bs) = go (rprs ++ prs) bs
+    go []  [] = []
+    go prs [] = [Rec prs]
+
+mapBindBndrs :: (b -> b) -> Bind b -> Bind b
+mapBindBndrs f (NonRec b r) = NonRec (f b) r
+mapBindBndrs f (Rec prs)    = Rec (mapFst f prs)
 
 -- | We often want to strip off leading lambdas before getting down to
 -- business. Variants are 'collectTyBinders', 'collectValBinders',

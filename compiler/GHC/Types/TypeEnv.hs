@@ -67,9 +67,9 @@ mkTypeEnvWithImplicits things =
     `plusNameEnv`
   mkTypeEnv (concatMap implicitTyThings things)
 
-typeEnvFromEntities :: [Id] -> [TyCon] -> [PatSyn] -> [FamInst] -> TypeEnv
-typeEnvFromEntities ids tcs patsyns famInsts =
-  mkTypeEnv (   map AnId ids
+typeEnvFromEntities :: [Var] -> [TyCon] -> [PatSyn] -> [FamInst] -> TypeEnv
+typeEnvFromEntities vars tcs patsyns famInsts =
+  mkTypeEnv (   map varTyThing vars
              ++ map ATyCon all_tcs
              ++ concatMap implicitTyConThings all_tcs
              ++ map (ACoAxiom . toBranchedAxiom . famInstAxiom) famInsts

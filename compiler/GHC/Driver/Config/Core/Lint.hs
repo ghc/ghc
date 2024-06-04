@@ -53,14 +53,18 @@ endPassHscEnvIO hsc_env name_ppr_ctx pass binds rules
        }
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> WarnsAndErrs
-lintCoreBindings dflags coreToDo vars -- binds
-  = lintCoreBindings' $ LintConfig
-      { l_diagOpts = initDiagOpts dflags
-      , l_platform = targetPlatform dflags
-      , l_flags    = perPassFlags dflags coreToDo
-      , l_vars     = vars
-      }
+-- I think we should pass [CoreRule] to this function too; but I don't know
+-- who the callers (if any) are, so for not I'm leaving the API unchanged
+lintCoreBindings :: DynFlags -> CoreToDo -> [Var]
+                 -> CoreProgram -> WarnsAndErrs
+lintCoreBindings dflags coreToDo vars binds
+  = lintCoreBindings' config binds []
+  where
+    config =  LintConfig { l_diagOpts = initDiagOpts dflags
+                         , l_platform = targetPlatform dflags
+                         , l_flags    = perPassFlags dflags coreToDo
+                         , l_vars     = vars
+                         }
 
 initEndPassConfig :: DynFlags -> [Var] -> NamePprCtx -> CoreToDo -> EndPassConfig
 initEndPassConfig dflags extra_vars name_ppr_ctx pass = EndPassConfig

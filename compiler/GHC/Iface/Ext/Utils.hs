@@ -160,7 +160,7 @@ hieTypeToIface = foldType go
   where
     go (HTyVarTy n) = IfaceTyVar $ (mkIfLclName (occNameFS $ getOccName n))
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
-    go (HLitTy l) = IfaceLitTy l
+    go (HLitTy l)   = IfaceLitTy l
     go (HForAllTy ((n,k),af) t) = let b = (mkIfLclName (occNameFS $ getOccName n), k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
     go (HFunTy w a b)   = IfaceFunTy visArgTypeLike   w       a    b

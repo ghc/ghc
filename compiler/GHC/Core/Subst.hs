@@ -16,7 +16,7 @@ module GHC.Core.Subst (
         substTyUnchecked, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupIdSubst_maybe, substIdType, substIdOcc,
-        substTickish, substDVarSet, substIdInfo,
+        substTickish, substFreeVars, substIdInfo,
 
         -- ** Operations on substitutions
         emptySubst, mkEmptySubst, mkTCvSubst, mkOpenSubst, isEmptySubst,
@@ -30,7 +30,7 @@ module GHC.Core.Subst (
 
         -- ** Substituting and cloning binders
         substBndr, substBndrs, substRecBndrs, substTyVarBndr, substCoVarBndr,
-        cloneBndr, cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
+        cloneBndr, cloneBndrs, cloneRecIdBndrs,
         cloneBndrsM, cloneRecIdBndrsM,
 
     ) where
@@ -44,8 +44,7 @@ import GHC.Core.Utils
 
         -- We are defining local versions
 import GHC.Core.Type hiding ( substTy )
-import GHC.Core.Coercion
-    ( tyCoFVsOfCo, mkCoVarCo, substCoVarBndr )
+import GHC.Core.Coercion    ( tyCoFVsOfCo, mkCoVarCo, substCoVarBndr )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env as InScopeSet
@@ -356,23 +355,24 @@ substBndrs = mapAccumL substBndr
 {-# INLINE substBndrs #-}
 
 -- | Substitute in a mutually recursive group of 'Id's
-substRecBndrs :: Traversable f => Subst -> f Id -> (Subst, f Id)
+substRecBndrs :: (HasDebugCallStack, Traversable f) => Subst -> f Id -> (Subst, f Id)
+-- Used with f=[] (for a list) and f=Identity (for a single binder)
 substRecBndrs subst bndrs
   = (new_subst, new_bndrs)
   where         -- Here's the reason we need to pass rec_subst to subst_id
     (new_subst, new_bndrs) = mapAccumL (substIdBndr (text "rec-bndr") new_subst) subst bndrs
-{-# SPECIALIZE substRecBndrs :: Subst -> [Id] -> (Subst, [Id]) #-}
-{-# SPECIALIZE substRecBndrs :: Subst -> Identity Id -> (Subst, Identity Id) #-}
+{-# SPECIALIZE substRecBndrs :: HasDebugCallStack => Subst -> [Id] -> (Subst, [Id]) #-}
+{-# SPECIALIZE substRecBndrs :: HasDebugCallStack => Subst -> Identity Id -> (Subst, Identity Id) #-}
 
-substIdBndr :: SDoc
+substIdBndr :: HasDebugCallStack
+            => SDoc
             -> Subst            -- ^ Substitution to use for the IdInfo
             -> Subst -> Id      -- ^ Substitution and Id to transform
             -> (Subst, Id)      -- ^ Transformed pair
                                 -- NB: unfolding may be zapped
 
 substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
-  = -- pprTrace "substIdBndr" (doc $$ ppr old_id $$ ppr in_scope) $
-    (Subst new_in_scope new_env tvs cvs, new_id)
+  = (Subst new_in_scope new_env tvs cvs, new_id)
   where
     id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
     id2 | no_type_change = id1
@@ -407,20 +407,6 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
 Now a variant that unconditionally allocates a new unique.
 It also unconditionally zaps the OccInfo.
 -}
-
--- | Very similar to 'substBndr', but it always allocates a new 'Unique' for
--- each variable in its output.  It substitutes the IdInfo though.
--- Discards non-Stable unfoldings
-cloneIdBndr :: Subst -> UniqSupply -> Id -> (Subst, Id)
-cloneIdBndr subst us old_id
-  = clone_id subst subst (old_id, uniqFromSupply us)
-
--- | Applies 'cloneIdBndr' to a number of 'Id's, accumulating a final
--- substitution from left to right
--- Discards non-Stable unfoldings
-cloneIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
-cloneIdBndrs subst us ids
-  = mapAccumL (clone_id subst) subst (ids `zip` uniqsFromSupply us)
 
 cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var])
 -- Works for all kinds of variables (typically case binders)
@@ -549,9 +535,8 @@ substIdOcc subst v = case lookupIdSubst subst v of
 ------------------
 -- | Substitutes for the 'Id's within the 'RuleInfo' given the new function 'Id'
 substRuleInfo :: Subst -> Id -> RuleInfo -> RuleInfo
-substRuleInfo subst new_id (RuleInfo rules rhs_fvs)
+substRuleInfo subst new_id (RuleInfo rules)
   = RuleInfo (map (substRule subst subst_ru_fn) rules)
-                  (substDVarSet subst rhs_fvs)
   where
     subst_ru_fn = const (idName new_id)
 
@@ -587,21 +572,21 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
     (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
-substDVarSet :: HasDebugCallStack => Subst -> DVarSet -> DVarSet
-substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
-  = mkDVarSet $ fst $ foldr subst_fv ([], emptyVarSet) $ dVarSetElems fvs
+substFreeVars :: HasDebugCallStack => Subst -> [InVar] -> [OutVar]
+substFreeVars subst@(Subst _ _ tv_env cv_env) fvs
+  = fst $ foldr subst_fv ([], emptyVarSet) $ fvs
   where
-  subst_fv :: Var -> ([Var], VarSet) -> ([Var], VarSet)
-  subst_fv fv acc
-     | isTyVar fv
-     , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv
-     = tyCoFVsOfType fv_ty (const True) emptyVarSet $! acc
-     | isCoVar fv
-     , let fv_co = lookupVarEnv cv_env fv `orElse` mkCoVarCo fv
-     = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
-     | otherwise
-     , let fv_expr = lookupIdSubst subst fv
-     = exprLocalFVs fv_expr (const True) emptyVarSet $! acc
+    subst_fv :: Var -> ([Var], VarSet) -> ([Var], VarSet)
+    subst_fv fv acc
+       | isTyVar fv
+       , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv
+       = tyCoFVsOfType fv_ty (const True) emptyVarSet $! acc
+       | isCoVar fv
+       , let fv_co = lookupVarEnv cv_env fv `orElse` mkCoVarCo fv
+       = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
+       | otherwise
+       , let fv_expr = lookupIdSubst subst fv
+       = exprLocalFVs fv_expr (const True) emptyVarSet $! acc
 
 ------------------
 -- | Drop free vars from the breakpoint if they have a non-variable substitution.
@@ -648,8 +633,6 @@ and the rule was
 
 This rule was attached to `transpose`, but also mentions itself in the RHS so we have
 to be careful to not force the `IdInfo` for transpose when dealing with the RHS of the rule.
-
-
 
 Note [substTickish]
 ~~~~~~~~~~~~~~~~~~~~~~

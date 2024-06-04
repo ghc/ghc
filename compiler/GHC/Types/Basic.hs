@@ -66,6 +66,8 @@ module GHC.Types.Basic (
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isManyOccs,
         isNoOccInfo, strongLoopBreaker, weakLoopBreaker,
 
+        TyCoOccInfo(..), plusTyCoOccInfo, isOneTyCoOcc, isDeadTyCoOcc,
+
         InsideLam(..),
         BranchCount, oneBranch,
         InterestingCxt(..),
@@ -1250,8 +1252,29 @@ point can also be invoked from other join points, not just from case branches:
 
 Here both 'j1' and 'j2' will get marked AlwaysTailCalled, but j1 will get
 ManyOccs and j2 will get `OneOcc { occ_n_br = 2 }`.
+-}
 
-************************************************************************
+data TyCoOccInfo = TyCoDead | TyCoOne | TyCoMany
+
+instance Outputable TyCoOccInfo where
+   ppr TyCoDead = text "dead"
+   ppr TyCoOne  = text "one"
+   ppr TyCoMany = text "many"
+
+isOneTyCoOcc :: TyCoOccInfo -> Bool
+isOneTyCoOcc TyCoOne = True
+isOneTyCoOcc _       = False
+
+isDeadTyCoOcc :: TyCoOccInfo -> Bool
+isDeadTyCoOcc TyCoDead = True
+isDeadTyCoOcc _        = False
+
+plusTyCoOccInfo :: TyCoOccInfo -> TyCoOccInfo -> TyCoOccInfo
+plusTyCoOccInfo TyCoDead occ = occ
+plusTyCoOccInfo occ TyCoDead = occ
+plusTyCoOccInfo _ _        = TyCoMany
+
+{-**********************************************************************
 *                                                                      *
                 Default method specification
 *                                                                      *

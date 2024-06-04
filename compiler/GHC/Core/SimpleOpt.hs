@@ -40,10 +40,10 @@ import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
 import GHC.Types.InlinePragma ( isAlwaysActive )
-import GHC.Types.Var      ( isNonCoVarId )
+import GHC.Types.Var      ( isNonCoVarId, setTyVarUnfolding, tyVarOccInfo )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
+import GHC.Types.Demand( topSubDmd )
 import GHC.Types.Tickish
 import GHC.Types.Basic
 
@@ -154,8 +154,7 @@ simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
 -- created from DynFlags, but not necessarily.
 
 simpleOptExpr opts expr
-  = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
-    simpleOptExprWith opts init_subst expr
+  = simpleOptExprWith opts init_subst expr
   where
     init_subst = mkEmptySubst (mkInScopeSet (mapVarSet zapIdUnfolding (exprFreeVars expr)))
         -- zapIdUnfolding: see Note [The InScopeSet for simpleOptExpr]
@@ -177,9 +176,10 @@ simpleOptExprNoInline opts expr
 simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
 simpleOptExprWith opts subst expr
-  = simple_opt_expr init_env (occurAnalyseExpr expr)
+  = simple_opt_expr init_env occ_expr
   where
     init_env = (emptyEnv opts) { soe_subst = subst }
+    occ_expr = occurAnalyseExpr expr
 
 ----------------------
 simpleOptPgm :: SimpleOpts
@@ -302,7 +302,7 @@ simple_opt_expr env expr = go expr
       , Just (Alt altcon bs rhs) <- findAlt (DataAlt con) as
       = case altcon of
           DEFAULT -> go rhs
-          _       -> foldr wrapLet (simple_opt_expr env' rhs) mb_prs
+          _       -> foldr wrapNonRec (simple_opt_expr env' rhs) mb_prs
             where
               (env', mb_prs) = mapAccumL (simple_out_bind NotTopLevel) env $
                                zipEqual bs es
@@ -380,6 +380,11 @@ simple_app env e0@(Lam {}) as0@(_:_)
 
     do_beta :: SimpleOptEnv -> InExpr -> [SimpleContItem] -> OutExpr
     do_beta env (Lam b body) (ApplyToArg a:as)
+      | (t_env, Type t) <- a
+      , (env'', mb_tpr) <- simple_type_bind env b (t_env, t)
+      = assert (isTyVar b) $
+        wrapNonRec mb_tpr $ do_beta env'' body as
+
       | -- simpl binder before looking at its type
         -- See Note [Dark corner with representation polymorphism]
         needsCaseBinding (idType b') (snd a)
@@ -389,7 +394,7 @@ simple_app env e0@(Lam {}) as0@(_:_)
       = mkDefaultCase a' b' $ do_beta env' body as
 
       | (env'', mb_pr) <- simple_bind_pair env' b (Just b') a NotTopLevel
-      = wrapLet mb_pr $ do_beta env'' body as
+      = wrapNonRec mb_pr $ do_beta env'' body as
       where (env', b') = subst_opt_bndr env b
 
     -- See Note [Eliminate casts in function position]
@@ -565,10 +570,14 @@ Wrinkle [Unlifted newtypes with wrappers]
 ----------------------
 simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe OutBind)
+simple_opt_bind env (NonRec b r) _top_level
+  | Type t <- r
+  , (env', mb_pr) <- simple_type_bind env b (env, t)
+  = assert (isTyVar b) $
+    (env', mkNonRec mb_pr)
+
 simple_opt_bind env (NonRec b r) top_level
-  = (env', case mb_pr of
-            Nothing    -> Nothing
-            Just (b,r) -> Just (NonRec b r))
+  = (env', mkNonRec mb_pr)
   where
     (b', r') = joinPointBinding_maybe b r `orElse` (b, r)
     (env', mb_pr) = simple_bind_pair env b' Nothing (env,r') top_level
@@ -589,6 +598,30 @@ simple_opt_bind env (Rec prs) top_level
          (env', mb_pr) = simple_bind_pair env b (Just b') (env,r) top_level
 
 ----------------------
+simple_type_bind :: SimpleOptEnv
+                 -> InTyVar
+                 -> (SimpleOptEnv, InType)
+                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
+-- See Note [Type and coercion lets]
+simple_type_bind env@(SOE { soe_subst = subst })
+                 in_tv (rhs_env, in_ty)
+  | occurs_once || typeIsSmallEnoughToInline out_ty
+  = (env { soe_subst = extendTvSubst subst in_tv out_ty }, Nothing)
+
+  | otherwise  -- Make a type binding
+  = let (subst1, tv1) = substTyVarBndr subst in_tv
+        out_tv = tv1 `setTyVarUnfolding` out_ty
+    in ( env { soe_subst = extendTvSubst subst1 in_tv (mkTyVarTy out_tv) }
+       , Just (out_tv, Type out_ty) )
+       -- Very important to extend the substitution to propagate
+       -- the unfolding to all the usage sites of the binder
+  where
+    subst_for_rhs = setInScope (soe_subst rhs_env) (substInScopeSet subst)
+    out_ty        = substTyUnchecked subst_for_rhs in_ty
+    bndr_occ      = tyVarOccInfo in_tv
+    occurs_once {- syntactically -} = isOneTyCoOcc bndr_occ
+
+----------------------
 simple_bind_pair :: SimpleOptEnv
                  -> InVar -> Maybe OutVar
                  -> SimpleClo
@@ -600,10 +633,8 @@ simple_bind_pair :: SimpleOptEnv
 simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst, soe_opts = opts })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
                  top_level
-  | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
-  , let out_ty = substTyUnchecked (soe_subst rhs_env) ty
-  = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr in_rhs) $
-    (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
+  | Type in_ty <- in_rhs
+  = pprPanic "simple_bind_pair" (ppr in_bndr $$ ppr in_ty)
 
   | Coercion co <- in_rhs
   , let out_co = optCoercion (so_co_opts (soe_opts env)) (soe_subst rhs_env) co
@@ -675,8 +706,8 @@ simple_out_bind :: TopLevelFlag
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind top_level env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
   | Type out_ty <- out_rhs
-  = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr out_ty $$ ppr out_rhs)
-    (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
+  = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr out_ty $$ ppr out_rhs) $
+    (env, Just (in_bndr `setTyVarUnfolding` out_ty, out_rhs))
 
   | Coercion out_co <- out_rhs
   = assert (isCoVar in_bndr)
@@ -926,9 +957,13 @@ add_info env old_bndr top_level new_rhs new_bndr
                                     False -- Not a join point
                                     new_rhs Nothing
 
-wrapLet :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
-wrapLet Nothing      body = body
-wrapLet (Just (b,r)) body = Let (NonRec b r) body
+mkNonRec :: Maybe (Id,CoreExpr) -> Maybe OutBind
+mkNonRec Nothing      = Nothing
+mkNonRec (Just (b,r)) = Just (NonRec b r)
+
+wrapNonRec :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
+wrapNonRec Nothing      body = body
+wrapNonRec (Just (b,r)) body = Let (NonRec b r) body
 
 {-
 Note [Inline prag in simplOpt]
@@ -1077,12 +1112,7 @@ joinPointBinding_maybe bndr rhs
   = Just (bndr, rhs)
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
-  , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  , let str_sig   = idDmdSig bndr
-        str_arity = count isId bndrs  -- Strictness demands are for Ids only
-        join_bndr = bndr `asJoinId`        join_arity
-                         `setIdDmdSig` etaConvertDmdSig str_arity str_sig
-  = Just (join_bndr, mkLams bndrs body)
+  = Just (mkNewJoinPointBinding bndr join_arity rhs)
 
   | otherwise
   = Nothing
@@ -1700,7 +1730,7 @@ exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
     | Just (x, e,ts) <- exprIsLambda_maybe ise casted_e
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
-    , not (isTyVar x) && not (isCoVar x)
+    , isNonCoVarId x
     , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
     , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
     , let res = Just (x',e',ts)

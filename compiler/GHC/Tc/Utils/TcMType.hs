@@ -188,7 +188,7 @@ newEvVars theta = mapM newEvVar theta
 newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name ManyTy ty) }
+                 ; return (mkLocalId name ManyTy ty) }
 
 -- | Create a new Wanted constraint with the given 'CtLoc'.
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
@@ -1481,8 +1481,8 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
                    -- See Note [Naughty quantification candidates]
                 -> do { traceTc "Naughty quantifier" $
                           vcat [ ppr tv <+> dcolon <+> ppr tv_kind
-                               , text "bound:" <+> pprTyVars (nonDetEltsUniqSet bound)
-                               , text "fvs:" <+> pprTyVars (nonDetEltsUniqSet tv_kind_vars) ]
+                               , text "bound:" <+> pprTyVarsWithKind (nonDetEltsUniqSet bound)
+                               , text "fvs:" <+> pprTyVarsWithKind (nonDetEltsUniqSet tv_kind_vars) ]
 
                       ; let escapees = intersectVarSet bound tv_kind_vars
                       ; naughtyQuantification orig_ty tv escapees }
@@ -1714,8 +1714,8 @@ quantifyTyVars skol_info ns_strat dvs
        ; final_qtvs  <- liftZonkM $ mapMaybeM zonk_quant undefaulted
 
        ; traceTc "quantifyTyVars }"
-           (vcat [ text "undefaulted:" <+> pprTyVars undefaulted
-                 , text "final_qtvs:"  <+> pprTyVars final_qtvs ])
+           (vcat [ text "undefaulted:" <+> pprTyVarsWithKind undefaulted
+                 , text "final_qtvs:"  <+> pprTyVarsWithKind final_qtvs ])
 
        -- We should never quantify over coercion variables; check this
        ; let co_vars = filter isCoVar final_qtvs
@@ -1749,7 +1749,7 @@ zonkAndSkolemise skol_info tyvar
        ; skolemiseQuantifiedTyVar skol_info zonked_tyvar }
 
   | otherwise
-  = assertPpr (isImmutableTyVar tyvar || isCoVar tyvar) (pprTyVar tyvar) $
+  = assertPpr (isImmutableTyVar tyvar || isCoVar tyvar) (pprTyVarWithKind tyvar) $
     zonkTyCoVarKind tyvar
 
 skolemiseQuantifiedTyVar :: SkolemInfo -> TcTyVar -> ZonkM TcTyVar
