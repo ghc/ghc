@@ -152,10 +152,16 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
   be duplicated here, otherwise there will be some
   -Wimplicit-function-declaration compilation errors. Especially when
   GHC compiles out-of-tree cbits that rely on SET_HDR in RTS API.
+
+  However when RtsFlags.h is imported, we don't want to redefine them to avoid
+  spurious warnings (#24918).
 */
+#if !defined(RTS_FLAGS_DOING_PROFILING)
+#define RTS_FLAGS_DOING_PROFILING 1
 bool doingLDVProfiling(void);
 bool doingRetainerProfiling(void);
 bool doingErasProfiling(void);
+#endif
 
 /*
   The following macro works for both retainer profiling and LDV profiling. For
