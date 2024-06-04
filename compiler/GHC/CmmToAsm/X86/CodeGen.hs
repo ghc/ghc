@@ -124,7 +124,7 @@ cmmTopCodeGen (CmmProc info lab live graph) = do
       os   = platformOS platform
 
   case picBaseMb of
-      Just picBase -> initializePicBase_x86 ArchX86 os picBase tops
+      Just picBase -> initializePicBase_x86 os picBase tops
       Nothing -> return tops
 
 cmmTopCodeGen (CmmData sec dat) =

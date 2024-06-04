@@ -883,7 +883,6 @@ needs_probe_call :: Platform -> Int -> Bool
 needs_probe_call platform amount
   = case platformOS platform of
      OSMinGW32 -> case platformArch platform of
-                    ArchX86    -> amount > (4 * 1024)
                     ArchX86_64 -> amount > (4 * 1024)
                     _          -> False
      _         -> False
@@ -913,15 +912,6 @@ mkStackAllocInstr platform amount
         -- function dropping the stack more than a page.
         -- See Note [Windows stack layout]
         case platformArch platform of
-            ArchX86    | needs_probe_call platform amount ->
-                           [ MOV II32 (OpImm (ImmInt amount)) (OpReg eax)
-                           , CALL (Left $ strImmLit (fsLit "___chkstk_ms")) [eax]
-                           , SUB II32 (OpReg eax) (OpReg esp)
-                           ]
-                       | otherwise ->
-                           [ SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
-                           , TEST II32 (OpReg esp) (OpReg esp)
-                           ]
             ArchX86_64 | needs_probe_call platform amount ->
                            [ MOV II64 (OpImm (ImmInt amount)) (OpReg rax)
                            , CALL (Left $ strImmLit (fsLit "___chkstk_ms")) [rax]

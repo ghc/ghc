@@ -148,8 +148,6 @@ addPlatformDepCcFlags archOs cc0 = do
   let cc1 = addWorkaroundFor7799 archOs cc0
   -- As per FPTOOLS_SET_C_LD_FLAGS
   case archOs of
-    ArchOS ArchX86 OSMinGW32 ->
-      return $ cc1 & _ccFlags %++ "-march=i686"
     ArchOS ArchX86 OSFreeBSD ->
       return $ cc1 & _ccFlags %++ "-march=i686"
     ArchOS ArchX86_64 OSSolaris2 ->
@@ -183,4 +181,3 @@ addWorkaroundFor7799 :: ArchOS -> Cc -> Cc
 addWorkaroundFor7799 archOs cc
   | ArchX86 <- archOS_arch archOs = cc & _ccFlags %++ "-U__i686"
   | otherwise = cc
-

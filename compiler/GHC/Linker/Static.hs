@@ -219,23 +219,10 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                              toolSettings_ldSupportsCompactUnwind toolSettings' &&
                              (platformOS platform == OSDarwin) &&
                              case platformArch platform of
-                               ArchX86     -> True
                                ArchX86_64  -> True
-                               ArchARM {}  -> True
                                ArchAArch64 -> True
                                _ -> False
                           then ["-Wl,-no_compact_unwind"]
-                          else [])
-
-                      -- '-Wl,-read_only_relocs,suppress'
-                      -- ld gives loads of warnings like:
-                      --     ld: warning: text reloc in _base_GHCziArr_unsafeArray_info to _base_GHCziArr_unsafeArray_closure
-                      -- when linking any program. We're not sure
-                      -- whether this is something we ought to fix, but
-                      -- for now this flags silences them.
-                      ++ (if platformOS   platform == OSDarwin &&
-                             platformArch platform == ArchX86
-                          then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
                           -- We should rather be asking does it support --gc-sections?

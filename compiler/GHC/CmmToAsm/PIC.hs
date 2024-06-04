@@ -303,25 +303,15 @@ howToAccessLabel config arch OSDarwin DataReference lbl
         | otherwise
         = AccessDirectly
 
-howToAccessLabel config arch OSDarwin JumpReference lbl
+howToAccessLabel config _ OSDarwin JumpReference lbl
         -- dyld code stubs don't work for tailcalls because the
         -- stack alignment is only right for regular calls.
         -- Therefore, we have to go via a symbol pointer:
-        | arch == ArchX86 || arch == ArchX86_64 || arch == ArchAArch64
-        , ncgLabelDynamic config lbl
+        | ncgLabelDynamic config lbl
         = AccessViaSymbolPtr
 
 
-howToAccessLabel config arch OSDarwin _kind lbl
-        -- Code stubs are the usual method of choice for imported code;
-        -- not needed on x86_64 because Apple's new linker, ld64, generates
-        -- them automatically, neither on Aarch64 (arm64).
-        | arch /= ArchX86_64
-        , arch /= ArchAArch64
-        , ncgLabelDynamic config lbl
-        = AccessViaStub
-
-        | otherwise
+howToAccessLabel _ _ OSDarwin _ _
         = AccessDirectly
 
 ----------------------------------------------------------------------------
@@ -534,16 +524,6 @@ gotLabel
 -- However, for PIC on x86, we need a small helper function.
 pprGotDeclaration :: NCGConfig -> HDoc
 pprGotDeclaration config = case (arch,os) of
-   (ArchX86, OSDarwin)
-        | ncgPIC config
-        -> lines_ [
-                text ".section __TEXT,__textcoal_nt,coalesced,no_toc",
-                text ".weak_definition ___i686.get_pc_thunk.ax",
-                text ".private_extern ___i686.get_pc_thunk.ax",
-                text "___i686.get_pc_thunk.ax:",
-                text "\tmovl (%esp), %eax",
-                text "\tret" ]
-
    (_, OSDarwin) -> empty
 
    -- Emit XCOFF TOC section
@@ -597,59 +577,6 @@ pprGotDeclaration config = case (arch,os) of
 
 pprImportedSymbol :: NCGConfig -> CLabel -> HDoc
 pprImportedSymbol config importedLbl = case (arch,os) of
-   (ArchX86, OSDarwin)
-        | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
-        -> if not pic
-             then
-              lines_ [
-                  text ".symbol_stub",
-                  text "L" <> ppr_lbl lbl <> text "$stub:",
-                      text "\t.indirect_symbol" <+> ppr_lbl lbl,
-                      text "\tjmp *L" <> ppr_lbl lbl
-                          <> text "$lazy_ptr",
-                  text "L" <> ppr_lbl lbl
-                      <> text "$stub_binder:",
-                      text "\tpushl $L" <> ppr_lbl lbl
-                          <> text "$lazy_ptr",
-                      text "\tjmp dyld_stub_binding_helper"
-              ]
-             else
-              lines_ [
-                  text ".section __TEXT,__picsymbolstub2,"
-                      <> text "symbol_stubs,pure_instructions,25",
-                  text "L" <> ppr_lbl lbl <> text "$stub:",
-                      text "\t.indirect_symbol" <+> ppr_lbl lbl,
-                      text "\tcall ___i686.get_pc_thunk.ax",
-                  text "1:",
-                      text "\tmovl L" <> ppr_lbl lbl
-                          <> text "$lazy_ptr-1b(%eax),%edx",
-                      text "\tjmp *%edx",
-                  text "L" <> ppr_lbl lbl
-                      <> text "$stub_binder:",
-                      text "\tlea L" <> ppr_lbl lbl
-                          <> text "$lazy_ptr-1b(%eax),%eax",
-                      text "\tpushl %eax",
-                      text "\tjmp dyld_stub_binding_helper"
-              ]
-           $$ lines_ [
-                text ".section __DATA, __la_sym_ptr"
-                    <> (if pic then int 2 else int 3)
-                    <> text ",lazy_symbol_pointers",
-                text "L" <> ppr_lbl lbl <> text "$lazy_ptr:",
-                    text "\t.indirect_symbol" <+> ppr_lbl lbl,
-                    text "\t.long L" <> ppr_lbl lbl
-                    <> text "$stub_binder"]
-
-        | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
-        -> lines_ [
-                text ".non_lazy_symbol_pointer",
-                char 'L' <> ppr_lbl lbl <> text "$non_lazy_ptr:",
-                text "\t.indirect_symbol" <+> ppr_lbl lbl,
-                text "\t.long\t0"]
-
-        | otherwise
-        -> empty
-
    (ArchAArch64, OSDarwin)
         -> empty
 
@@ -734,7 +661,6 @@ pprImportedSymbol config importedLbl = case (arch,os) of
    ppr_lbl  = pprAsmLabel   platform
    arch     = platformArch  platform
    os       = platformOS    platform
-   pic      = ncgPIC config
 
 --------------------------------------------------------------------------------
 -- Generate code to calculate the address that should be put in the
@@ -840,11 +766,11 @@ initializePicBase_ppc _ _ _ _
 -- (See PprMach.hs)
 
 initializePicBase_x86
-        :: Arch -> OS -> Reg
+        :: OS -> Reg
         -> [NatCmmDecl (Alignment, RawCmmStatics) X86.Instr]
         -> NatM [NatCmmDecl (Alignment, RawCmmStatics) X86.Instr]
 
-initializePicBase_x86 ArchX86 os picReg
+initializePicBase_x86 os picReg
         (CmmProc info lab live (ListGraph blocks) : statics)
     | osElfTarget os
     = return (CmmProc info lab live (ListGraph blocks') : statics)
@@ -862,12 +788,12 @@ initializePicBase_x86 ArchX86 os picReg
           fetchGOT (BasicBlock bID insns) =
              BasicBlock bID (X86.FETCHGOT picReg : insns)
 
-initializePicBase_x86 ArchX86 OSDarwin picReg
+initializePicBase_x86 OSDarwin picReg
         (CmmProc info lab live (ListGraph (entry:blocks)) : statics)
         = return (CmmProc info lab live (ListGraph (block':blocks)) : statics)
 
     where BasicBlock bID insns = entry
           block' = BasicBlock bID (X86.FETCHPC picReg : insns)
 
-initializePicBase_x86 _ _ _ _
+initializePicBase_x86 _ _ _
         = panic "initializePicBase_x86: not needed"
