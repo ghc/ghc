@@ -24,7 +24,12 @@ void initRtsFlagsDefaults (void);
 void setupRtsFlags        (int *argc, char *argv[], RtsConfig rtsConfig);
 void freeRtsArgs          (void);
 bool is_io_mng_native_p   (void);
-#if defined(PROFILING)
+
+/* These prototypes may also be defined by ClosureMacros.h. We don't want to
+ * define them twice (#24918).
+ */
+#if defined(PROFILING) && !defined(RTS_FLAGS_DOING_PROFILING)
+#define RTS_FLAGS_DOING_PROFILING 1
 bool doingLDVProfiling (void);
 bool doingRetainerProfiling(void);
 bool doingErasProfiling(void);
