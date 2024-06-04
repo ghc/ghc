@@ -412,7 +412,7 @@ cseBind toplevel env (Rec [(in_id, rhs)])
   = (extendCSRecEnv env1 out_id rhs'' id_expr', Rec [(zapped_id, rhs')])
 
   where
-    (env1, Identity out_id) = addRecBinders toplevel env (Identity in_id)
+    (env1, out_id) = addRecBinder toplevel env in_id
     rhs'  = cseExpr env1 rhs
     rhs'' = stripTicksE tickishFloatable rhs'
     ticks = stripTicksT tickishFloatable rhs'
@@ -927,7 +927,16 @@ addNonRecBinder top_lvl cse v
   where
     (sub', v') = substBndr (cs_subst cse) v
 
+addRecBinder :: TopLevelFlag -> CSEnv -> Id -> (CSEnv, Id)
+{-# INLINE addRecBinder #-}
+addRecBinder top_lvl env id = (env', id')
+  where
+    (env', Identity id') = addRecBinders top_lvl env (Identity id)
+
 addRecBinders :: Traversable f => TopLevelFlag -> CSEnv -> f Id -> (CSEnv, f Id)
+-- We instantiate `f` at
+--    (a) []        for multiple binders
+--    (b) Identity  for a single binder
 -- Don't clone at top level
 addRecBinders top_lvl cse vs
   | isTopLevel top_lvl  = (cse,                     vs)

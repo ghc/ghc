@@ -427,7 +427,7 @@ it easier to read debugging output.
 
 -- Make a new Id with the same print name, but different type, and new unique
 newUniqueId :: Id -> Mult -> Type -> DsM Id
-newUniqueId id = mkSysLocalOrCoVarM (occNameFS (nameOccName (idName id)))
+newUniqueId id = mkSysLocalM (occNameFS (nameOccName (idName id)))
 
 duplicateLocalDs :: Id -> DsM Id
 duplicateLocalDs old_local
@@ -435,8 +435,7 @@ duplicateLocalDs old_local
         ; return (setIdUnique old_local uniq) }
 
 newPredVarDs :: PredType -> DsM Var
-newPredVarDs
- = mkSysLocalOrCoVarM (fsLit "ds") ManyTy  -- like newSysLocalDs, but we allow covars
+newPredVarDs = mkSysLocalM (fsLit "ds") ManyTy  -- like newSysLocalDs, but we allow covars
 
 newSysLocalMDs, newFailLocalMDs :: Type -> DsM Id
 -- Implicitly have ManyTy multiplicity, hence the "M"

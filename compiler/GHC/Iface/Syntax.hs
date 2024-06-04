@@ -184,7 +184,12 @@ putIfaceTopBndr bh name =
           putEntry tbl bh (BindingName name)
 
 data IfaceDecl
-  = IfaceId { ifName      :: IfaceTopBndr,
+  = -- A top-level Tyvar, e.g.   a = Maybe Int
+    IfaceTv { ifName   :: IfaceTopBndr
+            , ifTvKind :: IfaceKind
+            , ifTvUnf  :: IfaceType }
+
+  | IfaceId { ifName      :: IfaceTopBndr,
               ifType      :: IfaceType,
               ifIdDetails :: IfaceIdDetails,
               ifIdInfo    :: IfaceIdInfo
@@ -722,10 +727,14 @@ data IfaceBindingX r b
   | IfaceRec    [(b, r)]
   deriving (Functor, Foldable, Traversable, Ord, Eq)
 
--- IfaceLetBndr is like IfaceIdBndr, but has IdInfo too
+-- IfaceLetBndr is like IfaceIdBndr, but has additional information too
 -- It's used for *non-top-level* let/rec binders
--- See Note [IdInfo on nested let-bindings]
-data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo JoinPointHood
+data IfaceLetBndr
+  -- See Note [IdInfo on nested let-bindings]
+  = IfLetBndr IfLclName IfaceType IfaceIdInfo JoinPointHood
+
+  -- See Note [Type and coercion lets]
+  | IfTypeLetBndr IfLclName IfaceKind
 
 data IfaceTopBndrInfo = IfLclTopBndr IfLclName IfaceType IfaceIdInfo IfaceIdDetails
                       | IfGblTopBndr IfaceTopBndr
@@ -1097,10 +1106,11 @@ iface_decl_generative IfaceSynonym{} = False
 iface_decl_generative IfaceFamily{ifFamFlav = rhs}
   | IfaceDataFamilyTyCon <- rhs = True
   | otherwise = False
-iface_decl_generative IfaceData{} = True
-iface_decl_generative IfaceId{} = True
-iface_decl_generative IfaceClass{} = True
-iface_decl_generative IfaceAxiom{} = True
+iface_decl_generative IfaceData{}   = True
+iface_decl_generative IfaceId{}     = True
+iface_decl_generative IfaceTv{}     = True
+iface_decl_generative IfaceClass{}  = True
+iface_decl_generative IfaceAxiom{}  = True
 iface_decl_generative IfacePatSyn{} = True
 
 iface_at_mentioned_vars :: IfaceAT -> Set.Set IfLclName
@@ -1114,9 +1124,7 @@ iface_at_mentioned_vars (IfaceAT decl _)
       IfaceData{ifBinders} -> ifBinders
       IfaceSynonym{ifBinders} -> ifBinders
       IfaceClass{ifBinders} -> ifBinders
-      IfaceId{} -> panic "IfaceId shoudn't be an associated type!"
-      IfaceAxiom{} -> panic "IfaceAxiom shoudn't be an associated type!"
-      IfacePatSyn {} -> panic "IfacePatSyn shoudn't be an associated type!"
+      _ -> pprPanic "IfaceId shoudn't be an associated type!" (ppr decl)
 
     suppress_arity = not (iface_decl_generative decl)
 
@@ -1173,8 +1181,9 @@ iface_decl_mentioned_vars (IfaceFamily { ifBinders = binders, ifResVar = res_var
   | otherwise = mempty
 
 iface_decl_mentioned_vars IfacePatSyn{} = mempty
-iface_decl_mentioned_vars IfaceId{} = mempty
-iface_decl_mentioned_vars IfaceAxiom{} = mempty
+iface_decl_mentioned_vars IfaceId{}     = mempty
+iface_decl_mentioned_vars IfaceTv{}     = mempty
+iface_decl_mentioned_vars IfaceAxiom{}  = mempty
 
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
@@ -1443,6 +1452,11 @@ pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
               2 (pprIfaceSigmaType (ss_forall ss) ty)
          , ppShowIface ss (ppr details)
          , ppShowIface ss (ppr info) ]
+
+pprIfaceDecl ss (IfaceTv { ifName = var, ifTvKind = kind, ifTvUnf = unf })
+  = vcat [ hang (pprPrefixIfDeclBndr (ss_how_much ss) (occName var) <+> dcolon)
+              2 (pprIfaceSigmaType (ss_forall ss) kind)
+         , ppShowIface ss (ppr unf) ]
 
 pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
                            , ifAxBranches = branches })
@@ -1844,6 +1858,9 @@ ppr_bind :: (IfaceLetBndr, IfaceExpr) -> SDoc
 ppr_bind (IfLetBndr b ty info ji, rhs)
   = sep [hang (ppr b <+> dcolon <+> ppr ty) 2 (ppr ji <+> ppr info),
          equals <+> pprIfaceExpr noParens rhs]
+ppr_bind (IfTypeLetBndr b ki, rhs)
+  = sep [char '@' <> ppr b <+> dcolon <+> ppr ki,
+         equals <+> pprIfaceExpr noParens rhs]
 
 ------------------
 pprIfaceTickish :: IfaceTickish -> SDoc
@@ -1916,6 +1933,9 @@ fingerprinting the instance, so DFuns are not dependencies.
 -}
 
 freeNamesIfDecl :: IfaceDecl -> NameSet
+freeNamesIfDecl (IfaceTv { ifTvKind = k, ifTvUnf = t })
+  = freeNamesIfType k &&& freeNamesIfType t
+
 freeNamesIfDecl (IfaceId { ifType = t, ifIdDetails = d, ifIdInfo = i})
   = freeNamesIfType t &&&
     freeNamesIfIdInfo i &&&
@@ -2058,8 +2078,9 @@ freeNamesIfAppArgs (IA_Arg t _ ts) = freeNamesIfType t &&& freeNamesIfAppArgs ts
 freeNamesIfAppArgs IA_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet
-freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
-freeNamesIfType (IfaceTyVar _)        = emptyNameSet
+freeNamesIfType (IfaceFreeTyVar {})   = emptyNameSet
+freeNamesIfType (IfaceTyVar {})       = emptyNameSet
+freeNamesIfType (IfaceExtTyVar n)     = unitNameSet n
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
 freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
@@ -2131,6 +2152,7 @@ freeNamesIfLetBndr :: IfaceLetBndr -> NameSet
 -- local INLINE pragmas), so look there too
 freeNamesIfLetBndr (IfLetBndr _name ty info _ji) = freeNamesIfType ty
                                                  &&& freeNamesIfIdInfo info
+freeNamesIfLetBndr (IfTypeLetBndr _name ki) = freeNamesIfKind ki
 
 freeNamesIfTvBndr :: IfaceTvBndr -> NameSet
 freeNamesIfTvBndr (_fs,k) = freeNamesIfKind k
@@ -2261,8 +2283,14 @@ details.
 -}
 
 instance Binary IfaceDecl where
-    put_ bh (IfaceId name ty details idinfo) = do
+    put_ bh (IfaceTv name kind unf) = do
         putByte bh 0
+        putIfaceTopBndr bh name
+        lazyPut bh (kind, unf)
+        -- See Note [Lazy deserialization of IfaceId]
+
+    put_ bh (IfaceId name ty details idinfo) = do
+        putByte bh 1
         putIfaceTopBndr bh name
         lazyPut bh (ty, details, idinfo)
         -- See Note [Lazy deserialization of IfaceId]
@@ -2366,10 +2394,13 @@ instance Binary IfaceDecl where
         h <- getByte bh
         case h of
             0 -> do name <- get bh
+                    ~(kind, unf) <- lazyGet bh
+                    -- See Note [Lazy deserialization of IfaceId]
+                    return (IfaceTv name kind unf)
+            1 -> do name <- get bh
                     ~(ty, details, idinfo) <- lazyGet bh
                     -- See Note [Lazy deserialization of IfaceId]
                     return (IfaceId name ty details idinfo)
-            1 -> error "Binary.get(TyClDecl): ForeignType"
             2 -> do a1  <- getIfaceTopBndr bh
                     a2  <- get bh
                     a3  <- get bh
@@ -3006,15 +3037,29 @@ instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
 
 instance Binary IfaceLetBndr where
     put_ bh (IfLetBndr a b c d) = do
+            putByte bh 0
             put_ bh a
             put_ bh b
             put_ bh c
             put_ bh d
-    get bh = do a <- get bh
-                b <- get bh
-                c <- get bh
-                d <- get bh
-                return (IfLetBndr a b c d)
+
+    put_ bh (IfTypeLetBndr a b) = do
+            putByte bh 1
+            put_ bh a
+            put_ bh b
+    get bh = do
+                h <- getByte bh
+                case h of
+                    0 -> do
+                      a <- get bh
+                      b <- get bh
+                      c <- get bh
+                      d <- get bh
+                      return (IfLetBndr a b c d)
+                    _ -> do
+                      a <- get bh
+                      b <- get bh
+                      return (IfTypeLetBndr a b)
 
 instance Binary IfaceTopBndrInfo where
     put_ bh (IfLclTopBndr lcl ty info dets) = do
@@ -3087,6 +3132,9 @@ instance NFData ImpIfaceList where
 
 instance NFData IfaceDecl where
   rnf = \case
+    IfaceTv f1 f2 f3 ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3
+
     IfaceId f1 f2 f3 f4 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
 
@@ -3227,6 +3275,8 @@ instance NFData IfaceMaybeRhs where
 instance NFData IfaceLetBndr where
   rnf (IfLetBndr nm ty id_info join_info) =
     rnf nm `seq` rnf ty `seq` rnf id_info `seq` rnf join_info
+  rnf (IfTypeLetBndr nm ki) =
+    rnf nm `seq` rnf ki
 
 instance NFData IfaceFamTyConFlav where
   rnf = \case

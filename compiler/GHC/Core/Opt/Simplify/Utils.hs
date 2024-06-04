@@ -12,7 +12,8 @@ module GHC.Core.Opt.Simplify.Utils (
         tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
-        preInlineUnconditionally, postInlineUnconditionally,
+        preInlineUnconditionally, preInlineTypeUnconditionally,
+        postInlineUnconditionally, postInlineTypeUnconditionally,
         activeRule,
         getUnfoldingInRuleMatch,
         updModeForStableUnfoldings, updModeForRuleLHS, updModeForRuleRHS,
@@ -59,7 +60,7 @@ import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Type     hiding( substTy )
+import GHC.Core.Type     hiding( extendTvSubst, substTy )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
@@ -71,7 +72,9 @@ import GHC.Types.InlinePragma
 import GHC.Types.Tickish
 import GHC.Types.Demand
 import GHC.Types.Var.Set
+import GHC.Types.Var ( tyVarOccInfo )
 import GHC.Types.Basic
+import GHC.Types.Name.Env
 
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
@@ -83,7 +86,7 @@ import GHC.Utils.Panic
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
-import GHC.Types.Name.Env
+import Data.Maybe       ( catMaybes )
 import Data.Graph
 
 {- *********************************************************************
@@ -1065,7 +1068,7 @@ interestingArg env e = go env 0 e
                                    ValueArg -> ValueArg
                                    _        -> NonTrivArg
                                where
-                                 env' = env `addNewInScopeIds` bindersOf b
+                                 env' = env `addNewInScopeBndrs` bindersOf b
 
     go_var n v
        | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
@@ -1517,8 +1520,23 @@ is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
 -}
 
+preInlineTypeUnconditionally :: SimplEnv -> InTyVar -> InType -> Maybe SimplEnv
+preInlineTypeUnconditionally env tv rhs_ty
+  | not (sePreInline env)
+  = Nothing
+
+  -- Inline unconditionally if it occurs exactly once, inside a lambda or not.
+  -- No work is wasted by substituting inside a lambda, although if the
+  -- lambda is inlined a lot, we migth duplicate the type.
+  | isOneTyCoOcc (tyVarOccInfo tv)
+  = Just $! extendTvSubst env tv $! substTy env rhs_ty
+
+  | otherwise
+  = Nothing
+
 preInlineUnconditionally
-    :: SimplEnv -> TopLevelFlag -> InId
+    :: SimplEnv -> TopLevelFlag
+    -> InId                 -- Works for CoVar, and Id; not a TyVar
     -> InExpr -> StaticEnv  -- These two go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let-can-float invariant
@@ -1526,22 +1544,23 @@ preInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
-  | not pre_inline_unconditionally           = Nothing
+  | assertPpr (isId bndr) (ppr bndr) $
+    not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
   | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
-  | not (isStableUnfolding unf)              = Just $! (extend_subst_with rhs)
+  | not (isStableUnfolding unf)              = Just $! (extend_id_subst_with rhs)
 
   -- See Note [Stable unfoldings and preInlineUnconditionally]
   | not (isInlinePragma inline_prag)
-  , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
+  , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_id_subst_with inl)
   | otherwise                                = Nothing
   where
     unf = idUnfolding bndr
-    extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
+    extend_id_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
@@ -1659,6 +1678,9 @@ NB: unconditional inlining of this sort can introduce ticks in places that
 may seem surprising; for instance, the LHS of rules. See Note [Simplifying
 rules] for details.
 -}
+
+postInlineTypeUnconditionally :: Type -> Bool
+postInlineTypeUnconditionally _ = False -- For now
 
 postInlineUnconditionally
     :: SimplEnv -> BindContext
@@ -2277,14 +2299,16 @@ new binding is abstracted.  Several points worth noting
       manifestly a literal string.
 -}
 
-abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
+abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar]
+              -> SimplFloats   -- Precondition: no join-floats in here
+                               -- And (for now) no let-floats or covar floats
               -> OutExpr -> SimplM ([OutBind], OutExpr)
 abstractFloats uf_opts top_lvl main_tvs floats body
   = assert (notNull body_floats) $
     assert (isNilOL (sfJoinFloats floats)) $
     do  { let sccs = concatMap to_sccs body_floats
-        ; (subst, float_binds) <- mapAccumLM abstract empty_subst sccs
-        ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
+        ; (subst, mb_float_binds) <- mapAccumLM abstract empty_subst sccs
+        ; return (catMaybes mb_float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
     body_floats = letFloatBinds (sfLetFloats floats)
@@ -2292,21 +2316,22 @@ abstractFloats uf_opts top_lvl main_tvs floats body
 
     -- See wrinkle (AB5) in Note [Which type variables to abstract over]
     -- for why we need to re-do dependency analysis
-    to_sccs :: OutBind -> [SCC (Id, CoreExpr, VarSet)]
-    to_sccs (NonRec id e) = [AcyclicSCC (id, e, emptyVarSet)] -- emptyVarSet: abstract doesn't need it
+    to_sccs :: OutBind -> [SCC (Var, CoreExpr, VarSet)]
+    to_sccs (NonRec v e) = [AcyclicSCC (v, e, emptyVarSet)] -- emptyVarSet: abstract doesn't need it
     to_sccs (Rec prs)     = sccs
       where
-        (ids,rhss) = unzip prs
-        sccs = depAnal (\(id,_rhs,_fvs) -> [getName id])
-                       (\(_id,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
-                       (zip3 ids rhss (map exprFreeVars rhss))
+        (vars,rhss) = unzip prs
+        sccs = depAnal (\(v,_rhs,_fvs) -> [getName v])
+                       (\(_v,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
+                       (zip3 vars rhss (map exprFreeVars rhss))
 
-    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet) -> SimplM (GHC.Core.Subst.Subst, OutBind)
+    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet)
+             -> SimplM (GHC.Core.Subst.Subst, Maybe OutBind)
     abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
       = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
                  !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
-           ; return (subst', NonRec poly_id2 poly_rhs) }
+           ; return (subst', Just (NonRec poly_id2 poly_rhs)) }
       where
         rhs' = GHC.Core.Subst.substExpr subst rhs
 
@@ -2319,7 +2344,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                  poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
                               | (poly_id, rhs) <- poly_ids `zip` rhss
                               , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
-           ; return (subst', Rec poly_pairs) }
+           ; return (subst', Just (Rec poly_pairs)) }
       where
         (ids,rhss,_fvss) = unzip3 trpls
 

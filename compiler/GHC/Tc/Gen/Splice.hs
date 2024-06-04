@@ -2191,7 +2191,7 @@ reifyThing (ATcId {tct_id = id})
         ; ty2 <- reifyType ty1
         ; return (TH.VarI (reifyName id) ty2 Nothing) }
 
-reifyThing (ATyVar tv tv1)
+reifyThing (ATcTyVar tv tv1)
   = do { ty1 <- liftZonkM $ zonkTcTyVar tv1
        ; ty2 <- reifyType ty1
        ; return (TH.TyVarI (reifyName tv) ty2) }
@@ -2934,14 +2934,15 @@ reifyTypeOfThing :: TH.Name -> TcM TH.Type
 reifyTypeOfThing th_name = do
   thing <- getThing th_name
   case thing of
-    AGlobal (AnId id) -> reifyType (idType id)
+    AGlobal (ATyVar tv) -> reifyType (tyVarKind tv)
+    AGlobal (AnId id)   -> reifyType (idType id)
     AGlobal (ATyCon tc) -> reifyKind (tyConKind tc)
     AGlobal (AConLike (RealDataCon dc)) ->
       reifyType (idType (dataConWrapId dc))
     AGlobal (AConLike (PatSynCon ps)) ->
       reifyPatSynType (patSynSigBndr ps)
     ATcId{tct_id = id} -> liftZonkM (zonkTcType (idType id)) >>= reifyType
-    ATyVar _ tctv -> liftZonkM (zonkTcTyVar tctv) >>= reifyType
+    ATcTyVar _ tctv    -> liftZonkM (zonkTcTyVar tctv) >>= reifyType
     -- Impossible cases, supposedly:
     AGlobal (ACoAxiom _) -> panic "reifyTypeOfThing: ACoAxiom"
     ATcTyCon _ -> panic "reifyTypeOfThing: ATcTyCon"

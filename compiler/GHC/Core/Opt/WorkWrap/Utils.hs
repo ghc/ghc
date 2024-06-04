@@ -241,7 +241,7 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
                 = (work_args, work_args, work_marks)
 
               call_work work_fn  = mkVarApps (Var work_fn) work_call_args
-              call_rhs fn_rhs = mkAppsBeta fn_rhs fn_args
+              call_rhs fn_rhs = mkApps fn_rhs fn_args
                                   -- See Note [Join points and beta-redexes]
               wrapper_body = mkLams cloned_arg_vars . wrap_fn_cpr . wrap_fn_str . call_work
                                   -- See Note [Call-by-value for worker args]
@@ -279,14 +279,6 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
     n_dmds = length demands
     arity_ok | isJoinId fun_id = ww_arity <= n_dmds
              | otherwise       = ww_arity == n_dmds
-
--- | Version of 'GHC.Core.mkApps' that does beta reduction on-the-fly.
--- PRECONDITION: The arg expressions are not free in any of the lambdas binders.
-mkAppsBeta :: CoreExpr -> [CoreArg] -> CoreExpr
--- The precondition holds for our call site in mkWwBodies, because all the FVs
--- of as are either cloned_arg_vars (and thus fresh) or fresh worker args.
-mkAppsBeta (Lam b body) (a:as) = bindNonRec b a $! mkAppsBeta body as
-mkAppsBeta f            as     = mkApps f as
 
 -- See Note [Limit w/w arity]
 isWorkerSmallEnough :: Int -> Int -> [Var] -> Bool
@@ -527,14 +519,15 @@ c.f Note [SpecConstr void argument insertion] in GHC.Core.Opt.SpecConstr
 
 Note [Join points and beta-redexes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Originally, the worker would invoke the original function by calling it with
-arguments, thus producing a beta-redex for the simplifier to munch away:
+The worker invokes the original function by calling it with arguments,
+thus producing a beta-redex for the simplifier to munch away:
 
-  \x y z -> e => (\x y z -> e) wx wy wz
+  \x y z -> body => (\x y z -> body) wx wy wz
 
-Now that we have special rules about join points, however, this is Not Good if
-the original function is itself a join point, as then it may contain invocations
-of other join points:
+However if the original binding is a join point, then `body` will contain
+jupms to that join point, inside the (applied) lambda.  Happily the occurrence
+analyser treats applied lambdas specially: see GHC.Core.Opt.OccurAnal
+Note [Occurrence analysis for beta-redexes]. Example
 
   join j1 x = ...
   join j2 y = if y == 0 then 0 else j1 y
@@ -542,18 +535,13 @@ of other join points:
   =>
 
   join j1 x = ...
-  join $wj2 y# = let wy = I# y# in (\y -> if y == 0 then 0 else jump j1 y) wy
+  join $wj2 y# = (\y -> if y == 0 then 0 else jump j1 y) (I# y#)
   join j2 y = case y of I# y# -> jump $wj2 y#
 
-There can't be an intervening lambda between a join point's declaration and its
-occurrences, so $wj2 here is wrong. But of course, this is easy enough to fix:
+Notice the jump to `j1` inside the beta-redex in `$wj2`.
 
-  ...
-  let join $wj2 y# = let wy = I# y# in let y = wy in if y == 0 then 0 else j1 y
-  ...
-
-Hence we simply do the beta-reduction here. (This would be harder if we had to
-worry about hygiene, but luckily wy is freshly generated.)
+At one point we tried generating let bindings instead; but that ran
+into trouble when there was shadowing among the binders.
 
 Note [Freshen WW arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1621,7 +1609,7 @@ mkWWcpr_entry opts body_ty body_cpr
 mk_res_bndr :: Type -> UniqSM Id
 mk_res_bndr body_ty = do
   -- See Note [Linear types and CPR]
-  bndr <- mkSysLocalOrCoVarM ww_prefix cprCaseBndrMult body_ty
+  bndr <- mkSysLocalM ww_prefix cprCaseBndrMult body_ty
   -- See Note [Record evaluated-ness in worker/wrapper]
   pure (setCaseBndrEvald MarkedStrict bndr)
 

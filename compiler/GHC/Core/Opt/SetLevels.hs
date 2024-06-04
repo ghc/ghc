@@ -89,18 +89,14 @@ import GHC.Core
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
-import GHC.Core.FVs     -- all of it
+import GHC.Core.FVs
 import GHC.Core.Subst
 import GHC.Core.TyCo.Subst( lookupTyVar )
-import GHC.Core.Make    ( sortQuantVars )
-import GHC.Core.Type    ( Type, tyCoVarsOfType
-                        , mightBeUnliftedType, closeOverKindsDSet
-                        , typeHasFixedRuntimeRep
-                        )
-import GHC.Core.Multiplicity     ( pattern ManyTy )
+import GHC.Core.Predicate( scopedSort )
+import GHC.Core.Type
 
 import GHC.Types.Id
-import GHC.Types.Id.Info
+import GHC.Types.Id.Info      ( vanillaIdInfo )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
@@ -128,6 +124,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Maybe
+import Data.List        ( partition )
 
 {-
 ************************************************************************
@@ -637,7 +634,7 @@ lvlMFE env strict_ctxt ann_expr
        ; var <- newLvlVar expr1 NotJoinPoint is_mk_static
        ; let var2 = annotateBotStr var float_n_lams mb_bot_str
        ; return (Let (NonRec (TB var2 (FloatMe dest_lvl)) expr1)
-                     (mkVarApps (Var var2) abs_vars)) }
+                     (mkAbsVarApps (Var var2) abs_vars)) }
 
   -- OK, so the float has an unlifted type (not top-level bindable)
   --     and no new value lambdas (float_is_new_lam is False)
@@ -651,13 +648,13 @@ lvlMFE env strict_ctxt ann_expr
   , let [bx_bndr, ubx_bndr] = mkTemplateLocals [box_ty, expr_ty]
   = do { expr1 <- lvlExpr rhs_env ann_expr
        ; let l1r       = incMinorLvlFrom rhs_env
-             float_rhs = mkLams abs_vars_w_lvls $
+             float_rhs = mkTaggedAbsLams abs_vars_w_lvls $
                          Case expr1 (stayPut l1r ubx_bndr) box_ty
                              [Alt DEFAULT [] (App boxing_expr (Var ubx_bndr))]
 
        ; var <- newLvlVar float_rhs NotJoinPoint is_mk_static
        ; let l1u      = incMinorLvlFrom env
-             use_expr = Case (mkVarApps (Var var) abs_vars)
+             use_expr = Case (mkAbsVarApps (Var var) abs_vars)
                              (stayPut l1u bx_bndr) expr_ty
                              [Alt (DataAlt box_dc) [stayPut l1u ubx_bndr] (Var ubx_bndr)]
        ; return (Let (NonRec (TB var (FloatMe dest_lvl)) float_rhs)
@@ -1266,7 +1263,7 @@ lvlBind :: LevelEnv
         -> LvlM (LevelledBind, LevelEnv)
 
 lvlBind env (AnnNonRec bndr rhs)
-  |  isTyVar bndr  -- Don't float TyVar binders (simplifier gets rid of them pronto)
+  |  isTyVar bndr  -- Don't float TyVar binders
   || isCoVar bndr  -- Don't float CoVars: difficult to fix up CoVar occurrences
                    --                     (see extendPolyLvlEnv)
   || not (wantToFloat env NonRecursive dest_lvl is_join is_top_bindable)
@@ -1355,7 +1352,7 @@ lvlBind env (AnnRec pairs)
     new_rhs_body <- lvlRhs body_env2 Recursive is_bot NotJoinPoint rhs_body
     (poly_env, [poly_bndr]) <- newPolyBndrs dest_lvl env abs_vars [bndr]
     return (Rec [(TB poly_bndr (FloatMe dest_lvl)
-                 , mkLams abs_vars_w_lvls $
+                 , mkTaggedAbsLams abs_vars_w_lvls $
                    mkLams lam_bndrs2 $
                    Let (Rec [( TB new_bndr (StayPut rhs_lvl)
                              , mkLams lam_bndrs2 new_rhs_body)])
@@ -1445,7 +1442,7 @@ lvlRhs env rec_flag is_bot mb_join_arity expr
   = lvlFloatRhs [] (le_ctxt_lvl env) env
                 rec_flag is_bot mb_join_arity expr
 
-lvlFloatRhs :: [OutVar] -> Level -> LevelEnv -> RecFlag
+lvlFloatRhs :: AbsVars -> Level -> LevelEnv -> RecFlag
             -> Bool   -- Binding is for a bottoming function
             -> JoinPointHood
             -> CoreExprWithFVs
@@ -1456,7 +1453,7 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                      && any isId bndrs
                   then lvlMFE  body_env True body
                   else lvlExpr body_env      body
-       ; return (mkLams bndrs' body') }
+       ; return (mkTaggedAbsLams bndrs' body') }
   where
     (bndrs, body)     | JoinPoint join_arity <- mb_join_arity
                       = collectNAnnBndrs join_arity rhs
@@ -1819,52 +1816,82 @@ lookupVar le v = case lookupVarEnv (le_env le) v of
                     Just (_, expr) -> expr
                     _              -> Var v
 
-abstractVars :: Level -> LevelEnv -> DVarSet -> [OutVar]
-        -- Find the variables in fvs, free vars of the target expression,
-        -- whose level is greater than the destination level
-        -- These are the ones we are going to abstract out
-        --
-        -- Note that to get reproducible builds, the variables need to be
-        -- abstracted in deterministic order, not dependent on the values of
-        -- Uniques. This is achieved by using DVarSets, deterministic free
-        -- variable computation and deterministic sort.
-        -- See Note [Unique Determinism] in GHC.Types.Unique for explanation of why
-        -- Uniques are not deterministic.
+abstractVars :: Level -> LevelEnv -> DVarSet -> AbsVars
+-- Find the variables in fvs, free vars of the target expression,
+-- whose level is greater than the destination level
+-- These are the ones we are going to abstract out
+--
+-- Type-lets: see Note [Type-lets and abstracting over free variables]
+--            in GHC.Core.Utils.
+--
+-- Determinism: to get reproducible builds, the variables need to be
+--     abstracted in deterministic order, not dependent on the values of
+--     Uniques. This is achieved by using DVarSets, deterministic free
+--     variable computation and deterministic sort.
+--     See Note [Unique Determinism] in GHC.Types.Unique for explanation of why
+--     Uniques are not deterministic.
 abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
   =  -- NB: sortQuantVars might not put duplicates next to each other
-    map zap $ sortQuantVars $
-    filter abstract_me      $
-    dVarSetElems            $
-    closeOverKindsDSet      $
-    substDVarSet subst in_fvs
+--    pprTrace "abstractVars"
+--      (vcat [ text "r7:" <+> ppr r7
+--           , text "r1:" <+> ppr r1
+--           , text "r2:" <+> ppr r3
+--           , text "r3:" <+> ppr r3
+--           , text "subst:" <+> ppr subst ])
+      r6
+  where
+    r1 = dVarSetElems in_fvs
+    r2 = substFreeVars subst r1     -- Apply the substituteion
+    r3 = mapUnionDVarSet close r2   -- Close over tyvar unfoldings, and zap Id unfoldings
+    r4 = dVarSetElems r3
+    r5 = filter abstract_me r4      -- Filter out the ones to abstract
+    r6 = dep_anal r5                -- and put them in dependency order
         -- NB: it's important to call abstract_me only on the OutIds the
         -- come from substDVarSet (not on fv, which is an InId)
-  where
+
     abstract_me v = case lookupVarEnv lvl_env v of
                         Just lvl -> dest_lvl `ltLvl` lvl
                         Nothing  -> False
 
-        -- We are going to lambda-abstract, so nuke any IdInfo,
-        -- and add the tyvars of the Id (if necessary)
-    zap v | isId v = warnPprTrace (isStableUnfolding (idUnfolding v) ||
-                           not (isEmptyRuleInfo (idSpecialisation v)))
-                           "absVarsOf: discarding info on" (ppr v) $
-                     setIdInfo v vanillaIdInfo
-          | otherwise = v
+    close_set :: DVarSet -> DVarSet
+    close_set s = mapUnionDVarSet close (dVarSetElems s)
 
+    close :: Var -> DVarSet
+    -- See Note [Type-lets and abstracting over free variables]
+    --    in GHC.Core.Utils.
+    close v | isId v    = close_set ty_tvs `extendDVarSet` zapped_id
+            | otherwise = close_set (unf_tvs `unionDVarSet` ty_tvs)
+                          `extendDVarSet` v
+      where
+        unf_tvs = case tyVarUnfolding_maybe v of
+                     Just ty -> tyCoVarsOfTypeDSet ty
+                     Nothing -> emptyDVarSet
+        ty_tvs = tyCoVarsOfTypeDSet (varType v)
+
+        -- zapped_id: We are going to lambda-abstract, so nuke any IdInfo
+        --           But (crucially) leave TyVar unfoldings alone
+        zapped_id = setIdInfo v vanillaIdInfo
+
+    dep_anal vs = scopedSort tcvs ++ ids
+      where
+         (tcvs, ids) = partition (isTyVar <||> isCoVar) vs
+      -- NB: scopedSort is a deterministic sort, meaning it doesn't look at the values
+      -- of Uniques. For explanation why it's important See Note [Unique Determinism]
+      -- in GHC.Types.Unique.
+
+-----------------------------------------
 type LvlM result = UniqSM result
 
 initLvl :: UniqSupply -> UniqSM a -> a
 initLvl = initUs_
 
-newPolyBndrs :: Level -> LevelEnv -> [OutVar] -> [InId]
-             -> LvlM (LevelEnv, [OutId])
+newPolyBndrs :: Level -> LevelEnv -> AbsVars -> [InId] -> LvlM (LevelEnv, [OutId])
 -- The envt is extended to bind the new bndrs to dest_lvl, but
 -- the le_ctxt_lvl is unaffected
 newPolyBndrs dest_lvl
              env@(LE { le_lvl_env = lvl_env, le_subst = subst, le_env = id_env })
              abs_vars bndrs
- = assert (all (not . isCoVar) bndrs) $   -- What would we add to the CoSubst in this case. No easy answer.
+ = assert (all (\b -> not (isCoVar b || isTyVar b)) bndrs) $   -- What would we add to the CoSubst in this case. No easy answer.
    do { uniqs <- getUniquesM
       ; let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
             bndr_prs  = bndrs `zip` new_bndrs
@@ -1873,15 +1900,18 @@ newPolyBndrs dest_lvl
                        , le_env     = foldl' add_id    id_env  bndr_prs }
       ; return (env', new_bndrs) }
   where
-    add_subst env (v, v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
-    add_id    env (v, v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
+    -- See Note [le_subst and le_env]
+    add_subst env (v, v') = extendIdSubst env v (mkAbsVarApps (Var v') abs_vars)
+    add_id env (v, v')    = extendVarEnv env v ((v':abs_vars), mkAbsVarApps (Var v') abs_vars)
 
-    mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
-                             transfer_join_info bndr $
-                             mkSysLocal str uniq (idMult bndr) poly_ty
-                           where
-                             str     = fsLit "poly_" `appendFS` occNameFS (getOccName bndr)
-                             poly_ty = mkLamTypes abs_vars (substTyUnchecked subst (idType bndr))
+    mk_poly_bndr bndr uniq
+      = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
+        transfer_join_info bndr $
+        mkSysLocal str uniq (idMult bndr) poly_ty
+      where
+        str     = fsLit "poly_" `appendFS` occNameFS (getOccName bndr)
+        poly_ty = mkAbsLamTypes abs_vars            $
+                  substTyUnchecked subst (idType bndr)
 
     -- If we are floating a join point to top level, it stops being
     -- a join point.  Otherwise it continues to be a join point,

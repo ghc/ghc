@@ -39,7 +39,7 @@ module GHC.Core.Opt.Arity
 
 
    -- ** Join points
-   , etaExpandToJoinPoint, etaExpandToJoinPointRule
+   , etaExpandToJoinPoint, etaExpandToJoinPointRule, mkNewJoinPointBinding
 
    -- ** Coercions and casts
    , pushCoArg, pushCoArgs, pushCoValArg, pushCoTyArg
@@ -1620,6 +1620,9 @@ arityType env (Case scrut bndr _ altList)
   | otherwise = botArityType    -- Do not eta expand. See (1) in Note [Dealing with bottom]
 
 arityType env (Let (NonRec b rhs) e)
+  | isTyCoVar b       -- Totally ignore a type-let or coercion-let
+  = arityType env e
+  | otherwise
   = -- See Note [arityType for non-recursive let-bindings]
     floatIn rhs_cost (arityType env' e)
   where
@@ -2668,7 +2671,7 @@ Fix 1: Zap `idArity` when analysing recursive RHSs and re-attach the info when
     (such as dropping of `seq`s when arity > 0) will no longer work in the RHS.
     Plus it requires non-trivial refactorings to both the simple optimiser (in
     the way `subst_opt_bndr` is used) as well as the Simplifier (in the way
-    `simplRecBndrs` and `simplRecJoinBndrs` is used), modifying the SimplEnv's
+    `simplIdBndrs` and `simplRecJoinBndrs` is used), modifying the SimplEnv's
     substitution twice in the process. A very complicated stop-gap.
 
 Fix 2: Pass the set of enclosing recursive binders to `tryEtaReduce`; these are
@@ -3174,6 +3177,16 @@ more elaborate stuff, but it'd involve substitution etc.
 ********************************************************************* -}
 
 -------------------
+mkNewJoinPointBinding :: Id -> JoinArity -> CoreExpr -> (Id, CoreExpr)
+mkNewJoinPointBinding bndr join_arity rhs
+  = (join_bndr, mkLams join_lam_bndrs join_body)
+  where
+    (join_lam_bndrs, join_body) = etaExpandToJoinPoint join_arity rhs
+    str_sig   = idDmdSig bndr
+    str_arity = count isId join_lam_bndrs  -- Strictness demands are for Ids only
+    join_bndr = bndr `asJoinId`    join_arity
+                     `setIdDmdSig` etaConvertDmdSig str_arity str_sig
+
 -- | Split an expression into the given number of binders and a body,
 -- eta-expanding if necessary. Counts value *and* type binders.
 etaExpandToJoinPoint :: JoinArity -> CoreExpr -> ([CoreBndr], CoreExpr)
@@ -3258,7 +3271,5 @@ freshEtaId n subst ty
       where
         Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
         eta_id' = uniqAway (substInScopeSet subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) mult' ty'
-                  -- "OrCoVar" since this can be used to eta-expand
-                  -- coercion abstractions
+                  mkSysLocal (fsLit "eta") (mkBuiltinUnique n) mult' ty'
         subst'  = extendSubstInScope subst eta_id'

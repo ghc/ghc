@@ -55,8 +55,8 @@ module GHC.Core.Utils (
         -- * StaticPtr
         collectMakeStaticArgs,
 
-        -- * Join points
-        isJoinBind,
+        -- * Predicates on binds
+        isJoinBind, isTypeBind, isTypeBind_maybe, isTyCoBind,
 
         -- * Tag inference
         mkStrictFieldSeqs, wantCbvForId,
@@ -65,7 +65,11 @@ module GHC.Core.Utils (
         isUnsafeEqualityCase,
 
         -- * Dumping stuff
-        dumpIdInfoOfProgram
+        dumpIdInfoOfProgram,
+
+        -- * AbsVars
+        AbsVar, AbsVars, mkPolyAbsLams, mkCoreAbsLams, mkTaggedAbsLams,
+                         mkAbsLamTypes, mkAbsVarApps
     ) where
 
 import GHC.Prelude
@@ -132,21 +136,29 @@ exprType :: HasDebugCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'GHC.Core.Type' expression as it cannot
 -- really be said to have a type
-exprType (Var var)           = idType var
-exprType (Lit lit)           = literalType lit
-exprType (Coercion co)       = coercionType co
-exprType (Let bind body)
-  | NonRec tv rhs <- bind    -- See Note [Type bindings]
-  , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
-  | otherwise                = exprType body
-exprType (Case _ _ ty _)     = ty
-exprType (Cast _ co)         = coercionRKind co
-exprType (Tick _ e)          = exprType e
-exprType (Lam binder expr)   = mkLamType binder (exprType expr)
-exprType e@(App _ _)
-  = case collectArgs e of
-        (fun, args) -> applyTypeToArgs (exprType fun) args
-exprType (Type ty) = pprPanic "exprType" (ppr ty)
+exprType e = go emptyVarSet e
+  where
+    -- When we get to a type, expand locally-bound tyvars, if any
+    -- For example,   exprType (let @a{=Int} = Int in Nothing @(a,b))
+    --   should return (Maybe (Int,b)), having expanded out the `a`
+    expand = expandTyVarUnfoldings
+
+    go tvs (Var var)         = expand tvs $ idType var
+    go tvs (Lit lit)         = expand tvs $ literalType lit
+    go tvs (Coercion co)     = expand tvs $ coercionType co
+    go tvs (Let bind body)
+      | NonRec tv rhs <- bind    -- See Note [Type bindings]
+      , Type {} <- rhs       = go (tvs `extendVarSet` tv) body
+      | otherwise            = go tvs body
+    go tvs (Case _ _ ty _)   = expand tvs ty
+    go tvs (Cast _ co)       = expand tvs $ coercionRKind co
+    go tvs (Tick _ e)        = go tvs e
+    go tvs (Lam binder expr) = mkLamType (updateVarType (expand tvs) binder)
+                                         (go tvs expr)
+    go tvs e@(App _ _)
+      = case collectArgs e of
+            (fun, args) -> expand tvs $ applyTypeToArgs (exprType fun) args
+    go _ (Type ty) = pprPanic "exprType" (ppr ty)
 
 coreAltType :: CoreAlt -> Type
 -- ^ Returns the type of the alternatives right hand side
@@ -1363,6 +1375,9 @@ and that confuses the code generator (#11155). So best to kill
 it off at source.
 -}
 
+coercionIsTrivial :: Coercion -> Bool
+coercionIsTrivial co = coercionSize co < 10    -- Try this out
+
 {-# INLINE trivial_expr_fold #-}
 trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
 -- ^ The worker function for Note [exprIsTrivial] and Note [getIdFromTrivialExpr]
@@ -1384,17 +1399,19 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     -- If you change this function, be sure to change
     -- SetLevels.notWorthFloating as well!
     -- (Or yet better: Come up with a way to share code with this function.)
-    go (Var v)                            = k_id v  -- See Note [Variables are trivial]
-    go (Lit l)    | litIsTrivial l        = k_lit l
-    go (Type _)                           = k_triv
-    go (Coercion _)                       = k_triv
+    go (Var v)                              = k_id v  -- See Note [Variables are trivial]
+    go (Lit l)    | litIsTrivial l          = k_lit l
+    go (Type _)                             = k_triv
+    go (Coercion co) | coercionIsTrivial co = k_triv
     go (App f arg)
-      | not (isRuntimeArg arg)            = go f
-      | exprIsUnaryClassFun f             = go arg
-      | otherwise                         = k_not_triv
-    go (Lam b e)  | not (isRuntimeVar b)  = go e
-    go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
-    go (Cast e _)                         = go e
+      | not (isRuntimeArg arg)              = go f
+      | exprIsUnaryClassFun f               = go arg
+      | otherwise                           = k_not_triv
+    go (Lam b e)   | not (isRuntimeVar b)   = go e
+    go (Tick t e)  | not (tickishIsCode t)  = go e              -- See Note [Tick trivial]
+    go (Cast e co) | coercionIsTrivial co   = go e
+    go (Let b e)   | isTyCoBind b           = go e
+       -- ToDo: what about a non-triv coercion?
     go (Case e b _ as)
       | null as
       = go e     -- See Note [Empty case is trivial]
@@ -2577,8 +2594,8 @@ dataConInstPat fss uniqs mult con inst_tys
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
     mk_id_var uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
-        mkUserLocalOrCoVar (mkVarOccFS fs) uniq
-                           (mult `mkMultMul` m) (Type.substTy full_subst ty) noSrcSpan
+        mkUserLocal (mkVarOccFS fs) uniq (mult `mkMultMul` m)
+                    (Type.substTy full_subst ty) noSrcSpan
 
 {-
 Note [Mark evaluated arguments]
@@ -2791,6 +2808,17 @@ locBind loc b1 b2 diffs = map addLoc diffs
                 | otherwise = ppr b1 <> char '/' <> ppr b2
 
 
+dumpIdInfoOfProgram :: Bool -> (IdInfo -> SDoc) -> CoreProgram -> SDoc
+dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)
+  where
+  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
+  getIds (NonRec i _) = [ i ]
+  getIds (Rec bs)     = map fst bs
+  -- By default only include full info for exported ids, unless we run in the verbose
+  -- pprDebug mode.
+  printId id | isExportedId id || dump_locals = ppr id <> colon <+> (ppr_id_info (idInfo id))
+             | otherwise       = empty
+
 {- *********************************************************************
 *                                                                      *
 \subsection{Determining non-updatable right-hand-sides}
@@ -2889,27 +2917,30 @@ collectMakeStaticArgs _          = Nothing
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Join points}
+                  Predicates on binds
 *                                                                      *
 ************************************************************************
 -}
 
--- | Does this binding bind a join point (or a recursive group of join points)?
+-- | `isTypeBind` is True of type bindings (@a = Type ty)
+isTypeBind :: Bind b -> Bool
+isTypeBind (NonRec _ (Type {})) = True
+isTypeBind _                    = False
+
+isTypeBind_maybe :: Bind b -> Maybe (b, Type)
+isTypeBind_maybe (NonRec tv (Type rhs_ty)) = Just (tv,rhs_ty)
+isTypeBind_maybe  _                        = Nothing
+
+-- | `isTypeBind` is True of type bindings (@a = Type ty)
+isTyCoBind :: Bind b -> Bool
+isTyCoBind (NonRec _ (Type     {})) = True
+isTyCoBind (NonRec _ (Coercion {})) = True
+isTyCoBind _                        = False
+
 isJoinBind :: CoreBind -> Bool
 isJoinBind (NonRec b _)       = isJoinId b
 isJoinBind (Rec ((b, _) : _)) = isJoinId b
 isJoinBind _                  = False
-
-dumpIdInfoOfProgram :: Bool -> (IdInfo -> SDoc) -> CoreProgram -> SDoc
-dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)
-  where
-  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
-  getIds (NonRec i _) = [ i ]
-  getIds (Rec bs)     = map fst bs
-  -- By default only include full info for exported ids, unless we run in the verbose
-  -- pprDebug mode.
-  printId id | isExportedId id || dump_locals = ppr id <> colon <+> (ppr_id_info (idInfo id))
-             | otherwise       = empty
 
 {-
 ************************************************************************
@@ -3198,3 +3229,133 @@ isUnsafeEqualityCase scrut bndr alts
   = Just rhs
   | otherwise
   = Nothing
+
+
+{- *********************************************************************
+*                                                                      *
+             Abstracting over free variables
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Type-lets and abstracting over free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are abstracting over variables {a:Type, x:a} that are free in an
+expression.  This happens in GHC.Core.Opt.SetLevels and GHC.Core.Opt.Exitify.
+What if one of those variables is a type variable with an unfolding?  Then
+we don't want to /abstract/ over it; rather we want to /duplicate/ the binding into
+the body of the lambda.  For example
+      /\a. \(x::a). let @b = Maybe a in
+                    let foo = \(y::b). isJust y
+                    in ...
+Suppose we want to float that `foo` binding outside the /\a (x::a).  We can't
+just abstract over b, thus
+     foo = /\b (y::b). isJust y
+because the type-correctness of `isJust y` relies on knowning that `b=Maybe a`.
+Instead we must duplicate that type-let thus:
+     let lvl_foo = /\a. let @b = Maybe a in \(y:b). isJust y
+     in /\a. \(x::a). let @b = Maybe a in
+                      let foo = lvl_foo @a
+
+So:
+
+* `AbsVars` is a list of free variables, in dependency order, to abstract.
+  Some of them may be tyvars-with-unfoldings. For example
+      vs = [a, b=[a], x:b]
+
+* When we make an AbsVars list, we close over the free vars of the unfoldings
+  of any tyvars in it.  So if `b{=Maybe a}` is in the list then so is `a`
+
+* `mkCoreAbsLams` forms a lambda abstraction pushing the tyvar bindings
+  into the body:
+      mkCoreAbsLams [a, b=[a], x:b] body
+         = \a. \(x:[a]). let @b = [a] in body
+
+   It pushes the let inwards to try to keep the lambas together; this
+   matters for join points, where the lambdas are supposed to be adjacent.
+
+* `mkAbsVarApps` forms an application, droppping those tyvars-with-unfoldings
+      mkAbsVarApps fun [a, b=[a], x:b]
+         = fun @a x
+-}
+
+type AbsVar        = Var
+type AbsVars       = [AbsVar]
+type TaggedAbsVars t = [TaggedBndr t]
+
+mkPolyAbsLams :: forall b. (b -> AbsVar, Var -> b -> b)
+                        -> [b] -> Expr b -> Expr b
+-- `mkPolyAbsLams` is polymorphic in (get,set) so that we can
+-- use it for both CoreExpr and LevelledExpr
+{-# INLINE mkPolyAbsLams #-}
+mkPolyAbsLams (getter,setter) bndrs body
+  = go emptyVarSet [] bndrs
+  where
+    go :: TyVarSet   -- Earlier TyVar bndrs that have TyVarUnfoldings
+       -> [Bind b]   -- Accumulated impedence-matching bindings (reversed)
+       -> [b]        -- Binders, bs
+       -> Expr b     -- The resulting lambda
+    go _ binds [] = mkLets (reverse binds) body
+
+    go unf_tvs binds (bndr:bndrs)
+
+      | Just ty <- tyVarUnfolding_maybe var
+      = go (unf_tvs `extendVarSet` var) (NonRec bndr (Type ty) : binds) bndrs
+
+      | isTyVar var, change_ty
+      , let binds' | isDeadBinder var = binds
+                   | otherwise        = NonRec bndr (Type (mkTyVarTy var1)) : binds
+      = Lam (setter var1 bndr) (go unf_tvs binds' bndrs)
+
+      | isId var, change_ty || change_unf
+      , let binds' | isDeadBinder var = binds
+                   | otherwise        = NonRec bndr (Var id2) : binds
+      = Lam (setter id2 bndr) (go unf_tvs binds' bndrs)
+
+      | otherwise
+      = Lam bndr  (go unf_tvs binds bndrs)
+      where
+        var    = getter bndr
+        var_ty = varType var
+
+        (change_ty, var1) = update_type var
+        (change_unf, id2) = zap_unfolding var1  -- Only used for Ids
+
+        -- zap_unfolding: We are going to lambda-abstract, so nuke any IdInfo
+        zap_unfolding var | isId var, hasSomeUnfolding (idUnfolding var)
+                          = (True, setIdInfo var vanillaIdInfo)
+                          | otherwise
+                          = (False, var)
+
+        -- update_type: expand unfoldings of any tyvars in `unf_tvs`
+        update_type var | not (isEmptyVarSet unf_tvs)
+                        , anyFreeVarsOfType (`elemVarSet` unf_tvs) var_ty
+                        = (True, setVarType var (expandTyVarUnfoldings unf_tvs var_ty))
+                        | otherwise
+                        = (False, var)
+
+mkCoreAbsLams :: AbsVars -> CoreExpr -> CoreExpr
+-- Specialise for CoreExpr
+mkCoreAbsLams = mkPolyAbsLams (get, set)
+  where
+    get v   = v
+    set v _ = v
+
+mkTaggedAbsLams :: TaggedAbsVars t -> TaggedExpr t -> TaggedExpr t
+-- Specialise for TaggedExpr
+mkTaggedAbsLams = mkPolyAbsLams (get, set)
+  where
+    get (TB v _)   = v
+    set v (TB _ t) = TB v t
+
+mkAbsLamTypes :: AbsVars -> Type -> Type
+mkAbsLamTypes abs_vars ty
+  = expandTyVarUnfoldings (mkVarSet tvs_w_unfs) (mkLamTypes abs_lam_vars ty)
+  where
+    (abs_lam_vars, tvs_w_unfs) = partition (isNothing . tyVarUnfolding_maybe) abs_vars
+
+mkAbsVarApps :: Expr b -> AbsVars -> Expr b
+mkAbsVarApps fun [] = fun
+mkAbsVarApps fun (a:as)
+  | Just {} <- tyVarUnfolding_maybe a = mkAbsVarApps fun                         as
+  | otherwise                         = mkAbsVarApps (App fun (varToCoreExpr a)) as
+

@@ -180,7 +180,11 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 -- Synonyms are retained in the interface type
 toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
+  | isExternalName nm          = IfaceExtTyVar nm
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
+  where
+    nm = tyVarName tv
+
 toIfaceTypeX fr ty@(AppTy {})  =
   -- Flatten as many argument AppTys as possible, then turn them into an
   -- IfaceAppArgs list.
@@ -434,11 +438,18 @@ toIfaceBang _   (HsStrict _)         = IfStrict
 toIfaceSrcBang :: HsSrcBang -> IfaceSrcBang
 toIfaceSrcBang (HsSrcBang _ unpk bang) = IfSrcBang unpk bang
 
-toIfaceLetBndr :: Id -> IfaceLetBndr
-toIfaceLetBndr id  = IfLetBndr (mkIfLclName (occNameFS (getOccName id)))
-                               (toIfaceType (idType id))
-                               (toIfaceIdInfo (idInfo id))
-                               (idJoinPointHood id)
+toIfaceLetBndr :: Var -> IfaceLetBndr
+toIfaceLetBndr tv
+  | isTyVar tv
+  = IfTypeLetBndr (mkIfLclName (occNameFS (getOccName tv)))
+                  (toIfaceKind (tyVarKind tv))
+
+toIfaceLetBndr id
+  = assertPpr (isId id) (ppr id) $
+    IfLetBndr (mkIfLclName (occNameFS (getOccName id)))
+              (toIfaceType (idType id))
+              (toIfaceIdInfo (idInfo id))
+              (idJoinPointHood id)
   -- Put into the interface file any IdInfo that GHC.Core.Tidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in GHC.Iface.Syntax
 
