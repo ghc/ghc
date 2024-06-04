@@ -24,7 +24,7 @@ import GHC.Prelude
 
 import GHC.Types.Var       ( Var, isId, mkLocalVar )
 import GHC.Types.Name      ( mkSystemVarName )
-import GHC.Types.Id        ( Id, mkSysLocalOrCoVarM )
+import GHC.Types.Id        ( Id, mkSysLocalM )
 import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
 import GHC.Core.Type       ( Type, Mult )
 import GHC.Core.Opt.Stats
@@ -206,7 +206,7 @@ gets :: (SimplTopEnv -> a) -> SimplM a
 gets f = liftIOWithEnv (return . f)
 
 newId :: FastString -> Mult -> Type -> SimplM Id
-newId fs w ty = mkSysLocalOrCoVarM fs w ty
+newId fs w ty = mkSysLocalM fs w ty
 
 -- | Make a join id with given type and arity but without call-by-value annotations.
 newJoinId :: [Var] -> Type -> SimplM Id

@@ -38,6 +38,7 @@ Now `t` is no longer in a recursive function, and good things happen!
 import GHC.Prelude
 import GHC.Builtin.Uniques
 import GHC.Core
+import GHC.Core.Opt.Arity( mkNewJoinPointBinding )
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -49,12 +50,13 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic( JoinPointHood(..) )
 
-import GHC.Utils.Monad.State.Strict
-import GHC.Utils.Misc( mapSnd )
+import qualified GHC.Utils.Monad.State.Strict as S
+import GHC.Utils.Misc( mapSnd, count )
 
 import GHC.Data.FastString
 
 import Data.Bifunctor
+import Data.Maybe( isNothing )
 import Control.Monad
 
 -- | Traverses the AST, simply to find all joinrecs and call 'exitify' on them.
@@ -104,7 +106,7 @@ exitifyProgram binds = map goTopLvl binds
 
 
 -- | State Monad used inside `exitify`
-type ExitifyM =  State [(JoinId, CoreExpr)]
+type ExitifyM =  S.State [(JoinId, CoreExpr)]
 
 -- | Given a recursive group of a joinrec, identifies “exit paths” and binds them as
 --   join-points outside the joinrec.
@@ -120,7 +122,7 @@ exitifyRec in_scope pairs
     -- Which are the recursive calls?
     recursive_calls = mkVarSet $ map fst pairs
 
-    (pairs',exits) = (`runState` []) $
+    (pairs',exits) = (`S.runState` []) $
         forM ann_pairs $ \(x,rhs) -> do
             -- go past the lambdas of the join point
             let (args, body) = collectNAnnBndrs (idJoinArity x) rhs
@@ -222,13 +224,11 @@ exitifyRec in_scope pairs
 
       -- We have something to float out!
       | otherwise
-      = do { -- Assemble the RHS of the exit join point
-             let rhs   = mkLams abs_vars e
-                 avoid = in_scope `extendInScopeSetList` captured
-             -- Remember this binding under a suitable name
-           ; v <- addExit avoid (length abs_vars) rhs
-             -- And jump to it from here
-           ; return $ mkVarApps (Var v) abs_vars }
+      = do { let avoid = in_scope `extendInScopeSetList` captured
+             -- Create the new join-point binding, recording it in the monad
+           ; j <- addExitBinding avoid abs_vars e
+             -- Return a call of that join point
+           ; return $ mkAbsVarApps (Var j) abs_vars }
 
       where
         -- Used to detect exit expressions that are already proper exit jumps
@@ -258,28 +258,30 @@ exitifyRec in_scope pairs
         captures_join_points = any isJoinId abs_vars
 
 
--- Picks a new unique, which is disjoint from
---  * the free variables of the whole joinrec
---  * any bound variables (captured)
---  * any exit join points created so far.
-mkExitJoinId :: InScopeSet -> Type -> JoinArity -> ExitifyM JoinId
-mkExitJoinId in_scope ty join_arity = do
-    fs <- get
-    let avoid = in_scope `extendInScopeSetList` (map fst fs)
-                         `extendInScopeSet` exit_id_tmpl -- just cosmetics
-    return (uniqAway avoid exit_id_tmpl)
-  where
-    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy ty
-                    `asJoinId` join_arity
+addExitBinding :: InScopeSet -> AbsVars -> CoreExpr -> ExitifyM JoinId
+addExitBinding avoid1 abs_vars join_body
+  = do { fs <- S.get
+       ; let join_rhs = mkCoreAbsLams abs_vars join_body
+             -- mkCoreAbsLams: see GHC.Core.Utils
+             --     Note [Type-lets and abstracting over free variables]
+             join_arity = count (isNothing . tyVarUnfolding_maybe) abs_vars
 
-addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId
-addExit in_scope join_arity rhs = do
-    -- Pick a suitable name
-    let ty = exprType rhs
-    v <- mkExitJoinId in_scope ty join_arity
-    fs <- get
-    put ((v,rhs):fs)
-    return v
+             avoid2 = avoid1 `extendInScopeSetList` (map fst fs)
+                             `extendInScopeSet` exit_id1 -- just cosmetics
+               -- avoid2: pick a new unique, that is disjoint from
+               --  * avoid1: the free variables of the whole joinrec
+               --            plus any bound variables (captured)
+               --  * adding exit join points created so far (in `fs`)
+
+             join_ty  = exprType join_rhs
+             exit_id1 = mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy join_ty
+             exit_id2 = uniqAway avoid2 exit_id1
+
+             bind_pr@(exit_id3,_) = mkNewJoinPointBinding exit_id2 join_arity join_rhs
+               -- NB: mkNewJoinPointBinding adds the JoinId tag
+
+       ; S.put (bind_pr : fs)
+       ; return exit_id3 }
 
 {-
 Note [Interesting expression]
@@ -489,7 +491,6 @@ could get more from running it multiple times, as seen in fish).
 
 Note [Picking arguments to abstract over]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When we create an exit join point, so we need to abstract over those of its
 free variables that are be out-of-scope at the destination of the exit join
 point. So we go through the list `captured` and pick those that are actually

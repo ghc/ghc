@@ -391,7 +391,8 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and sy
   where
     do_tcv is v = Endo do_it
       where
-        do_it acc | v `elemVarSet` is  = acc
+        do_it acc | isGlobalVar v      = acc
+                  | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = acc `extendVarSet` v
 
@@ -447,7 +448,8 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
 
     do_covar is v = Endo do_it
       where
-        do_it acc | v `elemVarSet` is  = acc
+        do_it acc | isGlobalVar v      = acc
+                  | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = appEndo (deep_cv_ty (varType v)) $
                                          acc `extendVarSet` v
@@ -598,9 +600,9 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
-  | not (f v) = (acc_list, acc_set)
+  | not (f v)                 = (acc_list, acc_set)
   | v `elemVarSet` bound_vars = (acc_list, acc_set)
-  | v `elemVarSet` acc_set = (acc_list, acc_set)
+  | v `elemVarSet` acc_set    = (acc_list, acc_set)
   | otherwise = tyCoFVsOfType (tyVarKind v) f
                                emptyVarSet   -- See Note [Closing over free variable kinds]
                                (v:acc_list, extendVarSet acc_set v)
@@ -987,7 +989,6 @@ noFreeVarsOfTypes tys = not $ DM.getAny (f tys)
 noFreeVarsOfCo :: Coercion -> Bool
 noFreeVarsOfCo co = not $ DM.getAny (f co)
   where (_, _, f, _) = foldTyCo (afvFolder (const True)) emptyVarSet
-
 
 {-
 ************************************************************************
