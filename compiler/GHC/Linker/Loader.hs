@@ -111,7 +111,7 @@ import System.Win32.Info (getSystemDirectory)
 
 import GHC.Utils.Exception
 import GHC.Unit.Module.ModIface (ModIface, ModIface_ (..))
-import GHC.Unit.Module.ModDetails (ModDetails (..), emptyModDetails)
+import GHC.Unit.Module.ModDetails (ModDetails (..))
 import GHC.Unit.Finder (FindResult(..), findImportedModule)
 import qualified GHC.Data.Maybe as ME
 import GHC.Unit.Module.ModSummary (ModSummary(..))
@@ -229,7 +229,7 @@ loadDependencies
   :: Interp
   -> HscEnv
   -> LoaderState
-  -> (ModIface -> ModDetails -> Linkable -> IO Linkable)
+  -> (ModIface -> Linkable -> IO Linkable)
   -> SrcSpan
   -> [Module]
   -> IO (LoaderState, SuccessFlag, [Linkable], PkgsLoaded) -- ^ returns the set of linkables required
@@ -728,32 +728,27 @@ loadByteCode loc iface mod_sum = do
 loadIfaceByteCode ::
   Interp ->
   HscEnv ->
-  (ModIface -> ModDetails -> Linkable -> IO Linkable) ->
+  (ModIface -> Linkable -> IO Linkable) ->
   LoaderState ->
   Module ->
   IO ([Linkable], LoaderState)
 loadIfaceByteCode interp hsc_env hydrate pls mod = do
-  mb_iface <- run_ifg $ loadInterface (text "blarkh") mod (ImportByUser NotBoot)
+  iface <- run_ifg $ loadSysInterface (text "blarkh") mod
   imp_mod <- findImportedModule hsc_env (moduleName mod) (OtherPkg (moduleUnitId mod))
-  let pprI =
-        case mb_iface of
-          ME.Succeeded iface -> ppr (mi_module iface)
-          ME.Failed _ -> text "missing"
   dbg "loadIfaceByteCode" [
     ("mod", ppr mod),
-    ("iface", ppr pprI)
+    ("iface", ppr (mi_module iface))
     ]
-  case (imp_mod, mb_iface) of
-    (Found loc _, ME.Succeeded iface) -> do
-      let det = emptyModDetails
+  case imp_mod of
+    (Found loc _) -> do
       summ <- mod_summary mod loc iface
       l <- loadByteCode loc iface summ
-      lh <- maybeToList <$> traverse (hydrate iface det) l
-      dbg "loadIfaceByteCode found" [("loc", ppr loc), ("loaded", ppr lh)]
+      lh <- maybeToList <$> traverse (hydrate iface) l
+      dbg "loadIfaceByteCode found" [("hi", text (ml_hi_file loc)), ("loaded", ppr lh)]
       pls1 <- dynLinkBCOs interp pls lh
       pure (lh, pls1)
-    (fr, _) -> do
-      dbg "loadIfaceByteCode not found" [("result", pprI), ("impo", debugFr fr)]
+    fr -> do
+      dbg "loadIfaceByteCode not found" [("impo", debugFr fr)]
       pure ([], pls)
   where
     run_ifg :: forall a . IfG a -> IO a
@@ -774,7 +769,7 @@ loadIfaceByteCode interp hsc_env hydrate pls mod = do
 loadIfacesByteCode ::
   Interp ->
   HscEnv ->
-  (ModIface -> ModDetails -> Linkable -> IO Linkable) ->
+  (ModIface -> Linkable -> IO Linkable) ->
   LoaderState ->
   [Linkable] ->
   IO (LoaderState, [Linkable])
@@ -803,7 +798,7 @@ loadIfacesByteCode interp hsc_env hydrate pls lnks = do
 loadDecls ::
   Interp ->
   HscEnv ->
-  (ModIface -> ModDetails -> Linkable -> IO Linkable) ->
+  (ModIface -> Linkable -> IO Linkable) ->
   SrcSpan ->
   CompiledByteCode ->
   IO ([(Name, ForeignHValue)], [Linkable], PkgsLoaded)

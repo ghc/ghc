@@ -1,4 +1,6 @@
 module CrossDep where
 
-dep :: Int
-dep = 9681
+data A = A Int
+
+dep :: A
+dep = A 9681
