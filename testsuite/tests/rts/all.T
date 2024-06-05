@@ -109,6 +109,8 @@ test('outofmem', [ when(opsys('darwin'), skip),
                    js_skip,
                    # similarly for the JS backend
                    when(opsys('mingw32'), skip),
+                   # times out with --disable-large-address-space
+                   when(wordsize(64) and not have_large_address_space(), skip),
 		   normalise_errmsg_fun(remove_parenthesis)],
                  makefile_test, ['outofmem'])
 test('outofmem2',
