@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 module Settings.Builders.RunTest (runTestBuilderArgs
                                  , runTestGhcFlags
@@ -8,11 +9,13 @@ module Settings.Builders.RunTest (runTestBuilderArgs
 import Hadrian.Utilities
 import qualified System.FilePath
 import System.Environment
+import System.Directory.Extra (listFilesRecursive)
 
 import CommandLine
 import Oracles.TestSettings
 import Packages
 import Settings.Builders.Common
+import qualified Data.ByteString as BS
 import qualified Data.Set    as Set
 import Flavour
 import qualified Context.Type as C
@@ -229,6 +232,21 @@ runTestBuilderArgs = builder Testsuite ? do
         Just stg -> inTreeCompilerArgs stg
         Nothing  -> outOfTreeCompilerArgs
 
+    use_large_addr_space <- expr $ do
+      h <- case stageOfTestCompiler testGhc of
+        Just stg -> do
+          rtsPath <- rtsBuildPath stg
+          let h = rtsPath -/- "include" -/- "ghcautoconf.h"
+          pure h
+        Nothing -> liftIO $ do
+          fs <- listFilesRecursive libdir
+          case [f | f <- fs, takeFileName f == "ghcautoconf.h" ] of
+            [h] -> pure h
+            _ -> error "impossible: none or more than one ghcautoconf.h"
+      liftIO $ do
+        f <- BS.readFile h
+        pure $ "#define USE_LARGE_ADDRESS_SPACE 1" `BS.isInfixOf` f
+
     -- MP: TODO, these should be queried from the test compiler?
     bignumBackend <- getBignumBackend
     bignumCheck   <- getBignumCheck
@@ -299,6 +317,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ asBool "config.ghc_with_threaded_rts=" (hasThreadedRts)
             , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
             , arg "-e", arg $ asBool "config.target_has_smp=" targetWithSMP
+            , arg "-e", arg $ asBool "config.have_large_address_space=" use_large_addr_space
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
             , arg "-e", arg $ "config.leading_underscore=" ++ show leadingUnderscore
 

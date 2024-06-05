@@ -1085,6 +1085,8 @@ def llvm_build ( ) -> bool:
 def have_thread_sanitizer( ) -> bool:
     return config.have_thread_sanitizer
 
+def have_large_address_space( ) -> bool:
+    return config.have_large_address_space
 
 def gcc_as_cmmp() -> bool:
     return config.cmm_cpp_is_gcc

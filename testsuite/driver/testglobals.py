@@ -183,6 +183,9 @@ class TestConfig:
         # Are we running in a ThreadSanitizer-instrumented build?
         self.have_thread_sanitizer = False
 
+        # Is the target RTS built with --enable-large-address-space?
+        self.have_large_address_space = False
+
         # Do symbols use leading underscores?
         self.leading_underscore = False
 
