@@ -226,7 +226,7 @@ Reflections and wrinkles
   case expressions are involved.  See #15488.
 
 * Test T18730 did not involve join points.  But join points are very prone to
-  the same kind of thing.  For exampe in #13253, and several related tickets,
+  the same kind of thing.  For example in #13253, and several related tickets,
   we got an exponential blowup in code size from a program that looks like
   this.
 
