@@ -79,14 +79,26 @@ representation-polymorphic type.
 
 However, not all is lost. We can still do this: ::
 
-  ($) :: forall r (a :: Type) (b :: TYPE r).
+  good :: forall r (a :: Type) (b :: TYPE r).
          (a -> b) -> a -> b
-  f $ x = f x
+  good f x = f x
 
 Here, only ``b`` is representation-polymorphic. There are no variables
 with a representation-polymorphic type. And the code generator has no
-trouble with this. Indeed, this is the true type of GHC's ``$`` operator,
-slightly more general than the Haskell 98 version.
+trouble with this. Nonetheless, there is a way to write a definition with
+``bad``'s type: ::
+
+
+  ($) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                (a :: TYPE r1) (b :: TYPE r2).
+         (a -> b) -> a -> b
+  ($) f = f
+
+By eta-reducing, we got rid of ``x``, and thus have no variable with a
+representation-polymorphic type.  Indeed, this is the true type of GHC's ``$``
+operator, slightly more general than the Haskell 98 version. However, its
+strictness properties are different: ``(good undefined) `seq` ()`` is equivalent
+to ``()``, whereas ``(($) undefined) `seq` ()`` diverges.
 
 Because the code generator must store and move arguments as well
 as variables, the logic above applies equally well to function arguments,
