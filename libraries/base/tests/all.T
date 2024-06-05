@@ -189,6 +189,7 @@ test('CatEntail', normal, compile, [''])
 
 # When running with WAY=ghci and profiled ways, T7653 uses a lot of memory.
 test('T7653', [when(opsys('mingw32'), skip),
+               when(arch('wasm32'), run_timeout_multiplier(5)),
                omit_ways(prof_ways + ghci_ways)], compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
 
