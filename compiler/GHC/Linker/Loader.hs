@@ -90,6 +90,7 @@ import GHC.Linker.Types
 
 -- Standard libraries
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
 
 import qualified Data.Set as Set
 import Data.Char (isSpace)
@@ -236,10 +237,15 @@ loadDependencies interp hsc_env pls hydrate span needed_mods = do
 
    -- Find what packages and linkables are required
    deps <- getLinkDeps opts interp pls span needed_mods
+
+   -- Load bytecode from interface files in the package db
    let s0 = LIBC {libc_loader = pls, libc_seen = emptyUniqDSet}
-       needed = ldNeededLinkables deps
-       load_bc = loadIfacesByteCode interp hsc_env hydrate needed
-   (links_needed, LIBC {libc_loader = pls1}) <- runStateT load_bc s0
+       handlers = libc_handlers interp hsc_env hydrate
+       load_bc = loadIfacesByteCode handlers (ldNeededLinkables deps)
+
+   (links_needed, LIBC {libc_loader = pls1}) <-
+     initIfaceCheck (text "loader") hsc_env $
+     runStateT load_bc s0
 
    let this_pkgs_needed = ldNeededUnits deps
 
@@ -731,23 +737,47 @@ data LIBC =
     libc_seen :: UniqDSet Module
   }
 
-loadIfaceByteCode ::
+data LIBCHandlers =
+  LIBCHandlers {
+    libc_find :: Module -> IO InstalledFindResult,
+    libc_hydrate :: ModIface -> Linkable -> IO Linkable,
+    libc_link :: forall m . MonadIO m => [Linkable] -> StateT LIBC m ()
+  }
+
+libc_handlers ::
   Interp ->
   HscEnv ->
   (ModIface -> Linkable -> IO Linkable) ->
+  LIBCHandlers
+libc_handlers interp hsc_env libc_hydrate =
+  LIBCHandlers {libc_find, libc_hydrate, libc_link}
+  where
+    unit_state = hsc_units hsc_env
+    fc = hsc_FC hsc_env
+    mhome_unit = Nothing
+    -- This would search in the home unit as well, but we don't need to load
+    -- core bindings for that.
+    -- mhome_unit = hsc_home_unit_maybe hsc_env
+    dflags = hsc_dflags hsc_env
+    fopts = initFinderOpts dflags
+    other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
+
+    libc_find mod =
+      findExactModule fc fopts other_fopts unit_state mhome_unit
+      (mkModule (moduleUnitId mod) (moduleName mod))
+
+    libc_link :: forall m . MonadIO m => [Linkable] -> StateT LIBC m ()
+    libc_link linkables = StateT $ \ s -> do
+      pls <- liftIO $ dynLinkBCOs interp (libc_loader s) linkables
+      pure ((), s {libc_loader = pls})
+
+loadIfaceByteCode ::
+  LIBCHandlers ->
   Module ->
-  StateT LIBC IO [Linkable]
-loadIfaceByteCode interp hsc_env hydrate mod = do
-  iface <- liftIO $ run_ifg $ loadSysInterface (text "blarkh") mod
-  let
-      unit_state = hsc_units hsc_env
-      fc = hsc_FC hsc_env
-      mhome_unit = hsc_home_unit_maybe hsc_env
-      dflags = hsc_dflags hsc_env
-      fopts = initFinderOpts dflags
-      other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
-      installed = mkModule (moduleUnitId mod) (moduleName mod)
-  find_res <- liftIO (findExactModule fc fopts other_fopts unit_state mhome_unit installed)
+  StateT LIBC IfG [Linkable]
+loadIfaceByteCode handlers@LIBCHandlers {..} mod = do
+  iface <- lift $ loadSysInterface load_doc mod
+  find_res <- liftIO (libc_find mod)
   dbg "loadIfaceByteCode" [
     ("mod", ppr mod),
     ("iface", ppr (mi_module iface))
@@ -756,23 +786,20 @@ loadIfaceByteCode interp hsc_env hydrate mod = do
     (InstalledFound loc _) -> do
       summ <- liftIO $ mod_summary mod loc iface
       l <- liftIO $ loadByteCode loc iface summ
-      lh <- liftIO $ maybeToList <$> traverse (hydrate iface) l
-      lh1 <- loadIfacesByteCode interp hsc_env hydrate lh
+      lh <- liftIO $ maybeToList <$> traverse (libc_hydrate iface) l
+      lh1 <- loadIfacesByteCode handlers lh
       dbg "loadIfaceByteCode found" [
         ("hi", text (ml_hi_file loc)),
         ("loaded", ppr lh),
         ("loaded recursive", ppr lh1)
         ]
-      StateT $ \ s -> do
-        pls <- dynLinkBCOs interp (libc_loader s) lh1
-        pure ((), s {libc_loader = pls})
+      libc_link lh1
       pure lh1
     result -> do
       dbg "loadIfaceByteCode not found" [("result", debugFr result)]
       pure []
   where
-    run_ifg :: forall a . IfG a -> IO a
-    run_ifg = initIfaceCheck (text "loader") hsc_env
+    load_doc = text "Loading core bindings of splice dependencies"
 
     debugFr = \case
       InstalledFound _ _ -> text "found"
@@ -783,19 +810,14 @@ loadIfaceByteCode interp hsc_env hydrate mod = do
         ]
 
 loadIfacesByteCode ::
-  Interp ->
-  HscEnv ->
-  (ModIface -> Linkable -> IO Linkable) ->
+  LIBCHandlers ->
   [Linkable] ->
-  StateT LIBC IO [Linkable]
-loadIfacesByteCode interp hsc_env hydrate lnks = do
+  StateT LIBC IfG [Linkable]
+loadIfacesByteCode handlers lnks = do
   all <- state (filter_deps all_deps)
-  lnks1 <- traverse one (uniqDSetToList all)
+  lnks1 <- traverse (loadIfaceByteCode handlers) (uniqDSetToList all)
   pure (mconcat (lnks : lnks1))
   where
-    one :: Module -> StateT LIBC IO [Linkable]
-    one = loadIfaceByteCode interp hsc_env hydrate
-
     all_deps = linkables_deps (concatMap linkableUnlinked lnks)
 
     linkables_deps = unionManyUniqDSets . fmap linkable_deps
@@ -806,7 +828,10 @@ loadIfacesByteCode interp hsc_env hydrate lnks = do
       LoadedBCOs l -> linkables_deps l
       _ -> emptyUniqDSet
 
-    loadable n = isExternalName n && not (isWiredInName n) && not (moduleUnitId (nameModule n) `elem` wiredInUnitIds)
+    loadable n =
+      isExternalName n &&
+      not (isWiredInName n) &&
+      not (moduleUnitId (nameModule n) `elem` wiredInUnitIds)
 
     bco_free_names cbc =
       foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet (bc_bcos cbc)
