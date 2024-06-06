@@ -111,10 +111,9 @@ import System.Win32.Info (getSystemDirectory)
 
 import GHC.Utils.Exception
 import GHC.Unit.Module.ModIface (ModIface, ModIface_ (..))
-import GHC.Unit.Finder (FindResult(..), findImportedModule)
+import GHC.Unit.Finder (findExactModule, InstalledFindResult (..))
 import GHC.Unit.Module.ModSummary (ModSummary(..))
 import GHC.Unit.Module.WholeCoreBindings (WholeCoreBindings(..))
-import GHC.Types.PkgQual (PkgQual(OtherPkg))
 import Control.Monad.Trans.State.Strict (StateT(..), state)
 import GHC.Utils.Misc (modificationTimeIfExists)
 
@@ -740,13 +739,21 @@ loadIfaceByteCode ::
   StateT LIBC IO [Linkable]
 loadIfaceByteCode interp hsc_env hydrate mod = do
   iface <- liftIO $ run_ifg $ loadSysInterface (text "blarkh") mod
-  imp_mod <- liftIO $ findImportedModule hsc_env (moduleName mod) (OtherPkg (moduleUnitId mod))
+  let
+      unit_state = hsc_units hsc_env
+      fc = hsc_FC hsc_env
+      mhome_unit = hsc_home_unit_maybe hsc_env
+      dflags = hsc_dflags hsc_env
+      fopts = initFinderOpts dflags
+      other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
+      installed = mkModule (moduleUnitId mod) (moduleName mod)
+  find_res <- liftIO (findExactModule fc fopts other_fopts unit_state mhome_unit installed)
   dbg "loadIfaceByteCode" [
     ("mod", ppr mod),
     ("iface", ppr (mi_module iface))
     ]
-  case imp_mod of
-    (Found loc _) -> do
+  case find_res of
+    (InstalledFound loc _) -> do
       summ <- liftIO $ mod_summary mod loc iface
       l <- liftIO $ loadByteCode loc iface summ
       lh <- liftIO $ maybeToList <$> traverse (hydrate iface) l
@@ -760,23 +767,19 @@ loadIfaceByteCode interp hsc_env hydrate mod = do
         pls <- dynLinkBCOs interp (libc_loader s) lh1
         pure ((), s {libc_loader = pls})
       pure lh1
-    fr -> do
-      dbg "loadIfaceByteCode not found" [("impo", debugFr fr)]
+    result -> do
+      dbg "loadIfaceByteCode not found" [("result", debugFr result)]
       pure []
   where
     run_ifg :: forall a . IfG a -> IO a
     run_ifg = initIfaceCheck (text "loader") hsc_env
 
     debugFr = \case
-      Found _ _ -> text "found"
-      NoPackage u -> text "NoPackage " <+> ppr u
-      FoundMultiple _ -> text "FoundMultiple"
-      NotFound {..} -> vcat [
-        text "paths:" <+> brackets (hsep (text <$> fr_paths)),
-        text "pkg:" <+> ppr fr_pkg,
-        text "fr_mods_hidden:" <+> ppr fr_mods_hidden,
-        text "fr_pkgs_hidden:" <+> ppr fr_pkgs_hidden,
-        text "fr_unusables:" <+> ppr (ModUnusable <$> fr_unusables)
+      InstalledFound _ _ -> text "found"
+      InstalledNoPackage u -> text "NoPackage " <+> ppr u
+      InstalledNotFound paths pkg -> vcat [
+        text "paths:" <+> brackets (hsep (text <$> paths)),
+        text "pkg:" <+> ppr pkg
         ]
 
 loadIfacesByteCode ::
