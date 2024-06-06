@@ -114,57 +114,19 @@
  * 'Portable' inlining:
  * INLINE_HEADER is for inline functions in header files (macros)
  * STATIC_INLINE is for inline functions in source files
- * EXTERN_INLINE is for functions that we want to inline sometimes
- * (we also compile a static version of the function; see Inlines.c)
+ * EXTERN_INLINE is for functions that may be called in Cmm
+ * (we also compile a static version of an EXTERN_INLINE function; see Inlines.c)
  */
 
-// We generally assume C99 semantics albeit these two definitions work fine even
-// when gnu90 semantics are active (i.e. when __GNUC_GNU_INLINE__ is defined or
-// when a GCC older than 4.2 is used)
-//
-// The problem, however, is with 'extern inline' whose semantics significantly
-// differs between gnu90 and C99
 #define INLINE_HEADER static inline
 #define STATIC_INLINE static inline
 
-// Figure out whether `__attributes__((gnu_inline))` is needed
-// to force gnu90-style 'external inline' semantics.
-#if defined(FORCE_GNU_INLINE)
-// disable auto-detection since HAVE_GNU_INLINE has been defined externally
-#elif defined(__GNUC_GNU_INLINE__) && __GNUC__ == 4 && __GNUC_MINOR__ == 2
-// GCC 4.2.x didn't properly support C99 inline semantics (GCC 4.3 was the first
-// release to properly support C99 inline semantics), and therefore warned when
-// using 'extern inline' while in C99 mode unless `__attributes__((gnu_inline))`
-// was explicitly set.
-# define FORCE_GNU_INLINE 1
-#endif
-
-#if defined(FORCE_GNU_INLINE)
-// Force compiler into gnu90 semantics
-# if defined(KEEP_INLINES)
-#  define EXTERN_INLINE inline __attribute__((gnu_inline))
-# else
-#  define EXTERN_INLINE extern inline __attribute__((gnu_inline))
-# endif
-#elif defined(__GNUC_GNU_INLINE__)
-// we're currently in gnu90 inline mode by default and
-// __attribute__((gnu_inline)) may not be supported, so better leave it off
-# if defined(KEEP_INLINES)
-#  define EXTERN_INLINE inline
-# else
-#  define EXTERN_INLINE extern inline
-# endif
-#else
-// Assume C99 semantics (yes, this curiously results in swapped definitions!)
-// This is the preferred branch, and at some point we may drop support for
-// compilers not supporting C99 semantics altogether.
+// See comment in rts/Inlines.c for explanation.
 # if defined(KEEP_INLINES)
 #  define EXTERN_INLINE extern inline
 # else
-#  define EXTERN_INLINE inline
+#  define EXTERN_INLINE static inline
 # endif
-#endif
-
 
 /*
  * GCC attributes
