@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE MagicHash #-}
@@ -60,7 +61,7 @@ module GHC.Data.FastString
         lengthFZS,
 
         -- * FastStrings
-        FastString(..),     -- not abstract, for now.
+        FastString,     -- not abstract, for now.
         NonDetFastString (..),
         LexicalFastString (..),
 
@@ -115,7 +116,6 @@ import GHC.Prelude.Basic as Prelude
 import GHC.Utils.Encoding
 import GHC.Utils.IO.Unsafe
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Misc
 import GHC.Data.FastMutInt
 
 import Control.Concurrent.MVar
@@ -148,17 +148,16 @@ import GHC.IO
 
 -- | Gives the Modified UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS, fastStringToByteString :: FastString -> ByteString
-{-# INLINE[1] bytesFS #-}
-bytesFS f = SBS.fromShort $ fs_sbs f
+bytesFS = SBS.fromShort
 
 {-# DEPRECATED fastStringToByteString "Use `bytesFS` instead" #-}
 fastStringToByteString = bytesFS
 
 fastStringToShortByteString :: FastString -> ShortByteString
-fastStringToShortByteString = fs_sbs
+fastStringToShortByteString = id
 
 fastStringToShortText :: FastString -> ShortText
-fastStringToShortText = ShortText . fs_sbs
+fastStringToShortText = ShortText
 
 fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs
@@ -167,8 +166,6 @@ fastZStringToByteString (FastZString bs) = bs
 unsafeMkByteString :: String -> ByteString
 unsafeMkByteString = BSC.pack
 
-hashFastString :: FastString -> Int
-hashFastString fs = hashStr $ fs_sbs fs
 
 -- -----------------------------------------------------------------------------
 
@@ -205,56 +202,24 @@ comparison.
 It is also associated with a lazy reference to the Z-encoding
 of this string which is used by the compiler internally.
 -}
-data FastString = FastString {
-      uniq    :: {-# UNPACK #-} !Int, -- unique id
-      n_chars :: {-# UNPACK #-} !Int, -- number of chars
-      fs_sbs  :: {-# UNPACK #-} !ShortByteString,
-      fs_zenc :: FastZString
-      -- ^ Lazily computed Z-encoding of this string. See Note [Z-Encoding] in
-      -- GHC.Utils.Encoding.
-      --
-      -- Since 'FastString's are globally memoized this is computed at most
-      -- once for any given string.
-  }
-
-instance Eq FastString where
-  f1 == f2  =  uniq f1 == uniq f2
+type FastString = ShortByteString
 
 -- We don't provide any "Ord FastString" instance to force you to think about
 -- which ordering you want:
 --    * lexical:   deterministic,     O(n). Cf lexicalCompareFS and LexicalFastString.
 --    * by unique: non-deterministic, O(1). Cf uniqCompareFS    and NonDetFastString.
 
-instance IsString FastString where
-    fromString = fsLit
 
-instance Semi.Semigroup FastString where
-    (<>) = appendFS
 
-instance Monoid FastString where
-    mempty = nilFS
-    mappend = (Semi.<>)
-    mconcat = concatFS
 
-instance Show FastString where
-   show fs = show (unpackFS fs)
 
-instance Data FastString where
-  -- don't traverse?
-  toConstr _   = abstractConstr "FastString"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "FastString"
 
-instance NFData FastString where
-  rnf fs = seq fs ()
 
 -- | Compare FastString lexically
 --
 -- If you don't care about the lexical ordering, use `uniqCompareFS` instead.
 lexicalCompareFS :: FastString -> FastString -> Ordering
-lexicalCompareFS fs1 fs2 =
-  if uniq fs1 == uniq fs2 then EQ else
-  utf8CompareShortByteString (fs_sbs fs1) (fs_sbs fs2)
+lexicalCompareFS = compare
   -- perform a lexical comparison taking into account the Modified UTF-8
   -- encoding we use (cf #18562)
 
@@ -262,7 +227,7 @@ lexicalCompareFS fs1 fs2 =
 --
 -- Much cheaper than `lexicalCompareFS` but non-deterministic!
 uniqCompareFS :: FastString -> FastString -> Ordering
-uniqCompareFS fs1 fs2 = compare (uniq fs1) (uniq fs2)
+uniqCompareFS = compare
 
 -- | Non-deterministic FastString
 --
@@ -332,48 +297,10 @@ Following parameters are determined based on:
 * Stats of @echo :browse | ghc --interactive -dfaststring-stats >/dev/null@:
   on 2018-10-24, we have 13920 entries.
 -}
-segmentBits, numSegments, segmentMask, initialNumBuckets :: Int
-segmentBits = 8
+numSegments, initialNumBuckets :: Int
 numSegments = 256   -- bit segmentBits
-segmentMask = 0xff  -- bit segmentBits - 1
 initialNumBuckets = 64
 
-hashToSegment# :: Int# -> Int#
-hashToSegment# hash# = hash# `andI#` segmentMask#
-  where
-    !(I# segmentMask#) = segmentMask
-
-hashToIndex# :: MutableArray# RealWorld [FastString] -> Int# -> Int#
-hashToIndex# buckets# hash# =
-  (hash# `uncheckedIShiftRL#` segmentBits#) `remInt#` size#
-  where
-    !(I# segmentBits#) = segmentBits
-    size# = sizeofMutableArray# buckets#
-
-maybeResizeSegment :: IORef FastStringTableSegment -> IO FastStringTableSegment
-maybeResizeSegment segmentRef = do
-  segment@(FastStringTableSegment lock counter old#) <- readIORef segmentRef
-  let oldSize# = sizeofMutableArray# old#
-      newSize# = oldSize# *# 2#
-  (I# n#) <- readFastMutInt counter
-  if isTrue# (n# <# newSize#) -- maximum load of 1
-  then return segment
-  else do
-    resizedSegment@(FastStringTableSegment _ _ new#) <- IO $ \s1# ->
-      case newArray# newSize# [] s1# of
-        (# s2#, arr# #) -> (# s2#, FastStringTableSegment lock counter arr# #)
-    forM_ [0 .. (I# oldSize#) - 1] $ \(I# i#) -> do
-      fsList <- IO $ readArray# old# i#
-      forM_ fsList $ \fs -> do
-        let -- Shall we store in hash value in FastString instead?
-            !(I# hash#) = hashFastString fs
-            idx# = hashToIndex# new# hash#
-        IO $ \s1# ->
-          case readArray# new# idx# s1# of
-            (# s2#, bucket #) -> case writeArray# new# idx# (fs: bucket) s2# of
-              s3# -> (# s3#, () #)
-    writeIORef segmentRef resizedSegment
-    return resizedSegment
 
 {-# NOINLINE stringTable #-}
 stringTable :: FastStringTable
@@ -473,60 +400,12 @@ The procedure goes like this:
    * Otherwise, insert and return the string we created.
 -}
 
-mkFastStringWith
-    :: (Int -> FastMutInt-> IO FastString) -> ShortByteString -> IO FastString
-mkFastStringWith mk_fs sbs = do
-  FastStringTableSegment lock _ buckets# <- readIORef segmentRef
-  let idx# = hashToIndex# buckets# hash#
-  bucket <- IO $ readArray# buckets# idx#
-  case bucket_match bucket sbs of
-    Just found -> return found
-    Nothing -> do
-      -- The withMVar below is not dupable. It can lead to deadlock if it is
-      -- only run partially and putMVar is not called after takeMVar.
-      noDuplicate
-      n <- get_uid
-      new_fs <- mk_fs n n_zencs
-      withMVar lock $ \_ -> insert new_fs
-  where
-    !(FastStringTable uid n_zencs segments#) = stringTable
-    get_uid = atomicFetchAddFastMut uid 1
-
-    !(I# hash#) = hashStr sbs
-    (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
-    insert fs = do
-      FastStringTableSegment _ counter buckets# <- maybeResizeSegment segmentRef
-      let idx# = hashToIndex# buckets# hash#
-      bucket <- IO $ readArray# buckets# idx#
-      case bucket_match bucket sbs of
-        -- The FastString was added by another thread after previous read and
-        -- before we acquired the write lock.
-        Just found -> return found
-        Nothing -> do
-          IO $ \s1# ->
-            case writeArray# buckets# idx# (fs : bucket) s1# of
-              s2# -> (# s2#, () #)
-          _ <- atomicFetchAddFastMut counter 1
-          return fs
-
-bucket_match :: [FastString] -> ShortByteString -> Maybe FastString
-bucket_match fs sbs = go fs
-  where go [] = Nothing
-        go (fs@(FastString {fs_sbs=fs_sbs}) : ls)
-          | fs_sbs == sbs = Just fs
-          | otherwise     = go ls
--- bucket_match used to inline before changes to instance Eq ShortByteString
--- in bytestring-0.12, which made it slightly larger than inlining threshold.
--- Non-inlining causes a small, but measurable performance regression, so let's force it.
-{-# INLINE bucket_match #-}
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
     -- NB: Might as well use unsafeDupablePerformIO, since mkFastStringWith is
     -- idempotent.
-    unsafeDupablePerformIO $ do
-        sbs <- newSBSFromPtr ptr len
-        mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+    unsafeDupablePerformIO $ newSBSFromPtr ptr len
 
 newSBSFromPtr :: Ptr a -> Int -> IO ShortByteString
 newSBSFromPtr (Ptr src#) (I# len#) =
@@ -538,47 +417,22 @@ newSBSFromPtr (Ptr src#) (I# len#) =
 
 -- | Create a 'FastString' by copying an existing 'ByteString'
 mkFastStringByteString :: ByteString -> FastString
-mkFastStringByteString bs =
-  let sbs = SBS.toShort bs in
-  inlinePerformIO $
-      mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+mkFastStringByteString = SBS.toShort
 
 -- | Create a 'FastString' from an existing 'ShortByteString' without
 -- copying.
 mkFastStringShortByteString :: ShortByteString -> FastString
-mkFastStringShortByteString sbs =
-  inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+mkFastStringShortByteString = id
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
-{-# NOINLINE[1] mkFastString #-}
 mkFastString str =
-  inlinePerformIO $ do
     let !sbs = utf8EncodeShortByteString str
-    mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
-
--- The following rule is used to avoid polluting the non-reclaimable FastString
--- table with transient strings when we only want their encoding.
-{-# RULES
-"bytesFS/mkFastString" forall x. bytesFS (mkFastString x) = utf8EncodeByteString x #-}
+     in sbs
 
 -- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
 mkFastStringByteList :: [Word8] -> FastString
 mkFastStringByteList str = mkFastStringShortByteString (SBS.pack str)
-
--- | Creates a (lazy) Z-encoded 'FastString' from a 'ShortByteString' and
--- account the number of forced z-strings into the passed 'FastMutInt'.
-mkZFastString :: FastMutInt -> ShortByteString -> FastZString
-mkZFastString n_zencs sbs = unsafePerformIO $ do
-  _ <- atomicFetchAddFastMut n_zencs 1
-  return $ mkFastZStringString (zEncodeString (utf8DecodeShortByteString sbs))
-
-mkNewFastStringShortByteString :: ShortByteString -> Int
-                               -> FastMutInt -> IO FastString
-mkNewFastStringShortByteString sbs uid n_zencs = do
-  let zstr = mkZFastString n_zencs sbs
-      chars = utf8CountCharsShortByteString sbs
-  return (FastString uid chars sbs zstr)
 
 hashStr  :: ShortByteString -> Int
  -- produce a hash value between 0 & m (inclusive)
@@ -603,15 +457,15 @@ hashStr sbs@(SBS.SBS ba#) = loop 0# 0#
 
 -- | Returns the length of the 'FastString' in characters
 lengthFS :: FastString -> Int
-lengthFS fs = n_chars fs
+lengthFS = SBS.length -- romes: does this return utf8 length?
 
 -- | Returns @True@ if the 'FastString' is empty
 nullFS :: FastString -> Bool
-nullFS fs = SBS.null $ fs_sbs fs
+nullFS = SBS.null
 
 -- | Lazily unpacks and decodes the FastString
 unpackFS :: FastString -> String
-unpackFS fs = utf8DecodeShortByteString $ fs_sbs fs
+unpackFS = utf8DecodeShortByteString
 
 -- | Returns a Z-encoded version of a 'FastString'.  This might be the
 -- original, if it was already Z-encoded.  The first time this
@@ -619,14 +473,13 @@ unpackFS fs = utf8DecodeShortByteString $ fs_sbs fs
 -- memoized.
 --
 zEncodeFS :: FastString -> FastZString
-zEncodeFS fs = fs_zenc fs
+zEncodeFS = mkFastZStringString . zEncodeString . utf8DecodeShortByteString
 
 appendFS :: FastString -> FastString -> FastString
-appendFS fs1 fs2 = mkFastStringShortByteString
-                 $ (Semi.<>) (fs_sbs fs1) (fs_sbs fs2)
+appendFS = (Semi.<>)
 
 concatFS :: [FastString] -> FastString
-concatFS = mkFastStringShortByteString . mconcat . map fs_sbs
+concatFS = mconcat
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
@@ -638,7 +491,9 @@ unconsFS fs =
     (chr : str) -> Just (chr, mkFastString str)
 
 uniqueOfFS :: FastString -> Int
-uniqueOfFS fs = uniq fs
+uniqueOfFS x =
+  let y = abs $ hashStr x -- that can't possibly be unique...
+   in assert (0 <= y) y
 
 nilFS :: FastString
 nilFS = mkFastString ""
