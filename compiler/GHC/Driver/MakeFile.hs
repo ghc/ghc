@@ -16,6 +16,7 @@ where
 import GHC.Prelude
 
 import qualified GHC
+import GHC.Driver.Make
 import GHC.Driver.Monad
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
@@ -210,10 +211,9 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps dflags _ _ _ _ (CyclicSCC nodes)
+processDeps _ _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    throwGhcExceptionIO $ ProgramError $
-      showSDoc dflags $ GHC.cyclicModuleErr nodes
+    cyclicModuleErr nodes
 
 processDeps dflags _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
   =     -- There shouldn't be any backpack instantiations; report them as well

@@ -1265,9 +1265,7 @@ upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = d
     -- of the upsweep.
     case cycle of
         Just mss -> do
-          let logger = hsc_logger hsc_env
-          liftIO $ fatalErrorMsg logger (cyclicModuleErr mss)
-          return (Failed, [])
+          cyclicModuleErr mss
         Nothing  -> do
           let success_flag = successIf (all isJust res)
           return (success_flag, completed)
@@ -2388,16 +2386,18 @@ multiRootsErr summs@(summ1:_)
     mod = ms_mod summ1
     files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs
 
-cyclicModuleErr :: [ModuleGraphNode] -> SDoc
+cyclicModuleErr :: [ModuleGraphNode] -> IO a
 -- From a strongly connected component we find
 -- a single cycle to report
 cyclicModuleErr mss
   = assert (not (null mss)) $
     case findCycle graph of
-       Nothing   -> text "Unexpected non-cycle" <+> ppr mss
-       Just path0 -> vcat
-        [ text "Module graph contains a cycle:"
-        , nest 2 (show_path path0)]
+       Nothing   -> pprPanic "Unexpected non-cycle" (ppr mss)
+       Just path -> throwOneError $ mkPlainErrorMsgEnvelope src_span
+                                  $ GhcDriverMessage
+                                  $ DriverModuleGraphCycle path
+        where
+          src_span = maybe noSrcSpan (mkFileSrcSpan . ms_location) (moduleGraphNodeModSum (head path))
   where
     graph :: [Node NodeKey ModuleGraphNode]
     graph =
@@ -2409,24 +2409,11 @@ cyclicModuleErr mss
       | ms <- mss
       ]
 
-    show_path :: [ModuleGraphNode] -> SDoc
-    show_path []  = panic "show_path"
-    show_path [m] = ppr_node m <+> text "imports itself"
-    show_path (m1:m2:ms) = vcat ( nest 14 (ppr_node m1)
-                                : nest 6 (text "imports" <+> ppr_node m2)
-                                : go ms )
-       where
-         go []     = [text "which imports" <+> ppr_node m1]
-         go (m:ms) = (text "which imports" <+> ppr_node m) : go ms
-
-    ppr_node :: ModuleGraphNode -> SDoc
-    ppr_node (ModuleNode _deps m) = text "module" <+> ppr_ms m
-    ppr_node (InstantiationNode _uid u) = text "instantiated unit" <+> ppr u
-    ppr_node (LinkNode uid _) = pprPanic "LinkNode should not be in a cycle" (ppr uid)
-
-    ppr_ms :: ModSummary -> SDoc
-    ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+>
-                (parens (text (msHsFilePath ms)))
+mkFileSrcSpan :: ModLocation -> SrcSpan
+mkFileSrcSpan mod_loc
+  = case ml_hs_file mod_loc of
+      Just file_path -> mkGeneralSrcSpan (mkFastString file_path)
+      Nothing        -> interactiveSrcSpan   -- Presumably
 
 
 cleanCurrentModuleTempFilesMaybe :: MonadIO m => Logger -> TmpFs -> DynFlags -> m ()

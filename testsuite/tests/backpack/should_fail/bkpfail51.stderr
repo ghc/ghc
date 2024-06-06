@@ -2,7 +2,9 @@
   [1 of 2] Compiling H[sig]           ( p/H.hsig, nothing )
   [2 of 2] Compiling I                ( p/I.hs, nothing )
 [2 of 2] Processing q
-Module graph contains a cycle:
-        instantiated unit p[H=A]
-        imports module ‘A’ (q/A.hsig)
-  which imports instantiated unit p[H=A]
+<no location info>: error: [GHC-92213]
+    Module graph contains a cycle:
+                    instantiated unit p[H=<A>]
+            imports module ‘A’ (q/A.hsig)
+      which imports instantiated unit p[H=<A>]
+

@@ -1,4 +1,6 @@
-Module graph contains a cycle:
-                module ‘T24196A’ (./T24196A.hs-boot)
-        imports module ‘T24196B’ (T24196B.hs)
-  which imports module ‘T24196A’ (./T24196A.hs-boot)
+./T24196A.hs-boot: error: [GHC-92213]
+    Module graph contains a cycle:
+                    module ‘T24196A’ (./T24196A.hs-boot)
+            imports module ‘T24196B’ (T24196B.hs)
+      which imports module ‘T24196A’ (./T24196A.hs-boot)
+

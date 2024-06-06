@@ -113,6 +113,7 @@ GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
 GHC.Iface.Type
+GHC.Linker.Static.Utils
 GHC.Parser
 GHC.Parser.Annotation
 GHC.Parser.CharClass
@@ -189,6 +190,7 @@ GHC.Types.SafeHaskell
 GHC.Types.SourceFile
 GHC.Types.SourceText
 GHC.Types.SrcLoc
+GHC.Types.Target
 GHC.Types.Tickish
 GHC.Types.TyThing
 GHC.Types.Unique
@@ -208,9 +210,11 @@ GHC.Unit.Info
 GHC.Unit.Module
 GHC.Unit.Module.Deps
 GHC.Unit.Module.Env
+GHC.Unit.Module.Graph
 GHC.Unit.Module.Imported
 GHC.Unit.Module.Location
 GHC.Unit.Module.ModIface
+GHC.Unit.Module.ModSummary
 GHC.Unit.Module.Warnings
 GHC.Unit.Parser
 GHC.Unit.Ppr

@@ -315,11 +315,8 @@ module GHC (
         parser,
 
         -- * API Annotations
-        AnnKeywordId(..),EpaComment(..),
-
-        -- * Miscellaneous
-        --sessionHscEnv,
-        cyclicModuleErr,
+        AnnKeywordId(..),
+        EpaComment(..)
   ) where
 
 {-

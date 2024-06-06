@@ -20,7 +20,10 @@ import GHC.Types.Error
 import GHC.Types.Error.Codes
 import GHC.Unit.Types
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Unit.Module
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.ModSummary
 import GHC.Unit.State
 import GHC.Types.Hint
 import GHC.Types.SrcLoc
@@ -238,6 +241,30 @@ instance Diagnostic DriverMessage where
       -> mkSimpleDecorated $ text $ "unrecognised warning flag: -" ++ arg
     DriverDeprecatedFlag arg msg
       -> mkSimpleDecorated $ text $ arg ++ " is deprecated: " ++ msg
+    DriverModuleGraphCycle path
+      -> mkSimpleDecorated $ vcat
+        [ text "Module graph contains a cycle:"
+        , nest 2 (show_path path) ]
+      where
+        show_path :: [ModuleGraphNode] -> SDoc
+        show_path []  = panic "show_path"
+        show_path [m] = ppr_node m <+> text "imports itself"
+        show_path (m1:m2:ms) = vcat ( nest 14 (ppr_node m1)
+                                    : nest 6 (text "imports" <+> ppr_node m2)
+                                    : go ms )
+           where
+             go []     = [text "which imports" <+> ppr_node m1]
+             go (m:ms) = (text "which imports" <+> ppr_node m) : go ms
+
+        ppr_node :: ModuleGraphNode -> SDoc
+        ppr_node (ModuleNode _deps m) = text "module" <+> ppr_ms m
+        ppr_node (InstantiationNode _uid u) = text "instantiated unit" <+> ppr u
+        ppr_node (LinkNode uid _) = pprPanic "LinkNode should not be in a cycle" (ppr uid)
+
+        ppr_ms :: ModSummary -> SDoc
+        ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+>
+                    (parens (text (msHsFilePath ms)))
+
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -303,6 +330,8 @@ instance Diagnostic DriverMessage where
       -> WarningWithFlag Opt_WarnUnrecognisedWarningFlags
     DriverDeprecatedFlag {}
       -> WarningWithFlag Opt_WarnDeprecatedFlags
+    DriverModuleGraphCycle {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     DriverUnknownMessage m
@@ -369,6 +398,8 @@ instance Diagnostic DriverMessage where
     DriverUnrecognisedFlag {}
       -> noHints
     DriverDeprecatedFlag {}
+      -> noHints
+    DriverModuleGraphCycle {}
       -> noHints
 
   diagnosticCode = constructorCode

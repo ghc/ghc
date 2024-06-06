@@ -28,6 +28,7 @@ import GHC.Driver.DynFlags (DynFlags, PackageArg, gopt)
 import GHC.Driver.Flags (GeneralFlag (Opt_BuildingCabalPackage))
 import GHC.Types.Error
 import GHC.Unit.Module
+import GHC.Unit.Module.Graph
 import GHC.Unit.State
 
 import GHC.Parser.Errors.Types ( PsMessage(PsHeaderMessage) )
@@ -383,6 +384,18 @@ data DriverMessage where
   DriverUnrecognisedFlag :: String -> DriverMessage
 
   DriverDeprecatedFlag :: String -> String -> DriverMessage
+
+  {- | DriverModuleGraphCycle is an error that occurs if the module graph
+       contains cyclic imports.
+
+  Test cases:
+    tests/backpack/should_fail/bkpfail51
+    tests/driver/T20459
+    tests/driver/T24196/T24196
+    tests/driver/T24275/T24275
+
+  -}
+  DriverModuleGraphCycle :: [ModuleGraphNode] -> DriverMessage
 
 deriving instance Generic DriverMessage
 
