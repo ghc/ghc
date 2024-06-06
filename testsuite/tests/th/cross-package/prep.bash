@@ -22,11 +22,13 @@ ghc()
 }
 
 mkdir -p "$lib" "$db"
-cp CrossDep.hs dep.conf "$lib/"
+mv CrossDep.hs CrossDepApi.hs dep.conf "$lib/"
 
 ghc_pkg recache
 
-ghc "-package-db ${db@Q} -hidir ${lib@Q} -O0 -this-unit-id dep-1.0 -fbyte-code-and-object-code -c ${lib@Q}/CrossDep.hs"
-$AR cqs "${lib}/libHSdep-1.0.a" "${lib}/CrossDep.o"
+ghc "-package-db ${db@Q} -hidir ${lib@Q} -O0 -this-unit-id dep-1.0 -fbyte-code-and-object-code -c ${lib@Q}/CrossDep.hs ${lib@Q}/CrossDepApi.hs"
+$AR cqs "${lib}/libHSdep-1.0.a" "${lib}/CrossDep.o" "${lib}/CrossDepApi.o"
 
 ghc_pkg -v0 register "${lib@Q}/dep.conf"
+
+tree >&2

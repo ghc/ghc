@@ -2,7 +2,7 @@ test(
     'CrossPackage',
     [
         pre_cmd('$MAKE -s --no-print-directory CrossPackage'),
-        extra_files(['Cross.hs', 'CrossLocal.hs', 'CrossDep.hs', 'CrossNum.hs', 'prep.bash', 'dep.conf']),
+        extra_files(['Cross.hs', 'CrossLocal.hs', 'CrossDep.hs', 'CrossDepApi.hs', 'CrossNum.hs', 'prep.bash', 'dep.conf']),
         # ignore_stderr,
     ],
     # multimod_compile_and_run,
