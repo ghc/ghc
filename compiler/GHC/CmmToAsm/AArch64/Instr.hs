@@ -102,6 +102,9 @@ regUsageOfInstr platform instr = case instr of
   UXTH dst src             -> usage (regOp src, regOp dst)
   CLZ  dst src             -> usage (regOp src, regOp dst)
   RBIT dst src             -> usage (regOp src, regOp dst)
+  REV   dst src            -> usage (regOp src, regOp dst)
+  -- REV32 dst src            -> usage (regOp src, regOp dst)
+  REV16 dst src            -> usage (regOp src, regOp dst)
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -138,6 +141,7 @@ regUsageOfInstr platform instr = case instr of
   SCVTF dst src            -> usage (regOp src, regOp dst)
   FCVTZS dst src           -> usage (regOp src, regOp dst)
   FABS dst src             -> usage (regOp src, regOp dst)
+  FSQRT dst src            -> usage (regOp src, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
 
@@ -237,7 +241,11 @@ patchRegsOfInstr instr env = case instr of
     SXTH o1 o2       -> SXTH (patchOp o1) (patchOp o2)
     UXTH o1 o2       -> UXTH (patchOp o1) (patchOp o2)
     CLZ o1 o2        -> CLZ  (patchOp o1) (patchOp o2)
-    RBIT o1 o2       -> RBIT  (patchOp o1) (patchOp o2)
+    RBIT o1 o2       -> RBIT (patchOp o1) (patchOp o2)
+    REV   o1 o2      -> REV  (patchOp o1) (patchOp o2)
+    -- REV32 o1 o2      -> REV32 (patchOp o1) (patchOp o2)
+    REV16 o1 o2      -> REV16 (patchOp o1) (patchOp o2)
+
 
     -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -276,6 +284,7 @@ patchRegsOfInstr instr env = case instr of
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
     FABS o1 o2     -> FABS (patchOp o1) (patchOp o2)
+    FSQRT o1 o2    -> FSQRT (patchOp o1) (patchOp o2)
     FMA s o1 o2 o3 o4 ->
       FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
 
@@ -597,6 +606,12 @@ data Instr
     | UBFX Operand Operand Operand Operand -- rd = rn[i,j]
     | CLZ  Operand Operand -- rd = countLeadingZeros(rn)
     | RBIT Operand Operand -- rd = reverseBits(rn)
+    | REV Operand Operand   -- rd = reverseBytes(rn): (for 32 & 64 bit operands)
+                            -- 0xAABBCCDD -> 0xDDCCBBAA
+    | REV16 Operand Operand -- rd = reverseBytes16(rn)
+                            -- 0xAABB_CCDD -> xBBAA_DDCC
+    -- | REV32 Operand Operand -- rd = reverseBytes32(rn) - 64bit operands only!
+    --                         -- 0xAABBCCDD_EEFFGGHH -> 0XDDCCBBAA_HHGGFFEE
 
     -- 3. Logical and Move Instructions ----------------------------------------
     | AND Operand Operand Operand -- rd = rn & op2
@@ -639,6 +654,8 @@ data Instr
     | FCVTZS Operand Operand
     -- Float ABSolute value
     | FABS Operand Operand
+    -- Float SQuare RooT
+    | FSQRT Operand Operand
 
     -- | Floating-point fused multiply-add instructions
     --
@@ -682,6 +699,9 @@ instrCon i =
       UBFX{} -> "UBFX"
       CLZ{} -> "CLZ"
       RBIT{} -> "RBIT"
+      REV{} -> "REV"
+      REV16{} -> "REV16"
+      -- REV32{} -> "REV32"
       AND{} -> "AND"
       ASR{} -> "ASR"
       EOR{} -> "EOR"
@@ -708,6 +728,7 @@ instrCon i =
       SCVTF{} -> "SCVTF"
       FCVTZS{} -> "FCVTZS"
       FABS{} -> "FABS"
+      FSQRT{} -> "FSQRT"
       FMA variant _ _ _ _ ->
         case variant of
           FMAdd  -> "FMADD"
