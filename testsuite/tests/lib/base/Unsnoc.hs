@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-x-partial #-}
 
-module Main (main) where 
+module Main (main) where
 
 import Data.List (unsnoc)
 
