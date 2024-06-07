@@ -7,5 +7,5 @@ test(
     ],
     # multimod_compile_and_run,
     multimod_compile,
-    ['Cross', '-package-db db -fprefer-byte-code -fbyte-code-and-object-code -package dep -v0'],
+    ['Cross', '-O0 -package-db db -fprefer-byte-code -fbyte-code-and-object-code -package dep -v0'],
 )
