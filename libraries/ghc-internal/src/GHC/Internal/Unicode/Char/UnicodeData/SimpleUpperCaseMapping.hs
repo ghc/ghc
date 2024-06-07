@@ -7,9 +7,8 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      : GHC.Internal.Unicode.Char.UnicodeData.SimpleUpperCaseMapping
--- Copyright   : (c) 2020 Composewell Technologies and Contributors
 -- License     : BSD-3-Clause
--- Maintainer  : streamly@composewell.com
+-- Maintainer  : The GHC Developers <ghc-devs@haskell.org>
 -- Stability   : internal
 -----------------------------------------------------------------------------
 
