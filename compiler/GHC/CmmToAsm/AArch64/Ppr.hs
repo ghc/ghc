@@ -398,6 +398,9 @@ pprInstr platform instr = case instr of
   UBFM o1 o2 o3 o4 -> op4 (text "\tubfm") o1 o2 o3 o4
   CLZ  o1 o2       -> op2 (text "\tclz")  o1 o2
   RBIT  o1 o2      -> op2 (text "\trbit")  o1 o2
+  REV o1 o2        -> op2 (text "\trev")  o1 o2
+  REV16 o1 o2      -> op2 (text "\trev16")  o1 o2
+  -- REV32 o1 o2      -> op2 (text "\trev32")  o1 o2
   -- signed and unsigned bitfield extract
   SBFX o1 o2 o3 o4 -> op4 (text "\tsbfx") o1 o2 o3 o4
   UBFX o1 o2 o3 o4 -> op4 (text "\tubfx") o1 o2 o3 o4
@@ -531,6 +534,7 @@ pprInstr platform instr = case instr of
   SCVTF o1 o2 -> op2 (text "\tscvtf") o1 o2
   FCVTZS o1 o2 -> op2 (text "\tfcvtzs") o1 o2
   FABS o1 o2 -> op2 (text "\tfabs") o1 o2
+  FSQRT o1 o2 -> op2 (text "\tfsqrt") o1 o2
   FMA variant d r1 r2 r3 ->
     let fma = case variant of
                 FMAdd  -> text "\tfmadd"

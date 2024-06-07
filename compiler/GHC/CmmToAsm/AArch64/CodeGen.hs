@@ -1607,9 +1607,20 @@ genCCall target dest_regs arg_regs = do
     PrimTarget MO_F32_Fabs
       | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
         unaryFloatOp W32 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+      | otherwise -> panic "mal-formed MO_F32_Fabs"
     PrimTarget MO_F64_Fabs
       | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
         unaryFloatOp W64 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+      | otherwise -> panic "mal-formed MO_F64_Fabs"
+    PrimTarget MO_F32_Sqrt
+      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
+        unaryFloatOp W32 (\d x -> unitOL $ FSQRT d x) arg_reg dest_reg
+      | otherwise -> panic "mal-formed MO_F32_Sqrt"
+    PrimTarget MO_F64_Sqrt
+      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
+        unaryFloatOp W64 (\d x -> unitOL $ FSQRT d x) arg_reg dest_reg
+      | otherwise -> panic "mal-formed MO_F64_Sqrt"
+
 
     PrimTarget (MO_S_Mul2 w)
           -- Life is easier when we're working with word sized operands,
@@ -1864,7 +1875,25 @@ genCCall target dest_regs arg_regs = do
                     , RBIT (r dst') (r dst')
                     ]
             | otherwise -> unsupported (MO_BRev  w)
-
+    PrimTarget (MO_BSwap  w)
+          | w == W64 || w == W32
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst_reg = getRegisterReg platform (CmmLocal dst)
+              return $ code_x `snocOL` REV (OpReg w dst_reg) (OpReg w reg_a)
+          | w == W16
+          , [src] <- arg_regs
+          , [dst] <- dest_regs
+          -> do
+              (reg_a, _format_x, code_x) <- getSomeReg src
+              let dst' = getRegisterReg platform (CmmLocal dst)
+                  r n = OpReg W32 n
+              -- Swaps the bytes in each 16bit word
+              -- TODO: Expose the 32 & 64 bit version of this?
+              return $ code_x `snocOL` REV16 (r dst') (r reg_a)
+          | otherwise -> unsupported (MO_BSwap w)
 
     -- or a possibly side-effecting machine operation
     -- mop :: CallishMachOp (see GHC.Cmm.MachOp)
@@ -1894,8 +1923,6 @@ genCCall target dest_regs arg_regs = do
         MO_F64_Log1P -> mkCCall "log1p"
         MO_F64_Exp   -> mkCCall "exp"
         MO_F64_ExpM1 -> mkCCall "expm1"
-        MO_F64_Fabs  -> mkCCall "fabs"
-        MO_F64_Sqrt  -> mkCCall "sqrt"
 
         -- 32 bit float ops
         MO_F32_Pwr   -> mkCCall "powf"
@@ -1916,8 +1943,6 @@ genCCall target dest_regs arg_regs = do
         MO_F32_Log1P -> mkCCall "log1pf"
         MO_F32_Exp   -> mkCCall "expf"
         MO_F32_ExpM1 -> mkCCall "expm1f"
-        MO_F32_Fabs  -> mkCCall "fabsf"
-        MO_F32_Sqrt  -> mkCCall "sqrtf"
 
         -- 64-bit primops
         MO_I64_ToI   -> mkCCall "hs_int64ToInt"
@@ -1990,7 +2015,6 @@ genCCall target dest_regs arg_regs = do
         MO_PopCnt w         -> mkCCall (popCntLabel w)
         MO_Pdep w           -> mkCCall (pdepLabel w)
         MO_Pext w           -> mkCCall (pextLabel w)
-        MO_BSwap w          -> mkCCall (bSwapLabel w)
 
         -- -- Atomic read-modify-write.
         MO_AtomicRead w ord
