@@ -26,6 +26,7 @@ module Data.List
      singleton,
      null,
      length,
+     compareLength,
      -- *  List transformations
      map,
      reverse,
@@ -178,8 +179,12 @@ module Data.List
      genericReplicate
      ) where
 
+import GHC.Internal.Data.Bool (otherwise)
 import GHC.Internal.Data.List
 import GHC.Internal.Data.List.NonEmpty (NonEmpty(..))
+import GHC.Internal.Data.Ord (Ordering(..), (<), (>))
+import GHC.Internal.Int (Int)
+import GHC.Internal.Num ((-))
 import GHC.List (build)
 
 inits1, tails1 :: [a] -> [NonEmpty a]
@@ -243,3 +248,37 @@ tails1 lst = build (\c n ->
   let tails1Go [] = n
       tails1Go (x : xs) = (x :| xs) `c` tails1Go xs
   in tails1Go lst)
+
+-- | Use 'compareLength' @xs@ @n@ as a safer and faster alternative
+-- to 'compare' ('length' @xs@) @n@. Similarly, it's better
+-- to write @compareLength xs 10 == LT@ instead of @length xs < 10@.
+--
+-- While 'length' would force and traverse
+-- the entire spine of @xs@ (which could even diverge if @xs@ is infinite),
+-- 'compareLength' traverses at most @n@ elements to determine its result.
+--
+-- >>> compareLength [] 0
+-- EQ
+-- >>> compareLength [] 1
+-- LT
+-- >>> compareLength ['a'] 1
+-- EQ
+-- >>> compareLength ['a', 'b'] 1
+-- GT
+-- >>> compareLength [0..] 100
+-- GT
+-- >>> compareLength undefined (-1)
+-- GT
+-- >>> compareLength ('a' : undefined) 0
+-- GT
+--
+-- @since 4.21.0.0
+--
+compareLength :: [a] -> Int -> Ordering
+compareLength xs n
+  | n < 0 = GT
+  | otherwise = foldr
+    (\_ f m -> if m > 0 then f (m - 1) else GT)
+    (\m -> if m > 0 then LT else EQ)
+    xs
+    n

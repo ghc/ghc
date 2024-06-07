@@ -1299,6 +1299,7 @@ module Data.List where
   and :: forall (t :: * -> *). GHC.Internal.Data.Foldable.Foldable t => t GHC.Types.Bool -> GHC.Types.Bool
   any :: forall (t :: * -> *) a. GHC.Internal.Data.Foldable.Foldable t => (a -> GHC.Types.Bool) -> t a -> GHC.Types.Bool
   break :: forall a. (a -> GHC.Types.Bool) -> [a] -> ([a], [a])
+  compareLength :: forall a. [a] -> GHC.Types.Int -> GHC.Types.Ordering
   concat :: forall (t :: * -> *) a. GHC.Internal.Data.Foldable.Foldable t => t [a] -> [a]
   concatMap :: forall (t :: * -> *) a b. GHC.Internal.Data.Foldable.Foldable t => (a -> [b]) -> t a -> [b]
   cycle :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> [a]
@@ -1423,6 +1424,7 @@ module Data.List.NonEmpty where
   append :: forall a. NonEmpty a -> NonEmpty a -> NonEmpty a
   appendList :: forall a. NonEmpty a -> [a] -> NonEmpty a
   break :: forall a. (a -> GHC.Types.Bool) -> NonEmpty a -> ([a], [a])
+  compareLength :: forall a. NonEmpty a -> GHC.Types.Int -> GHC.Types.Ordering
   cons :: forall a. a -> NonEmpty a -> NonEmpty a
   cycle :: forall a. NonEmpty a -> NonEmpty a
   drop :: forall a. GHC.Types.Int -> NonEmpty a -> [a]

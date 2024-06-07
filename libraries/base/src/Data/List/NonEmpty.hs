@@ -36,6 +36,7 @@ module Data.List.NonEmpty (
    , sortWith      -- :: Ord o => (a -> o) -> NonEmpty a -> NonEmpty a
    -- * Basic functions
    , length      -- :: NonEmpty a -> Int
+   , compareLength -- :: NonEmpty a -> Int -> Ordering
    , head        -- :: NonEmpty a -> a
    , tail        -- :: NonEmpty a -> [a]
    , last        -- :: NonEmpty a -> a
@@ -127,6 +128,36 @@ infixr 5 <|
 -- | Number of elements in 'NonEmpty' list.
 length :: NonEmpty a -> Int
 length (_ :| xs) = 1 + Prelude.length xs
+
+-- | Use 'compareLength' @xs@ @n@ as a safer and faster alternative
+-- to 'compare' ('length' @xs@) @n@. Similarly, it's better
+-- to write @compareLength xs 10 == LT@ instead of @length xs < 10@.
+--
+-- While 'length' would force and traverse
+-- the entire spine of @xs@ (which could even diverge if @xs@ is infinite),
+-- 'compareLength' traverses at most @n@ elements to determine its result.
+--
+-- >>> compareLength ('a' :| []) 1
+-- EQ
+-- >>> compareLength ('a' :| ['b']) 3
+-- LT
+-- >>> compareLength (0 :| [1..]) 100
+-- GT
+-- >>> compareLength undefined 0
+-- GT
+-- >>> compareLength ('a' :| 'b' : undefined) 1
+-- GT
+--
+-- @since 4.21.0.0
+--
+compareLength :: NonEmpty a -> Int -> Ordering
+compareLength xs n
+  | n < 1 = GT
+  | otherwise = foldr
+    (\_ f m -> if m > 0 then f (m - 1) else GT)
+    (\m -> if m > 0 then LT else EQ)
+    xs
+    n
 
 -- | Compute n-ary logic exclusive OR operation on 'NonEmpty' list.
 xor :: NonEmpty Bool -> Bool
