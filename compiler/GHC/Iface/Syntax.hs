@@ -41,7 +41,7 @@ module GHC.Iface.Syntax (
 
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
-        freeNamesIfConDecls,
+        freeNamesIfConDecls, freeNamesIfExpr,
 
         -- Pretty printing
         pprIfaceExpr,

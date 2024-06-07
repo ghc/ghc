@@ -118,6 +118,9 @@ import GHC.Unit.Module.WholeCoreBindings (WholeCoreBindings(..))
 import Control.Monad.Trans.State.Strict (StateT(..), state)
 import GHC.Utils.Misc (modificationTimeIfExists)
 import qualified Data.Map.Strict as Map
+import Data.Foldable (toList)
+import GHC.Iface.Syntax
+import GHC.Types.Name.Set (unionNameSets, mkNameSet, intersectsNameSet, intersectNameSet, elemNameSet)
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -419,6 +422,55 @@ cbl_handlers hsc_env cbl_hydrate =
       findExactModule fc fopts other_fopts unit_state mhome_unit
       (mkModule (moduleUnitId mod) (moduleName mod))
 
+wcb_closure ::
+  MonadIO m =>
+  [Name] ->
+  WholeCoreBindings ->
+  m WholeCoreBindings
+wcb_closure names (WholeCoreBindings cbs m l) = do
+  dbg "wcb_closure" [
+    ("cbs", ppr cbs),
+    ("names", ppr names),
+    ("top_names", ppr top_names),
+    ("used_top_names", ppr used_top_names),
+    ("all_used_names", ppr all_used_names),
+    ("all_used_binders", ppr all_used_binders),
+    ("wcb_c", ppr wcb_c)
+    ]
+  pure (WholeCoreBindings wcb_c m l)
+  where
+    wcb_c = fst <$> all_used_binders
+    all_used_binders = filter (has_used_name . snd) cbsn
+    has_used_name used = intersectsNameSet used all_used_names
+
+    all_used_names = unionNameSets (used_top_names : (used_names_iface_binder . fst <$> used_top_binders))
+    used_names_iface_binder = \case
+      IfaceNonRec _ r -> used_names r
+      IfaceRec bs -> unionNameSets (used_names . snd <$> bs)
+    used_names = \case
+      IfRhs r -> freeNamesIfExpr r
+      _ -> mempty
+
+    used_top_binders = filter (is_used_iface_binder . fst) cbsn
+    is_used_iface_binder = \case
+      IfaceNonRec b _ -> is_used_binder b
+      IfaceRec bs -> any (is_used_binder . fst) bs
+    is_used_binder = \case
+      IfGblTopBndr name -> elemNameSet name used_top_names
+      IfLclTopBndr {} -> False
+
+    cbsn = with_names <$> cbs
+    with_names ib = case ib of
+      IfaceNonRec b _ -> (ib, mkNameSet (binder_names b))
+      IfaceRec bs -> (ib, mkNameSet (concatMap (binder_names . fst) bs))
+
+    used_top_names = intersectNameSet names_set top_names
+    top_names = mkNameSet (concatMap binder_names (concatMap toList cbs))
+    binder_names = \case
+      IfGblTopBndr name -> [name]
+      IfLclTopBndr {} -> []
+    names_set = mkNameSet names
+
 loadModuleNamesFromCoreBindings ::
   CBLoaderHandlers ->
   Module ->
@@ -435,8 +487,9 @@ loadModuleNamesFromCoreBindings handlers@CBLoaderHandlers {..} mod names = do
     InstalledFound loc _ -> do
       summ <- liftIO $ cbload_mod_summary mod loc iface
       liftIO (loadByteCode loc iface summ) >>= \case
-        Just wcb_linkable -> do
-          hydrated <- liftIO $ cbl_hydrate iface wcb_linkable
+        Just wcb_linkable@LM {linkableUnlinked = [CoreBindings wcb]} -> do
+          wcb' <- wcb_closure names wcb
+          hydrated <- liftIO $ cbl_hydrate iface (wcb_linkable { linkableUnlinked = [CoreBindings wcb']})
           let hydrated_bcos = unwrap_hydrated (linkableUnlinked hydrated)
           complete <- loadDepsFromCoreBindings handlers hydrated_bcos
           dbg "loadIfaceByteCode found" [
