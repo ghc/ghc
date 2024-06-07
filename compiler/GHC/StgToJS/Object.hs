@@ -538,7 +538,7 @@ instance Binary Sat.JVal where
 
 instance Binary Ident where
   put_ bh (identFS -> xs) = put_ bh xs
-  get  bh                = global <$> get bh
+  get  bh                 = name <$> get bh
 
 instance Binary ClosureInfo where
   put_ bh (ClosureInfo v regs name layo typ static) = do

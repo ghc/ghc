@@ -28,6 +28,8 @@ import qualified GHC.JS.Syntax as Sat
 import GHC.JS.Make
 import GHC.JS.Ppr () -- expose Outputable instances to downstream modules
 
+import GHC.StgToJS.Symbols
+
 import GHC.Stg.Syntax
 import GHC.Core.TyCon
 import GHC.Linker.Config
@@ -45,10 +47,14 @@ import GHC.Data.FastMutInt
 
 import GHC.Unit.Module
 
+import           Data.Array
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString       as BS
+import qualified Data.ByteString.Char8 as BSC
+import           Data.Char (toUpper)
 import qualified Data.Map as M
-import           Data.Set (Set)
-import qualified Data.ByteString as BS
 import           Data.Monoid
+import           Data.Set (Set)
 import           Data.Word
 
 -- | A State monad over IO holding the generator state.
@@ -278,9 +284,9 @@ instance ToJExpr StaticLit where
   toJExpr (IntLit i)            = toJExpr i
   toJExpr NullLit               = null_
   toJExpr (DoubleLit d)         = toJExpr (unSaneDouble d)
-  toJExpr (StringLit t)         = app (mkFastString "h$str") [toJExpr t]
-  toJExpr (BinLit b)            = app (mkFastString "h$rstr") [toJExpr (map toInteger (BS.unpack b))]
-  toJExpr (LabelLit _isFun lbl) = var lbl
+  toJExpr (StringLit t)         = app hdStr    [toJExpr t]
+  toJExpr (BinLit b)            = app hdRawStr [toJExpr (map toInteger (BS.unpack b))]
+  toJExpr (LabelLit _isFun lbl) = global lbl
 
 -- | A foreign reference to some JS code
 data ForeignJSRef = ForeignJSRef
@@ -371,7 +377,7 @@ data ClosureType
   | Con         -- ^ The closure is a Constructor
   | Blackhole   -- ^ The closure is a Blackhole
   | StackFrame  -- ^ The closure is a stack frame
-  deriving (Show, Eq, Ord, Enum, Bounded)
+  deriving (Show, Eq, Ord, Enum, Bounded, Ix)
 
 -- | Convert 'ClosureType' to an Int
 ctNum :: ClosureType -> Int
@@ -381,6 +387,20 @@ ctNum Thunk      = 0
 ctNum Pap        = 3
 ctNum Blackhole  = 5
 ctNum StackFrame = -1
+
+closureB :: ByteString
+closureB = BSC.pack "_CLOSURE"
+
+closureNames :: Array ClosureType Ident
+closureNames = listArray (minBound, maxBound) [ name $ mk_names n
+                                              | n <- enumFromTo minBound maxBound
+                                              ]
+  where
+    mk_names :: ClosureType -> FastString
+    mk_names nm = mkFastStringByteString
+                  $  hdB
+                  <> BSC.pack (map toUpper (show nm))
+                  <> closureB
 
 -- | Convert 'ClosureType' to a String
 ctJsName :: ClosureType -> String

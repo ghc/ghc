@@ -40,19 +40,20 @@ import GHC.JS.Ident
 import GHC.StgToJS.Apply
 import GHC.StgToJS.Arg
 import GHC.StgToJS.Closure
+import GHC.StgToJS.DataCon
 import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.FFI
 import GHC.StgToJS.Heap
-import GHC.StgToJS.Monad
-import GHC.StgToJS.DataCon
-import GHC.StgToJS.Types
+import GHC.StgToJS.Ids
 import GHC.StgToJS.Literal
+import GHC.StgToJS.Monad
 import GHC.StgToJS.Prim
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
-import GHC.StgToJS.Utils
 import GHC.StgToJS.Stack
-import GHC.StgToJS.Ids
+import GHC.StgToJS.Symbols
+import GHC.StgToJS.Types
+import GHC.StgToJS.Utils
 
 import GHC.Types.CostCentre
 import GHC.Types.Tickish
@@ -170,7 +171,7 @@ genBind ctx bndr =
            the_fvjs <- varsForId the_fv
            case (tgts, the_fvjs) of
              ([tgt], [the_fvj]) -> return $ Just
-               (tgt ||= ApplExpr (var ("h$c_sel_" <> mkFastString sel_tag)) [the_fvj])
+               (tgt ||= ApplExpr (global (hdCSelStr <> mkFastString sel_tag)) [the_fvj])
              _ -> panic "genBind.assign: invalid size"
      assign b (StgRhsClosure _ext _ccs _upd [] expr _typ)
        | isInlineExpr expr = do
@@ -233,7 +234,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
       mk_bh | isUpdatable update =
               do x <- freshIdent
                  return $ mconcat
-                   [ x ||= ApplExpr (var "h$bh_lne") [Sub sp (toJExpr myOffset), toJExpr (payloadSize+1)]
+                   [ x ||= ApplExpr hdBlackHoleLNE [Sub sp (toJExpr myOffset), toJExpr (payloadSize+1)]
                    , IfStat (Var x) (ReturnStat (Var x)) mempty
                    ]
             | otherwise = pure mempty
@@ -242,7 +243,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
   body   <- genBody ctx R1 args body typ
   ei@(identFS -> eii) <- identForEntryId i
   sr   <- genStaticRefsRhs rhs
-  let f = (blk_hl <> locals <> body)
+  let f = blk_hl <> locals <> body
   emitClosureInfo $ ClosureInfo
     { ciVar = ei
     , ciRegs = CIRegs 0 $ concatMap idJSRep args
@@ -388,7 +389,7 @@ verifyRuntimeReps xs = do
     ver j DoubleV = v "h$verify_rep_double"  [j]
     ver j ArrV    = v "h$verify_rep_arr"     [j]
     ver _ _       = mempty
-    v f as = ApplStat (var f) as
+    v f as = ApplStat (global f) as
 
 -- | Given a set of 'Id's, bind each 'Id' to the appropriate data fields in N
 -- registers. This assumes these data fields have already been populated in the
@@ -416,7 +417,7 @@ loadLiveFun l = do
                , l''
                ]
   where
-        loadLiveVar d n v = let ident = global (dataFieldName n)
+        loadLiveVar d n v = let ident = name (dataFieldName n)
                             in  v ||= SelExpr d ident
 
 -- | Pop a let-no-escape frame off the stack
@@ -458,7 +459,7 @@ genUpdFrame u i
 --
 bhSingleEntry :: StgToJSConfig -> JStgStat
 bhSingleEntry _settings = mconcat
-  [ closureInfo   r1 |= var "h$blackholeTrap"
+  [ closureInfo   r1 |= hdBlackHoleTrap
   , closureField1 r1 |= undefined_
   , closureField2 r1 |= undefined_
   ]
@@ -784,7 +785,7 @@ verifyMatchRep x alt = do
     else case alt of
       AlgAlt tc -> do
         ix <- varsForId x
-        pure $ ApplStat (var "h$verify_match_alg") (ValExpr(JStr(mkFastString (renderWithContext defaultSDocContext (ppr tc)))):ix)
+        pure $ ApplStat (global "h$verify_match_alg") (ValExpr (JStr (mkFastString (renderWithContext defaultSDocContext (ppr tc)))):ix)
       _ -> pure mempty
 
 -- | A 'Branch' represents a possible branching path of an Stg case statement,
@@ -946,7 +947,7 @@ loadParams from args = do
     loadIfUsed  _ _   _    = mempty
 
     loadConVarsIfUsed fr cs = mconcat $ zipWith f cs [(1::Int)..]
-      where f (x,u) n = loadIfUsed (SelExpr fr (global (dataFieldName n))) x u
+      where f (x,u) n = loadIfUsed (SelExpr fr (name (dataFieldName n))) x u
 
 -- | Determine if a branch will end in a continuation or not. If not the inline
 -- branch must be normalized. See 'normalizeBranches'
@@ -1021,7 +1022,7 @@ allocDynAll haveDecl middle cls = do
                                        , (closureMeta_  , zero_)
                                        ]
                              ++ fmap (\cid -> ("cc", ValExpr (JVar cid))) ccs)
-            else ApplExpr (var "h$c") (f : fmap (ValExpr . JVar) ccs)
+            else ApplExpr hdC (f : fmap (ValExpr . JVar) ccs)
         ]
 
     fillObjs :: [JStgStat]
@@ -1048,7 +1049,7 @@ allocDynAll haveDecl middle cls = do
 
     checkObjs :: [JStgStat]
     checkObjs | csAssertRts settings  =
-                map (\(i,_,_,_) -> ApplStat (var "h$checkObj") [Var i]) cls
+                map (\(i,_,_,_) -> ApplStat hdCheckObj [Var i]) cls
               | otherwise = mempty
 
   objs <- makeObjs

@@ -277,9 +277,9 @@ allocateStaticList _ _ = panic "allocateStaticList: unexpected literal in list"
 jsStaticArg :: StaticArg -> JStgExpr
 jsStaticArg = \case
   StaticLitArg l      -> toJExpr l
-  StaticObjArg t      -> var t
+  StaticObjArg t      -> global t
   StaticConArg c args ->
-    allocDynamicE False (var c) (map jsStaticArg args) Nothing
+    allocDynamicE False (global c) (map jsStaticArg args) Nothing
 
 -- | Generate JS code corresponding to a list of static args
 jsStaticArgs :: [StaticArg] -> JStgExpr

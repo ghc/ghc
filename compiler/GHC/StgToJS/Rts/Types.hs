@@ -22,18 +22,19 @@ module GHC.StgToJS.Rts.Types where
 import GHC.Prelude
 
 import GHC.JS.Make
-import GHC.JS.JStg.Syntax
 import GHC.JS.JStg.Monad
+import GHC.JS.JStg.Syntax
+
 import GHC.StgToJS.Regs
+import GHC.StgToJS.Symbols
 import GHC.StgToJS.Types
 
 --------------------------------------------------------------------------------
 -- Syntactic Sugar for some Utilities we want in JS land
 --------------------------------------------------------------------------------
 
--- | Syntactic sugar, i.e., a Haskell function which generates useful JS code.
--- Given a @JStgExpr@, 'ex', inject a trace statement on 'ex' in the compiled JS
--- program
+-- | Given a @JStgExpr@, 'ex', inject a trace statement on 'ex' in the compiled
+-- JS program
 traceRts :: StgToJSConfig -> JStgExpr -> JStgStat
 traceRts s ex | (csTraceRts s)  = appS "h$log" [ex]
               | otherwise       = mempty
@@ -58,7 +59,7 @@ stackFrameSize :: JStgExpr -- ^ assign frame size to this
                -> JStgExpr -- ^ stack frame header function
                -> JSM JStgStat -- ^ size of the frame, including header
 stackFrameSize tgt f =
-  jIf (f .===. var "h$ap_gen") -- h$ap_gen is special
+  jIf (f .===. hdApGen) -- h$ap_gen is special
     (pure $ tgt |= (stack .! (sp - 1) .>>. 8) + 2)
     (jVar (\tag ->
               return $ mconcat

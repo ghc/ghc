@@ -78,9 +78,8 @@ freshIdent :: G Ident
 freshIdent = do
   i <- freshUnique
   mod <- State.gets gsModule
-  let !name = mkFreshJsSymbol mod i
-  return (global name)
-
+  let !sym_name = mkFreshJsSymbol mod i
+  return (name sym_name)
 
 -- | Generate unique Ident for the given ID (uncached!)
 --
@@ -100,19 +99,19 @@ freshIdent = do
 -- Int64#), Addr#, StablePtr#, unboxed tuples, etc.
 --
 makeIdentForId :: Id -> Maybe Int -> IdType -> Module -> Ident
-makeIdentForId i num id_type current_module = global ident
+makeIdentForId i num id_type current_module = name ident
   where
     exported = isExportedId i
-    name     = getName i
+    name'    = getName i
     mod
       | exported
-      , Just m <- nameModule_maybe name
+      , Just m <- nameModule_maybe name'
       = m
       | otherwise
       = current_module
 
     !ident   = mkFastStringByteString $ mconcat
-      [ mkJsSymbolBS exported mod (occNameMangledFS (nameOccName name))
+      [ mkJsSymbolBS exported mod (occNameMangledFS (nameOccName name'))
 
         -------------
         -- suffixes

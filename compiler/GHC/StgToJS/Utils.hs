@@ -44,8 +44,9 @@ where
 
 import GHC.Prelude
 
-import GHC.StgToJS.Types
 import GHC.StgToJS.ExprCtx
+import GHC.StgToJS.Symbols
+import GHC.StgToJS.Types
 
 import GHC.JS.JStg.Syntax
 import GHC.JS.Make
@@ -123,7 +124,7 @@ assignCoerce1 x y     = pprPanic "assignCoerce1"
 assignCoerce :: TypedExpr -> TypedExpr -> JStgStat
 -- Coercion between StablePtr# and Addr#
 assignCoerce (TypedExpr AddrRep [a_val, a_off]) (TypedExpr (BoxedRep (Just Unlifted)) [sptr]) = mconcat
-    [ a_val |= var "h$stablePtrBuf"
+    [ a_val |= hdStablePtrBuf
     , a_off |= sptr
     ]
 assignCoerce (TypedExpr (BoxedRep (Just Unlifted)) [sptr]) (TypedExpr AddrRep [_a_val, a_off]) =

@@ -14,10 +14,10 @@ import GHC.JS.JStg.Syntax
 import GHC.JS.Make
 import GHC.JS.Ident
 
-import GHC.StgToJS.Types
-import GHC.StgToJS.Monad
 import GHC.StgToJS.Ids
+import GHC.StgToJS.Monad
 import GHC.StgToJS.Symbols
+import GHC.StgToJS.Types
 
 import GHC.Data.FastString
 import GHC.Types.Literal
@@ -62,8 +62,8 @@ genLit = \case
   LitFloat r               -> return [ toJExpr (r2f r) ]
   LitDouble r              -> return [ toJExpr (r2d r) ]
   LitLabel name fod
-    | fod == IsFunction      -> return [ ApplExpr (var "h$mkFunctionPtr")
-                                                  [var (mkRawSymbol True name)]
+    | fod == IsFunction      -> return [ ApplExpr hdMkFunctionPtr
+                                                  [global (mkRawSymbol True name)]
                                        , ValExpr (JInt 0)
                                        ]
     | otherwise              -> return [ toJExpr (global (mkRawSymbol True name))

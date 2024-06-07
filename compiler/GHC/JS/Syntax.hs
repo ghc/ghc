@@ -341,7 +341,7 @@ instance NFData AOp
 
 -- | construct a JS variable reference
 var :: FastString -> JExpr
-var = Var . global
+var = Var . name
 
 -- | The JS literal 'true'
 true_ :: JExpr

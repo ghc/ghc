@@ -13,9 +13,10 @@ import GHC.Types.Literal
 import GHC.JS.JStg.Syntax
 import GHC.JS.Make
 
-import GHC.StgToJS.Types
-import GHC.StgToJS.Literal
+import GHC.StgToJS.Symbols
 import GHC.StgToJS.Ids
+import GHC.StgToJS.Literal
+import GHC.StgToJS.Types
 
 initStaticPtrs :: [SptEntry] -> G JStgStat
 initStaticPtrs ptrs = mconcat <$> mapM initStatic ptrs
@@ -23,5 +24,5 @@ initStaticPtrs ptrs = mconcat <$> mapM initStatic ptrs
     initStatic (SptEntry sp_id (Fingerprint w1 w2)) = do
       i <- varForId sp_id
       fpa <- concat <$> mapM (genLit . mkLitWord64 . fromIntegral) [w1,w2]
-      let sptInsert = ApplStat (var "h$hs_spt_insert") (fpa ++ [i])
-      return $ (var "h$initStatic" .^ "push") `ApplStat` [Func [] sptInsert]
+      let sptInsert = ApplStat hdHsSptInsert (fpa ++ [i])
+      return $ (hdInitStatic .^ "push") `ApplStat` [Func [] sptInsert]

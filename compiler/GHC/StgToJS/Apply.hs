@@ -37,14 +37,15 @@ import GHC.StgToJS.Closure
 import GHC.StgToJS.DataCon
 import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.Heap
+import GHC.StgToJS.Ids
 import GHC.StgToJS.Monad
-import GHC.StgToJS.Types
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
-import GHC.StgToJS.Utils
 import GHC.StgToJS.Rts.Types
 import GHC.StgToJS.Stack
-import GHC.StgToJS.Ids
+import GHC.StgToJS.Symbols
+import GHC.StgToJS.Types
+import GHC.StgToJS.Utils
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -161,7 +162,7 @@ genApp ctx i args
       let ww = case concatMap typex_expr (ctxTarget ctx) of
                  [t] | csAssertRts settings ->
                          ifS (isObject t .&&. isThunk t)
-                             (appS "throw" [String "unexpected thunk"]) -- yuck
+                             (appS throwStr [String "unexpected thunk"]) -- yuck
                              mempty
                  _   -> mempty
       return (a `mappend` ww, ExprInline)
@@ -183,7 +184,7 @@ genApp ctx i args
                 _              -> panic "genApp: unexpected arg"
           if isStrictId a' || ctxIsEvaluated a'
             then return (t |= ai, ExprInline)
-            else return (returnS (app "h$e" [ai]), ExprCont)
+            else return (returnS (app (identFS hdEntry) [ai]), ExprCont)
         _ -> panic "genApp: invalid size"
 
     -- no args and Id can't be a function: just enter it
@@ -196,7 +197,7 @@ genApp ctx i args
                        [x] -> return x
                        xs  -> pprPanic "genApp: unexpected multi-var argument"
                                 (vcat [ppr (length xs), ppr i])
-      return (returnS (app "h$e" [enter_id]), ExprCont)
+      return (returnS (app (identFS hdEntry) [enter_id]), ExprCont)
 
     -- fully saturated global function:
     --  - deals with arguments
@@ -285,12 +286,12 @@ data ApplyConv
 -- | Name of the generic apply function
 genericApplyName :: ApplyConv -> FastString
 genericApplyName = \case
-  RegsConv  -> "h$ap_gen_fast"
-  StackConv -> "h$ap_gen"
+  RegsConv  -> identFS hdApGenFastStr
+  StackConv -> identFS hdApGenStr
 
 -- | Expr of the generic apply function
 genericApplyExpr :: ApplyConv -> JStgExpr
-genericApplyExpr conv = var (genericApplyName conv)
+genericApplyExpr conv = global (genericApplyName conv)
 
 
 -- | Return the name of the specialized apply function for the given number of
@@ -327,7 +328,7 @@ specApplyName = \case
 -- Warning: the returned function may not be generated! Use specApplyExprMaybe
 -- if you want to ensure that it exists.
 specApplyExpr :: ApplySpec -> JStgExpr
-specApplyExpr spec = var (specApplyName spec)
+specApplyExpr spec = global (specApplyName spec)
 
 -- | Return the expression of the specialized apply function for the given
 -- number of args, number of arg variables, and calling convention.
@@ -377,7 +378,7 @@ applySpec = [ ApplySpec conv nargs nvars
 --
 -- Warning: tag doesn't take into account the calling convention
 specTag :: ApplySpec -> Int
-specTag spec = Bits.shiftL (specVars spec) 8 Bits..|. (specArgs spec)
+specTag spec = Bits.shiftL (specVars spec) 8 Bits..|. specArgs spec
 
 -- | Generate a tag expression for the given ApplySpec
 specTagExpr :: ApplySpec -> JStgExpr
@@ -390,13 +391,13 @@ specTagExpr = toJExpr . specTag
 mkApplyArr :: JSM JStgStat
 mkApplyArr =
   do mk_ap_gens  <- jFor (|= zero_) (.<. Int 65536) preIncrS
-                    \j -> var "h$apply" .! j |= var "h$ap_gen"
+                    \j -> hdApply .! j |= hdApGen
      mk_pap_gens <- jFor (|= zero_) (.<. Int 128) preIncrS
-                    \j -> var "h$paps" .! j |= var "h$pap_gen"
+                    \j -> hdPaps .! j |=  hdPapGen
      return $ mconcat
-       [ global "h$apply" ||= toJExpr (JList [])
-       , global "h$paps"  ||= toJExpr (JList [])
-       , ApplStat (var "h$initStatic" .^ "push")
+       [ name hdApplyStr ||= toJExpr (JList [])
+       , name hdPapsStr  ||= toJExpr (JList [])
+       , ApplStat (hdInitStatic .^ "push")
          [ jLam' $
            mconcat
            [ mk_ap_gens
@@ -412,12 +413,13 @@ mkApplyArr =
       -- both fast/slow (regs/stack) specialized apply functions have the same
       -- tags. We store the stack ones in the array because they are used as
       -- continuation stack frames.
-      StackConv -> var "h$apply" .! specTagExpr spec |= specApplyExpr spec
+      StackConv -> hdApply .! specTagExpr spec |= specApplyExpr spec
       RegsConv  -> mempty
 
+    hdPap_ = unpackFS hdPapStr_
+
     assignPap :: Int -> JStgStat
-    assignPap p = var "h$paps" .! toJExpr p |=
-                      (var (mkFastString $ ("h$pap_" ++ show p)))
+    assignPap p = hdPaps .! toJExpr p |= global (mkFastString (hdPap_ ++ show p))
 
 -- | Push a continuation on the stack
 --
@@ -453,7 +455,7 @@ genericStackApply cfg = closure info body
          pap <- fun_case cf (papArity r1)
          return $
            mconcat $
-           [ traceRts cfg (jString "h$ap_gen")
+           [ traceRts cfg (jString $ identFS hdApGenStr)
            , cf |= closureInfo r1
            -- switch on closure type
            , SwitchStat (infoClosureType cf)
@@ -467,16 +469,16 @@ genericStackApply cfg = closure info body
 
     -- info table for h$ap_gen
     info = ClosureInfo
-      { ciVar     = global "h$ap_gen"
+      { ciVar     = hdApGenStr
       , ciRegs    = CIRegs 0 [PtrV] -- closure to apply to
-      , ciName    = "h$ap_gen"
+      , ciName    = identFS hdApGenStr
       , ciLayout  = CILayoutVariable
       , ciType    = CIStackFrame
       , ciStatic  = mempty
       }
 
-    default_case cf = appS "throw" [jString "h$ap_gen: unexpected closure type "
-                                    + (infoClosureType cf)]
+    default_case cf = appS throwStr [jString "h$ap_gen: unexpected closure type "
+                                     + (infoClosureType cf)]
 
     thunk_case cfg cf = mconcat
       [ profStat cfg pushRestoreCCS
@@ -484,8 +486,8 @@ genericStackApply cfg = closure info body
       ]
 
     blackhole_case cfg = mconcat
-      [ push' cfg [r1, var "h$return"]
-      , returnS (app "h$blockOnBlackhole" [r1])
+      [ push' cfg [r1, hdReturn]
+      , returnS (app hdBlockOnBlackHoleStr [r1])
       ]
 
     fun_case c arity = jVars \(tag, needed_args, needed_regs, given_args, given_regs, newTag, newAp, p, dat) ->
@@ -496,12 +498,12 @@ genericStackApply cfg = closure info body
          load_reg_values <- loop 0 (.<. needed_regs)
                             \i -> return $
                                   mconcat [ traceRts cfg (jString "h$ap_gen: loading register: " + i)
-                                          , appS "h$setReg" [ i+2 , stack .! (sp-2-i)]
+                                          , appS hdSetRegStr [ i+2 , stack .! (sp-2-i)]
                                           , postIncrS i
                                           ]
          set_reg_values <- loop 0 (.<. given_regs)
            \i -> return $
-                 mconcat [ appS "h$setReg" [ i+2, stack .! (sp-2-i)]
+                 mconcat [ appS hdSetRegStr [ i+2, stack .! (sp-2-i)]
                          , postIncrS i
                          ]
          return $
@@ -537,12 +539,12 @@ genericStackApply cfg = closure info body
                          -- compute new tag with consumed register values and args removed
                          , newTag |= ((given_regs-needed_regs).<<.8) .|. (given_args - needed_args)
                          -- find application function for the remaining regs/args
-                         , newAp |= var "h$apply" .! newTag
+                         , newAp |= hdApply .! newTag
                          , traceRts cfg (jString "h$ap_gen: next: " + (newAp .^ "n"))
 
                          -- Drop used registers from the stack.
                          -- Test if the application function needs a tag and push it.
-                         , ifS (newAp .===. var "h$ap_gen")
+                         , ifS (newAp .===. hdApGen )
                            ((sp |= sp - needed_regs) <> (stack .! (sp - 1) |= newTag))
                            (sp |= sp - needed_regs - 1)
 
@@ -561,7 +563,7 @@ genericStackApply cfg = closure info body
                          -----------------------------
                          [ traceRts cfg (jString "h$ap_gen: undersat")
                          -- find PAP entry function corresponding to given_regs count
-                         , p      |= var "h$paps" .! given_regs
+                         , p      |= hdPaps .! given_regs
 
                          -- build PAP payload: R1 + tag + given register values
                          , newTag |= ((needed_regs-given_regs) .<<. 8) .|. (needed_args-given_args)
@@ -590,7 +592,7 @@ genericStackApply cfg = closure info body
 --
 genericFastApply :: StgToJSConfig -> JSM JStgStat
 genericFastApply s =
-   jFunction (global "h$ap_gen_fast")
+   jFunction (name "h$ap_gen_fast")
    \(MkSolo tag) -> jVar $ \c ->
      do push_stk_app <- pushStackApply c tag
         fast_fun     <- jVar \farity ->
@@ -617,13 +619,13 @@ genericFastApply s =
             , (toJExpr Pap, fast_pap)
             , (toJExpr Con, traceRts s (jString "h$ap_gen_fast: con")
                 <> jwhenS (tag .!=. 0)
-                            (appS "throw" [jString "h$ap_gen_fast: invalid apply"])
+                            (appS throwStr [jString "h$ap_gen_fast: invalid apply"])
                             <> returnS c)
             , (toJExpr Blackhole, traceRts s (jString "h$ap_gen_fast: blackhole")
                 <> push_stk_app
-                <> push' s [r1, var "h$return"]
-                <> returnS (app "h$blockOnBlackhole" [r1]))
-            ] $ appS "throw" [jString "h$ap_gen_fast: unexpected closure type: " + infoClosureType c]
+                <> push' s [r1, hdReturn]
+                <> returnS (app hdBlockOnBlackHoleStr [r1]))
+            ] $ appS throwStr [jString "h$ap_gen_fast: unexpected closure type: " + infoClosureType c]
           ]
 
   where
@@ -634,8 +636,8 @@ genericFastApply s =
              do push_all_regs <- pushAllRegs tag
                 return $ mconcat $
                   [ push_all_regs
-                  , ap |= var "h$apply" .! tag
-                  , ifS (ap .===. var "h$ap_gen")
+                  , ap |= hdApply .! tag
+                  , ifS (ap .===. hdApGen)
                     ((sp |= sp + 2) <> (stack .! (sp-1) |= tag))
                     (sp |= sp + 1)
                   , stack .! sp |= ap
@@ -648,7 +650,7 @@ genericFastApply s =
 
         do get_regs <- loop 0 (.<. myRegs) $
              \i -> return $
-                   (dat .^ "push") `ApplStat` [app "h$getReg" [i+2]] <> postIncrS i
+                   (dat .^ "push") `ApplStat` [app hdGetRegStr [i+2]] <> postIncrS i
            push_args <- pushArgs regsStart myRegs
 
            return $ mconcat $
@@ -668,8 +670,8 @@ genericFastApply s =
                 , traceRts s (jString "h$ap_gen_fast: oversat " + sp)
                 , push_args
                 , newTag |= ((myRegs-( arity.>>.8)).<<.8).|.myAr-ar
-                , newAp |= var "h$apply" .! newTag
-                , ifS (newAp .===. var "h$ap_gen")
+                , newAp |= hdApply .! newTag
+                , ifS (newAp .===. hdApGen)
                   ((sp |= sp + 2) <> (stack .! (sp - 1) |= newTag))
                   (sp |= sp + 1)
                 , stack .! sp |= newAp
@@ -679,7 +681,7 @@ genericFastApply s =
                -- else
                 [traceRts s (jString "h$ap_gen_fast: undersat: " + myRegs + jString " " + tag)
                 , jwhenS (tag .!=. 0) $ mconcat
-                  [ p |= var "h$paps" .! myRegs
+                  [ p |= hdPaps .! myRegs
                   , dat |= toJExpr [r1, ((arity .>>. 8)-myRegs)*256+ar-myAr]
                   , get_regs
                   , r1 |= initClosure s p dat jCurrentCCS
@@ -705,7 +707,7 @@ genericFastApply s =
       loop end (.>=.start)
       \i -> return $
             traceRts s (jString "pushing register: " + i)
-            <> (stack .! (sp + start - i) |= app "h$getReg" [i+1])
+            <> (stack .! (sp + start - i) |= app hdGetRegStr [i+1])
             <> postDecrS i
 
 -- | Make specialized apply function for the given ApplySpec
@@ -730,7 +732,7 @@ stackApply s fun_name nargs nvars =
     else closure info body
   where
     info  = ClosureInfo
-              { ciVar = global fun_name
+              { ciVar = name fun_name
               , ciRegs = CIRegs 0 [PtrV]
               , ciName = fun_name
               , ciLayout = CILayoutUnknown nvars
@@ -738,7 +740,7 @@ stackApply s fun_name nargs nvars =
               , ciStatic = mempty
               }
     info0 = ClosureInfo
-              { ciVar = global fun_name
+              { ciVar = name fun_name
               , ciRegs = CIRegs 0 [PtrV]
               , ciName = fun_name
               , ciLayout = CILayoutFixed 0 []
@@ -762,8 +764,8 @@ stackApply s fun_name nargs nvars =
              [ (toJExpr Thunk, traceRts s (toJExpr $ fun_name <> ": thunk") <> profStat s pushRestoreCCS <> returnS c)
              , (toJExpr Fun, traceRts s (toJExpr $ fun_name <> ": fun") <> fun_case)
              , (toJExpr Pap, traceRts s (toJExpr $ fun_name <> ": pap") <> pap_case)
-             , (toJExpr Blackhole, push' s [r1, var "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))
-             ] (appS "throw" [toJExpr ("panic: " <> fun_name <> ", unexpected closure type: ") + (infoClosureType c)])
+             , (toJExpr Blackhole, push' s [r1, hdReturn] <> returnS (app hdBlockOnBlackHoleStr [r1]))
+             ] (appS throwStr [toJExpr ("panic: " <> fun_name <> ", unexpected closure type: ") + (infoClosureType c)])
            ]
 
     funExact c = popSkip 1 (reverse $ take nvars jsRegsFromR2) <> returnS c
@@ -824,7 +826,7 @@ stackApply s fun_name nargs nvars =
              [ rs |= (arity .>>. 8)
              , loadRegs rs
              , sp |= sp - rs
-             , newAp |= (var "h$apply" .! ((toJExpr nargs-arity0).|.((toJExpr nvars-rs).<<.8)))
+             , newAp |= (hdApply .! ((toJExpr nargs-arity0).|.((toJExpr nvars-rs).<<.8)))
              , stack .! sp |= newAp
              , profStat s pushRestoreCCS
              , traceRts s (toJExpr (fun_name <> ": new stack frame: ") + (newAp .^ "n"))
@@ -846,7 +848,7 @@ fastApply s fun_name nargs nvars = if nargs == 0 && nvars == 0
                                    -- general case
                                    else jFunction' func body
   where
-      func    = global fun_name
+      func    = name fun_name
       ap_fast :: JSM JStgStat
       ap_fast = enter s r1
 
@@ -869,8 +871,8 @@ fastApply s fun_name nargs nvars = if nargs == 0 && nvars == 0
                               <> fun_case_fun)
                ,(toJExpr Pap, traceRts s (toJExpr (fun_name <> ": pap")) <> (arity |= papArity r1) <> fun_case_pap)
                ,(toJExpr Thunk, traceRts s (toJExpr (fun_name <> ": thunk")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> profStat s pushRestoreCCS <> returnS c)
-               ,(toJExpr Blackhole, traceRts s (toJExpr (fun_name <> ": blackhole")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> push' s [r1, var "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))]
-               (appS "throw" [toJExpr (fun_name <> ": unexpected closure type: ") + infoClosureType c])
+               ,(toJExpr Blackhole, traceRts s (toJExpr (fun_name <> ": blackhole")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> push' s [r1, global "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))]
+               (appS throwStr [toJExpr (fun_name <> ": unexpected closure type: ") + infoClosureType c])
              ]
 
       funCase :: JStgExpr -> JStgExpr -> JSM JStgStat
@@ -907,7 +909,7 @@ fastApply s fun_name nargs nvars = if nargs == 0 && nvars == 0
                               + rsRemain)
                 , saveRegs rs
                 , sp |= sp + rsRemain + 1
-                , stack .! sp |= var "h$apply" .! ((rsRemain.<<.8).|. (toJExpr nargs - mask8 arity))
+                , stack .! sp |= hdApply .! ((rsRemain.<<.8).|. (toJExpr nargs - mask8 arity))
                 , profStat s pushRestoreCCS
                 , returnS c
                 ]
@@ -917,7 +919,7 @@ fastApply s fun_name nargs nvars = if nargs == 0 && nvars == 0
               switchAlts = map (\x -> (toJExpr x, stack .! (sp + toJExpr (nvars-x)) |= jsReg (x+2))) [0..nvars-1]
 
 zeroApply :: StgToJSConfig -> JSM JStgStat
-zeroApply s = jFunction (global "h$e")
+zeroApply s = jFunction hdEntry
               $ \(MkSolo c) -> fmap ((r1 |= c) <>) $ enter s c
 
 -- carefully enter a closure that might be a thunk or a function
@@ -926,15 +928,15 @@ zeroApply s = jFunction (global "h$e")
 enter :: StgToJSConfig -> JStgExpr -> JSM JStgStat
 enter s ex = jVar \c ->
   return $ mconcat $
-  [ jwhenS (app "typeof" [ex] .!==. jTyObject) returnStack
+  [ jwhenS (app typeof [ex] .!==. jTyObject) returnStack
   , c |= closureInfo ex
-  , jwhenS (c .===. var "h$unbox_e") ((r1 |= closureField1 ex) <> returnStack)
+  , jwhenS (c .===. hdUnboxEntry) ((r1 |= closureField1 ex) <> returnStack)
   , SwitchStat (infoClosureType c)
     [ (toJExpr Con, mempty)
     , (toJExpr Fun, mempty)
     , (toJExpr Pap, returnStack)
-    , (toJExpr Blackhole, push' s [var "h$ap_0_0", ex, var "h$return"]
-        <> returnS (app "h$blockOnBlackhole" [ex]))
+    , (toJExpr Blackhole, push' s [hdAp00, ex, hdReturn]
+        <> returnS (app hdBlockOnBlackHoleStr [ex]))
     ] (returnS c)
   ]
 
@@ -944,7 +946,7 @@ updates s = do
   upd_frm_lne <- update_frame_lne
   return $ BlockStat [upd_frm, upd_frm_lne]
   where
-    unbox_closure f1 = Closure { clInfo   = var "h$unbox_e"
+    unbox_closure f1 = Closure { clInfo   = hdUnboxEntry -- global "h$unbox_e"
                                , clField1 = f1
                                , clField2 = null_
                                , clMeta   = 0
@@ -961,9 +963,9 @@ updates s = do
                           ]
     update_frame = closure
                    (ClosureInfo
-                      { ciVar = global "h$upd_frame"
+                      { ciVar = hdUpdFrameStr
                       , ciRegs = CIRegs 0 [PtrV]
-                      , ciName = "h$upd_frame"
+                      , ciName = identFS hdUpdFrameStr
                       , ciLayout = CILayoutFixed 1 [PtrV]
                       , ciType = CIStackFrame
                       , ciStatic = mempty
@@ -972,7 +974,7 @@ updates s = do
                        do upd_loop         <- upd_loop' ss si sir
                           wake_thread_loop <- loop zero_ (.<. waiters .^ "length")
                                               \i -> return $
-                                                    appS "h$wakeupThread" [waiters .! i]
+                                                    appS hdWakeupThread [waiters .! i]
                                                     <> postIncrS i
                           let updateCC updatee = closureCC updatee |= jCurrentCCS
 
@@ -983,11 +985,11 @@ updates s = do
                                  waiters |= closureField2 updatee
                                , jwhenS (waiters .!==. null_) wake_thread_loop
                                , -- update selectors
-                                 jwhenS ((app "typeof" [closureMeta updatee] .===. jTyObject) .&&. (closureMeta updatee .^ "sel"))
+                                 jwhenS ((app typeof [closureMeta updatee] .===. jTyObject) .&&. (closureMeta updatee .^ "sel"))
                                  ((ss |= closureMeta updatee .^ "sel")
                                   <> upd_loop)
                                , -- overwrite the object
-                                 ifS (app "typeof" [r1] .===. jTyObject)
+                                 ifS (app typeof [r1] .===. jTyObject)
                                  (mconcat [ traceRts s (jString "$upd_frame: boxed: " + ((closureInfo r1) .^ "n"))
                                           , copyClosure DontCopyCC updatee r1
                                           ])
@@ -1006,7 +1008,7 @@ updates s = do
 
     update_frame_lne = closure
                      (ClosureInfo
-                        { ciVar = global "h$upd_frame_lne"
+                        { ciVar = name $ fsLit "h$upd_frame_lne"
                         , ciRegs = CIRegs 0 [PtrV]
                         , ciName = "h$upd_frame_lne"
                         , ciLayout = CILayoutFixed 1 [PtrV]
@@ -1016,7 +1018,7 @@ updates s = do
                      $ jVar \updateePos ->
                          return $ mconcat $
                          [ updateePos |= stack .! (sp - 1)
-                         , (stack .! updateePos |= r1)
+                         , stack .! updateePos |= r1
                          , adjSpN' 2
                          , traceRts s (jString "h$upd_frame_lne: updating: "
                                        + updateePos
@@ -1031,35 +1033,35 @@ selectors s =
     sel_one  <- mkSel "1"      closureField1
     sel_twoA <- mkSel "2a"  closureField2
     sel_twoB <- mkSel "2b"  (closureField1 . closureField2)
-    rest     <- mconcat <$> (mapM mkSelN [3..16])
+    rest     <- mconcat <$> mapM mkSelN [3..16]
     return $
       sel_one <> sel_twoA <> sel_twoB <> rest
    where
     mkSelN :: Int -> JSM JStgStat
     mkSelN x = mkSel (mkFastString $ show x)
                      (\e -> SelExpr (closureField2 (toJExpr e))
-                            (global $ mkFastString ("d" ++ show (x-1))))
+                            (name $ mkFastString ("d" ++ show (x-1))))
 
 
     mkSel :: FastString -> (JStgExpr -> JStgExpr) -> JSM JStgStat
-    mkSel name sel = mconcat <$> sequence
-      [jFunction (global createName) $
+    mkSel name_ sel = mconcat <$> sequence
+      [jFunction (name createName) $
        \(MkSolo r) -> return $ mconcat
-          [ traceRts s (toJExpr ("selector create: " <> name <> " for ") + (r .^ "alloc"))
+          [ traceRts s (toJExpr ("selector create: " <> name_ <> " for ") + (r .^ "alloc"))
           , ifS (isThunk r .||. isBlackhole r)
               (returnS (app "h$mkSelThunk" [r, toJExpr (v entryName), toJExpr (v resName)]))
               (returnS (sel r))
           ]
-      , jFunction (global resName) $
+      , jFunction (name resName) $
         \(MkSolo r) -> return $ mconcat
-          [ traceRts s (toJExpr ("selector result: " <> name <> " for ") + (r .^ "alloc"))
+          [ traceRts s (toJExpr ("selector result: " <> name_ <> " for ") + (r .^ "alloc"))
           , returnS (sel r)
           ]
       , closure
         (ClosureInfo
-          { ciVar = global entryName
+          { ciVar = name entryName
           , ciRegs = CIRegs 0 [PtrV]
-          , ciName = "select " <> name
+          , ciName = "select " <> name_
           , ciLayout = CILayoutFixed 1 [PtrV]
           , ciType = CIThunk
           , ciStatic = mempty
@@ -1067,32 +1069,32 @@ selectors s =
         (jVar $ \tgt ->
           return $ mconcat $
           [ tgt |= closureField1 r1
-          , traceRts s (toJExpr ("selector entry: " <> name <> " for ") + (tgt .^ "alloc"))
+          , traceRts s (toJExpr ("selector entry: " <> name_ <> " for ") + (tgt .^ "alloc"))
           , ifS (isThunk tgt .||. isBlackhole tgt)
               (preIncrS sp
-               <> (stack .! sp |= var frameName)
+               <> (stack .! sp |= global frameName)
                <> returnS (app "h$e" [tgt]))
               (returnS (app "h$e" [sel tgt]))
           ])
       , closure
         (ClosureInfo
-          { ciVar = global frameName
+          { ciVar = name frameName
           , ciRegs = CIRegs 0 [PtrV]
-          , ciName = "select " <> name <> " frame"
+          , ciName = "select " <> name_ <> " frame"
           , ciLayout = CILayoutFixed 0 []
           , ciType = CIStackFrame
           , ciStatic = mempty
           })
         $ return $
-        mconcat [ traceRts s (toJExpr ("selector frame: " <> name))
+        mconcat [ traceRts s (toJExpr ("selector frame: " <> name_))
                 , postDecrS sp
                 , returnS (app "h$e" [sel r1])
                 ]
       ]
 
       where
-         v x   = JVar (global x)
-         n ext =  "h$c_sel_" <> name <> ext
+         v x   = JVar (name x)
+         n ext =  "h$c_sel_" <> name_ <> ext
          createName = n ""
          resName    = n "_res"
          entryName  = n "_e"
@@ -1116,7 +1118,7 @@ mkPap s tgt fun n values =
 
     values' | GHC.Prelude.null values = [null_]
             | otherwise   = values
-    entry | length values > numSpecPap = global "h$pap_gen"
+    entry | length values > numSpecPap = name "h$pap_gen"
           | otherwise                  = specPapIdents ! length values
 
 -- | Number of specialized PAPs (pre-generated for a given number of args)
@@ -1130,7 +1132,7 @@ specPap = [0..numSpecPap]
 
 -- | Cache of specialized PAP idents
 specPapIdents :: Array Int Ident
-specPapIdents = listArray (0,numSpecPap) $ map (global . mkFastString . ("h$pap_"++) . show) specPap
+specPapIdents = listArray (0,numSpecPap) $ map (name . mkFastString . ("h$pap_"++) . show) specPap
 
 pap :: StgToJSConfig
     -> Int
@@ -1144,7 +1146,7 @@ pap s r = closure (ClosureInfo
                     , ciStatic = mempty
                     }) body
   where
-    funcIdent = global funcName
+    funcIdent = name funcName
     funcName = mkFastString ("h$pap_" ++ show r)
 
     body = jVars $ \(c, d, f, extra) ->
@@ -1166,7 +1168,7 @@ pap s r = closure (ClosureInfo
     moveCase m = (toJExpr m, jsReg (m+r+1) |= jsReg (m+1))
     loadOwnArgs d = mconcat $ map (\r ->
         jsReg (r+1) |= dField d (r+2)) [1..r]
-    dField d n = SelExpr d (global . mkFastString $ ('d':show (n-1)))
+    dField d n = SelExpr d (name . mkFastString $ ('d':show (n-1)))
 
 -- Construct a generic PAP
 papGen :: StgToJSConfig -> JSM JStgStat
@@ -1192,7 +1194,7 @@ papGen cfg =
                 (jString "h$pap_gen: expected function or pap")
               , profStat cfg (enterCostCentreFun currentCCS)
               , traceRts cfg (jString "h$pap_gen: generic pap extra args moving: " + or)
-              , appS "h$moveRegs2" [or, r]
+              , appS hdMoveRegs2 [or, r]
               , loadOwnArgs d r
               , r1 |= c
               , returnS f
@@ -1200,8 +1202,8 @@ papGen cfg =
 
 
   where
-    funcIdent = global funcName
-    funcName = "h$pap_gen"
+    funcIdent = name funcName
+    funcName = hdPapGenStr
     loadOwnArgs d r =
       let prop n = d .^ ("d" <> mkFastString (show $ n+1))
           loadOwnArg n = (toJExpr n, jsReg (n+1) |= prop n)
@@ -1210,7 +1212,7 @@ papGen cfg =
 -- general utilities
 -- move the first n registers, starting at R2, m places up (do not use with negative m)
 moveRegs2 :: JSM JStgStat
-moveRegs2 = jFunction (global "h$moveRegs2") moveSwitch
+moveRegs2 = jFunction (name hdMoveRegs2) moveSwitch
   where
     moveSwitch (n,m) = defaultCase n m >>= return . SwitchStat ((n .<<. 8) .|. m) switchCases
     -- fast cases
@@ -1224,13 +1226,13 @@ moveRegs2 = jFunction (global "h$moveRegs2") moveSwitch
     -- fallback
     defaultCase n m =
       loop n (.>.0) (\i -> return $
-                           appS "h$setReg" [i+1+m, app "h$getReg" [i+1]]
+                           appS hdSetRegStr [i+1+m, app hdGetRegStr [i+1]]
                            <> postDecrS i)
 
 
 -- Initalize a variable sized object from an array of values
 initClosure :: StgToJSConfig -> JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr
-initClosure cfg info values ccs = app "h$init_closure"
+initClosure cfg info values ccs = app hdInitClosure
   [ newClosure $ Closure
       { clInfo   = info
       , clField1 = null_

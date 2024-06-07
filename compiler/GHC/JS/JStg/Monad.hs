@@ -92,7 +92,7 @@ newIdent = do env <- get
               return  $ mk_ident tag id
 
 mk_ident :: FastString -> Unique -> Ident
-mk_ident t i = global (mconcat [t, "_", mkFastString (show i)])
+mk_ident t i = name (mconcat [t, "_", mkFastString (show i)])
 
 -- | Set the tag for @Ident@s for all remaining computations.
 tag_names :: FastString -> JSM ()

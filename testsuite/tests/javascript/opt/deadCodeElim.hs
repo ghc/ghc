@@ -28,10 +28,10 @@ nested_blocks_opt :: JStat
 nested_blocks_opt = double_return_opt
 
 global_func :: JStat
-global_func = FuncStat (global (fsLit "bar")) [] double_return
+global_func = FuncStat (name (fsLit "bar")) [] double_return
 
 global_func_opt :: JStat
-global_func_opt = FuncStat (global (fsLit "bar")) [] double_return_opt
+global_func_opt = FuncStat (name (fsLit "bar")) [] double_return_opt
 
 func_with_locals :: JStat
 func_with_locals = AssignStat (var (fsLit "foo"))
@@ -56,31 +56,31 @@ func_with_locals_opt = AssignStat (var (fsLit "foo"))
 
 -- This one comes straight from MR10260 where we noticed the optimizer was not catching the redundant return
 bignum_test :: JStat
-bignum_test = DeclStat (global $ fsLit "h$ghczmbignumZCGHCziNumziIntegerziintegerToInt64zh_e")
-              (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
+bignum_test = DeclStat (name $ fsLit "h$ghczmbignumZCGHCziNumziIntegerziintegerToInt64zh_e")
+              (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (name $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
                                                     , ApplStat (var $ fsLit "h$p1") [var $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99"]
                                                     , ReturnStat (ApplExpr (var $ fsLit "h$e") [var $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e"])
                                                     , ReturnStat (ApplExpr (var $ fsLit "h$rs") [])]))
 
 bignum_test_opt :: JStat
 bignum_test_opt =
-  DeclStat (global $ fsLit "h$ghczmbignumZCGHCziNumziIntegerziintegerToInt64zh_e")
-              (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
+  DeclStat (name $ fsLit "h$ghczmbignumZCGHCziNumziIntegerziintegerToInt64zh_e")
+              (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (name $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
                                                     , ApplStat (var $ fsLit "h$p1") [var $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99"]
                                                     , ReturnStat (ApplExpr (var $ fsLit "h$e") [var $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e"])
                                                     ]))
 
 bignum_test_2 :: JStat
-bignum_test_2 = BlockStat [FuncStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99") [] (BlockStat [DeclStat (global $ fsLit "h$ghczmbignumZCGHCziNumziIntegerziintegerToInt64zh_e")
-              (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
+bignum_test_2 = BlockStat [FuncStat (name $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99") [] (BlockStat [DeclStat (name $ fsLit "h$ghczmbignumZCGHCziNumziIntegerziintegerToInt64zh_e")
+              (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (name $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
                                                     , ApplStat (var $ fsLit "h$p1") [var $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99"]
                                                     , ReturnStat (ApplExpr (var $ fsLit "h$e") [var $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e"])
                                                     , ReturnStat (ApplExpr (var $ fsLit "h$rs") [])]))])]
 
 bignum_test_opt_2 :: JStat
 bignum_test_opt_2 = BlockStat [
-  FuncStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99") [] (DeclStat (global $ fsLit "a")
-              (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (global $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
+  FuncStat (name $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99") [] (DeclStat (name $ fsLit "a")
+              (Just (ValExpr $ JFunc [] $ BlockStat [ DeclStat (name $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e") (Just (var $ fsLit "h$r2"))
                                                     , ApplStat (var $ fsLit "h$p1") [var $ fsLit "h$$ghczmbignumZCGHCziNumziInteger_99"]
                                                     , ReturnStat (ApplExpr (var $ fsLit "h$e") [var $ fsLit "h$$ghczmbignumZCGHCziNumziIntegerzids_s_2f9e"])
                                                     ]))) ]

@@ -28,6 +28,10 @@
 --     is written in. Nothing fancy, its just a straightforward deeply embedded
 --     DSL.
 --
+--     In general, one should not use these constructors explicitly in the JS
+--     backend. Instead, prefer using the combinators in GHC.JS.Make, if those
+--     are suitable then prefer using the patterns exported from this module
+
 -----------------------------------------------------------------------------
 module GHC.JS.JStg.Syntax
   ( -- * Deeply embedded JS datatypes
@@ -63,7 +67,8 @@ module GHC.JS.JStg.Syntax
   -- * Utility
   , SaneDouble(..)
   , pattern Func
-  , var
+  , global
+  , local
   ) where
 
 import GHC.Prelude
@@ -233,7 +238,6 @@ pattern LOr x y = InfixExpr LOrOp x y
 pattern LAnd :: JStgExpr -> JStgExpr -> JStgExpr
 pattern LAnd x y = InfixExpr LAndOp x y
 
-
 -- | pattern synonym to create integer values
 pattern Int :: Integer -> JStgExpr
 pattern Int x = ValExpr (JInt x)
@@ -328,6 +332,10 @@ data AOp
 
 instance NFData AOp
 
--- | construct a JS variable reference
-var :: FastString -> JStgExpr
-var = Var . global
+-- | construct a JS reference, intended to refer to a global name
+global :: FastString -> JStgExpr
+global = Var . name
+
+-- | construct a JS reference, intended to refer to a local name
+local :: FastString -> JStgExpr
+local = Var . name

@@ -34,25 +34,29 @@
 
 module GHC.JS.Ident
   ( Ident(..)
-  , global
+  , name
   ) where
 
-import Prelude
+import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Types.Unique
+import GHC.Utils.Outputable
 
 --------------------------------------------------------------------------------
 --                            Identifiers
 --------------------------------------------------------------------------------
--- We use FastString for identifiers in JS backend
 
 -- | A newtype wrapper around 'FastString' for JS identifiers.
 newtype Ident = TxtI { identFS :: FastString }
  deriving stock   (Show, Eq)
- deriving newtype (Uniquable)
+ deriving newtype (Uniquable, Outputable)
 
--- | A not-so-smart constructor for @Ident@s, used to indicate that this name is
--- expected to be top-level
-global :: FastString -> Ident
-global = TxtI
+-- | To give a thing a name is to have power over it. This smart constructor
+-- serves two purposes: first, it isolates the JS backend from the rest of GHC.
+-- The backend should not explicitly use types provided by GHC but instead
+-- should wrap them such as we do here. Second it creates a symbol in the JS
+-- backend, but it does not yet give that symbols meaning. Giving the symbol
+-- meaning only occurs once it is used with a combinator from @GHC.JS.Make@.
+name :: FastString -> Ident
+name = TxtI

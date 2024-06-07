@@ -22,6 +22,7 @@ import GHC.StgToJS.Heap
 import GHC.StgToJS.Types
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
+import GHC.StgToJS.Symbols
 
 import GHC.Core.Type
 
@@ -59,8 +60,8 @@ genPrim prof bound ty op = case op of
 
   IntAddOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= toI32 (Add x y)
   IntSubOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= toI32 (Sub x y)
-  IntMulOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= app "Math.imul" [x, y]
-  IntMul2Op       -> \[c,hr,lr] [x,y] -> pure $ PrimInline $ appT [c,hr,lr] "h$hs_timesInt2" [x, y]
+  IntMulOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= app hdMulImulStr [x, y]
+  IntMul2Op       -> \[c,hr,lr] [x,y] -> pure $ PrimInline $ appT [c,hr,lr] hdHsTimesInt2Str [x, y]
   IntMulMayOfloOp -> \[r] [x,y] -> do
     PrimInline <$>
       jVar \tmp ->
@@ -100,7 +101,7 @@ genPrim prof bound ty op = case op of
   IntGtOp           -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .>. y)
   IntGeOp           -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .>=. y)
   IntEqOp           -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .===. y)
-  IntNeOp           -> \[r] [x,y] -> pure $ PrimInline $ r |= if10(x .!==. y)
+  IntNeOp           -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .!==. y)
   IntLtOp           -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .<. y)
   IntLeOp           -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .<=. y)
   ChrOp             -> \[r] [x]   -> pure $ PrimInline $ r |= x
@@ -281,15 +282,15 @@ genPrim prof bound ty op = case op of
         , r_h |= toI32 (Add (BNot h) (Not r_l))
         ]
 
-  Int64AddOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_plusInt64"  [h0,l0,h1,l1]
-  Int64SubOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_minusInt64" [h0,l0,h1,l1]
-  Int64MulOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_timesInt64" [h0,l0,h1,l1]
-  Int64QuotOp -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_quotInt64"  [h0,l0,h1,l1]
-  Int64RemOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_remInt64"   [h0,l0,h1,l1]
+  Int64AddOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsPlusInt64Str  [h0,l0,h1,l1]
+  Int64SubOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsMinusInt64Str [h0,l0,h1,l1]
+  Int64MulOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsTimesInt64Str [h0,l0,h1,l1]
+  Int64QuotOp -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsQuotInt64Str  [h0,l0,h1,l1]
+  Int64RemOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsRemInt64Str   [h0,l0,h1,l1]
 
-  Int64SllOp  -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftLLInt64" [h,l,n]
-  Int64SraOp  -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftRAInt64" [h,l,n]
-  Int64SrlOp  -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftRLInt64" [h,l,n]
+  Int64SllOp  -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] hdHsUncheckedShiftLLInt64Str [h,l,n]
+  Int64SraOp  -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] hdHsUncheckedShiftRAInt64Str [h,l,n]
+  Int64SrlOp  -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] hdHsUncheckedShiftRLInt64Str [h,l,n]
 
   Int64ToWord64Op   -> \[r1,r2] [x1,x2] ->
       pure $ PrimInline $ mconcat
@@ -332,8 +333,8 @@ genPrim prof bound ty op = case op of
   Word64LeOp -> \[r] [h0,l0,h1,l1] -> pure $ PrimInline $ r |= if10 (LOr (h0 .<. h1) (LAnd (h0 .===. h1) (l0 .<=. l1)))
   Word64LtOp -> \[r] [h0,l0,h1,l1] -> pure $ PrimInline $ r |= if10 (LOr (h0 .<. h1) (LAnd (h0 .===. h1) (l0 .<. l1)))
 
-  Word64SllOp -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftLWord64" [h,l,n]
-  Word64SrlOp -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] "h$hs_uncheckedShiftRWord64" [h,l,n]
+  Word64SllOp -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] hdHsUncheckedShiftLWord64Str [h,l,n]
+  Word64SrlOp -> \[hr,lr] [h,l,n] -> pure $ PrimInline $ appT [hr,lr] hdHsUncheckedShiftRWord64Str [h,l,n]
 
   Word64OrOp  -> \[hr,hl] [h0, l0, h1, l1] ->
       pure $ PrimInline $ mconcat
@@ -359,11 +360,11 @@ genPrim prof bound ty op = case op of
         , hl |= toU32 (BNot l)
         ]
 
-  Word64AddOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_plusWord64"  [h0,l0,h1,l1]
-  Word64SubOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_minusWord64" [h0,l0,h1,l1]
-  Word64MulOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_timesWord64" [h0,l0,h1,l1]
-  Word64QuotOp -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_quotWord64"  [h0,l0,h1,l1]
-  Word64RemOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] "h$hs_remWord64"   [h0,l0,h1,l1]
+  Word64AddOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsPlusWord64Str  [h0,l0,h1,l1]
+  Word64SubOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsMinusWord64Str [h0,l0,h1,l1]
+  Word64MulOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsTimesWord64Str [h0,l0,h1,l1]
+  Word64QuotOp -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsQuotWord64Str  [h0,l0,h1,l1]
+  Word64RemOp  -> \[hr,lr] [h0,l0,h1,l1] -> pure $ PrimInline $ appT [hr,lr] hdHsRemWord64Str   [h0,l0,h1,l1]
 
 ------------------------------ Word ---------------------------------------------
 
@@ -381,14 +382,14 @@ genPrim prof bound ty op = case op of
         [ r |= toU32 (Sub x y)
         , c |= if10 (y .>. x)
         ]
-  WordAdd2Op    -> \[h,l] [x,y] -> pure $ PrimInline $ appT [h,l] "h$wordAdd2" [x,y]
+  WordAdd2Op    -> \[h,l] [x,y] -> pure $ PrimInline $ appT [h,l] hdWordAdd2 [x,y]
   WordSubOp     -> \  [r] [x,y] -> pure $ PrimInline $ r |= toU32 (Sub x y)
-  WordMulOp     -> \  [r] [x,y] -> pure $ PrimInline $ r |= toU32 (app "Math.imul" [x, y])
-  WordMul2Op    -> \[h,l] [x,y] -> pure $ PrimInline $ appT [h,l] "h$mul2Word32" [x,y]
-  WordQuotOp    -> \  [q] [x,y] -> pure $ PrimInline $ q |= app "h$quotWord32" [x,y]
-  WordRemOp     -> \  [r] [x,y] -> pure $ PrimInline $ r |= app "h$remWord32" [x,y]
-  WordQuotRemOp -> \[q,r] [x,y] -> pure $ PrimInline $ appT [q,r] "h$quotRemWord32" [x,y]
-  WordQuotRem2Op   -> \[q,r] [xh,xl,y] -> pure $ PrimInline $ appT [q,r] "h$quotRem2Word32" [xh,xl,y]
+  WordMulOp     -> \  [r] [x,y] -> pure $ PrimInline $ r |= toU32 (app hdMulImulStr [x, y])
+  WordMul2Op    -> \[h,l] [x,y] -> pure $ PrimInline $ appT [h,l] hdMul2Word32Str [x,y]
+  WordQuotOp    -> \  [q] [x,y] -> pure $ PrimInline $ q |= app hdQuotWord32Str [x,y]
+  WordRemOp     -> \  [r] [x,y] -> pure $ PrimInline $ r |= app hdRemWord32Str [x,y]
+  WordQuotRemOp -> \[q,r] [x,y] -> pure $ PrimInline $ appT [q,r] hdQuotRemWord32Str [x,y]
+  WordQuotRem2Op   -> \[q,r] [xh,xl,y] -> pure $ PrimInline $ appT [q,r] hdQuotRem2Word32Str [xh,xl,y]
   WordAndOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= toU32 (BAnd x y)
   WordOrOp         -> \[r] [x,y] -> pure $ PrimInline $ r |= toU32 (BOr  x y)
   WordXorOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= toU32 (BXor x y)
@@ -404,34 +405,34 @@ genPrim prof bound ty op = case op of
   WordLeOp         -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .<=. y)
   WordToDoubleOp   -> \[r] [x]   -> pure $ PrimInline $ r |= x
   WordToFloatOp    -> \[r] [x]   -> pure $ PrimInline $ r |= math_fround [x]
-  PopCnt8Op        -> \[r] [x]   -> pure $ PrimInline $ r |= var "h$popCntTab" .! (mask8 x)
-  PopCnt16Op       -> \[r] [x]   -> pure $ PrimInline $ r |= Add (var "h$popCntTab" .! (mask8 x))
-                                                      (var "h$popCntTab" .! (mask8 (x .>>>. Int 8)))
+  PopCnt8Op        -> \[r] [x]   -> pure $ PrimInline $ r |= hdPopCntTab .! (mask8 x)
+  PopCnt16Op       -> \[r] [x]   -> pure $ PrimInline $ r |= Add (hdPopCntTab .! (mask8 x))
+                                                      (hdPopCntTab .! (mask8 (x .>>>. Int 8)))
 
-  PopCnt32Op  -> \[r] [x]     -> pure $ PrimInline $ r |= app "h$popCnt32" [x]
-  PopCnt64Op  -> \[r] [x1,x2] -> pure $ PrimInline $ r |= app "h$popCnt64" [x1,x2]
+  PopCnt32Op  -> \[r] [x]     -> pure $ PrimInline $ r |= app hdPopCnt32Str [x]
+  PopCnt64Op  -> \[r] [x1,x2] -> pure $ PrimInline $ r |= app hdPopCnt64Str [x1,x2]
   PopCntOp    -> \[r] [x]     -> genPrim prof bound ty PopCnt32Op [r] [x]
-  Pdep8Op     -> \[r] [s,m]   -> pure $ PrimInline $ r |= app "h$pdep8"  [s,m]
-  Pdep16Op    -> \[r] [s,m]   -> pure $ PrimInline $ r |= app "h$pdep16" [s,m]
-  Pdep32Op    -> \[r] [s,m]   -> pure $ PrimInline $ r |= app "h$pdep32" [s,m]
-  Pdep64Op    -> \[ra,rb] [sa,sb,ma,mb] -> pure $ PrimInline $ appT [ra,rb] "h$pdep64" [sa,sb,ma,mb]
+  Pdep8Op     -> \[r] [s,m]   -> pure $ PrimInline $ r |= app hdPDep8Str  [s,m]
+  Pdep16Op    -> \[r] [s,m]   -> pure $ PrimInline $ r |= app hdPDep16Str [s,m]
+  Pdep32Op    -> \[r] [s,m]   -> pure $ PrimInline $ r |= app hdPDep32Str [s,m]
+  Pdep64Op    -> \[ra,rb] [sa,sb,ma,mb] -> pure $ PrimInline $ appT [ra,rb] hdPDep64Str [sa,sb,ma,mb]
   PdepOp      -> \rs xs                 -> genPrim prof bound ty Pdep32Op rs xs
-  Pext8Op     -> \[r] [s,m] -> pure $ PrimInline $ r |= app "h$pext8" [s,m]
-  Pext16Op    -> \[r] [s,m] -> pure $ PrimInline $ r |= app "h$pext16" [s,m]
-  Pext32Op    -> \[r] [s,m] -> pure $ PrimInline $ r |= app "h$pext32" [s,m]
-  Pext64Op    -> \[ra,rb] [sa,sb,ma,mb] -> pure $ PrimInline $ appT [ra,rb] "h$pext64" [sa,sb,ma,mb]
+  Pext8Op     -> \[r] [s,m] -> pure $ PrimInline $ r |= app hdPExit8Str  [s,m]
+  Pext16Op    -> \[r] [s,m] -> pure $ PrimInline $ r |= app hdPExit16Str [s,m]
+  Pext32Op    -> \[r] [s,m] -> pure $ PrimInline $ r |= app hdPExit32Str [s,m]
+  Pext64Op    -> \[ra,rb] [sa,sb,ma,mb] -> pure $ PrimInline $ appT [ra,rb] hdPExit64Str [sa,sb,ma,mb]
   PextOp      -> \rs xs     -> genPrim prof bound ty Pext32Op rs xs
 
-  ClzOp       -> \[r]   [x]     -> pure $ PrimInline $ r |= app "h$clz32" [x]
-  Clz8Op      -> \[r]   [x]     -> pure $ PrimInline $ r |= app "h$clz8"  [x]
-  Clz16Op     -> \[r]   [x]     -> pure $ PrimInline $ r |= app "h$clz16" [x]
-  Clz32Op     -> \[r]   [x]     -> pure $ PrimInline $ r |= app "h$clz32" [x]
-  Clz64Op     -> \[r]   [x1,x2] -> pure $ PrimInline $ r |= app "h$clz64" [x1,x2]
-  CtzOp       -> \[r]   [x]     -> pure $ PrimInline $ r |= app "h$ctz32" [x]
-  Ctz8Op      -> \[r]   [x]     -> pure $ PrimInline $ r |= app "h$ctz8"  [x]
-  Ctz16Op     -> \[r]   [x]     -> pure $ PrimInline $ r |= app "h$ctz16" [x]
-  Ctz32Op     -> \[r]   [x]     -> pure $ PrimInline $ r |= app "h$ctz32" [x]
-  Ctz64Op     -> \[r]   [x1,x2] -> pure $ PrimInline $ r |= app "h$ctz64" [x1,x2]
+  ClzOp       -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdClz32Str [x]
+  Clz8Op      -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdClz8Str  [x]
+  Clz16Op     -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdClz16Str [x]
+  Clz32Op     -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdClz32Str [x]
+  Clz64Op     -> \[r]   [x1,x2] -> pure $ PrimInline $ r |= app  hdClz64Str [x1,x2]
+  CtzOp       -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdCtz32Str [x]
+  Ctz8Op      -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdCtz8Str  [x]
+  Ctz16Op     -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdCtz16Str [x]
+  Ctz32Op     -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdCtz32Str [x]
+  Ctz64Op     -> \[r]   [x1,x2] -> pure $ PrimInline $ r |= app  hdCtz64Str [x1,x2]
 
   BSwap16Op   -> \[r] [x]   -> pure $ PrimInline $
       r |= BOr ((mask8 x) .<<. (Int 8))
@@ -441,16 +442,16 @@ genPrim prof bound ty op = case op of
             `BOr` ((BAnd x (Int 0xFF00)) .<<. (Int 8))
             `BOr` ((BAnd x (Int 0xFF0000)) .>>. (Int 8))
             `BOr` (x .>>>. (Int 24)))
-  BSwap64Op   -> \[r1,r2] [x,y] -> pure $ PrimInline $ appT [r1,r2] "h$bswap64" [x,y]
+  BSwap64Op   -> \[r1,r2] [x,y] -> pure $ PrimInline $ appT [r1,r2] hdBSwap64Str [x,y]
   BSwapOp     -> \[r] [x]       -> genPrim prof bound ty BSwap32Op [r] [x]
 
   BRevOp      -> \[r] [w] -> genPrim prof bound ty BRev32Op [r] [w]
-  BRev8Op     -> \[r] [w] -> pure $ PrimInline $ r |= (app "h$reverseWord" [w] .>>>. Int 24)
-  BRev16Op    -> \[r] [w] -> pure $ PrimInline $ r |= (app "h$reverseWord" [w] .>>>. Int 16)
-  BRev32Op    -> \[r] [w] -> pure $ PrimInline $ r |= app "h$reverseWord" [w]
+  BRev8Op     -> \[r] [w] -> pure $ PrimInline $ r |= (app hdReverseWordStr [w] .>>>. Int 24)
+  BRev16Op    -> \[r] [w] -> pure $ PrimInline $ r |= (app hdReverseWordStr [w] .>>>. Int 16)
+  BRev32Op    -> \[r] [w] -> pure $ PrimInline $ r |= app  hdReverseWordStr [w]
   BRev64Op    -> \[rh,rl] [h,l] -> pure $ PrimInline $ mconcat
-                           [ rl |= app "h$reverseWord" [h]
-                           , rh |= app "h$reverseWord" [l]
+                           [ rl |= app hdReverseWordStr [h]
+                           , rh |= app hdReverseWordStr [l]
                            ]
 
 ------------------------------ Narrow -------------------------------------------
@@ -496,10 +497,10 @@ genPrim prof bound ty op = case op of
   DoubleAcoshOp     -> \[r] [x]   -> pure $ PrimInline $ r |= math_acosh [x]
   DoubleAtanhOp     -> \[r] [x]   -> pure $ PrimInline $ r |= math_atanh [x]
   DoublePowerOp     -> \[r] [x,y] -> pure $ PrimInline $ r |= math_pow [x,y]
-  DoubleDecode_2IntOp  -> \[s,h,l,e] [x] -> pure $ PrimInline $ appT [s,h,l,e] "h$decodeDouble2Int" [x]
-  DoubleDecode_Int64Op -> \[s1,s2,e] [d] -> pure $ PrimInline $ appT [e,s1,s2] "h$decodeDoubleInt64" [d]
-  CastDoubleToWord64Op -> \[rh,rl] [x]   -> pure $ PrimInline $ appT [rh,rl]   "h$castDoubleToWord64" [x]
-  CastWord64ToDoubleOp -> \[r]     [h,l] -> pure $ PrimInline $ appT [r]       "h$castWord64ToDouble" [h,l]
+  DoubleDecode_2IntOp  -> \[s,h,l,e] [x] -> pure $ PrimInline $ appT [s,h,l,e] hdDecodeDouble2IntStr   [x]
+  DoubleDecode_Int64Op -> \[s1,s2,e] [d] -> pure $ PrimInline $ appT [e,s1,s2] hdDecodeDoubleInt64Str  [d]
+  CastDoubleToWord64Op -> \[rh,rl] [x]   -> pure $ PrimInline $ appT [rh,rl]   hdCastDoubleToWord64Str [x]
+  CastWord64ToDoubleOp -> \[r]     [h,l] -> pure $ PrimInline $ appT [r]       hdCastWord64ToDoubleStr [h,l]
 
   DoubleFMAdd  -> unhandledPrimop op
   DoubleFMSub  -> unhandledPrimop op
@@ -540,9 +541,9 @@ genPrim prof bound ty op = case op of
   FloatAtanhOp      -> \[r] [x]   -> pure $ PrimInline $ r |= math_fround [math_atanh [x]]
   FloatPowerOp      -> \[r] [x,y] -> pure $ PrimInline $ r |= math_fround [math_pow [x,y]]
   FloatToDoubleOp   -> \[r] [x]   -> pure $ PrimInline $ r |= x
-  FloatDecode_IntOp -> \[s,e] [x] -> pure $ PrimInline $ appT [s,e] "h$decodeFloatInt" [x]
-  CastFloatToWord32Op -> \[r] [x] -> pure $ PrimInline $ appT [r] "h$castFloatToWord32" [x]
-  CastWord32ToFloatOp -> \[r] [x] -> pure $ PrimInline $ appT [r] "h$castWord32ToFloat" [x]
+  FloatDecode_IntOp -> \[s,e] [x] -> pure $ PrimInline $ appT [s,e] hdDecodeFloatIntStr  [x]
+  CastFloatToWord32Op -> \[r] [x] -> pure $ PrimInline $ appT [r] hdCastFloatToWord32Str [x]
+  CastWord32ToFloatOp -> \[r] [x] -> pure $ PrimInline $ appT [r] hdCastWord32ToFloatStr [x]
 
 
   FloatFMAdd  -> unhandledPrimop op
@@ -552,11 +553,11 @@ genPrim prof bound ty op = case op of
 
 ------------------------------ Arrays -------------------------------------------
 
-  NewArrayOp           -> \[r] [l,e]   -> pure $ PrimInline $ r |= app "h$newArray" [l,e]
+  NewArrayOp           -> \[r] [l,e]   -> pure $ PrimInline $ r |= app hdNewArrayStr [l,e]
   ReadArrayOp          -> \[r] [a,i]   -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
   WriteArrayOp         -> \[]  [a,i,v] -> pure $ PrimInline $ bnd_arr bound a i (a .! i |= v)
-  SizeofArrayOp        -> \[r] [a]     -> pure $ PrimInline $ r |= a .^ "length"
-  SizeofMutableArrayOp -> \[r] [a]     -> pure $ PrimInline $ r |= a .^ "length"
+  SizeofArrayOp        -> \[r] [a]     -> pure $ PrimInline $ r |= a .^ lngth
+  SizeofMutableArrayOp -> \[r] [a]     -> pure $ PrimInline $ r |= a .^ lngth
   IndexArrayOp         -> \[r] [a,i]   -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
   UnsafeFreezeArrayOp  -> \[r] [a]     -> pure $ PrimInline $ r |= a
   UnsafeThawArrayOp    -> \[r] [a]     -> pure $ PrimInline $ r |= a
@@ -576,27 +577,27 @@ genPrim prof bound ty op = case op of
     pure $ PrimInline
       $ bnd_arr_range bound a1 o1 n
       $ bnd_arr_range bound a2 o2 n
-      $ appS "h$copyMutableArray" [a1,o1,a2,o2,n]
+      $ appS hdCopyMutableArrayStr [a1,o1,a2,o2,n]
 
   CloneArrayOp        -> \[r] [a,start,n]     ->
     pure $ PrimInline
       $ bnd_arr_range bound a start n
-      $ r |= app "h$sliceArray" [a,start,n]
+      $ r |= app hdSliceArrayStr [a,start,n]
 
   CloneMutableArrayOp -> \[r] [a,start,n]     ->
     pure $ PrimInline
       $ bnd_arr_range bound a start n
-      $ r |= app "h$sliceArray" [a,start,n]
+      $ r |= app hdSliceArrayStr [a,start,n]
 
   FreezeArrayOp       -> \[r] [a,start,n]     ->
     pure $ PrimInline
       $ bnd_arr_range bound a start n
-      $ r |= app "h$sliceArray" [a,start,n]
+      $ r |= app hdSliceArrayStr [a,start,n]
 
   ThawArrayOp         -> \[r] [a,start,n]     ->
     pure $ PrimInline
       $ bnd_arr_range bound a start n
-      $ r |= app "h$sliceArray" [a,start,n]
+      $ r |= app hdSliceArrayStr [a,start,n]
 
   CasArrayOp          -> \[s,o] [a,i,old,new] ->
     PrimInline <$>
@@ -616,11 +617,11 @@ genPrim prof bound ty op = case op of
 
 ------------------------------ Small Arrays -------------------------------------
 
-  NewSmallArrayOp            -> \[a]   [n,e]         -> pure $ PrimInline $ a |= app "h$newArray" [n,e]
+  NewSmallArrayOp            -> \[a]   [n,e]         -> pure $ PrimInline $ a |= app hdNewArrayStr [n,e]
   ReadSmallArrayOp           -> \[r]   [a,i]         -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
   WriteSmallArrayOp          -> \[]    [a,i,e]       -> pure $ PrimInline $ bnd_arr bound a i (a .! i |= e)
-  SizeofSmallArrayOp         -> \[r]   [a]           -> pure $ PrimInline $ r |= a .^ "length"
-  SizeofSmallMutableArrayOp  -> \[r]   [a]           -> pure $ PrimInline $ r |= a .^ "length"
+  SizeofSmallArrayOp         -> \[r]   [a]           -> pure $ PrimInline $ r |= a .^ lngth
+  SizeofSmallMutableArrayOp  -> \[r]   [a]           -> pure $ PrimInline $ r |= a .^ lngth
   IndexSmallArrayOp          -> \[r]   [a,i]         -> pure $ PrimInline $ bnd_arr bound a i (r |= a .! i)
   UnsafeFreezeSmallArrayOp   -> \[r]   [a]           -> pure $ PrimInline $ r |= a
   UnsafeThawSmallArrayOp     -> \[r]   [a]           -> pure $ PrimInline $ r |= a
@@ -639,7 +640,7 @@ genPrim prof bound ty op = case op of
     pure $ PrimInline
       $ bnd_arr_range bound s si n
       $ bnd_arr_range bound d di n
-      $ appS "h$copyMutableArray" [s,si,d,di,n]
+      $ appS hdCopyMutableArrayStr [s,si,d,di,n]
 
   CloneSmallArrayOp          -> \[r]   [a,o,n]       -> pure $ PrimInline $ cloneArray bound r a o n
   CloneSmallMutableArrayOp   -> \[r]   [a,o,n]       -> pure $ PrimInline $ cloneArray bound r a o n
@@ -671,13 +672,13 @@ genPrim prof bound ty op = case op of
   ByteArrayIsPinnedOp               -> \[r]   [_]        -> pure $ PrimInline $ r |= one_
   ByteArrayContents_Char            -> \[a,o] [b]        -> pure $ PrimInline $ mconcat [a |= b, o |= zero_]
   MutableByteArrayContents_Char     -> \[a,o] [b]        -> pure $ PrimInline $ mconcat [a |= b, o |= zero_]
-  ShrinkMutableByteArrayOp_Char     -> \[]    [a,n]      -> pure $ PrimInline $ appS "h$shrinkMutableByteArray" [a,n]
-  ResizeMutableByteArrayOp_Char     -> \[r]   [a,n]      -> pure $ PrimInline $ r |= app "h$resizeMutableByteArray" [a,n]
+  ShrinkMutableByteArrayOp_Char     -> \[]    [a,n]      -> pure $ PrimInline $ appS hdShrinkMutableByteArrayStr [a,n]
+  ResizeMutableByteArrayOp_Char     -> \[r]   [a,n]      -> pure $ PrimInline $ r |= app hdResizeMutableByteArrayStr [a,n]
   UnsafeFreezeByteArrayOp           -> \[a]   [b]        -> pure $ PrimInline $ a |= b
   UnsafeThawByteArrayOp             -> \[a]   [b]        -> pure $ PrimInline $ a |= b
-  SizeofByteArrayOp                 -> \[r]   [a]        -> pure $ PrimInline $ r |= a .^ "len"
-  SizeofMutableByteArrayOp          -> \[r]   [a]        -> pure $ PrimInline $ r |= a .^ "len"
-  GetSizeofMutableByteArrayOp       -> \[r]   [a]        -> pure $ PrimInline $ r |= a .^ "len"
+  SizeofByteArrayOp                 -> \[r]   [a]        -> pure $ PrimInline $ r |= a .^ len
+  SizeofMutableByteArrayOp          -> \[r]   [a]        -> pure $ PrimInline $ r |= a .^ len
+  GetSizeofMutableByteArrayOp       -> \[r]   [a]        -> pure $ PrimInline $ r |= a .^ len
 
   IndexByteArrayOp_Char      -> \[r]   [a,i] -> pure $ PrimInline $ bnd_ix8  bound a i $ r |= read_u8  a i
   IndexByteArrayOp_WideChar  -> \[r]   [a,i] -> pure $ PrimInline $ bnd_ix32 bound a i $ r |= read_i32 a i
@@ -734,7 +735,7 @@ genPrim prof bound ty op = case op of
       pure . PrimInline
       . bnd_ba_range bound a1 o1 n
       . bnd_ba_range bound a2 o2 n
-      $ r |= app "h$compareByteArrays" [a1,o1,a2,o2,n]
+      $ r |= app hdCompareByteArraysStr [a1,o1,a2,o2,n]
 
   -- We assume the arrays aren't overlapping since they're of different types
   -- (ByteArray vs MutableByteArray, Addr# vs MutableByteArray#, [Mutable]ByteArray# vs Addr#)
@@ -751,7 +752,7 @@ genPrim prof bound ty op = case op of
   SetByteArrayOp -> \[] [a,o,n,v] ->
     PrimInline <$> jVar \tmpIdent ->
     do
-      let tmp = var $ identFS tmpIdent
+      let tmp = global $ identFS tmpIdent
       pure . bnd_ba_range bound a o n $
         mconcat [ tmpIdent ||= zero_
                 , WhileStat False (tmp .<. n) $
@@ -777,12 +778,12 @@ genPrim prof bound ty op = case op of
   AddrRemOp   -> \[r]     [_a,o,i]        -> pure $ PrimInline $ r |= Mod o i
   AddrToIntOp -> \[i]     [_a,o]          -> pure $ PrimInline $ i |= o -- only usable for comparisons within one range
   IntToAddrOp -> \[a,o]   [i]             -> pure $ PrimInline $ mconcat [a |= null_, o |= i]
-  AddrGtOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .>. zero_)
-  AddrGeOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .>=. zero_)
-  AddrEqOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .===. zero_)
-  AddrNeOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .!==. zero_)
-  AddrLtOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .<. zero_)
-  AddrLeOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app "h$comparePointer" [a1,o1,a2,o2] .<=. zero_)
+  AddrGtOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app hdComparePointerStr [a1,o1,a2,o2] .>. zero_)
+  AddrGeOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app hdComparePointerStr [a1,o1,a2,o2] .>=. zero_)
+  AddrEqOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app hdComparePointerStr [a1,o1,a2,o2] .===. zero_)
+  AddrNeOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app hdComparePointerStr [a1,o1,a2,o2] .!==. zero_)
+  AddrLtOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app hdComparePointerStr [a1,o1,a2,o2] .<. zero_)
+  AddrLeOp -> \[r] [a1,o1,a2,o2] -> pure $ PrimInline $ r |= if10 (app hdComparePointerStr [a1,o1,a2,o2] .<=. zero_)
 
 ------------------------------- Addr Indexing: Unboxed Arrays -------------------
 
@@ -883,126 +884,126 @@ genPrim prof bound ty op = case op of
   WriteOffAddrOp_Word8AsWord64    -> \[] [a,o,i,h,l]   -> pure $ PrimInline $ write_boff_u64 a (off8 o i) h l
 
 ------------------------------- Mutable variables --------------------------------------
-  NewMutVarOp           -> \[r] [x]       -> pure $ PrimInline $ r |= New (app "h$MutVar" [x])
-  ReadMutVarOp          -> \[r] [m]       -> pure $ PrimInline $ r |= m .^ "val"
-  WriteMutVarOp         -> \[] [m,x]      -> pure $ PrimInline $ m .^ "val" |= x
-  AtomicModifyMutVar2Op -> \[r1,r2] [m,f] -> pure $ PrimInline $ appT [r1,r2] "h$atomicModifyMutVar2" [m,f]
-  AtomicModifyMutVar_Op -> \[r1,r2] [m,f] -> pure $ PrimInline $ appT [r1,r2] "h$atomicModifyMutVar" [m,f]
+  NewMutVarOp           -> \[r] [x]       -> pure $ PrimInline $ r |= New (app hdMutVarStr [x])
+  ReadMutVarOp          -> \[r] [m]       -> pure $ PrimInline $ r |= m .^ val
+  WriteMutVarOp         -> \[] [m,x]      -> pure $ PrimInline $ m .^ val |= x
+  AtomicModifyMutVar2Op -> \[r1,r2] [m,f] -> pure $ PrimInline $ appT [r1,r2] hdAtomicModifyMutVar2Str [m,f]
+  AtomicModifyMutVar_Op -> \[r1,r2] [m,f] -> pure $ PrimInline $ appT [r1,r2] hdAtomicModifyMutVarStr [m,f]
 
   AtomicSwapMutVarOp    -> \[r] [mv,v] -> pure $ PrimInline $ mconcat
-                                          [ r |= mv .^ "val", mv .^ "val" |= v ]
-  CasMutVarOp -> \[status,r] [mv,o,n] -> pure $ PrimInline $ ifS (mv .^ "val" .===. o)
-                   (mconcat [status |= zero_, r |= n, mv .^ "val" |= n])
-                   (mconcat [status |= one_ , r |= mv .^ "val"])
+                                          [ r |= mv .^ val, mv .^ val |= v ]
+  CasMutVarOp -> \[status,r] [mv,o,n] -> pure $ PrimInline $ ifS (mv .^ val .===. o)
+                   (mconcat [status |= zero_, r |= n, mv .^ val |= n])
+                   (mconcat [status |= one_ , r |= mv .^ val])
 
 ------------------------------- Exceptions --------------------------------------
 
-  CatchOp -> \[_r] [a,handler] -> pure $ PRPrimCall $ returnS (app "h$catch" [a, handler])
+  CatchOp -> \[_r] [a,handler] -> pure $ PRPrimCall $ returnS (app hdCatchStr [a, handler])
 
                              -- fully ignore the result arity as it can use 1 or 2
                              -- slots, depending on the return type.
-  RaiseOp                 -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$throw" [a, false_])
-  RaiseIOOp               -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$throw" [a, false_])
-  RaiseUnderflowOp        -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziInternalziExceptionziTypeziunderflowException", false_])
-  RaiseOverflowOp         -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziInternalziExceptionziTypezioverflowException", false_])
-  RaiseDivZeroOp          -> \_r []  -> pure $ PRPrimCall $ returnS (app "h$throw" [var "h$ghczminternalZCGHCziInternalziExceptionziTypezidivZZeroException", false_])
-  MaskAsyncExceptionsOp   -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$maskAsync" [a])
-  MaskUninterruptibleOp   -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$maskUnintAsync" [a])
-  UnmaskAsyncExceptionsOp -> \_r [a] -> pure $ PRPrimCall $ returnS (app "h$unmaskAsync" [a])
+  RaiseOp                 -> \_r [a] -> pure $ PRPrimCall $ returnS (app hdThrowStr [a, false_])
+  RaiseIOOp               -> \_r [a] -> pure $ PRPrimCall $ returnS (app hdThrowStr [a, false_])
+  RaiseUnderflowOp        -> \_r []  -> pure $ PRPrimCall $ returnS (app hdThrowStr [hdInternalExceptionTypeUnderflow, false_])
+  RaiseOverflowOp         -> \_r []  -> pure $ PRPrimCall $ returnS (app hdThrowStr [hdInternalExceptionTypeOverflow, false_])
+  RaiseDivZeroOp          -> \_r []  -> pure $ PRPrimCall $ returnS (app hdThrowStr [hdInternalExceptionTypeDivZero, false_])
+  MaskAsyncExceptionsOp   -> \_r [a] -> pure $ PRPrimCall $ returnS (app hdMaskAsyncStr [a])
+  MaskUninterruptibleOp   -> \_r [a] -> pure $ PRPrimCall $ returnS (app hdMaskUnintAsyncStr [a])
+  UnmaskAsyncExceptionsOp -> \_r [a] -> pure $ PRPrimCall $ returnS (app hdUnmaskAsyncStr [a])
 
   MaskStatus -> \[r] [] -> pure $ PrimInline $ r |= app "h$maskStatus" []
 
 ------------------------------- STM-accessible Mutable Variables  --------------
 
-  AtomicallyOp -> \[_r] [a]   -> pure $ PRPrimCall $ returnS (app "h$atomically" [a])
-  RetryOp      -> \_r   []    -> pure $ PRPrimCall $ returnS (app "h$stmRetry" [])
-  CatchRetryOp -> \[_r] [a,b] -> pure $ PRPrimCall $ returnS (app "h$stmCatchRetry" [a,b])
-  CatchSTMOp   -> \[_r] [a,h] -> pure $ PRPrimCall $ returnS (app "h$catchStm" [a,h])
-  NewTVarOp    -> \[tv] [v]   -> pure $ PrimInline $ tv |= app "h$newTVar" [v]
-  ReadTVarOp   -> \[r] [tv]   -> pure $ PrimInline $ r |= app "h$readTVar" [tv]
-  ReadTVarIOOp -> \[r] [tv]   -> pure $ PrimInline $ r |= app "h$readTVarIO" [tv]
-  WriteTVarOp  -> \[] [tv,v]  -> pure $ PrimInline $ appS "h$writeTVar" [tv,v]
+  AtomicallyOp -> \[_r] [a]   -> pure $ PRPrimCall $ returnS (app hdAtomicallyStr [a])
+  RetryOp      -> \_r   []    -> pure $ PRPrimCall $ returnS (app hdStmRetryStr [])
+  CatchRetryOp -> \[_r] [a,b] -> pure $ PRPrimCall $ returnS (app hdStmCatchRetryStr [a,b])
+  CatchSTMOp   -> \[_r] [a,h] -> pure $ PRPrimCall $ returnS (app hdCatchStmStr [a,h])
+  NewTVarOp    -> \[tv] [v]   -> pure $ PrimInline $ tv |= app hdNewTVar    [v]
+  ReadTVarOp   -> \[r] [tv]   -> pure $ PrimInline $ r  |= app hdReadTVar   [tv]
+  ReadTVarIOOp -> \[r] [tv]   -> pure $ PrimInline $ r  |= app hdReadTVarIO [tv]
+  WriteTVarOp  -> \[] [tv,v]  -> pure $ PrimInline $ appS hdWriteTVar [tv,v]
 
 ------------------------------- Synchronized Mutable Variables ------------------
 
-  NewMVarOp     -> \[r]   []    -> pure $ PrimInline $ r |= New (app "h$MVar" [])
-  TakeMVarOp    -> \[_r]  [m]   -> pure $ PRPrimCall $ returnS (app "h$takeMVar" [m])
-  TryTakeMVarOp -> \[r,v] [m]   -> pure $ PrimInline $ appT [r,v] "h$tryTakeMVar" [m]
-  PutMVarOp     -> \[]    [m,v] -> pure $ PRPrimCall $ returnS (app "h$putMVar" [m,v])
-  TryPutMVarOp  -> \[r]   [m,v] -> pure $ PrimInline $ r |= app "h$tryPutMVar" [m,v]
-  ReadMVarOp    -> \[_r]  [m]   -> pure $ PRPrimCall $ returnS (app "h$readMVar" [m])
+  NewMVarOp     -> \[r]   []    -> pure $ PrimInline $ r |= New (app hdMVarStr [])
+  TakeMVarOp    -> \[_r]  [m]   -> pure $ PRPrimCall $ returnS (app hdTakeMVarStr [m])
+  TryTakeMVarOp -> \[r,v] [m]   -> pure $ PrimInline $ appT [r,v] hdTryTakeMVarStr [m]
+  PutMVarOp     -> \[]    [m,v] -> pure $ PRPrimCall $ returnS (app hdPutMVarStr [m,v])
+  TryPutMVarOp  -> \[r]   [m,v] -> pure $ PrimInline $ r |= app hdTryPutMVarStr [m,v]
+  ReadMVarOp    -> \[_r]  [m]   -> pure $ PRPrimCall $ returnS (app hdReadMVarStr [m])
   TryReadMVarOp -> \[r,v] [m]   -> pure $ PrimInline $ mconcat
-                                   [ v |= m .^ "val"
+                                   [ v |= m .^ val
                                    , r |= if01 (v .===. null_)
                                    ]
-  IsEmptyMVarOp -> \[r]   [m]   -> pure $ PrimInline $ r |= if10 (m .^ "val" .===. null_)
+  IsEmptyMVarOp -> \[r]   [m]   -> pure $ PrimInline $ r |= if10 (m .^ val .===. null_)
 
 ------------------------------- Delay/Wait Ops ---------------------------------
 
-  DelayOp     -> \[] [t]  -> pure $ PRPrimCall $ returnS (app "h$delayThread" [t])
-  WaitReadOp  -> \[] [fd] -> pure $ PRPrimCall $ returnS (app "h$waitRead" [fd])
-  WaitWriteOp -> \[] [fd] -> pure $ PRPrimCall $ returnS (app "h$waitWrite" [fd])
+  DelayOp     -> \[] [t]  -> pure $ PRPrimCall $ returnS (app hdDelayThread [t])
+  WaitReadOp  -> \[] [fd] -> pure $ PRPrimCall $ returnS (app hdWaitRead    [fd])
+  WaitWriteOp -> \[] [fd] -> pure $ PRPrimCall $ returnS (app hdWaitWrite   [fd])
 
 ------------------------------- Concurrency Primitives -------------------------
 
-  ForkOp                 -> \[_tid] [x]    -> pure $ PRPrimCall $ returnS (app "h$fork" [x, true_])
-  ForkOnOp               -> \[_tid] [_p,x] -> pure $ PRPrimCall $ returnS (app "h$fork" [x, true_]) -- ignore processor argument
-  KillThreadOp           -> \[] [tid,ex]   -> pure $ PRPrimCall $ returnS (app "h$killThread" [tid,ex])
-  YieldOp                -> \[] []         -> pure $ PRPrimCall $ returnS (app "h$yield" [])
-  MyThreadIdOp           -> \[r] []        -> pure $ PrimInline $ r |= var "h$currentThread"
+  ForkOp                 -> \[_tid] [x]    -> pure $ PRPrimCall $ returnS (app hdFork [x, true_])
+  ForkOnOp               -> \[_tid] [_p,x] -> pure $ PRPrimCall $ returnS (app hdFork [x, true_]) -- ignore processor argument
+  KillThreadOp           -> \[] [tid,ex]   -> pure $ PRPrimCall $ returnS (app hdKillThread [tid,ex])
+  YieldOp                -> \[] []         -> pure $ PRPrimCall $ returnS (app hdYield [])
+  MyThreadIdOp           -> \[r] []        -> pure $ PrimInline $ r |= hdCurrentThread
   IsCurrentThreadBoundOp -> \[r] []        -> pure $ PrimInline $ r |= one_
   NoDuplicateOp          -> \[] []         -> pure $ PrimInline mempty -- don't need to do anything as long as we have eager blackholing
-  ThreadStatusOp         -> \[stat,cap,locked] [tid] -> pure $ PrimInline $ appT [stat, cap, locked] "h$threadStatus" [tid]
-  ListThreadsOp          -> \[r] [] -> pure $ PrimInline $ appT [r] "h$listThreads" []
-  GetThreadLabelOp       -> \[r1, r2] [t]  -> pure $ PrimInline $ appT [r1, r2] "h$getThreadLabel" [t]
-  LabelThreadOp          -> \[] [t,l]      -> pure $ PrimInline $ t .^ "label" |= l
+  ThreadStatusOp         -> \[stat,cap,locked] [tid] -> pure $ PrimInline $ appT [stat, cap, locked] hdThreadStatus [tid]
+  ListThreadsOp          -> \[r] [] -> pure $ PrimInline $ appT [r] hdListThreads []
+  GetThreadLabelOp       -> \[r1, r2] [t]  -> pure $ PrimInline $ appT [r1, r2] hdGetThreadLabel [t]
+  LabelThreadOp          -> \[] [t,l]      -> pure $ PrimInline $ t .^ label |= l
 
 ------------------------------- Weak Pointers -----------------------------------
 
-  MkWeakOp              -> \[r] [o,b,c] -> pure $ PrimInline $ r |= app "h$makeWeak" [o,b,c]
-  MkWeakNoFinalizerOp   -> \[r] [o,b]   -> pure $ PrimInline $ r |= app "h$makeWeakNoFinalizer" [o,b]
+  MkWeakOp              -> \[r] [o,b,c] -> pure $ PrimInline $ r |= app hdMakeWeak [o,b,c]
+  MkWeakNoFinalizerOp   -> \[r] [o,b]   -> pure $ PrimInline $ r |= app hdMakeWeakNoFinalizer [o,b]
   AddCFinalizerToWeakOp -> \[r] [_a1,_a1o,_a2,_a2o,_i,_a3,_a3o,_w] -> pure $ PrimInline $ r |= one_
   DeRefWeakOp           -> \[f,v] [w] -> pure $ PrimInline $ mconcat
-                                         [ v |= w .^ "val"
+                                         [ v |= w .^ val
                                          , f |= if01 (v .===. null_)
                                          ]
-  FinalizeWeakOp     -> \[fl,fin] [w] -> pure $ PrimInline $ appT [fin, fl] "h$finalizeWeak" [w]
+  FinalizeWeakOp     -> \[fl,fin] [w] -> pure $ PrimInline $ appT [fin, fl] hdFinalizeWeak [w]
   TouchOp            -> \[] [_e]      -> pure $ PrimInline mempty
-  KeepAliveOp        -> \[_r] [x, f]  -> pure $ PRPrimCall $ ReturnStat (app "h$keepAlive" [x, f])
+  KeepAliveOp        -> \[_r] [x, f]  -> pure $ PRPrimCall $ ReturnStat (app hdKeepAlive [x, f])
 
 
 ------------------------------ Stable pointers and names ------------------------
 
   MakeStablePtrOp -> \[s1,s2] [a] -> pure $ PrimInline $ mconcat
-      [ s1 |= var "h$stablePtrBuf"
-      , s2 |= app "h$makeStablePtr" [a]
+      [ s1 |= hdStablePtrBuf
+      , s2 |= app hdMakeStablePtrStr [a]
       ]
-  DeRefStablePtrOp -> \[r] [_s1,s2]            -> pure $ PrimInline $ r |= app "h$deRefStablePtr" [s2]
+  DeRefStablePtrOp -> \[r] [_s1,s2]            -> pure $ PrimInline $ r |= app hdDeRefStablePtr [s2]
   EqStablePtrOp    -> \[r] [_sa1,sa2,_sb1,sb2] -> pure $ PrimInline $ r |= if10 (sa2 .===. sb2)
 
-  MakeStableNameOp  -> \[r] [a] -> pure $ PrimInline $ r |= app "h$makeStableName" [a]
-  StableNameToIntOp -> \[r] [s] -> pure $ PrimInline $ r |= app "h$stableNameInt" [s]
+  MakeStableNameOp  -> \[r] [a] -> pure $ PrimInline $ r |= app hdMakeStableName [a]
+  StableNameToIntOp -> \[r] [s] -> pure $ PrimInline $ r |= app hdStableNameInt  [s]
 
 ------------------------------ Compact normal form -----------------------------
 
-  CompactNewOp           -> \[c] [s]   -> pure $ PrimInline $ c |= app "h$compactNew" [s]
-  CompactResizeOp        -> \[]  [c,s] -> pure $ PrimInline $ appS "h$compactResize" [c,s]
-  CompactContainsOp      -> \[r] [c,v] -> pure $ PrimInline $ r |= app "h$compactContains" [c,v]
-  CompactContainsAnyOp   -> \[r] [v]   -> pure $ PrimInline $ r |= app "h$compactContainsAny" [v]
+  CompactNewOp           -> \[c] [s]   -> pure $ PrimInline $ c |= app hdCompactNew [s]
+  CompactResizeOp        -> \[]  [c,s] -> pure $ PrimInline $ appS hdCompactResize [c,s]
+  CompactContainsOp      -> \[r] [c,v] -> pure $ PrimInline $ r |= app hdCompactContains [c,v]
+  CompactContainsAnyOp   -> \[r] [v]   -> pure $ PrimInline $ r |= app hdCompactContainsAny [v]
   CompactGetFirstBlockOp -> \[ra,ro,s] [c] ->
-    pure $ PrimInline $ appT [ra,ro,s] "h$compactGetFirstBlock" [c]
+    pure $ PrimInline $ appT [ra,ro,s] hdCompactGetFirstBlock [c]
   CompactGetNextBlockOp -> \[ra,ro,s] [c,a,o] ->
-    pure $ PrimInline $ appT [ra,ro,s] "h$compactGetNextBlock" [c,a,o]
+    pure $ PrimInline $ appT [ra,ro,s] hdCompactGetNextBlock [c,a,o]
   CompactAllocateBlockOp -> \[ra,ro] [size,sa,so] ->
-    pure $ PrimInline $ appT [ra,ro] "h$compactAllocateBlock" [size,sa,so]
+    pure $ PrimInline $ appT [ra,ro] hdCompactAllocateBlock [size,sa,so]
   CompactFixupPointersOp -> \[c,newroota, newrooto] [blocka,blocko,roota,rooto] ->
-    pure $ PrimInline $ appT [c,newroota,newrooto] "h$compactFixupPointers" [blocka,blocko,roota,rooto]
+    pure $ PrimInline $ appT [c,newroota,newrooto] hdCompactFixupPointers  [blocka,blocko,roota,rooto]
   CompactAdd -> \[_r] [c,o] ->
-    pure $ PRPrimCall $ returnS (app "h$compactAdd" [c,o])
+    pure $ PRPrimCall $ returnS (app hdCompactAdd [c,o])
   CompactAddWithSharing -> \[_r] [c,o] ->
-    pure $ PRPrimCall $ returnS (app "h$compactAddWithSharing" [c,o])
+    pure $ PRPrimCall $ returnS (app hdCompactAddWithSharing [c,o])
   CompactSize -> \[s] [c] ->
-    pure $ PrimInline $ s |= app "h$compactSize" [c]
+    pure $ PrimInline $ s |= app hdCompactSize [c]
 
 ------------------------------ Unsafe pointer equality --------------------------
 
@@ -1017,17 +1018,17 @@ genPrim prof bound ty op = case op of
 ------------------------------ Tag to enum stuff --------------------------------
 
   DataToTagSmallOp -> \[_r] [d] -> pure $ PRPrimCall $ mconcat
-      [ stack .! PreInc sp |= var "h$dataToTag_e"
-      , returnS (app "h$e" [d])
+      [ stack .! PreInc sp |= global (identFS hdDataToTagEntryStr)
+      , returnS (app hdEntryStr [d])
       ]
   DataToTagLargeOp -> \[_r] [d] -> pure $ PRPrimCall $ mconcat
-      [ stack .! PreInc sp |= var "h$dataToTag_e"
-      , returnS (app "h$e" [d])
+      [ stack .! PreInc sp |= global (identFS hdDataToTagEntryStr)
+      , returnS (app hdEntryStr [d])
       ]
   TagToEnumOp -> \[r] [tag] -> pure $ PrimInline $
     if isBoolTy ty
     then r |= IfExpr tag true_ false_
-    else r |= app "h$tagToEnum" [tag]
+    else r |= app hdTagToEnum [tag]
 
 ------------------------------ Bytecode operations ------------------------------
 
@@ -1038,7 +1039,7 @@ genPrim prof bound ty op = case op of
   GetCCSOfOp -> \[a, o] [obj] -> pure $ PrimInline $ mconcat
     if prof
     then [ a |= if_ (isObject obj)
-           (app "h$buildCCSPtr" [obj .^ "cc"])
+           (app hdBuildCCSPtrStr [obj .^ ccStr])
            null_
          , o |= zero_
          ]
@@ -1047,20 +1048,20 @@ genPrim prof bound ty op = case op of
          ]
 
   GetCurrentCCSOp -> \[a, o] [_dummy_arg] ->
-    let ptr = if prof then app "h$buildCCSPtr" [jCurrentCCS]
+    let ptr = if prof then app hdBuildCCSPtrStr [jCurrentCCS]
                       else null_
     in pure $ PrimInline $ mconcat
         [ a |= ptr
         , o |= zero_
         ]
 
-  ClearCCSOp -> \[_r] [x] -> pure $ PRPrimCall $ ReturnStat (app "h$clearCCS" [x])
+  ClearCCSOp -> \[_r] [x] -> pure $ PRPrimCall $ ReturnStat (app hdClearCCSStr [x])
 
 ------------------------------ Eventlog -------------------
 
-  TraceEventOp       -> \[] [ed,eo]     -> pure $ PrimInline $ appS "h$traceEvent" [ed,eo]
-  TraceEventBinaryOp -> \[] [ed,eo,len] -> pure $ PrimInline $ appS "h$traceEventBinary" [ed,eo,len]
-  TraceMarkerOp      -> \[] [ed,eo]     -> pure $ PrimInline $ appS "h$traceMarker" [ed,eo]
+  TraceEventOp       -> \[] [ed,eo]     -> pure $ PrimInline $ appS hdTraceEventStr [ed,eo]
+  TraceEventBinaryOp -> \[] [ed,eo,len] -> pure $ PrimInline $ appS hdTraceEventBinaryStr [ed,eo,len]
+  TraceMarkerOp      -> \[] [ed,eo]     -> pure $ PrimInline $ appS hdTraceMarkerStr [ed,eo]
 
 ------------------------------ ByteArray -------------------
 
@@ -1139,8 +1140,8 @@ genPrim prof bound ty op = case op of
                                           , write_boff_u32 a o w
                                           ]
 
-  ShrinkSmallMutableArrayOp_Char    -> \[]  [a,n] -> pure $ PrimInline $ appS "h$shrinkMutableCharArray" [a,n]
-  GetSizeofSmallMutableArrayOp      -> \[r] [a]   -> pure $ PrimInline $ r |= a .^ "length"
+  ShrinkSmallMutableArrayOp_Char    -> \[]  [a,n] -> pure $ PrimInline $ appS hdShrinkMutableCharArrayStr  [a,n]
+  GetSizeofSmallMutableArrayOp      -> \[r] [a]   -> pure $ PrimInline $ r |= a .^ lngth
 
   AtomicReadAddrOp_Word             -> \[r] [a,o]   -> pure $ PrimInline $ r |= read_boff_u32 a o
   AtomicWriteAddrOp_Word            -> \[]  [a,o,w] -> pure $ PrimInline $ write_boff_u32 a o w
@@ -1224,9 +1225,9 @@ unhandledPrimop op rs as = pure $ PrimInline $ mconcat
            , " "
            , show (length rs, length as)
            ]
-  , appS (mkFastString $ "h$primop_" ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
+  , appS (mkFastString $ unpackFS hdPrimOpStr ++ zEncodeString (renderWithContext defaultSDocContext (ppr op))) as
     -- copyRes
-  , mconcat $ zipWith (\r reg -> r |= (foreignRegister reg)) rs (enumFrom Ret1)
+  , mconcat $ zipWith (\r reg -> r |= foreignRegister reg) rs (enumFrom Ret1)
   ]
 
 -- | A No Op, used for primops the JS platform cannot or do not support. For
@@ -1267,11 +1268,11 @@ appT (r:rs) f xs = mconcat
 -- Prefer using them over idx_* to make your intent clearer.
 
 idx_i32, idx_u8, idx_u16, idx_f64, idx_f32 :: JStgExpr -> JStgExpr -> JStgExpr
-idx_i32 a i = IdxExpr (a .^ "i3") i
-idx_u8  a i = IdxExpr (a .^ "u8") i
-idx_u16 a i = IdxExpr (a .^ "u1") i
-idx_f64 a i = IdxExpr (a .^ "f6") i
-idx_f32 a i = IdxExpr (a .^ "f3") i
+idx_i32 a i = IdxExpr (a .^ i3) i
+idx_u8  a i = IdxExpr (a .^ u8) i
+idx_u16 a i = IdxExpr (a .^ u1) i
+idx_f64 a i = IdxExpr (a .^ f6) i
+idx_f32 a i = IdxExpr (a .^ f3) i
 
 read_u8 :: JStgExpr -> JStgExpr -> JStgExpr
 read_u8 a i = idx_u8 a i
@@ -1317,23 +1318,23 @@ write_addr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 write_addr a i r o = mconcat
   [ write_i32 a i o
     -- create the hidden array for arrays if it doesn't exist
-  , ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
-  , a .^ "arr" .! (i .<<. two_) |= r
+  , ifS (Not (a .^ arr)) (a .^ arr |= ValExpr (JList [])) mempty
+  , a .^ arr .! (i .<<. two_) |= r
   ]
 
 read_addr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 read_addr a i r o = mconcat
   [ o |= read_i32 a i
-  , r |= if_ ((a .^ "arr") .&&. (a .^ "arr" .! (i .<<. two_)))
-            (a .^ "arr" .! (i .<<. two_))
+  , r |= if_ ((a .^ arr) .&&. (a .^ arr .! (i .<<. two_)))
+            (a .^ arr .! (i .<<. two_))
             null_
   ]
 
 read_boff_addr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 read_boff_addr a i r o = mconcat
   [ o |= read_boff_i32 a i
-  , r |= if_ ((a .^ "arr") .&&. (a .^ "arr" .! i))
-            (a .^ "arr" .! i)
+  , r |= if_ ((a .^ arr) .&&. (a .^ arr .! i))
+            (a .^ arr .! i)
             null_
   ]
 
@@ -1341,8 +1342,8 @@ write_boff_addr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 write_boff_addr a i r o = mconcat
   [ write_boff_i32 a i o
     -- create the hidden array for arrays if it doesn't exist
-  , ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
-  , a .^ "arr" .! i |= r
+  , ifS (Not (a .^ arr)) (a .^ arr |= ValExpr (JList [])) mempty
+  , a .^ arr .! i |= r
   ]
 
 
@@ -1355,7 +1356,7 @@ read_stableptr a i r o = mconcat
   [ o |= read_i32 a i
   , ifS (o .===. zero_)
       (r |= null_)
-      (r |= var "h$stablePtrBuf")
+      (r |= hdStablePtrBuf)
   ]
 
 read_boff_stableptr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
@@ -1363,7 +1364,7 @@ read_boff_stableptr a i r o = mconcat
   [ o |= read_boff_i32 a i
   , ifS (o .===. zero_)
       (r |= null_)
-      (r |= var "h$stablePtrBuf")
+      (r |= hdStablePtrBuf)
   ]
 
 write_stableptr :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
@@ -1418,12 +1419,12 @@ write_i64 a i h l = mconcat
 write_boff_i8, write_boff_u8, write_boff_i16, write_boff_u16, write_boff_i32, write_boff_u32, write_boff_f32, write_boff_f64 :: JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 write_boff_i8  a i v = write_i8 a i v
 write_boff_u8  a i v = write_u8 a i v
-write_boff_i16 a i v = ApplStat (a .^ "dv" .^ "setInt16"  ) [i, v, true_]
-write_boff_u16 a i v = ApplStat (a .^ "dv" .^ "setUint16" ) [i, v, true_]
-write_boff_i32 a i v = ApplStat (a .^ "dv" .^ "setInt32"  ) [i, v, true_]
-write_boff_u32 a i v = ApplStat (a .^ "dv" .^ "setUint32" ) [i, v, true_]
-write_boff_f32 a i v = ApplStat (a .^ "dv" .^ "setFloat32") [i, v, true_]
-write_boff_f64 a i v = ApplStat (a .^ "dv" .^ "setFloat64") [i, v, true_]
+write_boff_i16 a i v = ApplStat (a .^ dv .^ setInt16  ) [i, v, true_]
+write_boff_u16 a i v = ApplStat (a .^ dv .^ setUint16 ) [i, v, true_]
+write_boff_i32 a i v = ApplStat (a .^ dv .^ setInt32  ) [i, v, true_]
+write_boff_u32 a i v = ApplStat (a .^ dv .^ setUint32 ) [i, v, true_]
+write_boff_f32 a i v = ApplStat (a .^ dv .^ setFloat32) [i, v, true_]
+write_boff_f64 a i v = ApplStat (a .^ dv .^ setFloat64) [i, v, true_]
 
 write_boff_i64, write_boff_u64 :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 write_boff_i64 a i h l = mconcat
@@ -1438,12 +1439,12 @@ write_boff_u64 a i h l = mconcat
 read_boff_i8, read_boff_u8, read_boff_i16, read_boff_u16, read_boff_i32, read_boff_u32, read_boff_f32, read_boff_f64 :: JStgExpr -> JStgExpr -> JStgExpr
 read_boff_i8  a i = read_i8 a i
 read_boff_u8  a i = read_u8 a i
-read_boff_i16 a i = ApplExpr (a .^ "dv" .^ "getInt16"  ) [i, true_]
-read_boff_u16 a i = ApplExpr (a .^ "dv" .^ "getUint16" ) [i, true_]
-read_boff_i32 a i = ApplExpr (a .^ "dv" .^ "getInt32"  ) [i, true_]
-read_boff_u32 a i = ApplExpr (a .^ "dv" .^ "getUint32" ) [i, true_]
-read_boff_f32 a i = ApplExpr (a .^ "dv" .^ "getFloat32") [i, true_]
-read_boff_f64 a i = ApplExpr (a .^ "dv" .^ "getFloat64") [i, true_]
+read_boff_i16 a i = ApplExpr (a .^ dv .^ getInt16  ) [i, true_]
+read_boff_u16 a i = ApplExpr (a .^ dv .^ getUint16 ) [i, true_]
+read_boff_i32 a i = ApplExpr (a .^ dv .^ getInt32  ) [i, true_]
+read_boff_u32 a i = ApplExpr (a .^ dv .^ getUint32 ) [i, true_]
+read_boff_f32 a i = ApplExpr (a .^ dv .^ getFloat32) [i, true_]
+read_boff_f64 a i = ApplExpr (a .^ dv .^ getFloat64) [i, true_]
 
 read_boff_i64 :: JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 read_boff_i64 a i rh rl = mconcat
@@ -1509,14 +1510,14 @@ cloneArray :: Bool -> JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgStat
 cloneArray bound_check tgt src start len =
   bnd_arr_range bound_check src start len
   $ mconcat
-      [ tgt |= ApplExpr (src .^ "slice") [start, Add len start]
-      , tgt .^ closureMeta_   |= zero_
-      , tgt .^ "__ghcjsArray" |= true_
+      [ tgt |= ApplExpr (src .^ slice) [start, Add len start]
+      , tgt .^ closureMeta_ |= zero_
+      , tgt .^ ghcjsArray   |= true_
       ]
 
 newByteArray :: JStgExpr -> JStgExpr -> JStgStat
 newByteArray tgt len =
-  tgt |= app "h$newByteArray" [len]
+  tgt |= app hdNewByteArrayStr [len]
 
 -- | Check that index is positive and below a max value. Halt the process with
 -- error code 134 otherwise. This is used to implement -fcheck-prim-bounds
@@ -1529,7 +1530,7 @@ check_bound
 check_bound _         False _ r = r
 check_bound max_index True  i r = mconcat
   [ jwhenS ((i .<. zero_) .||. (i .>=. max_index)) $
-      returnS (app "h$exitProcess" [Int 134])
+      returnS (app hdExitProcess [Int 134])
   , r
   ]
 
@@ -1540,7 +1541,7 @@ bnd_arr
   -> JStgExpr -- ^ Index
   -> JStgStat -- ^ Result
   -> JStgStat
-bnd_arr do_check arr = check_bound (arr .^ "length") do_check
+bnd_arr do_check arr = check_bound (arr .^ lngth) do_check
 
 -- | Range bounds checking using ".length" property (Arrays)
 --
@@ -1554,7 +1555,7 @@ bnd_arr_range
   -> JStgStat
 bnd_arr_range False _arr _i _n r = r
 bnd_arr_range True   arr  i  n r =
-  ifS (n .<. zero_) (returnS $ app "h$exitProcess" [Int 134]) $
+  ifS (n .<. zero_) (returnS $ app hdExitProcess [Int 134]) $
   -- Empty ranges trivially pass the check
   ifS (n .===. zero_)
       r
@@ -1567,7 +1568,7 @@ bnd_ba
   -> JStgExpr -- ^ Index
   -> JStgStat -- ^ Result
   -> JStgStat
-bnd_ba do_check arr = check_bound (arr .^ "len") do_check
+bnd_ba do_check arr = check_bound (arr .^ len) do_check
 
 -- | ByteArray bounds checking (byte offset, 8-bit value)
 bnd_ba8 :: Bool -> JStgExpr -> JStgExpr -> JStgStat -> JStgStat
@@ -1625,7 +1626,7 @@ bnd_ba_range
   -> JStgStat
 bnd_ba_range False _  _ _ r = r
 bnd_ba_range True  xs i n r =
-  ifS (n .<. zero_) (returnS $ app "h$exitProcess" [Int 134]) $
+  ifS (n .<. zero_) (returnS $ app hdExitProcess [Int 134]) $
   -- Empty ranges trivially pass the check
   ifS (n .===. zero_)
       r
@@ -1642,13 +1643,13 @@ checkOverlapByteArray
   -> JStgStat
 checkOverlapByteArray False _ _ _ _ _ r    = r
 checkOverlapByteArray True a1 o1 a2 o2 n r =
-  ifS (app "h$checkOverlapByteArray" [a1, o1, a2, o2, n])
+  ifS (app hdCheckOverlapByteArrayStr [a1, o1, a2, o2, n])
     r
-    (returnS $ app "h$exitProcess" [Int 134])
+    (returnS $ app hdExitProcess [Int 134])
 
 copyByteArray :: Bool -> Bool -> JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> JStgExpr -> PrimRes
 copyByteArray allow_overlap bound a1 o1 a2 o2 n = PrimInline $
-  check $ appS "h$copyMutableByteArray" [a1,o1,a2,o2,n]
+  check $ appS hdCopyMutableByteArrayStr [a1,o1,a2,o2,n]
   where
       check = bnd_ba_range bound a1 o1 n
               . bnd_ba_range bound a2 o2 n

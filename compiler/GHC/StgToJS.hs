@@ -11,6 +11,23 @@ import GHC.StgToJS.CodeGen
 --
 -- StgToJS ("JS backend") is adapted from GHCJS [GHCJS2013].
 --
+-- Implementation Big Picture
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The big picture of the JS backend is roughly:
+--
+-- JS Backend --> JStgExpr ----> JExpr
+--                                 |
+--                                 V
+-- STG -------------------------> JExpr --> Optimizations --> Code Gen
+--
+-- Why this design? Because we generate the RTS via an eDSL, if we accidentally
+-- create a bug in the RTS we will not find out until we have completely
+-- finished compiling and are running the testsuite. Thus having a typed eDSL
+-- with which we can write the RTS is beneficial because a type error will have
+-- a much faster turn around than building and then trying to debug a bunch of
+-- generated, z-encoded code.
+--
 -- Haskell to JavaScript
 -- ~~~~~~~~~~~~~~~~~~~~~
 -- StgToJS converts STG into a JavaScript AST (in GHC.JS) that has been adapted

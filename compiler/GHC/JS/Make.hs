@@ -107,11 +107,10 @@ module GHC.JS.Make
   , off8, off16, off32, off64
   , mask8, mask16
   , signExtend8, signExtend16
-  , typeof
+  , typeOf
   , returnStack, assignAllEqual, assignAll, assignAllReverseOrder
   , declAssignAll
   , nullStat, (.^)
-  , trace
   -- ** Hash combinators
   , jhEmpty
   , jhSingle
@@ -182,8 +181,8 @@ instance ToJExpr () where
     toJExpr _ = ValExpr $ JList []
 
 instance ToJExpr Bool where
-    toJExpr True  = var "true"
-    toJExpr False = var "false"
+    toJExpr True  = global "true"
+    toJExpr False = global "false"
 
 instance ToJExpr JVal where
     toJExpr = ValExpr
@@ -376,7 +375,7 @@ jTryCatchFinally :: (Ident -> JStgStat) -> (Ident -> JStgStat) -> (Ident -> JStg
 jTryCatchFinally c f f2 = do i <- newIdent
                              return $ TryStat (c i) i (f i) (f2 i)
 
--- | Convert a ShortText to a Javascript String
+-- | Convert a FastString to a Javascript String
 jString :: FastString -> JStgExpr
 jString = toJExpr
 
@@ -447,8 +446,8 @@ infixl 8 .||., .&&.
 infixl 9 .<<., .>>., .>>>.
 
 -- | Given a 'JStgExpr', return the its type.
-typeof :: JStgExpr -> JStgExpr
-typeof = UOpExpr TypeofOp
+typeOf :: JStgExpr -> JStgExpr
+typeOf = UOpExpr TypeofOp
 
 -- | JS if-expression
 --
@@ -494,15 +493,15 @@ if10 e = IfExpr e one_ zero_
 if01 :: JStgExpr -> JStgExpr
 if01 e = IfExpr e zero_ one_
 
--- | an expression application, see related 'appS'
+-- | an application expression, see related 'appS'
 --
 -- > app f xs ==> f(xs)
 app :: FastString -> [JStgExpr] -> JStgExpr
-app f xs = ApplExpr (var f) xs
+app f xs = ApplExpr (global f) xs
 
 -- | A statement application, see the expression form 'app'
 appS :: FastString -> [JStgExpr] -> JStgStat
-appS f xs = ApplStat (var f) xs
+appS f xs = ApplStat (global f) xs
 
 -- | Return a 'JStgExpr'
 returnS :: JStgExpr -> JStgStat
@@ -577,7 +576,7 @@ signExtend16 x = (BAnd x (Int 0x7FFF)) `Sub` (BAnd x (Int 0x8000))
 --
 -- > obj .^ prop ==> obj.prop
 (.^) :: JStgExpr -> FastString -> JStgExpr
-obj .^ prop = SelExpr obj (global prop)
+obj .^ prop = SelExpr obj (name prop)
 infixl 8 .^
 
 -- | Assign a variable to an expression
@@ -614,9 +613,6 @@ assignAllReverseOrder xs ys = mconcat (reverse (zipWith (|=) xs ys))
 declAssignAll :: [Ident] -> [JStgExpr] -> JStgStat
 declAssignAll xs ys = mconcat (zipWith (||=) xs ys)
 
-trace :: ToJExpr a => a -> JStgStat
-trace ex = appS "h$log" [toJExpr ex]
-
 
 --------------------------------------------------------------------------------
 --                             Literals
@@ -627,7 +623,7 @@ trace ex = appS "h$log" [toJExpr ex]
 
 -- | The JS literal 'null'
 null_ :: JStgExpr
-null_ = var "null"
+null_ = global "null"
 
 -- | The JS literal 0
 zero_ :: JStgExpr
@@ -647,7 +643,7 @@ three_ = Int 3
 
 -- | The JS literal 'undefined'
 undefined_ :: JStgExpr
-undefined_ = var "undefined"
+undefined_ = global "undefined"
 
 -- | The JS literal 'true'
 true_ :: JStgExpr
@@ -658,7 +654,7 @@ false_ :: JStgExpr
 false_ = ValExpr (JBool False)
 
 returnStack :: JStgStat
-returnStack = ReturnStat (ApplExpr (var "h$rs") [])
+returnStack = ReturnStat (ApplExpr (global "h$rs") [])
 
 
 --------------------------------------------------------------------------------
@@ -669,7 +665,7 @@ returnStack = ReturnStat (ApplExpr (var "h$rs") [])
 -- is the sole math introduction function.
 
 math :: JStgExpr
-math = var "Math"
+math = global "Math"
 
 math_ :: FastString -> [JStgExpr] -> JStgExpr
 math_ op args = ApplExpr (math .^ op) args

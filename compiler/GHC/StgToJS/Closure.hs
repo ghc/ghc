@@ -253,10 +253,10 @@ allocClsA i = toJExpr (global (clsName i))
 
 -- | Cache "xXXX" names
 varCache :: Array Int Ident
-varCache = listArray (0,jsClosureCount) (fmap (global . mkFastString . ('x':) . show) [(0::Int)..jsClosureCount])
+varCache = listArray (0,jsClosureCount) (fmap (name . mkFastString . ('x':) . show) [(0::Int)..jsClosureCount])
 
 varName :: Int -> Ident
 varName i
-  | i < 0 || i > jsClosureCount = global $ mkFastString ('x' : show i)
+  | i < 0 || i > jsClosureCount = name $ mkFastString ('x' : show i)
   | otherwise                   = varCache ! i
 

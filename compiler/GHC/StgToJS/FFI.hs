@@ -11,17 +11,17 @@ where
 import GHC.Prelude
 
 import GHC.JS.JStg.Syntax
-import GHC.JS.Ident
 import GHC.JS.Make
 
 import GHC.StgToJS.Arg
 import GHC.StgToJS.ExprCtx
-import GHC.StgToJS.Monad
-import GHC.StgToJS.Types
-import GHC.StgToJS.Literal
-import GHC.StgToJS.Regs
-import GHC.StgToJS.Utils
 import GHC.StgToJS.Ids
+import GHC.StgToJS.Literal
+import GHC.StgToJS.Monad
+import GHC.StgToJS.Regs
+import GHC.StgToJS.Symbols
+import GHC.StgToJS.Types
+import GHC.StgToJS.Utils
 
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
@@ -44,7 +44,7 @@ import qualified Data.List as L
 
 genPrimCall :: ExprCtx -> PrimCall -> [StgArg] -> Type -> G (JStgStat, ExprResult)
 genPrimCall ctx (PrimCall lbl _) args t = do
-  j <- parseFFIPattern False False False ("h$" ++ unpackFS lbl) t (concatMap typex_expr $ ctxTarget ctx) args
+  j <- parseFFIPattern False False False (unpackFS hdStr ++ unpackFS lbl) t (concatMap typex_expr $ ctxTarget ctx) args
   return (j, ExprInline)
 
 -- | generate the actual call
@@ -79,8 +79,7 @@ parseFFIPattern catchExcep async jscc pat t es as
       --  } catch(except) {
       --    return h$throwJSException(except);
       --  }
-      let ex = global "except"
-      return (TryStat c ex (ReturnStat (ApplExpr (var "h$throwJSException") [toJExpr ex])) mempty)
+      return (TryStat c exceptStr (ReturnStat (ApplExpr hdThrowJSException [except])) mempty)
   | otherwise  = parseFFIPatternA async jscc pat t es as
 
 parseFFIPatternA :: Bool  -- ^ async
@@ -98,18 +97,18 @@ parseFFIPatternA True True pat t es as  = do
   d  <- freshIdent
   stat <- parseFFIPattern' (Just (toJExpr cb)) True pat t es as
   return $ mconcat
-    [ x  ||= (toJExpr (jhFromList [("mv", null_)]))
-    , cb ||= ApplExpr (var "h$mkForeignCallback") [toJExpr x]
+    [ x  ||= (toJExpr (jhFromList [(mv, null_)]))
+    , cb ||= ApplExpr hdMkForeignCallback [toJExpr x]
     , stat
-    , IfStat (InfixExpr StrictEqOp (toJExpr x .^ "mv") null_)
+    , IfStat (InfixExpr StrictEqOp (toJExpr x .^ mv) null_)
           (mconcat
-            [ toJExpr x .^ "mv" |= UOpExpr NewOp (ApplExpr (var "h$MVar") [])
+            [ toJExpr x .^ mv |= UOpExpr NewOp (ApplExpr hdMVar [])
             , sp |= Add sp one_
-            , (IdxExpr stack sp) |= var "h$unboxFFIResult"
-            , ReturnStat $ ApplExpr (var "h$takeMVar") [toJExpr x .^ "mv"]
+            , (IdxExpr stack sp) |= hdUnboxFFIResult
+            , ReturnStat $ ApplExpr hdTakeMVar [toJExpr x .^ mv]
             ])
           (mconcat
-            [ d ||= toJExpr x .^ "mv"
+            [ d ||= toJExpr x .^ mv
             , copyResult (toJExpr d)
             ])
     ]
@@ -155,7 +154,7 @@ parseFFIPattern' callback javascriptCc pat t ret args
     copyResult rs = mconcat $ zipWith (\t r -> toJExpr r |= toJExpr t) (enumFrom Ret1) rs
 
     traceCall cs as
-        | csTraceForeign cs = ApplStat (var "h$traceForeign") [toJExpr pat, toJExpr as]
+        | csTraceForeign cs = ApplStat hdTraceForeign [toJExpr pat, toJExpr as]
         | otherwise         = mempty
 
 -- generate arg to be passed to FFI call, with marshalling JStgStat to be run
@@ -189,7 +188,7 @@ genForeignCall _ctx
                _t
                [obj]
                args
-  | tgt == fsLit "h$buildObject"
+  | tgt == hdBuildObjectStr
   , Just pairs <- getObjectKeyValuePairs args = do
       pairs' <- mapM (\(k,v) -> genArg v >>= \vs -> return (k, head vs)) pairs
       return ( (|=) obj (ValExpr (JHash $ listToUniqMap pairs'))
@@ -197,18 +196,19 @@ genForeignCall _ctx
              )
 
 genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
-  emitForeign (ctxSrcSpan ctx) (mkFastString lbl) safety cconv (map showArgType args) (showType t)
-  (,exprResult) <$> parseFFIPattern catchExcep async isJsCc lbl t tgt' args
+  emitForeign (ctxSrcSpan ctx) lbl safety cconv (map showArgType args) (showType t)
+  (,exprResult) <$> parseFFIPattern catchExcep async isJsCc (unpackFS lbl) t tgt' args
   where
     isJsCc = cconv == JavaScriptCallConv
 
     lbl | (StaticTarget _ clbl _mpkg _isFunPtr) <- ccTarget
-            = let clbl' = unpackFS clbl
-              in  if | isJsCc -> clbl'
+            = let clbl'    = unpackFS clbl
+                  hDollarS = unpackFS hdStr
+              in  if | isJsCc -> clbl
                      | wrapperPrefix `L.isPrefixOf` clbl' ->
-                         ("h$" ++ (drop 2 $ dropWhile isDigit $ drop (length wrapperPrefix) clbl'))
-                     | otherwise -> "h$" ++ clbl'
-        | otherwise = "h$callDynamic"
+                         mkFastString (hDollarS ++ (drop 2 $ dropWhile isDigit $ drop (length wrapperPrefix) clbl'))
+                     | otherwise -> mkFastString $ hDollarS ++ clbl'
+        | otherwise = hdCallDynamicStr
 
     exprResult | async     = ExprCont
                | otherwise = ExprInline
@@ -222,7 +222,7 @@ genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
     tgt'  | async     = take (length tgt) jsRegsFromR1
           | otherwise = tgt
 
-    wrapperPrefix = "ghczuwrapperZC"
+    wrapperPrefix = unpackFS wrapperColonStr
 
 getObjectKeyValuePairs :: [StgArg] -> Maybe [(FastString, StgArg)]
 getObjectKeyValuePairs [] = Just []
@@ -242,4 +242,4 @@ showType :: Type -> FastString
 showType t
   | Just tc <- tyConAppTyCon_maybe (unwrapType t) =
       mkFastString (renderWithContext defaultSDocContext (ppr tc))
-  | otherwise = "<unknown>"
+  | otherwise = unknown

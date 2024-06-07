@@ -90,7 +90,7 @@ closureType :: JStgExpr -> JStgExpr
 closureType = infoClosureType . closureInfo
 
 isObject :: JStgExpr -> JStgExpr
-isObject c = typeof c .===. String "object"
+isObject c = typeOf c .===. String "object"
 
 isThunk :: JStgExpr -> JStgExpr
 isThunk c = closureType c .===. toJExpr Thunk

@@ -70,12 +70,13 @@ import GHC.JS.JStg.Syntax
 import GHC.JS.Make
 import GHC.JS.Ident
 
-import GHC.StgToJS.Types
-import GHC.StgToJS.Monad
-import GHC.StgToJS.Ids
 import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.Heap
+import GHC.StgToJS.Ids
+import GHC.StgToJS.Monad
 import GHC.StgToJS.Regs
+import GHC.StgToJS.Symbols
+import GHC.StgToJS.Types
 
 import GHC.Types.Id
 import GHC.Utils.Misc
@@ -213,7 +214,7 @@ adjSpN n = do
 --
 -- and so on up to 32.
 pushN :: Array Int Ident
-pushN = listArray (1,32) $ map (global . mkFastString . ("h$p"++) . show) [(1::Int)..32]
+pushN = listArray (1,32) $ map (name . mkFastString . ("h$p"++) . show) [(1::Int)..32]
 
 -- | Convert all function symbols in 'pushN' to global top-level functions. This
 -- is a hack which converts the function symbols to variables. This hack is
@@ -235,7 +236,7 @@ pushN' = fmap (ValExpr . JVar) pushN
 -- The 33rd entry skips slots 1-4 to bind the top of the stack and the 6th
 -- slot. See 'pushOptimized' and 'pushOptimized'' for use cases.
 pushNN :: Array Integer Ident
-pushNN = listArray (1,255) $ map (global . mkFastString . ("h$pp"++) . show) [(1::Int)..255]
+pushNN = listArray (1,255) $ map (name . mkFastString . ("h$pp"++) . show) [(1::Int)..255]
 
 -- | Like 'pushN'' but for the partial push functions
 pushNN' :: Array Integer JStgExpr
@@ -346,9 +347,9 @@ popN n = addUnknownSlots n >> adjSpN n
 -- | Generate statements to update the current node with a blackhole
 bhStats :: StgToJSConfig -> Bool -> JStgStat
 bhStats s pushUpd = mconcat
-  [ if pushUpd then push' s [r1, var "h$upd_frame"] else mempty
-  , toJExpr R1 .^ closureInfo_   |= var "h$blackhole"
-  , toJExpr R1 .^ closureField1_ |= var "h$currentThread"
+  [ if pushUpd then push' s [r1, hdUpdFrame] else mempty
+  , toJExpr R1 .^ closureInfo_   |= hdBlackHole
+  , toJExpr R1 .^ closureField1_ |= hdCurrentThread
   , toJExpr R1 .^ closureField2_ |= null_ -- will be filled with waiters array
   ]
 
@@ -362,7 +363,7 @@ updateThunk = do
       adjPushStack n = do modifyStackDepth (+n)
                           dropSlots n
   adjPushStack 2
-  return $ (updateThunk' settings)
+  return $ updateThunk' settings
 
 -- | Update a thunk by checking 'StgToJSConfig'. If the config inlines black
 -- holes then update inline, else make an explicit call to the black hole
@@ -371,4 +372,4 @@ updateThunk' :: StgToJSConfig -> JStgStat
 updateThunk' settings =
   if csInlineBlackhole settings
     then bhStats settings True
-    else ApplStat (var "h$bh") []
+    else ApplStat hdBh []

@@ -16,6 +16,8 @@ module GHC.StgToJS.Regs
   , jsReg
   , maxReg
   , minReg
+  , lowRegs
+  , retRegs
   , register
   , foreignRegister
   )
@@ -24,12 +26,17 @@ where
 import GHC.Prelude
 
 import GHC.JS.JStg.Syntax
+import GHC.JS.Ident
 import GHC.JS.Make
+
+import GHC.StgToJS.Symbols
 
 import GHC.Data.FastString
 
 import Data.Array
+import qualified Data.ByteString.Char8 as BSC
 import Data.Char
+import Data.Semigroup ((<>))
 
 -- | General purpose "registers"
 --
@@ -67,8 +74,8 @@ data StgRet = Ret1 | Ret2 | Ret3 | Ret4 | Ret5 | Ret6 | Ret7 | Ret8 | Ret9 | Ret
   deriving (Eq, Ord, Show, Enum, Bounded, Ix)
 
 instance ToJExpr Special where
-  toJExpr Stack  = var "h$stack"
-  toJExpr Sp     = var "h$sp"
+  toJExpr Stack  = hdStack
+  toJExpr Sp     = hdStackPtr
 
 instance ToJExpr StgReg where
   toJExpr r = registers ! r
@@ -128,20 +135,26 @@ jsRegsFromR2 = tail jsRegsFromR1
 -- caches
 ---------------------------------------------------
 
+lowRegs :: [Ident]
+lowRegs = map reg_to_ident [R1 .. R31]
+  where reg_to_ident = name . mkFastString . (unpackFS hdStr ++) . map toLower . show
+
+retRegs :: [Ident]
+retRegs = [name . mkFastStringByteString
+           $ hdB <> BSC.pack (map toLower $ show n) | n <- enumFrom Ret1]
+
 -- cache JExpr representing StgReg
 registers :: Array StgReg JStgExpr
-registers = listArray (minBound, maxBound) (map regN regsFromR1)
+registers = listArray (minBound, maxBound) (map (global . identFS) lowRegs ++ map regN [R32 .. R128])
   where
-    regN r
-      | fromEnum r < 32 = var . mkFastString . ("h$"++) . map toLower . show $ r
-      | otherwise       = IdxExpr (var "h$regs")
-                            (toJExpr ((fromEnum r) - 32))
+    regN :: StgReg -> JStgExpr
+    regN r = IdxExpr hdRegs (toJExpr (fromEnum r - 32))
 
 -- cache JExpr representing StgRet
 rets :: Array StgRet JStgExpr
 rets = listArray (minBound, maxBound) (map retN (enumFrom Ret1))
   where
-    retN = var . mkFastString . ("h$"++) . map toLower . show
+    retN = global . mkFastString . (unpackFS hdStr ++) . map toLower . show
 
 -- | Given a register, return the JS syntax object representing that register
 register :: StgReg -> JStgExpr
