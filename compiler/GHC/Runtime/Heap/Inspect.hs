@@ -367,7 +367,7 @@ cPprTermBase y =
   , ifTerm' (isTyCon doubleTyCon  . ty) ppr_double
   , ifTerm' (isTyCon integerTyCon . ty) ppr_integer
   , ifTerm' (isTyCon naturalTyCon . ty) ppr_natural
-  , ifSuspension         (isFunTy . ty) ppr_fun
+  , ifFunSuspension         (isFunTy . ty) ppr_fun
   ]
  where
    ifTerm :: (Term -> Bool)
@@ -382,12 +382,14 @@ cPprTermBase y =
        | pred t    = f prec t
    ifTerm' _ _ _ _  = return Nothing
 
-   ifSuspension :: (Term -> Bool)
-          -> (Precedence -> Term -> m (Maybe SDoc))
-          -> Precedence -> Term -> m (Maybe SDoc)
-   ifSuspension pred f prec t@Suspension{}
-       | pred t    = f prec t
-   ifSuspension _ _ _ _  = return Nothing
+   ifFunSuspension :: (Term -> Bool)
+                   -> (Precedence -> Term -> m (Maybe SDoc))
+                   -> Precedence -> Term -> m (Maybe SDoc)
+   ifFunSuspension pred f prec t@Suspension{ctype = ctype}
+       | ctype `elem` fun_ctype && pred t    = f prec t
+     where
+       fun_ctype = [ FUN, FUN_1_0, FUN_0_1, FUN_2_0, FUN_1_1, FUN_0_2, FUN_STATIC ]
+   ifFunSuspension _ _ _ _  = return Nothing
 
    isFunTy :: Type -> Bool
    isFunTy (FunTy {}) = True  -- Functions e.g. let f = () -> ()

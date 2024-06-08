@@ -3,5 +3,5 @@
 HasCallStack backtrace:
   undefined, called at <interactive>:1:7 in interactive:Ghci1
 
-x :: a = <_ :: forall {a}. a>
+x :: a = _
 y :: Int = 3
