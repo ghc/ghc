@@ -53,6 +53,7 @@ module GHC.Tc.Errors.Types (
   , Exported(..)
   , HsDocContext(..)
   , FixedRuntimeRepErrorInfo(..)
+  , TcRnNoDerivStratSpecifiedInfo(..)
 
   , ErrorItem(..), errorItemOrigin, errorItemEqRel, errorItemPred, errorItemCtLoc
 
@@ -180,7 +181,7 @@ import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType,
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Avail
-import GHC.Types.Hint (UntickedPromotedThing(..))
+import GHC.Types.Hint (UntickedPromotedThing(..), AssumedDerivingStrategy(..))
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)
@@ -219,6 +220,7 @@ import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
 import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
 import qualified GHC.Internal.TH.Syntax as TH
+import Data.Map.Strict (Map)
 
 import GHC.Generics ( Generic )
 import GHC.Types.Name.Env (NameEnv)
@@ -3265,20 +3267,22 @@ data TcRnMessage where
   -}
   TcRnIllegalMultipleDerivClauses :: TcRnMessage
 
-  {-| TcRnNoDerivStratSpecified is a warning implied by -Wmissing-deriving-strategies
-      and triggered by deriving clause without specified deriving strategy.
+  {-| TcRnNoDerivStratSpecified is a warning implied by
+      -Wmissing-deriving-strategies and triggered by deriving without
+      mentioning a strategy.
 
-      Example:
+      See 'TcRnNoDerivStratSpecifiedInfo' cases for examples.
 
-        data T = T
-          deriving Eq
-
-      Test cases: rename/should_compile/T15798a
-                  rename/should_compile/T15798b
-                  rename/should_compile/T15798c
+      Test cases: deriving/should_compile/T15798a
+                  deriving/should_compile/T15798b
+                  deriving/should_compile/T15798c
+                  deriving/should_compile/T24955a
+                  deriving/should_compile/T24955b
+                  deriving/should_compile/T24955c
   -}
   TcRnNoDerivStratSpecified
-    :: Bool -- True if DerivingStrategies is enabled
+    :: Bool -- ^ True if DerivingStrategies is enabled
+    -> TcRnNoDerivStratSpecifiedInfo
     -> TcRnMessage
 
   {-| TcRnStupidThetaInGadt is an error triggered by data contexts in GADT-style
@@ -6740,3 +6744,48 @@ data TypeCannotBeMarshaledReason
   | NotSimpleUnliftedType
   | NotBoxedKindAny
   deriving Generic
+
+data TcRnNoDerivStratSpecifiedInfo where
+  {-| 'TcRnNoDerivStratSpecified TcRnNoDerivingClauseStrategySpecified' is
+       a warning implied by -Wmissing-deriving-strategies and triggered by a
+       deriving clause without a specified deriving strategy.
+
+      Example:
+
+        newtype T = T Int
+          deriving (Eq, Ord, Show)
+
+      Here we would suggest fixing the deriving clause to:
+
+        deriving stock (Show)
+        deriving newtype (Eq, Ord)
+
+      Test cases: deriving/should_compile/T15798a
+                  deriving/should_compile/T15798c
+                  deriving/should_compile/T24955a
+                  deriving/should_compile/T24955b
+   -}
+  TcRnNoDerivingClauseStrategySpecified
+    :: Map AssumedDerivingStrategy [LHsSigType GhcRn]
+    -> TcRnNoDerivStratSpecifiedInfo
+
+  {-| 'TcRnNoDerivStratSpecified TcRnNoStandaloneDerivingStrategySpecified' is
+       a warning implied by -Wmissing-deriving-strategies and triggered by a
+       standalone deriving declaration without a specified deriving strategy.
+
+      Example:
+
+        data T a = T a
+        deriving instance Show a => Show (T a)
+
+      Here we would suggest fixing the instance to:
+
+        deriving stock instance Show a => Show (T a)
+
+      Test cases: deriving/should_compile/T15798b
+                  deriving/should_compile/T24955c
+   -}
+  TcRnNoStandaloneDerivingStrategySpecified
+    :: AssumedDerivingStrategy
+    -> LHsSigWcType GhcRn -- ^ The instance signature (e.g @Show a => Show (T a)@)
+    -> TcRnNoDerivStratSpecifiedInfo

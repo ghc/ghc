@@ -48,6 +48,7 @@ import GHC.Core.Type
 import GHC.Utils.Error
 import GHC.Core.DataCon
 import GHC.Data.Maybe
+import GHC.Types.Hint (AssumedDerivingStrategy(..))
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Name.Set as NameSet
@@ -71,6 +72,8 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.List (partition, find)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
 {-
 ************************************************************************
@@ -415,6 +418,76 @@ in derived code.
 @makeDerivSpecs@ fishes around to find the info about needed derived instances.
 -}
 
+mechanismToAssumedStrategy :: DerivSpecMechanism -> Maybe AssumedDerivingStrategy
+mechanismToAssumedStrategy = \case
+  DerivSpecStock{} -> Just AssumedStockStrategy
+  DerivSpecAnyClass{} -> Just AssumedAnyclassStrategy
+  DerivSpecNewtype{} -> Just AssumedNewtypeStrategy
+  DerivSpecVia{} -> Nothing -- `via` is never assumed, it is always explicit
+
+warnNoDerivingClauseStrategy
+  :: Maybe (LDerivStrategy GhcTc)
+  -- ^ The given deriving strategy, if any.
+  -> [(LHsSigType GhcRn, EarlyDerivSpec)]
+  -- ^ The given deriving predicates of a deriving clause (for example 'Show' &
+  --   'Eq' in @deriving (Show, Eq)@) along with the 'EarlyDerivSpec' which we
+  --   use to find out what deriving strategy was actually used.
+  --   See comments of 'TcRnNoDerivingClauseStrategySpecified'.
+  -> TcM ()
+warnNoDerivingClauseStrategy Just{} _early_deriv_specs = pure ()
+warnNoDerivingClauseStrategy Nothing early_deriv_specs = do
+  let all_assumed_strategies :: Map AssumedDerivingStrategy [LHsSigType GhcRn]
+      all_assumed_strategies =
+        Map.unionsWith (++) (map early_deriv_spec_to_assumed_strategies early_deriv_specs)
+
+  dyn_flags <- getDynFlags
+  addDiagnosticTc $
+    TcRnNoDerivStratSpecified (xopt LangExt.DerivingStrategies dyn_flags) $
+      TcRnNoDerivingClauseStrategySpecified all_assumed_strategies
+
+  where
+    deriv_spec_to_assumed_strategy :: LHsSigType GhcRn
+                                   -> DerivSpec theta
+                                   -> Map AssumedDerivingStrategy [LHsSigType GhcRn]
+    deriv_spec_to_assumed_strategy deriv_head deriv_spec =
+      Map.fromList
+        [ (strat, [deriv_head])
+        | strat <- maybeToList $ mechanismToAssumedStrategy (ds_mechanism deriv_spec)
+        ]
+
+    early_deriv_spec_to_assumed_strategies :: (LHsSigType GhcRn, EarlyDerivSpec)
+                                           -> Map AssumedDerivingStrategy [LHsSigType GhcRn]
+    early_deriv_spec_to_assumed_strategies (deriv_head, InferTheta deriv_spec) =
+      deriv_spec_to_assumed_strategy deriv_head deriv_spec
+    early_deriv_spec_to_assumed_strategies (deriv_head, GivenTheta deriv_spec) =
+      deriv_spec_to_assumed_strategy deriv_head deriv_spec
+
+warnNoStandaloneDerivingStrategy
+  :: Maybe (LDerivStrategy GhcTc)
+  -- ^ The given deriving strategy, if any.
+  -> LHsSigWcType GhcRn
+  -- ^ The standalone deriving declaration's signature for example, the:
+  --     C a => C (T a)
+  --   part of the standalone deriving instance:
+  --     deriving instance C a => C (T a)
+  -> EarlyDerivSpec
+  -- ^ We extract the assumed deriving strategy from this.
+  -> TcM ()
+warnNoStandaloneDerivingStrategy Just{} _deriv_ty _early_deriv_spec = pure ()
+warnNoStandaloneDerivingStrategy Nothing deriv_ty early_deriv_spec =
+  case mechanismToAssumedStrategy $ early_deriv_spec_mechanism early_deriv_spec of
+    Nothing -> pure ()
+    Just assumed_strategy -> do
+      dyn_flags <- getDynFlags
+      addDiagnosticTc $
+        TcRnNoDerivStratSpecified (xopt LangExt.DerivingStrategies dyn_flags) $
+          TcRnNoStandaloneDerivingStrategySpecified assumed_strategy deriv_ty
+
+  where
+    early_deriv_spec_mechanism :: EarlyDerivSpec -> DerivSpecMechanism
+    early_deriv_spec_mechanism (InferTheta deriv_spec) = ds_mechanism deriv_spec
+    early_deriv_spec_mechanism (GivenTheta deriv_spec) = ds_mechanism deriv_spec
+
 makeDerivSpecs :: [DerivInfo]
                -> [LDerivDecl GhcRn]
                -> TcM [EarlyDerivSpec]
@@ -433,10 +506,10 @@ makeDerivSpecs deriv_infos deriv_decls
         ; eqns2 <- mapM (recoverM (pure Nothing) . deriveStandalone) deriv_decls
         ; return $ concat eqns1 ++ catMaybes eqns2 }
   where
-    deriv_clause_preds :: LDerivClauseTys GhcRn -> [LHsSigType GhcRn]
-    deriv_clause_preds (L _ dct) = case dct of
-      DctSingle _ ty -> [ty]
-      DctMulti _ tys -> tys
+    deriv_clause_preds :: LDerivClauseTys GhcRn -> LocatedC [LHsSigType GhcRn]
+    deriv_clause_preds (L loc dct) = case dct of
+      DctSingle _ ty -> L loc [ty]
+      DctMulti _ tys -> L loc tys
 
 ------------------------------------------------------------------
 -- | Process the derived classes in a single @deriving@ clause.
@@ -444,10 +517,13 @@ deriveClause :: TyCon
              -> [(Name, TcTyVar)]  -- Scoped type variables taken from tcTyConScopedTyVars
                                    -- See Note [Scoped tyvars in a TcTyCon] in "GHC.Core.TyCon"
              -> Maybe (LDerivStrategy GhcRn)
-             -> [LHsSigType GhcRn] -> SDoc
+             -> LocatedC [LHsSigType GhcRn]
+                -- ^ The location refers to the @(Show, Eq)@ part of @deriving (Show, Eq)@.
+             -> SDoc
              -> TcM [EarlyDerivSpec]
-deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
-  = addErrCtxt err_ctxt $ do
+deriveClause rep_tc scoped_tvs mb_lderiv_strat (L loc deriv_preds) err_ctxt
+  = setSrcSpanA loc $
+    addErrCtxt err_ctxt $ do
       traceTc "deriveClause" $ vcat
         [ text "tvs"             <+> ppr tvs
         , text "scoped_tvs"      <+> ppr scoped_tvs
@@ -456,15 +532,21 @@ deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
         , text "mb_lderiv_strat" <+> ppr mb_lderiv_strat ]
       tcExtendNameTyVarEnv scoped_tvs $ do
         (mb_lderiv_strat', via_tvs) <- tcDerivStrategy mb_lderiv_strat
-        tcExtendTyVarEnv via_tvs $
+        earlyDerivSpecs <- tcExtendTyVarEnv via_tvs $
         -- Moreover, when using DerivingVia one can bind type variables in
         -- the `via` type as well, so these type variables must also be
         -- brought into scope.
-          mapMaybeM (derivePred tc tys mb_lderiv_strat' via_tvs) deriv_preds
+          mapMaybeM
+            (\deriv_pred ->
+              do maybe_early_deriv_spec <- derivePred tc tys mb_lderiv_strat' via_tvs deriv_pred
+                 pure $ fmap (deriv_pred,) maybe_early_deriv_spec)
+            deriv_preds
           -- After typechecking the `via` type once, we then typecheck all
           -- of the classes associated with that `via` type in the
           -- `deriving` clause.
           -- See also Note [Don't typecheck too much in DerivingVia].
+        warnNoDerivingClauseStrategy mb_lderiv_strat' earlyDerivSpecs
+        return (snd <$> earlyDerivSpecs)
   where
     tvs = tyConTyVars rep_tc
     (tc, tys) = case tyConFamInstSig_maybe rep_tc of
@@ -678,10 +760,16 @@ deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mo
        ; if className cls == typeableClassName
          then do warnUselessTypeable
                  return Nothing
-         else Just <$> mkEqnHelp (fmap unLoc overlap_mode)
-                                 tvs' cls inst_tys'
-                                 deriv_ctxt' mb_deriv_strat'
-                                 (fmap unLoc warn) }
+         else do early_deriv_spec <-
+                   mkEqnHelp (fmap unLoc overlap_mode)
+                             tvs' cls inst_tys'
+                             deriv_ctxt' mb_deriv_strat'
+                             (fmap unLoc warn)
+                 warnNoStandaloneDerivingStrategy
+                   mb_lderiv_strat
+                   deriv_ty
+                   early_deriv_spec
+                 pure (Just early_deriv_spec) }
 
 -- Typecheck the type in a standalone deriving declaration.
 --

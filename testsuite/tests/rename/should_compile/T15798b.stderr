@@ -1,5 +1,0 @@
-
-T15798b.hs:9:19: warning: [GHC-55631] [-Wmissing-deriving-strategies]
-    No deriving strategy specified. Did you want stock, newtype, or anyclass?
-    Suggested fix:
-      Perhaps you intended to use the ‘DerivingStrategies’ extension (implied by ‘DerivingVia’)

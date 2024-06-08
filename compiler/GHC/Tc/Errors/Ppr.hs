@@ -3038,9 +3038,13 @@ instance Diagnostic TcRnMessage where
       _ -> [suggestExtension LangExt.DerivingStrategies]
     TcRnIllegalMultipleDerivClauses{}
       -> [suggestExtension LangExt.DerivingStrategies]
-    TcRnNoDerivStratSpecified isDSEnabled -> if isDSEnabled
-      then noHints
-      else [suggestExtension LangExt.DerivingStrategies]
+    TcRnNoDerivStratSpecified is_ds_enabled info -> do
+      let explicit_strategy_hint = case info of
+            TcRnNoDerivingClauseStrategySpecified assumed_derivings ->
+              SuggestExplicitDerivingClauseStrategies assumed_derivings
+            TcRnNoStandaloneDerivingStrategySpecified assumed_strategy deriv_sig ->
+              SuggestExplicitStandaloneDerivingStrategy assumed_strategy deriv_sig
+      explicit_strategy_hint : [suggestExtension LangExt.DerivingStrategies | not is_ds_enabled]
     TcRnStupidThetaInGadt{}
       -> noHints
     TcRnShadowedTyVarNameInFamResult{}

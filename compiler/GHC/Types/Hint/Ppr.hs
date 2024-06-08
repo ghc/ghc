@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-}   -- instance Outputable GhcHint
+{-# OPTIONS_GHC -Wno-orphans #-}   {- instance Outputable GhcHint -}
 
 module GHC.Types.Hint.Ppr (
   perhapsAsPat
@@ -28,9 +28,9 @@ import GHC.Utils.Outputable
 import GHC.Driver.Flags
 
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Map.Strict as Map
 
 import qualified GHC.LanguageExtensions as LangExt
-
 
 instance Outputable GhcHint where
   ppr = \case
@@ -270,6 +270,19 @@ instance Outputable GhcHint where
     SuggestBindTyVarExplicitly tv
       -> text "bind" <+> quotes (ppr tv)
          <+> text "explicitly with" <+> quotes (char '@' <> ppr tv)
+    SuggestExplicitDerivingClauseStrategies assumed_derivings ->
+      hang
+        (text "Use explicit deriving strategies:")
+        2
+        (vcat $ map pp_derivings (Map.toList assumed_derivings))
+      where
+        pp_derivings (strat, preds) =
+          hsep [text "deriving", ppr strat, parens (pprWithCommas ppr preds)]
+    SuggestExplicitStandaloneDerivingStrategy strat deriv_sig ->
+      hang
+        (text "Use an explicit deriving strategy:")
+        2
+        (hsep [text "deriving", ppr strat, text "instance", ppr deriv_sig])
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

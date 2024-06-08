@@ -10,6 +10,7 @@ module GHC.Types.Hint (
   , SimilarName(..)
   , StarIsType(..)
   , UntickedPromotedThing(..)
+  , AssumedDerivingStrategy(..)
   , pprUntickedConstructor, isBareSymbol
   , suggestExtension
   , suggestExtensionWithInfo
@@ -22,7 +23,7 @@ module GHC.Types.Hint (
   ) where
 
 import Language.Haskell.Syntax.Expr (LHsExpr)
-import Language.Haskell.Syntax (LPat, LIdP)
+import Language.Haskell.Syntax (LPat, LIdP, LHsSigType, LHsSigWcType)
 
 import GHC.Prelude
 
@@ -46,6 +47,7 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString (fsLit, FastString)
 
 import Data.Typeable ( Typeable )
+import Data.Map.Strict (Map)
 
 -- | The bindings we have available in scope when
 -- suggesting an explicit type signature.
@@ -476,6 +478,40 @@ data GhcHint
 
   {-| Suggest binding explicitly; e.g   data T @k (a :: F k) = .... -}
   | SuggestBindTyVarExplicitly Name
+
+  {-| Suggest using explicit deriving strategies for a deriving clause.
+
+      Triggered by: 'GHC.Tc.Errors.Types.TcRnNoDerivingClauseStrategySpecified'.
+
+      See comment of 'TcRnNoDerivingClauseStrategySpecified' for context.
+  -}
+  | SuggestExplicitDerivingClauseStrategies
+    (Map AssumedDerivingStrategy [LHsSigType GhcRn])
+    -- ^ Those deriving clauses that we assumed a particular strategy for.
+
+  {-| Suggest using an explicit deriving strategy for a standalone deriving instance.
+
+      Triggered by: 'GHC.Tc.Errors.Types.TcRnNoStandaloneDerivingStrategySpecified'.
+
+      See comment of 'TcRnNoStandaloneDerivingStrategySpecified' for context.
+  -}
+  | SuggestExplicitStandaloneDerivingStrategy
+    AssumedDerivingStrategy -- ^ The deriving strategy we assumed
+    (LHsSigWcType GhcRn) -- ^ The instance signature (e.g 'Show a => Show (T a)')
+
+-- | The deriving strategy that was assumed when not explicitly listed in the
+--   source. This is used solely by the missing-deriving-strategies warning.
+--   There's no `Via` case because we never assume that.
+data AssumedDerivingStrategy
+  = AssumedStockStrategy
+  | AssumedAnyclassStrategy
+  | AssumedNewtypeStrategy
+  deriving (Eq, Ord)
+
+instance Outputable AssumedDerivingStrategy where
+  ppr AssumedStockStrategy = text "stock"
+  ppr AssumedAnyclassStrategy = text "anyclass"
+  ppr AssumedNewtypeStrategy = text "newtype"
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

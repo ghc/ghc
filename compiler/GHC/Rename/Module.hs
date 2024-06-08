@@ -1128,12 +1128,10 @@ rnSrcDerivDecl (DerivDecl (inst_warn_ps, ann) ty mds overlap)
        ; addNoNestedForallsContextsErr ctxt
            NFC_StandaloneDerivedInstanceHead
            (getLHsInstDeclHead $ dropWildCards ty')
-       ; warnNoDerivStrat mds' loc
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
        ; return (DerivDecl (inst_warn_rn, ann) ty' mds' overlap, fvs) }
   where
     ctxt    = DerivDeclCtx
-    loc = getLocA nowc_ty
     nowc_ty = dropWildCards ty
 
 {-
@@ -2108,18 +2106,6 @@ The main parts of the implementation are:
 
 -}
 
-warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
-                 -> SrcSpan
-                 -> RnM ()
-warnNoDerivStrat mds loc
-  = do { dyn_flags <- getDynFlags
-       ; case mds of
-           Nothing ->
-             addDiagnosticAt loc $ TcRnNoDerivStratSpecified
-              (xopt LangExt.DerivingStrategies dyn_flags)
-           _ -> pure ()
-       }
-
 rnLHsDerivingClause :: HsDocContext -> LHsDerivingClause GhcPs
                     -> RnM (LHsDerivingClause GhcRn, FreeVars)
 rnLHsDerivingClause doc
@@ -2129,7 +2115,6 @@ rnLHsDerivingClause doc
                               , deriv_clause_tys = dct }))
   = do { (dcs', dct', fvs)
            <- rnLDerivStrategy doc dcs $ rn_deriv_clause_tys dct
-       ; warnNoDerivStrat dcs' (locA loc)
        ; pure ( L loc (HsDerivingClause { deriv_clause_ext = noExtField
                                         , deriv_clause_strategy = dcs'
                                         , deriv_clause_tys = dct' })

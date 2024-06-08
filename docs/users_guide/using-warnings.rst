@@ -1109,7 +1109,7 @@ of ``-W(no-)*``.
         d a = x a -- would not warn
 
 .. ghc-flag:: -Wmissing-deriving-strategies
-    :shortdesc: warn when a deriving clause is missing a deriving strategy
+    :shortdesc: warn when deriving without mentioning a deriving strategy
     :type: dynamic
     :reverse: -Wno-missing-deriving-strategies
     :category:
@@ -1125,8 +1125,11 @@ of ``-W(no-)*``.
           deriving (Eq)
 
     The compiler will warn here that the deriving clause doesn't specify a
-    strategy. If the warning is enabled, but :extension:`DerivingStrategies` is
-    not enabled, the compiler will suggest turning on the
+    strategy. The suggested fix will show which deriving strategies were
+    assumed.
+
+    If the warning is enabled, but :extension:`DerivingStrategies` is not
+    enabled, the compiler will suggest turning on the
     :extension:`DerivingStrategies` extension.
 
 .. ghc-flag:: -Wmissing-fields
