@@ -146,7 +146,6 @@ static void acquireAllCapabilities(Capability *cap, Task *task);
 static void startWorkerTasks (uint32_t from USED_IF_THREADS,
                               uint32_t to USED_IF_THREADS);
 #endif
-static void scheduleStartSignalHandlers (Capability *cap);
 static void scheduleCheckBlockedThreads (Capability *cap);
 static void scheduleProcessInbox(Capability **cap);
 static void scheduleDetectDeadlock (Capability **pcap, Task *task);
@@ -636,7 +635,9 @@ scheduleFindWork (Capability **pcap)
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
     queueIOThread();
 #endif
-    scheduleStartSignalHandlers(*pcap);
+#if defined(RTS_USER_SIGNALS)
+    startPendingSignalHandlers(*pcap);
+#endif
 
     scheduleProcessInbox(pcap);
 
@@ -887,26 +888,6 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 #endif /* THREADED_RTS */
 
 }
-
-/* ----------------------------------------------------------------------------
- * Start any pending signal handlers
- * ------------------------------------------------------------------------- */
-
-#if defined(RTS_USER_SIGNALS) && !defined(THREADED_RTS)
-static void
-scheduleStartSignalHandlers(Capability *cap)
-{
-    if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-        // safe outside the lock
-        startSignalHandlers(cap);
-    }
-}
-#else
-static void
-scheduleStartSignalHandlers(Capability *cap STG_UNUSED)
-{
-}
-#endif
 
 /* ----------------------------------------------------------------------------
  * Check for blocked threads that can be woken up.
