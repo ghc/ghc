@@ -3,6 +3,7 @@
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE LambdaCase          #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -54,6 +55,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Data.Bag
+import GHC.Types.Basic (Arity)
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
@@ -2557,6 +2559,12 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
         return ((PatSynName bnd_name, con_info) : names)
       | otherwise
       = return names
+
+conDetailsArity :: (rec -> Arity) -> HsConDetails tyarg arg rec -> Arity
+conDetailsArity recToArity = \case
+  PrefixCon _ args -> length args
+  RecCon rec -> recToArity rec
+  InfixCon _ _ -> 2
 
 {-
 *********************************************************
