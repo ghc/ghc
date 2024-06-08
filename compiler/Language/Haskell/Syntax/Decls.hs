@@ -106,11 +106,11 @@ import GHC.Types.Fixity (LexicalFixity)
 
 import GHC.Core.Type (Specificity)
 import GHC.Unit.Module.Warnings (WarningTxt)
-import GHC.Utils.Panic.Plain ( assert )
 
 import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
 import Control.Monad
+import Control.Exception (assert)
 import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Void
 import Data.Maybe
