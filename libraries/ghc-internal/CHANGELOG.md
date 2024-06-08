@@ -1,5 +1,5 @@
 # Revision history for `ghc-internal`
 
-## 0.1.0.0 -- YYYY-mm-dd
+## 9.1001.0 -- 2024-05-01
 
-* First version. Released on an unsuspecting world.
+* Package created containing implementation moved from `base`.
