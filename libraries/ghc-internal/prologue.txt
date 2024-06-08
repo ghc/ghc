@@ -1,3 +1,2 @@
-This package contains the @Prelude@ and its support libraries, and a large
-collection of useful libraries ranging from data structures to parsing
-combinators and debugging utilities.
+This package contains the implementation of GHC's standard libraries and is
+not intended for use by end-users.
