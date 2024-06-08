@@ -26,6 +26,7 @@ import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Module.Name (ModuleName)
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
 
@@ -33,7 +34,6 @@ import Language.Haskell.Syntax.Binds
 import GHC.Types.Fixity (LexicalFixity(Infix), Fixity)
 import GHC.Types.SourceText (StringLiteral, SourceText)
 
-import GHC.Unit.Module (ModuleName)
 import GHC.Data.FastString (FastString)
 
 -- libraries:
