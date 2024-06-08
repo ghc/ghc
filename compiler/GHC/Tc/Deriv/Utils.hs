@@ -52,7 +52,6 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Driver.Session
 import GHC.Unit.Module (getModule)
-import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface (mi_fix)
 
 import GHC.Types.Fixity.Env (lookupFixity)

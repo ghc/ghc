@@ -35,7 +35,6 @@ import GHC.Core.FamInstEnv
 import GHC.Tc.Gen.HsType
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr ( pprTyVars )
-import GHC.Unit.Module.Warnings
 
 import GHC.Rename.Bind
 import GHC.Rename.Env

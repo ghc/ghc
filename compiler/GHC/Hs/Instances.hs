@@ -23,6 +23,8 @@ module GHC.Hs.Instances where
 
 import Data.Data hiding ( Fixity )
 
+import Language.Haskell.Syntax.Decls (WarningTxt(..))
+
 import GHC.Prelude
 import GHC.Hs.Extension
 import GHC.Hs.Binds
@@ -33,6 +35,8 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+
+import GHC.Core.InstEnv (ClsInst(..))
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -578,3 +582,11 @@ deriving instance Data XXPatGhcTc
 deriving instance Data XViaStrategyPs
 
 -- ---------------------------------------------------------------------
+
+deriving instance Data ClsInst
+
+-- ---------------------------------------------------------------------
+
+deriving instance Data (WarningTxt GhcPs)
+deriving instance Data (WarningTxt GhcRn)
+deriving instance Data (WarningTxt GhcTc)

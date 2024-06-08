@@ -312,10 +312,14 @@ rnWarningTxt (WarningTxt mb_cat st wst) = do
     unless (validWarningCategory cat) $
       addErrAt (locA loc) (TcRnInvalidWarningCategory cat)
   wst' <- traverse (traverse rnHsDoc) wst
-  pure (WarningTxt mb_cat st wst')
+  pure (WarningTxt (fmap rnInWarningCategory <$> mb_cat) st wst')
 rnWarningTxt (DeprecatedTxt st wst) = do
   wst' <- traverse (traverse rnHsDoc) wst
   pure (DeprecatedTxt st wst')
+
+rnInWarningCategory :: InWarningCategory GhcPs -> InWarningCategory GhcRn
+rnInWarningCategory (InWarningCategory {iwc_in, iwc_st, iwc_wc}) =
+  InWarningCategory iwc_in iwc_st iwc_wc
 
 rnLWarningTxt :: LWarningTxt GhcPs -> RnM (LWarningTxt GhcRn)
 rnLWarningTxt (L loc warn) = L loc <$> rnWarningTxt warn

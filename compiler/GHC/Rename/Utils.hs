@@ -73,7 +73,6 @@ import GHC.Data.Bag ( mapBagM, headMaybe )
 import Control.Monad
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import GHC.Unit.Module
-import GHC.Unit.Module.Warnings  ( WarningTxt(..) )
 import GHC.Iface.Load
 import qualified GHC.LanguageExtensions as LangExt
 

@@ -1,4 +1,3 @@
-
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -87,6 +86,8 @@ module Language.Haskell.Syntax.Decls (
 
   -- * Grouping
   HsGroup(..), hsGroupInstDecls,
+  -- * Warnings
+  WarningTxt(..), InWarningCategory(..), WarningCategory(..)
     ) where
 
 -- friends:
@@ -105,10 +106,10 @@ import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CC
 import GHC.Types.Fixity (LexicalFixity)
 
 import GHC.Core.Type (Specificity)
-import GHC.Unit.Module.Warnings (WarningTxt)
 import GHC.Utils.Panic.Plain ( assert )
 
-import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
+import GHC.Hs.Doc (LHsDoc, WithHsDocIdentifiers) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
+import GHC.Types.SourceText (StringLiteral, SourceText)
 
 import Control.Monad
 import Data.Data        hiding (TyCon, Fixity, Infix)
@@ -124,6 +125,13 @@ import qualified Data.List
 import Data.Foldable
 import Data.Traversable
 import Data.List.NonEmpty (NonEmpty (..))
+import GHC.Data.FastString (FastString)
+-- TODO(no-ghc-import) OK
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
+import GHC.Parser.Annotation (EpToken)
+-- TODO(ghc-import) This can eventually be defined in `GHC.Utils.Binary`
+import GHC.Utils.Binary (Binary)
 
 {-
 ************************************************************************
@@ -1783,3 +1791,87 @@ data RoleAnnotDecl pass
 
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XRoleAnnotDecl !(XXRoleAnnotDecl pass)
+
+-- | Warning Text
+--
+-- reason/explanation from a WARNING or DEPRECATED pragma
+data WarningTxt pass
+   = WarningTxt
+      (Maybe (XRec pass (InWarningCategory pass)))
+        -- ^ Warning category attached to this WARNING pragma, if any;
+        -- see Note [Warning categories]
+      SourceText
+      [XRec pass (WithHsDocIdentifiers StringLiteral pass)]
+   | DeprecatedTxt
+      SourceText
+      [XRec pass (WithHsDocIdentifiers StringLiteral pass)]
+  deriving (Generic)
+
+deriving instance
+  ( Eq (XRec pass (InWarningCategory pass)),
+    Eq (XRec pass (WithHsDocIdentifiers StringLiteral pass))
+  ) => Eq (WarningTxt pass)
+
+{-
+Note [Warning categories]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+See GHC Proposal 541 for the design of the warning categories feature:
+https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0541-warning-pragmas-with-categories.rst
+
+A WARNING pragma may be annotated with a category such as "x-partial" written
+after the 'in' keyword, like this:
+
+    {-# WARNING in "x-partial" head "This function is partial..." #-}
+
+This is represented by the 'Maybe (Located WarningCategory)' field in
+'WarningTxt'.  The parser will accept an arbitrary string as the category name,
+then the renamer (in 'rnWarningTxt') will check it contains only valid
+characters, so we can generate a nicer error message than a parse error.
+
+The corresponding warnings can then be controlled with the -Wx-partial,
+-Wno-x-partial, -Werror=x-partial and -Wwarn=x-partial flags.  Such a flag is
+distinguished from an 'unrecognisedWarning' by the flag parser testing
+'validWarningCategory'.  The 'x-' prefix means we can still usually report an
+unrecognised warning where the user has made a mistake.
+
+A DEPRECATED pragma may not have a user-defined category, and is always treated
+as belonging to the special category 'deprecations'.  Similarly, a WARNING
+pragma without a category belongs to the 'deprecations' category.
+Thus the '-Wdeprecations' flag will enable all of the following:
+
+    {-# WARNING in "deprecations" foo "This function is deprecated..." #-}
+    {-# WARNING foo "This function is deprecated..." #-}
+    {-# DEPRECATED foo "This function is deprecated..." #-}
+
+The '-Wwarnings-deprecations' flag is supported for backwards compatibility
+purposes as being equivalent to '-Wdeprecations'.
+
+The '-Wextended-warnings' warning group collects together all warnings with
+user-defined categories, so they can be enabled or disabled
+collectively. Moreover they are treated as being part of other warning groups
+such as '-Wdefault' (see 'warningGroupIncludesExtendedWarnings').
+
+'DynFlags' and 'DiagOpts' each contain a set of enabled and a set of fatal
+warning categories, just as they do for the finite enumeration of 'WarningFlag's
+built in to GHC.  These are represented as 'WarningCategorySet's to allow for
+the possibility of them being infinite.
+
+-}
+
+data InWarningCategory pass
+  = InWarningCategory
+    { iwc_in :: !(EpToken "in"),
+      iwc_st :: !SourceText,
+      iwc_wc :: (XRec pass WarningCategory)
+    }
+
+deriving instance (Eq (XRec pass WarningCategory)) => Eq (InWarningCategory pass)
+
+deriving instance Typeable (InWarningCategory pass)
+
+deriving instance (Data pass, Data (XRec pass WarningCategory)) => Data (InWarningCategory pass)
+
+
+-- See Note [Warning categories]
+newtype WarningCategory = WarningCategory FastString
+  deriving (Binary, Data, Eq, Show, NFData)

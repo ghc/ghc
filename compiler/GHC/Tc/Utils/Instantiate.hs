@@ -93,7 +93,6 @@ import GHC.Utils.Unique (sameUnique)
 
 import GHC.Unit.State
 import GHC.Unit.External
-import GHC.Unit.Module.Warnings
 
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
