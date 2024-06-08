@@ -1045,22 +1045,14 @@ lower_CmmExpr_Typed lbl ty expr = do
 lower_CmmExpr_Ptr :: CLabel -> CmmExpr -> WasmCodeGenM w (WasmExpr w w, Int)
 lower_CmmExpr_Ptr lbl ptr = do
   ty_word <- wasmWordTypeM
-  case ptr of
-    CmmLit (CmmLabelOff lbl o)
-      | o >= 0 -> do
-          instrs <-
-            lower_CmmExpr_Typed
-              lbl
-              ty_word
-              (CmmLit $ CmmLabel lbl)
-          pure (instrs, o)
-    CmmMachOp (MO_Add _) [base, CmmLit (CmmInt o _)]
-      | o >= 0 -> do
-          instrs <- lower_CmmExpr_Typed lbl ty_word base
-          pure (instrs, fromInteger o)
-    _ -> do
-      instrs <- lower_CmmExpr_Typed lbl ty_word ptr
-      pure (instrs, 0)
+  let (ptr', o) = case ptr of
+        CmmLit (CmmLabelOff lbl o)
+          | o >= 0 -> (CmmLit $ CmmLabel lbl, o)
+        CmmMachOp (MO_Add _) [base, CmmLit (CmmInt o _)]
+          | o >= 0 -> (base, fromInteger o)
+        _ -> (ptr, 0)
+  instrs <- lower_CmmExpr_Typed lbl ty_word ptr'
+  pure (instrs, o)
 
 -- | Push a series of values onto the wasm value stack, returning the
 -- result stack type.
