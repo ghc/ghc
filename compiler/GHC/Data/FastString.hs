@@ -323,7 +323,15 @@ data FastZStringTable = FastZStringTable
   -- ^ The number of encoded Z strings
   (Array# (IORef FastZStringTableSegment)) -- ^  concurrent segments
 
-type  FastZStringTableSegment = TableSegment (Int,FastZString)
+type  FastZStringTableSegment = TableSegment HashedFastZString
+
+data HashedFastZString
+  = HashedFastZString
+    {-# UNPACK #-} !Int
+    {-# NOUNPACK #-} !FastZString
+
+zStringHash :: HashedFastZString -> Int
+zStringHash (HashedFastZString hash _) = hash
 
 {-
 Following parameters are determined based on:
@@ -579,7 +587,7 @@ mkNewFastZString (FastString uniq _ sbs) = do
     !(I# hash#) = uniq*6364136223846793005 + 1
     (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
     insert n fs = do
-      TableSegment _ counter buckets# <- maybeResizeSegment fst segmentRef
+      TableSegment _ counter buckets# <- maybeResizeSegment zStringHash segmentRef
       let idx# = hashToIndex# buckets# hash#
       bucket <- IO $ readArray# buckets# idx#
       case zbucket_match bucket hash# of
@@ -588,17 +596,18 @@ mkNewFastZString (FastString uniq _ sbs) = do
         Just found -> return found
         Nothing -> do
           IO $ \s1# ->
-            case writeArray# buckets# idx# ((n,fs) : bucket) s1# of
+            case writeArray# buckets# idx# (HashedFastZString n fs : bucket) s1# of
               s2# -> (# s2#, () #)
           _ <- atomicFetchAddFastMut counter 1
           return fs
 
-zbucket_match :: [(Int,FastZString)] -> Int# -> Maybe FastZString
+zbucket_match :: [HashedFastZString] -> Int# -> Maybe FastZString
 zbucket_match fs hash = go fs
   where go [] = Nothing
-        go ((I# u,x) : ls)
+        go (HashedFastZString (I# u) x : ls)
           | isTrue# (u ==# hash) = Just x
           | otherwise     = go ls
+{-# INLINE zbucket_match #-}
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
