@@ -648,12 +648,23 @@ pprInstr platform instr = case instr of
 
   FABS o1 o2 | isSingleOp o2 -> op2 (text "\tfabs.s") o1 o2
   FABS o1 o2 | isDoubleOp o2 -> op2 (text "\tfabs.d") o1 o2
+  FMA variant d r1 r2 r3 ->
+    let fma = case variant of
+                FMAdd  -> text "\tfmadd" <> dot <> floatPrecission d
+                FMSub  -> text "\tfmsub" <> dot <> floatPrecission d
+                FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
+                FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
+    in op4 fma d r1 r2 r3
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
+       op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
        pprDmbType DmbRead = text "r"
        pprDmbType DmbWrite = text "w"
        pprDmbType DmbReadWrite = text "rw"
+       floatPrecission o | isSingleOp o = text "s"
+                         | isDoubleOp o = text "d"
+                         | otherwise  = pprPanic "Impossible floating point precission: " (pprOp platform o)
 
 floatOpPrecision :: Platform -> Operand -> Operand -> String
 floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingleOp r = "s" -- single precision

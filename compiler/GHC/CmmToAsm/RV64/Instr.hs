@@ -134,6 +134,8 @@ regUsageOfInstr platform instr = case instr of
   SCVTF dst src            -> usage (regOp src, regOp dst)
   FCVTZS dst src           -> usage (regOp src, regOp dst)
   FABS dst src             -> usage (regOp src, regOp dst)
+  FMA _ dst src1 src2 src3 ->
+    usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
 
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
 
@@ -253,6 +255,8 @@ patchRegsOfInstr instr env = case instr of
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
     FABS o1 o2     -> FABS (patchOp o1) (patchOp o2)
+    FMA s o1 o2 o3 o4 ->
+      FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     _              -> panic $ "patchRegsOfInstr: " ++ instrCon instr
     where
         patchOp :: Operand -> Operand
@@ -634,6 +638,13 @@ data Instr
     | FCVTZS Operand Operand
     -- Float ABSolute value
     | FABS Operand Operand
+    -- | Floating-point fused multiply-add instructions
+    --
+    -- - fmadd : d =   r1 * r2 + r3
+    -- - fnmsub: d =   r1 * r2 - r3
+    -- - fmsub : d = - r1 * r2 + r3
+    -- - fnmadd: d = - r1 * r2 - r3
+    | FMA FMASign Operand Operand Operand Operand
 
 data DmbType = DmbRead | DmbWrite | DmbReadWrite
 
@@ -683,6 +694,12 @@ instrCon i =
       SCVTF{} -> "SCVTF"
       FCVTZS{} -> "FCVTZS"
       FABS{} -> "FABS"
+      FMA variant _ _ _ _ ->
+        case variant of
+          FMAdd  -> "FMADD"
+          FMSub  -> "FMSUB"
+          FNMAdd -> "FNMADD"
+          FNMSub -> "FNMSUB"
 
 data Target
     = TBlock BlockId

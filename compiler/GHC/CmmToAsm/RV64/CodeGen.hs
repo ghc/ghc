@@ -755,7 +755,7 @@ getRegister' config plat expr =
       where w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
             r' = getRegisterReg plat reg
 
-    -- Generic case.
+    -- Generic binary case.
     CmmMachOp op [x, y] -> do
       let
           -- A "plain" operation.
@@ -910,6 +910,42 @@ getRegister' config plat expr =
         MO_S_Shr w -> intOp True  w (\d x y -> unitOL $ annExpr expr (ASR d x y))
 
         op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ pprMachOp op <+> text "in" <+> pdoc plat expr
+
+    -- Generic ternary case.
+    CmmMachOp op [x, y, z] ->
+
+      case op of
+
+        -- Floating-point fused multiply-add operations
+
+        -- x86 fmadd    x * y + z <=> AArch64 fmadd : d =   r1 * r2 + r3
+        -- x86 fmsub    x * y - z <=> AArch64 fnmsub: d =   r1 * r2 - r3
+        -- x86 fnmadd - x * y + z <=> AArch64 fmsub : d = - r1 * r2 + r3
+        -- x86 fnmsub - x * y - z <=> AArch64 fnmadd: d = - r1 * r2 - r3
+
+        MO_FMA var w -> case var of
+          FMAdd  -> float3Op w (\d n m a -> unitOL $ FMA FMAdd  d n m a)
+          FMSub  -> float3Op w (\d n m a -> unitOL $ FMA FMSub d n m a)
+          FNMAdd -> float3Op w (\d n m a -> unitOL $ FMA FNMSub  d n m a)
+          FNMSub -> float3Op w (\d n m a -> unitOL $ FMA FNMAdd d n m a)
+
+        _ -> pprPanic "getRegister' (unhandled ternary CmmMachOp): " $
+                (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
+
+      where
+          float3Op w op = do
+            (reg_fx, format_x, code_fx) <- getFloatReg x
+            (reg_fy, format_y, code_fy) <- getFloatReg y
+            (reg_fz, format_z, code_fz) <- getFloatReg z
+            massertPpr (isFloatFormat format_x && isFloatFormat format_y && isFloatFormat format_z) $
+              text "float3Op: non-float"
+            return $
+              Any (floatFormat w) $ \ dst ->
+                code_fx `appOL`
+                code_fy `appOL`
+                code_fz `appOL`
+                op (OpReg w dst) (OpReg w reg_fx) (OpReg w reg_fy) (OpReg w reg_fz)
+
     CmmMachOp _op _xs
       -> pprPanic "getRegister' (variadic CmmMachOp): " (pdoc plat expr)
 
