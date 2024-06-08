@@ -30,6 +30,7 @@ import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Utils.Outputable
+import GHC.Utils.Panic (panic)
 import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
@@ -248,3 +249,7 @@ pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
 
+negateOverLitVal :: OverLitVal -> OverLitVal
+negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
+negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
+negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"

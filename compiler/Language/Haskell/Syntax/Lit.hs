@@ -21,7 +21,7 @@ module Language.Haskell.Syntax.Lit where
 import Language.Haskell.Syntax.Extension
 
 import GHC.Utils.Panic (panic)
-import GHC.Types.SourceText (IntegralLit, FractionalLit, SourceText, negateIntegralLit, negateFractionalLit)
+import GHC.Types.SourceText (IntegralLit, FractionalLit, SourceText)
 import GHC.Core.Type (Type)
 
 import GHC.Data.FastString (FastString, lexicalCompareFS)
@@ -127,11 +127,6 @@ data OverLitVal
   | HsFractional !FractionalLit          -- ^ Frac-looking literals
   | HsIsString   !SourceText !FastString -- ^ String-looking literals
   deriving Data
-
-negateOverLitVal :: OverLitVal -> OverLitVal
-negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
-negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
-negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
