@@ -1536,7 +1536,7 @@ repE (HsVar _ (L _ x)) =
         Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
                                  ; return (MkC e') } }
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
-repE (HsOverLabel _ _ s) = repOverLabel s
+repE (HsOverLabel _ s) = repOverLabel s
 
 repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
 

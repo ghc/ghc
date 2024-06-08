@@ -31,7 +31,7 @@ import Language.Haskell.Syntax.Binds
 
 -- others:
 import GHC.Types.Fixity (LexicalFixity(Infix), Fixity)
-import GHC.Types.SourceText (StringLiteral, SourceText)
+import GHC.Types.SourceText (StringLiteral)
 
 import GHC.Unit.Module (ModuleName)
 import GHC.Data.FastString (FastString)
@@ -283,9 +283,8 @@ data HsExpr p
                            -- See Note [Non-overloaded record field selectors] and
                            -- Note [Record selectors in the AST]
 
-  | HsOverLabel (XOverLabel p) SourceText FastString
+  | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
-     -- Note [Pragma source text] in GHC.Types.SourceText
 
   | HsIPVar   (XIPVar p)
               HsIPName   -- ^ Implicit parameter (not in use after typechecking)
