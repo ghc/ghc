@@ -60,6 +60,7 @@
 /libraries/base/                  @hvr
 /libraries/ghci/                  @simonmar
 /libraries/template-haskell/      @rae
+/testsuite/tests/interface-stability/ @core-libraries
 
 [Internal utilities and libraries]
 /utils/iserv-proxy/               @angerman @simonmar
