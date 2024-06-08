@@ -24,7 +24,7 @@
 #include "Trace.h"
 
 #include "Poll.h"
-#include "Signals.h"
+#include "RtsSignals.h"
 
 #include <poll.h>
 #include <limits.h>
@@ -451,18 +451,16 @@ void awaitCompletedTimeoutsOrIOPoll(Capability *cap)
             processIOCompletions(cap, iomgr, ncompletions);
 
         } else if (errno == EINTR) {
-            /* We got interrupted by a signal. */
-  #if defined(RTS_USER_SIGNALS) && !defined(THREADED_RTS)
-            /* If the signal is one of ours we need to return to the scheduler
-             * to let it handle it. Otherwise we would loop and keep waiting
-             * for I/O or timeouts, meaning we would block for a long time
-             * before the signal is serviced.
+            /* We got interrupted by a signal. In the non-threaded RTS, if the
+             * signal is one of ours we need to return to the scheduler to let
+             * it handle it. Otherwise we would loop and keep waiting for I/O
+             * or timeouts, meaning we would block for a long time before the
+             * signal is serviced.
              */
-            if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-                startSignalHandlers(cap);
-                break;
-            }
-  #endif
+#if defined(RTS_USER_SIGNALS)
+            if (startPendingSignalHandlers(cap)) break;
+#endif
+
             /* We can also be interrupted by the shutdown signal handler, which
              * will set sched_state and so cause us to drop out of the loop.
              *

@@ -51,6 +51,34 @@ void freeSignalHandlers(void);
  */
 void awaitUserSignals(void);
 
+/*
+ * Function: startPendingSignalHandlers()
+ *
+ * Start any pending signal handlers. This is used by the scheduler and some
+ * in-RTS I/O managers. It does nothing (returns false) in the threaded RTS.
+ *
+ * Returns true if any signal handlers were pending and thus started.
+ */
+INLINE_HEADER bool startPendingSignalHandlers(Capability *cap);
+
+#if !defined(THREADED_RTS)
+INLINE_HEADER bool startPendingSignalHandlers(Capability *cap)
+{
+    if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
+        // safe outside the lock
+        startSignalHandlers(cap);
+        return true;
+    } else {
+        return false;
+    }
+}
+#else
+INLINE_HEADER bool startPendingSignalHandlers(Capability *cap STG_UNUSED)
+{
+    return false;
+}
+#endif
+
 #include "EndPrivate.h"
 
 #endif /* RTS_USER_SIGNALS */
