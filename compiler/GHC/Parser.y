@@ -3007,7 +3007,7 @@ aexp2   :: { ECP }
         | ipvar %shift                  {% fmap ecpFromExp
                                            (ams1 $1 (HsIPVar NoExtField $! unLoc $1)) }
         | overloaded_label              {% fmap ecpFromExp
-                                           (ams1 $1 (HsOverLabel NoExtField (fst $! unLoc $1) (snd $! unLoc $1))) }
+                                           (ams1 $1 (HsOverLabel (fst $! unLoc $1) (snd $! unLoc $1))) }
         | literal                       { ECP $ mkHsLitPV $! $1 }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -XOverloadedStrings is on.
