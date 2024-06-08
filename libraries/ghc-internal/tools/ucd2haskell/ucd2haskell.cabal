@@ -45,7 +45,12 @@ executable ucd2haskell
   ghc-options: -O2
   hs-source-dirs: exe
   main-is: UCD2Haskell.hs
-  other-modules: UCD2Haskell.ModuleGenerators
+  other-modules:
+    UCD2Haskell.ModuleGenerators
+    Generator.ByteString
+    Generator.GeneralCategory
+    Generator.RangeSwitch
+    Generator.WordEncoding
   build-depends:
       base                >= 4.7   && < 5
     , bytestring          >= 0.11  && < 0.13

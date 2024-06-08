@@ -42,17 +42,14 @@ import qualified Unicode.CharacterDatabase.Parser.Common as C
 import qualified Unicode.CharacterDatabase.Parser.UnicodeData as UD
 import qualified Unicode.CharacterDatabase.Parser.Properties.Multiple as P
 
+import Generator.GeneralCategory (generateGeneralCategoryCode)
+import Generator.ByteString (unlinesBB, unwordsBB)
+
 import Prelude hiding (pred)
 
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
-
-unlinesBB :: [BB.Builder] -> BB.Builder
-unlinesBB = (<> "\n") . mconcat . intersperse "\n"
-
-unwordsBB :: [BB.Builder] -> BB.Builder
-unwordsBB = mconcat . intersperse " "
 
 headerRule :: BB.Builder
 headerRule = "-----------------------------------------------------------------------------"
@@ -125,57 +122,6 @@ bitMapToAddrLiteral bs cs = foldr encode cs (unfoldr mkChunks bs)
 
     toByte :: [Bool] -> Int
     toByte xs = sum $ map (\i -> if xs !! i then 1 `shiftL` i else 0) [0..7]
-
-genEnumBitmap ::
-  forall a. (Bounded a, Enum a, Show a) =>
-  -- | Function name
-  BB.Builder ->
-  -- | Default value
-  a ->
-  -- | List of values to encode
-  [a] ->
-  BB.Builder
-genEnumBitmap funcName def as = unlinesBB
-    [ "{-# INLINE " <> funcName <> " #-}"
-    , funcName <> " :: Char -> Int"
-    , funcName <> " c = let n = ord c in if n >= "
-               <> BB.intDec (length as)
-               <> " then "
-               <> BB.intDec (fromEnum def)
-               <> " else lookup_bitmap n"
-
-    , "{-# NOINLINE lookup_bitmap #-}"
-    , "lookup_bitmap :: Int -> Int"
-    , "lookup_bitmap n = lookupIntN bitmap# n"
-    , "  where"
-    , "    bitmap# = \"" <> enumMapToAddrLiteral as "\"#"
-    ]
-
-{-| Encode a list of values as a byte map, using their 'Enum' instance.
-
-__Note:__ 'Enum' instance must respect the following:
-
-* @fromEnum minBound >= 0x00@
-* @fromEnum maxBound <= 0xff@
--}
-enumMapToAddrLiteral ::
-  forall a. (Bounded a, Enum a, Show a) =>
-  -- | Values to encode
-  [a] ->
-  -- | String to append
-  BB.Builder ->
-  BB.Builder
-enumMapToAddrLiteral xs cs = foldr go cs xs
-
-    where
-
-    go :: a -> BB.Builder -> BB.Builder
-    go x acc = BB.char7 '\\' <> BB.word8Dec (toWord8 x) <> acc
-
-    toWord8 :: a -> Word8
-    toWord8 a = let w = fromEnum a in if 0 <= w && w <= 0xff
-        then fromIntegral w
-        else error $ "Cannot convert to Word8: " <> show a
 
 genUnicodeVersion :: FilePath -> IO ()
 genUnicodeVersion outdir = do
@@ -267,21 +213,7 @@ genGeneralCategoryModule moduleName = Fold step initial done
           (replicate (ord ch2 - ord ch1 + 1) d.generalCategory <> acc)
           (succ ch2)
 
-    done (GeneralCategoryAcc acc _) = unlinesBB
-        [ "{-# LANGUAGE NoImplicitPrelude #-}"
-        , "{-# LANGUAGE MagicHash #-}"
-        , "{-# OPTIONS_HADDOCK hide #-}"
-        , ""
-        , mkModuleHeader moduleName
-        , "module " <> moduleName
-        , "(generalCategory)"
-        , "where"
-        , ""
-        , "import GHC.Internal.Base (Char, Int, Ord(..), ord)"
-        , "import GHC.Internal.Unicode.Bits (lookupIntN)"
-        , ""
-        , genEnumBitmap "generalCategory" UD.Cn (reverse acc)
-        ]
+    done (GeneralCategoryAcc acc _) = generateGeneralCategoryCode mkModuleHeader moduleName 50 (reverse acc)
 
 genSimpleCaseMappingModule
     :: BB.Builder

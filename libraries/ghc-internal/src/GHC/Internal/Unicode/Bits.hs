@@ -1,6 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnliftedNewtypes #-}
+{-# LANGUAGE BlockArguments #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,20 +21,23 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Unicode.Bits
-    ( lookupBit64,
-      lookupIntN
-    ) where
+    ( lookupIntN
+    , lookupBit64
+    , newByteArrayFromWord8List
+    , byteArrayLookupIntN
+    , copyAddrToWord8List
+    , UnicodeByteArray
+    )
+    where
 
-import GHC.Internal.Base (Bool, Int(..), Word(..), Eq(..))
 import GHC.Internal.Bits (finiteBitSize, popCount)
 import {-# SOURCE #-} GHC.Internal.ByteOrder
 import GHC.Prim
-       (Addr#,
-        indexWordOffAddr#, indexWord8OffAddr#,
-        andI#, uncheckedIShiftRL#,
-        and#, word2Int#, uncheckedShiftL#,
-        word8ToWord#, byteSwap#)
-import GHC.Internal.Num ((-))
+import GHC.Internal.ST
+import GHC.Internal.Base
+import GHC.Internal.Num
+import GHC.Internal.List
+import GHC.Internal.Word
 
 -- | @lookup64 addr index@ looks up the bit stored at bit index @index@ using a
 -- bitmap starting at the address @addr@. Looks up the 64-bit word containing
@@ -71,3 +77,41 @@ lookupIntN
 lookupIntN addr# (I# index#) =
   let word## = word8ToWord# (indexWord8OffAddr# addr# index#)
   in I# (word2Int# word##)
+
+data UnicodeByteArray = UnicodeByteArray !ByteArray#
+
+byteArrayLookupIntN :: UnicodeByteArray -> Int -> Int
+byteArrayLookupIntN ba idx
+  = let !(UnicodeByteArray addr) = ba
+  in lookupIntN (byteArrayContents# addr) idx
+
+newByteArrayFromWord8List :: [Word8] -> UnicodeByteArray
+newByteArrayFromWord8List xs = runST $ ST \s0 ->
+  case newPinnedByteArray# len s0 of
+    !(# s1, mba #) ->
+      let s2 = fillByteArray mba 0# xs s1
+      in case unsafeFreezeByteArray# mba s2 of
+        !(# s3, fba #) -> (# s3, UnicodeByteArray fba #)
+  where
+    !(I# len) = length xs
+
+    fillByteArray _ _ [] s = s
+    fillByteArray mba i (y:ys) s =
+      let !(W8# y#) = y
+          s' = writeWord8Array# mba i y# s
+      in fillByteArray mba (i +# 1#) ys s'
+
+copyAddrToWord8List :: Addr# -> Int -> [Word8]
+copyAddrToWord8List addr !len@(I# len') = runST $ ST \s0 ->
+  case newByteArray# len' s0 of
+    !(# s1, mba #) ->
+      let s2 = copyAddrToByteArray# addr mba 0# len' s1
+      in case unsafeFreezeByteArray# mba s2 of
+        !(# s3, fba #) -> (# s3, readByteFromArray fba 0 len #)
+  where
+    readByteFromArray :: ByteArray# -> Int -> Int -> [Word8]
+    readByteFromArray ba !from@(I# from') to =
+      W8# (indexWord8Array# ba from') :
+        if from == (to - 1)
+          then []
+          else readByteFromArray ba (from + 1) to
