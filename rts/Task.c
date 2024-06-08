@@ -52,7 +52,7 @@ Mutex all_tasks_mutex;
 // A thread-local-storage key that we can use to get access to the
 // current thread's Task structure.
 #if defined(THREADED_RTS)
-# if defined(MYTASK_USE_TLV)
+# if CC_SUPPORTS_TLS
 __thread Task *my_task;
 # else
 ThreadLocalKey currentTaskKey;
@@ -75,7 +75,7 @@ initTaskManager (void)
         peakWorkerCount = 0;
         tasksInitialized = 1;
 #if defined(THREADED_RTS)
-#if !defined(MYTASK_USE_TLV)
+#if !CC_SUPPORTS_TLS
         newThreadLocalKey(&currentTaskKey);
 #endif
         initMutex(&all_tasks_mutex);
@@ -109,7 +109,7 @@ freeTaskManager (void)
 
 #if defined(THREADED_RTS)
     closeMutex(&all_tasks_mutex);
-#if !defined(MYTASK_USE_TLV)
+#if !CC_SUPPORTS_TLS
     freeThreadLocalKey(&currentTaskKey);
 #endif
 #endif
