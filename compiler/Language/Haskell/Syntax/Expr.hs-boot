@@ -9,7 +9,7 @@ module Language.Haskell.Syntax.Expr where
 import Language.Haskell.Syntax.Extension ( XRec )
 import Data.Kind  ( Type )
 
-import GHC.Prelude (Eq)
+import Prelude (Eq)
 import Data.Data (Data)
 
 type role HsExpr nominal
