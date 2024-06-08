@@ -1,4 +1,5 @@
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# LANGUAGE CPP #-}
 
@@ -49,6 +50,7 @@ import GHC.Types.RepType
 import GHC.Core.Multiplicity
 import qualified GHC.Core.Unify as U
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep (Type(..))
 
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
@@ -365,6 +367,7 @@ cPprTermBase y =
   , ifTerm' (isTyCon doubleTyCon  . ty) ppr_double
   , ifTerm' (isTyCon integerTyCon . ty) ppr_integer
   , ifTerm' (isTyCon naturalTyCon . ty) ppr_natural
+  , ifSuspension         (isFunTy . ty) ppr_fun
   ]
  where
    ifTerm :: (Term -> Bool)
@@ -378,6 +381,18 @@ cPprTermBase y =
    ifTerm' pred f prec t@Term{}
        | pred t    = f prec t
    ifTerm' _ _ _ _  = return Nothing
+
+   ifSuspension :: (Term -> Bool)
+          -> (Precedence -> Term -> m (Maybe SDoc))
+          -> Precedence -> Term -> m (Maybe SDoc)
+   ifSuspension pred f prec t@Suspension{}
+       | pred t    = f prec t
+   ifSuspension _ _ _ _  = return Nothing
+
+   isFunTy :: Type -> Bool
+   isFunTy (FunTy {}) = True  -- Functions e.g. let f = () -> ()
+   isFunTy (ForAllTy {}) = True  -- "Overloaded values" e.g. Implicitly let x = 3
+   isFunTy _ = False
 
    isTupleTy ty    = fromMaybe False $ do
      (tc,_) <- tcSplitTyConApp_maybe ty
@@ -492,6 +507,10 @@ cPprTermBase y =
               getListTerms t@Suspension{}       = [t]
               getListTerms t = pprPanic "getListTerms" (ppr t)
    ppr_list _ _ = panic "doList"
+
+   ppr_fun :: Precedence -> Term -> m (Maybe SDoc)
+   ppr_fun _ (ty -> fun_ty) = return $ Just $
+     angleBrackets (underscore <+> dcolon <+> pprType fun_ty)
 
 
 repPrim :: TyCon -> [Word] -> SDoc
