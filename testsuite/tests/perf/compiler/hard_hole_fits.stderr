@@ -1,4 +1,3 @@
-
 hard_hole_fits.hs:14:22: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsVar a b) = _
@@ -37,13 +36,11 @@ hard_hole_fits.hs:15:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Internal.Enum’))
 
-hard_hole_fits.hs:16:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:16:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (HsOverLabel xol s m_ip) = _
+    • In an equation for ‘testMe’: testMe (HsOverLabel xol m_ip) = _
     • Relevant bindings include
         m_ip :: GHC.Data.FastString.FastString
-          (bound at hard_hole_fits.hs:16:27)
-        s :: GHC.Types.SourceText.SourceText
           (bound at hard_hole_fits.hs:16:25)
         xol :: Language.Haskell.Syntax.Extension.XOverLabel GhcPs
           (bound at hard_hole_fits.hs:16:21)
@@ -646,3 +643,4 @@ hard_hole_fits.hs:46:21: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with minBound @Int
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Internal.Enum’))
+

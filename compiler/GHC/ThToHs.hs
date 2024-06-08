@@ -1158,7 +1158,7 @@ cvtl e = wrapLA (cvt e)
                               -- constructor names - see #14627.
                               { s' <- vcName s
                               ; wrapParLA (HsVar noExtField) s' }
-    cvt (LabelE s)       = return $ HsOverLabel noExtField NoSourceText (fsLit s)
+    cvt (LabelE s)       = return $ HsOverLabel NoSourceText (fsLit s)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExtField n' }
     cvt (GetFieldE exp f) = do { e' <- cvtl exp
                                ; return $ HsGetField noExtField e'
