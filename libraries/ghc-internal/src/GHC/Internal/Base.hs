@@ -1709,8 +1709,8 @@ data NonEmpty a = a :| [a]
 
 -- | @since base-4.9.0.0
 instance Functor NonEmpty where
-  fmap f ~(a :| as) = f a :| fmap f as
-  b <$ ~(_ :| as)   = b   :| (b <$ as)
+  fmap f (a :| as) = f a :| fmap f as
+  b <$ (_ :| as)   = b   :| (b <$ as)
 
 -- | @since base-4.9.0.0
 instance Applicative NonEmpty where

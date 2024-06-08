@@ -185,7 +185,7 @@ nonEmpty (a:as) = Just (a :| as)
 -- | 'uncons' produces the first element of the stream, and a stream of the
 -- remaining elements, if any.
 uncons :: NonEmpty a -> (a, Maybe (NonEmpty a))
-uncons ~(a :| as) = (a, nonEmpty as)
+uncons (a :| as) = (a, nonEmpty as)
 
 -- | The 'unfoldr' function is analogous to "Data.List"'s
 -- 'GHC.Internal.Data.List.unfoldr' operation.
@@ -274,7 +274,7 @@ fromList [] = error "NonEmpty.fromList: empty list"
 
 -- | Convert a stream to a normal list efficiently.
 toList :: NonEmpty a -> [a]
-toList ~(a :| as) = a : as
+toList (a :| as) = a : as
 
 -- | Lift list operations to work on a 'NonEmpty' stream.
 --
@@ -285,7 +285,7 @@ lift f = fromList . f . Foldable.toList
 
 -- | Map a function over a 'NonEmpty' stream.
 map :: (a -> b) -> NonEmpty a -> NonEmpty b
-map f ~(a :| as) = f a :| fmap f as
+map f (a :| as) = f a :| fmap f as
 
 -- | The 'inits' function takes a stream @xs@ and returns all the
 -- finite prefixes of @xs@, starting with the shortest. The result is
@@ -360,17 +360,17 @@ scanr f z = fromList . List.scanr f z . Foldable.toList
 --
 -- > scanl1 f [x1, x2, ...] == x1 :| [x1 `f` x2, x1 `f` (x2 `f` x3), ...]
 scanl1 :: (a -> a -> a) -> NonEmpty a -> NonEmpty a
-scanl1 f ~(a :| as) = fromList (List.scanl f a as)
+scanl1 f (a :| as) = fromList (List.scanl f a as)
 
 -- | 'scanr1' is a variant of 'scanr' that has no starting value argument.
 scanr1 :: (a -> a -> a) -> NonEmpty a -> NonEmpty a
-scanr1 f ~(a :| as) = fromList (List.scanr1 f (a:as))
+scanr1 f (a :| as) = fromList (List.scanr1 f (a:as))
 
 -- | 'intersperse x xs' alternates elements of the list with copies of @x@.
 --
 -- > intersperse 0 (1 :| [2,3]) == 1 :| [0,2,0,3]
 intersperse :: a -> NonEmpty a -> NonEmpty a
-intersperse a ~(b :| bs) = b :| case bs of
+intersperse a (b :| bs) = b :| case bs of
     [] -> []
     _ -> a : List.intersperse a bs
 
@@ -533,7 +533,7 @@ isPrefixOf (y:ys) (x :| xs) = (y == x) && List.isPrefixOf ys xs
 --
 -- /Beware/: a negative or out-of-bounds index will cause an error.
 (!!) :: HasCallStack => NonEmpty a -> Int -> a
-(!!) ~(x :| xs) n
+(!!) (x :| xs) n
   | n == 0 = x
   | n > 0  = xs List.!! (n - 1)
   | otherwise = error "NonEmpty.!! negative index"

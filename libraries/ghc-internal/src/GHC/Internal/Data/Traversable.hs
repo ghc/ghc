@@ -245,7 +245,7 @@ instance Traversable [] where
 
 -- | @since base-4.9.0.0
 instance Traversable NonEmpty where
-  traverse f ~(a :| as) = liftA2 (:|) (f a) (traverse f as)
+  traverse f (a :| as) = liftA2 (:|) (f a) (traverse f as)
 
 -- | @since base-4.7.0.0
 instance Traversable (Either a) where
