@@ -33,6 +33,7 @@ typedef enum {
     SystemTimerThreadEventManagerStore,
     SystemTimerThreadIOManagerThreadStore,
     LibHSghcFastStringTable,
+    LibHSghcFastZStringTable,
     LibHSghcGlobalHasPprDebug,
     LibHSghcGlobalHasNoDebugOutput,
     LibHSghcGlobalHasNoStateHack,
@@ -104,6 +105,7 @@ mkStoreAccessor(SystemEventThreadIOManagerThreadStore)
 mkStoreAccessor(SystemTimerThreadEventManagerStore)
 mkStoreAccessor(SystemTimerThreadIOManagerThreadStore)
 mkStoreAccessor(LibHSghcFastStringTable)
+mkStoreAccessor(LibHSghcFastZStringTable)
 mkStoreAccessor(LibHSghcGlobalHasPprDebug)
 mkStoreAccessor(LibHSghcGlobalHasNoDebugOutput)
 mkStoreAccessor(LibHSghcGlobalHasNoStateHack)

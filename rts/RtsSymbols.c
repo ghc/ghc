@@ -561,6 +561,7 @@ extern char **environ;
       SymI_HasProto(getOrSetSystemTimerThreadEventManagerStore)         \
       SymI_HasProto(getOrSetSystemTimerThreadIOManagerThreadStore)      \
       SymI_HasProto(getOrSetLibHSghcFastStringTable)                    \
+      SymI_HasProto(getOrSetLibHSghcFastZStringTable)                    \
       SymI_HasProto(getRTSStats)                                        \
       SymI_HasProto(getRTSStatsEnabled)                                 \
       SymI_HasProto(getOrSetLibHSghcGlobalHasPprDebug)                  \

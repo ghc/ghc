@@ -208,13 +208,7 @@ of this string which is used by the compiler internally.
 data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
-      fs_sbs  :: {-# UNPACK #-} !ShortByteString,
-      fs_zenc :: FastZString
-      -- ^ Lazily computed Z-encoding of this string. See Note [Z-Encoding] in
-      -- GHC.Utils.Encoding.
-      --
-      -- Since 'FastString's are globally memoized this is computed at most
-      -- once for any given string.
+      fs_sbs  :: {-# UNPACK #-} !ShortByteString
   }
 
 instance Eq FastString where
@@ -311,19 +305,25 @@ data FastStringTable = FastStringTable
   -- ^ The unique ID counter shared with all buckets
   --
   -- We unpack the 'FastMutInt' counter as it is always consumed strictly.
-  {-# NOUNPACK #-} !FastMutInt
-  -- ^ Number of computed z-encodings for all buckets.
-  --
   -- We mark this as 'NOUNPACK' as this 'FastMutInt' is retained by a thunk
   -- in 'mkFastStringWith' and needs to be boxed any way.
   -- If this is unpacked, then we box this single 'FastMutInt' once for each
   -- allocated FastString.
   (Array# (IORef FastStringTableSegment)) -- ^  concurrent segments
 
-data FastStringTableSegment = FastStringTableSegment
+data TableSegment a = TableSegment
   {-# UNPACK #-} !(MVar ())  -- the lock for write in each segment
   {-# UNPACK #-} !FastMutInt -- the number of elements
-  (MutableArray# RealWorld [FastString]) -- buckets in this segment
+  (MutableArray# RealWorld [a]) -- buckets in this segment
+
+type FastStringTableSegment = TableSegment FastString
+
+data FastZStringTable = FastZStringTable
+  {-# UNPACK #-} !FastMutInt
+  -- ^ The number of encoded Z strings
+  (Array# (IORef FastZStringTableSegment)) -- ^  concurrent segments
+
+type  FastZStringTableSegment = TableSegment (Int,FastZString)
 
 {-
 Following parameters are determined based on:
@@ -343,34 +343,34 @@ hashToSegment# hash# = hash# `andI#` segmentMask#
   where
     !(I# segmentMask#) = segmentMask
 
-hashToIndex# :: MutableArray# RealWorld [FastString] -> Int# -> Int#
+hashToIndex# :: MutableArray# RealWorld a -> Int# -> Int#
 hashToIndex# buckets# hash# =
   (hash# `uncheckedIShiftRL#` segmentBits#) `remInt#` size#
   where
     !(I# segmentBits#) = segmentBits
     size# = sizeofMutableArray# buckets#
 
-maybeResizeSegment :: IORef FastStringTableSegment -> IO FastStringTableSegment
-maybeResizeSegment segmentRef = do
-  segment@(FastStringTableSegment lock counter old#) <- readIORef segmentRef
+maybeResizeSegment :: forall a. (a -> Int) -> IORef (TableSegment a) -> IO (TableSegment a)
+maybeResizeSegment hashElem segmentRef = do
+  segment@(TableSegment lock counter old#) <- readIORef segmentRef
   let oldSize# = sizeofMutableArray# old#
       newSize# = oldSize# *# 2#
   (I# n#) <- readFastMutInt counter
   if isTrue# (n# <# newSize#) -- maximum load of 1
   then return segment
   else do
-    resizedSegment@(FastStringTableSegment _ _ new#) <- IO $ \s1# ->
+    resizedSegment@(TableSegment _ _ new#) <- IO $ \s1# ->
       case newArray# newSize# [] s1# of
-        (# s2#, arr# #) -> (# s2#, FastStringTableSegment lock counter arr# #)
+        (# s2#, arr# #) -> (# s2#, TableSegment lock counter arr# #)
     forM_ [0 .. (I# oldSize#) - 1] $ \(I# i#) -> do
       fsList <- IO $ readArray# old# i#
       forM_ fsList $ \fs -> do
         let -- Shall we store in hash value in FastString instead?
-            !(I# hash#) = hashFastString fs
+            !(I# hash#) = hashElem fs
             idx# = hashToIndex# new# hash#
         IO $ \s1# ->
           case readArray# new# idx# s1# of
-            (# s2#, bucket #) -> case writeArray# new# idx# (fs: bucket) s2# of
+            (# s2#, bucket #) -> case writeArray# new# idx# (fs : bucket) s2# of
               s3# -> (# s3#, () #)
     writeIORef segmentRef resizedSegment
     return resizedSegment
@@ -386,17 +386,16 @@ stringTable = unsafePerformIO $ do
             (# s2#, lock #) -> case newFastMutInt 0 `unIO` s2# of
               (# s3#, counter #) -> case newArray# initialNumBuckets# [] s3# of
                 (# s4#, buckets# #) -> case newIORef
-                    (FastStringTableSegment lock counter buckets#) `unIO` s4# of
+                    (TableSegment lock counter buckets#) `unIO` s4# of
                   (# s5#, segment #) -> case writeArray# a# i# segment s5# of
                     s6# -> loop a# (i# +# 1#) s6#
   uid <- newFastMutInt 603979776 -- ord '$' * 0x01000000
-  n_zencs <- newFastMutInt 0
   tab <- IO $ \s1# ->
     case newArray# numSegments# (panic "string_table") s1# of
       (# s2#, arr# #) -> case loop arr# 0# s2# of
         s3# -> case unsafeFreezeArray# arr# s3# of
           (# s4#, segments# #) ->
-            (# s4#, FastStringTable uid n_zencs segments# #)
+            (# s4#, FastStringTable uid segments# #)
 
   -- use the support wired into the RTS to share this CAF among all images of
   -- libHSghc
@@ -405,11 +404,48 @@ stringTable = unsafePerformIO $ do
 #else
   sharedCAF tab getOrSetLibHSghcFastStringTable
 
+
 -- from the 9.3 RTS; the previous RTS before might not have this symbol.  The
 -- right way to do this however would be to define some HAVE_FAST_STRING_TABLE
 -- or similar rather than use (odd parity) development versions.
 foreign import ccall unsafe "getOrSetLibHSghcFastStringTable"
   getOrSetLibHSghcFastStringTable :: Ptr a -> IO (Ptr a)
+#endif
+
+{-# NOINLINE zstringTable #-}
+zstringTable :: FastZStringTable
+zstringTable = unsafePerformIO $ do
+  let !(I# numSegments#) = numSegments
+      !(I# initialNumBuckets#) = initialNumBuckets
+      loop a# i# s1#
+        | isTrue# (i# ==# numSegments#) = s1#
+        | otherwise = case newMVar () `unIO` s1# of
+            (# s2#, lock #) -> case newFastMutInt 0 `unIO` s2# of
+              (# s3#, counter #) -> case newArray# initialNumBuckets# [] s3# of
+                (# s4#, buckets# #) -> case newIORef
+                    (TableSegment lock counter buckets#) `unIO` s4# of
+                  (# s5#, segment #) -> case writeArray# a# i# segment s5# of
+                    s6# -> loop a# (i# +# 1#) s6#
+  uid <- newFastMutInt 0 -- ord '$' * 0x01000000
+  tab <- IO $ \s1# ->
+    case newArray# numSegments# (panic "string_table") s1# of
+      (# s2#, arr# #) -> case loop arr# 0# s2# of
+        s3# -> case unsafeFreezeArray# arr# s3# of
+          (# s4#, segments# #) ->
+            (# s4#, FastZStringTable uid segments# #)
+
+  -- use the support wired into the RTS to share this CAF among all images of
+  -- libHSghc
+#if !MIN_VERSION_rts(1,0,3)
+  return tab
+#else
+  sharedCAF tab getOrSetLibHSghcFastZStringTable
+
+-- from the 9.3 RTS; the previous RTS before might not have this symbol.  The
+-- right way to do this however would be to define some HAVE_FAST_STRING_TABLE
+-- or similar rather than use (odd parity) development versions.
+foreign import ccall unsafe "getOrSetLibHSghcFastZStringTable"
+  getOrSetLibHSghcFastZStringTable :: Ptr a -> IO (Ptr a)
 #endif
 
 {-
@@ -474,9 +510,9 @@ The procedure goes like this:
 -}
 
 mkFastStringWith
-    :: (Int -> FastMutInt-> IO FastString) -> ShortByteString -> IO FastString
+    :: (Int -> IO FastString) -> ShortByteString -> IO FastString
 mkFastStringWith mk_fs sbs = do
-  FastStringTableSegment lock _ buckets# <- readIORef segmentRef
+  TableSegment lock _ buckets# <- readIORef segmentRef
   let idx# = hashToIndex# buckets# hash#
   bucket <- IO $ readArray# buckets# idx#
   case bucket_match bucket sbs of
@@ -486,16 +522,16 @@ mkFastStringWith mk_fs sbs = do
       -- only run partially and putMVar is not called after takeMVar.
       noDuplicate
       n <- get_uid
-      new_fs <- mk_fs n n_zencs
+      new_fs <- mk_fs n
       withMVar lock $ \_ -> insert new_fs
   where
-    !(FastStringTable uid n_zencs segments#) = stringTable
+    !(FastStringTable uid segments#) = stringTable
     get_uid = atomicFetchAddFastMut uid 1
 
     !(I# hash#) = hashStr sbs
     (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
     insert fs = do
-      FastStringTableSegment _ counter buckets# <- maybeResizeSegment segmentRef
+      TableSegment _ counter buckets# <- maybeResizeSegment hashFastString segmentRef
       let idx# = hashToIndex# buckets# hash#
       bucket <- IO $ readArray# buckets# idx#
       case bucket_match bucket sbs of
@@ -519,6 +555,50 @@ bucket_match fs sbs = go fs
 -- in bytestring-0.12, which made it slightly larger than inlining threshold.
 -- Non-inlining causes a small, but measurable performance regression, so let's force it.
 {-# INLINE bucket_match #-}
+
+mkNewFastZString :: FastString -> IO FastZString
+mkNewFastZString (FastString uniq _ sbs) = do
+  TableSegment lock _ buckets# <- readIORef segmentRef
+  let idx# = hashToIndex# buckets# hash#
+  bucket <- IO $ readArray# buckets# idx#
+  case zbucket_match bucket hash# of
+    Just found -> return found
+    Nothing -> do
+      -- The withMVar below is not dupable. It can lead to deadlock if it is
+      -- only run partially and putMVar is not called after takeMVar.
+      noDuplicate
+      n <- get_uid
+      let !new_fs = mkZFastString sbs
+      withMVar lock $ \_ -> insert n new_fs
+  where
+    !(FastZStringTable uid segments#) = zstringTable
+    get_uid = atomicFetchAddFastMut uid 1
+
+    -- FastString uniques are sequential, pass them through a linear
+    -- congruential generator to randomise
+    !(I# hash#) = uniq*6364136223846793005 + 1
+    (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
+    insert n fs = do
+      TableSegment _ counter buckets# <- maybeResizeSegment fst segmentRef
+      let idx# = hashToIndex# buckets# hash#
+      bucket <- IO $ readArray# buckets# idx#
+      case zbucket_match bucket hash# of
+        -- The FastString was added by another thread after previous read and
+        -- before we acquired the write lock.
+        Just found -> return found
+        Nothing -> do
+          IO $ \s1# ->
+            case writeArray# buckets# idx# ((n,fs) : bucket) s1# of
+              s2# -> (# s2#, () #)
+          _ <- atomicFetchAddFastMut counter 1
+          return fs
+
+zbucket_match :: [(Int,FastZString)] -> Int# -> Maybe FastZString
+zbucket_match fs hash = go fs
+  where go [] = Nothing
+        go ((I# u,x) : ls)
+          | isTrue# (u ==# hash) = Just x
+          | otherwise     = go ls
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
@@ -568,17 +648,13 @@ mkFastStringByteList str = mkFastStringShortByteString (SBS.pack str)
 
 -- | Creates a (lazy) Z-encoded 'FastString' from a 'ShortByteString' and
 -- account the number of forced z-strings into the passed 'FastMutInt'.
-mkZFastString :: FastMutInt -> ShortByteString -> FastZString
-mkZFastString n_zencs sbs = unsafePerformIO $ do
-  _ <- atomicFetchAddFastMut n_zencs 1
-  return $ mkFastZStringString (zEncodeString (utf8DecodeShortByteString sbs))
+mkZFastString :: ShortByteString -> FastZString
+mkZFastString sbs = mkFastZStringString (zEncodeString (utf8DecodeShortByteString sbs))
 
-mkNewFastStringShortByteString :: ShortByteString -> Int
-                               -> FastMutInt -> IO FastString
-mkNewFastStringShortByteString sbs uid n_zencs = do
-  let zstr = mkZFastString n_zencs sbs
-      chars = utf8CountCharsShortByteString sbs
-  return (FastString uid chars sbs zstr)
+mkNewFastStringShortByteString :: ShortByteString -> Int -> IO FastString
+mkNewFastStringShortByteString sbs uid = do
+  let chars = utf8CountCharsShortByteString sbs
+  return (FastString uid chars sbs)
 
 hashStr  :: ShortByteString -> Int
  -- produce a hash value between 0 & m (inclusive)
@@ -619,7 +695,7 @@ unpackFS fs = utf8DecodeShortByteString $ fs_sbs fs
 -- memoized.
 --
 zEncodeFS :: FastString -> FastZString
-zEncodeFS fs = fs_zenc fs
+zEncodeFS fs = inlinePerformIO $ mkNewFastZString fs
 
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = mkFastStringShortByteString
@@ -650,17 +726,16 @@ getFastStringTable :: IO [[[FastString]]]
 getFastStringTable =
   forM [0 .. numSegments - 1] $ \(I# i#) -> do
     let (# segmentRef #) = indexArray# segments# i#
-    FastStringTableSegment _ _ buckets# <- readIORef segmentRef
+    TableSegment _ _ buckets# <- readIORef segmentRef
     let bucketSize = I# (sizeofMutableArray# buckets#)
     forM [0 .. bucketSize - 1] $ \(I# j#) ->
       IO $ readArray# buckets# j#
   where
-    !(FastStringTable _ _ segments#) = stringTable
+    !(FastStringTable _ segments#) = stringTable
 
 getFastStringZEncCounter :: IO Int
-getFastStringZEncCounter = readFastMutInt n_zencs
-  where
-    !(FastStringTable _ n_zencs _) = stringTable
+getFastStringZEncCounter = readFastMutInt counter
+  where (FastZStringTable counter _) = zstringTable
 
 -- -----------------------------------------------------------------------------
 -- Outputting 'FastString's
