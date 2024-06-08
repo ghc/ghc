@@ -2958,7 +2958,7 @@ instance ExactPrint (HsExpr GhcPs) where
       _ -> do
         printStringAtLsDelta (SameLine 0) "_"
         return x
-  exact x@(HsOverLabel _ src l) = do
+  exact x@(HsOverLabel src l) = do
     printStringAtLsDelta (SameLine 0) "#"
     case src of
       NoSourceText   -> printStringAtLsDelta (SameLine 0) (unpackFS l)
