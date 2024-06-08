@@ -1048,6 +1048,8 @@ lower_CmmExpr_Ptr lbl ptr = do
   let (ptr', o) = case ptr of
         CmmLit (CmmLabelOff lbl o)
           | o >= 0 -> (CmmLit $ CmmLabel lbl, o)
+        CmmRegOff reg o
+          | o >= 0 -> (CmmReg reg, o)
         CmmMachOp (MO_Add _) [base, CmmLit (CmmInt o _)]
           | o >= 0 -> (base, fromInteger o)
         _ -> (ptr, 0)
