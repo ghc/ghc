@@ -198,10 +198,13 @@ data Instr
 
         -- Moves.
         | MOV         Format Operand Operand
-             -- ^ N.B. when used with the 'II64' 'Format', the source
+             -- ^ N.B. Due to AT&T assembler quirks, when used with 'II64'
+             -- 'Format' immediate source and memory target operand, the source
              -- operand is interpreted to be a 32-bit sign-extended value.
-             -- True 64-bit operands need to be moved with @MOVABS@, which we
-             -- currently don't use.
+             -- True 64-bit operands need to be either first moved to a register or moved
+             -- with @MOVABS@; we currently do not use this instruction in GHC.
+             -- See https://stackoverflow.com/questions/52434073/whats-the-difference-between-the-x86-64-att-instructions-movq-and-movabsq.
+
         | MOVD   Format Operand Operand -- ^ MOVD/MOVQ SSE2 instructions
                                         -- (bitcast between a general purpose
                                         -- register and a float register).
