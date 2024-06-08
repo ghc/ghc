@@ -124,6 +124,12 @@ data GenModule unit = Module
    }
    deriving (Eq,Ord,Data,Functor)
 
+instance Data ModuleName where
+  -- don't traverse?
+  toConstr _   = abstractConstr "ModuleName"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "ModuleName"
+
 -- | A Module is a pair of a 'Unit' and a 'ModuleName'.
 type Module = GenModule Unit
 
