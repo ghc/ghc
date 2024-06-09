@@ -6,7 +6,7 @@
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([GHC run-time system], [1.0.2], [libraries@haskell.org], [rts])
+AC_INIT([GHC run-time system], [1.0.3], [libraries@haskell.org], [rts])
 
 AC_CONFIG_MACRO_DIRS([../m4])
 

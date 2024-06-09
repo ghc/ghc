@@ -1032,10 +1032,15 @@ dumpFinalStats logger = do
 
   when (logHasDumpFlag logger Opt_D_dump_faststrings) $ do
     fss <- getFastStringTable
+    fzss <- getFastZStringTable
     let ppr_table         = fmap ppr_segment (fss `zip` [0..])
         ppr_segment (s,n) = hang (text "Segment" <+> int n) 2 (vcat (fmap ppr_bucket (s `zip` [0..])))
         ppr_bucket  (b,n) = hang (text "Bucket" <+> int n) 2 (vcat (fmap ftext b))
     putDumpFileMaybe logger Opt_D_dump_faststrings "FastStrings" FormatText (vcat ppr_table)
+    let ppr_table'         = fmap ppr_segment' (fzss `zip` [0..])
+        ppr_segment' (s,n) = hang (text "Segment" <+> int n) 2 (vcat (fmap ppr_bucket' (s `zip` [0..])))
+        ppr_bucket'  (b,n) = hang (text "Bucket" <+> int n) 2 (vcat (fmap (text . zString) b))
+    putDumpFileMaybe logger Opt_D_dump_faststrings "FastZStrings" FormatText (vcat ppr_table')
 
 dumpFastStringStats :: Logger -> IO ()
 dumpFastStringStats logger = do
@@ -1053,6 +1058,7 @@ dumpFastStringStats logger = do
         , text "smallest segment: " <+> int (minimum bucketsPerSegment)
         , text "longest bucket:   " <+> int (maximum entriesPerBucket)
         , text "has z-encoding:   " <+> (hasZ `pcntOf` entries)
+        , text "z-encodings:      " <+> int (hasZ)
         ])
         -- we usually get more "has z-encoding" than "z-encoded", because
         -- when we z-encode a string it might hash to the exact same string,
