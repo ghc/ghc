@@ -2065,22 +2065,22 @@ deprecation :: { OrdList (LWarnDecl GhcPs) }
              {% fmap unitOL $ amsA' (sL (comb3 $1 $2 $>) $ (Warning (unLoc $1, fst $ unLoc $3) (unLoc $2)
                                           (DeprecatedTxt NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
-strings :: { Located ([AddEpAnn],[Located StringLiteral]) }
-    : STRING { sL1 $1 ([],[L (gl $1) (getStringLiteral $1)]) }
+strings :: { Located ([AddEpAnn],[Located StringLit]) }
+    : STRING { sL1 $1 ([],[L (gl $1) (getStringLit $1)]) }
     | '[' stringlist ']' { sLL $1 $> $ ([mos $1,mcs $3],fromOL (unLoc $2)) }
 
-stringlist :: { Located (OrdList (Located StringLiteral)) }
+stringlist :: { Located (OrdList (Located StringLit)) }
     : stringlist ',' STRING {% if isNilOL (unLoc $1)
                                 then return (sLL $1 $> (unLoc $1 `snocOL`
-                                                  (L (gl $3) (getStringLiteral $3))))
+                                                  (L (gl $3) (getStringLit $3))))
                                 else case (unLoc $1) of
                                    SnocOL hs t -> do
                                      let { t' = addTrailingCommaS t (glAA $2) }
                                      return (sLL $1 $> (snocOL hs t' `snocOL`
-                                                  (L (gl $3) (getStringLiteral $3))))
+                                                  (L (gl $3) (getStringLit $3))))
 
 }
-    | STRING                { sLL $1 $> (unitOL (L (gl $1) (getStringLiteral $1))) }
+    | STRING                { sLL $1 $> (unitOL (L (gl $1) (getStringLit $1))) }
     | {- empty -}           { noLoc nilOL }
 
 -----------------------------------------------------------------------------
@@ -2131,10 +2131,10 @@ safety :: { Located Safety }
         | 'interruptible'               { sLL $1 $> PlayInterruptible }
 
 fspec :: { Located ([AddEpAnn]
-                    ,(Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)) }
+                    ,(Located StringLit, LocatedN RdrName, LHsSigType GhcPs)) }
        : STRING var '::' sigtype        { sLL $1 $> ([mu AnnDcolon $3]
                                              ,(L (getLoc $1)
-                                                    (getStringLiteral $1), $2, $4)) }
+                                                    (getStringLit $1), $2, $4)) }
        |        var '::' sigtype        { sLL $1 $> ([mu AnnDcolon $2]
                                              ,(noLoc (StringLiteral NoSourceText nilFS Nothing), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
@@ -4236,7 +4236,7 @@ getOVERLAPS_PRAGs     (L _ (IToverlaps_prag     src)) = src
 getINCOHERENT_PRAGs   (L _ (ITincoherent_prag   src)) = src
 getCTYPEs             (L _ (ITctype             src)) = src
 
-getStringLiteral l = StringLiteral (getSTRINGs l) (getSTRING l) Nothing
+getStringLit l = StringLiteral (getSTRINGs l) (getSTRING l) Nothing
 
 isUnicode :: Located Token -> Bool
 isUnicode (L _ (ITforall         iu)) = iu == UnicodeSyntax
@@ -4268,8 +4268,8 @@ getSCC lt = do let s = getSTRING lt
                    then addFatalError $ mkPlainErrorMsgEnvelope (getLoc lt) $ PsErrSpaceInSCC
                    else return s
 
-stringLiteralToHsDocWst :: Located StringLiteral -> LocatedE (WithHsDocIdentifiers StringLiteral GhcPs)
-stringLiteralToHsDocWst  sl = reLoc $ lexStringLiteral parseIdentifier sl
+stringLiteralToHsDocWst :: Located StringLit -> LocatedE (WithHsDocIdentifiers StringLit GhcPs)
+stringLiteralToHsDocWst  sl = reLoc $ lexStringLit parseIdentifier sl
 
 -- Utilities for combining source spans
 comb2 :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
@@ -4702,7 +4702,7 @@ addTrailingCommaN (L anns a) span = do
                 else addTrailingCommaToN anns (srcSpan2e span)
   return (L anns' a)
 
-addTrailingCommaS :: Located StringLiteral -> EpaLocation -> Located StringLiteral
+addTrailingCommaS :: Located StringLit -> EpaLocation -> Located StringLit
 addTrailingCommaS (L l sl) span
     = L (widenSpan l [AddEpAnn AnnComma span]) (sl { sl_tc = Just (epaToNoCommentsLocation span) })
 

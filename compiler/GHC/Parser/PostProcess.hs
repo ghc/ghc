@@ -3021,7 +3021,7 @@ checkNewOrData span name is_type_data = curry $ \ case
 --
 mkImport :: Located CCallConv
          -> Located Safety
-         -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
+         -> (Located StringLit, LocatedN RdrName, LHsSigType GhcPs)
          -> P ([AddEpAnn] -> HsDecl GhcPs)
 mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
     case unLoc cconv of
@@ -3131,7 +3131,7 @@ parseCImport cconv safety nm str sourceText =
 -- construct a foreign export declaration
 --
 mkExport :: Located CCallConv
-         -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
+         -> (Located StringLit, LocatedN RdrName, LHsSigType GhcPs)
          -> P ([AddEpAnn] -> HsDecl GhcPs)
 mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty)
  = return $ \ann -> ForD noExtField $

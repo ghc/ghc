@@ -1120,7 +1120,7 @@ rep_specialiseInst ty loc
        ; return [(loc, pragma)] }
 
 rep_sccFun :: LocatedN Name
-        -> Maybe (XRec GhcRn StringLiteral)
+        -> Maybe (XRec GhcRn StringLit)
         -> SrcSpan
         -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_sccFun nm Nothing loc = do

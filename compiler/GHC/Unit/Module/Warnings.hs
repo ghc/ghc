@@ -205,10 +205,10 @@ data WarningTxt pass
         -- ^ Warning category attached to this WARNING pragma, if any;
         -- see Note [Warning categories]
       SourceText
-      [LocatedE (WithHsDocIdentifiers StringLiteral pass)]
+      [LocatedE (WithHsDocIdentifiers StringLit pass)]
    | DeprecatedTxt
       SourceText
-      [LocatedE (WithHsDocIdentifiers StringLiteral pass)]
+      [LocatedE (WithHsDocIdentifiers StringLit pass)]
   deriving Generic
 
 -- | To which warning category does this WARNING or DEPRECATED pragma belong?
@@ -218,7 +218,7 @@ warningTxtCategory (WarningTxt (Just (L _ (InWarningCategory _  _ (L _ cat)))) _
 warningTxtCategory _ = defaultWarningCategory
 
 -- | The message that the WarningTxt was specified to output
-warningTxtMessage :: WarningTxt p -> [LocatedE (WithHsDocIdentifiers StringLiteral p)]
+warningTxtMessage :: WarningTxt p -> [LocatedE (WithHsDocIdentifiers StringLit p)]
 warningTxtMessage (WarningTxt _ _ m) = m
 warningTxtMessage (DeprecatedTxt _ m) = m
 
@@ -229,7 +229,7 @@ warningTxtSame w1 w2
   && literal_message w1 == literal_message w2
   && same_type
   where
-    literal_message :: WarningTxt p -> [StringLiteral]
+    literal_message :: WarningTxt p -> [StringLit]
     literal_message = map (hsDocString . unLoc) . warningTxtMessage
     same_type | DeprecatedTxt {} <- w1, DeprecatedTxt {} <- w2 = True
               | WarningTxt {} <- w1, WarningTxt {} <- w2       = True
@@ -260,13 +260,12 @@ instance Outputable (WarningTxt pass) where
           NoSourceText   -> pp_ws ds
           SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
-pp_ws :: [LocatedE (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
+pp_ws :: [LocatedE (WithHsDocIdentifiers StringLit pass)] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
   = text "["
     <+> vcat (punctuate comma (map (ppr . unLoc) ws))
     <+> text "]"
-
 
 pprWarningTxtForMsg :: WarningTxt p -> SDoc
 pprWarningTxtForMsg (WarningTxt _ _ ws)
