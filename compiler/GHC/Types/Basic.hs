@@ -132,7 +132,7 @@ import GHC.Utils.Binary
 import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
-import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag, TopLevelFlag(..), isTopLevel, isNotTopLevel)
+import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag, TopLevelFlag(..), isTopLevel, isNotTopLevel, TypeOrData(..))
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
 
 import Control.DeepSeq ( NFData(..) )
@@ -2206,13 +2206,6 @@ instance NFData tc => NFData (TyConFlavour tc) where
 tyConFlavourAssoc_maybe :: TyConFlavour tc -> Maybe tc
 tyConFlavourAssoc_maybe (OpenFamilyFlavour _ mb_parent) = mb_parent
 tyConFlavourAssoc_maybe _                               = Nothing
-
--- | Whether something is a type or a data declaration,
--- e.g. a type family or a data family.
-data TypeOrData
-  = IAmData
-  | IAmType
-  deriving (Eq, Data)
 
 instance Outputable TypeOrData where
   ppr IAmData = text "data"

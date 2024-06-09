@@ -118,3 +118,10 @@ isNotTopLevel TopLevel    = False
 
 isTopLevel TopLevel     = True
 isTopLevel NotTopLevel  = False
+
+-- | Whether something is a type or a data declaration,
+-- e.g. a type family or a data family.
+data TypeOrData
+  = IAmData
+  | IAmType
+  deriving (Eq, Data)
