@@ -110,6 +110,7 @@ import GHC.Core.Type (Specificity)
 import GHC.Utils.Panic.Plain ( assert )
 
 import GHC.Hs.Doc (LHsDoc, WithHsDocIdentifiers) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
+-- TODO(ghc-import): `StringLiteral` is only used in `WithHsDocIdentifiers`, which presumably get moved out themselves.
 import GHC.Types.SourceText (StringLiteral, SourceText)
 
 import Control.Monad
