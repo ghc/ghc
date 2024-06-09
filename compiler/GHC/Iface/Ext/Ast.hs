@@ -83,6 +83,7 @@ import Control.Monad.Trans.Class  ( lift )
 import Control.Applicative        ( (<|>) )
 import GHC.Types.TyThing          (TyThing (..))
 import GHC.Types.TypeEnv          (TypeEnv)
+import Control.Arrow (second)
 
 {- Note [Updating HieAst for changes in the GHC AST]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -233,6 +234,8 @@ data HieState = HieState
   -- This includes things like top level evidence bindings.
   , type_env :: TypeEnv
   -- tcg_type_env from TcGblEnv contains the type environment for the module
+  , entity_infos :: M.Map Identifier (S.Set EntityInfo)
+  -- ^ Information about entities in the module
   }
 
 addUnlocatedEvBind :: Var -> ContextInfo -> HieM ()
@@ -250,7 +253,7 @@ getUnlocatedEvBinds file = do
   org <- ask
   let elts = dVarEnvElts binds
 
-      mkNodeInfo (n,ci) = (Right (varName n), IdentifierDetails (Just $ varType n) ci S.empty)
+      mkNodeInfo (n,ci) = (Right (varName n), IdentifierDetails (Just $ varType n) ci)
 
       go e@(v,_) (xs,ys) = case nameSrcSpan $ varName v of
         RealSrcSpan spn _
@@ -269,8 +272,14 @@ hieLookupTyThing v = do
   m <- lift $ gets type_env
   pure $ lookupNameEnv m v <|> wiredInNameTyThing_maybe v
 
+-- | Insert entity information for an identifier
+insertEntityInfo :: Identifier -> S.Set EntityInfo -> HieM ()
+insertEntityInfo ident info = do
+  lift $ modify' $ \s ->
+    s { entity_infos = M.insertWith S.union ident info (entity_infos s) }
+
 initState :: HieState
-initState = HieState emptyNameEnv emptyDVarEnv mempty
+initState = HieState emptyNameEnv emptyDVarEnv mempty mempty
 
 class ModifyState a where -- See Note [Name Remapping]
   addSubstitution :: a -> a -> HieState -> HieState
@@ -313,7 +322,7 @@ mkHieFileWithSource src_file src ms ts rs =
       insts = tcg_insts ts
       tte = tcg_type_env ts
       tcs = tcg_tcs ts
-      (asts',arr) = getCompressedAsts tc_binds rs top_ev_binds insts tcs tte in
+      (asts',arr,entity_infos) = getCompressedAsts tc_binds rs top_ev_binds insts tcs tte in
   HieFile
       { hie_hs_file = src_file
       , hie_module = ms_mod ms
@@ -322,19 +331,20 @@ mkHieFileWithSource src_file src ms ts rs =
       -- mkIfaceExports sorts the AvailInfos for stability
       , hie_exports = mkIfaceExports (tcg_exports ts)
       , hie_hs_src = src
+      , hie_entity_infos = entity_infos
       }
 
 getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon] -> TypeEnv
-  -> (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
+  -> (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat, M.Map Identifier (S.Set EntityInfo))
 getCompressedAsts ts rs top_ev_binds insts tcs tte =
-  let asts = enrichHie ts rs top_ev_binds insts tcs tte in
-  compressTypes asts
+  let (asts, infos) = enrichHie ts rs top_ev_binds insts tcs tte
+      add c (a, b) = (a,b,c)
+  in add infos $ compressTypes asts
 
 enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon] -> TypeEnv
-  -> HieASTs Type
+  -> (HieASTs Type, M.Map Identifier (S.Set EntityInfo))
 enrichHie ts (hsGrp, imports, exports, docs, modName) ev_bs insts tcs tte =
-  runIdentity $ flip evalStateT initState{type_env=tte} $ flip runReaderT SourceInfo $ do
-
+  second entity_infos $ runIdentity $ flip runStateT initState{type_env=tte} $ flip runReaderT SourceInfo $ do
     modName <- toHie (IEC Export <$> modName)
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
@@ -610,7 +620,9 @@ instance (ToHie a) => ToHie (Maybe a) where
 instance ToHie (IEContext (LocatedA ModuleName)) where
   toHie (IEC c (L (EpAnn (EpaSpan (RealSrcSpan span _)) _ _) mname)) = do
       org <- ask
-      pure $ [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
+      -- insert the entity info for the name into the entity_infos map
+      insertEntityInfo (Left mname) $ S.singleton EntityModuleName
+      pure [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
     where details = mempty{identInfo = S.singleton (IEThing c)}
           idents = M.singleton (Left mname) details
   toHie _ = pure []
@@ -635,13 +647,14 @@ instance ToHie (Context (Located Var)) where
               ty = case isDataConId_maybe name' of
                       Nothing -> varType name'
                       Just dc -> dataConNonlinearType dc
+          -- insert the entity info for the name into the entity_infos map
+          insertEntityInfo (Right $ varName name) $ idEntityInfo name'
           pure
             [Node
               (mkSourcedNodeInfo org $ NodeInfo S.empty [] $
                 M.singleton (Right $ varName name)
                             (IdentifierDetails (Just ty)
-                                               (S.singleton context)
-                                               (idEntityInfo name')))
+                                               (S.singleton context)))
               span
               []]
       C (EvidenceVarBind i _ sp)  (L _ name) -> do
@@ -661,13 +674,14 @@ instance ToHie (Context (Located Name)) where
                 Just var -> varName var
                 Nothing -> name'
           tyThing <- hieLookupTyThing name
+          -- insert the entity info for the name into the entity_infos map
+          insertEntityInfo (Right name) $ maybe (nameEntityInfo name) tyThingEntityInfo tyThing
           pure
             [Node
               (mkSourcedNodeInfo org $ NodeInfo S.empty [] $
                 M.singleton (Right name)
                             (IdentifierDetails Nothing
-                                               (S.singleton context)
-                                               (maybe (nameEntityInfo name) tyThingEntityInfo tyThing)))
+                                               (S.singleton context)))
               span
               []]
       _ -> pure []

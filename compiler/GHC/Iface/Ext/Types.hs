@@ -91,7 +91,15 @@ data HieFile = HieFile
 
     , hie_hs_src :: ByteString
     -- ^ Raw bytes of the initial Haskell source
+
+    , hie_entity_infos :: M.Map Identifier (S.Set EntityInfo)
+    -- ^ Entity information for each identifier in the `hie_asts`
     }
+
+instance Binary (M.Map Identifier (S.Set EntityInfo)) where
+  put_ bh m = put_ bh $ M.toAscList m
+  get bh = fmap M.fromDistinctAscList (get bh)
+
 instance Binary HieFile where
   put_ bh hf = do
     put_ bh $ hie_hs_file hf
@@ -100,6 +108,7 @@ instance Binary HieFile where
     put_ bh $ hie_asts hf
     put_ bh $ hie_exports hf
     put_ bh $ hie_hs_src hf
+    put_ bh $ hie_entity_infos hf
 
   get bh = HieFile
     <$> get bh
@@ -108,6 +117,10 @@ instance Binary HieFile where
     <*> get bh
     <*> get bh
     <*> get bh
+    <*> get bh
+
+getIdentifierEntityInfo :: HieFile -> Identifier -> S.Set EntityInfo
+getIdentifierEntityInfo hf ident = M.findWithDefault S.empty ident (hie_entity_infos hf)
 
 
 {-
@@ -378,29 +391,25 @@ type NodeIdentifiers a = M.Map Identifier (IdentifierDetails a)
 data IdentifierDetails a = IdentifierDetails
   { identType :: Maybe a
   , identInfo :: S.Set ContextInfo
-  , identEntityInfo :: S.Set EntityInfo
   } deriving (Eq, Functor, Foldable, Traversable)
 
 
 instance Outputable a => Outputable (IdentifierDetails a) where
-  ppr x = text "Details: " <+> ppr (identType x) <+> ppr (identInfo x) <+> ppr (identEntityInfo x)
+  ppr x = text "Details: " <+> ppr (identType x) <+> ppr (identInfo x)
 
 instance Semigroup (IdentifierDetails a) where
   d1 <> d2 = IdentifierDetails (identType d1 <|> identType d2)
                                (S.union (identInfo d1) (identInfo d2))
-                               (S.union (identEntityInfo d1) (identEntityInfo d2))
 
 instance Monoid (IdentifierDetails a) where
-  mempty = IdentifierDetails Nothing S.empty S.empty
+  mempty = IdentifierDetails Nothing S.empty
 
 instance Binary (IdentifierDetails TypeIndex) where
   put_ bh dets = do
     put_ bh $ identType dets
     put_ bh $ S.toList $ identInfo dets
-    put_ bh $ S.toList $ identEntityInfo dets
   get bh =  IdentifierDetails
     <$> get bh
-    <*> fmap S.fromDistinctAscList (get bh)
     <*> fmap S.fromDistinctAscList (get bh)
 
 
@@ -825,6 +834,7 @@ data EntityInfo
   | EntityTypeSynonym
   | EntityTypeFamily
   | EntityRecordField
+  | EntityModuleName
   deriving (Eq, Ord, Enum, Show)
 
 
@@ -840,6 +850,7 @@ instance Outputable EntityInfo where
   ppr EntityTypeSynonym = text "type synonym"
   ppr EntityTypeFamily = text "type family"
   ppr EntityRecordField = text "record field"
+  ppr EntityModuleName = text "module name"
 
 
 instance Binary EntityInfo where
