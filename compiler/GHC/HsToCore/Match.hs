@@ -32,6 +32,7 @@ import GHC.Types.Basic
 import GHC.Types.SourceText
     ( FractionalLit,
       IntegralLit(il_value),
+      StringLit(sl_fs),
       negateFractionalLit,
       integralFractionalLit )
 import GHC.Driver.DynFlags
@@ -1291,8 +1292,8 @@ patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
     (HsFractional f, is_neg)
       | is_neg    -> PgN $! negateFractionalLit f
       | otherwise -> PgN f
-    (HsIsString _ s, _) -> assert (isNothing mb_neg) $
-                            PgOverS s
+    (HsIsString s, _) -> assert (isNothing mb_neg) $
+                            PgOverS (sl_fs s)
 patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)

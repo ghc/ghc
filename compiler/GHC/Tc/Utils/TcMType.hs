@@ -2370,7 +2370,7 @@ shortCutLit platform val res_ty
   = case val of
       HsIntegral int_lit    -> go_integral int_lit
       HsFractional frac_lit -> go_fractional frac_lit
-      HsIsString s src      -> go_string   s src
+      HsIsString s_lit      -> go_string (sl_st s_lit) (sl_fs s_lit)
   where
     go_integral int@(IL src neg i)
       | isIntTy res_ty  && platformInIntRange  platform i

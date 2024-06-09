@@ -380,9 +380,9 @@ mkRecStmt anns stmts  = (emptyRecStmt' anns :: StmtLR (GhcPass idL) GhcPs bodyR)
                              { recS_stmts = stmts }
 
 
-mkHsIntegral     i  = OverLit noExtField (HsIntegral       i)
-mkHsFractional   f  = OverLit noExtField (HsFractional     f)
-mkHsIsString src s  = OverLit noExtField (HsIsString   src s)
+mkHsIntegral     i  = OverLit noExtField (HsIntegral           i)
+mkHsFractional   f  = OverLit noExtField (HsFractional         f)
+mkHsIsString src s  = OverLit noExtField (HsIsString   (SL src s Nothing))
 
 mkHsDo     ctxt stmts      = HsDo noAnn ctxt stmts
 mkHsDoAnns ctxt stmts anns = HsDo anns  ctxt stmts
