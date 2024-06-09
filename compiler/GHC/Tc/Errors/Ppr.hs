@@ -964,10 +964,10 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedAnnotation ty bang
       -> mkSimpleDecorated $
            let err = case bang of
-                 HsSrcBang _ SrcUnpack _           -> "UNPACK"
-                 HsSrcBang _ SrcNoUnpack _         -> "NOUNPACK"
-                 HsSrcBang _ NoSrcUnpack SrcLazy   -> "laziness"
-                 HsSrcBang _ _ _                   -> "strictness"
+                 HsBang SrcUnpack   _       -> "UNPACK"
+                 HsBang SrcNoUnpack _       -> "NOUNPACK"
+                 HsBang NoSrcUnpack SrcLazy -> "laziness"
+                 HsBang _           _       -> "strictness"
             in text "Unexpected" <+> text err <+> text "annotation:" <+> ppr ty $$
                text err <+> text "annotation cannot appear nested inside a type"
     TcRnIllegalRecordSyntax either_ty_ty

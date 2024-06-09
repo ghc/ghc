@@ -931,7 +931,7 @@ repBangTy ty = do
   rep2 bangTypeName [b, t]
   where
     (su', ss', ty') = case unLoc ty of
-            HsBangTy _ (HsSrcBang _ su ss) ty -> (su, ss, ty)
+            HsBangTy _ (HsBang su ss) ty -> (su, ss, ty)
             _ -> (NoSrcUnpack, NoSrcStrict, ty)
 
 -------------------------------------------------------

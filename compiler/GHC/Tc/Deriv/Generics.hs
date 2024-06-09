@@ -613,7 +613,7 @@ tc_mkRepTy gk get_fixity dit@(DerivInstTys{ dit_rep_tc = tycon
                                   | (t,sb',ib',j) <- zip4 l sb ib [0..] ]
 
         arg :: GenericKind_DC -> Type -> HsSrcBang -> HsImplBang -> Maybe FieldLabel -> Type
-        arg gk_ t (HsSrcBang _ su ss) ib fl = mkS fl su ss ib $ case gk_ of
+        arg gk_ t (HsSrcBang _ (HsBang su ss)) ib fl = mkS fl su ss ib $ case gk_ of
             -- Here we previously used Par0 if t was a type variable, but we
             -- realized that we can't always guarantee that we are wrapping-up
             -- all type variables in Par0. So we decided to stop using Par0

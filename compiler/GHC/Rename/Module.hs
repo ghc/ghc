@@ -1922,7 +1922,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
     has_strictness_flags condecl
       = any (is_strict . getBangStrictness . hsScaledThing) (con_args condecl)
 
-    is_strict (HsSrcBang _ _ s) = isSrcStrict s
+    is_strict (HsSrcBang _ (HsBang _ s)) = isSrcStrict s
 
     con_args (ConDeclGADT { con_g_args = PrefixConGADT _ args }) = args
     con_args (ConDeclH98 { con_args = PrefixCon _ args }) = args

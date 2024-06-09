@@ -1180,9 +1180,9 @@ pp_hs_context cxt unicode = parenList (map (ppType unicode) cxt)
 
 -------------------------------------------------------------------------------
 
-ppBang :: HsSrcBang -> LaTeX
-ppBang (HsSrcBang _ _ SrcStrict) = char '!'
-ppBang (HsSrcBang _ _ SrcLazy) = char '~'
+ppBang :: HsBang -> LaTeX
+ppBang (HsBang _ SrcStrict) = char '!'
+ppBang (HsBang _ SrcLazy) = char '~'
 ppBang _ = empty
 
 tupleParens :: HsTupleSort -> [LaTeX] -> LaTeX

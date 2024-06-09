@@ -2207,7 +2207,7 @@ data TcRnMessage where
                 typecheck/should_fail/T7210
                 rename/should_fail/T22478b
   -}
-  TcRnUnexpectedAnnotation :: !(HsType GhcRn) -> !HsSrcBang -> TcRnMessage
+  TcRnUnexpectedAnnotation :: !(HsType GhcRn) -> !HsBang -> TcRnMessage
 
   {-| TcRnIllegalRecordSyntax is an error indicating an illegal use of record syntax.
 
