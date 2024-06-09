@@ -94,7 +94,7 @@ module Prelude (
              sum),      -- :: Num a => t a -> a
              -- toList) -- :: Foldable t => t a -> [a]
 
-    Traversable(traverse, sequenceA, mapM, sequence),
+    Traversable(traverse, sequenceA, mapM, sequence), for,
 
     -- ** Miscellaneous functions
     id, const, (.), flip, ($), until,
