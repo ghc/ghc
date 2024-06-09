@@ -30,5 +30,5 @@ toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLit GhcRn -> (IfaceS
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
 
 toIfaceStringLiteral :: StringLit -> IfaceStringLiteral
-toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl fs
+toIfaceStringLiteral (SL sl fs _) = IfStringLiteral sl fs
 

@@ -301,7 +301,7 @@ instance Outputable FractionalLit where
 
 -- | A String Literal in the source, including its original raw format for use by
 -- source to source manipulation tools.
-data StringLit = StringLiteral
+data StringLit = SL
                        { sl_st :: SourceText, -- literal raw source.
                                               -- See Note [Literal source text]
                          sl_fs :: FastString, -- literal string value
@@ -315,7 +315,7 @@ data StringLit = StringLiteral
                        } deriving Data
 
 instance Eq StringLit where
-  (StringLiteral _ a _) == (StringLiteral _ b _) = a == b
+  (SL _ a _) == (SL _ b _) = a == b
 
 instance Outputable StringLit where
   ppr sl = pprWithSourceText (sl_st sl) (doubleQuotes $ ftext $ sl_fs sl)

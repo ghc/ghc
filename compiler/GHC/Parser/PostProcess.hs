@@ -3023,7 +3023,7 @@ mkImport :: Located CCallConv
          -> Located Safety
          -> (Located StringLit, LocatedN RdrName, LHsSigType GhcPs)
          -> P ([AddEpAnn] -> HsDecl GhcPs)
-mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
+mkImport cconv safety (L loc (SL esrc entity _), v, ty) =
     case unLoc cconv of
       CCallConv          -> returnSpec =<< mkCImport
       CApiConv           -> do
@@ -3133,7 +3133,7 @@ parseCImport cconv safety nm str sourceText =
 mkExport :: Located CCallConv
          -> (Located StringLit, LocatedN RdrName, LHsSigType GhcPs)
          -> P ([AddEpAnn] -> HsDecl GhcPs)
-mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty)
+mkExport (L lc cconv) (L le (SL esrc entity _), v, ty)
  = return $ \ann -> ForD noExtField $
    ForeignExport { fd_e_ext = ann, fd_name = v, fd_sig_ty = ty
                  , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
