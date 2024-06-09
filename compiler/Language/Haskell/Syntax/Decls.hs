@@ -97,11 +97,10 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic (Role, TopLevelFlag, TypeOrData(..))
+import Language.Haskell.Syntax.Basic (Role, TopLevelFlag, TypeOrData(..), TyConFlavour(..))
 import Language.Haskell.Syntax.Specificity (Specificity)
 
-import GHC.Types.Basic (OverlapMode, RuleName, Activation
-                       ,TyConFlavour(..))
+import GHC.Types.Basic (OverlapMode, RuleName, Activation)
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 import GHC.Types.Fixity (LexicalFixity)
 

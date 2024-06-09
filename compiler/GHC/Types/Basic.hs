@@ -132,7 +132,7 @@ import GHC.Utils.Binary
 import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
-import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag, TopLevelFlag(..), isTopLevel, isNotTopLevel, TypeOrData(..))
+import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag, TopLevelFlag(..), isTopLevel, isNotTopLevel, TypeOrData(..), TyConFlavour(..))
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
 
 import Control.DeepSeq ( NFData(..) )
@@ -2152,22 +2152,6 @@ data TypeOrConstraint
                           TyConFlavour
 *                                                                      *
 ********************************************************************* -}
-
--- | Paints a picture of what a 'TyCon' represents, in broad strokes.
--- This is used towards more informative error messages.
-data TyConFlavour tc
-  = ClassFlavour
-  | TupleFlavour Boxity
-  | SumFlavour
-  | DataTypeFlavour
-  | NewtypeFlavour
-  | AbstractTypeFlavour
-  | OpenFamilyFlavour TypeOrData (Maybe tc) -- Just tc <=> (tc == associated class)
-  | ClosedTypeFamilyFlavour
-  | TypeSynonymFlavour
-  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
-  | PromotedDataConFlavour
-  deriving (Eq, Data, Functor)
 
 instance Outputable (TyConFlavour tc) where
   ppr = text . go

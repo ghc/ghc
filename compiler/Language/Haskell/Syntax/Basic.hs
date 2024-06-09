@@ -2,6 +2,8 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 module Language.Haskell.Syntax.Basic where
 
+import Prelude
+
 import Data.Data
 import Data.Eq
 import Data.Ord
@@ -125,3 +127,19 @@ data TypeOrData
   = IAmData
   | IAmType
   deriving (Eq, Data)
+
+-- | Paints a picture of what a 'TyCon' represents, in broad strokes.
+-- This is used towards more informative error messages.
+data TyConFlavour tc
+  = ClassFlavour
+  | TupleFlavour Boxity
+  | SumFlavour
+  | DataTypeFlavour
+  | NewtypeFlavour
+  | AbstractTypeFlavour
+  | OpenFamilyFlavour TypeOrData (Maybe tc) -- Just tc <=> (tc == associated class)
+  | ClosedTypeFamilyFlavour
+  | TypeSynonymFlavour
+  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
+  | PromotedDataConFlavour
+  deriving (Eq, Data, Functor)
