@@ -199,7 +199,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
 
                 -- Subtract 1 from iteration_no to get the
                 -- number of iterations we actually completed
-        return ( "Simplifier baled out", iteration_no - 1
+        return ( "Simplifier bailed out", iteration_no - 1
                , totalise counts_so_far
                , guts_no_binds { mg_binds = binds, mg_rules = local_rules } )
 
