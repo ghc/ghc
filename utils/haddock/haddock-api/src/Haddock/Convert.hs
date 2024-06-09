@@ -485,8 +485,8 @@ synifyDataCon use_gadt_syntax dc =
         ( \ty bang ->
             let tySyn = synifyType WithinType [] (scaledThing ty)
              in case bang of
-                  (HsSrcBang _ NoSrcUnpack NoSrcStrict) -> tySyn
-                  bang' -> noLocA $ HsBangTy noAnn bang' tySyn
+                  (HsSrcBang _ (HsBang NoSrcUnpack NoSrcStrict)) -> tySyn
+                  (HsSrcBang src bang') -> noLocA $ HsBangTy (noAnn, src) bang' tySyn
         )
         arg_tys
         (dataConSrcBangs dc)

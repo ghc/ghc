@@ -4061,7 +4061,7 @@ instance ExactPrint (HsType GhcPs) where
   exact (HsDocTy an ty doc) = do
     ty' <- markAnnotated ty
     return (HsDocTy an ty' doc)
-  exact (HsBangTy an (HsSrcBang mt up str) ty) = do
+  exact (HsBangTy (an, mt) (HsBang up str) ty) = do
     an0 <-
       case mt of
         NoSourceText -> return an
@@ -4077,7 +4077,7 @@ instance ExactPrint (HsType GhcPs) where
         SrcStrict   -> mark an0 AnnBang
         NoSrcStrict -> return an0
     ty' <- markAnnotated ty
-    return (HsBangTy an1 (HsSrcBang mt up str) ty')
+    return (HsBangTy (an1, mt) (HsBang up str) ty')
   exact (HsExplicitListTy an prom tys) = do
     an0 <- if (isPromoted prom)
              then mark an AnnSimpleQuote

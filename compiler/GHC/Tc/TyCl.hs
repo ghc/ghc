@@ -4695,32 +4695,32 @@ checkValidDataCon dflags existential_ok tc con
         ; hsc_env <- getTopEnv
         ; let check_bang :: Type -> HsSrcBang -> HsImplBang -> Int -> TcM ()
               check_bang orig_arg_ty bang rep_bang n
-               | HsSrcBang _ _ SrcLazy <- bang
+               | HsSrcBang _ (HsBang _ SrcLazy) <- bang
                , not (bang_opt_strict_data bang_opts)
                = addErrTc (bad_bang n LazyFieldsDisabled)
 
                -- Warn about UNPACK without "!"
                -- e.g.   data T = MkT {-# UNPACK #-} Int
-               | HsSrcBang _ want_unpack strict_mark <- bang
+               | HsSrcBang _ (HsBang want_unpack strict_mark) <- bang
                , isSrcUnpacked want_unpack, not (is_strict strict_mark)
                , not (isUnliftedType orig_arg_ty)
                = addDiagnosticTc (bad_bang n UnpackWithoutStrictness)
 
                -- Warn about a redundant ! on an unlifted type
                -- e.g.   data T = MkT !Int#
-               | HsSrcBang _ _ SrcStrict <- bang
+               | HsSrcBang _ (HsBang _ SrcStrict) <- bang
                , isUnliftedType orig_arg_ty
                = addDiagnosticTc $ TcRnBangOnUnliftedType orig_arg_ty
 
                -- Warn about a ~ on an unlifted type (#21951)
                -- e.g.   data T = MkT ~Int#
-               | HsSrcBang _ _ SrcLazy <- bang
+               | HsSrcBang _ (HsBang _ SrcLazy) <- bang
                , isUnliftedType orig_arg_ty
                = addDiagnosticTc $ TcRnLazyBangOnUnliftedType orig_arg_ty
 
                -- Warn about unusable UNPACK pragmas
                -- e.g.   data T a = MkT {-# UNPACK #-} !a      -- Can't unpack
-               | HsSrcBang _ want_unpack _ <- bang
+               | HsSrcBang _ (HsBang want_unpack _) <- bang
 
                -- See Note [Detecting useless UNPACK pragmas] in GHC.Core.DataCon.
                , isSrcUnpacked want_unpack  -- this means the user wrote {-# UNPACK #-}
@@ -4817,9 +4817,9 @@ checkNewDataCon con
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
       = dataConFullSig con
 
-    ok_bang (HsSrcBang _ _ SrcStrict) = False
-    ok_bang (HsSrcBang _ _ SrcLazy)   = False
-    ok_bang _                         = True
+    ok_bang (HsSrcBang _ (HsBang _ SrcStrict)) = False
+    ok_bang (HsSrcBang _ (HsBang _ SrcLazy))   = False
+    ok_bang _                                  = True
 
     ok_mult OneTy = True
     ok_mult _     = False
