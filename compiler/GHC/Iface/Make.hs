@@ -412,10 +412,10 @@ toIfaceWarningTxt :: WarningTxt GhcRn -> IfaceWarningTxt
 toIfaceWarningTxt (WarningTxt mb_cat src strs) = IfWarningTxt (unLoc . iwc_wc . unLoc <$> mb_cat) src (map (toIfaceStringLiteralWithNames . unLoc) strs)
 toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt src (map (toIfaceStringLiteralWithNames . unLoc) strs)
 
-toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLiteral GhcRn -> (IfaceStringLiteral, [IfExtName])
+toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLit GhcRn -> (IfaceStringLiteral, [IfExtName])
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
 
-toIfaceStringLiteral :: StringLiteral -> IfaceStringLiteral
+toIfaceStringLiteral :: StringLit -> IfaceStringLiteral
 toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl fs
 
 coreRuleToIfaceRule :: CoreRule -> IfaceRule

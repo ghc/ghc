@@ -608,10 +608,10 @@ fromIfaceWarningTxt = \case
     IfWarningTxt mb_cat src strs -> WarningTxt (noLocA . fromWarningCategory <$> mb_cat) src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
     IfDeprecatedTxt src strs -> DeprecatedTxt src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
 
-fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers StringLiteral GhcRn
+fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers StringLit GhcRn
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
 
-fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral
+fromIfaceStringLiteral :: IfaceStringLiteral -> StringLit
 fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs Nothing
 
 

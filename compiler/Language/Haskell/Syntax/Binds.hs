@@ -36,7 +36,7 @@ import GHC.Types.Fixity (Fixity)
 import GHC.Types.Basic (InlinePragma)
 
 import GHC.Data.BooleanFormula (LBooleanFormula)
-import GHC.Types.SourceText (StringLiteral)
+import GHC.Types.SourceText (StringLit)
 
 import Data.Void
 import Data.Bool
@@ -477,7 +477,7 @@ data Sig pass
 
   | SCCFunSig  (XSCCFunSig pass)
                (LIdP pass)    -- Function name
-               (Maybe (XRec pass StringLiteral))
+               (Maybe (XRec pass StringLit))
        -- | A complete match pragma
        --
        -- > {-# COMPLETE C, D [:: T] #-}

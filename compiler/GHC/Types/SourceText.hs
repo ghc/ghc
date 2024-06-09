@@ -14,7 +14,7 @@ module GHC.Types.SourceText
    -- * Literals
    , IntegralLit(..)
    , FractionalLit(..)
-   , StringLiteral(..)
+   , StringLit(..)
    , negateIntegralLit
    , negateFractionalLit
    , mkIntegralLit
@@ -301,7 +301,7 @@ instance Outputable FractionalLit where
 
 -- | A String Literal in the source, including its original raw format for use by
 -- source to source manipulation tools.
-data StringLiteral = StringLiteral
+data StringLit = StringLiteral
                        { sl_st :: SourceText, -- literal raw source.
                                               -- See Note [Literal source text]
                          sl_fs :: FastString, -- literal string value
@@ -314,8 +314,8 @@ data StringLiteral = StringLiteral
                        -- that would cause import loops.
                        } deriving Data
 
-instance Eq StringLiteral where
+instance Eq StringLit where
   (StringLiteral _ a _) == (StringLiteral _ b _) = a == b
 
-instance Outputable StringLiteral where
+instance Outputable StringLit where
   ppr sl = pprWithSourceText (sl_st sl) (doubleQuotes $ ftext $ sl_fs sl)

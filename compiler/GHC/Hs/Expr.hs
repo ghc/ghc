@@ -2164,7 +2164,7 @@ lamCaseKeyword LamSingle = text "lambda"
 lamCaseKeyword LamCase   = text "\\case"
 lamCaseKeyword LamCases  = text "\\cases"
 
-pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
+pprExternalSrcLoc :: (StringLit,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src _,(n1,n2),(n3,n4))
   = ppr (src,(n1,n2),(n3,n4))
 

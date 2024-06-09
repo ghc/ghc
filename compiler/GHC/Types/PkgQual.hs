@@ -12,8 +12,8 @@ import Data.Data
 
 -- | Package-qualifier as it was parsed
 data RawPkgQual
-  = NoRawPkgQual             -- ^ No package qualifier
-  | RawPkgQual StringLiteral -- ^ Raw package qualifier string.
+  = NoRawPkgQual         -- ^ No package qualifier
+  | RawPkgQual StringLit -- ^ Raw package qualifier string.
   deriving (Data)
 
 -- | Package-qualifier after renaming

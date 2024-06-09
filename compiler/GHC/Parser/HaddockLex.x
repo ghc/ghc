@@ -1,7 +1,7 @@
 {
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module GHC.Parser.HaddockLex (lexHsDoc, lexStringLiteral) where
+module GHC.Parser.HaddockLex (lexHsDoc, lexStringLit) where
 
 import GHC.Prelude
 
@@ -129,11 +129,11 @@ advanceSrcLocBS !loc bs = case utf8UnconsByteString bs of
   Nothing -> loc
   Just (c, bs') -> advanceSrcLocBS (advanceSrcLoc loc c) bs'
 
--- | Lex 'StringLiteral' for warning messages
-lexStringLiteral :: P (LocatedN RdrName) -- ^ A precise identifier parser
-                 -> Located StringLiteral
-                 -> Located (WithHsDocIdentifiers StringLiteral GhcPs)
-lexStringLiteral identParser (L l sl@(StringLiteral _ fs _))
+-- | Lex 'StringLit' for warning messages
+lexStringLit :: P (LocatedN RdrName) -- ^ A precise identifier parser
+                 -> Located StringLit
+                 -> Located (WithHsDocIdentifiers StringLit GhcPs)
+lexStringLit identParser (L l sl@(StringLiteral _ fs _))
   = L l (WithHsDocIdentifiers sl idents)
   where
     bs = bytesFS fs
