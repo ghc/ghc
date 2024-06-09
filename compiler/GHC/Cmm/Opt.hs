@@ -92,7 +92,7 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
       MO_SF_Round _frm to -> CmmLit (CmmFloat (fromInteger x) to)
       MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
       MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
-      MO_XX_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
+      MO_XX_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
 
       _ -> panic $ "cmmMachOpFoldM: unknown unary op: " ++ show op
 
