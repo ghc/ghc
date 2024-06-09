@@ -42,7 +42,6 @@ import Data.Bool
 import Data.Eq
 import Data.Maybe
 import Data.List.NonEmpty ( NonEmpty )
-import GHC.Types.Name.Reader
 
 {- Note [RecordDotSyntax field updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -265,19 +264,6 @@ data HsExpr p
   = HsVar     (XVar p)
               (LIdP p) -- ^ Variable
                        -- See Note [Located RdrNames]
-
-  | HsUnboundVar (XUnboundVar p)
-                 RdrName     -- ^ Unbound variable; also used for "holes"
-                             --   (_ or _x).
-                             -- Turned from HsVar to HsUnboundVar by the
-                             --   renamer, when it finds an out-of-scope
-                             --   variable or hole.
-                             -- The (XUnboundVar p) field becomes an HoleExprRef
-                             --   after typechecking; this is where the
-                             --   erroring expression will be written after
-                             --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
-
-
   | HsRecSel  (XRecSel p)
               (FieldOcc p) -- ^ Variable pointing to record selector
                            -- See Note [Non-overloaded record field selectors] and
@@ -578,7 +564,8 @@ data HsExpr p
   -- Used with RequiredTypeArguments, e.g. fn (type (Int -> Bool))
   | HsEmbTy   (XEmbTy p)
               (LHsWcType (NoGhcTc p))
-
+  -- | Holes, written _
+  | HsHole      (XHole p)
   | XExpr       !(XXExpr p)
   -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the
   -- general idea, and Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr

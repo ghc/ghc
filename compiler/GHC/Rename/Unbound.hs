@@ -165,6 +165,7 @@ unboundNameOrTermInType if_term_in_type looking_for rdr_name hints
         TermInTypes demoted_name -> TcRnTermNameInType demoted_name hints
         _ -> TcRnNotInScope err name_to_search imp_errs hints
 
+-- TODO(aidylns): this used to handle holes as well, does something need to be changed?
 notInScopeErr :: WhereLooking -> RdrName -> NotInScopeError
 notInScopeErr where_look rdr_name
   | Just name <- isExact_maybe rdr_name

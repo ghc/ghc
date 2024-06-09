@@ -564,7 +564,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
 
     fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
       = case tc_fun of
-          HsUnboundVar {} -> True
+          XExpr (HsUnboundVarTc {}) -> True
           _               -> False
 
     inst_fun :: [HsExprArg 'TcpRn] -> ForAllTyFlag -> Bool
@@ -932,8 +932,8 @@ expr_to_type earg =
       = do { t <- go (L l e)
            ; let splice_result' = HsUntypedSpliceTop finalizers t
            ; return (L l (HsSpliceTy splice_result' splice)) }
-    go (L l (HsUnboundVar _ rdr))
-      | isUnderscore occ = return (L l (HsWildCardTy noExtField))
+    go (L l (HsHole _)) = return (L l (HsWildCardTy noExtField))
+    go (L _ (XExpr (HsUnboundVarRn rdr)))
       | startsWithUnderscore occ =
           -- See Note [Wildcards in the T2T translation]
           do { wildcards_enabled <- xoptM LangExt.NamedWildCards

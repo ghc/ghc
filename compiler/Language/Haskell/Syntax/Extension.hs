@@ -407,7 +407,6 @@ type family XXModule x
 -- Type families for the HsExpr extension points
 
 type family XVar            x
-type family XUnboundVar     x
 type family XRecSel         x
 type family XOverLabel      x
 type family XIPVar          x
@@ -448,6 +447,7 @@ type family XTick           x
 type family XBinTick        x
 type family XPragE          x
 type family XEmbTy          x
+type family XHole           x
 type family XXExpr          x
 
 -- -------------------------------------

@@ -1674,9 +1674,6 @@ repE (HsTypedSplice n _) = rep_splice n
 repE (HsUntypedSplice (HsUntypedSpliceNested n) _)  = rep_splice n
 repE e@(HsUntypedSplice (HsUntypedSpliceTop _ _) _) = pprPanic "repE: top level splice" (ppr e)
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
-repE (HsUnboundVar _ uv)   = do
-                               name <- repRdrName uv
-                               repUnboundVar name
 repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
   repGetField e1 f
@@ -1684,6 +1681,7 @@ repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel .
 repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]
+repE (HsHole _) = error "TODO(aidylns)"
 repE e@(XExpr (ExpandedThingRn o x))
   | OrigExpr e <- o
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
@@ -1694,6 +1692,9 @@ repE e@(XExpr (ExpandedThingRn o x))
   = notHandled (ThExpressionForm e)
 
 repE (XExpr (PopErrCtxt (L _ e))) = repE e
+repE (XExpr (HsUnboundVarRn uv)) = do
+  name <- repRdrName uv
+  repUnboundVar name
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)

@@ -1176,7 +1176,6 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie $ C Use (L mspan var)
              -- Patch up var location since typechecker removes it
         ]
-      HsUnboundVar _ _ -> []  -- there is an unbound name here, but that causes trouble
       HsRecSel _ fld ->
         [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
         ]
@@ -1309,6 +1308,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       HsGetField {} -> []
       HsProjection {} -> []
+      HsHole {} -> []
       XExpr x
         | HieTc <- hiePass @p
         -> case x of
@@ -1325,6 +1325,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
              HsBinTick _ _ expr
                -> [ toHie expr
                   ]
+             HsUnboundVarTc _ _ -> []  -- there is an unbound name here, but that causes trouble
         | otherwise -> []
 
 -- NOTE: no longer have the location

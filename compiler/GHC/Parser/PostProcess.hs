@@ -1921,8 +1921,8 @@ instance DisambECP (HsExpr GhcPs) where
                                                          (PsErrUnallowedPragma prag)
   rejectPragmaPV _                        = return ()
 
-hsHoleExpr :: Maybe EpAnnUnboundVar -> HsExpr GhcPs
-hsHoleExpr anns = HsUnboundVar anns (mkRdrUnqual (mkVarOccFS (fsLit "_")))
+hsHoleExpr :: Maybe EpAnnUnboundVar -> HsExpr GhcPs -- TODO(aidylns): why is this 'Maybe EpAnnUnboundVar' here?
+hsHoleExpr anns = HsHole anns
 
 instance DisambECP (PatBuilder GhcPs) where
   type Body (PatBuilder GhcPs) = PatBuilder

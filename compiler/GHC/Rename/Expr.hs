@@ -318,7 +318,7 @@ rnUnboundVar v = do
   deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
   -- See Note [Reporting unbound names] for difference between qualified and unqualified names.
   unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
-  return (HsUnboundVar noExtField v, emptyFVs)
+  return (XExpr (HsUnboundVarRn v), emptyFVs)
 
 rnExpr (HsVar _ (L l v))
   = do { dflags <- getDynFlags
@@ -352,9 +352,6 @@ rnExpr (HsVar _ (L l v))
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
-
-rnExpr (HsUnboundVar _ v)
-  = return (HsUnboundVar noExtField v, emptyFVs)
 
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel _ src v)
@@ -612,6 +609,9 @@ rnExpr (ArithSeq _ _ seq)
 rnExpr (HsEmbTy _ ty)
   = do { (ty', fvs) <- rnHsWcType HsTypeCtx ty
        ; return (HsEmbTy noExtField ty', fvs) }
+
+rnExpr (HsHole _)
+  = rnUnboundVar (error "TODO(aidylns)")
 
 {-
 ************************************************************************

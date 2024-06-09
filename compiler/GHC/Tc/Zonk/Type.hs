@@ -924,16 +924,6 @@ zonkExpr (HsVar x (L l id))
   do { id' <- zonkIdOcc id
      ; return (HsVar x (L l id')) }
 
-zonkExpr (HsUnboundVar her occ)
-  = do her' <- zonk_her her
-       return (HsUnboundVar her' occ)
-  where
-    zonk_her :: HoleExprRef -> ZonkTcM HoleExprRef
-    zonk_her (HER ref ty u)
-      = do updTcRefM ref zonkEvTerm
-           ty'  <- zonkTcTypeToTypeX ty
-           return (HER ref ty' u)
-
 zonkExpr (HsRecSel _ (FieldOcc v occ))
   = do { v' <- zonkIdOcc v
        ; return (HsRecSel noExtField (FieldOcc v' occ)) }
@@ -1076,6 +1066,10 @@ zonkExpr (HsStatic (fvs, ty) expr)
 
 zonkExpr (HsEmbTy x _) = dataConCantHappen x
 
+zonkExpr (HsHole her)
+  = do her' <- zonkHoleExprRef her
+       return (HsHole her')
+
 zonkExpr (XExpr (WrapExpr (HsWrap co_fn expr)))
   = runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->
     do new_expr <- zonkExpr expr
@@ -1099,6 +1093,16 @@ zonkExpr (HsGetField x _ _) = dataConCantHappen x
 zonkExpr (HsProjection x _) = dataConCantHappen x
 zonkExpr e@(XExpr (HsTick {})) = pprPanic "zonkExpr" (ppr e)
 zonkExpr e@(XExpr (HsBinTick {})) = pprPanic "zonkExpr" (ppr e)
+zonkExpr (XExpr (HsUnboundVarTc her occ))
+  = do her' <- zonkHoleExprRef her
+       return (XExpr (HsUnboundVarTc her' occ))
+
+zonkHoleExprRef :: HoleExprRef -> ZonkTcM HoleExprRef
+zonkHoleExprRef (HER ref ty u)
+  = do updTcRefM ref zonkEvTerm
+       ty'  <- zonkTcTypeToTypeX ty
+       return (HER ref ty' u)
+
 
 -------------------------------------------------------------------------
 {-

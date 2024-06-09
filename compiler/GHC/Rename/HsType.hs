@@ -1429,7 +1429,8 @@ get_op :: LHsExpr GhcRn -> OpName
 -- An unbound name could be either HsVar or HsUnboundVar
 -- See GHC.Rename.Expr.rnUnboundVar
 get_op (L _ (HsVar _ n))         = NormalOp (unLoc n)
-get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
+get_op (L _ (HsHole _))          = error "TODO(aidylns)"
+get_op (L _ (XExpr (HsUnboundVarRn uv))) = UnboundOp uv
 get_op (L _ (HsRecSel _ fld))    = RecFldOp fld
 get_op other                     = pprPanic "get_op" (ppr other)
 

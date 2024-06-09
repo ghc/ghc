@@ -716,7 +716,6 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
 exprCtOrigin (HsGetField _ _ (L _ f)) = HasFieldOrigin (field_label $ unLoc $ dfoLabel f)
-exprCtOrigin (HsUnboundVar {})    = Shouldn'tHappenOrigin "unbound variable"
 exprCtOrigin (HsRecSel _ f)       = OccurrenceOfRecSel (unLoc $ foLabel f)
 exprCtOrigin (HsOverLabel _ _ l)  = OverLabelOrigin l
 exprCtOrigin (ExplicitList {})    = ListOrigin
@@ -751,9 +750,11 @@ exprCtOrigin (HsUntypedSplice {})  = Shouldn'tHappenOrigin "TH untyped splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
+exprCtOrigin (HsHole {})         = Shouldn'tHappenOrigin "hole"
 exprCtOrigin (XExpr (ExpandedThingRn thing _)) | OrigExpr a <- thing = exprCtOrigin a
                                                | OrigStmt _ <- thing = DoOrigin
                                                | OrigPat p  <- thing = DoPatOrigin p
+exprCtOrigin (XExpr (HsUnboundVarRn {})) = Shouldn'tHappenOrigin "unbound variable"
 exprCtOrigin (XExpr (PopErrCtxt {})) = Shouldn'tHappenOrigin "PopErrCtxt"
 
 -- | Extract a suitable CtOrigin from a MatchGroup
