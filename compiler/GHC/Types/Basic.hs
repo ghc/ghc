@@ -14,7 +14,9 @@ types that
 \end{itemize}
 -}
 
-{-# OPTIONS_GHC -Wno-orphans #-} -- Outputable PromotionFlag, Binary PromotionFlag, Outputable Boxity, Binay Boxity
+{-# OPTIONS_GHC -Wno-orphans #-}
+-- Outputable PromotionFlag, Binary PromotionFlag, Outputable Boxity, Binay Boxity,
+-- Outputable ForAllTyFlag, Specificity, et friends...
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -132,7 +134,8 @@ import GHC.Utils.Binary
 import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
-import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
+import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag, TopLevelFlag(..), isTopLevel, isNotTopLevel, TypeOrData(..), TyConFlavour(..))
+import Language.Haskell.Syntax.Specificity
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
 
 import Control.DeepSeq ( NFData(..) )
@@ -541,19 +544,6 @@ pprRuleName rn = doubleQuotes (ftext rn)
 *                                                                      *
 ************************************************************************
 -}
-
-data TopLevelFlag
-  = TopLevel
-  | NotTopLevel
-  deriving Data
-
-isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
-
-isNotTopLevel NotTopLevel = True
-isNotTopLevel TopLevel    = False
-
-isTopLevel TopLevel     = True
-isTopLevel NotTopLevel  = False
 
 instance Outputable TopLevelFlag where
   ppr TopLevel    = text "<TopLevel>"
@@ -2166,22 +2156,6 @@ data TypeOrConstraint
 *                                                                      *
 ********************************************************************* -}
 
--- | Paints a picture of what a 'TyCon' represents, in broad strokes.
--- This is used towards more informative error messages.
-data TyConFlavour tc
-  = ClassFlavour
-  | TupleFlavour Boxity
-  | SumFlavour
-  | DataTypeFlavour
-  | NewtypeFlavour
-  | AbstractTypeFlavour
-  | OpenFamilyFlavour TypeOrData (Maybe tc) -- Just tc <=> (tc == associated class)
-  | ClosedTypeFamilyFlavour
-  | TypeSynonymFlavour
-  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
-  | PromotedDataConFlavour
-  deriving (Eq, Data, Functor)
-
 instance Outputable (TyConFlavour tc) where
   ppr = text . go
     where
@@ -2220,16 +2194,49 @@ tyConFlavourAssoc_maybe :: TyConFlavour tc -> Maybe tc
 tyConFlavourAssoc_maybe (OpenFamilyFlavour _ mb_parent) = mb_parent
 tyConFlavourAssoc_maybe _                               = Nothing
 
--- | Whether something is a type or a data declaration,
--- e.g. a type family or a data family.
-data TypeOrData
-  = IAmData
-  | IAmType
-  deriving (Eq, Data)
-
 instance Outputable TypeOrData where
   ppr IAmData = text "data"
   ppr IAmType = text "type"
+
+{- *********************************************************************
+*                                                                      *
+*                   ForAllTyFlag
+*                                                                      *
+********************************************************************* -}
+
+instance Outputable ForAllTyFlag where
+  ppr Required  = text "[req]"
+  ppr Specified = text "[spec]"
+  ppr Inferred  = text "[infrd]"
+
+instance Binary Specificity where
+  put_ bh SpecifiedSpec = putByte bh 0
+  put_ bh InferredSpec  = putByte bh 1
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return SpecifiedSpec
+      _ -> return InferredSpec
+
+instance Binary ForAllTyFlag where
+  put_ bh Required  = putByte bh 0
+  put_ bh Specified = putByte bh 1
+  put_ bh Inferred  = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Required
+      1 -> return Specified
+      _ -> return Inferred
+
+instance NFData Specificity where
+  rnf SpecifiedSpec = ()
+  rnf InferredSpec = ()
+instance NFData ForAllTyFlag where
+  rnf (Invisible spec) = rnf spec
+  rnf Required = ()
 
 {- *********************************************************************
 *                                                                      *
