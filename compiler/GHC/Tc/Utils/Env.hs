@@ -115,7 +115,6 @@ import GHC.Utils.Encoding
 import GHC.Utils.Misc ( HasDebugCallStack )
 
 import GHC.Data.FastString
-import GHC.Data.Bag
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe( MaybeErr(..), orElse )
 
@@ -205,7 +204,7 @@ addTypecheckedBinds tcg_env binds
   | isHsBootOrSig (tcg_src tcg_env) = tcg_env
     -- Do not add the code for record-selector bindings
     -- when compiling hs-boot files
-  | otherwise = tcg_env { tcg_binds = foldr unionBags
+  | otherwise = tcg_env { tcg_binds = foldr (++)
                                             (tcg_binds tcg_env)
                                             binds }
 

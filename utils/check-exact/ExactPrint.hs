@@ -34,7 +34,6 @@ module ExactPrint
 import GHC
 import GHC.Base (NonEmpty(..))
 import GHC.Core.Coercion.Axiom (Role(..))
-import GHC.Data.Bag
 import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import GHC.TypeLits
@@ -2362,14 +2361,14 @@ instance ExactPrint (ClsInstDecl GhcPs) where
           ds <- withSortKey sortKey
                                [(ClsAtdTag, prepareListAnnotationA ats),
                                 (ClsAtdTag, prepareListAnnotationF an adts),
-                                (ClsMethodTag, prepareListAnnotationA (bagToList binds)),
+                                (ClsMethodTag, prepareListAnnotationA binds),
                                 (ClsSigTag, prepareListAnnotationA sigs)
                                ]
           an3 <- markEpAnnL an2 lidl AnnCloseC -- '}'
           let
             ats'   = undynamic ds
             adts'  = undynamic ds
-            binds' = listToBag $ undynamic ds
+            binds' = undynamic ds
             sigs'  = undynamic ds
           return (ClsInstDecl { cid_ext = (mbWarn', an3, sortKey)
                               , cid_poly_ty = inst_ty', cid_binds = binds'
@@ -2668,8 +2667,8 @@ instance ExactPrint (HsValBindsLR GhcPs GhcPs) where
   exact (ValBinds sortKey binds sigs) = do
     decls <- setLayoutBoth $ mapM markAnnotated $ hsDeclsValBinds (ValBinds sortKey binds sigs)
     let
-      binds' = listToBag $ concatMap decl2Bind decls
-      sigs'  =             concatMap decl2Sig decls
+      binds' = concatMap decl2Bind decls
+      sigs'  = concatMap decl2Sig decls
     return (ValBinds sortKey binds' sigs')
   exact (XValBindsLR _) = panic "XValBindsLR"
 
@@ -3672,7 +3671,7 @@ instance ExactPrint (TyClDecl GhcPs) where
                     tcdATs = ats, tcdATDefs = at_defs,
                     tcdDocs = _docs})
       -- TODO: add a test that demonstrates tcdDocs
-      | null sigs && isEmptyBag methods && null ats && null at_defs -- No "where" part
+      | null sigs && null methods && null ats && null at_defs -- No "where" part
       = do
           (an0, fds', lclas', tyvars',context') <- top_matter
           an1 <- markEpAnnL an0 lidl AnnOpenC
@@ -3692,7 +3691,7 @@ instance ExactPrint (TyClDecl GhcPs) where
           an2 <- markEpAnnAllL' an1 lidl AnnSemi
           ds <- withSortKey sortKey
                                [(ClsSigTag, prepareListAnnotationA sigs),
-                                (ClsMethodTag, prepareListAnnotationA (bagToList methods)),
+                                (ClsMethodTag, prepareListAnnotationA methods),
                                 (ClsAtTag, prepareListAnnotationA ats),
                                 (ClsAtdTag, prepareListAnnotationA at_defs)
                              -- ++ prepareListAnnotation docs
@@ -3700,7 +3699,7 @@ instance ExactPrint (TyClDecl GhcPs) where
           an3 <- markEpAnnL an2 lidl AnnCloseC
           let
             sigs'    = undynamic ds
-            methods' = listToBag $ undynamic ds
+            methods' = undynamic ds
             ats'     = undynamic ds
             at_defs' = undynamic ds
           return (ClassDecl {tcdCExt = (an3, lo, sortKey),

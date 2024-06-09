@@ -244,7 +244,7 @@ tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- signatures in it.  The renamer checked all this.
 tcHsBootSigs binds sigs
   = do  { unless (null binds) $
-            rejectBootDecls HsBoot BootBindsRn (concatMap (bagToList . snd) binds)
+            rejectBootDecls HsBoot BootBindsRn (concatMap snd binds)
         ; concatMapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
@@ -343,7 +343,7 @@ tcValBinds top_lvl binds sigs thing_inside
         ; return (binds' ++ extra_binds', wrapper, thing) }}
   where
     patsyns = getPatSynBinds binds
-    prag_fn = mkPragEnv sigs (foldr (unionBags . snd) emptyBag binds)
+    prag_fn = mkPragEnv sigs (concatMap snd binds)
 
 ------------------------
 
@@ -401,7 +401,7 @@ tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) closed thing_inside
         -- A single non-recursive binding
         -- We want to keep non-recursive things non-recursive
         -- so that we desugar unlifted bindings correctly
-  = do { let bind = case bagToList binds of
+  = do { let bind = case binds of
                  [bind] -> bind
                  []     -> panic "tc_group: empty list of binds"
                  _      -> panic "tc_group: NonRecursive binds is not a singleton bag"
@@ -436,8 +436,8 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
                         ; ((binds2, inner_wrapper, thing), outer_wrapper) <-
                               tcExtendLetEnv top_lvl sig_fn closed ids1
                               (go sccs)
-                        ; return (binds1 `unionBags` binds2, outer_wrapper <.> inner_wrapper, thing) }
-    go []         = do  { thing <- thing_inside; return (emptyBag, idHsWrapper, thing) }
+                        ; return (binds1 ++ binds2, outer_wrapper <.> inner_wrapper, thing) }
+    go []         = do  { thing <- thing_inside; return ([], idHsWrapper, thing) }
 
     tc_scc (AcyclicSCC bind) = tc_sub_group NonRecursive [bind]
     tc_scc (CyclicSCC binds) = tc_sub_group Recursive    binds
@@ -494,7 +494,7 @@ mkEdges sig_fn binds
     no_sig :: Name -> Bool
     no_sig n = not (hasCompleteSig sig_fn n)
 
-    keyd_binds = bagToList binds `zip` [0::BKey ..]
+    keyd_binds = binds `zip` [0::BKey ..]
 
     key_map :: NameEnv BKey     -- Which binding it comes from
     key_map = mkNameEnv [(bndr, key) | (L _ bind, key) <- keyd_binds
@@ -561,7 +561,7 @@ recoveryCode :: [Name] -> TcSigFun -> TcM (LHsBinds GhcTc, [Scaled Id])
 recoveryCode binder_names sig_fn
   = do  { traceTc "tcBindsWithSigs: error recovery" (ppr binder_names)
         ; let poly_ids = map (Scaled ManyTy) $ map mk_dummy binder_names
-        ; return (emptyBag, poly_ids) }
+        ; return ([], poly_ids) }
   where
     mk_dummy name
       | Just sig <- sig_fn name
@@ -674,10 +674,10 @@ tcPolyCheck prag_fn
                                  , abs_ev_vars  = []
                                  , abs_ev_binds = []
                                  , abs_exports  = [export]
-                                 , abs_binds    = unitBag (L bind_loc bind')
+                                 , abs_binds    = [L bind_loc bind']
                                  , abs_sig      = True }
 
-       ; return (unitBag abs_bind, [Scaled mult poly_id]) }
+       ; return ([abs_bind], [Scaled mult poly_id]) }
 
 tcPolyCheck _prag_fn sig bind
   = pprPanic "tcPolyCheck" (ppr sig $$ ppr bind)
@@ -798,7 +798,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
                                  , abs_sig = False }
 
        ; traceTc "Binding:" (ppr (poly_ids `zip` map idType poly_ids))
-       ; return (unitBag abs_bind, scaled_poly_ids) }
+       ; return ([abs_bind], scaled_poly_ids) }
          -- poly_ids are guaranteed zonked by mkExport
   where
     manyIfPat bind@(L _ (PatBind{pat_lhs=(L _ (VarPat{}))}))
@@ -1376,7 +1376,7 @@ tcMonoBinds is_rec sig_fn no_gen
                tcFunBindMatches (InfSigCtxt name) name mult matches [] exp_ty
        ; mono_id <- newLetBndr no_gen name mult rhs_ty'
 
-        ; return (unitBag $ L b_loc $
+        ; return (singleton $ L b_loc $
                      FunBind { fun_id      = L nm_loc mono_id,
                                fun_matches = matches',
                                fun_ext     = (co_fn, []) },
@@ -1427,7 +1427,7 @@ tcMonoBinds is_rec sig_fn no_gen
             -- `tcCollectingUsage` to throw the `bottomUE` away, since it would
             -- let us bypass many linearity checks.
 
-       ; return ( unitBag $ L b_loc $
+       ; return ( singleton $ L b_loc $
                      PatBind { pat_lhs = pat', pat_rhs = grhss'
                              , pat_ext = (pat_ty, ([],[]))
                              , pat_mult = setTcMultAnn mult mult_ann }
@@ -1457,7 +1457,7 @@ tcMonoBinds _ sig_fn no_gen binds
         ; binds' <- tcExtendRecIds rhs_id_env $
                     mapM (wrapLocMA tcRhs) tc_binds
 
-        ; return (listToBag binds', mono_infos) }
+        ; return (binds', mono_infos) }
 
 {- Note [Special case for non-recursive function bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1903,7 +1903,7 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
     has_mult_ann_and_pat (L _ (PatBind{})) = True
     has_mult_ann_and_pat _ = False
 
-isClosedBndrGroup :: TcTypeEnv -> Bag (LHsBind GhcRn) -> IsGroupClosed
+isClosedBndrGroup :: TcTypeEnv -> [(LHsBind GhcRn)] -> IsGroupClosed
 isClosedBndrGroup type_env binds
   = IsGroupClosed fv_env type_closed
   where

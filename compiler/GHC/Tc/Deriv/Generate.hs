@@ -240,7 +240,7 @@ gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                 else non_nullary_pats ++ [mkHsCaseAlt nlWildPat true_Expr]))
       ]
 
-    method_binds = unitBag eq_bind
+    method_binds = [eq_bind]
     eq_bind = mkFunBindEC 2 loc eq_RDR (const true_Expr) binds
       where
         binds
@@ -406,10 +406,9 @@ gen_Ord_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, Bag AuxBindSpec
 gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                    , dit_rep_tc_args = tycon_args }) = do
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
-      then ( unitBag $ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []
+      then ( [mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []]
            , emptyBag)
-      else ( unitBag (mkOrdOp OrdCompare)
-             `unionBags` other_ops
+      else ( [mkOrdOp OrdCompare] ++ other_ops
            , aux_binds)
   where
     aux_binds = emptyBag
@@ -418,9 +417,9 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     other_ops
       | (last_tag - first_tag) <= 2     -- 1-3 constructors
         || null non_nullary_cons        -- Or it's an enumeration
-      = listToBag [mkOrdOp OrdLT, lE, gT, gE]
+      = [mkOrdOp OrdLT, lE, gT, gE]
       | otherwise
-      = emptyBag
+      = []
 
     negate_expr = nlHsApp (nlHsVar not_RDR)
     pats = noLocA [a_Pat, b_Pat]
@@ -661,7 +660,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     return ( method_binds tag2con_RDR maxtag_RDR
            , aux_binds    tag2con_RDR maxtag_RDR )
   where
-    method_binds tag2con_RDR maxtag_RDR = listToBag
+    method_binds tag2con_RDR maxtag_RDR =
       [ succ_enum      tag2con_RDR maxtag_RDR
       , pred_enum      tag2con_RDR
       , to_enum        tag2con_RDR maxtag_RDR
@@ -745,10 +744,10 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
 gen_Bounded_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Bounded_binds loc (DerivInstTys{dit_rep_tc = tycon})
   | isEnumerationTyCon tycon
-  = (listToBag [ min_bound_enum, max_bound_enum ], emptyBag)
+  = ([ min_bound_enum, max_bound_enum ], emptyBag)
   | otherwise
   = assert (isSingleton data_cons)
-    (listToBag [ min_bound_1con, max_bound_1con ], emptyBag)
+    ([ min_bound_1con, max_bound_1con ], emptyBag)
   where
     data_cons = tyConDataCons tycon
 
@@ -842,7 +841,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
       else (single_con_ixes, emptyBag)
   where
     --------------------------------------------------------------
-    enum_ixes tag2con_RDR = listToBag
+    enum_ixes tag2con_RDR =
       [ enum_range   tag2con_RDR
       , enum_index
       , enum_inRange
@@ -889,7 +888,7 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
 
     --------------------------------------------------------------
     single_con_ixes
-      = listToBag [single_con_range, single_con_index, single_con_inRange]
+      = [single_con_range, single_con_index, single_con_inRange]
 
     data_con
       = case tyConSingleDataCon_maybe tycon of -- just checking...
@@ -1035,7 +1034,7 @@ gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> DerivInstTys
                -> (LHsBinds GhcPs, Bag AuxBindSpec)
 
 gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
-  = (listToBag [read_prec, default_readlist, default_readlistprec], emptyBag)
+  = ([read_prec, default_readlist, default_readlistprec], emptyBag)
   where
     -----------------------------------------------------------------------
     default_readlist
@@ -1220,7 +1219,7 @@ gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> DerivInstTys
 
 gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                                , dit_rep_tc_args = tycon_args })
-  = (unitBag shows_prec, emptyBag)
+  = ([shows_prec], emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
     shows_prec = mkFunBindEC 2 loc showsPrec_RDR id (map pats_etc data_cons)
@@ -1386,9 +1385,9 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
          dataT_RDR  <- new_dataT_rdr_name loc rep_tc
        ; dataC_RDRs <- traverse (new_dataC_rdr_name loc) data_cons
 
-       ; pure ( listToBag [ gfoldl_bind, gunfold_bind
-                          , toCon_bind dataC_RDRs, dataTypeOf_bind dataT_RDR ]
-                `unionBags` gcast_binds
+       ; pure ( [ gfoldl_bind, gunfold_bind
+                , toCon_bind dataC_RDRs, dataTypeOf_bind dataT_RDR ]
+                ++ gcast_binds
                           -- Auxiliary definitions: the data type and constructors
               , listToBag
                   ( DerivDataDataType rep_tc dataT_RDR dataC_RDRs
@@ -1478,10 +1477,10 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
                     Nothing          -> tyConKind rep_tc
     gcast_binds | tycon_kind `tcEqKind` kind1 = mk_gcast dataCast1_RDR gcast1_RDR
                 | tycon_kind `tcEqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
-                | otherwise                 = emptyBag
+                | otherwise                 = []
     mk_gcast dataCast_RDR gcast_RDR
-      = unitBag (mkSimpleGeneratedFunBind loc dataCast_RDR (noLocA [nlVarPat f_RDR])
-                                 (nlHsVar gcast_RDR `nlHsApp` nlHsVar f_RDR))
+      = [mkSimpleGeneratedFunBind loc dataCast_RDR (noLocA [nlVarPat f_RDR])
+                                 (nlHsVar gcast_RDR `nlHsApp` nlHsVar f_RDR)]
 
 
 kind1, kind2 :: Kind
@@ -1646,7 +1645,7 @@ lifting warning in derived code. (See #20688)
 gen_Lift_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
                                 , dit_rep_tc_args = tycon_args }) =
-  (listToBag [lift_bind, liftTyped_bind], emptyBag)
+  ([lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
                                  (map (pats_etc mk_untyped_bracket mk_usplice liftName) data_cons)
@@ -1975,7 +1974,7 @@ gen_Newtype_binds :: SrcSpan
                   -> (LHsBinds GhcPs, [LSig GhcPs])
 -- See Note [Newtype-deriving instances]
 gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
-  = (listToBag binds, sigs)
+  = (binds, sigs)
   where
     (binds, sigs) = mapAndUnzip mk_bind_and_sig (classMethods cls)
 

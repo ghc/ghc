@@ -496,7 +496,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
             --     TcGblEnv.  They are now in ev_binds', binds', etc.
             --   * Add the zonked Ids from the value bindings to tcg_type_env
             --     Up to now these Ids are only in tcl_env's type-envt
-            init_tcg_env = tcg_env { tcg_binds     = emptyBag
+            init_tcg_env = tcg_env { tcg_binds     = []
                                    , tcg_ev_binds  = emptyBag
                                    , tcg_imp_specs = []
                                    , tcg_rules     = []
@@ -542,7 +542,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
               -- to the previous tcg_env
 
             ; tcg_env' = tcg_env
-                          { tcg_binds     = binds'    `unionBags` binds_mf
+                          { tcg_binds     = binds'     ++ binds_mf
                           , tcg_ev_binds  = ev_binds' `unionBags` ev_binds_mf
                           , tcg_imp_specs = imp_specs' ++ imp_specs_mf
                           , tcg_rules     = rules'     ++ rules_mf
@@ -774,10 +774,10 @@ checkHiBootIface tcg_env boot_info
         -- to (a) the type envt, and (b) the top-level bindings
         ; let boot_impedance_bds = map fst imp_prs
               type_env'          = extendTypeEnvWithIds local_type_env boot_impedance_bds
-              impedance_binds    = listToBag [ mkVarBind boot_id (nlHsVar id)
-                                             | (boot_id, id) <- imp_prs ]
+              impedance_binds    =  [ mkVarBind boot_id (nlHsVar id)
+                                    | (boot_id, id) <- imp_prs ]
               tcg_env_w_binds
-                = tcg_env { tcg_binds = binds `unionBags` impedance_binds }
+                = tcg_env { tcg_binds = binds ++ impedance_binds }
 
         ; type_env' `seq`
              -- Why the seq?  Without, we will put a TypeEnv thunk in
@@ -1656,8 +1656,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
 
                 -- Wrap up
         traceTc "Tc7a" empty ;
-        let { all_binds = inst_binds     `unionBags`
-                          foe_binds
+        let { all_binds = inst_binds ++ foe_binds
 
             ; fo_gres = fi_gres `unionBags` foe_gres
             ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` (greName gre))
@@ -1668,7 +1667,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
 
                 -- Extend the GblEnv with the (as yet un-zonked)
                 -- bindings, rules, foreign decls
-            ; tcg_env' = tcg_env { tcg_binds   = tcg_binds tcg_env `unionBags` all_binds
+            ; tcg_env' = tcg_env { tcg_binds   = tcg_binds tcg_env ++ all_binds
                                  , tcg_sigs    = tcg_sigs tcg_env `unionNameSet` sig_names
                                  , tcg_rules   = tcg_rules tcg_env
                                                       ++ flattenRuleDecls rules
@@ -1857,7 +1856,7 @@ generateMainBinding tcg_env main_name = do
 
     ; return (tcg_env { tcg_main  = Just main_name
                       , tcg_binds = tcg_binds tcg_env
-                                    `snocBag` main_bind
+                                    ++ [main_bind]
                       , tcg_dus   = tcg_dus tcg_env
                                     `plusDU` usesOnly (unitFV main_name) })
                     -- Record the use of 'main', so that we don't
@@ -2185,7 +2184,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
               -- [let it = expr]
               let_stmt  = L loc $ LetStmt noAnn $ HsValBinds noAnn
                            $ XValBindsLR
-                               (NValBinds [(NonRecursive,unitBag the_bind)] [])
+                               (NValBinds [(NonRecursive,[the_bind])] [])
 
               -- [it <- e]
               bind_stmt = L loc $ BindStmt

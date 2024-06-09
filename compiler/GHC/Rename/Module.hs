@@ -53,7 +53,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
-import GHC.Data.Bag
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
@@ -481,7 +480,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --
     checkCanonicalMonadInstances
       | cls == applicativeClassName =
-          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpanA loc $
+          forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
@@ -494,7 +493,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   _ -> return ()
 
       | cls == monadClassName =
-          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpanA loc $
+          forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
@@ -523,7 +522,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --
     checkCanonicalMonoidInstances
       | cls == semigroupClassName =
-          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpanA loc $
+          forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id      = L _ name
                           , fun_matches = mg }
@@ -533,7 +532,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   _ -> return ()
 
       | cls == monoidClassName =
-          forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpanA loc $
+          forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
@@ -2712,7 +2711,7 @@ add_kisig d (tycls@(TyClGroup { group_kisigs = kisigs }) : rest)
   = tycls { group_kisigs = d : kisigs } : rest
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBinds x bs sigs) = ValBinds x (bs `snocBag` b) sigs
+add_bind b (ValBinds x bs sigs) = ValBinds x (bs ++ [b]) sigs
 add_bind _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_bind"
 
 add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)

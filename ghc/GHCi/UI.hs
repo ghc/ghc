@@ -106,7 +106,6 @@ import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Data.Bag (unitBag)
 import qualified GHC.Data.Strict as Strict
 import GHC.Types.Error
 
@@ -1352,7 +1351,7 @@ runStmt input step = do
       let
         la  = L (noAnnSrcSpan loc)
         la' = L (noAnnSrcSpan loc)
-      in la (LetStmt noAnn (HsValBinds noAnn (ValBinds NoAnnSortKey (unitBag (la' bind)) [])))
+      in la (LetStmt noAnn (HsValBinds noAnn (ValBinds NoAnnSortKey [la' bind] [])))
 
     setDumpFilePrefix :: GHC.GhcMonad m => InteractiveContext -> m () -- #17500
     setDumpFilePrefix ic = do

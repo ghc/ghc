@@ -436,8 +436,7 @@
       (Prefix)
       []
       []
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       []
       []
       [])))
@@ -651,8 +650,7 @@
       (Prefix)
       []
       []
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       []
       []
       [])))]))

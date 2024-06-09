@@ -368,8 +368,7 @@
                 []))
               (Unqual
                {OccName: a}))))))))]
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       []
       []
       [(L

@@ -563,7 +563,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
         ; case tcg_src gbl_env of
           { HsSrcFile -> return ()
           ; HsBootOrSig boot_or_sig ->
-             do { rejectBootDecls boot_or_sig BootBindsRn (bagToList binds)
+             do { rejectBootDecls boot_or_sig BootBindsRn binds
                 ; rejectBootDecls boot_or_sig BootInstanceSigs uprags } }
         ; return ([inst_info], all_insts, deriv_infos) }
   where
@@ -1233,7 +1233,7 @@ tcInstDecls2 tycl_decls inst_decls
   = do  { -- (a) Default methods from class decls
           let class_decls = filter (isClassDecl . unLoc) tycl_decls
         ; dm_binds_s <- mapM tcClassDecl2 class_decls
-        ; let dm_binds = unionManyBags dm_binds_s
+        ; let dm_binds = concat dm_binds_s
 
           -- (b) instance declarations
         ; let dm_ids = collectHsBindsBinders CollNoDictBinders dm_binds
@@ -1244,7 +1244,7 @@ tcInstDecls2 tycl_decls inst_decls
                           mapM tcInstDecl2 inst_decls
 
           -- Done
-        ; return (dm_binds `unionBags` unionManyBags inst_binds_s) }
+        ; return (dm_binds ++ concat inst_binds_s) }
 
 {- Note [Default methods in the type environment]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1296,7 +1296,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                      op_items ibinds
 
                    ; return ( sc_ids     ++          meth_ids
-                            , sc_binds   `unionBags` meth_binds
+                            , sc_binds   ++ meth_binds
                             , sc_implics `unionBags` meth_implics ) }
 
        ; imp <- newImplication
@@ -1356,11 +1356,10 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
                                   , abs_ev_binds = []
-                                  , abs_binds = unitBag dict_bind
+                                  , abs_binds = [dict_bind]
                                   , abs_sig = True }
 
-       ; return (unitBag (L loc' main_bind)
-                  `unionBags` sc_meth_binds)
+       ; return (L loc' main_bind : sc_meth_binds)
        }
  where
    dfun_id = instanceDFunId ispec
@@ -1487,7 +1486,7 @@ tcSuperClasses :: SkolemInfoAnon -> DFunId -> Class -> [TcTyVar]
 -- of solving each superclass constraint
 tcSuperClasses skol_info dfun_id cls tyvars dfun_evs dfun_ev_binds sc_theta
   = do { (ids, binds, implics) <- mapAndUnzip3M tc_super (zip sc_theta [fIRST_TAG..])
-       ; return (ids, listToBag binds, listToBag implics) }
+       ; return (ids, binds, listToBag implics) }
   where
     loc = getSrcSpan dfun_id
     tc_super (sc_pred, n)
@@ -1511,7 +1510,7 @@ tcSuperClasses skol_info dfun_id cls tyvars dfun_evs dfun_ev_binds sc_theta
                                  , abs_ev_vars  = dfun_evs
                                  , abs_exports  = [export]
                                  , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
-                                 , abs_binds    = emptyBag
+                                 , abs_binds    = []
                                  , abs_sig      = False }
            ; return (sc_top_id, L (noAnnSrcSpan loc) bind, sc_implic) }
 
@@ -1792,7 +1791,7 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
        ; (ids, binds, mb_implics) <- set_exts exts $
                                      unset_warnings_deriving $
                                      mapAndUnzip3M tc_item op_items
-       ; return (ids, listToBag binds, listToBag (catMaybes mb_implics)) }
+       ; return (ids, binds, listToBag (catMaybes mb_implics)) }
   where
     set_exts :: [LangExt.Extension] -> TcM a -> TcM a
     set_exts es thing = foldr setXOptM thing es
@@ -2067,7 +2066,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                           , abe_wrap  = hs_wrap
                           , abe_prags = noSpecPrags }
 
-       ; return (unitBag $ L (getLoc meth_bind) $ XHsBindsLR $
+       ; return (singleton $ L (getLoc meth_bind) $ XHsBindsLR $
                  AbsBinds { abs_tvs = [], abs_ev_vars = []
                           , abs_exports = [export]
                           , abs_binds = tc_bind, abs_ev_binds = []

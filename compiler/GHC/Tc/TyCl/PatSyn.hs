@@ -61,7 +61,6 @@ import GHC.Core.ConLike
 import GHC.Types.FieldLabel
 import GHC.Rename.Env
 import GHC.Rename.Utils (wrapGenSpan, isIrrefutableHsPat)
-import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Driver.DynFlags ( getDynFlags, xopt_FieldSelectors )
 import Data.Maybe( mapMaybe )
@@ -827,7 +826,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                            , fun_matches = mg
                            , fun_ext = (idHsWrapper, [])
                            }
-             matcher_bind = unitBag (noLocA bind)
+             matcher_bind = [noLocA bind]
        ; traceTc "tcPatSynMatcher" (ppr ps_name $$ ppr (idType matcher_id))
        ; traceTc "tcPatSynMatcher" (ppr matcher_bind)
 
@@ -888,7 +887,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
                                  , psb_dir = dir
                                  , psb_args = details })
   | isUnidirectional dir
-  = return emptyBag
+  = return []
 
   | Left why <- mb_match_group       -- Can't invert the pattern
   = setSrcSpan (getLocA lpat) $ failWithTc $ TcRnPatSynInvalidRhs ps_name lpat args why
@@ -896,7 +895,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
   | Right match_group <- mb_match_group  -- Bidirectional
   = do { patsyn <- tcLookupPatSyn ps_name
        ; case patSynBuilder patsyn of {
-           Nothing -> return emptyBag ;
+           Nothing -> return [] ;
              -- This case happens if we found a type error in the
              -- pattern synonym, recovered, and put a placeholder
              -- with patSynBuilder=Nothing in the environment

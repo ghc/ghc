@@ -8,7 +8,6 @@ import System.IO
 import GHC
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
-import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
 
@@ -32,13 +31,13 @@ main = do
                         d <- desugarModule t
                         let ts=typecheckedSource d
 --                        liftIO (putStr (showSDocDebug (ppr ts)))
-                        let fs=filterBag isDataCon ts
-                        return $ not $ isEmptyBag fs
+                        let fs=filter isDataCon ts
+                        return $ not $ null fs
         removeFile "Test.hs"
         print ok
     where
       isDataCon (L _ (XHsBindsLR (AbsBinds { abs_binds = bs })))
-        = not (isEmptyBag (filterBag isDataCon bs))
+        = not (null (filter isDataCon bs))
       isDataCon (L l (f@FunBind {}))
         | (MG _ (L _ (m:_))) <- fun_matches f,
           ((L _ c@ConPat{}):_)<-hsLMatchPats m,
