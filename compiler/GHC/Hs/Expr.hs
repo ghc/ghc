@@ -429,6 +429,7 @@ instance NoAnn AnnsIf where
 -- ---------------------------------------------------------------------
 
 type instance XSCC           (GhcPass _) = (AnnPragma, SourceText)
+type instance XSCCCC         (GhcPass _) = StringLiteral
 type instance XXPragE        (GhcPass _) = DataConCantHappen
 
 type instance XCDotFieldOcc (GhcPass _) = AnnFieldLabel

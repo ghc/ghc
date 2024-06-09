@@ -459,6 +459,7 @@ type family XXDotFieldOcc  x
 -- -------------------------------------
 -- HsPragE type families
 type family XSCC            x
+type family XSCCCC          x
 type family XXPragE         x
 
 

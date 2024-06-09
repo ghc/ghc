@@ -32,7 +32,7 @@ import Language.Haskell.Syntax.Binds
 
 -- others:
 import GHC.Types.Fixity (LexicalFixity(Infix), Fixity)
-import GHC.Types.SourceText (StringLiteral, SourceText)
+import GHC.Types.SourceText (SourceText)
 
 import GHC.Data.FastString (FastString)
 
@@ -598,7 +598,7 @@ data DotFieldOcc p
 -- | A pragma, written as {-# ... #-}, that may appear within an expression.
 data HsPragE p
   = HsPragSCC   (XSCC p)
-                StringLiteral         -- "set cost centre" SCC pragma
+                (XSCCCC p)            -- "set cost centre" SCC pragma
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
   --       'GHC.Parser.Annotation.AnnOpen' @'{-\# GENERATED'@,
