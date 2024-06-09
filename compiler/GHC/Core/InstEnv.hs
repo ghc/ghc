@@ -43,6 +43,7 @@ import GHC.Core.Class
 import GHC.Core.Unify
 import GHC.Core.FVs( orphNamesOfTypes, orphNamesOfType )
 import GHC.Hs.Extension
+import GHC.Hs.Lit ()
 
 import GHC.Unit.Module.Env
 import GHC.Unit.Module.Warnings

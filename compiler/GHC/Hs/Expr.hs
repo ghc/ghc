@@ -1060,11 +1060,11 @@ isAtomicHsExpr (XExpr x)
 isAtomicHsExpr _ = False
 
 instance Outputable (HsPragE (GhcPass p)) where
-  ppr (HsPragSCC (_, st) (SL stl lbl _)) =
+  ppr (HsPragSCC (_, st) (SL stl lbl)) =
     pprWithSourceText st (text "{-# SCC")
-     -- no doublequotes if stl empty, for the case where the SCC was written
+     -- no doublequotes if (fst stl) empty, for the case where the SCC was written
      -- without quotes.
-    <+> pprWithSourceText stl (ftext lbl) <+> text "#-}"
+    <+> pprWithSourceText (fst stl) (ftext lbl) <+> text "#-}"
 
 
 {- *********************************************************************
@@ -2164,8 +2164,8 @@ lamCaseKeyword LamSingle = text "lambda"
 lamCaseKeyword LamCase   = text "\\case"
 lamCaseKeyword LamCases  = text "\\cases"
 
-pprExternalSrcLoc :: (StringLit,(Int,Int),(Int,Int)) -> SDoc
-pprExternalSrcLoc (SL _ src _,(n1,n2),(n3,n4))
+pprExternalSrcLoc :: (StringLit (GhcPass p),(Int,Int),(Int,Int)) -> SDoc
+pprExternalSrcLoc (SL _ src,(n1,n2),(n3,n4))
   = ppr (src,(n1,n2),(n3,n4))
 
 instance Outputable HsArrowMatchContext where

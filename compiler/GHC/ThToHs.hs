@@ -957,7 +957,7 @@ cvtPragmaD (CompleteP cls mty)
 cvtPragmaD (SCCP nm str) = do
   nm' <- vcNameN nm
   str' <- traverse (\s ->
-    returnLA $ SL NoSourceText (mkFastString s) Nothing) str
+    returnLA $ SL (NoSourceText, Nothing) (mkFastString s)) str
   returnJustLA $ Hs.SigD noExtField
     $ SCCFunSig (noAnn, SourceText $ fsLit "{-# SCC") nm' str'
 

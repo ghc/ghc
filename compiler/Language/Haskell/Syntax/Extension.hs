@@ -731,5 +731,12 @@ type family XXIEWrappedName p
 type family NoGhcTc (p :: Type)
 
 -- =====================================================================
+-- SourceText
+
+type family XIntegralLit pass
+type family XFractionalLit pass
+type family XStringLit pass
+
+-- =====================================================================
 -- End of Type family definitions
 -- =====================================================================

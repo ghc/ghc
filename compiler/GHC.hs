@@ -1715,7 +1715,7 @@ modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc d
 renamePkgQualM :: GhcMonad m => ModuleName -> Maybe FastString -> m PkgQual
 renamePkgQualM mn p = withSession $ \hsc_env -> pure (renamePkgQual (hsc_unit_env hsc_env) mn p)
 
-renameRawPkgQualM :: GhcMonad m => ModuleName -> RawPkgQual -> m PkgQual
+renameRawPkgQualM :: GhcMonad m => ModuleName -> RawPkgQual GhcPs -> m PkgQual
 renameRawPkgQualM mn p = withSession $ \hsc_env -> pure (renameRawPkgQual (hsc_unit_env hsc_env) mn p)
 
 -- | Like 'findModule', but differs slightly when the module refers to

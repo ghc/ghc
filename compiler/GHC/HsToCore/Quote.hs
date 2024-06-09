@@ -1121,7 +1121,7 @@ rep_specialiseInst ty loc
        ; return [(loc, pragma)] }
 
 rep_sccFun :: LocatedN Name
-        -> Maybe (XRec GhcRn StringLit)
+        -> Maybe (XRec GhcRn (StringLit GhcRn))
         -> SrcSpan
         -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_sccFun nm Nothing loc = do
@@ -2997,7 +2997,7 @@ repLiteral lit
 mk_integer :: Integer -> MetaM (HsLit GhcRn)
 mk_integer  i = return $ HsInteger NoSourceText i integerTy
 
-mk_rational :: FractionalLit -> MetaM (HsLit GhcRn)
+mk_rational :: FractionalLit GhcRn -> MetaM (HsLit GhcRn)
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat noExtField r rat_ty
 mk_string :: FastString -> MetaM (HsLit GhcRn)
@@ -3013,7 +3013,7 @@ repOverloadedLiteral (OverLit { ol_val = val})
         -- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
         -- and rationalL is sucked in when any TH stuff is used
 
-mk_lit :: OverLitVal -> MetaM (HsLit GhcRn)
+mk_lit :: OverLitVal GhcRn -> MetaM (HsLit GhcRn)
 mk_lit (HsIntegral i)     = mk_integer  (il_value i)
 mk_lit (HsFractional f)   = mk_rational f
 mk_lit (HsIsString s)     = mk_string   (sl_fs s)

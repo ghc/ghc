@@ -41,6 +41,8 @@ import GHC.Prelude
 
 import GHC.Data.Bag
 import GHC.Data.FastString
+import GHC.Hs.Extension
+import GHC.Hs.Lit
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Unique.DSet
@@ -66,9 +68,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
 import GHC.Types.CompleteMatch (CompleteMatch(..))
-import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
-                            , fractionalLitFromRational
-                            , FractionalExponentBase(..))
+import GHC.Types.SourceText (SourceText(..), FractionalLit, FractionalExponentBase(..))
 import Numeric (fromRat)
 import Data.Foldable (find)
 import Data.Ratio
@@ -380,7 +380,7 @@ data PmLitValue
   -- lists
   | PmLitString FastString
   | PmLitOverInt Int {- How often Negated? -} Integer
-  | PmLitOverRat Int {- How often Negated? -} FractionalLit
+  | PmLitOverRat Int {- How often Negated? -} (FractionalLit GhcTc)
   | PmLitOverString FastString
 
 -- | Undecidable semantic equality result.

@@ -477,7 +477,7 @@ data Sig pass
 
   | SCCFunSig  (XSCCFunSig pass)
                (LIdP pass)    -- Function name
-               (Maybe (XRec pass StringLit))
+               (Maybe (XRec pass (StringLit pass)))
        -- | A complete match pragma
        --
        -- > {-# COMPLETE C, D [:: T] #-}

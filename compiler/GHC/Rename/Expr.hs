@@ -481,7 +481,7 @@ rnExpr (HsPragE x prag expr)
        ; return (HsPragE x (rn_prag prag) expr', fvs_expr) }
   where
     rn_prag :: HsPragE GhcPs -> HsPragE GhcRn
-    rn_prag (HsPragSCC x ann) = HsPragSCC x ann
+    rn_prag (HsPragSCC x ann) = HsPragSCC x (convertStringLit ann)
 
 rnExpr (HsLam x lam_variant matches)
   = do { (matches', fvs_ms) <- rnMatchGroup (LamAlt lam_variant) rnLExpr matches

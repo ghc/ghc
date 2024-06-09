@@ -34,6 +34,7 @@ import GHC.Types.PkgQual
 
 import GHC.Parser.Annotation
 import GHC.Hs.Extension
+import GHC.Hs.Lit ()
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -74,7 +75,7 @@ isImportDeclQualified NotQualified = False
 isImportDeclQualified _ = True
 
 
-type instance ImportDeclPkgQual GhcPs = RawPkgQual
+type instance ImportDeclPkgQual GhcPs = RawPkgQual GhcPs
 type instance ImportDeclPkgQual GhcRn = PkgQual
 type instance ImportDeclPkgQual GhcTc = PkgQual
 

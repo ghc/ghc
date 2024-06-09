@@ -1134,7 +1134,7 @@ renameSig ctxt sig@(PatSynSig _ vs ty)
 
 renameSig ctxt sig@(SCCFunSig (_, st) v s)
   = do  { new_v <- lookupSigOccRnN ctxt sig v
-        ; return (SCCFunSig (noAnn, st) new_v s, emptyFVs) }
+        ; return (SCCFunSig (noAnn, st) new_v (fmap convertStringLit <$> s), emptyFVs) }
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn

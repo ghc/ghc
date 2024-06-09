@@ -1096,13 +1096,14 @@ tcInferOverLit lit@(OverLit { ol_val = val
        ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
        -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
        ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
-                        HsLit noExtField hs_lit
+                        HsLit noExtField (convertLit hs_lit)
              from_expr = mkHsWrap (wrap2 <.> wrap1) $
                          HsVar noExtField (L loc from_id)
              witness = HsApp noExtField (L (l2l loc) from_expr) lit_expr
-             lit' = lit { ol_ext = OverLitTc { ol_rebindable = rebindable
-                                             , ol_witness = witness
-                                             , ol_type = res_ty } }
+             lit' = OverLit { ol_ext = OverLitTc { ol_rebindable = rebindable
+                                                 , ol_witness = witness
+                                                 , ol_type = res_ty }
+                            , ol_val = convertOverLitVal (ol_val lit) }
        ; return (HsOverLit noExtField lit', res_ty) }
 
 {- *********************************************************************

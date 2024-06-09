@@ -2774,9 +2774,9 @@ checkNewOrData span name is_type_data = curry $ \ case
 --
 mkImport :: Located CCallConv
          -> Located Safety
-         -> (Located StringLit, LocatedN RdrName, LHsSigType GhcPs)
+         -> (Located (StringLit GhcPs), LocatedN RdrName, LHsSigType GhcPs)
          -> P ([AddEpAnn] -> HsDecl GhcPs)
-mkImport cconv safety (L loc (SL esrc entity _), v, ty) =
+mkImport cconv safety (L loc (SL esrc entity), v, ty) =
     case unLoc cconv of
       CCallConv          -> returnSpec =<< mkCImport
       CApiConv           -> do
@@ -2794,7 +2794,7 @@ mkImport cconv safety (L loc (SL esrc entity _), v, ty) =
     -- name (cf section 8.5.1 in Haskell 2010 report).
     mkCImport = do
       let e = unpackFS entity
-      case parseCImport (reLoc cconv) (reLoc safety) (mkExtName (unLoc v)) e (L loc esrc) of
+      case parseCImport (reLoc cconv) (reLoc safety) (mkExtName (unLoc v)) e (L loc (fst esrc)) of
         Nothing         -> addFatalError $ mkPlainErrorMsgEnvelope loc $
                              PsErrMalformedEntityString
         Just importSpec -> return importSpec
@@ -2809,8 +2809,8 @@ mkImport cconv safety (L loc (SL esrc entity _), v, ty) =
         entity'    = if nullFS entity
                         then mkExtName (unLoc v)
                         else entity
-        funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
-        importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
+        funcTarget = CFunction (StaticTarget (fst esrc) entity' Nothing True)
+        importSpec = CImport (L (l2l loc) (fst esrc)) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
     returnSpec spec = return $ \ann -> ForD noExtField $ ForeignImport
           { fd_i_ext  = ann
@@ -2884,12 +2884,12 @@ parseCImport cconv safety nm str sourceText =
 -- construct a foreign export declaration
 --
 mkExport :: Located CCallConv
-         -> (Located StringLit, LocatedN RdrName, LHsSigType GhcPs)
+         -> (Located (StringLit GhcPs), LocatedN RdrName, LHsSigType GhcPs)
          -> P ([AddEpAnn] -> HsDecl GhcPs)
-mkExport (L lc cconv) (L le (SL esrc entity _), v, ty)
+mkExport (L lc cconv) (L le (SL esrc entity), v, ty)
  = return $ \ann -> ForD noExtField $
    ForeignExport { fd_e_ext = ann, fd_name = v, fd_sig_ty = ty
-                 , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
+                 , fd_fe = CExport (L (l2l le) (fst esrc)) (L (l2l lc) (CExportStatic (fst esrc) entity' cconv)) }
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity

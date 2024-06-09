@@ -74,8 +74,8 @@ getImports :: ParserOpts   -- ^ Parser options
                            --   in the function result)
            -> IO (Either
                (Messages PsMessage)
-               ([(RawPkgQual, Located ModuleName)],
-                [(RawPkgQual, Located ModuleName)],
+               ([(RawPkgQual GhcPs, Located ModuleName)],
+                [(RawPkgQual GhcPs, Located ModuleName)],
                 Bool, -- Is GHC.Prim imported or not
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package

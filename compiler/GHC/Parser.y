@@ -1157,12 +1157,12 @@ maybe_safe :: { (Maybe EpaLocation,Bool) }
         : 'safe'                                { (Just (glAA $1),True) }
         | {- empty -}                           { (Nothing,      False) }
 
-maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
+maybe_pkg :: { (Maybe EpaLocation, RawPkgQual GhcPs) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
                         ; unless (looksLikePackageName (unpackFS pkgFS)) $
                              addError $ mkPlainErrorMsgEnvelope (getLoc $1) $
                                (PsErrInvalidPackageName pkgFS)
-                        ; return (Just (glAA $1), RawPkgQual (SL (getSTRINGs $1) pkgFS Nothing)) } }
+                        ; return (Just (glAA $1), RawPkgQual (SL (getSTRINGs $1, Nothing) pkgFS)) } }
         | {- empty -}                           { (Nothing,NoRawPkgQual) }
 
 optqualified :: { Located (Maybe EpaLocation) }
@@ -2050,11 +2050,11 @@ deprecation :: { OrdList (LWarnDecl GhcPs) }
              {% fmap unitOL $ amsA' (sL (comb3 $1 $2 $>) $ (Warning (unLoc $1, fst $ unLoc $3) (unLoc $2)
                                           (DeprecatedTxt NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
-strings :: { Located ([AddEpAnn],[Located StringLit]) }
+strings :: { Located ([AddEpAnn],[Located (StringLit GhcPs)]) }
     : STRING { sL1 $1 ([],[L (gl $1) (getStringLit $1)]) }
     | '[' stringlist ']' { sLL $1 $> $ ([mos $1,mcs $3],fromOL (unLoc $2)) }
 
-stringlist :: { Located (OrdList (Located StringLit)) }
+stringlist :: { Located (OrdList (Located (StringLit GhcPs))) }
     : stringlist ',' STRING {% if isNilOL (unLoc $1)
                                 then return (sLL $1 $> (unLoc $1 `snocOL`
                                                   (L (gl $3) (getStringLit $3))))
@@ -2116,12 +2116,12 @@ safety :: { Located Safety }
         | 'interruptible'               { sLL $1 $> PlayInterruptible }
 
 fspec :: { Located ([AddEpAnn]
-                    ,(Located StringLit, LocatedN RdrName, LHsSigType GhcPs)) }
+                    ,(Located (StringLit GhcPs), LocatedN RdrName, LHsSigType GhcPs)) }
        : STRING var '::' sigtype        { sLL $1 $> ([mu AnnDcolon $3]
                                              ,(L (getLoc $1)
                                                     (getStringLit $1), $2, $4)) }
        |        var '::' sigtype        { sLL $1 $> ([mu AnnDcolon $2]
-                                             ,(noLoc (SL NoSourceText nilFS Nothing), $1, $3)) }
+                                             ,(noLoc (SL (NoSourceText, Nothing) nilFS), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -2703,7 +2703,7 @@ sigdecl :: { LHsDecl GhcPs }
 
         | '{-# SCC' qvar STRING '#-}'
           {% do { scc <- getSCC $3
-                ; let str_lit = SL (getSTRINGs $3) scc Nothing
+                ; let str_lit = SL (getSTRINGs $3, Nothing) scc
                 ; amsA' (sLL $1 $> (SigD noExtField (SCCFunSig ([mo $1, mc $4], (getSCC_PRAGs $1)) $2 (Just ( sL1a $3 str_lit))))) }}
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
@@ -2871,12 +2871,12 @@ prag_e :: { Located (HsPragE GhcPs) }
                                              (HsPragSCC
                                                 (AnnPragma (mo $1) (mc $3) [mj AnnValStr $2],
                                                 (getSCC_PRAGs $1))
-                                                (SL (getSTRINGs $2) scc Nothing)))} }
+                                                (SL (getSTRINGs $2, Nothing) scc)))} }
       | '{-# SCC' VARID  '#-}'      { sLL $1 $>
                                              (HsPragSCC
                                                (AnnPragma (mo $1) (mc $3) [mj AnnVal $2],
                                                (getSCC_PRAGs $1))
-                                               (SL NoSourceText (getVARID $2) Nothing)) }
+                                               (SL (NoSourceText, Nothing) (getVARID $2))) }
 
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
@@ -4146,7 +4146,7 @@ getOVERLAPS_PRAGs     (L _ (IToverlaps_prag     src)) = src
 getINCOHERENT_PRAGs   (L _ (ITincoherent_prag   src)) = src
 getCTYPEs             (L _ (ITctype             src)) = src
 
-getStringLit l = SL (getSTRINGs l) (getSTRING l) Nothing
+getStringLit l = SL (getSTRINGs l, Nothing) (getSTRING l)
 
 isUnicode :: Located Token -> Bool
 isUnicode (L _ (ITforall         iu)) = iu == UnicodeSyntax
@@ -4178,7 +4178,7 @@ getSCC lt = do let s = getSTRING lt
                    then addFatalError $ mkPlainErrorMsgEnvelope (getLoc lt) $ PsErrSpaceInSCC
                    else return s
 
-stringLiteralToHsDocWst :: Located StringLit -> LocatedE (WithHsDocIdentifiers StringLit GhcPs)
+stringLiteralToHsDocWst :: Located (StringLit GhcPs) -> LocatedE (WithHsDocIdentifiers (StringLit GhcPs) GhcPs)
 stringLiteralToHsDocWst  sl = reLoc $ lexStringLit parseIdentifier sl
 
 -- Utilities for combining source spans
@@ -4612,9 +4612,9 @@ addTrailingCommaN (L anns a) span = do
                 else addTrailingCommaToN anns (srcSpan2e span)
   return (L anns' a)
 
-addTrailingCommaS :: Located StringLit -> EpaLocation -> Located StringLit
-addTrailingCommaS (L l sl) span
-    = L (widenSpan l [AddEpAnn AnnComma span]) (sl { sl_tc = Just (epaToNoCommentsLocation span) })
+addTrailingCommaS :: Located (StringLit GhcPs) -> EpaLocation -> Located (StringLit GhcPs)
+addTrailingCommaS (L l (SL (st, _) fs)) span
+    = L (widenSpan l [AddEpAnn AnnComma span]) (SL (st, Just (epaToNoCommentsLocation span)) fs)
 
 -- -------------------------------------
 

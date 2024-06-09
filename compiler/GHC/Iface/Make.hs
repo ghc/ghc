@@ -412,11 +412,11 @@ toIfaceWarningTxt :: WarningTxt GhcRn -> IfaceWarningTxt
 toIfaceWarningTxt (WarningTxt mb_cat src strs) = IfWarningTxt (unLoc . iwc_wc . unLoc <$> mb_cat) src (map (toIfaceStringLiteralWithNames . unLoc) strs)
 toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt src (map (toIfaceStringLiteralWithNames . unLoc) strs)
 
-toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLit GhcRn -> (IfaceStringLiteral, [IfExtName])
+toIfaceStringLiteralWithNames :: WithHsDocIdentifiers (StringLit GhcRn) GhcRn -> (IfaceStringLiteral, [IfExtName])
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
 
-toIfaceStringLiteral :: StringLit -> IfaceStringLiteral
-toIfaceStringLiteral (SL sl fs _) = IfStringLiteral sl fs
+toIfaceStringLiteral :: StringLit GhcRn -> IfaceStringLiteral
+toIfaceStringLiteral (SL (sl, _) fs) = IfStringLiteral sl fs
 
 coreRuleToIfaceRule :: CoreRule -> IfaceRule
 -- A plugin that installs a BuiltinRule in a CoreDoPluginPass should

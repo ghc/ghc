@@ -597,7 +597,7 @@ data DotFieldOcc p
 -- | A pragma, written as {-# ... #-}, that may appear within an expression.
 data HsPragE p
   = HsPragSCC   (XSCC p)
-                StringLit             -- "set cost centre" SCC pragma
+                (StringLit p)         -- "set cost centre" SCC pragma
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
   --       'GHC.Parser.Annotation.AnnOpen' @'{-\# GENERATED'@,

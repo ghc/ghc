@@ -84,6 +84,7 @@ import GHC.Stg.InferTags.TagSig
 import GHC.Parser.Annotation (noLocA)
 import GHC.Hs.Extension ( GhcRn )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
+import GHC.Hs.Lit ( )
 
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Utils.Fingerprint
@@ -608,11 +609,11 @@ fromIfaceWarningTxt = \case
     IfWarningTxt mb_cat src strs -> WarningTxt (noLocA . fromWarningCategory <$> mb_cat) src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
     IfDeprecatedTxt src strs -> DeprecatedTxt src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
 
-fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers StringLit GhcRn
+fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers (StringLit GhcRn) GhcRn
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
 
-fromIfaceStringLiteral :: IfaceStringLiteral -> StringLit
-fromIfaceStringLiteral (IfStringLiteral st fs) = SL st fs Nothing
+fromIfaceStringLiteral :: IfaceStringLiteral -> StringLit GhcRn
+fromIfaceStringLiteral (IfStringLiteral st fs) = SL (st, Nothing) fs
 
 
 {-

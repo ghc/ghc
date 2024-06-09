@@ -744,7 +744,7 @@ genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) (mkEmptyWildCardBnd
 genLHsLit :: (NoAnn an) => HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genLHsLit = wrapGenSpan . HsLit noExtField
 
-genHsIntegralLit :: (NoAnn an) => IntegralLit -> LocatedAn an (HsExpr GhcRn)
+genHsIntegralLit :: (NoAnn an) => IntegralLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genHsIntegralLit = genLHsLit . HsInt noExtField
 
 genHsTyLit :: FastString -> HsType GhcRn

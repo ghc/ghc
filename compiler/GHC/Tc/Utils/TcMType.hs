@@ -96,7 +96,9 @@ module GHC.Tc.Utils.TcMType (
   mkHsDictLet, mkHsApp,
   mkHsAppTy, mkHsCaseAlt,
   tcShortCutLit, shortCutLit, hsOverLitName,
-  conLikeResTy
+  conLikeResTy,
+
+  convertOverLitVal
   ) where
 
 import GHC.Prelude
@@ -2353,19 +2355,24 @@ to short-cut the process for built-in types.  We can do this in two places;
 -}
 
 tcShortCutLit :: HsOverLit GhcRn -> ExpRhoType -> TcM (Maybe (HsOverLit GhcTc))
-tcShortCutLit lit@(OverLit { ol_val = val, ol_ext = OverLitRn rebindable _}) exp_res_ty
+tcShortCutLit (OverLit { ol_val = val, ol_ext = OverLitRn rebindable _}) exp_res_ty
   | not rebindable
   , Just res_ty <- checkingExpType_maybe exp_res_ty
   = do { dflags <- getDynFlags
        ; let platform = targetPlatform dflags
-       ; case shortCutLit platform val res_ty of
+       ; case shortCutLit platform (convertOverLitVal val) res_ty of
             Just expr -> return $ Just $
-                         lit { ol_ext = OverLitTc False expr res_ty }
+                         OverLit { ol_ext = OverLitTc False expr res_ty, ol_val = convertOverLitVal val }
             Nothing   -> return Nothing }
   | otherwise
   = return Nothing
 
-shortCutLit :: Platform -> OverLitVal -> TcType -> Maybe (HsExpr GhcTc)
+convertOverLitVal :: OverLitVal (GhcPass p1) -> OverLitVal (GhcPass p2)
+convertOverLitVal (HsIntegral i) = HsIntegral (convertIntegralLit i)
+convertOverLitVal (HsFractional f) = HsFractional (convertFractionalLit f)
+convertOverLitVal (HsIsString s) = HsIsString (convertStringLit s)
+
+shortCutLit :: Platform -> OverLitVal GhcTc -> TcType -> Maybe (HsExpr GhcTc)
 shortCutLit platform val res_ty
   = case val of
       HsIntegral int_lit    -> go_integral int_lit
@@ -2398,7 +2405,7 @@ shortCutLit platform val res_ty
             -- We limit short-cutting Fractional Literals to when their power of 10
             -- is less than 100, which ensures desugaring isn't slow.
 
-    go_string src s
+    go_string (src, _) s
       | isStringTy res_ty = Just (HsLit noExtField (HsString src s))
       | otherwise         = Nothing
 
@@ -2406,7 +2413,7 @@ mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
 mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
-hsOverLitName :: OverLitVal -> Name
+hsOverLitName :: OverLitVal (GhcPass p) -> Name
 -- Get the canonical 'fromX' name for a particular OverLitVal
 hsOverLitName (HsIntegral {})   = fromIntegerName
 hsOverLitName (HsFractional {}) = fromRationalName

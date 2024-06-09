@@ -63,13 +63,13 @@ import GHC.Core.Coercion.Axiom
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType )
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
-import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 import GHC.Tc.Zonk.Monad ( ZonkM )
@@ -778,21 +778,22 @@ newNonTrivialOverloadedLit :: HsOverLit GhcRn
 newNonTrivialOverloadedLit
   lit@(OverLit { ol_val = val, ol_ext = OverLitRn rebindable (L loc meth_name) })
   res_ty
-  = do  { hs_lit <- mkOverLit val
+  = do  { hs_lit <- mkOverLit (convertOverLitVal val)
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
                                       [synKnownType lit_ty] res_ty $
                       \_ _ -> return ()
         ; let L _ witness = mkHsSyntaxApps (l2l loc) fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
-        ; return (lit { ol_ext = OverLitTc { ol_rebindable = rebindable
-                                           , ol_witness = witness
-                                           , ol_type = res_ty } }) }
+        ; return (OverLit { ol_ext = OverLitTc { ol_rebindable = rebindable
+                                               , ol_witness = witness
+                                               , ol_type = res_ty }
+                          , ol_val = convertOverLitVal val }) }
   where
     orig = LiteralOrigin lit
 
 ------------
-mkOverLit :: OverLitVal -> TcM (HsLit (GhcPass p))
+mkOverLit :: OverLitVal (GhcPass p) -> TcM (HsLit (GhcPass p))
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
         ; return (HsInteger (il_text i)
@@ -802,7 +803,7 @@ mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
         ; return (HsRat noExtField r rat_ty) }
 
-mkOverLit (HsIsString s) = return (HsString (sl_st s) (sl_fs s))
+mkOverLit (HsIsString s) = return (HsString (fst $ sl_st s) (sl_fs s))
 
 {-
 ************************************************************************

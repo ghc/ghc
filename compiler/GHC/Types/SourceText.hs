@@ -9,22 +9,15 @@
 --
 module GHC.Types.SourceText
    ( SourceText (..)
+   , NoCommentsLocation
    , pprWithSourceText
 
    -- * Literals
    , IntegralLit(..)
    , FractionalLit(..)
    , StringLit(..)
-   , negateIntegralLit
-   , negateFractionalLit
-   , mkIntegralLit
-   , mkTHFractionalLit, rationalFromFractionalLit
-   , integralFractionalLit, mkSourceFractionalLit
+   , rationalFromFractionalLit
    , FractionalExponentBase(..)
-
-   -- Used by the pm checker.
-   , fractionalLitFromRational
-   , mkFractionalLit
 
    )
 where
@@ -39,9 +32,10 @@ import GHC.Utils.Panic
 
 import Data.Function (on)
 import Data.Data
-import GHC.Real ( Ratio(..) )
 import GHC.Types.SrcLoc
 import Control.DeepSeq
+
+import Language.Haskell.Syntax.Extension
 
 {-
 Note [Pragma source text]
@@ -144,27 +138,16 @@ pprWithSourceText (SourceText src) _ = ftext src
 -- Used (instead of Integer) to represent negative zegative zero which is
 -- required for NegativeLiterals extension to correctly parse `-0::Double`
 -- as negative zero. See also #13211.
-data IntegralLit = IL
-   { il_text  :: SourceText
+data IntegralLit pass = IL
+   { il_text  :: XIntegralLit pass
    , il_neg   :: Bool -- See Note [Negative zero] in GHC.Rename.Pat
    , il_value :: Integer
    }
-   deriving (Data, Show)
 
-mkIntegralLit :: Integral a => a -> IntegralLit
-mkIntegralLit i = IL { il_text = SourceText (fsLit $ show i_integer)
-                     , il_neg = i < 0
-                     , il_value = i_integer }
-  where
-    i_integer :: Integer
-    i_integer = toInteger i
+deriving instance (Data pass, XIntegralLit pass ~ SourceText)
+  => Data (IntegralLit pass)
 
-negateIntegralLit :: IntegralLit -> IntegralLit
-negateIntegralLit (IL text neg value)
-  = case text of
-      SourceText (unconsFS -> Just ('-',src)) -> IL (SourceText src)                False    (negate value)
-      SourceText src                          -> IL (SourceText ('-' `consFS` src)) True     (negate value)
-      NoSourceText                            -> IL NoSourceText          (not neg) (negate value)
+deriving instance (XIntegralLit pass ~ SourceText) => Show (IntegralLit pass)
 
 -- | Fractional Literal
 --
@@ -179,15 +162,19 @@ negateIntegralLit (IL text neg value)
 -- For example FL { fl_neg = True, fl_signi = 5.3, fl_exp = 4, fl_exp_base = Base10 }
 -- denotes  -5300
 
-data FractionalLit = FL
-    { fl_text :: SourceText     -- ^ How the value was written in the source
+data FractionalLit pass = FL
+    { fl_text :: XFractionalLit pass       -- ^ How the value was written in the source
     , fl_neg :: Bool                        -- See Note [Negative zero]
     , fl_signi :: Rational                  -- The significand component of the literal
     , fl_exp :: Integer                     -- The exponent component of the literal
     , fl_exp_base :: FractionalExponentBase -- See Note [fractional exponent bases]
     }
-    deriving (Data, Show)
-  -- The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
+
+deriving instance (Data pass, XFractionalLit pass ~ SourceText)
+  => Data (FractionalLit pass)
+
+-- | The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
+deriving instance (XFractionalLit pass ~ SourceText) => Show (FractionalLit pass)
 
 -- See Note [FractionalLit representation] in GHC.HsToCore.Match.Literal
 data FractionalExponentBase
@@ -195,60 +182,13 @@ data FractionalExponentBase
   | Base10
   deriving (Eq, Ord, Data, Show)
 
-mkFractionalLit :: SourceText -> Bool -> Rational -> Integer -> FractionalExponentBase
-                -> FractionalLit
-mkFractionalLit = FL
-
 mkRationalWithExponentBase :: Rational -> Integer -> FractionalExponentBase -> Rational
 mkRationalWithExponentBase i e feb = i * (eb ^^ e)
   where eb = case feb of Base2 -> 2 ; Base10 -> 10
 
-fractionalLitFromRational :: Rational -> FractionalLit
-fractionalLitFromRational r =  FL { fl_text = NoSourceText
-                           , fl_neg = r < 0
-                           , fl_signi = r
-                           , fl_exp = 0
-                           , fl_exp_base = Base10 }
-
-rationalFromFractionalLit :: FractionalLit -> Rational
+rationalFromFractionalLit :: FractionalLit pass -> Rational
 rationalFromFractionalLit (FL _ _ i e expBase) =
   mkRationalWithExponentBase i e expBase
-
-mkTHFractionalLit :: Rational -> FractionalLit
-mkTHFractionalLit r =  FL { fl_text = SourceText (fsLit $ show (realToFrac r::Double))
-                             -- Converting to a Double here may technically lose
-                             -- precision (see #15502). We could alternatively
-                             -- convert to a Rational for the most accuracy, but
-                             -- it would cause Floats and Doubles to be displayed
-                             -- strangely, so we opt not to do this. (In contrast
-                             -- to mkIntegralLit, where we always convert to an
-                             -- Integer for the highest accuracy.)
-                           , fl_neg = r < 0
-                           , fl_signi = r
-                           , fl_exp = 0
-                           , fl_exp_base = Base10 }
-
-negateFractionalLit :: FractionalLit -> FractionalLit
-negateFractionalLit (FL text neg i e eb)
-  = case text of
-      SourceText (unconsFS -> Just ('-',src))
-                           -> FL (SourceText src)                False (negate i) e eb
-      SourceText      src  -> FL (SourceText ('-' `consFS` src)) True  (negate i) e eb
-      NoSourceText         -> FL NoSourceText (not neg) (negate i) e eb
-
--- | The integer should already be negated if it's negative.
-integralFractionalLit :: Bool -> Integer -> FractionalLit
-integralFractionalLit neg i = FL { fl_text = SourceText (fsLit $ show i)
-                                 , fl_neg = neg
-                                 , fl_signi = i :% 1
-                                 , fl_exp = 0
-                                 , fl_exp_base = Base10 }
-
--- | The arguments should already be negated if they are negative.
-mkSourceFractionalLit :: String -> Bool -> Integer -> Integer
-                      -> FractionalExponentBase
-                      -> FractionalLit
-mkSourceFractionalLit !str !b !r !i !ff = FL (SourceText $ fsLit str) b (r :% 1) i ff
 
 {- Note [fractional exponent bases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -261,20 +201,20 @@ base 10. These are the only options, hence the sum type. See also #15646.
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
 
-instance Eq IntegralLit where
+instance Eq (IntegralLit pass) where
   (==) = (==) `on` il_value
 
-instance Ord IntegralLit where
+instance Ord (IntegralLit pass) where
   compare = compare `on` il_value
 
-instance Outputable IntegralLit where
+instance (XIntegralLit pass ~ SourceText) => Outputable (IntegralLit pass) where
   ppr (IL (SourceText src) _ _) = ftext src
   ppr (IL NoSourceText _ value) = text (show value)
 
 
 -- | Compare fractional lits with small exponents for value equality but
 --   large values for syntactic equality.
-compareFractionalLit :: FractionalLit -> FractionalLit -> Ordering
+compareFractionalLit :: FractionalLit pass -> FractionalLit pass -> Ordering
 compareFractionalLit fl1 fl2
   | fl_exp fl1 < 100 && fl_exp fl2 < 100 && fl_exp fl1 >= -100 && fl_exp fl2 >= -100
     = rationalFromFractionalLit fl1 `compare` rationalFromFractionalLit fl2
@@ -283,7 +223,7 @@ compareFractionalLit fl1 fl2
 -- | Be wary of using this instance to compare for equal *values* when exponents are
 -- large. The same value expressed in different syntactic form won't compare as equal when
 -- any of the exponents is >= 100.
-instance Eq FractionalLit where
+instance Eq (FractionalLit pass) where
   (==) fl1 fl2 = case compare fl1 fl2 of
           EQ -> True
           _  -> False
@@ -291,34 +231,32 @@ instance Eq FractionalLit where
 -- | Be wary of using this instance to compare for equal *values* when exponents are
 -- large. The same value expressed in different syntactic form won't compare as equal when
 -- any of the exponents is >= 100.
-instance Ord FractionalLit where
+instance Ord (FractionalLit pass) where
   compare = compareFractionalLit
 
-instance Outputable FractionalLit where
+instance (XFractionalLit pass ~ SourceText)
+  => Outputable (FractionalLit pass) where
   ppr (fl@(FL {})) =
     pprWithSourceText (fl_text fl) $
       rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl)
 
 -- | A String Literal in the source, including its original raw format for use by
 -- source to source manipulation tools.
-data StringLit = SL
-                       { sl_st :: SourceText, -- literal raw source.
-                                              -- See Note [Literal source text]
-                         sl_fs :: FastString, -- literal string value
-                         sl_tc :: Maybe NoCommentsLocation
-                                                    -- Location of
-                                                    -- possible
-                                                    -- trailing comma
-                       -- AZ: if we could have a LocatedA
-                       -- StringLiteral we would not need sl_tc, but
-                       -- that would cause import loops.
-                       } deriving Data
+data StringLit pass = SL
+  { sl_st :: XStringLit pass, -- literal raw source.
+                         -- See Note [Literal source text]
+    sl_fs :: FastString  -- literal string value
+  }
 
-instance Eq StringLit where
-  (SL _ a _) == (SL _ b _) = a == b
+instance Eq (StringLit pass) where
+  (SL _ a) == (SL _ b) = a == b
 
-instance Ord StringLit where
-  (SL _ a _) `compare` (SL _ b _) = a `lexicalCompareFS` b
+instance Ord (StringLit pass) where
+  (SL _ a) `compare` (SL _ b) = a `lexicalCompareFS` b
 
-instance Outputable StringLit where
-  ppr sl = pprWithSourceText (sl_st sl) (doubleQuotes $ ftext $ sl_fs sl)
+deriving instance (Data pass, XStringLit pass ~ (SourceText, Maybe NoCommentsLocation))
+  => Data (StringLit pass)
+
+instance (XStringLit pass ~ (SourceText, Maybe NoCommentsLocation))
+  => Outputable (StringLit pass) where
+  ppr sl = pprWithSourceText (fst (sl_st sl)) (doubleQuotes $ ftext $ sl_fs sl)

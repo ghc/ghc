@@ -952,4 +952,4 @@ type instance Anno (Sig (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (FixitySig (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno StringLit = EpAnnCO
+type instance Anno (StringLit (GhcPass p)) = EpAnnCO

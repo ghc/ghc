@@ -123,7 +123,7 @@ dsLit l = do
     HsString _ str   -> mkStringExprFS str
     HsInteger _ i _  -> return (mkIntegerExpr platform i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
-    HsRat _ fl ty    -> dsFractionalLitToRational fl ty
+    HsRat _ fl ty    -> dsFractionalLitToRational (convertFractionalLit fl) ty
 
 {-
 Note [FractionalLit representation]
@@ -208,7 +208,7 @@ The moving parts are here:
 -}
 
 -- | See Note [FractionalLit representation]
-dsFractionalLitToRational :: FractionalLit -> Type -> DsM CoreExpr
+dsFractionalLitToRational :: FractionalLit GhcTc -> Type -> DsM CoreExpr
 dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = base } ty
   -- We compute "small" rationals here and now
   | abs exp <= 100

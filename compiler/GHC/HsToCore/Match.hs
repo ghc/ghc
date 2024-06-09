@@ -32,9 +32,7 @@ import GHC.Types.Basic
 import GHC.Types.SourceText
     ( FractionalLit,
       IntegralLit(il_value),
-      StringLit(sl_fs),
-      negateFractionalLit,
-      integralFractionalLit )
+      StringLit(sl_fs) )
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -1014,7 +1012,7 @@ data PatGroup
   | PgCon DataCon       -- Constructor patterns (incl list, tuple)
   | PgSyn PatSyn [Type] -- See Note [Pattern synonym groups]
   | PgLit Literal       -- Literal patterns
-  | PgN   FractionalLit -- Overloaded numeric literals;
+  | PgN   (FractionalLit GhcTc) -- Overloaded numeric literals;
                         -- see Note [Don't use Literal for PgN]
   | PgOverS FastString  -- Overloaded string literals
   | PgNpK Integer       -- n+k patterns

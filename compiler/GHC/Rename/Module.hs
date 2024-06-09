@@ -22,6 +22,7 @@ import GHC.Prelude hiding ( head )
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
+import GHC.Types.SourceText (StringLit)
 import GHC.Hs
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
@@ -312,11 +313,17 @@ rnWarningTxt (WarningTxt mb_cat st wst) = do
   forM_ mb_cat $ \(L _ (InWarningCategory _ _ (L loc cat))) ->
     unless (validWarningCategory cat) $
       addErrAt (locA loc) (TcRnInvalidWarningCategory cat)
-  wst' <- traverse (traverse rnHsDoc) wst
+  wst' <- traverse (traverse (rnHsDoc)) (fmap convertWithHsDocIdentifiers <$> wst)
   pure (WarningTxt mb_cat st wst')
 rnWarningTxt (DeprecatedTxt st wst) = do
-  wst' <- traverse (traverse rnHsDoc) wst
+  wst' <- traverse (traverse rnHsDoc) (fmap convertWithHsDocIdentifiers <$> wst)
   pure (DeprecatedTxt st wst')
+
+convertWithHsDocIdentifiers
+  :: WithHsDocIdentifiers (StringLit GhcPs) GhcPs
+  -> WithHsDocIdentifiers (StringLit GhcRn) GhcPs
+convertWithHsDocIdentifiers (WithHsDocIdentifiers hsDocString hsDocIdentifiers) =
+  WithHsDocIdentifiers (convertStringLit hsDocString) hsDocIdentifiers
 
 rnLWarningTxt :: LWarningTxt GhcPs -> RnM (LWarningTxt GhcRn)
 rnLWarningTxt (L loc warn) = L loc <$> rnWarningTxt warn

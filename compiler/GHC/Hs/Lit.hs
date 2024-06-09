@@ -6,6 +6,7 @@
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns     #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable, OutputableBndrId
 
@@ -32,6 +33,8 @@ import GHC.Core.Type
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 import GHC.Hs.Extension
+import GHC.Data.FastString
+import GHC.Real (Ratio(..))
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
@@ -64,6 +67,18 @@ type instance XHsRat        (GhcPass _) = NoExtField
 type instance XHsFloatPrim  (GhcPass _) = NoExtField
 type instance XHsDoublePrim (GhcPass _) = NoExtField
 type instance XXLit         (GhcPass _) = DataConCantHappen
+type instance XIntegralLit  (GhcPass p) = SourceText
+type instance XFractionalLit (GhcPass p) = SourceText
+type instance XStringLit    (GhcPass p) =
+    ( SourceText
+    , Maybe NoCommentsLocation
+        -- Location of
+        -- possible
+        -- trailing comma
+            -- AZ: if we could have a LocatedA
+            -- StringLiteral we would not need sl_tc, but
+            -- that would cause import loops.
+    )
 
 data OverLitRn
   = OverLitRn {
@@ -116,7 +131,7 @@ overLitType (OverLit OverLitTc{ ol_type = ty } _) = ty
 hsOverLitNeedsParens :: PprPrec -> HsOverLit x -> Bool
 hsOverLitNeedsParens p (OverLit { ol_val = olv }) = go olv
   where
-    go :: OverLitVal -> Bool
+    go :: OverLitVal pass -> Bool
     go (HsIntegral x)   = p > topPrec && il_neg x
     go (HsFractional x) = p > topPrec && fl_neg x
     go (HsIsString {})  = False
@@ -157,7 +172,7 @@ convertLit (HsChar a x)       = HsChar a x
 convertLit (HsCharPrim a x)   = HsCharPrim a x
 convertLit (HsString a x)     = HsString a x
 convertLit (HsStringPrim a x) = HsStringPrim a x
-convertLit (HsInt a x)        = HsInt a x
+convertLit (HsInt a x)        = HsInt a (convertIntegralLit x)
 convertLit (HsIntPrim a x)    = HsIntPrim a x
 convertLit (HsWordPrim a x)   = HsWordPrim a x
 convertLit (HsInt8Prim a x)   = HsInt8Prim a x
@@ -169,9 +184,18 @@ convertLit (HsWord16Prim a x) = HsWord16Prim a x
 convertLit (HsWord32Prim a x) = HsWord32Prim a x
 convertLit (HsWord64Prim a x) = HsWord64Prim a x
 convertLit (HsInteger a x b)  = HsInteger a x b
-convertLit (HsRat a x b)      = HsRat a x b
-convertLit (HsFloatPrim a x)  = HsFloatPrim a x
-convertLit (HsDoublePrim a x) = HsDoublePrim a x
+convertLit (HsRat a x b)      = HsRat a (convertFractionalLit x) b
+convertLit (HsFloatPrim a x)  = HsFloatPrim a (convertFractionalLit x)
+convertLit (HsDoublePrim a x) = HsDoublePrim a (convertFractionalLit x)
+
+convertIntegralLit :: IntegralLit (GhcPass p1) -> IntegralLit (GhcPass p2)
+convertIntegralLit (IL il_text il_neg il_value) = IL il_text il_neg il_value
+
+convertFractionalLit :: FractionalLit (GhcPass p1) -> FractionalLit (GhcPass p2)
+convertFractionalLit (FL fl_text fl_neg fl_signi fl_exp fl_exp_base) = FL fl_text fl_neg fl_signi fl_exp fl_exp_base
+
+convertStringLit :: StringLit (GhcPass p1) -> StringLit (GhcPass p2)
+convertStringLit (SL sl_st sl_fs) = SL sl_st sl_fs
 
 {-
 Note [ol_rebindable]
@@ -217,10 +241,10 @@ instance OutputableBndrId p
   ppr (OverLit {ol_val=val, ol_ext=ext})
         = ppr val <+> (whenPprDebug (parens (pprXOverLit (ghcPass @p) ext)))
 
-instance Outputable OverLitVal where
+instance Outputable (OverLitVal (GhcPass p)) where
   ppr (HsIntegral i)   = pprWithSourceText (il_text i) (integer (il_value i))
   ppr (HsFractional f) = ppr f
-  ppr (HsIsString s)   = pprWithSourceText (sl_st s) (pprHsString (sl_fs s))
+  ppr (HsIsString s)   = pprWithSourceText (fst (sl_st s)) (pprHsString (sl_fs s))
 
 -- | pmPprHsLit pretty prints literals and is used when pretty printing pattern
 -- match warnings. All are printed the same (i.e., without hashes if they are
@@ -249,19 +273,69 @@ pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
 
-negateOverLitVal :: OverLitVal -> OverLitVal
+mkIntegralLit :: Integral a => a -> (IntegralLit (GhcPass p))
+mkIntegralLit i = IL { il_text = SourceText (fsLit $ show i_integer)
+                     , il_neg = i < 0
+                     , il_value = i_integer }
+  where
+    i_integer :: Integer
+    i_integer = toInteger i
+
+negateIntegralLit :: (IntegralLit (GhcPass p)) -> (IntegralLit (GhcPass p))
+negateIntegralLit (IL text neg value)
+  = case text of
+      SourceText (unconsFS -> Just ('-',src)) -> IL (SourceText src)                False    (negate value)
+      SourceText src                          -> IL (SourceText ('-' `consFS` src)) True     (negate value)
+      NoSourceText                            -> IL NoSourceText          (not neg) (negate value)
+
+mkFractionalLit :: SourceText -> Bool -> Rational -> Integer -> FractionalExponentBase
+                -> FractionalLit (GhcPass p)
+mkFractionalLit = FL
+
+fractionalLitFromRational :: Rational -> FractionalLit (GhcPass p)
+fractionalLitFromRational r =  FL { fl_text = NoSourceText
+                           , fl_neg = r < 0
+                           , fl_signi = r
+                           , fl_exp = 0
+                           , fl_exp_base = Base10 }
+
+mkTHFractionalLit :: Rational -> FractionalLit (GhcPass p)
+mkTHFractionalLit r =  FL { fl_text = SourceText (fsLit $ show (realToFrac r::Double))
+                             -- Converting to a Double here may technically lose
+                             -- precision (see #15502). We could alternatively
+                             -- convert to a Rational for the most accuracy, but
+                             -- it would cause Floats and Doubles to be displayed
+                             -- strangely, so we opt not to do this. (In contrast
+                             -- to mkIntegralLit, where we always convert to an
+                             -- Integer for the highest accuracy.)
+                           , fl_neg = r < 0
+                           , fl_signi = r
+                           , fl_exp = 0
+                           , fl_exp_base = Base10 }
+
+negateFractionalLit :: FractionalLit (GhcPass p) -> FractionalLit (GhcPass p)
+negateFractionalLit (FL text neg i e eb)
+  = case text of
+      SourceText (unconsFS -> Just ('-',src))
+                           -> FL (SourceText src)                False (negate i) e eb
+      SourceText      src  -> FL (SourceText ('-' `consFS` src)) True  (negate i) e eb
+      NoSourceText         -> FL NoSourceText (not neg) (negate i) e eb
+
+-- | The integer should already be negated if it's negative.
+integralFractionalLit :: Bool -> Integer -> FractionalLit (GhcPass p)
+integralFractionalLit neg i = FL { fl_text = SourceText (fsLit $ show i)
+                                 , fl_neg = neg
+                                 , fl_signi = i :% 1
+                                 , fl_exp = 0
+                                 , fl_exp_base = Base10 }
+
+-- | The arguments should already be negated if they are negative.
+mkSourceFractionalLit :: String -> Bool -> Integer -> Integer
+                      -> FractionalExponentBase
+                      -> FractionalLit (GhcPass p)
+mkSourceFractionalLit !str !b !r !i !ff = FL (SourceText $ fsLit str) b (r :% 1) i ff
+
+negateOverLitVal :: OverLitVal (GhcPass p)-> OverLitVal (GhcPass p)
 negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
 negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
 negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
-
-instance (Ord (XXOverLit p)) => Ord (HsOverLit p) where
-  compare (OverLit _ val1)  (OverLit _ val2) = val1 `compare` val2
-  compare (XOverLit  val1)  (XOverLit  val2) = val1 `compare` val2
-  compare _ _ = panic "Ord HsOverLit"
-
--- Comparison operations are needed when grouping literals
--- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
-instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
-  (OverLit _ val1) == (OverLit _ val2) = val1 == val2
-  (XOverLit  val1) == (XOverLit  val2) = val1 == val2
-  _ == _ = panic "Eq HsOverLit"

@@ -443,7 +443,7 @@ rnImportDecl this_mod
 
 
 -- | Rename raw package imports
-renameRawPkgQual :: UnitEnv -> ModuleName -> RawPkgQual -> PkgQual
+renameRawPkgQual :: UnitEnv -> ModuleName -> RawPkgQual GhcPs -> PkgQual
 renameRawPkgQual unit_env mn = \case
   NoRawPkgQual -> NoPkgQual
   RawPkgQual p -> renamePkgQual unit_env mn (Just (sl_fs p))

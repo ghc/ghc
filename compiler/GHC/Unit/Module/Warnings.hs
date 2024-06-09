@@ -70,7 +70,6 @@ import Data.List (isPrefixOf)
 import GHC.Generics ( Generic )
 import Control.DeepSeq
 
-
 {-
 Note [Warning categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -205,10 +204,10 @@ data WarningTxt pass
         -- ^ Warning category attached to this WARNING pragma, if any;
         -- see Note [Warning categories]
       SourceText
-      [LocatedE (WithHsDocIdentifiers StringLit pass)]
+      [LocatedE (WithHsDocIdentifiers (StringLit pass) pass)]
    | DeprecatedTxt
       SourceText
-      [LocatedE (WithHsDocIdentifiers StringLit pass)]
+      [LocatedE (WithHsDocIdentifiers (StringLit pass) pass)]
   deriving Generic
 
 -- | To which warning category does this WARNING or DEPRECATED pragma belong?
@@ -218,18 +217,18 @@ warningTxtCategory (WarningTxt (Just (L _ (InWarningCategory _  _ (L _ cat)))) _
 warningTxtCategory _ = defaultWarningCategory
 
 -- | The message that the WarningTxt was specified to output
-warningTxtMessage :: WarningTxt p -> [LocatedE (WithHsDocIdentifiers StringLit p)]
+warningTxtMessage :: WarningTxt p -> [LocatedE (WithHsDocIdentifiers (StringLit p) p)]
 warningTxtMessage (WarningTxt _ _ m) = m
 warningTxtMessage (DeprecatedTxt _ m) = m
 
 -- | True if the 2 WarningTxts have the same category and messages
-warningTxtSame :: WarningTxt p1 -> WarningTxt p2 -> Bool
+warningTxtSame :: WarningTxt p -> WarningTxt p -> Bool
 warningTxtSame w1 w2
   = warningTxtCategory w1 == warningTxtCategory w2
   && literal_message w1 == literal_message w2
   && same_type
   where
-    literal_message :: WarningTxt p -> [StringLit]
+    literal_message :: WarningTxt p -> [StringLit p]
     literal_message = map (hsDocString . unLoc) . warningTxtMessage
     same_type | DeprecatedTxt {} <- w1, DeprecatedTxt {} <- w2 = True
               | WarningTxt {} <- w1, WarningTxt {} <- w2       = True
@@ -237,8 +236,12 @@ warningTxtSame w1 w2
 
 deriving instance Eq InWarningCategory
 
-deriving instance (Eq (IdP pass)) => Eq (WarningTxt pass)
-deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
+deriving instance (Eq (IdP (GhcPass pass))) => Eq (WarningTxt (GhcPass pass))
+deriving instance
+  ( Data (GhcPass p),
+    (XStringLit (GhcPass p) ~ (SourceText, Maybe NoCommentsLocation)),
+    Data (IdP (GhcPass p)))
+  => Data (WarningTxt (GhcPass p))
 
 type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnP
 
@@ -246,7 +249,9 @@ instance Outputable InWarningCategory where
   ppr (InWarningCategory _ _ wt) = text "in" <+> doubleQuotes (ppr wt)
 
 
-instance Outputable (WarningTxt pass) where
+instance
+  (XStringLit (GhcPass p) ~ (SourceText, Maybe NoCommentsLocation))
+  => Outputable (WarningTxt (GhcPass p)) where
     ppr (WarningTxt mcat lsrc ws)
       = case lsrc of
             NoSourceText   -> pp_ws ws
@@ -260,12 +265,15 @@ instance Outputable (WarningTxt pass) where
           NoSourceText   -> pp_ws ds
           SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
-pp_ws :: [LocatedE (WithHsDocIdentifiers StringLit pass)] -> SDoc
+pp_ws
+  :: (XStringLit (GhcPass p) ~ (SourceText, Maybe NoCommentsLocation))
+  => [LocatedE (WithHsDocIdentifiers (StringLit (GhcPass p)) (GhcPass p))] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
   = text "["
     <+> vcat (punctuate comma (map (ppr . unLoc) ws))
     <+> text "]"
+
 
 pprWarningTxtForMsg :: WarningTxt p -> SDoc
 pprWarningTxtForMsg (WarningTxt _ _ ws)
@@ -313,7 +321,7 @@ type DeclWarnOccNames pass = [(OccName, WarningTxt pass)]
 -- | Names that are deprecated as exports
 type ExportWarnNames pass = [(Name, WarningTxt pass)]
 
-deriving instance Eq (IdP pass) => Eq (Warnings pass)
+deriving instance Eq (IdP (GhcPass p)) => Eq (Warnings (GhcPass p))
 
 emptyWarn :: Warnings p
 emptyWarn = WarnSome [] []
