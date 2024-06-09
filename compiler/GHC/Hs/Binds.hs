@@ -47,7 +47,6 @@ import GHC.Types.Basic
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var
-import GHC.Data.Bag
 import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -458,7 +457,7 @@ instance (OutputableBndrId pl, OutputableBndrId pr)
     = getPprDebug $ \case
         -- Print with sccs showing
         True  -> vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
-        False -> pprDeclList (pprLHsBindsForUser (unionManyBags (map snd sccs)) sigs)
+        False -> pprDeclList (pprLHsBindsForUser (concat (map snd sccs)) sigs)
    where
      ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
      pp_rec Recursive    = text "rec"
@@ -468,7 +467,7 @@ pprLHsBinds :: (OutputableBndrId idL, OutputableBndrId idR)
             => LHsBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
-  | otherwise = pprDeclList (map ppr (bagToList binds))
+  | otherwise = pprDeclList (map ppr binds)
 
 pprLHsBindsForUser :: (OutputableBndrId idL,
                        OutputableBndrId idR,
@@ -486,7 +485,7 @@ pprLHsBindsForUser binds sigs
 
     decls :: [(SrcSpan, SDoc)]
     decls = [(locA loc, ppr sig)  | L loc sig <- sigs] ++
-            [(locA loc, ppr bind) | L loc bind <- bagToList binds]
+            [(locA loc, ppr bind) | L loc bind <- binds]
 
     sort_by_loc decls = sortBy (SrcLoc.leftmost_smallest `on` fst) decls
 
@@ -514,20 +513,20 @@ isEmptyValBinds (ValBinds _ ds sigs)  = isEmptyLHsBinds ds && null sigs
 isEmptyValBinds (XValBindsLR (NValBinds ds sigs)) = null ds && null sigs
 
 emptyValBindsIn, emptyValBindsOut :: HsValBindsLR (GhcPass a) (GhcPass b)
-emptyValBindsIn  = ValBinds NoAnnSortKey emptyBag []
+emptyValBindsIn  = ValBinds NoAnnSortKey [] []
 emptyValBindsOut = XValBindsLR (NValBinds [] [])
 
 emptyLHsBinds :: LHsBindsLR (GhcPass idL) idR
-emptyLHsBinds = emptyBag
+emptyLHsBinds = []
 
 isEmptyLHsBinds :: LHsBindsLR (GhcPass idL) idR -> Bool
-isEmptyLHsBinds = isEmptyBag
+isEmptyLHsBinds = null
 
 ------------
 plusHsValBinds :: HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
                -> HsValBinds(GhcPass a)
 plusHsValBinds (ValBinds _ ds1 sigs1) (ValBinds _ ds2 sigs2)
-  = ValBinds NoAnnSortKey (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
+  = ValBinds NoAnnSortKey (ds1 ++ ds2) (sigs1 ++ sigs2)
 plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
                (XValBindsLR (NValBinds ds2 sigs2))
   = XValBindsLR (NValBinds (ds1 ++ ds2) (sigs1 ++ sigs2))

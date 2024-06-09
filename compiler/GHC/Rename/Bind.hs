@@ -61,7 +61,6 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.List.SetOps    ( findDupsEq )
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
 import GHC.Data.Graph.Directed ( SCC(..) )
-import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -200,8 +199,8 @@ rnTopBindsLHSBoot fix_env binds
   = do  { topBinds <- rnTopBindsLHS fix_env binds
         ; case topBinds of
             ValBinds x mbinds sigs ->
-              do  { rejectBootDecls HsBoot BootBindsPs (bagToList $ mbinds)
-                  ; pure (ValBinds x emptyBag sigs) }
+              do  { rejectBootDecls HsBoot BootBindsPs mbinds
+                  ; pure (ValBinds x [] sigs) }
             _ -> pprPanic "rnTopBindsLHSBoot" (ppr topBinds) }
 
 rejectBootDecls :: HsBootOrSig
@@ -309,7 +308,7 @@ rnValBindsLHS :: NameMaker
               -> HsValBinds GhcPs
               -> RnM (HsValBindsLR GhcRn GhcPs)
 rnValBindsLHS topP (ValBinds x mbinds sigs)
-  = do { mbinds' <- mapBagM (wrapLocMA (rnBindLHS topP doc)) mbinds
+  = do { mbinds' <- mapM (wrapLocMA (rnBindLHS topP doc)) mbinds
        ; return $ ValBinds x mbinds' sigs }
   where
     bndrs = collectHsBindsBinders CollNoDictBinders mbinds
@@ -327,7 +326,7 @@ rnValBindsRHS :: HsSigCtxt
 
 rnValBindsRHS ctxt (ValBinds _ mbinds sigs)
   = do { (sigs', sig_fvs) <- renameSigs ctxt sigs
-       ; binds_w_dus <- mapBagM (rnLBind (mkScopedTvFn sigs')) mbinds
+       ; binds_w_dus <- mapM (rnLBind (mkScopedTvFn sigs')) mbinds
        ; let !(anal_binds, anal_dus) = depAnalBinds binds_w_dus
 
        ; let patsyn_fvs = foldr (unionNameSet . psb_ext) emptyNameSet $
@@ -628,7 +627,7 @@ ticket #1136.
 *                                                                      *
 ********************************************************************* -}
 
-depAnalBinds :: Bag (LHsBind GhcRn, [Name], Uses)
+depAnalBinds :: [(LHsBind GhcRn, [Name], Uses)]
              -> ([(RecFlag, LHsBinds GhcRn)], DefUses)
 -- Dependency analysis; this is important so that
 -- unused-binding reporting is accurate
@@ -639,10 +638,10 @@ depAnalBinds binds_w_dus
                    (\(_, _, uses) -> nonDetEltsUniqSet uses)
                    -- It's OK to use nonDetEltsUniqSet here as explained in
                    -- Note [depAnal determinism] in GHC.Types.Name.Env.
-                   (bagToList binds_w_dus)
+                   binds_w_dus
 
-    get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, unitBag bind)
-    get_binds (CyclicSCC  binds_w_dus)  = (Recursive, listToBag [b | (b,_,_) <- binds_w_dus])
+    get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, [bind])
+    get_binds (CyclicSCC  binds_w_dus)  = (Recursive, [b | (b,_,_) <- binds_w_dus])
 
     get_du (AcyclicSCC (_, bndrs, uses)) = (Just (mkNameSet bndrs), uses)
     get_du (CyclicSCC  binds_w_dus)      = (Just defs, uses)
@@ -936,7 +935,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
              -- for instance decls too
 
        -- Rename the bindings LHSs
-       ; binds' <- foldrM (rnMethodBindLHS is_cls_decl cls) emptyBag binds
+       ; binds' <- foldrM (rnMethodBindLHS is_cls_decl cls) [] binds
 
        -- Rename the pragmas and signatures
        -- Annoyingly the type variables /are/ in scope for signatures, but
@@ -954,10 +953,10 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        -- type variables from the class/instance head are in scope.
        -- Answer no in Haskell 2010, but yes if you have -XScopedTypeVariables
        ; (binds'', bind_fvs) <- bindSigTyVarsFV ktv_names $
-              do { binds_w_dus <- mapBagM (rnLBind (mkScopedTvFn other_sigs')) binds'
+              do { binds_w_dus <- mapM (rnLBind (mkScopedTvFn other_sigs')) binds'
                  ; let bind_fvs = foldr (\(_,_,fv1) fv2 -> fv1 `plusFV` fv2)
                                            emptyFVs binds_w_dus
-                 ; return (mapBag fstOf3 binds_w_dus, bind_fvs) }
+                 ; return (map fstOf3 binds_w_dus, bind_fvs) }
 
        ; return ( binds'', spec_prags' ++ other_sigs'
                 , sig_fvs `plusFV` spg_fvs `plusFV` bind_fvs) }
@@ -1010,7 +1009,7 @@ rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
     do { sel_name <- wrapLocMA (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
        ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
-       ; return (L loc bind' `consBag` rest ) }
+       ; return (L loc bind' : rest ) }
 
 -- Report error for all other forms of bindings
 -- This is why we use a fold rather than map

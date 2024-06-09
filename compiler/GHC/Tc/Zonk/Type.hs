@@ -712,7 +712,7 @@ zonkRecMonoBinds binds
 
 ---------------------------------------------
 zonkMonoBinds :: LHsBinds GhcTc -> ZonkTcM (LHsBinds GhcTc)
-zonkMonoBinds binds = mapBagM zonk_lbind binds
+zonkMonoBinds binds = mapM zonk_lbind binds
 
 zonk_lbind :: LHsBind GhcTc -> ZonkTcM (LHsBind GhcTc)
 zonk_lbind = wrapLocZonkMA zonk_bind
@@ -758,7 +758,7 @@ zonk_bind (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
     runZonkBndrT (zonkTcEvBinds_s ev_binds) $ \ new_ev_binds ->
   do { (new_val_bind, new_exports) <- mfix $ \ ~(new_val_binds, _) ->
        runZonkBndrT (extendIdZonkEnvRec $ collectHsBindsBinders CollNoDictBinders new_val_binds) $ \ _ ->
-       do { new_val_binds <- mapBagM zonk_val_bind val_binds
+       do { new_val_binds <- mapM zonk_val_bind val_binds
           ; new_exports   <- mapM zonk_export exports
           ; return (new_val_binds, new_exports)
           }

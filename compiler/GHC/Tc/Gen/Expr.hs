@@ -82,7 +82,6 @@ import GHC.Builtin.Uniques ( mkBuiltinUnique )
 import GHC.Driver.DynFlags
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
-import GHC.Data.Bag ( unitBag )
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
@@ -1429,7 +1428,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
              let_binds = HsValBinds noAnn $ XValBindsLR
                        $ NValBinds upd_ids_lhs (map mk_idSig upd_ids)
              upd_ids_lhs :: [(RecFlag, LHsBindsLR GhcRn GhcRn)]
-             upd_ids_lhs = [ (NonRecursive, unitBag $ genSimpleFunBind (idName id) [] rhs)
+             upd_ids_lhs = [ (NonRecursive, [genSimpleFunBind (idName id) [] rhs])
                            | (_, (id, rhs)) <- upd_ids ]
              mk_idSig :: (Name, (Id, LHsExpr GhcRn)) -> LSig GhcRn
              mk_idSig (_, (id, _)) = L gen $ XSig $ IdSig id

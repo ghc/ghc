@@ -6,7 +6,6 @@
 module GHC.HsToCore.Docs where
 
 import GHC.Prelude
-import GHC.Data.Bag
 import GHC.Hs.Binds
 import GHC.Hs.Doc
 import GHC.Hs.Decls
@@ -455,7 +454,7 @@ classDecls class_ = filterDecls . collectDocs . sortLocatedA $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
     docs  = mkDecls tcdDocs (DocD noExtField) class_
-    defs  = mkDecls (bagToList . tcdMeths) (ValD noExtField) class_
+    defs  = mkDecls tcdMeths (ValD noExtField) class_
     sigs  = mkDecls tcdSigs (SigD noExtField) class_
     ats   = mkDecls tcdATs (TyClD noExtField . FamDecl noExtField) class_
 
@@ -519,7 +518,7 @@ ungroup group_ =
 
     valbinds :: HsValBinds GhcRn -> [LHsBind GhcRn]
     valbinds (XValBindsLR (NValBinds binds _)) =
-      concatMap bagToList . snd . unzip $ binds
+      concat . snd . unzip $ binds
     valbinds ValBinds{} = error "expected XValBindsLR"
 
 -- | Collect docs and attach them to the right declarations.

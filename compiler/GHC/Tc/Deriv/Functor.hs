@@ -154,7 +154,7 @@ gen_Functor_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
 gen_Functor_binds loc (DerivInstTys{dit_rep_tc = tycon})
   | Phantom <- last (tyConRoles tycon)
-  = (unitBag fmap_bind, emptyBag)
+  = ([fmap_bind], emptyBag)
   where
     fmap_name = L (noAnnSrcSpan loc) fmap_RDR
     fmap_bind = mkRdrFunBind fmap_name fmap_eqns
@@ -165,7 +165,7 @@ gen_Functor_binds loc (DerivInstTys{dit_rep_tc = tycon})
 
 gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                        , dit_rep_tc_args = tycon_args })
-  = (listToBag [fmap_bind, replace_bind], emptyBag)
+  = ([fmap_bind, replace_bind], emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
     fmap_name = L (noAnnSrcSpan loc) fmap_RDR
@@ -817,7 +817,7 @@ gen_Foldable_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpe
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
 gen_Foldable_binds loc (DerivInstTys{dit_rep_tc = tycon})
   | Phantom <- last (tyConRoles tycon)
-  = (unitBag foldMap_bind, emptyBag)
+  = ([foldMap_bind], emptyBag)
   where
     foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
     foldMap_bind = mkRdrFunBind foldMap_name foldMap_eqns
@@ -830,10 +830,10 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                         , dit_rep_tc_args = tycon_args })
   | null data_cons  -- There's no real point producing anything but
                     -- foldMap for a type with no constructors.
-  = (unitBag foldMap_bind, emptyBag)
+  = ([foldMap_bind], emptyBag)
 
   | otherwise
-  = (listToBag [foldr_bind, foldMap_bind, null_bind], emptyBag)
+  = ([foldr_bind, foldMap_bind, null_bind], emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
 
@@ -1051,7 +1051,7 @@ gen_Traversable_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBind
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
 gen_Traversable_binds loc (DerivInstTys{dit_rep_tc = tycon})
   | Phantom <- last (tyConRoles tycon)
-  = (unitBag traverse_bind, emptyBag)
+  = ([traverse_bind], emptyBag)
   where
     traverse_name = L (noAnnSrcSpan loc) traverse_RDR
     traverse_bind = mkRdrFunBind traverse_name traverse_eqns
@@ -1063,7 +1063,7 @@ gen_Traversable_binds loc (DerivInstTys{dit_rep_tc = tycon})
 
 gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                            , dit_rep_tc_args = tycon_args })
-  = (unitBag traverse_bind, emptyBag)
+  = ([traverse_bind], emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
 

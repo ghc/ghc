@@ -68,7 +68,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Data.Maybe
-import GHC.Data.Bag
 import GHC.Data.BooleanFormula
 
 import Control.Monad
@@ -141,7 +140,7 @@ tcClassSigs clas sigs def_methods
                -- (Generic signatures without value bindings indicate
                -- that a default of this form is expected to be
                -- provided.)
-               case bagToList def_methods of
+               case def_methods of
                  []           -> return ()
                  meth : meths -> failWithTc (TcRnIllegalHsigDefaultMethods clas (meth NE.:| meths))
             else
@@ -157,7 +156,7 @@ tcClassSigs clas sigs def_methods
     gen_sigs :: [Located ([LocatedN Name], LHsSigType GhcRn)] -- AZ temp
     gen_sigs     = [L (locA loc) (nm,ty) | L loc (ClassOpSig _ True  nm ty) <- sigs]
     dm_bind_names :: [Name] -- These ones have a value binding in the class decl
-    dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
+    dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- def_methods]
 
     tc_sig :: NameEnv (SrcSpan, Type) -> ([LocatedN Name], LHsSigType GhcRn)
            -> TcM [TcMethInfo]
@@ -222,7 +221,7 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
         ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
                       mapM tc_item op_items
 
-        ; return (unionManyBags dm_binds) }
+        ; return (concat dm_binds) }
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
@@ -239,7 +238,7 @@ tcDefMeth _ _ _ _ _ prag_fn (sel_id, Nothing)
   = do { -- No default method
          mapM_ (addLocM (badDmPrag sel_id ))
                (lookupPragEnv prag_fn (idName sel_id))
-       ; return emptyBag }
+       ; return [] }
 
 tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
           (sel_id, Just (dm_name, dm_spec))
@@ -316,7 +315,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                                   , abs_binds    = tc_bind
                                   , abs_sig      = True }
 
-       ; return (unitBag (L bind_loc full_bind)) }
+       ; return [L bind_loc full_bind] }
 
   | otherwise = pprPanic "tcDefMeth" (ppr sel_id)
   where
@@ -389,7 +388,7 @@ findMethodBind  :: Name                 -- Selector
                 -- site of the method binder, and any inline or
                 -- specialisation pragmas
 findMethodBind sel_name binds prag_fn
-  = foldl' mplus Nothing (mapBag f binds)
+  = foldl' mplus Nothing (map f binds)
   where
     prags    = lookupPragEnv prag_fn sel_name
 

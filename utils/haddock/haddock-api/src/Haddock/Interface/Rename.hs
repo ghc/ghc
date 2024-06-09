@@ -27,7 +27,6 @@ import Haddock.Types
 
 import GHC hiding (NoLink)
 import GHC.Builtin.Types (eqTyCon_RDR, tupleDataConName, tupleTyConName)
-import GHC.Data.Bag (emptyBag)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName (Exact))
 
@@ -582,7 +581,7 @@ renameTyClD d = case d of
             , tcdFixity = fixity
             , tcdFDs = lfundeps'
             , tcdSigs = lsigs'
-            , tcdMeths = emptyBag
+            , tcdMeths = []
             , tcdATs = ats'
             , tcdATDefs = at_defs'
             , tcdDocs = []
@@ -841,7 +840,7 @@ renameClsInstD
           { cid_ext = noExtField
           , cid_overlap_mode = omode
           , cid_poly_ty = ltype'
-          , cid_binds = emptyBag
+          , cid_binds = []
           , cid_sigs = []
           , cid_tyfam_insts = lATs'
           , cid_datafam_insts = lADTs'

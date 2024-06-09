@@ -68,7 +68,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 
-import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.Maybe
 
@@ -1914,14 +1913,14 @@ rep_implicit_param_name (HsIPName name) = coreStringLit name
 rep_val_binds :: HsValBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 -- Assumes: all the binders of the binding are already in the meta-env
 rep_val_binds (XValBindsLR (NValBinds binds sigs))
- = do { core1 <- rep_binds (unionManyBags (map snd binds))
+ = do { core1 <- rep_binds (concatMap snd binds)
       ; core2 <- rep_sigs sigs
       ; return (core1 ++ core2) }
 rep_val_binds (ValBinds _ _ _)
  = panic "rep_val_binds: ValBinds"
 
 rep_binds :: LHsBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
-rep_binds = mapM rep_bind . bagToList
+rep_binds = mapM rep_bind
 
 rep_bind :: LHsBind GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 -- Assumes: all the binders of the binding are already in the meta-env

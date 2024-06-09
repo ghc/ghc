@@ -57,7 +57,6 @@ import GHC.Utils.Misc
 import GHC.Utils.FV as FV
 
 import GHC.Data.Maybe
-import GHC.Data.Bag
 import GHC.Data.FastString
 
 import GHC.Unit.Module
@@ -852,7 +851,7 @@ tcRecSelBinds sel_bind_prs
     sigs = [ L (noAnnSrcSpan loc) (XSig $ IdSig sel_id)
                                              | (sel_id, _) <- sel_bind_prs
                                              , let loc = getSrcSpan sel_id ]
-    binds = [(NonRecursive, unitBag bind) | (_, bind) <- sel_bind_prs]
+    binds = [(NonRecursive, [bind]) | (_, bind) <- sel_bind_prs]
 
 mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'

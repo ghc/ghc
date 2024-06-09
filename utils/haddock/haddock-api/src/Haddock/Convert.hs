@@ -37,7 +37,6 @@ import GHC.Core.TyCo.Compare (eqTypes)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Data.Bag (emptyBag)
 import GHC.Types.Basic (DefMethSpec (..), TopLevelFlag (..), TupleSort (..))
 import GHC.Types.Fixity (LexicalFixity (..))
 import GHC.Types.SourceText (SourceText (..))
@@ -183,7 +182,7 @@ tyThingToLHsDecl prr t = case t of
                         | clsOp <- classOpItems cl
                         , tcdSig <- synifyTcIdSig vs clsOp
                         ]
-                , tcdMeths = emptyBag -- ignore default method definitions, they don't affect signature
+                , tcdMeths = [] -- ignore default method definitions, they don't affect signature
                 -- class associated-types are a subset of TyCon:
                 , tcdATs = atFamDecls
                 , tcdATDefs = catMaybes atDefFamDecls

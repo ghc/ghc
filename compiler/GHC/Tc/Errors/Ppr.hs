@@ -358,7 +358,7 @@ instance Diagnostic TcRnMessage where
     TcRnRecursivePatternSynonym binds
       -> mkSimpleDecorated $
             hang (text "Recursive pattern synonym definition with following bindings:")
-               2 (vcat $ map pprLBind . bagToList $ binds)
+               2 (vcat $ map pprLBind binds)
           where
             pprLoc loc = parens (text "defined at" <+> ppr loc)
             pprLBind :: CollectPass GhcRn => GenLocated (EpAnn a) (HsBindLR GhcRn idR) -> SDoc

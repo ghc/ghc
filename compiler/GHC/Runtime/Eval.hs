@@ -1230,7 +1230,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
       expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc'
       let_stmt = L loc . LetStmt noAnn . (HsValBinds noAnn) $
         ValBinds NoAnnSortKey
-                     (unitBag $ mkHsVarBind loc' (getRdrName expr_name) expr) []
+                     [mkHsVarBind loc' (getRdrName expr_name) expr] []
 
   pstmt <- liftIO $ hscParsedStmt hsc_env let_stmt
   let (hvals_io, fix_env) = case pstmt of

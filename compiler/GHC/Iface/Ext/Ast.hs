@@ -1409,14 +1409,14 @@ scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
     bsScope :: [Scope]
-    bsScope = map (mkScope . getLoc) $ bagToList bs
+    bsScope = map (mkScope . getLoc) bs
     sigsScope :: [Scope]
     sigsScope = map (mkScope . getLocA) sigs
 scopeHsLocaLBinds (HsValBinds _ (XValBindsLR (NValBinds bs sigs)))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
     bsScope :: [Scope]
-    bsScope = map (mkScope . getLoc) $ concatMap (bagToList . snd) bs
+    bsScope = map (mkScope . getLoc) $ concatMap snd bs
     sigsScope :: [Scope]
     sigsScope = map (mkScope . getLocA) sigs
 
@@ -1442,7 +1442,7 @@ instance HiePass p => ToHie (RScoped (HsValBindsLR (GhcPass p) (GhcPass p))) whe
 
 instance HiePass p => ToHie (RScoped (NHsValBindsLR (GhcPass p))) where
   toHie (RS sc (NValBinds binds sigs)) = concatM $
-    [ toHie (concatMap (map (BC RegularBind sc) . bagToList . snd) binds)
+    [ toHie (concatMap (map (BC RegularBind sc) . snd) binds)
     , toHie $ fmap (SC (SI BindSig Nothing)) sigs
     ]
 
@@ -1598,7 +1598,7 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
         where
           context_scope = mkScope $ fromMaybe (noLocA []) context
           rhs_scope = foldl1' combineScopes $ map mkScope
-            [ getHasLocList deps, getHasLocList sigs, getHasLocList (bagToList meths), getHasLocList typs, getHasLocList deftyps]
+            [ getHasLocList deps, getHasLocList sigs, getHasLocList meths, getHasLocList typs, getHasLocList deftyps]
 
 instance ToHie (LocatedA (FamilyDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of

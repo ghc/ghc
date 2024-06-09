@@ -53,7 +53,6 @@ import GHC.Prelude hiding (head, init, last, mod, tail)
 import GHC.Hs
 
 import GHC.Types.SrcLoc
-import GHC.Data.Bag
 
 import Data.Semigroup
 import Data.Foldable
@@ -1488,7 +1487,7 @@ flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
   -- - 'LHsDecl' produced by 'decl_cls' in Parser.y always have a 'BufSpan'
   -- - 'partitionBindsAndSigs' does not discard this 'BufSpan'
   mergeListsBy cmpBufSpanA [
-    mapLL (\b -> ValD noExtField b) (bagToList all_bs),
+    mapLL (\b -> ValD noExtField b) all_bs,
     mapLL (\s -> SigD noExtField s) all_ss,
     mapLL (\t -> TyClD noExtField (FamDecl noExtField t)) all_ts,
     mapLL (\tfi -> InstD noExtField (TyFamInstD noExtField tfi)) all_tfis,

@@ -20,7 +20,6 @@ import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
 import GHC.Core (Expr(Var,App))
 import GHC.Data.FastString (unpackFS, lengthFS)
-import GHC.Data.Bag (bagToList)
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Tc.Utils.TcMType (shortCutLit)
@@ -384,7 +383,7 @@ sequenceGrdDagMapM f as = sequenceGrdDags <$> traverse f as
 -- See Note [Long-distance information for HsLocalBinds].
 desugarLocalBinds :: HsLocalBinds GhcTc -> DsM GrdDag
 desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
-  sequenceGrdDagMapM (sequenceGrdDagMapM go . bagToList) (map snd binds)
+  sequenceGrdDagMapM (sequenceGrdDagMapM go) (map snd binds)
   where
     go :: LHsBind GhcTc -> DsM GrdDag
     go (L _ FunBind{fun_id = L _ x, fun_matches = mg})
@@ -409,7 +408,7 @@ desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
             | otherwise
             = Nothing
       let exps = mapMaybe go_export exports
-      bs <- sequenceGrdDagMapM go (bagToList binds)
+      bs <- sequenceGrdDagMapM go binds
       return (sequencePmGrds exps `gdSeq` bs)
     go _ = return GdEnd
 desugarLocalBinds _binds = return GdEnd

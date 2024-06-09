@@ -63,7 +63,6 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Utils.Misc
-import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Core.PatSyn
@@ -114,7 +113,7 @@ ds_val_bind :: DynFlags -> (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
 -- a tuple and doing selections.
 -- Silently ignore INLINE and SPECIALISE pragmas...
 ds_val_bind _ (NonRecursive, hsbinds) body
-  | [L loc bind] <- bagToList hsbinds
+  | [L loc bind] <- hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
         -- ToDo: in some bizarre case it's conceivable that there
         --       could be dict binds in the 'binds'.  (See the notes
@@ -148,9 +147,9 @@ ds_val_bind _ (NonRecursive, hsbinds) body
 
 
 ds_val_bind _ (is_rec, binds) _body
-  | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
+  | any (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
   = assert (isRec is_rec )
-    errDsCoreExpr $ DsRecBindsNotAllowedForUnliftedTys (bagToList binds)
+    errDsCoreExpr $ DsRecBindsNotAllowedForUnliftedTys binds
 
 -- Special case: a non-recursive PatBind. No dancing about with lets and seqs,
 -- we make a case immediately. Very important for linear types: let !pat can be
@@ -159,7 +158,7 @@ ds_val_bind _ (is_rec, binds) _body
 -- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
 ds_val_bind dflags (NonRecursive, hsbinds) body
   | [L _loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann
-                     , pat_ext = (ty, (rhs_tick, _var_ticks))})] <- bagToList hsbinds
+                     , pat_ext = (ty, (rhs_tick, _var_ticks))})] <- hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
   , pat' <- decideBangHood dflags pat
   , isBangedLPat pat'
@@ -180,7 +179,7 @@ ds_val_bind dflags (NonRecursive, hsbinds) body
 
 -- Ordinary case for bindings; none should be unlifted
 ds_val_bind _ (is_rec, binds) body
-  = do  { massert (isRec is_rec || isSingletonBag binds)
+  = do  { massert (isRec is_rec || isSingleton binds)
                -- we should never produce a non-recursive list of multiple binds
 
         ; (force_vars,prs) <- dsLHsBinds binds
