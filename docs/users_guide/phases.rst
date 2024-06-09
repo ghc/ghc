@@ -515,14 +515,6 @@ defined by your local GHC installation, the following trick is useful:
     Only defined when :ghc-flag:`-fignore-asserts` is specified.
     This can be used to create your own assertions, see :ref:`assertions`
 
-``__PARALLEL_HASKELL__``
-    .. index::
-       single: __PARALLEL_HASKELL__
-
-    Only defined when ``-parallel`` is in use! This symbol is defined
-    when pre-processing Haskell (input) and pre-processing C (GHC
-    output).
-
 ``os_HOST_OS=1``
     This define allows conditional compilation based on the Operating
     System, where⟨os⟩ is the name of the current Operating System (eg.
