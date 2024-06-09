@@ -62,7 +62,7 @@ import GHC.Utils.Outputable
 import GHC.Unicode
 
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Decls (WarningTxt(..), InWarningCategory(..), XInWarningCategoryIn(), WarningCategory(..))
+import Language.Haskell.Syntax.Decls (WarningTxt(..), XWarningTxt, XDeprecatedTxt, InWarningCategory(..), XInWarningCategory, XInWarningCategoryIn(), WarningCategory(..))
 
 import Data.List (isPrefixOf)
 
@@ -72,6 +72,8 @@ fromWarningCategory
   :: NoAnn (XInWarningCategoryIn (GhcPass pass))
   => WarningCategory -> InWarningCategory (GhcPass pass)
 fromWarningCategory wc = InWarningCategory noAnn NoSourceText (noLocA wc)
+
+type instance XInWarningCategory (GhcPass p) = SourceText
 
 mkWarningCategory :: FastString -> WarningCategory
 mkWarningCategory = WarningCategory
@@ -190,6 +192,9 @@ instance Outputable (WarningTxt (GhcPass p)) where
           NoSourceText   -> pp_ws ds
           SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
+type instance XWarningTxt (GhcPass p) = SourceText
+type instance XDeprecatedTxt (GhcPass p) = SourceText
+
 pp_ws :: [LocatedE (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
@@ -248,6 +253,9 @@ type ExportWarnNames pass = [(Name, WarningTxt pass)]
 
 deriving instance
   ( Eq (IdP (GhcPass p)),
+    Eq (XWarningTxt (GhcPass p)),
+    Eq (XDeprecatedTxt (GhcPass p)),
+    Eq (XInWarningCategory (GhcPass p)),
     Eq (XInWarningCategoryIn (GhcPass p))
   ) => Eq (Warnings (GhcPass p))
 

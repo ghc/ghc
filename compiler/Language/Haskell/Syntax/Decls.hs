@@ -87,8 +87,8 @@ module Language.Haskell.Syntax.Decls (
   -- * Grouping
   HsGroup(..), hsGroupInstDecls,
   -- * Warnings
-  WarningTxt(..), InWarningCategory(..), WarningCategory(..),
-  XInWarningCategoryIn,
+  WarningTxt(..), XWarningTxt, XDeprecatedTxt, InWarningCategory(..),
+  XInWarningCategory, WarningCategory(..), XInWarningCategoryIn,
     ) where
 
 -- friends:
@@ -111,7 +111,7 @@ import GHC.Utils.Panic.Plain ( assert )
 
 import GHC.Hs.Doc (LHsDoc, WithHsDocIdentifiers) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 -- TODO(ghc-import): `StringLiteral` is only used in `WithHsDocIdentifiers`, which presumably get moved out themselves.
-import GHC.Types.SourceText (StringLiteral, SourceText)
+import GHC.Types.SourceText (StringLiteral)
 
 import Control.Monad
 import Data.Data        hiding (TyCon, Fixity, Infix)
@@ -1801,15 +1801,21 @@ data WarningTxt pass
       (Maybe (XRec pass (InWarningCategory pass)))
         -- ^ Warning category attached to this WARNING pragma, if any;
         -- see Note [Warning categories]
-      SourceText
+      (XWarningTxt pass)
       [XRec pass (WithHsDocIdentifiers StringLiteral pass)]
    | DeprecatedTxt
-      SourceText
+      (XDeprecatedTxt pass)
       [XRec pass (WithHsDocIdentifiers StringLiteral pass)]
   deriving (Generic)
 
+type family XWarningTxt p
+
+type family XDeprecatedTxt p
+
 deriving instance
-  ( Eq (XRec pass (InWarningCategory pass)),
+  ( Eq (XWarningTxt pass),
+    Eq (XDeprecatedTxt pass),
+    Eq (XRec pass (InWarningCategory pass)),
     Eq (XRec pass (WithHsDocIdentifiers StringLiteral pass))
   ) => Eq (WarningTxt pass)
 
@@ -1862,15 +1868,17 @@ the possibility of them being infinite.
 data InWarningCategory pass
   = InWarningCategory
     { iwc_in :: !(XInWarningCategoryIn pass),
-      iwc_st :: !SourceText,
+      iwc_st :: !(XInWarningCategory pass),
       iwc_wc :: (XRec pass WarningCategory)
     }
 
+type family XInWarningCategory p
 
 type family XInWarningCategoryIn p
 
 deriving instance
   (
+    Eq (XInWarningCategory pass),
     Eq (XInWarningCategoryIn pass),
     Eq (XRec pass WarningCategory)
   )
@@ -1880,6 +1888,7 @@ deriving instance Typeable (InWarningCategory pass)
 
 deriving instance
   ( Data pass,
+    Data (XInWarningCategory pass),
     Data (XInWarningCategoryIn pass),
     Data (XRec pass WarningCategory)
   )
