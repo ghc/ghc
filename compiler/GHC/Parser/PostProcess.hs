@@ -1491,7 +1491,7 @@ instance Outputable (ArgPatBuilder GhcPs) where
 
 mkBangTy :: [AddEpAnn] -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy anns strictness =
-  HsBangTy anns (HsSrcBang NoSourceText NoSrcUnpack strictness)
+  HsBangTy (anns, NoSourceText) (HsBang NoSrcUnpack strictness)
 
 -- | Result of parsing @{-\# UNPACK \#-}@ or @{-\# NOUNPACK \#-}@.
 data UnpackednessPragma =
@@ -1508,11 +1508,11 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
     -- such as ~T or !T, then add the pragma to the existing HsBangTy.
     --
     -- Otherwise, wrap the type in a new HsBangTy constructor.
-    addUnpackedness an (L _ (HsBangTy x bang t))
-      | HsSrcBang NoSourceText NoSrcUnpack strictness <- bang
-      = HsBangTy (an Semi.<> x) (HsSrcBang prag unpk strictness) t
+    addUnpackedness an (L _ (HsBangTy (anns, NoSourceText) bang t))
+      | HsBang NoSrcUnpack strictness <- bang
+      = HsBangTy (an Semi.<> anns, prag) (HsBang unpk strictness) t
     addUnpackedness an t
-      = HsBangTy an (HsSrcBang prag unpk NoSrcStrict) t
+      = HsBangTy (an, prag) (HsBang unpk NoSrcStrict) t
 
 ---------------------------------------------------------------------------
 -- | Check for monad comprehensions

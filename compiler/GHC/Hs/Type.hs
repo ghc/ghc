@@ -103,7 +103,10 @@ import Language.Haskell.Syntax.Type
 import {-# SOURCE #-} GHC.Hs.Expr ( pprUntypedSplice, HsUntypedSpliceResult(..) )
 
 import Language.Haskell.Syntax.Extension
-import GHC.Core.DataCon( SrcStrictness(..), SrcUnpackedness(..), HsImplBang(..) )
+import GHC.Core.DataCon ( SrcStrictness(..), SrcUnpackedness(..)
+                        , HsSrcBang(..), HsImplBang(..)
+                        , mkHsSrcBang
+                        )
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
@@ -146,9 +149,9 @@ getBangType (L _ (HsDocTy x (L _ (HsBangTy _ _ lty)) lds)) =
 getBangType lty                                            = lty
 
 getBangStrictness :: LHsType (GhcPass p) -> HsSrcBang
-getBangStrictness                 (L _ (HsBangTy _ s _))     = s
-getBangStrictness (L _ (HsDocTy _ (L _ (HsBangTy _ s _)) _)) = s
-getBangStrictness _ = (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
+getBangStrictness                 (L _ (HsBangTy (_, s) b _))     = HsSrcBang s b
+getBangStrictness (L _ (HsDocTy _ (L _ (HsBangTy (_, s) b _)) _)) = HsSrcBang s b
+getBangStrictness _ = (mkHsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 
 {-
 ************************************************************************
@@ -417,7 +420,7 @@ type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
 type instance XSpliceTy        GhcTc = Kind
 
 type instance XDocTy           (GhcPass _) = [AddEpAnn]
-type instance XBangTy          (GhcPass _) = [AddEpAnn]
+type instance XBangTy          (GhcPass _) = ([AddEpAnn], SourceText)
 
 type instance XRecTy           GhcPs = AnnList
 type instance XRecTy           GhcRn = NoExtField

@@ -1189,7 +1189,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                                       ; return (HsUnpack (Just co)) }
 
     src_strict :: IfaceSrcBang -> HsSrcBang
-    src_strict (IfSrcBang unpk bang) = HsSrcBang NoSourceText unpk bang
+    src_strict (IfSrcBang unpk bang) = mkHsSrcBang NoSourceText unpk bang
 
 tcIfaceEqSpec :: IfaceEqSpec -> IfL [EqSpec]
 tcIfaceEqSpec spec

@@ -12,7 +12,7 @@ module GHC.Core.DataCon (
         -- * Main data types
         DataCon, DataConRep(..),
         SrcStrictness(..), SrcUnpackedness(..),
-        HsSrcBang(..), HsImplBang(..),
+        HsSrcBang(..), HsBang(..), HsImplBang(..),
         StrictnessMark(..),
         ConTag,
         DataConEnv,
@@ -25,7 +25,7 @@ module GHC.Core.DataCon (
         FieldLabel(..), flLabel, FieldLabelString,
 
         -- ** Type construction
-        mkDataCon, fIRST_TAG,
+        mkHsSrcBang, mkDataCon, fIRST_TAG,
 
         -- ** Type deconstruction
         dataConRepType, dataConInstSig, dataConFullSig,
@@ -841,18 +841,17 @@ type DataConEnv a = UniqFM DataCon a     -- Keyed by DataCon
 
 -- | Haskell Source Bang
 --
--- Bangs on data constructor arguments as the user wrote them in the
--- source code.
+-- Bangs on data constructor arguments as written by the user, including the
+-- source code for exact-printing.
 --
--- @(HsSrcBang _ SrcUnpack SrcLazy)@ and
--- @(HsSrcBang _ SrcUnpack NoSrcStrict)@ (without StrictData) makes no sense, we
--- emit a warning (in checkValidDataCon) and treat it like
--- @(HsSrcBang _ NoSrcUnpack SrcLazy)@
-data HsSrcBang =
-  HsSrcBang SourceText -- See Note [Pragma source text] in "GHC.Types.SourceText"
-            SrcUnpackedness
-            SrcStrictness
-  deriving Data.Data
+-- In the AST, the SourceText is deconstructed and hidden inside
+-- 'Language.Haskell.Syntax.Extension.XBangTy' extension point.
+data HsSrcBang
+  = HsSrcBang SourceText HsBang -- See Note [Pragma source text] in "GHC.Types.SourceText"
+
+-- | Make a 'HsSrcBang' from all parts
+mkHsSrcBang :: SourceText -> SrcUnpackedness -> SrcStrictness -> HsSrcBang
+mkHsSrcBang stext u s = HsSrcBang stext (HsBang u s)
 
 -- | Haskell Implementation Bang
 --
@@ -1039,8 +1038,8 @@ instance Data.Data DataCon where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "DataCon"
 
-instance Outputable HsSrcBang where
-    ppr (HsSrcBang _ prag mark) = ppr prag <+> ppr mark
+instance Outputable HsBang where
+    ppr (HsBang prag mark) = ppr prag <+> ppr mark
 
 instance Outputable HsImplBang where
     ppr HsLazy                  = text "Lazy"

@@ -768,7 +768,7 @@ cvt_arg (Bang su ss, ty)
        ; let ty' = parenthesizeHsType appPrec ty''
              su' = cvtSrcUnpackedness su
              ss' = cvtSrcStrictness ss
-       ; returnLA $ HsBangTy noAnn (HsSrcBang NoSourceText su' ss') ty' }
+       ; returnLA $ HsBangTy (noAnn, NoSourceText) (HsBang su' ss') ty' }
 
 cvt_id_arg :: TH.Name -- ^ parent constructor name
            -> (TH.Name, TH.Bang, TH.Type) -> CvtM (LConDeclField GhcPs)
