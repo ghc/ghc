@@ -96,3 +96,25 @@ data SrcUnpackedness = SrcUnpack -- ^ {-# UNPACK #-} specified
                      | SrcNoUnpack -- ^ {-# NOUNPACK #-} specified
                      | NoSrcUnpack -- ^ no unpack pragma
      deriving (Eq, Data)
+
+
+{-
+************************************************************************
+*                                                                      *
+Top-level/not-top level flag
+*                                                                      *
+************************************************************************
+-}
+
+data TopLevelFlag
+  = TopLevel
+  | NotTopLevel
+  deriving Data
+
+isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
+
+isNotTopLevel NotTopLevel = True
+isNotTopLevel TopLevel    = False
+
+isTopLevel TopLevel     = True
+isTopLevel NotTopLevel  = False

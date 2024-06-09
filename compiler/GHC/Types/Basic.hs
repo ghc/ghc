@@ -132,7 +132,7 @@ import GHC.Utils.Binary
 import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
-import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
+import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag, TopLevelFlag(..), isTopLevel, isNotTopLevel)
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
 
 import Control.DeepSeq ( NFData(..) )
@@ -541,19 +541,6 @@ pprRuleName rn = doubleQuotes (ftext rn)
 *                                                                      *
 ************************************************************************
 -}
-
-data TopLevelFlag
-  = TopLevel
-  | NotTopLevel
-  deriving Data
-
-isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
-
-isNotTopLevel NotTopLevel = True
-isNotTopLevel TopLevel    = False
-
-isTopLevel TopLevel     = True
-isTopLevel NotTopLevel  = False
 
 instance Outputable TopLevelFlag where
   ppr TopLevel    = text "<TopLevel>"
