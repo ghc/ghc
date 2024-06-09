@@ -28,17 +28,61 @@ import GHC.Internal.Data.Coerce (coerce)
 infixr 9 .
 infixr 1 >>>, <<<
 
--- | A class for categories. Instances should satisfy the laws
+-- | A class for categories.
 --
--- [Right identity] @f '.' 'id'  =  f@
--- [Left identity]  @'id' '.' f  =  f@
--- [Associativity]  @f '.' (g '.' h)  =  (f '.' g) '.' h@
+-- In mathematics, a /category/ is defined as a collection of /objects/ and a collection
+-- of /morphisms/ between objects, together with an /identity morphism/ 'id' for every
+-- object and an operation '(.)' that /composes/ compatible morphisms.
+--
+-- This class is defined in an analogous way. The collection of morphisms is represented
+-- by a type parameter @cat@, which has kind @k -> k -> 'Data.Kind.Type'@ for some kind variable @k@
+-- that represents the collection of objects; most of the time the choice of @k@ will be
+-- 'Data.Kind.Type'.
+--
+-- ==== __Examples__
+--
+-- As the method names suggest, there's a category of functions:
+--
+-- @
+-- instance Category '(->)' where
+--   id = \\x -> x
+--   f . g = \\x -> f (g x)
+-- @
+--
+-- Using the `TypeData` language extension, we can also make a category where `k` isn't
+-- `Type`, but a custom kind `Door` instead:
+--
+-- @
+-- type data Door = DoorOpen | DoorClosed
+--
+-- data Action (before :: Door) (after :: Door) where
+--   DoNothing :: Action door door
+--   OpenDoor :: Action start DoorClosed -> Action start DoorOpen
+--   CloseDoor :: Action start DoorOpen -> Action start DoorClosed
+--
+-- instance Category Action where
+--   id = DoNothing
+--
+--   DoNothing . action = action
+--   OpenDoor rest . action = OpenDoor (rest . action)
+--   CloseDoor rest . action = CloseDoor (rest . action)
+-- @
 --
 class Category cat where
-    -- | the identity morphism
+    -- | The identity morphism. Implementations should satisfy two laws:
+    --
+    -- [Right identity] @f '.' 'id'  =  f@
+    -- [Left identity]  @'id' '.' f  =  f@
+    --
+    -- These essentially state that 'id' should "do nothing".
     id :: cat a a
 
-    -- | morphism composition
+    -- | Morphism composition. Implementations should satisfy the law:
+    --
+    -- [Associativity]  @f '.' (g '.' h)  =  (f '.' g) '.' h@
+    --
+    -- This means that the way morphisms are grouped is irrelevant, so it is unambiguous
+    -- to write a composition of morphisms as @f '.' g '.' h@, without parentheses.
     (.) :: cat b c -> cat a b -> cat a c
 
 {-# RULES
@@ -70,11 +114,13 @@ instance Category Coercion where
   id = Coercion
   (.) Coercion = coerce
 
--- | Right-to-left composition
+-- | Right-to-left composition. This is a synonym for '(.)', but it can be useful to make
+-- the order of composition more apparent.
 (<<<) :: Category cat => cat b c -> cat a b -> cat a c
 (<<<) = (.)
 
--- | Left-to-right composition
+-- | Left-to-right composition. This is useful if you want to write a morphism as a
+-- pipeline going from left to right.
 (>>>) :: Category cat => cat a b -> cat b c -> cat a c
 f >>> g = g . f
 {-# INLINE (>>>) #-} -- see Note [INLINE on >>>]
