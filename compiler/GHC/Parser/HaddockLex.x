@@ -133,7 +133,7 @@ advanceSrcLocBS !loc bs = case utf8UnconsByteString bs of
 lexStringLit :: P (LocatedN RdrName) -- ^ A precise identifier parser
                  -> Located StringLit
                  -> Located (WithHsDocIdentifiers StringLit GhcPs)
-lexStringLit identParser (L l sl@(StringLiteral _ fs _))
+lexStringLit identParser (L l sl@(SL _ fs _))
   = L l (WithHsDocIdentifiers sl idents)
   where
     bs = bytesFS fs

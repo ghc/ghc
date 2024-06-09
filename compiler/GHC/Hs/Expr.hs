@@ -1060,7 +1060,7 @@ isAtomicHsExpr (XExpr x)
 isAtomicHsExpr _ = False
 
 instance Outputable (HsPragE (GhcPass p)) where
-  ppr (HsPragSCC (_, st) (StringLiteral stl lbl _)) =
+  ppr (HsPragSCC (_, st) (SL stl lbl _)) =
     pprWithSourceText st (text "{-# SCC")
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
@@ -2165,7 +2165,7 @@ lamCaseKeyword LamCase   = text "\\case"
 lamCaseKeyword LamCases  = text "\\cases"
 
 pprExternalSrcLoc :: (StringLit,(Int,Int),(Int,Int)) -> SDoc
-pprExternalSrcLoc (StringLiteral _ src _,(n1,n2),(n3,n4))
+pprExternalSrcLoc (SL _ src _,(n1,n2),(n3,n4))
   = ppr (src,(n1,n2),(n3,n4))
 
 instance Outputable HsArrowMatchContext where
