@@ -81,7 +81,7 @@ import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.InferTags.TagSig
-import GHC.Parser.Annotation (noLocA)
+import GHC.Parser.Annotation (NoAnn, noLocA)
 import GHC.Hs.Extension ( GhcRn )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 
@@ -93,6 +93,8 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
+
+import Language.Haskell.Syntax.Decls (XInWarningCategoryIn)
 
 import Control.Monad
 import System.IO.Unsafe
@@ -597,13 +599,17 @@ ifaceDeclFingerprints hash decl
        unsafeDupablePerformIO
         . computeFingerprint (panic "ifaceDeclFingerprints")
 
-fromIfaceWarnings :: IfaceWarnings -> Warnings GhcRn
+fromIfaceWarnings
+  :: (NoAnn (XInWarningCategoryIn GhcRn))
+  => IfaceWarnings -> Warnings GhcRn
 fromIfaceWarnings = \case
     IfWarnAll txt -> WarnAll (fromIfaceWarningTxt txt)
     IfWarnSome vs ds -> WarnSome [(occ, fromIfaceWarningTxt txt) | (occ, txt) <- vs]
                                  [(occ, fromIfaceWarningTxt txt) | (occ, txt) <- ds]
 
-fromIfaceWarningTxt :: IfaceWarningTxt -> WarningTxt GhcRn
+fromIfaceWarningTxt
+  :: (NoAnn (XInWarningCategoryIn GhcRn))
+  => IfaceWarningTxt -> WarningTxt GhcRn
 fromIfaceWarningTxt = \case
     IfWarningTxt mb_cat src strs -> WarningTxt (noLocA . fromWarningCategory <$> mb_cat) src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
     IfDeprecatedTxt src strs -> DeprecatedTxt src (noLocA <$> map fromIfaceStringLiteralWithNames strs)

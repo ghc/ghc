@@ -1402,3 +1402,5 @@ type instance Anno (Maybe Role) = EpAnnCO
 type instance Anno CCallConv   = EpaLocation
 type instance Anno Safety      = EpaLocation
 type instance Anno CExportSpec = EpaLocation
+
+type instance XInWarningCategoryIn (GhcPass _) = EpToken "in"

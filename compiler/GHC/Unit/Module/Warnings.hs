@@ -62,13 +62,15 @@ import GHC.Utils.Outputable
 import GHC.Unicode
 
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Decls (WarningTxt(..), InWarningCategory(..), WarningCategory(..))
+import Language.Haskell.Syntax.Decls (WarningTxt(..), InWarningCategory(..), XInWarningCategoryIn(), WarningCategory(..))
 
 import Data.List (isPrefixOf)
 
 
 
-fromWarningCategory :: WarningCategory -> InWarningCategory (GhcPass pass)
+fromWarningCategory
+  :: NoAnn (XInWarningCategoryIn (GhcPass pass))
+  => WarningCategory -> InWarningCategory (GhcPass pass)
 fromWarningCategory wc = InWarningCategory noAnn NoSourceText (noLocA wc)
 
 mkWarningCategory :: FastString -> WarningCategory
@@ -244,7 +246,10 @@ type DeclWarnOccNames pass = [(OccName, WarningTxt pass)]
 -- | Names that are deprecated as exports
 type ExportWarnNames pass = [(Name, WarningTxt pass)]
 
-deriving instance Eq (IdP (GhcPass p)) => Eq (Warnings (GhcPass p))
+deriving instance
+  ( Eq (IdP (GhcPass p)),
+    Eq (XInWarningCategoryIn (GhcPass p))
+  ) => Eq (Warnings (GhcPass p))
 
 emptyWarn :: Warnings p
 emptyWarn = WarnSome [] []

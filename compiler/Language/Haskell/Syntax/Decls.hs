@@ -87,7 +87,8 @@ module Language.Haskell.Syntax.Decls (
   -- * Grouping
   HsGroup(..), hsGroupInstDecls,
   -- * Warnings
-  WarningTxt(..), InWarningCategory(..), WarningCategory(..)
+  WarningTxt(..), InWarningCategory(..), WarningCategory(..),
+  XInWarningCategoryIn,
     ) where
 
 -- friends:
@@ -129,7 +130,6 @@ import GHC.Data.FastString (FastString)
 -- TODO(no-ghc-import) OK
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
-import GHC.Parser.Annotation (EpToken)
 -- TODO(ghc-import) This can eventually be defined in `GHC.Utils.Binary`
 import GHC.Utils.Binary (Binary)
 
@@ -1860,16 +1860,29 @@ the possibility of them being infinite.
 
 data InWarningCategory pass
   = InWarningCategory
-    { iwc_in :: !(EpToken "in"),
+    { iwc_in :: !(XInWarningCategoryIn pass),
       iwc_st :: !SourceText,
       iwc_wc :: (XRec pass WarningCategory)
     }
 
-deriving instance (Eq (XRec pass WarningCategory)) => Eq (InWarningCategory pass)
+
+type family XInWarningCategoryIn p
+
+deriving instance
+  (
+    Eq (XInWarningCategoryIn pass),
+    Eq (XRec pass WarningCategory)
+  )
+  => Eq (InWarningCategory pass)
 
 deriving instance Typeable (InWarningCategory pass)
 
-deriving instance (Data pass, Data (XRec pass WarningCategory)) => Data (InWarningCategory pass)
+deriving instance
+  ( Data pass,
+    Data (XInWarningCategoryIn pass),
+    Data (XRec pass WarningCategory)
+  )
+  => Data (InWarningCategory pass)
 
 
 -- See Note [Warning categories]
