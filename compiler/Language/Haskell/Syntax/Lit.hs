@@ -20,8 +20,7 @@ module Language.Haskell.Syntax.Lit where
 
 import Language.Haskell.Syntax.Extension
 
-import GHC.Utils.Panic (panic)
-import GHC.Types.SourceText (IntegralLit, FractionalLit, SourceText, negateIntegralLit, negateFractionalLit)
+import GHC.Types.SourceText (IntegralLit, FractionalLit, SourceText)
 import GHC.Core.Type (Type)
 
 import GHC.Data.FastString (FastString, lexicalCompareFS)
@@ -128,28 +127,11 @@ data OverLitVal
   | HsIsString   !SourceText !FastString -- ^ String-looking literals
   deriving Data
 
-negateOverLitVal :: OverLitVal -> OverLitVal
-negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
-negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
-negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
-
--- Comparison operations are needed when grouping literals
--- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
-instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
-  (OverLit _ val1) == (OverLit _ val2) = val1 == val2
-  (XOverLit  val1) == (XOverLit  val2) = val1 == val2
-  _ == _ = panic "Eq HsOverLit"
-
 instance Eq OverLitVal where
   (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
   (HsFractional f1)   == (HsFractional f2)   = f1 == f2
   (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
   _                   == _                   = False
-
-instance (Ord (XXOverLit p)) => Ord (HsOverLit p) where
-  compare (OverLit _ val1)  (OverLit _ val2) = val1 `compare` val2
-  compare (XOverLit  val1)  (XOverLit  val2) = val1 `compare` val2
-  compare _ _ = panic "Ord HsOverLit"
 
 instance Ord OverLitVal where
   compare (HsIntegral i1)     (HsIntegral i2)     = i1 `compare` i2

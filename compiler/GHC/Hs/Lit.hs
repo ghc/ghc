@@ -34,6 +34,7 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
+import GHC.Utils.Panic (panic)
 
 {-
 ************************************************************************
@@ -248,3 +249,19 @@ pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
 
+negateOverLitVal :: OverLitVal -> OverLitVal
+negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
+negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
+negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
+
+instance (Ord (XXOverLit p)) => Ord (HsOverLit p) where
+  compare (OverLit _ val1)  (OverLit _ val2) = val1 `compare` val2
+  compare (XOverLit  val1)  (XOverLit  val2) = val1 `compare` val2
+  compare _ _ = panic "Ord HsOverLit"
+
+-- Comparison operations are needed when grouping literals
+-- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
+instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
+  (OverLit _ val1) == (OverLit _ val2) = val1 == val2
+  (XOverLit  val1) == (XOverLit  val2) = val1 == val2
+  _ == _ = panic "Eq HsOverLit"
