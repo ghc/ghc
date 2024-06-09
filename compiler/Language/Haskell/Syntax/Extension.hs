@@ -214,6 +214,7 @@ type family XSpecSig          x
 type family XSpecInstSig      x
 type family XMinimalSig       x
 type family XSCCFunSig        x
+type family XSCCFunSigCC      x
 type family XCompleteMatchSig x
 type family XXSig             x
 
