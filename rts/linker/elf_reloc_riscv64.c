@@ -114,6 +114,7 @@ char *relocationTypeToString(Elf64_Xword type) {
 
 #define Page(x) ((x) & ~0xFFF)
 
+STG_NORETURN
 int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
                             Elf_Rel *rel STG_UNUSED) {
   debugBelch("decodeAddendRISCV64: Relocations with explicit addend are not "
@@ -430,7 +431,7 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
     // relocations aren't pure, but this is how LLVM does it. And, calculating
     // the lower 12 bit without any relation ship to the GOT entry's address
     // makes no sense either.
-      for (unsigned i = relNo; i >= 0 ; i--) {
+      for (int64_t i = relNo; i >= 0 ; i--) {
         Elf_Rela *rel_prime = &relaTab->relocations[i];
 
         addr_t P_prime =
@@ -459,7 +460,7 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
           IF_DEBUG(linker,
                    debugBelch(
                        "Found matching relocation: %s (P: 0x%lx, S: 0x%lx, "
-                       "sym-name: %s) -> %s (P: 0x%lx, S: 0x%lx, sym-name: %s, relNo: %u)",
+                       "sym-name: %s) -> %s (P: 0x%lx, S: %p, sym-name: %s, relNo: %ld)",
                        relocationTypeToString(rel->r_info), P, S, symbol->name,
                        relocationTypeToString(rel_prime->r_info), P_prime,
                        symbol_prime->addr, symbol_prime->name, i));
@@ -492,7 +493,7 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
       SymbolExtra *symbolExtra = makeSymbolExtra(oc, ELF_R_SYM(rel->r_info), S);
       addr_t* FAKE_GOT_S = &symbolExtra->addr;
       IF_DEBUG(linker, debugBelch("R_RISCV_CALL_PLT w/ SymbolExtra = %p , "
-                                  "entry = 0x%lx\n",
+                                  "entry = %p\n",
                                   symbolExtra, FAKE_GOT_S));
       GOT_Target = (addr_t) FAKE_GOT_S;
     }
@@ -515,7 +516,6 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
   case R_RISCV_ADD32:
     FALLTHROUGH;
   case R_RISCV_ADD64:
-    FALLTHROUGH;
     return S + A; // Add V when the value is set
   case R_RISCV_SUB6:
     FALLTHROUGH;
@@ -526,7 +526,6 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
   case R_RISCV_SUB32:
     FALLTHROUGH;
   case R_RISCV_SUB64:
-    FALLTHROUGH;
     return S + A; // Subtract from V when value is set
   case R_RISCV_SET6:
     FALLTHROUGH;
@@ -535,7 +534,6 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
   case R_RISCV_SET16:
     FALLTHROUGH;
   case R_RISCV_SET32:
-    FALLTHROUGH;
     return S + A;
   case R_RISCV_RELAX:
   case R_RISCV_ALIGN:
@@ -563,7 +561,7 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
       addr_t* FAKE_GOT_S = &symbolExtra->addr;
       addr_t res = (addr_t) FAKE_GOT_S + A - P;
       IF_DEBUG(linker, debugBelch("R_RISCV_GOT_HI20 w/ SymbolExtra = %p , "
-                                  "entry = 0x%lx , reloc-addend = 0x%lu ",
+                                  "entry = %p , reloc-addend = 0x%lu ",
                                   symbolExtra, FAKE_GOT_S, res));
       return res;
     }
@@ -640,12 +638,13 @@ void flushInstructionCacheRISCV64(ObjectCode *oc) {
 
   /* The main object code */
   void *codeBegin = oc->image + oc->misalignment;
-  __builtin___clear_cache(codeBegin, codeBegin + oc->fileSize);
+  // TODO: Check the upper boundary e.g. with a debugger.
+  __builtin___clear_cache(codeBegin, (void*) ((uint64_t*) codeBegin + oc->fileSize));
 
   /* Jump Islands */
+  // TODO: Check the upper boundary e.g. with a debugger.
   __builtin___clear_cache((void *)oc->symbol_extras,
-                          (void *)oc->symbol_extras +
-                              sizeof(SymbolExtra) * oc->n_symbol_extras);
+                          (void *)(oc->symbol_extras + oc->n_symbol_extras));
 
   // Memory barrier to ensure nothing circumvents the fence.i / cache flushes.
   SEQ_CST_FENCE();

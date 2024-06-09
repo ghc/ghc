@@ -1128,9 +1128,9 @@ end:
    return result;
 }
 
-// the aarch64 linker uses relocacteObjectCodeAarch64,
-// see elf_reloc_aarch64.{h,c}
-#if !defined(aarch64_HOST_ARCH)
+// the aarch64 and riscv64 linkers use relocacteObjectCodeAarch64,
+// see elf_reloc_aarch64.{h,c}, elf_reloc_riscv64.{h,c}
+#if !defined(aarch64_HOST_ARCH) && !defined(riscv64_HOST_ARCH)
 
 /* Do ELF relocations which lack an explicit addend.  All x86-linux
    and arm-linux relocations appear to be of this form. */

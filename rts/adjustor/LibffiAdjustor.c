@@ -197,8 +197,9 @@ createAdjustor (int cconv,
     // On Linux the parameters of __builtin___clear_cache are currently unused.
     // Add them anyways for future compatibility. (I.e. the parameters couldn't
     // be checked during development.)
+    // TODO: Check the upper boundary e.g. with a debugger.
     __builtin___clear_cache((void *)code,
-                            (void *)code + instrCount * sizeof(uint64_t));
+                            (void *)((uint64_t *) code + instrCount));
     // Memory barrier to ensure nothing circumvents the fence.i / cache flush.
     SEQ_CST_FENCE();
 #endif
