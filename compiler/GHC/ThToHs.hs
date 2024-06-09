@@ -42,7 +42,6 @@ import GHC.Types.Fixity as Hs
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.SourceText
-import GHC.Data.Bag
 import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
@@ -586,7 +585,7 @@ cvt_ci_decs declDescr decs
         ; let (fams', bads)          = partitionWith is_fam_decl prob_fams'
         ; for_ (nonEmpty bads) $ \ bad_decls ->
             failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
-        ; return (listToBag binds', sigs', fams', ats', adts') }
+        ; return (binds', sigs', fams', ats', adts') }
 
 ----------------
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]
@@ -1003,7 +1002,7 @@ cvtLocalDecs declDescr ds
         let (sigs, bads) = partitionWith is_sig prob_sigs
         for_ (nonEmpty bads) $ \ bad_decls ->
           failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
-        return (HsValBinds noAnn (ValBinds NoAnnSortKey (listToBag binds) sigs))
+        return (HsValBinds noAnn (ValBinds NoAnnSortKey binds sigs))
       (ip_binds, []) -> do
         binds <- mapM (uncurry cvtImplicitParamBind) ip_binds
         return (HsIPBinds noAnn (IPBinds noExtField binds))

@@ -5,7 +5,6 @@ import Control.Monad.IO.Class
 import Data.List (intercalate)
 import GHC.Driver.Plugins
 import GHC.Plugins
-import GHC.Data.Bag
 import GHC.Tc.Types
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Expr
@@ -44,7 +43,7 @@ removeParsedBinding name (L l m)
 typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
 typecheckPlugin [name, "typecheck"] _ tc
   = return $ tc { tcg_exports = filter (availNotNamedAs name) (tcg_exports tc)
-                , tcg_binds = filterBag (notNamedAs name) (tcg_binds tc)
+                , tcg_binds = filter (notNamedAs name) (tcg_binds tc)
                 }
   where notNamedAs name (L _ FunBind { fun_id = L _ fid })
           = occNameString (getOccName fid) /= name

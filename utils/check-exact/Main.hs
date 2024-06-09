@@ -10,7 +10,6 @@
 import Data.Data
 import Data.List (intercalate)
 import GHC hiding (moduleName)
-import GHC.Data.Bag
 import GHC.Driver.Errors.Types
 import GHC.Driver.Ppr
 import GHC.Hs.Dump
@@ -448,15 +447,15 @@ changeLetIn1 _libdir parsed
     replace :: HsExpr GhcPs -> HsExpr GhcPs
     replace (HsLet (tkLet, _) localDecls expr)
       =
-         let (HsValBinds x (ValBinds xv bagDecls sigs)) = localDecls
-             [l2,_l1] = map wrapDecl $ bagToList bagDecls
-             bagDecls' = listToBag $ concatMap decl2Bind [l2]
+         let (HsValBinds x (ValBinds xv decls sigs)) = localDecls
+             [l2,_l1] = map wrapDecl decls
+             decls' = concatMap decl2Bind [l2]
              (L _ e) = expr
              a = EpAnn (EpaDelta (SameLine 1) []) noAnn emptyComments
              expr' = L a e
              tkIn' = EpTok (EpaDelta (DifferentLine 1 0) [])
          in (HsLet (tkLet, tkIn')
-                (HsValBinds x (ValBinds xv bagDecls' sigs)) expr')
+                (HsValBinds x (ValBinds xv decls' sigs)) expr')
 
     replace x = x
 
@@ -518,7 +517,7 @@ changeLocalDecls libdir (L l p) = do
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match an mln pats (GRHSs _ rhs (HsValBinds van (ValBinds _ binds sigs))))) = do
-        let oldDecls = sortLocatedA $ map wrapDecl (bagToList binds) ++ map wrapSig sigs
+        let oldDecls = sortLocatedA $ map wrapDecl binds ++ map wrapSig sigs
         let decls = s:d:oldDecls
         let oldDecls' = captureLineSpacing oldDecls
         let oldBinds     = concatMap decl2Bind oldDecls'
@@ -530,7 +529,7 @@ changeLocalDecls libdir (L l p) = do
         -- let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
         -- let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
-                          (ValBinds sortKey (listToBag $ decl':oldBinds)
+                          (ValBinds sortKey (decl':oldBinds)
                                           (sig':os':oldSigs)))
         return (L lm (Match an mln pats (GRHSs emptyComments rhs binds')))
                    `debug` ("oldDecls=" ++ showAst oldDecls)
@@ -560,7 +559,7 @@ changeLocalDecls2 libdir (L l p) = do
                         emptyComments
         let decls = [s,d]
         let sortKey = captureOrderBinds decls
-        let binds = (HsValBinds an (ValBinds sortKey (listToBag $ [decl'])
+        let binds = (HsValBinds an (ValBinds sortKey [decl']
                                     [sig']))
         return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))
       replaceLocalBinds x = return x

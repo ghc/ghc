@@ -33,7 +33,6 @@ import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 
 import GHC.Types.Fixity (Fixity)
-import GHC.Data.Bag (Bag)
 import GHC.Types.Basic (InlinePragma)
 
 import GHC.Data.BooleanFormula (LBooleanFormula)
@@ -128,7 +127,7 @@ type LHsBinds id = LHsBindsLR id id
 type HsBind   id = HsBindLR   id id
 
 -- | Located Haskell Bindings with separate Left and Right identifier types
-type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
+type LHsBindsLR idL idR = [LHsBindLR idL idR]
 
 -- | Located Haskell Binding with separate Left and Right identifier types
 type LHsBindLR  idL idR = XRec idL (HsBindLR idL idR)

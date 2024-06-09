@@ -407,7 +407,7 @@ tcForeignExports' decls
   where
    combine (binds, fs, gres1) (L loc fe) = do
        (b, f, gres2) <- setSrcSpanA loc (tcFExport fe)
-       return (b `consBag` binds, L loc f : fs, gres1 `unionBags` gres2)
+       return (b : binds, L loc f : fs, gres1 `unionBags` gres2)
 
 tcFExport :: ForeignDecl GhcRn
           -> TcM (LHsBind GhcTc, ForeignDecl GhcTc, Bag GlobalRdrElt)

@@ -9,119 +9,118 @@
     (NValBinds
      [((,)
        (NonRecursive)
-       {Bag(LocatedA (HsBind Name)):
-        [(L
-          (EpAnn
-           (EpaSpan { DumpRenamedAst.hs:35:1-23 })
-           (AnnListItem
-            [])
-           (EpaComments
-            []))
-          (FunBind
-           {NameSet:
-            []}
+       [(L
+         (EpAnn
+          (EpaSpan { DumpRenamedAst.hs:35:1-23 })
+          (AnnListItem
+           [])
+          (EpaComments
+           []))
+         (FunBind
+          {NameSet:
+           []}
+          (L
+           (EpAnn
+            (EpaSpan { DumpRenamedAst.hs:35:1-4 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             []))
+           {Name: DumpRenamedAst.main})
+          (MG
+           (FromSource)
            (L
             (EpAnn
-             (EpaSpan { DumpRenamedAst.hs:35:1-4 })
-             (NameAnnTrailing
+             (EpaSpan { DumpRenamedAst.hs:35:1-23 })
+             (AnnList
+              (Nothing)
+              (Nothing)
+              (Nothing)
+              []
               [])
              (EpaComments
               []))
-            {Name: DumpRenamedAst.main})
-           (MG
-            (FromSource)
-            (L
-             (EpAnn
-              (EpaSpan { DumpRenamedAst.hs:35:1-23 })
-              (AnnList
-               (Nothing)
-               (Nothing)
-               (Nothing)
+            [(L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:35:1-23 })
+               (AnnListItem
+                [])
+               (EpaComments
+                []))
+              (Match
                []
-               [])
-              (EpaComments
-               []))
-             [(L
-               (EpAnn
-                (EpaSpan { DumpRenamedAst.hs:35:1-23 })
-                (AnnListItem
-                 [])
+               (FunRhs
+                (L
+                 (EpAnn
+                  (EpaSpan { DumpRenamedAst.hs:35:1-4 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   []))
+                 {Name: DumpRenamedAst.main})
+                (Prefix)
+                (NoSrcStrict))
+               (L
+                (EpaSpan { <no location info> })
+                [])
+               (GRHSs
                 (EpaComments
-                 []))
-               (Match
-                []
-                (FunRhs
-                 (L
+                 [])
+                [(L
                   (EpAnn
-                   (EpaSpan { DumpRenamedAst.hs:35:1-4 })
-                   (NameAnnTrailing
-                    [])
+                   (EpaSpan { DumpRenamedAst.hs:35:6-23 })
+                   (NoEpAnns)
                    (EpaComments
                     []))
-                  {Name: DumpRenamedAst.main})
-                 (Prefix)
-                 (NoSrcStrict))
-                (L
-                 (EpaSpan { <no location info> })
-                 [])
-                (GRHSs
-                 (EpaComments
-                  [])
-                 [(L
+                  (GRHS
                    (EpAnn
-                    (EpaSpan { DumpRenamedAst.hs:35:6-23 })
-                    (NoEpAnns)
+                    (EpaDelta (SameLine 0) [])
+                    (GrhsAnn
+                     (Nothing)
+                     (AddEpAnn Annlarrowtail (EpaDelta (SameLine 0) [])))
                     (EpaComments
                      []))
-                   (GRHS
+                   []
+                   (L
                     (EpAnn
-                     (EpaDelta (SameLine 0) [])
-                     (GrhsAnn
-                      (Nothing)
-                      (AddEpAnn Annlarrowtail (EpaDelta (SameLine 0) [])))
+                     (EpaSpan { DumpRenamedAst.hs:35:8-23 })
+                     (AnnListItem
+                      [])
                      (EpaComments
                       []))
-                    []
-                    (L
-                     (EpAnn
-                      (EpaSpan { DumpRenamedAst.hs:35:8-23 })
-                      (AnnListItem
-                       [])
-                      (EpaComments
-                       []))
-                     (HsApp
-                      (NoExtField)
-                      (L
-                       (EpAnn
-                        (EpaSpan { DumpRenamedAst.hs:35:8-15 })
-                        (AnnListItem
-                         [])
-                        (EpaComments
-                         []))
-                       (HsVar
-                        (NoExtField)
-                        (L
-                         (EpAnn
-                          (EpaSpan { DumpRenamedAst.hs:35:8-15 })
-                          (NameAnnTrailing
-                           [])
-                          (EpaComments
-                           []))
-                         {Name: GHC.Internal.System.IO.putStrLn})))
-                      (L
-                       (EpAnn
-                        (EpaSpan { DumpRenamedAst.hs:35:17-23 })
-                        (AnnListItem
-                         [])
-                        (EpaComments
-                         []))
-                       (HsLit
-                        (NoExtField)
-                        (HsString
-                         (SourceText "hello")
-                         {FastString: "hello"})))))))]
-                 (EmptyLocalBinds
-                  (NoExtField)))))]))))]})]
+                    (HsApp
+                     (NoExtField)
+                     (L
+                      (EpAnn
+                       (EpaSpan { DumpRenamedAst.hs:35:8-15 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        []))
+                      (HsVar
+                       (NoExtField)
+                       (L
+                        (EpAnn
+                         (EpaSpan { DumpRenamedAst.hs:35:8-15 })
+                         (NameAnnTrailing
+                          [])
+                         (EpaComments
+                          []))
+                        {Name: GHC.Internal.System.IO.putStrLn})))
+                     (L
+                      (EpAnn
+                       (EpaSpan { DumpRenamedAst.hs:35:17-23 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        []))
+                      (HsLit
+                       (NoExtField)
+                       (HsString
+                        (SourceText "hello")
+                        {FastString: "hello"})))))))]
+                (EmptyLocalBinds
+                 (NoExtField)))))]))))])]
      []))
    []
    [(TyClGroup
@@ -1936,8 +1935,7 @@
         (Prefix)
         []
         []
-        {Bag(LocatedA (HsBind Name)):
-         []}
+        []
         [(L
           (EpAnn
            (EpaSpan { DumpRenamedAst.hs:29:3-12 })
@@ -2090,8 +2088,7 @@
                    (EpaComments
                     []))
                   {Name: a})))))))))
-         {Bag(LocatedA (HsBind Name)):
-          []}
+         []
          []
          [(L
            (EpAnn

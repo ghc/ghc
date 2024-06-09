@@ -91,7 +91,6 @@ import Control.Monad.RWS
 import qualified Control.Monad.Fail as Fail
 
 import GHC  hiding (parseModule, parsedSource)
-import GHC.Data.Bag
 import GHC.Data.FastString
 
 import Data.Data
@@ -501,7 +500,7 @@ pushTrailingComments w cs lb@(HsValBinds an _)
       (L la d:ds) -> (an, L (addCommentsToEpAnn la cs) d:ds)
     (vb,_ws2) = case runTransform (replaceDeclsValbinds w lb (reverse decls')) of
       ((HsValBinds _ vb'), _, ws2') -> (vb', ws2')
-      _ -> (ValBinds NoAnnSortKey emptyBag [], [])
+      _ -> (ValBinds NoAnnSortKey [] [], [])
 
 
 balanceCommentsList' :: (Monad m) => [LocatedA a] -> TransformT m [LocatedA a]
@@ -1074,7 +1073,7 @@ replaceDeclsValbinds w b@(HsValBinds a _) new
         logTr "replaceDeclsValbinds"
         let oldSpan = spanHsLocaLBinds b
         an <- oldWhereAnnotation a w (realSrcSpan oldSpan)
-        let decs = listToBag $ concatMap decl2Bind new
+        let decs = concatMap decl2Bind new
         let sigs = concatMap decl2Sig new
         let sortKey = captureOrderBinds new
         return (HsValBinds an (ValBinds sortKey decs sigs))
@@ -1085,7 +1084,7 @@ replaceDeclsValbinds w (EmptyLocalBinds _) new
         an <- newWhereAnnotation w
         let newBinds = concatMap decl2Bind new
             newSigs  = concatMap decl2Sig  new
-        let decs = listToBag $ newBinds
+        let decs = newBinds
         let sigs = newSigs
         let sortKey = captureOrderBinds new
         return (HsValBinds an (ValBinds sortKey decs sigs))

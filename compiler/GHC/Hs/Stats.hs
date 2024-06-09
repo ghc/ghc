@@ -11,7 +11,6 @@ module GHC.Hs.Stats ( ppSourceStats ) where
 
 import GHC.Prelude
 
-import GHC.Data.Bag
 import GHC.Hs
 import GHC.Types.SrcLoc
 
@@ -146,7 +145,7 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     class_info decl@(ClassDecl {})
         = (classops, addpr (sum3 (map count_bind methods)))
       where
-        methods = map unLoc $ bagToList (tcdMeths decl)
+        methods = map unLoc $ tcdMeths decl
         (_, classops, _, _, _) = count_sigs (map unLoc (tcdSigs decl))
     class_info _ = (0,0)
 
@@ -162,7 +161,7 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
                   (addpr (sum3 (map count_bind methods)),
                    ss, is, length ats, length adts)
       where
-        methods = map unLoc $ bagToList inst_meths
+        methods = map unLoc inst_meths
 
     -- TODO: use Sum monoid
     addpr :: (Int,Int,Int) -> Int

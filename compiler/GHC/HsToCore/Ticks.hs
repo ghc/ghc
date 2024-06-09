@@ -28,7 +28,6 @@ import GHC.Core.TyCon
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
-import GHC.Data.Bag
 import GHC.Data.SizedSeq
 
 import GHC.Driver.Flags (DumpFlag(..))
@@ -219,7 +218,7 @@ stripTicksTopHsExpr e = ([], e)
 -- Adding ticks to bindings
 
 addTickLHsBinds :: LHsBinds GhcTc -> TM (LHsBinds GhcTc)
-addTickLHsBinds = mapBagM addTickLHsBind
+addTickLHsBinds = mapM addTickLHsBind
 
 addTickLHsBind :: LHsBind GhcTc -> TM (LHsBind GhcTc)
 addTickLHsBind (L pos (XHsBindsLR bind@(AbsBinds { abs_binds = binds

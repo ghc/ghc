@@ -36,7 +36,6 @@ import GHC.Core.DataCon
 import GHC.Unit.Module
 import GHC.Hs
 import GHC.Driver.DynFlags
-import GHC.Data.Bag
 import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map.Type
 import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
@@ -196,7 +195,7 @@ mkModIdBindings
 
        ; tcg_env <- tcExtendGlobalValEnv [mod_id] getGblEnv
        ; return (tcg_env { tcg_tr_module = Just mod_id }
-                 `addTypecheckedBinds` [unitBag mod_bind]) }
+                 `addTypecheckedBinds` [[mod_bind]]) }
 
 mkModIdRHS :: Module -> TcM (LHsExpr GhcTc)
 mkModIdRHS mod
@@ -325,7 +324,7 @@ mkPrimTypeableTodos
                    ; gbl_env <- tcExtendGlobalValEnv [ghc_prim_module_id]
                                                      getGblEnv
                    ; let gbl_env' = gbl_env `addTypecheckedBinds`
-                                    [unitBag ghc_prim_module_bind]
+                                    [[ghc_prim_module_bind]]
 
                      -- Build TypeRepTodos for built-in KindReps
                    ; todo1 <- todoForExportedKindReps builtInKindReps
@@ -427,7 +426,7 @@ mkTyConRepBinds stuff todo (TypeableTyCon {..})
        -- Make the TyCon binding
        let tycon_rep_rhs = mkTyConRepTyConRHS stuff todo tycon kind_rep
            tycon_rep_bind = mkVarBind tycon_rep_id tycon_rep_rhs
-       return $ unitBag tycon_rep_bind
+       return [tycon_rep_bind]
 
 -- | Is a particular 'TyCon' representable by @Typeable@?. These exclude type
 -- families and polytypes.
@@ -529,7 +528,7 @@ runKindRepM (KindRepM action) = do
         to_bind_pair (_, Nothing) rest = rest
     tcg_env <- tcExtendGlobalValEnv (map fst rep_binds) getGblEnv
     let binds = map (uncurry mkVarBind) rep_binds
-        tcg_env' = tcg_env `addTypecheckedBinds` [listToBag binds]
+        tcg_env' = tcg_env `addTypecheckedBinds` [binds]
     return (tcg_env', res)
 
 -- | Produce or find a 'KindRep' for the given kind.

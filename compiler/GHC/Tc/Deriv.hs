@@ -293,7 +293,7 @@ renameDeriv inst_infos bagBinds
         -- before renaming the instances themselves
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
         ; let (aux_binds, aux_sigs) = unzipBag bagBinds
-              aux_val_binds = ValBinds NoAnnSortKey aux_binds (bagToList aux_sigs)
+              aux_val_binds = ValBinds NoAnnSortKey (bagToList aux_binds) (bagToList aux_sigs)
         -- Importantly, we use rnLocalValBindsLHS, not rnTopBindsLHS, to rename
         -- auxiliary bindings as if they were defined locally.
         -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
@@ -1999,7 +1999,7 @@ genInstBinds spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
 
           -- Try DeriveAnyClass
           DerivSpecAnyClass
-            -> return (emptyBag, [], emptyBag, [])
+            -> return ([], [], emptyBag, [])
                -- No method bindings, signatures, auxiliary bindings or free
                -- variable names are needed. The only interesting work happens when
                -- defaulting associated type family instances (see the

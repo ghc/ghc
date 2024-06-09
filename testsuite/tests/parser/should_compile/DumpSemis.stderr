@@ -1411,8 +1411,7 @@
                   []))
                 (Unqual
                  {OccName: Int}))))))))))]
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       []
       []
       [])))
@@ -1848,199 +1847,198 @@
                     []))
                   (ValBinds
                    (NoAnnSortKey)
-                   {Bag(LocatedA (HsBind GhcPs)):
-                    [(L
-                      (EpAnn
-                       (EpaSpan { DumpSemis.hs:34:19-21 })
-                       (AnnListItem
-                        [(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:34:22 }))
-                        ,(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:34:23 }))])
-                       (EpaComments
-                        []))
-                      (FunBind
-                       (NoExtField)
+                   [(L
+                     (EpAnn
+                      (EpaSpan { DumpSemis.hs:34:19-21 })
+                      (AnnListItem
+                       [(AddSemiAnn
+                         (EpaSpan { DumpSemis.hs:34:22 }))
+                       ,(AddSemiAnn
+                         (EpaSpan { DumpSemis.hs:34:23 }))])
+                      (EpaComments
+                       []))
+                     (FunBind
+                      (NoExtField)
+                      (L
+                       (EpAnn
+                        (EpaSpan { DumpSemis.hs:34:19 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       (Unqual
+                        {OccName: y}))
+                      (MG
+                       (FromSource)
                        (L
                         (EpAnn
-                         (EpaSpan { DumpSemis.hs:34:19 })
-                         (NameAnnTrailing
+                         (EpaSpan { DumpSemis.hs:34:19-21 })
+                         (AnnList
+                          (Nothing)
+                          (Nothing)
+                          (Nothing)
+                          []
                           [])
                          (EpaComments
                           []))
-                        (Unqual
-                         {OccName: y}))
-                       (MG
-                        (FromSource)
-                        (L
-                         (EpAnn
-                          (EpaSpan { DumpSemis.hs:34:19-21 })
-                          (AnnList
-                           (Nothing)
-                           (Nothing)
-                           (Nothing)
+                        [(L
+                          (EpAnn
+                           (EpaSpan { DumpSemis.hs:34:19-21 })
+                           (AnnListItem
+                            [])
+                           (EpaComments
+                            []))
+                          (Match
                            []
-                           [])
-                          (EpaComments
-                           []))
-                         [(L
-                           (EpAnn
-                            (EpaSpan { DumpSemis.hs:34:19-21 })
-                            (AnnListItem
-                             [])
+                           (FunRhs
+                            (L
+                             (EpAnn
+                              (EpaSpan { DumpSemis.hs:34:19 })
+                              (NameAnnTrailing
+                               [])
+                              (EpaComments
+                               []))
+                             (Unqual
+                              {OccName: y}))
+                            (Prefix)
+                            (NoSrcStrict))
+                           (L
+                            (EpaSpan { <no location info> })
+                            [])
+                           (GRHSs
                             (EpaComments
-                             []))
-                           (Match
-                            []
-                            (FunRhs
-                             (L
+                             [])
+                            [(L
                               (EpAnn
-                               (EpaSpan { DumpSemis.hs:34:19 })
-                               (NameAnnTrailing
-                                [])
+                               (EpaSpan { DumpSemis.hs:34:20-21 })
+                               (NoEpAnns)
                                (EpaComments
                                 []))
-                              (Unqual
-                               {OccName: y}))
-                             (Prefix)
-                             (NoSrcStrict))
-                            (L
-                             (EpaSpan { <no location info> })
-                             [])
-                            (GRHSs
-                             (EpaComments
-                              [])
-                             [(L
+                              (GRHS
                                (EpAnn
                                 (EpaSpan { DumpSemis.hs:34:20-21 })
-                                (NoEpAnns)
+                                (GrhsAnn
+                                 (Nothing)
+                                 (AddEpAnn AnnEqual (EpaSpan { DumpSemis.hs:34:20 })))
                                 (EpaComments
                                  []))
-                               (GRHS
+                               []
+                               (L
                                 (EpAnn
-                                 (EpaSpan { DumpSemis.hs:34:20-21 })
-                                 (GrhsAnn
-                                  (Nothing)
-                                  (AddEpAnn AnnEqual (EpaSpan { DumpSemis.hs:34:20 })))
+                                 (EpaSpan { DumpSemis.hs:34:21 })
+                                 (AnnListItem
+                                  [])
                                  (EpaComments
                                   []))
-                                []
-                                (L
-                                 (EpAnn
-                                  (EpaSpan { DumpSemis.hs:34:21 })
-                                  (AnnListItem
-                                   [])
-                                  (EpaComments
-                                   []))
-                                 (HsOverLit
+                                (HsOverLit
+                                 (NoExtField)
+                                 (OverLit
                                   (NoExtField)
-                                  (OverLit
-                                   (NoExtField)
-                                   (HsIntegral
-                                    (IL
-                                     (SourceText 2)
-                                     (False)
-                                     (2))))))))]
-                             (EmptyLocalBinds
-                              (NoExtField)))))]))))
-                    ,(L
-                      (EpAnn
-                       (EpaSpan { DumpSemis.hs:34:24-26 })
-                       (AnnListItem
-                        [(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:34:27 }))
-                        ,(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:34:28 }))
-                        ,(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:34:29 }))
-                        ,(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:34:30 }))])
-                       (EpaComments
-                        []))
-                      (FunBind
-                       (NoExtField)
+                                  (HsIntegral
+                                   (IL
+                                    (SourceText 2)
+                                    (False)
+                                    (2))))))))]
+                            (EmptyLocalBinds
+                             (NoExtField)))))]))))
+                   ,(L
+                     (EpAnn
+                      (EpaSpan { DumpSemis.hs:34:24-26 })
+                      (AnnListItem
+                       [(AddSemiAnn
+                         (EpaSpan { DumpSemis.hs:34:27 }))
+                       ,(AddSemiAnn
+                         (EpaSpan { DumpSemis.hs:34:28 }))
+                       ,(AddSemiAnn
+                         (EpaSpan { DumpSemis.hs:34:29 }))
+                       ,(AddSemiAnn
+                         (EpaSpan { DumpSemis.hs:34:30 }))])
+                      (EpaComments
+                       []))
+                     (FunBind
+                      (NoExtField)
+                      (L
+                       (EpAnn
+                        (EpaSpan { DumpSemis.hs:34:24 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       (Unqual
+                        {OccName: z}))
+                      (MG
+                       (FromSource)
                        (L
                         (EpAnn
-                         (EpaSpan { DumpSemis.hs:34:24 })
-                         (NameAnnTrailing
+                         (EpaSpan { DumpSemis.hs:34:24-26 })
+                         (AnnList
+                          (Nothing)
+                          (Nothing)
+                          (Nothing)
+                          []
                           [])
                          (EpaComments
                           []))
-                        (Unqual
-                         {OccName: z}))
-                       (MG
-                        (FromSource)
-                        (L
-                         (EpAnn
-                          (EpaSpan { DumpSemis.hs:34:24-26 })
-                          (AnnList
-                           (Nothing)
-                           (Nothing)
-                           (Nothing)
+                        [(L
+                          (EpAnn
+                           (EpaSpan { DumpSemis.hs:34:24-26 })
+                           (AnnListItem
+                            [])
+                           (EpaComments
+                            []))
+                          (Match
                            []
-                           [])
-                          (EpaComments
-                           []))
-                         [(L
-                           (EpAnn
-                            (EpaSpan { DumpSemis.hs:34:24-26 })
-                            (AnnListItem
-                             [])
+                           (FunRhs
+                            (L
+                             (EpAnn
+                              (EpaSpan { DumpSemis.hs:34:24 })
+                              (NameAnnTrailing
+                               [])
+                              (EpaComments
+                               []))
+                             (Unqual
+                              {OccName: z}))
+                            (Prefix)
+                            (NoSrcStrict))
+                           (L
+                            (EpaSpan { <no location info> })
+                            [])
+                           (GRHSs
                             (EpaComments
-                             []))
-                           (Match
-                            []
-                            (FunRhs
-                             (L
+                             [])
+                            [(L
                               (EpAnn
-                               (EpaSpan { DumpSemis.hs:34:24 })
-                               (NameAnnTrailing
-                                [])
+                               (EpaSpan { DumpSemis.hs:34:25-26 })
+                               (NoEpAnns)
                                (EpaComments
                                 []))
-                              (Unqual
-                               {OccName: z}))
-                             (Prefix)
-                             (NoSrcStrict))
-                            (L
-                             (EpaSpan { <no location info> })
-                             [])
-                            (GRHSs
-                             (EpaComments
-                              [])
-                             [(L
+                              (GRHS
                                (EpAnn
                                 (EpaSpan { DumpSemis.hs:34:25-26 })
-                                (NoEpAnns)
+                                (GrhsAnn
+                                 (Nothing)
+                                 (AddEpAnn AnnEqual (EpaSpan { DumpSemis.hs:34:25 })))
                                 (EpaComments
                                  []))
-                               (GRHS
+                               []
+                               (L
                                 (EpAnn
-                                 (EpaSpan { DumpSemis.hs:34:25-26 })
-                                 (GrhsAnn
-                                  (Nothing)
-                                  (AddEpAnn AnnEqual (EpaSpan { DumpSemis.hs:34:25 })))
+                                 (EpaSpan { DumpSemis.hs:34:26 })
+                                 (AnnListItem
+                                  [])
                                  (EpaComments
                                   []))
-                                []
-                                (L
-                                 (EpAnn
-                                  (EpaSpan { DumpSemis.hs:34:26 })
-                                  (AnnListItem
-                                   [])
-                                  (EpaComments
-                                   []))
-                                 (HsOverLit
+                                (HsOverLit
+                                 (NoExtField)
+                                 (OverLit
                                   (NoExtField)
-                                  (OverLit
-                                   (NoExtField)
-                                   (HsIntegral
-                                    (IL
-                                     (SourceText 3)
-                                     (False)
-                                     (3))))))))]
-                             (EmptyLocalBinds
-                              (NoExtField)))))]))))]}
+                                  (HsIntegral
+                                   (IL
+                                    (SourceText 3)
+                                    (False)
+                                    (3))))))))]
+                            (EmptyLocalBinds
+                             (NoExtField)))))]))))]
                    []))
                  (L
                   (EpAnn

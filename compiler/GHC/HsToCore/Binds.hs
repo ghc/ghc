@@ -95,9 +95,9 @@ import Control.Monad
 dsTopLHsBinds :: LHsBinds GhcTc -> DsM (OrdList (Id,CoreExpr))
 dsTopLHsBinds binds
      -- see Note [Strict binds checks]
-  | not (isEmptyBag unlifted_binds) || not (isEmptyBag bang_binds)
-  = do { mapBagM_ (top_level_err UnliftedTypeBinds) unlifted_binds
-       ; mapBagM_ (top_level_err StrictBinds)       bang_binds
+  | not (null unlifted_binds) || not (null bang_binds)
+  = do { mapM_ (top_level_err UnliftedTypeBinds) unlifted_binds
+       ; mapM_ (top_level_err StrictBinds)       bang_binds
        ; return nilOL }
 
   | otherwise
@@ -110,8 +110,8 @@ dsTopLHsBinds binds
        ; return (toOL prs) }
 
   where
-    unlifted_binds = filterBag (isUnliftedHsBind . unLoc) binds
-    bang_binds     = filterBag (isBangedHsBind   . unLoc) binds
+    unlifted_binds = filter (isUnliftedHsBind . unLoc) binds
+    bang_binds     = filter (isBangedHsBind   . unLoc) binds
 
     top_level_err bindsType (L loc bind)
       = putSrcSpanDs (locA loc) $
@@ -166,9 +166,9 @@ make sure to return the binding in dependency order [$sg, g].
 -- see Note [Return non-recursive bindings in dependency order]
 dsLHsBinds :: LHsBinds GhcTc -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBinds binds
-  = do { ds_bs <- mapBagM dsLHsBind binds
-       ; return (foldBag (\(a, a') (b, b') -> (a ++ b, a' ++ b'))
-                         id ([], []) ds_bs) }
+  = do { ds_bs <- mapM dsLHsBind binds
+       ; return (foldr (\(a, a') (b, b') -> (a ++ b, a' ++ b'))
+                         ([], []) ds_bs) }
 
 ------------------------
 dsLHsBind :: LHsBind GhcTc
@@ -259,7 +259,7 @@ dsHsBind
              -- See Check, Note [Long-distance information]
 
     -- dsAbsBinds does the hard work
-    ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds (isSingletonBag binds) has_sig }
+    ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds (isSingleton binds) has_sig }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 

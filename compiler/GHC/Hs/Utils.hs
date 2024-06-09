@@ -149,7 +149,6 @@ import GHC.Types.Fixity
 import GHC.Types.SourceText
 
 import GHC.Data.FastString
-import GHC.Data.Bag
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -874,14 +873,14 @@ spanHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
   = foldr combineSrcSpans noSrcSpan (bsSpans ++ sigsSpans)
   where
     bsSpans :: [SrcSpan]
-    bsSpans = map getLocA $ bagToList bs
+    bsSpans = map getLocA bs
     sigsSpans :: [SrcSpan]
     sigsSpans = map getLocA sigs
 spanHsLocaLBinds (HsValBinds _ (XValBindsLR (NValBinds bs sigs)))
   = foldr combineSrcSpans noSrcSpan (bsSpans ++ sigsSpans)
   where
     bsSpans :: [SrcSpan]
-    bsSpans = map getLocA $ concatMap (bagToList . snd) bs
+    bsSpans = map getLocA $ concatMap snd bs
     sigsSpans :: [SrcSpan]
     sigsSpans = map getLocA sigs
 spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
@@ -1036,7 +1035,7 @@ isUnliftedHsBind (PatBind { pat_lhs = pat })
 isUnliftedHsBind (PatSynBind {}) = panic "isUnliftedBind: PatSynBind"
 
 isUnliftedHsBinds :: LHsBinds GhcTc -> Bool
-isUnliftedHsBinds = anyBag (isUnliftedHsBind . unLoc)
+isUnliftedHsBinds = any (isUnliftedHsBind . unLoc)
 
 is_unlifted_id :: Id -> Bool
 is_unlifted_id id = isUnliftedType (idType id)
@@ -1046,7 +1045,7 @@ is_unlifted_id id = isUnliftedType (idType id)
 -- | Is a binding a strict variable or pattern bind (e.g. @!x = ...@)?
 isBangedHsBind :: HsBind GhcTc -> Bool
 isBangedHsBind (XHsBindsLR (AbsBinds { abs_binds = binds }))
-  = anyBag (isBangedHsBind . unLoc) binds
+  = any (isBangedHsBind . unLoc) binds
 isBangedHsBind (FunBind {fun_matches = matches})
   | [L _ match] <- unLoc $ mg_alts matches
   , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
@@ -1516,7 +1515,7 @@ hsPatSynSelectors :: IsPass p => HsValBinds (GhcPass p) -> [FieldOcc (GhcPass p)
 -- names are collected by 'collectHsValBinders'.
 hsPatSynSelectors (ValBinds _ _ _) = panic "hsPatSynSelectors"
 hsPatSynSelectors (XValBindsLR (NValBinds binds _))
-  = foldr addPatSynSelector [] . unionManyBags $ map snd binds
+  = foldr addPatSynSelector [] . concat $ map snd binds
 
 addPatSynSelector :: forall p. UnXRec p => LHsBind p -> [FieldOcc p] -> [FieldOcc p]
 addPatSynSelector bind sels
@@ -1528,7 +1527,7 @@ getPatSynBinds :: forall id. UnXRec id
                => [(RecFlag, LHsBinds id)] -> [PatSynBind id id]
 getPatSynBinds binds
   = [ psb | (_, lbinds) <- binds
-          , (unXRec @id -> (PatSynBind _ psb)) <- bagToList lbinds ]
+          , (unXRec @id -> (PatSynBind _ psb)) <- lbinds ]
 
 -------------------
 hsLInstDeclBinders :: (IsPass p, OutputableBndrId p)
@@ -1805,7 +1804,7 @@ hsValBindsImplicits (ValBinds _ binds _)
   = lhsBindsImplicits binds
 
 lhsBindsImplicits :: LHsBindsLR GhcRn idR -> [(SrcSpan, [ImplicitFieldBinders])]
-lhsBindsImplicits = foldBag (++) (lhs_bind . unLoc) []
+lhsBindsImplicits = concatMap (lhs_bind . unLoc)
   where
     lhs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
     lhs_bind _ = []

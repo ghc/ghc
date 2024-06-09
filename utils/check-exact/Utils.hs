@@ -29,7 +29,6 @@ import Lookup
 
 import GHC hiding (EpaComment)
 import qualified GHC
-import GHC.Data.Bag
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -486,7 +485,7 @@ hsDeclsClassDecl dec = case dec of
       decls
           = orderedDecls sortKey $ Map.fromList
               [(ClsSigTag,    map (\(L l s) -> (srs l, L l (SigD noExtField s))) sigs),
-               (ClsMethodTag, map (\(L l s) -> (srs l, L l (ValD noExtField s))) (bagToList methods)),
+               (ClsMethodTag, map (\(L l s) -> (srs l, L l (ValD noExtField s))) methods),
                (ClsAtTag,     map (\(L l s) -> (srs l, L l (TyClD noExtField $ FamDecl noExtField s))) ats),
                (ClsAtdTag,    map (\(L l s) -> (srs l, L l (InstD noExtField $ TyFamInstD noExtField s))) at_defs)
               ]
@@ -510,12 +509,12 @@ partitionWithSortKey
       [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
 partitionWithSortKey = go
   where
-    go [] = ([], emptyBag, [], [], [], [], [])
+    go [] = ([], [], [], [], [], [], [])
     go ((L l decl) : ds) =
       let (tags, bs, ss, ts, tfis, dfis, docs) = go ds in
       case decl of
         ValD _ b
-          -> (ClsMethodTag:tags, L l b `consBag` bs, ss, ts, tfis, dfis, docs)
+          -> (ClsMethodTag:tags, L l b : bs, ss, ts, tfis, dfis, docs)
         SigD _ s
           -> (ClsSigTag:tags, bs, L l s : ss, ts, tfis, dfis, docs)
         TyClD _ (FamDecl _ t)
@@ -553,7 +552,7 @@ hsDeclsLocalBinds :: HsLocalBinds GhcPs -> [LHsDecl GhcPs]
 hsDeclsLocalBinds lb = case lb of
     HsValBinds _ (ValBinds sortKey bs sigs) ->
       let
-        bds = map wrapDecl (bagToList bs)
+        bds = map wrapDecl bs
         sds = map wrapSig sigs
       in
         orderedDeclsBinds sortKey bds sds
@@ -564,7 +563,7 @@ hsDeclsLocalBinds lb = case lb of
 hsDeclsValBinds :: (HsValBindsLR GhcPs GhcPs) -> [LHsDecl GhcPs]
 hsDeclsValBinds (ValBinds sortKey bs sigs) =
       let
-        bds = map wrapDecl (bagToList bs)
+        bds = map wrapDecl bs
         sds = map wrapSig sigs
       in
         orderedDeclsBinds sortKey bds sds

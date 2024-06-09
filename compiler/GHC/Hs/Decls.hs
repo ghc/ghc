@@ -129,7 +129,6 @@ import GHC.Core.Type
 import GHC.Types.ForeignCall
 import GHC.Unit.Module.Warnings
 
-import GHC.Data.Bag
 import GHC.Data.Maybe
 import Data.Data (Data)
 import Data.Foldable (toList)
@@ -172,12 +171,12 @@ partitionBindsAndSigs
       [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
 partitionBindsAndSigs = go
   where
-    go [] = (emptyBag, [], [], [], [], [])
+    go [] = ([], [], [], [], [], [])
     go ((L l decl) : ds) =
       let (bs, ss, ts, tfis, dfis, docs) = go ds in
       case decl of
         ValD _ b
-          -> (L l b `consBag` bs, ss, ts, tfis, dfis, docs)
+          -> (L l b : bs, ss, ts, tfis, dfis, docs)
         SigD _ s
           -> (bs, L l s : ss, ts, tfis, dfis, docs)
         TyClD _ (FamDecl _ t)
@@ -452,7 +451,7 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
                     tcdFDs  = fds,
                     tcdSigs = sigs, tcdMeths = methods,
                     tcdATs = ats, tcdATDefs = at_defs})
-      | null sigs && isEmptyBag methods && null ats && null at_defs -- No "where" part
+      | null sigs && null methods && null ats && null at_defs -- No "where" part
       = top_matter
 
       | otherwise       -- Laid out
@@ -919,7 +918,7 @@ instance OutputableBndrId p
                          , cid_sigs = sigs, cid_tyfam_insts = ats
                          , cid_overlap_mode = mbOverlap
                          , cid_datafam_insts = adts })
-      | null sigs, null ats, null adts, isEmptyBag binds  -- No "where" part
+      | null sigs, null ats, null adts, null binds  -- No "where" part
       = top_matter
 
       | otherwise       -- Laid out

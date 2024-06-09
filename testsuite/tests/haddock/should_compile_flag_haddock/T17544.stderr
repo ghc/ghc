@@ -188,8 +188,7 @@
                      " comment on Int"))
                    []))
                  []))))))))))]
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       []
       []
       [])))
@@ -326,8 +325,7 @@
                   []))
                 (Unqual
                  {OccName: Int}))))))))))]
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       []
       []
       [(L
@@ -483,8 +481,7 @@
                   []))
                 (Unqual
                  {OccName: Int}))))))))))]
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       []
       []
       [])))
@@ -726,8 +723,7 @@
                   []))
                 (Unqual
                  {OccName: Int}))))))))))]
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       []
       []
       [])))
@@ -787,8 +783,7 @@
       (Prefix)
       []
       []
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:22:20-28 })
@@ -918,8 +913,7 @@
                 []))
               (Unqual
                {OccName: Int}))))))))
-       {Bag(LocatedA (HsBind GhcPs)):
-        []}
+       []
        []
        []
        [(L
@@ -1116,8 +1110,7 @@
       (Prefix)
       []
       []
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:28:20-28 })
@@ -1247,8 +1240,7 @@
                 []))
               (Unqual
                {OccName: Int}))))))))
-       {Bag(LocatedA (HsBind GhcPs)):
-        []}
+       []
        []
        []
        [(L
@@ -1445,8 +1437,7 @@
       (Prefix)
       []
       []
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:34:20-28 })
@@ -1576,8 +1567,7 @@
                 []))
               (Unqual
                {OccName: Int}))))))))
-       {Bag(LocatedA (HsBind GhcPs)):
-        []}
+       []
        []
        []
        [(L
@@ -1774,8 +1764,7 @@
       (Prefix)
       []
       []
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:40:20-28 })
@@ -1905,8 +1894,7 @@
                 []))
               (Unqual
                {OccName: Int}))))))))
-       {Bag(LocatedA (HsBind GhcPs)):
-        []}
+       []
        []
        []
        [(L
@@ -2103,8 +2091,7 @@
       (Prefix)
       []
       []
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:46:20-28 })
@@ -2234,8 +2221,7 @@
                 []))
               (Unqual
                {OccName: Int}))))))))
-       {Bag(LocatedA (HsBind GhcPs)):
-        []}
+       []
        []
        []
        [(L
@@ -2432,8 +2418,7 @@
       (Prefix)
       []
       []
-      {Bag(LocatedA (HsBind GhcPs)):
-       []}
+      []
       [(L
         (EpAnn
          (EpaSpan { T17544.hs:52:21-30 })
@@ -2563,8 +2548,7 @@
                 []))
               (Unqual
                {OccName: Int}))))))))
-       {Bag(LocatedA (HsBind GhcPs)):
-        []}
+       []
        []
        []
        [(L
@@ -2729,7 +2713,6 @@
         [])))))]))
 
 
-
 T17544.hs:19:1: warning: [GHC-94458] [-Winvalid-haddock]
     A Haddock comment cannot appear in this position and will be ignored.
 
@@ -2747,3 +2730,4 @@ T17544.hs:44:3: warning: [GHC-94458] [-Winvalid-haddock]
 
 T17544.hs:50:2: warning: [GHC-94458] [-Winvalid-haddock]
     A Haddock comment cannot appear in this position and will be ignored.
+
