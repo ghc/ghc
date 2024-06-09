@@ -31,10 +31,10 @@ Language
   This means that code using :extension:`UnliftedDatatypes` or
   :extension:`UnliftedNewtypes` can now use :extension:`OverloadedRecordDot`.
 
-- Unboxed Float#/Double# literals now support the HexFloatLiterals extension
+- Unboxed ``Float#``/``Double#`` literals now support the HexFloatLiterals extension
   (`#22155 <https://gitlab.haskell.org/ghc/ghc/-/issues/22155>`_).
 
-- UnliftedFFITypes: GHC will now accept ffi types like: ``(# #) -> T`` where ``(# #)``
+- :extension:`UnliftedFFITypes`: GHC will now accept FFI types like: ``(# #) -> T`` where ``(# #)``
   is used as the one and only function argument.
 
 Compiler
