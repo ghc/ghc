@@ -50,4 +50,20 @@ allows enabling assertions even when optimisation is turned on.
 Assertion failures can be caught, see the documentation for the
 :base-ref:`Control.Exception.` library for the details.
 
+The ``__GLASGOW_HASKELL_ASSERTS_IGNORED__`` CPP macro
+=====================================================
 
+When code is compiled with assertions ignored (using :ghc-flag:`-fignore-asserts` or :ghc-flag:`-O`),
+the :extension:`CPP` macro ``__GLASGOW_HASKELL_ASSERTS_IGNORED__`` will be defined.
+This can be used to conditionally compile your own custom assert-like functions.
+For example: ::
+
+    checkedAdd :: Word -> Word -> Word
+    #ifdef __GLASGOW_HASKELL_ASSERTS_IGNORED__
+      checkedAdd lhs rhs = lhs + rhs 
+    #else
+      checkedAdd lhs rhs
+        | res < lhs || res < rhs = raise OverflowException
+        | otherwise              = res
+        where res = lhs + rhs
+    #endif

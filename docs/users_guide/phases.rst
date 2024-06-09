@@ -508,6 +508,13 @@ defined by your local GHC installation, the following trick is useful:
     is added, so for example when using version 3.7 of LLVM,
     ``__GLASGOW_HASKELL_LLVM__==307``).
 
+``__GLASGOW_HASKELL_ASSERTS_IGNORED__``
+    .. index::
+       single: __GLASGOW_HASKELL_ASSERTS_IGNORED__
+
+    Only defined when :ghc-flag:`-fignore-asserts` is specified.
+    This can be used to create your own assertions, see :ref:`assertions`
+
 ``__PARALLEL_HASKELL__``
     .. index::
        single: __PARALLEL_HASKELL__

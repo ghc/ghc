@@ -168,6 +168,9 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     backend_defs <- applyCDefs (backendCDefs $ backend dflags) logger dflags
 
     let th_defs = [ "-D__GLASGOW_HASKELL_TH__" ]
+
+    let asserts_def = [ "-D__GLASGOW_HASKELL_ASSERTS_IGNORED__" | gopt Opt_IgnoreAsserts dflags]
+
     -- Default CPP defines in Haskell source
     ghcVersionH <- getGhcVersionPathName dflags unit_env
     let hsSourceCppOpts = [ "-include", ghcVersionH ]
@@ -197,6 +200,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
                     ++ map GHC.SysTools.Option target_defs
                     ++ map GHC.SysTools.Option backend_defs
                     ++ map GHC.SysTools.Option th_defs
+                    ++ map GHC.SysTools.Option asserts_def
                     ++ map GHC.SysTools.Option hscpp_opts
                     ++ map GHC.SysTools.Option sse_defs
                     ++ map GHC.SysTools.Option fma_def
