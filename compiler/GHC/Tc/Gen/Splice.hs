@@ -2831,7 +2831,7 @@ reifyStrictness SrcLazy     = TH.SourceLazy
 
 reifySourceBang :: DataCon.HsSrcBang
                 -> (TH.SourceUnpackedness, TH.SourceStrictness)
-reifySourceBang (HsSrcBang _ u s) = (reifyUnpackedness u, reifyStrictness s)
+reifySourceBang (HsSrcBang _ (HsBang u s)) = (reifyUnpackedness u, reifyStrictness s)
 
 reifyDecidedStrictness :: DataCon.HsImplBang -> TH.DecidedStrictness
 reifyDecidedStrictness HsLazy       = TH.DecidedLazy

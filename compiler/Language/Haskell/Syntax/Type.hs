@@ -43,7 +43,7 @@ module Language.Haskell.Syntax.Type (
         LHsTypeArg,
 
         LBangType, BangType,
-        HsSrcBang(..),
+        HsBang(..),
         PromotionFlag(..), isPromoted,
 
         ConDeclField(..), LConDeclField,
@@ -61,11 +61,11 @@ module Language.Haskell.Syntax.Type (
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
+import Language.Haskell.Syntax.Basic ( HsBang(..) )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity
 
 import GHC.Types.Name.Reader ( RdrName )
-import GHC.Core.DataCon( HsSrcBang(..) )
 
 import GHC.Hs.Doc (LHsDoc)
 import GHC.Data.FastString (FastString)
@@ -879,8 +879,8 @@ data HsType pass
 
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
-  | HsBangTy    (XBangTy pass)
-                HsSrcBang (LHsType pass)   -- Bang-style type annotations
+  | HsBangTy    (XBangTy pass)          -- Contains the SourceText in GHC passes.
+                HsBang (LHsType pass)   -- Bang-style type annotations
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
       --         'GHC.Parser.Annotation.AnnOpen' @'{-\# UNPACK' or '{-\# NOUNPACK'@,
       --         'GHC.Parser.Annotation.AnnClose' @'#-}'@

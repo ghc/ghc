@@ -1633,9 +1633,9 @@ ppDataHeader _ _ _ _ = error "ppDataHeader: illegal argument"
 
 --------------------------------------------------------------------------------
 
-ppBang :: HsSrcBang -> Html
-ppBang (HsSrcBang _ _ SrcStrict) = toHtml "!"
-ppBang (HsSrcBang _ _ SrcLazy) = toHtml "~"
+ppBang :: HsBang -> Html
+ppBang (HsBang _ SrcStrict) = toHtml "!"
+ppBang (HsBang _ SrcLazy) = toHtml "~"
 ppBang _ = noHtml
 
 tupleParens :: HsTupleSort -> [Html] -> Html
