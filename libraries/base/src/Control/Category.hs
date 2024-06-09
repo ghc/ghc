@@ -11,9 +11,26 @@
 --
 
 module Control.Category
-  ( Category(..)
+  ( -- * Class
+    Category(..)
+
+    -- * Combinators
   , (<<<)
   , (>>>)
+
+  -- $namingConflicts
   ) where
 
 import GHC.Internal.Control.Category
+
+-- $namingConflicts
+--
+-- == A note on naming conflicts
+--
+-- The methods from 'Category' conflict with 'Prelude.id' and 'Prelude..' from the
+-- prelude; you will likely want to either import this module qualified, or hide the
+-- prelude functions:
+--
+-- @
+-- import "Prelude" hiding (id, (.))
+-- @
