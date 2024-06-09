@@ -976,6 +976,7 @@ Library
         Language.Haskell.Syntax.Lit
         Language.Haskell.Syntax.Module.Name
         Language.Haskell.Syntax.Pat
+        Language.Haskell.Syntax.Specificity
         Language.Haskell.Syntax.Type
 
     autogen-modules: GHC.Platform.Constants
