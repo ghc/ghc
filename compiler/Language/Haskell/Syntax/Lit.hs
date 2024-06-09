@@ -20,10 +20,10 @@ module Language.Haskell.Syntax.Lit where
 
 import Language.Haskell.Syntax.Extension
 
-import GHC.Types.SourceText (IntegralLit, FractionalLit, SourceText)
+import GHC.Types.SourceText (IntegralLit, FractionalLit, StringLit)
 import GHC.Core.Type (Type)
 
-import GHC.Data.FastString (FastString, lexicalCompareFS)
+import GHC.Data.FastString (FastString)
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -124,24 +124,24 @@ data HsOverLit p
 -- the following
 -- | Overloaded Literal Value
 data OverLitVal
-  = HsIntegral   !IntegralLit            -- ^ Integer-looking literals;
-  | HsFractional !FractionalLit          -- ^ Frac-looking literals
-  | HsIsString   !SourceText !FastString -- ^ String-looking literals
+  = HsIntegral   !IntegralLit   -- ^ Integer-looking literals;
+  | HsFractional !FractionalLit -- ^ Frac-looking literals
+  | HsIsString   !StringLit     -- ^ String-looking literals
   deriving Data
 
 instance Eq OverLitVal where
   (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
   (HsFractional f1)   == (HsFractional f2)   = f1 == f2
-  (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
+  (HsIsString   s1)   == (HsIsString   s2)   = s1 == s2
   _                   == _                   = False
 
 instance Ord OverLitVal where
   compare (HsIntegral i1)     (HsIntegral i2)     = i1 `compare` i2
   compare (HsIntegral _)      (HsFractional _)    = LT
-  compare (HsIntegral _)      (HsIsString _ _)    = LT
+  compare (HsIntegral _)      (HsIsString   _)    = LT
   compare (HsFractional f1)   (HsFractional f2)   = f1 `compare` f2
   compare (HsFractional _)    (HsIntegral   _)    = GT
-  compare (HsFractional _)    (HsIsString _ _)    = LT
-  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `lexicalCompareFS` s2
-  compare (HsIsString _ _)    (HsIntegral   _)    = GT
-  compare (HsIsString _ _)    (HsFractional _)    = GT
+  compare (HsFractional _)    (HsIsString   _)    = LT
+  compare (HsIsString   s1)   (HsIsString   s2)   = s1 `compare` s2
+  compare (HsIsString   _)    (HsIntegral   _)    = GT
+  compare (HsIsString   _)    (HsFractional _)    = GT

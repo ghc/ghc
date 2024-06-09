@@ -592,7 +592,7 @@ tidyNPat (OverLit (OverLitTc False _ ty) val) mb_neg _eq outer_ty
 
     mb_str_lit :: Maybe FastString
     mb_str_lit = case (mb_neg, val) of
-                   (Nothing, HsIsString _ s) -> Just s
+                   (Nothing, HsIsString s) -> Just (sl_fs s)
                    _ -> Nothing
 
 tidyNPat over_lit mb_neg eq outer_ty

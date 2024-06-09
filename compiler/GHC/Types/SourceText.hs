@@ -317,5 +317,8 @@ data StringLit = SL
 instance Eq StringLit where
   (SL _ a _) == (SL _ b _) = a == b
 
+instance Ord StringLit where
+  (SL _ a _) `compare` (SL _ b _) = a `lexicalCompareFS` b
+
 instance Outputable StringLit where
   ppr sl = pprWithSourceText (sl_st sl) (doubleQuotes $ ftext $ sl_fs sl)

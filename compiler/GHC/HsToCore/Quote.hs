@@ -3058,7 +3058,7 @@ repOverloadedLiteral (OverLit { ol_val = val})
 mk_lit :: OverLitVal -> MetaM (HsLit GhcRn)
 mk_lit (HsIntegral i)     = mk_integer  (il_value i)
 mk_lit (HsFractional f)   = mk_rational f
-mk_lit (HsIsString _ s)   = mk_string   s
+mk_lit (HsIsString s)     = mk_string   (sl_fs s)
 
 repRdrName :: RdrName -> MetaM (Core TH.Name)
 repRdrName rdr_name = do

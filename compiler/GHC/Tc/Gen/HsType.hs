@@ -4765,5 +4765,5 @@ tyLitFromLit _ = Nothing
 
 tyLitFromOverloadedLit :: OverLitVal -> Maybe (HsTyLit GhcRn)
 tyLitFromOverloadedLit (HsIntegral n) = Just $ HsNumTy NoSourceText (il_value n)
-tyLitFromOverloadedLit (HsIsString _ s) = Just $ HsStrTy NoSourceText s
+tyLitFromOverloadedLit (HsIsString s) = Just $ HsStrTy NoSourceText (sl_fs s)
 tyLitFromOverloadedLit HsFractional{} = Nothing

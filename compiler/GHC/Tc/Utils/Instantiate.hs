@@ -817,7 +817,7 @@ mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
         ; return (HsRat noExtField r rat_ty) }
 
-mkOverLit (HsIsString src s) = return (HsString src s)
+mkOverLit (HsIsString s) = return (HsString (sl_st s) (sl_fs s))
 
 {-
 ************************************************************************

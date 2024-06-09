@@ -227,9 +227,9 @@ instance OutputableBndrId p
         = ppr val <+> (whenPprDebug (parens (pprXOverLit (ghcPass @p) ext)))
 
 instance Outputable OverLitVal where
-  ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
-  ppr (HsFractional f)   = ppr f
-  ppr (HsIsString st s)  = pprWithSourceText st (pprHsString s)
+  ppr (HsIntegral i)   = pprWithSourceText (il_text i) (integer (il_value i))
+  ppr (HsFractional f) = ppr f
+  ppr (HsIsString s)   = pprWithSourceText (sl_st s) (pprHsString (sl_fs s))
 
 -- | pmPprHsLit pretty prints literals and is used when pretty printing pattern
 -- match warnings. All are printed the same (i.e., without hashes if they are
