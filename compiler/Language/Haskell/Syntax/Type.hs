@@ -62,10 +62,10 @@ module Language.Haskell.Syntax.Type (
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Specificity
 
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..) )
-import GHC.Core.Type (Specificity)
 
 import GHC.Hs.Doc (LHsDoc)
 import GHC.Data.FastString (FastString)

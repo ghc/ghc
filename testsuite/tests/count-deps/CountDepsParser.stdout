@@ -104,6 +104,7 @@ GHC.Hs.ImpExp
 GHC.Hs.Instances
 GHC.Hs.Lit
 GHC.Hs.Pat
+GHC.Hs.Specificity
 GHC.Hs.Type
 GHC.Hs.Utils
 GHC.HsToCore.Errors.Types
@@ -256,4 +257,5 @@ Language.Haskell.Syntax.ImpExp
 Language.Haskell.Syntax.Lit
 Language.Haskell.Syntax.Module.Name
 Language.Haskell.Syntax.Pat
+Language.Haskell.Syntax.Specificity
 Language.Haskell.Syntax.Type
