@@ -102,6 +102,7 @@ module GHC.Data.FastString
 
         -- ** Internal
         getFastStringTable,
+        getFastZStringTable,
         getFastStringZEncCounter,
 
         -- * PtrStrings
@@ -361,6 +362,7 @@ hashToIndex# buckets# hash# =
     !(I# segmentBits#) = segmentBits
     size# = sizeofMutableArray# buckets#
 
+{-# INLINE maybeResizeSegment #-}
 maybeResizeSegment :: forall a. (a -> Int) -> IORef (TableSegment a) -> IO (TableSegment a)
 maybeResizeSegment hashElem segmentRef = do
   segment@(TableSegment lock counter old#) <- readIORef segmentRef
@@ -563,6 +565,9 @@ bucket_match fs sbs = go fs
 -- Non-inlining causes a small, but measurable performance regression, so let's force it.
 {-# INLINE bucket_match #-}
 
+
+{-# INLINE mkNewFastZString #-}
+
 mkNewFastZString :: FastString -> IO FastZString
 mkNewFastZString (FastString uniq _ sbs) = do
   TableSegment lock _ buckets# <- readIORef segmentRef
@@ -574,9 +579,9 @@ mkNewFastZString (FastString uniq _ sbs) = do
       -- The withMVar below is not dupable. It can lead to deadlock if it is
       -- only run partially and putMVar is not called after takeMVar.
       noDuplicate
-      n <- get_uid
+      _ <- get_uid
       let !new_fs = mkZFastString sbs
-      withMVar lock $ \_ -> insert n new_fs
+      withMVar lock $ \_ -> insert (I# hash#) new_fs
   where
     !(FastZStringTable uid segments#) = zstringTable
     get_uid = atomicFetchAddFastMut uid 1
@@ -705,6 +710,8 @@ unpackFS fs = utf8DecodeShortByteString $ fs_sbs fs
 zEncodeFS :: FastString -> FastZString
 zEncodeFS fs = inlinePerformIO $ mkNewFastZString fs
 
+{-# INLINE zEncodeFS #-}
+
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = mkFastStringShortByteString
                  $ (Semi.<>) (fs_sbs fs1) (fs_sbs fs2)
@@ -740,6 +747,17 @@ getFastStringTable =
       IO $ readArray# buckets# j#
   where
     !(FastStringTable _ segments#) = stringTable
+
+getFastZStringTable :: IO [[[FastZString]]]
+getFastZStringTable =
+  forM [0 .. numSegments - 1] $ \(I# i#) -> do
+    let (# segmentRef #) = indexArray# segments# i#
+    TableSegment _ _ buckets# <- readIORef segmentRef
+    let bucketSize = I# (sizeofMutableArray# buckets#)
+    forM [0 .. bucketSize - 1] $ \(I# j#) ->
+      fmap (map (\(HashedFastZString _ s) -> s)) $ IO $ readArray# buckets# j#
+  where
+    !(FastZStringTable _ segments#) = zstringTable
 
 getFastStringZEncCounter :: IO Int
 getFastStringZEncCounter = readFastMutInt counter
