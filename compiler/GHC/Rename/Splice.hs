@@ -360,7 +360,8 @@ runRnSplice :: UntypedSpliceFlavour
             -> HsUntypedSplice GhcRn
             -> TcRn (res, [ForeignRef (TH.Q ())])
 runRnSplice flavour run_meta ppr_res splice
-  = do { hooks <- hsc_hooks <$> getTopEnv
+  = withTimingTcRn (text "splice") (\(x,_) -> () `seq` x)
+    do { hooks <- hsc_hooks <$> getTopEnv
        ; splice' <- case runRnSpliceHook hooks of
             Nothing -> return splice
             Just h  -> h splice

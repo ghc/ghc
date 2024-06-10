@@ -43,6 +43,7 @@ module GHC.Tc.Utils.Monad(
   -- * Debugging
   traceTc, traceRn, traceOptTcRn, dumpOptTcRn,
   dumpTcRn,
+  withTimingTcRn,
   getNamePprCtx,
   printForUserTcRn,
   traceIf, traceOptIf,
@@ -841,6 +842,15 @@ dumpTcRn useUserStyle flag title fmt doc = do
               then mkUserStyle name_ppr_ctx AllTheWay
               else mkDumpStyle name_ppr_ctx
   liftIO $ logDumpFile logger sty flag title fmt real_doc
+
+withTimingTcRn
+  :: SDoc -- ^ name of the phase
+  -> (a -> ()) -- ^ a function to force the result
+  -> TcRn a
+  -> TcRn a
+withTimingTcRn what force action = do
+  logger <- getLogger
+  withTiming logger what force action
 
 -- | Add current location if -dppr-debug
 -- (otherwise the full location is usually way too much)
