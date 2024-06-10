@@ -69,11 +69,10 @@ module Language.Haskell.Syntax.Decls.Foreign (
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 
-import GHC.Data.FastString (FastString)
-
 import Control.DeepSeq
 import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Maybe
+import Data.Text (Text)
 import Data.Eq
 import Prelude (Enum, Show)
 
@@ -217,14 +216,14 @@ data CExportSpec
         CCallConv
   deriving Data
 
-type CLabelString = FastString  -- A C label, completely unencoded
+type CLabelString = Text  -- A C label, completely unencoded
 
 -- | A C type, used in CAPI FFI calls
 data CType pass
   = CType
       (XCType pass)
       (Maybe (Header pass)) -- header to include for this type
-      FastString
+      Text
   | XCType !(XXCType pass)
 
 -- The filename for a C header file
@@ -232,7 +231,7 @@ data CType pass
 data Header pass
   = Header
       (XHeader pass)
-      FastString
+      Text
   | XHeader !(XXHeader pass)
 
 data Safety

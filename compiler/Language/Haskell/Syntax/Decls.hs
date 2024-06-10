@@ -92,7 +92,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
         -- Because Expr imports Decls via HsBracket
 
 import Language.Haskell.Syntax.Basic
-  (LexicalFixity, Role, RuleName, TopLevelFlag)
+  (LexicalFixity, Role, TopLevelFlag)
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Decls.Foreign
 import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
@@ -101,7 +101,6 @@ import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity (Specificity)
 import Language.Haskell.Syntax.Type
 
-import GHC.Data.FastString (FastString)
 import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 import GHC.Hs.Doc (WithHsDocIdentifiers)
 import GHC.Types.SourceText (StringLiteral)
@@ -109,12 +108,13 @@ import GHC.Types.SourceText (StringLiteral)
 import Control.DeepSeq
 import Control.Monad
 import Data.Data        hiding (TyCon, Fixity, Infix)
+import Data.Text (Text)
 import Data.Maybe
 import Data.String
 import Data.Eq
 import Data.Int
 import Data.Bool
-import Prelude (Show)
+import Prelude (Show, Ord)
 import Data.Foldable
 import Data.Traversable
 import Data.List.NonEmpty (NonEmpty (..))
@@ -1383,7 +1383,7 @@ data RuleDecl pass
   = HsRule -- Source rule
        { rd_ext  :: XHsRule pass
            -- ^ After renamer, free-vars from the LHS and RHS
-       , rd_name :: XRec pass RuleName
+       , rd_name :: XRec pass Text
            -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
        , rd_act   :: Activation pass
        , rd_bndrs :: RuleBndrs pass
@@ -1571,9 +1571,9 @@ data InWarningCategory pass
     }
   | XInWarningCategory !(XXInWarningCategory pass)
 
-newtype WarningCategory = WarningCategory FastString
+newtype WarningCategory = WarningCategory Text
   deriving stock (Data)
-  deriving newtype (Eq, Show, NFData)
+  deriving newtype (Eq, Ord, Show, NFData)
 
-mkWarningCategory :: FastString -> WarningCategory
+mkWarningCategory :: Text -> WarningCategory
 mkWarningCategory = WarningCategory

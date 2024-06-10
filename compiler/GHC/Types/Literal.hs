@@ -925,7 +925,7 @@ pprLiteral _       (LitNumber nt i)
        LitNumWord32  -> pprPrimWord32 i
        LitNumWord64  -> pprPrimWord64 i
 pprLiteral add_par (LitLabel l fod) =
-    add_par (text "__label" <+> pprHsString l <+> ppr fod)
+    add_par (text "__label" <+> pprHsString (unpackFS l) <+> ppr fod)
 pprLiteral _       (LitRubbish torc rep)
   = text "RUBBISH" <> pp_tc <> parens (ppr rep)
   where

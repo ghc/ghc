@@ -48,6 +48,7 @@ import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 import GHC.Types.ForeignCall
 import GHC.Data.Maybe
+import GHC.Data.FastString (mkFastStringText)
 import GHC.Utils.Panic
 import GHC.Types.Basic
 import GHC.Types.Unique.DSM
@@ -86,7 +87,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                               TargetIsInThat unit -> ForeignLabelInPackage $ toUnitId unit
                         in  ( unzip cmm_args
                             , CmmLit
-                              (CmmLabel (mkForeignLabel lbl labelSource IsFunction)))
+                              (CmmLabel (mkForeignLabel (mkFastStringText lbl) labelSource IsFunction)))
 
                     DynamicTarget{} -> case cmm_args of
                        (fn,_):rest -> (unzip rest, fn)

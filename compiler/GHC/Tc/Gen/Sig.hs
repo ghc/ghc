@@ -1212,9 +1212,10 @@ tcRule (HsRule { rd_ext  = ext
                , rd_bndrs = bndrs
                , rd_lhs  = lhs
                , rd_rhs  = rhs })
-  = addErrCtxt (RuleCtxt name)  $
+  = let name_fs = mkFastStringText name in
+    addErrCtxt (RuleCtxt name_fs)  $
     do { traceTc "---- Rule ------" (pprFullRuleName (snd ext) rname)
-       ; skol_info <- mkSkolemInfo (RuleSkol name)
+       ; skol_info <- mkSkolemInfo (RuleSkol name_fs)
         -- Note [Typechecking rules]
        ; (tc_lvl, lhs_wanted, stuff)
               <- tcRuleBndrs skol_info bndrs $
@@ -1230,7 +1231,7 @@ tcRule (HsRule { rd_ext  = ext
                                   , ppr rhs_wanted ])
 
        ; (lhs_evs, residual_lhs_wanted, dont_default)
-            <- simplifyRule name tc_lvl lhs_wanted rhs_wanted
+            <- simplifyRule name_fs tc_lvl lhs_wanted rhs_wanted
 
        -- SimplifyRule Plan, step 4
        -- Now figure out what to quantify over
@@ -1271,7 +1272,7 @@ tcRule (HsRule { rd_ext  = ext
        -- See Note [Quantifying over equalities in RULES].
        ; case allPreviouslyQuantifiableEqualities residual_lhs_wanted of {
            Just cts | not (insolubleWC rhs_wanted)
-                    -> do { addDiagnostic $ TcRnRuleLhsEqualities name lhs cts
+                    -> do { addDiagnostic $ TcRnRuleLhsEqualities name_fs lhs cts
                           ; return Nothing } ;
            _  ->
 

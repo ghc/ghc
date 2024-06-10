@@ -93,7 +93,6 @@ module GHC.Types.ForeignCall (
 
 import GHC.Prelude
 
-import GHC.Data.FastString
 import GHC.Hs.Extension
 import GHC.Types.SourceText (SourceText(..), pprWithSourceText)
 import GHC.Unit.Types
@@ -107,6 +106,8 @@ import Language.Haskell.Syntax.Extension
 import Data.Char
 import Data.Data (Data)
 import Data.Functor ((<&>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Control.DeepSeq (NFData(..))
 
@@ -173,11 +174,11 @@ ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
 ccallConvAttribute JavaScriptCallConv = empty
 
 pprCLabelString :: CLabelString -> SDoc
-pprCLabelString lbl = ftext lbl
+pprCLabelString lbl = text $ T.unpack lbl
 
 isCLabelString :: CLabelString -> Bool  -- Checks to see if this is a valid C label
 isCLabelString lbl
-  = all ok (unpackFS lbl)
+  = all ok (T.unpack lbl)
   where
     ok c = isAlphaNum c || c == '_' || c == '.' || c == '@'
         -- The '.' appears in e.g. "foo.so" in the
@@ -213,9 +214,9 @@ instance Outputable CCallSpec where
 
 defaultCType :: String -> CType (GhcPass p)
 defaultCType =
-  CType (CTypeGhc NoSourceText NoSourceText) Nothing . fsLit
+  CType (CTypeGhc NoSourceText NoSourceText) Nothing . T.pack
 
-mkCType :: SourceText -> SourceText -> Maybe (Header (GhcPass p)) -> FastString -> CType (GhcPass p)
+mkCType :: SourceText -> SourceText -> Maybe (Header (GhcPass p)) -> Text -> CType (GhcPass p)
 mkCType x y m =
   CType (CTypeGhc x y) m
 
@@ -435,12 +436,12 @@ instance Binary (CType (GhcPass p)) where
     put_ bh (CType ext mh fs) = do
         put_ bh ext
         put_ bh mh
-        put_ bh fs
+        put_ bh (T.unpack fs)
     get bh = do
       ext <- get bh
       mh  <- get bh
       fs  <- get bh
-      return (CType ext mh fs)
+      return (CType ext mh (T.pack fs))
 
 instance Binary ForeignKind where
     put_ bh = putByte bh . \case
@@ -483,7 +484,7 @@ instance Outputable CExportSpec where
 instance Outputable (CType (GhcPass p)) where
     ppr (CType ext mh ct) =
         pprWithSourceText stp (text "{-# CTYPE") <+> hDoc <+>
-        pprWithSourceText stct (doubleQuotes (ftext ct)) <+> text "#-}"
+        pprWithSourceText stct (doubleQuotes (ppr ct)) <+> text "#-}"
       where
         stp  = cTypeSourceText ext
         stct = cTypeOtherText  ext

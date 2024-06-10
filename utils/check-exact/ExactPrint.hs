@@ -76,6 +76,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import Data.Maybe ( isJust, mapMaybe )
 import Data.Void
+import qualified Data.Text as T
 
 import Utils
 import Types
@@ -1605,7 +1606,7 @@ instance ExactPrint (SourceText, WarningCategory) where
 
   exact (st, WarningCategory wc) = do
       case st of
-          NoSourceText -> printStringAdvance $ "\"" ++ (unpackFS wc) ++ "\""
+          NoSourceText -> printStringAdvance $ "\"" ++ T.unpack wc ++ "\""
           SourceText src -> printStringAdvance $ (unpackFS src)
       return (st, WarningCategory wc)
 
@@ -1971,7 +1972,7 @@ instance ExactPrint StringLiteral where
   setAnnotationAnchor a _ _ _ = a
 
   exact (StringLiteral src fs mcomma) = do
-    printSourceTextAA src (show (unpackFS fs))
+    printSourceTextAA src (show fs)
     mcomma' <- mapM (\r -> printStringAtNC r ",") mcomma
     return (StringLiteral src fs mcomma')
 
@@ -1982,7 +1983,7 @@ instance ExactPrint FastString where
   setAnnotationAnchor a _ _ _ = a
 
   -- TODO: https://ghc.haskell.org/trac/ghc/ticket/10313 applies.
-  -- exact fs = printStringAdvance (show (unpackFS fs))
+  -- exact fs = printStringAdvance (show fs)
   exact fs = printStringAdvance (unpackFS fs) >> return fs
 
 -- ---------------------------------------------------------------------
@@ -2566,7 +2567,7 @@ instance ExactPrint HsIPName where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact i@(HsIPName fs) = printStringAdvanceA ("?" ++ (unpackFS fs)) >> return i
+  exact i@(HsIPName fs) = printStringAdvanceA ("?" ++ (T.unpack fs)) >> return i
 
 -- ---------------------------------------------------------------------
 -- Managing lists which have been separated, e.g. Sigs and Binds
@@ -2861,12 +2862,12 @@ instance ExactPrint (HsExpr GhcPs) where
   exact x@(HsOverLabel src l) = do
     printStringAdvanceA "#" >> return ()
     case src of
-      NoSourceText   -> printStringAdvanceA (unpackFS l)  >> return ()
+      NoSourceText   -> printStringAdvanceA (T.unpack l)  >> return ()
       SourceText txt -> printStringAdvanceA (unpackFS txt) >> return ()
     return x
 
   exact x@(HsIPVar _ (HsIPName n))
-    = printStringAdvance ("?" ++ unpackFS n) >> return x
+    = printStringAdvance ("?" ++ T.unpack n) >> return x
 
   exact x@(HsOverLit _an ol) = do
     let str = case ol_val ol of
@@ -3191,7 +3192,7 @@ instance ExactPrint (HsPragE GhcPs) where
 
   exact (HsPragSCC (AnnPragma o c s l1 l2 t m,st) sl) = do
     o' <- markAnnOpen'' o st  "{-# SCC"
-    l1' <- printStringAtAA l1 (sourceTextToString (sl_st sl) (unpackFS $ sl_fs sl))
+    l1' <- printStringAtAA l1 (sourceTextToString (sl_st sl) (T.unpack $ sl_fs sl))
     c' <- markEpToken c
     return (HsPragSCC (AnnPragma o' c' s l1' l2 t m,st) sl)
 
@@ -3227,7 +3228,7 @@ instance ExactPrint (HsUntypedSplice GhcPs) where
     unless pMarkLayout $ setLayoutOffsetP 0
     printStringAdvance
             -- Note: Lexer.x does not provide unicode alternative. 2017-02-26
-            ("[" ++ (showPprUnsafe q) ++ "|" ++ (unpackFS fs) ++ "|]")
+            ("[" ++ (showPprUnsafe q) ++ "|" ++ (T.unpack fs) ++ "|]")
     unless pMarkLayout $ setLayoutOffsetP oldOffset
     return (HsQuasiQuote an q (L l fs))
 
@@ -3333,7 +3334,7 @@ instance ExactPrint (DotFieldOcc GhcPs) where
     an0 <- markLensFun an lafDot (\ml -> mapM markEpToken ml)
     -- The field name has a SrcSpanAnnN, print it as a
     -- LocatedN RdrName
-    L loc' _ <- markAnnotated (L loc (mkVarUnqual fs))
+    L loc' _ <- markAnnotated (L loc (mkVarUnqual (mkFastStringText fs)))
     return (DotFieldOcc an0 (L loc' (FieldLabelString fs)))
 
 -- ---------------------------------------------------------------------
@@ -4457,19 +4458,19 @@ instance Typeable p => ExactPrint (LocatedP (CType (GhcPass p))) where
              Nothing -> return l1
              Just (Header srcH _h) ->
                printStringAtAA l1 (toSourceTextWithSuffix srcH "" "")
-    l2' <- printStringAtAA l2 (toSourceTextWithSuffix stct (unpackFS ct) "")
+    l2' <- printStringAtAA l2 (toSourceTextWithSuffix stct (T.unpack ct) "")
     c' <- markEpToken c
     return (L (EpAnn l (AnnPragma o' c' s l1' l2' t m) cs) (CType ext mh ct))
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (SourceText, RuleName) where
+instance ExactPrint (SourceText, T.Text) where
   -- We end up at the right place from the Located wrapper
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
   exact (st, rn)
-    = printStringAdvance (toSourceTextWithSuffix st (unpackFS rn) "")
+    = printStringAdvance (toSourceTextWithSuffix st (T.unpack rn) "")
       >> return (st, rn)
 
 

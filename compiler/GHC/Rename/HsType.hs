@@ -75,6 +75,7 @@ import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.Maybe
+import GHC.Data.FastString (mkFastStringText)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List (nubBy, partition)
@@ -1361,7 +1362,7 @@ rnHsConDeclRecFields ctxt fls fields
    = mapFvRn (rnField fl_env env) fields
   where
     env    = mkTyKiEnv ctxt TypeLevel RnTypeBody
-    fl_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
+    fl_env = mkFsEnv [ (mkFastStringText (field_label $ flLabel fl), fl) | fl <- fls ]
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LHsConDeclRecField GhcPs
         -> RnM (LHsConDeclRecField GhcRn, FreeVars)

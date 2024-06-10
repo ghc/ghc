@@ -138,6 +138,7 @@ import Data.Function (on)
 import Data.List ( groupBy, sortBy, sortOn, tails, partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
+import qualified Data.Text as T
 
 
 defaultTcRnMessageOpts :: TcRnMessageOpts
@@ -5214,12 +5215,12 @@ pprHasFieldMsg = \case
     where
       same_name_diff_tc (rep_tc', fld') = do
         let occ = case fld' of
-                     SimilarName n -> getOccFS n
-                     SimilarRdrName n _ _ -> occNameFS $ rdrNameOcc n
+                     SimilarName n -> getOccString n
+                     SimilarRdrName n _ _ -> occNameString $ rdrNameOcc n
         guard $
           rep_tc' /= rep_tc
             &&
-          (fld == FieldLabelString occ)
+          (fld == FieldLabelString (T.pack occ))
         return rep_tc'
   SuggestSimilarFields Nothing fld _suggs pat_syns _imp_suggs ->
     pprHasFieldPatSynMsg fld pat_syns
@@ -5249,10 +5250,10 @@ pprHasFieldPatSynMsg fld pat_syns =
   where
     same_name (_,nm) =
       let occ = case nm of
-                  SimilarName n -> getOccFS n
-                  SimilarRdrName n _ _ -> occNameFS $ rdrNameOcc n
+                  SimilarName n -> getOccString n
+                  SimilarRdrName n _ _ -> occNameString $ rdrNameOcc n
       in
-        occ == field_label fld
+        T.pack occ == field_label fld
 
 pprWhenMatching :: SolverReportErrCtxt -> WhenMatching -> SDoc
 pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
@@ -5501,7 +5502,7 @@ hasFieldMsgHints = \case
   SuggestSimilarFields mb_orig_tc orig_fld suggs _patsyns imp_suggs ->
     map (ImportSuggestion fld_occ) imp_suggs ++ similar_suggs
     where
-      fld_occ = mkVarOccFS $ field_label orig_fld
+      fld_occ = mkVarOccFS $ mkFastStringText $ field_label orig_fld
       similar_suggs =
         case NE.nonEmpty $ filter different_name suggs of
           Nothing -> noHints
@@ -5518,10 +5519,10 @@ hasFieldMsgHints = \case
                 ]
       different_name ( _, nm ) =
         let occ = case nm of
-                    SimilarName n -> getOccFS n
-                    SimilarRdrName n _ _ -> occNameFS $ rdrNameOcc n
+                    SimilarName n -> getOccString n
+                    SimilarRdrName n _ _ -> occNameString $ rdrNameOcc n
         in
-          orig_fld /= FieldLabelString occ
+          orig_fld /= FieldLabelString (T.pack occ)
   OutOfScopeField _tc fld import_suggs ->
     map (ImportSuggestion (nameOccName $ flSelector fld)) import_suggs
   CustomHasField {} -> noHints

@@ -31,7 +31,7 @@ module Language.Haskell.Syntax.Type (
         HsTupleSort(..),
         HsContext, LHsContext,
         HsTyLit(..),
-        HsIPName(..), hsIPNameFS,
+        HsIPName(..),
         HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
 
         LHsTypeArg,
@@ -57,7 +57,6 @@ import Language.Haskell.Syntax.Specificity
 
 
 import GHC.Hs.Doc (LHsDoc)
-import GHC.Data.FastString (FastString)
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
@@ -67,6 +66,7 @@ import Data.Char
 import Prelude (Integer)
 import Data.Ord (Ord)
 import Control.DeepSeq
+import Data.Text (Text)
 
 {-
 ************************************************************************
@@ -650,11 +650,8 @@ mapHsOuterImplicit _ hso@(XHsOuterTyVarBndrs{}) = hso
 --------------------------------------------------
 -- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
-newtype HsIPName = HsIPName FastString
+newtype HsIPName = HsIPName Text
   deriving( Eq, Data )
-
-hsIPNameFS :: HsIPName -> FastString
-hsIPNameFS (HsIPName n) = n
 
 --------------------------------------------------
 
@@ -895,7 +892,7 @@ data HsType pass
 -- | Haskell Type Literal
 data HsTyLit pass
   = HsNumTy  (XNumTy pass) Integer
-  | HsStrTy  (XStrTy pass) FastString
+  | HsStrTy  (XStrTy pass) Text
   | HsCharTy (XCharTy pass) Char
   | XTyLit   !(XXTyLit pass)
 

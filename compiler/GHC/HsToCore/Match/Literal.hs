@@ -67,6 +67,8 @@ import qualified GHC.Data.List.NonEmpty as NEL
 import Control.Monad
 import Data.Int
 import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import Data.Word
 import GHC.Real ( Ratio(..), numerator, denominator )
 
@@ -116,7 +118,7 @@ dsLit l = do
     HsFloatPrim  _ fl -> return (Lit (LitFloat (rationalFromFractionalLit fl)))
     HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
     HsChar _ c       -> return (mkCharExpr c)
-    HsString _ str   -> mkStringExprFS str
+    HsString _ str   -> mkStringExprFS (mkFastStringText str)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     XLit x           -> case ghcPass @p of
       GhcTc          -> case x of
@@ -526,10 +528,10 @@ tidyLitPat :: HsLit GhcTc -> Pat GhcTc
 --  * We get rid of HsChar right here
 tidyLitPat (HsChar src c) = unLoc (mkCharLitPat src c)
 tidyLitPat (HsString src s)
-  | lengthFS s <= 1     -- Short string literals only
+  | T.length s <= 1     -- Short string literals only
   = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon
                                              [mkCharLitPat src c, pat] [charTy])
-                  (mkNilPat charTy) (unpackFS s)
+                  (mkNilPat charTy) (T.unpack s)
         -- The stringTy is the type of the whole pattern, not
         -- the type to instantiate (:) or [] with!
 tidyLitPat lit = LitPat noExtField lit
@@ -576,7 +578,7 @@ tidyNPat (OverLit (OverLitTc False _ ty) val) mb_neg _eq outer_ty
                    (Just _,  HsIntegral i) -> Just (-(il_value i))
                    _ -> Nothing
 
-    mb_str_lit :: Maybe FastString
+    mb_str_lit :: Maybe T.Text
     mb_str_lit = case (mb_neg, val) of
                    (Nothing, HsIsString _ s) -> Just s
                    _ -> Nothing
@@ -658,7 +660,7 @@ hsLitKey _        (HsCharPrim   _ c)  = mkLitChar            c
 hsLitKey _        (HsFloatPrim  _ fl) = mkLitFloat (rationalFromFractionalLit fl)
 hsLitKey _        (HsDoublePrim _ fl) = mkLitDouble (rationalFromFractionalLit fl)
 
-hsLitKey _        (HsString _ s)      = LitString (bytesFS s)
+hsLitKey _        (HsString _ s)      = LitString (T.encodeUtf8 s)
 hsLitKey _        l                   = pprPanic "hsLitKey" (ppr l)
 
 {-

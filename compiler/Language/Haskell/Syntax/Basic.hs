@@ -8,18 +8,7 @@ import Data.Eq
 import Data.Ord
 import Data.Bool
 import Prelude
-
-import GHC.Data.FastString (FastString)
-
-{-
-************************************************************************
-*                                                                      *
-Rules
-*                                                                      *
-************************************************************************
--}
-
-type RuleName = FastString
+import Data.Text (Text)
 
 {-
 ************************************************************************
@@ -86,7 +75,7 @@ Field Labels
 
 -- | Field labels are just represented as strings;
 -- they are not necessarily unique (even within a module)
-newtype FieldLabelString = FieldLabelString { field_label:: FastString }
+newtype FieldLabelString = FieldLabelString { field_label:: Text }
   deriving (Data, Eq, NFData)
 
 {-

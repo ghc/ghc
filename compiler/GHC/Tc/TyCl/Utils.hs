@@ -975,7 +975,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
         inst_tys = dataConResRepTyArgs dc
 
     unit_rhs = mkLHsTupleExpr [] noExtField
-    msg_lit = HsStringPrim NoSourceText (bytesFS (field_label lbl))
+    msg_lit = HsStringPrim NoSourceText (bytesFS (mkFastStringText (field_label lbl)))
 
 {-
 Note [Polymorphic selectors]

@@ -8,7 +8,7 @@ import Control.DeepSeq
 import qualified Text.ParserCombinators.ReadP as Parse
 import System.FilePath
 
-import GHC.Data.FastString
+import GHC.Data.FastString -- todo: make modulename parametrized?
 
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString deriving (Show, Eq)

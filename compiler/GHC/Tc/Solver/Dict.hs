@@ -55,6 +55,7 @@ import GHC.Utils.Misc
 import GHC.Unit.Module
 
 import GHC.Data.Bag
+import GHC.Data.FastString
 
 import GHC.Driver.DynFlags
 
@@ -131,7 +132,7 @@ canDictCt ev cls tys
     do { -- First we emit a new constraint that will capture the
          -- given CallStack.
 
-         let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
+         let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName $ fastStringToText ip_name))
                             -- We change the origin to IPOccOrigin so
                             -- this rule does not fire again.
                             -- See Note [Overview of implicit CallStacks]

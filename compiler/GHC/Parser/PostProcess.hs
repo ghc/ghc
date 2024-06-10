@@ -179,6 +179,7 @@ import Data.Char
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
 import Data.List.NonEmpty ( NonEmpty (..) )
+import qualified Data.Text as T
 
 {- **********************************************************************
 
@@ -3018,7 +3019,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
     recFieldToProjUpdate (L l (HsFieldBind anns (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
         -- The idea here is to convert the label to a singleton [FastString].
         let f = occNameFS . rdrNameOcc $ rdr
-            fl = DotFieldOcc noAnn (L loc (FieldLabelString f))
+            fl = DotFieldOcc noAnn (L loc (FieldLabelString (fastStringToText f)))
             lf = locA loc
         in mkRdrProjUpdate l (L lf (L (l2l loc) fl :| [])) (punnedVar f) pun anns
         where
@@ -3122,7 +3123,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
     -- If 'cid' is missing, the function name 'v' is used instead as symbol
     -- name (cf section 8.5.1 in Haskell 2010 report).
     mkCImport = do
-      let e = unpackFS entity
+      let e = T.unpack entity
       case parseCImport (reLoc cconv) (reLoc safety) (mkExtName (unLoc v)) e (L loc esrc) of
         Nothing         -> addFatalError $ mkPlainErrorMsgEnvelope loc $
                              PsErrMalformedEntityString
@@ -3135,7 +3136,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
     -- the entity string. If it is missing, we use the function name instead.
     mkOtherImport = returnSpec importSpec
       where
-        entity'    = if nullFS entity
+        entity'    = if T.null entity
                         then mkExtName (unLoc v)
                         else entity
         funcTarget = CFunction (StaticTarget esrc entity' ForeignFunction)
@@ -3153,7 +3154,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
 -- the string "foo" is ambiguous: either a header or a C identifier.  The
 -- C identifier case comes first in the alternatives below, so we pick
 -- that one.
-parseCImport :: LocatedE CCallConv -> LocatedE Safety -> FastString -> String
+parseCImport :: LocatedE CCallConv -> LocatedE Safety -> T.Text -> String
              -> Located SourceText
              -> Maybe (ForeignImport GhcPs)
 parseCImport cconv safety nm str sourceText =
@@ -3170,7 +3171,7 @@ parseCImport cconv safety nm str sourceText =
               (do h <- munch1 hdr_char
                   skipSpaces
                   let src = mkFastString h
-                  mk (Just (Header (SourceText src) src))
+                  mk (Just (Header (SourceText src) (T.pack h)))
                       <$> cimp nm))
          ]
        skipSpaces
@@ -3206,7 +3207,7 @@ parseCImport cconv safety nm str sourceText =
             cid = return nm +++
                   (do c  <- satisfy id_first_char
                       cs <-  many (satisfy id_char)
-                      return (mkFastString (c:cs)))
+                      return (T.pack (c:cs)))
 
 
 -- construct a foreign export declaration
@@ -3220,7 +3221,7 @@ mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
                  , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic entity' cconv)) }
   where
-    entity' | nullFS entity = mkExtName (unLoc v)
+    entity' | T.null entity = mkExtName (unLoc v)
             | otherwise     = entity
 
 -- Supplying the ext_name in a foreign decl is optional; if it
@@ -3230,7 +3231,7 @@ mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
 -- want z-encoding (e.g. names with z's in them shouldn't be doubled)
 --
 mkExtName :: RdrName -> CLabelString
-mkExtName rdrNm = occNameFS (rdrNameOcc rdrNm)
+mkExtName rdrNm = T.pack $ occNameString (rdrNameOcc rdrNm)
 
 --------------------------------------------------------------------------------
 -- Help with module system imports/exports

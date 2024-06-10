@@ -59,6 +59,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 
 import GHC.Data.FastString
+import qualified Data.Text as T
 import GHC.Data.Maybe
 
 import GHC.Utils.Outputable
@@ -101,7 +102,7 @@ dsJsFExport fn_id co ext_name cconv isDyn = do
                                 Nothing                 -> (orig_res_ty, False)
     platform <- targetPlatform <$> getDynFlags
     return $
-      mkFExportJSBits platform ext_name m_fn_id
+      mkFExportJSBits platform (mkFastStringText ext_name) m_fn_id
                      (map scaledThing fe_arg_tys) res_ty is_IO_res_ty cconv
 
 mkFExportJSBits
@@ -241,7 +242,7 @@ dsJsImport id co (CLabel cid) _ _ _ = do
              _ -> IsData
    (_resTy, foRhs) <- jsResultWrapper ty
 --   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
-   let rhs = foRhs (Lit (LitLabel cid fod))
+   let rhs = foRhs (Lit (LitLabel (mkFastStringText cid) fod))
        rhs' = Cast rhs co
 
    return ([(id, rhs')], mempty, mempty)
@@ -270,7 +271,7 @@ dsJsFExportDynamic id co0 cconv = do
                                         -- Must have an IO type; hence Just
                                         $ tcSplitIOType_maybe fn_res_ty
     mod <- getModule
-    let fe_nm = mkFastString $ zEncodeString
+    let fe_nm = T.pack $ zEncodeString
             ("h$" ++ moduleStableString mod ++ "$" ++ toJsName id)
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
@@ -292,12 +293,12 @@ dsJsFExportDynamic id co0 cconv = do
           (ccall).
          -}
         adj_args      = [ Var stbl_value
-                        , Lit (LitLabel fe_nm IsFunction)
+                        , Lit (LitLabel (mkFastStringText fe_nm) IsFunction)
                         , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.)
-        adjustor   = fsLit "createAdjustor"
+        adjustor   = T.pack "createAdjustor"
 
     ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
         -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -609,7 +610,7 @@ jsResultWrapper result_ty
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey = do
 --    result_id <- newSysLocalDs boolTy
     ccall_uniq <- newUnique
-    let forceBool e = mkJsCall ccall_uniq (fsLit "((x) => { return !(!x); })") [e] boolTy
+    let forceBool e = mkJsCall ccall_uniq (T.pack "((x) => { return !(!x); })") [e] boolTy
     return
      (Just intPrimTy, \e -> forceBool e)
 
@@ -644,7 +645,7 @@ jsResultWrapper result_ty
     maybe_tc_app = splitTyConApp_maybe result_ty
 
 -- low-level primitive JavaScript call:
-mkJsCall :: Unique -> FastString -> [CoreExpr] -> Type -> CoreExpr
+mkJsCall :: Unique -> CLabelString -> [CoreExpr] -> Type -> CoreExpr
 mkJsCall u tgt args t = mkFCall u ccall args t
   where
     stExt = StaticTargetGhc

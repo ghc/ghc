@@ -78,6 +78,7 @@ import GHC.Utils.FV ( fvVarList, unionFV )
 import GHC.Data.Bag
 import GHC.Data.List.SetOps ( equivClasses, nubOrdBy )
 import GHC.Data.Maybe
+import GHC.Data.FastString (fastStringToText)
 import qualified GHC.Data.Strict as Strict
 
 
@@ -2630,7 +2631,7 @@ hasFieldInfo_maybe rdr_env fam_inst_envs item
         return $ Just $ NotALiteralFieldName x_ty
     ; Just x ->
  do { dflags <- getDynFlags
-    ; let x_fl = FieldLabelString x
+    ; let x_fl = FieldLabelString (fastStringToText x)
           looking_for_field = LF WL_RecField WL_Global
           fld_var_occ = mkVarOccFS x
           lkup_fld_occ = LookupOccName fld_var_occ (RelevantGREsFOS WantField)

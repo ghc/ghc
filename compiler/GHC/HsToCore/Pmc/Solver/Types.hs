@@ -842,10 +842,10 @@ instance Outputable PmLitValue where
   ppr (PmLitInt i)        = ppr i
   ppr (PmLitRat r)        = double (fromRat r) -- good enough
   ppr (PmLitChar c)       = pprHsChar c
-  ppr (PmLitString s)     = pprHsString s
+  ppr (PmLitString s)     = pprHsString (unpackFS s)
   ppr (PmLitOverInt n i)  = minuses n (ppr i)
   ppr (PmLitOverRat n r)  = minuses n (ppr r)
-  ppr (PmLitOverString s) = pprHsString s
+  ppr (PmLitOverString s) = pprHsString (unpackFS s)
 
 -- Take care of negated literals
 minuses :: Int -> SDoc -> SDoc

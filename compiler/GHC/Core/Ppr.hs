@@ -669,12 +669,12 @@ pprRules rules = vcat (map pprRule rules)
 
 pprRule :: CoreRule -> SDoc
 pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
-  = text "Built in rule for" <+> ppr fn <> colon <+> doubleQuotes (ftext name)
+  = text "Built in rule for" <+> ppr fn <> colon <+> doubleQuotes (ppr name)
 
 pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
                 ru_bndrs = tpl_vars, ru_args = tpl_args,
                 ru_rhs = rhs })
-  = hang (doubleQuotes (ftext name) <+> ppr act)
+  = hang (doubleQuotes (ppr name) <+> ppr act)
        4 (sep [text "forall" <+> pprCoreBinders tpl_vars <> dot,
                nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
                nest 2 (text "=" <+> pprCoreExpr rhs)

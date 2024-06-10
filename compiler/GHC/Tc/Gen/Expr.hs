@@ -88,6 +88,7 @@ import GHC.Utils.Panic
 
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
+import GHC.Data.FastString (fastStringToText)
 
 import Control.Monad
 import qualified Data.List.NonEmpty as NE
@@ -1744,7 +1745,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc rdr (L l sel_name))) rhs
       = do { addErrTc (badFieldConErr (getName con_like) field_lbl)
            ; return Nothing }
   where
-        field_lbl = FieldLabelString $ occNameFS $ rdrNameOcc rdr
+        field_lbl = FieldLabelString $ fastStringToText $ occNameFS $ rdrNameOcc rdr
 
 
 checkMissingFields ::  ConLike -> HsRecordBinds GhcRn -> [Scaled TcType] -> TcM ()

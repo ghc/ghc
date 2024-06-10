@@ -521,7 +521,7 @@ lookupRecFieldOcc mb_con rdr_name
   , isUnboundName con  -- Avoid error cascade
   = return $ mk_unbound_rec_fld con
   | Just qcon@(WithUserRdr _ con) <- mb_con
-  = do { let lbl = FieldLabelString $ occNameFS (rdrNameOcc rdr_name)
+  = do { let lbl = FieldLabelString $ fastStringToText (occNameFS (rdrNameOcc rdr_name))
        ; mb_nm <- lookupExactOrOrig rdr_name ensure_recfld $  -- See Note [Record field names and Template Haskell]
             do { flds <- lookupConstructorFields qcon
                ; env <- getGlobalRdrEnv
@@ -1672,7 +1672,7 @@ badFieldsUpd rbinds fld1_cons_fields
       = sortMembership $
         map
           ( (\fld -> (fld, map (fld `elementOfUniqSet`) fieldLabelSets))
-          . FieldLabelString . occNameFS . rdrNameOcc . unLoc . getFieldUpdLbl )
+          . FieldLabelString . fastStringToText . occNameFS . rdrNameOcc . unLoc . getFieldUpdLbl )
           rbinds
 
     fieldLabelSets :: [UniqSet FieldLabelString]

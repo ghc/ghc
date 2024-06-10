@@ -123,6 +123,7 @@ import Control.DeepSeq ( NFData(..) )
 import Data.Data
 import Data.Maybe
 import qualified Data.Semigroup as Semi
+import GHC.Data.FastString (FastString)
 
 {-
 ************************************************************************
@@ -331,6 +332,16 @@ instance Outputable OneShotInfo where
 {-
 ************************************************************************
 *                                                                      *
+Rules
+*                                                                      *
+************************************************************************
+-}
+
+type RuleName = FastString
+
+{-
+************************************************************************
+*                                                                      *
            Swap flag
 *                                                                      *
 ************************************************************************
@@ -425,7 +436,7 @@ instance NFData FunctionOrData where
 -}
 
 pprRuleName :: RuleName -> SDoc
-pprRuleName rn = doubleQuotes (ftext rn)
+pprRuleName rn = doubleQuotes (ppr rn)
 
 
 {-

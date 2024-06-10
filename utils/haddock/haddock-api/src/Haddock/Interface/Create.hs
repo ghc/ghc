@@ -46,7 +46,7 @@ import GHC hiding (lookupName)
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 import GHC.Core.ConLike (ConLike (..))
-import GHC.Data.FastString (FastString, bytesFS, unpackFS)
+import GHC.Data.FastString (unpackFS)
 import qualified GHC.Driver.Config.Parser as Parser
 import qualified GHC.Driver.DynFlags as DynFlags
 import GHC.Driver.Ppr
@@ -66,6 +66,8 @@ import GHC.Utils.Outputable (SDocContext)
 import qualified GHC.Utils.Outputable as O
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (pprPanic)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 
 import Documentation.Haddock.Doc
 import Haddock.Convert (PrintRuntimeReps (..), tyThingToLHsDecl)
@@ -359,8 +361,8 @@ parseWarning parserOpts sDocContext w = case w of
     dstToDoc :: (IfaceStringLiteral, [Name]) -> HsDoc GhcRn
     dstToDoc ((IfStringLiteral _ fs), ids) = WithHsDocIdentifiers (fsToDoc fs) (map noLoc ids)
 
-    fsToDoc :: FastString -> HsDocString
-    fsToDoc fs = GeneratedDocString $ HsDocStringChunk (bytesFS fs)
+    fsToDoc :: T.Text -> HsDocString
+    fsToDoc fs = GeneratedDocString $ HsDocStringChunk (T.encodeUtf8 fs)
 
     format x bs =
       DocWarning . DocParagraph . DocAppend (DocString x)

@@ -1892,7 +1892,7 @@ generatePrimCall d s p target _result_ty args
          prim_args_offsets = mapFst stgArgRepU args_offsets
          shifted_args_offsets = mapSnd (+ d) args_offsets
 
-         push_target = PUSH_UBX (LitLabel target IsFunction) 1
+         push_target = PUSH_UBX (LitLabel (mkFastStringText target) IsFunction) 1
          push_info = PUSH_UBX (mkNativeCallInfoLit platform args_info) 1
          {-
             compute size to move payload (without stg_primcall_info header)
@@ -2045,7 +2045,7 @@ generateCCall d0 s p (CCallSpec target _ safety) result_ty args
                  StaticTarget _ _ ForeignValue ->
                    panic "generateCCall: unexpected FFI value import"
                  StaticTarget _ target ForeignFunction ->
-                   Just (LitLabel target IsFunction)
+                   Just (LitLabel (mkFastStringText target) IsFunction)
 
      let
          is_static = isJust maybe_static_target

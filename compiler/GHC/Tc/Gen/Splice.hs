@@ -166,6 +166,7 @@ import Data.IORef
 import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
+import qualified Data.Text as T
 
 {-
 Note [Template Haskell state diagram]
@@ -838,7 +839,7 @@ tcUntypedSplice (QuoteWrapper _ m_var) splice_name (HsQuasiQuote (HsQuasiQuoteEx
 
    -- 4. Apply the selector to the quasi-quoter
    let expr' = mkLHsWrapCo res_co $
-                nlHsApp (nlHsApp (nlHsVar sel) (noLocA quoter')) (nlHsLit (mkHsStringFS (unLoc s)))
+                nlHsApp (nlHsApp (nlHsVar sel) (noLocA quoter')) (nlHsLit (mkHsString $ T.unpack (unLoc s)))
 
    return (PendingTcSplice splice_name expr')
    where

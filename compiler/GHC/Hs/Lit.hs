@@ -34,6 +34,8 @@ import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
 
+import qualified Data.Text as T
+
 {-
 ************************************************************************
 *                                                                      *
@@ -211,7 +213,7 @@ instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
     ppr (HsString st s)     =
       case st of
-        NoSourceText -> pprHsString s
+        NoSourceText -> pprHsString (T.unpack s)
         SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
@@ -242,7 +244,7 @@ instance OutputableBndrId p
 instance Outputable OverLitVal where
   ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
   ppr (HsFractional f)   = ppr f
-  ppr (HsIsString st s)  = pprWithSourceText st (pprHsString s)
+  ppr (HsIsString st s)  = pprWithSourceText st (pprHsString (T.unpack s))
 
 negateOverLitVal :: OverLitVal -> OverLitVal
 negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)

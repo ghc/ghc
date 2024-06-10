@@ -36,6 +36,7 @@ import GHC.Core.Type hiding (typeSize)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable (renderWithContext, defaultSDocContext, ppr)
 import GHC.Data.FastString
+import qualified Data.Text as T
 
 import Data.Char
 import Data.Monoid
@@ -43,7 +44,7 @@ import qualified Data.List as L
 
 genPrimCall :: ExprCtx -> PrimCall -> [StgArg] -> Type -> G (JStgStat, ExprResult)
 genPrimCall ctx (PrimCall lbl _) args t = do
-  j <- parseFFIPattern False False False (unpackFS hdStr ++ unpackFS lbl) t (concatMap typex_expr $ ctxTarget ctx) args
+  j <- parseFFIPattern False False False (unpackFS hdStr ++ T.unpack lbl) t (concatMap typex_expr $ ctxTarget ctx) args
   return (j, ExprInline)
 
 -- | generate the actual call
@@ -187,7 +188,7 @@ genForeignCall _ctx
                _t
                [obj]
                args
-  | tgt == hdBuildObjectStr
+  | tgt == fastStringToText hdBuildObjectStr
   , Just pairs <- getObjectKeyValuePairs args
   , TargetIsInThisUnit <- staticTargetUnit ext = do
       pairs' <- mapM (\(k,v) -> genArg v >>= \vs -> return (k, head vs)) pairs
@@ -196,19 +197,19 @@ genForeignCall _ctx
              )
 
 genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
-  emitForeign (ctxSrcSpan ctx) lbl safety cconv (map showArgType args) (showType t)
-  (,exprResult) <$> parseFFIPattern catchExcep async isJsCc (unpackFS lbl) t tgt' args
+  emitForeign (ctxSrcSpan ctx) (mkFastStringText lbl) safety cconv (map showArgType args) (showType t)
+  (,exprResult) <$> parseFFIPattern catchExcep async isJsCc (T.unpack lbl) t tgt' args
   where
     isJsCc = cconv == JavaScriptCallConv
 
     lbl | (StaticTarget _ clbl _isFunPtr) <- ccTarget
-            = let clbl'    = unpackFS clbl
+            = let clbl'    = T.unpack clbl
                   hDollarS = unpackFS hdStr
               in  if | isJsCc -> clbl
                      | wrapperPrefix `L.isPrefixOf` clbl' ->
-                         mkFastString (hDollarS ++ (drop 2 $ dropWhile isDigit $ drop (length wrapperPrefix) clbl'))
-                     | otherwise -> mkFastString $ hDollarS ++ clbl'
-        | otherwise = hdCallDynamicStr
+                         T.pack (hDollarS ++ (drop 2 $ dropWhile isDigit $ drop (length wrapperPrefix) clbl'))
+                     | otherwise -> T.pack (hDollarS ++ clbl')
+        | otherwise = fastStringToText hdCallDynamicStr
 
     exprResult | async     = ExprCont
                | otherwise = ExprInline

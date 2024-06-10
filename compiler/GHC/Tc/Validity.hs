@@ -1720,7 +1720,7 @@ checkHasFieldInst cls tys@[_k_ty, _r_rep, _a_rep, lbl_ty, r_ty, _a_ty] =
                   -> add_err IllegalHasFieldInstanceFamilyTyCon
       | otherwise -> case isStrLitTy lbl_ty of
        Just lbl
-         | let lbl_str = FieldLabelString lbl
+         | let lbl_str = FieldLabelString (fastStringToText lbl)
          , Just fl <- lookupTyConFieldLabel lbl_str tc
          -> do
             -- GHC does not provide HasField instances for naughty record selectors

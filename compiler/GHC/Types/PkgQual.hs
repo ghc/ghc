@@ -28,7 +28,7 @@ instance Outputable RawPkgQual where
   ppr = \case
     NoRawPkgQual -> empty
     RawPkgQual (StringLiteral st p _)
-      -> pprWithSourceText st (doubleQuotes (ftext p))
+      -> pprWithSourceText st (doubleQuotes (ppr p))
 
 instance Outputable PkgQual where
   ppr = \case

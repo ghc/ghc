@@ -42,6 +42,7 @@ module GHC.Data.StringBuffer
         -- * Conversion
         lexemeToString,
         lexemeToFastString,
+        lexemeToText,
         decodePrevNChars,
 
          -- * Parsing integers
@@ -70,6 +71,8 @@ import GHC.IO.Encoding.Failure  ( CodingFailureMode(IgnoreCodingFailure) )
 
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString as BS
+import qualified Data.Text as T
+import qualified Data.Text.Foreign as T
 import Data.ByteString ( ByteString )
 
 import GHC.Exts
@@ -387,6 +390,16 @@ lexemeToFastString (StringBuffer buf _ cur) len =
    inlinePerformIO $
      unsafeWithForeignPtr buf $ \ptr ->
        return $! mkFastStringBytes (ptr `plusPtr` cur) len
+
+lexemeToText :: StringBuffer
+             -> Int               -- ^ @n@, the number of bytes
+             -> T.Text
+lexemeToText _ 0 = T.empty
+lexemeToText (StringBuffer buf _ cur) len =
+   inlinePerformIO $
+     unsafeWithForeignPtr buf $ \ptr ->
+       T.fromPtr (ptr `plusPtr` cur) (fromIntegral len)
+
 
 -- | Return the previous @n@ characters (or fewer if we are less than @n@
 -- characters into the buffer.

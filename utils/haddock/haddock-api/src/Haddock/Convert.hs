@@ -84,6 +84,8 @@ import Haddock.GhcUtils (defaultRuntimeRepVars, mkEmptySigType, orderedFVs)
 import Haddock.Interface.RenameType
 import Haddock.Types
 
+import GHC.Data.FastString (fastStringToText, mkFastStringText)
+
 -- | Whether or not to default 'RuntimeRep' variables to 'LiftedRep'. Check
 -- out Note [Defaulting RuntimeRep variables] in GHC.Iface.Type for the
 -- motivation.
@@ -590,7 +592,7 @@ synifyDataCon use_gadt_syntax dc =
       noLocA $
         HsConDeclRecField
           noExtField
-          [noLocA $ FieldOcc (mkVarUnqual $ field_label $ flLabel fl) (noLocA (flSelector fl))]
+          [noLocA $ FieldOcc (mkVarUnqual $ mkFastStringText $ field_label $ flLabel fl) (noLocA (flSelector fl))]
           synTy
 
     mk_h98_arg_tys :: Either String (HsConDeclH98Details GhcRn)
@@ -847,7 +849,7 @@ synifyType _ boundTvs (TyConApp tc tys) =
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
       , Just x <- isStrLitTy name =
-          noLocA $ HsIParamTy noAnn (noLocA $ HsIPName x) (synifyType WithinType boundTvs ty)
+          noLocA $ HsIParamTy noAnn (noLocA $ HsIPName (fastStringToText x)) (synifyType WithinType boundTvs ty)
       -- and equalities
       | tc `hasKey` eqTyConKey
       , [ty1, ty2] <- tys =
@@ -1156,7 +1158,7 @@ Remarks:
 
 synifyTyLit :: TyLit -> HsTyLit GhcRn
 synifyTyLit (NumTyLit n) = HsNumTy NoSourceText n
-synifyTyLit (StrTyLit s) = HsStrTy NoSourceText s
+synifyTyLit (StrTyLit s) = HsStrTy NoSourceText (fastStringToText s)
 synifyTyLit (CharTyLit c) = HsCharTy NoSourceText c
 
 synifyKindSig :: Kind -> LHsKind GhcRn

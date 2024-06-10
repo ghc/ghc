@@ -175,6 +175,8 @@ import GHC.IO
 import GHC.Word
 
 import Unsafe.Coerce (unsafeCoerce)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 
 type BinArray = ForeignPtr Word8
 
@@ -1036,6 +1038,10 @@ instance (Binary a, Binary b) => Binary (Either a b) where
                            case h of
                              0 -> do a <- get bh ; return (Left a)
                              _ -> do b <- get bh ; return (Right b)
+
+instance Binary T.Text where
+  put_ bh t = put_ bh (T.encodeUtf8 t)
+  get bh = T.decodeUtf8 <$> get bh
 
 instance Binary UTCTime where
     put_ bh u = do put_ bh (utctDay u)

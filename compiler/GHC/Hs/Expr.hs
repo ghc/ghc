@@ -63,6 +63,7 @@ import qualified GHC.Boot.TH.Monad as TH (Q)
 import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
+import qualified Data.Text as T
 import Data.Maybe (isJust)
 import Data.Foldable ( toList )
 import Data.List.NonEmpty (NonEmpty (..))
@@ -121,7 +122,7 @@ data SyntaxExprTc = SyntaxExprTc { syn_expr      :: HsExpr GhcTc
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
 noExpr :: HsExpr (GhcPass p)
-noExpr = HsLit noExtField (HsString (SourceText $ fsLit "noExpr") (fsLit "noExpr"))
+noExpr = HsLit noExtField (HsString (SourceText $ fsLit "noExpr") (T.pack "noExpr"))
 
 noSyntaxExpr :: forall p. IsPass p => SyntaxExpr (GhcPass p)
                               -- Before renaming, and sometimes after
@@ -907,9 +908,11 @@ ppr_expr (HsOverLabel s l) = case ghcPass @p of
                GhcPs -> helper s
                GhcRn -> helper s
                GhcTc -> dataConCantHappen s
-    where helper s =
+
+    where helper :: SourceText -> SDoc
+          helper s =
             char '#' <> case s of
-                          NoSourceText -> ppr l
+                          NoSourceText -> text (T.unpack l)
                           SourceText src -> ftext src
 ppr_expr (HsPragE _ prag e)  = sep [ppr prag, ppr_lexpr e]
 
@@ -1331,7 +1334,7 @@ instance Outputable (HsPragE (GhcPass p)) where
     pprWithSourceText st (text "{-# SCC")
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
-    <+> pprWithSourceText stl (ftext lbl) <+> text "#-}"
+    <+> pprWithSourceText stl (ppr lbl) <+> text "#-}"
 
 
 {- *********************************************************************
@@ -2364,7 +2367,7 @@ pprUntypedSplice _     _ (XUntypedSplice x) =
     GhcRn -> case x of
               HsImplicitLiftSplice _ _ _ lid -> ppr lid
 
-ppr_quasi :: OutputableBndr p => p -> FastString -> SDoc
+ppr_quasi :: OutputableBndr p => p -> T.Text -> SDoc
 ppr_quasi quoter quote = char '[' <> ppr quoter <> vbar <>
                            ppr quote <> text "|]"
 
@@ -2706,7 +2709,7 @@ pprPrefixFastString :: FastString -> SDoc
 pprPrefixFastString fs = pprPrefixOcc (mkVarUnqual fs)
 
 instance UnXRec p => Outputable (DotFieldOcc p) where
-  ppr (DotFieldOcc _ s) = (pprPrefixFastString . field_label . unXRec @p) s
+  ppr (DotFieldOcc _ s) = (pprPrefixFastString . mkFastStringText {-todo? Extension point for FieldLabel instead of doing Text-}. field_label . unXRec @p) s
   ppr XDotFieldOcc{} = text "XDotFieldOcc"
 
 {-
@@ -2742,6 +2745,7 @@ type instance Anno (FieldLabelStrings (GhcPass p)) = EpAnnCO
 type instance Anno FieldLabelString                = SrcSpanAnnN
 
 type instance Anno FastString                      = EpAnnCO
+type instance Anno T.Text                          = EpAnnCO
   -- Used in HsQuasiQuote and perhaps elsewhere
 
 type instance Anno (DotFieldOcc (GhcPass p))       = EpAnnCO

@@ -1,0 +1,1 @@
+Looks like both `ModuleName` and `FieldLabelString` should be TTG extended rather than hardcoding `Text`.

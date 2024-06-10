@@ -50,6 +50,7 @@ module GHC.Data.FastString
         fastStringToByteString,
         mkFastStringByteString,
         fastZStringToByteString,
+        fastStringToText,
         unsafeMkByteString,
 
         -- * ShortByteString
@@ -58,6 +59,9 @@ module GHC.Data.FastString
 
         -- * ShortText
         fastStringToShortText,
+
+        -- * Text
+        mkFastStringText,
 
         -- * FastZString
         FastZString,
@@ -140,6 +144,8 @@ import System.IO
 import Data.Data
 import Data.IORef
 import Data.Semigroup as Semi
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 
 import Foreign
 
@@ -164,6 +170,9 @@ fastStringToShortText = ShortText . fs_sbs
 
 fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs
+
+fastStringToText :: FastString -> T.Text
+fastStringToText = T.decodeUtf8 . bytesFS
 
 -- This will drop information if any character > '\xFF'
 unsafeMkByteString :: String -> ByteString
@@ -546,6 +555,10 @@ mkFastStringByteString bs =
 mkFastStringShortByteString :: ShortByteString -> FastString
 mkFastStringShortByteString sbs =
   inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+
+-- | Create a UTF-8 encoded 'FastString' from a 'Text'
+mkFastStringText :: T.Text -> FastString
+mkFastStringText = mkFastStringByteString . T.encodeUtf8
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString

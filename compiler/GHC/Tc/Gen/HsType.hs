@@ -1270,7 +1270,7 @@ tcHsType _ rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
 
 tcHsType _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
   = do { checkWiredInTyCon typeSymbolKindCon
-       ; checkExpKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind }
+       ; checkExpKind rn_ty (mkStrLitTy $ mkFastStringText s) typeSymbolKind exp_kind }
 tcHsType _ rn_ty@(HsTyLit _ (HsCharTy _ c)) exp_kind
   = do { checkWiredInTyCon charTyCon
        ; checkExpKind rn_ty (mkCharLitTy c) charTy exp_kind }

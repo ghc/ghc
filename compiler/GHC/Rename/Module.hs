@@ -54,7 +54,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..) )
+import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..), RuleName )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
 import GHC.Types.Unique.Set
@@ -1213,10 +1213,11 @@ rnHsRuleDecl (HsRule { rd_ext   = (_, st)
                      , rd_bndrs = bndrs
                      , rd_lhs   = lhs
                      , rd_rhs   = rhs })
-  = bindRuleBndrs (RuleCtx rule_name) bndrs $ \tm_names bndrs' ->
+  = let rule_name_fs = mkFastStringText rule_name in
+    bindRuleBndrs (RuleCtx rule_name_fs) bndrs $ \tm_names bndrs' ->
     do { (lhs', fv_lhs') <- rnLExpr lhs
        ; (rhs', fv_rhs') <- rnLExpr rhs
-       ; checkValidRule rule_name tm_names lhs' fv_lhs'
+       ; checkValidRule rule_name_fs tm_names lhs' fv_lhs'
        ; return (HsRule { rd_ext   = (HsRuleRn fv_lhs' fv_rhs', st)
                         , rd_name  = lrule_name
                         , rd_act   = act

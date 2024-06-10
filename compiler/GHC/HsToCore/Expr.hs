@@ -76,6 +76,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import Control.Monad
+import GHC.Data.FastString
 
 {-
 ************************************************************************
@@ -404,7 +405,7 @@ dsExpr (HsPragE _ (HsPragSCC _ cc) expr)
          then do
             mod_name <- getModule
             count <- goptM Opt_ProfCountEntries
-            let nm = sl_fs cc
+            let nm = mkFastStringText $ sl_fs cc
             flavour <- mkExprCCFlavour <$> getCCIndexDsM nm
             Tick (ProfNote (mkUserCC nm mod_name (getLocA expr) flavour) count True)
                  <$> dsLExpr expr

@@ -752,7 +752,7 @@ mkApEntryLabel platform upd arity =
 -- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
 mkPrimCallLabel (PrimCall str pkg)
-        = CmmLabel (toUnitId pkg) (NeedExternDecl True) str CmmPrimCall
+        = CmmLabel (toUnitId pkg) (NeedExternDecl True) (mkFastStringText str) CmmPrimCall
 
 
 -- Constructing ForeignLabels

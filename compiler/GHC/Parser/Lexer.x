@@ -102,6 +102,10 @@ import qualified GHC.LanguageExtensions as LangExt
 -- bytestring
 import Data.ByteString (ByteString)
 
+-- text
+import Data.Text (Text)
+import qualified Data.Text as T
+
 -- containers
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -473,11 +477,11 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 }
 
 <0> {
-  \? @varid / { ifExtension IpBit } { skip_one_varid ITdupipvarid }
+  \? @varid / { ifExtension IpBit } { skip_one_varid_text ITdupipvarid }
 }
 
 <0> {
-  "#" $idchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid_src ITlabelvarid }
+  "#" $idchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid_src_text ITlabelvarid }
   "#" \" @stringchar* \" / { ifExtension OverloadedLabelsBit } { tok_quoted_label }
 }
 
@@ -907,15 +911,15 @@ data Token
   | ITqvarsym (FastString,FastString)
   | ITqconsym (FastString,FastString)
 
-  | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
-  | ITlabelvarid SourceText FastString   -- Overloaded label: #x
+  | ITdupipvarid Text                    -- GHC extension: implicit param: ?x
+  | ITlabelvarid SourceText Text         -- Overloaded label: #x
                                          -- The SourceText is required because we can
                                          -- have a string literal as a label
                                          -- Note [Literal source text] in "GHC.Types.SourceText"
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstringMulti SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstring   SourceText String -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstringMulti SourceText String -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
 
@@ -945,11 +949,11 @@ data Token
   | ITdollar                            --  prefix $
   | ITdollardollar                      --  prefix $$
   | ITtyQuote                           --  ''
-  | ITquasiQuote (FastString, PsSpan, FastString, PsSpan)
+  | ITquasiQuote (FastString, PsSpan, Text, PsSpan)
     -- ITquasiQuote(quoter, quoter_loc, quote, quote_loc)
     -- represents a quasi-quote of the form
     -- [quoter| quote |]
-  | ITqQuasiQuote (FastString,FastString,PsSpan, FastString, PsSpan)
+  | ITqQuasiQuote (FastString,FastString,PsSpan, Text, PsSpan)
     -- ITqQuasiQuote(Qual, quoter, quoter_loc, quote, quote_loc)
     -- represents a qualified quasi-quote of the form
     -- [Qual.quoter| quote |]
@@ -1186,10 +1190,19 @@ skip_one_varid :: (FastString -> Token) -> Action
 skip_one_varid f span buf len _buf2
   = return (L span $! f (lexemeToFastString (stepOn buf) (len-1)))
 
+skip_one_varid_text :: (Text -> Token) -> Action
+skip_one_varid_text f span buf len _buf2
+  = return (L span $! f (lexemeToText (stepOn buf) (len-1)))
+
 skip_one_varid_src :: (SourceText -> FastString -> Token) -> Action
 skip_one_varid_src f span buf len _buf2
   = return (L span $! f (SourceText $ lexemeToFastString (stepOn buf) (len-1))
                         (lexemeToFastString (stepOn buf) (len-1)))
+
+skip_one_varid_src_text :: (SourceText -> Text -> Token) -> Action
+skip_one_varid_src_text f span buf len _buf2
+  = return (L span $! f (SourceText $ lexemeToFastString (stepOn buf) (len-1))
+                        (lexemeToText (stepOn buf) (len-1)))
 
 skip_two_varid :: (FastString -> Token) -> Action
 skip_two_varid f span buf len _buf2
@@ -1677,7 +1690,7 @@ qvarid, qconid :: StringBuffer -> Int -> Token
 qvarid buf len = ITqvarid $! splitQualName buf len False
 qconid buf len = ITqconid $! splitQualName buf len False
 
-splitQualName :: StringBuffer -> Int -> Bool -> (FastString,FastString)
+splitQualName :: StringBuffer -> Int -> Bool -> (FastString, FastString)
 -- takes a StringBuffer and a length, and returns the module name
 -- and identifier parts of a qualified name.  Splits at the *last* dot,
 -- because of hierarchical module names.
@@ -2164,7 +2177,7 @@ tok_string span buf len _buf2 = do
         addError err
       pure $ L span (ITprimstring src (unsafeMkByteString s))
     else
-      pure $ L span (ITstring src (mkFastString s))
+      pure $ L span (ITstring src s)
   where
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
@@ -2208,7 +2221,7 @@ tok_string_multi startSpan startBuf _len _buf2 = do
       lexMultilineString contentLen contentStartBuf
 
   setInput i'
-  pure $ L span $ ITstringMulti src (mkFastString s)
+  pure $ L span $ ITstringMulti src s
   where
     goContent i0 =
       case Lexer.String.alexScan i0 Lexer.String.string_multi_content of
@@ -2259,7 +2272,7 @@ throwStringLexError i (StringLexError e pos) = setInput (advanceInputTo pos i) >
 tok_quoted_label :: Action
 tok_quoted_label span buf len _buf2 = do
   s <- lex_chars ("#\"", "\"") span buf len
-  pure $ L span (ITlabelvarid src (mkFastString s))
+  pure $ L span (ITlabelvarid src (T.pack s))
   where
     -- skip leading '#'
     src = SourceText . mkFastString . drop 1 $ lexemeToString buf len
@@ -2296,7 +2309,7 @@ lex_qquasiquote_tok span buf len _buf2 = do
            (ITqQuasiQuote (qual,
                            quoter,
                            quoter_span,
-                           mkFastString (reverse quote),
+                           T.pack (reverse quote),
                            mkPsSpan quoteStart end)))
 
 lex_quasiquote_tok :: Action
@@ -2313,7 +2326,7 @@ lex_quasiquote_tok span buf len _buf2 = do
   return (L (mkPsSpan (psSpanStart span) end)
            (ITquasiQuote (mkFastString quoter,
                           quoter_span,
-                          mkFastString (reverse quote),
+                          T.pack (reverse quote),
                           mkPsSpan quoteStart end)))
 
 lex_quasiquote :: RealSrcLoc -> String -> P String

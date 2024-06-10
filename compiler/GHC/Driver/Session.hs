@@ -309,6 +309,7 @@ import Text.ParserCombinators.ReadP as R
 import qualified GHC.Data.EnumSet as EnumSet
 
 import qualified GHC.LanguageExtensions as LangExt
+import qualified Data.Text as T
 
 
 -- Note [Updating flag description in the User's Guide]
@@ -2077,7 +2078,7 @@ customOrUnrecognisedWarning prefix custom = defHiddenFlag prefix (Prefix action)
       | validWarningCategory cat = custom cat
       | otherwise = unrecognised flag
       where
-        cat = mkWarningCategory (mkFastString flag)
+        cat = mkWarningCategory (T.pack flag)
 
     unrecognised flag = do
       -- #23402 and #12056

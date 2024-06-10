@@ -173,7 +173,6 @@ import GHC.Builtin.Names
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString.Env
 import GHC.Types.FieldLabel
 import GHC.Settings.Constants
 import GHC.Utils.Misc
@@ -184,6 +183,7 @@ import Control.DeepSeq
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Data as Data
+import qualified Data.Map as M
 
 {-
 -----------------------------------------------
@@ -1983,23 +1983,23 @@ primRepIsInt _ = False
 
 -- | The labels for the fields of this particular 'TyCon'
 tyConFieldLabels :: TyCon -> [FieldLabel]
-tyConFieldLabels tc = dFsEnvElts $ tyConFieldLabelEnv tc
+tyConFieldLabels tc = M.elems $ tyConFieldLabelEnv tc
 
 -- | The labels for the fields of this particular 'TyCon'
 tyConFieldLabelEnv :: TyCon -> FieldLabelEnv
 tyConFieldLabelEnv (TyCon { tyConDetails = details })
   | AlgTyCon { algTcFields = fields } <- details = fields
-  | otherwise                                    = emptyDFsEnv
+  | otherwise                                    = M.empty
 
 -- | Look up a field label belonging to this 'TyCon'
 lookupTyConFieldLabel :: FieldLabelString -> TyCon -> Maybe FieldLabel
-lookupTyConFieldLabel lbl tc = lookupDFsEnv (tyConFieldLabelEnv tc) (field_label lbl)
+lookupTyConFieldLabel lbl tc = M.lookup (field_label lbl) (tyConFieldLabelEnv tc)
 
 -- | Make a map from strings to FieldLabels from all the data
 -- constructors of this algebraic tycon
 fieldsOfAlgTcRhs :: AlgTyConRhs -> FieldLabelEnv
-fieldsOfAlgTcRhs rhs = mkDFsEnv [ (field_label $ flLabel fl, fl)
-                                | fl <- dataConsFields (visibleDataCons rhs) ]
+fieldsOfAlgTcRhs rhs = M.fromList [ (field_label $ flLabel fl, fl)
+                                  | fl <- dataConsFields (visibleDataCons rhs) ]
   where
     -- Duplicates in this list will be removed by 'mkFsEnv'
     dataConsFields dcs = concatMap dataConFieldLabels dcs
@@ -2120,7 +2120,7 @@ mkTupleTyCon name binders res_kind con sort parent
              , algTcStupidTheta = []
              , algTcRhs         = TupleTyCon { data_con = con
                                              , tup_sort = sort }
-             , algTcFields      = emptyDFsEnv
+             , algTcFields      = M.empty
              , algTcFlavour     = parent }
 
 constRoles :: [TyConBinder] -> Role -> [Role]
@@ -2139,7 +2139,7 @@ mkSumTyCon name binders res_kind cons parent
              , algTcGadtSyntax  = False
              , algTcStupidTheta = []
              , algTcRhs         = mkSumTyConRhs cons
-             , algTcFields      = emptyDFsEnv
+             , algTcFields      = M.empty
              , algTcFlavour     = parent }
 
 -- | Makes a tycon suitable for use during type-checking. It stores

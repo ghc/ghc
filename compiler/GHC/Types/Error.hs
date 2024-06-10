@@ -113,6 +113,7 @@ import Data.Maybe ( maybeToList )
 import Data.Typeable ( Typeable )
 import Numeric.Natural ( Natural )
 import Text.Printf ( printf )
+import qualified Data.Text as T
 
 {- Note [Messages]
 ~~~~~~~~~~~~~~~~~~
@@ -620,7 +621,7 @@ jsonDiagnostic rendered m = JSObject $ [
               ]
           WarningWithCategory (WarningCategory cat) ->
             Just $ JSObject
-              [ ("category", JSString $ unpackFS cat)
+              [ ("category", JSString $ T.unpack cat)
               ]
 
 instance Show (MsgEnvelope DiagnosticMessage) where

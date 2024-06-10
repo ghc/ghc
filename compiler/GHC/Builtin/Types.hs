@@ -13,7 +13,7 @@ Wired-in knowledge about {\em non-primitive} types
 -- | This module is about types that can be defined in Haskell, but which
 --   must be wired into the compiler nonetheless.  C.f module "GHC.Builtin.Types.Prim"
 module GHC.Builtin.Types (
-        -- * Helper functions defined here
+      -- * Helper functions defined here
         mkWiredInTyConName, -- This is used in GHC.Builtin.Types.Literals to define the
                             -- built-in functions for evaluation.
 

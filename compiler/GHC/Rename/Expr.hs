@@ -2838,11 +2838,11 @@ mkGetField get_field arg field = unLoc (head $ mkGet get_field (arg :| []) field
 -- NB: the order of aruments is specified by GHC Proposal 583: HasField redesign.
 mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
 mkSetField set_field a (L _ (FieldLabelString field)) b =
-  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field) b) a
+  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit (mkFastStringText field)) b) a
 
 mkGet :: Name -> NonEmpty (LHsExpr GhcRn) -> LocatedAn NoEpAnns FieldLabelString -> NonEmpty (LHsExpr GhcRn)
 mkGet get_field l@(r :| _) (L _ (FieldLabelString field)) =
-  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) NE.<| l
+  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit (mkFastStringText field)) r) NE.<| l
 
 mkSet :: Name -> LHsExpr GhcRn -> (LocatedAn NoEpAnns FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
 mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
@@ -2857,7 +2857,7 @@ mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fie
     f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
 
     proj :: FieldLabelString -> HsExpr GhcRn
-    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit f
+    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit (mkFastStringText f)
 
 -- mkProjUpdateSetField calculates functions representing dot notation record updates.
 -- e.g. Suppose an update like foo.bar = 1.
