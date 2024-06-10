@@ -32,14 +32,8 @@
 // libc allocator's certain invariants. But dlmalloc permits this
 // behavior!
 //
-// Therefore, we bypass dlmalloc, and directly call memory.grow to
-// allocate megablocks. We even patch dlmalloc in the libc sysroot
-// shipped in our wasi-sdk release, so that whenever dlmalloc calls
-// sbrk(), it extends the linear memory to align to the megablock
-// size, so to avoid space waste as much as possible. Our wasi-libc
-// patch doesn't impact ABI interoperability, and when stock clang
-// compiles code that calls malloc() to wasm objects, those objects
-// would just link fine with our build products.
+// Therefore, we bypass dlmalloc, and directly call sbrk() to
+// allocate megablocks.
 //
 // One remaining question is how to free a megablock. Wasm spec
 // doesn't allow shrinking the linear memory, so the logic of
@@ -49,12 +43,13 @@
 // megablock on Wasm.
 
 #include "Rts.h"
-
-#include "RtsUtils.h"
 #include "sm/OSMem.h"
-#include "rts/storage/HeapAlloc.h"
 
-#include <__macro_PAGESIZE.h>
+#include <unistd.h>
+
+#define PAGESIZE (0x10000)
+
+GHC_STATIC_ASSERT(MBLOCK_SIZE == PAGESIZE, "MBLOCK_SIZE must be equal to wasm page size");
 
 void osMemInit(void)
 {
@@ -63,13 +58,7 @@ void osMemInit(void)
 void *
 osGetMBlocks(uint32_t n)
 {
-  size_t base = __builtin_wasm_memory_size(0) * PAGESIZE;
-  size_t start = MBLOCK_ROUND_UP(base);
-  size_t end = start + (n << MBLOCK_SHIFT);
-  ptrdiff_t delta = (end - base) / PAGESIZE;
-  if (__builtin_wasm_memory_grow(0, delta) == SIZE_MAX)
-    barf("osGetMBlocks failed");
-  return start;
+  return sbrk(PAGESIZE * n);
 }
 
 void osBindMBlocksToNode(

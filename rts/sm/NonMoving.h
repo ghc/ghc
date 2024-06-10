@@ -17,7 +17,12 @@
 #include "BeginPrivate.h"
 
 // Segments
+#if defined(wasm32_HOST_ARCH)
+#define NONMOVING_SEGMENT_BITS 14ULL   // 2^14 = 16kByte
+#else
 #define NONMOVING_SEGMENT_BITS 15ULL   // 2^15 = 32kByte
+#endif
+
 // Mask to find base of segment
 #define NONMOVING_SEGMENT_MASK (((uintptr_t)1 << NONMOVING_SEGMENT_BITS) - 1)
 // In bytes

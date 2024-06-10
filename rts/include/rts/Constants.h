@@ -170,7 +170,11 @@
 #define BLOCK_SHIFT  12
 
 /* The size of a megablock (2^MBLOCK_SHIFT bytes) */
+#if defined(wasm32_HOST_ARCH)
+#define MBLOCK_SHIFT   16
+#else
 #define MBLOCK_SHIFT   20
+#endif
 
 /* -----------------------------------------------------------------------------
    Bitmap/size fields (used in info tables)
