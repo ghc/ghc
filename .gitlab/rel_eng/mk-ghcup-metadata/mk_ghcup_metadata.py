@@ -217,7 +217,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     a64 = { "Linux_Debian": { "< 10": deb9
                            , "( >= 10 && < 11 )": deb10
                            , "( >= 11 && < 12 )": deb11
-                           , ">= 11": deb12
+                           , ">= 12": deb12
                            , "unknown_versioning": deb11 }
           , "Linux_Ubuntu" : { "unknown_versioning": ubuntu2004
                              , "( >= 16 && < 18 )": deb9
