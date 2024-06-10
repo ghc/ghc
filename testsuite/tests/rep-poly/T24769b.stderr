@@ -1,0 +1,4 @@
+T24769b.hs:6:1: error: [GHC-94185]
+    Can't quantify over ‘r’
+      bound by the partial type signature: f :: (_ :: TYPE r)
+

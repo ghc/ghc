@@ -1,0 +1,3 @@
+:m GHC.Exts Data.Kind
+f :: forall (r :: Type -> RuntimeRep) s (a :: TYPE (r s)). () -> a; f = f
+:t f ()

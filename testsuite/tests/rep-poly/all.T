@@ -37,6 +37,7 @@ test('T23153', normal, compile_fail, [''])
 test('T23154', normal, compile_fail, [''])
 test('T23176', normal, compile_fail, ['-XPartialTypeSignatures -fdefer-out-of-scope-variables'])
 test('T23903', normal, compile_fail, [''])
+test('T23505', normal, compile_fail, [''])
 
 test('EtaExpandDataCon', normal, compile, ['-O'])
 test('EtaExpandStupid1', normal, compile, ['-Wno-deprecated-flags'])
@@ -107,6 +108,11 @@ test('RepPolyWrappedVar', normal, compile_fail, [''])
 test('RepPolyWrappedVar2', [js_skip], compile, [''])
 test('UnliftedNewtypesCoerceFail', normal, compile_fail, [''])
 test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
+test('T24769a', normal, compile_fail, [''])
+test('T24769b', normal, compile_fail, [''])
+test('T24769c', [extra_files(['T24769c_aux.hs'])], multimod_compile_fail, ['T24769c', ''])
+test('T24769d', normal, compile_fail, [''])
+test('T24769e', normal, ghci_script, ['T24769e.script'])
 
 ###############################################################################
 ## The following tests require rewriting in RuntimeReps,                     ##

@@ -1,0 +1,5 @@
+T24769d.hs:8:1: error: [GHC-94185]
+    Can't quantify over ‘r’
+      bound by the partial type signature:
+        f :: forall r (a :: TYPE r). (HasCallStack, _) => a
+

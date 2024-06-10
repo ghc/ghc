@@ -1324,6 +1324,10 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
               psig_theta  = [ pred | sig <- partial_sigs
                                    , pred <- sig_inst_theta sig ]
 
+       ; zonked_kinds <- mapM (TcM.liftZonkM . TcM.zonkTcType . typeKind . snd) name_taus
+       ; _ <- promoteTyVarSet (tyCoVarsOfTypes zonked_kinds)
+         -- Promote free variables in the kind (#24769)
+
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
 
        ; skol_info <- mkSkolemInfo (InferSkol name_taus)
@@ -1834,9 +1838,10 @@ decidePromotedTyVars :: InferMode
 --   (a) Mentioned in a constraint we can't generalise (the MR)
 --   (b) Mentioned in the kind of a CoVar; we can't quantify over a CoVar,
 --       so we must not quantify over a type variable free in its kind
---   (c) Connected by an equality or fundep to
+--   (c) Free in kind (e.g. we can't generalize over r in 'forall (a :: TYPE r). a')
+--   (d) Connected by an equality or fundep to
 --          * a type variable at level < N, or
---          * A tyvar subject to (a), (b) or (c)
+--          * A tyvar subject to (a), (b), (c) or (d)
 -- Having found all such level-N tyvars that we can't generalise,
 -- promote them, to eliminate them from further consideration.
 --
@@ -1867,6 +1872,8 @@ decidePromotedTyVars infer_mode name_taus psigs candidates
              co_vars = coVarsOfTypes (psig_tys ++ taus ++ candidates)
              co_var_tvs = closeOverKinds co_vars
 
+             freeVarsInKinds = mapUnionVarSet (tyCoVarsOfType . typeKind) taus
+
              mono_tvs0 = filterVarSet (not . isQuantifiableTv tc_lvl) $
                          tyCoVarsOfTypes candidates
                -- We need to grab all the non-quantifiable tyvars in the
@@ -1881,7 +1888,9 @@ decidePromotedTyVars infer_mode name_taus psigs candidates
                -- are in the equality constraint with alpha. Actual test case:
                -- typecheck/should_compile/tc213
 
-             mono_tvs1 = mono_tvs0 `unionVarSet` co_var_tvs
+             mono_tvs0a = mono_tvs0 `unionVarSet` freeVarsInKinds
+
+             mono_tvs1 = mono_tvs0a `unionVarSet` co_var_tvs
 
                -- mono_tvs1 is now the set of variables from an outer scope
                -- (that's mono_tvs0) and the set of covars, closed over kinds.
@@ -1916,6 +1925,7 @@ decidePromotedTyVars infer_mode name_taus psigs candidates
 
              mono_tvs = (mono_tvs2 `unionVarSet` constrained_tvs)
                         `delVarSetList` psig_qtvs
+                        `unionVarSet` freeVarsInKinds
              -- (`delVarSetList` psig_qtvs): if the user has explicitly
              --   asked for quantification, then that request "wins"
              --   over the MR.

@@ -1,0 +1,1 @@
+f () :: forall {a :: TYPE (r0 s0)}. a

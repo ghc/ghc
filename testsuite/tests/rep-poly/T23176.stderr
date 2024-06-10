@@ -1,30 +1,45 @@
+T23176.hs:5:1: error: [GHC-55287]
+    The binder ‘f’ does not have a fixed runtime representation.
+    Its type is:
+      w :: TYPE (r1 s1)
 
-T23176.hs:5:1: error: [GHC-52083]
-    The binder ‘f’
-    cannot be assigned a fixed runtime representation, not even by defaulting.
-    Suggested fix: Add a type signature.
+T23176.hs:5:19: error: [GHC-94185]
+    • Can't quantify over ‘s’
+        bound by the partial type signature:
+          <expression> :: (_ :: TYPE (r s))
+    • In the expression: outOfScope :: (_ :: TYPE (r s))
+      In an equation for ‘f’: f = outOfScope :: (_ :: TYPE (r s))
 
-T23176.hs:5:1: error: [GHC-52083]
-    The binder ‘f’
-    cannot be assigned a fixed runtime representation, not even by defaulting.
-    Suggested fix: Add a type signature.
+T23176.hs:5:19: error: [GHC-94185]
+    • Can't quantify over ‘r’
+        bound by the partial type signature:
+          <expression> :: (_ :: TYPE (r s))
+    • In the expression: outOfScope :: (_ :: TYPE (r s))
+      In an equation for ‘f’: f = outOfScope :: (_ :: TYPE (r s))
 
-T23176.hs:5:1: error: [GHC-52083]
-    The binder ‘f’
-    cannot be assigned a fixed runtime representation, not even by defaulting.
-    Suggested fix: Add a type signature.
+T23176.hs:6:1: error: [GHC-55287]
+    The binder ‘g’ does not have a fixed runtime representation.
+    Its type is:
+      forall {w :: TYPE (r0 s0)}. w :: TYPE (r0 s0)
 
-T23176.hs:6:1: error: [GHC-52083]
-    The pattern binding
-    cannot be assigned a fixed runtime representation, not even by defaulting.
-    Suggested fix: Add a type signature.
+T23176.hs:6:12: error: [GHC-55287]
+    • The pattern binding does not have a fixed runtime representation.
+      Its type is:
+        w :: TYPE (r0 s0)
+    • In the expression: outOfScope :: (_ :: TYPE (r s))
+      In a pattern binding: (g :: _) = outOfScope :: (_ :: TYPE (r s))
 
-T23176.hs:6:1: error: [GHC-52083]
-    The pattern binding
-    cannot be assigned a fixed runtime representation, not even by defaulting.
-    Suggested fix: Add a type signature.
+T23176.hs:6:26: error: [GHC-94185]
+    • Can't quantify over ‘s’
+        bound by the partial type signature:
+          <expression> :: (_ :: TYPE (r s))
+    • In the expression: outOfScope :: (_ :: TYPE (r s))
+      In a pattern binding: (g :: _) = outOfScope :: (_ :: TYPE (r s))
 
-T23176.hs:6:1: error: [GHC-52083]
-    The pattern binding
-    cannot be assigned a fixed runtime representation, not even by defaulting.
-    Suggested fix: Add a type signature.
+T23176.hs:6:26: error: [GHC-94185]
+    • Can't quantify over ‘r’
+        bound by the partial type signature:
+          <expression> :: (_ :: TYPE (r s))
+    • In the expression: outOfScope :: (_ :: TYPE (r s))
+      In a pattern binding: (g :: _) = outOfScope :: (_ :: TYPE (r s))
+

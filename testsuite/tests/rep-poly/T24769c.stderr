@@ -1,0 +1,20 @@
+[1 of 2] Compiling T24769c_aux      ( T24769c_aux.hs, T24769c_aux.o )
+T24769c_aux.hs:8:13: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘w :: TYPE (r s)’
+      Where: ‘r’, ‘s’, ‘w’ are rigid type variables bound by
+               the inferred type of g :: Code Q w
+               at T24769c_aux.hs:(9,1)-(11,22)
+    • In the second argument of ‘Code’, namely ‘_’
+      In the type signature: g :: Code Q _
+
+[2 of 2] Compiling T24769c          ( T24769c.hs, T24769c.o )
+T24769c.hs:5:1: error: [GHC-52083]
+    The binder ‘h’
+    cannot be assigned a fixed runtime representation, not even by defaulting.
+    Suggested fix: Add a type signature.
+
+T24769c.hs:5:1: error: [GHC-52083]
+    The binder ‘h’
+    cannot be assigned a fixed runtime representation, not even by defaulting.
+    Suggested fix: Add a type signature.
+

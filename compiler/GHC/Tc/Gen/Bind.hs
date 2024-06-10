@@ -52,7 +52,7 @@ import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Validity (checkValidType, checkEscapingKind)
+import GHC.Tc.Validity (checkValidType)
 import GHC.Tc.Zonk.TcType
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
@@ -1013,9 +1013,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
 
        ; unless insoluble $
          addErrCtxtM (mk_inf_msg poly_name inferred_poly_ty) $
-         do { checkEscapingKind inferred_poly_ty
-                 -- See Note [Inferred type with escaping kind]
-            ; checkValidType (InfSigCtxt poly_name) inferred_poly_ty }
+         checkValidType (InfSigCtxt poly_name) inferred_poly_ty
                  -- See Note [Validity of inferred types]
          -- unless insoluble: if we found an insoluble error in the
          -- function definition, don't do this check; otherwise
@@ -1258,22 +1256,6 @@ Examples that might fail:
  - an inferred theta that requires type equalities e.g. (F a ~ G b)
                                 or multi-parameter type classes
  - an inferred type that includes unboxed tuples
-
-Note [Inferred type with escaping kind]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check for an inferred type with an escaping kind; e.g. #23051
-   forall {k} {f :: k -> RuntimeRep} {g :: k} {a :: TYPE (f g)}. a
-where the kind of the body of the forall mentions `f` and `g` which
-are bound by the forall.  No no no.
-
-This check, mkInferredPolyId, is really in the wrong place:
-`inferred_poly_ty` doesn't obey the PKTI and it would be better not to
-generalise it in the first place; see #20686.  But for now it works.
-
-I considered adjusting the generalisation in GHC.Tc.Solver to directly check for
-escaping kind variables; instead, promoting or defaulting them. But that
-gets into the defaulting swamp and is a non-trivial and unforced
-change, so I have left it alone for now.
 
 Note [Impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

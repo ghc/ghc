@@ -1,0 +1,23 @@
+T23505.hs:5:1: error: [GHC-55287]
+    The binder ‘f’ does not have a fixed runtime representation.
+    Its type is:
+      forall {t :: TYPE r0}. t :: TYPE r0
+
+T23505.hs:5:10: error: [GHC-94185]
+    • Can't quantify over ‘r’
+        bound by the partial type signature: <expression> :: (_ :: TYPE r)
+    • In the expression: f :: (_ :: TYPE r)
+      In an equation for ‘f’: f = f :: (_ :: TYPE r)
+
+T23505.hs:5:11: error: [GHC-88464]
+    • Found type wildcard ‘_’ standing for ‘t :: TYPE r0’
+      Where: ‘r0’ is an ambiguous type variable
+             ‘t’ is a rigid type variable bound by
+               the inferred type of f :: t
+               at T23505.hs:5:1-22
+      To use the inferred type, enable PartialTypeSignatures
+    • In an expression type signature: (_ :: TYPE r)
+      In the expression: f :: (_ :: TYPE r)
+      In an equation for ‘f’: f = f :: (_ :: TYPE r)
+    • Relevant bindings include f :: t (bound at T23505.hs:5:1)
+
