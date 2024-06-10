@@ -618,7 +618,14 @@ getRegister' config plat expr =
         MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` annExpr e (FCVT (OpReg to dst) (OpReg from reg)))
 
         -- Conversions
+        -- TODO: Duplication with MO_UU_Conv
+        MO_XX_Conv from to | to < from -> pure $ Any (intFormat to) (\dst ->
+                                                                      code `snocOL`
+                                                                      annExpr e (MOV (OpReg from dst) (OpReg from reg)) `appOL`
+                                                                      truncateReg from to dst
+                                                                     )
         MO_XX_Conv _from to -> swizzleRegisterRep (intFormat to) <$> getRegister e
+
         MO_AlignmentCheck align wordWidth -> do
           reg <- getRegister' config plat e
           addAlignmentCheck align wordWidth reg
