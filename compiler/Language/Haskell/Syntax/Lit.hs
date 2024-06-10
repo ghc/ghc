@@ -39,10 +39,10 @@ module Language.Haskell.Syntax.Lit (
   , LStringLit
   ) where
 
+import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name (ModuleName)
 
-import GHC.Data.FastString
 
 import Data.Bool
 import Data.ByteString (ByteString)
@@ -68,7 +68,7 @@ data HsLit x
       -- ^ Character
   | HsCharPrim (XHsCharPrim x) Char
       -- ^ Unboxed character
-  | HsString (XHsString x) FastString
+  | HsString (XHsString x) HText
       -- ^ String
   | HsStringPrim (XHsStringPrim x) !ByteString
       -- ^ Packed bytes
@@ -118,7 +118,6 @@ data OverLitVal x
   = HsIntegral   !(IntegralLit   x) -- ^ Integer-looking literals
   | HsFractional !(FractionalLit x) -- ^    Frac-looking literals
   | HsIsString   !(StringLiteral x) -- ^  String-looking literals
-
 -- | Haskell Qualified Literal
 data HsQualLit p
   = QualLit
@@ -129,7 +128,7 @@ data HsQualLit p
   | XQualLit !(XXQualLit p)
 
 data QualLitVal p
-  = HsQualString !(XQualLitString p) !FastString
+  = HsQualString !(XQualLitString p) !HText
     -- ^ See Note [Implementation of QualifiedStrings]
   | XQualLitVal !(XXQualLitVal p)
 
@@ -191,6 +190,6 @@ type LStringLit p = XRec p (StringLiteral p)
 -- source to source manipulation tools.
 data StringLiteral pass = StringLiteral
   { sl_src :: XStringLit pass
-  , sl_fs  :: FastString -- literal string value
+  , sl_fs  :: HText -- literal string value
   }
   | XStringLit !(XXStringLit pass)

@@ -99,6 +99,7 @@ import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        zipWithEqual )
 
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
+import Language.Haskell.Syntax.Text
 
 import Control.Monad
 import Control.DeepSeq
@@ -429,7 +430,7 @@ data IfaceWarningTxt
   | IfDeprecatedTxt SourceText [(IfaceStringLiteral, [IfExtName])]
 
 data IfaceStringLiteral
-  = IfStringLiteral SourceText FastString
+  = IfStringLiteral SourceText HText
 
 data IfaceAnnotation
   = IfaceAnnotation {
@@ -843,7 +844,7 @@ instance Outputable IfaceWarningTxt where
         pp_with_name = ppr . fst
 
 instance Outputable IfaceStringLiteral where
-    ppr (IfStringLiteral st fs) = pprWithSourceText st (ftext fs)
+    ppr (IfStringLiteral st fs) = pprWithSourceText st (ppr fs)
 
 instance Outputable IfaceAnnotation where
   ppr (IfaceAnnotation target value) = ppr target <+> colon <+> ppr value

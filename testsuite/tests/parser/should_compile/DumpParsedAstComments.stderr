@@ -458,7 +458,9 @@
                    (NoExtField)
                    (HsString
                     (SourceText "hello")
-                    {FastString: "hello"})))))))
+                    (HTextInternal
+                     (pack
+                      "hello")))))))))
              [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))

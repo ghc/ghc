@@ -3838,7 +3838,7 @@ emitCopyUpdRemSetPush platform hdr_size dst dst_off n =
         emit graph
   where
     lbl = mkLblExpr $ mkPrimCallLabel
-          $ PrimCall (fsLit "stg_copyArray_barrier") rtsUnit
+          $ PrimCall (fastStringToShortText (fsLit "stg_copyArray_barrier")) rtsUnit
     args =
       [ mkIntExpr platform (toTargetInt hdr_size)
       , dst

@@ -123,6 +123,7 @@ import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
+import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Data.TrieMap
 import GHC.Utils.Exception
@@ -154,6 +155,7 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short.Internal as SBS
 import qualified Data.Text.Internal as T
+import qualified GHC.Data.ShortText as ST
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.List.NonEmpty       ( NonEmpty(..))
@@ -1888,6 +1890,10 @@ instance Binary LBS.ByteString where
     LBS.foldrChunks f (pure ()) lbs
 
   get bh = LBS.fromStrict <$> get bh
+
+instance Binary ShortText where
+  put_ bh = put_ bh . ST.contents
+  get bh = ST.ShortText <$> get bh
 
 instance Binary T.Text where
   put_ bh (T.Text ba off len) = do

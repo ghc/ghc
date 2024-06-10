@@ -1281,7 +1281,7 @@ patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
       | is_neg    -> PgN $! negateFractionalLit f
       | otherwise -> PgN f
     (HsIsString s, _) -> assert (isNothing mb_neg) $
-                            PgOverS (sl_fs s)
+                            PgOverS (mkFastStringShortText (sl_fs s))
 patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)

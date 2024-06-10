@@ -52,6 +52,7 @@ import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Data.Maybe          ( orElse, mapMaybe )
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps    ( findDupsEq )
+import GHC.Data.FastString (mkFastStringShortText)
 
 
 import GHC.Types.Error
@@ -787,7 +788,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                RecCon x vars ->
                    do { checkDupRdrNames (map (foLabel . recordPatSynField) vars)
                       ; fls <- lookupConstructorFields $ noUserRdr name
-                      ; let fld_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
+                      ; let fld_env = mkFsEnv [ (mkFastStringShortText (field_label $ flLabel fl), fl) | fl <- fls ]
                       ; let rnRecordPatSynField
                               (RecordPatSynField { recordPatSynField  = visible
                                                  , recordPatSynPatVar = hidden })

@@ -32,11 +32,10 @@ import Data.Ord
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
-import GHC hiding (Header)
+import GHC
 import GHC.Data.EnumSet as EnumSet
 import Haddock.GhcUtils (fastStringToText)
 import GHC.Driver.Session
-import GHC.Hs.DocString (renderHsDocStringText, renderHsDocStringsText)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Lexer (ParserOpts)
 import GHC.Parser.PostProcess

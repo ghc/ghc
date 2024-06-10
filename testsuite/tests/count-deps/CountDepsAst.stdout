@@ -259,4 +259,5 @@ Language.Haskell.Syntax.Lit
 Language.Haskell.Syntax.Module.Name
 Language.Haskell.Syntax.Pat
 Language.Haskell.Syntax.Specificity
+Language.Haskell.Syntax.Text
 Language.Haskell.Syntax.Type

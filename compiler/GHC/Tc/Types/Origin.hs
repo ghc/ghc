@@ -590,7 +590,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ (WithUserRdr _ name))) = OccurrenceOf name
-exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
+exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin (mkFastStringShortText l)
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit _ lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})           = Shouldn'tHappenOrigin "concrete literal"
@@ -629,7 +629,7 @@ exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIf {})            = IfThenElseOrigin
 exprCtOrigin (HsProjection _ p)   = RecordFieldProjectionOrigin (FieldLabelStrings $ fmap noLocA p)
 exprCtOrigin (RecordUpd{})        = RecordUpdOrigin
-exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap field_label $ dfoLabel (unLoc f))
+exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap (mkFastStringShortText . field_label) $ dfoLabel (unLoc f))
 exprCtOrigin (XExpr (ExpandedThingRn (HSE o _))) = hsCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 

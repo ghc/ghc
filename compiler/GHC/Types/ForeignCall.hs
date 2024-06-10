@@ -93,7 +93,6 @@ module GHC.Types.ForeignCall (
 
 import GHC.Prelude
 
-import GHC.Data.FastString
 import GHC.Hs.Extension
 import GHC.Types.SourceText (SourceText(..), pprWithSourceText)
 import GHC.Unit.Types
@@ -103,6 +102,7 @@ import GHC.Utils.Panic
 
 import Language.Haskell.Syntax.Decls.Foreign
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Text
 
 import Data.Char
 import Data.Data (Data)
@@ -173,11 +173,11 @@ ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
 ccallConvAttribute JavaScriptCallConv = empty
 
 pprCLabelString :: CLabelString -> SDoc
-pprCLabelString lbl = ftext lbl
+pprCLabelString = ppr
 
 isCLabelString :: CLabelString -> Bool  -- Checks to see if this is a valid C label
 isCLabelString lbl
-  = all ok (unpackFS lbl)
+  = all ok (unpackHText lbl)
   where
     ok c = isAlphaNum c || c == '_' || c == '.' || c == '@'
         -- The '.' appears in e.g. "foo.so" in the
@@ -213,9 +213,9 @@ instance Outputable CCallSpec where
 
 defaultCType :: String -> CType (GhcPass p)
 defaultCType =
-  CType (CTypeGhc NoSourceText NoSourceText) Nothing . fsLit
+  CType (CTypeGhc NoSourceText NoSourceText) Nothing . packHText
 
-mkCType :: SourceText -> SourceText -> Maybe (Header (GhcPass p)) -> FastString -> CType (GhcPass p)
+mkCType :: SourceText -> SourceText -> Maybe (Header (GhcPass p)) -> HText -> CType (GhcPass p)
 mkCType x y m =
   CType (CTypeGhc x y) m
 
@@ -483,7 +483,7 @@ instance Outputable CExportSpec where
 instance Outputable (CType (GhcPass p)) where
     ppr (CType ext mh ct) =
         pprWithSourceText stp (text "{-# CTYPE") <+> hDoc <+>
-        pprWithSourceText stct (doubleQuotes (ftext ct)) <+> text "#-}"
+        pprWithSourceText stct (doubleQuotes (ppr ct)) <+> text "#-}"
       where
         stp  = cTypeSourceText ext
         stct = cTypeOtherText  ext

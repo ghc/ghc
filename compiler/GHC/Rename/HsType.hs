@@ -1427,7 +1427,7 @@ rnHsConDeclRecFields ctxt fls fields
    = mapFvRn (rnField fl_env env) fields
   where
     env    = mkTyKiEnv ctxt TypeLevel RnTypeBody
-    fl_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
+    fl_env = mkFsEnv [ (mkFastStringShortText (field_label $ flLabel fl), fl) | fl <- fls ]
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LHsConDeclRecField GhcPs
         -> RnM (LHsConDeclRecField GhcRn, FreeNames)

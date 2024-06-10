@@ -1,0 +1,8 @@
+section: ghc-lib
+synopsis: GHC now represents string literals in the AST via HText, a GHC
+    Modified UTF-8 encoded text, rather than FastString. This makes the AST
+    independent of FastString, which is tied to the ghc-the-library internals,
+    opening the possibility of pulling the AST out of ghc-the-library.
+issues: #21628
+mrs: !12846
+

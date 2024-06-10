@@ -64,7 +64,7 @@ import GHC.Prelude hiding ( head, init, last, tail )
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS)
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, occNameString, mkVarOccFS )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
@@ -95,8 +95,10 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax.Text
 
 import qualified Data.Semigroup as Semi
+import qualified Data.Text as T
 }
 
 %expect 0 -- shift/reduce conflicts
@@ -829,7 +831,7 @@ moduleid :: { LHsModuleId PackageName }
           | unitid ':' modid    { sLL $1 $> $ HsModuleId $1 (reLoc $3) }
 
 pkgname :: { Located PackageName }
-        : STRING     { sL1 $1 $ PackageName (getSTRING $1) }
+        : STRING     { sL1 $1 $ PackageName (mkFastString $ getSTRING $1) }
         | litpkgname { sL1 $1 $ PackageName (unLoc $1) }
 
 litpkgname_segment :: { Located FastString }
@@ -1180,11 +1182,11 @@ maybe_level :: { (Maybe EpAnnLevel) }
         | {- empty -}                           { (Nothing) }
 
 maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
-        : STRING  {% do { let { pkgFS = getSTRING $1 }
-                        ; unless (looksLikePackageName (unpackFS pkgFS)) $
+        : STRING  {% do { let { pkgS = getSTRING $1 }
+                        ; unless (looksLikePackageName pkgS) $
                              addError $ mkPlainErrorMsgEnvelope (getLoc $1) $
-                               (PsErrInvalidPackageName pkgFS)
-                        ; return (Just (glR $1), RawPkgQual (getSTRINGs $1) pkgFS) } }
+                               (PsErrInvalidPackageName pkgS)
+                        ; return (Just (glR $1), RawPkgQual (getSTRINGs $1) (mkFastString pkgS)) } }
         | {- empty -}                           { (Nothing,NoRawPkgQual) }
 
 optqualified :: { Maybe (EpToken "qualified") }
@@ -1709,12 +1711,12 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
 
 capi_ctype :: { Maybe (LocatedP (CType GhcPs)) }
 capi_ctype : '{-# CTYPE' STRING STRING '#-}'
-                       {% fmap Just $ amsr (sLL $1 $> (mkCType (getCTYPEs $1) (getSTRINGs $3) (Just (Header (getSTRINGs $2) (getSTRING $2)))
-                                        (getSTRING $3)))
+                       {% fmap Just $ amsr (sLL $1 $> (mkCType (getCTYPEs $1) (getSTRINGs $3) (Just (Header (getSTRINGs $2) (packHText $ getSTRING $2)))
+                                        (packHText $ getSTRING $3)))
                               (AnnPragma (glR $1) (epTok $4) noAnn (glR $2) (glR $3) noAnn noAnn) }
 
            | '{-# CTYPE'        STRING '#-}'
-                       {% fmap Just $ amsr (sLL $1 $> (mkCType (getCTYPEs $1) (getSTRINGs $2) Nothing (getSTRING $2)))
+                       {% fmap Just $ amsr (sLL $1 $> (mkCType (getCTYPEs $1) (getSTRINGs $2) Nothing (packHText $ getSTRING $2)))
                               (AnnPragma (glR $1) (epTok $3) noAnn noAnn (glR $2) noAnn noAnn) }
 
            |           { Nothing }
@@ -1982,7 +1984,7 @@ rule    :: { LRuleDecl GhcPs }
            runPV (unECP $6) >>= \ $6 ->
            amsA' (sLL $1 $> $ HsRule
                                    { rd_ext =((fst $2, epTok $5), getSTRINGs $1)
-                                   , rd_name = L (noAnnSrcSpan $ gl $1) (getSTRING $1)
+                                   , rd_name = L (noAnnSrcSpan $ gl $1) (packHText $ getSTRING $1)
                                    , rd_act = snd $2 `orElse` AlwaysActive
                                    , rd_bndrs = ruleBndrsOrDef $3
                                    , rd_lhs = $4, rd_rhs = $6 }) }
@@ -2082,7 +2084,7 @@ maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
 
 warning_category :: { Maybe (LocatedE (InWarningCategory GhcPs)) }
         : 'in' STRING                  { Just (reLoc $ sLL $1 $> $ InWarningCategory (epTok $1, getSTRINGs $2)
-                                                                    (reLoc $ sL1 $2 $ mkWarningCategory (getSTRING $2))) }
+                                                                    (reLoc $ sL1 $2 $ mkWarningCategory (packHText $ getSTRING $2))) }
         | {- empty -}                  { Nothing }
 
 warnings :: { OrdList (LWarnDecl GhcPs) }
@@ -2207,7 +2209,7 @@ fspec :: { Located (TokDcolon
                                              ,(L (getLoc $1)
                                                     (getStringLiteral $1), $2, $4)) }
        |        var '::' sigtype        { sLL $1 $> (epUniTok $2
-                                             ,(noLoc (StringLiteral NoSourceText nilFS), $1, $3)) }
+                                             ,(noLoc (StringLiteral NoSourceText mempty), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -3053,7 +3055,7 @@ prag_e :: { Located (HsPragE GhcPs) }
                                              (HsPragSCC
                                                (AnnPragma (glR $1) (epTok $3) noAnn (glR $2) noAnn noAnn noAnn,
                                                (getSCC_PRAGs $1))
-                                               (StringLiteral NoSourceText (getVARID $2))) }
+                                               (StringLiteral NoSourceText (fastStringToShortText $ getVARID $2))) }
 
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
@@ -3199,7 +3201,7 @@ aexp2   :: { ECP }
                                               QualLit
                                                 { ql_ext = noExtField
                                                 , ql_mod = getQualStringMod $1
-                                                , ql_val = HsQualString (getSTRINGs $1) (getSTRING $1)
+                                                , ql_val = HsQualString (getSTRINGs $1) (packHText $ getSTRING $1)
                                                 }
                                         }
         | literal                       { ECP $ mkHsLitPV $! $1 }
@@ -3762,7 +3764,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = True
-                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOccFS . field_label . unLoc . dfoLabel . unLoc $ final))
+                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOccFS . mkFastStringShortText . field_label . unLoc . dfoLabel . unLoc $ final))
                             fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun Nothing
                         }
 
@@ -3799,7 +3801,7 @@ ipvar   :: { Located HsIPName }
 -----------------------------------------------------------------------------
 -- Overloaded labels
 
-overloaded_label :: { Located (SourceText, FastString) }
+overloaded_label :: { Located (SourceText, HText) }
         : LABELVARID          { sL1 $1 (getLABELVARIDs $1, getLABELVARID $1) }
 
 -----------------------------------------------------------------------------
@@ -4073,7 +4075,7 @@ qvar    :: { LocatedN RdrName }
 -- *after* we see the close paren.
 
 field :: { LocatedN FieldLabelString  }
-      : varid { fmap (FieldLabelString . occNameFS . rdrNameOcc) $1 }
+      : varid { fmap (FieldLabelString . packHText . occNameString . rdrNameOcc) $1 }
 
 qvarid :: { LocatedN RdrName }
         : varid               { $1 }
@@ -4174,7 +4176,7 @@ consym :: { LocatedN RdrName }
 
 literal :: { Located (HsLit GhcPs) }
         : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
-        | STRING            { sL1 $1 $ HsString     (getSTRINGs $1) (getSTRING $1) }
+        | STRING            { sL1 $1 $ HsString     (getSTRINGs $1) (packHText $ getSTRING $1) }
         | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
                                                     $ getPRIMINTEGER $1 }
         | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
@@ -4342,7 +4344,7 @@ getCTYPEs             (L _ (ITctype             src)) = src
 
 getQualStringMod (L _ (ITstring _ StringMeta{strMetaQualified = Just modName} _)) = modName
 
-getStringLiteral l = StringLiteral (getSTRINGs l) (getSTRING l)
+getStringLiteral l = StringLiteral (getSTRINGs l) (packHText $ getSTRING l)
 
 isUnicode :: Located Token -> Bool
 isUnicode (L _ (ITforall         iu)) = iu == UnicodeSyntax
@@ -4367,12 +4369,12 @@ hasE (L _ (ITopenExpQuote HasE _)) = True
 hasE (L _ (ITopenTExpQuote HasE))  = True
 hasE _                             = False
 
-getSCC :: Located Token -> P FastString
+getSCC :: Located Token -> P HText
 getSCC lt = do let s = getSTRING lt
                -- We probably actually want to be more restrictive than this
-               if ' ' `elem` unpackFS s
+               if ' ' `elem` s
                    then addFatalError $ mkPlainErrorMsgEnvelope (getLoc lt) $ PsErrSpaceInSCC
-                   else return s
+                   else return (packHText s)
 
 stringLiteralToHsDocWst :: Located (StringLiteral GhcPs) -> LocatedA (WithHsDocIdentifiers (StringLiteral GhcPs) GhcPs)
 stringLiteralToHsDocWst  sl = reLoc $ lexStringLiteral parseIdentifier sl

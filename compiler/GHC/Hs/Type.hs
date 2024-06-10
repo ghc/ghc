@@ -119,6 +119,7 @@ import GHC.Core.Multiplicity( pprArrowWithModifiers )
 import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
+import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Misc (count)
 
@@ -336,6 +337,9 @@ mkHsTyPat x = HsTP { hstp_ext  = noExtField
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs GhcRn thing
 mkEmptyWildCardBndrs x = HsWC { hswc_body = x
                               , hswc_ext  = [] }
+
+hsIPNameFS :: HsIPName -> FastString
+hsIPNameFS (HsIPName n) = mkFastStringShortText n
 
 --------------------------------------------------
 
@@ -1298,7 +1302,7 @@ instance (OutputableBndrId p)
     ppr (HsTP { hstp_body = ty }) = ppr ty
 
 instance Outputable HsIPName where
-    ppr (HsIPName n) = char '?' <> ftext n -- Ordinary implicit parameters
+    ppr (HsIPName n) = char '?' <> ppr n -- Ordinary implicit parameters
 
 instance OutputableBndr HsIPName where
     pprBndr _ n   = ppr n         -- Simple for now

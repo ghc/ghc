@@ -32,7 +32,7 @@ module Language.Haskell.Syntax.Type (
         HsContext, LHsContext, HsContextDetails(..), XHsContext, XXHsContextDetails,
         HsModifierOf(..), LHsModifierOf,  HsModifier, LHsModifier, XModifier,
         HsLit(..),
-        HsIPName(..), hsIPNameFS,
+        HsIPName(..),
         HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
 
         LHsTypeArg,
@@ -56,10 +56,9 @@ import Language.Haskell.Syntax.Basic ( SrcStrictness, SrcUnpackedness )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Lit
-
+import Language.Haskell.Syntax.Text
 
 import GHC.Hs.Doc (LHsDoc)
-import GHC.Data.FastString (FastString)
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
@@ -742,11 +741,8 @@ mapHsOuterImplicit _ hso@(XHsOuterTyVarBndrs{}) = hso
 --------------------------------------------------
 -- | These names are used early on to store the names of implicit
 -- parameters.  They completely disappear after type-checking.
-newtype HsIPName = HsIPName FastString
+newtype HsIPName = HsIPName HText
   deriving( Eq, Data )
-
-hsIPNameFS :: HsIPName -> FastString
-hsIPNameFS (HsIPName n) = n
 
 --------------------------------------------------
 

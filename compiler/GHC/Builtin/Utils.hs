@@ -84,6 +84,7 @@ import GHC.Hs.Lit
 import GHC.Unit.Module.ModIface (IfaceExport)
 import GHC.Unit.Module.Warnings
 
+import GHC.Data.FastString (fastStringToShortText)
 import GHC.Data.List.SetOps
 
 import Control.Applicative ((<|>))
@@ -300,7 +301,7 @@ ghcPrimWarns = WarnSome
   []
   where
     mk_txt msg =
-      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText msg) []]
+      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText (fastStringToShortText msg)) []]
     mk_decl_dep (occ, msg) = (occ, mk_txt msg)
 
 ghcPrimFixities :: [(OccName,Fixity)]

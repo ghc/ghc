@@ -433,7 +433,7 @@ data PsMessage
                             -- ^ Is TH on?
 
    -- | Invalid package name
-   | PsErrInvalidPackageName !FastString
+   | PsErrInvalidPackageName !String
 
    -- | Invalid rule activation marker
    | PsErrInvalidRuleActivationMarker

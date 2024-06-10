@@ -116,6 +116,7 @@ import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
 import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
+import Language.Haskell.Syntax.Text
 
 import GHC.Prelude.Basic
 
@@ -1079,6 +1080,9 @@ instance Outputable FastString where
     ppr fs = ftext fs           -- Prints an unadorned string,
                                 -- no double quotes or anything
 
+instance Outputable HText where
+    ppr = text . unpackHText
+
 deriving newtype instance Outputable NonDetFastString
 deriving newtype instance Outputable LexicalFastString
 
@@ -1325,8 +1329,8 @@ pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: 
             | otherwise      = text (show c)
 
 -- | Special combinator for showing string literals.
-pprHsString :: FastString -> SDoc
-pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
+pprHsString :: String -> SDoc
+pprHsString fs = vcat (map text (showMultiLineString fs))
 
 -- | Special combinator for showing bytestring literals.
 pprHsBytes :: ByteString -> SDoc

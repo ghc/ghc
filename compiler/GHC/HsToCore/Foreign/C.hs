@@ -61,6 +61,7 @@ import GHC.Utils.Encoding
 
 import Data.Maybe
 import Data.List (nub)
+import Language.Haskell.Syntax.Text
 
 dsCFExport:: Id                 -- Either the exported Id,
                                 -- or the foreign-export-dynamic constructor
@@ -98,7 +99,7 @@ dsCFExport fn_id co ext_name cconv isDyn = do
 
     dflags <- getDynFlags
     return $
-      mkFExportCBits dflags ext_name m_fn_id fe_arg_tys res_ty is_IO_res_ty cconv
+      mkFExportCBits dflags (mkFastStringShortText ext_name) m_fn_id fe_arg_tys res_ty is_IO_res_ty cconv
 
 dsCImport :: Id
           -> Coercion
@@ -117,7 +118,7 @@ dsCImport id co (CLabel cid) _ _ _ = do
    (resTy, foRhs) <- resultWrapper ty
    assert (fromJust resTy `eqType` addrPrimTy) $    -- typechecker ensures this
     let
-        rhs = foRhs (Lit (LitLabel cid fod))
+        rhs = foRhs (Lit (LitLabel (mkFastStringShortText cid) fod))
         rhs' = Cast rhs co
     in
     return ([(id, rhs')], mempty, mempty)
@@ -171,7 +172,7 @@ dsCFExportDynamic :: Id
                  -> DsM ([Binding], CHeader, CStub)
 dsCFExportDynamic id co0 cconv = do
     mod <- getModule
-    let fe_nm = mkFastString $ zEncodeString
+    let fe_nm = packHText $ zEncodeString
             (moduleStableString mod ++ "$" ++ toCName id)
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
@@ -193,12 +194,12 @@ dsCFExportDynamic id co0 cconv = do
           (ccall).
          -}
         adj_args      = [ Var stbl_value
-                        , Lit (LitLabel fe_nm IsFunction)
+                        , Lit (LitLabel (mkFastStringShortText fe_nm) IsFunction)
                         , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.)
-        adjustor   = fsLit "createAdjustor"
+        adjustor   = packHText "createAdjustor"
 
     ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
         -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -260,15 +261,15 @@ dsFCall fn_id co fcall mDeclHeader = do
               CCall (CCallSpec (StaticTarget stExt cName targetKind)
                                CApiConv safety) ->
                do nextWrapperNum <- ds_next_wrapper_num <$> getGblEnv
-                  wrapperName <- mkWrapperName nextWrapperNum "ghc_wrapper" (unpackFS cName)
+                  wrapperName <- mkWrapperName nextWrapperNum "ghc_wrapper" (unpackHText cName)
                   let fcall' = CCall (CCallSpec
                                       (StaticTarget (stExt { staticTargetLabel = NoSourceText} )
-                                                    wrapperName
+                                                    (fastStringToShortText wrapperName)
                                                     ForeignFunction)
                                       CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
-                      includes = vcat [ text "#include \"" <> ftext h
+                      includes = vcat [ text "#include \"" <> ftext (mkFastStringShortText h)
                                         <> text "\""
                                       | Header _ h <- nub headers ]
                       fun_proto = constQual <+> cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
@@ -376,7 +377,7 @@ toCType t = case f False t of
            -- anything, as it may be the synonym that is annotated.
            | Just tycon <- tyConAppTyConPicky_maybe t
            , Just (CType _ mHeader cType) <- tyConCType_maybe tycon
-              = (mHeader, False, ftext cType)
+              = (mHeader, False, ppr cType)
            -- If we don't know a C type for this type, then try looking
            -- through one layer of type synonym etc.
            | Just t' <- coreView t
