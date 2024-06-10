@@ -42,6 +42,7 @@ module GHC.Data.StringBuffer
         -- * Conversion
         lexemeToString,
         lexemeToFastString,
+        lexemeToText,
         decodePrevNChars,
 
          -- * Parsing integers
@@ -70,7 +71,9 @@ import GHC.IO.Encoding.Failure  ( CodingFailureMode(IgnoreCodingFailure) )
 
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short.Internal as SBS
 import Data.ByteString ( ByteString )
+import Language.Haskell.Syntax.Text
 
 import GHC.Exts
 
@@ -387,6 +390,17 @@ lexemeToFastString (StringBuffer buf _ cur) len =
    inlinePerformIO $
      unsafeWithForeignPtr buf $ \ptr ->
        return $! mkFastStringBytes (ptr `plusPtr` cur) len
+
+lexemeToText :: StringBuffer
+             -> Int               -- ^ @n@, the number of bytes
+             -> HText
+lexemeToText _ 0 = mempty
+lexemeToText (StringBuffer buf _ cur) len =
+   inlinePerformIO $
+     unsafeWithForeignPtr buf $ \ptr ->
+       -- Reads the Modified UTF-8 bytes as-is; surrogates are preserved.
+       shortByteStringToHText <$> SBS.createFromPtr (ptr `plusPtr` cur) len
+
 
 -- | Return the previous @n@ characters (or fewer if we are less than @n@
 -- characters into the buffer.

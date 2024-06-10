@@ -36,6 +36,7 @@ import GHC.Utils.Outputable
 
 import Data.Data hiding (Fixity)
 import qualified Data.ByteString as B
+import qualified GHC.Data.ShortText as ST
 import GHC.TypeLits
 
 -- | Should source spans be removed from output.
@@ -91,6 +92,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` deltaPos
               `extQ` epaLocation
               `extQ` maybe_epaLocation
+              `extQ` shortText
               `extQ` bytestring
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
               `extQ` dataCon
@@ -112,6 +114,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             fastString s = braces $
                             text "FastString:"
                         <+> text (normalize_newlines . show $ s)
+
+            shortText :: ST.ShortText -> SDoc
+            shortText = text . normalize_newlines . show
 
             bytestring :: B.ByteString -> SDoc
             bytestring = text . normalize_newlines . show

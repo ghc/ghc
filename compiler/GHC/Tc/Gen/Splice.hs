@@ -97,6 +97,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon as DataCon
 
 import GHC.Types.SrcLoc
+import GHC.Types.SourceText
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -839,7 +840,7 @@ tcUntypedSplice (QuoteWrapper _ m_var) splice_name (HsQuasiQuote (HsQuasiQuoteEx
 
    -- 4. Apply the selector to the quasi-quoter
    let expr' = mkLHsWrapCo res_co $
-                nlHsApp (nlHsApp (nlHsVar sel) (noLocA quoter')) (nlHsLit (mkHsStringFS (unLoc s)))
+                nlHsApp (nlHsApp (nlHsVar sel) (noLocA quoter')) (nlHsLit (HsString NoSourceText (unLoc s)))
 
    return (PendingTcSplice splice_name expr')
    where

@@ -123,6 +123,7 @@ import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
+import GHC.Data.ShortText (ShortText)
 import GHC.Data.FastString
 import GHC.Data.TrieMap
 import GHC.Utils.Exception
@@ -1888,6 +1889,12 @@ instance Binary LBS.ByteString where
     LBS.foldrChunks f (pure ()) lbs
 
   get bh = LBS.fromStrict <$> get bh
+
+instance Binary ShortText where
+  -- serializes through FastString to regain the FastString sharing benefits of
+  -- interface file symbol table
+  put_ bh = put_ bh . mkFastStringShortText
+  get bh = fastStringToShortText <$> get bh
 
 instance Binary T.Text where
   put_ bh (T.Text ba off len) = do

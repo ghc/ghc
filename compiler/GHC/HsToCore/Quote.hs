@@ -92,6 +92,7 @@ import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import GHC.Types.Name.Reader (RdrName(..), WithUserRdr (..))
+import Language.Haskell.Syntax.Text
 
 data MetaWrappers = MetaWrappers {
       -- Applies its argument to a type argument `m` and dictionary `Quote m`
@@ -742,7 +743,7 @@ repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
       = notHandled (ThForeignLabel cls)
     conv_cimportspec (CFunction (DynamicTarget{})) = return "dynamic"
     conv_cimportspec (CFunction (StaticTarget _ fs ForeignFunction))
-                            = return (unpackFS fs)
+                            = return (unpackHText fs)
     conv_cimportspec (CFunction (StaticTarget _ _ ForeignValue))
                             = panic "conv_cimportspec: values not supported yet"
     conv_cimportspec CWrapper = return "wrapper"
@@ -752,7 +753,7 @@ repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
                  CFunction (StaticTarget _ _ _) | not raw_cconv -> "static "
                  _ -> ""
     chStr = case mch of
-            Just (Header _ h) | not raw_cconv -> unpackFS h ++ " "
+            Just (Header _ h) | not raw_cconv -> unpackHText h ++ " "
             _ -> ""
 repForD decl@(L _ ForeignExport{}) = notHandled (ThForeignExport decl)
 
@@ -800,7 +801,7 @@ repRuleD (L loc (HsRule { rd_name = n
                         , rd_rhs = rhs }))
   = fmap (locA loc, ) <$>
       repRuleBinders bndrs $ \ ty_bndrs' tm_bndrs' ->
-        do { n'   <- coreStringLit $ unLoc n
+        do { n'   <- coreStringLit $ mkFastStringShortText $ unLoc n
            ; act' <- repPhases act
            ; lhs' <- repLE lhs
            ; rhs' <- repLE rhs
@@ -1164,7 +1165,7 @@ rep_sccFun nm Nothing loc = do
 
 rep_sccFun nm (Just (L _ str)) loc = do
   nm1 <- lookupLOcc nm
-  str1 <- coreStringLit (sl_fs str)
+  str1 <- coreStringLit (mkFastStringShortText $ sl_fs str)
   scc <- repPragSCCFunNamed nm1 str1
   return [(loc, scc)]
 
@@ -1515,7 +1516,7 @@ repTyLit (HsNatural _ i) = do
   platform <- getPlatform
   rep2 numTyLitName [mkIntegerExpr platform (il_value i)]
 repTyLit (HsString _ s) = do
-  s' <- mkStringExprFS s
+  s' <- mkStringExprFS (mkFastStringShortText s)
   rep2 strTyLitName [s']
 repTyLit (HsChar _ c) = do
   c' <- return (mkCharExpr c)
@@ -1578,7 +1579,7 @@ repE (HsHole (HoleVar (L _ uv))) = do
   repUnboundVar name
 repE (HsHole HoleError) = panic "repE: HoleError"
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
-repE (HsOverLabel _ s) = repOverLabel s
+repE (HsOverLabel _ s) = repOverLabel (mkFastStringShortText s)
 
 
         -- Remember, we're desugaring renamer output here, so
@@ -1719,8 +1720,8 @@ repE e@(HsTypedSplice HsTypedSpliceTop _) = pprPanic "repE: top level splice" (p
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
 repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
-  repGetField e1 f
-repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel) xs)
+  repGetField e1 (mkFastStringShortText f)
+repE (HsProjection _ xs) = repProjection (fmap (mkFastStringShortText . field_label . unLoc . dfoLabel) xs)
 repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]
@@ -1995,7 +1996,7 @@ rep_implicit_param_bind (L loc (IPBind _ (L _ n) (L _ rhs)))
       ; return (locA loc, ipb) }
 
 rep_implicit_param_name :: HsIPName -> MetaM (Core String)
-rep_implicit_param_name (HsIPName name) = coreStringLit name
+rep_implicit_param_name (HsIPName name) = coreStringLit (mkFastStringShortText name)
 
 rep_val_binds :: HsValBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 -- Assumes: all the binders of the binding are already in the meta-env
@@ -3106,7 +3107,7 @@ mk_rational :: FractionalLit GhcRn -> MetaM (HsLit GhcTc)
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ XLit $ HsRat (tcFractionalLit r) rat_ty
 
-mk_string :: FastString -> MetaM (HsLit GhcRn)
+mk_string :: HText -> MetaM (HsLit GhcRn)
 mk_string s = return $ HsString NoSourceText s
 
 mk_char :: Char -> MetaM (HsLit GhcRn)

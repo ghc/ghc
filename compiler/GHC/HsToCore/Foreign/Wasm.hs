@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.HsToCore.Foreign.Wasm
@@ -44,6 +44,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import Language.Haskell.Syntax.Text
 
 data Synchronicity = Sync | Async
   deriving (Eq)
@@ -54,11 +55,11 @@ dsWasmJSImport ::
   CImportSpec GhcTc ->
   Safety ->
   DsM ([Binding], CHeader, CStub, [Id])
-dsWasmJSImport id co (CFunction (StaticTarget stExt js_src _)) safety
+dsWasmJSImport id co (CFunction (StaticTarget stExt (unpackHText -> js_src) _)) safety
   | js_src == "wrapper" = dsWasmJSDynamicExport Async id co unitId
   | js_src == "wrapper sync" = dsWasmJSDynamicExport Sync id co unitId
   | otherwise = do
-      (bs, h, c) <- dsWasmJSStaticImport id co (unpackFS js_src) unitId sync
+      (bs, h, c) <- dsWasmJSStaticImport id co js_src unitId sync
       pure (bs, h, c, [])
   where
     unitId = staticTargetUnit stExt
@@ -459,7 +460,7 @@ importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty res_trans = do
   let cfun_fcall =
         CCall
           ( CCallSpec
-              (StaticTarget stExt cfun_name ForeignFunction)
+              (StaticTarget stExt (fastStringToShortText cfun_name) ForeignFunction)
               CCallConv
               -- Same even for foreign import javascript unsafe, for
               -- the sake of re-entrancy.
@@ -631,7 +632,7 @@ dsWasmJSExport ::
   DsM (CHeader, CStub, String, [Id], [Binding])
 dsWasmJSExport fn_id co str = dsWasmJSExport' sync (Just fn_id) co ext_name
   where
-    (sync, ext_name) = case words $ unpackFS str of
+    (sync, ext_name) = case words $ unpackHText str of
       [ext_name] -> (Async, ext_name)
       [ext_name, "sync"] -> (Sync, ext_name)
       _ -> panic "dsWasmJSExport: unrecognized label string"

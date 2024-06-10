@@ -113,6 +113,7 @@ import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Text
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
@@ -322,7 +323,7 @@ nlParPat p = noLocA (gParPat p)
 
 mkHsIntegral   :: IntegralLit   GhcPs -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit GhcPs -> HsOverLit GhcPs
-mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
+mkHsIsString   :: SourceText -> HText -> HsOverLit GhcPs
 mkHsDo         :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> HsExpr GhcPs
 mkHsDoAnns     :: HsDoFlavour -> LocatedA [ExprLStmt GhcPs] -> AnnList EpaLocation -> HsExpr GhcPs
 mkHsComp       :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
@@ -471,10 +472,10 @@ mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLocA (mkHsVar (noLocA op))) e2
 
 mkHsString :: String -> HsLit (GhcPass p)
-mkHsString s = HsString NoSourceText (mkFastString s)
+mkHsString s = HsString NoSourceText (packHText s)
 
 mkHsStringFS :: FastString -> HsLit (GhcPass p)
-mkHsStringFS s = HsString NoSourceText s
+mkHsStringFS = HsString NoSourceText . fastStringToShortText
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
 mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)

@@ -106,6 +106,7 @@ import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Module.Name (moduleNameString)
+import Language.Haskell.Syntax.Text
 
 import Data.Function (on)
 import Data.Ratio ((%))
@@ -358,8 +359,8 @@ instance IsPass p => Outputable (HsLit (GhcPass p)) where
          (HsInteger st i _) -> pprWithSourceText st (integer i)
          (HsRat  f _)       -> ppr f
 
-pprHsStringLit :: SourceText -> FastString -> SDoc
-pprHsStringLit NoSourceText     s = pprHsString s
+pprHsStringLit :: SourceText -> HText -> SDoc
+pprHsStringLit NoSourceText     s = pprHsString (unpackHText s)
 pprHsStringLit (SourceText src) _ = vcat $ map text $ split '\n' (unpackFS src)
 
 -- -----------------------------------------------------------------------------
@@ -402,7 +403,7 @@ instance Ord (OverLitVal (GhcPass p)) where
   -- HsIsString
   HsIsString{}    `compare` HsIntegral{}    = GT
   HsIsString{}    `compare` HsFractional{}  = GT
-  HsIsString   s1 `compare` HsIsString   s2 = sl_fs s1 `lexicalCompareFS` sl_fs s2
+  HsIsString   s1 `compare` HsIsString   s2 = sl_fs s1 `compare` sl_fs s2
 
 instance Outputable (OverLitVal (GhcPass p)) where
   ppr (HsIntegral   i) = pprIntegralLit i
@@ -460,7 +461,7 @@ instance Eq (QualLitVal (GhcPass p)) where
   HsQualString _ s1 == HsQualString _ s2 = s1 == s2
 
 instance Ord (QualLitVal (GhcPass p)) where
-  HsQualString _ s1 `compare` HsQualString _ s2 = s1 `lexicalCompareFS` s2
+  HsQualString _ s1 `compare` HsQualString _ s2 = s1 `compare` s2
 
 instance Outputable (QualLitVal (GhcPass p)) where
   ppr (HsQualString st s) = pprHsStringLit st s
@@ -675,7 +676,7 @@ instance Eq (StringLiteral (GhcPass p)) where
   (StringLiteral _ a) == (StringLiteral _ b) = a == b
 
 instance Outputable (StringLiteral (GhcPass p)) where
-  ppr (StringLiteral{..}) = pprWithSourceText sl_src (doubleQuotes $ ftext sl_fs)
+  ppr (StringLiteral{..}) = pprWithSourceText sl_src (doubleQuotes $ ppr sl_fs)
 
 -- The 'Show' instance is required the 'parsed' test case of GHC's test-suite.
 instance Show (StringLiteral (GhcPass p)) where
