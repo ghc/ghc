@@ -48,7 +48,7 @@ import Prelude
 -- The memory representation of a 'ByteArray' is:
 --
 -- > ╭─────────────┬───╮  ╭────────┬──────┬─────────╮
--- > │ Constructor │ * ┼─➤│ Header │ Size │ Payload │
+-- > │ Constructor │ * ┼─►│ Header │ Size │ Payload │
 -- > ╰─────────────┴───╯  ╰────────┴──────┴─────────╯
 --
 -- And its overhead is the following:
