@@ -639,6 +639,17 @@ That is we make the specialized function strict in arguments
 representing strict fields. See Note [Call-by-value for worker args]
 for why we do this.
 
+(SCF1) The arg_id might be an /imported/ Id like M.foo_acf (see #24944).
+  We don't want to make
+     case M.foo_acf of M.foo_acf { DEFAULT -> blah }
+  because the binder of a case-expression should never be imported.  Rather,
+  we must localise it thus:
+     case M.foo_acf of foo_acf { DEFAULT -> blah }
+  We keep the same unique, so in the next round of simplification we'll replace
+  any M.foo_acf's in `blah` by `foo_acf`.
+
+  c.f. Note [Localise pattern binders] in GHC.HsToCore.Utils.
+
 Note [Specialising on dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In #21386, SpecConstr saw this call:
@@ -2030,8 +2041,8 @@ generaliseDictPats qvars pats
        | otherwise
        = return (extra_qvs, pat)
 
--- See Note [SpecConstr and strict fields]
 mkSeqs :: [Var] -> Type -> CoreExpr -> CoreExpr
+-- See Note [SpecConstr and strict fields]
 mkSeqs seqees res_ty rhs =
   foldr addEval rhs seqees
     where
@@ -2039,7 +2050,11 @@ mkSeqs seqees res_ty rhs =
       addEval arg_id rhs
         -- Argument representing strict field and it's worth passing via cbv
         | shouldStrictifyIdForCbv arg_id
-        = Case (Var arg_id) arg_id res_ty ([Alt DEFAULT [] rhs])
+        = Case (Var arg_id)
+               (localiseId arg_id)  -- See (SCF1) in Note [SpecConstr and strict fields]
+               res_ty
+               ([Alt DEFAULT [] rhs])
+
         | otherwise
         = rhs
 
