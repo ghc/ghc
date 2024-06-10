@@ -522,3 +522,6 @@ test('T24726', normal, compile, ['-dcore-lint -dsuppress-uniques'])
 test('T24768', normal, compile, ['-O'])
 test('T24770', [ grep_errmsg(r'Dead') ], compile, ['-O'])
 test('T24808', [ grep_errmsg(r'myFunction') ], compile, ['-O -ddump-simpl'])
+
+# T24944 needs -O2 because it's about SpecConstr
+test('T24944', [extra_files(['T24944a.hs'])], multimod_compile, ['T24944', '-v0 -O2'])
