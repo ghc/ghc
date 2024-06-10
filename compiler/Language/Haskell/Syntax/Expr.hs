@@ -18,11 +18,10 @@ import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name (ModuleName)
+import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
 
--- others:
-import GHC.Data.FastString (FastString)
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -330,7 +329,7 @@ data HsExpr p
               (LIdOccP p) -- ^ Variable
                           -- See Note [Located RdrNames]
 
-  | HsOverLabel (XOverLabel p) FastString
+  | HsOverLabel (XOverLabel p) HText
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
 
   | HsIPVar   (XIPVar p)
@@ -1324,8 +1323,8 @@ data HsUntypedSplice id
 
    | HsQuasiQuote            -- See Note [Quasi-quote overview]
         (XQuasiQuote id)
-        (LIdP id)             -- The quoter (the bit between `[` and `|`)
-        (XRec id FastString) -- The enclosed string
+        (LIdP id)            -- The quoter (the bit between `[` and `|`)
+        (XRec id HText)      -- The enclosed string
 
    | XUntypedSplice !(XXUntypedSplice id) -- Extension point; see Note [Trees That Grow]
                                           -- in Language.Haskell.Syntax.Extension

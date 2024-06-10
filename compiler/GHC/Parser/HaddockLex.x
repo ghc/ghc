@@ -31,6 +31,7 @@ import Data.ByteString ( ByteString )
 import qualified Data.ByteString as BS
 
 import qualified GHC.LanguageExtensions as LangExt
+import Language.Haskell.Syntax.Text
 }
 
 -- -----------------------------------------------------------------------------
@@ -140,7 +141,7 @@ lexStringLiteral :: P (LocatedN RdrName) -- ^ A precise identifier parser
 lexStringLiteral identParser (L l sl)
   = L l (WithHsDocIdentifiers sl idents)
   where
-    bs = bytesFS (sl_fs sl)
+    bs = bytesHText (sl_fs sl)
 
     idents = mapMaybe (uncurry (validateIdentWith identParser)) plausibleIdents
 

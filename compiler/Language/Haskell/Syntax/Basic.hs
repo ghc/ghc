@@ -2,24 +2,13 @@
 
 module Language.Haskell.Syntax.Basic where
 
+import Language.Haskell.Syntax.Text
 import Control.DeepSeq
 import Data.Data (Data)
 import Data.Eq
 import Data.Ord
 import Data.Bool
 import Prelude
-
-import GHC.Data.FastString (FastString)
-
-{-
-************************************************************************
-*                                                                      *
-Rules
-*                                                                      *
-************************************************************************
--}
-
-type RuleName = FastString
 
 {-
 ************************************************************************
@@ -86,7 +75,7 @@ Field Labels
 
 -- | Field labels are just represented as strings;
 -- they are not necessarily unique (even within a module)
-newtype FieldLabelString = FieldLabelString { field_label:: FastString }
+newtype FieldLabelString = FieldLabelString { field_label:: HText }
   deriving (Data, Eq, NFData)
 
 {-

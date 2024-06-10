@@ -13,7 +13,7 @@ import GHC.Prelude
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
 import GHC.Core (Expr(Var,App))
-import GHC.Data.FastString (unpackFS, lengthFS)
+import GHC.Data.FastString (unpackFS, lengthFS, mkFastStringShortText)
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Tc.Utils.TcMType (shortCutLit)
@@ -195,7 +195,7 @@ desugarPat x pat = case pat of
           -> case ql_val of
             -- Desugar qualified string literals the same as RebindableSyntax
             -- See Note [Implementation of QualifiedStrings]
-            HsQualString _ s -> mkPmLitGrds x $ PmLit ty (PmLitOverString s)
+            HsQualString _ s -> mkPmLitGrds x $ PmLit ty (PmLitOverString (mkFastStringShortText s))
 
         _ -> desugarPat x expansion
 

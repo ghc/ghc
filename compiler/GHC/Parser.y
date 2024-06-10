@@ -64,7 +64,7 @@ import GHC.Prelude hiding ( head, init, last, tail )
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS)
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, occNameString, mkVarOccFS )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
@@ -95,8 +95,10 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax.Text
 
 import qualified Data.Semigroup as Semi
+import qualified Data.Text as T
 }
 
 %expect 0 -- shift/reduce conflicts
@@ -829,7 +831,7 @@ moduleid :: { LHsModuleId PackageName }
           | unitid ':' modid    { sLL $1 $> $ HsModuleId $1 (reLoc $3) }
 
 pkgname :: { Located PackageName }
-        : STRING     { sL1 $1 $ PackageName (getSTRING $1) }
+        : STRING     { sL1 $1 $ PackageName (mkFastStringShortText $ getSTRING $1) }
         | litpkgname { sL1 $1 $ PackageName (unLoc $1) }
 
 litpkgname_segment :: { Located FastString }
@@ -1180,8 +1182,8 @@ maybe_level :: { (Maybe EpAnnLevel) }
         | {- empty -}                           { (Nothing) }
 
 maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
-        : STRING  {% do { let { pkgFS = getSTRING $1 }
-                        ; unless (looksLikePackageName (unpackFS pkgFS)) $
+        : STRING  {% do { let { pkgS = getSTRING $1; pkgFS = mkFastStringShortText pkgS }
+                        ; unless (looksLikePackageName (unpackHText pkgS)) $
                              addError $ mkPlainErrorMsgEnvelope (getLoc $1) $
                                (PsErrInvalidPackageName pkgFS)
                         ; return (Just (glR $1), RawPkgQual (getSTRINGs $1) pkgFS) } }
@@ -2209,7 +2211,7 @@ fspec :: { Located (TokDcolon
                                              ,(L (getLoc $1)
                                                     (getStringLiteral $1), $2, $4)) }
        |        var '::' sigtype        { sLL $1 $> (epUniTok $2
-                                             ,(noLoc (StringLiteral NoSourceText nilFS), $1, $3)) }
+                                             ,(noLoc (StringLiteral NoSourceText mempty), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -3055,7 +3057,7 @@ prag_e :: { Located (HsPragE GhcPs) }
                                              (HsPragSCC
                                                (AnnPragma (glR $1) (epTok $3) noAnn (glR $2) noAnn noAnn noAnn,
                                                (getSCC_PRAGs $1))
-                                               (StringLiteral NoSourceText (getVARID $2))) }
+                                               (StringLiteral NoSourceText (fastStringToShortText $ getVARID $2))) }
 
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
@@ -3764,7 +3766,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = True
-                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOccFS . field_label . unLoc . dfoLabel . unLoc $ final))
+                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOccFS . mkFastStringShortText . field_label . unLoc . dfoLabel . unLoc $ final))
                             fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun Nothing
                         }
 
@@ -3801,7 +3803,7 @@ ipvar   :: { Located HsIPName }
 -----------------------------------------------------------------------------
 -- Overloaded labels
 
-overloaded_label :: { Located (SourceText, FastString) }
+overloaded_label :: { Located (SourceText, HText) }
         : LABELVARID          { sL1 $1 (getLABELVARIDs $1, getLABELVARID $1) }
 
 -----------------------------------------------------------------------------
@@ -4075,7 +4077,7 @@ qvar    :: { LocatedN RdrName }
 -- *after* we see the close paren.
 
 field :: { LocatedN FieldLabelString  }
-      : varid { fmap (FieldLabelString . occNameFS . rdrNameOcc) $1 }
+      : varid { fmap (FieldLabelString . fastStringToShortText . occNameFS . rdrNameOcc) $1 }
 
 qvarid :: { LocatedN RdrName }
         : varid               { $1 }
@@ -4369,10 +4371,10 @@ hasE (L _ (ITopenExpQuote HasE _)) = True
 hasE (L _ (ITopenTExpQuote HasE))  = True
 hasE _                             = False
 
-getSCC :: Located Token -> P FastString
+getSCC :: Located Token -> P HText
 getSCC lt = do let s = getSTRING lt
                -- We probably actually want to be more restrictive than this
-               if ' ' `elem` unpackFS s
+               if ' ' `elem` unpackHText s
                    then addFatalError $ mkPlainErrorMsgEnvelope (getLoc lt) $ PsErrSpaceInSCC
                    else return s
 

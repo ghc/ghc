@@ -35,6 +35,7 @@ import GHC.Data.BooleanFormula
 import GHC.Exts hiding (toList)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (rdrNameOcc)
+import Language.Haskell.Syntax.Text (unpackHText)
 import Text.XHtml hiding (name, p, quote, title)
 
 import Haddock.Backends.Xhtml.DocMarkup
@@ -1894,7 +1895,7 @@ ppr_infix_ty _ _ = Nothing
 
 ppr_tylit :: HsLit DocNameI -> Html
 ppr_tylit (HsNatural _ n) = toHtml (show (il_value n))
-ppr_tylit (HsString  _ s) = toHtml (show s)
+ppr_tylit (HsString  _ s) = toHtml (show (unpackHText s))
 ppr_tylit (HsChar    _ c) = toHtml (show c)
 ppr_tylit _               = error "ppr_tylit: unsupported lit"
 

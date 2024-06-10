@@ -41,14 +41,11 @@ where
 
 import GHC.Prelude
 
-import GHC.Data.FastString (mkFastString, unpackFS)
 import GHC.Types.SourceText
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Env
 import GHC.Types.Name (Name)
 import GHC.Types.SrcLoc
-import GHC.Types.Unique
-import GHC.Types.Unique.Set
 import GHC.Hs.Doc
 import GHC.Hs.Extension
 import GHC.Hs.Lit
@@ -60,8 +57,10 @@ import GHC.Unicode
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Text
 
 import Data.List (isPrefixOf)
+import qualified Data.Set as S
 
 
 fromWarningCategory ::
@@ -72,7 +71,7 @@ fromWarningCategory wc = InWarningCategory (noAnn, NoSourceText) (noLocA wc)
 -- | The @deprecations@ category is used for all DEPRECATED pragmas and for
 -- WARNING pragmas that do not specify a category.
 defaultWarningCategory :: WarningCategory
-defaultWarningCategory = mkWarningCategory (mkFastString "deprecations")
+defaultWarningCategory = mkWarningCategory (packHText "deprecations")
 
 -- | Is this warning category allowed to appear in user-defined WARNING pragmas?
 -- It must either be the known category @deprecations@, or be a custom category
@@ -82,7 +81,7 @@ validWarningCategory :: WarningCategory -> Bool
 validWarningCategory cat@(WarningCategory c) =
     cat == defaultWarningCategory || ("x-" `isPrefixOf` s && all is_allowed s)
   where
-    s = unpackFS c
+    s = unpackHText c
     is_allowed c = isAlphaNum c || c == '\'' || c == '-'
 
 -- | A finite or infinite set of warning categories.
@@ -93,39 +92,39 @@ validWarningCategory cat@(WarningCategory c) =
 -- represent it as either a finite set of categories, or a cofinite set (where
 -- we store the complement).
 data WarningCategorySet =
-    FiniteWarningCategorySet   (UniqSet WarningCategory)
+    FiniteWarningCategorySet   (S.Set WarningCategory)
       -- ^ The set of warning categories is the given finite set.
-  | CofiniteWarningCategorySet (UniqSet WarningCategory)
+  | CofiniteWarningCategorySet (S.Set WarningCategory)
       -- ^ The set of warning categories is infinite, so the constructor stores
       -- its (finite) complement.
 
 -- | The empty set of warning categories.
 emptyWarningCategorySet :: WarningCategorySet
-emptyWarningCategorySet = FiniteWarningCategorySet emptyUniqSet
+emptyWarningCategorySet = FiniteWarningCategorySet S.empty
 
 -- | The set consisting of all possible warning categories.
 completeWarningCategorySet :: WarningCategorySet
-completeWarningCategorySet = CofiniteWarningCategorySet emptyUniqSet
+completeWarningCategorySet = CofiniteWarningCategorySet S.empty
 
 -- | Is this set empty?
 nullWarningCategorySet :: WarningCategorySet -> Bool
-nullWarningCategorySet (FiniteWarningCategorySet s) = isEmptyUniqSet s
+nullWarningCategorySet (FiniteWarningCategorySet s) = S.null s
 nullWarningCategorySet CofiniteWarningCategorySet{} = False
 
 -- | Does this warning category belong to the set?
 elemWarningCategorySet :: WarningCategory -> WarningCategorySet -> Bool
-elemWarningCategorySet c (FiniteWarningCategorySet   s) =      c `elementOfUniqSet` s
-elemWarningCategorySet c (CofiniteWarningCategorySet s) = not (c `elementOfUniqSet` s)
+elemWarningCategorySet c (FiniteWarningCategorySet   s) =      c `S.member` s
+elemWarningCategorySet c (CofiniteWarningCategorySet s) = not (c `S.member` s)
 
 -- | Insert an element into a warning category set.
 insertWarningCategorySet :: WarningCategory -> WarningCategorySet -> WarningCategorySet
-insertWarningCategorySet c (FiniteWarningCategorySet   s) = FiniteWarningCategorySet   (addOneToUniqSet   s c)
-insertWarningCategorySet c (CofiniteWarningCategorySet s) = CofiniteWarningCategorySet (delOneFromUniqSet s c)
+insertWarningCategorySet c (FiniteWarningCategorySet   s) = FiniteWarningCategorySet   (S.insert c s)
+insertWarningCategorySet c (CofiniteWarningCategorySet s) = CofiniteWarningCategorySet (S.delete c s)
 
 -- | Delete an element from a warning category set.
 deleteWarningCategorySet :: WarningCategory -> WarningCategorySet -> WarningCategorySet
-deleteWarningCategorySet c (FiniteWarningCategorySet   s) = FiniteWarningCategorySet   (delOneFromUniqSet s c)
-deleteWarningCategorySet c (CofiniteWarningCategorySet s) = CofiniteWarningCategorySet (addOneToUniqSet   s c)
+deleteWarningCategorySet c (FiniteWarningCategorySet   s) = FiniteWarningCategorySet   (S.delete c s)
+deleteWarningCategorySet c (CofiniteWarningCategorySet s) = CofiniteWarningCategorySet (S.insert c s)
 
 type LWarningTxt pass = XRec pass (WarningTxt pass)
 
@@ -188,8 +187,6 @@ deriving instance Binary WarningCategory
 
 deriving instance Outputable WarningCategory
 
-deriving instance Uniquable WarningCategory
-
 instance Outputable (WarningTxt (GhcPass pass)) where
     ppr (WarningTxt lsrc mcat ws)
       = case lsrc of
@@ -213,10 +210,10 @@ pp_ws ws
 
 pprWarningTxtForMsg :: WarningTxt (GhcPass pass) -> SDoc
 pprWarningTxtForMsg (WarningTxt _ _ ws)
-                     = doubleQuotes (vcat (map (ftext . sl_fs . hsDocString . unLoc) ws))
+                     = doubleQuotes (vcat (map (ppr . sl_fs . hsDocString . unLoc) ws))
 pprWarningTxtForMsg (DeprecatedTxt _ ds)
                      = text "Deprecated:" <+>
-                       doubleQuotes (vcat (map (ftext . sl_fs . hsDocString . unLoc) ds))
+                       doubleQuotes (vcat (map (ppr . sl_fs . hsDocString . unLoc) ds))
 
 
 -- | Warning information from a module

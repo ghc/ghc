@@ -9,7 +9,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
 import Data.List (isPrefixOf, isSuffixOf)
-import GHC.Data.FastString (mkFastString)
+import GHC.Data.FastString (mkFastString, mkFastStringShortText)
 import GHC.Data.StringBuffer (StringBuffer, atEnd)
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer as Lexer
@@ -116,7 +116,7 @@ parse parserOpts fpath bs = case unP (go False []) initState of
               L _ (ITstring _ _ file) <- tryP wrappedLexer
               L spF ITclose_prag <- tryP wrappedLexer
 
-              let newLoc = mkRealSrcLoc file (fromIntegral line - 1) (srcSpanEndCol spF)
+              let newLoc = mkRealSrcLoc (mkFastStringShortText file) (fromIntegral line - 1) (srcSpanEndCol spF)
               (bEnd'', _) <- lift getInput
               lift $ setInput (bEnd'', newLoc)
 

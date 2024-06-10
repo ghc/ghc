@@ -1327,7 +1327,7 @@ tc_hs_lit_ty rn_ty (HsNatural _ lit) exp_kind
        checkExpKind rn_ty (mkNumLitTy n) naturalTy exp_kind
 tc_hs_lit_ty rn_ty (HsString _ s) exp_kind
   = do checkWiredInTyCon typeSymbolKindCon
-       checkExpKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind
+       checkExpKind rn_ty (mkStrLitTy $ mkFastStringShortText s) typeSymbolKind exp_kind
 tc_hs_lit_ty rn_ty (HsChar _ c) exp_kind
   = do checkWiredInTyCon charTyCon
        checkExpKind rn_ty (mkCharLitTy c) charTy exp_kind

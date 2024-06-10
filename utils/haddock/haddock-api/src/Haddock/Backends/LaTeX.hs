@@ -31,6 +31,7 @@ import qualified Data.Text as T
 import GHC hiding (HsTypeGhcPsExt (..), fromMaybeContext)
 import GHC.Core.Type (Specificity (..))
 import GHC.Data.FastString (unpackFS)
+import Language.Haskell.Syntax.Text (unpackHText)
 import GHC.Types.Name (getOccString, nameOccName, tidyNameOcc)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (rdrNameOcc)
@@ -1378,7 +1379,7 @@ ppr_infix_ty _ = Nothing
 
 ppr_tylit :: HsLit DocNameI -> Bool -> LaTeX
 ppr_tylit (HsNatural _ n) _ = integer (il_value n)
-ppr_tylit (HsString  _ s) _ = text (show s)
+ppr_tylit (HsString  _ s) _ = text (show (unpackHText s))
 ppr_tylit (HsChar    _ c) _ = text (show c)
 ppr_tylit _               _ = error "ppr_tylit: unsupported lit"
 

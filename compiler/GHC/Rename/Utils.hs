@@ -62,13 +62,13 @@ import GHC.Types.Basic
 import GHC.Data.List.SetOps ( removeDupsOn )
 import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.DynFlags
-import GHC.Data.FastString
 import GHC.Data.Bag ( mapBagM, headMaybe )
 import Control.Monad
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import GHC.Unit.Module
 import GHC.Iface.Load
 import qualified GHC.LanguageExtensions as LangExt
+import Language.Haskell.Syntax.Text
 
 import qualified Data.List.NonEmpty as NE
 import Data.Foldable (for_)
@@ -752,7 +752,7 @@ genLHsLit = wrapGenSpan . HsLit noExtField
 genHsIntegralLit :: (NoAnn an) => IntegralLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genHsIntegralLit = genLHsLit . HsInt noExtField
 
-genHsTyLit :: FastString -> HsType GhcRn
+genHsTyLit :: HText -> HsType GhcRn
 genHsTyLit = HsTyLit noExtField . HsString NoSourceText
 
 genSimpleConPat :: Name -> [LPat GhcRn] -> LPat GhcRn

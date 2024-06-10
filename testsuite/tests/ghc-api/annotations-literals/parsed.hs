@@ -3,6 +3,7 @@
 -- argument.
 module Main where
 
+import Language.Haskell.Syntax.Text
 import GHC.Data.FastString
 import GHC.Types.Basic
 import GHC.Types.SourceText
@@ -53,7 +54,7 @@ testOneFile libdir fileName = do
      doHsLit (HsCharPrim   (SourceText src) c)
        = ["HsCharPrim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsString     (SourceText src) c)
-       = ["HsString [" ++ unpackFS src ++ "] " ++ show c]
+       = ["HsString [" ++ unpackFS src ++ "] " ++ show (unpackHText c)]
      doHsLit (HsStringPrim (SourceText src) c)
        = ["HsStringPrim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsNatural  _ (IL (SourceText src) _ c))

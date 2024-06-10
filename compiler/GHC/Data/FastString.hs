@@ -58,6 +58,7 @@ module GHC.Data.FastString
 
         -- * ShortText
         fastStringToShortText,
+        mkFastStringShortText,
 
         -- * FastZString
         FastZString,
@@ -548,6 +549,10 @@ mkFastStringByteString bs =
 mkFastStringShortByteString :: ShortByteString -> FastString
 mkFastStringShortByteString sbs =
   inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+
+-- | Create a 'FastString' from an 'HText'
+mkFastStringShortText :: ShortText -> FastString
+mkFastStringShortText = mkFastStringShortByteString . contents
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString

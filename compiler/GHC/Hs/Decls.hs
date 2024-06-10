@@ -105,6 +105,7 @@ import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Decls.Foreign
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Text
 
 import {-# SOURCE #-} GHC.Hs.Expr (pprExpr, pprUntypedSplice)
         -- Because Expr imports Decls via HsBracket
@@ -1292,7 +1293,7 @@ instance forall p. (IsPass p, OutputableBndrId p)
     where
       pp_hdr = case mHeader of
                Nothing -> empty
-               Just (Header _ header) -> ftext header
+               Just (Header _ header) -> ppr header
 
       pprCEntity (CLabel lbl) _ =
         doubleQuotes $ text "static" <+> pp_hdr <+> char '&' <> ppr lbl
@@ -1386,8 +1387,8 @@ instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
                  GhcRn | (_, st) <- ext -> st
                  GhcTc | (_, st) <- ext -> st
 
-pprFullRuleName :: SourceText -> GenLocated a (RuleName) -> SDoc
-pprFullRuleName st (L _ n) = pprWithSourceText st (doubleQuotes $ ftext n)
+pprFullRuleName :: SourceText -> GenLocated a HText -> SDoc
+pprFullRuleName st (L _ n) = pprWithSourceText st (doubleQuotes $ ppr n)
 
 
 {-

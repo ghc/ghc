@@ -70,6 +70,7 @@ import qualified GHC.Boot.TH.Monad  as TH (Q)
 
 import qualified GHC.LanguageExtensions as LangExt
 import qualified Data.Set as Set
+import Language.Haskell.Syntax.Text
 
 {-
 ************************************************************************
@@ -393,7 +394,7 @@ recordPendingSplice _ _ (TcPending _ _ _) = panic "impossible"
 
 ------------------
 mkQuasiQuoteExpr :: UntypedSpliceFlavour -> LIdP GhcRn
-                 -> XRec GhcPs FastString
+                 -> XRec GhcPs HText
                  -> LHsExpr GhcRn
 -- Return the expression (quoter "...quote...")
 -- which is what we must run in a quasi-quote

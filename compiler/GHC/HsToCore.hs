@@ -69,6 +69,7 @@ import GHC.Builtin.Types
 import GHC.Data.Maybe    ( expectJust )
 import GHC.Data.OrdList
 import GHC.Data.SizedSeq ( sizeSS )
+import GHC.Data.FastString (mkFastStringShortText)
 
 import GHC.Iface.Make (mkRecompUsageInfo)
 
@@ -453,7 +454,7 @@ dsRule (L loc (HsRule { rd_name = name
               fn_name   = idName fn_id
               simpl_opts = initSimpleOpts dflags
               final_rhs = simpleOptExpr simpl_opts rhs''    -- De-crap it
-              rule_name = unLoc name
+              rule_name = mkFastStringShortText (unLoc name)
               rule = mkRule this_mod False is_local rule_name rule_act
                             fn_name final_bndrs args final_rhs
         ; dsWarnOrphanRule rule
