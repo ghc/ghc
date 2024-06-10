@@ -1417,9 +1417,16 @@ instance Diagnostic TcRnMessage where
            , interpp'SP errorVars ]
     TcRnBadlyStaged reason bind_lvl use_lvl
       -> mkSimpleDecorated $
-         text "Stage error:" <+> pprStageCheckReason reason <+>
-         hsep [text "is bound at stage" <+> ppr bind_lvl,
-               text "but used at stage" <+> ppr use_lvl]
+         vcat $
+         [ text "Stage error:" <+> pprStageCheckReason reason <+>
+           hsep [text "is bound at stage" <+> ppr bind_lvl,
+                 text "but used at stage" <+> ppr use_lvl]
+         ] ++
+         [ hsep [ text "Hint: quoting" <+> thBrackets (ppUnless (isValName n) "t") (ppr n)
+                , text "or an enclosing expression would allow the quotation to be used in an earlier stage"
+                ]
+         | StageCheckSplice n <- [reason]
+         ]
     TcRnBadlyStagedType name bind_lvl use_lvl
       -> mkSimpleDecorated $
          text "Badly staged type:" <+> ppr name <+>
