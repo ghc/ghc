@@ -10,7 +10,6 @@ import GHC.Hs.Doc
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
 import GHC.Types.SrcLoc
-import GHC.Types.SourceText
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Strict as Strict
 import GHC.Types.Name.Reader
@@ -27,6 +26,8 @@ import Data.ByteString ( ByteString )
 import qualified Data.ByteString as BS
 
 import qualified GHC.LanguageExtensions as LangExt
+
+import Language.Haskell.Syntax.Lit
 }
 
 -- -----------------------------------------------------------------------------

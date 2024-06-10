@@ -75,7 +75,6 @@ import GHC.Types.Hint
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic  ( TopLevelFlag(..) )
-import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.HpcInfo
 import GHC.Types.PkgQual

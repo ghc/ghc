@@ -56,7 +56,6 @@ import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Generics (Generic)
-import Data.Data        ( Data )
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe       ( isJust )
@@ -115,7 +114,6 @@ data ClsInst
                 -- See Note [Implementation of deprecated instances]
                 -- in GHC.Tc.Solver.Dict
     }
-  deriving Data
 
 -- | A fuzzy comparison function for class instances, intended for sorting
 -- instances before displaying them to the user.

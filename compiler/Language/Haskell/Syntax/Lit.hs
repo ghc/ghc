@@ -18,21 +18,16 @@
 -- | Source-language literals
 module Language.Haskell.Syntax.Lit where
 
+import Prelude
 import Language.Haskell.Syntax.Extension
 
-import GHC.Types.SourceText (IntegralLit, FractionalLit, StringLit, SourceText, NoCommentsLocation)
 import GHC.Core.Type (Type)
-import GHC.Utils.Panic (panic)
 
-import GHC.Data.FastString (FastString)
+import GHC.Data.FastString (FastString, lexicalCompareFS)
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
-import Data.Bool
-import Data.Ord
-import Data.Eq
-import Data.Char
-import Prelude (Maybe, Integer)
+import Data.Function (on)
 
 {-
 ************************************************************************
@@ -127,14 +122,12 @@ data OverLitVal pass
   | HsFractional !(FractionalLit pass) -- ^ Frac-looking literals
   | HsIsString   !(StringLit pass)     -- ^ String-looking literals
 
-deriving instance (Data pass, XIntegralLit pass ~ SourceText, XFractionalLit pass ~ SourceText, XStringLit pass ~ (SourceText, Maybe NoCommentsLocation)) => Data (OverLitVal pass)
-
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
 instance (Eq (XXOverLit pass)) => Eq (HsOverLit pass) where
   (OverLit _ val1) == (OverLit _ val2) = val1 == val2
   (XOverLit  val1) == (XOverLit  val2) = val1 == val2
-  _ == _ = panic "Eq HsOverLit"
+  _ == _ = False
 
 instance Eq (OverLitVal pass) where
   (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
@@ -145,7 +138,8 @@ instance Eq (OverLitVal pass) where
 instance (Ord (XXOverLit pass)) => Ord (HsOverLit pass) where
   compare (OverLit _ val1)  (OverLit _ val2) = val1 `compare` val2
   compare (XOverLit  val1)  (XOverLit  val2) = val1 `compare` val2
-  compare _ _ = panic "Ord HsOverLit"
+  compare (OverLit _ _)     (XOverLit _)     = GT
+  compare (XOverLit _)     (OverLit _ _)     = LT
 
 instance Ord (OverLitVal pass) where
   compare (HsIntegral i1)     (HsIntegral i2)     = i1 `compare` i2
@@ -157,3 +151,115 @@ instance Ord (OverLitVal pass) where
   compare (HsIsString   s1)   (HsIsString   s2)   = s1 `compare` s2
   compare (HsIsString   _)    (HsIntegral   _)    = GT
   compare (HsIsString   _)    (HsFractional _)    = GT
+
+------------------------------------------------
+-- Literals
+------------------------------------------------
+
+-- | Integral Literal
+--
+-- Used (instead of Integer) to represent negative zegative zero which is
+-- required for NegativeLiterals extension to correctly parse `-0::Double`
+-- as negative zero. See also #13211.
+data IntegralLit pass = IL
+   { il_text  :: XIntegralLit pass
+   , il_neg   :: Bool -- See Note [Negative zero] in GHC.Rename.Pat
+   , il_value :: Integer
+   }
+
+-- Comparison operations are needed when grouping literals
+-- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
+
+instance Eq (IntegralLit pass) where
+  (==) = (==) `on` il_value
+
+instance Ord (IntegralLit pass) where
+  compare = compare `on` il_value
+
+-- | The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
+deriving instance Show (XIntegralLit pass) => Show (IntegralLit pass)
+
+-- | Fractional Literal
+--
+-- Used (instead of Rational) to represent exactly the floating point literal that we
+-- encountered in the user's source program. This allows us to pretty-print exactly what
+-- the user wrote, which is important e.g. for floating point numbers that can't represented
+-- as Doubles (we used to via Double for pretty-printing). See also #2245.
+-- Note [FractionalLit representation] in GHC.HsToCore.Match.Literal
+-- The actual value then is: sign * fl_signi * (fl_exp_base^fl_exp)
+--                             where sign = if fl_neg then (-1) else 1
+--
+-- For example FL { fl_neg = True, fl_signi = 5.3, fl_exp = 4, fl_exp_base = Base10 }
+-- denotes  -5300
+
+data FractionalLit pass = FL
+    { fl_text :: XFractionalLit pass       -- ^ How the value was written in the source
+    , fl_neg :: Bool                        -- See Note [Negative zero]
+    , fl_signi :: Rational                  -- The significand component of the literal
+    , fl_exp :: Integer                     -- The exponent component of the literal
+    , fl_exp_base :: FractionalExponentBase -- See Note [fractional exponent bases]
+    }
+
+-- See Note [FractionalLit representation] in GHC.HsToCore.Match.Literal
+data FractionalExponentBase
+  = Base2 -- Used in hex fractional literals
+  | Base10
+  deriving (Eq, Ord, Data, Show)
+
+-- TODO
+{- Note [fractional exponent bases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For hexadecimal rationals of
+the form 0x0.3p10 the exponent is given on base 2 rather than
+base 10. These are the only options, hence the sum type. See also #15646.
+-}
+
+-- | Be wary of using this instance to compare for equal *values* when exponents are
+-- large. The same value expressed in different syntactic form won't compare as equal when
+-- any of the exponents is >= 100.
+instance Eq (FractionalLit pass) where
+  (==) fl1 fl2 = case compare fl1 fl2 of
+          EQ -> True
+          _  -> False
+
+-- | Be wary of using this instance to compare for equal *values* when exponents are
+-- large. The same value expressed in different syntactic form won't compare as equal when
+-- any of the exponents is >= 100.
+instance Ord (FractionalLit pass) where
+  compare = compareFractionalLit
+
+-- | The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
+deriving instance Show (XFractionalLit pass) => Show (FractionalLit pass)
+
+-- | Compare fractional lits with small exponents for value equality but
+--   large values for syntactic equality.
+compareFractionalLit :: FractionalLit pass -> FractionalLit pass -> Ordering
+compareFractionalLit fl1 fl2
+  | fl_exp fl1 < 100 && fl_exp fl2 < 100 && fl_exp fl1 >= -100 && fl_exp fl2 >= -100
+    = rationalFromFractionalLit fl1 `compare` rationalFromFractionalLit fl2
+  | otherwise = (compare `on` (\x -> (fl_signi x, fl_exp x, fl_exp_base x))) fl1 fl2
+
+rationalFromFractionalLit :: FractionalLit pass -> Rational
+rationalFromFractionalLit (FL _ _ i e expBase) =
+  mkRationalWithExponentBase i e expBase
+
+mkRationalWithExponentBase :: Rational -> Integer -> FractionalExponentBase -> Rational
+mkRationalWithExponentBase i e feb = i * (eb ^^ e)
+  where eb = case feb of Base2 -> 2 ; Base10 -> 10
+
+-- | A String Literal in the source, including its original raw format for use by
+-- source to source manipulation tools.
+data StringLit pass = SL
+  { sl_st :: XStringLit pass, -- literal raw source.
+                         -- See Note [Literal source text]
+    sl_fs :: FastString  -- literal string value
+  }
+
+instance Eq (StringLit pass) where
+  (SL _ a) == (SL _ b) = a == b
+
+instance Ord (StringLit pass) where
+  (SL _ a) `compare` (SL _ b) = a `lexicalCompareFS` b
+
+-- | The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
+deriving instance Show (XStringLit pass) => Show (StringLit pass)

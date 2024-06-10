@@ -67,7 +67,6 @@ import GHC.Types.SourceFile
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
 import GHC.Types.CompleteMatch
-import GHC.Types.SourceText
 import GHC.Types.SrcLoc ( unLoc )
 
 import GHC.Utils.Outputable

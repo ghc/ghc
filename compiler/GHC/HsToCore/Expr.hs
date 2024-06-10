@@ -31,7 +31,6 @@ import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc
 import GHC.HsToCore.Errors.Types
-import GHC.Types.SourceText
 import GHC.Types.Name hiding (varName)
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.HsToCore.Quote

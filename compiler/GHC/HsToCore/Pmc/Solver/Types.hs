@@ -68,7 +68,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
 import GHC.Types.CompleteMatch (CompleteMatch(..))
-import GHC.Types.SourceText (SourceText(..), FractionalLit, FractionalExponentBase(..))
+import GHC.Types.SourceText (SourceText(..))
 import Numeric (fromRat)
 import Data.Foldable (find)
 import Data.Ratio

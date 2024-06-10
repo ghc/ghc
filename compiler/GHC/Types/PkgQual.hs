@@ -9,6 +9,7 @@ import GHC.Unit.Types
 import GHC.Utils.Outputable
 
 import Language.Haskell.Syntax.Extension
+import {-# SOURCE #-} Language.Haskell.Syntax.Lit
 
 import Data.Data
 
@@ -16,10 +17,6 @@ import Data.Data
 data RawPkgQual pass
   = NoRawPkgQual                -- ^ No package qualifier
   | RawPkgQual (StringLit pass) -- ^ Raw package qualifier string.
-
-deriving instance
-  (Data pass, XStringLit pass ~ (SourceText, Maybe NoCommentsLocation))
-  => Data (RawPkgQual pass)
 
 -- | Package-qualifier after renaming
 --

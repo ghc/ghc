@@ -21,8 +21,11 @@ module GHC.Hs.Instances where
 
 -- UndecidableInstances ?
 
+import Language.Haskell.Syntax.Lit
+
 import Data.Data hiding ( Fixity )
 
+import GHC.Core.InstEnv
 import GHC.Prelude
 import GHC.Hs.Extension
 import GHC.Hs.Binds
@@ -32,7 +35,9 @@ import GHC.Hs.Lit
 import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
+import GHC.Types.PkgQual
 import GHC.Parser.Annotation
+import GHC.Unit.Module.Warnings
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -578,3 +583,29 @@ deriving instance Data XXPatGhcTc
 deriving instance Data XViaStrategyPs
 
 -- ---------------------------------------------------------------------
+
+deriving instance Data (IntegralLit GhcPs)
+deriving instance Data (IntegralLit GhcRn)
+deriving instance Data (IntegralLit GhcTc)
+
+deriving instance Data (FractionalLit GhcPs)
+deriving instance Data (FractionalLit GhcRn)
+deriving instance Data (FractionalLit GhcTc)
+
+deriving instance Data (StringLit GhcPs)
+deriving instance Data (StringLit GhcRn)
+deriving instance Data (StringLit GhcTc)
+
+deriving instance Data (OverLitVal GhcPs)
+deriving instance Data (OverLitVal GhcRn)
+deriving instance Data (OverLitVal GhcTc)
+
+deriving instance Data (RawPkgQual GhcPs)
+deriving instance Data (RawPkgQual GhcRn)
+deriving instance Data (RawPkgQual GhcTc)
+
+deriving instance Data (WarningTxt GhcPs)
+deriving instance Data (WarningTxt GhcRn)
+deriving instance Data (WarningTxt GhcTc)
+
+deriving instance Data ClsInst

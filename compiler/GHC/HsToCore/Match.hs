@@ -29,10 +29,6 @@ import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
 import GHC.Types.Basic
 
-import GHC.Types.SourceText
-    ( FractionalLit,
-      IntegralLit(il_value),
-      StringLit(sl_fs) )
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Hs.Syn.Type

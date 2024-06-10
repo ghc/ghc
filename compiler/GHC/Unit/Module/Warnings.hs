@@ -60,10 +60,12 @@ import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
 import GHC.Utils.Outputable
+import GHC.Utils.Outputable.Instances ()
 import GHC.Utils.Binary
 import GHC.Unicode
 
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Lit
 
 import Data.Data
 import Data.List (isPrefixOf)
@@ -237,11 +239,6 @@ warningTxtSame w1 w2
 deriving instance Eq InWarningCategory
 
 deriving instance (Eq (IdP (GhcPass pass))) => Eq (WarningTxt (GhcPass pass))
-deriving instance
-  ( Data (GhcPass p),
-    (XStringLit (GhcPass p) ~ (SourceText, Maybe NoCommentsLocation)),
-    Data (IdP (GhcPass p)))
-  => Data (WarningTxt (GhcPass p))
 
 type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnP
 

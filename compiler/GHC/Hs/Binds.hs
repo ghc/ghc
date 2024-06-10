@@ -30,8 +30,9 @@ module GHC.Hs.Binds
 
 import GHC.Prelude
 
-import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Lit
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprFunBind, pprPatBind )
 import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )

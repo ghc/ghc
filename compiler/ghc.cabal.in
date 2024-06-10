@@ -949,6 +949,7 @@ Library
         GHC.Utils.Monad.Codensity
         GHC.Utils.Monad.State.Strict
         GHC.Utils.Outputable
+        GHC.Utils.Outputable.Instances
         GHC.Utils.Panic
         GHC.Utils.Panic.Plain
         GHC.Utils.Ppr

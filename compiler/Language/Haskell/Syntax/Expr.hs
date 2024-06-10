@@ -32,7 +32,6 @@ import Language.Haskell.Syntax.Binds
 
 -- others:
 import GHC.Types.Fixity (LexicalFixity(Infix), Fixity)
-import GHC.Types.SourceText (StringLit)
 
 import GHC.Data.FastString (FastString)
 

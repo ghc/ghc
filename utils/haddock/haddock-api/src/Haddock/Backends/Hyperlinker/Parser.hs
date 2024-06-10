@@ -36,6 +36,8 @@ import GHC.Utils.Error (pprLocMsgEnvelopeDefault)
 import GHC.Utils.Outputable (text, ($$))
 import GHC.Utils.Panic (panic)
 
+import Language.Haskell.Syntax.Lit
+
 import Haddock.Backends.Hyperlinker.Types as T
 import Haddock.GhcUtils
 

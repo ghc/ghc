@@ -67,7 +67,6 @@ import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 
 import GHC.Types.Basic
-import GHC.Types.SourceText
 import GHC.Utils.Misc
 import GHC.Data.FastString ( uniqCompareFS )
 import GHC.Data.List.SetOps( removeDups )

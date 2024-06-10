@@ -22,7 +22,6 @@ import GHC.Prelude hiding ( head )
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
-import GHC.Types.SourceText (StringLit)
 import GHC.Hs
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader

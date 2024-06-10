@@ -135,7 +135,6 @@ import GHC.Core.UsageEnv
 import GHC.Types.Var
 import GHC.Types.Id as Id
 import GHC.Types.Name
-import GHC.Types.SourceText
 import GHC.Types.Var.Set
 
 import GHC.Builtin.Types

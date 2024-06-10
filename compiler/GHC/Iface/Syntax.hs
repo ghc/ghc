@@ -95,6 +95,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
 
+import Language.Haskell.Syntax.Lit
+
 import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
