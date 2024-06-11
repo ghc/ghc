@@ -1445,7 +1445,7 @@ void nonmovingPrintSegment(struct NonmovingSegment *seg)
     debugBelch("End of segment\n\n");
 }
 
-void nonmovingPrintSweepList(void)
+void nonmovingPrintSweepList()
 {
     debugBelch("==== SWEEP LIST =====\n");
     int i = 0;

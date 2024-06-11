@@ -63,8 +63,8 @@ STATIC_INLINE void
 newStackBlock( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
-    ts->stackTop     = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
-    ts->stackBottom  = (stackElement *)bd->start;
+    ts->stackTop     = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
+    ts->stackBottom  = (stackElement *)bdescr_start(bd);
     ts->stackLimit   = (stackElement *)ts->stackTop;
     bd->free     = (StgPtr)ts->stackLimit;
 }
@@ -79,8 +79,8 @@ returnToOldStack( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
     ts->stackTop = (stackElement *)bd->free;
-    ts->stackBottom = (stackElement *)bd->start;
-    ts->stackLimit = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
+    ts->stackBottom = (stackElement *)bdescr_start(bd);
+    ts->stackLimit = (stackElement *)(bdescr_start(bd) + BLOCK_SIZE_W * bd->blocks);
     bd->free = (StgPtr)ts->stackLimit;
 }
 
@@ -568,7 +568,7 @@ popStackElement(traverseState *ts) {
     debug("popStackElement() to the previous stack.\n");
 
     ASSERT(ts->stackTop + 1 == ts->stackLimit);
-    ASSERT(ts->stackBottom == (stackElement *)ts->currentStack->start);
+    ASSERT(ts->stackBottom == (stackElement *) bdescr_start(ts->currentStack));
 
     if (ts->firstStack == ts->currentStack) {
         // The stack is completely empty.
@@ -1099,7 +1099,7 @@ resetMutableObjects(traverseState* ts)
         // visited during heap traversal.
         for (n = 0; n < getNumCapabilities(); n++) {
           for (bd = getCapability(n)->mut_lists[g]; bd != NULL; bd = bd->link) {
-            for (ml = bd->start; ml < bd->free; ml++) {
+            for (ml = bdescr_start(bd); ml < bd->free; ml++) {
                 traverseMaybeInitClosureData(ts, (StgClosure *)*ml);
             }
           }

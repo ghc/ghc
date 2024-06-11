@@ -96,12 +96,12 @@ static struct NonmovingSegment *nonmovingAllocSegment(enum AllocLockMode mode, u
         while(bd->link) {
           bdescr *next_bd = bd->link;
           bd->link = NULL;
-          nonmovingPushFreeSegment((struct NonmovingSegment *)bd->start);
+          nonmovingPushFreeSegment((struct NonmovingSegment *) bdescr_start(bd));
           bd = next_bd;
         }
 
         // Use the last segment to service the allocation.
-        ret = (struct NonmovingSegment *)bd->start;
+        ret = (struct NonmovingSegment *) bdescr_start(bd);
     }
 
     // Check alignment

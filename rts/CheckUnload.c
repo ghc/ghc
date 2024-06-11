@@ -376,6 +376,7 @@ static int findSectionIdx(OCSectionIndices *s_indices, const void *addr) {
     }
     ASSERT(w_addr >= s_indices->indices[left].start);
     if (w_addr < s_indices->indices[left].end) {
+
         return left;
     }
     return -1;

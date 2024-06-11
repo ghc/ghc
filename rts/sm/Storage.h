@@ -90,11 +90,11 @@ bool doYouWantToGC(Capability *cap)
 // allocated in cap->total_allocated.
 //
 INLINE_HEADER void finishedNurseryBlock (Capability *cap, bdescr *bd) {
-    cap->total_allocated += bd->free - bd->start;
+    cap->total_allocated += bd->free - bdescr_start(bd);
 }
 
 INLINE_HEADER void newNurseryBlock (bdescr *bd) {
-    RELAXED_STORE(&bd->free, bd->start);
+    RELAXED_STORE(&bd->free, bdescr_start(bd));
 }
 
 void     updateNurseriesStats (void);
@@ -213,7 +213,7 @@ extern StgIndStatic * debug_caf_list;
 extern StgIndStatic * revertible_caf_list;
 
 INLINE_HEADER void clear_blocks(bdescr *bd) {
-   memset(bd->start, 0, BLOCK_SIZE * bd->blocks);
+   memset(bdescr_start(bd), 0, BLOCK_SIZE * bd->blocks);
 }
 
 #include "EndPrivate.h"

@@ -39,7 +39,7 @@ push_mark_stack(StgPtr p)
             mark_stack_top_bd = bd;
             mark_stack_bd = bd;
         }
-        mark_sp     = mark_stack_bd->start;
+        mark_sp     = bdescr_start(mark_stack_bd);
     }
 }
 
@@ -55,7 +55,7 @@ pop_mark_stack(void)
         else
         {
             mark_stack_bd = mark_stack_bd->link;
-            mark_sp       = mark_stack_bd->start + BLOCK_SIZE_W;
+            mark_sp       = bdescr_start(mark_stack_bd) + BLOCK_SIZE_W;
         }
     }
     return (StgPtr)*--mark_sp;

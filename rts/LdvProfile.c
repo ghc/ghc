@@ -173,7 +173,7 @@ processHeapForDead( bdescr *bd )
     StgPtr p;
 
     while (bd != NULL) {
-        p = bd->start;
+        p = bdescr_start(bd);
         while (p < bd->free) {
             p += processHeapClosureForDead((StgClosure *)p);
             while (p < bd->free && !*p)   // skip slop
@@ -194,7 +194,7 @@ processChainForDead( bdescr *bd )
     // Any object still in the chain is dead!
     while (bd != NULL) {
         if (!(bd->flags & BF_PINNED)) {
-            processHeapClosureForDead((StgClosure *)bd->start);
+            processHeapClosureForDead((StgClosure *)bdescr_start(bd));
         }
         bd = bd->link;
     }

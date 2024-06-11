@@ -534,7 +534,7 @@ update_fwd_cnf( bdescr *bd )
 {
     while (bd) {
         ASSERT(bd->flags & BF_COMPACT);
-        StgCompactNFData *str = ((StgCompactNFDataBlock*)bd->start)->owner;
+        StgCompactNFData *str = ((StgCompactNFDataBlock*) bdescr_start(bd))->owner;
 
         // Thread hash table keys. Values won't be moved as those are inside the
         // CNF, and the CNF is a large object and so won't ever move.
@@ -558,7 +558,7 @@ update_fwd_large( bdescr *bd )
     // at the beginning.
     if (bd->flags & BF_PINNED) continue;
 
-    P_ p = bd->start;
+    P_ p = bdescr_start(bd);
     const StgInfoTable *info = get_itbl((StgClosure *)p);
 
     switch (info->type) {
@@ -829,7 +829,7 @@ update_fwd( bdescr *blocks )
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-        P_ p = bd->start;
+        P_ p = bdescr_start(bd);
 
         // linearly scan the objects in this block
         while (p < bd->free) {
@@ -845,11 +845,11 @@ update_fwd_compact( bdescr *blocks )
 {
     bdescr *bd = blocks;
     bdescr *free_bd = blocks;
-    P_ free = free_bd->start;
+    P_ free = bdescr_start(free_bd);
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-        P_ p = bd->start;
+        P_ p = bdescr_start(bd);
 
         while (p < bd->free ) {
 
@@ -877,7 +877,7 @@ update_fwd_compact( bdescr *blocks )
             p = thread_obj(info, p);
 
             W_ size = p - q;
-            if (free + size > free_bd->start + BLOCK_SIZE_W) {
+            if (free + size > bdescr_start(free_bd) + BLOCK_SIZE_W) {
                 // set the next bit in the bitmap to indicate that this object
                 // needs to be pushed into the next block.  This saves us having
                 // to run down the threaded info pointer list twice during the
@@ -885,7 +885,7 @@ update_fwd_compact( bdescr *blocks )
                 // Compact.h.
                 mark(q+1,bd);
                 free_bd = free_bd->link;
-                free = free_bd->start;
+                free = bdescr_start(free_bd);
             } else {
                 ASSERT(!is_marked(q+1,bd));
             }
@@ -903,12 +903,12 @@ update_bkwd_compact( generation *gen )
     bdescr *bd, *free_bd;
     bd = free_bd = gen->old_blocks;
 
-    P_ free = free_bd->start;
+    P_ free = bdescr_start(free_bd);
     W_ free_blocks = 1;
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
-        P_ p = bd->start;
+        P_ p = bdescr_start(bd);
 
         while (p < bd->free) {
 
@@ -928,11 +928,11 @@ update_bkwd_compact( generation *gen )
                 // the next block
                 IF_DEBUG(zero_on_gc, {
                     memset(free_bd->free, 0xaa,
-                           BLOCK_SIZE - ((W_)(free_bd->free - free_bd->start) * sizeof(W_)));
+                           BLOCK_SIZE - ((W_)(free_bd->free - bdescr_start(free_bd)) * sizeof(W_)));
                 });
 
                 free_bd = free_bd->link;
-                free = free_bd->start;
+                free = bdescr_start(free_bd);
                 free_blocks++;
             }
 
@@ -967,7 +967,7 @@ update_bkwd_compact( generation *gen )
     // Zero the free bits of the last used block.
     IF_DEBUG(zero_on_gc, {
         W_ block_size_bytes = free_bd->blocks * BLOCK_SIZE;
-        W_ block_in_use_bytes = (free_bd->free - free_bd->start) * sizeof(W_);
+        W_ block_in_use_bytes = (free_bd->free - bdescr_start(free_bd)) * sizeof(W_);
         W_ block_free_bytes = block_size_bytes - block_in_use_bytes;
         memset(free_bd->free, 0xaa, block_free_bytes);
     });
@@ -999,7 +999,7 @@ compact(StgClosure *static_objects,
         for (W_ n = 0; n < getNumCapabilities(); n++) {
             for (bdescr *bd = getCapability(n)->mut_lists[g];
                  bd != NULL; bd = bd->link) {
-                for (P_ p = bd->start; p < bd->free; p++) {
+                for (P_ p = bdescr_start(bd); p < bd->free; p++) {
                     thread((StgClosure **)p);
                 }
             }

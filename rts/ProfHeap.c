@@ -1104,7 +1104,7 @@ static void
 heapCensusCompactList(Census *census, bdescr *bd)
 {
     for (; bd != NULL; bd = bd->link) {
-        StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bd->start;
+        StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bdescr_start(bd);
         StgCompactNFData *str = block->owner;
         heapProfObject(census, (StgClosure*)str,
                        compact_nfdata_full_sizeW(str), true);
@@ -1118,7 +1118,7 @@ heapCensusCompactList(Census *census, bdescr *bd)
 static void
 heapCensusBlock(Census *census, bdescr *bd)
 {
-    StgPtr p = bd->start;
+    StgPtr p = bdescr_start(bd);
 
     // In the case of PINNED blocks there can be (zeroed) slop at the beginning
     // due to object alignment.
@@ -1401,7 +1401,7 @@ heapCensusChain( Census *census, bdescr *bd )
         // OVERWRITING_CLOSURE_OFS).
         // Consequently, we handle large ARR_WORDS objects as a special case.
         if (bd->flags & BF_LARGE) {
-            StgPtr p = bd->start;
+            StgPtr p = bdescr_start(bd);
             // There may be some initial zeros due to object alignment.
             while (p < bd->free && !*p) p++;
             if (get_itbl((StgClosure *)p)->type == ARR_WORDS) {

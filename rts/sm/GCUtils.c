@@ -65,7 +65,7 @@ allocBlocks_sync(uint32_t n, bdescr **hd)
     for (i = 0; i < n; i++) {
         bd[i].blocks = 1;
         bd[i].link = &bd[i+1];
-        bd[i].free = bd[i].start;
+        bd[i].free = bdescr_start(&bd[i]);
     }
     bd[n-1].link = NULL;
     // We have to hold the lock until we've finished fiddling with the metadata,
@@ -147,14 +147,14 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
     ASSERT(bd->u.scan == bd->free);
 
     if (bd->blocks == 1 &&
-        bd->start + BLOCK_SIZE_W - bd->free > WORK_UNIT_WORDS)
+        bdescr_start(bd) + BLOCK_SIZE_W - bd->free > WORK_UNIT_WORDS)
     {
         // A partially full block: put it on the part_list list.
         // Only for single objects - see Note [big objects]
         bd->link = ws->part_list;
         ws->part_list = bd;
         ws->n_part_blocks += bd->blocks;
-        ws->n_part_words += bd->free - bd->start;
+        ws->n_part_words += bd->free - bdescr_start(bd);
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->part_list) == ws->n_part_blocks));
     }
@@ -164,7 +164,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         bd->link = ws->scavd_list;
         ws->scavd_list = bd;
         ws->n_scavd_blocks += bd->blocks;
-        ws->n_scavd_words += bd->free - bd->start;
+        ws->n_scavd_words += bd->free - bdescr_start(bd);
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
     }
@@ -174,7 +174,7 @@ void
 push_todo_block(bdescr *bd, gen_workspace *ws)
 {
     debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
-            bd->start, (unsigned long)(bd->free - bd->u.scan),
+            bdescr_start(bd), (unsigned long)(bd->free - bd->u.scan),
             ws->gen->no, dequeElements(ws->todo_q));
 
     ASSERT(bd->link == NULL);
@@ -268,15 +268,15 @@ todo_block_full (uint32_t size, gen_workspace *ws)
     // room for the current object, *and* we're not into the second or
     // subsequent block of a large block (see Note [big objects]).
     can_extend =
-        ws->todo_free + size <= bd->start + bd->blocks * BLOCK_SIZE_W
-        && ws->todo_free < ws->todo_bd->start + BLOCK_SIZE_W;
+        ws->todo_free + size <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W
+        && ws->todo_free < bdescr_start(ws->todo_bd) + BLOCK_SIZE_W;
 
     if (!urgent_to_push && can_extend)
     {
-        ws->todo_lim = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
+        ws->todo_lim = stg_min(bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W,
                                ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
         debugTrace(DEBUG_gc, "increasing limit for %p to %p",
-                   bd->start, ws->todo_lim);
+                   bdescr_start(bd), ws->todo_lim);
         p = ws->todo_free;
         ws->todo_free += size;
 
@@ -286,7 +286,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
     gct->copied += ws->todo_free - RELAXED_LOAD(&bd->free);
     RELAXED_STORE(&bd->free, ws->todo_free);
 
-    ASSERT(bd->u.scan >= bd->start && bd->u.scan <= bd->free);
+    ASSERT(bd->u.scan >= bdescr_start(bd) && bd->u.scan <= bd->free);
 
     // If this block is not the scan block, we want to push it out and
     // make room for a new todo block.
@@ -297,7 +297,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
         // push it on to the scanned list.
         if (bd->u.scan == bd->free)
         {
-            if (bd->free == bd->start) {
+            if (bd->free == bdescr_start(bd)) {
                 // Normally the block would not be empty, because then
                 // there would be enough room to copy the current
                 // object.  However, if the object we're copying is
@@ -334,11 +334,11 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
     // Grab a part block if we have one, and it has enough room
     bd = ws->part_list;
     if (bd != NULL &&
-        bd->start + bd->blocks * BLOCK_SIZE_W - bd->free > (int)size)
+        bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W - bd->free > (int)size)
     {
         ws->part_list = bd->link;
         ws->n_part_blocks -= bd->blocks;
-        ws->n_part_words -= bd->free - bd->start;
+        ws->n_part_words -= bd->free - bdescr_start(bd);
     }
     else
     {
@@ -360,7 +360,7 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
             }
         }
         initBdescr(bd, ws->gen, ws->gen->to);
-        RELAXED_STORE(&bd->u.scan, RELAXED_LOAD(&bd->start));
+        RELAXED_STORE(&bd->u.scan, bdescr_start(bd));
         // blocks in to-space get the BF_EVACUATED flag.
         // RELEASE here to ensure that bd->gen is visible to other cores.
         RELEASE_STORE(&bd->flags, BF_EVACUATED);
@@ -370,7 +370,7 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
 
     ws->todo_bd = bd;
     ws->todo_free = bd->free;
-    ws->todo_lim  = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
+    ws->todo_lim  = stg_min(bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W,
                             bd->free + stg_max(WORK_UNIT_WORDS,size));
                      // See Note [big objects]
 

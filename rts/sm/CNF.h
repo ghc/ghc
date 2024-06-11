@@ -54,7 +54,7 @@ INLINE_HEADER StgCompactNFDataBlock *objectGetCompactBlock (StgClosure *closure)
 
     ASSERT((head_block->flags & BF_COMPACT) != 0);
 
-    return (StgCompactNFDataBlock*)(head_block->start);
+    return (StgCompactNFDataBlock*)(bdescr_start(head_block));
 }
 
 // Go from an arbitrary pointer into any block of a compact chain, to the

@@ -455,7 +455,7 @@ scavenge_block (bdescr *bd)
   gen_workspace *ws;
 
   debugTrace(DEBUG_gc, "scavenging block %p (gen %d) @ %p",
-             bd->start, bd->gen_no, bd->u.scan);
+             bdescr_start(bd), bd->gen_no, bd->u.scan);
 
   gct->scan_bd = bd;
   gct->evac_gen_no = bd->gen_no;
@@ -1647,7 +1647,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
     gct->evac_gen_no = gen_no;
 
     for (; bd != NULL; bd = bd->link) {
-        for (q = bd->start; q < bd->free; q++) {
+        for (q = bdescr_start(bd); q < bd->free; q++) {
             p = (StgPtr)*q;
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
@@ -2071,13 +2071,13 @@ scavenge_large (gen_workspace *ws)
         ACQUIRE_SPIN_LOCK(&ws->gen->sync);
         if (bd->flags & BF_COMPACT) {
             dbl_link_onto(bd, &ws->gen->live_compact_objects);
-            StgCompactNFData *str = ((StgCompactNFDataBlock*)bd->start)->owner;
+            StgCompactNFData *str = ((StgCompactNFDataBlock*)bdescr_start(bd))->owner;
             ws->gen->n_live_compact_blocks += str->totalW / BLOCK_SIZE_W;
             p = (StgPtr)str;
         } else {
             dbl_link_onto(bd, &ws->gen->scavenged_large_objects);
             ws->gen->n_scavenged_large_blocks += bd->blocks;
-            p = bd->start;
+            p = bdescr_start(bd);
         }
         RELEASE_SPIN_LOCK(&ws->gen->sync);
 

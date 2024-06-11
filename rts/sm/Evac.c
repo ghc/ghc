@@ -243,7 +243,7 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
         to[i] = from[i];
     }
 
-//  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
+//  if (to+size+2 < bdescr_start(bd) + BLOCK_SIZE_W) {
 //      __builtin_prefetch(to + size + 2, 1);
 //  }
 
@@ -310,7 +310,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
     RELEASE_STORE(&src->header.info, \
                   (const StgInfoTable *)MK_FORWARDING_PTR(to));
 
-//  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
+//  if (to+size+2 < bdescr_start(bd) + BLOCK_SIZE_W) {
 //      __builtin_prefetch(to + size + 2, 1);
 //  }
 

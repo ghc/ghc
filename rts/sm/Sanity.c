@@ -596,7 +596,7 @@ void checkHeapChain (bdescr *bd)
 {
     for (; bd != NULL; bd = bd->link) {
         if(!(bd->flags & BF_SWEPT)) {
-            StgPtr p = bd->start;
+            StgPtr p = bdescr_start(bd);
             while (p < bd->free) {
                 uint32_t size = checkClosure((StgClosure *)p);
                 /* This is the smallest size of closure that can live in the heap */
@@ -670,7 +670,7 @@ checkLargeObjects(bdescr *bd)
 {
   while (bd != NULL) {
     if (!(bd->flags & BF_PINNED)) {
-      checkClosure((StgClosure *)bd->start);
+      checkClosure((StgClosure *)bdescr_start(bd));
     }
     bd = bd->link;
   }
@@ -685,7 +685,7 @@ checkCompactObjects(bdescr *bd)
     for ( ; bd != NULL; bd = bd->link) {
         ASSERT(bd->flags & BF_COMPACT);
 
-        StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bd->start;
+        StgCompactNFDataBlock *block = (StgCompactNFDataBlock*) bdescr_start(bd);
         StgCompactNFData *str = block->owner;
         ASSERT((W_)str == (W_)block + sizeof(StgCompactNFDataBlock));
 
@@ -697,12 +697,13 @@ checkCompactObjects(bdescr *bd)
 
             totalW += Bdescr((P_)block)->blocks * BLOCK_SIZE_W;
 
-            StgPtr start = Bdescr((P_)block)->start + sizeofW(StgCompactNFDataBlock);
+            const bdescr *block_bd = Bdescr((P_)block);
+            StgPtr start = bdescr_start(block_bd) + sizeofW(StgCompactNFDataBlock);
             StgPtr free;
-            if (Bdescr((P_)block)->start == (P_)str->nursery) {
+            if (bdescr_start(block_bd) == (P_)str->nursery) {
                 free = str->hp;
             } else {
-                free = Bdescr((P_)block)->free;
+                free = block_bd->free;
             }
             StgPtr p = start;
             while (p < free)  {
@@ -855,7 +856,7 @@ checkMutableList( bdescr *mut_bd, uint32_t gen )
     StgClosure *p;
 
     for (bd = mut_bd; bd != NULL; bd = bd->link) {
-        for (q = bd->start; q < bd->free; q++) {
+        for (q = bdescr_start(bd); q < bd->free; q++) {
             p = (StgClosure *)*q;
             ASSERT(!HEAP_ALLOCED(p) || Bdescr((P_)p)->gen_no == gen);
             checkClosure(p);
@@ -1057,7 +1058,7 @@ static void
 markCompactBlocks(bdescr *bd)
 {
     for (; bd != NULL; bd = bd->link) {
-        compactMarkKnown(((StgCompactNFDataBlock*)bd->start)->owner);
+        compactMarkKnown(((StgCompactNFDataBlock*) bdescr_start(bd))->owner);
     }
 }
 
@@ -1173,10 +1174,10 @@ void findSlop(bdescr *bd)
     W_ slop;
 
     for (; bd != NULL; bd = bd->link) {
-        slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bd->start);
+        slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bdescr_start(bd));
         if (slop > (1024/sizeof(W_))) {
             debugBelch("block at %p (bdescr %p) has %" FMT_Word "KB slop\n",
-                       bd->start, bd, slop / (1024/(W_)sizeof(W_)));
+                       bdescr_start(bd), bd, slop / (1024/(W_)sizeof(W_)));
         }
     }
 }
