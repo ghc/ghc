@@ -597,8 +597,8 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just ibi) = do
    let tv_subst     = newTyVars us free_tvs
        (filtered_ids, occs'') = unzip         -- again, sync the occ-names
           [ (id, occ) | (id, Just _hv, occ) <- zip3 ids mb_hValues occs' ]
-       (_,tidy_tys) = tidyOpenTypes emptyTidyEnv $
-                      map (substTy tv_subst . idType) filtered_ids
+       tidy_tys = tidyOpenTypes emptyTidyEnv $
+                  map (substTy tv_subst . idType) filtered_ids
 
    new_ids     <- zipWith3M mkNewId occs'' tidy_tys filtered_ids
    result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span

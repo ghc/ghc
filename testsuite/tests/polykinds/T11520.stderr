@@ -1,9 +1,9 @@
-
 T11520.hs:18:77: error: [GHC-25897]
-    • Expected kind ‘k2 -> k1’, but ‘g’ has kind ‘k4’
-      ‘k4’ is a rigid type variable bound by
+    • Expected kind ‘k2 -> k1’, but ‘g’ has kind ‘k’
+      ‘k’ is a rigid type variable bound by
         an instance declaration
         at T11520.hs:18:10-78
     • In the second argument of ‘Compose’, namely ‘g’
       In the first argument of ‘Typeable’, namely ‘(Compose f g)’
       In the instance declaration for ‘Typeable (Compose f g)’
+

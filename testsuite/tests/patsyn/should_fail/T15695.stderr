@@ -1,8 +1,7 @@
-
 T15695.hs:40:14: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
-    • Could not deduce ‘a2 ~ NA VO’
+    • Could not deduce ‘a1 ~ NA VO’
       from the context: ((* -> * -> *) ~ (k -> k1 -> *), Either ~~ f,
-                         ctx ~~ (a2 :&: (a3 :&: E)), f a2 ~~ f1, f1 a3 ~~ a4)
+                         ctx ~~ (a1 :&: (a2 :&: E)), f a1 ~~ f1, f1 a2 ~~ a3)
         bound by a pattern with pattern synonym:
                    ASSO :: forall kind (a :: kind) (b :: Ctx kind).
                            () =>
@@ -13,9 +12,9 @@ T15695.hs:40:14: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
                            a3 -> ApplyT kind a b,
                  in an equation for ‘from'’
         at T15695.hs:40:8-21
-      Expected: a4
-        Actual: Either (NA VO) a3
-      ‘a2’ is a rigid type variable bound by
+      Expected: a3
+        Actual: Either (NA VO) a2
+      ‘a1’ is a rigid type variable bound by
         a pattern with pattern synonym:
           ASSO :: forall kind (a :: kind) (b :: Ctx kind).
                   () =>
@@ -45,3 +44,4 @@ T15695.hs:41:33: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Relevant bindings include
         from' :: ApplyT (* -> * -> *) Either ctx -> NS (NP NA) '[ '[VO]]
           (bound at T15695.hs:40:1)
+

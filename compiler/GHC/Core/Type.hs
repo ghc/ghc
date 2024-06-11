@@ -226,8 +226,10 @@ module GHC.Core.Type (
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
         tidyOpenType,  tidyOpenTypes,
-        tidyVarBndr, tidyVarBndrs, tidyFreeTyCoVars,
-        tidyOpenTyCoVar, tidyOpenTyCoVars,
+        tidyOpenTypeX, tidyOpenTypesX,
+        tidyVarBndr, tidyVarBndrs,
+        tidyFreeTyCoVars,
+        tidyFreeTyCoVarX, tidyFreeTyCoVarsX,
         tidyTyCoVarOcc,
         tidyTopType,
         tidyForAllTyBinder, tidyForAllTyBinders,

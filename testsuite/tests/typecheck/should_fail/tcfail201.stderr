@@ -1,4 +1,3 @@
-
 tcfail201.hs:17:27: error: [GHC-25897]
     • Couldn't match expected type ‘a’ with actual type ‘HsDoc id0’
       ‘a’ is a rigid type variable bound by
@@ -15,3 +14,4 @@ tcfail201.hs:17:27: error: [GHC-25897]
         gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
                    -> (forall g. g -> c g) -> a -> c a
           (bound at tcfail201.hs:16:1)
+

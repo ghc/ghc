@@ -1239,7 +1239,7 @@ Two wrinkles:
           [f :-> \x p. p*p]
      but that is fine.
 
-(W2) This wrinkle concerns the overlp between the new HOP rule and the existing
+(W2) This wrinkle concerns the overlap between the new HOP rule and the existing
      decompose-application rule.  See 3.1 of GHC Proposal #555 for a discussion.
 
      Consider potential match:

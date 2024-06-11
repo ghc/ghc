@@ -1914,7 +1914,8 @@ defaultTyVar def_strat tv
            ; liftZonkM $ writeMetaTyVar kv liftedTypeKind
            ; return True }
       | otherwise
-      = do { addErr $ TcRnCannotDefaultKindVar kv' (tyVarKind kv')
+      = do { let (tidy_env, kv') = tidyFreeTyCoVarX emptyTidyEnv kv
+           ; addErrTcM $ (tidy_env, TcRnCannotDefaultKindVar kv' (tyVarKind kv'))
            -- We failed to default it, so return False to say so.
            -- Hence, it'll get skolemised.  That might seem odd, but we must either
            -- promote, skolemise, or zap-to-Any, to satisfy GHC.Tc.Gen.HsType
@@ -1923,8 +1924,6 @@ defaultTyVar def_strat tv
            -- because we are in an error situation anyway.
            ; return False
         }
-      where
-        (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
 
 -- | Default some unconstrained type variables, as specified
 -- by the defaulting options:
@@ -2130,7 +2129,7 @@ doNotQuantifyTyVars dvs where_found
           -- are OK
        ; let leftover_metas = filter isMetaTyVar undefaulted
        ; unless (null leftover_metas) $
-         do { let (tidy_env1, tidied_tvs) = tidyOpenTyCoVars emptyTidyEnv leftover_metas
+         do { let (tidy_env1, tidied_tvs) = tidyFreeTyCoVarsX emptyTidyEnv leftover_metas
             ; (tidy_env2, where_doc) <- liftZonkM $ where_found tidy_env1
             ; let msg = TcRnUninferrableTyVar tidied_tvs where_doc
             ; failWithTcM (tidy_env2, msg) }
@@ -2491,7 +2490,7 @@ naughtyQuantification orig_ty tv escapees
                              -- we'll just be printing, so no harmful non-determinism
               ; return (orig_ty1, escapees') }
 
-       ; let fvs  = tyCoVarsOfTypeWellScoped orig_ty1
+       ; let fvs  = tyCoVarsOfTypeList orig_ty1
              env0 = tidyFreeTyCoVars emptyTidyEnv fvs
              env  = env0 `delTidyEnvList` escapees'
                     -- this avoids gratuitous renaming of the escaped

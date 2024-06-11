@@ -93,18 +93,19 @@ pprPrecTypeX env prec ty
     -- NB: debug-style is used for -dppr-debug
     --     dump-style  is used for -ddump-tc-trace etc
 
+tidyToIfaceTypeStyX :: TidyEnv -> Type -> PprStyle -> IfaceType
+tidyToIfaceTypeStyX env ty sty
+  | userStyle sty = tidyToIfaceTypeX env ty
+  | otherwise     = toIfaceTypeX (tyCoVarsOfType ty) ty
+     -- in latter case, don't tidy, as we'll be printing uniques.
+
+
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
 
 pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
-
-tidyToIfaceTypeStyX :: TidyEnv -> Type -> PprStyle -> IfaceType
-tidyToIfaceTypeStyX env ty sty
-  | userStyle sty = tidyToIfaceTypeX env ty
-  | otherwise     = toIfaceTypeX (tyCoVarsOfType ty) ty
-     -- in latter case, don't tidy, as we'll be printing uniques.
 
 tidyToIfaceType :: Type -> IfaceType
 tidyToIfaceType = tidyToIfaceTypeX emptyTidyEnv
@@ -117,9 +118,12 @@ tidyToIfaceTypeX :: TidyEnv -> Type -> IfaceType
 -- leave them as IfaceFreeTyVar.  This is super-important
 -- for debug printing.
 tidyToIfaceTypeX env ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env' ty)
+  -- NB: if the type has /already/ been tidied (for example by the typechecker)
+  --     the tidy step here is a no-op.  See Note [Tidying is idempotent]
+  --     in GHC.Core.TyCo.Tidy
   where
     env'      = tidyFreeTyCoVars env free_tcvs
-    free_tcvs = tyCoVarsOfTypeWellScoped ty
+    free_tcvs = tyCoVarsOfTypeList ty
 
 ------------
 pprCo, pprParendCo :: Coercion -> SDoc

@@ -1,4 +1,3 @@
-
 T21906.hs:14:17: error: [GHC-55287]
     • The return type of the third argument of the primop ‘keepAlive#’
       does not have a fixed runtime representation.
@@ -13,7 +12,7 @@ T21906.hs:21:25: error: [GHC-55287]
     • The return type of the first argument of the primop ‘catch#’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE q0
+        a :: TYPE q1
       Cannot unify ‘r’ with the type variable ‘q1’
       because the former is not a concrete ‘RuntimeRep’.
     • In the expression: catch# action handle s
@@ -40,3 +39,4 @@ T21906.hs:35:19: error: [GHC-55287]
     • In the first argument of ‘fork#’, namely ‘f’
       In the expression: fork# f s
       In an equation for ‘test4’: test4 f s = fork# f s
+

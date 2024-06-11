@@ -3409,7 +3409,7 @@ format_frr_err :: Type  -- ^ the type which doesn't have a fixed runtime represe
 format_frr_err ty
   = (bullet <+> ppr tidy_ty <+> dcolon <+> ppr tidy_ki)
   where
-    (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
+    (tidy_env, tidy_ty) = tidyOpenTypeX emptyTidyEnv ty
     tidy_ki             = tidyType tidy_env (typeKind ty)
 
 pprField :: (FieldLabelString, TcType) -> SDoc

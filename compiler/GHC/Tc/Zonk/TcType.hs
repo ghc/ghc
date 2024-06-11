@@ -560,12 +560,11 @@ tcInitTidyEnv
 tcInitOpenTidyEnv :: [TyCoVar] -> ZonkM TidyEnv
 tcInitOpenTidyEnv tvs
   = do { env1 <- tcInitTidyEnv
-       ; let env2 = tidyFreeTyCoVars env1 tvs
-       ; return env2 }
+       ; return (tidyFreeTyCoVars env1 tvs) }
 
 zonkTidyTcType :: TidyEnv -> TcType -> ZonkM (TidyEnv, TcType)
 zonkTidyTcType env ty = do { ty' <- zonkTcType ty
-                           ; return (tidyOpenType env ty') }
+                           ; return (tidyOpenTypeX env ty') }
 
 zonkTidyTcTypes :: TidyEnv -> [TcType] -> ZonkM (TidyEnv, [TcType])
 zonkTidyTcTypes = zonkTidyTcTypes' []
@@ -642,7 +641,7 @@ zonkTidyFRRInfos = go []
 
     go_mb_not_conc env Nothing = return (env, Nothing)
     go_mb_not_conc env (Just (tv, ty))
-      = do { (env, tv) <- return $ tidyOpenTyCoVar env tv
+      = do { (env, tv) <- return $ tidyFreeTyCoVarX env tv
            ; (env, ty) <- zonkTidyTcType env ty
            ; return (env, Just (tv, ty)) }
 
@@ -654,12 +653,12 @@ tidyCt env = updCtEvidence (tidyCtEvidence env)
 tidyCtEvidence :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evar field because we don't
      --     show it in error messages
-tidyCtEvidence env ctev = ctev { ctev_pred = tidyType env ty }
+tidyCtEvidence env ctev = ctev { ctev_pred = tidyOpenType env ty }
   where
     ty  = ctev_pred ctev
 
 tidyHole :: TidyEnv -> Hole -> Hole
-tidyHole env h@(Hole { hole_ty = ty }) = h { hole_ty = tidyType env ty }
+tidyHole env h@(Hole { hole_ty = ty }) = h { hole_ty = tidyOpenType env ty }
 
 tidyDelayedError :: TidyEnv -> DelayedError -> DelayedError
 tidyDelayedError env (DE_Hole hole)

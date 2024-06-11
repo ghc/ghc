@@ -1,20 +1,20 @@
-
 GivenForallLoop.hs:8:11: error: [GHC-25897]
     • Could not deduce ‘a ~ b’
-      from the context: a ~ (forall b1. F a b1)
+      from the context: a ~ (forall b. F a b)
         bound by the type signature for:
-                   loopy :: forall a b. (a ~ (forall b1. F a b1)) => a -> b
+                   loopy :: forall a b. (a ~ (forall b. F a b)) => a -> b
         at GivenForallLoop.hs:7:1-42
       ‘a’ is a rigid type variable bound by
         the type signature for:
-          loopy :: forall a b. (a ~ (forall b1. F a b1)) => a -> b
+          loopy :: forall a b. (a ~ (forall b. F a b)) => a -> b
         at GivenForallLoop.hs:7:1-42
       ‘b’ is a rigid type variable bound by
         the type signature for:
-          loopy :: forall a b. (a ~ (forall b1. F a b1)) => a -> b
+          loopy :: forall a b. (a ~ (forall b. F a b)) => a -> b
         at GivenForallLoop.hs:7:1-42
     • In the expression: x
       In an equation for ‘loopy’: loopy x = x
     • Relevant bindings include
         x :: a (bound at GivenForallLoop.hs:8:7)
         loopy :: a -> b (bound at GivenForallLoop.hs:8:1)
+

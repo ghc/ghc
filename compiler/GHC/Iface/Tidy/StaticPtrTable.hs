@@ -71,6 +71,8 @@ Here is a running example:
   IdBindingInfo] in GHC.Tc.Types).  In our example, 'k' is floatable.
   Even though it is bound in a nested let, we are fine.
 
+  See the call to `checkClosedInStaticForm` in the HsStatic case of `tcExpr`.
+
 * The desugarer replaces the static form with an application of the
   function 'makeStatic' (defined in module GHC.StaticPtr.Internal of
   base).  So we get

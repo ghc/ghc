@@ -1754,7 +1754,7 @@ warnMissingSignatures gbl_env
              add_binding_warn id =
                when (not_ghc_generated name) $
                do { env <- liftZonkM $ tcInitTidyEnv -- Why not use emptyTidyEnv?
-                  ; let (_, ty) = tidyOpenType env (idType id)
+                  ; let ty = tidyOpenType env (idType id)
                         missing = MissingTopLevelBindingSig name ty
                         diag = TcRnMissingSignature missing exported
                   ; addDiagnosticAt (getSrcSpan name) diag }

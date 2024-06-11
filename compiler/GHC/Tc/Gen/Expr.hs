@@ -533,7 +533,9 @@ tcExpr (HsStatic fvs expr) res_ty
                              [liftedTypeKind, expr_ty]
 
         -- Insert the constraints of the static form in a global list for later
-        -- validation.
+        -- validation.  See #13499 for an explanation of why this really isn't the
+        -- right thing to do: the enclosing skolems aren't in scope any more!
+        -- Static forms really aren't well worked out yet.
         ; emitStaticConstraints lie
 
         -- Wrap the static form with the 'fromStaticPtr' call.

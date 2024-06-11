@@ -59,7 +59,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
-import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
+import GHC.Core.Type (mkStrLitTy, tidyOpenTypeX, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 
 import GHC.Builtin.Types ( mkConstraintTupleTy, multiplicityTy, oneDataConTy  )
@@ -1179,7 +1179,7 @@ localSigWarn id mb_sig
 warnMissingSignatures :: Id -> TcM ()
 warnMissingSignatures id
   = do  { env0 <- liftZonkM $ tcInitTidyEnv
-        ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
+        ; let (env1, tidy_ty) = tidyOpenTypeX env0 (idType id)
         ; let dia = TcRnPolymorphicBinderMissingSig (idName id) tidy_ty
         ; addDiagnosticTcM (env1, dia) }
 

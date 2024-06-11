@@ -290,16 +290,19 @@ runTyCoVars f = appEndo f emptyVarSet
 ********************************************************************* -}
 
 tyCoVarsOfType :: Type -> TyCoVarSet
+-- The "deep" TyCoVars of the the type
 tyCoVarsOfType ty = runTyCoVars (deep_ty ty)
 -- Alternative:
 --   tyCoVarsOfType ty = closeOverKinds (shallowTyCoVarsOfType ty)
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
+-- The "deep" TyCoVars of the the type
 tyCoVarsOfTypes tys = runTyCoVars (deep_tys tys)
 -- Alternative:
 --   tyCoVarsOfTypes tys = closeOverKinds (shallowTyCoVarsOfTypes tys)
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
+-- The "deep" TyCoVars of the the coercion
 -- See Note [Free variables of types]
 tyCoVarsOfCo co = runTyCoVars (deep_co co)
 

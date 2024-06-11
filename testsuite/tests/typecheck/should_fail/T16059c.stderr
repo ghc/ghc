@@ -1,7 +1,7 @@
-
 T16059c.hs:6:6: error: [GHC-91510]
-    • Illegal polymorphic type: forall a1. a1
+    • Illegal polymorphic type: forall a. a
     • In the expansion of type synonym ‘Foo’
       In the type signature: f :: Foo -> a -> f
     Suggested fix:
       Perhaps you intended to use the ‘RankNTypes’ extension (implied by ‘ImpredicativeTypes’)
+

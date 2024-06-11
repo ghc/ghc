@@ -1,4 +1,3 @@
-
 T14846.hs:38:8: error: [GHC-25897]
     • Couldn't match type ‘ríki’ with ‘Hom riki’
       Expected: ríki a a
@@ -34,3 +33,4 @@ T14846.hs:39:44: error: [GHC-25897]
       In an expression type signature: AStruct (Structured a cls)
     • Relevant bindings include
         i :: Hom riki a a (bound at T14846.hs:39:3)
+

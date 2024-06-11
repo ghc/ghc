@@ -1,4 +1,3 @@
-
 T9834.hs:23:12: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘a’ with ‘p a0’
       Expected: p a
@@ -51,3 +50,4 @@ T9834.hs:23:23: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
                  Comp p q a -> Comp p q a)
                 -> p a
           (bound at T9834.hs:23:3)
+
