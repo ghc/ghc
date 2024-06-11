@@ -47,7 +47,7 @@
    When there is no global work to do, we start scavenging the todo
    blocks in the workspaces.  This is where the scan_bd field comes
    in: we can scan the contents of the todo block, when we have
-   scavenged the contents of the todo block (up to todo_bd->free), we
+   scavenged the contents of the todo block (up to bdescr_free(todo_bd)), we
    don't want to move this block immediately to the scavd_list,
    because it is probably only partially full.  So we remember that we
    have scanned up to this point by saving the block in ws->scan_bd,

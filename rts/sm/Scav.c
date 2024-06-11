@@ -435,7 +435,7 @@ scavenge_fun_srt(const StgInfoTable *info)
 }
 
 /* -----------------------------------------------------------------------------
-   Scavenge a block from the given scan pointer up to bd->free.
+   Scavenge a block from the given scan pointer up to bdescr_free(bd).
 
    evac_gen_no is set by the caller to be either zero (for a step in a
    generation < N) or G where G is the generation of the step being
@@ -475,9 +475,9 @@ scavenge_block (bdescr *bd)
 
 
   // we might be evacuating into the very object that we're
-  // scavenging, so we have to check the real bd->free pointer each
+  // scavenging, so we have to check the real bdescr_free(bd) pointer each
   // time around the loop.
-  while (p < bd->free || (bd == ws->todo_bd && p < ws->todo_free)) {
+  while (p < bdescr_free(bd) || (bd == ws->todo_bd && p < ws->todo_free)) {
 
     ASSERT(bd->link == NULL);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
@@ -871,17 +871,17 @@ scavenge_block (bdescr *bd)
     }
   }
 
-  if (p > bd->free)  {
-      gct->copied += ws->todo_free - bd->free;
-      RELEASE_STORE(&bd->free, p);
+  if (p > bdescr_free(bd))  {
+      gct->copied += ws->todo_free - bdescr_free(bd);
+      bdescr_set_free(bd, p);
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
-             (unsigned long)((bd->free - bd->u.scan) * sizeof(W_)));
+             (unsigned long)((bdescr_free(bd) - bd->u.scan) * sizeof(W_)));
 
   // update stats: this is a block that has been scavenged
-  gct->scanned += bd->free - bd->u.scan;
-  bd->u.scan = bd->free;
+  gct->scanned += bdescr_free(bd) - bd->u.scan;
+  bd->u.scan = bdescr_free(bd);
 
   if (bd != ws->todo_bd) {
       // we're not going to evac any more objects into
@@ -1647,7 +1647,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
     gct->evac_gen_no = gen_no;
 
     for (; bd != NULL; bd = bd->link) {
-        for (q = bdescr_start(bd); q < bd->free; q++) {
+        for (q = bdescr_start(bd); q < bdescr_free(bd); q++) {
             p = (StgPtr)*q;
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 

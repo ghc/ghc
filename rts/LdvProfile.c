@@ -170,16 +170,15 @@ processHeapClosureForDead( const StgClosure *c )
 static void
 processHeapForDead( bdescr *bd )
 {
-    StgPtr p;
-
     while (bd != NULL) {
-        p = bdescr_start(bd);
-        while (p < bd->free) {
+        StgPtr p = bdescr_start(bd);
+        const StgPtr free = bdescr_free(bd);
+        while (p < free) {
             p += processHeapClosureForDead((StgClosure *)p);
-            while (p < bd->free && !*p)   // skip slop
+            while (p < free && !*p)   // skip slop
                 p++;
         }
-        ASSERT(p == bd->free);
+        ASSERT(p == free);
         bd = bd->link;
     }
 }

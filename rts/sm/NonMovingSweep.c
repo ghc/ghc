@@ -286,7 +286,7 @@ void nonmovingSweepMutLists(void)
         bdescr *old_mut_list = cap->mut_lists[oldest_gen->no];
         cap->mut_lists[oldest_gen->no] = allocBlockOnNode_lock(cap->node);
         for (bdescr *bd = old_mut_list; bd; bd = bd->link) {
-            for (StgPtr p = bdescr_start(bd); p < bd->free; p++) {
+            for (StgPtr p = bdescr_start(bd); p < bdescr_free(bd); p++) {
                 StgClosure **q = (StgClosure**)p;
                 ASSERT(Bdescr((StgPtr) *q)->gen_no == oldest_gen->no);
                 if (nonmovingIsAlive(*q) && !is_closure_clean(*q)) {

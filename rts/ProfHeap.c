@@ -1403,7 +1403,7 @@ heapCensusChain( Census *census, bdescr *bd )
         if (bd->flags & BF_LARGE) {
             StgPtr p = bdescr_start(bd);
             // There may be some initial zeros due to object alignment.
-            while (p < bd->free && !*p) p++;
+            while (p < bdescr_free(bd) && !*p) p++;
             if (get_itbl((StgClosure *)p)->type == ARR_WORDS) {
                 size_t size = arr_words_sizeW((StgArrBytes *)p);
                 bool prim = true;

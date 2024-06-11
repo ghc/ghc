@@ -113,7 +113,7 @@ alloc_in_moving_heap (uint32_t size, uint32_t gen_no)
     if (ws->todo_free > ws->todo_lim) {
         to = todo_block_full(size, ws);
     }
-    ASSERT(ws->todo_free >= ws->todo_bd->free && ws->todo_free <= ws->todo_lim);
+    ASSERT(ws->todo_free >= bdescr_free(ws->todo_bd) && ws->todo_free <= ws->todo_lim);
 
     return to;
 }

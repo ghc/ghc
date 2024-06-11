@@ -497,7 +497,7 @@ printMutableList(bdescr *bd)
     debugBelch("mutable list %p: ", bd);
 
     for (; bd != NULL; bd = bd->link) {
-        for (p = bdescr_start(bd); p < bd->free; p++) {
+        for (p = bdescr_start(bd); p < bdescr_free(bd); p++) {
             debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
         }
     }
@@ -957,11 +957,12 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 {
     StgPtr q, r, end;
     for (; bd; bd = bd->link) {
+        const StgPtr free = bdescr_free(bd);
         searched++;
-        for (q = bdescr_start(bd); q < bd->free; q++) {
+        for (q = bdescr_start(bd); q < free; q++) {
             if (UNTAG_CONST_CLOSURE((StgClosure*)*q) == (const StgClosure *)p) {
                 if (i < arr_size) {
-                    for (r = bdescr_start(bd); r < bd->free; r = end) {
+                    for (r = bdescr_start(bd); r < free; r = end) {
                         // skip over zeroed-out slop
                         while (*r == 0) r++;
                         if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
@@ -977,7 +978,7 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
                             break;
                         }
                     }
-                    if (r >= bd->free) {
+                    if (r >= free) {
                         debugBelch("%p found at %p, closure?", p, q);
                     }
                 } else {

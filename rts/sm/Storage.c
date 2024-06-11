@@ -1143,7 +1143,7 @@ allocateMightFail (Capability *cap, W_ n)
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
         RELAXED_STORE(&bd->flags, BF_LARGE);
-        RELAXED_STORE(&bd->free, bdescr_start(bd) + n);
+        bdescr_set_free(bd, bdescr_start(bd) + n);
         cap->total_allocated += n;
         return bdescr_start(bd);
     }
@@ -1152,7 +1152,7 @@ allocateMightFail (Capability *cap, W_ n)
 
     accountAllocation(cap, n);
     bd = cap->r.rCurrentAlloc;
-    if (RTS_UNLIKELY(bd == NULL || bd->free + n > bdescr_start(bd) + BLOCK_SIZE_W)) {
+    if (RTS_UNLIKELY(bd == NULL || bdescr_free(bd) + n > bdescr_start(bd) + BLOCK_SIZE_W)) {
 
         if (bd) finishedNurseryBlock(cap,bd);
 
@@ -1209,8 +1209,8 @@ allocateMightFail (Capability *cap, W_ n)
         cap->r.rCurrentAlloc = bd;
         IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
     }
-    p = bd->free;
-    bd->free += n;
+    p = bdescr_free(bd);
+    bdescr_set_free(bd, p + n);
 
     IF_DEBUG(sanity, ASSERT(*((StgWord8*)p) == 0xaa));
     return p;
@@ -1338,14 +1338,14 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
     }
 
     const StgWord alignment_w = alignment / sizeof(W_);
-    W_ off_w = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
+    W_ off_w = ALIGN_WITH_OFF_W(bdescr_free(bd), alignment, align_off);
 
     // If the request is is smaller than LARGE_OBJECT_THRESHOLD then
     // allocate into the pinned object accumulator.
     if (n + off_w < LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
         // If the current pinned object block isn't large enough to hold the new
         // object, get a new one.
-        if ((bd->free + off_w + n) > (bdescr_start(bd) + BLOCK_SIZE_W)) {
+        if ((bdescr_free(bd) + off_w + n) > (bdescr_start(bd) + BLOCK_SIZE_W)) {
             bd = start_new_pinned_block(cap);
 
             // The pinned_object_block remains attached to the capability
@@ -1362,19 +1362,19 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
             // block will be promoted as usual (if anything in it is
             // live).
 
-            off_w = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
+            off_w = ALIGN_WITH_OFF_W(bdescr_free(bd), alignment, align_off);
         }
 
         // N.B. it is important that we account for the alignment padding
         // when determining large-object-ness, lest we may over-fill the
         // block. See #23400.
         if (n + off_w < LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-            StgPtr p = bd->free;
+            StgPtr p = bdescr_free(bd);
             MEMSET_SLOP_W(p, 0, off_w);
             n += off_w;
             p += off_w;
-            bd->free += n;
-            ASSERT(bd->free <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W);
+            bdescr_set_free(bd, bdescr_free(bd) + n);
+            ASSERT(bdescr_free(bd) <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W);
             accountAllocation(cap, n);
             return p;
         }
@@ -1638,8 +1638,8 @@ W_ countOccupied (bdescr *bd)
 
     words = 0;
     for (; bd != NULL; bd = bd->link) {
-        ASSERT(bd->free <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W);
-        words += bd->free - bdescr_start(bd);
+        ASSERT(bdescr_free(bd) <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W);
+        words += bdescr_free(bd) - bdescr_start(bd);
     }
     return words;
 }

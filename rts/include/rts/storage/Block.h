@@ -209,6 +209,18 @@ EXTERN_INLINE StgPtr bdescr_start(const bdescr *bd)
         );
 }
 
+EXTERN_INLINE StgPtr bdescr_free(const bdescr *bd);
+EXTERN_INLINE StgPtr bdescr_free(const bdescr *bd)
+{
+    return RELAXED_LOAD(&bd->free);
+}
+
+EXTERN_INLINE void bdescr_set_free(bdescr *bd, void *free);
+EXTERN_INLINE void bdescr_set_free(bdescr *bd, void *free)
+{
+    RELAXED_STORE(&bd->free, free);
+}
+
 #endif
 
 /* Useful Macros ------------------------------------------------------------ */

@@ -597,14 +597,14 @@ void checkHeapChain (bdescr *bd)
     for (; bd != NULL; bd = bd->link) {
         if(!(bd->flags & BF_SWEPT)) {
             StgPtr p = bdescr_start(bd);
-            while (p < bd->free) {
+            while (p < bdescr_free(bd)) {
                 uint32_t size = checkClosure((StgClosure *)p);
                 /* This is the smallest size of closure that can live in the heap */
                 ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
                 p += size;
 
                 /* skip over slop, see Note [slop on the heap] */
-                while (p < bd->free &&
+                while (p < bdescr_free(bd) &&
                        (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
             }
         }
@@ -703,7 +703,7 @@ checkCompactObjects(bdescr *bd)
             if (bdescr_start(block_bd) == (P_)str->nursery) {
                 free = str->hp;
             } else {
-                free = block_bd->free;
+                free = bdescr_free(block_bd);
             }
             StgPtr p = start;
             while (p < free)  {
@@ -856,7 +856,7 @@ checkMutableList( bdescr *mut_bd, uint32_t gen )
     StgClosure *p;
 
     for (bd = mut_bd; bd != NULL; bd = bd->link) {
-        for (q = bdescr_start(bd); q < bd->free; q++) {
+        for (q = bdescr_start(bd); q < bdescr_free(bd); q++) {
             p = (StgClosure *)*q;
             ASSERT(!HEAP_ALLOCED(p) || Bdescr((P_)p)->gen_no == gen);
             checkClosure(p);
@@ -1174,7 +1174,7 @@ void findSlop(bdescr *bd)
     W_ slop;
 
     for (; bd != NULL; bd = bd->link) {
-        slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bdescr_start(bd));
+        slop = (bd->blocks * BLOCK_SIZE_W) - (bdescr_free(bd) - bdescr_start(bd));
         if (slop > (1024/sizeof(W_))) {
             debugBelch("block at %p (bdescr %p) has %" FMT_Word "KB slop\n",
                        bdescr_start(bd), bd, slop / (1024/(W_)sizeof(W_)));

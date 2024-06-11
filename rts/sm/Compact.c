@@ -832,7 +832,7 @@ update_fwd( bdescr *blocks )
         P_ p = bdescr_start(bd);
 
         // linearly scan the objects in this block
-        while (p < bd->free) {
+        while (p < bdescr_free(bd)) {
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
             const StgInfoTable *info = get_itbl((StgClosure *)p);
             p = thread_obj(info, p);
@@ -851,12 +851,12 @@ update_fwd_compact( bdescr *blocks )
     for (; bd != NULL; bd = bd->link) {
         P_ p = bdescr_start(bd);
 
-        while (p < bd->free ) {
+        while (p < bdescr_free(bd)) {
 
-            while ( p < bd->free && !is_marked(p,bd) ) {
+            while ( p < bdescr_free(bd) && !is_marked(p,bd) ) {
                 p++;
             }
-            if (p >= bd->free) {
+            if (p >= bdescr_free(bd)) {
                 break;
             }
 
@@ -909,26 +909,27 @@ update_bkwd_compact( generation *gen )
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
         P_ p = bdescr_start(bd);
+        const P_ bd_free = bdescr_free(bd);
 
-        while (p < bd->free) {
+        while (p < bd_free) {
 
-            while (p < bd->free && !is_marked(p,bd)) {
+            while (p < bd_free && !is_marked(p,bd)) {
                 p++;
             }
 
-            if (p >= bd->free) {
+            if (p >= bd_free) {
                 break;
             }
 
             if (is_marked(p+1,bd)) {
                 // Don't forget to update the free ptr in the block desc
-                free_bd->free = free;
+                bdescr_set_free(free_bd, free);
 
                 // Zero the remaining bytes of this block before moving on to
                 // the next block
                 IF_DEBUG(zero_on_gc, {
-                    memset(free_bd->free, 0xaa,
-                           BLOCK_SIZE - ((W_)(free_bd->free - bdescr_start(free_bd)) * sizeof(W_)));
+                    memset(bdescr_free(free_bd), 0xaa,
+                           BLOCK_SIZE - ((W_)(bdescr_free(free_bd) - bdescr_start(free_bd)) * sizeof(W_)));
                 });
 
                 free_bd = free_bd->link;
@@ -958,7 +959,7 @@ update_bkwd_compact( generation *gen )
     }
 
     // Free the remaining blocks and count what's left.
-    free_bd->free = free;
+    bdescr_set_free(free_bd, free);
     if (free_bd->link != NULL) {
         freeChain(free_bd->link);
         free_bd->link = NULL;
@@ -967,9 +968,9 @@ update_bkwd_compact( generation *gen )
     // Zero the free bits of the last used block.
     IF_DEBUG(zero_on_gc, {
         W_ block_size_bytes = free_bd->blocks * BLOCK_SIZE;
-        W_ block_in_use_bytes = (free_bd->free - bdescr_start(free_bd)) * sizeof(W_);
+        W_ block_in_use_bytes = (bdescr_free(free_bd) - bdescr_start(free_bd)) * sizeof(W_);
         W_ block_free_bytes = block_size_bytes - block_in_use_bytes;
-        memset(free_bd->free, 0xaa, block_free_bytes);
+        memset(bdescr_free(free_bd), 0xaa, block_free_bytes);
     });
 
     return free_blocks;
@@ -999,7 +1000,7 @@ compact(StgClosure *static_objects,
         for (W_ n = 0; n < getNumCapabilities(); n++) {
             for (bdescr *bd = getCapability(n)->mut_lists[g];
                  bd != NULL; bd = bd->link) {
-                for (P_ p = bdescr_start(bd); p < bd->free; p++) {
+                for (P_ p = bdescr_start(bd); p < bdescr_free(bd); p++) {
                     thread((StgClosure **)p);
                 }
             }
