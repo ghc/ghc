@@ -1,3 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE RecordWildCards #-}
 module GHC.Driver.MakeFile.JSON
   ( writeJSONFile,
     JsonOutput (..),
@@ -5,6 +12,8 @@ module GHC.Driver.MakeFile.JSON
     updateJson,
     writeJsonOutput,
     DepJSON,
+    DepNode (..),
+    Dep (..),
     initDepJSON,
     updateDepJSON,
     OptJSON,
@@ -13,15 +22,22 @@ module GHC.Driver.MakeFile.JSON
   )
 where
 
+import Data.Foldable (traverse_)
 import Data.IORef
 import qualified Data.Map.Strict as Map
+import qualified Data.Semigroup as Semigroup
 import qualified Data.Set as Set
+import GHC.Data.FastString (unpackFS)
+import GHC.Generics (Generic, Generically (Generically))
 import GHC.Prelude
+import GHC.Unit (Module, ModuleName, UnitId, moduleName, moduleNameString, IsBootInterface (IsBoot))
+import GHC.Unit.Database (GenericUnitInfo (..))
+import GHC.Unit.Info (PackageName (PackageName), UnitInfo)
+import GHC.Unit.Types (unitIdString)
 import GHC.Utils.Json
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import System.FilePath
-import Data.Foldable (traverse_)
 
 --------------------------------------------------------------------------------
 -- Output helpers
@@ -62,7 +78,7 @@ mkJsonOutput mk_ref =
 
 -- | Update the dump data in 'json_ref' if the output target is present.
 updateJson :: Maybe (JsonOutput a) -> (a -> a) -> IO ()
-updateJson out f = traverse_ (flip modifyIORef' f . json_ref) out
+updateJson out f = traverse_ (\ JsonOutput {json_ref} -> modifyIORef' json_ref f) out
 
 -- | Write a json object to the flag-dependent file if the output target is
 -- present.
@@ -79,31 +95,115 @@ writeJsonOutput =
 -- Payload for -dep-json
 --------------------------------------------------------------------------------
 
-newtype DepJSON = DepJSON (Map.Map FilePath (Set.Set FilePath))
+data DepNode =
+  DepNode {
+    dn_mod :: Module,
+    dn_src :: FilePath,
+    dn_obj :: FilePath,
+    dn_hi :: FilePath,
+    dn_boot :: IsBootInterface
+  }
+
+data Dep =
+  DepHi {
+    dep_mod :: Module,
+    dep_path :: FilePath,
+    dep_unit :: Maybe UnitInfo,
+    dep_local :: Bool,
+    dep_boot :: IsBootInterface
+  }
+  |
+  DepCpp {
+    dep_path :: FilePath
+  }
+
+newtype PackageDeps =
+  PackageDeps (Map.Map (String, UnitId) (Set.Set ModuleName))
+  deriving newtype (Monoid)
+
+instance Semigroup PackageDeps where
+  PackageDeps l <> PackageDeps r = PackageDeps (Map.unionWith (Semigroup.<>) l r)
+
+data Deps =
+  Deps {
+    sources :: Set.Set FilePath,
+    modules :: (Set.Set ModuleName, Set.Set ModuleName),
+    packages :: PackageDeps,
+    cpp :: Set.Set FilePath,
+    preprocessor :: Maybe FilePath
+  }
+  deriving stock (Generic)
+  deriving (Semigroup, Monoid) via (Generically Deps)
+
+newtype DepJSON = DepJSON (Map.Map ModuleName Deps)
 
 instance ToJson DepJSON where
   json (DepJSON m) =
-    JSObject
-      [ (target, JSArray [JSString dep | dep <- Set.toList deps])
-        | (target, deps) <- Map.toList m
-      ]
+    JSObject [
+      (moduleNameString target, JSObject [
+        ("sources", array sources id),
+        ("modules", array (fst modules) moduleNameString),
+        ("modules-boot", array (snd modules) moduleNameString),
+        ("packages", JSArray [package unit_id name mods | ((name, unit_id), mods) <- Map.toList packages]),
+        ("cpp", array cpp id),
+        ("preprocessor", maybe JSNull JSString preprocessor)
+      ])
+      | (target, Deps {packages = PackageDeps packages, ..}) <- Map.toList m
+    ]
+    where
+      package unit_id name mods =
+        JSObject [
+          ("id", JSString (unitIdString unit_id)),
+          ("name", JSString name),
+          ("modules", array mods moduleNameString)
+        ]
+
+      array values render = JSArray (fmap (JSString . render) (Set.toList values))
 
 initDepJSON :: IO (IORef DepJSON)
 initDepJSON = newIORef $ DepJSON Map.empty
 
-updateDepJSON :: [FilePath] -> FilePath -> DepJSON -> DepJSON
-updateDepJSON targets dep (DepJSON m0) =
+insertDepJSON :: [ModuleName] -> Deps -> DepJSON -> DepJSON
+insertDepJSON targets dep (DepJSON m0) =
   DepJSON
     $ foldl'
       ( \acc target ->
           Map.insertWith
-            Set.union
-            (normalise target)
-            (Set.singleton $ normalise dep)
+            (Semigroup.<>)
+            target
+            dep
             acc
       )
       m0
       targets
+
+updateDepJSON :: Bool -> Maybe FilePath -> DepNode -> [Dep] -> DepJSON -> DepJSON
+updateDepJSON include_pkgs preprocessor DepNode {..} deps =
+  insertDepJSON [moduleName dn_mod] payload
+  where
+    payload = node_data Semigroup.<> foldMap dep deps
+
+    node_data = mempty {sources = Set.singleton dn_src, preprocessor}
+
+    dep = \case
+      DepHi {dep_mod, dep_local, dep_unit, dep_boot}
+        | dep_local
+        , let set = Set.singleton (moduleName dep_mod)
+              value | IsBoot <- dep_boot = (Set.empty, set)
+                    | otherwise = (set, Set.empty)
+        -> mempty {modules = value}
+
+        | include_pkgs
+        , Just unit <- dep_unit
+        , let PackageName name = unitPackageName unit
+              key = (unpackFS name, unitId unit)
+        -> mempty {packages = PackageDeps (Map.singleton key (Set.singleton (moduleName dep_mod)))}
+
+        | otherwise
+        -> mempty
+
+      DepCpp {dep_path} ->
+        mempty {cpp = Set.singleton dep_path}
 
 --------------------------------------------------------------------------------
 -- Payload for -opt-json

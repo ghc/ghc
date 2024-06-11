@@ -3,7 +3,9 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 T24384:
-	'$(TEST_HC)' -M D.hs C.hs B.hs A.hs -dep-json dep.json -opt-json opt.json
+	mkdir -p lib
+	mv B.hs lib/
+	'$(TEST_HC)' -M A.hs lib/B.hs C.hs D.hs E.hs -dep-json dep.json -opt-json opt.json -include-pkg-deps -include-cpp-deps -outputdir . -package containers
 	cat dep.json
 	echo ''
 	cat opt.json
