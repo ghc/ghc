@@ -4,23 +4,25 @@
 module GHC.Core.TyCo.Tidy
   (
         -- * Tidying type related things up for printing
-        tidyType,      tidyTypes,
-        tidyOpenType,  tidyOpenTypes,
-        tidyVarBndr, tidyVarBndrs, tidyFreeTyCoVars, avoidNameClashes,
-        tidyOpenTyCoVar, tidyOpenTyCoVars,
-        tidyTyCoVarOcc,
+        tidyType, tidyTypes,
+        tidyCo,   tidyCos,
         tidyTopType,
-        tidyCo, tidyCos,
-        tidyForAllTyBinder, tidyForAllTyBinders
+
+        tidyOpenType,  tidyOpenTypes,
+        tidyOpenTypeX, tidyOpenTypesX,
+        tidyFreeTyCoVars, tidyFreeTyCoVarX, tidyFreeTyCoVarsX,
+
+        tidyAvoiding,
+        tidyVarBndr, tidyVarBndrs, avoidNameClashes,
+        tidyForAllTyBinder, tidyForAllTyBinders,
+        tidyTyCoVarOcc
   ) where
 
 import GHC.Prelude
 import GHC.Data.FastString
 
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
-
-import GHC.Data.Maybe (orElse)
+import GHC.Core.TyCo.FVs
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -29,12 +31,76 @@ import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
 
-{-
-%************************************************************************
-%*                                                                      *
-\subsection{TidyType}
-%*                                                                      *
-%************************************************************************
+{- **********************************************************************
+
+                  TidyType
+
+********************************************************************** -}
+
+{- Note [Tidying open types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When tidying some open types [t1,..,tn], we find their free vars, and tidy them first.
+
+But (tricky point) we restrict the occ_env part of inner_env to just the /free/
+vars of [t1..tn], so that we don't gratuitously rename the /bound/ variables.
+
+Example: assume the TidyEnv
+      ({"a1","b"} , [a_4 :-> a1, b_7 :-> b])
+and call tidyOpenTypes on
+      [a_1, forall a_2. Maybe (a_2,a_4), forall b. (b,a_1)]
+All the a's have the same OccName, but different uniques.
+
+The TidyOccEnv binding for "b" relates b_7, which doesn't appear free in the
+these types at all, so we don't want that to mess up the tidying for the
+(forall b...).
+
+So we proceed as follows:
+  1. Find the free vars.
+     In our example:the free vars are a_1 and a_4:
+
+  2. Use tidyFreeTyCoVars to tidy them (workhorse: `tidyFreeCoVarX`)
+     In our example:
+      * a_4 already has a tidy form, a1, so don't change that
+      * a_1 gets tidied to a2
+
+  3. Trim the TidyOccEnv to OccNames of the tidied free vars (`trimTidyEnv`)
+     In our example "a1" and "a2"
+
+  4. Now tidy the types.  In our example we get
+      [a2, forall a3. Maybe (a3,a1), forall b. (b, a2)]
+
+Note [Tidying is idempotent]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Key invariant: tidyFreeTyCoVars is idempotent, at least if you start with
+an empty TidyEnv. This is important because:
+
+  * The typechecker error message processing carefully tidies types, using
+    global knowledge; see for example calls to `tidyCt` in GHC.Tc.Errors.
+
+  * Then the type pretty-printer, GHC.Core.TyCo.Ppr.pprType tidies the type
+    again, because that's important for pretty-printing types in general.
+
+But the second tidying is a no-op if the first step has happened, because
+all the free vars will have distinct OccNames, so no renaming needs to happen.
+
+Note [tidyAvoiding]
+~~~~~~~~~~~~~~~~~~~
+Consider tidying this unsolved constraint in GHC.Tc.Errors.report_unsolved.
+    C a_33, (forall a. Eq a => D a)
+Here a_33 is a free unification variable.  If we firs tidy [a_33 :-> "a"]
+then we have no choice but to tidy the `forall a` to something else. But it
+is confusing (sometimes very confusing) to gratuitously rename skolems in
+this way -- see #24868.  So it is better to :
+
+  * Find the /bound/ skolems (just `a` in this case)
+  * Initialise the TidyOccEnv to avoid using "a"
+  * Now tidy the free a_33 to, say, "a1"
+  * Delete "a" from the TidyOccEnv
+
+This is done by `tidyAvoiding`.
+
+The last step is very important; if we leave "a" in the TidyOccEnv, when
+we get to the (forall a. blah) we'll rename `a` to "a2", avoiding "a".
 -}
 
 -- | This tidies up a type for printing in an error message, or in
@@ -95,31 +161,38 @@ tidyForAllTyBinders tidy_env tvbs
 tidyFreeTyCoVars :: TidyEnv -> [TyCoVar] -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
-tidyFreeTyCoVars tidy_env tyvars
-  = fst (tidyOpenTyCoVars tidy_env tyvars)
+-- Precondition: input free vars are closed over kinds and
+-- This function does a scopedSort, so that tidied variables
+-- have tidied kinds.
+-- See Note [Tidying is idempotent]
+tidyFreeTyCoVars tidy_env tyvars = fst (tidyFreeTyCoVarsX tidy_env tyvars)
 
 ---------------
-tidyOpenTyCoVars :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
-tidyOpenTyCoVars env tyvars = mapAccumL tidyOpenTyCoVar env tyvars
+tidyFreeTyCoVarsX :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
+-- Precondition: input free vars are closed over kinds and
+-- This function does a scopedSort, so that tidied variables
+-- have tidied kinds.
+-- See Note [Tidying is idempotent]
+tidyFreeTyCoVarsX env tyvars = mapAccumL tidyFreeTyCoVarX env $
+                               scopedSort tyvars
 
 ---------------
-tidyOpenTyCoVar :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
+tidyFreeTyCoVarX :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
 -- ^ Treat a new 'TyCoVar' as a binder, and give it a fresh tidy name
 -- using the environment if one has not already been allocated. See
 -- also 'tidyVarBndr'
-tidyOpenTyCoVar env@(_, subst) tyvar
+-- See Note [Tidying is idempotent]
+tidyFreeTyCoVarX env@(_, subst) tyvar
   = case lookupVarEnv subst tyvar of
-        Just tyvar' -> (env, tyvar')              -- Already substituted
-        Nothing     ->
-          let env' = tidyFreeTyCoVars env (tyCoVarsOfTypeList (tyVarKind tyvar))
-          in tidyVarBndr env' tyvar  -- Treat it as a binder
+        Just tyvar' -> (env, tyvar')           -- Already substituted
+        Nothing     -> tidyVarBndr env tyvar  -- Treat it as a binder
 
 ---------------
 tidyTyCoVarOcc :: TidyEnv -> TyCoVar -> TyCoVar
-tidyTyCoVarOcc env@(_, subst) tv
-  = case lookupVarEnv subst tv of
-        Nothing  -> updateVarType (tidyType env) tv
-        Just tv' -> tv'
+tidyTyCoVarOcc env@(_, subst) tcv
+  = case lookupVarEnv subst tcv of
+        Nothing   -> updateVarType (tidyType env) tcv
+        Just tcv' -> tcv'
 
 ---------------
 
@@ -157,22 +230,26 @@ tidyTypes env tys = strictMap (tidyType env) tys
 --
 -- See Note [Strictness in tidyType and friends]
 tidyType :: TidyEnv -> Type -> Type
-tidyType _   t@(LitTy {})          = t -- Preserve sharing
-tidyType env (TyVarTy tv)          = TyVarTy $! tidyTyCoVarOcc env tv
-tidyType _   t@(TyConApp _ [])     = t -- Preserve sharing if possible
-tidyType env (TyConApp tycon tys)  = TyConApp tycon $! tidyTypes env tys
-tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
-                                           ; !arg' = tidyType env arg
-                                           ; !res' = tidyType env res }
-                                       in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
-tidyType env (ty@(ForAllTy{}))     = (mkForAllTys' $! (zip tvs' vis)) $! tidyType env' body_ty
-  where
-    (tvs, vis, body_ty) = splitForAllTyCoVars' ty
-    (env', tvs') = tidyVarBndrs env tvs
-tidyType env (CastTy ty co)       = (CastTy $! tidyType env ty) $! (tidyCo env co)
-tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
+tidyType _   t@(LitTy {})           = t -- Preserve sharing
+tidyType env (TyVarTy tv)           = TyVarTy $! tidyTyCoVarOcc env tv
+tidyType _   t@(TyConApp _ [])      = t -- Preserve sharing if possible
+tidyType env (TyConApp tycon tys)   = TyConApp tycon $! tidyTypes env tys
+tidyType env (AppTy fun arg)        = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (CastTy ty co)         = (CastTy $! tidyType env ty) $! (tidyCo env co)
+tidyType env (CoercionTy co)        = CoercionTy $! (tidyCo env co)
+tidyType env ty@(FunTy _ w arg res) = let { !w'   = tidyType env w
+                                          ; !arg' = tidyType env arg
+                                          ; !res' = tidyType env res }
+                                      in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
+tidyType env (ty@(ForAllTy{}))      = tidyForAllType env ty
 
+
+tidyForAllType :: TidyEnv -> Type -> Type
+tidyForAllType env ty
+   = (mkForAllTys' $! (zip tcvs' vis)) $! tidyType body_env body_ty
+  where
+    (tcvs, vis, body_ty) = splitForAllTyCoVars' ty
+    (body_env, tcvs') = tidyVarBndrs env tcvs
 
 -- The following two functions differ from mkForAllTys and splitForAllTyCoVars in that
 -- they expect/preserve the ForAllTyFlag argument. These belong to "GHC.Core.Type", but
@@ -190,23 +267,52 @@ splitForAllTyCoVars' ty = go ty [] []
 
 
 ---------------
--- | Grabs the free type variables, tidies them
--- and then uses 'tidyType' to work over the type itself
-tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
-tidyOpenTypes env tys
-  = (env', tidyTypes (trimmed_occ_env, var_env) tys)
+tidyAvoiding :: [OccName]
+             -> (TidyEnv -> a -> TidyEnv)
+             -> a -> TidyEnv
+-- Initialise an empty TidyEnv with some bound vars to avoid,
+-- run the do_tidy function, and then remove the bound vars again.
+-- See Note [tidyAvoiding]
+tidyAvoiding bound_var_avoids do_tidy thing
+  = (occs' `delTidyOccEnvList` bound_var_avoids, vars')
   where
-    (env'@(_, var_env), tvs') = tidyOpenTyCoVars env $
-                                tyCoVarsOfTypesWellScoped tys
-    trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
-      -- The idea here was that we restrict the new TidyEnv to the
-      -- _free_ vars of the types, so that we don't gratuitously rename
-      -- the _bound_ variables of the types.
+    (occs', vars') = do_tidy init_tidy_env thing
+    init_tidy_env  = mkEmptyTidyEnv (initTidyOccEnv bound_var_avoids)
 
 ---------------
-tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
-tidyOpenType env ty = let (env', [ty']) = tidyOpenTypes env [ty] in
-                      (env', ty')
+trimTidyEnv :: TidyEnv -> [TyCoVar] -> TidyEnv
+trimTidyEnv (occ_env, var_env) tcvs
+  = (trimTidyOccEnv occ_env (map getOccName tcvs), var_env)
+
+---------------
+-- | Grabs the free type variables, tidies them
+-- and then uses 'tidyType' to work over the type itself
+tidyOpenTypesX :: TidyEnv -> [Type] -> (TidyEnv, [Type])
+-- See Note [Tidying open  types]
+tidyOpenTypesX env tys
+  = (env1, tidyTypes inner_env tys)
+  where
+    free_tcvs :: [TyCoVar] -- Closed over kinds
+    free_tcvs          = tyCoVarsOfTypesList tys
+    (env1, free_tcvs') = tidyFreeTyCoVarsX env free_tcvs
+    inner_env          = trimTidyEnv env1 free_tcvs'
+
+---------------
+tidyOpenTypeX :: TidyEnv -> Type -> (TidyEnv, Type)
+-- See Note [Tidying open  types]
+tidyOpenTypeX env ty
+  = (env1, tidyType inner_env ty)
+  where
+    free_tcvs          = tyCoVarsOfTypeList ty
+    (env1, free_tcvs') = tidyFreeTyCoVarsX env free_tcvs
+    inner_env          = trimTidyEnv env1 free_tcvs'
+
+---------------
+tidyOpenTypes :: TidyEnv -> [Type] -> [Type]
+tidyOpenTypes env ty = snd (tidyOpenTypesX env ty)
+
+tidyOpenType :: TidyEnv -> Type -> Type
+tidyOpenType env ty = snd (tidyOpenTypeX env ty)
 
 ---------------
 -- | Calls 'tidyType' on a top-level type (i.e. with an empty tidying environment)
@@ -219,7 +325,7 @@ tidyTopType ty = tidyType emptyTidyEnv ty
 --
 -- See Note [Strictness in tidyType and friends]
 tidyCo :: TidyEnv -> Coercion -> Coercion
-tidyCo env@(_, subst) co
+tidyCo env co
   = go co
   where
     go_mco MRefl    = MRefl
@@ -236,7 +342,7 @@ tidyCo env@(_, subst) co
             -- of tv. But the alternative is to use coercionKind, which seems worse.
     go (FunCo r afl afr w co1 co2) = ((FunCo r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = CoVarCo $! go_cv cv
-    go (HoleCo h)            = HoleCo h
+    go (HoleCo h)            = HoleCo $! go_hole h
     go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
@@ -249,7 +355,10 @@ tidyCo env@(_, subst) co
     go (SubCo co)            = SubCo $! go co
     go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
 
-    go_cv cv = lookupVarEnv subst cv `orElse` cv
+    go_cv cv = tidyTyCoVarOcc env cv
+
+    go_hole (CoercionHole cv r h) = (CoercionHole $! go_cv cv) r h
+    -- Tidy even the holes; tidied types should have tidied kinds
 
     go_prov (PhantomProv co)    = PhantomProv $! go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co

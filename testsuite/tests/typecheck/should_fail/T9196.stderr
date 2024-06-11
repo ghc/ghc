@@ -1,6 +1,5 @@
-
 T9196.hs:4:6: error: [GHC-91510]
-    • Illegal polymorphic type: forall a1. Eq a1
+    • Illegal polymorphic type: forall a. Eq a
       A constraint must be a monotype
     • In the type signature: f :: (forall a. Eq a) => a -> a
     Suggested fix:
@@ -12,3 +11,4 @@ T9196.hs:7:6: error: [GHC-91510]
     • In the type signature: g :: (Eq a => Ord a) => a -> a
     Suggested fix:
       Perhaps you intended to use the ‘QuantifiedConstraints’ extension
+

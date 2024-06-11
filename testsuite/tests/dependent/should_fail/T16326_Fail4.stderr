@@ -1,4 +1,3 @@
-
 T16326_Fail4.hs:6:30: error: [GHC-51580]
     • Illegal visible, dependent quantification in the type of a term:
         forall a1 -> Maybe a1 -> Maybe a1 -> Maybe a1
@@ -10,3 +9,4 @@ T16326_Fail4.hs:6:30: error: [GHC-51580]
         zipWith ((<>) :: forall a -> Maybe a -> Maybe a -> Maybe a) xs ys
     Suggested fix:
       Perhaps you intended to use the ‘RequiredTypeArguments’ extension
+

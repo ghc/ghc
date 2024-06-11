@@ -1,4 +1,3 @@
-
 T13233.hs:14:11: error: [GHC-55287]
     • • The first component of the unboxed tuple
         does not have a fixed runtime representation.
@@ -32,3 +31,4 @@ T13233.hs:22:16: error: [GHC-55287]
     • In the first argument of ‘obscure’, namely ‘(#,#)’
       In the expression: obscure (#,#)
       In an equation for ‘quux’: quux = obscure (#,#)
+

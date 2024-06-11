@@ -1,9 +1,9 @@
-
 T15787.hs:17:14: error: [GHC-25897]
-    • Expected a type, but ‘k’ has kind ‘ob1’
-      ‘ob1’ is a rigid type variable bound by
+    • Expected a type, but ‘k’ has kind ‘ob’
+      ‘ob’ is a rigid type variable bound by
         the type signature for ‘Kl’
         at T15787.hs:17:3-43
     • In the type ‘k’
       In the definition of data constructor ‘Kl’
       In the data declaration for ‘Kl_kind’
+

@@ -22,6 +22,7 @@ module GHC.Tc.Types.Constraint (
         mkNonCanonical, mkGivens,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
+        boundOccNamesOfWC,
 
         -- Particular forms of constraint
         EqCt(..),    eqCtEvidence, eqCtLHS,
@@ -846,6 +847,20 @@ eqCanEqLHS _ _ = False
 *                                                                      *
 ************************************************************************
 -}
+
+---------------- Getting bound tyvars -------------------------
+boundOccNamesOfWC :: WantedConstraints -> [OccName]
+-- Return the OccNames of skolem-bound type variables
+-- We could recurse into types, and get the forall-bound ones too,
+-- but I'm going wait until that is needed
+-- See Note [tidyAvoiding] in GHC.Core.TyCo.Tidy
+boundOccNamesOfWC wc = bagToList (go_wc wc)
+  where
+    go_wc (WC { wc_impl = implics })
+      = concatMapBag go_implic implics
+    go_implic (Implic { ic_skols = tvs, ic_wanted = wc })
+      = listToBag (map getOccName tvs) `unionBags` go_wc wc
+
 
 ---------------- Getting free tyvars -------------------------
 

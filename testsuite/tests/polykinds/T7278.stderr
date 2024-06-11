@@ -1,8 +1,8 @@
-
 T7278.hs:9:43: error: [GHC-25897]
-    • Expected kind ‘* -> * -> *’, but ‘t’ has kind ‘k1’
-      ‘k1’ is a rigid type variable bound by
+    • Expected kind ‘* -> * -> *’, but ‘t’ has kind ‘k’
+      ‘k’ is a rigid type variable bound by
         the type signature for ‘f’
         at T7278.hs:9:1-49
     • In the type signature:
         f :: (C (t :: k) (TF t)) => TF t p1 p0 -> t p1 p0
+

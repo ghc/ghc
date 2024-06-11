@@ -1,4 +1,3 @@
-
 T14369.hs:29:5: error: [GHC-25897]
     • Couldn't match type ‘a1’ with ‘a2’
       Expected: Sing x -> Maybe (Demote a2)
@@ -19,3 +18,4 @@ T14369.hs:29:5: error: [GHC-25897]
       In an equation for ‘f’: f = fromSing
     • Relevant bindings include
         f :: Sing x -> Maybe (Demote a2) (bound at T14369.hs:29:1)
+

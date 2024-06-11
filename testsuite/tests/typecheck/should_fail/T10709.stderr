@@ -1,12 +1,9 @@
-
 T10709.hs:6:21: error: [GHC-91028]
-    • Couldn't match type ‘a2’
-                     with ‘(forall a4. IO a4 -> IO a4) -> IO a3’
+    • Couldn't match type ‘a2’ with ‘(forall a. IO a -> IO a) -> IO a3’
       Expected: a2 -> IO a3
         Actual: ((forall a. IO a -> IO a) -> IO a3) -> IO a3
       Cannot equate type variable ‘a2’
-      with a type involving polytypes:
-        (forall a4. IO a4 -> IO a4) -> IO a3
+      with a type involving polytypes: (forall a. IO a -> IO a) -> IO a3
       ‘a2’ is a rigid type variable bound by
         the inferred type of x1 :: a2 -> IO [a3]
         at T10709.hs:6:1-24
@@ -31,13 +28,14 @@ T10709.hs:7:22: error: [GHC-91028]
 
 T10709.hs:8:22: error: [GHC-91028]
     • Couldn't match type ‘a0’
-                     with ‘(forall a2. IO a2 -> IO a2) -> IO a’
+                     with ‘(forall a1. IO a1 -> IO a1) -> IO a’
       Expected: a0 -> IO a
         Actual: ((forall a1. IO a1 -> IO a1) -> IO a) -> IO a
       Cannot instantiate unification variable ‘a0’
       with a type involving polytypes:
-        (forall a2. IO a2 -> IO a2) -> IO a
+        (forall a1. IO a1 -> IO a1) -> IO a
     • In the second argument of ‘(.)’, namely ‘mask’
       In the first argument of ‘($)’, namely ‘(replicateM 2 . mask)’
       In the expression: (replicateM 2 . mask) $ undefined
     • Relevant bindings include x3 :: IO [a] (bound at T10709.hs:8:1)
+

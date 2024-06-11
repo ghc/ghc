@@ -61,6 +61,7 @@ import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Ppr     ( pprTyVars )
+import GHC.Core.TyCo.Tidy    ( tidyAvoiding )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -218,7 +219,8 @@ report_unsolved type_errors expr_holes
 
        ; wanted <- liftZonkM $ zonkWC wanted   -- Zonk to reveal all information
 
-       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs
+       ; let tidy_env = tidyAvoiding bound_occs tidyFreeTyCoVars free_tvs
+                        -- See Note [tidyAvoiding] in GHC.Core.TyCo.Tidy
              free_tvs = filterOut isCoVar $
                         tyCoVarsOfWCList wanted
                         -- tyCoVarsOfWC returns free coercion *holes*, even though
@@ -227,8 +229,12 @@ report_unsolved type_errors expr_holes
                         -- no sense. Really we should not return those holes at all;
                         -- for now we just filter them out.
 
+             bound_occs :: [OccName]
+             bound_occs = boundOccNamesOfWC wanted
+
        ; traceTc "reportUnsolved (after zonking):" $
          vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
+              , text "Bound occs:" <+> ppr bound_occs
               , text "Tidy env:" <+> ppr tidy_env
               , text "Wanted:" <+> ppr wanted ]
 

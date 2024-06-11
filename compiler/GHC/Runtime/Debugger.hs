@@ -138,7 +138,7 @@ pprintClosureCommand bindThings force str = do
            -- It's OK to use nonDetEltsUniqSet here because initTidyOccEnv
            -- forgets the ordering immediately by creating an env
                         , getUniqSet $ env_tvs `intersectVarSet` my_tvs)
-     return $ mapTermType (snd . tidyOpenType tidyEnv) t
+     return $ mapTermType (tidyOpenType tidyEnv) t
 
 -- | Give names, and bind in the interactive environment, to all the suspensions
 --   included (inductively) in a term

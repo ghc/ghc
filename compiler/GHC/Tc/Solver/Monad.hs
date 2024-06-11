@@ -1889,8 +1889,7 @@ solverDepthError loc ty
            do { ty   <- TcM.zonkTcType ty
               ; env0 <- TcM.tcInitTidyEnv
               ; return (ty, env0) }
-       ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfTypeList ty)
-             tidy_ty      = tidyType tidy_env ty
+       ; let (tidy_env, tidy_ty)  = tidyOpenTypeX env0 ty
              msg = TcRnSolverDepthError tidy_ty depth
        ; TcM.failWithTcM (tidy_env, msg) }
   where

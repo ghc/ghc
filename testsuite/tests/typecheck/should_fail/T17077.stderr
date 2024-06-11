@@ -1,7 +1,7 @@
-
 T17077.hs:7:13: error: [GHC-91028]
     • Expected kind ‘forall (k :: k1). a’, but ‘z’ has kind ‘k0’
       Cannot instantiate unification variable ‘k0’
-      with a kind involving polytypes: forall (k2 :: k1). a
+      with a kind involving polytypes: forall (k :: k1). a
     • In the first argument of ‘Proxy’, namely ‘(z :: forall k. a)’
       In the type signature: t :: Proxy (z :: forall k. a)
+

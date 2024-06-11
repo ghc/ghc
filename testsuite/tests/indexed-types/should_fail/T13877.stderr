@@ -1,7 +1,6 @@
-
 T13877.hs:65:41: error: [GHC-83865]
     • Expecting one more argument to ‘p’
-      Expected kind ‘(-?>) [a] (*) (:->)’, but ‘p’ has kind ‘[a] ~> *’
+      Expected kind ‘(-?>) [a1] (*) (:->)’, but ‘p’ has kind ‘[a1] ~> *’
     • In the type ‘p’
       In the expression: listElimPoly @(:->) @a @p @l
       In an equation for ‘listElimTyFun’:
@@ -9,7 +8,8 @@ T13877.hs:65:41: error: [GHC-83865]
     • Relevant bindings include
         listElimTyFun :: Sing l
                          -> (p @@ '[])
-                         -> (forall (x :: a) (xs :: [a]).
+                         -> (forall (x :: a1) (xs :: [a1]).
                              Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs))
                          -> p @@ l
           (bound at T13877.hs:65:1)
+

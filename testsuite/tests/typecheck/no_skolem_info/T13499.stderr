@@ -1,14 +1,14 @@
-
 T13499.hs:7:19: error: [GHC-88464]
-    • Found hole: _ :: a
-      Where: ‘a’ is a rigid type variable bound by
+    • Found hole: _ :: a1
+      Where: ‘a1’ is a rigid type variable bound by
                the type signature for:
-                 f :: forall a. Typeable a => StaticPtr (a -> a)
+                 f :: forall a1. Typeable a1 => StaticPtr (a1 -> a1)
                at T13499.hs:6:1-37
     • In the body of a static form: (\ a -> _)
       In the expression: static (\ a -> _)
       In an equation for ‘f’: f = static (\ a -> _)
     • Relevant bindings include
-        a :: a (bound at T13499.hs:7:14)
-        f :: StaticPtr (a -> a) (bound at T13499.hs:7:1)
-      Valid hole fits include a :: a (bound at T13499.hs:7:14)
+        a :: a1 (bound at T13499.hs:7:14)
+        f :: StaticPtr (a1 -> a1) (bound at T13499.hs:7:1)
+      Valid hole fits include a :: a1 (bound at T13499.hs:7:14)
+

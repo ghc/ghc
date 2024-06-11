@@ -1,24 +1,24 @@
-
 RepPolyNPlusK.hs:22:1: error: [GHC-55287]
     The first pattern in the equation for ‘foo’
     does not have a fixed runtime representation.
     Its type is:
-      a :: TYPE rep2
+      a :: TYPE rep1
 
 RepPolyNPlusK.hs:22:6: error: [GHC-55287]
     • • The first argument of the rebindable syntax operator ‘(>=)’
           arising from the literal ‘2’
         does not have a fixed runtime representation.
         Its type is:
-          a1 :: TYPE rep1
-        Cannot unify ‘rep2’ with the type variable ‘rep1’
+          a1 :: TYPE rep2
+        Cannot unify ‘rep1’ with the type variable ‘rep2’
         because the former is not a concrete ‘RuntimeRep’.
       • The first argument of the rebindable syntax operator ‘(-)’
           arising from the literal ‘2’
         does not have a fixed runtime representation.
         Its type is:
           a0 :: TYPE rep0
-        Cannot unify ‘rep2’ with the type variable ‘rep0’
+        Cannot unify ‘rep1’ with the type variable ‘rep0’
         because the former is not a concrete ‘RuntimeRep’.
     • In the pattern: bndr_a+2
       In an equation for ‘foo’: foo (bndr_a+2) = ()
+

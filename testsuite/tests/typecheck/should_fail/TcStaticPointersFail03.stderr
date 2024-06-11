@@ -1,6 +1,6 @@
-
 TcStaticPointersFail03.hs:9:29: error: [GHC-39999]
-    • No instance for ‘Monad m’ arising from a use of ‘return’
+    • No instance for ‘Monad m1’ arising from a use of ‘return’
     • In the body of a static form: return
       In the first argument of ‘deRefStaticPtr’, namely ‘(static return)’
       In the expression: deRefStaticPtr (static return)
+

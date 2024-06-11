@@ -106,7 +106,7 @@ module GHC.Types.Name.Occurrence (
         mainOcc, ppMainFn,
 
         -- * Tidying up
-        TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv,
+        TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv, trimTidyOccEnv,
         tidyOccName, avoidClashesOccEnv, delTidyOccEnvList,
 
         -- FsEnv
@@ -1142,7 +1142,7 @@ tack on the '1', if necessary.
 
 Note [TidyOccEnv]
 ~~~~~~~~~~~~~~~~~
-type TidyOccEnv = UniqFM Int
+type TidyOccEnv = UniqFM FastString Int
 
 * Domain = The OccName's FastString. These FastStrings are "taken";
            make sure that we don't re-use
@@ -1197,7 +1197,15 @@ would like to see is
 To achieve this, the function avoidClashesOccEnv can be used to prepare the
 TidyEnv, by “blocking” every name that occurs twice in the map. This way, none
 of the "a"s will get the privilege of keeping this name, and all of them will
-get a suitable number by tidyOccName.
+get a suitable number by tidyOccName.  Thus
+
+   avoidNameClashesOccEnv ["a" :-> 7] ["b", "a", "c", "b", "a"]
+     = ["a" :-> 7, "b" :-> 1]
+
+Here
+* "a" is already the TidyOccEnv, and so is unaffected
+* "b" occurs twice, so is blocked by adding "b" :-> 1
+* "c" occurs only once, and so is not affected.
 
 This prepared TidyEnv can then be used with tidyOccName. See tidyTyCoVarBndrs
 for an example where this is used.
@@ -1217,8 +1225,8 @@ initTidyOccEnv = foldl' add emptyUFM
   where
     add env (OccName _ fs) = addToUFM env fs 1
 
-delTidyOccEnvList :: TidyOccEnv -> [FastString] -> TidyOccEnv
-delTidyOccEnvList = delListFromUFM
+delTidyOccEnvList :: TidyOccEnv -> [OccName] -> TidyOccEnv
+delTidyOccEnvList env occs = env `delListFromUFM` map occNameFS occs
 
 -- see Note [Tidying multiple names at once]
 avoidClashesOccEnv :: TidyOccEnv -> [OccName] -> TidyOccEnv
@@ -1262,6 +1270,16 @@ tidyOccName env occ@(OccName occ_sp fs)
                      -- If they are the same (n==1), the former wins
                      -- See Note [TidyOccEnv]
 
+trimTidyOccEnv :: TidyOccEnv -> [OccName] -> TidyOccEnv
+-- Restrict the env to just the [OccName]
+trimTidyOccEnv env vs
+  = foldl' add emptyUFM vs
+  where
+    add :: TidyOccEnv -> OccName -> TidyOccEnv
+    add so_far (OccName _ fs)
+      = case lookupUFM env fs of
+          Just n  -> addToUFM so_far fs n
+          Nothing -> so_far
 
 {-
 ************************************************************************

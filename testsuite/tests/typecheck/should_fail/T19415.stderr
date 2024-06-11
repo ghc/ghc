@@ -1,10 +1,10 @@
-
 T19415.hs:27:8: error: [GHC-18872]
     • Couldn't match type ‘[Char]’ with ‘Char’
         arising from a functional dependency between:
-          constraint ‘SetField "name" (Pet a) (Pet b) Char’
+          constraint ‘SetField "name" (Pet a1) (Pet b) Char’
             arising from a use of ‘setField’
-          instance ‘SetField "name" (Pet a1) (Pet b1) String’
+          instance ‘SetField "name" (Pet a) (Pet b1) String’
             at T19415.hs:(23,3)-(24,60)
     • In the expression: setField @"name" 'c' (Pet "hi")
       In an equation for ‘loop’: loop = setField @"name" 'c' (Pet "hi")
+

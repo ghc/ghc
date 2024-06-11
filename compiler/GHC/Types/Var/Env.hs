@@ -470,7 +470,7 @@ mkEmptyTidyEnv occ_env = (occ_env, emptyVarEnv)
 delTidyEnvList :: TidyEnv -> [Var] -> TidyEnv
 delTidyEnvList (occ_env, var_env) vs = (occ_env', var_env')
   where
-    occ_env' = occ_env `delTidyOccEnvList` map (occNameFS . getOccName) vs
+    occ_env' = occ_env `delTidyOccEnvList` map getOccName vs
     var_env' = var_env `delVarEnvList` vs
 
 {-

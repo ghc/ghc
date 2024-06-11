@@ -290,7 +290,7 @@ checkUserTypeError ctxt ty
 
   | Just msg <- deepUserTypeError_maybe ty
   = do { env0 <- liftZonkM tcInitTidyEnv
-       ; let (env1, tidy_msg) = tidyOpenType env0 msg
+       ; let (env1, tidy_msg) = tidyOpenTypeX env0 msg
        ; failWithTcM (env1, TcRnUserTypeError tidy_msg) }
   | otherwise
   = return ()
@@ -793,7 +793,9 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
                           , ve_rank = rank, ve_expand = expand }) ty
   | not (null tvbs && null theta)
   = do  { traceTc "check_type" (ppr ty $$ ppr rank)
-        ; checkTcM (forAllAllowed rank) (env, TcRnForAllRankErr rank (tidyType env ty))
+        ; checkTcM (forAllAllowed rank) $
+          let (env1, tidy_ty) = tidyOpenTypeX env ty
+          in  (env1, TcRnForAllRankErr rank tidy_ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message
 
