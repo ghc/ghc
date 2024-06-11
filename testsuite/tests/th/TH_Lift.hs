@@ -1,6 +1,7 @@
 -- test Lifting instances
 
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE MagicHash #-}
 
 module TH_Lift where
 
@@ -10,6 +11,8 @@ import Data.Word
 import Data.Int
 import Numeric.Natural
 import Data.List.NonEmpty
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Internal as B
 
 a :: Integer
 a = $( (\x -> [| x |]) (5 :: Integer) )
@@ -80,3 +83,17 @@ o = $( (\x -> [| x |]) (True, 'x', 4 :: Int) )
 p :: NonEmpty Char
 p = $( (\x -> [| x |])  ('a' :| "bcde") )
 
+exp :: Exp
+exp = $( [| 3 + 4 |] >>= lift )
+
+texp :: TExp Int
+texp = $$( examineCode [|| 3 + 4 ||] `bindCode` liftTyped )
+
+bytes :: Bytes
+bytes = $(do
+  let (fp, offset, size) = B.toForeignPtr (B.pack [72, 101, 108, 108, 111]) -- "hello"#
+  let bytes = Bytes { bytesPtr = fp
+                    , bytesOffset = fromIntegral offset
+                    , bytesSize = fromIntegral size
+                    }
+  lift bytes)
