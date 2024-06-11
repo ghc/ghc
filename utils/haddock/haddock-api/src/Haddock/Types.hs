@@ -924,6 +924,7 @@ type instance XStockStrategy DocNameI = NoExtField
 type instance XAnyClassStrategy DocNameI = NoExtField
 type instance XNewtypeStrategy DocNameI = NoExtField
 type instance XViaStrategy DocNameI = LHsSigType DocNameI
+type instance XTHStrategy DocNameI = NoExtField
 type instance XDataFamInstD DocNameI = NoExtField
 type instance XTyFamInstD DocNameI = NoExtField
 type instance XClsInstD DocNameI = NoExtField

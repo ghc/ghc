@@ -136,6 +136,9 @@ data AuxBindSpec
               -- data type. This is only used on the RHS of the
               -- to-be-generated $c binding.
 
+  | DerivTHBind (LHsBind GhcPs) -- just the thing; should be System name already (see ThToHs.thRdrName)
+  | DerivTHSig  (LSig GhcPs)    -- dito
+
 -- | Retrieve the 'RdrName' of the binding that the supplied 'AuxBindSpec'
 -- describes.
 auxBindSpecRdrName :: AuxBindSpec -> RdrName
@@ -143,6 +146,8 @@ auxBindSpecRdrName (DerivTag2Con      _ tag2con_RDR) = tag2con_RDR
 auxBindSpecRdrName (DerivMaxTag       _ maxtag_RDR)  = maxtag_RDR
 auxBindSpecRdrName (DerivDataDataType _ dataT_RDR _) = dataT_RDR
 auxBindSpecRdrName (DerivDataConstr   _ dataC_RDR _) = dataC_RDR
+auxBindSpecRdrName DerivTHBind{}                     = panic "not here; see gen_aux_bind_spec"
+auxBindSpecRdrName DerivTHSig{}                      = panic "not here; see gen_aux_bind_spec"
 
 {-
 ************************************************************************
@@ -2203,6 +2208,9 @@ genAuxBindSpecOriginal loc spec
         fixity | is_infix  = infix_RDR
                | otherwise = prefix_RDR
 
+    gen_bind DerivTHBind{} = panic "not here; see gen_aux_bind_spec"
+    gen_bind DerivTHSig{}  = panic "not here; see gen_aux_bind_spec"
+
 -- | Generate the code for an auxiliary binding that is a duplicate of another
 -- auxiliary binding.
 -- See @Note [Auxiliary binders] (Wrinkle: Reducing code duplication)@.
@@ -2231,6 +2239,10 @@ genAuxBindSpecSig loc spec = case spec of
     -> mk_sig (nlHsTyVar NotPromoted dataType_RDR)
   DerivDataConstr _ _ _
     -> mk_sig (nlHsTyVar NotPromoted constr_RDR)
+  DerivTHBind{}
+    -> panic "not here; see gen_aux_bind_spec"
+  DerivTHSig{}
+    -> panic "not here; see gen_aux_bind_spec"
   where
     mk_sig = mkHsWildCardBndrs . L (noAnnSrcSpan loc) . mkHsImplicitSigType
 
@@ -2238,8 +2250,8 @@ genAuxBindSpecSig loc spec = case spec of
 -- bindings based on the declarative descriptions in the supplied
 -- 'AuxBindSpec's. See @Note [Auxiliary binders]@.
 genAuxBinds :: SrcSpan -> Bag AuxBindSpec
-            -> Bag (LHsBind GhcPs, LSig GhcPs)
-genAuxBinds loc = snd . foldr gen_aux_bind_spec (emptyOccEnv, emptyBag)
+            -> (LHsBinds GhcPs, [LSig GhcPs])
+genAuxBinds loc = snd . foldr gen_aux_bind_spec (emptyOccEnv, (emptyBag, []))
  where
   -- Perform a CSE-like pass over the generated auxiliary bindings to avoid
   -- code duplication, as described in
@@ -2247,19 +2259,22 @@ genAuxBinds loc = snd . foldr gen_aux_bind_spec (emptyOccEnv, emptyBag)
   -- The OccEnv remembers the first occurrence of each sort of auxiliary
   -- binding and maps it to the unique RdrName for that binding.
   gen_aux_bind_spec :: AuxBindSpec
-                    -> (OccEnv RdrName, Bag (LHsBind GhcPs, LSig GhcPs))
-                    -> (OccEnv RdrName, Bag (LHsBind GhcPs, LSig GhcPs))
+                    -> (OccEnv RdrName, (LHsBinds GhcPs, [LSig GhcPs]))
+                    -> (OccEnv RdrName, (LHsBinds GhcPs, [LSig GhcPs]))
+  gen_aux_bind_spec (DerivTHBind bind) (env, (binds, sigs)) = (env, (bind `consBag` binds, sigs)) -- TODO sigs
+  gen_aux_bind_spec (DerivTHSig sig) (env, (binds, sigs)) = (env, (binds, sig : sigs)) -- TODO sigs
   gen_aux_bind_spec spec (original_rdr_name_env, spec_bag) =
     case lookupOccEnv original_rdr_name_env spec_occ of
       Nothing
         -> ( extendOccEnv original_rdr_name_env spec_occ spec_rdr_name
-           , genAuxBindSpecOriginal loc spec `consBag` spec_bag )
+           , genAuxBindSpecOriginal loc spec `cons_bind_sig` spec_bag )
       Just original_rdr_name
         -> ( original_rdr_name_env
-           , genAuxBindSpecDup loc original_rdr_name spec `consBag` spec_bag )
+           , genAuxBindSpecDup loc original_rdr_name spec `cons_bind_sig` spec_bag )
     where
       spec_rdr_name = auxBindSpecRdrName spec
       spec_occ      = rdrNameOcc spec_rdr_name
+      cons_bind_sig (bind, sig) (binds, sigs) = (bind `consBag` binds, sig : sigs)
 
 mkParentType :: TyCon -> Type
 -- Turn the representation tycon of a family into

@@ -1699,6 +1699,7 @@ instance ToHie (RScoped (LocatedAn NoEpAnns (DerivStrategy GhcRn))) where
       AnyclassStrategy _ -> []
       NewtypeStrategy _ -> []
       ViaStrategy s -> [ toHie (TS (ResolvedScopes [sc]) s) ]
+      THStrategy _ -> []
 
 instance ToHie (LocatedP OverlapMode) where
   toHie (L span _) = locOnly (locA span)
@@ -1984,6 +1985,7 @@ instance ToHie (HsQuote GhcRn) where
   toHie (DecBrG _ decls) = processGrp decls
   toHie (TypBr _ ty) = toHie ty
   toHie (VarBr {} )  = pure []
+  toHie (XQuote THTypBr{}) = panic "May never happen; only arises during splice expansion"
 
 instance ToHie PendingRnSplice where
   toHie (PendingRnSplice _ _ e) = toHie e

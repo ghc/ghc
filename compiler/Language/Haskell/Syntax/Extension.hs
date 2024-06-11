@@ -340,6 +340,7 @@ type family XStockStrategy    x
 type family XAnyClassStrategy x
 type family XNewtypeStrategy  x
 type family XViaStrategy      x
+type family XTHStrategy       x
 
 -- -------------------------------------
 -- DefaultDecl type families

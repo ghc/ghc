@@ -8,6 +8,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -39,7 +40,7 @@ import GHC.Unit.Module.Warnings
 
 import GHC.Rename.Bind
 import GHC.Rename.Env
-import GHC.Rename.Module ( addTcgDUs )
+import GHC.Rename.Module ( addTcgDUs, rnATInstDecls, rnTyFamInstDecl, rnDataFamInstDecl )
 import GHC.Rename.Utils
 
 import GHC.Core.Unify( tcUnifyTy )
@@ -71,6 +72,13 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.List (partition, find)
+import {-# SOURCE #-} GHC.Tc.Gen.Splice (reifyType, runMetaD)
+import GHC.Types.Basic
+import GHC.Builtin.Names.TH (deriveTHName)
+import GHC.Rename.Splice (runRnSplice)
+import GHC.Rename.HsType (rnHsSigType)
+import GHC.Tc.Instance.Class (AssocInstInfo(..))
+import {-# SOURCE #-} GHC.Tc.TyCl.Instance (tcDataFamInstDecl, tcTyFamInstDecl)
 
 {-
 ************************************************************************
@@ -165,18 +173,6 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 
 -}
 
--- | Stuff needed to process a datatype's `deriving` clauses
-data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
-                             -- ^ The data tycon for normal datatypes,
-                             -- or the *representation* tycon for data families
-                           , di_scoped_tvs :: ![(Name,TyVar)]
-                             -- ^ Variables that scope over the deriving clause.
-                             -- See @Note [Scoped tyvars in a TcTyCon]@ in
-                             -- "GHC.Core.TyCon".
-                           , di_clauses :: [LHsDerivingClause GhcRn]
-                           , di_ctxt    :: SDoc -- ^ error context
-                           }
-
 {-
 
 ************************************************************************
@@ -266,9 +262,9 @@ pprRepTy fi@(FamInst { fi_tys = lhs })
   where rhs = famInstRHS fi
 
 renameDeriv :: [InstInfo GhcPs]
-            -> Bag (LHsBind GhcPs, LSig GhcPs)
+            -> (LHsBinds GhcPs, [LSig GhcPs])
             -> TcM (Bag (InstInfo GhcRn), HsValBinds GhcRn, DefUses)
-renameDeriv inst_infos bagBinds
+renameDeriv inst_infos (aux_binds, aux_sigs)
   = discardWarnings $
     -- Discard warnings about unused bindings etc
     setXOptM LangExt.EmptyCase $
@@ -289,8 +285,7 @@ renameDeriv inst_infos bagBinds
         -- Bring the extra deriving stuff into scope
         -- before renaming the instances themselves
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
-        ; let (aux_binds, aux_sigs) = unzipBag bagBinds
-              aux_val_binds = ValBinds NoAnnSortKey aux_binds (bagToList aux_sigs)
+        ; let aux_val_binds = ValBinds NoAnnSortKey aux_binds aux_sigs
         -- Importantly, we use rnLocalValBindsLHS, not rnTopBindsLHS, to rename
         -- auxiliary bindings as if they were defined locally.
         -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
@@ -1208,6 +1203,8 @@ mkEqnHelp overlap_mode tvs cls cls_args deriv_ctxt deriv_strat warn = do
             derivingThingFailWith NoGeneralizedNewtypeDeriving DerivErrGNDUsedOnData
           mkNewTypeEqn True dit
 
+        Just (THStrategy _) -> mk_eqn_th
+
         Nothing -> mk_eqn_no_strategy
 
 -- @expectNonNullaryClsArgs inst_tys@ checks if @inst_tys@ is non-empty.
@@ -1424,6 +1421,43 @@ mk_eqn_via cls_tys inst_ty via_ty =
   mk_eqn_from_mechanism $ DerivSpecVia { dsm_via_cls_tys = cls_tys
                                        , dsm_via_inst_ty = inst_ty
                                        , dsm_via_ty      = via_ty }
+
+mk_eqn_th :: DerivM EarlyDerivSpec
+mk_eqn_th = do
+  dflags <- getDynFlags
+  unless (xopt LangExt.TemplateHaskell dflags) $
+    derivingThingFailWith NoGeneralizedNewtypeDeriving
+                          (panic "errormsg") -- (DerivErrNotDeriveable isDeriveAnyClassEnabled)
+  DerivEnv{denv_cls = cls, denv_inst_tys = all_inst_tys} <- ask
+  let cls_tc = classTyCon cls
+  th_ty <- lift $ reifyType (mkTyConApp cls_tc all_inst_tys)
+  let br      = noLocA $ HsUntypedBracket [] $ XQuote (THTypBr th_ty) :: LHsExpr GhcRn
+  let inst_ty = nlHsTyVar NotPromoted (tyConName (classTyCon cls))    :: LHsType GhcRn
+  let exp =
+        nlHsVar deriveTHName             -- deriveTHEntry
+        `mkHsAppType` HsWC [] inst_ty    --   @C
+        `nlHsApp`     br                 --   [TH.Type| C a b (List c) |]
+  let spl = HsUntypedSpliceExpr [] exp :: HsUntypedSplice GhcRn
+  let ppr_decls :: [LHsDecl GhcPs] -> SDoc
+      ppr_decls ds = vcat (map ppr ds)
+  (decls, mod_finalizers) <- lift $ checkNoErrs $
+      runRnSplice UntypedDeclSplice runMetaD ppr_decls spl
+  lift $ addModFinalizersWithLclEnv $ ThModFinalizers mod_finalizers -- Is this correct?
+  inst_decl <- case decls of
+    [L _ (InstD _ (ClsInstD _ inst_decl))] -> pure inst_decl
+    _                                      -> panic "not a class inst"
+
+  th_topdecls_var <- fmap tcg_th_topdecls (lift getGblEnv)
+  th_ds <- readTcRef th_topdecls_var
+  writeTcRef th_topdecls_var []
+  (aux_binds, aux_sigs) <- case partitionBindsAndSigs th_ds of
+    (aux_binds, aux_sigs, [], [], [], []) -> pure (aux_binds, aux_sigs)
+    _                                     -> panic "errormsg"
+
+  pprTraceM "mk_eqn_th" (ppr br $$ ppr inst_decl $$ ppr aux_binds)
+  mk_eqn_from_mechanism (DerivSpecTH
+    { dsm_th_inst_decl = inst_decl
+    , dsm_th_aux_binds = mapBag DerivTHBind aux_binds `unionBags` listToBag (map DerivTHSig aux_sigs)})
 
 -- Derive an instance without a user-requested deriving strategy. This uses
 -- heuristics to determine which deriving strategy to use.
@@ -1893,6 +1927,18 @@ genInstBinds spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
           -- in a different module, see #20524
         , LangExt.UnboxedTuples
         ]
+      | isDerivSpecTH mechanism
+      = [ -- We must be very conservative and activate all extensions users
+          -- might want to use here, because users have no way to activate theses
+          -- extensions by themselves
+
+          -- InstanceSigs is one such example:
+          LangExt.InstanceSigs
+          -- Associated type families:
+        , LangExt.TypeFamilies
+          -- TODO: Perhaps ScopedTypeVariables?
+          -- , LangExt.ScopedTypeVariables
+        ]
       | otherwise
       = []
 
@@ -1920,6 +1966,11 @@ genInstBinds spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
           -- Try DerivingVia
           DerivSpecVia{dsm_via_ty = via_ty}
             -> gen_newtype_or_via via_ty
+
+          DerivSpecTH { dsm_th_aux_binds = aux_binds
+                      , dsm_th_inst_decl = ClsInstDecl { cid_binds = meth_binds
+                                                       , cid_sigs  = sigs } }
+            -> pure (meth_binds, sigs, aux_binds, [])
 
     gen_newtype_or_via ty = do
       let (binds, sigs) = gen_Newtype_binds loc clas tyvars inst_tys ty
@@ -1958,6 +2009,39 @@ genFamInsts spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
       -- Try DerivingVia
       DerivSpecVia{dsm_via_ty = via_ty}
         -> gen_newtype_or_via via_ty
+
+      DerivSpecTH{dsm_th_inst_decl=inst_decl} -> do
+        let ctx = GenericCtx $ text "a derived instance declaration"
+        (inst_ty', _inst_fvs) <- rnHsSigType ctx TypeLevel inst_decl.cid_poly_ty
+        let (ktv_names, _, _head_ty') = splitLHsInstDeclTy inst_ty'
+        (ats', adts') <- bindLocalNames ktv_names $
+          do { (ats',  _at_fvs)  <- rnATInstDecls rnTyFamInstDecl (className clas) ktv_names inst_decl.cid_tyfam_insts
+             ; (adts', _adt_fvs) <- rnATInstDecls rnDataFamInstDecl (className clas) ktv_names inst_decl.cid_datafam_insts
+             ; return (ats', adts') }
+
+        dfun_ty <- tcHsClsInstType (GHC.Tc.Gen.HsType.InstDeclCtxt False {-TODO-}) inst_ty'
+        let (tyvars', _theta', _clas', inst_tys') = tcSplitDFunTy dfun_ty
+        massertPpr (tyvars == tyvars' && all2 eqType inst_tys inst_tys') empty
+                 -- Next, process any associated types.
+        (datafam_stuff, tyfam_insts) <- tcExtendNameTyVarEnv (zip ktv_names tyvars) $
+              do  { let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
+                        mini_subst = mkTvSubst (mkInScopeSetList tyvars) mini_env
+                        mb_info    = InClsInst { ai_class = clas
+                                               , ai_tyvars = [] -- visible_skol_tvs
+                                               , ai_inst_env = mini_env }
+                        defined_ats = mkNameSet (map (tyFamInstDeclName . unLoc) ats')
+                                      `unionNameSet`
+                                      mkNameSet (map (unLoc . feqn_tycon
+                                                            . dfid_eqn
+                                                            . unLoc) adts')
+                  ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info emptyVarEnv) adts'
+                  ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats'
+
+                  ; tf_insts2 <- mapM (tcATDefault loc mini_subst defined_ats)
+                                      (classATItems clas)
+                  ; return (df_stuff, tf_insts1 ++ concat tf_insts2) }
+
+        pure (map fst datafam_stuff ++ tyfam_insts)
   where
     gen_newtype_or_via ty = gen_Newtype_fam_insts loc clas tyvars inst_tys ty
 
@@ -1990,6 +2074,8 @@ doDerivInstErrorChecks1 mechanism =
       -> pure ()
     DerivSpecVia{}
       -> atf_coerce_based_error_checks
+    DerivSpecTH{}
+      -> pure ()
   where
     -- When processing a standalone deriving declaration, check that all of the
     -- constructors for the data type are in scope. For instance:

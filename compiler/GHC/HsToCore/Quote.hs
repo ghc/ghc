@@ -175,6 +175,7 @@ dsBracket (HsBracketTc { hsb_wrap = mb_wrap, hsb_splices = splices, hsb_quote = 
       TypBr _ t   -> runOverloaded $ do { MkC t1  <- repLTy t    ; return t1 }
       DecBrG _ gp -> runOverloaded $ do { MkC ds1 <- repTopDs gp ; return ds1 }
       DecBrL {}   -> panic "dsUntypedBracket: unexpected DecBrL"
+      XQuote (THTypBr t)   -> runOverloaded $ do { MkC t1  <- repThTy t ; return t1 }
   where
     Just wrap = mb_wrap  -- Not used in VarBr case
       -- In the overloaded case we have to get given a wrapper, it is just
@@ -1185,14 +1186,25 @@ instance RepTV () () where
 
 instance RepTV Specificity TH.Specificity where
     tyVarBndrName = tyVarBndrSpecTyConName
+    repPlainTV  (MkC nm) spec          = do { (MkC spec') <- rep_flag (spec2spec spec)
+                                            ; rep2 plainInvisTVName  [nm, spec'] }
+    repKindedTV (MkC nm) spec (MkC ki) = do { (MkC spec') <- rep_flag (spec2spec spec)
+                                            ; rep2 kindedInvisTVName [nm, spec', ki] }
+
+instance RepTV TH.Specificity TH.Specificity where
+    tyVarBndrName = tyVarBndrSpecTyConName
     repPlainTV  (MkC nm) spec          = do { (MkC spec') <- rep_flag spec
                                             ; rep2 plainInvisTVName  [nm, spec'] }
     repKindedTV (MkC nm) spec (MkC ki) = do { (MkC spec') <- rep_flag spec
                                             ; rep2 kindedInvisTVName [nm, spec', ki] }
 
-rep_flag :: Specificity -> MetaM (Core TH.Specificity)
-rep_flag SpecifiedSpec = rep2_nw specifiedSpecName []
-rep_flag InferredSpec  = rep2_nw inferredSpecName []
+spec2spec :: Specificity -> TH.Specificity
+spec2spec SpecifiedSpec = TH.SpecifiedSpec
+spec2spec InferredSpec = TH.InferredSpec
+
+rep_flag :: TH.Specificity -> MetaM (Core TH.Specificity)
+rep_flag TH.SpecifiedSpec = rep2_nw specifiedSpecName []
+rep_flag TH.InferredSpec  = rep2_nw inferredSpecName []
 
 instance RepTV (HsBndrVis GhcRn) TH.BndrVis where
     tyVarBndrName = tyVarBndrVisTyConName
@@ -1496,6 +1508,101 @@ repRole (L _ (Just Nominal))          = rep2_nw nominalRName []
 repRole (L _ (Just Representational)) = rep2_nw representationalRName []
 repRole (L _ (Just Phantom))          = rep2_nw phantomRName []
 repRole (L _ Nothing)                 = rep2_nw inferRName []
+
+repThName :: TH.Name -> MetaM (Core (TH.Name))
+repThName (TH.Name (TH.OccName s) flv) = coreString s >>= \nm -> case flv of
+  TH.NameS -> repNameS nm
+  TH.NameQ (TH.ModName mod) -> repNameQ nm =<< coreString mod
+  TH.NameU u  -> repNameU nm =<< coreIntegerLit u
+  TH.NameL u  -> repNameL nm =<< coreIntegerLit u
+  TH.NameG ns (TH.PkgName pkg) (TH.ModName mod) -> do
+    mod <- coreString mod
+    pkg <- coreString pkg
+    repNameG ns mod pkg nm
+
+-- | Represent a TH type variable binder
+repThTyVarBndr :: RepTV flag flag' => TH.TyVarBndr flag -> MetaM (Core (M (TH.TyVarBndr flag')))
+repThTyVarBndr (TH.PlainTV nm fl) = do { nm <- repThName nm; repPlainTV nm fl }
+repThTyVarBndr (TH.KindedTV nm fl ki) = do { nm <- repThName nm; ki <- repThTy ki; repKindedTV nm fl ki }
+
+repThTyLit :: TH.TyLit -> MetaM (Core (M TH.TyLit))
+repThTyLit (TH.NumTyLit n) = repTnumTyLit =<< coreIntegerLit n
+repThTyLit (TH.StrTyLit s) = repTstrTyLit =<< coreString s
+repThTyLit (TH.CharTyLit c) = repTcharTyLit =<< coreChar c
+
+repTnumTyLit :: Core Integer -> MetaM (Core (M TH.TyLit))
+repTnumTyLit (MkC n) = rep2 numTyLitName [n]
+
+repTstrTyLit :: Core String -> MetaM (Core (M TH.TyLit))
+repTstrTyLit (MkC s) = rep2 strTyLitName [s]
+
+repTcharTyLit :: Core Char -> MetaM (Core (M TH.TyLit))
+repTcharTyLit (MkC c) = rep2 charTyLitName [c]
+
+repThCxt :: TH.Cxt -> MetaM (Core (M TH.Cxt))
+repThCxt cxt = repListM typeTyConName repThTy cxt >>= repCtxt
+
+repThTy :: TH.Type -> MetaM (Core (M TH.Type))
+-- A bit like `lift @TH.Type`, but in `MetaM . Core . M` instead of `Q`
+repThTy (TH.ForallT bndrs cxt ty) = do
+  bndrs <- repListM tyVarBndrSpecTyConName repThTyVarBndr bndrs
+  cxt   <- repThCxt cxt
+  ty    <- repThTy ty
+  repTForall bndrs cxt ty
+repThTy (TH.ForallVisT bndrs ty) = do
+  bndrs <- repListM tyVarBndrSpecTyConName repThTyVarBndr bndrs
+  ty    <- repThTy ty
+  repTForallVis bndrs ty
+repThTy (TH.AppT f a) = do
+  f <- repThTy f
+  a <- repThTy a
+  repTapp f a
+repThTy (TH.AppKindT f k) = do
+  f <- repThTy f
+  k <- repThTy k
+  repTappKind f k
+repThTy (TH.SigT t k) = do
+  t <- repThTy t
+  k <- repThTy k
+  repTSig t k
+repThTy (TH.VarT n) = do
+  n <- repThName n
+  repTvar n
+repThTy (TH.ConT n) = do
+  n <- repThName n
+  repNamedTyCon n
+repThTy (TH.PromotedT n) = do
+  n <- repThName n
+  repPromotedDataCon n
+repThTy (TH.InfixT a n b) = do
+  a <- repThTy a
+  n <- repThName n
+  b <- repThTy b
+  repTInfix a n b
+repThTy (TH.TupleT n) = repTupleTyCon n
+repThTy (TH.UnboxedTupleT n) = repUnboxedTupleTyCon n
+repThTy (TH.UnboxedSumT n) = repUnboxedSumTyCon n
+repThTy TH.ArrowT = repArrowTyCon
+repThTy TH.MulArrowT = repMulArrowTyCon
+repThTy TH.EqualityT = repTequality
+repThTy TH.ListT = repListTyCon
+repThTy (TH.PromotedTupleT n) = repPromotedTupleTyCon n
+repThTy TH.PromotedNilT = repPromotedNilTyCon
+repThTy TH.PromotedConsT = repPromotedConsTyCon
+repThTy TH.StarT = repTStar
+repThTy TH.ConstraintT = repTConstraint
+repThTy TH.WildCardT = repTWildCard
+repThTy (TH.ImplicitParamT s t) = do
+  s <- coreString s
+  t <- repThTy t
+  repTImplicitParam s t
+repThTy (TH.LitT lit) = do
+  lit <- repThTyLit lit
+  repTLit lit
+repThTy TH.ParensT{}         = panic "ParensT impossible"
+repThTy TH.PromotedInfixT{}  = panic "PromotedInfixT impossible"
+repThTy TH.UInfixT{}         = panic "UInfixT impossible"
+repThTy TH.PromotedUInfixT{} = panic "PromotedUInfixT impossible"
 
 -----------------------------------------------------------------------------
 --              Splices
@@ -2641,6 +2748,7 @@ repDerivStrategy mds thing_inside =
                                  via_strat <- repViaStrategy ty'
                                  m_via_strat <- just via_strat
                                  thing_inside m_via_strat
+        THStrategy       _ -> thing_inside =<< just =<< repTHStrategy
   where
   nothing = coreNothingM derivStrategyTyConName
   just    = coreJustM    derivStrategyTyConName
@@ -2650,6 +2758,9 @@ repStockStrategy = rep2 stockStrategyName []
 
 repAnyclassStrategy :: MetaM (Core (M TH.DerivStrategy))
 repAnyclassStrategy = rep2 anyclassStrategyName []
+
+repTHStrategy :: MetaM (Core (M TH.DerivStrategy))
+repTHStrategy = rep2 thStrategyName []
 
 repNewtypeStrategy :: MetaM (Core (M TH.DerivStrategy))
 repNewtypeStrategy = rep2 newtypeStrategyName []
@@ -3038,6 +3149,20 @@ repNameS (MkC name) = rep2_nw mkNameSName [name]
 repNameQ :: Core String -> Core String -> MetaM (Core TH.Name)
 repNameQ (MkC mn) (MkC name) = rep2_nw mkNameQName [mn, name]
 
+repNameU :: Core String -> Core Integer -> MetaM (Core TH.Name)
+repNameU (MkC mn) (MkC uniq) = rep2_nw mkNameUName [mn, uniq]
+
+repNameL :: Core String -> Core Integer -> MetaM (Core TH.Name)
+repNameL (MkC mn) (MkC uniq) = rep2_nw mkNameLName [mn, uniq]
+
+repNameG :: TH.NameSpace -> Core String -> Core String -> Core String -> MetaM (Core TH.Name)
+repNameG TH.DataName      (MkC mod) (MkC pkg) (MkC nm) = rep2_nw mkNameG_dName [pkg,mod,nm]
+repNameG TH.VarName       (MkC mod) (MkC pkg) (MkC nm) = rep2_nw mkNameG_vName [pkg,mod,nm]
+repNameG TH.TcClsName     (MkC mod) (MkC pkg) (MkC nm) = rep2_nw mkNameG_tcName [pkg,mod,nm]
+repNameG (TH.FldName fld) (MkC mod) (MkC pkg) (MkC nm) = do
+  MkC fld <- coreString fld
+  rep2_nw mkNameG_fldName [pkg,mod,nm,fld]
+
 --------------- Miscellaneous -------------------
 
 repGensym :: Core String -> MetaM (Core (M TH.Name))
@@ -3131,6 +3256,12 @@ nonEmptyCoreList' xs@(MkC x:|_) = MkC (mkListExpr (exprType x) (toList $ fmap un
 coreStringLit :: MonadThings m => FastString -> m (Core String)
 coreStringLit s = do { z <- mkStringExprFS s; return (MkC z) }
 
+coreString :: MonadThings m => String -> m (Core String)
+coreString s = do { z <- mkStringExpr s; return (MkC z) }
+
+coreChar :: MonadThings m => Char -> m (Core Char)
+coreChar c = return (MkC (mkCharExpr c))
+
 ------------------- Maybe ------------------
 
 repMaybe :: Name -> (a -> MetaM (Core b))
@@ -3186,6 +3317,10 @@ coreNothingList elt_ty = coreNothing' (mkListTy elt_ty)
 coreIntLit :: Int -> MetaM (Core Int)
 coreIntLit i = do platform <- getPlatform
                   return (MkC (mkIntExprInt platform i))
+
+coreIntegerLit :: Integer -> MetaM (Core Integer)
+coreIntegerLit i = do platform <- getPlatform
+                      return (MkC (mkIntegerExpr platform i))
 
 coreVar :: Id -> Core TH.Name   -- The Id has type Name
 coreVar id = MkC (Var id)

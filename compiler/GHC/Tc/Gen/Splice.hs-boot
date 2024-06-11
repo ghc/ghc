@@ -9,6 +9,7 @@ import GHC.Tc.Types( TcM , SpliceType )
 import GHC.Tc.Utils.TcType   ( ExpRhoType )
 import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
 import GHC.Hs.Extension ( GhcRn, GhcPs, GhcTc )
+import qualified GHC.Core.TyCo.Rep as TyCoRep
 
 import GHC.Hs ( HsQuote, HsExpr, LHsExpr, LHsType, LPat, LHsDecl, ThModFinalizers, HsUntypedSpliceResult )
 import qualified GHC.Internal.TH.Syntax as TH
@@ -27,6 +28,8 @@ tcUntypedBracket :: HsExpr GhcRn
                  -> [PendingRnSplice]
                  -> ExpRhoType
                  -> TcM (HsExpr GhcTc)
+
+reifyType :: TyCoRep.Type -> TcM TH.Type
 
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 

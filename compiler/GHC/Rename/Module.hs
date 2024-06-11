@@ -13,7 +13,8 @@ Main pass of renamer
 -}
 
 module GHC.Rename.Module (
-        rnSrcDecls, addTcgDUs, findSplice, rnWarningTxt, rnLWarningTxt
+        rnSrcDecls, addTcgDUs, findSplice, rnWarningTxt, rnLWarningTxt,
+        rnATInstDecls, rnDataFamInstDecl, rnTyFamInstDecl
     ) where
 
 import GHC.Prelude hiding ( head )
@@ -2176,7 +2177,7 @@ rnLDerivStrategy doc mds thing_inside
       let extNeeded :: LangExt.Extension
           extNeeded
             | ViaStrategy{} <- ds
-            = LangExt.DerivingVia
+            = LangExt.DerivingVia -- TODO: TH
             | otherwise
             = LangExt.DerivingStrategies
 
@@ -2187,6 +2188,7 @@ rnLDerivStrategy doc mds thing_inside
         StockStrategy    _ -> boring_case (StockStrategy noExtField)
         AnyclassStrategy _ -> boring_case (AnyclassStrategy noExtField)
         NewtypeStrategy  _ -> boring_case (NewtypeStrategy noExtField)
+        THStrategy       _ -> boring_case (THStrategy noExtField)
         ViaStrategy (XViaStrategyPs _ via_ty) ->
           do checkInferredVars doc via_ty
              (via_ty', fvs1) <- rnHsSigType doc TypeLevel via_ty

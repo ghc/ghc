@@ -21,7 +21,7 @@
 -- | Template Haskell splices
 module GHC.Tc.Gen.Splice(
      tcTypedSplice, tcTypedBracket, tcUntypedBracket,
-     runAnnotation, getUntypedSpliceBody,
+     reifyType, runAnnotation, getUntypedSpliceBody,
 
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
@@ -762,13 +762,14 @@ brackTy b =
         return (Just wrapper, final_ty)
   in
   case b of
-    (VarBr {}) -> (Nothing,) <$> tcMetaTy nameTyConName
+    (VarBr {})           -> (Nothing,) <$> tcMetaTy nameTyConName
                                            -- Result type is Var (not Quote-monadic)
-    (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
-    (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
-    (DecBrG {}) -> mkTy decsTyConName -- Result type is m [Dec]
-    (PatBr {})  -> mkTy patTyConName  -- Result type is m Pat
-    (DecBrL {}) -> panic "tcBrackTy: Unexpected DecBrL"
+    (ExpBr {})           -> mkTy expTyConName  -- Result type is m Exp
+    (TypBr {})           -> mkTy typeTyConName -- Result type is m Type
+    (DecBrG {})          -> mkTy decsTyConName -- Result type is m [Dec]
+    (PatBr {})           -> mkTy patTyConName  -- Result type is m Pat
+    (DecBrL {})          -> panic "tcBrackTy: Unexpected DecBrL"
+    (XQuote (THTypBr{})) -> mkTy typeTyConName -- Result type is m Type
 
 ---------------
 -- | Typechecking a pending splice from a untyped bracket

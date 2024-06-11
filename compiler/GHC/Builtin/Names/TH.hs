@@ -32,8 +32,7 @@ templateHaskellNames :: [Name]
 templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName, liftTypedName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameG_fldName,
-    mkNameLName,
-    mkNameSName, mkNameQName,
+    mkNameUName, mkNameLName, mkNameSName, mkNameQName,
     mkModNameName,
     liftStringName,
     unTypeName, unTypeCodeName,
@@ -177,7 +176,11 @@ templateHaskellNames = [
     modNameTyConName,
 
     -- Quasiquoting
-    quoteDecName, quoteTypeName, quoteExpName, quotePatName]
+    quoteDecName, quoteTypeName, quoteExpName, quotePatName,
+
+    -- DeriveTH
+    deriveTHClassName, deriveTHName
+    ]
 
 thSyn, thLib, qqLib, liftLib :: Module
 thSyn = mkTHModule (fsLit "GHC.Internal.TH.Syntax")
@@ -210,6 +213,9 @@ liftClassName = mk_known_key_name clsName liftLib (fsLit "Lift") liftClassKey
 quoteClassName :: Name
 quoteClassName = thCls (fsLit "Quote") quoteClassKey
 
+deriveTHClassName :: Name
+deriveTHClassName = mk_known_key_name clsName thLib (fsLit "DeriveTH") deriveTHClassKey
+
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
@@ -235,8 +241,9 @@ modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_fldName, mkNameG_dName, mkNameG_tcName,
-    mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeCodeName,
-    unsafeCodeCoerceName, liftTypedName, mkModNameName, mkNameQName :: Name
+    mkNameLName, mkNameSName, mkNameUName, liftStringName, unTypeName,
+    unTypeCodeName, unsafeCodeCoerceName, liftTypedName, mkModNameName,
+    mkNameQName, deriveTHName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -246,6 +253,7 @@ mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
 mkNameG_tcName = thFun (fsLit "mkNameG_tc") mkNameG_tcIdKey
 mkNameG_fldName= thFun (fsLit "mkNameG_fld") mkNameG_fldIdKey
+mkNameUName    = thFun (fsLit "mkNameU")    mkNameUIdKey
 mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
 mkNameQName    = thFun (fsLit "mkNameQ")    mkNameQIdKey
 mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
@@ -256,6 +264,7 @@ unsafeCodeCoerceName = thFun (fsLit "unsafeCodeCoerce") unsafeCodeCoerceIdKey
 liftName       = liftFun (fsLit "lift")      liftIdKey
 liftStringName = liftFun (fsLit "liftString")  liftStringIdKey
 liftTypedName = liftFun (fsLit "liftTyped") liftTypedIdKey
+deriveTHName   = libFun (fsLit "deriveTHEntry") deriveTHIdKey
 
 
 -------------------- TH.Lib -----------------------
@@ -595,9 +604,10 @@ derivClauseName = libFun (fsLit "derivClause") derivClauseIdKey
 
 -- data DerivStrategy = ...
 stockStrategyName, anyclassStrategyName, newtypeStrategyName,
-  viaStrategyName :: Name
+  viaStrategyName, thStrategyName :: Name
 stockStrategyName    = libFun (fsLit "stockStrategy")    stockStrategyIdKey
 anyclassStrategyName = libFun (fsLit "anyclassStrategy") anyclassStrategyIdKey
+thStrategyName       = libFun (fsLit "thStrategy")       thStrategyIdKey
 newtypeStrategyName  = libFun (fsLit "newtypeStrategy")  newtypeStrategyIdKey
 viaStrategyName      = libFun (fsLit "viaStrategy")      viaStrategyIdKey
 
@@ -688,6 +698,9 @@ liftClassKey = mkPreludeClassUnique 200
 
 quoteClassKey :: Unique
 quoteClassKey = mkPreludeClassUnique 201
+
+deriveTHClassKey :: Unique
+deriveTHClassKey = mkPreludeClassUnique 202
 
 {- *********************************************************************
 *                                                                      *
@@ -799,8 +812,9 @@ dataNamespaceSpecifierDataConKey = mkPreludeDataConUnique 215
 
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_fldIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
-    mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeCodeIdKey,
-    unsafeCodeCoerceIdKey, liftTypedIdKey, mkModNameIdKey, mkNameQIdKey :: Unique
+    mkNameUIdKey, mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeCodeIdKey,
+    unsafeCodeCoerceIdKey, liftTypedIdKey, mkModNameIdKey, mkNameQIdKey,
+    deriveTHIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -819,6 +833,7 @@ mkModNameIdKey        = mkPreludeMiscIdUnique 215
 unsafeCodeCoerceIdKey = mkPreludeMiscIdUnique 216
 mkNameQIdKey         = mkPreludeMiscIdUnique 217
 mkNameG_fldIdKey     = mkPreludeMiscIdUnique 218
+deriveTHIdKey         = mkPreludeMiscIdUnique 219
 
 
 -- data Lit = ...
@@ -874,6 +889,7 @@ matchIdKey          = mkPreludeMiscIdUnique 261
 clauseIdKey :: Unique
 clauseIdKey         = mkPreludeMiscIdUnique 262
 
+mkNameUIdKey         = mkPreludeMiscIdUnique 269
 
 -- data Exp = ...
 varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
@@ -1152,6 +1168,8 @@ ruleVarIdKey, typedRuleVarIdKey :: Unique
 ruleVarIdKey      = mkPreludeMiscIdUnique 480
 typedRuleVarIdKey = mkPreludeMiscIdUnique 481
 
+thStrategyIdKey       = mkPreludeMiscIdUnique 489
+
 -- data AnnTarget = ...
 valueAnnotationIdKey, typeAnnotationIdKey, moduleAnnotationIdKey :: Unique
 valueAnnotationIdKey  = mkPreludeMiscIdUnique 490
@@ -1164,11 +1182,11 @@ derivClauseIdKey = mkPreludeMiscIdUnique 493
 
 -- data DerivStrategy = ...
 stockStrategyIdKey, anyclassStrategyIdKey, newtypeStrategyIdKey,
-  viaStrategyIdKey :: Unique
-stockStrategyIdKey    = mkPreludeDataConUnique 494
-anyclassStrategyIdKey = mkPreludeDataConUnique 495
-newtypeStrategyIdKey  = mkPreludeDataConUnique 496
-viaStrategyIdKey      = mkPreludeDataConUnique 497
+  viaStrategyIdKey, thStrategyIdKey :: Unique
+stockStrategyIdKey    = mkPreludeMiscIdUnique 494
+anyclassStrategyIdKey = mkPreludeMiscIdUnique 495
+newtypeStrategyIdKey  = mkPreludeMiscIdUnique 496
+viaStrategyIdKey      = mkPreludeMiscIdUnique 497
 
 -- data Specificity = ...
 specifiedSpecKey, inferredSpecKey :: Unique

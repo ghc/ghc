@@ -15,6 +15,7 @@ module GHC.Tc.Gen.Bind
    ( tcLocalBinds
    , tcTopBinds
    , tcValBinds
+   , tcTySigs
    , tcHsBootSigs
    , tcPolyCheck
    , chooseInferredQuantifiers

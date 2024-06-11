@@ -647,6 +647,7 @@ derivStrategyName = text . go
     go AnyclassStrategy {} = "anyclass"
     go NewtypeStrategy  {} = "newtype"
     go ViaStrategy      {} = "via"
+    go THStrategy       {} = "template-haskell"
 
 type instance XDctSingle (GhcPass _) = NoExtField
 type instance XDctMulti  (GhcPass _) = NoExtField
@@ -1063,6 +1064,10 @@ type instance XViaStrategy GhcPs = XViaStrategyPs
 type instance XViaStrategy GhcRn = LHsSigType GhcRn
 type instance XViaStrategy GhcTc = Type
 
+type instance XTHStrategy  GhcPs = [AddEpAnn]
+type instance XTHStrategy  GhcRn = NoExtField
+type instance XTHStrategy  GhcTc = NoExtField
+
 data XViaStrategyPs = XViaStrategyPs [AddEpAnn] (LHsSigType GhcPs)
 
 instance OutputableBndrId p
@@ -1074,6 +1079,7 @@ instance OutputableBndrId p
                                                 GhcPs -> ppr ty
                                                 GhcRn -> ppr ty
                                                 GhcTc -> ppr ty
+    ppr (THStrategy  _)      = text "template-haskell"
 
 instance Outputable XViaStrategyPs where
     ppr (XViaStrategyPs _ t) = ppr t
@@ -1085,7 +1091,8 @@ foldDerivStrategy :: (p ~ GhcPass pass)
 foldDerivStrategy other _   (StockStrategy    _) = other
 foldDerivStrategy other _   (AnyclassStrategy _) = other
 foldDerivStrategy other _   (NewtypeStrategy  _) = other
-foldDerivStrategy _     via (ViaStrategy t)  = via t
+foldDerivStrategy other _   (THStrategy  _)      = other
+foldDerivStrategy _     via (ViaStrategy t)      = via t
 
 -- | Map over the @via@ type if dealing with 'ViaStrategy'. Otherwise,
 -- return the 'DerivStrategy' unchanged.

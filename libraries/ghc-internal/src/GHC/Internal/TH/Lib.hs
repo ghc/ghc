@@ -1,6 +1,8 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 
@@ -27,13 +29,15 @@ import Control.Applicative(liftA, Applicative(..))
 import qualified Data.Kind as Kind (Type)
 import Data.Word( Word8 )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import GHC.Exts (TYPE)
+import GHC.Exts (TYPE, Constraint)
 import Prelude hiding (Applicative(..))
+import Data.Proxy
 #else
 import GHC.Internal.Base hiding (Type, Module, inline)
 import GHC.Internal.Data.Foldable
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.Maybe
+import GHC.Internal.Data.Proxy
 import GHC.Internal.Data.Traversable (traverse, sequenceA)
 import GHC.Internal.Integer
 import GHC.Internal.List (zip)
@@ -1252,3 +1256,10 @@ docCons (c, md, arg_docs) = do
                     | nm <- get_cons_names c'
                     , (i, Just arg_doc) <- zip [0..] arg_docs
                 ]
+
+class DeriveTH (c :: k) where
+  deriveTH :: Proxy c -> Type -> Q [Dec]
+
+deriveTHEntry :: forall c. DeriveTH c => Q Type -> Q [Dec]
+deriveTHEntry head = do
+  deriveTH (Proxy :: Proxy c) =<< head

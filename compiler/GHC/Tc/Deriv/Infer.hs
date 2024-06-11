@@ -39,7 +39,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr (pprTyVars)
 import GHC.Core.Type
 import GHC.Core.Predicate
-import GHC.Core.Unify (tcUnifyTy)
+import GHC.Core.Unify (tcUnifyTy, tcMatchTys)
 
 import GHC.Data.Pair
 import GHC.Builtin.Names
@@ -62,6 +62,11 @@ import Data.Function              (on)
 import Data.Functor.Classes       (liftEq)
 import Data.List                  (sortBy)
 import Data.Maybe
+import GHC.Rename.HsType (rnHsSigType)
+import GHC.Tc.Errors.Types (HsDocContext(..))
+import GHC.Tc.Gen.HsType (tcHsClsInstType)
+import GHC.Hs.Decls (ClsInstDecl(..))
+import GHC.Types.Var.Set (mkVarSet, subVarSet)
 
 ----------------------
 
@@ -96,6 +101,8 @@ inferConstraints mechanism
                               , mechanism{dsm_stock_dit = dit'} )
                  DerivSpecAnyClass
                    -> infer_constraints_simple inferConstraintsAnyclass
+                 DerivSpecTH{}
+                   -> infer_constraints_simple (inferConstraintsTH mechanism)
                  DerivSpecNewtype { dsm_newtype_dit =
                                       DerivInstTys{dit_cls_tys = cls_tys}
                                   , dsm_newtype_rep_ty = rep_ty }
@@ -393,6 +400,45 @@ inferConstraintsAnyclass
                                  }
 
        ; pure $ map meth_pred gen_dms }
+
+-- | Like 'inferConstraintsAnyclass', but used only in the case of @DeriveTH@,
+-- where constraints are gathered based on the type signatures generated for
+-- class methods.
+--
+-- See Note [Gathering and simplifying constraints for DeriveTH]
+-- for an explanation of how these constraints are used to determine the
+-- derived instance context.
+inferConstraintsTH :: DerivSpecMechanism -> DerivM ThetaSpec
+inferConstraintsTH DerivSpecTH{dsm_th_inst_decl=inst_decl}
+  = do { DerivEnv { denv_cls       = cls
+                  , denv_tvs       = tyvars
+                  , denv_inst_tys  = inst_tys } <- ask
+       ; wildcard <- isStandaloneWildcardDeriv
+       ; let ctx = GenericCtx $ text "a derived instance declaration"
+       ; (dfun_ty, _inst_fvs) <- lift $ rnHsSigType ctx TypeLevel (cid_poly_ty inst_decl)
+       ; dfun_ty <- lift $ tcHsClsInstType (InstDeclCtxt False {-TODO-}) dfun_ty
+       ; let (tyvars_th, theta_th, cls_th, inst_tys_th) = tcSplitDFunTy dfun_ty -- TODO verify that inst_tys matches (is equal to?) inst_tys2
+       ; pprTraceM "infer1" (ppr dfun_ty $$ ppr tyvars $$ ppr tyvars_th $$ ppr inst_tys $$ ppr inst_tys_th)
+       ; if cls_th /= cls
+           then panic "complain about the DeriveTH instance"
+           else return ()
+       ; if not (mkVarSet tyvars_th `subVarSet` mkVarSet tyvars)
+           then panic "complain about the DeriveTH instance"
+           else return ()
+       ; let inst_tys_th_skol = substTysWith tyvars_th (map mkTyVarTy tyvars) inst_tys_th
+       ; let theta_th_skol    = substTysWith tyvars_th (map mkTyVarTy tyvars) theta_th
+       ; subst <- case tcMatchTys inst_tys inst_tys_th_skol of
+          Just subst -> pure subst
+          _          -> panic "complain about the DeriveTH instance"
+       ; let origin = mkDerivOrigin wildcard
+       ; let subst_preds = [ SimplePredSpec (mkPrimEqPred (mkTyVarTy tv) ty) origin TypeLevel
+                           | tv <- tyvars, Just ty <- pure $ lookupTyVar subst tv ]
+       ; pprTraceM "infer2" (ppr inst_tys $$ ppr inst_tys_th_skol $$ ppr subst $$ ppr subst_preds $$ ppr theta_th_skol)
+       ; let blah pred = SimplePredSpec pred origin TypeLevel {- TODO -}
+       ; return (subst_preds ++ map blah theta_th_skol) }
+
+inferConstraintsTH _
+  = panic "not called with DerivTH"
 
 -- Like 'inferConstraints', but used only for @GeneralizedNewtypeDeriving@ and
 -- @DerivingVia@. Since both strategies generate code involving 'coerce', the

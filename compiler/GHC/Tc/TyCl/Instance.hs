@@ -16,6 +16,8 @@ module GHC.Tc.TyCl.Instance
    ( tcInstDecls1
    , tcInstDeclsDeriv
    , tcInstDecls2
+   , tcDataFamInstDecl
+   , tcTyFamInstDecl
    )
 where
 

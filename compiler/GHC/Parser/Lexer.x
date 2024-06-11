@@ -856,6 +856,7 @@ data Token
   | ITstock
   | ITanyclass
   | ITvia
+  | ITtemplatehaskell
 
   -- Backpack tokens
   | ITunit
@@ -1104,6 +1105,7 @@ reservedWordsFM = listToUFM $
          ( "stock",          ITstock,         0 ),
          ( "anyclass",       ITanyclass,      0 ),
          ( "via",            ITvia,           0 ),
+         ( "th", ITtemplatehaskell, 0 ),
          ( "group",          ITgroup,         xbit TransformComprehensionsBit),
          ( "by",             ITby,            xbit TransformComprehensionsBit),
          ( "using",          ITusing,         xbit TransformComprehensionsBit),

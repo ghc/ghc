@@ -9,6 +9,7 @@ module GHC.Rename.Splice (
         rnTypedSplice,
         -- Untyped splices
         rnSpliceType, rnUntypedSpliceExpr, rnSplicePat, rnSpliceTyPat, rnSpliceDecl,
+        runRnSplice,
 
         -- Brackets
         rnTypedBracket, rnUntypedBracket,
@@ -361,6 +362,7 @@ runRnSplice :: UntypedSpliceFlavour
             -> TcRn (res, [ForeignRef (TH.Q ())])
 runRnSplice flavour run_meta ppr_res splice
   = do { hooks <- hsc_hooks <$> getTopEnv
+       ; pprTraceM "run0" empty
        ; splice' <- case runRnSpliceHook hooks of
             Nothing -> return splice
             Just h  -> h splice
@@ -371,19 +373,26 @@ runRnSplice flavour run_meta ppr_res splice
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
+       ; pprTraceM "run01" (ppr meta_exp_ty $$ ppr the_expr)
+       ; blah                <-  tcTopSpliceExpr Untyped
+                              (tcCheckPolyExpr the_expr meta_exp_ty)
+       ; pprTraceM "run02" (ppr meta_exp_ty $$ ppr the_expr $$ ppr blah)
        ; zonked_q_expr <- zonkTopLExpr =<<
                             tcTopSpliceExpr Untyped
                               (tcCheckPolyExpr the_expr meta_exp_ty)
+       ; pprTraceM "run1" empty
 
              -- Run the expression
        ; mod_finalizers_ref <- newTcRef []
        ; result <- setStage (RunSplice mod_finalizers_ref) $
                      run_meta zonked_q_expr
+       ; pprTraceM "run2" empty
        ; mod_finalizers <- readTcRef mod_finalizers_ref
        ; traceSplice (SpliceInfo { spliceDescription = what
                                  , spliceIsDecl      = is_decl
                                  , spliceSource      = Just the_expr
                                  , spliceGenerated   = ppr_res result })
+       ; pprTraceM "run3" empty
 
        ; return (result, mod_finalizers) }
 

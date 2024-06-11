@@ -311,6 +311,7 @@ data AnnKeywordId
     | AnnValStr  -- ^ String value, will need quotes when output
     | AnnVbar -- ^ '|'
     | AnnVia -- ^ 'via'
+    | AnnTH -- ^ 'template-haskell' (as deriving strategy)
     | AnnWhere
     | Annlarrowtail -- ^ '-<'
     | AnnlarrowtailU -- ^ '-<', unicode variant

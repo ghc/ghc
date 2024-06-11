@@ -231,6 +231,7 @@ classify tok =
     ITthen -> TkKeyword
     ITtype -> TkKeyword
     ITvia -> TkKeyword
+    ITtemplatehaskell -> TkKeyword
     ITwhere -> TkKeyword
     ITforall{} -> TkKeyword
     ITexport -> TkKeyword

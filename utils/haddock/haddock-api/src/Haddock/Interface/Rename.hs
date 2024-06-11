@@ -823,6 +823,7 @@ renameDerivStrategy (StockStrategy a) = pure (StockStrategy a)
 renameDerivStrategy (AnyclassStrategy a) = pure (AnyclassStrategy a)
 renameDerivStrategy (NewtypeStrategy a) = pure (NewtypeStrategy a)
 renameDerivStrategy (ViaStrategy ty) = ViaStrategy <$> renameLSigType ty
+renameDerivStrategy (THStrategy a) = pure (THStrategy a)
 
 renameClsInstD :: ClsInstDecl GhcRn -> RnM (ClsInstDecl DocNameI)
 renameClsInstD

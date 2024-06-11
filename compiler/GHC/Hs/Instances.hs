@@ -405,6 +405,8 @@ deriving instance Data (HsUntypedSplice GhcTc)
 
 deriving instance Data a => Data (HsUntypedSpliceResult a)
 
+deriving instance Data THQuote
+
 -- deriving instance (DataIdLR p p) => Data (HsQuote p)
 deriving instance Data (HsQuote GhcPs)
 deriving instance Data (HsQuote GhcRn)

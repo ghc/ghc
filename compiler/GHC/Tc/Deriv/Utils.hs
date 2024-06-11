@@ -9,10 +9,11 @@
 
 -- | Error-checking and other utilities for @deriving@ clauses or declarations.
 module GHC.Tc.Deriv.Utils (
+        DerivInfo(..),
         DerivM, DerivEnv(..),
         DerivSpec(..), pprDerivSpec, setDerivSpecTheta, zonkDerivSpec,
         DerivSpecMechanism(..), derivSpecMechanismToStrategy, isDerivSpecStock,
-        isDerivSpecNewtype, isDerivSpecAnyClass,
+        isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecTH,
         isDerivSpecVia, zonkDerivSpecMechanism,
         DerivContext(..), OriginativeDerivStatus(..), StockGenFns(..),
         isStandaloneDeriv, isStandaloneWildcardDeriv,
@@ -75,6 +76,18 @@ import Data.Foldable (traverse_)
 import Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.List.SetOps (assocMaybe)
+
+-- | Stuff needed to process a datatype's `deriving` clauses
+data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
+                             -- ^ The data tycon for normal datatypes,
+                             -- or the *representation* tycon for data families
+                           , di_scoped_tvs :: ![(Name,TyVar)]
+                             -- ^ Variables that scope over the deriving clause.
+                             -- See @Note [Scoped tyvars in a TcTyCon]@ in
+                             -- "GHC.Core.TyCon".
+                           , di_clauses :: [LHsDerivingClause GhcRn]
+                           , di_ctxt    :: SDoc -- ^ error context
+                           }
 
 -- | To avoid having to manually plumb everything in 'DerivEnv' throughout
 -- various functions in "GHC.Tc.Deriv" and "GHC.Tc.Deriv.Infer", we use 'DerivM', which
@@ -291,15 +304,22 @@ data DerivSpecMechanism
       -- ^ The @via@ type
     }
 
+    -- | @DeriveAnyClass@
+  | DerivSpecTH
+    { dsm_th_inst_decl  :: ClsInstDecl GhcPs
+    , dsm_th_aux_binds  :: Bag AuxBindSpec
+    }
+
 -- | Convert a 'DerivSpecMechanism' to its corresponding 'DerivStrategy'.
 derivSpecMechanismToStrategy :: DerivSpecMechanism -> DerivStrategy GhcTc
-derivSpecMechanismToStrategy DerivSpecStock{}      = StockStrategy noExtField
-derivSpecMechanismToStrategy DerivSpecNewtype{}    = NewtypeStrategy noExtField
-derivSpecMechanismToStrategy DerivSpecAnyClass     = AnyclassStrategy noExtField
+derivSpecMechanismToStrategy DerivSpecStock{}               = StockStrategy noExtField
+derivSpecMechanismToStrategy DerivSpecNewtype{}             = NewtypeStrategy noExtField
+derivSpecMechanismToStrategy DerivSpecAnyClass              = AnyclassStrategy noExtField
+derivSpecMechanismToStrategy DerivSpecTH{}                  = THStrategy noExtField
 derivSpecMechanismToStrategy (DerivSpecVia{dsm_via_ty = t}) = ViaStrategy t
 
-isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia
-  :: DerivSpecMechanism -> Bool
+isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia,
+  isDerivSpecTH :: DerivSpecMechanism -> Bool
 isDerivSpecStock (DerivSpecStock{}) = True
 isDerivSpecStock _                  = False
 
@@ -311,6 +331,9 @@ isDerivSpecAnyClass _                 = False
 
 isDerivSpecVia (DerivSpecVia{}) = True
 isDerivSpecVia _                = False
+
+isDerivSpecTH (DerivSpecTH{}) = True
+isDerivSpecTH _               = False
 
 -- | Zonk the 'TcTyVar's in a 'DerivSpecMechanism' to 'TyVar's.
 -- See @Note [What is zonking?]@ in "GHC.Tc.Zonk.Type".
@@ -336,8 +359,10 @@ zonkDerivSpecMechanism mechanism =
       pure $ DerivSpecNewtype { dsm_newtype_dit    = dit'
                               , dsm_newtype_rep_ty = rep_ty'
                               }
-    DerivSpecAnyClass ->
-      pure DerivSpecAnyClass
+    DerivSpecAnyClass {} ->
+      pure mechanism
+    DerivSpecTH {} ->
+      pure mechanism
     DerivSpecVia { dsm_via_cls_tys = cls_tys
                  , dsm_via_inst_ty = inst_ty
                  , dsm_via_ty      = via_ty
@@ -365,6 +390,9 @@ instance Outputable DerivSpecMechanism where
          2 (vcat [ text "dsm_via_cls_tys" <+> ppr cls_tys
                  , text "dsm_via_inst_ty" <+> ppr inst_ty
                  , text "dsm_via_ty"      <+> ppr via_ty ])
+  ppr (DerivSpecTH{dsm_th_inst_decl = inst, dsm_th_aux_binds = _binds})
+    = hang (text "DerivSpecTH")
+         2 (vcat [ text "dsm_th_inst_decl" <+> ppr inst ])
 
 {-
 Note [DerivEnv and DerivSpecMechanism]
@@ -463,6 +491,12 @@ Each deriving strategy imposes restrictions on arg_1 through arg_n as follows:
     class Baz a where ...
     instance Baz (ByBar a) where ...
     deriving via ByBar (Foo a) instance Baz (Foo a)
+
+* Template Haskell (DerivSpecTH):
+
+  Similarly to DeriveAnyClass, the Template Haskell deriving strategy is quite
+  flexible; it only needs the type class as well as the instance head to derive
+  in order to call the entry point in GHC.Internal.TH.Lib.
 -}
 
 -- | Whether GHC is processing a @deriving@ clause or a standalone deriving

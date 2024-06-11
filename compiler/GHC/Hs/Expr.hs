@@ -66,7 +66,8 @@ import GHC.Tc.Utils.TcType (TcType, TcTyVar)
 import {-# SOURCE #-} GHC.Tc.Types.LclEnv (TcLclEnv)
 
 import GHCi.RemoteTypes ( ForeignRef )
-import qualified GHC.Internal.TH.Syntax as TH (Q)
+import qualified GHC.Internal.TH.Syntax as TH
+import qualified GHC.Internal.TH.Ppr as TH
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -2039,6 +2040,8 @@ ppr_splice herald mn e
          Just splice_name -> whenPprDebug (brackets (ppr splice_name)))
     <> ppr e
 
+data THQuote
+  = THTypBr TH.Type
 
 type instance XExpBr  GhcPs       = NoExtField
 type instance XPatBr  GhcPs       = NoExtField
@@ -2054,7 +2057,7 @@ type instance XDecBrL GhcRn       = NoExtField
 type instance XDecBrG GhcRn       = NoExtField
 type instance XTypBr  GhcRn       = NoExtField
 type instance XVarBr  GhcRn       = NoExtField
-type instance XXQuote GhcRn       = DataConCantHappen
+type instance XXQuote GhcRn       = THQuote
 
 -- See Note [The life cycle of a TH quotation]
 type instance XExpBr  GhcTc       = DataConCantHappen
@@ -2064,6 +2067,9 @@ type instance XDecBrG GhcTc       = DataConCantHappen
 type instance XTypBr  GhcTc       = DataConCantHappen
 type instance XVarBr  GhcTc       = DataConCantHappen
 type instance XXQuote GhcTc       = NoExtField
+
+instance Outputable THQuote where
+  ppr (THTypBr ty) = thBrackets (text "TH.Type") (text (TH.pprint ty))
 
 instance OutputableBndrId p
           => Outputable (HsQuote (GhcPass p)) where
@@ -2081,6 +2087,7 @@ instance OutputableBndrId p
       pprHsQuote (VarBr _ False n)
         = text "''" <> pprPrefixOcc (unLoc n)
       pprHsQuote (XQuote b)  = case ghcPass @p of
+          GhcRn -> ppr b
           GhcTc -> pprPanic "pprHsQuote: `HsQuote GhcTc` shouldn't exist" (ppr b)
                    -- See Note [The life cycle of a TH quotation]
 

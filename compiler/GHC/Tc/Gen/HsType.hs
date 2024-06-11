@@ -676,6 +676,7 @@ tcDerivStrategy mb_lds
     tc_deriv_strategy (StockStrategy    _) = boring_case (StockStrategy    noExtField)
     tc_deriv_strategy (AnyclassStrategy _) = boring_case (AnyclassStrategy noExtField)
     tc_deriv_strategy (NewtypeStrategy  _) = boring_case (NewtypeStrategy  noExtField)
+    tc_deriv_strategy (THStrategy       _) = boring_case (THStrategy       noExtField)
     tc_deriv_strategy (ViaStrategy hs_sig)
       = do { ty <- tcTopLHsType DerivClauseCtxt hs_sig
              -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]

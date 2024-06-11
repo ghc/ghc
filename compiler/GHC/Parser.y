@@ -635,9 +635,10 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'using'    { L _ ITusing }     -- for list transform extension
  'pattern'      { L _ ITpattern } -- for pattern synonyms
  'static'       { L _ ITstatic }  -- for static pointers extension
- 'stock'        { L _ ITstock }    -- for DerivingStrategies extension
- 'anyclass'     { L _ ITanyclass } -- for DerivingStrategies extension
- 'via'          { L _ ITvia }      -- for DerivingStrategies extension
+ 'stock'        { L _ ITstock }                -- for DerivingStrategies extension
+ 'anyclass'     { L _ ITanyclass }             -- for DerivingStrategies extension
+ 'via'          { L _ ITvia }                  -- for DerivingStrategies extension
+ 'th' { L _ ITtemplatehaskell }  -- for DerivingStrategies extension
 
  'unit'         { L _ ITunit }
  'signature'    { L _ ITsignature }
@@ -1415,6 +1416,7 @@ deriv_strategy_no_via :: { LDerivStrategy GhcPs }
   : 'stock'                     {% amsA' (sL1 $1 (StockStrategy [mj AnnStock $1])) }
   | 'anyclass'                  {% amsA' (sL1 $1 (AnyclassStrategy [mj AnnAnyclass $1])) }
   | 'newtype'                   {% amsA' (sL1 $1 (NewtypeStrategy [mj AnnNewtype $1])) }
+  | 'th'                        {% amsA' (sL1 $1 (THStrategy [mj AnnTH $1])) }
 
 deriv_strategy_via :: { LDerivStrategy GhcPs }
   : 'via' sigktype          {% amsA' (sLL $1 $> (ViaStrategy (XViaStrategyPs [mj AnnVia $1] $2))) }
@@ -3945,6 +3947,7 @@ special_id
         | 'stock'               { sL1 $1 (fsLit "stock") }
         | 'anyclass'            { sL1 $1 (fsLit "anyclass") }
         | 'via'                 { sL1 $1 (fsLit "via") }
+        | 'th'                  { sL1 $1 (fsLit "th") }
         | 'unit'                { sL1 $1 (fsLit "unit") }
         | 'dependency'          { sL1 $1 (fsLit "dependency") }
         | 'signature'           { sL1 $1 (fsLit "signature") }

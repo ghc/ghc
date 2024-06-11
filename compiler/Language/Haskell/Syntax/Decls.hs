@@ -1497,6 +1497,8 @@ data DerivStrategy pass
   | NewtypeStrategy  (XNewtypeStrategy pass)  -- ^ @-XGeneralizedNewtypeDeriving@
   | ViaStrategy (XViaStrategy pass)
                      -- ^ @-XDerivingVia@
+  | THStrategy (XTHStrategy pass)
+                     -- ^ @-XDerivingTemplateHaskell@
 
 
 {-
