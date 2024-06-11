@@ -26,7 +26,6 @@ import GHC.Core.TyCo.FVs
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Types.Var.Set
 import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
@@ -343,9 +342,10 @@ tidyCo env co
     go (FunCo r afl afr w co1 co2) = ((FunCo r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = CoVarCo $! go_cv cv
     go (HoleCo h)            = HoleCo $! go_hole h
-    go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
-    go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
-                                tidyType env t1) $! tidyType env t2
+    go (AxiomCo ax cos)      = AxiomCo ax $ strictMap go cos
+    go co@(UnivCo { uco_lty  = t1, uco_rty = t2 })
+                             = co { uco_lty = tidyType env t1, uco_rty = tidyType env t2 }
+                               -- Don't bother to tidy the uco_deps field
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
     go (SelCo d co)          = SelCo d $! go co
@@ -353,16 +353,11 @@ tidyCo env co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
 
     go_cv cv = tidyTyCoVarOcc env cv
 
     go_hole (CoercionHole cv r h) = (CoercionHole $! go_cv cv) r h
     -- Tidy even the holes; tidied types should have tidied kinds
-
-    go_prov (PhantomProv co)    = PhantomProv $! go co
-    go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co
-    go_prov (PluginProv s cvs)  = PluginProv s $ mapDVarSet go_cv cvs
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = strictMap (tidyCo env)

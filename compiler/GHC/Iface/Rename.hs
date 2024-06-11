@@ -661,39 +661,27 @@ rnIfaceMCo IfaceMRefl    = pure IfaceMRefl
 rnIfaceMCo (IfaceMCo co) = IfaceMCo <$> rnIfaceCo co
 
 rnIfaceCo :: Rename IfaceCoercion
-rnIfaceCo (IfaceReflCo ty) = IfaceReflCo <$> rnIfaceType ty
-rnIfaceCo (IfaceGReflCo role ty mco)
-  = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
-rnIfaceCo (IfaceFunCo role w co1 co2)
-    = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
-rnIfaceCo (IfaceTyConAppCo role tc cos)
-    = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
-rnIfaceCo (IfaceAppCo co1 co2)
-    = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty
+rnIfaceCo (IfaceGReflCo role ty mco)    = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
+rnIfaceCo (IfaceFunCo role w co1 co2)   = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceTyConAppCo role tc cos) = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
+rnIfaceCo (IfaceAppCo co1 co2)          = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceFreeCoVar c)            = pure (IfaceFreeCoVar c)
+rnIfaceCo (IfaceCoVarCo lcl)            = IfaceCoVarCo <$> pure lcl
+rnIfaceCo (IfaceHoleCo lcl)             = IfaceHoleCo  <$> pure lcl
+rnIfaceCo (IfaceSymCo c)                = IfaceSymCo <$> rnIfaceCo c
+rnIfaceCo (IfaceTransCo c1 c2)          = IfaceTransCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
+rnIfaceCo (IfaceInstCo c1 c2)           = IfaceInstCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
+rnIfaceCo (IfaceSelCo d c)              = IfaceSelCo d <$> rnIfaceCo c
+rnIfaceCo (IfaceLRCo lr c)              = IfaceLRCo lr <$> rnIfaceCo c
+rnIfaceCo (IfaceSubCo c)                = IfaceSubCo <$> rnIfaceCo c
+rnIfaceCo (IfaceAxiomCo ax cos)         = IfaceAxiomCo ax <$> mapM rnIfaceCo cos
+rnIfaceCo (IfaceKindCo c)               = IfaceKindCo <$> rnIfaceCo c
 rnIfaceCo (IfaceForAllCo bndr visL visR co1 co2)
     = (\bndr' co1' co2' -> IfaceForAllCo bndr' visL visR co1' co2')
       <$> rnIfaceBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
-rnIfaceCo (IfaceFreeCoVar c) = pure (IfaceFreeCoVar c)
-rnIfaceCo (IfaceCoVarCo lcl) = IfaceCoVarCo <$> pure lcl
-rnIfaceCo (IfaceHoleCo lcl)  = IfaceHoleCo  <$> pure lcl
-rnIfaceCo (IfaceAxiomInstCo n i cs)
-    = IfaceAxiomInstCo <$> rnIfaceGlobal n <*> pure i <*> mapM rnIfaceCo cs
-rnIfaceCo (IfaceUnivCo s r t1 t2)
-    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2
-        -- Renaming affects only type constructors, not coercion variables,
-        -- so no need to recurse into the provenance.
-rnIfaceCo (IfaceSymCo c)
-    = IfaceSymCo <$> rnIfaceCo c
-rnIfaceCo (IfaceTransCo c1 c2)
-    = IfaceTransCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
-rnIfaceCo (IfaceInstCo c1 c2)
-    = IfaceInstCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
-rnIfaceCo (IfaceSelCo d c) = IfaceSelCo d <$> rnIfaceCo c
-rnIfaceCo (IfaceLRCo lr c) = IfaceLRCo lr <$> rnIfaceCo c
-rnIfaceCo (IfaceSubCo c) = IfaceSubCo <$> rnIfaceCo c
-rnIfaceCo (IfaceAxiomRuleCo ax cos)
-    = IfaceAxiomRuleCo ax <$> mapM rnIfaceCo cos
-rnIfaceCo (IfaceKindCo c) = IfaceKindCo <$> rnIfaceCo c
+rnIfaceCo (IfaceUnivCo s r t1 t2 deps)
+    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> mapM rnIfaceCo deps
 
 rnIfaceTyCon :: Rename IfaceTyCon
 rnIfaceTyCon (IfaceTyCon n info)

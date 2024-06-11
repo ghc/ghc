@@ -255,7 +255,6 @@ import GHC.Core.TyCo.FVs
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Unique.Set
 
 import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
@@ -274,7 +273,7 @@ import GHC.Core.Coercion.Axiom
 import {-# SOURCE #-} GHC.Core.Coercion
    ( mkNomReflCo, mkGReflCo, mkReflCo
    , mkTyConAppCo, mkAppCo
-   , mkForAllCo, mkFunCo2, mkAxiomInstCo, mkUnivCo
+   , mkForAllCo, mkFunCo2, mkAxiomCo, mkUnivCo
    , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
    , mkKindCo, mkSubCo, mkFunCo, funRole
    , decomposePiCos, coercionKind
@@ -556,10 +555,10 @@ expandTypeSynonyms ty
       = mkFunCo2 r afl afr (go_co subst w) (go_co subst co1) (go_co subst co2)
     go_co subst (CoVarCo cv)
       = substCoVar subst cv
-    go_co subst (AxiomInstCo ax ind args)
-      = mkAxiomInstCo ax ind (map (go_co subst) args)
-    go_co subst (UnivCo p r t1 t2)
-      = mkUnivCo (go_prov subst p) r (go subst t1) (go subst t2)
+    go_co subst (AxiomCo ax cs)
+      = mkAxiomCo ax (map (go_co subst) cs)
+    go_co subst co@(UnivCo { uco_lty = lty, uco_rty = rty })
+      = co { uco_lty = go subst lty, uco_rty = go subst rty }
     go_co subst (SymCo co)
       = mkSymCo (go_co subst co)
     go_co subst (TransCo co1 co2)
@@ -574,14 +573,8 @@ expandTypeSynonyms ty
       = mkKindCo (go_co subst co)
     go_co subst (SubCo co)
       = mkSubCo (go_co subst co)
-    go_co subst (AxiomRuleCo ax cs)
-      = AxiomRuleCo ax (map (go_co subst) cs)
     go_co _ (HoleCo h)
       = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
-
-    go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
-    go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
-    go_prov _     p@(PluginProv _ _)  = p
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -972,17 +965,20 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                                            <*> go_co env c1 <*> go_co env c2
     go_co !env (CoVarCo cv)               = covar env cv
     go_co !env (HoleCo hole)              = cohole env hole
-    go_co !env (UnivCo p r t1 t2)         = mkUnivCo <$> go_prov env p <*> pure r
-                                           <*> go_ty env t1 <*> go_ty env t2
+    go_co !env (UnivCo { uco_prov = p, uco_role = r
+                       , uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                                          = mkUnivCo <$> pure p
+                                                     <*> go_cos env deps
+                                                     <*> pure r
+                                                     <*> go_ty env t1 <*> go_ty env t2
     go_co !env (SymCo co)                 = mkSymCo <$> go_co env co
     go_co !env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
-    go_co !env (AxiomRuleCo r cos)        = AxiomRuleCo r <$> go_cos env cos
+    go_co !env (AxiomCo r cos)            = mkAxiomCo r <$> go_cos env cos
     go_co !env (SelCo i co)               = mkSelCo i <$> go_co env co
     go_co !env (LRCo lr co)               = mkLRCo lr <$> go_co env co
     go_co !env (InstCo co arg)            = mkInstCo <$> go_co env co <*> go_co env arg
     go_co !env (KindCo co)                = mkKindCo <$> go_co env co
     go_co !env (SubCo co)                 = mkSubCo <$> go_co env co
-    go_co !env (AxiomInstCo ax i cos)     = mkAxiomInstCo ax i <$> go_cos env cos
     go_co !env co@(TyConAppCo r tc cos)
       | isTcTyCon tc
       = do { tc' <- tycon tc
@@ -1002,16 +998,6 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
            ; return $ mkForAllCo tv' visL visR kind_co' co' }
         -- See Note [Efficiency for ForAllCo case of mapTyCoX]
 
-    go_prov !env (PhantomProv co)    = PhantomProv <$> go_co env co
-    go_prov !env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
-    go_prov !env (PluginProv s cvs)  = PluginProv s <$> go_fcvs env (dVarSetElems cvs)
-
-    -- See Note [Use explicit recursion in mapTyCo]
-    go_fcvs :: env -> [CoVar] -> m DTyCoVarSet
-    go_fcvs _   []       = return emptyDVarSet
-    go_fcvs env (cv:cvs) = do { co   <- covar env cv
-                              ; cvs' <- go_fcvs env cvs
-                              ; return (tyCoVarsOfCoDSet co `unionDVarSet` cvs') }
 
 {- Note [Use explicit recursion in mapTyCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2313,20 +2299,13 @@ buildSynTyCon name binders res_kind roles rhs
   = mkSynonymTyCon name binders res_kind roles rhs
                    is_tau is_fam_free is_forgetful is_concrete
   where
+    qtvs         = mkVarSet (map binderVar binders)
     is_tau       = isTauTy rhs
     is_fam_free  = isFamFreeTy rhs
-    expanded_rhs = expandTypeSynonyms rhs
+    is_concrete  = isConcreteTypeWith qtvs rhs
+    is_forgetful = not (qtvs `subVarSet` expanded_rhs_tyvars)
 
-    is_concrete  = uniqSetAll isConcreteTyCon rhs_tycons
-    rhs_tycons   = tyConsOfType expanded_rhs
-         -- NB: we look at expanded_rhs  e.g.
-         --       type S a b = b
-         --       type family F a
-         --       type T a = S (F a) a
-         -- We want to mark T as concrete, because S ignores its first argument
-
-    is_forgetful = not (all ((`elemVarSet` expanded_rhs_tyvars) . binderVar) binders)
-    expanded_rhs_tyvars = tyCoVarsOfType expanded_rhs
+    expanded_rhs_tyvars = tyCoVarsOfType (expandTypeSynonyms rhs)
        -- See Note [Forgetful type synonyms] in GHC.Core.TyCon
        -- To find out if this TyCon is forgetful, expand the synonyms in its RHS
        -- and check that all of the binders are free in the expanded type.
@@ -2869,9 +2848,17 @@ isFixedRuntimeRepKind k
 --
 -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
 isConcreteType :: Type -> Bool
-isConcreteType = go
+isConcreteType = isConcreteTypeWith emptyVarSet
+
+isConcreteTypeWith :: TyVarSet -> Type -> Bool
+-- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
+-- For this "With" version we pass in a set of TyVars to be considered
+-- concrete.  This supports mkSynonymTyCon, which needs to test the RHS
+-- for concreteness, under the assumption that the binders are instantiated
+-- to concrete types
+isConcreteTypeWith conc_tvs = go
   where
-    go (TyVarTy tv)        = isConcreteTyVar tv
+    go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
     go (AppTy ty1 ty2)     = go ty1 && go ty2
     go (TyConApp tc tys)   = go_tc tc tys
     go ForAllTy{}          = False

@@ -1,9 +1,9 @@
-
 T20363_show_co.hs:23:10: error: [GHC-55287]
     • The newtype constructor pattern
       does not have a fixed runtime representation.
       Its type is:
-        ((# #) |> (TYPE (Sym (T20363_show_co.D:R:NilRep[0])))_N) :: TYPE
-                                                                      NilRep
+        ((# #) |> (TYPE (Sym T20363_show_co.D:R:NilRep[0]))_N) :: TYPE
+                                                                    NilRep
     • In the pattern: MkNT (##)
       In an equation for ‘test1b’: test1b (MkNT (##)) = 0
+

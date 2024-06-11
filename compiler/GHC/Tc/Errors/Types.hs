@@ -177,6 +177,7 @@ import GHC.Tc.Types.Evidence (EvBindsVar)
 import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
+import GHC.Tc.Types.CtLocEnv( CtLoc, ctLocOrigin, SubGoalDepth )
 import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType,
                             PatersonCondFailure, PatersonCondFailureContext)
@@ -195,8 +196,10 @@ import GHC.Types.TyThing (TyThing)
 import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar, Specificity)
 import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
+
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
+
 import GHC.Core.Class (Class, ClassMinimalDef, ClassOpItem, ClassATItem)
 import GHC.Core.Coercion (Coercion)
 import GHC.Core.Coercion.Axiom (CoAxBranch)

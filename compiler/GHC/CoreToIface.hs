@@ -88,7 +88,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Data.Maybe ( isNothing, catMaybes )
-import Data.List ( partition )
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -285,23 +284,22 @@ toIfaceCoercionX fr co
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
     go (CoVarCo cv)
       -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
-      | cv `elemVarSet` fr  = IfaceFreeCoVar cv
-      | otherwise           = IfaceCoVarCo (toIfaceCoVar cv)
-    go (HoleCo h)           = IfaceHoleCo  (coHoleCoVar h)
+      | cv `elemVarSet` fr = IfaceFreeCoVar cv
+      | otherwise          = IfaceCoVarCo (toIfaceCoVar cv)
+    go (HoleCo h)          = IfaceHoleCo  (coHoleCoVar h)
 
-    go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
-    go (SymCo co)           = IfaceSymCo (go co)
-    go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
-    go (SelCo d co)         = IfaceSelCo d (go co)
-    go (LRCo lr co)         = IfaceLRCo lr (go co)
-    go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
-    go (KindCo c)           = IfaceKindCo (go c)
-    go (SubCo co)           = IfaceSubCo (go co)
-    go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (mkIfLclName (coaxrName co)) (map go cs)
-    go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
-    go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
-                                          (toIfaceTypeX fr t1)
-                                          (toIfaceTypeX fr t2)
+    go (AppCo co1 co2)     = IfaceAppCo  (go co1) (go co2)
+    go (SymCo co)          = IfaceSymCo (go co)
+    go (TransCo co1 co2)   = IfaceTransCo (go co1) (go co2)
+    go (SelCo d co)        = IfaceSelCo d (go co)
+    go (LRCo lr co)        = IfaceLRCo lr (go co)
+    go (InstCo co arg)     = IfaceInstCo (go co) (go arg)
+    go (KindCo c)          = IfaceKindCo (go c)
+    go (SubCo co)          = IfaceSubCo (go co)
+    go (AxiomCo ax cs)     = IfaceAxiomCo (toIfaceAxiomRule ax) (map go cs)
+    go (UnivCo { uco_prov = p, uco_role = r, uco_lty = t1, uco_rty = t2, uco_deps = deps })
+        = IfaceUnivCo p r (toIfaceTypeX fr t1) (toIfaceTypeX fr t2) (map go deps)
+
     go co@(TyConAppCo r tc cos)
       =  assertPpr (isNothing (tyConAppFunCo_maybe r tc cos)) (ppr co) $
          IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
@@ -318,12 +316,11 @@ toIfaceCoercionX fr co
                           where
                             fr' = fr `delVarSet` tv
 
-    go_prov :: UnivCoProvenance -> IfaceUnivCoProv
-    go_prov (PhantomProv co)     = IfacePhantomProv (go co)
-    go_prov (ProofIrrelProv co)  = IfaceProofIrrelProv (go co)
-    go_prov (PluginProv str cvs) = IfacePluginProv str (map toIfaceCoVar bound_cvs) free_cvs
-      where
-        (free_cvs, bound_cvs) = partition (`elemVarSet` fr) (dVarSetElems cvs)
+toIfaceAxiomRule :: CoAxiomRule -> IfaceAxiomRule
+toIfaceAxiomRule (BuiltInFamRew  bif) = IfaceAR_X (mkIfLclName (bifrw_name bif))
+toIfaceAxiomRule (BuiltInFamInj bif)  = IfaceAR_X (mkIfLclName (bifinj_name bif))
+toIfaceAxiomRule (BranchedAxiom ax i) = IfaceAR_B (coAxiomName ax) i
+toIfaceAxiomRule (UnbranchedAxiom ax) = IfaceAR_U (coAxiomName ax)
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet

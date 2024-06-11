@@ -21,9 +21,8 @@ mkFunCo      :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coerci
 mkNakedFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
 mkFunCo2     :: Role -> FunTyFlag -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
 mkCoVarCo :: CoVar -> Coercion
-mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion
-mkUnivCo :: UnivCoProvenance -> Role -> Type -> Type -> Coercion
+mkUnivCo :: UnivCoProvenance -> [Coercion] -> Role -> Type -> Type -> Coercion
 mkSymCo :: Coercion -> Coercion
 mkTransCo :: Coercion -> Coercion -> Coercion
 mkSelCo :: HasDebugCallStack => CoSel -> Coercion -> Coercion
@@ -34,7 +33,7 @@ mkNomReflCo :: Type -> Coercion
 mkKindCo :: Coercion -> Coercion
 mkSubCo :: HasDebugCallStack => Coercion -> Coercion
 mkProofIrrelCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
-mkAxiomRuleCo :: CoAxiomRule -> [Coercion] -> Coercion
+mkAxiomCo :: CoAxiomRule -> [Coercion] -> Coercion
 
 funRole :: Role -> FunSel -> Role
 
@@ -42,16 +41,16 @@ isGReflCo :: Coercion -> Bool
 isReflCo :: Coercion -> Bool
 isReflexiveCo :: Coercion -> Bool
 decomposePiCos :: HasDebugCallStack => Coercion -> Pair Type -> [Type] -> ([Coercion], Coercion)
-coVarKindsTypesRole :: HasDebugCallStack => CoVar -> (Kind, Kind, Type, Type, Role)
+coVarTypesRole :: HasDebugCallStack => CoVar -> (Type, Type, Role)
 coVarRole :: CoVar -> Role
 
 mkCoercionType :: Role -> Type -> Type -> Type
 
 seqCo :: Coercion -> ()
 
-coercionKind :: Coercion -> Pair Type
-coercionLKind :: Coercion -> Type
-coercionRKind :: Coercion -> Type
+coercionKind  :: HasDebugCallStack => Coercion -> Pair Type
+coercionLKind :: HasDebugCallStack => Coercion -> Type
+coercionRKind :: HasDebugCallStack => Coercion -> Type
 coercionType :: Coercion -> Type
 
 topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)

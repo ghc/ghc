@@ -355,24 +355,24 @@ opt_co4 env sym rep r (CoVarCo cv)
 opt_co4 _ _ _ _ (HoleCo h)
   = pprPanic "opt_univ fell into a hole" (ppr h)
 
-opt_co4 env sym rep r (AxiomInstCo con ind cos)
+opt_co4 env sym rep r (AxiomCo con cos)
     -- Do *not* push sym inside top-level axioms
     -- e.g. if g is a top-level axiom
     --   g a : f a ~ a
     -- then (sym (g ty)) /= g (sym ty) !!
-  = assert (r == coAxiomRole con )
-    wrapRole rep (coAxiomRole con) $
+  = assert (r == coAxiomRuleRole con )
+    wrapRole rep (coAxiomRuleRole con) $
     wrapSym sym $
                        -- some sub-cos might be P: use opt_co2
                        -- See Note [Optimising coercion optimisation]
-    AxiomInstCo con ind (zipWith (opt_co2 env False)
-                                 (coAxBranchRoles (coAxiomNthBranch con ind))
-                                 cos)
+    AxiomCo con (zipWith (opt_co2 env False)
+                         (coAxiomRuleArgRoles con)
+                         cos)
       -- Note that the_co does *not* have sym pushed into it
 
-opt_co4 env sym rep r (UnivCo prov _r t1 t2)
-  = assert (r == _r )
-    opt_univ env sym prov (chooseRole rep r) t1 t2
+opt_co4 env sym rep r (UnivCo { uco_prov = prov, uco_lty = t1
+                              , uco_rty = t2, uco_deps = deps })
+  = opt_univ env sym prov deps (chooseRole rep r) t1 t2
 
 opt_co4 env sym rep r (TransCo co1 co2)
                       -- sym (g `o` h) = sym h `o` sym g
@@ -506,13 +506,6 @@ opt_co4 env sym _ r (SubCo co)
   = assert (r == Representational) $
     opt_co4_wrap env sym True Nominal co
 
--- This could perhaps be optimized more.
-opt_co4 env sym rep r (AxiomRuleCo co cs)
-  = assert (r == coaxrRole co) $
-    wrapRole rep r $
-    wrapSym sym $
-    AxiomRuleCo co (zipWith (opt_co2 env False) (coaxrAsmpRoles co) cs)
-
 {- Note [Optimise CoVarCo to Refl]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have (c :: t~t) we can optimise it to Refl. That increases the
@@ -526,8 +519,12 @@ in GHC.Core.Coercion.
 -- | Optimize a phantom coercion. The input coercion may not necessarily
 -- be a phantom, but the output sure will be.
 opt_phantom :: LiftingContext -> SymFlag -> Coercion -> NormalCo
+opt_phantom env sym (UnivCo { uco_prov = prov, uco_lty = t1
+                            , uco_rty = t2, uco_deps = deps })
+  = opt_univ env sym prov deps Phantom t1 t2
+
 opt_phantom env sym co
-  = opt_univ env sym (PhantomProv (mkKindCo co)) Phantom ty1 ty2
+  = opt_univ env sym PhantomProv [mkKindCo co] Phantom ty1 ty2
   where
     Pair ty1 ty2 = coercionKind co
 
@@ -562,17 +559,25 @@ See #19509.
 
  -}
 
-opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> Role
-         -> Type -> Type -> Coercion
-opt_univ env sym (PhantomProv h) _r ty1 ty2
-  | sym       = mkPhantomCo h' ty2' ty1'
-  | otherwise = mkPhantomCo h' ty1' ty2'
+opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance
+         -> [Coercion]
+         -> Role -> Type -> Type -> Coercion
+opt_univ env sym prov deps role ty1 ty2
+  = let ty1'  = substTyUnchecked (lcSubstLeft  env) ty1
+        ty2'  = substTyUnchecked (lcSubstRight env) ty2
+        deps' = map (opt_co1 env sym) deps
+        (ty1'', ty2'') = swapSym sym (ty1', ty2')
+    in
+    mkUnivCo prov deps' role ty1'' ty2''
+
+{-
+opt_univ env PhantomProv cvs _r ty1 ty2
+  = mkUnivCo PhantomProv cvs Phantom ty1' ty2'
   where
-    h' = opt_co4 env sym False Nominal h
     ty1' = substTy (lcSubstLeft  env) ty1
     ty2' = substTy (lcSubstRight env) ty2
 
-opt_univ env sym prov role oty1 oty2
+opt_univ1 env prov cvs' role oty1 oty2
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
   , Just (tc2, tys2) <- splitTyConApp_maybe oty2
   , tc1 == tc2
@@ -581,8 +586,8 @@ opt_univ env sym prov role oty1 oty2
       -- NB: prov must not be the two interesting ones (ProofIrrel & Phantom);
       -- Phantom is already taken care of, and ProofIrrel doesn't relate tyconapps
   = let roles    = tyConRoleListX role tc1
-        arg_cos  = zipWith3 (mkUnivCo prov') roles tys1 tys2
-        arg_cos' = zipWith (opt_co4 env sym False) roles arg_cos
+        arg_cos  = zipWith3 (mkUnivCo prov cvs') roles tys1 tys2
+        arg_cos' = zipWith (opt_co4 env False False) roles arg_cos
     in
     mkTyConAppCo role tc1 arg_cos'
 
@@ -595,14 +600,13 @@ opt_univ env sym prov role oty1 oty2
       -- NB: prov isn't interesting here either
   = let k1   = tyVarKind tv1
         k2   = tyVarKind tv2
-        eta  = mkUnivCo prov' Nominal k1 k2
+        eta  = mkUnivCo prov cvs' Nominal k1 k2
           -- eta gets opt'ed soon, but not yet.
         ty2' = substTyWith [tv2] [TyVarTy tv1 `mkCastTy` eta] ty2
 
-        (env', tv1', eta') = optForAllCoBndr env sym tv1 eta
-        !(vis1', vis2') = swapSym sym (vis1, vis2)
+        (env', tv1', eta') = optForAllCoBndr env False tv1 eta
     in
-    mkForAllCo tv1' vis1' vis2' eta' (opt_univ env' sym prov' role ty1 ty2')
+    mkForAllCo tv1' vis1 vis2 eta' (opt_univ1 env' prov cvs' role ty1 ty2')
 
   | Just (Bndr cv1 vis1, ty1) <- splitForAllForAllTyBinder_maybe oty1
   , isCoVar cv1
@@ -612,7 +616,7 @@ opt_univ env sym prov role oty1 oty2
   = let k1    = varType cv1
         k2    = varType cv2
         r'    = coVarRole cv1
-        eta   = mkUnivCo prov' Nominal k1 k2
+        eta   = mkUnivCo prov cvs' Nominal k1 k2
         eta_d = downgradeRole r' Nominal eta
           -- eta gets opt'ed soon, but not yet.
         n_co  = (mkSymCo $ mkSelCo (SelTyCon 2 r') eta_d) `mkTransCo`
@@ -620,23 +624,16 @@ opt_univ env sym prov role oty1 oty2
                 (mkSelCo (SelTyCon 3 r') eta_d)
         ty2'  = substTyWithCoVars [cv2] [n_co] ty2
 
-        (env', cv1', eta') = optForAllCoBndr env sym cv1 eta
-        !(vis1', vis2') = swapSym sym (vis1, vis2)
+        (env', cv1', eta') = optForAllCoBndr env False cv1 eta
     in
-    mkForAllCo cv1' vis1' vis2' eta' (opt_univ env' sym prov' role ty1 ty2')
+    mkForAllCo cv1' vis1 vis2 eta' (opt_univ1 env' prov cvs' role ty1 ty2')
 
   | otherwise
   = let ty1 = substTyUnchecked (lcSubstLeft  env) oty1
         ty2 = substTyUnchecked (lcSubstRight env) oty2
-        (a, b) | sym       = (ty2, ty1)
-               | otherwise = (ty1, ty2)
     in
-    mkUnivCo prov' role a b
-
-  where
-    prov' = case prov of
-      ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
-      PluginProv s cvs   -> PluginProv s $ substDCoVarSet (liftingContextSubst env) cvs
+    mkUnivCo prov cvs' role ty1 ty2
+-}
 
 -------------
 opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
@@ -722,21 +719,13 @@ opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
   = fireTransRule "TrPushInst" in_co1 in_co2 $
     mkInstCo (opt_trans is co1 co2) ty1
 
-opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
-                  in_co2@(UnivCo p2 r2 _tyl2 tyr2)
-  | Just prov' <- opt_trans_prov p1 p2
+opt_trans_rule _
+    in_co1@(UnivCo { uco_prov = p1, uco_role = r1, uco_lty = tyl1, uco_deps = deps1 })
+    in_co2@(UnivCo { uco_prov = p2, uco_role = r2, uco_rty = tyr2, uco_deps = deps2 })
+  | p1 == p2    -- If the provenances are different, opt'ing will be very confusing
   = assert (r1 == r2) $
     fireTransRule "UnivCo" in_co1 in_co2 $
-    mkUnivCo prov' r1 tyl1 tyr2
-  where
-    -- if the provenances are different, opt'ing will be very confusing
-    opt_trans_prov (PhantomProv kco1)    (PhantomProv kco2)
-      = Just $ PhantomProv $ opt_trans is kco1 kco2
-    opt_trans_prov (ProofIrrelProv kco1) (ProofIrrelProv kco2)
-      = Just $ ProofIrrelProv $ opt_trans is kco1 kco2
-    opt_trans_prov (PluginProv str1 cvs1) (PluginProv str2 cvs2)
-      | str1 == str2 = Just (PluginProv str1 (cvs1 `unionDVarSet` cvs2))
-    opt_trans_prov _ _ = Nothing
+    mkUnivCo p1 (deps1 ++ deps2) r1 tyl1 tyr2
 
 -- Push transitivity down through matching top-level constructors.
 opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2)
@@ -844,15 +833,13 @@ opt_trans_rule is co1 co2
   -- If we put TrPushSymAxR first, we'll get
   --    (axN ty ; sym (axN ty)) :: N ty ~ N ty -- Obviously Refl
   --    --> axN (sym (axN ty))  :: N ty ~ N ty -- Very stupid
-  | Just (sym1, ax1, ind1, cos1) <- isAxiom_maybe co1
-  , Just (sym2, ax2, ind2, cos2) <- isAxiom_maybe co2
-  , ax1 == ax2
-  , ind1 == ind2
+  | Just (sym1, axr1, cos1) <- isAxiomCo_maybe co1
+  , Just (sym2, axr2, cos2) <- isAxiomCo_maybe co2
+  , axr1 == axr2
   , sym1 == not sym2
-  , let branch = coAxiomNthBranch ax1 ind1
-        role   = coAxiomRole ax1
-        qtvs   = coAxBranchTyVars branch ++ coAxBranchCoVars branch
-        lhs    = coAxNthLHS ax1 ind1
+  , Just (tc, role, branch) <- coAxiomRuleBranch_maybe axr1
+  , let qtvs   = coAxBranchTyVars branch ++ coAxBranchCoVars branch
+        lhs    = mkTyConApp tc (coAxBranchLHS branch)
         rhs    = coAxBranchRHS branch
         pivot_tvs = exactTyCoVarsOfType (if sym2 then rhs else lhs)
   , all (`elemVarSet` pivot_tvs) qtvs
@@ -866,35 +853,31 @@ opt_trans_rule is co1 co2
   -- See Note [Push transitivity inside axioms] and
   -- Note [Push transitivity inside newtype axioms only]
   -- TrPushSymAxR
-  | Just (sym, con, ind, cos1) <- isAxiom_maybe co1
-  , isNewTyCon (coAxiomTyCon con)
+  | Just (sym, axr, cos1) <- isAxiomCo_maybe co1
   , True <- sym
-  , Just cos2 <- matchAxiom sym con ind co2
-  , let newAxInst = AxiomInstCo con ind (opt_transList is (map mkSymCo cos2) cos1)
+  , Just cos2 <- matchNewtypeBranch sym axr co2
+  , let newAxInst = AxiomCo axr (opt_transList is (map mkSymCo cos2) cos1)
   = fireTransRule "TrPushSymAxR" co1 co2 $ SymCo newAxInst
 
   -- TrPushAxR
-  | Just (sym, con, ind, cos1) <- isAxiom_maybe co1
-  , isNewTyCon (coAxiomTyCon con)
+  | Just (sym, axr, cos1) <- isAxiomCo_maybe co1
   , False <- sym
-  , Just cos2 <- matchAxiom sym con ind co2
-  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
+  , Just cos2 <- matchNewtypeBranch sym axr co2
+  , let newAxInst = AxiomCo axr (opt_transList is cos1 cos2)
   = fireTransRule "TrPushAxR" co1 co2 newAxInst
 
   -- TrPushSymAxL
-  | Just (sym, con, ind, cos2) <- isAxiom_maybe co2
-  , isNewTyCon (coAxiomTyCon con)
+  | Just (sym, axr, cos2) <- isAxiomCo_maybe co2
   , True <- sym
-  , Just cos1 <- matchAxiom (not sym) con ind co1
-  , let newAxInst = AxiomInstCo con ind (opt_transList is cos2 (map mkSymCo cos1))
+  , Just cos1 <- matchNewtypeBranch (not sym) axr co1
+  , let newAxInst = AxiomCo axr (opt_transList is cos2 (map mkSymCo cos1))
   = fireTransRule "TrPushSymAxL" co1 co2 $ SymCo newAxInst
 
   -- TrPushAxL
-  | Just (sym, con, ind, cos2) <- isAxiom_maybe co2
-  , isNewTyCon (coAxiomTyCon con)
+  | Just (sym, axr, cos2) <- isAxiomCo_maybe co2
   , False <- sym
-  , Just cos1 <- matchAxiom (not sym) con ind co1
-  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
+  , Just cos1 <- matchNewtypeBranch (not sym) axr co1
+  , let newAxInst = AxiomCo axr (opt_transList is cos1 cos2)
   = fireTransRule "TrPushAxL" co1 co2 newAxInst
 
 
@@ -1149,24 +1132,24 @@ chooseRole True _ = Representational
 chooseRole _    r = r
 
 -----------
-isAxiom_maybe :: Coercion -> Maybe (Bool, CoAxiom Branched, Int, [Coercion])
+isAxiomCo_maybe :: Coercion -> Maybe (SymFlag, CoAxiomRule, [Coercion])
 -- We don't expect to see nested SymCo; and that lets us write a simple,
 -- non-recursive function. (If we see a nested SymCo we'll just fail,
 -- which is ok.)
-isAxiom_maybe (SymCo (AxiomInstCo ax ind cos))
-  = Just (True, ax, ind, cos)
-isAxiom_maybe (AxiomInstCo ax ind cos)
-  = Just (False, ax, ind, cos)
-isAxiom_maybe _ = Nothing
+isAxiomCo_maybe (SymCo (AxiomCo ax cos)) = Just (True, ax, cos)
+isAxiomCo_maybe (AxiomCo ax cos)         = Just (False, ax, cos)
+isAxiomCo_maybe _                        = Nothing
 
-matchAxiom :: Bool -- True = match LHS, False = match RHS
-           -> CoAxiom br -> Int -> Coercion -> Maybe [Coercion]
-matchAxiom sym ax@(CoAxiom { co_ax_tc = tc }) ind co
-  | CoAxBranch { cab_tvs = qtvs
+matchNewtypeBranch :: Bool -- True = match LHS, False = match RHS
+                   -> CoAxiomRule
+                   -> Coercion -> Maybe [Coercion]
+matchNewtypeBranch sym axr co
+  | Just (tc,branch) <- isNewtypeAxiomRule_maybe axr
+  , CoAxBranch { cab_tvs = qtvs
                , cab_cvs = []   -- can't infer these, so fail if there are any
                , cab_roles = roles
                , cab_lhs = lhs
-               , cab_rhs = rhs } <- coAxiomNthBranch ax ind
+               , cab_rhs = rhs } <- branch
   , Just subst <- liftCoMatch (mkVarSet qtvs)
                               (if sym then (mkTyConApp tc lhs) else rhs)
                               co

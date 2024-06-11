@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  x :: forall (x :: Bool). P (F Int) (x |> Sym (T14729.D:R:FInt[0]))
+  x :: forall (x :: Bool). P (F Int) (x |> Sym T14729.D:R:FInt)
   y :: forall {x :: Bool}. P Bool x
 TYPE CONSTRUCTORS
   type family F{1} :: * -> *
@@ -11,4 +11,4 @@ COERCION AXIOMS
 FAMILY INSTANCES
   type instance F Int = Bool -- Defined at T14729.hs:10:15
 Dependent modules: []
-Dependent packages: [base-4.19.0.0]
+Dependent packages: [base-4.20.0.0]

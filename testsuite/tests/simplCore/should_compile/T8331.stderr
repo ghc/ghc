@@ -6,8 +6,8 @@
       useAbstractMonad @(ReaderT Int (ST s)) $dMonadAbstractIOST
       = (useAbstractMonad1 @s)
         `cast` (<Int>_R
-                %<'Many>_N ->_R <Int>_R %<'Many>_N ->_R Sym (N:ST[0] <s>_N <Int>_R)
-                                ; Sym (N:ReaderT[0] <*>_N <Int>_R <ST s>_R <Int>_N)
+                %<'Many>_N ->_R <Int>_R %<'Many>_N ->_R Sym (N:ST <s>_N <Int>_R)
+                                ; Sym (N:ReaderT <*>_N <Int>_R <ST s>_R <Int>_N)
                 :: Coercible
                      (Int -> Int -> STRep s Int) (Int -> ReaderT Int (ST s) Int))
 

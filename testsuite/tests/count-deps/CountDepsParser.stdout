@@ -2,6 +2,7 @@ Found GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
+GHC.Builtin.Types.Literals
 GHC.Builtin.Types.Prim
 GHC.Builtin.Uniques
 GHC.ByteCode.Types

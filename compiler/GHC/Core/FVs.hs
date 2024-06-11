@@ -39,9 +39,8 @@ module GHC.Core.FVs (
         exprFVs,
 
         -- * Orphan names
-        orphNamesOfType, orphNamesOfTypes,
-        orphNamesOfCo,  orphNamesOfCoCon, orphNamesOfAxiomLHS,
-        exprsOrphNames,
+        orphNamesOfType, orphNamesOfTypes, orphNamesOfAxiomLHS,
+        orphNamesOfExprs,
 
         -- * Core syntax tree annotation with free variables
         FVAnn,                  -- annotation, abstract
@@ -291,52 +290,34 @@ tickish_fvs :: CoreTickish -> FV
 tickish_fvs (Breakpoint _ _ ids _) = FV.mkFVs ids
 tickish_fvs _ = emptyFV
 
-{-
-************************************************************************
-*                                                                      *
-\section{Free names}
-*                                                                      *
-************************************************************************
--}
-
--- | Finds the free /external/ names of an expression, notably
--- including the names of type constructors (which of course do not show
--- up in 'exprFreeVars').
-exprOrphNames :: CoreExpr -> NameSet
--- There's no need to delete local binders, because they will all
--- be /internal/ names.
-exprOrphNames e
-  = go e
-  where
-    go (Var v)
-      | isExternalName n    = unitNameSet n
-      | otherwise           = emptyNameSet
-      where n = idName v
-    go (Lit _)              = emptyNameSet
-    go (Type ty)            = orphNamesOfType ty        -- Don't need free tyvars
-    go (Coercion co)        = orphNamesOfCo co
-    go (App e1 e2)          = go e1 `unionNameSet` go e2
-    go (Lam v e)            = go e `delFromNameSet` idName v
-    go (Tick _ e)           = go e
-    go (Cast e co)          = go e `unionNameSet` orphNamesOfCo co
-    go (Let (NonRec _ r) e) = go e `unionNameSet` go r
-    go (Let (Rec prs) e)    = exprsOrphNames (map snd prs) `unionNameSet` go e
-    go (Case e _ ty as)     = go e `unionNameSet` orphNamesOfType ty
-                              `unionNameSet` unionNameSets (map go_alt as)
-
-    go_alt (Alt _ _ r)      = go r
-
--- | Finds the free /external/ names of several expressions: see 'exprOrphNames' for details
-exprsOrphNames :: [CoreExpr] -> NameSet
-exprsOrphNames es = foldr (unionNameSet . exprOrphNames) emptyNameSet es
-
-
 {- **********************************************************************
 %*                                                                      *
-                    orphNamesXXX
-
+                    Orphan names
 %*                                                                      *
 %********************************************************************* -}
+
+{- Note [Finding orphan names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The functions here (orphNamesOfType, orphNamesOfExpr etc) traverse a template:
+  * the head of an class instance decl
+  * the LHS of a type-family instance
+  * the arguments of a RULE
+to find TyCons or (in the case of a RULE) Ids, that will be matched against when
+matching the template. If none of these orphNames are locally defined, the instance
+or RULE is an orphan: see Note [Orphans] in GHC.Core
+
+Wrinkles:
+ (ON1) We do not need to look inside coercions, because we never match against
+       them.  Indeed, it'd be wrong to do so, because it could make an instance
+       into a non-orphan, when it really is an orphan.
+
+ (ON2) These orphNames functions are also (rather separately) used by GHCi, to
+       implement :info.  When you say ":info Foo", we show all the instances that
+       involve `Foo`; that is, all the instances whose oprhNames include `Foo`.
+
+       To support `:info (->)` we need to ensure that (->) is treated as an orphName
+       of FunTy, which is a bit messy since the "real" TyCon is `FUN`
+-}
 
 orphNamesOfTyCon :: TyCon -> NameSet
 orphNamesOfTyCon tycon = unitNameSet (getName tycon) `unionNameSet` case tyConClass_maybe tycon of
@@ -350,6 +331,8 @@ orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (LitTy {})           = emptyNameSet
 orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
                                        `unionNameSet` orphNamesOfType res
+orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
+
 orphNamesOfType (TyConApp tycon tys) = func
                                        `unionNameSet` orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
@@ -367,65 +350,15 @@ orphNamesOfType (FunTy af w arg res) =  func
 
               fun_tc = tyConName (funTyFlagTyCon af)
 
-orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
-orphNamesOfType (CastTy ty co)       = orphNamesOfType ty `unionNameSet` orphNamesOfCo co
-orphNamesOfType (CoercionTy co)      = orphNamesOfCo co
+-- Coercions: see wrinkle (ON1) of Note [Finding orphan names]
+orphNamesOfType (CastTy ty _co)  = orphNamesOfType ty
+orphNamesOfType (CoercionTy _co) = emptyNameSet
 
 orphNamesOfThings :: (a -> NameSet) -> [a] -> NameSet
 orphNamesOfThings f = foldr (unionNameSet . f) emptyNameSet
 
 orphNamesOfTypes :: [Type] -> NameSet
 orphNamesOfTypes = orphNamesOfThings orphNamesOfType
-
-orphNamesOfMCo :: MCoercion -> NameSet
-orphNamesOfMCo MRefl    = emptyNameSet
-orphNamesOfMCo (MCo co) = orphNamesOfCo co
-
-orphNamesOfCo :: Coercion -> NameSet
-orphNamesOfCo (Refl ty)             = orphNamesOfType ty
-orphNamesOfCo (GRefl _ ty mco)      = orphNamesOfType ty `unionNameSet` orphNamesOfMCo mco
-orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` orphNamesOfCos cos
-orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (ForAllCo { fco_kind = kind_co, fco_body = co })
-                                    = orphNamesOfCo kind_co
-                                      `unionNameSet` orphNamesOfCo co
-orphNamesOfCo (FunCo { fco_mult = co_mult, fco_arg = co1, fco_res = co2 })
-                                    = orphNamesOfCo co_mult
-                                      `unionNameSet` orphNamesOfCo co1
-                                      `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (CoVarCo _)           = emptyNameSet
-orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orphNamesOfCos cos
-orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1
-                                      `unionNameSet` orphNamesOfType t2
-orphNamesOfCo (SymCo co)            = orphNamesOfCo co
-orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (SelCo _ co)          = orphNamesOfCo co
-orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
-orphNamesOfCo (InstCo co arg)       = orphNamesOfCo co `unionNameSet` orphNamesOfCo arg
-orphNamesOfCo (KindCo co)           = orphNamesOfCo co
-orphNamesOfCo (SubCo co)            = orphNamesOfCo co
-orphNamesOfCo (AxiomRuleCo _ cs)    = orphNamesOfCos cs
-orphNamesOfCo (HoleCo _)            = emptyNameSet
-
-orphNamesOfProv :: UnivCoProvenance -> NameSet
-orphNamesOfProv (PhantomProv co)    = orphNamesOfCo co
-orphNamesOfProv (ProofIrrelProv co) = orphNamesOfCo co
-orphNamesOfProv (PluginProv _ _)    = emptyNameSet
-
-orphNamesOfCos :: [Coercion] -> NameSet
-orphNamesOfCos = orphNamesOfThings orphNamesOfCo
-
-orphNamesOfCoCon :: CoAxiom br -> NameSet
-orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
-  = orphNamesOfTyCon tc `unionNameSet` orphNamesOfCoAxBranches branches
-
-orphNamesOfCoAxBranches :: Branches br -> NameSet
-orphNamesOfCoAxBranches
-  = foldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet . fromBranches
-
-orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
-orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
-  = orphNamesOfTypes lhs `unionNameSet` orphNamesOfType rhs
 
 -- | `orphNamesOfAxiomLHS` collects the names of the concrete types and
 -- type constructors that make up the LHS of a type family instance,
@@ -441,11 +374,44 @@ orphNamesOfAxiomLHS axiom
   = (orphNamesOfTypes $ concatMap coAxBranchLHS $ fromBranches $ coAxiomBranches axiom)
     `extendNameSet` getName (coAxiomTyCon axiom)
 
--- Detect FUN 'Many as an application of (->), so that :i (->) works as expected
+-- Detect (FUN 'Many) as an application of (->), so that :i (->) works as expected
 -- (see #8535) Issue #16475 describes a more robust solution
+-- See wrinkle (ON2) of Note [Finding orphan names]
 orph_names_of_fun_ty_con :: Mult -> NameSet
 orph_names_of_fun_ty_con ManyTy = unitNameSet unrestrictedFunTyConName
 orph_names_of_fun_ty_con _      = emptyNameSet
+
+-- | Finds the free /external/ names of an expression, notably
+-- including the names of type constructors (which of course do not show
+-- up in 'exprFreeVars').
+orphNamesOfExpr :: CoreExpr -> NameSet
+-- There's no need to delete local binders, because they will all
+-- be /internal/ names.
+orphNamesOfExpr e
+  = go e
+  where
+    go (Var v)
+      | isExternalName n    = unitNameSet n
+      | otherwise           = emptyNameSet
+      where n = idName v
+    go (Lit _)              = emptyNameSet
+    go (Type ty)            = orphNamesOfType ty        -- Don't need free tyvars
+    go (Coercion _co)       = emptyNameSet -- See wrinkle (ON1) of Note [Finding orphan names]
+    go (App e1 e2)          = go e1 `unionNameSet` go e2
+    go (Lam v e)            = go e `delFromNameSet` idName v
+    go (Tick _ e)           = go e
+    go (Cast e _co)         = go e  -- See wrinkle (ON1) of Note [Finding orphan names]
+    go (Let (NonRec _ r) e) = go e `unionNameSet` go r
+    go (Let (Rec prs) e)    = orphNamesOfExprs (map snd prs) `unionNameSet` go e
+    go (Case e _ ty as)     = go e `unionNameSet` orphNamesOfType ty
+                              `unionNameSet` unionNameSets (map go_alt as)
+
+    go_alt (Alt _ _ r)      = go r
+
+-- | Finds the free /external/ names of several expressions: see 'exprOrphNames' for details
+orphNamesOfExprs :: [CoreExpr] -> NameSet
+orphNamesOfExprs es = foldr (unionNameSet . orphNamesOfExpr) emptyNameSet es
+
 
 {-
 ************************************************************************
