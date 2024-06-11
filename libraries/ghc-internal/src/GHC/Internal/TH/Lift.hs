@@ -42,7 +42,7 @@ module GHC.Internal.TH.Lift
   where
 
 import GHC.Internal.TH.Syntax
-import GHC.Internal.TH.Lib ()  -- See wrinkle (W4) of Note [Tracking dependencies on primitives]
+import qualified GHC.Internal.TH.Lib as Lib (litE)  -- See wrinkle (W4) of Note [Tracking dependencies on primitives]
 import GHC.Internal.Lexeme ( startsVarSym, startsVarId )
 
 import GHC.Internal.Data.Either
@@ -54,8 +54,9 @@ import GHC.Internal.Integer
 import GHC.Internal.Real
 import GHC.Internal.Word
 import GHC.Internal.Int
-import GHC.Internal.Data.Data
+import GHC.Internal.Data.Data hiding (Fixity)
 import GHC.Internal.Natural
+import GHC.Internal.ForeignPtr
 
 -- | A 'Lift' instance can have any of its values turned into a Template
 -- Haskell expression. This is needed when a value used within a Template
@@ -304,6 +305,141 @@ rightName = 'Right
 
 nonemptyName :: Name
 nonemptyName = '(:|)
+
+-----------------------------------------------------
+--
+--              Lifting the TH AST
+--
+-----------------------------------------------------
+
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Loc
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift DocLoc
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift ModName
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift GHC.Internal.TH.Syntax.Module
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift NameSpace
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift NamespaceSpecifier
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift PkgName
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift NameFlavour
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift OccName
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Name
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift NameIs
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Specificity
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift BndrVis
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift a => Lift (TyVarBndr a)
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift TyLit
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Type
+-- | @since template-haskell-2.22.1.0
+instance Lift Bytes where
+  liftTyped x = unsafeCodeCoerce (lift x)
+  lift bytes@Bytes{} = -- See Note [Why FinalPtr]
+    [| Bytes
+      { bytesPtr = ForeignPtr $(Lib.litE (BytesPrimL bytes)) FinalPtr
+      , bytesOffset = 0
+      , bytesSize = $(lift (bytesSize bytes))
+      }
+    |]
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Lit
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Pat
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Clause
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift DerivClause
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift DerivStrategy
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Overlap
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift FunDep
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Safety
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Callconv
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Foreign
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift ForeignSrcLang
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift FixityDirection
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Fixity
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Inline
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift RuleMatch
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Phases
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift RuleBndr
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift AnnTarget
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Pragma
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift SourceStrictness
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift SourceUnpackedness
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift DecidedStrictness
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Bang
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Con
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift TySynEqn
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift FamilyResultSig
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift InjectivityAnn
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift TypeFamilyHead
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Role
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift PatSynArgs
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift PatSynDir
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Dec
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Range
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Exp
+-- | @since template-haskell-2.22.1.0
+instance Lift (TExp a) where
+  lift (TExp e) = [| TExp $(lift e) |]
+  liftTyped = unsafeCodeCoerce . lift
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Match
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Guard
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Stmt
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Body
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Info
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift AnnLookup
+-- | @since template-haskell-2.22.1.0
+deriving instance Lift Extension
 
 -----------------------------------------------------
 --

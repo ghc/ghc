@@ -1,5 +1,9 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.22.1.0
+
+  * `Lift` instances were added for the `template-haskell` AST.
+
 ## 2.22.0.0
 
   * The kind of `Code` was changed from `forall r. (Type -> Type) -> TYPE r -> Type`

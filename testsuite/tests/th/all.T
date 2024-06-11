@@ -318,7 +318,7 @@ test('T1476', normal, compile, ['-v0'])
 test('T1476b', normal, compile, ['-v0'])
 test('T8031', normal, compile, ['-v0'])
 test('T8624', only_ways(['normal']), makefile_test, ['T8624'])
-test('TH_Lift', normal, compile, ['-v0'])
+test('TH_Lift', js_broken(24886), compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T10047', only_ways(['ghci']), ghci_script, ['T10047.script'])
 test('T10019', only_ways(['ghci']), ghci_script, ['T10019.script'])
 test('T10267', [], multimod_compile_fail,

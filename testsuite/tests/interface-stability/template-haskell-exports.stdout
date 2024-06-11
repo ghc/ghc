@@ -2420,11 +2420,37 @@ instance GHC.Internal.Show.Show GHC.Internal.LanguageExtensions.Extension -- Def
 instance GHC.Internal.Show.Show GHC.Internal.TH.Ppr.ForallVisFlag -- Defined in ‘GHC.Internal.TH.Ppr’
 instance [safe] GHC.Internal.Show.Show GHC.Internal.TH.PprLib.Doc -- Defined in ‘GHC.Internal.TH.PprLib’
 instance GHC.Internal.Show.Show GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Body -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Types.Bool -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Bytes -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Callconv -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Types.Char -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.DerivClause -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Types.Double -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b) => GHC.Internal.TH.Lift.Lift (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.FixityDirection -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Types.Float -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Guard -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Types.Int -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.TH.Lift’
@@ -2432,16 +2458,49 @@ instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int64 -- Defined in ‘GHC.I
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Num.Integer.Integer -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift [a] -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameFlavour -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameIs -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameSpace -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NamespaceSpecifier -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Num.Natural.Natural -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.OccName -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Overlap -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.PkgName -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.TH.Lift.Lift (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Safety -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift (GHC.Internal.TH.Syntax.TExp a) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b) => GHC.Internal.TH.Lift.Lift (a, b) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b c. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c) => GHC.Internal.TH.Lift.Lift (a, b, c) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b c d. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d) => GHC.Internal.TH.Lift.Lift (a, b, c, d) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b c d e. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e) => GHC.Internal.TH.Lift.Lift (a, b, c, d, e) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b c d e f. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e, GHC.Internal.TH.Lift.Lift f) => GHC.Internal.TH.Lift.Lift (a, b, c, d, e, f) -- Defined in ‘GHC.Internal.TH.Lift’
 instance forall a b c d e f g. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e, GHC.Internal.TH.Lift.Lift f, GHC.Internal.TH.Lift.Lift g) => GHC.Internal.TH.Lift.Lift (a, b, c, d, e, f, g) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.TySynEqn -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift (GHC.Internal.TH.Syntax.TyVarBndr a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift () -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Types.Word -- Defined in ‘GHC.Internal.TH.Lift’
