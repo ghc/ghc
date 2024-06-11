@@ -641,12 +641,18 @@ openNursery profile tso = do
 
    ]
 
-nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks
-  :: Platform -> CmmReg -> CmmExpr
+-- | The address of the @free@ field of a nursery block descriptor pointed to by @cn@
+nursery_bdescr_free :: Platform -> CmmReg -> CmmExpr
 nursery_bdescr_free   platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_free (platformConstants platform))
+
+-- | The address of the @start@ field of a nursery block descriptor pointed to by @cn@
+nursery_bdescr_start :: Platform -> CmmReg -> CmmExpr
 nursery_bdescr_start  platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_start (platformConstants platform))
+
+-- | The address of the @blocks@ field of a nursery block descriptor pointed to by @cn@
+nursery_bdescr_blocks :: Platform -> CmmReg -> CmmExpr
 nursery_bdescr_blocks platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_blocks (platformConstants platform))
 
