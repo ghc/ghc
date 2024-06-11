@@ -1,5 +1,3 @@
-with-compiler: ghc-9.7
-
 packages: ./
           ./haddock-api
           ./haddock-library

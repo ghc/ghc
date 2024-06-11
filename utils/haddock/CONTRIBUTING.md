@@ -28,6 +28,17 @@ Then, run the following command from the top-level:
 $ ./hadrian/build -j --flavour=Quick --freeze1 _build/stage1/bin/haddock
 ```
 
+### Running the test suites
+
+Currently, this cannot be done with hadrian but has to be done with a
+`cabal-install` built from `master`.
+
+```
+cabal test -w <absolute-path-to-ghc-repo>/_build/stage1/bin/ghc
+```
+
+For more details, see https://gitlab.haskell.org/ghc/ghc/-/issues/24976.
+
 ## Working with the codebase
 
 The project provides a Makefile with rules to accompany you during development:
