@@ -507,7 +507,7 @@ closeNursery profile tso = do
     let alloc =
            CmmMachOp (mo_wordSub platform)
               [ cmmOffsetW platform (hpExpr platform) 1
-              , cmmLoadBWord platform (nursery_bdescr_start platform cnreg)
+              , nurseryStart platform cnreg
               ]
 
         alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
@@ -610,7 +610,7 @@ openNursery profile tso = do
      -- Hp = CurrentNursery->free - 1;
      mkAssign (hpReg platform) (cmmOffsetW platform (CmmReg bdfreereg) (-1)),
 
-     mkAssign bdstartreg (cmmLoadBWord platform (nursery_bdescr_start platform cnreg)),
+     mkAssign bdstartreg (nurseryStart platform cnreg),
 
      -- HpLim = CurrentNursery->start +
      --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
@@ -641,6 +641,12 @@ openNursery profile tso = do
 
    ]
 
+-- | @nurseryStart platform bd@ is the start address of the nursery block with descriptor
+-- @bd@.
+nurseryStart :: Platform -> CmmReg -> CmmExpr
+nurseryStart platform cnreg =
+  cmmLoadBWord platform (nursery_bdescr_start platform cnreg)
+
 -- | The address of the @free@ field of a nursery block descriptor pointed to by @cn@
 nursery_bdescr_free :: Platform -> CmmReg -> CmmExpr
 nursery_bdescr_free   platform cn =
@@ -651,7 +657,7 @@ nursery_bdescr_start :: Platform -> CmmReg -> CmmExpr
 nursery_bdescr_start  platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_start (platformConstants platform))
 
--- | The address of the @blocks@ field of a nursery block descriptor pointed to by @cn@
+-- | The address of the @start@ field of a nursery block descriptor pointed to by @cn@
 nursery_bdescr_blocks :: Platform -> CmmReg -> CmmExpr
 nursery_bdescr_blocks platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_blocks (platformConstants platform))
