@@ -657,18 +657,18 @@ tidyCt env = updCtEvidence (tidyCtEvidence env)
 tidyCtEvidence :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evar field because we don't
      --     show it in error messages
-tidyCtEvidence env ctev = ctev { ctev_pred = tidyOpenType env ty }
-  where
-    ty  = ctev_pred ctev
+tidyCtEvidence env ctev
+  = ctev { ctev_pred = tidyType env $ ctev_pred ctev }
+  -- No need for tidyOpenType because all the free tyvars are already tidied
 
 tidyHole :: TidyEnv -> Hole -> Hole
-tidyHole env h@(Hole { hole_ty = ty }) = h { hole_ty = tidyOpenType env ty }
+tidyHole env h@(Hole { hole_ty = ty })
+  = h { hole_ty = tidyType env ty }
+  -- No need for tidyOpenType because all the free tyvars are already tidied
 
 tidyDelayedError :: TidyEnv -> DelayedError -> DelayedError
-tidyDelayedError env (DE_Hole hole)
-  = DE_Hole $ tidyHole env hole
-tidyDelayedError env (DE_NotConcrete err)
-  = DE_NotConcrete $ tidyConcreteError env err
+tidyDelayedError env (DE_Hole hole)       = DE_Hole        $ tidyHole env hole
+tidyDelayedError env (DE_NotConcrete err) = DE_NotConcrete $ tidyConcreteError env err
 
 tidyConcreteError :: TidyEnv -> NotConcreteError -> NotConcreteError
 tidyConcreteError env err@(NCE_FRR { nce_frr_origin = frr_orig })
@@ -677,7 +677,9 @@ tidyConcreteError env err@(NCE_FRR { nce_frr_origin = frr_orig })
 tidyFRROrigin :: TidyEnv -> FixedRuntimeRepOrigin -> FixedRuntimeRepOrigin
 tidyFRROrigin env (FixedRuntimeRepOrigin ty orig)
   = FixedRuntimeRepOrigin (tidyType env ty) orig
+  -- No need for tidyOpenType because all the free tyvars are already tidied
 
 ----------------
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
+  -- No need for tidyOpenType because all the free tyvars are already tidied
