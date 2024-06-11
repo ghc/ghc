@@ -1601,9 +1601,9 @@ addStmtCtxt stmt thing_inside
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
-      HsUnboundVar {} -> thing_inside
+      XExpr (HsUnboundVarRn {}) -> thing_inside
       _ -> addErrCtxt (exprCtxt e) thing_inside
-   -- The HsUnboundVar special case addresses situations like
+   -- The HsUnboundVarRn special case addresses situations like
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself

@@ -20,6 +20,7 @@ import Data.Maybe
 plugin :: Plugin
 plugin = defaultPlugin {parsedResultAction = parsedAction}
 
+-- TODO(aidylns): what's the ex-HsUnboundVar thing to do here? The parser doesn't do that anymore.
 -- Replace every hole (and other unbound vars) with the given expression
 replaceHoles :: forall a . Data a => HsExpr GhcPs -> a -> a
 replaceHoles new = gmapT \case

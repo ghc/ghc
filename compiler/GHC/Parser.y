@@ -3829,8 +3829,9 @@ qopm    :: { forall b. DisambInfixOp b => PV (LocatedN b) }   -- used in section
         | qconop                { mkHsConOpPV $1 }
         | hole_op               { mkHsInfixHolePV $1 }
 
-hole_op :: { LocatedN (HsExpr GhcPs) }   -- used in sections
-hole_op : '`' '_' '`'           { sLLa $1 $> (hsHoleExpr (Just $ EpAnnUnboundVar (glAA $1, glAA $3) (glAA $2))) }
+hole_op :: { LocatedN RdrName }   -- used in sections
+hole_op : '`' '_' '`'           {% amsr (sLL $1 $> (mkUnqual varName (fsLit "_")))
+                                           (NameAnn NameBackquotes (glAA $1) (glAA (sL1n $2 $! mkUnqual varName (fsLit "_"))) (glAA $3) []) }
 
 qvarop :: { LocatedN RdrName }
         : qvarsym               { $1 }

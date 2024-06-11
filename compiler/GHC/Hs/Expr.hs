@@ -207,11 +207,6 @@ data EpAnnHsCase = EpAnnHsCase
 instance NoAnn EpAnnHsCase where
   noAnn = EpAnnHsCase noAnn noAnn noAnn
 
-data EpAnnUnboundVar = EpAnnUnboundVar
-     { hsUnboundBackquotes :: (EpaLocation, EpaLocation)
-     , hsUnboundHole       :: EpaLocation
-     } deriving Data
-
 -- Record selectors at parse time are HsVar; they convert to HsRecSel
 -- on renaming.
 type instance XRecSel              GhcPs = DataConCantHappen
@@ -227,14 +222,6 @@ type instance XOverLabel     GhcTc = DataConCantHappen
 -- ---------------------------------------------------------------------
 
 type instance XVar           (GhcPass _) = NoExtField
-
-type instance XUnboundVar    GhcPs = Maybe EpAnnUnboundVar
-type instance XUnboundVar    GhcRn = NoExtField
-type instance XUnboundVar    GhcTc = HoleExprRef
-  -- We really don't need the whole HoleExprRef; just the IORef EvTerm
-  -- would be enough. But then deriving a Data instance becomes impossible.
-  -- Much, much easier just to define HoleExprRef with a Data instance and
-  -- store the whole structure.
 
 type instance XIPVar         GhcPs = NoExtField
 type instance XIPVar         GhcRn = NoExtField
@@ -498,6 +485,10 @@ data XXExprGhcRn
                                                    -- Does not presist post renaming phase
                                                    -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
                                                    -- in `GHC.Tc.Gen.Do`
+  | HsUnboundVarRn RdrName   -- ^ Unbound variable.
+                             -- Turned from HsVar to HsUnboundVarRn by the
+                             --   renamer, when it finds an out-of-scope
+                             --   variable.
 
 
 -- | Wrap a located expression with a `PopErrCtxt`
@@ -578,6 +569,19 @@ data XXExprGhcTc
      Int                                -- module-local tick number for True
      Int                                -- module-local tick number for False
      (LHsExpr GhcTc)                    -- sub-expression
+  | HsUnboundVarTc HoleExprRef RdrName
+                             -- ^ Unbound variable; also used for "holes"
+                             --   (_ or _x).
+                             -- The HoleExprRef is where the erroring expression
+                             -- will be written after solving. See Note [Holes]
+                             -- in GHC.Tc.Types.Constraint.
+                             -- 
+                             -- We really don't need the whole HoleExprRef; just
+                             -- the IORef EvTerm would be enough. But then
+                             -- deriving a Data instance becomes impossible.
+                             -- Much, much easier just to define HoleExprRef
+                             -- with a Data instance and store the whole
+                             -- structure.
 
 -- | Build a 'XXExprGhcRn' out of an extension constructor,
 --   and the two components of the expansion: original and
@@ -638,7 +642,6 @@ ppr_lexpr e = ppr_expr (unLoc e)
 ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
-ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
 ppr_expr (HsRecSel _ f)      = pprPrefixOcc f
 ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel _ s l) = char '#' <> case s of
@@ -843,6 +846,7 @@ instance Outputable HsThingRn where
 instance Outputable XXExprGhcRn where
   ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [ppr o, ppr e]) (ppr o)
   ppr (PopErrCtxt e)        = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
+  ppr (HsUnboundVarRn uv)   = pprPrefixOcc uv
 
 instance Outputable XXExprGhcTc where
   ppr (WrapExpr (HsWrap co_fn e))
@@ -871,11 +875,11 @@ instance Outputable XXExprGhcTc where
             ppr tickIdFalse,
             text ">(",
             ppr exp, text ")"]
+  ppr (HsUnboundVarTc _ uv)   = pprPrefixOcc uv
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsRecSel _ f)       = Just (pprInfixOcc f)
-ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)            = case ghcPass @p of
                                         GhcRn -> ppr_infix_expr_rn x
                                         GhcTc -> ppr_infix_expr_tc x
@@ -884,6 +888,7 @@ ppr_infix_expr _ = Nothing
 ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
 ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
 ppr_infix_expr_rn (PopErrCtxt (L _ a)) = ppr_infix_expr a
+ppr_infix_expr_rn (HsUnboundVarRn occ) = Just (pprInfixOcc occ)
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
 ppr_infix_expr_tc (WrapExpr (HsWrap _ e))    = ppr_infix_expr e
@@ -891,6 +896,7 @@ ppr_infix_expr_tc (ExpandedThingTc thing _)  = ppr_infix_hs_expansion thing
 ppr_infix_expr_tc (ConLikeTc {})             = Nothing
 ppr_infix_expr_tc (HsTick {})                = Nothing
 ppr_infix_expr_tc (HsBinTick {})             = Nothing
+ppr_infix_expr_tc (HsUnboundVarTc _ occ) = Just (pprInfixOcc occ)
 
 ppr_infix_hs_expansion :: HsThingRn -> Maybe SDoc
 ppr_infix_hs_expansion (OrigExpr e) = ppr_infix_expr e
@@ -938,7 +944,6 @@ hsExprNeedsParens prec = go
   where
     go :: HsExpr (GhcPass p) -> Bool
     go (HsVar{})                      = False
-    go (HsUnboundVar{})               = False
     go (HsIPVar{})                    = False
     go (HsOverLabel{})                = False
     go (HsLit _ l)                    = hsLitNeedsParens prec l
@@ -991,10 +996,12 @@ hsExprNeedsParens prec = go
     go_x_tc (ConLikeTc {})                   = False
     go_x_tc (HsTick _ (L _ e))               = hsExprNeedsParens prec e
     go_x_tc (HsBinTick _ _ (L _ e))          = hsExprNeedsParens prec e
+    go_x_tc (HsUnboundVarTc {})              = False
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn thing _)    = hsExpandedNeedsParens thing
     go_x_rn (PopErrCtxt (L _ a))         = hsExprNeedsParens prec a
+    go_x_rn (HsUnboundVarRn _)           = False
 
     hsExpandedNeedsParens :: HsThingRn -> Bool
     hsExpandedNeedsParens (OrigExpr e) = hsExprNeedsParens prec e
@@ -1031,7 +1038,6 @@ isAtomicHsExpr (HsLit {})        = True
 isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
-isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsRecSel{})      = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = go_x_tc x
@@ -1043,10 +1049,12 @@ isAtomicHsExpr (XExpr x)
     go_x_tc (ConLikeTc {})                   = True
     go_x_tc (HsTick {}) = False
     go_x_tc (HsBinTick {}) = False
+    go_x_tc (HsUnboundVarTc {}) = True
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn thing _)    = isAtomicExpandedThingRn thing
     go_x_rn (PopErrCtxt (L _ a))         = isAtomicHsExpr a
+    go_x_rn (HsUnboundVarRn {}) = True
 
     isAtomicExpandedThingRn :: HsThingRn -> Bool
     isAtomicExpandedThingRn (OrigExpr e) = isAtomicHsExpr e

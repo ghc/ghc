@@ -12,7 +12,6 @@ import GHC (GhcPs)
 
 testMe :: HsExpr GhcPs -> Int
 testMe (HsVar a b) = _
-testMe (HsUnboundVar xuv uv) = _
 testMe (HsOverLabel xol s m_ip) = _
 testMe (HsIPVar xv hin) = _
 testMe (HsOverLit xole hol) = _
