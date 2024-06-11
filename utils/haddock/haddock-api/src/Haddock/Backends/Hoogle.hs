@@ -429,6 +429,7 @@ markupTag dflags =
     , markupOrderedList = box (TagL 'o') . map snd
     , markupDefList = box (TagL 'u') . map (\(a, b) -> TagInline "i" a : Str " " : b)
     , markupCodeBlock = box TagPre
+    , markupCodeBlockHighlight   = const $ str "<code>"
     , markupHyperlink = \(Hyperlink url mLabel) -> box (TagInline "a") (fromMaybe (str url) mLabel)
     , markupAName = const $ str ""
     , markupProperty = box TagPre . str

@@ -82,6 +82,7 @@ overIdentifier f d = g d
     g (DocOrderedList x) = DocOrderedList $ fmap (\(index, a) -> (index, g a)) x
     g (DocDefList x) = DocDefList $ fmap (\(y, z) -> (g y, g z)) x
     g (DocCodeBlock x) = DocCodeBlock $ g x
+    g (DocCodeBlockHighlight hl) = DocCodeBlockHighlight hl
     g (DocHyperlink (Hyperlink u x)) = DocHyperlink (Hyperlink u (fmap g x))
     g (DocPic x) = DocPic x
     g (DocMathInline x) = DocMathInline x
@@ -355,6 +356,7 @@ paragraph =
           , orderedList indent
           , birdtracks
           , codeblock
+          , codeblockHighlight indent
           , property
           , header
           , textParagraphThatStartsWithMarkdownLink
@@ -881,6 +883,49 @@ codeblock =
           | isNewline && c == '@' = Nothing
           | isNewline && isSpace c = Just isNewline
           | otherwise = Just $ c == '\n'
+
+-- | Parses a code block with triple backticks for highlighting (markdown syntax).
+-- The indentation in the code block is relative to the position of the opening
+-- backticks.
+--
+-- The parser does not process identifiers for linking (such as the codeBlock
+-- parser).
+--
+-- Example syntax:
+--
+-- ```haskell
+-- -- ```haskell
+-- -- fac :: Int -> Int
+-- -- fac 0 = 1
+-- -- fac n = n * fac (n - 1)
+-- --  ```
+-- ```
+codeblockHighlight :: Text -> Parser (DocH mod id)
+codeblockHighlight indent = DocCodeBlockHighlight <$> pHighlight
+  where
+    pHighlight :: Parser Highlight
+    pHighlight =
+      Highlight
+        <$  string "```"
+        <*> pLang
+        <*> (intercalate "\n" <$> Parsec.manyTill pCodeLine pBlockEnd)
+
+    pLang :: Parser String
+    pLang =
+      skipHorizontalSpace
+        *> Parsec.many1 Parsec.alphaNum
+        <* skipHorizontalSpace
+        <* Parsec.newline
+
+    pBlockEnd :: Parser ()
+    pBlockEnd = void (string indent *> string "```" <* Parsec.newline)
+
+    pCodeLine :: Parser String
+    pCodeLine =
+      pure "" <$> Parsec.newline -- we don't require indentation for empty lines
+        <|> string indent *> Parsec.manyTill Parsec.anyChar (try Parsec.newline)
+
+
 
 hyperlink :: Parser (DocH mod Identifier)
 hyperlink = choice' [angleBracketLink, autoUrl]

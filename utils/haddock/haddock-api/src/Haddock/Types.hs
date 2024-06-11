@@ -587,6 +587,7 @@ instance
     DocOrderedList a -> a `deepseq` ()
     DocDefList a -> a `deepseq` ()
     DocCodeBlock a -> a `deepseq` ()
+    DocCodeBlockHighlight a   -> a `deepseq` ()
     DocHyperlink a -> a `deepseq` ()
     DocPic a -> a `deepseq` ()
     DocMathInline a -> a `deepseq` ()
@@ -627,6 +628,9 @@ instance NFData id => NFData (TableRow id) where
 
 instance NFData id => NFData (TableCell id) where
   rnf (TableCell i j c) = i `deepseq` j `deepseq` c `deepseq` ()
+
+instance NFData Highlight where
+  rnf (Highlight lang content) = lang `deepseq` content `deepseq` ()
 
 exampleToString :: Example -> String
 exampleToString (Example expression result) =

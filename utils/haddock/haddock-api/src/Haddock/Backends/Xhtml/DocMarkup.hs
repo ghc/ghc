@@ -70,6 +70,8 @@ parHtmlMarkup qual insertAnchors ppId =
     , markupOrderedList = makeOrdList
     , markupDefList = defList
     , markupCodeBlock = pre
+    , markupCodeBlockHighlight   = \(Highlight l cont) ->
+        pre ! [theclass ("language-" ++ l)] << toHtml cont
     , markupHyperlink = \(Hyperlink url mLabel) ->
         if insertAnchors
           then

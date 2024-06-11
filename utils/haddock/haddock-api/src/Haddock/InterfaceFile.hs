@@ -470,6 +470,15 @@ instance Binary Picture where
     title <- get bh
     return (Picture uri title)
 
+instance Binary Highlight where
+    put_ bh (Highlight lang content) = do
+        put_ bh lang
+        put_ bh content
+    get bh = do
+        lang <- get bh
+        content <- get bh
+        return (Highlight lang content)
+
 instance Binary a => Binary (Header a) where
   put_ bh (Header l t) = do
     put_ bh l
@@ -604,6 +613,9 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
   put_ bh (DocModule af) = do
     putByte bh 24
     put_ bh af
+  put_ bh (DocCodeBlockHighlight hl) = do
+    putByte bh 25
+    put_ bh hl
 
   get bh = do
     h <- getByte bh
@@ -690,6 +702,11 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
       24 -> do
         af <- get bh
         return (DocModule af)
+      25 -> do
+        lang <- get bh
+        content <- get bh
+        return (DocCodeBlockHighlight (Highlight lang content))
+
       _ -> error "invalid binary data found in the interface file"
 
 instance Binary name => Binary (HaddockModInfo name) where

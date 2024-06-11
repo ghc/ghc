@@ -109,6 +109,12 @@ data Table id = Table
   }
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+data Highlight = Highlight
+  { highlightLanguage :: String
+  , highlightContent  :: String
+  }
+  deriving (Eq, Show)
+
 data DocH mod id
   = DocEmpty
   | DocAppend (DocH mod id) (DocH mod id)
@@ -128,6 +134,7 @@ data DocH mod id
   | DocOrderedList [(Int, DocH mod id)]
   | DocDefList [(DocH mod id, DocH mod id)]
   | DocCodeBlock (DocH mod id)
+  | DocCodeBlockHighlight Highlight
   | DocHyperlink (Hyperlink (DocH mod id))
   | DocPic Picture
   | DocMathInline String
@@ -156,6 +163,7 @@ instance Bifunctor DocH where
   bimap f g (DocOrderedList docs) = DocOrderedList (map (\(index, a) -> (index, bimap f g a)) docs)
   bimap f g (DocDefList docs) = DocDefList (map (bimap f g *** bimap f g) docs)
   bimap f g (DocCodeBlock doc) = DocCodeBlock (bimap f g doc)
+  bimap _ _ (DocCodeBlockHighlight hl) = DocCodeBlockHighlight hl
   bimap f g (DocHyperlink (Hyperlink url lbl)) = DocHyperlink (Hyperlink url (fmap (bimap f g) lbl))
   bimap _ _ (DocPic picture) = DocPic picture
   bimap _ _ (DocMathInline s) = DocMathInline s
@@ -201,6 +209,7 @@ instance Bitraversable DocH where
       traverseSnd f' = traverse (\(x, a) -> (\b -> (x, b)) <$> f' a)
   bitraverse f g (DocDefList docs) = DocDefList <$> traverse (bitraverse (bitraverse f g) (bitraverse f g)) docs
   bitraverse f g (DocCodeBlock doc) = DocCodeBlock <$> bitraverse f g doc
+  bitraverse _ _ (DocCodeBlockHighlight doc) = pure (DocCodeBlockHighlight doc)
   bitraverse f g (DocHyperlink (Hyperlink url lbl)) = DocHyperlink <$> (Hyperlink url <$> traverse (bitraverse f g) lbl)
   bitraverse _ _ (DocPic picture) = pure (DocPic picture)
   bitraverse _ _ (DocMathInline s) = pure (DocMathInline s)
@@ -243,6 +252,7 @@ data DocMarkupH mod id a = Markup
   , markupOrderedList :: [(Int, a)] -> a
   , markupDefList :: [(a, a)] -> a
   , markupCodeBlock :: a -> a
+  , markupCodeBlockHighlight :: Highlight -> a
   , markupHyperlink :: Hyperlink a -> a
   , markupAName :: String -> a
   , markupPic :: Picture -> a

@@ -171,6 +171,7 @@ rename dflags renamer = rn
       DocOrderedList docs -> DocOrderedList <$> traverseSnd rn docs
       DocDefList list -> DocDefList <$> traverse (\(a, b) -> (,) <$> rn a <*> rn b) list
       DocCodeBlock dcb -> DocCodeBlock <$> rn dcb
+      DocCodeBlockHighlight hl -> pure (DocCodeBlockHighlight hl)
       DocIdentifierUnchecked x -> pure (DocIdentifierUnchecked x)
       DocModule (ModLink m l) -> DocModule . ModLink m <$> traverse rn l
       DocHyperlink (Hyperlink u l) -> DocHyperlink . Hyperlink u <$> traverse rn l
