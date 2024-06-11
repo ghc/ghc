@@ -15,6 +15,7 @@
   * Add `inits1` and `tails1` to `Data.List`, factored from the corresponding functions in `Data.List.NonEmpty` ([CLC proposal #252](https://github.com/haskell/core-libraries-committee/issues/252))
   * Add `firstA` and `secondA` to `Data.Bitraversable`. ([CLC proposal #172](https://github.com/haskell/core-libraries-committee/issues/172))
   * Deprecate `GHC.TypeNats.Internal`, `GHC.TypeLits.Internal`, `GHC.ExecutionStack.Internal` ([CLC proposal #217](https://github.com/haskell/core-libraries-committee/issues/217))
+  * `System.IO.Error.ioError` and `Control.Exception.ioError` now both carry `HasCallStack` constraints ([CLC proposal #275](https://github.com/haskell/core-libraries-committee/issues/275))
   * Define `Eq1`, `Ord1`, `Show1` and `Read1` instances for basic `Generic` representation types. ([CLC proposal #273](https://github.com/haskell/core-libraries-committee/issues/273))
   * `setNonBlockingMode` will no longer throw an exception when called on a FD associated with a unknown device type. ([CLC proposal #282](https://github.com/haskell/core-libraries-committee/issues/282))
   * Add exception type metadata to default exception handler output.

@@ -286,7 +286,7 @@ module Control.Exception where
   handle :: forall e a. Exception e => (e -> GHC.Types.IO a) -> GHC.Types.IO a -> GHC.Types.IO a
   handleJust :: forall e b a. Exception e => (e -> GHC.Internal.Maybe.Maybe b) -> (b -> GHC.Types.IO a) -> GHC.Types.IO a -> GHC.Types.IO a
   interruptible :: forall a. GHC.Types.IO a -> GHC.Types.IO a
-  ioError :: forall a. GHC.Internal.IO.Exception.IOError -> GHC.Types.IO a
+  ioError :: forall a. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.IO.Exception.IOError -> GHC.Types.IO a
   mapException :: forall e1 e2 a. (Exception e1, Exception e2) => (e1 -> e2) -> a -> a
   mask :: forall b. ((forall a. GHC.Types.IO a -> GHC.Types.IO a) -> GHC.Types.IO b) -> GHC.Types.IO b
   mask_ :: forall a. GHC.Types.IO a -> GHC.Types.IO a
@@ -394,7 +394,7 @@ module Control.Exception.Base where
   handleJust :: forall e b a. Exception e => (e -> GHC.Internal.Maybe.Maybe b) -> (b -> GHC.Types.IO a) -> GHC.Types.IO a -> GHC.Types.IO a
   impossibleConstraintError :: forall (q :: GHC.Types.RuntimeRep) (a :: GHC.Prim.CONSTRAINT q). GHC.Prim.Addr# -=> a
   impossibleError :: forall (q :: GHC.Types.RuntimeRep) (a :: TYPE q). GHC.Prim.Addr# -> a
-  ioError :: forall a. GHC.Internal.IO.Exception.IOError -> GHC.Types.IO a
+  ioError :: forall a. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.IO.Exception.IOError -> GHC.Types.IO a
   mapException :: forall e1 e2 a. (Exception e1, Exception e2) => (e1 -> e2) -> a -> a
   mask :: forall b. ((forall a. GHC.Types.IO a -> GHC.Types.IO a) -> GHC.Types.IO b) -> GHC.Types.IO b
   mask_ :: forall a. GHC.Types.IO a -> GHC.Types.IO a
@@ -7970,7 +7970,7 @@ module GHC.IO.Exception where
   cannotCompactMutable :: GHC.Internal.Exception.Type.SomeException
   cannotCompactPinned :: GHC.Internal.Exception.Type.SomeException
   heapOverflow :: GHC.Internal.Exception.Type.SomeException
-  ioError :: forall a. IOError -> GHC.Types.IO a
+  ioError :: forall a. GHC.Internal.Stack.Types.HasCallStack => IOError -> GHC.Types.IO a
   ioException :: forall a. GHC.Internal.Stack.Types.HasCallStack => IOException -> GHC.Types.IO a
   stackOverflow :: GHC.Internal.Exception.Type.SomeException
   unsupportedOperation :: IOError
@@ -10419,7 +10419,7 @@ module Prelude where
   id :: forall a. a -> a
   init :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> [a]
   interact :: (String -> String) -> IO ()
-  ioError :: forall a. IOError -> IO a
+  ioError :: forall a. GHC.Internal.Stack.Types.HasCallStack => IOError -> IO a
   iterate :: forall a. (a -> a) -> a -> [a]
   last :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
   lcm :: forall a. Integral a => a -> a -> a
@@ -10658,7 +10658,7 @@ module System.IO.Error where
   eofErrorType :: IOErrorType
   fullErrorType :: IOErrorType
   illegalOperationErrorType :: IOErrorType
-  ioError :: forall a. IOError -> GHC.Types.IO a
+  ioError :: forall a. GHC.Internal.Stack.Types.HasCallStack => IOError -> GHC.Types.IO a
   ioeGetErrorString :: IOError -> GHC.Internal.Base.String
   ioeGetErrorType :: IOError -> IOErrorType
   ioeGetFileName :: IOError -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.FilePath
