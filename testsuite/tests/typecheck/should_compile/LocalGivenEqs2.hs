@@ -1,9 +1,7 @@
 {-# LANGUAGE TypeFamilies, GADTSyntax, ExistentialQuantification #-}
 
--- This is a simple case that exercises the LocalGivenEqs bullet
--- of Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad
--- If a future change rejects this, that's not the end of the world, but it's nice
--- to be able to infer `f`.
+-- This one should be rejected.
+-- See Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet
 
 module LocalGivenEqs2 where
 
