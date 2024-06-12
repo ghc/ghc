@@ -658,13 +658,17 @@ tidyCtEvidence :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evar field because we don't
      --     show it in error messages
 tidyCtEvidence env ctev
-  = ctev { ctev_pred = tidyType env $ ctev_pred ctev }
-  -- No need for tidyOpenType because all the free tyvars are already tidied
+  = ctev { ctev_pred = tidyOpenType env $ ctev_pred ctev }
+  -- tidyOpenType: for (beta ~ (forall a. a->a), don't gratuitously
+  -- rename the 'forall a' just because of an 'a' in scope somewhere
+  -- else entirely.
 
 tidyHole :: TidyEnv -> Hole -> Hole
 tidyHole env h@(Hole { hole_ty = ty })
-  = h { hole_ty = tidyType env ty }
-  -- No need for tidyOpenType because all the free tyvars are already tidied
+  = h { hole_ty = tidyOpenType env ty }
+  -- tidyOpenType: for, say, (b -> (forall a. a->a)), don't gratuitously
+  -- rename the 'forall a' just because of an 'a' in scope somewhere
+  -- else entirely.
 
 tidyDelayedError :: TidyEnv -> DelayedError -> DelayedError
 tidyDelayedError env (DE_Hole hole)       = DE_Hole        $ tidyHole env hole
