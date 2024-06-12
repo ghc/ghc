@@ -647,11 +647,16 @@ enclosing Given equality.
 Exactly which constraints should trigger (UNTOUCHABLE), and hence
 should update inert_given_eq_lvl?
 
-* We do /not/ need to worry about let-bound skolems, such ast
+(TGE1) We do /not/ need to worry about let-bound skolems, such as
      forall[2] a. a ~ [b] => blah
-  See Note [Let-bound skolems]
+  See Note [Let-bound skolems] and the isOuterTyVar tests in `updGivenEqs`
 
-* Consider an implication
+(TGE2) However, solely to support better error messages (see Note [HasGivenEqs] in
+   GHC.Tc.Types.Constraint) we also track these "local" equalities in the
+   boolean inert_given_eqs field.  This field is used only subsequntly (see
+   `getHasGivenEqs`), to set the ic_given_eqs field to LocalGivenEqs.
+
+(TGE3) Consider an implication
       forall[2]. beta[1] => alpha[1] ~ Int
   where beta is a unification variable that has already been unified
   to () in an outer scope.  Then alpha[1] is perfectly touchable and
@@ -659,42 +664,25 @@ should update inert_given_eq_lvl?
   an equality, we should canonicalise first, rather than just looking at
   the /original/ givens (#8644).
 
- * However, we must take account of *potential* equalities. Consider the
+(TGE4) However, we must take account of *potential* equalities. Consider the
    same example again, but this time we have /not/ yet unified beta:
       forall[2] beta[1] => ...blah...
 
    Because beta might turn into an equality, updGivenEqs conservatively
    treats it as a potential equality, and updates inert_give_eq_lvl
 
- * What about something like forall[2] a b. a ~ F b => [W] alpha[1] ~ X y z?
-
-   That Given cannot affect the Wanted, because the Given is entirely
-   *local*: it mentions only skolems bound in the very same
-   implication. Such equalities need not make alpha untouchable. (Test
-   case typecheck/should_compile/LocalGivenEqs has a real-life
-   motivating example, with some detailed commentary.)
-   Hence the 'mentionsOuterVar' test in updGivenEqs.
-
-   However, solely to support better error messages
-   (see Note [HasGivenEqs] in GHC.Tc.Types.Constraint) we also track
-   these "local" equalities in the boolean inert_given_eqs field.
-   This field is used only to set the ic_given_eqs field to LocalGivenEqs;
-   see the function getHasGivenEqs.
-
-   Here is a simpler case that triggers this behaviour:
-
-     data T where
-       MkT :: F a ~ G b => a -> b -> T
-
-     f (MkT _ _) = True
-
-   Because of this behaviour around local equality givens, we can infer the
-   type of f. This is typecheck/should_compile/LocalGivenEqs2.
-
- * We need not look at the equality relation involved (nominal vs
+(TGE5) We should not look at the equality relation involved (nominal vs
    representational), because representational equalities can still
    imply nominal ones. For example, if (G a ~R G b) and G's argument's
    role is nominal, then we can deduce a ~N b.
+
+Historical note: prior to #24938 we also ignored Given equalities that
+did not mention an "outer" type variable.  But that is wrong, as #24938
+showed. Another example is immortalised in test LocalGivenEqs2
+   data T where
+      MkT :: F a ~ G b => a -> b -> T
+   f (MkT _ _) = True
+We should not infer the type for `f`; let-bound-skolems does not apply.
 
 Note [Let-bound skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -702,21 +690,40 @@ If   * the inert set contains a canonical Given CEqCan (a ~ ty)
 and  * 'a' is a skolem bound in this very implication,
 
 then:
-a) The Given is pretty much a let-binding, like
-      f :: (a ~ b->c) => a -> a
-   Here the equality constraint is like saying
-      let a = b->c in ...
-   It is not adding any new, local equality  information,
-   and hence can be ignored by has_given_eqs
+   a) The Given is pretty much a let-binding, like
+         f :: (a ~ b->c) => a -> a
+      Here the equality constraint is like saying
+         let a = b->c in ...
+      It is not adding any new, local equality  information,
+      and hence can be ignored by has_given_eqs
 
-b) 'a' will have been completely substituted out in the inert set,
-   so we can safely discard it.
+   b) 'a' will have been completely substituted out in the inert set,
+      so we can safely discard it.
 
 For an example, see #9211.
 
-See also GHC.Tc.Utils.Unify Note [Deeper level on the left] for how we ensure
-that the right variable is on the left of the equality when both are
-tyvars.
+The actual test is in `isLetBoundSkolemCt`
+
+Wrinkles:
+
+(LBS1) See GHC.Tc.Utils.Unify Note [Deeper level on the left] for how we ensure
+       that the correct variable is on the left of the equality when both are
+       tyvars.
+
+(LBS2) We also want this to work for
+            forall a. [G] F b ~ a   (CEqCt with TyFamLHS)
+   Here the Given will have a TyFamLHS, with the skolem-bound tyvar on the RHS.
+   See tests T24938a, and LocalGivenEqs.
+
+(LBS3) Happily (LBS2) also makes cycle-breakers work. Suppose we have
+            forall a. [G] (F a) Int ~ a
+  where F has arity 1, and `a` is the locally-bound skolem.  Then, as
+  Note [Type equality cycles] explains, we split into
+           [G] F a ~ cbv, [G] cbv Int ~ a
+  where `cbv` is the cycle breaker variable.  But cbv has the same level
+  as `a`, so `isOuterTyVar` (called in `isLetBoundSkolemCt`) will return False.
+
+  This actually matters occasionally: see test LocalGivenEqs.
 
 You might wonder whether the skolem really needs to be bound "in the
 very same implication" as the equality constraint.
@@ -740,6 +747,18 @@ body of the lambda we'll get
 
 Now, unify alpha := a.  Now we are stuck with an unsolved alpha~Int!
 So we must treat alpha as untouchable under the forall[2] implication.
+
+Possible future improvements.  The current test just looks to see whether one
+side of an equality is a locally-bound skolem.  But actually we could, in
+theory, do better: if one side (or both sides, actually) of an equality
+ineluctably mentions a local skolem, then the equality cannot possibly impact
+types outside of the implication (because doing to would cause those types to be
+ill-scoped). The problem is the "ineluctably": this means that no expansion,
+other solving, etc., could possibly get rid of the variable. This is hard,
+perhaps impossible, to know for sure, especially when we think about type family
+interactions. (And it's a user-visible property so we don't want it to be hard
+to predict.) So we keep the existing check, looking for one lone variable,
+because we're sure that variable isn't going anywhere.
 
 Note [Detailed InertCans Invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1467,27 +1486,28 @@ updGivenEqs :: TcLevel -> Ct -> InertCans -> InertCans
 -- if the constraint is a given equality that should prevent
 -- filling in an outer unification variable.
 -- See Note [Tracking Given equalities]
-updGivenEqs tclvl ct inerts@(IC { inert_given_eq_lvl = ge_lvl })
+--
+-- Precondition: Ct is either CEqCan or CIrredCan
+updGivenEqs tclvl ct inerts
   | not (isGivenCt ct) = inerts
-  | not_equality ct    = inerts -- See Note [Let-bound skolems]
-  | otherwise          = inerts { inert_given_eq_lvl = ge_lvl'
-                                , inert_given_eqs    = True }
-  where
-    ge_lvl' | mentionsOuterVar tclvl (ctEvidence ct)
-              -- Includes things like (c a), which *might* be an equality
-            = tclvl
-            | otherwise
-            = ge_lvl
 
-    not_equality :: Ct -> Bool
-    -- True <=> definitely not an equality of any kind
-    --          except for a let-bound skolem, which doesn't count
-    --          See Note [Let-bound skolems]
-    -- NB: no need to spot the boxed CDictCan (a ~ b) because its
-    --     superclass (a ~# b) will be a CEqCan
-    not_equality (CEqCan (EqCt { eq_lhs = TyVarLHS tv })) = not (isOuterTyVar tclvl tv)
-    not_equality (CDictCan {})                            = True
-    not_equality _                                        = False
+  -- See Note [Let-bound skolems]
+  | isLetBoundSkolemCt tclvl ct = inerts { inert_given_eqs = True }
+
+  -- At this point we are left with a constraint that either
+  -- is an equality (F a ~ ty), or /might/ be, like (c a)
+  | otherwise = inerts { inert_given_eq_lvl = tclvl
+                       , inert_given_eqs    = True }
+
+isLetBoundSkolemCt :: TcLevel -> Ct -> Bool
+-- See Note [Let-bound skolems]
+isLetBoundSkolemCt tclvl (CEqCan (EqCt { eq_lhs = lhs, eq_rhs = rhs }))
+  = case lhs of
+      TyVarLHS tv -> not (isOuterTyVar tclvl tv)
+      TyFamLHS {} -> case getTyVar_maybe rhs of
+                       Just tv -> not (isOuterTyVar tclvl tv)
+                       Nothing -> False
+isLetBoundSkolemCt _ _ = False
 
 data KickOutSpec -- See Note [KickOutSpec]
   = KOAfterUnify  TcTyVarSet   -- We have unified these tyvars
@@ -1731,11 +1751,6 @@ Hence:
 *                                                                      *
 *                                                                      *
 ********************************************************************* -}
-
-mentionsOuterVar :: TcLevel -> CtEvidence -> Bool
-mentionsOuterVar tclvl ev
-  = anyFreeVarsOfType (isOuterTyVar tclvl) $
-    ctEvPred ev
 
 isOuterTyVar :: TcLevel -> TyCoVar -> Bool
 -- True of a type variable that comes from a

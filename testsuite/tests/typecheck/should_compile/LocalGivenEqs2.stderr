@@ -1,0 +1,16 @@
+LocalGivenEqs2.hs:14:15: error: [GHC-25897]
+    • Could not deduce ‘p ~ Bool’
+      from the context: F a ~ G b
+        bound by a pattern with constructor:
+                   MkT :: forall a b. (F a ~ G b) => a -> b -> T,
+                 in an equation for ‘f’
+        at LocalGivenEqs2.hs:14:4-10
+      ‘p’ is a rigid type variable bound by
+        the inferred type of f :: T -> p
+        at LocalGivenEqs2.hs:14:1-18
+    • In the expression: True
+      In an equation for ‘f’: f (MkT _ _) = True
+    • Relevant bindings include
+        f :: T -> p (bound at LocalGivenEqs2.hs:14:1)
+    Suggested fix: Consider giving ‘f’ a type signature
+

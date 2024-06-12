@@ -4,7 +4,7 @@
 
 module LocalGivenEqs where
 
--- See Note [When does an implication have given equalities?] in GHC.Tc.Solver.Monad;
+-- See Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet;
 -- this tests custom treatment for LocalGivenEqs
 
 {-

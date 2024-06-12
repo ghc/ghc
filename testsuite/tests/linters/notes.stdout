@@ -44,8 +44,6 @@ ref    testsuite/tests/perf/should_run/all.T:8:6:     Note [Solving from instanc
 ref    testsuite/tests/polykinds/CuskFam.hs:16:11:     Note [Unifying implicit CUSK variables]
 ref    testsuite/tests/simplCore/should_compile/T5776.hs:16:7:     Note [Simplifying RULE lhs constraints]
 ref    testsuite/tests/simplCore/should_compile/simpl018.hs:3:7:     Note [Float coercions]
-ref    testsuite/tests/typecheck/should_compile/LocalGivenEqs.hs:7:7:     Note [When does an implication have given equalities?]
-ref    testsuite/tests/typecheck/should_compile/LocalGivenEqs2.hs:4:6:     Note [When does an implication have given equalities?]
 ref    testsuite/tests/typecheck/should_compile/T9117.hs:3:12:     Note [Order of Coercible Instances]
 ref    testsuite/tests/typecheck/should_compile/tc200.hs:5:7:     Note [Multiple instantiation]
 ref    testsuite/tests/typecheck/should_compile/tc228.hs:9:7:     Note [Inference and implication constraints]

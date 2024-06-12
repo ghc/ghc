@@ -1,6 +1,9 @@
-
 T22645.hs:9:5: error: [GHC-25897]
-    • Couldn't match type ‘a’ with ‘b’ arising from a use of ‘coerce’
+    • Could not deduce ‘a ~ b’ arising from a use of ‘coerce’
+      from the context: Coercible a b
+        bound by the type signature for:
+                   p :: forall a b. Coercible a b => T Maybe a -> T Maybe b
+        at T22645.hs:8:1-44
       ‘a’ is a rigid type variable bound by
         the type signature for:
           p :: forall a b. Coercible a b => T Maybe a -> T Maybe b
@@ -13,3 +16,4 @@ T22645.hs:9:5: error: [GHC-25897]
       In an equation for ‘p’: p = coerce
     • Relevant bindings include
         p :: T Maybe a -> T Maybe b (bound at T22645.hs:9:1)
+

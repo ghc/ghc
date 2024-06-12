@@ -1,6 +1,8 @@
-
 T11010.hs:9:34: error: [GHC-25897]
-    • Couldn't match type ‘a1’ with ‘Int’
+    • Could not deduce ‘a1 ~ Int’
+      from the context: a ~ Int
+        bound by the signature for pattern synonym ‘IntFun’
+        at T11010.hs:9:1-36
       Expected: a -> b
         Actual: a1 -> b
       ‘a1’ is a rigid type variable bound by
@@ -15,3 +17,4 @@ T11010.hs:9:34: error: [GHC-25897]
   |
 9 | pattern IntFun str f x = Fun str f x
   |                                  ^
+

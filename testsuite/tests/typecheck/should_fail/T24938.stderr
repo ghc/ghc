@@ -1,0 +1,19 @@
+T24938.hs:30:16: error: [GHC-25897]
+    • Could not deduce ‘p ~ GHC.Types.Bool’
+      from the context: Nt String ~ Mt Int
+        bound by a pattern with constructor:
+                   Refl :: forall {k} (a :: k). Eq a a,
+                 in a case alternative
+        at T24938.hs:28:5-8
+      ‘p’ is a rigid type variable bound by
+        the inferred type of foo :: p -> Eq (Mt Int) (Nt String) -> t
+        at T24938.hs:(26,1)-(33,17)
+    • In the expression: p
+      In the expression: if p then useIntAndRaise x else use x
+      In an equation for ‘bar’:
+          bar x = if p then useIntAndRaise x else use x
+    • Relevant bindings include
+        p :: p (bound at T24938.hs:26:5)
+        foo :: p -> Eq (Mt Int) (Nt String) -> t (bound at T24938.hs:26:1)
+    Suggested fix: Consider giving ‘foo’ a type signature
+
