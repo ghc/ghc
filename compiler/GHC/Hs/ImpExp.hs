@@ -81,11 +81,10 @@ type instance ImportDeclPkgQual GhcTc = PkgQual
 type instance XCImportDecl  GhcPs = XImportDeclPass
 type instance XCImportDecl  GhcRn = XImportDeclPass
 type instance XCImportDecl  GhcTc = DataConCantHappen
-                                 -- Note [Pragma source text] in "GHC.Types.SourceText"
 
 data XImportDeclPass = XImportDeclPass
     { ideclAnn        :: EpAnn EpAnnImportDecl
-    , ideclSourceText :: SourceText
+    , ideclSourceText :: SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
     , ideclImplicit   :: Bool
         -- ^ GHC generates an `ImportDecl` to represent the invisible `import Prelude`
         -- that appears in any file that omits `import Prelude`, setting
@@ -112,12 +111,12 @@ deriving instance Eq (IEWrappedName GhcTc)
 -- API Annotations types
 
 data EpAnnImportDecl = EpAnnImportDecl
-  { importDeclAnnImport    :: EpaLocation
-  , importDeclAnnPragma    :: Maybe (EpaLocation, EpaLocation)
-  , importDeclAnnSafe      :: Maybe EpaLocation
-  , importDeclAnnQualified :: Maybe EpaLocation
-  , importDeclAnnPackage   :: Maybe EpaLocation
-  , importDeclAnnAs        :: Maybe EpaLocation
+  { importDeclAnnImport    :: EpaLocation -- ^ The location of the @import@ keyword
+  , importDeclAnnPragma    :: Maybe (EpaLocation, EpaLocation) -- ^ The locations of @{-# SOURCE@ and @#-}@ respectively
+  , importDeclAnnSafe      :: Maybe EpaLocation -- ^ The location of the @safe@ keyword
+  , importDeclAnnQualified :: Maybe EpaLocation -- ^ The location of the @qualified@ keyword
+  , importDeclAnnPackage   :: Maybe EpaLocation -- ^ The location of the package name (when using @-XPackageImports@)
+  , importDeclAnnAs        :: Maybe EpaLocation -- ^ The location of the @as@ keyword
   } deriving (Data)
 
 instance NoAnn EpAnnImportDecl where

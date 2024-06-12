@@ -863,7 +863,7 @@ data Token
   | ITdependency
   | ITrequires
 
-  -- Pragmas, see  Note [Pragma source text] in "GHC.Types.SourceText"
+  -- Pragmas, see Note [Pragma source text] in "GHC.Types.SourceText"
   | ITinline_prag       SourceText InlineSpec RuleMatchInfo
   | ITopaque_prag       SourceText
   | ITspec_prag         SourceText                -- SPECIALISE

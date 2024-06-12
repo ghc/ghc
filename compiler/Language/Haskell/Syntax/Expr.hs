@@ -285,7 +285,8 @@ data HsExpr p
 
   | HsOverLabel (XOverLabel p) SourceText FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
-     -- Note [Pragma source text] in GHC.Types.SourceText
+
+     -- See Note [Pragma source text] in "GHC.Types.SourceText"
 
   | HsIPVar   (XIPVar p)
               HsIPName   -- ^ Implicit parameter (not in use after typechecking)

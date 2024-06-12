@@ -1571,7 +1571,7 @@ no harm.
 
 data InlinePragma            -- Note [InlinePragma]
   = InlinePragma
-      { inl_src    :: SourceText -- Note [Pragma source text]
+      { inl_src    :: SourceText -- See Note [Pragma source text]
       , inl_inline :: InlineSpec -- See Note [inl_inline and inl_act]
 
       , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n

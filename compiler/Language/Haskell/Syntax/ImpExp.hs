@@ -30,11 +30,6 @@ One per import declaration in a module.
 
 -- | Located Import Declaration
 type LImportDecl pass = XRec pass (ImportDecl pass)
-        -- ^ When in a list this may have
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | If/how an import is 'qualified'.
 data ImportDeclQualifiedStyle
@@ -58,10 +53,10 @@ instance NFData IsBootInterface where
 -- A single Haskell @import@ declaration.
 data ImportDecl pass
   = ImportDecl {
-      ideclExt        :: XCImportDecl pass,
+      ideclExt        :: XCImportDecl pass, -- ^ Locations of keywords like @import@, @qualified@, etc. are captured here.
       ideclName       :: XRec pass ModuleName, -- ^ Module name.
       ideclPkgQual    :: ImportDeclPkgQual pass,  -- ^ Package qualifier.
-      ideclSource     :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import
+      ideclSource     :: IsBootInterface,      -- ^ IsBoot \<=> {-\# SOURCE \#-} import
       ideclSafe       :: Bool,          -- ^ True => safe import
       ideclQualified  :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclAs         :: Maybe (XRec pass ModuleName),  -- ^ as Module
@@ -69,24 +64,8 @@ data ImportDecl pass
                                        -- ^ Explicit import list (EverythingBut => hiding, names)
     }
   | XImportDecl !(XXImportDecl pass)
-     -- ^
-     --  'GHC.Parser.Annotation.AnnKeywordId's
-     --
-     --  - 'GHC.Parser.Annotation.AnnImport'
-     --
-     --  - 'GHC.Parser.Annotation.AnnOpen', 'GHC.Parser.Annotation.AnnClose' for ideclSource
-     --
-     --  - 'GHC.Parser.Annotation.AnnSafe','GHC.Parser.Annotation.AnnQualified',
-     --    'GHC.Parser.Annotation.AnnPackageName','GHC.Parser.Annotation.AnnAs',
-     --    'GHC.Parser.Annotation.AnnVal'
-     --
-     --  - 'GHC.Parser.Annotation.AnnHiding','GHC.Parser.Annotation.AnnOpen',
-     --    'GHC.Parser.Annotation.AnnClose' attached
-     --     to location in ideclImportList
 
-     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-
--- | Whether the import list is exactly what to import, or whether `hiding` was
+-- | Whether the import list is exactly what to import, or whether @hiding@ was
 -- used, and therefore everything but what was listed should be imported
 data ImportListInterpretation = Exactly | EverythingBut
     deriving (Eq, Data)
@@ -107,7 +86,7 @@ type ExportDoc pass = LHsDoc pass
 
 -- | Imported or exported entity.
 data IE pass
-  = IEVar       (XIEVar pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
+  = IEVar (XIEVar pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
         -- ^ Imported or exported variable
         --
         -- @
@@ -115,36 +94,34 @@ data IE pass
         -- import Mod ( test )
         -- @
 
-  | IEThingAbs  (XIEThingAbs pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
+  | IEThingAbs (XIEThingAbs pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
         -- ^ Imported or exported Thing with absent subordinate list
         --
-        -- The thing is a typeclass or type (can't tell)
-        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnPattern',
-        --             'GHC.Parser.Annotation.AnnType','GHC.Parser.Annotation.AnnVal'
+        -- The thing is a Class\/Type (can't tell)
         --
         -- @
         -- module Mod ( Test )
         -- import Mod ( Test )
         -- @
 
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | IEThingAll  (XIEThingAll pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
-        -- ^ Imported or exported thing with wildcard subordinate list (e..g @(..)@)
+        -- ^ Imported or exported thing with wildcard subordinate list (e.g. @(..)@)
         --
-        -- The thing is a Class/Type and the All refers to methods/constructors
+        -- The thing is a Class\/Type and the All refers to methods\/constructors
         --
-        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
-        --       'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose',
-        --                                 'GHC.Parser.Annotation.AnnType'
         -- @
         -- module Mod ( Test(..) )
         -- import Mod ( Test(..) )
         -- @
+        --
+        -- exactprint: the location of parens and @..@ is captured via 'GHC.Parser.Annotation.AnnKeywordId's :
+        --      'GHC.Parser.Annotation.AnnOpenP',
+        --      'GHC.Parser.Annotation.AnnDotdot',
+        --      'GHC.Parser.Annotation.AnnCloseP'
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
-
   | IEThingWith (XIEThingWith pass)
                 (LIEWrappedName pass)
                 IEWildcard
@@ -152,31 +129,30 @@ data IE pass
                 (Maybe (ExportDoc pass))
         -- ^ Imported or exported thing with explicit subordinate list.
         --
-        -- The thing is a Class/Type and the imported or exported things are
+        -- The thing is a Class\/Type (can't tell) and the imported or exported things are
         -- its children.
-        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
-        --                                   'GHC.Parser.Annotation.AnnClose',
-        --                                   'GHC.Parser.Annotation.AnnComma',
-        --                                   'GHC.Parser.Annotation.AnnType'
+        --
         -- @
-        -- module Mod ( Test(..) )
-        -- import Mod ( Test(..) )
+        -- module Mod ( Test(f, g) )
+        -- import Mod ( Test(f, g) )
         -- @
+        --
+        -- exactprint: the location of parens is captured via 'GHC.Parser.Annotation.AnnKeywordId's :
+        -- 'GHC.Parser.Annotation.AnnOpenP', 'GHC.Parser.Annotation.AnnCloseP'
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
-        -- ^ Imported or exported module contents
-        --
-        -- (Export Only)
-        --
-        -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnModule'
+        -- ^ Export of entire module. Can only occur in export list.
         --
         -- @
         -- module Mod ( module Mod2 )
         -- @
+        --
+        -- exactprint: the location of @module@ keyword is capture via 'GHC.Parser.Annotation.AnnKeywordId' :
+        -- 'GHC.Parser.Annotation.AnnModule'
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | IEGroup             (XIEGroup pass) Int (LHsDoc pass) -- ^ Doc section heading
+  | IEGroup (XIEGroup pass) Int (LHsDoc pass)
         -- ^ A Haddock section in an export list.
         --
         -- @
@@ -185,7 +161,7 @@ data IE pass
         --     ...
         --   )
         -- @
-  | IEDoc               (XIEDoc pass) (LHsDoc pass)       -- ^ Some documentation
+  | IEDoc (XIEDoc pass) (LHsDoc pass)
         -- ^ A bit of unnamed documentation.
         --
         -- @
@@ -194,7 +170,7 @@ data IE pass
         --     ...
         --   )
         -- @
-  | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
+  | IEDocNamed (XIEDocNamed pass) String
         -- ^ A reference to a named documentation chunk.
         --
         -- @
@@ -216,17 +192,16 @@ data IEWildcard
 
 -- | A name in an import or export specification which may have
 -- adornments. Used primarily for accurate pretty printing of
--- ParsedSource, and API Annotation placement. The
--- 'GHC.Parser.Annotation' is the location of the adornment in
--- the original source.
+-- ParsedSource, and API Annotation placement.
 data IEWrappedName p
-  = IEName    (XIEName p)    (LIdP p)  -- ^ no extra
-  | IEPattern (XIEPattern p) (LIdP p)  -- ^ pattern X
-  | IEType    (XIEType p)    (LIdP p)  -- ^ type (:+:)
+  = IEName    (XIEName p)    (LIdP p)  -- ^ unadorned name, e.g @myFun@
+  | IEPattern (XIEPattern p) (LIdP p)  -- ^ @pattern X@
+                                       --
+                                       -- exactprint: the location of @pattern@ keyword is captured via 'GHC.Parser.Annotation.EpaLocation'
+  | IEType    (XIEType p)    (LIdP p)  -- ^ @type (:+:)@
+                                       --
+                                       -- exactprint: the location of @type@ keyword is captured via 'GHC.Parser.Annotation.EpaLocation'
   | XIEWrappedName !(XXIEWrappedName p)
 
 -- | Located name with possible adornment
--- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnType',
---         'GHC.Parser.Annotation.AnnPattern'
 type LIEWrappedName p = XRec p (IEWrappedName p)
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation

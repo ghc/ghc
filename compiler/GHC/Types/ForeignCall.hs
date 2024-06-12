@@ -222,7 +222,7 @@ instance Outputable CCallSpec where
         = text "__ffi_dyn_ccall" <> gc_suf <+> text "\"\""
 
 -- The filename for a C header file
--- Note [Pragma source text] in "GHC.Types.SourceText"
+-- See Note [Pragma source text] in "GHC.Types.SourceText"
 data Header = Header SourceText FastString
     deriving (Eq, Data)
 
@@ -236,7 +236,7 @@ instance Outputable Header where
 --        'GHC.Parser.Annotation.AnnClose' @'\#-}'@,
 
 -- For details on above see Note [exact print annotations] in "GHC.Parser.Annotation"
-data CType = CType SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
+data CType = CType SourceText -- See Note [Pragma source text] in "GHC.Types.SourceText"
                    (Maybe Header) -- header to include for this type
                    (SourceText,FastString) -- the type itself
     deriving (Eq, Data)

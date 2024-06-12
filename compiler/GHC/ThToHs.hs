@@ -1883,7 +1883,7 @@ In the process, all parens are stripped out, as they are not needed.
 
 This Convert module then converts the TH AST back to hsSyn AST.
 
-In order to pretty-print this hsSyn AST, parens need to be adde back at certain
+In order to pretty-print this hsSyn AST, parens need to be added back at certain
 points so that the code is readable with its original meaning.
 
 So scattered through "GHC.ThToHs" are various points where parens are added.

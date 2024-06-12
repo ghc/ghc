@@ -172,11 +172,15 @@ type GhcTc   = GhcPass 'Typechecked -- Output of typechecker
 
 -- | Allows us to check what phase we're in at GHC's runtime.
 -- For example, this class allows us to write
--- >  f :: forall p. IsPass p => HsExpr (GhcPass p) -> blah
--- >  f e = case ghcPass @p of
--- >          GhcPs ->    ... in this RHS we have HsExpr GhcPs...
--- >          GhcRn ->    ... in this RHS we have HsExpr GhcRn...
--- >          GhcTc ->    ... in this RHS we have HsExpr GhcTc...
+--
+-- @
+-- f :: forall p. IsPass p => HsExpr (GhcPass p) -> blah
+-- f e = case ghcPass @p of
+--         GhcPs ->    ... in this RHS we have HsExpr GhcPs...
+--         GhcRn ->    ... in this RHS we have HsExpr GhcRn...
+--         GhcTc ->    ... in this RHS we have HsExpr GhcTc...
+-- @
+--
 -- which is very useful, for example, when pretty-printing.
 -- See Note [IsPass].
 class ( NoGhcTcPass (NoGhcTcPass p) ~ NoGhcTcPass p

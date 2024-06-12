@@ -2721,7 +2721,7 @@ mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
 -- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
 mkInlinePragma src (inl, match_info) mb_act
-  = InlinePragma { inl_src = src -- Note [Pragma source text] in "GHC.Types.SourceText"
+  = InlinePragma { inl_src = src -- See Note [Pragma source text] in "GHC.Types.SourceText"
                  , inl_inline = inl
                  , inl_sat    = Nothing
                  , inl_act    = act
