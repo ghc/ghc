@@ -288,7 +288,7 @@ trimTidyEnv (occ_env, var_env) tcvs
 -- | Grabs the free type variables, tidies them
 -- and then uses 'tidyType' to work over the type itself
 tidyOpenTypesX :: TidyEnv -> [Type] -> (TidyEnv, [Type])
--- See Note [Tidying open  types]
+-- See Note [Tidying open types]
 tidyOpenTypesX env tys
   = (env1, tidyTypes inner_env tys)
   where
@@ -299,7 +299,7 @@ tidyOpenTypesX env tys
 
 ---------------
 tidyOpenTypeX :: TidyEnv -> Type -> (TidyEnv, Type)
--- See Note [Tidying open  types]
+-- See Note [Tidying open types]
 tidyOpenTypeX env ty
   = (env1, tidyType inner_env ty)
   where
