@@ -1031,9 +1031,12 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                 extra_bndrs = scopedSort extra_tvs ++ extra_dicts
                   where
                     extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
+
+                -- isEvVar: this includes coercions, matching what
+                --          happens in `split_lets` (isDictId, isCoVar)
                 extra_dicts =
-                  [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
-                  | d <- extra_vars, isDictId d ]
+                  [ mkLocalIdOrCoVar (localiseName (idName d)) ManyTy (idType d)
+                    | d <- extra_vars, isEvVar d ]
                 extra_vars  =
                   [ v
                   | v <- exprsFreeVarsList args

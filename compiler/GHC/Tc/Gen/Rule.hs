@@ -108,11 +108,13 @@ tcRules decls = mapM (wrapLocMA tcRuleDecls) decls
 tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTc)
 tcRuleDecls (HsRules { rds_ext = src
                      , rds_rules = decls })
-   = do { tc_decls <- mapM (wrapLocMA tcRule) decls
+   = do { maybe_tc_decls <- mapM (wrapLocMA tcRule) decls
+        ; let tc_decls = [L loc rule | (L loc (Just rule)) <- maybe_tc_decls]
         ; return $ HsRules { rds_ext   = src
                            , rds_rules = tc_decls } }
 
-tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTc)
+
+tcRule :: RuleDecl GhcRn -> TcM (Maybe (RuleDecl GhcTc))
 tcRule (HsRule { rd_ext  = ext
                , rd_name = rname@(L _ name)
                , rd_act  = act
@@ -181,7 +183,17 @@ tcRule (HsRule { rd_ext  = ext
        ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
                                          lhs_evs rhs_wanted
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
-       ; return $ HsRule { rd_ext = ext
+
+       -- A type error on the LHS of a rule will be reported earlier while solving for
+       -- lhs_implic. However, we should also drop the rule entirely for cases where
+       -- compilation continues regardless of the error. For example with
+       -- `-fdefer-type-errors`, where this ill-typed LHS rule may cause follow-on errors
+       -- (#24026).
+       ; if anyBag insolubleImplic lhs_implic
+        then
+          return Nothing -- The RULE LHS does not type-check and will be dropped.
+        else
+          return . Just $ HsRule { rd_ext = ext
                          , rd_name = rname
                          , rd_act = act
                          , rd_tyvs = ty_bndrs -- preserved for ppr-ing

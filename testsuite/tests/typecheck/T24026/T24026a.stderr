@@ -1,0 +1,9 @@
+T24026a.hs:4:11: warning: [GHC-95396] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "f" may never fire because ‘f’ might inline first
+    Suggested fix: Add an INLINE[n] or NOINLINE[n] pragma for ‘f’
+
+T24026a.hs:4:37: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Int’ with actual type ‘Bool’
+    • In the first argument of ‘f’, namely ‘x’
+      In the expression: f x
+      When checking the rewrite rule "f"
