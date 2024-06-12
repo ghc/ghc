@@ -12,6 +12,9 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE DeriveLift #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
 -- | This module gives the definition of the 'Lift' class.
@@ -47,7 +50,6 @@ import GHC.Internal.Type.Reflection
 import GHC.Internal.Data.Bool
 import GHC.Internal.Base hiding (Type, Module, inline)
 import GHC.Internal.Data.Foldable
-import GHC.Internal.Data.Functor
 import GHC.Internal.Integer
 import GHC.Internal.Real
 import GHC.Internal.Word
@@ -95,6 +97,11 @@ class Lift (t :: TYPE r) where
   -- @since template-haskell-2.16.0.0
   liftTyped :: Quote m => t -> Code m t
 
+-----------------------------------------------------
+--
+--      Manual instances for lifting to Literals
+--
+-----------------------------------------------------
 
 -- If you add any instances here, consider updating test th/TH_Lift
 instance Lift Integer where
@@ -186,12 +193,6 @@ instance Lift Char# where
   liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (CharPrimL (C# x)))
 
-instance Lift Bool where
-  liftTyped x = unsafeCodeCoerce (lift x)
-
-  lift True  = return (ConE trueName)
-  lift False = return (ConE falseName)
-
 -- | Produces an 'Addr#' literal from the NUL-terminated C-string starting at
 -- the given memory address.
 --
@@ -201,18 +202,6 @@ instance Lift Addr# where
   lift x
     = return (LitE (StringPrimL (map (fromIntegral . ord) (unpackCString# x))))
 
-instance Lift a => Lift (Maybe a) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-
-  lift Nothing  = return (ConE nothingName)
-  lift (Just x) = liftM (ConE justName `AppE`) (lift x)
-
-instance (Lift a, Lift b) => Lift (Either a b) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-
-  lift (Left x)  = liftM (ConE leftName  `AppE`) (lift x)
-  lift (Right y) = liftM (ConE rightName `AppE`) (lift y)
-
 instance Lift a => Lift [a] where
   liftTyped x = unsafeCodeCoerce (lift x)
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
@@ -221,193 +210,85 @@ liftString :: Quote m => String -> m Exp
 -- Used in GHC.Tc.Gen.Expr to short-circuit the lifting for strings
 liftString s = return (LitE (StringL s))
 
--- | @since template-haskell-2.15.0.0
-instance Lift a => Lift (NonEmpty a) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-
-  lift (x :| xs) = do
-    x' <- lift x
-    xs' <- lift xs
-    return (InfixE (Just x') (ConE nonemptyName) (Just xs'))
-
--- | @since template-haskell-2.15.0.0
-instance Lift Void where
-  liftTyped = liftCode . absurd
-  lift = pure . absurd
-
-instance Lift () where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift () = return (ConE (tupleDataName 0))
-
-instance (Lift a, Lift b) => Lift (a, b) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (a, b)
-    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b]
-
-instance (Lift a, Lift b, Lift c) => Lift (a, b, c) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (a, b, c)
-    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
-
-instance (Lift a, Lift b, Lift c, Lift d) => Lift (a, b, c, d) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (a, b, c, d)
-    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c, lift d]
-
-instance (Lift a, Lift b, Lift c, Lift d, Lift e)
-      => Lift (a, b, c, d, e) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (a, b, c, d, e)
-    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b
-                                              , lift c, lift d, lift e ]
-
-instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
-      => Lift (a, b, c, d, e, f) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (a, b, c, d, e, f)
-    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
-                                              , lift d, lift e, lift f ]
-
-instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
-      => Lift (a, b, c, d, e, f, g) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (a, b, c, d, e, f, g)
-    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
-                                              , lift d, lift e, lift f, lift g ]
-
--- | @since template-haskell-2.16.0.0
-instance Lift (# #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (# #) = return (ConE (unboxedTupleTypeName 0))
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a) => Lift (# a #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (# a #)
-    = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a]
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b) => Lift (# a, b #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (# a, b #)
-    = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a, lift b]
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c)
-      => Lift (# a, b, c #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (# a, b, c #)
-    = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c, Lift d)
-      => Lift (# a, b, c, d #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (# a, b, c, d #)
-    = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b
-                                                     , lift c, lift d ]
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c, Lift d, Lift e)
-      => Lift (# a, b, c, d, e #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (# a, b, c, d, e #)
-    = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b
-                                                     , lift c, lift d, lift e ]
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
-      => Lift (# a, b, c, d, e, f #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (# a, b, c, d, e, f #)
-    = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
-                                                     , lift d, lift e, lift f ]
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
-      => Lift (# a, b, c, d, e, f, g #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift (# a, b, c, d, e, f, g #)
-    = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
-                                                     , lift d, lift e, lift f
-                                                     , lift g ]
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b) => Lift (# a | b #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift x
-    = case x of
-        (# y | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 2
-        (# | y #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 2
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c)
-      => Lift (# a | b | c #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift x
-    = case x of
-        (# y | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 3
-        (# | y | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 3
-        (# | | y #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 3
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c, Lift d)
-      => Lift (# a | b | c | d #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift x
-    = case x of
-        (# y | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 4
-        (# | y | | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 4
-        (# | | y | #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 4
-        (# | | | y #) -> UnboxedSumE <$> lift y <*> pure 4 <*> pure 4
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c, Lift d, Lift e)
-      => Lift (# a | b | c | d | e #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift x
-    = case x of
-        (# y | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 5
-        (# | y | | | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 5
-        (# | | y | | #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 5
-        (# | | | y | #) -> UnboxedSumE <$> lift y <*> pure 4 <*> pure 5
-        (# | | | | y #) -> UnboxedSumE <$> lift y <*> pure 5 <*> pure 5
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
-      => Lift (# a | b | c | d | e | f #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift x
-    = case x of
-        (# y | | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 6
-        (# | y | | | | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 6
-        (# | | y | | | #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 6
-        (# | | | y | | #) -> UnboxedSumE <$> lift y <*> pure 4 <*> pure 6
-        (# | | | | y | #) -> UnboxedSumE <$> lift y <*> pure 5 <*> pure 6
-        (# | | | | | y #) -> UnboxedSumE <$> lift y <*> pure 6 <*> pure 6
-
--- | @since template-haskell-2.16.0.0
-instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
-      => Lift (# a | b | c | d | e | f | g #) where
-  liftTyped x = unsafeCodeCoerce (lift x)
-  lift x
-    = case x of
-        (# y | | | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 7
-        (# | y | | | | | #) -> UnboxedSumE <$> lift y <*> pure 2 <*> pure 7
-        (# | | y | | | | #) -> UnboxedSumE <$> lift y <*> pure 3 <*> pure 7
-        (# | | | y | | | #) -> UnboxedSumE <$> lift y <*> pure 4 <*> pure 7
-        (# | | | | y | | #) -> UnboxedSumE <$> lift y <*> pure 5 <*> pure 7
-        (# | | | | | y | #) -> UnboxedSumE <$> lift y <*> pure 6 <*> pure 7
-        (# | | | | | | y #) -> UnboxedSumE <$> lift y <*> pure 7 <*> pure 7
-
 -- TH has a special form for literal strings,
 -- which we should take advantage of.
 -- NB: the lhs of the rule has no args, so that
 --     the rule will apply to a 'lift' all on its own
 --     which happens to be the way the type checker
 --     creates it.
-{-# RULES "TH:liftString" lift = \s -> return (LitE (StringL s)) #-}
+-- SG: This RULE is tested by T3600.
+--     In #24983 I advocated defining an overlapping instance
+--     to replace this RULE. However, doing so breaks drv023
+--     which would need to declare an instance derived from `Lift @[a]` as
+--     incoherent. So this RULE it is.
+{-# RULES "TH:liftString" lift = liftString #-}
 
+-----------------------------------------------------
+--
+--      Derived instances for base data types
+--
+-----------------------------------------------------
+
+deriving instance Lift Bool
+deriving instance Lift a => Lift (Maybe a)
+deriving instance (Lift a, Lift b) => Lift (Either a b)
+-- | @since template-haskell-2.15.0.0
+deriving instance Lift a => Lift (NonEmpty a)
+-- | @since template-haskell-2.15.0.0
+deriving instance Lift Void
+deriving instance Lift ()
+deriving instance (Lift a, Lift b)
+      => Lift (a, b)
+deriving instance (Lift a, Lift b, Lift c)
+      => Lift (a, b, c)
+deriving instance (Lift a, Lift b, Lift c, Lift d)
+      => Lift (a, b, c, d)
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e)
+      => Lift (a, b, c, d, e)
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
+      => Lift (a, b, c, d, e, f)
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
+      => Lift (a, b, c, d, e, f, g)
+-- | @since template-haskell-2.16.0.0
+deriving instance Lift (# #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a)
+      => Lift (# a #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b)
+      => Lift (# a, b #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c)
+      => Lift (# a, b, c #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c, Lift d)
+      => Lift (# a, b, c, d #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e)
+      => Lift (# a, b, c, d, e #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
+      => Lift (# a, b, c, d, e, f #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
+      => Lift (# a, b, c, d, e, f, g #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b) => Lift (# a | b #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c)
+      => Lift (# a | b | c #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c, Lift d)
+      => Lift (# a | b | c | d #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e)
+      => Lift (# a | b | c | d | e #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
+      => Lift (# a | b | c | d | e | f #)
+-- | @since template-haskell-2.16.0.0
+deriving instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
+      => Lift (# a | b | c | d | e | f | g #)
 
 trueName, falseName :: Name
 trueName  = 'True
