@@ -1279,9 +1279,6 @@ type instance XXCmd       GhcPs = DataConCantHappen
 type instance XXCmd       GhcRn = DataConCantHappen
 type instance XXCmd       GhcTc = HsWrap HsCmd
 
-type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
-  = SrcSpanAnnL
-
     -- If   cmd :: arg1 --> res
     --      wrap :: arg1 "->" arg2
     -- Then (XCmd (HsWrap wrap cmd)) :: arg2 --> res

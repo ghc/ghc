@@ -94,8 +94,6 @@ type instance XCModule GhcRn = DataConCantHappen
 type instance XCModule GhcTc = DataConCantHappen
 type instance XXModule p = DataConCantHappen
 
-type instance Anno ModuleName = SrcSpanAnnA
-
 deriving instance Data (HsModule GhcPs)
 
 data AnnsModule

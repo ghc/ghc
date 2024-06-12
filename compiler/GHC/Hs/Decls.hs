@@ -810,8 +810,6 @@ ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
 type instance XCFamEqn    (GhcPass _) r = [AddEpAnn]
 type instance XXFamEqn    (GhcPass _) r = DataConCantHappen
 
-type instance Anno (FamEqn (GhcPass p) _) = SrcSpanAnnA
-
 ----------------- Class instances -------------
 
 type instance XCClsInstDecl    GhcPs = ( Maybe (LWarningTxt GhcPs)
@@ -1024,8 +1022,6 @@ derivDeprecation = fmap unLoc . decl_deprecation (ghcPass @p)
     decl_deprecation GhcRn (DerivDecl{ deriv_ext = (depr, _) })
       = depr
     decl_deprecation _ _ = Nothing
-
-type instance Anno OverlapMode = SrcSpanAnnP
 
 instance OutputableBndrId p
        => Outputable (DerivDecl (GhcPass p)) where
@@ -1341,8 +1337,6 @@ type instance XCRoleAnnotDecl GhcRn = NoExtField
 type instance XCRoleAnnotDecl GhcTc = NoExtField
 
 type instance XXRoleAnnotDecl (GhcPass _) = DataConCantHappen
-
-type instance Anno (Maybe Role) = EpAnnCO
 
 instance OutputableBndr (IdP (GhcPass p))
        => Outputable (RoleAnnotDecl (GhcPass p)) where
