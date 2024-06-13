@@ -271,6 +271,12 @@ tcApp works like this:
    Otherwise, delegate back to tcExpr, which
      infers an (instantiated) TcRhoType
 
+   This isn't perfect. Consider this (which uses visible type application):
+    (let { f :: forall a. a -> a; f x = x } in f) @Int
+   Since 'let' is not among the special cases for tcInferAppHead,
+   we'll delegate back to tcExpr, which will instantiate f's type
+   and the type application to @Int will fail.  Too bad!
+
 3. Use tcInstFun to instantiate the function, Quick-Looking as we go.  This
    implements the |-inst judgement in Fig 4, plus the modification in Fig 5, of
    the QL paper: "A quick look at impredicativity" (ICFP'20).
@@ -325,16 +331,15 @@ application; but it also does a couple of gruesome final checks:
   * Horrible newtype check
   * Special case for tagToEnum
 
-
-Some cases that /won't/ work:
-
-1. Consider this (which uses visible type application):
-
-    (let { f :: forall a. a -> a; f x = x } in f) @Int
-
-   Since 'let' is not among the special cases for tcInferAppHead,
-   we'll delegate back to tcExpr, which will instantiate f's type
-   and the type application to @Int will fail.  Too bad!
+(TCAPP2) There is a lurking difficulty in the above plan:
+  * Before calling tcInstFun, we set the ambient level in the monad
+    to QLInstVar (Step 2 above).
+  * Then, when kind-checking the visible type args of the application,
+    we may perhaps build an implication constraint.
+  * That means we'll try to add 1 to the ambient level; which is a no-op.
+  * So skolem escape checks won't work right.
+  This is pretty exotic, so I'm just deferring it for now, leaving
+  this note to alert you to the possiblity.
 
 Note [Quick Look for particular Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -401,7 +406,7 @@ tcApp rn_expr exp_res_ty
        -- Step 3: Instantiate the function type (taking a quick look at args)
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho)
-              <- setQLInstLevel do_ql $  -- See (TCAPP1) in
+              <- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
                                          -- Note [tcApp: typechecking applications]
                  tcInstFun do_ql True tc_head fun_sigma rn_args
 
@@ -2007,6 +2012,8 @@ That is the entire point of qlUnify!   Wrinkles:
   use them.  (An alternative; use uType directly, if the result is not Refl,
   discard the constraints and the coercion, and do not update the instantiation
   variable.  But see "Sadly discarded design alternative" below.)
+
+  See also (TCAPP2) in Note [tcApp: typechecking applications].
 
 (UQL3) Instantiation variables don't really have a settled level yet;
   they have level QLInstVar (see Note [The QLInstVar TcLevel] in GHC.Tc.Utils.TcType.
