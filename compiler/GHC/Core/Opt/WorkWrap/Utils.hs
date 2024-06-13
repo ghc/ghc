@@ -15,7 +15,7 @@ module GHC.Core.Opt.WorkWrap.Utils
    , findTypeShape, IsRecDataConResult(..), isRecDataCon
    , mkAbsentFiller
    , isWorkerSmallEnough, dubiousDataConInstArgTys
-   , boringSplit , usefulSplit
+   , boringSplit, usefulSplit, workWrapArity
    )
 where
 
@@ -159,6 +159,7 @@ nop_fn body = body
 
 mkWwBodies :: WwOpts
            -> Id             -- ^ The original function
+           -> Arity          -- ^ Worker/wrapper arity
            -> [Var]          -- ^ Manifest args of original function
            -> Type           -- ^ Result type of the original function,
                              --   after being stripped of args
@@ -205,8 +206,8 @@ mkWwBodies :: WwOpts
 -- and beta-redexes]), which allows us to apply the same split to function body
 -- and its unfolding(s) alike.
 --
-mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
-  = do  { massertPpr (filter isId arg_vars `equalLength` demands)
+mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
+  = do  { massertPpr arity_ok
                      (text "wrong wrapper arity" $$ ppr fun_id $$ ppr arg_vars $$ ppr res_ty $$ ppr demands)
 
         -- Clone and prepare arg_vars of the original fun RHS
@@ -271,6 +272,10 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
       | otherwise
       = False
 
+    n_dmds = length demands
+    arity_ok | isJoinId fun_id = ww_arity <= n_dmds
+             | otherwise       = ww_arity == n_dmds
+
 -- | Version of 'GHC.Core.mkApps' that does beta reduction on-the-fly.
 -- PRECONDITION: The arg expressions are not free in any of the lambdas binders.
 mkAppsBeta :: CoreExpr -> [CoreArg] -> CoreExpr
@@ -287,6 +292,13 @@ isWorkerSmallEnough max_worker_args old_n_args vars
     -- variables which have no runtime representation.
     -- Also if the function took 82 arguments before (old_n_args), it's fine if
     -- it takes <= 82 arguments afterwards.
+
+workWrapArity :: Id -> CoreExpr -> Arity
+-- See Note [Worker/wrapper arity and join points] in DmdAnal
+workWrapArity fn rhs
+  = case idJoinPointHood fn of
+      JoinPoint join_arity -> count isId $ fst $ collectNBinders join_arity rhs
+      NotJoinPoint         -> idArity fn
 
 {-
 Note [Always do CPR w/w]
