@@ -102,6 +102,7 @@ regUsageOfInstr platform instr = case instr of
   UXTH dst src             -> usage (regOp src, regOp dst)
   CLZ  dst src             -> usage (regOp src, regOp dst)
   RBIT dst src             -> usage (regOp src, regOp dst)
+  REV  dst src             -> usage (regOp src, regOp dst)
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -238,7 +239,8 @@ patchRegsOfInstr instr env = case instr of
     SXTH o1 o2       -> SXTH (patchOp o1) (patchOp o2)
     UXTH o1 o2       -> UXTH (patchOp o1) (patchOp o2)
     CLZ o1 o2        -> CLZ  (patchOp o1) (patchOp o2)
-    RBIT o1 o2       -> RBIT  (patchOp o1) (patchOp o2)
+    RBIT o1 o2       -> RBIT (patchOp o1) (patchOp o2)
+    REV o1 o2        -> REV  (patchOp o1) (patchOp o2)
 
     -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -599,6 +601,7 @@ data Instr
     | UBFX Operand Operand Operand Operand -- rd = rn[i,j]
     | CLZ  Operand Operand -- rd = countLeadingZeros(rn)
     | RBIT Operand Operand -- rd = reverseBits(rn)
+    | REV  Operand Operand -- rd = bswap(rn)
 
     -- 3. Logical and Move Instructions ----------------------------------------
     | AND Operand Operand Operand -- rd = rn & op2
@@ -686,6 +689,7 @@ instrCon i =
       UBFX{} -> "UBFX"
       CLZ{} -> "CLZ"
       RBIT{} -> "RBIT"
+      REV{} -> "REV"
       AND{} -> "AND"
       ASR{} -> "ASR"
       EOR{} -> "EOR"

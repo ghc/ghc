@@ -397,7 +397,12 @@ pprInstr platform instr = case instr of
   SBFM o1 o2 o3 o4 -> op4 (text "\tsbfm") o1 o2 o3 o4
   UBFM o1 o2 o3 o4 -> op4 (text "\tubfm") o1 o2 o3 o4
   CLZ  o1 o2       -> op2 (text "\tclz")  o1 o2
-  RBIT  o1 o2      -> op2 (text "\trbit")  o1 o2
+  RBIT o1 o2       -> op2 (text "\trbit")  o1 o2
+  REV  (OpReg W8  (RegReal (RealRegSingle i))) _ | i < 32 ->
+    {- swapping a single byte is a no-op -} empty
+  REV  o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
+                      op2 (text "\trev16") o1 o2
+  REV  o1 o2       -> op2 (text "\trev")   o1 o2
   -- signed and unsigned bitfield extract
   SBFX o1 o2 o3 o4 -> op4 (text "\tsbfx") o1 o2 o3 o4
   UBFX o1 o2 o3 o4 -> op4 (text "\tubfx") o1 o2 o3 o4

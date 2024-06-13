@@ -1546,7 +1546,7 @@ genCondBranch _ true false expr = do
 -- range within 64bit.
 
 genCCall
-    :: ForeignTarget      -- function to call
+    :: ForeignTarget      -- function to call (or primop)
     -> [CmmFormal]        -- where to put the result
     -> [CmmActual]        -- arguments (of mixed type)
     -> BlockId            -- The block we are in
@@ -2014,7 +2014,15 @@ genCCall target dest_regs arg_regs bid = do
         MO_PopCnt w         -> mkCCall (popCntLabel w)
         MO_Pdep w           -> mkCCall (pdepLabel w)
         MO_Pext w           -> mkCCall (pextLabel w)
-        MO_BSwap w          -> mkCCall (bSwapLabel w)
+        MO_BSwap w
+          | [src_reg] <- arg_regs
+          , [dst_reg] <- dest_regs -> do
+              (src, _fmt_p, code_p) <- getSomeReg src_reg
+              platform <- getPlatform
+              let dst = getRegisterReg platform (CmmLocal dst_reg)
+                  code = code_p `snocOL` REV (OpReg w dst) (OpReg w src)
+              return (code, Nothing)
+          | otherwise -> panic "mal-formed ByteSwap"
 
         -- -- Atomic read-modify-write.
         MO_AtomicRead w ord
