@@ -1008,7 +1008,7 @@ dmdTransform :: AnalEnv   -- ^ The analysis environment
              -> DmdType   -- ^ The demand type unleashed by the variable in this
                           -- context. The returned DmdEnv includes the demand on
                           -- this function plus demand on its free variables
--- See Note [What are demand signatures?] in "GHC.Types.Demand"
+-- See Note [DmdSig: demand signatures, and demand-sig arity] in "GHC.Types.Demand"
 dmdTransform env var sd
   -- Data constructors
   | Just con <- isDataConWorkId_maybe var
@@ -1081,31 +1081,33 @@ dmdAnalRhsSig
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
-dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
+dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs
   = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr rhs_dmds $$ ppr sig $$ ppr weak_fvs) $
     (final_env, weak_fvs, final_id, final_rhs)
   where
-    threshold_arity = thresholdArity id rhs
+    ww_arity = workWrapArity id rhs
+      -- See Note [Worker/wrapper arity and join points] point (1)
 
-    rhs_dmd = mkCalledOnceDmds threshold_arity body_dmd
-
-    body_dmd
-      | isJoinId id
+    body_sd | isJoinId id = let_sd
+            | otherwise   = topSubDmd
       -- See Note [Demand analysis for join points]
       -- See Note [Invariants on join points] invariant 2b, in GHC.Core
-      --     threshold_arity matches the join arity of the join point
-      -- See Note [Unboxed demand on function bodies returning small products]
-      = unboxedWhenSmall env rec_flag (resultType_maybe id) let_dmd
-      | otherwise
-      -- See Note [Unboxed demand on function bodies returning small products]
-      = unboxedWhenSmall env rec_flag (resultType_maybe id) topSubDmd
+      --     ww_arity matches the join arity of the join point
 
-    WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_dmd rhs
+    adjusted_body_sd = unboxedWhenSmall env rec_flag (resultType_maybe id) body_sd
+      -- See Note [Unboxed demand on function bodies returning small products]
+
+    rhs_sd = mkCalledOnceDmds ww_arity adjusted_body_sd
+
+    WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_sd rhs
     DmdType rhs_env rhs_dmds = rhs_dmd_ty
-    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id threshold_arity
+    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id ww_arity
                                                       rhs_dmds (de_div rhs_env) rhs'
 
-    sig = mkDmdSigForArity threshold_arity (DmdType sig_env final_rhs_dmds)
+    dmd_sig_arity = ww_arity + strictCallArity body_sd
+    sig = mkDmdSigForArity dmd_sig_arity (DmdType sig_env final_rhs_dmds)
+          -- strictCallArity is > 0 only for join points
+          -- See Note [mkDmdSigForArity]
 
     opts       = ae_opts env
     final_id   = setIdDmdAndBoxSig opts id sig
@@ -1136,13 +1138,6 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
 splitWeakDmds :: DmdEnv -> (DmdEnv, WeakDmds)
 splitWeakDmds (DE fvs div) = (DE sig_fvs div, weak_fvs)
   where (!weak_fvs, !sig_fvs) = partitionVarEnv isWeakDmd fvs
-
-thresholdArity :: Id -> CoreExpr -> Arity
--- See Note [Demand signatures are computed for a threshold arity based on idArity]
-thresholdArity fn rhs
-  = case idJoinPointHood fn of
-      JoinPoint join_arity -> count isId $ fst $ collectNBinders join_arity rhs
-      NotJoinPoint         -> idArity fn
 
 -- | The result type after applying 'idArity' many arguments. Returns 'Nothing'
 -- when the type doesn't have exactly 'idArity' many arrows.
@@ -1243,47 +1238,97 @@ Consider
                    B -> j 4
                    C -> (p,7))
 
-If j was a vanilla function definition, we'd analyse its body with
-evalDmd, and think that it was lazy in p.  But for join points we can
-do better!  We know that j's body will (if called at all) be evaluated
-with the demand that consumes the entire join-binding, in this case
-the argument demand from g.  Whizzo!  g evaluates both components of
-its argument pair, so p will certainly be evaluated if j is called.
+If j was a vanilla function definition, we'd analyse its body with evalDmd, and
+think that it was lazy in p.  But for join points we can do better!  We know
+that j's body will (if called at all) be evaluated with the demand that consumes
+the entire join-binding, in this case the argument demand from g.  Whizzo!  g
+evaluates both components of its argument pair, so p will certainly be evaluated
+if j is called.
 
-For f to be strict in p, we need /all/ paths to evaluate p; in this
-case the C branch does so too, so we are fine.  So, as usual, we need
-to transport demands on free variables to the call site(s).  Compare
-Note [Lazy and unleashable free variables].
+For f to be strict in p, we need /all/ paths to evaluate p; in this case the C
+branch does so too, so we are fine.  So, as usual, we need to transport demands
+on free variables to the call site(s).  Compare Note [Lazy and unleashable free
+variables].
 
-The implementation is easy.  When analysing a join point, we can
-analyse its body with the demand from the entire join-binding (written
-let_dmd here).
+The implementation is easy: see `body_sd` in`dmdAnalRhsSig`.  When analysing
+a join point, we can analyse its body (after stripping off the join binders,
+here just 'y') with the demand from the entire join-binding (written `let_sd`
+here).
 
 Another win for join points!  #13543.
 
-However, note that the strictness signature for a join point can
-look a little puzzling.  E.g.
+BUT see Note [Worker/wrapper arity and join points].
 
+Note we may analyse the rhs of a join point with a demand that is either
+bigger than, or smaller than, the number of lambdas syntactically visible.
+* More lambdas than call demands:
+       join j x = \p q r -> blah in ...
+  in a context with demand Top.
+
+* More call demands than lambdas:
+       (join j x = h in ..(j 2)..(j 3)) a b c
+
+Note [Worker/wrapper arity and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
     (join j x = \y. error "urk")
     (in case v of              )
     (     A -> j 3             )  x
     (     B -> j 4             )
     (     C -> \y. blah        )
 
-The entire thing is in a C(1,L) context, so j's strictness signature
-will be    [A]b
-meaning one absent argument, returns bottom.  That seems odd because
-there's a \y inside.  But it's right because when consumed in a C(1,L)
-context the RHS of the join point is indeed bottom.
+The entire thing is in a C(1,L) context, so we will analyse j's body, namely
+   \y. error "urk"
+with demand C(C(1,L)).  See `rhs_sd` in `dmdAnalRhsSig`.  That will produce
+a demand signature of <A><A>b: and indeed `j` diverges when given two arguments.
 
-Note [Demand signatures are computed for a threshold arity based on idArity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given a binding { f = rhs }, we compute a "theshold arity", and do demand
-analysis based on a call with that many value arguments.
+BUT we do /not/ want to worker/wrapper `j` with two arguments.  Suppose we have
+     join j2 :: Int -> Int -> blah
+          j2 x = rhs
+     in ...(j2 3)...(j2 4)...
 
-The threshold we use is
+where j2's join-arity is 1, so calls to `j` will all have /one/ argument.
+Suppose the entire expression is in a called context (like `j` above) and `j2`
+gets the demand signature <1!P(L)><1!P(L)>, that is, strict in both arguments.
 
-* Ordinary bindings: idArity f.
+we worker/wrapper'd `j2` with two args we'd get
+     join $wj2 x# y# = let x = I# x#; y = I# y# in rhs
+          j2 x = \y. case x of I# x# -> case y of I# y# -> $wj2 x# y#
+     in ...(j2 3)...(j2 4)...
+But now `$wj2`is no longer a join point. Boo.
+
+Instead if we w/w at all, we want to do so only with /one/ argument:
+     join $wj2 x# = let x = I# x# in rhs
+          j2 x = case x of I# x# -> $wj2 x#
+     in ...(j2 3)...(j2 4)...
+Now all is fine.  BUT in `finaliseArgBoxities` we should trim y's boxity,
+to reflect the fact tta we aren't going to unbox `y` at all.
+
+Conclusion:
+
+(1) The "worker/wrapper arity" of an Id is
+    * For non-join-points: idArity
+    * The join points: the join arity (Id part only of course)
+    This is the number of args we will use in worker/wrapper.
+    See `ww_arity` in `dmdAnalRhsSig`, and the function `workWrapArity`.
+
+(2) A join point's demand-signature arity may exceed the Id's worker/wrapper
+    arity.  See the `arity_ok` assertion in `mkWwBodies`.
+
+(3) In `finaliseArgBoxities`, do trimBoxity on any argument demands beyond
+    the worker/wrapper arity.
+
+(4) In WorkWrap.splitFun, make sure we split based on the worker/wrapper
+    arity (re)-computed by workWrapArity.
+
+Note [The demand for the RHS of a binding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given a binding { f = rhs }, in `dmdAnalRhsSig` we compute a `rhs_sd` in
+which to analyse `rhs`.
+
+The demand we use is:
+
+* Ordinary bindings: a call-demand of depth (idArity f).
   Why idArity arguments? Because that's a conservative estimate of how many
   arguments we must feed a function before it does anything interesting with
   them.  Also it elegantly subsumes the trivial RHS and PAP case.  E.g. for
@@ -1293,22 +1338,17 @@ The threshold we use is
   idArity is /at least/ the number of manifest lambdas, but might be higher for
   PAPs and trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
 
-* Join points: the value-binder subset of the JoinArity.  This can
-  be less than the number of visible lambdas; e.g.
-     join j x = \y. blah
-     in ...(jump j 2)....(jump j 3)....
-  We know that j will never be applied to more than 1 arg (its join
-  arity, and we don't eta-expand join points, so here a threshold
-  of 1 is the best we can do.
+* Join points: a call-demand of depth (value-binder subset of JoinArity),
+  wrapped around the incoming demand for the entire expression; see
+  Note [Demand analysis for join points]
 
 Note that the idArity of a function varies independently of its cardinality
 properties (cf. Note [idArity varies independently of dmdTypeDepth]), so we
-implicitly encode the arity for when a demand signature is sound to unleash
-in its 'dmdTypeDepth', not in its idArity (cf. Note [Understanding DmdType
-and DmdSig] in GHC.Types.Demand). It is unsound to unleash a demand
-signature when the incoming number of arguments is less than that. See
-GHC.Types.Demand Note [What are demand signatures?]  for more details on
-soundness.
+implicitly encode the arity for when a demand signature is sound to unleash in
+its 'dmdTypeDepth', not in its idArity (cf. Note [Understanding DmdType and
+DmdSig] in GHC.Types.Demand). It is unsound to unleash a demand signature when
+the incoming number of arguments is less than that. See GHC.Types.Demand
+Note [DmdSig: demand signatures, and demand-sig arity].
 
 Note that there might, in principle, be functions for which we might want to
 analyse for more incoming arguments than idArity. Example:
@@ -1338,6 +1378,30 @@ Since we only compute one signature, we do so for arity 1. Computing multiple
 signatures for different arities (i.e., polyvariance) would be entirely
 possible, if it weren't for the additional runtime and implementation
 complexity.
+
+Note [mkDmdSigForArity]
+~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f x = if expensive x
+         then \y. blah1
+         else \y. blah2
+We will analyse the body with demand C(1L), reflecting the single visible
+argument x.  But dmdAnal will return a DmdType looking like
+    DmdType fvs [x-dmd, y-dmd]
+because it has seen two lambdas, \x and \y. Since the length of the argument
+demands in a DmdSig gives the "threshold" for applying the signature
+(see Note [DmdSig: demand signatures, and demand-sig arity] in GHC.Types.Demand)
+we must trim that DmdType to just
+    DmdSig (DmdTypte fvs [x-dmd])
+when making that DmdType into the DmdSig for f.  This trimming is the job of
+`mkDmdSigForArity`.
+
+Alternative.  An alternative would be be to ensure that if
+    (dmd_ty, e') = dmdAnal env subdmd e
+then the length dmds in dmd_ty is always less than (or maybe equal to?) the
+call-depth of subdmd.  To do that we'd need to adjust the Lam case of dmdAnal.
+Probably not hard, but a job for another day; see discussion on !12873, #23113,
+and #21392.
 
 Note [idArity varies independently of dmdTypeDepth]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1932,30 +1996,35 @@ positiveTopBudget (MkB n _) = n >= 0
 finaliseArgBoxities :: AnalEnv -> Id -> Arity
                     -> [Demand] -> Divergence
                     -> CoreExpr -> ([Demand], CoreExpr)
-finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
+-- POSTCONDITION:
+-- If:    (dmds', rhs') = finaliseArgBoxitities ... dmds .. rhs
+-- Then:
+--     dmds' is the same as dmds (including length), except for boxity info
+--     rhs'  is the same as rhs, except for dmd info on lambda binders
+-- NB: For join points, length dmds might be greater than ww_arity
+finaliseArgBoxities env fn ww_arity arg_dmds div rhs
 
   -- Check for an OPAQUE function: see Note [OPAQUE pragma]
   -- In that case, trim off all boxity info from argument demands
   -- and demand info on lambda binders
   -- See Note [The OPAQUE pragma and avoiding the reboxing of arguments]
   | isOpaquePragma (idInlinePragma fn)
-  , let trimmed_rhs_dmds = map trimBoxity rhs_dmds
-  = (trimmed_rhs_dmds, set_lam_dmds trimmed_rhs_dmds rhs)
+  , let trimmed_arg_dmds = map trimBoxity arg_dmds
+  = (trimmed_arg_dmds, set_lam_dmds trimmed_arg_dmds rhs)
 
   -- Check that we have enough visible binders to match the
-  -- threshold arity; if not, we won't do worker/wrapper
+  -- ww arity; if not, we won't do worker/wrapper
   -- This happens if we have simply  {f = g} or a PAP {f = h 13}
   -- we simply want to give f the same demand signature as g
   -- How can such bindings arise?  Perhaps from {-# NOLINE[2] f #-},
   -- or if the call to `f` is currently not-applied (map f xs).
   -- It's a bit of a corner case.  Anyway for now we pass on the
   -- unadulterated demands from the RHS, without any boxity trimming.
-  | threshold_arity > count isId bndrs
-  = (rhs_dmds, rhs)
+  | ww_arity > count isId bndrs
+  = (arg_dmds, rhs)
 
   -- The normal case
-  | otherwise -- NB: threshold_arity might be less than
-              -- manifest arity for join points
+  | otherwise
   = -- pprTrace "finaliseArgBoxities" (
     --   vcat [text "function:" <+> ppr fn
     --        , text "max" <+> ppr max_wkr_args
@@ -1966,22 +2035,28 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
     -- of the function, both because that's kosher, and because CPR analysis
     -- uses the info on the binders directly.
   where
-    opts            = ae_opts env
-    (bndrs, _body)  = collectBinders rhs
-    unarise_arity   = sum [ unariseArity (idType b) | b <- bndrs, isId b ]
-    max_wkr_args    = dmd_max_worker_args opts `max` unarise_arity
-                      -- This is the budget initialisation step of
-                      -- Note [Worker argument budget]
+    opts           = ae_opts env
+    (bndrs, _body) = collectBinders rhs
+       -- NB: in the interesting code path, count isId bndrs >= ww_arity
+
+    arg_triples :: [(Type, StrictnessMark, Demand)]
+    arg_triples = take ww_arity $
+                  [ (idType bndr, NotMarkedStrict, get_dmd bndr)
+                  | bndr <- bndrs, isRuntimeVar bndr ]
+
+    arg_dmds' = ww_arg_dmds ++ map trimBoxity (drop ww_arity arg_dmds)
+                -- If ww_arity < length arg_dmds, the leftover ones
+                -- will not be w/w'd, so trimBoxity them
+                -- See Note [Worker/wrapper arity and join points] point (3)
 
     -- This is the key line, which uses almost-circular programming
     -- The remaining budget from one layer becomes the initial
     -- budget for the next layer down.  See Note [Worker argument budget]
-    (remaining_budget, arg_dmds') = go_args (MkB max_wkr_args remaining_budget) arg_triples
-
-    arg_triples :: [(Type, StrictnessMark, Demand)]
-    arg_triples = take threshold_arity $
-                  [ (idType bndr, NotMarkedStrict, get_dmd bndr)
-                  | bndr <- bndrs, isRuntimeVar bndr ]
+    (remaining_budget, ww_arg_dmds) = go_args (MkB max_wkr_args remaining_budget) arg_triples
+    unarise_arity = sum [ unariseArity (idType b) | b <- bndrs, isId b ]
+    max_wkr_args  = dmd_max_worker_args opts `max` unarise_arity
+                    -- This is the budget initialisation step of
+                    -- Note [Worker argument budget]
 
     get_dmd :: Id -> Demand
     get_dmd bndr

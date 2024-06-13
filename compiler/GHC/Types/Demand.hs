@@ -1,3 +1,4 @@
+
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -38,7 +39,7 @@ module GHC.Types.Demand (
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd,
-    peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
+    peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds, strictCallArity,
     mkWorkerDemand, subDemandIfEvaluated,
     -- ** Extracting one-shot information
     callCards, argOneShots, argsOneShots, saturatedByOneShots,
@@ -1036,6 +1037,12 @@ peelManyCalls k sd = go k C_11 sd
     go k !n (viewCall -> Just (m, sd)) = go (k-1) (n `multCard` m) sd
     go _ _  _                          = (topCard, topSubDmd)
 {-# INLINE peelManyCalls #-} -- so that the pair cancels away in a `fst _` context
+
+strictCallArity :: SubDemand -> Arity
+strictCallArity sd = go 0 sd
+  where
+    go n (Call card sd) | isStrict card = go (n+1) sd
+    go n _                              = n
 
 -- | Extract the 'SubDemand' of a 'Demand'.
 -- PRECONDITION: The SubDemand must be used in a context where the expression
@@ -2073,6 +2080,12 @@ body of the function.
 *                                                                      *
 ************************************************************************
 
+Note [DmdSig: demand signatures, and demand-sig arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also
+  * Note [Demand signatures semantically]
+  * Note [Understanding DmdType and DmdSig]
+
 In a let-bound Id we record its demand signature.
 In principle, this demand signature is a demand transformer, mapping
 a demand on the Id into a DmdType, which gives
@@ -2083,20 +2096,22 @@ a demand on the Id into a DmdType, which gives
 
 However, in fact we store in the Id an extremely emasculated demand
 transformer, namely
-
-                a single DmdType
+        a single DmdType
 (Nevertheless we dignify DmdSig as a distinct type.)
 
-This DmdType gives the demands unleashed by the Id when it is applied
-to as many arguments as are given in by the arg demands in the DmdType.
+The DmdSig for an Id is a semantic thing.  Suppose a function `f` has a DmdSig of
+  DmdSig (DmdType (fv_dmds,res) [d1..dn])
+Here `n` is called the "demand-sig arity" of the DmdSig.  The signature means:
+  * If you apply `f` to n arguments (the demand-sig-arity)
+  * then you can unleash demands d1..dn on the arguments
+  * and demands fv_dmds on the free variables.
 Also see Note [Demand type Divergence] for the meaning of a Divergence in a
-strictness signature.
+demand signature.
 
-If an Id is applied to less arguments than its arity, it means that
-the demand on the function at a call site is weaker than the vanilla
-call demand, used for signature inference. Therefore we place a top
-demand on all arguments. Otherwise, the demand is specified by Id's
-signature.
+If `f` is applied to fewer value arguments than its demand-sig arity, it means
+that the demand on the function at a call site is weaker than the vanilla call
+demand, used for signature inference. Therefore we place a top demand on all
+arguments.
 
 For example, the demand transformer described by the demand signature
         DmdSig (DmdType {x -> <1L>} <A><1P(L,L)>)
@@ -2106,6 +2121,61 @@ and 1P(L,L) on the second.
 
 If this same function is applied to one arg, all we can say is that it
 uses x with 1L, and its arg with demand 1P(L,L).
+
+Note [Demand signatures semantically]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Demand analysis interprets expressions in the abstract domain of demand
+transformers. Given a (sub-)demand that denotes the evaluation context, the
+abstract transformer of an expression gives us back a demand type denoting
+how other things (like arguments and free vars) were used when the expression
+was evaluated. Here's an example:
+
+  f x y =
+    if x + expensive
+      then \z -> z + y * ...
+      else \z -> z * ...
+
+The abstract transformer (let's call it F_e) of the if expression (let's
+call it e) would transform an incoming (undersaturated!) head sub-demand A
+into a demand type like {x-><1L>,y-><L>}<L>. In pictures:
+
+     SubDemand ---F_e---> DmdType
+     <A>                  {x-><1L>,y-><L>}<L>
+
+Let's assume that the demand transformers we compute for an expression are
+correct wrt. to some concrete semantics for Core. How do demand signatures fit
+in? They are strange beasts, given that they come with strict rules when to
+it's sound to unleash them.
+
+Fortunately, we can formalise the rules with Galois connections. Consider
+f's strictness signature, {}<1L><L>. It's a single-point approximation of
+the actual abstract transformer of f's RHS for arity 2. So, what happens is that
+we abstract *once more* from the abstract domain we already are in, replacing
+the incoming Demand by a simple lattice with two elements denoting incoming
+arity: A_2 = {<2, >=2} (where '<2' is the top element and >=2 the bottom
+element). Here's the diagram:
+
+     A_2 -----f_f----> DmdType
+      ^                   |
+      | α               γ |
+      |                   v
+  SubDemand --F_f----> DmdType
+
+With
+  α(C(1,C(1,_))) = >=2
+  α(_)         =  <2
+  γ(ty)        =  ty
+and F_f being the abstract transformer of f's RHS and f_f being the abstracted
+abstract transformer computable from our demand signature simply by
+
+  f_f(>=2) = {}<1L><L>
+  f_f(<2)  = multDmdType C_0N {}<1L><L>
+
+where multDmdType makes a proper top element out of the given demand type.
+
+In practice, the A_n domain is not just a simple Bool, but a Card, which is
+exactly the Card with which we have to multDmdType. The Card for arity n
+is computed by calling @peelManyCalls n@, which corresponds to α above.
 
 Note [Understanding DmdType and DmdSig]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2119,10 +2189,10 @@ Here is a table with demand types resulting from different incoming demands we
 put that expression under. Note the monotonicity; a stronger incoming demand
 yields a more precise demand type:
 
-    incoming demand   |  demand type
+    incoming sub-demand   |  demand type
     --------------------------------
-    1A                  |  <L><L>{}
-    C(1,C(1,L))           |  <1P(L)><L>{}
+    P(A)                  |  <L><L>{}
+    C(1,C(1,P(L)))        |  <1P(L)><L>{}
     C(1,C(1,1P(1P(L),A))) |  <1P(A)><A>{}
 
 Note that in the first example, the depth of the demand type was *higher* than
@@ -2143,11 +2213,11 @@ being a newtype wrapper around DmdType, it actually encodes two things:
   * A demand type that is sound to unleash when the minimum arity requirement is
     met.
 
-Here comes the subtle part: The threshold is encoded in the wrapped demand
-type's depth! So in mkDmdSigForArity we make sure to trim the list of
-argument demands to the given threshold arity. Call sites will make sure that
-this corresponds to the arity of the call demand that elicited the wrapped
-demand type. See also Note [What are demand signatures?].
+Here comes the subtle part: The threshold is encoded in the demand-sig arity!
+So in mkDmdSigForArity we make sure to trim the list of argument demands to the
+given threshold arity. Call sites will make sure that this corresponds to the
+arity of the call demand that elicited the wrapped demand type. See also
+Note [DmdSig: demand signatures, and demand-sig arity]
 -}
 
 -- | The depth of the wrapped 'DmdType' encodes the arity at which it is safe
@@ -2160,9 +2230,11 @@ newtype DmdSig
 -- | Turns a 'DmdType' computed for the particular 'Arity' into a 'DmdSig'
 -- unleashable at that arity. See Note [Understanding DmdType and DmdSig].
 mkDmdSigForArity :: Arity -> DmdType -> DmdSig
-mkDmdSigForArity arity dmd_ty@(DmdType fvs args)
-  | arity < dmdTypeDepth dmd_ty = DmdSig $ DmdType fvs (take arity args)
-  | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty)
+mkDmdSigForArity threshold_arity dmd_ty@(DmdType fvs args)
+  | threshold_arity < dmdTypeDepth dmd_ty
+  = DmdSig $ DmdType (fvs { de_div = topDiv }) (take threshold_arity args)
+  | otherwise
+  = DmdSig (etaExpandDmdType threshold_arity dmd_ty)
 
 mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
 mkClosedDmdSig ds div = mkDmdSigForArity (length ds) (DmdType (mkEmptyDmdEnv div) ds)
@@ -2307,7 +2379,7 @@ etaConvertDmdSig arity (DmdSig dmd_ty)
 -- whether it diverges.
 --
 -- See Note [Understanding DmdType and DmdSig]
--- and Note [What are demand signatures?].
+-- and Note [DmdSig: demand signatures, and demand-sig arity]
 type DmdTransformer = SubDemand -> DmdType
 
 -- | Extrapolate a demand signature ('DmdSig') into a 'DmdTransformer'.
@@ -2318,7 +2390,7 @@ dmdTransformSig :: DmdSig -> DmdTransformer
 dmdTransformSig (DmdSig dmd_ty@(DmdType _ arg_ds)) sd
   = multDmdType (fst $ peelManyCalls (length arg_ds) sd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
-    -- and Note [What are demand signatures?]
+    -- and Note [DmdSig: demand signatures, and demand-sig arity]
 
 -- | A special 'DmdTransformer' for data constructors that feeds product
 -- demands into the constructor arguments.
@@ -2356,61 +2428,6 @@ dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* prod])) call_sd
 dmdTransformDictSelSig sig sd = pprPanic "dmdTransformDictSelSig: no args" (ppr sig $$ ppr sd)
 
 {-
-Note [What are demand signatures?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Demand analysis interprets expressions in the abstract domain of demand
-transformers. Given a (sub-)demand that denotes the evaluation context, the
-abstract transformer of an expression gives us back a demand type denoting
-how other things (like arguments and free vars) were used when the expression
-was evaluated. Here's an example:
-
-  f x y =
-    if x + expensive
-      then \z -> z + y * ...
-      else \z -> z * ...
-
-The abstract transformer (let's call it F_e) of the if expression (let's
-call it e) would transform an incoming (undersaturated!) head demand 1A into
-a demand type like {x-><1L>,y-><L>}<L>. In pictures:
-
-     Demand ---F_e---> DmdType
-     <1A>              {x-><1L>,y-><L>}<L>
-
-Let's assume that the demand transformers we compute for an expression are
-correct wrt. to some concrete semantics for Core. How do demand signatures fit
-in? They are strange beasts, given that they come with strict rules when to
-it's sound to unleash them.
-
-Fortunately, we can formalise the rules with Galois connections. Consider
-f's strictness signature, {}<1L><L>. It's a single-point approximation of
-the actual abstract transformer of f's RHS for arity 2. So, what happens is that
-we abstract *once more* from the abstract domain we already are in, replacing
-the incoming Demand by a simple lattice with two elements denoting incoming
-arity: A_2 = {<2, >=2} (where '<2' is the top element and >=2 the bottom
-element). Here's the diagram:
-
-     A_2 -----f_f----> DmdType
-      ^                   |
-      | α               γ |
-      |                   v
-  SubDemand --F_f----> DmdType
-
-With
-  α(C(1,C(1,_))) = >=2
-  α(_)         =  <2
-  γ(ty)        =  ty
-and F_f being the abstract transformer of f's RHS and f_f being the abstracted
-abstract transformer computable from our demand signature simply by
-
-  f_f(>=2) = {}<1L><L>
-  f_f(<2)  = multDmdType C_0N {}<1L><L>
-
-where multDmdType makes a proper top element out of the given demand type.
-
-In practice, the A_n domain is not just a simple Bool, but a Card, which is
-exactly the Card with which we have to multDmdType. The Card for arity n
-is computed by calling @peelManyCalls n@, which corresponds to α above.
-
 Note [Demand transformer for a dictionary selector]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have a superclass selector 'sc_sel' and a class method
