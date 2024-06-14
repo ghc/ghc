@@ -53,7 +53,7 @@ import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
-import GHC.Core.TyCo.Compare ( eqType, eqTypeOpt, defaultCmpTypeOpt, CmpTypeOpt (..), eqForAllVis )
+import GHC.Core.TyCo.Compare ( eqType, eqTypes, eqTypeIgnoringMultiplicity, eqForAllVis )
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
@@ -2807,7 +2807,7 @@ lint_axiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches
 
     extra_checks
       | isNewTyCon tc
-      = do { CoAxBranch { cab_tvs     = tvs
+      = do { CoAxBranch { cab_tvs     = ax_tvs
                         , cab_eta_tvs = eta_tvs
                         , cab_cvs     = cvs
                         , cab_roles   = roles
@@ -2815,14 +2815,10 @@ lint_axiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches
               <- case branch_list of
                [branch] -> return branch
                _        -> failWithL (text "multi-branch axiom with newtype")
-           ; let ax_lhs = mkInfForAllTys tvs $
-                          mkTyConApp tc lhs_tys
-                 nt_tvs = takeList tvs (tyConTyVars tc)
-                    -- axiom may be eta-reduced: Note [Newtype eta] in GHC.Core.TyCon
-                 nt_lhs = mkInfForAllTys nt_tvs $
-                          mkTyConApp tc (mkTyVarTys nt_tvs)
-                 -- See Note [Newtype eta] in GHC.Core.TyCon
-           ; lintL (ax_lhs `eqType` nt_lhs)
+
+           -- The LHS of the axiom is (N lhs_tys)
+           -- We expect it to be      (N ax_tvs)
+           ; lintL (mkTyVarTys ax_tvs `eqTypes` lhs_tys)
                    (text "Newtype axiom LHS does not match newtype definition")
            ; lintL (null cvs)
                    (text "Newtype axiom binds coercion variables")
@@ -2831,7 +2827,7 @@ lint_axiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches
                    (text "Newtype axiom has eta-tvs")
            ; lintL (ax_role == Representational)
                    (text "Newtype axiom role not representational")
-           ; lintL (roles `equalLength` tvs)
+           ; lintL (roles `equalLength` ax_tvs)
                    (text "Newtype axiom roles list is the wrong length." $$
                     text "roles:" <+> sep (map ppr roles))
            ; lintL (roles == takeList roles (tyConRoles tc))
@@ -3101,17 +3097,14 @@ Note [Linting linearity]
 Lint ignores linearity unless `-dlinear-core-lint` is set.  For why, see below.
 
 But first, "ignore linearity" specifically means two things. When ignoring linearity:
-* In `ensureEqTypes`, use `eqTypeOpt` with instructions to ignore multiplicities in FunTy.
+* In `ensureEqTypes`, use `eqTypeIgnoringMultiplicity`
 * In `ensureSubMult`, do nothing
 
-The behaviour of functions such as eqTypeOpt which may or may not ignore
-linearity is governed by a flag of type GHC.Core.Multiplicity.MultiplicityFlag.
-
-But why make `-dcore-lint` ignore linearity?  Because
-optimisation passes are not (yet) guaranteed to maintain linearity.  They should
-do so semantically (GHC is careful not to duplicate computation) but it is much
-harder to ensure that the statically-checkable constraints of Linear Core are
-maintained. The current Linear Core is described in the wiki at:
+But why make `-dcore-lint` ignore linearity?  Because optimisation passes are
+not (yet) guaranteed to maintain linearity.  They should do so semantically (GHC
+is careful not to duplicate computation) but it is much harder to ensure that
+the statically-checkable constraints of Linear Core are maintained. The current
+Linear Core is described in the wiki at:
 https://gitlab.haskell.org/ghc/ghc/-/wikis/linear-types/implementation.
 
 Here are some examples of how the optimiser can break linearity checking.  Other
@@ -3495,17 +3488,25 @@ ensureEqTys :: LintedType -> LintedType -> SDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
 -- Assumes ty1,ty2 are have already had the substitution applied
-ensureEqTys ty1 ty2 msg = do
-  flags <- getLintFlags
-  -- When `-dlinear-core-lint` is off, then consider `a -> b` and `a %1 -> b` to
-  -- be equal. See Note [Linting linearity].
-  lintL (eqTypeOpt (opt flags) ty1 ty2) msg
-  where
-    opt flags =
-      if lf_check_linearity flags then
-        defaultCmpTypeOpt { cmp_multiplicity_in_funty = RespectMultiplicities }
-      else
-        defaultCmpTypeOpt { cmp_multiplicity_in_funty = IgnoreMultiplicities }
+{-# INLINE ensureEqTys #-} -- See Note [INLINE ensureEqTys]
+ensureEqTys ty1 ty2 msg
+  = do { flags <- getLintFlags
+       ; lintL (eq_type flags ty1 ty2) msg }
+
+eq_type :: LintFlags -> Type -> Type -> Bool
+-- When `-dlinear-core-lint` is off, then consider `a -> b` and `a %1 -> b` to
+-- be equal. See Note [Linting linearity].
+eq_type flags ty1 ty2 | lf_check_linearity flags = eqType                     ty1 ty2
+                      | otherwise                = eqTypeIgnoringMultiplicity ty1 ty2
+
+{- Note [INLINE ensureEqTys]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To make Lint fast, we want to avoid allocating a thunk for <msg> in
+      ensureEqTypes ty1 ty2 <msg>
+because the test almost always succeeds, and <msg> isn't needed.
+So we INLINE `ensureEqTys`.  This actually make a difference of
+1-2% when compiling programs with -dcore-lint.
+-}
 
 ensureSubUsage :: Usage -> Mult -> SDoc -> LintM ()
 ensureSubUsage Bottom     _              _ = return ()

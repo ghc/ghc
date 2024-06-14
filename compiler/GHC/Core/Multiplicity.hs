@@ -31,7 +31,8 @@ module GHC.Core.Multiplicity
   , submult
   , mapScaledType
   , pprArrowWithMultiplicity
-  , MultiplicityFlag(..)) where
+  , MultiplicityFlag(..)
+  ) where
 
 import GHC.Prelude
 
