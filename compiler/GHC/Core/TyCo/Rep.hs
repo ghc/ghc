@@ -350,14 +350,24 @@ This kind instantiation only happens in TyConApp currently.
 
 Note [Non-trivial definitional equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Is Int |> <*> the same as Int? YES! In order to reduce headaches,
-we decide that any reflexive casts in types are just ignored.
-(Indeed they must be. See Note [Respecting definitional equality].)
-More generally, the `eqType` function, which defines Core's type equality
-relation, ignores casts and coercion arguments, as long as the
-two types have the same kind. This allows us to be a little sloppier
-in keeping track of coercions, which is a good thing. It also means
-that eqType does not depend on eqCoercion, which is also a good thing.
+Is ((IO |> co1) Int |> co2) equal to (IO Int)?
+Assume
+   co1 :: (Type->Type) ~ (Type->Wombat)
+   co2 :: Wombat ~ Type
+Well, yes.  The casts are just getting in the way.
+See also Note [Respecting definitional equality].
+
+So we do this:
+
+(EQTYPE)
+  The `eqType` function, which defines Core's type equality relation,
+  - /ignores/ casts, and
+  - /ignores/ coercion arguments
+  - /provided/ two types have the same kind
+
+This allows us to be a little sloppier in keeping track of coercions, which is a
+good thing. It also means that eqType does not depend on eqCoercion, which is
+also a good thing.
 
 Why is this sensible? That is, why is something different than α-equivalence
 appropriate for the implementation of eqType?

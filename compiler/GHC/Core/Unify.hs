@@ -233,6 +233,7 @@ ruleMatchTyKiX tmpl_tvs rn_env tenv tmpl target
   = case tc_unify_tys (matchBindFun tmpl_tvs) False False
                       True -- <-- this means to match the kinds
                       IgnoreMultiplicities
+                        -- See Note [Rewrite rules ignore multiplicities in FunTy]
                       rn_env tenv emptyCvSubstEnv [tmpl] [target] of
       Unifiable (tenv', _) -> Just tenv'
       _                    -> Nothing
@@ -418,10 +419,16 @@ their types unify (see Note [Matching variable types] in GHC.Core.Rules). So
 when unifying types for the sake of rule-matching, the unification algorithm
 must be able to ignore multiplicities altogether.
 
-The way we implement this deserves a comment. In unify_ty, `FunTy` is handled as
-if it was a regular type constructor. In this case, and when the types being
-unified are *function* arrows, but not constraint arrows, then the first
-argument is a multiplicity.
+How is this done?
+  (1) The `um_arr_mult` field of `UMEnv` recordsw when we are doing rule-matching,
+      and hence want to ignore multiplicities.
+  (2) The field is set to True in by `ruleMatchTyKiX`.
+  (3) It is consulted when matching `FunTy` in `unify_ty`.
+
+Wrinkle in (3). In `unify_tc_app`, in `unify_ty`, `FunTy` is handled as if it
+was a regular type constructor. In this case, and when the types being unified
+are *function* arrows, but not constraint arrows, then the first argument is a
+multiplicity.
 
 We select this situation by comparing the type constructor with fUNTyCon. In
 this case, and this case only, we can safely drop the first argument (using the
@@ -1208,20 +1215,21 @@ unify_ty env ty1 ty2 _kco
   where
     mb_tc_app1 = splitTyConApp_maybe ty1
     mb_tc_app2 = splitTyConApp_maybe ty2
+
     unify_tc_app tc tys1 tys2
       | tc == fUNTyCon
       , IgnoreMultiplicities <- um_arr_mult env
-      , (_ : no_mult_tys1) <- tys1
-      , (_ : no_mult_tys2) <- tys2
+      , (_mult1 : no_mult_tys1) <- tys1
+      , (_mult2 : no_mult_tys2) <- tys2
       = -- We're comparing function arrow types here (not constraint arrow
         -- types!), and they have at least one argument, which is the arrow's
         -- multiplicity annotation. The flag `um_arr_mult` instructs us to
         -- ignore multiplicities in this very case. This is a little tricky: see
-        -- Note [Rewrite rules ignore multiplicities in FunTy].
+        -- point (3) in Note [Rewrite rules ignore multiplicities in FunTy].
          unify_tys env no_mult_tys1 no_mult_tys2
+
       | otherwise
       = unify_tys env tys1 tys2
-
 
         -- Applications need a bit of care!
         -- They can match FunTy and TyConApp, so use splitAppTy_maybe
