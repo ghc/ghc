@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -78,9 +77,12 @@ type SubMap = Map Name [Name]
 type DeclMap = Map Name DeclMapEntry
 type InstMap = Map RealSrcSpan Name
 type FixMap = Map Name Fixity
-data DocPaths      = DocPaths { docPathsHtml :: FilePath  -- ^ path to HTML Haddocks
-                              , docPathsSources :: Maybe FilePath -- ^ path to hyperlinked sources
-                              }
+data DocPaths = DocPaths
+  { docPathsHtml :: FilePath
+  -- ^ path to HTML Haddocks
+  , docPathsSources :: Maybe FilePath
+  -- ^ path to hyperlinked sources
+  }
 type WarningMap = Map Name (Doc Name)
 
 -----------------------------------------------------------------------------

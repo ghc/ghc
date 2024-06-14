@@ -1,8 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -31,13 +28,13 @@ import Haddock.Types
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
 import Control.DeepSeq (force)
-import Data.Foldable (foldl', toList)
-import Data.List (sortBy)
+import Data.Foldable (toList)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Ord (comparing)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.List as List
 
 import GHC
 import GHC.Builtin.Types (unrestrictedFunTyConName)
@@ -168,7 +165,7 @@ attachOrphanInstances
 attachOrphanInstances expInfo getInstDoc cls_instances fam_index =
   [ (synifyInstHead i famInsts, getInstDoc n, (L (getSrcSpan n) n), nameModule_maybe n)
   | let is = [(instanceSig i, getName i) | i <- cls_instances, isOrphan (is_orphan i)]
-  , (i@(_, _, cls, tys), n) <- sortBy (comparing $ first instHead) is
+  , (i@(_, _, cls, tys), n) <- List.sortBy (comparing $ first instHead) is
   , not $ isInstanceHidden expInfo (getName cls) tys
   , let famInsts = getFamInsts expInfo fam_index getInstDoc cls tys
   ]
@@ -205,7 +202,7 @@ attachToExportItem cls_index fam_index index expInfo getInstDoc getFixity export
                 , spanNameE n synFamInst (L (locA eSpan) (tcdName d))
                 , mb_mdl
                 )
-              | i <- sortBy (comparing instFam) fam_instances
+              | i <- List.sortBy (comparing instFam) fam_instances
               , let n = getName i
               , not $ isNameHidden expInfo (fi_fam i)
               , not $ any (isTypeHidden expInfo) (fi_tys i)
@@ -220,7 +217,7 @@ attachToExportItem cls_index fam_index index expInfo getInstDoc getFixity export
                 , mb_mdl
                 )
               | let is = [(instanceSig i, getName i) | i <- cls_instances]
-              , (i@(_, _, cls, tys), n) <- sortBy (comparing $ first instHead) is
+              , (i@(_, _, cls, tys), n) <- List.sortBy (comparing $ first instHead) is
               , not $ isInstanceHidden expInfo (getName cls) tys
               , let synClsInst = synifyInstHead i famInsts
                     famInsts = getFamInsts expInfo fam_index getInstDoc cls tys
@@ -251,7 +248,7 @@ attachToExportItem cls_index fam_index index expInfo getInstDoc getFixity export
             }
         where
           fixities :: [(Name, Fixity)]
-          !fixities = force . Map.toList $ foldl' f Map.empty all_names
+          !fixities = force . Map.toList $ List.foldl' f Map.empty all_names
 
           f :: Map.Map Name Fixity -> Name -> Map.Map Name Fixity
           f !fs n = Map.alter (<|> getFixity n) n fs

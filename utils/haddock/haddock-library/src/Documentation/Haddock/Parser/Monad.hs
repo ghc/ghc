@@ -34,7 +34,7 @@ import Control.Applicative as App
 import Control.Monad (mfilter)
 import Data.Bits (Bits (..))
 import Data.Char (ord)
-import Data.List (foldl')
+import qualified Data.List as List
 import Data.String (IsString (..))
 
 import Documentation.Haddock.Types (MetaSince (..))
@@ -146,13 +146,13 @@ scan f st = do
 
 -- | Parse a decimal number.
 decimal :: Integral a => Parser a
-decimal = foldl' step 0 `fmap` Parsec.many1 Parsec.digit
+decimal = List.foldl' step 0 `fmap` Parsec.many1 Parsec.digit
   where
     step a c = a * 10 + fromIntegral (ord c - 48)
 
 -- | Parse a hexadecimal number.
 hexadecimal :: (Integral a, Bits a) => Parser a
-hexadecimal = foldl' step 0 `fmap` Parsec.many1 Parsec.hexDigit
+hexadecimal = List.foldl' step 0 `fmap` Parsec.many1 Parsec.hexDigit
   where
     step a c
       | w >= 48 && w <= 57 = (a `shiftL` 4) .|. fromIntegral (w - 48)

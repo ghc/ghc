@@ -43,8 +43,29 @@ source-repository head
   location: https://gitlab.haskell.org/ghc/ghc.git
   subdir: utils/haddock/haddock-api
 
+common extensions
+  default-extensions:
+    LambdaCase
+    NoStarIsType
+    OverloadedRecordDot
+    StrictData
+    TypeApplications
+    TypeOperators
+
+  default-language:   Haskell2010
+
+common ghc-options
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wredundant-constraints
+    -fhide-source-paths -Wno-unused-do-bind -fshow-hole-constraints
+    -Wno-unticked-promoted-constructors -Werror=unused-imports
+    -fdicts-strict -Wunused-packages -funbox-strict-fields
+    -Wnoncanonical-monad-instances -Wmissing-home-modules
+
 library
-  default-language: Haskell2010
+  import: extensions
+  import: ghc-options
 
   -- this package typically supports only single major versions
   build-depends: base             >= 4.16 && < 4.21
@@ -69,19 +90,6 @@ library
                , transformers
 
   hs-source-dirs: src
-
-  ghc-options: -funbox-strict-fields -O2
-               -Wall
-               -Wcompat
-               -Wcompat-unqualified-imports
-               -Widentities
-               -Wredundant-constraints
-               -Wnoncanonical-monad-instances
-               -Wmissing-home-modules
-               -Wincomplete-uni-patterns
-               -Wincomplete-record-updates
-
-
   exposed-modules:
     Documentation.Haddock
 
@@ -131,10 +139,10 @@ library
     Paths_haddock_api
 
 test-suite spec
+  import: extensions
+  import: ghc-options
   type:             exitcode-stdio-1.0
-  default-language: Haskell2010
   main-is:          Spec.hs
-  ghc-options: -Wall
 
   hs-source-dirs:
       test
@@ -201,7 +209,6 @@ test-suite spec
                , exceptions
                , filepath
                , ghc-boot
-               , ghc-boot-th
                , mtl
                , transformers
 

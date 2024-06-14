@@ -69,11 +69,28 @@ source-repository head
   location: https://gitlab.haskell.org/ghc/ghc.git
   subdir: utils/haddock
 
+common extensions
+  default-extensions:
+    NoStarIsType
+    OverloadedRecordDot
+    StrictData
+
+  default-language:   Haskell2010
+
+common ghc-options
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wredundant-constraints
+    -fhide-source-paths -Wno-unused-do-bind -fshow-hole-constraints
+    -Wno-unticked-promoted-constructors -Werror=unused-imports
+    -fdicts-strict -Wunused-packages -funbox-strict-fields
+    -Wnoncanonical-monad-instances -Wmissing-home-modules
+
 executable haddock
-  default-language:     Haskell2010
+  import: extensions
+  import: ghc-options
   main-is:              Main.hs
   hs-source-dirs:       driver
-  ghc-options:          -funbox-strict-fields -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -O2
   if flag(threaded)
     ghc-options: -threaded
 
@@ -93,7 +110,6 @@ executable haddock
       array,
       xhtml >= 3000.2 && < 3000.3,
       ghc-boot,
-      ghc-boot-th,
       ghc == 9.11.*,
       bytestring,
       parsec,
@@ -162,38 +178,41 @@ executable haddock
     build-depends:  haddock-api == 2.30.0
 
 test-suite html-test
+  import: extensions
+  import: ghc-options
   type:             exitcode-stdio-1.0
   -- This tells cabal that this test depends on the executable
   -- component 'haddock' from this very same package, as well
   -- as adding the build-folder where the `haddock`
   -- executable can be found in front of $PATH
   build-tool-depends: haddock:haddock
-  default-language:   Haskell2010
   main-is:            Main.hs
   hs-source-dirs:     html-test
   build-depends:      base, filepath, haddock-test == 0.0.1
 
 test-suite hypsrc-test
+  import: extensions
+  import: ghc-options
   type:               exitcode-stdio-1.0
   build-tool-depends: haddock:haddock
-  default-language:   Haskell2010
   main-is:            Main.hs
   hs-source-dirs:     hypsrc-test
   build-depends:      base, filepath, haddock-test == 0.0.1
-  ghc-options:        -Wall -fwarn-tabs
 
 test-suite latex-test
+  import: extensions
+  import: ghc-options
   type:               exitcode-stdio-1.0
   build-tool-depends: haddock:haddock
-  default-language:   Haskell2010
   main-is:            Main.hs
   hs-source-dirs:     latex-test
   build-depends:      base, filepath, haddock-test == 0.0.1
 
 test-suite hoogle-test
+  import: extensions
+  import: ghc-options
   type:               exitcode-stdio-1.0
   build-tool-depends: haddock:haddock
-  default-language:   Haskell2010
   main-is:            Main.hs
   hs-source-dirs:     hoogle-test
   build-depends:      base, filepath, haddock-test == 0.0.1

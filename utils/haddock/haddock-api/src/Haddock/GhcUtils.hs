@@ -31,10 +31,11 @@ module Haddock.GhcUtils where
 
 import Control.Arrow
 import Data.Char (isSpace)
-import Data.Foldable (foldl', toList)
+import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
+import qualified Data.List as List
 
 import Haddock.Types (DocName, DocNameI, XRecCond)
 
@@ -771,7 +772,7 @@ typeNames ty = go ty Set.empty
         TyVarTy{} -> acc
         AppTy t1 t2 -> go t2 $ go t1 acc
         FunTy _ _ t1 t2 -> go t2 $ go t1 acc
-        TyConApp tcon args -> foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
+        TyConApp tcon args -> List.foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
         ForAllTy bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) acc
         LitTy _ -> acc
         CastTy t' _ -> go t' acc

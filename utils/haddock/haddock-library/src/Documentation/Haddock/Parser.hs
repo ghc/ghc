@@ -28,7 +28,7 @@ import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
 import Data.Char (chr, isAlpha, isSpace, isUpper)
-import Data.List (elemIndex, intercalate, unfoldr, intersperse)
+import Data.List (elemIndex, intercalate, intersperse, unfoldr)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid
 import qualified Data.Set as Set

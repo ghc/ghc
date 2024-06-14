@@ -8,7 +8,7 @@ import Control.Applicative ((<|>))
 import Control.Exception (IOException, catch)
 import Control.Monad (when)
 import Data.Foldable (traverse_)
-import Data.List (foldl')
+import qualified Data.List as List
 import Data.Traversable (for)
 import GHC.Generics (Generic)
 import System.Directory (getDirectoryContents)
@@ -86,7 +86,7 @@ runFixtures fixtures = do
           input <- readFile i
           return (parseString input)
     ediffGolden goldenFixture name o readDoc
-  case foldl' combineResults (Result 0 0) results of
+  case List.foldl' combineResults (Result 0 0) results of
     Result s t -> do
       putStrLn $ "Fixtures: success " ++ show s ++ "; total " ++ show t
       when (s /= t) exitFailure

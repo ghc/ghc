@@ -1,8 +1,6 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE NamedFieldPuns    #-}
-{-# LANGUAGE TupleSections     #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface
@@ -47,7 +45,7 @@ import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
 import Control.Monad
-import Data.List (foldl', isPrefixOf)
+import Data.List (isPrefixOf)
 import Data.Traversable (for)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -71,11 +69,11 @@ import GHC.Types.Name.Occurrence (emptyOccEnv)
 import GHC.Unit.Module.Graph (ModuleGraphNode (..))
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModSummary (isBootSummary)
-import GHC.Utils.Outputable ((<+>), pprModuleName)
+import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName)
 import GHC.Utils.Error (withTiming)
 import GHC.Unit.Home.ModInfo
 import GHC.Tc.Utils.Env (lookupGlobal_maybe)
-import GHC.Utils.Outputable (Outputable)
+import qualified Data.List as List
 
 #if defined(mingw32_HOST_OS)
 import System.IO
@@ -327,15 +325,15 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap = do
 -- The interfaces are passed in in topologically sorted order, but we start
 -- by reversing the list so we can do a foldl.
 buildHomeLinks :: [Interface] -> LinkEnv
-buildHomeLinks ifaces = foldl' upd Map.empty (reverse ifaces)
+buildHomeLinks ifaces = List.foldl' upd Map.empty (reverse ifaces)
   where
     upd old_env iface
       | OptHide `elem` ifaceOptions iface =
           old_env
       | OptNotHome `elem` ifaceOptions iface =
-          foldl' keep_old old_env exported_names
+          List.foldl' keep_old old_env exported_names
       | otherwise =
-          foldl' keep_new old_env exported_names
+          List.foldl' keep_new old_env exported_names
       where
         exported_names = ifaceVisibleExports iface ++ map getName (ifaceInstances iface)
         mdl            = ifaceMod iface

@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wwarn           #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock
@@ -50,9 +49,9 @@ import Control.DeepSeq (force)
 import Control.Monad hiding (forM_)
 import Control.Monad.IO.Class (MonadIO(..))
 import Data.Bifunctor (second)
-import Data.Foldable (forM_, foldl')
+import Data.Foldable (forM_)
 import Data.Traversable (for)
-import Data.List (find, isPrefixOf, nub)
+import qualified Data.List as List
 import Control.Exception
 import Data.Maybe
 import Data.IORef
@@ -256,7 +255,7 @@ withTempOutputDir action = do
 
 -- | Create warnings about potential misuse of -optghc
 optGhcWarnings :: [String] -> [String]
-optGhcWarnings = map format . filter (isPrefixOf "-optghc")
+optGhcWarnings = map format . filter (List.isPrefixOf "-optghc")
   where
     format arg = concat ["Warning: `", arg, "' means `-o ", drop 2 arg, "', did you mean `-", arg, "'?"]
 
@@ -449,7 +448,7 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
 
   let withQuickjump = Flag_QuickJumpIndex `elem` flags
       withBaseURL = isJust
-                  . find (\flag -> case flag of
+                  . List.find (\flag -> case flag of
                            Flag_BaseURL base_url ->
                              base_url /= "." && base_url /= "./"
                            _ -> False
@@ -481,7 +480,7 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
             ppJsonIndex odir sourceUrls' opt_wiki_urls
                         unicode Nothing qual
                         ifaces
-                        ( nub
+                        ( List.nub
                         . map fst
                         . filter ((== Visible) . piVisibility . snd)
                         $ packages)
@@ -612,7 +611,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
               ++ if needHieFiles
                     then [Opt_WriteHie] -- Generate .hie-files
                     else []
-          dynflags' = (foldl' gopt_set dynflags extra_opts)
+          dynflags' = (List.foldl' gopt_set dynflags extra_opts)
                         { backend = noBackend
                         , ghcMode = CompManager
                         , ghcLink = NoLink
@@ -626,7 +625,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
 
 unsetPatternMatchWarnings :: DynFlags -> DynFlags
 unsetPatternMatchWarnings dflags =
-  foldl' wopt_unset dflags pattern_match_warnings
+  List.foldl' wopt_unset dflags pattern_match_warnings
   where
     pattern_match_warnings =
       [ Opt_WarnIncompletePatterns

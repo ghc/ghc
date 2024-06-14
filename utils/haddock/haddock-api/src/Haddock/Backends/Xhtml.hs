@@ -50,9 +50,10 @@ import Control.DeepSeq (force)
 import Control.Monad (unless, when)
 import Data.Bifunctor (bimap)
 import qualified Data.ByteString.Builder as Builder
+import qualified Data.List as List
 import Data.Char (isSpace, toUpper)
 import Data.Either (partitionEithers)
-import Data.Foldable (foldl', traverse_)
+import Data.Foldable (traverse_)
 import Data.List (intersperse, isPrefixOf, sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -305,12 +306,15 @@ bodyHtml
     body
       << [ divPackageHeader
             << [ nonEmptySectionName << doctitle
-               , unordList (catMaybes [
-                   srcButton maybe_source_url iface,
-                   wikiButton maybe_wiki_url (ifaceMod <$> iface),
-                   contentsButton maybe_contents_url,
-                   indexButton maybe_index_url])
-                       ! [theclass "links", identifier "page-menu"]
+               , unordList
+                  ( catMaybes
+                      [ srcButton maybe_source_url iface
+                      , wikiButton maybe_wiki_url (ifaceMod <$> iface)
+                      , contentsButton maybe_contents_url
+                      , indexButton maybe_index_url
+                      ]
+                  )
+                  ! [theclass "links", identifier "page-menu"]
                ]
          , divContent << pageContent
          , divFooter
@@ -777,7 +781,7 @@ ppHtmlIndex
       -- that export that entity.  Each of the modules exports the entity
       -- in a visible or invisible way (hence the Bool).
       full_index :: Map String (Map GHC.Name [(Module, Bool)])
-      full_index = foldl' f Map.empty ifaces
+      full_index = List.foldl' f Map.empty ifaces
         where
           f
             :: Map String (Map Name [(Module, Bool)])
@@ -791,7 +795,7 @@ ppHtmlIndex
 
       getIfaceIndex :: InstalledInterface -> Map String (Map Name [(Module, Bool)])
       getIfaceIndex iface =
-        foldl' f Map.empty (instExports iface)
+        List.foldl' f Map.empty (instExports iface)
         where
           f
             :: Map String (Map Name [(Module, Bool)])

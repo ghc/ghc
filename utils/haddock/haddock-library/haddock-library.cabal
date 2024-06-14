@@ -29,8 +29,21 @@ source-repository head
   location: https://gitlab.haskell.org/ghc/ghc.git
   subdir: utils/haddock/haddock-library
 
-common lib-defaults
-  default-language: Haskell2010
+common extensions
+  default-extensions:
+    NoStarIsType
+    StrictData
+
+  default-language:   Haskell2010
+
+common ghc-options
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wredundant-constraints
+    -fhide-source-paths -Wno-unused-do-bind -fshow-hole-constraints
+    -Wno-unticked-promoted-constructors -Werror=unused-imports
+    -fdicts-strict -Wunused-packages -funbox-strict-fields
+    -Wnoncanonical-monad-instances -Wmissing-home-modules
 
   build-depends:
     , base         >= 4.10     && < 4.21
@@ -38,13 +51,9 @@ common lib-defaults
     , text         ^>= 1.2.3.0 || ^>= 2.0 || ^>= 2.1
     , parsec       ^>= 3.1.13.0
 
-  ghc-options: -funbox-strict-fields
-               -Wall
-               -Wcompat
-               -Wnoncanonical-monad-instances
-
 library
-  import: lib-defaults
+  import: extensions
+  import: ghc-options
 
   hs-source-dirs:       src
 
@@ -60,7 +69,8 @@ library
     Documentation.Haddock.Parser.Identifier
 
 test-suite spec
-  import: lib-defaults
+  import: extensions
+  import: ghc-options
   type:             exitcode-stdio-1.0
   main-is:          Spec.hs
   hs-source-dirs:
@@ -94,10 +104,10 @@ test-suite spec
     , hspec-discover:hspec-discover  >= 2.4.4    && < 2.12
 
 test-suite fixtures
+  import: extensions
+  import: ghc-options
   type:             exitcode-stdio-1.0
-  default-language: Haskell2010
   main-is:          Fixtures.hs
-  ghc-options:      -Wall
   hs-source-dirs:   fixtures
   build-depends:
       -- intra-package dependency

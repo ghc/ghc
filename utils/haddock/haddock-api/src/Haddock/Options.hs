@@ -563,10 +563,12 @@ readIfaceArgs flags = [parseIfaceOption s | Flag_ReadInterface s <- flags]
             (src, ',' : rest') ->
               let src' = case src of
                     "" -> Nothing
-                    _  -> Just src
-                  docPaths = DocPaths { docPathsHtml = fpath
-                                      , docPathsSources = src'
-                                      }
+                    _ -> Just src
+                  docPaths =
+                    DocPaths
+                      { docPathsHtml = fpath
+                      , docPathsSources = src'
+                      }
                in case break (== ',') rest' of
                     (visibility, ',' : file)
                       | visibility == "hidden" ->
