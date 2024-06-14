@@ -241,3 +241,4 @@ test('MulMayOflo_full',
      ['MulMayOflo', [('MulMayOflo_full.cmm', '')], ''])
 test('T24295a', normal, compile_and_run, ['-O -floopification'])
 test('T24295b', normal, compile_and_run, ['-O -floopification -fpedantic-bottoms'])
+test('T23034', normal, compile_and_run, ['-O2 T23034_c.c'])
