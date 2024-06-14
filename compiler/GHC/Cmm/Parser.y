@@ -1151,6 +1151,7 @@ callishMachOps platform = listToUFM $
     [ allWidths "popcnt" MO_PopCnt
     , allWidths "pdep" MO_Pdep
     , allWidths "pext" MO_Pext
+    , allWidths "bswap" MO_BSwap
     , allWidths "cmpxchg" MO_Cmpxchg
     , allWidths "xchg" MO_Xchg
     , allWidths "load_relaxed" (\w -> MO_AtomicRead w MemOrderAcquire)
