@@ -1770,7 +1770,7 @@ genCCall' config gcp target dest_regs args
                                 _ -> panic "genCall': unknown calling conv."
 
         argReps = map (cmmExprType platform) args
-        (argHints, _) = foreignTargetHints target
+        (_, argHints) = foreignTargetHints target
 
         roundTo a x | x `mod` a == 0 = x
                     | otherwise = x + a - (x `mod` a)
