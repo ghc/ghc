@@ -587,7 +587,7 @@ pprInstr platform instr = case instr of
 
    JMP lbl _
      -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
-     | isForeignLabel lbl -> panic "PPC.Ppr.pprInstr: JMP to ForeignLabel"
+     | isForeignLabel lbl -> pprPanic "PPC.Ppr.pprInstr: JMP to ForeignLabel" (pprDebugCLabel platform lbl)
      | otherwise ->
        line $ hcat [ -- an alias for b that takes a CLabel
            text "\tb\t",
