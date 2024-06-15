@@ -95,10 +95,6 @@ def isCross() -> bool:
     """ Are we testing a cross-compiler? """
     return config.target_wrapper is not None
 
-def isCross() -> bool:
-    """ Are we testing a cross-compiler? """
-    return config.target_wrapper is not None
-
 def isCompilerStatsTest() -> bool:
     opts = getTestOpts()
     return bool(opts.is_compiler_stats_test)
