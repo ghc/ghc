@@ -67,10 +67,10 @@ instance FR AArch64.FreeRegs where
     frReleaseReg = \_ -> AArch64.releaseReg
 
 instance FR RV64.FreeRegs where
-    frAllocateReg = \_ -> RV64.allocateReg
-    frGetFreeRegs = \_ -> RV64.getFreeRegs
+    frAllocateReg = const RV64.allocateReg
+    frGetFreeRegs = const RV64.getFreeRegs
     frInitFreeRegs = RV64.initFreeRegs
-    frReleaseReg = \_ -> RV64.releaseReg
+    frReleaseReg = const RV64.releaseReg
 
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config = case platformArch (ncgPlatform config) of
