@@ -169,9 +169,9 @@ cmmMakePicReference config lbl
   | ArchAArch64 <- platformArch platform
   = CmmLit $ CmmLabel lbl
 
+  -- as on AArch64, there's no pic base register.
   | ArchRISCV64 <- platformArch platform
   = CmmLit $ CmmLabel lbl
-
 
   | OSAIX <- platformOS platform
   = CmmMachOp (MO_Add W32)
