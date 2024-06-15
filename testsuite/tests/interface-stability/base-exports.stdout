@@ -10962,6 +10962,7 @@ instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Data.Functor.Identity.Iden
 instance [safe] Data.Functor.Classes.Eq1 [] -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Maybe.Maybe -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Base.NonEmpty -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.Par1 -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 Solo -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Classes.Eq a => Data.Functor.Classes.Eq1 ((,) a) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a b. (GHC.Classes.Eq a, GHC.Classes.Eq b) => Data.Functor.Classes.Eq1 ((,,) a b) -- Defined in ‘Data.Functor.Classes’
@@ -10976,6 +10977,7 @@ instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Data.Functor.Identity.Ide
 instance [safe] Data.Functor.Classes.Ord1 [] -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Maybe.Maybe -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Base.NonEmpty -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.Par1 -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Ord1 Solo -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Classes.Ord a => Data.Functor.Classes.Ord1 ((,) a) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a b. (GHC.Classes.Ord a, GHC.Classes.Ord b) => Data.Functor.Classes.Ord1 ((,,) a b) -- Defined in ‘Data.Functor.Classes’
@@ -10991,6 +10993,7 @@ instance [safe] Data.Functor.Classes.Read1 GHC.Internal.Data.Functor.Identity.Id
 instance [safe] Data.Functor.Classes.Read1 [] -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Read1 GHC.Internal.Maybe.Maybe -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Read1 GHC.Internal.Base.NonEmpty -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Read1 GHC.Internal.Generics.Par1 -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Read1 Solo -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Read.Read a => Data.Functor.Classes.Read1 ((,) a) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a b. (GHC.Internal.Read.Read a, GHC.Internal.Read.Read b) => Data.Functor.Classes.Read1 ((,,) a b) -- Defined in ‘Data.Functor.Classes’
@@ -11006,6 +11009,7 @@ instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Data.Functor.Identity.Id
 instance [safe] Data.Functor.Classes.Show1 [] -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Maybe.Maybe -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Base.NonEmpty -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.Par1 -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Show1 Solo -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Show.Show a => Data.Functor.Classes.Show1 ((,) a) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a b. (GHC.Internal.Show.Show a, GHC.Internal.Show.Show b) => Data.Functor.Classes.Show1 ((,,) a b) -- Defined in ‘Data.Functor.Classes’
@@ -12495,6 +12499,7 @@ instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec G
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.UAddr p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Encoding.Types.CodingProgress -- Defined in ‘GHC.Internal.IO.Encoding.Types’
