@@ -724,9 +724,9 @@ load' mhmi_cache how_much diag_wrapper mHscMessage mod_graph = do
         checkMod m and_then
             | m `Set.member` all_home_mods = and_then
             | otherwise = do
-                    liftIO $ errorMsg logger
-                        (text "no such module:" <+> quotes (ppr (moduleUnit m) <> colon <> ppr (moduleName m)))
-                    return Failed
+                    throwOneError $ mkPlainErrorMsgEnvelope noSrcSpan
+                                  $ GhcDriverMessage
+                                  $ DriverModuleNotFound (moduleName m)
 
     checkHowMuch how_much $ do
 
