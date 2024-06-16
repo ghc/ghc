@@ -160,41 +160,21 @@ regUsageOfInstr platform instr = case instr of
         -- Is this register interesting for the register allocator?
         interesting :: Platform -> Reg -> Bool
         interesting _        (RegVirtual _)                 = True
-        interesting _        (RegReal (RealRegSingle (-1))) = False
         interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
 
--- Save caller save registers
--- This is x0-x18
+-- | Caller-saved registers (according to calling convention)
 --
--- For SIMD/FP Registers:
--- Registers v8-v15 must be preserved by a callee across subroutine calls;
--- the remaining registers (v0-v7, v16-v31) do not need to be preserved (or
--- should be preserved by the caller). Additionally, only the bottom 64 bits
--- of each value stored in v8-v15 need to be preserved [7]; it is the
--- responsibility of the caller to preserve larger values.
---
--- .---------------------------------------------------------------------------------------------------------------------------------------------------------------.
--- |  0 |  1 |  2 |  3 |  4 |  5 |  6 |  7 |  8 |  9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 |
--- | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 42 | 44 | 45 | 46 | 47 | 48 | 49 | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 58 | 59 | 60 | 61 | 62 | 63 |
--- |== General Purpose registers ==================================================================================================================================|
--- | ZR | RA | SP | GP | TP | <- tmp r. -> | FP | <- | <---- argument passing -------------> | -- callee saved ------------------------------> | <--- tmp regs --> |
--- | -- | -- | -- | -- | -- | <- free r. > | -- | BR | <---- free registers ---------------> | SP | HP | R1 | R2 | R3 | R4 | R5 | R6 | R7 | SL | <-- free regs --> |
--- |== SIMD/FP Registers ==========================================================================================================================================|
--- | <--- temporary registers -----------> | <------ | <---- argument passing -------------> | -- callee saved ------------------------------> | <--- tmp regs --> |
--- | <---------- free registers ---------> | F1 | F2 | <---- free registers ---------------> | F3 | F4 | F5 | F6 | D1 | D2 | D3 | D4 | D5 | D6 | -- | -- | -- | -- |
--- '---------------------------------------------------------------------------------------------------------------------------------------------------------------'
--- ZR: Zero, RA: Return Address, SP: Stack Pointer, GP: Global Pointer, TP: Thread Pointer, FP: Frame Pointer
--- BR: Base, SL: SpLim
+-- These registers may be clobbered after a jump.
 callerSavedRegisters :: [Reg]
 callerSavedRegisters =
-  map regSingle [t0RegNo .. t2RegNo]
+  [regSingle raRegNo]
+    ++ map regSingle [t0RegNo .. t2RegNo]
     ++ map regSingle [a0RegNo .. a7RegNo]
     ++ map regSingle [t3RegNo .. t6RegNo]
     ++ map regSingle [ft0RegNo .. ft7RegNo]
     ++ map regSingle [fa0RegNo .. fa7RegNo]
 
--- | Apply a given mapping to all the register references in this
--- instruction.
+-- | Apply a given mapping to all the register references in this instruction.
 patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 patchRegsOfInstr instr env = case instr of
     -- 0. Meta Instructions

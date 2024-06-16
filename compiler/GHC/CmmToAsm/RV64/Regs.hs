@@ -22,6 +22,11 @@ import GHC.Platform
 x0RegNo :: RegNo
 x0RegNo = 0
 
+-- | return address register
+x1RegNo, raRegNo :: RegNo
+x1RegNo = 1
+raRegNo = x1RegNo
+
 x5RegNo, t0RegNo :: RegNo
 x5RegNo = 5
 t0RegNo = x5RegNo
