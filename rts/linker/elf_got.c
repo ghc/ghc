@@ -9,20 +9,22 @@
  * Check if we need a global offset table slot for a
  * given symbol
  */
-bool needGotSlot(Elf_Sym *symbol) {
-  /* using global here should give an upper bound */
-  /* I don't believe we need to relocate STB_LOCAL
-   * symbols via the GOT; however I'm unsure about
-   * STB_WEAK.
-   *
-   * Any more restrictive filter here would result
-   * in a smaller GOT, which is preferable.
-   */
-  return ELF_ST_BIND(symbol->st_info) == STB_GLOBAL ||
-         ELF_ST_BIND(symbol->st_info) == STB_WEAK
-         // Section symbols exist primarily for relocation
-         // and as such may need a GOT slot.
-         || ELF_ST_TYPE(symbol->st_info) == STT_SECTION;
+bool
+needGotSlot(Elf_Sym * symbol) {
+    /* using global here should give an upper bound */
+    /* I don't believe we need to relocate STB_LOCAL
+     * symbols via the GOT; however I'm unsure about
+     * STB_WEAK.
+     *
+     * Any more restrictive filter here would result
+     * in a smaller GOT, which is preferable.
+     */
+    return ELF_ST_BIND(symbol->st_info) == STB_GLOBAL
+        || ELF_ST_BIND(symbol->st_info) == STB_WEAK
+        // Section symbols exist primarily for relocation
+        // and as such may need a GOT slot.
+        || ELF_ST_TYPE(symbol->st_info) == STT_SECTION;
+
 }
 
 bool
