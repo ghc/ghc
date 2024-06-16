@@ -171,7 +171,6 @@ regUsageOfInstr platform instr = case instr of
         -- Is this register interesting for the register allocator?
         interesting :: Platform -> Reg -> Bool
         interesting _        (RegVirtual _)                 = True
-        interesting _        (RegReal (RealRegSingle (-1))) = False
         interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
 
 -- Save caller save registers
@@ -758,14 +757,9 @@ data Operand
 opReg :: Width -> Reg -> Operand
 opReg = OpReg
 
-xzr, wzr, sp, ip0 :: Operand
-xzr = OpReg W64 (RegReal (RealRegSingle (-1)))
-wzr = OpReg W32 (RegReal (RealRegSingle (-1)))
+sp, ip0 :: Operand
 sp  = OpReg W64 (RegReal (RealRegSingle 31))
 ip0 = OpReg W64 (RegReal (RealRegSingle 16))
-
-reg_zero :: Reg
-reg_zero = RegReal (RealRegSingle (-1))
 
 _x :: Int -> Operand
 _x i = OpReg W64 (RegReal (RealRegSingle i))
