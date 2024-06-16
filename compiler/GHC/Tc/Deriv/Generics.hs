@@ -654,9 +654,9 @@ tc_mkRepTy gk get_fixity dit@(DerivInstTys{ dit_rep_tc = tycon
         ctFix c
             | dataConIsInfix c
             = case get_fixity (dataConName c) of
-                   Fixity _ n InfixL -> buildFix n pLA
-                   Fixity _ n InfixR -> buildFix n pRA
-                   Fixity _ n InfixN -> buildFix n pNA
+                   Fixity n InfixL -> buildFix n pLA
+                   Fixity n InfixR -> buildFix n pRA
+                   Fixity n InfixN -> buildFix n pNA
             | otherwise = mkTyConTy pPrefix
         buildFix n assoc = mkTyConApp pInfix [ mkTyConTy assoc
                                              , mkNumLitTy (fromIntegral n)]

@@ -978,8 +978,8 @@ instance NFData FixityDirection where
   rnf InfixN = ()
 
 instance NFData Fixity where
-  rnf (Fixity sourceText n dir) =
-    sourceText `deepseq` n `deepseq` dir `deepseq` ()
+  rnf (Fixity n dir) =
+    n `deepseq` dir `deepseq` ()
 
 instance NFData (EpAnn NameAnn) where
   rnf (EpAnn en ann cs) = en `deepseq` ann `deepseq` cs `deepseq` ()

@@ -56,7 +56,7 @@ import GHC.Types.Unique.FM
 import GHC.Unit.State
 import GHC.Utils.Binary
 
-import GHC.Iface.Type (IfaceType, getIfaceType, putIfaceType)
+import GHC.Iface.Type (IfaceType, putIfaceType)
 
 import Haddock.Options (Visibility (..))
 

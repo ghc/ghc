@@ -90,9 +90,9 @@ pOption : lowerName '=' false               { OptionFalse  $1 }
         | can_fail_warning '=' pPrimOpCanFailWarnFlag { OptionCanFailWarnFlag $3 }
 
 pInfix :: { Maybe Fixity }
-pInfix : infix  integer { Just $ Fixity NoSourceText $2 InfixN }
-       | infixl integer { Just $ Fixity NoSourceText $2 InfixL }
-       | infixr integer { Just $ Fixity NoSourceText $2 InfixR }
+pInfix : infix  integer { Just $ Fixity $2 InfixN }
+       | infixl integer { Just $ Fixity $2 InfixL }
+       | infixr integer { Just $ Fixity $2 InfixR }
        | nothing        { Nothing }
 
 pEffect :: { PrimOpEffect }

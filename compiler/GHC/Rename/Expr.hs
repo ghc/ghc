@@ -411,7 +411,7 @@ rnExpr (OpApp _ e1 op e2)
         ; fixity <- case op' of
               L _ (HsVar _ (L _ n)) -> lookupFixityRn n
               L _ (HsRecSel _ f)    -> lookupFieldFixityRn f
-              _ -> return (Fixity NoSourceText minPrecedence InfixL)
+              _ -> return (Fixity minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 
         ; lexical_negation <- xoptM LangExt.LexicalNegation

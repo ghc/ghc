@@ -364,7 +364,7 @@ gen_hs_source (Info defaults entries) =
 
            prim_fixity options n
               = [ pprFixityDir d ++ " " ++ show i ++ " " ++ asInfix n
-                | OptionFixity (Just (Fixity _ i d)) <- options ]
+                | OptionFixity (Just (Fixity i d)) <- options ]
 
            prim_func n t = [ wrapOp n ++ " :: " ++ pprTy t,
                              wrapOp n ++ " = " ++ funcRhs n ]

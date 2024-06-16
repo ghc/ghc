@@ -241,7 +241,7 @@ jsonName :: Name -> JsonDoc
 jsonName = JSString . nameStableString
 
 jsonFixity :: Fixity -> JsonDoc
-jsonFixity (Fixity _ prec dir) =
+jsonFixity (Fixity prec dir) =
   jsonObject
     [ ("prec", jsonInt prec)
     , ("direction", jsonFixityDirection dir)

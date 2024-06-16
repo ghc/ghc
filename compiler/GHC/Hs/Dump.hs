@@ -74,7 +74,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
               `extQ` dataCon
               `extQ` bagName `extQ` bagRdrName `extQ` bagVar `extQ` nameSet
-              `extQ` fixity
               `ext2Q` located
               `extQ` srcSpanAnnA
               `extQ` srcSpanAnnL
@@ -139,11 +138,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                                , generic s ]
 
             sourceText :: SourceText -> SDoc
-            sourceText NoSourceText = parens $ text "NoSourceText"
+            sourceText NoSourceText = case bs of
+              BlankSrcSpan -> parens $ text "SourceText" <+> text "blanked"
+              _            -> parens $ text "NoSourceText"
             sourceText (SourceText src) = case bs of
-              NoBlankSrcSpan   -> parens $ text "SourceText" <+> ftext src
-              BlankSrcSpanFile -> parens $ text "SourceText" <+> ftext src
-              _                -> parens $ text "SourceText" <+> text "blanked"
+              BlankSrcSpan     -> parens $ text "SourceText" <+> text "blanked"
+              _                -> parens $ text "SourceText" <+> ftext src
 
             epaAnchor :: EpaLocation -> SDoc
             epaAnchor (EpaSpan s) = parens $ text "EpaSpan" <+> srcSpan s
@@ -215,11 +215,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             nameSet ns =  braces $
                           text "NameSet:"
                        $$ (list . nameSetElemsStable $ ns)
-
-            fixity :: Fixity -> SDoc
-            fixity fx =  braces $
-                         text "Fixity:"
-                     <+> ppr fx
 
             located :: (Data a, Data b) => GenLocated a b -> SDoc
             located (L ss a)

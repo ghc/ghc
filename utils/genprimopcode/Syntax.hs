@@ -101,15 +101,11 @@ instance Show TyCon where
 
 -- The SourceText exists so that it matches the SourceText field in
 -- BasicTypes.Fixity
-data Fixity = Fixity SourceText Int FixityDirection
+data Fixity = Fixity Int FixityDirection
   deriving (Eq, Show)
 
 data FixityDirection = InfixN | InfixL | InfixR
   deriving (Eq, Show)
-
-data SourceText = SourceText String
-                | NoSourceText
-                deriving (Eq,Show)
 
 data PrimOpEffect
   = NoEffect

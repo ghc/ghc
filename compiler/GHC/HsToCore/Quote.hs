@@ -780,7 +780,7 @@ repLFixD :: LFixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 repLFixD (L loc fix_sig) = rep_fix_d (locA loc) fix_sig
 
 rep_fix_d :: SrcSpan -> FixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
-rep_fix_d loc (FixitySig ns_spec names (Fixity _ prec dir))
+rep_fix_d loc (FixitySig ns_spec names (Fixity prec dir))
   = do { MkC prec' <- coreIntLit prec
        ; let rep_fn = case dir of
                         InfixL -> infixLWithSpecDName

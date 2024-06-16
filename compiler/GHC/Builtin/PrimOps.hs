@@ -49,7 +49,6 @@ import GHC.Types.Basic
 import GHC.Types.Fixity  ( Fixity(..), FixityDirection(..) )
 import GHC.Types.SrcLoc  ( wiredInSrcSpan )
 import GHC.Types.ForeignCall ( CLabelString )
-import GHC.Types.SourceText  ( SourceText(..) )
 import GHC.Types.Unique  ( Unique )
 
 import GHC.Unit.Types    ( Unit )

@@ -57,7 +57,6 @@ import Data.Traversable (for)
 import Control.Arrow (first, (&&&))
 import GHC hiding (lookupName)
 import GHC.Builtin.Names
-import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Core.ConLike (ConLike (..))
 import GHC.Data.FastString (FastString, bytesFS, unpackFS)
@@ -65,7 +64,6 @@ import GHC.Driver.Ppr
 import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Iface.Syntax
 import GHC.Types.Avail
-import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SafeHaskell

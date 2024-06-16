@@ -90,7 +90,6 @@ import GHC.Types.Avail
 import GHC.Types.Fixity
 import GHC.Types.Fixity.Env
 import GHC.Types.SourceError
-import GHC.Types.SourceText
 import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
@@ -1030,7 +1029,7 @@ ghcPrimIface
 
     -- The fixity listed here for @`seq`@ should match
     -- those in primops.txt.pp (from which Haddock docs are generated).
-    fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
+    fixities = (getOccName seqId, Fixity 0 InfixR)
              : mapMaybe mkFixity allThePrimOps
     mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
 
@@ -1235,5 +1234,3 @@ instance Outputable WhereFrom where
   ppr (ImportByUser NotBoot)               = empty
   ppr ImportBySystem                       = text "{- SYSTEM -}"
   ppr ImportByPlugin                       = text "{- PLUGIN -}"
-
-

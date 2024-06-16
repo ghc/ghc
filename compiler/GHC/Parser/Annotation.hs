@@ -112,6 +112,7 @@ import GHC.Hs.DocString
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
+import GHC.Types.SourceText (SourceText (NoSourceText))
 
 {-
 Note [exact print annotations]
@@ -1362,6 +1363,9 @@ instance NoAnn (EpToken s) where
 
 instance NoAnn (EpUniToken s t) where
   noAnn = NoEpUniTok
+
+instance NoAnn SourceText where
+  noAnn = NoSourceText
 
 -- ---------------------------------------------------------------------
 
