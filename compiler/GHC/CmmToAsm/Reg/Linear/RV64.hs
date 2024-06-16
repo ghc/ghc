@@ -21,7 +21,16 @@ import GHC.Stack
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-data FreeRegs = FreeRegs !Word32 !Word32
+-- | Bitmaps to indicate which registers are free (currently unused)
+--
+-- The bit index represents the `RegNo`, in case of floating point registers
+-- with an offset of 32. The register is free when the bit is set.
+data FreeRegs
+  = FreeRegs
+      -- | integer/general purpose registers (`RcInteger`)
+      !Word32
+      -- | floating point registers (`RcDouble`)
+      !Word32
 
 instance Show FreeRegs where
   show (FreeRegs g f) = "FreeRegs 0b" ++ showBits g ++ " 0b" ++ showBits f
@@ -45,23 +54,32 @@ instance Outputable FreeRegs where
       show_bit bits bit | testBit bits bit = text "  "
       show_bit _ _ = text " x"
 
+-- | Set bits of all allocatable registers to 1
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
   where
     noFreeRegs :: FreeRegs
     noFreeRegs = FreeRegs 0 0
 
+-- | Get all free `RealReg`s (i.e. those where the corresponding bit is 1)
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]
 getFreeRegs cls (FreeRegs g f)
   | RcFloat <- cls = [] -- For now we only support double and integer registers, floats will need to be promoted.
-  | RcDouble <- cls = go 32 f [0 .. 31]
-  | RcInteger <- cls = go 0 g ([5 .. 7] ++ [10 .. 17] ++ [28 .. 31])
+  | RcDouble <- cls = go 32 f allocatableDoubleRegs
+  | RcInteger <- cls = go 0 g allocatableIntRegs
   where
     go _ _ [] = []
     go off x (i : is)
       | testBit x i = RealRegSingle (off + i) : (go off x $! is)
       | otherwise = go off x $! is
+    -- The lists of allocatable registers are manually crafted: Register
+    -- allocation is pretty hot code. We don't want to iterate and map like
+    -- `initFreeRegs` all the time! (The register mappings aren't supposed to
+    -- change often.)
+    allocatableIntRegs = [5 .. 7] ++ [10 .. 17] ++ [28 .. 30]
+    allocatableDoubleRegs = [0 .. 7] ++ [10 .. 17] ++ [28 .. 31]
 
+-- | Set corresponding register bit to 0
 allocateReg :: (HasCallStack) => RealReg -> FreeRegs -> FreeRegs
 allocateReg (RealRegSingle r) (FreeRegs g f)
   | r > 31 && testBit f (r - 32) = FreeRegs g (clearBit f (r - 32))
@@ -69,6 +87,7 @@ allocateReg (RealRegSingle r) (FreeRegs g f)
   | r > 31 = panic $ "Linear.RV64.allocReg: double allocation of float reg v" ++ show (r - 32) ++ "; " ++ showBits f
   | otherwise = pprPanic "Linear.RV64.allocReg" $ text ("double allocation of gp reg x" ++ show r ++ "; " ++ showBits g)
 
+-- | Set corresponding register bit to 1
 releaseReg :: (HasCallStack) => RealReg -> FreeRegs -> FreeRegs
 releaseReg (RealRegSingle r) (FreeRegs g f)
   | r > 31 && testBit f (r - 32) = pprPanic "Linear.RV64.releaseReg" (text "can't release non-allocated reg v" <> int (r - 32))
