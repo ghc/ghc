@@ -1984,7 +1984,7 @@ cvtPatSynSigTy ty         = cvtSigType ty
 
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity
-cvtFixity (TH.Fixity prec dir) = Hs.Fixity NoSourceText prec (cvt_dir dir)
+cvtFixity (TH.Fixity prec dir) = Hs.Fixity prec (cvt_dir dir)
    where
      cvt_dir TH.InfixL = Hs.InfixL
      cvt_dir TH.InfixR = Hs.InfixR

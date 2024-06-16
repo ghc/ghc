@@ -2679,8 +2679,8 @@ sigdecl :: { LHsDecl GhcPs }
                                                 Nothing -> (NoSourceText, maxPrecedence)
                                                 Just l2 -> (fst $ unLoc l2, snd $ unLoc l2)
                    ; amsA' (sLL $1 $> $ SigD noExtField
-                            (FixSig (mj AnnInfix $1 : maybeToList mbPrecAnn) (FixitySig (unLoc $3) (fromOL $ unLoc $4)
-                                    (Fixity fixText fixPrec (unLoc $1)))))
+                            (FixSig (mj AnnInfix $1 : maybeToList mbPrecAnn, fixText) (FixitySig (unLoc $3) (fromOL $ unLoc $4)
+                                    (Fixity fixPrec (unLoc $1)))))
                    }}
 
         | pattern_synonym_sig   { L (getLoc $1) . SigD noExtField . unLoc $ $1 }

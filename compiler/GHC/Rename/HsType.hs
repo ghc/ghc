@@ -1557,8 +1557,8 @@ checkPrecMatch op (MG { mg_alts = (L _ ms) })
 
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
 checkPrec op (ConPat NoExtField op1 (InfixCon _ _)) right = do
-    op_fix@(Fixity _ op_prec  op_dir) <- lookupFixityRn op
-    op1_fix@(Fixity _ op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
+    op_fix@(Fixity op_prec  op_dir) <- lookupFixityRn op
+    op1_fix@(Fixity op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
     let
         inf_ok = op1_prec > op_prec ||
                  (op1_prec == op_prec &&
@@ -1586,8 +1586,8 @@ checkSectionPrec direction section op arg
         _                 -> return ()
   where
     op_name = get_op op
-    go_for_it arg_op arg_fix@(Fixity _ arg_prec assoc) = do
-          op_fix@(Fixity _ op_prec _) <- lookupFixityOp op_name
+    go_for_it arg_op arg_fix@(Fixity arg_prec assoc) = do
+          op_fix@(Fixity op_prec _) <- lookupFixityOp op_name
           unless (op_prec < arg_prec
                   || (op_prec == arg_prec && direction == assoc))
                  (sectionPrecErr (get_op op, op_fix)

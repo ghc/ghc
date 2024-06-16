@@ -16,33 +16,28 @@ where
 
 import GHC.Prelude
 
-import GHC.Types.SourceText
-
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 
 import Data.Data hiding (Fixity, Prefix, Infix)
 
-data Fixity = Fixity SourceText Int FixityDirection
-  -- Note [Pragma source text] in "GHC.Types.SourceText"
+data Fixity = Fixity Int FixityDirection
   deriving Data
 
 instance Outputable Fixity where
-    ppr (Fixity _ prec dir) = hcat [ppr dir, space, int prec]
+    ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
 
 instance Eq Fixity where -- Used to determine if two fixities conflict
-  (Fixity _ p1 dir1) == (Fixity _ p2 dir2) = p1==p2 && dir1 == dir2
+  (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
 
 instance Binary Fixity where
-    put_ bh (Fixity src aa ab) = do
-            put_ bh src
+    put_ bh (Fixity aa ab) = do
             put_ bh aa
             put_ bh ab
     get bh = do
-          src <- get bh
           aa <- get bh
           ab <- get bh
-          return (Fixity src aa ab)
+          return (Fixity aa ab)
 
 ------------------------
 data FixityDirection
@@ -76,12 +71,12 @@ maxPrecedence = 9
 minPrecedence = 0
 
 defaultFixity :: Fixity
-defaultFixity = Fixity NoSourceText maxPrecedence InfixL
+defaultFixity = Fixity maxPrecedence InfixL
 
 negateFixity, funTyFixity :: Fixity
 -- Wired-in fixities
-negateFixity = Fixity NoSourceText 6 InfixL  -- Fixity of unary negate
-funTyFixity  = Fixity NoSourceText (-1) InfixR  -- Fixity of '->', see #15235
+negateFixity = Fixity 6 InfixL  -- Fixity of unary negate
+funTyFixity  = Fixity (-1) InfixR  -- Fixity of '->', see #15235
 
 {-
 Consider
@@ -96,7 +91,7 @@ whether there's an error.
 compareFixity :: Fixity -> Fixity
               -> (Bool,         -- Error please
                   Bool)         -- Associate to the right: a op1 (b op2 c)
-compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
+compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
   = case prec1 `compare` prec2 of
         GT -> left
         LT -> right

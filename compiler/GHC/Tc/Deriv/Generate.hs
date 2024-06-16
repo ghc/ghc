@@ -1336,7 +1336,7 @@ appPrecedence = fromIntegral maxPrecedence + 1
 getPrecedence :: (Name -> Fixity) -> Name -> Integer
 getPrecedence get_fixity nm
    = case get_fixity nm of
-        Fixity _ x _assoc -> fromIntegral x
+        Fixity x _assoc -> fromIntegral x
           -- NB: the Report says that associativity is not taken
           --     into account for either Read or Show; hence we
           --     ignore associativity here

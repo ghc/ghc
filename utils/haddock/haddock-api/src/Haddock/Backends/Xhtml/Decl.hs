@@ -372,7 +372,7 @@ ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
 
     uniq_fs =
       [ (n, the p, the d')
-      | (n, Fixity _ p d) <- fs
+      | (n, Fixity p d) <- fs
       , let d' = ppDir d
       , then group by
           Down (p, d')

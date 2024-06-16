@@ -2761,7 +2761,7 @@ instance ExactPrint (Sig GhcPs) where
         (an0, vars',ty') <- exactVarSig an vars ty
         return (ClassOpSig an0 is_deflt vars' ty')
 
-  exact (FixSig an (FixitySig x names (Fixity src v fdir))) = do
+  exact (FixSig (an,src) (FixitySig x names (Fixity v fdir))) = do
     let fixstr = case fdir of
          InfixL -> "infixl"
          InfixR -> "infixr"
@@ -2769,7 +2769,7 @@ instance ExactPrint (Sig GhcPs) where
     an0 <- markEpAnnLMS'' an  lidl AnnInfix (Just fixstr)
     an1 <- markEpAnnLMS'' an0 lidl AnnVal (Just (sourceTextToString src (show v)))
     names' <- markAnnotated names
-    return (FixSig an1 (FixitySig x names' (Fixity src v fdir)))
+    return (FixSig (an1,src) (FixitySig x names' (Fixity v fdir)))
 
   exact (InlineSig an ln inl) = do
     an0 <- markAnnOpen an (inl_src inl) "{-# INLINE"

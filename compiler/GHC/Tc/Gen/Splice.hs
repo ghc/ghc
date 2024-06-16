@@ -2816,7 +2816,7 @@ reifyFixity name
   = do { (found, fix) <- lookupFixityRn_help name
        ; return (if found then Just (conv_fix fix) else Nothing) }
     where
-      conv_fix (Hs.Fixity _ i d) = TH.Fixity i (conv_dir d)
+      conv_fix (Hs.Fixity i d) = TH.Fixity i (conv_dir d)
       conv_dir Hs.InfixR = TH.InfixR
       conv_dir Hs.InfixL = TH.InfixL
       conv_dir Hs.InfixN = TH.InfixN
