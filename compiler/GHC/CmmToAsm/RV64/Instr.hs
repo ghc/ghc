@@ -1,8 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module GHC.CmmToAsm.RV64.Instr
-
-where
+module GHC.CmmToAsm.RV64.Instr where
 
 import GHC.Prelude
 
@@ -49,8 +47,7 @@ stackFrameHeaderSize = 2 * spillSlotSize
 spillSlotSize :: Int
 spillSlotSize = 8
 
--- | The number of bytes that the stack pointer should be aligned
--- to.
+-- | The number of bytes that the stack pointer should be aligned to.
 stackAlign :: Int
 stackAlign = 16
 
@@ -60,10 +57,13 @@ maxSpillSlots config
     = ((ncgSpillPreallocSize config - stackFrameHeaderSize)
          `div` spillSlotSize) - 1
 
--- | Convert a spill slot number to a *byte* offset, with no sign.
+-- | Convert a spill slot number to a *byte* offset.
 spillSlotToOffset :: Int -> Int
 spillSlotToOffset slot
    = stackFrameHeaderSize + spillSlotSize * slot
+
+instance Outputable RegUsage where
+    ppr (RU reads writes) = text "RegUsage(reads:" <+> ppr reads <> comma <+> text "writes:" <+> ppr writes <> char ')'
 
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
@@ -72,12 +72,9 @@ spillSlotToOffset slot
 -- allocation goes, are taken care of by the register allocator.
 --
 -- RegUsage = RU [<read regs>] [<write regs>]
-
-instance Outputable RegUsage where
-    ppr (RU reads writes) = text "RegUsage(reads:" <+> ppr reads <> comma <+> text "writes:" <+> ppr writes <> char ')'
-
 regUsageOfInstr :: Platform -> Instr -> RegUsage
 regUsageOfInstr platform instr = case instr of
+  -- 0. Meta Instructions
   ANN _ i                  -> regUsageOfInstr platform i
   COMMENT{}                -> usage ([], [])
   MULTILINE_COMMENT{}      -> usage ([], [])
@@ -122,7 +119,6 @@ regUsageOfInstr platform instr = case instr of
   CSET dst l r _           -> usage (regOp l ++ regOp r, regOp dst)
   -- 7. Load and Store Instructions --------------------------------------------
   STR _ src dst            -> usage (regOp src ++ regOp dst, [])
-  -- STLR _ src dst      L     -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
   LDRU _ dst src           -> usage (regOp src, regOp dst)
 
@@ -505,6 +501,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 -- This most notably leaves out B. (Bit Manipulation) instructions.
 
 data Instr
+    -- 0. Pseudo Instructions --------------------------------------------------
     -- comment pseudo-op
     = COMMENT SDoc
     | MULTILINE_COMMENT SDoc
@@ -530,7 +527,6 @@ data Instr
     -- benefit of subsequent passes
     | DELTA   Int
 
-    -- 0. Pseudo Instructions --------------------------------------------------
     | PUSH_STACK_FRAME
     | POP_STACK_FRAME
 
