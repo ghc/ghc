@@ -339,7 +339,7 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
     return EXIT_SUCCESS;
 }
 
-void flushInstructionCacheAarch64(ObjectCode * oc) {
+void flushInstructionCacheAarch64(ObjectCode * oc STG_UNUSED) {
   // Looks like we don't need this on Aarch64.
   /* no-op */
 }
