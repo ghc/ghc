@@ -1594,7 +1594,7 @@ genCCall target dest_regs arg_regs bid = do
                        then 8 * (stackSpace' `div` 8 + 1)
                        else stackSpace'
 
-      (returnRegs, readResultsCode)   <- readResults allGpArgRegs allFpArgRegs dest_regs [] nilOL
+      readResultsCode <- readResults allGpArgRegs allFpArgRegs dest_regs [] nilOL
 
       let moveStackDown 0 = toOL [ PUSH_STACK_FRAME
                                  , DELTA (-16) ]
@@ -1612,7 +1612,7 @@ genCCall target dest_regs arg_regs bid = do
       let code =    call_target_code          -- compute the label (possibly into a register)
             `appOL` moveStackDown (stackSpace `div` 8)
             `appOL` passArgumentsCode         -- put the arguments into x0, ...
-            `appOL` (unitOL $ BL call_target passRegs returnRegs) -- branch and link.
+            `appOL` (unitOL $ BL call_target passRegs) -- branch and link.
             `appOL` readResultsCode           -- parse the results into registers
             `appOL` moveStackUp (stackSpace `div` 8)
       return (code, Nothing)
@@ -2225,8 +2225,8 @@ genCCall target dest_regs arg_regs bid = do
 
     passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
 
-    readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM ([Reg], InstrBlock)
-    readResults _ _ [] accumRegs accumCode = return (accumRegs, accumCode)
+    readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM (InstrBlock)
+    readResults _ _ [] _ accumCode = return accumCode
     readResults [] _ _ _ _ = do
       platform <- getPlatform
       pprPanic "genCCall, out of gp registers when reading results" (pdoc platform target)
