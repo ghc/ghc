@@ -86,8 +86,8 @@ import qualified Data.Set as Set
 import GHC.Unit.Module.Graph
 
 runHsc :: HscEnv -> Hsc a -> IO a
-runHsc hsc_env (Hsc hsc) = do
-    (a, w) <- hsc hsc_env emptyMessages
+runHsc hsc_env hsc = do
+    (a, w) <- runHsc' hsc_env hsc
     let dflags = hsc_dflags hsc_env
     let !diag_opts = initDiagOpts dflags
         !print_config = initPrintConfig dflags

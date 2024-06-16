@@ -64,6 +64,7 @@ module GHC.Driver.Main
     , hscRecompStatus
     , hscParse
     , hscTypecheckRename
+    , hscTypecheckRenameWithDiagnostics
     , hscTypecheckAndGetWarnings
     , hscDesugar
     , makeSimpleDetails
@@ -642,7 +643,14 @@ extract_renamed_stuff mod_summary tc_result = do
 -- | Rename and typecheck a module, additionally returning the renamed syntax
 hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
                    -> IO (TcGblEnv, RenamedStuff)
-hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $
+hscTypecheckRename hsc_env mod_summary rdr_module =
+    fst <$> hscTypecheckRenameWithDiagnostics hsc_env mod_summary rdr_module
+
+-- | Rename and typecheck a module, additionally returning the renamed syntax
+-- and the diagnostics produced.
+hscTypecheckRenameWithDiagnostics :: HscEnv -> ModSummary -> HsParsedModule
+                                  -> IO ((TcGblEnv, RenamedStuff), Messages GhcMessage)
+hscTypecheckRenameWithDiagnostics hsc_env mod_summary rdr_module = runHsc' hsc_env $
     hsc_typecheck True mod_summary (Just rdr_module)
 
 -- | Do Typechecking without throwing SourceError exception with -Werror
