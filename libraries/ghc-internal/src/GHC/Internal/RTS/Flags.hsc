@@ -382,7 +382,11 @@ data ParFlags = ParFlags
 --
 -- @since base-4.20.0.0
 data HpcFlags = HpcFlags
-    { writeTixFile :: Bool
+    { readTixFile :: Bool
+      -- ^ Controls whether a @<program>.tix@ file is read at
+      -- the start of execution to initialize the RTS internal
+      -- HPC datastructures.
+    , writeTixFile :: Bool
       -- ^ Controls whether the @<program>.tix@ file should be
       -- written after the execution of the program.
     }
@@ -498,6 +502,8 @@ getHpcFlags = do
   let ptr = (#ptr RTS_FLAGS, HpcFlags) rtsFlagsPtr
   HpcFlags
     <$> (toBool <$>
+          (#{peek HPC_FLAGS, readTixFile} ptr :: IO CBool))
+    <*> (toBool <$>
           (#{peek HPC_FLAGS, writeTixFile} ptr :: IO CBool))
 
 getConcFlags :: IO ConcFlags

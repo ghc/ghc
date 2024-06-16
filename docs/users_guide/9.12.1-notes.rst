@@ -91,6 +91,11 @@ Runtime system
 
 - Reduce fragmentation incurred by the nonmoving GC's segment allocator. In one application this reduced resident set size by 26%. See :ghc-ticket:`24150`.
 
+- The new runtime flag :rts-flag:`--read-tix-file=\<yes|no\>` allows to modify whether a preexisting .tix file is read in at the beginning of a program run.
+  The default is currently ``--read-tix-file=yes`` but will change to ``--read-tix-file=no`` in a future version of GHC.
+  For this reason, a warning is emitted if a .tix file is read in implicitly. You can silence this warning by explicitly passing ``--read-tix-file=yes``.
+  Details can be found in `GHC proposal 612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

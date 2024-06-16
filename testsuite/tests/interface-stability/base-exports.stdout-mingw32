@@ -9329,7 +9329,7 @@ module GHC.RTS.Flags where
   type GiveGCStats :: *
   data GiveGCStats = NoGCStats | CollectGCStats | OneLineGCStats | SummaryGCStats | VerboseGCStats
   type HpcFlags :: *
-  data HpcFlags = HpcFlags {writeTixFile :: GHC.Types.Bool}
+  data HpcFlags = HpcFlags {readTixFile :: GHC.Types.Bool, writeTixFile :: GHC.Types.Bool}
   type IoManagerFlag :: *
   data IoManagerFlag = IoManagerFlagAuto | IoManagerFlagSelect | IoManagerFlagMIO | IoManagerFlagWinIO | IoManagerFlagWin32Legacy
   type IoSubSystem :: *

@@ -297,6 +297,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TickyFlags.showTickyStats   = false;
     RtsFlags.TickyFlags.tickyFile        = NULL;
 #endif
+    RtsFlags.HpcFlags.readTixFile        = HPC_YES_IMPLICIT;
     RtsFlags.HpcFlags.writeTixFile       = true;
 }
 
@@ -564,6 +565,10 @@ usage_text[] = {
 "             The amount of allocation after the program receives a",
 "             HeapOverflow exception before the exception is thrown again, if",
 "             the program is still exceeding the heap limit.",
+"",
+"  --read-tix-file=<yes|no>",
+"             Whether to initialize HPC datastructures from  <program>.tix "
+"             at the start of execution. (default: yes)",
 "",
 "  --write-tix-file=<yes|no>",
 "             Whether to write <program>.tix at the end of execution.",
@@ -1067,6 +1072,16 @@ error = true;
                       } else {
                         RtsFlags.GcFlags.nonmovingDenseAllocatorCount = threshold;
                       }
+                  }
+                  else if (strequal("read-tix-file=yes",
+                              &rts_argv[arg][2])) {
+                       OPTION_UNSAFE;
+                       RtsFlags.HpcFlags.readTixFile = HPC_YES_EXPLICIT;
+                  }
+                  else if (strequal("read-tix-file=no",
+                              &rts_argv[arg][2])) {
+                       OPTION_UNSAFE;
+                       RtsFlags.HpcFlags.readTixFile = HPC_NO_EXPLICIT;
                   }
                   else if (strequal("write-tix-file=yes",
                               &rts_argv[arg][2])) {

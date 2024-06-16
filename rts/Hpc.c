@@ -236,7 +236,14 @@ startupHpc(void)
     sprintf(tixFilename, "%s.tix", prog_name);
   }
 
-  if (init_open(__rts_fopen(tixFilename,"r"))) {
+  if ((RtsFlags.HpcFlags.readTixFile == HPC_YES_IMPLICIT) && init_open(__rts_fopen(tixFilename,"r"))) {
+    fprintf(stderr,"Deprecation warning:\n"
+                   "I am reading in the existing tix file, and will add hpc info from this run to the existing data in that file.\n"
+                   "GHC 9.14 will cease looking for an existing tix file by default.\n"
+                   "If you positively want to add hpc info to the current tix file, use the RTS option --read-tix-file=yes.\n"
+                   "More information can be found in the accepted GHC proposal 612.\n");
+    readTix();
+  } else if ((RtsFlags.HpcFlags.readTixFile == HPC_YES_EXPLICIT) && init_open(__rts_fopen(tixFilename,"r"))) {
     readTix();
   }
 }

@@ -1,6 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.21.0.0 *TBA*
+  * Add a `readTixFile` field to the `HpcFlags` record in `GHC.RTS.Flags` ([CLC proposal #276](https://github.com/haskell/core-libraries-committee/issues/276))
   * Add the `MonadFix` instance for `(,) a`, similar to the one for `Writer a` ([CLC proposal #238](https://github.com/haskell/core-libraries-committee/issues/238))
   * Improve `toInteger :: Word32 -> Integer` on 64-bit platforms ([CLC proposal #259](https://github.com/haskell/core-libraries-committee/issues/259))
   * Make `flip` representation polymorphic ([CLC proposal #245](https://github.com/haskell/core-libraries-committee/issues/245))

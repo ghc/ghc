@@ -302,10 +302,26 @@ typedef struct _PAR_FLAGS {
   bool           setAffinity;    /* force thread affinity with CPUs */
 } PAR_FLAGS;
 
+/* Corresponds to the RTS flag `--read-tix-file=<yes|no>`.
+ * The accepted GHC proposal 612 introduced a one-release warning period
+ * during which we emit a warning if we read a .tix file and the flag
+ * isn't explicitly set. In order to distinguish between whether the flag
+ * was explicitly set or defaulted we need to use a tri-state variable.
+ */
+typedef enum _HPC_READ_FILE {
+    HPC_NO_EXPLICIT = 0,  /* The user has specified --read-tix-file=no */
+    HPC_YES_IMPLICIT = 1, /* The user hasn't specified an option and we emit
+                           * a warning when we read a tix file.
+                           */
+    HPC_YES_EXPLICIT = 2  /* The user has specified --read-tix-file=yes */
+  } HPC_READ_FILE;
+
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _HPC_FLAGS {
   bool           writeTixFile;   /* Whether the RTS should write a tix
                                     file at the end of execution */
+  HPC_READ_FILE  readTixFile;    /* Whether the RTS should read a tix
+                                    file at the beginning of execution */
 } HPC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

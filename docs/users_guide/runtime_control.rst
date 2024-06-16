@@ -1373,7 +1373,22 @@ and can be controlled by the following flags.
 .. index::
     single: RTS options, hpc
 
-.. rts-flag:: --write-tix-file
+.. rts-flag:: --read-tix-file=<yes|no>
+
+    :default: enabled
+    :since: 9.12
+
+    The RTS can be instructed to read a ``<program>.tix`` file during the startup
+    phase. The datastructures which accumulate the coverage information during
+    program execution are then initialized with the information from this file.
+    This option is useful for aggregating coverage information over multiple runs
+    of an executable.
+
+    The default for this flag is currently ``--read-tix-file=yes`` but will change
+    to ``-read-tix-file=no`` in a future version of GHC according to the accepted
+    `GHC proposal 612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
+
+.. rts-flag:: --write-tix-file=<yes|no>
 
     :default: enabled
     :since: 9.10
