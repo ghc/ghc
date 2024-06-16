@@ -7,6 +7,7 @@ module GHC.CmmToAsm.RV64.RegInfo
     canShortcut,
     shortcutStatics,
     shortcutJump,
+    JumpDest (..),
   )
 where
 
