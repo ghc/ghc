@@ -222,7 +222,7 @@ linearRegAlloc config entry_ids block_live sccs
       ArchAlpha      -> panic "linearRegAlloc ArchAlpha"
       ArchMipseb     -> panic "linearRegAlloc ArchMipseb"
       ArchMipsel     -> panic "linearRegAlloc ArchMipsel"
-      ArchRISCV64    -> go $ (frInitFreeRegs platform :: RV64.FreeRegs)
+      ArchRISCV64    -> go (frInitFreeRegs platform :: RV64.FreeRegs)
       ArchLoongArch64-> panic "linearRegAlloc ArchLoongArch64"
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
       ArchWasm32     -> panic "linearRegAlloc ArchWasm32"
