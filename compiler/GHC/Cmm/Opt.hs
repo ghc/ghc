@@ -49,6 +49,7 @@ constantFoldExprOpt e = wrapRecExpOpt f e
           CmmMachOp op' args' -> fromMaybe (CmmMachOp op' args') <$> cmmMachOpFoldOptM cfg op' args'
           e -> pure e
     f (CmmRegOff r 0) = pure (CmmReg r)
+    f (CmmLit (CmmInt x rep)) = pure (CmmLit $ CmmInt (narrowU rep x) rep)
     f e = pure e
 
 constantFoldExpr :: Platform -> CmmExpr -> CmmExpr
@@ -88,7 +89,7 @@ cmmMachOpFoldM _ (MO_VF_Broadcast lg _w) exprs =
     _ -> Nothing
 cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
   = Just $! case op of
-      MO_S_Neg _ -> CmmLit (CmmInt (-x) rep)
+      MO_S_Neg _ -> CmmLit (CmmInt (narrowS rep (-x)) rep)
       MO_Not _   -> CmmLit (CmmInt (complement x) rep)
 
         -- these are interesting: we must first narrow to the
@@ -164,9 +165,9 @@ cmmMachOpFoldM platform mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
         MO_S_Lt _ -> Just $! CmmLit (CmmInt (if x_s <  y_s then 1 else 0) (wordWidth platform))
         MO_S_Le _ -> Just $! CmmLit (CmmInt (if x_s <= y_s then 1 else 0) (wordWidth platform))
 
-        MO_Add r -> Just $! CmmLit (CmmInt (x + y) r)
-        MO_Sub r -> Just $! CmmLit (CmmInt (x - y) r)
-        MO_Mul r -> Just $! CmmLit (CmmInt (x * y) r)
+        MO_Add r -> Just $! CmmLit (CmmInt (narrowU r $ x + y) r)
+        MO_Sub r -> Just $! CmmLit (CmmInt (narrowS r $ x - y) r)
+        MO_Mul r -> Just $! CmmLit (CmmInt (narrowU r $ x * y) r)
         MO_U_Quot r | y /= 0 -> Just $! CmmLit (CmmInt (x_u `quot` y_u) r)
         MO_U_Rem  r | y /= 0 -> Just $! CmmLit (CmmInt (x_u `rem`  y_u) r)
         MO_S_Quot r | y /= 0 -> Just $! CmmLit (CmmInt (x_s `quot` y_s) r)
@@ -176,7 +177,7 @@ cmmMachOpFoldM platform mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
         MO_Or    r -> Just $! CmmLit (CmmInt (x .|. y) r)
         MO_Xor   r -> Just $! CmmLit (CmmInt (x `xor` y) r)
 
-        MO_Shl   r -> Just $! CmmLit (CmmInt (x   `shiftL` fromIntegral y) r)
+        MO_Shl   r -> Just $! CmmLit (CmmInt (narrowU r $ x   `shiftL` fromIntegral y) r)
         MO_U_Shr r -> Just $! CmmLit (CmmInt (x_u `shiftR` fromIntegral y) r)
         MO_S_Shr r -> Just $! CmmLit (CmmInt (x_s `shiftR` fromIntegral y) r)
 

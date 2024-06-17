@@ -1,0 +1,12 @@
+#include "Cmm.h"
+
+func(W_ buffer) {
+  I8[buffer]   = %lobits8(255 + 45);
+  I8[buffer+(1)] = %lobits8(310 - 10);
+  I8[buffer+(2)] = %lobits8(30  * 10);
+  I8[buffer+(3)] = %lobits8(150 << 1);
+  // This one comes from test-primops
+  I64[buffer+(4)] = %zx64(((1 :: bits16) & ((1 :: bits16) & (((516 :: bits16) * (154 :: bits16)) + bits16[buffer + (0 :: W_)]))));
+  return(1);
+}
+
