@@ -910,10 +910,10 @@ codeblockHighlight indent = DocCodeBlockHighlight <$> pHighlight
         <*> pLang
         <*> (intercalate "\n" <$> Parsec.manyTill pCodeLine pBlockEnd)
 
-    pLang :: Parser String
+    pLang :: Parser (Maybe String)
     pLang =
       skipHorizontalSpace
-        *> Parsec.many1 Parsec.alphaNum
+        *> optional (Parsec.many1 Parsec.alphaNum)
         <* skipHorizontalSpace
         <* Parsec.newline
 

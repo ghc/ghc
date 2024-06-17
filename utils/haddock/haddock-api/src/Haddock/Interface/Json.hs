@@ -155,7 +155,7 @@ jsonDoc (DocCodeBlockHighlight hl) = jsonObject
     ]
   where
     jsonHighlight Highlight{..} = jsonObject
-        [ ("highlightLanguage", jsonString highlightLanguage)
+        [ ("highlightLanguage", jsonMaybe jsonString highlightLanguage)
         , ("highlightContent", jsonString highlightContent)
         ]
 

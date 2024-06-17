@@ -110,7 +110,7 @@ data Table id = Table
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Highlight = Highlight
-  { highlightLanguage :: String
+  { highlightLanguage :: Maybe String
   , highlightContent  :: String
   }
   deriving (Eq, Show)
