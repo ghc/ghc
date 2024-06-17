@@ -5,7 +5,5 @@ include $(TOP)/mk/test.mk
 T24384:
 	mkdir -p lib
 	mv B.hs lib/
-	'$(TEST_HC)' -M A.hs lib/B.hs C.hs D.hs E.hs -dep-json dep.json -opt-json opt.json -include-pkg-deps -include-cpp-deps -outputdir . -package containers
+	'$(TEST_HC)' -M A.hs lib/B.hs C.hs D.hs E.hs -dep-json dep.json -include-pkg-deps -include-cpp-deps -outputdir . -package containers
 	cat dep.json
-	echo ''
-	cat opt.json

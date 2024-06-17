@@ -112,7 +112,7 @@ doMkDependHS srcs = do
     hsc_env <- getSession
     root <- liftIO getCurrentDirectory
     let excl_mods = depExcludeMods dflags
-    mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files) (mkd_dep_json files) (mkd_opt_json files)) sorted
+    mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files) (mkd_dep_json files)) sorted
 
     -- If -ddump-mod-cycles, show cycles in the module graph
     liftIO $ dumpModCycles logger module_graph
@@ -134,8 +134,6 @@ data MkDepFiles
             mkd_make_hdl  :: Maybe Handle,      -- Handle for the open makefile
              -- | Output interface for the -dep-json file
             mkd_dep_json  :: !(Maybe (JsonOutput DepJSON)),
-             -- | Output interface for the -opt-json file
-            mkd_opt_json  :: !(Maybe (JsonOutput OptJSON)),
             mkd_tmp_file  :: FilePath,          -- Name of the temporary file
             mkd_tmp_hdl   :: Handle }           -- Handle of the open temporary file
 
@@ -180,14 +178,11 @@ beginMkDependHS logger tmpfs dflags = do
 
   dep_json_ref <- mkJsonOutput initDepJSON (depJSON dflags)
 
-  opt_json_ref <- mkJsonOutput initOptJSON (optJSON dflags)
-
         -- write the magic marker into the tmp file
   hPutStrLn tmp_hdl depStartMarker
 
   return (MkDep { mkd_make_file = makefile, mkd_make_hdl = mb_make_hdl,
                   mkd_dep_json = dep_json_ref,
-                  mkd_opt_json = opt_json_ref,
                   mkd_tmp_file  = tmp_file, mkd_tmp_hdl  = tmp_hdl})
 
 -----------------------------------------------------------------
@@ -202,7 +197,6 @@ processDeps :: DynFlags
             -> FilePath
             -> Handle           -- Write dependencies to here
             -> Maybe (JsonOutput DepJSON)
-            -> Maybe (JsonOutput OptJSON)
             -> SCC ModuleGraphNode
             -> IO ()
 -- Write suitable dependencies to handle
@@ -220,28 +214,26 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps dflags _ _ _ _ _ _ (CyclicSCC nodes)
+processDeps dflags _ _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwGhcExceptionIO $ ProgramError $
       showSDoc dflags $ GHC.cyclicModuleErr nodes
 
-processDeps dflags _ _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
+processDeps dflags _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
   =     -- There shouldn't be any backpack instantiations; report them as well
     throwGhcExceptionIO $ ProgramError $
       showSDoc dflags $
         vcat [ text "Unexpected backpack instantiation in dependency graph while constructing Makefile:"
              , nest 2 $ ppr node ]
-processDeps _dflags _ _ _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
+processDeps _dflags_ _ _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
 
-processDeps dflags hsc_env excl_mods root hdl m_dep_json m_opt_json (AcyclicSCC (ModuleNode _ node)) = do
+processDeps dflags hsc_env excl_mods root hdl m_dep_json (AcyclicSCC (ModuleNode _ node)) = do
   pp <- preprocessor
   deps <- fmap concat $ sequence $
     [cpp_deps | depIncludeCppDeps dflags] ++ [
       import_deps IsBoot (ms_srcimps node),
       import_deps NotBoot (ms_imps node)
     ]
-  -- TODO write options to dep json?
-  updateJson m_opt_json (updateOptJSON src_file (ms_opts node))
   updateJson m_dep_json (updateDepJSON include_pkg_deps pp dep_node deps)
   writeDependencies include_pkg_deps root hdl extra_suffixes dep_node deps
   where
@@ -254,7 +246,8 @@ processDeps dflags hsc_env excl_mods root hdl m_dep_json m_opt_json (AcyclicSCC 
         dn_src = src_file,
         dn_obj = msObjFilePath node,
         dn_hi = msHiFilePath node,
-        dn_boot = isBootSummary node
+        dn_boot = isBootSummary node,
+        dn_options = Set.fromList (ms_opts node)
       }
 
     preprocessor
@@ -414,7 +407,7 @@ endMkDependHS :: Logger -> MkDepFiles -> IO ()
 
 endMkDependHS logger
    (MkDep { mkd_make_file = makefile, mkd_make_hdl = makefile_hdl,
-            mkd_dep_json, mkd_opt_json,
+            mkd_dep_json,
             mkd_tmp_file = tmp_file, mkd_tmp_hdl = tmp_hdl })
   = do
   -- write the magic marker into the tmp file
@@ -441,7 +434,6 @@ endMkDependHS logger
   -- Write the dependency and option data to a json file if the corresponding
   -- flags were specified.
   writeJsonOutput mkd_dep_json
-  writeJsonOutput mkd_opt_json
 
 
 -----------------------------------------------------------------

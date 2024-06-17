@@ -330,7 +330,6 @@ data DynFlags = DynFlags {
   depExcludeMods        :: [ModuleName],
   depSuffixes           :: [String],
   depJSON               :: !(Maybe FilePath),
-  optJSON               :: !(Maybe FilePath),
 
   --  Package flags
   packageDBFlags        :: [PackageDBFlag],
@@ -651,7 +650,6 @@ defaultDynFlags mySettings =
         depExcludeMods    = [],
         depSuffixes       = [],
         depJSON           = Nothing,
-        optJSON           = Nothing,
         -- end of ghc -M values
         ghcVersionFile = Nothing,
         haddockOptions = Nothing,

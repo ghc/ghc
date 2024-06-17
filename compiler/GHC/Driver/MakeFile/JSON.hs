@@ -16,9 +16,6 @@ module GHC.Driver.MakeFile.JSON
     Dep (..),
     initDepJSON,
     updateDepJSON,
-    OptJSON,
-    initOptJSON,
-    updateOptJSON,
   )
 where
 
@@ -37,7 +34,6 @@ import GHC.Unit.Types (unitIdString)
 import GHC.Utils.Json
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import System.FilePath
 
 --------------------------------------------------------------------------------
 -- Output helpers
@@ -53,8 +49,8 @@ writeJSONFile doc p = do
 --------------------------------------------------------------------------------
 
 -- | Resources for a json dump option, used in "GHC.Driver.MakeFile".
--- The flags @-dep-json@ and @-opt-json@ add an additional output target for
--- dependency diagnostics.
+-- The flag @-dep-json@ add an additional output target for dependency
+-- diagnostics.
 data JsonOutput a =
   JsonOutput {
     -- | This ref is updated in @processDeps@ incrementally, using a
@@ -101,7 +97,8 @@ data DepNode =
     dn_src :: FilePath,
     dn_obj :: FilePath,
     dn_hi :: FilePath,
-    dn_boot :: IsBootInterface
+    dn_boot :: IsBootInterface,
+    dn_options :: Set.Set String
   }
 
 data Dep =
@@ -130,6 +127,7 @@ data Deps =
     modules :: (Set.Set ModuleName, Set.Set ModuleName),
     packages :: PackageDeps,
     cpp :: Set.Set FilePath,
+    options :: Set.Set String,
     preprocessor :: Maybe FilePath
   }
   deriving stock (Generic)
@@ -146,6 +144,7 @@ instance ToJson DepJSON where
         ("modules-boot", array (snd modules) moduleNameString),
         ("packages", JSArray [package unit_id name mods | ((name, unit_id), mods) <- Map.toList packages]),
         ("cpp", array cpp id),
+        ("options", array options id),
         ("preprocessor", maybe JSNull JSString preprocessor)
       ])
       | (target, Deps {packages = PackageDeps packages, ..}) <- Map.toList m
@@ -183,7 +182,12 @@ updateDepJSON include_pkgs preprocessor DepNode {..} deps =
   where
     payload = node_data Semigroup.<> foldMap dep deps
 
-    node_data = mempty {sources = Set.singleton dn_src, preprocessor}
+    node_data =
+      mempty {
+        sources = Set.singleton dn_src,
+        preprocessor,
+        options = dn_options
+      }
 
     dep = \case
       DepHi {dep_mod, dep_local, dep_unit, dep_boot}
@@ -204,23 +208,3 @@ updateDepJSON include_pkgs preprocessor DepNode {..} deps =
 
       DepCpp {dep_path} ->
         mempty {cpp = Set.singleton dep_path}
-
---------------------------------------------------------------------------------
--- Payload for -opt-json
---------------------------------------------------------------------------------
-
-newtype OptJSON = OptJSON (Map.Map FilePath [String])
-
-instance ToJson OptJSON where
-  json (OptJSON m) =
-    JSObject
-      [ (src_file, JSArray [JSString opt | opt <- opts])
-        | (src_file, opts) <- Map.toList m
-      ]
-
-initOptJSON :: IO (IORef OptJSON)
-initOptJSON = newIORef $ OptJSON Map.empty
-
-updateOptJSON :: FilePath -> [String] -> OptJSON -> OptJSON
-updateOptJSON src_file opts (OptJSON m0) =
-  OptJSON $ Map.insert (normalise src_file) opts m0
