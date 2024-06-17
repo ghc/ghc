@@ -300,8 +300,6 @@ import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Cmm.Config (CmmConfig)
-import GHC.Cmm.UniqueRenamer
-import Data.Bifunctor
 
 
 {- **********************************************************************
@@ -2087,7 +2085,6 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
                                        $ parseCmmFile cmmpConfig cmm_mod home_unit filename
                   let msgs = warns `unionMessages` errs
                   return (GhcPsMessage <$> msgs, cmm)
-
     liftIO $ do
         putDumpFileMaybe logger Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
 
@@ -2097,10 +2094,8 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         -- Re-ordering here causes breakage when booting with C backend because
         -- in C we must declare before use, but SRT algorithm is free to
         -- re-order [A, B] (B refers to A) when A is not CAFFY and return [B, A]
-        (rn_mapping, cmmgroup) <-
-          second concat <$> mapAccumLM (\rn_mapping cmm -> snd <$> cmmPipeline logger cmm_config (emptySRT cmm_mod) rn_mapping [cmm]) emptyDetUFM cmm
-
-        debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
+        cmmgroup <-
+          concatMapM (\cmm -> snd <$> cmmPipeline logger cmm_config (emptySRT cmm_mod) [cmm]) cmm
 
         unless (null cmmgroup) $
           putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm"
@@ -2198,10 +2193,9 @@ doCodeGen hsc_env this_mod denv data_tycons
 
         pipeline_stream :: Stream IO CmmGroupSRTs CmmCgInfos
         pipeline_stream = do
-          ((mod_srt_info, ipes, ipe_stats, rn_mapping), lf_infos) <-
+          ((mod_srt_info, ipes, ipe_stats), lf_infos) <-
             {-# SCC "cmmPipeline" #-}
-            Stream.mapAccumL_ (pipeline_action logger cmm_config) (emptySRT this_mod, M.empty, mempty, emptyDetUFM) ppr_stream1
-          liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
+            Stream.mapAccumL_ (pipeline_action logger cmm_config) (emptySRT this_mod, M.empty, mempty) ppr_stream1
           let nonCaffySet = srtMapNonCAFs (moduleSRTMap mod_srt_info)
           cmmCgInfos <- generateCgIPEStub hsc_env this_mod denv (nonCaffySet, lf_infos, ipes, ipe_stats)
           return cmmCgInfos
@@ -2209,11 +2203,11 @@ doCodeGen hsc_env this_mod denv data_tycons
         pipeline_action
           :: Logger
           -> CmmConfig
-          -> (ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats, DetUniqFM)
+          -> (ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
           -> CmmGroup
-          -> IO ((ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats, DetUniqFM), CmmGroupSRTs)
-        pipeline_action logger cmm_config (mod_srt_info, ipes, stats, detRnEnv) cmm_group = do
-          (mod_srt_info', (rn_mapping, cmm_srts)) <- cmmPipeline logger cmm_config mod_srt_info detRnEnv cmm_group
+          -> IO ((ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats), CmmGroupSRTs)
+        pipeline_action logger cmm_config (mod_srt_info, ipes, stats) cmm_group = do
+          (mod_srt_info', cmm_srts) <- cmmPipeline logger cmm_config mod_srt_info cmm_group
 
           -- If -finfo-table-map is enabled, we precompute a map from info
           -- tables to source locations. See Note [Mapping Info Tables to Source
@@ -2224,7 +2218,7 @@ doCodeGen hsc_env this_mod denv data_tycons
             else
               return (ipes, stats)
 
-          return ((mod_srt_info', ipes', stats', rn_mapping), cmm_srts)
+          return ((mod_srt_info', ipes', stats'), cmm_srts)
 
         dump2 a = do
           unless (null a) $
