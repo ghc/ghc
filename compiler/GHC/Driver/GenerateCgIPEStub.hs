@@ -35,6 +35,7 @@ import GHC.Unit.Types (Module, moduleName)
 import GHC.Unit.Module (moduleNameString)
 import qualified GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable (ppr)
+import GHC.Cmm.UniqueRenamer (emptyDetUFM)
 
 {-
 Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
@@ -211,7 +212,7 @@ generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesW
   let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
       ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv')
 
-  (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) ipeCmmGroup
+  (_, (_, ipeCmmGroupSRTs)) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) emptyDetUFM ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs
 
   ipeStub <-

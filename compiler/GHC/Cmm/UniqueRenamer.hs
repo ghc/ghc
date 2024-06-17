@@ -76,7 +76,7 @@ renameDetUniq uq = do
       return det_uniq
 
 -- Rename local symbols deterministically (in order of appearance)
-detRenameUniques :: DetUniqFM -> RawCmmGroup -> (DetUniqFM, RawCmmGroup)
+detRenameUniques :: DetUniqFM -> CmmGroup -> (DetUniqFM, CmmGroup)
 detRenameUniques dufm group = swap $ runState (mapM uniqRename group) dufm
 
 -- The most important function here, which does the actual renaming.
@@ -112,11 +112,32 @@ instance UniqRenamable CmmTickScope where
 
 -- * Traversals from here on out
 
+-- ROMES:TODO: Delete RawCmmStatics instanceS?
 instance UniqRenamable (GenCmmDecl RawCmmStatics (LabelMap RawCmmStatics) CmmGraph) where
   uniqRename (CmmProc h lbl regs g)
     = CmmProc <$> uniqRename h <*> uniqRename lbl <*> mapM uniqRename regs <*> uniqRename g
   uniqRename (CmmData sec d)
     = CmmData <$> uniqRename sec <*> uniqRename d
+
+instance UniqRenamable (GenCmmDecl CmmStatics CmmTopInfo CmmGraph) where
+  uniqRename (CmmProc h lbl regs g)
+    = CmmProc <$> uniqRename h <*> uniqRename lbl <*> mapM uniqRename regs <*> uniqRename g
+  uniqRename (CmmData sec d)
+    = CmmData <$> uniqRename sec <*> uniqRename d
+
+instance UniqRenamable CmmTopInfo where
+  uniqRename TopInfo{info_tbls, stack_info}
+    = TopInfo <$> uniqRename info_tbls <*> pure stack_info
+
+instance UniqRenamable CmmStatics where
+  uniqRename (CmmStatics clbl info ccs lits1 lits2)
+    = CmmStatics <$> uniqRename clbl <*> uniqRename info <*> pure ccs <*> mapM uniqRename lits1 <*> mapM uniqRename lits2
+  uniqRename (CmmStaticsRaw lbl sts)
+    = CmmStaticsRaw <$> uniqRename lbl <*> mapM uniqRename sts
+
+instance UniqRenamable CmmInfoTable where
+  uniqRename CmmInfoTable{cit_lbl, cit_rep, cit_prof, cit_srt, cit_clo}
+      = CmmInfoTable <$> uniqRename cit_lbl <*> pure cit_rep <*> pure cit_prof <*> uniqRename cit_srt <*> pure cit_clo
 
 instance UniqRenamable Section where
   uniqRename (Section ty lbl) = Section ty <$> uniqRename lbl
