@@ -16,7 +16,7 @@
 --
 -- @since 4.9.0.0
 
-module GHC.ExecutionStack.Internal (
+module GHC.ExecutionStack.Internal {-# DEPRECATED "This module will be removed from base in the next version (v4.22)" #-} (
   -- * Internal
     Location (..)
   , SrcLoc (..)

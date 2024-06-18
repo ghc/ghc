@@ -26,7 +26,7 @@
 --
 -- @since 4.16.0.0
 
-module GHC.TypeLits.Internal
+module GHC.TypeLits.Internal {-# DEPRECATED "This module will be removed from base in the next version (v4.22)" #-}
     (Symbol,
      CmpSymbol,
      CmpChar
