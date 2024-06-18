@@ -33,7 +33,7 @@ common lib-defaults
   default-language: Haskell2010
 
   build-depends:
-    , base         >= 4.10     && < 4.20
+    , base         >= 4.10     && < 4.21
     , containers   ^>= 0.4.2.1 || ^>= 0.5.0.0 || ^>= 0.6.0.1 || ^>= 0.7
     , text         ^>= 1.2.3.0 || ^>= 2.0 || ^>= 2.1
     , parsec       ^>= 3.1.13.0
@@ -79,9 +79,9 @@ test-suite spec
     Documentation.Haddock.Parser.Identifier
 
   build-depends:
-    , base-compat  ^>= 0.12.0 || ^>= 0.13.0
-    , QuickCheck   ^>= 2.11  || ^>= 2.13.2 || ^>= 2.14
-    , deepseq      ^>= 1.3.0.0 || ^>= 1.4.0.0 || ^>=1.5.0.0
+    , base-compat  >= 0.12.0 && <0.15.0
+    , QuickCheck   >= 2.11 && <2.16
+    , deepseq      >= 1.3.0.0 && <1.6.0.0
 
   -- NB: build-depends & build-tool-depends have independent
   --     install-plans, so it's best to limit to a single major
@@ -106,8 +106,8 @@ test-suite fixtures
     , base
 
       -- extra dependencies
-    , base-compat           ^>= 0.12.0 || ^>=0.13.0
+    , base-compat
     , directory             ^>= 1.3.0.2
-    , filepath              ^>= 1.4.1.2
+    , filepath              >= 1.4 && <1.6
     , optparse-applicative  >= 0.15 && < 0.19
     , tree-diff             ^>= 0.2 || ^>= 0.3
