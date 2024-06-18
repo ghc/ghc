@@ -1146,12 +1146,15 @@ callishMachOps platform = listToUFM $
         ( "prefetch0", (MO_Prefetch_Data 0,)),
         ( "prefetch1", (MO_Prefetch_Data 1,)),
         ( "prefetch2", (MO_Prefetch_Data 2,)),
-        ( "prefetch3", (MO_Prefetch_Data 3,))
+        ( "prefetch3", (MO_Prefetch_Data 3,)),
+
+        ( "bswap16", (MO_BSwap W16,) ),
+        ( "bswap32", (MO_BSwap W32,) ),
+        ( "bswap64", (MO_BSwap W64,) )
     ] ++ concat
     [ allWidths "popcnt" MO_PopCnt
     , allWidths "pdep" MO_Pdep
     , allWidths "pext" MO_Pext
-    , allWidths "bswap" MO_BSwap
     , allWidths "cmpxchg" MO_Cmpxchg
     , allWidths "xchg" MO_Xchg
     , allWidths "load_relaxed" (\w -> MO_AtomicRead w MemOrderAcquire)
