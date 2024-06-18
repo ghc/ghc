@@ -67,6 +67,11 @@ import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import Data.IORef
 import GHC.Utils.Panic
+import GHC.Cmm.UniqueRenamer
+import Data.Bifunctor
+import Control.Monad.Trans.State (runState)
+import Data.List (mapAccumL)
+import Data.Tuple (swap)
 
 codeGen :: Logger
         -> TmpFs
@@ -79,6 +84,7 @@ codeGen :: Logger
         -> Stream IO CmmGroup ModuleLFInfos       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
+-- romes:TODO: it looks like we could do a lot of this in parallel...
 codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
@@ -86,18 +92,37 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
               -- we would need to add a state monad layer which regresses
               -- allocations by 0.5-2%.
         ; cgref <- liftIO $ initC >>= \s -> newIORef s
+        ; uniqRnRef <- liftIO $ newIORef emptyDetUFM
+        ; let fstate = initFCodeState $ stgToCmmPlatform cfg
         ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
                 (a, cmm) <- liftIO . withTimingSilent logger (text "STG -> Cmm") (`seq` ()) $ do
-                         st <- readIORef cgref
-                         let fstate = initFCodeState $ stgToCmmPlatform cfg
-                         let (a,st') = runC cfg fstate st (getCmm fcode)
+                         st0 <- readIORef cgref
 
-                         -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
-                         -- a big space leak.  DO NOT REMOVE!
-                         -- This is observed by the #3294 test
-                         writeIORef cgref $! (st'{ cgs_tops = nilOL, cgs_stmts = mkNop })
-                         return a
+                         -- To produce deterministic object code, we alpha-rename all Uniques to deterministic uniques before Cmm linting.
+                         -- From here on out, the backend code generation can't use (non-deterministic) Uniques, or risk producing non-deterministic code.
+                         -- For example, the fix-up action in the ASM NCG should use determinist names for potential new blocks it has to create.
+                         -- Therefore, in the ASM NCG `NatM` Monad we use a deterministic `UniqSuply` (which won't be shared about multiple threads)
+                         -- TODO: Put these all into notes carefully organized
+                         rnm0 <- liftIO $ readIORef uniqRnRef
+
+                         let
+                           rn_fcode = second (detRenameUniques rnm0) <$> getCmm fcode -- todo: if gopt Opt_DeterministicObjects dflags
+
+                           ((a, (rnm1, cmm)),st1) = runC cfg fstate st0 rn_fcode
+
+                           -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
+                           -- a big space leak.  DO NOT REMOVE!
+                           -- This is observed by the #3294 test
+                           st2 = st1{ cgs_tops = nilOL, cgs_stmts = mkNop }
+
+                           -- -- Rename after stubbing, to do less work.
+                           -- (st3, rnm2) = runState (uniqRename st2) rnm1
+
+                         writeIORef cgref $! st2
+                         writeIORef uniqRnRef $! rnm1
+
+                         return (a, cmm)
                 yield cmm
                 return a
 
@@ -123,7 +148,8 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
         ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (UsageSite (stgToCmmThisModule cfg) k) dc)) (nonDetEltsUFM denv)
 
         ; final_state <- liftIO (readIORef cgref)
-        ; let cg_id_infos = cgs_binds final_state
+        ; let cg_id_infos0 = cgs_binds final_state
+        ; rn_mapping0 <- liftIO $ readIORef uniqRnRef
 
           -- See Note [Conveying CAF-info and LFInfo between modules] in
           -- GHC.StgToCmm.Types
@@ -131,13 +157,16 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
                 where
                   !name = idName (cg_id info)
                   !lf = cg_lf info
+              (rn_mapping1, cg_id_infos1)
+                = mapAccumL (\m c -> swap $ runState (uniqRename c) m) rn_mapping0 (nonDetEltsUFM cg_id_infos0)
 
               !generatedInfo
                 | stgToCmmOmitIfPragmas cfg
                 = emptyNameEnv
                 | otherwise
-                = mkNameEnv (Prelude.map extractInfo (nonDetEltsUFM cg_id_infos))
+                = mkNameEnv (Prelude.map extractInfo cg_id_infos1)
 
+        ; liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping1)
         ; return generatedInfo
         }
 
