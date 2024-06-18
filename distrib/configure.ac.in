@@ -151,6 +151,11 @@ FP_HSCPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 AC_SUBST([HaskellCPPCmd])
 AC_SUBST([HaskellCPPArgs])
 
+# --with-js-cpp/--with-js-cpp-flags
+FP_JSCPP_CMD_WITH_ARGS(JavaScriptCPPCmd, JavaScriptCPPArgs)
+AC_SUBST([JavaScriptCPPCmd])
+AC_SUBST([JavaScriptCPPArgs])
+
 # --with-cmm-cpp/--with-cmm-cpp-flags
 FP_CMM_CPP_CMD_WITH_ARGS([$CC], [CmmCPPCmd], [CmmCPPArgs], [CmmCPPSupportsG0])
 AC_SUBST([CmmCPPCmd])
