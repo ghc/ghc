@@ -293,6 +293,9 @@ AC_SUBST(TargetHasIdentDirective)
 GHC_GNU_NONEXEC_STACK
 AC_SUBST(TargetHasGnuNonexecStack)
 
+GHC_LLVM_TARGET_SET_VAR
+AC_SUBST(LlvmTarget)
+
 dnl ** See whether cc supports --target=<triple> and set
 dnl CONF_CC_OPTS_STAGE[12] accordingly.
 FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE1], [CONF_CXX_OPTS_STAGE1])
