@@ -34,6 +34,7 @@ import GHC.Unit.Types (unitIdString)
 import GHC.Utils.Json
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import System.FilePath (normalise)
 
 --------------------------------------------------------------------------------
 -- Output helpers
@@ -139,7 +140,7 @@ instance ToJson DepJSON where
   json (DepJSON m) =
     JSObject [
       (moduleNameString target, JSObject [
-        ("sources", array sources id),
+        ("sources", array sources normalise),
         ("modules", array (fst modules) moduleNameString),
         ("modules-boot", array (snd modules) moduleNameString),
         ("packages", JSArray [package unit_id name mods | ((name, unit_id), mods) <- Map.toList packages]),
