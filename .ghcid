@@ -1,5 +1,5 @@
---command sh -c "HADRIAN_ARGS=-j ./hadrian/ghci -j"
+--command sh -c "HADRIAN_ARGS=-j exec ./hadrian/ghci-multi -j"
 --reload compiler
 --reload ghc
 --reload includes
---restart hadrian/ghci
+--restart hadrian/ghci-multi
