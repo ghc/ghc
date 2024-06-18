@@ -1,4 +1,7 @@
-module GHC.CmmToAsm.RV64.Cond where
+module GHC.CmmToAsm.RV64.Cond
+  ( Cond (..),
+  )
+where
 
 import GHC.Prelude hiding (EQ)
 
@@ -37,22 +40,3 @@ data Cond
   | -- | floating point instruction @fgt@
     FGT
   deriving (Eq, Show)
-
--- | Negate a condition.
---
--- This is useful to e.g. construct far branches from usual branches.
-negateCond :: Cond -> Cond
-negateCond EQ = NE
-negateCond NE = EQ
-negateCond SLT = SGE
-negateCond SLE = SGT
-negateCond SGE = SLT
-negateCond SGT = SLE
-negateCond ULT = UGE
-negateCond ULE = UGT
-negateCond UGE = ULT
-negateCond UGT = ULE
-negateCond FLT = FGE
-negateCond FLE = FGT
-negateCond FGE = FLT
-negateCond FGT = FLE

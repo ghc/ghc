@@ -512,29 +512,13 @@ pprInstr platform instr = case instr of
   B l | isLabel l -> line $ text "\tjal" <+> pprOp platform x0 <> comma <+> getLabel platform l
   B (TReg r)      -> line $ text "\tjalr" <+> text "x0" <> comma <+> pprReg W64 r <> comma <+> text "0"
 
-  B_FAR bid  -> lines_ [ text "\tla" <+> pprOp platform ip <> comma <+> pprBlockId platform bid
-                            , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0" ]
-
-  BL l _ _ | isLabel l-> line $ text "\tcall" <+> getLabel platform l
-  BL (TReg r)     _ _ -> line $ text "\tjalr" <+> text "x1" <> comma <+> pprReg W64 r <> comma <+> text "0"
+  BL l _ | isLabel l-> line $ text "\tcall" <+> getLabel platform l
+  BL (TReg r) _ -> line $ text "\tjalr" <+> text "x1" <> comma <+> pprReg W64 r <> comma <+> text "0"
 
   BCOND c l r t | isLabel t ->
     line $ text "\t" <> pprBcond c <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
 
   BCOND _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
-
-  -- This is the far branches trick: Negate the condition and either do a
-  -- register based jump (ignoring the link result in register zero) or just
-  -- branch to the end of the block, jumping over the far jump instructions.
-  BCOND_FAR c l r b t | isLabel t ->
-    lines_ [ text "\t" <> pprBcond (negateCond c) <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform b <> text "far_branch_end"
-           , text "\tla" <+> pprOp platform ip <> comma <+> getLabel platform t
-           , text "\tjalr" <+> text "x0" <> comma <+> pprOp platform ip <> comma <+> text "0"
-           , text "\t" <> getLabel platform b <> text "far_branch_end" <> colon
-           ]
-
-  BCOND_FAR _ _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
-
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------

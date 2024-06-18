@@ -6,11 +6,11 @@
 module GHC.CmmToAsm.RV64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
+    , makeFarBranches
 )
 
 where
 
-import Control.Monad (mapAndUnzipM)
 import Data.Maybe
 import Data.Word
 import GHC.Cmm
@@ -55,6 +55,9 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Cmm.Dataflow.Label
+import GHC.Types.Unique.Supply
+import GHC.Utils.Monad
 
 -- For an overview of an NCG's structure, see Note [General layout of an NCG]
 
@@ -125,14 +128,17 @@ basicBlockCodeGen block = do
   let
         (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
 
-        mkBlocks (NEWBLOCK id) (instrs,blocks,statics)
-          = ([], BasicBlock id instrs : blocks, statics)
-        mkBlocks (LDATA sec dat) (instrs,blocks,statics)
-          = (instrs, blocks, CmmData sec dat:statics)
-        mkBlocks instr (instrs,blocks,statics)
-          = (instr:instrs, blocks, statics)
   return (BasicBlock id top : other_blocks, statics)
 
+mkBlocks :: Instr
+          -> ([Instr], [GenBasicBlock Instr], [GenCmmDecl RawCmmStatics h g])
+          -> ([Instr], [GenBasicBlock Instr], [GenCmmDecl RawCmmStatics h g])
+mkBlocks (NEWBLOCK id) (instrs,blocks,statics)
+  = ([], BasicBlock id instrs : blocks, statics)
+mkBlocks (LDATA sec dat) (instrs,blocks,statics)
+  = (instrs, blocks, CmmData sec dat:statics)
+mkBlocks instr (instrs,blocks,statics)
+  = (instr:instrs, blocks, statics)
 
 -- -----------------------------------------------------------------------------
 -- | Utilities
@@ -1495,7 +1501,7 @@ genCCall target dest_regs arg_regs bid = do
                        then 8 * (stackSpace' `div` 8 + 1)
                        else stackSpace'
 
-      (returnRegs, readResultsCode)   <- readResults allGpArgRegs allFpArgRegs dest_regs [] nilOL
+      readResultsCode   <- readResults allGpArgRegs allFpArgRegs dest_regs [] nilOL
 
       let moveStackDown 0 = toOL [ PUSH_STACK_FRAME
                                  , DELTA (-16) ]
@@ -1513,7 +1519,7 @@ genCCall target dest_regs arg_regs bid = do
       let code = call_target_code          -- compute the label (possibly into a register)
             `appOL` moveStackDown (stackSpace `div` 8)
             `appOL` passArgumentsCode      -- put the arguments into x0, ...
-            `snocOL` BL call_target passRegs returnRegs -- branch and link.
+            `snocOL` BL call_target passRegs  -- branch and link.
             `appOL` readResultsCode        -- parse the results into registers
             `appOL` moveStackUp (stackSpace `div` 8)
       return (code, Nothing)
@@ -1801,8 +1807,8 @@ genCCall target dest_regs arg_regs bid = do
 
     passArguments _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
 
-    readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM ([Reg], InstrBlock)
-    readResults _ _ [] accumRegs accumCode = return (accumRegs, accumCode)
+    readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM InstrBlock
+    readResults _ _ [] _ accumCode = return accumCode
     readResults [] _ _ _ _ = do
       platform <- getPlatform
       pprPanic "genCCall, out of gp registers when reading results" (pdoc platform target)
@@ -1830,3 +1836,220 @@ genCCall target dest_regs arg_regs bid = do
       let dst = getRegisterReg platform (CmmLocal dest_reg)
       let code = code_fx `appOL` op (OpReg w dst) (OpReg w reg_fx)
       return (code, Nothing)
+
+{- Note [RISCV64 far jumps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RISCV64 conditional jump instructions can only encode an offset of +/-4KiB
+(12bits) which is usually enough but can be exceeded in edge cases. In these
+cases we will replace:
+
+  b.cond <cond> foo
+
+with the sequence:
+
+  b.cond <cond> <lbl_true>
+  b <lbl_false>
+  <lbl_true>:
+  la reg foo
+  b reg
+  <lbl_false>:
+
+Compared to AArch64 the target label is loaded to a register, because
+unconditional jump instructions can only address +/-1MiB. The LA
+pseudo-instruction will be replaced by up to two real instructions, ensuring
+correct addressing.
+
+RISCV has many pseudo-instructions which emit more than one real instructions.
+Thus, our counting algorithm is approximative. (This could be optimized by
+either only using real instructions or accounting pseudo-instructions by their
+real size.)
+
+We make some simplifications in the name of performance which can result in overestimating
+jump <-> label offsets:
+
+* To avoid having to recalculate the label offsets once we replaced a jump we simply
+  assume all jumps will be expanded to a three instruction far jump sequence.
+* For labels associated with a info table we assume the info table is 64byte large.
+  Most info tables are smaller than that but it means we don't have to distinguish
+  between multiple types of info tables.
+
+In terms of implementation we walk the instruction stream at least once calculating
+label offsets, and if we determine during this that the functions body is big enough
+to potentially contain out of range jumps we walk the instructions a second time, replacing
+out of range jumps with the sequence of instructions described above.
+
+-}
+
+-- | A conditional jump to a far target
+--
+-- By loading the far target into a register for the jump, we can address the
+-- whole memory range.
+genCondFarJump :: (MonadUnique m) => Cond -> Operand -> Operand -> BlockId -> m InstrBlock
+genCondFarJump cond op1 op2 far_target = do
+  skip_lbl_id <- newBlockId
+  jmp_lbl_id <- newBlockId
+
+  -- TODO: We can improve this by inverting the condition
+  -- but it's not quite trivial since we don't know if we
+  -- need to consider float orderings.
+  -- So we take the hit of the additional jump in the false
+  -- case for now.
+  return
+    $ toOL
+      [ ann (text "Conditional far jump to: " <> ppr far_target)
+          $ BCOND cond op1 op2 (TBlock jmp_lbl_id),
+        B (TBlock skip_lbl_id),
+        NEWBLOCK jmp_lbl_id,
+        LDR II64 (OpReg W64 ipReg) (OpImm (ImmCLbl (blockLbl far_target))),
+        B (TReg ipReg),
+        NEWBLOCK skip_lbl_id
+      ]
+
+-- | An unconditional jump to a far target
+--
+-- By loading the far target into a register for the jump, we can address the
+-- whole memory range.
+genFarJump :: (MonadUnique m) => BlockId -> m InstrBlock
+genFarJump far_target =
+  return
+    $ toOL
+      [ ann (text "Unconditional far jump to: " <> ppr far_target)
+          $ LDR II64 (OpReg W64 ipReg) (OpImm (ImmCLbl (blockLbl far_target))),
+        B (TReg ipReg)
+      ]
+
+-- | An unconditional jump to a far target
+--
+-- By loading the far target into a register for the jump, we can address the
+-- whole memory range.
+genFarBranchAndLink :: (MonadUnique m) => BlockId -> [Reg] -> m InstrBlock
+genFarBranchAndLink far_target ps =
+  return
+    $ toOL
+      [ ann (text "Unconditional branch and link to: " <> ppr far_target)
+          $ LDR II64 (OpReg W64 ipReg) (OpImm (ImmCLbl (blockLbl far_target))),
+        BL (TReg ipReg) ps
+      ]
+
+-- See Note [RISCV64 far jumps]
+data BlockInRange = InRange | NotInRange BlockId
+
+-- See Note [RISCV64 far jumps]
+makeFarBranches :: Platform -> LabelMap RawCmmStatics -> [NatBasicBlock Instr]
+                -> UniqSM [NatBasicBlock Instr]
+makeFarBranches {- only used when debugging -} _platform statics basic_blocks = do
+  -- All offsets/positions are counted in multiples of 4 bytes (the size of RISCV64 instructions)
+  -- That is an offset of 1 represents a 4-byte/one instruction offset.
+  let (func_size, lblMap) = foldl' calc_lbl_positions (0, mapEmpty) basic_blocks
+  if func_size < max_jump_dist
+    then pure basic_blocks
+    else do
+      (_,blocks) <- mapAccumLM (replace_blk lblMap) 0 basic_blocks
+      pure $ concat blocks
+      -- pprTrace "lblMap" (ppr lblMap) $ basic_blocks
+
+  where
+    -- 2^11, 12 bit immediate with one bit is reserved for the sign
+    max_jump_dist = 2^(11::Int) - 1 :: Int
+    -- Currently all inline info tables fit into 64 bytes.
+    max_info_size     = 16 :: Int
+    long_bc_jump_size =  5 :: Int
+    long_b_jump_size = 2 :: Int
+
+    -- Replace out of range conditional jumps with unconditional jumps.
+    replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqSM (Int, [GenBasicBlock Instr])
+    replace_blk !m !pos (BasicBlock lbl instrs) = do
+      -- Account for a potential info table before the label.
+      let !block_pos = pos + infoTblSize_maybe lbl
+      (!pos', instrs') <- mapAccumLM (replace_jump m) block_pos instrs
+      let instrs'' = concat instrs'
+      -- We might have introduced new labels, so split the instructions into basic blocks again if neccesary.
+      let (top, split_blocks, no_data) = foldr mkBlocks ([],[],[]) instrs''
+      -- There should be no data in the instruction stream at this point
+      massert (null no_data)
+
+      let final_blocks = BasicBlock lbl top : split_blocks
+      pure (pos', final_blocks)
+
+    replace_jump :: LabelMap Int -> Int -> Instr -> UniqSM (Int, [Instr])
+    replace_jump !m !pos instr = do
+      case instr of
+        ANN ann instr -> do
+          (idx,instr':instrs') <- replace_jump m pos instr
+          pure (idx, ANN ann instr':instrs')
+        BCOND cond op1 op2 t
+          -> case target_in_range m t pos of
+              InRange -> pure (pos+long_bc_jump_size,[instr])
+              NotInRange far_target -> do
+                jmp_code <- genCondFarJump cond op1 op2 far_target
+                pure (pos+long_bc_jump_size, fromOL jmp_code)
+        B t
+          -> case target_in_range m t pos of
+              InRange -> pure (pos+long_b_jump_size,[instr])
+              NotInRange far_target -> do
+                jmp_code <- genFarJump far_target
+                pure (pos+long_b_jump_size, fromOL jmp_code)
+        J t
+          -> case target_in_range m t pos of
+              InRange -> pure (pos+long_b_jump_size,[instr])
+              NotInRange far_target -> do
+                jmp_code <- genFarJump far_target
+                pure (pos+long_b_jump_size, fromOL jmp_code)
+        BL t ps
+          -> case target_in_range m t pos of
+              InRange -> pure (pos+long_b_jump_size,[instr])
+              NotInRange far_target -> do
+                jmp_code <- genFarBranchAndLink far_target ps
+                pure (pos+long_b_jump_size, fromOL jmp_code)
+        instr
+          | isMetaInstr instr -> pure (pos,[instr])
+          | otherwise -> pure (pos+1, [instr])
+
+    target_in_range :: LabelMap Int -> Target -> Int -> BlockInRange
+    target_in_range m target src =
+      case target of
+        (TReg{}) -> InRange
+        (TBlock bid) -> block_in_range m src bid
+
+    block_in_range :: LabelMap Int -> Int -> BlockId -> BlockInRange
+    block_in_range m src_pos dest_lbl =
+      case mapLookup dest_lbl m of
+        Nothing       ->
+          pprTrace "not in range" (ppr dest_lbl) $
+            NotInRange dest_lbl
+        Just dest_pos -> if abs (dest_pos - src_pos) < max_jump_dist
+          then InRange
+          else NotInRange dest_lbl
+
+    calc_lbl_positions :: (Int, LabelMap Int) -> GenBasicBlock Instr -> (Int, LabelMap Int)
+    calc_lbl_positions (pos, m) (BasicBlock lbl instrs)
+      = let !pos' = pos + infoTblSize_maybe lbl
+        in foldl' instr_pos (pos',mapInsert lbl pos' m) instrs
+
+    instr_pos :: (Int, LabelMap Int) -> Instr -> (Int, LabelMap Int)
+    instr_pos (pos, m) instr =
+      case instr of
+        ANN _ann instr -> instr_pos (pos, m) instr
+        NEWBLOCK _bid -> panic "mkFarBranched - unexpected NEWBLOCK" -- At this point there should be no NEWBLOCK
+                                                                     -- in the instruction stream
+                                                                     -- (pos, mapInsert bid pos m)
+        COMMENT{} -> (pos, m)
+        instr
+          | Just jump_size <- is_expandable_jump instr -> (pos+jump_size, m)
+          | otherwise -> (pos+1, m)
+
+    infoTblSize_maybe bid =
+      case mapLookup bid statics of
+        Nothing           -> 0 :: Int
+        Just _info_static -> max_info_size
+
+    -- These jumps have a 12bit immediate as offset which is quite
+    -- limiting so we potentially have to expand them into
+    -- multiple instructions.
+    is_expandable_jump i = case i of
+      BCOND{} -> Just long_bc_jump_size
+      J (TBlock _) -> Just long_b_jump_size
+      B (TBlock _) -> Just long_b_jump_size
+      BL (TBlock _) _ -> Just long_b_jump_size
+      _ -> Nothing

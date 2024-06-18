@@ -28,10 +28,6 @@ import GHC.Utils.Panic
 import Data.Maybe
 
 import GHC.Stack
-import qualified Data.List.NonEmpty as NE
-import Data.Foldable
-import GHC.Cmm.Info (maxRetInfoTableSizeW)
-import GHC.Types.Unique.FM (listToUFM, lookupUFM)
 import GHC.Data.FastString (LexicalFastString)
 
 -- | Stack frame header size in bytes.
@@ -109,10 +105,8 @@ regUsageOfInstr platform instr = case instr of
   J t                      -> usage (regTarget t, [])
   J_TBL _ _ t              -> usage ([t], [])
   B t                      -> usage (regTarget t, [])
-  B_FAR _t                 -> usage ([], [])
   BCOND _ l r t            -> usage (regTarget t ++ regOp l ++ regOp r, [])
-  BCOND_FAR _ l r _ t        -> usage (regTarget t ++ regOp l ++ regOp r, [])
-  BL t ps _rs              -> usage (regTarget t ++ ps, callerSavedRegisters)
+  BL t ps                  -> usage (regTarget t ++ ps, callerSavedRegisters)
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
@@ -209,10 +203,8 @@ patchRegsOfInstr instr env = case instr of
     J t            -> J (patchTarget t)
     J_TBL ids mbLbl t    -> J_TBL ids mbLbl (env t)
     B t            -> B (patchTarget t)
-    B_FAR t            -> B_FAR t
-    BL t rs ts     -> BL (patchTarget t) rs ts
+    BL t ps          -> BL (patchTarget t) ps
     BCOND c o1 o2 t -> BCOND c (patchOp o1) (patchOp o2) (patchTarget t)
-    BCOND_FAR c o1 o2 b t -> BCOND_FAR c (patchOp o1) (patchOp o2) (patchTarget b) (patchTarget t)
 
     -- 5. Atomic Instructions --------------------------------------------------
     -- 6. Conditional Instructions ---------------------------------------------
@@ -257,10 +249,8 @@ isJumpishInstr instr = case instr of
   J {} -> True
   J_TBL {} -> True
   B {} -> True
-  B_FAR {} -> True
   BL {} -> True
   BCOND {} -> True
-  BCOND_FAR {} -> True
   _ -> False
 
 -- | Get the `BlockId`s of the jump destinations (if any)
@@ -269,10 +259,8 @@ jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (B_FAR t) = [t]
-jumpDestsOfInstr (BL t _ _) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (BL t _) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND _ _ _ t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (BCOND_FAR _ _ _ _ t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr _ = []
 
 -- | Change the destination of this (potential) jump instruction.
@@ -286,10 +274,8 @@ patchJumpInstr instr patchF =
     J (TBlock bid) -> J (TBlock (patchF bid))
     J_TBL ids mbLbl r -> J_TBL (map (fmap patchF) ids) mbLbl r
     B (TBlock bid) -> B (TBlock (patchF bid))
-    B_FAR bid -> B_FAR (patchF bid)
-    BL (TBlock bid) ps rs -> BL (TBlock (patchF bid)) ps rs
+    BL (TBlock bid) ps -> BL (TBlock (patchF bid)) ps
     BCOND c o1 o2 (TBlock bid) -> BCOND c o1 o2 (TBlock (patchF bid))
-    BCOND_FAR c o1 o2 b (TBlock bid) -> BCOND_FAR c o1 o2 b (TBlock (patchF bid))
     _ -> panic $ "patchJumpInstr: " ++ instrCon instr
 
 -- -----------------------------------------------------------------------------
@@ -596,12 +582,9 @@ data Instr
     -- | A `J` instruction with data for switch jump tables
     | J_TBL [Maybe BlockId] (Maybe CLabel) Reg
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
-    -- | pseudo-op for far branch targets
-    | B_FAR BlockId
-    | BL Target [Reg] [Reg] -- branch and link (e.g. set x30 to next pc, and branch)
+    | BL Target [Reg] -- branch and link (e.g. set x30 to next pc, and branch)
     | BCOND Cond Operand Operand Target   -- branch with condition. b.<cond>
     -- | pseudo-op for far branch targets
-    | BCOND_FAR Cond Operand Operand Target Target
 
     -- 8. Synchronization Instructions -----------------------------------------
     | DMBSY DmbType DmbType
@@ -661,10 +644,8 @@ instrCon i =
       J{} -> "J"
       J_TBL{} -> "J_TBL"
       B{} -> "B"
-      B_FAR{} -> "B_FAR"
       BL{} -> "BL"
       BCOND{} -> "BCOND"
-      BCOND_FAR{} -> "BCOND_FAR"
       DMBSY{} -> "DMBSY"
       FCVT{} -> "FCVT"
       SCVTF{} -> "SCVTF"
@@ -809,75 +790,3 @@ isFloatReg (RegReal (RealRegSingle i)) | i > 31 = True
 isFloatReg (RegVirtual (VirtualRegF _)) = True
 isFloatReg (RegVirtual (VirtualRegD _)) = True
 isFloatReg _ = False
-
-
--- | Making far branches
-
--- Conditional branch instructions can target labels in a range of +/- 4 KiB.
--- The assembler can transform this into a J instruction targeting +/- 1MiB.
--- There are rare cases where this is not enough (e.g. the Happy-generated
--- @Parser.hs@.) We need to manually transform these into register based jumps
--- using @ip@ (register reserved for calculations.) The trick is to invert the
--- condition, do a far jump in the fall-through case or a short jump when the
--- (inverted) condition is true.
-makeFarBranches ::
-  Platform ->
-  LabelMap RawCmmStatics ->
-  [NatBasicBlock Instr] ->
-  UniqSM [NatBasicBlock Instr]
-makeFarBranches _platform info_env blocks
-  | NE.last blockAddresses < nearLimit = pure blocks
-  | otherwise = pure $ zipWith handleBlock blockAddressList blocks
-  where
-    blockAddresses = NE.scanl (+) 0 $ map blockLen blocks
-    blockAddressList = toList blockAddresses
-    blockLen (BasicBlock _ instrs) = length instrs
-
-    handleBlock addr (BasicBlock id instrs) =
-      BasicBlock id (zipWith (makeFar id) [addr ..] instrs)
-
-    -- TODO: Use UniqSM to generate unique block ids.
-    makeFar :: BlockId -> Int -> Instr -> Instr
-    makeFar bid addr orig@(BCOND cond op1 op2 tgt@(TBlock tgtBid))
-      | abs (addr - targetAddr) >= nearLimit =
-          annotate addr targetAddr $
-            BCOND_FAR cond op1 op2 (TBlock bid) tgt
-      | otherwise =
-          annotate addr targetAddr orig
-      where
-        targetAddr = fromJust $ lookupUFM blockAddressMap tgtBid
-    makeFar _bid addr orig@(B (TBlock tgtBid))
-      | abs (addr - targetAddr) >= nearLimit =
-          annotate addr targetAddr $
-            B_FAR tgtBid
-      | otherwise =
-          annotate addr targetAddr orig
-      where
-        targetAddr = fromJust $ lookupUFM blockAddressMap tgtBid
-    makeFar bid addr (ANN desc other) = ANN desc $ makeFar bid addr other
-    makeFar _bid _ other = other
-
-    -- 262144 (2^20 / 4) instructions are allowed; let's keep some distance, as
-    -- we have pseudo-insns that are pretty-printed as multiple instructions,
-    -- and it's just not worth the effort to calculate things exactly as linker
-    -- relaxations are applied later (optimizing away our flaws.) The educated
-    -- guess here is that every instruction does not emit more than two in the
-    -- mean.
-    nearLimit = 131072 - mapSize info_env * maxRetInfoTableSizeW
-
-    blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddressList
-
-    -- We may want to optimize the limit in future. So, annotate the most
-    -- important values of the decision.
-    annotate :: Int -> Int -> Instr -> Instr
-    annotate addr targetAddr instr =
-      ANN
-        ( text (instrCon instr)
-            <+> text "targetAddr" <> colon
-            <+> int targetAddr <> comma
-            <+> text "offset" <> colon
-            <+> int (addr - targetAddr) <> comma
-            <+> text "nearLimit" <> colon
-            <+> int nearLimit
-        )
-        instr
