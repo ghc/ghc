@@ -88,6 +88,8 @@ import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Deps
 
+import qualified Data.ByteString as BS
+import Data.Traversable
 import Data.Function
 import Data.List ( sortBy )
 import Data.Ord
@@ -131,17 +133,19 @@ mkPartialIface hsc_env core_prog mod_details mod_summary
 -- CmmCgInfos is not available when not generating code (-fno-code), or when not
 -- generating interface pragmas (-fomit-interface-pragmas). See also
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> IO ModIface
-mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> [FilePath] -> IO ModIface
+mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos fos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
           = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
 
+    stub_objs <- for fos BS.readFile
+
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface{ mi_decls = decls }
+      addFingerprints hsc_env partial_iface{ mi_decls = decls, mi_stub_objs = stub_objs }
 
     -- Debug printing
     let unit_state = hsc_units hsc_env
@@ -238,7 +242,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                    docs mod_summary
                    mod_details
 
-          mkFullIface hsc_env partial_iface Nothing Nothing
+          mkFullIface hsc_env partial_iface Nothing Nothing []
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
