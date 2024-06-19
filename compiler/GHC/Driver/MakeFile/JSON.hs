@@ -27,10 +27,7 @@ import qualified Data.Set as Set
 import GHC.Data.FastString (unpackFS)
 import GHC.Generics (Generic, Generically (Generically))
 import GHC.Prelude
-import GHC.Unit (Module, ModuleName, UnitId, moduleName, moduleNameString, IsBootInterface (IsBoot))
-import GHC.Unit.Database (GenericUnitInfo (..))
-import GHC.Unit.Info (PackageName (PackageName), UnitInfo)
-import GHC.Unit.Types (unitIdString)
+import GHC.Unit
 import GHC.Utils.Json
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -89,7 +86,7 @@ writeJsonOutput =
     writeJSONFile payload json_path
 
 --------------------------------------------------------------------------------
--- Payload for -dep-json
+-- Types abstracting over json and Makefile
 --------------------------------------------------------------------------------
 
 data DepNode =
@@ -115,8 +112,12 @@ data Dep =
     dep_path :: FilePath
   }
 
+--------------------------------------------------------------------------------
+-- Payload for -dep-json
+--------------------------------------------------------------------------------
+
 newtype PackageDeps =
-  PackageDeps (Map.Map (String, UnitId) (Set.Set ModuleName))
+  PackageDeps (Map.Map (String, UnitId, PackageId) (Set.Set ModuleName))
   deriving newtype (Monoid)
 
 instance Semigroup PackageDeps where
@@ -143,7 +144,12 @@ instance ToJson DepJSON where
         ("sources", array sources normalise),
         ("modules", array (fst modules) moduleNameString),
         ("modules-boot", array (snd modules) moduleNameString),
-        ("packages", JSArray [package unit_id name mods | ((name, unit_id), mods) <- Map.toList packages]),
+        ("packages",
+          JSArray [
+            package unit_id name package_id mods |
+            ((name, unit_id, package_id), mods) <- Map.toList packages
+          ]
+        ),
         ("cpp", array cpp id),
         ("options", array options id),
         ("preprocessor", maybe JSNull JSString preprocessor)
@@ -151,10 +157,11 @@ instance ToJson DepJSON where
       | (target, Deps {packages = PackageDeps packages, ..}) <- Map.toList m
     ]
     where
-      package unit_id name mods =
+      package unit_id name (PackageId package_id) mods =
         JSObject [
           ("id", JSString (unitIdString unit_id)),
           ("name", JSString name),
+          ("package-id", JSString (unpackFS package_id)),
           ("modules", array mods moduleNameString)
         ]
 
@@ -201,7 +208,7 @@ updateDepJSON include_pkgs preprocessor DepNode {..} deps =
         | include_pkgs
         , Just unit <- dep_unit
         , let PackageName name = unitPackageName unit
-              key = (unpackFS name, unitId unit)
+              key = (unpackFS name, unitId unit, unitPackageId unit)
         -> mempty {packages = PackageDeps (Map.singleton key (Set.singleton (moduleName dep_mod)))}
 
         | otherwise
