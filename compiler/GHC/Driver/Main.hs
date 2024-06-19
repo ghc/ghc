@@ -292,6 +292,8 @@ import GHC.Types.TypeEnv
 import System.IO
 import {-# SOURCE #-} GHC.Driver.Pipeline
 import Data.Time
+import Data.Traversable
+import qualified Data.ByteString as BS
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
@@ -991,7 +993,18 @@ initModDetails hsc_env iface =
 
 -- Hydrate any WholeCoreBindings linkables into BCOs
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
-initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM utc_time this_mod <$> mapM go uls
+initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
+  -- If a module is compiled with -fbyte-code-and-object-code and it
+  -- makes use of foreign stubs, then the interface file will also
+  -- contain serialized stub dynamic objects, and we can simply write
+  -- them to temporary objects and refer to them as unlinked items
+  -- directly.
+  stub_uls <- for (mi_stub_objs mod_iface) $ \stub_obj -> do
+    f <- newTempName (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)) TFL_GhcSession "dyn_o"
+    BS.writeFile f stub_obj
+    pure $ DotO f
+  bytecode_uls <- for uls go
+  pure $ LM utc_time this_mod $ stub_uls ++ bytecode_uls
   where
     go (CoreBindings fi) = do
         let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
@@ -1005,9 +1018,6 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM 
         -- in the interface file.
         LoadedBCOs <$> (unsafeInterleaveIO $ do
                   core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
-                  -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
-                  -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
-                  -- reports a bug.
                   let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
                   trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
                   generateByteCode hsc_env cgi_guts (wcb_mod_location fi))

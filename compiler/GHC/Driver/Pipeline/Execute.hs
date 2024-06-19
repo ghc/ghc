@@ -588,14 +588,17 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               -- compile foreign stubs as shared objects to ensure
               -- they can be properly loaded.
               let hsc_env_stub
-                    | gopt Opt_ByteCodeAndObjectCode dflags = hscUpdateFlags setDynamicNow hsc_env
+                    | gopt Opt_WriteIfSimplifiedCore dflags = hscUpdateFlags setDynamicNow hsc_env
                     | otherwise = hsc_env
               stub_o <- mapM (compileStub hsc_env_stub) mStub
               foreign_os <-
                 mapM (uncurry (compileForeign hsc_env_stub)) foreign_files
               let fos = maybe [] return stub_o ++ foreign_os
+                  iface_fos
+                    | gopt Opt_WriteIfSimplifiedCore dflags = fos
+                    | otherwise = []
 
-              final_iface <- mkFullIface hsc_env partial_iface stg_infos cg_infos
+              final_iface <- mkFullIface hsc_env partial_iface stg_infos cg_infos iface_fos
 
               -- See Note [Writing interface files]
               hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash mod_location
@@ -617,7 +620,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               -- In interpreted mode the regular codeGen backend is not run so we
               -- generate a interface without codeGen info.
             do
-              final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing
+              final_iface <- mkFullIface hsc_env partial_iface Nothing Nothing []
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
               bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
               return ([], final_iface, emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
