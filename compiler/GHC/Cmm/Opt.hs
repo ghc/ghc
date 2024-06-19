@@ -952,8 +952,8 @@ mapExpOpt _ l@(CmmBranch _)                         = pure l
 mapExpOpt f   (CmmCondBranch e ti fi l)             = f e >>= \newE -> pure (CmmCondBranch newE ti fi l)
 mapExpOpt f   (CmmSwitch e ids)                     = flip CmmSwitch ids <$> f e
 mapExpOpt f   n@CmmCall {cml_target=tgt}            = f tgt >>= \newTgt -> pure n{cml_target = newTgt}
-mapExpOpt f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl)
+mapExpOpt f   (CmmForeignCall tgt fs as succ ret_args updfr intrbl track_safe_ccs)
                                                     = do
                                                       newTgt <- mapForeignTargetOpt f tgt
                                                       newAs <- traverse f as
-                                                      pure $ CmmForeignCall newTgt fs newAs succ ret_args updfr intrbl
+                                                      pure $ CmmForeignCall newTgt fs newAs succ ret_args updfr intrbl track_safe_ccs

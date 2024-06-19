@@ -297,8 +297,8 @@ dsJsFExportDynamic id co0 cconv = do
           -- (probably in the RTS.)
         adjustor   = fsLit "createAdjustor"
 
-    ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
-        -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
+    ccall_adj <- dsCCall adjustor adj_args UnsafeCall (mkTyConApp io_tc [res_ty])
+        -- UnsafeCall: the adjustor doesn't allocate in the Haskell heap or do a callback
 
     let io_app = mkLams tvs                  $
                  Lam cback                   $

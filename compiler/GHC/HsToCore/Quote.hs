@@ -773,7 +773,7 @@ repCCallConv JavaScriptCallConv = rep2_nw javaScriptCallName []
 
 repSafety :: Safety -> MetaM (Core TH.Safety)
 repSafety UnsafeCall = rep2_nw unsafeName []
-repSafety SafeCall { safety_interruptible = interruptible, safety_track_cost = track_cost}
+repSafety SafeCall { safety_interruptible = interruptible, safety_track_cost = _track_cost}
   -- TODO: Support cost tracking
   | interruptible = rep2_nw interruptibleName []
   | otherwise = rep2_nw safeName []
