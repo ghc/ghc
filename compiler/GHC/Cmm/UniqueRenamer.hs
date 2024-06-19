@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase, UnicodeSyntax #-}
 module GHC.Cmm.UniqueRenamer
-  ( detRenameUniques, uniqRename
+  ( detRenameUniques
 
   -- Careful! Not for general use!
   , DetUniqFM, emptyDetUFM)
@@ -15,14 +15,10 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Switch
-import GHC.StgToCmm.Monad
-import GHC.StgToCmm.Closure
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable as Outputable
 import Data.Tuple (swap)
-import GHC.Types.Id (setIdUnique, idName)
-import GHC.Types.Name (isInternalName)
 
 {-
 --------------------------------------------------------------------------------
@@ -111,23 +107,8 @@ instance UniqRenamable Label where
   uniqRename lbl = mkHooplLabel . getKey <$> renameDetUniq (getUnique lbl)
 
 instance UniqRenamable CmmTickScope where
-  -- TODO: We have to change this to get deterministic objects with ticks.
+  -- ROMES:TODO: We may have to change this to get deterministic objects with ticks.
   uniqRename = pure
-
-instance UniqRenamable CgIdInfo where
-  uniqRename
-    CgIdInfo { cg_id, cg_lf, cg_loc }
-      = CgIdInfo <$> uniqRenameId cg_id <*> pure cg_lf <*> uniqRename cg_loc
-        where
-          uniqRenameId i
-            | isInternalName $ idName i
-            = setIdUnique i <$> renameDetUniq (getUnique i)
-            | otherwise
-            = pure i
-
-instance UniqRenamable CgLoc where
-  uniqRename (CmmLoc exp) = CmmLoc <$> uniqRename exp
-  uniqRename (LneLoc bi regs) = LneLoc <$> uniqRename bi <*> mapM uniqRename regs
 
 -- * Traversals from here on out
 

@@ -60,7 +60,6 @@ newtype Stream m a b =
                                         (a -> m r') -- For fusing calls to `map` and `mapM`
                                      -> (b -> StreamS m r' r)  -- For fusing `>>=`
                                      -> StreamS m r' r }
--- romes:TODO: I suppose this lends itself well to parallelism? Perhaps we could make Stream be as parallel as possible?
 
 runStream :: Applicative m => Stream m r' r -> StreamS m r' r
 runStream st = runStreamInternal st pure Done

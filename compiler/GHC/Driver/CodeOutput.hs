@@ -39,6 +39,7 @@ import GHC.Data.OsPath
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
+import GHC.Cmm.UniqueRenamer
 
 import GHC.Utils.TmpFs
 
@@ -95,12 +96,23 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
   cmm_stream
   =
     do  {
+        -- To produce deterministic object code, we alpha-rename all Uniques to deterministic uniques before Cmm linting.
+        -- From here on out, the backend code generation can't use (non-deterministic) Uniques, or risk producing non-deterministic code.
+        -- For example, the fix-up action in the ASM NCG should use determinist names for potential new blocks it has to create.
+        -- Therefore, in the ASM NCG `NatM` Monad we use a deterministic `UniqSuply` (which won't be shared about multiple threads)
+        -- TODO: Put these all into notes carefully organized
+        ; let renamed_cmm_stream = do
+                -- if gopt Opt_DeterministicObjects dflags
+
+                (rn_mapping, stream) <- Stream.mapAccumL_ (fmap pure . detRenameUniques) emptyDetUFM cmm_stream
+                Stream.liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
+                return stream
 
         -- Lint each CmmGroup as it goes past
         ; let linted_cmm_stream =
                  if gopt Opt_DoCmmLinting dflags
-                    then Stream.mapM do_lint cmm_stream
-                    else cmm_stream
+                    then Stream.mapM do_lint renamed_cmm_stream
+                    else renamed_cmm_stream
 
               do_lint cmm = withTimingSilent logger
                   (text "CmmLint"<+>brackets (ppr this_mod))
