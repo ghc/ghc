@@ -40,6 +40,9 @@ import Data.Maybe ( fromMaybe )
 
 -- the very simple optimiser is used to optimise unfoldings
 import {-# SOURCE #-} GHC.Core.SimpleOpt
+import GHC.Core.Subst (mkOpenSubst)
+import GHC.Core.Type (substTy)
+import GHC.Types.Var.Env (mkInScopeSetList)
 
 
 
@@ -180,10 +183,12 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
       -- to
       --       \sbs. MkD ((\obs. <op1>) spec_args) ... ditto <opn>
   where
-    spec_arg arg = simpleOptExpr opts $
-                   spec_app (mkLams old_bndrs arg)
-                   -- The beta-redexes created by spec_app will be
-                   -- simplified away by simplOptExpr
+    spec_arg (Type t) = let subst = mkOpenSubst (mkInScopeSetList old_bndrs) (zip old_bndrs rule_lhs_args)
+                        in Type (substTy subst t)
+    spec_arg arg      = simpleOptExpr opts $
+                        spec_app (mkLams old_bndrs arg)
+                        -- The beta-redexes created by spec_app will be
+                        -- simplified away by simplOptExpr
 
 specUnfolding opts spec_bndrs spec_app rule_lhs_args
               (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
