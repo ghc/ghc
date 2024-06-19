@@ -4,8 +4,6 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
 
-{-# OPTIONS_GHC -fprof-auto-top #-}
-
 --
 --  (c) The University of Glasgow 2002-2006
 --
