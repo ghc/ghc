@@ -27,7 +27,6 @@ htmlTest:
 		$(ACCEPT) \
 		--ghc-path='$(TEST_HC)' \
 		--haddock-path='$(HADDOCK)' \
-		--haddock-stdout=haddock-out.log
 
 # Corresponds to the `latex-test` testsuite
 .PHONY: latexTest
@@ -43,7 +42,6 @@ latexTest:
 		$(ACCEPT) \
 		--ghc-path='$(TEST_HC)' \
 		--haddock-path='$(HADDOCK)' \
-		--haddock-stdout=haddock-out.log
 
 # Corresponds to the `hoogle-test` testsuite
 .PHONY: hoogleTest
@@ -59,7 +57,6 @@ hoogleTest:
 		$(ACCEPT) \
 		--ghc-path='$(TEST_HC)' \
 		--haddock-path='$(HADDOCK)' \
-		--haddock-stdout=haddock-out.log
 
 # Corresponds to the `hypsrc-test` testsuite
 .PHONY: hypsrcTest
@@ -75,4 +72,3 @@ hypsrcTest:
 		$(ACCEPT) \
 		--ghc-path='$(TEST_HC)' \
 		--haddock-path='$(HADDOCK)' \
-		--haddock-stdout=haddock-out.log

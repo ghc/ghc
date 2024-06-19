@@ -78,7 +78,6 @@ runHaddock cfg@(Config{..}) = do
 
   putStrLn "Generating documentation..."
   successes <- forM cfgPackages $ \tpkg -> do
-    haddockStdOut <- openFile cfgHaddockStdOut WriteMode
     let pc =
           processConfig
             { pcArgs =
@@ -88,8 +87,6 @@ runHaddock cfg@(Config{..}) = do
                   , tpkgFiles tpkg
                   ]
             , pcEnv = Just cfgEnv
-            , pcStdOut = Just haddockStdOut
-            , pcStdErr = Just haddockStdOut
             }
 
     let msg = "Failed to run Haddock on test package '" ++ tpkgName tpkg ++ "'"
@@ -111,7 +108,6 @@ runHaddock cfg@(Config{..}) = do
         ]
 
       -- Build .hi files
-      haddockStdOut <- openFile cfgHaddockStdOut WriteMode
       let pc' =
             processConfig
               { pcArgs =
@@ -121,14 +117,13 @@ runHaddock cfg@(Config{..}) = do
                       , "-haddock"
                       , "-fwrite-interface"
                       , "-fwrite-ide-info"
+                      , "-no-keep-o-files"
                       , "-hidir=" ++ hiDir
                       , "-hiedir=" ++ hieDir
                       ]
                     , tpkgFiles tpkg
                     ]
               , pcEnv = Just cfgEnv
-              , pcStdOut = Just haddockStdOut
-              , pcStdErr = Just haddockStdOut
               }
       let msg = "Failed to run GHC on test package '" ++ tpkgName tpkg ++ "'"
       _ <- waitForSuccess msg stdout =<< runProcess' cfgGhcPath pc'
@@ -139,7 +134,6 @@ runHaddock cfg@(Config{..}) = do
       let srcRef = if "--hyperlinked-source" `elem` cfgHaddockArgs then ",src,visible," else ""
           loop [] = pure True
           loop (file : files) = do
-            haddockStdOut <- openFile cfgHaddockStdOut WriteMode
             let hiFile = hiDir </> file
                 haddockFile = hiFile ++ ".haddock"
                 pc =
@@ -153,8 +147,6 @@ runHaddock cfg@(Config{..}) = do
                             ]
                           ]
                     , pcEnv = Just cfgEnv
-                    , pcStdOut = Just haddockStdOut
-                    , pcStdErr = Just haddockStdOut
                     }
             let msg = "Failed to run Haddock in one-shot mode on file '" ++ hiFile ++ "'"
             succeeded <- waitForSuccess msg stdout =<< runProcess' cfgHaddockPath pc
@@ -172,13 +164,6 @@ runHaddock cfg@(Config{..}) = do
       pure succeeded2
 
   let somethingFailed = any not successes
-  when somethingFailed $
-    putStrLn
-      ( "Haddock output is at '"
-          ++ cfgHaddockStdOut
-          ++ "'. "
-          ++ "This file can be set with `--haddock-stdout`."
-      )
   pure somethingFailed
 
 checkFile :: Config c -> FilePath -> IO CheckResult

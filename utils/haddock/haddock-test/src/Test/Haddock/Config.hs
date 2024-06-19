@@ -83,7 +83,6 @@ data Config c = Config
     , cfgGhcPath :: FilePath
     , cfgPackages :: [TestPackage]
     , cfgHaddockArgs :: [String]
-    , cfgHaddockStdOut :: FilePath
     , cfgDiffTool :: Maybe FilePath
     , cfgEnv :: Environment
     , cfgAccept :: Bool
@@ -105,7 +104,6 @@ cfgOneShotOutDir = dcfgOneShotOutDir . cfgDirConfig
 data Flag
     = FlagHaddockPath FilePath
     | FlagHaddockOptions String
-    | FlagHaddockStdOut FilePath
     | FlagGhcPath FilePath
     | FlagDiffTool FilePath
     | FlagNoDiff
@@ -125,10 +123,6 @@ flagsHaddockOptions flags = concat
     [ words opts | FlagHaddockOptions opts <- flags ]
 
 
-flagsHaddockStdOut :: [Flag] -> Maybe FilePath
-flagsHaddockStdOut flags = mlast [ path | FlagHaddockStdOut path <- flags ]
-
-
 flagsDiffTool :: [Flag] -> Maybe FilePath
 flagsDiffTool flags = mlast [ path | FlagDiffTool path <- flags ]
 
@@ -139,8 +133,6 @@ options =
         "path to Haddock executable to exectue tests with"
     , Option [] ["haddock-options"] (ReqArg FlagHaddockOptions "OPTS")
         "additional options to run Haddock with"
-    , Option [] ["haddock-stdout"] (ReqArg FlagHaddockStdOut "FILE")
-        "where to redirect Haddock output"
     , Option [] ["ghc-path"] (ReqArg FlagGhcPath "FILE")
         "path ghc executable"
     , Option [] ["diff-tool"] (ReqArg FlagDiffTool "PATH")
@@ -222,8 +214,6 @@ loadConfig ccfg dcfg flags files = do
         , pure $ flagsHaddockOptions flags
         , baseDependencies cfgGhcPath
         ]
-
-    let cfgHaddockStdOut = fromMaybe defaultStdOut (flagsHaddockStdOut flags)
 
     cfgDiffTool <- if FlagNoDiff `elem` flags
         then pure Nothing
