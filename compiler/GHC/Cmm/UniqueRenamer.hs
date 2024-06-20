@@ -76,9 +76,7 @@ renameDetUniq uq = do
       return det_uniq
 
 -- Rename local symbols deterministically (in order of appearance)
-{-# SPECIALISE detRenameUniques :: DetUniqFM -> CmmGroup -> (DetUniqFM, CmmGroup) #-}
-{-# SPECIALISE detRenameUniques :: DetUniqFM -> RawCmmGroup -> (DetUniqFM, RawCmmGroup) #-}
-detRenameUniques :: UniqRenamable a => DetUniqFM -> [a] -> (DetUniqFM, [a])
+detRenameUniques :: DetUniqFM -> CmmGroup -> (DetUniqFM, CmmGroup)
 detRenameUniques dufm group = swap $ runState (mapM uniqRename group) dufm
 
 -- The most important function here, which does the actual renaming.
