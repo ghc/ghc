@@ -168,7 +168,7 @@ install_lib: lib/settings
 	$(INSTALL_DIR) "$(DESTDIR)$(ActualLibsDir)"
 
 	@dest="$(DESTDIR)$(ActualLibsDir)"; \
-	cd lib; \
+	cd ./lib; \
 	for i in `$(FIND) . -type f`; do \
 		dir="`dirname $$i`" ; \
 		$(INSTALL_DIR) "$$dest/$$dir" ; \
@@ -196,7 +196,7 @@ install_docs:
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
 
 	if [ -d doc ]; then \
-		cd doc; $(FIND) . -type f -exec sh -c \
+		cd ./doc; $(FIND) . -type f -exec sh -c \
 			'$(INSTALL_DIR) "$(DESTDIR)$(docdir)/`dirname $$1`" && $(INSTALL_DATA) "$$1" "$(DESTDIR)$(docdir)/`dirname $$1`"' \
 			sh '{}' ';'; \
 	fi
@@ -212,7 +212,7 @@ install_data:
 	@echo "Copying data to $(DESTDIR)share"
 	$(INSTALL_DIR) "$(DESTDIR)$(datadir)"
 	if [ -d share ]; then \
-		cd share; $(FIND) . -type f -exec sh -c \
+		cd ./share; $(FIND) . -type f -exec sh -c \
 			'$(INSTALL_DIR) "$(DESTDIR)$(datadir)/`dirname $$1`" && \
 			$(INSTALL_DATA) "$$1" "$(DESTDIR)$(datadir)/`dirname $$1`"' \
 			sh '{}' ';'; \
@@ -234,7 +234,7 @@ export SHELL
 install_wrappers: install_bin_libdir install_hsc2hs_wrapper
 	@echo "Installing wrapper scripts"
 	$(INSTALL_DIR) "$(DESTDIR)$(WrapperBinsDir)"
-	for p in `cd wrappers; $(FIND) . ! -type d`; do \
+	for p in `cd ./wrappers; $(FIND) . ! -type d`; do \
 	    mk/install_script.sh "$$p" "$(DESTDIR)/$(WrapperBinsDir)/$$p" "$(WrapperBinsDir)" "$(ActualBinsDir)" "$(ActualBinsDir)/$$p" "$(ActualLibsDir)" "$(docdir)" "$(includedir)"; \
 	done
 
