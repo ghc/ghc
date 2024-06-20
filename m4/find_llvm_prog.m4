@@ -14,7 +14,7 @@ AC_DEFUN([FIND_LLVM_PROG],[
     PROG_VERSION_CANDIDATES=$(for llvmVersion in `seq $(($4-1)) -1 $3`; do echo "$2-$llvmVersion $2-$llvmVersion.0 $2$llvmVersion"; done)
     AC_CHECK_TOOLS([$1], [$PROG_VERSION_CANDIDATES $2], [])
     AS_IF([test x"$$1" != x],[
-        PROG_VERSION=`$$1 --version | sed -n -e 's/.*version \(\([[0-9]]\+\.\)\+[[0-9]]\+\).*/\1/gp'`
+        PROG_VERSION=`$$1 --version | sed -n -e 's/.*version \(\([[0-9]][[0-9]]*\.\)\([[0-9]][[0-9]]*\.\)*[[0-9]][[0-9]]*\).*/\1/gp'`
         AS_IF([test x"$PROG_VERSION" = x],
           [AC_MSG_RESULT(no)
            $1=""
