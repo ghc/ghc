@@ -341,15 +341,26 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
   = \ t1 t2 -> t1 `seq` t2 `seq`
     let go = generic_eq_type_x syn_flag mult_flag mb_env
              -- Abbreviation for recursive calls
+
+        gos []       []       = True
+        gos (t1:ts1) (t2:ts2) = go t1 t2 && gos ts1 ts2
+        gos _ _               = False
+
     in case (t1,t2) of
       _ | 1# <- reallyUnsafePtrEquality# t1 t2 -> True
       -- See Note [Type comparisons using object pointer comparisons]
 
-      (TyConApp tc1 [], TyConApp tc2 []) | tc1 == tc2 -> True
+      (TyConApp tc1 tys1, TyConApp tc2 tys2)
+        | tc1 == tc2, not (isForgetfulSynTyCon tc1)
+        -> gos tys1 tys2
       -- See Note [Comparing nullary type synonyms]
 
       _ | ExpandSynonyms <- syn_flag, Just t1' <- coreView t1 -> go t1' t2
         | ExpandSynonyms <- syn_flag, Just t2' <- coreView t2 -> go t1 t2'
+
+      (TyConApp tc1 ts1, TyConApp tc2 ts2)
+        | tc1 == tc2 -> gos ts1 ts2
+        | otherwise  -> False
 
       (TyVarTy tv1, TyVarTy tv2)
         -> case mb_env of
@@ -380,14 +391,6 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
       (_,  AppTy s2 t2')
         | Just (s1, t1') <- tcSplitAppTyNoView_maybe t1
         -> go s1 s2 && go t1' t2'
-
-      (TyConApp tc1 ts1, TyConApp tc2 ts2)
-        | tc1 == tc2 -> gos ts1 ts2
-        | otherwise  -> False
-        where
-          gos []       []       = True
-          gos (t1:ts1) (t2:ts2) = go t1 t2 && gos ts1 ts2
-          gos _ _               = False
 
       (ForAllTy (Bndr tv1 vis1) body1, ForAllTy (Bndr tv2 vis2) body2)
         -> case mb_env of
