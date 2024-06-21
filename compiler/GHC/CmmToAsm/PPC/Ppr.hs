@@ -586,8 +586,12 @@ pprInstr platform instr = case instr of
                   Just False -> char '+'
 
    JMP lbl _
-     -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
-     | isForeignLabel lbl -> pprPanic "PPC.Ppr.pprInstr: JMP to ForeignLabel" (pprDebugCLabel platform lbl)
+     | OSAIX <- platformOS platform ->
+       line $ hcat [ -- an alias for b that takes a CLabel
+           text "\tb.\t", -- add the ".", cf Note [AIX function descriptors and entry-code addresses]
+           pprAsmLabel platform lbl
+       ]
+
      | otherwise ->
        line $ hcat [ -- an alias for b that takes a CLabel
            text "\tb\t",
@@ -611,6 +615,8 @@ pprInstr platform instr = case instr of
    BL lbl _
       -> case platformOS platform of
            OSAIX ->
+             -- Note [AIX function descriptors and entry-code addresses]
+             -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
              -- On AIX, "printf" denotes a function-descriptor (for use
              -- by function pointers), whereas the actual entry-code
              -- address is denoted by the dot-prefixed ".printf" label.
