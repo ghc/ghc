@@ -122,6 +122,7 @@ Library
         GHC.Internal.Data.IORef
         GHC.Internal.Data.Ix
         GHC.Internal.Data.List
+        GHC.Internal.Data.List.NonEmpty
         GHC.Internal.Data.Maybe
         GHC.Internal.Data.Monoid
         GHC.Internal.Data.OldList

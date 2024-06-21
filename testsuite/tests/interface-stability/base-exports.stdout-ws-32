@@ -1332,6 +1332,7 @@ module Data.List where
   head :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
   init :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> [a]
   inits :: forall a. [a] -> [[a]]
+  inits1 :: forall a. [a] -> [GHC.Internal.Base.NonEmpty a]
   insert :: forall a. GHC.Classes.Ord a => a -> [a] -> [a]
   insertBy :: forall a. (a -> a -> GHC.Types.Ordering) -> a -> [a] -> [a]
   intercalate :: forall a. [a] -> [[a]] -> [a]
@@ -1382,6 +1383,7 @@ module Data.List where
   sum :: forall (t :: * -> *) a. (GHC.Internal.Data.Foldable.Foldable t, GHC.Internal.Num.Num a) => t a -> a
   tail :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> [a]
   tails :: forall a. [a] -> [[a]]
+  tails1 :: forall a. [a] -> [GHC.Internal.Base.NonEmpty a]
   take :: forall a. GHC.Types.Int -> [a] -> [a]
   takeWhile :: forall a. (a -> GHC.Types.Bool) -> [a] -> [a]
   transpose :: forall a. [[a]] -> [[a]]

@@ -109,10 +109,10 @@ import           Prelude             hiding (break, cycle, drop, dropWhile,
 import qualified Prelude
 
 import           Control.Applicative (Applicative (..), Alternative (many))
+import qualified Data.List                        as List
 import           GHC.Internal.Data.Foldable       hiding (length, toList)
 import qualified GHC.Internal.Data.Foldable       as Foldable
 import           GHC.Internal.Data.Function       (on)
-import qualified GHC.Internal.Data.List           as List
 import           GHC.Internal.Data.Ord            (comparing)
 import           GHC.Internal.Base            (NonEmpty(..))
 import           GHC.Internal.Stack.Types     (HasCallStack)
@@ -273,15 +273,7 @@ inits = fromList . List.inits . Foldable.toList
 --
 -- @since 4.18
 inits1 :: NonEmpty a -> NonEmpty (NonEmpty a)
-inits1 =
-  -- fromList is an unsafe function, but this usage should be safe, since:
-  -- * `inits xs = [[], ..., init (init xs), init xs, xs]`
-  -- * If `xs` is nonempty, it follows that `inits xs` contains at least one nonempty
-  --   list, since `last (inits xs) = xs`.
-  -- * The only empty element of `inits xs` is the first one (by the definition of `inits`)
-  -- * Therefore, if we take all but the first element of `inits xs` i.e.
-  --   `tail (inits xs)`, we have a nonempty list of nonempty lists
-  fromList . Prelude.map fromList . List.drop 1 . List.inits . Foldable.toList
+inits1 = fromList . List.inits1 . Foldable.toList
 
 -- | The 'tails' function takes a stream @xs@ and returns all the
 -- suffixes of @xs@, starting with the longest. The result is 'NonEmpty'
@@ -301,15 +293,7 @@ tails = fromList . List.tails . Foldable.toList
 --
 -- @since 4.18
 tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
-tails1 =
-  -- fromList is an unsafe function, but this usage should be safe, since:
-  -- * `tails xs = [xs, tail xs, tail (tail xs), ..., []]`
-  -- * If `xs` is nonempty, it follows that `tails xs` contains at least one nonempty
-  --   list, since `head (tails xs) = xs`.
-  -- * The only empty element of `tails xs` is the last one (by the definition of `tails`)
-  -- * Therefore, if we take all but the last element of `tails xs` i.e.
-  --   `init (tails xs)`, we have a nonempty list of nonempty lists
-  fromList . Prelude.map fromList . List.init . List.tails . Foldable.toList
+tails1 = fromList . List.tails1 . Foldable.toList
 
 -- | @'insert' x xs@ inserts @x@ into the last position in @xs@ where it
 -- is still less than or equal to the next element. In particular, if the
