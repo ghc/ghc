@@ -31,8 +31,6 @@ import GHC.Utils.Misc ( partitionWithM )
 import GHC.Platform
 
 import Control.Monad
-import Data.List (mapAccumL)
-import Data.Bifunctor
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -49,7 +47,7 @@ cmmPipeline
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, (DetUniqFM, CmmGroupSRTs)) -- Output CPS transformed C--
 
-cmmPipeline logger cmm_config srtInfo0 detRnEnv0 prog = do
+cmmPipeline logger cmm_config srtInfo detRnEnv prog = do
   let forceRes (info, group) = info `seq` foldr seq () group
   let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
@@ -59,24 +57,13 @@ cmmPipeline logger cmm_config srtInfo0 detRnEnv0 prog = do
      -- For example, the fix-up action in the ASM NCG should use determinist names for potential new blocks it has to create.
      -- Therefore, in the ASM NCG `NatM` Monad we use a deterministic `UniqSuply` (which won't be shared about multiple threads)
      -- TODO: Put these all into notes carefully organized
-     let (detRnEnv1, renamed_prog) = detRenameUniques detRnEnv0 prog -- TODO: if gopt Opt_DeterministicObjects dflags
+     let (rn_mapping, renamed_prog) = detRenameUniques detRnEnv prog -- TODO: if gopt Opt_DeterministicObjects dflags
 
      (procs, data_) <- {-# SCC "tops" #-} partitionWithM (cpsTop logger platform cmm_config) renamed_prog
-     -- We also have to rename `data_` since it is not fully determined from
-     -- the renamed CLabels in renamed_prog.
-     -- We may also generate new names in procs, so rename that too.
-     -- We need to do this before SRT generation because otherwise we may look
-     -- at the "old names" within the body of the function we are generating SRTs for.
-     -- Easy easy: rename before and after.
-     -- Easy easy: but that turns out to be really slow, so let's try renaming
-     -- procs and data instead and hope srts are generated using names found there.
-     -- And don't rename procs just yet, ehhh
-     let (detRnEnv2, data_renamed) = mapAccumL (\rne (a,b) -> second (a,) $ detRenameUniques rne b) detRnEnv1 data_
-     (srtInfo1, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo0 procs data_renamed
-     dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm (uniq-renamed)" FormatCMM (pdoc platform cmms)
+     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo procs data_
+     dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
-     return (srtInfo1, (detRnEnv2, cmms))
-
+     return (srtInfo, (rn_mapping, cmms))
 
 -- | The Cmm pipeline for a single 'CmmDecl'. Returns:
 --
