@@ -305,7 +305,7 @@ can_eq_nc
    -> Type -> Type    -- RHS, after and before type-synonym expansion, resp
    -> TcS (StopOrContinue (Either IrredCt EqCt))
 
--- See Note [Comparing nullary type synonyms] in GHC.Core.TyCo.Compare
+-- See Note [Unifying type synonyms] in GHC.Core.Unify
 can_eq_nc _flat _rdr_env _envs ev eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TyConApp tc2 []) _ps_ty2
   | tc1 == tc2
   = canEqReflexive ev eq_rel ty1

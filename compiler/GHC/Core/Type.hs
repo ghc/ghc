@@ -2327,7 +2327,7 @@ buildSynTyCon name binders res_kind roles rhs
     is_forgetful = not (all ((`elemVarSet` rhs_tyvars) . binderVar) binders) ||
                    uniqSetAny isForgetfulSynTyCon rhs_tycons
          -- NB: is_forgetful is allowed to be conservative, returning True more often
-         -- than it should. See comments on GHC.Core.TyCon.isForgetfulSynTyCon
+         -- than it should. See Note [Forgetful type synonyms] in GHC.Core.TyCon
 
     rhs_tycons = tyConsOfType   rhs
     rhs_tyvars = tyCoVarsOfType rhs
@@ -3275,8 +3275,9 @@ efficient. Specifically, we strive to
 Goal (b) is particularly useful as it makes traversals (e.g. free variable
 traversal, substitution, and comparison) more efficient.
 Comparison in particular takes special advantage of nullary type synonym
-applications (e.g. things like @TyConApp typeTyCon []@), Note [Comparing
-nullary type synonyms] in "GHC.Core.Type".
+applications (e.g. things like @TyConApp typeTyCon []@). See
+* Note [Comparing type synonyms] in "GHC.Core.TyCo.Compare"
+* Note [Unifying type synonyms] in "GHC.Core.Unify"
 
 To accomplish these we use a number of tricks, implemented by mkTyConApp.
 
