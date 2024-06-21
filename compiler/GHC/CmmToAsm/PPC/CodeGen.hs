@@ -449,6 +449,7 @@ getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32) [x])
 getRegister' _ platform (CmmLoad mem pk _)
  | not (isWord64 pk) = do
         Amode addr addr_code <- getAmode D mem
+        let format = cmmTypeFormat pk
         let code dst = assert ((targetClassOfReg platform dst == RcDouble) == isFloatType pk) $
                        addr_code `snocOL` LD format dst addr
         return (Any format code)
@@ -457,7 +458,12 @@ getRegister' _ platform (CmmLoad mem pk _)
         let code dst = addr_code `snocOL` LD II64 dst addr
         return (Any II64 code)
 
-          where format = cmmTypeFormat pk
+ | otherwise = do -- 32-bit arch & 64-bit load
+        (hi_addr, lo_addr, addr_code) <- getI64Amodes mem
+        let code dst = addr_code
+                        `snocOL` LD II32 dst lo_addr
+                        `snocOL` LD II32 (getHiVRegFromLo dst) hi_addr
+        return (Any II64 code)
 
 -- catch simple cases of zero- or sign-extended load
 getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _ _]) = do
