@@ -33,7 +33,6 @@ import qualified Data.Set as Set
 import GHC
 import GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString (unpackFS)
-import GHC.Driver.Ppr (showPpr, showSDoc)
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.PostProcess
@@ -42,7 +41,8 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Utils.Misc ((<||>))
-import GHC.Utils.Outputable (Outputable)
+import GHC.Utils.Outputable (Outputable (ppr), SDocContext, renderWithContext)
+import qualified GHC.Utils.Outputable as Outputable
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
@@ -50,11 +50,12 @@ import Haddock.Types
 processDocStringsParas
   :: MonadIO m
   => DynFlags
+  -> SDocContext
   -> Maybe Package
   -> [HsDoc GhcRn]
   -> IfM m (MDoc Name)
-processDocStringsParas dflags pkg hdss =
-  overDocF (rename dflags $ hsDocRenamer hds) $ parseParas dflags pkg (renderHsDocStrings $ hsDocString hds)
+processDocStringsParas dflags sDocContext pkg hdss =
+  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas dflags pkg (renderHsDocStrings $ hsDocString hds)
   where
     hds :: WithHsDocIdentifiers [HsDocString] GhcRn
     hds = WithHsDocIdentifiers (map hsDocString hdss) (concatMap hsDocIdentifiers hdss)
@@ -62,30 +63,33 @@ processDocStringsParas dflags pkg hdss =
 processDocStringParas
   :: MonadIO m
   => DynFlags
+  -> SDocContext
   -> Maybe Package
-  -> (HsDoc GhcRn)
+  -> HsDoc GhcRn
   -> IfM m (MDoc Name)
-processDocStringParas dflags pkg hds =
-  overDocF (rename dflags $ hsDocRenamer hds) $ parseParas dflags pkg (renderHsDocString $ hsDocString hds)
+processDocStringParas dflags sDocContext pkg hds =
+  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas dflags pkg (renderHsDocString $ hsDocString hds)
 
 processDocString
   :: MonadIO m
   => DynFlags
-  -> (HsDoc GhcRn)
+  -> SDocContext
+  -> HsDoc GhcRn
   -> IfM m (Doc Name)
-processDocString dflags hds =
-  rename dflags (hsDocRenamer hds) $ parseString dflags (renderHsDocString $ hsDocString hds)
+processDocString dflags sDocContext hds =
+  rename sDocContext (hsDocRenamer hds) $ parseString dflags (renderHsDocString $ hsDocString hds)
 
 processModuleHeader
   :: MonadIO m
   => DynFlags
+  -> SDocContext
   -> Maybe Package
   -> SafeHaskellMode
   -> Maybe Language
   -> EnumSet LangExt.Extension
   -> Maybe (HsDoc GhcRn)
   -> IfM m (HaddockModInfo Name, Maybe (MDoc Name))
-processModuleHeader dflags pkgName safety mayLang extSet mayStr = do
+processModuleHeader dflags sDocContext pkgName safety mayLang extSet mayStr = do
   (hmi, doc) <-
     case mayStr of
       Nothing -> return failure
@@ -94,10 +98,10 @@ processModuleHeader dflags pkgName safety mayLang extSet mayStr = do
             (hmi, doc) = parseModuleHeader dflags pkgName str
             renamer = hsDocRenamer hsDoc
         !descr <- case hmi_description hmi of
-          Just hmi_descr -> Just <$> rename dflags renamer hmi_descr
+          Just hmi_descr -> Just <$> rename sDocContext renamer hmi_descr
           Nothing -> pure Nothing
         let hmi' = hmi{hmi_description = descr}
-        doc' <- overDocF (rename dflags renamer) doc
+        doc' <- overDocF (rename sDocContext renamer) doc
         return (hmi', Just doc')
 
   let flags :: [LangExt.Extension]
@@ -105,7 +109,7 @@ processModuleHeader dflags pkgName safety mayLang extSet mayStr = do
       flags = EnumSet.toList extSet \\ languageExtensions mayLang
   return
     ( hmi
-        { hmi_safety = Just $ showPpr dflags safety
+        { hmi_safety = Just $ Outputable.renderWithContext sDocContext (Outputable.ppr safety)
         , hmi_language = language dflags
         , hmi_extensions = flags
         }
@@ -130,11 +134,11 @@ traverseSnd f =
 -- See the comments in the source for implementation commentary.
 rename
   :: MonadIO m
-  => DynFlags
+  => SDocContext
   -> Renamer
   -> Doc NsRdrName
   -> IfM m (Doc Name)
-rename dflags renamer = rn
+rename sDocContext renamer = rn
   where
     rn :: MonadIO m => Doc NsRdrName -> IfM m (Doc Name)
     rn d = case d of
@@ -156,13 +160,13 @@ rename dflags renamer = rn
               Value -> valueNsChoices
               Type -> typeNsChoices
               None -> valueNsChoices <||> typeNsChoices
-        case renamer (showPpr dflags x) choices of
+        case renamer (Outputable.renderWithContext sDocContext (Outputable.ppr x)) choices of
           [] -> case ns of
-            Type -> outOfScope dflags ns (i $> setRdrNameSpace x tcName)
-            _ -> outOfScope dflags ns (i $> x)
+            Type -> outOfScope sDocContext ns (i $> setRdrNameSpace x tcName)
+            _ -> outOfScope sDocContext ns (i $> x)
           [a] -> pure (DocIdentifier $ i $> a)
           -- There are multiple names available.
-          names -> ambiguous dflags i names
+          names -> ambiguous sDocContext i names
       DocWarning dw -> DocWarning <$> rn dw
       DocEmphasis de -> DocEmphasis <$> rn de
       DocBold db -> DocBold <$> rn db
@@ -193,8 +197,8 @@ rename dflags renamer = rn
 -- users shouldn't rely on this doing the right thing. See tickets
 -- #253 and #375 on the confusion this causes depending on which
 -- default we pick in 'rename'.
-outOfScope :: MonadIO m => DynFlags -> Namespace -> Wrap RdrName -> IfM m (Doc a)
-outOfScope dflags ns x =
+outOfScope :: MonadIO m => SDocContext -> Namespace -> Wrap RdrName -> IfM m (Doc a)
+outOfScope sDocContext ns x =
   case unwrap x of
     Unqual occ -> warnAndMonospace (x $> occ)
     Qual mdl occ -> pure (DocIdentifierUnchecked (x $> (mdl, occ)))
@@ -209,7 +213,7 @@ outOfScope dflags ns x =
 
     warnAndMonospace :: (MonadIO m, Outputable a) => Wrap a -> IfM m (DocH mod id)
     warnAndMonospace a = do
-      let a' = showWrapped (showPpr dflags) a
+      let a' = showWrapped (renderWithContext sDocContext . Outputable.ppr) a
 
       -- If we have already warned for this identifier, don't warn again
       firstWarn <- Set.notMember a' <$> gets ifeOutOfScopeNames
@@ -233,15 +237,15 @@ outOfScope dflags ns x =
 -- Emits a warning if the 'GlobalRdrElts's don't belong to the same type or class.
 ambiguous
   :: MonadIO m
-  => DynFlags
+  => SDocContext
   -> Wrap NsRdrName
   -> [Name]
   -- ^ More than one @gre@s sharing the same `RdrName` above.
   -> IfM m (Doc Name)
-ambiguous dflags x names = do
+ambiguous sDocContext x names = do
   let noChildren = map availName (nubAvails (map Avail names))
       dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
-      nameStr = showNsRdrName dflags x
+      nameStr = showNsRdrName sDocContext x
       msg =
         "Warning: "
           ++ nameStr
@@ -268,13 +272,13 @@ ambiguous dflags x names = do
   where
     isLocalName (nameSrcLoc -> RealSrcLoc{}) = True
     isLocalName _ = False
-    defnLoc = showSDoc dflags . pprNameDefnLoc
+    defnLoc = Outputable.renderWithContext sDocContext . pprNameDefnLoc
 
 -- | Printable representation of a wrapped and namespaced name
-showNsRdrName :: DynFlags -> Wrap NsRdrName -> String
-showNsRdrName dflags = (\p i -> p ++ "'" ++ i ++ "'") <$> prefix <*> ident
+showNsRdrName :: SDocContext -> Wrap NsRdrName -> String
+showNsRdrName sDocContext = (\p i -> p ++ "'" ++ i ++ "'") <$> prefix <*> ident
   where
-    ident = showWrapped (showPpr dflags . rdrName)
+    ident = showWrapped (Outputable.renderWithContext sDocContext . ppr . rdrName)
     prefix = renderNs . namespace . unwrap
 
 hsDocRenamer :: WithHsDocIdentifiers a GhcRn -> Renamer

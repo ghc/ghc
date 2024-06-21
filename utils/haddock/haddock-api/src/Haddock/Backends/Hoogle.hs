@@ -44,6 +44,7 @@ import Data.List (intercalate, isPrefixOf)
 import Data.Maybe
 import Data.Version
 
+import qualified GHC.Driver.DynFlags as DynFlags
 import System.Directory
 import System.FilePath
 
@@ -59,24 +60,25 @@ ppHoogle dflags unit_state package version synopsis prologue ifaces odir = do
   let
     -- Since Hoogle is line based, we want to avoid breaking long lines.
     dflags' = dflags{pprCols = maxBound}
+    sDocContext = DynFlags.initSDocContext dflags' Outputable.defaultUserStyle
     filename = package ++ ".txt"
     contents =
       prefix
-        ++ docWith dflags' (drop 2 $ dropWhile (/= ':') synopsis) prologue
+        ++ docWith sDocContext (drop 2 $ dropWhile (/= ':') synopsis) prologue
         ++ ["@package " ++ package]
         ++ [ "@version " ++ showVersion version
            | not (null (versionBranch version))
            ]
-        ++ concat [ppModule dflags' unit_state i | i <- ifaces, OptHide `notElem` ifaceOptions i]
+        ++ concat [ppModule dflags' sDocContext unit_state i | i <- ifaces, OptHide `notElem` ifaceOptions i]
   createDirectoryIfMissing True odir
   writeUtf8File (odir </> filename) (unlines contents)
 
-ppModule :: DynFlags -> UnitState -> Interface -> [String]
-ppModule dflags unit_state iface =
+ppModule :: DynFlags -> SDocContext -> UnitState -> Interface -> [String]
+ppModule dflags sDocContext unit_state iface =
   ""
-    : ppDocumentation dflags (ifaceDoc iface)
+    : ppDocumentation sDocContext (ifaceDoc iface)
     ++ ["module " ++ moduleString (ifaceMod iface)]
-    ++ concatMap ppExportItem (ifaceRnExportItems $ iface)
+    ++ concatMap ppExportItem (ifaceRnExportItems iface)
     ++ concatMap (ppInstance dflags unit_state) (ifaceInstances iface)
 
 -- | If the export item is an 'ExportDecl', get the attached Hoogle textual
@@ -110,8 +112,8 @@ dropHsDocTy = drop_sig_ty
     drop_ty (HsDocTy _ a _) = drop_ty $ unL a
     drop_ty x = x
 
-outHsSigType :: DynFlags -> HsSigType GhcRn -> String
-outHsSigType dflags = out dflags . reparenSigType . dropHsDocTy
+outHsSigType :: SDocContext -> HsSigType GhcRn -> String
+outHsSigType sDocContext = out sDocContext . reparenSigType . dropHsDocTy
 
 dropComment :: String -> String
 dropComment (' ' : '-' : '-' : ' ' : _) = []
@@ -131,15 +133,15 @@ outWith p =
     f (x : xs) = x : f xs
     f [] = []
 
-out :: Outputable a => DynFlags -> a -> String
-out dflags = outWith $ showSDoc dflags
+out :: Outputable a => SDocContext -> a -> String
+out sDocContext = outWith $ Outputable.renderWithContext sDocContext
 
 operator :: String -> String
 operator (x : xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = '(' : x : xs ++ ")"
 operator x = x
 
-commaSeparate :: Outputable a => DynFlags -> [a] -> String
-commaSeparate dflags = showSDoc dflags . interpp'SP
+commaSeparate :: Outputable a => SDocContext -> [a] -> String
+commaSeparate sDocContext = Outputable.renderWithContext sDocContext . interpp'SP
 
 ---------------------------------------------------------------------
 -- How to print each export
@@ -155,59 +157,54 @@ ppExportD
     , expDFixities = fixities
     } =
     concat
-      [ ppDocumentation dflags' dc ++ f d
+      [ ppDocumentation sDocContext dc ++ f d
       | (d, (dc, _)) <- (decl, mbDoc) : bundledPats
       ]
       ++ ppFixities
     where
-      -- Since Hoogle is line based, we want to avoid breaking long lines.
-      dflags' :: DynFlags
-      dflags' = dflags{pprCols = maxBound}
-
       f :: HsDecl GhcRn -> [String]
-      f (TyClD _ d@DataDecl{}) = ppData dflags' d subdocs
-      f (TyClD _ d@SynDecl{}) = ppSynonym dflags' d
-      f (TyClD _ d@ClassDecl{}) = ppClass dflags' d subdocs
-      f (TyClD _ (FamDecl _ d)) = ppFam dflags' d
-      f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags' [name] typ]
-      f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags' [name] typ]
-      f (SigD _ sig) = ppSig dflags' sig
+      f (TyClD _ d@DataDecl{}) = ppData sDocContext d subdocs
+      f (TyClD _ d@SynDecl{}) = ppSynonym sDocContext d
+      f (TyClD _ d@ClassDecl{}) = ppClass sDocContext d subdocs
+      f (TyClD _ (FamDecl _ d)) = ppFam sDocContext d
+      f (ForD _ (ForeignImport _ name typ _)) = [ppSig sDocContext [name] typ]
+      f (ForD _ (ForeignExport _ name typ _)) = [ppSig sDocContext [name] typ]
+      f (SigD _ sig) = ppSigWithDoc sDocContext sig []
       f _ = []
 
       ppFixities :: [String]
-      ppFixities = concatMap (ppFixity dflags') fixities
+      ppFixities = concatMap (ppFixity sDocContext) fixities
 
-ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
-ppSigWithDoc dflags sig subdocs = case sig of
+      sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
+
+ppSigWithDoc :: SDocContext -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
+ppSigWithDoc sDocContext sig subdocs = case sig of
   TypeSig _ names t -> concatMap (mkDocSig "" (dropWildCards t)) names
   PatSynSig _ names t -> concatMap (mkDocSig "pattern " t) names
   _ -> []
   where
     mkDocSig leader typ n =
       mkSubdocN
-        dflags
+        sDocContext
         n
         subdocs
-        [leader ++ pp_sig dflags [n] typ]
+        [leader ++ ppSig sDocContext [n] typ]
 
-ppSig :: DynFlags -> Sig GhcRn -> [String]
-ppSig dflags x = ppSigWithDoc dflags x []
-
-pp_sig :: DynFlags -> [LocatedN Name] -> LHsSigType GhcRn -> String
-pp_sig dflags names (L _ typ) =
-  operator prettyNames ++ " :: " ++ outHsSigType dflags typ
+ppSig :: SDocContext -> [LocatedN Name] -> LHsSigType GhcRn -> String
+ppSig sDocContext names (L _ typ) =
+  operator prettyNames ++ " :: " ++ outHsSigType sDocContext typ
   where
-    prettyNames = intercalate ", " $ map (out dflags) names
+    prettyNames = intercalate ", " $ map (out sDocContext) names
 
 -- note: does not yet output documentation for class methods
-ppClass :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
-ppClass dflags decl@(ClassDecl{}) subdocs =
+ppClass :: SDocContext -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
+ppClass sDocContext decl@(ClassDecl{}) subdocs =
   (ppDecl ++ ppTyFams) : ppMethods
   where
     ppDecl :: String
     ppDecl =
       out
-        dflags
+        sDocContext
         decl
           { tcdSigs = []
           , tcdATs = []
@@ -218,7 +215,7 @@ ppClass dflags decl@(ClassDecl{}) subdocs =
     ppMethods :: [String]
     ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decl
 
-    ppSig' = flip (ppSigWithDoc dflags) subdocs
+    ppSig' = flip (ppSigWithDoc sDocContext) subdocs
 
     add_ctxt = addClassContext (tcdName decl) (tyClDeclTyVars decl)
 
@@ -226,7 +223,7 @@ ppClass dflags decl@(ClassDecl{}) subdocs =
     ppTyFams
       | null $ tcdATs decl = ""
       | otherwise =
-          (" " ++) . showSDoc dflags . whereWrapper $
+          (" " ++) . Outputable.renderWithContext sDocContext . whereWrapper $
             concat
               [ map pprTyFam (tcdATs decl)
               , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decl)
@@ -237,12 +234,12 @@ ppClass dflags decl@(ClassDecl{}) subdocs =
       vcat' $
         map text $
           mkSubdocN
-            dflags
+            sDocContext
             (fdLName at)
             subdocs
             -- Associated type families should not be printed as top-level
             -- (avoid printing the `family` keyword)
-            (ppFam dflags at{fdTopLevel = NotTopLevel})
+            (ppFam sDocContext at{fdTopLevel = NotTopLevel})
 
     whereWrapper elems =
       vcat'
@@ -252,9 +249,9 @@ ppClass dflags decl@(ClassDecl{}) subdocs =
         ]
 ppClass _ _non_cls_decl _ = []
 
-ppFam :: DynFlags -> FamilyDecl GhcRn -> [String]
-ppFam dflags decl@(FamilyDecl{fdInfo = info}) =
-  [out dflags decl']
+ppFam :: SDocContext -> FamilyDecl GhcRn -> [String]
+ppFam sDocContext decl@(FamilyDecl{fdInfo = info}) =
+  [out sDocContext decl']
   where
     decl' = case info of
       -- We don't need to print out a closed type family's equations
@@ -280,33 +277,33 @@ ppInstance dflags unit_state x =
               }
         }
 
-ppSynonym :: DynFlags -> TyClDecl GhcRn -> [String]
-ppSynonym dflags x = [out dflags x]
+ppSynonym :: SDocContext -> TyClDecl GhcRn -> [String]
+ppSynonym sDocContext x = [out sDocContext x]
 
-ppData :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
-ppData dflags decl@DataDecl{tcdLName = name, tcdTyVars = tvs, tcdFixity = fixity, tcdDataDefn = defn} subdocs =
-  out dflags (ppDataDefnHeader (pp_vanilla_decl_head name tvs fixity) defn)
-    : concatMap (ppCtor dflags decl subdocs . unLoc) (dd_cons defn)
+ppData :: SDocContext -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
+ppData sDocContext decl@DataDecl{tcdLName = name, tcdTyVars = tvs, tcdFixity = fixity, tcdDataDefn = defn} subdocs =
+  out sDocContext (ppDataDefnHeader (pp_vanilla_decl_head name tvs fixity) defn)
+    : concatMap (ppCtor sDocContext decl subdocs . unLoc) (dd_cons defn)
 ppData _ _ _ = panic "ppData"
 
 -- | for constructors, and named-fields...
-lookupCon :: DynFlags -> [(Name, DocForDecl Name)] -> LocatedN Name -> [String]
-lookupCon dflags subdocs (L _ name) = case lookup name subdocs of
-  Just (d, _) -> ppDocumentation dflags d
+lookupCon :: SDocContext -> [(Name, DocForDecl Name)] -> LocatedN Name -> [String]
+lookupCon sDocContext subdocs (L _ name) = case lookup name subdocs of
+  Just (d, _) -> ppDocumentation sDocContext d
   _ -> []
 
-ppCtor :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> ConDecl GhcRn -> [String]
-ppCtor dflags dat subdocs con@ConDeclH98{con_args = con_args'} =
+ppCtor :: SDocContext -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> ConDecl GhcRn -> [String]
+ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
   -- AZ:TODO get rid of the concatMap
-  concatMap (lookupCon dflags subdocs) [con_name con] ++ f con_args'
+  concatMap (lookupCon sDocContext subdocs) [con_name con] ++ f con_args'
   where
     f (PrefixCon _ args) = [typeSig name $ (map hsScaledThing args) ++ [resType]]
     f (InfixCon a1 a2) = f $ PrefixCon [] [a1, a2]
     f (RecCon (L _ recs)) =
       f (PrefixCon [] $ map (hsLinear . cd_fld_type . unLoc) recs)
         ++ concat
-          [ (concatMap (lookupCon dflags subdocs . noLocA . foExt . unLoc) (cd_fld_names r))
-            ++ [out dflags (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
+          [ (concatMap (lookupCon sDocContext subdocs . noLocA . foExt . unLoc) (cd_fld_names r))
+            ++ [out sDocContext (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
           | r <- map unLoc recs
           ]
 
@@ -316,11 +313,11 @@ ppCtor dflags dat subdocs con@ConDeclH98{con_args = con_args'} =
     typeSig nm flds =
       operator nm
         ++ " :: "
-        ++ outHsSigType dflags (unL $ mkEmptySigType $ funs flds)
+        ++ outHsSigType sDocContext (unL $ mkEmptySigType $ funs flds)
 
     -- We print the constructors as comma-separated list. See GHC
     -- docs for con_names on why it is a list to begin with.
-    name = commaSeparate dflags . toList $ unL <$> getConNames con
+    name = commaSeparate sDocContext . toList $ unL <$> getConNames con
 
     tyVarArg (UserTyVar _ _ n) = HsTyVar noAnn NotPromoted n
     tyVarArg (KindedTyVar _ _ n lty) = HsKindSig noAnn (reL (HsTyVar noAnn NotPromoted n)) lty
@@ -332,7 +329,7 @@ ppCtor dflags dat subdocs con@ConDeclH98{con_args = con_args'} =
           (HsTyVar noAnn NotPromoted (reL (tcdName dat)))
             : map (tyVarArg . unLoc) (hsQTvExplicit $ tyClDeclTyVars dat)
 ppCtor
-  dflags
+  sDocContext
   _dat
   subdocs
   ( ConDeclGADT
@@ -343,10 +340,10 @@ ppCtor
       , con_res_ty = res_ty
       }
     ) =
-    concatMap (lookupCon dflags subdocs) names ++ [typeSig]
+    concatMap (lookupCon sDocContext subdocs) names ++ [typeSig]
     where
-      typeSig = operator name ++ " :: " ++ outHsSigType dflags con_sig_ty
-      name = out dflags $ unL <$> names
+      typeSig = operator name ++ " :: " ++ outHsSigType sDocContext con_sig_ty
+      name = out sDocContext $ unL <$> names
       con_sig_ty = HsSig noExtField outer_bndrs theta_ty
         where
           theta_ty = case mcxt of
@@ -358,35 +355,35 @@ ppCtor
               RecConGADT _ (L _ flds) -> map (cd_fld_type . unL) flds
           mkFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) a b)
 
-ppFixity :: DynFlags -> (Name, Fixity) -> [String]
-ppFixity dflags (name, fixity) = [out dflags ((FixitySig NoNamespaceSpecifier [noLocA name] fixity) :: FixitySig GhcRn)]
+ppFixity :: SDocContext -> (Name, Fixity) -> [String]
+ppFixity sDocContext (name, fixity) = [out sDocContext ((FixitySig NoNamespaceSpecifier [noLocA name] fixity) :: FixitySig GhcRn)]
 
 ---------------------------------------------------------------------
 -- DOCUMENTATION
 
-ppDocumentation :: Outputable o => DynFlags -> Documentation o -> [String]
-ppDocumentation dflags (Documentation d w) = mdoc dflags d ++ doc dflags w
+ppDocumentation :: Outputable o => SDocContext -> Documentation o -> [String]
+ppDocumentation sDocContext (Documentation d w) = mdoc sDocContext d ++ doc sDocContext w
 
-doc :: Outputable o => DynFlags -> Maybe (Doc o) -> [String]
-doc dflags = docWith dflags ""
+doc :: Outputable o => SDocContext -> Maybe (Doc o) -> [String]
+doc sDocContext = docWith sDocContext ""
 
-mdoc :: Outputable o => DynFlags -> Maybe (MDoc o) -> [String]
-mdoc dflags = docWith dflags "" . fmap _doc
+mdoc :: Outputable o => SDocContext -> Maybe (MDoc o) -> [String]
+mdoc sDocContext = docWith sDocContext "" . fmap _doc
 
-docWith :: Outputable o => DynFlags -> String -> Maybe (Doc o) -> [String]
+docWith :: Outputable o => SDocContext -> String -> Maybe (Doc o) -> [String]
 docWith _ [] Nothing = []
-docWith dflags header d =
+docWith sDocContext header d =
   ("" :) $
     zipWith (++) ("-- | " : repeat "--   ") $
       lines header
         ++ ["" | header /= "" && isJust d]
-        ++ maybe [] (showTags . markup (markupTag dflags)) d
+        ++ maybe [] (showTags . markup (markupTag sDocContext)) d
 
-mkSubdocN :: DynFlags -> LocatedN Name -> [(Name, DocForDecl Name)] -> [String] -> [String]
-mkSubdocN dflags n subdocs s = mkSubdoc dflags (la2la n) subdocs s
+mkSubdocN :: SDocContext -> LocatedN Name -> [(Name, DocForDecl Name)] -> [String] -> [String]
+mkSubdocN sDocContext n subdocs s = mkSubdoc sDocContext (la2la n) subdocs s
 
-mkSubdoc :: DynFlags -> LocatedA Name -> [(Name, DocForDecl Name)] -> [String] -> [String]
-mkSubdoc dflags n subdocs s = concatMap (ppDocumentation dflags) getDoc ++ s
+mkSubdoc :: SDocContext -> LocatedA Name -> [(Name, DocForDecl Name)] -> [String] -> [String]
+mkSubdoc sDocContext n subdocs s = concatMap (ppDocumentation sDocContext) getDoc ++ s
   where
     getDoc = maybe [] (return . fst) (lookup (unLoc n) subdocs)
 
@@ -408,15 +405,15 @@ str a = [Str a]
 -- or inlne for others (a,i,tt)
 -- entities (&,>,<) should always be appropriately escaped
 
-markupTag :: Outputable o => DynFlags -> DocMarkup o [Tag]
-markupTag dflags =
+markupTag :: Outputable o => SDocContext -> DocMarkup o [Tag]
+markupTag sDocContext =
   Markup
     { markupParagraph = box TagP
     , markupEmpty = str ""
     , markupString = str
     , markupAppend = (++)
-    , markupIdentifier = box (TagInline "a") . str . out dflags
-    , markupIdentifierUnchecked = box (TagInline "a") . str . showWrapped (out dflags . snd)
+    , markupIdentifier = box (TagInline "a") . str . out sDocContext
+    , markupIdentifierUnchecked = box (TagInline "a") . str . showWrapped (out sDocContext . snd)
     , markupModule = \(ModLink m label) -> box (TagInline "a") (fromMaybe (str m) label)
     , markupWarning = box (TagInline "i")
     , markupEmphasis = box (TagInline "i")

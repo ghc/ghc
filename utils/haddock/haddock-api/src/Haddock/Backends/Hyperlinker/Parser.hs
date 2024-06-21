@@ -15,7 +15,6 @@ import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (mkFastString)
 import GHC.Data.StringBuffer (StringBuffer, atEnd)
 import GHC.Driver.Config.Diagnostic
-import GHC.Driver.Ppr (showSDoc)
 import GHC.Driver.Session
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer as Lexer
@@ -33,7 +32,8 @@ import qualified GHC.Types.Error as E
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Utils.Error (pprLocMsgEnvelopeDefault)
-import GHC.Utils.Outputable (text, ($$))
+import GHC.Utils.Outputable (SDocContext, text, ($$))
+import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
 
 import Haddock.Backends.Hyperlinker.Types as T
@@ -46,17 +46,18 @@ import Haddock.GhcUtils
 parse
   :: DynFlags
   -- ^ Flags for this module
+  -> SDocContext
   -> FilePath
   -- ^ Path to the source of this module
   -> BS.ByteString
   -- ^ Raw UTF-8 encoded source of this module
   -> [T.Token]
-parse dflags fpath bs = case unP (go False []) initState of
+parse dflags sDocContext fpath bs = case unP (go False []) initState of
   POk _ toks -> reverse toks
   PFailed pst ->
     let err : _ = bagToList (E.getMessages $ getPsErrorMessages pst)
      in panic $
-          showSDoc dflags $
+          Outputable.renderWithContext sDocContext $
             text "Hyperlinker parse error:" $$ pprLocMsgEnvelopeDefault err
   where
     initState = initParserState pflags buf start

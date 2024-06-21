@@ -27,7 +27,6 @@ import Haddock.Backends.Xhtml.Utils
 import Haddock.Utils
 
 import GHC
-import GHC.Driver.Ppr (showSDoc)
 import GHC.Iface.Ext.Types (HieAST (..), HieArgs (..), HieType (..), HieTypeFlat, TypeIndex)
 import GHC.Iface.Type
 import GHC.Types.Name (getOccFS, getOccString)
@@ -36,6 +35,8 @@ import GHC.Types.Var (TypeOrConstraint (..), VarBndr (..), invisArg, visArg)
 import System.FilePath.Posix ((<.>), (</>))
 
 import qualified Data.Array as A
+import GHC.Utils.Outputable (SDocContext)
+import qualified GHC.Utils.Outputable as Outputable
 
 {-# INLINE hypSrcDir #-}
 hypSrcDir :: FilePath
@@ -122,19 +123,19 @@ type PrintedType = String
 -- multiple calls to 'recoverFullType' don't share intermediate results. This
 -- function fixes that.
 recoverFullIfaceTypes
-  :: DynFlags
+  :: SDocContext
   -> A.Array TypeIndex HieTypeFlat
   -- ^ flat types
   -> HieAST TypeIndex
   -- ^ flattened AST
   -> HieAST PrintedType
   -- ^ full AST
-recoverFullIfaceTypes df flattened ast = fmap (printed A.!) ast
+recoverFullIfaceTypes sDocContext flattened ast = fmap (printed A.!) ast
   where
     -- Splitting this out into its own array is also important: we don't want
     -- to pretty print the same type many times
     printed :: A.Array TypeIndex PrintedType
-    printed = fmap (showSDoc df . pprIfaceType) unflattened
+    printed = fmap (Outputable.renderWithContext sDocContext . pprIfaceType) unflattened
 
     -- The recursion in 'unflattened' is crucial - it's what gives us sharing
     -- between the IfaceType's produced

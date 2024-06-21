@@ -32,10 +32,10 @@ module Haddock.GhcUtils where
 import Control.Arrow
 import Data.Char (isSpace)
 import Data.Foldable (toList)
+import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
-import qualified Data.List as List
 
 import Haddock.Types (DocName, DocNameI, XRecCond)
 

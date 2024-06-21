@@ -16,6 +16,7 @@ import Text.Parsec.ByteString.Lazy (Parser)
 import Text.ParserCombinators.Parsec ((<?>))
 import qualified Text.ParserCombinators.Parsec as Parsec
 
+import qualified Data.List as List
 import Haddock.Utils.Json.Types hiding (object)
 
 parseJSONValue :: Parser Value
@@ -94,12 +95,19 @@ parseString =
 
     uni = check =<< Parsec.count 4 (Parsec.satisfy isHexDigit)
       where
-        check x
-          | code <= max_char = return (toEnum code)
-          | otherwise = mzero
-          where
-            code = fst $ head $ readHex x
-            max_char = fromEnum (maxBound :: Char)
+        check :: Enum a => String -> Parser a
+        check x = do
+          code <- parseHex x
+          if code <= max_char
+            then pure (toEnum code)
+            else mzero
+        parseHex :: String -> Parser Int
+        parseHex c =
+          case List.uncons (readHex c) of
+            Nothing -> mzero
+            Just (result, _) -> pure $ fst result
+        max_char :: Int
+        max_char = fromEnum (maxBound :: Char)
 
 parseObject :: Parser Object
 parseObject =

@@ -50,11 +50,11 @@ import Control.DeepSeq (force)
 import Control.Monad (unless, when)
 import Data.Bifunctor (bimap)
 import qualified Data.ByteString.Builder as Builder
-import qualified Data.List as List
 import Data.Char (isSpace, toUpper)
 import Data.Either (partitionEithers)
 import Data.Foldable (traverse_)
 import Data.List (intersperse, isPrefixOf, sortBy)
+import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe

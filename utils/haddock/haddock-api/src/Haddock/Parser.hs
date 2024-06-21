@@ -28,10 +28,10 @@ import GHC.Types.Name.Reader (RdrName (..))
 import GHC.Types.SrcLoc (GenLocated (..), mkRealSrcLoc)
 
 parseParas :: DynFlags -> Maybe Package -> String -> MetaDoc mod (Wrap NsRdrName)
-parseParas d p = overDoc (P.overIdentifier (parseIdent d)) . P.parseParas p
+parseParas dflags p = overDoc (P.overIdentifier (parseIdent dflags)) . P.parseParas p
 
 parseString :: DynFlags -> String -> DocH mod (Wrap NsRdrName)
-parseString d = P.overIdentifier (parseIdent d) . P.parseString
+parseString dflags = P.overIdentifier (parseIdent dflags) . P.parseString
 
 parseIdent :: DynFlags -> Namespace -> String -> Maybe (Wrap NsRdrName)
 parseIdent dflags ns str0 =

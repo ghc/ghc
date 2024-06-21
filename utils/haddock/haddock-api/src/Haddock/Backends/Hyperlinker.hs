@@ -23,10 +23,12 @@ import System.FilePath
 
 import Data.Map as M
 import GHC.Data.FastString (mkFastString)
+import qualified GHC.Driver.DynFlags as DynFlags
 import GHC.Iface.Ext.Binary (hie_file_result, readHieFile)
 import GHC.Iface.Ext.Types (HieAST (..), HieASTs (..), HieFile (..), SourcedNodeInfo (..), pattern HiePath)
 import GHC.Types.SrcLoc (mkRealSrcLoc, realSrcLocSpan, srcSpanFile)
 import GHC.Unit.Module (Module, moduleName)
+import qualified GHC.Utils.Outputable as Outputable
 
 -- | Generate hyperlinked source for given interfaces.
 --
@@ -78,9 +80,9 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
       mast
         | M.size asts == 1 = snd <$> M.lookupMin asts
         | otherwise = M.lookup (HiePath (mkFastString file)) asts
-      tokens' = parse df file rawSrc
+      tokens' = parse dflags sDocContext file rawSrc
       ast = fromMaybe (emptyHieAst fileFs) mast
-      fullAst = recoverFullIfaceTypes df types ast
+      fullAst = recoverFullIfaceTypes sDocContext types ast
 
   -- Warn if we didn't find an AST, but there were still ASTs
   if M.null asts
@@ -104,7 +106,8 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
   -- Produce and write out the hyperlinked sources
   writeUtf8File path . renderToString pretty . render' fullAst $ tokens
   where
-    df = ifaceDynFlags iface
+    dflags = ifaceDynFlags iface
+    sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
     render' = render (Just srcCssFile) (Just highlightScript) srcs
     path = srcdir </> hypSrcModuleFile (ifaceMod iface)
 

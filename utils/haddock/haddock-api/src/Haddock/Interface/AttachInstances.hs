@@ -29,12 +29,12 @@ import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
 import Control.DeepSeq (force)
 import Data.Foldable (toList)
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Ord (comparing)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import qualified Data.List as List
 
 import GHC
 import GHC.Builtin.Types (unrestrictedFunTyConName)

@@ -245,7 +245,10 @@ renameExportItem item = case item of
     let !hoogleOut =
           force $
             if rnHoogleOutput
-              then ppExportD rnDynFlags ed
+              then
+                -- Since Hoogle is line based, we want to avoid breaking long lines.
+                let dflags = rnDynFlags{pprCols = maxBound}
+                 in ppExportD dflags ed
               else []
 
     decl' <- renameLDecl decl
