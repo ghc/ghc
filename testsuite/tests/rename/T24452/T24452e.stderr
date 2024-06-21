@@ -1,0 +1,10 @@
+T24452e.hs:19:7: error: [GHC-87543]
+    Ambiguous occurrence ‘empty’.
+    It could refer to
+       either the field ‘empty’ of record ‘A’,
+              defined at T24452e.hs:13:5,
+           or the field ‘empty’ of record ‘B’,
+              defined at T24452e.hs:16:5.
+
+T24452e.hs:24:3: error: [GHC-54721]
+    ‘empty’ is not a (visible) method of class ‘Alternative’
