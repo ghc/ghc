@@ -698,9 +698,10 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
   -- The remaining GREs are things that we *could* export here.
   -- Note that this includes things which have `NoParent`;
   -- those are sorted in `checkPatSynParent`.
-  traceRn "parent" (ppr parent)
-  traceRn "lookupExportChild original_gres:" (ppr original_gres)
-  traceRn "lookupExportChild picked_gres:" (ppr picked_gres $$ ppr must_have_parent)
+  traceTc "parent" (ppr parent)
+  traceTc "lookupExportChild must_have_parent:" (ppr must_have_parent)
+  traceTc "lookupExportChild original_gres:" (ppr original_gres)
+  traceTc "lookupExportChild picked_gres:" (ppr picked_gres)
   case picked_gres of
     NoOccurrence ->
       noMatchingParentErr original_gres
@@ -711,7 +712,13 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
     DisambiguatedOccurrence g ->
       checkFld g
     AmbiguousOccurrence gres ->
-      mkNameClashErr gres
+      if must_have_parent
+        -- It is more helpful to tell the user that the ambiguous matches
+        -- are for a wrong parent, then that there is a name clash,
+        -- see (#24452). Also since `gres` is NonEmpty and is a sub-list
+        -- of `original_gres` we are sure the original list is NonEmpty.
+      then mkIncorrectParentErr (NE.fromList original_gres)
+      else mkNameClashErr gres
     where
         checkFld :: GlobalRdrElt -> RnM ChildLookupResult
         checkFld g = do
@@ -723,25 +730,26 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
         -- 1. There were none to begin with.
         -- 2. None of the matching ones were the parent but
         --  a. They were from an overloaded record field so we can report
-        --     a better error
+        --     a better error.
         --  b. The original lookup was actually ambiguous.
         --     For example, the case where overloading is off and two
         --     record fields are in scope from different record
         --     constructors, neither of which is the parent.
         noMatchingParentErr :: [GlobalRdrElt] -> RnM ChildLookupResult
         noMatchingParentErr original_gres = do
-          traceRn "npe" (ppr original_gres)
+          traceRn "noMatchingParentErr" (ppr original_gres)
           dup_fields_ok <- xoptM LangExt.DuplicateRecordFields
           case original_gres of
             []  -> return NameNotFound
-            [g] -> return $ IncorrectParent parent g
-                              [p | ParentIs p <- [greParent g]]
+            [g] -> mkIncorrectParentErr (NE.fromList [g])
             gss@(g:gss'@(_:_)) ->
-              if all isRecFldGRE gss && dup_fields_ok
-              then return $
-                    IncorrectParent parent g
-                      [p | x <- gss, ParentIs p <- [greParent x]]
+              if dup_fields_ok && all isRecFldGRE gss
+              then mkIncorrectParentErr (NE.fromList gss)
               else mkNameClashErr $ g NE.:| gss'
+
+        mkIncorrectParentErr :: NE.NonEmpty GlobalRdrElt -> RnM ChildLookupResult
+        mkIncorrectParentErr gres = return $ IncorrectParent parent (NE.head gres)
+                                      [p | x <- NE.toList gres, ParentIs p <- [greParent x]]
 
         mkNameClashErr :: NE.NonEmpty GlobalRdrElt -> RnM ChildLookupResult
         mkNameClashErr gres = do

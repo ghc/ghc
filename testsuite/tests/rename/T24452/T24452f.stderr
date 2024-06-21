@@ -1,0 +1,10 @@
+T24452f.hs:4:17: [GHC-87543]
+     Ambiguous occurrence ‘foo’.
+      It could refer to
+         either the field ‘foo’ of pattern synonym ‘AmbigPatSynA.MkT’,
+                imported from ‘AmbigPatSynA’ at T24452f.hs:5:5-23
+                (and originally defined at AmbigPatSynA.hs:4:15-17),
+             or the field ‘foo’ of pattern synonym ‘AmbigPatSynB.MkT’,
+                imported from ‘AmbigPatSynB’ at T24452f.hs:6:5-23
+                (and originally defined at AmbigPatSynB.hs:4:15-17).
+     In the export: S(foo)

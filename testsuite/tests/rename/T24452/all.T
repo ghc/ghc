@@ -1,0 +1,6 @@
+test('T24452a', normal, compile, [''])
+test('T24452b', normal, compile_fail, [''])
+test('T24452c', normal, compile_fail, [''])
+test('T24452d', normal, compile_fail, [''])
+test('T24452e', normal, compile_fail, [''])
+test('T24452f', [extra_files(['AmbigPatSynA.hs', 'AmbigPatSynB.hs'])], multimod_compile_fail, ['T24452f','-v0'])
