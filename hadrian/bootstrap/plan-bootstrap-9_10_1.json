@@ -6,27 +6,31 @@
     },
     {
       "package": "ghc-prim",
-      "version": "0.9.0"
+      "version": "0.11.0"
     },
     {
       "package": "ghc-bignum",
       "version": "1.3"
     },
     {
+      "package": "ghc-internal",
+      "version": "9.1001.0"
+    },
+    {
       "package": "base",
-      "version": "4.17.0.0"
+      "version": "4.20.0.0"
     },
     {
       "package": "array",
-      "version": "0.5.4.0"
+      "version": "0.5.7.0"
     },
     {
       "package": "deepseq",
-      "version": "1.4.8.0"
+      "version": "1.5.0.0"
     },
     {
       "package": "ghc-boot-th",
-      "version": "9.4.2"
+      "version": "9.10.1"
     },
     {
       "package": "pretty",
@@ -34,23 +38,43 @@
     },
     {
       "package": "template-haskell",
-      "version": "2.19.0.0"
+      "version": "2.22.0.0"
     },
     {
       "package": "bytestring",
-      "version": "0.11.3.1"
+      "version": "0.12.1.0"
     },
     {
       "package": "containers",
-      "version": "0.6.6"
+      "version": "0.7"
     },
     {
       "package": "binary",
-      "version": "0.8.9.1"
+      "version": "0.8.9.2"
+    },
+    {
+      "package": "transformers",
+      "version": "0.6.1.1"
+    },
+    {
+      "package": "mtl",
+      "version": "2.3.1"
+    },
+    {
+      "package": "stm",
+      "version": "2.5.3.1"
+    },
+    {
+      "package": "exceptions",
+      "version": "0.10.7"
+    },
+    {
+      "package": "os-string",
+      "version": "2.0.2"
     },
     {
       "package": "filepath",
-      "version": "1.4.2.2"
+      "version": "1.5.2.0"
     },
     {
       "package": "time",
@@ -58,39 +82,23 @@
     },
     {
       "package": "unix",
-      "version": "2.7.3"
+      "version": "2.8.5.1"
     },
     {
       "package": "directory",
-      "version": "1.3.7.1"
-    },
-    {
-      "package": "transformers",
-      "version": "0.5.6.2"
-    },
-    {
-      "package": "mtl",
-      "version": "2.2.2"
+      "version": "1.3.8.3"
     },
     {
       "package": "text",
-      "version": "2.0.1"
+      "version": "2.1.1"
     },
     {
       "package": "parsec",
-      "version": "3.1.15.0"
+      "version": "3.1.17.0"
     },
     {
       "package": "process",
-      "version": "1.6.15.0"
-    },
-    {
-      "package": "stm",
-      "version": "2.5.1.0"
-    },
-    {
-      "package": "exceptions",
-      "version": "0.10.5"
+      "version": "1.6.19.0"
     }
   ],
   "dependencies": [
@@ -179,15 +187,6 @@
       "source": "local",
       "src_sha256": null,
       "version": "0.1.0.0"
-    },
-    {
-      "cabal_sha256": "704ea0b499f9d4e43c98fd11e2fcf6b8762a1daa91114aa195966ebcc76a8d51",
-      "flags": [],
-      "package": "os-string",
-      "revision": 0,
-      "source": "hackage",
-      "src_sha256": "3fcc0d7657207d5ee45ce8994a74c5baa2f1149bbd28b3b75e2f646ed4a7251c",
-      "version": "2.0.2.2"
     },
     {
       "cabal_sha256": "ae22238274c572aa91e90c6c353e7206386708912ac5e6dc40ac61d1dcc553db",
