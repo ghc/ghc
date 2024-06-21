@@ -15,7 +15,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Switch
-import GHC.Cmm.Info.Build
+-- import GHC.Cmm.Info.Build
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable as Outputable
@@ -119,18 +119,18 @@ instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (GenCmmDecl a b Cmm
   uniqRename (CmmData sec d)
     = CmmData <$> uniqRename sec <*> uniqRename d
 
-instance UniqRenamable ModuleSRTInfo where
-  uniqRename
-    ModuleSRTInfo{thisModule, dedupSRTs, flatSRTs, moduleSRTMap}
-    -- ROMES:TODO: I feel like we don't really need to do this for all of these maps, and can shortcut some of this
-    -- Nonetheless, in order to produce a working prototype, I'm just always renaming them all. We can optimise later.
-      = ModuleSRTInfo thisModule <$> uniqRename dedupSRTs <*> uniqRename flatSRTs <*> uniqRename moduleSRTMap
+-- instance UniqRenamable ModuleSRTInfo where
+--   uniqRename
+--     ModuleSRTInfo{thisModule, dedupSRTs, flatSRTs, moduleSRTMap}
+--     -- ROMES:TODO: I feel like we don't really need to do this for all of these maps, and can shortcut some of this
+--     -- Nonetheless, in order to produce a working prototype, I'm just always renaming them all. We can optimise later.
+--       = ModuleSRTInfo thisModule <$> uniqRename dedupSRTs <*> uniqRename flatSRTs <*> uniqRename moduleSRTMap
 
-instance UniqRenamable SRTEntry where
-  uniqRename (SRTEntry cl) = SRTEntry <$> uniqRename cl
+-- instance UniqRenamable SRTEntry where
+--   uniqRename (SRTEntry cl) = SRTEntry <$> uniqRename cl
 
-instance UniqRenamable CAFfyLabel where
-  uniqRename (CAFfyLabel cl) = CAFfyLabel <$> uniqRename cl
+-- instance UniqRenamable CAFfyLabel where
+--   uniqRename (CAFfyLabel cl) = CAFfyLabel <$> uniqRename cl
 
 instance UniqRenamable CmmDataDecl where
   uniqRename (CmmData sec d)

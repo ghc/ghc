@@ -14,6 +14,7 @@ module GHC.StgToCmm ( codeGen ) where
 
 import GHC.Prelude as Prelude
 
+import GHC.Cmm.UniqueRenamer
 import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
