@@ -15,9 +15,7 @@ import Text.PrettyPrint
 import Data.Word
 import Data.Bits
 import Data.List        ( intersperse, nub, sort )
-import System.Exit
 import System.Environment
-import System.IO
 import Control.Arrow ((***))
 
 {-
@@ -78,8 +76,10 @@ data TargetInfo = TargetInfo
 parseTargetInfo :: FilePath -> IO TargetInfo
 parseTargetInfo path = do
   header <- readFile path
-  let tups = [ (k, read v) | '/':'/':' ':l <- lines header, let [k, v] = words l ]
-      tups_get k = v where Just v = lookup k tups
+  let tups = [ (k, read v) | '/':'/':' ':l <- lines header, [k, v] <- [words l] ]
+      tups_get k = case lookup k tups of
+                    Nothing -> error "genapply.parseTargetInfo: Missing key"
+                    Just v  -> v
       tag_bits = tups_get "TAG_BITS"
   pure TargetInfo {
     maxRealVanillaReg = tups_get "MAX_Real_Vanilla_REG",
@@ -442,7 +442,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
               adj_reg_locs = [ (reg, off - adj + 1) |
                                (reg,off) <- extra_reg_locs ]
               adj = case extra_reg_locs of
-                      (reg, fst_off):_ -> fst_off
+                      (_reg, fst_off):_ -> fst_off
                       [] -> error "Impossible: genapply.hs : No extra register locations"
               size = snd (last adj_reg_locs) + 1
 
