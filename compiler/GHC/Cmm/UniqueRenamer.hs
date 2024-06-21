@@ -15,10 +15,13 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Switch
+import GHC.Cmm.Info.Build
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable as Outputable
 import Data.Tuple (swap)
+import qualified Data.Map as M
+import qualified Data.Set as S
 
 {-
 --------------------------------------------------------------------------------
@@ -76,8 +79,8 @@ renameDetUniq uq = do
       return det_uniq
 
 -- Rename local symbols deterministically (in order of appearance)
-detRenameUniques :: DetUniqFM -> CmmGroup -> (DetUniqFM, CmmGroup)
-detRenameUniques dufm group = swap $ runState (mapM uniqRename group) dufm
+detRenameUniques :: UniqRenamable a => DetUniqFM -> a -> (DetUniqFM, a)
+detRenameUniques dufm x = swap $ runState (uniqRename x) dufm
 
 -- The most important function here, which does the actual renaming.
 -- Arguably, maybe we should rename this to CLabelRenamer
@@ -110,20 +113,24 @@ instance UniqRenamable CmmTickScope where
   -- ROMES:TODO: We may have to change this to get deterministic objects with ticks.
   uniqRename = pure
 
--- * Traversals from here on out
-
--- ROMES:TODO: Delete RawCmmStatics instanceS?
-instance UniqRenamable (GenCmmDecl RawCmmStatics (LabelMap RawCmmStatics) CmmGraph) where
+instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (GenCmmDecl a b CmmGraph) where
   uniqRename (CmmProc h lbl regs g)
-    = CmmProc <$> uniqRename h <*> uniqRename lbl <*> mapM uniqRename regs <*> uniqRename g
+    = CmmProc <$> uniqRename h <*> uniqRename lbl <*> uniqRename regs <*> uniqRename g
   uniqRename (CmmData sec d)
     = CmmData <$> uniqRename sec <*> uniqRename d
 
-instance UniqRenamable (GenCmmDecl CmmStatics CmmTopInfo CmmGraph) where
-  uniqRename (CmmProc h lbl regs g)
-    = CmmProc <$> uniqRename h <*> uniqRename lbl <*> mapM uniqRename regs <*> uniqRename g
-  uniqRename (CmmData sec d)
-    = CmmData <$> uniqRename sec <*> uniqRename d
+instance UniqRenamable ModuleSRTInfo where
+  uniqRename
+    ModuleSRTInfo{thisModule, dedupSRTs, flatSRTs, moduleSRTMap}
+    -- ROMES:TODO: I feel like we don't really need to do this for all of these maps, and can shortcut some of this
+    -- Nonetheless, in order to produce a working prototype, I'm just always renaming them all. We can optimise later.
+      = ModuleSRTInfo thisModule <$> uniqRename dedupSRTs <*> uniqRename flatSRTs <*> uniqRename moduleSRTMap
+
+instance UniqRenamable SRTEntry where
+  uniqRename (SRTEntry cl) = SRTEntry <$> uniqRename cl
+
+instance UniqRenamable CAFfyLabel where
+  uniqRename (CAFfyLabel cl) = CAFfyLabel <$> uniqRename cl
 
 instance UniqRenamable CmmTopInfo where
   uniqRename TopInfo{info_tbls, stack_info}
@@ -167,8 +174,7 @@ instance UniqRenamable CmmLit where
 
 instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
   => UniqRenamable (LabelMap a) where
-    -- ROMES:TODO: Can a rename of the map have collisions and we lose values? Think harder...
-  uniqRename lm = mapFromListWith (\_ _ -> error "very bad") <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
+  uniqRename lm = mapFromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
 
 instance UniqRenamable CmmGraph where
   uniqRename (CmmGraph e g) = CmmGraph <$> uniqRename e <*> uniqRename g
@@ -241,9 +247,25 @@ instance UniqRenamable CmmReg where
     CmmLocal l -> CmmLocal <$> uniqRename l
     CmmGlobal x -> pure $ CmmGlobal x
 
+instance UniqRenamable a => UniqRenamable [a] where
+  uniqRename = mapM uniqRename
+
 instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (a, b) where
   uniqRename (a, b) = (,) <$> uniqRename a <*> uniqRename b
 
 instance (UniqRenamable a) => UniqRenamable (Maybe a) where
   uniqRename Nothing = pure Nothing
   uniqRename (Just x) = Just <$> uniqRename x
+
+instance (Ord a, UniqRenamable a, UniqRenamable b) => UniqRenamable (M.Map a b) where
+  uniqRename m = M.fromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (M.toList m)
+
+instance (Ord a, UniqRenamable a) => UniqRenamable (S.Set a) where
+  -- Because of renaming being injective the resulting set should have the same
+  -- size as the intermediate list.
+  uniqRename s = S.fromList <$> mapM uniqRename (S.toList s)
+
+-- | Utility panic used by UniqRenamable instances for Map-like datatypes
+panicMapKeysNotInjective :: a -> b -> c
+panicMapKeysNotInjective _ _ = error "this should be impossible because the function which maps keys should be injective"
+

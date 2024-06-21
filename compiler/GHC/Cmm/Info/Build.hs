@@ -9,6 +9,10 @@ module GHC.Cmm.Info.Build
   ( CAFSet, CAFEnv, cafAnal, cafAnalData
   , doSRTs, ModuleSRTInfo (..), emptySRT
   , SRTMap, srtMapNonCAFs
+
+  -- * Some internal bits
+  , SRTEntry(..)
+  , CAFfyLabel(..)
   ) where
 
 import GHC.Prelude hiding (succ)

@@ -47,7 +47,7 @@ cmmPipeline
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, (DetUniqFM, CmmGroupSRTs)) -- Output CPS transformed C--
 
-cmmPipeline logger cmm_config srtInfo detRnEnv prog = do
+cmmPipeline logger cmm_config srtInfo detRnEnv0 prog = do
   let forceRes (info, group) = info `seq` foldr seq () group
   let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
@@ -57,13 +57,21 @@ cmmPipeline logger cmm_config srtInfo detRnEnv prog = do
      -- For example, the fix-up action in the ASM NCG should use determinist names for potential new blocks it has to create.
      -- Therefore, in the ASM NCG `NatM` Monad we use a deterministic `UniqSuply` (which won't be shared about multiple threads)
      -- TODO: Put these all into notes carefully organized
-     let (rn_mapping, renamed_prog) = detRenameUniques detRnEnv prog -- TODO: if gopt Opt_DeterministicObjects dflags
+     let (detRnEnv1, renamed_prog) = detRenameUniques detRnEnv0 prog -- TODO: if gopt Opt_DeterministicObjects dflags
 
      (procs, data_) <- {-# SCC "tops" #-} partitionWithM (cpsTop logger platform cmm_config) renamed_prog
+     -- We also have to rename `data_` since it is not fully determined from
+     -- the renamed CLabels in renamed_prog.
+     -- We may also generate new names in procs, so rename that too.
+     -- We need to do this before SRT generation because otherwise we may look
+     -- at the "old names" within the body of the function we are generating SRTs for.
+     -- Easy easy: rename before and after.
      (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo procs data_
-     dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
+     -- Easy easy: here we go.
+     let (detRnEnv2, (srtInfo_renamed, cmms_renamed)) = detRenameUniques detRnEnv1 (srtInfo, cmms)
+     dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm (uniq-renamed)" FormatCMM (pdoc platform cmms_renamed)
 
-     return (srtInfo, (rn_mapping, cmms))
+     return (srtInfo_renamed, (detRnEnv2, cmms_renamed))
 
 
 -- | The Cmm pipeline for a single 'CmmDecl'. Returns:
