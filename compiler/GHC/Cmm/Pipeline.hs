@@ -19,7 +19,6 @@ import GHC.Cmm.ProcPoint
 import GHC.Cmm.Sink
 import GHC.Cmm.Switch.Implement
 import GHC.Cmm.ThreadSanitizer
-import GHC.Cmm.UniqueRenamer
 
 import GHC.Types.Unique.Supply
 
@@ -43,27 +42,18 @@ cmmPipeline
  :: Logger
  -> CmmConfig
  -> ModuleSRTInfo        -- Info about SRTs generated so far
- -> DetUniqFM
  -> CmmGroup             -- Input C-- with Procedures
- -> IO (ModuleSRTInfo, (DetUniqFM, CmmGroupSRTs)) -- Output CPS transformed C--
+ -> IO (ModuleSRTInfo, CmmGroupSRTs) -- Output CPS transformed C--
 
-cmmPipeline logger cmm_config srtInfo detRnEnv prog = do
+cmmPipeline logger cmm_config srtInfo prog = do
   let forceRes (info, group) = info `seq` foldr seq () group
   let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
-
-     -- To produce deterministic object code, we alpha-rename all Uniques to deterministic uniques before Cmm linting.
-     -- From here on out, the backend code generation can't use (non-deterministic) Uniques, or risk producing non-deterministic code.
-     -- For example, the fix-up action in the ASM NCG should use determinist names for potential new blocks it has to create.
-     -- Therefore, in the ASM NCG `NatM` Monad we use a deterministic `UniqSuply` (which won't be shared about multiple threads)
-     -- TODO: Put these all into notes carefully organized
-     let (rn_mapping, renamed_prog) = detRenameUniques detRnEnv prog -- TODO: if gopt Opt_DeterministicObjects dflags
-
-     (procs, data_) <- {-# SCC "tops" #-} partitionWithM (cpsTop logger platform cmm_config) renamed_prog
+     (procs, data_) <- {-# SCC "tops" #-} partitionWithM (cpsTop logger platform cmm_config) prog
      (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo procs data_
      dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
-     return (srtInfo, (rn_mapping, cmms))
+     return (srtInfo, cmms)
 
 -- | The Cmm pipeline for a single 'CmmDecl'. Returns:
 --
