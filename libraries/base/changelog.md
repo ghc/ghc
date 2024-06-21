@@ -12,7 +12,8 @@
   * Add `inits1` and `tails1` to `Data.List`, factored from the corresponding functions in `Data.List.NonEmpty` ([CLC proposal #252](https://github.com/haskell/core-libraries-committee/issues/252))
   * Add `firstA` and `secondA` to `Data.Bitraversable`. ([CLC proposal #172](https://github.com/haskell/core-libraries-committee/issues/172))
 
-## 4.20.0.0 *TBA*
+## 4.20.0.0 May 2024
+  * Shipped with GHC 9.10.1
   * Deprecate `GHC.Pack` ([#21461](https://gitlab.haskell.org/ghc/ghc/-/issues/21461))
   * Export `foldl'` from `Prelude` ([CLC proposal #167](https://github.com/haskell/core-libraries-committee/issues/167))
   * The top-level handler for uncaught exceptions now displays the output of `displayException` rather than `show`  ([CLC proposal #198](https://github.com/haskell/core-libraries-committee/issues/198))
@@ -45,7 +46,6 @@
   * Implement `many` and `some` methods of `instance Alternative (Compose f g)` explicitly. ([CLC proposal #181](https://github.com/haskell/core-libraries-committee/issues/181))
   * Change the types of the `GHC.Stack.StackEntry.closureType` and `GHC.InfoProv.InfoProv.ipDesc` record fields to use `GHC.Exts.Heap.ClosureType` rather than an `Int`.
     To recover the old value use `fromEnum`. ([CLC proposal #210](https://github.com/haskell/core-libraries-committee/issues/210))
-
   * The functions `GHC.Exts.dataToTag#` and `GHC.Base.getTag` have had
     their types changed to the following:
 
@@ -60,22 +60,21 @@
     matches a `data` or `data instance` declaration) with all of its
     constructors in scope and the levity of `t` is statically known,
     then the constraint `DataToTag t` can always be solved.
+    ([CLC proposal #104](https://github.com/haskell/core-libraries-committee/issues/104))
   * `GHC.Exts` no longer exports the GHC-internal `whereFrom#` primop ([CLC proposal #214](https://github.com/haskell/core-libraries-committee/issues/214))
   * `GHC.InfoProv.InfoProv` now provides a `ipUnitId :: String` field encoding the unit ID of the unit defining the info table ([CLC proposal #214](https://github.com/haskell/core-libraries-committee/issues/214))
-
-    ([CLC proposal #104](https://github.com/haskell/core-libraries-committee/issues/104))
   * Add `sortOn` to `Data.List.NonEmpty`
     ([CLC proposal #227](https://github.com/haskell/core-libraries-committee/issues/227))
-
   * Add more instances for `Compose`: `Fractional`, `RealFrac`, `Floating`, `RealFloat` ([CLC proposal #226](https://github.com/haskell/core-libraries-committee/issues/226))
-
   * Treat all FDs as "nonblocking" on wasm32 ([CLC proposal #234](https://github.com/haskell/core-libraries-committee/issues/234))
-
   * Add `HeapByEra`, `eraSelector` and `automaticEraIncrement` to `GHC.RTS.Flags` to
     reflect the new RTS flags: `-he` profiling mode, `-he` selector and `--automatic-era-increment`.
     ([CLC proposal #254](https://github.com/haskell/core-libraries-committee/issues/254))
+  * Document that certain modules are unstable and not meant to be consumed by the general public ([CLC proposal #146](https://github.com/haskell/core-libraries-committee/issues/146))
+  * Add unaligned `Addr#` primops ([CLC proposal #154](https://github.com/haskell/core-libraries-committee/issues/154))
 
 ## 4.19.0.0 *October 2023*
+  * Shipped with GHC 9.8.1
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
     ([CLC proposal #87](https://github.com/haskell/core-libraries-committee/issues/87) and [#114](https://github.com/haskell/core-libraries-committee/issues/114))
@@ -106,12 +105,15 @@
   * Add more instances for `Compose`: `Enum`, `Bounded`, `Num`, `Real`, `Integral` ([CLC proposal #160](https://github.com/haskell/core-libraries-committee/issues/160))
   * Make `(&)` representation polymorphic in the return type ([CLC proposal #158](https://github.com/haskell/core-libraries-committee/issues/158))
   * Implement `GHC.IORef.atomicSwapIORef` via a new dedicated primop `atomicSwapMutVar#` ([CLC proposal #139](https://github.com/haskell/core-libraries-committee/issues/139))
-  * Change `BufferCodec` to use an unboxed implementation, while providing a compatibility layer using pattern synonyms. ([CLC proposal #134](https://github.com/haskell/core-libraries-committee/issues/134))
+  * Change `BufferCodec` to use an unboxed implementation, while providing a compatibility layer using pattern synonyms. ([CLC proposal #134](https://github.com/haskell/core-libraries-committee/issues/134) and [#178](https://github.com/haskell/core-libraries-committee/issues/178))
   * Add nominal role annotations to `SNat` / `SSymbol` / `SChar` ([CLC proposal #170](https://github.com/haskell/core-libraries-committee/issues/170))
   * Make `Semigroup`'s `stimes` specializable. ([CLC proposal #8](https://github.com/haskell/core-libraries-committee/issues/8))
   * Implement `copyBytes`, `fillBytes`, `moveBytes` and `stimes` for `Data.Array.Byte.ByteArray` using primops ([CLC proposal #188](https://github.com/haskell/core-libraries-committee/issues/188))
   * Add rewrite rules for conversion between `Int64` / `Word64` and `Float` / `Double` on 64-bit architectures ([CLC proposal #203](https://github.com/haskell/core-libraries-committee/issues/203)).
   * `Generic` instances for tuples now expose `Unit`, `Tuple2`, `Tuple3`, ..., `Tuple64` as the actual names for tuple type constructors ([GHC proposal #475](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0475-tuple-syntax.rst)).
+  * Reject `FilePath`s containing interior `NUL`s ([CLC proposal #144](https://github.com/haskell/core-libraries-committee/issues/144))
+  * Add `GHC.JS.Foreign.Callback` module for JavaScript backend ([CLC proposal #150](https://github.com/haskell/core-libraries-committee/issues/150))
+  * Generalize the type of `keepAlive#` and `touch#` ([CLC proposal #152](https://github.com/haskell/core-libraries-committee/issues/152))
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1
