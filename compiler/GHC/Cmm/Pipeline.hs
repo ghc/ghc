@@ -31,6 +31,8 @@ import GHC.Utils.Misc ( partitionWithM )
 import GHC.Platform
 
 import Control.Monad
+import Data.List (mapAccumL)
+import Data.Bifunctor
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -47,7 +49,7 @@ cmmPipeline
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, (DetUniqFM, CmmGroupSRTs)) -- Output CPS transformed C--
 
-cmmPipeline logger cmm_config srtInfo detRnEnv0 prog = do
+cmmPipeline logger cmm_config srtInfo0 detRnEnv0 prog = do
   let forceRes (info, group) = info `seq` foldr seq () group
   let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
@@ -66,12 +68,14 @@ cmmPipeline logger cmm_config srtInfo detRnEnv0 prog = do
      -- We need to do this before SRT generation because otherwise we may look
      -- at the "old names" within the body of the function we are generating SRTs for.
      -- Easy easy: rename before and after.
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo procs data_
-     -- Easy easy: here we go.
-     let (detRnEnv2, (srtInfo_renamed, cmms_renamed)) = detRenameUniques detRnEnv1 (srtInfo, cmms)
-     dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm (uniq-renamed)" FormatCMM (pdoc platform cmms_renamed)
+     -- Easy easy: but that turns out to be really slow, so let's try renaming
+     -- procs and data instead and hope srts are generated using names found there.
+     -- And don't rename procs just yet, ehhh
+     let (detRnEnv2, data_renamed) = mapAccumL (\rne (a,b) -> second (a,) $ detRenameUniques rne b) detRnEnv1 data_
+     (srtInfo1, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo0 procs data_renamed
+     dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm (uniq-renamed)" FormatCMM (pdoc platform cmms)
 
-     return (srtInfo_renamed, (detRnEnv2, cmms_renamed))
+     return (srtInfo1, (detRnEnv2, cmms))
 
 
 -- | The Cmm pipeline for a single 'CmmDecl'. Returns:

@@ -132,6 +132,11 @@ instance UniqRenamable SRTEntry where
 instance UniqRenamable CAFfyLabel where
   uniqRename (CAFfyLabel cl) = CAFfyLabel <$> uniqRename cl
 
+instance UniqRenamable CmmDataDecl where
+  uniqRename (CmmData sec d)
+    = CmmData <$> uniqRename sec <*> uniqRename d
+  uniqRename _ = error "impossible"
+
 instance UniqRenamable CmmTopInfo where
   uniqRename TopInfo{info_tbls, stack_info}
     = TopInfo <$> uniqRename info_tbls <*> pure stack_info
