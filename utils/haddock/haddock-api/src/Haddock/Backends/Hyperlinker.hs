@@ -23,9 +23,14 @@ import System.FilePath
 
 import Data.Map as M
 import GHC.Data.FastString (mkFastString)
+import GHC.Driver.Config.Diagnostic (initDiagOpts)
+import GHC.Driver.DynFlags (DynFlags (extensionFlags, targetPlatform))
 import qualified GHC.Driver.DynFlags as DynFlags
+import GHC.Driver.Session (safeImportsOn, supportedLanguagesAndExtensions)
 import GHC.Iface.Ext.Binary (hie_file_result, readHieFile)
 import GHC.Iface.Ext.Types (HieAST (..), HieASTs (..), HieFile (..), SourcedNodeInfo (..), pattern HiePath)
+import GHC.Parser.Lexer as Lexer
+import GHC.Platform
 import GHC.Types.SrcLoc (mkRealSrcLoc, realSrcLocSpan, srcSpanFile)
 import GHC.Unit.Module (Module, moduleName)
 import qualified GHC.Utils.Outputable as Outputable
@@ -80,7 +85,7 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
       mast
         | M.size asts == 1 = snd <$> M.lookupMin asts
         | otherwise = M.lookup (HiePath (mkFastString file)) asts
-      tokens' = parse dflags sDocContext file rawSrc
+      tokens' = parse parserOpts sDocContext file rawSrc
       ast = fromMaybe (emptyHieAst fileFs) mast
       fullAst = recoverFullIfaceTypes sDocContext types ast
 
@@ -107,7 +112,17 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
   writeUtf8File path . renderToString pretty . render' fullAst $ tokens
   where
     dflags = ifaceDynFlags iface
+    arch_os = platformArchOS (dflags.targetPlatform)
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
+    parserOpts =
+      Lexer.mkParserOpts
+        (dflags.extensionFlags)
+        (initDiagOpts dflags)
+        (supportedLanguagesAndExtensions arch_os)
+        (safeImportsOn dflags)
+        False -- lex Haddocks as comment tokens
+        True -- produce comment tokens
+        False -- produce position pragmas tokens
     render' = render (Just srcCssFile) (Just highlightScript) srcs
     path = srcdir </> hypSrcModuleFile (ifaceMod iface)
 

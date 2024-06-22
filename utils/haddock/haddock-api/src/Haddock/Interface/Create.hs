@@ -56,10 +56,12 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 import GHC.Core.ConLike (ConLike (..))
 import GHC.Data.FastString (FastString, bytesFS, unpackFS)
+import qualified GHC.Driver.Config.Parser as Parser
 import qualified GHC.Driver.DynFlags as DynFlags
 import GHC.Driver.Ppr
 import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Iface.Syntax
+import GHC.Parser.Lexer (ParserOpts)
 import GHC.Types.Avail
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -95,6 +97,8 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
 
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
     dflags = ms_hspp_opts
+    mLanguage = language dflags
+    parserOpts = Parser.initParserOpts dflags
     mdl = mi_module mod_iface
     sem_mdl = mi_semantic_module mod_iface
     is_sig = isJust (mi_sig_of mod_iface)
@@ -148,29 +152,30 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
 
   (!info, header_doc) <-
     processModuleHeader
-      dflags
+      mLanguage
+      parserOpts
       sDocContext
       pkg_name
       safety
       (docs_language mod_iface_docs)
       (docs_extensions mod_iface_docs)
       (docs_mod_hdr mod_iface_docs)
-  mod_warning <- moduleWarning dflags sDocContext warnings
+  mod_warning <- moduleWarning parserOpts sDocContext warnings
 
   (docMap :: DocMap Name) <- do
     let docsDecls = Map.fromList $ UniqMap.nonDetUniqMapToList mod_iface_docs.docs_decls
-    traverse (processDocStringsParas dflags sDocContext pkg_name) docsDecls
+    traverse (processDocStringsParas parserOpts sDocContext pkg_name) docsDecls
 
-  exportsSinceMap <- mkExportSinceMap dflags sDocContext pkg_name mod_iface_docs
+  exportsSinceMap <- mkExportSinceMap parserOpts sDocContext pkg_name mod_iface_docs
 
   (argMap :: Map Name (Map Int (MDoc Name))) <- do
     let docsArgs = Map.fromList $ UniqMap.nonDetUniqMapToList mod_iface_docs.docs_args
     (result :: Map Name (IntMap (MDoc Name))) <-
-      traverse (traverse (processDocStringParas dflags sDocContext pkg_name)) docsArgs
+      traverse (traverse (processDocStringParas parserOpts sDocContext pkg_name)) docsArgs
     let result2 = Map.map (\intMap -> Map.fromList $ IM.assocs intMap) result
     pure result2
 
-  warningMap <- mkWarningMap dflags sDocContext warnings exportedNames
+  warningMap <- mkWarningMap parserOpts sDocContext warnings exportedNames
 
   let local_instances =
         filter (nameIsLocalOrFrom sem_mdl) $
@@ -204,6 +209,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
       (bonus_ds $ docs_structure mod_iface_docs)
       inst_ifaces
       dflags
+      parserOpts
       sDocContext
       def_meths_env
 
@@ -264,17 +270,17 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
 mkExportSinceMap
   :: forall m
    . MonadIO m
-  => DynFlags
+  => ParserOpts
   -> SDocContext
   -> Maybe Package
   -> Docs
   -> IfM m (Map Name MetaSince)
-mkExportSinceMap dflags sDocContext pkg_name docs = do
+mkExportSinceMap parserOpts sDocContext pkg_name docs = do
   Map.unions <$> traverse processExportDoc (UniqMap.nonDetUniqMapToList (docs_exports docs))
   where
     processExportDoc :: (Name, HsDoc GhcRn) -> IfM m (Map Name MetaSince)
     processExportDoc (nm, doc) = do
-      mdoc <- processDocStringsParas dflags sDocContext pkg_name [doc]
+      mdoc <- processDocStringsParas parserOpts sDocContext pkg_name [doc]
       case _doc mdoc of
         DocEmpty -> return ()
         _ -> warn "Export docstrings may only contain @since annotations"
@@ -288,12 +294,12 @@ mkExportSinceMap dflags sDocContext pkg_name docs = do
 
 mkWarningMap
   :: MonadIO m
-  => DynFlags
+  => ParserOpts
   -> SDocContext
   -> IfaceWarnings
   -> [Name]
   -> IfM m WarningMap
-mkWarningMap dflags sDocContext warnings exps =
+mkWarningMap parserOpts sDocContext warnings exps =
   case warnings of
     IfWarnSome ws _ ->
       let expsOccEnv = mkOccEnv [(nameOccName n, n) | n <- exps]
@@ -303,25 +309,25 @@ mkWarningMap dflags sDocContext warnings exps =
             case lookupOccEnv_WithFields expsOccEnv occ of
               (n : _) -> Just (n, w)
               [] -> Nothing
-       in Map.fromList <$> traverse (traverse (parseWarning dflags sDocContext)) ws'
+       in Map.fromList <$> traverse (traverse (parseWarning parserOpts sDocContext)) ws'
     _ -> pure Map.empty
 
 moduleWarning
   :: MonadIO m
-  => DynFlags
+  => ParserOpts
   -> SDocContext
   -> IfaceWarnings
   -> IfM m (Maybe (Doc Name))
-moduleWarning dflags sDocContext (IfWarnAll w) = Just <$> parseWarning dflags sDocContext w
+moduleWarning parserOpts sDocContext (IfWarnAll w) = Just <$> parseWarning parserOpts sDocContext w
 moduleWarning _ _ _ = pure Nothing
 
 parseWarning
   :: MonadIO m
-  => DynFlags
+  => ParserOpts
   -> SDocContext
   -> IfaceWarningTxt
   -> IfM m (Doc Name)
-parseWarning dflags sDocContext w = case w of
+parseWarning parserOpts sDocContext w = case w of
   IfDeprecatedTxt _ msg -> format "Deprecated: " (map dstToDoc msg)
   IfWarningTxt _ _ msg -> format "Warning: " (map dstToDoc msg)
   where
@@ -333,7 +339,7 @@ parseWarning dflags sDocContext w = case w of
 
     format x bs =
       DocWarning . DocParagraph . DocAppend (DocString x)
-        <$> foldrM (\doc rest -> docAppend <$> processDocString dflags sDocContext doc <*> pure rest) DocEmpty bs
+        <$> foldrM (\doc rest -> docAppend <$> processDocString parserOpts sDocContext doc <*> pure rest) DocEmpty bs
 
 -------------------------------------------------------------------------------
 -- Doc options
@@ -401,6 +407,7 @@ mkExportItems
   -> DocStructure
   -> InstIfaceMap
   -> DynFlags
+  -> ParserOpts
   -> SDocContext
   -> OccEnv Name
   -> IfM m [ExportItem GhcRn]
@@ -418,6 +425,7 @@ mkExportItems
   dsItems
   instIfaceMap
   dflags
+  parserOpts
   sDocContext
   defMeths =
     concat <$> traverse lookupExport dsItems
@@ -425,10 +433,10 @@ mkExportItems
       lookupExport :: MonadIO m => DocStructureItem -> IfM m [ExportItem GhcRn]
       lookupExport = \case
         DsiSectionHeading lev hsDoc' -> do
-          doc <- processDocString dflags sDocContext hsDoc'
+          doc <- processDocString parserOpts sDocContext hsDoc'
           pure [ExportGroup lev "" doc]
         DsiDocChunk hsDoc' -> do
-          doc <- processDocStringParas dflags sDocContext pkgName hsDoc'
+          doc <- processDocStringParas parserOpts sDocContext pkgName hsDoc'
           pure [ExportDoc doc]
         DsiNamedChunkRef ref -> do
           case Map.lookup ref namedChunks of
@@ -436,7 +444,7 @@ mkExportItems
               warn $ "Cannot find documentation for: $" ++ ref
               pure []
             Just hsDoc' -> do
-              doc <- processDocStringParas dflags sDocContext pkgName hsDoc'
+              doc <- processDocStringParas parserOpts sDocContext pkgName hsDoc'
               pure [ExportDoc doc]
         DsiExports avails ->
           -- TODO: We probably don't need nubAvails here.
@@ -445,7 +453,7 @@ mkExportItems
         DsiModExport mod_names avails -> do
           -- only consider exporting a module if we are sure we are really
           -- exporting the whole module and not some subset.
-          (unrestricted_mods, remaining_avails) <- unrestrictedModExports dflags thisMod modMap instIfaceMap avails (NE.toList mod_names)
+          (unrestricted_mods, remaining_avails) <- unrestrictedModExports sDocContext thisMod modMap instIfaceMap avails (NE.toList mod_names)
           avail_exps <- concat <$> traverse availExport remaining_avails
           pure (map ExportModule unrestricted_mods ++ avail_exps)
 
@@ -468,7 +476,7 @@ mkExportItems
 
 unrestrictedModExports
   :: MonadIO m
-  => DynFlags
+  => SDocContext
   -> Module
   -- ^ Current Module
   -> IfaceMap
@@ -483,7 +491,7 @@ unrestrictedModExports
   --   , remaining exports not included in any
   --     of these modules
   --   )
-unrestrictedModExports dflags thisMod ifaceMap instIfaceMap avails mod_names = do
+unrestrictedModExports sDocContext thisMod ifaceMap instIfaceMap avails mod_names = do
   mods_and_exports <- fmap catMaybes $ for mod_names $ \mod_name -> do
     let m_local = mkModule (moduleUnit thisMod) mod_name
     case Map.lookup m_local ifaceMap of
@@ -495,10 +503,10 @@ unrestrictedModExports dflags thisMod ifaceMap instIfaceMap avails mod_names = d
           Nothing -> do
             warn $
               "Warning: "
-                ++ pretty dflags thisMod
+                ++ pretty sDocContext thisMod
                 ++ ": Could not find "
                 ++ "documentation for exported module: "
-                ++ pretty dflags mod_name
+                ++ pretty sDocContext mod_name
             pure Nothing
   let unrestricted = filter everythingVisible mods_and_exports
       mod_exps = unionNameSets (map snd unrestricted)
@@ -557,7 +565,7 @@ availExportItem
       declWith :: AvailInfo -> IfM m [ExportItem GhcRn]
       declWith avail = do
         let t = availName avail
-        mayDecl <- hiDecl dflags sDocContext prr t
+        mayDecl <- hiDecl sDocContext prr t
         case mayDecl of
           Nothing -> return [ExportNoDecl t []]
           Just decl -> do
@@ -580,9 +588,9 @@ availExportItem
                       Nothing -> do
                         warn $
                           "Warning: "
-                            ++ pretty dflags thisMod
+                            ++ pretty sDocContext thisMod
                             ++ ": Couldn't find .haddock for export "
-                            ++ pretty dflags t
+                            ++ pretty sDocContext t
                         let subs_ = availNoDocs avail
                         pure (noDocForDecl, subs_)
                       Just instIface ->
@@ -596,7 +604,7 @@ availExportItem
         extractDecl prr dflags sDocContext declName parentDecl >>= \case
           Right d -> pure d
           Left err -> do
-            synifiedDeclOpt <- hiDecl dflags sDocContext prr declName
+            synifiedDeclOpt <- hiDecl sDocContext prr declName
             case synifiedDeclOpt of
               Just synifiedDecl -> pure synifiedDecl
               Nothing -> pprPanic "availExportItem" (O.text err)
@@ -708,16 +716,15 @@ applyExportSince _ _ dd = dd
 
 hiDecl
   :: MonadIO m
-  => DynFlags
-  -> SDocContext
+  => SDocContext
   -> PrintRuntimeReps
   -> Name
   -> IfM m (Maybe (LHsDecl GhcRn))
-hiDecl dflags sDocContext prr t = do
+hiDecl sDocContext prr t = do
   mayTyThing <- lookupName t
   case mayTyThing of
     Nothing -> do
-      warn $ "Warning: Not found in environment: " ++ pretty dflags t
+      warn $ "Warning: Not found in environment: " ++ pretty sDocContext t
       return Nothing
     Just x -> case tyThingToLHsDecl prr x of
       Left m -> (warn $ bugWarn m) >> return Nothing
@@ -830,7 +837,7 @@ extractDecl prr dflags sDocContext name decl
                    in pure (Right $ L pos (SigD noExtField sig))
                 (_, [L pos fam_decl]) -> pure (Right $ L pos (TyClD noExtField (FamDecl noExtField fam_decl)))
                 ([], []) -> do
-                  famInstDeclOpt <- hiDecl dflags sDocContext prr name
+                  famInstDeclOpt <- hiDecl sDocContext prr name
                   case famInstDeclOpt of
                     Nothing ->
                       pure $
@@ -867,7 +874,7 @@ extractDecl prr dflags sDocContext name decl
             pure (SigD noExtField <$> lsig)
         TyClD _ FamDecl{}
           | isValName name -> do
-              famInstOpt <- hiDecl dflags sDocContext prr name
+              famInstOpt <- hiDecl sDocContext prr name
               case famInstOpt of
                 Just famInst -> extractDecl prr dflags sDocContext name famInst
                 Nothing -> pure $ Left ("extractDecl: Unhandled decl for " ++ getOccString name)

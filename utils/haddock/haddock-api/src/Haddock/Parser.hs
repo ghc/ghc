@@ -19,22 +19,20 @@ import Haddock.Types
 
 import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
-import GHC.Driver.Config.Parser (initParserOpts)
-import GHC.Driver.Session (DynFlags)
 import GHC.Parser (parseIdentifier)
-import GHC.Parser.Lexer (ParseResult (PFailed, POk), initParserState, unP)
+import GHC.Parser.Lexer (ParseResult (PFailed, POk), ParserOpts, initParserState, unP)
 import GHC.Types.Name.Occurrence (occNameString)
 import GHC.Types.Name.Reader (RdrName (..))
 import GHC.Types.SrcLoc (GenLocated (..), mkRealSrcLoc)
 
-parseParas :: DynFlags -> Maybe Package -> String -> MetaDoc mod (Wrap NsRdrName)
-parseParas dflags p = overDoc (P.overIdentifier (parseIdent dflags)) . P.parseParas p
+parseParas :: ParserOpts -> Maybe Package -> String -> MetaDoc mod (Wrap NsRdrName)
+parseParas parserOpts p = overDoc (P.overIdentifier (parseIdent parserOpts)) . P.parseParas p
 
-parseString :: DynFlags -> String -> DocH mod (Wrap NsRdrName)
-parseString dflags = P.overIdentifier (parseIdent dflags) . P.parseString
+parseString :: ParserOpts -> String -> DocH mod (Wrap NsRdrName)
+parseString parserOpts = P.overIdentifier (parseIdent parserOpts) . P.parseString
 
-parseIdent :: DynFlags -> Namespace -> String -> Maybe (Wrap NsRdrName)
-parseIdent dflags ns str0 =
+parseIdent :: ParserOpts -> Namespace -> String -> Maybe (Wrap NsRdrName)
+parseIdent parserOpts ns str0 =
   case unP parseIdentifier (pstate str1) of
     POk _ (L _ name)
       -- Guards against things like 'Q.--', 'Q.case', etc.
@@ -47,7 +45,7 @@ parseIdent dflags ns str0 =
     PFailed{} -> Nothing
   where
     realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
-    pstate str = initParserState (initParserOpts dflags) (stringToStringBuffer str) realSrcLc
+    pstate str = initParserState parserOpts (stringToStringBuffer str) realSrcLc
     (wrap, str1) = case str0 of
       '(' : s@(c : _)
         | c /= ','

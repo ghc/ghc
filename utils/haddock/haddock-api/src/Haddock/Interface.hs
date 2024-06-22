@@ -62,6 +62,8 @@ import GHC.Driver.Monad
 import GHC.Driver.Make
 import GHC.Driver.Main
 import GHC.Core.InstEnv
+import qualified GHC.Driver.DynFlags as DynFlags
+import qualified GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session hiding (verbosity)
 import GHC.HsToCore.Docs (getMainDeclBinder)
 import GHC.Types.Error (mkUnknownDiagnostic)
@@ -239,6 +241,7 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap = do
 
   hsc_env <- getSession
   dflags <- getDynFlags
+  let sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
   let hmi = case lookupHpt (hsc_HPT hsc_env) (moduleName $ ms_mod modSummary) of
         Nothing -> error "processModule: All modules should be loaded into the HPT by this point"
         Just x -> x
@@ -294,7 +297,7 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap = do
 
           p :: Outputable a => [a] -> String
           p [] = ""
-          p (x:_) = let n = pretty dflags x
+          p (x:_) = let n = pretty sDocContext x
                         ms = modString ++ "."
                     in if ms `isPrefixOf` n
                        then drop (length ms) n

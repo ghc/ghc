@@ -14,20 +14,17 @@ import qualified Data.ByteString as BS
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (mkFastString)
 import GHC.Data.StringBuffer (StringBuffer, atEnd)
-import GHC.Driver.Config.Diagnostic
-import GHC.Driver.Session
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer as Lexer
   ( P (..)
   , PState (..)
   , ParseResult (..)
+  , ParserOpts
   , Token (..)
   , getPsErrorMessages
   , initParserState
   , lexer
-  , mkParserOpts
   )
-import GHC.Platform
 import qualified GHC.Types.Error as E
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
@@ -44,15 +41,14 @@ import Haddock.GhcUtils
 -- Result should retain original file layout (including comments,
 -- whitespace, and CPP).
 parse
-  :: DynFlags
-  -- ^ Flags for this module
+  :: ParserOpts
   -> SDocContext
   -> FilePath
   -- ^ Path to the source of this module
   -> BS.ByteString
   -- ^ Raw UTF-8 encoded source of this module
   -> [T.Token]
-parse dflags sDocContext fpath bs = case unP (go False []) initState of
+parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
   POk _ toks -> reverse toks
   PFailed pst ->
     let err : _ = bagToList (E.getMessages $ getPsErrorMessages pst)
@@ -60,19 +56,9 @@ parse dflags sDocContext fpath bs = case unP (go False []) initState of
           Outputable.renderWithContext sDocContext $
             text "Hyperlinker parse error:" $$ pprLocMsgEnvelopeDefault err
   where
-    initState = initParserState pflags buf start
+    initState = initParserState parserOpts buf start
     buf = stringBufferFromByteString bs
     start = mkRealSrcLoc (mkFastString fpath) 1 1
-    arch_os = platformArchOS (targetPlatform dflags)
-    pflags =
-      mkParserOpts
-        (extensionFlags dflags)
-        (initDiagOpts dflags)
-        (supportedLanguagesAndExtensions arch_os)
-        (safeImportsOn dflags)
-        False -- lex Haddocks as comment tokens
-        True -- produce comment tokens
-        False -- produce position pragmas tokens
     go
       :: Bool
       -- \^ are we currently in a pragma?

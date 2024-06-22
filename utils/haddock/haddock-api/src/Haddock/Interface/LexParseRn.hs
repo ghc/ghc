@@ -35,6 +35,7 @@ import GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString (unpackFS)
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Parser.Lexer (ParserOpts)
 import GHC.Parser.PostProcess
 import GHC.Types.Avail
 import GHC.Types.Name
@@ -49,39 +50,40 @@ import Haddock.Types
 
 processDocStringsParas
   :: MonadIO m
-  => DynFlags
+  => ParserOpts
   -> SDocContext
   -> Maybe Package
   -> [HsDoc GhcRn]
   -> IfM m (MDoc Name)
-processDocStringsParas dflags sDocContext pkg hdss =
-  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas dflags pkg (renderHsDocStrings $ hsDocString hds)
+processDocStringsParas parserOpts sDocContext pkg hdss =
+  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas parserOpts pkg (renderHsDocStrings $ hsDocString hds)
   where
     hds :: WithHsDocIdentifiers [HsDocString] GhcRn
     hds = WithHsDocIdentifiers (map hsDocString hdss) (concatMap hsDocIdentifiers hdss)
 
 processDocStringParas
   :: MonadIO m
-  => DynFlags
+  => ParserOpts
   -> SDocContext
   -> Maybe Package
   -> HsDoc GhcRn
   -> IfM m (MDoc Name)
-processDocStringParas dflags sDocContext pkg hds =
-  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas dflags pkg (renderHsDocString $ hsDocString hds)
+processDocStringParas parserOpts sDocContext pkg hds =
+  overDocF (rename sDocContext $ hsDocRenamer hds) $ parseParas parserOpts pkg (renderHsDocString $ hsDocString hds)
 
 processDocString
   :: MonadIO m
-  => DynFlags
+  => ParserOpts
   -> SDocContext
   -> HsDoc GhcRn
   -> IfM m (Doc Name)
-processDocString dflags sDocContext hds =
-  rename sDocContext (hsDocRenamer hds) $ parseString dflags (renderHsDocString $ hsDocString hds)
+processDocString parserOpts sDocContext hds =
+  rename sDocContext (hsDocRenamer hds) $ parseString parserOpts (renderHsDocString $ hsDocString hds)
 
 processModuleHeader
   :: MonadIO m
-  => DynFlags
+  => Maybe Language
+  -> ParserOpts
   -> SDocContext
   -> Maybe Package
   -> SafeHaskellMode
@@ -89,13 +91,13 @@ processModuleHeader
   -> EnumSet LangExt.Extension
   -> Maybe (HsDoc GhcRn)
   -> IfM m (HaddockModInfo Name, Maybe (MDoc Name))
-processModuleHeader dflags sDocContext pkgName safety mayLang extSet mayStr = do
+processModuleHeader mLanguage parserOpts sDocContext pkgName safety mayLang extSet mayStr = do
   (hmi, doc) <-
     case mayStr of
       Nothing -> return failure
       Just hsDoc -> do
         let str = renderHsDocString $ hsDocString hsDoc
-            (hmi, doc) = parseModuleHeader dflags pkgName str
+            (hmi, doc) = parseModuleHeader parserOpts pkgName str
             renamer = hsDocRenamer hsDoc
         !descr <- case hmi_description hmi of
           Just hmi_descr -> Just <$> rename sDocContext renamer hmi_descr
@@ -110,7 +112,7 @@ processModuleHeader dflags sDocContext pkgName safety mayLang extSet mayStr = do
   return
     ( hmi
         { hmi_safety = Just $ Outputable.renderWithContext sDocContext (Outputable.ppr safety)
-        , hmi_language = language dflags
+        , hmi_language = mLanguage
         , hmi_extensions = flags
         }
     , doc

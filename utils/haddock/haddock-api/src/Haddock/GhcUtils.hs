@@ -45,7 +45,6 @@ import GHC.Builtin.Types (liftedRepTy)
 import GHC.Core.TyCo.Rep (Type (..))
 import GHC.Core.Type (binderVar, isRuntimeRepVar)
 import GHC.Data.FastString
-import GHC.Driver.Ppr (showPpr)
 import GHC.Driver.Session
 import GHC.Types.Name
 import GHC.Types.SrcLoc (advanceSrcLoc)
@@ -60,7 +59,8 @@ import GHC.Types.Var
 import GHC.Types.Var.Env (TyVarEnv, elemVarEnv, emptyVarEnv, extendVarEnv)
 import GHC.Types.Var.Set (VarSet, emptyVarSet)
 import GHC.Utils.FV as FV
-import GHC.Utils.Outputable (Outputable)
+import GHC.Utils.Outputable (Outputable, SDocContext, ppr)
+import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
 
 import GHC.Data.StringBuffer (StringBuffer)
@@ -131,8 +131,8 @@ isClassD :: HsDecl a -> Bool
 isClassD (TyClD _ d) = isClassDecl d
 isClassD _ = False
 
-pretty :: Outputable a => DynFlags -> a -> String
-pretty = showPpr
+pretty :: Outputable a => SDocContext -> a -> String
+pretty sDocContext thing = Outputable.renderWithContext sDocContext (ppr thing)
 
 dataListModule :: Module
 dataListModule = mkBaseModule (fsLit "Data.List")

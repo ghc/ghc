@@ -18,7 +18,7 @@ module Haddock.Interface.ParseModuleHeader (parseModuleHeader) where
 import Control.Applicative (Alternative (..))
 import Control.Monad (ap)
 import Data.Char
-import GHC.Driver.Session
+import GHC.Parser.Lexer (ParserOpts)
 import Haddock.Parser
 import Haddock.Types
 
@@ -28,8 +28,8 @@ import Haddock.Types
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: DynFlags -> Maybe Package -> String -> (HaddockModInfo NsRdrName, MDoc NsRdrName)
-parseModuleHeader dflags pkgName str0 =
+parseModuleHeader :: ParserOpts -> Maybe Package -> String -> (HaddockModInfo NsRdrName, MDoc NsRdrName)
+parseModuleHeader parserOpts pkgName str0 =
   let
     kvs :: [(String, String)]
     str1 :: String
@@ -53,7 +53,7 @@ parseModuleHeader dflags pkgName str0 =
     portabilityOpt = getKey "Portability"
    in
     ( HaddockModInfo
-        { hmi_description = parseString dflags <$> descriptionOpt
+        { hmi_description = parseString parserOpts <$> descriptionOpt
         , hmi_copyright = copyrightOpt
         , hmi_license = spdxLicenceOpt <|> licenseOpt <|> licenceOpt
         , hmi_maintainer = maintainerOpt
@@ -63,7 +63,7 @@ parseModuleHeader dflags pkgName str0 =
         , hmi_language = Nothing -- set in LexParseRn
         , hmi_extensions = [] -- also set in LexParseRn
         }
-    , parseParas dflags pkgName str1
+    , parseParas parserOpts pkgName str1
     )
 
 -------------------------------------------------------------------------------

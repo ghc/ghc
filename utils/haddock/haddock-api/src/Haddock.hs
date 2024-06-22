@@ -57,6 +57,8 @@ import Data.Maybe
 import Data.IORef
 import Data.Map.Strict (Map)
 import Data.Version (makeVersion)
+import GHC.Parser.Lexer (ParserOpts)
+import qualified GHC.Driver.Config.Parser as Parser
 import qualified Data.Map.Strict as Map
 import System.IO
 import System.Exit
@@ -200,8 +202,14 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       hPutStrLn stderr noCheckWarning
 
   ghc flags' $ withDir $ do
-    dflags <- getDynFlags
-    logger <- getLogger
+    dflags' <- getDynFlags
+    let unicode = Flag_UseUnicode `elem` flags
+    let dflags
+          | unicode = gopt_set dflags' Opt_PrintUnicodeSyntax
+          | otherwise = dflags'
+    logger' <- getLogger
+    let logger = setLogFlags logger' (initLogFlags dflags)
+    let parserOpts = Parser.initParserOpts dflags
     !unit_state <- hsc_units <$> getSession
 
     -- If any --show-interface was used, show the given interfaces
@@ -229,7 +237,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           }
 
       -- Render the interfaces.
-      liftIO $ renderStep logger dflags unit_state flags sinceQual qual packages ifaces
+      liftIO $ renderStep dflags parserOpts logger unit_state flags sinceQual qual packages ifaces
 
     -- If we were not given any input files, error if documentation was
     -- requested
@@ -242,7 +250,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       packages <- liftIO $ readInterfaceFiles name_cache (readIfaceArgs flags) noChecks
 
       -- Render even though there are no input files (usually contents/index).
-      liftIO $ renderStep logger dflags unit_state flags sinceQual qual packages []
+      liftIO $ renderStep dflags parserOpts logger unit_state flags sinceQual qual packages []
 
 -- | Run the GHC action using a temporary output directory
 withTempOutputDir :: Ghc a -> Ghc a
@@ -294,9 +302,18 @@ readPackagesAndProcessModules flags files = do
     return (packages, ifaces, homeLinks)
 
 
-renderStep :: Logger -> DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption
-           -> [(DocPaths, Visibility, FilePath, InterfaceFile)] -> [Interface] -> IO ()
-renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = do
+renderStep
+  :: DynFlags
+  -> ParserOpts
+  -> Logger
+  -> UnitState
+  -> [Flag]
+  -> SinceQual
+  -> QualOption
+  -> [(DocPaths, Visibility, FilePath, InterfaceFile)]
+  -> [Interface]
+  -> IO ()
+renderStep dflags parserOpts logger unit_state flags sinceQual nameQual pkgs interfaces = do
   updateHTMLXRefs (map (\(docPath, _ifaceFilePath, _showModules, ifaceFile) ->
                           ( case baseUrl flags of
                               Nothing  -> docPathsHtml docPath
@@ -312,7 +329,7 @@ renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = d
       (DocPaths {docPathsSources=Just path}, _, _, ifile) <- pkgs
       iface <- ifInstalledIfaces ifile
       return (instMod iface, path)
-  render logger dflags unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
+  render dflags parserOpts logger unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
   where
     -- get package name from unit-id
     packageName :: Unit -> String
@@ -322,10 +339,19 @@ renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = d
         Just pkg -> unitPackageNameString pkg
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: Logger -> DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption -> [Interface]
-       -> [(FilePath, PackageInterfaces)] -> Map Module FilePath -> IO ()
-render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = do
-
+render
+  :: DynFlags
+  -> ParserOpts
+  -> Logger
+  -> UnitState
+  -> [Flag]
+  -> SinceQual
+  -> QualOption
+  -> [Interface]
+  -> [(FilePath, PackageInterfaces)]
+  -> Map Module FilePath
+  -> IO ()
+render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages extSrcMap = do
   let
     packageInfo = PackageInfo { piPackageName    = fromMaybe (PackageName mempty)
                                                  $ optPackageName flags
@@ -344,10 +370,6 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
     opt_latex_style      = optLaTeXStyle     flags
     opt_source_css       = optSourceCssFile  flags
     opt_mathjax          = optMathjax        flags
-    dflags'
-      | unicode          = gopt_set dflags Opt_PrintUnicodeSyntax
-      | otherwise        = dflags
-    logger               = setLogFlags log' (initLogFlags dflags')
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
@@ -443,7 +465,7 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
       _ -> warn' ("Cannot parse reexported module flag '" ++ mod_str ++ "'") >> return [])
 
   libDir   <- getHaddockLibDir flags
-  !prologue <- force <$> getPrologue dflags' flags
+  !prologue <- force <$> getPrologue parserOpts flags
   themes   <- getThemes libDir flags >>= either bye return
 
   let withQuickjump = Flag_QuickJumpIndex `elem` flags
@@ -509,7 +531,7 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
 
             pkgVer =
               fromMaybe (makeVersion []) mpkgVer
-          in ppHoogle dflags' unit_state pkgNameStr pkgVer title (fmap _doc prologue)
+          in ppHoogle dflags unit_state pkgNameStr pkgVer title (fmap _doc prologue)
                visibleIfaces odir
       _ -> putStrLn . unlines $
           [ "haddock: Unable to find a package providing module "
@@ -803,15 +825,15 @@ updateHTMLXRefs packages = do
     mapping' = [ (moduleName m, html) | (m, html) <- mapping ]
 
 
-getPrologue :: DynFlags -> [Flag] -> IO (Maybe (MDoc RdrName))
-getPrologue dflags flags =
+getPrologue :: ParserOpts -> [Flag] -> IO (Maybe (MDoc RdrName))
+getPrologue parserOpts flags =
   case [filename | Flag_Prologue filename <- flags ] of
     [] -> return Nothing
     [filename] -> do
       h <- openFile filename ReadMode
       hSetEncoding h utf8
       str <- hGetContents h -- semi-closes the handle
-      return . Just $! second (fmap rdrName) $ parseParas dflags Nothing str
+      return . Just $! second (fmap rdrName) $ parseParas parserOpts Nothing str
     _ -> throwE "multiple -p/--prologue options"
 
 
