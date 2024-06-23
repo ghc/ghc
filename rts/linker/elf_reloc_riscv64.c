@@ -3,7 +3,7 @@
 #include "Rts.h"
 #include "Stg.h"
 #include "SymbolExtras.h"
-#include <elf.h>
+#include "linker/ElfTypes.h"
 #include "elf_plt.h"
 #include "elf_util.h"
 #include "rts/Messages.h"
