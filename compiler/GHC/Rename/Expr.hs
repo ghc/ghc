@@ -906,7 +906,7 @@ rnCmd (HsCmdArrApp _ arrow arg ho rtl)
         -- inside 'arrow'.  In the higher-order case (-<<), they are.
 
 -- infix form
-rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
+rnCmd (HsCmdArrForm _ op Infix _ [arg1, arg2])
   = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
        ; let L _ (HsVar _ (L _ op_name)) = op'
        ; (arg1',fv_arg1) <- rnCmdTop arg1
