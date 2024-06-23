@@ -8,6 +8,22 @@ module Haddock.Backends.Hyperlinker
   , module Haddock.Backends.Hyperlinker.Utils
   ) where
 
+import Data.Map as M
+import Data.Maybe
+import GHC.Data.FastString (mkFastString)
+import GHC.Platform
+import GHC.Driver.Config.Diagnostic (initDiagOpts)
+import GHC.Driver.Session (supportedLanguagesAndExtensions, safeImportsOn)
+import GHC.Parser.Lexer as Lexer
+import qualified GHC.Driver.DynFlags as DynFlags
+import GHC.Iface.Ext.Binary (hie_file_result, readHieFile)
+import GHC.Iface.Ext.Types (HieAST (..), HieASTs (..), HieFile (..), SourcedNodeInfo (..), pattern HiePath)
+import GHC.Types.SrcLoc (mkRealSrcLoc, realSrcLocSpan, srcSpanFile)
+import GHC.Unit.Module (Module, moduleName)
+import qualified GHC.Utils.Outputable as Outputable
+import System.Directory
+import System.FilePath
+
 import Haddock.Backends.Hyperlinker.Parser
 import Haddock.Backends.Hyperlinker.Renderer
 import Haddock.Backends.Hyperlinker.Types
@@ -16,24 +32,6 @@ import Haddock.Backends.Xhtml.Utils (renderToString)
 import Haddock.InterfaceFile
 import Haddock.Types
 import Haddock.Utils (Verbosity, out, verbose, writeUtf8File)
-
-import Data.Maybe
-import System.Directory
-import System.FilePath
-
-import Data.Map as M
-import GHC.Data.FastString (mkFastString)
-import GHC.Driver.Config.Diagnostic (initDiagOpts)
-import GHC.Driver.DynFlags (DynFlags (extensionFlags, targetPlatform))
-import qualified GHC.Driver.DynFlags as DynFlags
-import GHC.Driver.Session (safeImportsOn, supportedLanguagesAndExtensions)
-import GHC.Iface.Ext.Binary (hie_file_result, readHieFile)
-import GHC.Iface.Ext.Types (HieAST (..), HieASTs (..), HieFile (..), SourcedNodeInfo (..), pattern HiePath)
-import GHC.Parser.Lexer as Lexer
-import GHC.Platform
-import GHC.Types.SrcLoc (mkRealSrcLoc, realSrcLocSpan, srcSpanFile)
-import GHC.Unit.Module (Module, moduleName)
-import qualified GHC.Utils.Outputable as Outputable
 
 -- | Generate hyperlinked source for given interfaces.
 --

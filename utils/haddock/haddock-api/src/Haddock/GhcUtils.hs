@@ -30,22 +30,25 @@
 module Haddock.GhcUtils where
 
 import Control.Arrow
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BS
 import Data.Char (isSpace)
 import Data.Foldable (toList)
 import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
-
-import Haddock.Types (DocName, DocNameI, XRecCond)
-
 import GHC
 import GHC.Builtin.Names
 import GHC.Builtin.Types (liftedRepTy)
 import GHC.Core.TyCo.Rep (Type (..))
 import GHC.Core.Type (binderVar, isRuntimeRepVar)
 import GHC.Data.FastString
+import GHC.Data.StringBuffer (StringBuffer)
+import qualified GHC.Data.StringBuffer as S
 import GHC.Driver.Session
+import GHC.HsToCore.Docs hiding (sigNameNoLoc)
 import GHC.Types.Name
 import GHC.Types.SrcLoc (advanceSrcLoc)
 import GHC.Types.Var
@@ -63,14 +66,7 @@ import GHC.Utils.Outputable (Outputable, SDocContext, ppr)
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
 
-import GHC.Data.StringBuffer (StringBuffer)
-import qualified GHC.Data.StringBuffer as S
-
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Internal as BS
-
-import GHC.HsToCore.Docs hiding (sigNameNoLoc)
+import Haddock.Types (DocName, DocNameI, XRecCond)
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName

@@ -19,6 +19,7 @@ import Control.Applicative (Alternative (..))
 import Control.Monad (ap)
 import Data.Char
 import GHC.Parser.Lexer (ParserOpts)
+
 import Haddock.Parser
 import Haddock.Types
 

@@ -20,21 +20,6 @@ module Haddock.Backends.LaTeX
   ( ppLaTeX
   ) where
 
-import Documentation.Haddock.Markup
-import GHC.Utils.Ppr hiding (Doc, quote)
-import qualified GHC.Utils.Ppr as Pretty
-import Haddock.Doc (combineDocumentation)
-import Haddock.GhcUtils
-import Haddock.Types
-import Haddock.Utils
-
-import GHC hiding (fromMaybeContext)
-import GHC.Core.Type (Specificity (..))
-import GHC.Data.FastString (unpackFS)
-import GHC.Types.Name (getOccString, nameOccName, tidyNameOcc)
-import GHC.Types.Name.Occurrence
-import GHC.Types.Name.Reader (rdrNameOcc)
-
 import Control.Monad
 import Data.Char
 import Data.Foldable (toList)
@@ -42,9 +27,23 @@ import Data.List (sort)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
 import Data.Maybe
+import GHC hiding (fromMaybeContext)
+import GHC.Core.Type (Specificity (..))
+import GHC.Data.FastString (unpackFS)
+import GHC.Types.Name (getOccString, nameOccName, tidyNameOcc)
+import GHC.Types.Name.Occurrence
+import GHC.Types.Name.Reader (rdrNameOcc)
 import System.Directory
 import System.FilePath
 import Prelude hiding ((<>))
+
+import Documentation.Haddock.Markup
+import GHC.Utils.Ppr hiding (Doc, quote)
+import qualified GHC.Utils.Ppr as Pretty
+import Haddock.Doc (combineDocumentation)
+import Haddock.GhcUtils
+import Haddock.Types
+import Haddock.Utils
 
 {- SAMPLE OUTPUT
 

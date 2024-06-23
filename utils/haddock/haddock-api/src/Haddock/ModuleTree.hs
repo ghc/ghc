@@ -13,13 +13,12 @@
 -- Portability :  portable
 module Haddock.ModuleTree (ModuleTree (..), mkModuleTree) where
 
-import Haddock.Types (MDoc)
-
+import qualified Control.Applicative as A
 import GHC (Name)
 import GHC.Unit.Module (Module, moduleName, moduleNameString, moduleUnit, unitString)
 import GHC.Unit.State (UnitState, lookupUnit, unitPackageIdString)
 
-import qualified Control.Applicative as A
+import Haddock.Types (MDoc)
 
 data ModuleTree = Node String (Maybe Module) (Maybe String) (Maybe String) (Maybe (MDoc Name)) [ModuleTree]
 

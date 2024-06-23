@@ -49,19 +49,19 @@ import Control.Monad.State.Strict
 import Data.Data (Data)
 import Data.Map (Map)
 import qualified Data.Set as Set
-import Documentation.Haddock.Types
+import GHC
 import qualified GHC.Data.Strict as Strict
+import GHC.Driver.Session (Language)
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Fixity (Fixity (..))
 import GHC.Types.Name (stableNameCmp)
+import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
 import GHC.Types.SrcLoc (BufPos (..), BufSpan (..))
 import GHC.Types.Var (Specificity)
-
-import GHC
-import GHC.Driver.Session (Language)
-import qualified GHC.LanguageExtensions as LangExt
-import GHC.Types.Name.Occurrence
 import GHC.Utils.Outputable
+
+import Documentation.Haddock.Types
 
 -----------------------------------------------------------------------------
 

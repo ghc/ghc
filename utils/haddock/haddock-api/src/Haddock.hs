@@ -29,22 +29,6 @@ module Haddock (
   withGhc
 ) where
 
-import Haddock.Backends.Xhtml
-import Haddock.Backends.Xhtml.Meta
-import Haddock.Backends.Xhtml.Themes (getThemes)
-import Haddock.Backends.LaTeX
-import Haddock.Backends.Hoogle
-import Haddock.Backends.Hyperlinker
-import Haddock.Interface
-import Haddock.Interface.Json
-import Haddock.Parser
-import Haddock.Types
-import Haddock.Version
-import Haddock.InterfaceFile
-import Haddock.Options
-import Haddock.Utils
-import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir)
-
 import Control.DeepSeq (force)
 import Control.Monad hiding (forM_)
 import Control.Monad.IO.Class (MonadIO(..))
@@ -63,7 +47,6 @@ import qualified Data.Map.Strict as Map
 import System.IO
 import System.Exit
 import System.FilePath
-
 #ifdef IN_GHC_TREE
 import System.Environment (getExecutablePath)
 #else
@@ -71,7 +54,6 @@ import qualified GHC.Paths as GhcPaths
 import Paths_haddock_api (getDataDir)
 #endif
 import System.Directory (doesDirectoryExist, getTemporaryDirectory)
-
 import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import GHC.Settings.Config
@@ -85,6 +67,22 @@ import GHC.Types.Name.Cache
 import GHC.Unit
 import GHC.Utils.Panic (handleGhcException)
 import GHC.Data.FastString
+
+import Haddock.Backends.Xhtml
+import Haddock.Backends.Xhtml.Meta
+import Haddock.Backends.Xhtml.Themes (getThemes)
+import Haddock.Backends.LaTeX
+import Haddock.Backends.Hoogle
+import Haddock.Backends.Hyperlinker
+import Haddock.Interface
+import Haddock.Interface.Json
+import Haddock.Parser
+import Haddock.Types
+import Haddock.Version
+import Haddock.InterfaceFile
+import Haddock.Options
+import Haddock.Utils
+import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir)
 
 --------------------------------------------------------------------------------
 -- * Exception handling

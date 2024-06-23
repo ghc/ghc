@@ -7,6 +7,7 @@ module Haddock.Doc
   ) where
 
 import Data.Maybe
+
 import Documentation.Haddock.Doc
 import Haddock.Types
 import Haddock.Utils (mkMeta)

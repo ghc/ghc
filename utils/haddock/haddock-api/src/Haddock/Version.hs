@@ -18,12 +18,13 @@ module Haddock.Version
   , projectUrl
   ) where
 
+import Data.Version (showVersion)
+
 #ifdef IN_GHC_TREE
 import Paths_haddock ( version )
 #else
 import Paths_haddock_api ( version )
 #endif
-import Data.Version (showVersion)
 
 projectName :: String
 projectName = "Haddock"

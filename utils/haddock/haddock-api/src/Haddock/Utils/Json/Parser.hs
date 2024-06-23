@@ -4,19 +4,18 @@ module Haddock.Utils.Json.Parser
   ( parseJSONValue
   ) where
 
-import Prelude hiding (null)
-
 import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus (..))
 import qualified Data.ByteString.Lazy.Char8 as BSCL
 import Data.Char (isHexDigit)
 import Data.Functor (($>))
+import qualified Data.List as List
 import Numeric
 import Text.Parsec.ByteString.Lazy (Parser)
 import Text.ParserCombinators.Parsec ((<?>))
 import qualified Text.ParserCombinators.Parsec as Parsec
+import Prelude hiding (null)
 
-import qualified Data.List as List
 import Haddock.Utils.Json.Types hiding (object)
 
 parseJSONValue :: Parser Value

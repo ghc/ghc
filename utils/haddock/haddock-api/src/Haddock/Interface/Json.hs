@@ -6,15 +6,14 @@ module Haddock.Interface.Json
   , renderJson
   ) where
 
+import Control.Arrow
+import Data.Map (Map)
+import qualified Data.Map as Map
 import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Utils.Json
 import GHC.Utils.Outputable
-
-import Control.Arrow
-import Data.Map (Map)
-import qualified Data.Map as Map
 
 import Haddock.InterfaceFile
 import Haddock.Types

@@ -11,6 +11,7 @@ module Documentation.Haddock.Doc
 
 import Control.Applicative ((<|>))
 import Data.Char (isSpace)
+
 import Documentation.Haddock.Types
 
 docConcat :: [DocH mod id] -> DocH mod id

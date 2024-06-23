@@ -7,10 +7,8 @@ module Haddock.Backends.Hyperlinker.Parser (parse) where
 import Control.Applicative (Alternative (..))
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
-import Data.List (isPrefixOf, isSuffixOf)
-
 import qualified Data.ByteString as BS
-
+import Data.List (isPrefixOf, isSuffixOf)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (mkFastString)
 import GHC.Data.StringBuffer (StringBuffer, atEnd)

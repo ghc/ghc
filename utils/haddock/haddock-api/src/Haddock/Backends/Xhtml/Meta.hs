@@ -1,11 +1,11 @@
 module Haddock.Backends.Xhtml.Meta where
 
-import Haddock.Utils.Json
-import Haddock.Version
-
 import Data.ByteString.Builder (hPutBuilder)
 import System.FilePath ((</>))
 import System.IO (IOMode (WriteMode), withFile)
+
+import Haddock.Utils.Json
+import Haddock.Version
 
 -- | Everytime breaking changes to the Quckjump api
 -- happen this needs to be modified.

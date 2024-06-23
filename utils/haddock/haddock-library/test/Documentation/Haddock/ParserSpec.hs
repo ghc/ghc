@@ -6,13 +6,13 @@ module Documentation.Haddock.ParserSpec (main, spec) where
 
 import Data.Char (isSpace)
 import Data.String
+import Test.Hspec
+import Test.QuickCheck
+import Prelude hiding ((<>))
+
 import Documentation.Haddock.Doc (docAppend)
 import qualified Documentation.Haddock.Parser as Parse
 import Documentation.Haddock.Types
-import Test.Hspec
-import Test.QuickCheck
-
-import Prelude hiding ((<>))
 
 infixr 6 <>
 (<>) :: Doc id -> Doc id -> Doc id

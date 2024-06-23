@@ -56,12 +56,13 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import GHC hiding (anchor)
 import GHC.Types.Name (nameOccName)
+import Text.XHtml hiding (name, quote, title)
+
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
 import Haddock.Utils (makeAnchorId, nameAnchorId)
-import Text.XHtml hiding (name, quote, title)
 
 --------------------------------------------------------------------------------
 

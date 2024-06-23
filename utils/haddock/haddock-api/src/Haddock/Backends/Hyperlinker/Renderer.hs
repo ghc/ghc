@@ -5,11 +5,11 @@
 
 module Haddock.Backends.Hyperlinker.Renderer (render) where
 
-import Haddock.Backends.Hyperlinker.Types
-import Haddock.Backends.Hyperlinker.Utils
-
 import qualified Data.ByteString as BS
 
+import qualified Data.List as List
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils (emptyNodeInfo, isEvidenceContext)
 import GHC.Types.Name (Name, getOccString, isInternalName, nameModule, nameUnique)
@@ -17,15 +17,12 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique (getKey)
 import GHC.Unit.Module (ModuleName, moduleNameString)
 import GHC.Utils.Encoding (utf8DecodeByteString)
-
 import System.FilePath.Posix ((</>))
-
-import qualified Data.List as List
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-
 import Text.XHtml (Html, HtmlAttr, (!))
 import qualified Text.XHtml as Html
+
+import Haddock.Backends.Hyperlinker.Types
+import Haddock.Backends.Hyperlinker.Utils
 
 type StyleClass = String
 

@@ -30,18 +30,17 @@ module Haddock.Backends.Xhtml.Names
   , ppWrappedName
   ) where
 
-import Haddock.Backends.Xhtml.Utils
-import Haddock.GhcUtils
-import Haddock.Types
-import Haddock.Utils
-
 import Data.List (stripPrefix)
-import Text.XHtml hiding (name, p, quote)
-
 import GHC hiding (LexicalFixity (..), anchor)
 import GHC.Data.FastString (unpackFS)
 import GHC.Types.Name
 import GHC.Types.Name.Reader
+import Text.XHtml hiding (name, p, quote)
+
+import Haddock.Backends.Xhtml.Utils
+import Haddock.GhcUtils
+import Haddock.Types
+import Haddock.Utils
 
 -- | Indicator of how to render a 'DocName' into 'Html'
 data Notation

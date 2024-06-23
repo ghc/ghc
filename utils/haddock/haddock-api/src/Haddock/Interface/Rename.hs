@@ -19,18 +19,7 @@
 -- Portability :  portable
 module Haddock.Interface.Rename (renameInterface) where
 
-import Data.Traversable (mapM)
-
-import Haddock.Backends.Hoogle (ppExportD)
-import Haddock.GhcUtils
-import Haddock.Types
-
-import GHC hiding (NoLink)
-import GHC.Builtin.Types (eqTyCon_RDR, tupleDataConName, tupleTyConName)
-import GHC.Types.Name
-import GHC.Types.Name.Reader (RdrName (Exact))
-
-import Control.Applicative
+import Control.Applicative ()
 import Control.DeepSeq (force)
 import Control.Monad hiding (mapM)
 import Control.Monad.Reader
@@ -38,8 +27,17 @@ import Control.Monad.Writer.CPS
 import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Data.Traversable (mapM)
+import GHC hiding (NoLink)
+import GHC.Builtin.Types (eqTyCon_RDR, tupleDataConName, tupleTyConName)
 import GHC.Types.Basic (Boxity (..), TopLevelFlag (..), TupleSort (..))
+import GHC.Types.Name
+import GHC.Types.Name.Reader (RdrName (Exact))
 import Prelude hiding (mapM)
+
+import Haddock.Backends.Hoogle (ppExportD)
+import Haddock.GhcUtils
+import Haddock.Types
 
 -- | Traverse docstrings and ASTs in the Haddock interface, renaming 'Name' to
 -- 'DocName'.

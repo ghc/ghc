@@ -10,20 +10,18 @@ module Haddock.Interface.RenameType
   ( rename
   ) where
 
-import Haddock.Types
-
-import GHC
-import GHC.Data.FastString
-import GHC.Types.Name
-
 import Control.Monad.Trans.State
-
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import GHC
+import GHC.Data.FastString
+import GHC.Types.Name
+
+import Haddock.Types
 
 -- | Haskell AST type representation.
 --

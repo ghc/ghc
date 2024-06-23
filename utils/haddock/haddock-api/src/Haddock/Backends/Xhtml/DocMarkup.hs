@@ -23,6 +23,11 @@ module Haddock.Backends.Xhtml.DocMarkup
   ) where
 
 import Data.List (intersperse)
+import Data.Maybe (fromMaybe)
+import GHC hiding (anchor)
+import GHC.Types.Name
+import Text.XHtml hiding (name, p, quote)
+
 import Documentation.Haddock.Markup
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils
@@ -34,12 +39,6 @@ import Haddock.Doc
   )
 import Haddock.Types
 import Haddock.Utils
-
-import Data.Maybe (fromMaybe)
-import Text.XHtml hiding (name, p, quote)
-
-import GHC hiding (anchor)
-import GHC.Types.Name
 
 parHtmlMarkup
   :: Qualification

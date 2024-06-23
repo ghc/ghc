@@ -36,27 +36,24 @@ module Haddock.InterfaceFile
   , binaryInterfaceVersionCompatibility
   ) where
 
-import Haddock.Types
-
 import Data.Function ((&))
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Version
 import Data.Word
-import Text.ParserCombinators.ReadP (readP_to_S)
-
 import GHC hiding (NoLink)
 import GHC.Data.FastMutInt
 import GHC.Data.FastString
 import GHC.Iface.Binary (getWithUserData, putSymbolTable)
+import GHC.Iface.Type (IfaceType, putIfaceType)
 import GHC.Types.Name.Cache
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Unit.State
 import GHC.Utils.Binary
-
-import GHC.Iface.Type (IfaceType, putIfaceType)
+import Haddock.Types
+import Text.ParserCombinators.ReadP (readP_to_S)
 
 import Haddock.Options (Visibility (..))
 

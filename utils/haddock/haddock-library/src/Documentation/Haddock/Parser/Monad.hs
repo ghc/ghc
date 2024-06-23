@@ -18,6 +18,15 @@
 -- specialized to 'Text').
 module Documentation.Haddock.Parser.Monad where
 
+import Control.Applicative as App
+import Control.Monad (mfilter)
+import Data.Bits (Bits (..))
+import Data.Char (ord)
+import Data.Functor (($>))
+import qualified Data.List as List
+import Data.String (IsString (..))
+import Data.Text (Text)
+import qualified Data.Text as T
 import Text.Parsec
   ( State (..)
   , getParserState
@@ -25,21 +34,9 @@ import Text.Parsec
   )
 import qualified Text.Parsec as Parsec
 import Text.Parsec.Pos (updatePosChar)
-
-import Data.Functor (($>))
-import Data.Text (Text)
-import qualified Data.Text as T
-
-import Control.Applicative as App
-import Control.Monad (mfilter)
-import Data.Bits (Bits (..))
-import Data.Char (ord)
-import qualified Data.List as List
-import Data.String (IsString (..))
+import Prelude hiding (takeWhile)
 
 import Documentation.Haddock.Types (MetaSince (..))
-
-import Prelude hiding (takeWhile)
 
 -- | The only bit of information we really care about trudging along with us
 -- through parsing is the version attached to a @\@since@ annotation - if

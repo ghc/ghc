@@ -5,9 +5,9 @@ module Documentation.Haddock.Markup
   , plainMarkup
   ) where
 
-import Documentation.Haddock.Types
-
 import Data.Maybe (fromMaybe)
+
+import Documentation.Haddock.Types
 
 markup :: DocMarkupH mod id a -> DocH mod id -> a
 markup m DocEmpty = markupEmpty m

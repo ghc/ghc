@@ -21,10 +21,6 @@
 -- Portability :  portable
 module Haddock.Interface.AttachInstances (attachInstances, instHead) where
 
-import Haddock.Convert
-import Haddock.GhcUtils (typeNames)
-import Haddock.Types
-
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
 import Control.DeepSeq (force)
@@ -35,7 +31,6 @@ import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Ord (comparing)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-
 import GHC
 import GHC.Builtin.Types (unrestrictedFunTyConName)
 import GHC.Core (isOrphan)
@@ -64,6 +59,10 @@ import GHC.Unit.Env
 import GHC.Unit.Module.Env (mkModuleSet, moduleSetElts)
 import GHC.Unit.State
 import GHC.Utils.Outputable (sep, text, (<+>))
+
+import Haddock.Convert
+import Haddock.GhcUtils (typeNames)
+import Haddock.Types
 
 type ExportedNames = Set.Set Name
 type Modules = Set.Set Module

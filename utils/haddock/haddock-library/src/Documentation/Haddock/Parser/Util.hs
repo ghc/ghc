@@ -19,17 +19,15 @@ module Documentation.Haddock.Parser.Util
   , skipHorizontalSpace
   ) where
 
-import qualified Text.Parsec as Parsec
-
-import Data.Text (Text)
-import qualified Data.Text as T
-
 import Control.Applicative
 import Control.Monad (mfilter)
-import Documentation.Haddock.Parser.Monad
+import Data.Char (isSpace)
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Text.Parsec as Parsec
 import Prelude hiding (takeWhile)
 
-import Data.Char (isSpace)
+import Documentation.Haddock.Parser.Monad
 
 -- | Characters that count as horizontal space
 horizontalSpace :: Char -> Bool

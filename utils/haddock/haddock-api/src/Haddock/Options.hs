@@ -56,10 +56,11 @@ import Data.Version
 import GHC (Module, moduleUnit)
 import GHC.Data.FastString
 import GHC.Unit.State
-import Haddock.Types
-import Haddock.Utils
 import System.Console.GetOpt
 import qualified Text.ParserCombinators.ReadP as RP
+
+import Haddock.Types
+import Haddock.Utils
 
 data Flag
   = Flag_BuiltInThemes

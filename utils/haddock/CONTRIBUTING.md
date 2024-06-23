@@ -5,7 +5,7 @@ order to make your contribution
 
 ## Reporting issues
 
-Please open a ticket if you get an unexpected behaviour from Haddock!  
+Please open a ticket if you get an unexpected behaviour from Haddock!
 You should ideally include a [Short, Self Contained, Correct (Compilable), Example][SSCCE]
 in your ticket, so that the maintainers may easily reproduce your issue.
 
@@ -37,6 +37,8 @@ Currently, this cannot be done with hadrian but has to be done with a
 cabal test -w <absolute-path-to-ghc-repo>/_build/stage1/bin/ghc
 ```
 
+In order to make the process less burdensome, you can write the path in a cabal.project.local file.
+
 For more details, see https://gitlab.haskell.org/ghc/ghc/-/issues/24976.
 
 ## Working with the codebase
@@ -46,5 +48,9 @@ The project provides a Makefile with rules to accompany you during development:
 * `make style` runs the code formatter. You need `fourmolu` 0.15.0.0 and `cabal-fmt` 0.1.12 installed.
 * `make tags` run the generation of etags/ctags, to enable you to browse to definitions without HLS. You need `ghc-tags` 1.8 installed.
 
+We classify import statements in two blocks:
+
+* Top block is for non-Haddock imports (`base`, `ghc`, `containers`, etc)
+* Bottom block is for Haddock imports
 
 [SSCCE]: http://sscce.org/

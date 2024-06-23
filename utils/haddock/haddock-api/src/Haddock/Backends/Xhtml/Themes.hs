@@ -18,19 +18,18 @@ module Haddock.Backends.Xhtml.Themes
   )
 where
 
-import Haddock.Backends.Xhtml.Types (BaseURL, withBaseURL)
-import Haddock.Options
-
 import Control.Monad (liftM)
 import Data.Char (toLower)
 import Data.Either (lefts, rights)
 import Data.List (nub)
 import Data.Maybe (isJust, listToMaybe)
-
 import System.Directory
 import System.FilePath
 import Text.XHtml hiding (name, p, quote, title, (</>))
 import qualified Text.XHtml as XHtml
+
+import Haddock.Backends.Xhtml.Types (BaseURL, withBaseURL)
+import Haddock.Options
 
 --------------------------------------------------------------------------------
 

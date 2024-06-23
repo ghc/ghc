@@ -27,20 +27,8 @@ module Haddock.Convert
   ) where
 
 import Control.DeepSeq (force)
-import GHC.Core.Class
-import GHC.Core.Coercion.Axiom
-import GHC.Core.ConLike
-import GHC.Core.DataCon
-import GHC.Core.FamInstEnv
-import GHC.Core.PatSyn
-import GHC.Core.TyCo.Compare (eqTypes)
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCon
-import GHC.Core.Type
-import GHC.Types.Basic (DefMethSpec (..), TopLevelFlag (..), TupleSort (..))
-import GHC.Types.Fixity (LexicalFixity (..))
-import GHC.Types.SourceText (SourceText (..))
-
+import Data.Either (lefts, partitionEithers, rights)
+import Data.Maybe (catMaybes, mapMaybe, maybeToList)
 import GHC.Builtin.Names
   ( boxedRepDataConKey
   , eqTyConKey
@@ -58,11 +46,24 @@ import GHC.Builtin.Types
   , unitTy
   )
 import GHC.Builtin.Types.Prim (alphaTyVars)
+import GHC.Core.Class
+import GHC.Core.Coercion.Axiom
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.FamInstEnv
+import GHC.Core.PatSyn
+import GHC.Core.TyCo.Compare (eqTypes)
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCon
+import GHC.Core.Type
 import GHC.Hs
+import GHC.Types.Basic (DefMethSpec (..), TopLevelFlag (..), TupleSort (..))
+import GHC.Types.Fixity (LexicalFixity (..))
 import GHC.Types.Id (idType, setIdType)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (mkVarUnqual)
 import GHC.Types.Name.Set (emptyNameSet)
+import GHC.Types.SourceText (SourceText (..))
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.Unique (getUnique)
@@ -77,15 +78,11 @@ import GHC.Utils.Misc
   , filterOut
   )
 import GHC.Utils.Panic.Plain (assert)
-
 import Language.Haskell.Syntax.Basic (FieldLabelString (..))
 
 import Haddock.GhcUtils (defaultRuntimeRepVars, mkEmptySigType, orderedFVs)
 import Haddock.Interface.RenameType
 import Haddock.Types
-
-import Data.Either (lefts, partitionEithers, rights)
-import Data.Maybe (catMaybes, mapMaybe, maybeToList)
 
 -- | Whether or not to default 'RuntimeRep' variables to 'LiftedRep'. Check
 -- out Note [Defaulting RuntimeRep variables] in GHC.Iface.Type for the

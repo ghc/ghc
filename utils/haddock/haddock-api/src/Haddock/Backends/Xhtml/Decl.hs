@@ -24,6 +24,19 @@ module Haddock.Backends.Xhtml.Decl
   , ppOrphanInstances
   ) where
 
+import Data.Foldable (toList)
+import Data.List (intersperse, sort)
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.Map as Map
+import Data.Maybe
+import GHC hiding (LexicalFixity (..), fromMaybeContext)
+import GHC.Core.Type (Specificity (..))
+import GHC.Data.BooleanFormula
+import GHC.Exts hiding (toList)
+import GHC.Types.Name
+import GHC.Types.Name.Reader (rdrNameOcc)
+import Text.XHtml hiding (name, p, quote, title)
+
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Layout
 import Haddock.Backends.Xhtml.Names
@@ -32,20 +45,6 @@ import Haddock.Backends.Xhtml.Utils
 import Haddock.Doc (combineDocumentation)
 import Haddock.GhcUtils
 import Haddock.Types
-
-import Data.Foldable (toList)
-import Data.List (intersperse, sort)
-import Data.List.NonEmpty (NonEmpty (..))
-import qualified Data.Map as Map
-import Data.Maybe
-import Text.XHtml hiding (name, p, quote, title)
-
-import GHC hiding (LexicalFixity (..), fromMaybeContext)
-import GHC.Core.Type (Specificity (..))
-import GHC.Data.BooleanFormula
-import GHC.Exts hiding (toList)
-import GHC.Types.Name
-import GHC.Types.Name.Reader (rdrNameOcc)
 
 -- | Pretty print a declaration
 ppDecl

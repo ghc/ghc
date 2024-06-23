@@ -26,6 +26,29 @@ module Haddock.Backends.Xhtml
   , ppJsonIndex
   ) where
 
+import Control.DeepSeq (force)
+import Control.Monad (unless, when)
+import Data.Bifunctor (bimap)
+import qualified Data.ByteString.Builder as Builder
+import Data.Char (isSpace, toUpper)
+import Data.Either (partitionEithers)
+import Data.Foldable (traverse_)
+import Data.List (intersperse, isPrefixOf, sortBy)
+import qualified Data.List as List
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Maybe
+import Data.Ord (comparing)
+import qualified Data.Set as Set hiding (Set)
+import GHC hiding (LexicalFixity (..), NoLink, anchor, moduleInfo)
+import GHC.Types.Name
+import GHC.Unit.State
+import System.Directory
+import System.FilePath hiding ((</>))
+import qualified System.FilePath as FilePath
+import qualified System.IO as IO
+import Text.XHtml hiding (name, p, quote, title)
+import qualified Text.XHtml as XHtml
 import Prelude hiding (div)
 
 import Haddock.Backends.Xhtml.Decl
@@ -43,31 +66,6 @@ import Haddock.Types
 import Haddock.Utils
 import Haddock.Utils.Json
 import Haddock.Version
-import Text.XHtml hiding (name, p, quote, title)
-import qualified Text.XHtml as XHtml
-
-import Control.DeepSeq (force)
-import Control.Monad (unless, when)
-import Data.Bifunctor (bimap)
-import qualified Data.ByteString.Builder as Builder
-import Data.Char (isSpace, toUpper)
-import Data.Either (partitionEithers)
-import Data.Foldable (traverse_)
-import Data.List (intersperse, isPrefixOf, sortBy)
-import qualified Data.List as List
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import Data.Maybe
-import Data.Ord (comparing)
-import qualified Data.Set as Set hiding (Set)
-import System.Directory
-import System.FilePath hiding ((</>))
-import qualified System.FilePath as FilePath
-import qualified System.IO as IO
-
-import GHC hiding (LexicalFixity (..), NoLink, anchor, moduleInfo)
-import GHC.Types.Name
-import GHC.Unit.State
 
 --------------------------------------------------------------------------------
 

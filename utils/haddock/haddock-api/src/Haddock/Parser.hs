@@ -13,10 +13,6 @@ module Haddock.Parser
   , parseIdent
   ) where
 
-import qualified Documentation.Haddock.Parser as P
-import Documentation.Haddock.Types
-import Haddock.Types
-
 import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Parser (parseIdentifier)
@@ -24,6 +20,10 @@ import GHC.Parser.Lexer (ParseResult (PFailed, POk), ParserOpts, initParserState
 import GHC.Types.Name.Occurrence (occNameString)
 import GHC.Types.Name.Reader (RdrName (..))
 import GHC.Types.SrcLoc (GenLocated (..), mkRealSrcLoc)
+
+import qualified Documentation.Haddock.Parser as P
+import Documentation.Haddock.Types
+import Haddock.Types
 
 parseParas :: ParserOpts -> Maybe Package -> String -> MetaDoc mod (Wrap NsRdrName)
 parseParas parserOpts p = overDoc (P.overIdentifier (parseIdent parserOpts)) . P.parseParas p

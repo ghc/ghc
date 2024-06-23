@@ -32,20 +32,19 @@ import Data.List (elemIndex, intercalate, intersperse, unfoldr)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid
 import qualified Data.Set as Set
+import Data.Text (Text)
+import qualified Data.Text as T
+import Text.Parsec (try)
+import qualified Text.Parsec as Parsec
+import Prelude hiding (takeWhile)
+import qualified Prelude as P
+
 import Documentation.Haddock.Doc
 import Documentation.Haddock.Markup (markup, plainMarkup)
 import Documentation.Haddock.Parser.Identifier
 import Documentation.Haddock.Parser.Monad
 import Documentation.Haddock.Parser.Util
 import Documentation.Haddock.Types
-import Prelude hiding (takeWhile)
-import qualified Prelude as P
-
-import Text.Parsec (try)
-import qualified Text.Parsec as Parsec
-
-import Data.Text (Text)
-import qualified Data.Text as T
 
 -- $setup
 -- >>> :set -XOverloadedStrings

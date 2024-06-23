@@ -10,17 +10,15 @@ import Control.Monad (when)
 import Data.Foldable (traverse_)
 import qualified Data.List as List
 import Data.Traversable (for)
+import Data.TreeDiff
+import Data.TreeDiff.Golden
 import GHC.Generics (Generic)
+import qualified Options.Applicative as O
 import System.Directory (getDirectoryContents)
 import System.Exit (exitFailure)
 import System.FilePath
 import System.IO
 import Prelude
-
-import Data.TreeDiff
-import Data.TreeDiff.Golden
-
-import qualified Options.Applicative as O
 
 import qualified Documentation.Haddock.Parser as Parse
 import Documentation.Haddock.Types

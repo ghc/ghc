@@ -23,20 +23,18 @@ module Haddock.Backends.Hyperlinker.Utils
   , recoverFullIfaceTypes
   ) where
 
-import Haddock.Backends.Xhtml.Utils
-import Haddock.Utils
-
+import qualified Data.Array as A
 import GHC
 import GHC.Iface.Ext.Types (HieAST (..), HieArgs (..), HieType (..), HieTypeFlat, TypeIndex)
 import GHC.Iface.Type
 import GHC.Types.Name (getOccFS, getOccString)
 import GHC.Types.Var (TypeOrConstraint (..), VarBndr (..), invisArg, visArg)
-
-import System.FilePath.Posix ((<.>), (</>))
-
-import qualified Data.Array as A
 import GHC.Utils.Outputable (SDocContext)
 import qualified GHC.Utils.Outputable as Outputable
+import System.FilePath.Posix ((<.>), (</>))
+
+import Haddock.Backends.Xhtml.Utils
+import Haddock.Utils
 
 {-# INLINE hypSrcDir #-}
 hypSrcDir :: FilePath

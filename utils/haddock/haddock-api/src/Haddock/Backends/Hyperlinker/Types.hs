@@ -3,11 +3,9 @@
 
 module Haddock.Backends.Hyperlinker.Types where
 
-import qualified GHC
-
 import Data.ByteString (ByteString)
-
 import Data.Map (Map)
+import qualified GHC
 
 data Token = Token
   { tkType :: TokenType

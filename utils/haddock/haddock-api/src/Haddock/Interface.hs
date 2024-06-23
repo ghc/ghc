@@ -35,15 +35,6 @@ module Haddock.Interface (
 ) where
 
 
-import Haddock.GhcUtils (moduleString, pretty)
-import Haddock.Interface.AttachInstances (attachInstances)
-import Haddock.Interface.Create (createInterface1)
-import Haddock.Interface.Rename (renameInterface)
-import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
-import Haddock.Options hiding (verbosity)
-import Haddock.Types
-import Haddock.Utils (Verbosity (..), normal, out, verbose)
-
 import Control.Monad
 import Data.List (isPrefixOf)
 import Data.Traversable (for)
@@ -52,7 +43,6 @@ import qualified Data.Set as Set
 import Debug.Trace (traceMarkerIO)
 import System.Exit (exitFailure ) -- TODO use Haddock's die
 import Text.Printf
-
 import GHC hiding (verbosity, SuccessFlag(..))
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed
@@ -82,6 +72,15 @@ import System.IO
 import GHC.IO.Encoding.CodePage (mkLocaleEncoding)
 import GHC.IO.Encoding.Failure (CodingFailureMode(TransliterateCodingFailure))
 #endif
+
+import Haddock.GhcUtils (moduleString, pretty)
+import Haddock.Interface.AttachInstances (attachInstances)
+import Haddock.Interface.Create (createInterface1)
+import Haddock.Interface.Rename (renameInterface)
+import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
+import Haddock.Options hiding (verbosity)
+import Haddock.Types
+import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
 -- | Create 'Interface's and a link environment by typechecking the list of
 -- modules using the GHC API and processing the resulting syntax trees.

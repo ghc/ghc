@@ -67,12 +67,6 @@ module Haddock.Utils
   , getProcessID
   ) where
 
-import Documentation.Haddock.Doc (emptyMetaDoc)
-import Haddock.Types
-
-import GHC
-import GHC.Types.Name
-
 import Control.Monad.Catch (MonadMask, bracket_)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.Char (chr, isAlpha, isAlphaNum, isAscii, ord)
@@ -80,6 +74,8 @@ import Data.IORef (IORef, newIORef, readIORef)
 import Data.List (isSuffixOf)
 import Data.Map (Map)
 import qualified Data.Map as Map hiding (Map)
+import GHC
+import GHC.Types.Name
 import Numeric (showIntAtBase)
 import System.Directory (createDirectory, removeDirectoryRecursive)
 import System.Environment (getProgName)
@@ -91,6 +87,9 @@ import System.IO.Unsafe (unsafePerformIO)
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
 #endif
+
+import Documentation.Haddock.Doc (emptyMetaDoc)
+import Haddock.Types
 
 --------------------------------------------------------------------------------
 

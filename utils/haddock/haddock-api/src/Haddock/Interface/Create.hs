@@ -31,14 +31,7 @@
 -- results 'TypecheckedModule' from GHC.
 module Haddock.Interface.Create (IfM, runIfM, createInterface1) where
 
-import Documentation.Haddock.Doc
-import Haddock.Convert (PrintRuntimeReps (..), tyThingToLHsDecl)
-import Haddock.GhcUtils
-import Haddock.Interface.LexParseRn
-import Haddock.Options (Flag (..), modulePackageInfo)
-import Haddock.Types
-import Haddock.Utils (replace)
-
+import Control.Arrow (first, (&&&))
 import Control.DeepSeq
 import Control.Monad.State.Strict
 import Data.Foldable
@@ -49,8 +42,6 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, isJust, mapMaybe, maybeToList)
 import Data.Traversable (for)
-
-import Control.Arrow (first, (&&&))
 import GHC hiding (lookupName)
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
@@ -74,6 +65,14 @@ import GHC.Utils.Outputable (SDocContext)
 import qualified GHC.Utils.Outputable as O
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (pprPanic)
+
+import Documentation.Haddock.Doc
+import Haddock.Convert (PrintRuntimeReps (..), tyThingToLHsDecl)
+import Haddock.GhcUtils
+import Haddock.Interface.LexParseRn
+import Haddock.Options (Flag (..), modulePackageInfo)
+import Haddock.Types
+import Haddock.Utils (replace)
 
 createInterface1
   :: MonadIO m

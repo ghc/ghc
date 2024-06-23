@@ -41,7 +41,6 @@ import Control.Applicative (Alternative (..))
 import Control.Monad (MonadPlus (..), zipWithM, (>=>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Fail as Fail
-
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BSL
@@ -50,11 +49,7 @@ import Data.Int
 import Data.List (intersperse)
 import Data.Monoid
 import Data.Word
-
 import GHC.Natural
-
--- TODO: We may want to replace 'String' with 'Text' or 'ByteString'
-
 import qualified Text.Parsec.ByteString.Lazy as Parsec.Lazy
 import qualified Text.ParserCombinators.Parsec as Parsec
 

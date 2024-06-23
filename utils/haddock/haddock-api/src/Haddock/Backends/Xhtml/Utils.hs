@@ -52,14 +52,13 @@ module Haddock.Backends.Xhtml.Utils
   , collapseControl
   ) where
 
-import Haddock.Utils
-
-import Text.XHtml hiding (name, p, quote, title)
-import qualified Text.XHtml as XHtml
-
 import GHC (Name, SrcSpan (..), srcSpanStartLine)
 import GHC.Types.Name (getOccString, isValOcc, nameOccName)
 import GHC.Unit.Module (Module, ModuleName, moduleName, moduleNameString)
+import Text.XHtml hiding (name, p, quote, title)
+import qualified Text.XHtml as XHtml
+
+import Haddock.Utils
 
 -- | Replace placeholder string elements with provided values.
 --

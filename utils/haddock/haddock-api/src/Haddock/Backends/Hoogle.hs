@@ -24,29 +24,27 @@ module Haddock.Backends.Hoogle
   , ppExportD
   ) where
 
-import Documentation.Haddock.Markup
-import Haddock.GhcUtils
-import Haddock.Types hiding (Version)
-import Haddock.Utils hiding (out)
-
+import Data.Char
+import Data.Foldable (toList)
+import Data.List (intercalate, isPrefixOf)
+import Data.Maybe
+import Data.Version
 import GHC
 import GHC.Core.InstEnv
+import qualified GHC.Driver.DynFlags as DynFlags
 import GHC.Driver.Ppr
 import GHC.Plugins (TopLevelFlag (..))
 import GHC.Types.SourceText
 import GHC.Unit.State
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-
-import Data.Char
-import Data.Foldable (toList)
-import Data.List (intercalate, isPrefixOf)
-import Data.Maybe
-import Data.Version
-
-import qualified GHC.Driver.DynFlags as DynFlags
 import System.Directory
 import System.FilePath
+
+import Documentation.Haddock.Markup
+import Haddock.GhcUtils
+import Haddock.Types hiding (Version)
+import Haddock.Utils hiding (out)
 
 prefix :: [String]
 prefix =

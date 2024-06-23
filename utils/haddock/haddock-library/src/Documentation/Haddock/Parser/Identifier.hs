@@ -15,8 +15,12 @@ module Documentation.Haddock.Parser.Identifier
   , parseValid
   ) where
 
-import Documentation.Haddock.Parser.Monad
-import Documentation.Haddock.Types (Namespace (..))
+import Control.Monad (guard)
+import Data.Char (isAlpha, isAlphaNum)
+import Data.Functor (($>))
+import Data.Maybe
+import Data.Text (Text)
+import qualified Data.Text as T
 import Text.Parsec
   ( State (..)
   , getParserState
@@ -26,13 +30,8 @@ import qualified Text.Parsec as Parsec
 import Text.Parsec.Pos (updatePosChar)
 import Text.Read.Lex (isSymbolChar)
 
-import Data.Functor (($>))
-import Data.Text (Text)
-import qualified Data.Text as T
-
-import Control.Monad (guard)
-import Data.Char (isAlpha, isAlphaNum)
-import Data.Maybe
+import Documentation.Haddock.Parser.Monad
+import Documentation.Haddock.Types (Namespace (..))
 
 -- | Identifier string surrounded with namespace, opening, and closing quotes/backticks.
 data Identifier = Identifier !Namespace !Char String !Char

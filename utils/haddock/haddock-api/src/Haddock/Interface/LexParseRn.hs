@@ -44,6 +44,7 @@ import GHC.Types.Name.Set
 import GHC.Utils.Misc ((<||>))
 import GHC.Utils.Outputable (Outputable (ppr), SDocContext, renderWithContext)
 import qualified GHC.Utils.Outputable as Outputable
+
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
