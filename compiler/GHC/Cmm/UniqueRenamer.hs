@@ -22,6 +22,8 @@ import GHC.Utils.Outputable as Outputable
 import Data.Tuple (swap)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import GHC.Types.Id
+import GHC.Types.Name (isInternalName)
 
 {-
 --------------------------------------------------------------------------------
@@ -87,6 +89,14 @@ detRenameUniques dufm x = swap $ runState (uniqRename x) dufm
 detRenameCLabel :: CLabel -> DetRnM CLabel
 detRenameCLabel = mapInternalNonDetUniques renameDetUniq
 
+-- | We want to rename uniques in Ids, but ONLY internal ones.
+detRenameId :: Id -> DetRnM Id
+detRenameId i
+    | isInternalName (idName i)
+    = setIdUnique i <$> renameDetUniq (getUnique i)
+    | otherwise
+    = pure i
+
 --------------------------------------------------------------------------------
 -- Traversals
 --------------------------------------------------------------------------------
@@ -149,7 +159,10 @@ instance UniqRenamable CmmStatics where
 
 instance UniqRenamable CmmInfoTable where
   uniqRename CmmInfoTable{cit_lbl, cit_rep, cit_prof, cit_srt, cit_clo}
-      = CmmInfoTable <$> uniqRename cit_lbl <*> pure cit_rep <*> pure cit_prof <*> uniqRename cit_srt <*> pure cit_clo
+      = CmmInfoTable <$> uniqRename cit_lbl <*> pure cit_rep <*> pure cit_prof <*> uniqRename cit_srt <*>
+         (case cit_clo of
+            Nothing -> pure Nothing
+            Just (an_id, ccs) -> Just . (,ccs) <$> detRenameId an_id)
 
 instance UniqRenamable Section where
   uniqRename (Section ty lbl) = Section ty <$> uniqRename lbl
