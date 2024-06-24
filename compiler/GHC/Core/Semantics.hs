@@ -42,8 +42,9 @@ import GHC.Core.FVs
 import GHC.Core.Class
 import GHC.Types.Id.Info
 import GHC.Types.Unique
+import GHC.Builtin.Names
 
-data Event = Lookup Id | LookupArg CoreExpr | Update | App1 | App2 | Case1 | Case2 | Let1
+data Event = Look Id | LookArg CoreExpr | Update | App1 | App2 | Case1 | Case2 | Let1
 
 class Trace d where
   step :: Event -> d -> d
@@ -58,15 +59,15 @@ class Domain d where
   global :: Id -> d
   classOp :: Id -> Class -> d
   primOp :: Id -> PrimOp -> d
-  fun :: Id -> (d -> d) -> d
+  fun :: Var -> (d -> d) -> d
   con :: DataCon -> [d] -> d
-  apply :: d -> d -> d
-  applyTy :: d -> d -- URGHHH otherwise we have no easy way to discern Type Apps
+  apply :: d -> (Bool, d) -> d
   select :: d -> CoreExpr -> Id -> [DAlt d] -> d
-  keepAlive :: [d] -> d -- Used for coercion FVs, unfolding and RULE FVs. No simple semantic description for those; pretend that they may or may not be seq'd.
-  seq_ :: d -> d -> d -- The primitive one. Just like `select a (const False) wildCardId [(DEFAULT, [], \_a _ds -> b)]`, but we don't have available the type of the LHS.
+  keepAlive :: [d] -> d -> d
+    -- ^ "keep alive" the list, but return the second argument.
+    -- Used for coercion FVs, unfolding and RULE FVs. No simple semantic
+    -- description for those; pretend that they may or may not be seq'd.
 type DAlt d = (AltCon, [Id], d -> [d] -> d)
-
 
 data BindHint = BindArg Id | BindLet CoreBind
 class HasBind d where
@@ -74,6 +75,23 @@ class HasBind d where
     -- NB: The `BindHint` bears no semantic sigificance:
     --     `HasBind (D (ByNeed T))` does not look at it.
     --     Still useful for analyses!
+
+keepAliveVars :: Domain d => [Id] -> IdEnv d -> d -> d
+-- Make sure that the given (local) Ids are all "alive", that is, in scope and
+-- reachable through `keepAlive` (which itself is a rather abstract concept).
+keepAliveVars xs env | Just ds <- traverse (lookupVarEnv env) xs = keepAlive ds
+                     | otherwise                                 = const stuck
+
+keepAliveCo :: Domain d => Coercion -> IdEnv d -> d -> d
+-- Coercions are ultimately erased to `coercionToken#` because they are
+-- irrelevant to runtime behavior (of a /well-typed/ program).
+-- Nevertheless, they have a static semantics that requires its free variables
+-- to be present; otherwise the coercion is considered stuck.
+keepAliveCo co = keepAliveVars (nonDetEltsUniqSet $ coVarsOfCo co)
+
+keepAliveUnfRules :: Domain d => Id -> IdEnv d -> d -> d
+-- ^ `keepAlive` the free Ids of an Id's unfolding and RULE RHSs.
+keepAliveUnfRules x = keepAliveVars (nonDetEltsUniqSet $ bndrRuleAndUnfoldingIds x)
 
 feignBndr :: Name -> PiTyBinder -> Var
 feignBndr n (Anon (Scaled mult ty) _) = mkLocalIdOrCoVar n mult ty
@@ -92,51 +110,29 @@ x1,x2 :: Name
 localNames :: [Name]
 localNames@(x1:x2:_) = [ mkSystemName (mkUniqueInt 'I' i) (mkVarOcc "local") | i <- [0..] ]
 
--- The following does not work, because we need the `idType` of `a` in `select`:
--- seq_ :: Domain d => d -> d -> d
--- seq_ a b = select a (const False) wildCardId [(DEFAULT, [], \_a _ds -> b)]
---
--- wildCardId :: Id
--- wildCardId = feignBndr wildCardName (Anon (Scaled ManyTy panicType) FTF_T_T)
---
--- panicType :: HasCallStack => Type
--- panicType = panic "The seq_ case binder should be dead, we don't need its type"
-
-anfise :: (Trace d, Domain d, HasBind d) => Name -> CoreExpr -> IdEnv d -> (d -> d) -> d
-anfise _ (Lit l) _ k = k (lit l)
-anfise _ (Var x) env k = evalVar x env k
-anfise _ (Coercion co) env k = keepAliveCo co env `seq_` k erased
-anfise _ (Type _ty) _ k = k erased
-anfise x (Tick _t e) env k = anfise x e env k
-anfise x (Cast e co) env k = keepAliveCo co env `seq_` anfise x e env k
-anfise x e env k = bind (BindArg (feignId x (exprType e))) [\_ -> eval e env]
-                   (\ds -> let d = step (LookupArg e) (only ds) in
-                           if isUnliftedType (exprType e) && not (exprOkForSpeculation e)
-                             then d `seq_` k d
-                             else k d)
-
-anfiseMany :: (Trace d, Domain d, HasBind d) => [CoreExpr] -> IdEnv d -> ([d] -> d) -> d
-anfiseMany es env k = go (zip localNames es) []
+anfise :: (Trace d, Domain d, HasBind d) => [CoreExpr] -> IdEnv d -> ([d] -> d) -> d
+anfise es env k = go (zip localNames es) []
   where
     go [] ds = k (reverse ds)
-    go ((x,e):es) ds = anfise x e env $ \d -> go es (d:ds)
-
-keepAliveVars :: Domain d => [Id] -> IdEnv d -> d
--- Make sure that the given (local) Ids are all "alive", that is, in scope and
--- reachable through `keepAlive` (which itself is a rather abstract concept).
-keepAliveVars xs env | Just ds <- traverse (lookupVarEnv env) xs = keepAlive ds
-                     | otherwise                                 = stuck
-
-keepAliveCo :: Domain d => Coercion -> IdEnv d -> d
--- Coercions are ultimately erased to `coercionToken#` because they are
--- irrelevant to runtime behavior (of a /well-typed/ program).
--- Nevertheless, they have a static semantics that requires its free variables
--- to be present; otherwise the coercion is considered stuck.
-keepAliveCo co = keepAliveVars (nonDetEltsUniqSet $ coVarsOfCo co)
-
-keepAliveUnfRules :: Domain d => Id -> IdEnv d -> d
--- ^ `keepAlive` the free Ids of an Id's unfolding and RULE RHSs.
-keepAliveUnfRules x = keepAliveVars (nonDetEltsUniqSet $ bndrRuleAndUnfoldingIds x)
+    go ((x,e):es) ds = anf_one x e env $ \d -> go es (d:ds)
+    anf_one _ (Lit l) _ k = k (lit l)
+    anf_one _ (Var x) env k = evalVar x env k
+    anf_one _ (Coercion co) env k = keepAliveCo co env (k erased)
+    anf_one _ (Type _ty) _ k = k erased
+    anf_one x (Tick _t e) env k = anf_one x e env k
+    anf_one x (Cast e co) env k = keepAliveCo co env (anf_one x e env k)
+    anf_one x e env k = bind (BindArg (feignId x e_ty)) [\_ -> eval e env]
+                       (\ds -> let d = step (LookArg e) (only ds) in
+                               if isUnliftedType e_ty && not (exprOkForSpeculation e)
+                                 then seq_ (d,e,e_ty) (k d)
+                                 else k d)
+      where
+        e_ty = exprType e
+        seq_ :: Domain d => (d,CoreExpr,Type) -> d -> d
+        seq_ (a,e,ty) b = select a e wildCardId [(DEFAULT, [], \_a _ds -> b)]
+          where
+            wildCardId :: Id
+            wildCardId = feignBndr wildCardName (Anon (Scaled ManyTy ty) FTF_T_T)
 
 evalConApp :: (Trace d, Domain d, HasBind d) => DataCon -> [d] -> d
 evalConApp dc args = case compareLength args rep_ty_bndrs of
@@ -159,56 +155,49 @@ evalVar x env k = case idDetails x of
   _                -> maybe stuck k (lookupVarEnv env x)
 
 eval :: (Trace d, Domain d, HasBind d) => CoreExpr -> IdEnv d -> d
-eval (Coercion co) env = keepAliveCo co env
+eval (Coercion co) env = keepAliveCo co env erased
 eval (Type _ty) _ = erased
 eval (Lit l) _ = lit l
 eval (Tick _t e) env = eval e env
-eval (Cast e co) env = keepAliveCo co env `seq_` eval e env
+eval (Cast e co) env = keepAliveCo co env (eval e env)
 eval (Var x) env = evalVar x env id
 eval (Lam x e) env = fun x (\d -> step App2 (eval e (extendVarEnv env x d)))
 eval e@App{} env
   | Var v <- f, Just dc <- isDataConWorkId_maybe v
-  = anfiseMany as env (evalConApp dc)
+  = anfise as env (evalConApp dc)
   | otherwise
-  = anfiseMany (f:as) env $ \(df:das) -> -- NB: anfise is a no-op for Vars
+  = anfise (f:as) env $ \(df:das) -> -- NB: anfise is a no-op for Vars
       go df (zipWith (\d a -> (d, isTypeArg a)) das as)
   where
     (f, as) = collectArgs e
     go df [] = df
-    go df ((d,is_ty):ds) = go (step App1 $ app df is_ty d) ds
-    app df {-isTypeArg=-}True  _da = applyTy df -- There must be a better way...
-    app df               False da  = apply   df da
+    go df ((d,is_ty):ds) = go (step App1 $ apply df (is_ty,d)) ds
 eval (Let b@(NonRec x rhs) body) env =
   bind (BindLet b)
        -- See Note [Absence analysis for stable unfoldings and RULES]
-       [\_  -> keepAliveUnfRules x env `seq_`
+       [\_  -> keepAliveUnfRules x env $
                eval rhs env]
-       (\ds -> step Let1 (eval body (extendVarEnv env x (step (Lookup x) (only ds)))))
+       (\ds -> step Let1 (eval body (extendVarEnv env x (step (Look x) (only ds)))))
 eval (Let b@(Rec binds) body) env =
   bind (BindLet b)
-       [\ds -> keepAliveUnfRules x (new_env ds) `seq_`
+       [\ds -> keepAliveUnfRules x (new_env ds) $
                eval rhs  (new_env ds)  | (x,rhs) <- binds]
        (\ds -> step Let1 (eval body (new_env ds)))
   where
     xs = map fst binds
-    new_env ds = extendVarEnvList env (zipWith (\x d -> (x, step (Lookup x) d)) xs ds)
+    new_env ds = extendVarEnvList env (zipWith (\x d -> (x, step (Look x) d)) xs ds)
 eval (Case e b _ty alts) env = step Case1 $
   select (eval e env) e b
          [ (con, xs, cont xs rhs) | Alt con xs rhs <- alts ]
   where
     cont xs rhs scrut ds = step Case2 $
       eval rhs (extendVarEnvList env (zipEqual "eval Case{}" (b:xs) (scrut:ds)))
-        -- TODO: Do we want (step (Lookup b) scrut)? I think not, because Case
-        -- does not actually allocate itself. On the other hand, not all Values
-        -- are currently heap-bound... e.g., case Just x of b -> b would not do
-        -- a lookup transition at all, despite `Just x` living on the heap...
-        -- Urgh, think about it later.
-        -- Literature does not often handle case binders.
-        -- Fast Curry and Frame-limited re-use do not, for example.
-        -- But the former unconditionally let-binds values, thus absolving of
-        -- the problem. Perhaps we should do the same. It's what CorePrep does,
-        -- after all.
+        -- TODO: I think we should ANFise the scrutinee so that the semantics of
+        -- an expression like `case Just x of b -> b` actually reflects the heap
+        -- allocation. Not now.
 
+-- Haven't figured out yet how to do whole programs, because there is no notion
+-- of "evaluation":
 --evalProgram :: (Trace d, Domain d, HasBind d) => [CoreRule] -> CoreProgram -> [d]
 --evalProgram rules binds
 --  where
@@ -224,7 +213,6 @@ eval (Case e b _ty alts) env = step Case1 $
 --
 --    rule_fvs :: IdSet
 --    rule_fvs = rulesRhsFreeIds rules
-
 
 -- By-need semantics, from the paper
 
@@ -243,23 +231,19 @@ data Value τ
   | Con DataCon [D τ]
 
 instance (Trace (D τ), Monad τ) => Domain (D τ) where
-  keepAlive _ = return Erased
   stuck = return Stuck
-  erased = return Erased
   lit l = return (Litt l)
   fun _x f = return (Fun f)
   con k ds = return (Con k ds)
-  apply d a = d >>= \case Fun f -> f a; _ -> stuck
-  applyTy d = d
+  apply d (_b,a) = d >>= \case Fun f -> f a; _ -> stuck
   select d _f _b fs = d >>= \v -> case v of
     Stuck                                                    -> stuck
     Con k ds | Just (_con, _xs, f) <- findAlt (DataAlt k) fs -> f (return v) ds
     Litt l   | Just (_con, _xs, f) <- findAlt (LitAlt l)  fs -> f (return v) []
     _        | Just (_con, _xs, f) <- findAlt DEFAULT     fs -> f (return v) []
     _                                                        -> stuck
-  seq_ a b = a >> b -- The caller may want to insert steps here... Not sure
-  global _        = return Stuck -- For now; looking at the unfolding would need to call `eval`
-  classOp _x _cls = return Stuck -- For now; looking at the unfolding would need to call `eval`
+  global _        = stuck -- For now; looking at the unfolding would need to call `eval`
+  classOp _x _cls = stuck -- For now; looking at the unfolding would need to call `eval`
   primOp _x op = case op of
     IntAddOp -> intop (+)
     IntMulOp -> intop (*)
@@ -272,6 +256,8 @@ instance (Trace (D τ), Monad τ) => Domain (D τ) where
         _ -> Stuck
       binop ty1 ty2 f = mkPap [ty1,ty2] $ \[d1,d2] -> f <$> d1 <*> d2
       int_ty = Anon (Scaled ManyTy intTy) FTF_T_T
+  erased = return Erased
+  keepAlive _ d = d
 
 -- The following function was copy and pasted from GHC.Core.Utils.findAlt:
 findAlt :: AltCon -> [DAlt d] -> Maybe (DAlt d)
@@ -323,8 +309,8 @@ evalByNeed e = runStateT (runByNeed (eval e emptyVarEnv)) WM.empty
 
 -- Boilerplate
 instance Outputable Event where
-  ppr (Lookup n) = text "Lookup" <> parens (ppr n)
-  ppr (LookupArg e) = text "LookupArg" <> parens (ppr e)
+  ppr (Look n) = text "Look" <> parens (ppr n)
+  ppr (LookArg e) = text "LookArg" <> parens (ppr e)
   ppr Update = text "Update"
   ppr App1 = text "App1"
   ppr App2 = text "App2"

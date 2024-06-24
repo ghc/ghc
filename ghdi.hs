@@ -48,11 +48,11 @@ compileToCore libdir args expression = do
       when (not (null err_messages)) $ liftIO $ pprPrint err_messages >> exitFailure
 
       setSessionDynFlags $
-        -- flip gopt_unset Opt_FullLaziness $
-        -- flip gopt_unset Opt_WorkerWrapper $
-        -- updOptLevel 1 $ -- if you want to compile with -O1 opts, make sure to unset -ffull-laziness and -fworker-wrapper above in addition to -flocal-float-out-top-level
+        flip gopt_unset Opt_FullLaziness $
+        flip gopt_unset Opt_WorkerWrapper $
         flip gopt_unset Opt_LocalFloatOutTopLevel $
         flip gopt_unset Opt_IgnoreInterfacePragmas $ -- This enables cross-module inlining
+        updOptLevel 1 $ -- if you want to compile with -O1 opts, make sure to unset -ffull-laziness and -fworker-wrapper above in addition to -flocal-float-out-top-level
         flip xopt_set LangExt.MagicHash $
         dflags
       mod_guts <- compileToCoreSimplified file

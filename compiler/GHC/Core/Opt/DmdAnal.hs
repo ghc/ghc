@@ -2483,7 +2483,6 @@ data AnalEnv = AE
   { ae_opts      :: !DmdAnalOpts
   -- ^ Analysis options
   , ae_sigs      :: !SigEnv
-  -- ^ True on first iteration only. See Note [Initialising strictness]
   , ae_fam_envs  :: !FamInstEnvs
   , ae_rec_dc    :: DataCon -> IsRecDataConResult
   -- ^ Memoised result of 'GHC.Core.Opt.WorkWrap.Utils.isRecDataCon'
@@ -2805,7 +2804,7 @@ sPair2DmdType :: SPair DmdVal DmdEnv -> DmdType
 sPair2DmdType (S2 val env) = DmdType env val
 
 instance Trace (DmdD s) where
-  step (Lookup x) d = \env sd -> d env sd >>= \t ->
+  step (Look x) d = \env sd -> d env sd >>= \t ->
     case (t, lookupSigEnv env x) of
       (S2 val env, Just (_,_,NotTopLevel)) -> -- pprTrace "local" (ppr x <+> ppr sd) $
         pure $! S2 val (addVarDmdEnv env x (C_11 :* sd))
@@ -2827,14 +2826,9 @@ botDmdD _ _ = pure (dmdType2SPair botDmdType)
 nopDmdD _ _ = pure (dmdType2SPair nopDmdType)
 
 mkSurrogate :: Id -> DmdD s
-mkSurrogate x = step (Lookup x) nopDmdD
+mkSurrogate x = step (Look x) nopDmdD
 
 instance Domain (DmdD s) where
-  keepAlive ds env _ = do
-    -- This is called for denotations of free variables of Coercions, RULE RHSs
-    -- and unfoldings
-    fvs <- plusDmdEnvs <$> traverse (\d -> squeezeDmd env d topDmd) ds
-    pure $! S2 [] fvs -- Nop value
   stuck = botDmdD
   erased = nopDmdD
   lit _l = nopDmdD
@@ -2863,8 +2857,8 @@ instance Domain (DmdD s) where
     fvs <- plusDmdEnvs <$> zipWithM (squeezeDmd env) value_ds dmds
     -- pprTraceM "dmdAnal:Con" (ppr dc <+> ppr sd <+> ppr dmds $$ ppr fvs)
     pure $! S2 [] fvs
-  applyTy f = f
-  apply f a env sd = do
+  apply f (True, _d) = f
+  apply f (False, a) = \env sd -> do
     let call_sd = mkCalledOnceDmd sd
     fun_ty <- sPair2DmdType <$> f env call_sd
     let (arg_dmd, res_ty) = splitDmdTy fun_ty
@@ -2878,10 +2872,6 @@ instance Domain (DmdD s) where
     --      , text "res dmd_ty =" <+> ppr res_ty
     --      , text "overall res dmd_ty =" <+> ppr combined_ty ]
     pure $! dmdType2SPair combined_ty
-  seq_ a b env sd = do
-    fvs <- sSnd <$> a env seqSubDmd
-    dmd_ty <- sPair2DmdType <$> b env sd
-    pure $! dmdType2SPair (dmd_ty `plusDmdType` fvs) -- plain and simple :)
   select d scrut case_bndr alts env sd
     | [(alt_con, bndrs, rhs)] <- alts, want_precise_field_dmds alt_con = do
         let rhs_env = extendAnalEnvs NotTopLevel env (case_bndr:bndrs) (repeat nopSig)
@@ -2973,6 +2963,12 @@ instance Domain (DmdD s) where
         = True
       want_precise_field_dmds (LitAlt {}) = False  -- Like the non-product datacon above
       want_precise_field_dmds DEFAULT     = True
+  keepAlive ds d env sd = do
+    -- This is called for denotations of free variables of Coercions, RULE RHSs
+    -- and unfoldings
+    fvs <- plusDmdEnvs <$> traverse (\d -> squeezeDmd env d topDmd) ds
+    dmd_ty <- sPair2DmdType <$> d env sd
+    pure $! dmdType2SPair (dmd_ty `plusDmdType` fvs) -- plain and simple :)
 
 squeezeSubDmd :: AnalEnv -> DmdD s -> SubDemand -> AnalM s DmdEnv
 squeezeSubDmd env d sd = sSnd <$> d env sd
@@ -3215,4 +3211,4 @@ dmdAnal env sd e = do
   -- dmdAnal'' env sd e
   pure $! _new
   where
-    f (x, sig, _top_lvl) = step (Lookup x) (sig2DmdHnf sig)
+    f (x, sig, _top_lvl) = step (Look x) (sig2DmdHnf sig)
