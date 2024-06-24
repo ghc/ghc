@@ -9,6 +9,7 @@
 -- A data type defining the language extensions supported by GHC.
 --
 {-# LANGUAGE DeriveGeneric, CPP, Trustworthy #-}
+{-# OPTIONS_GHC -Wno-trustworthy-safe #-} -- GHC.Internal.Base is not safe
 module GHC.Internal.LanguageExtensions ( Extension(..) ) where
 
 #ifdef BOOTSTRAP_TH
