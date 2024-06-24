@@ -36,6 +36,7 @@ let
       "AR=/usr/bin/ar"
       "LLC=${llvm}/bin/llc"
       "OPT=${llvm}/bin/opt"
+      "LLVMAS=${llvm_clang}/bin/clang"
       "CONF_CC_OPTS_STAGE2=--target=${targetTriple}"
       "CONF_CXX_OPTS_STAGE2=--target=${targetTriple}"
       "CONF_GCC_LINKER_OPTS_STAGE2=--target=${targetTriple}"
@@ -97,6 +98,7 @@ let
   fonts = with pkgs; makeFontsConf { fontDirectories = [ dejavu_fonts ]; };
 
   llvm = pkgs.llvm_15;
+  llvm_clang = pkgs.llvmPackages_15.clang-unwrapped;
 in
 pkgs.writeTextFile {
   name = "toolchain";
@@ -112,6 +114,7 @@ pkgs.writeTextFile {
     export GHC="${ghc}/bin/ghc"
     export LLC="${llvm}/bin/llc"
     export OPT="${llvm}/bin/opt"
+    export LLVMAS="${llvm_clang}/bin/clang"
     export SPHINXBUILD="${pkgs.python3Packages.sphinx}/bin/sphinx-build"
     export CABAL_INSTALL="${pkgs.cabal-install}/bin/cabal"
     export CABAL="$CABAL_INSTALL"
