@@ -152,6 +152,10 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (nonDetEltsUFM cg_id_infos))
 
+          -- if gopt Opt_DeterministicObjects dflags
+        ; rn_mapping <- liftIO (readIORef uniqRnRef)
+        ; liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
+
         ; return generatedInfo
         }
 
