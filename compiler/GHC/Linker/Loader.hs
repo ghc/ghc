@@ -648,6 +648,7 @@ initLinkDepsOpts hsc_env = opts
             , ldUseByteCode = gopt Opt_UseBytecodeRatherThanObjects dflags
             , ldMsgOpts     = initIfaceMessageOpts dflags
             , ldWays        = ways dflags
+            , ldHscEnv      = hsc_env
             }
     dflags = hsc_dflags hsc_env
     load_iface msg mod = initIfaceCheck (text "loader") hsc_env

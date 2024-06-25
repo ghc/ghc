@@ -536,6 +536,8 @@ loadInterface doc_str mod from
                 eps {
                   eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+                  eps_PTT =
+                    extendModuleEnv (eps_PTT eps) mod (mkNameEnv new_eps_decls),
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
                   eps_complete_matches
@@ -569,7 +571,7 @@ loadInterface doc_str mod from
 {- Note [Loading your own hi-boot file]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking, when compiling module M, we should not
-load M.hi boot into the EPS.  After all, we are very shortly
+load M.hi-boot into the EPS.  After all, we are very shortly
 going to have full information about M.  Moreover, see
 Note [Do not update EPS with your own hi-boot] in GHC.Iface.Recomp.
 
