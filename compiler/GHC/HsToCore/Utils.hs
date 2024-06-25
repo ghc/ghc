@@ -42,6 +42,9 @@ module GHC.HsToCore.Utils (
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
         mkOptTickBox, mkBinaryTickBox, decideBangHood,
         isTrueLHsExpr,
+
+        -- Multiplicity
+        checkMultiplicityCoercions,
     ) where
 
 import GHC.Prelude
@@ -55,6 +58,7 @@ import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Core
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Errors.Types
 
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -84,7 +88,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Evidence
 
-import Control.Monad    ( zipWithM )
+import Control.Monad    ( unless, zipWithM )
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (maybeToList)
 import qualified Data.List.NonEmpty as NEL
@@ -1103,3 +1107,9 @@ isTrueLHsExpr (L _ (XExpr (HsBinTick ixT _ e)))
 
 isTrueLHsExpr (L _ (HsPar _ e)) = isTrueLHsExpr e
 isTrueLHsExpr _                 = Nothing
+
+-- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+checkMultiplicityCoercions :: MultiplicityCheckCoercions -> DsM ()
+checkMultiplicityCoercions cos =
+  unless (all isReflexiveCo cos) $
+    diagnosticDs DsMultiplicityCoercionsNotSupported

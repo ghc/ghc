@@ -1359,7 +1359,7 @@ dsHsWrapper (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
                                            is_unspecable_var v = v `S.member` unspecables
                                            is_specable = not $ any (is_unspecable_var) vs -- See Note [Desugaring non-canonical evidence]
                                      ; k (\e -> app_ev is_specable e core_tm) }
-  -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+  -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
 dsHsWrapper (WpMultCoercion co) k = do { unless (isReflexiveCo co) $
                                            diagnosticDs DsMultiplicityCoercionsNotSupported
                                        ; k $ \e -> e }

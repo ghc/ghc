@@ -39,7 +39,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
-  TcMCoercion, TcMCoercionN, TcMCoercionR,
+  TcMCoercion, TcMCoercionN, TcMCoercionR, MultiplicityCheckCoercions,
   Role(..), LeftOrRight(..), pickLR,
   maybeSymCo,
   unwrapIP, wrapIP,
@@ -110,6 +110,11 @@ type TcMCoercion  = MCoercion
 type TcMCoercionN = MCoercionN  -- nominal
 type TcMCoercionR = MCoercionR  -- representational
 
+type MultiplicityCheckCoercions = [TcCoercion]
+-- Coercions which must all be reflexivity after zonking.
+-- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+
+
 -- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
 maybeSymCo :: SwapFlag -> TcCoercion -> TcCoercion
 maybeSymCo IsSwapped  co = mkSymCo co
@@ -174,7 +179,7 @@ data HsWrapper
 
   | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
                                 -- error in the desugarer. See GHC.Tc.Utils.Unify
-                                -- Note [Wrapper returned from tcSubMult]
+                                -- Note [Coercions returned from tcSubMult]
   deriving Data.Data
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data

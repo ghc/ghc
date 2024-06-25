@@ -2275,7 +2275,7 @@ a \/\a in the final result but all the occurrences of a will be zonked to ()
 
 -- | @tcCheckUsage name mult thing_inside@ runs @thing_inside@, checks that the
 -- usage of @name@ is a submultiplicity of @mult@, and removes @name@ from the
--- usage environment. See also Note [Wrapper returned from tcSubMult] in
+-- usage environment. See also Note [Coercions returned from tcSubMult] in
 -- GHC.Tc.Utils.Unify, which applies to the wrapper returned from this function.
 tcCheckUsage :: Name -> Mult -> TcM a -> TcM (a, HsWrapper)
 tcCheckUsage name id_mult thing_inside

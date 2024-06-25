@@ -1182,6 +1182,7 @@ reportGroup mk_err ctxt items
 -- See Note [No deferring for multiplicity errors]
 nonDeferrableOrigin :: CtOrigin -> Bool
 nonDeferrableOrigin (NonLinearPatternOrigin {}) = True
+nonDeferrableOrigin (OmittedFieldOrigin {}) = True
 nonDeferrableOrigin (UsageEnvironmentOf {}) = True
 nonDeferrableOrigin (FRROrigin {})          = True
 nonDeferrableOrigin _                       = False
@@ -1368,7 +1369,7 @@ With #10283, you can now opt out of deferred type error warnings.
 
 Note [No deferring for multiplicity errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As explained in Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify,
+As explained in Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify,
 linear types do not support casts and any nontrivial coercion will raise
 an error during desugaring.
 
@@ -1378,8 +1379,7 @@ by the desugarer would shadow the type mismatch warnings (#20083).
 As a solution, we refuse to defer submultiplicity constraints. Test: T20083.
 
 To determine whether a constraint arose from a submultiplicity check, we
-look at the CtOrigin. All calls to tcSubMult use one of two origins,
-UsageEnvironmentOf and NonLinearPatternOrigin. Those origins are not
+look at the CtOrigin. All calls to tcSubMult use origins which are not
 used outside of linear types.
 
 In the future, we should compile 'WpMultCoercion' to a runtime error with

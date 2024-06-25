@@ -623,6 +623,7 @@ data CtOrigin
       ClsInst -- ^ The declared typeclass instance
 
   | NonLinearPatternOrigin NonLinearPatternReason (LPat GhcRn)
+  | OmittedFieldOrigin (Maybe FieldLabel)
   | UsageEnvironmentOf Name
 
   | CycleBreakerOrigin
@@ -936,6 +937,8 @@ pprCtO ListOrigin            = text "an overloaded list"
 pprCtO IfThenElseOrigin      = text "an if-then-else expression"
 pprCtO StaticOrigin          = text "a static form"
 pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
+pprCtO (OmittedFieldOrigin Nothing) = text "an omitted anonymous field"
+pprCtO (OmittedFieldOrigin (Just fl)) = hsep [text "omitted field" <+> quotes (ppr fl)]
 pprCtO BracketOrigin         = text "a quotation bracket"
 
 -- These ones are handled by pprCtOrigin, but we nevertheless sometimes

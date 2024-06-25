@@ -435,7 +435,7 @@ tcExpr (HsLet x binds expr) res_ty
   = do  { (binds', wrapper, expr') <- tcLocalBinds binds $
                                       tcMonoExpr expr res_ty
           -- The wrapper checks for correct multiplicities.
-          -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+          -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; return (HsLet x binds' (mkLHsWrap wrapper expr')) }
 
 tcExpr (HsCase ctxt scrut matches) res_ty
@@ -1643,7 +1643,7 @@ tcRecordBinds
 
 tcRecordBinds con_like arg_tys (HsRecFields _ rbinds dd)
   = do  { mb_binds <- mapM do_bind rbinds
-        ; return (HsRecFields noExtField (catMaybes mb_binds) dd) }
+        ; return (HsRecFields [] (catMaybes mb_binds) dd) }
   where
     fields = map flSelector $ conLikeFieldLabels con_like
     flds_w_tys = zipEqual "tcRecordBinds" fields arg_tys

@@ -37,7 +37,7 @@ import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
-import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar, decideBangHood)
+import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar, decideBangHood, checkMultiplicityCoercions)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
 import GHC.Core.TyCo.Rep
@@ -271,7 +271,9 @@ desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
 desugarConPatOut x con univ_tys ex_tvs dicts = \case
     PrefixCon _ ps               -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
-    RecCon    (HsRecFields _ fs _) -> go_field_pats (rec_field_ps fs)
+    RecCon    (HsRecFields mult_cos fs _) -> do
+      checkMultiplicityCoercions mult_cos
+      go_field_pats (rec_field_ps fs)
   where
     -- The actual argument types (instantiated)
     arg_tys     = map scaledThing $ conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)
