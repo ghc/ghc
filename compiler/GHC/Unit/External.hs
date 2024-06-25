@@ -31,6 +31,8 @@ import GHC.Types.CompleteMatch
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
 
+import GHC.Linker.Types (Linkable)
+
 import Data.IORef
 
 
@@ -68,6 +70,7 @@ initExternalPackageState = EPS
   , eps_PIT              = emptyPackageIfaceTable
   , eps_free_holes       = emptyInstalledModuleEnv
   , eps_PTE              = emptyTypeEnv
+  , eps_iface_bytecode   = emptyModuleEnv
   , eps_inst_env         = emptyInstEnv
   , eps_fam_inst_env     = emptyFamInstEnv
   , eps_rule_base        = mkRuleBase builtinRules
@@ -138,6 +141,12 @@ data ExternalPackageState
                 -- ^ Result of typechecking all the external package
                 -- interface files we have sucked in. The domain of
                 -- the mapping is external-package modules
+
+        -- | If an interface was written with @-fwrite-if-simplified-core@, this
+        -- will contain an IO action that compiles bytecode from core bindings.
+        --
+        -- See Note [Interface Files with Core Definitions]
+        eps_iface_bytecode :: !(ModuleEnv (IO Linkable)),
 
         eps_inst_env     :: !PackageInstEnv,   -- ^ The total 'InstEnv' accumulated
                                                -- from all the external-package modules
