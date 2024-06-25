@@ -55,6 +55,15 @@ import qualified Data.Map as M
 
 import System.FilePath
 import System.Directory
+import GHC.Driver.Env
+import GHC.Tc.Utils.Monad
+import GHC.IfaceToCore
+import {-# SOURCE #-} GHC.Driver.Main
+import GHC.Unit.Module.ModSummary
+import {-# SOURCE #-} GHC.Driver.Make
+import GHC.Driver.Session
+import GHC.Types.PkgQual
+import Data.Time.Clock
 
 
 data LinkDepsOpts = LinkDepsOpts
@@ -70,6 +79,7 @@ data LinkDepsOpts = LinkDepsOpts
   , ldWays        :: !Ways                          -- ^ Enabled ways
   , ldLoadIface   :: SDoc -> Module -> IO (MaybeErr MissingInterfaceError ModIface)
                                                     -- ^ Interface loader function
+  , ldHscEnv      :: !HscEnv
   }
 
 data LinkDeps = LinkDeps
@@ -283,13 +293,23 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                   Found loc mod -> found loc mod
                   _ -> no_obj (moduleName mod)
         where
-            found loc mod = do {
+            found loc mod = do
+               Succeeded !iface <- ldLoadIface opts (text "makima") mod
+               !details <- initModDetails (ldHscEnv opts) iface
+               -- let home_unit = (ue_unitHomeUnit (homeUnitId_ (hsc_dflags (ldHscEnv opts))) (hsc_unit_env (ldHscEnv opts)))
+               -- !(FoundHome r) <- summariseModule (ldHscEnv opts) home_unit mempty NotBoot (noLoc (moduleName mod)) (ThisPkg (homeUnitId home_unit)) Nothing []
+               --- !bc_linkable <- loadByteCode iface undefined ;
+               t <- getCurrentTime
+               !bytecode_ul <- initWholeCoreBindings (ldHscEnv opts) iface details (LM t mod [CoreBindings $ WholeCoreBindings (fromJust $ mi_extra_decls iface) mod undefined]) ;
+               -- !mod_details <- initIfaceLoadModule (ldHscEnv opts) (mi_module iface) (typecheckIface iface) ;
+               putStrLn $ "[DEBUG] found " ++ show (moduleName mod)
                 -- ...and then find the linkable for it
-               mb_lnk <- findObjectLinkableMaybe mod loc ;
-               case mb_lnk of {
-                  Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable lnk
-              }}
+               pure bytecode_ul
+               -- mb_lnk <- findObjectLinkableMaybe mod loc
+               -- case mb_lnk of {
+               --   Nothing  -> no_obj mod ;
+               --   Just lnk -> adjust_linkable lnk
+               --}
 
             adjust_linkable lnk
                 | Just new_osuf <- maybe_normal_osuf = do

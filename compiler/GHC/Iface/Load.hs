@@ -516,11 +516,6 @@ loadInterface doc_str mod from
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
 
         ; let final_iface = iface
-                               & set_mi_decls     (panic "No mi_decls in PIT")
-                               & set_mi_insts     (panic "No mi_insts in PIT")
-                               & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
-                               & set_mi_rules     (panic "No mi_rules in PIT")
-                               & set_mi_anns      (panic "No mi_anns in PIT")
 
         ; let bad_boot = mi_boot iface == IsBoot
                           && isJust (lookupKnotVars (if_rec_types gbl_env) mod)

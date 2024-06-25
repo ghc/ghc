@@ -106,6 +106,7 @@ module GHC.Driver.Main
     , showModuleIndex
     , hscAddSptEntries
     , writeInterfaceOnlyMode
+    , loadByteCode
     ) where
 
 import GHC.Prelude
