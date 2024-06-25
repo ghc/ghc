@@ -1,0 +1,6 @@
+WARNING:
+  loadInterface
+  C
+  Call stack:
+      CallStack (from HasCallStack):
+        warnPprTrace, called at compiler/GHC/Iface/Load.hs:<line>:<column> in <package-id>:GHC.Iface.Load
