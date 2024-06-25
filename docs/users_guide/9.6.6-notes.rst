@@ -1,0 +1,107 @@
+.. _release-9.6.6:
+
+Version 9.6.6
+==============
+
+The significant changes to the various parts of the compiler are listed below.
+See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.6>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+11, 12, 13, 14 or 15.
+
+Significant Changes
+~~~~~~~~~~~~~~~~~~~~
+
+Issues fixed in this release include:
+
+Compiler
+--------
+
+- Fix a bug in the NCG that could lead to incorrect runtime results due to
+  erroneously removing a jump instruction (:ghc-ticket:`24507`).
+- Fix a bug leading to runtime exponential in the size of the package dependency
+  graph when checking if a multiple home unit session satisfied the closure
+  property.
+- Fix a bug arising from interactions between GHC and cabal in how they
+  call the linker to merge objects, resulting in linker errors in
+  certain situations (:ghc-ticket:`22210`).
+- Improve the algorithm used to detect missing home modules for the purpose of
+  emitting warnings, making it no longer quadratic (:ghc-ticket:`24778`).
+- Ensure ``-ddump-splices`` doesn't omit required parentheses when printing
+  pattern signatures (:ghc-ticket:`24837`).
+- Fix a possible alignment confusion in the code generator
+  (:ghc-ticket:`24930`).
+- Fix sign hints for the PowerPC NCG in C foreign calls (:ghc-ticket:`23034`).
+- Fix a simplifier bug that could lead to compiler panics in certain sitations
+  due to incorrect eta expansion (:ghc-ticket:`24718`).
+- Fix a segfault in the bytecode interpreter due to incorrect constructor tagging
+  (:ghc-ticket:`24870`).
+
+Runtime system
+--------------
+
+- Fixes for various warnings emitted by ``UndefinedBehaviorSanitizer``. 
+- Fix an argument ordering warning for ``stgCallocBytes`` (:ghc-ticket:`24828`).
+- Fix a GC bug that manifests in certain situations when byte code objects end up
+  on the mutable list (:ghc-ticket:`23375`).
+
+Build system and packaging
+--------------------------
+
+- Allow hadrian to be bootstrapped using GHC 9.6 and Cabal 3.10.3 (:ghc-ticket:`24694`).
+- The ``no_dynamic_libs`` flavour transformer now doesn't need users to also explicitly
+  disable building a dynamic GHC.
+- 
+
+Core libraries
+--------------
+
+- Bump ``directory`` to 1.3.8.5
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
