@@ -60,16 +60,16 @@ import System.Directory
 data LinkDepsOpts = LinkDepsOpts
   { ldObjSuffix   :: !String                        -- ^ Suffix of .o files
   , ldOneShotMode :: !Bool                          -- ^ Is the driver in one-shot mode?
-  , ldModuleGraph :: !ModuleGraph                   -- ^ Module graph
-  , ldUnitEnv     :: !UnitEnv                       -- ^ Unit environment
+  , ldModuleGraph :: !ModuleGraph
+  , ldUnitEnv     :: !UnitEnv
   , ldPprOpts     :: !SDocContext                   -- ^ Rendering options for error messages
-  , ldFinderCache :: !FinderCache                   -- ^ Finder cache
-  , ldFinderOpts  :: !FinderOpts                    -- ^ Finder options
   , ldUseByteCode :: !Bool                          -- ^ Use bytecode rather than objects
   , ldMsgOpts     :: !(DiagnosticOpts IfaceMessage) -- ^ Options for diagnostics
   , ldWays        :: !Ways                          -- ^ Enabled ways
-  , ldLoadIface   :: SDoc -> Module -> IO (MaybeErr MissingInterfaceError ModIface)
-                                                    -- ^ Interface loader function
+  , ldFinderCache :: !FinderCache
+  , ldFinderOpts  :: !FinderOpts
+  , ldLoadIface   :: !(SDoc -> Module -> IO (MaybeErr MissingInterfaceError ModIface))
+  , ldLoadByteCode :: !(Module -> IO (Maybe Linkable))
   }
 
 data LinkDeps = LinkDeps
@@ -275,21 +275,21 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
              case ue_homeUnit unit_env of
               Nothing -> no_obj mod
               Just home_unit -> do
-
-                let fc = ldFinderCache opts
-                let fopts = ldFinderOpts opts
-                mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
-                case mb_stuff of
-                  Found loc mod -> found loc mod
-                  _ -> no_obj (moduleName mod)
+                from_bc <- ldLoadByteCode opts mod
+                maybe (fallback_no_bytecode home_unit mod) pure from_bc
         where
-            found loc mod = do {
-                -- ...and then find the linkable for it
-               mb_lnk <- findObjectLinkableMaybe mod loc ;
-               case mb_lnk of {
-                  Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable lnk
-              }}
+
+            fallback_no_bytecode home_unit mod = do
+              let fc = ldFinderCache opts
+              let fopts = ldFinderOpts opts
+              mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
+              case mb_stuff of
+                Found loc _ -> do
+                  mb_lnk <- findObjectLinkableMaybe mod loc
+                  case mb_lnk of
+                    Nothing  -> no_obj mod
+                    Just lnk -> adjust_linkable lnk
+                _ -> no_obj (moduleName mod)
 
             adjust_linkable lnk
                 | Just new_osuf <- maybe_normal_osuf = do

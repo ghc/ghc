@@ -1310,8 +1310,10 @@ upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
   -- MP: This is a bit janky, because before you add the entries you have to extend the HPT with the module
   -- you just compiled. Another option, would be delay adding anything until after upsweep has finished, but I
   -- am unsure if this is sound (wrt running TH splices for example).
-  -- This function only does anything if the linkable produced is a BCO, which only happens with the
-  -- bytecode backend, no need to guard against the backend type additionally.
+  -- This function only does anything if the linkable produced is a BCO, which
+  -- used to only happen with the bytecode backend, but with
+  -- @-fprefer-byte-code@, @HomeModInfo@ has bytecode even when generating
+  -- object code, see #25230.
   addSptEntries (hscUpdateHPT (\hpt -> addToHpt hpt (ms_mod_name summary) hmi) hsc_env)
                 (homeModInfoByteCode hmi)
 
@@ -3012,7 +3014,7 @@ which can be checked easily using ghc-debug.
         a reference to the entire HscEnv, if we are not careful the HscEnv will
         contain the HomePackageTable at the time the interface was loaded and
         it will never be released.
-   Where? dontLeakTheHPT in GHC.Iface.Load
+   Where? dontLeakTheHUG in GHC.Iface.Load
 
 2. No KnotVars are live at the end of upsweep (#20491)
    Why? KnotVars contains an old stale reference to the TypeEnv for modules

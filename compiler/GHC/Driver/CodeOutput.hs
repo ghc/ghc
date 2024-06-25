@@ -260,7 +260,6 @@ outputForeignStubs
            Maybe FilePath) -- C file created
 outputForeignStubs logger tmpfs dflags unit_state mod location stubs
  = do
-   let stub_h = unsafeDecodeUtf $ mkStubPaths (initFinderOpts dflags) (moduleName mod) location
    stub_c <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
 
    case stubs of
@@ -275,8 +274,6 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
             -- Header file protos for "foreign export"ed functions.
             stub_h_output_d = pprCode h_code
             stub_h_output_w = showSDoc dflags stub_h_output_d
-
-        createDirectoryIfMissing True (takeDirectory stub_h)
 
         putDumpFileMaybe logger Opt_D_dump_foreign
                       "Foreign export header file"
@@ -299,9 +296,20 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
               | platformMisc_libFFI $ platformMisc dflags = "#include \"rts/ghc_ffi.h\"\n"
               | otherwise = ""
 
-        stub_h_file_exists
-           <- outputForeignStubs_help stub_h stub_h_output_w
-                ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
+        stub_h_file_exists <-
+          if null stub_h_output_w
+          then pure False
+          else do
+            -- The header path is computed from the module source path, which
+            -- does not exist when loading interface core bindings for Template
+            -- Haskell.
+            -- The header is only generated for foreign exports.
+            -- Since those aren't supported for TH with bytecode, we can skip
+            -- this here for now.
+            let stub_h = unsafeDecodeUtf $ mkStubPaths (initFinderOpts dflags) (moduleName mod) location
+            createDirectoryIfMissing True (takeDirectory stub_h)
+            outputForeignStubs_help stub_h stub_h_output_w
+                  ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
         putDumpFileMaybe logger Opt_D_dump_foreign
                       "Foreign export stubs" FormatC stub_c_output_d

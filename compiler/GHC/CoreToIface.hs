@@ -602,7 +602,7 @@ toIfaceTopBind b =
           in (top_bndr, rhs')
 
         -- The sharing behaviour is currently disabled due to #22807, and relies on
-        -- finished #220056 to be re-enabled.
+        -- finished #20056 to be re-enabled.
         disabledDueTo22807 = True
 
         already_has_unfolding b = not disabledDueTo22807
@@ -774,8 +774,8 @@ outside of the hs-boot loop.
 Note [Interface File with Core: Sharing RHSs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-IMPORTANT: This optimisation is currently disabled due to #22027, it can be
-           re-enabled once #220056 is implemented.
+IMPORTANT: This optimisation is currently disabled due to #22807, it can be
+           re-enabled once #22056 is implemented.
 
 In order to avoid duplicating definitions for bindings which already have unfoldings
 we do some minor headstands to avoid serialising the RHS of a definition if it has
