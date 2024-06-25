@@ -38,7 +38,6 @@ import GHC.Platform.Ways
 
 import GHC.Builtin.Names ( gHC_PRIM )
 
-import GHC.Data.Maybe ( expectJust )
 import GHC.Data.OsPath
 
 import GHC.Unit.Env
@@ -60,6 +59,7 @@ import GHC.Types.PkgQual
 import GHC.Fingerprint
 import Data.IORef
 import System.Directory.OsPath
+import Control.Applicative ((<|>))
 import Control.Monad
 import Data.Time
 import qualified Data.Map as M
@@ -711,27 +711,27 @@ mkHiePath fopts basename mod_basename = hie_basename <.> hiesuf
 -- We don't have to store these in ModLocations, because they can be derived
 -- from other available information, and they're only rarely needed.
 
+-- | Compute the file name of a header file for foreign stubs, using either the
+-- directory explicitly specified in the command line option @-stubdir@, or the
+-- directory of the module's source file.
+--
+-- When compiling bytecode from interface Core bindings, @ModLocation@ does not
+-- contain a source file path, so the header isn't written.
+-- This doesn't have an impact, since we cannot support headers importing
+-- Haskell symbols defined in bytecode for TH whatsoever at the moment.
 mkStubPaths
   :: FinderOpts
   -> ModuleName
   -> ModLocation
-  -> OsPath
+  -> Maybe OsPath
+mkStubPaths fopts mod location = do
+  stub_basename <- in_stub_dir <|> src_basename
+  pure (stub_basename `mappend` os "_stub" <.> os "h")
+  where
+    in_stub_dir = (</> mod_basename) <$> (finder_stubDir fopts)
 
-mkStubPaths fopts mod location
-  = let
-        stubdir = finder_stubDir fopts
-
-        mod_basename = unsafeEncodeUtf $ moduleNameSlashes mod
-        src_basename = OsPath.dropExtension $ expectJust "mkStubPaths"
-                                                  (ml_hs_file_ospath location)
-
-        stub_basename0
-            | Just dir <- stubdir = dir </> mod_basename
-            | otherwise           = src_basename
-
-        stub_basename = stub_basename0 `mappend` os "_stub"
-     in
-        stub_basename <.> os "h"
+    mod_basename = unsafeEncodeUtf $ moduleNameSlashes mod
+    src_basename = OsPath.dropExtension <$> ml_hs_file_ospath location
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here,

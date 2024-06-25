@@ -76,6 +76,7 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
 import GHC.Unit.Env
+import GHC.Unit.External (ExternalPackageState (EPS, eps_iface_bytecode))
 import GHC.Unit.Module
 import GHC.Unit.State as Packages
 
@@ -641,17 +642,22 @@ initLinkDepsOpts hsc_env = opts
             , ldOneShotMode = isOneShot (ghcMode dflags)
             , ldModuleGraph = hsc_mod_graph hsc_env
             , ldUnitEnv     = hsc_unit_env hsc_env
-            , ldLoadIface   = load_iface
             , ldPprOpts     = initSDocContext dflags defaultUserStyle
             , ldFinderCache = hsc_FC hsc_env
             , ldFinderOpts  = initFinderOpts dflags
             , ldUseByteCode = gopt Opt_UseBytecodeRatherThanObjects dflags
             , ldMsgOpts     = initIfaceMessageOpts dflags
             , ldWays        = ways dflags
+            , ldLoadIface
+            , ldLoadByteCode
             }
     dflags = hsc_dflags hsc_env
-    load_iface msg mod = initIfaceCheck (text "loader") hsc_env
+    ldLoadIface msg mod = initIfaceCheck (text "loader") hsc_env
                           $ loadInterface msg mod (ImportByUser NotBoot)
+
+    ldLoadByteCode mod = do
+      EPS {eps_iface_bytecode} <- hscEPS hsc_env
+      sequence (lookupModuleEnv eps_iface_bytecode mod)
 
 
 

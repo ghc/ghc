@@ -49,6 +49,7 @@ module GHC.Driver.Main
     , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
     , initWholeCoreBindings
+    , loadIfaceByteCode
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -105,6 +106,7 @@ module GHC.Driver.Main
     , showModuleIndex
     , hscAddSptEntries
     , writeInterfaceOnlyMode
+    , loadByteCode
     ) where
 
 import GHC.Prelude
@@ -275,7 +277,8 @@ import GHC.SysTools (initSysTools)
 import GHC.SysTools.BaseDir (findTopDir)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.List        ( nub, isPrefixOf, partition )
+import Data.Functor ((<&>))
+import Data.List ( nub, isPrefixOf, partition )
 import qualified Data.List.NonEmpty as NE
 import Control.Monad
 import Data.IORef
@@ -972,19 +975,23 @@ loadByteCode iface mod_sum = do
                    (mi_foreign iface)
           return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
+
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
 
+add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> HscEnv
+add_iface_to_hpt iface details =
+  hscUpdateHPT $ \ hpt ->
+    addToHpt hpt (moduleName (mi_module iface))
+    (HomeModInfo iface details emptyHomeModInfoLinkable)
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
 initModDetails :: HscEnv -> ModIface -> IO ModDetails
 initModDetails hsc_env iface =
   fixIO $ \details' -> do
-    let act hpt  = addToHpt hpt (moduleName $ mi_module iface)
-                                (HomeModInfo iface details' emptyHomeModInfoLinkable)
-    let !hsc_env' = hscUpdateHPT act hsc_env
+    let !hsc_env' = add_iface_to_hpt iface details' hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
     -- any further typechecking.  It's much more useful
@@ -1012,8 +1019,52 @@ compile_for_interpreter hsc_env use =
 
     adapt_way want = if want (hscInterp hsc_env) then addWay else removeWay
 
+-- | Assemble 'WholeCoreBindings' if the interface contains Core bindings.
+iface_core_bindings :: ModIface -> ModLocation -> Maybe WholeCoreBindings
+iface_core_bindings iface wcb_mod_location =
+  mi_extra_decls <&> \ wcb_bindings ->
+    WholeCoreBindings {
+      wcb_bindings,
+      wcb_module = mi_module,
+      wcb_mod_location,
+      wcb_foreign = mi_foreign
+    }
+  where
+    ModIface {mi_module, mi_extra_decls, mi_foreign} = iface
+
+-- | Return an 'IO' that hydrates Core bindings and compiles them to bytecode if
+-- the interface contains any, using the supplied type env for typechecking.
+--
+-- Unlike 'initWholeCoreBindings', this does not use lazy IO.
+-- Instead, the 'IO' is only evaluated (in @get_link_deps@) when it is clear
+-- that it will be used immediately (because we're linking TH with
+-- @-fprefer-byte-code@ in oneshot mode), and the result is cached in
+-- 'LoaderState'.
+--
+-- 'initWholeCoreBindings' needs the laziness because it is used to populate
+-- 'HomeModInfo', which is done preemptively, in anticipation of downstream
+-- modules using the bytecode for TH in make mode, which might never happen.
+loadIfaceByteCode ::
+  HscEnv ->
+  ModIface ->
+  ModLocation ->
+  TypeEnv ->
+  Maybe (IO Linkable)
+loadIfaceByteCode hsc_env iface location type_env =
+  compile <$> iface_core_bindings iface location
+  where
+    compile decls = do
+      (bcos, fos) <- compileWholeCoreBindings hsc_env type_env decls
+      linkable $ BCOs bcos :| [DotO fo ForeignObject | fo <- fos]
+
+    linkable parts = do
+      if_time <- modificationTimeIfExists (ml_hi_file location)
+      time <- maybe getCurrentTime pure if_time
+      return $! Linkable time (mi_module iface) parts
+
 -- | If the 'Linkable' contains Core bindings loaded from an interface, replace
--- them with a lazy IO thunk that compiles them to bytecode and foreign objects.
+-- them with a lazy IO thunk that compiles them to bytecode and foreign objects,
+-- using the supplied environment for type checking.
 --
 -- The laziness is necessary because this value is stored purely in a
 -- 'HomeModLinkable' in the home package table, rather than some dedicated
@@ -1027,29 +1078,71 @@ compile_for_interpreter hsc_env use =
 --
 -- This is sound because generateByteCode just depends on things already loaded
 -- in the interface file.
-initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
-initWholeCoreBindings hsc_env mod_iface details (Linkable utc_time this_mod uls) =
+initWholeCoreBindings ::
+  HscEnv ->
+  ModIface ->
+  ModDetails ->
+  Linkable ->
+  IO Linkable
+initWholeCoreBindings hsc_env iface details (Linkable utc_time this_mod uls) =
   Linkable utc_time this_mod <$> mapM go uls
   where
-    go (CoreBindings wcb@WholeCoreBindings {wcb_foreign, wcb_mod_location}) = do
-        types_var <- newIORef (md_types details)
-        let act hpt = addToHpt hpt (moduleName $ mi_module mod_iface)
-                      (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
-            kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
-            hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
-        ~(bcos, fos) <- unsafeInterleaveIO $ do
-          core_binds <- initIfaceCheck (text "l") hsc_env' $
-                        typecheckWholeCoreBindings types_var wcb
-          (stubs, foreign_files) <-
-            decodeIfaceForeign logger (hsc_tmpfs hsc_env)
-            (tmpDir (hsc_dflags hsc_env)) wcb_foreign
-          let cgi_guts = CgInteractiveGuts this_mod core_binds
-                         (typeEnvTyCons (md_types details)) stubs foreign_files
-                         Nothing []
-          trace_if logger (text "Generating ByteCode for" <+> ppr this_mod)
-          generateByteCode hsc_env cgi_guts wcb_mod_location
-        pure (LazyBCOs bcos fos)
-    go ul = return ul
+    go = \case
+      CoreBindings wcb -> do
+        ~(bco, fos) <- unsafeInterleaveIO $
+                       compileWholeCoreBindings hsc_env' type_env wcb
+        pure (LazyBCOs bco fos)
+      l -> pure l
+
+    hsc_env' = add_iface_to_hpt iface details hsc_env
+    type_env = md_types details
+
+-- | Hydrate interface Core bindings and compile them to bytecode.
+--
+-- This consists of:
+--
+-- 1. Running a typechecking step to insert the global names that were removed
+--    when the interface was written or were unavailable due to boot import
+--    cycles, converting the bindings to 'CoreBind'.
+--
+-- 2. Restoring the foreign build inputs from their serialized format, resulting
+--    in a set of foreign import stubs and source files added via
+--    'qAddForeignFilePath'.
+--
+-- 3. Generating bytecode and foreign objects from the results of the previous
+--    steps using the usual pipeline actions.
+compileWholeCoreBindings ::
+  HscEnv ->
+  TypeEnv ->
+  WholeCoreBindings ->
+  IO (CompiledByteCode, [FilePath])
+compileWholeCoreBindings hsc_env type_env wcb = do
+  core_binds <- typecheck
+  (stubs, foreign_files) <- decode_foreign
+  gen_bytecode core_binds stubs foreign_files
+  where
+    typecheck = do
+      types_var <- newIORef type_env
+      let
+        tc_env = hsc_env {
+          hsc_type_env_vars =
+            knotVarsFromModuleEnv (mkModuleEnv [(wcb_module, types_var)])
+        }
+      initIfaceCheck (text "l") tc_env $
+        typecheckWholeCoreBindings types_var wcb
+
+    decode_foreign =
+      decodeIfaceForeign logger (hsc_tmpfs hsc_env)
+      (tmpDir (hsc_dflags hsc_env)) wcb_foreign
+
+    gen_bytecode core_binds stubs foreign_files = do
+      let cgi_guts = CgInteractiveGuts wcb_module core_binds
+                      (typeEnvTyCons type_env) stubs foreign_files
+                      Nothing []
+      trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
+      generateByteCode hsc_env cgi_guts wcb_mod_location
+
+    WholeCoreBindings {wcb_module, wcb_mod_location, wcb_foreign} = wcb
 
     logger = hsc_logger hsc_env
 

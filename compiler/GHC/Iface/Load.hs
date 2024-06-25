@@ -115,6 +115,7 @@ import Data.Map ( toList )
 import System.FilePath
 import System.Directory
 import GHC.Driver.Env.KnotVars
+import {-# source #-} GHC.Driver.Main (loadIfaceByteCode)
 import GHC.Iface.Errors.Types
 import Data.Function ((&))
 
@@ -474,7 +475,7 @@ loadInterface doc_str mod from
         -- Template Haskell original-name).
             Succeeded (iface, loc) ->
         let
-            loc_doc = text loc
+            loc_doc = text (ml_hi_file loc)
         in
         initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $
 
@@ -511,6 +512,7 @@ loadInterface doc_str mod from
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
+        ; purged_hsc_env <- getTopEnv
 
         ; let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
@@ -518,12 +520,25 @@ loadInterface doc_str mod from
                                & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
                                & set_mi_rules     (panic "No mi_rules in PIT")
                                & set_mi_anns      (panic "No mi_anns in PIT")
+                               & set_mi_extra_decls (panic "No mi_extra_decls in PIT")
 
-        ; let bad_boot = mi_boot iface == IsBoot
+              bad_boot = mi_boot iface == IsBoot
                           && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
                             -- Warn against an EPS-updating import
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
+
+              -- Create an IO action that loads and compiles bytecode from Core
+              -- bindings.
+              --
+              -- See Note [Interface Files with Core Definitions]
+              add_bytecode old
+                | Just action <- loadIfaceByteCode purged_hsc_env iface loc (mkNameEnv new_eps_decls)
+                = extendModuleEnv old mod action
+                -- Don't add an entry if the iface doesn't have 'extra_decls'
+                -- so 'get_link_deps' knows that it should load object code.
+                | otherwise
+                = old
 
         ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
           updateEps_  $ \ eps ->
@@ -536,6 +551,7 @@ loadInterface doc_str mod from
                 eps {
                   eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+                  eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
                   eps_complete_matches
@@ -569,7 +585,7 @@ loadInterface doc_str mod from
 {- Note [Loading your own hi-boot file]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking, when compiling module M, we should not
-load M.hi boot into the EPS.  After all, we are very shortly
+load M.hi-boot into the EPS.  After all, we are very shortly
 going to have full information about M.  Moreover, see
 Note [Do not update EPS with your own hi-boot] in GHC.Iface.Recomp.
 
@@ -698,7 +714,7 @@ computeInterface
   -> SDoc
   -> IsBootInterface
   -> Module
-  -> IO (MaybeErr MissingInterfaceError (ModIface, FilePath))
+  -> IO (MaybeErr MissingInterfaceError (ModIface, ModLocation))
 computeInterface hsc_env doc_str hi_boot_file mod0 = do
   massert (not (isHoleModule mod0))
   let mhome_unit  = hsc_home_unit_maybe hsc_env
@@ -845,7 +861,7 @@ findAndReadIface
                      -- this to check the consistency of the requirements of the
                      -- module we read out.
   -> IsBootInterface -- ^ Looking for .hi-boot or .hi file
-  -> IO (MaybeErr MissingInterfaceError (ModIface, FilePath))
+  -> IO (MaybeErr MissingInterfaceError (ModIface, ModLocation))
 findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
 
   let profile = targetProfile dflags
@@ -875,7 +891,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
           let iface = case ghcPrimIfaceHook hooks of
                        Nothing -> ghcPrimIface
                        Just h  -> h
-          return (Succeeded (iface, "<built in interface for GHC.Prim>"))
+          return (Succeeded (iface, panic "GHC.Prim ModLocation (findAndReadIface)"))
       else do
           let fopts = initFinderOpts dflags
           -- Look for the file
@@ -900,7 +916,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
                                                          iface loc
                                 case r2 of
                                   Failed sdoc -> return (Failed sdoc)
-                                  Succeeded {} -> return $ Succeeded (iface,_fp)
+                                  Succeeded {} -> return $ Succeeded (iface, loc)
               err -> do
                   trace_if logger (text "...not found")
                   return $ Failed $ cannotFindInterface
