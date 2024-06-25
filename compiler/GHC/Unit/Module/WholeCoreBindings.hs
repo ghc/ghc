@@ -28,12 +28,12 @@ import System.FilePath (takeExtension)
 
 {-
 Note [Interface Files with Core Definitions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A interface file can optionally contain the definitions of all core bindings, this
 is enabled by the flag `-fwrite-if-simplified-core`.
 This provides everything needed in addition to the normal ModIface and ModDetails
-to restart compilation after typechecking to generate bytecode. The `fi_bindings` field
+to restart compilation after typechecking to generate bytecode. The `wcb_bindings` field
 is stored in the normal interface file and the other fields populated whilst loading
 the interface file.
 
@@ -62,8 +62,55 @@ after whatever simplification the user requested has been performed. So the simp
 of the interface file agree with the optimisation level as reported by the interface
 file.
 
+The lifecycle differs beyond laziness depending on the provenance of a module.
+In all cases, the main consumer for interface bytecode is 'get_link_deps', which
+traverses a splice's or GHCi expression's dependencies and collects the needed
+build artifacts, which can be objects or bytecode, depending on the build
+settings.
+
+1. In make mode, all eligible modules are part of the dependency graph.
+   Their interfaces are loaded unconditionally and in dependency order by the
+   compilation manager, and each module's bytecode is prepared before its
+   dependents are compiled, in one of two ways:
+
+   - If the interface file for a module is missing or out of sync with its
+     source, it is recompiled and bytecode is generated directly and
+     immediately, not involving 'WholeCoreBindings' (in 'runHscBackendPhase').
+
+   - If the interface file is up to date, no compilation is performed, and a
+     lazy thunk generating bytecode from interface Core bindings is created in
+     'compileOne'', which will only be compiled if a downstream module contains
+     a splice that depends on it, as described above.
+
+   In both cases, the bytecode 'Linkable' is stored in a 'HomeModLinkable' in
+   the Home Unit Graph, lazy or not.
+
+2. In oneshot mode, which compiles individual modules without a shared home unit
+   graph, a previously compiled module is not reprocessed as described for make
+   mode above.
+   When 'get_link_deps' encounters a dependency on a local module, it requests
+   its bytecode from the External Package State, who loads the interface
+   on-demand.
+
+   Since the EPS stores interfaces for all package dependencies in addition to
+   local modules in oneshot mode, it has a substantial memory footprint.
+   We try to curtail that by extracting important data into specialized fields
+   in the EPS, and retaining only a few fields of 'ModIface' by overwriting the
+   others with bottom values.
+
+   In order to avoid keeping around all of the interface's components needed for
+   compiling bytecode, we instead store an IO action in 'eps_iface_bytecode'.
+   When 'get_link_deps' evaluates this action, the result is not retained in the
+   EPS, but stored in 'LoaderState', where it may eventually get evicted to free
+   up the memory.
+   This IO action retains the dehydrated Core bindings from the interface in its
+   closure.
+   Like the bytecode 'Linkable' stored in 'LoaderState', this is preferable to
+   storing the intermediate representation as rehydrated Core bindings, since
+   the latter have a significantly greater memory footprint.
+
 Note [Size of Interface Files with Core Definitions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 How much overhead does `-fwrite-if-simplified-core` add to a typical interface file?
 As an experiment I compiled the `Cabal` library and `ghc` library (Aug 22) with

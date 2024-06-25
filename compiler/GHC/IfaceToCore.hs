@@ -893,11 +893,11 @@ tcTopIfaceBindings :: IORef TypeEnv -> [IfaceBindingX IfaceMaybeRhs IfaceTopBndr
           -> IfL [CoreBind]
 tcTopIfaceBindings ty_var ver_decls
    = do
-      int <- mapM tcTopBinders  ver_decls
+      int <- mapM tcTopBinders ver_decls
       let all_ids :: [Id] = concatMap toList int
       liftIO $ modifyIORef ty_var (flip extendTypeEnvList (map AnId all_ids))
 
-      extendIfaceIdEnv all_ids $ mapM (tc_iface_bindings) int
+      extendIfaceIdEnv all_ids $ mapM tc_iface_bindings int
 
 tcTopBinders :: IfaceBindingX a IfaceTopBndrInfo -> IfL (IfaceBindingX a Id)
 tcTopBinders = traverse mk_top_id
