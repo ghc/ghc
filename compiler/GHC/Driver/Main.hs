@@ -50,6 +50,7 @@ module GHC.Driver.Main
     , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
     , initWholeCoreBindings
+    , initWholeCoreBindingsEps
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -106,6 +107,7 @@ module GHC.Driver.Main
     , showModuleIndex
     , hscAddSptEntries
     , writeInterfaceOnlyMode
+    , loadByteCode
     ) where
 
 import GHC.Prelude
@@ -976,24 +978,34 @@ loadByteCode iface mod_sum = do
 -- Compilers
 --------------------------------------------------------------
 
+add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> HscEnv
+add_iface_to_hpt iface details =
+  hscUpdateHPT $ \ hpt ->
+    addToHpt hpt (moduleName (mi_module iface))
+    (HomeModInfo iface details emptyHomeModInfoLinkable)
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
 initModDetails :: HscEnv -> ModIface -> IO ModDetails
 initModDetails hsc_env iface =
   fixIO $ \details' -> do
-    let act hpt  = addToHpt hpt (moduleName $ mi_module iface)
-                                (HomeModInfo iface details' emptyHomeModInfoLinkable)
-    let !hsc_env' = hscUpdateHPT act hsc_env
+    let !hsc_env' = add_iface_to_hpt iface details' hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
     -- any further typechecking.  It's much more useful
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env' iface
 
--- Hydrate any WholeCoreBindings linkables into BCOs
-initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
-initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
+-- | Hydrate any WholeCoreBindings linkables into BCOs, using the supplied
+-- action to initialize the appropriate environment for type checking.
+initWcbWithTcEnv ::
+  HscEnv ->
+  HscEnv ->
+  ModIface ->
+  ModDetails ->
+  Linkable ->
+  IO Linkable
+initWcbWithTcEnv tc_hsc_env hsc_env mod_iface details (LM utc_time this_mod uls) = do
   -- If a module is compiled with -fbyte-code-and-object-code and it
   -- makes use of foreign stubs, then the interface file will also
   -- contain serialized stub dynamic objects, and we can simply write
@@ -1006,22 +1018,39 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
   bytecode_uls <- for uls go
   pure $ LM utc_time this_mod $ stub_uls ++ bytecode_uls
   where
-    go (CoreBindings fi) = do
-        let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
-                                (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
-        types_var <- newIORef (md_types details)
-        let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
-        let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
-        -- The bytecode generation itself is lazy because otherwise even when doing
-        -- recompilation checking the bytecode will be generated (which slows things down a lot)
-        -- the laziness is OK because generateByteCode just depends on things already loaded
-        -- in the interface file.
-        LoadedBCOs <$> (unsafeInterleaveIO $ do
-                  core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
-                  let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
-                  trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
-                  generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
+    go (CoreBindings fi) =
+      -- The bytecode generation itself is lazy because otherwise even when doing
+      -- recompilation checking the bytecode will be generated (which slows things down a lot)
+      -- the laziness is OK because generateByteCode just depends on things already loaded
+      -- in the interface file.
+      LoadedBCOs <$> (unsafeInterleaveIO $ do
+        type_env <- newIORef (md_types details)
+        let
+          tc_hsc_env_with_kv = tc_hsc_env {
+            hsc_type_env_vars =
+              knotVarsFromModuleEnv (mkModuleEnv [(this_mod, type_env)])
+          }
+        core_binds <- initIfaceCheck (text "l") tc_hsc_env_with_kv $
+                      typecheckWholeCoreBindings type_env fi
+        let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
+        trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> ppr this_mod)
+        generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
     go ul = return ul
+
+-- | Hydrate core bindings for a module in the home package table, for which we
+-- can obtain a 'ModDetails'.
+initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
+initWholeCoreBindings hsc_env iface details =
+  initWcbWithTcEnv (add_iface_to_hpt iface details hsc_env) hsc_env iface details
+
+-- | Hydrate core bindings for a module in the external package state.
+-- This is used for home modules as well when compiling in oneshot mode.
+initWholeCoreBindingsEps :: HscEnv -> ModIface -> Linkable -> IO Linkable
+initWholeCoreBindingsEps hsc_env iface lnk = do
+  -- details <- genModDetails hsc_env iface
+  details <- initIfaceLoadModule hsc_env (mi_module iface) (typecheckIface iface)
+  initWcbWithTcEnv hsc_env hsc_env iface details lnk
+
 
 {-
 Note [ModDetails and --make mode]

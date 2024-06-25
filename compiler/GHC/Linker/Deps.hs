@@ -55,6 +55,11 @@ import qualified Data.Map as M
 
 import System.FilePath
 import System.Directory
+import GHC.Driver.Env
+import {-# SOURCE #-} GHC.Driver.Main
+import Data.Time.Clock
+import GHC.Driver.Flags
+import GHC.Driver.Session
 
 data LinkDepsOpts = LinkDepsOpts
   { ldObjSuffix   :: !String                        -- ^ Suffix of .o files
@@ -69,6 +74,7 @@ data LinkDepsOpts = LinkDepsOpts
   , ldWays        :: !Ways                          -- ^ Enabled ways
   , ldLoadIface   :: SDoc -> Module -> IO (MaybeErr MissingInterfaceError ModIface)
                                                     -- ^ Interface loader function
+  , ldHscEnv      :: !HscEnv
   }
 
 data LinkDeps = LinkDeps
@@ -282,13 +288,27 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                   Found loc mod -> found loc mod
                   _ -> no_obj (moduleName mod)
         where
-            found loc mod = do {
-                -- ...and then find the linkable for it
-               mb_lnk <- findObjectLinkableMaybe mod loc ;
-               case mb_lnk of {
-                  Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable lnk
-              }}
+            found loc mod
+              | prefer_bytecode = do
+                  Succeeded iface <- ldLoadIface opts (text "load core bindings") mod
+                  case mi_extra_decls iface of
+                    Just extra_decls -> do
+                      t <- getCurrentTime
+                      initWholeCoreBindingsEps hsc_env iface $ LM t mod [CoreBindings $ WholeCoreBindings extra_decls mod loc]
+                    _ -> fallback_no_bytecode loc mod
+              | otherwise = fallback_no_bytecode loc mod
+
+            fallback_no_bytecode loc mod = do
+              mb_lnk <- findObjectLinkableMaybe mod loc
+              case mb_lnk of
+                Nothing  -> no_obj mod
+                Just lnk -> adjust_linkable lnk
+
+            prefer_bytecode = gopt Opt_UseBytecodeRatherThanObjects dflags
+
+            dflags = hsc_dflags hsc_env
+
+            hsc_env = ldHscEnv opts
 
             adjust_linkable lnk
                 | Just new_osuf <- maybe_normal_osuf = do
