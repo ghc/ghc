@@ -1039,6 +1039,13 @@ matchingStr :: String -> UnitInfo -> Bool
 matchingStr str p
         =  str == unitPackageIdString p
         || str == unitPackageNameString p
+        || matchSublibrary
+  where
+    matchSublibrary
+      | Just (PackageName c) <- unitComponentName p
+      = str == (unitPackageNameString p ++ ":" ++ unpackFS c)
+      | otherwise
+      = False
 
 matchingId :: UnitId -> UnitInfo -> Bool
 matchingId uid p = uid == unitId p

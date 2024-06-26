@@ -146,7 +146,7 @@ instance ToJson DepJSON where
         ("modules-boot", array (snd modules) moduleNameString),
         ("packages",
           JSArray [
-            package unit_id name package_id mods |
+            package name unit_id package_id mods |
             ((name, unit_id, package_id), mods) <- Map.toList packages
           ]
         ),
@@ -157,7 +157,7 @@ instance ToJson DepJSON where
       | (target, Deps {packages = PackageDeps packages, ..}) <- Map.toList m
     ]
     where
-      package unit_id name (PackageId package_id) mods =
+      package name unit_id (PackageId package_id) mods =
         JSObject [
           ("id", JSString (unitIdString unit_id)),
           ("name", JSString name),
@@ -207,8 +207,11 @@ updateDepJSON include_pkgs preprocessor DepNode {..} deps =
 
         | include_pkgs
         , Just unit <- dep_unit
-        , let PackageName name = unitPackageName unit
-              key = (unpackFS name, unitId unit, unitPackageId unit)
+        , let PackageName nameFS = unitPackageName unit
+              name = unpackFS nameFS
+              withLibName (PackageName c) = name ++ ":" ++ unpackFS c
+              lname = maybe name withLibName (unitComponentName unit)
+              key = (lname, unitId unit, unitPackageId unit)
         -> mempty {packages = PackageDeps (Map.singleton key (Set.singleton (moduleName dep_mod)))}
 
         | otherwise
