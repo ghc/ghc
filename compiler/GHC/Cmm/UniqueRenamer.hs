@@ -91,11 +91,7 @@ detRenameCLabel = mapInternalNonDetUniques renameDetUniq
 
 -- | We want to rename uniques in Ids, but ONLY internal ones.
 detRenameId :: Id -> DetRnM Id
-detRenameId i
-    | isInternalName (idName i)
-    = setIdUnique i <$> renameDetUniq (getUnique i)
-    | otherwise
-    = pure i
+detRenameId i = setIdUnique i <$> renameDetUniq (getUnique i)
 
 --------------------------------------------------------------------------------
 -- Traversals

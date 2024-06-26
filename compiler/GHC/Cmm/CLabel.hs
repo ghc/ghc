@@ -343,8 +343,8 @@ newtype NeedExternDecl
 -- code-generation. See Note [Unique Determinism and code generation]
 instance Ord CLabel where
   compare (IdLabel a1 b1 c1) (IdLabel a2 b2 c2) =
-    -- Note [...TODO]: Use stable name comparison to guarantee non-determinism of uniques doesn't influence the order of IdLabels in eg data sections or symbol table.
-    stableNameCmp a1 a2 S.<>
+    -- Comparing names here should deterministic because all unique should have been renamed deterministically ......
+    compare a1 a2 S.<>
     compare b1 b2 S.<>
     compare c1 c2
   compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
@@ -1854,11 +1854,7 @@ returns True.
 -- See Note [....TODO]
 mapInternalNonDetUniques :: Applicative m => (Unique -> m Unique) -> CLabel -> m CLabel
 mapInternalNonDetUniques f = \case
-  il@(IdLabel name cafInfo idLabelInfo)
-    | isInternalName name
-    -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
-    | otherwise
-    -> pure il
+  il@(IdLabel name cafInfo idLabelInfo) -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
   cl@CmmLabel{} -> pure cl
   -- ROMES:TODO: what about `RtsApFast NonDetFastString`?
   RtsLabel rtsLblInfo -> pure $ RtsLabel rtsLblInfo
