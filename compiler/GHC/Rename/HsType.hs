@@ -1426,10 +1426,10 @@ data NegationHandling = ReassociateNegation | KeepNegationIntact
 ----------------------------
 
 get_op :: LHsExpr GhcRn -> OpName
--- An unbound name could be either HsVar or HsUnboundVar
+-- An unbound name could be either HsVar or (XExpr (HsUnboundVarRn uv))
 -- See GHC.Rename.Expr.rnUnboundVar
 get_op (L _ (HsVar _ n))         = NormalOp (unLoc n)
-get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
+get_op (L _ (XExpr (HsUnboundVarRn uv))) = UnboundOp uv
 get_op (L _ (HsRecSel _ fld))    = RecFldOp fld
 get_op other                     = pprPanic "get_op" (ppr other)
 

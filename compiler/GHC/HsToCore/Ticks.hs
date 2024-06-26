@@ -475,7 +475,6 @@ addBinTickLHsExpr boxLabel e@(L pos e0)
 
 addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
 addTickHsExpr e@(HsVar _ (L _ id))  = do freeVar id; return e
-addTickHsExpr e@(HsUnboundVar {})   = return e
 addTickHsExpr e@(HsRecSel _ (FieldOcc id _))   = do freeVar id; return e
 
 addTickHsExpr e@(HsIPVar {})            = return e
@@ -483,6 +482,7 @@ addTickHsExpr e@(HsOverLit {})          = return e
 addTickHsExpr e@(HsOverLabel{})         = return e
 addTickHsExpr e@(HsLit {})              = return e
 addTickHsExpr e@(HsEmbTy {})            = return e
+addTickHsExpr e@(HsHole {})             = return e
 addTickHsExpr (HsLam x v mg)            = liftM (HsLam x v)
                                                 (addTickMatchGroup True mg)
 addTickHsExpr (HsApp x e1 e2)          = liftM2 (HsApp x) (addTickLHsExprNever e1)
@@ -600,6 +600,7 @@ addTickHsExpr (XExpr (HsTick t e)) =
         liftM (XExpr . HsTick t) (addTickLHsExprNever e)
 addTickHsExpr (XExpr (HsBinTick t0 t1 e)) =
         liftM (XExpr . HsBinTick t0 t1) (addTickLHsExprNever e)
+addTickHsExpr e@(XExpr (HsUnboundVarTc {})) = return e
 
 addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
