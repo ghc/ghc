@@ -764,7 +764,7 @@ calls across module and package boundaries: there's no need for the header file
 to be available when compiling an inlined version of a foreign call, so the
 compiler is free to inline foreign calls in any context.
 
-The ``-#include`` option is now deprecated, and the ``include-files``
+The ``-#include`` option is now deprecated, and the ``includes``
 field in a Cabal package specification is ignored.
 
 Memory Allocation
