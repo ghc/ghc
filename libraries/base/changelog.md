@@ -11,6 +11,7 @@
   * Improve the performance of `Data.List.sort` using an improved merging strategy. Instead of `compare`, `sort` now uses `(>)` which may break *malformed* `Ord` instances ([CLC proposal #236](https://github.com/haskell/core-libraries-committee/issues/236))
   * Add `inits1` and `tails1` to `Data.List`, factored from the corresponding functions in `Data.List.NonEmpty` ([CLC proposal #252](https://github.com/haskell/core-libraries-committee/issues/252))
   * Add `firstA` and `secondA` to `Data.Bitraversable`. ([CLC proposal #172](https://github.com/haskell/core-libraries-committee/issues/172))
+  * Deprecate `GHC.TypeNats.Internal`, `GHC.TypeLits.Internal`, `GHC.ExecutionStack.Internal` ([CLC proposal #217](https://github.com/haskell/core-libraries-committee/issues/217))
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1
