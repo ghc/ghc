@@ -304,17 +304,6 @@ tcExpr e@(HsOverLit _ lit) res_ty
            Just lit' -> return (HsOverLit noExtField lit')
            Nothing   -> tcApp e res_ty }
 
--- Typecheck an occurrence of an unbound Id
---
--- Some of these started life as a true expression hole "_".
--- Others might simply be variables that accidentally have no binding site
-tcExpr (HsUnboundVar _ occ) res_ty
-  = do { ty <- expTypeToType res_ty    -- Allow Int# etc (#12531)
-       ; her <- emitNewExprHole occ ty
-       ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
-                                       -- (#18491)
-       ; return (HsUnboundVar her occ) }
-
 tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit
        ; tcWrapResult e (HsLit x (convertLit lit)) lit_ty res_ty }
@@ -735,6 +724,17 @@ tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc _) <- o
   = setSrcSpanA loc $
        mkExpandedStmtTc ls <$> tcApp (XExpr xe) res_ty
+
+-- Typecheck an occurrence of an unbound Id
+--
+-- Some of these started life as a true expression hole "_".
+-- Others might simply be variables that accidentally have no binding site.
+tcXExpr (HsUnboundVarRn occ) res_ty
+  = do { ty <- expTypeToType res_ty    -- Allow Int# etc (#12531)
+       ; her <- emitNewExprHole occ ty
+       ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
+                                       -- (#18491)
+       ; return (XExpr (HsUnboundVarTc her occ)) }
 
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 

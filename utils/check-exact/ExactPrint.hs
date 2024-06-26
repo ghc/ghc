@@ -338,10 +338,6 @@ instance HasTrailing AnnExplicitSum where
   trailing _ = []
   setTrailing a _ = a
 
-instance HasTrailing (Maybe EpAnnUnboundVar) where
-  trailing _ = []
-  setTrailing a _ = a
-
 instance HasTrailing GrhsAnn where
   trailing _ = []
   setTrailing a _ = a
@@ -2948,16 +2944,6 @@ instance ExactPrint (HsExpr GhcPs) where
       then markAnnotated n
       else return n
     return (HsVar x n')
-  exact x@(HsUnboundVar an _) = do
-    case an of
-      Just (EpAnnUnboundVar (ob,cb) l) -> do
-        printStringAtAA ob "`" >> return ()
-        printStringAtAA l  "_" >> return ()
-        printStringAtAA cb "`" >> return ()
-        return x
-      _ -> do
-        printStringAtLsDelta (SameLine 0) "_"
-        return x
   exact x@(HsOverLabel _ src l) = do
     printStringAtLsDelta (SameLine 0) "#"
     case src of

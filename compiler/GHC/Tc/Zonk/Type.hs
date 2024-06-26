@@ -924,9 +924,9 @@ zonkExpr (HsVar x (L l id))
   do { id' <- zonkIdOcc id
      ; return (HsVar x (L l id')) }
 
-zonkExpr (HsUnboundVar her occ)
+zonkExpr (XExpr (HsUnboundVarTc her occ))
   = do her' <- zonk_her her
-       return (HsUnboundVar her' occ)
+       return (XExpr (HsUnboundVarTc her' occ))
   where
     zonk_her :: HoleExprRef -> ZonkTcM HoleExprRef
     zonk_her (HER ref ty u)

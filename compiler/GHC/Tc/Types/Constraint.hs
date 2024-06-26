@@ -690,7 +690,7 @@ For expression holes, the user has the option of deferring errors until runtime
 with -fdefer-type-errors. In this case, the hole actually has evidence: this
 evidence is an erroring expression that prints an error and crashes at runtime.
 The ExprHole variant of holes stores an IORef EvTerm that will contain this evidence;
-during constraint generation, this IORef was stored in the HsUnboundVar extension
+during constraint generation, this IORef was stored in the HsUnboundVarTc extension
 field by the type checker. The desugarer simply dereferences to get the CoreExpr.
 
 Prior to fixing #17812, we used to invent an Id to hold the erroring
