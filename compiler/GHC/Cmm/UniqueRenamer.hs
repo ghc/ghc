@@ -23,7 +23,6 @@ import Data.Tuple (swap)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import GHC.Types.Id
-import GHC.Types.Name (isInternalName)
 
 {-
 --------------------------------------------------------------------------------
@@ -110,7 +109,9 @@ instance UniqRenamable CLabel where
   uniqRename = detRenameCLabel
 
 instance UniqRenamable LocalReg where
-  uniqRename (LocalReg uq t) = LocalReg <$> renameDetUniq uq <*> pure t
+  -- uniqRename (LocalReg uq t) = LocalReg <$> renameDetUniq uq <*> pure t
+  uniqRename (LocalReg uq t) = pure $ LocalReg uq t
+    -- ROMES:TODO: This has unique r1, we're debugging. this may still be a source of non determinism.
 
 instance UniqRenamable Label where
   uniqRename lbl = mkHooplLabel . getKey <$> renameDetUniq (getUnique lbl)
@@ -124,19 +125,6 @@ instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (GenCmmDecl a b Cmm
     = CmmProc <$> uniqRename h <*> uniqRename lbl <*> uniqRename regs <*> uniqRename g
   uniqRename (CmmData sec d)
     = CmmData <$> uniqRename sec <*> uniqRename d
-
--- instance UniqRenamable ModuleSRTInfo where
---   uniqRename
---     ModuleSRTInfo{thisModule, dedupSRTs, flatSRTs, moduleSRTMap}
---     -- ROMES:TODO: I feel like we don't really need to do this for all of these maps, and can shortcut some of this
---     -- Nonetheless, in order to produce a working prototype, I'm just always renaming them all. We can optimise later.
---       = ModuleSRTInfo thisModule <$> uniqRename dedupSRTs <*> uniqRename flatSRTs <*> uniqRename moduleSRTMap
-
--- instance UniqRenamable SRTEntry where
---   uniqRename (SRTEntry cl) = SRTEntry <$> uniqRename cl
-
--- instance UniqRenamable CAFfyLabel where
---   uniqRename (CAFfyLabel cl) = CAFfyLabel <$> uniqRename cl
 
 instance UniqRenamable CmmDataDecl where
   uniqRename (CmmData sec d)

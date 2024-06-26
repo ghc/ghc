@@ -1852,9 +1852,10 @@ returns True.
 -- Note that not all Uniques are mapped over. Only those that can be safely alpha
 -- renamed, eg uniques of local symbols or of system names.
 -- See Note [....TODO]
+-- ROMES:TODO: We can do less work here, like, do we really need to rename AsmTempLabel, SRTLabel, LocalBlockLabel?
 mapInternalNonDetUniques :: Applicative m => (Unique -> m Unique) -> CLabel -> m CLabel
 mapInternalNonDetUniques f = \case
-  il@(IdLabel name cafInfo idLabelInfo) -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
+  IdLabel name cafInfo idLabelInfo -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
   cl@CmmLabel{} -> pure cl
   -- ROMES:TODO: what about `RtsApFast NonDetFastString`?
   RtsLabel rtsLblInfo -> pure $ RtsLabel rtsLblInfo

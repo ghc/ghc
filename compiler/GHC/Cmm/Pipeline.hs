@@ -78,7 +78,7 @@ cpsTop logger platform cfg proc =
       --
       CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
            return $ cmmCfgOptsProc splitting_proc_points proc
-      dump Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+      dump Opt_D_dump_cmm_cfg "Post control-flow optimisations (1)" g
 
       let !TopInfo {stack_info=StackInfo { arg_space = entry_off
                                          , do_layout = do_layout }} = h
@@ -168,7 +168,7 @@ cpsTop logger platform cfg proc =
                     else g
       g <- return $ map (removeUnreachableBlocksProc platform) g
            -- See Note [unreachable blocks]
-      dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+      dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations (2)" g
 
       return (Left (cafEnv, g))
 
