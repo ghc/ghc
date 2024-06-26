@@ -49,6 +49,7 @@ findStub(Section * section,
 bool
 makeStub(Section * section,
           void* * addr,
+          void* got_addr STG_UNUSED,
           uint8_t flags) {
 
     Stub * s = (Stub *)stgCallocBytes(sizeof(Stub), 1, "makeStub");
