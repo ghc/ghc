@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
@@ -77,7 +78,11 @@ ghcAutogen verbosity lbi@LocalBuildInfo{..} = do
   -- Call genprimopcode to generate *.hs-incl
   forM_ primopIncls $ \(file,command) -> do
     contents <- readProcess "genprimopcode" [command] primopsStr
+#if MIN_VERSION_Cabal(3,11,0)
+    rewriteFileEx verbosity (buildDir lbi </> file) contents
+#else
     rewriteFileEx verbosity (buildDir </> file) contents
+#endif
 
   -- Write GHC.Platform.Constants
   let platformConstantsPath = autogenPackageModulesDir lbi </> "GHC/Platform/Constants.hs"
