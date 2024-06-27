@@ -79,6 +79,11 @@ cmmMachOpFoldM
     -> MachOp
     -> [CmmExpr]
     -> Maybe CmmExpr
+cmmMachOpFoldM _ (MO_V_Broadcast {}) _ = Nothing
+cmmMachOpFoldM _ (MO_VF_Broadcast {}) _ = Nothing
+  -- SIMD NCG TODO: supporting constant folding for vector operations
+  -- would require augmenting getRegister' to handle them.
+  -- See the code for "getRegister' platform _ (CmmLit lit)".
 cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
   = Just $! case op of
       MO_S_Neg _ -> CmmLit (CmmInt (-x) rep)

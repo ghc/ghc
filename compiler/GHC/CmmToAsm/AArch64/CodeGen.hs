@@ -827,6 +827,8 @@ getRegister' config plat expr
         MO_AlignmentCheck {} ->
           pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
 
+        MO_V_Broadcast {} -> vectorsNeedLlvm
+        MO_VF_Broadcast {} -> vectorsNeedLlvm
         MO_VF_Neg {} -> vectorsNeedLlvm
       where
         notUnary = pprPanic "getRegister' (non-unary CmmMachOp with 1 argument):" (pdoc plat expr)
@@ -1172,6 +1174,8 @@ getRegister' config plat expr
         MO_FF_Conv {} -> notDyadic
         MO_WF_Bitcast {} -> notDyadic
         MO_FW_Bitcast {} -> notDyadic
+        MO_V_Broadcast {} -> notDyadic
+        MO_VF_Broadcast {} -> notDyadic
         MO_V_Insert {} -> notDyadic
         MO_VF_Insert {} -> notDyadic
         MO_AlignmentCheck {} -> notDyadic

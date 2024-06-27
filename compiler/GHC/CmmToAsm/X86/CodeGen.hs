@@ -1010,9 +1010,10 @@ getRegister' _ is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal (GlobalRegUse 
         LEA II64 (OpAddr (ripRel (litToImm displacement))) (OpReg dst))
 
 getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
-    sse2 <- sse2Enabled
-    sse  <- sseEnabled
-    avx  <- avxEnabled
+    sse4_1 <- sse4_1Enabled
+    sse2   <- sse2Enabled
+    sse    <- sseEnabled
+    avx    <- avxEnabled
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
 
@@ -1105,6 +1106,19 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                        -> sorry "Please enable the -mavx or -msse, -msse2 flag"
       -- SIMD NCG TODO: add integer negation
       MO_VS_Neg {} -> needLlvm mop
+
+      MO_VF_Broadcast l W32 | avx       -> vector_float_broadcast_avx l W32 x
+                            | sse4_1    -> vector_float_broadcast_sse l W32 x
+                            | otherwise
+                              -> sorry "Please enable the -mavx or -msse4 flag"
+      MO_VF_Broadcast l W64 | sse2      -> vector_float_broadcast_avx l W64 x
+                            | otherwise -> sorry "Please enable the -msse2 flag"
+      MO_VF_Broadcast {} -> incorrectOperands
+
+      MO_V_Broadcast l W64  | sse2      -> vector_int_broadcast l W64 x
+                            | otherwise -> sorry "Please enable the -msse2 flag"
+      -- SIMD NCG TODO: W32, W16, W8
+      MO_V_Broadcast {} -> needLlvm mop
 
       -- Binary MachOps
       MO_Add {}    -> incorrectOperands
@@ -1240,6 +1254,70 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                          (SUB format (OpReg reg) (OpReg dst))
           return (Any format code)
 
+        -----------------------
+        vector_float_broadcast_avx :: Length
+                                   -> Width
+                                   -> CmmExpr
+                                   -> NatM Register
+        vector_float_broadcast_avx len W32 expr
+          = do
+          (reg, exp) <- getSomeReg expr
+          let f    = VecFormat len FmtFloat
+              addr = spRel platform 0
+           in return $ Any f (\dst -> exp    `snocOL`
+                                    (MOVU f (OpReg reg) (OpAddr addr)) `snocOL`
+                                    (VBROADCAST f addr dst))
+        vector_float_broadcast_avx len W64 expr
+          = do
+          (reg, exp) <- getSomeReg expr
+          let f    = VecFormat len FmtDouble
+              addr = spRel platform 0
+           in return $ Any f (\dst -> exp `snocOL`
+                                    (MOVU f (OpReg reg) (OpAddr addr)) `snocOL`
+                                    (MOVL f (OpAddr addr) (OpReg dst)) `snocOL`
+                                    (MOVH f (OpAddr addr) (OpReg dst)))
+        vector_float_broadcast_avx _ _ c
+          = pprPanic "Broadcast not supported for : " (pdoc platform c)
+        -----------------------
+        vector_float_broadcast_sse :: Length
+                                   -> Width
+                                   -> CmmExpr
+                                   -> NatM Register
+        vector_float_broadcast_sse len W32 expr
+          = do
+          (reg, exp) <- getSomeReg expr
+          let f        = VecFormat len FmtFloat
+              addr     = spRel platform 0
+              code dst = exp `snocOL`
+                         (MOVU f (OpReg reg) (OpAddr addr)) `snocOL`
+                         (insertps $ 0b1110) `snocOL`
+                         (insertps $ 16) `snocOL`
+                         (insertps $ 32) `snocOL`
+                         (insertps $ 48)
+                where
+                  insertps imm =
+                    INSERTPS f (ImmInt imm) (OpAddr addr) dst
+
+           in return $ Any f code
+        vector_float_broadcast_sse _ _ c
+          = pprPanic "Broadcast not supported for : " (pdoc platform c)
+
+        vector_int_broadcast :: Length
+                             -> Width
+                             -> CmmExpr
+                             -> NatM Register
+        vector_int_broadcast len W64 expr
+          = do
+          (reg, exp) <- getSomeReg expr
+          let fmt = VecFormat len FmtInt64
+          return $ Any fmt (\dst -> exp `snocOL`
+                                    (MOVD II64 (OpReg reg) (OpReg dst)) `snocOL`
+                                    (PUNPCKLQDQ fmt (OpReg dst) dst)
+                                    )
+        vector_int_broadcast _ _ c
+          = pprPanic "Broadcast not supported for : " (pdoc platform c)
+
+
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse2   <- sse2Enabled
   sse    <- sseEnabled
@@ -1369,6 +1447,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_AlignmentCheck {} -> incorrectOperands
       MO_VS_Neg {} -> incorrectOperands
       MO_VF_Neg {} -> incorrectOperands
+      MO_V_Broadcast {} -> incorrectOperands
+      MO_VF_Broadcast {} -> incorrectOperands
 
       -- Ternary MachOps
       MO_FMA {} -> incorrectOperands

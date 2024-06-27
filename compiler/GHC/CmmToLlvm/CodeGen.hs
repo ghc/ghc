@@ -1460,6 +1460,9 @@ genMachOp _ op [x] = case op of
             all0s = LMLitVar $ LMVectorLit (replicate len all0)
         in negateVec vecty all0s LM_MO_FSub
 
+    MO_V_Broadcast  l w -> genBroadcastOp l w x
+    MO_VF_Broadcast l w -> genBroadcastOp l w x
+
     MO_RelaxedRead w -> exprToVar (CmmLoad x (cmmBits w) NaturallyAligned)
 
     MO_AlignmentCheck _ _ -> panic "-falignment-sanitisation is not supported by -fllvm"
@@ -1719,6 +1722,8 @@ genMachOp_slow opt op [x, y] = case op of
 
     MO_VS_Neg {} -> panicOp
 
+    MO_VF_Broadcast {} -> panicOp
+    MO_V_Broadcast {} -> panicOp
     MO_V_Insert  {} -> panicOp
     MO_VF_Insert  {} -> panicOp
 
@@ -1840,6 +1845,21 @@ genMachOp_slow _opt op [x, y, z] = do
 
 -- More than three expressions, invalid!
 genMachOp_slow _ _ _ = panic "genMachOp_slow: More than 3 expressions in MachOp!"
+
+genBroadcastOp :: Int -> Width -> CmmExpr -> LlvmM ExprData
+genBroadcastOp lg _width x = runExprData $ do
+  -- To broadcast a scalar x as a vector v:
+  --   1. insert x at the 0 position of the zero vector
+  --   2. shuffle x into all positions
+  var_x <- exprToVarW x
+  let tx = getVarType var_x
+      tv = LMVector lg tx
+      z = if isFloat tx
+          then LMFloatLit 0 tx
+          else LMIntLit   0 tx
+      zs = LMLitVar $ LMVectorLit $ replicate lg z
+  w <- doExprW tv $ Insert zs var_x (LMLitVar $ LMIntLit 0 (LMInt 32))
+  doExprW tv $ Shuffle w w (replicate lg 0)
 
 genShuffleOp :: [Int] -> CmmExpr -> CmmExpr -> LlvmM ExprData
 genShuffleOp is x y = runExprData $ do
