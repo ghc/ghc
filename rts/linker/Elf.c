@@ -1357,7 +1357,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                /* try to locate an existing stub for this target */
                if(findStub(&oc->sections[target_shndx], (void**)&S, 0)) {
                    /* didn't find any. Need to create one */
-                   if(makeStub(&oc->sections[target_shndx], (void**)&S, 0)) {
+                   if(makeStub(&oc->sections[target_shndx], (void**)&S, NULL, 0)) {
                        errorBelch("Unable to create veneer for ARM_CALL\n");
                        return 0;
                    }
@@ -1449,7 +1449,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                /* try to locate an existing stub for this target */
                if(findStub(&oc->sections[target_shndx], (void**)&S, 1)) {
                    /* didn't find any. Need to create one */
-                   if(makeStub(&oc->sections[target_shndx], (void**)&S, 1)) {
+                   if(makeStub(&oc->sections[target_shndx], (void**)&S, NULL, 1)) {
                        errorBelch("Unable to create veneer for ARM_THM_CALL\n");
                        return 0;
                    }
