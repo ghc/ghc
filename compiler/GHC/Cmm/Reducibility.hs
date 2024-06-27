@@ -47,7 +47,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Data.Graph.Collapse
 import GHC.Data.Graph.Inductive.Graph
 import GHC.Data.Graph.Inductive.PatriciaTree
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Panic
 
 -- | Represents the result of a reducibility analysis.
@@ -81,7 +81,7 @@ reducibility gwd =
 -- control-flow graph.
 
 asReducible :: GraphWithDominators CmmNode
-            -> UniqSM (GraphWithDominators CmmNode)
+            -> UniqDSM (GraphWithDominators CmmNode)
 asReducible gwd = case reducibility gwd of
                     Reducible -> return gwd
                     Irreducible -> assertReducible <$> nodeSplit gwd
@@ -97,7 +97,7 @@ assertReducible gwd = case reducibility gwd of
 -- irreducible.
 
 nodeSplit :: GraphWithDominators CmmNode
-          -> UniqSM (GraphWithDominators CmmNode)
+          -> UniqDSM (GraphWithDominators CmmNode)
 nodeSplit gwd =
     graphWithDominators <$> inflate (g_entry g) <$> runNullCollapse collapsed
   where g = gwd_graph gwd
@@ -181,7 +181,7 @@ instance PureSupernode CmmSuper where
   mapLabels = changeLabels
 
 instance Supernode CmmSuper NullCollapseViz where
-  freshen s = liftUniqSM $ relabel s
+  freshen s = liftUniqDSM $ relabel s
 
 
 -- | Return all labels defined within a supernode.
@@ -212,11 +212,11 @@ changeBlockLabels f block = blockJoin entry' middle exit'
 -- | Within the given supernode, replace every defined label (and all
 -- of its uses) with a fresh label.
 
-relabel :: CmmSuper -> UniqSM CmmSuper
+relabel :: CmmSuper -> UniqDSM CmmSuper
 relabel node = do
      finite_map <- foldM addPair mapEmpty $ definedLabels node
      return $ changeLabels (labelChanger finite_map) node
-  where addPair :: LabelMap Label -> Label -> UniqSM (LabelMap Label)
+  where addPair :: LabelMap Label -> Label -> UniqDSM (LabelMap Label)
         addPair map old = do new <- newBlockId
                              return $ mapInsert old new map
         labelChanger :: LabelMap Label -> (Label -> Label)

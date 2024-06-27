@@ -209,6 +209,7 @@ import GHC.Builtin.Names
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos, LambdaFormInfo(..))
+import GHC.StgToCmm.CgUtils (CgStream)
 
 import GHC.Cmm
 import GHC.Cmm.Info.Build
@@ -267,7 +268,6 @@ import GHC.Data.Bag
 import GHC.Data.OsPath (unsafeEncodeUtf)
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
-import GHC.Data.Stream (Stream)
 import GHC.Data.Maybe
 
 import GHC.SysTools (initSysTools)
@@ -300,6 +300,7 @@ import GHC.Stg.InferTags.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
+import GHC.Types.Unique.DSM
 import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
@@ -2085,7 +2086,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               let dump a = do
                     unless (null a) $ putDumpFileMaybe logger Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
                     return a
-                  rawcmms1 = Stream.mapM dump rawcmms0
+                  rawcmms1 = Stream.mapM (liftIO . dump) rawcmms0
 
               let foreign_stubs st = foreign_stubs0
                                      `appendStubC` prof_init
@@ -2094,7 +2095,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
                   <- {-# SCC "codeOutput" #-}
                     codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
-                    foreign_stubs foreign_files dependencies rawcmms1
+                    foreign_stubs foreign_files dependencies (initDUniqSupply 'n' 0) rawcmms1
               return  ( output_filename, stub_c_exists, foreign_fps
                       , Just stg_cg_infos, Just cmm_cg_infos)
 
@@ -2221,16 +2222,23 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         -- Re-ordering here causes breakage when booting with C backend because
         -- in C we must declare before use, but SRT algorithm is free to
         -- re-order [A, B] (B refers to A) when A is not CAFFY and return [B, A]
-        cmmgroup <-
-          concatMapM (\cmm -> snd <$> cmmPipeline logger cmm_config (emptySRT cmm_mod) [cmm]) cmm
+        ((_,dus1), cmmgroup) <- second concat <$>
+          mapAccumLM (\(msrt0, dus0) cmm -> do
+            ((msrt1, cmm'), dus1) <- cmmPipeline logger cmm_config msrt0 [cmm] dus0
+            return ((msrt1, dus1), cmm')) (emptySRT cmm_mod, initDUniqSupply 'u' 0) cmm
 
         unless (null cmmgroup) $
           putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm"
             FormatCMM (pdoc platform cmmgroup)
 
-        rawCmms <- case cmmToRawCmmHook hooks of
+        rawCmms0 <- case cmmToRawCmmHook hooks of
           Nothing -> cmmToRawCmm logger profile (Stream.yield cmmgroup)
           Just h  -> h           dflags Nothing (Stream.yield cmmgroup)
+
+        let dump a = do
+              unless (null a) $ putDumpFileMaybe logger Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
+              return a
+            rawCmms = Stream.mapM (liftIO . dump) rawCmms0
 
         let foreign_stubs _
               | not $ null ipe_ents =
@@ -2239,7 +2247,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
               | otherwise     = NoStubs
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
           <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
-             rawCmms
+             dus1 rawCmms
         return stub_c_exists
   where
     no_loc = OsPathModLocation
@@ -2272,7 +2280,7 @@ This reduces residency towards the end of the CodeGen phase significantly
 doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
           -> CollectedCCs
           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
-          -> IO (Stream IO CmmGroupSRTs CmmCgInfos)
+          -> IO (CgStream CmmGroupSRTs CmmCgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -2292,7 +2300,7 @@ doCodeGen hsc_env this_mod denv data_tycons
                         Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags mod)
                         Just h  -> h                             (initStgToCmmConfig dflags mod)
 
-    let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
+    let cmm_stream :: CgStream CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs
@@ -2308,11 +2316,11 @@ doCodeGen hsc_env this_mod denv data_tycons
               "Cmm produced by codegen" FormatCMM (pdoc platform a)
           return a
 
-        ppr_stream1 = Stream.mapM dump1 cmm_stream
+        ppr_stream1 = Stream.mapM (liftIO . dump1) cmm_stream
 
         cmm_config = initCmmConfig dflags
 
-        pipeline_stream :: Stream IO CmmGroupSRTs CmmCgInfos
+        pipeline_stream :: CgStream CmmGroupSRTs CmmCgInfos
         pipeline_stream = do
           ((mod_srt_info, ipes, ipe_stats), lf_infos) <-
             {-# SCC "cmmPipeline" #-}
@@ -2326,16 +2334,16 @@ doCodeGen hsc_env this_mod denv data_tycons
           -> CmmConfig
           -> (ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
           -> CmmGroup
-          -> IO ((ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats), CmmGroupSRTs)
+          -> UniqDSMT IO ((ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats), CmmGroupSRTs)
         pipeline_action logger cmm_config (mod_srt_info, ipes, stats) cmm_group = do
-          (mod_srt_info', cmm_srts) <- cmmPipeline logger cmm_config mod_srt_info cmm_group
+          (mod_srt_info', cmm_srts) <- withDUS $ cmmPipeline logger cmm_config mod_srt_info cmm_group
 
           -- If -finfo-table-map is enabled, we precompute a map from info
           -- tables to source locations. See Note [Mapping Info Tables to Source
           -- Positions] in GHC.Stg.Debug.
           (ipes', stats') <-
             if (gopt Opt_InfoTableMap dflags) then
-              lookupEstimatedTicks hsc_env ipes stats cmm_srts
+              liftIO $ lookupEstimatedTicks hsc_env ipes stats cmm_srts
             else
               return (ipes, stats)
 
@@ -2346,7 +2354,7 @@ doCodeGen hsc_env this_mod denv data_tycons
             putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
-    return $ Stream.mapM dump2 pipeline_stream
+    return $ Stream.mapM (liftIO . dump2) pipeline_stream
 
 myCoreToStg :: Logger -> DynFlags -> [Var]
             -> Bool

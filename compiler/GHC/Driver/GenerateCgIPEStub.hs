@@ -13,7 +13,7 @@ import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Info.Build (emptySRT)
 import GHC.Cmm.Pipeline (cmmPipeline)
-import GHC.Data.Stream (Stream, liftIO)
+import GHC.Data.Stream (liftIO, liftEff)
 import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags, hsc_logger)
 import GHC.Driver.Env.Types (HscEnv)
@@ -28,6 +28,7 @@ import GHC.StgToCmm.Monad (getCmm, initC, runC, initFCodeState)
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos)
 import GHC.StgToCmm.Utils
+import GHC.StgToCmm.CgUtils (CgStream)
 import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
 import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.Tickish (GenTickish (SourceNote))
@@ -35,6 +36,7 @@ import GHC.Unit.Types (Module, moduleName)
 import GHC.Unit.Module (moduleNameString)
 import qualified GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable (ppr)
+import GHC.Types.Unique.DSM
 
 {-
 Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
@@ -198,7 +200,7 @@ generateCgIPEStub
      , Map CmmInfoTable (Maybe IpeSourceLocation)
      , IPEStats
      )
-  -> Stream IO CmmGroupSRTs CmmCgInfos
+  -> CgStream CmmGroupSRTs CmmCgInfos
 generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesWithTickishes, initStats) = do
   let dflags   = hsc_dflags hsc_env
       platform = targetPlatform dflags
@@ -211,7 +213,7 @@ generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesW
   let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
       ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv')
 
-  (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) ipeCmmGroup
+  (_, ipeCmmGroupSRTs) <- liftEff $ withDUS $ cmmPipeline logger cmm_cfg (emptySRT this_mod) ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs
 
   ipeStub <-

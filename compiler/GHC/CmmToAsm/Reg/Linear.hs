@@ -129,7 +129,7 @@ import GHC.Data.Graph.Directed
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
@@ -146,11 +146,11 @@ regAlloc
         :: Instruction instr
         => NCGConfig
         -> LiveCmmDecl statics instr
-        -> UniqSM ( NatCmmDecl statics instr
-                  , Maybe Int  -- number of extra stack slots required,
-                               -- beyond maxSpillSlots
-                  , Maybe RegAllocStats
-                  )
+        -> UniqDSM ( NatCmmDecl statics instr
+                   , Maybe Int  -- number of extra stack slots required,
+                                -- beyond maxSpillSlots
+                   , Maybe RegAllocStats
+                   )
 
 regAlloc _ (CmmData sec d)
         = return
@@ -207,7 +207,7 @@ linearRegAlloc
               -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)]
               -- ^ instructions annotated with "deaths"
-        -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
+        -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
 linearRegAlloc config entry_ids block_live sccs
  = case platformArch platform of
@@ -228,7 +228,7 @@ linearRegAlloc config entry_ids block_live sccs
       ArchUnknown    -> panic "linearRegAlloc ArchUnknown"
  where
   go :: (FR regs, Outputable regs)
-     => regs -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
+     => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
   go f = linearRegAlloc' config f entry_ids block_live sccs
   platform = ncgPlatform config
 
@@ -244,14 +244,14 @@ linearRegAlloc'
         -> [BlockId]                    -- ^ entry points
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
-        -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
+        -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
 linearRegAlloc' config initFreeRegs entry_ids block_live sccs
- = do   us      <- getUniqueSupplyM
-        let !(_, !stack, !stats, !blocks) =
-                runR config emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
-                    $ linearRA_SCCs entry_ids block_live [] sccs
-        return  (blocks, stats, getStackUse stack)
+ = UDSM $ \us -> do
+    let !(_, !stack, !stats, !blocks, us') =
+            runR config emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
+                $ linearRA_SCCs entry_ids block_live [] sccs
+     in DUniqResult (blocks, stats, getStackUse stack) us'
 
 
 linearRA_SCCs :: OutputableRegConstraint freeRegs instr
