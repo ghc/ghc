@@ -2,7 +2,7 @@
 module GHC.Cmm.UniqueRenamer
   ( detRenameUniques
   , UniqDSM, runUniqueDSM
-  , DUniqSupply(..), getUniqueDSM
+  , DUniqSupply, getUniqueDSM
 
   -- Careful! Not for general use!
   , DetUniqFM, emptyDetUFM)
@@ -287,7 +287,7 @@ panicMapKeysNotInjective _ _ = error "this should be impossible because the func
 -- there, but without the unboxing it feels? Maybe not, since we carry the
 -- mappings too.
 
-newtype DUniqSupply = DUS Word64 -- supply uniques iteratively
+type DUniqSupply = Word64 -- supply uniques iteratively
 type DUniqResult result = (# result, DUniqSupply #)
 
 pattern DUniqResult :: a -> b -> (# a, b #)
@@ -317,7 +317,7 @@ instance Applicative UniqDSM where
   {-# INLINE (*>) #-}
 
 getUniqueDSM :: UniqDSM Unique
-getUniqueDSM = UDSM (\tag (DUS us0) -> DUniqResult (mkUniqueGrimily $ tag .|. us0) (DUS $ us0+1))
+getUniqueDSM = UDSM (\tag us0 -> DUniqResult (mkUniqueGrimily $ tag .|. us0) (us0+1))
 
 runUniqueDSM :: Char {- tag -} -> DUniqSupply {- first unique -}
              -> UniqDSM a -> (a, DUniqSupply)
@@ -326,3 +326,9 @@ runUniqueDSM c firstUniq (UDSM f) =
    in case f tag firstUniq of
         DUniqResult uq us -> (uq, us)
 
+{-
+Note [Cmm Local Deterministic Uniques]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO!!!!!
+TODO!!!!!
+-}

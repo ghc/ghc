@@ -37,7 +37,6 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Runtime.Heap.Layout
-import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
 
@@ -51,6 +50,7 @@ import Control.Monad.Trans.Class
 import Data.List (unzip4)
 
 import GHC.Types.Name.Set
+import GHC.Cmm.UniqueRenamer
 
 {- Note [SRTs]
    ~~~~~~~~~~~
@@ -887,7 +887,10 @@ doSRTs
   -> IO (ModuleSRTInfo, [CmmDeclSRTs])
 
 doSRTs cfg moduleSRTInfo procs data_ = do
-  us <- mkSplitUniqSupply 'u' -- ROMES:TODO: We could use a deterministic supply here? All names from here on out should be deterministic. Perhaps I could also grep for all supplies created after this point in its closure or somethinkg...
+
+  -- Use local namespace 'u' here.
+  -- See Note [Cmm Local Deterministic Uniques]
+  let runUDSM x = let (a,b) = runUniqueDSM 'u' 1 x in pprTrace "doSRTS" (ppr b) a
 
   let profile = cmmProfile cfg
 
@@ -941,7 +944,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
           ) ]
 
       (result, moduleSRTInfo') =
-        initUs_ us $
+        runUDSM $
         flip runStateT moduleSRTInfo $ do
           nonCAFs <- mapM (doSCC cfg staticFuns static_data_env) sccs
           cAFs <- forM cafsWithSRTs $ \(l, cafLbl, cafs) ->
@@ -990,7 +993,7 @@ doSCC
   -> LabelMap CLabel -- ^ which blocks are static function entry points
   -> DataCAFEnv      -- ^ static data
   -> SCC (SomeLabel, CAFfyLabel, Set CAFfyLabel)
-  -> StateT ModuleSRTInfo UniqSM
+  -> StateT ModuleSRTInfo UniqDSM
         ( [CmmDeclSRTs]          -- generated SRTs
         , [(Label, CLabel)]      -- SRT fields for info tables
         , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
@@ -1045,7 +1048,7 @@ oneSRT
   -> Bool                       -- ^ True <=> this SRT is for a CAF
   -> Set CAFfyLabel             -- ^ SRT for this set
   -> DataCAFEnv                 -- Static data labels in this group
-  -> StateT ModuleSRTInfo UniqSM
+  -> StateT ModuleSRTInfo UniqDSM
        ( [CmmDeclSRTs]                -- SRT objects we built
        , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
        , [(Label, [SRTEntry])]        -- SRTs to attach to static functions
@@ -1112,7 +1115,7 @@ oneSRT cfg staticFuns lbls caf_lbls isCAF cafs static_data_env = do
     -- update the SRTMap for the label to point to a closure. It's
     -- important that we don't do this for static functions or CAFs,
     -- see Note [Invalid optimisation: shortcutting].
-    updateSRTMap :: Maybe SRTEntry -> StateT ModuleSRTInfo UniqSM ()
+    updateSRTMap :: Maybe SRTEntry -> StateT ModuleSRTInfo UniqDSM ()
     updateSRTMap srtEntry =
       srtTrace "updateSRTMap"
         (pdoc platform srtEntry <+> "isCAF:" <+> ppr isCAF <+>
@@ -1236,7 +1239,7 @@ oneSRT cfg staticFuns lbls caf_lbls isCAF cafs static_data_env = do
 buildSRTChain
    :: Profile
    -> [SRTEntry]
-   -> UniqSM
+   -> UniqDSM
         ( [CmmDeclSRTs] -- The SRT object(s)
         , SRTEntry      -- label to use in the info table
         )
@@ -1254,9 +1257,9 @@ buildSRTChain profile cafSet =
     mAX_SRT_SIZE = 16
 
 
-buildSRT :: Profile -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
+buildSRT :: Profile -> [SRTEntry] -> UniqDSM (CmmDeclSRTs, SRTEntry)
 buildSRT profile refs = do
-  id <- getUniqueM
+  id <- getUniqueDSM
   let
     lbl = mkSRTLabel id
     platform = profilePlatform profile
