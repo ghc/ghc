@@ -801,6 +801,8 @@ getRegister' config plat expr
         MO_VS_Neg {} -> notUnary
         MO_VU_Quot {} -> notUnary
         MO_VU_Rem {} -> notUnary
+        MO_V_Shuffle {} -> notUnary
+        MO_VF_Shuffle  {} -> notUnary
         MO_VF_Insert {} -> notUnary
         MO_VF_Extract {} -> notUnary
         MO_VF_Add {} -> notUnary
@@ -1179,6 +1181,8 @@ getRegister' config plat expr
         MO_VF_Neg {} -> vectorsNeedLlvm
         MO_VF_Mul {} -> vectorsNeedLlvm
         MO_VF_Quot {} -> vectorsNeedLlvm
+        MO_V_Shuffle {} -> vectorsNeedLlvm
+        MO_VF_Shuffle {} -> vectorsNeedLlvm
         where
           notDyadic =
             pprPanic "getRegister' (non-dyadic CmmMachOp with 2 arguments): " $

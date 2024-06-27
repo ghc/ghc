@@ -1523,6 +1523,9 @@ genMachOp _ op [x] = case op of
     MO_VF_Insert  _ _ -> panicOp
     MO_VF_Extract _ _ -> panicOp
 
+    MO_V_Shuffle {} -> panicOp
+    MO_VF_Shuffle {} -> panicOp
+
     MO_VF_Add     _ _ -> panicOp
     MO_VF_Sub     _ _ -> panicOp
     MO_VF_Mul     _ _ -> panicOp
@@ -1719,6 +1722,9 @@ genMachOp_slow opt op [x, y] = case op of
     MO_V_Insert  {} -> panicOp
     MO_VF_Insert  {} -> panicOp
 
+    MO_V_Shuffle _ _ is -> genShuffleOp is x y
+    MO_VF_Shuffle _ _ is -> genShuffleOp is x y
+
     MO_VF_Neg {} -> panicOp
 
     MO_RelaxedRead {} -> panicOp
@@ -1834,6 +1840,18 @@ genMachOp_slow _opt op [x, y, z] = do
 
 -- More than three expressions, invalid!
 genMachOp_slow _ _ _ = panic "genMachOp_slow: More than 3 expressions in MachOp!"
+
+genShuffleOp :: [Int] -> CmmExpr -> CmmExpr -> LlvmM ExprData
+genShuffleOp is x y = runExprData $ do
+  vx <- exprToVarW x
+  vy <- exprToVarW y
+  let tx = getVarType vx
+      ty = getVarType vy
+  Panic.massertPpr
+    (tx == ty)
+    (vcat [ text "shuffle: mismatched arg types"
+          , ppLlvmType tx, ppLlvmType ty ])
+  doExprW tx $ Shuffle vx vy is
 
 -- | Generate code for a fused multiply-add operation.
 genFmaOp :: CmmExpr -> CmmExpr -> CmmExpr -> LlvmM ExprData
