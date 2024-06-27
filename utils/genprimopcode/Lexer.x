@@ -67,6 +67,7 @@ words :-
     <0>         "SCALAR"            { mkT TSCALAR }
     <0>         "VECTOR"            { mkT TVECTOR }
     <0>         "VECTUPLE"          { mkT TVECTUPLE }
+    <0>         "INTVECTUPLE"       { mkT TINTVECTUPLE }
     <0>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
     <0>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
     <0>         \-? [0-9][0-9]*     { mkTv (TInteger . read) }

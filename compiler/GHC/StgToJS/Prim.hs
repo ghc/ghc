@@ -1203,6 +1203,7 @@ genPrim prof bound ty op = case op of
   VecIndexScalarOffAddrOp _ _ _     -> unhandledPrimop op
   VecReadScalarOffAddrOp _ _ _      -> unhandledPrimop op
   VecWriteScalarOffAddrOp _ _ _     -> unhandledPrimop op
+  VecShuffleOp _ _ _                -> unhandledPrimop op
 
   PrefetchByteArrayOp3              -> noOp
   PrefetchMutableByteArrayOp3       -> noOp

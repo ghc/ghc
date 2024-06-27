@@ -124,6 +124,7 @@ data Token = TEOF
            | TSCALAR
            | TVECTOR
            | TVECTUPLE
+           | TINTVECTUPLE
     deriving Show
 
 -- Actions
