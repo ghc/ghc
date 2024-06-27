@@ -1075,6 +1075,10 @@ emitPrimOp cfg primop =
     ty :: CmmType
     ty = vecCmmCat vcat w
 
+  VecShuffleOp vcat n w -> \ args -> opIntoRegs $ \ [res] -> do
+    checkVecCompatibility cfg vcat n w
+    doShuffleOp (vecCmmType vcat n w) args res
+
 -- Prefetch
   PrefetchByteArrayOp3         -> \args -> opIntoRegs $ \[] ->
     doPrefetchByteArrayOp 3  args
@@ -2668,6 +2672,36 @@ doVecInsertOp ty src e idx res = do
 
     wid :: Width
     wid = typeWidth (vecElemType ty)
+
+------------------------------------------------------------------------------
+-- Shuffles
+
+doShuffleOp :: CmmType -> [CmmExpr] -> LocalReg -> FCode ()
+doShuffleOp ty (v1:v2:idxs) res
+  | isVecType ty
+  = case mapMaybe idx_maybe idxs of
+      is
+        | length is == len
+        -> emitAssign (CmmLocal res) (CmmMachOp (mo is) [v1,v2])
+        | otherwise
+        -> pprPanic "doShuffleOp" $
+             vcat [ text "shuffle indices must be literals, 0 <= i <" <+> ppr len ]
+  | otherwise
+  = pprPanic "doShuffleOp" $
+        vcat [ text "non-vector argument type:" <+> ppr ty ]
+  where
+    len = vecLength ty
+    wid = typeWidth $ vecElemType ty
+    mo = if isFloatType (vecElemType ty)
+         then MO_VF_Shuffle len wid
+         else MO_V_Shuffle  len wid
+    idx_maybe (CmmLit (CmmInt i _))
+      | let j :: Int; j = fromInteger i
+      , j >= 0, j < 2 * len
+      = Just j
+    idx_maybe _ = Nothing
+doShuffleOp _ _ _ =
+  panic "doShuffleOp: wrong number of arguments"
 
 ------------------------------------------------------------------------------
 -- Helpers for translating prefetching.

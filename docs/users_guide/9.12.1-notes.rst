@@ -196,6 +196,14 @@ Cmm
   These follow the same semantics as ``fmadd``/``fmsub``/``fnmadd``/``fnmsub``,
   operating in parallel on vectors of floating-point values.
 
+- New vector shuffle instructions, such as ``shuffleFloatX4# :: FloatX4# -> FloatX4# -> (# Int#, Int#, Int#, Int# #) -> FloatX4#``.
+  These instructions take two input vectors and a collection of indices (which must
+  be compile-time literal integers), and constructs a result vector by extracting
+  out the values at those indices. For instance, ``shuffleFloatX4#`` on input vectors with
+  components ``(# 0.1#, 11.1#, 22.1#, 33.1# #)`` and ``(# 44.1#, 55.1#, 66.1#, 77.1# #)``,
+  and indices ``(# 4#, 3#, 6#, 1# #)``, will return a vector with components
+  ``(# 44.1#, 33.1#, 66.1#, 11.1# #)``.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

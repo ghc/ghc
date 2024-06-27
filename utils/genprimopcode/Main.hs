@@ -79,6 +79,8 @@ desugarVectorSpec i              = case vecOptions i of
         desugarTy (TyApp SCALAR [])   = TyApp (TyCon repCon) []
         desugarTy (TyApp VECTOR [])   = TyApp (VecTyCon vecCons vecTyName) []
         desugarTy (TyApp VECTUPLE []) = TyUTup (replicate n (TyApp (TyCon repCon) []))
+        desugarTy (TyApp INTVECTUPLE [])
+                                      = TyUTup (replicate n (TyApp (TyCon "Int#") []) )
         desugarTy (TyApp tycon ts)    = TyApp tycon (map desugarTy ts)
         desugarTy t@(TyVar {})        = t
         desugarTy (TyUTup ts)         = TyUTup (map desugarTy ts)

@@ -1112,6 +1112,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_VS_Rem {}        -> incorrectOperands
       MO_VU_Quot {}       -> incorrectOperands
       MO_VU_Rem {}        -> incorrectOperands
+      MO_V_Shuffle {}     -> incorrectOperands
+      MO_VF_Shuffle {}    -> incorrectOperands
 
       MO_VF_Extract {}    -> incorrectOperands
       MO_VF_Add {}        -> incorrectOperands
@@ -1254,6 +1256,16 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_U_Shr rep -> shift_code rep SHR x y {-False-}
       MO_S_Shr rep -> shift_code rep SAR x y {-False-}
 
+      MO_VF_Shuffle l w is
+        | l * widthInBits w == 128
+        -> if
+            | avx
+            -> vector_shuffle_float l w x y is
+            | otherwise
+            -> sorry "Please enable the -mavx flag"
+        | otherwise
+        -> sorry "Please use -fllvm for wide shuffle instructions"
+
       MO_VF_Extract l W32   | avx       -> vector_float_extract l W32 x y
                             | otherwise -> vector_float_extract_sse l W32 x y
       MO_VF_Extract l W64               -> vector_float_extract l W64 x y
@@ -1276,6 +1288,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                             | otherwise -> vector_float_op_sse VA_Div l w x y
 
       -- SIMD NCG TODO: integer vector operations
+      MO_V_Shuffle {} -> needLlvm mop
       MO_V_Add {} -> needLlvm mop
       MO_V_Sub {} -> needLlvm mop
       MO_V_Mul {} -> needLlvm mop
@@ -1616,6 +1629,84 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
     vector_int_extract_sse _ w c e
       = pprPanic "Unsupported SSE floating-point vector extract" (pdoc platform c $$ pdoc platform e $$ ppr w)
 
+    vector_shuffle_float :: Length -> Width -> CmmExpr -> CmmExpr -> [Int] -> NatM Register
+    vector_shuffle_float l w v1 v2 is = do
+      (r1, exp1) <- getSomeReg v1
+      (r2, exp2) <- getSomeReg v2
+      let fmt = VecFormat l (if w == W32 then FmtFloat else FmtDouble)
+          code dst
+            = exp1 `appOL` (exp2 `appOL` shuffleInstructions fmt r1 r2 is dst)
+      return (Any fmt code)
+
+    shuffleInstructions :: Format -> Reg -> Reg -> [Int] -> Reg -> OrdList Instr
+    shuffleInstructions fmt v1 v2 is dst =
+      case fmt of
+        VecFormat 2 FmtDouble ->
+          case is of
+            [i1, i2] -> case (i1, i2) of
+              (0,0) -> unitOL (VSHUF fmt (ImmInt 0b00) (OpReg v1) v1 dst)
+              (1,1) -> unitOL (VSHUF fmt (ImmInt 0b11) (OpReg v1) v1 dst)
+              (2,2) -> unitOL (VSHUF fmt (ImmInt 0b00) (OpReg v2) v2 dst)
+              (3,3) -> unitOL (VSHUF fmt (ImmInt 0b11) (OpReg v2) v2 dst)
+              (0,1) -> unitOL (VMOVU fmt (OpReg v1) (OpReg dst))
+              (2,3) -> unitOL (VMOVU fmt (OpReg v2) (OpReg dst))
+              (1,0) -> unitOL (VSHUF fmt (ImmInt 0b01) (OpReg v1) v1 dst)
+              (3,2) -> unitOL (VSHUF fmt (ImmInt 0b01) (OpReg v2) v2 dst)
+              (0,2) -> unitOL (VSHUF fmt (ImmInt 0b00) (OpReg v2) v1 dst)
+              (2,0) -> unitOL (VSHUF fmt (ImmInt 0b00) (OpReg v1) v2 dst)
+              (0,3) -> unitOL (VSHUF fmt (ImmInt 0b10) (OpReg v2) v1 dst)
+              (3,0) -> unitOL (VSHUF fmt (ImmInt 0b01) (OpReg v1) v2 dst)
+              (1,2) -> unitOL (VSHUF fmt (ImmInt 0b01) (OpReg v2) v1 dst)
+              (2,1) -> unitOL (VSHUF fmt (ImmInt 0b10) (OpReg v1) v2 dst)
+              (1,3) -> unitOL (VSHUF fmt (ImmInt 0b11) (OpReg v2) v1 dst)
+              (3,1) -> unitOL (VSHUF fmt (ImmInt 0b11) (OpReg v1) v2 dst)
+              _ -> pprPanic "vector shuffle: indices out of bounds 0 <= i <= 3" (ppr is)
+            _ -> pprPanic "vector shuffle: wrong number of indices (expected 2)" (ppr is)
+        VecFormat 4 FmtFloat
+          -- indices 0 <= i <= 7
+          | all ( (>= 0) <&&> (<= 7) ) is ->
+          case is of
+            [i1, i2, i3, i4]
+              | all ( <= 3 ) is
+              , let imm = i1 + i2 `shiftL` 2 + i3 `shiftL` 4 + i4 `shiftL` 6
+              -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v1) v1 dst)
+              | all ( >= 4 ) is
+              , let [j1, j2, j3, j4] = map ( subtract 4 ) is
+                    imm = j1 + j2 `shiftL` 2 + j3 `shiftL` 4 + j4 `shiftL` 6
+              -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v2) v2 dst)
+              | i1 <= 3, i2 <= 3
+              , i3 >= 4, i4 >= 4
+              , let imm = i1 + i2 `shiftL` 2 + (i3 - 4) `shiftL` 4 + (i4 - 4) `shiftL` 6
+              -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v2) v1 dst)
+              | i1 >= 4, i2 >= 4
+              , i3 <= 3, i4 <= 3
+              , let imm = (i1 - 4) + (i2 - 4) `shiftL` 2 + i3 `shiftL` 4 + i4 `shiftL` 6
+              -> unitOL (VSHUF fmt (ImmInt imm) (OpReg v1) v2 dst)
+              | otherwise
+              ->
+              -- Fall-back code with 4 INSERTPS operations.
+              -- SIMD NCG TODO: handle more cases with better lowering.
+              let -- bits: ss_dd_zzzz
+                  -- ss: pick source location
+                  -- dd: pick destination location
+                  -- zzzz: pick locations to be zeroed
+                  insertImm src dst = shiftL   ( src `mod` 4 ) 6
+                                    .|. shiftL dst 4
+                  vec src = if src >= 4 then v2 else v1
+              in unitOL
+                (INSERTPS fmt (ImmInt $ insertImm i1 0 .|. 0b1110) (OpReg $ vec i1) dst)
+                `snocOL`
+                (INSERTPS fmt (ImmInt $ insertImm i2 1) (OpReg $ vec i2) dst)
+                `snocOL`
+                (INSERTPS fmt (ImmInt $ insertImm i3 2) (OpReg $ vec i3) dst)
+                `snocOL`
+                (INSERTPS fmt (ImmInt $ insertImm i4 3) (OpReg $ vec i4) dst)
+            _ -> pprPanic "vector shuffle: wrong number of indices (expected 4)" (ppr is)
+          | otherwise
+          -> pprPanic "vector shuffle: indices out of bounds 0 <= i <= 7" (ppr is)
+        _ ->
+          pprPanic "vector shuffle: unsupported format" (ppr fmt)
+
 getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
   avx    <- avxEnabled
   sse4_1 <- sse4_1Enabled
@@ -1688,7 +1779,7 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
                   CmmInt 1 _ -> valExp `appOL`
                                 vecExp `snocOL`
                                 (movu (VecFormat 2 FmtDouble) (OpReg vecReg) (OpReg dst)) `snocOL`
-                                (SHUFPD fmt (ImmInt 0b00) (OpReg valReg) dst)
+                                (SHUF fmt (ImmInt 0b00) (OpReg valReg) dst)
                   _ -> pprPanic "MO_VF_Insert DoubleX2: unsupported offset" (ppr offset)
          in return $ Any fmt code
     vector_double_insert _ _ _ _ _ =

@@ -237,6 +237,10 @@ data LlvmExpression
   -}
   | Insert LlvmVar LlvmVar LlvmVar
 
+  {- | Shuffle two vectors into a destination vector using given indices
+  -}
+  | Shuffle LlvmVar LlvmVar [Int]
+
   {- |
     Allocate amount * sizeof(tp) bytes on the heap
       * tp:     LlvmType to reserve room for

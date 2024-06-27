@@ -175,6 +175,10 @@ data MachOp
   | MO_VU_Quot Length Width
   | MO_VU_Rem  Length Width
 
+  -- Vector shuffles
+  | MO_V_Shuffle  Length Width [Int]
+  | MO_VF_Shuffle Length Width [Int]
+
   -- Floating point vector element insertion and extraction operations
   | MO_VF_Insert    Length Width   -- Insert scalar into vector
   | MO_VF_Extract   Length Width   -- Extract scalar from vector
@@ -499,6 +503,9 @@ machOpResultType platform mop tys =
     MO_VU_Quot l w      -> cmmVec l (cmmBits w)
     MO_VU_Rem  l w      -> cmmVec l (cmmBits w)
 
+    MO_V_Shuffle  l w _ -> cmmVec l (cmmBits w)
+    MO_VF_Shuffle l w _ -> cmmVec l (cmmFloat w)
+
     MO_VF_Insert  l w   -> cmmVec l (cmmFloat w)
     MO_VF_Extract _ w   -> cmmFloat w
 
@@ -581,6 +588,9 @@ machOpArgReps platform op =
     MO_FF_Conv from _     -> [from]
     MO_WF_Bitcast w       -> [w]
     MO_FW_Bitcast w       -> [w]
+
+    MO_V_Shuffle  l w _ -> [vecwidth l w, vecwidth l w]
+    MO_VF_Shuffle l w _ -> [vecwidth l w, vecwidth l w]
 
     MO_V_Insert   l w   -> [vecwidth l w, w, W32]
     MO_V_Extract  l w   -> [vecwidth l w, W32]
