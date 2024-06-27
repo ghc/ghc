@@ -976,6 +976,7 @@ getRegister' _ _ (CmmMachOp mop []) =
   pprPanic "getRegister(x86): nullary MachOp" (text $ show mop)
 
 getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
+    sse4_1 <- sse4_1Enabled
     avx    <- avxEnabled
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
@@ -1067,6 +1068,17 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                      | otherwise -> vector_float_negate_sse l w x
       -- SIMD NCG TODO: add integer negation
       MO_VS_Neg {} -> needLlvm mop
+
+      MO_VF_Broadcast l w
+        | avx
+        -> vector_float_broadcast_avx l w x
+        | otherwise
+        -> case w of
+            W32 | not sse4_1
+              -> sorry "32-bit float broadcast requires -msse4 or -fllvm."
+            _ -> vector_float_broadcast_sse l w x
+      MO_V_Broadcast l w
+        -> vector_int_broadcast l w x
 
       -- Binary MachOps
       MO_Add {}    -> incorrectOperands
@@ -1179,7 +1191,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                            _ -> pprPanic "Cannot negate vector of width" (ppr w)
               code dst = case w of
                            W32 -> exp `appOL` addr_code `snocOL`
-                                  (VBROADCAST format addr tmp) `snocOL`
+                                  (VBROADCAST format (OpAddr addr) tmp) `snocOL`
                                   (VSUB format (OpReg reg) tmp dst)
                            W64 -> exp `appOL` addr_code `snocOL`
                                   (MOVL format (OpAddr addr) (OpReg tmp)) `snocOL`
@@ -1201,6 +1213,55 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                          (MOVU format (OpReg tmp) (OpReg dst)) `snocOL`
                          (SUB format (OpReg reg) (OpReg dst))
           return (Any format code)
+
+        -----------------------
+        vector_float_broadcast_avx :: Length
+                                   -> Width
+                                   -> CmmExpr
+                                   -> NatM Register
+        vector_float_broadcast_avx len w expr = do
+          (dst, exp) <- getSomeReg expr
+          let fmt = VecFormat len (floatScalarFormat w)
+              code = case w of
+                W64 -> unitOL $ VSHUF fmt (ImmInt 0) (OpReg dst) dst dst
+                _   -> toOL [ INSERTPS fmt (ImmInt 0b00_10_0000) (OpReg dst) dst
+                            , VSHUF fmt (ImmInt 0) (OpReg dst) dst dst ]
+          return $ Fixed fmt dst (exp `appOL` code)
+
+        vector_float_broadcast_sse :: Length
+                                   -> Width
+                                   -> CmmExpr
+                                   -> NatM Register
+        vector_float_broadcast_sse len w expr = do
+          (dst, exp) <- getSomeReg expr
+          let fmt = VecFormat len (floatScalarFormat w)
+              code = case w of
+                W64 -> unitOL $ SHUF fmt (ImmInt 0) (OpReg dst) dst
+                _   -> toOL [ INSERTPS fmt (ImmInt 0b00_10_0000) (OpReg dst) dst
+                            , SHUF fmt (ImmInt 0) (OpReg dst) dst ]
+          return $ Fixed fmt dst (exp `appOL` code)
+
+        vector_int_broadcast :: Length
+                             -> Width
+                             -> CmmExpr
+                             -> NatM Register
+        vector_int_broadcast len W64 expr = do
+          (reg, exp) <- getNonClobberedReg expr
+          let fmt = VecFormat len FmtInt64
+          return $ Any fmt (\dst -> exp `snocOL`
+                                    (MOVD II64 (OpReg reg) (OpReg dst)) `snocOL`
+                                    (PUNPCKLQDQ fmt (OpReg dst) dst)
+                                    )
+        vector_int_broadcast len W32 expr = do
+          (reg, exp) <- getNonClobberedReg expr
+          let fmt = VecFormat len FmtInt32
+          return $ Any fmt (\dst -> exp `snocOL`
+                                    (MOVD II32 (OpReg reg) (OpReg dst)) `snocOL`
+                                    (PSHUFD fmt (ImmInt 0x00) (OpReg dst) dst)
+                                    )
+        vector_int_broadcast _ _ _ =
+          sorry "Unsupported Integer vector broadcast operation; please use -fllvm."
+
 
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   avx <- avxEnabled
@@ -1313,6 +1374,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_AlignmentCheck {} -> incorrectOperands
       MO_VS_Neg {} -> incorrectOperands
       MO_VF_Neg {} -> incorrectOperands
+      MO_V_Broadcast {} -> incorrectOperands
+      MO_VF_Broadcast {} -> incorrectOperands
 
       -- Ternary MachOps
       MO_FMA {} -> incorrectOperands

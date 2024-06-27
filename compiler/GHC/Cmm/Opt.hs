@@ -78,6 +78,14 @@ cmmMachOpFoldM
     -> MachOp
     -> [CmmExpr]
     -> Maybe CmmExpr
+cmmMachOpFoldM _ (MO_V_Broadcast lg _w) exprs =
+  case exprs of
+    [CmmLit l] -> Just $! CmmLit (CmmVec $ replicate lg l)
+    _ -> Nothing
+cmmMachOpFoldM _ (MO_VF_Broadcast lg _w) exprs =
+  case exprs of
+    [CmmLit l] -> Just $! CmmLit (CmmVec $ replicate lg l)
+    _ -> Nothing
 cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
   = Just $! case op of
       MO_S_Neg _ -> CmmLit (CmmInt (-x) rep)

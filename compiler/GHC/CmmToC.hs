@@ -881,6 +881,14 @@ pprMachOp_for_C platform mop = case mop of
                                 (text "MO_VU_Rem")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VU_Rem"
                                       ++ "unsupported by the unregisterised backend")
+        MO_V_Broadcast {} -> pprTrace "offending mop:"
+                                 (text "MO_V_Broadcast")
+                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Broadcast"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VF_Broadcast {} -> pprTrace "offending mop:"
+                                 (text "MO_VF_Broadcast")
+                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Broadcast"
+                                      ++ "unsupported by the unregisterised backend")
         MO_VF_Insert {}   -> pprTrace "offending mop:"
                                 (text "MO_VF_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Insert"

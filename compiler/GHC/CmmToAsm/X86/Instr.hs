@@ -284,7 +284,7 @@ data Instr
         -- Vector Instructions --
         -- NOTE: Instructions follow the AT&T syntax
         -- Constructors and deconstructors
-        | VBROADCAST  Format AddrMode Reg
+        | VBROADCAST  Format Operand Reg
         | VEXTRACT    Format Imm Reg Operand
         | INSERTPS    Format Imm Operand Reg
 
@@ -450,7 +450,7 @@ regUsageOfInstr platform instr
     MFENCE -> noUsage
 
     -- vector instructions
-    VBROADCAST fmt src dst   -> mkRU (use_EA src []) [mk fmt dst]
+    VBROADCAST fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
     VEXTRACT     fmt _off src dst -> mkRU [mk fmt src] (use_R fmt dst [])
     INSERTPS     fmt (ImmInt off) src dst
       -> mkRU ((use_R fmt src []) ++ [mk fmt dst | not doesNotReadDst]) [mk fmt dst]
@@ -692,7 +692,7 @@ patchRegsOfInstr platform instr env
     MFENCE               -> instr
 
     -- vector instructions
-    VBROADCAST   fmt src dst   -> VBROADCAST fmt (lookupAddr src) (env dst)
+    VBROADCAST   fmt src dst   -> VBROADCAST fmt (patchOp src) (env dst)
     VEXTRACT     fmt off src dst
       -> VEXTRACT fmt off (env src) (patchOp dst)
     INSERTPS    fmt off src dst

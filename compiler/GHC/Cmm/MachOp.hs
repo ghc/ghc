@@ -158,6 +158,7 @@ data MachOp
   | MO_FW_Bitcast Width      -- Float/Double  -> Word32/Word64
 
   -- Vector element insertion and extraction operations
+  | MO_V_Broadcast Length Width -- Broadcast a scalar into a vector
   | MO_V_Insert    Length Width -- Insert scalar into vector
   | MO_V_Extract   Length Width -- Extract scalar from vector
 
@@ -180,6 +181,7 @@ data MachOp
   | MO_VF_Shuffle Length Width [Int]
 
   -- Floating point vector element insertion and extraction operations
+  | MO_VF_Broadcast Length Width   -- Broadcast a scalar into a vector
   | MO_VF_Insert    Length Width   -- Insert scalar into vector
   | MO_VF_Extract   Length Width   -- Extract scalar from vector
 
@@ -489,6 +491,7 @@ machOpResultType platform mop tys =
     MO_WF_Bitcast   w   -> cmmFloat w
     MO_FW_Bitcast   w   -> cmmBits w
 
+    MO_V_Broadcast l w  -> cmmVec l (cmmBits w)
     MO_V_Insert  l w    -> cmmVec l (cmmBits w)
     MO_V_Extract _ w    -> cmmBits w
 
@@ -506,6 +509,7 @@ machOpResultType platform mop tys =
     MO_V_Shuffle  l w _ -> cmmVec l (cmmBits w)
     MO_VF_Shuffle l w _ -> cmmVec l (cmmFloat w)
 
+    MO_VF_Broadcast l w -> cmmVec l (cmmFloat w)
     MO_VF_Insert  l w   -> cmmVec l (cmmFloat w)
     MO_VF_Extract _ w   -> cmmFloat w
 
@@ -592,8 +596,10 @@ machOpArgReps platform op =
     MO_V_Shuffle  l w _ -> [vecwidth l w, vecwidth l w]
     MO_VF_Shuffle l w _ -> [vecwidth l w, vecwidth l w]
 
+    MO_V_Broadcast _ w  -> [w]
     MO_V_Insert   l w   -> [vecwidth l w, w, W32]
     MO_V_Extract  l w   -> [vecwidth l w, W32]
+    MO_VF_Broadcast _ w -> [w]
     MO_VF_Insert  l w   -> [vecwidth l w, w, W32]
     MO_VF_Extract l w   -> [vecwidth l w, W32]
       -- SIMD vector indices are always 32 bit
