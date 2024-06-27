@@ -87,6 +87,7 @@ data TyCon = TyCon String
            | SCALAR
            | VECTOR
            | VECTUPLE
+           | INTVECTUPLE
            | VecTyCon String String
   deriving (Eq, Ord)
 
@@ -95,6 +96,7 @@ instance Show TyCon where
     show SCALAR          = "SCALAR"
     show VECTOR          = "VECTOR"
     show VECTUPLE        = "VECTUPLE"
+    show INTVECTUPLE     = "INTVECTUPLE"
     show (VecTyCon tc _) = tc
 
 -- Follow definitions of Fixity and FixityDirection in GHC

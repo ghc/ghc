@@ -667,6 +667,8 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_VF_Neg {} -> vectorsNeedLlvm
       MO_VF_Mul {} -> vectorsNeedLlvm
       MO_VF_Quot {} -> vectorsNeedLlvm
+      MO_V_Shuffle {} -> vectorsNeedLlvm
+      MO_VF_Shuffle {} -> vectorsNeedLlvm
 
       _ -> panic "PPC.CodeGen.getRegister: no match"
 

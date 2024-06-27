@@ -58,6 +58,7 @@ import AccessOps
     SCALAR          { TSCALAR }
     VECTOR          { TVECTOR }
     VECTUPLE        { TVECTUPLE }
+    INTVECTUPLE     { TINTVECTUPLE }
     bytearray_access_ops { TByteArrayAccessOps }
     addr_access_ops { TAddrAccessOps }
     thats_all_folks { TThatsAllFolks }
@@ -215,6 +216,7 @@ pTycon : upperName { TyCon $1 }
        | SCALAR       { SCALAR }
        | VECTOR       { VECTOR }
        | VECTUPLE     { VECTUPLE }
+       | INTVECTUPLE  { INTVECTUPLE }
 
 {
 parse :: String -> Either String Info

@@ -4214,6 +4214,12 @@ primop   VecFNMSub   "fnmsub#" GenPrimOp
    with
       vector = FLOAT_VECTOR_TYPES
 
+primop VecShuffleOp "shuffle#" GenPrimOp
+  VECTOR -> VECTOR -> INTVECTUPLE -> VECTOR
+  {Shuffle elements of the concatenation of the input two vectors
+  into the result vector.}
+   with vector = ALL_VECTOR_TYPES
+
 ------------------------------------------------------------------------
 
 section "Prefetch"

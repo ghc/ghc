@@ -833,6 +833,14 @@ pprMachOp_for_C platform mop = case mop of
         MO_AlignmentCheck {} -> panic "-falignment-sanitisation not supported by unregisterised backend"
 
 -- SIMD vector instructions: currently unsupported
+        MO_V_Shuffle {} -> pprTrace "offending mop:"
+                                (text "MO_V_Shuffle")
+                                (panic $ "PprC.pprMachOp_for_C: MO_V_Shuffle"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VF_Shuffle {} -> pprTrace "offending mop:"
+                                (text "MO_VF_Shuffle")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VF_Shuffle"
+                                      ++ "unsupported by the unregisterised backend")
         MO_V_Insert {}    -> pprTrace "offending mop:"
                                 (text "MO_V_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Insert"

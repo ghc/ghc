@@ -1018,18 +1018,16 @@ pprInstr platform i = case i of
      -> pprFormatImmRegOp (text "vextract") format offset from to
    INSERTPS format offset addr dst
      -> pprInsert (text "insertps") format offset addr dst
-   VPSHUFD format offset src dst
-     -> pprShuf (text "vpshufd") format offset src dst
+
+   SHUF format offset src dst
+     -> pprShuf (text "shuf" <> pprFormat format) format offset src dst
+   VSHUF format offset src1 src2 dst
+     -> pprVShuf (text "vshuf" <> pprFormat format) format offset src1 src2 dst
    PSHUFD format offset src dst
      -> pprShuf (text "pshufd") format offset src dst
-   SHUFPS format offset src dst
-     -> pprShuf (text "shufps") format offset src dst
-   SHUFPD format offset src dst
-     -> pprShuf (text "shufpd") format offset src dst
-   VSHUFPS format offset src1 src2 dst
-     -> pprVShuf (text "vshufps") format offset src1 src2 dst
-   VSHUFPD format offset src1 src2 dst
-     -> pprVShuf (text "vshufpd") format offset src1 src2 dst
+   VPSHUFD format offset src dst
+     -> pprShuf (text "vpshufd") format offset src dst
+
    PSLLDQ format offset dst
      -> pprDoubleShift (text "pslldq") format offset dst
    PSRLDQ format offset dst

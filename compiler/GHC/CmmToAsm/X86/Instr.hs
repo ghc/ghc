@@ -313,12 +313,10 @@ data Instr
         | VDIV       Format Operand Reg Reg
 
         -- Shuffle
-        | VPSHUFD    Format Imm Operand Reg
+        | SHUF       Format Imm Operand Reg
+        | VSHUF      Format Imm Operand Reg Reg
         | PSHUFD     Format Imm Operand Reg
-        | SHUFPS     Format Imm Operand Reg
-        | VSHUFPS    Format Imm Operand Reg Reg
-        | SHUFPD     Format Imm Operand Reg
-        | VSHUFPD    Format Imm Operand Reg Reg
+        | VPSHUFD    Format Imm Operand Reg
 
         -- | Move two 32-bit floats from the high part of an xmm register
         -- to the low part of another xmm register.
@@ -484,18 +482,14 @@ regUsageOfInstr platform instr
     VMUL         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
     VDIV         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
 
-    VPSHUFD fmt _off src dst
-      -> mkRU (use_R fmt src []) [mk fmt dst]
-    PSHUFD fmt _off src dst
-      -> mkRU (use_R fmt src []) [mk fmt dst]
-    SHUFPD fmt _off src dst
+    SHUF fmt _mask src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    SHUFPS fmt _off src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    VSHUFPD fmt _off src1 src2 dst
+    VSHUF fmt _mask src1 src2 dst
       -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
-    VSHUFPS fmt _off src1 src2 dst
-      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+    PSHUFD fmt _mask src dst
+      -> mkRU (use_R fmt src []) [mk fmt dst]
+    VPSHUFD fmt _mask src dst
+      -> mkRU (use_R fmt src []) [mk fmt dst]
 
     PSLLDQ fmt off dst -> mkRU (use_R fmt off []) [mk fmt dst]
 
@@ -718,18 +712,14 @@ patchRegsOfInstr platform instr env
     VMUL       fmt s1 s2 dst -> VMUL fmt (patchOp s1) (env s2) (env dst)
     VDIV       fmt s1 s2 dst -> VDIV fmt (patchOp s1) (env s2) (env dst)
 
-    VPSHUFD      fmt off src dst
-      -> VPSHUFD fmt off (patchOp src) (env dst)
+    SHUF      fmt off src dst
+      -> SHUF fmt off (patchOp src) (env dst)
+    VSHUF      fmt off src1 src2 dst
+      -> VSHUF fmt off (patchOp src1) (env src2) (env dst)
     PSHUFD       fmt off src dst
       -> PSHUFD  fmt off (patchOp src) (env dst)
-    SHUFPS      fmt off src dst
-      -> SHUFPS fmt off (patchOp src) (env dst)
-    SHUFPD      fmt off src dst
-      -> SHUFPD fmt off (patchOp src) (env dst)
-    VSHUFPS      fmt off src1 src2 dst
-      -> VSHUFPS fmt off (patchOp src1) (env src2) (env dst)
-    VSHUFPD      fmt off src1 src2 dst
-      -> VSHUFPD fmt off (patchOp src1) (env src2) (env dst)
+    VPSHUFD      fmt off src dst
+      -> VPSHUFD fmt off (patchOp src) (env dst)
 
     PSLLDQ       fmt off dst
       -> PSLLDQ  fmt (patchOp off) (env dst)

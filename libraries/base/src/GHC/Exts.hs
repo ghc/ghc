@@ -156,6 +156,37 @@ import GHC.Prim hiding
   , fmsubDoubleX8#
   , fnmaddDoubleX8#
   , fnmsubDoubleX8#
+  -- Don't re-export SIMD shuffle primops
+  , shuffleDoubleX2#
+  , shuffleDoubleX4#
+  , shuffleDoubleX8#
+  , shuffleFloatX16#
+  , shuffleFloatX4#
+  , shuffleFloatX8#
+  , shuffleInt16X16#
+  , shuffleInt16X32#
+  , shuffleInt16X8#
+  , shuffleInt32X16#
+  , shuffleInt32X4#
+  , shuffleInt32X8#
+  , shuffleInt64X2#
+  , shuffleInt64X4#
+  , shuffleInt64X8#
+  , shuffleInt8X16#
+  , shuffleInt8X32#
+  , shuffleInt8X64#
+  , shuffleWord16X16#
+  , shuffleWord16X32#
+  , shuffleWord16X8#
+  , shuffleWord32X16#
+  , shuffleWord32X4#
+  , shuffleWord32X8#
+  , shuffleWord64X2#
+  , shuffleWord64X4#
+  , shuffleWord64X8#
+  , shuffleWord8X16#
+  , shuffleWord8X32#
+  , shuffleWord8X64#
   )
 import qualified GHC.Prim as Prim
   ( BCO, mkApUpd0#, newBCO# )

@@ -281,6 +281,7 @@ ppLlvmExpression opts expr
         Extract    vec idx          -> ppExtract opts vec idx
         ExtractV   struct idx       -> ppExtractV opts struct idx
         Insert     vec elt idx      -> ppInsert opts vec elt idx
+        Shuffle    v1 v2 idxs       -> ppShuffle opts v1 v2 idxs
         GetElemPtr inb ptr indexes  -> ppGetElementPtr opts inb ptr indexes
         Load       ptr align        -> ppLoad opts ptr align
         ALoad      ord st ptr       -> ppALoad opts ord st ptr
@@ -576,6 +577,15 @@ ppInsert opts vec elt idx =
     <+> ppVar opts idx
 {-# SPECIALIZE ppInsert :: LlvmCgConfig -> LlvmVar -> LlvmVar -> LlvmVar -> SDoc #-}
 {-# SPECIALIZE ppInsert :: LlvmCgConfig -> LlvmVar -> LlvmVar -> LlvmVar -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+
+ppShuffle :: IsLine doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> [Int] -> doc
+ppShuffle opts v1 v2 idxs =
+    text "shufflevector"
+    <+> ppLlvmType (getVarType v1) <+> ppName opts v1 <> comma
+    <+> ppLlvmType (getVarType v2) <+> ppName opts v2 <> comma
+    <+> ppLlvmType (LMVector (length idxs) (LMInt 32)) <+> ppLit opts (LMVectorLit $ map ((`LMIntLit` (LMInt 32)) . fromIntegral) idxs)
+{-# SPECIALIZE ppShuffle :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [Int] -> SDoc #-}
+{-# SPECIALIZE ppShuffle :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [Int] -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 ppMetaAnnotExpr :: IsLine doc => LlvmCgConfig -> [MetaAnnot] -> LlvmExpression -> doc
 ppMetaAnnotExpr opts meta expr =
