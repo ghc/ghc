@@ -949,16 +949,8 @@ emitPrimOp cfg primop =
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
     checkVecCompatibility cfg vcat n w
-    doVecPackOp ty zeros (replicate n e) res
+    doVecBroadcastOp ty e res
    where
-    zeros :: CmmExpr
-    zeros = CmmLit $ CmmVec (replicate n zero)
-
-    zero :: CmmLit
-    zero = case vcat of
-             IntVec   -> CmmInt 0 w
-             WordVec  -> CmmInt 0 w
-             FloatVec -> CmmFloat 0 w
 
     ty :: CmmType
     ty = vecVmmType vcat n w
@@ -2602,6 +2594,21 @@ checkVecCompatibility cfg vcat l w =
 
 ------------------------------------------------------------------------------
 -- Helpers for translating vector packing and unpacking.
+
+doVecBroadcastOp :: CmmType       -- Type of vector
+                 -> CmmExpr       -- Element
+                 -> CmmFormal     -- Destination for result
+                 -> FCode ()
+doVecBroadcastOp ty e dst
+  | isFloatType (vecElemType ty)
+  = emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Broadcast len wid) [e])
+  | otherwise
+  = emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Broadcast len wid) [e])
+  where
+    len :: Length
+    len = vecLength ty
+    wid :: Width
+    wid = typeWidth (vecElemType ty)
 
 doVecPackOp :: CmmType       -- Type of vector
             -> [CmmExpr]     -- Elements
