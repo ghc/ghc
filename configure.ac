@@ -177,6 +177,9 @@ if test "$WithGhc" != ""; then
   if test -z "$LD_STAGE0"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
   fi
+  if test -z "$LD_STAGE0"; then
+    BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[Merge objects command])
+  fi
   if test -z "$AR_STAGE0"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
   fi
