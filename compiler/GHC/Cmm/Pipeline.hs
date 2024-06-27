@@ -68,7 +68,8 @@ cmmPipeline logger cmm_config srtInfo dus0 prog = do
 --
 --   - in the case of a `CmmData`, the unmodified 'CmmDecl' and a 'CAFSet' containing
 cpsTop :: Logger -> Platform -> CmmConfig -> DUniqSupply -> CmmDecl -> IO (DUniqSupply, Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDataDecl))
-cpsTop logger platform _ dus (CmmData section statics) = return (dus, Right (cafAnalData platform statics, CmmData section statics))
+cpsTop _logger platform _ dus (CmmData section statics) =
+  return (dus, Right (cafAnalData platform statics, CmmData section statics))
 cpsTop logger platform cfg dus proc =
     do
       ----------- Control-flow optimisations ----------------------------------

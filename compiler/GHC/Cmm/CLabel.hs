@@ -1871,12 +1871,15 @@ returns True.
 -- renamed, eg uniques of local symbols or of system names.
 -- See Note [....TODO]
 -- ROMES:TODO: We can do less work here, like, do we really need to rename AsmTempLabel, SRTLabel, LocalBlockLabel?
+-- however, the input to layout must be deterministic to produce deterministic layout.
+-- Which means we could avoid renaming it here, as long as we guarantee the labels are produced deterministically (which we could, perhaps by using a det supply in fcode)
 mapInternalNonDetUniques :: Applicative m => (Unique -> m Unique) -> CLabel -> m CLabel
 mapInternalNonDetUniques f = \case
   IdLabel name cafInfo idLabelInfo -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
   cl@CmmLabel{} -> pure cl
   -- ROMES:TODO: what about `RtsApFast NonDetFastString`?
   RtsLabel rtsLblInfo -> pure $ RtsLabel rtsLblInfo
+  -- Even if we can't get away with not renaming, we could forget these local ones right after renaming this block
   LocalBlockLabel unique -> LocalBlockLabel <$> f unique
   fl@ForeignLabel{} -> pure fl
   AsmTempLabel unique -> AsmTempLabel <$> f unique

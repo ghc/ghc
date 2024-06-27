@@ -1,9 +1,13 @@
-{-# LANGUAGE LambdaCase, UnicodeSyntax #-}
+{-# LANGUAGE LambdaCase, RecordWildCards, MagicHash, UnboxedTuples, PatternSynonyms, ExplicitNamespaces #-}
 module GHC.Cmm.UniqueRenamer
   ( detRenameUniques
+  , MonadGetUnique(..)
 
   -- Careful! Not for general use!
-  , DetUniqFM, emptyDetUFM)
+  , DetUniqFM, emptyDetUFM
+
+  , module GHC.Types.Unique.DSM
+  )
   where
 
 import Prelude
@@ -20,9 +24,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable as Outputable
 import Data.Tuple (swap)
-import qualified Data.Map as M
-import qualified Data.Set as S
 import GHC.Types.Id
+import GHC.Types.Unique.DSM
 
 {-
 --------------------------------------------------------------------------------
@@ -50,6 +53,7 @@ instance Outputable DetUniqFM where
     ppr mapping $$
     text "supply:" Outputable.<> ppr supply
 
+-- ToDo: Use ReaderT UniqDSM instead of this?
 type DetRnM = State DetUniqFM
 
 emptyDetUFM :: DetUniqFM
@@ -109,8 +113,8 @@ instance UniqRenamable CLabel where
   uniqRename = detRenameCLabel
 
 instance UniqRenamable LocalReg where
-  -- uniqRename (LocalReg uq t) = LocalReg <$> renameDetUniq uq <*> pure t
-  uniqRename (LocalReg uq t) = pure $ LocalReg uq t
+  uniqRename (LocalReg uq t) = LocalReg <$> renameDetUniq uq <*> pure t
+  -- uniqRename (LocalReg uq t) = pure $ LocalReg uq t
     -- ROMES:TODO: This has unique r1, we're debugging. this may still be a source of non determinism.
 
 instance UniqRenamable Label where
@@ -122,7 +126,13 @@ instance UniqRenamable CmmTickScope where
 
 instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (GenCmmDecl a b CmmGraph) where
   uniqRename (CmmProc h lbl regs g)
-    = CmmProc <$> uniqRename h <*> uniqRename lbl <*> uniqRename regs <*> uniqRename g
+    = do
+      g' <- uniqRename g
+      regs' <- uniqRename regs
+      lbl' <- uniqRename lbl
+      --- rename h last!!! (TODO: Check if this is really still needed now that LabelMap is deterministic. My guess is this is not needed at all.
+      h' <- uniqRename h
+      return $ CmmProc h' lbl' regs' g'
   uniqRename (CmmData sec d)
     = CmmData <$> uniqRename sec <*> uniqRename d
 
@@ -174,6 +184,7 @@ instance UniqRenamable CmmLit where
     CmmBlock bid -> CmmBlock <$> uniqRename bid
     CmmHighStackMark -> pure CmmHighStackMark
 
+-- This is fine because LabelMap is backed by a deterministic UDFM
 instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
   => UniqRenamable (LabelMap a) where
   uniqRename lm = mapFromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
@@ -258,14 +269,6 @@ instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (a, b) where
 instance (UniqRenamable a) => UniqRenamable (Maybe a) where
   uniqRename Nothing = pure Nothing
   uniqRename (Just x) = Just <$> uniqRename x
-
-instance (Ord a, UniqRenamable a, UniqRenamable b) => UniqRenamable (M.Map a b) where
-  uniqRename m = M.fromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (M.toList m)
-
-instance (Ord a, UniqRenamable a) => UniqRenamable (S.Set a) where
-  -- Because of renaming being injective the resulting set should have the same
-  -- size as the intermediate list.
-  uniqRename s = S.fromList <$> mapM uniqRename (S.toList s)
 
 -- | Utility panic used by UniqRenamable instances for Map-like datatypes
 panicMapKeysNotInjective :: a -> b -> c
