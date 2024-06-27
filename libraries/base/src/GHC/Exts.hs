@@ -130,6 +130,32 @@ import GHC.Prim hiding
 
   -- deprecated
   , BCO, mkApUpd0#, newBCO#
+
+  -- Don't re-export vector FMA instructions
+  , fmaddFloatX4#
+  , fmsubFloatX4#
+  , fnmaddFloatX4#
+  , fnmsubFloatX4#
+  , fmaddFloatX8#
+  , fmsubFloatX8#
+  , fnmaddFloatX8#
+  , fnmsubFloatX8#
+  , fmaddFloatX16#
+  , fmsubFloatX16#
+  , fnmaddFloatX16#
+  , fnmsubFloatX16#
+  , fmaddDoubleX2#
+  , fmsubDoubleX2#
+  , fnmaddDoubleX2#
+  , fnmsubDoubleX2#
+  , fmaddDoubleX4#
+  , fmsubDoubleX4#
+  , fnmaddDoubleX4#
+  , fnmsubDoubleX4#
+  , fmaddDoubleX8#
+  , fmsubDoubleX8#
+  , fnmaddDoubleX8#
+  , fnmsubDoubleX8#
   )
 import qualified GHC.Prim as Prim
   ( BCO, mkApUpd0#, newBCO# )

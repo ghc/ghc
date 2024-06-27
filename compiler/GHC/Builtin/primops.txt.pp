@@ -4193,6 +4193,27 @@ primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp
         can_fail_warning = YesWarnCanFail
         vector = ALL_VECTOR_TYPES
 
+primop   VecFMAdd   "fmadd#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR -> VECTOR
+   {Fused multiply-add operation @x*y+z@. See "GHC.Prim#fma".}
+   with
+      vector = FLOAT_VECTOR_TYPES
+primop   VecFMSub   "fmsub#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR -> VECTOR
+   {Fused multiply-subtract operation @x*y-z@. See "GHC.Prim#fma".}
+   with
+      vector = FLOAT_VECTOR_TYPES
+primop   VecFNMAdd   "fnmadd#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR -> VECTOR
+   {Fused negate-multiply-add operation @-x*y+z@. See "GHC.Prim#fma".}
+   with
+      vector = FLOAT_VECTOR_TYPES
+primop   VecFNMSub   "fnmsub#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR -> VECTOR
+   {Fused negate-multiply-subtract operation @-x*y-z@. See "GHC.Prim#fma".}
+   with
+      vector = FLOAT_VECTOR_TYPES
+
 ------------------------------------------------------------------------
 
 section "Prefetch"

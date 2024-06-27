@@ -692,12 +692,14 @@ getRegister' _ _ (CmmMachOp mop [x, y, z]) -- ternary PrimOps
       -- x86 fnmadd - x * y + z ~~ PPC fnmsub rt = -(ra * rc - rb)
       -- x86 fnmsub - x * y - z ~~ PPC fnmadd rt = -(ra * rc + rb)
 
-      MO_FMA variant w ->
+      MO_FMA variant l w | l == 1 ->
         case variant of
           FMAdd  -> fma_code w (FMADD FMAdd) x y z
           FMSub  -> fma_code w (FMADD FMSub) x y z
           FNMAdd -> fma_code w (FMADD FNMAdd) x y z
           FNMSub -> fma_code w (FMADD FNMSub) x y z
+        | otherwise
+        -> vectorsNeedLlvm
 
       MO_V_Insert {} -> vectorsNeedLlvm
       MO_VF_Insert {} -> vectorsNeedLlvm
