@@ -176,6 +176,12 @@ if test "$WithGhc" != ""; then
 
   if test -z "$LD_STAGE0"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[ld command])
+    # ld command is removed in 9.10.1 as a boot compiler and supplies "Merge objects
+    # command" instead
+    if test -z "$LD_STAGE0"; then
+      BOOTSTRAPPING_GHC_INFO_FIELD([LD_STAGE0],[Merge objects command])
+    fi
+
   fi
   if test -z "$AR_STAGE0"; then
     BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
