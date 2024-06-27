@@ -47,13 +47,14 @@ import GHC.Platform.Profile
 import GHC.Data.Maybe
 import GHC.Utils.Error (withTimingSilent)
 import GHC.Utils.Panic
-import GHC.Types.Unique.Supply
 import GHC.Utils.Logger
 import GHC.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Types.Unique.DSM
 
 import Data.ByteString (ByteString)
+import Data.IORef
 
 -- When we split at proc points, we need an empty info table.
 mkEmptyContInfoTable :: CLabel -> CmmInfoTable
@@ -67,16 +68,22 @@ mkEmptyContInfoTable info_lbl
 cmmToRawCmm :: Logger -> Profile -> Stream IO CmmGroupSRTs a
             -> IO (Stream IO RawCmmGroup a)
 cmmToRawCmm logger profile cmms
-  = do {
+  = do { detUqSupply <- newIORef (initDUniqSupply 'i' 1)
        ; let do_one :: [CmmDeclSRTs] -> IO [RawCmmDecl]
              do_one cmm = do
-               uniqs <- mkSplitUniqSupply 'i'
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
-               withTimingSilent logger (text "Cmm -> Raw Cmm") (\x -> seqList x ())
-                  -- TODO: It might be better to make `mkInfoTable` run in
-                  -- IO as well so we don't have to pass around
-                  -- a UniqSupply (see #16843)
-                 (return $ initUs_ uniqs $ concatMapM (mkInfoTable profile) cmm)
+               withTimingSilent logger (text "Cmm -> Raw Cmm") (\x -> seqList x ()) $ do
+                 -- We have to store the deterministic unique supply
+                 -- to produce uniques across cmm decls.
+                 nextUq <- readIORef detUqSupply
+                 -- By using a local namespace 'i' here, we can have other
+                 -- deterministic supplies starting from the same unique in
+                 -- other parts of the Cmm backend
+                 -- See Note [Cmm Local Deterministic Uniques] (TODO)
+                 let (a, us) = runUniqueDSM nextUq $
+                               concatMapM (mkInfoTable profile) cmm
+                 writeIORef detUqSupply us
+                 return a
        ; return (Stream.mapM do_one cmms)
        }
 
@@ -114,7 +121,7 @@ cmmToRawCmm logger profile cmms
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: Profile -> CmmDeclSRTs -> UniqSM [RawCmmDecl]
+mkInfoTable :: Profile -> CmmDeclSRTs -> UniqDSM [RawCmmDecl]
 mkInfoTable _ (CmmData sec dat) = return [CmmData sec dat]
 
 mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
@@ -177,7 +184,7 @@ type InfoTableContents = ( [CmmLit]          -- The standard part
 mkInfoTableContents :: Profile
                     -> CmmInfoTable
                     -> Maybe Int               -- Override default RTS type tag?
-                    -> UniqSM ([RawCmmDecl],             -- Auxiliary top decls
+                    -> UniqDSM ([RawCmmDecl],             -- Auxiliary top decls
                                InfoTableContents)       -- Info tbl + extra bits
 
 mkInfoTableContents profile
@@ -218,10 +225,10 @@ mkInfoTableContents profile
   where
     platform = profilePlatform profile
     mk_pieces :: ClosureTypeInfo -> [CmmLit]
-              -> UniqSM ( Maybe CmmLit  -- Override the SRT field with this
-                        , Maybe CmmLit  -- Override the layout field with this
-                        , [CmmLit]           -- "Extra bits" for info table
-                        , [RawCmmDecl])      -- Auxiliary data decls
+              -> UniqDSM ( Maybe CmmLit  -- Override the SRT field with this
+                         , Maybe CmmLit  -- Override the layout field with this
+                         , [CmmLit]           -- "Extra bits" for info table
+                         , [RawCmmDecl])      -- Auxiliary data decls
     mk_pieces (Constr con_tag con_descr) _no_srt    -- A data constructor
       = do { (descr_lit, decl) <- newStringLit con_descr
            ; return ( Just (CmmInt (fromIntegral con_tag)
@@ -338,14 +345,14 @@ makeRelativeRefTo platform info_lbl lit
 -- The head of the stack layout is the top of the stack and
 -- the least-significant bit.
 
-mkLivenessBits :: Platform -> Liveness -> UniqSM (CmmLit, [RawCmmDecl])
+mkLivenessBits :: Platform -> Liveness -> UniqDSM (CmmLit, [RawCmmDecl])
               -- ^ Returns:
               --   1. The bitmap (literal value or label)
               --   2. Large bitmap CmmData if needed
 
 mkLivenessBits platform liveness
   | n_bits > mAX_SMALL_BITMAP_SIZE platform -- does not fit in one word
-  = do { uniq <- getUniqueM
+  = do { uniq <- getUniqueDSM
        ; let bitmap_lbl = mkBitmapLabel uniq
        ; return (CmmLabel bitmap_lbl,
                  [mkRODataLits bitmap_lbl lits]) }
@@ -412,16 +419,16 @@ mkStdInfoTable profile (type_descr, closure_descr) cl_type srt layout_lit
 --
 -------------------------------------------------------------------------
 
-mkProfLits :: Platform -> ProfilingInfo -> UniqSM ((CmmLit,CmmLit), [RawCmmDecl])
+mkProfLits :: Platform -> ProfilingInfo -> UniqDSM ((CmmLit,CmmLit), [RawCmmDecl])
 mkProfLits platform NoProfilingInfo = return ((zeroCLit platform, zeroCLit platform), [])
 mkProfLits _ (ProfilingInfo td cd)
   = do { (td_lit, td_decl) <- newStringLit td
        ; (cd_lit, cd_decl) <- newStringLit cd
        ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
 
-newStringLit :: ByteString -> UniqSM (CmmLit, GenCmmDecl RawCmmStatics info stmt)
+newStringLit :: ByteString -> UniqDSM (CmmLit, GenCmmDecl RawCmmStatics info stmt)
 newStringLit bytes
-  = do { uniq <- getUniqueM
+  = do { uniq <- getUniqueDSM
        ; return (mkByteStringCLit (mkStringLitLabel uniq) bytes) }
 
 

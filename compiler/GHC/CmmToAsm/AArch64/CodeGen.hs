@@ -1,4 +1,4 @@
-{-# language GADTs #-}
+{-# language GADTs, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
@@ -44,7 +44,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Graph
 import GHC.Types.Tickish ( GenTickish(..) )
 import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 
 -- The rest:
 import GHC.Data.OrdList
@@ -1440,7 +1440,7 @@ genCondJump bid expr = do
       _ -> pprPanic "AArch64.genCondJump: " (text $ show expr)
 
 -- A conditional jump with at least +/-128M jump range
-genCondFarJump :: MonadUnique m => Cond -> Target -> m InstrBlock
+genCondFarJump :: MonadGetUnique m => Cond -> Target -> m InstrBlock
 genCondFarJump cond far_target = do
   skip_lbl_id <- newBlockId
   jmp_lbl_id <- newBlockId
@@ -2272,7 +2272,7 @@ data BlockInRange = InRange | NotInRange Target
 
 -- See Note [AArch64 far jumps]
 makeFarBranches :: Platform -> LabelMap RawCmmStatics -> [NatBasicBlock Instr]
-                -> UniqSM [NatBasicBlock Instr]
+                -> UniqDSM [NatBasicBlock Instr]
 makeFarBranches {- only used when debugging -} _platform statics basic_blocks = do
   -- All offsets/positions are counted in multiples of 4 bytes (the size of AArch64 instructions)
   -- That is an offset of 1 represents a 4-byte/one instruction offset.
@@ -2293,7 +2293,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
     long_bz_jump_size =  4 :: Int
 
     -- Replace out of range conditional jumps with unconditional jumps.
-    replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqSM (Int, [GenBasicBlock Instr])
+    replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqDSM (Int, [GenBasicBlock Instr])
     replace_blk !m !pos (BasicBlock lbl instrs) = do
       -- Account for a potential info table before the label.
       let !block_pos = pos + infoTblSize_maybe lbl
@@ -2307,12 +2307,14 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       let final_blocks = BasicBlock lbl top : split_blocks
       pure (pos', final_blocks)
 
-    replace_jump :: LabelMap Int -> Int -> Instr -> UniqSM (Int, [Instr])
+    replace_jump :: LabelMap Int -> Int -> Instr -> UniqDSM (Int, [Instr])
     replace_jump !m !pos instr = do
       case instr of
         ANN ann instr -> do
-          (idx,instr':instrs') <- replace_jump m pos instr
-          pure (idx, ANN ann instr':instrs')
+          replace_jump m pos instr >>= \case
+            (idx,instr':instrs') ->
+              pure (idx, ANN ann instr':instrs')
+            (idx,[]) -> pprPanic "replace_jump" (text "empty return list for " <+> ppr idx)
         BCOND cond t
           -> case target_in_range m t pos of
               InRange -> pure (pos+long_bc_jump_size,[instr])

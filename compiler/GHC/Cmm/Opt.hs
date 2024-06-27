@@ -22,8 +22,8 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Utils
 import GHC.Cmm
 import GHC.Cmm.Config
-
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
+import GHC.Types.Unique
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -664,7 +664,7 @@ cmmMachOpFoldOptM _ _ _ = pure Nothing
 intoRegister :: CmmExpr -> CmmType -> Opt CmmExpr
 intoRegister e@(CmmReg _) _ = pure e
 intoRegister expr ty = do
-  u <- getUniqueM
+  u <- getUniqueOpt
   let reg = LocalReg u ty
   CmmReg (CmmLocal reg) <$ prependNode (CmmAssign (CmmLocal reg) expr)
 
@@ -754,7 +754,7 @@ generateDivisionBySigned platform _cfg rep n divisor = do
     mul2 n
       -- Using mul2 for sub-word sizes regresses for signed integers only
       | rep == wordWidth platform = do
-        (r1, r2, r3) <- (,,) <$> getUniqueM <*> getUniqueM <*> getUniqueM
+        (r1, r2, r3) <- (,,) <$> getUniqueOpt <*> getUniqueOpt <*> getUniqueOpt
         let rg1    = LocalReg r1 resRep
             resReg = LocalReg r2 resRep
             rg3    = LocalReg r3 resRep
@@ -845,7 +845,7 @@ generateDivisionByUnsigned platform cfg rep n divisor = do
     -- generate the multiply with the magic number
     mul2 n
       | rep == wordWidth platform || (cmmAllowMul2 cfg && needsAdd) = do
-        (r1, r2) <- (,) <$> getUniqueM <*> getUniqueM
+        (r1, r2) <- (,) <$> getUniqueOpt <*> getUniqueOpt
         let rg1    = LocalReg r1 resRep
             resReg = LocalReg r2 resRep
         res <- CmmReg (CmmLocal resReg) <$ prependNode (CmmUnsafeForeignCall (PrimTarget (MO_U_Mul2 rep)) [resReg, rg1] [n, CmmLit $ CmmInt magic rep])
@@ -897,16 +897,16 @@ divisionMagicU rep doPreShift divisor = (toInteger zeros, magic, needsAdd, toInt
 -- -----------------------------------------------------------------------------
 -- Opt monad
 
-newtype Opt a = OptI { runOptI :: CmmConfig -> [CmmNode O O] -> UniqSM ([CmmNode O O], a) }
+newtype Opt a = OptI { runOptI :: CmmConfig -> [CmmNode O O] -> UniqDSM ([CmmNode O O], a) }
 
 -- | Pattern synonym for 'Opt', as described in Note [The one-shot state
 -- monad trick].
-pattern Opt :: (CmmConfig -> [CmmNode O O] -> UniqSM ([CmmNode O O], a)) -> Opt a
+pattern Opt :: (CmmConfig -> [CmmNode O O] -> UniqDSM ([CmmNode O O], a)) -> Opt a
 pattern Opt f <- OptI f
   where Opt f = OptI . oneShot $ \cfg -> oneShot $ \out -> f cfg out
 {-# COMPLETE Opt #-}
 
-runOpt :: CmmConfig -> Opt a -> UniqSM ([CmmNode O O], a)
+runOpt :: CmmConfig -> Opt a -> UniqDSM ([CmmNode O O], a)
 runOpt cf (Opt g) = g cf []
 
 getConfig :: Opt CmmConfig
@@ -926,10 +926,8 @@ instance Monad Opt where
     (ys, a) <- g cf xs
     runOptI (f a) cf ys
 
-instance MonadUnique Opt where
-  getUniqueSupplyM = Opt $ \_ xs -> (xs,) <$> getUniqueSupplyM
-  getUniqueM       = Opt $ \_ xs -> (xs,) <$> getUniqueM
-  getUniquesM      = Opt $ \_ xs -> (xs,) <$> getUniquesM
+getUniqueOpt :: Opt Unique
+getUniqueOpt = Opt $ \_ xs -> (xs,) <$> getUniqueDSM
 
 mapForeignTargetOpt :: (CmmExpr -> Opt CmmExpr) -> ForeignTarget -> Opt ForeignTarget
 mapForeignTargetOpt exp   (ForeignTarget e c) = flip ForeignTarget c <$> exp e

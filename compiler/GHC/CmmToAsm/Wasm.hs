@@ -21,7 +21,7 @@ import GHC.Driver.DynFlags
 import GHC.Platform
 import GHC.Prelude
 import GHC.Settings
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Unit
 import GHC.Utils.Logger
 import GHC.Utils.Outputable (text)
@@ -32,7 +32,7 @@ ncgWasm ::
   Logger ->
   Platform ->
   ToolSettings ->
-  UniqSupply ->
+  DUniqSupply ->
   ModLocation ->
   Handle ->
   Stream IO RawCmmGroup a ->
@@ -58,7 +58,7 @@ ncgWasm ncg_config logger platform ts us loc h cmms = do
 streamCmmGroups ::
   NCGConfig ->
   Platform ->
-  UniqSupply ->
+  DUniqSupply ->
   Stream IO RawCmmGroup a ->
   IO (a, WasmCodeGenState 'I32)
 streamCmmGroups ncg_config platform us cmms =
