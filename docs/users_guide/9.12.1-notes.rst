@@ -159,6 +159,11 @@ Runtime system
 
 - Usage of deprecated primops is now correctly reported (#19629).
 
+- New fused multiply-add instructions for vectors of floating-point values,
+  such as ``fmaddFloatX4# :: FloatX4# -> FloatX4# -> FloatX4# -> FloatX4#`` and
+  ``fnmsubDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2# -> DoubleX2#``.
+  These follow the same semantics as ``fmadd``/``fmsub``/``fnmadd``/``fnmsub``,
+  operating in parallel on vectors of floating-point values.
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~

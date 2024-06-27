@@ -1491,7 +1491,7 @@ genMachOp _ op [x] = case op of
     MO_F_Mul        _ -> panicOp
     MO_F_Quot       _ -> panicOp
 
-    MO_FMA _ _        -> panicOp
+    MO_FMA _ _ _      -> panicOp
 
     MO_F_Eq         _ -> panicOp
     MO_F_Ne         _ -> panicOp
@@ -1676,7 +1676,7 @@ genMachOp_slow opt op [x, y] = case op of
     MO_F_Mul  _ -> genBinMach LM_MO_FMul
     MO_F_Quot _ -> genBinMach LM_MO_FDiv
 
-    MO_FMA _ _  -> panicOp
+    MO_FMA _ _ _ -> panicOp
 
     MO_And _   -> genBinMach LM_MO_And
     MO_Or  _   -> genBinMach LM_MO_Or
@@ -1815,7 +1815,7 @@ genMachOp_slow _opt op [x, y, z] = do
     panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-ternary op encountered "
                    ++ "with three arguments! (" ++ show op ++ ")"
   case op of
-    MO_FMA var width ->
+    MO_FMA var lg width ->
       case var of
         -- LLVM only has the fmadd variant.
         FMAdd   -> genFmaOp x y z
@@ -1825,7 +1825,11 @@ genMachOp_slow _opt op [x, y, z] = do
         FNMAdd  -> genFmaOp (neg x) y z
         FNMSub  -> genFmaOp (neg x) y (neg z)
       where
-        neg x = CmmMachOp (MO_F_Neg width) [x]
+        neg x
+          | lg == 1
+          = CmmMachOp (MO_F_Neg width) [x]
+          | otherwise
+          = CmmMachOp (MO_VF_Neg lg width) [x]
     _ -> panicOp
 
 -- More than three expressions, invalid!
@@ -1847,6 +1851,12 @@ genFmaOp x y z = runExprData $ do
   let fname = case tx of
         LMFloat  -> fsLit "llvm.fma.f32"
         LMDouble -> fsLit "llvm.fma.f64"
+        LMVector 4 LMFloat -> fsLit "llvm.fma.v4f32"
+        LMVector 8 LMFloat -> fsLit "llvm.fma.v8f32"
+        LMVector 16 LMFloat -> fsLit "llvm.fma.v16f32"
+        LMVector 2 LMDouble -> fsLit "llvm.fma.v2f64"
+        LMVector 4 LMDouble -> fsLit "llvm.fma.v4f64"
+        LMVector 8 LMDouble -> fsLit "llvm.fma.v8f64"
         _ -> pprPanic "CmmToLlvm.genFmaOp: unsupported type" (ppLlvmType tx)
   fptr <- liftExprData $ getInstrinct fname ty [tx, ty, tz]
   doExprW tx $ Call StdCall fptr [vx, vy, vz] [ReadNone, NoUnwind]

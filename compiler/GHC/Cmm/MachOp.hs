@@ -116,7 +116,7 @@ data MachOp
 
   -- Floating-point fused multiply-add operations
   -- | Fused multiply-add, see 'FMASign'.
-  | MO_FMA FMASign Width
+  | MO_FMA FMASign Length Width
 
   -- Floating point comparison
   | MO_F_Eq Width
@@ -459,7 +459,7 @@ machOpResultType platform mop tys =
     MO_F_Quot r         -> cmmFloat r
     MO_F_Neg r          -> cmmFloat r
 
-    MO_FMA _ r        -> cmmFloat r
+    MO_FMA _ l r        -> if l == 1 then cmmFloat r else cmmVec l (cmmFloat r)
 
     MO_F_Eq  {}         -> comparisonResultRep platform
     MO_F_Ne  {}         -> comparisonResultRep platform
@@ -556,7 +556,7 @@ machOpArgReps platform op =
     MO_F_Quot r         -> [r,r]
     MO_F_Neg r          -> [r]
 
-    MO_FMA _ r          -> [r,r,r]
+    MO_FMA _ l r        -> [vecwidth l r, vecwidth l r, vecwidth l r]
 
     MO_F_Eq  r          -> [r,r]
     MO_F_Ne  r          -> [r,r]

@@ -36,6 +36,9 @@ test('simd009', [ req_th
                 ]
               , multimod_compile_and_run, ['simd009', ''])
 test('simd010', [], compile_and_run, [''])
+test('simd011', [ unless(have_cpu_feature('fma'), skip)
+                , extra_hc_opts('-mfma')
+                ], compile_and_run, [''])
 
 test('T25062_V16', [], compile_and_run, [''])
 test('T25062_V32', [ unless(have_cpu_feature('avx2'), skip)
