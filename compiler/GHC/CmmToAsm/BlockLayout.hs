@@ -48,7 +48,7 @@ import Data.STRef
 import Control.Monad.ST.Strict
 import Control.Monad (foldM, unless)
 import GHC.Data.UnionFind
-import GHC.Types.Unique.Supply (UniqSM)
+import GHC.Types.Unique.DSM (UniqDSM)
 
 {-
   Note [CFG based code layout]
@@ -793,7 +793,7 @@ sequenceTop
     => NcgImpl statics instr jumpDest
     -> Maybe CFG -- ^ CFG if we have one.
     -> NatCmmDecl statics instr -- ^ Function to serialize
-    -> UniqSM (NatCmmDecl statics instr)
+    -> UniqDSM (NatCmmDecl statics instr)
 
 sequenceTop _       _           top@(CmmData _ _) = pure top
 sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks)) = do

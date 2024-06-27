@@ -79,7 +79,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Misc
-import GHC.Types.Unique.Supply ( getUniqueM )
+import GHC.Types.Unique.DSM ( getUniqueM )
 
 import Control.Monad
 import Data.Foldable (fold)

@@ -205,6 +205,9 @@ instance Uniquable FastString where
 instance Uniquable Int where
   getUnique i = mkUniqueIntGrimily i
 
+instance Uniquable Word64 where
+  getUnique i = mkUniqueGrimily i
+
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm
 
