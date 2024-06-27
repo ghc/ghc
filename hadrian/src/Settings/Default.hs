@@ -169,6 +169,9 @@ stage1Packages = do
         , xhtml
         , if winTarget then win32 else unix
         ]
+      , [ deriveConstants
+        , genprimopcode
+        ]
       , when (not cross)
         [ haddock
         , hpcBin

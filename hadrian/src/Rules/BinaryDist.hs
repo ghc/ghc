@@ -437,7 +437,7 @@ pkgToWrappers pkg = do
       | pkg == runGhc -> pure $ map (prefix++) ["runghc", "runhaskell"]
         -- These are the packages which we want to expose to the user and hence
         -- there are wrappers installed in the bindist.
-      | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, ghc, ghcPkg]
+      | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, ghc, ghcPkg, deriveConstants, genprimopcode]
                       -> (:[]) <$> (programName =<< programContext Stage1 pkg)
       | otherwise     -> pure []
 
