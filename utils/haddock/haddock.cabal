@@ -43,7 +43,6 @@ extra-source-files:
   doc/README.md
   doc/*.rst
   doc/conf.py
-  haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
   hypsrc-test/src/*.hs
