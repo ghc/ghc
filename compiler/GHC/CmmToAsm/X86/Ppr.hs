@@ -1289,14 +1289,16 @@ pprInstr platform i = case i of
    -- Custom pretty printers
    -- These instructions currently don't follow a uniform suffix pattern
    -- in their names, so we have custom pretty printers for them.
-   pprBroadcast :: Line doc -> Format -> AddrMode -> Reg -> doc
-   pprBroadcast name format op dst
+   pprBroadcast :: Line doc -> Format -> Operand -> Reg -> doc
+   pprBroadcast name fmt@(VecFormat _ sFmt) op dst
      = line $ hcat [
-           pprBroadcastMnemonic name format,
-           pprAddr platform op,
+           pprBroadcastMnemonic name fmt,
+           pprOperand platform (scalarFormatFormat sFmt) op,
            comma,
-           pprReg platform format dst
+           pprReg platform fmt dst
        ]
+   pprBroadcast _ fmt _ _ =
+     pprPanic "pprBroadcast: expected vector format" (ppr fmt)
 
    pprXor :: Line doc -> Format -> Reg -> Reg -> Reg -> doc
    pprXor name format reg1 reg2 reg3

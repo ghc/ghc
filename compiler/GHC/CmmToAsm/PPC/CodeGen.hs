@@ -538,6 +538,8 @@ getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
 
       MO_XX_Conv _ to -> conversionNop (intFormat to) x
 
+      MO_V_Broadcast {} -> vectorsNeedLlvm
+      MO_VF_Broadcast {} -> vectorsNeedLlvm
       MO_VF_Neg {} -> vectorsNeedLlvm
 
       _ -> panic "PPC.CodeGen.getRegister: no match"
