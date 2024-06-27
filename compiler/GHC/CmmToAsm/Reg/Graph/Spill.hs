@@ -22,7 +22,7 @@ import GHC.Utils.Monad.State.Strict
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
@@ -52,7 +52,7 @@ regSpill
         -> UniqSet Int                  -- ^ available stack slots
         -> Int                          -- ^ current number of spill slots.
         -> UniqSet VirtualReg           -- ^ the regs to spill
-        -> UniqSM
+        -> UniqDSM
             ([LiveCmmDecl statics instr]
                  -- code with SPILL and RELOAD meta instructions added.
             , UniqSet Int               -- left over slots
@@ -81,17 +81,20 @@ regSpill platform code slotsFree slotCount regs
                     -- See Note [Unique Determinism and code generation]
 
                 -- Grab the unique supply from the monad.
-                us      <- getUniqueSupplyM
+                UDSM $ \us ->
 
-                -- Run the spiller on all the blocks.
-                let (code', state')     =
-                        runState (mapM (regSpill_top platform regSlotMap) code)
-                                 (initSpillS us)
+                  -- Run the spiller on all the blocks.
+                  let (code', state')     =
+                          runState (mapM (regSpill_top platform regSlotMap) code)
+                                   (initSpillS us)
 
-                return  ( code'
+                   in DUniqResult
+                        ( code'
                         , minusUniqSet slotsFree (mkUniqSet slots)
                         , slotCount
                         , makeSpillStats state')
+                        ( stateUS state' )
+
 
 
 -- | Spill some registers to stack slots in a top-level thing.
@@ -323,21 +326,28 @@ patchReg1 old new instr
 
 -- Spiller monad --------------------------------------------------------------
 -- | State monad for the spill code generator.
-type SpillM a
-        = State SpillS a
+type SpillM = State SpillS
 
 -- | Spill code generator state.
 data SpillS
         = SpillS
         { -- | Unique supply for generating fresh vregs.
-          stateUS       :: UniqSupply
+          stateUS       :: DUniqSupply
 
           -- | Spilled vreg vs the number of times it was loaded, stored.
         , stateSpillSL  :: UniqFM Reg (Reg, Int, Int) }
 
+instance MonadGetUnique SpillM where
+  getUniqueM = do
+    us <- gets stateUS
+    case takeUniqueFromDSupply us of
+     (uniq, us')
+      -> do modify $ \s -> s { stateUS = us' }
+            return uniq
+
 
 -- | Create a new spiller state.
-initSpillS :: UniqSupply -> SpillS
+initSpillS :: DUniqSupply -> SpillS
 initSpillS uniqueSupply
         = SpillS
         { stateUS       = uniqueSupply
@@ -346,12 +356,7 @@ initSpillS uniqueSupply
 
 -- | Allocate a new unique in the spiller monad.
 newUnique :: SpillM Unique
-newUnique
- = do   us      <- gets stateUS
-        case takeUniqFromSupply us of
-         (uniq, us')
-          -> do modify $ \s -> s { stateUS = us' }
-                return uniq
+newUnique = getUniqueM
 
 
 -- | Add a spill/reload count to a stats record for a register.

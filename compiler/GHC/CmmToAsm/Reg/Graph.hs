@@ -31,7 +31,7 @@ import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Misc (seqList)
 import GHC.CmmToAsm.CFG
 
@@ -57,8 +57,8 @@ regAlloc
         -> Int                          -- ^ current number of spill slots
         -> [LiveCmmDecl statics instr]  -- ^ code annotated with liveness information.
         -> Maybe CFG                    -- ^ CFG of basic blocks if available
-        -> UniqSM ( [NatCmmDecl statics instr]
-                  , Maybe Int, [RegAllocStats statics instr] )
+        -> UniqDSM ( [NatCmmDecl statics instr]
+                   , Maybe Int, [RegAllocStats statics instr] )
            -- ^ code with registers allocated, additional stacks required
            -- and stats for each stage of allocation
 
@@ -107,7 +107,7 @@ regAlloc_spin
         -> [RegAllocStats statics instr] -- ^ Current regalloc stats to add to.
         -> [LiveCmmDecl statics instr]   -- ^ Liveness annotated code to allocate.
         -> Maybe CFG
-        -> UniqSM ( [NatCmmDecl statics instr]
+        -> UniqDSM ( [NatCmmDecl statics instr]
                   , [RegAllocStats statics instr]
                   , Int                  -- Slots in use
                   , Color.Graph VirtualReg RegClass RealReg)
@@ -305,7 +305,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
 buildGraph
         :: Instruction instr
         => [LiveCmmDecl statics instr]
-        -> UniqSM (Color.Graph VirtualReg RegClass RealReg)
+        -> UniqDSM (Color.Graph VirtualReg RegClass RealReg)
 
 buildGraph code
  = do

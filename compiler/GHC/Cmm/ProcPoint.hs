@@ -24,7 +24,7 @@ import Control.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
@@ -185,14 +185,14 @@ callProcPoints g = foldlGraphBlocks add (setSingleton (g_entry g)) g
                       _ -> set
 
 minimalProcPointSet :: Platform -> ProcPointSet -> CmmGraph
-                    -> UniqSM ProcPointSet
+                    -> UniqDSM ProcPointSet
 -- Given the set of successors of calls (which must be proc-points)
 -- figure out the minimal set of necessary proc-points
 minimalProcPointSet platform callProcPoints g
   = extendPPSet platform g (revPostorder g) callProcPoints
 
 extendPPSet
-    :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> UniqSM ProcPointSet
+    :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> UniqDSM ProcPointSet
 extendPPSet platform g blocks procPoints =
     let env = procPointAnalysis procPoints g
         add pps block = let id = entryLabel block
@@ -236,7 +236,7 @@ extendPPSet platform g blocks procPoints =
 -- ToDo: use the _ret naming convention that the old code generator
 -- used. -- EZY
 splitAtProcPoints :: Platform -> CLabel -> ProcPointSet-> ProcPointSet -> LabelMap Status -> CmmDecl
-                  -> UniqSM [CmmDecl]
+                  -> UniqDSM [CmmDecl]
 splitAtProcPoints _ _ _ _ _ t@(CmmData _ _) = return [t]
 splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
   -- Build a map from procpoints to the blocks they reach
@@ -286,9 +286,9 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
   -- and replace branches to procpoints with branches to the jump-off blocks
   let add_jump_block :: (LabelMap Label, [CmmBlock])
                      -> (Label, CLabel)
-                     -> UniqSM (LabelMap Label, [CmmBlock])
+                     -> UniqDSM (LabelMap Label, [CmmBlock])
       add_jump_block (env, bs) (pp, l) = do
-        bid <- liftM mkBlockId getUniqueM
+        bid <- liftM mkBlockId getUniqueDSM
         let b    = blockJoin (CmmEntry bid GlobalScope) emptyBlock jump
             live = ppLiveness pp
             jump = CmmCall (CmmLit (CmmLabel l)) Nothing live 0 0 0
@@ -317,7 +317,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
           CmmSwitch _ ids         -> foldr add_if_pp rst $ switchTargetsToList ids
           _                       -> rst
 
-  let add_jumps :: LabelMap CmmGraph -> (Label, LabelMap CmmBlock) -> UniqSM (LabelMap CmmGraph)
+  let add_jumps :: LabelMap CmmGraph -> (Label, LabelMap CmmBlock) -> UniqDSM (LabelMap CmmGraph)
       add_jumps newGraphEnv (ppId, blockEnv) = do
         -- find which procpoints we currently branch to
         let needed_jumps = mapFoldr add_if_branch_to_pp [] blockEnv

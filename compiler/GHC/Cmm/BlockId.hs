@@ -15,7 +15,7 @@ import GHC.Data.FastString
 import GHC.Types.Id.Info
 import GHC.Types.Name
 import GHC.Types.Unique
-import GHC.Types.Unique.Supply
+import qualified GHC.Types.Unique.DSM as DSM
 
 import GHC.Cmm.Dataflow.Label (Label, mkHooplLabel)
 
@@ -36,8 +36,12 @@ type BlockId = Label
 mkBlockId :: Unique -> BlockId
 mkBlockId unique = mkHooplLabel $ getKey unique
 
-newBlockId :: MonadUnique m => m BlockId
-newBlockId = mkBlockId <$> getUniqueM
+-- If the monad unique instance uses a deterministic unique supply, this will
+-- give you a deterministic unique. Otherwise, it will not. Note that from Cmm
+-- onwards (after deterministic renaming in 'codeGen'), there should only exist
+-- deterministic block labels.
+newBlockId :: DSM.MonadGetUnique m => m BlockId
+newBlockId = mkBlockId <$> DSM.getUniqueM
 
 blockLbl :: BlockId -> CLabel
 blockLbl label = mkLocalBlockLabel (getUnique label)

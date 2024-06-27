@@ -57,6 +57,7 @@ import GHC.Unit.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import qualified GHC.Types.Unique.DSM as DSM
 
 import Control.Monad (ap)
 import GHC.Utils.Outputable (SDocContext)
@@ -101,6 +102,9 @@ instance MonadUnique CmmParse where
   getUniqueM = EC $ \_ _ decls -> do
     u <- getUniqueM
     return (decls, u)
+
+instance DSM.MonadGetUnique CmmParse where
+  getUniqueM = GHC.Types.Unique.Supply.getUniqueM
 
 getProfile :: CmmParse Profile
 getProfile = EC (\_ _ d -> (d,) <$> F.getProfile)

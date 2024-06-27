@@ -56,7 +56,7 @@ import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Data.Bag
 import GHC.Utils.Monad.State.Strict
 
@@ -685,7 +685,7 @@ cmmTopLiveness
         => Maybe CFG
         -> Platform
         -> NatCmmDecl statics instr
-        -> UniqSM (LiveCmmDecl statics instr)
+        -> UniqDSM (LiveCmmDecl statics instr)
 cmmTopLiveness cfg platform cmm
         = regLiveness platform $ natCmmTopToLive cfg cmm
 
@@ -779,7 +779,7 @@ regLiveness
         :: Instruction instr
         => Platform
         -> LiveCmmDecl statics instr
-        -> UniqSM (LiveCmmDecl statics instr)
+        -> UniqDSM (LiveCmmDecl statics instr)
 
 regLiveness _ (CmmData i d)
         = return $ CmmData i d

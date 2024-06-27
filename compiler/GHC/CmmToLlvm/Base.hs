@@ -56,6 +56,7 @@ import GHC.Types.Unique
 import GHC.Utils.BufHandle   ( BufHandle )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
+import qualified GHC.Types.Unique.DSM as DSM
 import GHC.Utils.Logger
 
 import Data.Maybe (fromJust)
@@ -291,14 +292,13 @@ getPlatform = llvmCgPlatform <$> getConfig
 getConfig :: LlvmM LlvmCgConfig
 getConfig = LlvmM $ \env -> return (envConfig env, env)
 
-instance MonadUnique LlvmM where
-    getUniqueSupplyM = do
-        tag <- getEnv envTag
-        liftIO $! mkSplitUniqSupply tag
 
-    getUniqueM = do
-        tag <- getEnv envTag
-        liftIO $! uniqFromTag tag
+-- TODO(#25274): If you want Llvm code to be deterministic, this instance should use a
+-- deterministic unique supply to produce uniques, rather than using 'uniqFromTag'.
+instance DSM.MonadGetUnique LlvmM where
+  getUniqueM = do
+    tag <- getEnv envTag
+    liftIO $! uniqFromTag tag
 
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a

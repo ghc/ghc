@@ -37,7 +37,7 @@ import GHC.Data.FastString
 import GHC.Types.ForeignCall
 import GHC.Data.OrdList
 import GHC.Runtime.Heap.Layout (ByteOff)
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Panic
 
@@ -169,9 +169,9 @@ outOfLine      :: BlockId -> CmmAGraphScoped -> CmmAGraph
 outOfLine l (c,s) = unitOL (CgFork l c s)
 
 -- | allocate a fresh label for the entry point
-lgraphOfAGraph :: CmmAGraphScoped -> UniqSM CmmGraph
+lgraphOfAGraph :: CmmAGraphScoped -> UniqDSM CmmGraph
 lgraphOfAGraph g = do
-  u <- getUniqueM
+  u <- getUniqueDSM
   return (labelAGraph (mkBlockId u) g)
 
 -- | use the given BlockId as the label of the entry point

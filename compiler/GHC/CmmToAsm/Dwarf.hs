@@ -14,7 +14,7 @@ import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Types.Unique
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 
 import GHC.CmmToAsm.Dwarf.Constants
 import GHC.CmmToAsm.Dwarf.Types
@@ -31,8 +31,7 @@ import System.FilePath
 import qualified GHC.Cmm.Dataflow.Label as H
 
 -- | Generate DWARF/debug information
-dwarfGen :: IsDoc doc => String -> NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock]
-            -> (doc, UniqSupply)
+dwarfGen :: IsDoc doc => String -> NCGConfig -> ModLocation -> DUniqSupply -> [DebugBlock] -> (doc, DUniqSupply)
 dwarfGen _        _      _      us []     = (empty, us)
 dwarfGen compPath config modLoc us blocks =
   let platform = ncgPlatform config
@@ -65,7 +64,7 @@ dwarfGen compPath config modLoc us blocks =
 
   -- .debug_info section: Information records on procedures and blocks
       -- unique to identify start and end compilation unit .debug_inf
-      (unitU, us') = takeUniqFromSupply us
+      (unitU, us') = takeUniqueFromDSupply us
       infoSct = vcat [ line (dwarfInfoLabel <> colon)
                      , dwarfInfoSection platform
                      , compileUnitHeader platform unitU
@@ -79,7 +78,7 @@ dwarfGen compPath config modLoc us blocks =
                 line (dwarfLineLabel <> colon)
 
   -- .debug_frame section: Information about the layout of the GHC stack
-      (framesU, us'') = takeUniqFromSupply us'
+      (framesU, us'') = takeUniqueFromDSupply us'
       frameSct = dwarfFrameSection platform $$
                  line (dwarfFrameLabel <> colon) $$
                  pprDwarfFrame platform (debugFrame platform framesU procs)
@@ -90,8 +89,8 @@ dwarfGen compPath config modLoc us blocks =
       aranges = dwarfARangesSection platform $$ pprDwarfARanges platform aranges' unitU
 
   in (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
-{-# SPECIALIZE dwarfGen :: String -> NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock] -> (SDoc, UniqSupply) #-}
-{-# SPECIALIZE dwarfGen :: String -> NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock] -> (HDoc, UniqSupply) #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfGen :: String -> NCGConfig -> ModLocation -> DUniqSupply -> [DebugBlock] -> (SDoc, DUniqSupply) #-}
+{-# SPECIALIZE dwarfGen :: String -> NCGConfig -> ModLocation -> DUniqSupply -> [DebugBlock] -> (HDoc, DUniqSupply) #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Build an address range entry for one proc.
 -- With split sections, each proc needs its own entry, since they may get
