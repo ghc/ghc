@@ -12,7 +12,7 @@ packages: ./
 
 -- This essentially freezes the build plan for hadrian
 -- It would be wise to keep this up to date with the state set in ci.sh
-index-state: 2024-05-13T15:04:38Z
+index-state: 2024-06-27T02:07:41Z
 
 -- unordered-containers-0.2.20-r1 requires template-haskell < 2.22
 -- ghc-9.10 has template-haskell-2.22.0.0
