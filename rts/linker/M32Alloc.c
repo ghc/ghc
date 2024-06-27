@@ -156,7 +156,10 @@ static bool
 is_okay_address(void *p) {
   int8_t *here = LINKER_LOAD_BASE;
   ssize_t displacement = (int8_t *) p - here;
-  return (displacement > -0x7fffffff) && (displacement < 0x7fffffff);
+  // if we assume -fPIC, we don't care where we load code.
+  // But we still want to use the m32 allocator to avoid fragmentation (#24432)
+  return RtsFlags.MiscFlags.linkerAlwaysPic
+         || ((displacement > -0x7fffffff) && (displacement < 0x7fffffff));
 }
 
 enum m32_page_type {
