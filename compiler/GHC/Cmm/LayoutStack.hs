@@ -8,7 +8,7 @@ import GHC.Prelude hiding ((<*>))
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.StgToCmm.Monad      ( newTemp  ) -- XXX layering violation
+import GHC.StgToCmm.Monad      ( newTemp ) -- XXX layering violation
 import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs  ) -- XXX layering violation
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
@@ -25,9 +25,9 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import GHC.Types.Unique.Supply
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSM
 import GHC.Utils.Misc
 
 import GHC.Utils.Outputable hiding ( isEmpty )
@@ -235,7 +235,7 @@ instance Outputable StackMap where
 
 
 cmmLayoutStack :: CmmConfig -> ProcPointSet -> ByteOff -> CmmGraph
-               -> UniqSM (CmmGraph, LabelMap StackMap)
+               -> UniqDSM (CmmGraph, LabelMap StackMap)
 cmmLayoutStack cfg procpoints entry_args
                graph@(CmmGraph { g_entry = entry })
   = do
@@ -271,7 +271,7 @@ layout :: CmmConfig
 
        -> [CmmBlock]                    -- [in] blocks
 
-       -> UniqSM
+       -> UniqDSM
           ( LabelMap StackMap           -- [out] stack maps
           , ByteOff                     -- [out] Sp high water mark
           , [CmmBlock]                  -- [out] new blocks
@@ -436,7 +436,7 @@ handleLastNode
    -> LabelMap StackMap -> StackMap -> CmmTickScope
    -> Block CmmNode O O
    -> CmmNode O C
-   -> UniqSM
+   -> UniqDSM
       ( [CmmNode O O]      -- nodes to go *before* the Sp adjustment
       , ByteOff            -- amount to adjust Sp
       , CmmNode O C        -- new last node
@@ -502,7 +502,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
      -- proc point, we have to set up the stack to match what the proc
      -- point is expecting.
      --
-     handleBranches :: UniqSM ( [CmmNode O O]
+     handleBranches :: UniqDSM ( [CmmNode O O]
                                 , ByteOff
                                 , CmmNode O C
                                 , [CmmBlock]
@@ -535,7 +535,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
                  , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
 
      -- For each successor of this block
-     handleBranch :: BlockId -> UniqSM (BlockId, BlockId, StackMap, [CmmBlock])
+     handleBranch :: BlockId -> UniqDSM (BlockId, BlockId, StackMap, [CmmBlock])
      handleBranch l
         --   (a) if the successor already has a stackmap, we need to
         --       shuffle the current stack to make it look the same.
@@ -570,7 +570,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
 
 makeFixupBlock :: CmmConfig -> ByteOff -> Label -> StackMap
                -> CmmTickScope -> [CmmNode O O]
-               -> UniqSM (Label, [CmmBlock])
+               -> UniqDSM (Label, [CmmBlock])
 makeFixupBlock cfg sp0 l stack tscope assigs
   | null assigs && sp0 == sm_sp stack = return (l, [])
   | otherwise = do
@@ -1047,7 +1047,7 @@ insertReloadsAsNeeded
     -> LabelMap StackMap
     -> BlockId
     -> [CmmBlock]
-    -> UniqSM [CmmBlock]
+    -> UniqDSM [CmmBlock]
 insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
     toBlockList . fst <$>
         rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) mapEmpty
@@ -1133,7 +1133,7 @@ expecting them (see Note [safe foreign call convention]). Note also
 that safe foreign call is replace by an unsafe one in the Cmm graph.
 -}
 
-lowerSafeForeignCall :: Profile -> CmmBlock -> UniqSM CmmBlock
+lowerSafeForeignCall :: Profile -> CmmBlock -> UniqDSM CmmBlock
 lowerSafeForeignCall profile block
   | (entry@(CmmEntry _ tscp), middle, CmmForeignCall { .. }) <- blockSplit block
   = do

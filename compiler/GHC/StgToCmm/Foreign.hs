@@ -48,8 +48,8 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.ForeignCall
 import GHC.Data.Maybe
 import GHC.Utils.Panic
-import GHC.Types.Unique.Supply
 import GHC.Types.Basic
+import GHC.Types.Unique.DSM
 import GHC.Unit.Types
 
 import GHC.Core.TyCo.Rep
@@ -308,7 +308,7 @@ emitSaveThreadState = do
   emit code
 
 -- | Produce code to save the current thread state to @CurrentTSO@
-saveThreadState :: MonadUnique m => Profile -> m CmmAGraph
+saveThreadState :: MonadGetUnique m => Profile -> m CmmAGraph
 saveThreadState profile = do
   let platform = profilePlatform profile
   tso <- newTemp (gcWord platform)
@@ -447,7 +447,7 @@ Closing the nursery corresponds to the following code:
   cn->free = Hp + WDS(1);
 @
 -}
-closeNursery :: MonadUnique m => Profile -> LocalReg -> m CmmAGraph
+closeNursery :: MonadGetUnique m => Profile -> LocalReg -> m CmmAGraph
 closeNursery profile tso = do
   let tsoreg   = CmmLocal tso
       platform = profilePlatform profile
@@ -480,7 +480,7 @@ emitLoadThreadState = do
   emit code
 
 -- | Produce code to load the current thread state from @CurrentTSO@
-loadThreadState :: MonadUnique m => Profile -> m CmmAGraph
+loadThreadState :: MonadGetUnique m => Profile -> m CmmAGraph
 loadThreadState profile = do
   let platform = profilePlatform profile
   tso <- newTemp (gcWord platform)
@@ -545,7 +545,7 @@ Opening the nursery corresponds to the following code:
    HpLim = bdstart + CurrentNursery->blocks*BLOCK_SIZE_W - 1;
 @
 -}
-openNursery :: MonadUnique m => Profile -> LocalReg -> m CmmAGraph
+openNursery :: MonadGetUnique m => Profile -> LocalReg -> m CmmAGraph
 openNursery profile tso = do
   let tsoreg   = CmmLocal tso
       platform = profilePlatform profile
