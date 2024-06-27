@@ -1054,10 +1054,10 @@ machOps = listToUFM $
         ( "fmul",       MO_F_Mul ),
         ( "fquot",      MO_F_Quot ),
 
-        ( "fmadd" ,     MO_FMA FMAdd  ),
-        ( "fmsub" ,     MO_FMA FMSub  ),
-        ( "fnmadd",     MO_FMA FNMAdd ),
-        ( "fnmsub",     MO_FMA FNMSub ),
+        ( "fmadd" ,     MO_FMA FMAdd  1 ),
+        ( "fmsub" ,     MO_FMA FMSub  1 ),
+        ( "fnmadd",     MO_FMA FNMAdd 1 ),
+        ( "fnmsub",     MO_FMA FNMSub 1 ),
 
         ( "feq",        MO_F_Eq ),
         ( "fne",        MO_F_Ne ),

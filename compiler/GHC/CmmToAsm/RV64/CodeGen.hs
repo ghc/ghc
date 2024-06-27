@@ -1134,11 +1134,15 @@ getRegister' config plat expr =
         -- x86 fmsub    x * y - z <=> RISCV64 fnmsub: d =   r1 * r2 - r3
         -- x86 fnmadd - x * y + z <=> RISCV64 fmsub : d = - r1 * r2 + r3
         -- x86 fnmsub - x * y - z <=> RISCV64 fnmadd: d = - r1 * r2 - r3
-        MO_FMA var w -> case var of
-          FMAdd -> float3Op w (\d n m a -> unitOL $ FMA FMAdd d n m a)
-          FMSub -> float3Op w (\d n m a -> unitOL $ FMA FMSub d n m a)
-          FNMAdd -> float3Op w (\d n m a -> unitOL $ FMA FNMSub d n m a)
-          FNMSub -> float3Op w (\d n m a -> unitOL $ FMA FNMAdd d n m a)
+        MO_FMA var l w
+          | l == 1
+          -> case var of
+                FMAdd -> float3Op w (\d n m a -> unitOL $ FMA FMAdd d n m a)
+                FMSub -> float3Op w (\d n m a -> unitOL $ FMA FMSub d n m a)
+                FNMAdd -> float3Op w (\d n m a -> unitOL $ FMA FNMSub d n m a)
+                FNMSub -> float3Op w (\d n m a -> unitOL $ FMA FNMAdd d n m a)
+          | otherwise
+          -> sorry "The RISCV64 backend does not (yet) support vectors."
         _ ->
           pprPanic "getRegister' (unhandled ternary CmmMachOp): "
             $ pprMachOp op

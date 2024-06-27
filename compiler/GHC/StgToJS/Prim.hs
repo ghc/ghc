@@ -1194,6 +1194,11 @@ genPrim prof bound ty op = case op of
   VecReadOffAddrOp _ _ _            -> unhandledPrimop op
   VecWriteOffAddrOp _ _ _           -> unhandledPrimop op
 
+  VecFMAdd  {} -> unhandledPrimop op
+  VecFMSub  {} -> unhandledPrimop op
+  VecFNMAdd {} -> unhandledPrimop op
+  VecFNMSub {} -> unhandledPrimop op
+
   VecIndexScalarByteArrayOp _ _ _   -> unhandledPrimop op
   VecReadScalarByteArrayOp _ _ _    -> unhandledPrimop op
   VecWriteScalarByteArrayOp _ _ _   -> unhandledPrimop op

@@ -188,6 +188,11 @@ Cmm
 
   This need for this distinction originally surfaced in https://gitlab.haskell.org/ghc/ghc/-/issues/22255
 
+- New fused multiply-add instructions for vectors of floating-point values,
+  such as ``fmaddFloatX4# :: FloatX4# -> FloatX4# -> FloatX4# -> FloatX4#`` and
+  ``fnmsubDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2# -> DoubleX2#``.
+  These follow the same semantics as ``fmadd``/``fmsub``/``fnmadd``/``fnmsub``,
+  operating in parallel on vectors of floating-point values.
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~

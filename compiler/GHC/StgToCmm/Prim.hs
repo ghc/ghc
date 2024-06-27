@@ -1481,10 +1481,10 @@ emitPrimOp cfg primop =
   DoubleDivOp    -> opTranslate (MO_F_Quot W64)
   DoubleNegOp    -> opTranslate (MO_F_Neg W64)
 
-  DoubleFMAdd    -> fmaOp FMAdd  W64
-  DoubleFMSub    -> fmaOp FMSub  W64
-  DoubleFNMAdd   -> fmaOp FNMAdd W64
-  DoubleFNMSub   -> fmaOp FNMSub W64
+  DoubleFMAdd    -> fmaOp FMAdd  1 W64
+  DoubleFMSub    -> fmaOp FMSub  1 W64
+  DoubleFNMAdd   -> fmaOp FNMAdd 1 W64
+  DoubleFNMSub   -> fmaOp FNMSub 1 W64
 
 -- Float ops
 
@@ -1501,10 +1501,10 @@ emitPrimOp cfg primop =
   FloatDivOp    -> opTranslate (MO_F_Quot W32)
   FloatNegOp    -> opTranslate (MO_F_Neg  W32)
 
-  FloatFMAdd    -> fmaOp FMAdd  W32
-  FloatFMSub    -> fmaOp FMSub  W32
-  FloatFNMAdd   -> fmaOp FNMAdd W32
-  FloatFNMSub   -> fmaOp FNMSub W32
+  FloatFMAdd    -> fmaOp FMAdd  1 W32
+  FloatFMSub    -> fmaOp FMSub  1 W32
+  FloatFNMAdd   -> fmaOp FNMAdd 1 W32
+  FloatFNMSub   -> fmaOp FNMSub 1 W32
 
 -- Vector ops
 
@@ -1531,6 +1531,12 @@ emitPrimOp cfg primop =
   (VecQuotOp WordVec n w) -> opTranslate (MO_VU_Quot n w)
   (VecRemOp  WordVec n w) -> opTranslate (MO_VU_Rem  n w)
   (VecNegOp  WordVec _ _) -> \_ -> panic "unsupported primop"
+
+  -- Vector FMA instructions
+  VecFMAdd  _ n w -> fmaOp FMAdd  n w
+  VecFMSub  _ n w -> fmaOp FMSub  n w
+  VecFNMAdd _ n w -> fmaOp FNMAdd n w
+  VecFNMSub _ n w -> fmaOp FNMSub n w
 
 -- Conversions
 
@@ -1831,10 +1837,11 @@ emitPrimOp cfg primop =
 
   allowFMA = stgToCmmAllowFMAInstr cfg
 
-  fmaOp :: FMASign -> Width -> [CmmActual] -> PrimopCmmEmit
-  fmaOp signs w args@[arg_x, arg_y, arg_z]
-    | allowFMA signs
-    = opTranslate (MO_FMA signs w) args
+  fmaOp :: FMASign -> Length -> Width -> [CmmActual] -> PrimopCmmEmit
+  fmaOp signs l w args@[arg_x, arg_y, arg_z]
+    |  allowFMA signs
+    || l > 1 -- (always use the MachOp for vector FMA)
+    = opTranslate (MO_FMA signs l w) args
     | otherwise
     = case signs of
 
@@ -1843,12 +1850,16 @@ emitPrimOp cfg primop =
 
         -- Other fused multiply-add operations are implemented in terms of fmadd
         -- This is sound: it does not lose any precision.
-        FMSub  -> fmaOp FMAdd w [arg_x, arg_y, neg arg_z]
-        FNMAdd -> fmaOp FMAdd w [neg arg_x, arg_y, arg_z]
-        FNMSub -> fmaOp FMAdd w [neg arg_x, arg_y, neg arg_z]
+        FMSub  -> fmaOp FMAdd l w [arg_x, arg_y, neg arg_z]
+        FNMAdd -> fmaOp FMAdd l w [neg arg_x, arg_y, arg_z]
+        FNMSub -> fmaOp FMAdd l w [neg arg_x, arg_y, neg arg_z]
     where
-      neg x = CmmMachOp (MO_F_Neg w) [x]
-  fmaOp _ _ _ = panic "fmaOp: wrong number of arguments (expected 3)"
+      neg x
+        | l == 1
+        = CmmMachOp (MO_F_Neg w) [x]
+        | otherwise
+        = CmmMachOp (MO_VF_Neg l w) [x]
+  fmaOp _ _ _ _ = panic "fmaOp: wrong number of arguments (expected 3)"
 
 data PrimopCmmEmit
   -- | Out of line fake primop that's actually just a foreign call to other

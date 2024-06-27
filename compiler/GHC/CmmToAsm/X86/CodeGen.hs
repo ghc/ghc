@@ -1621,7 +1621,11 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
   sse4_1 <- sse4_1Enabled
   case mop of
       -- Floating point fused multiply-add operations @ ± x*y ± z@
-      MO_FMA var w -> genFMA3Code w var x y z
+      MO_FMA var l w
+        | l * widthInBits w > 256
+        -> sorry "Please use -fllvm for wide vector FMA support"
+        | otherwise
+        -> genFMA3Code l w var x y z
 
       -- Ternary vector operations
       MO_VF_Insert l W32  | sse4_1 -> vector_float_insert_sse l x y z
@@ -3799,10 +3803,11 @@ _   `regClashesWithOp` _            = False
 
 -- | Generate code for a fused multiply-add operation, of the form @± x * y ± z@,
 -- with 3 operands (FMA3 instruction set).
-genFMA3Code :: Width
+genFMA3Code :: Length
+            -> Width
             -> FMASign
             -> CmmExpr -> CmmExpr -> CmmExpr -> NatM Register
-genFMA3Code w signs x y z = do
+genFMA3Code l w signs x y z = do
   config <- getConfig
   -- For the FMA instruction, we want to compute x * y + z
   --
@@ -3830,7 +3835,11 @@ genFMA3Code w signs x y z = do
   -- only possible if the other arguments don't use the destination register.
   -- We check for this and if there is a conflict we move the result only after
   -- the computation. See #24496 how this went wrong in the past.
-  let rep = floatFormat w
+  let rep
+        | l == 1
+        = floatFormat w
+        | otherwise
+        = vecFormat (cmmVec l $ cmmFloat w)
   (y_reg, y_code) <- getNonClobberedReg y
   (z_op, z_code) <- getNonClobberedOperand z
   x_code <- getAnyReg x

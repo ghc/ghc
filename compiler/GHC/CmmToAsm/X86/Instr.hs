@@ -206,8 +206,9 @@ data Instr
 
         -- | FMA3 fused multiply-add operations.
         | FMA3         Format FMASign FMAPermutation Operand Reg Reg
-          -- src3 (r/m), src2 (r), dst/src1 (r)
-          -- This is exactly reversed from how intel lists the arguments.
+          -- For the FMA213 permutation (the only one we use currently),
+          -- this is: src3 (r/m), src2 (r), dst/src1 (r)
+          -- (NB: this isexactly reversed from how Intel lists the arguments.)
 
         -- use ADD, SUB, and SQRT for arithmetic.  In both cases, operands
         -- are  Operand Reg.
