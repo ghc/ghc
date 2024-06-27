@@ -61,13 +61,13 @@ import GHC.Core.Type
 
 import GHC.Tc.Types
 import GHC.Stg.Syntax
+import GHC.StgToCmm.CgUtils (CgStream)
 import GHC.StgToCmm.Types (ModuleLFInfos)
 import GHC.StgToCmm.Config
 import GHC.Cmm
 
 import GHCi.RemoteTypes
 
-import GHC.Data.Stream
 import GHC.Data.Bag
 
 import qualified Data.Kind
@@ -149,9 +149,9 @@ data Hooks = Hooks
                                          -> IO (Either Type (HValue, [Linkable], PkgsLoaded))))
   , createIservProcessHook :: !(Maybe (CreateProcess -> IO ProcessHandle))
   , stgToCmmHook           :: !(Maybe (StgToCmmConfig -> InfoTableProvMap -> [TyCon] -> CollectedCCs
-                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos))
-  , cmmToRawCmmHook        :: !(forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
-                                 -> IO (Stream IO RawCmmGroup a)))
+                                 -> [CgStgTopBinding] -> HpcInfo -> CgStream CmmGroup ModuleLFInfos))
+  , cmmToRawCmmHook        :: !(forall a . Maybe (DynFlags -> Maybe Module -> CgStream CmmGroupSRTs a
+                                 -> IO (CgStream RawCmmGroup a)))
   }
 
 {-# DEPRECATED cmmToRawCmmHook "cmmToRawCmmHook is being deprecated. If you do use it in your project, please raise a GHC issue!" #-}

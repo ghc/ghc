@@ -45,6 +45,7 @@ module GHC.CmmToAsm.Wasm.Types
     wasmStateM,
     wasmModifyM,
     wasmExecM,
+    wasmRunM
   )
 where
 
@@ -66,7 +67,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Outputable hiding ((<>))
 import Unsafe.Coerce
@@ -419,10 +420,10 @@ data WasmCodeGenState w = WasmCodeGenState
       UniqFM LocalReg LocalInfo,
     localRegsCount ::
       Int,
-    wasmUniqSupply :: UniqSupply
+    wasmDUniqSupply :: DUniqSupply
   }
 
-initialWasmCodeGenState :: Platform -> UniqSupply -> WasmCodeGenState w
+initialWasmCodeGenState :: Platform -> DUniqSupply -> WasmCodeGenState w
 initialWasmCodeGenState platform us =
   WasmCodeGenState
     { wasmPlatform =
@@ -436,11 +437,16 @@ initialWasmCodeGenState platform us =
         [],
       localRegs = emptyUFM,
       localRegsCount = 0,
-      wasmUniqSupply = us
+      wasmDUniqSupply = us
     }
 
 newtype WasmCodeGenM w a = WasmCodeGenM (State (WasmCodeGenState w) a)
   deriving newtype (Functor, Applicative, Monad)
+
+instance MonadUniqDSM (WasmCodeGenM w) where
+  liftUniqDSM (UDSM m) = wasmStateM $ \st ->
+    let DUniqResult a us' = m (wasmDUniqSupply st)
+     in (# a, st{wasmDUniqSupply=us'} #)
 
 wasmGetsM :: (WasmCodeGenState w -> a) -> WasmCodeGenM w a
 wasmGetsM = coerce . gets
@@ -465,18 +471,13 @@ wasmStateM = coerce . State
 wasmModifyM :: (WasmCodeGenState w -> WasmCodeGenState w) -> WasmCodeGenM w ()
 wasmModifyM = coerce . modify
 
-wasmEvalM :: WasmCodeGenM w a -> WasmCodeGenState w -> a
-wasmEvalM (WasmCodeGenM s) = evalState s
-
 wasmExecM :: WasmCodeGenM w a -> WasmCodeGenState w -> WasmCodeGenState w
 wasmExecM (WasmCodeGenM s) = execState s
 
-instance MonadUnique (WasmCodeGenM w) where
-  getUniqueSupplyM = wasmGetsM wasmUniqSupply
+wasmRunM :: WasmCodeGenM w a -> WasmCodeGenState w -> (a, WasmCodeGenState w)
+wasmRunM (WasmCodeGenM s) = runState s
+
+instance MonadGetUnique (WasmCodeGenM w) where
   getUniqueM = wasmStateM $
-    \s@WasmCodeGenState {..} -> case takeUniqFromSupply wasmUniqSupply of
-      (u, us) -> (# u, s {wasmUniqSupply = us} #)
-  getUniquesM = do
-    u <- getUniqueM
-    s <- WasmCodeGenM get
-    pure $ u:(wasmEvalM getUniquesM s)
+    \s@WasmCodeGenState {..} -> case takeUniqueFromDSupply wasmDUniqSupply of
+      (u, us) -> (# u, s {wasmDUniqSupply = us} #)

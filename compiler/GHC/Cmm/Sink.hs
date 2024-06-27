@@ -20,7 +20,7 @@ import GHC.Platform.Regs
 
 import GHC.Platform
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Cmm.Config
 
 import Data.List (partition)
@@ -152,7 +152,7 @@ type Assignments = [Assignment]
   --     y = e2
   --     x = e1
 
-cmmSink :: CmmConfig -> CmmGraph -> UniqSM CmmGraph
+cmmSink :: CmmConfig -> CmmGraph -> UniqDSM CmmGraph
 cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
   where
   platform = cmmPlatform cfg
@@ -163,7 +163,7 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: LabelMap Assignments -> [CmmBlock] -> UniqSM [CmmBlock]
+  sink :: LabelMap Assignments -> [CmmBlock] -> UniqDSM [CmmBlock]
   sink _ [] = pure []
   sink sunk (b:bs) = do
     -- Now sink and inline in this block
@@ -312,7 +312,7 @@ walk :: CmmConfig
                                         -- Earlier assignments may refer
                                         -- to later ones.
 
-     -> UniqSM ( Block CmmNode O O             -- The new block
+     -> UniqDSM ( Block CmmNode O O             -- The new block
                , Assignments                   -- Assignments to sink further
                )
 
@@ -598,7 +598,7 @@ improveConditional other = other
 -- Now we can go ahead and inline x.
 --
 -- For now we do nothing, because this would require putting
--- everything inside UniqSM.
+-- everything inside UniqDSM.
 --
 -- One more variant of this (#7366):
 --

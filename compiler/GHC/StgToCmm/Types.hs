@@ -22,7 +22,6 @@ import GHC.Types.Name.Set
 
 import GHC.Utils.Outputable
 
-
 {-
 Note [Conveying CAF-info and LFInfo between modules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

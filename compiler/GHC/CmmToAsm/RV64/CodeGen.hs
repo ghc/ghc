@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module GHC.CmmToAsm.RV64.CodeGen
@@ -52,7 +53,7 @@ import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc (srcSpanFile, srcSpanStartCol, srcSpanStartLine)
 import GHC.Types.Tickish (GenTickish (..))
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Monad
@@ -2037,7 +2038,7 @@ out of range jumps with the sequence of instructions described above.
 --
 -- By loading the far target into a register for the jump, we can address the
 -- whole memory range.
-genCondFarJump :: (MonadUnique m) => Cond -> Operand -> Operand -> BlockId -> m InstrBlock
+genCondFarJump :: (MonadGetUnique m) => Cond -> Operand -> Operand -> BlockId -> m InstrBlock
 genCondFarJump cond op1 op2 far_target = do
   skip_lbl_id <- newBlockId
   jmp_lbl_id <- newBlockId
@@ -2062,7 +2063,7 @@ genCondFarJump cond op1 op2 far_target = do
 --
 -- By loading the far target into a register for the jump, we can address the
 -- whole memory range.
-genFarJump :: (MonadUnique m) => BlockId -> m InstrBlock
+genFarJump :: (MonadGetUnique m) => BlockId -> m InstrBlock
 genFarJump far_target =
   return
     $ toOL
@@ -2079,7 +2080,7 @@ makeFarBranches ::
   Platform ->
   LabelMap RawCmmStatics ->
   [NatBasicBlock Instr] ->
-  UniqSM [NatBasicBlock Instr]
+  UniqDSM [NatBasicBlock Instr]
 makeFarBranches {- only used when debugging -} _platform statics basic_blocks = do
   -- All offsets/positions are counted in multiples of 4 bytes (the size of RISCV64 instructions)
   -- That is an offset of 1 represents a 4-byte/one instruction offset.
@@ -2100,7 +2101,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
     long_b_jump_size = 2 :: Int
 
     -- Replace out of range conditional jumps with unconditional jumps.
-    replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqSM (Int, [GenBasicBlock Instr])
+    replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqDSM (Int, [GenBasicBlock Instr])
     replace_blk !m !pos (BasicBlock lbl instrs) = do
       -- Account for a potential info table before the label.
       let !block_pos = pos + infoTblSize_maybe lbl
@@ -2114,12 +2115,14 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       let final_blocks = BasicBlock lbl top : split_blocks
       pure (pos', final_blocks)
 
-    replace_jump :: LabelMap Int -> Int -> Instr -> UniqSM (Int, [Instr])
+    replace_jump :: LabelMap Int -> Int -> Instr -> UniqDSM (Int, [Instr])
     replace_jump !m !pos instr = do
       case instr of
         ANN ann instr -> do
-          (idx, instr' : instrs') <- replace_jump m pos instr
-          pure (idx, ANN ann instr' : instrs')
+          replace_jump m pos instr >>= \case
+            (_, []) -> error "RV64:replace_jump"
+            (idx, instr' : instrs') ->
+              pure (idx, ANN ann instr' : instrs')
         BCOND cond op1 op2 t ->
           case target_in_range m t pos of
             InRange -> pure (pos + instr_size instr, [instr])

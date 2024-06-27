@@ -101,7 +101,7 @@ import GHC.Cmm.GenericOpt
 import GHC.Cmm.CLabel
 
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Utils.Misc
@@ -117,7 +117,8 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
 import GHC.Types.Unique.Set
 import GHC.Unit
-import GHC.Data.Stream (Stream)
+import GHC.StgToCmm.CgUtils (CgStream)
+import GHC.Data.Stream (liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Settings
 
@@ -130,14 +131,14 @@ import System.IO
 import System.Directory ( getCurrentDirectory )
 
 --------------------
-nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle -> UniqSupply
-              -> Stream IO RawCmmGroup a
-              -> IO a
-nativeCodeGen logger ts config modLoc h us cmms
+nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
+              -> CgStream RawCmmGroup a
+              -> UniqDSMT IO a
+nativeCodeGen logger ts config modLoc h cmms
  = let platform = ncgPlatform config
        nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
-            => NcgImpl statics instr jumpDest -> IO a
-       nCG' ncgImpl = nativeCodeGen' logger config modLoc ncgImpl h us cmms
+            => NcgImpl statics instr jumpDest -> UniqDSMT IO a
+       nCG' ncgImpl = nativeCodeGen' logger config modLoc ncgImpl h cmms
    in case platformArch platform of
       ArchX86       -> nCG' (X86.ncgX86     config)
       ArchX86_64    -> nCG' (X86.ncgX86_64  config)
@@ -153,7 +154,7 @@ nativeCodeGen logger ts config modLoc h us cmms
       ArchLoongArch64->panic "nativeCodeGen: No NCG for LoongArch64"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
-      ArchWasm32    -> Wasm32.ncgWasm config logger platform ts us modLoc h cmms
+      ArchWasm32    -> Wasm32.ncgWasm config logger platform ts modLoc h cmms
 
 -- | Data accumulated during code generation. Mostly about statistics,
 -- but also collects debug data for DWARF generation.
@@ -204,19 +205,17 @@ nativeCodeGen' :: (OutputableP Platform statics, Outputable jumpDest, Instructio
                -> ModLocation
                -> NcgImpl statics instr jumpDest
                -> Handle
-               -> UniqSupply
-               -> Stream IO RawCmmGroup a
-               -> IO a
-nativeCodeGen' logger config modLoc ncgImpl h us cmms
+               -> CgStream RawCmmGroup a
+               -> UniqDSMT IO a
+nativeCodeGen' logger config modLoc ncgImpl h cmms
  = do
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
-        bufh <- newBufHandle h
+        bufh <- liftIO $ newBufHandle h
         let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
-        (ngs, us', a) <- cmmNativeGenStream logger config modLoc ncgImpl bufh us
-                                         cmms ngs0
-        _ <- finishNativeGen logger config modLoc bufh us' ngs
+        (ngs, a) <- cmmNativeGenStream logger config modLoc ncgImpl bufh cmms ngs0
+        _ <- finishNativeGen logger config modLoc bufh ngs
         return a
 
 finishNativeGen :: Instruction instr
@@ -224,20 +223,20 @@ finishNativeGen :: Instruction instr
                 -> NCGConfig
                 -> ModLocation
                 -> BufHandle
-                -> UniqSupply
                 -> NativeGenAcc statics instr
-                -> IO UniqSupply
-finishNativeGen logger config modLoc bufh us ngs
+                -> UniqDSMT IO ()
+finishNativeGen logger config modLoc bufh ngs
  = withTimingSilent logger (text "NCG") (`seq` ()) $ do
-        -- Write debug data and finish
-        us' <- if not (ncgDwarfEnabled config)
-                  then return us
-                  else do
-                     compPath <- getCurrentDirectory
-                     let (dwarf_h, us') = dwarfGen compPath config modLoc us (ngs_debug ngs)
-                         (dwarf_s, _)   = dwarfGen compPath config modLoc us (ngs_debug ngs)
-                     emitNativeCode logger config bufh dwarf_h dwarf_s
-                     return us'
+      -- Write debug data and finish
+      if not (ncgDwarfEnabled config)
+        then return ()
+        else withDUS $ \us -> do
+           compPath <- getCurrentDirectory
+           let (dwarf_h, us') = dwarfGen compPath config modLoc us (ngs_debug ngs)
+               (dwarf_s, _)   = dwarfGen compPath config modLoc us (ngs_debug ngs)
+           emitNativeCode logger config bufh dwarf_h dwarf_s
+           return ((), us')
+      liftIO $ do
 
         -- dump global NCG stats for graph coloring allocator
         let stats = concat (ngs_colorStats ngs)
@@ -273,7 +272,7 @@ finishNativeGen logger config modLoc bufh us ngs
         bPutHDoc bufh ctx $ makeImportsDoc config (concat (ngs_imports ngs))
         bFlush bufh
 
-        return us'
+        return ()
   where
     dump_stats = logDumpFile logger (mkDumpStyle alwaysQualify)
                    Opt_D_dump_asm_stats "NCG stats"
@@ -285,20 +284,18 @@ cmmNativeGenStream :: forall statics jumpDest instr a . (OutputableP Platform st
               -> ModLocation
               -> NcgImpl statics instr jumpDest
               -> BufHandle
-              -> UniqSupply
-              -> Stream.Stream IO RawCmmGroup a
+              -> CgStream RawCmmGroup a
               -> NativeGenAcc statics instr
-              -> IO (NativeGenAcc statics instr, UniqSupply, a)
+              -> UniqDSMT IO (NativeGenAcc statics instr, a)
 
-cmmNativeGenStream logger config modLoc ncgImpl h us cmm_stream ngs
- = loop us (Stream.runStream cmm_stream) ngs
+cmmNativeGenStream logger config modLoc ncgImpl h cmm_stream ngs
+ = loop (Stream.runStream cmm_stream) ngs
   where
     ncglabel = text "NCG"
-    loop :: UniqSupply
-              -> Stream.StreamS IO RawCmmGroup a
-              -> NativeGenAcc statics instr
-              -> IO (NativeGenAcc statics instr, UniqSupply, a)
-    loop us s ngs =
+    loop :: Stream.StreamS (UniqDSMT IO) RawCmmGroup a
+         -> NativeGenAcc statics instr
+         -> UniqDSMT IO (NativeGenAcc statics instr, a)
+    loop s ngs =
       case s of
         Stream.Done a ->
           return (ngs { ngs_imports = reverse $ ngs_imports ngs
@@ -306,35 +303,33 @@ cmmNativeGenStream logger config modLoc ncgImpl h us cmm_stream ngs
                       , ngs_colorStats = reverse $ ngs_colorStats ngs
                       , ngs_linearStats = reverse $ ngs_linearStats ngs
                       },
-                  us,
                   a)
-        Stream.Effect m -> m >>= \cmm_stream' -> loop us cmm_stream' ngs
+        Stream.Effect m -> m >>= \cmm_stream' -> loop cmm_stream' ngs
         Stream.Yield cmms cmm_stream' -> do
-          (us', ngs'') <-
-            withTimingSilent logger
-                ncglabel (\(a, b) -> a `seq` b `seq` ()) $ do
+          ngs'' <-
+            withTimingSilent logger ncglabel (`seq` ()) $ do
               -- Generate debug information
               let !ndbgs | ncgDwarfEnabled config = cmmDebugGen modLoc cmms
                          | otherwise              = []
                   dbgMap = debugToMap ndbgs
 
               -- Generate native code
-              (ngs',us') <- cmmNativeGens logger config ncgImpl h
-                                          dbgMap us cmms ngs 0
+              ngs' <- withDUS $ cmmNativeGens logger config ncgImpl h
+                                  dbgMap cmms ngs 0
 
               -- Link native code information into debug blocks
               -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
               let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
                   platform = ncgPlatform config
-              unless (null ldbgs) $
+              unless (null ldbgs) $ liftIO $
                 putDumpFileMaybe logger Opt_D_dump_debug "Debug Infos" FormatText
                   (vcat $ map (pdoc platform) ldbgs)
 
               -- Accumulate debug information for emission in finishNativeGen.
               let ngs'' = ngs' { ngs_debug = ngs_debug ngs' ++ ldbgs, ngs_labels = [] }
-              return (us', ngs'')
+              return ngs''
 
-          loop us' cmm_stream' ngs''
+          loop cmm_stream' ngs''
 
 
 -- | Do native code generation on all these cmms.
@@ -346,22 +341,22 @@ cmmNativeGens :: forall statics instr jumpDest.
               -> NcgImpl statics instr jumpDest
               -> BufHandle
               -> LabelMap DebugBlock
-              -> UniqSupply
               -> [RawCmmDecl]
               -> NativeGenAcc statics instr
               -> Int
-              -> IO (NativeGenAcc statics instr, UniqSupply)
+              -> DUniqSupply
+              -> IO (NativeGenAcc statics instr, DUniqSupply)
 
 cmmNativeGens logger config ncgImpl h dbgMap = go
   where
-    go :: UniqSupply -> [RawCmmDecl]
-       -> NativeGenAcc statics instr -> Int
-       -> IO (NativeGenAcc statics instr, UniqSupply)
+    go :: [RawCmmDecl]
+       -> NativeGenAcc statics instr -> Int -> DUniqSupply
+       -> IO (NativeGenAcc statics instr, DUniqSupply)
 
-    go us [] ngs !_ =
+    go [] ngs !_ !us =
         return (ngs, us)
 
-    go us (cmm : cmms) ngs count = do
+    go (cmm : cmms) ngs count us = do
         let fileIds = ngs_dwarfFiles ngs
         (us', fileIds', native, imports, colorStats, linearStats, unwinds, mcfg)
           <- {-# SCC "cmmNativeGen" #-}
@@ -410,7 +405,7 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
                       , ngs_dwarfFiles  = fileIds'
                       , ngs_unwinds     = ngs_unwinds ngs `mapUnion` unwinds
                       }
-        go us' cmms ngs' (count + 1)
+        go cmms ngs' (count + 1) us'
 
 
 -- see Note [pprNatCmmDeclS and pprNatCmmDeclH] in GHC.CmmToAsm.Monad
@@ -431,12 +426,12 @@ cmmNativeGen
     :: forall statics instr jumpDest. (Instruction instr, OutputableP Platform statics, Outputable jumpDest)
     => Logger
     -> NcgImpl statics instr jumpDest
-        -> UniqSupply
+        -> DUniqSupply
         -> DwarfFiles
         -> LabelMap DebugBlock
         -> RawCmmDecl                                   -- ^ the cmm to generate code for
         -> Int                                          -- ^ sequence number of this top thing
-        -> IO   ( UniqSupply
+        -> IO   ( DUniqSupply
                 , DwarfFiles
                 , [NatCmmDecl statics instr]                -- native code
                 , [CLabel]                                  -- things imported by this cmm
@@ -476,7 +471,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         -- generate native code from cmm
         let ((native, lastMinuteImports, fileIds', nativeCfgWeights), usGen) =
                 {-# SCC "genMachCode" #-}
-                initUs us $ genMachCode config
+                runUniqueDSM us $ genMachCode config
                                         (cmmTopCodeGen ncgImpl)
                                         fileIds dbgMap opt_cmm cmmCfg
 
@@ -494,7 +489,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                                 else Nothing
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
-                initUs usGen
+                runUniqueDSM usGen
                         $ mapM (cmmTopLiveness livenessCfg platform) native
 
         putDumpFileMaybe logger
@@ -516,7 +511,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 -- do the graph coloring register allocation
                 let ((alloced, maybe_more_stack, regAllocStats), usAlloc)
                         = {-# SCC "RegAlloc-color" #-}
-                          initUs usLive
+                          runUniqueDSM usLive
                           $ Color.regAlloc
                                 config
                                 alloc_regs
@@ -526,13 +521,13 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                                 livenessCfg
 
                 let ((alloced', stack_updt_blks), usAlloc')
-                        = initUs usAlloc $
-                                case maybe_more_stack of
-                                Nothing     -> return (alloced, [])
-                                Just amount -> do
-                                    (alloced',stack_updt_blks) <- unzip <$>
-                                                (mapM ((ncgAllocMoreStack ncgImpl) amount) alloced)
-                                    return (alloced', concat stack_updt_blks )
+                        = runUniqueDSM usAlloc $
+                            case maybe_more_stack of
+                            Nothing     -> return (alloced, [])
+                            Just amount -> do
+                                (alloced',stack_updt_blks) <- unzip <$>
+                                            (mapM ((ncgAllocMoreStack ncgImpl) amount) alloced)
+                                return (alloced', concat stack_updt_blks )
 
 
                 -- dump out what happened during register allocation
@@ -576,7 +571,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
 
                 let ((alloced, regAllocStats, stack_updt_blks), usAlloc)
                         = {-# SCC "RegAlloc-linear" #-}
-                          initUs usLive
+                          runUniqueDSM usLive
                           $ liftM unzip3
                           $ mapM reg_alloc withLiveness
 
@@ -648,7 +643,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         -- sequenced :: [NatCmmDecl statics instr]
         let (sequenced, us_seq) =
                         {-# SCC "sequenceBlocks" #-}
-                        initUs usAlloc $ mapM (BlockLayout.sequenceTop
+                        runUniqueDSM usAlloc $ mapM (BlockLayout.sequenceTop
                                 ncgImpl optimizedCFG)
                             shorted
 
@@ -920,7 +915,7 @@ genMachCode
         -> LabelMap DebugBlock
         -> RawCmmDecl
         -> CFG
-        -> UniqSM
+        -> UniqDSM
                 ( [NatCmmDecl statics instr]
                 , [CLabel]
                 , DwarfFiles
@@ -928,15 +923,16 @@ genMachCode
                 )
 
 genMachCode config cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
-  = do  { initial_us <- getUniqueSupplyM
-        ; let initial_st           = mkNatM_State initial_us 0 config
-                                                  fileIds dbgMap cmm_cfg
-              (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
-              final_delta          = natm_delta final_st
-              final_imports        = natm_imports final_st
-              final_cfg            = natm_cfg final_st
-        ; if   final_delta == 0
-          then return (new_tops, final_imports
-                      , natm_fileid final_st, final_cfg)
-          else pprPanic "genMachCode: nonzero final delta" (int final_delta)
-    }
+  = UDSM $ \initial_us -> do
+      { let initial_st           = mkNatM_State initial_us 0 config
+                                                fileIds dbgMap cmm_cfg
+            (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
+            final_delta          = natm_delta final_st
+            final_imports        = natm_imports final_st
+            final_cfg            = natm_cfg final_st
+      ; if   final_delta == 0
+        then DUniqResult
+              (new_tops, final_imports
+                , natm_fileid final_st, final_cfg) (natm_us final_st)
+        else DUniqResult (pprPanic "genMachCode: nonzero final delta" (int final_delta)) undefined
+      }

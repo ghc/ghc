@@ -171,8 +171,7 @@ and hardcode the tag into the MonadUnique instance. On top of all the
 benefits of threading the tag this *also* has the benefit of avoiding
 the tag getting captured in thunks, or being passed around at runtime.
 It does however come at the cost of having to use a fixed tag for all
-code run in this Monad. But remember, the tag is purely cosmetic:
-See Note [Uniques and tags].
+code run in this Monad. The tag is mostly cosmetic: See Note [Uniques and tags].
 
 NB: It's *not* an optimization to pass around the UniqSupply inside an
 IORef instead of the tag. While this would avoid frequent state updates
@@ -203,9 +202,8 @@ data UniqSupply
 
 mkSplitUniqSupply :: Char -> IO UniqSupply
 -- ^ Create a unique supply out of thin air.
--- The "tag" (Char) supplied is purely cosmetic, making it easier
--- to figure out where a Unique was born. See
--- Note [Uniques and tags].
+-- The "tag" (Char) supplied is mostly cosmetic, making it easier
+-- to figure out where a Unique was born. See Note [Uniques and tags].
 --
 -- The payload part of the Uniques allocated from this UniqSupply are
 -- guaranteed distinct wrt all other supplies, regardless of their "tag".

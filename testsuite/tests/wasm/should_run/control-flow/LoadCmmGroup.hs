@@ -36,6 +36,7 @@ import GHC.StgToCmm (codeGen)
 import GHC.Types.CostCentre (emptyCollectedCCs)
 import GHC.Types.HpcInfo (emptyHpcInfo)
 import GHC.Types.IPE (emptyInfoTableProvMap)
+import GHC.Types.Unique.DSM
 import GHC.Unit.Home
 import GHC.Unit.Module.ModGuts
 import GHC.Utils.Error
@@ -73,7 +74,8 @@ cmmOfSummary summ = do
       tmpfs = hsc_tmpfs env
       stg_to_cmm dflags mod = codeGen logger tmpfs (initStgToCmmConfig dflags mod)
   (groups, _infos) <-
-      liftIO $
+      liftIO $ fmap fst $
+      runUDSMT (initDUniqSupply 't' 0) $
       collectAll $
       stg_to_cmm dflags (ms_mod summ) infotable tycons ccs stg' hpcinfo
   return groups

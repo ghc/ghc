@@ -48,7 +48,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Panic
 import GHC.Wasm.ControlFlow.FromCmm
@@ -1572,11 +1572,9 @@ lower_CmmGraph :: CLabel -> CmmGraph -> WasmCodeGenM w (FuncBody w)
 lower_CmmGraph lbl g = do
   ty_word <- wasmWordTypeM
   platform <- wasmPlatformM
-  us <- getUniqueSupplyM
   body <-
     structuredControl
       platform
-      us
       (\_ -> lower_CmmExpr_Typed lbl ty_word)
       (lower_CmmActions lbl)
       g

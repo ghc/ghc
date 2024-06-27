@@ -23,10 +23,11 @@ import GHC.CmmToLlvm.Regs
 import GHC.CmmToLlvm.Mangler
 import GHC.CmmToLlvm.Version
 
-import GHC.StgToCmm.CgUtils ( fixStgRegisters )
+import GHC.StgToCmm.CgUtils ( fixStgRegisters, CgStream )
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Label
 
+import GHC.Types.Unique.DSM
 import GHC.Utils.BufHandle
 import GHC.Driver.DynFlags
 import GHC.Platform ( platformArch, Arch(..) )
@@ -46,9 +47,11 @@ import System.IO
 -- | Top-level of the LLVM Code generator
 --
 llvmCodeGen :: Logger -> LlvmCgConfig -> Handle
-               -> Stream.Stream IO RawCmmGroup a
-               -> IO a
-llvmCodeGen logger cfg h cmm_stream
+            -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream.
+                           -- See Note [Deterministic Uniques in the CG]
+            -> CgStream RawCmmGroup a
+            -> IO a
+llvmCodeGen logger cfg h dus cmm_stream
   = withTiming logger (text "LLVM CodeGen") (const ()) $ do
        bufh <- newBufHandle h
 
@@ -83,21 +86,24 @@ llvmCodeGen logger cfg h cmm_stream
 
        -- run code generation
        a <- runLlvm logger cfg llvm_ver bufh $
-         llvmCodeGen' cfg cmm_stream
+         llvmCodeGen' cfg dus cmm_stream
 
        bFlush bufh
 
        return a
 
-llvmCodeGen' :: LlvmCgConfig -> Stream.Stream IO RawCmmGroup a -> LlvmM a
-llvmCodeGen' cfg cmm_stream
+llvmCodeGen' :: LlvmCgConfig
+             -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream.
+                            -- See Note [Deterministic Uniques in the CG]
+             -> CgStream RawCmmGroup a -> LlvmM a
+llvmCodeGen' cfg dus cmm_stream
   = do  -- Preamble
         renderLlvm (llvmHeader cfg) (llvmHeader cfg)
         ghcInternalFunctions
         cmmMetaLlvmPrelude
 
         -- Procedures
-        a <- Stream.consume cmm_stream liftIO llvmGroupLlvmGens
+        (a, _) <- runUDSMT dus $ Stream.consume cmm_stream (hoistUDSMT liftIO) (liftUDSMT . llvmGroupLlvmGens)
 
         -- Declare aliases for forward references
         decls <- generateExternDecls

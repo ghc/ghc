@@ -27,6 +27,8 @@ import GHC.Cmm.Lint         ( cmmLint )
 import GHC.Cmm
 import GHC.Cmm.CLabel
 
+import GHC.StgToCmm.CgUtils (CgStream)
+
 import GHC.Driver.DynFlags
 import GHC.Driver.Config.Finder    ( initFinderOpts   )
 import GHC.Driver.Config.CmmToAsm  ( initNCGConfig    )
@@ -37,7 +39,7 @@ import GHC.Driver.Backend
 
 import GHC.Data.OsPath
 import qualified GHC.Data.ShortText as ST
-import GHC.Data.Stream           ( Stream )
+import GHC.Data.Stream           ( liftIO )
 import qualified GHC.Data.Stream as Stream
 
 import GHC.Utils.TmpFs
@@ -56,7 +58,7 @@ import GHC.Unit.Finder      ( mkStubPaths )
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
 import GHC.Types.ForeignStubs
-import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
+import GHC.Types.Unique.DSM
 
 import System.Directory
 import System.FilePath
@@ -86,19 +88,21 @@ codeOutput
     -> [(ForeignSrcLang, FilePath)]
     -- ^ additional files to be compiled with the C compiler
     -> Set UnitId -- ^ Dependencies
-    -> Stream IO RawCmmGroup a                       -- Compiled C--
+    -> DUniqSupply -- ^ The deterministic unique supply to run the CgStream.
+                   -- See Note [Deterministic Uniques in the CG]
+    -> CgStream RawCmmGroup a -- ^ Compiled C--
     -> IO (FilePath,
            (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
            [(ForeignSrcLang, FilePath)]{-foreign_fps-},
            a)
-codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps
+codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps dus0
   cmm_stream
   =
     do  {
         -- Lint each CmmGroup as it goes past
         ; let linted_cmm_stream =
                  if gopt Opt_DoCmmLinting dflags
-                    then Stream.mapM do_lint cmm_stream
+                    then Stream.mapM (liftIO . do_lint) cmm_stream
                     else cmm_stream
 
               do_lint cmm = withTimingSilent logger
@@ -115,25 +119,26 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                 ; return cmm
                 }
 
-        ; let final_stream :: Stream IO RawCmmGroup (ForeignStubs, a)
+        ; let final_stream :: CgStream RawCmmGroup (ForeignStubs, a)
               final_stream = do
                   { a <- linted_cmm_stream
                   ; let stubs = genForeignStubs a
                   ; emitInitializerDecls this_mod stubs
                   ; return (stubs, a) }
 
+        ; let dus1 = newTagDUniqSupply 'n' dus0
         ; (stubs, a) <- case backendCodeOutput (backend dflags) of
-                 NcgCodeOutput  -> outputAsm logger dflags this_mod location filenm
+                 NcgCodeOutput  -> outputAsm logger dflags this_mod location filenm dus1
                                              final_stream
-                 ViaCCodeOutput -> outputC logger dflags filenm final_stream pkg_deps
-                 LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm final_stream
+                 ViaCCodeOutput -> outputC logger dflags filenm dus1 final_stream pkg_deps
+                 LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm dus1 final_stream
                  JSCodeOutput   -> outputJS logger llvm_config dflags filenm final_stream
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
 -- | See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini for details.
-emitInitializerDecls :: Module -> ForeignStubs -> Stream IO RawCmmGroup ()
+emitInitializerDecls :: Module -> ForeignStubs -> CgStream RawCmmGroup ()
 emitInitializerDecls this_mod (ForeignStubs _ cstub)
   | initializers <- getInitializers cstub
   , not $ null initializers =
@@ -161,15 +166,18 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 outputC :: Logger
         -> DynFlags
         -> FilePath
-        -> Stream IO RawCmmGroup a
+        -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream
+                       -- See Note [Deterministic Uniques in the CG]
+        -> CgStream RawCmmGroup a
         -> Set UnitId
         -> IO a
-outputC logger dflags filenm cmm_stream unit_deps =
+outputC logger dflags filenm dus cmm_stream unit_deps =
   withTiming logger (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
     let pkg_names = map unitIdString (Set.toAscList unit_deps)
-    doOutput filenm $ \ h -> do
-      hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
-      hPutStr h "#include \"Stg.h\"\n"
+    doOutput filenm $ \ h -> fmap fst $ runUDSMT dus $ do
+      liftIO $ do
+        hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
+        hPutStr h "#include \"Stg.h\"\n"
       let platform = targetPlatform dflags
           writeC cmm = do
             let doc = cmmToC platform cmm
@@ -179,7 +187,7 @@ outputC logger dflags filenm cmm_stream unit_deps =
                           doc
             let ctx = initSDocContext dflags PprCode
             printSDocLn ctx LeftMode h doc
-      Stream.consume cmm_stream id writeC
+      Stream.consume cmm_stream id (liftIO . writeC)
 
 {-
 ************************************************************************
@@ -194,15 +202,19 @@ outputAsm :: Logger
           -> Module
           -> ModLocation
           -> FilePath
-          -> Stream IO RawCmmGroup a
+          -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream
+                         -- See Note [Deterministic Uniques in the CG]
+          -> CgStream RawCmmGroup a
           -> IO a
-outputAsm logger dflags this_mod location filenm cmm_stream = do
-  ncg_uniqs <- mkSplitUniqSupply 'n'
+outputAsm logger dflags this_mod location filenm dus cmm_stream = do
+  -- Update tag of uniques in Stream
   debugTraceMsg logger 4 (text "Outputing asm to" <+> text filenm)
   let ncg_config = initNCGConfig dflags this_mod
   {-# SCC "OutputAsm" #-} doOutput filenm $
     \h -> {-# SCC "NativeCodeGen" #-}
-      nativeCodeGen logger (toolSettings dflags) ncg_config location h ncg_uniqs cmm_stream
+      fmap fst $
+      runUDSMT dus $ setTagUDSMT 'n' $
+      nativeCodeGen logger (toolSettings dflags) ncg_config location h cmm_stream
 
 {-
 ************************************************************************
@@ -212,12 +224,15 @@ outputAsm logger dflags this_mod location filenm cmm_stream = do
 ************************************************************************
 -}
 
-outputLlvm :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
-outputLlvm logger llvm_config dflags filenm cmm_stream = do
+outputLlvm :: Logger -> LlvmConfigCache -> DynFlags -> FilePath
+           -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream
+                          -- See Note [Deterministic Uniques in the CG]
+           -> CgStream RawCmmGroup a -> IO a
+outputLlvm logger llvm_config dflags filenm dus cmm_stream = do
   lcg_config <- initLlvmCgConfig logger llvm_config dflags
   {-# SCC "llvm_output" #-} doOutput filenm $
     \f -> {-# SCC "llvm_CodeGen" #-}
-      llvmCodeGen logger lcg_config f cmm_stream
+      llvmCodeGen logger lcg_config f dus cmm_stream
 
 {-
 ************************************************************************
@@ -226,7 +241,7 @@ outputLlvm logger llvm_config dflags filenm cmm_stream = do
 *                                                                      *
 ************************************************************************
 -}
-outputJS :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
+outputJS :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> CgStream RawCmmGroup a -> IO a
 outputJS _ _ _ _ _ = pgmError $ "codeOutput: Hit JavaScript case. We should never reach here!"
                               ++ "\nThe JS backend should shortcircuit to StgToJS after Stg."
                               ++ "\nIf you reached this point then you've somehow made it to Cmm!"

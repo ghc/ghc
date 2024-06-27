@@ -22,8 +22,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Utils
 import GHC.Cmm
 import GHC.Cmm.Config
-
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -914,16 +913,16 @@ divisionMagicU rep doPreShift divisor = (toInteger zeros, magic, needsAdd, toInt
 -- -----------------------------------------------------------------------------
 -- Opt monad
 
-newtype Opt a = OptI { runOptI :: CmmConfig -> [CmmNode O O] -> UniqSM ([CmmNode O O], a) }
+newtype Opt a = OptI { runOptI :: CmmConfig -> [CmmNode O O] -> UniqDSM ([CmmNode O O], a) }
 
 -- | Pattern synonym for 'Opt', as described in Note [The one-shot state
 -- monad trick].
-pattern Opt :: (CmmConfig -> [CmmNode O O] -> UniqSM ([CmmNode O O], a)) -> Opt a
+pattern Opt :: (CmmConfig -> [CmmNode O O] -> UniqDSM ([CmmNode O O], a)) -> Opt a
 pattern Opt f <- OptI f
   where Opt f = OptI . oneShot $ \cfg -> oneShot $ \out -> f cfg out
 {-# COMPLETE Opt #-}
 
-runOpt :: CmmConfig -> Opt a -> UniqSM ([CmmNode O O], a)
+runOpt :: CmmConfig -> Opt a -> UniqDSM ([CmmNode O O], a)
 runOpt cf (Opt g) = g cf []
 
 getConfig :: Opt CmmConfig
@@ -943,10 +942,8 @@ instance Monad Opt where
     (ys, a) <- g cf xs
     runOptI (f a) cf ys
 
-instance MonadUnique Opt where
-  getUniqueSupplyM = Opt $ \_ xs -> (xs,) <$> getUniqueSupplyM
-  getUniqueM       = Opt $ \_ xs -> (xs,) <$> getUniqueM
-  getUniquesM      = Opt $ \_ xs -> (xs,) <$> getUniquesM
+instance MonadGetUnique Opt where
+  getUniqueM = Opt $ \_ xs -> (xs,) <$> getUniqueDSM
 
 mapForeignTargetOpt :: (CmmExpr -> Opt CmmExpr) -> ForeignTarget -> Opt ForeignTarget
 mapForeignTargetOpt exp   (ForeignTarget e c) = flip ForeignTarget c <$> exp e

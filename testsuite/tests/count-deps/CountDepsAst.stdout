@@ -179,6 +179,7 @@ GHC.Types.Tickish
 GHC.Types.TyThing
 GHC.Types.Unique
 GHC.Types.Unique.DFM
+GHC.Types.Unique.DSM
 GHC.Types.Unique.DSet
 GHC.Types.Unique.FM
 GHC.Types.Unique.Map

@@ -26,6 +26,7 @@ import GHC.StgToCmm.Config
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Types (ModuleLFInfos)
+import GHC.StgToCmm.CgUtils (CgStream)
 
 import GHC.Cmm
 import GHC.Cmm.Utils
@@ -76,7 +77,8 @@ codeGen :: Logger
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ModuleLFInfos       -- Output as a stream, so codegen can
+        -> CgStream CmmGroup ModuleLFInfos -- See Note [Deterministic Uniques in the CG] on why UniqDSMT
+                                       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
@@ -86,7 +88,7 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
               -- we would need to add a state monad layer which regresses
               -- allocations by 0.5-2%.
         ; cgref <- liftIO $ initC >>= \s -> newIORef s
-        ; let cg :: FCode a -> Stream IO CmmGroup a
+        ; let cg :: FCode a -> CgStream CmmGroup a
               cg fcode = do
                 (a, cmm) <- liftIO . withTimingSilent logger (text "STG -> Cmm") (`seq` ()) $ do
                          st <- readIORef cgref

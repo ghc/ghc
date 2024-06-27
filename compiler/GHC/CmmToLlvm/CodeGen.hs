@@ -30,7 +30,7 @@ import GHC.Data.FastString
 import GHC.Data.OrdList
 
 import GHC.Types.ForeignCall
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Types.Unique
 
 import GHC.Utils.Outputable
@@ -92,7 +92,7 @@ basicBlocksCodeGen live cmmBlocks
        -- destination in exhaustive switches.
        --
        -- See Note [Unreachable block as default destination in Switch]
-       ubid@(UnreachableBlockId ubid') <- (UnreachableBlockId . mkBlockId) <$> getUniqueM
+       ubid@(UnreachableBlockId ubid') <- UnreachableBlockId <$> newBlockId
        let ubblock = BasicBlock ubid' [Unreachable]
 
        -- Generate code
