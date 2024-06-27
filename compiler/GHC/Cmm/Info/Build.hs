@@ -37,7 +37,6 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Runtime.Heap.Layout
-import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
 
@@ -51,6 +50,7 @@ import Control.Monad.Trans.Class
 import Data.List (unzip4)
 
 import GHC.Types.Name.Set
+import GHC.Types.Unique.DSM
 
 {- Note [SRTs]
    ~~~~~~~~~~~
@@ -882,13 +882,14 @@ anyCafRefs caf_infos = case any mayHaveCafRefs caf_infos of
 doSRTs
   :: CmmConfig
   -> ModuleSRTInfo
+  -> DUniqSupply
   -> [(CAFEnv, [CmmDecl])]   -- ^ 'CAFEnv's and 'CmmDecl's for code blocks
   -> [(CAFSet, CmmDataDecl)]     -- ^ static data decls and their 'CAFSet's
-  -> IO (ModuleSRTInfo, [CmmDeclSRTs])
+  -> IO (ModuleSRTInfo, DUniqSupply, [CmmDeclSRTs])
 
-doSRTs cfg moduleSRTInfo procs data_ = do
-  us <- mkSplitUniqSupply 'u' -- ROMES:TODO: We could use a deterministic supply here? All names from here on out should be deterministic. Perhaps I could also grep for all supplies created after this point in its closure or somethinkg...
+doSRTs cfg moduleSRTInfo dus procs data_ = do
 
+  let runUDSM = runUniqueDSM dus
   let profile = cmmProfile cfg
 
   -- Ignore the original grouping of decls, and combine all the
@@ -940,8 +941,8 @@ doSRTs cfg moduleSRTInfo procs data_ = do
           , CafInfo                -- Whether the group has CAF references
           ) ]
 
-      (result, moduleSRTInfo') =
-        initUs_ us $
+      ((result, moduleSRTInfo'), dus') =
+        runUDSM $
         flip runStateT moduleSRTInfo $ do
           nonCAFs <- mapM (doSCC cfg staticFuns static_data_env) sccs
           cAFs <- forM cafsWithSRTs $ \(l, cafLbl, cafs) ->
@@ -981,7 +982,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
                     CmmProc void _ _ _ -> case void of)
                (moduleSRTMap moduleSRTInfo') data_
 
-  return (moduleSRTInfo'{ moduleSRTMap = srtMap_w_raws }, srt_decls ++ decls')
+  return (moduleSRTInfo'{ moduleSRTMap = srtMap_w_raws }, dus', srt_decls ++ decls')
 
 
 -- | Build the SRT for a strongly-connected component of blocks.
@@ -990,7 +991,7 @@ doSCC
   -> LabelMap CLabel -- ^ which blocks are static function entry points
   -> DataCAFEnv      -- ^ static data
   -> SCC (SomeLabel, CAFfyLabel, Set CAFfyLabel)
-  -> StateT ModuleSRTInfo UniqSM
+  -> StateT ModuleSRTInfo UniqDSM
         ( [CmmDeclSRTs]          -- generated SRTs
         , [(Label, CLabel)]      -- SRT fields for info tables
         , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
@@ -1045,7 +1046,7 @@ oneSRT
   -> Bool                       -- ^ True <=> this SRT is for a CAF
   -> Set CAFfyLabel             -- ^ SRT for this set
   -> DataCAFEnv                 -- Static data labels in this group
-  -> StateT ModuleSRTInfo UniqSM
+  -> StateT ModuleSRTInfo UniqDSM
        ( [CmmDeclSRTs]                -- SRT objects we built
        , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
        , [(Label, [SRTEntry])]        -- SRTs to attach to static functions
@@ -1112,7 +1113,7 @@ oneSRT cfg staticFuns lbls caf_lbls isCAF cafs static_data_env = do
     -- update the SRTMap for the label to point to a closure. It's
     -- important that we don't do this for static functions or CAFs,
     -- see Note [Invalid optimisation: shortcutting].
-    updateSRTMap :: Maybe SRTEntry -> StateT ModuleSRTInfo UniqSM ()
+    updateSRTMap :: Maybe SRTEntry -> StateT ModuleSRTInfo UniqDSM ()
     updateSRTMap srtEntry =
       srtTrace "updateSRTMap"
         (pdoc platform srtEntry <+> "isCAF:" <+> ppr isCAF <+>
@@ -1236,7 +1237,7 @@ oneSRT cfg staticFuns lbls caf_lbls isCAF cafs static_data_env = do
 buildSRTChain
    :: Profile
    -> [SRTEntry]
-   -> UniqSM
+   -> UniqDSM
         ( [CmmDeclSRTs] -- The SRT object(s)
         , SRTEntry      -- label to use in the info table
         )
@@ -1254,9 +1255,9 @@ buildSRTChain profile cafSet =
     mAX_SRT_SIZE = 16
 
 
-buildSRT :: Profile -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
+buildSRT :: Profile -> [SRTEntry] -> UniqDSM (CmmDeclSRTs, SRTEntry)
 buildSRT profile refs = do
-  id <- getUniqueM
+  id <- getUniqueDSM
   let
     lbl = mkSRTLabel id
     platform = profilePlatform profile

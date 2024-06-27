@@ -11,7 +11,7 @@ module GHC.Data.Graph.Collapse
   , VizCollapseMonad(..)
   , NullCollapseViz(..)
   , runNullCollapse
-  , MonadUniqSM(..)
+  , MonadUniqDSM(..)
   )
 where
 
@@ -24,7 +24,7 @@ import Data.Semigroup
 
 import GHC.Cmm.Dataflow.Label
 import GHC.Data.Graph.Inductive.Graph
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Utils.Panic hiding (assert)
 
 
@@ -59,23 +59,21 @@ Functional Graph Library (Hackage package `fgl`, modules
 -- care about visualization, you would use the `NullCollapseViz`
 -- monad, in which these operations are no-ops.
 
-class (Monad m) => MonadUniqSM m where
-  liftUniqSM :: UniqSM a -> m a
+class (Monad m) => MonadUniqDSM m where
+  liftUniqDSM :: UniqDSM a -> m a
 
-class (MonadUniqSM m, Graph gr, Supernode s m) => VizCollapseMonad m gr s where
+class (MonadUniqDSM m, Graph gr, Supernode s m) => VizCollapseMonad m gr s where
   consumeByInGraph :: Node -> Node -> gr s () -> m ()
   splitGraphAt :: gr s () -> LNode s -> m ()
   finalGraph :: gr s () -> m ()
 
-
-
 -- | The identity monad as a `VizCollapseMonad`.  Use this monad when
 -- you want efficiency in graph collapse.
-newtype NullCollapseViz a = NullCollapseViz { unNCV :: UniqSM a }
-  deriving (Functor, Applicative, Monad, MonadUnique)
+newtype NullCollapseViz a = NullCollapseViz { unNCV :: UniqDSM a }
+  deriving (Functor, Applicative, Monad, MonadGetUnique)
 
-instance MonadUniqSM NullCollapseViz where
-  liftUniqSM = NullCollapseViz
+instance MonadUniqDSM NullCollapseViz where
+  liftUniqDSM = NullCollapseViz
 
 instance (Graph gr, Supernode s NullCollapseViz) =>
     VizCollapseMonad NullCollapseViz gr s where
@@ -83,7 +81,7 @@ instance (Graph gr, Supernode s NullCollapseViz) =>
   splitGraphAt _ _ = return ()
   finalGraph _ = return ()
 
-runNullCollapse :: NullCollapseViz a -> UniqSM a
+runNullCollapse :: NullCollapseViz a -> UniqDSM a
 runNullCollapse = unNCV
 
 
@@ -158,7 +156,7 @@ class (Semigroup node) => PureSupernode node where
   superLabel :: node -> Label
   mapLabels :: (Label -> Label) -> (node -> node)
 
-class (MonadUnique m, PureSupernode node) => Supernode node m where
+class (MonadGetUnique m, PureSupernode node) => Supernode node m where
   freshen :: node -> m node
 
   -- ghost method

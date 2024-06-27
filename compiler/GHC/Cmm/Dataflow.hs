@@ -10,7 +10,7 @@
 --
 -- This module is a specialised and optimised version of
 -- Compiler.Hoopl.Dataflow in the hoopl package.  In particular it is
--- specialised to the UniqSM monad.
+-- specialised to the UniqDSM monad.
 --
 
 module GHC.Cmm.Dataflow
@@ -33,7 +33,7 @@ where
 import GHC.Prelude
 
 import GHC.Cmm
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 
 import Data.Array
 import Data.Maybe
@@ -85,14 +85,14 @@ type TransferFun' (n :: Extensibility -> Extensibility -> Type) f =
 -- | Function for rewriting and analysis combined. To be used with
 -- @rewriteCmm@.
 --
--- Currently set to work with @UniqSM@ monad, but we could probably abstract
+-- Currently set to work with @UniqDSM@ monad, but we could probably abstract
 -- that away (if we do that, we might want to specialize the fixpoint algorithms
 -- to the particular monads through SPECIALIZE).
-type RewriteFun f = CmmBlock -> FactBase f -> UniqSM (CmmBlock, FactBase f)
+type RewriteFun f = CmmBlock -> FactBase f -> UniqDSM (CmmBlock, FactBase f)
 
 -- | `RewriteFun` abstracted over `n` (the node type)
 type RewriteFun' (n :: Extensibility -> Extensibility -> Type) f =
-    Block n C C -> FactBase f -> UniqSM (Block n C C, FactBase f)
+    Block n C C -> FactBase f -> UniqDSM (Block n C C, FactBase f)
 
 analyzeCmmBwd, analyzeCmmFwd
     :: (NonLocal node)
@@ -167,7 +167,7 @@ rewriteCmmBwd
     -> RewriteFun' node f
     -> GenCmmGraph node
     -> FactBase f
-    -> UniqSM (GenCmmGraph node, FactBase f)
+    -> UniqDSM (GenCmmGraph node, FactBase f)
 rewriteCmmBwd = rewriteCmm Bwd
 
 rewriteCmm
@@ -177,7 +177,7 @@ rewriteCmm
     -> RewriteFun' node f
     -> GenCmmGraph node
     -> FactBase f
-    -> UniqSM (GenCmmGraph node, FactBase f)
+    -> UniqDSM (GenCmmGraph node, FactBase f)
 rewriteCmm dir lattice rwFun cmmGraph initFact = {-# SCC rewriteCmm #-} do
     let entry = g_entry cmmGraph
         hooplGraph = g_graph cmmGraph
@@ -197,7 +197,7 @@ fixpointRewrite
     -> Label
     -> LabelMap (Block node C C)
     -> FactBase f
-    -> UniqSM (LabelMap (Block node C C), FactBase f)
+    -> UniqDSM (LabelMap (Block node C C), FactBase f)
 fixpointRewrite dir lattice do_block entry blockmap = loop start blockmap
   where
     -- Sorting the blocks helps to minimize the number of times we need to
@@ -216,7 +216,7 @@ fixpointRewrite dir lattice do_block entry blockmap = loop start blockmap
         :: IntHeap                    -- Worklist, i.e., blocks to process
         -> LabelMap (Block node C C)  -- Rewritten blocks.
         -> FactBase f                 -- Current facts.
-        -> UniqSM (LabelMap (Block node C C), FactBase f)
+        -> UniqDSM (LabelMap (Block node C C), FactBase f)
     loop todo !blocks1 !fbase1
       | Just (index, todo1) <- IntSet.minView todo = do
         -- Note that we use the *original* block here. This is important.
@@ -422,10 +422,10 @@ foldNodesBwdOO funOO = go
 -- Strict in both accumulated parts.
 foldRewriteNodesBwdOO
     :: forall f node.
-       (node O O -> f -> UniqSM (Block node O O, f))
+       (node O O -> f -> UniqDSM (Block node O O, f))
     -> Block node O O
     -> f
-    -> UniqSM (Block node O O, f)
+    -> UniqDSM (Block node O O, f)
 foldRewriteNodesBwdOO rewriteOO initBlock initFacts = go initBlock initFacts
   where
     go (BCons node1 block1) !fact1 = (rewriteOO node1 `comp` go block1) fact1

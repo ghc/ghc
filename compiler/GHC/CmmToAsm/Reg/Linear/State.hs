@@ -49,7 +49,7 @@ import GHC.Cmm.BlockId
 
 import GHC.Platform
 import GHC.Types.Unique
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Exts (oneShot)
 
 import GHC.Utils.Monad.State.Strict as Strict
@@ -84,9 +84,9 @@ runR    :: NCGConfig
         -> freeRegs
         -> RegMap Loc
         -> StackMap
-        -> UniqSupply
+        -> DUniqSupply
         -> RegM freeRegs a
-        -> (BlockAssignment freeRegs, StackMap, RegAllocStats, a)
+        -> (BlockAssignment freeRegs, StackMap, RegAllocStats, a, DUniqSupply)
 
 runR config block_assig freeregs assig stack us thing =
   case unReg thing
@@ -102,7 +102,7 @@ runR config block_assig freeregs assig stack us thing =
                 , ra_fixups     = [] })
    of
         RA_Result state returned_thing
-         ->     (ra_blockassig state, ra_stack state, makeRAStats state, returned_thing)
+         ->  (ra_blockassig state, ra_stack state, makeRAStats state, returned_thing, ra_us state)
 
 
 -- | Make register allocator stats from its final state.
@@ -162,7 +162,7 @@ getDeltaR = mkRegM $ \s -> RA_Result s (ra_delta s)
 
 getUniqueR :: RegM freeRegs Unique
 getUniqueR = mkRegM $ \s ->
-  case takeUniqFromSupply (ra_us s) of
+  case takeUniqueFromDSupply (ra_us s) of
     (uniq, us) -> RA_Result s{ra_us = us} uniq
 
 

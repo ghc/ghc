@@ -62,7 +62,7 @@ import GHC.Cmm.Expr             (LocalReg (..), isWord64)
 
 import GHC.Data.FastString      ( FastString )
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Types.Unique         ( Unique )
 import GHC.Unit.Module
 
@@ -109,11 +109,11 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
     ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr
-                              -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
+                              -> UniqDSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
     -- ^ The list of block ids records the redirected jumps to allow us to update
     -- the CFG.
     ncgMakeFarBranches        :: Platform -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
-                              -> UniqSM [NatBasicBlock instr],
+                              -> UniqDSM [NatBasicBlock instr],
     extractUnwindPoints       :: [instr] -> [UnwindPoint],
     -- ^ given the instruction sequence of a block, produce a list of
     -- the block's 'UnwindPoint's
@@ -178,7 +178,7 @@ mistake would readily show up in performance tests). -}
 
 data NatM_State
         = NatM_State {
-                natm_us          :: UniqSupply,
+                natm_us          :: DUniqSupply,
                 natm_delta       :: Int, -- ^ Stack offset for unwinding information
                 natm_imports     :: [(CLabel)],
                 natm_pic         :: Maybe Reg,
@@ -205,7 +205,7 @@ pattern NatM f <- NatM' (runState -> f)
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
-mkNatM_State :: UniqSupply -> Int -> NCGConfig ->
+mkNatM_State :: DUniqSupply -> Int -> NCGConfig ->
                 DwarfFiles -> LabelMap DebugBlock -> CFG -> NatM_State
 mkNatM_State us delta config
         = \dwf dbg cfg ->
@@ -223,19 +223,13 @@ mkNatM_State us delta config
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat = flip unNat
 
-instance MonadUnique NatM where
-  getUniqueSupplyM = NatM $ \st ->
-      case splitUniqSupply (natm_us st) of
-          (us1, us2) -> (us1, st {natm_us = us2})
-
+instance MonadGetUnique NatM where
   getUniqueM = NatM $ \st ->
-      case takeUniqFromSupply (natm_us st) of
-          (uniq, us') -> (uniq, st {natm_us = us'})
+      case takeUniqueFromDSupply (natm_us st) of
+        (uniq, us') -> (uniq, st {natm_us = us'})
 
 getUniqueNat :: NatM Unique
-getUniqueNat = NatM $ \ st ->
-    case takeUniqFromSupply $ natm_us st of
-    (uniq, us') -> (uniq, st {natm_us = us'})
+getUniqueNat = getUniqueM
 
 getDeltaNat :: NatM Int
 getDeltaNat = NatM $ \ st -> (natm_delta st, st)

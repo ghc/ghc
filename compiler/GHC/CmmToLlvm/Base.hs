@@ -56,6 +56,7 @@ import GHC.Types.Unique
 import GHC.Utils.BufHandle   ( BufHandle )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
+import qualified GHC.Types.Unique.DSM as DSM
 import GHC.Utils.Logger
 
 import Data.Maybe (fromJust)
@@ -299,6 +300,13 @@ instance MonadUnique LlvmM where
     getUniqueM = do
         tag <- getEnv envTag
         liftIO $! uniqFromTag tag
+
+-- TODO: If you want Llvm code to be deterministic, this should use a
+-- deterministic unique supply to get the Id.
+instance DSM.MonadGetUnique LlvmM where
+  getUniqueM = do
+    tag <- getEnv envTag
+    liftIO $! uniqFromTag tag
 
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a

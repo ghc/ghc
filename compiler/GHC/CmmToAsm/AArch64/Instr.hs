@@ -23,7 +23,7 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 import GHC.Utils.Outputable
 import GHC.Platform
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 
 import GHC.Utils.Panic
 
@@ -485,13 +485,13 @@ allocMoreStack
   :: Platform
   -> Int
   -> NatCmmDecl statics GHC.CmmToAsm.AArch64.Instr.Instr
-  -> UniqSM (NatCmmDecl statics GHC.CmmToAsm.AArch64.Instr.Instr, [(BlockId,BlockId)])
+  -> UniqDSM (NatCmmDecl statics GHC.CmmToAsm.AArch64.Instr.Instr, [(BlockId,BlockId)])
 
 allocMoreStack _ _ top@(CmmData _ _) = return (top,[])
 allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
     let entries = entryBlocks proc
 
-    uniqs <- getUniquesM
+    retargetList <- mapM (\e -> (e,) . mkBlockId <$> getUniqueM) entries
 
     let
       delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up
@@ -499,8 +499,6 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 
       alloc   = mkStackAllocInstr   platform delta
       dealloc = mkStackDeallocInstr platform delta
-
-      retargetList = (zip entries (map mkBlockId uniqs))
 
       new_blockmap :: LabelMap BlockId
       new_blockmap = mapFromList retargetList

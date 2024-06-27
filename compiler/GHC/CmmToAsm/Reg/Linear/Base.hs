@@ -32,7 +32,7 @@ import GHC.Platform.Reg
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Reg.Utils
@@ -170,7 +170,7 @@ data RA_State freeRegs
         , ra_stack      :: StackMap
 
         -- | unique supply for generating names for join point fixup blocks.
-        , ra_us         :: UniqSupply
+        , ra_us         :: DUniqSupply
 
         -- | Record why things were spilled, for -ddrop-asm-stats.
         --      Just keep a list here instead of a map of regs -> reasons.

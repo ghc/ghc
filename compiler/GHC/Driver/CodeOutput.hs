@@ -56,7 +56,7 @@ import GHC.Unit.Finder      ( mkStubPaths )
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
 import GHC.Types.ForeignStubs
-import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
+import GHC.Types.Unique.DSM
 
 import System.Directory
 import System.FilePath
@@ -198,7 +198,7 @@ outputAsm :: Logger
           -> Stream IO RawCmmGroup a
           -> IO a
 outputAsm logger dflags this_mod location filenm cmm_stream = do
-  ncg_uniqs <- mkSplitUniqSupply 'n'
+  let ncg_uniqs = initDUniqSupply 'n' 0 {- See Note [Cmm Local Deterministic Uniques], or should we receive it as input?-}
   debugTraceMsg logger 4 (text "Outputing asm to" <+> text filenm)
   let ncg_config = initNCGConfig dflags this_mod
   {-# SCC "OutputAsm" #-} doOutput filenm $
