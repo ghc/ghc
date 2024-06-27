@@ -727,7 +727,7 @@ pprMachOp_for_C platform mop = case mop of
         MO_F_Quot       _ -> char '/'
 
         -- Floating-point fused multiply-add operations
-        MO_FMA FMAdd w ->
+        MO_FMA FMAdd 1 w ->
           case w of
             W32 -> text "fmaf"
             W64 -> text "fma"
@@ -736,10 +736,15 @@ pprMachOp_for_C platform mop = case mop of
                 (text "FMAdd")
                 (panic $ "PprC.pprMachOp_for_C: FMAdd unsupported"
                        ++ "at width " ++ show w)
-        MO_FMA var _ ->
-          pprTrace "offending mop:"
+        MO_FMA var l width
+          | l == 1
+          -> pprTrace "offending mop:"
               (text $ "FMA " ++ show var)
               (panic $ "PprC.pprMachOp_for_C: should have been handled earlier!")
+          | otherwise
+          -> pprTrace "offending mop:"
+              (text $ "FMA " ++ show var ++ " " ++ show l ++ " " ++ show width)
+              (panic $ "PprC.pprMachOp_for_C: unsupported vector operation")
 
         -- Signed comparisons
         MO_S_Ge         _ -> text ">="
