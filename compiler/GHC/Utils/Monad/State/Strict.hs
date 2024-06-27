@@ -4,7 +4,7 @@
 -- | A state monad which is strict in its state.
 module GHC.Utils.Monad.State.Strict
   ( -- * The State monad
-    State(State)
+    State(State, State')
   , state
   , evalState
   , execState

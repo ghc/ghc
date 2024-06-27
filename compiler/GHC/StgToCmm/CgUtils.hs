@@ -14,6 +14,9 @@ module GHC.StgToCmm.CgUtils (
         get_Regtable_addr_from_offset,
         regTableOffset,
         get_GlobalReg_addr,
+
+        -- * Streaming for CG
+        CgStream
   ) where
 
 import GHC.Prelude
@@ -26,6 +29,21 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Utils.Panic
+
+import GHC.Data.Stream (Stream)
+import GHC.Types.Unique.DSM (UniqDSMT)
+
+-- -----------------------------------------------------------------------------
+-- Streaming
+
+-- | The Stream instantiation used for code generation.
+-- Note the underlying monad is @UniqDSMT IO@, where @UniqDSMT@ is a transformer
+-- that propagates a deterministic unique supply (essentially an incrementing
+-- counter) from which new uniques are deterministically created during the
+-- code generation stages following StgToCmm.
+-- See Note [Object determinism].
+type CgStream = Stream (UniqDSMT IO)
+
 
 -- -----------------------------------------------------------------------------
 -- Information about global registers

@@ -16,12 +16,13 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Wasm.Asm
 import GHC.CmmToAsm.Wasm.FromCmm
 import GHC.CmmToAsm.Wasm.Types
-import GHC.Data.Stream (Stream, StreamS (..), runStream)
+import GHC.StgToCmm.CgUtils (CgStream)
+import GHC.Data.Stream (StreamS (..), runStream, liftIO)
 import GHC.Driver.DynFlags
 import GHC.Platform
 import GHC.Prelude
 import GHC.Settings
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Unit
 import GHC.Utils.Logger
 import GHC.Utils.Outputable (text)
@@ -32,13 +33,12 @@ ncgWasm ::
   Logger ->
   Platform ->
   ToolSettings ->
-  UniqSupply ->
   ModLocation ->
   Handle ->
-  Stream IO RawCmmGroup a ->
-  IO a
-ncgWasm ncg_config logger platform ts us loc h cmms = do
-  (r, s) <- streamCmmGroups ncg_config platform us cmms
+  CgStream RawCmmGroup a ->
+  UniqDSMT IO a
+ncgWasm ncg_config logger platform ts loc h cmms = do
+  (r, s) <- streamCmmGroups ncg_config platform cmms
   outputWasm $ "# " <> string7 (fromJust $ ml_hs_file loc) <> "\n\n"
   outputWasm $ execWasmAsmM do_tail_call $ asmTellEverything TagI32 s
   pure r
@@ -46,7 +46,7 @@ ncgWasm ncg_config logger platform ts us loc h cmms = do
     -- See Note [WasmTailCall]
     do_tail_call = doTailCall ts
 
-    outputWasm builder = do
+    outputWasm builder = liftIO $ do
       putDumpFileMaybe
         logger
         Opt_D_dump_asm
@@ -58,14 +58,16 @@ ncgWasm ncg_config logger platform ts us loc h cmms = do
 streamCmmGroups ::
   NCGConfig ->
   Platform ->
-  UniqSupply ->
-  Stream IO RawCmmGroup a ->
-  IO (a, WasmCodeGenState 'I32)
-streamCmmGroups ncg_config platform us cmms =
-  go (initialWasmCodeGenState platform us) $ runStream cmms
+  CgStream RawCmmGroup a ->
+  UniqDSMT IO (a, WasmCodeGenState 'I32)
+streamCmmGroups ncg_config platform cmms = withDUS $ \us -> do
+  (r,s) <- go (initialWasmCodeGenState platform us) $ runStream cmms
+  return ((r,s), wasmDUniqSupply s)
   where
     go s (Done r) = pure (r, s)
-    go s (Effect m) = m >>= go s
+    go s (Effect m) = do
+      (a, us') <- runUDSMT (wasmDUniqSupply s) m
+      go s{wasmDUniqSupply = us'} a
     go s (Yield decls k) = go (wasmExecM (onCmmGroup $ map opt decls) s) k
       where
         -- Run the generic cmm optimizations like other NCGs, followed

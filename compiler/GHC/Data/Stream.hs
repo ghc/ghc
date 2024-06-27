@@ -9,7 +9,7 @@
 
 -- | Monadic streams
 module GHC.Data.Stream (
-    Stream(..), StreamS(..), runStream, yield, liftIO,
+    Stream(..), StreamS(..), runStream, yield, liftIO, liftEff, hoistEff,
     collect,  consume, fromList,
     map, mapM, mapAccumL_
   ) where
@@ -140,3 +140,22 @@ mapAccumL_ f c str = Stream $ \f h -> go c f h (runStream str)
     go c f1 h1 (Yield a p) = Effect (f c a >>= (\(c', b) -> f1 b
                                            >>= \r' -> return $ Yield r' (go c' f1 h1 p)))
     go c f1 h1 (Effect m) = Effect (go c f1 h1 <$> m)
+
+-- | Lift an effect into the Stream
+liftEff :: Monad m => m b -> Stream m a b
+liftEff eff = Stream $ \_f g -> Effect (g <$> eff)
+
+-- | Hoist the underlying Stream effect
+-- Note this is not very efficience since, just like 'mapAccumL_', it also needs
+-- to traverse and rebuild the whole stream.
+hoistEff :: forall m n a b. (Applicative m, Monad n) => (forall x. m x -> n x) -> Stream m a b -> Stream n a b
+hoistEff h s = Stream $ \f g -> hs f g (runStream s :: StreamS m a b) where
+  hs :: (a -> n r')
+     -> (b -> StreamS n r' r)
+     -> StreamS m a b
+     -> StreamS n r' r
+  hs f g x = case x of
+    Done d -> g d
+    Yield a r -> Effect (f a >>= \r' -> return $ Yield r' (hs f g r))
+    Effect e -> Effect (h (hs f g <$> e))
+

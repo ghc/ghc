@@ -21,10 +21,10 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Reducibility
 import GHC.Cmm.Switch
 
+import GHC.Data.Graph.Collapse (MonadUniqDSM (liftUniqDSM))
 import GHC.CmmToAsm.Wasm.Types
 
 import GHC.Platform
-import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable ( Outputable, text, (<+>), ppr
@@ -138,21 +138,19 @@ emptyPost _ = False
 -- | Convert a Cmm CFG to WebAssembly's structured control flow.
 
 structuredControl :: forall expr stmt m .
-                     Applicative m
+                     MonadUniqDSM m
                   => Platform  -- ^ needed for offset calculation
-                  -> UniqSupply
                   -> (Label -> CmmExpr -> m expr) -- ^ translator for expressions
                   -> (Label -> CmmActions -> m stmt) -- ^ translator for straight-line code
                   -> CmmGraph -- ^ CFG to be translated
                   -> m (WasmControl stmt expr '[] '[ 'I32])
-structuredControl platform us txExpr txBlock g' =
-   doTree returns dominatorTree emptyContext
- where
+structuredControl platform txExpr txBlock g' = do
+  gwd :: GraphWithDominators CmmNode <-
+    liftUniqDSM $ asReducible $ graphWithDominators g'
+
+  let
    g :: CmmGraph
    g = gwd_graph gwd
-
-   gwd :: GraphWithDominators CmmNode
-   gwd = initUs_ us $ asReducible $ graphWithDominators g'
 
    dominatorTree :: Tree.Tree CmmBlock-- Dominator tree in which children are sorted
                                        -- with highest reverse-postorder number first
@@ -313,7 +311,7 @@ structuredControl platform us txExpr txBlock g' =
    dominates lbl blockname =
        lbl == blockname || dominatorsMember lbl (gwdDominatorsOf gwd blockname)
 
-
+  doTree returns dominatorTree emptyContext
 
 nodeBody :: CmmBlock -> CmmActions
 nodeBody (BlockCC _first middle _last) = middle

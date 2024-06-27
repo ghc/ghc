@@ -30,7 +30,7 @@ import GHC.Data.FastString
 import GHC.Data.OrdList
 
 import GHC.Types.ForeignCall
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Types.Unique
 
 import GHC.Utils.Outputable
