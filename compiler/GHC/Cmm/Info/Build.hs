@@ -882,15 +882,17 @@ anyCafRefs caf_infos = case any mayHaveCafRefs caf_infos of
 doSRTs
   :: CmmConfig
   -> ModuleSRTInfo
+  -> DUniqSupply
   -> [(CAFEnv, [CmmDecl])]   -- ^ 'CAFEnv's and 'CmmDecl's for code blocks
   -> [(CAFSet, CmmDataDecl)]     -- ^ static data decls and their 'CAFSet's
-  -> IO (ModuleSRTInfo, [CmmDeclSRTs])
+  -> IO (ModuleSRTInfo, DUniqSupply, [CmmDeclSRTs])
 
-doSRTs cfg moduleSRTInfo procs data_ = do
+doSRTs cfg moduleSRTInfo dus procs data_ = do
 
   -- Use local namespace 'u' here.
   -- See Note [Cmm Local Deterministic Uniques]
-  let runUDSM x = let (a,b) = runUniqueDSM 'u' 1 x in pprTrace "doSRTS" (ppr b) a
+  -- in the future, set tag before usign DUniqueSupply
+  let runUDSM = runUniqueDSM 'u' dus
 
   let profile = cmmProfile cfg
 
@@ -943,7 +945,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
           , CafInfo                -- Whether the group has CAF references
           ) ]
 
-      (result, moduleSRTInfo') =
+      ((result, moduleSRTInfo'), dus') =
         runUDSM $
         flip runStateT moduleSRTInfo $ do
           nonCAFs <- mapM (doSCC cfg staticFuns static_data_env) sccs
@@ -984,7 +986,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
                     CmmProc void _ _ _ -> case void of)
                (moduleSRTMap moduleSRTInfo') data_
 
-  return (moduleSRTInfo'{ moduleSRTMap = srtMap_w_raws }, srt_decls ++ decls')
+  return (moduleSRTInfo'{ moduleSRTMap = srtMap_w_raws }, dus', srt_decls ++ decls')
 
 
 -- | Build the SRT for a strongly-connected component of blocks.

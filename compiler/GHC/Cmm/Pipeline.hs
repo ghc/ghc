@@ -30,6 +30,7 @@ import GHC.Utils.Misc ( partitionWithM )
 import GHC.Platform
 
 import Control.Monad
+import GHC.Cmm.UniqueRenamer
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -42,18 +43,19 @@ cmmPipeline
  :: Logger
  -> CmmConfig
  -> ModuleSRTInfo        -- Info about SRTs generated so far
+ -> DUniqSupply
  -> CmmGroup             -- Input C-- with Procedures
- -> IO (ModuleSRTInfo, CmmGroupSRTs) -- Output CPS transformed C--
+ -> IO (ModuleSRTInfo, DUniqSupply, CmmGroupSRTs) -- Output CPS transformed C--
 
-cmmPipeline logger cmm_config srtInfo prog = do
-  let forceRes (info, group) = info `seq` foldr seq () group
+cmmPipeline logger cmm_config srtInfo dus prog = do
+  let forceRes (info, us, group) = info `seq` us `seq` foldr seq () group
   let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
-     (procs, data_) <- {-# SCC "tops" #-} partitionWithM (cpsTop logger platform cmm_config) prog
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo procs data_
+     (procs, data_) <- {-# SCC "tops" #-} partitionWithM (cpsTop logger platform cmm_config {-TODO: dus argument too -}) prog
+     (srtInfo, dus, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo dus procs data_
      dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
-     return (srtInfo, cmms)
+     return (srtInfo, dus, cmms)
 
 -- | The Cmm pipeline for a single 'CmmDecl'. Returns:
 --
@@ -354,6 +356,7 @@ generator later.
 
 -}
 
+-- ROMESTODO: MAKE THIS DETERMINISTIC!!!!!!
 runUniqSM :: UniqSM a -> IO a
 runUniqSM m = do
   us <- mkSplitUniqSupply 'u'
