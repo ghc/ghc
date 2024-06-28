@@ -29,7 +29,6 @@ typedef uint16_t cinst_t;
 char *relocationTypeToString(Elf64_Xword type);
 int32_t decodeAddendRISCV64(Section *section, Elf_Rel *rel);
 bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend);
-int32_t SignExtend32(uint32_t X, unsigned B);
 void write8le(uint8_t *p, uint8_t v);
 uint8_t read8le(const uint8_t *P);
 void write16le(cinst_t *p, uint16_t v);
@@ -48,8 +47,6 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
 void setJType(inst_t *loc, uint32_t val);
 void setIType(inst_t *loc, int32_t val);
 void checkInt(inst_t *loc, int32_t v, int n);
-uint32_t setLO12_I(uint32_t insn, uint32_t imm);
-uint32_t setLO12_S(uint32_t insn, uint32_t imm);
 void setUType(inst_t *loc, int32_t val);
 
 
@@ -122,91 +119,97 @@ int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
   abort(/* we don't support Rel locations yet. */);
 }
 
-// Sign-extend the number in the bottom B bits of X to a 32-bit integer.
-// Requires 0 < B <= 32. (32 bit is sufficient as we can only encode 20 + 12 =
-// 32 bit in a relocation pair.)
-int32_t SignExtend32(uint32_t X, unsigned B) {
-  assert(B > 0 && "Bit width can't be 0.");
-  assert(B <= 32 && "Bit width out of range.");
-  return (int32_t)(X << (32 - B)) >> (32 - B);
-}
-
 // Make sure that V can be represented as an N bit signed integer.
 void checkInt(inst_t *loc, int32_t v, int n) {
-  if (v != SignExtend32(v, n)) {
+  if (v != signExtend32(v, n)) {
     debugBelch("Relocation at 0x%x is out of range. value: 0x%x (%d), "
                "sign-extended value: 0x%x (%d), max bits 0x%x (%d)\n",
-               *loc, v, v, SignExtend32(v, n), SignExtend32(v, n), n, n);
+               *loc, v, v, signExtend32(v, n), signExtend32(v, n), n, n);
   }
 }
 
-// RISCV is little-endian by definition.
+// RISCV is little-endian by definition: We can rely on (implicit) casts.
 void write8le(uint8_t *p, uint8_t v) { *p = v; }
 
-// RISCV is little-endian by definition.
-uint8_t read8le(const uint8_t *P) { return *P; }
+// RISCV is little-endian by definition: We can rely on (implicit) casts.
+uint8_t read8le(const uint8_t *p) { return *p; }
 
-// RISCV is little-endian by definition.
+// RISCV is little-endian by definition: We can rely on (implicit) casts.
 void write16le(cinst_t *p, uint16_t v) { *p = v; }
 
-// RISCV is little-endian by definition.
-uint16_t read16le(const cinst_t *P) { return *P; }
+// RISCV is little-endian by definition: We can rely on (implicit) casts.
+uint16_t read16le(const cinst_t *p) { return *p; }
 
-// RISCV is little-endian by definition.
-uint32_t read32le(const inst_t *P) { return *P; }
+// RISCV is little-endian by definition: We can rely on (implicit) casts.
+uint32_t read32le(const inst_t *p) { return *p; }
 
-// RISCV is little-endian by definition.
+// RISCV is little-endian by definition: We can rely on (implicit) casts.
 void write32le(inst_t *p, uint32_t v) { *p = v; }
 
-// RISCV is little-endian by definition.
-uint64_t read64le(const uint64_t *P) { return *P; }
+// RISCV is little-endian by definition: We can rely on (implicit) casts.
+uint64_t read64le(const uint64_t *p) { return *p; }
 
-// RISCV is little-endian by definition.
+// RISCV is little-endian by definition: We can rely on (implicit) casts.
 void write64le(uint64_t *p, uint64_t v) { *p = v; }
 
 uint32_t extractBits(uint64_t v, uint32_t begin, uint32_t end) {
   return (v & ((1ULL << (begin + 1)) - 1)) >> end;
 }
 
-uint32_t setLO12_I(uint32_t insn, uint32_t imm) {
-  IF_DEBUG(linker, debugBelch("setLO12_I: insn 0x%x imm 0x%x (insn & 0xfffff) "
-                              "0x%x (imm << 20) 0x%x \n",
-                              insn, imm, (insn & 0xfffff), (imm << 20)));
-  return (insn & 0xfffff) | (imm << 20);
-}
-
-uint32_t setLO12_S(uint32_t insn, uint32_t imm) {
-  return (insn & 0x1fff07f) | (extractBits(imm, 11, 5) << 25) |
-         (extractBits(imm, 4, 0) << 7);
-}
-
+// Set immediate val in the instruction at *loc. In U-type instructions the
+// upper 20bits carry the upper 20bits of the immediate.
 void setUType(inst_t *loc, int32_t val) {
   const unsigned bits = 32;
   uint32_t hi = val + 0x800;
-  checkInt(loc, SignExtend32(hi, bits) >> 12, 20);
+  checkInt(loc, signExtend32(hi, bits) >> 12, 20);
   IF_DEBUG(linker, debugBelch("setUType: hi 0x%x val 0x%x\n", hi, val));
-  write32le(loc, (read32le(loc) & 0xFFF) | (hi & 0xFFFFF000));
+
+  uint32_t imm = hi & 0xFFFFF000;
+  write32le(loc, (read32le(loc) & 0xFFF) | imm);
 }
 
+// Set immediate val in the instruction at *loc. In I-type instructions the
+// upper 12bits carry the lower 12bit of the immediate.
 void setIType(inst_t *loc, int32_t val) {
   uint64_t hi = (val + 0x800) >> 12;
   uint64_t lo = val - (hi << 12);
+
   IF_DEBUG(linker, debugBelch("setIType: hi 0x%lx lo 0x%lx\n", hi, lo));
   IF_DEBUG(linker, debugBelch("setIType: loc %p  *loc 0x%x  val 0x%x\n", loc,
                               *loc, val));
-  uint32_t insn = setLO12_I(read32le(loc), lo & 0xfff);
-  IF_DEBUG(linker, debugBelch("setIType: insn 0x%x\n", insn));
-  write32le(loc, insn);
+
+  uint32_t imm = lo & 0xfff;
+  uint32_t instr = (read32le(loc) & 0xfffff) | (imm << 20);
+
+  IF_DEBUG(linker, debugBelch("setIType: insn 0x%x\n", instr));
+  write32le(loc, instr);
   IF_DEBUG(linker, debugBelch("setIType: loc %p  *loc' 0x%x  val 0x%x\n", loc,
                               *loc, val));
 }
 
+// Set immediate val in the instruction at *loc. In S-type instructions the
+// lower 12 bits of the immediate are at bits 7 to 11 ([0:4]) and 25 to 31
+// ([5:11]).
 void setSType(inst_t *loc, uint32_t val) {
   uint64_t hi = (val + 0x800) >> 12;
   uint64_t lo = val - (hi << 12);
-  write32le(loc, setLO12_S(read32le(loc), lo));
+
+  uint32_t imm = lo;
+  uint32_t instr = (read32le(loc) & 0x1fff07f) | (extractBits(imm, 11, 5) << 25) |
+         (extractBits(imm, 4, 0) << 7);
+
+  write32le(loc, instr);
 }
 
+// Set immediate val in the instruction at *loc. In J-type instructions the
+// immediate has 20bits which are pretty scattered:
+// instr bit -> imm bit
+// 31 -> 20
+// [30:21] -> [10:1]
+// 20 -> 11
+// [19:12] -> [19:12]
+//
+// N.B. bit 0 of the immediate is missing!
 void setJType(inst_t *loc, uint32_t val) {
   checkInt(loc, val, 21);
 
@@ -220,6 +223,15 @@ void setJType(inst_t *loc, uint32_t val) {
   write32le(loc, insn);
 }
 
+// Set immediate val in the instruction at *loc. In B-type instructions the
+// immediate has 12bits which are pretty scattered:
+// instr bit -> imm bit
+// 31 -> 12
+// [30:25] -> [10:5]
+// [11:8] -> [4:1]
+// 7 -> 11
+//
+// N.B. bit 0 of the immediate is missing!
 void setBType(inst_t *loc, uint32_t val) {
   checkInt(loc, val, 13);
 
@@ -233,6 +245,18 @@ void setBType(inst_t *loc, uint32_t val) {
   write32le(loc, insn);
 }
 
+
+// Set immediate val in the instruction at *loc. CB-type instructions have a
+// lenght of 16 bits (half-word, compared to the usual 32bit/word instructions.)
+// The immediate has 8bits which are pretty scattered:
+// instr bit -> imm bit
+// 12 -> 8
+// [11:10] -> [4:3]
+// [6:5] -> [7:6]
+// [4:3] -> [2:1]
+// 2 -> 5
+//
+// N.B. bit 0 of the immediate is missing!
 void setCBType(cinst_t *loc, uint32_t val) {
   checkInt((inst_t *)loc, val, 9);
   uint16_t insn = read16le(loc) & 0xE383;
@@ -246,6 +270,20 @@ void setCBType(cinst_t *loc, uint32_t val) {
   write16le(loc, insn);
 }
 
+// Set immediate val in the instruction at *loc. CJ-type instructions have a
+// lenght of 16 bits (half-word, compared to the usual 32bit/word instructions.)
+// The immediate has 11bits which are pretty scattered:
+// instr bit -> imm bit
+// 12 -> 11
+// 11 -> 4
+// [10:9] ->[9:8]
+// 8 -> 10
+// 7 -> 6
+// 6 -> 7
+// [5:3] -> [3:1]
+// 2 -> 5
+//
+// N.B. bit 0 of the immediate is missing!
 void setCJType(cinst_t *loc, uint32_t val) {
   checkInt((inst_t *)loc, val, 12);
   uint16_t insn = read16le(loc) & 0xE003;
@@ -428,9 +466,9 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
     FALLTHROUGH;
   case R_RISCV_PCREL_LO12_I: {
     // Lookup related HI20 relocation and use that value. I'm still confused why
-    // relocations aren't pure, but this is how LLVM does it. And, calculating
-    // the lower 12 bit without any relation ship to the GOT entry's address
-    // makes no sense either.
+    // relocations aren't self-contained, but this is how LLVM does it. And,
+    // calculating the lower 12 bit without any relationship to the GOT entry's
+    // address makes no sense either.
       for (int64_t i = relNo; i >= 0 ; i--) {
         Elf_Rela *rel_prime = &relaTab->relocations[i];
 
@@ -630,19 +668,16 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
 }
 
 void flushInstructionCacheRISCV64(ObjectCode *oc) {
-  // Synchronize the memory and instruction cache to prevent illegal
-  // instruction exceptions. On Linux the parameters of
-  // __builtin___clear_cache are currently unused. Add them anyways for future
-  // compatibility. (I.e. the parameters couldn't be checked during
-  // development.)
+  // Synchronize the memory and instruction cache to prevent illegal instruction
+  // exceptions. On Linux the parameters of __builtin___clear_cache are
+  // currently unused. Add them anyways for future compatibility. (I.e. the
+  // parameters couldn't be checked during development.)
 
   /* The main object code */
   void *codeBegin = oc->image + oc->misalignment;
-  // TODO: Check the upper boundary e.g. with a debugger.
   __builtin___clear_cache(codeBegin, (void*) ((uint64_t*) codeBegin + oc->fileSize));
 
   /* Jump Islands */
-  // TODO: Check the upper boundary e.g. with a debugger.
   __builtin___clear_cache((void *)oc->symbol_extras,
                           (void *)(oc->symbol_extras + oc->n_symbol_extras));
 

@@ -2014,6 +2014,7 @@ ocResolve_ELF ( ObjectCode* oc )
 #if defined(powerpc_HOST_ARCH)
     ocFlushInstructionCache( oc );
 #elif defined(riscv64_HOST_ARCH)
+    /* New-style pseudo-polymorph (by architecture) call */
     flushInstructionCache( oc );
 #endif
 
