@@ -103,10 +103,10 @@ module GHC.Types.Var (
         mkTyVar, mkTyVarWithUnfolding, mkTcTyVar,
 
         -- ** Taking 'TyVar's apart
-        tyVarName, tyVarKind, tyVarUnfolding, tcTyVarDetails, setTcTyVarDetails,
+        tyVarName, tyVarKind, tyVarUnfolding, tyVarOccInfo, tcTyVarDetails, setTcTyVarDetails,
 
         -- ** Modifying 'TyVar's
-        setTyVarName, setTyVarUnique, setTyVarKind, setTyVarUnfolding,
+        setTyVarName, setTyVarUnique, setTyVarKind, setTyVarUnfolding, setTyVarOccInfo,
         updateTyVarKind, updateTyVarKindM, updateTyVarUnfolding, updateTyVarUnfoldingM,
         updateTyVarKindAndUnfoldingM,
 
@@ -124,7 +124,7 @@ import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , nonDetCmpUnique )
-import GHC.Types.Basic( TypeOrConstraint(..) )
+import GHC.Types.Basic( TypeOrConstraint(..), OccInfo, noOccInfo )
 import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -258,8 +258,9 @@ data Var
                                        -- Identical to the Unique in the name,
                                        -- cached here for speed
         varType      :: Kind,          -- ^ The type or kind of the 'Var' in question
-        tv_unfolding :: Maybe Type     -- ^ The type to which the variable is bound to,
+        tv_unfolding :: Maybe Type,    -- ^ The type to which the variable is bound to,
                                        -- if any.
+        tv_occ_info  :: OccInfo
  }
 
   | TcTyVar {                           -- Used only during type inference
@@ -1096,6 +1097,11 @@ tyVarUnfolding :: TyVar -> Maybe Type
 tyVarUnfolding (TyVar { tv_unfolding = unf }) = unf
 tyVarUnfolding _ = Nothing
 
+tyVarOccInfo :: TyVar -> OccInfo
+tyVarOccInfo (TcTyVar {}) = noOccInfo
+tyVarOccInfo tv = assertPpr (isTyVar tv) (ppr tv) $ tv_occ_info tv
+{-# NOINLINE tyVarOccInfo #-}
+
 setTyVarUnique :: TyVar -> Unique -> TyVar
 setTyVarUnique = setVarUnique
 
@@ -1107,6 +1113,14 @@ setTyVarKind tv k = tv {varType = k}
 
 setTyVarUnfolding :: TyVar -> Type -> TyVar
 setTyVarUnfolding tv unf = tv {tv_unfolding = Just unf}
+
+setTyVarOccInfo :: TyVar -> OccInfo -> TyVar
+-- TODO: Surprisingly, TcTyVar's can occur after zonking, why?
+-- It could be caused by other parts of my changes though, but I wasn't able to find out where.
+-- For now, we just ignore them.
+-- setTyVarOccInfo tv@(TcTyVar {}) occ_info = pprPanic "setTyVarOccInfo" (ppr tv $$ ppr occ_info)
+setTyVarOccInfo tv@(TcTyVar {}) _occ_info = tv
+setTyVarOccInfo tv occ_info = assertPpr (isTyVar tv) (ppr tv) $ tv {tv_occ_info = occ_info}
 
 updateTyVarKind :: (Kind -> Kind) -> TyVar -> TyVar
 updateTyVarKind update tv = tv {varType = update (tyVarKind tv)}
@@ -1143,6 +1157,7 @@ mkTyVar name kind = TyVar { varName      = name
                           , realUnique   = nameUnique name
                           , varType      = kind
                           , tv_unfolding = Nothing
+                          , tv_occ_info  = noOccInfo
                           }
 
 mkTyVarWithUnfolding :: Name -> Kind -> Type -> TyVar
@@ -1150,6 +1165,7 @@ mkTyVarWithUnfolding name kind unf = TyVar { varName      = name
                                            , realUnique   = nameUnique name
                                            , varType      = kind
                                            , tv_unfolding = Just unf
+                                           , tv_occ_info  = noOccInfo
                                            }
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
