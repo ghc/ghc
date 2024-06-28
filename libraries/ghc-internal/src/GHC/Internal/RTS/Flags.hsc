@@ -170,6 +170,9 @@ data MiscFlags = MiscFlags
                , Generic -- ^ @since base-4.15.0.0
                )
 
+-- |
+--
+-- @since base-4.21.0.0
 data IoManagerFlag =
        IoManagerFlagAuto
      | IoManagerFlagSelect        -- ^ Unix only, non-threaded RTS only
