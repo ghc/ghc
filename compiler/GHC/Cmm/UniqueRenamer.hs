@@ -72,7 +72,7 @@ renameDetUniq uq = do
     Nothing -> do
       new_w <- gets supply -- New deterministic unique in this `DetRnM`
       let (tag, _) = unpkUnique uq
-          det_uniq = mkUnique tag new_w
+          det_uniq = mkUnique 'Q' new_w
       modify' (\DetUniqFM{mapping, supply} ->
         -- Update supply and mapping
         DetUniqFM
@@ -113,8 +113,8 @@ instance UniqRenamable CLabel where
   uniqRename = detRenameCLabel
 
 instance UniqRenamable LocalReg where
-  -- uniqRename (LocalReg uq t) = LocalReg <$> renameDetUniq uq <*> pure t
-  uniqRename (LocalReg uq t) = pure $ LocalReg uq t
+  uniqRename (LocalReg uq t) = LocalReg <$> renameDetUniq uq <*> pure t
+  -- uniqRename (LocalReg uq t) = pure $ LocalReg uq t
     -- ROMES:TODO: This has unique r1, we're debugging. this may still be a source of non determinism.
 
 instance UniqRenamable Label where
@@ -126,7 +126,13 @@ instance UniqRenamable CmmTickScope where
 
 instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (GenCmmDecl a b CmmGraph) where
   uniqRename (CmmProc h lbl regs g)
-    = CmmProc <$> uniqRename h <*> uniqRename lbl <*> uniqRename regs <*> uniqRename g
+    = do
+      g' <- uniqRename g
+      regs' <- uniqRename regs
+      lbl' <- uniqRename lbl
+      --- rename h last!!!
+      h' <- uniqRename h
+      return $ CmmProc h' lbl' regs' g'
   uniqRename (CmmData sec d)
     = CmmData <$> uniqRename sec <*> uniqRename d
 
@@ -178,6 +184,7 @@ instance UniqRenamable CmmLit where
     CmmBlock bid -> CmmBlock <$> uniqRename bid
     CmmHighStackMark -> pure CmmHighStackMark
 
+-- TODO::: VERY BAD!!! This isn't deterministic since the key is non-deterministic thus the order in which we rename is non deterministic
 instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
   => UniqRenamable (LabelMap a) where
   uniqRename lm = mapFromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
@@ -263,9 +270,11 @@ instance (UniqRenamable a) => UniqRenamable (Maybe a) where
   uniqRename Nothing = pure Nothing
   uniqRename (Just x) = Just <$> uniqRename x
 
+-- TODO::: BAD!!! This won't be deterministic if the key is non-deterministic because the order in which we rename is non deterministic
 instance (Ord a, UniqRenamable a, UniqRenamable b) => UniqRenamable (M.Map a b) where
   uniqRename m = M.fromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (M.toList m)
 
+-- TODO::: BAD!!! This won't be deterministic if the key is non-deterministic because the order in which we rename is non deterministic
 instance (Ord a, UniqRenamable a) => UniqRenamable (S.Set a) where
   -- Because of renaming being injective the resulting set should have the same
   -- size as the intermediate list.
