@@ -114,9 +114,8 @@ char *relocationTypeToString(Elf64_Xword type) {
 STG_NORETURN
 int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
                             Elf_Rel *rel STG_UNUSED) {
-  debugBelch("decodeAddendRISCV64: Relocations with explicit addend are not "
-             "supported.");
-  abort(/* we don't support Rel locations yet. */);
+  barf("decodeAddendRISCV64: Relocations with explicit addend are not supported."
+       " Please open a ticket; providing the causing code/binary.");
 }
 
 // Make sure that V can be represented as an N bit signed integer.
@@ -300,7 +299,9 @@ void setCJType(cinst_t *loc, uint32_t val) {
   write16le(loc, insn);
 }
 
+// Encode the addend according to the relocaction into the instruction.
 bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend) {
+  // instruction to rewrite (P: Position of the relocation)
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
   IF_DEBUG(linker,
            debugBelch(
@@ -407,11 +408,14 @@ bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend) {
   }
   case R_RISCV_RELAX:
   case R_RISCV_ALIGN:
-    // I guess we don't need to implement these relaxations (optimizations).
+    // Implementing relaxations (rewriting instructions to more efficient ones)
+    // could be implemented in future. As the code already is aligned and we do
+    // not change the instruction sizes, we should get away with not aligning
+    // (though, that is cheating.) To align or change the instruction count, we
+    // would need machinery to squeeze or extend memory at the current location.
     break;
   default:
-    debugBelch("Missing relocation 0x%lx\n", ELF64_R_TYPE(rel->r_info));
-    abort();
+    barf("Missing relocation 0x%lx\n", ELF64_R_TYPE(rel->r_info));
   }
   return EXIT_SUCCESS;
 }
@@ -428,17 +432,18 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
                       int64_t addend, ObjectCode *oc) {
   Section * section = &oc->sections[relaTab->targetSectionIndex];
 
-  /* Position where something is relocated */
+  // instruction to rewrite (P: Position of the relocation)
   addr_t P = (addr_t)((uint8_t *)section->start + rel->r_offset);
 
   CHECK(0x0 != P);
   CHECK((uint64_t)section->start <= P);
   CHECK(P <= (uint64_t)section->start + section->size);
-  /* Address of the symbol */
+  // S: Value of the symbol in the symbol table
   addr_t S = (addr_t)symbol->addr;
-  /* GOT slot for the symbol */
+  /* GOT slot for the symbol (G + GOT) */
   addr_t GOT_S = (addr_t)symbol->got_addr;
 
+  // A: Addend field in the relocation entry associated with the symbol
   int64_t A = addend;
 
   IF_DEBUG(linker, debugBelch("%s: P 0x%lx S 0x%lx %s GOT_S 0x%lx A 0x%lx relNo %u\n",
@@ -564,6 +569,7 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
   case R_RISCV_SUB32:
     FALLTHROUGH;
   case R_RISCV_SUB64:
+    // TODO: Is this '+' correct? Not '-'?
     return S + A; // Subtract from V when value is set
   case R_RISCV_SET6:
     FALLTHROUGH;
@@ -574,6 +580,8 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
   case R_RISCV_SET32:
     return S + A;
   case R_RISCV_RELAX:
+    // This "relocation" has no addend.
+    FALLTHROUGH;
   case R_RISCV_ALIGN:
     // I guess we don't need to implement this relaxation. Otherwise, this
     // should return the number of blank bytes to insert via NOPs.
@@ -605,15 +613,13 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
     }
   }
   default:
-    debugBelch("Unimplemented relocation: 0x%lx\n (%lu)",
+    barf("Unimplemented relocation: 0x%lx\n (%lu)",
                ELF64_R_TYPE(rel->r_info), ELF64_R_TYPE(rel->r_info));
-    abort(/* unhandled rel */);
   }
-  debugBelch("This should never happen!");
-  abort(/* unhandled rel */);
+  barf("This should never happen!");
 }
 
-// TODO: This is duplicated from elf_reloc_aarch64.c
+// Iterate over all relocations and perform them.
 bool relocateObjectCodeRISCV64(ObjectCode *oc) {
   for (ElfRelocationTable *relTab = oc->info->relTable; relTab != NULL;
        relTab = relTab->next) {
@@ -631,8 +637,9 @@ bool relocateObjectCodeRISCV64(ObjectCode *oc) {
 
       CHECK(0x0 != symbol);
 
-      // TODO: This always fails, because we don't support Rel locations: Do
-      // we need this case?
+      // This always fails, because we don't support Rel locations, yet: Do we
+      // need this case? Leaving it in to spot the potential bug when it
+      // appears.
       /* decode implicit addend */
       int64_t addend = decodeAddendRISCV64(targetSection, rel);
 
