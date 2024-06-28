@@ -458,7 +458,7 @@ simple_bind_type env@(SOE { soe_subst = subst })
                         Just out_bndr -> (env, out_bndr)
                         Nothing       -> subst_opt_bndr env in_bndr
       out_bndr = setTyVarUnfolding bndr1 out_ty
-    in (env' { soe_subst = extendTvSubst subst in_bndr (mkTyVarTy out_bndr) }, Just (out_bndr, out_ty))
+    in (env', Just (out_bndr, out_ty))
 
 ----------------------
 simple_bind_pair :: SimpleOptEnv
