@@ -274,7 +274,7 @@ stmtToInstrs bid stmt = do
   platform <- getPlatform
   case stmt of
     CmmUnsafeForeignCall target result_regs args
-       -> genCCall target result_regs args bid
+      -> (,Nothing) <$> genCCall target result_regs args bid
 
     _ -> (,Nothing) <$> case stmt of
       CmmComment s   -> return (unitOL (COMMENT (ftext s)))
@@ -1455,7 +1455,7 @@ genCCall
     -> [CmmFormal]        -- where to put the result
     -> [CmmActual]        -- arguments (of mixed type)
     -> BlockId            -- The block we are in
-    -> NatM (InstrBlock, Maybe BlockId)
+    -> NatM InstrBlock
 -- TODO: Specialize where we can.
 -- Generic impl
 genCCall target dest_regs arg_regs bid = do
@@ -1519,7 +1519,7 @@ genCCall target dest_regs arg_regs bid = do
             `snocOL` BL call_target_reg passRegs  -- branch and link (C calls aren't tail calls, but return)
             `appOL` readResultsCode        -- parse the results into registers
             `appOL` moveStackUp (stackSpace `div` 8)
-      return (code, Nothing)
+      return code
 
     PrimTarget MO_F32_Fabs
       | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
@@ -1636,13 +1636,13 @@ genCCall target dest_regs arg_regs bid = do
         -- atomic_thread_fence(memory_order_release);
 --        MO_ReadBarrier      ->  return (unitOL (DMBSY DmbRead DmbRead), Nothing)
 --        MO_WriteBarrier     ->  return (unitOL (DMBSY DmbWrite DmbWrite), Nothing)
-        MO_AcquireFence -> return (unitOL (DMBSY DmbRead DmbReadWrite), Nothing)
-        MO_ReleaseFence -> return (unitOL (DMBSY DmbReadWrite DmbWrite), Nothing)
-        MO_SeqCstFence -> return (unitOL (DMBSY DmbReadWrite DmbReadWrite), Nothing)
+        MO_AcquireFence -> pure (unitOL (DMBSY DmbRead DmbReadWrite))
+        MO_ReleaseFence -> pure (unitOL (DMBSY DmbReadWrite DmbWrite))
+        MO_SeqCstFence -> pure (unitOL (DMBSY DmbReadWrite DmbReadWrite))
 
-        MO_Touch            ->  return (nilOL, Nothing) -- Keep variables live (when using interior pointers)
+        MO_Touch            -> pure nilOL -- Keep variables live (when using interior pointers)
         -- Prefetch
-        MO_Prefetch_Data _n -> return (nilOL, Nothing) -- Prefetch hint.
+        MO_Prefetch_Data _n -> pure nilOL -- Prefetch hint.
 
         -- Memory copy/set/move/cmp, with alignment for optimization
 
@@ -1690,7 +1690,7 @@ genCCall target dest_regs arg_regs bid = do
                   dst = getRegisterReg platform (CmmLocal dst_reg)
                   moDescr = (text . show) mo
                   code = code_p `appOL` instrs
-              return (code, Nothing)
+              return code
           | otherwise -> panic "mal-formed AtomicRead"
         mo@(MO_AtomicWrite w ord)
           | [p_reg, val_reg] <- arg_regs -> do
@@ -1713,7 +1713,7 @@ genCCall target dest_regs arg_regs bid = do
                     code_p `appOL`
                     code_val `appOL`
                     instrs
-              return (code, Nothing)
+              pure code
           | otherwise -> panic "mal-formed AtomicWrite"
         MO_AtomicRMW w amop -> mkCCall (atomicRMWLabel w amop)
         MO_Cmpxchg w        -> mkCCall (cmpxchgLabel w)
@@ -1726,7 +1726,7 @@ genCCall target dest_regs arg_regs bid = do
     unsupported :: Show a => a -> b
     unsupported mop = panic ("outOfLineCmmOp: " ++ show mop
                           ++ " not supported here")
-    mkCCall :: FastString -> NatM (InstrBlock, Maybe BlockId)
+    mkCCall :: FastString -> NatM InstrBlock
     mkCCall name = do
       config <- getConfig
       target <- cmmMakeDynamicReference config CallReference $
@@ -1830,7 +1830,7 @@ genCCall target dest_regs arg_regs bid = do
       (reg_fx, _format_x, code_fx) <- getFloatReg arg_reg
       let dst = getRegisterReg platform (CmmLocal dest_reg)
       let code = code_fx `appOL` op (OpReg w dst) (OpReg w reg_fx)
-      return (code, Nothing)
+      pure code
 
 {- Note [RISCV64 far jumps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
