@@ -148,8 +148,8 @@ basicBlockCodeGen block = do
             let line = srcSpanStartLine span; col = srcSpanStartCol span
             return $ unitOL $ LOCATION fileId line col (unpackFS name)
     _ -> return nilOL
-  (mid_instrs,mid_bid) <- stmtsToInstrs id stmts
-  (!tail_instrs) <- stmtToInstrs mid_bid tail
+  mid_instrs <- stmtsToInstrs stmts
+  (!tail_instrs) <- stmtToInstrs tail
   let instrs = header_comment_instr `appOL` loc_instrs `appOL` mid_instrs `appOL` tail_instrs
   -- TODO: Then x86 backend run @verifyBasicBlock@ here and inserts
   --      unwinding info. See Ticket 19913
@@ -251,34 +251,25 @@ generateJumpTableForInstr _ _ = Nothing
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
 
--- See Note [Keeping track of the current block] for why
--- we pass the BlockId.
-stmtsToInstrs :: BlockId -- ^ Basic block these statement will start to be placed in.
-              -> [CmmNode O O] -- ^ Cmm Statement
-              -> NatM (InstrBlock, BlockId) -- ^ Resulting instruction
-stmtsToInstrs bid stmts =
-    go bid stmts nilOL
+stmtsToInstrs :: [CmmNode O O] -- ^ Cmm Statements
+              -> NatM InstrBlock -- ^ Resulting instructions
+stmtsToInstrs stmts =
+    go stmts nilOL
   where
-    go bid  []        instrs = return (instrs,bid)
-    go bid (s:stmts)  instrs = do
-      instrs' <- stmtToInstrs bid s
-      go bid stmts (instrs `appOL` instrs')
+    go []        instrs = return instrs
+    go (s:stmts) instrs = do
+      instrs' <- stmtToInstrs s
+      go stmts (instrs `appOL` instrs')
 
--- | `bid` refers to the current block and is used to update the CFG
---   if new blocks are inserted in the control flow.
--- See Note [Keeping track of the current block] for more details.
-stmtToInstrs :: BlockId -- ^ Basic block this statement will start to be placed in.
-             -> CmmNode e x
-             -> NatM InstrBlock
-             -- ^ Instructions, and bid of new block if successive
-             -- statements are placed in a different basic block.
-stmtToInstrs bid stmt = do
+stmtToInstrs :: CmmNode e x -- ^ Cmm Statement
+             -> NatM InstrBlock -- ^ Resulting Instructions
+stmtToInstrs stmt = do
   -- traceM $ "-- -------------------------- stmtToInstrs -------------------------- --\n"
   --     ++ showSDocUnsafe (ppr stmt)
   platform <- getPlatform
   case stmt of
     CmmUnsafeForeignCall target result_regs args
-       -> genCCall target result_regs args bid
+       -> genCCall target result_regs args
 
     _ -> case stmt of
       CmmComment s   -> return (unitOL (COMMENT (ftext s)))
@@ -301,7 +292,7 @@ stmtToInstrs bid stmt = do
       --We try to arrange blocks such that the likely branch is the fallthrough
       --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
       CmmCondBranch arg true false _prediction ->
-          genCondBranch bid true false arg
+          genCondBranch true false arg
 
       CmmSwitch arg ids -> genSwitch arg ids
 
@@ -1453,14 +1444,12 @@ genCondFarJump cond far_target = do
                 , B far_target
                 , NEWBLOCK skip_lbl_id]
 
-genCondBranch
-    :: BlockId      -- the source of the jump
-    -> BlockId      -- the true branch target
+genCondBranch :: BlockId      -- the true branch target
     -> BlockId      -- the false branch target
     -> CmmExpr      -- the condition on which to branch
     -> NatM InstrBlock -- Instructions
 
-genCondBranch _ true false expr = do
+genCondBranch true false expr = do
   b1 <- genCondJump true expr
   b2 <- genBranch false
   return (b1 `appOL` b2)
@@ -1546,11 +1535,10 @@ genCCall
     :: ForeignTarget      -- function to call
     -> [CmmFormal]        -- where to put the result
     -> [CmmActual]        -- arguments (of mixed type)
-    -> BlockId            -- The block we are in
     -> NatM InstrBlock
 -- TODO: Specialize where we can.
 -- Generic impl
-genCCall target dest_regs arg_regs bid = do
+genCCall target dest_regs arg_regs = do
   -- we want to pass arg_regs into allArgRegs
   -- pprTraceM "genCCall target" (ppr target)
   -- pprTraceM "genCCall formal" (ppr dest_regs)
@@ -2049,7 +2037,7 @@ genCCall target dest_regs arg_regs bid = do
       target <- cmmMakeDynamicReference config CallReference $
           mkForeignLabel name ForeignLabelInThisPackage IsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
-      genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
+      genCCall (ForeignTarget target cconv) dest_regs arg_regs
 
     -- TODO: Optimize using paired stores and loads (STP, LDP). It is
     -- automatically done by the allocator for us. However it's not optimal,
