@@ -1469,23 +1469,20 @@ genCCall target dest_regs arg_regs bid = do
     -- be a foreign procedure with an address expr
     -- and a calling convention.
     ForeignTarget expr _cconv -> do
-      (call_target, call_target_code) <- case expr of
-        -- if this is a label, let's just directly to it.  This will produce the
-        -- correct CALL relocation for BL...
-        -- While this works on aarch64, for _most_ labels, it will fall short
-        -- where label branching only works for shoter distances (e.g. riscv)
-        -- (CmmLit (CmmLabel lbl)) -> pure (TLabel lbl, nilOL)
-        -- ... if it's not a label--well--let's compute the expression into a
-        -- register and jump to that. See Note [PLT vs GOT relocations]
-        _ -> do (reg, _format, reg_code) <- getSomeReg expr
-                pure (TReg reg, reg_code)
+      (call_target_reg, call_target_code) <-
+         -- Compute the address of the call target into a register. This
+         -- addressing enables us to jump through the whole address space
+         -- without further ado. PC-relative addressing would involve
+         -- instructions to do similar, though.
+         do (reg, _format, reg_code) <- getSomeReg expr
+            pure (reg, reg_code)
       -- compute the code and register logic for all arg_regs.
       -- this will give us the format information to match on.
       arg_regs' <- mapM getSomeReg arg_regs
 
       -- Now this is stupid.  Our Cmm expressions doesn't carry the proper sizes
       -- so while in Cmm we might get W64 incorrectly for an int, that is W32 in
-      -- STG; this thenn breaks packing of stack arguments, if we need to pack
+      -- STG; this then breaks packing of stack arguments, if we need to pack
       -- for the pcs, e.g. darwinpcs.  Option one would be to fix the Int type
       -- in Cmm proper. Option two, which we choose here is to use extended Hint
       -- information to contain the size information and use that when packing
@@ -1519,7 +1516,7 @@ genCCall target dest_regs arg_regs bid = do
       let code = call_target_code          -- compute the label (possibly into a register)
             `appOL` moveStackDown (stackSpace `div` 8)
             `appOL` passArgumentsCode      -- put the arguments into x0, ...
-            `snocOL` BL call_target passRegs  -- branch and link.
+            `snocOL` BL call_target_reg passRegs  -- branch and link (C calls aren't tail calls, but return)
             `appOL` readResultsCode        -- parse the results into registers
             `appOL` moveStackUp (stackSpace `div` 8)
       return (code, Nothing)
@@ -1692,9 +1689,7 @@ genCCall target dest_regs arg_regs bid = do
                       MemOrderRelease -> panic $ "Unexpected MemOrderRelease on an AtomicRead: " ++ show mo
                   dst = getRegisterReg platform (CmmLocal dst_reg)
                   moDescr = (text . show) mo
-                  code =
-                    code_p `appOL`
-                    instrs
+                  code = code_p `appOL` instrs
               return (code, Nothing)
           | otherwise -> panic "mal-formed AtomicRead"
         mo@(MO_AtomicWrite w ord)
@@ -1930,19 +1925,6 @@ genFarJump far_target =
         B (TReg ipReg)
       ]
 
--- | An unconditional jump to a far target
---
--- By loading the far target into a register for the jump, we can address the
--- whole memory range.
-genFarBranchAndLink :: (MonadUnique m) => BlockId -> [Reg] -> m InstrBlock
-genFarBranchAndLink far_target ps =
-  return
-    $ toOL
-      [ ann (text "Unconditional branch and link to: " <> ppr far_target)
-          $ LDR II64 (OpReg W64 ipReg) (OpImm (ImmCLbl (blockLbl far_target))),
-        BL (TReg ipReg) ps
-      ]
-
 -- See Note [RISCV64 far jumps]
 data BlockInRange = InRange | NotInRange BlockId
 
@@ -2009,12 +1991,6 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
             InRange -> pure (pos + instr_size instr, [instr])
             NotInRange far_target -> do
               jmp_code <- genFarJump far_target
-              pure (pos + instr_size instr, fromOL jmp_code)
-        BL t ps ->
-          case target_in_range m t pos of
-            InRange -> pure (pos + instr_size instr, [instr])
-            NotInRange far_target -> do
-              jmp_code <- genFarBranchAndLink far_target ps
               pure (pos + instr_size instr, fromOL jmp_code)
         _ -> pure (pos + instr_size instr, [instr])
 
@@ -2095,6 +2071,5 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       J (TReg _) -> 1
       B (TBlock _) -> long_b_jump_size
       B (TReg _) -> 1
-      BL (TBlock _) _ -> long_b_jump_size
-      BL (TReg _) _ -> 1
+      BL _ _ -> 1
       J_TBL {} -> 1

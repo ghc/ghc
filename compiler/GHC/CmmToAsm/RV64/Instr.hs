@@ -106,7 +106,7 @@ regUsageOfInstr platform instr = case instr of
   J_TBL _ _ t              -> usage ([t], [])
   B t                      -> usage (regTarget t, [])
   BCOND _ l r t            -> usage (regTarget t ++ regOp l ++ regOp r, [])
-  BL t ps                  -> usage (regTarget t ++ ps, callerSavedRegisters)
+  BL t ps                  -> usage (t : ps, callerSavedRegisters)
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
@@ -203,7 +203,7 @@ patchRegsOfInstr instr env = case instr of
     J t            -> J (patchTarget t)
     J_TBL ids mbLbl t    -> J_TBL ids mbLbl (env t)
     B t            -> B (patchTarget t)
-    BL t ps          -> BL (patchTarget t) ps
+    BL t ps          -> BL (patchReg t) ps
     BCOND c o1 o2 t -> BCOND c (patchOp o1) (patchOp o2) (patchTarget t)
 
     -- 5. Atomic Instructions --------------------------------------------------
@@ -237,6 +237,9 @@ patchRegsOfInstr instr env = case instr of
         patchAddr :: AddrMode -> AddrMode
         patchAddr (AddrRegImm r1 i)  = AddrRegImm (env r1) i
         patchAddr (AddrReg r) = AddrReg (env r)
+        patchReg :: Reg -> Reg
+        patchReg = env
+
 --------------------------------------------------------------------------------
 
 -- | Checks whether this instruction is a jump/branch instruction.
@@ -259,7 +262,6 @@ jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (BL t _) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND _ _ _ t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr _ = []
 
@@ -274,7 +276,6 @@ patchJumpInstr instr patchF =
     J (TBlock bid) -> J (TBlock (patchF bid))
     J_TBL ids mbLbl r -> J_TBL (map (fmap patchF) ids) mbLbl r
     B (TBlock bid) -> B (TBlock (patchF bid))
-    BL (TBlock bid) ps -> BL (TBlock (patchF bid)) ps
     BCOND c o1 o2 (TBlock bid) -> BCOND c o1 o2 (TBlock (patchF bid))
     _ -> panic $ "patchJumpInstr: " ++ instrCon instr
 
@@ -582,7 +583,7 @@ data Instr
     -- | A `J` instruction with data for switch jump tables
     | J_TBL [Maybe BlockId] (Maybe CLabel) Reg
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
-    | BL Target [Reg] -- branch and link (e.g. set x30 to next pc, and branch)
+    | BL Reg [Reg] -- branch and link (e.g. set x30 to next pc, and branch)
     | BCOND Cond Operand Operand Target   -- branch with condition. b.<cond>
     -- | pseudo-op for far branch targets
 
