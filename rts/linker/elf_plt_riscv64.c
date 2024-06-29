@@ -2,6 +2,7 @@
 #include "elf_compat.h"
 #include "elf_plt_riscv64.h"
 #include "rts/Messages.h"
+#include "linker/ElfTypes.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -35,6 +36,7 @@ bool needStubForRelaRISCV64(Elf_Rela *rela) {
 
 // After the global offset table (GOT) has been set up, we can use these three
 // instructions to jump to the target address / function:
+//
 //  1. AUIPC ip, %pcrel_hi(addr)
 //  2. LD ip, %pcrel_lo(addr)(ip)
 //  3. JARL x0, ip, 0
@@ -43,6 +45,10 @@ bool needStubForRelaRISCV64(Elf_Rela *rela) {
 // that would require loading a 64-bit constant which is a nightmare to do in
 // riscv64 assembly. (See
 // https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/5ffe5b5aeedb37b1c1c0c3d94641267d9ad4795a/riscv-elf.adoc#procedure-linkage-table)
+//
+// So far, PC-relative addressing seems to be good enough. If it ever turns out
+// to be not, one could (additionally for out-of-range cases?) encode absolute
+// addressing here.
 bool makeStubRISCV64(Stub *s) {
   uint32_t *P = (uint32_t *)s->addr;
   int32_t addr = (uint64_t)s->got_addr - (uint64_t)P;

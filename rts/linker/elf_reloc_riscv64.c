@@ -109,8 +109,6 @@ char *relocationTypeToString(Elf64_Xword type) {
   }
 }
 
-#define Page(x) ((x) & ~0xFFF)
-
 STG_NORETURN
 int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
                             Elf_Rel *rel STG_UNUSED) {
@@ -121,7 +119,7 @@ int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
 // Make sure that V can be represented as an N bit signed integer.
 void checkInt(inst_t *loc, int32_t v, int n) {
   if (v != signExtend32(v, n)) {
-    debugBelch("Relocation at 0x%x is out of range. value: 0x%x (%d), "
+    barf("Relocation at 0x%x is out of range. value: 0x%x (%d), "
                "sign-extended value: 0x%x (%d), max bits 0x%x (%d)\n",
                *loc, v, v, signExtend32(v, n), signExtend32(v, n), n, n);
   }
@@ -569,7 +567,6 @@ int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *re
   case R_RISCV_SUB32:
     FALLTHROUGH;
   case R_RISCV_SUB64:
-    // TODO: Is this '+' correct? Not '-'?
     return S + A; // Subtract from V when value is set
   case R_RISCV_SET6:
     FALLTHROUGH;
