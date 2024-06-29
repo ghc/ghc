@@ -12,7 +12,8 @@ import Text.PrettyPrint (render)
 import GHC.Internal.TH.PprLib
 import GHC.Internal.TH.Syntax
 import Data.Word ( Word8 )
-import Data.Char ( toLower, chr)
+import Data.Char ( toLower, chr )
+import Data.List ( intersperse )
 import GHC.Show  ( showMultiLineString )
 import GHC.Lexeme( isVarSymChar )
 import Data.Ratio ( numerator, denominator )
@@ -836,7 +837,7 @@ pprType _ (TupleT 0)             = text "()"
 pprType p (TupleT 1)             = pprType p (ConT (tupleTypeName 1))
 pprType _ (TupleT n)             = parens (hcat (replicate (n-1) comma))
 pprType _ (UnboxedTupleT n)      = hashParens $ hcat $ replicate (n-1) comma
-pprType _ (UnboxedSumT arity)    = hashParens $ hcat $ replicate (arity-1) bar
+pprType _ (UnboxedSumT arity)    = hashParens $ hsep $ replicate (arity-1) bar
 pprType _ ArrowT                 = parens (text "->")
 pprType _ MulArrowT              = text "FUN"
 pprType _ ListT                  = text "[]"
@@ -929,6 +930,12 @@ pprTyApp p (PromotedTupleT 1, args) = pprTyApp p (PromotedT (tupleDataName 1), a
 pprTyApp _ (PromotedTupleT n, args)
  | length args == n, Just args' <- traverse fromTANormal args
  = quoteParens (commaSep args')
+pprTyApp _ (UnboxedTupleT n, args)
+ | length args == n, Just args' <- traverse fromTANormal args
+ = hashParens (commaSep args')
+pprTyApp _ (UnboxedSumT n, args)
+ | length args == n, Just args' <- traverse fromTANormal args
+ = hashParens (sep $ intersperse bar $ map ppr args')
 pprTyApp p (fun, args) =
   parensIf (p >= appPrec) $ pprParendType fun <+> sep (map pprParendTypeArg args)
 

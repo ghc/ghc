@@ -1,1 +1,1 @@
-data Main.T = Main.T ((# , #) GHC.Types.Int GHC.Types.Int)
+data Main.T = Main.T (# GHC.Types.Int, GHC.Types.Int #)
