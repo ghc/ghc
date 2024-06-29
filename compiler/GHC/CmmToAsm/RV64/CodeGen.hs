@@ -1147,7 +1147,6 @@ addAlignmentCheck align wordWidth reg = do
     Fixed fmt reg code -> Fixed fmt reg (code `appOL` check fmt jumpReg cmpReg okayLblId reg)
     Any fmt f -> Any fmt (\reg -> f reg `appOL` check fmt jumpReg cmpReg okayLblId reg)
   where
-    -- TODO: Reduce amount of parameters by making this a let binding
     check :: Format -> Reg -> Reg -> BlockId -> Reg -> InstrBlock
     check fmt jumpReg cmpReg okayLblId reg =
       let width = formatToWidth fmt

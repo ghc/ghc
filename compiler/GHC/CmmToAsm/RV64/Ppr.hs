@@ -183,7 +183,6 @@ pprDatas config (CmmStaticsRaw lbl dats)
    where
       platform = ncgPlatform config
 
--- TODO: Unused parameter.
 pprData :: IsDoc doc => NCGConfig -> CmmStatic -> doc
 pprData _config (CmmString str) = line (pprString str)
 pprData _config (CmmFileEmbed path _) = line (pprFileEmbed path)
