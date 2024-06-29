@@ -51,7 +51,6 @@ import GHC.Data.OrdList
 import GHC.Utils.Outputable
 
 import Control.Monad    ( mapAndUnzipM, foldM )
-import Data.Maybe
 import GHC.Float
 
 import GHC.Types.Basic
@@ -150,7 +149,7 @@ basicBlockCodeGen block = do
             return $ unitOL $ LOCATION fileId line col (unpackFS name)
     _ -> return nilOL
   (mid_instrs,mid_bid) <- stmtsToInstrs id stmts
-  (!tail_instrs,_) <- stmtToInstrs mid_bid tail
+  (!tail_instrs) <- stmtToInstrs mid_bid tail
   let instrs = header_comment_instr `appOL` loc_instrs `appOL` mid_instrs `appOL` tail_instrs
   -- TODO: Then x86 backend run @verifyBasicBlock@ here and inserts
   --      unwinding info. See Ticket 19913
@@ -262,17 +261,15 @@ stmtsToInstrs bid stmts =
   where
     go bid  []        instrs = return (instrs,bid)
     go bid (s:stmts)  instrs = do
-      (instrs',bid') <- stmtToInstrs bid s
-      -- If the statement introduced a new block, we use that one
-      let !newBid = fromMaybe bid bid'
-      go newBid stmts (instrs `appOL` instrs')
+      instrs' <- stmtToInstrs bid s
+      go bid stmts (instrs `appOL` instrs')
 
 -- | `bid` refers to the current block and is used to update the CFG
 --   if new blocks are inserted in the control flow.
 -- See Note [Keeping track of the current block] for more details.
 stmtToInstrs :: BlockId -- ^ Basic block this statement will start to be placed in.
              -> CmmNode e x
-             -> NatM (InstrBlock, Maybe BlockId)
+             -> NatM InstrBlock
              -- ^ Instructions, and bid of new block if successive
              -- statements are placed in a different basic block.
 stmtToInstrs bid stmt = do
@@ -283,7 +280,7 @@ stmtToInstrs bid stmt = do
     CmmUnsafeForeignCall target result_regs args
        -> genCCall target result_regs args bid
 
-    _ -> (,Nothing) <$> case stmt of
+    _ -> case stmt of
       CmmComment s   -> return (unitOL (COMMENT (ftext s)))
       CmmTick {}     -> return nilOL
 
@@ -1550,7 +1547,7 @@ genCCall
     -> [CmmFormal]        -- where to put the result
     -> [CmmActual]        -- arguments (of mixed type)
     -> BlockId            -- The block we are in
-    -> NatM (InstrBlock, Maybe BlockId)
+    -> NatM InstrBlock
 -- TODO: Specialize where we can.
 -- Generic impl
 genCCall target dest_regs arg_regs bid = do
@@ -1617,7 +1614,7 @@ genCCall target dest_regs arg_regs bid = do
             `appOL` (unitOL $ BL call_target passRegs) -- branch and link.
             `appOL` readResultsCode           -- parse the results into registers
             `appOL` moveStackUp (stackSpace `div` 8)
-      return (code, Nothing)
+      return code
 
     PrimTarget MO_F32_Fabs
       | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
@@ -1642,7 +1639,7 @@ genCCall target dest_regs arg_regs bid = do
               let lo = getRegisterReg platform (CmmLocal dst_lo)
                   hi = getRegisterReg platform (CmmLocal dst_hi)
                   nd = getRegisterReg platform (CmmLocal dst_needed)
-              return (
+              return $
                   code_x `appOL`
                   code_y `snocOL`
                   MUL   (OpReg W64 lo) (OpReg W64 reg_a) (OpReg W64 reg_b) `snocOL`
@@ -1651,7 +1648,6 @@ genCCall target dest_regs arg_regs bid = do
                   -- nd = (hi == ASR(lo,width-1)) ? 1 : 0
                   CMP   (OpReg W64 hi) (OpRegShift W64 lo SASR (widthInBits w - 1)) `snocOL`
                   CSET  (OpReg W64 nd) NE
-                  , Nothing)
             -- For sizes < platform width, we can just perform a multiply and shift
             -- using the normal 64 bit multiply. Calculating the dst_needed value is
             -- complicated a little by the need to be careful when truncation happens.
@@ -1674,7 +1670,7 @@ genCCall target dest_regs arg_regs bid = do
               (reg_a, code_a') <- signExtendReg w w' reg_a'
               (reg_b, code_b') <- signExtendReg w w' reg_b'
 
-              return (
+              return $
                   code_a  `appOL`
                   code_b  `appOL`
                   code_a' `appOL`
@@ -1704,7 +1700,6 @@ genCCall target dest_regs arg_regs bid = do
                   CSET  (OpReg w' nd) EQ `appOL`
                   -- Finally truncate hi to drop any extraneous sign bits.
                   truncateReg w' w hi
-                  , Nothing)
           -- Can't handle > 64 bit operands
           | otherwise -> unsupported (MO_S_Mul2 w)
     PrimTarget (MO_U_Mul2  w)
@@ -1724,7 +1719,7 @@ genCCall target dest_regs arg_regs bid = do
                   code_y `snocOL`
                   MUL   (OpReg W64 lo) (OpReg W64 reg_a) (OpReg W64 reg_b) `snocOL`
                   UMULH (OpReg W64 hi) (OpReg W64 reg_a) (OpReg W64 reg_b)
-                  , Nothing)
+                  )
             -- For sizes < platform width, we can just perform a multiply and shift
             -- Need to be careful to truncate the low half, but the upper half should be
             -- be ok if the invariant in [Signed arithmetic on AArch64] is maintained.
@@ -1755,7 +1750,7 @@ genCCall target dest_regs arg_regs bid = do
                       (OpImm (ImmInt $ widthInBits w)) -- width to extract
                       `appOL`
                   truncateReg W64 w lo
-                  , Nothing)
+                  )
           | otherwise -> unsupported (MO_U_Mul2  w)
     PrimTarget (MO_Clz  w)
           | w == W64 || w == W32
@@ -1767,7 +1762,7 @@ genCCall target dest_regs arg_regs bid = do
               return (
                   code_x `snocOL`
                   CLZ   (OpReg w dst_reg) (OpReg w reg_a)
-                  , Nothing)
+                  )
           | w == W16
           , [src] <- arg_regs
           , [dst] <- dest_regs
@@ -1783,7 +1778,7 @@ genCCall target dest_regs arg_regs bid = do
                     , ORR (r dst') (r dst')  (imm 0x00008000)
                     , CLZ (r dst') (r dst')
                     ]
-                  , Nothing)
+                  )
           | w == W8
           , [src] <- arg_regs
           , [dst] <- dest_regs
@@ -1793,13 +1788,12 @@ genCCall target dest_regs arg_regs bid = do
                   r n = OpReg W32 n
                   imm n = OpImm (ImmInt n)
               {- dst = clz(x << 24 | 0x0080_0000) -}
-              return (
+              return $
                   code_x `appOL` toOL
                     [ LSL (r dst') (r reg_a) (imm 24)
                     , ORR (r dst') (r dst')  (imm 0x00800000)
                     , CLZ (r dst') (r dst')
                     ]
-                  , Nothing)
             | otherwise -> unsupported (MO_Clz  w)
     PrimTarget (MO_Ctz  w)
           | w == W64 || w == W32
@@ -1808,11 +1802,10 @@ genCCall target dest_regs arg_regs bid = do
           -> do
               (reg_a, _format_x, code_x) <- getSomeReg src
               let dst_reg = getRegisterReg platform (CmmLocal dst)
-              return (
+              return $
                   code_x `snocOL`
                   RBIT (OpReg w dst_reg) (OpReg w reg_a) `snocOL`
                   CLZ  (OpReg w dst_reg) (OpReg w dst_reg)
-                  , Nothing)
           | w == W16
           , [src] <- arg_regs
           , [dst] <- dest_regs
@@ -1822,13 +1815,12 @@ genCCall target dest_regs arg_regs bid = do
                   r n = OpReg W32 n
                   imm n = OpImm (ImmInt n)
               {- dst = clz(reverseBits(x) | 0x0000_8000) -}
-              return (
+              return $
                   code_x `appOL` toOL
                     [ RBIT (r dst') (r reg_a)
                     , ORR  (r dst') (r dst') (imm 0x00008000)
                     , CLZ  (r dst') (r dst')
                     ]
-                  , Nothing)
           | w == W8
           , [src] <- arg_regs
           , [dst] <- dest_regs
@@ -1838,13 +1830,12 @@ genCCall target dest_regs arg_regs bid = do
                   r n = OpReg W32 n
                   imm n = OpImm (ImmInt n)
               {- dst = clz(reverseBits(x) | 0x0080_0000) -}
-              return (
+              return $
                   code_x `appOL` toOL
                     [ RBIT (r dst') (r reg_a)
                     , ORR (r dst')  (r dst') (imm 0x00800000)
                     , CLZ  (r dst')  (r dst')
                     ]
-                  , Nothing)
             | otherwise -> unsupported (MO_Ctz  w)
     PrimTarget (MO_BRev  w)
           | w == W64 || w == W32
@@ -1853,10 +1844,9 @@ genCCall target dest_regs arg_regs bid = do
           -> do
               (reg_a, _format_x, code_x) <- getSomeReg src
               let dst_reg = getRegisterReg platform (CmmLocal dst)
-              return (
+              return $
                   code_x `snocOL`
                   RBIT (OpReg w dst_reg) (OpReg w reg_a)
-                  , Nothing)
           | w == W16
           , [src] <- arg_regs
           , [dst] <- dest_regs
@@ -1866,12 +1856,11 @@ genCCall target dest_regs arg_regs bid = do
                   r n = OpReg W32 n
                   imm n = OpImm (ImmInt n)
               {- dst = reverseBits32(x << 16) -}
-              return (
+              return $
                   code_x `appOL` toOL
                     [ LSL  (r dst') (r reg_a) (imm 16)
                     , RBIT (r dst') (r dst')
                     ]
-                  , Nothing)
           | w == W8
           , [src] <- arg_regs
           , [dst] <- dest_regs
@@ -1881,12 +1870,11 @@ genCCall target dest_regs arg_regs bid = do
                   r n = OpReg W32 n
                   imm n = OpImm (ImmInt n)
               {- dst = reverseBits32(x << 24) -}
-              return (
+              return $
                   code_x `appOL` toOL
                     [ LSL  (r dst') (r reg_a) (imm 24)
                     , RBIT (r dst') (r dst')
                     ]
-                  , Nothing)
             | otherwise -> unsupported (MO_BRev  w)
 
 
@@ -1989,12 +1977,12 @@ genCCall target dest_regs arg_regs bid = do
         MO_SubIntC    _w -> unsupported mop
 
         -- Memory Ordering
-        MO_AcquireFence     ->  return (unitOL DMBISH, Nothing)
-        MO_ReleaseFence     ->  return (unitOL DMBISH, Nothing)
-        MO_SeqCstFence      ->  return (unitOL DMBISH, Nothing)
-        MO_Touch            ->  return (nilOL, Nothing) -- Keep variables live (when using interior pointers)
+        MO_AcquireFence     ->  return (unitOL DMBISH)
+        MO_ReleaseFence     ->  return (unitOL DMBISH)
+        MO_SeqCstFence      ->  return (unitOL DMBISH)
+        MO_Touch            ->  return nilOL -- Keep variables live (when using interior pointers)
         -- Prefetch
-        MO_Prefetch_Data _n -> return (nilOL, Nothing) -- Prefetch hint.
+        MO_Prefetch_Data _n -> return nilOL -- Prefetch hint.
 
         -- Memory copy/set/move/cmp, with alignment for optimization
 
@@ -2029,7 +2017,7 @@ genCCall target dest_regs arg_regs bid = do
                   code =
                     code_p `snocOL`
                     instr (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)
-              return (code, Nothing)
+              return code
           | otherwise -> panic "mal-formed AtomicRead"
         MO_AtomicWrite w ord
           | [p_reg, val_reg] <- arg_regs -> do
@@ -2042,7 +2030,7 @@ genCCall target dest_regs arg_regs bid = do
                     code_p `appOL`
                     code_val `snocOL`
                     instr fmt_val (OpReg w val) (OpAddr $ AddrReg p)
-              return (code, Nothing)
+              return code
           | otherwise -> panic "mal-formed AtomicWrite"
         MO_AtomicRMW w amop -> mkCCall (atomicRMWLabel w amop)
         MO_Cmpxchg w        -> mkCCall (cmpxchgLabel w)
@@ -2055,7 +2043,7 @@ genCCall target dest_regs arg_regs bid = do
     unsupported :: Show a => a -> b
     unsupported mop = panic ("outOfLineCmmOp: " ++ show mop
                           ++ " not supported here")
-    mkCCall :: FastString -> NatM (InstrBlock, Maybe BlockId)
+    mkCCall :: FastString -> NatM InstrBlock
     mkCCall name = do
       config <- getConfig
       target <- cmmMakeDynamicReference config CallReference $
@@ -2227,7 +2215,7 @@ genCCall target dest_regs arg_regs bid = do
       (reg_fx, _format_x, code_fx) <- getFloatReg arg_reg
       let dst = getRegisterReg platform (CmmLocal dest_reg)
       let code = code_fx `appOL` op (OpReg w dst) (OpReg w reg_fx)
-      return (code, Nothing)
+      return code
 
 {- Note [AArch64 far jumps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
