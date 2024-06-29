@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module GHC.CmmToAsm.RV64.Ppr (pprNatCmmDecl, pprInstr) where
 
 import GHC.Prelude hiding (EQ)
@@ -25,19 +26,18 @@ import GHC.Utils.Outputable
 
 import GHC.Utils.Panic
 
--- TODO: Move function down to where it is used.
-pprProcAlignment :: IsDoc doc => NCGConfig -> doc
-pprProcAlignment config = maybe empty (pprAlign platform . mkAlignment) (ncgProcAlignment config)
-   where
-      platform = ncgPlatform config
-
-pprNatCmmDecl :: IsDoc doc => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
+pprNatCmmDecl :: forall doc. IsDoc doc => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
 pprNatCmmDecl config (CmmData section dats) =
   pprSectionAlign config section $$ pprDatas config dats
 
 pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
-  let platform = ncgPlatform config in
-  pprProcAlignment config $$
+  let
+    platform = ncgPlatform config
+
+    pprProcAlignment :: doc
+    pprProcAlignment = maybe empty (pprAlign . mkAlignment) (ncgProcAlignment config)
+  in
+  pprProcAlignment $$
   case topInfoTable proc of
     Nothing ->
         -- special case for code without info table:
@@ -78,21 +78,26 @@ pprLabel platform lbl =
    $$ pprTypeDecl platform lbl
    $$ line (pprAsmLabel platform lbl <> char ':')
 
--- TODO: Delete unused parameter.
-pprAlign :: IsDoc doc => Platform -> Alignment -> doc
-pprAlign _platform alignment
+pprAlign :: IsDoc doc => Alignment -> doc
+pprAlign alignment
+-- "The .align directive for RISC-V is an alias to .p2align, which aligns to a
+-- power of two, so .align 2 means align to 4 bytes. Because the definition of
+-- the .align directive varies by architecture, it is recommended to use the
+-- unambiguous .p2align or .balign directives instead."
+-- (https://github.com/riscv-non-isa/riscv-asm-manual/blob/main/riscv-asm.md#-align)
         = line $ text "\t.balign " <> int (alignmentBytes alignment)
 
--- TODO: Delete unused parameters.
 -- | Print appropriate alignment for the given section type.
-pprAlignForSection :: IsDoc doc => Platform -> SectionType -> doc
-pprAlignForSection _platform _seg
-    -- .balign is stable, whereas .align is platform dependent.
-    = line (text "\t.balign 8") --  always 8
+--
+-- Currently, this always aligns to a full machine word (8 byte.) A future
+-- improvement could be to really do this per section type (though, it's
+-- probably not a big gain.)
+pprAlignForSection :: IsDoc doc => SectionType -> doc
+pprAlignForSection _seg = pprAlign . mkAlignment $ 8
 
 -- | Print section header and appropriate alignment for that section.
 --
--- This one will emit the header:
+-- This will e.g. emit a header like:
 --
 --     .section .text
 --     .balign 8
@@ -102,7 +107,7 @@ pprSectionAlign _config (Section (OtherSection _) _) =
   panic "RV64.Ppr.pprSectionAlign: unknown section"
 pprSectionAlign config sec@(Section seg _) =
     line (pprSectionHeader config sec)
-    $$ pprAlignForSection (ncgPlatform config) seg
+    $$ pprAlignForSection seg
 
 pprProcEndLabel :: IsLine doc => Platform -> CLabel -- ^ Procedure name
                 -> doc
@@ -114,14 +119,16 @@ pprBlockEndLabel :: IsLine doc => Platform -> CLabel -- ^ Block name
 pprBlockEndLabel platform lbl =
     pprAsmLabel platform (mkAsmTempEndLabel lbl) <> colon
 
--- | Output the ELF .size directive.
-pprSizeDecl :: IsDoc doc => Platform -> CLabel -> doc
+-- | Output the ELF .size directive (if needed.)
+pprSizeDecl :: (IsDoc doc) => Platform -> CLabel -> doc
 pprSizeDecl platform lbl
- = if osElfTarget (platformOS platform)
-   then line (text "\t.size" <+> pprAsmLabel platform lbl <> text ", .-" <> pprAsmLabel platform lbl)
-   else empty
+  | osElfTarget (platformOS platform) =
+      line $ text "\t.size" <+> asmLbl <> text ", .-" <> asmLbl
+  where
+    asmLbl = pprAsmLabel platform lbl
+pprSizeDecl _ _ = empty
 
-pprBasicBlock :: IsDoc doc => NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
+pprBasicBlock :: (IsDoc doc) => NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
               -> doc
 pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $
@@ -381,34 +388,39 @@ pprReg w r = case r of
          -- no support for widths > W64.
          | otherwise = pprPanic "Unsupported width in register (max is 64)" (ppr w <+> int i)
 
+-- | Single precission `Operand` (floating-point)
 isSingleOp :: Operand -> Bool
 isSingleOp (OpReg W32 _) = True
 isSingleOp _ = False
 
+-- | Double precission `Operand` (floating-point)
 isDoubleOp :: Operand -> Bool
 isDoubleOp (OpReg W64 _) = True
 isDoubleOp _ = False
 
+-- | `Operand` is an immediate value
 isImmOp :: Operand -> Bool
 isImmOp (OpImm _) = True
 isImmOp _ = False
 
+-- | `Operand` is an immediate @0@ value
 isImmZero :: Operand -> Bool
 isImmZero (OpImm (ImmFloat 0)) = True
 isImmZero (OpImm (ImmDouble 0)) = True
 isImmZero (OpImm (ImmInt 0)) = True
 isImmZero _ = False
 
+-- | `Target` represents a label
 isLabel :: Target -> Bool
 isLabel (TBlock _) = True
 isLabel _ = False
 
-getLabel :: IsLine doc => Platform -> Target -> doc
+getLabel :: (IsLine doc) => Platform -> Target -> doc
 getLabel platform (TBlock bid) = pprBlockId platform bid
+  where
+    pprBlockId :: (IsLine doc) => Platform -> BlockId -> doc
+    pprBlockId platform bid = pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
 getLabel _platform _other = panic "Cannot turn this into a label"
-
-pprBlockId :: IsLine doc => Platform -> BlockId -> doc
-pprBlockId platform bid = pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
 
 pprInstr :: IsDoc doc => Platform -> Instr -> doc
 pprInstr platform instr = case instr of
@@ -509,6 +521,7 @@ pprInstr platform instr = case instr of
   J t             -> pprInstr platform (B t)
   J_TBL _ _ r     -> pprInstr platform (J (TReg r))
   -- TODO: This is odd: (B)ranch and branch and link (BL) do the same: branch and link
+  -- TODO: replace B by J and (to be created) JR (simpler and clearer)
   B l | isLabel l -> line $ text "\tjal" <+> pprOp platform x0 <> comma <+> getLabel platform l
   B (TReg r)      -> line $ text "\tjalr" <+> text "x0" <> comma <+> pprReg W64 r <> comma <+> text "0"
 

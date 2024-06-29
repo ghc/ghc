@@ -330,26 +330,23 @@ swizzleRegisterRep :: Format -> Register -> Register
 swizzleRegisterRep format (Fixed _ reg code) = Fixed format reg code
 swizzleRegisterRep format (Any _ codefn)     = Any   format codefn
 
--- | Grab the Reg for a CmmReg
+-- | Grab a `Reg` for a `CmmReg`
+--
+-- `LocalReg`s are assigned virtual registers (`RegVirtual`), `GlobalReg`s are
+-- assigned real registers (`RegReal`). It is an error if a `GlobalReg` is not a
+-- STG register.
 getRegisterReg :: Platform -> CmmReg -> Reg
-
 getRegisterReg _ (CmmLocal (LocalReg u pk))
   = RegVirtual $ mkVirtualReg u (cmmTypeFormat pk)
-
 getRegisterReg platform (CmmGlobal mid)
   = case globalRegMaybe platform (globalRegUseGlobalReg mid) of
         Just reg -> RegReal reg
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
-        -- By this stage, the only MagicIds remaining should be the
-        -- ones which map to a real machine register on this
-        -- platform.  Hence if it's not mapped to a registers something
-        -- went wrong earlier in the pipeline.
 
 -- -----------------------------------------------------------------------------
 -- General things for putting together code sequences
 
--- | The dual to getAnyReg: compute an expression into a register, but
---      we don't mind which one it is.
+-- | Compute an expression into any register
 getSomeReg :: CmmExpr -> NatM (Reg, Format, InstrBlock)
 getSomeReg expr = do
   r <- getRegister expr
@@ -360,8 +357,10 @@ getSomeReg expr = do
     Fixed rep reg code ->
         return (reg, rep, code)
 
--- TODO OPT: we might be able give getRegister
---          a hint, what kind of register we want.
+-- | Compute an expression into any floating-point register
+--
+-- If the initial expression is not a floating-point expression, finally move
+-- the result into a floating-point register.
 getFloatReg :: HasCallStack => CmmExpr -> NatM (Reg, Format, InstrBlock)
 getFloatReg expr = do
   r <- getRegister expr
@@ -382,9 +381,10 @@ getFloatReg expr = do
     Fixed rep reg code ->
       return (reg, rep, code)
 
--- TODO: TODO, bounds. We can't put any immediate
--- value in. They are constrained.
--- See Ticket 19911
+-- | Map `CmmLit` to `OpImm`
+--
+-- N.B. this is a partial function, because not all `CmmLit`s have an immediate
+-- representation.
 litToImm' :: CmmLit -> NatM (Operand, InstrBlock)
 litToImm' lit = return (OpImm (litToImm lit), nilOL)
 
