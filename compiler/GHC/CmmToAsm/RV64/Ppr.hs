@@ -518,12 +518,9 @@ pprInstr platform instr = case instr of
   XORI o1 o2 o3 -> op3 (text "\txori") o1 o2 o3
 
   -- 4. Branch Instructions ----------------------------------------------------
-  J t             -> pprInstr platform (B t)
-  J_TBL _ _ r     -> pprInstr platform (J (TReg r))
-  -- TODO: This is odd: (B)ranch and branch and link (BL) do the same: branch and link
-  -- TODO: replace B by J and (to be created) JR (simpler and clearer)
+  J_TBL _ _ r     -> pprInstr platform (B (TReg r))
   B l | isLabel l -> line $ text "\tjal" <+> pprOp platform x0 <> comma <+> getLabel platform l
-  B (TReg r)      -> line $ text "\tjalr" <+> text "x0" <> comma <+> pprReg W64 r <> comma <+> text "0"
+  B (TReg r)      -> line $ text "\tjalr" <+> pprOp platform x0 <> comma <+> pprReg W64 r <> comma <+> text "0"
 
   BL r _ -> line $ text "\tjalr" <+> text "x1" <> comma <+> pprReg W64 r <> comma <+> text "0"
 

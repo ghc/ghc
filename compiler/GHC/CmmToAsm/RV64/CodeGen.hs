@@ -1159,7 +1159,7 @@ addAlignmentCheck align wordWidth reg = do
                   , BCOND EQ (OpReg width cmpReg) zero (TBlock okayLblId)
                   , COMMENT (text "Alignment check failed")
                   , LDR II64 (OpReg W64 jumpReg) (OpImm $ ImmCLbl mkBadAlignmentLabel)
-                  , J (TReg jumpReg)
+                  , B (TReg jumpReg)
                   , NEWBLOCK okayLblId
               ]
 
@@ -1986,12 +1986,6 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
             NotInRange far_target -> do
               jmp_code <- genFarJump far_target
               pure (pos + instr_size instr, fromOL jmp_code)
-        J t ->
-          case target_in_range m t pos of
-            InRange -> pure (pos + instr_size instr, [instr])
-            NotInRange far_target -> do
-              jmp_code <- genFarJump far_target
-              pure (pos + instr_size instr, fromOL jmp_code)
         _ -> pure (pos + instr_size instr, [instr])
 
     target_in_range :: LabelMap Int -> Target -> Int -> BlockInRange
@@ -2067,8 +2061,6 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1
       BCOND {} -> long_bc_jump_size
-      J (TBlock _) -> long_b_jump_size
-      J (TReg _) -> 1
       B (TBlock _) -> long_b_jump_size
       B (TReg _) -> 1
       BL _ _ -> 1
