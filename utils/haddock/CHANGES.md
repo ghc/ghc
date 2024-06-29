@@ -5,6 +5,8 @@
 
  * Fix large margin on top of small headings
 
+ * Include `package_info` with haddock's `--show-interface` option.
+
 ## Changes in 2.28.0
  * `hi-haddock` is integrated, which means docstrings are no longer extracted
    through typchecked module results. Instead, docstrings are taken from Haskell

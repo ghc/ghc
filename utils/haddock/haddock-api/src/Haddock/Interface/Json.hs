@@ -21,7 +21,8 @@ import Haddock.Types
 jsonInterfaceFile :: InterfaceFile -> JsonDoc
 jsonInterfaceFile InterfaceFile{..} =
   jsonObject
-    [ ("link_env", jsonMap nameStableString (jsonString . moduleNameString . moduleName) ifLinkEnv)
+    [ ("package_info", jsonPackageInfo ifPackageInfo)
+    , ("link_env", jsonMap nameStableString (jsonString . moduleNameString . moduleName) ifLinkEnv)
     , ("inst_ifaces", jsonArray (map jsonInstalledInterface ifInstalledIfaces))
     ]
 
@@ -52,6 +53,9 @@ jsonHaddockModInfo HaddockModInfo{..} =
     , ("language", jsonMaybe (jsonString . show) hmi_language)
     , ("extensions", jsonArray (map (jsonString . show) hmi_extensions))
     ]
+
+jsonPackageInfo :: PackageInfo -> JsonDoc
+jsonPackageInfo = jsonString . ppPackageInfo
 
 jsonMap :: (a -> String) -> (b -> JsonDoc) -> Map a b -> JsonDoc
 jsonMap f g = jsonObject . map (f *** g) . Map.toList
