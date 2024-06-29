@@ -190,7 +190,7 @@ genSwitch config expr targets = do
   tmp <- getNewRegNat fmt
   lbl <- getNewLabelNat
   dynRef <- cmmMakeDynamicReference config DataReference lbl
-  (tableReg, fmt2, t_code) <- getSomeReg $ dynRef
+  (tableReg, fmt2, t_code) <- getSomeReg dynRef
   let code =
         toOL [ COMMENT (text "indexExpr" <+> (text . show) indexExpr)
              , COMMENT (text "dynRef" <+> (text . show) dynRef)
@@ -943,7 +943,7 @@ getRegister' config plat expr =
           FNMSub -> float3Op w (\d n m a -> unitOL $ FMA FNMAdd d n m a)
 
         _ -> pprPanic "getRegister' (unhandled ternary CmmMachOp): " $
-                (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
+                pprMachOp op <+> text "in" <+> pdoc plat expr
 
       where
           float3Op w op = do
