@@ -57,6 +57,7 @@ import GHC.Utils.Panic
 import GHC.Cmm.Dataflow.Label
 import GHC.Types.Unique.Supply
 import GHC.Utils.Monad
+import Control.Monad
 
 -- For an overview of an NCG's structure, see Note [General layout of an NCG]
 
@@ -66,27 +67,19 @@ cmmTopCodeGen
 
 -- Thus we'll have to deal with either CmmProc ...
 cmmTopCodeGen _cmm@(CmmProc info lab live graph) = do
-  -- do
-  --   traceM $ "-- -------------------------- cmmTopGen (CmmProc) -------------------------- --\n"
-  --         ++ showSDocUnsafe (ppr cmm)
+  picBaseMb <- getPicBaseMaybeNat
+  when (isJust picBaseMb) $  panic "RV64.cmmTopCodeGen: Unexpected PIC base register (RISCV ISA does not define one)"
 
   let blocks = toBlockListEntryFirst graph
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
-  picBaseMb <- getPicBaseMaybeNat
 
   let proc = CmmProc info lab live (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
 
-  case picBaseMb of
-      Just _picBase -> panic "RV64.cmmTopCodeGen: picBase not implemented"
-      Nothing -> return tops
+  pure tops
 
 -- ... or CmmData.
-cmmTopCodeGen _cmm@(CmmData sec dat) = do
-  -- do
-  --   traceM $ "-- -------------------------- cmmTopGen (CmmData) -------------------------- --\n"
-  --         ++ showSDocUnsafe (ppr cmm)
-  return [CmmData sec dat] -- no translation, we just use CmmStatic
+cmmTopCodeGen (CmmData sec dat) = pure [CmmData sec dat] -- no translation, we just use CmmStatic
 
 basicBlockCodeGen
         :: Block CmmNode C C
@@ -95,9 +88,6 @@ basicBlockCodeGen
 
 basicBlockCodeGen block = do
   config <- getConfig
-  -- do
-  --   traceM $ "-- --------------------------- basicBlockCodeGen --------------------------- --\n"
-  --         ++ showSDocUnsafe (ppr block)
   let (_, nodes, tail)  = blockSplit block
       id = entryLabel block
       stmts = blockToList nodes
@@ -107,27 +97,37 @@ basicBlockCodeGen block = do
           $+$ withPprStyle defaultDumpStyle (pdoc (ncgPlatform config) block)
           )
                            | otherwise = nilOL
-  -- Generate location directive
-  dbg <- getDebugBlock (entryLabel block)
-  loc_instrs <- case dblSourceTick =<< dbg of
-    Just (SourceNote span name)
-      -> do fileId <- getFileId (srcSpanFile span)
-            let line = srcSpanStartLine span; col = srcSpanStartCol span
-            return $ unitOL $ LOCATION fileId line col name
-    _ -> return nilOL
+
+  -- Generate location directive `.loc` (DWARF debug location info)
+  loc_instrs <- genLocInstrs
+
+  -- Generate other instructions
   mid_instrs <- stmtsToInstrs stmts
   (!tail_instrs) <- stmtToInstrs tail
+
   let instrs = header_comment_instr `appOL` loc_instrs `appOL` mid_instrs `appOL` tail_instrs
-  -- TODO: Then x86 backend run @verifyBasicBlock@ here and inserts
-  --      unwinding info. See Ticket 19913
-  -- code generation may introduce new basic block boundaries, which
-  -- are indicated by the NEWBLOCK instruction.  We must split up the
-  -- instruction stream into basic blocks again.  Also, we extract
-  -- LDATAs here too.
-  let
-        (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
+
+  -- TODO: Then x86 backend runs @verifyBasicBlock@ here. How important it is to
+  -- have a valid CFG is an open question: This and the AArch64 and PPC NCGs
+  -- work fine without it.
+
+  -- Code generation may introduce new basic block boundaries, which are
+  -- indicated by the NEWBLOCK instruction. We must split up the instruction
+  -- stream into basic blocks again. Also, we extract LDATAs here too.
+      (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
 
   return (BasicBlock id top : other_blocks, statics)
+
+  where
+    genLocInstrs :: NatM (OrdList Instr)
+    genLocInstrs = do
+      dbg <- getDebugBlock (entryLabel block)
+      case dblSourceTick =<< dbg of
+        Just (SourceNote span name)
+          -> do fileId <- getFileId (srcSpanFile span)
+                let line = srcSpanStartLine span; col = srcSpanStartCol span
+                pure $ unitOL $ LOCATION fileId line col name
+        _ -> pure nilOL
 
 mkBlocks :: Instr
           -> ([Instr], [GenBasicBlock Instr], [GenCmmDecl RawCmmStatics h g])
@@ -141,9 +141,10 @@ mkBlocks instr (instrs,blocks,statics)
 
 -- -----------------------------------------------------------------------------
 -- | Utilities
+
+-- | Annotate an `Instr` with a `SDoc` comment
 ann :: SDoc -> Instr -> Instr
 ann doc instr {- debugIsOn -} = ANN doc instr
--- ann _ instr = instr
 {-# INLINE ann #-}
 
 -- Using pprExpr will hide the AST, @ANN@ will end up in the assembly with
@@ -243,82 +244,78 @@ generateJumpTableForInstr _ _ = Nothing
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
 
--- See Note [Keeping track of the current block] for why
--- we pass the BlockId.
-stmtsToInstrs :: [CmmNode O O] -- ^ Cmm Statements
-              -> NatM InstrBlock -- ^ Resulting instruction
-stmtsToInstrs stmts =
-    go stmts nilOL
-  where
-    go [] instrs = pure instrs
-    go (s:stmts)  instrs = do
-      instrs' <- stmtToInstrs s
-      go stmts (instrs `appOL` instrs')
+stmtsToInstrs ::
+  -- | Cmm Statements
+  [CmmNode O O] ->
+  -- | Resulting instruction
+  NatM InstrBlock
+stmtsToInstrs stmts = concatOL <$> mapM stmtToInstrs stmts
 
 stmtToInstrs :: CmmNode e x
              -> NatM InstrBlock -- ^ Resulting instructions
 stmtToInstrs stmt = do
-  -- traceM $ "-- -------------------------- stmtToInstrs -------------------------- --\n"
-  --     ++ showSDocUnsafe (ppr stmt)
   config <- getConfig
   platform <- getPlatform
   case stmt of
     CmmUnsafeForeignCall target result_regs args
       -> genCCall target result_regs args
 
-    _ -> case stmt of
-      CmmComment s   -> return (unitOL (COMMENT (ftext s)))
-      CmmTick {}     -> return nilOL
+    CmmComment s   -> pure (unitOL (COMMENT (ftext s)))
+    CmmTick {}     -> pure nilOL
 
-      CmmAssign reg src
-        | isFloatType ty         -> assignReg_FltCode format reg src
-        | otherwise              -> assignReg_IntCode format reg src
-          where ty = cmmRegType reg
-                format = cmmTypeFormat ty
+    CmmAssign reg src
+      | isFloatType ty         -> assignReg_FltCode format reg src
+      | otherwise              -> assignReg_IntCode format reg src
+        where ty = cmmRegType reg
+              format = cmmTypeFormat ty
 
-      CmmStore addr src _alignment
-        | isFloatType ty         -> assignMem_FltCode format addr src
-        | otherwise              -> assignMem_IntCode format addr src
-          where ty = cmmExprType platform src
-                format = cmmTypeFormat ty
+    CmmStore addr src _alignment
+      | isFloatType ty         -> assignMem_FltCode format addr src
+      | otherwise              -> assignMem_IntCode format addr src
+        where ty = cmmExprType platform src
+              format = cmmTypeFormat ty
 
-      CmmBranch id          -> genBranch id
+    CmmBranch id          -> genBranch id
 
-      --We try to arrange blocks such that the likely branch is the fallthrough
-      --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
-      CmmCondBranch arg true false _prediction ->
-          genCondBranch true false arg
+    --We try to arrange blocks such that the likely branch is the fallthrough
+    --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
+    CmmCondBranch arg true false _prediction ->
+        genCondBranch true false arg
 
-      CmmSwitch arg ids -> genSwitch config arg ids
+    CmmSwitch arg ids -> genSwitch config arg ids
 
-      CmmCall { cml_target = arg } -> genJump arg
+    CmmCall { cml_target = arg } -> genJump arg
 
-      CmmUnwind _regs -> return nilOL
+    CmmUnwind _regs -> pure nilOL
 
-      _ -> pprPanic "stmtToInstrs: statement should have been cps'd away" (pdoc platform stmt)
+    -- Intentionally not have a default case here: If anybody adds a
+    -- constructor, the compiler should force them to think about this here.
+    CmmForeignCall {} -> pprPanic "stmtToInstrs: statement should have been cps'd away" (pdoc platform stmt)
+    CmmEntry {} ->  pprPanic "stmtToInstrs: statement should have been cps'd away" (pdoc platform stmt)
 
 --------------------------------------------------------------------------------
--- | 'InstrBlock's are the insn sequences generated by the insn selectors.
---      They are really trees of insns to facilitate fast appending, where a
---      left-to-right traversal yields the insns in the correct order.
---
-type InstrBlock
-        = OrdList Instr
 
--- | Register's passed up the tree.  If the stix code forces the register
---      to live in a pre-decided machine register, it comes out as @Fixed@;
---      otherwise, it comes out as @Any@, and the parent can decide which
---      register to put it in.
+-- | 'InstrBlock's are the insn sequences generated by the insn selectors.
 --
+-- They are really trees of insns to facilitate fast appending, where a
+-- left-to-right traversal yields the insns in the correct order.
+type InstrBlock =
+  OrdList Instr
+
+-- | Register's passed up the tree.
+--
+-- If the stix code forces the register to live in a pre-decided machine
+-- register, it comes out as @Fixed@; otherwise, it comes out as @Any@, and the
+-- parent can decide which register to put it in.
 data Register
-        = Fixed Format Reg InstrBlock
-        | Any   Format (Reg -> InstrBlock)
+  = Fixed Format Reg InstrBlock
+  | Any Format (Reg -> InstrBlock)
 
 -- | Sometimes we need to change the Format of a register. Primarily during
 -- conversion.
 swizzleRegisterRep :: Format -> Register -> Register
-swizzleRegisterRep format (Fixed _ reg code) = Fixed format reg code
-swizzleRegisterRep format (Any _ codefn)     = Any   format codefn
+swizzleRegisterRep format' (Fixed _format reg code) = Fixed format' reg code
+swizzleRegisterRep format' (Any _format codefn) = Any format' codefn
 
 -- | Grab a `Reg` for a `CmmReg`
 --
@@ -378,6 +375,7 @@ getFloatReg expr = do
 litToImm' :: CmmLit -> NatM (Operand, InstrBlock)
 litToImm' lit = return (OpImm (litToImm lit), nilOL)
 
+-- | Compute a `CmmExpr` into a `Register`
 getRegister :: CmmExpr -> NatM Register
 getRegister e = do
   config <- getConfig
@@ -477,7 +475,7 @@ getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i <
 getRegister' config plat expr =
   case expr of
     CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _)) ->
-      pprPanic "getRegisterReg-memory" (ppr PicBaseReg)
+      pprPanic "getRegister': There's no PIC base register on RISCV" (ppr PicBaseReg)
 
     CmmLit lit ->
       case lit of
@@ -821,45 +819,6 @@ getRegister' config plat expr =
         MO_Add w -> intOp False w (\d x y -> unitOL $ annExpr expr (ADD d x y))
         -- TODO: Handle sub-word case
         MO_Sub w -> intOp False w (\d x y -> unitOL $ annExpr expr (SUB d x y))
-
-        -- TODO: Check if this comment is correct
-        -- Note [CSET]
-        -- ~~~~~~~~~~~
-        -- Setting conditional flags: the architecture internally knows the
-        -- following flag bits.  And based on thsoe comparisons as in the
-        -- table below.
-        --
-        --    31  30  29  28
-        --  .---+---+---+---+-- - -
-        --  | N | Z | C | V |
-        --  '---+---+---+---+-- - -
-        --  Negative
-        --  Zero
-        --  Carry
-        --  oVerflow
-        --
-        --  .------+-------------------------------------+-----------------+----------.
-        --  | Code | Meaning                             | Flags           | Encoding |
-        --  |------+-------------------------------------+-----------------+----------|
-        --  |  EQ  | Equal                               | Z = 1           | 0000     |
-        --  |  NE  | Not Equal                           | Z = 0           | 0001     |
-        --  |  HI  | Unsigned Higher                     | C = 1 && Z = 0  | 1000     |
-        --  |  HS  | Unsigned Higher or Same             | C = 1           | 0010     |
-        --  |  LS  | Unsigned Lower or Same              | C = 0 || Z = 1  | 1001     |
-        --  |  LO  | Unsigned Lower                      | C = 0           | 0011     |
-        --  |  GT  | Signed Greater Than                 | Z = 0 && N = V  | 1100     |
-        --  |  GE  | Signed Greater Than or Equal        | N = V           | 1010     |
-        --  |  LE  | Signed Less Than or Equal           | Z = 1 || N /= V | 1101     |
-        --  |  LT  | Signed Less Than                    | N /= V          | 1011     |
-        --  |  CS  | Carry Set (Unsigned Overflow)       | C = 1           | 0010     |
-        --  |  CC  | Carry Clear (No Unsigned Overflow)  | C = 0           | 0011     |
-        --  |  VS  | Signed Overflow                     | V = 1           | 0110     |
-        --  |  VC  | No Signed Overflow                  | V = 0           | 0111     |
-        --  |  MI  | Minus, Negative                     | N = 1           | 0100     |
-        --  |  PL  | Plus, Positive or Zero (!)          | N = 0           | 0101     |
-        --  |  AL  | Always                              | Any             | 1110     |
-        --  |  NV  | Never                               | Any             | 1111     |
-        --- '-------------------------------------------------------------------------'
 
         -- N.B. We needn't sign-extend sub-word size (in)equality comparisons
         -- since we don't care about ordering.
