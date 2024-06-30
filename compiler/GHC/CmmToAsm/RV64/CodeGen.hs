@@ -1403,9 +1403,8 @@ genCCall
     -> NatM InstrBlock
 -- TODO: Specialize where we can.
 -- Generic impl
-genCCall target dest_regs arg_regs = do
+genCCall target dest_regs arg_regs =
   -- we want to pass arg_regs into allArgRegs
-
   case target of
     -- The target :: ForeignTarget call can either
     -- be a foreign procedure with an address expr
