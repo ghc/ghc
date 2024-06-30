@@ -836,7 +836,7 @@ getRegister' config plat expr =
         MO_U_Quot w -> intOp False w (\d x y -> unitOL $ annExpr expr (DIVU d x y))
         MO_U_Rem w  -> intOp False w (\d x y -> unitOL $ annExpr expr (REMU d x y))
 
-        -- Signed comparisons -- see Note [CSET)
+        -- Signed comparisons
         MO_S_Ge w     -> intOp True  w (\d x y -> unitOL $ annExpr expr (CSET d x y SGE))
         MO_S_Le w     -> intOp True  w (\d x y -> unitOL $ annExpr expr (CSET d x y SLE))
         MO_S_Gt w     -> intOp True  w (\d x y -> unitOL $ annExpr expr (CSET d x y SGT))
@@ -1405,9 +1405,6 @@ genCCall
 -- Generic impl
 genCCall target dest_regs arg_regs = do
   -- we want to pass arg_regs into allArgRegs
-  -- pprTraceM "genCCall target" (ppr target)
-  -- pprTraceM "genCCall formal" (ppr dest_regs)
-  -- pprTraceM "genCCall actual" (ppr arg_regs)
 
   case target of
     -- The target :: ForeignTarget call can either

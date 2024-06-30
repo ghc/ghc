@@ -568,8 +568,11 @@ data Instr
     -- Load and stores.
 
     -- Conditional instructions
-    -- This is a synthetic operation.
-    | CSET Operand Operand Operand Cond   -- if(o2 cond o3) op <- 1 else op <- 0
+
+    -- | Pseudo-op for conditional setting of a register.
+    --
+    -- @if(o2 cond o3) op <- 1 else op <- 0@
+    | CSET Operand Operand Operand Cond
 
     -- Branching.
     -- | A jump instruction with data for switch/jump tables
@@ -584,13 +587,13 @@ data Instr
     -- 8. Synchronization Instructions -----------------------------------------
     | DMBSY DmbType DmbType
     -- 9. Floating Point Instructions
-    -- Float ConVerT
+    -- | Float ConVerT
     | FCVT Operand Operand
-    -- Signed ConVerT Float
+    -- | Signed ConVerT Float
     | SCVTF Operand Operand
-    -- Float ConVerT to Zero Signed
+    -- | Float ConVerT to Zero Signed
     | FCVTZS Operand Operand
-    -- Float ABSolute value
+    -- | Float ABSolute value
     | FABS Operand Operand
     -- | Floating-point fused multiply-add instructions
     --

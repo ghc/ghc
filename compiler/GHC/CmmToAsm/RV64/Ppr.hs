@@ -536,8 +536,6 @@ pprInstr platform instr = case instr of
     EQ | isFloatOp l && isFloatOp r -> line $ binOp ("\tfeq." ++ floatOpPrecision platform l r)
     NE | isIntOp l && isIntOp r -> lines_ [ subFor l r
                   , text "\tsnez" <+> pprOp platform o <> comma <+> pprOp platform o]
-    --    feq.s   a0,fa0,fa1
-    --    xori    a0,a0,1
     NE | isFloatOp l && isFloatOp r -> lines_ [binOp ("\tfeq." ++ floatOpPrecision platform l r)
                                               , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1"]
     SLT -> lines_ [ sltFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r ]
