@@ -1410,13 +1410,11 @@ genCCall
     -> NatM InstrBlock
 -- TODO: Specialize where we can.
 -- Generic impl
-genCCall target dest_regs arg_regs =
-  -- we want to pass arg_regs into allArgRegs
-  case target of
+genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
+    -- we want to pass arg_regs into allArgRegs
     -- The target :: ForeignTarget call can either
     -- be a foreign procedure with an address expr
     -- and a calling convention.
-    ForeignTarget expr _cconv -> do
       (call_target_reg, call_target_code) <-
          -- Compute the address of the call target into a register. This
          -- addressing enables us to jump through the whole address space
@@ -1462,19 +1460,105 @@ genCCall target dest_regs arg_regs =
             `appOL` readResultsCode        -- parse the results into registers
             `appOL` moveStackUp stackSpaceWords
       return code
+  where
+    -- Implementiation of the RISCV ABI calling convention.
+    -- https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/948463cd5dbebea7c1869e20146b17a2cc8fda2f/riscv-cc.adoc#integer-calling-convention
+    passArguments :: [Reg] -> [Reg] -> [(Reg, Format, ForeignHint, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
+    -- Base case: no more arguments to pass (left)
+    passArguments _ _ [] stackSpaceWords accumRegs accumCode = return (stackSpaceWords, accumRegs, accumCode)
 
-    PrimTarget MO_F32_Fabs
-      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
-        unaryFloatOp W32 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
-    PrimTarget MO_F64_Fabs
-      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
-        unaryFloatOp W64 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+    -- Still have GP regs, and we want to pass an GP argument.
+    passArguments (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpaceWords accumRegs accumCode | isIntFormat format = do
+      -- RISCV64 Integer Calling Convention: "When passed in registers or on the
+      -- stack, integer scalars narrower than XLEN bits are widened according to
+      -- the sign of their type up to 32 bits, then sign-extended to XLEN bits."
+      let w = formatToWidth format
+          assignArg = if hint == SignedHint then
+             COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r) `consOL`
+                       signExtend w W64 r gpReg
 
-    -- or a possibly side-effecting machine operation
-    -- mop :: CallishMachOp (see GHC.Cmm.MachOp)
-    PrimTarget mop -> do
-      -- We'll need config to construct forien targets
-      case mop of
+            else toOL [COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r)
+                     , MOV (OpReg w gpReg) (OpReg w r)]
+          accumCode' = accumCode `appOL`
+                       code_r `appOL`
+                       assignArg
+      passArguments gpRegs fpRegs args stackSpaceWords (gpReg:accumRegs) accumCode'
+
+    -- Still have FP regs, and we want to pass an FP argument.
+    passArguments gpRegs (fpReg:fpRegs) ((r, format, _hint, code_r):args) stackSpaceWords accumRegs accumCode | isFloatFormat format = do
+      let w = formatToWidth format
+          mov = MOV (OpReg w fpReg) (OpReg w r)
+          accumCode' = accumCode `appOL`
+                       code_r `snocOL`
+                       ann (text "Pass fp argument: " <> ppr r) mov
+      passArguments gpRegs fpRegs args stackSpaceWords (fpReg:accumRegs) accumCode'
+
+    -- No mor regs left to pass. Must pass on stack.
+    passArguments [] [] ((r, format, hint, code_r) : args) stackSpaceWords accumRegs accumCode = do
+      let w = formatToWidth format
+          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt stackSpaceWords)))
+          stackCode =
+            if hint == SignedHint
+              then
+                code_r
+                  `appOL` signExtend w W64 r ipReg
+                  `snocOL` ann (text "Pass signed argument (size " <> ppr w <> text ") on the stack: " <> ppr ipReg) str
+              else
+                code_r
+                  `snocOL` ann (text "Pass unsigned argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
+      passArguments [] [] args (stackSpaceWords + 1) accumRegs (stackCode `appOL` accumCode)
+
+    -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
+    passArguments [] fpRegs ((r, format, _hint, code_r):args) stackSpaceWords accumRegs accumCode | isIntFormat format = do
+      let w = formatToWidth format
+          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt stackSpaceWords)))
+          stackCode = code_r `snocOL`
+                      ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
+      passArguments [] fpRegs args (stackSpaceWords + 1) accumRegs (stackCode `appOL` accumCode)
+
+    -- Still have gpRegs left, but want to pass a FP argument. Must be passed in gpReg then.
+    passArguments (gpReg:gpRegs) [] ((r, format, _hint, code_r):args) stackSpaceWords accumRegs accumCode | isFloatFormat format = do
+      let w = formatToWidth format
+          mov = MOV (OpReg w gpReg) (OpReg w r)
+          accumCode' = accumCode `appOL`
+                       code_r `snocOL`
+                       ann (text "Pass fp argument in gpReg: " <> ppr r) mov
+      passArguments gpRegs [] args stackSpaceWords (gpReg:accumRegs) accumCode'
+
+    passArguments _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
+
+    readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM InstrBlock
+    readResults _ _ [] _ accumCode = return accumCode
+    readResults [] _ _ _ _ = do
+      platform <- getPlatform
+      pprPanic "genCCall, out of gp registers when reading results" (pdoc platform target)
+    readResults _ [] _ _ _ = do
+      platform <- getPlatform
+      pprPanic "genCCall, out of fp registers when reading results" (pdoc platform target)
+    readResults (gpReg:gpRegs) (fpReg:fpRegs) (dst:dsts) accumRegs accumCode = do
+      -- gp/fp reg -> dst
+      platform <- getPlatform
+      let rep = cmmRegType (CmmLocal dst)
+          format = cmmTypeFormat rep
+          w   = cmmRegWidth (CmmLocal dst)
+          r_dst = getRegisterReg platform (CmmLocal dst)
+      if isFloatFormat format
+        then readResults (gpReg:gpRegs) fpRegs dsts (fpReg:accumRegs) (accumCode `snocOL` MOV (OpReg w r_dst) (OpReg w fpReg))
+        else readResults gpRegs (fpReg:fpRegs) dsts (gpReg:accumRegs) $
+          accumCode `snocOL`
+          MOV (OpReg w r_dst) (OpReg w gpReg) `appOL`
+          -- truncate, otherwise an unexpectedly big value might be used in upfollowing calculations
+          truncateReg W64 w r_dst
+
+genCCall (PrimTarget mop) dest_regs arg_regs = do
+  case mop of
+        MO_F32_Fabs
+          | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
+            unaryFloatOp W32 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+        MO_F64_Fabs
+          | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
+            unaryFloatOp W64 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+
         -- 64 bit float ops
         MO_F64_Pwr   -> mkCCall "pow"
 
@@ -1675,95 +1759,6 @@ genCCall target dest_regs arg_regs =
           mkForeignLabel name Nothing ForeignLabelInThisPackage IsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs
-
-    -- Implementiation of the RISCV ABI calling convention.
-    -- https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/948463cd5dbebea7c1869e20146b17a2cc8fda2f/riscv-cc.adoc#integer-calling-convention
-    passArguments :: [Reg] -> [Reg] -> [(Reg, Format, ForeignHint, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
-    -- Base case: no more arguments to pass (left)
-    passArguments _ _ [] stackSpaceWords accumRegs accumCode = return (stackSpaceWords, accumRegs, accumCode)
-
-    -- Still have GP regs, and we want to pass an GP argument.
-    passArguments (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpaceWords accumRegs accumCode | isIntFormat format = do
-      -- RISCV64 Integer Calling Convention: "When passed in registers or on the
-      -- stack, integer scalars narrower than XLEN bits are widened according to
-      -- the sign of their type up to 32 bits, then sign-extended to XLEN bits."
-      let w = formatToWidth format
-          assignArg = if hint == SignedHint then
-             COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r) `consOL`
-                       signExtend w W64 r gpReg
-
-            else toOL [COMMENT (text "Pass gp argument sign-extended (SignedHint): " <> ppr r)
-                     , MOV (OpReg w gpReg) (OpReg w r)]
-          accumCode' = accumCode `appOL`
-                       code_r `appOL`
-                       assignArg
-      passArguments gpRegs fpRegs args stackSpaceWords (gpReg:accumRegs) accumCode'
-
-    -- Still have FP regs, and we want to pass an FP argument.
-    passArguments gpRegs (fpReg:fpRegs) ((r, format, _hint, code_r):args) stackSpaceWords accumRegs accumCode | isFloatFormat format = do
-      let w = formatToWidth format
-          mov = MOV (OpReg w fpReg) (OpReg w r)
-          accumCode' = accumCode `appOL`
-                       code_r `snocOL`
-                       ann (text "Pass fp argument: " <> ppr r) mov
-      passArguments gpRegs fpRegs args stackSpaceWords (fpReg:accumRegs) accumCode'
-
-    -- No mor regs left to pass. Must pass on stack.
-    passArguments [] [] ((r, format, hint, code_r) : args) stackSpaceWords accumRegs accumCode = do
-      let w = formatToWidth format
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt stackSpaceWords)))
-          stackCode =
-            if hint == SignedHint
-              then
-                code_r
-                  `appOL` signExtend w W64 r ipReg
-                  `snocOL` ann (text "Pass signed argument (size " <> ppr w <> text ") on the stack: " <> ppr ipReg) str
-              else
-                code_r
-                  `snocOL` ann (text "Pass unsigned argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
-      passArguments [] [] args (stackSpaceWords + 1) accumRegs (stackCode `appOL` accumCode)
-
-    -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
-    passArguments [] fpRegs ((r, format, _hint, code_r):args) stackSpaceWords accumRegs accumCode | isIntFormat format = do
-      let w = formatToWidth format
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt stackSpaceWords)))
-          stackCode = code_r `snocOL`
-                      ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
-      passArguments [] fpRegs args (stackSpaceWords + 1) accumRegs (stackCode `appOL` accumCode)
-
-    -- Still have gpRegs left, but want to pass a FP argument. Must be passed in gpReg then.
-    passArguments (gpReg:gpRegs) [] ((r, format, _hint, code_r):args) stackSpaceWords accumRegs accumCode | isFloatFormat format = do
-      let w = formatToWidth format
-          mov = MOV (OpReg w gpReg) (OpReg w r)
-          accumCode' = accumCode `appOL`
-                       code_r `snocOL`
-                       ann (text "Pass fp argument in gpReg: " <> ppr r) mov
-      passArguments gpRegs [] args stackSpaceWords (gpReg:accumRegs) accumCode'
-
-    passArguments _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
-
-    readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM InstrBlock
-    readResults _ _ [] _ accumCode = return accumCode
-    readResults [] _ _ _ _ = do
-      platform <- getPlatform
-      pprPanic "genCCall, out of gp registers when reading results" (pdoc platform target)
-    readResults _ [] _ _ _ = do
-      platform <- getPlatform
-      pprPanic "genCCall, out of fp registers when reading results" (pdoc platform target)
-    readResults (gpReg:gpRegs) (fpReg:fpRegs) (dst:dsts) accumRegs accumCode = do
-      -- gp/fp reg -> dst
-      platform <- getPlatform
-      let rep = cmmRegType (CmmLocal dst)
-          format = cmmTypeFormat rep
-          w   = cmmRegWidth (CmmLocal dst)
-          r_dst = getRegisterReg platform (CmmLocal dst)
-      if isFloatFormat format
-        then readResults (gpReg:gpRegs) fpRegs dsts (fpReg:accumRegs) (accumCode `snocOL` MOV (OpReg w r_dst) (OpReg w fpReg))
-        else readResults gpRegs (fpReg:fpRegs) dsts (gpReg:accumRegs) $
-          accumCode `snocOL`
-          MOV (OpReg w r_dst) (OpReg w gpReg) `appOL`
-          -- truncate, otherwise an unexpectedly big value might be used in upfollowing calculations
-          truncateReg W64 w r_dst
 
     unaryFloatOp w op arg_reg dest_reg = do
       platform <- getPlatform
