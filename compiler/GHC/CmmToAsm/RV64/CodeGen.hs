@@ -1,5 +1,4 @@
 {-# language GADTs #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -116,8 +115,8 @@ basicBlockCodeGen block = do
             let line = srcSpanStartLine span; col = srcSpanStartCol span
             return $ unitOL $ LOCATION fileId line col name
     _ -> return nilOL
-  (mid_instrs,mid_bid) <- stmtsToInstrs id stmts
-  (!tail_instrs,_) <- stmtToInstrs mid_bid tail
+  mid_instrs <- stmtsToInstrs stmts
+  (!tail_instrs) <- stmtToInstrs tail
   let instrs = header_comment_instr `appOL` loc_instrs `appOL` mid_instrs `appOL` tail_instrs
   -- TODO: Then x86 backend run @verifyBasicBlock@ here and inserts
   --      unwinding info. See Ticket 19913
@@ -246,37 +245,28 @@ generateJumpTableForInstr _ _ = Nothing
 
 -- See Note [Keeping track of the current block] for why
 -- we pass the BlockId.
-stmtsToInstrs :: BlockId -- ^ Basic block these statement will start to be placed in.
-              -> [CmmNode O O] -- ^ Cmm Statement
-              -> NatM (InstrBlock, BlockId) -- ^ Resulting instruction
-stmtsToInstrs bid stmts =
-    go bid stmts nilOL
+stmtsToInstrs :: [CmmNode O O] -- ^ Cmm Statements
+              -> NatM InstrBlock -- ^ Resulting instruction
+stmtsToInstrs stmts =
+    go stmts nilOL
   where
-    go bid  []        instrs = return (instrs,bid)
-    go bid (s:stmts)  instrs = do
-      (instrs',bid') <- stmtToInstrs bid s
-      -- If the statement introduced a new block, we use that one
-      let !newBid = fromMaybe bid bid'
-      go newBid stmts (instrs `appOL` instrs')
+    go [] instrs = pure instrs
+    go (s:stmts)  instrs = do
+      instrs' <- stmtToInstrs s
+      go stmts (instrs `appOL` instrs')
 
--- | `bid` refers to the current block and is used to update the CFG
---   if new blocks are inserted in the control flow.
--- See Note [Keeping track of the current block] for more details.
-stmtToInstrs :: BlockId -- ^ Basic block this statement will start to be placed in.
-             -> CmmNode e x
-             -> NatM (InstrBlock, Maybe BlockId)
-             -- ^ Instructions, and bid of new block if successive
-             -- statements are placed in a different basic block.
-stmtToInstrs bid stmt = do
+stmtToInstrs :: CmmNode e x
+             -> NatM InstrBlock -- ^ Resulting instructions
+stmtToInstrs stmt = do
   -- traceM $ "-- -------------------------- stmtToInstrs -------------------------- --\n"
   --     ++ showSDocUnsafe (ppr stmt)
   config <- getConfig
   platform <- getPlatform
   case stmt of
     CmmUnsafeForeignCall target result_regs args
-      -> (,Nothing) <$> genCCall target result_regs args bid
+      -> genCCall target result_regs args
 
-    _ -> (,Nothing) <$> case stmt of
+    _ -> case stmt of
       CmmComment s   -> return (unitOL (COMMENT (ftext s)))
       CmmTick {}     -> return nilOL
 
@@ -297,7 +287,7 @@ stmtToInstrs bid stmt = do
       --We try to arrange blocks such that the likely branch is the fallthrough
       --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
       CmmCondBranch arg true false _prediction ->
-          genCondBranch bid true false arg
+          genCondBranch true false arg
 
       CmmSwitch arg ids -> genSwitch config arg ids
 
@@ -1359,14 +1349,12 @@ genCondJump bid expr = do
       _ -> pprPanic "RV64.genCondJump: " (text $ show expr)
 
 
-genCondBranch
-    :: BlockId      -- the source of the jump
-    -> BlockId      -- the true branch target
+genCondBranch :: BlockId      -- the true branch target
     -> BlockId      -- the false branch target
     -> CmmExpr      -- the condition on which to branch
     -> NatM InstrBlock -- Instructions
 
-genCondBranch _ true false expr = do
+genCondBranch true false expr = do
   b1 <- genCondJump true expr
   b2 <- genBranch false
   return (b1 `appOL` b2)
@@ -1453,11 +1441,10 @@ genCCall
     :: ForeignTarget      -- function to call
     -> [CmmFormal]        -- where to put the result
     -> [CmmActual]        -- arguments (of mixed type)
-    -> BlockId            -- The block we are in
     -> NatM InstrBlock
 -- TODO: Specialize where we can.
 -- Generic impl
-genCCall target dest_regs arg_regs bid = do
+genCCall target dest_regs arg_regs = do
   -- we want to pass arg_regs into allArgRegs
   -- pprTraceM "genCCall target" (ppr target)
   -- pprTraceM "genCCall formal" (ppr dest_regs)
@@ -1731,7 +1718,7 @@ genCCall target dest_regs arg_regs bid = do
       target <- cmmMakeDynamicReference config CallReference $
           mkForeignLabel name Nothing ForeignLabelInThisPackage IsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
-      genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
+      genCCall (ForeignTarget target cconv) dest_regs arg_regs
 
     -- Implementiation of the RISCV ABI calling convention.
     -- https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/948463cd5dbebea7c1869e20146b17a2cc8fda2f/riscv-cc.adoc#integer-calling-convention
