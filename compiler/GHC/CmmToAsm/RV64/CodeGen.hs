@@ -1308,15 +1308,22 @@ genCondJump bid expr = do
       _ -> pprPanic "RV64.genCondJump: " (text $ show expr)
 
 
-genCondBranch :: BlockId      -- the true branch target
-    -> BlockId      -- the false branch target
-    -> CmmExpr      -- the condition on which to branch
-    -> NatM InstrBlock -- Instructions
-
-genCondBranch true false expr = do
-  b1 <- genCondJump true expr
-  b2 <- genBranch false
-  return (b1 `appOL` b2)
+-- | Generate conditional branching instructions
+--
+-- This is basically an "if with else" statement.
+genCondBranch ::
+  -- | the true branch target
+  BlockId ->
+  -- | the false branch target
+  BlockId ->
+  -- | the condition on which to branch
+  CmmExpr ->
+  -- | Instructions
+  NatM InstrBlock
+genCondBranch true false expr =
+  appOL
+    <$> genCondJump true expr
+    <*> genBranch false
 
 -- -----------------------------------------------------------------------------
 --  Generating C calls
