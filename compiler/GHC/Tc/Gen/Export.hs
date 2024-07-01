@@ -699,7 +699,7 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
                   }
 
                 -- Do not report export list declaration deprecations
-          name <-  lookupSubBndrOcc_helper False ExportDeprecationWarnings
+          name <-  lookupSubBndrOccOnExportList ExportDeprecationWarnings
                         spec_parent bareName what_lkup
           traceRn "lookupChildrenExport" (ppr name)
           -- Default to data constructors for slightly better error

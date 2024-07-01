@@ -3,6 +3,8 @@
 {-# LANGUAGE MultiWayIf       #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TupleSections    #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2006
@@ -32,7 +34,8 @@ module GHC.Rename.Env (
         getUpdFieldLbls,
 
         ChildLookupResult(..),
-        lookupSubBndrOcc_helper,
+        lookupSubBndrOccOnTypeClass,
+        lookupSubBndrOccOnExportList,
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn, lookupSigOccRnN,
         lookupSigCtxtOccRn,
@@ -677,100 +680,162 @@ disambiguation anyway, because `x` is an original name, and
 lookupGlobalOccRn will find it.
 -}
 
--- | Used in export lists to lookup the children.
-lookupSubBndrOcc_helper :: Bool -> DeprecationWarnings
-                        -> Name
-                        -> RdrName -- ^ thing we are looking up
+-- Find all the things the 'RdrName' maps to,
+-- and pick the one with the right 'Parent' 'Name'.
+lookupSubBndrOcc :: DeprecationWarnings
+                 -> Name     -- ^ Parent
+                 -> SDoc
+                 -> RdrName  -- ^ thing we are looking up
+                 -> RnM (Either NotInScopeError Name)
+lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name =
+  lookupExactOrOrig rdr_name (Right . greName) $
+    -- This happens for built-in classes, see mod052 for example
+    do { child <- lookupSubBndrOccOnTypeClass warn_if_deprec the_parent rdr_name what_lkup
+       ; return $ case child of
+           FoundChild g       -> Right (greName g)
+           NameNotFound       -> Left (UnknownSubordinate doc)
+           IncorrectParent {} -> Left (UnknownSubordinate doc) }
+       -- See [Mismatched class methods and associated type families]
+       -- in TcInstDecls.
+  where
+    what_lkup = LookupChild { wantedParent        = the_parent
+                            , lookupDataConFirst  = False
+                            , prioritiseParent    = True -- See T23664.
+                            }
+
+{- NOTE [Something on Type Class and Instance (better name)]
+-- TODO
+-- An specialization of lookupSubBndrOccOnExportList
+-}
+lookupSubBndrOccOnTypeClass :: DeprecationWarnings
+                        -> Name        -- ^ Parent
+                        -> RdrName     -- ^ thing we are looking up
                         -> LookupChild -- ^ how to look it up (e.g. which
                                        -- 'NameSpace's to look in)
                         -> RnM ChildLookupResult
-lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
-  | isUnboundName parent
-    -- Avoid an error cascade
-  = return (FoundChild (mkUnboundGRERdr rdr_name))
-
-  | otherwise = do
-  gre_env <- getGlobalRdrEnv
-  let original_gres = lookupGRE gre_env (LookupChildren (rdrNameOcc rdr_name) how_lkup)
-      picked_gres = pick_gres original_gres
-  -- The remaining GREs are things that we *could* export here.
-  -- Note that this includes things which have `NoParent`;
-  -- those are sorted in `checkPatSynParent`.
-  traceTc "parent" (ppr parent)
-  traceTc "lookupExportChild must_have_parent:" (ppr must_have_parent)
-  traceTc "lookupExportChild original_gres:" (ppr original_gres)
-  traceTc "lookupExportChild picked_gres:" (ppr picked_gres)
-  case picked_gres of
-    NoOccurrence ->
-      noMatchingParentErr original_gres
-    UniqueOccurrence g ->
-      if must_have_parent
-      then noMatchingParentErr original_gres
-      else checkFld g
-    DisambiguatedOccurrence g ->
-      checkFld g
-    AmbiguousOccurrence gres ->
-      if must_have_parent
+lookupSubBndrOccOnTypeClass warn_if_deprec parent rdr_name how_lkup =
+  if isUnboundName parent
+    -- Avoid an error cascade, see Note [ Unbound vs Ambiguous Names ]
+  then return (FoundChild (mkUnboundGRERdr rdr_name))
+  else do
+    traceTc "lookupSubBndrOccOnTypeClass" (vcat [])
+    (picked_gres, original_gres) <- lookup_names_on_gres parent rdr_name how_lkup
+    case picked_gres of
+      NoOccurrence ->
+        noMatchingParentErr parent rdr_name original_gres
+      UniqueOccurrence _ ->
+        -- This unique occurrence will have no parent, and thus can't match the parent
+        -- we are looking for.
+        noMatchingParentErr parent rdr_name original_gres
+      DisambiguatedOccurrence g ->
+        markUsedAndReturnFoundChild warn_if_deprec g
+      AmbiguousOccurrence _ ->
         -- It is more helpful to tell the user that the ambiguous matches
         -- are for a wrong parent, then that there is a name clash,
         -- see (#24452). Also since `gres` is NonEmpty and is a sub-list
         -- of `original_gres` we are sure the original list is NonEmpty.
-      then mkIncorrectParentErr (NE.fromList original_gres)
-      else mkNameClashErr gres
-    where
-        checkFld :: GlobalRdrElt -> RnM ChildLookupResult
-        checkFld g = do
-          addUsedGRE warn_if_deprec g
-          return $ FoundChild g
+        mkIncorrectParentErr parent (NE.fromList original_gres)
+{-# INLINEABLE lookupSubBndrOccOnTypeClass #-}
 
-        -- Called when we find no matching GREs after disambiguation but
-        -- there are three situations where this happens.
-        -- 1. There were none to begin with.
-        -- 2. None of the matching ones were the parent but
-        --  a. They were from an overloaded record field so we can report
-        --     a better error.
-        --  b. The original lookup was actually ambiguous.
-        --     For example, the case where overloading is off and two
-        --     record fields are in scope from different record
-        --     constructors, neither of which is the parent.
-        noMatchingParentErr :: [GlobalRdrElt] -> RnM ChildLookupResult
-        noMatchingParentErr original_gres = do
-          traceRn "noMatchingParentErr" (ppr original_gres)
-          dup_fields_ok <- xoptM LangExt.DuplicateRecordFields
-          case original_gres of
-            []  -> return NameNotFound
-            [g] -> mkIncorrectParentErr (NE.fromList [g])
-            gss@(g:gss'@(_:_)) ->
-              if dup_fields_ok && all isRecFldGRE gss
-              then mkIncorrectParentErr (NE.fromList gss)
-              else mkNameClashErr $ g NE.:| gss'
+-- | Used in export lists to lookup the children.
+lookupSubBndrOccOnExportList :: DeprecationWarnings
+                        -> Name        -- ^ Parent
+                        -> RdrName     -- ^ thing we are looking up
+                        -> LookupChild -- ^ how to look it up (e.g. which
+                                       -- 'NameSpace's to look in)
+                        -> RnM ChildLookupResult
+lookupSubBndrOccOnExportList warn_if_deprec parent rdr_name how_lkup =
+  if isUnboundName parent
+    -- Avoid an error cascade, see Note [ Unbound vs Ambiguous Names ]
+  then return (FoundChild (mkUnboundGRERdr rdr_name))
+  else do
+    traceTc "lookupSubBndrOccOnTypeClass" (vcat [])
+    (picked_gres, original_gres) <- lookup_names_on_gres parent rdr_name how_lkup
+    case picked_gres of
+      NoOccurrence ->
+        noMatchingParentErr parent rdr_name original_gres
+      UniqueOccurrence g ->
+        markUsedAndReturnFoundChild warn_if_deprec g
+      DisambiguatedOccurrence g ->
+        markUsedAndReturnFoundChild warn_if_deprec g
+      AmbiguousOccurrence gres ->
+        mkGresNameClashErr rdr_name gres -- it seems odd this is used here too
+{-# INLINEABLE lookupSubBndrOccOnExportList #-}
 
-        mkIncorrectParentErr :: NE.NonEmpty GlobalRdrElt -> RnM ChildLookupResult
-        mkIncorrectParentErr gres = return $ IncorrectParent parent (NE.head gres)
-                                      [p | x <- NE.toList gres, ParentIs p <- [greParent x]]
+-- TODO
+lookup_names_on_gres :: Name    -- Parent
+            -> RdrName          -- ^ thing we are looking up
+            -> LookupChild      -- ^ how to look it up (e.g. which
+                                -- 'NameSpace's to look in)
+            -> RnM (DisambigInfo, [GlobalRdrEltX GREInfo])
+lookup_names_on_gres parent rdr_name how_lkup = do
+  gre_env <- getGlobalRdrEnv
+  let original_gres = lookupGRE gre_env (LookupChildren (rdrNameOcc rdr_name) how_lkup)
+      picked_gres = pick_gres original_gres
+  -- The remaining GREs are things that we *could* export here.
+  -- Note that this includes things which have 'NoParent';
+  -- those are sorted in 'checkPatSynParent'.
+  traceTc "lookupExportChild original_gres:" (ppr original_gres)
+  traceTc "lookupExportChild picked_gres:" (ppr picked_gres)
+  return (picked_gres, original_gres)
+  where
+    pick_gres :: [GlobalRdrElt] -> DisambigInfo
+    -- TODO understand this better
+    -- For Unqual, find GREs that are in scope qualified or unqualified
+    -- For Qual,   find GREs that are in scope with that qualification
+    pick_gres gres
+      | isUnqual rdr_name
+      = mconcat (map right_parent gres)
+      | otherwise
+      = mconcat (map right_parent (pickGREs rdr_name gres))
 
-        mkNameClashErr :: NE.NonEmpty GlobalRdrElt -> RnM ChildLookupResult
-        mkNameClashErr gres = do
-          addNameClashErrRn rdr_name gres
-          return (FoundChild (NE.head gres))
+    right_parent :: GlobalRdrElt -> DisambigInfo
+    right_parent gre
+      = case greParent gre of
+          ParentIs cur_parent
+              | parent == cur_parent -> DisambiguatedOccurrence gre
+              | otherwise            -> NoOccurrence
+          NoParent                   -> UniqueOccurrence gre
 
-        pick_gres :: [GlobalRdrElt] -> DisambigInfo
-        -- For Unqual, find GREs that are in scope qualified or unqualified
-        -- For Qual,   find GREs that are in scope with that qualification
-        pick_gres gres
-          | isUnqual rdr_name
-          = mconcat (map right_parent gres)
-          | otherwise
-          = mconcat (map right_parent (pickGREs rdr_name gres))
 
-        right_parent :: GlobalRdrElt -> DisambigInfo
-        right_parent gre
-          = case greParent gre of
-              ParentIs cur_parent
-                 | parent == cur_parent -> DisambiguatedOccurrence gre
-                 | otherwise            -> NoOccurrence
-              NoParent                  -> UniqueOccurrence gre
-{-# INLINEABLE lookupSubBndrOcc_helper #-}
+-- Called when we find no matching GREs after disambiguation but
+-- there are three situations where this happens.
+-- 1. There were none to begin with.
+-- 2. None of the matching ones were the parent but
+--  a. They were from an overloaded record field so we can report
+--     a better error.
+--  b. The original lookup was actually ambiguous.
+--     For example, the case where overloading is off and two
+--     record fields are in scope from different record
+--     constructors, neither of which is the parent.
+noMatchingParentErr :: Name -> RdrName -> [GlobalRdrEltX GREInfo] -> RnM ChildLookupResult
+noMatchingParentErr parent rdr_name original_gres = do
+  traceRn "noMatchingParentErr" (ppr original_gres)
+  dup_fields_ok <- xoptM LangExt.DuplicateRecordFields
+  case original_gres of
+    []  -> return NameNotFound
+    [g] -> mkIncorrectParentErr parent (NE.fromList [g])
+    gss@(g:gss'@(_:_)) ->
+      if dup_fields_ok && all isRecFldGRE gss
+      then mkIncorrectParentErr parent (NE.fromList gss)
+      else mkGresNameClashErr rdr_name $ g NE.:| gss'
+
+-- TODO explain this better
+-- mkGresNameClashErr is one of the exceptions mentioned on
+-- Not [ Unbound vs Ambiguous Names ].
+mkGresNameClashErr :: RdrName -> NE.NonEmpty GlobalRdrElt -> RnM ChildLookupResult
+mkGresNameClashErr rdr_name gres = do
+  addNameClashErrRn rdr_name gres
+  return (FoundChild (NE.head gres))
+
+mkIncorrectParentErr :: Name -> NE.NonEmpty (GlobalRdrEltX GREInfo) -> RnM ChildLookupResult
+mkIncorrectParentErr parent gres = return $ IncorrectParent parent (NE.head gres)
+                              [p | x <- NE.toList gres, ParentIs p <- [greParent x]]
+
+markUsedAndReturnFoundChild :: DeprecationWarnings -> GlobalRdrElt -> RnM ChildLookupResult
+markUsedAndReturnFoundChild warn_if_deprec g = do
+  addUsedGRE warn_if_deprec g
+  return $ FoundChild g
 
 -- | This domain specific datatype is used to record why we decided it was
 -- possible that a GRE could be exported with a parent.
@@ -796,7 +861,12 @@ instance Outputable DisambigInfo where
 
 instance Semi.Semigroup DisambigInfo where
   -- These are the key lines: we prefer disambiguated occurrences to other
-  -- names.
+  -- names. But if we have two disambiguated occurrences, this is an
+  -- ambiguous match (see #25014).
+  DisambiguatedOccurrence g <> DisambiguatedOccurrence g'
+    = AmbiguousOccurrence $ g NE.:| [g']
+  AmbiguousOccurrence gs <> DisambiguatedOccurrence g'
+    = AmbiguousOccurrence (g' `NE.cons` gs)
   _ <> DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
   DisambiguatedOccurrence g' <> _ = DisambiguatedOccurrence g'
 
@@ -835,28 +905,6 @@ instance Outputable ChildLookupResult where
     = text "IncorrectParent"
       <+> hsep [ppr p, ppr $ greName g, ppr ns]
 
-lookupSubBndrOcc :: DeprecationWarnings
-                 -> Name     -- Parent
-                 -> SDoc
-                 -> RdrName
-                 -> RnM (Either NotInScopeError Name)
--- ^ Find all the things the 'RdrName' maps to,
--- and pick the one with the right 'Parent' 'Name'.
-lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name =
-  lookupExactOrOrig rdr_name (Right . greName) $
-    -- This happens for built-in classes, see mod052 for example
-    do { child <- lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name what_lkup
-       ; return $ case child of
-           FoundChild g       -> Right (greName g)
-           NameNotFound       -> Left (UnknownSubordinate doc)
-           IncorrectParent {} -> Left (UnknownSubordinate doc) }
-       -- See [Mismatched class methods and associated type families]
-       -- in TcInstDecls.
-  where
-    what_lkup = LookupChild { wantedParent        = the_parent
-                            , lookupDataConFirst  = False
-                            , prioritiseParent    = True -- See T23664.
-                            }
 {-
 Note [Family instance binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

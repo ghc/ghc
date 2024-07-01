@@ -1,0 +1,1 @@
+test('T25014', [extra_files(['Ambig1.hs', 'Ambig2.hs'])], multimod_compile_fail, ['T25014','-v0'])

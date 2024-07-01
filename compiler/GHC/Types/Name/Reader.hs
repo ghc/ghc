@@ -1265,7 +1265,7 @@ greIsRelevant which_gres ns gre
 {- Note [childGREPriority]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are currently two places in the compiler where we look up GlobalRdrElts
-which have a given Parent. These are the two calls to lookupSubBndrOcc_helper:
+which have a given Parent. These are the two calls to lookupSubBndrOccHelper (RENAME):
 
   A. Looking up children in an export item, e.g.
 
