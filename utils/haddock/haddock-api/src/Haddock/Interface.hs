@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE TupleSections     #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface
@@ -58,6 +59,8 @@ import GHC.Core.InstEnv
 import qualified GHC.Driver.DynFlags as DynFlags
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session hiding (verbosity)
+import GHC.Driver.Phases
+import GHC.Driver.Pipeline (compileFile)
 import GHC.HsToCore.Docs (getMainDeclBinder)
 import GHC.Iface.Load (loadSysInterface)
 import GHC.IfaceToCore (tcIfaceInst, tcIfaceFamInst)
@@ -73,6 +76,7 @@ import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
 import GHC.Unit.Module.ModSummary (isBootSummary)
 import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text)
 import GHC.Utils.Error (withTiming)
+import GHC.Utils.Monad (mapMaybeM)
 
 #if defined(mingw32_HOST_OS)
 import System.IO
@@ -165,7 +169,15 @@ createIfaces
     -> Ghc [Interface]
     -- ^ Resulting interfaces
 createIfaces verbosity modules flags instIfaceMap = do
-  targets <- mapM (\filePath -> guessTarget filePath Nothing Nothing) modules
+  let (hs_srcs, non_hs_srcs) = List.partition isHaskellishTarget $ map (,Nothing) modules
+  hsc_env <- getSession
+  o_files <- mapMaybeM (\x -> liftIO $ compileFile hsc_env NoStop x)
+             non_hs_srcs
+  dflags <- getSessionDynFlags
+  let dflags' = dflags { ldInputs = map (FileOption "") o_files
+                                    ++ ldInputs dflags }
+  _ <- setSessionDynFlags dflags'
+  targets <- mapM (\(filePath, _) -> guessTarget filePath Nothing Nothing) hs_srcs
   setTargets targets
   (_errs, modGraph) <- depanalE [] False
 

@@ -19,3 +19,8 @@ test('haddockHypsrcTest',
      [ignore_stdout, ignore_stderr, req_haddock],
      makefile_test,
      ['hypsrcTest ' + accept])
+
+test('haddockForeignTest',
+     [ignore_stdout, ignore_stderr, req_haddock, extra_files(['./haddock-th-foreign-repro/A.hs', './haddock-th-foreign-repro/B.hs', './haddock-th-foreign-repro/F.hs', './haddock-th-foreign-repro/arith.c'])],
+     makefile_test,
+     ['haddockForeignTest'])
