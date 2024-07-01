@@ -142,6 +142,7 @@ import Data.Int
 import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.IntSet as IntSet
 import qualified GHC.Data.Word64Set as Word64Set
 import Data.String
 import Data.Word
@@ -990,6 +991,9 @@ instance (Outputable a) => Outputable (Set a) where
 
 instance Outputable Word64Set.Word64Set where
     ppr s = braces (pprWithCommas ppr (Word64Set.toList s))
+
+instance Outputable IntSet.IntSet where
+    ppr s = braces (pprWithCommas ppr (IntSet.toList s))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
