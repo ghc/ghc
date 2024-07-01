@@ -1265,13 +1265,15 @@ greIsRelevant which_gres ns gre
 {- Note [childGREPriority]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are currently two places in the compiler where we look up GlobalRdrElts
-which have a given Parent. These are the two calls to lookupSubBndrOccHelper (RENAME):
+which have a given Parent.
 
-  A. Looking up children in an export item, e.g.
+  A. lookupSubBndrOccOnExportList looks up children in an export item, e.g.
 
        module M ( T(MkT, D) ) where { data T = MkT; data D = D }
 
-  B. Looking up binders in a class or instance declaration, e.g.
+  B. lookupSubBndrOccOnTypeClass looks up binders in a class or
+     instance declaration, e.g.
+
      the operator +++ in the fixity declaration:
 
        class C a where { type (+++) :: a -> a ->; infixl 6 +++ }
