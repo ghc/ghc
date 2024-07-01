@@ -148,6 +148,31 @@ Language
   This feature is an experimental alternative to :extension:`ScopedTypeVariables`,
   see the :ref:`type-abstractions-in-functions` section.
 
+- In accordance with GHC Proposal `#425 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_,
+  arity inference for type families and type synonyms was removed. Previously
+  GHC performed attempts to figure out how many trailing invisible ``forall``'s
+  should be implicitly bound on the LHS. Consider this example: ::
+
+    type P :: forall k. k -> Proxy k
+    type P = Proxy
+
+  Before this change, GHC used to add an invisible binder for the kind, like this: ::
+
+    type P @k = Proxy @k
+
+  This meant that such ``P`` did not work in higher-ranked contexts, as type synonyms
+  must always appear fully saturated.
+
+  After this change, GHC no longer tries to guess the arity. Instead, the arity
+  is directly specified via the :extension:`TypeAbstractions` extension.
+
+- It is now possible to use untyped quotes in typed splices and vice versa: ::
+
+    $$(const [|| 'x' ||] ([| 'y' |]  :: IO Exp))
+
+  This is useful, e.g. for quoting patterns in typed splices.
+
+
 Compiler
 ~~~~~~~~
 
