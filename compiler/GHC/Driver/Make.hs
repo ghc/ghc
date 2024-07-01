@@ -2408,13 +2408,6 @@ cyclicModuleErr mss
       | ms <- mss
       ]
 
-mkFileSrcSpan :: ModLocation -> SrcSpan
-mkFileSrcSpan mod_loc
-  = case ml_hs_file mod_loc of
-      Just file_path -> mkGeneralSrcSpan (mkFastString file_path)
-      Nothing        -> interactiveSrcSpan   -- Presumably
-
-
 cleanCurrentModuleTempFilesMaybe :: MonadIO m => Logger -> TmpFs -> DynFlags -> m ()
 cleanCurrentModuleTempFilesMaybe logger tmpfs dflags =
   if gopt Opt_KeepTmpFiles dflags

@@ -64,7 +64,6 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 
-import GHC.Data.FastString
 import GHC.Data.Maybe    ( expectJust )
 import GHC.Data.OrdList
 import GHC.Data.SizedSeq ( sizeSS )
@@ -288,12 +287,6 @@ deSugar hsc_env
               }
         ; return (msgs, Just mod_guts)
         }}}}
-
-mkFileSrcSpan :: ModLocation -> SrcSpan
-mkFileSrcSpan mod_loc
-  = case ml_hs_file mod_loc of
-      Just file_path -> mkGeneralSrcSpan (mkFastString file_path)
-      Nothing        -> interactiveSrcSpan   -- Presumably
 
 dsImpSpecs :: [LTcSpecPrag] -> DsM (OrdList (Id,CoreExpr), [CoreRule])
 dsImpSpecs imp_specs

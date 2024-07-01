@@ -18,6 +18,7 @@ module GHC.Unit.Module.Location
    , addBootSuffixLocn
    , addBootSuffixLocnOut
    , removeBootSuffix
+   , mkFileSrcSpan
    )
 where
 
@@ -25,7 +26,9 @@ import GHC.Prelude
 
 import GHC.Data.OsPath
 import GHC.Unit.Types
+import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Data.FastString (mkFastString)
 
 import qualified System.OsString as OsString
 
@@ -127,6 +130,13 @@ addBootSuffixLocnOut locn
          , ml_dyn_obj_file_ospath = addBootSuffix (ml_dyn_obj_file_ospath locn)
          , ml_hie_file_ospath = addBootSuffix (ml_hie_file_ospath locn)
          }
+
+-- | Compute a 'SrcSpan' from a 'ModLocation'.
+mkFileSrcSpan :: ModLocation -> SrcSpan
+mkFileSrcSpan mod_loc
+  = case ml_hs_file mod_loc of
+      Just file_path -> mkGeneralSrcSpan (mkFastString file_path)
+      Nothing        -> interactiveSrcSpan   -- Presumably
 
 -- ----------------------------------------------------------------------------
 -- Helpers for backwards compatibility
