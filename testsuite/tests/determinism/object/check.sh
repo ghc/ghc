@@ -21,7 +21,7 @@ fi
 S1=`find Cabal-3.12.0.0/out1 -name "*.o" | wc -l`
 S2=`find Cabal-3.12.0.0/out2 -name "*.o" | wc -l`
 
-test $S1 > 0
+test $S1 > 0 || (echo "no files generated" && false)
 test $S1 == $S2
 
 # $1 = objects

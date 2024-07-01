@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, MagicHash, UnboxedTuples, PatternSynonyms, ExplicitNamespaces #-}
+{-# LANGUAGE LambdaCase, MagicHash, UnboxedTuples, PatternSynonyms, ExplicitNamespaces, TypeFamilies #-}
 module GHC.Cmm.UniqueRenamer
   ( detRenameUniques
   , UniqDSM, runUniqueDSM
@@ -23,8 +23,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable as Outputable
 import Data.Tuple (swap)
-import qualified Data.Map as M
-import qualified Data.Set as S
 import GHC.Types.Id
 
 {-
@@ -72,7 +70,7 @@ renameDetUniq uq = do
     Nothing -> do
       new_w <- gets supply -- New deterministic unique in this `DetRnM`
       let (tag, _) = unpkUnique uq
-          det_uniq = mkUnique 'Q' new_w
+          det_uniq = mkUnique tag new_w
       modify' (\DetUniqFM{mapping, supply} ->
         -- Update supply and mapping
         DetUniqFM
@@ -184,7 +182,7 @@ instance UniqRenamable CmmLit where
     CmmBlock bid -> CmmBlock <$> uniqRename bid
     CmmHighStackMark -> pure CmmHighStackMark
 
--- TODO::: VERY BAD!!! This isn't deterministic since the key is non-deterministic thus the order in which we rename is non deterministic
+-- This is fine because LabelMap is backed by a deterministic UDFM
 instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
   => UniqRenamable (LabelMap a) where
   uniqRename lm = mapFromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
@@ -269,16 +267,6 @@ instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (a, b) where
 instance (UniqRenamable a) => UniqRenamable (Maybe a) where
   uniqRename Nothing = pure Nothing
   uniqRename (Just x) = Just <$> uniqRename x
-
--- TODO::: BAD!!! This won't be deterministic if the key is non-deterministic because the order in which we rename is non deterministic
-instance (Ord a, UniqRenamable a, UniqRenamable b) => UniqRenamable (M.Map a b) where
-  uniqRename m = M.fromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (M.toList m)
-
--- TODO::: BAD!!! This won't be deterministic if the key is non-deterministic because the order in which we rename is non deterministic
-instance (Ord a, UniqRenamable a) => UniqRenamable (S.Set a) where
-  -- Because of renaming being injective the resulting set should have the same
-  -- size as the intermediate list.
-  uniqRename s = S.fromList <$> mapM uniqRename (S.toList s)
 
 -- | Utility panic used by UniqRenamable instances for Map-like datatypes
 panicMapKeysNotInjective :: a -> b -> c
