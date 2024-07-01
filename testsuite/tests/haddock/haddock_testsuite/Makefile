@@ -72,3 +72,7 @@ hypsrcTest:
 		$(ACCEPT) \
 		--ghc-path='$(TEST_HC)' \
 		--haddock-path='$(HADDOCK)' \
+
+.PHONY: haddockForeignTest
+haddockForeignTest:
+	'$(HADDOCK)' A.hs B.hs F.hs arith.c
