@@ -385,7 +385,7 @@ data DriverMessage where
 
   DriverDeprecatedFlag :: String -> String -> DriverMessage
 
-  {- | DriverModuleGraphCycle is an error that occurs if the module graph
+  {-| DriverModuleGraphCycle is an error that occurs if the module graph
        contains cyclic imports.
 
   Test cases:
@@ -396,6 +396,11 @@ data DriverMessage where
 
   -}
   DriverModuleGraphCycle :: [ModuleGraphNode] -> DriverMessage
+
+  {- | DriverInstantiationNodeInDependencyGeneration is an error that occurs
+       if the module graph used for dependency generation contains
+       Backpack 'InstantiationNode's. -}
+  DriverInstantiationNodeInDependencyGeneration :: InstantiatedUnit -> DriverMessage
 
 deriving instance Generic DriverMessage
 
