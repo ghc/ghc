@@ -19,6 +19,7 @@ import Data.Bifunctor
 import Data.List.Extra
 import Development.Shake
 import qualified Distribution.Compat.Graph                     as Graph
+import qualified Distribution.Compat.Lens                      as CL
 import qualified Distribution.ModuleName                       as C
 import qualified Distribution.Package                          as C
 import qualified Distribution.PackageDescription               as C
@@ -37,6 +38,7 @@ import qualified Distribution.Simple.Utils                     as C
 import qualified Distribution.Simple.Program.Types             as C
 import qualified Distribution.Simple.Configure                 as C (getPersistBuildConfig)
 import qualified Distribution.Simple.Build                     as C
+import qualified Distribution.Types.BuildInfo.Lens             as CL (HasBuildInfo(..), traverseBuildInfos)
 import qualified Distribution.Types.ComponentLocalBuildInfo    as C
 import qualified Distribution.InstalledPackageInfo             as Installed
 import qualified Distribution.Simple.PackageIndex              as C
@@ -193,10 +195,21 @@ configurePackage context@Context {..} = do
     verbosity <- getVerbosity
     let v = shakeVerbosityToCabalFlag verbosity
         argList' = argList ++ ["--flags=" ++ unwords flagList, v]
+
     when (verbosity >= Verbose) $
         putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ unwords argList'
+
+    -- See #24826 for why this workaround exists
+    -- In future `Cabal` versions we should pass the `--ignore-build-tools` flag when
+    -- calling configure.
+    -- See https://github.com/haskell/cabal/pull/10128
+    let gpdWithoutBuildTools =
+            CL.set (CL.traverseBuildInfos . CL.buildToolDepends) []
+          . CL.set (CL.traverseBuildInfos . CL.buildTools) []
+          $ gpd
+
     traced "cabal-configure" $
-        C.defaultMainWithHooksNoReadArgs hooks gpd argList'
+        C.defaultMainWithHooksNoReadArgs hooks gpdWithoutBuildTools argList'
 
     dir <- Context.buildPath context
     files <- liftIO $ getDirectoryFilesIO "." [ dir -/- "include" -/- "**"
