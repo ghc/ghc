@@ -264,7 +264,10 @@ instance Diagnostic DriverMessage where
         ppr_ms :: ModSummary -> SDoc
         ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+>
                     (parens (text (msHsFilePath ms)))
-
+    DriverInstantiationNodeInDependencyGeneration node ->
+      mkSimpleDecorated $
+        vcat [ text "Unexpected backpack instantiation in dependency graph while constructing Makefile:"
+             , nest 2 $ ppr node ]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -331,6 +334,8 @@ instance Diagnostic DriverMessage where
     DriverDeprecatedFlag {}
       -> WarningWithFlag Opt_WarnDeprecatedFlags
     DriverModuleGraphCycle {}
+      -> ErrorWithoutFlag
+    DriverInstantiationNodeInDependencyGeneration {}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -400,6 +405,8 @@ instance Diagnostic DriverMessage where
     DriverDeprecatedFlag {}
       -> noHints
     DriverModuleGraphCycle {}
+      -> noHints
+    DriverInstantiationNodeInDependencyGeneration {}
       -> noHints
 
   diagnosticCode = constructorCode

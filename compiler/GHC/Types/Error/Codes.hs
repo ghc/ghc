@@ -321,6 +321,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DriverUnrecognisedFlag"                        = 93741
   GhcDiagnosticCode "DriverDeprecatedFlag"                          = 53692
   GhcDiagnosticCode "DriverModuleGraphCycle"                        = 92213
+  GhcDiagnosticCode "DriverInstantiationNodeInDependencyGeneration" = 74284
 
   -- Constraint solver diagnostic codes
   GhcDiagnosticCode "BadTelescope"                                  = 97739

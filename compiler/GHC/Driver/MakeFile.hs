@@ -19,7 +19,6 @@ import qualified GHC
 import GHC.Driver.Make
 import GHC.Driver.Monad
 import GHC.Driver.DynFlags
-import GHC.Driver.Ppr
 import GHC.Utils.Misc
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
@@ -213,14 +212,14 @@ processDeps :: DynFlags
 
 processDeps _ _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
-    cyclicModuleErr nodes
+    throwOneError $ cyclicModuleErr nodes
 
-processDeps dflags _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
+processDeps _ _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
   =     -- There shouldn't be any backpack instantiations; report them as well
-    throwGhcExceptionIO $ ProgramError $
-      showSDoc dflags $
-        vcat [ text "Unexpected backpack instantiation in dependency graph while constructing Makefile:"
-             , nest 2 $ ppr node ]
+    throwOneError $
+      mkPlainErrorMsgEnvelope noSrcSpan $
+      GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
+
 processDeps _dflags _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
 
 processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
