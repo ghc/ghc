@@ -1265,7 +1265,7 @@ upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = d
     -- of the upsweep.
     case cycle of
         Just mss -> do
-          cyclicModuleErr mss
+          throwOneError $ cyclicModuleErr mss
         Nothing  -> do
           let success_flag = successIf (all isJust res)
           return (success_flag, completed)
@@ -2386,16 +2386,15 @@ multiRootsErr summs@(summ1:_)
     mod = ms_mod summ1
     files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs
 
-cyclicModuleErr :: [ModuleGraphNode] -> IO a
+cyclicModuleErr :: [ModuleGraphNode] -> MsgEnvelope GhcMessage
 -- From a strongly connected component we find
 -- a single cycle to report
 cyclicModuleErr mss
   = assert (not (null mss)) $
     case findCycle graph of
        Nothing   -> pprPanic "Unexpected non-cycle" (ppr mss)
-       Just path -> throwOneError $ mkPlainErrorMsgEnvelope src_span
-                                  $ GhcDriverMessage
-                                  $ DriverModuleGraphCycle path
+       Just path -> mkPlainErrorMsgEnvelope src_span $
+                    GhcDriverMessage $ DriverModuleGraphCycle path
         where
           src_span = maybe noSrcSpan (mkFileSrcSpan . ms_location) (moduleGraphNodeModSum (head path))
   where

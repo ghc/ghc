@@ -41,6 +41,7 @@
 [GHC-19971] is untested (constructor = DriverBackpackModuleNotFound)
 [GHC-37141] is untested (constructor = DriverCannotLoadInterfaceFile)
 [GHC-29747] is untested (constructor = DriverMissingSafeHaskellMode)
+[GHC-74284] is untested (constructor = DriverInstantiationNodeInDependencyGeneration)
 [GHC-06200] is untested (constructor = BlockedEquality)
 [GHC-81325] is untested (constructor = ExpectingMoreArguments)
 [GHC-78125] is untested (constructor = AmbiguityPreventsSolvingCt)
