@@ -2150,6 +2150,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    *(uint32_t *)pP = (uint32_t)v;
                    break;
                }
+            case 14: /* R_X86_64_PC64 (ELF constant 24) - IMAGE_REL_AMD64_SREL32 (PE constant 14) */
+               {
+                   /* mingw will emit this for a pc-rel 64 relocation */
+                   uint64_t A;
+                   checkProddableBlock(oc, pP, 8);
+                   A = *(uint64_t*)pP;
+                   *(uint64_t *)pP = S + A - (intptr_t)pP;
+                   break;
+               }
             case 4: /* R_X86_64_PC32 (ELF constant 2) - IMAGE_REL_AMD64_REL32 (PE constant 4) */
                {
                    intptr_t v;
