@@ -61,7 +61,6 @@ library
         exposed-modules:
             GHCi.Run
             GHCi.CreateBCO
-            GHCi.ObjLink
             GHCi.Signals
             GHCi.StaticPtrTable
             GHCi.TH
@@ -72,6 +71,7 @@ library
             GHCi.InfoTable
 
     exposed-modules:
+        GHCi.ObjLink
         GHCi.BreakArray
         GHCi.BinaryArray
         GHCi.Message
