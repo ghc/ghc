@@ -967,10 +967,20 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
     // lookupDependentSymbol directly.
     SymbolAddr* r = lookupDependentSymbol(lbl, NULL, NULL);
     if (!r) {
-        errorBelch("^^ Could not load '%s', dependency unresolved. "
-                   "See top entry above.\n", lbl);
-        IF_DEBUG(linker, printLoadedObjects());
-        fflush(stderr);
+        if (!RtsFlags.MiscFlags.linkerOptimistic) {
+          errorBelch("^^ Could not load '%s', dependency unresolved. "
+                     "See top entry above. You might consider using --optimistic-linking\n",
+                     lbl);
+          IF_DEBUG(linker, printLoadedObjects());
+          fflush(stderr);
+        } else {
+          // if --optimistic-linking is passed into the RTS we allow the linker
+          // to optimistically continue
+          errorBelch("^^ Could not load '%s', dependency unresolved, "
+                     "optimistically continuing\n",
+                     lbl);
+          r = (void*) 0xDEADBEEF;
+        }
     }
 
     if (!runPendingInitializers()) {

@@ -97,9 +97,22 @@ fillGot(ObjectCode * oc) {
                             if(0 == strncmp(symbol->name,"_GLOBAL_OFFSET_TABLE_",21)) {
                                 symbol->addr = oc->info->got_start;
                             } else {
-                                errorBelch("Failed to lookup symbol: %s\n",
+                                errorBelch("Failed to lookup symbol: %s,"
+                                           " you might consider using --optimistic-linking\n",
                                            symbol->name);
-                                return EXIT_FAILURE;
+
+                                // if --optimistic-linking is passed into the
+                                // RTS we allow the linker to optimistically
+                                // continue
+                                if (RtsFlags.MiscFlags.linkerOptimistic) {
+                                    errorBelch("Failed to lookup symbol: %s,"
+                                               " optimistically continuing.\n",
+                                               symbol->name);
+                                    symbol->addr = (void*) 0xDEADBEEF;
+                                } else {
+                                    return EXIT_FAILURE;
+                                }
+
                             }
                         }
                     } else {

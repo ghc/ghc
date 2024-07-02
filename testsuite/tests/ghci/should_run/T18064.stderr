@@ -1,2 +1,2 @@
-<interactive>: ^^ Could not load 'blah', dependency unresolved. See top entry above.
+<interactive>: ^^ Could not load 'blah', dependency unresolved. See top entry above. You might consider using --optimistic-linking
 

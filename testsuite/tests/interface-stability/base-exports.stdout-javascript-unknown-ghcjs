@@ -12153,7 +12153,7 @@ module GHC.RTS.Flags where
   type IoSubSystem :: *
   data IoSubSystem = IoPOSIX | IoNative
   type MiscFlags :: *
-  data MiscFlags = MiscFlags {tickInterval :: RtsTime, installSignalHandlers :: GHC.Types.Bool, installSEHHandlers :: GHC.Types.Bool, generateCrashDumpFile :: GHC.Types.Bool, generateStackTrace :: GHC.Types.Bool, machineReadable :: GHC.Types.Bool, disableDelayedOsMemoryReturn :: GHC.Types.Bool, internalCounters :: GHC.Types.Bool, linkerAlwaysPic :: GHC.Types.Bool, linkerMemBase :: GHC.Types.Word, ioManager :: IoManagerFlag, numIoWorkerThreads :: GHC.Internal.Word.Word32}
+  data MiscFlags = MiscFlags {tickInterval :: RtsTime, installSignalHandlers :: GHC.Types.Bool, installSEHHandlers :: GHC.Types.Bool, generateCrashDumpFile :: GHC.Types.Bool, generateStackTrace :: GHC.Types.Bool, machineReadable :: GHC.Types.Bool, disableDelayedOsMemoryReturn :: GHC.Types.Bool, internalCounters :: GHC.Types.Bool, linkerAlwaysPic :: GHC.Types.Bool, linkerOptimistic :: GHC.Types.Bool, linkerMemBase :: GHC.Types.Word, ioManager :: IoManagerFlag, numIoWorkerThreads :: GHC.Internal.Word.Word32}
   type ParFlags :: *
   data ParFlags = ParFlags {nCapabilities :: GHC.Internal.Word.Word32, migrate :: GHC.Types.Bool, maxLocalSparks :: GHC.Internal.Word.Word32, parGcEnabled :: GHC.Types.Bool, parGcGen :: GHC.Internal.Word.Word32, parGcLoadBalancingEnabled :: GHC.Types.Bool, parGcLoadBalancingGen :: GHC.Internal.Word.Word32, parGcNoSyncWithIdle :: GHC.Internal.Word.Word32, parGcThreads :: GHC.Internal.Word.Word32, setAffinity :: GHC.Types.Bool}
   type ProfFlags :: *

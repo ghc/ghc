@@ -1,0 +1,236 @@
+.. _release-9-11-1:
+
+Version 9.12.1
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.12>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+Language
+~~~~~~~~
+
+- New language extension: :extension:`OrPatterns` implements `GHC Proposal #522
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0522-or-patterns.rst>`_).
+- GHC Proposal `#569 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0569-multiline-strings.rst>`_
+  "Multiline string literals" has been implemented.
+  The following code is now accepted by GHC::
+
+    {-# LANGUAGE MultilineStrings #-}
+
+    x :: String
+    x =
+      """
+      This is a
+      multiline
+
+          string
+
+      literal
+      """
+
+  This feature is guarded behind :extension:`MultilineStrings`.
+
+- The ordering of variables used for visible type application has been changed in two cases.
+  It is supposed to be left-to-right, but due to an oversight, it was wrong:
+
+  - in an infix application ``f :: a `op` b``, it is now ``forall a op b.`` rather than
+    ``forall op a b.``
+  - in a linear type ``f :: a %m -> b``, it is now ``forall a m b.`` rather than
+    ``forall a b m.``.
+
+  This change is backwards-incompatible, although in practice we don't expect it
+  to cause significant disruption.
+
+- The built-in ``HasField`` class, used by :extension:`OverloadedRecordDot`, now
+  supports representation polymorphism (implementing part of `GHC Proposal #583
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0583-hasfield-redesign.rst>`_).
+  This means that code using :extension:`UnliftedDatatypes` or
+  :extension:`UnliftedNewtypes` can now use :extension:`OverloadedRecordDot`.
+
+- Unboxed ``Float#``/``Double#`` literals now support the HexFloatLiterals extension
+  (`#22155 <https://gitlab.haskell.org/ghc/ghc/-/issues/22155>`_).
+
+- :extension:`UnliftedFFITypes`: GHC will now accept FFI types like: ``(# #) -> T`` where ``(# #)``
+  is used as the one and only function argument.
+
+- The venerable ``default`` declarations have been generalized. They can now name a class
+  other than ``Num`` and the class defaults can be exported. The functionality is guarded
+  by the new ``NamedDefaults`` language extension. See the `GHC proposal
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0409-exportable-named-default.rst>`__
+  for details.
+
+- GHC now takes COMPLETE pragmas into consideration when deciding whether
+  pattern matches in do notation are fallible.
+
+- As part of `GHC Proposal #281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
+  GHC now accepts type syntax in expressions, namely function type arrow ``a -> b``,
+  constraint arrow ``a => b``, and ``forall`` telescopes: ::
+
+    g = f (forall a. Show a => a -> String)
+      where f :: forall a -> ...
+
+Compiler
+~~~~~~~~
+
+- Constructor ``PluginProv`` of type ``UnivCoProvenance``, relevant
+  for typing plugins, gets an extra ``DCoVarSet`` argument.
+  The argument is intended to contain the in-scope coercion variables
+  that the the proof represented by the coercion makes use of.
+  See ``Note [The importance of tracking free coercion variables]``
+  in ``GHC.Core.TyCo.Rep``, :ref:`constraint-solving-with-plugins`
+  and the migration guide.
+
+- The flag :ghc-flag:`-fprof-late` will no longer prevent top level constructors from being statically allocated.
+
+  It used to be the case that we would add a cost centre for bindings like ``foo = Just bar``.
+  This turned the binding into a CAF that would allocate the constructor on first evaluation.
+
+  However without the cost centre ``foo`` can be allocated at compile time. This reduces code-bloat and
+  reduces overhead for short-running applications.
+
+  The tradeoff is that calling ``whoCreated`` on top level value definitions like ``foo`` will be less informative.
+
+- A new flag :ghc-flag:`-fexpose-overloaded-unfoldings` has been added providing a lightweight alternative to :ghc-flag:`-fexpose-all-unfoldings`.
+
+- :ghc-flag:`-Wderiving-typeable` has been added to :ghc-flag:`-Wall`.
+
+- i386 Windows support is now completely removed amid massive cleanup
+  of legacy code to pave way for Arm64 Windows support (`#24883
+  <https://gitlab.haskell.org/ghc/ghc/-/issues/24883>`_). Rest
+  assured, this does not impact existing support for x86_64 Windows or
+  i386 Linux. For end users, the ``stdcall`` C calling convention is
+  now fully deprecated and GHC will unconditionally produce a warning
+  and treat it as ``ccall``. All C import/export declarations on
+  Windows should now use ``ccall``.
+
+- 32-bit macOS/iOS support has also been completely removed (`#24921
+  <https://gitlab.haskell.org/ghc/ghc/-/issues/24921>`_). This does
+  not affect existing support of apple systems on x86_64/aarch64.
+
+- The flag :ghc-flag:`-fignore-asserts` will now also enable the
+  :extension:`CPP` macro ``__GLASGOW_HASKELL_ASSERTS_IGNORED__`` (`#24967
+  <https://gitlab.haskell.org/ghc/ghc/-/issues/24967>`_).
+  This enables people to write their own custom assertion functions.
+  See :ref:`assertions`.
+
+- The flag :ghc-flag:`-fkeep-auto-rules` that forces GHC to keep auto generated
+  specialization rules was added. It was actually added ghc-9.10.1 already but
+  mistakenly not mentioned in the 9.10.1 changelog.
+
+- Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
+  on certain programs. (#24941)
+
+- A new warning :ghc-flag:`-Wview-pattern-signatures` is introduced to notify users about
+  future changes in parsing of view patterns in combination with pattern signatures
+
+GHCi
+~~~~
+
+- Fix a bug where GHCi would not start alongside a local file called ``Prelude.hs``
+  or ``Prelude.lhs`` (:ghc-ticket:`10920`).
+
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- Reduce fragmentation incurred by the nonmoving GC's segment allocator. In one application this reduced resident set size by 26%. See :ghc-ticket:`24150`.
+
+- Memory return logic now uses live bytes rather than live blocks to measure the size of the heap.
+  This primarily affects the non-moving GC, which should now be more willing to return memory to the OS.
+  Users who have fine-tuned the :rts-flag:`-F ⟨factor⟩`, :rts-flag:`-Fd ⟨factor⟩`, or :rts-flag:`-O ⟨size⟩` flags,
+  and use the non-moving GC, should see if adjustments are needed in light of this change.
+
+- The new runtime flag :rts-flag:`--read-tix-file=\<yes|no\>` allows to modify whether a preexisting .tix file is read in at the beginning of a program run.
+  The default is currently ``--read-tix-file=yes`` but will change to ``--read-tix-file=no`` in a future version of GHC.
+  For this reason, a warning is emitted if a .tix file is read in implicitly. You can silence this warning by explicitly passing ``--read-tix-file=yes``.
+  Details can be found in `GHC proposal 612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
+
+- Add new runtime flag :rts-flag:`--optimistic-linking` which instructs the
+  runtime linker to continue in the presence of unknown symbols. By default this
+  flag is not passed, preserving previous behavior.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Add exception type metadata to SomeException's displayException and
+  "Exception:" header to the default handler
+  (i.e. ``GHC.Conc.Sync.uncaughtExceptionHandler``):
+
+  https://github.com/haskell/core-libraries-committee/issues/231
+  https://github.com/haskell/core-libraries-committee/issues/261
+
+- The `deprecation process of GHC.Pack <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>` has come its term. The module has now been removed from ``base``.
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+- Usage of deprecated primops is now correctly reported (#19629).
+- New primops `isMutableByteArrayWeaklyPinned#` and `isByteArrayWeaklyPinned#`
+  to allow users to avoid copying large arrays safely when dealing with ffi.
+  See the users guide for more details on the different kinds of
+  pinned arrays in 9.12.
+
+  This need for this distinction originally surfaced in https://gitlab.haskell.org/ghc/ghc/-/issues/22255
+
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+``ghc-heap`` library
+~~~~~~~~~~~~~~~~~~~~
+
+``ghc-experimental`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``template-haskell`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Included libraries
+~~~~~~~~~~~~~~~~~~
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:                         Dependency of ``ghc`` library
+    libraries/base/base.cabal:                           Core library
+    libraries/binary/binary.cabal:                       Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:               Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:                   Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:     Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:    Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:                     Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:                 Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:               Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:                   Dependency of ``ghc`` library
+    compiler/ghc.cabal:                                  The compiler itself
+    libraries/ghci/ghci.cabal:                           The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:                   Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal:             Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal:             Core library
+    libraries/ghc-heap/ghc-heap.cabal:                   GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:                   Core library
+    utils/haddock/haddock-api/haddock-api.cabal:         Dependency of ``haddock`` executable
+    utils/haddock/haddock-library/haddock-library.cabal: Dependency of ``haddock`` executable
+    libraries/haskeline/haskeline.cabal:                 Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                             Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal:             Core library
+    libraries/mtl/mtl.cabal:                             Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:                       Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:                       Dependency of ``ghc`` library
+    libraries/process/process.cabal:                     Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                             Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:   Core library
+    libraries/terminfo/terminfo.cabal:                   Dependency of ``haskeline`` library
+    libraries/text/text.cabal:                           Dependency of ``Cabal`` library
+    libraries/time/time.cabal:                           Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal:           Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:                           Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:                         Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:                         Dependency of ``haddock`` executable
+    libraries/os-string/os-string.cabal:                 Dependency of ``filepath`` library
+    libraries/file-io/file-io.cabal:                     Dependency of ``directory`` library

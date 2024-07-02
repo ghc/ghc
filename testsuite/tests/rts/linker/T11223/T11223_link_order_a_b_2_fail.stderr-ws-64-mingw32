@@ -9,7 +9,7 @@ This could be caused by:
    * Specifying the same object file twice on the GHCi command line
    * An incorrect `package.conf' entry, causing some object to be
      loaded twice.
-ghc-stage2.exe: ^^ Could not load 'c', dependency unresolved. See top entry above.
+ghc-stage2.exe: ^^ Could not load 'c', dependency unresolved. See top entry above. You might consider using --optimistic-linking
 
 
 GHC.ByteCode.Linker: can't find label

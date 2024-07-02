@@ -397,6 +397,11 @@ Miscellaneous RTS options
     heap larger than 1T. ``-xr`` is a no-op if GHC is configured with
     ``--disable-large-address-space`` or if the platform is 32-bit.
 
+.. rts-flag:: --optimistic-linking
+
+    If given, instruct the runtime linker to try to continue linking in the
+    presence of an unresolved symbol.
+
 .. _rts-options-gc:
 
 RTS options to control the garbage collector
