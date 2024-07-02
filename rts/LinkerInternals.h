@@ -64,6 +64,8 @@ typedef enum _SymType {
     SYM_TYPE_DUP_DISCARD = 1 << 3, /* the symbol is a symbol in a BFD import library
                                       however if a duplicate is found with a mismatching
                                       SymType then discard this one.  */
+    SYM_TYPE_HIDDEN = 1 << 4, /* the symbol is hidden and should not be exported */
+
 } SymType;
 
 

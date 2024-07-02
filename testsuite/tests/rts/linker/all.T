@@ -168,3 +168,11 @@ test('reloc-none',
                 unless(opsys('linux'), skip),
 		req_rts_linker],
 	makefile_test, ['reloc-none'])
+
+test('T25191',
+     [req_rts_linker,
+      extra_files(['T25191_foo1.c','T25191_foo2.c']),
+      when(opsys('darwin'), expect_broken(25191)), # not supported in the MachO linker yet
+      when(opsys('mingw32'), expect_broken(25191)) # not supported in the PE linker yet
+     ],
+     makefile_test, ['T25191'])
