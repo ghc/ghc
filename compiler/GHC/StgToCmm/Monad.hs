@@ -24,7 +24,7 @@ module GHC.StgToCmm.Monad (
         emitOutOfLine, emitAssign, emitStore, emitStore',
         emitComment, emitTick, emitUnwind,
 
-        newTemp,
+        newTemp, newTempD,
 
         getCmm, aGraphToGraph, getPlatform, getProfile,
         getCodeR, getCode, getCodeScoped, getHeapUsage,
@@ -85,6 +85,8 @@ import GHC.Data.OrdList
 import GHC.Types.Basic( ConTagZ )
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import GHC.Cmm.UniqueRenamer ( UniqDSM, getUniqueDSM, MonadGetUnique )
+import qualified GHC.Cmm.UniqueRenamer as UR
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -169,6 +171,9 @@ instance MonadUnique FCode where
   getUniqueM = FCode $ \_ _ st ->
     let (u, us') = takeUniqFromSupply (cgs_uniqs st)
     in (u, st { cgs_uniqs = us' })
+
+instance MonadGetUnique FCode where
+  getUniqueM = GHC.Types.Unique.Supply.getUniqueM
 
 initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
@@ -450,9 +455,13 @@ newUnique = do
         setState $ state { cgs_uniqs = us' }
         return u
 
-newTemp :: MonadUnique m => CmmType -> m LocalReg
-newTemp rep = do { uniq <- getUniqueM
+newTemp :: MonadGetUnique m => CmmType -> m LocalReg
+newTemp rep = do { uniq <- UR.getUniqueM
                  ; return (LocalReg uniq rep) }
+
+newTempD :: CmmType -> UniqDSM LocalReg
+newTempD rep = do { uniq <- getUniqueDSM
+                  ; return (LocalReg uniq rep) }
 
 ------------------
 initFCodeState :: Platform -> FCodeState

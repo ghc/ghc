@@ -8,7 +8,7 @@ import GHC.Prelude hiding ((<*>))
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.StgToCmm.Monad      ( newTemp  ) -- XXX layering violation
+import GHC.StgToCmm.Monad      ( newTempD ) -- XXX layering violation
 import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs  ) -- XXX layering violation
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
@@ -574,7 +574,7 @@ makeFixupBlock :: CmmConfig -> ByteOff -> Label -> StackMap
 makeFixupBlock cfg sp0 l stack tscope assigs
   | null assigs && sp0 == sm_sp stack = return (l, [])
   | otherwise = do
-    tmp_lbl <- newBlockId
+    tmp_lbl <- mkBlockId <$> getUniqueDSM {- todo: newBlockId -}
     let sp_off = sp0 - sm_sp stack
         block = blockJoin (CmmEntry tmp_lbl tscope)
                           ( maybeAddSpAdj cfg sp0 sp_off
@@ -1140,8 +1140,8 @@ lowerSafeForeignCall profile block
     let platform = profilePlatform profile
     -- Both 'id' and 'new_base' are KindNonPtr because they're
     -- RTS-only objects and are not subject to garbage collection
-    id <- newTemp (bWord platform)
-    new_base <- newTemp (cmmRegType $ baseReg platform)
+    id <- newTempD (bWord platform)
+    new_base <- newTempD (cmmRegType $ baseReg platform)
     let (caller_save, caller_load) = callerSaveVolatileRegs platform
     save_state_code <- saveThreadState profile
     load_state_code <- loadThreadState profile

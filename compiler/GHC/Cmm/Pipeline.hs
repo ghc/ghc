@@ -105,9 +105,12 @@ cpsTop logger platform cfg dus proc =
       ----------- ThreadSanitizer instrumentation -----------------------------
       g <- {-# SCC "annotateTSAN" #-}
           if cmmOptThreadSanitizer cfg
+          then do
              -- romes: hard to support deterministic here without changing too
              -- much in graph, maybe we can skip it.
-          then runUniqSM $ annotateTSAN platform g
+            us <- mkSplitUniqSupply 'u'
+            return $ initUs_ us $
+              annotateTSAN platform g
           else return g
       dump Opt_D_dump_cmm_thread_sanitizer "ThreadSanitizer instrumentation" g
 
@@ -135,10 +138,10 @@ cpsTop logger platform cfg dus proc =
       dump Opt_D_dump_cmm_sp "Layout Stack" g
 
       ----------- Sink and inline assignments  --------------------------------
-      g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
+      (g, dus) <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
            if cmmOptSink cfg
-              then runUniqSM $ cmmSink cfg g
-              else return g
+              then pure $ runUniqueDSM dus $ cmmSink cfg g
+              else return (g, dus)
       dump Opt_D_dump_cmm_sink "Sink assignments" g
 
 
@@ -359,12 +362,6 @@ removing them is good because it might save time in the native code
 generator later.
 
 -}
-
--- ROMESTODO: MAKE THIS DETERMINISTIC!!!!!!
-runUniqSM :: UniqSM a -> IO a
-runUniqSM m = do
-  us <- mkSplitUniqSupply 'u'
-  return (initUs_ us m)
 
 dumpGraph :: Logger -> Platform -> Bool -> DumpFlag -> String -> CmmGraph -> IO ()
 dumpGraph logger platform do_linting flag name g = do

@@ -3,14 +3,17 @@ module GHC.Cmm.UniqueRenamer
   ( detRenameUniques
   , UniqDSM, runUniqueDSM
   , DUniqSupply, getUniqueDSM, takeUniqueFromDSupply, initDUniqSupply, newTagDUniqSupply
+  , MonadGetUnique(..)
 
   -- Careful! Not for general use!
-  , DetUniqFM, emptyDetUFM)
+  , DetUniqFM, emptyDetUFM
+  )
   where
 
 import Data.Bits
 import Prelude
 import Control.Monad.Trans.State
+import Control.Monad.Fix
 import GHC.Word
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -24,6 +27,7 @@ import GHC.Types.Unique.FM
 import GHC.Utils.Outputable as Outputable
 import Data.Tuple (swap)
 import GHC.Types.Id
+import qualified GHC.Types.Unique.Supply as USM
 
 {-
 --------------------------------------------------------------------------------
@@ -313,6 +317,9 @@ instance Applicative UniqDSM where
   {-# INLINE pure #-}
   {-# INLINE (*>) #-}
 
+instance MonadFix UniqDSM where
+  mfix m = UDSM (\us0 -> let (r,us1) = runUniqueDSM us0 (m r) in DUniqResult r us1)
+
 getUniqueDSM :: UniqDSM Unique
 getUniqueDSM = UDSM (\(DUS us0) -> DUniqResult (mkUniqueGrimily us0) (DUS $ us0+1))
 
@@ -333,6 +340,15 @@ runUniqueDSM :: DUniqSupply -> UniqDSM a -> (a, DUniqSupply)
 runUniqueDSM ds (UDSM f) =
   case f ds of
     DUniqResult uq us -> (uq, us)
+
+class Monad m => MonadGetUnique m where
+  getUniqueM :: m Unique
+
+instance MonadGetUnique UniqDSM where
+  getUniqueM = getUniqueDSM
+
+instance MonadGetUnique USM.UniqSM where
+  getUniqueM = USM.getUniqueM
 
 {-
 Note [Cmm Local Deterministic Uniques]

@@ -889,10 +889,7 @@ doSRTs
 
 doSRTs cfg moduleSRTInfo dus procs data_ = do
 
-  -- Use local namespace 'u' here.
-  -- See Note [Cmm Local Deterministic Uniques]
-  let runUDSM = runUniqueDSM (newTagDUniqSupply 'u' dus)
-
+  let runUDSM = runUniqueDSM dus
   let profile = cmmProfile cfg
 
   -- Ignore the original grouping of decls, and combine all the
