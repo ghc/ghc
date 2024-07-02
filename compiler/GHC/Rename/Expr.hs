@@ -822,7 +822,7 @@ See #18151.
 Note [Reporting unbound names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Faced with an out-of-scope `RdrName` there are two courses of action
-A. Report an error immediately (and return a HsUnboundVarRn. This will halt GHC after the renamer is complete
+A. Report an error immediately (and return a HsUnboundVarRn). This will halt GHC after the renamer is complete
 B. Return a HsUnboundVarRn without reporting an error.  That will allow the typechecker to run, which in turn
    can give a better error message, notably giving the type of the variable via the "typed holes" mechanism.
 
