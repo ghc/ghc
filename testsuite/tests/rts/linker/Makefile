@@ -145,3 +145,10 @@ reloc-none:
 	"$(TEST_HC)" load-object.c -o load-object -no-hs-main -debug
 	"$(TEST_HC)" -c reloc-none.c -o reloc-none.o
 	./load-object reloc-none.o
+
+.PHONY: T25191
+T25191:
+	"$(TEST_HC)" -c T25191_foo1.c -o foo1.o -v0
+	"$(TEST_HC)" -c T25191_foo2.c -o foo2.o -v0
+	"$(TEST_HC)" T25191.hs -v0
+	./T25191
