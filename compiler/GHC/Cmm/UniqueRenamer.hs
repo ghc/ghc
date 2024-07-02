@@ -1,8 +1,8 @@
-{-# LANGUAGE LambdaCase, MagicHash, UnboxedTuples, PatternSynonyms, ExplicitNamespaces, TypeFamilies #-}
+{-# LANGUAGE LambdaCase, RecordWildCards, MagicHash, UnboxedTuples, PatternSynonyms, ExplicitNamespaces #-}
 module GHC.Cmm.UniqueRenamer
   ( detRenameUniques
   , UniqDSM, runUniqueDSM
-  , DUniqSupply, getUniqueDSM
+  , DUniqSupply, getUniqueDSM, takeUniqueFromDSupply, initDUniqSupply, newTagDUniqSupply
 
   -- Careful! Not for general use!
   , DetUniqFM, emptyDetUFM)
@@ -70,7 +70,7 @@ renameDetUniq uq = do
     Nothing -> do
       new_w <- gets supply -- New deterministic unique in this `DetRnM`
       let (tag, _) = unpkUnique uq
-          det_uniq = mkUnique tag new_w
+          det_uniq = mkUnique 'Q' new_w
       modify' (\DetUniqFM{mapping, supply} ->
         -- Update supply and mapping
         DetUniqFM
@@ -284,7 +284,7 @@ panicMapKeysNotInjective _ _ = error "this should be impossible because the func
 -- there, but without the unboxing it feels? Maybe not, since we carry the
 -- mappings too.
 
-type DUniqSupply = Word64 -- supply uniques iteratively
+newtype DUniqSupply = DUS Word64 -- supply uniques iteratively
 type DUniqResult result = (# result, DUniqSupply #)
 
 pattern DUniqResult :: a -> b -> (# a, b #)
@@ -293,35 +293,46 @@ pattern DUniqResult x y = (# x, y #)
 
 -- | A monad which just gives the ability to obtain 'Unique's deterministically.
 -- There's no splitting.
-newtype UniqDSM result = UDSM { unUDSM :: Word64 {- tag -} -> DUniqSupply -> DUniqResult result }
+newtype UniqDSM result = UDSM { unUDSM :: DUniqSupply -> DUniqResult result }
   deriving Functor
 
 instance Monad UniqDSM where
-  (>>=) (UDSM f) cont = UDSM $ \tag us0 -> case f tag us0 of
-    DUniqResult result us1 -> unUDSM (cont result) tag us1
+  (>>=) (UDSM f) cont = UDSM $ \us0 -> case f us0 of
+    DUniqResult result us1 -> unUDSM (cont result) us1
   (>>)  = (*>)
   {-# INLINE (>>=) #-}
   {-# INLINE (>>) #-}
 
 instance Applicative UniqDSM where
-  pure result = UDSM (\_tag us -> DUniqResult result us)
-  (UDSM f) <*> (UDSM x) = UDSM $ \tag us0 -> case f tag us0 of
-    DUniqResult ff us1 -> case x tag us1 of
+  pure result = UDSM (DUniqResult result)
+  (UDSM f) <*> (UDSM x) = UDSM $ \us0 -> case f us0 of
+    DUniqResult ff us1 -> case x us1 of
       DUniqResult xx us2 -> DUniqResult (ff xx) us2
-  (*>) (UDSM expr) (UDSM cont) = UDSM $ \tag us0 -> case expr tag us0 of
-    DUniqResult _ us1 -> cont tag us1
+  (*>) (UDSM expr) (UDSM cont) = UDSM $ \us0 -> case expr us0 of
+    DUniqResult _ us1 -> cont us1
   {-# INLINE pure #-}
   {-# INLINE (*>) #-}
 
 getUniqueDSM :: UniqDSM Unique
-getUniqueDSM = UDSM (\tag us0 -> DUniqResult (mkUniqueGrimily $ tag .|. us0) (us0+1))
+getUniqueDSM = UDSM (\(DUS us0) -> DUniqResult (mkUniqueGrimily us0) (DUS $ us0+1))
 
-runUniqueDSM :: Char {- tag -} -> DUniqSupply {- first unique -}
-             -> UniqDSM a -> (a, DUniqSupply)
-runUniqueDSM c firstUniq (UDSM f) =
-  let !tag = mkTag c
-   in case f tag firstUniq of
-        DUniqResult uq us -> (uq, us)
+takeUniqueFromDSupply :: DUniqSupply -> (Unique, DUniqSupply)
+takeUniqueFromDSupply d =
+  case unUDSM getUniqueDSM d of
+    DUniqResult x y -> (x, y)
+
+initDUniqSupply :: Char -> Word64 -> DUniqSupply
+initDUniqSupply c firstUniq =
+  let !tag = mkTag 'Q' {- TODO: c -}
+  in DUS (tag .|. firstUniq)
+
+newTagDUniqSupply :: Char -> DUniqSupply -> DUniqSupply
+newTagDUniqSupply c (DUS w) = DUS $ getKey $ newTagUnique (mkUniqueGrimily w) c
+
+runUniqueDSM :: DUniqSupply -> UniqDSM a -> (a, DUniqSupply)
+runUniqueDSM ds (UDSM f) =
+  case f ds of
+    DUniqResult uq us -> (uq, us)
 
 {-
 Note [Cmm Local Deterministic Uniques]

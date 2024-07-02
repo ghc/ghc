@@ -891,8 +891,7 @@ doSRTs cfg moduleSRTInfo dus procs data_ = do
 
   -- Use local namespace 'u' here.
   -- See Note [Cmm Local Deterministic Uniques]
-  -- in the future, set tag before usign DUniqueSupply
-  let runUDSM = runUniqueDSM 'u' dus
+  let runUDSM = runUniqueDSM (newTagDUniqSupply 'u' dus)
 
   let profile = cmmProfile cfg
 

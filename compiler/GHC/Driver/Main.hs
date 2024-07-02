@@ -2098,7 +2098,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         cmmgroup <- concat . snd <$>
           mapAccumLM (\(msrt0, dus0) cmm -> do
             (msrt1, dus1, cmm') <- cmmPipeline logger cmm_config msrt0 dus0 [cmm]
-            return ((msrt1, dus1), cmm')) (emptySRT cmm_mod, 1) cmm
+            return ((msrt1, dus1), cmm')) (emptySRT cmm_mod, initDUniqSupply 'u' {- what was the tag we were using before???? -} 1) cmm
 
         unless (null cmmgroup) $
           putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm"
@@ -2198,7 +2198,7 @@ doCodeGen hsc_env this_mod denv data_tycons
         pipeline_stream = do
           ((mod_srt_info, ipes, ipe_stats, dus), lf_infos) <-
             {-# SCC "cmmPipeline" #-}
-            Stream.mapAccumL_ (pipeline_action logger cmm_config) (emptySRT this_mod, M.empty, mempty, 1) ppr_stream1
+            Stream.mapAccumL_ (pipeline_action logger cmm_config) (emptySRT this_mod, M.empty, mempty, initDUniqSupply 'u' {- what was the tag we were using before???? -} 1) ppr_stream1
           let nonCaffySet = srtMapNonCAFs (moduleSRTMap mod_srt_info)
           cmmCgInfos <- generateCgIPEStub hsc_env this_mod denv (nonCaffySet, lf_infos, ipes, ipe_stats, dus)
           return cmmCgInfos

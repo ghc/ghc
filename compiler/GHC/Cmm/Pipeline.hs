@@ -25,12 +25,13 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
-import GHC.Utils.Misc ( partitionWithM )
+import GHC.Utils.Misc ( partitionWith )
 
 import GHC.Platform
 
 import Control.Monad
 import GHC.Cmm.UniqueRenamer
+import GHC.Utils.Monad (mapAccumLM)
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -47,12 +48,13 @@ cmmPipeline
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, DUniqSupply, CmmGroupSRTs) -- Output CPS transformed C--
 
-cmmPipeline logger cmm_config srtInfo dus prog = do
+cmmPipeline logger cmm_config srtInfo dus0 prog = do
   let forceRes (info, us, group) = info `seq` us `seq` foldr seq () group
   let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
-     (procs, data_) <- {-# SCC "tops" #-} partitionWithM (cpsTop logger platform cmm_config {-TODO: dus argument too -}) prog
-     (srtInfo, dus, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo dus procs data_
+     (dus1, prog')  <- {-# SCC "tops" #-} mapAccumLM (cpsTop logger platform cmm_config) dus0 prog
+     let (procs, data_) = partitionWith id prog'
+     (srtInfo, dus, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo dus1 procs data_
      dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
      return (srtInfo, dus, cmms)
@@ -65,12 +67,12 @@ cmmPipeline logger cmm_config srtInfo dus prog = do
 --     [SRTs].
 --
 --   - in the case of a `CmmData`, the unmodified 'CmmDecl' and a 'CAFSet' containing
-cpsTop :: Logger -> Platform -> CmmConfig -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDataDecl))
-cpsTop logger platform _ (CmmData section statics) = do
+cpsTop :: Logger -> Platform -> CmmConfig -> DUniqSupply -> CmmDecl -> IO (DUniqSupply, Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDataDecl))
+cpsTop logger platform _ dus (CmmData section statics) = do
       dumpWith logger Opt_D_dump_cmm_verbose "Pre CPS Data" FormatCMM (pdoc platform (CmmData section statics :: CmmDataDecl))
       dumpWith logger  Opt_D_dump_cmm_verbose "Post CPS Data" FormatCMM (pdoc platform (cafAnalData platform statics))
-      return (Right (cafAnalData platform statics, CmmData section statics))
-cpsTop logger platform cfg proc =
+      return (dus, Right (cafAnalData platform statics, CmmData section statics))
+cpsTop logger platform cfg dus proc =
     do
       ----------- Control-flow optimisations ----------------------------------
 
@@ -94,10 +96,10 @@ cpsTop logger platform cfg proc =
       -- elimCommonBlocks
 
       ----------- Implement switches ------------------------------------------
-      g <- if cmmDoCmmSwitchPlans cfg
+      (g, dus) <- if cmmDoCmmSwitchPlans cfg
              then {-# SCC "createSwitchPlans" #-}
-                  runUniqSM $ cmmImplementSwitchPlans platform g
-             else pure g
+                  pure $ runUniqueDSM dus $ cmmImplementSwitchPlans platform g
+             else pure (g, dus)
       dump Opt_D_dump_cmm_switch "Post switch plan" g
 
       ----------- ThreadSanitizer instrumentation -----------------------------

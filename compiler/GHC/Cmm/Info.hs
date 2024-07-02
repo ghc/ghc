@@ -68,7 +68,7 @@ mkEmptyContInfoTable info_lbl
 cmmToRawCmm :: Logger -> Profile -> Stream IO CmmGroupSRTs a
             -> IO (Stream IO RawCmmGroup a)
 cmmToRawCmm logger profile cmms
-  = do { detUqSupply <- newIORef 1
+  = do { detUqSupply <- newIORef (initDUniqSupply 'i' 1)
        ; let do_one :: [CmmDeclSRTs] -> IO [RawCmmDecl]
              do_one cmm = do
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
@@ -80,7 +80,7 @@ cmmToRawCmm logger profile cmms
                  -- deterministic supplies starting from the same unique in
                  -- other parts of the Cmm backend
                  -- See Note [Cmm Local Deterministic Uniques] (TODO)
-                 let (a, us) = runUniqueDSM 'i' nextUq $
+                 let (a, us) = runUniqueDSM nextUq $
                                concatMapM (mkInfoTable profile) cmm
                  writeIORef detUqSupply us
                  return a
