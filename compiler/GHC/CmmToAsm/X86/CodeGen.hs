@@ -2437,10 +2437,11 @@ genCCall32 :: CmmExpr           -- ^ address of the function to call
            -> [CmmFormal]       -- ^ where to put the result
            -> [CmmActual]       -- ^ arguments (of mixed type)
            -> NatM InstrBlock
-genCCall32 addr conv dest_regs args = do
+genCCall32 addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
         config <- getConfig
         let platform = ncgPlatform config
-            prom_args = map (maybePromoteCArg platform W32) args
+            args_hints = zip args (argHints ++ repeat NoHint)
+            prom_args = map (maybePromoteCArg platform W32) args_hints
 
             -- If the size is smaller than the word, we widen things (see maybePromoteCArg)
             arg_size_bytes :: CmmType -> Int
@@ -2594,10 +2595,11 @@ genCCall64 :: CmmExpr           -- ^ address of function to call
            -> [CmmFormal]       -- ^ where to put the result
            -> [CmmActual]       -- ^ arguments (of mixed type)
            -> NatM InstrBlock
-genCCall64 addr conv dest_regs args = do
+genCCall64 addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
     platform <- getPlatform
     -- load up the register arguments
-    let prom_args = map (maybePromoteCArg platform W32) args
+    let args_hints = zip args (argHints ++ repeat NoHint)
+    let prom_args = map (maybePromoteCArg platform W32) args_hints
 
     let load_args :: [CmmExpr]
                   -> [Reg]         -- int regs avail for args
@@ -2835,9 +2837,11 @@ genCCall64 addr conv dest_regs args = do
             assign_code dest_regs)
 
 
-maybePromoteCArg :: Platform -> Width -> CmmExpr -> CmmExpr
-maybePromoteCArg platform wto arg
- | wfrom < wto = CmmMachOp (MO_UU_Conv wfrom wto) [arg]
+maybePromoteCArg :: Platform -> Width -> (CmmExpr, ForeignHint) -> CmmExpr
+maybePromoteCArg platform wto (arg, hint)
+ | wfrom < wto = case hint of
+     SignedHint -> CmmMachOp (MO_SS_Conv wfrom wto) [arg]
+     _          -> CmmMachOp (MO_UU_Conv wfrom wto) [arg]
  | otherwise   = arg
  where
    wfrom = cmmExprWidth platform arg
