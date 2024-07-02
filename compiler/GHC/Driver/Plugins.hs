@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
 
-#if defined(HAVE_INTERNAL_INTERPRETER) && defined(CAN_LOAD_DLL)
+#if defined(CAN_LOAD_DLL)
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -109,7 +109,7 @@ import qualified Data.Semigroup
 
 import Control.Monad
 
-#if defined(HAVE_INTERNAL_INTERPRETER) && defined(CAN_LOAD_DLL)
+#if defined(CAN_LOAD_DLL)
 import GHCi.ObjLink
 import GHC.Exts (addrToAny#, Ptr(..))
 import GHC.Utils.Encoding
@@ -387,10 +387,7 @@ defaultFrontendPlugin = FrontendPlugin { frontend = \_ _ -> return () }
 -- | Load external plugins
 loadExternalPlugins :: [ExternalPluginSpec] -> IO [ExternalPlugin]
 loadExternalPlugins [] = return []
-#if !defined(HAVE_INTERNAL_INTERPRETER)
-loadExternalPlugins _ = do
-  panic "loadExternalPlugins: can't load external plugins with GHC built without internal interpreter"
-#elif !defined(CAN_LOAD_DLL)
+#if !defined(CAN_LOAD_DLL)
 loadExternalPlugins _ = do
   panic "loadExternalPlugins: loading shared libraries isn't supported by this compiler"
 #else
