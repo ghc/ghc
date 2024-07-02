@@ -107,6 +107,26 @@ mapGraphBlocks f = map
         map (GUnit b) = GUnit (f b)
         map (GMany e b x) = GMany (fmap f e) (mapMap f b) (fmap f x)
 
+-- | Like 'mapGraphBlocks', but monadic.
+-- mapGraphBlocksM :: forall block n block' n' e x m.
+--                    Monad m
+--                 => (forall e x . block n e x -> m (block' n' e x))
+--                 -> (Graph' block n e x -> m (Graph' block' n' e x))
+-- mapGraphBlocksM f = map
+--   where map :: Graph' block n e x -> m (Graph' block' n' e x)
+--         map GNil = pure GNil
+--         map (GUnit b) = GUnit <$> f b
+--         map (GMany e b x) = do
+--           case e of
+--             NothingO -> do
+--               case x of
+--                 NothingO -> do
+--                   GMany 
+--               NothingO
+--             JustO e' -> JustO <$> f e'
+
+--           GMany (fmap f e) (mapMap f b) (fmap f x)
+
 -- -----------------------------------------------------------------------------
 -- Extracting Labels from graphs
 
