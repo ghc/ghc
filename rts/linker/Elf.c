@@ -1073,6 +1073,9 @@ ocGetNames_ELF ( ObjectCode* oc )
                } else {
                    sym_type = SYM_TYPE_DATA;
                }
+               if(ELF_ST_VISIBILITY(symbol->elf_sym->st_other) == STV_HIDDEN) {
+                   sym_type |= SYM_TYPE_HIDDEN;
+               }
 
                /* And the decision is ... */
 
