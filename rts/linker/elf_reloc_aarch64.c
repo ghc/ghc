@@ -326,7 +326,8 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
                                ELF64_R_SYM((Elf64_Xword)rel->r_info));
 
             CHECK(0x0 != symbol);
-            CHECK(0x0 != symbol->addr);
+            if(0x0 == symbol->addr)
+                barf("0x0 address for %s + %ld of type %ld in %s for relocation %d in section %d of kind: %d\n", symbol->name, rel->r_addend, ELF64_R_TYPE((Elf64_Xword)rel->r_info), OC_INFORMATIVE_FILENAME(oc), i, relaTab->targetSectionIndex, oc->sections[relaTab->targetSectionIndex].kind);
 
             /* take explicit addend */
             int64_t addend = rel->r_addend;
