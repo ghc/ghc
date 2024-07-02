@@ -18,13 +18,18 @@ import GHC.Data.FastString
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
-import GHC.Cmm.UniqueRenamer
+import GHC.Types.Unique.Supply
 
 import Data.Maybe (fromMaybe)
 
-annotateTSAN :: Platform -> CmmGraph -> UniqDSM CmmGraph
-annotateTSAN platform graph =
-  modifyGraph (mapGraphBlocks (annotateBlock platform)) graph
+data Env = Env { platform :: Platform
+               , uniques :: UniqSupply
+               }
+
+annotateTSAN :: Platform -> CmmGraph -> UniqSM CmmGraph
+annotateTSAN platform graph = do
+    env <- Env platform <$> getUniqueSupplyM
+    return $ modifyGraph (mapGraphBlocks (annotateBlock env)) graph
 
 mapBlockList :: (forall e' x'. n e' x' -> Block n e' x')
              -> Block n e x -> Block n e x
@@ -37,10 +42,10 @@ mapBlockList f (BCat a b)         = mapBlockList f a `blockAppend` mapBlockList 
 mapBlockList f (BSnoc a n)        = mapBlockList f a `blockAppend` f n
 mapBlockList f (BCons n a)        = f n `blockAppend` mapBlockList f a
 
-annotateBlock :: Platform -> Block CmmNode e x -> UniqDSM (Block CmmNode e x)
+annotateBlock :: Env -> Block CmmNode e x -> Block CmmNode e x
 annotateBlock env = mapBlockList (annotateNode env)
 
-annotateNode :: Platform -> CmmNode e x -> UniqDSM (Block CmmNode e x)
+annotateNode :: Env -> CmmNode e x -> Block CmmNode e x
 annotateNode env node =
     case node of
       CmmEntry{}              -> BlockCO node BNil
@@ -67,22 +72,22 @@ annotateNode env node =
       CmmCall{}               -> annotateNodeOC env node
       CmmForeignCall{}        -> annotateNodeOC env node
 
-annotateNodeOO :: Platform -> CmmNode O O -> UniqDSM (Block CmmNode O O)
+annotateNodeOO :: Env -> CmmNode O O -> Block CmmNode O O
 annotateNodeOO env node =
     annotateLoads env (collectLoadsNode node) `blockSnoc` node
 
-annotateNodeOC :: Platform -> CmmNode O C -> UniqDSM (Block CmmNode O C)
+annotateNodeOC :: Env -> CmmNode O C -> Block CmmNode O C
 annotateNodeOC env node =
     annotateLoads env (collectLoadsNode node) `blockJoinTail` node
 
-annotateExpr :: Platform -> CmmExpr -> UniqDSM (Block CmmNode O O)
+annotateExpr :: Env -> CmmExpr -> Block CmmNode O O
 annotateExpr env expr =
     annotateLoads env (collectExprLoads expr)
 
 -- | A load mentioned in a 'CmmExpr'.
 data Load = Load CmmType AlignmentSpec CmmExpr
 
-annotateLoads :: Platform -> [Load] -> UniqDSM (Block CmmNode O O)
+annotateLoads :: Env -> [Load] -> Block CmmNode O O
 annotateLoads env loads =
     blockConcat
     [ tsanLoad env align ty addr
@@ -106,11 +111,11 @@ collectExprLoads (CmmStackSlot _ _)   = []
 collectExprLoads (CmmRegOff _ _)      = []
 
 -- | Generate TSAN instrumentation for a 'CallishMachOp' occurrence.
-annotatePrim :: Platform
+annotatePrim :: Env
              -> CallishMachOp   -- ^ the applied operation
              -> [CmmFormal]     -- ^ results
              -> [CmmActual]     -- ^ arguments
-             -> UniqDSM (Maybe (Block CmmNode O O))
+             -> Maybe (Block CmmNode O O)
                                 -- ^ 'Just' a block of instrumentation, if applicable
 annotatePrim env (MO_AtomicRMW w aop)    [dest]   [addr, val]  = Just $ tsanAtomicRMW env MemOrderSeqCst aop w addr val dest
 annotatePrim env (MO_AtomicRead w mord)  [dest]   [addr]       = Just $ tsanAtomicLoad env mord w addr dest
@@ -120,11 +125,11 @@ annotatePrim env (MO_Cmpxchg w)          [dest]   [addr, expected, new]
                                                                = Just $ tsanAtomicCas env MemOrderSeqCst MemOrderSeqCst w addr expected new dest
 annotatePrim _    _                       _        _           = Nothing
 
-mkUnsafeCall :: Platform
+mkUnsafeCall :: Env
              -> ForeignTarget  -- ^ function
              -> [CmmFormal]    -- ^ results
              -> [CmmActual]    -- ^ arguments
-             -> UniqDSM (Block CmmNode O O)
+             -> Block CmmNode O O
 mkUnsafeCall env ftgt formals args =
     save `blockAppend`     -- save global registers
     bind_args `blockSnoc`  -- bind arguments to local registers
@@ -153,8 +158,8 @@ mkUnsafeCall env ftgt formals args =
 -- register allocator to spill them to the stack around the call.
 -- We cannot use the register table for this since we would interface
 -- with {SAVE,RESTORE}_THREAD_STATE.
-saveRestoreCallerRegs :: Platform
-                      -> UniqDSM (Block CmmNode O O, Block CmmNode O O)
+saveRestoreCallerRegs :: UniqSupply -> Platform
+                      -> (Block CmmNode O O, Block CmmNode O O)
 saveRestoreCallerRegs us platform =
     (save, restore)
   where
@@ -180,9 +185,9 @@ saveRestoreCallerRegs us platform =
 
 -- | Mirrors __tsan_memory_order
 -- <https://github.com/llvm/llvm-project/blob/main/compiler-rt/include/sanitizer/tsan_interface_atomic.h#L34>
-memoryOrderToTsanMemoryOrder :: Platform -> MemoryOrdering -> CmmExpr
-memoryOrderToTsanMemoryOrder p mord =
-    mkIntExpr p n
+memoryOrderToTsanMemoryOrder :: Env -> MemoryOrdering -> CmmExpr
+memoryOrderToTsanMemoryOrder env mord =
+    mkIntExpr (platform env) n
   where
     n = case mord of
       MemOrderRelaxed -> 0
@@ -200,9 +205,9 @@ tsanTarget fn formals args =
     conv = ForeignConvention CCallConv args formals CmmMayReturn
     lbl = mkForeignLabel fn ForeignLabelInExternalPackage IsFunction
 
-tsanStore :: Platform
+tsanStore :: Env
           -> CmmType -> CmmExpr
-          -> UniqDSM (Block CmmNode O O)
+          -> Block CmmNode O O
 tsanStore env ty addr =
     mkUnsafeCall env ftarget [] [addr]
   where
@@ -210,9 +215,9 @@ tsanStore env ty addr =
     w = widthInBytes (typeWidth ty)
     fn = fsLit $ "__tsan_write" ++ show w
 
-tsanLoad :: Platform
+tsanLoad :: Env
          -> AlignmentSpec -> CmmType -> CmmExpr
-         -> UniqDSM (Block CmmNode O O)
+         -> Block CmmNode O O
 tsanLoad env align ty addr =
     mkUnsafeCall env ftarget [] [addr]
   where
@@ -223,9 +228,9 @@ tsanLoad env align ty addr =
              | w > 1    -> fsLit $ "__tsan_unaligned_read" ++ show w
            _            -> fsLit $ "__tsan_read" ++ show w
 
-tsanAtomicStore :: Platform
+tsanAtomicStore :: Env
                 -> MemoryOrdering -> Width -> CmmExpr -> CmmExpr
-                -> UniqDSM (Block CmmNode O O)
+                -> Block CmmNode O O
 tsanAtomicStore env mord w val addr =
     mkUnsafeCall env ftarget [] [addr, val, mord']
   where
@@ -233,9 +238,9 @@ tsanAtomicStore env mord w val addr =
     ftarget = tsanTarget fn [] [AddrHint, NoHint, NoHint]
     fn = fsLit $ "__tsan_atomic" ++ show (widthInBits w) ++ "_store"
 
-tsanAtomicLoad :: Platform
+tsanAtomicLoad :: Env
                -> MemoryOrdering -> Width -> CmmExpr -> LocalReg
-               -> UniqDSM (Block CmmNode O O)
+               -> Block CmmNode O O
 tsanAtomicLoad env mord w addr dest =
     mkUnsafeCall env ftarget [dest] [addr, mord']
   where
@@ -243,9 +248,9 @@ tsanAtomicLoad env mord w addr dest =
     ftarget = tsanTarget fn [NoHint] [AddrHint, NoHint]
     fn = fsLit $ "__tsan_atomic" ++ show (widthInBits w) ++ "_load"
 
-tsanAtomicExchange :: Platform
+tsanAtomicExchange :: Env
                    -> MemoryOrdering -> Width -> CmmExpr -> CmmExpr -> LocalReg
-                   -> UniqDSM (Block CmmNode O O)
+                   -> Block CmmNode O O
 tsanAtomicExchange env mord w val addr dest =
     mkUnsafeCall env ftarget [dest] [addr, val, mord']
   where
@@ -256,7 +261,7 @@ tsanAtomicExchange env mord w val addr dest =
 -- N.B. C11 CAS returns a boolean (to avoid the ABA problem) whereas Cmm's CAS
 -- returns the expected value. We use define a shim in the RTS to provide
 -- Cmm's semantics using the TSAN C11 primitive.
-tsanAtomicCas :: Platform
+tsanAtomicCas :: Env
               -> MemoryOrdering  -- ^ success ordering
               -> MemoryOrdering  -- ^ failure ordering
               -> Width
@@ -264,7 +269,7 @@ tsanAtomicCas :: Platform
               -> CmmExpr         -- ^ expected value
               -> CmmExpr         -- ^ new value
               -> LocalReg        -- ^ result destination
-              -> UniqDSM (Block CmmNode O O)
+              -> Block CmmNode O O
 tsanAtomicCas env mord_success mord_failure w addr expected new dest =
     mkUnsafeCall env ftarget [dest] [addr, expected, new, mord_success', mord_failure']
   where
@@ -273,9 +278,9 @@ tsanAtomicCas env mord_success mord_failure w addr expected new dest =
     ftarget = tsanTarget fn [NoHint] [AddrHint, NoHint, NoHint, NoHint, NoHint]
     fn = fsLit $ "ghc_tsan_atomic" ++ show (widthInBits w) ++ "_compare_exchange"
 
-tsanAtomicRMW :: Platform
+tsanAtomicRMW :: Env
               -> MemoryOrdering -> AtomicMachOp -> Width -> CmmExpr -> CmmExpr -> LocalReg
-              -> UniqDSM (Block CmmNode O O)
+              -> Block CmmNode O O
 tsanAtomicRMW env mord op w addr val dest =
     mkUnsafeCall env ftarget [dest] [addr, val, mord']
   where
