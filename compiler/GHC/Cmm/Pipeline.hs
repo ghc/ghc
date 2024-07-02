@@ -127,11 +127,11 @@ cpsTop logger platform cfg dus proc =
               return (call_pps, dus)
 
       ----------- Layout the stack and manifest Sp ----------------------------
-      (g, stackmaps) <-
-           {-# SCC "layoutStack" #-}
-           if do_layout
-              then runUniqSM $ cmmLayoutStack cfg proc_points entry_off g
-              else return (g, mapEmpty)
+      ((g, stackmaps), dus) <- pure $
+         {-# SCC "layoutStack" #-}
+         if do_layout
+            then runUniqueDSM dus $ cmmLayoutStack cfg proc_points entry_off g
+            else ((g, mapEmpty), dus)
       dump Opt_D_dump_cmm_sp "Layout Stack" g
 
       ----------- Sink and inline assignments  --------------------------------
@@ -146,21 +146,21 @@ cpsTop logger platform cfg dus proc =
       let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps l g
       dumpWith logger Opt_D_dump_cmm_caf "CAFEnv" FormatText (pdoc platform cafEnv)
 
-      g <- if splitting_proc_points
+      (g, dus) <- if splitting_proc_points
            then do
              ------------- Split into separate procedures -----------------------
              let pp_map = {-# SCC "procPointAnalysis" #-}
                           procPointAnalysis proc_points g
              dumpWith logger Opt_D_dump_cmm_procmap "procpoint map"
                 FormatCMM (ppr pp_map)
-             g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
+             (g, dus) <- {-# SCC "splitAtProcPoints" #-} pure $ runUniqueDSM dus $
                   splitAtProcPoints platform l call_pps proc_points pp_map
                                     (CmmProc h l v g)
              dumps Opt_D_dump_cmm_split "Post splitting" g
-             return g
+             return (g, dus)
            else
              -- attach info tables to return points
-             return $ [attachContInfoTables call_pps (CmmProc h l v g)]
+             return ([attachContInfoTables call_pps (CmmProc h l v g)], dus)
 
       ------------- Populate info tables with stack info -----------------
       g <- {-# SCC "setInfoTableStackMap" #-}
@@ -176,7 +176,7 @@ cpsTop logger platform cfg dus proc =
            -- See Note [unreachable blocks]
       dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations (2)" g
 
-      return (Left (cafEnv, g))
+      return (dus, Left (cafEnv, g))
 
   where dump = dumpGraph logger platform (cmmDoLinting cfg)
 
