@@ -269,6 +269,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.disableDelayedOsMemoryReturn = false;
     RtsFlags.MiscFlags.internalCounters        = false;
     RtsFlags.MiscFlags.linkerAlwaysPic         = DEFAULT_LINKER_ALWAYS_PIC;
+    RtsFlags.MiscFlags.linkerOptimistic        = false;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
     RtsFlags.MiscFlags.ioManager               = IO_MNGR_FLAG_AUTO;
 #if defined(THREADED_RTS) && defined(mingw32_HOST_OS)
@@ -997,6 +998,11 @@ error = true;
                               &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.generate_dump_file = true;
+                  }
+                  else if (strequal("optimistic-linking",
+                              &rts_argv[arg][2])) {
+                       OPTION_UNSAFE;
+                       RtsFlags.MiscFlags.linkerOptimistic = true;
                   }
                   else if (strequal("null-eventlog-writer",
                                &rts_argv[arg][2])) {
