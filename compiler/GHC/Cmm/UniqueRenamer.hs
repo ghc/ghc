@@ -328,9 +328,19 @@ takeUniqueFromDSupply d =
   case unUDSM getUniqueDSM d of
     DUniqResult x y -> (x, y)
 
+-- Write Note about the importance of locality in uniques that are deterministic
+--
+-- If you use a tag which collides with other names, you'll get a uniques
+-- deterministically colliding with existing symbols.
+--
+-- (e.g. easy to observe if you do this wrong)
+--
+-- Ideally, we'd thread the same deterministic unique supply all the way
+-- throughout the Cmm pipeline, starting off from hte deterministic rename
+-- pass.
 initDUniqSupply :: Char -> Word64 -> DUniqSupply
 initDUniqSupply c firstUniq =
-  let !tag = mkTag 'Q' {- TODO: c -}
+  let !tag = mkTag c
   in DUS (tag .|. firstUniq)
 
 newTagDUniqSupply :: Char -> DUniqSupply -> DUniqSupply
