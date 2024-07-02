@@ -147,6 +147,10 @@ Runtime system
   For this reason, a warning is emitted if a .tix file is read in implicitly. You can silence this warning by explicitly passing ``--read-tix-file=yes``.
   Details can be found in `GHC proposal 612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
 
+- Add new runtime flag :rts-flag:`--optimistic-linking` which instructs the
+  runtime linker to continue in the presence of unknown symbols. By default this
+  flag is not passed, preserving previous behavior.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

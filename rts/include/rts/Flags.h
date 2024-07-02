@@ -267,6 +267,7 @@ typedef struct _MISC_FLAGS {
                                           there as well. */
     bool internalCounters;       /* See Note [Internal Counters Stats] */
     bool linkerAlwaysPic;        /* Assume the object code is always PIC */
+    bool linkerOptimistic;       /* Should the runtime linker optimistically continue */
     StgWord linkerMemBase;       /* address to ask the OS for memory
                                   * for the linker, NULL ==> off */
     IO_MANAGER_FLAG ioManager;   /* The I/O manager to use.  */
