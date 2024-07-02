@@ -105,6 +105,8 @@ cpsTop logger platform cfg dus proc =
       ----------- ThreadSanitizer instrumentation -----------------------------
       g <- {-# SCC "annotateTSAN" #-}
           if cmmOptThreadSanitizer cfg
+             -- romes: hard to support deterministic here without changing too
+             -- much in graph, maybe we can skip it.
           then runUniqSM $ annotateTSAN platform g
           else return g
       dump Opt_D_dump_cmm_thread_sanitizer "ThreadSanitizer instrumentation" g
@@ -113,16 +115,16 @@ cpsTop logger platform cfg dus proc =
       let
         call_pps :: ProcPointSet -- LabelMap
         call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
-      proc_points <-
+      (proc_points, dus) <-
          if splitting_proc_points
             then do
-              pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
-                 minimalProcPointSet platform call_pps g
+              let (pp, dus) = {-# SCC "minimalProcPointSet" #-} runUniqueDSM dus $
+                    minimalProcPointSet platform call_pps g
               dumpWith logger Opt_D_dump_cmm_proc "Proc points"
                     FormatCMM (pdoc platform l $$ ppr pp $$ pdoc platform g)
-              return pp
+              return (pp, dus)
             else
-              return call_pps
+              return (call_pps, dus)
 
       ----------- Layout the stack and manifest Sp ----------------------------
       (g, stackmaps) <-
