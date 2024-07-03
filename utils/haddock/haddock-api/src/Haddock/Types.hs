@@ -166,6 +166,7 @@ data InstalledInterface = InstalledInterface
   , instOptions :: [DocOption]
   -- ^ Haddock options for this module (prune, ignore-exports, etc).
   , instFixMap :: Map Name Fixity
+  , instWarningMap :: WarningMap
   }
 
 -- | Convert an 'Interface' to an 'InstalledInterface'
@@ -182,6 +183,7 @@ toInstalledIface interface =
     , instOptions = interface.ifaceOptions
     , instFixMap = interface.ifaceFixMap
     , instDefMeths = interface.ifaceDefMeths
+    , instWarningMap = interface.ifaceWarningMap
     }
 
 -- | A monad in which we create Haddock interfaces. Not to be confused with
