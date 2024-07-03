@@ -5,6 +5,7 @@
 --
 -- -----------------------------------------------------------------------------
 
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
 
@@ -26,7 +27,8 @@ import GHC.Cmm.Opt           ( cmmMachOpFold )
 import GHC.Cmm.CLabel
 import GHC.Data.FastString
 import GHC.Unit
-import Control.Monad
+import Control.Monad.Trans.Reader
+import GHC.Utils.Monad.State.Strict as Strict
 
 -- -----------------------------------------------------------------------------
 -- Generic Cmm optimiser
@@ -67,19 +69,7 @@ pattern OptMResult x y = (# x, y #)
 {-# COMPLETE OptMResult #-}
 
 newtype CmmOptM a = CmmOptM (NCGConfig -> [CLabel] -> OptMResult a)
-    deriving (Functor)
-
-instance Applicative CmmOptM where
-    pure x = CmmOptM $ \_ imports -> OptMResult x imports
-    (<*>) = ap
-
-instance Monad CmmOptM where
-  (CmmOptM f) >>= g =
-    CmmOptM $ \config imports0 ->
-                case f config imports0 of
-                  OptMResult x imports1 ->
-                    case g x of
-                      CmmOptM g' -> g' config imports1
+    deriving (Functor, Applicative, Monad) via (ReaderT NCGConfig (Strict.State [CLabel]))
 
 instance CmmMakeDynamicReferenceM CmmOptM where
     addImport = addImportCmmOpt
