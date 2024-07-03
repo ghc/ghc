@@ -24,6 +24,7 @@ module GHC.CmmToAsm.Format (
     isVecFormat,
     cmmTypeFormat,
     formatToWidth,
+    scalarWidth,
     formatInBytes,
     isFloatScalarFormat,
     scalarFormatFormat,

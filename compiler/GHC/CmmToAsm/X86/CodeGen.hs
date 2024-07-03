@@ -926,6 +926,7 @@ getRegister' _ _ (CmmLit lit@(CmmFloat f w)) =
   float_const_sse2  where
   float_const_sse2
     | f == 0.0 = do
+      -- TODO: this mishandles negative zero floating point literals.
       let
           format = floatFormat w
           code dst = unitOL  (XOR format (OpReg dst) (OpReg dst))
@@ -933,9 +934,7 @@ getRegister' _ _ (CmmLit lit@(CmmFloat f w)) =
         -- They all appear to do the same thing --SDM
       return (Any format code)
 
-   | otherwise = do
-      Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
-      loadFloatAmode w addr code
+   | otherwise = getFloatLitRegister lit
 
 -- catch simple cases of zero- or sign-extended load
 getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad addr _ _]) = do
@@ -1198,46 +1197,61 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
 
         vector_float_negate_avx :: Length -> Width -> CmmExpr -> NatM Register
         vector_float_negate_avx l w expr = do
-          tmp                  <- getNewRegNat (VecFormat l FmtFloat)
-          (reg, exp)           <- getSomeReg expr
-          Amode addr addr_code <- memConstant (mkAlignment $ widthInBytes W32) (CmmFloat 0.0 W32)
-          let format   = case w of
-                           W32 -> VecFormat l FmtFloat
-                           W64 -> VecFormat l FmtDouble
-                           _ -> pprPanic "Cannot negate vector of width" (ppr w)
-              code dst = case w of
-                           W32 -> exp `appOL` addr_code `snocOL`
-                                  (VBROADCAST format addr tmp) `snocOL`
-                                  (VSUB format (OpReg reg) tmp dst)
-                           W64 -> exp `appOL` addr_code `snocOL`
-                                  (MOVL format (OpAddr addr) (OpReg tmp)) `snocOL`
-                                  (MOVH format (OpAddr addr) (OpReg tmp)) `snocOL`
-                                  (VSUB format (OpReg reg) tmp dst)
-                           _ -> pprPanic "Cannot negate vector of width" (ppr w)
-          return (Any format code)
+          let fmt :: Format
+              mask :: CmmLit
+              (fmt, mask) = case w of
+                       W32 -> (VecFormat l FmtFloat , CmmInt (bit 31) w) -- TODO: these should be negative 0 floating point literals,
+                       W64 -> (VecFormat l FmtDouble, CmmInt (bit 63) w) -- but we don't currently have those in Cmm.
+                       _ -> panic "AVX floating-point negation: elements must be FF32 or FF64"
+          (maskReg, maskCode) <- getSomeReg (CmmMachOp (MO_VF_Broadcast l w) [CmmLit mask])
+          (reg, exp) <- getSomeReg expr
+          let code dst = maskCode `appOL`
+                         exp `snocOL`
+                         (VMOVU fmt (OpReg reg) (OpReg dst)) `snocOL`
+                         (VXOR fmt (OpReg maskReg) dst dst)
+          return (Any fmt code)
 
         vector_float_negate_sse :: Length -> Width -> CmmExpr -> NatM Register
         vector_float_negate_sse l w expr = do
-          tmp                  <- getNewRegNat (VecFormat l FmtFloat)
-          (reg, exp)           <- getSomeReg expr
-          let format   = case w of
-                           W32 -> VecFormat l FmtFloat
-                           W64 -> VecFormat l FmtDouble
-                           _ -> pprPanic "Cannot negate vector of width" (ppr w)
-              code dst = exp `snocOL`
-                         (XOR format (OpReg tmp) (OpReg tmp)) `snocOL`
-                         (MOVU format (OpReg tmp) (OpReg dst)) `snocOL`
-                         (SUB format (OpReg reg) (OpReg dst))
-          return (Any format code)
+          let fmt :: Format
+              mask :: CmmLit
+              (fmt, mask) = case w of
+                       W32 -> (VecFormat l FmtFloat , CmmInt (bit 31) w) -- Same comment as for vector_float_negate_avx,
+                       W64 -> (VecFormat l FmtDouble, CmmInt (bit 63) w) -- these should be -0.0 CmmFloat values.
+                       _ -> panic "SSE floating-point negation: elements must be FF32 or FF64"
+          (maskReg, maskCode) <- getSomeReg (CmmMachOp (MO_VF_Broadcast l w) [CmmLit mask])
+          (reg, exp) <- getSomeReg expr
+          let code dst = maskCode `appOL`
+                         exp `snocOL`
+                         (MOVU fmt (OpReg reg) (OpReg dst)) `snocOL`
+                         (XOR  fmt (OpReg maskReg) (OpReg dst))
+          return (Any fmt code)
 
         -----------------------
+
+        -- Like 'getSomeReg', but with special handling for int literals
+        -- used as floating point values, to work around the fact that we don't
+        -- have negative zero floating point literals in Cmm yet.
+        --
+        -- This should get removed once we have negative zero in CmmFloat.
+        get_float_broadcast_value_reg expr = case expr of
+          CmmLit lit -> do
+            r <- getFloatLitRegister lit
+            case r of
+              Any rep code -> do
+                tmp <- getNewRegNat rep
+                return (tmp, code tmp)
+              Fixed _ reg code ->
+                return (reg, code)
+          _ -> getSomeReg expr
+
         vector_float_broadcast_avx :: Length
                                    -> Width
                                    -> CmmExpr
                                    -> NatM Register
         vector_float_broadcast_avx len W32 expr
           = do
-          (reg, exp) <- getSomeReg expr
+          (reg, exp) <- get_float_broadcast_value_reg expr
           let f    = VecFormat len FmtFloat
               addr = spRel platform 0
            in return $ Any f (\dst -> exp `snocOL`
@@ -1253,7 +1267,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                                    -> NatM Register
         vector_float_broadcast_sse len W32 expr
           = do
-          (reg, exp) <- getSomeReg expr
+          (reg, exp) <- get_float_broadcast_value_reg expr
           let f        = VecFormat len FmtFloat
               addr     = spRel platform 0
               code dst = exp `snocOL`
@@ -1269,7 +1283,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
            in return $ Any f code
         vector_float_broadcast_sse len W64 expr
           = do
-          (reg, exp) <- getSomeReg expr
+          (reg, exp) <- get_float_broadcast_value_reg expr
           let f    = VecFormat len FmtDouble
               addr = spRel platform 0
            in return $ Any f (\dst -> exp `snocOL`
@@ -2014,33 +2028,49 @@ getRegister' platform is32Bit (CmmLit lit)
         -- note2: all labels are small, because we're assuming the
         -- small memory model. See Note [%rip-relative addressing on x86-64].
 
-getRegister' platform _ (CmmLit lit)
-  | isVecType cmmtype = vectorRegister cmmtype
-  | otherwise         = standardRegister cmmtype
-  where
-    cmmtype = cmmLitType platform lit
-    vectorRegister ctype
-      | case lit of { CmmVec fs -> all (\case { CmmInt i _ -> i == 0; CmmFloat f _ -> f == 0; _ -> False }) fs; _ -> False }
-      = -- NOTE:
-        -- This operation is only used to zero a register. For loading a
-        -- vector literal there are pack and broadcast operations
-        let format = cmmTypeFormat ctype
-            code dst = unitOL (XOR format (OpReg dst) (OpReg dst))
-        in return (Any format code)
+getRegister' platform _ (CmmLit lit) =
+  case fmt of
+    VecFormat l sFmt
+      | case lit of { CmmVec fs -> all is_zero fs; _ -> False }
+      -> let code dst = unitOL (XOR fmt (OpReg dst) (OpReg dst))
+         in return (Any fmt code)
+      | Just f <- case lit of { CmmVec (f:fs) | all (== f) fs -> Just f; _ -> Nothing }
+      -- TODO: mishandles negative zero (because -0.0 == 0.0 returns True)
+      -> do config <- getConfig
+            let w = scalarWidth sFmt
+                broadcast = if isFloatScalarFormat sFmt
+                            then MO_VF_Broadcast l w
+                            else MO_V_Broadcast l w
+            (valReg, valCode) <- getSomeReg (CmmMachOp broadcast [CmmLit f])
+            let code dst =
+                   valCode `snocOL`
+                   (mkRegRegMoveInstr config fmt valReg dst)
+            return $ Any fmt code
       | otherwise
-      = pprPanic "getRegister': no support for (nonzero) vector literals" $
-          vcat [ text "lit:" <+> ppr lit ]
-      -- SIMD NCG TODO: can we do better here?
-    standardRegister ctype
-      = do
-      let format = cmmTypeFormat ctype
-          imm = litToImm lit
-          code dst = unitOL (MOV format (OpImm imm) (OpReg dst))
-      return (Any format code)
+      -- SIMD NCG TODO: handle this case as well.
+      -> pprPanic "getRegister': non-constant vector literals not supported"
+          (ppr lit)
+       where
+        is_zero (CmmInt i _) = i == 0
+        is_zero (CmmFloat f _) = f == 0 -- TODO: mishandles negative zero
+        is_zero _ = False
+
+    _ -> let imm = litToImm lit
+             code dst = unitOL (MOV fmt (OpImm imm) (OpReg dst))
+         in return (Any fmt code)
+  where
+    cmmTy = cmmLitType platform lit
+    fmt = cmmTypeFormat cmmTy
 
 getRegister' platform _ other
   = pprPanic "getRegister(x86)" (pdoc platform other)
 
+getFloatLitRegister :: CmmLit -> NatM Register
+getFloatLitRegister lit = do
+  let w :: Width
+      w = case lit of { CmmInt _ w -> w; CmmFloat _ w -> w; _ -> panic "getFloatLitRegister" (ppr lit) }
+  Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
+  loadFloatAmode w addr code
 
 intLoadCode :: (Operand -> Operand -> Instr) -> CmmExpr
    -> NatM (Reg -> InstrBlock)
