@@ -1,0 +1,11 @@
+T25014g.hs:5:17: [GHC-87543]
+     Ambiguous occurrence ‘MkT’.
+      It could refer to
+         either ‘Ambig1.MkT’,
+                imported from ‘Ambig1’ at T25014g.hs:6:18-23
+                (and originally defined at Ambig1.hs:5:26-28),
+             or ‘Ambig2.MkT’,
+                imported from ‘Ambig2’ at T25014g.hs:7:18-23
+                (and originally defined at Ambig2.hs:5:25-27),
+              or ‘T25014g.MkT’, defined at T25014g.hs:9:3.
+    In the export: T(MkT)

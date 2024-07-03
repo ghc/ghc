@@ -654,32 +654,67 @@ If the module has NO main function:
       The IO action ‘main’ is not defined in module ‘Main’
 -}
 
+{-
+Note [Renaming children on export lists]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Renaming export lists has many corner cases, and 5 different things can appear
+in a children export list under a parent.
 
--- Renaming exports lists is a minefield. Five different things can appear in
--- children export lists ( T(A, B, C) ).
--- 1. Record selectors
--- 2. Type constructors
--- 3. Data constructors
--- 4. Pattern Synonyms
--- 5. Pattern Synonym Selectors
---
--- However, things get put into weird name spaces.
--- 1. Some type constructors are parsed as variables (-.->) for example.
--- 2. All data constructors are parsed as type constructors
--- 3. When there is ambiguity, we default type constructors to data
--- constructors and require the explicit `type` keyword for type
--- constructors.
---
--- This function first establishes the possible namespaces that an
--- identifier might be in (`choosePossibleNameSpaces`).
---
--- Then for each namespace in turn, tries to find the correct identifier
--- there returning the first positive result or the first terminating
--- error.
---
+  module M (R (s), D (MkD), Maybe (Empty), Either (Empty), pattern Px) where
+
+    -- 1. Record Selector
+    data R = R { s :: Int }
+
+    -- 2. Data Constructor
+    data D a = MkD a
+
+    -- 3. Type Constructor
+    type S = MkD Int
+
+    -- 4. Pattern Synonyms
+    class Empty a where
+      isEmpty :: a -> Bool
+
+    instance Empty (Maybe a) where
+      isEmpty Nothing = True
+
+    instance Empty (Either a b) where
+      isEmpty (Left _) = True
+
+    pattern Empty :: Empty a => a
+    pattern Empty <- (isEmpty -> True)
+
+    -- 5. Record Pattern Synonym selectors
+    data Point = Point Int Int
+
+    pattern Px :: Int -> Point
+    pattern Px{x} <- Point x _
 
 
+To makes matter more complicated:
+1. Some type constructors are parsed as variables (-.->) for example.
+2. All data constructors are parsed as type constructors
+3. When there is ambiguity, we default type constructors to data
+constructors and require the explicit `type` keyword for type
+constructors.
+4. Pattern synonyms are very flexible in which parents they can be exported with
+(see [Typing Pattern Synonym Exports]).
 
+We proceed in two steps:
+
+  1. We look up GREs, handling the possible NameSpaces to look up in.
+     See Note [Configurable GRE lookup priority].
+  2. We refine by using the GRE parent information.
+     See Note [Renaming child GREs].
+
+For more details see
+[Renaming the LHS on type class Instances],
+[Configurable GRE lookup priority] and [Picking and disambiguating children
+candidates].
+
+Also notice that this logic is similar to
+[Renaming the LHS on type class Instances]
+-}
 lookupChildrenExport :: Name -> [LIEWrappedName GhcPs]
                      -> RnM ([(LIEWrappedName GhcRn, GlobalRdrElt)])
 lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
@@ -698,8 +733,8 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
                   , prioritiseParent   = False -- See T11970.
                   }
 
-                -- Do not report export list declaration deprecations
-          name <-  lookupSubBndrOcc_helper False ExportDeprecationWarnings
+          -- Do not report export list declaration deprecations
+          name <-  lookupChildExportListSubBndr ExportDeprecationWarnings
                         spec_parent bareName what_lkup
           traceRn "lookupChildrenExport" (ppr name)
           -- Default to data constructors for slightly better error

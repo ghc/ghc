@@ -1,0 +1,5 @@
+T25014c.hs:2:17: [GHC-88993]
+     The type constructor ‘A’ is not the parent of the record selector ‘foo’.
+      Record selectors can only be exported with their parent type constructor.
+      Parent: B
+     In the export: A(foo)

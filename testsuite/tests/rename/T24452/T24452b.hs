@@ -1,5 +1,4 @@
 -- Alternative.empty is not visible
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module BugReproduce where
 
 import Control.Applicative (Alternative)

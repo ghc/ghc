@@ -1215,7 +1215,7 @@ data LookupChild
     --  - @True@: prioritise getting the right 'Parent'
     --  - @False@: prioritise getting the right 'NameSpace'
     --
-    -- See Note [childGREPriority].
+    -- See Note [Configurable GRE lookup priority].
   }
 
 instance Outputable LookupChild where
@@ -1262,20 +1262,26 @@ greIsRelevant which_gres ns gre
   where
     other_ns = greNameSpace gre
 
-{- Note [childGREPriority]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Configurable GRE lookup priority]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are currently two places in the compiler where we look up GlobalRdrElts
-which have a given Parent. These are the two calls to lookupSubBndrOcc_helper:
+which have a given Parent.
 
-  A. Looking up children in an export item, e.g.
+  A. lookupChildExportListSubBndr looks up children in an export item, e.g.
 
        module M ( T(MkT, D) ) where { data T = MkT; data D = D }
 
-  B. Looking up binders in a class or instance declaration, e.g.
+     -- see [Renaming children on export lists]
+
+  B. lookupInstanceDeclarationSubBndr looks up binders in a class or
+     instance declaration, e.g.
+
      the operator +++ in the fixity declaration:
 
-       class C a where { type (+++) :: a -> a ->; infixl 6 +++ }
+       class C a where { type (+++) :: a -> a -> a; infixl 6 +++ }
        (+++) :: Int -> Int -> Int; (+++) = (+)
+
+     -- see [Renaming the LHS on type class Instances]
 
 In these two situations, there are two competing metrics for finding the "best"
 'GlobalRdrElt' that a particular 'OccName' resolves to:
@@ -1307,7 +1313,7 @@ Not doing so led to #23664.
 --
 -- We score by 'Parent' and 'NameSpace', with higher priorities having lower
 -- numbers. Which lexicographic order we use ('Parent' or 'NameSpace' first)
--- is determined by the first argument; see Note [childGREPriority].
+-- is determined by the first argument; see Note [Configurable GRE lookup priority].
 childGREPriority :: LookupChild -- ^ what kind of child do we want,
                                 -- e.g. what should its parent be?
                  -> NameSpace   -- ^ what 'NameSpace' are we originally looking in?
@@ -1327,7 +1333,7 @@ childGREPriority (LookupChild { wantedParent = wanted_parent
         in Just $ if par_first
                   then (par_prio, ns_prio)
                   else (ns_prio, par_prio)
-          -- See Note [childGREPriority].
+          -- See Note [Configurable GRE lookup priority].
 
   where
       -- Pick out the possible 'NameSpace's in order of priority.
