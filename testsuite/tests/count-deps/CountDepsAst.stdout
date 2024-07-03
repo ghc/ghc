@@ -218,6 +218,7 @@ GHC.Utils.Lexeme
 GHC.Utils.Logger
 GHC.Utils.Misc
 GHC.Utils.Monad
+GHC.Utils.Monad.State.Strict
 GHC.Utils.Outputable
 GHC.Utils.Panic
 GHC.Utils.Panic.Plain
