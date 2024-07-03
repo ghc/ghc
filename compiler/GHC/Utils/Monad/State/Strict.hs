@@ -72,6 +72,7 @@ pattern State :: (s -> (# a, s #))
 pattern State m <- State' m
   where
     State m = State' (oneShot $ \s -> forceState (m s))
+{-# COMPLETE State #-}
 
 -- | Forces the state component of the unboxed representation pair of 'State'.
 -- See Note [Strict State monad]. This is The Place doing the forcing!
