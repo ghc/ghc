@@ -1,2 +1,2 @@
-T24452b.hs:10:3: error: [GHC-54721]
+T24452b.hs:9:3: error: [GHC-54721]
     ‘empty’ is not a (visible) method of class ‘Alternative’

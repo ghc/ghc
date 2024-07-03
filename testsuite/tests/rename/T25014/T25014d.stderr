@@ -1,0 +1,4 @@
+T25014d.hs:2:17: [GHC-88993]
+     The type constructor ‘A’ is not the parent of the identifier ‘foo’.
+      Identifiers can only be exported with their parent type constructor.
+     In the export: A(foo)

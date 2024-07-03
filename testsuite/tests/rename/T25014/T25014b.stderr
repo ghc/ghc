@@ -1,0 +1,3 @@
+T25014b.hs:2:17: [GHC-76037]
+     Not in scope: ‘foo’
+     In the export: A(foo)
