@@ -40,13 +40,14 @@ module GHC.Types.Unique.DFM (
         adjustUDFM_Directly,
         alterUDFM,
         mapUDFM,
+        mapWithInternalKeyUDFM,
         mapMaybeUDFM,
         mapMUDFM,
         plusUDFM,
-        plusUDFM_C,
+        plusUDFM_C, plusUDFM_CK,
         lookupUDFM, lookupUDFM_Directly,
         elemUDFM,
-        foldUDFM,
+        foldUDFM, foldWithKeyUDFM,
         eltsUDFM,
         filterUDFM, filterUDFM_Directly,
         isNullUDFM,
@@ -56,6 +57,7 @@ module GHC.Types.Unique.DFM (
         equalKeysUDFM,
         minusUDFM,
         listToUDFM, listToUDFM_Directly,
+        listToUDFM_C_Directly,
         udfmMinusUFM, ufmMinusUDFM,
         partitionUDFM,
         udfmRestrictKeys,
@@ -84,6 +86,7 @@ import Data.Function (on)
 import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 import Unsafe.Coerce
 import qualified GHC.Data.Word64Set as W
+import GHC.Word
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -224,6 +227,12 @@ addListToUDFM_Directly_C
 addListToUDFM_Directly_C f = foldl' (\m (k, v) -> addToUDFM_C_Directly f m k v)
 {-# INLINEABLE addListToUDFM_Directly_C #-}
 
+-- | Like 'addListToUDFM_Directly_C' but also passes the unique key to the combine function
+addListToUDFM_Directly_CK
+  :: (Unique -> elt -> elt -> elt) -> UniqDFM key elt -> [(Unique,elt)] -> UniqDFM key elt
+addListToUDFM_Directly_CK f = foldl' (\m (k, v) -> addToUDFM_C_Directly (f k) m k v)
+{-# INLINEABLE addListToUDFM_Directly_CK #-}
+
 delFromUDFM :: Uniquable key => UniqDFM key elt -> key -> UniqDFM key elt
 delFromUDFM (UDFM m i) k = UDFM (M.delete (getKey $ getUnique k) m) i
 
@@ -233,6 +242,15 @@ plusUDFM_C f udfml@(UDFM _ i) udfmr@(UDFM _ j)
   -- to insert the smaller one into the bigger one
   | i > j = insertUDFMIntoLeft_C f udfml udfmr
   | otherwise = insertUDFMIntoLeft_C f udfmr udfml
+
+-- | Like 'plusUDFM_C' but the combine function also receives the unique key
+plusUDFM_CK :: (Unique -> elt -> elt -> elt) -> UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
+plusUDFM_CK f udfml@(UDFM _ i) udfmr@(UDFM _ j)
+  -- we will use the upper bound on the tag as a proxy for the set size,
+  -- to insert the smaller one into the bigger one
+  | i > j = insertUDFMIntoLeft_CK f udfml udfmr
+  | otherwise = insertUDFMIntoLeft_CK f udfmr udfml
+
 
 -- Note [Overflow on plusUDFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -282,6 +300,12 @@ insertUDFMIntoLeft_C
 insertUDFMIntoLeft_C f udfml udfmr =
   addListToUDFM_Directly_C f udfml $ udfmToList udfmr
 
+-- | Like 'insertUDFMIntoLeft_C', but the merge function also receives the unique key
+insertUDFMIntoLeft_CK
+  :: (Unique -> elt -> elt -> elt) -> UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
+insertUDFMIntoLeft_CK f udfml udfmr =
+  addListToUDFM_Directly_CK f udfml $ udfmToList udfmr
+
 lookupUDFM :: Uniquable key => UniqDFM key elt -> key -> Maybe elt
 lookupUDFM (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey $ getUnique k) m
 
@@ -297,6 +321,12 @@ foldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
 {-# INLINE foldUDFM #-}
 -- This INLINE prevents a regression in !10568
 foldUDFM k z m = foldr k z (eltsUDFM m)
+
+-- | Like 'foldUDFM' but the function also receives a key
+foldWithKeyUDFM :: (Unique -> elt -> a -> a) -> a -> UniqDFM key elt -> a
+{-# INLINE foldWithKeyUDFM #-}
+-- This INLINE was copied from foldUDFM
+foldWithKeyUDFM k z m = foldr (uncurry k) z (udfmToList m)
 
 -- | Performs a nondeterministic strict fold over the UniqDFM.
 -- It's O(n), same as the corresponding function on `UniqFM`.
@@ -397,6 +427,9 @@ listToUDFM = foldl' (\m (k, v) -> addToUDFM m k v) emptyUDFM
 listToUDFM_Directly :: [(Unique, elt)] -> UniqDFM key elt
 listToUDFM_Directly = foldl' (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
 
+listToUDFM_C_Directly :: (elt -> elt -> elt) -> [(Unique, elt)] -> UniqDFM key elt
+listToUDFM_C_Directly f = foldl' (\m (u, v) -> addToUDFM_C_Directly f m u v) emptyUDFM
+
 -- | Apply a function to a particular element
 adjustUDFM :: Uniquable key => (elt -> elt) -> UniqDFM key elt -> key -> UniqDFM key elt
 adjustUDFM f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey $ getUnique k) m) i
@@ -436,6 +469,10 @@ mapMUDFM :: Monad m => (elt1 -> m elt2) -> UniqDFM key elt1 -> m (UniqDFM key el
 mapMUDFM f (UDFM m i) = do
   m' <- traverse (traverse f) m
   return $ UDFM m' i
+
+-- | Map a function over every value in a UniqDFM
+mapWithInternalKeyUDFM :: (Word64 -> elt1 -> elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
+mapWithInternalKeyUDFM f (UDFM m i) = UDFM (MS.mapWithKey (fmap . f) m) i
 
 mapMaybeUDFM :: forall elt1 elt2 key.
                 (elt1 -> Maybe elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
