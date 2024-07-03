@@ -14,6 +14,7 @@ module Haddock.Backends.Hyperlinker.Utils
   , hypSrcModuleNameUrlFormat
   , hypSrcModuleLineUrlFormat
   , hypSrcModuleUrlToNameFormat
+  , hypSrcModuleUrlToLineFormat
   , hypSrcPkgUrlToModuleFormat
   , spliceURL
   , spliceURL'
@@ -85,6 +86,9 @@ hypSrcModuleLineUrlFormat = hypSrcModuleUrlFormat ++ "#" ++ lineFormat
 
 hypSrcModuleUrlToNameFormat :: String -> String
 hypSrcModuleUrlToNameFormat url = url ++ "#" ++ nameFormat
+
+hypSrcModuleUrlToLineFormat :: String -> String
+hypSrcModuleUrlToLineFormat url = url ++ "#" ++ lineFormat
 
 hypSrcPkgUrlToModuleFormat :: String -> String
 hypSrcPkgUrlToModuleFormat url = url </> moduleFormat
