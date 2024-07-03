@@ -36,6 +36,7 @@ module Haddock.InterfaceFile
   , binaryInterfaceVersionCompatibility
   ) where
 
+import Data.Coerce (coerce)
 import Data.Function ((&))
 import Data.IORef
 import Data.Map (Map)
@@ -367,6 +368,7 @@ instance Binary InstalledInterface where
         opts
         fixMap
         warnMap
+        locMap
       ) = do
       put_ bh modu
       put_ bh is_sig
@@ -378,6 +380,7 @@ instance Binary InstalledInterface where
       put_ bh opts
       put_ bh fixMap
       put_ bh warnMap
+      put_ bh (coerce @_ @(Map Name BinSpan) locMap)
 
   get bh = do
     modu <- get bh
@@ -390,6 +393,7 @@ instance Binary InstalledInterface where
     opts <- get bh
     fixMap <- get bh
     warnMap <- get bh
+    locMap <- get bh
     return
       ( InstalledInterface
           modu
@@ -403,6 +407,7 @@ instance Binary InstalledInterface where
           opts
           fixMap
           warnMap
+          (coerce @(Map Name BinSpan) locMap)
       )
 
 instance Binary DocOption where

@@ -438,16 +438,17 @@ render dflags languagesAndExtensions parserOpts logger unit_state flags sinceQua
       = Map.insert k srcNameUrl pkgSrcMap
       | otherwise = pkgSrcMap
 
+    pkgSrcLMap = Map.map (hypSrcModuleUrlToLineFormat . hypSrcPkgUrlToModuleFormat)
+               $ Map.mapKeys moduleUnit extSrcMap
     -- These urls have a template for the module %M and the line %L
-    -- TODO: Get these from the interface files as with srcMap
     pkgSrcLMap'
       | Flag_HyperlinkedSource `elem` flags
       , Just k <- pkgKey
-      = Map.singleton k hypSrcModuleLineUrlFormat
+      = Map.insert k hypSrcModuleLineUrlFormat pkgSrcLMap
       | Just path <- srcLEntity
       , Just k <- pkgKey
-      = Map.singleton k path
-      | otherwise = Map.empty
+      = Map.insert k path pkgSrcLMap
+      | otherwise = pkgSrcLMap
 
     sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
 

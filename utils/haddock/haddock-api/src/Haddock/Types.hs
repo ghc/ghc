@@ -48,16 +48,18 @@ import Control.Monad.Catch
 import Control.Monad.State.Strict
 import Data.Data (Data)
 import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC
 import qualified GHC.Data.Strict as Strict
 import GHC.Driver.Session (Language)
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Core.InstEnv (is_dfun_name)
 import GHC.Types.Fixity (Fixity (..))
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
-import GHC.Types.SrcLoc (BufPos (..), BufSpan (..))
+import GHC.Types.SrcLoc (BufPos (..), BufSpan (..), srcSpanToRealSrcSpan)
 import GHC.Types.Var (Specificity)
 import GHC.Utils.Outputable
 
@@ -167,6 +169,7 @@ data InstalledInterface = InstalledInterface
   -- ^ Haddock options for this module (prune, ignore-exports, etc).
   , instFixMap :: Map Name Fixity
   , instWarningMap :: WarningMap
+  , instInstanceLocMap :: Map Name RealSrcSpan
   }
 
 -- | Convert an 'Interface' to an 'InstalledInterface'
@@ -184,6 +187,7 @@ toInstalledIface interface =
     , instFixMap = interface.ifaceFixMap
     , instDefMeths = interface.ifaceDefMeths
     , instWarningMap = interface.ifaceWarningMap
+    , instInstanceLocMap = Map.fromList [(inst_name, loc) |  i <- interface.ifaceInstances, let inst_name = is_dfun_name i, Just loc <- [srcSpanToRealSrcSpan (nameSrcSpan inst_name)]]
     }
 
 -- | A monad in which we create Haddock interfaces. Not to be confused with
