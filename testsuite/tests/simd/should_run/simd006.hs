@@ -123,17 +123,15 @@ instance Arbitrary Word32 where
 newtype FloatNT = FloatNT Float
   deriving newtype (Show, Num)
 instance Eq FloatNT where
-  FloatNT f1 == FloatNT f2 = f1 == f2
-    -- TODO: tests fail with this equality due to signed zeros
-    -- castFloatToWord32 f1 == castFloatToWord32 f2
+  FloatNT f1 == FloatNT f2 =
+    castFloatToWord32 f1 == castFloatToWord32 f2
 instance Arbitrary FloatNT where
   arbitrary = FloatNT . castWord32ToFloat <$> arbitrary
 newtype DoubleNT = DoubleNT Double
   deriving newtype (Show, Num)
 instance Eq DoubleNT where
-  DoubleNT d1 == DoubleNT d2 = d1 == d2
-    -- TODO: tests fail with this equality due to signed zeros
-    -- castDoubleToWord64 d1 == castDoubleToWord64 d2
+  DoubleNT d1 == DoubleNT d2 =
+    castDoubleToWord64 d1 == castDoubleToWord64 d2
 instance Arbitrary DoubleNT where
   arbitrary = DoubleNT . castWord64ToDouble <$> arbitrary
 
