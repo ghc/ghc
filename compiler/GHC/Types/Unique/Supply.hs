@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -41,6 +42,7 @@ import Control.Monad
 import Data.Word
 import GHC.Exts( Ptr(..), noDuplicate#, oneShot )
 import Foreign.Storable
+import GHC.Utils.Monad.State.Strict as Strict
 
 #include "MachDeps.h"
 
@@ -304,6 +306,8 @@ uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily n
 uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
 takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily n, s1)
 
+{-# INLINE splitUniqSupply #-}
+
 {-
 ************************************************************************
 *                                                                      *
@@ -320,29 +324,13 @@ pattern UniqResult x y = (# x, y #)
 
 -- | A monad which just gives the ability to obtain 'Unique's
 newtype UniqSM result = USM { unUSM :: UniqSupply -> UniqResult result }
-
--- See Note [The one-shot state monad trick] for why we don't derive this.
-instance Functor UniqSM where
-  fmap f (USM m) = mkUniqSM $ \us ->
-      case m us of
-        (# r, us' #) -> UniqResult (f r) us'
+  deriving (Functor, Applicative, Monad) via (Strict.State UniqSupply)
 
 -- | Smart constructor for 'UniqSM', as described in Note [The one-shot state
 -- monad trick].
 mkUniqSM :: (UniqSupply -> UniqResult a) -> UniqSM a
 mkUniqSM f = USM (oneShot f)
 {-# INLINE mkUniqSM #-}
-
-instance Monad UniqSM where
-  (>>=) = thenUs
-  (>>)  = (*>)
-
-instance Applicative UniqSM where
-    pure = returnUs
-    (USM f) <*> (USM x) = mkUniqSM $ \us0 -> case f us0 of
-                            UniqResult ff us1 -> case x us1 of
-                              UniqResult xx us2 -> UniqResult (ff xx) us2
-    (*>) = thenUs_
 
 -- TODO: try to get rid of this instance
 instance MonadFail UniqSM where
@@ -356,29 +344,11 @@ initUs init_us m = case unUSM m init_us of { UniqResult r us -> (r, us) }
 initUs_ :: UniqSupply -> UniqSM a -> a
 initUs_ init_us m = case unUSM m init_us of { UniqResult r _ -> r }
 
-{-# INLINE thenUs #-}
-{-# INLINE returnUs #-}
-{-# INLINE splitUniqSupply #-}
-
--- @thenUs@ is where we split the @UniqSupply@.
-
 liftUSM :: UniqSM a -> UniqSupply -> (a, UniqSupply)
 liftUSM (USM m) us0 = case m us0 of UniqResult a us1 -> (a, us1)
 
 instance MonadFix UniqSM where
     mfix m = mkUniqSM (\us0 -> let (r,us1) = liftUSM (m r) us0 in UniqResult r us1)
-
-thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
-thenUs (USM expr) cont
-  = mkUniqSM (\us0 -> case (expr us0) of
-                   UniqResult result us1 -> unUSM (cont result) us1)
-
-thenUs_ :: UniqSM a -> UniqSM b -> UniqSM b
-thenUs_ (USM expr) (USM cont)
-  = mkUniqSM (\us0 -> case (expr us0) of { UniqResult _ us1 -> cont us1 })
-
-returnUs :: a -> UniqSM a
-returnUs result = mkUniqSM (\us -> UniqResult result us)
 
 getUs :: UniqSM UniqSupply
 getUs = mkUniqSM (\us0 -> case splitUniqSupply us0 of (us1,us2) -> UniqResult us1 us2)

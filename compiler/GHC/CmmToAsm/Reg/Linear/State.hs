@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms, DeriveFunctor, DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnboxedTuples #-}
 
@@ -52,30 +52,23 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Exts (oneShot)
 
-import Control.Monad (ap)
+import GHC.Utils.Monad.State.Strict as Strict
 
-type RA_Result freeRegs a = (# RA_State freeRegs, a #)
+type RA_Result freeRegs a = (# a, RA_State freeRegs #)
 
-pattern RA_Result :: a -> b -> (# a, b #)
-pattern RA_Result a b = (# a, b #)
+pattern RA_Result :: a -> b -> (# b, a #)
+pattern RA_Result a b = (# b, a #)
 {-# COMPLETE RA_Result #-}
 
 -- | The register allocator monad type.
 newtype RegM freeRegs a
         = RegM { unReg :: RA_State freeRegs -> RA_Result freeRegs a }
-        deriving (Functor)
+        deriving (Functor, Applicative, Monad) via (Strict.State (RA_State freeRegs))
 
 -- | Smart constructor for 'RegM', as described in Note [The one-shot state
 -- monad trick] in GHC.Utils.Monad.
 mkRegM :: (RA_State freeRegs -> RA_Result freeRegs a) -> RegM freeRegs a
 mkRegM f = RegM (oneShot f)
-
-instance Applicative (RegM freeRegs) where
-      pure a  =  mkRegM $ \s -> RA_Result s a
-      (<*>) = ap
-
-instance Monad (RegM freeRegs) where
-  m >>= k   =  mkRegM $ \s -> case unReg m s of { RA_Result s a -> unReg (k a) s }
 
 -- | Get native code generator configuration
 getConfig :: RegM a NCGConfig
