@@ -170,6 +170,8 @@ data Instr
         | AND         Format Operand Operand
         | OR          Format Operand Operand
         | XOR         Format Operand Operand
+        -- | AVX bitwise logical XOR operation
+        | VXOR        Format Operand Reg Reg
         | NOT         Format Operand
         | NEGI        Format Operand         -- NEG instruction (name clash with Cond)
         | BSWAP       Format Reg
@@ -384,9 +386,16 @@ regUsageOfInstr platform instr
     OR     fmt src dst    -> usageRM fmt src dst
 
     XOR    fmt (OpReg src) (OpReg dst)
-        | src == dst    -> mkRU [] [mk fmt dst]
+      | src == dst
+      -> mkRU [] [mk fmt dst]
+    XOR    fmt src dst
+      -> usageRM fmt src dst
+    VXOR fmt (OpReg src1) src2 dst
+      | src1 == src2, src1 == dst
+      -> mkRU [] [mk fmt dst]
+    VXOR fmt src1 src2 dst
+      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
 
-    XOR    fmt src dst    -> usageRM fmt src dst
     NOT    fmt op         -> usageM fmt op
     BSWAP  fmt reg        -> mkRU [mk fmt reg] [mk fmt reg]
     NEGI   fmt op         -> usageM fmt op
@@ -628,6 +637,7 @@ patchRegsOfInstr platform instr env
     AND  fmt src dst     -> patch2 (AND  fmt) src dst
     OR   fmt src dst     -> patch2 (OR   fmt) src dst
     XOR  fmt src dst     -> patch2 (XOR  fmt) src dst
+    VXOR fmt src1 src2 dst -> VXOR fmt (patchOp src1) (env src2) (env dst)
     NOT  fmt op          -> patch1 (NOT  fmt) op
     BSWAP fmt reg        -> BSWAP fmt (env reg)
     NEGI fmt op          -> patch1 (NEGI fmt) op
@@ -670,6 +680,8 @@ patchRegsOfInstr platform instr env
     LOCATION {}         -> instr
     UNWIND {}           -> instr
     DELTA _             -> instr
+    LDATA {}            -> instr
+    NEWBLOCK {}         -> instr
 
     JXX _ _             -> instr
     JXX_GBL _ _         -> instr
@@ -730,8 +742,6 @@ patchRegsOfInstr platform instr env
       -> MOVHLPS fmt (env src) (env dst)
     PUNPCKLQDQ fmt src dst
       -> PUNPCKLQDQ fmt (patchOp src) (env dst)
-
-    _other              -> panic "patchRegs: unrecognised instr"
 
   where
     patch1 :: (Operand -> a) -> Operand -> a

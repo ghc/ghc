@@ -754,11 +754,14 @@ pprInstr platform i = case i of
    XOR format src dst
       -> pprFormatOpOp (text "xor") format src dst
 
+   VXOR fmt src1 src2 dst
+      -> pprVxor fmt src1 src2 dst
+
    POPCNT format src dst
       -> pprOpOp (text "popcnt") format src (OpReg dst)
 
    LZCNT format src dst
-      ->  pprOpOp (text "lzcnt") format src (OpReg dst)
+      -> pprOpOp (text "lzcnt") format src (OpReg dst)
 
    TZCNT format src dst
       -> pprOpOp (text "tzcnt") format src (OpReg dst)
@@ -1310,6 +1313,23 @@ pprInstr platform i = case i of
            comma,
            pprReg platform format reg3
        ]
+
+   pprVxor :: Format -> Operand -> Reg -> Reg -> doc
+   pprVxor fmt src1 src2 dst
+     = line $ hcat [
+           pprGenMnemonic mem fmt,
+           pprOperand platform fmt src1,
+           comma,
+           pprReg platform fmt src2,
+           comma,
+           pprReg platform fmt dst
+       ]
+     where
+      mem = case fmt of
+        VecFormat _ FmtFloat -> text "vxorps"
+        VecFormat _ FmtDouble -> text "vxorpd"
+        _ -> pprPanic "GHC.CmmToAsm.X86.Ppr.pprVxor: elementy type must be Float or Double"
+              (ppr fmt)
 
    pprInsert :: Line doc -> Format -> Imm -> Operand -> Reg -> doc
    pprInsert name format off src dst
