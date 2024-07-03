@@ -228,25 +228,28 @@ createIfaces verbosity modules flags instIfaceMap = do
       -- Visit modules in that order
       sortedMods = concatMap go $ topSortModuleGraph False modGraph Nothing
   out verbosity normal "Haddock coverage:"
-  (ifaces, _) <- foldM f ([], Map.empty) sortedMods
+  let inst_warning_map = Map.unions $ map instWarningMap (Map.elems instIfaceMap)
+  (ifaces, _, _) <- foldM f ([], Map.empty, inst_warning_map) sortedMods
   return (reverse ifaces)
   where
-    f (ifaces, ifaceMap) modSummary = do
+    f (ifaces, ifaceMap, warningMap) modSummary = do
       x <- {-# SCC processModule #-}
            withTimingM "processModule" (const ()) $ do
-             processModule verbosity modSummary flags ifaceMap instIfaceMap
+             processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap
       return $ case x of
         Just iface -> ( iface:ifaces
-                      , Map.insert (ifaceMod iface) iface ifaceMap )
+                      , Map.insert (ifaceMod iface) iface ifaceMap
+                      , Map.union (ifaceWarningMap iface) warningMap)
         Nothing    -> ( ifaces
-                      , ifaceMap ) -- Boot modules don't generate ifaces.
+                      , ifaceMap
+                      , warningMap ) -- Boot modules don't generate ifaces.
 
 dropErr :: MaybeErr e a -> Maybe a
 dropErr (Succeeded a) = Just a
 dropErr (Failed _) = Nothing
 
-processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> Ghc (Maybe Interface)
-processModule verbosity modSummary flags ifaceMap instIfaceMap = do
+processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> WarningMap -> Ghc (Maybe Interface)
+processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modSummary) ++ "..."
 
   hsc_env <- getSession
@@ -269,7 +272,7 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap = do
     {-# SCC createInterface #-}
       withTiming logger "createInterface" (const ()) $
         runIfM (liftIO . fmap dropErr . lookupGlobal_maybe hsc_env) $
-          createInterface1 flags unit_state modSummary mod_iface ifaceMap instIfaceMap insts
+          createInterface1 flags unit_state modSummary mod_iface ifaceMap instIfaceMap insts warningMap
 
   let
     (haddockable, haddocked) =
@@ -375,13 +378,13 @@ createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
   let hieFilePath = case res of
                       Found ml _ -> ml_hie_file ml
                       _ -> throwE "createOneShotIface: module not found"
-
+  let inst_warning_map = Map.unions $ map instWarningMap (Map.elems instIfaceMap)
   !interface <- do
     logger <- getLogger
     {-# SCC createInterface #-}
       withTiming logger "createInterface" (const ()) $
         runIfM (liftIO . fmap dropErr . lookupGlobal_maybe hsc_env) $
-          createInterface1' flags (hsc_units hsc_env) dflags' hieFilePath iface mempty instIfaceMap insts
+          createInterface1' flags (hsc_units hsc_env) dflags' hieFilePath iface mempty instIfaceMap insts inst_warning_map
 
   pure [interface]
 

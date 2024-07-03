@@ -83,8 +83,9 @@ createInterface1
   -> IfaceMap
   -> InstIfaceMap
   -> ([ClsInst], [FamInst])
+  -> WarningMap
   -> IfM m Interface
-createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instances, fam_instances) =
+createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings =
   let
     ModSummary
       { -- Cached flags from OPTIONS, INCLUDE and LANGUAGE
@@ -94,7 +95,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
       , ms_location = modl
       } = mod_sum
    in
-    createInterface1' flags unit_state ms_hspp_opts (ml_hie_file modl) mod_iface ifaces inst_ifaces (instances, fam_instances)
+    createInterface1' flags unit_state ms_hspp_opts (ml_hie_file modl) mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings
 
 createInterface1'
   :: MonadIO m
@@ -106,8 +107,9 @@ createInterface1'
   -> IfaceMap
   -> InstIfaceMap
   -> ([ClsInst], [FamInst])
+  -> WarningMap
   -> IfM m Interface
-createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces (instances, fam_instances) = do
+createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings = do
   let
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
     mLanguage = language dflags
@@ -205,7 +207,7 @@ createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces 
   let
     -- Warnings in this module and transitive warnings from dependent modules
     transitiveWarnings :: Map Name (Doc Name)
-    transitiveWarnings = Map.unions (warningMap : map ifaceWarningMap (Map.elems ifaces))
+    transitiveWarnings = Map.union warningMap depWarnings
 
   export_items <-
     mkExportItems
