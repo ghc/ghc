@@ -78,12 +78,15 @@ Compiler
   <https://gitlab.haskell.org/ghc/ghc/-/issues/24921>`_). This does
   not affect existing support of apple systems on x86_64/aarch64.
 
-- The flag :ghc-flag:`-fignore-asserts` will now also enable the 
+- The flag :ghc-flag:`-fignore-asserts` will now also enable the
   :extension:`CPP` macro ``__GLASGOW_HASKELL_ASSERTS_IGNORED__`` (`#24967
   <https://gitlab.haskell.org/ghc/ghc/-/issues/24967>`_).
   This enables people to write their own custom assertion functions.
   See :ref:`assertions`.
-  
+
+- Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
+  on certain programs. (#24941)
+
 
 GHCi
 ~~~~
