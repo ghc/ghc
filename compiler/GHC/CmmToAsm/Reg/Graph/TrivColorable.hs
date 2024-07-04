@@ -179,7 +179,8 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchPPC       -> 26
                             ArchPPC_64 _  -> 20
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchAArch64   -> 32
+                            ArchAArch64   -> 24 -- 32 - F1 .. F4, D1..D4 - it's odd but see Note [AArch64 Register assignments] for our reg use.
+                                                -- Seems we reserve different registers for D1..D4 and F1 .. F4 somehow, we should fix this.
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
