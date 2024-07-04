@@ -16,3 +16,34 @@ def test_T25090(name):
 
 test_T25090('T25090a')
 test_T25090('T25090b')
+
+def test_pkg(suf, files = []):
+    name = f'Pkg{suf}'
+    test(
+        name,
+        [
+            extra_files([
+                'PkgBytecode.hs',
+                'Local.hs',
+                'Dep.hs',
+                'DepApi.hs',
+                'Num.hs',
+                'Num.hs-boot',
+                'Obj.hs',
+                'dep.conf',
+                'obj.conf',
+                'prep.bash',
+                'run.bash',
+            ] + files),
+            use_specs({'stdout': 'PkgBytecode.stdout'}),
+        ],
+        makefile_test,
+        [name],
+    )
+
+test_pkg('Archive')
+test_pkg('EmptyArchive')
+test_pkg('NoArchive')
+# TODO broken
+# test_pkg('ArchiveObjCode')
+test_pkg('MultiUnit', ['unit1', 'unit2'])
