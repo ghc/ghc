@@ -23,6 +23,7 @@ import GHC.Types.Demand
 import GHC.Utils.Misc
 
 import Control.Arrow ( first, second )
+import GHC.Types.Var (isTyVar)
 
 
 {-
@@ -559,7 +560,9 @@ addInterestingBinds int bind
 -- Second argument is the demand from the body
 callArityBind :: VarSet -> CallArityRes -> VarSet -> CoreBind -> (CallArityRes, CoreBind)
 -- Non-recursive let
-callArityBind boring_vars ae_body int (NonRec v rhs)
+callArityBind boring_vars ae_body int bind@(NonRec v rhs)
+  | isTyVar v
+  = (ae_body, bind)
   | otherwise
   = -- pprTrace "callArityBind:NonRec"
     --          (vcat [ppr v, ppr ae_body, ppr int, ppr ae_rhs, ppr safe_arity])

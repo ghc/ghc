@@ -1469,9 +1469,15 @@ specBind :: TopLevelFlag
          -> SpecM ( [OutBind]           -- New bindings
                   , body                -- Body
                   , UsageDetails)       -- And info to pass upstream
-
 -- Returned UsageDetails:
 --    No calls for binders of this bind
+
+specBind _top_lvl env bind@(NonRec _ (Type {})) do_body
+  -- Can't check that the binder is a type variable, otherwise the the variable is forced and
+  -- will trigger an infinite loop. Instead, we match on the structure of the RHS.
+  = do { (body, body_uds) <- do_body env
+       ; return ([bind], body, body_uds) }
+
 specBind top_lvl env (NonRec fn rhs) do_body
   = do { (rhs', rhs_uds) <- specExpr env rhs
 

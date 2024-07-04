@@ -499,6 +499,8 @@ cprAnalBind
   -> CoreExpr
   -> (Id, CoreExpr, AnalEnv)
 cprAnalBind env id rhs
+  | isTyVar id
+  = (id, rhs, extendSigEnv env id topCprSig)
   | isDFunId id -- Never give DFuns the CPR property; we'll never save allocs.
   = (id,  rhs,  extendSigEnv env id topCprSig)
   -- See Note [CPR for data structures]
