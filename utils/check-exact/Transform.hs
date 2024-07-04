@@ -218,8 +218,8 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig dc rs') ns (HsWC xw ty))))
     rd = case last ns of
       L (EpAnn anc' _ _) _ -> anchor anc' -- TODO MovedAnchor?
     dc' = case dca of
-      EpaSpan (RealSrcSpan r _) -> AddEpAnn kw (EpaDelta (ss2delta (ss2posEnd rd) r) [])
-      _                         -> AddEpAnn kw dca
+      EpaSpan ss@(RealSrcSpan r _) -> AddEpAnn kw (EpaDelta ss (ss2delta (ss2posEnd rd) r) [])
+      _                            -> AddEpAnn kw dca
 
     -- ---------------------------------
 
@@ -228,10 +228,10 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig dc rs') ns (HsWC xw ty))))
       (L (EpAnn anc0 a c) b)
         -> let
               anc' = case anc0 of
-                EpaDelta _ _ -> anc0
+                EpaDelta _ _ _ -> anc0
                 _ -> case dca of
-                  EpaSpan _ -> EpaDelta (SameLine 1) []
-                  EpaDelta _ cs0 -> EpaDelta (SameLine 1) cs0
+                  EpaSpan ss -> EpaDelta ss (SameLine 1) []
+                  EpaDelta ss _ cs0 -> EpaDelta ss (SameLine 1) cs0
            in (L (EpAnn anc' a c) b)
 
 captureTypeSigSpacing s = s
@@ -254,12 +254,12 @@ setEntryDPDecl d dp = setEntryDP d dp
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
 setEntryDP :: NoAnn t => LocatedAn t a -> DeltaPos -> LocatedAn t a
-setEntryDP (L (EpAnn (EpaSpan (UnhelpfulSpan _)) an cs) a) dp
-  = L (EpAnn (EpaDelta dp []) an cs) a
-setEntryDP (L (EpAnn (EpaSpan _) an (EpaComments [])) a) dp
-  = L (EpAnn (EpaDelta dp []) an (EpaComments [])) a
-setEntryDP (L (EpAnn (EpaDelta d csd) an cs) a) dp
-  = L (EpAnn (EpaDelta d' csd') an cs') a
+setEntryDP (L (EpAnn (EpaSpan ss@(UnhelpfulSpan _)) an cs) a) dp
+  = L (EpAnn (EpaDelta ss dp []) an cs) a
+setEntryDP (L (EpAnn (EpaSpan ss) an (EpaComments [])) a) dp
+  = L (EpAnn (EpaDelta ss dp []) an (EpaComments [])) a
+setEntryDP (L (EpAnn (EpaDelta ss d csd) an cs) a) dp
+  = L (EpAnn (EpaDelta ss d' csd') an cs') a
   where
     (d', csd', cs') = case cs of
       EpaComments (h:t) ->
@@ -283,22 +283,22 @@ setEntryDP (L (EpAnn (EpaDelta d csd) an cs) a) dp
                 in
                   (dp0, c':t, EpaCommentsBalanced [] ts)
     go :: GenLocated NoCommentsLocation e -> (DeltaPos, GenLocated NoCommentsLocation e)
-    go (L (EpaDelta _ c0) c) = (d,  L (EpaDelta dp c0) c)
-    go (L (EpaSpan _)     c) = (d,  L (EpaDelta dp NoComments) c)
-setEntryDP (L (EpAnn (EpaSpan (RealSrcSpan r _)) an cs) a) dp
+    go (L (EpaDelta ss0 _ c0) c) = (d,  L (EpaDelta ss0 dp c0) c)
+    go (L (EpaSpan ss0)       c) = (d,  L (EpaDelta ss0 dp NoComments) c)
+setEntryDP (L (EpAnn (EpaSpan ss@(RealSrcSpan r _)) an cs) a) dp
   = case sortEpaComments (priorComments cs) of
       [] ->
-        L (EpAnn (EpaDelta dp []) an cs) a
+        L (EpAnn (EpaDelta ss dp []) an cs) a
       (L ca c:cs') ->
-        L (EpAnn (EpaDelta edp csd) an cs'') a
+        L (EpAnn (EpaDelta ss edp csd) an cs'') a
               where
                 cs'' = setPriorComments cs []
-                csd = L (EpaDelta dp NoComments) c:cs'
+                csd = L (EpaDelta ss dp NoComments) c:cs'
                 lc = last $ (L ca c:cs')
                 delta = case getLoc lc of
                           EpaSpan (RealSrcSpan rr _) -> ss2delta (ss2pos rr) r
                           EpaSpan _ -> (SameLine 0)
-                          EpaDelta _dp _ -> DifferentLine 1 0
+                          EpaDelta _ _dp _ -> DifferentLine 1 0
                 line = getDeltaLine delta
                 col = deltaColumn delta
                 edp' = if line == 0 then SameLine col
@@ -309,27 +309,27 @@ setEntryDP (L (EpAnn (EpaSpan (RealSrcSpan r _)) an cs) a) dp
 -- ---------------------------------------------------------------------
 
 getEntryDP :: LocatedAn t a -> DeltaPos
-getEntryDP (L (EpAnn (EpaDelta dp _) _ _) _) = dp
+getEntryDP (L (EpAnn (EpaDelta _ dp _) _ _) _) = dp
 getEntryDP _ = SameLine 1
 
 -- ---------------------------------------------------------------------
 
 addEpaLocationDelta :: LayoutStartCol -> RealSrcSpan -> EpaLocation -> EpaLocation
-addEpaLocationDelta _off _anc (EpaDelta d cs) = EpaDelta d cs
-addEpaLocationDelta _off _anc (EpaSpan (UnhelpfulSpan _)) = EpaDelta (SameLine 0) []
-addEpaLocationDelta  off  anc (EpaSpan (RealSrcSpan r _))
-  = EpaDelta (adjustDeltaForOffset off (ss2deltaEnd anc r)) []
+addEpaLocationDelta _off _anc (EpaDelta ss d cs) = EpaDelta ss d cs
+addEpaLocationDelta _off _anc (EpaSpan ss@(UnhelpfulSpan _)) = EpaDelta ss (SameLine 0) []
+addEpaLocationDelta  off  anc (EpaSpan ss@(RealSrcSpan r _))
+  = EpaDelta ss (adjustDeltaForOffset off (ss2deltaEnd anc r)) []
 
 -- Set the entry DP for an element coming after an existing keyword annotation
 setEntryDPFromAnchor :: LayoutStartCol -> EpaLocation -> LocatedA t -> LocatedA t
-setEntryDPFromAnchor _off (EpaDelta _ _) (L la a) = L la a
+setEntryDPFromAnchor _off (EpaDelta _ _ _) (L la a) = L la a
 setEntryDPFromAnchor _off (EpaSpan (UnhelpfulSpan _)) (L la a) = L la a
 setEntryDPFromAnchor  off (EpaSpan (RealSrcSpan anc _)) ll@(L la _) = setEntryDP ll dp'
   where
     dp' = case la of
       (EpAnn (EpaSpan (RealSrcSpan r' _)) _ _) -> adjustDeltaForOffset off (ss2deltaEnd anc r')
       (EpAnn (EpaSpan _) _ _)                  -> adjustDeltaForOffset off (SameLine 0)
-      (EpAnn (EpaDelta dp _) _ _)              -> adjustDeltaForOffset off dp
+      (EpAnn (EpaDelta _ dp _) _ _)            -> adjustDeltaForOffset off dp
 
 -- ---------------------------------------------------------------------
 
@@ -559,7 +559,7 @@ balanceComments' la1 la2 = do
 trailingCommentsDeltas :: RealSrcSpan -> [LEpaComment]
                -> [(Int, LEpaComment)]
 trailingCommentsDeltas _ [] = []
-trailingCommentsDeltas r (la@(L (EpaDelta dp _) _):las)
+trailingCommentsDeltas r (la@(L (EpaDelta _ dp _) _):las)
   = (getDeltaLine dp, la): trailingCommentsDeltas r las
 trailingCommentsDeltas r (la@(L l _):las)
   = deltaComment r la : trailingCommentsDeltas (anchor l) las
@@ -576,7 +576,7 @@ priorCommentsDeltas r cs = go r (reverse $ sortEpaComments cs)
   where
     go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
     go _   [] = []
-    go _   (la@(L l@(EpaDelta dp _) _):las) = (deltaLine dp, la) : go (anchor l) las
+    go _   (la@(L l@(EpaDelta _ dp _) _):las) = (deltaLine dp, la) : go (anchor l) las
     go rs' (la@(L l _):las) = deltaComment rs' la : go (anchor l) las
 
     deltaComment :: RealSrcSpan -> LEpaComment -> (Int, LEpaComment)
@@ -705,7 +705,7 @@ anchorEof (L l m@(HsModule (XModulePs an _lo _ _) _mn _exps _imps _decls)) = L l
 -- | Create a @SrcSpanAnn@ with a @MovedAnchor@ operation using the
 -- given @DeltaPos@.
 noAnnSrcSpanDP :: (NoAnn ann) => DeltaPos -> EpAnn ann
-noAnnSrcSpanDP dp = EpAnn (EpaDelta dp []) noAnn emptyComments
+noAnnSrcSpanDP dp = EpAnn (EpaDelta noSrcSpan dp []) noAnn emptyComments
 
 noAnnSrcSpanDP0 :: (NoAnn ann) => EpAnn ann
 noAnnSrcSpanDP0 = noAnnSrcSpanDP (SameLine 0)
@@ -717,13 +717,13 @@ noAnnSrcSpanDPn :: (NoAnn ann) => Int -> EpAnn ann
 noAnnSrcSpanDPn s = noAnnSrcSpanDP (SameLine s)
 
 d0 :: EpaLocation
-d0 = EpaDelta (SameLine 0) []
+d0 = EpaDelta noSrcSpan (SameLine 0) []
 
 d1 :: EpaLocation
-d1 = EpaDelta (SameLine 1) []
+d1 = EpaDelta noSrcSpan (SameLine 1) []
 
 dn :: Int -> EpaLocation
-dn n = EpaDelta (SameLine n) []
+dn n = EpaDelta noSrcSpan (SameLine n) []
 
 addComma :: SrcSpanAnnA -> SrcSpanAnnA
 addComma (EpAnn anc (AnnListItem as) cs)
@@ -888,8 +888,8 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
                   off = case l of
                           (EpaSpan (RealSrcSpan r _)) -> LayoutStartCol $ snd $ ss2pos r
                           (EpaSpan (UnhelpfulSpan _)) -> LayoutStartCol 0
-                          (EpaDelta (SameLine _) _) -> LayoutStartCol 0
-                          (EpaDelta (DifferentLine _ c) _) -> LayoutStartCol c
+                          (EpaDelta _ (SameLine _) _) -> LayoutStartCol 0
+                          (EpaDelta _ (DifferentLine _ c) _) -> LayoutStartCol c
                   ex'' = setEntryDPFromAnchor off i ex
                   newDecls'' = case newDecls of
                     [] -> newDecls
@@ -1095,7 +1095,7 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
   -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation, change the AnnList anchor to have the correct DP too
   let (AnnList ancl o c _r t) = an
   let w = case ww of
-        WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
+        WithWhere -> [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])]
         WithoutWhere -> []
   (anc', ancl') <- do
         case ww of
@@ -1108,10 +1108,10 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
 
 newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (EpAnn AnnList)
 newWhereAnnotation ww = do
-  let anc  = EpaDelta (DifferentLine 1 3) []
-  let anc2 = EpaDelta (DifferentLine 1 5) []
+  let anc  = EpaDelta noSrcSpan (DifferentLine 1 3) []
+  let anc2 = EpaDelta noSrcSpan (DifferentLine 1 5) []
   let w = case ww of
-        WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
+        WithWhere -> [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])]
         WithoutWhere -> []
   let an = EpAnn anc
                   (AnnList (Just anc2) Nothing Nothing w [])

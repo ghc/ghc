@@ -1046,7 +1046,7 @@ instance NFData NoComments where
 
 instance NFData a => NFData (EpaLocation' a) where
   rnf (EpaSpan ss) = rnf ss
-  rnf (EpaDelta dp lc) = dp `seq` lc `deepseq` ()
+  rnf (EpaDelta ss dp lc) = ss `seq` dp `seq` lc `deepseq` ()
 
 instance NFData EpAnnComments where
   rnf (EpaComments cs) = rnf cs

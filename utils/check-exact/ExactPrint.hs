@@ -406,8 +406,8 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   acceptSpan <- getAcceptSpan
   setAcceptSpan False
   case anchor' of
-    EpaDelta _ _ -> setAcceptSpan True
-    _            -> return ()
+    EpaDelta _ _ _ -> setAcceptSpan True
+    _              -> return ()
   p <- getPosP
   pe0 <- getPriorEndD
   debugM $ "enterAnn:starting:(anchor',p,pe,a) =" ++ show (showAst anchor', p, pe0, astId a)
@@ -420,7 +420,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
     CanUpdateAnchor -> pushAppliedComments
     _ -> return ()
   case anchor' of
-    EpaDelta _ dcs -> do
+    EpaDelta _ _ dcs -> do
       debugM $ "enterAnn:Printing comments:" ++ showGhc (priorComments cs)
       mapM_ printOneComment (concatMap tokComment $ priorComments cs)
       debugM $ "enterAnn:Printing EpaDelta comments:" ++ showGhc dcs
@@ -433,7 +433,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   priorCs <- cua canUpdateAnchor takeAppliedComments -- no pop
   -- -------------------------
   case anchor' of
-    EpaDelta dp _ -> do
+    EpaDelta _ dp _ -> do
       debugM $ "enterAnn: EpaDelta:" ++ show dp
       -- Set the original anchor as prior end, so the rest of this AST
       -- fragment has a reference
@@ -475,14 +475,14 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
                off (ss2delta priorEndAfterComments curAnchor)
   debugM $ "enterAnn: (edp',off,priorEndAfterComments,curAnchor):" ++ show (edp',off,priorEndAfterComments,rs2range curAnchor)
   let edp'' = case anchor' of
-        EpaDelta dp _ -> dp
+        EpaDelta _ dp _ -> dp
         _ -> edp'
   -- ---------------------------------------------
   med <- getExtraDP
   setExtraDP Nothing
   let edp = case med of
         Nothing -> edp''
-        Just (EpaDelta dp _) -> dp
+        Just (EpaDelta _ dp _) -> dp
                    -- Replace original with desired one. Allows all
                    -- list entry values to be DP (1,0)
         Just (EpaSpan (RealSrcSpan r _)) -> dp
@@ -536,7 +536,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   debugM $ "enterAnn:done:(anchor,p,pe,a) =" ++ show (showAst anchor', p1, pe1, astId a')
 
   case anchor' of
-    EpaDelta _ _ -> return ()
+    EpaDelta _ _ _ -> return ()
     EpaSpan (RealSrcSpan rss _) -> do
       setAcceptSpan False
       setPriorEndD (snd $ rs2range rss)
@@ -554,7 +554,8 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   trailing' <- markTrailing trailing_anns
 
   -- Update original anchor, comments based on the printing process
-  let newAchor = EpaDelta edp []
+  -- TODO:AZ: probably need to put something appropriate in instead of noSrcSpan
+  let newAchor = EpaDelta noSrcSpan edp []
   let r = case canUpdateAnchor of
             CanUpdateAnchor -> setAnnotationAnchor a' newAchor trailing' (mkEpaComments (priorCs ++ postCs) [])
             CanUpdateAnchorOnly -> setAnnotationAnchor a' newAchor [] emptyComments
@@ -653,8 +654,8 @@ printSourceText (NoSourceText) txt   =  printStringAdvance txt >> return ()
 printSourceText (SourceText   txt) _ =  printStringAdvance (unpackFS txt) >> return ()
 
 printSourceTextAA :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
-printSourceTextAA (NoSourceText) txt   = printStringAtAA (EpaDelta (SameLine 0) []) txt >> return ()
-printSourceTextAA (SourceText   txt) _ =  printStringAtAA (EpaDelta (SameLine 0) []) (unpackFS txt) >> return ()
+printSourceTextAA (NoSourceText) txt   = printStringAtAA noAnn txt >> return ()
+printSourceTextAA (SourceText   txt) _ =  printStringAtAA noAnn (unpackFS txt) >> return ()
 
 -- ---------------------------------------------------------------------
 
@@ -681,9 +682,9 @@ printStringAtRsC capture pa str = do
     NoCaptureComments -> return []
   debugM $ "printStringAtRsC:cs'=" ++ show cs'
   debugM $ "printStringAtRsC:p'=" ++ showAst p'
-  debugM $ "printStringAtRsC: (EpaDelta p' [])=" ++ showAst (EpaDelta p' NoComments)
-  debugM $ "printStringAtRsC: (EpaDelta p' (map comment2LEpaComment cs'))=" ++ showAst (EpaDelta p' (map comment2LEpaComment cs'))
-  return (EpaDelta p' (map comment2LEpaComment cs'))
+  debugM $ "printStringAtRsC: (EpaDelta p' [])=" ++ showAst (EpaDelta noSrcSpan p' NoComments)
+  debugM $ "printStringAtRsC: (EpaDelta p' (map comment2LEpaComment cs'))=" ++ showAst (EpaDelta noSrcSpan p' (map comment2LEpaComment cs'))
+  return (EpaDelta noSrcSpan p' (map comment2LEpaComment cs'))
 
 printStringAtRs' :: (Monad m, Monoid w) => RealSrcSpan -> String -> EP w m ()
 printStringAtRs' pa str = printStringAtRsC NoCaptureComments pa str >> return ()
@@ -695,7 +696,7 @@ printStringAtMLoc' :: (Monad m, Monoid w)
 printStringAtMLoc' (Just aa) s = Just <$> printStringAtAA aa s
 printStringAtMLoc' Nothing s = do
   printStringAtLsDelta (SameLine 1) s
-  return (Just (EpaDelta (SameLine 1) []))
+  return (Just (EpaDelta noSrcSpan (SameLine 1) []))
 
 printStringAtMLocL :: (Monad m, Monoid w)
   => EpAnn a -> Lens a (Maybe EpaLocation) -> String -> EP w m (EpAnn a)
@@ -706,7 +707,7 @@ printStringAtMLocL (EpAnn anc an cs) l s = do
     go (Just aa) str = Just <$> printStringAtAA aa str
     go Nothing str = do
       printStringAtLsDelta (SameLine 1) str
-      return (Just (EpaDelta (SameLine 1) []))
+      return (Just (EpaDelta noSrcSpan (SameLine 1) []))
 
 printStringAtAA :: (Monad m, Monoid w) => EpaLocation -> String -> EP w m EpaLocation
 printStringAtAA el str = printStringAtAAC CaptureComments el str
@@ -726,7 +727,7 @@ printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
 printStringAtAAC capture (EpaSpan (RealSrcSpan r _)) s = printStringAtRsC capture r s
 printStringAtAAC _capture (EpaSpan ss@(UnhelpfulSpan _)) _s = error $ "printStringAtAAC:ss=" ++ show ss
-printStringAtAAC capture (EpaDelta d cs) s = do
+printStringAtAAC capture (EpaDelta ss d cs) s = do
   mapM_ printOneComment $ concatMap tokComment cs
   pe1 <- getPriorEndD
   p1 <- getPosP
@@ -739,7 +740,7 @@ printStringAtAAC capture (EpaDelta d cs) s = do
     CaptureComments -> takeAppliedComments
     NoCaptureComments -> return []
   debugM $ "printStringAtAA:(pe1,pe2,p1,p2,cs')=" ++ show (pe1,pe2,p1,p2,cs')
-  return (EpaDelta d (map comment2LEpaComment cs'))
+  return (EpaDelta ss d (map comment2LEpaComment cs'))
 
 -- ---------------------------------------------------------------------
 
@@ -1486,7 +1487,7 @@ printOneComment :: (Monad m, Monoid w) => Comment -> EP w m ()
 printOneComment c@(Comment _str loc _r _mo) = do
   debugM $ "printOneComment:c=" ++ showGhc c
   dp <-case loc of
-    EpaDelta dp _ -> return dp
+    EpaDelta _ dp _ -> return dp
     EpaSpan (RealSrcSpan r _) -> do
         pe <- getPriorEndD
         debugM $ "printOneComment:pe=" ++ showGhc pe
@@ -1496,7 +1497,7 @@ printOneComment c@(Comment _str loc _r _mo) = do
     EpaSpan (UnhelpfulSpan _) -> return (SameLine 0)
   mep <- getExtraDP
   dp' <- case mep of
-    Just (EpaDelta edp _) -> do
+    Just (EpaDelta _ edp _) -> do
       debugM $ "printOneComment:edp=" ++ show edp
       adjustDeltaForOffsetM edp
     _ -> return dp
@@ -1513,7 +1514,7 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
   where
     (r,c) = ss2posEnd pp
     dp'' = case anc of
-      EpaDelta dp1 _ -> dp1
+      EpaDelta _ dp1 _ -> dp1
       EpaSpan (RealSrcSpan la _) ->
            if r == 0
              then (ss2delta (r,c+0) la)
@@ -1527,12 +1528,12 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
       _ -> dp''
     op' = case dp' of
             SameLine n -> if n >= 0
-                            then EpaDelta dp' NoComments
-                            else EpaDelta dp NoComments
-            _ -> EpaDelta dp' NoComments
-    anc' = if str == "" && op' == EpaDelta (SameLine 0) NoComments -- EOF comment
-           then EpaDelta dp NoComments
-           else EpaDelta dp NoComments
+                            then EpaDelta noSrcSpan dp' NoComments
+                            else EpaDelta noSrcSpan dp NoComments
+            _ -> EpaDelta noSrcSpan dp' NoComments
+    anc' = if str == "" && op' == EpaDelta noSrcSpan (SameLine 0) NoComments -- EOF comment
+           then EpaDelta noSrcSpan dp NoComments
+           else EpaDelta noSrcSpan dp NoComments
 
 -- ---------------------------------------------------------------------
 
@@ -4265,11 +4266,11 @@ printUnicode anc n = do
             -- TODO: unicode support?
               "forall" -> if spanLength (anchor anc) == 1 then "∀" else "forall"
               s -> s
-  loc <- printStringAtAAC NoCaptureComments (EpaDelta (SameLine 0) []) str
+  loc <- printStringAtAAC NoCaptureComments (EpaDelta noSrcSpan (SameLine 0) []) str
   case loc of
     EpaSpan _ -> return anc
-    EpaDelta dp [] -> return $ EpaDelta dp []
-    EpaDelta _ _cs -> error "printUnicode should not capture comments"
+    EpaDelta ss dp [] -> return $ EpaDelta ss dp []
+    EpaDelta _ _ _cs  -> error "printUnicode should not capture comments"
 
 
 markName :: (Monad m, Monoid w)

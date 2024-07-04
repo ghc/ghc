@@ -914,9 +914,12 @@ mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Strict.Just b)
 -- version, to provide a position for the item relative to the end of
 -- the previous item in the source.  This is useful when editing an
 -- AST prior to exact printing the changed one.
+-- The EpaDelta also contains the original @'SrcSpan'@ for use by
+-- tools wanting to manipulate the AST after converting it using
+-- ghc-exactprint' @'makeDeltaAst'@.
 
 data EpaLocation' a = EpaSpan !SrcSpan
-                    | EpaDelta !DeltaPos !a
+                    | EpaDelta !SrcSpan !DeltaPos !a
                     deriving (Data,Eq,Show)
 
 type NoCommentsLocation = EpaLocation' NoComments
@@ -957,7 +960,7 @@ instance Outputable NoComments where
 
 instance (Outputable a) => Outputable (EpaLocation' a) where
   ppr (EpaSpan r) = text "EpaSpan" <+> ppr r
-  ppr (EpaDelta d cs) = text "EpaDelta" <+> ppr d <+> ppr cs
+  ppr (EpaDelta s d cs) = text "EpaDelta" <+> ppr s <+> ppr d <+> ppr cs
 
 instance Outputable DeltaPos where
   ppr (SameLine c) = text "SameLine" <+> ppr c

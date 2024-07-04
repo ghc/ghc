@@ -184,8 +184,8 @@ isPointSrcSpan ss = spanLength ss == 0
 -- `MovedAnchor` operation based on the original location, only if it
 -- does not already have one.
 commentOrigDelta :: LEpaComment -> LEpaComment
-commentOrigDelta (L (EpaSpan (RealSrcSpan la _)) (GHC.EpaComment t pp))
-  = (L (EpaDelta dp NoComments) (GHC.EpaComment t pp))
+commentOrigDelta (L (EpaSpan ss@(RealSrcSpan la _)) (GHC.EpaComment t pp))
+  = (L (EpaDelta ss dp NoComments) (GHC.EpaComment t pp))
                   `debug` ("commentOrigDelta: (la, pp, r,c, dp)=" ++ showAst (la, pp, r,c, dp))
   where
         (r,c) = ss2posEnd pp
@@ -330,10 +330,10 @@ sortEpaComments cs = sortBy cmp cs
 mkKWComment :: AnnKeywordId -> NoCommentsLocation -> Comment
 mkKWComment kw (EpaSpan (RealSrcSpan ss mb))
   = Comment (keywordToString kw) (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
-mkKWComment kw (EpaSpan (UnhelpfulSpan _))
-  = Comment (keywordToString kw) (EpaDelta (SameLine 0) NoComments) placeholderRealSpan (Just kw)
-mkKWComment kw (EpaDelta dp cs)
-  = Comment (keywordToString kw) (EpaDelta dp cs) placeholderRealSpan (Just kw)
+mkKWComment kw (EpaSpan ss@(UnhelpfulSpan _))
+  = Comment (keywordToString kw) (EpaDelta ss (SameLine 0) NoComments) placeholderRealSpan (Just kw)
+mkKWComment kw (EpaDelta ss dp cs)
+  = Comment (keywordToString kw) (EpaDelta ss dp cs) placeholderRealSpan (Just kw)
 
 -- | Detects a comment which originates from a specific keyword.
 isKWComment :: Comment -> Bool
@@ -434,11 +434,11 @@ To be absolutely sure, we make the delta versions use -ve values.
 
 hackSrcSpanToAnchor :: SrcSpan -> Anchor
 hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
-hackSrcSpanToAnchor (RealSrcSpan r mb)
+hackSrcSpanToAnchor ss@(RealSrcSpan r mb)
   = case mb of
     (Strict.Just (BufSpan (BufPos s) (BufPos e))) ->
       if s <= 0 && e <= 0
-      then EpaDelta (deltaPos (-s) (-e)) []
+      then EpaDelta ss (deltaPos (-s) (-e)) []
         `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
       else EpaSpan (RealSrcSpan r mb)
     _ -> EpaSpan (RealSrcSpan r mb)
