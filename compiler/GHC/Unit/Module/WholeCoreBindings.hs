@@ -68,7 +68,7 @@ traverses a splice's or GHCi expression's dependencies and collects the needed
 build artifacts, which can be objects or bytecode, depending on the build
 settings.
 
-1. In make mode, all eligible modules are part of the dependency graph.
+1. In make mode, all eligible home modules are part of the dependency graph.
    Their interfaces are loaded unconditionally and in dependency order by the
    compilation manager, and each module's bytecode is prepared before its
    dependents are compiled, in one of two ways:
@@ -88,9 +88,10 @@ settings.
 2. In oneshot mode, which compiles individual modules without a shared home unit
    graph, a previously compiled module is not reprocessed as described for make
    mode above.
-   When 'get_link_deps' encounters a dependency on a local module, it requests
-   its bytecode from the External Package State, who loads the interface
-   on-demand.
+   'get_link_deps' requests the bytecode of dependencies from the External
+   Package State, who loads the interface on-demand.
+   This works for modules in local directories (via @-i@ and @-hidir@) as well
+   as those exposed from a package DB.
 
    Since the EPS stores interfaces for all package dependencies in addition to
    local modules in oneshot mode, it has a substantial memory footprint.
@@ -108,6 +109,18 @@ settings.
    Like the bytecode 'Linkable' stored in 'LoaderState', this is preferable to
    storing the intermediate representation as rehydrated Core bindings, since
    the latter have a significantly greater memory footprint.
+
+3. In both of the above modes, whenever a module from an external package
+   (loaded from a package DB) is encountered, the workflow is the same as for
+   oneshot mode if the flag @-fpackage-db-byte-code@ is enabled; otherwise, object
+   code is loaded.
+   Interfaces for external modules are stored together with local oneshot mode
+   modules, so almost no special treatment is necessary, with the exception of:
+   - When external package modules are compiled, the @InteractiveContext@ in
+     @HscEnv@ is accessed, which is not available due to its impact on retention
+     of outdated build products.
+     This is solved by writing an empty @InteractiveContext@ to the env used for
+     compilation.
 
 Note [Size of Interface Files with Core Definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -210,7 +223,9 @@ If the 'HomeModLinkable' already contains bytecode (case 1), this is a no-op.
 Otherwise, the stub objects from the interface are compiled to objects in
 'generateByteCode' and added to the 'HomeModLinkable' as well.
 
-Case 3 is not implemented yet (!13042).
+In case 3, Core bindings are loaded from the EPS, where stubs only exist in
+their serialized form in the interface, so they must be regenerated like in case
+2.
 
 Problem 3:
 
