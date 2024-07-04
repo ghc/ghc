@@ -747,7 +747,7 @@ mkStubPaths fopts mod location = do
     src_basename = dropExtension <$> ml_hs_file location
 
 -- -----------------------------------------------------------------------------
--- findLinkable isn't related to the other stuff in here,
+-- findObjectLinkable isn't related to the other stuff in here,
 -- but there's no other obvious place for it
 
 findObjectLinkableMaybe :: Module -> ModLocation -> IO (Maybe Linkable)

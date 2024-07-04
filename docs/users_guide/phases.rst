@@ -785,6 +785,17 @@ Options affecting code generation
     will generate byte-code rather than object code.
 
 
+.. ghc-flag:: -fpackage-db-byte-code
+    :shortdesc: Use byte-code from package DB dependencies
+    :type: dynamic
+    :category: codegen
+
+    GHC normally only considers local modules to be eligible for loading
+    bytecode from interfaces for splices with :ghc-flag:`-fprefer-byte-code`.
+    When this flag is specified additionally, bytecode will be loaded from
+    interfaces for all external package dependencies that provide it.
+
+
 .. _options-linker:
 
 Options affecting linking
