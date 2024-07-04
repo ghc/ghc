@@ -1548,7 +1548,7 @@ cpeArgArity env float_decision arg
          -- See wrinkle (EA2) in Note [Eta expansion of arguments in CorePrep]
 
   | Just ao <- cp_arityOpts (cpe_config env) -- Just <=> -O1 or -O2
-  , not (has_join_in_tail_context arg)
+  , not (eta_would_wreck_join arg)
             -- See Wrinkle (EA1) of Note [Eta expansion of arguments in CorePrep]
   = case exprEtaExpandArity ao arg of
       Nothing -> 0
@@ -1557,15 +1557,15 @@ cpeArgArity env float_decision arg
   | otherwise
   = exprArity arg -- this is cheap enough for -O0
 
-has_join_in_tail_context :: CoreExpr -> Bool
+eta_would_wreck_join :: CoreExpr -> Bool
 -- ^ Identify the cases where we'd generate invalid `CpeApp`s as described in
 -- Wrinkle (EA1) of Note [Eta expansion of arguments in CorePrep]
-has_join_in_tail_context (Let bs e)            = isJoinBind bs || has_join_in_tail_context e
-has_join_in_tail_context (Lam b e) | isTyVar b = has_join_in_tail_context e
-has_join_in_tail_context (Cast e _)            = has_join_in_tail_context e
-has_join_in_tail_context (Tick _ e)            = has_join_in_tail_context e
-has_join_in_tail_context (Case _ _ _ alts)     = any has_join_in_tail_context (rhssOfAlts alts)
-has_join_in_tail_context _                     = False
+eta_would_wreck_join (Let bs e)        = isJoinBind bs || eta_would_wreck_join e
+eta_would_wreck_join (Lam _ e)         = eta_would_wreck_join e
+eta_would_wreck_join (Cast e _)        = eta_would_wreck_join e
+eta_would_wreck_join (Tick _ e)        = eta_would_wreck_join e
+eta_would_wreck_join (Case _ _ _ alts) = any eta_would_wreck_join (rhssOfAlts alts)
+eta_would_wreck_join _                 = False
 
 maybeSaturate :: Id -> CpeApp -> Int -> [CoreTickish] -> UniqSM CpeRhs
 maybeSaturate fn expr n_args unsat_ticks
@@ -1698,7 +1698,8 @@ There is a nasty Wrinkle:
 
 (EA1) When eta expanding an argument headed by a join point, we might get
       "crap", as Note [Eta expansion for join points] in GHC.Core.Opt.Arity puts
-      it.
+      it.  This crap means the output does not conform to the syntax in
+      Note [CorePrep invariants], which then makes later passes crash (#25033).
       Consider
 
         f (join j x = rhs in ...(j 1)...(j 2)...)
@@ -1713,16 +1714,23 @@ There is a nasty Wrinkle:
       In our case, (join j x = rhs in ...(j 1)...(j 2)...) is not a valid
       `CpeApp` (see Note [CorePrep invariants]) and we'd get a crash in the App
       case of `coreToStgExpr`.
-      Hence we simply check for the cases where an intervening join point
-      binding in the tail context of the argument would lead to the introduction
-      of such crap via `has_join_in_tail_context`, in which case we abstain from
-      eta expansion.
+
+      Hence, in `eta_would_wreck_join`, we check for the cases where an
+      intervening join point binding in the tail context of the argument would
+      make eta-expansion break Note [CorePrep invariants], in which
+      case we abstain from eta expansion.
 
       This scenario occurs rarely; hence it's OK to generate sub-optimal code.
       The alternative would be to fix Note [Eta expansion for join points], but
       that's quite challenging due to unfoldings of (recursive) join points.
 
-(EA2) In cpeArgArity, if float_decision = FloatNone) the `arg` will look like
+      `eta_would_wreck_join` sees if there are any join points, like `j` above
+      that would be messed up.   It must look inside lambdas (#25033); consider
+             f (\x. join j y = ... in ...(j 1)...(j 3)...)
+      We can't eta expand that `\x` any more than we could if the join was at
+      the top.  (And when there's a lambda, we don't have a thunk anyway.)
+
+(EA2) In cpeArgArity, if float_decision=FloatNone the `arg` will look like
            let <binds> in rhs
       where <binds> is non-empty and can't be floated out of a lazy context (see
       `wantFloatLocal`). So we can't eta-expand it anyway, so we can return 0

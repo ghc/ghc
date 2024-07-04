@@ -516,3 +516,4 @@ test('T24229b', [ grep_errmsg(r'wfoo') ], compile, ['-O2 -ddump-simpl -dno-typea
 test('T24370', normal, compile, ['-O'])
 test('T24551', normal, compile, ['-O -dcore-lint'])
 test('T24726', normal, compile, ['-dcore-lint -dsuppress-uniques'])
+test('T25033', normal, compile, ['-O'])
