@@ -117,6 +117,7 @@ import System.Directory
 import GHC.Driver.Env.KnotVars
 import {-# source #-} GHC.Driver.Main (loadIfaceByteCode)
 import GHC.Iface.Errors.Types
+import GHC.Runtime.Context (emptyInteractiveContext)
 import Data.Function ((&))
 
 {-
@@ -533,12 +534,22 @@ loadInterface doc_str mod from
               --
               -- See Note [Interface Files with Core Definitions]
               add_bytecode old
-                | Just action <- loadIfaceByteCode purged_hsc_env iface loc (mkNameEnv new_eps_decls)
+                | Just action <- loadIfaceByteCode hydration_env iface loc (mkNameEnv new_eps_decls)
                 = extendModuleEnv old mod action
                 -- Don't add an entry if the iface doesn't have 'extra_decls'
                 -- so 'get_link_deps' knows that it should load object code.
                 | otherwise
                 = old
+                where
+                  -- @dontLeakTheHUG@ purges @InteractiveContext@, but when
+                  -- bytecode is compiled in @hscInteractive@ with CoreLint
+                  -- enabled, the context is used to find variables defined in
+                  -- GHCi to prevent false positives.
+                  -- Since code loaded from interface Core bindings cannot
+                  -- depend on variables in the interactive session, we provide
+                  -- an empty context here.
+                  hydration_env =
+                    purged_hsc_env {hsc_IC = emptyInteractiveContext (hsc_dflags purged_hsc_env)}
 
         ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
           updateEps_  $ \ eps ->
