@@ -69,7 +69,7 @@ linker_unload_native:
 	$(RM) Test.o Test.hi Test.a Test.so Test2.so
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Test.hs -v0 -dynamic -fPIC -o Test.a
 	# only libraries without DT_NEEDED are supported
-	"$(CC)" -shared -Wl,-Bsymbolic -nostdlib -o Test.so -Wl,-nostdlib \
+	"$(TEST_CC)" -shared -Wl,-Bsymbolic -nostdlib -o Test.so -Wl,-nostdlib \
 		-Wl,--whole-archive Test.a
 	cp Test.so Test2.so
 

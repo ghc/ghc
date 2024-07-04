@@ -221,7 +221,12 @@ test('exec_signals',
      [when(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
       cmd_prefix('./exec_signals_prepare'),
-      req_process],
+      req_process,
+      req_c], # C compiler is used to build exec_signals_prepare/child programs.
+              # With the JS backend, it fails because these programs are
+              # compiled with Emscipten and they can't be directly executed
+              # (permission denied error); they must be loaded in nodejs (or
+              # compiled with the host CC compiler).
      compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
