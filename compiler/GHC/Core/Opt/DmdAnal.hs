@@ -297,6 +297,9 @@ dmdAnalBind
                                --   where the binding is in scope
   -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBind top_lvl env dmd bind anal_body = case bind of
+  NonRec var rhs
+    | isTyVar var
+    -> dmdAnalBindLetDown top_lvl env dmd bind anal_body
   NonRec id rhs
     | useLetUp top_lvl id
     -> dmdAnalBindLetUp   top_lvl env_rhs     id rhs anal_body
@@ -369,6 +372,9 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec 
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> WithDmdType a) -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
+  NonRec tv rhs
+    | isTyVar tv
+    -> do_rest env emptyVarEnv [(tv, rhs)] (uncurry NonRec . only)
   NonRec id rhs
     | (env', weak_fv, id1, rhs1) <-
         dmdAnalRhsSig top_lvl NonRecursive env dmd id rhs
@@ -379,13 +385,16 @@ dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
   where
     do_rest env' weak_fv pairs1 build_bind = WithDmdType final_ty (R (build_bind pairs2) body')
       where
-        WithDmdType body_ty body'        = anal_body env'
+        WithDmdType body_ty body'       = anal_body env'
         -- see Note [Lazy and unleashable free variables]
         dmd_ty                          = addWeakFVs body_ty weak_fv
-        WithDmdType final_ty id_dmds    = findBndrsDmds env' dmd_ty (strictMap fst pairs1)
+        WithDmdType final_ty maybe_dmds = findBndrsDmds_maybe env' dmd_ty (strictMap fst pairs1)
         -- Important to force this as build_bind might not force it.
-        !pairs2                         = strictZipWith do_one pairs1 id_dmds
-        do_one (id', rhs') dmd          = ((,) $! setBindIdDemandInfo top_lvl id' dmd) $! rhs'
+        !pairs2                         = strictZipWith do_one pairs1 maybe_dmds
+        do_one (bndr', rhs') maybe_dmd
+          | isTyVar bndr'         = (bndr', rhs')
+          | Just dmd <- maybe_dmd = ((,) $! setBindIdDemandInfo top_lvl bndr' dmd) $! rhs'
+          | otherwise             = pprPanic "dmdAnalBindLetDown:do_one" (ppr bndr' $$ ppr rhs' $$ ppr maybe_dmd)
         -- If the actual demand is better than the vanilla call
         -- demand, you might think that we might do better to re-analyse
         -- the RHS with the stronger demand.
@@ -2539,6 +2548,18 @@ findBndrsDmds env dmd_ty bndrs
                         WithDmdType dmd_ty2 dmd  = findBndrDmd env dmd_ty1 b
                     in WithDmdType dmd_ty2  (dmd : dmds)
       | otherwise = go dmd_ty bs
+
+findBndrsDmds_maybe :: AnalEnv -> DmdType -> [Var] -> WithDmdType [Maybe Demand]
+findBndrsDmds_maybe env dmd_ty bndrs
+  = go dmd_ty bndrs
+  where
+    go dmd_ty []  = WithDmdType dmd_ty []
+    go dmd_ty (b:bs)
+      | isId b    = let WithDmdType dmd_ty1 dmds = go dmd_ty bs
+                        WithDmdType dmd_ty2 dmd  = findBndrDmd env dmd_ty1 b
+                    in WithDmdType dmd_ty2  (Just dmd : dmds)
+      | otherwise = let WithDmdType dmd_ty1 dmds = go dmd_ty bs
+                    in WithDmdType dmd_ty1 (Nothing : dmds)
 
 findBndrDmd :: AnalEnv -> DmdType -> Id -> WithDmdType Demand
 -- See Note [Trimming a demand to a type]

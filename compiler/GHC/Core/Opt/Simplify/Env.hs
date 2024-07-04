@@ -21,15 +21,15 @@ module GHC.Core.Opt.Simplify.Env (
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
-        setInScopeSet, modifyInScope, addNewInScopeIds,
+        setInScopeSet, modifyInScope, addNewInScopeBndrs,
         getSimplRules, enterRecGroupRHSs,
         reSimplifying,
 
         -- * Substitution results
         SimplSR(..), mkContEx, substId, lookupRecBndr,
 
-        -- * Simplifying 'Id' binders
-        simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
+        -- * Simplifying binders
+        simplTopBndrs, simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
         simplBinder, simplBinders,
         substTy, substTyVar, getSubst,
         substCo, substCoVar,
@@ -588,20 +588,39 @@ setInScopeFromE rhs_env here_env = rhs_env { seInScope = seInScope here_env }
 setInScopeFromF :: SimplEnv -> SimplFloats -> SimplEnv
 setInScopeFromF env floats = env { seInScope = sfInScope floats }
 
-addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
-        -- The new Ids are guaranteed to be freshly allocated
-addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) vs
--- See Note [Bangs in the Simplifier]
-  = let !in_scope1 = in_scope `extendInScopeSetList` vs
-        !id_subst1 = id_subst `delVarEnvList` vs
-    in
-    env { seInScope = in_scope1,
-          seIdSubst = id_subst1 }
-        -- Why delete?  Consider
-        --      let x = a*b in (x, \x -> x+3)
-        -- We add [x |-> a*b] to the substitution, but we must
-        -- _delete_ it from the substitution when going inside
-        -- the (\x -> ...)!
+addNewInScopeBndrs :: SimplEnv -> [CoreBndr] -> SimplEnv
+        -- The new binders are guaranteed to be freshly allocated
+addNewInScopeBndrs env bndrs
+  = go env bndrs
+  where
+    go env [] = env
+    go env@(SimplEnv { seInScope = in_scope, seTvSubst = tv_subst }) (tv:bndrs)
+      | isTyVar tv
+      = let !in_scope1 = in_scope `extendInScopeSet` tv
+            !tv_subst1 = tv_subst `delVarEnv` tv
+            env1       = env { seInScope = in_scope1,
+                               seTvSubst = tv_subst1 }
+        in go env1 bndrs
+    go env@(SimplEnv { seInScope = in_scope, seCvSubst = cv_subst }) (cv:bndrs)
+      | isCoVar cv
+      = let !in_scope1 = in_scope `extendInScopeSet` cv
+            !cv_subst1 = cv_subst `delVarEnv` cv
+            env1       = env { seInScope = in_scope1,
+                               seCvSubst = cv_subst1 }
+        in go env1 bndrs
+    go env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) (v:bndrs)
+      = -- See Note [Bangs in the Simplifier]
+        let !in_scope1 = in_scope `extendInScopeSet` v
+            !id_subst1 = id_subst `delVarEnv` v
+            -- Why delete?  Consider
+            --      let x = a*b in (x, \x -> x+3)
+            -- We add [x |-> a*b] to the substitution, but we must
+            -- _delete_ it from the substitution when going inside
+            -- the (\x -> ...)!
+            env1       = env { seInScope = in_scope1,
+                               seIdSubst = id_subst1 }
+        in go env1 bndrs
+
 
 modifyInScope :: SimplEnv -> CoreBndr -> SimplEnv
 -- The variable should already be in scope, but
@@ -776,6 +795,7 @@ unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
   where
     flag (Rec {})                = FltLifted
     flag (NonRec bndr rhs)
+      | isTyVar bndr             = FltLifted
       | not (isStrictId bndr)    = FltLifted
       | exprIsTickedString rhs   = FltLifted
           -- String literals can be floated freely.
@@ -964,6 +984,12 @@ refineFromInScope in_scope v
 lookupRecBndr :: SimplEnv -> InId -> OutId
 -- Look up an Id which has been put into the envt by simplRecBndrs,
 -- but where we have not yet done its RHS
+-- lookupRecBndr (SimplEnv { seInScope = in_scope, seTvSubst = tvs }) v
+--   | isTyVar v
+--   = case lookupVarEnv tvs v of
+--         Just (DoneId v) -> v
+--         Just _ -> pprPanic "lookupRecBndr" (ppr v)
+--         Nothing -> refineFromInScope in_scope v
 lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of
         Just (DoneId v) -> v
@@ -1030,30 +1056,63 @@ simplBinder !env bndr
 ---------------
 simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder
-simplNonRecBndr !env id
+simplNonRecBndr !env bndr
   -- See Note [Bangs in the Simplifier]
-  = do  { let (!env1, id1) = substIdBndr env id
-        ; seqId id1 `seq` return (env1, id1) }
+  = do  { let (!env1, bndr1) = substBndr env bndr
+        ; seqVar bndr1 `seq` return (env1, bndr1) }
 
 ---------------
 simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
-simplRecBndrs env@(SimplEnv {}) ids
+simplRecBndrs env@(SimplEnv {}) bndrs
   -- See Note [Bangs in the Simplifier]
-  = assert (all (not . isJoinId) ids) $
-    do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
-        ; seqIds ids1 `seq` return env1 }
+  = assert (all (not . isJoinId) bndrs) $
+    do  { let (!env1, bndrs1) = mapAccumL substIdBndr env bndrs
+        ; seqVars bndrs1 `seq` return env1 }
 
 ---------------
-substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+simplTopBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
+simplTopBndrs env@(SimplEnv {}) bndrs
+  -- See Note [Bangs in the Simplifier]
+  = assert (all (not . isJoinId) bndrs) $
+    do  { let (!env1, bndrs1) = mapAccumL substBndr env bndrs
+        ; seqVars bndrs1 `seq` return env1 }
+
+---------------
+substBndr :: HasDebugCallStack => SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+substBndr env bndr
+  | isTyVar bndr = substTyVarBndr env bndr
+  | otherwise    = substIdBndr env bndr
+
+---------------
+substIdBndr :: HasDebugCallStack => SimplEnv -> InBndr -> (SimplEnv, OutBndr)
 -- Might be a coercion variable
 substIdBndr env bndr
   | isCoVar bndr  = substCoVarBndr env bndr
   | otherwise     = substNonCoVarIdBndr env bndr
 
 ---------------
+-- substTyVarBndr :: SimplEnv
+--                -> InBndr
+--                -> (SimplEnv, OutBndr)
+-- substTyVarBndr env@(SimplEnv { seInScope = in_scope, seTvSubst = tv_subst }) old_tv
+--   = assertPpr (isTyVar old_tv) (ppr old_tv)
+--     (env { seInScope = new_in_scope,
+--            seTvSubst = new_subst }, new_tv)
+--   where
+--     !tv1    = uniqAway in_scope old_tv
+--     !tv2    = substTyVarKind env tv1
+--     !new_tv = zapFragileTyVarInfo tv2   -- Zaps unfolding and fragile OccInfo
+--     !new_subst | new_tv /= old_tv
+--                = extendVarEnv tv_subst old_tv (DoneId new_tv)
+--                | otherwise
+--                = delVarEnv tv_subst old_tv
+-- 
+--     !new_in_scope = in_scope `extendInScopeSet` new_tv
+
+---------------
 substNonCoVarIdBndr
-   :: SimplEnv
+   :: HasDebugCallStack => SimplEnv
    -> InBndr    -- Env and binder to transform
    -> (SimplEnv, OutBndr)
 -- Clone Id if necessary, substitute its type
@@ -1079,7 +1138,7 @@ substNonCoVarIdBndr env id = subst_id_bndr env id (\x -> x)
 -- This is especially important for `substNonCoVarIdBndr` which
 -- passes an identity lambda.
 {-# INLINE subst_id_bndr #-}
-subst_id_bndr :: SimplEnv
+subst_id_bndr :: HasDebugCallStack => SimplEnv
               -> InBndr    -- Env and binder to transform
               -> (OutId -> OutId)  -- Adjust the type
               -> (SimplEnv, OutBndr)
@@ -1123,6 +1182,15 @@ seqId id = seqType (idType id)  `seq`
 seqIds :: [Id] -> ()
 seqIds []       = ()
 seqIds (id:ids) = seqId id `seq` seqIds ids
+
+seqVar :: Var -> ()
+seqVar var
+  | isTyVar var = seqTyVar var
+  | otherwise   = seqId var
+
+seqVars :: [Var] -> ()
+seqVars []         = ()
+seqVars (var:vars) = seqVar var `seq` seqVars vars
 
 {-
 Note [Arity robustness]
@@ -1308,3 +1376,4 @@ substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
     subst = Subst in_scope emptyIdSubstEnv tv_env cv_env
     old_ty = idType id
     old_w  = varMult id
+
