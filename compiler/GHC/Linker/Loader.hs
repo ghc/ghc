@@ -77,11 +77,13 @@ import GHC.Utils.TmpFs
 
 import GHC.Unit.Env
 import GHC.Unit.External (ExternalPackageState (EPS, eps_iface_bytecode))
+import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.State as Packages
 
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.FastString
+import qualified GHC.Data.Maybe as Maybe
 
 import GHC.Linker.Deps
 import GHC.Linker.MacOS
@@ -94,6 +96,7 @@ import Control.Monad
 import qualified Data.Set as Set
 import Data.Char (isSpace)
 import qualified Data.Foldable as Foldable
+import Data.Functor ((<&>))
 import Data.IORef
 import Data.List (intercalate, isPrefixOf, nub, partition)
 import Data.Maybe
@@ -231,10 +234,10 @@ loadDependencies interp hsc_env pls span needed_mods = do
    -- Find what packages and linkables are required
    deps <- getLinkDeps opts interp pls span needed_mods
 
-   let this_pkgs_needed = ldNeededUnits deps
+   let this_pkgs_needed = ldAllUnits deps
 
    -- Link the packages and modules required
-   pls1 <- loadPackages' interp hsc_env (ldUnits deps) pls
+   pls1 <- loadPackages' interp hsc_env (ldNeededUnits deps) pls
    (pls2, succ) <- loadModuleLinkables interp hsc_env pls1 (ldNeededLinkables deps)
    let this_pkgs_loaded = udfmRestrictKeys all_pkgs_loaded $ getUniqDSet trans_pkgs_needed
        all_pkgs_loaded = pkgs_loaded pls2
@@ -650,14 +653,34 @@ initLinkDepsOpts hsc_env = opts
             , ldWays        = ways dflags
             , ldLoadIface
             , ldLoadByteCode
+            , ldDebugTrace = debugTraceMsg (hsc_logger hsc_env) 3
             }
     dflags = hsc_dflags hsc_env
-    ldLoadIface msg mod = initIfaceCheck (text "loader") hsc_env
-                          $ loadInterface msg mod (ImportByUser NotBoot)
+
+    ldLoadIface msg mod =
+      initIfaceCheck (text "loader") hsc_env (loadInterface msg mod (ImportByUser NotBoot)) >>= \case
+        Maybe.Failed err -> pure (Maybe.Failed err)
+        Maybe.Succeeded iface ->
+          find_location mod <&> \case
+            InstalledFound loc _ -> Maybe.Succeeded (iface, loc)
+            err -> Maybe.Failed $
+                   cannotFindInterface unit_state home_unit
+                   (targetProfile dflags) (moduleName mod) err
+
+    find_location mod =
+      liftIO $
+      findExactModule (hsc_FC hsc_env) (initFinderOpts dflags)
+      (initFinderOpts . homeUnitEnv_dflags <$> hsc_HUG hsc_env)
+      unit_state home_unit
+      (toUnitId <$> mod)
+
+    unit_state = hsc_units hsc_env
+
+    home_unit = ue_homeUnit (hsc_unit_env hsc_env)
 
     ldLoadByteCode mod = do
       EPS {eps_iface_bytecode} <- hscEPS hsc_env
-      sequence (lookupModuleEnv eps_iface_bytecode mod)
+      pure (lookupModuleEnv eps_iface_bytecode mod)
 
 
 

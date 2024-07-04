@@ -672,7 +672,11 @@ dontLeakTheHUG thing_inside = do
        in
        hsc_env {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
                ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
-               ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
+               -- TODO this is needed for bytecode compilation of package deps
+               -- only. local EPS modules work fine.
+               -- Also it appears to work when the local modules use multiple
+               -- home units?!?!?
+               -- ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
                ,  hsc_type_env_vars = case maybe_type_vars of
                                           Just vars -> vars
                                           Nothing -> panic "cleanTopEnv: hsc_type_env_vars"
