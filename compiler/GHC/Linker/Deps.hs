@@ -58,8 +58,6 @@ import System.Directory
 import GHC.Driver.Env
 import {-# SOURCE #-} GHC.Driver.Main
 import Data.Time.Clock
-import GHC.Driver.Flags
-import GHC.Driver.Session
 
 
 data LinkDepsOpts = LinkDepsOpts
@@ -211,16 +209,22 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 -> UniqDSet Module         -- accum. module dependencies
                 -> UniqDSet UnitId          -- accum. package dependencies
                 -> IO ([Module], UniqDSet UnitId) -- result
-    follow_deps []     acc_mods acc_pkgs
-        = return (uniqDSetToList acc_mods, acc_pkgs)
-    follow_deps (mod:mods) acc_mods acc_pkgs
-        = do
-          mb_iface <- ldLoadIface opts msg mod
-          iface <- case mb_iface of
-                    Failed err      -> throwProgramError opts $
-                      missingInterfaceErrorDiagnostic (ldMsgOpts opts) err
-                    Succeeded iface -> return iface
+    follow_deps [] acc_mods acc_pkgs =
+      pure (uniqDSetToList acc_mods, acc_pkgs)
+    follow_deps (mod : mods) acc_mods acc_pkgs = do
+      ldLoadIface opts msg mod >>= \case
+        Failed err
+          | ldUseByteCode opts
+          -> follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs (moduleUnitId mod))
+          | otherwise
+          -> throwProgramError opts $
+             missingInterfaceErrorDiagnostic (ldMsgOpts opts) err
+        Succeeded iface -> follow_deps_iface iface mod mods acc_mods acc_pkgs
+      where
+        msg = text "need to link module" <+> ppr mod <+>
+              text "due to use of Template Haskell"
 
+    follow_deps_iface iface mod mods acc_mods acc_pkgs = do
           when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
 
           let
@@ -228,28 +232,43 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
             deps  = mi_deps iface
 
             pkg_deps = dep_direct_pkgs deps
-            (boot_deps, mod_deps) = flip partitionWith (Set.toList (dep_direct_mods deps)) $
+            (boot_deps_home, mod_deps_home) = flip partitionWith (Set.toList (dep_direct_mods deps)) $
               \case
-                (_, GWIB m IsBoot)  -> Left m
-                (_, GWIB m NotBoot) -> Right m
+                (_, GWIB m IsBoot)  -> Left (mkModule pkg m)
+                (_, GWIB m NotBoot) -> Right (mkModule pkg m)
 
-            mod_deps' = case ue_homeUnit unit_env of
-                          Nothing -> []
-                          Just home_unit -> filter (not . (`elementOfUniqDSet` acc_mods)) (map (mkHomeModule home_unit) $ (boot_deps ++ mod_deps))
-            acc_mods'  = case ue_homeUnit unit_env of
-                          Nothing -> acc_mods
-                          Just home_unit -> addListToUniqDSet acc_mods (mod : map (mkHomeModule home_unit) mod_deps)
-            acc_pkgs'  = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
+            has_core_bindings = isJust (mi_extra_decls iface)
+
+            acc_pkgs'
+              | ldUseByteCode opts
+              = if has_core_bindings
+                then acc_pkgs
+                else addOneToUniqDSet acc_pkgs (moduleUnitId mod)
+              | otherwise
+              = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
+
+            mod_deps_pkg
+              | ldUseByteCode opts
+              = [usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface]
+              | otherwise
+              = []
+
+            mod_deps' = filterOut (`elementOfUniqDSet` acc_mods) (boot_deps_home ++ mod_deps_home ++ mod_deps_pkg)
+
+            acc_mods'
+              | ldUseByteCode opts
+              = addOneToUniqDSet acc_mods mod
+              | otherwise
+              = addListToUniqDSet acc_mods (mod : mod_deps')
 
           case ue_homeUnit unit_env of
-            Just home_unit | isHomeUnit home_unit pkg ->  follow_deps (mod_deps' ++ mods)
-                                                                      acc_mods' acc_pkgs'
-            _ ->  follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
+            _ | ldUseByteCode opts && has_core_bindings ->
+              follow_deps (mod_deps' ++ mods) acc_mods' acc_pkgs'
+            Just home_unit | isHomeUnit home_unit pkg ->
+              follow_deps (mod_deps' ++ mods) acc_mods' acc_pkgs'
+            _ ->
+              follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
         where
-           msg = text "need to link module" <+> ppr mod <+>
-                  text "due to use of Template Haskell"
-
-
 
     link_boot_mod_error :: Module -> IO a
     link_boot_mod_error mod = throwProgramError opts $
@@ -287,28 +306,27 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
                 case mb_stuff of
                   Found loc mod -> found loc mod
-                  _ -> no_obj (moduleName mod)
+                  _ | ldUseByteCode opts -> hydrate (no_obj mod) mod
+                    | otherwise -> no_obj (moduleName mod)
         where
             found loc mod
-              | prefer_bytecode = do
-                  Succeeded iface <- ldLoadIface opts (text "makima") mod
-                  case mi_extra_decls iface of
-                    Just extra_decls -> do
-                      details <- initModDetails hsc_env iface
-                      t <- getCurrentTime
-                      initWholeCoreBindings hsc_env iface details $ LM t mod [CoreBindings $ WholeCoreBindings extra_decls mod undefined]
-                    _ -> fallback_no_bytecode loc mod
+              | ldUseByteCode opts = hydrate (fallback_no_bytecode loc mod) mod
               | otherwise = fallback_no_bytecode loc mod
+
+            hydrate alt mod = do
+              Succeeded iface <- ldLoadIface opts (text "makima") mod
+              case mi_extra_decls iface of
+                Just extra_decls -> do
+                  details <- initModDetails hsc_env iface
+                  t <- getCurrentTime
+                  initWholeCoreBindings hsc_env iface details $ LM t mod [CoreBindings $ WholeCoreBindings extra_decls mod undefined]
+                _ -> alt
 
             fallback_no_bytecode loc mod = do
               mb_lnk <- findObjectLinkableMaybe mod loc
               case mb_lnk of
                 Nothing  -> no_obj mod
                 Just lnk -> adjust_linkable lnk
-
-            prefer_bytecode = gopt Opt_UseBytecodeRatherThanObjects dflags
-
-            dflags = hsc_dflags hsc_env
 
             hsc_env = ldHscEnv opts
 
