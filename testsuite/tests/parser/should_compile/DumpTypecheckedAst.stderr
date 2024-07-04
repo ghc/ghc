@@ -1975,10 +1975,10 @@
                  []))
                (GRHS
                 (EpAnn
-                 (EpaDelta (SameLine 0) [])
+                 (EpaDelta { <no location info> } (SameLine 0) [])
                  (GrhsAnn
                   (Nothing)
-                  (AddEpAnn Annlarrowtail (EpaDelta (SameLine 0) [])))
+                  (AddEpAnn Annlarrowtail (EpaDelta { <no location info> } (SameLine 0) [])))
                  (EpaComments
                   []))
                 []

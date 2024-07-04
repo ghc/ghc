@@ -459,12 +459,12 @@ type EpaLocation = EpaLocation' [LEpaComment]
 
 epaToNoCommentsLocation :: EpaLocation -> NoCommentsLocation
 epaToNoCommentsLocation (EpaSpan ss) = EpaSpan ss
-epaToNoCommentsLocation (EpaDelta dp []) = EpaDelta dp NoComments
-epaToNoCommentsLocation (EpaDelta _ _ ) = panic "epaToNoCommentsLocation"
+epaToNoCommentsLocation (EpaDelta ss dp []) = EpaDelta ss dp NoComments
+epaToNoCommentsLocation (EpaDelta _ _ _ ) = panic "epaToNoCommentsLocation"
 
 noCommentsToEpaLocation :: NoCommentsLocation -> EpaLocation
 noCommentsToEpaLocation (EpaSpan ss) = EpaSpan ss
-noCommentsToEpaLocation (EpaDelta dp NoComments) = EpaDelta dp []
+noCommentsToEpaLocation (EpaDelta ss dp NoComments) = EpaDelta ss dp []
 
 -- | Tokens embedded in the AST have an EpaLocation, unless they come from
 -- generated code (e.g. by TH).
@@ -550,8 +550,8 @@ spanAsAnchor ss  = EpaSpan ss
 realSpanAsAnchor :: RealSrcSpan -> (EpaLocation' a)
 realSpanAsAnchor s = EpaSpan (RealSrcSpan s Strict.Nothing)
 
-noSpanAnchor :: (NoAnn a) => (EpaLocation' a)
-noSpanAnchor =  EpaDelta (SameLine 0) noAnn
+noSpanAnchor :: (NoAnn a) => EpaLocation' a
+noSpanAnchor =  EpaDelta noSrcSpan (SameLine 0) noAnn
 
 -- ---------------------------------------------------------------------
 
@@ -1044,7 +1044,7 @@ instance HasLoc (EpAnn a) where
 
 instance HasLoc EpaLocation where
   getHasLoc (EpaSpan l) = l
-  getHasLoc (EpaDelta _ _) = noSrcSpan
+  getHasLoc (EpaDelta l _ _) = l
 
 getHasLocList :: HasLoc a => [a] -> SrcSpan
 getHasLocList [] = noSrcSpan
@@ -1088,7 +1088,7 @@ widenSpan s as = foldl combineSrcSpans s (go as)
     go [] = []
     go (AddEpAnn _ (EpaSpan (RealSrcSpan s mb)):rest) = RealSrcSpan s mb : go rest
     go (AddEpAnn _ (EpaSpan _):rest) = go rest
-    go (AddEpAnn _ (EpaDelta _ _):rest) = go rest
+    go (AddEpAnn _ (EpaDelta _ _ _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
@@ -1132,7 +1132,7 @@ widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
 widenAnchor (EpaSpan (RealSrcSpan s mb)) as
   = EpaSpan (RealSrcSpan (widenRealSpan s as) (liftA2 combineBufSpans mb  (bufSpanFromAnns as)))
 widenAnchor (EpaSpan us) _ = EpaSpan us
-widenAnchor a@(EpaDelta _ _) as = case (realSpanFromAnns as) of
+widenAnchor a@EpaDelta{} as = case (realSpanFromAnns as) of
                                     Strict.Nothing -> a
                                     Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
 
@@ -1140,7 +1140,7 @@ widenAnchorS :: Anchor -> SrcSpan -> Anchor
 widenAnchorS (EpaSpan (RealSrcSpan s mbe)) (RealSrcSpan r mbr)
   = EpaSpan (RealSrcSpan (combineRealSrcSpans s r) (liftA2 combineBufSpans mbe mbr))
 widenAnchorS (EpaSpan us) _ = EpaSpan us
-widenAnchorS (EpaDelta _ _) (RealSrcSpan r mb) = EpaSpan (RealSrcSpan r mb)
+widenAnchorS EpaDelta{} (RealSrcSpan r mb) = EpaSpan (RealSrcSpan r mb)
 widenAnchorS anc _ = anc
 
 widenLocatedAn :: EpAnn an -> [AddEpAnn] -> EpAnn an
@@ -1290,7 +1290,7 @@ instance Semigroup EpaLocation where
   EpaSpan s1       <> EpaSpan s2        = EpaSpan (combineSrcSpans s1 s2)
   EpaSpan s1       <> _                 = EpaSpan s1
   _                <> EpaSpan s2        = EpaSpan s2
-  EpaDelta dp1 cs1 <> EpaDelta _dp2 cs2 = EpaDelta dp1 (cs1<>cs2)
+  EpaDelta s1 dp1 cs1 <> EpaDelta s2 _dp2 cs2 = EpaDelta (combineSrcSpans s1 s2) dp1 (cs1<>cs2)
 
 instance Semigroup EpAnnComments where
   EpaComments cs1 <> EpaComments cs2 = EpaComments (cs1 ++ cs2)
@@ -1314,7 +1314,7 @@ instance Monoid (AnnSortKey tag) where
 -- ---------------------------------------------------------------------
 
 instance NoAnn EpaLocation where
-  noAnn = EpaDelta (SameLine 0) []
+  noAnn = EpaDelta noSrcSpan (SameLine 0) []
 
 instance NoAnn AnnKeywordId where
   noAnn = Annlarrowtail  {- gotta pick one -}

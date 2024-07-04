@@ -451,9 +451,9 @@ changeLetIn1 _libdir parsed
              [l2,_l1] = map wrapDecl decls
              decls' = concatMap decl2Bind [l2]
              (L _ e) = expr
-             a = EpAnn (EpaDelta (SameLine 1) []) noAnn emptyComments
+             a = EpAnn (EpaDelta noSrcSpan (SameLine 1) []) noAnn emptyComments
              expr' = L a e
-             tkIn' = EpTok (EpaDelta (DifferentLine 1 0) [])
+             tkIn' = EpTok (EpaDelta noSrcSpan (DifferentLine 1 0) [])
          in (HsLet (tkLet, tkIn')
                 (HsValBinds x (ValBinds xv decls' sigs)) expr')
 
@@ -525,7 +525,7 @@ changeLocalDecls libdir (L l p) = do
             os' = setEntryDP os (DifferentLine 2 0)
         let sortKey = captureOrderBinds decls
         let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
+        let van' = (EpAnn anc (AnnList (Just (EpaDelta noSrcSpan (DifferentLine 1 5) [])) a b c dd) cs)
         -- let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
         -- let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
@@ -551,11 +551,11 @@ changeLocalDecls2 libdir (L l p) = do
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
-        let anc = (EpaDelta (DifferentLine 1 3) [])
-        let anc2 = (EpaDelta (DifferentLine 1 5) [])
+        let anc = (EpaDelta noSrcSpan (DifferentLine 1 3) [])
+        let anc2 = (EpaDelta noSrcSpan (DifferentLine 1 5) [])
         let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
-                                 [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])] [])
+                                 [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])] [])
                         emptyComments
         let decls = [s,d]
         let sortKey = captureOrderBinds decls

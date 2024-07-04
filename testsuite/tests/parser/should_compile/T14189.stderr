@@ -217,9 +217,9 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (EpaDelta (SameLine 0) [])
+       (EpaDelta { <no location info> } (SameLine 0) [])
        (EpAnnImportDecl
-        (EpaDelta (SameLine 0) [])
+        (EpaDelta { <no location info> } (SameLine 0) [])
         (Nothing)
         (Nothing)
         (Nothing)
@@ -318,11 +318,13 @@
        ,{Name: T14189.NT}])])])
   (Nothing)
   (Just
-  (L
+   (L
     (EpAnn
-    (EpaSpan { T14189.hs:1:8-13 })
-    (AnnListItem
+     (EpaSpan { T14189.hs:1:8-13 })
+     (AnnListItem
       [])
-    (EpaComments
+     (EpaComments
       []))
     {ModuleName: T14189}))))
+
+

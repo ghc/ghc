@@ -482,7 +482,7 @@ valid_anchor _ = False
 -- If the decl list for where binds is empty, the anchor ends up
 -- invalid. In this case, use the parent one
 patch_anchor :: RealSrcSpan -> Anchor -> Anchor
-patch_anchor r (EpaDelta _ _) = EpaSpan (RealSrcSpan r Strict.Nothing)
+patch_anchor r EpaDelta{} = EpaSpan (RealSrcSpan r Strict.Nothing)
 patch_anchor r1 (EpaSpan (RealSrcSpan r0 mb)) = EpaSpan (RealSrcSpan r mb)
   where
     r = if srcSpanStartLine r0 < 0 then r1 else r0
@@ -976,7 +976,7 @@ checkTyVars pp_what equals_or_where tc tparms
     -- Return an AddEpAnn for use in widenLocatedAn. The AnnKeywordId is not used.
     for_widening :: HsBndrVis GhcPs -> AddEpAnn
     for_widening (HsBndrInvisible (EpTok loc)) = AddEpAnn AnnAnyclass loc
-    for_widening  _                            = AddEpAnn AnnAnyclass (EpaDelta (SameLine 0) [])
+    for_widening  _                            = AddEpAnn AnnAnyclass noAnn
 
 
 whereDots, equalsDots :: SDoc
@@ -3277,7 +3277,7 @@ epTokenWidenR :: EpToken tok -> SrcSpan -> EpToken tok'
 epTokenWidenR NoEpTok _ = NoEpTok
 epTokenWidenR (EpTok l) (UnhelpfulSpan _) = EpTok l
 epTokenWidenR (EpTok (EpaSpan s1)) s2 = EpTok (EpaSpan (combineSrcSpans s1 s2))
-epTokenWidenR (EpTok (EpaDelta _ _)) _ =
+epTokenWidenR (EpTok EpaDelta{}) _ =
   -- Never happens because the parser does not produce EpaDelta.
   panic "epTokenWidenR: EpaDelta"
 

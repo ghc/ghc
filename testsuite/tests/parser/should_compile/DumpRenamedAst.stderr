@@ -74,10 +74,10 @@
                     []))
                   (GRHS
                    (EpAnn
-                    (EpaDelta (SameLine 0) [])
+                    (EpaDelta { <no location info> } (SameLine 0) [])
                     (GrhsAnn
                      (Nothing)
-                     (AddEpAnn Annlarrowtail (EpaDelta (SameLine 0) [])))
+                     (AddEpAnn Annlarrowtail (EpaDelta { <no location info> } (SameLine 0) [])))
                     (EpaComments
                      []))
                    []
@@ -276,8 +276,8 @@
                  (HsParTy
                   (AnnParen
                    AnnParens
-                   (EpaDelta (SameLine 0) [])
-                   (EpaDelta (SameLine 0) []))
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (EpaDelta { <no location info> } (SameLine 0) []))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:13:11-16 })
@@ -370,8 +370,8 @@
                  (HsParTy
                   (AnnParen
                    AnnParens
-                   (EpaDelta (SameLine 0) [])
-                   (EpaDelta (SameLine 0) []))
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (EpaDelta { <no location info> } (SameLine 0) []))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:13:27-35 })
@@ -796,8 +796,8 @@
              (HsParTy
               (AnnParen
                AnnParens
-               (EpaDelta (SameLine 0) [])
-               (EpaDelta (SameLine 0) []))
+               (EpaDelta { <no location info> } (SameLine 0) [])
+               (EpaDelta { <no location info> } (SameLine 0) []))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:19:23-36 })
@@ -899,8 +899,8 @@
                (HsParTy
                 (AnnParen
                  AnnParens
-                 (EpaDelta (SameLine 0) [])
-                 (EpaDelta (SameLine 0) []))
+                 (EpaDelta { <no location info> } (SameLine 0) [])
+                 (EpaDelta { <no location info> } (SameLine 0) []))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:19:43-51 })
@@ -1012,8 +1012,8 @@
                   (HsParTy
                    (AnnParen
                     AnnParens
-                    (EpaDelta (SameLine 0) [])
-                    (EpaDelta (SameLine 0) []))
+                    (EpaDelta { <no location info> } (SameLine 0) [])
+                    (EpaDelta { <no location info> } (SameLine 0) []))
                    (L
                     (EpAnn
                      (EpaSpan { DumpRenamedAst.hs:20:11-33 })
@@ -1025,10 +1025,10 @@
                      (NoExtField)
                      (HsForAllInvis
                       (EpAnn
-                       (EpaDelta (SameLine 0) [])
+                       (EpaDelta { <no location info> } (SameLine 0) [])
                        ((,)
-                        (AddEpAnn Annlarrowtail (EpaDelta (SameLine 0) []))
-                        (AddEpAnn Annlarrowtail (EpaDelta (SameLine 0) [])))
+                        (AddEpAnn Annlarrowtail (EpaDelta { <no location info> } (SameLine 0) []))
+                        (AddEpAnn Annlarrowtail (EpaDelta { <no location info> } (SameLine 0) [])))
                        (EpaComments
                         []))
                       [(L
@@ -1350,8 +1350,8 @@
                  (HsParTy
                   (AnnParen
                    AnnParens
-                   (EpaDelta (SameLine 0) [])
-                   (EpaDelta (SameLine 0) []))
+                   (EpaDelta { <no location info> } (SameLine 0) [])
+                   (EpaDelta { <no location info> } (SameLine 0) []))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:22:26-28 })
@@ -1822,8 +1822,8 @@
                (HsParTy
                 (AnnParen
                  AnnParens
-                 (EpaDelta (SameLine 0) [])
-                 (EpaDelta (SameLine 0) []))
+                 (EpaDelta { <no location info> } (SameLine 0) [])
+                 (EpaDelta { <no location info> } (SameLine 0) []))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:24:18-26 })
@@ -2256,9 +2256,9 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (EpaDelta (SameLine 0) [])
+       (EpaDelta { <no location info> } (SameLine 0) [])
        (EpAnnImportDecl
-        (EpaDelta (SameLine 0) [])
+        (EpaDelta { <no location info> } (SameLine 0) [])
         (Nothing)
         (Nothing)
         (Nothing)

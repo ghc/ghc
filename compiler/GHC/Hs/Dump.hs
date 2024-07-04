@@ -147,9 +147,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             epaAnchor :: EpaLocation -> SDoc
             epaAnchor (EpaSpan s) = parens $ text "EpaSpan" <+> srcSpan s
-            epaAnchor (EpaDelta d cs) = case ba of
-              NoBlankEpAnnotations -> parens $ text "EpaDelta" <+> deltaPos d <+> showAstData' cs
-              BlankEpAnnotations -> parens $ text "EpaDelta" <+> deltaPos d <+> text "blanked"
+            epaAnchor (EpaDelta s d cs) = case ba of
+              NoBlankEpAnnotations -> parens $ text "EpaDelta" <+> srcSpan s <+> deltaPos d <+> showAstData' cs
+              BlankEpAnnotations -> parens $ text "EpaDelta" <+> srcSpan s <+> deltaPos d <+> text "blanked"
 
             deltaPos :: DeltaPos -> SDoc
             deltaPos (SameLine c) = parens $ text "SameLine" <+> ppr c
