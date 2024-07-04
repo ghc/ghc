@@ -61,6 +61,9 @@ Compiler
 - PPC NCG: Fix sign hints in C calls. This bug caused segfaults when using FFI under some
   circumstances. (#23034)
 
+- Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
+  on certain programs. (#24941)
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 

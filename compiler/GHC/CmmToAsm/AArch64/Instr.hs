@@ -177,6 +177,8 @@ regUsageOfInstr platform instr = case instr of
         interesting _        (RegReal (RealRegSingle (-1))) = False
         interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
 
+-- Note [AArch64 Register assignments]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Save caller save registers
 -- This is x0-x18
 --
@@ -199,6 +201,8 @@ regUsageOfInstr platform instr = case instr of
 -- '---------------------------------------------------------------------------------------------------------------------------------------------------------------'
 -- IR: Indirect result location register, IP: Intra-procedure register, PL: Platform register, FP: Frame pointer, LR: Link register, SP: Stack pointer
 -- BR: Base, SL: SpLim
+--
+-- TODO: The zero register is currently mapped to -1 but should get it's own separate number.
 callerSavedRegisters :: [Reg]
 callerSavedRegisters
     = map regSingle [0..18]
