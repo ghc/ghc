@@ -23,8 +23,8 @@ T4059:
 	./T4059
 
 exec_signals-prep:
-	$(CC) -o exec_signals_child exec_signals_child.c
-	$(CC) -o exec_signals_prepare exec_signals_prepare.c
+	$(TEST_CC) -o exec_signals_child exec_signals_child.c
+	$(TEST_CC) -o exec_signals_prepare exec_signals_prepare.c
 
 .PHONY: T4850
 T4850:
