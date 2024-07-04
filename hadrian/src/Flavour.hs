@@ -68,6 +68,7 @@ flavourTransformers = M.fromList
     , "hi_core"          =: enableHiCore
     , "late_ccs"         =: enableLateCCS
     , "boot_nonmoving_gc" =: enableBootNonmovingGc
+    , "dump_stg"         =: enableDumpStg
     ]
   where (=:) = (,)
 
@@ -177,6 +178,11 @@ tickyArgs = mconcat
   , arg "-ticky-allocd"
   , arg "-ticky-dyn-thunk"
   ]
+
+enableDumpStg :: Flavour -> Flavour
+enableDumpStg =
+  addArgs $ stage1 ?
+    builder (Ghc CompileHs) ? mconcat [ arg "-ddump-to-file", arg "-ddump-stg-final" ]
 
 -- | Enable Core, STG, and (not C--) linting in all compilations with the stage1 compiler.
 enableLinting :: Flavour -> Flavour

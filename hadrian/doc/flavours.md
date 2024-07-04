@@ -320,6 +320,10 @@ The supported transformers are listed below:
         <td><code>late_ccs</code></td>
         <td>Enable <code>-fprof-late</code> in profiled libraries.</td>
     </tr>
+    <tr>
+        <td><code>dump_stg</code></td>
+        <td>Dump STG of all modules compiled by a stage1 compiler to a file</td>
+    </tr>
 </table>
 
 ### Static
