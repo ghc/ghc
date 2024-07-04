@@ -86,6 +86,7 @@ import Control.Monad    ( when )
 import Data.List        ( sortBy )
 import GHC.Types.Name.Env
 import Data.Graph
+import GHC.Types.Var (tyVarOccInfo)
 
 {- *********************************************************************
 *                                                                      *
@@ -98,20 +99,26 @@ data BindContext
   = BC_Let                 -- A regular let-binding
       TopLevelFlag RecFlag
 
+  | BC_Type
+      TopLevelFlag
+
   | BC_Join                -- A join point with continuation k
       RecFlag              -- See Note [Rules and unfolding for join points]
       SimplCont            -- in GHC.Core.Opt.Simplify
 
 bindContextLevel :: BindContext -> TopLevelFlag
 bindContextLevel (BC_Let top_lvl _) = top_lvl
+bindContextLevel (BC_Type top_lvl)  = top_lvl
 bindContextLevel (BC_Join {})       = NotTopLevel
 
 bindContextRec :: BindContext -> RecFlag
 bindContextRec (BC_Let _ rec_flag)  = rec_flag
+bindContextRec (BC_Type _) = NonRecursive
 bindContextRec (BC_Join rec_flag _) = rec_flag
 
 isJoinBC :: BindContext -> Bool
 isJoinBC (BC_Let {})  = False
+isJoinBC (BC_Type {}) = False
 isJoinBC (BC_Join {}) = True
 
 
@@ -1041,7 +1048,7 @@ interestingArg env e = go env 0 e
                                    ValueArg -> ValueArg
                                    _        -> NonTrivArg
                                where
-                                 env' = env `addNewInScopeIds` bindersOf b
+                                 env' = env `addNewInScopeBndrs` bindersOf b
 
     go_var n v
        | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
@@ -1462,6 +1469,7 @@ preInlineUnconditionally
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
+  | isTyVar bndr                             = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
@@ -1597,6 +1605,7 @@ postInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 postInlineUnconditionally env bind_cxt old_bndr bndr rhs
+  | BC_Type {} <- bind_cxt      = False
   | not active                  = False
   | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
                                         -- because it might be referred to "earlier"
@@ -2220,16 +2229,19 @@ abstractFloats uf_opts top_lvl main_tvs floats body
 
     -- See wrinkle (AB5) in Note [Which type variables to abstract over]
     -- for why we need to re-do dependency analysis
-    to_sccs :: OutBind -> [SCC (Id, CoreExpr, VarSet)]
-    to_sccs (NonRec id e) = [AcyclicSCC (id, e, emptyVarSet)] -- emptyVarSet: abstract doesn't need it
+    to_sccs :: OutBind -> [SCC (Var, CoreExpr, VarSet)]
+    to_sccs (NonRec v e) = [AcyclicSCC (v, e, emptyVarSet)] -- emptyVarSet: abstract doesn't need it
     to_sccs (Rec prs)     = sccs
       where
-        (ids,rhss) = unzip prs
-        sccs = depAnal (\(id,_rhs,_fvs) -> [getName id])
-                       (\(_id,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
-                       (zip3 ids rhss (map exprFreeVars rhss))
+        (vars,rhss) = unzip prs
+        sccs = depAnal (\(v,_rhs,_fvs) -> [getName v])
+                       (\(_v,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
+                       (zip3 vars rhss (map exprFreeVars rhss))
 
     abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet) -> SimplM (GHC.Core.Subst.Subst, OutBind)
+    abstract subst (AcyclicSCC (tv, rhs, _empty_var_set))
+      | isTyVar tv
+      = return (subst, NonRec tv rhs)
     abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
       = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'

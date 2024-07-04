@@ -88,12 +88,16 @@ wwBind  :: WwOpts
                                 -- the caller will convert to Expr/Binding,
                                 -- as appropriate.
 
-wwBind ww_opts (NonRec binder rhs) = do
-    new_rhs   <- wwExpr ww_opts rhs
-    new_pairs <- tryWW ww_opts NonRecursive binder new_rhs
-    return [NonRec b e | (b,e) <- new_pairs]
-      -- Generated bindings must be non-recursive
-      -- because the original binding was.
+wwBind ww_opts (NonRec binder rhs)
+  | isTyVar binder
+  = return [NonRec binder rhs]
+
+  | otherwise
+  = do { new_rhs   <- wwExpr ww_opts rhs
+       ; new_pairs <- tryWW ww_opts NonRecursive binder new_rhs
+       ; return [NonRec b e | (b,e) <- new_pairs] }
+           -- Generated bindings must be non-recursive
+           -- because the original binding was.
 
 wwBind ww_opts (Rec pairs)
   = return . Rec <$> concatMapM do_one pairs
