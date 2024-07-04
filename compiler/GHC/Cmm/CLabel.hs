@@ -1583,6 +1583,7 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
    CmmLabel _ _ fs CmmRetInfo  -> maybe_underscore $ ftext fs <> text "_info"
    CmmLabel _ _ fs CmmRet      -> maybe_underscore $ ftext fs <> text "_ret"
    CmmLabel _ _ fs CmmClosure  -> maybe_underscore $ ftext fs <> text "_closure"
+{-# INLINABLE pprCLabelStyle #-} -- Workaround a bug which prevented pprCLabelStyle from specialising (see #25060).
 {-# SPECIALIZE pprCLabelStyle :: Platform -> LabelStyle -> CLabel -> SDoc #-}
 {-# SPECIALIZE pprCLabelStyle :: Platform -> LabelStyle -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 

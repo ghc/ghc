@@ -713,6 +713,7 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
    handlePuns :: Bool -> Maybe FastString -> SDoc -> SDoc
    handlePuns True (Just pun) _ = ftext pun
    handlePuns _    _          r = r
+{-# INLINABLE pprName #-} -- Workaround a bug which prevented pprName from specialising (see #25060).
 {-# SPECIALISE pprName :: Name -> SDoc #-}
 {-# SPECIALISE pprName :: Name -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
