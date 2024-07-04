@@ -317,6 +317,7 @@ pprReg w r = case r of
          | w == W64 = text "sp"
          | w == W32 = text "wsp"
 
+    -- See Note [AArch64 Register assignments]
     ppr_reg_no w i
          | i < 0, w == W32 = text "wzr"
          | i < 0, w == W64 = text "xzr"

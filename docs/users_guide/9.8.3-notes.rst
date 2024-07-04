@@ -5,3 +5,15 @@ Version 9.8.3
 
 The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
 11, 12, 13, 14 or 15.
+
+Significant Changes
+~~~~~~~~~~~~~~~~~~~~
+
+Issues fixed in this release include:
+
+Compiler
+--------
+
+- Fixed a bug that caused GHC to panic when using the AArch64 ncg and :ghc-flag:`-fregs-graph`
+  on certain programs (:ghc-ticket:`24941`).
+
