@@ -1,10 +1,12 @@
-{-# LANGUAGE UnboxedTuples, PatternSynonyms #-}
+{-# LANGUAGE UnboxedTuples, PatternSynonyms, DerivingVia #-}
 module GHC.Types.Unique.DSM where
 
+import GHC.Exts (oneShot)
 import GHC.Prelude
 import GHC.Word
 import Control.Monad.Fix
 import GHC.Types.Unique
+import qualified GHC.Utils.Monad.State.Strict as Strict
 import qualified GHC.Types.Unique.Supply as USM
 
 -- todo: Do I need to use the one-shot state monad trick? Probably yes.
@@ -24,28 +26,18 @@ pattern DUniqResult x y = (# x, y #)
 
 -- | A monad which just gives the ability to obtain 'Unique's deterministically.
 -- There's no splitting.
-newtype UniqDSM result = UDSM { unUDSM :: DUniqSupply -> DUniqResult result }
-  deriving Functor
-
-instance Monad UniqDSM where
-  (>>=) (UDSM f) cont = UDSM $ \us0 -> case f us0 of
-    DUniqResult result us1 -> unUDSM (cont result) us1
-  (>>)  = (*>)
-  {-# INLINE (>>=) #-}
-  {-# INLINE (>>) #-}
-
-instance Applicative UniqDSM where
-  pure result = UDSM (DUniqResult result)
-  (UDSM f) <*> (UDSM x) = UDSM $ \us0 -> case f us0 of
-    DUniqResult ff us1 -> case x us1 of
-      DUniqResult xx us2 -> DUniqResult (ff xx) us2
-  (*>) (UDSM expr) (UDSM cont) = UDSM $ \us0 -> case expr us0 of
-    DUniqResult _ us1 -> cont us1
-  {-# INLINE pure #-}
-  {-# INLINE (*>) #-}
+newtype UniqDSM result = UDSM' { unUDSM :: DUniqSupply -> DUniqResult result }
+  deriving (Functor, Applicative, Monad) via (Strict.State DUniqSupply)
 
 instance MonadFix UniqDSM where
   mfix m = UDSM (\us0 -> let (r,us1) = runUniqueDSM us0 (m r) in DUniqResult r us1)
+
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+pattern UDSM :: (DUniqSupply -> DUniqResult a) -> UniqDSM a
+pattern UDSM m <- UDSM' m
+  where
+    UDSM m = UDSM' (oneShot $ \s -> m s)
+{-# COMPLETE UDSM #-}
 
 getUniqueDSM :: UniqDSM Unique
 getUniqueDSM = UDSM (\(DUS us0) -> DUniqResult (mkUniqueGrimily us0) (DUS $ us0+1))
