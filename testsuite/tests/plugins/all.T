@@ -11,11 +11,15 @@ setTestOpts([
     when(opsys('mingw32'), multi_cpu_race),
 ])
 
-import itertools
 
 # Check the simple-plugin tests without
 # caring about the order of loading of interfaces
 def normalizeIfaces(unnormalized_str):
+    # Why is this not at the top-level? Probably a python bug which I didn't fancy
+    # investigating deeply.
+    # NameError: name 'itertools' is not defined. Did you forget to import 'itertools'
+    # if placed at the top-level
+    import itertools
     iface_plugin_prefix = "interfacePlugin: "
     grouped_plugins = itertools.groupby(
         unnormalized_str.split('\n'),
