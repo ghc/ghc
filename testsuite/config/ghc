@@ -236,7 +236,7 @@ def get_compiler_info():
 
         if test_src is None:
             test_src = '''
-                module Main where
+                module A where
                 main = putStrLn "Hello World!"
             '''
 
@@ -245,7 +245,7 @@ def get_compiler_info():
             src.write_text(textwrap.dedent(test_src))
             try:
                 p = subprocess.run(
-                    '{} -v0 {} -o test '.format(config.compiler, src) + ' '.join(flags),
+                    '{} -v0 {} '.format(config.compiler, src) + ' '.join(flags),
                     shell=True,
                     cwd=d,
                     stderr=None if config.verbose >= 3 else subprocess.DEVNULL
