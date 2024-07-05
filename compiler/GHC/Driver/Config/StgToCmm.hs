@@ -53,6 +53,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmExtDynRefs    = gopt Opt_ExternalDynamicRefs   dflags
   , stgToCmmDoBoundsCheck = gopt Opt_DoBoundsChecking      dflags
   , stgToCmmDoTagCheck    = gopt Opt_DoTagInferenceChecks  dflags
+  , stgToCmmObjectDeterminism = gopt Opt_ObjectDeterminism dflags
 
   -- backend flags:
 

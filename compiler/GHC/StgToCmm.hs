@@ -103,7 +103,12 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
 
                          let
                            ((a, cmm), st') = runC cfg fstate st (getCmm fcode)
-                           (rnm1, cmm_renamed) = detRenameUniques rnm0 cmm -- The yielded cmm will already be renamed.
+                           (rnm1, cmm_renamed) =
+                             -- Enable deterministic object code generation by
+                             -- renaming uniques deterministically.
+                             if stgToCmmObjectDeterminism cfg
+                                then detRenameUniques rnm0 cmm -- The yielded cmm will already be renamed.
+                                else (rnm0, cmm)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
@@ -152,7 +157,6 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (nonDetEltsUFM cg_id_infos))
 
-          -- if gopt Opt_DeterministicObjects dflags
         ; rn_mapping <- liftIO (readIORef uniqRnRef)
         ; liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
 
