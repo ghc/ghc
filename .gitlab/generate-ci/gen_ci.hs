@@ -117,6 +117,7 @@ data LinuxDistro
   | Centos7
   | Alpine312
   | Alpine318
+  | Alpine320
   | AlpineWasm
   | Rocky8
   deriving (Eq)
@@ -302,6 +303,7 @@ distroName Ubuntu2004 = "ubuntu20_04"
 distroName Centos7    = "centos7"
 distroName Alpine312  = "alpine3_12"
 distroName Alpine318  = "alpine3_18"
+distroName Alpine320  = "alpine3_20"
 distroName AlpineWasm = "alpine3_18-wasm"
 distroName Rocky8     = "rocky8"
 
@@ -452,6 +454,7 @@ alpineVariables = mconcat
 distroVariables :: LinuxDistro -> Variables
 distroVariables Alpine312 = alpineVariables
 distroVariables Alpine318 = alpineVariables
+distroVariables Alpine320 = alpineVariables
 distroVariables Centos7 = mconcat [
     "HADRIAN_ARGS" =: "--docs=no-sphinx"
   , "BROKEN_TESTS" =: "T22012" -- due to #23979
@@ -1015,7 +1018,7 @@ job_groups =
      -- Dynamically linked build, suitable for building your own static executables on alpine
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla))
      , disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine318) (splitSectionsBroken vanilla))
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine318) (splitSectionsBroken vanilla))
+     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine320) (splitSectionsBroken vanilla))
      , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
 

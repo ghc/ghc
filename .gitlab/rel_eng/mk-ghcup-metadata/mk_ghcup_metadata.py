@@ -198,7 +198,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     darwin_arm64 = mk(darwin("aarch64"))
     windows = mk(windowsArtifact)
     alpine3_12 = mk(alpine("3_12"))
-    alpine3_18 = mk(alpine("3_18"))
+    alpine3_20 = mk(alpine("3_20"))
     alpine3_18_arm64 = mk(alpine("3_18", arch='aarch64'))
     deb9 = mk(debian(9, "x86_64"))
     deb10 = mk(debian(10, "x86_64"))
@@ -234,7 +234,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
           , "Windows" : { "unknown_versioning" :  windows }
           , "Linux_Alpine" : { "( >= 3.12 && < 3.18 )": alpine3_12
-                             , ">= 3.18": alpine3_18
+                             , ">= 3.20": alpine3_20
                              , "unknown_versioning": alpine3_12 }
 
           }

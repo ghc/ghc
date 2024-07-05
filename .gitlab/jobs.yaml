@@ -897,70 +897,6 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-alpine3_18-validate": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "8 weeks",
-      "paths": [
-        "ghc-x86_64-linux-alpine3_18-validate.tar.xz",
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-alpine3_18-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_18:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": false,
-        "job": "hadrian-ghc-in-ghci"
-      }
-    ],
-    "rules": [
-      {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-validate",
-      "BROKEN_TESTS": "encoding004 T10458",
-      "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_18-validate",
-      "XZ_OPT": "-9"
-    }
-  },
   "nightly-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
@@ -1150,6 +1086,70 @@
       "HADRIAN_ARGS": "--docs=none",
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_18-wasm-unreg-cross_wasm32-wasi-release+fully_static+text_simdutf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-alpine3_20-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_20-validate.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_20-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_20:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_20-validate",
+      "BROKEN_TESTS": "encoding004 T10458",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
+      "RUNTEST_ARGS": "",
+      "TEST_ENV": "x86_64-linux-alpine3_20-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -3343,7 +3343,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-linux-alpine3_18-release+no_split_sections": {
+  "release-x86_64-linux-alpine3_20-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -3354,7 +3354,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-alpine3_18-release+no_split_sections.tar.xz",
+        "ghc-x86_64-linux-alpine3_20-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3364,14 +3364,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "x86_64-linux-alpine3_18-$CACHE_REV",
+      "key": "x86_64-linux-alpine3_20-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_18:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_20:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -3397,7 +3397,7 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_18-release+no_split_sections",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_20-release+no_split_sections",
       "BROKEN_TESTS": "encoding004 T10458",
       "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
@@ -3405,7 +3405,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-alpine3_18-release+no_split_sections",
+      "TEST_ENV": "x86_64-linux-alpine3_20-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },
