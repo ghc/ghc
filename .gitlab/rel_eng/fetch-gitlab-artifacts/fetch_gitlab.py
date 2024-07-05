@@ -34,7 +34,7 @@ def job_triple(job_name):
         'release-x86_64-linux-alpine3_12-release+fully_static': 'x86_64-alpine3_12-linux-static',
         'release-x86_64-linux-alpine3_12-release': 'x86_64-alpine3_12-linux',
         'release-x86_64-linux-alpine3_12-int_native-release+fully_static': 'x86_64-alpine3_12-linux-static-int_native',
-        'release-x86_64-linux-alpine3_18-release': 'x86_64-alpine3_18-linux',
+        'release-x86_64-linux-alpine3_20-release': 'x86_64-alpine3_20-linux',
         'release-x86_64-darwin-release': 'x86_64-apple-darwin',
         'release-i386-linux-deb9-release': 'i386-deb9-linux',
         'release-i386-linux-deb10-release': 'i386-deb10-linux',
