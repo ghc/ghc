@@ -58,6 +58,7 @@ import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Exception
+import Data.ByteString (ByteString)
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -207,6 +208,13 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- ^ Extra variable definitions which are **NOT** exposed but when
                 -- combined with mi_decls allows us to restart code generation.
                 -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
+
+        mi_stub_objs :: ![ByteString],
+                -- ^ Serialized foreign stub dynamic objects when
+                -- compiled with -fbyte-code-and-object-code, empty
+                -- and unused in other cases. This is required to make
+                -- whole core bindings properly work with foreign
+                -- stubs (see #24634).
 
         mi_globals  :: !(Maybe IfGlobalRdrEnv),
                 -- ^ Binds all the things defined at the top level in
@@ -358,6 +366,7 @@ instance Binary ModIface where
                  mi_anns      = anns,
                  mi_decls     = decls,
                  mi_extra_decls = extra_decls,
+                 mi_stub_objs = stub_objs,
                  mi_insts     = insts,
                  mi_fam_insts = fam_insts,
                  mi_rules     = rules,
@@ -402,6 +411,7 @@ instance Binary ModIface where
         lazyPut bh anns
         put_ bh decls
         put_ bh extra_decls
+        put_ bh stub_objs
         put_ bh insts
         put_ bh fam_insts
         lazyPut bh rules
@@ -434,6 +444,7 @@ instance Binary ModIface where
         anns        <- {-# SCC "bin_anns" #-} lazyGet bh
         decls       <- {-# SCC "bin_tycldecls" #-} get bh
         extra_decls <- get bh
+        stub_objs   <- get bh
         insts       <- {-# SCC "bin_insts" #-} get bh
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
@@ -458,6 +469,7 @@ instance Binary ModIface where
                  mi_warns       = warns,
                  mi_decls       = decls,
                  mi_extra_decls = extra_decls,
+                 mi_stub_objs   = stub_objs,
                  mi_globals     = Nothing,
                  mi_insts       = insts,
                  mi_fam_insts   = fam_insts,
@@ -508,6 +520,7 @@ emptyPartialModIface mod
                mi_rules       = [],
                mi_decls       = [],
                mi_extra_decls = Nothing,
+               mi_stub_objs   = [],
                mi_globals     = Nothing,
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
@@ -559,7 +572,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
          ) => NFData (ModIface_ phase) where
   rnf (ModIface{ mi_module, mi_sig_of, mi_hsc_src, mi_deps, mi_usages
                , mi_exports, mi_used_th, mi_fixities, mi_warns, mi_anns
-               , mi_decls, mi_extra_decls, mi_globals, mi_insts
+               , mi_decls, mi_extra_decls, mi_stub_objs, mi_globals, mi_insts
                , mi_fam_insts, mi_rules, mi_hpc, mi_trust, mi_trust_pkg
                , mi_complete_matches, mi_docs, mi_final_exts
                , mi_ext_fields, mi_src_hash })
@@ -575,6 +588,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_anns
     `seq` rnf mi_decls
     `seq` rnf mi_extra_decls
+    `seq` rnf mi_stub_objs
     `seq` rnf mi_globals
     `seq` rnf mi_insts
     `seq` rnf mi_fam_insts
@@ -625,6 +639,3 @@ type WhetherHasOrphans   = Bool
 
 -- | Does this module define family instances?
 type WhetherHasFamInst = Bool
-
-
-

@@ -327,6 +327,7 @@ mkIface_ hsc_env
           mi_used_th     = used_th,
           mi_decls       = decls,
           mi_extra_decls = extra_decls,
+          mi_stub_objs   = [],
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
