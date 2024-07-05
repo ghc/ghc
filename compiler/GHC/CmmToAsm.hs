@@ -234,7 +234,8 @@ finishNativeGen logger config modLoc bufh us ngs
                   else do
                      compPath <- getCurrentDirectory
                      let (dwarf_h, us') = dwarfGen compPath config modLoc us (ngs_debug ngs)
-                         (dwarf_s, _)   = dwarfGen compPath config modLoc us (ngs_debug ngs)
+                         -- `dwarfGen @SDoc` is only needed if -ddump-asm is enabled (see emitNativeCode)
+                         ~(dwarf_s, _)   = dwarfGen compPath config modLoc us (ngs_debug ngs)
                      emitNativeCode logger config bufh dwarf_h dwarf_s
                      return us'
 
