@@ -26,4 +26,4 @@ executable lint-commit-msg
     base
        >= 4.14 && < 5,
     text
-       >= 1.2  && < 2.1
+       >= 1.2  && < 2.2
