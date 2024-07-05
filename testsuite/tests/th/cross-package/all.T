@@ -13,6 +13,7 @@ def cross_test(suf):
                 'prep.bash',
                 'run.bash',
             ]),
+            use_specs({'stdout': 'CrossPackage.stdout'}),
         ],
         makefile_test,
         [name],
@@ -21,3 +22,4 @@ def cross_test(suf):
 cross_test('Archive')
 cross_test('EmptyArchive')
 cross_test('NoArchive')
+cross_test('ArchiveObjCode')

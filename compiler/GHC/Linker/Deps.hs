@@ -47,7 +47,6 @@ import GHC.Utils.Misc
 import GHC.Unit.Home
 import GHC.Data.Maybe
 
-import Control.Monad
 import Control.Applicative
 
 import qualified Data.Set as Set
@@ -117,44 +116,55 @@ get_link_deps
 get_link_deps opts pls maybe_normal_osuf span mods = do
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
         -- (omitting modules from the interactive package, which is already linked)
-      (mods_s, pkgs_s) <-
+      deps <-
           -- Why two code paths here? There is a significant amount of repeated work
           -- performed calculating transitive dependencies
           -- if --make uses the oneShot code path (see MultiLayerModulesTH_* tests)
           if ldOneShotMode opts
-            then follow_deps (filterOut isInteractiveModule mods)
-                              emptyUniqDSet emptyUniqDSet;
-            else do
-              (pkgs, mmods) <- unzip <$> mapM get_mod_info all_home_mods
-              return (catMaybes mmods, unionManyUniqDSets (init_pkg_set : pkgs))
+          then oneshot_deps opts (filterOut isInteractiveModule mods)
+          else make_deps
 
-      let
-        -- 2.  Exclude ones already linked
-        --      Main reason: avoid findModule calls in get_linkable
-            (mods_needed, links_got) = partitionWith split_mods mods_s
-            pkgs_needed = eltsUDFM $ getUniqDSet pkgs_s `minusUDFM` pkgs_loaded pls
-
-            split_mods mod =
-                let is_linked = lookupModuleEnv (objs_loaded pls) mod
-                                <|> lookupModuleEnv (bcos_loaded pls) mod
-                in case is_linked of
-                     Just linkable -> Right linkable
-                     Nothing -> Left mod
+            -- TODO this used to avoid some lookups, maybe we can move that to
+            -- oneshot_deps now
+            -- (mods_needed, links_got) = partitionWith split_mods mods_s
+            --
+            -- split_mods mod =
+            --     let is_linked = lookupModuleEnv (objs_loaded pls) mod
+            --                     <|> lookupModuleEnv (bcos_loaded pls) mod
+            --     in case is_linked of
+            --          Just linkable -> Right linkable
+            --          Nothing -> Left mod
 
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
-      lnks_needed <- mapM get_linkable mods_needed
+      (lnks, pkgs_s) <- partitionWithM dep_linkable deps
+      let
+        lnks_needed = concat lnks
+        pkgs_s' = mkUniqDSet pkgs_s
+        pkgs_needed = eltsUDFM $ getUniqDSet pkgs_s' `minusUDFM` pkgs_loaded pls
 
       return $ LinkDeps
         { ldNeededLinkables = lnks_needed
-        , ldAllLinkables    = links_got ++ lnks_needed
+        -- , ldAllLinkables    = links_got ++ lnks_needed
+        , ldAllLinkables    = lnks_needed
         , ldUnits           = pkgs_needed
-        , ldNeededUnits     = pkgs_s
+        , ldNeededUnits     = pkgs_s'
         }
   where
     mod_graph = ldModuleGraph opts
     unit_env  = ldUnitEnv     opts
+
+    make_deps = do
+      (pkgs, mmods) <- unzip <$> mapM get_mod_info all_home_mods
+      let
+        link_mods =
+          listToUDFM [(moduleName (mi_module (hm_iface m)), m) | m <- mmods]
+        link_libs =
+          uniqDSetToList (unionManyUniqDSets (init_pkg_set : pkgs))
+      pure $
+        LinkModules (LinkHomeModule <$> link_mods) :
+        (LinkLibrary <$> link_libs)
 
     -- This code is used in `--make` mode to calculate the home package and unit dependencies
     -- for a set of modules.
@@ -187,93 +197,13 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
     get_mod_info (ModNodeKeyWithUid gwib uid) =
       case lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) of
-        Just hmi ->
-          let iface = (hm_iface hmi)
-              mmod = case mi_hsc_src iface of
-                      HsBootFile -> link_boot_mod_error (mi_module iface)
-                      _          -> return $ Just (mi_module iface)
-
-          in (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface),) <$>  mmod
+        Just hmi -> do
+          let iface = hm_iface hmi
+          case mi_hsc_src iface of
+            HsBootFile -> throwProgramError opts $ link_boot_mod_error (mi_module iface)
+            _ -> pure (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface), hmi)
         Nothing -> throwProgramError opts $
           text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
-
-
-       -- This code is used in one-shot mode to traverse downwards through the HPT
-       -- to find all link dependencies.
-       -- The ModIface contains the transitive closure of the module dependencies
-       -- within the current package, *except* for boot modules: if we encounter
-       -- a boot module, we have to find its real interface and discover the
-       -- dependencies of that.  Hence we need to traverse the dependency
-       -- tree recursively.  See bug #936, testcase ghci/prog007.
-    follow_deps :: [Module]             -- modules to follow
-                -> UniqDSet Module         -- accum. module dependencies
-                -> UniqDSet UnitId          -- accum. package dependencies
-                -> IO ([Module], UniqDSet UnitId) -- result
-    follow_deps [] acc_mods acc_pkgs =
-      pure (uniqDSetToList acc_mods, acc_pkgs)
-    follow_deps (mod : mods) acc_mods acc_pkgs = do
-      ldLoadIface opts msg mod >>= \case
-        Failed err
-          | ldUseByteCode opts
-          -> follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs (moduleUnitId mod))
-          | otherwise
-          -> throwProgramError opts $
-             missingInterfaceErrorDiagnostic (ldMsgOpts opts) err
-        Succeeded iface -> follow_deps_iface iface mod mods acc_mods acc_pkgs
-      where
-        msg = text "need to link module" <+> ppr mod <+>
-              text "due to use of Template Haskell"
-
-    follow_deps_iface iface mod mods acc_mods acc_pkgs = do
-          when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
-
-          let
-            pkg = moduleUnit mod
-            deps  = mi_deps iface
-
-            pkg_deps = dep_direct_pkgs deps
-            (boot_deps_home, mod_deps_home) = flip partitionWith (Set.toList (dep_direct_mods deps)) $
-              \case
-                (_, GWIB m IsBoot)  -> Left (mkModule pkg m)
-                (_, GWIB m NotBoot) -> Right (mkModule pkg m)
-
-            has_core_bindings = isJust (mi_extra_decls iface)
-
-            acc_pkgs'
-              | ldUseByteCode opts
-              = if has_core_bindings
-                then acc_pkgs
-                else addOneToUniqDSet acc_pkgs (moduleUnitId mod)
-              | otherwise
-              = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
-
-            mod_deps_pkg
-              | ldUseByteCode opts
-              = [usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface]
-              | otherwise
-              = []
-
-            mod_deps' = filterOut (`elementOfUniqDSet` acc_mods) (boot_deps_home ++ mod_deps_home ++ mod_deps_pkg)
-
-            acc_mods'
-              | ldUseByteCode opts
-              = addOneToUniqDSet acc_mods mod
-              | otherwise
-              = addListToUniqDSet acc_mods (mod : mod_deps')
-
-          case ue_homeUnit unit_env of
-            _ | ldUseByteCode opts && has_core_bindings ->
-              follow_deps (mod_deps' ++ mods) acc_mods' acc_pkgs'
-            Just home_unit | isHomeUnit home_unit pkg ->
-              follow_deps (mod_deps' ++ mods) acc_mods' acc_pkgs'
-            _ ->
-              follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-        where
-
-    link_boot_mod_error :: Module -> IO a
-    link_boot_mod_error mod = throwProgramError opts $
-            text "module" <+> ppr mod <+>
-            text "cannot be linked; it is only available as a boot module"
 
     no_obj :: Outputable a => a -> IO b
     no_obj mod = dieWith opts span $
@@ -283,6 +213,24 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
     while_linking_expr = text "while linking an interpreted expression"
 
+    dep_linkable = \case
+      LinkModules mods -> Left <$> mapM get_linkable (eltsUDFM mods)
+      LinkLibrary uid -> pure (Right uid)
+
+    get_linkable = \case
+      LinkHomeModule hmi ->
+        pure (expectJust "getLinkDeps" (homeModLinkable hmi))
+
+      LinkObjectModule iface loc -> do
+        let mod = mi_module iface
+        findObjectLinkableMaybe mod loc >>= \case
+          Nothing  -> no_obj mod
+          Just lnk -> adjust_linkable lnk
+
+      LinkByteCodeModule iface wcb -> do
+        details <- initModDetails (ldHscEnv opts) iface
+        t <- getCurrentTime
+        initWholeCoreBindings (ldHscEnv opts) iface details $ LM t (mi_module iface) [CoreBindings wcb]
 
     -- See Note [Using Byte Code rather than Object Code for Template Haskell]
     homeModLinkable :: HomeModInfo -> Maybe Linkable
@@ -291,72 +239,182 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         then homeModInfoByteCode hmi <|> homeModInfoObject hmi
         else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
 
-    get_linkable mod      -- A home-package module
-        | Just mod_info <- lookupHugByModule mod (ue_home_unit_graph unit_env)
-        = adjust_linkable (expectJust "getLinkDeps" (homeModLinkable mod_info))
-        | otherwise
-        = do    -- It's not in the HPT because we are in one shot mode,
-                -- so use the Finder to get a ModLocation...
-             case ue_homeUnit unit_env of
-              Nothing -> no_obj mod
-              Just home_unit -> do
+    adjust_linkable lnk
+        | Just new_osuf <- maybe_normal_osuf = do
+                new_uls <- mapM (adjust_ul new_osuf)
+                                (linkableUnlinked lnk)
+                return lnk{ linkableUnlinked=new_uls }
+        | otherwise =
+                return lnk
 
-                let fc = ldFinderCache opts
-                let fopts = ldFinderOpts opts
-                mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
-                case mb_stuff of
-                  Found loc mod -> found loc mod
-                  _ | ldUseByteCode opts -> hydrate (no_obj mod) mod
-                    | otherwise -> no_obj (moduleName mod)
-        where
-            found loc mod
-              | ldUseByteCode opts = hydrate (fallback_no_bytecode loc mod) mod
-              | otherwise = fallback_no_bytecode loc mod
+    adjust_ul new_osuf (DotO file) = do
+        -- file may already has new_osuf suffix. One example
+        -- is when we load bytecode from whole core bindings,
+        -- then the corresponding foreign stub objects are
+        -- compiled as shared objects and file may already has
+        -- .dyn_o suffix. And it's okay as long as the file to
+        -- load is already there.
+        let new_file = file -<.> new_osuf
+        ok <- doesFileExist new_file
+        if (not ok)
+            then dieWith opts span $
+                  text "cannot find object file "
+                        <> quotes (text new_file) $$ while_linking_expr
+            else return (DotO new_file)
+    adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
+    adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
+    adjust_ul _ l@(BCOs {}) = return l
+    adjust_ul _ l@LoadedBCOs{} = return l
+    adjust_ul _ (CoreBindings (WholeCoreBindings _ mod _))     = pprPanic "Unhydrated core bindings" (ppr mod)
 
-            hydrate alt mod = do
-              Succeeded iface <- ldLoadIface opts (text "makima") mod
-              case mi_extra_decls iface of
-                Just extra_decls -> do
-                  details <- initModDetails hsc_env iface
-                  t <- getCurrentTime
-                  initWholeCoreBindings hsc_env iface details $ LM t mod [CoreBindings $ WholeCoreBindings extra_decls mod undefined]
-                _ -> alt
+data LinkObjectModule =
+  LinkHomeModule HomeModInfo
+  |
+  LinkObjectModule ModIface ModLocation
+  |
+  LinkByteCodeModule ModIface WholeCoreBindings
 
-            fallback_no_bytecode loc mod = do
-              mb_lnk <- findObjectLinkableMaybe mod loc
-              case mb_lnk of
-                Nothing  -> no_obj mod
-                Just lnk -> adjust_linkable lnk
+instance Outputable LinkObjectModule where
+  ppr = \case
+    LinkHomeModule hmi -> ppr (mi_module (hm_iface hmi)) <+> brackets (text "HMI")
+    LinkObjectModule iface _ -> ppr (mi_module iface)
+    LinkByteCodeModule _ wcb -> ppr (wcb_module wcb) <+> brackets (text "BC")
 
-            hsc_env = ldHscEnv opts
+data LinkDep =
+  LinkModules (UniqDFM ModuleName LinkObjectModule)
+  |
+  LinkLibrary UnitId
 
-            adjust_linkable lnk
-                | Just new_osuf <- maybe_normal_osuf = do
-                        new_uls <- mapM (adjust_ul new_osuf)
-                                        (linkableUnlinked lnk)
-                        return lnk{ linkableUnlinked=new_uls }
-                | otherwise =
-                        return lnk
+instance Outputable LinkDep where
+  ppr = \case
+    LinkModules mods -> text "link modules:" <+> ppr mods
+    LinkLibrary uid -> text "link library:" <+> ppr uid
 
-            adjust_ul new_osuf (DotO file) = do
-                -- file may already has new_osuf suffix. One example
-                -- is when we load bytecode from whole core bindings,
-                -- then the corresponding foreign stub objects are
-                -- compiled as shared objects and file may already has
-                -- .dyn_o suffix. And it's okay as long as the file to
-                -- load is already there.
-                let new_file = file -<.> new_osuf
-                ok <- doesFileExist new_file
-                if (not ok)
-                   then dieWith opts span $
-                          text "cannot find object file "
-                                <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file)
-            adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
-            adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
-            adjust_ul _ l@(BCOs {}) = return l
-            adjust_ul _ l@LoadedBCOs{} = return l
-            adjust_ul _ (CoreBindings (WholeCoreBindings _ mod _))     = pprPanic "Unhydrated core bindings" (ppr mod)
+-- This code is used in one-shot mode to traverse downwards through the HPT
+-- to find all link dependencies.
+-- The ModIface contains the transitive closure of the module dependencies
+-- within the current package, *except* for boot modules: if we encounter
+-- a boot module, we have to find its real interface and discover the
+-- dependencies of that.  Hence we need to traverse the dependency
+-- tree recursively.  See bug #936, testcase ghci/prog007.
+oneshot_deps ::
+  LinkDepsOpts ->
+  -- | Modules whose imports to follow
+  [Module] ->
+  IO [LinkDep]
+oneshot_deps opts mods =
+  eltsUDFM <$> oneshot_deps_loop opts [GWIB m NotBoot | m <- mods] emptyUDFM
+
+oneshot_deps_loop ::
+  LinkDepsOpts ->
+  [ModuleWithIsBoot] ->
+  UniqDFM UnitId LinkDep ->
+  IO (UniqDFM UnitId LinkDep)
+oneshot_deps_loop _ [] acc =
+  pure acc
+oneshot_deps_loop opts (GWIB mod is_boot : mods) acc = do
+  (new_acc, new_mods) <- process_module
+  oneshot_deps_loop opts (new_mods ++ mods) new_acc
+  where
+    process_module
+      | already_seen
+      = pure (acc, [])
+      | is_home || oe_bytecode
+      = try_add_module
+      | otherwise
+      = add_library
+
+    already_seen
+      | Just (LinkModules mods) <- mod_dep
+      = elemUDFM mod_name mods
+      | Just (LinkLibrary _) <- mod_dep
+      = True
+      | otherwise
+      = False
+
+    try_add_module = do
+      -- TODO use finder as well here to get ModLocation right away
+      ldLoadIface opts load_reason mod >>= \case
+        Failed err
+          -- Interfaces can be missing, e.g. from ghc-prim
+          -- TODO ???
+          | not is_home
+          , oe_bytecode
+          -> do
+            add_library
+          | otherwise
+          -> throwProgramError opts $
+              missingInterfaceErrorDiagnostic (ldMsgOpts opts) err
+        Succeeded iface
+          | mi_boot iface == IsBoot
+          -> throwProgramError opts $ link_boot_mod_error mod
+          | oe_bytecode
+          , Just core_bindings <- mi_extra_decls iface
+          -> pure (add_bytecode iface (WholeCoreBindings core_bindings mod undefined))
+          | is_home
+          , Just home <- oe_home
+          -> do
+            let fc = ldFinderCache opts
+                fopts = ldFinderOpts opts
+            findHomeModule fc fopts home (moduleName mod) >>= \case
+              Found loc _ -> do
+                pure (add_home_module iface loc)
+              _ ->
+                throwProgramError opts $
+                text "No home module for matching unit in module" <+> ppr mod
+          | otherwise
+          -> add_library
+
+    add_library = pure (addToUDFM acc mod_unit_id (LinkLibrary mod_unit_id), [])
+
+    add_bytecode iface core_bindings = add_module iface (LinkByteCodeModule iface core_bindings)
+
+    add_home_module iface loc = add_module iface (LinkObjectModule iface loc)
+
+    add_module iface lmod = (new_acc lmod, new_deps iface)
+
+    new_acc iface
+      | IsBoot <- is_boot
+      = acc
+      | otherwise
+      = alterUDFM (add_package_module iface) acc mod_unit_id
+
+    add_package_module lmod = \case
+      Just (LinkLibrary u) -> Just (LinkLibrary u)
+      Just (LinkModules old) -> Just (LinkModules (addToUDFM old mod_name lmod))
+      Nothing -> Just (LinkModules (unitUDFM mod_name lmod))
+
+    new_deps iface
+      | oe_bytecode
+      = [GWIB usg_mod NotBoot | UsagePackageModule {usg_mod} <- mi_usages iface] ++ local
+      | Just _ <- oe_home
+      = local
+      | otherwise
+      = []
+      where
+        local = [GWIB (mkModule mod_unit n) b | (_, GWIB n b) <- Set.toList (dep_direct_mods (mi_deps iface))]
+
+    is_home
+      | Just home <- oe_home
+      = homeUnitAsUnit home == mod_unit
+      | otherwise
+      = False
+
+    mod_dep = lookupUDFM acc mod_unit_id
+    mod_name = moduleName mod
+    mod_unit_id = moduleUnitId mod
+    mod_unit = moduleUnit mod
+    load_reason =
+      text "need to link module" <+> ppr mod <+>
+      text "due to use of Template Haskell"
+
+    oe_bytecode = ldUseByteCode opts
+    oe_home = ue_homeUnit (ldUnitEnv opts)
+
+link_boot_mod_error :: Module -> SDoc
+link_boot_mod_error mod =
+  text "module" <+> ppr mod <+>
+  text "cannot be linked; it is only available as a boot module"
 
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]

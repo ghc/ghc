@@ -2,7 +2,8 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-ARGS := $(TEST_HC_OPTS) -package-db db -fprefer-byte-code -fbyte-code-and-object-code -package dep -v0
+BASIC := $(TEST_HC_OPTS) -this-unit-id=cross -package-db db -package dep -v0
+ARGS := $(BASIC) -fprefer-byte-code -fbyte-code-and-object-code
 
 .PHONY: CrossPackageArchive
 CrossPackageArchive:
@@ -18,3 +19,8 @@ CrossPackageEmptyArchive:
 CrossPackageNoArchive:
 	./prep.bash "$(TEST_HC)" " $(TEST_HC_OPTS)" "$(GHC_PKG)" 3
 	./run.bash "$(TEST_HC)" "$(ARGS)"
+
+.PHONY: CrossPackageArchiveObjCode
+CrossPackageArchiveObjCode:
+	./prep.bash "$(TEST_HC)" "$(TEST_HC_OPTS)" "$(GHC_PKG)" 1
+	./run.bash "$(TEST_HC)" "$(BASIC)"
