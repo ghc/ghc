@@ -501,11 +501,6 @@ initLinker_ (int retain_cafs)
     }
 #   endif
 
-    if (RtsFlags.MiscFlags.linkerMemBase != 0) {
-        // User-override for mmap_32bit_base
-        mmap_32bit_base = (void*)RtsFlags.MiscFlags.linkerMemBase;
-    }
-
 #if defined(OBJFORMAT_PEi386)
     initLinker_PEi386();
 #endif
