@@ -36,7 +36,7 @@ import qualified Data.ByteString.Internal as BS
 import Data.Char (isSpace)
 import Data.Foldable (toList)
 import qualified Data.List as List
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
 import GHC
@@ -49,6 +49,7 @@ import GHC.Data.StringBuffer (StringBuffer)
 import qualified GHC.Data.StringBuffer as S
 import GHC.Driver.Session
 import GHC.HsToCore.Docs hiding (sigNameNoLoc)
+import GHC.Platform (Platform (..))
 import GHC.Types.Name
 import GHC.Types.SrcLoc (advanceSrcLoc)
 import GHC.Types.Var
@@ -66,7 +67,7 @@ import GHC.Utils.Outputable (Outputable, SDocContext, ppr)
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
 
-import Haddock.Types (DocName, DocNameI, XRecCond)
+import Haddock.Types (DocName, DocNameI, Interface (..), XRecCond)
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
@@ -628,6 +629,14 @@ setOutputDir dir dynFlags =
     , includePaths = addGlobalInclude (includePaths dynFlags) [dir]
     , dumpDir = Just dir
     }
+
+getSupportedLanguagesAndExtensions
+  :: [Interface]
+  -> [String]
+getSupportedLanguagesAndExtensions [] = []
+getSupportedLanguagesAndExtensions (iface : _) = do
+  let dflags = ifaceDynFlags iface
+   in supportedLanguagesAndExtensions dflags.targetPlatform.platformArchOS
 
 -------------------------------------------------------------------------------
 

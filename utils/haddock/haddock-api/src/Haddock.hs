@@ -82,7 +82,7 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Options
 import Haddock.Utils
-import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir)
+import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir, getSupportedLanguagesAndExtensions)
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -228,6 +228,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
                                     , piPackageVersion =
                                         fromMaybe (makeVersion []) (optPackageVersion flags)
                                     }
+          languagesAndExtensions = getSupportedLanguagesAndExtensions ifaces
 
       -- Dump an "interface file" (.haddock file), if requested.
       forM_ (optDumpInterfaceFile flags) $ \path -> liftIO $ do
@@ -238,7 +239,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           }
 
       -- Render the interfaces.
-      liftIO $ renderStep dflags parserOpts logger unit_state flags sinceQual qual packages ifaces
+      liftIO $ renderStep dflags languagesAndExtensions parserOpts logger unit_state flags sinceQual qual packages ifaces
 
     -- If we were not given any input files, error if documentation was
     -- requested
@@ -251,7 +252,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       packages <- liftIO $ readInterfaceFiles name_cache (readIfaceArgs flags) noChecks
 
       -- Render even though there are no input files (usually contents/index).
-      liftIO $ renderStep dflags parserOpts logger unit_state flags sinceQual qual packages []
+      liftIO $ renderStep dflags [] parserOpts logger unit_state flags sinceQual qual packages []
 
 -- | Run the GHC action using a temporary output directory
 withTempOutputDir :: Ghc a -> Ghc a
@@ -305,6 +306,8 @@ readPackagesAndProcessModules flags files = do
 
 renderStep
   :: DynFlags
+  -> [String]
+  -- ^ Supported languages and extensions based on architecture and OS
   -> ParserOpts
   -> Logger
   -> UnitState
@@ -314,7 +317,7 @@ renderStep
   -> [(DocPaths, Visibility, FilePath, InterfaceFile)]
   -> [Interface]
   -> IO ()
-renderStep dflags parserOpts logger unit_state flags sinceQual nameQual pkgs interfaces = do
+renderStep dflags languagesAndExtensions parserOpts logger unit_state flags sinceQual nameQual pkgs interfaces = do
   updateHTMLXRefs (map (\(docPath, _ifaceFilePath, _showModules, ifaceFile) ->
                           ( case baseUrl flags of
                               Nothing  -> docPathsHtml docPath
@@ -330,7 +333,7 @@ renderStep dflags parserOpts logger unit_state flags sinceQual nameQual pkgs int
       (DocPaths {docPathsSources=Just path}, _, _, ifile) <- pkgs
       iface <- ifInstalledIfaces ifile
       return (instMod iface, path)
-  render dflags parserOpts logger unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
+  render dflags languagesAndExtensions parserOpts logger unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
   where
     -- get package name from unit-id
     packageName :: Unit -> String
@@ -342,6 +345,8 @@ renderStep dflags parserOpts logger unit_state flags sinceQual nameQual pkgs int
 -- | Render the interfaces with whatever backend is specified in the flags.
 render
   :: DynFlags
+  -> [String]
+  -- ^ Supported languages and extensions based on architecture and OS
   -> ParserOpts
   -> Logger
   -> UnitState
@@ -352,7 +357,7 @@ render
   -> [(FilePath, PackageInterfaces)]
   -> Map Module FilePath
   -> IO ()
-render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages extSrcMap = do
+render dflags languagesAndExtensions parserOpts logger unit_state flags sinceQual qual ifaces packages extSrcMap = do
   let
     packageInfo = PackageInfo { piPackageName    = fromMaybe (PackageName mempty)
                                                  $ optPackageName flags
@@ -554,7 +559,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
   when (Flag_HyperlinkedSource `elem` flags && not (null ifaces)) $ do
     withTiming logger "ppHyperlinkedSource" (const ()) $ do
       _ <- {-# SCC ppHyperlinkedSource #-}
-           ppHyperlinkedSource (verbosity flags) (isJust (optOneShot flags)) odir libDir opt_source_css pretty srcMap ifaces
+           ppHyperlinkedSource (verbosity flags) (isJust (optOneShot flags)) languagesAndExtensions  odir libDir opt_source_css pretty srcMap ifaces
       return ()
 
 

@@ -12,13 +12,12 @@ import Control.Monad (unless)
 import Data.Map as M
 import Data.Maybe
 import GHC.Data.FastString (mkFastString)
-import GHC.Platform
 import GHC.Driver.Config.Diagnostic (initDiagOpts)
-import GHC.Driver.Session (supportedLanguagesAndExtensions, safeImportsOn)
-import GHC.Parser.Lexer as Lexer
 import qualified GHC.Driver.DynFlags as DynFlags
+import GHC.Driver.Session (safeImportsOn)
 import GHC.Iface.Ext.Binary (hie_file_result, readHieFile)
 import GHC.Iface.Ext.Types (HieAST (..), HieASTs (..), HieFile (..), SourcedNodeInfo (..), pattern HiePath)
+import GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc (mkRealSrcLoc, realSrcLocSpan, srcSpanFile)
 import GHC.Unit.Module (Module, moduleName)
 import qualified GHC.Utils.Outputable as Outputable
@@ -43,6 +42,8 @@ ppHyperlinkedSource
   :: Verbosity
   -> Bool
   -- ^ In one-shot mode
+  -> [String]
+  -- ^ Supported languages and extensions based on architecture and OS
   -> FilePath
   -- ^ Output directory
   -> FilePath
@@ -56,21 +57,29 @@ ppHyperlinkedSource
   -> [Interface]
   -- ^ Interfaces for which we create source
   -> IO ()
-ppHyperlinkedSource verbosity isOneShot outdir libdir mstyle pretty srcs' ifaces = do
+ppHyperlinkedSource verbosity isOneShot languagesAndExtensions  outdir libdir mstyle pretty srcs' ifaces = do
   createDirectoryIfMissing True srcdir
   unless isOneShot $ do
     let cssFile = fromMaybe (defaultCssFile libdir) mstyle
     copyFile cssFile $ srcdir </> srcCssFile
     copyFile (libdir </> "html" </> highlightScript) $
       srcdir </> highlightScript
-  mapM_ (ppHyperlinkedModuleSource verbosity srcdir pretty srcs) ifaces
+  mapM_ (ppHyperlinkedModuleSource verbosity languagesAndExtensions  srcdir pretty srcs) ifaces
   where
     srcdir = outdir </> hypSrcDir
     srcs = (srcs', M.mapKeys moduleName srcs')
 
 -- | Generate hyperlinked source for particular interface.
-ppHyperlinkedModuleSource :: Verbosity -> FilePath -> Bool -> SrcMaps -> Interface -> IO ()
-ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
+ppHyperlinkedModuleSource
+  :: Verbosity
+  -> [String]
+  -- ^ Supported languages and extensions based on architecture and OS
+  -> FilePath
+  -> Bool
+  -> SrcMaps
+  -> Interface
+  -> IO ()
+ppHyperlinkedModuleSource verbosity languagesAndExtensions srcdir pretty srcs iface = do
   -- Parse the GHC-produced HIE file
   nc <- freshNameCache
   HieFile
@@ -114,13 +123,12 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
   writeUtf8File path . renderToString pretty . render' fullAst $ tokens
   where
     dflags = ifaceDynFlags iface
-    arch_os = platformArchOS (dflags.targetPlatform)
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
     parserOpts =
       Lexer.mkParserOpts
         (dflags.extensionFlags)
         (initDiagOpts dflags)
-        (supportedLanguagesAndExtensions arch_os)
+        languagesAndExtensions
         (safeImportsOn dflags)
         False -- lex Haddocks as comment tokens
         True -- produce comment tokens
