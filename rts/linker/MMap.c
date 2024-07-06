@@ -40,6 +40,13 @@
 
 void *mmap_32bit_base = LINKER_LOAD_BASE;
 
+void initLinkerMMap(void) {
+    if (RtsFlags.MiscFlags.linkerMemBase != 0) {
+        // User-override for mmap_32bit_base
+        mmap_32bit_base = (void*)RtsFlags.MiscFlags.linkerMemBase;
+    }
+}
+
 static const char *memoryAccessDescription(MemoryAccess mode)
 {
   switch (mode) {

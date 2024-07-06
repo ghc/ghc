@@ -49,6 +49,8 @@
 #define LINKER_LOAD_BASE ((void *) 0x40000000)
 #endif
 
+void initLinkerMMap(void);
+
 /** Access modes for mprotectForLinker */
 typedef enum {
     MEM_NO_ACCESS,
