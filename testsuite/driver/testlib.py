@@ -1426,9 +1426,24 @@ async def test_common_work(name: TestName, opts,
             if needsTargetWrapper():
                 opts.skip = True
         elif func in [makefile_test, run_command]:
-            # makefile tests aren't necessarily runtime or compile-time
+            # Note [Makefile tests are supposed to be run in all ways]
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            # Makefile tests aren't necessarily runtime or compile-time
             # specific. Assume we can run them in all ways. See #16042 for what
             # happened previously.
+            #
+            # For example, the WASM test environment requires a target wrapper to run tests
+            # which is why Makefile tests are skipped by default. For cases where the
+            # target wrapper is actually not needed we can trigger Makefile tests to run
+            # by using something like `pre_cmd('$MAKE -s --no-print-directory...`.
+            # Examples of this can be found throughout the code.
+            #
+            # Additionally, it is useful to set `multimod_compile` as the running mode
+            # because it provides enough flexibility to specify source names to compile
+            # without wasting time on running.
+            #
+            # `ignore_stdout` and `ignore_stderr` could also be helpful in cases where
+            # all you need is to compare the exit code with 0.
             all_ways = config.compile_ways + config.run_ways
             if needsTargetWrapper():
                 opts.skip = True
