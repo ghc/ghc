@@ -66,7 +66,7 @@ import GHC.Cmm.Switch
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label (LabelMap, mapMember)
 import GHC.Cmm.CLabel
 import GHC.Types.Tickish ( GenTickish(..) )
 import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )

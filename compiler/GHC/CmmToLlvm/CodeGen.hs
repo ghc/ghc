@@ -24,7 +24,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label (mapLookup)
 
 import GHC.Data.FastString
 import GHC.Data.OrdList

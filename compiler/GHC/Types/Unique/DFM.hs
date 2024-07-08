@@ -21,6 +21,7 @@ is not deterministic.
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-stg-final -ddump-to-file -dumpdir=/var/folders/tv/35hlch6s3y15hfvndc71l6d40000gn/T/tmp.bJv7ldTSvf #-}
 
 module GHC.Types.Unique.DFM (
         -- * Unique-keyed deterministic mappings

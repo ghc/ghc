@@ -34,7 +34,7 @@ import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Cmm.InitFini
 import GHC.CmmToAsm.Wasm.Types
 import GHC.CmmToAsm.Wasm.Utils

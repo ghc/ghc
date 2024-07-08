@@ -22,7 +22,7 @@ import Control.Monad
 import Data.List (delete, union, insert, intersect)
 import Data.Semigroup
 
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Data.Graph.Inductive.Graph
 import GHC.Types.Unique.DSM
 import GHC.Utils.Panic hiding (assert)

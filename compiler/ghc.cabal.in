@@ -237,6 +237,7 @@ Library
         GHC.Cmm.Dataflow.Block
         GHC.Cmm.Dataflow.Graph
         GHC.Cmm.Dataflow.Label
+        GHC.Cmm.Dataflow.Label.NonDet
         GHC.Cmm.DebugBlock
         GHC.Cmm.Expr
         GHC.Cmm.GenericOpt

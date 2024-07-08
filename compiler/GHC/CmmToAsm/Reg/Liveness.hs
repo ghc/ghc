@@ -46,7 +46,8 @@ import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label (mapToList, LabelMap, mapInsert, mapEmpty, mapFilterWithKey, mapLookup, mapMap)
+import GHC.Cmm.Dataflow.Label.NonDet (LabelSet, setMember, setFromList)
 import GHC.Cmm hiding (RegSet, emptyRegSet)
 
 import GHC.Data.Graph.Directed
