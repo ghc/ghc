@@ -23,6 +23,8 @@ import GHC.Cmm.Config
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet (lookupFact)
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Dataflow
 import GHC.Unit.Module
 import GHC.Data.Graph.Directed
@@ -532,7 +534,7 @@ newtype CAFfyLabel = CAFfyLabel CLabel
 deriving newtype instance OutputableP env CLabel => OutputableP env CAFfyLabel
 
 type CAFSet = Set CAFfyLabel
-type CAFEnv = LabelMap CAFSet
+type CAFEnv = NonDet.LabelMap CAFSet
 
 -- | Records the CAFfy references of a set of static data decls.
 type DataCAFEnv = Map CLabel CAFSet
@@ -599,7 +601,7 @@ cafAnal
   -> CAFEnv
 cafAnal platform contLbls topLbl cmmGraph =
   analyzeCmmBwd cafLattice
-    (cafTransfers platform contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
+    (cafTransfers platform contLbls (g_entry cmmGraph) topLbl) cmmGraph NonDet.mapEmpty
 
 
 cafLattice :: DataflowLattice CAFSet
@@ -659,7 +661,7 @@ cafTransfers platform contLbls entry topLbl
                                 text "topLbl:"       <+> pdoc platform topLbl $$
                                 text "cafs in exit:" <+> pdoc platform joined $$
                                 text "result:"       <+> pdoc platform result) $
-        mapSingleton (entryLabel eNode) result
+        NonDet.mapSingleton (entryLabel eNode) result
 
 
 -- -----------------------------------------------------------------------------
@@ -775,7 +777,7 @@ depAnalSRTs platform cafEnv cafEnv_static decls =
           | (l, lbl) <- labelledBlocks
           , Just (cafs :: Set CAFfyLabel) <-
               [case l of
-                 BlockLabel l -> mapLookup l cafEnv
+                 BlockLabel l -> NonDet.mapLookup l cafEnv
                  DeclLabel cl -> Map.lookup cl cafEnv_static]
           , let cafs' = Set.delete lbl cafs
           ]
@@ -810,7 +812,7 @@ getCAFs platform cafEnv = mapMaybe getCAFLabel
       | Just info <- mapLookup (g_entry g) (info_tbls top_info)
       , let rep = cit_rep info
       , isStaticRep rep && isThunkRep rep
-      , Just cafs <- mapLookup (g_entry g) cafEnv
+      , Just cafs <- NonDet.mapLookup (g_entry g) cafEnv
       = Just (Just (g_entry g), mkCAFfyLabel platform top_lbl, cafs)
 
       | otherwise
@@ -902,7 +904,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
                 CmmStaticsRaw lbl _ -> (lbl, set)
 
       (proc_envs, procss) = unzip procs
-      cafEnv = mapUnions proc_envs
+      cafEnv = NonDet.mapUnions proc_envs
       decls = map (cmmDataDeclCmmDecl . snd) data_ ++ concat procss
       staticFuns = mapFromList (getStaticFuns decls)
 

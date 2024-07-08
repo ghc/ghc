@@ -15,7 +15,7 @@ import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.Cmm hiding (RegSet)
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label (mapFoldlWithKey, mapLookup, mapInsert)
 
 import GHC.Utils.Monad
 import GHC.Utils.Monad.State.Strict

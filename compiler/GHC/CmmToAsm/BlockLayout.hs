@@ -26,7 +26,8 @@ import GHC.CmmToAsm.Config
 
 import GHC.Cmm
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label (LabelMap, mapMember, mapLookup, mapElems, mapKeys, mapEmpty, mapInsert, mapDelete, mapFromList, mapMap)
+import GHC.Cmm.Dataflow.Label.NonDet (LabelSet, setEmpty, setMember, setFromList, setInsert)
 
 import GHC.Types.Unique.FM
 

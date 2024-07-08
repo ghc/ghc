@@ -76,7 +76,7 @@ import GHC.StgToCmm.Sequel
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label (mapSingleton, mapEmpty)
 import GHC.Runtime.Heap.Layout
 import GHC.Unit
 import GHC.Types.Id

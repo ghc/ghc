@@ -14,7 +14,7 @@ import GHC.Cmm.Liveness
 import GHC.Cmm.LRegSet
 import GHC.Cmm.Utils
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Cmm.Dataflow.Graph
 import GHC.Platform.Regs
 

@@ -24,7 +24,7 @@ import GHC.Platform.Reg
 
 import GHC.Data.Graph.Base
 
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label (mapLookup, Label, LabelMap)
 import GHC.Cmm
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
