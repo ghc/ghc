@@ -57,6 +57,8 @@ import System.Directory
 import GHC.Driver.Env
 import {-# SOURCE #-} GHC.Driver.Main
 import Data.Time.Clock
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 
 
 data LinkDepsOpts = LinkDepsOpts
@@ -67,6 +69,7 @@ data LinkDepsOpts = LinkDepsOpts
   , ldPprOpts     :: !SDocContext                   -- ^ Rendering options for error messages
   , ldFinderCache :: !FinderCache                   -- ^ Finder cache
   , ldFinderOpts  :: !FinderOpts                    -- ^ Finder options
+  , ldHugFinderOpts :: !(UnitEnvGraph FinderOpts)
   , ldUseByteCode :: !Bool                          -- ^ Use bytecode rather than objects
   , ldMsgOpts     :: !(DiagnosticOpts IfaceMessage) -- ^ Options for diagnostics
   , ldWays        :: !Ways                          -- ^ Enabled ways
@@ -287,8 +290,15 @@ data LinkDep =
 
 instance Outputable LinkDep where
   ppr = \case
-    LinkModules mods -> text "link modules:" <+> ppr mods
-    LinkLibrary uid -> text "link library:" <+> ppr uid
+    LinkModules mods -> text "modules:" <+> ppr (eltsUDFM mods)
+    LinkLibrary uid -> text "library:" <+> ppr uid
+
+data OneshotError =
+  NoLocation Module
+  |
+  NoInterface MissingInterfaceError
+  |
+  LinkBootModule Module
 
 -- This code is used in one-shot mode to traverse downwards through the HPT
 -- to find all link dependencies.
@@ -303,26 +313,33 @@ oneshot_deps ::
   [Module] ->
   IO [LinkDep]
 oneshot_deps opts mods =
-  eltsUDFM <$> oneshot_deps_loop opts [GWIB m NotBoot | m <- mods] emptyUDFM
+  runExceptT (oneshot_deps_loop opts mods emptyUDFM) >>= \case
+    Right a -> pure (eltsUDFM a)
+    Left err -> throwProgramError opts (message err)
+  where
+    message = \case
+      NoLocation mod ->
+        pprPanic "found iface but no location" (ppr mod)
+      NoInterface err ->
+        missingInterfaceErrorDiagnostic (ldMsgOpts opts) err
+      LinkBootModule mod ->
+        link_boot_mod_error mod
 
 oneshot_deps_loop ::
   LinkDepsOpts ->
-  [ModuleWithIsBoot] ->
+  [Module] ->
   UniqDFM UnitId LinkDep ->
-  IO (UniqDFM UnitId LinkDep)
+  ExceptT OneshotError IO (UniqDFM UnitId LinkDep)
 oneshot_deps_loop _ [] acc =
   pure acc
-oneshot_deps_loop opts (GWIB mod is_boot : mods) acc = do
+oneshot_deps_loop opts (mod : mods) acc = do
   (new_acc, new_mods) <- process_module
   oneshot_deps_loop opts (new_mods ++ mods) new_acc
   where
     process_module
-      | already_seen
-      = pure (acc, [])
-      | is_home || oe_bytecode
-      = try_add_module
-      | otherwise
-      = add_library
+      | already_seen = pure (acc, [])
+      | is_home || bytecode = try_iface
+      | otherwise = add_library
 
     already_seen
       | Just (LinkModules mods) <- mod_dep
@@ -332,52 +349,30 @@ oneshot_deps_loop opts (GWIB mod is_boot : mods) acc = do
       | otherwise
       = False
 
-    try_add_module = do
-      -- TODO use finder as well here to get ModLocation right away
-      ldLoadIface opts load_reason mod >>= \case
-        Failed err
-          -- Interfaces can be missing, e.g. from ghc-prim
-          -- TODO ???
-          | not is_home
-          , oe_bytecode
-          -> do
-            add_library
-          | otherwise
-          -> throwProgramError opts $
-              missingInterfaceErrorDiagnostic (ldMsgOpts opts) err
-        Succeeded iface
-          | mi_boot iface == IsBoot
-          -> throwProgramError opts $ link_boot_mod_error mod
-          | oe_bytecode
-          , Just core_bindings <- mi_extra_decls iface
-          -> pure (add_bytecode iface (WholeCoreBindings core_bindings mod undefined))
-          | is_home
-          , Just home <- oe_home
-          -> do
-            let fc = ldFinderCache opts
-                fopts = ldFinderOpts opts
-            findHomeModule fc fopts home (moduleName mod) >>= \case
-              Found loc _ -> do
-                pure (add_home_module iface loc)
-              _ ->
-                throwProgramError opts $
-                text "No home module for matching unit in module" <+> ppr mod
-          | otherwise
-          -> add_library
+    try_iface =
+      liftIO (ldLoadIface opts load_reason mod) >>= \case
+        Failed err -> throwE (NoInterface err)
+        Succeeded iface ->
+          location >>= \case
+            InstalledFound loc _ -> with_iface loc iface
+            _ -> throwE (NoLocation mod)
+
+    with_iface loc iface
+      | mi_boot iface == IsBoot
+      = throwE (LinkBootModule mod)
+      | bytecode
+      , Just core_bindings <- mi_extra_decls iface
+      , let wcb = WholeCoreBindings core_bindings mod loc
+      = pure (add_module iface (LinkByteCodeModule iface wcb))
+      | is_home
+      = pure (add_module iface (LinkObjectModule iface loc))
+      | otherwise
+      = add_library
 
     add_library = pure (addToUDFM acc mod_unit_id (LinkLibrary mod_unit_id), [])
 
-    add_bytecode iface core_bindings = add_module iface (LinkByteCodeModule iface core_bindings)
-
-    add_home_module iface loc = add_module iface (LinkObjectModule iface loc)
-
-    add_module iface lmod = (new_acc lmod, new_deps iface)
-
-    new_acc iface
-      | IsBoot <- is_boot
-      = acc
-      | otherwise
-      = alterUDFM (add_package_module iface) acc mod_unit_id
+    add_module iface lmod =
+      (alterUDFM (add_package_module lmod) acc mod_unit_id, new_deps iface)
 
     add_package_module lmod = \case
       Just (LinkLibrary u) -> Just (LinkLibrary u)
@@ -385,20 +380,33 @@ oneshot_deps_loop opts (GWIB mod is_boot : mods) acc = do
       Nothing -> Just (LinkModules (unitUDFM mod_name lmod))
 
     new_deps iface
-      | oe_bytecode
-      = [GWIB usg_mod NotBoot | UsagePackageModule {usg_mod} <- mi_usages iface] ++ local
-      | Just _ <- oe_home
+      | bytecode
+      -- TODO How can we better determine the external deps?
+      = [usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface] ++ local
+      | Just _ <- mb_home
       = local
       | otherwise
       = []
       where
-        local = [GWIB (mkModule mod_unit n) b | (_, GWIB n b) <- Set.toList (dep_direct_mods (mi_deps iface))]
+        local =
+          [
+            mkModule mod_unit m
+            -- TODO Somehow this just works, no idea what the deal was in the
+            -- old code with boot modules.
+            | (_, GWIB m _) <- Set.toList (dep_direct_mods (mi_deps iface))
+          ]
 
     is_home
-      | Just home <- oe_home
+      | Just home <- mb_home
       = homeUnitAsUnit home == mod_unit
       | otherwise
       = False
+
+    location =
+      liftIO $
+      findExactModule (ldFinderCache opts) (ldFinderOpts opts)
+      (ldHugFinderOpts opts) (hsc_units (ldHscEnv opts)) mb_home
+      (toUnitId <$> mod)
 
     mod_dep = lookupUDFM acc mod_unit_id
     mod_name = moduleName mod
@@ -408,8 +416,8 @@ oneshot_deps_loop opts (GWIB mod is_boot : mods) acc = do
       text "need to link module" <+> ppr mod <+>
       text "due to use of Template Haskell"
 
-    oe_bytecode = ldUseByteCode opts
-    oe_home = ue_homeUnit (ldUnitEnv opts)
+    bytecode = ldUseByteCode opts
+    mb_home = ue_homeUnit (ldUnitEnv opts)
 
 link_boot_mod_error :: Module -> SDoc
 link_boot_mod_error mod =

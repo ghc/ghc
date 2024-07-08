@@ -645,6 +645,7 @@ initLinkDepsOpts hsc_env = opts
             , ldPprOpts     = initSDocContext dflags defaultUserStyle
             , ldFinderCache = hsc_FC hsc_env
             , ldFinderOpts  = initFinderOpts dflags
+            , ldHugFinderOpts = initFinderOpts . homeUnitEnv_dflags <$> hsc_HUG hsc_env
             , ldUseByteCode = gopt Opt_UseBytecodeRatherThanObjects dflags
             , ldMsgOpts     = initIfaceMessageOpts dflags
             , ldWays        = ways dflags

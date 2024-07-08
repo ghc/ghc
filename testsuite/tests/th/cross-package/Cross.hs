@@ -2,6 +2,7 @@
 
 module Main where
 
+import GHC.Prim
 import CrossLocal (splc)
 
 a :: Int
