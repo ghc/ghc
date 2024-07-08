@@ -2,8 +2,8 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-# TODO check error without -package obj (especially for ObjCode, it appears to fail at link time)
-BASIC := $(TEST_HC_OPTS) -this-unit-id=cross -package-db db -package dep -package obj -v0
+# TODO it works even without -package obj, but it should complain about the package not being exposed
+BASIC := $(TEST_HC_OPTS) -this-unit-id=cross -package-db db -package dep -v0
 ARGS := $(BASIC) -fprefer-byte-code -fbyte-code-and-object-code
 
 .PHONY: CrossPackageArchive

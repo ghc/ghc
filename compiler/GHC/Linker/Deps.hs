@@ -48,6 +48,9 @@ import GHC.Unit.Home
 import GHC.Data.Maybe
 
 import Control.Applicative
+import Control.Monad
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 
 import qualified Data.Set as Set
 import qualified Data.Map as M
@@ -57,8 +60,6 @@ import System.Directory
 import GHC.Driver.Env
 import {-# SOURCE #-} GHC.Driver.Main
 import Data.Time.Clock
-import Control.Monad.IO.Class (MonadIO (liftIO))
-import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 
 
 data LinkDepsOpts = LinkDepsOpts
@@ -372,12 +373,20 @@ oneshot_deps_loop opts (mod : mods) acc = do
     add_library = pure (addToUDFM acc mod_unit_id (LinkLibrary mod_unit_id), [])
 
     add_module iface lmod =
-      (alterUDFM (add_package_module lmod) acc mod_unit_id, new_deps iface)
+      (addListToUDFM with_mod (direct_pkgs iface), new_deps iface)
+      where
+        with_mod = alterUDFM (add_package_module lmod) acc mod_unit_id
 
     add_package_module lmod = \case
       Just (LinkLibrary u) -> Just (LinkLibrary u)
       Just (LinkModules old) -> Just (LinkModules (addToUDFM old mod_name lmod))
       Nothing -> Just (LinkModules (unitUDFM mod_name lmod))
+
+    direct_pkgs iface
+      | bytecode
+      = []
+      | otherwise
+      = [(u, LinkLibrary u) | u <- Set.toList (dep_direct_pkgs (mi_deps iface))]
 
     new_deps iface
       | bytecode
