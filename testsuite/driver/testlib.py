@@ -727,7 +727,7 @@ def _find_so(lib, directory, in_place):
     # "\w+"         matches the hash on release builds or "inplace", such as 765d in the example
     # "ghc\S+"      matches the ghc build name: ghc9.11.20240508
     if in_place:
-        to_match = r'libHS{}-\d+(\.\d+)+-\w+-ghc\S+\.' + suffix
+        to_match = r'libHS{}-\d+(\.\d+)+-[a-z0-9]+-ghc\S+\.' + suffix
     else:
         to_match = r'libHS{}-\d+(\.\d+)+-ghc\S+\.' + suffix
 
