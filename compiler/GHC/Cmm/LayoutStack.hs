@@ -1,5 +1,4 @@
 {-# LANGUAGE RecordWildCards, GADTs #-}
-{-# OPTIONS_GHC -ddump-simpl -ddump-stg-final -ddump-to-file -dumpdir=/var/folders/tv/35hlch6s3y15hfvndc71l6d40000gn/T/tmp.bJv7ldTSvf #-}
 module GHC.Cmm.LayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
