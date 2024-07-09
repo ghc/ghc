@@ -1,4 +1,4 @@
-def cross_test(suf):
+def cross_test(suf, files = []):
     name = f'CrossPackage{suf}'
     test(
         name,
@@ -15,7 +15,7 @@ def cross_test(suf):
                 'obj.conf',
                 'prep.bash',
                 'run.bash',
-            ]),
+            ] + files),
             use_specs({'stdout': 'CrossPackage.stdout'}),
         ],
         makefile_test,
@@ -26,3 +26,4 @@ cross_test('Archive')
 cross_test('EmptyArchive')
 cross_test('NoArchive')
 cross_test('ArchiveObjCode')
+cross_test('MultiUnit', ['unit1', 'unit2'])

@@ -392,7 +392,7 @@ oneshot_deps_loop opts (mod : mods) acc = do
       | bytecode
       -- TODO How can we better determine the external deps?
       = [usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface] ++ local
-      | Just _ <- mb_home
+      | is_home
       = local
       | otherwise
       = []

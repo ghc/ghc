@@ -3,8 +3,10 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 # TODO it works even without -package obj, but it should complain about the package not being exposed
-BASIC := $(TEST_HC_OPTS) -this-unit-id=cross -package-db db -package dep -v0
-ARGS := $(BASIC) -fprefer-byte-code -fbyte-code-and-object-code
+DB := -package-db db -package dep
+BASIC := $(TEST_HC_OPTS) $(DB) -this-unit-id=cross -v0
+BC := -fprefer-byte-code -fbyte-code-and-object-code
+ARGS := $(BASIC) $(BC)
 
 .PHONY: CrossPackageArchive
 CrossPackageArchive:
@@ -25,3 +27,11 @@ CrossPackageNoArchive:
 CrossPackageArchiveObjCode:
 	./prep.bash "$(TEST_HC)" "$(TEST_HC_OPTS)" "$(GHC_PKG)" 1
 	./run.bash "$(TEST_HC)" "$(BASIC)"
+
+.PHONY: CrossPackageMultiUnit
+CrossPackageMultiUnit:
+	./prep.bash "$(TEST_HC)" "$(TEST_HC_OPTS)" "$(GHC_PKG)" 1
+	mkdir -p unit2-src/
+	mv CrossLocal.hs CrossNum.hs CrossNum.hs-boot unit2-src/
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ARGS) -unit @unit1 -unit @unit2
+	./Cross
