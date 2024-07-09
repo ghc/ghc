@@ -11,8 +11,6 @@ module GHC.Cmm.Dataflow.Label
     , LabelMap
     , LabelSet
     , mkHooplLabel
-    , FactBase
-    , lookupFact
     -- * Set
     , setEmpty
     , setNull
@@ -296,10 +294,3 @@ instance TrieMap LabelMap where
   foldTM k m z  = mapFoldr k z m
   filterTM f m  = mapFilter f m
 
------------------------------------------------------------------------------
--- FactBase
-
-type FactBase f = LabelMap f
-
-lookupFact :: Label -> FactBase f -> Maybe f
-lookupFact = mapLookup

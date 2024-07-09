@@ -27,6 +27,7 @@ import GHC.Cmm.Config
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet (lookupFact)
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Dataflow
 import GHC.Unit.Module
@@ -603,10 +604,8 @@ cafAnal
   -> CmmGraph
   -> CAFEnv
 cafAnal platform contLbls topLbl cmmGraph =
-  -- ToDo: Is this worth it, or does it shadow the cost of deterministic mapUnion?
-  NonDet.fromDetMap $
-    analyzeCmmBwd cafLattice
-      (cafTransfers platform contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
+  analyzeCmmBwd cafLattice
+    (cafTransfers platform contLbls (g_entry cmmGraph) topLbl) cmmGraph NonDet.mapEmpty
 
 
 cafLattice :: DataflowLattice CAFSet
@@ -666,7 +665,7 @@ cafTransfers platform contLbls entry topLbl
                                 text "topLbl:"       <+> pdoc platform topLbl $$
                                 text "cafs in exit:" <+> pdoc platform joined $$
                                 text "result:"       <+> pdoc platform result) $
-        mapSingleton (entryLabel eNode) result
+        NonDet.mapSingleton (entryLabel eNode) result
 
 
 -- -----------------------------------------------------------------------------

@@ -263,7 +263,7 @@ cmmLayoutStack cfg procpoints entry_args
 
 layout :: CmmConfig
        -> LabelSet                      -- proc points
-       -> LabelMap CmmLocalLive         -- liveness
+       -> NonDet.LabelMap CmmLocalLive         -- liveness
        -> BlockId                       -- entry
        -> ByteOff                       -- stack args on entry
 
@@ -439,7 +439,7 @@ getStackLoc (Young l) n stackmaps =
 -- extra code that goes *after* the Sp adjustment.
 
 handleLastNode
-   :: CmmConfig -> ProcPointSet -> LabelMap CmmLocalLive -> LabelMap ByteOff
+   :: CmmConfig -> ProcPointSet -> NonDet.LabelMap CmmLocalLive -> LabelMap ByteOff
    -> NonDet.LabelMap StackMap -> StackMap -> CmmTickScope
    -> Block CmmNode O O
    -> CmmNode O C
@@ -571,7 +571,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
         --       the destination, because this StackMap might be used
         --       by fixupStack if this is a join point.
         | otherwise = return (l, l, stack1, [])
-        where live = mapFindWithDefault (panic "handleBranch") l liveness
+        where live = NonDet.mapFindWithDefault (panic "handleBranch") l liveness
               stack1 = stack0 { sm_regs = filterUFM is_live (sm_regs stack0) }
               is_live (r,_) = r `elemRegSet` live
 
@@ -620,7 +620,7 @@ fixupStack old_stack new_stack = concatMap move new_locs
 setupStackFrame
              :: Platform
              -> BlockId                 -- label of continuation
-             -> LabelMap CmmLocalLive   -- liveness
+             -> NonDet.LabelMap CmmLocalLive   -- liveness
              -> ByteOff      -- updfr
              -> ByteOff      -- bytes of return values on stack
              -> StackMap     -- current StackMap
@@ -630,7 +630,7 @@ setupStackFrame platform lbl liveness updfr_off ret_args stack0
   = (cont_stack, assignments)
   where
       -- get the set of LocalRegs live in the continuation
-      live = mapFindWithDefault Set.empty lbl liveness
+      live = NonDet.mapFindWithDefault Set.empty lbl liveness
 
       -- the stack from the base to updfr_off is off-limits.
       -- our new stack frame contains:
@@ -1058,7 +1058,7 @@ insertReloadsAsNeeded
     -> UniqDSM [CmmBlock]
 insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
     toBlockList . fst <$>
-        rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) mapEmpty
+        rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) NonDet.mapEmpty
   where
     rewriteCC :: RewriteFun CmmLocalLive
     rewriteCC (BlockCC e_node middle0 x_node) fact_base0 = do
@@ -1085,7 +1085,7 @@ insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
                 = (middle0, live_at_middle0)
 
             -- Final liveness for this block.
-            !fact_base2 = mapSingleton entry_label live_with_reloads
+            !fact_base2 = NonDet.mapSingleton entry_label live_with_reloads
 
         return (BlockCC e_node middle1 x_node, fact_base2)
 
