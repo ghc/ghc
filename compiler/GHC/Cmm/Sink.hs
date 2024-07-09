@@ -14,7 +14,8 @@ import GHC.Cmm.Liveness
 import GHC.Cmm.LRegSet
 import GHC.Cmm.Utils
 import GHC.Cmm.Dataflow.Block
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label (mapFindWithDefault)
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Dataflow.Graph
 import GHC.Platform.Regs
 
@@ -153,7 +154,7 @@ type Assignments = [Assignment]
   --     x = e1
 
 cmmSink :: CmmConfig -> CmmGraph -> UniqDSM CmmGraph
-cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
+cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink NonDet.mapEmpty blocks
   where
   platform = cmmPlatform cfg
   liveness = cmmLocalLivenessL platform graph
@@ -163,13 +164,13 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: LabelMap Assignments -> [CmmBlock] -> UniqDSM [CmmBlock]
+  sink :: NonDet.LabelMap Assignments -> [CmmBlock] -> UniqDSM [CmmBlock]
   sink _ [] = pure []
   sink sunk (b:bs) = do
     -- Now sink and inline in this block
     (prepend, last_fold) <- runOpt cfg $ constantFoldNode last
 
-    (middle', assigs) <- walk cfg (ann_middles ++ annotate platform live_middle prepend) (mapFindWithDefault [] lbl sunk)
+    (middle', assigs) <- walk cfg (ann_middles ++ annotate platform live_middle prepend) (NonDet.mapFindWithDefault [] lbl sunk)
 
     let (final_last, assigs') = tryToInline platform live last_fold assigs
         -- Now, drop any assignments that we will not sink any further.
@@ -192,9 +193,10 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
 
         final_middle = foldl' blockSnoc middle' dropped_last
 
-        sunk' = mapUnion sunk $
-                  mapFromList [ (l, filterAssignments platform (getLive l) assigs'')
-                              | l <- succs ]
+        sunk' = NonDet.mapUnion sunk $
+                  NonDet.mapFromList
+                    [ (l, filterAssignments platform (getLive l) assigs'')
+                    | l <- succs ]
 
     (blockJoin first final_middle final_last :) <$> sink sunk' bs
 
@@ -214,7 +216,7 @@ cmmSink cfg graph = ofBlockList (g_entry graph) <$> sink mapEmpty blocks
       -- We cannot sink into join points (successors with more than
       -- one predecessor), so identify the join points and the set
       -- of registers live in them.
-      (joins, nonjoins) = partition (`mapMember` join_pts) succs
+      (joins, nonjoins) = partition (`NonDet.mapMember` join_pts) succs
       live_in_joins = unionsLRegSet (map getLive joins)
 
       -- We do not want to sink an assignment into multiple branches,
@@ -264,13 +266,13 @@ annotate platform live nodes = snd $ foldr ann (live,[]) nodes
 --
 -- Find the blocks that have multiple successors (join points)
 --
-findJoinPoints :: [CmmBlock] -> LabelMap Int
-findJoinPoints blocks = mapFilter (>1) succ_counts
+findJoinPoints :: [CmmBlock] -> NonDet.LabelMap Int
+findJoinPoints blocks = NonDet.mapFilter (>1) succ_counts
  where
   all_succs = concatMap successors blocks
 
-  succ_counts :: LabelMap Int
-  succ_counts = foldl' (\acc l -> mapInsertWith (+) l 1 acc) mapEmpty all_succs
+  succ_counts :: NonDet.LabelMap Int
+  succ_counts = foldl' (\acc l -> NonDet.mapInsertWith (+) l 1 acc) NonDet.mapEmpty all_succs
 
 --
 -- filter the list of assignments to remove any assignments that

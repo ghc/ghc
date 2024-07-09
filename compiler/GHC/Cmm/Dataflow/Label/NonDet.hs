@@ -22,8 +22,6 @@ module GHC.Cmm.Dataflow.Label.NonDet
     ( Label
     , LabelMap
     , LabelSet
-    , FactBase
-    , lookupFact
     , mkHooplLabel
     -- * Set
     , setEmpty
@@ -75,6 +73,7 @@ module GHC.Cmm.Dataflow.Label.NonDet
     , nonDetMapFoldMapWithKey
     , nonDetMapKeys
     , nonDetMapToList
+    , fromDetMap
     ) where
 
 import GHC.Prelude
@@ -93,6 +92,7 @@ import qualified GHC.Data.Word64Map.Strict as M
 import Data.List (foldl1')
 
 import GHC.Cmm.Dataflow.Label (Label(..), mkHooplLabel)
+import qualified GHC.Cmm.Dataflow.Label as Det
 
 -----------------------------------------------------------------------------
 -- LabelSet
@@ -268,6 +268,9 @@ nonDetMapKeys (LM m) = map (mkHooplLabel . fst) (M.toList m)
 nonDetMapToList :: LabelMap b -> [(Label, b)]
 nonDetMapToList (LM m) = [(mkHooplLabel k, v) | (k, v) <- M.toList m]
 
+fromDetMap :: Det.LabelMap a -> LabelMap a
+fromDetMap = mapFromList . Det.mapToList
+
 -----------------------------------------------------------------------------
 -- Instances
 
@@ -288,10 +291,3 @@ instance OutputableP env a => OutputableP env (LabelMap a) where
 --   foldTM k m z  = mapFoldr k z m -- TODO:ERROR?
 --   filterTM f m  = mapFilter f m
 
------------------------------------------------------------------------------
--- FactBase
-
-type FactBase f = LabelMap f
-
-lookupFact :: Label -> FactBase f -> Maybe f
-lookupFact = mapLookup

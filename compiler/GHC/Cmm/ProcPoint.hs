@@ -29,7 +29,6 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 
 -- Compute a minimal set of proc points for a control-flow graph.
 
@@ -135,7 +134,7 @@ instance Outputable Status where
 -- Once you know what the proc-points are, figure out
 -- what proc-points each block is reachable from
 -- See Note [Proc-point analysis]
-procPointAnalysis :: ProcPointSet -> CmmGraph -> NonDet.LabelMap Status
+procPointAnalysis :: ProcPointSet -> CmmGraph -> LabelMap Status
 procPointAnalysis procPoints cmmGraph@(CmmGraph {g_graph = graph}) =
     analyzeCmmFwd procPointLattice procPointTransfer cmmGraph initProcPoints
   where
@@ -197,14 +196,14 @@ extendPPSet
 extendPPSet platform g blocks procPoints =
     let env = procPointAnalysis procPoints g
         add pps block = let id = entryLabel block
-                        in  case NonDet.mapLookup id env of
+                        in  case mapLookup id env of
                               Just ProcPoint -> setInsert id pps
                               _ -> pps
         procPoints' = foldlGraphBlocks add setEmpty g
         newPoints = mapMaybe ppSuccessor blocks
         newPoint  = listToMaybe newPoints
         ppSuccessor b =
-            let nreached id = case NonDet.mapLookup id env `orElse`
+            let nreached id = case mapLookup id env `orElse`
                                     pprPanic "no ppt" (ppr id <+> pdoc platform b) of
                                 ProcPoint -> 1
                                 ReachedBy ps -> setSize ps
@@ -236,7 +235,7 @@ extendPPSet platform g blocks procPoints =
 -- Input invariant: A block should only be reachable from a single ProcPoint.
 -- ToDo: use the _ret naming convention that the old code generator
 -- used. -- EZY
-splitAtProcPoints :: Platform -> CLabel -> ProcPointSet-> ProcPointSet -> NonDet.LabelMap Status -> CmmDecl
+splitAtProcPoints :: Platform -> CLabel -> ProcPointSet-> ProcPointSet -> LabelMap Status -> CmmDecl
                   -> UniqDSM [CmmDecl]
 splitAtProcPoints _ _ _ _ _ t@(CmmData _ _) = return [t]
 splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
@@ -250,7 +249,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
 
   let add_block :: LabelMap (LabelMap CmmBlock) -> CmmBlock -> LabelMap (LabelMap CmmBlock)
       add_block graphEnv b =
-        case NonDet.mapLookup bid procMap of
+        case mapLookup bid procMap of
           Just ProcPoint -> add graphEnv bid bid b
           Just (ReachedBy set) ->
             case setElems set of
@@ -264,7 +263,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
 
   let liveness = cmmGlobalLiveness platform g
   let ppLiveness pp = filter isArgReg $ regSetToList $
-                        expectJust "ppLiveness" $ NonDet.mapLookup pp liveness
+                        expectJust "ppLiveness" $ mapLookup pp liveness
   graphEnv <- return $ foldlGraphBlocks add_block mapEmpty g
 
   -- Build a map from proc point BlockId to pairs of:

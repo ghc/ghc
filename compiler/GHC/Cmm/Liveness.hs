@@ -19,7 +19,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.LRegSet
 
 import GHC.Data.Maybe
