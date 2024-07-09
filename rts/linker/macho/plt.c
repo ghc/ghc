@@ -56,8 +56,7 @@ makeStub(Section * section,
     s->target = *addr;
     s->flags  = flags;
     s->next = NULL;
-    s->addr = (uint8_t *)section->info->stub_offset + 8
-            + STUB_SIZE * section->info->nstubs;
+    s->addr = (uint8_t *)section->info->stub_offset + STUB_SIZE * section->info->nstubs;
 
     if((*_makeStub)(s))
         return EXIT_FAILURE;
