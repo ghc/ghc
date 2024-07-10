@@ -68,6 +68,7 @@ import GHC.Core.Unfold
 import Data.List( partition )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import GHC.Core.Subst (substTickish)
+import GHC.Core.FamInstEnv (FamInstEnvs)
 
 {-
 ************************************************************************
@@ -638,8 +639,9 @@ Hence, the invariant is this:
 -}
 
 -- | Specialise calls to type-class overloaded functions occurring in a program.
-specProgram :: ModGuts -> CoreM ModGuts
-specProgram guts@(ModGuts { mg_module = this_mod
+specProgram :: FamInstEnvs -- ^ Used to reduce type family applications occuring in rules.
+            -> ModGuts -> CoreM ModGuts
+specProgram fam_inst_envs guts@(ModGuts { mg_module = this_mod
                           , mg_rules  = local_rules
                           , mg_binds  = binds })
   = do { dflags   <- getDynFlags
@@ -657,7 +659,8 @@ specProgram guts@(ModGuts { mg_module = this_mod
                                       --  bindersOfBinds binds
                           , se_module = this_mod
                           , se_rules  = rule_env
-                          , se_dflags = dflags }
+                          , se_dflags = dflags
+                          , se_fam_inst_envs = fam_inst_envs }
 
              go []           = return ([], emptyUDs)
              go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
@@ -1168,6 +1171,7 @@ data SpecEnv
        , se_module :: Module
        , se_rules  :: RuleEnv  -- From the home package and this module
        , se_dflags :: DynFlags
+       , se_fam_inst_envs :: FamInstEnvs
      }
 
 instance Outputable SpecEnv where
@@ -1820,7 +1824,7 @@ specLookupRule :: SpecEnv -> Id -> [CoreExpr]
                -> CompilerPhase  -- Look up rules as if we were in this phase
                -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 specLookupRule env fn args phase rules
-  = lookupRule ropts in_scope_env is_active fn args rules
+  = lookupRule ropts in_scope_env (se_fam_inst_envs env) is_active fn args rules
   where
     dflags       = se_dflags env
     in_scope     = getSubstInScope (se_subst env)

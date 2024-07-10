@@ -65,7 +65,7 @@ import GHC.Core.Opt.Arity( etaExpandToJoinPointRule )
 import GHC.Core.Make     ( mkCoreLams )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr )
 
-import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
+import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe, isTyFamFree )
 import GHC.Builtin.Types    ( anyTypeOfKind )
 
 import GHC.Types.Id
@@ -95,6 +95,7 @@ import GHC.Utils.Constants (debugIsOn)
 import Data.List (sortBy, mapAccumL, isPrefixOf)
 import Data.Function    ( on )
 import Control.Monad    ( guard )
+import GHC.Core.FamInstEnv (FamInstEnvs)
 
 {-
 Note [Overall plumbing for rules]
@@ -265,9 +266,12 @@ roughTopNames :: [CoreExpr] -> [Maybe Name]
 roughTopNames args = map roughTopName args
 
 roughTopName :: CoreExpr -> Maybe Name
-roughTopName (Type ty) = case tcSplitTyConApp_maybe ty of
-                               Just (tc,_) -> Just (getName tc)
-                               Nothing     -> Nothing
+roughTopName (Type ty)
+  | not (isTyFamFree ty) = Nothing
+  | otherwise =
+      case tcSplitTyConApp_maybe ty of
+                                  Just (tc,_) -> Just (getName tc)
+                                  Nothing     -> Nothing
 roughTopName (Coercion _) = Nothing
 roughTopName (App f _) = roughTopName f
 roughTopName (Var f)   | isGlobalId f   -- Note [Care with roughTopName]
@@ -538,7 +542,7 @@ map.
 -- supplied rules to this instance of an application in a given
 -- context, returning the rule applied and the resulting expression if
 -- successful.
-lookupRule :: RuleOpts -> InScopeEnv
+lookupRule :: RuleOpts -> InScopeEnv -> FamInstEnvs
            -> (Activation -> Bool)      -- When rule is active
            -> Id -- Function head
            -> [CoreExpr] -- Args
@@ -547,11 +551,11 @@ lookupRule :: RuleOpts -> InScopeEnv
 
 -- See Note [Extra args in the target]
 -- See comments on matchRule
-lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
+lookupRule opts rule_env@(ISE in_scope _) fam_inst_envs is_active fn args rules
   = -- pprTrace "lookupRule" (ppr fn <+> ppr args $$ ppr rules $$ ppr in_scope) $
     case go [] rules of
         []     -> Nothing
-        (m:ms) -> Just (findBest in_scope (fn,args') m ms)
+        (m:ms) -> Just (findBest in_scope fam_inst_envs(fn,args') m ms)
   where
     rough_args = map roughTopName args
 
@@ -564,7 +568,7 @@ lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms [] = ms
     go ms (r:rs)
-      | Just e <- matchRule opts rule_env is_active fn args' rough_args r
+      | Just e <- matchRule opts rule_env fam_inst_envs is_active fn args' rough_args r
       = go ((r,mkTicks ticks e):ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
@@ -574,16 +578,16 @@ lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
         --       , isCheapUnfolding unf] )
         go ms rs
 
-findBest :: InScopeSet -> (Id, [CoreExpr])
+findBest :: InScopeSet -> FamInstEnvs -> (Id, [CoreExpr])
          -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
 -- All these pairs matched the expression
 -- Return the pair the most specific rule
 -- The (fn,args) is just for overlap reporting
 
-findBest _        _      (rule,ans)   [] = (rule,ans)
-findBest in_scope target (rule1,ans1) ((rule2,ans2):prs)
-  | isMoreSpecific in_scope rule1 rule2 = findBest in_scope target (rule1,ans1) prs
-  | isMoreSpecific in_scope rule2 rule1 = findBest in_scope target (rule2,ans2) prs
+findBest _        _fam_inst_envs _      (rule,ans)   [] = (rule,ans)
+findBest in_scope fam_inst_envs target (rule1,ans1) ((rule2,ans2):prs)
+  | isMoreSpecific in_scope fam_inst_envs rule1 rule2 = findBest in_scope fam_inst_envs target (rule1,ans1) prs
+  | isMoreSpecific in_scope fam_inst_envs rule2 rule1 = findBest in_scope fam_inst_envs target (rule2,ans2) prs
   | debugIsOn = let pp_rule rule
                       = ifPprDebug (ppr rule)
                                    (doubleQuotes (ftext (ruleName rule)))
@@ -593,20 +597,21 @@ findBest in_scope target (rule1,ans1) ((rule2,ans2):prs)
                                  <+> sep (map ppr args)
                                , text "Rule 1:" <+> pp_rule rule1
                                , text "Rule 2:" <+> pp_rule rule2]) $
-                findBest in_scope target (rule1,ans1) prs
-  | otherwise = findBest in_scope target (rule1,ans1) prs
+                findBest in_scope fam_inst_envs target (rule1,ans1) prs
+  | otherwise = findBest in_scope fam_inst_envs target (rule1,ans1) prs
   where
     (fn,args) = target
 
-isMoreSpecific :: InScopeSet -> CoreRule -> CoreRule -> Bool
+isMoreSpecific :: InScopeSet -> FamInstEnvs -> CoreRule -> CoreRule -> Bool
 -- The call (rule1 `isMoreSpecific` rule2)
 -- sees if rule2 can be instantiated to look like rule1
 -- See Note [isMoreSpecific]
-isMoreSpecific _        (BuiltinRule {}) _                = False
-isMoreSpecific _        (Rule {})        (BuiltinRule {}) = True
-isMoreSpecific in_scope (Rule { ru_bndrs = bndrs1, ru_args = args1 })
-                        (Rule { ru_bndrs = bndrs2, ru_args = args2 })
-  = isJust (matchExprs in_scope_env bndrs2 args2 args1)
+isMoreSpecific _        _ (BuiltinRule {}) _                = False
+isMoreSpecific _        _ (Rule {})        (BuiltinRule {}) = True
+isMoreSpecific in_scope fam_inst_envs
+                          (Rule { ru_bndrs = bndrs1, ru_args = args1 })
+                          (Rule { ru_bndrs = bndrs2, ru_args = args2 })
+  = isJust (matchExprs in_scope_env fam_inst_envs bndrs2 args2 args1)
   where
    full_in_scope = in_scope `extendInScopeSetList` bndrs1
    in_scope_env  = ISE full_in_scope noUnfoldingFun
@@ -660,7 +665,7 @@ start, in general eta expansion wastes work.  SLPJ July 99
 -}
 
 ------------------------------------
-matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
+matchRule :: RuleOpts -> InScopeEnv -> FamInstEnvs -> (Activation -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
 
@@ -689,23 +694,23 @@ matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
 -- NB: The 'surplus' argument e4 in the input is simply dropped.
 -- See Note [Extra args in the target]
 
-matchRule opts rule_env _is_active fn args _rough_args
+matchRule opts rule_env _fam_inst_envs _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
   = case match_fn opts rule_env fn args of
         Nothing   -> Nothing
         Just expr -> Just expr
 
-matchRule _ rule_env is_active _ args rough_args
+matchRule _ rule_env fam_inst_envs is_active _ args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
                 , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
   | not (is_active act)               = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
-  | otherwise = matchN rule_env rule_name tpl_vars tpl_args args rhs
+  | otherwise = matchN rule_env fam_inst_envs rule_name tpl_vars tpl_args args rhs
 
 
 ---------------------------------------
-matchN  :: InScopeEnv
+matchN  :: InScopeEnv -> FamInstEnvs
         -> RuleName -> [Var] -> [CoreExpr]
         -> [CoreExpr] -> CoreExpr           -- ^ Target; can have more elements than the template
         -> Maybe CoreExpr
@@ -719,14 +724,14 @@ matchN  :: InScopeEnv
 -- trailing ones, returning the result of applying the rule to a prefix
 -- of the actual arguments.
 
-matchN ise _rule_name tmpl_vars tmpl_es target_es rhs
-  = do { (bind_wrapper, matched_es) <- matchExprs ise tmpl_vars tmpl_es target_es
+matchN ise fam_inst_envs _rule_name tmpl_vars tmpl_es target_es rhs
+  = do { (bind_wrapper, matched_es) <- matchExprs ise fam_inst_envs tmpl_vars tmpl_es target_es
        ; return (bind_wrapper $
                  mkLams tmpl_vars rhs `mkApps` matched_es) }
 
-matchExprs :: InScopeEnv -> [Var] -> [CoreExpr] -> [CoreExpr]
+matchExprs :: InScopeEnv -> FamInstEnvs -> [Var] -> [CoreExpr] -> [CoreExpr]
            -> Maybe (BindWrapper, [CoreExpr])  -- 1-1 with the [Var]
-matchExprs (ISE in_scope id_unf) tmpl_vars tmpl_es target_es
+matchExprs (ISE in_scope id_unf) fam_inst_envs tmpl_vars tmpl_es target_es
   = do  { rule_subst <- match_exprs init_menv emptyRuleSubst tmpl_es target_es
         ; let (_, matched_es) = mapAccumL (lookup_tmpl rule_subst)
                                           (mkEmptySubst in_scope) $
@@ -743,7 +748,8 @@ matchExprs (ISE in_scope id_unf) tmpl_vars tmpl_es target_es
     init_menv = RV { rv_tmpls = mkVarSet tmpl_vars1
                    , rv_lcl   = init_rn_env
                    , rv_fltR  = mkEmptySubst (rnInScopeSet init_rn_env)
-                   , rv_unf   = id_unf }
+                   , rv_unf   = id_unf
+                   , rv_fams  = fam_inst_envs }
 
     lookup_tmpl :: RuleSubst -> Subst -> (InVar,OutVar) -> (Subst, CoreExpr)
                    -- Need to return a RuleSubst solely for the benefit of fake_ty
@@ -887,6 +893,7 @@ data RuleMatchEnv
                                      -- N.B. The InScopeSet of rv_fltR is always ignored;
                                      -- see (4) in Note [Matching lets].
        , rv_unf :: IdUnfoldingFun
+       , rv_fams :: FamInstEnvs
        }
 
 {- Note [rv_lcl in RuleMatchEnv]
@@ -1873,12 +1880,13 @@ is so important.
 -- | Report partial matches for rules beginning with the specified
 -- string for the purposes of error reporting
 ruleCheckProgram :: RuleOpts                    -- ^ Rule options
+                 -> FamInstEnvs
                  -> CompilerPhase               -- ^ Rule activation test
                  -> String                      -- ^ Rule pattern
                  -> (Id -> [CoreRule])          -- ^ Rules for an Id
                  -> CoreProgram                 -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
-ruleCheckProgram ropts phase rule_pat rules binds
+ruleCheckProgram ropts fam_inst_envs phase rule_pat rules binds
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -1894,7 +1902,8 @@ ruleCheckProgram ropts phase rule_pat rules binds
                        , rc_pattern   = rule_pat
                        , rc_rules     = rules
                        , rc_ropts     = ropts
-                       , rc_in_scope  = emptyInScopeSet }
+                       , rc_in_scope  = emptyInScopeSet
+                       , rc_fams      = fam_inst_envs }
 
     results = go env binds
 
@@ -1908,7 +1917,8 @@ data RuleCheckEnv = RuleCheckEnv
     , rc_pattern   :: String
     , rc_rules     :: Id -> [CoreRule]
     , rc_ropts     :: RuleOpts
-    , rc_in_scope  :: InScopeSet }
+    , rc_in_scope  :: InScopeSet
+    , rc_fams      :: FamInstEnvs }
 
 extendInScopeRC :: RuleCheckEnv -> Var -> RuleCheckEnv
 extendInScopeRC env@(RuleCheckEnv { rc_in_scope = in_scope }) v
@@ -1976,7 +1986,7 @@ ruleAppCheck_help env fn args rules
         = text "Rule" <+> doubleQuotes (ftext name)
 
     rule_info opts rule
-        | Just _ <- matchRule opts (ISE emptyInScopeSet (rc_id_unf env))
+        | Just _ <- matchRule opts (ISE emptyInScopeSet (rc_id_unf env)) (rc_fams env)
                               noBlackList fn args rough_args rule
         = text "matches (which is very peculiar!)"
 
@@ -2000,4 +2010,5 @@ ruleAppCheck_help env fn args rules
                   renv = RV { rv_lcl   = mkRnEnv2 in_scope
                             , rv_tmpls = mkVarSet rule_bndrs
                             , rv_fltR  = mkEmptySubst in_scope
-                            , rv_unf   = rc_id_unf env }
+                            , rv_unf   = rc_id_unf env
+                            , rv_fams  = rc_fams env }

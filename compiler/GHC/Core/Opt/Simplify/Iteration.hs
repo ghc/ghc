@@ -2570,7 +2570,7 @@ tryRules env rules fn args call_cont
   | null rules
   = return Nothing
 
-  | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
+  | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env) (seFamEnvs env)
                                         (activeRule (seMode env)) fn
                                         (argInfoAppArgs args) rules
   -- Fire a rule for the function

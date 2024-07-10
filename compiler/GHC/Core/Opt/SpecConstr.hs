@@ -85,6 +85,7 @@ import Data.List ( sortBy, partition, dropWhileEnd, mapAccumL )
 import Data.Maybe( mapMaybe )
 import Data.Ord( comparing )
 import Data.Tuple
+import GHC.Core.FamInstEnv (emptyFamInstEnvs)
 
 {-
 -----------------------------------------------------
@@ -2826,7 +2827,9 @@ betterPat :: InScopeSet -> CallPat -> CallPat -> Bool
 betterPat is (CP { cp_qvars = vs1, cp_args = as1 })
              (CP { cp_qvars = vs2, cp_args = as2 })
   | equalLength as1 as2
-  = case matchExprs ise vs1 as1 as2 of
+  -- TODO: Right now this might fail if we try to match up types involving
+  -- type families. For that we would need to pipe through a typeFamEnv
+  = case matchExprs ise emptyFamInstEnvs vs1 as1 as2 of
       Just (_, ms) -> all exprIsTrivial ms
       Nothing      -> False
 

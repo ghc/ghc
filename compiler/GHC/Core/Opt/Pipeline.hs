@@ -514,7 +514,7 @@ doCorePass pass guts = do
                                                us)
 
     CoreDoSpecialising        -> {-# SCC "Specialise" #-}
-                                 specProgram guts
+                                 specProgram fam_envs guts
 
     CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-}
                                  specConstrProgram guts
@@ -529,7 +529,7 @@ doCorePass pass guts = do
                                  liftIO $ printCore logger (mg_binds guts) >> return guts
 
     CoreDoRuleCheck phase pat -> {-# SCC "RuleCheck" #-}
-                                 ruleCheckPass phase pat guts
+                                 ruleCheckPass fam_envs phase pat guts
     CoreDoNothing             -> return guts
     CoreDoPasses passes       -> runCorePasses passes guts
 
@@ -552,8 +552,8 @@ printCore :: Logger -> CoreProgram -> IO ()
 printCore logger binds
     = Logger.logDumpMsg logger "Print Core" (pprCoreBindings binds)
 
-ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
-ruleCheckPass current_phase pat guts = do
+ruleCheckPass :: FamInstEnvs -> CompilerPhase -> String -> ModGuts -> CoreM ModGuts
+ruleCheckPass fam_inst_envs current_phase pat guts = do
     dflags <- getDynFlags
     logger <- getLogger
     withTiming logger (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
@@ -562,7 +562,7 @@ ruleCheckPass current_phase pat guts = do
         let rule_fn fn = getRules rule_env fn
             ropts = initRuleOpts dflags
         liftIO $ logDumpMsg logger "Rule check"
-                     (ruleCheckProgram ropts current_phase pat
+                     (ruleCheckProgram ropts fam_inst_envs current_phase pat
                         rule_fn (mg_binds guts))
         return guts
 
