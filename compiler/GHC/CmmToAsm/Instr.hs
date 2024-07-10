@@ -10,7 +10,7 @@ import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Reg
-import GHC.Utils.Outputable (SDoc)
+import GHC.Utils.Outputable (HDoc, SDoc)
 
 import GHC.Cmm.BlockId
 
@@ -173,8 +173,10 @@ class Instruction instr where
                 -> Int
                 -> [instr]
 
-        -- | Pretty-print an instruction
-        pprInstr :: Platform -> instr -> SDoc
+        -- | Pretty-print an instruction using HDoc (see Note [SDoc versus HDoc])
+        pprInstrH :: Platform -> instr -> HDoc
+        -- | Pretty-print an instruction using SDoc (see Note [SDoc versus HDoc])
+        pprInstrS :: Platform -> instr -> SDoc
 
         -- Create a comment instruction
         mkComment :: FastString -> [instr]

@@ -467,7 +467,7 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
 raInsn _ _ _ instr
         = do
             platform <- getPlatform
-            let instr' = fmap (pprInstr platform) instr
+            let instr' = fmap (pprInstrS platform) instr
             pprPanic "raInsn" (text "no match for:" <> ppr instr')
 
 -- ToDo: what can we do about

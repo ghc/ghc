@@ -59,4 +59,6 @@ instance Instruction AArch64.Instr where
         mkStackAllocInstr       = AArch64.mkStackAllocInstr
         mkStackDeallocInstr     = AArch64.mkStackDeallocInstr
         mkComment               = pure . AArch64.COMMENT . ftext
-        pprInstr                = AArch64.pprInstr
+        pprInstrH               = AArch64.pprInstr
+        pprInstrS               = AArch64.pprInstr
+

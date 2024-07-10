@@ -169,7 +169,8 @@ instance Instruction instr => Instruction (InstrSR instr) where
         mkStackDeallocInstr platform amount =
              Instr <$> mkStackDeallocInstr platform amount
 
-        pprInstr platform i = ppr (fmap (pprInstr platform) i)
+        pprInstrH platform i    = pprInstrSR (pprInstrH platform) i
+        pprInstrS platform i    = pprInstrSR (pprInstrS platform) i
 
         mkComment               = fmap Instr . mkComment
 
@@ -207,6 +208,27 @@ data LiveInfo
 type LiveBasicBlock instr
         = GenBasicBlock (LiveInstr instr)
 
+pprInstrSR :: IsDoc doc => (instr -> doc) -> InstrSR instr -> doc
+pprInstrSR pp (Instr realInstr)
+  = pp realInstr
+
+pprInstrSR _pp (SPILL reg slot)
+   = line $ hcat [
+        text "\tSPILL",
+        char ' ',
+        pprPlatformReg reg,
+        comma,
+        text "SLOT" <> parens (int slot)]
+
+pprInstrSR _pp (RELOAD slot reg)
+   = line $ hcat [
+        text "\tRELOAD",
+        char ' ',
+        text "SLOT" <> parens (int slot),
+        comma,
+        pprPlatformReg reg]
+{-# SPECIALIZE pprInstrSR :: (instr -> SDoc) -> InstrSR instr -> SDoc #-}
+{-# SPECIALIZE pprInstrSR :: (instr -> HDoc) -> InstrSR instr -> HDoc #-}
 
 instance Outputable instr
       => Outputable (InstrSR instr) where
@@ -539,7 +561,7 @@ stripLive config live
 
 -- | Pretty-print a `LiveCmmDecl`
 pprLiveCmmDecl :: (OutputableP Platform statics, Instruction instr) => Platform -> LiveCmmDecl statics instr -> SDoc
-pprLiveCmmDecl platform d = pdoc platform (mapLiveCmmDecl (pprInstr platform) d)
+pprLiveCmmDecl platform d = pdoc platform (mapLiveCmmDecl (pprInstrS platform) d)
 
 
 -- | Map over instruction type in `LiveCmmDecl`
@@ -874,7 +896,7 @@ computeLiveness
 computeLiveness platform sccs
  = case checkIsReverseDependent sccs of
         Nothing         -> livenessSCCs platform mapEmpty [] sccs
-        Just bad        -> let sccs' = fmap (fmap (fmap (fmap (pprInstr platform)))) sccs
+        Just bad        -> let sccs' = fmap (fmap (fmap (fmap (pprInstrS platform)))) sccs
                            in pprPanic "RegAlloc.Liveness.computeLiveness"
                                 (vcat   [ text "SCCs aren't in reverse dependent order"
                                         , text "bad blockId" <+> ppr bad

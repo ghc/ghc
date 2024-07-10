@@ -120,7 +120,7 @@ slurpSpillCostInfo platform cfg cmm
 
                 | otherwise
                 = pprPanic "RegSpillCost.slurpSpillCostInfo"
-                $ text "no liveness information on instruction " <> pprInstr platform instr
+                $ text "no liveness information on instruction " <> pprInstrS platform instr
 
         countLIs scale rsLiveEntry (LiveInstr instr (Just live) : lis)
          = do

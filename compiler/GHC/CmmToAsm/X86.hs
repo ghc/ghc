@@ -62,5 +62,6 @@ instance Instruction X86.Instr where
    mkJumpInstr             = X86.mkJumpInstr
    mkStackAllocInstr       = X86.mkStackAllocInstr
    mkStackDeallocInstr     = X86.mkStackDeallocInstr
-   pprInstr                = X86.pprInstr
+   pprInstrH               = X86.pprInstr
+   pprInstrS               = X86.pprInstr
    mkComment               = pure . X86.COMMENT

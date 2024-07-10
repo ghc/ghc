@@ -57,5 +57,6 @@ instance Instruction PPC.Instr where
    mkJumpInstr         = PPC.mkJumpInstr
    mkStackAllocInstr   = PPC.mkStackAllocInstr
    mkStackDeallocInstr = PPC.mkStackDeallocInstr
-   pprInstr            = PPC.pprInstr
+   pprInstrH           = PPC.pprInstr
+   pprInstrS           = PPC.pprInstr
    mkComment           = pure . PPC.COMMENT
