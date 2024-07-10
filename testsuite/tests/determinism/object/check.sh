@@ -39,10 +39,44 @@ compareObjs() {
     done
 }
 
+# $1 = objects
+# $2 = extra flags
+compareHis() {
+    for o in $2
+    do
+        echo $1 --show-iface $o
+        echo "--------------------------------------------------------------------------------"
+        # Compare the object dumps except for the first line which prints the file path
+        $1 --show-iface Cabal-3.12.0.0/hiout1/$o > dump1
+        $1 --show-iface Cabal-3.12.0.0/hiout2/$o > dump2
+        diff -C3 dump1 dump2 && echo "OK-hi"
+        echo "--------------------------------------------------------------------------------"
+    done
+}
+
+#if diff -r Cabal-3.12.0.0/hiout1 Cabal-3.12.0.0/hiout2
+#then
+#    echo "OK-hi"
+#else
+#    echo "--------------------------------------------------------------------------------"
+#    echo "Comparing all objects (1. headers, 2. disassembly). Stopping at first failure..."
+#    echo "--------------------------------------------------------------------------------"
+#
+#
+#    pushd Cabal-3.12.0.0/hiout1 >/dev/null
+#    OBJS=$(find . -type f)
+#    popd >/dev/null
+#
+#    compareHis "/home/matt/ghc-rodrigo/_build/stage1/bin/ghc" "$OBJS"
+#
+#    exit 1
+#
+#fi
+
 # Big fast check
 if diff -r Cabal-3.12.0.0/out1 Cabal-3.12.0.0/out2
 then
-    echo "OK"
+    echo "OK-obj"
 else
     echo "--------------------------------------------------------------------------------"
     echo "Comparing all objects (1. headers, 2. disassembly). Stopping at first failure..."
@@ -56,6 +90,7 @@ else
     compareObjs "$OBJS" "--all-headers"
 
     compareObjs "$OBJS" "--disassemble-all"
+    exit 1
 
 fi
 

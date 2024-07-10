@@ -26,6 +26,9 @@ import GHC.Utils.Outputable as Outputable
 import Data.Tuple (swap)
 import GHC.Types.Id
 import GHC.Types.Unique.DSM
+import GHC.Types.Name hiding (varName)
+import GHC.Types.Var
+
 
 {-
 --------------------------------------------------------------------------------
@@ -72,7 +75,7 @@ renameDetUniq uq = do
     Nothing -> do
       new_w <- gets supply -- New deterministic unique in this `DetRnM`
       let (tag, _) = unpkUnique uq
-          det_uniq = mkUnique tag new_w
+          det_uniq = mkUnique 'Q' new_w
       modify' (\DetUniqFM{mapping, supply} ->
         -- Update supply and mapping
         DetUniqFM
@@ -94,7 +97,9 @@ detRenameCLabel = mapInternalNonDetUniques renameDetUniq
 
 -- | We want to rename uniques in Ids, but ONLY internal ones.
 detRenameId :: Id -> DetRnM Id
-detRenameId i = setIdUnique i <$> renameDetUniq (getUnique i)
+detRenameId i
+  | isExternalName (varName i) = return i
+  | otherwise = setIdUnique i <$> renameDetUniq (getUnique i)
 
 --------------------------------------------------------------------------------
 -- Traversals

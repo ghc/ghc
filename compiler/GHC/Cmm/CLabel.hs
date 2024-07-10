@@ -343,6 +343,10 @@ newtype NeedExternDecl
 -- This is non-deterministic but we do not currently support deterministic
 -- code-generation. See Note [Unique Determinism and code generation]
 instance Ord CLabel where
+  compare (IdLabel a1 b1 c1)
+          (IdLabel a2 b2 c2)
+          | isExternalName a1, isExternalName a2 = stableNameCmp a1 a2 S.<> compare b1 b2 S.<> compare c1 c2
+
   compare (IdLabel a1 b1 c1) (IdLabel a2 b2 c2) =
     -- Comparing names here should deterministic because all unique should have been renamed deterministically ......
     compare a1 a2 S.<>
@@ -1874,8 +1878,10 @@ returns True.
 -- however, the input to layout must be deterministic to produce deterministic layout.
 -- Which means we could avoid renaming it here, as long as we guarantee the labels are produced deterministically (which we could, perhaps by using a det supply in fcode)
 mapInternalNonDetUniques :: Applicative m => (Unique -> m Unique) -> CLabel -> m CLabel
-mapInternalNonDetUniques f = \case
-  IdLabel name cafInfo idLabelInfo -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
+mapInternalNonDetUniques f x = case x of
+  IdLabel name cafInfo idLabelInfo
+    | not (isExternalName name) -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
+    | otherwise -> pure x
   cl@CmmLabel{} -> pure cl
   -- ROMES:TODO: what about `RtsApFast NonDetFastString`?
   RtsLabel rtsLblInfo -> pure $ RtsLabel rtsLblInfo
