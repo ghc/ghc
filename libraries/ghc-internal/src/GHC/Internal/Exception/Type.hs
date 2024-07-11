@@ -196,6 +196,7 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
+    -- | @since base-4.20.0.0
     backtraceDesired :: e -> Bool
     backtraceDesired _ = True
 
