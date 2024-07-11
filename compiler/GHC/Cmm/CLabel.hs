@@ -346,6 +346,8 @@ instance Ord CLabel where
   compare (IdLabel a1 b1 c1)
           (IdLabel a2 b2 c2)
           | isExternalName a1, isExternalName a2 = stableNameCmp a1 a2 S.<> compare b1 b2 S.<> compare c1 c2
+          | isExternalName a1 = GT
+          | isExternalName a2 = LT
 
   compare (IdLabel a1 b1 c1) (IdLabel a2 b2 c2) =
     -- Comparing names here should deterministic because all unique should have been renamed deterministically ......

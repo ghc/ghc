@@ -5,7 +5,6 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE TupleSections              #-}
-{-# OPTIONS_GHC -ddump-simpl -ddump-to-file #-}
 --
 -- Copyright (c) 2018 Andreas Klebinger
 --
