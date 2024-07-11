@@ -122,7 +122,7 @@ import GHC.Platform.Reg
 import GHC.Platform.Reg.Class (RegClass(..))
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label (mapLookup)
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet (mapLookup)
 import GHC.Cmm hiding (RegSet)
 
 import GHC.Data.Graph.Directed
@@ -359,7 +359,7 @@ initBlock id block_live
                 -- empty.
                 Nothing
                  -> do  -- pprTrace "initFreeRegs" (text $ show initFreeRegs) (return ())
-                        case mapLookup id block_live of
+                        case NonDet.mapLookup id block_live of
                           Nothing ->
                             setFreeRegsR    (frInitFreeRegs platform)
                           Just live ->

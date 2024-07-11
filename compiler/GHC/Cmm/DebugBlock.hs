@@ -57,6 +57,7 @@ import Data.Maybe
 import Data.List     ( minimumBy, nubBy )
 import Data.Ord      ( comparing )
 import qualified Data.Map as Map
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 
 -- | Debug information about a block of code. Ticks scope over nested
 -- blocks.
@@ -250,7 +251,7 @@ cmmDebugLabels is_valid_label isMeta nats = seqList lbls lbls
 
 -- | Sets position and unwind table fields in the debug block tree according to
 -- native generated code.
-cmmDebugLink :: [Label] -> LabelMap [UnwindPoint]
+cmmDebugLink :: [Label] -> NonDet.LabelMap [UnwindPoint]
              -> [DebugBlock] -> [DebugBlock]
 cmmDebugLink labels unwindPts blocks = mapMaybe link blocks
   where blockPos :: LabelMap Int
@@ -262,7 +263,7 @@ cmmDebugLink labels unwindPts blocks = mapMaybe link blocks
           pos      -> Just $ block
                          { dblPosition = pos
                          , dblBlocks   = mapMaybe link (dblBlocks block)
-                         , dblUnwind   = fromMaybe mempty $ mapLookup (dblLabel block) unwindPts
+                         , dblUnwind   = fromMaybe mempty $ NonDet.mapLookup (dblLabel block) unwindPts
                          }
 
 -- | Converts debug blocks into a label map for easier lookups

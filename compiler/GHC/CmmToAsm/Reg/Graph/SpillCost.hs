@@ -24,7 +24,6 @@ import GHC.Platform.Reg
 
 import GHC.Data.Graph.Base
 
-import GHC.Cmm.Dataflow.Label (mapLookup)
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet (mapLookup, Label, LabelMap)
 import GHC.Cmm
 import GHC.Types.Unique.FM
@@ -99,7 +98,7 @@ slurpSpillCostInfo platform cfg cmm
         --      the info table from the CmmProc.
         countBlock info freqMap (BasicBlock blockId instrs)
                 | LiveInfo _ _ blockLive _ <- info
-                , Just rsLiveEntry  <- mapLookup blockId blockLive
+                , Just rsLiveEntry  <- NonDet.mapLookup blockId blockLive
                 , rsLiveEntry_virt  <- takeVirtuals rsLiveEntry
                 = countLIs (ceiling $ blockFreq freqMap blockId) rsLiveEntry_virt instrs
 

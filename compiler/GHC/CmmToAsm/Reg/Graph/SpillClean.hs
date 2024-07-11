@@ -49,8 +49,7 @@ import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Cmm.Dataflow.Label (mapLookup)
---import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet (mapLookup)
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet (mapLookup)
 
 import Data.List (nub, foldl1', find)
 import Data.Maybe
@@ -391,7 +390,7 @@ cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc (li : instrs)
         = do
                 let slotsReloadedByTargets
                         = IntSet.unions
-                        $ mapMaybe (flip mapLookup liveSlotsOnEntry)
+                        $ mapMaybe (flip NonDet.mapLookup liveSlotsOnEntry)
                         $ targets
 
                 let noReloads'

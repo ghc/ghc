@@ -169,7 +169,7 @@ data NativeGenAcc statics instr
         , ngs_labels      :: ![Label]
         , ngs_debug       :: ![DebugBlock]
         , ngs_dwarfFiles  :: !DwarfFiles
-        , ngs_unwinds     :: !(LabelMap [UnwindPoint])
+        , ngs_unwinds     :: !(NonDet.LabelMap [UnwindPoint])
              -- ^ see Note [Unwinding information in the NCG]
              -- and Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
         }
@@ -213,7 +213,7 @@ nativeCodeGen' logger config modLoc ncgImpl h us cmms
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
-        let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
+        let ngs0 = NGS [] [] [] [] [] [] emptyUFM NonDet.mapEmpty
         (ngs, us', a) <- cmmNativeGenStream logger config modLoc ncgImpl bufh us
                                          cmms ngs0
         _ <- finishNativeGen logger config modLoc bufh us' ngs
@@ -408,7 +408,7 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
                       , ngs_linearStats = linearStats `mCon` ngs_linearStats ngs
                       , ngs_labels      = ngs_labels ngs ++ labels'
                       , ngs_dwarfFiles  = fileIds'
-                      , ngs_unwinds     = ngs_unwinds ngs `mapUnion` unwinds
+                      , ngs_unwinds     = ngs_unwinds ngs `NonDet.mapUnion` unwinds
                       }
         go us' cmms ngs' (count + 1)
 
@@ -442,7 +442,7 @@ cmmNativeGen
                 , [CLabel]                                  -- things imported by this cmm
                 , Maybe [Color.RegAllocStats statics instr] -- stats for the coloring register allocator
                 , Maybe [Linear.RegAllocStats]              -- stats for the linear register allocators
-                , LabelMap [UnwindPoint]                    -- unwinding information for blocks
+                , BlockMap [UnwindPoint]                    -- unwinding information for blocks
                 , Maybe CFG                                 -- final CFG
                 )
 
@@ -671,10 +671,10 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         let unwinds :: BlockMap [UnwindPoint]
             unwinds =
                 {-# SCC "unwindingInfo" #-}
-                foldl' addUnwind mapEmpty branchOpt
+                foldl' addUnwind NonDet.mapEmpty branchOpt
               where
                 addUnwind acc proc =
-                    acc `mapUnion` computeUnwinding config ncgImpl proc
+                    acc `NonDet.mapUnion` computeUnwinding config ncgImpl proc
 
         return  ( us_seq
                 , fileIds'
@@ -719,12 +719,12 @@ computeUnwinding :: Instruction instr
                  -> NcgImpl statics instr jumpDest
                  -> NatCmmDecl statics instr
                     -- ^ the native code generated for the procedure
-                 -> LabelMap [UnwindPoint]
+                 -> BlockMap [UnwindPoint]
                     -- ^ unwinding tables for all points of all blocks of the
                     -- procedure
 computeUnwinding config _ _
-  | not (ncgComputeUnwinding config) = mapEmpty
-computeUnwinding _ _ (CmmData _ _)   = mapEmpty
+  | not (ncgComputeUnwinding config) = NonDet.mapEmpty
+computeUnwinding _ _ (CmmData _ _)   = NonDet.mapEmpty
 computeUnwinding _ ncgImpl (CmmProc _ _ _ (ListGraph blks)) =
     -- In general we would need to push unwinding information down the
     -- block-level call-graph to ensure that we fully account for all
@@ -734,8 +734,8 @@ computeUnwinding _ ncgImpl (CmmProc _ _ _ (ListGraph blks)) =
     -- Sp. The fact that GHC.Cmm.LayoutStack already ensures that we have unwind
     -- information at the beginning of every block means that there is no need
     -- to perform this sort of push-down.
-    mapFromList [ (blk_lbl, extractUnwindPoints ncgImpl instrs)
-                | BasicBlock blk_lbl instrs <- blks ]
+    NonDet.mapFromList [ (blk_lbl, extractUnwindPoints ncgImpl instrs)
+                       | BasicBlock blk_lbl instrs <- blks ]
 
 -- | Build a doc for all the imports.
 --

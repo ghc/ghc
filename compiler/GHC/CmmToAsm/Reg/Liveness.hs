@@ -46,9 +46,9 @@ import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label (LabelMap, mapInsert, mapEmpty, mapFilterWithKey, mapLookup, mapMap, mapMapWithKey, mapToList)
+import GHC.Cmm.Dataflow.Label (LabelMap, mapFilterWithKey)
 import GHC.Cmm.Dataflow.Label.NonDet (LabelSet, setMember, setFromList)
---import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm hiding (RegSet, emptyRegSet)
 
 import GHC.Data.Graph.Directed
@@ -82,7 +82,7 @@ emptyRegMap = emptyUFM
 emptyRegSet :: RegSet
 emptyRegSet = emptyUniqSet
 
-type BlockMap a = LabelMap a
+type BlockMap a = NonDet.LabelMap a
 
 type SlotMap a = UniqFM Slot a
 
@@ -348,7 +348,7 @@ slurpConflicts live
 
         slurpBlock info rs (BasicBlock blockId instrs)
                 | LiveInfo _ _ blockLive _        <- info
-                , Just rsLiveEntry                <- mapLookup blockId blockLive
+                , Just rsLiveEntry                <- NonDet.mapLookup blockId blockLive
                 , (conflicts, moves)              <- slurpLIs rsLiveEntry rs instrs
                 = (consBag rsLiveEntry conflicts, moves)
 
@@ -625,7 +625,7 @@ patchEraseLive patchF cmm
          = let
                 patchRegSet set = mkUniqSet $ map patchF $ nonDetEltsUFM set
                   -- See Note [Unique Determinism and code generation]
-                blockMap'       = mapMap (patchRegSet . getUniqSet) blockMap
+                blockMap'       = NonDet.mapMap (patchRegSet . getUniqSet) blockMap
 
                 info'           = LiveInfo static id blockMap' mLiveSlots
            in   CmmProc info' label live $ map patchSCC sccs
@@ -705,10 +705,10 @@ natCmmTopToLive _ (CmmData i d)
         = CmmData i d
 
 natCmmTopToLive _ (CmmProc info lbl live (ListGraph []))
-        = CmmProc (LiveInfo info [] mapEmpty mapEmpty) lbl live []
+        = CmmProc (LiveInfo info [] NonDet.mapEmpty NonDet.mapEmpty) lbl live []
 
 natCmmTopToLive mCfg proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
-        = CmmProc (LiveInfo info' (first_id : entry_ids) mapEmpty mapEmpty)
+        = CmmProc (LiveInfo info' (first_id : entry_ids) NonDet.mapEmpty NonDet.mapEmpty)
                 lbl live sccsLive
    where
         first_id        = blockId first
@@ -794,7 +794,7 @@ regLiveness _ (CmmData i d)
 regLiveness _ (CmmProc info lbl live [])
         | LiveInfo static mFirst _ _    <- info
         = return $ CmmProc
-                        (LiveInfo static mFirst mapEmpty mapEmpty)
+                        (LiveInfo static mFirst NonDet.mapEmpty NonDet.mapEmpty)
                         lbl live []
 
 regLiveness platform (CmmProc info lbl live sccs)
@@ -876,7 +876,7 @@ computeLiveness
 
 computeLiveness platform sccs
  = case checkIsReverseDependent sccs of
-        Nothing         -> livenessSCCs platform mapEmpty [] sccs
+        Nothing         -> livenessSCCs platform NonDet.mapEmpty [] sccs
         Just bad        -> let sccs' = fmap (fmap (fmap (fmap (pprInstr platform)))) sccs
                            in pprPanic "RegAlloc.Liveness.computeLiveness"
                                 (vcat   [ text "SCCs aren't in reverse dependent order"
@@ -928,8 +928,8 @@ livenessSCCs platform blockmap done
                 -- BlockMaps for equality.
             equalBlockMaps a b
                 = a' == b'
-              where a' = mapToList $ mapMapWithKey f a
-                    b' = mapToList $ mapMapWithKey f b
+              where a' = NonDet.nonDetMapToList $ NonDet.mapMapWithKey f a
+                    b' = NonDet.nonDetMapToList $ NonDet.mapMapWithKey f b
                     f key elt = (key, nonDetEltsUniqSet elt)
                     -- See Note [Unique Determinism and code generation]
 
@@ -948,7 +948,7 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
  = let
         (regsLiveOnEntry, instrs1)
             = livenessBack platform emptyUniqSet blockmap [] (reverse instrs)
-        blockmap'       = mapInsert block_id regsLiveOnEntry blockmap
+        blockmap'       = NonDet.mapInsert block_id regsLiveOnEntry blockmap
 
         instrs2         = livenessForward platform regsLiveOnEntry instrs1
 
@@ -1058,7 +1058,7 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             not_a_branch = null targets
 
             targetLiveRegs target
-                  = case mapLookup target blockmap of
+                  = case NonDet.mapLookup target blockmap of
                                 Just ra -> ra
                                 Nothing -> emptyRegSet
 

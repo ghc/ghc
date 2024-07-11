@@ -15,8 +15,7 @@ import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.Cmm hiding (RegSet)
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label (mapFoldlWithKey, mapLookup, mapInsert)
---import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 
 import GHC.Utils.Monad
 import GHC.Utils.Monad.State.Strict
@@ -124,7 +123,7 @@ regSpill_top platform regSlotMap cmm
                 -- after we've done a successful allocation.
                 let liveSlotsOnEntry' :: BlockMap IntSet
                     liveSlotsOnEntry'
-                        = mapFoldlWithKey patchLiveSlot
+                        = NonDet.nonDetMapFoldlWithKey patchLiveSlot
                                           liveSlotsOnEntry liveVRegsOnEntry
 
                 let info'
@@ -148,7 +147,7 @@ regSpill_top platform regSlotMap cmm
          = let
                 -- Slots that are already recorded as being live.
                 curSlotsLive    = fromMaybe IntSet.empty
-                                $ mapLookup blockId slotMap
+                                $ NonDet.mapLookup blockId slotMap
 
                 moreSlotsLive   = IntSet.fromList
                                 $ mapMaybe (lookupUFM regSlotMap)
@@ -156,8 +155,8 @@ regSpill_top platform regSlotMap cmm
                     -- See Note [Unique Determinism and code generation]
 
                 slotMap'
-                 = mapInsert blockId (IntSet.union curSlotsLive moreSlotsLive)
-                             slotMap
+                 = NonDet.mapInsert blockId (IntSet.union curSlotsLive moreSlotsLive)
+                                    slotMap
 
            in   slotMap'
 
