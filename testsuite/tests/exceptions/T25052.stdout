@@ -1,0 +1,5 @@
+user error (no trailing whitespace)
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: IOException
