@@ -45,6 +45,7 @@ module GHC.Internal.Exception.Type
        , underflowException
        ) where
 
+import GHC.Internal.Data.OldList (intersperse)
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable (Typeable, TypeRep, cast)
 import qualified GHC.Internal.Data.Typeable as Typeable
@@ -213,11 +214,14 @@ instance Exception SomeException where
     fromException = Just
     backtraceDesired (SomeException e) = backtraceDesired e
     displayException (SomeException e) =
-        displayException e
-          ++ displayTypeInfo (Typeable.typeOf e)
-          ++ "\n\n"
-          ++ (displayContext ?exceptionContext)
+        case displayContext ?exceptionContext of
+          "" -> msg
+          dc -> msg ++ "\n\n" ++ dc
         where
+            msg =
+              displayException e
+                ++ displayTypeInfo (Typeable.typeOf e)
+
             displayTypeInfo :: TypeRep -> String
             displayTypeInfo rep =
               mconcat
@@ -232,10 +236,9 @@ instance Exception SomeException where
                   tyCon = Typeable.typeRepTyCon rep
 
 displayContext :: ExceptionContext -> String
-displayContext (ExceptionContext anns0) = go anns0
+displayContext (ExceptionContext anns0) = mconcat $ intersperse "\n" $ map go anns0
   where
-    go (SomeExceptionAnnotation ann : anns) = displayExceptionAnnotation ann ++ "\n" ++ go anns
-    go [] = ""
+    go (SomeExceptionAnnotation ann) = displayExceptionAnnotation ann
 
 newtype NoBacktrace e = NoBacktrace e
     deriving (Show)
