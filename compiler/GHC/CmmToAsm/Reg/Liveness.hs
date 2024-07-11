@@ -14,7 +14,7 @@
 module GHC.CmmToAsm.Reg.Liveness (
         RegSet,
         RegMap, emptyRegMap,
-        BlockMap, mapEmpty,
+        BlockMap,
         LiveCmmDecl,
         InstrSR   (..),
         LiveInstr (..),
@@ -46,8 +46,9 @@ import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label (mapToList, LabelMap, mapInsert, mapEmpty, mapFilterWithKey, mapLookup, mapMap)
+import GHC.Cmm.Dataflow.Label (LabelMap, mapInsert, mapEmpty, mapFilterWithKey, mapLookup, mapMap, mapMapWithKey, mapToList)
 import GHC.Cmm.Dataflow.Label.NonDet (LabelSet, setMember, setFromList)
+--import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm hiding (RegSet, emptyRegSet)
 
 import GHC.Data.Graph.Directed
@@ -927,9 +928,9 @@ livenessSCCs platform blockmap done
                 -- BlockMaps for equality.
             equalBlockMaps a b
                 = a' == b'
-              where a' = map f $ mapToList a
-                    b' = map f $ mapToList b
-                    f (key,elt) = (key, nonDetEltsUniqSet elt)
+              where a' = mapToList $ mapMapWithKey f a
+                    b' = mapToList $ mapMapWithKey f b
+                    f key elt = (key, nonDetEltsUniqSet elt)
                     -- See Note [Unique Determinism and code generation]
 
 

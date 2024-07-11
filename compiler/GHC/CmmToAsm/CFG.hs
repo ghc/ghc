@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE TupleSections              #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file #-}
 --
 -- Copyright (c) 2018 Andreas Klebinger
 --
@@ -48,7 +49,9 @@ import GHC.Cmm.BlockId
 import GHC.Cmm as Cmm
 
 import GHC.Cmm.Switch
-import GHC.Cmm.Dataflow.Label
+--import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import qualified GHC.Cmm.Dataflow.Label as Det
 import GHC.Cmm.Dataflow.Block
 import qualified GHC.Cmm.Dataflow.Graph as G
 
@@ -106,7 +109,7 @@ newtype EdgeWeight
 instance Outputable EdgeWeight where
   ppr (EdgeWeight w) = doublePrec 5 w
 
-type EdgeInfoMap edgeInfo = LabelMap (LabelMap edgeInfo)
+type EdgeInfoMap edgeInfo = NonDet.LabelMap (NonDet.LabelMap edgeInfo)
 
 -- | A control flow graph where edges have been annotated with a weight.
 -- Implemented as IntMap (IntMap \<edgeData>)
@@ -208,22 +211,22 @@ setEdgeWeight cfg !weight from to
 
 getCfgNodes :: CFG -> [BlockId]
 getCfgNodes m =
-    mapKeys m
+    NonDet.nonDetMapKeys m
 
 -- | Is this block part of this graph?
 hasNode :: CFG -> BlockId -> Bool
 hasNode m node =
   -- Check the invariant that each node must exist in the first map or not at all.
-  assert (found || not (any (mapMember node) m))
+  assert (found || not (NonDet.anyLM (NonDet.mapMember node) m))
   found
     where
-      found = mapMember node m
+      found = NonDet.mapMember node m
 
 
 
 -- | Check if the nodes in the cfg and the set of blocks are the same.
 --   In a case of a mismatch we panic and show the difference.
-sanityCheckCfg :: CFG -> LabelSet -> SDoc -> Bool
+sanityCheckCfg :: CFG -> NonDet.LabelSet -> SDoc -> Bool
 sanityCheckCfg m blockSet msg
     | blockSet == cfgNodes
     = True
@@ -235,17 +238,17 @@ sanityCheckCfg m blockSet msg
             msg )
             False
     where
-      cfgNodes = setFromList $ getCfgNodes m :: LabelSet
-      diff = (setUnion cfgNodes blockSet) `setDifference` (setIntersection cfgNodes blockSet) :: LabelSet
+      cfgNodes = NonDet.setFromList $ getCfgNodes m :: NonDet.LabelSet
+      diff = (NonDet.setUnion cfgNodes blockSet) `NonDet.setDifference` (NonDet.setIntersection cfgNodes blockSet) :: NonDet.LabelSet
 
 -- | Filter the CFG with a custom function f.
 --   Parameters are `f from to edgeInfo`
 filterEdges :: (BlockId -> BlockId -> EdgeInfo -> Bool) -> CFG -> CFG
 filterEdges f cfg =
-    mapMapWithKey filterSources cfg
+    NonDet.mapMapWithKey filterSources cfg
     where
       filterSources from m =
-        mapFilterWithKey (\to w -> f from to w) m
+        NonDet.mapFilterWithKey (\to w -> f from to w) m
 
 
 {- Note [Updating the CFG during shortcutting]
@@ -295,56 +298,56 @@ This function (shortcutWeightMap) takes the same mapping and
 applies the mapping to the CFG in the way laid out above.
 
 -}
-shortcutWeightMap :: LabelMap (Maybe BlockId) -> CFG -> CFG
+shortcutWeightMap :: NonDet.LabelMap (Maybe BlockId) -> CFG -> CFG
 shortcutWeightMap cuts cfg
-  | mapNull cuts = cfg
+  | NonDet.mapNull cuts = cfg
   | otherwise = normalised_cfg
     where
       -- First take the cuts map and collapse any shortcuts, for example
       -- if the cuts map has A -> B and B -> C then we want to rewrite
       -- A -> C and B -> C directly.
-      normalised_cuts_st :: forall s . ST s (LabelMap (Maybe BlockId))
+      normalised_cuts_st :: forall s . ST s (NonDet.LabelMap (Maybe BlockId))
       normalised_cuts_st = do
         (null :: Point s (Maybe BlockId)) <- fresh Nothing
-        let cuts_list = mapToList cuts
+        let cuts_list = NonDet.nonDetMapToList cuts
         -- Create a unification variable for each of the nodes in a rewrite
         cuts_vars <- traverse (\p -> (p,) <$> fresh (Just p)) (concatMap (\(a, b) -> [a] ++ maybe [] (:[]) b) cuts_list)
-        let cuts_map = mapFromList cuts_vars :: LabelMap (Point s (Maybe BlockId))
+        let cuts_map = NonDet.mapFromList cuts_vars :: NonDet.LabelMap (Point s (Maybe BlockId))
         -- Then unify according to the rewrites in the cuts map
-        mapM_ (\(from, to) -> expectJust "shortcutWeightMap" (mapLookup from cuts_map)
-                              `union` expectJust "shortcutWeightMap" (maybe (Just null) (flip mapLookup cuts_map) to) ) cuts_list
+        mapM_ (\(from, to) -> expectJust "shortcutWeightMap" (NonDet.mapLookup from cuts_map)
+                              `union` expectJust "shortcutWeightMap" (maybe (Just null) (flip NonDet.mapLookup cuts_map) to) ) cuts_list
         -- Then recover the unique representative, which is the result of following
         -- the chain to the end.
-        mapM find cuts_map
+        NonDet.nonDetMapM find cuts_map
 
       normalised_cuts = runST normalised_cuts_st
 
-      cuts_domain :: LabelSet
-      cuts_domain = setFromList $ mapKeys cuts
+      cuts_domain :: NonDet.LabelSet
+      cuts_domain = NonDet.setFromList $ NonDet.nonDetMapKeys cuts
 
       -- The CFG is shortcutted using the normalised cuts map
       normalised_cfg :: CFG
-      normalised_cfg = mapFoldlWithKey update_edge mapEmpty cfg
+      normalised_cfg = NonDet.nonDetMapFoldlWithKey update_edge NonDet.mapEmpty cfg
 
-      update_edge :: CFG -> Label -> LabelMap EdgeInfo -> CFG
+      update_edge :: CFG -> NonDet.Label -> NonDet.LabelMap EdgeInfo -> CFG
       update_edge new_map from edge_map
         -- If the from edge is in the cuts map then delete the edge
-        | setMember from cuts_domain = new_map
+        | NonDet.setMember from cuts_domain = new_map
         -- Otherwise we are keeping the edge, but might have shortcutted some of
         -- the target nodes.
-        | otherwise = mapInsert from (mapFoldlWithKey update_from_edge mapEmpty edge_map) new_map
+        | otherwise = NonDet.mapInsert from (NonDet.nonDetMapFoldlWithKey update_from_edge NonDet.mapEmpty edge_map) new_map
 
-      update_from_edge :: LabelMap a -> Label -> a -> LabelMap a
+      update_from_edge :: NonDet.LabelMap a -> NonDet.Label -> a -> NonDet.LabelMap a
       update_from_edge new_map to_edge edge_info
         -- Edge is in the normalised cuts
-        | Just new_edge <- mapLookup to_edge normalised_cuts =
+        | Just new_edge <- NonDet.mapLookup to_edge normalised_cuts =
             case new_edge of
               -- The result was Nothing, so edge is deleted
               Nothing -> new_map
               -- The new target for the edge, write it with the old edge_info.
-              Just new_to -> mapInsert new_to edge_info new_map
+              Just new_to -> NonDet.mapInsert new_to edge_info new_map
         -- Node wasn't in the cuts map, so just add it back
-        | otherwise = mapInsert to_edge edge_info new_map
+        | otherwise = NonDet.mapInsert to_edge edge_info new_map
 
 
 -- | Sometimes we insert a block which should unconditionally be executed
@@ -368,14 +371,14 @@ addImmediateSuccessor weights node follower cfg
 -- | Adds a new edge, overwrites existing edges if present
 addEdge :: BlockId -> BlockId -> EdgeInfo -> CFG -> CFG
 addEdge from to info cfg =
-    mapAlter addFromToEdge from $
-    mapAlter addDestNode to cfg
+    NonDet.mapAlter addFromToEdge from $
+    NonDet.mapAlter addDestNode to cfg
     where
         -- Simply insert the edge into the edge list.
-        addFromToEdge Nothing = Just $ mapSingleton to info
-        addFromToEdge (Just wm) = Just $ mapInsert to info wm
+        addFromToEdge Nothing = Just $ NonDet.mapSingleton to info
+        addFromToEdge (Just wm) = Just $ NonDet.mapInsert to info wm
         -- We must add the destination node explicitly
-        addDestNode Nothing = Just $ mapEmpty
+        addDestNode Nothing = Just $ NonDet.mapEmpty
         addDestNode n@(Just _) = n
 
 
@@ -388,29 +391,29 @@ addWeightEdge from to weight cfg =
 
 delEdge :: BlockId -> BlockId -> CFG -> CFG
 delEdge from to m =
-    mapAdjust (mapDelete to) from m
+    NonDet.mapAdjust (NonDet.mapDelete to) from m
 
 
 -- | Destinations from bid ordered by weight (descending)
 getSuccEdgesSorted :: CFG -> BlockId -> [(BlockId,EdgeInfo)]
 getSuccEdgesSorted m bid =
-    let destMap = mapFindWithDefault mapEmpty bid m
-        cfgEdges = mapToList destMap
+    let destMap = NonDet.mapFindWithDefault NonDet.mapEmpty bid m
+        cfgEdges = NonDet.nonDetMapToList destMap
         sortedEdges = sortWith (negate . edgeWeight . snd) cfgEdges
     in  --pprTrace "getSuccEdgesSorted" (ppr bid <+> text "map:" <+> ppr m)
         sortedEdges
 
 -- | Get successors of a given node with edge weights.
 getSuccessorEdges :: HasDebugCallStack => CFG -> BlockId -> [(BlockId,EdgeInfo)]
-getSuccessorEdges m bid = maybe lookupError mapToList (mapLookup bid m)
+getSuccessorEdges m bid = maybe lookupError NonDet.nonDetMapToList (NonDet.mapLookup bid m)
   where
     lookupError = pprPanic "getSuccessorEdges: Block does not exist" $
                     ppr bid <+> pprEdgeWeights m
 
 getEdgeInfo :: BlockId -> BlockId -> CFG -> Maybe EdgeInfo
 getEdgeInfo from to m
-    | Just wm <- mapLookup from m
-    , Just info <- mapLookup to wm
+    | Just wm <- NonDet.mapLookup from m
+    , Just info <- NonDet.mapLookup to wm
     = Just $! info
     | otherwise
     = Nothing
@@ -425,26 +428,26 @@ getTransitionSource from to cfg = transitionSource $ expectJust "Source info for
                         getEdgeInfo from to cfg
 
 reverseEdges :: CFG -> CFG
-reverseEdges cfg = mapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) mapEmpty cfg
+reverseEdges cfg = NonDet.nonDetMapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) NonDet.mapEmpty cfg
   where
     -- We must preserve nodes without outgoing edges!
     addNode :: CFG -> BlockId -> CFG
-    addNode cfg b = mapInsertWith mapUnion b mapEmpty cfg
-    go :: CFG -> BlockId -> (LabelMap EdgeInfo) -> CFG
-    go cfg from toMap = mapFoldlWithKey (\cfg to info -> addEdge to from info cfg) cfg toMap  :: CFG
+    addNode cfg b = NonDet.mapInsertWith NonDet.mapUnion b NonDet.mapEmpty cfg
+    go :: CFG -> BlockId -> (NonDet.LabelMap EdgeInfo) -> CFG
+    go cfg from toMap = NonDet.nonDetMapFoldlWithKey (\cfg to info -> addEdge to from info cfg) cfg toMap  :: CFG
 
 
 -- | Returns a unordered list of all edges with info
 infoEdgeList :: CFG -> [CfgEdge]
 infoEdgeList m =
-    go (mapToList m) []
+    go (NonDet.nonDetMapToList m) []
   where
     -- We avoid foldMap to avoid thunk buildup
-    go :: [(BlockId,LabelMap EdgeInfo)] -> [CfgEdge] -> [CfgEdge]
+    go :: [(BlockId,NonDet.LabelMap EdgeInfo)] -> [CfgEdge] -> [CfgEdge]
     go [] acc = acc
     go ((from,toMap):xs) acc
-      = go' xs from (mapToList toMap) acc
-    go' :: [(BlockId,LabelMap EdgeInfo)] -> BlockId -> [(BlockId,EdgeInfo)] -> [CfgEdge] -> [CfgEdge]
+      = go' xs from (NonDet.nonDetMapToList toMap) acc
+    go' :: [(BlockId,NonDet.LabelMap EdgeInfo)] -> BlockId -> [(BlockId,EdgeInfo)] -> [CfgEdge] -> [CfgEdge]
     go' froms _    []              acc = go froms acc
     go' froms from ((to,info):tos) acc
       = go' froms from tos (CfgEdge from to info : acc)
@@ -452,14 +455,14 @@ infoEdgeList m =
 -- | Returns a unordered list of all edges without weights
 edgeList :: CFG -> [Edge]
 edgeList m =
-    go (mapToList m) []
+    go (NonDet.nonDetMapToList m) []
   where
     -- We avoid foldMap to avoid thunk buildup
-    go :: [(BlockId,LabelMap EdgeInfo)] -> [Edge] -> [Edge]
+    go :: [(BlockId,NonDet.LabelMap EdgeInfo)] -> [Edge] -> [Edge]
     go [] acc = acc
     go ((from,toMap):xs) acc
-      = go' xs from (mapKeys toMap) acc
-    go' :: [(BlockId,LabelMap EdgeInfo)] -> BlockId -> [BlockId] -> [Edge] -> [Edge]
+      = go' xs from (NonDet.nonDetMapKeys toMap) acc
+    go' :: [(BlockId,NonDet.LabelMap EdgeInfo)] -> BlockId -> [BlockId] -> [Edge] -> [Edge]
     go' froms _    []              acc = go froms acc
     go' froms from (to:tos) acc
       = go' froms from tos ((from,to) : acc)
@@ -467,8 +470,8 @@ edgeList m =
 -- | Get successors of a given node without edge weights.
 getSuccessors :: HasDebugCallStack => CFG -> BlockId -> [BlockId]
 getSuccessors m bid
-    | Just wm <- mapLookup bid m
-    = mapKeys wm
+    | Just wm <- NonDet.mapLookup bid m
+    = NonDet.nonDetMapKeys wm
     | otherwise = lookupError
     where
       lookupError = pprPanic "getSuccessors: Block does not exist" $
@@ -487,8 +490,8 @@ pprEdgeWeights m =
         printNode node
             = text "\t" <> ppr node <> text ";\n"
         getEdgeNodes (CfgEdge from to _) = [from,to]
-        edgeNodes = setFromList $ concatMap getEdgeNodes edges :: LabelSet
-        nodes = filter (\n -> (not . setMember n) edgeNodes) . mapKeys $ mapFilter null m
+        edgeNodes = NonDet.setFromList $ concatMap getEdgeNodes edges :: NonDet.LabelSet
+        nodes = filter (\n -> (not . NonDet.setMember n) edgeNodes) . NonDet.nonDetMapKeys $ NonDet.mapFilter NonDet.mapNull m
     in
     text "digraph {\n" <>
         (foldl' (<>) empty (map printEdge edges)) <>
@@ -601,7 +604,7 @@ addNodesBetween weights m updates =
 -}
 -- | Generate weights for a Cmm proc based on some simple heuristics.
 getCfgProc :: Platform -> Weights -> RawCmmDecl -> CFG
-getCfgProc _        _       (CmmData {}) = mapEmpty
+getCfgProc _        _       (CmmData {}) = NonDet.mapEmpty
 getCfgProc platform weights (CmmProc _info _lab _live graph) = getCfg platform weights graph
 
 getCfg :: Platform -> Weights -> CmmGraph -> CFG
@@ -621,14 +624,14 @@ getCfg platform weights graph =
             } = weights
     -- Explicitly add all nodes to the cfg to ensure they are part of the
     -- CFG.
-    edgelessCfg = mapFromList $ zip (map G.entryLabel blocks) (repeat mapEmpty)
+    edgelessCfg = NonDet.mapFromList $ zip (map G.entryLabel blocks) (repeat NonDet.mapEmpty)
     insertEdge :: CFG -> ((BlockId,BlockId),EdgeInfo) -> CFG
     insertEdge m ((from,to),weight) =
-      mapAlter f from m
+      NonDet.mapAlter f from m
         where
-          f :: Maybe (LabelMap EdgeInfo) -> Maybe (LabelMap EdgeInfo)
-          f Nothing = Just $ mapSingleton to weight
-          f (Just destMap) = Just $ mapInsert to weight destMap
+          f :: Maybe (NonDet.LabelMap EdgeInfo) -> Maybe (NonDet.LabelMap EdgeInfo)
+          f Nothing = Just $ NonDet.mapSingleton to weight
+          f (Just destMap) = Just $ NonDet.mapInsert to weight destMap
     getBlockEdges :: CmmBlock -> [((BlockId,BlockId),EdgeInfo)]
     getBlockEdges block =
       case branch of
@@ -724,13 +727,13 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
                     cfg backedges
 
     -- Since we cant fall through info tables we penalize these.
-    penalizeInfoTables :: LabelMap a -> CFG -> CFG
+    penalizeInfoTables :: Det.LabelMap a -> CFG -> CFG
     penalizeInfoTables info cfg =
         mapWeights fupdate cfg
       where
         fupdate :: BlockId -> BlockId -> EdgeWeight -> EdgeWeight
         fupdate _ to weight
-          | mapMember to info
+          | Det.mapMember to info
           = weight - (fromIntegral $ infoTablePenalty weights)
           | otherwise = weight
 
@@ -769,7 +772,7 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
       where
         fallthroughTarget :: BlockId -> EdgeInfo -> Bool
         fallthroughTarget to (EdgeInfo source _weight)
-          | mapMember to info = False
+          | Det.mapMember to info = False
           | AsmCodeGen <- source = True
           | CmmSource { trans_cmmNode = CmmBranch {} } <- source = True
           | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
@@ -782,9 +785,9 @@ staticPredCfg entry cfg = cfg'
     (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-}
                              mkGlobalWeights entry cfg
     cfg' = {-# SCC rewriteEdges #-}
-            mapFoldlWithKey
+            NonDet.nonDetMapFoldlWithKey
                 (\cfg from m ->
-                    mapFoldlWithKey
+                    NonDet.nonDetMapFoldlWithKey
                         (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
                         cfg m )
                 cfg
@@ -792,9 +795,9 @@ staticPredCfg entry cfg = cfg'
 
 -- | Determine loop membership of blocks based on SCC analysis
 --   This is faster but only gives yes/no answers.
-loopMembers :: HasDebugCallStack => CFG -> LabelMap Bool
+loopMembers :: HasDebugCallStack => CFG -> NonDet.LabelMap Bool
 loopMembers cfg =
-    foldl' (flip setLevel) mapEmpty sccs
+    foldl' (flip setLevel) NonDet.mapEmpty sccs
   where
     mkNode :: BlockId -> Node BlockId BlockId
     mkNode bid = DigraphNode bid bid (getSuccessors cfg bid)
@@ -802,19 +805,19 @@ loopMembers cfg =
 
     sccs = stronglyConnCompFromEdgedVerticesOrd nodes
 
-    setLevel :: SCC BlockId -> LabelMap Bool -> LabelMap Bool
-    setLevel (AcyclicSCC bid) m = mapInsert bid False m
-    setLevel (CyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
+    setLevel :: SCC BlockId -> NonDet.LabelMap Bool -> NonDet.LabelMap Bool
+    setLevel (AcyclicSCC bid) m = NonDet.mapInsert bid False m
+    setLevel (CyclicSCC bids) m = foldl' (\m k -> NonDet.mapInsert k True m) m bids
 
-loopLevels :: CFG -> BlockId -> LabelMap Int
+loopLevels :: CFG -> BlockId -> NonDet.LabelMap Int
 loopLevels cfg root = liLevels loopInfos
     where
       loopInfos = loopInfo cfg root
 
 data LoopInfo = LoopInfo
   { liBackEdges :: [(Edge)] -- ^ List of back edges
-  , liLevels :: LabelMap Int -- ^ BlockId -> LoopLevel mapping
-  , liLoops :: [(Edge, LabelSet)] -- ^ (backEdge, loopBody), body includes header
+  , liLevels :: NonDet.LabelMap Int -- ^ BlockId -> LoopLevel mapping
+  , liLoops :: [(Edge, NonDet.LabelSet)] -- ^ (backEdge, loopBody), body includes header
   }
 
 instance Outputable LoopInfo where
@@ -843,13 +846,13 @@ instance Outputable LoopInfo where
 --   to care about that special case.
 loopInfo :: HasDebugCallStack => CFG -> BlockId -> LoopInfo
 loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
-                              , liLevels = mapFromList loopCounts
+                              , liLevels = NonDet.mapFromList loopCounts
                               , liLoops = loopBodies }
   where
     revCfg = reverseEdges cfg
 
     graph = -- pprTrace "CFG - loopInfo" (pprEdgeWeights cfg) $
-            fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
+            fmap (NonDet.setFromList . NonDet.nonDetMapKeys ) cfg :: NonDet.LabelMap NonDet.LabelSet
 
 
     --TODO - This should be a no op: Export constructors? Use unsafeCoerce? ...
@@ -858,7 +861,7 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
     tree = fmap toBlockId $ Dom.domTree rooted :: Tree BlockId
 
     -- Map from Nodes to their dominators
-    domMap :: LabelMap LabelSet
+    domMap :: NonDet.LabelMap NonDet.LabelSet
     domMap = mkDomMap tree
 
     edges = edgeList cfg :: [(BlockId, BlockId)]
@@ -867,56 +870,56 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
 
     -- identify back edges
     isBackEdge (from,to)
-      | Just doms <- mapLookup from domMap
-      , setMember to doms
+      | Just doms <- NonDet.mapLookup from domMap
+      , NonDet.setMember to doms
       = True
       | otherwise = False
 
     -- See Note [Determining the loop body]
     -- Get the loop body associated with a back edge.
     findBody edge@(tail, head)
-      = ( edge, setInsert head $ go (setSingleton tail) (setSingleton tail) )
+      = ( edge, NonDet.setInsert head $ go (NonDet.setSingleton tail) (NonDet.setSingleton tail) )
       where
         -- See Note [Determining the loop body]
 
 
-        go :: LabelSet -> LabelSet -> LabelSet
+        go :: NonDet.LabelSet -> NonDet.LabelSet -> NonDet.LabelSet
         go found current
-          | setNull current = found
-          | otherwise = go  (setUnion newSuccessors found)
+          | NonDet.setNull current = found
+          | otherwise = go  (NonDet.setUnion newSuccessors found)
                             newSuccessors
           where
             -- Really predecessors, since we use the reversed cfg.
-            newSuccessors = setFilter (\n -> not $ setMember n found) successors :: LabelSet
-            successors = setDelete head $ setUnions $ map
-                                      (\x -> if x == head then setEmpty else setFromList (getSuccessors revCfg x))
-                                      (setElems current) :: LabelSet
+            newSuccessors = NonDet.setFilter (\n -> not $ NonDet.setMember n found) successors :: NonDet.LabelSet
+            successors = NonDet.setDelete head $ NonDet.setUnions $ map
+                                      (\x -> if x == head then NonDet.setEmpty else NonDet.setFromList (getSuccessors revCfg x))
+                                      (NonDet.nonDetSetElems current) :: NonDet.LabelSet
 
     backEdges = filter isBackEdge edges
-    loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
+    loopBodies = map findBody backEdges :: [(Edge, NonDet.LabelSet)]
 
     -- Block b is part of n loop bodies => loop nest level of n
     loopCounts =
       let bodies = map (first snd) loopBodies -- [(Header, Body)]
-          loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
+          loopCount n = length $ nub . map fst . filter (NonDet.setMember n . snd) $ bodies
       in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
-    toWord64Set :: LabelSet -> Word64Set
-    toWord64Set s = WS.fromList . map fromBlockId . setElems $ s
-    toWord64Map :: LabelMap a -> Word64Map a
-    toWord64Map m = WM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ mapToList m
+    toWord64Set :: NonDet.LabelSet -> Word64Set
+    toWord64Set s = WS.fromList . map fromBlockId . NonDet.nonDetSetElems $ s
+    toWord64Map :: NonDet.LabelMap a -> Word64Map a
+    toWord64Map m = WM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ NonDet.nonDetMapToList m
 
-    mkDomMap :: Tree BlockId -> LabelMap LabelSet
-    mkDomMap root = mapFromList $ go setEmpty root
+    mkDomMap :: Tree BlockId -> NonDet.LabelMap NonDet.LabelSet
+    mkDomMap root = NonDet.mapFromList $ go NonDet.setEmpty root
       where
-        go :: LabelSet -> Tree BlockId -> [(Label,LabelSet)]
+        go :: NonDet.LabelSet -> Tree BlockId -> [(NonDet.Label,NonDet.LabelSet)]
         go parents (Node lbl [])
           =  [(lbl, parents)]
         go parents (Node _ leaves)
           = let nodes = map rootLabel leaves
                 entries = map (\x -> (x,parents)) nodes
             in  entries ++ concatMap
-                            (\n -> go (setInsert (rootLabel n) parents) n)
+                            (\n -> go (NonDet.setInsert (rootLabel n) parents) n)
                             leaves
 
     fromBlockId :: BlockId -> Word64
@@ -937,7 +940,7 @@ revPostorderFrom cfg root =
     map fromNode $ G.revPostorderFrom hooplGraph root
   where
     nodes = getCfgNodes cfg
-    hooplGraph = foldl' (\m n -> mapInsert n (toNode n) m) mapEmpty nodes
+    hooplGraph = foldl' (\m n -> Det.mapInsert n (toNode n) m) Det.mapEmpty nodes
 
     fromNode :: BlockNode C C -> BlockId
     fromNode (BN x) = fst x
@@ -969,19 +972,19 @@ revPostorderFrom cfg root =
 
 {-# NOINLINE mkGlobalWeights #-}
 {-# SCC mkGlobalWeights #-}
-mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
+mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (NonDet.LabelMap Double, NonDet.LabelMap (NonDet.LabelMap Double))
 mkGlobalWeights root localCfg
-  | null localCfg = panic "Error - Empty CFG"
+  | NonDet.mapNull localCfg = panic "Error - Empty CFG"
   | otherwise
   = (blockFreqs', edgeFreqs')
   where
     -- Calculate fixpoints
     (blockFreqs, edgeFreqs) = calcFreqs nodeProbs backEdges' bodies' revOrder'
-    blockFreqs' = mapFromList $ map (first fromVertex) (assocs blockFreqs) :: LabelMap Double
+    blockFreqs' = NonDet.mapFromList $ map (first fromVertex) (assocs blockFreqs) :: NonDet.LabelMap Double
     edgeFreqs' = fmap fromVertexMap $ fromVertexMap edgeFreqs
 
-    fromVertexMap :: IM.IntMap x -> LabelMap x
-    fromVertexMap m = mapFromList . map (first fromVertex) $ IM.toList m
+    fromVertexMap :: IM.IntMap x -> NonDet.LabelMap x
+    fromVertexMap m = NonDet.mapFromList . map (first fromVertex) $ IM.toList m
 
     revOrder = revPostorderFrom localCfg root :: [BlockId]
     loopResults@(LoopInfo backedges _levels bodies) = loopInfo localCfg root
@@ -998,13 +1001,13 @@ mkGlobalWeights root localCfg
     -- order simply by sorting.
     -- TODO: The sort is redundant if we can guarantee that setElems returns elements ascending
     calcBody (backedge, blocks) =
-        (toVertex $ snd backedge, sort . map toVertex $ (setElems blocks))
+        (toVertex $ snd backedge, sort . map toVertex $ (NonDet.nonDetSetElems blocks))
 
-    vertexMapping = mapFromList $ zip revOrder [0..] :: LabelMap Int
-    blockMapping = listArray (0,mapSize vertexMapping - 1) revOrder :: Array Int BlockId
+    vertexMapping = NonDet.mapFromList $ zip revOrder [0..] :: NonDet.LabelMap Int
+    blockMapping = listArray (0,NonDet.mapSize vertexMapping - 1) revOrder :: Array Int BlockId
     -- Map from blockId to indices starting at zero
     toVertex :: BlockId -> Int
-    toVertex   blockId  = expectJust "mkGlobalWeights" $ mapLookup blockId vertexMapping
+    toVertex   blockId  = expectJust "mkGlobalWeights" $ NonDet.mapLookup blockId vertexMapping
     -- Map from indices starting at zero to blockIds
     fromVertex :: Int -> BlockId
     fromVertex vertex   = blockMapping ! vertex
@@ -1059,7 +1062,7 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
     nodes = getCfgNodes cfg
     backedges = S.fromList $ l_backEdges
     -- Loops keyed by their back edge
-    loops = M.fromList $ l_loops :: M.Map Edge LabelSet
+    loops = M.fromList $ l_loops :: M.Map Edge NonDet.LabelSet
     loopHeads = S.fromList $ map snd $ M.keys loops
 
     update :: CFG -> BlockId -> CFG
@@ -1163,8 +1166,8 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
                 LT -> Just (1-pred_LEH) --s1 exits to a shallower loop level (exits loop)
                 GT -> Just (pred_LEH)   --s1 exits to a deeper loop level
             where
-                s1Level = mapLookup s1 loopLevels
-                s2Level = mapLookup s2 loopLevels
+                s1Level = NonDet.mapLookup s1 loopLevels
+                s2Level = NonDet.mapLookup s2 loopLevels
 
         -- Comparing to a constant is unlikely to be equal.
         ohPredicts (s1,_s2)
@@ -1192,28 +1195,28 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
 -- Ignoring rounding errors all outgoing edges sum up to 1.
 cfgEdgeProbabilities :: CFG -> (BlockId -> Int) -> IM.IntMap (IM.IntMap Prob)
 cfgEdgeProbabilities cfg toVertex
-    = mapFoldlWithKey foldEdges IM.empty cfg
+    = NonDet.nonDetMapFoldlWithKey foldEdges IM.empty cfg
   where
     foldEdges = (\m from toMap -> IM.insert (toVertex from) (normalize toMap) m)
 
-    normalize :: (LabelMap EdgeInfo) -> (IM.IntMap Prob)
+    normalize :: (NonDet.LabelMap EdgeInfo) -> (IM.IntMap Prob)
     normalize weightMap
-        | edgeCount <= 1 = mapFoldlWithKey (\m k _ -> IM.insert (toVertex k) 1.0 m) IM.empty weightMap
-        | otherwise = mapFoldlWithKey (\m k _ -> IM.insert (toVertex k) (normalWeight k) m) IM.empty weightMap
+        | edgeCount <= 1 = NonDet.nonDetMapFoldlWithKey (\m k _ -> IM.insert (toVertex k) 1.0 m) IM.empty weightMap
+        | otherwise = NonDet.nonDetMapFoldlWithKey (\m k _ -> IM.insert (toVertex k) (normalWeight k) m) IM.empty weightMap
       where
-        edgeCount = mapSize weightMap
+        edgeCount = NonDet.mapSize weightMap
         -- Negative weights are generally allowed but are mapped to zero.
         -- We then check if there is at least one non-zero edge and if not
         -- assign uniform weights to all branches.
         minWeight = 0 :: Prob
         weightMap' = fmap (\w -> max (weightToDouble . edgeWeight $ w) minWeight) weightMap
-        totalWeight = sum weightMap'
+        totalWeight = NonDet.mapSum weightMap'
 
         normalWeight :: BlockId -> Prob
         normalWeight bid
          | totalWeight == 0
          = 1.0 / fromIntegral edgeCount
-         | Just w <- mapLookup bid weightMap'
+         | Just w <- NonDet.mapLookup bid weightMap'
          = w/totalWeight
          | otherwise = panic "impossible"
 

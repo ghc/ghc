@@ -12,4 +12,4 @@ cabal build -w $1 --ghc-options="-fforce-recomp -j4 -ddump-to-file -fobject-dete
 # cabal build -w $1 --ghc-options="-fforce-recomp -j4" --ghc-options=-odir=out1 Cabal
 cabal build -w $1 --ghc-options="-fforce-recomp -j4 -dinitial-unique=16777215 -dunique-increment=-1 -fobject-determinism" --ghc-options=-odir=out2 Cabal
 # cabal build -w $1 --ghc-options="-fforce-recomp -j4" --ghc-options=-odir=out2 Cabal
-./check.sh darwin
+./check.sh linux

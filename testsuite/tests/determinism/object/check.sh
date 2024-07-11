@@ -54,24 +54,24 @@ compareHis() {
     done
 }
 
-#if diff -r Cabal-3.12.0.0/hiout1 Cabal-3.12.0.0/hiout2
-#then
-#    echo "OK-hi"
-#else
-#    echo "--------------------------------------------------------------------------------"
-#    echo "Comparing all objects (1. headers, 2. disassembly). Stopping at first failure..."
-#    echo "--------------------------------------------------------------------------------"
-#
-#
-#    pushd Cabal-3.12.0.0/hiout1 >/dev/null
-#    OBJS=$(find . -type f)
-#    popd >/dev/null
-#
-#    compareHis "/home/matt/ghc-rodrigo/_build/stage1/bin/ghc" "$OBJS"
-#
-#    exit 1
-#
-#fi
+if diff -r Cabal-3.12.0.0/hiout1 Cabal-3.12.0.0/hiout2
+then
+    echo "OK-hi"
+else
+    echo "--------------------------------------------------------------------------------"
+    echo "Comparing all objects (1. headers, 2. disassembly). Stopping at first failure..."
+    echo "--------------------------------------------------------------------------------"
+
+
+    pushd Cabal-3.12.0.0/hiout1 >/dev/null
+    OBJS=$(find . -type f)
+    popd >/dev/null
+
+    compareHis "/home/matt/ghc-rodrigo/_build/stage1/bin/ghc" "$OBJS"
+
+    exit 1
+
+fi
 
 # Big fast check
 if diff -r Cabal-3.12.0.0/out1 Cabal-3.12.0.0/out2

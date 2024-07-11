@@ -35,6 +35,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
+--import qualified GHC.Cmm.Dataflow.Label as NonDet
 import GHC.CmmToAsm.Reg.Utils
 
 data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)

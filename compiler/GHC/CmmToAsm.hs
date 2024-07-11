@@ -96,6 +96,7 @@ import GHC.Cmm.BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.GenericOpt
 import GHC.Cmm.CLabel
 
@@ -615,7 +616,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "generateJumpTables" #-}
                 generateJumpTables ncgImpl alloced
 
-        when (not $ null nativeCfgWeights) $ putDumpFileMaybe logger
+        when (not $ NonDet.mapNull nativeCfgWeights) $ putDumpFileMaybe logger
                 Opt_D_dump_cfg_weights "CFG Update information"
                 FormatText
                 ( text "stack:" <+> ppr stack_updt_blks $$
@@ -639,7 +640,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         when ( ncgEnableDeadCodeElimination config &&
                 (ncgAsmLinting config || debugIsOn )) $ do
                 let blocks = concatMap getBlks shorted
-                let labels = setFromList $ fmap blockId blocks :: LabelSet
+                let labels = NonDet.setFromList $ fmap blockId blocks :: NonDet.LabelSet
                 let cfg = fromJust optimizedCFG
                 return $! seq (sanityCheckCfg cfg labels $
                                 text "cfg not in lockstep") ()
@@ -688,7 +689,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
 maybeDumpCfg :: Logger -> Maybe CFG -> String -> SDoc -> IO ()
 maybeDumpCfg _logger Nothing _ _ = return ()
 maybeDumpCfg logger (Just cfg) msg proc_name
-        | null cfg = return ()
+        | NonDet.mapNull cfg = return ()
         | otherwise
         = putDumpFileMaybe logger
                 Opt_D_dump_cfg_weights msg
@@ -836,17 +837,17 @@ shortcutBranches config ncgImpl tops weights
   = (tops, weights)
   where
     (tops', mappings) = mapAndUnzip (build_mapping ncgImpl) tops
-    mapping = mapUnions mappings :: LabelMap jumpDest
+    mapping = NonDet.mapUnions mappings :: NonDet.LabelMap jumpDest
     mappingBid = fmap (getJumpDestBlockId ncgImpl) mapping
 
 build_mapping :: forall instr t d statics jumpDest.
                  NcgImpl statics instr jumpDest
               -> GenCmmDecl d (LabelMap t) (ListGraph instr)
               -> (GenCmmDecl d (LabelMap t) (ListGraph instr)
-                 ,LabelMap jumpDest)
-build_mapping _ top@(CmmData _ _) = (top, mapEmpty)
+                 ,NonDet.LabelMap jumpDest)
+build_mapping _ top@(CmmData _ _) = (top, NonDet.mapEmpty)
 build_mapping _ (CmmProc info lbl live (ListGraph []))
-  = (CmmProc info lbl live (ListGraph []), mapEmpty)
+  = (CmmProc info lbl live (ListGraph []), NonDet.mapEmpty)
 build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
   = (CmmProc info lbl live (ListGraph (head:others)), mapping)
         -- drop the shorted blocks, but don't ever drop the first one,
@@ -874,19 +875,19 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     has_info l = mapMember l info
 
     -- build a mapping from BlockId to JumpDest for shorting branches
-    mapping = mapFromList shortcut_blocks
+    mapping = NonDet.mapFromList shortcut_blocks
 
 apply_mapping :: NcgImpl statics instr jumpDest
-              -> LabelMap jumpDest
+              -> NonDet.LabelMap jumpDest
               -> GenCmmDecl statics h (ListGraph instr)
               -> GenCmmDecl statics h (ListGraph instr)
 apply_mapping ncgImpl ufm (CmmData sec statics)
-  = CmmData sec (shortcutStatics ncgImpl (\bid -> mapLookup bid ufm) statics)
+  = CmmData sec (shortcutStatics ncgImpl (\bid -> NonDet.mapLookup bid ufm) statics)
 apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
   = CmmProc info lbl live (ListGraph $ map short_bb blocks)
   where
     short_bb (BasicBlock id insns) = BasicBlock id $! map short_insn insns
-    short_insn i = shortcutJump ncgImpl (\bid -> mapLookup bid ufm) i
+    short_insn i = shortcutJump ncgImpl (\bid -> NonDet.mapLookup bid ufm) i
                  -- shortcutJump should apply the mapping repeatedly,
                  -- just in case we can short multiple branches.
 

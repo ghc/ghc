@@ -75,6 +75,10 @@ module GHC.Cmm.Dataflow.Label.NonDet
     , nonDetMapFoldMapWithKey
     , nonDetMapKeys
     , nonDetMapToList
+    , nonDetMapM
+    , allLM
+    , anyLM
+    , mapSum
     ) where
 
 import GHC.Prelude
@@ -267,6 +271,18 @@ nonDetMapKeys (LM m) = map (mkHooplLabel . fst) (M.toList m)
 {-# INLINE nonDetMapToList #-}
 nonDetMapToList :: LabelMap b -> [(Label, b)]
 nonDetMapToList (LM m) = [(mkHooplLabel k, v) | (k, v) <- M.toList m]
+
+nonDetMapM :: Monad m => (a -> m b) -> LabelMap a -> m (LabelMap b)
+nonDetMapM f (LM m) = LM <$> M.traverseWithKey (\_ x -> f x) m
+
+allLM :: (a -> Bool) -> LabelMap a -> Bool
+allLM f (LM m) = all f m
+
+anyLM :: (a -> Bool) -> LabelMap a -> Bool
+anyLM f (LM m) = any f m
+
+mapSum :: Num a => LabelMap a -> a
+mapSum (LM m) = sum m
 
 -----------------------------------------------------------------------------
 -- Instances
