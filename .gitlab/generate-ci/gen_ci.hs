@@ -975,75 +975,30 @@ flattenNamedJob (NamedJob n i) = (n, i)
 jobs :: Map String Job
 jobs = Map.fromList $ concatMap (flattenJobGroup) job_groups
 
-job_groups :: [JobGroup Job]
-job_groups =
-     [ disableValidate (standardBuilds Amd64 (Linux Debian10))
-     , addValidateRule TestPrimops (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
-     , validateBuilds Amd64 (Linux Debian10) nativeInt
-     , validateBuilds Amd64 (Linux Debian10) unreg
-     , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
-     , -- More work is needed to address TSAN failures: #22520
-       modifyNightlyJobs allowFailure
-         (modifyValidateJobs (allowFailure . manual) tsan_jobs)
-     , -- Nightly allowed to fail: #22343
-       modifyNightlyJobs allowFailure
-        (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
-     , onlyRule LLVMBackend (validateBuilds Amd64 (Linux Debian12) llvm)
-     , disableValidate (standardBuilds Amd64 (Linux Debian11))
-     , disableValidate (standardBuilds Amd64 (Linux Debian12))
-     -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
-     -- not being at EOL until April 2023 and they still need tinfo5.
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
-     , disableValidate (standardBuilds Amd64 (Linux Ubuntu1804))
-     , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
-     , disableValidate (standardBuilds Amd64 (Linux Rocky8))
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
-     -- Fedora33 job is always built with perf so there's one job in the normal
-     -- validate pipeline which is built with perf.
-     , fastCI (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
-     -- This job is only for generating head.hackage docs
-     , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
-     , disableValidate (standardBuilds Amd64 (Linux Fedora38))
-     , fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
-     , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
-     , addValidateRule TestPrimops (standardBuilds Amd64 Darwin)
-     , fastCI (standardBuilds AArch64 Darwin)
-     , fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
-     , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
-     , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian12) llvm)
-     , standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla)
-     -- Fully static build, in theory usable on any linux distribution.
-     , fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken static))
-     -- Dynamically linked build, suitable for building your own static executables on alpine
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla))
-     , disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine318) (splitSectionsBroken vanilla))
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine320) (splitSectionsBroken vanilla))
-     , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+debian_x86 :: [JobGroup Job]
+debian_x86 =
+  [ disableValidate (standardBuilds Amd64 (Linux Debian10))
+  , addValidateRule TestPrimops (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
+  , validateBuilds Amd64 (Linux Debian10) nativeInt
+  , validateBuilds Amd64 (Linux Debian10) unreg
+  , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
+  , -- More work is needed to address TSAN failures: #22520
+    modifyNightlyJobs allowFailure
+      (modifyValidateJobs (allowFailure . manual) tsan_jobs)
+  , -- Nightly allowed to fail: #22343
+    modifyNightlyJobs allowFailure
+     (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
+  , onlyRule LLVMBackend (validateBuilds Amd64 (Linux Debian12) llvm)
+  , disableValidate (standardBuilds Amd64 (Linux Debian11))
+  , disableValidate (standardBuilds Amd64 (Linux Debian12))
+  -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
+  -- not being at EOL until April 2023 and they still need tinfo5.
+  , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
 
-     , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
-
-     , make_wasm_jobs wasm_build_config
-     , modifyValidateJobs manual $
-         make_wasm_jobs wasm_build_config {bignumBackend = Native}
-     , modifyValidateJobs manual $
-         make_wasm_jobs wasm_build_config {unregisterised = True}
-     , onlyRule NonmovingGc (validateBuilds Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
-     , onlyRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
-     ]
-
+  , onlyRule NonmovingGc (validateBuilds Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
+  , onlyRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
+  ]
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
-                         { bignumBackend = Native }
-
-    -- ghcilink002 broken due to #17869
-    --
-    -- linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
-    -- (see Note [Object unloading]).
-    fullyStaticBrokenTests = modifyJobs (addVariable "BROKEN_TESTS" "ghcilink002 linker_unload_native")
-
-    hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-for-hackage")
 
     tsan_jobs =
       modifyJobs
@@ -1052,6 +1007,96 @@ job_groups =
          -- memory.
         . addVariable "HADRIAN_ARGS" "--docs=none") $
       validateBuilds Amd64 (Linux Debian12) tsan
+
+debian_aarch64 :: [JobGroup Job]
+debian_aarch64 =
+  [
+     fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
+   , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
+   , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian12) llvm)
+  ]
+
+debian_i386 :: [JobGroup Job]
+debian_i386 =
+  [ standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla) ]
+
+ubuntu_x86 :: [JobGroup Job]
+ubuntu_x86 =
+  [ disableValidate (standardBuilds Amd64 (Linux Ubuntu1804))
+  , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
+  ]
+
+rhel_x86 :: [JobGroup Job]
+rhel_x86 =
+  [ disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
+  , disableValidate (standardBuilds Amd64 (Linux Rocky8))
+  ]
+
+fedora_x86 :: [JobGroup Job]
+fedora_x86 =
+  [
+  -- Fedora33 job is always built with perf so there's one job in the normal
+  -- validate pipeline which is built with perf.
+    fastCI (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
+  -- This job is only for generating head.hackage docs
+  , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
+  , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
+  , disableValidate (standardBuilds Amd64 (Linux Fedora38))
+  ]
+  where
+    hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-for-hackage")
+
+windows_x86 :: [JobGroup Job]
+windows_x86 =
+  [ fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
+  , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
+  ]
+
+darwin :: [JobGroup Job]
+darwin =
+  [ addValidateRule TestPrimops (standardBuilds Amd64 Darwin)
+  , fastCI (standardBuilds AArch64 Darwin)
+  ]
+
+alpine_x86 :: [JobGroup Job]
+alpine_x86 =
+  [ -- Fully static build, in theory usable on any linux distribution.
+    fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken static))
+  , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
+  -- Dynamically linked build, suitable for building your own static executables on alpine
+  , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla))
+  , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine320) (splitSectionsBroken vanilla))
+  ]
+  where
+    -- ghcilink002 broken due to #17869
+    --
+    -- linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
+    -- (see Note [Object unloading]).
+    fullyStaticBrokenTests = modifyJobs (addVariable "BROKEN_TESTS" "ghcilink002 linker_unload_native")
+
+alpine_aarch64 :: [JobGroup Job]
+alpine_aarch64 = [
+  disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine318) (splitSectionsBroken vanilla))
+  ]
+
+cross_jobs :: [JobGroup Job]
+cross_jobs = [
+  -- x86 -> aarch64
+    validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+
+  -- Javascript
+  , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
+
+  -- Wasm
+  , make_wasm_jobs wasm_build_config
+  , modifyValidateJobs manual $
+      make_wasm_jobs wasm_build_config {bignumBackend = Native}
+  , modifyValidateJobs manual $
+      make_wasm_jobs wasm_build_config {unregisterised = True}
+  ]
+  where
+    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+                         { bignumBackend = Native }
 
     make_wasm_jobs cfg =
       modifyJobs
@@ -1068,6 +1113,20 @@ job_groups =
           , buildFlavour     = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
           , textWithSIMDUTF = True
         }
+
+job_groups :: [JobGroup Job]
+job_groups =
+     debian_x86
+  ++ debian_aarch64
+  ++ debian_i386
+  ++ fedora_x86
+  ++ windows_x86
+  ++ darwin
+  ++ ubuntu_x86
+  ++ rhel_x86
+  ++ alpine_x86
+  ++ alpine_aarch64
+  ++ cross_jobs
 
 
 mkPlatform :: Arch -> Opsys -> String
