@@ -89,7 +89,7 @@ platformSupportsSharedLibs :: Action Bool
 platformSupportsSharedLibs = do
     windows       <- isWinTarget
     wasm          <- anyTargetArch [ ArchWasm32 ]
-    ppc_linux     <- (&&) <$> anyTargetArch [ ArchPPC ] <*> anyTargetOs [ OSLinux ]
+    ppc_linux     <- (&&) <$> anyTargetArch [ ArchPPC ] <*> anyTargetOs [ OSLinux ]
     solaris       <- (&&) <$> anyTargetArch [ ArchX86 ] <*> anyTargetOs [ OSSolaris2 ]
     javascript    <- anyTargetArch     [ ArchJavaScript ]
     return $ not (windows || wasm || javascript || ppc_linux || solaris)

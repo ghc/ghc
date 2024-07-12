@@ -365,6 +365,14 @@ RTS_FUN_DECL(stg_ap_pppppp_fast);
 RTS_FUN_DECL(stg_PAP_apply);
 RTS_FUN_DECL(stg_CONTINUATION_apply);
 
+/* Defined in separate AutoApply_{V16,V32,V64}.cmm files and imported into AutoApply.cmm */
+RTS_FUN_DECL(stg_ap_stk_v16);
+RTS_FUN_DECL(stg_ap_stk_v32);
+RTS_FUN_DECL(stg_ap_stk_v64);
+RTS_FUN_DECL(stg_stk_save_v16);
+RTS_FUN_DECL(stg_stk_save_v32);
+RTS_FUN_DECL(stg_stk_save_v64);
+
 /* standard GC & stack check entry points, all defined in HeapStackCheck.cmm */
 
 RTS_FUN_DECL(stg_gc_noregs);

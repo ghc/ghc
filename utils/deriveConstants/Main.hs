@@ -1048,7 +1048,8 @@ writeHeader fn rs = atomicWriteFile fn xs
           genapplyBits = mconcat ["// " ++ _name ++ " " ++ show v ++ "\n" | (_name, v) <- genapplyData]
           genapplyData = [(_name, v) | (_, GetWord _name (Snd v)) <- rs, _name `elem` genapplyFields ]
           genapplyFields = [
-            "MAX_Real_Vanilla_REG", "MAX_Real_Float_REG", "MAX_Real_Double_REG", "MAX_Real_Long_REG",
+            "MAX_Real_Vanilla_REG", "MAX_Real_Float_REG", "MAX_Real_Double_REG",
+            "MAX_Real_Long_REG", "MAX_Real_XMM_REG",
             "WORD_SIZE", "TAG_BITS", "BITMAP_BITS_SHIFT"
             ]
           haskellRs = fmap snd $ filter (\r -> fst r `elem` [Haskell,Both]) rs
