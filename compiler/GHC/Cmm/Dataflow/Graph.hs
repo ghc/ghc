@@ -28,10 +28,10 @@ import GHC.Cmm.Dataflow.Block
 import Data.Kind
 
 -- | A (possibly empty) collection of closed/closed blocks
-type Body n = Body' Block n
+type Body s n = Body' s Block n
 
 -- | @Body@ abstracted over @block@
-type Body' block (n :: Extensibility -> Extensibility -> Type) = Det.LabelMap (block n C C)
+type Body' s block (n :: Extensibility -> Extensibility -> Type) = s (block n C C)
 
 -------------------------------
 -- | Gives access to the anchor points for
@@ -48,19 +48,19 @@ instance NonLocal n => NonLocal (Block n) where
   successors (BlockCC _ _ n) = successors n
 
 
-emptyBody :: Body' block n
-emptyBody = Det.mapEmpty
+emptyBody :: Body' NonDet.LabelMap block n
+emptyBody = NonDet.mapEmpty
 
-bodyList :: Body' block n -> [(Label,block n C C)]
-bodyList body = Det.mapToList body
+bodyList :: Body' NonDet.LabelMap block n -> [(Label,block n C C)]
+bodyList body = NonDet.nonDetMapToList body
 
-bodyToBlockList :: Body n -> [Block n C C]
-bodyToBlockList body = Det.mapElems body
+bodyToBlockList :: Body NonDet.LabelMap n -> [Block n C C]
+bodyToBlockList body = NonDet.nonDetMapElems body
 
 addBlock
     :: (NonLocal block, HasDebugCallStack)
-    => block C C -> Det.LabelMap (block C C) -> Det.LabelMap (block C C)
-addBlock block body = Det.mapAlter add lbl body
+    => block C C -> NonDet.LabelMap (block C C) -> NonDet.LabelMap (block C C)
+addBlock block body = NonDet.mapAlter add lbl body
   where
     lbl = entryLabel block
     add Nothing = Just block
@@ -74,18 +74,18 @@ addBlock block body = Det.mapAlter add lbl body
 -- O/C, C/O, C/C).  A graph open at the entry has a single,
 -- distinguished, anonymous entry point; if a graph is closed at the
 -- entry, its entry point(s) are supplied by a context.
-type Graph = Graph' Block
+type Graph = Graph' NonDet.LabelMap Block
 
 -- | @Graph'@ is abstracted over the block type, so that we can build
 -- graphs of annotated blocks for example (Compiler.Hoopl.Dataflow
 -- needs this).
-data Graph' block (n :: Extensibility -> Extensibility -> Type) e x where
-  GNil  :: Graph' block n O O
-  GUnit :: block n O O -> Graph' block n O O
+data Graph' s block (n :: Extensibility -> Extensibility -> Type) e x where
+  GNil  :: Graph' s block n O O
+  GUnit :: block n O O -> Graph' s block n O O
   GMany :: MaybeO e (block n O C)
-        -> Body' block n
+        -> Body' s block n
         -> MaybeO x (block n C O)
-        -> Graph' block n e x
+        -> Graph' s block n e x
 
 
 -- -----------------------------------------------------------------------------
@@ -93,30 +93,31 @@ data Graph' block (n :: Extensibility -> Extensibility -> Type) e x where
 
 -- | Maps over all nodes in a graph.
 mapGraph :: (forall e x. n e x -> n' e x) -> Graph n e x -> Graph n' e x
-mapGraph f = mapGraphBlocks (mapBlock f)
+mapGraph f = mapGraphBlocks NonDet.mapMap (mapBlock f)
 
 -- | Function 'mapGraphBlocks' enables a change of representation of blocks,
 -- nodes, or both.  It lifts a polymorphic block transform into a polymorphic
 -- graph transform.  When the block representation stabilizes, a similar
 -- function should be provided for blocks.
-mapGraphBlocks :: forall block n block' n' e x .
-                  (forall e x . block n e x -> block' n' e x)
-               -> (Graph' block n e x -> Graph' block' n' e x)
+mapGraphBlocks :: forall s block n block' n' e x .
+                  (forall a b . (a -> b) -> s a -> s b)
+               -> (forall e x . block n e x -> block' n' e x)
+               -> (Graph' s block n e x -> Graph' s block' n' e x)
 
-mapGraphBlocks f = map
-  where map :: Graph' block n e x -> Graph' block' n' e x
+mapGraphBlocks f g = map
+  where map :: Graph' s block n e x -> Graph' s block' n' e x
         map GNil = GNil
-        map (GUnit b) = GUnit (f b)
-        map (GMany e b x) = GMany (fmap f e) (Det.mapMap f b) (fmap f x)
+        map (GUnit b) = GUnit (g b)
+        map (GMany e b x) = GMany (fmap g e) (f g b) (fmap g x)
 
 -- -----------------------------------------------------------------------------
 -- Extracting Labels from graphs
 
-labelsDefined :: forall block n e x . NonLocal (block n) => Graph' block n e x
+labelsDefined :: forall block n e x . NonLocal (block n) => Graph' NonDet.LabelMap block n e x
               -> NonDet.LabelSet
 labelsDefined GNil      = NonDet.setEmpty
 labelsDefined (GUnit{}) = NonDet.setEmpty
-labelsDefined (GMany _ body x) = Det.mapFoldlWithKey addEntry (exitLabel x) body
+labelsDefined (GMany _ body x) = NonDet.nonDetMapFoldlWithKey addEntry (exitLabel x) body
   where addEntry :: forall a. NonDet.LabelSet -> Label -> a -> NonDet.LabelSet
         addEntry labels label _ = NonDet.setInsert label labels
         exitLabel :: MaybeO x (block n C O) -> NonDet.LabelSet
@@ -150,7 +151,7 @@ labelsDefined (GMany _ body x) = Det.mapFoldlWithKey addEntry (exitLabel x) body
 -- B and C before we analyze D.
 revPostorderFrom
   :: forall block.  (NonLocal block)
-  => Det.LabelMap (block C C) -> Label -> [block C C]
+  => NonDet.LabelMap (block C C) -> Label -> [block C C]
 revPostorderFrom graph start = go start_worklist NonDet.setEmpty []
   where
     start_worklist = lookup_for_descend start Nil
@@ -182,7 +183,7 @@ revPostorderFrom graph start = go start_worklist NonDet.setEmpty []
 
     lookup_for_descend :: Label -> DfsStack (block C C) -> DfsStack (block C C)
     lookup_for_descend label wl
-      | Just b <- Det.mapLookup label graph = ConsTodo b wl
+      | Just b <- NonDet.mapLookup label graph = ConsTodo b wl
       | otherwise =
            error $ "Label that doesn't have a block?! " ++ show label
 

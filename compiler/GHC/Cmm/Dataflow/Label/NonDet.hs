@@ -167,6 +167,7 @@ nonDetSetElems (LS s) = map mkHooplLabel (S.elems s)
 
 newtype LabelMap v = LM (Word64Map v)
   deriving newtype (Eq, Ord, Show, Functor)
+  deriving stock (Traversable, Foldable)
 
 mapNull :: LabelMap a -> Bool
 mapNull (LM m) = M.null m
@@ -304,6 +305,7 @@ instance TrieMap LabelMap where
   alterTM k f m = mapAlter f k m
   foldTM = error "TrieMap: NonDet.LabelMap"
   filterTM f m  = mapFilter f m
+
 
 -----------------------------------------------------------------------------
 -- FactBase

@@ -28,9 +28,9 @@ import GHC.Types.Unique.DSM
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
 import GHC.Cmm.Dataflow.Label (Label)
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import qualified GHC.Cmm.Dataflow.Label as Det
 
 -- Compute a minimal set of proc points for a control-flow graph.
 
@@ -246,10 +246,10 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
 
   let add graphEnv procId bid b = NonDet.mapInsert procId graph' graphEnv
         where
-          graph' = Det.mapInsert bid b graph
-          graph  = NonDet.mapLookup procId graphEnv `orElse` Det.mapEmpty
+          graph' = NonDet.mapInsert bid b graph
+          graph  = NonDet.mapLookup procId graphEnv `orElse` NonDet.mapEmpty
 
-  let add_block :: NonDet.LabelMap (Det.LabelMap CmmBlock) -> CmmBlock -> NonDet.LabelMap (Det.LabelMap CmmBlock)
+  let add_block :: NonDet.LabelMap (NonDet.LabelMap CmmBlock) -> CmmBlock -> NonDet.LabelMap (NonDet.LabelMap CmmBlock)
       add_block graphEnv b =
         case NonDet.mapLookup bid procMap of
           Just ProcPoint -> add graphEnv bid bid b
@@ -282,7 +282,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
 
       procLabels :: NonDet.LabelMap (CLabel, Maybe CLabel)
       procLabels = foldl' add_label NonDet.mapEmpty
-                          (filter (flip Det.mapMember (toBlockMap g)) (NonDet.nonDetSetElems procPoints))
+                          (filter (flip NonDet.mapMember (toBlockMap g)) (NonDet.nonDetSetElems procPoints))
 
   -- In each new graph, add blocks jumping off to the new procedures,
   -- and replace branches to procpoints with branches to the jump-off blocks
@@ -319,16 +319,16 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
           CmmSwitch _ ids         -> foldr add_if_pp rst $ switchTargetsToList ids
           _                       -> rst
 
-  let add_jumps :: NonDet.LabelMap CmmGraph -> (Label, Det.LabelMap CmmBlock) -> UniqDSM (NonDet.LabelMap CmmGraph)
+  let add_jumps :: NonDet.LabelMap CmmGraph -> (Label, NonDet.LabelMap CmmBlock) -> UniqDSM (NonDet.LabelMap CmmGraph)
       add_jumps newGraphEnv (ppId, blockEnv) = do
         -- find which procpoints we currently branch to
-        let needed_jumps = Det.mapFoldr add_if_branch_to_pp [] blockEnv
+        let needed_jumps = NonDet.nonDetMapFoldr add_if_branch_to_pp [] blockEnv
 
         (jumpEnv, jumpBlocks) <-
            foldM add_jump_block (NonDet.mapEmpty, []) needed_jumps
             -- update the entry block
-        let b = expectJust "block in env" $ Det.mapLookup ppId blockEnv
-            blockEnv' = Det.mapInsert ppId b blockEnv
+        let b = expectJust "block in env" $ NonDet.mapLookup ppId blockEnv
+            blockEnv' = NonDet.mapInsert ppId b blockEnv
             -- replace branches to procpoints with branches to jumps
             blockEnv'' = toBlockMap $ replaceBranches jumpEnv $ ofBlockMap ppId blockEnv'
             -- add the jump blocks to the graph
@@ -389,7 +389,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
 replaceBranches :: NonDet.LabelMap BlockId -> CmmGraph -> CmmGraph
 replaceBranches env cmmg
   = {-# SCC "replaceBranches" #-}
-    ofBlockMap (g_entry cmmg) $ Det.mapMap f $ toBlockMap cmmg
+    ofBlockMap (g_entry cmmg) $ NonDet.mapMap f $ toBlockMap cmmg
   where
     f block = replaceLastNode block $ last (lastNode block)
 

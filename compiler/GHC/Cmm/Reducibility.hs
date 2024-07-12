@@ -112,8 +112,8 @@ type CGraph = Gr CmmSuper ()
 inflate :: Label -> CGraph -> CmmGraph
 inflate entry cg = CmmGraph entry graph
   where graph = GMany NothingO body NothingO
-        body :: Det.LabelMap CmmBlock
-        body = foldl (\map block -> Det.mapInsert (entryLabel block) block map) Det.mapEmpty $
+        body :: NonDet.LabelMap CmmBlock
+        body = foldl (\map block -> NonDet.mapInsert (entryLabel block) block map) NonDet.mapEmpty $
                blocks super
         super = case labNodes cg of
                   [(_, s)] -> s

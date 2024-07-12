@@ -1575,7 +1575,7 @@ parseCmmFile :: CmmParserConfig
              -> Module
              -> HomeUnit
              -> FilePath
-             -> IO (Messages PsMessage, Messages PsMessage, Maybe (CmmGroup, [InfoProvEnt]))
+             -> IO (Messages PsMessage, Messages PsMessage, Maybe (DCmmGroup, [InfoProvEnt]))
 parseCmmFile cmmpConfig this_mod home_unit filename = do
   buf <- hGetStringBuffer filename
   let
@@ -1595,7 +1595,7 @@ parseCmmFile cmmpConfig this_mod home_unit filename = do
               ((), cmm) <- getCmm $ unEC code "global" (initEnv (pdProfile pdConfig)) [] >> return ()
               -- See Note [Mapping Info Tables to Source Positions] (IPE Maps)
               let used_info
-                    | do_ipe    = map (cmmInfoTableToInfoProvEnt this_mod) (mapMaybe topInfoTable cmm)
+                    | do_ipe    = map (cmmInfoTableToInfoProvEnt this_mod) (mapMaybe topInfoTableD cmm)
                     | otherwise = []
                     where
                       do_ipe = stgToCmmInfoTableMap $ cmmpStgToCmmConfig cmmpConfig

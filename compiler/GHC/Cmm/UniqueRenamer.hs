@@ -18,6 +18,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import qualified GHC.Cmm.Dataflow.Label as Det
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Switch
 -- import GHC.Cmm.Info.Build
 import GHC.Types.Unique
@@ -96,7 +97,7 @@ detRenameCmmGroup dufm group = swap (runState (mapM go group) dufm)
     go :: DCmmDecl -> State DetUniqFM CmmDecl
     go (CmmProc h lbl regs g)
       = do
-        g' <- uniqRename g
+        g' <- goCmmGraph g
         regs' <- uniqRename regs
         lbl' <- uniqRename lbl
         --- rename h last!!! (TODO: Check if this is really still needed now that LabelMap is deterministic. My guess is this is not needed at all.
@@ -107,6 +108,17 @@ detRenameCmmGroup dufm group = swap (runState (mapM go group) dufm)
 
     goTop :: DCmmTopInfo -> State DetUniqFM CmmTopInfo
     goTop (TopInfo (DWrap i) b) = TopInfo . Det.mapFromList <$> uniqRename i <*> pure b
+
+    goCmmGraph :: DCmmGraph -> State DetUniqFM CmmGraph
+    goCmmGraph (CmmGraph entry bs) = CmmGraph <$> uniqRename entry <*> goGraph bs
+
+    goGraph = \case
+      GNil  -> pure GNil
+      GUnit block -> GUnit <$> uniqRename block
+      GMany m1 b m2 -> GMany <$> uniqRename m1 <*> goBody b <*> uniqRename m2
+
+    goBody (DWrap b) = NonDet.mapFromList <$> uniqRename b
+
 
 -- The most important function here, which does the actual renaming.
 -- Arguably, maybe we should rename this to CLabelRenamer
@@ -200,14 +212,17 @@ instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
   => UniqRenamable (Det.LabelMap a) where
   uniqRename lm = Det.mapFromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (Det.mapToList lm)
 
-instance UniqRenamable CmmGraph where
+{- instance UniqRenamable CmmGraph where
   uniqRename (CmmGraph e g) = CmmGraph <$> uniqRename e <*> uniqRename g
+  -}
 
-instance UniqRenamable (Graph CmmNode n m) where
+
+{- instance UniqRenamable (Graph  CmmNode n m) where
   uniqRename = \case
     GNil  -> pure GNil
     GUnit block -> GUnit <$> uniqRename block
     GMany m1 b m2 -> GMany <$> uniqRename m1 <*> uniqRename b <*> uniqRename m2
+    -}
 
 instance UniqRenamable t => UniqRenamable (MaybeO n t) where
   uniqRename (JustO x) = JustO <$> uniqRename x

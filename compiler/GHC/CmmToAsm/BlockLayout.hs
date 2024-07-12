@@ -26,8 +26,7 @@ import GHC.CmmToAsm.Config
 
 import GHC.Cmm
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label (LabelMap, mapMember, mapLookup, mapElems, mapKeys, mapEmpty, mapInsert, mapDelete, mapFromList, mapMap)
-import GHC.Cmm.Dataflow.Label.NonDet (LabelSet, setEmpty, setMember, setFromList, setInsert)
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 
 import GHC.Types.Unique.FM
 
@@ -289,7 +288,7 @@ neighbourOverlapp = 2
 -- [A,B,C,D,E] Gives entries like (B -> ([A,B], [A,B,C,D,E]))
 -- where [A,B] are blocks in the end region of a chain.
 -- This is cheaper then recomputing the ends multiple times.
-type FrontierMap = LabelMap ([BlockId],BlockChain)
+type FrontierMap = NonDet.LabelMap ([BlockId],BlockChain)
 
 -- | A non empty ordered sequence of basic blocks.
 --   It is suitable for serialization in this order.
@@ -418,22 +417,22 @@ combineNeighbourhood edges chains
         --Build maps from chain ends to chains
         endFrontier, startFrontier :: FrontierMap
         endFrontier =
-            mapFromList $ concatMap (\chain ->
+            NonDet.mapFromList $ concatMap (\chain ->
                                 let ends = getEnds chain :: [BlockId]
                                     entry = (ends,chain)
                                 in map (\x -> (x,entry)) ends ) chains
         startFrontier =
-            mapFromList $ concatMap (\chain ->
+            NonDet.mapFromList $ concatMap (\chain ->
                                 let front = getFronts chain
                                     entry = (front,chain)
                                 in map (\x -> (x,entry)) front) chains
         applyEdges :: [CfgEdge] -> FrontierMap -> FrontierMap -> Set.Set (BlockId, BlockId)
                    -> ([BlockChain], Set.Set (BlockId,BlockId))
         applyEdges [] chainEnds _chainFronts combined =
-            (ordNub $ map snd $ mapElems chainEnds, combined)
+            (ordNub $ map snd $ NonDet.nonDetMapElems chainEnds, combined)
         applyEdges ((CfgEdge from to _w):edges) chainEnds chainFronts combined
-            | Just (c1_e,c1) <- mapLookup from chainEnds
-            , Just (c2_f,c2) <- mapLookup to chainFronts
+            | Just (c1_e,c1) <- NonDet.mapLookup from chainEnds
+            , Just (c2_f,c2) <- NonDet.mapLookup to chainFronts
             , c1 /= c2 -- Avoid trying to concat a chain with itself.
             = let newChain = chainConcat c1 c2
                   newChainFrontier = getFronts newChain
@@ -441,16 +440,16 @@ combineNeighbourhood edges chains
                   newFronts :: FrontierMap
                   newFronts =
                     let withoutOld =
-                            foldl' (\m b -> mapDelete b m :: FrontierMap) chainFronts (c2_f ++ getFronts c1)
+                            foldl' (\m b -> NonDet.mapDelete b m :: FrontierMap) chainFronts (c2_f ++ getFronts c1)
                         entry =
                             (newChainFrontier,newChain) --let bound to ensure sharing
-                    in foldl' (\m x -> mapInsert x entry m)
+                    in foldl' (\m x -> NonDet.mapInsert x entry m)
                               withoutOld newChainFrontier
 
                   newEnds =
-                    let withoutOld = foldl' (\m b -> mapDelete b m) chainEnds (c1_e ++ getEnds c2)
+                    let withoutOld = foldl' (\m b -> NonDet.mapDelete b m) chainEnds (c1_e ++ getEnds c2)
                         entry = (newChainEnds,newChain) --let bound to ensure sharing
-                    in foldl' (\m x -> mapInsert x entry m)
+                    in foldl' (\m x -> NonDet.mapInsert x entry m)
                               withoutOld newChainEnds
               in
                 -- pprTrace "ApplyEdges"
@@ -483,8 +482,8 @@ mergeChains edges chains
     = runST $ do
         let addChain m0 chain = do
                 ref <- fresh chain
-                return $ chainFoldl (\m' b -> mapInsert b ref m') m0 chain
-        chainMap' <- foldM (\m0 c -> addChain m0 c) mapEmpty chains
+                return $ chainFoldl (\m' b -> NonDet.mapInsert b ref m') m0 chain
+        chainMap' <- foldM (\m0 c -> addChain m0 c) NonDet.mapEmpty chains
         merge edges chainMap'
     where
         -- We keep a map from ALL blocks to their respective chain (sigh)
@@ -492,9 +491,9 @@ mergeChains edges chains
         -- the associated chains quickly.
         -- We use a union-find data structure to do this efficiently.
 
-        merge :: forall s. [CfgEdge] -> LabelMap (Point s BlockChain) -> ST s BlockChain
+        merge :: forall s. [CfgEdge] -> NonDet.LabelMap (Point s BlockChain) -> ST s BlockChain
         merge [] chains = do
-            chains' <- mapM find =<< (nub <$> (mapM repr $ mapElems chains)) :: ST s [BlockChain]
+            chains' <- mapM find =<< (nub <$> (mapM repr $ NonDet.nonDetMapElems chains)) :: ST s [BlockChain]
             return $ foldl' chainConcat (Partial.head chains') (Partial.tail chains')
         merge ((CfgEdge from to _):edges) chains
         --   | pprTrace "merge" (ppr (from,to) <> ppr chains) False
@@ -509,8 +508,8 @@ mergeChains edges chains
               union cFrom new_point
             merge edges chains
           where
-            cFrom = expectJust "mergeChains:chainMap:from" $ mapLookup from chains
-            cTo = expectJust "mergeChains:chainMap:to"   $ mapLookup to   chains
+            cFrom = expectJust "mergeChains:chainMap:from" $ NonDet.mapLookup from chains
+            cTo = expectJust "mergeChains:chainMap:to"   $ NonDet.mapLookup to   chains
 
 
 -- See Note [Chain based CFG serialization] for the general idea.
@@ -524,10 +523,10 @@ mergeChains edges chains
 -- An Edge is irrelevant if the ends are part of the same chain.
 -- We say these edges are already linked
 buildChains :: [CfgEdge] -> [BlockId]
-            -> ( LabelMap BlockChain  -- Resulting chains, indexed by end if chain.
+            -> ( NonDet.LabelMap BlockChain  -- Resulting chains, indexed by end if chain.
                , Set.Set (BlockId, BlockId)) --List of fused edges.
 buildChains edges blocks
-  = runST $ buildNext setEmpty mapEmpty mapEmpty edges Set.empty
+  = runST $ buildNext NonDet.setEmpty NonDet.mapEmpty NonDet.mapEmpty edges Set.empty
   where
     -- buildNext builds up chains from edges one at a time.
 
@@ -536,21 +535,21 @@ buildChains edges blocks
     -- existing chain!
     -- We store them using STRefs so we don't have to rebuild the spine of both
     -- maps every time we update a chain.
-    buildNext :: forall s. LabelSet
-              -> LabelMap (STRef s BlockChain) -- Map from end of chain to chain.
-              -> LabelMap (STRef s BlockChain) -- Map from start of chain to chain.
+    buildNext :: forall s. NonDet.LabelSet
+              -> NonDet.LabelMap (STRef s BlockChain) -- Map from end of chain to chain.
+              -> NonDet.LabelMap (STRef s BlockChain) -- Map from start of chain to chain.
               -> [CfgEdge] -- Edges to check - ordered by decreasing weight
               -> Set.Set (BlockId, BlockId) -- Used edges
-              -> ST s   ( LabelMap BlockChain -- Chains by end
+              -> ST s   ( NonDet.LabelMap BlockChain -- Chains by end
                         , Set.Set (BlockId, BlockId) --List of fused edges
                         )
     buildNext placed _chainStarts chainEnds  [] linked = do
-        ends' <- sequence $ mapMap readSTRef chainEnds :: ST s (LabelMap BlockChain)
+        ends' <- sequence $ NonDet.mapMap readSTRef chainEnds :: ST s (NonDet.LabelMap BlockChain)
         -- Any remaining blocks have to be made to singleton chains.
         -- They might be combined with other chains later on outside this function.
-        let unplaced = filter (\x -> not (setMember x placed)) blocks
+        let unplaced = filter (\x -> not (NonDet.setMember x placed)) blocks
             singletons = map (\x -> (x,chainSingleton x)) unplaced :: [(BlockId,BlockChain)]
-        return (foldl' (\m (k,v) -> mapInsert k v m) ends' singletons , linked)
+        return (foldl' (\m (k,v) -> NonDet.mapInsert k v m) ends' singletons , linked)
     buildNext placed chainStarts chainEnds (edge:todo) linked
         | from == to
         -- We skip self edges
@@ -561,16 +560,16 @@ buildChains edges blocks
             --pprTraceM "Edge-Chain:" (ppr edge)
             chain' <- newSTRef $ chainFromList [from,to]
             buildNext
-                (setInsert to (setInsert from placed))
-                (mapInsert from chain' chainStarts)
-                (mapInsert to chain' chainEnds)
+                (NonDet.setInsert to (NonDet.setInsert from placed))
+                (NonDet.mapInsert from chain' chainStarts)
+                (NonDet.mapInsert to chain' chainEnds)
                 todo
                 (Set.insert (from,to) linked)
 
         | (alreadyPlaced from) &&
           (alreadyPlaced to)
-        , Just predChain <- mapLookup from chainEnds
-        , Just succChain <- mapLookup to chainStarts
+        , Just predChain <- NonDet.mapLookup from chainEnds
+        , Just succChain <- NonDet.mapLookup to chainStarts
         , predChain /= succChain -- Otherwise we try to create a cycle.
           = fuseChain predChain succChain
 
@@ -583,11 +582,11 @@ buildChains edges blocks
       where
         from = edgeFrom edge
         to   = edgeTo   edge
-        alreadyPlaced blkId = (setMember blkId placed)
+        alreadyPlaced blkId = (NonDet.setMember blkId placed)
 
         -- Combine two chains into a single one.
         fuseChain :: STRef s BlockChain -> STRef s BlockChain
-                  -> ST s   ( LabelMap BlockChain -- Chains by end
+                  -> ST s   ( NonDet.LabelMap BlockChain -- Chains by end
                             , Set.Set (BlockId, BlockId) --List of fused edges
                             )
         fuseChain fromRef toRef = do
@@ -601,39 +600,39 @@ buildChains edges blocks
             -- pprTraceM "pre-fuse chains:" $ ppr chains
             buildNext
                 placed
-                (mapInsert start ref $ mapDelete to $ chainStarts)
-                (mapInsert end ref $ mapDelete from $ chainEnds)
+                (NonDet.mapInsert start ref $ NonDet.mapDelete to $ chainStarts)
+                (NonDet.mapInsert end ref $ NonDet.mapDelete from $ chainEnds)
                 todo
                 (Set.insert (from,to) linked)
 
 
         --Add the block to a existing chain or creates a new chain
-        findChain :: ST s   ( LabelMap BlockChain -- Chains by end
+        findChain :: ST s   ( NonDet.LabelMap BlockChain -- Chains by end
                             , Set.Set (BlockId, BlockId) --List of fused edges
                             )
         findChain
           -- We can attach the block to the end of a chain
           | alreadyPlaced from
-          , Just predChain <- mapLookup from chainEnds
+          , Just predChain <- NonDet.mapLookup from chainEnds
           = do
             chain <- readSTRef predChain
             let newChain = chainSnoc chain to
             writeSTRef predChain newChain
-            let chainEnds' = mapInsert to predChain $ mapDelete from chainEnds
+            let chainEnds' = NonDet.mapInsert to predChain $ NonDet.mapDelete from chainEnds
             -- chains <- sequence $ mapMap readSTRef chainStarts
             -- pprTraceM "from chains:" $ ppr chains
-            buildNext (setInsert to placed) chainStarts chainEnds' todo (Set.insert (from,to) linked)
+            buildNext (NonDet.setInsert to placed) chainStarts chainEnds' todo (Set.insert (from,to) linked)
           -- We can attack it to the front of a chain
           | alreadyPlaced to
-          , Just succChain <- mapLookup to chainStarts
+          , Just succChain <- NonDet.mapLookup to chainStarts
           = do
             chain <- readSTRef succChain
             let newChain = from `chainCons` chain
             writeSTRef succChain newChain
-            let chainStarts' = mapInsert from succChain $ mapDelete to chainStarts
+            let chainStarts' = NonDet.mapInsert from succChain $ NonDet.mapDelete to chainStarts
             -- chains <- sequence $ mapMap readSTRef chainStarts'
             -- pprTraceM "to chains:" $ ppr chains
-            buildNext (setInsert from placed) chainStarts' chainEnds todo (Set.insert (from,to) linked)
+            buildNext (NonDet.setInsert from placed) chainStarts' chainEnds todo (Set.insert (from,to) linked)
           -- The placed end of the edge is part of a chain already and not an end.
           | otherwise
           = do
@@ -641,15 +640,15 @@ buildChains edges blocks
             --pprTraceM "Singleton" $ ppr block
             let newChain = chainSingleton block
             ref <- newSTRef newChain
-            buildNext (setInsert block placed) (mapInsert block ref chainStarts)
-                      (mapInsert block ref chainEnds) todo (linked)
+            buildNext (NonDet.setInsert block placed) (NonDet.mapInsert block ref chainStarts)
+                      (NonDet.mapInsert block ref chainEnds) todo (linked)
             where
-              alreadyPlaced blkId = (setMember blkId placed)
+              alreadyPlaced blkId = (NonDet.setMember blkId placed)
 
 -- | Place basic blocks based on the given CFG.
 -- See Note [Chain based CFG serialization]
 sequenceChain :: forall a i. Instruction i
-              => LabelMap a -- ^ Keys indicate an info table on the block.
+              => NonDet.LabelMap a -- ^ Keys indicate an info table on the block.
               -> CFG -- ^ Control flow graph and some meta data.
               -> [GenBasicBlock i] -- ^ List of basic blocks to be placed.
               -> [GenBasicBlock i] -- ^ Blocks placed in sequence.
@@ -667,7 +666,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
                 | (EdgeInfo CmmSource { trans_cmmNode = CmmCall {} } _) <- edgeInfo
                 -- Ignore edges across calls.
                 = Nothing
-                | mapMember to info
+                | NonDet.mapMember to info
                 , w <- edgeWeight edgeInfo
                 -- The payoff is quite small if we jump over an info table
                 = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
@@ -685,17 +684,17 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
                   cantEliminate CmmSwitch {} = True
                   cantEliminate _ = False
 
-        blockMap :: LabelMap (GenBasicBlock i)
+        blockMap :: NonDet.LabelMap (GenBasicBlock i)
         blockMap
             = foldl' (\m blk@(BasicBlock lbl _ins) ->
-                        mapInsert lbl blk m)
-                     mapEmpty blocks
+                        NonDet.mapInsert lbl blk m)
+                     NonDet.mapEmpty blocks
 
         (builtChains, builtEdges)
             = {-# SCC "buildChains" #-}
               --pprTraceIt "generatedChains" $
               --pprTrace "blocks" (ppr (mapKeys blockMap)) $
-              buildChains directEdges (mapKeys blockMap)
+              buildChains directEdges (NonDet.nonDetMapKeys blockMap)
 
         rankedEdges :: [CfgEdge]
         -- Sort descending by weight, remove fused edges
@@ -704,10 +703,10 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
             directEdges
 
         (neighbourChains, combined)
-            = assert (noDups $ mapElems builtChains) $
+            = assert (noDups $ NonDet.nonDetMapElems builtChains) $
               {-# SCC "groupNeighbourChains" #-}
             --   pprTraceIt "NeighbourChains" $
-              combineNeighbourhood rankedEdges (mapElems builtChains)
+              combineNeighbourhood rankedEdges (NonDet.nonDetMapElems builtChains)
 
 
         allEdges :: [CfgEdge]
@@ -744,10 +743,10 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
               (concatMap fromOL $ map chainBlocks prepedChains)
 
         --chainPlaced = setFromList $ map blockId blockList :: LabelSet
-        chainPlaced = setFromList $ blockList :: LabelSet
+        chainPlaced = NonDet.setFromList $ blockList :: NonDet.LabelSet
         unplaced =
-            let blocks = mapKeys blockMap
-                isPlaced b = setMember (b) chainPlaced
+            let blocks = NonDet.nonDetMapKeys blockMap
+                isPlaced b = NonDet.setMember (b) chainPlaced
             in filter (\block -> not (isPlaced block)) blocks
 
         placedBlocks =
@@ -758,23 +757,23 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
             --pprTraceIt "placedBlocks" $
             -- ++ [] is still kinda expensive
             if null unplaced then blockList else blockList ++ unplaced
-        getBlock bid = expectJust "Block placement" $ mapLookup bid blockMap
+        getBlock bid = expectJust "Block placement" $ NonDet.mapLookup bid blockMap
     in
         --Assert we placed all blocks given as input
-        assert (all (\bid -> mapMember bid blockMap) placedBlocks) $
+        assert (all (\bid -> NonDet.mapMember bid blockMap) placedBlocks) $
         dropJumps info $ map getBlock placedBlocks
 
 {-# SCC dropJumps #-}
 -- | Remove redundant jumps between blocks when we can rely on
 -- fall through.
-dropJumps :: forall a i. Instruction i => LabelMap a -> [GenBasicBlock i]
+dropJumps :: forall a i. Instruction i => NonDet.LabelMap a -> [GenBasicBlock i]
           -> [GenBasicBlock i]
 dropJumps _    [] = []
 dropJumps info (BasicBlock lbl ins:todo)
     | Just ins <- nonEmpty ins --This can happen because of shortcutting
     , BasicBlock nextLbl _ : _ <- todo
     , canFallthroughTo (NE.last ins) nextLbl
-    , not (mapMember nextLbl info)
+    , not (NonDet.mapMember nextLbl info)
     = BasicBlock lbl (NE.init ins) : dropJumps info todo
     | otherwise
     = BasicBlock lbl ins : dropJumps info todo
@@ -832,7 +831,7 @@ sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks)) = do
 -- FYI, the classic layout for basic blocks uses postorder DFS; this
 -- algorithm is implemented in Hoopl.
 
-sequenceBlocks :: Instruction inst => Maybe CFG -> LabelMap a
+sequenceBlocks :: Instruction inst => Maybe CFG -> NonDet.LabelMap a
                -> [GenBasicBlock inst] -> [GenBasicBlock inst]
 sequenceBlocks _edgeWeight _ [] = []
 sequenceBlocks edgeWeights infos (entry:blocks) =
@@ -875,7 +874,7 @@ mkNode edgeWeights block@(BasicBlock id instrs) =
           | otherwise = []
 
 
-seqBlocks :: LabelMap i -> [Node BlockId (GenBasicBlock t1)]
+seqBlocks :: NonDet.LabelMap i -> [Node BlockId (GenBasicBlock t1)]
                         -> [GenBasicBlock t1]
 seqBlocks infos blocks = placeNext pullable0 todo0
   where
@@ -898,7 +897,7 @@ seqBlocks infos blocks = placeNext pullable0 todo0
     place pullable todo (block,[])
                           = block : placeNext pullable todo
     place pullable todo (block@(BasicBlock id instrs),[next])
-        | mapMember next infos
+        | NonDet.mapMember next infos
         = block : placeNext pullable todo
         | Just (nextBlock, pullable') <- lookupDeleteUFM pullable next
         = BasicBlock id instrs : place pullable' todo nextBlock

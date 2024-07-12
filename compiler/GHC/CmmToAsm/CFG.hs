@@ -725,13 +725,13 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
                     cfg backedges
 
     -- Since we cant fall through info tables we penalize these.
-    penalizeInfoTables :: Det.LabelMap a -> CFG -> CFG
+    penalizeInfoTables :: NonDet.LabelMap a -> CFG -> CFG
     penalizeInfoTables info cfg =
         mapWeights fupdate cfg
       where
         fupdate :: BlockId -> BlockId -> EdgeWeight -> EdgeWeight
         fupdate _ to weight
-          | Det.mapMember to info
+          | NonDet.mapMember to info
           = weight - (fromIntegral $ infoTablePenalty weights)
           | otherwise = weight
 
@@ -770,7 +770,7 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
       where
         fallthroughTarget :: BlockId -> EdgeInfo -> Bool
         fallthroughTarget to (EdgeInfo source _weight)
-          | Det.mapMember to info = False
+          | NonDet.mapMember to info = False
           | AsmCodeGen <- source = True
           | CmmSource { trans_cmmNode = CmmBranch {} } <- source = True
           | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
@@ -938,7 +938,7 @@ revPostorderFrom cfg root =
     map fromNode $ G.revPostorderFrom hooplGraph root
   where
     nodes = getCfgNodes cfg
-    hooplGraph = foldl' (\m n -> Det.mapInsert n (toNode n) m) Det.mapEmpty nodes
+    hooplGraph = foldl' (\m n -> NonDet.mapInsert n (toNode n) m) NonDet.mapEmpty nodes
 
     fromNode :: BlockNode C C -> BlockId
     fromNode (BN x) = fst x

@@ -163,7 +163,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
      -- Remember to update the shortcut_map, since we also have to
      -- update the info_tbls mapping now.
      (new_entry, shortcut_map')
-       | Just entry_blk <- Det.mapLookup entry_id new_blocks
+       | Just entry_blk <- NonDet.mapLookup entry_id new_blocks
        , Just dest      <- canShortcut entry_blk
        = (dest, NonDet.mapInsert entry_id dest shortcut_map)
        | otherwise
@@ -189,8 +189,8 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
      initialBackEdges = incPreds entry_id (predMap blocks)
 
      maybe_concat :: CmmBlock
-                  -> (Det.LabelMap CmmBlock, NonDet.LabelMap BlockId, NonDet.LabelMap Int)
-                  -> (Det.LabelMap CmmBlock, NonDet.LabelMap BlockId, NonDet.LabelMap Int)
+                  -> (NonDet.LabelMap CmmBlock, NonDet.LabelMap BlockId, NonDet.LabelMap Int)
+                  -> (NonDet.LabelMap CmmBlock, NonDet.LabelMap BlockId, NonDet.LabelMap Int)
      maybe_concat block (!blocks, !shortcut_map, !backEdges)
         -- If:
         --   (1) current block ends with unconditional branch to b' and
@@ -208,9 +208,9 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         -- we can ignore the contents of shortcut_map
         | CmmBranch b' <- last
         , hasOnePredecessor b'
-        , Just blk' <- Det.mapLookup b' blocks
+        , Just blk' <- NonDet.mapLookup b' blocks
         = let bid' = entryLabel blk'
-          in ( Det.mapDelete bid' $ Det.mapInsert bid (splice head blk') blocks
+          in ( NonDet.mapDelete bid' $ NonDet.mapInsert bid (splice head blk') blocks
              , shortcut_map
              , NonDet.mapDelete b' backEdges )
 
@@ -230,9 +230,9 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         -- with dest.
         | splitting_procs
         , Just b'   <- callContinuation_maybe last
-        , Just blk' <- Det.mapLookup b' blocks
+        , Just blk' <- NonDet.mapLookup b' blocks
         , Just dest <- canShortcut blk'
-        = ( Det.mapInsert bid (blockJoinTail head (update_cont dest)) blocks
+        = ( NonDet.mapInsert bid (blockJoinTail head (update_cont dest)) blocks
           , NonDet.mapInsert b' dest shortcut_map
           , decPreds b' $ incPreds dest backEdges )
 
@@ -250,7 +250,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         | Nothing <- callContinuation_maybe last
         = let oldSuccs = successors last
               newSuccs = successors rewrite_last
-          in ( Det.mapInsert bid (blockJoinTail head rewrite_last) blocks
+          in ( NonDet.mapInsert bid (blockJoinTail head rewrite_last) blocks
              , shortcut_map
              , if oldSuccs == newSuccs
                then backEdges
@@ -274,7 +274,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
           shortcut_last = mapSuccessors shortcut last
             where
               shortcut l =
-                 case Det.mapLookup l blocks of
+                 case NonDet.mapLookup l blocks of
                    Just b | Just dest <- canShortcut b -> dest
                    _otherwise -> l
 
@@ -424,7 +424,7 @@ predMap blocks = foldr add_preds NonDet.mapEmpty blocks
 -- Remove unreachable blocks from procs
 removeUnreachableBlocksProc :: Platform -> CmmDecl -> CmmDecl
 removeUnreachableBlocksProc _ proc@(CmmProc info lbl live g)
-   | used_blocks `lengthLessThan` Det.mapSize (toBlockMap g)
+   | used_blocks `lengthLessThan` NonDet.mapSize (toBlockMap g)
    = CmmProc info' lbl live g'
    | otherwise
    = proc

@@ -180,7 +180,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                              }
                 where (CmmProc infos _entryLbl _ graph) = prc
                       label = entryLabel block
-                      info = Det.mapLookup label infos
+                      info = NonDet.mapLookup label infos
                       blocks | top       = seqList childs childs
                              | otherwise = []
 
@@ -208,7 +208,7 @@ blockContexts decls = Map.map reverse $ foldr walkProc Map.empty decls
                  -> Map.Map CmmTickScope [BlockContext]
         walkProc CmmData{}                 m = m
         walkProc prc@(CmmProc _ _ _ graph) m
-          | Det.mapNull blocks = m
+          | NonDet.mapNull blocks = m
           | otherwise      = snd $ walkBlock prc entry (emptyLbls, m)
           where blocks = toBlockMap graph
                 entry  = [mapFind (g_entry graph) blocks]
@@ -230,7 +230,7 @@ blockContexts decls = Map.map reverse $ foldr walkProc Map.empty decls
                 (CmmProc _ _ _ graph) = prc
                 succs = map (flip mapFind (toBlockMap graph))
                             (successors (lastNode block))
-        mapFind = Det.mapFindWithDefault (error "contextTree: block not found!")
+        mapFind = NonDet.mapFindWithDefault (error "contextTree: block not found!")
 
 insertMulti :: Ord k => k -> a -> Map.Map k [a] -> Map.Map k [a]
 insertMulti k v = Map.insertWith (const (v:)) k [v]

@@ -173,14 +173,14 @@ graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
 
 reachable :: NonLocal node => [Block node C C] -> GenCmmGraph node -> GenCmmGraph node
 reachable blocks g = g { g_graph = GMany NothingO blockmap NothingO }
-  where blockmap = Det.mapFromList [(entryLabel b, b) | b <- blocks]
+  where blockmap = NonDet.mapFromList [(entryLabel b, b) | b <- blocks]
 
 
 -- | =Utility functions
 
 -- | Call `graphMap` to get the mapping from `Label` to `Block` that
 -- is embedded in every `CmmGraph`.
-graphMap :: GenCmmGraph n -> Det.LabelMap (Block n C C)
+graphMap :: GenCmmGraph n -> NonDet.LabelMap (Block n C C)
 graphMap (CmmGraph { g_graph = GMany NothingO blockmap NothingO }) = blockmap
 
 -- | Use `gwdRPNumber` on the result of the dominator analysis to get

@@ -55,7 +55,6 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 
 import GHC.Cmm.BlockId
-import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Cmm.DebugBlock
@@ -113,14 +112,14 @@ data NcgImpl statics instr jumpDest = NcgImpl {
                               -> UniqDSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
     -- ^ The list of block ids records the redirected jumps to allow us to update
     -- the CFG.
-    ncgMakeFarBranches        :: Platform -> Det.LabelMap RawCmmStatics -> [NatBasicBlock instr]
+    ncgMakeFarBranches        :: Platform -> NonDet.LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> UniqDSM [NatBasicBlock instr],
     extractUnwindPoints       :: [instr] -> [UnwindPoint],
     -- ^ given the instruction sequence of a block, produce a list of
     -- the block's 'UnwindPoint's
     -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
     -- and Note [Unwinding information in the NCG] in this module.
-    invertCondBranches        :: Maybe CFG -> Det.LabelMap RawCmmStatics -> [NatBasicBlock instr]
+    invertCondBranches        :: Maybe CFG -> NonDet.LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
     -- when possible.

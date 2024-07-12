@@ -25,7 +25,7 @@ import GHC.CmmToLlvm.Version
 
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import GHC.Cmm
-import qualified GHC.Cmm.Dataflow.Label as Det
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 
 import GHC.Utils.BufHandle
 import GHC.Driver.DynFlags
@@ -135,7 +135,7 @@ llvmGroupLlvmGens cmm = do
         let split (CmmData s d' )     = return $ Just (s, d')
             split (CmmProc h l live g) = do
               -- Set function type
-              let l' = case Det.mapLookup (g_entry g) h :: Maybe RawCmmStatics of
+              let l' = case NonDet.mapLookup (g_entry g) h :: Maybe RawCmmStatics of
                          Nothing                   -> l
                          Just (CmmStaticsRaw info_lbl _) -> info_lbl
               lml <- strCLabel_llvm l'

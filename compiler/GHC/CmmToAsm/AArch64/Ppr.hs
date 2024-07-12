@@ -16,7 +16,7 @@ import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 
 import GHC.Cmm hiding (topInfoTable)
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -103,7 +103,7 @@ pprSizeDecl platform lbl
    then line (text "\t.size" <+> pprAsmLabel platform lbl <> text ", .-" <> pprAsmLabel platform lbl)
    else empty
 
-pprBasicBlock :: IsDoc doc => Platform -> {- dwarf enabled -} Bool -> LabelMap RawCmmStatics -> NatBasicBlock Instr
+pprBasicBlock :: IsDoc doc => Platform -> {- dwarf enabled -} Bool -> NonDet.LabelMap RawCmmStatics -> NatBasicBlock Instr
               -> doc
 pprBasicBlock platform with_dwarf info_env (BasicBlock blockid instrs)
   = maybe_infotable $
@@ -120,7 +120,7 @@ pprBasicBlock platform with_dwarf info_env (BasicBlock blockid instrs)
             f _ = True
 
     asmLbl = blockLbl blockid
-    maybe_infotable c = case mapLookup blockid info_env of
+    maybe_infotable c = case NonDet.mapLookup blockid info_env of
        Nothing   -> c
        Just (CmmStaticsRaw info_lbl info) ->
           --  pprAlignForSection platform Text $$

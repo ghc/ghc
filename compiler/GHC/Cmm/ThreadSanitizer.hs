@@ -14,6 +14,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
+import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Data.FastString
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
@@ -29,7 +30,7 @@ data Env = Env { platform :: Platform
 annotateTSAN :: Platform -> CmmGraph -> UniqSM CmmGraph
 annotateTSAN platform graph = do
     env <- Env platform <$> getUniqueSupplyM
-    return $ modifyGraph (mapGraphBlocks (annotateBlock env)) graph
+    return $ modifyGraph (mapGraphBlocks mapMap (annotateBlock env)) graph
 
 mapBlockList :: (forall e' x'. n e' x' -> Block n e' x')
              -> Block n e x -> Block n e x

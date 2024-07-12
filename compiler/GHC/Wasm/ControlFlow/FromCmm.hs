@@ -248,7 +248,7 @@ structuredControl platform txExpr txBlock g' = do
    dominates :: NonDet.Label -> NonDet.Label -> Bool
     -- Domination relation (not just immediate domination)
 
-   blockmap :: Det.LabelMap CmmBlock
+   blockmap :: NonDet.LabelMap CmmBlock
    GMany NothingO blockmap NothingO = g_graph g
 
    blockLabeled l = findLabelInDet l blockmap
@@ -345,8 +345,8 @@ instance Outputable ContainingSyntax where
     ppr (LoopHeadedBy l) = text "loop" <+> ppr l
     ppr (IfThenElse l) = text "if-then-else" <+> ppr l
 
-findLabelInDet :: HasDebugCallStack => Det.Label -> Det.LabelMap a -> a
-findLabelInDet lbl = Det.mapFindWithDefault failed lbl
+findLabelInDet :: HasDebugCallStack => NonDet.Label -> NonDet.LabelMap a -> a
+findLabelInDet lbl = NonDet.mapFindWithDefault failed lbl
   where failed =
             pprPanic "label not found in control-flow graph" (ppr lbl)
 

@@ -7,23 +7,23 @@ where
 import GHC.Prelude
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm hiding (topInfoTable)
 
 -- | Returns the info table associated with the CmmDecl's entry point,
 -- if any.
-topInfoTable :: GenCmmDecl a (LabelMap i) (ListGraph b) -> Maybe i
+topInfoTable :: GenCmmDecl a (NonDet.LabelMap i) (ListGraph b) -> Maybe i
 topInfoTable (CmmProc infos _ _ (ListGraph (b:_)))
-  = mapLookup (blockId b) infos
+  = NonDet.mapLookup (blockId b) infos
 topInfoTable _
   = Nothing
 
 -- | Return the list of BlockIds in a CmmDecl that are entry points
 -- for this proc (i.e. they may be jumped to from outside this proc).
-entryBlocks :: GenCmmDecl a (LabelMap i) (ListGraph b) -> [BlockId]
+entryBlocks :: GenCmmDecl a (NonDet.LabelMap i) (ListGraph b) -> [BlockId]
 entryBlocks (CmmProc info _ _ (ListGraph code)) = entries
   where
-        infos = mapKeys info
+        infos = NonDet.nonDetMapKeys info
         entries = case code of
                     [] -> infos
                     BasicBlock entry _ : _ -- first block is the entry point

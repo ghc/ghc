@@ -10,7 +10,7 @@ module GHC.CmmToAsm.Types
    )
 where
 
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Cmm
 
 

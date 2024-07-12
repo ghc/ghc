@@ -76,7 +76,6 @@ import GHC.StgToCmm.Sequel
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import GHC.Cmm.Dataflow.Label (mapSingleton, mapEmpty)
 import GHC.Runtime.Heap.Layout
 import GHC.Unit
 import GHC.Types.Id
@@ -787,7 +786,7 @@ emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
 emitProc mb_info lbl live blocks offset do_layout
   = do  { l <- newBlockId
         ; let
-              blks :: CmmGraph
+              blks :: DCmmGraph
               blks = labelAGraph l blocks
 
               infos | Just info <- mb_info = [((g_entry blks), info)]
@@ -880,7 +879,7 @@ mkCmmCall f results actuals updfr_off
 -- ----------------------------------------------------------------------------
 -- turn CmmAGraph into CmmGraph, for making a new proc.
 
-aGraphToGraph :: CmmAGraphScoped -> FCode CmmGraph
+aGraphToGraph :: CmmAGraphScoped -> FCode DCmmGraph
 aGraphToGraph stmts
   = do  { l <- newBlockId
         ; return (labelAGraph l stmts) }

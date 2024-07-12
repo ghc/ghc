@@ -1188,7 +1188,7 @@ lowerSafeForeignCall profile block
                                copyout <*>
                                mkLast jump, tscp)
 
-    case toBlockList graph' of
+    case toBlockList (removeDetermGraph graph') of
       [one] -> let (_, middle', last) = blockSplit one
                in return (blockJoin entry (middle `blockAppend` middle') last)
       _ -> panic "lowerSafeForeignCall0"

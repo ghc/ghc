@@ -274,7 +274,7 @@ eqLastWith _ _ _ = False
 copyTicks :: NonDet.LabelMap BlockId -> CmmGraph -> CmmGraph
 copyTicks env g
   | NonDet.mapNull env = g
-  | otherwise   = ofBlockMap (g_entry g) $ Det.mapMap copyTo blockMap
+  | otherwise   = ofBlockMap (g_entry g) $ NonDet.mapMap copyTo blockMap
   where -- Reverse block merge map
         blockMap = toBlockMap g
         revEnv = NonDet.nonDetMapFoldlWithKey insertRev M.empty env
@@ -282,7 +282,7 @@ copyTicks env g
         -- Copy ticks and scopes into the given block
         copyTo block = case M.lookup (entryLabel block) revEnv of
           Nothing -> block
-          Just ls -> foldr copy block $ mapMaybe (flip Det.mapLookup blockMap) ls
+          Just ls -> foldr copy block $ mapMaybe (flip NonDet.mapLookup blockMap) ls
         copy from to =
           let ticks = blockTicks from
               CmmEntry  _   scp0        = firstNode from

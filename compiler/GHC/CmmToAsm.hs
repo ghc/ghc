@@ -95,7 +95,6 @@ import GHC.Cmm.DebugBlock
 import GHC.Cmm.BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import GHC.Cmm
-import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.GenericOpt
 import GHC.Cmm.CLabel
@@ -660,7 +659,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "invertCondBranches" #-}
                 map invert sequenced
               where
-                invertConds :: Det.LabelMap RawCmmStatics -> [NatBasicBlock instr]
+                invertConds :: NonDet.LabelMap RawCmmStatics -> [NatBasicBlock instr]
                             -> [NatBasicBlock instr]
                 invertConds = invertCondBranches ncgImpl optimizedCFG
                 invert top@CmmData {} = top
@@ -842,8 +841,8 @@ shortcutBranches config ncgImpl tops weights
 
 build_mapping :: forall instr t d statics jumpDest.
                  NcgImpl statics instr jumpDest
-              -> GenCmmDecl d (Det.LabelMap t) (ListGraph instr)
-              -> (GenCmmDecl d (Det.LabelMap t) (ListGraph instr)
+              -> GenCmmDecl d (NonDet.LabelMap t) (ListGraph instr)
+              -> (GenCmmDecl d (NonDet.LabelMap t) (ListGraph instr)
                  ,NonDet.LabelMap jumpDest)
 build_mapping _ top@(CmmData _ _) = (top, NonDet.mapEmpty)
 build_mapping _ (CmmProc info lbl live (ListGraph []))
@@ -872,7 +871,7 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     split (s, shortcut_blocks, others) other = (s, shortcut_blocks, other : others)
 
     -- do not eliminate blocks that have an info table
-    has_info l = Det.mapMember l info
+    has_info l = NonDet.mapMember l info
 
     -- build a mapping from BlockId to JumpDest for shorting branches
     mapping = NonDet.mapFromList shortcut_blocks

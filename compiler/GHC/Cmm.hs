@@ -15,15 +15,15 @@ module GHC.Cmm (
      DCmmGroup,
      CmmProgram, CmmGroup, CmmGroupSRTs, RawCmmGroup, GenCmmGroup,
      CmmDecl, DCmmDecl, CmmDeclSRTs, GenCmmDecl(..),
-     CmmDataDecl, cmmDataDeclCmmDecl,
-     CmmGraph, GenCmmGraph(..),
+     CmmDataDecl, cmmDataDeclCmmDecl, DCmmGraph,
+     CmmGraph, GenCmmGraph(..), GenGenCmmGraph(..),
      toBlockMap, revPostorder, toBlockList,
      CmmBlock, RawCmmDecl,
      Section(..), SectionType(..),
      GenCmmStatics(..), type CmmStatics, type RawCmmStatics, CmmStatic(..),
      SectionProtection(..), sectionProtection,
 
-     DWrap(..), unDeterm, removeDeterm, removeDetermDecl,
+     DWrap(..), unDeterm, removeDeterm, removeDetermDecl, removeDetermGraph,
 
      -- ** Blocks containing lists
      GenBasicBlock(..), blockId,
@@ -33,7 +33,7 @@ module GHC.Cmm (
      GenCmmTopInfo(..)
      , DCmmTopInfo
      , CmmTopInfo
-     , CmmStackInfo(..), CmmInfoTable(..), topInfoTable,
+     , CmmStackInfo(..), CmmInfoTable(..), topInfoTable, topInfoTableD,
      ClosureTypeInfo(..),
      ProfilingInfo(..), ConstrDescription,
 
@@ -82,13 +82,13 @@ type CmmProgram = [CmmGroup]
 
 type GenCmmGroup d h g = [GenCmmDecl d h g]
 -- | Cmm group after STG generation
-type DCmmGroup    = GenCmmGroup CmmStatics    DCmmTopInfo              CmmGraph
+type DCmmGroup    = GenCmmGroup CmmStatics    DCmmTopInfo              DCmmGraph
 -- | Cmm group before SRT generation
 type CmmGroup     = GenCmmGroup CmmStatics    CmmTopInfo               CmmGraph
 -- | Cmm group with SRTs
 type CmmGroupSRTs = GenCmmGroup RawCmmStatics CmmTopInfo               CmmGraph
 -- | "Raw" cmm group (TODO (osa): not sure what that means)
-type RawCmmGroup  = GenCmmGroup RawCmmStatics (Det.LabelMap RawCmmStatics) CmmGraph
+type RawCmmGroup  = GenCmmGroup RawCmmStatics (NonDet.LabelMap RawCmmStatics) CmmGraph
 
 -----------------------------------------------------------------------------
 --  CmmDecl, GenCmmDecl
@@ -126,7 +126,7 @@ instance (OutputableP Platform d, OutputableP Platform info, OutputableP Platfor
       => OutputableP Platform (GenCmmDecl d info i) where
     pdoc = pprTop
 
-type DCmmDecl    = GenCmmDecl CmmStatics DCmmTopInfo CmmGraph
+type DCmmDecl    = GenCmmDecl CmmStatics DCmmTopInfo DCmmGraph
 type CmmDecl     = GenCmmDecl CmmStatics    CmmTopInfo CmmGraph
 type CmmDeclSRTs = GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
 type CmmDataDecl = GenCmmDataDecl CmmStatics
@@ -141,7 +141,7 @@ cmmDataDeclCmmDecl = \ case
 type RawCmmDecl
    = GenCmmDecl
         RawCmmStatics
-        (Det.LabelMap RawCmmStatics)
+        (NonDet.LabelMap RawCmmStatics)
         CmmGraph
 
 -----------------------------------------------------------------------------
@@ -149,13 +149,17 @@ type RawCmmDecl
 -----------------------------------------------------------------------------
 
 type CmmGraph = GenCmmGraph CmmNode
-data GenCmmGraph n = CmmGraph { g_entry :: BlockId, g_graph :: Graph n C C }
+type DCmmGraph = GenGenCmmGraph DWrap CmmNode
+
+type GenCmmGraph n = GenGenCmmGraph NonDet.LabelMap n
+
+data GenGenCmmGraph s n = CmmGraph { g_entry :: BlockId, g_graph :: Graph' s Block n C C }
 type CmmBlock = Block CmmNode C C
 
 instance OutputableP Platform CmmGraph where
     pdoc = pprCmmGraph
 
-toBlockMap :: CmmGraph -> Det.LabelMap CmmBlock
+toBlockMap :: CmmGraph -> NonDet.LabelMap CmmBlock
 toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
 
 pprCmmGraph :: Platform -> CmmGraph -> SDoc
@@ -173,7 +177,7 @@ revPostorder g = {-# SCC "revPostorder" #-}
     revPostorderFrom (toBlockMap g) (g_entry g)
 
 toBlockList :: CmmGraph -> [CmmBlock]
-toBlockList g = Det.mapElems $ toBlockMap g
+toBlockList g = NonDet.nonDetMapElems $ toBlockMap g
 
 -----------------------------------------------------------------------------
 --     Info Tables
@@ -190,7 +194,7 @@ unDeterm :: DWrap a -> [(BlockId, a)]
 unDeterm (DWrap f) = f
 
 type DCmmTopInfo = GenCmmTopInfo DWrap
-type CmmTopInfo  = GenCmmTopInfo Det.LabelMap
+type CmmTopInfo  = GenCmmTopInfo NonDet.LabelMap
 
 instance OutputableP Platform CmmTopInfo where
     pdoc = pprTopInfo
@@ -200,8 +204,13 @@ pprTopInfo platform (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
   vcat [text "info_tbls: " <> pdoc platform info_tbl,
         text "stack_info: " <> ppr stack_info]
 
-topInfoTable :: GenCmmDecl a CmmTopInfo (GenCmmGraph n) -> Maybe CmmInfoTable
-topInfoTable (CmmProc infos _ _ g) = Det.mapLookup (g_entry g) (info_tbls infos)
+topInfoTableD :: GenCmmDecl a DCmmTopInfo (GenGenCmmGraph s n) -> Maybe CmmInfoTable
+topInfoTableD (CmmProc infos _ _ g) = case (info_tbls infos) of
+                                          DWrap xs -> lookup (g_entry g) xs
+topInfoTableD _                     = Nothing
+
+topInfoTable :: GenCmmDecl a CmmTopInfo (GenGenCmmGraph s n) -> Maybe CmmInfoTable
+topInfoTable (CmmProc infos _ _ g) = NonDet.mapLookup (g_entry g) (info_tbls infos)
 topInfoTable _                     = Nothing
 
 data CmmStackInfo
@@ -352,11 +361,17 @@ removeDeterm :: DCmmGroup -> CmmGroup
 removeDeterm = map removeDetermDecl
 
 removeDetermDecl :: DCmmDecl -> CmmDecl
-removeDetermDecl (CmmProc h e r g) = CmmProc (removeDetermTop h) e r g
+removeDetermDecl (CmmProc h e r g) = CmmProc (removeDetermTop h) e r (removeDetermGraph g)
 removeDetermDecl (CmmData a b) = CmmData a b
 
 removeDetermTop :: DCmmTopInfo -> CmmTopInfo
-removeDetermTop (TopInfo a b) = TopInfo (Det.mapFromList $ unDeterm a) b
+removeDetermTop (TopInfo a b) = TopInfo (NonDet.mapFromList $ unDeterm a) b
+
+removeDetermGraph :: DCmmGraph -> CmmGraph
+removeDetermGraph (CmmGraph x y) =
+  let y' = case y of
+            GMany a (DWrap b) c -> GMany a (NonDet.mapFromList b) c
+  in CmmGraph x y'
 
 
 -- -----------------------------------------------------------------------------
