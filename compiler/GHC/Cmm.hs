@@ -51,7 +51,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Expr
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
 import GHC.Utils.Outputable
 
 import Data.Void (Void)
@@ -79,7 +79,7 @@ type CmmGroup     = GenCmmGroup CmmStatics    CmmTopInfo               CmmGraph
 -- | Cmm group with SRTs
 type CmmGroupSRTs = GenCmmGroup RawCmmStatics CmmTopInfo               CmmGraph
 -- | "Raw" cmm group (TODO (osa): not sure what that means)
-type RawCmmGroup  = GenCmmGroup RawCmmStatics (LabelMap RawCmmStatics) CmmGraph
+type RawCmmGroup  = GenCmmGroup RawCmmStatics (Det.LabelMap RawCmmStatics) CmmGraph
 
 -----------------------------------------------------------------------------
 --  CmmDecl, GenCmmDecl
@@ -131,7 +131,7 @@ cmmDataDeclCmmDecl = \ case
 type RawCmmDecl
    = GenCmmDecl
         RawCmmStatics
-        (LabelMap RawCmmStatics)
+        (Det.LabelMap RawCmmStatics)
         CmmGraph
 
 -----------------------------------------------------------------------------
@@ -145,7 +145,7 @@ type CmmBlock = Block CmmNode C C
 instance OutputableP Platform CmmGraph where
     pdoc = pprCmmGraph
 
-toBlockMap :: CmmGraph -> LabelMap CmmBlock
+toBlockMap :: CmmGraph -> Det.LabelMap CmmBlock
 toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
 
 pprCmmGraph :: Platform -> CmmGraph -> SDoc
@@ -163,7 +163,7 @@ revPostorder g = {-# SCC "revPostorder" #-}
     revPostorderFrom (toBlockMap g) (g_entry g)
 
 toBlockList :: CmmGraph -> [CmmBlock]
-toBlockList g = mapElems $ toBlockMap g
+toBlockList g = Det.mapElems $ toBlockMap g
 
 -----------------------------------------------------------------------------
 --     Info Tables
@@ -171,7 +171,7 @@ toBlockList g = mapElems $ toBlockMap g
 
 -- | CmmTopInfo is attached to each CmmDecl (see defn of CmmGroup), and contains
 -- the extra info (beyond the executable code) that belongs to that CmmDecl.
-data CmmTopInfo   = TopInfo { info_tbls  :: LabelMap CmmInfoTable
+data CmmTopInfo   = TopInfo { info_tbls  :: Det.LabelMap CmmInfoTable
                             , stack_info :: CmmStackInfo }
 
 instance OutputableP Platform CmmTopInfo where
@@ -183,7 +183,7 @@ pprTopInfo platform (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
         text "stack_info: " <> ppr stack_info]
 
 topInfoTable :: GenCmmDecl a CmmTopInfo (GenCmmGraph n) -> Maybe CmmInfoTable
-topInfoTable (CmmProc infos _ _ g) = mapLookup (g_entry g) (info_tbls infos)
+topInfoTable (CmmProc infos _ _ g) = Det.mapLookup (g_entry g) (info_tbls infos)
 topInfoTable _                     = Nothing
 
 data CmmStackInfo

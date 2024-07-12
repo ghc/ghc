@@ -17,7 +17,7 @@ import GHC.Types.Name
 import GHC.Types.Unique
 import qualified GHC.Types.Unique.DSM as DSM
 
-import GHC.Cmm.Dataflow.Label (Label, mkHooplLabel)
+import qualified GHC.Cmm.Dataflow.Label as Det (Label, mkHooplLabel)
 
 ----------------------------------------------------------------
 --- Block Ids, their environments, and their sets
@@ -31,10 +31,10 @@ most assembly languages allow, a label is visible throughout the entire
 compilation unit in which it appears.
 -}
 
-type BlockId = Label
+type BlockId = Det.Label
 
 mkBlockId :: Unique -> BlockId
-mkBlockId unique = mkHooplLabel $ getKey unique
+mkBlockId unique = Det.mkHooplLabel $ getKey unique
 
 -- If the monad unique instance uses a deterministic unique supply, this will
 -- give you a deterministic unique. Otherwise, it will not. Note that from Cmm

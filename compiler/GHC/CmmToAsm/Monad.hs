@@ -55,7 +55,8 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Cmm.DebugBlock
 import GHC.Cmm.Expr             (LocalReg (..), isWord64)
@@ -112,14 +113,14 @@ data NcgImpl statics instr jumpDest = NcgImpl {
                               -> UniqDSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
     -- ^ The list of block ids records the redirected jumps to allow us to update
     -- the CFG.
-    ncgMakeFarBranches        :: Platform -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
+    ncgMakeFarBranches        :: Platform -> Det.LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> UniqDSM [NatBasicBlock instr],
     extractUnwindPoints       :: [instr] -> [UnwindPoint],
     -- ^ given the instruction sequence of a block, produce a list of
     -- the block's 'UnwindPoint's
     -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
     -- and Note [Unwinding information in the NCG] in this module.
-    invertCondBranches        :: Maybe CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
+    invertCondBranches        :: Maybe CFG -> Det.LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
     -- when possible.
@@ -184,7 +185,7 @@ data NatM_State
                 natm_pic         :: Maybe Reg,
                 natm_config      :: NCGConfig,
                 natm_fileid      :: DwarfFiles,
-                natm_debug_map   :: LabelMap DebugBlock,
+                natm_debug_map   :: NonDet.LabelMap DebugBlock,
                 natm_cfg         :: CFG
         -- ^ Having a CFG with additional information is essential for some
         -- operations. However we can't reconstruct all information once we
@@ -206,7 +207,7 @@ unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
 mkNatM_State :: DUniqSupply -> Int -> NCGConfig ->
-                DwarfFiles -> LabelMap DebugBlock -> CFG -> NatM_State
+                DwarfFiles -> NonDet.LabelMap DebugBlock -> CFG -> NatM_State
 mkNatM_State us delta config
         = \dwf dbg cfg ->
                 NatM_State
@@ -364,5 +365,5 @@ getFileId f = NatM $ \st ->
                       fids = addToUFM (natm_fileid st) f (f,n)
                   in n `seq` fids `seq` (n, st { natm_fileid = fids  })
 
-getDebugBlock :: Label -> NatM (Maybe DebugBlock)
-getDebugBlock l = NatM $ \st -> (mapLookup l (natm_debug_map st), st)
+getDebugBlock :: NonDet.Label -> NatM (Maybe DebugBlock)
+getDebugBlock l = NatM $ \st -> (NonDet.mapLookup l (natm_debug_map st), st)

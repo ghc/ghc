@@ -17,7 +17,7 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
 import GHC.Cmm.Switch
 -- import GHC.Cmm.Info.Build
 import GHC.Types.Unique
@@ -122,8 +122,8 @@ instance UniqRenamable LocalReg where
   -- uniqRename (LocalReg uq t) = pure $ LocalReg uq t
     -- ROMES:TODO: This has unique r1, we're debugging. this may still be a source of non determinism.
 
-instance UniqRenamable Label where
-  uniqRename lbl = mkHooplLabel . getKey <$> renameDetUniq (getUnique lbl)
+instance UniqRenamable Det.Label where
+  uniqRename lbl = Det.mkHooplLabel . getKey <$> renameDetUniq (getUnique lbl)
 
 instance UniqRenamable CmmTickScope where
   -- ROMES:TODO: We may have to change this to get deterministic objects with ticks.
@@ -191,8 +191,8 @@ instance UniqRenamable CmmLit where
 
 -- This is fine because LabelMap is backed by a deterministic UDFM
 instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
-  => UniqRenamable (LabelMap a) where
-  uniqRename lm = mapFromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (mapToList lm)
+  => UniqRenamable (Det.LabelMap a) where
+  uniqRename lm = Det.mapFromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (Det.mapToList lm)
 
 instance UniqRenamable CmmGraph where
   uniqRename (CmmGraph e g) = CmmGraph <$> uniqRename e <*> uniqRename g

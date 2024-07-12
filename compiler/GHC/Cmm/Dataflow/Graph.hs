@@ -20,16 +20,18 @@ module GHC.Cmm.Dataflow.Graph
 import GHC.Prelude
 import GHC.Utils.Misc
 
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
+import GHC.Cmm.Dataflow.Label (Label)
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Dataflow.Block
 
 import Data.Kind
 
 -- | A (possibly empty) collection of closed/closed blocks
-type Body n = LabelMap (Block n C C)
+type Body n = Det.LabelMap (Block n C C)
 
 -- | @Body@ abstracted over @block@
-type Body' block (n :: Extensibility -> Extensibility -> Type) = LabelMap (block n C C)
+type Body' block (n :: Extensibility -> Extensibility -> Type) = Det.LabelMap (block n C C)
 
 -------------------------------
 -- | Gives access to the anchor points for
@@ -47,18 +49,18 @@ instance NonLocal n => NonLocal (Block n) where
 
 
 emptyBody :: Body' block n
-emptyBody = mapEmpty
+emptyBody = Det.mapEmpty
 
 bodyList :: Body' block n -> [(Label,block n C C)]
-bodyList body = mapToList body
+bodyList body = Det.mapToList body
 
 bodyToBlockList :: Body n -> [Block n C C]
-bodyToBlockList body = mapElems body
+bodyToBlockList body = Det.mapElems body
 
 addBlock
     :: (NonLocal block, HasDebugCallStack)
-    => block C C -> LabelMap (block C C) -> LabelMap (block C C)
-addBlock block body = mapAlter add lbl body
+    => block C C -> Det.LabelMap (block C C) -> Det.LabelMap (block C C)
+addBlock block body = Det.mapAlter add lbl body
   where
     lbl = entryLabel block
     add Nothing = Just block
@@ -105,21 +107,21 @@ mapGraphBlocks f = map
   where map :: Graph' block n e x -> Graph' block' n' e x
         map GNil = GNil
         map (GUnit b) = GUnit (f b)
-        map (GMany e b x) = GMany (fmap f e) (mapMap f b) (fmap f x)
+        map (GMany e b x) = GMany (fmap f e) (Det.mapMap f b) (fmap f x)
 
 -- -----------------------------------------------------------------------------
 -- Extracting Labels from graphs
 
 labelsDefined :: forall block n e x . NonLocal (block n) => Graph' block n e x
-              -> LabelSet
-labelsDefined GNil      = setEmpty
-labelsDefined (GUnit{}) = setEmpty
-labelsDefined (GMany _ body x) = mapFoldlWithKey addEntry (exitLabel x) body
-  where addEntry :: forall a. LabelSet -> Label -> a -> LabelSet
-        addEntry labels label _ = setInsert label labels
-        exitLabel :: MaybeO x (block n C O) -> LabelSet
-        exitLabel NothingO  = setEmpty
-        exitLabel (JustO b) = setSingleton (entryLabel b)
+              -> NonDet.LabelSet
+labelsDefined GNil      = NonDet.setEmpty
+labelsDefined (GUnit{}) = NonDet.setEmpty
+labelsDefined (GMany _ body x) = Det.mapFoldlWithKey addEntry (exitLabel x) body
+  where addEntry :: forall a. NonDet.LabelSet -> Label -> a -> NonDet.LabelSet
+        addEntry labels label _ = NonDet.setInsert label labels
+        exitLabel :: MaybeO x (block n C O) -> NonDet.LabelSet
+        exitLabel NothingO  = NonDet.setEmpty
+        exitLabel (JustO b) = NonDet.setSingleton (entryLabel b)
 
 
 ----------------------------------------------------------------
@@ -148,8 +150,8 @@ labelsDefined (GMany _ body x) = mapFoldlWithKey addEntry (exitLabel x) body
 -- B and C before we analyze D.
 revPostorderFrom
   :: forall block.  (NonLocal block)
-  => LabelMap (block C C) -> Label -> [block C C]
-revPostorderFrom graph start = go start_worklist setEmpty []
+  => Det.LabelMap (block C C) -> Label -> [block C C]
+revPostorderFrom graph start = go start_worklist NonDet.setEmpty []
   where
     start_worklist = lookup_for_descend start Nil
 
@@ -165,22 +167,22 @@ revPostorderFrom graph start = go start_worklist setEmpty []
     -- NOTE: We add blocks to the result list in postorder, but we *prepend*
     -- them (i.e., we use @(:)@), which means that the final list is in reverse
     -- postorder.
-    go :: DfsStack (block C C) -> LabelSet -> [block C C] -> [block C C]
+    go :: DfsStack (block C C) -> NonDet.LabelSet -> [block C C] -> [block C C]
     go Nil                      !_           !result = result
     go (ConsMark block rest)    !wip_or_done !result =
         go rest wip_or_done (block : result)
     go (ConsTodo block rest)    !wip_or_done !result
-        | entryLabel block `setMember` wip_or_done = go rest wip_or_done result
+        | entryLabel block `NonDet.setMember` wip_or_done = go rest wip_or_done result
         | otherwise =
             let new_worklist =
                     foldr lookup_for_descend
                           (ConsMark block rest)
                           (successors block)
-            in go new_worklist (setInsert (entryLabel block) wip_or_done) result
+            in go new_worklist (NonDet.setInsert (entryLabel block) wip_or_done) result
 
     lookup_for_descend :: Label -> DfsStack (block C C) -> DfsStack (block C C)
     lookup_for_descend label wl
-      | Just b <- mapLookup label graph = ConsTodo b wl
+      | Just b <- Det.mapLookup label graph = ConsTodo b wl
       | otherwise =
            error $ "Label that doesn't have a block?! " ++ show label
 

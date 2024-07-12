@@ -16,7 +16,8 @@ import GHC.Cmm.ContFlowOpt
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import Data.Functor.Classes (liftEq)
 import Data.Maybe (mapMaybe)
 import qualified Data.List as List
@@ -62,7 +63,7 @@ import qualified Data.List.NonEmpty as NE
 elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
-     env = iterate mapEmpty blocks_with_key
+     env = iterate NonDet.mapEmpty blocks_with_key
      -- The order of blocks doesn't matter here. While we could use
      -- revPostorder which drops unreachable blocks this is done in
      -- ContFlowOpt already which runs before this pass. So we use
@@ -73,26 +74,26 @@ elimCommonBlocks g = replaceLabels env $ copyTicks env g
 -- Invariant: The blocks in the list are pairwise distinct
 -- (so avoid comparing them again)
 type DistinctBlocks = [CmmBlock]
-type Key = [Label]
-type Subst = LabelMap BlockId
+type Key = [NonDet.Label]
+type Subst = NonDet.LabelMap BlockId
 
 -- The outer list groups by hash. We retain this grouping throughout.
 iterate :: Subst -> [[(Key, DistinctBlocks)]] -> Subst
 iterate subst blocks
-    | mapNull new_substs = subst
+    | NonDet.mapNull new_substs = subst
     | otherwise = iterate subst' updated_blocks
   where
     grouped_blocks :: [[(Key, NonEmpty DistinctBlocks)]]
     grouped_blocks = map groupByLabel blocks
 
     merged_blocks :: [[(Key, DistinctBlocks)]]
-    (new_substs, merged_blocks) = List.mapAccumL (List.mapAccumL go) mapEmpty grouped_blocks
+    (new_substs, merged_blocks) = List.mapAccumL (List.mapAccumL go) NonDet.mapEmpty grouped_blocks
       where
-        go !new_subst1 (k,dbs) = (new_subst1 `mapUnion` new_subst2, (k,db))
+        go !new_subst1 (k,dbs) = (new_subst1 `NonDet.mapUnion` new_subst2, (k,db))
           where
             (new_subst2, db) = mergeBlockList subst dbs
 
-    subst' = subst `mapUnion` new_substs
+    subst' = subst `NonDet.mapUnion` new_substs
     updated_blocks = map (map (first (map (lookupBid subst')))) merged_blocks
 
 -- Combine two lists of blocks.
@@ -100,21 +101,21 @@ iterate subst blocks
 mergeBlocks :: Subst -> DistinctBlocks -> DistinctBlocks -> (Subst, DistinctBlocks)
 mergeBlocks subst existing new = go new
   where
-    go [] = (mapEmpty, existing)
+    go [] = (NonDet.mapEmpty, existing)
     go (b:bs) = case List.find (eqBlockBodyWith (eqBid subst) b) existing of
         -- This block is a duplicate. Drop it, and add it to the substitution
-        Just b' -> first (mapInsert (entryLabel b) (entryLabel b')) $ go bs
+        Just b' -> first (NonDet.mapInsert (entryLabel b) (entryLabel b')) $ go bs
         -- This block is not a duplicate, keep it.
         Nothing -> second (b:) $ go bs
 
 mergeBlockList :: Subst -> NonEmpty DistinctBlocks -> (Subst, DistinctBlocks)
-mergeBlockList subst (b:|bs) = go mapEmpty b bs
+mergeBlockList subst (b:|bs) = go NonDet.mapEmpty b bs
   where
     go !new_subst1 b [] = (new_subst1, b)
     go !new_subst1 b1 (b2:bs) = go new_subst b bs
       where
         (new_subst2, b) =  mergeBlocks subst b1 b2
-        new_subst = new_subst1 `mapUnion` new_subst2
+        new_subst = new_subst1 `NonDet.mapUnion` new_subst2
 
 
 -- -----------------------------------------------------------------------------
@@ -197,10 +198,10 @@ dont_care _other         = False
 -- Utilities: equality and substitution on the graph.
 
 -- Given a map ``subst'' from BlockID -> BlockID, we define equality.
-eqBid :: LabelMap BlockId -> BlockId -> BlockId -> Bool
+eqBid :: NonDet.LabelMap BlockId -> BlockId -> BlockId -> Bool
 eqBid subst bid bid' = lookupBid subst bid == lookupBid subst bid'
-lookupBid :: LabelMap BlockId -> BlockId -> BlockId
-lookupBid subst bid = case mapLookup bid subst of
+lookupBid :: NonDet.LabelMap BlockId -> BlockId -> BlockId
+lookupBid subst bid = case NonDet.mapLookup bid subst of
                         Just bid  -> lookupBid subst bid
                         Nothing -> bid
 
@@ -270,18 +271,18 @@ eqLastWith _ _ _ = False
 -- the same ticks as the respective "source" blocks. This not only
 -- means copying ticks, but also adjusting tick scopes where
 -- necessary.
-copyTicks :: LabelMap BlockId -> CmmGraph -> CmmGraph
+copyTicks :: NonDet.LabelMap BlockId -> CmmGraph -> CmmGraph
 copyTicks env g
-  | mapNull env = g
-  | otherwise   = ofBlockMap (g_entry g) $ mapMap copyTo blockMap
+  | NonDet.mapNull env = g
+  | otherwise   = ofBlockMap (g_entry g) $ Det.mapMap copyTo blockMap
   where -- Reverse block merge map
         blockMap = toBlockMap g
-        revEnv = mapFoldlWithKey insertRev M.empty env
+        revEnv = NonDet.nonDetMapFoldlWithKey insertRev M.empty env
         insertRev m k x = M.insertWith (const (k:)) x [k] m
         -- Copy ticks and scopes into the given block
         copyTo block = case M.lookup (entryLabel block) revEnv of
           Nothing -> block
-          Just ls -> foldr copy block $ mapMaybe (flip mapLookup blockMap) ls
+          Just ls -> foldr copy block $ mapMaybe (flip Det.mapLookup blockMap) ls
         copy from to =
           let ticks = blockTicks from
               CmmEntry  _   scp0        = firstNode from
@@ -293,7 +294,7 @@ copyTicks env g
 -- See Note [Compressed TrieMap] in GHC.Core.Map.Expr about the usage of GenMap.
 groupByLabel :: [(Key, DistinctBlocks)] -> [(Key, NonEmpty DistinctBlocks)]
 groupByLabel =
-  go (TM.emptyTM :: TM.ListMap (TM.GenMap LabelMap) (Key, NonEmpty DistinctBlocks))
+  go (TM.emptyTM :: TM.ListMap (TM.GenMap NonDet.LabelMap) (Key, NonEmpty DistinctBlocks))
     where
       go !m [] = TM.foldTM (:) m []
       go !m ((k,v) : entries) = go (TM.alterTM k adjust m) entries

@@ -24,7 +24,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
@@ -262,7 +262,7 @@ cmmLayoutStack cfg procpoints entry_args
 -- -----------------------------------------------------------------------------
 
 layout :: CmmConfig
-       -> LabelSet                      -- proc points
+       -> NonDet.LabelSet                      -- proc points
        -> NonDet.LabelMap CmmLocalLive         -- liveness
        -> BlockId                       -- entry
        -> ByteOff                       -- stack args on entry
@@ -372,13 +372,13 @@ isGcJump _something_else = False
 -- unnecessarily pessimistic, but probably not in the code we
 -- generate.
 
-collectContInfo :: [CmmBlock] -> (ByteOff, LabelMap ByteOff)
+collectContInfo :: [CmmBlock] -> (ByteOff, NonDet.LabelMap ByteOff)
 collectContInfo blocks
-  = (maximum ret_offs, mapFromList (catMaybes mb_argss))
+  = (maximum ret_offs, NonDet.mapFromList (catMaybes mb_argss))
  where
   (mb_argss, ret_offs) = mapAndUnzip get_cont blocks
 
-  get_cont :: Block CmmNode x C -> (Maybe (Label, ByteOff), ByteOff)
+  get_cont :: Block CmmNode x C -> (Maybe (NonDet.Label, ByteOff), ByteOff)
   get_cont b =
      case lastNode b of
         CmmCall { cml_cont = Just l, .. }
@@ -439,7 +439,7 @@ getStackLoc (Young l) n stackmaps =
 -- extra code that goes *after* the Sp adjustment.
 
 handleLastNode
-   :: CmmConfig -> ProcPointSet -> NonDet.LabelMap CmmLocalLive -> LabelMap ByteOff
+   :: CmmConfig -> ProcPointSet -> NonDet.LabelMap CmmLocalLive -> NonDet.LabelMap ByteOff
    -> NonDet.LabelMap StackMap -> StackMap -> CmmTickScope
    -> Block CmmNode O O
    -> CmmNode O C
@@ -518,9 +518,9 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
      handleBranches
          -- See Note [diamond proc point]
        | Just l <- futureContinuation middle
-       , (nub $ filter (`setMember` procpoints) $ successors last) == [l]
+       , (nub $ filter (`NonDet.setMember` procpoints) $ successors last) == [l]
        = do
-         let cont_args = mapFindWithDefault 0 l cont_info
+         let cont_args = NonDet.mapFindWithDefault 0 l cont_info
              (assigs, cont_stack) = prepareStack l cont_args (sm_ret_off stack0)
              out = NonDet.mapFromList
                      [ (l', cont_stack)
@@ -533,9 +533,9 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
 
         | otherwise = do
           pps <- mapM handleBranch (successors last)
-          let lbl_map :: LabelMap Label
-              lbl_map = mapFromList [ (l,tmp) | (l,tmp,_,_) <- pps ]
-              fix_lbl l = mapFindWithDefault l l lbl_map
+          let lbl_map :: NonDet.LabelMap Det.Label
+              lbl_map = NonDet.mapFromList [ (l,tmp) | (l,tmp,_,_) <- pps ]
+              fix_lbl l = NonDet.mapFindWithDefault l l lbl_map
           return ( []
                  , 0
                  , mapSuccessors fix_lbl last
@@ -556,9 +556,9 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
 
         --   (b) if the successor is a proc point, save everything
         --       on the stack.
-        | l `setMember` procpoints
+        | l `NonDet.setMember` procpoints
         = do
-             let cont_args = mapFindWithDefault 0 l cont_info
+             let cont_args = NonDet.mapFindWithDefault 0 l cont_info
                  (stack2, assigs) =
                       setupStackFrame platform l liveness (sm_ret_off stack0)
                                                         cont_args stack0
@@ -576,9 +576,9 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
               is_live (r,_) = r `elemRegSet` live
 
 
-makeFixupBlock :: CmmConfig -> ByteOff -> Label -> StackMap
+makeFixupBlock :: CmmConfig -> ByteOff -> Det.Label -> StackMap
                -> CmmTickScope -> [CmmNode O O]
-               -> UniqDSM (Label, [CmmBlock])
+               -> UniqDSM (Det.Label, [CmmBlock])
 makeFixupBlock cfg sp0 l stack tscope assigs
   | null assigs && sp0 == sm_sp stack = return (l, [])
   | otherwise = do
@@ -1019,7 +1019,7 @@ elimStackStores stackmap stackmaps area_off nodes
 
 setInfoTableStackMap :: Platform -> NonDet.LabelMap StackMap -> CmmDecl -> CmmDecl
 setInfoTableStackMap platform stackmaps (CmmProc top_info@TopInfo{..} l v g)
-  = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l v g
+  = CmmProc top_info{ info_tbls = Det.mapMapWithKey fix_info info_tbls } l v g
   where
     fix_info lbl info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
        info_tbl { cit_rep = StackRep (get_liveness lbl) }
@@ -1078,7 +1078,7 @@ insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
             -- they're actually live. Furthermore, nothing is live at the entry
             -- to a proc point.
             (middle1, live_with_reloads)
-                | entry_label `setMember` procpoints
+                | entry_label `NonDet.setMember` procpoints
                 = let reloads = insertReloads platform stackmap live_at_middle0
                   in (foldr blockCons middle0 reloads, emptyRegSet)
                 | otherwise

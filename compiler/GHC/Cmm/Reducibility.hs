@@ -43,7 +43,9 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dominators
 import GHC.Cmm.Dataflow.Graph hiding (addBlock)
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label (Label)
 import GHC.Data.Graph.Collapse
 import GHC.Data.Graph.Inductive.Graph
 import GHC.Data.Graph.Inductive.PatriciaTree
@@ -110,8 +112,8 @@ type CGraph = Gr CmmSuper ()
 inflate :: Label -> CGraph -> CmmGraph
 inflate entry cg = CmmGraph entry graph
   where graph = GMany NothingO body NothingO
-        body :: LabelMap CmmBlock
-        body = foldl (\map block -> mapInsert (entryLabel block) block map) mapEmpty $
+        body :: Det.LabelMap CmmBlock
+        body = foldl (\map block -> Det.mapInsert (entryLabel block) block map) Det.mapEmpty $
                blocks super
         super = case labNodes cg of
                   [(_, s)] -> s
@@ -125,9 +127,9 @@ cgraphOfCmm g = foldl' addSuccEdges (mkGraph cnodes []) blocks
    where blocks = zip [0..] $ revPostorderFrom (graphMap g) (g_entry g)
          cnodes = [(k, super block) | (k, block) <- blocks]
           where super block = Nodes (entryLabel block) (Seq.singleton block)
-         labelNumber = \lbl -> fromJust $ mapLookup lbl numbers
-             where numbers :: LabelMap Int
-                   numbers = mapFromList $ map swap blocks
+         labelNumber = \lbl -> fromJust $ NonDet.mapLookup lbl numbers
+             where numbers :: NonDet.LabelMap Int
+                   numbers = NonDet.mapFromList $ map swap blocks
                    swap (k, block) = (entryLabel block, k)
          addSuccEdges :: CGraph -> (Node, CmmBlock) -> CGraph
          addSuccEdges graph (k, block) =
@@ -214,10 +216,10 @@ changeBlockLabels f block = blockJoin entry' middle exit'
 
 relabel :: CmmSuper -> UniqDSM CmmSuper
 relabel node = do
-     finite_map <- foldM addPair mapEmpty $ definedLabels node
+     finite_map <- foldM addPair NonDet.mapEmpty $ definedLabels node
      return $ changeLabels (labelChanger finite_map) node
-  where addPair :: LabelMap Label -> Label -> UniqDSM (LabelMap Label)
+  where addPair :: NonDet.LabelMap Label -> Label -> UniqDSM (NonDet.LabelMap Label)
         addPair map old = do new <- newBlockId
-                             return $ mapInsert old new map
-        labelChanger :: LabelMap Label -> (Label -> Label)
-        labelChanger mapping = \lbl -> mapFindWithDefault lbl lbl mapping
+                             return $ NonDet.mapInsert old new map
+        labelChanger :: NonDet.LabelMap Label -> (Label -> Label)
+        labelChanger mapping = \lbl -> NonDet.mapFindWithDefault lbl lbl mapping

@@ -95,7 +95,7 @@ import GHC.Cmm.DebugBlock
 import GHC.Cmm.BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import GHC.Cmm
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.GenericOpt
 import GHC.Cmm.CLabel
@@ -166,7 +166,7 @@ data NativeGenAcc statics instr
              -- required.
         , ngs_colorStats  :: ![[Color.RegAllocStats statics instr]]
         , ngs_linearStats :: ![[Linear.RegAllocStats]]
-        , ngs_labels      :: ![Label]
+        , ngs_labels      :: ![NonDet.Label]
         , ngs_debug       :: ![DebugBlock]
         , ngs_dwarfFiles  :: !DwarfFiles
         , ngs_unwinds     :: !(NonDet.LabelMap [UnwindPoint])
@@ -345,7 +345,7 @@ cmmNativeGens :: forall statics instr jumpDest.
               -> NCGConfig
               -> NcgImpl statics instr jumpDest
               -> BufHandle
-              -> LabelMap DebugBlock
+              -> NonDet.LabelMap DebugBlock
               -> DUniqSupply
               -> [RawCmmDecl]
               -> NativeGenAcc statics instr
@@ -433,7 +433,7 @@ cmmNativeGen
     -> NcgImpl statics instr jumpDest
         -> DUniqSupply
         -> DwarfFiles
-        -> LabelMap DebugBlock
+        -> NonDet.LabelMap DebugBlock
         -> RawCmmDecl                                   -- ^ the cmm to generate code for
         -> Int                                          -- ^ sequence number of this top thing
         -> IO   ( DUniqSupply
@@ -660,7 +660,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "invertCondBranches" #-}
                 map invert sequenced
               where
-                invertConds :: LabelMap RawCmmStatics -> [NatBasicBlock instr]
+                invertConds :: Det.LabelMap RawCmmStatics -> [NatBasicBlock instr]
                             -> [NatBasicBlock instr]
                 invertConds = invertCondBranches ncgImpl optimizedCFG
                 invert top@CmmData {} = top
@@ -700,18 +700,18 @@ maybeDumpCfg logger (Just cfg) msg proc_name
 checkLayout :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
             -> Bool
 checkLayout procsUnsequenced procsSequenced =
-        assertPpr (setNull diff) (text "Block sequencing dropped blocks:" <> ppr diff)
+        assertPpr (NonDet.setNull diff) (text "Block sequencing dropped blocks:" <> ppr diff)
         True
   where
-        blocks1 = foldl' (setUnion) setEmpty $
-                        map getBlockIds procsUnsequenced :: LabelSet
-        blocks2 = foldl' (setUnion) setEmpty $
+        blocks1 = foldl' (NonDet.setUnion) NonDet.setEmpty $
+                        map getBlockIds procsUnsequenced :: NonDet.LabelSet
+        blocks2 = foldl' (NonDet.setUnion) NonDet.setEmpty $
                         map getBlockIds procsSequenced
-        diff = setDifference blocks1 blocks2
+        diff = NonDet.setDifference blocks1 blocks2
 
-        getBlockIds (CmmData _ _) = setEmpty
+        getBlockIds (CmmData _ _) = NonDet.setEmpty
         getBlockIds (CmmProc _ _ _ (ListGraph blocks)) =
-                setFromList $ map blockId blocks
+                NonDet.setFromList $ map blockId blocks
 
 -- | Compute unwinding tables for the blocks of a procedure
 computeUnwinding :: Instruction instr
@@ -735,7 +735,7 @@ computeUnwinding _ ncgImpl (CmmProc _ _ _ (ListGraph blks)) =
     -- information at the beginning of every block means that there is no need
     -- to perform this sort of push-down.
     NonDet.mapFromList [ (blk_lbl, extractUnwindPoints ncgImpl instrs)
-                       | BasicBlock blk_lbl instrs <- blks ]
+                      | BasicBlock blk_lbl instrs <- blks ]
 
 -- | Build a doc for all the imports.
 --
@@ -842,8 +842,8 @@ shortcutBranches config ncgImpl tops weights
 
 build_mapping :: forall instr t d statics jumpDest.
                  NcgImpl statics instr jumpDest
-              -> GenCmmDecl d (LabelMap t) (ListGraph instr)
-              -> (GenCmmDecl d (LabelMap t) (ListGraph instr)
+              -> GenCmmDecl d (Det.LabelMap t) (ListGraph instr)
+              -> (GenCmmDecl d (Det.LabelMap t) (ListGraph instr)
                  ,NonDet.LabelMap jumpDest)
 build_mapping _ top@(CmmData _ _) = (top, NonDet.mapEmpty)
 build_mapping _ (CmmProc info lbl live (ListGraph []))
@@ -858,21 +858,21 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     -- Don't completely eliminate loops here -- that can leave a dangling jump!
     shortcut_blocks :: [(BlockId, jumpDest)]
     (_, shortcut_blocks, others) =
-        foldl' split (setEmpty :: LabelSet, [], []) blocks
+        foldl' split (NonDet.setEmpty :: NonDet.LabelSet, [], []) blocks
     split (s, shortcut_blocks, others) b@(BasicBlock id [insn])
         | Just jd <- canShortcut ncgImpl insn
         , Just dest <- getJumpDestBlockId ncgImpl jd
         , not (has_info id)
-        , (setMember dest s) || dest == id -- loop checks
+        , (NonDet.setMember dest s) || dest == id -- loop checks
         = (s, shortcut_blocks, b : others)
     split (s, shortcut_blocks, others) (BasicBlock id [insn])
         | Just dest <- canShortcut ncgImpl insn
         , not (has_info id)
-        = (setInsert id s, (id,dest) : shortcut_blocks, others)
+        = (NonDet.setInsert id s, (id,dest) : shortcut_blocks, others)
     split (s, shortcut_blocks, others) other = (s, shortcut_blocks, other : others)
 
     -- do not eliminate blocks that have an info table
-    has_info l = mapMember l info
+    has_info l = Det.mapMember l info
 
     -- build a mapping from BlockId to JumpDest for shorting branches
     mapping = NonDet.mapFromList shortcut_blocks
@@ -918,7 +918,7 @@ genMachCode
         :: NCGConfig
         -> (RawCmmDecl -> NatM [NatCmmDecl statics instr])
         -> DwarfFiles
-        -> LabelMap DebugBlock
+        -> NonDet.LabelMap DebugBlock
         -> RawCmmDecl
         -> CFG
         -> UniqDSM

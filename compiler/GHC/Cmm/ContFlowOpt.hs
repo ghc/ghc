@@ -11,7 +11,8 @@ import GHC.Prelude hiding (succ, unzip, zip)
 
 import GHC.Cmm.Dataflow.Block hiding (blockConcat)
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import qualified GHC.Cmm.Dataflow.Label as Det
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Utils
@@ -139,13 +140,13 @@ cmmCfgOptsProc :: Bool -> CmmDecl -> CmmDecl
 cmmCfgOptsProc split (CmmProc info lbl live g) = CmmProc info' lbl live g'
     where (g', env) = blockConcat split g
           info' = info{ info_tbls = new_info_tbls }
-          new_info_tbls = mapFromList (map upd_info (mapToList (info_tbls info)))
+          new_info_tbls = Det.mapFromList (map upd_info (Det.mapToList (info_tbls info)))
 
           -- If we changed any labels, then we have to update the info tables
           -- too, except for the top-level info table because that might be
           -- referred to by other procs.
           upd_info (k,info)
-             | Just k' <- mapLookup k env
+             | Just k' <- NonDet.mapLookup k env
              = (k', if k' == g_entry g'
                        then info
                        else info{ cit_lbl = infoTblLbl k' })
@@ -154,7 +155,7 @@ cmmCfgOptsProc split (CmmProc info lbl live g) = CmmProc info' lbl live g'
 cmmCfgOptsProc _ top = top
 
 
-blockConcat :: Bool -> CmmGraph -> (CmmGraph, LabelMap BlockId)
+blockConcat :: Bool -> CmmGraph -> (CmmGraph, NonDet.LabelMap BlockId)
 blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
   = (replaceLabels shortcut_map $ ofBlockMap new_entry new_blocks, shortcut_map')
   where
@@ -162,9 +163,9 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
      -- Remember to update the shortcut_map, since we also have to
      -- update the info_tbls mapping now.
      (new_entry, shortcut_map')
-       | Just entry_blk <- mapLookup entry_id new_blocks
+       | Just entry_blk <- Det.mapLookup entry_id new_blocks
        , Just dest      <- canShortcut entry_blk
-       = (dest, mapInsert entry_id dest shortcut_map)
+       = (dest, NonDet.mapInsert entry_id dest shortcut_map)
        | otherwise
        = (entry_id, shortcut_map)
 
@@ -179,7 +180,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
      --  * map containing number of predecessors for each block. We discard
      --    it after we process all blocks.
      (new_blocks, shortcut_map, _) =
-           foldr maybe_concat (blockmap, mapEmpty, initialBackEdges) blocks
+           foldr maybe_concat (blockmap, NonDet.mapEmpty, initialBackEdges) blocks
 
      -- Map of predecessors for initial graph. We increase number of
      -- predecessors for entry block by one to denote that it is
@@ -188,8 +189,8 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
      initialBackEdges = incPreds entry_id (predMap blocks)
 
      maybe_concat :: CmmBlock
-                  -> (LabelMap CmmBlock, LabelMap BlockId, LabelMap Int)
-                  -> (LabelMap CmmBlock, LabelMap BlockId, LabelMap Int)
+                  -> (Det.LabelMap CmmBlock, NonDet.LabelMap BlockId, NonDet.LabelMap Int)
+                  -> (Det.LabelMap CmmBlock, NonDet.LabelMap BlockId, NonDet.LabelMap Int)
      maybe_concat block (!blocks, !shortcut_map, !backEdges)
         -- If:
         --   (1) current block ends with unconditional branch to b' and
@@ -207,11 +208,11 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         -- we can ignore the contents of shortcut_map
         | CmmBranch b' <- last
         , hasOnePredecessor b'
-        , Just blk' <- mapLookup b' blocks
+        , Just blk' <- Det.mapLookup b' blocks
         = let bid' = entryLabel blk'
-          in ( mapDelete bid' $ mapInsert bid (splice head blk') blocks
+          in ( Det.mapDelete bid' $ Det.mapInsert bid (splice head blk') blocks
              , shortcut_map
-             , mapDelete b' backEdges )
+             , NonDet.mapDelete b' backEdges )
 
         -- If:
         --   (1) we are splitting proc points (see Note
@@ -229,10 +230,10 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         -- with dest.
         | splitting_procs
         , Just b'   <- callContinuation_maybe last
-        , Just blk' <- mapLookup b' blocks
+        , Just blk' <- Det.mapLookup b' blocks
         , Just dest <- canShortcut blk'
-        = ( mapInsert bid (blockJoinTail head (update_cont dest)) blocks
-          , mapInsert b' dest shortcut_map
+        = ( Det.mapInsert bid (blockJoinTail head (update_cont dest)) blocks
+          , NonDet.mapInsert b' dest shortcut_map
           , decPreds b' $ incPreds dest backEdges )
 
         -- If:
@@ -249,7 +250,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         | Nothing <- callContinuation_maybe last
         = let oldSuccs = successors last
               newSuccs = successors rewrite_last
-          in ( mapInsert bid (blockJoinTail head rewrite_last) blocks
+          in ( Det.mapInsert bid (blockJoinTail head rewrite_last) blocks
              , shortcut_map
              , if oldSuccs == newSuccs
                then backEdges
@@ -273,7 +274,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
           shortcut_last = mapSuccessors shortcut last
             where
               shortcut l =
-                 case mapLookup l blocks of
+                 case Det.mapLookup l blocks of
                    Just b | Just dest <- canShortcut b -> dest
                    _otherwise -> l
 
@@ -307,7 +308,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
           invertLikeliness         = fmap not
 
           -- Number of predecessors for a block
-          numPreds bid = mapLookup bid backEdges `orElse` 0
+          numPreds bid = NonDet.mapLookup bid backEdges `orElse` 0
 
           hasOnePredecessor b = numPreds b == 1
 
@@ -344,11 +345,11 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
 -- that invariant, but calling replaceLabels may introduce unreachable blocks.
 -- We rely on subsequent passes in the Cmm pipeline to remove unreachable
 -- blocks.
-incPreds, decPreds :: BlockId -> LabelMap Int -> LabelMap Int
-incPreds bid edges = mapInsertWith (+) bid 1 edges
-decPreds bid edges = case mapLookup bid edges of
-                       Just preds | preds > 1 -> mapInsert bid (preds - 1) edges
-                       Just _                 -> mapDelete bid edges
+incPreds, decPreds :: BlockId -> NonDet.LabelMap Int -> NonDet.LabelMap Int
+incPreds bid edges = NonDet.mapInsertWith (+) bid 1 edges
+decPreds bid edges = case NonDet.mapLookup bid edges of
+                       Just preds | preds > 1 -> NonDet.mapInsert bid (preds - 1) edges
+                       Just _                 -> NonDet.mapDelete bid edges
                        _                      -> edges
 
 
@@ -384,13 +385,13 @@ callContinuation_maybe _ = Nothing
 
 -- Map over the CmmGraph, replacing each label with its mapping in the
 -- supplied LabelMap.
-replaceLabels :: LabelMap BlockId -> CmmGraph -> CmmGraph
+replaceLabels :: NonDet.LabelMap BlockId -> CmmGraph -> CmmGraph
 replaceLabels env g
-  | mapNull env = g
+  | NonDet.mapNull env = g
   | otherwise   = replace_eid $ mapGraphNodes1 txnode g
    where
      replace_eid g = g {g_entry = lookup (g_entry g)}
-     lookup id = mapLookup id env `orElse` id
+     lookup id = NonDet.mapLookup id env `orElse` id
 
      txnode :: CmmNode e x -> CmmNode e x
      txnode (CmmBranch bid) = CmmBranch (lookup bid)
@@ -409,21 +410,21 @@ replaceLabels env g
      exp (CmmStackSlot (Young id) i) = CmmStackSlot (Young (lookup id)) i
      exp e                                      = e
 
-mkCmmCondBranch :: CmmExpr -> Label -> Label -> Maybe Bool -> CmmNode O C
+mkCmmCondBranch :: CmmExpr -> NonDet.Label -> NonDet.Label -> Maybe Bool -> CmmNode O C
 mkCmmCondBranch p t f l =
   if t == f then CmmBranch t else CmmCondBranch p t f l
 
 -- Build a map from a block to its set of predecessors.
-predMap :: [CmmBlock] -> LabelMap Int
-predMap blocks = foldr add_preds mapEmpty blocks
+predMap :: [CmmBlock] -> NonDet.LabelMap Int
+predMap blocks = foldr add_preds NonDet.mapEmpty blocks
   where
     add_preds block env = foldr add env (successors block)
-      where add lbl env = mapInsertWith (+) lbl 1 env
+      where add lbl env = NonDet.mapInsertWith (+) lbl 1 env
 
 -- Remove unreachable blocks from procs
 removeUnreachableBlocksProc :: Platform -> CmmDecl -> CmmDecl
 removeUnreachableBlocksProc _ proc@(CmmProc info lbl live g)
-   | used_blocks `lengthLessThan` mapSize (toBlockMap g)
+   | used_blocks `lengthLessThan` Det.mapSize (toBlockMap g)
    = CmmProc info' lbl live g'
    | otherwise
    = proc
@@ -432,17 +433,17 @@ removeUnreachableBlocksProc _ proc@(CmmProc info lbl live g)
      info' = info { info_tbls = keep_used (info_tbls info) }
              -- Remove any info_tbls for unreachable
 
-     keep_used :: LabelMap CmmInfoTable -> LabelMap CmmInfoTable
-     keep_used bs = mapFoldlWithKey keep mapEmpty bs
+     keep_used :: Det.LabelMap CmmInfoTable -> Det.LabelMap CmmInfoTable
+     keep_used bs = Det.mapFoldlWithKey keep Det.mapEmpty bs
 
-     keep :: LabelMap CmmInfoTable -> Label -> CmmInfoTable -> LabelMap CmmInfoTable
-     keep env l i | l `setMember` used_lbls = mapInsert l i env
+     keep :: Det.LabelMap CmmInfoTable -> Det.Label -> CmmInfoTable -> Det.LabelMap CmmInfoTable
+     keep env l i | l `NonDet.setMember` used_lbls = Det.mapInsert l i env
                   | otherwise               = env
 
      used_blocks :: [CmmBlock]
      used_blocks = revPostorder g
 
-     used_lbls :: LabelSet
-     used_lbls = setFromList $ map entryLabel used_blocks
+     used_lbls :: NonDet.LabelSet
+     used_lbls = NonDet.setFromList $ map entryLabel used_blocks
 removeUnreachableBlocksProc platform data'@(CmmData _ _) =
     pprPanic "removeUnreachableBlocksProc: passed data declaration instead of procedure" (pdoc platform data')

@@ -97,6 +97,7 @@ import qualified GHC.Data.Word64Map.Strict as M
 import Data.List (foldl1')
 
 import GHC.Cmm.Dataflow.Label (Label(..), mkHooplLabel)
+import GHC.Data.TrieMap (TrieMap(..))
 
 -----------------------------------------------------------------------------
 -- LabelSet
@@ -296,13 +297,13 @@ instance Outputable a => Outputable (LabelMap a) where
 instance OutputableP env a => OutputableP env (LabelMap a) where
   pdoc env = pdoc env . nonDetMapToList
 
--- instance TrieMap LabelMap where
---   type Key LabelMap = Label
---   emptyTM       = mapEmpty
---   lookupTM k m  = mapLookup k m
---   alterTM k f m = mapAlter f k m
---   foldTM k m z  = mapFoldr k z m -- TODO:ERROR?
---   filterTM f m  = mapFilter f m
+instance TrieMap LabelMap where
+  type Key LabelMap = Label
+  emptyTM       = mapEmpty
+  lookupTM k m  = mapLookup k m
+  alterTM k f m = mapAlter f k m
+  foldTM = error "TrieMap: NonDet.LabelMap"
+  filterTM f m  = mapFilter f m
 
 -----------------------------------------------------------------------------
 -- FactBase
