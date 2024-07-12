@@ -1,28 +1,25 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
--- The above warning suppression flags are a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     https://gitlab.haskell.org/ghc/ghc/wikis/commentary/coding-style#warnings
--- for details
-module Main(main) where
+
+{-# OPTIONS_GHC -Wall #-}
+
+module Main (main) where
 
 import Prelude hiding ((<>))
 
+import Control.Arrow      ( (***) )
+import Data.Bits          ( (.|.), shiftL )
+import Data.List          ( intercalate, intersperse, nub, sort, sortOn )
+import Data.Maybe         ( isNothing, mapMaybe )
+import Data.Ord           ( Down(..) )
+import Data.Word          ( Word32 )
+import System.Environment ( getArgs )
+
 import Text.PrettyPrint
-import Data.Word
-import Data.Bits
-import Data.List        ( intersperse, nub, sort )
-import System.Environment
-import Control.Arrow ((***))
 
-{-
-
-Note [How genapply gets target info]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [How genapply gets target info]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 genapply generates AutoApply.cmm for the target rts, so it needs
 access to target constants like word size, MAX_REAL_VANILLA_REG, etc.
 These constants are computed by the deriveConstants program, which
@@ -60,6 +57,91 @@ the host. Should we add even more CPP hacks like passing flags like
 genapply logic into hadrian at some point, at least we should make it
 less hacky by nuking all CPP logic in it from the orbit.
 
+Note [AutoApply.cmm for vectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generating and compiling stg_ap functions for vectors (e.g. stg_ap_v16_fast)
+is quite tricky. The build platform generates Cmm code for the target platform,
+and the requirements are:
+
+  1. the host platform must be able to compile this code,
+  2. the target platform must be able to:
+      a. run this code when it passes the appropriate CPU flags such as -mavx
+      b. not run into any problems in other code that does not use vector registers.
+
+This is achieved by several means. The first step is to use CPP in the generated
+Cmm code. Specifically, any mention of XMM/YMM/ZMM registers is wrapped
+in a conditional. For example, stg_stk_save_v32 looks like:
+
+    stg_stk_save_v32
+    {
+        #if defined(REG_YMM1)
+        Sp_adj(-7);
+        V32_[Sp+WDS(3)] = YMM1;
+        ...
+        #else
+        foreign "C" barf("stg_stk_save_v32: unsupported vector register", NULL) never returns;
+        #endif
+    }
+
+This means that:
+
+  - the RTS unconditionally defines symbols such as 'stg_ap_v32_fast',
+  - but they may throw an error at runtime if vector registers are not supported.
+
+This is a lot more straightforward than attempting to defer the generation of
+this code. In particular, GHC.StgToCmm.ArgRep.slowCallPattern currently assumes
+that 1-argument stg_ap functions exist for all representations, and revisiting
+that design would constitute a fair amount of work.
+
+Case in point: this CPP allows the generated application code to be compiled on
+AArch64, for which REG_XMM1 is defined but both REG_YMM1 and REG_ZMM1 are not.
+Note that GHC will complain at compile-time if we try to use 256/512 bit wide
+vectors on AArch64, so it is immaterial that stg_ap_v32_fast will crash at runtime.
+
+How about on X86_64? There are several points to consider:
+
+  - The X86 NCG only partially supports vector registers; most operations
+    only work on 128-bit wide vectors.
+
+    However all that is needed is support for MOV instructions to perform the
+    stack save/load; so it suffices to have (working register allocation and)
+    support for move instructions for XMM/YMM/ZMM;
+    see GHC.CmmToAsm.X86.Instr.movInstr.
+
+  - For XMM load/stores, we can't assume that the target supports AVX, only SSE2.
+    So we have to pessimistically emit SSE2 instructions instead of AVX instructions.
+    On the other hand, YMM load/stores require -mavx2/-mavx512f, respectively.
+
+    To do this, we must compile e.g stg_ap_v16_fast WITHOUT -mavx.
+    (Were we to compile with -mavx, we would emit assembly containing AVX
+    instructions, and these might not be available on the target platform.)
+
+  - For YMM/ZMM load/stores, we must emit the appropriate AVX2/AVX512F
+    instructions (as GHC.CmmToAsm.X86.Instr.movInstr does).
+
+This means that:
+
+  - stg_ap_v16_fast (and friends) should be compiled WITHOUT -mavx.
+    (Were we to compile with -mavx, we would emit assembly containing AVX
+    instructions, and these might not be available on the target platform.)
+  - stg_ap_v32_fast (and friends) should be compiled with -mavx2.
+  - stg_ap_v64_fast (and friends) should be compiled with -mavx512f.
+
+However, there isn't currently a way to set CPU flags per function in Cmm, à la
+
+  __attribute__(("target"="avx2"))
+  stg_ap_v32_fast ...
+
+Instead, we put all V16 code in AutoApply_V16.cmm, all V32 code into
+AutoApply_V32.cmm, and all V64 code in AutoApply_V64.cmm.
+On X86, we then compile AutoApply_V32.cmm with -mavx2, and AutoApply_V64.cmm
+with -mavx512f. See references to AutoApply in Hadrian, Settings/Packages.hs.
+
+Note that it is very important to set these flags. For example, were we to
+compile AutoApply_V32.cmm without -mavx2 using the LLVM backend, LLVM would
+attempt to compile usage of ymm registers into usage of pairs of xmm registers.
+This violates the expected calling convention, and leads to segfaults
+(e.g. in test T25062_V32).
 -}
 
 data TargetInfo = TargetInfo
@@ -67,6 +149,7 @@ data TargetInfo = TargetInfo
     maxRealFloatReg,
     maxRealDoubleReg,
     maxRealLongReg,
+    maxRealXmmReg,
     wordSize,
     tagBits,
     tagBitsMax,
@@ -76,7 +159,8 @@ data TargetInfo = TargetInfo
 parseTargetInfo :: FilePath -> IO TargetInfo
 parseTargetInfo path = do
   header <- readFile path
-  let tups = [ (k, read v) | '/':'/':' ':l <- lines header, [k, v] <- [words l] ]
+  let tups :: [(String, Int)]
+      tups = [ (k, read v) | '/':'/':' ':l <- lines header, [k, v] <- [words l] ]
       tups_get k = case lookup k tups of
                     Nothing -> error "genapply.parseTargetInfo: Missing key"
                     Just v  -> v
@@ -86,6 +170,7 @@ parseTargetInfo path = do
     maxRealFloatReg = tups_get "MAX_Real_Float_REG",
     maxRealDoubleReg = tups_get "MAX_Real_Double_REG",
     maxRealLongReg = tups_get "MAX_Real_Long_REG",
+    maxRealXmmReg = tups_get "MAX_Real_XMM_REG",
     wordSize = tups_get "WORD_SIZE",
     tagBits = tag_bits,
     tagBitsMax = 1 `shiftL` tag_bits,
@@ -96,15 +181,16 @@ parseTargetInfo path = do
 -- Argument kinds (roughly equivalent to PrimRep)
 
 data ArgRep
-  = N   -- non-ptr
-  | P   -- ptr
-  | V   -- void
-  | F   -- float
-  | D   -- double
-  | L   -- long (64-bit)
-  | V16 -- 16-byte (128-bit) vectors
-  | V32 -- 32-byte (256-bit) vectors
-  | V64 -- 64-byte (512-bit) vectors
+  = N   -- ^ non-ptr
+  | P   -- ^ ptr
+  | V   -- ^ void
+  | F   -- ^ float
+  | D   -- ^ double
+  | L   -- ^ long (64 bit)
+  | V16 -- ^ 16 byte (128 bit) vector
+  | V32 -- ^ 32 byte (256 bit) vector
+  | V64 -- ^ 64 byte (512 bit) vector
+  deriving stock (Eq, Ord, Show)
 
 -- size of a value in *words*
 argSize :: TargetInfo -> ArgRep -> Int
@@ -139,33 +225,60 @@ isPtr _ = False
 
 type Reg = String
 
-availableRegs :: TargetInfo -> ([Reg],[Reg],[Reg],[Reg])
-availableRegs TargetInfo {..} =
-  ( vanillaRegs maxRealVanillaReg,
-    floatRegs   maxRealFloatReg,
-    doubleRegs  maxRealDoubleReg,
-    longRegs    maxRealLongReg
-  )
+-- Available registers.
+--
+-- Assumes we have only two types of assignable registers:
+--
+--  - general purpose registers (RegClass RcInteger)
+--  - floating point / vector registers (RegClass RcFloatOrVector)
+--
+-- Target architectures with different register layouts (e.g. different RegClass
+-- structure) will need adjustments here.
+data AvailRegs =
+  AvailRegs
+    { availIntegerRegNos :: [Int]
+    , availFloatOrVectorRegNos :: [Int]
+    }
 
-vanillaRegs, floatRegs, doubleRegs, longRegs :: Int -> [Reg]
-vanillaRegs n = [ "R" ++ show m | m <- [2..n] ]  -- never use R1
-floatRegs   n = [ "F" ++ show m | m <- [1..n] ]
-doubleRegs  n = [ "D" ++ show m | m <- [1..n] ]
-longRegs    n = [ "L" ++ show m | m <- [1..n] ]
+allAvailRegs :: AvailRegs
+allAvailRegs =
+  AvailRegs
+    { availIntegerRegNos       = [1..]
+    , availFloatOrVectorRegNos = [1..]
+    }
+
+findAvailIntegerReg :: ArgRep -> (Int, Int) -> AvailRegs -> Maybe (Reg, AvailRegs)
+findAvailIntegerReg rep (min_regno, max_regno) regs =
+  case mid of
+    []       -> Nothing
+    regNo:nos -> Just (regName rep regNo, regs { availIntegerRegNos = small ++ nos ++ big })
+  where
+    (small, rest) = span (< min_regno) $ availIntegerRegNos regs
+    (mid, big) = span (<= max_regno) rest
+
+findAvailFloatOrVectorReg :: ArgRep -> (Int, Int) -> AvailRegs -> Maybe (Reg, AvailRegs)
+findAvailFloatOrVectorReg reg (min_regno, max_regno) regs =
+  case mid of
+    []        -> Nothing
+    regNo:nos -> Just (regName reg regNo, regs { availFloatOrVectorRegNos = small ++ nos ++ big })
+  where
+    (small, rest) = span (< min_regno) $ availFloatOrVectorRegNos regs
+    (mid, big) = span (<= max_regno) rest
 
 -- -----------------------------------------------------------------------------
 -- Loading/saving register arguments to the stack
 
 loadRegArgs :: TargetInfo -> Int -> [ArgRep] -> (Doc,Int)
-loadRegArgs targetInfo sp args
- = (loadRegOffs reg_locs, sp')
- where (reg_locs, _, sp') = assignRegs targetInfo sp args
+loadRegArgs targetInfo sp args = (loadRegOffs reg_locs, sp')
+  where (reg_locs, _, sp') = assignRegs targetInfo sp args
 
 loadRegOffs :: [(Reg,Int)] -> Doc
-loadRegOffs = vcat . map (uncurry assign_stk_to_reg)
+loadRegOffs reg_locs =
+  vcat $ map (uncurry assign_stk_to_reg) reg_locs
 
 saveRegOffs :: [(Reg,Int)] -> Doc
-saveRegOffs = vcat . map (uncurry assign_reg_to_stk)
+saveRegOffs reg_locs =
+  vcat $ map (uncurry assign_reg_to_stk) reg_locs
 
 assignRegs
         :: TargetInfo
@@ -174,38 +287,95 @@ assignRegs
         -> ([(Reg,Int)],        -- regs and offsets to load
             [ArgRep],           -- left-over args
             Int)                -- Sp of left-over args
-assignRegs targetInfo sp args = assign targetInfo sp args (availableRegs targetInfo) []
+assignRegs targetInfo sp args = assign targetInfo sp args allAvailRegs []
 
+assign :: TargetInfo -> Int -> [ArgRep] -> AvailRegs -> [(Reg, Int)] -> ([(Reg, Int)], [ArgRep], Int)
 assign _ sp [] _regs doc = (doc, [], sp)
 assign targetInfo sp (V : args) regs doc = assign targetInfo sp args regs doc
 assign targetInfo sp (arg : args) regs doc
- = case findAvailableReg arg regs of
-    Just (reg, regs') -> assign targetInfo (sp + argSize targetInfo arg)  args regs'
+ = case findAvailableReg targetInfo arg regs of
+    Just (reg, regs') -> assign targetInfo (sp + argSize targetInfo arg) args regs'
                             ((reg, sp) : doc)
     Nothing -> (doc, (arg:args), sp)
 
-findAvailableReg N (vreg:vregs, fregs, dregs, lregs) =
-  Just (vreg, (vregs,fregs,dregs,lregs))
-findAvailableReg P (vreg:vregs, fregs, dregs, lregs) =
-  Just (vreg, (vregs,fregs,dregs,lregs))
-findAvailableReg F (vregs, freg:fregs, dregs, lregs) =
-  Just (freg, (vregs,fregs,dregs,lregs))
-findAvailableReg D (vregs, fregs, dreg:dregs, lregs) =
-  Just (dreg, (vregs,fregs,dregs,lregs))
-findAvailableReg L (vregs, fregs, dregs, lreg:lregs) =
-  Just (lreg, (vregs,fregs,dregs,lregs))
-findAvailableReg _ _ = Nothing
+findAvailableReg :: TargetInfo -> ArgRep -> AvailRegs -> Maybe (Reg, AvailRegs)
+findAvailableReg tgt N   = findAvailIntegerReg       N   (2, maxRealVanillaReg tgt) -- don't use R1
+findAvailableReg tgt P   = findAvailIntegerReg       P   (2, maxRealVanillaReg tgt) --     ''
+findAvailableReg tgt L   = findAvailIntegerReg       L   (1, maxRealLongReg tgt)
+findAvailableReg tgt F   = findAvailFloatOrVectorReg F   (1, maxRealFloatReg tgt)
+findAvailableReg tgt D   = findAvailFloatOrVectorReg D   (1, maxRealDoubleReg tgt)
+findAvailableReg tgt V16 = findAvailFloatOrVectorReg V16 (1, maxRealXmmReg tgt)
+findAvailableReg tgt V32 = findAvailFloatOrVectorReg V32 (1, maxRealXmmReg tgt)
+findAvailableReg tgt V64 = findAvailFloatOrVectorReg V64 (1, maxRealXmmReg tgt)
+findAvailableReg _   V   = error "genapply: findAvailableReg void arg (V)"
 
+regName :: ArgRep -> Int -> Reg
+regName rep regNo = regNm ++ show regNo
+  where
+    regNm :: String
+    regNm = case rep of
+      N   -> "R"
+      P   -> "R"
+      L   -> "L"
+      F   -> "F"
+      D   -> "D"
+      V16 -> "XMM"
+      V32 -> "YMM"
+      V64 -> "ZMM"
+      V  -> error "regName Void"
+
+vectorReg_maybe :: Reg -> Maybe Reg
+vectorReg_maybe r = case r of
+  xyz:'M':'M':_
+    | xyz `elem` ['X','Y','Z']
+    -> Just r
+  _ -> Nothing
+
+vecsCpp :: Doc -> [Reg] -> [Doc] -> [Doc]
+vecsCpp fun regs code =
+  case mapMaybe vectorReg_maybe regs of
+    [] -> code
+    vs ->
+      let cond = text (intercalate " && " [ "defined(REG_" ++ r ++ ")" | r <- vs ])
+      in [ text "// Guard usage of vector registers"
+         , text "#if" <+> cond ]
+         ++ code
+         ++ [ text "#else //" <+> cond
+            , text "foreign \"C\" barf(\"" <> fun <> text ": unsupported vector register\", NULL) never returns;"
+            , text "#endif //" <+> cond
+            ]
+
+vecRep_maybe :: ArgRep -> Maybe ArgRep
+vecRep_maybe = \case
+  V16 -> Just V16
+  V32 -> Just V32
+  V64 -> Just V64
+  _   -> Nothing
+
+
+largestVec :: [ArgRep] -> Maybe ArgRep
+largestVec reps
+  | r:_ <- sortOn Down reps
+  = vecRep_maybe r
+  | otherwise
+  = Nothing
+
+assign_reg_to_stk :: String -> Int -> Doc
 assign_reg_to_stk reg sp
    = loadSpWordOff (regRep reg) sp <> text " = " <> text reg <> semi
 
+assign_stk_to_reg :: String -> Int -> Doc
 assign_stk_to_reg reg sp
    = text reg <> text " = " <> loadSpWordOff (regRep reg) sp <> semi
 
+regRep :: String -> String
 regRep ('F':_) = "F_"
 regRep ('D':_) = "D_"
 regRep ('L':_) = "L_"
-regRep _       = "W_"
+regRep ('X':'M':'M':_) = "V16_"
+regRep ('Y':'M':'M':_) = "V32_"
+regRep ('Z':'M':'M':_) = "V64_"
+regRep _ = "W_"
 
 loadSpWordOff :: String -> Int -> Doc
 loadSpWordOff rep off = text rep <> text "[Sp+WDS(" <> int off <> text ")]"
@@ -217,7 +387,7 @@ mkJump :: TargetInfo
        -> [ArgRep]  -- Jump arguments
        -> Doc
 mkJump targetInfo jump live args =
-    text "jump" <+> jump <+> brackets (hcat (punctuate comma liveRegs))
+  text "jump" <+> jump <+> brackets (hcat (punctuate comma (map text liveRegs))) <+> semi
   where
     liveRegs = mkJumpLiveRegs targetInfo live args
 
@@ -228,7 +398,7 @@ mkJumpSaveCCCS :: TargetInfo
                -> [ArgRep]  -- Jump arguments
                -> Doc
 mkJumpSaveCCCS targetInfo jump live args =
-    text "jump_SAVE_CCCS" <> parens (hcat (punctuate comma (jump : liveRegs)))
+  text "jump_SAVE_CCCS" <> parens (hcat (punctuate comma (jump : map text liveRegs))) <+> semi
   where
     liveRegs = mkJumpLiveRegs targetInfo live args
 
@@ -236,19 +406,19 @@ mkJumpSaveCCCS targetInfo jump live args =
 mkJumpLiveRegs :: TargetInfo
                -> [Reg]     -- Registers that are definitely live
                -> [ArgRep]  -- Jump arguments
-               -> [Doc]
-mkJumpLiveRegs targetInfo live args =
-    map text regs
+               -> [String]
+mkJumpLiveRegs targetInfo live args = (nub . sort) (live ++ map fst reg_locs)
   where
     (reg_locs, _, _) = assignRegs targetInfo 0 args
-    regs             = (nub . sort) (live ++ map fst reg_locs)
 
 -- make a ptr/non-ptr bitmap from a list of argument types
 mkBitmap :: TargetInfo -> [ArgRep] -> Word32
 mkBitmap targetInfo args = foldr f 0 args
- where f arg bm | isPtr arg = bm `shiftL` 1
-                | otherwise = (bm `shiftL` size) .|. ((1 `shiftL` size) - 1)
-                where size = argSize targetInfo arg
+ where
+  f :: ArgRep -> Word32 -> Word32
+  f arg bm | isPtr arg = bm `shiftL` 1
+           | otherwise = (bm `shiftL` size) .|. ((1 `shiftL` size) - 1)
+           where size = argSize targetInfo arg
 
 -- -----------------------------------------------------------------------------
 -- Generating the application functions
@@ -269,22 +439,28 @@ mkBitmap targetInfo args = foldr f 0 args
 -- the args anyway (this might not be true of register-rich machines
 -- when we start passing args to stg_ap_* in regs).
 
+mkApplyName :: [ArgRep] -> Doc
 mkApplyName args
   = text "stg_ap_" <> text (concatMap showArg args)
 
+mkApplyRetName :: [ArgRep] -> Doc
 mkApplyRetName args
   = mkApplyName args <> text "_ret"
 
+mkApplyFastName :: [ArgRep] -> Doc
 mkApplyFastName args
   = mkApplyName args <> text "_fast"
 
+mkApplyInfoName :: [ArgRep] -> Doc
 mkApplyInfoName args
   = mkApplyName args <> text "_info"
 
+mb_tag_node :: TargetInfo -> Int -> Doc
 mb_tag_node targetInfo arity | Just tag <- tagForArity targetInfo arity = mkTagStmt tag <> semi
                              | otherwise = empty
 
-mkTagStmt tag = text ("R1 = R1 + "++ show tag)
+mkTagStmt :: Int -> Doc
+mkTagStmt tag = text ("R1 = R1 + " ++ show tag)
 
 type StackUsage = (Int, Int)  -- PROFILING, normal
 
@@ -313,16 +489,16 @@ stackCheck targetInfo args args_in_regs fun_info_label (prof_sp, norm_sp) =
                else
                  empty,
             text "Sp(0) = " <> fun_info_label <> char ';',
-            mkJump targetInfo (text "__stg_gc_enter_1") ["R1"] [] <> semi
+            mkJump targetInfo (text "__stg_gc_enter_1") ["R1"] []
             ]) $$
           char '}'
        | otherwise = empty
   in
   vcat [ text "#if defined(PROFILING)",
          cmp_sp prof_sp,
-         text "#else",
+         text "#else // defined(PROFILING)",
          cmp_sp norm_sp,
-         text "#endif"
+         text "#endif // defined(PROFILING)"
        ]
 
 genMkPAP :: TargetInfo
@@ -368,13 +544,13 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
     (smaller_arity_doc, smaller_arity_stack)
        = unzip [ smaller_arity i | i <- [1..n_args-1] ]
 
-    smaller_arity arity = (doc, stack_usage)
+    smaller_arity arity = (smaller_doc, smaller_stack_usage)
       where
-        (save_regs, stack_usage)
+        (save_regs, smaller_stack_usage)
           | overflow_regs = save_extra_regs
           | otherwise     = shuffle_extra_args
 
-        doc =
+        smaller_doc =
            text "if (arity == " <> int arity <> text ") {" $$
            nest 4 (vcat [
            --  text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_MANY();",
@@ -400,8 +576,8 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
             if is_fun_case then mb_tag_node targetInfo arity else empty,
             if overflow_regs
                 then mkJumpSaveCCCS targetInfo
-                       (text jump) live (take arity args) <> semi
-                else mkJump targetInfo (text jump) live (if no_load_regs then [] else args) <> semi
+                       (text jump) live (take arity args)
+                else mkJump targetInfo (text jump) live (if no_load_regs then [] else args)
             ]) $$
            text "}"
 
@@ -435,7 +611,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
 
         overflow_regs = args_in_regs && length reg_locs > length reg_locs'
 
-        save_extra_regs = (doc, (size,size))
+        save_extra_regs = (save_extra_doc, (size,size))
           where
              -- we have extra arguments in registers to save
               extra_reg_locs = drop (length reg_locs') (reverse reg_locs)
@@ -446,19 +622,21 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
                       [] -> error "Impossible: genapply.hs : No extra register locations"
               size = snd (last adj_reg_locs) + 1
 
-              doc =
+              save_extra_doc =
                 text "Sp_adj(" <> int (-size) <> text ");" $$
                 saveRegOffs adj_reg_locs $$
                 loadSpWordOff "W_" 0 <> text " = " <>
                              mkApplyInfoName rest_args <> semi
 
-        shuffle_extra_args = (doc, (shuffle_prof_stack, shuffle_norm_stack))
+        shuffle_extra_args = (shuffle_extra_doc, (shuffle_prof_stack, shuffle_norm_stack))
           where
-           doc = vcat [ text "#if defined(PROFILING)",
-                        shuffle_prof_doc,
-                        text "#else",
-                        shuffle_norm_doc,
-                        text "#endif"]
+           shuffle_extra_doc =
+            vcat [ text "#if defined(PROFILING)"
+                 , shuffle_prof_doc
+                 , text "#else // defined(PROFILING)"
+                 , shuffle_norm_doc
+                 , text "#endif // defined(PROFILING)"
+                 ]
 
            (shuffle_prof_doc, shuffle_prof_stack) = shuffle True
            (shuffle_norm_doc, shuffle_norm_stack) = shuffle False
@@ -466,21 +644,21 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
            -- Sadly here we have to insert an stg_restore_cccs frame
            -- just underneath the stg_ap_*_info frame if we're
            -- profiling; see Note [jump_SAVE_CCCS]
-           shuffle prof = (doc, -sp_adj)
+           shuffle prof = (shuffle_doc, -sp_adj)
              where
              sp_adj = sp_stk_args - 1 - offset
              offset = if prof then 2 else 0
-             doc =
-               vcat (map (shuffle_down (offset+1))
-                      [sp_stk_args .. sp_stk_args+stack_args_size-1]) $$
+             shuffle_doc =
+               vcat (map (shuffle_down (offset + 1))
+                      [sp_stk_args .. sp_stk_args + stack_args_size - 1]) $$
                (if prof
                  then
-                   loadSpWordOff "W_" (sp_stk_args+stack_args_size-3)
+                   loadSpWordOff "W_" (sp_stk_args + stack_args_size - 3)
                      <> text " = stg_restore_cccs_info;" $$
-                   loadSpWordOff "W_" (sp_stk_args+stack_args_size-2)
+                   loadSpWordOff "W_" (sp_stk_args + stack_args_size - 2)
                      <> text " = CCCS;"
                  else empty) $$
-               loadSpWordOff "W_" (sp_stk_args+stack_args_size-1)
+               loadSpWordOff "W_" (sp_stk_args + stack_args_size-1)
                      <> text " = "
                      <> mkApplyInfoName rest_args <> semi $$
                text "Sp_adj(" <> int sp_adj <> text ");"
@@ -511,7 +689,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
                 then text "R2 = " <> fun_info_label <> semi
                 else empty,
             if is_fun_case then mb_tag_node targetInfo n_args else empty,
-            mkJump targetInfo (text jump) live (if no_load_regs then [] else args) <> semi
+            mkJump targetInfo (text jump) live (if no_load_regs then [] else args)
           ])
 
 -- The LARGER ARITY cases:
@@ -520,7 +698,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
 --          BUILD_PAP(1,0,(W_)&stg_ap_v_info);
 --      }
 
-    (larger_arity_doc, larger_arity_stack) = (doc, stack)
+    (larger_arity_doc, larger_arity_stack) = (larger_doc, stack)
      where
        -- offsets in case we need to save regs:
        (reg_locs, _leftovers, sp_offset)
@@ -530,7 +708,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
        stack | args_in_regs = (sp_offset, sp_offset)
              | otherwise    = (0,0)
 
-       doc =
+       larger_doc =
            text "} else {" $$
            let
              save_regs
@@ -580,6 +758,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
 -- Examine tag bits of function pointer and enter it
 -- directly if needed.
 -- TODO: remove the redundant case in the original code.
+enterFastPath :: TargetInfo -> Bool -> Bool -> [ArgRep] -> Doc
 enterFastPath targetInfo no_load_regs args_in_regs args
     | Just tag <- tagForArity targetInfo (length args)
     = enterFastPathHelper targetInfo tag no_load_regs args_in_regs args
@@ -601,7 +780,7 @@ enterFastPathHelper targetInfo tag no_load_regs args_in_regs args =
     reg_doc,
     text "Sp_adj(" <> int sp' <> text ");",
     -- enter, but adjust offset with tag
-    mkJump targetInfo (text "%GET_ENTRY(R1-" <> int tag <> text ")") ["R1"] args <> semi
+    mkJump targetInfo (text "%GET_ENTRY(R1-" <> int tag <> text ")") ["R1"] args
   ]) $$
   text "}"
   -- I don't totally understand this code, I copied it from
@@ -619,9 +798,9 @@ enterFastPathHelper targetInfo tag no_load_regs args_in_regs args =
         | no_load_regs || args_in_regs = (empty, stk_args_offset)
         | otherwise    = loadRegArgs targetInfo stk_args_offset args
 
-tickForArity targetInfo arity
-    | True
-    = empty
+tickForArity :: TargetInfo -> Int -> Doc
+tickForArity _targetInfo _arity = empty
+{-
     | Just tag <- tagForArity targetInfo arity
     = vcat [
             text "W_[TOTAL_CALLS] = W_[TOTAL_CALLS] + 1;",
@@ -637,6 +816,7 @@ tickForArity targetInfo arity
             text "}"
           ]
 tickForArity _ _ = text "W_[TOTAL_CALLS] = W_[TOTAL_CALLS] + 1;"
+-}
 
 -- -----------------------------------------------------------------------------
 -- generate an apply function
@@ -647,8 +827,11 @@ formalParam V _ = empty
 formalParam arg n =
     formalParamType arg <> space <>
     text "arg" <> int n <> text ", "
+
+formalParamType :: ArgRep -> Doc
 formalParamType arg = argRep arg
 
+argRep :: ArgRep -> Doc
 argRep F   = text "F_"
 argRep D   = text "D_"
 argRep L   = text "L_"
@@ -681,16 +864,19 @@ genApply targetInfo args =
              args all_args_size fun_info_label {- tag stmt -}False
 
     stack_usage = maxStack [bco_stack, fun_stack, pap_stack]
+    applyName = mkApplyName args
+    (regsOffs,_,_) =assignRegs targetInfo 1 args
+    regs = map fst regsOffs
    in
     vcat [
-      text "INFO_TABLE_RET(" <> mkApplyName args <> text ", " <>
+      text "INFO_TABLE_RET(" <> applyName <> text ", " <>
         text "RET_SMALL, W_ info_ptr, " <> (cat $ zipWith formalParam args [1..]) <>
         text ")\n{",
-      nest 4 (vcat [
+      nest 4 (vcat $ vecsCpp applyName regs [
        text "W_ _unused;",
        text "W_ info;",
        text "W_ arity;",
-       text "unwind Sp = Sp + WDS(" <> int (1+all_args_size) <> text ");",
+       text "unwind Sp = Sp + WDS(" <> int (1 + all_args_size) <> text ");",
 
 --    if fast == 1:
 --        print "static void *lbls[] ="
@@ -728,12 +914,12 @@ genApply targetInfo args =
 --       text "TICK_SLOW_CALL(" <> int (length args) <> text ");",
 
        let do_assert [] _ = []
-           do_assert (arg:args) offset
-                | isPtr arg = this : rest
+           do_assert (a:as) offset
+                | isPtr a   = this : rest
                 | otherwise = rest
                 where this = text "ASSERT(LOOKS_LIKE_CLOSURE_PTR(Sp("
                                  <> int offset <> text ")));"
-                      rest = do_assert args (offset + argSize targetInfo arg)
+                      rest = do_assert as (offset + argSize targetInfo a)
        in
        vcat (do_assert args 1),
 
@@ -815,13 +1001,13 @@ genApply targetInfo args =
         text "     THUNK_SELECTOR: {",
         nest 4 (vcat [
 --          text "TICK_SLOW_CALL_UNEVALD(" <> int (length args) <> text ");",
-          text "Sp(0) = " <> fun_info_label <> text ";",
+          text "Sp(0) = " <> fun_info_label <> semi,
           -- CAREFUL! in SMP mode, the info table may already have been
           -- overwritten by an indirection, so we must enter the original
           -- info pointer we read, don't read it again, because it might
           -- not be enterable any more.
           mkJumpSaveCCCS targetInfo
-            (text "%ENTRY_CODE(info)") ["R1"] args <> semi,
+            (text "%ENTRY_CODE(info)") ["R1"] args,
             -- see Note [jump_SAVE_CCCS]
           text ""
          ]),
@@ -878,11 +1064,12 @@ genApplyFast targetInfo args =
     (reg_locs, _leftovers, sp_offset) = assignRegs targetInfo 1 args
 
     stack_usage = maxStack [fun_stack, (sp_offset,sp_offset)]
+
    in
-    vcat [
+    vcat $ [
      fun_fast_label,
      char '{',
-     nest 4 (vcat [
+     nest 4 (vcat $ vecsCpp fun_fast_label (map fst reg_locs) [
         text "W_ info;",
         text "W_ arity;",
 
@@ -918,7 +1105,7 @@ genApplyFast targetInfo args =
           nest 4 (vcat [
              text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
              saveRegOffs reg_locs,
-             mkJump targetInfo fun_ret_label [] args <> semi
+             mkJump targetInfo fun_ret_label [] args
           ]),
           char '}'
         ]),
@@ -926,7 +1113,7 @@ genApplyFast targetInfo args =
        char '}'
      ]),
      char '}'
-   ]
+  ]
 
 -- -----------------------------------------------------------------------------
 -- Making a stack apply
@@ -948,17 +1135,20 @@ mkStackApplyEntryLabel args = text "stg_ap_stk_" <> text (concatMap showArg args
 
 genStackApply :: TargetInfo -> [ArgRep] -> Doc
 genStackApply targetInfo args =
-  let fn_entry_label = mkStackApplyEntryLabel args in
   vcat [
     fn_entry_label,
     text "{", nest 4 body, text "}"
    ]
  where
+   fn_entry_label = mkStackApplyEntryLabel args
    (assign_regs, sp') = loadRegArgs targetInfo 0 args
-   body = vcat [assign_regs,
-                text "Sp_adj" <> parens (int sp') <> semi,
-                mkJump targetInfo (text "%GET_ENTRY(UNTAG(R1))") ["R1"] args <> semi
-                ]
+   (regs, _, _) = assignRegs targetInfo 0 args
+   body = vcat $
+     vecsCpp fn_entry_label (map fst regs)
+       [ assign_regs
+       , text "Sp_adj" <> parens (int sp') <> semi
+       , mkJump targetInfo (text "%GET_ENTRY(UNTAG(R1))") ["R1"] args
+       ]
 
 -- -----------------------------------------------------------------------------
 -- Stack save entry points.
@@ -973,19 +1163,21 @@ mkStackSaveEntryLabel args = text "stg_stk_save_" <> text (concatMap showArg arg
 
 genStackSave :: TargetInfo -> [ArgRep] -> Doc
 genStackSave targetInfo args =
-  let fn_entry_label= mkStackSaveEntryLabel args in
   vcat [
     fn_entry_label,
     text "{", nest 4 body, text "}"
    ]
  where
-   body = vcat [text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
-                saveRegOffs reg_locs,
-                text "Sp(2) = R1;",
-                text "Sp(1) =" <+> int stk_args <> semi,
-                text "Sp(0) = stg_gc_fun_info;",
-                text "jump stg_gc_noregs [];"
-                ]
+   fn_entry_label = mkStackSaveEntryLabel args
+   body = vcat $
+     vecsCpp fn_entry_label (map fst reg_locs)
+       [ text "Sp_adj" <> parens (int (-sp_offset)) <> semi
+       , saveRegOffs reg_locs
+       , text "Sp(2) = R1;"
+       , text "Sp(1) =" <+> int stk_args <> semi
+       , text "Sp(0) = stg_gc_fun_info;"
+       , text "jump stg_gc_noregs [];"
+       ]
 
    std_frame_size = 3 -- the std bits of the frame. See StgRetFun in Closures.h,
                       -- and the comment on stg_fun_gc_gen
@@ -998,8 +1190,36 @@ genStackSave targetInfo args =
 -- -----------------------------------------------------------------------------
 -- The prologue...
 
+main :: IO ()
 main = do
-  [path] <- getArgs
+  (path:args) <- getArgs
+  -- Because of Note [AutoApply.cmm for vectors],
+  -- we want to generate the code for V16/V32/V64 into separate files.
+  --
+  -- So GenApply takes an optional second argument (after the target info argument).
+  --
+  --  * No argument: generate code for all ArgReps except vectors
+  --  * -V16: generate code involving V16 vectors (at the widest)
+  --  * -V32: generate code involving V32 vectors (at the widest)
+  --  * -V64: generate code involving V64 vectors (at the widest)
+  let mbVec = case args of
+                arg:_ -> case arg of
+                  "-V16" -> Just V16
+                  "-V32" -> Just V32
+                  "-V64" -> Just V64
+                  _      -> error $ "genapply arg: " ++ arg
+                _ -> Nothing
+      wantArgs :: [ArgRep] -> Bool
+      wantArgs reps =
+        case mbVec of
+          Nothing
+            -> isNothing $ largestVec reps
+          Just v
+            | v' : _ <- sortOn Down reps
+            , v' == v
+            -> True
+            | otherwise
+            -> False
   targetInfo <- parseTargetInfo path
   let the_code = vcat [
                 text "// DO NOT EDIT!",
@@ -1013,46 +1233,51 @@ main = do
                 text "import CLOSURE HEAP_CHK_ctr;",
                 text "import CLOSURE RtsFlags;",
                 text "import CLOSURE stg_PAP_info;",
-                text "import CLOSURE stg_ap_d_info;",
-                text "import CLOSURE stg_ap_f_info;",
-                text "import CLOSURE stg_ap_l_info;",
-                text "import CLOSURE stg_ap_n_info;",
-                text "import CLOSURE stg_ap_p_info;",
-                text "import CLOSURE stg_ap_pp_info;",
-                text "import CLOSURE stg_ap_ppp_info;",
-                text "import CLOSURE stg_ap_pppp_info;",
-                text "import CLOSURE stg_ap_ppppp_info;",
-                text "import CLOSURE stg_ap_pppppp_info;",
-                text "import CLOSURE stg_ap_pppv_info;",
-                text "import CLOSURE stg_ap_ppv_info;",
-                text "import CLOSURE stg_ap_pv_info;",
-                text "import CLOSURE stg_ap_v16_info;",
-                text "import CLOSURE stg_ap_v32_info;",
-                text "import CLOSURE stg_ap_v64_info;",
-                text "import CLOSURE stg_ap_v_info;",
+         vcat [ text "import CLOSURE stg_ap_" <> text str <> text "_info;"
+              | argReps <- applyTypes
+              , wantArgs argReps
+              , let str = concatMap showArg argReps ],
                 text "import CLOSURE stg_gc_fun_info;",
                 text "import CLOSURE stg_restore_cccs_info;",
-                text "#endif",
-                text "",
+                text "#endif // !defined(UnregisterisedCompiler)",
 
-                vcat (intersperse (text "") $
-                   map (genApply targetInfo) applyTypes),
-                vcat (intersperse (text "") $
-                   map (genStackFns targetInfo) stackApplyTypes),
+         -- NB: the vector apply/save functions are defined in separate modules,
+         -- as per Note [AutoApply.cmm for vectors], so we import them here.
+         vcat [ text "import" <+> fun <> semi
+              | isNothing mbVec
+              , argReps <- stackApplyTypes
+              , not (wantArgs argReps)
+              , fun <- [ mkStackApplyEntryLabel argReps
+                       , mkStackSaveEntryLabel argReps ]
+              ],
 
-                vcat (intersperse (text "") $
-                   map (genApplyFast targetInfo) applyTypes),
+                vcat $ intersperse (text "") $
+                   [ genApply targetInfo argReps
+                   | argReps <- applyTypes
+                   , wantArgs argReps ],
+                vcat $ intersperse (text "") $
+                   [ genStackFns targetInfo argReps
+                   | argReps <- stackApplyTypes
+                   , wantArgs argReps ],
+                vcat $ intersperse (text "") $
+                   [ genApplyFast targetInfo argReps
+                   | argReps <- applyTypes
+                   , wantArgs argReps ],
 
-                genStackApplyArray stackApplyTypes,
+                if isNothing mbVec
+                then
+         vcat [ genStackApplyArray stackApplyTypes,
                 genStackSaveArray stackApplyTypes,
-                genBitmapArray targetInfo stackApplyTypes,
-
+                genBitmapArray targetInfo stackApplyTypes
+              ]
+                else empty,
                 text ""  -- add a newline at the end of the file
-            ]
-  -- in
+              ]
+
   putStr (render the_code)
 
 -- These have been shown to cover about 99% of cases in practice...
+applyTypes :: [[ArgRep]]
 applyTypes = [
         [V],
         [F],
@@ -1081,6 +1306,7 @@ applyTypes = [
 --  NOTE: other places to change if you change stackApplyTypes:
 --       - rts/include/rts/storage/FunTypes.h
 --       - GHC.StgToCmm.Layout: stdPattern
+stackApplyTypes :: [[ArgRep]]
 stackApplyTypes = [
         [],
         [N],
@@ -1110,11 +1336,12 @@ stackApplyTypes = [
         [P,P,P,P,P,P,P,P]
    ]
 
+genStackFns :: TargetInfo -> [ArgRep] -> Doc
 genStackFns targetInfo args
   =  genStackApply targetInfo args
   $$ genStackSave targetInfo args
 
-
+genStackApplyArray :: [[ArgRep]] -> Doc
 genStackApplyArray types =
   vcat [
     text "section \"relrodata\" {",
@@ -1126,6 +1353,7 @@ genStackApplyArray types =
  where
   arr_ent ty = text "W_" <+> mkStackApplyEntryLabel ty <> semi
 
+genStackSaveArray :: [[ArgRep]] -> Doc
 genStackSaveArray types =
   vcat [
     text "section \"relrodata\" {",

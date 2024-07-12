@@ -382,9 +382,9 @@ import qualified Data.ByteString.Char8 as BS8
         'bits16'        { L _ (CmmT_bits16) }
         'bits32'        { L _ (CmmT_bits32) }
         'bits64'        { L _ (CmmT_bits64) }
-        'bits128'       { L _ (CmmT_bits128) }
-        'bits256'       { L _ (CmmT_bits256) }
-        'bits512'       { L _ (CmmT_bits512) }
+        'vec128'        { L _ (CmmT_vec128) }
+        'vec256'        { L _ (CmmT_vec256) }
+        'vec512'        { L _ (CmmT_vec512) }
         'float32'       { L _ (CmmT_float32) }
         'float64'       { L _ (CmmT_float64) }
         'gcptr'         { L _ (CmmT_gcptr) }
@@ -945,9 +945,9 @@ typenot8 :: { CmmType }
         : 'bits16'              { b16 }
         | 'bits32'              { b32 }
         | 'bits64'              { b64 }
-        | 'bits128'             { b128 }
-        | 'bits256'             { b256 }
-        | 'bits512'             { b512 }
+        | 'vec128'              { cmmVec 2 f64 }
+        | 'vec256'              { cmmVec 4 f64 }
+        | 'vec512'              { cmmVec 8 f64 }
         | 'float32'             { f32 }
         | 'float64'             { f64 }
         | 'gcptr'               {% do platform <- PD.getPlatform; return $ gcWord platform }

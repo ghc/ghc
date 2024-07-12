@@ -351,6 +351,9 @@ library
                    Updates.cmm
                    -- AutoApply is generated
                    AutoApply.cmm
+                   AutoApply_V16.cmm
+                   AutoApply_V32.cmm
+                   AutoApply_V64.cmm
 
       -- Adjustor stuff
       if flag(libffi-adjustors)

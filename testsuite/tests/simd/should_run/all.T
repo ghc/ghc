@@ -43,3 +43,12 @@ test('simd010', [], compile_and_run, [''])
 
 test('T22187', [],compile,[''])
 test('T22187_run', [],compile_and_run,[''])
+test('T25062_V16', [], compile_and_run, [''])
+test('T25062_V32', [ unless(have_cpu_feature('avx2'), skip)
+                   , only_ways(llvm_ways) # SIMD NCG TODO: support 256 bit wide vectors
+                   ]
+                 , compile_and_run, [''])
+test('T25062_V64', [ unless(have_cpu_feature('avx512f'), skip)
+                   , only_ways(llvm_ways) # SIMD NCG TODO: support 512 bit wide vectors
+                   ]
+                 , compile_and_run, [''])

@@ -309,6 +309,7 @@ rtsPackageArgs = package rts ? do
     libzstdIncludeDir <- getSetting LibZstdIncludeDir
     libzstdLibraryDir <- getSetting LibZstdLibDir
 
+    x86 <- queryTarget (\ tgt -> archOS_arch (tgtArchOs tgt) `elem` [ ArchX86, ArchX86_64 ])
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
@@ -319,6 +320,13 @@ rtsPackageArgs = package rts ? do
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
           , notM targetSupportsSMP           ? arg "-optc-DNOSMP"
+
+            -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
+            --
+            -- In particular, we **do not** pass -mavx when compiling
+            -- AutoApply_V16.cmm, as that would lock out targets with SSE2 but not AVX.
+          , inputs ["**/AutoApply_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
+          , inputs ["**/AutoApply_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
           ]
 
     let cArgs = mconcat
@@ -372,7 +380,7 @@ rtsPackageArgs = package rts ? do
             , "-DRtsWay=\"rts_" ++ show way ++ "\""
             ]
 
-          -- We're after pur performance here. So make sure fast math and
+          -- We're after pure performance here. So make sure fast math and
           -- vectorization is enabled.
           , input "**/Hash.c" ? pure [ "-O3" ]
 
@@ -387,7 +395,14 @@ rtsPackageArgs = package rts ? do
           , speedHack ?
             inputs [ "**/Updates.c", "**/StgMiscClosures.c"
                    , "**/PrimOps.c", "**/Apply.c"
-                   , "**/AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
+                   , "**/AutoApply.c"
+                   , "**/AutoApply_V16.c"
+                   , "**/AutoApply_V32.c"
+                   , "**/AutoApply_V64.c" ] ? pure ["-fno-PIC", "-static"]
+
+            -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
+          , inputs ["**/AutoApply_V32.c"] ? pure [ "-mavx2"    | x86 ]
+          , inputs ["**/AutoApply_V64.c"] ? pure [ "-mavx512f" | x86 ]
 
           -- inlining warnings happen in Compact
           , inputs ["**/Compact.c"] ? arg "-Wno-inline"
