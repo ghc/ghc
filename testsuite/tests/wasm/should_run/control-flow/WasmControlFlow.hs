@@ -9,14 +9,14 @@ import System.Exit
 import GHC hiding (Stmt, Match)
 import GHC.Cmm hiding (succ)
 import GHC.Cmm.ContFlowOpt
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dominators
 import GHC.Cmm.Reducibility
 import GHC.Cmm.Switch.Implement
 import GHC.Driver.Session
 import GHC.Platform
-import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Wasm.ControlFlow
 import GHC.Wasm.ControlFlow.FromCmm
 
@@ -96,7 +96,7 @@ splittingTest platform (path, groups) = do
 
 testNodeSplitting :: CmmGraph -> IO (Maybe Outcome)
 testNodeSplitting original_graph = do
-  reducible_graph <- fmap gwd_graph $ runUniqSM $
+  reducible_graph <- fmap gwd_graph $ runUniqDSM $
                      asReducible $ graphWithDominators original_graph
   return $ case reducibility (graphWithDominators original_graph) of
     Reducible -> Nothing
@@ -132,11 +132,11 @@ translationTest platform (path, groups) = do
 
 testTranslation :: Platform -> CmmGraph -> IO Outcome
 testTranslation platform big_switch_graph = do
-  real_graph <- runUniqSM $ cmmImplementSwitchPlans platform big_switch_graph
-  reducible_graph <- fmap gwd_graph $ runUniqSM $
+  real_graph <- runUniqDSM $ cmmImplementSwitchPlans platform big_switch_graph
+  reducible_graph <- fmap gwd_graph $ runUniqDSM $
                      asReducible $ graphWithDominators real_graph
-  us <- mkSplitUniqSupply 'w'
-  wasm <- structuredControl platform us ((pure .) . expr) ((pure .) . stmt) reducible_graph
+  let us = initDUniqSupply 'w' 0
+  let (wasm, _) = runUniqueDSM us $ structuredControl platform ((pure .) . expr) ((pure .) . stmt) reducible_graph
   return $ compareWithEntropy (runcfg real_graph) (runwasm wasm) $
            cfgEntropy reducible_graph
 
@@ -238,10 +238,10 @@ runcfg = evalGraph stmt expr
 runwasm :: WasmControl Stmt Expr pre post -> BitConsumer Stmt Expr ()
 runwasm = evalWasm
 
-runUniqSM :: UniqSM a -> IO a
-runUniqSM m = do
-  us <- mkSplitUniqSupply 'g'
-  return (initUs_ us m)
+runUniqDSM :: UniqDSM a -> IO a
+runUniqDSM m = do
+  let us = initDUniqSupply 'g' 0
+  return (fst $ runUniqueDSM us m)
 
 ----------------------------------------------------------------
 

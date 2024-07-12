@@ -120,7 +120,7 @@ slurpCmm hsc_env filename = runHsc hsc_env $ do
                                        $ parseCmmFile cmmpConfig cmm_mod home_unit filename
                   let msgs = warns `unionMessages` errs
                   return (GhcPsMessage <$> msgs, cmm)
-    return cmm
+    return (removeDeterm cmm)
 
 collectAll :: Monad m => Stream m a b -> m ([a], b)
 collectAll = gobble . runStream

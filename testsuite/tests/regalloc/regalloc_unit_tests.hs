@@ -45,6 +45,7 @@ import GHC.Driver.Monad
 import GHC.Driver.Config.Diagnostic
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSM
 import GHC.Driver.Session
 import GHC.Driver.Errors
 import GHC.Utils.Error
@@ -136,7 +137,9 @@ compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
     -- parse the cmm file and output any warnings or errors
     let fake_mod = mkHomeModule home_unit (mkModuleName "fake")
         cmmpConfig = initCmmParserConfig dflags
-    (warnings, errors, parsedCmm) <- parseCmmFile cmmpConfig fake_mod home_unit cmmFile
+    (warnings, errors, dparsedCmm) <- parseCmmFile cmmpConfig fake_mod home_unit cmmFile
+
+    let parsedCmm = removeDeterm (fst (fromJust dparsedCmm))
 
     -- print parser errors or warnings
     let !diag_opts = initDiagOpts dflags
@@ -144,7 +147,8 @@ compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
     mapM_ (printMessages logger print_config diag_opts) [warnings, errors]
 
     let initTopSRT = emptySRT thisMod
-    cmmGroup <- fmap snd $ cmmPipeline logger cmm_config initTopSRT $ fst $ fromJust parsedCmm
+        dus = initDUniqSupply 'u' 0
+    (dusb, cmmGroup) <- fmap (\(_, dusb , cmm) -> (dusb, cmm)) $ cmmPipeline logger cmm_config initTopSRT dus $ parsedCmm
 
     let profile = targetProfile dflags
     rawCmms <- cmmToRawCmm logger profile (Stream.yield cmmGroup)
@@ -154,7 +158,7 @@ compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
     -- compile and discard the generated code, returning regalloc stats
     mapM (\ (count, thisCmm) ->
         cmmNativeGen logger ncgImpl
-            usb dwarfFileIds dbgMap thisCmm count >>=
+            dusb dwarfFileIds dbgMap thisCmm count >>=
                 (\(_, _, _, _, colorStats, linearStats, _, _) ->
                 -- scrub unneeded output from cmmNativeGen
                 return (colorStats, linearStats)))

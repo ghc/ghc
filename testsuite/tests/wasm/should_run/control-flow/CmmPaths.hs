@@ -19,7 +19,7 @@ import Prelude hiding (succ)
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Cmm.Switch
 
 import GHC.Utils.Panic

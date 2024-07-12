@@ -62,6 +62,9 @@ Functional Graph Library (Hackage package `fgl`, modules
 class (Monad m) => MonadUniqDSM m where
   liftUniqDSM :: UniqDSM a -> m a
 
+instance MonadUniqDSM UniqDSM where
+  liftUniqDSM = id
+
 class (MonadUniqDSM m, Graph gr, Supernode s m) => VizCollapseMonad m gr s where
   consumeByInGraph :: Node -> Node -> gr s () -> m ()
   splitGraphAt :: gr s () -> LNode s -> m ()
