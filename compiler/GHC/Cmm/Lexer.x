@@ -104,11 +104,14 @@ $white_no_nl+           ;
   "False"               { kw CmmT_False }
   "likely"              { kw CmmT_likely}
 
-  P@decimal             { global_regN VanillaReg      gcWord }
-  R@decimal             { global_regN VanillaReg       bWord }
-  F@decimal             { global_regN FloatReg  (const $ cmmFloat W32) }
-  D@decimal             { global_regN DoubleReg (const $ cmmFloat W64) }
-  L@decimal             { global_regN LongReg   (const $ cmmBits  W64) }
+  P@decimal             { global_regN 1 VanillaReg      gcWord }
+  R@decimal             { global_regN 1 VanillaReg       bWord }
+  F@decimal             { global_regN 1 FloatReg  (const $ cmmFloat W32) }
+  D@decimal             { global_regN 1 DoubleReg (const $ cmmFloat W64) }
+  L@decimal             { global_regN 1 LongReg   (const $ cmmBits  W64) }
+  XMM@decimal           { global_regN 3 XmmReg    (const $ cmmVec 2 (cmmFloat W64)) }
+  YMM@decimal           { global_regN 3 YmmReg    (const $ cmmVec 4 (cmmFloat W64)) }
+  ZMM@decimal           { global_regN 3 ZmmReg    (const $ cmmVec 8 (cmmFloat W64)) }
   Sp                    { global_reg  Sp               bWord }
   SpLim                 { global_reg  SpLim            bWord }
   Hp                    { global_reg  Hp              gcWord }
@@ -173,9 +176,9 @@ data CmmToken
   | CmmT_bits16
   | CmmT_bits32
   | CmmT_bits64
-  | CmmT_bits128
-  | CmmT_bits256
-  | CmmT_bits512
+  | CmmT_vec128
+  | CmmT_vec256
+  | CmmT_vec512
   | CmmT_float32
   | CmmT_float64
   | CmmT_gcptr
@@ -211,14 +214,16 @@ special_char span buf _len = return (L span (CmmT_SpecChar (currentChar buf)))
 kw :: CmmToken -> Action
 kw tok span _buf _len = return (L span tok)
 
-global_regN :: (Int -> GlobalReg) -> (Platform -> CmmType) -> Action
-global_regN con ty_fn span buf len
+global_regN :: Int -> (Int -> GlobalReg) -> (Platform -> CmmType) -> Action
+global_regN ident_nb_chars con ty_fn span buf len
   = do { platform <- getPlatform
        ; let reg = con (fromIntegral n)
              ty = ty_fn platform
        ; return (L span (CmmT_GlobalReg (GlobalRegUse reg ty))) }
-  where buf' = stepOn buf
-        n = parseUnsignedInteger buf' (len-1) 10 octDecDigit
+  where buf' = go ident_nb_chars buf
+          where go 0 b = b
+                go i b = go (i-1) (stepOn b)
+        n = parseUnsignedInteger buf' (len-ident_nb_chars) 10 octDecDigit
 
 global_reg :: GlobalReg -> (Platform -> CmmType) -> Action
 global_reg reg ty_fn span _buf _len
@@ -269,9 +274,9 @@ reservedWordsFM = listToUFM $
         ( "bits16",             CmmT_bits16 ),
         ( "bits32",             CmmT_bits32 ),
         ( "bits64",             CmmT_bits64 ),
-        ( "bits128",            CmmT_bits128 ),
-        ( "bits256",            CmmT_bits256 ),
-        ( "bits512",            CmmT_bits512 ),
+        ( "vec128",             CmmT_vec128 ),
+        ( "vec256",             CmmT_vec256 ),
+        ( "vec512",             CmmT_vec512 ),
         ( "float32",            CmmT_float32 ),
         ( "float64",            CmmT_float64 ),
 -- New forms
@@ -279,9 +284,6 @@ reservedWordsFM = listToUFM $
         ( "b16",                CmmT_bits16 ),
         ( "b32",                CmmT_bits32 ),
         ( "b64",                CmmT_bits64 ),
-        ( "b128",               CmmT_bits128 ),
-        ( "b256",               CmmT_bits256 ),
-        ( "b512",               CmmT_bits512 ),
         ( "f32",                CmmT_float32 ),
         ( "f64",                CmmT_float64 ),
         ( "gcptr",              CmmT_gcptr ),

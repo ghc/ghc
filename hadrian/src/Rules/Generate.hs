@@ -39,7 +39,13 @@ primopsTxt :: Stage -> FilePath
 primopsTxt stage = buildDir (vanillaContext stage compiler) -/- "primops.txt"
 
 isGeneratedCmmFile :: FilePath -> Bool
-isGeneratedCmmFile file = takeBaseName file == "AutoApply"
+isGeneratedCmmFile file =
+  takeBaseName file `elem`
+    [ "AutoApply"
+    , "AutoApply_V16"
+    , "AutoApply_V32"
+    , "AutoApply_V64"
+    ]
 
 ghcPrimDependencies :: Expr [FilePath]
 ghcPrimDependencies = do
@@ -156,7 +162,22 @@ generatePackageCode context@(Context stage pkg _ _) = do
             path <- buildPath context
             let h = path -/- "include/DerivedConstants.h"
             need [h]
-            build $ target context GenApply [h] [file]
+            build $ target context (GenApply Nothing) [h] [file]
+        root -/- "**" -/- dir -/- "cmm/AutoApply_V16.cmm" %> \file -> do
+            path <- buildPath context
+            let h = path -/- "include/DerivedConstants.h"
+            need [h]
+            build $ target context (GenApply (Just 16)) [h] [file]
+        root -/- "**" -/- dir -/- "cmm/AutoApply_V32.cmm" %> \file -> do
+            path <- buildPath context
+            let h = path -/- "include/DerivedConstants.h"
+            need [h]
+            build $ target context (GenApply (Just 32)) [h] [file]
+        root -/- "**" -/- dir -/- "cmm/AutoApply_V64.cmm" %> \file -> do
+            path <- buildPath context
+            let h = path -/- "include/DerivedConstants.h"
+            need [h]
+            build $ target context (GenApply (Just 64)) [h] [file]
         root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> \_ ->
             need . pure =<< pkgSetupConfigFile context
         root -/- "**" -/- dir -/- "include/ghcplatform.h" %> \_ ->

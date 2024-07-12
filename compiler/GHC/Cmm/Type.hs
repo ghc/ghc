@@ -4,7 +4,7 @@ module GHC.Cmm.Type
     , cInt
     , cmmBits, cmmFloat
     , typeWidth, setCmmTypeWidth
-    , cmmEqType, cmmEqType_ignoring_ptrhood
+    , cmmEqType, cmmCompatType
     , isFloatType, isGcPtrType, isBitsType
     , isWordAny, isWord32, isWord64
     , isFloat64, isFloat32
@@ -87,21 +87,27 @@ instance Outputable CmmCat where
 cmmEqType :: CmmType -> CmmType -> Bool -- Exact equality
 cmmEqType (CmmType c1 w1) (CmmType c2 w2) = c1==c2 && w1==w2
 
-cmmEqType_ignoring_ptrhood :: CmmType -> CmmType -> Bool
-  -- This equality is temporary; used in CmmLint
-  -- but the RTS files are not yet well-typed wrt pointers
-cmmEqType_ignoring_ptrhood (CmmType c1 w1) (CmmType c2 w2)
-   = c1 `weak_eq` c2 && w1==w2
+-- | A weaker notion of equality of 'CmmType's than 'cmmEqType',
+-- used (only) in Cmm Lint.
+--
+-- Why "weaker"? Because:
+--
+--  - we don't distinguish GcPtr vs NonGcPtr, because the the RTS files
+--    are not yet well-typed wrt pointers,
+--  - for vectors, we only compare the widths, because in practice things like
+--    X86 xmm registers support different types of data (e.g. 4xf32, 2xf64, 2xu64 etc).
+cmmCompatType :: CmmType -> CmmType -> Bool
+cmmCompatType (CmmType c1 w1) (CmmType c2 w2)
+   = c1 `weak_eq` c2 && w1 == w2
    where
      weak_eq :: CmmCat -> CmmCat -> Bool
-     FloatCat         `weak_eq` FloatCat         = True
-     FloatCat         `weak_eq` _other           = False
-     _other           `weak_eq` FloatCat         = False
-     (VecCat l1 cat1) `weak_eq` (VecCat l2 cat2) = l1 == l2
-                                                   && cat1 `weak_eq` cat2
-     (VecCat {})      `weak_eq` _other           = False
-     _other           `weak_eq` (VecCat {})      = False
-     _word1           `weak_eq` _word2           = True        -- Ignores GcPtr
+     FloatCat    `weak_eq` FloatCat    = True
+     FloatCat    `weak_eq` _other      = False
+     _other      `weak_eq` FloatCat    = False
+     (VecCat {}) `weak_eq` (VecCat {}) = True  -- only compare overall width
+     (VecCat {}) `weak_eq` _other      = False
+     _other      `weak_eq` (VecCat {}) = False
+     _word1      `weak_eq` _word2      = True  -- Ignores GcPtr
 
 --- Simple operations on CmmType -----
 typeWidth :: CmmType -> Width

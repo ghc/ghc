@@ -101,9 +101,9 @@
 #define F_   float32
 #define D_   float64
 #define L_   bits64
-#define V16_ bits128
-#define V32_ bits256
-#define V64_ bits512
+#define V16_ vec128
+#define V32_ vec256
+#define V64_ vec512
 
 #define SIZEOF_StgDouble 8
 #define SIZEOF_StgWord64 8

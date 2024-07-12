@@ -171,7 +171,7 @@ lintCmmMiddle node = case node of
   CmmAssign reg expr -> do
             erep <- lintCmmExpr expr
             let reg_ty = cmmRegType reg
-            unless (erep `cmmEqType_ignoring_ptrhood` reg_ty) $
+            unless (erep `cmmCompatType` reg_ty) $
               cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
 
   CmmStore l r _alignment -> do

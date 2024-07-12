@@ -6,6 +6,12 @@ import Builder
 import Settings.Builders.Common
 
 genapplyBuilderArgs :: Args
-genapplyBuilderArgs = builder GenApply ? do
-    h <- getInput
-    arg h
+genapplyBuilderArgs = mconcat
+  [ builder (GenApply Nothing) ? ( arg =<< getInput )
+  , mconcat
+    [ builder (GenApply (Just sz)) ? mconcat
+       [ arg =<< getInput
+       , arg ("-V" ++ show sz) ]
+    | sz <- [16, 32, 64]
+    ]
+   ]
