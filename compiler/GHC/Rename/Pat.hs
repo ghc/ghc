@@ -75,7 +75,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
-import GHC.Types.GREInfo   ( ConInfo(..), conInfoFields )
+import GHC.Types.GREInfo   ( ConInfo(..), conInfoFields, ConFieldInfo (..) )
 import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import GHC.Core.TyCon      ( isKindName )
@@ -896,7 +896,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; conInfo <- lookupConstructorInfo con
-           ; when (conInfo == ConHasPositionalArgs) (addErr (TcRnIllegalWildcardsInConstructor con))
+           ; when (conFieldInfo conInfo == ConHasPositionalArgs) (addErr (TcRnIllegalWildcardsInConstructor con))
            ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldLbls flds)
 
                    -- For constructor uses (but not patterns)

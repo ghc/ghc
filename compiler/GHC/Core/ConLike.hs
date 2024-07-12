@@ -34,6 +34,7 @@ import GHC.Core.DataCon
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep (Type, ThetaType)
+import GHC.Core.TyCon (tyConDataCons)
 import GHC.Core.Type(mkTyConApp)
 import GHC.Types.Unique
 import GHC.Types.Name
@@ -126,7 +127,14 @@ conLikeFieldLabels (PatSynCon pat_syn)    = patSynFieldLabels pat_syn
 -- | The 'ConInfo' (arity and field labels) associated to a 'ConLike'.
 conLikeConInfo :: ConLike -> ConInfo
 conLikeConInfo con =
-  mkConInfo (conLikeArity con) (conLikeFieldLabels con)
+  mkConInfo (conLikeConLikeInfo con) (conLikeArity con) (conLikeFieldLabels con)
+
+-- | Compute a 'ConLikeInfo' from a 'ConLike'.
+conLikeConLikeInfo :: ConLike -> ConLikeInfo
+conLikeConLikeInfo (RealDataCon con)
+  = ConIsData { conLikeDataCons = getName <$> tyConDataCons (dataConTyCon con) }
+conLikeConLikeInfo (PatSynCon {})
+  = ConIsPatSyn
 
 -- | Returns just the instantiated /value/ argument types of a 'ConLike',
 -- (excluding dictionary args)

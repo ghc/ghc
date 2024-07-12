@@ -24,7 +24,6 @@ import GHC.Prelude
 import GHC.Rename.Utils ( wrapGenSpan, genHsExpApps, genHsApp, genHsLet,
                           genHsLamDoExp, genHsCaseAltDoExp, genWildPat )
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
 
 import GHC.Hs
@@ -193,17 +192,19 @@ expand_do_stmts do_or_lc
 
 expand_do_stmts _ stmts = pprPanic "expand_do_stmts: impossible happened" $ (ppr stmts)
 
--- checks the pattern `pat`for irrefutability which decides if we need to wrap it with a fail block
+-- checks the pattern `pat` for irrefutability which decides if we need to wrap it with a fail block
 mk_failable_expr :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (LHsExpr GhcRn)
 mk_failable_expr doFlav pat@(L loc _) expr fail_op =
   do { is_strict <- xoptM LangExt.Strict
-     ; irrf_pat <- isIrrefutableHsPatRnTcM is_strict pat
+     ; rdrEnv <- getGlobalRdrEnv
+     ; comps <- getCompleteMatchesTcM
+     ; let irrf_pat = isIrrefutableHsPat is_strict (irrefutableConLikeRn rdrEnv comps) pat
      ; traceTc "mk_failable_expr" (vcat [ text "pat:" <+> ppr pat
                                         , text "isIrrefutable:" <+> ppr irrf_pat
                                         ])
 
-     ; if irrf_pat                        -- don't wrap with fail block if
-                                          -- the pattern is irrefutable
+     ; if irrf_pat -- don't wrap with fail block if
+                   -- the pattern is irrefutable
        then return $ genHsLamDoExp doFlav [pat] expr
        else L loc <$> mk_fail_block doFlav pat expr fail_op
      }
@@ -362,7 +363,7 @@ The `fail`-block wrapping is done by `GHC.Tc.Gen.Do.mk_failable_expr`.
   and irrefutable patterns shouldn't need a fail alternative.
 
 * _Wrinkel 1_: Note that pattern synonyms count as refutable during type checking,
-  (see `GHC.Tc.Gen.Pat.isIrrefutableHsPatRnTcM`). They will hence generate a
+  (see `isIrrefutableHsPat`). They will hence generate a
   `MonadFail` constraint and they will always be wrapped in a `fail`able-block.
 
   Consider a patten synonym declaration (testcase T24552):

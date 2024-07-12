@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -45,7 +46,9 @@ module GHC.Hs.Pat (
         looksLazyPatBind,
         isBangedLPat,
         gParPat, patNeedsParens, parenthesizePat,
-        isIrrefutableHsPatHelper, isIrrefutableHsPatHelperM, isBoringHsPat,
+        isIrrefutableHsPat, irrefutableConLikeRn, irrefutableConLikeTc,
+
+        isBoringHsPat,
 
         collectEvVarsPat, collectEvVarsPats,
 
@@ -73,22 +76,23 @@ import GHC.Types.SourceText
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Builtin.Types
+import GHC.Types.CompleteMatch
+import GHC.Types.TyThing (tyThingGREInfo)
+import GHC.Types.Unique.DSet
 import GHC.Types.Var
-import GHC.Types.Name.Reader ( RdrName )
+import GHC.Types.Name.Reader
+import GHC.Types.GREInfo
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
-import GHC.Utils.Monad
 import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
-import GHC.Data.Maybe
-import GHC.Types.Name (Name, dataName)
+import GHC.Types.Name
 import Data.Data
-import qualified Data.List.NonEmpty as NE
 
-import Data.Functor.Identity
+import qualified Data.List.NonEmpty as NE
 
 type instance XWildPat GhcPs = NoExtField
 type instance XWildPat GhcRn = NoExtField
@@ -619,97 +623,67 @@ encounters a LazyPat and -XStrict is enabled.
 See also Note [decideBangHood] in GHC.HsToCore.Utils.
 -}
 
-type ConLikePIrrefutableCheck m p
-  = Bool                       -- ^ Are we in a @-XStrict@ context?
-                               -- See Note [-XStrict and irrefutability]
-    -> XRec p (ConLikeP p)     -- ^ ConLikeThing
-    -> HsConPatDetails p       -- ^ ConPattern details
-    -> m Bool                  -- ^ is it Irrefutable?
-
-type LPatIrrefutableCheck m p
-  = Bool                              -- ^ Are we in a @-XStrict@ context?
-                                      -- See Note [-XStrict and irrefutability]
-    -> ConLikePIrrefutableCheck m p   -- How should I check ConLikeP things
-    -> LPat p                         -- The LPat thing
-    -> m Bool                         -- Is it irrefutable?
-
--- | (isIrrefutableHsPat p) is true if matching against p cannot fail
+-- | @isIrrefutableHsPat p@ is true if matching against @p@ cannot fail
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
 --      in 3.17.2 of the Haskell 98 report.)
 --
--- WARNING: isIrrefutableHsPat returns False if it's in doubt.
--- Specifically on a ConPatIn, which is what it sees for a
--- (LPat Name) in the renamer, it doesn't know the size of the
--- constructor family, so it returns False.  Result: only
--- tuple patterns are considered irrefutable at the renamer stage.
+-- If isIrrefutableHsPat returns 'True', the pattern is definitely irrefutable.
 --
--- But if it returns True, the pattern is definitely irrefutable
--- Instantiates `isIrrefutableHsPatHelperM` with a trivial identity monad
-isIrrefutableHsPatHelper :: forall p. (OutputableBndrId p)
-                         => Bool -- ^ Are we in a @-XStrict@ context?
-                                 -- See Note [-XStrict and irrefutability]
-                         -> LPat (GhcPass p) -> Bool
-isIrrefutableHsPatHelper is_strict pat = runIdentity $ doWork is_strict pat
+-- However, isIrrefutableHsPat returns 'False' if it's in doubt. It's a
+-- best effort guess with the information we have available:
+--
+--  - we sometimes call 'isIrrefutableHsPat' from the renamer, in which case
+--    we don't have type information to hand. This means we can't properly
+--    handle GADTs, nor the result TyCon of COMPLETE pragmas.
+--  - even when calling 'isIrrefutableHsPat' in the typechecker, we don't keep
+--    track of any long distance information like the pattern-match checker does.
+isIrrefutableHsPat
+  :: forall p
+  .  IsPass p
+  => Bool                           -- ^ Are we in a @-XStrict@ context?
+                                    -- See Note [-XStrict and irrefutability]
+  -> (ConLikeP (GhcPass p) -> Bool) -- ^ How to check whether the 'ConLike' in a
+                                    -- 'ConPat' pattern is irrefutable
+  -> LPat (GhcPass p)               -- ^ The (located) pattern to check
+  -> Bool                           -- Is it irrefutable?
+isIrrefutableHsPat is_strict irref_conLike pat = go (unLoc pat)
   where
-  doWork :: forall p. (OutputableBndrId p) => Bool -> LPat (GhcPass p) -> Identity Bool
-  doWork is_strict = isIrrefutableHsPatHelperM is_strict isConLikeIrr
+    goL (L _ p) = go p
 
-  isConLikeIrr :: forall p. (OutputableBndrId p) => ConLikePIrrefutableCheck Identity (GhcPass p)
-  isConLikeIrr is_strict con details
-    = case ghcPass @p of
-        GhcPs -> return False                   -- Conservative
-        GhcRn -> return False                   -- Conservative
-        GhcTc -> case con of
-          L _ (PatSynCon _pat)  -> return False -- Conservative
-          L _ (RealDataCon con) ->
-            do let b = isJust (tyConSingleDataCon_maybe (dataConTyCon con))
-               bs <- mapM (doWork is_strict) (hsConPatArgs details)
-               return $ b && and bs
-
-
--- This function abstracts 2 things
--- 1. How to compute irrefutability for a `ConLikeP` thing
--- 2. The wrapper monad
-isIrrefutableHsPatHelperM :: forall m p. (Monad m, OutputableBndrId p)
-                          => LPatIrrefutableCheck m (GhcPass p)
-isIrrefutableHsPatHelperM is_strict isConLikeIrr pat = go (unLoc pat)
-  where
-    goL = isIrrefutableHsPatHelperM is_strict isConLikeIrr
-
-    go :: Pat (GhcPass p) -> m Bool
-    go (WildPat {})        = return True
-    go (VarPat {})         = return True
+    go :: Pat (GhcPass p) -> Bool
+    go (WildPat {})        = True
+    go (VarPat {})         = True
     go (LazyPat _ p')
       | is_strict
-      = isIrrefutableHsPatHelperM False isConLikeIrr p'
-      | otherwise          = return True
+      = isIrrefutableHsPat False irref_conLike p'
+      | otherwise          = True
     go (BangPat _ pat)     = goL pat
     go (ParPat _ pat)      = goL pat
     go (AsPat _ _ pat)     = goL pat
     go (ViewPat _ _ pat)   = goL pat
     go (SigPat _ pat _)    = goL pat
-    go (TuplePat _ pats _) = allM goL pats
-    go (OrPat _ pats)      = anyM goL pats
-    go (SumPat {})         = return False
-                    -- See Note [Unboxed sum patterns aren't irrefutable]
-    go (ListPat {})        = return False
+    go (TuplePat _ pats _) = all goL pats
+    go (OrPat _ pats)      = any goL pats -- This is simplistic; see Note [Irrefutable or-patterns]
+    go (SumPat {})         = False -- See Note [Unboxed sum patterns aren't irrefutable]
+    go (ListPat {})        = False
 
-    go (ConPat
-        { pat_con  = con
-        , pat_args = details }) = isConLikeIrr is_strict con details
-    go (LitPat {})         = return False
-    go (NPat {})           = return False
-    go (NPlusKPat {})      = return False
+    -- See Note [Irrefutability of ConPat]
+    go (ConPat { pat_con = L _ con, pat_args = details })
+                           =  irref_conLike con
+                           && all goL (hsConPatArgs details)
+    go (LitPat {})         = False
+    go (NPat {})           = False
+    go (NPlusKPat {})      = False
 
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
-    go (SplicePat {})      = return False
+    go (SplicePat {})      = False
 
     -- The behavior of this case is unimportant, as GHC will throw an error shortly
     -- after reaching this case for other reasons (see TcRnIllegalTypePattern).
-    go (EmbTyPat {})       = return True
-    go (InvisPat {})       = return True
+    go (EmbTyPat {})       = True
+    go (InvisPat {})       = True
 
     go (XPat ext)          = case ghcPass @p of
       GhcRn -> case ext of
@@ -717,6 +691,64 @@ isIrrefutableHsPatHelperM is_strict isConLikeIrr pat = go (unLoc pat)
       GhcTc -> case ext of
         CoPat _ pat _ -> go pat
         ExpansionPat _ pat -> go pat
+
+-- | Check irrefutability of a 'ConLike' in a 'ConPat GhcRn'
+-- (the 'Irref-ConLike' condition of Note [Irrefutability of ConPat]).
+irrefutableConLikeRn :: GlobalRdrEnv
+                     -> CompleteMatches -- ^ in-scope COMPLETE pragmas
+                     -> Name -- ^ the 'Name' of the 'ConLike'
+                     -> Bool
+irrefutableConLikeRn rdr_env comps con_nm =
+  case mbInfo of
+    Just (IAmConLike conInfo) ->
+      case conLikeInfo conInfo of
+        ConIsData { conLikeDataCons = tc_cons } ->
+          length tc_cons == 1
+        ConIsPatSyn ->
+          in_single_complete_match con_nm comps
+    _ -> False
+  where
+    -- Sorry: it's horrible to manually call 'wiredInNameTyThing_maybe' here,
+    -- but import cycles make calling the right function, namely 'lookupGREInfo',
+    -- quite difficult from within this module.
+    mbInfo = case tyThingGREInfo <$> wiredInNameTyThing_maybe con_nm of
+                 Nothing -> greInfo <$> lookupGRE_Name rdr_env con_nm
+                 Just nfo -> Just nfo
+
+-- | Check irrefutability of the 'ConLike' in a 'ConPat GhcTc'
+-- (the 'Irref-ConLike' condition of Note [Irrefutability of ConPat]),
+-- given all in-scope COMPLETE pragmas ('CompleteMatches' in the typechecker,
+-- 'DsCompleteMatches' in the desugarer).
+irrefutableConLikeTc :: NamedThing con
+                     => [CompleteMatchX con]
+                         -- ^ in-scope COMPLETE pragmas
+                     -> ConLike
+                     -> Bool
+irrefutableConLikeTc comps con =
+  case con of
+    RealDataCon dc -> length (tyConDataCons (dataConTyCon dc)) == 1
+    PatSynCon {}   -> in_single_complete_match con_nm comps
+  where
+    con_nm = conLikeName con
+
+-- | Internal helper function: check whether a 'ConLike' is the single member
+-- of a COMPLETE set without a result 'TyCon'.
+--
+-- Why 'without a result TyCon'? See Wrinkle [Irrefutability and COMPLETE pragma result TyCons]
+-- in Note [Irrefutability of ConPat].
+in_single_complete_match :: NamedThing con => Name -> [CompleteMatchX con] -> Bool
+in_single_complete_match con_nm = go
+  where
+    go [] = False
+    go (comp:comps)
+      | Nothing <- cmResultTyCon comp
+        -- conservative, as we don't have enough info to compute
+        -- 'completeMatchAppliesAtType'
+      , let comp_nms = mapUniqDSet getName $ cmConLikes comp
+      , comp_nms == mkUniqDSet [con_nm]
+      = True
+      | otherwise
+      = go comps
 
 -- | Is the pattern any of combination of:
 --
@@ -791,8 +823,93 @@ isPatSyn :: LPat GhcTc -> Bool
 isPatSyn (L _ (ConPat {pat_con = L _ (PatSynCon{})})) = True
 isPatSyn _ = False
 
-{- Note [Unboxed sum patterns aren't irrefutable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Irrefutability of ConPat]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A constructor pattern `ConPat { pat_con, pat_args }` is irrefutable under two
+conditions:
+
+  Irref-ConLike: the constructor, pat_con, is itself irrefutable.
+  Irref-args   : all of the argument patterns, pat_args, are irrefutable.
+
+The (Irref-ConLike) condition can be stated as follows:
+
+  Irref-DataCon: a DataCon is irrefutable iff it is the only constructor of its
+                 parent type constructor.
+  Irref-PatSyn:  a PatSyn is irrefutable iff there is a COMPLETE pragma
+                 containing this PatSyn as its sole member.
+
+To understand this, let's consider some simple examples:
+
+  data A = MkA Int Bool
+  data BC = B Int | C
+
+  pattern P :: Maybe Int -> BC
+  pattern P mb_i <- ( ( \ case { B i -> Just i; C -> Nothing } ) -> mb_i )
+  {-# COMPLETE P #-}
+
+In this case:
+
+  - the pattern 'A p1 p2' (for patterns 'p1 :: Int', 'p2 :: Bool') is irrefutable
+    precisely when both 'p1' and 'p2' are irrefutable (this is the same as
+    irrefutability of tuple patterns);
+  - neither of the patterns 'B p' (for any pattern 'p :: Int') or 'C' are irrefutable,
+    because the parent type constructor 'BC' contains more than one data constructor,
+  - the pattern 'P q', for a pattern 'q :: Maybe Int', is irrefutable precisely
+    when 'q' is irrefutable, due to the COMPLETE pragma on 'P'.
+
+Wrinkle [Irrefutability and COMPLETE pragma result TyCons]
+
+  There is one subtlety in the Irref-PatSyn condition: COMPLETE pragmas may
+  optionally specify a result TyCon, as explained in Note [Implementation of COMPLETE pragmas]
+  in GHC.HsToCore.Pmc.Solver.
+
+  So, for a COMPLETE pragma with a result TyCon, we would need to compute
+  'completeMatchAppliesAtType' to ensure that the COMPLETE pragma is indeed
+  applicable. Doing so is not so straightforward in 'isIrrefutableHsPat', for
+  a couple of reasons:
+
+    1. 'isIrrefutableHsPat' is called from within the renamer, which means
+       we don't have the appropriate 'Type' to hand,
+    2. Even when 'isIrrefutableHsPat' is called from within the typechecker,
+       computing 'completeMatchAppliesAtType' for a 'ConPat' which might be
+       nested deep inside the top-level call, such as
+
+          ( ( _ , P (x :: Int) ) :: ( Int, Int )
+
+        would require keeping track of types as we recur in 'isIrrefutableHsPat',
+        which would be much more involved and require duplicating code from
+        the pattern match checker (it performs this check using the notion
+        of "match variables", which we don't have in the typechecker).
+
+Note [Irrefutable or-patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When is an or-pattern ( p_1 ; ... ; p_n ) irrefutable? It certainly suffices
+that individual pattern p_i is irrefutable, but it isn't necessary.
+
+For example, with the datatype definition
+
+  data ABC = A | B | C
+
+the or-pattern ( B ; C ; A ) is irrefutable. Similarly, one can take into
+account COMPLETE pragmas, e.g. (P ; R ; Q) is irrefutable in the presence of
+{-# COMPLETE P, Q, R #-}. This would extend Note [Irrefutability of ConPat] to
+the case of disjunctions of constructor patterns.
+
+For now, the function 'isIrrefutableHsPat' does not take into account these
+additional complications, and considers an or-pattern irrefutable precisely when
+any of the summands are irrefutable. This pessimistic behaviour is OK: the contract
+of 'isIrrefutableHsPat' is that it can only return 'True' for definitely irrefutable
+patterns, but may conservatively return 'False' in other cases.
+
+The justification for this design choice is as follows:
+
+  1. Producing the correct answer in all cases would be rather difficult,
+     for example for a complex pattern such as ( P ; !( R ; S ; ( Q :: Ty ) ) ).
+  2. Irrefutable or-patterns aren't particularly common or useful, given that
+     (currently) or-patterns aren't allowed to bind variables.
+
+Note [Unboxed sum patterns aren't irrefutable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Unlike unboxed tuples, unboxed sums are *not* irrefutable when used as
 patterns. A simple example that demonstrates this is from #14228:
 

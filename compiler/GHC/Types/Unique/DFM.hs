@@ -41,6 +41,7 @@ module GHC.Types.Unique.DFM (
         alterUDFM,
         mapUDFM,
         mapMaybeUDFM,
+        mapMUDFM,
         plusUDFM,
         plusUDFM_C,
         lookupUDFM, lookupUDFM_Directly,
@@ -428,6 +429,13 @@ mapUDFM f (UDFM m i) = UDFM (MS.map (fmap f) m) i
 -- Critical this is strict map, otherwise you get a big space leak when reloading
 -- in GHCi because all old ModDetails are retained (see pruneHomePackageTable).
 -- Modify with care.
+
+{-# INLINEABLE mapMUDFM #-}
+-- | 'mapM' for a 'UniqDFM'.
+mapMUDFM :: Monad m => (elt1 -> m elt2) -> UniqDFM key elt1 -> m (UniqDFM key elt2)
+mapMUDFM f (UDFM m i) = do
+  m' <- traverse (traverse f) m
+  return $ UDFM m' i
 
 mapMaybeUDFM :: forall elt1 elt2 key.
                 (elt1 -> Maybe elt2) -> UniqDFM key elt1 -> UniqDFM key elt2

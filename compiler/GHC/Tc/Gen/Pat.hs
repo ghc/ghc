@@ -21,7 +21,6 @@ module GHC.Tc.Gen.Pat
    , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcMatchPats
    , addDataConStupidTheta
-   , isIrrefutableHsPatRnTcM
    )
 where
 
@@ -77,7 +76,6 @@ import GHC.Data.List.SetOps ( getNth )
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.List( partition )
-import Data.Maybe (isJust)
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
 
@@ -1883,26 +1881,3 @@ checkGADT conlike ex_tvs arg_tys = \case
     has_existentials :: Bool
     has_existentials = any (`elemVarSet` tyCoVarsOfTypes arg_tys) ex_tvs
 
--- | Very similar to GHC.Tc.Pat.isIrrefutableHsPat, but doesn't typecheck the pattern
---   It does depend on the type checker monad (`TcM`) however as we need to check ConPat case in more detail.
---   Specifically, we call `tcLookupGlobal` to obtain constructor details from global packages
---   for a comprehensive irrefutability check and avoid false negatives. (testcase pattern-fails.hs)
-isIrrefutableHsPatRnTcM :: Bool -> LPat GhcRn -> TcM Bool
-isIrrefutableHsPatRnTcM is_strict = isIrrefutableHsPatHelperM is_strict isConLikeIrr
-  where
-      doWork is_strict = isIrrefutableHsPatHelperM is_strict isConLikeIrr
-
-      isConLikeIrr is_strict (L _ dcName) details =
-        do { tyth <- tcLookupGlobal dcName
-           ; case tyth of
-               (ATyCon tycon) -> doCheck is_strict tycon details
-               (AConLike cl) ->
-                 case cl of
-                   RealDataCon dc -> doCheck is_strict (dataConTyCon dc) details
-                   PatSynCon _pat -> return False -- conservative
-               _ -> return False                  -- conservative
-           }
-
-      doCheck is_strict tycon details =  do { let b = isJust (tyConSingleDataCon_maybe tycon)
-                                            ; bs <- mapM (doWork is_strict) (hsConPatArgs details)
-                                            ; return (b && and bs) }

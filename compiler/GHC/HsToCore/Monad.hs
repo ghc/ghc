@@ -106,6 +106,10 @@ import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
 import GHC.Types.TyThing
 import GHC.Types.Error
+import GHC.Types.CompleteMatch
+import GHC.Types.Unique.DSet
+
+import GHC.Tc.Utils.Env (lookupGlobal)
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -115,6 +119,7 @@ import qualified GHC.Data.Strict as Strict
 import Data.IORef
 import GHC.Driver.Env.KnotVars
 import qualified Data.Set as S
+import GHC.IO.Unsafe (unsafeInterleaveIO)
 
 {-
 ************************************************************************
@@ -259,14 +264,44 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              rdr_env  = tcg_rdr_env tcg_env
              fam_inst_env = tcg_fam_inst_env tcg_env
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
-             complete_matches = hptCompleteSigs hsc_env         -- from the home package
-                                ++ tcg_complete_matches tcg_env -- from the current module
-                                ++ eps_complete_matches eps     -- from imports
              -- re-use existing next_wrapper_num to ensure uniqueness
              next_wrapper_num_var = tcg_next_wrapper_num tcg_env
+
+       ; ds_complete_matches <-
+           liftIO $ unsafeInterleaveIO $
+             -- This call to 'unsafeInterleaveIO' ensures we only do this work
+             -- when we need to look at the COMPLETE pragmas, avoiding doing work
+             -- when we don't need them.
+             --
+             -- Relevant test case: MultiLayerModulesTH_Make, which regresses
+             -- in allocations by ~5% if we don't do this.
+           traverse (lookupCompleteMatch type_env hsc_env) $
+             localAndImportedCompleteMatches (tcg_complete_matches tcg_env) hsc_env eps
        ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env ptc
-                           msg_var cc_st_var next_wrapper_num_var complete_matches
+                           msg_var cc_st_var next_wrapper_num_var ds_complete_matches
        }
+
+-- | We have in hand the `CompleteMatches` for the module, but when
+-- doing pattern-match overlap checking we want the `ConLike` for each
+-- data constructor, not just its `Name`.  This function makes the
+-- transition.
+lookupCompleteMatch :: TypeEnv -> HscEnv -> CompleteMatch -> IO DsCompleteMatch
+lookupCompleteMatch type_env hsc_env (CompleteMatch { cmConLikes = nms, cmResultTyCon = mb_tc })
+  = do { cons <- mapMUniqDSet lookup_conLike nms
+       ; return $ CompleteMatch { cmConLikes = cons, cmResultTyCon = mb_tc } }
+  where
+    lookup_conLike :: Name -> IO ConLike
+    lookup_conLike nm
+      | Just ty <- wiredInNameTyThing_maybe nm
+      = go ty
+      | Just ty <- lookupTypeEnv type_env nm
+      = go ty
+      | otherwise
+      = go =<< lookupGlobal hsc_env nm
+      where
+        go :: TyThing -> IO ConLike
+        go (AConLike cl) = return cl
+        go ty = pprPanic "lookup_conLike not a ConLike" (ppr nm <+> ppr ty)
 
 runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages DsMessage, Maybe a)
 runDs hsc_env (ds_gbl, ds_lcl) thing_inside
@@ -295,17 +330,15 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
        ; let unit_env = hsc_unit_env hsc_env
              type_env = typeEnvFromEntities ids tycons patsyns fam_insts
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
-             complete_matches = hptCompleteSigs hsc_env     -- from the home package
-                                ++ local_complete_matches  -- from the current module
-                                ++ eps_complete_matches eps -- from imports
-
              bindsToIds (NonRec v _)   = [v]
              bindsToIds (Rec    binds) = map fst binds
              ids = concatMap bindsToIds binds
-
+       ; ds_complete_matches <- traverse (lookupCompleteMatch type_env hsc_env) $
+            localAndImportedCompleteMatches local_complete_matches hsc_env eps
+       ; let
              envs  = mkDsEnvs unit_env this_mod rdr_env type_env
                               fam_inst_env ptc msg_var cc_st_var
-                              next_wrapper_num complete_matches
+                              next_wrapper_num ds_complete_matches
        ; runDs hsc_env envs thing_inside
        }
 
@@ -345,7 +378,7 @@ initTcDsForSolver thing_inside
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> PromotionTickContext
          -> IORef (Messages DsMessage) -> IORef CostCentreState
-         -> IORef (ModuleEnv Int) -> CompleteMatches
+         -> IORef (ModuleEnv Int) -> DsCompleteMatches
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
          next_wrapper_num complete_matches
@@ -528,7 +561,7 @@ dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
 
 -- | The @COMPLETE@ pragmas that are in scope.
-dsGetCompleteMatches :: DsM CompleteMatches
+dsGetCompleteMatches :: DsM DsCompleteMatches
 dsGetCompleteMatches = ds_complete_matches <$> getGblEnv
 
 dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)

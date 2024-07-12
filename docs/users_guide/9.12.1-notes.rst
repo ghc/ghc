@@ -37,6 +37,9 @@ Language
 - :extension:`UnliftedFFITypes`: GHC will now accept FFI types like: ``(# #) -> T`` where ``(# #)``
   is used as the one and only function argument.
 
+- GHC now takes COMPLETE pragmas into consideration when deciding whether
+  pattern matches in do notation are fallible.
+
 Compiler
 ~~~~~~~~
 

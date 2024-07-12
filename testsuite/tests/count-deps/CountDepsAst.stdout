@@ -142,6 +142,7 @@ GHC.Tc.Zonk.Monad
 GHC.Types.Annotations
 GHC.Types.Avail
 GHC.Types.Basic
+GHC.Types.CompleteMatch
 GHC.Types.CostCentre
 GHC.Types.CostCentre.State
 GHC.Types.Cpr

@@ -47,7 +47,7 @@ import GHC.Rename.Utils ( bindLocalNamesFV, checkDupNames
                         , checkUnusedRecordWildcard
                         , wrapGenSpan, genHsIntegralLit, genHsTyLit
                         , genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps'
-                        , genAppType, isIrrefutableHsPat )
+                        , genAppType )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice, rnUntypedSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
@@ -1253,10 +1253,9 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat (L lb body))) thing_inside
                 -- The binders do not scope over the expression
         ; (bind_op, fvs1) <- lookupQualifiedDoStmtName ctxt bindMName
 
-        ; (fail_op, fvs2) <- monadFailOp pat ctxt
-
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
-        { (thing, fvs3) <- thing_inside (collectPatBinders CollNoDictBinders pat')
+        { (thing, fvs2) <- thing_inside (collectPatBinders CollNoDictBinders pat')
+        ; (fail_op, fvs3) <- monadFailOp pat' ctxt
         ; let xbsrn = XBindStmtRn { xbsrn_bindOp = bind_op, xbsrn_failOp = fail_op }
         ; return (( [( L loc (BindStmt xbsrn pat' (L lb body')), fv_expr )]
                   , thing),
@@ -2184,12 +2183,14 @@ stmtTreeToStmts monad_names ctxt (StmtTreeBind before after) tail tail_fvs = do
   return (stmts2, fvs1 `plusFV` fvs2)
 
 stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
+   rdrEnv <- getGlobalRdrEnv
+   comps <- getCompleteMatchesTcM
    pairs <- mapM (stmtTreeArg ctxt tail_fvs) trees
-   dflags <- getDynFlags
+   strict <- xoptM LangExt.Strict
    let (stmts', fvss) = unzip pairs
    let (need_join, tail') =
      -- See Note [ApplicativeDo and refutable patterns]
-         if any (hasRefutablePattern dflags) stmts'
+         if any (hasRefutablePattern strict rdrEnv comps) stmts'
          then (True, tail)
          else needJoin monad_names tail Nothing
 
@@ -2380,11 +2381,15 @@ of a refutable pattern, in order for the types to work out.
 
 -}
 
-hasRefutablePattern :: DynFlags -> ApplicativeArg GhcRn -> Bool
-hasRefutablePattern dflags (ApplicativeArgOne { app_arg_pattern = pat
-                                              , is_body_stmt = False}) =
-                                         not (isIrrefutableHsPat dflags pat)
-hasRefutablePattern _ _ = False
+hasRefutablePattern :: Bool -- ^ is -XStrict enabled?
+                    -> GlobalRdrEnv
+                    -> CompleteMatches
+                    -> ApplicativeArg GhcRn -> Bool
+hasRefutablePattern is_strict rdr_env comps arg =
+  case arg of
+    ApplicativeArgOne { app_arg_pattern = pat, is_body_stmt = False}
+      -> not (isIrrefutableHsPat is_strict (irrefutableConLikeRn rdr_env comps) pat)
+    _ -> False
 
 isLetStmt :: LStmt (GhcPass a) b -> Bool
 isLetStmt (L _ LetStmt{}) = True
@@ -2687,21 +2692,26 @@ badIpBinds = TcRnIllegalImplicitParameterBindings
 
 ---------
 
-monadFailOp :: LPat GhcPs
+monadFailOp :: LPat GhcRn
             -> HsStmtContextRn
             -> RnM (FailOperator GhcRn, FreeVars)
 monadFailOp pat ctxt = do
-    dflags <- getDynFlags
+    strict <- xoptM LangExt.Strict
+    rdrEnv <- getGlobalRdrEnv
+    comps <- getCompleteMatchesTcM
         -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
         -- we should not need to fail.
-    if | isIrrefutableHsPat dflags pat -> return (Nothing, emptyFVs)
+    if | isIrrefutableHsPat strict (irrefutableConLikeRn rdrEnv comps) pat
+       -> return (Nothing, emptyFVs)
 
         -- For non-monadic contexts (e.g. guard patterns, list
         -- comprehensions, etc.) we should not need to fail, or failure is handled in
         -- a different way. See Note [Failing pattern matches in Stmts].
-       | not (isMonadStmtContext ctxt) -> return (Nothing, emptyFVs)
+       | not (isMonadStmtContext ctxt)
+       -> return (Nothing, emptyFVs)
 
-       | otherwise -> getMonadFailOp ctxt
+       | otherwise
+       -> getMonadFailOp ctxt
 
 {-
 Note [Monad fail : Rebindable syntax, overloaded strings]

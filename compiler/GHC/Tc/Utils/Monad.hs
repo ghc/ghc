@@ -144,6 +144,9 @@ module GHC.Tc.Utils.Monad(
   -- * Zonking
   liftZonkM,
 
+  -- * Complete matches
+  localAndImportedCompleteMatches, getCompleteMatchesTcM,
+
   -- * Types etc.
   module GHC.Tc.Types,
   module GHC.Data.IOEnv
@@ -2319,3 +2322,19 @@ liftZonkM (ZonkM f) =
                             , zge_binder_stack = bndrs }
      ; liftIO $ f zge }
 {-# INLINE liftZonkM #-}
+
+--------------------------------------------------------------------------------
+
+getCompleteMatchesTcM :: TcM CompleteMatches
+getCompleteMatchesTcM
+  = do { hsc_env <- getTopEnv
+       ; tcg_env <- getGblEnv
+       ; eps <- liftIO $ hscEPS hsc_env
+       ; return $ localAndImportedCompleteMatches (tcg_complete_matches tcg_env) hsc_env eps
+       }
+
+localAndImportedCompleteMatches :: CompleteMatches -> HscEnv -> ExternalPackageState -> CompleteMatches
+localAndImportedCompleteMatches tcg_comps hsc_env eps =
+     tcg_comps                -- from the current module
+  ++ hptCompleteSigs hsc_env  -- from the home package
+  ++ eps_complete_matches eps -- from imports

@@ -80,7 +80,6 @@ import GHC.Types.Tickish
 import GHC.Utils.Misc
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
-import GHC.Rename.Utils
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Evidence
@@ -978,6 +977,8 @@ dsHandleMonadicFailure ctx pat res_ty match m_fail_op =
     MR_Infallible body -> body
     MR_Fallible body -> do
       dflags <- getDynFlags
+      let strict = xopt LangExt.Strict dflags
+      comps <- dsGetCompleteMatches
       fail_expr <- case m_fail_op of
         -- Note that (non-monadic) list comprehension, pattern guards, etc could
         -- have fallible bindings without an explicit failure op, but this is
@@ -987,7 +988,7 @@ dsHandleMonadicFailure ctx pat res_ty match m_fail_op =
         -- ApplicativeDo, because their desugaring to ViewPatterns leads
         -- to a MR_Fallible match. But irrefutability is easily asserted:
         Nothing -> do
-          massertPpr (isIrrefutableHsPat dflags pat) $
+          massertPpr (isIrrefutableHsPat strict (irrefutableConLikeTc comps) pat) $
             text "Pattern match:" <+> ppr pat <+>
             text "is failable, and fail_expr was left unset"
           -- In this case we likely desugar the pattern-match in something like

@@ -1,5 +1,6 @@
 
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -65,6 +66,7 @@ import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
+import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Unique.Set
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
@@ -77,7 +79,6 @@ import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
-import GHC.Types.GREInfo (ConInfo, mkConInfo, conInfoFields)
 
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
@@ -175,7 +176,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
-   (rn_val_decls, bind_dus) <- if is_boot
+   (rn_val_decls@(XValBindsLR (NValBinds _ sigs')), bind_dus) <- if is_boot
     -- For an hs-boot, use tc_bndrs (which collects how we're renamed
     -- signatures), since val_bndr_set is empty (there are no x = ...
     -- bindings in an hs-boot.)
@@ -210,7 +211,13 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    (rn_splice_decls,  src_fvs7) <- rnList rnSpliceDecl    splice_decls ;
    rn_docs <- traverse rnLDocDecl docs ;
 
-   last_tcg_env <- getGblEnv ;
+   -- Update the TcGblEnv with renamed COMPLETE pragmas from the current
+   -- module, for pattern irrefutability checking in do notation.
+   last_tcg_env0 <- getGblEnv ;
+   let { last_tcg_env =
+            last_tcg_env0
+              { tcg_complete_matches = tcg_complete_matches last_tcg_env0 ++ localCompletePragmas sigs' }
+       } ;
    -- (I) Compute the results and return
    let {rn_group = HsGroup { hs_ext     = noExtField,
                              hs_valds   = rn_val_decls,
@@ -2534,12 +2541,12 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
           let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocA (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordFieldLabel dup_fields_ok has_sel [bnd_name]) field_occs
-          let con_info = mkConInfo (conDetailsArity length (RecCon as)) flds
+          let con_info = mkConInfo ConIsPatSyn (conDetailsArity length (RecCon as)) flds
           return ((PatSynName bnd_name, con_info) : names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n, psb_args = as })) <- bind
       = do
         bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
-        let con_info = mkConInfo (conDetailsArity length as) []
+        let con_info = mkConInfo ConIsPatSyn (conDetailsArity length as) []
         return ((PatSynName bnd_name, con_info) : names)
       | otherwise
       = return names

@@ -80,12 +80,10 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Types.Basic
-import GHC.Types.CompleteMatch
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Names( ipClassName )
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -204,40 +202,14 @@ tcTopBinds binds sigs
           -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; specs <- tcImpPrags sigs   -- SPECIALISE prags for imported Ids
 
-        ; complete_matches <- restoreEnvs (tcg_env, tcl_env) $ tcCompleteSigs sigs
-        ; traceTc "complete_matches" (ppr binds $$ ppr sigs)
-        ; traceTc "complete_matches" (ppr complete_matches)
 
         ; let { tcg_env' = tcg_env { tcg_imp_specs
-                                      = specs ++ tcg_imp_specs tcg_env
-                                   , tcg_complete_matches
-                                      = complete_matches
-                                          ++ tcg_complete_matches tcg_env }
+                                      = specs ++ tcg_imp_specs tcg_env }
                            `addTypecheckedBinds` map snd binds' }
 
         ; return (tcg_env', tcl_env) }
         -- The top level bindings are flattened into a giant
         -- implicitly-mutually-recursive LHsBinds
-
-tcCompleteSigs  :: [LSig GhcRn] -> TcM [CompleteMatch]
-tcCompleteSigs sigs =
-  let
-      doOne :: LSig GhcRn -> TcM (Maybe CompleteMatch)
-      -- We don't need to "type-check" COMPLETE signatures anymore; if their
-      -- combinations are invalid it will be found so at match sites.
-      -- There it is also where we consider if the type of the pattern match is
-      -- compatible with the result type constructor 'mb_tc'.
-      doOne (L loc c@(CompleteMatchSig (_ext, _src_txt) ns mb_tc_nm))
-        = fmap Just $ setSrcSpanA loc $ addErrCtxt (text "In" <+> ppr c) $ do
-            cls   <- mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
-            mb_tc <- traverse @Maybe tcLookupLocatedTyCon mb_tc_nm
-            pure CompleteMatch { cmConLikes = cls, cmResultTyCon = mb_tc }
-      doOne _ = return Nothing
-
-  -- For some reason I haven't investigated further, the signatures come in
-  -- backwards wrt. declaration order. So we reverse them here, because it makes
-  -- a difference for incomplete match suggestions.
-  in mapMaybeM doOne $ reverse sigs
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type

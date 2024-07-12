@@ -23,7 +23,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.Name.Reader (GlobalRdrEnv)
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
-import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
+import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv)
 import GHC.HsToCore.Pmc.Types (Nablas)
 import GHC.HsToCore.Errors.Types
 import GHC.Core (CoreExpr)
@@ -33,6 +33,7 @@ import GHC.Unit.Module
 import GHC.Driver.Hooks (DsForeignsHook)
 import GHC.Data.OrdList (OrdList)
 import GHC.Types.ForeignStubs (ForeignStubs)
+import GHC.Types.CompleteMatch
 
 {-
 ************************************************************************
@@ -59,7 +60,7 @@ data DsGblEnv
   , ds_msgs    :: IORef (Messages DsMessage) -- Diagnostic messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things
-  , ds_complete_matches :: CompleteMatches
+  , ds_complete_matches :: DsCompleteMatches
      -- Additional complete pattern matches
   , ds_cc_st   :: IORef CostCentreState
      -- Tracking indices for cost centre annotations

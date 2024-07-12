@@ -39,7 +39,7 @@ type PackageRuleBase         = RuleBase
 type PackageInstEnv          = InstEnv
 type PackageFamInstEnv       = FamInstEnv
 type PackageAnnEnv           = AnnEnv
-type PackageCompleteMatches = CompleteMatches
+type PackageCompleteMatches  = CompleteMatches
 
 -- | Helps us find information about modules in the imported packages
 type PackageIfaceTable = ModuleEnv ModIface

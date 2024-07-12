@@ -18,5 +18,5 @@ tcIfaceRules           :: Bool -> [IfaceRule] -> IfL [CoreRule]
 tcIfaceInst            :: IfaceClsInst -> IfL ClsInst
 tcIfaceFamInst         :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations     :: [IfaceAnnotation] -> IfL [Annotation]
-tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
+tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL CompleteMatches
 tcIfaceDecls           :: Bool -> [(Fingerprint, IfaceDecl)] -> IfL [(Name,TyThing)]

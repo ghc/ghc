@@ -1361,12 +1361,8 @@ tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteMatches = mapM tcIfaceCompleteMatch
 
 tcIfaceCompleteMatch :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = forkM doc $ do -- See Note [Positioning of forkM]
-  conlikes <- mkUniqDSet <$> mapM tcIfaceConLike ms
-  mtc' <- traverse tcIfaceTyCon mtc
-  return (CompleteMatch conlikes mtc')
-  where
-    doc = text "COMPLETE sig" <+> ppr ms
+tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) =
+  return $ CompleteMatch (mkUniqDSet ms) mtc
 
 {- Note [Positioning of forkM]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2049,12 +2045,6 @@ tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
                          ; case thing of
                                 AConLike (RealDataCon dc) -> return dc
                                 _       -> pprPanic "tcIfaceDataCon" (ppr name$$ ppr thing) }
-
-tcIfaceConLike :: Name -> IfL ConLike
-tcIfaceConLike name = do { thing <- tcIfaceGlobal name
-                         ; case thing of
-                                AConLike cl -> return cl
-                                _           -> pprPanic "tcIfaceConLike" (ppr name$$ ppr thing) }
 
 tcIfaceExtId :: Name -> IfL Id
 tcIfaceExtId name = do { thing <- tcIfaceGlobal name

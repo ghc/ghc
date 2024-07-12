@@ -217,7 +217,7 @@ configured via command-line flags (in `GHC.setSessionDynFlags`).
 hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
 
-hptCompleteSigs :: HscEnv -> [CompleteMatch]
+hptCompleteSigs :: HscEnv -> CompleteMatches
 hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
 
 -- | Find all the instance declarations (of classes and families) from
@@ -260,7 +260,7 @@ hptAnns hsc_env (Just (uid, mn)) = hptSomeThingsBelowUs (md_anns . hm_details) F
 hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
 
 hptAllThings :: (HomeModInfo -> [a]) -> HscEnv -> [a]
-hptAllThings extract hsc_env = concatMap (concatMap extract . eltsHpt . homeUnitEnv_hpt . snd)
+hptAllThings extract hsc_env = concatMap (concatHpt extract . homeUnitEnv_hpt . snd)
                                 (hugElts (hsc_HUG hsc_env))
 
 -- | Get things from modules "below" this one (in the dependency sense)
