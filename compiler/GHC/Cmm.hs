@@ -12,8 +12,9 @@
 
 module GHC.Cmm (
      -- * Cmm top-level datatypes
+     DCmmGroup,
      CmmProgram, CmmGroup, CmmGroupSRTs, RawCmmGroup, GenCmmGroup,
-     CmmDecl, CmmDeclSRTs, GenCmmDecl(..),
+     CmmDecl, DCmmDecl, CmmDeclSRTs, GenCmmDecl(..),
      CmmDataDecl, cmmDataDeclCmmDecl,
      CmmGraph, GenCmmGraph(..),
      toBlockMap, revPostorder, toBlockList,
@@ -22,12 +23,17 @@ module GHC.Cmm (
      GenCmmStatics(..), type CmmStatics, type RawCmmStatics, CmmStatic(..),
      SectionProtection(..), sectionProtection,
 
+     DWrap(..), unDeterm, removeDeterm, removeDetermDecl,
+
      -- ** Blocks containing lists
      GenBasicBlock(..), blockId,
      ListGraph(..), pprBBlock,
 
      -- * Info Tables
-     CmmTopInfo(..), CmmStackInfo(..), CmmInfoTable(..), topInfoTable,
+     GenCmmTopInfo(..)
+     , DCmmTopInfo
+     , CmmTopInfo
+     , CmmStackInfo(..), CmmInfoTable(..), topInfoTable,
      ClosureTypeInfo(..),
      ProfilingInfo(..), ConstrDescription,
 
@@ -52,6 +58,7 @@ import GHC.Cmm.Expr
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import qualified GHC.Cmm.Dataflow.Label as Det
+import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Utils.Outputable
 
 import Data.Void (Void)
@@ -74,6 +81,8 @@ import qualified Data.ByteString as BS
 type CmmProgram = [CmmGroup]
 
 type GenCmmGroup d h g = [GenCmmDecl d h g]
+-- | Cmm group after STG generation
+type DCmmGroup    = GenCmmGroup CmmStatics    DCmmTopInfo              CmmGraph
 -- | Cmm group before SRT generation
 type CmmGroup     = GenCmmGroup CmmStatics    CmmTopInfo               CmmGraph
 -- | Cmm group with SRTs
@@ -117,6 +126,7 @@ instance (OutputableP Platform d, OutputableP Platform info, OutputableP Platfor
       => OutputableP Platform (GenCmmDecl d info i) where
     pdoc = pprTop
 
+type DCmmDecl    = GenCmmDecl CmmStatics DCmmTopInfo CmmGraph
 type CmmDecl     = GenCmmDecl CmmStatics    CmmTopInfo CmmGraph
 type CmmDeclSRTs = GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
 type CmmDataDecl = GenCmmDataDecl CmmStatics
@@ -171,8 +181,16 @@ toBlockList g = Det.mapElems $ toBlockMap g
 
 -- | CmmTopInfo is attached to each CmmDecl (see defn of CmmGroup), and contains
 -- the extra info (beyond the executable code) that belongs to that CmmDecl.
-data CmmTopInfo   = TopInfo { info_tbls  :: Det.LabelMap CmmInfoTable
-                            , stack_info :: CmmStackInfo }
+data GenCmmTopInfo f = TopInfo { info_tbls  :: f CmmInfoTable
+                               , stack_info :: CmmStackInfo }
+
+newtype DWrap a = DWrap [(BlockId, a)]
+
+unDeterm :: DWrap a -> [(BlockId, a)]
+unDeterm (DWrap f) = f
+
+type DCmmTopInfo = GenCmmTopInfo DWrap
+type CmmTopInfo  = GenCmmTopInfo Det.LabelMap
 
 instance OutputableP Platform CmmTopInfo where
     pdoc = pprTopInfo
@@ -327,6 +345,19 @@ instance OutputableP Platform (GenCmmStatics a) where
 
 type CmmStatics    = GenCmmStatics 'False
 type RawCmmStatics = GenCmmStatics 'True
+
+-- Converting out of deterministic Cmm
+
+removeDeterm :: DCmmGroup -> CmmGroup
+removeDeterm = map removeDetermDecl
+
+removeDetermDecl :: DCmmDecl -> CmmDecl
+removeDetermDecl (CmmProc h e r g) = CmmProc (removeDetermTop h) e r g
+removeDetermDecl (CmmData a b) = CmmData a b
+
+removeDetermTop :: DCmmTopInfo -> CmmTopInfo
+removeDetermTop (TopInfo a b) = TopInfo (Det.mapFromList $ unDeterm a) b
+
 
 -- -----------------------------------------------------------------------------
 -- Basic blocks consisting of lists

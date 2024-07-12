@@ -285,7 +285,7 @@ data CgState
   = MkCgState {
      cgs_stmts :: CmmAGraph,          -- Current procedure
 
-     cgs_tops  :: OrdList CmmDecl,
+     cgs_tops  :: OrdList DCmmDecl,
         -- Other procedures and data blocks in this compilation unit
         -- Both are ordered only so that we can
         -- reduce forward references, when it's easy to do so
@@ -744,7 +744,7 @@ emit ag
   = do  { state <- getState
         ; setState $ state { cgs_stmts = cgs_stmts state CmmGraph.<*> ag } }
 
-emitDecl :: CmmDecl -> FCode ()
+emitDecl :: DCmmDecl -> FCode ()
 emitDecl decl
   = do  { state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
@@ -790,13 +790,13 @@ emitProc mb_info lbl live blocks offset do_layout
               blks :: CmmGraph
               blks = labelAGraph l blocks
 
-              infos | Just info <- mb_info = mapSingleton (g_entry blks) info
-                    | otherwise            = mapEmpty
+              infos | Just info <- mb_info = [((g_entry blks), info)]
+                    | otherwise            = []
 
               sinfo = StackInfo { arg_space = offset
                                 , do_layout = do_layout }
 
-              tinfo = TopInfo { info_tbls = infos
+              tinfo = TopInfo { info_tbls = DWrap infos
                               , stack_info=sinfo}
 
               proc_block = CmmProc tinfo lbl live blks
@@ -804,7 +804,7 @@ emitProc mb_info lbl live blocks offset do_layout
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
-getCmm :: FCode a -> FCode (a, CmmGroup)
+getCmm :: FCode a -> FCode (a, DCmmGroup)
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
 -- object splitting (at a later stage)

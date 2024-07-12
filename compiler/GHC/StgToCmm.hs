@@ -107,8 +107,8 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
                              -- Enable deterministic object code generation by
                              -- renaming uniques deterministically.
                              if stgToCmmObjectDeterminism cfg
-                                then detRenameUniques rnm0 cmm -- The yielded cmm will already be renamed.
-                                else (rnm0, cmm)
+                                then detRenameCmmGroup rnm0 cmm -- The yielded cmm will already be renamed.
+                                else (rnm0, removeDeterm cmm)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!

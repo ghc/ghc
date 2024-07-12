@@ -213,7 +213,9 @@ generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesW
   let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
       ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv')
 
-  (_, _, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) dus ipeCmmGroup
+  -- TODO: Renaming here
+
+  (_, _, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) dus (removeDeterm ipeCmmGroup)
   Stream.yield ipeCmmGroupSRTs
 
   ipeStub <-

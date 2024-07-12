@@ -28,7 +28,7 @@ import GHC.Cmm.Dataflow.Block
 import Data.Kind
 
 -- | A (possibly empty) collection of closed/closed blocks
-type Body n = Det.LabelMap (Block n C C)
+type Body n = Body' Block n
 
 -- | @Body@ abstracted over @block@
 type Body' block (n :: Extensibility -> Extensibility -> Type) = Det.LabelMap (block n C C)

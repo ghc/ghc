@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase, RecordWildCards, MagicHash, UnboxedTuples, PatternSynonyms, ExplicitNamespaces #-}
 module GHC.Cmm.UniqueRenamer
-  ( detRenameUniques
+  ( detRenameCmmGroup
   , MonadGetUnique(..)
 
   -- Careful! Not for general use!
@@ -87,8 +87,26 @@ renameDetUniq uq = do
       return det_uniq
 
 -- Rename local symbols deterministically (in order of appearance)
-detRenameUniques :: UniqRenamable a => DetUniqFM -> a -> (DetUniqFM, a)
-detRenameUniques dufm x = swap $ runState (uniqRename x) dufm
+--detRename0Uniques :: UniqRenamable a => DetUniqFM -> a -> (DetUniqFM, a)
+--detRenameUniques dufm x = swap $ runState (uniqRename x) dufm
+
+detRenameCmmGroup :: DetUniqFM -> DCmmGroup -> (DetUniqFM, CmmGroup)
+detRenameCmmGroup dufm group = swap (runState (mapM go group) dufm)
+  where
+    go :: DCmmDecl -> State DetUniqFM CmmDecl
+    go (CmmProc h lbl regs g)
+      = do
+        g' <- uniqRename g
+        regs' <- uniqRename regs
+        lbl' <- uniqRename lbl
+        --- rename h last!!! (TODO: Check if this is really still needed now that LabelMap is deterministic. My guess is this is not needed at all.
+        h' <- goTop h
+        return $ CmmProc h' lbl' regs' g'
+    go (CmmData sec d)
+      = CmmData <$> uniqRename sec <*> uniqRename d
+
+    goTop :: DCmmTopInfo -> State DetUniqFM CmmTopInfo
+    goTop (TopInfo (DWrap i) b) = TopInfo . Det.mapFromList <$> uniqRename i <*> pure b
 
 -- The most important function here, which does the actual renaming.
 -- Arguably, maybe we should rename this to CLabelRenamer
@@ -128,18 +146,6 @@ instance UniqRenamable Det.Label where
 instance UniqRenamable CmmTickScope where
   -- ROMES:TODO: We may have to change this to get deterministic objects with ticks.
   uniqRename = pure
-
-instance (UniqRenamable a, UniqRenamable b) => UniqRenamable (GenCmmDecl a b CmmGraph) where
-  uniqRename (CmmProc h lbl regs g)
-    = do
-      g' <- uniqRename g
-      regs' <- uniqRename regs
-      lbl' <- uniqRename lbl
-      --- rename h last!!! (TODO: Check if this is really still needed now that LabelMap is deterministic. My guess is this is not needed at all.
-      h' <- uniqRename h
-      return $ CmmProc h' lbl' regs' g'
-  uniqRename (CmmData sec d)
-    = CmmData <$> uniqRename sec <*> uniqRename d
 
 instance UniqRenamable CmmDataDecl where
   uniqRename (CmmData sec d)
