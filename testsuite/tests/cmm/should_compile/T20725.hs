@@ -4,7 +4,7 @@ import GHC.Cmm
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet
 
 data TrivialFact = TrivialFact
 
