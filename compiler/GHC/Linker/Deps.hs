@@ -6,6 +6,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module GHC.Linker.Deps
   ( LinkDepsOpts (..)
@@ -82,8 +83,8 @@ data LinkDepsOpts = LinkDepsOpts
 data LinkDeps = LinkDeps
   { ldNeededLinkables :: [Linkable]
   , ldAllLinkables    :: [Linkable]
-  , ldUnits           :: [UnitId]
-  , ldNeededUnits     :: UniqDSet UnitId
+  , ldNeededUnits     :: [UnitId]
+  , ldAllUnits        :: UniqDSet UnitId
   }
 
 -- | Find all the packages and linkables that a set of modules depends on
@@ -109,7 +110,6 @@ getLinkDeps opts interp pls span mods = do
 
       get_link_deps opts pls maybe_normal_osuf span mods
 
-
 get_link_deps
   :: LinkDepsOpts
   -> LoaderState
@@ -118,43 +118,33 @@ get_link_deps
   -> [Module]
   -> IO LinkDeps
 get_link_deps opts pls maybe_normal_osuf span mods = do
-        -- 1.  Find the dependent home-pkg-modules/packages from each iface
-        -- (omitting modules from the interactive package, which is already linked)
-      deps <-
-          -- Why two code paths here? There is a significant amount of repeated work
-          -- performed calculating transitive dependencies
-          -- if --make uses the oneShot code path (see MultiLayerModulesTH_* tests)
-          if ldOneShotMode opts
+  -- 1.  Find the dependent home-pkg-modules/packages from each iface
+  --     (omitting modules from the interactive package, which is already linked)
+  --     Why two code paths here? There is a significant amount of repeated work
+  --     performed calculating transitive dependencies
+  --     if --make uses the oneShot code path (see MultiLayerModulesTH_* tests)
+  deps <- if ldOneShotMode opts
           then oneshot_deps opts (filterOut isInteractiveModule mods)
           else make_deps
 
-            -- TODO this used to avoid some lookups, maybe we can move that to
-            -- oneshot_deps now
-            -- (mods_needed, links_got) = partitionWith split_mods mods_s
-            --
-            -- split_mods mod =
-            --     let is_linked = lookupModuleEnv (objs_loaded pls) mod
-            --                     <|> lookupModuleEnv (bcos_loaded pls) mod
-            --     in case is_linked of
-            --          Just linkable -> Right linkable
-            --          Nothing -> Left mod
+  -- 2.  Exclude ones already linked
+  --     Main reason: avoid findModule calls in get_linkable
+  -- TODO outdated
+  let (loaded_modules, needed_modules, ldAllUnits, ldNeededUnits) =
+        classify_deps pls deps
 
-        -- 3.  For each dependent module, find its linkable
-        --     This will either be in the HPT or (in the case of one-shot
-        --     compilation) we may need to use maybe_getFileLinkable
-      (lnks, pkgs_s) <- partitionWithM dep_linkable deps
-      let
-        lnks_needed = concat lnks
-        pkgs_s' = mkUniqDSet pkgs_s
-        pkgs_needed = eltsUDFM $ getUniqDSet pkgs_s' `minusUDFM` pkgs_loaded pls
+  -- 3.  For each dependent module, find its linkable
+  --     This will either be in the HPT or (in the case of one-shot
+  --     compilation) we may need to use maybe_getFileLinkable
+  -- TODO outdated
+  ldNeededLinkables <- mapM module_linkable needed_modules
 
-      return $ LinkDeps
-        { ldNeededLinkables = lnks_needed
-        -- , ldAllLinkables    = links_got ++ lnks_needed
-        , ldAllLinkables    = lnks_needed
-        , ldUnits           = pkgs_needed
-        , ldNeededUnits     = pkgs_s'
-        }
+  pure LinkDeps {
+    ldNeededLinkables,
+    ldAllLinkables = loaded_modules ++ ldNeededLinkables,
+    ldNeededUnits,
+    ldAllUnits
+  }
   where
     mod_graph = ldModuleGraph opts
     unit_env  = ldUnitEnv     opts
@@ -217,11 +207,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
     while_linking_expr = text "while linking an interpreted expression"
 
-    dep_linkable = \case
-      LinkModules mods -> Left <$> mapM get_linkable (eltsUDFM mods)
-      LinkLibrary uid -> pure (Right uid)
-
-    get_linkable = \case
+    module_linkable = \case
       LinkHomeModule hmi ->
         pure (expectJust "getLinkDeps" (homeModLinkable hmi))
 
@@ -271,21 +257,27 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
     adjust_ul _ l@LoadedBCOs{} = return l
     adjust_ul _ (CoreBindings (WholeCoreBindings _ mod _))     = pprPanic "Unhydrated core bindings" (ppr mod)
 
-data LinkObjectModule =
+data LinkModule =
   LinkHomeModule HomeModInfo
   |
   LinkObjectModule ModIface ModLocation
   |
   LinkByteCodeModule ModIface WholeCoreBindings
 
-instance Outputable LinkObjectModule where
+link_module_iface :: LinkModule -> ModIface
+link_module_iface = \case
+  LinkHomeModule hmi -> hm_iface hmi
+  LinkObjectModule iface _ -> iface
+  LinkByteCodeModule iface _ -> iface
+
+instance Outputable LinkModule where
   ppr = \case
     LinkHomeModule hmi -> ppr (mi_module (hm_iface hmi)) <+> brackets (text "HMI")
     LinkObjectModule iface _ -> ppr (mi_module iface)
     LinkByteCodeModule _ wcb -> ppr (wcb_module wcb) <+> brackets (text "BC")
 
 data LinkDep =
-  LinkModules (UniqDFM ModuleName LinkObjectModule)
+  LinkModules (UniqDFM ModuleName LinkModule)
   |
   LinkLibrary UnitId
 
@@ -432,6 +424,33 @@ link_boot_mod_error :: Module -> SDoc
 link_boot_mod_error mod =
   text "module" <+> ppr mod <+>
   text "cannot be linked; it is only available as a boot module"
+
+classify_deps ::
+  LoaderState ->
+  [LinkDep] ->
+  ([Linkable], [LinkModule], UniqDSet UnitId, [UnitId])
+classify_deps pls deps =
+  (loaded_modules, needed_modules, all_packages, needed_packages)
+  where
+    (loaded_modules, needed_modules) =
+      partitionWith loaded_or_needed (concatMap eltsUDFM modules)
+
+    needed_packages =
+      eltsUDFM (getUniqDSet all_packages `minusUDFM` pkgs_loaded pls)
+
+    all_packages = mkUniqDSet packages
+
+    (modules, packages) = flip partitionWith deps $ \case
+      LinkModules mods -> Left mods
+      LinkLibrary lib -> Right lib
+
+    loaded_or_needed lm =
+      maybe (Right lm) Left (loaded_linkable (mi_module (link_module_iface lm)))
+
+    loaded_linkable mod =
+      lookupModuleEnv (objs_loaded pls) mod
+      <|>
+      lookupModuleEnv (bcos_loaded pls) mod
 
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]

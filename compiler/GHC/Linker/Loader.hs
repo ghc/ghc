@@ -230,10 +230,10 @@ loadDependencies interp hsc_env pls span needed_mods = do
    -- Find what packages and linkables are required
    deps <- getLinkDeps opts interp pls span needed_mods
 
-   let this_pkgs_needed = ldNeededUnits deps
+   let this_pkgs_needed = ldAllUnits deps
 
    -- Link the packages and modules required
-   pls1 <- loadPackages' interp hsc_env (ldUnits deps) pls
+   pls1 <- loadPackages' interp hsc_env (ldNeededUnits deps) pls
    (pls2, succ) <- loadModuleLinkables interp hsc_env pls1 (ldNeededLinkables deps)
    let this_pkgs_loaded = udfmRestrictKeys all_pkgs_loaded $ getUniqDSet trans_pkgs_needed
        all_pkgs_loaded = pkgs_loaded pls2
