@@ -1019,7 +1019,7 @@ elimStackStores stackmap stackmaps area_off nodes
 
 setInfoTableStackMap :: Platform -> NonDet.LabelMap StackMap -> CmmDecl -> CmmDecl
 setInfoTableStackMap platform stackmaps (CmmProc top_info@TopInfo{..} l v g)
-  = CmmProc top_info{ info_tbls = Det.mapMapWithKey fix_info info_tbls } l v g
+  = CmmProc top_info{ info_tbls = NonDet.mapMapWithKey fix_info info_tbls } l v g
   where
     fix_info lbl info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
        info_tbl { cit_rep = StackRep (get_liveness lbl) }

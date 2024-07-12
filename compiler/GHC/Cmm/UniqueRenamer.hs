@@ -107,7 +107,7 @@ detRenameCmmGroup dufm group = swap (runState (mapM go group) dufm)
       = CmmData <$> uniqRename sec <*> uniqRename d
 
     goTop :: DCmmTopInfo -> State DetUniqFM CmmTopInfo
-    goTop (TopInfo (DWrap i) b) = TopInfo . Det.mapFromList <$> uniqRename i <*> pure b
+    goTop (TopInfo (DWrap i) b) = TopInfo . NonDet.mapFromList <$> uniqRename i <*> pure b
 
     goCmmGraph :: DCmmGraph -> State DetUniqFM CmmGraph
     goCmmGraph (CmmGraph entry bs) = CmmGraph <$> uniqRename entry <*> goGraph bs
@@ -164,10 +164,6 @@ instance UniqRenamable CmmDataDecl where
     = CmmData <$> uniqRename sec <*> uniqRename d
   uniqRename _ = error "impossible"
 
-instance UniqRenamable CmmTopInfo where
-  uniqRename TopInfo{info_tbls, stack_info}
-    = TopInfo <$> uniqRename info_tbls <*> pure stack_info
-
 instance UniqRenamable CmmStatics where
   uniqRename (CmmStatics clbl info ccs lits1 lits2)
     = CmmStatics <$> uniqRename clbl <*> uniqRename info <*> pure ccs <*> mapM uniqRename lits1 <*> mapM uniqRename lits2
@@ -206,11 +202,6 @@ instance UniqRenamable CmmLit where
       CmmLabelDiffOff <$> uniqRename lbl1 <*> uniqRename lbl2 <*> pure i <*> pure w
     CmmBlock bid -> CmmBlock <$> uniqRename bid
     CmmHighStackMark -> pure CmmHighStackMark
-
--- This is fine because LabelMap is backed by a deterministic UDFM
-instance UniqRenamable a {- for 'Body' and on 'RawCmmStatics' -}
-  => UniqRenamable (Det.LabelMap a) where
-  uniqRename lm = Det.mapFromListWith panicMapKeysNotInjective <$> traverse (\(l,x) -> (,) <$> uniqRename l <*> uniqRename x) (Det.mapToList lm)
 
 {- instance UniqRenamable CmmGraph where
   uniqRename (CmmGraph e g) = CmmGraph <$> uniqRename e <*> uniqRename g
@@ -297,6 +288,6 @@ instance (UniqRenamable a) => UniqRenamable (Maybe a) where
   uniqRename (Just x) = Just <$> uniqRename x
 
 -- | Utility panic used by UniqRenamable instances for Map-like datatypes
-panicMapKeysNotInjective :: a -> b -> c
-panicMapKeysNotInjective _ _ = error "this should be impossible because the function which maps keys should be injective"
+--panicMapKeysNotInjective :: a -> b -> c
+--panicMapKeysNotInjective _ _ = error "this should be impossible because the function which maps keys should be injective"
 

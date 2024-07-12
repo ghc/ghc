@@ -16,7 +16,6 @@ import GHC.Cmm.ContFlowOpt
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import Data.Functor.Classes (liftEq)
 import Data.Maybe (mapMaybe)

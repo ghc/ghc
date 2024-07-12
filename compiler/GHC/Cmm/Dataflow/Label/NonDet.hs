@@ -303,7 +303,7 @@ instance TrieMap LabelMap where
   emptyTM       = mapEmpty
   lookupTM k m  = mapLookup k m
   alterTM k f m = mapAlter f k m
-  foldTM = error "TrieMap: NonDet.LabelMap"
+  foldTM k m z = nonDetMapFoldr k z m
   filterTM f m  = mapFilter f m
 
 

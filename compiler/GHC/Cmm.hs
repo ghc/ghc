@@ -16,7 +16,7 @@ module GHC.Cmm (
      CmmProgram, CmmGroup, CmmGroupSRTs, RawCmmGroup, GenCmmGroup,
      CmmDecl, DCmmDecl, CmmDeclSRTs, GenCmmDecl(..),
      CmmDataDecl, cmmDataDeclCmmDecl, DCmmGraph,
-     CmmGraph, GenCmmGraph(..), GenGenCmmGraph(..),
+     CmmGraph, GenCmmGraph, GenGenCmmGraph(..),
      toBlockMap, revPostorder, toBlockList,
      CmmBlock, RawCmmDecl,
      Section(..), SectionType(..),
@@ -57,7 +57,6 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Expr
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Utils.Outputable
 

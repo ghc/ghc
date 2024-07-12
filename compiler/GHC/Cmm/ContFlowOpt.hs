@@ -11,7 +11,6 @@ import GHC.Prelude hiding (succ, unzip, zip)
 
 import GHC.Cmm.Dataflow.Block hiding (blockConcat)
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.BlockId
 import GHC.Cmm
@@ -140,7 +139,7 @@ cmmCfgOptsProc :: Bool -> CmmDecl -> CmmDecl
 cmmCfgOptsProc split (CmmProc info lbl live g) = CmmProc info' lbl live g'
     where (g', env) = blockConcat split g
           info' = info{ info_tbls = new_info_tbls }
-          new_info_tbls = Det.mapFromList (map upd_info (Det.mapToList (info_tbls info)))
+          new_info_tbls = NonDet.mapFromList (map upd_info (NonDet.nonDetMapToList (info_tbls info)))
 
           -- If we changed any labels, then we have to update the info tables
           -- too, except for the top-level info table because that might be
@@ -433,11 +432,11 @@ removeUnreachableBlocksProc _ proc@(CmmProc info lbl live g)
      info' = info { info_tbls = keep_used (info_tbls info) }
              -- Remove any info_tbls for unreachable
 
-     keep_used :: Det.LabelMap CmmInfoTable -> Det.LabelMap CmmInfoTable
-     keep_used bs = Det.mapFoldlWithKey keep Det.mapEmpty bs
+     keep_used :: NonDet.LabelMap CmmInfoTable -> NonDet.LabelMap CmmInfoTable
+     keep_used bs = NonDet.nonDetMapFoldlWithKey keep NonDet.mapEmpty bs
 
-     keep :: Det.LabelMap CmmInfoTable -> Det.Label -> CmmInfoTable -> Det.LabelMap CmmInfoTable
-     keep env l i | l `NonDet.setMember` used_lbls = Det.mapInsert l i env
+     keep :: NonDet.LabelMap CmmInfoTable -> NonDet.Label -> CmmInfoTable -> NonDet.LabelMap CmmInfoTable
+     keep env l i | l `NonDet.setMember` used_lbls = NonDet.mapInsert l i env
                   | otherwise               = env
 
      used_blocks :: [CmmBlock]

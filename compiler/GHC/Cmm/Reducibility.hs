@@ -43,7 +43,6 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dominators
 import GHC.Cmm.Dataflow.Graph hiding (addBlock)
-import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Dataflow.Label (Label)
 import GHC.Data.Graph.Collapse

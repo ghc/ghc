@@ -26,7 +26,6 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Config
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
 import GHC.Cmm.Dataflow.Label.NonDet (lookupFact, Label)
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Dataflow
@@ -746,7 +745,7 @@ getLabelledBlocks platform decl = case decl of
                                             | not (isThunkRep (cit_rep info))
                                             ]
    CmmProc top_info _ _ _           -> [ (BlockLabel blockId, caf_lbl)
-                                       | (blockId, info) <- Det.mapToList (info_tbls top_info)
+                                       | (blockId, info) <- NonDet.nonDetMapToList (info_tbls top_info)
                                        , let rep = cit_rep info
                                        , not (isStaticRep rep) || not (isThunkRep rep)
                                        , let !caf_lbl = mkCAFfyLabel platform (cit_lbl info)
@@ -813,7 +812,7 @@ getCAFs platform cafEnv = mapMaybe getCAFLabel
     getCAFLabel :: CmmDecl -> Maybe (Maybe Label, CAFfyLabel, Set CAFfyLabel)
 
     getCAFLabel (CmmProc top_info top_lbl _ g)
-      | Just info <- Det.mapLookup (g_entry g) (info_tbls top_info)
+      | Just info <- NonDet.mapLookup (g_entry g) (info_tbls top_info)
       , let rep = cit_rep info
       , isStaticRep rep && isThunkRep rep
       , Just cafs <- NonDet.mapLookup (g_entry g) cafEnv
@@ -839,7 +838,7 @@ getStaticFuns :: [CmmDecl] -> [(BlockId, CLabel)]
 getStaticFuns decls =
   [ (g_entry g, lbl)
   | CmmProc top_info _ _ g <- decls
-  , Just info <- [Det.mapLookup (g_entry g) (info_tbls top_info)]
+  , Just info <- [NonDet.mapLookup (g_entry g) (info_tbls top_info)]
   , Just (id, _) <- [cit_clo info]
   , let rep = cit_rep info
   , isStaticRep rep && isFunRep rep
@@ -1296,7 +1295,7 @@ updInfoSRTs profile srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
   | otherwise = [ proc ]
   where
     proc = CmmProc top_info { info_tbls = newTopInfo } top_l live g
-    newTopInfo = Det.mapMapWithKey updInfoTbl (info_tbls top_info)
+    newTopInfo = NonDet.mapMapWithKey updInfoTbl (info_tbls top_info)
     updInfoTbl l info_tbl
       | l == g_entry g, Just (inf, _) <- maybeStaticClosure = inf
       | otherwise  = info_tbl { cit_srt = NonDet.mapLookup l srt_env }
@@ -1307,7 +1306,7 @@ updInfoSRTs profile srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
     maybeStaticClosure :: Maybe (CmmInfoTable, CmmDeclSRTs)
     maybeStaticClosure
       | Just info_tbl@CmmInfoTable{..} <-
-           Det.mapLookup (g_entry g) (info_tbls top_info)
+           NonDet.mapLookup (g_entry g) (info_tbls top_info)
       , Just (id, ccs) <- cit_clo
       , isStaticRep cit_rep =
         let

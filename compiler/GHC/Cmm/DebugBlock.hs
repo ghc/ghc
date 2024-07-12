@@ -51,7 +51,6 @@ import GHC.Utils.Misc      ( partitionWith, seqList )
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 
 import Data.Maybe

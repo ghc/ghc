@@ -30,7 +30,6 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label (Label)
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
-import qualified GHC.Cmm.Dataflow.Label as Det
 
 -- Compute a minimal set of proc points for a control-flow graph.
 
@@ -274,7 +273,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
   --    the proc point is a callPP)
   -- Due to common blockification, we may overestimate the set of procpoints.
   let add_label map pp = NonDet.mapInsert pp lbls map
-        where lbls | pp == entry = (entry_label, fmap cit_lbl (Det.mapLookup entry info_tbls))
+        where lbls | pp == entry = (entry_label, fmap cit_lbl (NonDet.mapLookup entry info_tbls))
                    | otherwise   = (block_lbl, guard (NonDet.setMember pp callPPs) >>
                                                  Just info_table_lbl)
                    where block_lbl      = blockLbl pp
@@ -347,11 +346,11 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
           | otherwise
           = case expectJust "pp label" $ NonDet.mapLookup bid procLabels of
               (lbl, Just info_lbl)
-                 -> CmmProc (TopInfo { info_tbls = Det.mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl)
+                 -> CmmProc (TopInfo { info_tbls = NonDet.mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl)
                                      , stack_info=stack_info})
                             lbl live g'
               (lbl, Nothing)
-                 -> CmmProc (TopInfo {info_tbls = Det.mapEmpty, stack_info=stack_info})
+                 -> CmmProc (TopInfo {info_tbls = NonDet.mapEmpty, stack_info=stack_info})
                             lbl live g'
              where
               g' = replacePPIds g
@@ -414,8 +413,8 @@ attachContInfoTables :: ProcPointSet -> CmmDecl -> CmmDecl
 attachContInfoTables call_proc_points (CmmProc top_info top_l live g)
  = CmmProc top_info{info_tbls = info_tbls'} top_l live g
  where
-   info_tbls' = Det.mapUnion (info_tbls top_info) $
-                Det.mapFromList [ (l, mkEmptyContInfoTable (infoTblLbl l))
+   info_tbls' = NonDet.mapUnion (info_tbls top_info) $
+                NonDet.mapFromList [ (l, mkEmptyContInfoTable (infoTblLbl l))
                             | l <- NonDet.nonDetSetElems call_proc_points
                             , l /= g_entry g ]
 attachContInfoTables _ other_decl

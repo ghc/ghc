@@ -10,7 +10,7 @@ import GHC.Cmm
 import GHC.Cmm.CLabel (CLabel, mkAsmTempLabel)
 import GHC.Cmm.Dataflow (O)
 import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
-import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Cmm.Info.Build (emptySRT)
 import GHC.Cmm.Pipeline (cmmPipeline)
 import GHC.Data.Stream (Stream, liftIO)
@@ -20,7 +20,7 @@ import GHC.Driver.Env.Types (HscEnv)
 import GHC.Driver.Flags (GeneralFlag (..), DumpFlag(Opt_D_ipe_stats))
 import GHC.Driver.DynFlags (gopt, targetPlatform)
 import GHC.Driver.Config.StgToCmm
-import GHC.Driver.Config.Cmm
+import GHC.Driver.Config.Cmm ( initCmmConfig )
 import GHC.Prelude
 import GHC.Runtime.Heap.Layout (isStackRep)
 import GHC.Settings (platformTablesNextToCode)
@@ -288,7 +288,7 @@ lookupEstimatedTicks hsc_env ipes stats cmm_group_srts =
       -> GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
       -> (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
     collectInfoTables (!acc, !stats) (CmmProc h _ _ _) =
-        mapFoldlWithKey go (acc, stats) (info_tbls h)
+        nonDetMapFoldlWithKey go (acc, stats) (info_tbls h)
       where
         go :: (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
            -> Label

@@ -17,7 +17,6 @@ import GHC.Cmm
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dominators
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Reducibility
 import GHC.Cmm.Switch

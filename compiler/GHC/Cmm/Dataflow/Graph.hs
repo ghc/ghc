@@ -20,7 +20,6 @@ module GHC.Cmm.Dataflow.Graph
 import GHC.Prelude
 import GHC.Utils.Misc
 
-import qualified GHC.Cmm.Dataflow.Label as Det
 import GHC.Cmm.Dataflow.Label (Label)
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
 import GHC.Cmm.Dataflow.Block

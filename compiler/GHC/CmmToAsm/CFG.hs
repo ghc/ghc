@@ -49,7 +49,6 @@ import GHC.Cmm as Cmm
 
 import GHC.Cmm.Switch
 import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
-import qualified GHC.Cmm.Dataflow.Label as Det
 import GHC.Cmm.Dataflow.Block
 import qualified GHC.Cmm.Dataflow.Graph as G
 
