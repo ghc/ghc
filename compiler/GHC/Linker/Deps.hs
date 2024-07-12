@@ -49,7 +49,6 @@ import GHC.Unit.Home
 import GHC.Data.Maybe
 
 import Control.Applicative
-import Control.Monad
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 
@@ -209,7 +208,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
     module_linkable = \case
       LinkHomeModule hmi ->
-        pure (expectJust "getLinkDeps" (homeModLinkable hmi))
+        adjust_linkable (expectJust "getLinkDeps" (homeModLinkable hmi))
 
       LinkObjectModule iface loc -> do
         let mod = mi_module iface
