@@ -1113,7 +1113,7 @@ layoutNativeCall profile call_type start_off arg_rep reps =
 
       -- sort the register parameters by register and add them to the stack
       regs_order :: Map.Map GlobalReg Int
-      regs_order = Map.fromList $ zip (allArgRegsCover platform) [0..]
+      regs_order = Map.fromList $ zip (map globalRegUseGlobalReg $ allArgRegsCover platform) [0..]
 
       reg_order :: GlobalReg -> (Int, GlobalReg)
       reg_order reg | Just n <- Map.lookup reg regs_order = (n, reg)

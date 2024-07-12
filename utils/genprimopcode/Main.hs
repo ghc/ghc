@@ -345,14 +345,9 @@ gen_hs_source (Info defaults entries) =
                  Section { } -> error "Section is not an entity"
              ]
 
-           extra options = case on_llvm_only options ++ can_fail options of
-             [m1,m2] -> "\n\n__/Warning:/__ this " ++ m1 ++ " and " ++ m2 ++ "."
+           extra options = case can_fail options of
              [m] -> "\n\n__/Warning:/__ this " ++ m ++ "."
              _ -> ""
-
-           on_llvm_only options
-             = [ "is only available on LLVM"
-               | Just (OptionTrue _) <- [lookup_attrib "llvm_only" options] ]
 
            can_fail options
              = [ "can fail with an unchecked exception"
@@ -475,39 +470,45 @@ gen_wrappers (Info _ entries)
      ++ "import qualified GHC.Prim\n"
      ++ "import GHC.Tuple ()\n"
      ++ "import GHC.Prim (" ++ types ++ ")\n"
-     ++ unlines (concatMap f specs)
+     ++ unlines (concatMap mk_wrapper wrappers)
      where
-        specs = filter (not.dodgy) $
-                filter (not.is_llvm_only) $
-                filter is_primop entries
-        tycons = foldr union [] $ map (tyconsIn . ty) specs
+        wrappers = filter want_wrapper entries
+        tycons = foldr union [] $ map (tyconsIn . ty) wrappers
         tycons' = filter (`notElem` [TyCon "()", TyCon "Bool"]) tycons
         types = concat $ intersperse ", " $ map show tycons'
-        f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
-                     src_name = wrap (name spec)
-                     lhs = src_name ++ " " ++ unwords args
-                     rhs = wrapQual (name spec) ++ " " ++ unwords args
-                 in ["{-# NOINLINE " ++ src_name ++ " #-}",
-                     src_name ++ " :: " ++ pprTy (ty spec),
-                     lhs ++ " = " ++ rhs]
+        mk_wrapper spec =
+          let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
+              src_name = wrap (name spec)
+              lhs = src_name ++ " " ++ unwords args
+              rhs = wrap_qual (name spec) ++ " " ++ unwords args
+          in ["{-# NOINLINE " ++ src_name ++ " #-}",
+              src_name ++ " :: " ++ pprTy (ty spec),
+              lhs ++ " = " ++ rhs]
         wrap nm | isLower (head nm) = nm
                 | otherwise = "(" ++ nm ++ ")"
-        wrapQual nm | isLower (head nm) = "GHC.Prim." ++ nm
-                    | otherwise         = "(GHC.Prim." ++ nm ++ ")"
+        wrap_qual nm | isLower (head nm) = "GHC.Prim." ++ nm
+                     | otherwise         = "(GHC.Prim." ++ nm ++ ")"
 
-        dodgy spec
-           = name spec `elem`
-             [-- tagToEnum# is really magical, and can't have
+        want_wrapper :: Entry -> Bool
+        want_wrapper entry =
+          and
+            [ is_primop entry
+            , not $ name entry `elem` magical_primops
+            , not $ is_vector entry
+                -- We currently don't generate wrappers for vector primops.
+                --
+                -- SIMD NCG TODO: this was the logic in place when SIMD primops
+                -- were LLVM only; but now that this is no longer the case I
+                -- suppose this choice can be revisited?
+            ]
+
+        magical_primops :: [String]
+        magical_primops =
+          [ "tagToEnum#"
+              -- tagToEnum# is really magical, and can't have
               -- a wrapper since its implementation depends on
               -- the type of its result
-              "tagToEnum#"
-             ]
-
-        is_llvm_only :: Entry -> Bool
-        is_llvm_only entry =
-            case lookup_attrib "llvm_only" (opts entry) of
-              Just (OptionTrue _) -> True
-              _                   -> False
+          ]
 
 gen_primop_list :: Info -> String
 gen_primop_list (Info _ entries)

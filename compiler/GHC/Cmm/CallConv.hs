@@ -7,7 +7,6 @@ module GHC.Cmm.CallConv (
 ) where
 
 import GHC.Prelude
-import Data.List (nub)
 
 import GHC.Cmm.Expr
 import GHC.Runtime.Heap.Layout
@@ -17,6 +16,8 @@ import GHC.Platform
 import GHC.Platform.Profile
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Data.List.SetOps (nubOrdBy)
+import Data.Ord (comparing)
 
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.
@@ -67,14 +68,16 @@ assignArgumentsPos profile off conv arg_ty reps = (stk_off, assignments)
       assign_regs assts (r:rs) regs | isVecType ty   = vec
                                     | isFloatType ty = float
                                     | otherwise      = int
-        where vec = case (w, regs) of
-                      (W128, AvailRegs vs fs ds ls (s:ss))
-                          | passVectorInReg W128 profile -> k (RegisterParam (XmmReg s), AvailRegs vs fs ds ls ss)
-                      (W256, AvailRegs vs fs ds ls (s:ss))
-                          | passVectorInReg W256 profile -> k (RegisterParam (YmmReg s), AvailRegs vs fs ds ls ss)
-                      (W512, AvailRegs vs fs ds ls (s:ss))
-                          | passVectorInReg W512 profile -> k (RegisterParam (ZmmReg s), AvailRegs vs fs ds ls ss)
-                      _ -> (assts, (r:rs))
+        where vec = case regs of
+                      AvailRegs vs fs ds ls (s:ss)
+                        | passVectorInReg w profile
+                          -> let reg_class = case w of
+                                    W128 -> XmmReg
+                                    W256 -> YmmReg
+                                    W512 -> ZmmReg
+                                    _    -> panic "CmmCallConv.assignArgumentsPos: Invalid vector width"
+                              in k (RegisterParam (reg_class s), AvailRegs vs fs ds ls ss)
+                      _ -> (assts, r:rs)
               float = case (w, regs) of
                         (W32, AvailRegs vs fs ds ls (s:ss))
                             | passFloatInXmm          -> k (RegisterParam (FloatReg s), AvailRegs vs fs ds ls ss)
@@ -213,28 +216,26 @@ allRegs platform =
 nodeOnly :: AvailRegs
 nodeOnly = noAvailRegs { availVanillaRegs = [VanillaReg 1] }
 
--- This returns the set of global registers that *cover* the machine registers
--- used for argument passing. On platforms where registers can overlap---right
--- now just x86-64, where Float and Double registers overlap---passing this set
--- of registers is guaranteed to preserve the contents of all live registers. We
--- only use this functionality in hand-written C-- code in the RTS.
-realArgRegsCover :: Platform -> [GlobalReg]
+-- | This returns the set of global registers that *cover* the machine registers
+-- used for argument passing. On platforms where registers can overlap, passing
+-- this set of registers is guaranteed to preserve the contents of all live
+-- registers. We only use this functionality in hand-written C-- code in the RTS.
+realArgRegsCover :: Platform -> [GlobalRegUse]
 realArgRegsCover platform
     | passFloatArgsInXmm platform
-    = realVanillaRegs    platform ++
-      realLongRegs       platform ++
-      realDoubleRegs     platform
-        -- we only need to save the low Double part of XMM registers.
-        -- Moreover, the NCG can't load/store full XMM
-        -- registers for now...
+    = [ GlobalRegUse r (globalRegSpillType platform r) | r <- realVanillaRegs platform ]
+   ++ [ GlobalRegUse r (globalRegSpillType platform r) | r <- realLongRegs    platform ]
+   ++ [ GlobalRegUse r (globalRegSpillType platform r) | r <- realDoubleRegs  platform ]
+        -- The above seems wrong, as it means we only save the low 64 bits
+        -- of XMM/YMM/ZMM registers on X86_64, which is probably wrong.
+        --
+        -- Challenge: change the realDoubleRegs line to use ZmmReg instead,
+        -- and fix the resulting compiler errors.
 
     | otherwise
-    = realVanillaRegs platform ++
-      realFloatRegs   platform ++
-      realDoubleRegs  platform ++
-      realLongRegs    platform
-        -- we don't save XMM registers if they are not used for parameter passing
-
+    = [ GlobalRegUse r (globalRegSpillType platform r)
+      | r <- realVanillaRegs platform ++ realFloatRegs platform ++ realDoubleRegs platform ++ realLongRegs platform
+      ] -- we don't save XMM registers if they are not used for parameter passing
 
 {-
 
@@ -335,9 +336,11 @@ realArgRegsCover platform
            make sure to also update GHC.StgToByteCode.layoutNativeCall
  -}
 
--- Like realArgRegsCover but always includes the node. This covers all real
+-- | Like 'realArgRegsCover' but always includes the node. This covers all real
 -- and virtual registers actually used for passing arguments.
-
-allArgRegsCover :: Platform -> [GlobalReg]
+allArgRegsCover :: Platform -> [GlobalRegUse]
 allArgRegsCover platform =
-  nub (VanillaReg 1 : realArgRegsCover platform)
+  nubOrdBy (comparing globalRegUseGlobalReg)
+    (GlobalRegUse node (globalRegSpillType platform node) : realArgRegsCover platform)
+  where
+    node = VanillaReg 1

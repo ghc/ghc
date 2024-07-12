@@ -664,7 +664,8 @@ mkNativeCallInfoSig platform NativeCallInfo{..}
   | otherwise
   = assertPpr (length regs <= 24) (text "too many registers for bitmap:" <+> ppr (length regs)) {- 24 bits for register bitmap -}
     assertPpr (cont_offset < 255) (text "continuation offset too large:" <+> ppr cont_offset) {- 8 bits for continuation offset (only for NativeTupleReturn) -}
-    assertPpr (all (`elem` regs) (regSetToList nativeCallRegs)) (text "not all registers accounted for") {- all regs accounted for -}
+    assertPpr (all (`elem` (map globalRegUseGlobalReg regs)) (regSetToList nativeCallRegs)) (text "not all registers accounted for") {- all regs accounted for -}
+      -- SLD: the above assertion seems wrong, because it doesn't account for register overlap
     foldl' reg_bit 0 (zip regs [0..]) .|. (cont_offset `shiftL` 24)
   where
     cont_offset :: Word32
@@ -672,8 +673,8 @@ mkNativeCallInfoSig platform NativeCallInfo{..}
       | nativeCallType == NativeTupleReturn = fromIntegral nativeCallStackSpillSize
       | otherwise                           = 0 -- there is no continuation for primcalls
 
-    reg_bit :: Word32 -> (GlobalReg, Int) -> Word32
-    reg_bit x (r, n)
+    reg_bit :: Word32 -> (GlobalRegUse, Int) -> Word32
+    reg_bit x (GlobalRegUse r _, n)
       | r `elemRegSet` nativeCallRegs = x .|. 1 `shiftL` n
       | otherwise                     = x
     regs = allArgRegsCover platform

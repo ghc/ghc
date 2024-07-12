@@ -770,13 +770,13 @@ safety  :: { Safety }
         : {- empty -}                   { PlayRisky }
         | STRING                        {% parseSafety $1 }
 
-vols    :: { [GlobalReg] }
+vols    :: { [GlobalRegUse] }
         : '[' ']'                       { [] }
-        | '[' '*' ']'                   {% do platform <- PD.getPlatform
-                                         ; return (realArgRegsCover platform) }
-                                           -- All of them. See comment attached
-                                           -- to realArgRegsCover
-        | '[' globals ']'               { map globalRegUseGlobalReg $2 }
+        | '[' '*' ']'                   {% do platform <- PD.getPlatform;
+                                              return $ realArgRegsCover platform }
+                                               -- All of them. See comment attached
+                                               -- to realArgRegsCover
+        | '[' globals ']'               { $2 }
 
 globals :: { [GlobalRegUse] }
         : GLOBALREG                     { [$1] }
@@ -1377,7 +1377,7 @@ mkReturnSimple profile actuals updfr_off =
   where e = entryCode platform (cmmLoadGCWord platform (CmmStackSlot Old updfr_off))
         platform = profilePlatform profile
 
-doRawJump :: CmmParse CmmExpr -> [GlobalReg] -> CmmParse ()
+doRawJump :: CmmParse CmmExpr -> [GlobalRegUse] -> CmmParse ()
 doRawJump expr_code vols = do
   profile <- getProfile
   expr <- expr_code

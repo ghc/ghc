@@ -554,12 +554,12 @@ backendPrimitiveImplementation (Named NoBackend)   = GenericPrimitives
 -- `NotValid`, it carries a message that is shown to
 -- users.
 backendSimdValidity :: Backend -> Validity' String
-backendSimdValidity (Named NCG)         = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
+backendSimdValidity (Named NCG)         = IsValid
 backendSimdValidity (Named LLVM)        = IsValid
-backendSimdValidity (Named ViaC)        = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
-backendSimdValidity (Named JavaScript)  = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
-backendSimdValidity (Named Interpreter) = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
-backendSimdValidity (Named NoBackend)   = NotValid $ unlines ["SIMD vector instructions require the LLVM back-end.","Please use -fllvm."]
+backendSimdValidity (Named ViaC)        = NotValid $ unlines ["SIMD vector instructions require using the NCG or the LLVM backend."]
+backendSimdValidity (Named JavaScript)  = NotValid $ unlines ["SIMD vector instructions require using the NCG or the LLVM backend."]
+backendSimdValidity (Named Interpreter) = NotValid $ unlines ["SIMD vector instructions require using the NCG or the LLVM backend."]
+backendSimdValidity (Named NoBackend)   = NotValid $ unlines ["SIMD vector instructions require using the NCG or the LLVM backend."]
 
 -- | This flag says whether the back end supports large
 -- binary blobs.  See Note [Embedding large binary blobs]

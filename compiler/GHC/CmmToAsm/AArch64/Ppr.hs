@@ -306,7 +306,6 @@ pprReg w r = case r of
   RegReal    (RealRegSingle i) -> ppr_reg_no w i
   -- virtual regs should not show up, but this is helpful for debugging.
   RegVirtual (VirtualRegI u)   -> text "%vI_" <> pprUniqueAlways u
-  RegVirtual (VirtualRegF u)   -> text "%vF_" <> pprUniqueAlways u
   RegVirtual (VirtualRegD u)   -> text "%vD_" <> pprUniqueAlways u
   _                            -> pprPanic "AArch64.pprReg" (text $ show r)
 
@@ -332,13 +331,13 @@ pprReg w r = case r of
          | i <= 63, w == W16 = text "h" <> int (i-32)
          | i <= 63, w == W32 = text "s" <> int (i-32)
          | i <= 63, w == W64 = text "d" <> int (i-32)
-         -- no support for 'q'uad in GHC's NCG yet.
-         | otherwise = text "very naughty powerpc register"
+         | i <= 63, w == W128= text "q" <> int (i-32)
+         | otherwise = text "very naughty AArch64 register" <+> parens (text (show w) <+> int i)
 
 isFloatOp :: Operand -> Bool
 isFloatOp (OpReg _ (RegReal (RealRegSingle i))) | i > 31 = True
-isFloatOp (OpReg _ (RegVirtual (VirtualRegF _))) = True
 isFloatOp (OpReg _ (RegVirtual (VirtualRegD _))) = True
+-- SIMD NCG TODO: what about VirtualVecV128? Could be floating-point or not?
 isFloatOp _ = False
 
 pprInstr :: IsDoc doc => Platform -> Instr -> doc

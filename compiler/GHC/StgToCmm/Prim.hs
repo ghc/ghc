@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -47,7 +48,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import Data.Maybe
 
-import Control.Monad (liftM, when, unless)
+import Control.Monad (liftM, when, unless, zipWithM_)
 import GHC.Utils.Outputable
 
 ------------------------------------------------------------------------
@@ -966,16 +967,8 @@ emitPrimOp cfg primop =
     checkVecCompatibility cfg vcat n w
     when (es `lengthIsNot` n) $
         panic "emitPrimOp: VecPackOp has wrong number of arguments"
-    doVecPackOp ty zeros es res
+    doVecPackOp ty es res
    where
-    zeros :: CmmExpr
-    zeros = CmmLit $ CmmVec (replicate n zero)
-
-    zero :: CmmLit
-    zero = case vcat of
-             IntVec   -> CmmInt 0 w
-             WordVec  -> CmmInt 0 w
-             FloatVec -> CmmFloat 0 w
 
     ty :: CmmType
     ty = vecVmmType vcat n w
@@ -2596,55 +2589,51 @@ checkVecCompatibility cfg vcat l w =
 -- Helpers for translating vector packing and unpacking.
 
 doVecPackOp :: CmmType       -- Type of vector
-            -> CmmExpr       -- Initial vector
             -> [CmmExpr]     -- Elements
             -> CmmFormal     -- Destination for result
             -> FCode ()
-doVecPackOp ty z es res = do
-    dst <- newTemp ty
-    emitAssign (CmmLocal dst) z
-    vecPack dst es 0
+doVecPackOp ty es dst = do
+  emitAssign (CmmLocal dst) (CmmLit $ CmmVec (replicate l zero))
+  zipWithM_ vecPack es [0..]
   where
-    vecPack :: CmmFormal -> [CmmExpr] -> Int -> FCode ()
-    vecPack src [] _ =
-        emitAssign (CmmLocal res) (CmmReg (CmmLocal src))
-
-    vecPack src (e : es) i = do
-        dst <- newTemp ty
-        if isFloatType (vecElemType ty)
-          then emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Insert len wid)
-                                                    [CmmReg (CmmLocal src), e, iLit])
-          else emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Insert len wid)
-                                                    [CmmReg (CmmLocal src), e, iLit])
-        vecPack dst es (i + 1)
+    -- SIMD NCG TODO: it should be possible to emit better code
+    -- for "pack" than doing a bunch of vector insertions in a row.
+    vecPack :: CmmExpr -> Int -> FCode ()
+    vecPack e i
+      | isFloatType (vecElemType ty)
+      = emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Insert l w)
+                                             [CmmReg (CmmLocal dst), e, iLit])
+      | otherwise
+      = emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Insert l w)
+                                             [CmmReg (CmmLocal dst), e, iLit])
       where
         -- vector indices are always 32-bits
         iLit = CmmLit (CmmInt (toInteger i) W32)
 
-    len :: Length
-    len = vecLength ty
+    l :: Length
+    l = vecLength ty
+    w :: Width
+    w = typeWidth (vecElemType ty)
 
-    wid :: Width
-    wid = typeWidth (vecElemType ty)
+    zero :: CmmLit
+    zero
+      | isFloatType (vecElemType ty)
+      = CmmFloat 0 w
+      | otherwise
+      = CmmInt 0 w
 
 doVecUnpackOp :: CmmType       -- Type of vector
               -> CmmExpr       -- Vector
               -> [CmmFormal]   -- Element results
               -> FCode ()
-doVecUnpackOp ty e res =
-    vecUnpack res 0
+doVecUnpackOp ty e res = zipWithM_ vecUnpack res [0..]
   where
-    vecUnpack :: [CmmFormal] -> Int -> FCode ()
-    vecUnpack [] _ =
-        return ()
-
-    vecUnpack (r : rs) i = do
-        if isFloatType (vecElemType ty)
-          then emitAssign (CmmLocal r) (CmmMachOp (MO_VF_Extract len wid)
-                                             [e, iLit])
-          else emitAssign (CmmLocal r) (CmmMachOp (MO_V_Extract len wid)
-                                             [e, iLit])
-        vecUnpack rs (i + 1)
+    vecUnpack :: CmmFormal -> Int -> FCode ()
+    vecUnpack r i
+      | isFloatType (vecElemType ty)
+      = emitAssign (CmmLocal r) (CmmMachOp (MO_VF_Extract len wid) [e, iLit])
+      | otherwise
+      = emitAssign (CmmLocal r) (CmmMachOp (MO_V_Extract len wid) [e, iLit])
       where
         -- vector indices are always 32-bits
         iLit = CmmLit (CmmInt (toInteger i) W32)
@@ -2667,8 +2656,8 @@ doVecInsertOp ty src e idx res = do
     let idx' :: CmmExpr
         idx' = CmmMachOp (MO_SS_Conv (wordWidth platform) W32) [idx]
     if isFloatType (vecElemType ty)
-      then emitAssign (CmmLocal res) (CmmMachOp (MO_VF_Insert len wid) [src, e, idx'])
-      else emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert len wid) [src, e, idx'])
+    then emitAssign (CmmLocal res) (CmmMachOp (MO_VF_Insert len wid) [src, e, idx'])
+    else emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert len wid) [src, e, idx'])
   where
 
     len :: Length

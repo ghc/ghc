@@ -49,8 +49,9 @@ pprLlvmCmmDecl (CmmData _ lmdata) = do
   return ( vcat $ map (pprLlvmData opts) lmdata
          , vcat $ map (pprLlvmData opts) lmdata)
 
-pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
-  = do let lbl = case mb_info of
+pprLlvmCmmDecl (CmmProc mb_info entry_lbl liveWithUses (ListGraph blks))
+  = do let live = map globalRegUseGlobalReg liveWithUses
+           lbl = case mb_info of
                      Nothing -> entry_lbl
                      Just (CmmStaticsRaw info_lbl _) -> info_lbl
            link = if externallyVisibleCLabel lbl

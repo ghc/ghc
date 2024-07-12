@@ -261,25 +261,24 @@ callerSaveVolatileRegs platform = (caller_save, caller_load)
     caller_save = catAGraphs (map (callerSaveGlobalReg    platform) regs_to_save)
     caller_load = catAGraphs (map (callerRestoreGlobalReg platform) regs_to_save)
 
-    system_regs = [ Sp,SpLim,Hp,HpLim,CCCS,CurrentTSO,CurrentNursery
-                    {- ,SparkHd,SparkTl,SparkBase,SparkLim -}
-                  , BaseReg ]
+    system_regs =
+      [ GlobalRegUse r (globalRegSpillType platform r)
+      | r <- [ Sp,SpLim,Hp,HpLim,CCCS,CurrentTSO,CurrentNursery
+          {- , SparkHd,SparkTl,SparkBase,SparkLim -}
+             , BaseReg ]
+      ]
 
-    regs_to_save = filter (callerSaves platform) system_regs
+    regs_to_save = filter (callerSaves platform . globalRegUseGlobalReg) system_regs
 
-callerSaveGlobalReg :: Platform -> GlobalReg -> CmmAGraph
-callerSaveGlobalReg platform reg
-    = mkStore (get_GlobalReg_addr platform reg) (CmmReg (CmmGlobal (GlobalRegUse reg spill_ty)))
-    where
-      spill_ty = globalRegSpillType platform reg
+callerSaveGlobalReg :: Platform -> GlobalRegUse -> CmmAGraph
+callerSaveGlobalReg platform ru@(GlobalRegUse reg _ty)
+    = mkStore (get_GlobalReg_addr platform reg) (CmmReg (CmmGlobal ru))
 
-callerRestoreGlobalReg :: Platform -> GlobalReg -> CmmAGraph
-callerRestoreGlobalReg platform reg
-    = mkAssign (CmmGlobal (GlobalRegUse reg spill_ty))
+callerRestoreGlobalReg :: Platform -> GlobalRegUse -> CmmAGraph
+callerRestoreGlobalReg platform ru@(GlobalRegUse reg ty)
+    = mkAssign (CmmGlobal ru)
                (CmmLoad (get_GlobalReg_addr platform reg)
-                        spill_ty NaturallyAligned)
-    where
-      spill_ty = globalRegSpillType platform reg
+                        ty NaturallyAligned)
 
 -------------------------------------------------------------------------
 --

@@ -30,6 +30,9 @@ data NCGConfig = NCGConfig
    , ncgAsmLinting            :: !Bool            -- ^ Perform ASM linting pass
    , ncgDoConstantFolding     :: !Bool            -- ^ Perform CMM constant folding
    , ncgSseVersion            :: Maybe SseVersion -- ^ (x86) SSE instructions
+   , ncgAvxEnabled            :: !Bool
+   , ncgAvx2Enabled           :: !Bool
+   , ncgAvx512fEnabled        :: !Bool
    , ncgBmiVersion            :: Maybe BmiVersion -- ^ (x86) BMI instructions
    , ncgDumpRegAllocStages    :: !Bool
    , ncgDumpAsmStats          :: !Bool

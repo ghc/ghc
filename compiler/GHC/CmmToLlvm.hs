@@ -139,7 +139,7 @@ llvmGroupLlvmGens cmm = do
                          Nothing                   -> l
                          Just (CmmStaticsRaw info_lbl _) -> info_lbl
               lml <- strCLabel_llvm l'
-              funInsert lml =<< llvmFunTy live
+              funInsert lml =<< llvmFunTy (map globalRegUseGlobalReg live)
               return Nothing
         cdata <- fmap catMaybes $ mapM split cmm
 

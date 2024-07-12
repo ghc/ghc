@@ -173,7 +173,7 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
                     in case reg of
                         BaseReg -> baseAddr
                         _other  -> CmmLoad baseAddr
-                                     (globalRegSpillType platform reg)
+                                     (globalRegUseType reg_use)
                                      NaturallyAligned
 
         CmmRegOff greg@(CmmGlobal reg) offset ->

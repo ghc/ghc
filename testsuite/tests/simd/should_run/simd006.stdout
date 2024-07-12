@@ -1,0 +1,7 @@
+Group ALL
+  Group FloatX4
+    Running FloatX4
+      Passed 100 iterations
+  Group DoubleX2
+    Running DoubleX2
+      Passed 100 iterations

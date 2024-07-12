@@ -736,10 +736,10 @@ pprMachOp_for_C platform mop = case mop of
                 (text "FMAdd")
                 (panic $ "PprC.pprMachOp_for_C: FMAdd unsupported"
                        ++ "at width " ++ show w)
-        MO_FMA var _width  ->
+        MO_FMA var _ ->
           pprTrace "offending mop:"
-            (text $ "FMA " ++ show var)
-            (panic $ "PprC.pprMachOp_for_C: should have been handled earlier!")
+              (text $ "FMA " ++ show var)
+              (panic $ "PprC.pprMachOp_for_C: should have been handled earlier!")
 
         -- Signed comparisons
         MO_S_Ge         _ -> text ">="
@@ -825,81 +825,77 @@ pprMachOp_for_C platform mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_S_MulMayOflo"
                                       ++ " should have been handled earlier!")
 
+        MO_AlignmentCheck {} -> panic "-falignment-sanitisation not supported by unregisterised backend"
+
+-- SIMD vector instructions: currently unsupported
         MO_V_Insert {}    -> pprTrace "offending mop:"
                                 (text "MO_V_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Insert"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_V_Extract {}   -> pprTrace "offending mop:"
                                 (text "MO_V_Extract")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Extract"
-                                      ++ " should have been handled earlier!")
-
+                                      ++ "unsupported by the unregisterised backend")
         MO_V_Add {}       -> pprTrace "offending mop:"
                                 (text "MO_V_Add")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Add"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_V_Sub {}       -> pprTrace "offending mop:"
                                 (text "MO_V_Sub")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Sub"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_V_Mul {}       -> pprTrace "offending mop:"
                                 (text "MO_V_Mul")
                                 (panic $ "PprC.pprMachOp_for_C: MO_V_Mul"
-                                      ++ " should have been handled earlier!")
-
+                                      ++ "unsupported by the unregisterised backend")
         MO_VS_Quot {}     -> pprTrace "offending mop:"
                                 (text "MO_VS_Quot")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Quot"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_VS_Rem {}      -> pprTrace "offending mop:"
                                 (text "MO_VS_Rem")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Rem"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_VS_Neg {}      -> pprTrace "offending mop:"
                                 (text "MO_VS_Neg")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VS_Neg"
-                                      ++ " should have been handled earlier!")
-
+                                      ++ "unsupported by the unregisterised backend")
         MO_VU_Quot {}     -> pprTrace "offending mop:"
                                 (text "MO_VU_Quot")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VU_Quot"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_VU_Rem {}      -> pprTrace "offending mop:"
                                 (text "MO_VU_Rem")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VU_Rem"
-                                      ++ " should have been handled earlier!")
-
+                                      ++ "unsupported by the unregisterised backend")
         MO_VF_Insert {}   -> pprTrace "offending mop:"
                                 (text "MO_VF_Insert")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Insert"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_VF_Extract {}  -> pprTrace "offending mop:"
                                 (text "MO_VF_Extract")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Extract"
-                                      ++ " should have been handled earlier!")
-
+                                      ++ "unsupported by the unregisterised backend")
         MO_VF_Add {}      -> pprTrace "offending mop:"
                                 (text "MO_VF_Add")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Add"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_VF_Sub {}      -> pprTrace "offending mop:"
                                 (text "MO_VF_Sub")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Sub"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_VF_Neg {}      -> pprTrace "offending mop:"
                                 (text "MO_VF_Neg")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Neg"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_VF_Mul {}      -> pprTrace "offending mop:"
                                 (text "MO_VF_Mul")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Mul"
-                                      ++ " should have been handled earlier!")
+                                      ++ "unsupported by the unregisterised backend")
         MO_VF_Quot {}     -> pprTrace "offending mop:"
                                 (text "MO_VF_Quot")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Quot"
-                                      ++ " should have been handled earlier!")
-
-        MO_AlignmentCheck {} -> panic "-falignment-sanitisation not supported by unregisterised backend"
+                                      ++ "unsupported by the unregisterised backend")
 
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints
 signedOp (MO_S_Quot _)    = True

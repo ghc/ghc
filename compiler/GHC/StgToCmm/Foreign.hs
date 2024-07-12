@@ -431,16 +431,15 @@ emitPushArgRegs :: CmmExpr -> FCode ()
 emitPushArgRegs regs_live = do
   platform <- getPlatform
   let regs = zip (allArgRegsCover platform) [0..]
-      save_arg (reg, n) =
+      save_arg (ru@(GlobalRegUse _reg reg_ty), n) =
         let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
             live     = cmmAndWord platform regs_live mask
             cond     = cmmNeWord platform live (zeroExpr platform)
-            reg_ty   = globalRegSpillType platform reg
             width    = roundUpToWords platform
                                       (widthInBytes $ typeWidth reg_ty)
             adj_sp   = mkAssign (spReg platform)
                                 (cmmOffset platform (spExpr platform) (negate width))
-            save_reg = mkStore (spExpr platform) (CmmReg $ CmmGlobal $ GlobalRegUse reg reg_ty)
+            save_reg = mkStore (spExpr platform) (CmmReg $ CmmGlobal ru)
         in mkCmmIfThen cond $ catAGraphs [adj_sp, save_reg]
   emit . catAGraphs =<< mapM save_arg (reverse $ regs)
 
@@ -449,16 +448,15 @@ emitPopArgRegs :: CmmExpr -> FCode ()
 emitPopArgRegs regs_live = do
   platform <- getPlatform
   let regs = zip (allArgRegsCover platform) [0..]
-      save_arg (reg, n) =
+      save_arg (ru@(GlobalRegUse _reg reg_ty), n) =
         let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
             live     = cmmAndWord platform regs_live mask
             cond     = cmmNeWord platform live (zeroExpr platform)
-            reg_ty   = globalRegSpillType platform reg
             width    = roundUpToWords platform
                                       (widthInBytes $ typeWidth reg_ty)
             adj_sp   = mkAssign (spReg platform)
                                 (cmmOffset platform (spExpr platform) width)
-            restore_reg = mkAssign (CmmGlobal $ GlobalRegUse reg reg_ty)
+            restore_reg = mkAssign (CmmGlobal ru)
                                    (CmmLoad (spExpr platform) reg_ty NaturallyAligned)
         in mkCmmIfThen cond $ catAGraphs [restore_reg, adj_sp]
   emit . catAGraphs =<< mapM save_arg regs
