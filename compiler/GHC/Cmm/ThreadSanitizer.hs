@@ -19,6 +19,7 @@ import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import GHC.Cmm.Dataflow.Label
 
 import Data.Maybe (fromMaybe)
 

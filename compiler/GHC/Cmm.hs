@@ -150,7 +150,7 @@ type RawCmmDecl
 type CmmGraph = GenCmmGraph CmmNode
 type DCmmGraph = GenGenCmmGraph DWrap CmmNode
 
-type GenCmmGraph n = GenGenCmmGraph NonDet.LabelMap n
+type GenCmmGraph n = GenGenCmmGraph LabelMap n
 
 data GenGenCmmGraph s n = CmmGraph { g_entry :: BlockId, g_graph :: Graph' s Block n C C }
 type CmmBlock = Block CmmNode C C
@@ -193,7 +193,7 @@ unDeterm :: DWrap a -> [(BlockId, a)]
 unDeterm (DWrap f) = f
 
 type DCmmTopInfo = GenCmmTopInfo DWrap
-type CmmTopInfo  = GenCmmTopInfo NonDet.LabelMap
+type CmmTopInfo  = GenCmmTopInfo LabelMap
 
 instance OutputableP Platform CmmTopInfo where
     pdoc = pprTopInfo
@@ -209,7 +209,7 @@ topInfoTableD (CmmProc infos _ _ g) = case (info_tbls infos) of
 topInfoTableD _                     = Nothing
 
 topInfoTable :: GenCmmDecl a CmmTopInfo (GenGenCmmGraph s n) -> Maybe CmmInfoTable
-topInfoTable (CmmProc infos _ _ g) = NonDet.mapLookup (g_entry g) (info_tbls infos)
+topInfoTable (CmmProc infos _ _ g) = mapLookup (g_entry g) (info_tbls infos)
 topInfoTable _                     = Nothing
 
 data CmmStackInfo
@@ -364,12 +364,12 @@ removeDetermDecl (CmmProc h e r g) = CmmProc (removeDetermTop h) e r (removeDete
 removeDetermDecl (CmmData a b) = CmmData a b
 
 removeDetermTop :: DCmmTopInfo -> CmmTopInfo
-removeDetermTop (TopInfo a b) = TopInfo (NonDet.mapFromList $ unDeterm a) b
+removeDetermTop (TopInfo a b) = TopInfo (mapFromList $ unDeterm a) b
 
 removeDetermGraph :: DCmmGraph -> CmmGraph
 removeDetermGraph (CmmGraph x y) =
   let y' = case y of
-            GMany a (DWrap b) c -> GMany a (NonDet.mapFromList b) c
+            GMany a (DWrap b) c -> GMany a (mapFromList b) c
   in CmmGraph x y'
 
 

@@ -344,7 +344,7 @@ cmmNativeGens :: forall statics instr jumpDest.
               -> NCGConfig
               -> NcgImpl statics instr jumpDest
               -> BufHandle
-              -> NonDet.LabelMap DebugBlock
+              -> LabelMap DebugBlock
               -> DUniqSupply
               -> [RawCmmDecl]
               -> NativeGenAcc statics instr

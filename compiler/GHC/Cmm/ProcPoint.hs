@@ -235,24 +235,24 @@ extendPPSet platform g blocks procPoints =
 -- Input invariant: A block should only be reachable from a single ProcPoint.
 -- ToDo: use the _ret naming convention that the old code generator
 -- used. -- EZY
-splitAtProcPoints :: Platform -> CLabel -> ProcPointSet-> ProcPointSet -> NonDet.LabelMap Status -> CmmDecl
+splitAtProcPoints :: Platform -> CLabel -> ProcPointSet-> ProcPointSet -> LabelMap Status -> CmmDecl
                   -> UniqDSM [CmmDecl]
 splitAtProcPoints _ _ _ _ _ t@(CmmData _ _) = return [t]
 splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
   -- Build a map from procpoints to the blocks they reach
   let (CmmProc (TopInfo {info_tbls = info_tbls}) top_l _ g@(CmmGraph {g_entry=entry})) = cmmProc
 
-  let add graphEnv procId bid b = NonDet.mapInsert procId graph' graphEnv
+  let add graphEnv procId bid b = mapInsert procId graph' graphEnv
         where
-          graph' = NonDet.mapInsert bid b graph
-          graph  = NonDet.mapLookup procId graphEnv `orElse` NonDet.mapEmpty
+          graph' = mapInsert bid b graph
+          graph  = mapLookup procId graphEnv `orElse` mapEmpty
 
-  let add_block :: NonDet.LabelMap (NonDet.LabelMap CmmBlock) -> CmmBlock -> NonDet.LabelMap (NonDet.LabelMap CmmBlock)
+  let add_block :: LabelMap (LabelMap CmmBlock) -> CmmBlock -> LabelMap (LabelMap CmmBlock)
       add_block graphEnv b =
-        case NonDet.mapLookup bid procMap of
+        case mapLookup bid procMap of
           Just ProcPoint -> add graphEnv bid bid b
           Just (ReachedBy set) ->
-            case NonDet.nonDetSetElems set of
+            case setElems set of
               []   -> graphEnv
               [id] -> add graphEnv id bid b
               _    -> panic "Each block should be reachable from only one ProcPoint"
@@ -286,7 +286,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
   -- and replace branches to procpoints with branches to the jump-off blocks
   let add_jump_block :: (LabelMap Label, [CmmBlock])
                      -> (Label, CLabel)
-                     -> UniqDSM (NonDet.LabelMap Label, [CmmBlock])
+                     -> UniqDSM (LabelMap Label, [CmmBlock])
       add_jump_block (env, bs) (pp, l) = do
         bid <- liftM mkBlockId getUniqueDSM
         let b    = blockJoin (CmmEntry bid GlobalScope) emptyBlock jump
@@ -317,7 +317,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
           CmmSwitch _ ids         -> foldr add_if_pp rst $ switchTargetsToList ids
           _                       -> rst
 
-  let add_jumps :: NonDet.LabelMap CmmGraph -> (Label, NonDet.LabelMap CmmBlock) -> UniqDSM (NonDet.LabelMap CmmGraph)
+  let add_jumps :: LabelMap CmmGraph -> (Label, LabelMap CmmBlock) -> UniqDSM (LabelMap CmmGraph)
       add_jumps newGraphEnv (ppId, blockEnv) = do
         -- find which procpoints we currently branch to
         let needed_jumps = mapFoldr add_if_branch_to_pp [] blockEnv

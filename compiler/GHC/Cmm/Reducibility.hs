@@ -214,10 +214,10 @@ changeBlockLabels f block = blockJoin entry' middle exit'
 
 relabel :: CmmSuper -> UniqDSM CmmSuper
 relabel node = do
-     finite_map <- foldM addPair NonDet.mapEmpty $ definedLabels node
+     finite_map <- foldM addPair mapEmpty $ definedLabels node
      return $ changeLabels (labelChanger finite_map) node
-  where addPair :: NonDet.LabelMap Label -> Label -> UniqDSM (NonDet.LabelMap Label)
+  where addPair :: LabelMap Label -> Label -> UniqDSM (LabelMap Label)
         addPair map old = do new <- newBlockId
-                             return $ NonDet.mapInsert old new map
-        labelChanger :: NonDet.LabelMap Label -> (Label -> Label)
-        labelChanger mapping = \lbl -> NonDet.mapFindWithDefault lbl lbl mapping
+                             return $ mapInsert old new map
+        labelChanger :: LabelMap Label -> (Label -> Label)
+        labelChanger mapping = \lbl -> mapFindWithDefault lbl lbl mapping

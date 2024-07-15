@@ -46,19 +46,19 @@ instance NonLocal n => NonLocal (Block n) where
   successors (BlockCC _ _ n) = successors n
 
 
-emptyBody :: Body' NonDet.LabelMap block n
-emptyBody = NonDet.mapEmpty
+emptyBody :: Body' LabelMap block n
+emptyBody = mapEmpty
 
-bodyList :: Body' NonDet.LabelMap block n -> [(Label,block n C C)]
-bodyList body = NonDet.nonDetMapToList body
+bodyList :: Body' LabelMap block n -> [(Label,block n C C)]
+bodyList body = mapToList body
 
-bodyToBlockList :: Body NonDet.LabelMap n -> [Block n C C]
-bodyToBlockList body = NonDet.nonDetMapElems body
+bodyToBlockList :: Body LabelMap n -> [Block n C C]
+bodyToBlockList body = mapElems body
 
 addBlock
     :: (NonLocal block, HasDebugCallStack)
-    => block C C -> NonDet.LabelMap (block C C) -> NonDet.LabelMap (block C C)
-addBlock block body = NonDet.mapAlter add lbl body
+    => block C C -> LabelMap (block C C) -> LabelMap (block C C)
+addBlock block body = mapAlter add lbl body
   where
     lbl = entryLabel block
     add Nothing = Just block
@@ -72,7 +72,7 @@ addBlock block body = NonDet.mapAlter add lbl body
 -- O/C, C/O, C/C).  A graph open at the entry has a single,
 -- distinguished, anonymous entry point; if a graph is closed at the
 -- entry, its entry point(s) are supplied by a context.
-type Graph = Graph' NonDet.LabelMap Block
+type Graph = Graph' LabelMap Block
 
 -- | @Graph'@ is abstracted over the block type, so that we can build
 -- graphs of annotated blocks for example (Compiler.Hoopl.Dataflow
@@ -91,7 +91,7 @@ data Graph' s block (n :: Extensibility -> Extensibility -> Type) e x where
 
 -- | Maps over all nodes in a graph.
 mapGraph :: (forall e x. n e x -> n' e x) -> Graph n e x -> Graph n' e x
-mapGraph f = mapGraphBlocks NonDet.mapMap (mapBlock f)
+mapGraph f = mapGraphBlocks mapMap (mapBlock f)
 
 -- | Function 'mapGraphBlocks' enables a change of representation of blocks,
 -- nodes, or both.  It lifts a polymorphic block transform into a polymorphic
@@ -111,16 +111,16 @@ mapGraphBlocks f g = map
 -- -----------------------------------------------------------------------------
 -- Extracting Labels from graphs
 
-labelsDefined :: forall block n e x . NonLocal (block n) => Graph' NonDet.LabelMap block n e x
-              -> NonDet.LabelSet
-labelsDefined GNil      = NonDet.setEmpty
-labelsDefined (GUnit{}) = NonDet.setEmpty
-labelsDefined (GMany _ body x) = NonDet.nonDetMapFoldlWithKey addEntry (exitLabel x) body
-  where addEntry :: forall a. NonDet.LabelSet -> Label -> a -> NonDet.LabelSet
-        addEntry labels label _ = NonDet.setInsert label labels
-        exitLabel :: MaybeO x (block n C O) -> NonDet.LabelSet
-        exitLabel NothingO  = NonDet.setEmpty
-        exitLabel (JustO b) = NonDet.setSingleton (entryLabel b)
+labelsDefined :: forall block n e x . NonLocal (block n) => Graph' LabelMap block n e x
+              -> LabelSet
+labelsDefined GNil      = setEmpty
+labelsDefined (GUnit{}) = setEmpty
+labelsDefined (GMany _ body x) = mapFoldlWithKey addEntry (exitLabel x) body
+  where addEntry :: forall a. LabelSet -> Label -> a -> LabelSet
+        addEntry labels label _ = setInsert label labels
+        exitLabel :: MaybeO x (block n C O) -> LabelSet
+        exitLabel NothingO  = setEmpty
+        exitLabel (JustO b) = setSingleton (entryLabel b)
 
 
 ----------------------------------------------------------------

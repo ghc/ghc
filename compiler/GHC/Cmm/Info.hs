@@ -133,7 +133,7 @@ mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
   = case topInfoTable proc of   --  must be at most one
       -- no info table
       Nothing ->
-         return [CmmProc NonDet.mapEmpty entry_lbl live blocks]
+         return [CmmProc mapEmpty entry_lbl live blocks]
 
       Just info@CmmInfoTable { cit_lbl = info_lbl } -> do
         (top_decls, (std_info, extra_bits)) <-

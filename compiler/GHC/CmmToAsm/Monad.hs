@@ -112,7 +112,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
                               -> UniqDSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
     -- ^ The list of block ids records the redirected jumps to allow us to update
     -- the CFG.
-    ncgMakeFarBranches        :: Platform -> NonDet.LabelMap RawCmmStatics -> [NatBasicBlock instr]
+    ncgMakeFarBranches        :: Platform -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> UniqDSM [NatBasicBlock instr],
     extractUnwindPoints       :: [instr] -> [UnwindPoint],
     -- ^ given the instruction sequence of a block, produce a list of
@@ -205,7 +205,7 @@ pattern NatM f <- NatM' (runState -> f)
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
 
-mkNatM_State :: UniqSupply -> Int -> NCGConfig ->
+mkNatM_State :: DUniqSupply -> Int -> NCGConfig ->
                 DwarfFiles -> LabelMap DebugBlock -> CFG -> NatM_State
 mkNatM_State us delta config
         = \dwf dbg cfg ->

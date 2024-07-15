@@ -25,7 +25,6 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import GHC.Types.Unique.Supply
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
@@ -236,7 +235,7 @@ instance Outputable StackMap where
 
 
 cmmLayoutStack :: CmmConfig -> ProcPointSet -> ByteOff -> CmmGraph
-               -> UniqDSM (CmmGraph, NonDet.LabelMap StackMap)
+               -> UniqDSM (CmmGraph, LabelMap StackMap)
 cmmLayoutStack cfg procpoints entry_args
                graph@(CmmGraph { g_entry = entry })
   = do
@@ -273,7 +272,7 @@ layout :: CmmConfig
        -> [CmmBlock]                    -- [in] blocks
 
        -> UniqDSM
-          ( NonDet.LabelMap StackMap    -- [out] stack maps
+          ( LabelMap StackMap    -- [out] stack maps
           , ByteOff                     -- [out] Sp high water mark
           , [CmmBlock]                  -- [out] new blocks
           )
@@ -283,7 +282,7 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
   where
     (updfr, cont_info)  = collectContInfo blocks
 
-    init_stackmap = NonDet.mapSingleton entry
+    init_stackmap = mapSingleton entry
                       StackMap{ sm_sp   = entry_args
                               , sm_args = entry_args
                               , sm_ret_off = updfr
@@ -291,10 +290,10 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
                               }
 
     go :: [Block CmmNode C C]
-       -> NonDet.LabelMap StackMap
+       -> LabelMap StackMap
        -> StackLoc
        -> [CmmBlock]
-       -> UniqDSM (NonDet.LabelMap StackMap, StackLoc, [CmmBlock])
+       -> UniqDSM (LabelMap StackMap, StackLoc, [CmmBlock])
     go [] acc_stackmaps acc_hwm acc_blocks
       = return (acc_stackmaps, acc_hwm, acc_blocks)
 
@@ -577,7 +576,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
 
 makeFixupBlock :: CmmConfig -> ByteOff -> Label -> StackMap
                -> CmmTickScope -> [CmmNode O O]
-               -> UniqDSM (Det.Label, [CmmBlock])
+               -> UniqDSM (Label, [CmmBlock])
 makeFixupBlock cfg sp0 l stack tscope assigs
   | null assigs && sp0 == sm_sp stack = return (l, [])
   | otherwise = do

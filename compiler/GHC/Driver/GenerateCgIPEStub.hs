@@ -288,7 +288,7 @@ lookupEstimatedTicks hsc_env ipes stats cmm_group_srts =
       -> GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
       -> (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
     collectInfoTables (!acc, !stats) (CmmProc h _ _ _) =
-        nonDetMapFoldlWithKey go (acc, stats) (info_tbls h)
+        mapFoldlWithKey go (acc, stats) (info_tbls h)
       where
         go :: (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
            -> Label

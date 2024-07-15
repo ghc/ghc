@@ -48,7 +48,7 @@ import GHC.Platform.Reg
 
 import GHC.Platform.Regs
 import GHC.Cmm.BlockId
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Cmm.CLabel
@@ -125,8 +125,6 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
 
         alloc   = mkStackAllocInstr   platform delta
         dealloc = mkStackDeallocInstr platform delta
-
-        retargetList = (zip entries (map mkBlockId uniqs))
 
         new_blockmap :: LabelMap BlockId
         new_blockmap = mapFromList retargetList
@@ -698,7 +696,7 @@ makeFarBranches
         :: Platform
         -> LabelMap RawCmmStatics
         -> [NatBasicBlock Instr]
-        -> UniqSM [NatBasicBlock Instr]
+        -> UniqDSM [NatBasicBlock Instr]
 makeFarBranches _platform info_env blocks
     | NE.last blockAddresses < nearLimit = return blocks
     | otherwise = return $ zipWith handleBlock blockAddressList blocks

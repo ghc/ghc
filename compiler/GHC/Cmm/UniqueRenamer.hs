@@ -17,10 +17,8 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Switch
--- import GHC.Cmm.Info.Build
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable as Outputable
@@ -107,7 +105,7 @@ detRenameCmmGroup dufm group = swap (runState (mapM go group) dufm)
       = CmmData <$> uniqRename sec <*> uniqRename d
 
     goTop :: DCmmTopInfo -> State DetUniqFM CmmTopInfo
-    goTop (TopInfo (DWrap i) b) = TopInfo . NonDet.mapFromList <$> uniqRename i <*> pure b
+    goTop (TopInfo (DWrap i) b) = TopInfo . mapFromList <$> uniqRename i <*> pure b
 
     goCmmGraph :: DCmmGraph -> State DetUniqFM CmmGraph
     goCmmGraph (CmmGraph entry bs) = CmmGraph <$> uniqRename entry <*> goGraph bs
@@ -117,7 +115,7 @@ detRenameCmmGroup dufm group = swap (runState (mapM go group) dufm)
       GUnit block -> GUnit <$> uniqRename block
       GMany m1 b m2 -> GMany <$> uniqRename m1 <*> goBody b <*> uniqRename m2
 
-    goBody (DWrap b) = NonDet.mapFromList <$> uniqRename b
+    goBody (DWrap b) = mapFromList <$> uniqRename b
 
 
 -- The most important function here, which does the actual renaming.
@@ -152,8 +150,8 @@ instance UniqRenamable LocalReg where
   -- uniqRename (LocalReg uq t) = pure $ LocalReg uq t
     -- ROMES:TODO: This has unique r1, we're debugging. this may still be a source of non determinism.
 
-instance UniqRenamable Det.Label where
-  uniqRename lbl = Det.mkHooplLabel . getKey <$> renameDetUniq (getUnique lbl)
+instance UniqRenamable Label where
+  uniqRename lbl = mkHooplLabel . getKey <$> renameDetUniq (getUnique lbl)
 
 instance UniqRenamable CmmTickScope where
   -- ROMES:TODO: We may have to change this to get deterministic objects with ticks.

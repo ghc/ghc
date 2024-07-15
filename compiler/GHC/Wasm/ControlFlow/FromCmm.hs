@@ -140,8 +140,8 @@ emptyPost _ = False
 structuredControl :: forall expr stmt m .
                      MonadUniqDSM m
                   => Platform  -- ^ needed for offset calculation
-                  -> (NonDet.Label -> CmmExpr -> m expr) -- ^ translator for expressions
-                  -> (NonDet.Label -> CmmActions -> m stmt) -- ^ translator for straight-line code
+                  -> (Label -> CmmExpr -> m expr) -- ^ translator for expressions
+                  -> (Label -> CmmActions -> m stmt) -- ^ translator for straight-line code
                   -> CmmGraph -- ^ CFG to be translated
                   -> m (WasmControl stmt expr '[] '[ 'I32])
 structuredControl platform txExpr txBlock g' = do
