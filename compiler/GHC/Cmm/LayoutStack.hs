@@ -8,7 +8,7 @@ import GHC.Prelude hiding ((<*>))
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.StgToCmm.Monad      ( newTemp ) -- XXX layering violation
+import GHC.StgToCmm.Monad      ( newTemp  ) -- XXX layering violation
 import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs  ) -- XXX layering violation
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
@@ -24,8 +24,8 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
+import GHC.Types.Unique.Supply
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
@@ -262,12 +262,12 @@ cmmLayoutStack cfg procpoints entry_args
 -- -----------------------------------------------------------------------------
 
 layout :: CmmConfig
-       -> NonDet.LabelSet                      -- proc points
-       -> NonDet.LabelMap CmmLocalLive         -- liveness
+       -> LabelSet                      -- proc points
+       -> LabelMap CmmLocalLive         -- liveness
        -> BlockId                       -- entry
        -> ByteOff                       -- stack args on entry
 
-       -> NonDet.LabelMap StackMap      -- [final] stack maps
+       -> LabelMap StackMap             -- [final] stack maps
        -> ByteOff                       -- [final] Sp high water mark
 
        -> [CmmBlock]                    -- [in] blocks
@@ -303,7 +303,7 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
        let (entry0@(CmmEntry entry_lbl tscope), middle0, last0) = blockSplit b0
 
        let stack0@StackMap { sm_sp = sp0 }
-               = NonDet.mapFindWithDefault
+               = mapFindWithDefault
                      (pprPanic "no stack map for" (ppr entry_lbl))
                      entry_lbl acc_stackmaps
 
@@ -335,7 +335,7 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
                manifestSp cfg final_stackmaps stack0 sp0 final_sp_high
                           entry0 middle_pre sp_off last1 fixup_blocks
 
-       let acc_stackmaps' = NonDet.mapUnion acc_stackmaps out
+       let acc_stackmaps' = mapUnion acc_stackmaps out
 
            -- If this block jumps to the GC, then we do not take its
            -- stack usage into account for the high-water mark.
@@ -347,7 +347,7 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
            this_sp_hwm | isGcJump last0 = 0
                        | otherwise      = sp0 - sp_off
 
-           hwm' = maximum (acc_hwm : this_sp_hwm : map sm_sp (NonDet.nonDetMapElems out))
+           hwm' = maximum (acc_hwm : this_sp_hwm : map sm_sp (mapElems out))
 
        go bs acc_stackmaps' hwm' (final_blocks ++ acc_blocks)
 
@@ -372,13 +372,13 @@ isGcJump _something_else = False
 -- unnecessarily pessimistic, but probably not in the code we
 -- generate.
 
-collectContInfo :: [CmmBlock] -> (ByteOff, NonDet.LabelMap ByteOff)
+collectContInfo :: [CmmBlock] -> (ByteOff, LabelMap ByteOff)
 collectContInfo blocks
-  = (maximum ret_offs, NonDet.mapFromList (catMaybes mb_argss))
+  = (maximum ret_offs, mapFromList (catMaybes mb_argss))
  where
   (mb_argss, ret_offs) = mapAndUnzip get_cont blocks
 
-  get_cont :: Block CmmNode x C -> (Maybe (NonDet.Label, ByteOff), ByteOff)
+  get_cont :: Block CmmNode x C -> (Maybe (Label, ByteOff), ByteOff)
   get_cont b =
      case lastNode b of
         CmmCall { cml_cont = Just l, .. }
@@ -400,7 +400,7 @@ collectContInfo blocks
 -- on the stack and need to be immediately saved across a call, we
 -- want to just leave them where they are on the stack.
 --
-procMiddle :: NonDet.LabelMap StackMap -> CmmNode e x -> StackMap -> StackMap
+procMiddle :: LabelMap StackMap -> CmmNode e x -> StackMap -> StackMap
 procMiddle stackmaps node sm
   = case node of
      CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) _ _)
@@ -411,10 +411,10 @@ procMiddle stackmaps node sm
      _other
        -> sm
 
-getStackLoc :: Area -> ByteOff -> NonDet.LabelMap StackMap -> StackLoc
+getStackLoc :: Area -> ByteOff -> LabelMap StackMap -> StackLoc
 getStackLoc Old       n _         = n
 getStackLoc (Young l) n stackmaps =
-  case NonDet.mapLookup l stackmaps of
+  case mapLookup l stackmaps of
     Nothing -> pprPanic "getStackLoc" (ppr l)
     Just sm -> sm_sp sm - sm_args sm + n
 
@@ -439,8 +439,8 @@ getStackLoc (Young l) n stackmaps =
 -- extra code that goes *after* the Sp adjustment.
 
 handleLastNode
-   :: CmmConfig -> ProcPointSet -> NonDet.LabelMap CmmLocalLive -> NonDet.LabelMap ByteOff
-   -> NonDet.LabelMap StackMap -> StackMap -> CmmTickScope
+   :: CmmConfig -> ProcPointSet -> LabelMap CmmLocalLive -> LabelMap ByteOff
+   -> LabelMap StackMap -> StackMap -> CmmTickScope
    -> Block CmmNode O O
    -> CmmNode O C
    -> UniqDSM
@@ -448,7 +448,7 @@ handleLastNode
       , ByteOff            -- amount to adjust Sp
       , CmmNode O C        -- new last node
       , [CmmBlock]         -- new blocks
-      , NonDet.LabelMap StackMap  -- stackmaps for the continuations
+      , LabelMap StackMap  -- stackmaps for the continuations
       )
 
 handleLastNode cfg procpoints liveness cont_info stackmaps
@@ -459,7 +459,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
       --  is cml_args, after popping any other junk from the stack.
       CmmCall{ cml_cont = Nothing, .. } -> do
         let sp_off = sp0 - cml_args
-        return ([], sp_off, last, [], NonDet.mapEmpty)
+        return ([], sp_off, last, [], mapEmpty)
 
       --  At each CmmCall with a continuation:
       CmmCall{ cml_cont = Just cont_lbl, .. } ->
@@ -480,20 +480,20 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
                  , ByteOff
                  , CmmNode O C
                  , [CmmBlock]
-                 , NonDet.LabelMap StackMap
+                 , LabelMap StackMap
                  )
      lastCall lbl cml_args cml_ret_args cml_ret_off
       =  ( assignments
          , spOffsetForCall sp0 cont_stack cml_args
          , last
          , [] -- no new blocks
-         , NonDet.mapSingleton lbl cont_stack )
+         , mapSingleton lbl cont_stack )
       where
          (assignments, cont_stack) = prepareStack lbl cml_ret_args cml_ret_off
 
 
      prepareStack lbl cml_ret_args cml_ret_off
-       | Just cont_stack <- NonDet.mapLookup lbl stackmaps
+       | Just cont_stack <- mapLookup lbl stackmaps
              -- If we have already seen this continuation before, then
              -- we just have to make the stack look the same:
        = (fixupStack stack0 cont_stack, cont_stack)
@@ -513,18 +513,17 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
                                 , ByteOff
                                 , CmmNode O C
                                 , [CmmBlock]
-                                , NonDet.LabelMap StackMap )
+                                , LabelMap StackMap )
 
      handleBranches
          -- See Note [diamond proc point]
        | Just l <- futureContinuation middle
-       , (nub $ filter (`NonDet.setMember` procpoints) $ successors last) == [l]
+       , (nub $ filter (`setMember` procpoints) $ successors last) == [l]
        = do
-         let cont_args = NonDet.mapFindWithDefault 0 l cont_info
+         let cont_args = mapFindWithDefault 0 l cont_info
              (assigs, cont_stack) = prepareStack l cont_args (sm_ret_off stack0)
-             out = NonDet.mapFromList
-                     [ (l', cont_stack)
-                     | l' <- successors last ]
+             out = mapFromList [ (l', cont_stack)
+                               | l' <- successors last ]
          return ( assigs
                 , spOffsetForCall sp0 cont_stack (platformWordSizeInBytes platform)
                 , last
@@ -533,14 +532,14 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
 
         | otherwise = do
           pps <- mapM handleBranch (successors last)
-          let lbl_map :: NonDet.LabelMap Det.Label
-              lbl_map = NonDet.mapFromList [ (l,tmp) | (l,tmp,_,_) <- pps ]
-              fix_lbl l = NonDet.mapFindWithDefault l l lbl_map
+          let lbl_map :: LabelMap Label
+              lbl_map = mapFromList [ (l,tmp) | (l,tmp,_,_) <- pps ]
+              fix_lbl l = mapFindWithDefault l l lbl_map
           return ( []
                  , 0
                  , mapSuccessors fix_lbl last
                  , concat [ blk | (_,_,_,blk) <- pps ]
-                 , NonDet.mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
+                 , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
 
      -- For each successor of this block
      handleBranch :: BlockId -> UniqDSM (BlockId, BlockId, StackMap, [CmmBlock])
@@ -548,7 +547,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
         --   (a) if the successor already has a stackmap, we need to
         --       shuffle the current stack to make it look the same.
         --       We have to insert a new block to make this happen.
-        | Just stack2 <- NonDet.mapLookup l stackmaps
+        | Just stack2 <- mapLookup l stackmaps
         = do
              let assigs = fixupStack stack0 stack2
              (tmp_lbl, block) <- makeFixupBlock cfg sp0 l stack2 tscp assigs
@@ -556,9 +555,9 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
 
         --   (b) if the successor is a proc point, save everything
         --       on the stack.
-        | l `NonDet.setMember` procpoints
+        | l `setMember` procpoints
         = do
-             let cont_args = NonDet.mapFindWithDefault 0 l cont_info
+             let cont_args = mapFindWithDefault 0 l cont_info
                  (stack2, assigs) =
                       setupStackFrame platform l liveness (sm_ret_off stack0)
                                                         cont_args stack0
@@ -571,12 +570,12 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
         --       the destination, because this StackMap might be used
         --       by fixupStack if this is a join point.
         | otherwise = return (l, l, stack1, [])
-        where live = NonDet.mapFindWithDefault (panic "handleBranch") l liveness
+        where live = mapFindWithDefault (panic "handleBranch") l liveness
               stack1 = stack0 { sm_regs = filterUFM is_live (sm_regs stack0) }
               is_live (r,_) = r `elemRegSet` live
 
 
-makeFixupBlock :: CmmConfig -> ByteOff -> Det.Label -> StackMap
+makeFixupBlock :: CmmConfig -> ByteOff -> Label -> StackMap
                -> CmmTickScope -> [CmmNode O O]
                -> UniqDSM (Det.Label, [CmmBlock])
 makeFixupBlock cfg sp0 l stack tscope assigs
@@ -620,7 +619,7 @@ fixupStack old_stack new_stack = concatMap move new_locs
 setupStackFrame
              :: Platform
              -> BlockId                 -- label of continuation
-             -> NonDet.LabelMap CmmLocalLive   -- liveness
+             -> LabelMap CmmLocalLive   -- liveness
              -> ByteOff      -- updfr
              -> ByteOff      -- bytes of return values on stack
              -> StackMap     -- current StackMap
@@ -630,7 +629,7 @@ setupStackFrame platform lbl liveness updfr_off ret_args stack0
   = (cont_stack, assignments)
   where
       -- get the set of LocalRegs live in the continuation
-      live = NonDet.mapFindWithDefault Set.empty lbl liveness
+      live = mapFindWithDefault Set.empty lbl liveness
 
       -- the stack from the base to updfr_off is off-limits.
       -- our new stack frame contains:
@@ -832,7 +831,7 @@ allocate platform ret_off live stackmap@StackMap{ sm_sp = sp0
 --
 manifestSp
    :: CmmConfig
-   -> NonDet.LabelMap StackMap  -- StackMaps for other blocks
+   -> LabelMap StackMap  -- StackMaps for other blocks
    -> StackMap           -- StackMap for this block
    -> ByteOff            -- Sp on entry to the block
    -> ByteOff            -- SpHigh
@@ -865,10 +864,10 @@ manifestSp cfg stackmaps stack0 sp0 sp_high
 
     fixup_blocks' = map (mapBlock3' (id, adj_post_sp, id)) fixup_blocks
 
-getAreaOff :: NonDet.LabelMap StackMap -> (Area -> StackLoc)
+getAreaOff :: LabelMap StackMap -> (Area -> StackLoc)
 getAreaOff _ Old = 0
 getAreaOff stackmaps (Young l) =
-  case NonDet.mapLookup l stackmaps of
+  case mapLookup l stackmaps of
     Just sm -> sm_sp sm - sm_args sm
     Nothing -> pprPanic "getAreaOff" (ppr l)
 
@@ -995,7 +994,7 @@ optStackCheck n = -- Note [Always false stack check]
 -- StackMap will invalidate its mapping there.
 --
 elimStackStores :: StackMap
-                -> NonDet.LabelMap StackMap
+                -> LabelMap StackMap
                 -> (Area -> ByteOff)
                 -> [CmmNode O O]
                 -> [CmmNode O O]
@@ -1017,9 +1016,9 @@ elimStackStores stackmap stackmaps area_off nodes
 -- Update info tables to include stack liveness
 
 
-setInfoTableStackMap :: Platform -> NonDet.LabelMap StackMap -> CmmDecl -> CmmDecl
+setInfoTableStackMap :: Platform -> LabelMap StackMap -> CmmDecl -> CmmDecl
 setInfoTableStackMap platform stackmaps (CmmProc top_info@TopInfo{..} l v g)
-  = CmmProc top_info{ info_tbls = NonDet.mapMapWithKey fix_info info_tbls } l v g
+  = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l v g
   where
     fix_info lbl info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
        info_tbl { cit_rep = StackRep (get_liveness lbl) }
@@ -1027,7 +1026,7 @@ setInfoTableStackMap platform stackmaps (CmmProc top_info@TopInfo{..} l v g)
 
     get_liveness :: BlockId -> Liveness
     get_liveness lbl
-      = case NonDet.mapLookup lbl stackmaps of
+      = case mapLookup lbl stackmaps of
           Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl <+> pdoc platform info_tbls)
           Just sm -> stackMapToLiveness platform sm
 
@@ -1052,18 +1051,18 @@ stackMapToLiveness platform StackMap{..} =
 insertReloadsAsNeeded
     :: Platform
     -> ProcPointSet
-    -> NonDet.LabelMap StackMap
+    -> LabelMap StackMap
     -> BlockId
     -> [CmmBlock]
     -> UniqDSM [CmmBlock]
 insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
     toBlockList . fst <$>
-        rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) NonDet.mapEmpty
+        rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) mapEmpty
   where
     rewriteCC :: RewriteFun CmmLocalLive
     rewriteCC (BlockCC e_node middle0 x_node) fact_base0 = do
         let entry_label = entryLabel e_node
-            stackmap = case NonDet.mapLookup entry_label final_stackmaps of
+            stackmap = case mapLookup entry_label final_stackmaps of
                 Just sm -> sm
                 Nothing -> panic "insertReloadsAsNeeded: rewriteCC: stackmap"
 
@@ -1078,14 +1077,14 @@ insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
             -- they're actually live. Furthermore, nothing is live at the entry
             -- to a proc point.
             (middle1, live_with_reloads)
-                | entry_label `NonDet.setMember` procpoints
+                | entry_label `setMember` procpoints
                 = let reloads = insertReloads platform stackmap live_at_middle0
                   in (foldr blockCons middle0 reloads, emptyRegSet)
                 | otherwise
                 = (middle0, live_at_middle0)
 
             -- Final liveness for this block.
-            !fact_base2 = NonDet.mapSingleton entry_label live_with_reloads
+            !fact_base2 = mapSingleton entry_label live_with_reloads
 
         return (BlockCC e_node middle1 x_node, fact_base2)
 

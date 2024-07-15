@@ -39,7 +39,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm hiding (pprBBlock, pprStatic)
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm.InitFini
@@ -78,7 +78,7 @@ cmmToC platform tops = (vcat $ intersperse blankLine $ map (pprTop platform) top
 pprTop :: Platform -> RawCmmDecl -> SDoc
 pprTop platform = \case
   (CmmProc infos clbl _in_live_regs graph) ->
-    (case NonDet.mapLookup (g_entry graph) infos of
+    (case mapLookup (g_entry graph) infos of
        Nothing -> empty
        Just (CmmStaticsRaw info_clbl info_dat) ->
            pprDataExterns platform info_dat $$

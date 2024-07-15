@@ -24,7 +24,7 @@ import GHC.Platform.Reg
 
 import GHC.Data.Graph.Base
 
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet (mapLookup, Label, LabelMap)
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
@@ -98,7 +98,7 @@ slurpSpillCostInfo platform cfg cmm
         --      the info table from the CmmProc.
         countBlock info freqMap (BasicBlock blockId instrs)
                 | LiveInfo _ _ blockLive _ <- info
-                , Just rsLiveEntry  <- NonDet.mapLookup blockId blockLive
+                , Just rsLiveEntry  <- mapLookup blockId blockLive
                 , rsLiveEntry_virt  <- takeVirtuals rsLiveEntry
                 = countLIs (ceiling $ blockFreq freqMap blockId) rsLiveEntry_virt instrs
 
@@ -150,9 +150,9 @@ slurpSpillCostInfo platform cfg cmm
         incUses     count reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, count, 0)
         incLifetime       reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 0, 1)
 
-        blockFreq :: Maybe (NonDet.LabelMap Double) -> NonDet.Label -> Double
+        blockFreq :: Maybe (LabelMap Double) -> Label -> Double
         blockFreq freqs bid
-          | Just freq <- join (NonDet.mapLookup bid <$> freqs)
+          | Just freq <- join (mapLookup bid <$> freqs)
           = max 1.0 (10000 * freq)
           | otherwise
           = 1.0 -- Only if no cfg given

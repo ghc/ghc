@@ -60,7 +60,7 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 
 
-import GHC.Cmm.Dataflow.Label.NonDet (mapMember)
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Cmm.CLabel
 import GHC.Cmm.Utils (cmmLoadBWord)

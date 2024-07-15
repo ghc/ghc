@@ -20,8 +20,7 @@ module GHC.Cmm.Dataflow.Graph
 import GHC.Prelude
 import GHC.Utils.Misc
 
-import GHC.Cmm.Dataflow.Label (Label)
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
 
 import Data.Kind
@@ -150,8 +149,8 @@ labelsDefined (GMany _ body x) = NonDet.nonDetMapFoldlWithKey addEntry (exitLabe
 -- B and C before we analyze D.
 revPostorderFrom
   :: forall block.  (NonLocal block)
-  => NonDet.LabelMap (block C C) -> Label -> [block C C]
-revPostorderFrom graph start = go start_worklist NonDet.setEmpty []
+  => LabelMap (block C C) -> Label -> [block C C]
+revPostorderFrom graph start = go start_worklist setEmpty []
   where
     start_worklist = lookup_for_descend start Nil
 
@@ -167,22 +166,22 @@ revPostorderFrom graph start = go start_worklist NonDet.setEmpty []
     -- NOTE: We add blocks to the result list in postorder, but we *prepend*
     -- them (i.e., we use @(:)@), which means that the final list is in reverse
     -- postorder.
-    go :: DfsStack (block C C) -> NonDet.LabelSet -> [block C C] -> [block C C]
+    go :: DfsStack (block C C) -> LabelSet -> [block C C] -> [block C C]
     go Nil                      !_           !result = result
     go (ConsMark block rest)    !wip_or_done !result =
         go rest wip_or_done (block : result)
     go (ConsTodo block rest)    !wip_or_done !result
-        | entryLabel block `NonDet.setMember` wip_or_done = go rest wip_or_done result
+        | entryLabel block `setMember` wip_or_done = go rest wip_or_done result
         | otherwise =
             let new_worklist =
                     foldr lookup_for_descend
                           (ConsMark block rest)
                           (successors block)
-            in go new_worklist (NonDet.setInsert (entryLabel block) wip_or_done) result
+            in go new_worklist (setInsert (entryLabel block) wip_or_done) result
 
     lookup_for_descend :: Label -> DfsStack (block C C) -> DfsStack (block C C)
     lookup_for_descend label wl
-      | Just b <- NonDet.mapLookup label graph = ConsTodo b wl
+      | Just b <- mapLookup label graph = ConsTodo b wl
       | otherwise =
            error $ "Label that doesn't have a block?! " ++ show label
 

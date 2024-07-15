@@ -11,7 +11,7 @@ import GHC.Cmm
 import GHC.Cmm.Config
 import GHC.Cmm.ContFlowOpt
 import GHC.Cmm.CommonBlockElim
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Lint
 import GHC.Cmm.LayoutStack

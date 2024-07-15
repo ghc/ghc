@@ -57,7 +57,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Expr
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Utils.Outputable
 
 import Data.Void (Void)
@@ -87,7 +87,7 @@ type CmmGroup     = GenCmmGroup CmmStatics    CmmTopInfo               CmmGraph
 -- | Cmm group with SRTs
 type CmmGroupSRTs = GenCmmGroup RawCmmStatics CmmTopInfo               CmmGraph
 -- | "Raw" cmm group (TODO (osa): not sure what that means)
-type RawCmmGroup  = GenCmmGroup RawCmmStatics (NonDet.LabelMap RawCmmStatics) CmmGraph
+type RawCmmGroup  = GenCmmGroup RawCmmStatics (LabelMap RawCmmStatics) CmmGraph
 
 -----------------------------------------------------------------------------
 --  CmmDecl, GenCmmDecl
@@ -140,7 +140,7 @@ cmmDataDeclCmmDecl = \ case
 type RawCmmDecl
    = GenCmmDecl
         RawCmmStatics
-        (NonDet.LabelMap RawCmmStatics)
+        (LabelMap RawCmmStatics)
         CmmGraph
 
 -----------------------------------------------------------------------------
@@ -158,7 +158,7 @@ type CmmBlock = Block CmmNode C C
 instance OutputableP Platform CmmGraph where
     pdoc = pprCmmGraph
 
-toBlockMap :: CmmGraph -> NonDet.LabelMap CmmBlock
+toBlockMap :: CmmGraph -> LabelMap CmmBlock
 toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
 
 pprCmmGraph :: Platform -> CmmGraph -> SDoc
@@ -176,7 +176,7 @@ revPostorder g = {-# SCC "revPostorder" #-}
     revPostorderFrom (toBlockMap g) (g_entry g)
 
 toBlockList :: CmmGraph -> [CmmBlock]
-toBlockList g = NonDet.nonDetMapElems $ toBlockMap g
+toBlockList g = mapElems $ toBlockMap g
 
 -----------------------------------------------------------------------------
 --     Info Tables

@@ -43,7 +43,7 @@ import Data.Kind (Type)
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 
 type family   Fact (x :: Extensibility) f :: Type
 type instance Fact C f = FactBase f
@@ -156,7 +156,7 @@ fixpointAnalysis direction lattice do_block entry blockmap = loop start
             -- information in fbase1 and (if something changed) we update it
             -- and add the affected blocks to the worklist.
             (todo2, fbase2) = {-# SCC "mapFoldWithKey" #-}
-                nonDetMapFoldlWithKey
+                mapFoldlWithKey
                     (updateFact join dep_blocks) (todo1, fbase1) out_facts
         in loop todo2 fbase2
     loop _ !fbase1 = fbase1
@@ -229,7 +229,7 @@ fixpointRewrite dir lattice do_block entry blockmap = loop start blockmap
             do_block block fbase1
         let blocks2 = mapInsert (entryLabel new_block) new_block blocks1
             (todo2, fbase2) = {-# SCC "mapFoldWithKey_rewrite" #-}
-                nonDetMapFoldlWithKey
+                mapFoldlWithKey
                     (updateFact join dep_blocks) (todo1, fbase1) out_facts
         loop todo2 blocks2 fbase2
     loop _ !blocks1 !fbase1 = return (blocks1, fbase1)

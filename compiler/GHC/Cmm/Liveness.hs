@@ -19,7 +19,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.LRegSet
 
 import GHC.Data.Maybe
@@ -57,7 +57,7 @@ cmmLocalLiveness platform graph =
   where
     entry = g_entry graph
     check facts =
-        noLiveOnEntry entry (expectJust "check" $ lookupFact entry facts) facts
+        noLiveOnEntry entry (expectJust "check" $ mapLookup entry facts) facts
 
 cmmGlobalLiveness :: Platform -> CmmGraph -> BlockEntryLiveness GlobalReg
 cmmGlobalLiveness platform graph =
@@ -120,7 +120,7 @@ cmmLocalLivenessL platform graph =
   where
     entry = g_entry graph
     check facts =
-        noLiveOnEntryL entry (expectJust "check" $ lookupFact entry facts) facts
+        noLiveOnEntryL entry (expectJust "check" $ mapLookup entry facts) facts
 
 -- | On entry to the procedure, there had better not be any LocalReg's live-in.
 noLiveOnEntryL :: BlockId -> LRegSet -> a -> a

@@ -110,7 +110,7 @@ allocMoreStack
 allocMoreStack _ _ top@(CmmData _ _) = return (top,[])
 allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
     let
-        infos   = NonDet.nonDetMapKeys info
+        infos   = mapKeys info
         entries = case code of
                     [] -> infos
                     BasicBlock entry _ : _ -- first block is the entry point
@@ -126,11 +126,13 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
         alloc   = mkStackAllocInstr   platform delta
         dealloc = mkStackDeallocInstr platform delta
 
-        new_blockmap :: NonDet.LabelMap BlockId
-        new_blockmap = NonDet.mapFromList retargetList
+        retargetList = (zip entries (map mkBlockId uniqs))
+
+        new_blockmap :: LabelMap BlockId
+        new_blockmap = mapFromList retargetList
 
         insert_stack_insns (BasicBlock id insns)
-            | Just new_blockid <- NonDet.mapLookup id new_blockmap
+            | Just new_blockid <- mapLookup id new_blockmap
                 = [ BasicBlock id $ alloc ++ [BCC ALWAYS new_blockid Nothing]
                   , BasicBlock new_blockid block'
                   ]
@@ -155,7 +157,7 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
 
         retarget :: BlockId -> BlockId
         retarget b
-            = fromMaybe b (NonDet.mapLookup b new_blockmap)
+            = fromMaybe b (mapLookup b new_blockmap)
 
         new_code
             = concatMap insert_stack_insns code
@@ -694,9 +696,9 @@ takeRegRegMoveInstr _  = Nothing
 
 makeFarBranches
         :: Platform
-        -> NonDet.LabelMap RawCmmStatics
+        -> LabelMap RawCmmStatics
         -> [NatBasicBlock Instr]
-        -> UniqDSM [NatBasicBlock Instr]
+        -> UniqSM [NatBasicBlock Instr]
 makeFarBranches _platform info_env blocks
     | NE.last blockAddresses < nearLimit = return blocks
     | otherwise = return $ zipWith handleBlock blockAddressList blocks
@@ -721,6 +723,6 @@ makeFarBranches _platform info_env blocks
         -- we have a few pseudo-insns that are pretty-printed as
         -- multiple instructions, and it's just not worth the effort
         -- to calculate things exactly
-        nearLimit = 7000 - NonDet.mapSize info_env * maxRetInfoTableSizeW
+        nearLimit = 7000 - mapSize info_env * maxRetInfoTableSizeW
 
         blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddressList

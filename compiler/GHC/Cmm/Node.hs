@@ -35,9 +35,7 @@ import GHC.Types.Basic (FunctionOrData(..))
 import GHC.Platform
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label as Det
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
-import GHC.Cmm.Dataflow.Label (Label)
+import GHC.Cmm.Dataflow.Label
 import Data.Foldable (toList)
 import Data.Functor.Classes (liftCompare)
 import Data.Maybe
@@ -49,7 +47,7 @@ import GHC.Utils.Constants (debugIsOn)
 ------------------------
 -- CmmNode
 
-#define ULabel {-# UNPACK #-} !Det.Label
+#define ULabel {-# UNPACK #-} !Label
 
 data CmmNode e x where
   CmmEntry :: ULabel -> CmmTickScope -> CmmNode C O
@@ -110,7 +108,7 @@ data CmmNode e x where
   CmmCall :: {                -- A native call or tail call
       cml_target :: CmmExpr,  -- never a CmmPrim to a CallishMachOp!
 
-      cml_cont :: Maybe Det.Label,
+      cml_cont :: Maybe Label,
           -- Label of continuation (Nothing for return or tail call)
           --
           -- Note [Continuation BlockIds]
@@ -799,12 +797,11 @@ mapCollectSuccessors f (CmmCondBranch p y n l)
     in  (CmmCondBranch p bidt bidf l, [accf, acct])
 mapCollectSuccessors f (CmmSwitch e ids)
   = let lbls = switchTargetsToList ids :: [Label]
-        res  = map f lbls
-        lblMap = NonDet.mapFromList $ zip lbls res :: NonDet.LabelMap (Label, a)
+        lblMap = mapFromList $ zip lbls (map f lbls) :: LabelMap (Label, a)
     in ( CmmSwitch e
           (mapSwitchTargets
-            (\l -> fst $ NonDet.mapFindWithDefault (error "impossible") l lblMap) ids)
-          , map snd res
+            (\l -> fst $ mapFindWithDefault (error "impossible") l lblMap) ids)
+          , map snd (mapElems lblMap)
         )
 mapCollectSuccessors _ n = (n, [])
 

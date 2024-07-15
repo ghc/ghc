@@ -43,8 +43,7 @@ import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dominators
 import GHC.Cmm.Dataflow.Graph hiding (addBlock)
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
-import GHC.Cmm.Dataflow.Label (Label)
+import GHC.Cmm.Dataflow.Label
 import GHC.Data.Graph.Collapse
 import GHC.Data.Graph.Inductive.Graph
 import GHC.Data.Graph.Inductive.PatriciaTree
@@ -111,8 +110,8 @@ type CGraph = Gr CmmSuper ()
 inflate :: Label -> CGraph -> CmmGraph
 inflate entry cg = CmmGraph entry graph
   where graph = GMany NothingO body NothingO
-        body :: NonDet.LabelMap CmmBlock
-        body = foldl (\map block -> NonDet.mapInsert (entryLabel block) block map) NonDet.mapEmpty $
+        body :: LabelMap CmmBlock
+        body = foldl (\map block -> mapInsert (entryLabel block) block map) mapEmpty $
                blocks super
         super = case labNodes cg of
                   [(_, s)] -> s
@@ -126,9 +125,9 @@ cgraphOfCmm g = foldl' addSuccEdges (mkGraph cnodes []) blocks
    where blocks = zip [0..] $ revPostorderFrom (graphMap g) (g_entry g)
          cnodes = [(k, super block) | (k, block) <- blocks]
           where super block = Nodes (entryLabel block) (Seq.singleton block)
-         labelNumber = \lbl -> fromJust $ NonDet.mapLookup lbl numbers
-             where numbers :: NonDet.LabelMap Int
-                   numbers = NonDet.mapFromList $ map swap blocks
+         labelNumber = \lbl -> fromJust $ mapLookup lbl numbers
+             where numbers :: LabelMap Int
+                   numbers = mapFromList $ map swap blocks
                    swap (k, block) = (entryLabel block, k)
          addSuccEdges :: CGraph -> (Node, CmmBlock) -> CGraph
          addSuccEdges graph (k, block) =

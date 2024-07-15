@@ -23,7 +23,7 @@ import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet (mapLookup)
+import GHC.Cmm.Dataflow.Label
 import GHC.Data.Graph.Directed
 import GHC.Utils.Panic
 import GHC.Utils.Monad (concatMapM)
@@ -89,7 +89,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
         -- adjust the current assignment to remove any vregs that are not live
         -- on entry to the destination block.
-        let Just live_set       = NonDet.mapLookup dest block_live
+        let Just live_set       = mapLookup dest block_live
         let still_live uniq _   = uniq `elemUniqSet_Directly` live_set
         let adjusted_assig      = filterUFM_Directly still_live assig
 

@@ -54,7 +54,7 @@ import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Platform.Regs
 import GHC.Cmm
 import GHC.Utils.Outputable

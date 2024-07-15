@@ -84,7 +84,7 @@ import GHC.Platform.Regs
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import GHC.Cmm.Dataflow.Graph
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
 
 ---------------------------------------------------
@@ -515,19 +515,19 @@ mkLiveness platform (reg:regs)
 modifyGraph :: (Graph n C C -> Graph n' C C) -> GenCmmGraph n -> GenCmmGraph n'
 modifyGraph f g = CmmGraph {g_entry=g_entry g, g_graph=f (g_graph g)}
 
-ofBlockMap :: BlockId -> NonDet.LabelMap CmmBlock -> CmmGraph
+ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
 ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyMap NothingO}
 
 -- | like 'toBlockList', but the entry block always comes first
 toBlockListEntryFirst :: CmmGraph -> [CmmBlock]
 toBlockListEntryFirst g
-  | NonDet.mapNull m  = []
+  | mapNull m  = []
   | otherwise  = entry_block : others
   where
     m = toBlockMap g
     entry_id = g_entry g
-    Just entry_block = NonDet.mapLookup entry_id m
-    others = filter ((/= entry_id) . entryLabel) (NonDet.nonDetMapElems m)
+    Just entry_block = mapLookup entry_id m
+    others = filter ((/= entry_id) . entryLabel) (mapElems m)
 
 -- | Like 'toBlockListEntryFirst', but we strive to ensure that we order blocks
 -- so that the false case of a conditional jumps to the next block in the output
@@ -539,21 +539,21 @@ toBlockListEntryFirst g
 -- defined in "GHC.Cmm.Node". -GBM
 toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
 toBlockListEntryFirstFalseFallthrough g
-  | NonDet.mapNull m  = []
-  | otherwise  = dfs NonDet.setEmpty [entry_block]
+  | mapNull m  = []
+  | otherwise  = dfs setEmpty [entry_block]
   where
     m = toBlockMap g
     entry_id = g_entry g
-    Just entry_block = NonDet.mapLookup entry_id m
+    Just entry_block = mapLookup entry_id m
 
-    dfs :: NonDet.LabelSet -> [CmmBlock] -> [CmmBlock]
+    dfs :: LabelSet -> [CmmBlock] -> [CmmBlock]
     dfs _ [] = []
     dfs visited (block:bs)
-      | id `NonDet.setMember` visited = dfs visited bs
-      | otherwise              = block : dfs (NonDet.setInsert id visited) bs'
+      | id `setMember` visited = dfs visited bs
+      | otherwise              = block : dfs (setInsert id visited) bs'
       where id = entryLabel block
             bs' = foldr add_id bs (successors block)
-            add_id id bs = case NonDet.mapLookup id m of
+            add_id id bs = case mapLookup id m of
                               Just b  -> b : bs
                               Nothing -> bs
 
@@ -568,14 +568,14 @@ mapGraphNodes :: ( CmmNode C O -> CmmNode C O
               -> CmmGraph -> CmmGraph
 mapGraphNodes funs@(mf,_,_) g =
   ofBlockMap (entryLabel $ mf $ CmmEntry (g_entry g) GlobalScope) $
-  NonDet.mapMap (mapBlock3' funs) $ toBlockMap g
+  mapMap (mapBlock3' funs) $ toBlockMap g
 
 mapGraphNodes1 :: (forall e x. CmmNode e x -> CmmNode e x) -> CmmGraph -> CmmGraph
 mapGraphNodes1 f = modifyGraph (mapGraph f)
 
 
 foldlGraphBlocks :: (a -> CmmBlock -> a) -> a -> CmmGraph -> a
-foldlGraphBlocks k z g = NonDet.nonDetMapFoldl k z $ toBlockMap g
+foldlGraphBlocks k z g = mapFoldl k z $ toBlockMap g
 
 -------------------------------------------------
 -- Tick utilities

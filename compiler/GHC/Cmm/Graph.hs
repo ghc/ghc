@@ -32,7 +32,7 @@ import GHC.Cmm.Switch (SwitchTargets)
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Data.FastString
 import GHC.Types.ForeignCall
 import GHC.Data.OrdList

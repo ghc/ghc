@@ -33,7 +33,7 @@ import GHC.StgToCmm.Closure
 
 import GHC.Cmm.Graph
 
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm.BlockId
 import GHC.Cmm

@@ -14,7 +14,6 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label.NonDet
 import GHC.Data.FastString
 import GHC.Types.Basic
 import GHC.Types.ForeignCall

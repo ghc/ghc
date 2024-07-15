@@ -10,7 +10,7 @@ import GHC.Cmm
 import GHC.Cmm.CLabel (CLabel, mkAsmTempLabel)
 import GHC.Cmm.Dataflow (O)
 import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Info.Build (emptySRT)
 import GHC.Cmm.Pipeline (cmmPipeline)
 import GHC.Data.Stream (Stream, liftIO)

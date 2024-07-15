@@ -28,8 +28,7 @@ import GHC.Types.Unique.DSM
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label (Label)
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 
 -- Compute a minimal set of proc points for a control-flow graph.
 
@@ -116,7 +115,7 @@ if a proc-point does not exist anymore then we will get compiler panic.
 See #8205.
 -}
 
-type ProcPointSet = NonDet.LabelSet
+type ProcPointSet = LabelSet
 
 data Status
   = ReachedBy ProcPointSet  -- set of proc points that directly reach the block
@@ -124,9 +123,9 @@ data Status
 
 instance Outputable Status where
   ppr (ReachedBy ps)
-      | NonDet.setNull ps = text "<not-reached>"
+      | setNull ps = text "<not-reached>"
       | otherwise = text "reached by" <+>
-                    (hsep $ punctuate comma $ map ppr $ NonDet.nonDetSetElems ps)
+                    (hsep $ punctuate comma $ map ppr $ setElems ps)
   ppr ProcPoint = text "<procpt>"
 
 --------------------------------------------------
@@ -135,7 +134,7 @@ instance Outputable Status where
 -- Once you know what the proc-points are, figure out
 -- what proc-points each block is reachable from
 -- See Note [Proc-point analysis]
-procPointAnalysis :: ProcPointSet -> CmmGraph -> NonDet.LabelMap Status
+procPointAnalysis :: ProcPointSet -> CmmGraph -> LabelMap Status
 procPointAnalysis procPoints cmmGraph@(CmmGraph {g_graph = graph}) =
     analyzeCmmFwd procPointLattice procPointTransfer cmmGraph initProcPoints
   where
@@ -143,9 +142,9 @@ procPointAnalysis procPoints cmmGraph@(CmmGraph {g_graph = graph}) =
         mkFactBase
             procPointLattice
             [ (id, ProcPoint)
-            | id <- NonDet.nonDetSetElems procPoints
+            | id <- setElems procPoints
             -- See Note [Non-existing proc-points]
-            , id `NonDet.setMember` labelsInGraph
+            , id `setMember` labelsInGraph
             ]
     labelsInGraph = labelsDefined graph
 
@@ -153,7 +152,7 @@ procPointTransfer :: TransferFun Status
 procPointTransfer block facts =
     let label = entryLabel block
         !fact = case getFact procPointLattice label facts of
-            ProcPoint -> ReachedBy $! NonDet.setSingleton label
+            ProcPoint -> ReachedBy $! setSingleton label
             f -> f
         result = map (\id -> (id, fact)) (successors block)
     in mkFactBase procPointLattice result
@@ -161,14 +160,14 @@ procPointTransfer block facts =
 procPointLattice :: DataflowLattice Status
 procPointLattice = DataflowLattice unreached add_to
   where
-    unreached = ReachedBy NonDet.setEmpty
+    unreached = ReachedBy setEmpty
     add_to (OldFact ProcPoint) _ = NotChanged ProcPoint
     add_to _ (NewFact ProcPoint) = Changed ProcPoint -- because of previous case
     add_to (OldFact (ReachedBy p)) (NewFact (ReachedBy p'))
-        | NonDet.setSize union > NonDet.setSize p = Changed (ReachedBy union)
+        | setSize union > setSize p = Changed (ReachedBy union)
         | otherwise = NotChanged (ReachedBy p)
       where
-        union = NonDet.setUnion p' p
+        union = setUnion p' p
 
 ----------------------------------------------------------------------
 
@@ -178,11 +177,11 @@ procPointLattice = DataflowLattice unreached add_to
 --
 -- Extract the set of Continuation BlockIds, see Note [Continuation BlockIds].
 callProcPoints      :: CmmGraph -> ProcPointSet
-callProcPoints g = foldlGraphBlocks add (NonDet.setSingleton (g_entry g)) g
-  where add :: NonDet.LabelSet -> CmmBlock -> NonDet.LabelSet
+callProcPoints g = foldlGraphBlocks add (setSingleton (g_entry g)) g
+  where add :: LabelSet -> CmmBlock -> LabelSet
         add set b = case lastNode b of
-                      CmmCall {cml_cont = Just k} -> NonDet.setInsert k set
-                      CmmForeignCall {succ=k}     -> NonDet.setInsert k set
+                      CmmCall {cml_cont = Just k} -> setInsert k set
+                      CmmForeignCall {succ=k}     -> setInsert k set
                       _ -> set
 
 minimalProcPointSet :: Platform -> ProcPointSet -> CmmGraph
@@ -197,30 +196,30 @@ extendPPSet
 extendPPSet platform g blocks procPoints =
     let env = procPointAnalysis procPoints g
         add pps block = let id = entryLabel block
-                        in  case NonDet.mapLookup id env of
-                              Just ProcPoint -> NonDet.setInsert id pps
+                        in  case mapLookup id env of
+                              Just ProcPoint -> setInsert id pps
                               _ -> pps
-        procPoints' = foldlGraphBlocks add NonDet.setEmpty g
+        procPoints' = foldlGraphBlocks add setEmpty g
         newPoints = mapMaybe ppSuccessor blocks
         newPoint  = listToMaybe newPoints
         ppSuccessor b =
-            let nreached id = case NonDet.mapLookup id env `orElse`
+            let nreached id = case mapLookup id env `orElse`
                                     pprPanic "no ppt" (ppr id <+> pdoc platform b) of
                                 ProcPoint -> 1
-                                ReachedBy ps -> NonDet.setSize ps
+                                ReachedBy ps -> setSize ps
                 block_procpoints = nreached (entryLabel b)
                 -- Looking for a successor of b that is reached by
                 -- more proc points than b and is not already a proc
                 -- point.  If found, it can become a proc point.
-                newId succ_id = not (NonDet.setMember succ_id procPoints') &&
+                newId succ_id = not (setMember succ_id procPoints') &&
                                 nreached succ_id > block_procpoints
             in  listToMaybe $ filter newId $ successors b
 
     in case newPoint of
          Just id ->
-             if NonDet.setMember id procPoints'
+             if setMember id procPoints'
                 then panic "added old proc pt"
-                else extendPPSet platform g blocks (NonDet.setInsert id procPoints')
+                else extendPPSet platform g blocks (setInsert id procPoints')
          Nothing -> return procPoints'
 
 
@@ -264,28 +263,28 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
 
   let liveness = cmmGlobalLiveness platform g
   let ppLiveness pp = filter isArgReg $ regSetToList $
-                        expectJust "ppLiveness" $ NonDet.mapLookup pp liveness
-  graphEnv <- return $ foldlGraphBlocks add_block NonDet.mapEmpty g
+                        expectJust "ppLiveness" $ mapLookup pp liveness
+  graphEnv <- return $ foldlGraphBlocks add_block mapEmpty g
 
   -- Build a map from proc point BlockId to pairs of:
   --  * Labels for their new procedures
   --  * Labels for the info tables of their new procedures (only if
   --    the proc point is a callPP)
   -- Due to common blockification, we may overestimate the set of procpoints.
-  let add_label map pp = NonDet.mapInsert pp lbls map
-        where lbls | pp == entry = (entry_label, fmap cit_lbl (NonDet.mapLookup entry info_tbls))
-                   | otherwise   = (block_lbl, guard (NonDet.setMember pp callPPs) >>
+  let add_label map pp = mapInsert pp lbls map
+        where lbls | pp == entry = (entry_label, fmap cit_lbl (mapLookup entry info_tbls))
+                   | otherwise   = (block_lbl, guard (setMember pp callPPs) >>
                                                  Just info_table_lbl)
                    where block_lbl      = blockLbl pp
                          info_table_lbl = infoTblLbl pp
 
-      procLabels :: NonDet.LabelMap (CLabel, Maybe CLabel)
-      procLabels = foldl' add_label NonDet.mapEmpty
-                          (filter (flip NonDet.mapMember (toBlockMap g)) (NonDet.nonDetSetElems procPoints))
+      procLabels :: LabelMap (CLabel, Maybe CLabel)
+      procLabels = foldl' add_label mapEmpty
+                          (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
 
   -- In each new graph, add blocks jumping off to the new procedures,
   -- and replace branches to procpoints with branches to the jump-off blocks
-  let add_jump_block :: (NonDet.LabelMap Label, [CmmBlock])
+  let add_jump_block :: (LabelMap Label, [CmmBlock])
                      -> (Label, CLabel)
                      -> UniqDSM (NonDet.LabelMap Label, [CmmBlock])
       add_jump_block (env, bs) (pp, l) = do
@@ -293,7 +292,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
         let b    = blockJoin (CmmEntry bid GlobalScope) emptyBlock jump
             live = ppLiveness pp
             jump = CmmCall (CmmLit (CmmLabel l)) Nothing live 0 0 0
-        return (NonDet.mapInsert pp bid env, b : bs)
+        return (mapInsert pp bid env, b : bs)
 
   -- when jumping to a PP that has an info table, if
   -- tablesNextToCode is off we must jump to the entry
@@ -306,7 +305,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
       jump_label Nothing  block_lbl = block_lbl
 
   let add_if_pp id rst =
-        case NonDet.mapLookup id procLabels of
+        case mapLookup id procLabels of
           Just (lbl, mb_info_lbl) -> (id, jump_label mb_info_lbl lbl) : rst
           Nothing                 -> rst
 
@@ -321,22 +320,22 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
   let add_jumps :: NonDet.LabelMap CmmGraph -> (Label, NonDet.LabelMap CmmBlock) -> UniqDSM (NonDet.LabelMap CmmGraph)
       add_jumps newGraphEnv (ppId, blockEnv) = do
         -- find which procpoints we currently branch to
-        let needed_jumps = NonDet.nonDetMapFoldr add_if_branch_to_pp [] blockEnv
+        let needed_jumps = mapFoldr add_if_branch_to_pp [] blockEnv
 
         (jumpEnv, jumpBlocks) <-
-           foldM add_jump_block (NonDet.mapEmpty, []) needed_jumps
+           foldM add_jump_block (mapEmpty, []) needed_jumps
             -- update the entry block
-        let b = expectJust "block in env" $ NonDet.mapLookup ppId blockEnv
-            blockEnv' = NonDet.mapInsert ppId b blockEnv
+        let b = expectJust "block in env" $ mapLookup ppId blockEnv
+            blockEnv' = mapInsert ppId b blockEnv
             -- replace branches to procpoints with branches to jumps
             blockEnv'' = toBlockMap $ replaceBranches jumpEnv $ ofBlockMap ppId blockEnv'
             -- add the jump blocks to the graph
             blockEnv''' = foldl' (flip addBlock) blockEnv'' jumpBlocks
         let g' = ofBlockMap ppId blockEnv'''
         -- pprTrace "g' pre jumps" (ppr g') $ do
-        return (NonDet.mapInsert ppId g' newGraphEnv)
+        return (mapInsert ppId g' newGraphEnv)
 
-  graphEnv <- foldM add_jumps NonDet.mapEmpty $ NonDet.nonDetMapToList graphEnv
+  graphEnv <- foldM add_jumps mapEmpty $ mapToList graphEnv
 
   let to_proc (bid, g)
           | bid == entry
@@ -344,13 +343,13 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
                                stack_info = stack_info})
                      top_l live g'
           | otherwise
-          = case expectJust "pp label" $ NonDet.mapLookup bid procLabels of
+          = case expectJust "pp label" $ mapLookup bid procLabels of
               (lbl, Just info_lbl)
-                 -> CmmProc (TopInfo { info_tbls = NonDet.mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl)
+                 -> CmmProc (TopInfo { info_tbls = mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl)
                                      , stack_info=stack_info})
                             lbl live g'
               (lbl, Nothing)
-                 -> CmmProc (TopInfo {info_tbls = NonDet.mapEmpty, stack_info=stack_info})
+                 -> CmmProc (TopInfo {info_tbls = mapEmpty, stack_info=stack_info})
                             lbl live g'
              where
               g' = replacePPIds g
@@ -364,7 +363,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
       replacePPIds g = {-# SCC "replacePPIds" #-}
                        mapGraphNodes (id, mapExp repl, mapExp repl) g
         where repl e@(CmmLit (CmmBlock bid)) =
-                case NonDet.mapLookup bid procLabels of
+                case mapLookup bid procLabels of
                   Just (_, Just info_lbl)  -> CmmLit (CmmLabel info_lbl)
                   _ -> e
               repl e = e
@@ -373,22 +372,22 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
   -- call sites.  Here, we sort them in reverse order -- it gets
   -- reversed later.
   let add_block_num (i, map) block =
-        (i + 1, NonDet.mapInsert (entryLabel block) i map)
+        (i + 1, mapInsert (entryLabel block) i map)
   let (_, block_order) =
-          foldl' add_block_num (0::Int, NonDet.mapEmpty :: NonDet.LabelMap Int)
+          foldl' add_block_num (0::Int, mapEmpty :: LabelMap Int)
                 (revPostorder g)
   let sort_fn (bid, _) (bid', _) =
-        compare (expectJust "block_order" $ NonDet.mapLookup bid  block_order)
-                (expectJust "block_order" $ NonDet.mapLookup bid' block_order)
+        compare (expectJust "block_order" $ mapLookup bid  block_order)
+                (expectJust "block_order" $ mapLookup bid' block_order)
 
-  return $ map to_proc $ sortBy sort_fn $ NonDet.nonDetMapToList graphEnv
+  return $ map to_proc $ sortBy sort_fn $ mapToList graphEnv
 
 -- Only called from GHC.Cmm.ProcPoint.splitAtProcPoints. NB. does a
 -- recursive lookup, see comment below.
-replaceBranches :: NonDet.LabelMap BlockId -> CmmGraph -> CmmGraph
+replaceBranches :: LabelMap BlockId -> CmmGraph -> CmmGraph
 replaceBranches env cmmg
   = {-# SCC "replaceBranches" #-}
-    ofBlockMap (g_entry cmmg) $ NonDet.mapMap f $ toBlockMap cmmg
+    ofBlockMap (g_entry cmmg) $ mapMap f $ toBlockMap cmmg
   where
     f block = replaceLastNode block $ last (lastNode block)
 
@@ -401,7 +400,7 @@ replaceBranches env cmmg
             -- label will now be in a different CmmProc.  Not only
             -- is this tidier, it stops CmmLint from complaining.
     last l@(CmmForeignCall {})   = l
-    lookup id = fmap lookup (NonDet.mapLookup id env) `orElse` id
+    lookup id = fmap lookup (mapLookup id env) `orElse` id
             -- XXX: this is a recursive lookup, it follows chains
             -- until the lookup returns Nothing, at which point we
             -- return the last BlockId
@@ -413,9 +412,9 @@ attachContInfoTables :: ProcPointSet -> CmmDecl -> CmmDecl
 attachContInfoTables call_proc_points (CmmProc top_info top_l live g)
  = CmmProc top_info{info_tbls = info_tbls'} top_l live g
  where
-   info_tbls' = NonDet.mapUnion (info_tbls top_info) $
-                NonDet.mapFromList [ (l, mkEmptyContInfoTable (infoTblLbl l))
-                            | l <- NonDet.nonDetSetElems call_proc_points
+   info_tbls' = mapUnion (info_tbls top_info) $
+                mapFromList [ (l, mkEmptyContInfoTable (infoTblLbl l))
+                            | l <- setElems call_proc_points
                             , l /= g_entry g ]
 attachContInfoTables _ other_decl
  = other_decl

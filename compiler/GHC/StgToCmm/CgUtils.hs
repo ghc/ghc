@@ -26,7 +26,6 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Utils.Panic
-import GHC.Cmm.Dataflow.Label.NonDet (mapMap)
 
 -- -----------------------------------------------------------------------------
 -- Information about global registers

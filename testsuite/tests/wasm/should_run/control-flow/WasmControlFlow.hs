@@ -9,7 +9,7 @@ import System.Exit
 import GHC hiding (Stmt, Match)
 import GHC.Cmm hiding (succ)
 import GHC.Cmm.ContFlowOpt
-import GHC.Cmm.Dataflow.Label.NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dominators
 import GHC.Cmm.Reducibility

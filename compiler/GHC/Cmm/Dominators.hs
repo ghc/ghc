@@ -32,8 +32,7 @@ import qualified GHC.CmmToAsm.CFG.Dominators as LT
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Cmm.Dataflow.Label (Label)
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 
 import GHC.Utils.Outputable( Outputable(..), text, int, hcat, (<+>))
@@ -113,8 +112,8 @@ intersectDominators ds ds' = commonPrefix (revDoms ds []) (revDoms ds' []) Entry
 -- Invariant: Dominators, graph, and RP numberings include only *reachable* blocks.
 data GraphWithDominators node =
     GraphWithDominators { gwd_graph :: GenCmmGraph node
-                        , gwd_dominators :: NonDet.LabelMap DominatorSet
-                        , gwd_rpnumbering :: NonDet.LabelMap RPNum
+                        , gwd_dominators :: LabelMap DominatorSet
+                        , gwd_rpnumbering :: LabelMap RPNum
                         }
 
 
@@ -139,14 +138,14 @@ graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
             rplabels :: Array Word64 Label
             rplabels = listArray bounds rplabels'
 
-            rpmap :: NonDet.LabelMap RPNum
-            rpmap = NonDet.mapFromList $ zipWith kvpair rpblocks [0..]
+            rpmap :: LabelMap RPNum
+            rpmap = mapFromList $ zipWith kvpair rpblocks [0..]
               where kvpair block i = (entryLabel block, RPNum i)
 
             labelIndex :: Label -> Word64
             labelIndex = flip findLabelIn imap
-              where imap :: NonDet.LabelMap Word64
-                    imap = NonDet.mapFromList $ zip rplabels' [0..]
+              where imap :: LabelMap Word64
+                    imap = mapFromList $ zip rplabels' [0..]
             blockIndex = labelIndex . entryLabel
 
             bounds :: (Word64, Word64)
@@ -168,18 +167,18 @@ graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
                 where d = idom_array ! i
             doms = tabulate bounds domSet
 
-            dmap = NonDet.mapFromList $ zipWith (\lbl i -> (lbl, domSet i)) rplabels' [0..]
+            dmap = mapFromList $ zipWith (\lbl i -> (lbl, domSet i)) rplabels' [0..]
 
 reachable :: NonLocal node => [Block node C C] -> GenCmmGraph node -> GenCmmGraph node
 reachable blocks g = g { g_graph = GMany NothingO blockmap NothingO }
-  where blockmap = NonDet.mapFromList [(entryLabel b, b) | b <- blocks]
+  where blockmap = mapFromList [(entryLabel b, b) | b <- blocks]
 
 
 -- | =Utility functions
 
 -- | Call `graphMap` to get the mapping from `Label` to `Block` that
 -- is embedded in every `CmmGraph`.
-graphMap :: GenCmmGraph n -> NonDet.LabelMap (Block n C C)
+graphMap :: GenCmmGraph n -> LabelMap (Block n C C)
 graphMap (CmmGraph { g_graph = GMany NothingO blockmap NothingO }) = blockmap
 
 -- | Use `gwdRPNumber` on the result of the dominator analysis to get
@@ -188,8 +187,8 @@ graphMap (CmmGraph { g_graph = GMany NothingO blockmap NothingO }) = blockmap
 gwdRPNumber :: HasDebugCallStack => GraphWithDominators node -> Label -> RPNum
 gwdRPNumber g l = findLabelIn l (gwd_rpnumbering g)
 
-findLabelIn :: HasDebugCallStack => Label -> NonDet.LabelMap a -> a
-findLabelIn lbl = NonDet.mapFindWithDefault failed lbl
+findLabelIn :: HasDebugCallStack => Label -> LabelMap a -> a
+findLabelIn lbl = mapFindWithDefault failed lbl
   where failed =
             pprPanic "label not found in result of analysis" (ppr lbl)
 
@@ -205,12 +204,12 @@ gwdDominatorsOf g lbl = findLabelIn lbl (gwd_dominators g)
 gwdDominatorTree :: GraphWithDominators node -> Tree.Tree Label
 gwdDominatorTree gwd = subtreeAt (g_entry (gwd_graph gwd))
   where subtreeAt label = Tree.Node label $ map subtreeAt $ children label
-        children l = NonDet.mapFindWithDefault [] l child_map
-        child_map :: NonDet.LabelMap [Label]
-        child_map = NonDet.nonDetMapFoldlWithKey addParent NonDet.mapEmpty $ gwd_dominators gwd
+        children l = mapFindWithDefault [] l child_map
+        child_map :: LabelMap [Label]
+        child_map = mapFoldlWithKey addParent mapEmpty $ gwd_dominators gwd
           where addParent cm _ EntryNode = cm
                 addParent cm lbl (ImmediateDominator p _) =
-                    NonDet.mapInsertWith (++) p [lbl] cm
+                    mapInsertWith (++) p [lbl] cm
 
 
 -- | Turn a function into an array.  Inspired by SML's `Array.tabulate`

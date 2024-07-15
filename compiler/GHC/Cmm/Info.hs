@@ -40,7 +40,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Data.Bitmap
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 
 import GHC.Platform
 import GHC.Platform.Profile
@@ -146,7 +146,7 @@ mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
         -- point as first entry) and the entry code
         --
         return (top_decls ++
-                [CmmProc NonDet.mapEmpty entry_lbl live blocks,
+                [CmmProc mapEmpty entry_lbl live blocks,
                  mkRODataLits info_lbl
                     (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)])
 
@@ -159,9 +159,9 @@ mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
   | otherwise
   = do
     (top_declss, raw_infos) <-
-       unzip `fmap` mapM do_one_info (NonDet.nonDetMapToList (info_tbls infos))
+       unzip `fmap` mapM do_one_info (mapToList (info_tbls infos))
     return (concat top_declss ++
-            [CmmProc (NonDet.mapFromList raw_infos) entry_lbl live blocks])
+            [CmmProc (mapFromList raw_infos) entry_lbl live blocks])
 
   where
    platform = profilePlatform profile

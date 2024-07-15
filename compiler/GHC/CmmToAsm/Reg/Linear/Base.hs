@@ -34,7 +34,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
 import GHC.Cmm.BlockId
-import qualified GHC.Cmm.Dataflow.Label.NonDet as NonDet
+import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Reg.Utils
 
 data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
@@ -50,7 +50,7 @@ data BlockAssignment freeRegs
 
 -- | Find the register mapping for a specific BlockId.
 lookupBlockAssignment :: BlockId -> BlockAssignment freeRegs -> Maybe (freeRegs, RegMap Loc)
-lookupBlockAssignment bid ba = NonDet.mapLookup bid (blockMap ba)
+lookupBlockAssignment bid ba = mapLookup bid (blockMap ba)
 
 -- | Lookup which register a virtual register was first assigned to.
 lookupFirstUsed :: VirtualReg -> BlockAssignment freeRegs -> Maybe RealReg
@@ -58,7 +58,7 @@ lookupFirstUsed vr ba = lookupUFM (firstUsed ba) vr
 
 -- | An initial empty 'BlockAssignment'
 emptyBlockAssignment :: BlockAssignment freeRegs
-emptyBlockAssignment = BlockAssignment NonDet.mapEmpty mempty
+emptyBlockAssignment = BlockAssignment mapEmpty mempty
 
 -- | Add new register mappings for a specific block.
 updateBlockAssignment :: BlockId
@@ -66,7 +66,7 @@ updateBlockAssignment :: BlockId
   -> BlockAssignment freeRegs
   -> BlockAssignment freeRegs
 updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
-  BlockAssignment (NonDet.mapInsert dest (freeRegs, regMap) blockMap)
+  BlockAssignment (mapInsert dest (freeRegs, regMap) blockMap)
                   (mergeUFM combWithExisting id (mapMaybeUFM fromLoc) (firstUsed) (toVRegMap regMap))
   where
     -- The blocks are processed in dependency order, so if there's already an
