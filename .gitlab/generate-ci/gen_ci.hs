@@ -977,28 +977,33 @@ jobs = Map.fromList $ concatMap (flattenJobGroup) job_groups
 
 debian_x86 :: [JobGroup Job]
 debian_x86 =
-  [ disableValidate (standardBuilds Amd64 (Linux Debian10))
-  , addValidateRule TestPrimops (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
-  , validateBuilds Amd64 (Linux Debian10) nativeInt
-  , validateBuilds Amd64 (Linux Debian10) unreg
-  , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
-  , -- More work is needed to address TSAN failures: #22520
-    modifyNightlyJobs allowFailure
-      (modifyValidateJobs (allowFailure . manual) tsan_jobs)
-  , -- Nightly allowed to fail: #22343
-    modifyNightlyJobs allowFailure
-     (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
-  , onlyRule LLVMBackend (validateBuilds Amd64 (Linux Debian12) llvm)
-  , disableValidate (standardBuilds Amd64 (Linux Debian11))
-  , disableValidate (standardBuilds Amd64 (Linux Debian12))
+  [ -- Release configurations
   -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
   -- not being at EOL until April 2023 and they still need tinfo5.
-  , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
+    disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
+  , disableValidate (standardBuilds Amd64 (Linux Debian10))
+  , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
+  , disableValidate (standardBuilds Amd64 (Linux Debian11))
+  , disableValidate (standardBuilds Amd64 (Linux Debian12))
 
-  , onlyRule NonmovingGc (validateBuilds Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
-  , onlyRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
+
+  -- Validate only builds
+  , fastCI (validateBuilds Amd64 (Linux validate_debian) debug)
+  , validateBuilds Amd64 (Linux validate_debian) nativeInt
+  , validateBuilds Amd64 (Linux validate_debian) unreg
+   -- More work is needed to address TSAN failures: #22520
+  , modifyNightlyJobs allowFailure (modifyValidateJobs (allowFailure . manual) tsan_jobs)
+  , -- Nightly allowed to fail: #22343
+    modifyNightlyJobs allowFailure (modifyValidateJobs manual (validateBuilds Amd64 (Linux validate_debian) noTntc))
+
+  , onlyRule LLVMBackend (validateBuilds Amd64 (Linux validate_debian) llvm)
+  , addValidateRule TestPrimops (standardBuilds Amd64 (Linux validate_debian))
+
+  , onlyRule NonmovingGc (validateBuilds Amd64 (Linux validate_debian) vanilla {validateNonmovingGc = True})
+  , onlyRule IpeData (validateBuilds Amd64 (Linux validate_debian) zstdIpe)
   ]
   where
+    validate_debian = Debian12
 
     tsan_jobs =
       modifyJobs
@@ -1006,19 +1011,22 @@ debian_x86 =
          -- Haddock is large enough to make TSAN choke without massive quantities of
          -- memory.
         . addVariable "HADRIAN_ARGS" "--docs=none") $
-      validateBuilds Amd64 (Linux Debian12) tsan
+      validateBuilds Amd64 (Linux validate_debian) tsan
 
 debian_aarch64 :: [JobGroup Job]
 debian_aarch64 =
   [
-     fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
-   , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
+     disableValidate (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
+   , fastCI (standardBuildsWithConfig AArch64 (Linux Debian12) (splitSectionsBroken vanilla))
+   -- LLVM backend bootstrap
    , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian12) llvm)
   ]
 
 debian_i386 :: [JobGroup Job]
 debian_i386 =
-  [ standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla) ]
+  [ disableValidate (standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla))
+  , standardBuildsWithConfig I386 (Linux Debian12) (splitSectionsBroken vanilla)
+  ]
 
 ubuntu_x86 :: [JobGroup Job]
 ubuntu_x86 =
@@ -1151,12 +1159,14 @@ platform_mapping = Map.map go combined_result
                 , "x86_64-linux-fedora33-release"
                 , "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
                 , "x86_64-windows-validate"
+                , "aarch64-linux-deb12-validate"
                 , "nightly-x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf"
                 , "nightly-x86_64-linux-deb11-validate"
                 , "nightly-x86_64-linux-deb12-validate"
                 , "x86_64-linux-alpine3_18-wasm-cross_wasm32-wasi-release+fully_static+text_simdutf"
                 , "x86_64-linux-deb12-validate+thread_sanitizer_cmm"
                 , "nightly-aarch64-linux-deb10-validate"
+                , "nightly-aarch64-linux-deb12-validate"
                 , "nightly-x86_64-linux-alpine3_12-validate"
                 , "nightly-x86_64-linux-deb10-validate"
                 , "nightly-x86_64-linux-fedora33-release"
