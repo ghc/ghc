@@ -621,7 +621,10 @@ def _extra_files(name, opts, files):
 
 # Record the size of a specific file
 def collect_size ( deviation, path ):
-    return collect_generic_stat ( 'size', deviation, lambda way: os.path.getsize(in_testdir(path)) )
+    return collect_size_func(deviation, lambda: path)
+
+def collect_size_func ( deviation, path_func ):
+    return collect_generic_stat ( 'size', deviation, lambda way: os.path.getsize(in_testdir(path_func())) )
 
 def get_dir_size(path):
     total = 0
@@ -637,13 +640,11 @@ def get_dir_size(path):
         print("Exception: Could not find: " + path)
 
 def collect_size_dir ( deviation, path ):
+    return collect_size_dir_func ( deviation, lambda: path )
 
-    ## os.path.join joins the path with slashes (not backslashes) on windows
-    ## CI...for some reason, so we manually detect it here
-    sep = r"/"
-    if on_windows():
-        sep = r"\\"
-    return collect_generic_stat ( 'size', deviation, lambda way: get_dir_size(path) )
+# Like collect_size_dir but the path is passed as a function which can be evaluated later.
+def collect_size_dir_func( deviation, path_func ):
+    return collect_generic_stat ( 'size', deviation, lambda way: get_dir_size(path_func()) )
 
 # Read a number from a specific file
 def stat_from_file ( metric, deviation, path ):
@@ -663,14 +664,14 @@ def collect_generic_stats ( metric_info ):
 # is call-by-value so if we placed the call in an all.T file then the python
 # interpreter would evaluate the call to path_from_ghcPkg
 def collect_size_ghc_pkg (deviation, library):
-    return collect_size_dir(deviation, path_from_ghcPkg(library, "library-dirs"))
+    return collect_size_dir_func(deviation, lambda: path_from_ghcPkg(library, "library-dirs"))
 
 # same for collect_size and find_so
 def collect_object_size (deviation, library, use_non_inplace=False):
     if use_non_inplace:
-        return collect_size(deviation, find_non_inplace_so(library))
+        return collect_size_func(deviation, lambda: find_non_inplace_so(library))
     else:
-        return collect_size(deviation, find_so(library))
+        return collect_size_func(deviation, lambda: find_so(library))
 
 def path_from_ghcPkg (library, field):
     """Find the field as a path for a library via a call to ghc-pkg. This is a
