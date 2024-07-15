@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE MultiWayIf          #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -119,7 +120,7 @@ module GHC.Tc.Utils.TcType (
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
-  anyRewritableTyVar, anyRewritableTyFamApp,
+  anyRewritableTyVar, anyRewritableTyFamApp, UnderFam,
 
   ---------------------------------
   -- Patersons sizes
@@ -994,10 +995,11 @@ isTyFamFree :: Type -> Bool
 -- ^ Check that a type does not contain any type family applications.
 isTyFamFree = null . tcTyFamInsts
 
+type UnderFam = Bool   -- True <=> we are in the argument of a type family application
+
 any_rewritable :: EqRel   -- Ambient role
-               -> (EqRel -> TcTyVar -> Bool)           -- check tyvar
-               -> (EqRel -> TyCon -> [TcType] -> Bool) -- check type family
-               -> (TyCon -> Bool)                      -- expand type synonym?
+               -> (UnderFam -> EqRel -> TcTyVar -> Bool)           -- Check tyvar
+               -> (UnderFam -> EqRel -> TyCon -> [TcType] -> Bool) -- Check type family application
                -> TcType -> Bool
 -- Checks every tyvar and tyconapp (not including FunTys) within a type,
 -- ORing the results of the predicates above together
@@ -1010,66 +1012,79 @@ any_rewritable :: EqRel   -- Ambient role
 --
 -- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 {-# INLINE any_rewritable #-} -- this allows specialization of predicates
-any_rewritable role tv_pred tc_pred should_expand
-  = go role emptyVarSet
+any_rewritable role tv_pred tc_pred ty
+  = go False emptyVarSet role ty
   where
-    go_tv rl bvs tv | tv `elemVarSet` bvs = False
-                    | otherwise           = tv_pred rl tv
+    go_tv uf bvs rl tv | tv `elemVarSet` bvs = False
+                       | otherwise           = tv_pred uf rl tv
 
-    go rl bvs ty@(TyConApp tc tys)
+    go :: UnderFam -> VarSet -> EqRel -> TcType -> Bool
+    go under_fam bvs rl (TyConApp tc tys)
+
+      -- Expand synonyms, unless (a) we are at Nominal role and (b) the synonym
+      -- is type-family-free; then it suffices just to look at the args
       | isTypeSynonymTyCon tc
-      , should_expand tc
-      , Just ty' <- coreView ty   -- should always match
-      = go rl bvs ty'
+      , case rl of { NomEq -> not (isFamFreeTyCon tc); ReprEq -> True }
+      , Just ty' <- expandSynTyConApp_maybe tc tys
+      = go under_fam bvs rl ty'
 
-      | tc_pred rl tc tys
-      = True
+      -- Check if we are going under a type family application
+      | case rl of
+           NomEq  -> isTypeFamilyTyCon tc
+           ReprEq -> isFamilyTyCon     tc
+      = if | tc_pred under_fam rl tc tys -> True
+           | otherwise                   -> go_fam under_fam (tyConArity tc) bvs tys
 
       | otherwise
-      = go_tc rl bvs tc tys
+      = go_tc under_fam bvs rl tc tys
 
-    go rl bvs (TyVarTy tv)       = go_tv rl bvs tv
-    go _ _     (LitTy {})        = False
-    go rl bvs (AppTy fun arg)    = go rl bvs fun || go NomEq bvs arg
-    go rl bvs (FunTy _ w arg res)  = go NomEq bvs arg_rep || go NomEq bvs res_rep ||
-                                     go rl bvs arg || go rl bvs res || go NomEq bvs w
+    go uf bvs rl (TyVarTy tv)        = go_tv uf bvs rl tv
+    go _  _    _ (LitTy {})          = False
+    go uf bvs rl (AppTy fun arg)     = go uf bvs rl fun || go uf bvs NomEq arg
+    go uf bvs rl (FunTy _ w arg res) = go uf bvs NomEq arg_rep || go uf bvs NomEq res_rep ||
+                                       go uf bvs rl arg || go uf bvs rl res || go uf bvs NomEq w
       where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
             res_rep = getRuntimeRep res
-    go rl bvs (ForAllTy tv ty)   = go rl (bvs `extendVarSet` binderVar tv) ty
-    go rl bvs (CastTy ty _)      = go rl bvs ty
-    go _  _   (CoercionTy _)     = False
+    go uf bvs rl (ForAllTy tv ty)   = go uf (bvs `extendVarSet` binderVar tv) rl ty
+    go uf bvs rl (CastTy ty _)      = go uf bvs rl ty
+    go _  _   _  (CoercionTy _)     = False
 
-    go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
-    go_tc ReprEq bvs tc tys = any (go_arg bvs)
-                              (tyConRoleListRepresentational tc `zip` tys)
+    go_tc :: UnderFam -> VarSet -> EqRel -> TyCon -> [TcType] -> Bool
+    go_tc uf bvs NomEq  _  tys = any (go uf bvs NomEq) tys
+    go_tc uf bvs ReprEq tc tys = any2 (go_arg uf bvs) tys (tyConRoleListRepresentational tc)
 
-    go_arg bvs (Nominal,          ty) = go NomEq  bvs ty
-    go_arg bvs (Representational, ty) = go ReprEq bvs ty
-    go_arg _   (Phantom,          _)  = False  -- We never rewrite with phantoms
+    go_arg uf bvs ty Nominal          = go uf bvs NomEq ty
+    go_arg uf bvs ty Representational = go uf bvs ReprEq ty
+    go_arg _   _  _  Phantom          = False  -- We never rewrite with phantoms
+
+    -- For a type-family or data-family application (F t1 .. tn), all arguments
+    --   have Nominal role (whether in F's arity or, if over-saturated, beyond it)
+    -- Switch on under_fam for arguments <= arity
+    go_fam uf 0 bvs tys      = any (go uf bvs NomEq) tys   -- Like AppTy
+    go_fam _  _ _   []       = False
+    go_fam uf n bvs (ty:tys) = go True bvs NomEq ty || go_fam uf (n-1) bvs tys
+                               -- True <=> switch on under_fam
 
 anyRewritableTyVar :: EqRel    -- Ambient role
-                   -> (EqRel -> TcTyVar -> Bool)  -- check tyvar
+                   -> (UnderFam -> EqRel -> TcTyVar -> Bool)  -- check tyvar
                    -> TcType -> Bool
 -- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
-anyRewritableTyVar role pred
-  = any_rewritable role pred
-      (\ _ _ _ -> False) -- no special check for tyconapps
-                         -- (this False is ORed with other results, so it
-                         --  really means "do nothing special"; the arguments
-                         --   are still inspected)
-      (\ _ -> False)     -- don't expand synonyms
-    -- NB: No need to expand synonyms, because we can find
-    -- all free variables of a synonym by looking at its
-    -- arguments
+anyRewritableTyVar role check_tv
+  = any_rewritable role
+      check_tv
+      (\ _ _ _ _ -> False) -- No special check for tyconapps
+                           -- (this False is ORed with other results,
+                           --  so it really means "do nothing special";
+                           --  the arguments are still inspected)
 
 anyRewritableTyFamApp :: EqRel   -- Ambient role
-                      -> (EqRel -> TyCon -> [TcType] -> Bool) -- check tyconapp
-                          -- should return True only for type family applications
+                      -> (UnderFam -> EqRel -> TyCon -> [TcType] -> Bool)
+                         -- Check a type-family application
                       -> TcType -> Bool
   -- always ignores casts & coercions
 -- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 anyRewritableTyFamApp role check_tyconapp
-  = any_rewritable role (\ _ _ -> False) check_tyconapp (not . isFamFreeTyCon)
+  = any_rewritable role (\ _ _ _ -> False) check_tyconapp
 
 {- Note [anyRewritableTyVar must be role-aware]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

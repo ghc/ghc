@@ -26,7 +26,7 @@ module GHC.Tc.Types.Constraint (
 
         -- Particular forms of constraint
         EqCt(..),    eqCtEvidence, eqCtLHS,
-        DictCt(..),  dictCtEvidence,
+        DictCt(..),  dictCtEvidence, dictCtPred,
         IrredCt(..), irredCtEvidence, mkIrredCt, ctIrredCt, irredCtPred,
 
         -- QCInst
@@ -224,6 +224,9 @@ data DictCt   -- e.g.  Num ty
 
 dictCtEvidence :: DictCt -> CtEvidence
 dictCtEvidence = di_ev
+
+dictCtPred :: DictCt -> TcPredType
+dictCtPred (DictCt { di_cls = cls, di_tys = tys }) = mkClassPred cls tys
 
 instance Outputable DictCt where
   ppr dict = ppr (CDictCan dict)
@@ -1956,7 +1959,7 @@ and expect a zonked result.  (For example, in the kind-check
 of `eqType`.)
 
 The safest thing is simply to keep `ctev_evar`/`ctev_dest` in sync
-with `ctev_pref`, as stated in `Note [CtEvidence invariants]`.
+with `ctev_pred`, as stated in `Note [CtEvidence invariants]`.
 
 Note [Bind new Givens immediately]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2045,9 +2048,7 @@ ctEvRewriteEqRel :: CtEvidence -> EqRel
 -- ^ Return the rewrite-role of an abitrary CtEvidence
 -- See Note [The rewrite-role of a constraint]
 -- We return ReprEq for (a ~R# b) and NomEq for all other preds
-ctEvRewriteEqRel ev
-  | isReprEqPrimPred (ctEvPred ev) = ReprEq
-  | otherwise                      = NomEq
+ctEvRewriteEqRel = predTypeEqRel . ctEvPred
 
 ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm ev = EvExpr (ctEvExpr ev)
@@ -2217,7 +2218,7 @@ dictCtFlavourRole (DictCt { di_ev = ev })
 
 -- | Extract the flavour and role from a 'Ct'
 ctFlavourRole :: HasDebugCallStack => Ct -> CtFlavourRole
--- Uses short-cuts to role for special cases
+-- Uses short-cuts for the Role field, for special cases
 ctFlavourRole (CDictCan di_ct) = dictCtFlavourRole di_ct
 ctFlavourRole (CEqCan eq_ct)   = eqCtFlavourRole eq_ct
 ctFlavourRole ct               = ctEvFlavourRole (ctEvidence ct)

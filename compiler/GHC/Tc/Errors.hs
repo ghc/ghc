@@ -80,11 +80,10 @@ import qualified GHC.Data.Strict as Strict
 import Control.Monad      ( unless, when, foldM, forM_ )
 import Data.Foldable      ( toList )
 import Data.Function      ( on )
-import Data.List          ( partition, sort, sortBy )
+import Data.List          ( partition, union, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord         ( comparing )
-import qualified Data.Semigroup as S
 
 {-
 ************************************************************************
@@ -1975,12 +1974,17 @@ eqInfoMsgs ty1 ty2
     mb_fun1 = isTyFun_maybe ty1
     mb_fun2 = isTyFun_maybe ty2
 
-      -- if a type isn't headed by a type function, then any ambiguous
-      -- variables need not be reported as such. e.g.: F a ~ t0 -> t0, where a is a skolem
-    ambig_tkvs1 = maybe mempty (\_ -> ambigTkvsOfTy ty1) mb_fun1
-    ambig_tkvs2 = maybe mempty (\_ -> ambigTkvsOfTy ty2) mb_fun2
+    ambig_tkvs1@(kvs1, tvs1) = ambigTkvsOfTy ty1
+    ambig_tkvs2@(kvs2, tvs2) = ambigTkvsOfTy ty2
 
-    ambig_tkvs@(ambig_kvs, ambig_tvs) = ambig_tkvs1 S.<> ambig_tkvs2
+      -- If a type isn't headed by a type function, then any ambiguous
+      -- variables need not be reported as such. e.g.: F a ~ t0 -> t0, where a is a skolem
+    ambig_tkvs@(ambig_kvs, ambig_tvs)
+      = case (mb_fun1, mb_fun2) of
+          (Nothing, Nothing) -> ([], [])
+          (Just {}, Nothing) -> ambig_tkvs1
+          (Nothing, Just {}) -> ambig_tkvs2
+          (Just{},Just{})    -> (kvs1 `union` kvs2, tvs1 `union` tvs2)  -- Avoid dups
 
     ambig_msg | isJust mb_fun1 || isJust mb_fun2
               , not (null ambig_kvs && null ambig_tvs)
