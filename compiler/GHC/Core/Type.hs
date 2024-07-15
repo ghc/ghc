@@ -171,7 +171,7 @@ module GHC.Core.Type (
 
         anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,
-        expandTypeSynonyms,
+        expandTypeSynonyms, expandSynTyConApp_maybe,
         typeSize, occCheckExpand,
 
         -- ** Closing over kinds
