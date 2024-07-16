@@ -852,7 +852,7 @@ data ArityOpts = ArityOpts
 
 -- | The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
-exprEtaExpandArity :: ArityOpts -> CoreExpr -> Maybe SafeArityType
+exprEtaExpandArity :: HasDebugCallStack => ArityOpts -> CoreExpr -> Maybe SafeArityType
 -- exprEtaExpandArity is used when eta expanding
 --      e  ==>  \xy -> e x y
 -- Nothing if the expression has arity 0

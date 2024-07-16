@@ -2226,34 +2226,44 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_cont = cont, sc_hole_ty = fun_ty })
   | fun_id `hasKey` runRWKey
-  , [ TyArg {}, TyArg {} ] <- rev_args
-  -- Do this even if (contIsStop cont)
+  , [ TyArg { as_arg_ty = hole_ty }, TyArg {} ] <- rev_args
+  -- Do this even if (contIsStop cont), or if seCaseCase is off.
   -- See Note [No eta-expansion in runRW#]
   = do { let arg_env = arg_se `setInScopeFromE` env
-             ty'   = contResultType cont
+
+             overall_res_ty  = contResultType cont
+             -- hole_ty is the type of the current runRW# application
+             (outer_cont, new_runrw_res_ty, inner_cont)
+                | seCaseCase env = (mkBoringStop overall_res_ty, overall_res_ty, cont)
+                | otherwise      = (cont, hole_ty, mkBoringStop hole_ty)
+                -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
+                --    Note [Case-of-case and full laziness]
 
        -- If the argument is a literal lambda already, take a short cut
-       -- This isn't just efficiency; if we don't do this we get a beta-redex
-       -- every time, so the simplifier keeps doing more iterations.
+       -- This isn't just efficiency:
+       --    * If we don't do this we get a beta-redex every time, so the
+       --      simplifier keeps doing more iterations.
+       --    * Even more important: see Note [No eta-expansion in runRW#]
        ; arg' <- case arg of
            Lam s body -> do { (env', s') <- simplBinder arg_env s
-                            ; body' <- simplExprC env' body cont
+                            ; body' <- simplExprC env' body inner_cont
                             ; return (Lam s' body') }
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
+
            _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
                    ; let (m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
                          cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
-                                            , sc_env = env', sc_cont = cont
-                                            , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty' }
+                                            , sc_env = env', sc_cont = inner_cont
+                                            , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty }
                                 -- cont' applies to s', then K
                    ; body' <- simplExprC env' arg cont'
                    ; return (Lam s' body') }
 
-       ; let rr'   = getRuntimeRep ty'
-             call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
-       ; return (emptyFloats env, call') }
+       ; let rr'   = getRuntimeRep new_runrw_res_ty
+             call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
+       ; rebuild env call' outer_cont }
 
 ---------- Simplify value arguments --------------------
 rebuildCall env fun_info
@@ -2266,7 +2276,8 @@ rebuildCall env fun_info
 
   -- Strict arguments
   | isStrictArgInfo fun_info
-  , seCaseCase env
+  , seCaseCase env    -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
+                      --    Note [Case-of-case and full laziness]
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
                (StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
@@ -3075,7 +3086,9 @@ doCaseToLet scrut case_bndr
 --------------------------------------------------
 
 reallyRebuildCase env scrut case_bndr alts cont
-  | not (seCaseCase env)
+  | not (seCaseCase env)    -- Only when case-of-case is on.
+                            -- See GHC.Driver.Config.Core.Opt.Simplify
+                            --    Note [Case-of-case and full laziness]
   = do { case_expr <- simplAlts env scrut case_bndr alts
                                 (mkBoringStop (contHoleType cont))
        ; rebuild env case_expr cont }
