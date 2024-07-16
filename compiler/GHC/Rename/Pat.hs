@@ -776,7 +776,7 @@ rnHsRecPatsAndThen mk (L _ con)
                                             hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
        ; check_unused_wildcard (lHsRecFieldsImplicits flds' <$> unLoc <$> dd)
-       ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
+       ; return (HsRecFields { rec_ext = noExtField, rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat l n = VarPat noExtField (L (noAnnSrcSpan l) n)
     rn_field (L l fld, n') =

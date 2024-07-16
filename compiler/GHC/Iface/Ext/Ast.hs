@@ -1068,7 +1068,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
-      contextify_rec (HsRecFields fds a) = HsRecFields (map go scoped_fds) a
+      contextify_rec (HsRecFields x fds a) = HsRecFields x (map go scoped_fds) a
         where
           go :: RScoped (LocatedA (HsFieldBind id a1))
                       -> LocatedA (HsFieldBind id (PScoped a1)) -- AZ
@@ -1464,7 +1464,7 @@ instance HiePass p => ToHie (RScoped (NHsValBindsLR (GhcPass p))) where
 
 instance ( ToHie arg , HasLoc arg , Data arg
          , HiePass p ) => ToHie (RContext (HsRecFields (GhcPass p) arg)) where
-  toHie (RC c (HsRecFields fields _)) = toHie $ map (RC c) fields
+  toHie (RC c (HsRecFields _ fields _)) = toHie $ map (RC c) fields
 
 instance ( ToHie (RFContext label)
          , ToHie arg, HasLoc arg, Data arg

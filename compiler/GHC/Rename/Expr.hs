@@ -543,7 +543,7 @@ rnExpr (RecordCon { rcon_con = con_id
   = do { con_lname@(L _ con_name) <- lookupLocatedOccRnConstr con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
-       ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
+       ; let rec_binds' = HsRecFields { rec_ext = noExtField, rec_flds = flds', rec_dotdot = dd }
        ; return (RecordCon { rcon_ext = noExtField
                            , rcon_con = con_lname, rcon_flds = rec_binds' }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }

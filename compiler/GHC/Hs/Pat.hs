@@ -191,6 +191,10 @@ type instance XConPatTyArg GhcPs = EpToken "@"
 type instance XConPatTyArg GhcRn = NoExtField
 type instance XConPatTyArg GhcTc = NoExtField
 
+type instance XHsRecFields GhcPs = NoExtField
+type instance XHsRecFields GhcRn = NoExtField
+type instance XHsRecFields GhcTc = NoExtField
+
 type instance XHsFieldBind _ = [AddEpAnn]
 
 type instance XInvisPat GhcPs = EpToken "@"

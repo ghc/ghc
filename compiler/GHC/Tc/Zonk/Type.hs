@@ -1462,9 +1462,9 @@ zonkStmt _zBody (XStmtLR (ApplicativeStmt body_ty args mb_join))
 
 -------------------------------------------------------------------------
 zonkRecFields :: HsRecordBinds GhcTc -> ZonkTcM (HsRecordBinds GhcTc)
-zonkRecFields (HsRecFields flds dd)
+zonkRecFields (HsRecFields x flds dd)
   = do  { flds' <- mapM zonk_rbind flds
-        ; return (HsRecFields flds' dd) }
+        ; return (HsRecFields x flds' dd) }
   where
     zonk_rbind (L l fld)
       = do { new_id   <- wrapLocZonkMA zonkFieldOcc (hfbLHS fld)
@@ -1629,12 +1629,12 @@ zonkConStuff (InfixCon p1 p2)
         ; p2' <- zonkPat p2
         ; return (InfixCon p1' p2') }
 
-zonkConStuff (RecCon (HsRecFields rpats dd))
+zonkConStuff (RecCon (HsRecFields x rpats dd))
   = do  { pats' <- zonkPats (map (hfbRHS . unLoc) rpats)
         ; let rpats' = zipWith (\(L l rp) p' ->
                                   L l (rp { hfbRHS = p' }))
                                rpats pats'
-        ; return (RecCon (HsRecFields rpats' dd)) }
+        ; return (RecCon (HsRecFields x rpats' dd)) }
         -- Field selectors have declared types; hence no zonking
 
 ---------------------------

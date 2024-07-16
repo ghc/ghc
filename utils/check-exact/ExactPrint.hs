@@ -3350,7 +3350,7 @@ instance ExactPrint (MatchGroup GhcPs (LocatedA (HsCmd GhcPs))) where
 instance (ExactPrint body) => ExactPrint (HsRecFields GhcPs body) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (HsRecFields fields mdot) = do
+  exact (HsRecFields x fields mdot) = do
     fields' <- markAnnotated fields
     mdot' <- case mdot of
       Nothing -> return Nothing
@@ -3358,7 +3358,7 @@ instance (ExactPrint body) => ExactPrint (HsRecFields GhcPs body) where
         ss' <- printStringAtAA ss ".."
         return $ Just (L ss' d)
       -- Note: mdot contains the SrcSpan where the ".." appears, if present
-    return (HsRecFields fields' mdot')
+    return (HsRecFields x fields' mdot')
 
 -- ---------------------------------------------------------------------
 

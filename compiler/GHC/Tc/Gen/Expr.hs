@@ -1641,9 +1641,9 @@ tcRecordBinds
         -> HsRecordBinds GhcRn
         -> TcM (HsRecordBinds GhcTc)
 
-tcRecordBinds con_like arg_tys (HsRecFields rbinds dd)
+tcRecordBinds con_like arg_tys (HsRecFields _ rbinds dd)
   = do  { mb_binds <- mapM do_bind rbinds
-        ; return (HsRecFields (catMaybes mb_binds) dd) }
+        ; return (HsRecFields noExtField (catMaybes mb_binds) dd) }
   where
     fields = map flSelector $ conLikeFieldLabels con_like
     flds_w_tys = zipEqual "tcRecordBinds" fields arg_tys

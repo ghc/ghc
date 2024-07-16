@@ -1156,7 +1156,7 @@ cvtl e = wrapLA (cvt e)
                               ; return $ ExprWithTySig noAnn pe (mkHsWildCardBndrs t') }
     cvt (RecConE c flds) = do { c' <- cNameN c
                               ; flds' <- mapM (cvtFld (wrapParLA mkFieldOcc)) flds
-                              ; return $ mkRdrRecordCon c' (HsRecFields flds' Nothing) noAnn }
+                              ; return $ mkRdrRecordCon c' (HsRecFields noExtField flds' Nothing) noAnn }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
                               ; flds'
                                   <- mapM (cvtFld (wrapParLA mkAmbiguousFieldOcc))
@@ -1506,7 +1506,7 @@ cvtp (RecP c fs)       = do { c' <- cNameN c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = c'
-                                , pat_args = Hs.RecCon $ HsRecFields fs' Nothing
+                                , pat_args = Hs.RecCon $ HsRecFields noExtField fs' Nothing
                                 }
                             }
 cvtp (ListP ps)        = do { ps' <- cvtPats ps

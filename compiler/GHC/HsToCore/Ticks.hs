@@ -975,9 +975,9 @@ addTickCmdStmt (XStmtLR (ApplicativeStmt{})) =
 addTickCmdStmt stmt  = pprPanic "addTickHsCmd" (ppr stmt)
 
 addTickHsRecordBinds :: HsRecordBinds GhcTc -> TM (HsRecordBinds GhcTc)
-addTickHsRecordBinds (HsRecFields fields dd)
+addTickHsRecordBinds (HsRecFields x fields dd)
   = do  { fields' <- mapM addTickHsRecField fields
-        ; return (HsRecFields fields' dd) }
+        ; return (HsRecFields x fields' dd) }
 
 addTickHsRecField :: LHsFieldBind GhcTc id (LHsExpr GhcTc)
                   -> TM (LHsFieldBind GhcTc id (LHsExpr GhcTc))

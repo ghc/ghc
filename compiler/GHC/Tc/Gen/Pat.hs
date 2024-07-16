@@ -1615,9 +1615,9 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
     where
       con_arity  = conLikeArity con_like
 
-  RecCon (HsRecFields rpats dd) -> do
+  RecCon (HsRecFields x rpats dd) -> do
         { (rpats', res) <- tcMultiple tc_field penv rpats thing_inside
-        ; return (RecCon (HsRecFields rpats' dd), res) }
+        ; return (RecCon (HsRecFields x rpats' dd), res) }
     where
       tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                           (LHsRecField GhcTc (LPat GhcTc))

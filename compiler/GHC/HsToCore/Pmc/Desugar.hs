@@ -271,7 +271,7 @@ desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
 desugarConPatOut x con univ_tys ex_tvs dicts = \case
     PrefixCon _ ps               -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
-    RecCon    (HsRecFields fs _) -> go_field_pats (rec_field_ps fs)
+    RecCon    (HsRecFields _ fs _) -> go_field_pats (rec_field_ps fs)
   where
     -- The actual argument types (instantiated)
     arg_tys     = map scaledThing $ conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)

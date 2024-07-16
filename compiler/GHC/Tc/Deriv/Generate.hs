@@ -604,7 +604,8 @@ nlConWildPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA $ getRdrName con
   , pat_args = RecCon $ HsRecFields
-      { rec_flds = []
+      { rec_ext = noExtField
+      , rec_flds = []
       , rec_dotdot = Nothing }
   }
 

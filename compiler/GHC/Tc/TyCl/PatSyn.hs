@@ -1010,9 +1010,9 @@ tcPatToExpr args pat = go pat
 
     mkRecordConExpr :: LocatedN Name -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
-    mkRecordConExpr con (HsRecFields fields dd)
+    mkRecordConExpr con (HsRecFields x fields dd)
       = do { exprFields <- mapM go' fields
-           ; return (RecordCon noExtField con (HsRecFields exprFields dd)) }
+           ; return (RecordCon noExtField con (HsRecFields x exprFields dd)) }
 
     go' :: LHsRecField GhcRn (LPat GhcRn) -> Either PatSynInvalidRhsReason (LHsRecField GhcRn (LHsExpr GhcRn))
     go' (L l rf) = L l <$> traverse go rf

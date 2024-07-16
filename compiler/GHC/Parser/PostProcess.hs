@@ -2278,13 +2278,13 @@ mkPatRec ::
   HsRecFields GhcPs (LocatedA (PatBuilder GhcPs)) ->
   [AddEpAnn] ->
   PV (PatBuilder GhcPs)
-mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd) anns
+mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields x fs dd) anns
   | isRdrDataCon (unLoc c)
   = do fs <- mapM checkPatField fs
        return $ PatBuilderPat $ ConPat
          { pat_con_ext = anns
          , pat_con = c
-         , pat_args = RecCon (HsRecFields fs dd)
+         , pat_args = RecCon (HsRecFields x fs dd)
          }
 mkPatRec p _ _ =
   addFatalError $ mkPlainErrorMsgEnvelope (getLocA p) $
@@ -2946,9 +2946,9 @@ mkRdrRecordCon
 mkRdrRecordCon con flds anns
   = RecordCon { rcon_ext = anns, rcon_con = con, rcon_flds = flds }
 
-mk_rec_fields :: [LocatedA (HsRecField (GhcPass p) arg)] -> Maybe SrcSpan -> HsRecFields (GhcPass p) arg
-mk_rec_fields fs Nothing = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
-mk_rec_fields fs (Just s)  = HsRecFields { rec_flds = fs
+mk_rec_fields :: [LocatedA (HsRecField GhcPs arg)] -> Maybe SrcSpan -> HsRecFields GhcPs arg
+mk_rec_fields fs Nothing = HsRecFields { rec_ext = noExtField, rec_flds = fs, rec_dotdot = Nothing }
+mk_rec_fields fs (Just s)  = HsRecFields { rec_ext = noExtField, rec_flds = fs
                                      , rec_dotdot = Just (L (l2l s) (RecFieldsDotDot $ length fs)) }
 
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs GhcPs
