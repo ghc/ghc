@@ -94,19 +94,19 @@ windowsArtifact = PlatformSpec ( 'x86_64-windows'
                                , 'ghc-{version}-x86_64-unknown-mingw32' )
 
 def centos(n, arch='x86_64'):
-    return linux_platform(arch, "x86_64-linux-centos{n}".format(n=n))
+    return linux_platform(arch, "{arch}-linux-centos{n}".format(n=n,arch=arch))
 
 def fedora(n, arch='x86_64'):
-    return linux_platform(arch, "x86_64-linux-fedora{n}".format(n=n))
+    return linux_platform(arch, "{arch}-linux-fedora{n}".format(n=n,arch=arch))
 
 def alpine(n, arch='x86_64'):
-    return linux_platform(arch, "x86_64-linux-alpine{n}".format(n=n))
+    return linux_platform(arch, "{arch}-linux-alpine{n}".format(n=n,arch=arch))
 
 def rocky(n, arch='x86_64'):
-    return linux_platform(arch, "x86_64-linux-rocky{n}".format(n=n))
+    return linux_platform(arch, "{arch}-linux-rocky{n}".format(n=n,arch=arch))
 
 def ubuntu(n, arch='x86_64'):
-    return linux_platform(arch, "x86_64-linux-ubuntu{n}".format(n=n))
+    return linux_platform(arch, "{arch}-linux-ubuntu{n}".format(n=n,arch=arch))
 
 def linux_platform(arch, opsys):
     return PlatformSpec( opsys, 'ghc-{version}-{arch}-unknown-linux'.format(version="{version}", arch=arch) )
