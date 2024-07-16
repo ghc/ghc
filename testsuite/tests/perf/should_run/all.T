@@ -413,3 +413,4 @@ test('T21839r',
 # perf doesn't regress further, so it is not marked as such.
 test('T18964', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O'])
 test('T23021', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O2'])
+test('T25055', [collect_stats('bytes allocated', 2), only_ways(['normal'])], compile_and_run, ['-O2'])

@@ -80,6 +80,7 @@ initGentleSimplMode :: DynFlags -> SimplMode
 initGentleSimplMode dflags = (initSimplMode dflags InitialPhase "Gentle")
   { -- Don't do case-of-case transformations.
     -- This makes full laziness work better
+    -- See Note [Case-of-case and full laziness]
     sm_case_case = False
   }
 
@@ -89,3 +90,37 @@ floatEnable dflags =
     (True, True) -> FloatEnabled
     (True, False)-> FloatNestedOnly
     (False, _)   -> FloatDisabled
+
+
+{- Note [Case-of-case and full laziness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case-of-case can hide opportunities for let-floating (full laziness).
+For example
+   rec { f = \y. case (expensive x) of (a,b) -> blah }
+We might hope to float the (expensive x) out of the \y-loop.
+But if we inline `expensive` we might get
+   \y. case (case x of I# x' -> body) of (a,b) -> blah
+Now if we do case-of-case we get
+   \y. case x if I# x2 ->
+       case body of (a,b) -> blah
+
+Sadly, at this point `body` mentions `x2`, so we can't float it out of the
+\y-loop.
+
+Solution: don't do case-of-case in the "gentle" simplification phase that
+precedes the first float-out transformation.  Implementation:
+
+  * `sm_case_case` field in SimplMode
+
+  * Consult `sm_case_case` (via `seCaseCase`) before doing case-of-case
+    in GHC.Core.Opt.Simplify.Iteration.rebuildCall.
+
+Wrinkles
+
+* This applies equally to the case-of-runRW# transformation:
+    case (runRW# (\s. body)) of (a,b) -> blah
+    --->
+    runRW# (\s. case body of (a,b) -> blah)
+  Again, don't do this when `sm_case_case` is off.  See #25055 for
+  a motivating example.
+-}
