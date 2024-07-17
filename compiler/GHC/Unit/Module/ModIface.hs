@@ -953,6 +953,7 @@ However, with the pragma, the correct core is generated:
 {-# INLINE mi_ext_fields #-}
 {-# INLINE mi_src_hash #-}
 {-# INLINE mi_hi_bytes #-}
+{-# COMPLETE ModIface #-}
 
 pattern ModIface ::
   Module -> Maybe Module -> HscSource -> Dependencies -> [Usage] ->
