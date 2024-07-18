@@ -11,6 +11,10 @@
 /hypsrc-test/one-shot-out/
 /latex-test/one-shot-out/
 /hoogle-test/one-shot-out/
+/html-test/no-compilation-out/
+/hypsrc-test/no-compilation-out/
+/latex-test/no-compilation-out/
+/hoogle-test/no-compilation-out/
 
 *.o
 *.hi

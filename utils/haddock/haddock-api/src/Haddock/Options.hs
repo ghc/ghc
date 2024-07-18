@@ -124,6 +124,7 @@ data Flag
   | Flag_ParCount (Maybe Int)
   | Flag_TraceArgs
   | Flag_OneShot String
+  | Flag_NoCompilation
   deriving (Eq, Show)
 
 options :: Bool -> [OptDescr Flag]
@@ -158,6 +159,11 @@ options backwardsCompat =
       ["show-interface"]
       (ReqArg Flag_ShowInterface "FILE")
       "print the interface in a human readable form"
+  , Option
+      []
+      ["no-compilation"]
+      (NoArg Flag_NoCompilation)
+      "never compile the code, just read the .hi files"
   , Option
       []
       ["incremental"]

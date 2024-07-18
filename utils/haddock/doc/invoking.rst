@@ -542,6 +542,13 @@ The following options are available:
     ``cabal`` uses temporary `response files
     <https://gcc.gnu.org/wiki/Response_Files>`_ to pass arguments to Haddock.
 
+.. option:: --no-compilation
+
+    Always :ref:`avoids recompilation<avoiding-recompilation>`, only loads the
+    required ``.hi`` and ``.hie`` files. Haddock will throw an error when it can't
+    find them. This will not check if the input files are out of date.
+    (This flag implies :option:`--no-tmp-comp-dir`.)
+
 .. option:: --incremental=<module>
 
     Use Haddock in :ref:`incremental mode<incremental-mode>`. Haddock will generate
@@ -554,6 +561,8 @@ Since Haddock uses GHC internally, both plain and literate Haskell
 sources are accepted without the need for the user to do anything. To
 use the C pre-processor, however, the user must pass the ``-cpp``
 option to GHC using :option:`--optghc`.
+
+.. _avoiding-recompilation:
 
 Avoiding recompilation
 ----------------------
@@ -579,32 +588,15 @@ should write the ``.hi`` and ``.hie`` files by providing the
 are building your application with ``cabal build``, the default location is in
 ``dist-newstyle/build/<arch>-<os>/ghc-<ghc-version>/<component>-0.1.0/build``.
 
-The next step is to ensure that the flags which Haddock passes to GHC will not
-trigger recompilation. Unfortunately, this is not very easy to do if you are
-invoking Haddock through ``cabal haddock``. Upon ``cabal haddock``, Cabal passes
-a ``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` (where ``NNNN`` is the Haddock
-version number) flag to Haddock, which forwards the ``-optP=...`` flag to GHC
-and triggers a recompilation (unless the existing build results were also
-created by a ``cabal haddock``). Additionally, Cabal passes a
-``--optghc="-stubdir=<temp directory>"`` flag to Haddock, which forwards the
-``-stubdir=<temp directory>`` flag to GHC and triggers a recompilation since
-``-stubdir`` adds a global include directory. Moreover, since the ``stubdir``
-that Cabal passes is a temporary directory, a recompilation is triggered even
-for immediately successive invocations. To avoid recompilations due to these
-flags, one must manually extract the arguments passed to Haddock by Cabal and
-remove the ``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` and
-``--optghc="-stubdir=<temp directory>"`` flags. This can be achieved using the
-:option:`--trace-args` flag by invoking ``cabal haddock`` with
-``--haddock-option="--trace-args"`` and copying the traced arguments to a script
-which makes an equivalent call to Haddock without the aformentioned flags.
-
-In addition to the above, Cabal passes a temporary directory as ``-hidir`` to
-Haddock by default. Obviously, this also triggers a recompilation for every
-invocation of ``cabal haddock``, since it will never find the necessary
+The next step is to make sure Haddock runs in no-compilation mode by using
+the :option:`--no-compilation` flag. In addition, Cabal passes a
+temporary directory as ``-hidir`` to Haddock by default. This will cause
+``cabal haddock`` to error, since it will never find the necessary
 interface files in that temporary directory. To remedy this, pass a
 ``--optghc="-hidir=/path/to/hidir"`` flag to Haddock, where ``/path/to/hidir``
 is the path to the directory in which your build process is writing ``.hi``
-files.
+files. You can do this by invoking ``cabal haddock`` with
+``--haddock-options="--no-compilation --optghc=-hidir --optghc=/path/to/hidir"``.
 
 Following the steps above will allow you to take full advantage of "hi-haddock"
 and generate Haddock documentation from existing build results without requiring
