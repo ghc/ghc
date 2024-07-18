@@ -12,6 +12,7 @@
 module GHC.Iface.Make
    ( mkPartialIface
    , mkFullIface
+   , mkFullIfaceWithForeignStubs
    , mkIfaceTc
    , mkIfaceExports
    )
@@ -129,14 +130,19 @@ mkPartialIface hsc_env core_prog mod_details mod_summary import_decls
   = mkIface_ hsc_env this_mod core_prog hsc_src used_th deps rdr_env import_decls fix_env warns hpc_info self_trust
              safe_mode usages docs mod_summary mod_details
 
+-- | Backwards compat interface for 'mkFullIfaceWithForeignStubs'.
+mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> IO ModIface
+mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos =
+  mkFullIfaceWithForeignStubs hsc_env partial_iface mb_stg_infos mb_cmm_infos []
+
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
 --
 -- CmmCgInfos is not available when not generating code (-fno-code), or when not
 -- generating interface pragmas (-fomit-interface-pragmas). See also
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> [FilePath] -> IO ModIface
-mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos fos = do
+mkFullIfaceWithForeignStubs :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> [FilePath] -> IO ModIface
+mkFullIfaceWithForeignStubs hsc_env partial_iface mb_stg_infos mb_cmm_infos fos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
@@ -278,7 +284,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                    docs mod_summary
                    mod_details
 
-          mkFullIface hsc_env partial_iface Nothing Nothing []
+          mkFullIface hsc_env partial_iface Nothing Nothing
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv -> [ImportUserSpec]
