@@ -205,7 +205,6 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     deb11 = mk(debian(11, "x86_64"))
     deb12 = mk(debian(12, "x86_64"))
     deb10_arm64 = mk(debian(10, "aarch64"))
-    deb11_arm64 = mk(debian(11, "aarch64"))
     deb12_arm64 = mk(debian(12, "aarch64"))
     deb10_i386 = mk(debian(10, "i386"))
     deb12_i386 = mk(debian(12, "i386"))
@@ -243,7 +242,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
 
     a32 = { "Linux_Debian": { "( >= 10 && < 12 )": deb10_i386
                             , ">= 12": deb12_i386
-                            , "unknown versioning": deb10_i386 }}
+                            , "unknown versioning": deb10_i386 }
           , "Linux_Ubuntu": { "unknown_versioning": deb10_i386 }
           , "Linux_Mint" : { "unknown_versioning": deb10_i386 }
           , "Linux_UnknownLinux" : { "unknown_versioning": deb10_i386 }
@@ -251,8 +250,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
 
     arm64 = { "Linux_UnknownLinux": { "unknown_versioning": deb10_arm64 }
             , "Linux_Alpine" : { "unknown_versioning": alpine3_18_arm64 }
-            , "Linux_Debian": { "( >= 10 && < 11 )": deb10_arm64
-                              , "( >= 11 && < 12 )": deb11_arm64
+            , "Linux_Debian": { "( >= 10 && < 12 )": deb10_arm64
                               , "( >= 12 )": deb12_arm64
                               , "unknown_versioning": deb10_arm64
                               }
