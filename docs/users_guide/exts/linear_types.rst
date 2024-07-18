@@ -28,8 +28,9 @@ once*, then its argument is consumed *exactly once*. Intuitively, it
 means that in every branch of the definition of ``f``, its argument
 ``x`` must be used exactly once. Which can be done by
 
-* Returning ``x`` unmodified
-* Passing ``x`` to a *linear* function
+* Returning ``x`` unmodified.
+* Passing ``x`` to a *linear* function and using the result exactly once
+  in the same fashion.
 * Pattern-matching on ``x`` and using each argument exactly once in the
   same fashion.
 * Calling it as a function and using the result exactly once in the same
