@@ -1587,13 +1587,11 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
         MO_U_Mul2     _w -> unsupported mop
 
         -- Memory Ordering
-        -- The concrete encoding is copied from load_load_barrier() and write_barrier() (SMP.h)
-        -- TODO: This needs to be changed for https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10628
         -- The related C functions are:
+        -- #include <stdatomic.h>
         -- atomic_thread_fence(memory_order_acquire);
         -- atomic_thread_fence(memory_order_release);
---        MO_ReadBarrier      ->  return (unitOL (DMBSY DmbRead DmbRead), Nothing)
---        MO_WriteBarrier     ->  return (unitOL (DMBSY DmbWrite DmbWrite), Nothing)
+        -- atomic_thread_fence(memory_order_seq_cst);
         MO_AcquireFence -> pure (unitOL (DMBSY DmbRead DmbReadWrite))
         MO_ReleaseFence -> pure (unitOL (DMBSY DmbReadWrite DmbWrite))
         MO_SeqCstFence -> pure (unitOL (DMBSY DmbReadWrite DmbReadWrite))
