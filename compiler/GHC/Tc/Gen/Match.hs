@@ -501,6 +501,32 @@ tcGuardStmt _ stmt _ _
 --      coercion matching stuff in them.  It's hard to avoid the
 --      potential for non-trivial coercions in tcMcStmt
 
+{-
+Note [Binding in list comprehension isn't linear]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In principle, [ y | () <- xs, y <- [0,1]] could be linear in `xs`.
+But, the way the desugaring works, we get something like
+
+case xs of
+  () : xs ' -> letrec next_stmt = … xs' …
+
+In the current typing rules for letrec in Core, next_stmt is necessarily of
+multiplicity Many and so is every free variable, including xs'. Which, in turns,
+requires xs to be of multiplicity Many.
+
+Rodrigo Mesquita worked out, in his master thesis, how to make letrecs having
+non-Many multiplicities. But it's a fair bit of work to implement.
+
+Since nobody actually cares about [ y | () <- xs, y <- [0,1]] being linear, then
+we just conservatively make it unrestricted instead.
+
+If we're to change that, we have to be careful that [ y | _ <- xs, y <- [0,1]]
+isn't linear in `xs` since the elements of `xs` are ignored. So we'd still have
+to call `tcScalingUsage` on `xs` in `tcLcStmt`, we'd just have to create a fresh
+multiplicity variable. We'd also use the same multiplicity variable in the call
+to `tcCheckPat` instead of `unrestricted`.
+-}
+
 tcLcStmt :: TyCon       -- The list type constructor ([])
          -> TcExprStmtChecker
 
@@ -512,20 +538,24 @@ tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside
 -- A generator, pat <- rhs
 tcLcStmt m_tc ctxt (BindStmt _ pat rhs) elt_ty thing_inside
  = do   { pat_ty <- newFlexiTyVarTy liftedTypeKind
-        ; rhs'   <- tcCheckMonoExpr rhs (mkTyConApp m_tc [pat_ty])
+          -- About the next `tcScalingUsage ManyTy` and unrestricted
+          -- see Note [Binding in list comprehension isn't linear]
+        ; rhs'   <- tcScalingUsage ManyTy $ tcCheckMonoExpr rhs (mkTyConApp m_tc [pat_ty])
         ; (pat', thing)  <- tcCheckPat (StmtCtxt ctxt) pat (unrestricted pat_ty) $
+                            tcScalingUsage ManyTy $
                             thing_inside elt_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
 -- A boolean guard
 tcLcStmt _ _ (BodyStmt _ rhs _ _) elt_ty thing_inside
   = do  { rhs'  <- tcCheckMonoExpr rhs boolTy
-        ; thing <- thing_inside elt_ty
+        ; thing <- tcScalingUsage ManyTy $ thing_inside elt_ty
         ; return (BodyStmt boolTy rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
 -- ParStmt: See notes with tcMcStmt and Note [Scoping in parallel list comprehensions]
 tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
-  = do  { env <- getLocalRdrEnv
+  = tcScalingUsage ManyTy $ -- parallel list comprehension never desugars to something linear.
+    do  { env <- getLocalRdrEnv
         ; (pairs', thing) <- loop env [] bndr_stmts_s
         ; return (ParStmt unitTy pairs' noExpr noSyntaxExpr, thing) }
   where
@@ -551,7 +581,8 @@ tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
 tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                               , trS_bndrs =  bindersMap
                               , trS_by = by, trS_using = using }) elt_ty thing_inside
-  = do { let (bndr_names, n_bndr_names) = unzip bindersMap
+  = tcScalingUsage ManyTy $ -- Transform statements are too complex: just make everything multiplicity Many
+    do { let (bndr_names, n_bndr_names) = unzip bindersMap
              unused_ty = pprPanic "tcLcStmt: inner ty" (ppr bindersMap)
              -- The inner 'stmts' lack a LastStmt, so the element type
              --  passed in to tcStmtsAndThen is never looked at
