@@ -1324,81 +1324,15 @@ genCondBranch true false expr =
 -- -----------------------------------------------------------------------------
 --  Generating C calls
 
--- Now the biggest nightmare---calls.  Most of the nastiness is buried in
--- @get_arg@, which moves the arguments to the correct registers/stack
--- locations.  Apart from that, the code is easy.
---
--- As per *convention*:
--- x0-x7:   (volatile) argument registers
--- x8:      (volatile) indirect result register / Linux syscall no
--- x9-x15:  (volatile) caller saved regs
--- x16,x17: (volatile) intra-procedure-call registers
--- x18:     (volatile) platform register. don't use for portability
--- x19-x28: (non-volatile) callee save regs
--- x29:     (non-volatile) frame pointer
--- x30:                    link register
--- x31:                    stack pointer / zero reg
---
--- Thus, this is what a c function will expect. Find the arguments in x0-x7,
--- anything above that on the stack.  We'll ignore c functions with more than
--- 8 arguments for now.  Sorry.
---
--- We need to make sure we preserve x9-x15, don't want to touch x16, x17.
 
--- Note [PLT vs GOT relocations]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- When linking objects together, we may need to lookup foreign references. That
--- is symbolic references to functions or values in other objects. When
--- compiling the object, we can not know where those elements will end up in
--- memory (relative to the current location). Thus the use of symbols. There
--- are two types of items we are interested, code segments we want to jump to
--- and continue execution there (functions, ...), and data items we want to look
--- up (strings, numbers, ...). For functions we can use the fact that we can use
--- an intermediate jump without visibility to the programs execution.  If we
--- want to jump to a function that is simply too far away to reach for the B/BL
--- instruction, we can create a small piece of code that loads the full target
--- address and jumps to that on demand. Say f wants to call g, however g is out
--- of range for a direct jump, we can create a function h in range for f, that
--- will load the address of g, and jump there. The area where we construct h
--- is called the Procedure Linking Table (PLT), we have essentially replaced
--- f -> g with f -> h -> g.  This is fine for function calls.  However if we
--- want to lookup values, this trick doesn't work, so we need something else.
--- We will instead reserve a slot in memory, and have a symbol pointing to that
--- slot. Now what we essentially do is, we reference that slot, and expect that
--- slot to hold the final resting address of the data we are interested in.
--- Thus what that symbol really points to is the location of the final data.
--- The block of memory where we hold all those slots is the Global Offset Table
--- (GOT).  Instead of x <- $foo, we now do y <- $fooPtr, and x <- [$y].
+-- | Generate a call to a C function.
 --
--- FIXME: Update for RISCV, the below is still AArch64.
--- For JUMP/CALLs we have 26bits (+/- 128MB), for conditional branches we only
--- have 19bits (+/- 1MB).  Symbol lookups are also within +/- 1MB, thus for most
--- of the LOAD/STOREs we'd want to use adrp, and add to compute a value within
--- 4GB of the PC, and load that.  For anything outside of that range, we'd have
--- to go through the GOT.
---
---  adrp x0, <symbol>
---  add x0, :lo:<symbol>
---
--- will compute the address of <symbol> int x0 if <symbol> is within 4GB of the
--- PC.
---
--- If we want to get the slot in the global offset table (GOT), we can do this:
---
---   adrp x0, #:got:<symbol>
---   ldr x0, [x0, #:got_lo12:<symbol>]
---
--- this will compute the address anywhere in the addressable 64bit space into
--- x0, by loading the address from the GOT slot.
---
--- To actually get the value of <symbol>, we'd need to ldr x0, x0 still, which
--- for the first case can be optimized to use ldr x0, [x0, #:lo12:<symbol>]
--- instead of the add instruction.
---
--- As the memory model for AArch64 for PIC is considered to be +/- 4GB, we do
--- not need to go through the GOT, unless we want to address the full address
--- range within 64bit.
-
+-- - Integer values are passed in GP registers a0-a7.
+-- - Floating point values are passed in FP registers fa0-fa7.
+-- - If there are no free floating point registers, the FP values are passed in GP registers.
+-- - If all GP registers are taken, the values are spilled as whole words (!) onto the stack.
+-- - For integers/words, the return value is in a0.
+-- - The return value is in fa0 if the return type is a floating point value.
 genCCall
     :: ForeignTarget      -- function to call
     -> [CmmFormal]        -- where to put the result
