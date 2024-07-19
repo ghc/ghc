@@ -841,8 +841,7 @@ data TyConDetails =
                                  --          are fine), again after expanding any
                                  --          nested synonyms
 
-        synIsForgetful :: Bool,  -- See Note [Forgetful type synonyms]
-                                 -- True <=  at least one argument is not mentioned
+        synIsForgetful :: Bool,  -- True <=  at least one argument is not mentioned
                                  --          in the RHS (or is mentioned only under
                                  --          forgetful synonyms)
                                  -- Test is conservative, so True does not guarantee
@@ -2122,42 +2121,10 @@ isFamFreeTyCon (TyCon { tyConDetails = details })
 -- True. Thus, False means that all bound variables appear on the RHS;
 -- True may not mean anything, as the test to set this flag is
 -- conservative.
---
--- See Note [Forgetful type synonyms]
 isForgetfulSynTyCon :: TyCon -> Bool
 isForgetfulSynTyCon (TyCon { tyConDetails = details })
   | SynonymTyCon { synIsForgetful = forget } <- details = forget
   | otherwise                                           = False
-
-{- Note [Forgetful type synonyms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A type synonyms is /forgetful/ if its RHS fails to mention one (or more) of its bound variables.
-
-Forgetfulness is conservative:
-  * A non-forgetful synonym /guarantees/ to mention all its bound variables in its RHS.
-  * It is always safe to classify a synonym as forgetful.
-
-Examples:
-    type R = Int             -- Not forgetful
-    type S a = Int           -- Forgetful
-    type T1 a = Int -> S a   -- Forgetful
-    type T2 a = a -> S a     -- Not forgetful
-    type T3 a = Int -> F a   -- Not forgetful
-      where type family F a
-
-* R shows that nullary synonyms are not forgetful.
-
-* T2 shows that forgetfulness needs to account for uses of forgetful
-  synonyms. `a` appears on the RHS, but only under a forgetful S
-
-* T3 shows that non-forgetfulness is not the same as injectivity. T3 mentions its
-  bound variable on its RHS, but under a type family.  So it is entirely possible
-  that    T3 Int ~ T3 Bool
-
-* Since type synonyms are non-recursive, we don't need a fixpoint analysis to
-  determine forgetfulness.  It's rather easy -- see `GHC.Core.Type.buildSynTyCon`,
-  which is a bit over-conservative for over-saturated synonyms.
--}
 
 -- As for newtypes, it is in some contexts important to distinguish between
 -- closed synonyms and synonym families, as synonym families have no unique

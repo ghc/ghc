@@ -38,7 +38,6 @@ import GHC.Prelude
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCon( isForgetfulSynTyCon )
 import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Data.TrieMap
 
@@ -229,11 +228,10 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
     andEq TEQX e = hasCast e
     andEq TEQ  e = e
 
-    -- See Note [Comparing type synonyms] in GHC.Core.TyCo.Compare
-    go (D env1 (TyConApp tc1 tys1)) (D env2 (TyConApp tc2 tys2))
-      | tc1 == tc2, not (isForgetfulSynTyCon tc1)
-      = gos env1 env2 tys1 tys2
-
+    -- See Note [Comparing nullary type synonyms] in GHC.Core.TyCo.Compare
+    go (D _ (TyConApp tc1 [])) (D _ (TyConApp tc2 []))
+      | tc1 == tc2
+      = TEQ
     go env_t@(D env t) env_t'@(D env' t')
       | Just new_t  <- coreView t  = go (D env new_t) env_t'
       | Just new_t' <- coreView t' = go env_t (D env' new_t')

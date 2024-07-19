@@ -2187,12 +2187,11 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
                               ; uType env orig_ty1 ty2 }
                Nothing -> uUnfilledVar env IsSwapped tv2 ty1 }
 
-      -- See Note [Unifying type synonyms] in GHC.Core.Unify
+      -- See Note [Expanding synonyms during unification]
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
       = return $ mkReflCo role ty1
 
-        -- Now expand synonyms
         -- See Note [Expanding synonyms during unification]
         --
         -- Also NB that we recurse to 'go' so that we don't push a
@@ -2350,7 +2349,7 @@ We expand synonyms during unification, but:
  * The problem case immediately above can happen only with arguments
    to the tycon. So we check for nullary tycons *before* expanding.
    This is particularly helpful when checking (* ~ *), because * is
-   now a type synonym.  See Note [Unifying type synonyms] in GHC.Core.Unify.
+   now a type synonym.
 
 Note [Deferred unification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -138,51 +138,34 @@ But the left is an AppTy while the right is a TyConApp. The solution is
 to use splitAppTyNoView_maybe to break up the TyConApp into its pieces and
 then continue. Easy to do, but also easy to forget to do.
 
-Note [Comparing type synonyms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Comparing nullary type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the task of testing equality between two 'Type's of the form
 
-  TyConApp tc tys1  =  TyConApp tc tys2
+  TyConApp tc []
 
-where `tc` is a type synonym. A naive way to perform this comparison these
+where @tc@ is a type synonym. A naive way to perform this comparison these
 would first expand the synonym and then compare the resulting expansions.
 
-However, this is obviously wasteful and the RHS of `tc` may be large. We'd
-prefer to compare `tys1 = tys2`.  When is that sound?  Precisely when the
-synonym is not /forgetful/; that is, all its type variables appear in its
-RHS -- see `GHC.Core.TyCon.isForgetfulSynTyCon`.
-
-Of course, if we find that the TyCons are *not* equal then we still need to
-perform the expansion as their RHSs may still be equal.
-
-This works fine for /equality/, but not for /comparison/.  Consider
-   type S a b = (b, a)
-Now consider
-   S Int Bool `compare` S Char Char
-The ordering may depend on whether we expand the synonym or not, and we
-don't want the result to depend on that. So for comparison we stick to
-/nullary/ synonyms only, which is still useful.
+However, this is obviously wasteful and the RHS of @tc@ may be large; it is
+much better to rather compare the TyCons directly. Consequently, before
+expanding type synonyms in type comparisons we first look for a nullary
+TyConApp and simply compare the TyCons if we find one. Of course, if we find
+that the TyCons are *not* equal then we still need to perform the expansion as
+their RHSs may still be equal.
 
 We perform this optimisation in a number of places:
 
- * GHC.Core.TyCo.Compare.eqType      (works for non-nullary synonyms)
- * GHC.Core.Map.TYpe.eqDeBruijnType  (works for non-nullary synonyms)
- * GHC.Core.Types.nonDetCmpType      (nullary only)
+ * GHC.Core.Types.eqType
+ * GHC.Core.Types.nonDetCmpType
+ * GHC.Core.Unify.unify_ty
+ * GHC.Tc.Solver.Equality.can_eq_nc'
+ * TcUnify.uType
 
 This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
 since GHC prefers to use the type synonym over @TYPE 'LiftedRep@ applications
 whenever possible. See Note [Using synonyms to compress types] in
 GHC.Core.Type for details.
-
-Currently-missed opportunity (#25009):
-* In the case of forgetful synonyms, we could still compare the args, pairwise,
-  and then compare the RHS's with a suitably extended RnEnv2.  That would avoid
-  comparing the same arg repeatedly.  e.g.
-      type S a b = (a,a)
-  Compare   S <big> y ~ S <big> y
-  If we expand, we end up compare <big> with itself twice.
-
-  But since forgetful synonyms are rare, we have not tried this.
 
 Note [Type comparisons using object pointer comparisons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -358,25 +341,15 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
   = \ t1 t2 -> t1 `seq` t2 `seq`
     let go = generic_eq_type_x syn_flag mult_flag mb_env
              -- Abbreviation for recursive calls
-
-        gos []       []       = True
-        gos (t1:ts1) (t2:ts2) = go t1 t2 && gos ts1 ts2
-        gos _ _               = False
-
     in case (t1,t2) of
       _ | 1# <- reallyUnsafePtrEquality# t1 t2 -> True
       -- See Note [Type comparisons using object pointer comparisons]
 
-      (TyConApp tc1 tys1, TyConApp tc2 tys2)
-        | tc1 == tc2, not (isForgetfulSynTyCon tc1)   -- See Note [Comparing type synonyms]
-        -> gos tys1 tys2
+      (TyConApp tc1 [], TyConApp tc2 []) | tc1 == tc2 -> True
+      -- See Note [Comparing nullary type synonyms]
 
       _ | ExpandSynonyms <- syn_flag, Just t1' <- coreView t1 -> go t1' t2
         | ExpandSynonyms <- syn_flag, Just t2' <- coreView t2 -> go t1 t2'
-
-      (TyConApp tc1 ts1, TyConApp tc2 ts2)
-        | tc1 == tc2 -> gos ts1 ts2
-        | otherwise  -> False
 
       (TyVarTy tv1, TyVarTy tv2)
         -> case mb_env of
@@ -407,6 +380,14 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
       (_,  AppTy s2 t2')
         | Just (s1, t1') <- tcSplitAppTyNoView_maybe t1
         -> go s1 s2 && go t1' t2'
+
+      (TyConApp tc1 ts1, TyConApp tc2 ts2)
+        | tc1 == tc2 -> gos ts1 ts2
+        | otherwise  -> False
+        where
+          gos []       []       = True
+          gos (t1:ts1) (t2:ts2) = go t1 t2 && gos ts1 ts2
+          gos _ _               = False
 
       (ForAllTy (Bndr tv1 vis1) body1, ForAllTy (Bndr tv2 vis2) body2)
         -> case mb_env of
@@ -685,11 +666,10 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- Returns both the resulting ordering relation between
     -- the two types and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
-
+    -- See Note [Comparing nullary type synonyms]
     go _   (TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
-      = TEQ    -- See Note [Comparing type synonyms]
-
+      = TEQ
     go env t1 t2
       | Just t1' <- coreView t1 = go env t1' t2
       | Just t2' <- coreView t2 = go env t1 t2'
@@ -778,10 +758,8 @@ mayLookIdentical orig_ty1 orig_ty2
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
     go :: RnEnv2 -> Type -> Type -> Bool
-
-    go env (TyConApp tc1 ts1) (TyConApp tc2 ts2)
-      | tc1 == tc2, not (isForgetfulSynTyCon tc1) -- See Note [Comparing type synonyms]
-      = gos env (tyConBinders tc1) ts1 ts2
+    -- See Note [Comparing nullary type synonyms]
+    go _  (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2 = True
 
     go env t1 t2 | Just t1' <- coreView t1 = go env t1' t2
     go env t1 t2 | Just t2' <- coreView t2 = go env t1 t2'

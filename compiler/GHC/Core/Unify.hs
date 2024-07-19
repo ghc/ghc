@@ -1089,47 +1089,6 @@ of arity n:
   If we couldn't decompose in the previous step, we return SurelyApart.
 
 Afterwards, the rest of the code doesn't have to worry about type families.
-
-Note [Unifying type synonyms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the task of unifying two 'Type's of the form
-
-  TyConApp tc [] ~ TyConApp tc []
-
-where `tc` is a type synonym. A naive way to perform this comparison these
-would first expand the synonym and then compare the resulting expansions.
-
-However, this is obviously wasteful and the RHS of `tc` may be large; it is
-much better to rather compare the TyCons directly. Consequently, before
-expanding type synonyms in type comparisons we first look for a nullary
-TyConApp and simply compare the TyCons if we find one.
-
-Of course, if we find that the TyCons are *not* equal then we still need to
-perform the expansion as their RHSs may still be unifiable.  E.g
-    type T = S (a->a)
-    type S a = [a]
-and consider
-    T Int ~ S (Int -> Int)
-
-We can't decompose non-nullary synonyms.  E.g.
-    type R a = F a    -- Where F is a type family
-and consider
-    R (a->a) ~ R Int
-We can't conclude that  (a->) ~ Int.  (There is a currently-missed opportunity
-here; if we knew that R was /injective/, perhaps we could decompose.)
-
-We perform the nullary-type-synonym optimisation in a number of places:
-
- * GHC.Core.Unify.unify_ty
- * GHC.Tc.Solver.Equality.can_eq_nc'
- * GHC.Tc.Utils.Unify.uType
-
-This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
-since GHC prefers to use the type synonym over @TYPE 'LiftedRep@ applications
-whenever possible. See Note [Using synonyms to compress types] in
-GHC.Core.Type for details.
-
-c.f. Note [Comparing type synonyms] in GHC.Core.TyCo.Compare
 -}
 
 -------------- unify_ty: the main workhorse -----------
@@ -1148,7 +1107,7 @@ unify_ty :: UMEnv
 -- Respects newtypes, PredTypes
 -- See Note [Computing equality on types] in GHC.Core.Type
 unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
-  -- See Note [Unifying type synonyms]
+  -- See Note [Comparing nullary type synonyms] in GHC.Core.TyCo.Compare
   | tc1 == tc2
   = return ()
 
