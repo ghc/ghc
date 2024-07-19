@@ -1374,12 +1374,12 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
                                  , DELTA (-16) ]
           moveStackDown i | odd i = moveStackDown (i + 1)
           moveStackDown i = toOL [ PUSH_STACK_FRAME
-                                 , SUB (OpReg W64 (regSingle 2)) (OpReg W64 (regSingle 2)) (OpImm (ImmInt (8 * i)))
+                                 , SUB (OpReg W64 (spMachReg)) (OpReg W64 (spMachReg)) (OpImm (ImmInt (8 * i)))
                                  , DELTA (-8 * i - 16) ]
           moveStackUp 0 = toOL [ POP_STACK_FRAME
                                , DELTA 0 ]
           moveStackUp i | odd i = moveStackUp (i + 1)
-          moveStackUp i = toOL [ ADD (OpReg W64 (regSingle 2)) (OpReg W64 (regSingle 2)) (OpImm (ImmInt (8 * i)))
+          moveStackUp i = toOL [ ADD (OpReg W64 (spMachReg)) (OpReg W64 (spMachReg)) (OpImm (ImmInt (8 * i)))
                                , POP_STACK_FRAME
                                , DELTA 0 ]
 
@@ -1427,7 +1427,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
     passArguments [] [] ((r, format, hint, code_r) : args) stackSpaceWords accumRegs accumCode = do
       let w = formatToWidth format
           spOffet = 8 * stackSpaceWords
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt spOffet)))
+          str = STR format (OpReg w r) (OpAddr (AddrRegImm (spMachReg) (ImmInt spOffet)))
           stackCode =
             if hint == SignedHint
               then
@@ -1443,7 +1443,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
     passArguments [] fpRegs ((r, format, _hint, code_r):args) stackSpaceWords accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
           spOffet = 8 * stackSpaceWords
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt spOffet)))
+          str = STR format (OpReg w r) (OpAddr (AddrRegImm (spMachReg) (ImmInt spOffet)))
           stackCode = code_r `snocOL`
                       ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
       passArguments [] fpRegs args (stackSpaceWords + 1) accumRegs (stackCode `appOL` accumCode)
