@@ -1492,7 +1492,8 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
     -- No mor regs left to pass. Must pass on stack.
     passArguments [] [] ((r, format, hint, code_r) : args) stackSpaceWords accumRegs accumCode = do
       let w = formatToWidth format
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt stackSpaceWords)))
+          spOffet = 8 * stackSpaceWords
+          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt spOffet)))
           stackCode =
             if hint == SignedHint
               then
@@ -1507,7 +1508,8 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
     -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
     passArguments [] fpRegs ((r, format, _hint, code_r):args) stackSpaceWords accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt stackSpaceWords)))
+          spOffet = 8 * stackSpaceWords
+          str = STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 2) (ImmInt spOffet)))
           stackCode = code_r `snocOL`
                       ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
       passArguments [] fpRegs args (stackSpaceWords + 1) accumRegs (stackCode `appOL` accumCode)
