@@ -384,10 +384,10 @@ getRegister e = do
 -- | The register width to be used for an operation on the given width
 -- operand.
 opRegWidth :: Width -> Width
-opRegWidth W64 = W64  -- x
-opRegWidth W32 = W32  -- w
-opRegWidth W16 = W32  -- w
-opRegWidth W8  = W32  -- w
+opRegWidth W64 = W64
+opRegWidth W32 = W32
+opRegWidth W16 = W32
+opRegWidth W8  = W32
 opRegWidth w   = pprPanic "opRegWidth" (text "Unsupported width" <+> ppr w)
 
 -- Note [Signed arithmetic on RISCV64]
@@ -428,17 +428,16 @@ opRegWidth w   = pprPanic "opRegWidth" (text "Unsupported width" <+> ppr w)
 -- Craig Topper covers possible future improvements
 -- (https://llvm.org/devmtg/2022-11/slides/TechTalk21-RISC-VSignExtensionOptimizations.pdf)
 --
--- TODO:
---   Don't use Width in Operands
---   Instructions should rather carry a RegWidth
 --
 -- Note [Handling PIC on RV64]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- RV64 does not have a special PIC register, the general approach is to
--- simply go through the GOT, and there is assembly support for this:
+-- RV64 does not have a special PIC register, the general approach is to simply
+-- do PC-relative addressing or go through the GOT. There is assembly support
+-- for both.
 --
 -- rv64 assembly has a `la` (load address) pseudo-instruction, that allows
--- loading a label, ... into a register.  The instruction is desugared into
+-- loading a label's address into a register. The instruction is desugared into
+-- different addressing modes, e.g. PC-relative addressing:
 --
 -- 1: lui  rd1, %pcrel_hi(label)
 --    addi rd1, %pcrel_lo(1b)
@@ -462,12 +461,12 @@ opRegWidth w   = pprPanic "opRegWidth" (text "Unsupported width" <+> ppr w)
 --
 
 getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
+
 -- OPTIMIZATION WARNING: CmmExpr rewrites
 -- 1. Rewrite: Reg + (-n) => Reg - n
 --    TODO: this expression shouldn't even be generated to begin with.
 getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i < 0
   = getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt (-i) w1)])
-
 getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i < 0
   = getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt (-i) w1)])
 
@@ -475,6 +474,7 @@ getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i <
 getRegister' config plat expr =
   case expr of
     CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _)) ->
+      -- See Note [Handling PIC on RV64]
       pprPanic "getRegister': There's no PIC base register on RISCV" (ppr PicBaseReg)
 
     CmmLit lit ->
@@ -875,16 +875,14 @@ getRegister' config plat expr =
 
     -- Generic ternary case.
     CmmMachOp op [x, y, z] ->
-
       case op of
 
         -- Floating-point fused multiply-add operations
-
-        -- x86 fmadd    x * y + z <=> AArch64 fmadd : d =   r1 * r2 + r3
-        -- x86 fmsub    x * y - z <=> AArch64 fnmsub: d =   r1 * r2 - r3
-        -- x86 fnmadd - x * y + z <=> AArch64 fmsub : d = - r1 * r2 + r3
-        -- x86 fnmsub - x * y - z <=> AArch64 fnmadd: d = - r1 * r2 - r3
-
+        --
+        -- x86 fmadd    x * y + z <=> RISCV64 fmadd : d =   r1 * r2 + r3
+        -- x86 fmsub    x * y - z <=> RISCV64 fnmsub: d =   r1 * r2 - r3
+        -- x86 fnmadd - x * y + z <=> RISCV64 fmsub : d = - r1 * r2 + r3
+        -- x86 fnmsub - x * y - z <=> RISCV64 fnmadd: d = - r1 * r2 - r3
         MO_FMA var w -> case var of
           FMAdd  -> float3Op w (\d n m a -> unitOL $ FMA FMAdd  d n m a)
           FMSub  -> float3Op w (\d n m a -> unitOL $ FMA FMSub d n m a)

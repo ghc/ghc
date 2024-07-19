@@ -151,6 +151,10 @@ data Imm
   | ImmConstantDiff Imm Imm
   deriving (Eq, Show)
 
+-- | Map `CmmLit` to `Imm`
+--
+-- N.B. this is a partial function, because not all `CmmLit`s have an immediate
+-- representation.
 litToImm :: CmmLit -> Imm
 litToImm (CmmInt i w) = ImmInteger (narrowS w i)
 -- narrow to the width: a CmmInt might be out of
