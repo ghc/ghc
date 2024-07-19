@@ -372,8 +372,8 @@ getFloatReg expr = do
 --
 -- N.B. this is a partial function, because not all `CmmLit`s have an immediate
 -- representation.
-litToImm' :: CmmLit -> NatM (Operand, InstrBlock)
-litToImm' lit = return (OpImm (litToImm lit), nilOL)
+litToImm' :: CmmLit -> Operand
+litToImm' = OpImm . litToImm
 
 -- | Compute a `CmmExpr` into a `Register`
 getRegister :: CmmExpr -> NatM Register
@@ -487,10 +487,9 @@ getRegister' config plat expr =
                      in
                         pure (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) imm)))
 
-        -- floatToBytes (fromRational f)
         CmmFloat 0 w   -> do
-          (op, imm_code) <- litToImm' lit
-          return (Any (floatFormat w) (\dst -> imm_code `snocOL` annExpr expr (MOV (OpReg w dst) op)))
+          let op = litToImm' lit
+          pure (Any (floatFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) op)))
 
         CmmFloat _f W8  -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)
         CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
@@ -509,26 +508,26 @@ getRegister' config plat expr =
                                                       , MOV (OpReg W64 dst) (OpReg W64 tmp)
                                                       ]))
         CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (pdoc plat expr)
-        CmmVec _ -> pprPanic "getRegister' (CmmLit:CmmVec): " (pdoc plat expr)
-        CmmLabel _lbl -> do
-          (op, imm_code) <- litToImm' lit
-          let rep = cmmLitType plat lit
+        CmmVec _lits -> pprPanic "getRegister' (CmmLit:CmmVec): " (pdoc plat expr)
+        CmmLabel lbl -> do
+          let op = OpImm (ImmCLbl lbl)
+              rep = cmmLitType plat lit
               format = cmmTypeFormat rep
-          return (Any format (\dst -> imm_code `snocOL` annExpr expr (LDR format (OpReg (formatToWidth format) dst) op)))
+          return (Any format (\dst -> unitOL $ annExpr expr (LDR format (OpReg (formatToWidth format) dst) op)))
 
-        CmmLabelOff _lbl off | isNbitEncodeable 12 (fromIntegral off) -> do
-          (op, imm_code) <- litToImm' lit
-          let rep = cmmLitType plat lit
+        CmmLabelOff lbl off | isNbitEncodeable 12 (fromIntegral off) -> do
+          let op = OpImm (ImmIndex lbl off)
+              rep = cmmLitType plat lit
               format = cmmTypeFormat rep
-          return (Any format (\dst -> imm_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op))
+          return (Any format (\dst -> unitOL $ LDR format (OpReg (formatToWidth format) dst) op))
 
         CmmLabelOff lbl off -> do
-          (op, imm_code) <- litToImm' (CmmLabel lbl)
-          let rep = cmmLitType plat lit
+          let op = litToImm' (CmmLabel lbl)
+              rep = cmmLitType plat lit
               format = cmmTypeFormat rep
               width = typeWidth rep
           (off_r, _off_format, off_code) <- getSomeReg $ CmmLit (CmmInt (fromIntegral off) width)
-          return (Any format (\dst -> imm_code `appOL` off_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op `snocOL` ADD (OpReg width dst) (OpReg width dst) (OpReg width off_r)))
+          return (Any format (\dst -> off_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op `snocOL` ADD (OpReg width dst) (OpReg width dst) (OpReg width off_r)))
 
         CmmLabelDiffOff {} -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
@@ -891,7 +890,6 @@ getRegister' config plat expr =
 
         _ -> pprPanic "getRegister' (unhandled ternary CmmMachOp): " $
                 pprMachOp op <+> text "in" <+> pdoc plat expr
-
       where
           float3Op w op = do
             (reg_fx, format_x, code_fx) <- getFloatReg x
@@ -899,7 +897,7 @@ getRegister' config plat expr =
             (reg_fz, format_z, code_fz) <- getFloatReg z
             massertPpr (isFloatFormat format_x && isFloatFormat format_y && isFloatFormat format_z) $
               text "float3Op: non-float"
-            return $
+            pure $
               Any (floatFormat w) $ \ dst ->
                 code_fx `appOL`
                 code_fy `appOL`
