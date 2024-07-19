@@ -132,18 +132,21 @@ regUsageOfInstr platform instr = case instr of
         -- filtering the usage is necessary, otherwise the register
         -- allocator will try to allocate pre-defined fixed stg
         -- registers as well, as they show up.
-        usage (src, dst) = RU (filter (interesting platform) src)
-                              (filter (interesting platform) dst)
+        usage :: ([Reg], [Reg]) -> RegUsage
+        usage (srcRegs, dstRegs) = RU (filter (interesting platform) srcRegs)
+                              (filter (interesting platform) dstRegs)
 
         regAddr :: AddrMode -> [Reg]
-        regAddr (AddrRegImm r1 _)  = [r1]
+        regAddr (AddrRegImm r1 _imm)  = [r1]
         regAddr (AddrReg r1)       = [r1]
+
         regOp :: Operand -> [Reg]
-        regOp (OpReg _ r1) = [r1]
+        regOp (OpReg _w r1) = [r1]
         regOp (OpAddr a) = regAddr a
-        regOp (OpImm _) = []
+        regOp (OpImm _imm) = []
+
         regTarget :: Target -> [Reg]
-        regTarget (TBlock _) = []
+        regTarget (TBlock _bid) = []
         regTarget (TReg r1)  = [r1]
 
         -- Is this register interesting for the register allocator?
