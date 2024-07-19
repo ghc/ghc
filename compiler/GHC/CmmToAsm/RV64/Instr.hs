@@ -231,13 +231,16 @@ patchRegsOfInstr instr env = case instr of
         patchOp :: Operand -> Operand
         patchOp (OpReg w r) = OpReg w (env r)
         patchOp (OpAddr a) = OpAddr (patchAddr a)
-        patchOp op = op
+        patchOp opImm = opImm
+
         patchTarget :: Target -> Target
         patchTarget (TReg r) = TReg (env r)
-        patchTarget t = t
+        patchTarget tBlock = tBlock
+
         patchAddr :: AddrMode -> AddrMode
-        patchAddr (AddrRegImm r1 i)  = AddrRegImm (env r1) i
+        patchAddr (AddrRegImm r1 imm)  = AddrRegImm (env r1) imm
         patchAddr (AddrReg r) = AddrReg (env r)
+
         patchReg :: Reg -> Reg
         patchReg = env
 
