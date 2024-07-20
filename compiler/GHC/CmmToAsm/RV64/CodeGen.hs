@@ -1629,8 +1629,11 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
           , [dst_reg] <- dest_regs -> do
               (p, _fmt_p, code_p) <- getSomeReg p_reg
               platform <- getPlatform
-              -- TODO: Check if these fence usages are correct.
-              -- See __atomic_load_n (in C)
+              -- Analog to the related MachOps (above)
+              -- The related C functions are:
+              -- #include <stdatomic.h>
+              -- __atomic_load_n(&a, __ATOMIC_ACQUIRE);
+              -- __atomic_load_n(&a, __ATOMIC_SEQ_CST);
               let instrs = case ord of
                       MemOrderRelaxed -> unitOL $ ann moDescr (LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p))
                       MemOrderAcquire -> toOL [
@@ -1652,12 +1655,17 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
           | [p_reg, val_reg] <- arg_regs -> do
               (p, _fmt_p, code_p) <- getSomeReg p_reg
               (val, fmt_val, code_val) <- getSomeReg val_reg
-              -- See __atomic_store_n (in C)
+              -- Analog to the related MachOps (above)
+              -- The related C functions are:
+              -- #include <stdatomic.h>
+              -- __atomic_store_n(&a, 23, __ATOMIC_SEQ_CST);
+              -- __atomic_store_n(&a, 23, __ATOMIC_RELEASE);
               let instrs = case ord of
                       MemOrderRelaxed -> unitOL $ ann moDescr (STR fmt_val (OpReg w val) (OpAddr $ AddrReg p))
                       MemOrderSeqCst  -> toOL [
                                                 ann moDescr (DMBSY DmbReadWrite DmbWrite),
-                                                STR fmt_val (OpReg w val) (OpAddr $ AddrReg p)
+                                                STR fmt_val (OpReg w val) (OpAddr $ AddrReg p),
+                                                DMBSY DmbReadWrite DmbReadWrite
                                               ]
                       MemOrderRelease -> toOL [
                                                 ann moDescr (DMBSY DmbReadWrite DmbWrite),
