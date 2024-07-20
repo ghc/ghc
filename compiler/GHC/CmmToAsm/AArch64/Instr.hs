@@ -134,7 +134,7 @@ regUsageOfInstr platform instr = case instr of
   LDAR _ dst src           -> usage (regOp src, regOp dst)
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBISH                   -> usage ([], [])
+  DMBISH _                 -> usage ([], [])
 
   -- 9. Floating Point Instructions --------------------------------------------
   FMOV dst src             -> usage (regOp src, regOp dst)
@@ -281,7 +281,7 @@ patchRegsOfInstr instr env = case instr of
     LDAR f o1 o2   -> LDAR f (patchOp o1) (patchOp o2)
 
     -- 8. Synchronization Instructions -----------------------------------------
-    DMBISH         -> DMBISH
+    DMBISH c       -> DMBISH c
 
     -- 9. Floating Point Instructions ------------------------------------------
     FMOV o1 o2     -> FMOV (patchOp o1) (patchOp o2)
@@ -649,7 +649,7 @@ data Instr
     | BCOND Cond Target   -- branch with condition. b.<cond>
 
     -- 8. Synchronization Instructions -----------------------------------------
-    | DMBISH
+    | DMBISH DMBISHFlags
     -- 9. Floating Point Instructions
     -- move to/from general purpose <-> floating, or floating to floating
     | FMOV Operand Operand
@@ -671,6 +671,9 @@ data Instr
     -- - fmsub : d = - r1 * r2 + r3
     -- - fnmadd: d = - r1 * r2 - r3
     | FMA FMASign Operand Operand Operand Operand
+
+data DMBISHFlags = DmbLoad | DmbLoadStore
+  deriving (Eq, Show)
 
 instrCon :: Instr -> String
 instrCon i =
