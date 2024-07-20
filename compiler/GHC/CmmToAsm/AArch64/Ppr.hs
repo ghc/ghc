@@ -526,7 +526,8 @@ pprInstr platform instr = case instr of
   LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBISH -> line $ text "\tdmb ish"
+  DMBISH DmbLoadStore -> line $ text "\tdmb ish"
+  DMBISH DmbLoad -> line $ text "\tdmb ishld"
 
   -- 9. Floating Point Instructions --------------------------------------------
   FMOV o1 o2 -> op2 (text "\tfmov") o1 o2
