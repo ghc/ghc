@@ -54,7 +54,7 @@ module GHC.Types.Id (
         setIdExported, setIdNotExported,
         globaliseId, localiseId,
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
-        zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
+        zapLamIdInfo, floatifyIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
         zapIdUsedOnceInfo, zapIdTailCallInfo,
         zapFragileIdInfo, zapIdDmdSig, zapStableUnfolding,
         transferPolyIdInfo, scaleIdBy, scaleVarBy,
@@ -969,12 +969,11 @@ setIdOneShotInfo id one_shot = modifyIdInfo (`setOneShotInfo` one_shot) id
 updOneShotInfo :: Id -> OneShotInfo -> Id
 -- Combine the info in the Id with new info
 updOneShotInfo id one_shot
-  | do_upd    = setIdOneShotInfo id one_shot
-  | otherwise = id
-  where
-    do_upd = case (idOneShotInfo id, one_shot) of
-                (NoOneShotInfo, _) -> True
-                (OneShotLam,    _) -> False
+  | OneShotLam <- one_shot
+  , NoOneShotInfo <- idOneShotInfo id
+  = setIdOneShotInfo id OneShotLam
+  | otherwise
+  = id
 
 -- The OneShotLambda functions simply fiddle with the IdInfo flag
 -- But watch out: this may change the type of something else
@@ -991,8 +990,9 @@ zapLamIdInfo = zapInfo zapLamInfo
 zapFragileIdInfo :: Id -> Id
 zapFragileIdInfo = zapInfo zapFragileInfo
 
-zapIdDemandInfo :: Id -> Id
-zapIdDemandInfo = zapInfo zapDemandInfo
+floatifyIdDemandInfo :: Id -> Id
+-- See Note [Floatifying demand info when floating] in GHC.Core.Opt.SetLevels
+floatifyIdDemandInfo = zapInfo floatifyDemandInfo
 
 zapIdUsageInfo :: Id -> Id
 zapIdUsageInfo = zapInfo zapUsageInfo

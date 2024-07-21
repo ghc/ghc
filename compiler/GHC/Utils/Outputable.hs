@@ -1261,7 +1261,7 @@ data BindingSite
 
 data JoinPointHood
   = JoinPoint {-# UNPACK #-} !Int   -- The JoinArity (but an Int here because
-  | NotJoinPoint                    -- synonym JoinArity is defined in Types.Basic
+  | NotJoinPoint                    -- synonym JoinArity is defined in Types.Basic)
   deriving( Eq )
 
 isJoinPoint :: JoinPointHood -> Bool
