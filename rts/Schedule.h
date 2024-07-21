@@ -20,7 +20,7 @@
  * Locks assumed   :  none
  */
 void initScheduler (void);
-void exitScheduler (bool wait_foreign);
+void exitScheduler (bool wait_foreign, bool program_exiting);
 void freeScheduler (void);
 
 // Place a new thread on the run queue of the current Capability

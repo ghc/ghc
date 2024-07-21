@@ -477,6 +477,9 @@ hs_exit_(bool wait_foreign)
 
     rts_shutdown = true;
 
+    // if we're main and we're exiting the program is exiting!
+    bool program_exiting = rtsConfig.rts_is_main;
+
     /* start timing the shutdown */
     stat_startExit();
 
@@ -493,7 +496,7 @@ hs_exit_(bool wait_foreign)
 
     /* stop all running tasks. This is also where we stop concurrent non-moving
      * collection if it's running */
-    exitScheduler(wait_foreign);
+    exitScheduler(wait_foreign, program_exiting);
 
     /* run C finalizers for all active weak pointers */
     for (i = 0; i < getNumCapabilities(); i++) {

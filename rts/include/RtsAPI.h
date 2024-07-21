@@ -93,6 +93,12 @@ typedef struct {
     // True if GHC was not passed -no-hs-main
     HsBool rts_hs_main;
 
+    // True if the GHC RTS is the main program
+    //
+    // Used to optimise shutdown: if we're the main program we can skip cleaning
+    // up certain os resources on shutdown.
+    HsBool rts_is_main;
+
     // Whether to retain CAFs (default: false)
     HsBool keep_cafs;
 

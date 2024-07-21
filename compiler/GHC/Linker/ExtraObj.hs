@@ -124,6 +124,7 @@ mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state = do
             Just opts -> text "    __conf.rts_opts= " <>
                           text (show opts) <> semi,
         text " __conf.rts_hs_main = true;",
+        text " __conf.rts_is_main = true;",
         text " return hs_main(argc,argv,&ZCMain_main_closure,__conf);",
         char '}',
         char '\n' -- final newline, to keep gcc happy

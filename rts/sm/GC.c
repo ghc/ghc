@@ -281,7 +281,8 @@ addMutListScavStats(const MutListScavStats *src,
 void
 GarbageCollect (struct GcConfig config,
                 Capability *cap,
-                bool idle_cap[])
+                bool idle_cap[],
+                bool program_exiting)
 {
   bdescr *bd;
   generation *gen;
@@ -1101,7 +1102,8 @@ GarbageCollect (struct GcConfig config,
       debugTrace(DEBUG_gc,"Returning: %d %d", got, need);
 
       uint32_t returned = 0;
-      if (got > need) {
+      if (got > need && !program_exiting) {
+          // no need to return memory to is if the program is exiting!
           returned = returnMemoryToOS(got - need);
       }
       traceEventMemReturn(cap, got, need, returned);

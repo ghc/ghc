@@ -69,6 +69,7 @@ const RtsConfig defaultRtsConfig  = {
     .rts_opts_suggestions = true,
     .rts_opts = NULL,
     .rts_hs_main = false,
+    .rts_is_main = false,
     .keep_cafs = false,
     .eventlog_writer = &FileEventLogWriter,
     .defaultsHook = FlagDefaultsHook,

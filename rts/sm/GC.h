@@ -35,7 +35,8 @@ struct GcConfig {
 
 void GarbageCollect (struct GcConfig config,
                      Capability *cap,
-                     bool idle_cap[]);
+                     bool idle_cap[],
+                     bool program_exiting);
 
 typedef void (*evac_fn)(void *user, StgClosure **root);
 

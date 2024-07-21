@@ -13,6 +13,8 @@ int main (int argc, char *argv[])
     conf.keep_cafs = 1;
 
     conf.rts_opts_enabled = RtsOptsAll;
+
+    conf.rts_is_main = true;
     extern StgClosure ZCMain_main_closure;
     hs_main(argc, argv, &ZCMain_main_closure, conf);
 }
