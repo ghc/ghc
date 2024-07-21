@@ -919,4 +919,4 @@ test('T23739a', normal, compile, [''])
 test('T24810', normal, compile, [''])
 test('T24887', normal, compile, [''])
 test('T24938a', normal, compile, [''])
-
+test('T25094', normal, compile, [''])
