@@ -38,7 +38,7 @@ module GHC.Types.Demand (
     -- *** Demands used in PrimOp signatures
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
-    oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd,
+    oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd, floatifyDmd,
     peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds, strictCallArity,
     mkWorkerDemand, subDemandIfEvaluated,
     -- ** Extracting one-shot information
@@ -608,22 +608,22 @@ multCard (Card a) (Card b)
 --
 -- Examples (using Note [Demand notation]):
 --
---   * 'seq' puts demand @1A@ on its first argument: It evaluates the argument
---     strictly (@1@), but not any deeper (@A@).
---   * 'fst' puts demand @1P(1L,A)@ on its argument: It evaluates the argument
+--   * 'seq' puts demand `1A` on its first argument: It evaluates the argument
+--     strictly (`1`), but not any deeper (`A`).
+--   * 'fst' puts demand `1P(1L,A)` on its argument: It evaluates the argument
 --     pair strictly and the first component strictly, but no nested info
---     beyond that (@L@). Its second argument is not used at all.
---   * '$' puts demand @1C(1,L)@ on its first argument: It calls (@C@) the
---     argument function with one argument, exactly once (@1@). No info
---     on how the result of that call is evaluated (@L@).
---   * 'maybe' puts demand @MC(M,L)@ on its second argument: It evaluates
+--     beyond that (`L`). Its second argument is not used at all.
+--   * '$' puts demand `1C(1,L)` on its first argument: It calls (`C`) the
+--     argument function with one argument, exactly once (`1`). No info
+--     on how the result of that call is evaluated (`L`).
+--   * 'maybe' puts demand `MC(M,L)` on its second argument: It evaluates
 --     the argument function at most once ((M)aybe) and calls it once when
 --     it is evaluated.
---   * @fst p + fst p@ puts demand @SP(SL,A)@ on @p@: It's @1P(1L,A)@
---     multiplied by two, so we get @S@ (used at least once, possibly multiple
+--   * `fst p + fst p` puts demand `SP(SL,A)` on `p`: It's `1P(1L,A)`
+--     multiplied by two, so we get `S` (used at least once, possibly multiple
 --     times).
 --
--- This data type is quite similar to @'Scaled' 'SubDemand'@, but it's scaled
+-- This data type is quite similar to `'Scaled' 'SubDemand'`, but it's scaled
 -- by 'Card', which is an /interval/ on 'Multiplicity', the upper bound of
 -- which could be used to infer uniqueness types. Also we treat 'AbsDmd' and
 -- 'BotDmd' specially, as the concept of a 'SubDemand' doesn't apply when there
@@ -1012,6 +1012,11 @@ strictifyDictDmd _  dmd = dmd
 -- | Make a 'Demand' lazy.
 lazifyDmd :: Demand -> Demand
 lazifyDmd = multDmd C_01
+
+-- | Adjust the demand on a binding that may float outwards
+-- See Note [Floatifying demand info when floating]
+floatifyDmd :: Demand -> Demand
+floatifyDmd = multDmd C_0N
 
 -- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @C(1,d)@.
 mkCalledOnceDmd :: SubDemand -> SubDemand
@@ -2651,7 +2656,12 @@ So, L can denote a 'Card', polymorphic 'SubDemand' or polymorphic 'Demand',
 but it's always clear from context which "overload" is meant. It's like
 return-type inference of e.g. 'read'.
 
-Examples are in the haddock for 'Demand'.
+Examples are in the haddock for 'Demand'.  Here are some more:
+   SA                 Strict, but does not look at subcomponents (`seq`)
+   SP(L,L)            Strict boxed pair, components lazy
+   S!P(L,L)           Strict unboxed pair, components lazy
+   LP(SA,SA)          Lazy pair, but if it is evaluated will evaluated its components
+   LC(1C(L))          Lazy, but if called will apply the result exactly once
 
 This is the syntax for demand signatures:
 

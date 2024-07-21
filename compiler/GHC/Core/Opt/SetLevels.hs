@@ -1874,7 +1874,6 @@ cloneLetVars is_rec
           env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
           dest_lvl vs
   = do { let vs1  = map zap vs
-                      -- See Note [Zapping the demand info]
        ; (subst', vs2) <- case is_rec of
                             NonRecursive -> cloneBndrs      subst vs1
                             Recursive    -> cloneRecIdBndrs subst vs1
@@ -1887,9 +1886,12 @@ cloneLetVars is_rec
        ; return (env', vs2) }
   where
     zap :: Var -> Var
-    zap v | isId v    = zap_join (zapIdDemandInfo v)
+    -- See Note [Floatifying demand info when floating]
+    -- and Note [Zapping JoinId when floating]
+    zap v | isId v    = zap_join (floatifyIdDemandInfo v)
           | otherwise = v
 
+    -- See Note [Zapping JoinId when floating]
     zap_join | isTopLvl dest_lvl = zapJoinId
              | otherwise         = id
 
@@ -1898,16 +1900,38 @@ add_id id_env (v, v1)
   | isTyVar v = delVarEnv    id_env v
   | otherwise = extendVarEnv id_env v ([v1], assert (not (isCoVar v1)) $ Var v1)
 
-{-
-Note [Zapping the demand info]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-VERY IMPORTANT: we must zap the demand info if the thing is going to
-float out, because it may be less demanded than at its original
-binding site.  Eg
-   f :: Int -> Int
-   f x = let v = 3*4 in v+x
-Here v is strict; but if we float v to top level, it isn't any more.
+{- Note [Zapping JoinId when floating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we are floating a join point, it won't be one anymore, so we zap
+the join point information.
 
-Similarly, if we're floating a join point, it won't be one anymore, so we zap
-join point information as well.
+Note [Floatifying demand info when floating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When floating we must lazify the outer demand info on the Id
+because it may be less demanded than at its original binding site.
+For example:
+     f :: Int -> Int
+     f x = let v = 3*4 in v+x
+Here v is strict and used at most once; but if we float v to top level,
+that isn't true any more. Specifically, we lose track of v's cardinality info:
+  * if `f` is called multiple times, then `v` is used more than once
+  * if `f` is never called, then `v` is never evaluated.
+
+But NOTE that we only need to adjust the /top-level/ cardinality info.
+For example
+     let x = (e1,e2)
+     in ...(case x of (a,b) -> a+b)...
+If we float x outwards, it may no longer be strict, but IF it is ever
+evaluated THEN its components will be evaluated.  So we to lazify and
+many-ify its demand-info, not discard it entirely.
+
+Same if we have
+     let f = \x y . blah
+     in ...(f a b)...(f c d)...
+Here `f` will get a demand like SC(S,C(1,L)). If we float it out, we can
+keep that `1C` called-once inner demand. It's only the outer strictness
+that we kill.
+
+Conclusion: to floatify a demand, just do `multDmd C_0N` to reflect the
+fact that `v` may be used any number of times, from zero upwards.
 -}

@@ -1485,11 +1485,12 @@ specBind top_lvl env (NonRec fn rhs) do_body
              -- This is important: see Note [Update unfolding after specialisation]
              -- And in any case cloneBndrSM discards non-Stable unfoldings
 
-             fn3 = zapIdDemandInfo fn2
+             fn3 = floatifyIdDemandInfo fn2
              -- We zap the demand info because the binding may float,
              -- which would invalidate the demand info (see #17810 for example).
              -- Destroying demand info is not terrible; specialisation is
              -- always followed soon by demand analysis.
+             -- See Note [Floatifying demand info when floating] in GHC.Core.Opt.SetLevels
 
              body_env2 = body_env1 `bringFloatedDictsIntoScope` ud_binds rhs_uds
                                    `extendInScope` fn3
