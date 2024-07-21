@@ -1028,10 +1028,10 @@ dmdTransform env var sd
       TopLevel
         | isInterestingTopLevelFn var
         -- Top-level things will be used multiple times or not at
-        -- all anyway, hence the multDmd below: It means we don't
+        -- all anyway, hence the `floatifyDmd`: it means we don't
         -- have to track whether @var@ is used strictly or at most
-        -- once, because ultimately it never will.
-        -> addVarDmd fn_ty var (C_0N `multDmd` (C_11 :* sd)) -- discard strictness
+        -- once, because ultimately it never will
+        -> addVarDmd fn_ty var (floatifyDmd (C_11 :* sd))
         | otherwise
         -> fn_ty -- don't bother tracking; just annotate with 'topDmd' later
   -- Everything else:

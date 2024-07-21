@@ -971,7 +971,7 @@ addLetBndrInfo new_bndr new_arity_type new_unf
 
     -- Demand info: Note [Setting the demand info]
     info3 | isEvaldUnfolding new_unf
-          = zapDemandInfo info2 `orElse` info2
+          = lazifyDemandInfo info2 `orElse` info2
           | otherwise
           = info2
 

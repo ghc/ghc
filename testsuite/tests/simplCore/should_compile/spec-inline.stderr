@@ -129,7 +129,7 @@ Roman.foo_go [InlPrag=[2]] :: Maybe Int -> Maybe Int -> Int
                  GHC.Types.I# ww
                  }}]
 Roman.foo_go
-  = \ (u :: Maybe Int) (ds :: Maybe Int) ->
+  = \ (u :: Maybe Int) (ds [OS=OneShot] :: Maybe Int) ->
       case Roman.$wgo u ds of ww { __DEFAULT -> GHC.Types.I# ww }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}

@@ -35,7 +35,8 @@ module GHC.Types.Id.Info (
 
         -- ** Zapping various forms of Info
         zapLamInfo, zapFragileInfo,
-        zapDemandInfo, zapUsageInfo, zapUsageEnvInfo, zapUsedOnceInfo,
+        lazifyDemandInfo, floatifyDemandInfo,
+        zapUsageInfo, zapUsageEnvInfo, zapUsedOnceInfo,
         zapTailCallInfo, zapCallArityInfo, trimUnfolding,
 
         -- ** The ArityInfo type
@@ -855,11 +856,21 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
 
     is_safe_dmd dmd = not (isStrUsedDmd dmd)
 
--- | Remove all demand info on the 'IdInfo'
-zapDemandInfo :: IdInfo -> Maybe IdInfo
-zapDemandInfo info = Just (info {demandInfo = topDmd})
+-- | Lazify (remove the top-level demand, only) the demand in `IdInfo`
+-- Keep nested demands; see Note [Floatifying demand info when floating]
+-- in GHC.Core.Opt.SetLevels
+lazifyDemandInfo :: IdInfo -> Maybe IdInfo
+lazifyDemandInfo info@(IdInfo { demandInfo = dmd })
+  = Just (info {demandInfo = lazifyDmd dmd })
 
--- | Remove usage (but not strictness) info on the 'IdInfo'
+-- | Floatify the demand in `IdInfo`
+-- But keep /nested/ demands; see Note [Floatifying demand info when floating]
+-- in GHC.Core.Opt.SetLevels
+floatifyDemandInfo :: IdInfo -> Maybe IdInfo
+floatifyDemandInfo info@(IdInfo { demandInfo = dmd })
+  = Just (info {demandInfo = floatifyDmd dmd })
+
+-- | Remove usage (but not strictness) info on the `IdInfo`
 zapUsageInfo :: IdInfo -> Maybe IdInfo
 zapUsageInfo info = Just (info {demandInfo = zapUsageDemand (demandInfo info)})
 
