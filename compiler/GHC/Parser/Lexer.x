@@ -61,11 +61,11 @@ module GHC.Parser.Lexer (
    allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..), getBit,
    getRealSrcLoc, getPState,
-   failMsgP, failLocMsgP, srcParseFail,
+   failMsgP, failLocMsgP, srcParseFail, srcParseFail', srcParseErr,
    getPsErrorMessages, getPsMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
-   getLexState, popLexState, pushLexState,
+   getLexState, popLexState, pushLexState, layout,
    ExtBits(..),
    xtest, xunset, xset,
    disableHaddock,
@@ -3214,8 +3214,7 @@ popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
         (_:tl) ->
           POk s{ context = tl } ()
         []     ->
-          unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
-
+          unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc) []) s
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
 pushCurrentContext gen_semic = P $ \ s@PState{ last_loc=loc, context=ctx } ->
@@ -3245,8 +3244,9 @@ srcParseErr
   -> StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
   -> SrcSpan
+  -> [String]           -- expected tokens
   -> MsgEnvelope PsMessage
-srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token details)
+srcParseErr options buf len loc expected = mkPlainErrorMsgEnvelope loc (PsErrParse token details)
   where
    token = lexemeToString (offsetBytes (-len) buf) len
    pattern_ = decodePrevNChars 8 buf
@@ -3261,15 +3261,52 @@ srcParseErr options buf len loc = mkPlainErrorMsgEnvelope loc (PsErrParse token 
      , ped_mdo_in_last_100 = mdoInLast100
      , ped_pat_syn_enabled = ps_enabled
      , ped_pattern_parsed  = pattern_ == "pattern "
+     , ped_expected        = expected
      }
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
 srcParseFail :: P a
-srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
-                            last_loc = last_loc } ->
-    unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+srcParseFail =
+  P $ \s@PState{ buffer = buf
+               , options = o
+               , last_len = len
+               , last_loc = last_loc } ->
+      unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc) []) s
+
+srcParseWarn
+  :: ParserOpts
+  -> StringBuffer       -- current buffer (placed just after the last token)
+  -> Int                -- length of the previous token
+  -> SrcSpan
+  -> [String]           -- expected tokens
+  -> MsgEnvelope PsMessage
+srcParseWarn options buf len loc expected = mkPlainWarningMsgEnvelope loc (PsErrParse token details)
+  where
+   token = lexemeToString (offsetBytes (-len) buf) len
+   pattern_ = decodePrevNChars 8 buf
+   last100 = decodePrevNChars 100 buf
+   doInLast100 = "do" `isInfixOf` last100
+   mdoInLast100 = "mdo" `isInfixOf` last100
+   th_enabled = ThQuotesBit `xtest` pExtsBitmap options
+   ps_enabled = PatternSynonymsBit `xtest` pExtsBitmap options
+   details = PsErrParseDetails {
+       ped_th_enabled      = th_enabled
+     , ped_do_in_last_100  = doInLast100
+     , ped_mdo_in_last_100 = mdoInLast100
+     , ped_pat_syn_enabled = ps_enabled
+     , ped_pattern_parsed  = pattern_ == "pattern "
+     , ped_expected        = expected
+     }
+
+srcParseFail' :: Located Token -> [String] -> P a -> P a
+srcParseFail' (L loc _last_tk) expected_toks resume =
+  do P $ \s@PState{ buffer = buf
+                  , options = o
+                  , last_len = len } ->
+         unP (addWarning $ srcParseWarn o buf len loc expected_toks) s
+     resume
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.

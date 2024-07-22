@@ -508,6 +508,8 @@ data PsErrParseDetails
     -- ^ Is 'PatternSynonyms' enabled?
   , ped_pattern_parsed :: !Bool
     -- ^ Did we parse a \"pattern\" keyword?
+  , ped_expected :: ![String]
+    -- ^ The stringified tokens the parser expected
   }
 
 data PsInvalidTypeSignature

@@ -168,11 +168,13 @@ instance Diagnostic PsMessage where
               LexErrKind_UTF8   -> text " (UTF-8 decoding error)"
               LexErrKind_Char c -> text $ " at character " ++ show c
            ]
-    PsErrParse token _details
-      | null token
-      -> mkSimpleDecorated $ text "parse error (possibly incorrect indentation or mismatched brackets)"
-      | otherwise
-      -> mkSimpleDecorated $ text "parse error on input" <+> quotes (text token)
+    PsErrParse token details
+      -> mkSimpleDecorated $ sep $
+           [ text "Parse error (possibly incorrect indentation or mismatched brackets)." | null token ] ++
+           [ text "Parse error on input" <+> quotes (text token) <> text "." | notNull token ] ++
+           [ text "Expected one of" <+> pprWithCommas text pref <> if notNull suf then text ", ..." else empty | notNull pref]
+         where
+           (pref, suf) = splitAt 10 (ped_expected details)
     PsErrCmmLexer
       -> mkSimpleDecorated $ text "Cmm lexical error"
     PsErrCmmParser cmm_err -> mkSimpleDecorated $ case cmm_err of

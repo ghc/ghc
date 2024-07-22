@@ -100,6 +100,8 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import qualified Data.Semigroup as Semi
 }
 
+%error { srcParseFail } { srcParseFail' }
+%error.expected
 %expect 0 -- shift/reduce conflicts
 
 {- Note [shift/reduce conflicts]
@@ -762,7 +764,7 @@ TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 %monad { P } { >>= } { return }
-%lexer { (lexer True) } { L _ ITeof }
+%lexer { (lexerDbg True) } { L _ ITeof }
   -- Replace 'lexer' above with 'lexerDbg'
   -- to dump the tokens fed to the parser.
 %tokentype { (Located Token) }
@@ -983,6 +985,11 @@ header  :: { Located (HsModule GhcPs) }
         | header_body2
                 {% fileSrcSpan >>= \ loc ->
                    return (L loc (HsModule (XModulePs noAnn EpNoLayout Nothing Nothing) Nothing Nothing $1 [])) }
+
+
+catch_tok(TOK) :: { Maybe (Located Token) }
+        : TOK { Just $1 }
+        | catch {% return Nothing }
 
 header_body :: { [LImportDecl GhcPs] }
         :  '{'            header_top            { $2 }
@@ -1859,6 +1866,7 @@ decls   :: { Located ([AddEpAnn], OrdList (LHsDecl GhcPs)) }
                                        return (sLZ $1 $> (fst $ unLoc $1
                                                       , snocOL hs t')) }
         | decl                          { sL1 $1 ([], unitOL $1) }
+        | catch ';' decl                { sLL $2 $> ((msemiA $2), unitOL $3) } -- The SrcLocs are probably incorrect
         | {- empty -}                   { noLoc ([],nilOL) }
 
 decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }

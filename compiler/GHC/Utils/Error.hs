@@ -30,7 +30,7 @@ module GHC.Utils.Error (
         -- ** Construction
         DiagOpts (..), emptyDiagOpts, diag_wopt, diag_fatal_wopt,
         emptyMessages, mkDecorated, mkLocMessage,
-        mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
+        mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope, mkPlainWarningMsgEnvelope,
         mkErrorMsgEnvelope,
         mkMCDiagnostic, errorDiagnostic, diagReasonSeverity,
 
@@ -236,6 +236,15 @@ mkPlainErrorMsgEnvelope :: Diagnostic e
                         -> MsgEnvelope e
 mkPlainErrorMsgEnvelope locn msg =
   mk_msg_envelope SevError locn alwaysQualify (ResolvedDiagnosticReason ErrorWithoutFlag) msg
+
+-- | Variant of 'mkPlainMsgEnvelope' which can be used when we are /sure/ we
+-- are constructing a diagnostic with a 'WarningWithoutFlag' reason.
+mkPlainWarningMsgEnvelope :: Diagnostic e
+                        => SrcSpan
+                        -> e
+                        -> MsgEnvelope e
+mkPlainWarningMsgEnvelope locn msg =
+  mk_msg_envelope SevWarning locn alwaysQualify (ResolvedDiagnosticReason WarningWithoutFlag) msg
 
 -------------------------
 data Validity' a
