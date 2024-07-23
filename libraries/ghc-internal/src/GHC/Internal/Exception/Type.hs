@@ -52,6 +52,19 @@ import GHC.Internal.Base
 import GHC.Internal.Show
 import GHC.Internal.Exception.Context
 
+{- |
+A constraint used to propagate 'ExceptionContext's.
+
+GHC will automatically default any unsolved 'HasExceptionContext' constraints to an
+empty exception context, similarly to 'HasCallStack'.
+
+NOTE: The fact that @HasExceptionContext@ is defined as an implicit parameter is
+an implementation detail and __should not__ be considered a part of the API.
+It does however mean that any implicit parameter `?exceptionContext :: ExceptionContext`
+will be subject to defaulting, as described above.
+
+@since base-4.20.0.0
+-}
 type HasExceptionContext = (?exceptionContext :: ExceptionContext)
 
 {- |
