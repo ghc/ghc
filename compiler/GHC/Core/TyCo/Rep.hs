@@ -61,6 +61,7 @@ module GHC.Core.TyCo.Rep (
 
         -- * Sizes
         typeSize, typesSize, coercionSize,
+        typeIsSmallEnoughToInline,
 
         -- * Multiplicities
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
@@ -2036,6 +2037,9 @@ coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
 coercionSize (KindCo co)         = 1 + coercionSize co
 coercionSize (SubCo co)          = 1 + coercionSize co
+
+typeIsSmallEnoughToInline :: Type -> Bool
+typeIsSmallEnoughToInline ty = typeSize ty <= 1
 
 {-
 ************************************************************************

@@ -117,6 +117,8 @@ module GHC.Core.Type (
         isValidJoinPointType,
         tyConAppNeedsKindSig,
 
+        typeIsSmallEnoughToInline,
+
         -- * Space-saving construction
         mkTYPEapp, mkTYPEapp_maybe,
         mkCONSTRAINTapp, mkCONSTRAINTapp_maybe,
