@@ -32,7 +32,7 @@ import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs
 import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
-import GHC.Types.Var      ( isNonCoVarId, tyVarUnfolding, setTyVarUnfolding )
+import GHC.Types.Var      ( isTcTyVar, isNonCoVarId, setTyVarUnfolding, tyVarOccInfo )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
@@ -439,26 +439,22 @@ simple_opt_bind env (Rec prs) top_level
 
 ----------------------
 simple_bind_type :: SimpleOptEnv
-                 -> InTyVar -> Maybe OutTyVar
+                 -> InTyVar
                  -> (SimpleOptEnv, InType)
                  -> (SimpleOptEnv, Maybe (OutTyVar, OutType))
 simple_bind_type env@(SOE { soe_subst = subst })
-                 in_bndr mb_out_bndr (rhs_env, in_rhs)
-  | Just in_tyvar <- getTyVar_maybe in_rhs
-  , Just unf <- tyVarUnfolding in_tyvar
-  , let out_unf = substTyUnchecked (soe_subst rhs_env) unf
-  , isAtomicTy out_unf
-  = {- pprTrace "simple_bind_type" (ppr in_tyvar) $ -}
-    (env { soe_subst = extendTvSubst subst in_bndr out_unf }, Nothing)
-
+                 in_bndr (rhs_env, in_ty)
+  | occurs_once || typeIsSmallEnoughToInline out_ty
+  = (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
   | otherwise
-  = let
-      out_ty = substTyUnchecked (soe_subst rhs_env) in_rhs
-      (env', bndr1) = case mb_out_bndr of
-                        Just out_bndr -> (env, out_bndr)
-                        Nothing       -> subst_opt_bndr env in_bndr
-      out_bndr = setTyVarUnfolding bndr1 out_ty
+  = let (env', subst_bndr) = subst_opt_bndr env in_bndr
+        out_bndr | isTcTyVar subst_bndr = subst_bndr
+                 | otherwise            = subst_bndr `setTyVarUnfolding` out_ty
     in (env', Just (out_bndr, out_ty))
+  where
+    out_ty = substTyUnchecked (soe_subst (soeSetInScope (soeInScope env) rhs_env)) in_ty
+    bndr_occ = tyVarOccInfo in_bndr
+    occurs_once {- syntactically -} = isOneOcc bndr_occ && occ_n_br bndr_occ == 1
 
 ----------------------
 simple_bind_pair :: SimpleOptEnv

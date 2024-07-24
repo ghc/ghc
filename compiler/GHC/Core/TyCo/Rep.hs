@@ -62,6 +62,7 @@ module GHC.Core.TyCo.Rep (
 
         -- * Sizes
         typeSize, typesSize, coercionSize, provSize,
+        typeIsSmallEnoughToInline,
 
         -- * Multiplicities
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
@@ -1929,6 +1930,9 @@ provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
+
+typeIsSmallEnoughToInline :: Type -> Bool
+typeIsSmallEnoughToInline ty = typeSize ty <= 1
 
 {-
 ************************************************************************
