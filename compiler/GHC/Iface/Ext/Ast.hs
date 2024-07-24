@@ -18,6 +18,10 @@ import GHC.Utils.Outputable(ppr)
 import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Core.Class             ( className, classSCSelIds )
+import GHC.Core.Utils (exprType)
+import GHC.Core.TyCo.Rep (Type(TyConApp))
+import GHC.Core.TyCon (TyCon(..))
+import GHC.Builtin.Names (hasFieldClassName, getFieldName)
 import GHC.Core.ConLike           ( conLikeName )
 import GHC.Core.DataCon           ( dataConWrapperType )
 import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
@@ -683,12 +687,21 @@ hieEvIdsOfTerm :: EvTerm -> [EvId]
 -- Returns only EvIds satisfying relevantEvId
 hieEvIdsOfTerm = runFVSelectiveList isEvId . evTermFVs
 
+evFreeVarsOfTermList :: EvTerm -> [Var]
+evFreeVarsOfTermList (EvExpr e) = exprFreeVarsList e
+evFreeVarsOfTermList _ = []
+
+evDepsOfTermList :: EvTerm -> [EvId]
+evDepsOfTermList e
+  | isHasFieldEvTerm e = evFreeVarsOfTermList e
+  | otherwise = evVarsOfTermList e
+
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))
     = concatMapM go $ bagToList bs
     where
       go evbind = do
-          let evDeps = hieEvIdsOfTerm $ eb_rhs evbind
+          let evDeps = evDepsOfTermList $ eb_rhs evbind
               depNames = EvBindDeps $ map varName evDeps
           concatM $
             [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
@@ -696,6 +709,13 @@ instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
             , toHie $ map (C EvidenceVarUse . L span) $ evDeps
             ]
   toHie _ = pure []
+
+isHasFieldEvTerm :: EvTerm -> Bool
+isHasFieldEvTerm (EvExpr expr)
+  | TyConApp tyCon _ <- exprType expr,
+    tyConName tyCon == hasFieldClassName
+  = True
+isHasFieldEvTerm _ = False
 
 instance ToHie (LocatedA HsWrapper) where
   toHie (L osp wrap)
@@ -708,8 +728,13 @@ instance ToHie (LocatedA HsWrapper) where
         (WpEvLam a) ->
           toHie $ C (EvidenceVarBind EvWrapperBind (mkScope osp) (getRealSpanA osp))
                 $ L osp a
-        (WpEvApp a) ->
-          concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
+        (WpEvApp a)
+          | isHasFieldEvTerm a ->
+              -- concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
+              pprTrace "HasField" (ppr (a, osp)) $ concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
+          | otherwise ->
+              -- pprTrace "Not HasField" (ppr (a, osp)) $ concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
+              concatMapM (toHie . C EvidenceVarUse . L osp) $ hieEvIdsOfTerm a
         _               -> pure []
 
 instance HiePass p => HasType (LocatedA (HsBind (GhcPass p))) where
