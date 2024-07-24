@@ -52,6 +52,13 @@ tidyBind :: TidyEnv
          ->  (TidyEnv, CoreBind)
 
 tidyBind env (NonRec bndr rhs)
+  | isTyVar bndr
+  = -- pprTrace "tidyBindNonRecType" (ppr bndr) $
+    let (env', bndr') = tidyLetBndr env env bndr
+        tidy_rhs = (tidyExpr env' rhs)
+    in (env', NonRec bndr' tidy_rhs)
+
+  | otherwise
   = -- pprTrace "tidyBindNonRec" (ppr bndr) $
     let cbv_bndr = (tidyCbvInfoLocal bndr rhs)
         (env', bndr') = tidyLetBndr env env cbv_bndr
@@ -315,9 +322,25 @@ tidyIdBndr env@(tidy_env, var_env) id
 
 tidyLetBndr :: TidyEnv         -- Knot-tied version for unfoldings
             -> TidyEnv         -- The one to extend
-            -> Id -> (TidyEnv, Id)
+            -> Var -> (TidyEnv, Var)
 -- Used for local (non-top-level) let(rec)s
 -- Just like tidyIdBndr above, but with more IdInfo
+tidyLetBndr rec_tidy_env env@(tidy_env, var_env) tv
+  | isTyVar tv
+  = case tidyOccName tidy_env (getOccName tv) of { (tidy_env', occ') ->
+    let
+        ki'      = tidyType env (tyVarKind tv)
+        name'    = mkInternalName (varUnique tv) occ' noSrcSpan
+        mb_unf   = tyVarUnfolding tv
+        occ_info = tyVarOccInfo tv
+        tv' | Just unf <- mb_unf = mkTyVarWithUnfolding name' ki' (tidyType rec_tidy_env unf)
+            | otherwise          = mkTyVar name' ki'
+        tv'' = tv' `setTyVarOccInfo` occ_info
+        var_env' = extendVarEnv var_env tv tv''
+
+    in
+    ((tidy_env', var_env'), tv') }
+
 tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
   = case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
     let
