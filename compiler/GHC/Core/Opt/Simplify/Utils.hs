@@ -60,7 +60,7 @@ import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Type     hiding( substTy )
+import GHC.Core.Type     hiding( extendTvSubst, substTy )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
@@ -72,6 +72,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Tickish
 import GHC.Types.Demand
 import GHC.Types.Var.Set
+import GHC.Types.Var ( tyVarOccInfo, tyVarUnfolding )
 import GHC.Types.Basic
 
 import GHC.Data.OrdList ( isNilOL )
@@ -86,7 +87,6 @@ import Control.Monad    ( when )
 import Data.List        ( sortBy )
 import GHC.Types.Name.Env
 import Data.Graph
-import GHC.Types.Var (tyVarOccInfo)
 
 {- *********************************************************************
 *                                                                      *
@@ -1469,22 +1469,26 @@ preInlineUnconditionally
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
-  | isTyVar bndr                             = Nothing
+  | isTyVar bndr
+  , not (one_occ (tyVarOccInfo bndr))        = Nothing
+  | isTyVar bndr
+  , Just unf <- tyVarUnfolding bndr          = Just $! (extend_tv_subst_with unf)
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
   | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
-  | not (isStableUnfolding unf)              = Just $! (extend_subst_with rhs)
+  | not (isStableUnfolding unf)              = Just $! (extend_id_subst_with rhs)
 
   -- See Note [Stable unfoldings and preInlineUnconditionally]
   | not (isInlinePragma inline_prag)
-  , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
+  , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_id_subst_with inl)
   | otherwise                                = Nothing
   where
     unf = idUnfolding bndr
-    extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
+    extend_id_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
+    extend_tv_subst_with ty      = extendTvSubst env bndr ty
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
@@ -2224,7 +2228,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
-    body_floats = letFloatBinds (sfLetFloats floats)
+    body_floats = letFloatBinds (sfLetFloats floats) ++ typeFloatBinds (sfTypeFloats floats)
     empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats)
 
     -- See wrinkle (AB5) in Note [Which type variables to abstract over]
