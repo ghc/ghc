@@ -954,6 +954,7 @@ extern char **environ;
       SymI_HasDataProto(stg_castDoubleToWord64zh)                       \
       SymI_HasDataProto(stg_castWord32ToFloatzh)                        \
       SymI_HasDataProto(stg_castFloatToWord32zh)                        \
+      SymI_HasProto(closure_sizeW_)                                     \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
