@@ -53,8 +53,9 @@ module GHC.Core.Utils (
         -- * StaticPtr
         collectMakeStaticArgs,
 
-        -- * Join points
+        -- * Predicates on binds
         isJoinBind,
+        isTypeBind,
 
         -- * Tag inference
         mkStrictFieldSeqs, shouldStrictifyIdForCbv, shouldUseCbvForId,
@@ -2653,16 +2654,20 @@ collectMakeStaticArgs _          = Nothing
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Join points}
+\subsection{Predicates on binds}
 *                                                                      *
 ************************************************************************
 -}
 
--- | Does this binding bind a join point (or a recursive group of join points)?
 isJoinBind :: CoreBind -> Bool
 isJoinBind (NonRec b _)       = isJoinId b
 isJoinBind (Rec ((b, _) : _)) = isJoinId b
 isJoinBind _                  = False
+
+-- | Does this binding bind a join point (or a recursive group of join points)?
+isTypeBind :: CoreBind -> Bool
+isTypeBind (NonRec b (Type _)) = isTyVar b
+isTypeBind _                   = False
 
 dumpIdInfoOfProgram :: Bool -> (IdInfo -> SDoc) -> CoreProgram -> SDoc
 dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)

@@ -242,7 +242,10 @@ corePrepTopBinds initialCorePrepEnv binds
   = go initialCorePrepEnv binds
   where
     go _   []             = return emptyFloats
-    go env (bind : binds) = do (env', floats, maybe_new_bind)
+    go env (bind : binds) | isTypeBind bind
+                          = go env binds
+                          | otherwise
+                          = do (env', floats, maybe_new_bind)
                                  <- cpeBind TopLevel env bind
                                massert (isNothing maybe_new_bind)
                                  -- Only join points get returned this way by
@@ -775,6 +778,9 @@ cpeRhsE env expr@(Var {})  = cpeApp env expr
 cpeRhsE env expr@(App {})  = cpeApp env expr
 
 cpeRhsE env (Let bind body)
+  | isTypeBind bind
+  = cpeRhsE env body
+  | otherwise
   = do { (env', bind_floats, maybe_bind') <- cpeBind NotTopLevel env bind
        ; (body_floats, body') <- cpeRhsE env' body
        ; let expr' = case maybe_bind' of Just bind' -> Let bind' body'
