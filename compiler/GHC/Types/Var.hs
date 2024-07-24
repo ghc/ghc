@@ -1100,7 +1100,6 @@ tyVarUnfolding _ = Nothing
 tyVarOccInfo :: TyVar -> OccInfo
 tyVarOccInfo (TcTyVar {}) = noOccInfo
 tyVarOccInfo tv = assertPpr (isTyVar tv) (ppr tv) $ tv_occ_info tv
-{-# NOINLINE tyVarOccInfo #-}
 
 setTyVarUnique :: TyVar -> Unique -> TyVar
 setTyVarUnique = setVarUnique
