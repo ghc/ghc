@@ -2720,8 +2720,8 @@ sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 --
 -- This is a "hot" function.  Do not call splitTyConApp_maybe here,
 -- to avoid the faff with FunTy
-sORTKind_maybe ty
-  | Just ty <- unfoldView ty
+sORTKind_maybe (TyVarTy tv)
+  | Just ty <- tyVarUnfolding tv
   = sORTKind_maybe ty
 sORTKind_maybe (TyConApp tc tys)
   -- First, short-cuts for Type and Constraint that do no allocation
