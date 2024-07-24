@@ -13,7 +13,7 @@ main = do
              `onException` return ()
 
   t <- forkIO $ do evaluate x; return ()
-  threadDelay 1000
+  threadDelay 2000
   killThread t
 
   print x `E.catch` \e -> putStrLn ("main caught: " ++ show (e::SomeException))
