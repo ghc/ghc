@@ -17,8 +17,8 @@ module GHC.Rename.Utils (
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, wrapGenSpan', wrapNoSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
-        genLHsApp, genAppType,
+        wrapGenSpan, wrapGenSpan', genHsVar, genHsVarWith, genLHsVar, genHsApp, genHsAppWith, genHsApps, genHsApps', genHsExpApps,
+        genLHsApp, genAppType, genAppTypeWith,
         genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
         genSimpleFunBind, genFunBind,
@@ -737,6 +737,9 @@ genHsExpApps fun arg = foldl genHsApp fun arg
 genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
 genHsApp fun arg = HsApp noExtField (wrapGenSpan fun) arg
 
+genHsAppWith :: SrcSpan -> HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
+genHsAppWith srcSpan fun arg = HsApp noExtField (wrapSrcSpan srcSpan fun) arg
+
 genLHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
 genLHsApp fun arg = wrapGenSpan (genHsApp fun arg)
 
@@ -745,6 +748,15 @@ genLHsVar nm = wrapGenSpan $ genHsVar nm
 
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) (mkEmptyWildCardBndrs (wrapGenSpan ty))
+
+genAppTypeWith :: SrcSpan -> HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
+genAppTypeWith srcSpan expr ty = HsAppType noExtField (wrapSrcSpan srcSpan expr) (mkEmptyWildCardBndrs (wrapSrcSpan srcSpan ty))
+
+genHsVarWith :: SrcSpan -> Name -> HsExpr GhcRn
+genHsVarWith srcSpan nm = HsVar noExtField (wrapSrcSpan srcSpan nm)
+
+wrapSrcSpan :: (HasAnnotation an) => SrcSpan -> a -> GenLocated an a
+wrapSrcSpan srcSpan x = L (noAnnSrcSpan srcSpan) x
 
 genLHsLit :: (NoAnn an) => HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genLHsLit = wrapGenSpan . HsLit noExtField
