@@ -146,8 +146,9 @@ mayLookIdentical orig_ty1 orig_ty2
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
     go :: RnEnv2 -> Type -> Type -> Bool
-    -- See Note [Comparing nullary type synonyms]
+    -- See Note [Comparing nullary type synonyms and type variables]
     go _  (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2 = True
+    go _  (TyVarTy tv1)     (TyVarTy tv2)     | tv1 == tv2 = True
 
     go env t1 t2 | Just t1' <- coreView t1 = go env t1' t2
     go env t1 t2 | Just t2' <- coreView t2 = go env t1 t2'
@@ -228,13 +229,14 @@ tc_eq_type keep_syns orig_ty1 orig_ty2
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
     view
-      | keep_syns = unfoldView
+      | keep_syns = unfoldView  -- We still want to look through let-bound type variables
+                                -- See Note [Type and coercion lets] in GHC.Core
       | otherwise = coreView
 
     go :: RnEnv2 -> Type -> Type -> Bool
-    -- See Note [Comparing nullary type synonyms]
+    -- See Note [Comparing nullary type synonyms and type variables]
     go _ (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2 = True
-    go _ (TyVarTy tv1) (TyVarTy tv2) | tv1 == tv2 = True
+    go _ (TyVarTy tv1)     (TyVarTy tv2)     | tv1 == tv2 = True
 
     go env t1 t2 | Just t1' <- view t1 = go env t1' t2
     go env t1 t2 | Just t2' <- view t2 = go env t1 t2'
@@ -462,8 +464,8 @@ But the left is an AppTy while the right is a TyConApp. The solution is
 to use splitAppTyNoView_maybe to break up the TyConApp into its pieces and
 then continue. Easy to do, but also easy to forget to do.
 
-Note [Comparing nullary type synonyms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Comparing nullary type synonyms and type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the task of testing equality between two 'Type's of the form
 
   TyConApp tc []
@@ -490,6 +492,10 @@ This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
 since GHC prefers to use the type synonym over @TYPE 'LiftedRep@ applications
 whenever possible. See Note [Using synonyms to compress types] in
 GHC.Core.Type for details.
+
+As coreView also expands let-bound type variables (c.f. Note [Type and coercion lets]
+in GHC.Core) into their unfolding, we want the same short-cutting behavior.
+After all, type variables are similar in nature to nullary type synonyms.
 
 -}
 
@@ -607,7 +613,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- Returns both the resulting ordering relation between
     -- the two types and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
-    -- See Note [Comparing nullary type synonyms]
+    -- See Note [Comparing nullary type synonyms and type variables]
     go _   (TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
       = TEQ

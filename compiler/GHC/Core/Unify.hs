@@ -1065,9 +1065,13 @@ unify_ty :: UMEnv
 -- See Note [Specification of unification]
 -- Respects newtypes, PredTypes
 -- See Note [Computing equality on types] in GHC.Core.Type
+
+-- See Note [Comparing nullary type synonyms and type variables] in GHC.Core.TyCo.Compare
 unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
-  -- See Note [Comparing nullary type synonyms] in GHC.Core.TyCo.Compare
   | tc1 == tc2
+  = return ()
+unify_ty _env (TyVarTy tv1) (TyVarTy tv2) _kco
+  | tv1 == tv2
   = return ()
 
 unify_ty env ty1 ty2 kco
