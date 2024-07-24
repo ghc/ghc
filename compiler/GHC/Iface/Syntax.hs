@@ -16,6 +16,7 @@ module GHC.Iface.Syntax (
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
+        IfaceTyVarInfo, IfaceTyVarInfoItem(..),
         IfaceWarnings(..), IfaceWarningTxt(..), IfaceStringLiteral(..),
         IfaceDefault(..), IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
         IfaceClassBody(..), IfaceBooleanFormula(..),
@@ -474,6 +475,11 @@ data IfGuidance
 -- implicit ones are needed here, because they are not put in
 -- interface files
 
+type IfaceTyVarInfo = [IfaceTyVarInfoItem]
+
+data IfaceTyVarInfoItem
+  = HsTypeUnfold IfaceType
+
 data IfaceIdDetails
   = IfVanillaId
   | IfWorkerLikeId [CbvMark]
@@ -720,6 +726,7 @@ data IfaceBindingX r b
 -- It's used for *non-top-level* let/rec binders
 -- See Note [IdInfo on nested let-bindings]
 data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo JoinPointHood
+                  | IfTypeLetBndr IfLclName IfaceKind IfaceTyVarInfo
 
 data IfaceTopBndrInfo = IfLclTopBndr IfLclName IfaceType IfaceIdInfo IfaceIdDetails
                       | IfGblTopBndr IfaceTopBndr
@@ -1838,6 +1845,9 @@ ppr_bind :: (IfaceLetBndr, IfaceExpr) -> SDoc
 ppr_bind (IfLetBndr b ty info ji, rhs)
   = sep [hang (ppr b <+> dcolon <+> ppr ty) 2 (ppr ji <+> ppr info),
          equals <+> pprIfaceExpr noParens rhs]
+ppr_bind (IfTypeLetBndr b ki info, rhs)
+  = sep [hang (char '@' <> ppr b <+> dcolon <+> ppr ki) 2 (ppr info),
+         equals <+> pprIfaceExpr noParens rhs]
 
 ------------------
 pprIfaceTickish :: IfaceTickish -> SDoc
@@ -1883,6 +1893,10 @@ instance Outputable IfaceInfoItem where
   ppr HsNoCafRefs           = text "HasNoCafRefs"
   ppr (HsLFInfo lf_info)    = text "LambdaFormInfo:" <+> ppr lf_info
   ppr (HsTagSig tag_sig)    = text "TagSig:" <+> ppr tag_sig
+
+instance Outputable IfaceTyVarInfoItem where
+  ppr (HsTypeUnfold unf)    = text "Unfolding"
+                              <> colon <+> ppr unf
 
 instance Outputable IfaceUnfolding where
   ppr (IfCoreUnfold src _ guide e)
@@ -2120,6 +2134,8 @@ freeNamesIfLetBndr :: IfaceLetBndr -> NameSet
 -- local INLINE pragmas), so look there too
 freeNamesIfLetBndr (IfLetBndr _name ty info _ji) = freeNamesIfType ty
                                                  &&& freeNamesIfIdInfo info
+freeNamesIfLetBndr (IfTypeLetBndr _name ki info) = freeNamesIfKind ki
+                                                 &&& freeNamesIfTyVarInfo info
 
 freeNamesIfTvBndr :: IfaceTvBndr -> NameSet
 freeNamesIfTvBndr (_fs,k) = freeNamesIfKind k
@@ -2131,10 +2147,16 @@ freeNamesIfIdBndr (_, _fs,k) = freeNamesIfKind k
 freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
 freeNamesIfIdInfo = fnList freeNamesItem
 
+freeNamesIfTyVarInfo :: IfaceTyVarInfo -> NameSet
+freeNamesIfTyVarInfo = fnList freeNamesTyVarItem
+
 freeNamesItem :: IfaceInfoItem -> NameSet
 freeNamesItem (HsUnfold _ u)         = freeNamesIfUnfold u
 freeNamesItem (HsLFInfo (IfLFCon n)) = unitNameSet n
 freeNamesItem _                      = emptyNameSet
+
+freeNamesTyVarItem :: IfaceTyVarInfoItem -> NameSet
+freeNamesTyVarItem (HsTypeUnfold u) = freeNamesIfType u
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
 freeNamesIfUnfold (IfCoreUnfold _ _ _ e) = freeNamesIfExpr e
@@ -2720,6 +2742,15 @@ instance Binary IfaceInfoItem where
             7 -> HsLFInfo <$> get bh
             _ -> HsTagSig <$> get bh
 
+instance Binary IfaceTyVarInfoItem where
+    put_ bh (HsTypeUnfold ad) = putByte bh 0 >> put_ bh ad
+
+    get :: BinHandle -> IO IfaceTyVarInfoItem
+    get bh = do
+        h <- getByte bh
+        case h of
+          _ -> HsTypeUnfold <$> get bh
+
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s c g e) = do
         putByte bh 0
@@ -2971,15 +3002,31 @@ instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
 
 instance Binary IfaceLetBndr where
     put_ bh (IfLetBndr a b c d) = do
+            putByte bh 0
             put_ bh a
             put_ bh b
             put_ bh c
             put_ bh d
-    get bh = do a <- get bh
-                b <- get bh
-                c <- get bh
-                d <- get bh
-                return (IfLetBndr a b c d)
+
+    put_ bh (IfTypeLetBndr a b c) = do
+            putByte bh 1
+            put_ bh a
+            put_ bh b
+            put_ bh c
+    get bh = do
+                h <- getByte bh
+                case h of
+                    0 -> do
+                      a <- get bh
+                      b <- get bh
+                      c <- get bh
+                      d <- get bh
+                      return (IfLetBndr a b c d)
+                    _ -> do
+                      a <- get bh
+                      b <- get bh
+                      c <- get bh
+                      return (IfTypeLetBndr a b c)
 
 instance Binary IfaceTopBndrInfo where
     put_ bh (IfLclTopBndr lcl ty info dets) = do
@@ -3144,6 +3191,10 @@ instance NFData IfaceInfoItem where
     HsLFInfo lf_info -> rnf lf_info `seq` ()
     HsTagSig sig -> seqTagSig sig `seq` ()
 
+instance NFData IfaceTyVarInfoItem where
+  rnf = \case
+    HsTypeUnfold unf -> rnf unf
+
 instance NFData IfGuidance where
   rnf = \case
     IfNoGuidance -> ()
@@ -3191,6 +3242,8 @@ instance NFData IfaceMaybeRhs where
 instance NFData IfaceLetBndr where
   rnf (IfLetBndr nm ty id_info join_info) =
     rnf nm `seq` rnf ty `seq` rnf id_info `seq` rnf join_info
+  rnf (IfTypeLetBndr nm ki tv_info) =
+    rnf nm `seq` rnf ki `seq` rnf tv_info
 
 instance NFData IfaceFamTyConFlav where
   rnf = \case
