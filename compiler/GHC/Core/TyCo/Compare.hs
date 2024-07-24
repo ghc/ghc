@@ -184,6 +184,13 @@ Currently-missed opportunity (#25009):
 
   But since forgetful synonyms are rare, we have not tried this.
 
+Note [Comparing type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As coreView also expands let-bound type variables (c.f. Note [Type and coercion lets]
+in GHC.Core) into their unfolding, we want the same short-cutting behaviour for
+type /variables/ as for type /synonyms/; see Note [Comparing type synonyms].
+After all, type variables are similar in nature to nullary type synonyms.
+
 Note [Type comparisons using object pointer comparisons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Quite often we substitute the type from a definition site into
@@ -370,6 +377,12 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
       (TyConApp tc1 tys1, TyConApp tc2 tys2)
         | tc1 == tc2, not (isForgetfulSynTyCon tc1)   -- See Note [Comparing type synonyms]
         -> gos tys1 tys2
+
+      (TyVarTy tv1, TyVarTy tv2)                      -- See Note [Comparing type variables]
+        | case mb_env of
+              Nothing  -> tv1 == tv2
+              Just env -> rnOccL env tv1 == rnOccR env tv2
+        -> True
 
       _ | ExpandSynonyms <- syn_flag, Just t1' <- coreView t1 -> go t1' t2
         | ExpandSynonyms <- syn_flag, Just t2' <- coreView t2 -> go t1 t2'
@@ -689,6 +702,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     go _   (TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
       = TEQ    -- See Note [Comparing type synonyms]
+    go _   (TyVarTy tv1) (TyVarTy tv2)
+      | rnOccL env tv1 == rnOccR env tv2
+      = TEQ    -- See Note [Comparing type variables]
 
     go env t1 t2
       | Just t1' <- coreView t1 = go env t1' t2
