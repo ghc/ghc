@@ -297,7 +297,7 @@ dmdAnalBind
                                --   where the binding is in scope
   -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBind top_lvl env dmd bind anal_body = case bind of
-  NonRec var rhs
+  NonRec var _rhs
     | isTyVar var
     -> dmdAnalBindLetDown top_lvl env dmd bind anal_body
   NonRec id rhs
