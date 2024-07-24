@@ -455,6 +455,7 @@ simple_bind_type :: SimpleOptEnv
                  -> InTyVar
                  -> (SimpleOptEnv, InType)
                  -> (SimpleOptEnv, Maybe (OutTyVar, OutType))
+-- See Note [Type and coercion lets]
 simple_bind_type env@(SOE { soe_subst = subst })
                  in_bndr (rhs_env, in_ty)
   | occurs_once || typeIsSmallEnoughToInline out_ty

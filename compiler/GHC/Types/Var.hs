@@ -259,7 +259,7 @@ data Var
                                        -- cached here for speed
         varType      :: Kind,          -- ^ The type or kind of the 'Var' in question
         tv_unfolding :: Maybe Type,    -- ^ The type to which the variable is bound to,
-                                       -- if any.
+                                       -- if any, see Note [Type and coercion lets] in GHC.Core
         tv_occ_info  :: OccInfo
  }
 

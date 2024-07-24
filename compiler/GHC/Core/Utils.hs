@@ -2664,8 +2664,9 @@ isJoinBind (NonRec b _)       = isJoinId b
 isJoinBind (Rec ((b, _) : _)) = isJoinId b
 isJoinBind _                  = False
 
--- | Does this binding bind a join point (or a recursive group of join points)?
+-- | Does this binding bind a type?
 isTypeBind :: CoreBind -> Bool
+-- See Note [Type and coercion lets] in GHC.Core
 isTypeBind (NonRec b (Type _)) = isTyVar b
 isTypeBind _                   = False
 

@@ -364,6 +364,7 @@ import GHC.Data.Maybe   ( orElse, isJust, firstJust )
 -}
 
 unfoldView :: Type -> Maybe Type
+-- Look through type variables, see Note [Type and coercion lets] in GHC.Core
 {-# INLINE unfoldView #-}
 unfoldView (TyVarTy tv) = tyVarUnfolding tv
 unfoldView _ = Nothing
@@ -392,7 +393,7 @@ coreView :: Type -> Maybe Type
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView (TyConApp tc tys) = expandSynTyConApp_maybe tc tys
-coreView (TyVarTy tv)      = tyVarUnfolding tv
+coreView (TyVarTy tv)      = tyVarUnfolding tv  -- c.f. unfoldView
 coreView _                 = Nothing
 -- See Note [Inlining coreView].
 {-# INLINE coreView #-}
@@ -405,6 +406,7 @@ coreFullView, core_full_view :: Type -> Type
 coreFullView ty@(TyConApp tc _)
   | isTypeSynonymTyCon tc = core_full_view ty
 coreFullView (TyVarTy tv)
+  -- c.f. unfoldView
   | Just ty <- tyVarUnfolding tv = core_full_view ty
 coreFullView ty = ty
 {-# INLINE coreFullView #-}

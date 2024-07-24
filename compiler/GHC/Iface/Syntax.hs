@@ -659,11 +659,14 @@ data IfaceBindingX r b
   | IfaceRec    [(b, r)]
   deriving (Functor, Foldable, Traversable, Ord, Eq)
 
--- IfaceLetBndr is like IfaceIdBndr, but has IdInfo too
+-- IfaceLetBndr is like IfaceIdBndr, but has additional information too
 -- It's used for *non-top-level* let/rec binders
--- See Note [IdInfo on nested let-bindings]
-data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo JoinPointHood
-                  | IfTypeLetBndr IfLclName IfaceKind IfaceTyVarInfo
+data IfaceLetBndr
+  -- See Note [IdInfo on nested let-bindings]
+  = IfLetBndr IfLclName IfaceType IfaceIdInfo JoinPointHood
+
+  -- See Note [Type and coercion lets]
+  | IfTypeLetBndr IfLclName IfaceKind IfaceTyVarInfo
 
 data IfaceTopBndrInfo = IfLclTopBndr IfLclName IfaceType IfaceIdInfo IfaceIdDetails
                       | IfGblTopBndr IfaceTopBndr
