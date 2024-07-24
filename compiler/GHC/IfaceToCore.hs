@@ -1592,6 +1592,22 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
         ; return (Let (NonRec id rhs') body') }
 
+tcIfaceExpr (IfaceLet (IfaceNonRec (IfTypeLetBndr fs ki info) rhs) body)
+  = case rhs of
+      IfaceType ty ->
+        do  { name    <- newIfaceName (mkVarOccFS fs)
+            ; ki'     <- tcIfaceType ki
+            ; mb_unf  <- extract_unf info
+            ; let tv | Just unf <- mb_unf = mkTyVarWithUnfolding name ki' unf
+                     | otherwise          = mkTyVar name ki'
+            ; ty' <- tcIfaceType ty
+            ; body' <- extendIfaceTyVarEnv [tv] (tcIfaceExpr body)
+            ; return (Let (NonRec tv (Type ty')) body') }
+      _ -> pprPanic "tcIfaceExpr:IfaceTypeLet" (ppr rhs)
+  where
+    extract_unf [] = return Nothing
+    extract_unf (HsTypeUnfold unf : _) = Just <$> tcIfaceType unf
+
 tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
   = do { ids <- mapM tc_rec_bndr (map fst pairs)
        ; extendIfaceIdEnv ids $ do
@@ -1603,11 +1619,16 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
           ; return (mkLocalId name ManyTy ty' `asJoinId_maybe` ji) }
+   tc_rec_bndr (IfTypeLetBndr fs ki _)
+     = pprPanic "tcIfaceExpr" (char '@' <> ppr fs <+> dcolon <+> ppr ki)
+
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                                 NotTopLevel (idName id) (idType id) info
           ; return (setIdInfo id id_info, rhs') }
+   tc_pair (IfTypeLetBndr fs ki _, ty) tv
+     = pprPanic "tcIfaceExpr" (char '@' <> ppr fs <+> dcolon <+> ppr ki $$ ppr ty $$ ppr tv)
 
 tcIfaceExpr (IfaceTick tickish expr) = do
     expr' <- tcIfaceExpr expr

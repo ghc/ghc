@@ -432,7 +432,15 @@ toIfaceBang _   (HsStrict _)         = IfStrict
 toIfaceSrcBang :: HsSrcBang -> IfaceSrcBang
 toIfaceSrcBang (HsSrcBang _ unpk bang) = IfSrcBang unpk bang
 
-toIfaceLetBndr :: Id -> IfaceLetBndr
+toIfaceLetBndr :: Var -> IfaceLetBndr
+toIfaceLetBndr tv
+  | isTyVar tv = IfTypeLetBndr (occNameFS (getOccName (tyVarName tv)))
+                               (toIfaceKind (tyVarKind tv))
+                               info
+  where
+    info | Just unf <- tyVarUnfolding tv = [HsTypeUnfold (toIfaceType unf)]
+         | otherwise                     = []
+
 toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
                                (toIfaceType (idType id))
                                (toIfaceIdInfo (idInfo id))
