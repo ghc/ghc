@@ -357,6 +357,11 @@ simple_app env e@(Lam {}) as@(_:_)
     n_args = length as
 
     do_beta env (Lam b body) (a:as)
+      | (t_env, Type t) <- a
+      , (env'', mb_tpr) <- simple_bind_type env b (t_env, t)
+      = assert (isTyVar b) $
+        wrapTypeLet mb_tpr $ do_beta env'' body as
+
       | -- simpl binder before looking at its type
         -- See Note [Dark corner with representation polymorphism]
         needsCaseBinding (idType b') (snd a)
@@ -414,6 +419,14 @@ finish_app env fun args
 ----------------------
 simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe OutBind)
+simple_opt_bind env (NonRec b r) _top_level
+  | Type t <- r
+  = assert (isTyVar b) $
+    let (env', mb_pr) = simple_bind_type env b (env, t)
+    in (env', case mb_pr of
+               Nothing     -> Nothing
+               Just (b, r) -> Just (NonRec b (Type r)))
+
 simple_opt_bind env (NonRec b r) top_level
   = (env', case mb_pr of
             Nothing    -> Nothing
@@ -468,15 +481,8 @@ simple_bind_pair :: SimpleOptEnv
 simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
                  top_level
-  | Type in_ty <- in_rhs        -- let a::* = TYPE ty in <body>
-  = let
-      (env', mb_out_bind_type) = simple_bind_type env in_bndr mb_out_bndr (rhs_env, in_ty)
-    in
-      case mb_out_bind_type of
-        Just (out_bndr, out_ty)
-          | isAtomicTy out_ty -> (env' { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
-          | otherwise         -> (env', Just (out_bndr, Type out_ty))
-        Nothing -> (env', Nothing)
+  | Type in_ty <- in_rhs
+  = pprPanic "simple_bind_pair" (ppr in_bndr $$ ppr in_ty)
 
   | Coercion co <- in_rhs
   , let out_co = optCoercion (so_co_opts (soe_opts env)) (soe_subst rhs_env) co
@@ -800,6 +806,10 @@ add_info env old_bndr top_level new_rhs new_bndr
 wrapLet :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
 wrapLet Nothing      body = body
 wrapLet (Just (b,r)) body = Let (NonRec b r) body
+
+wrapTypeLet :: Maybe (TyVar,Type) -> CoreExpr -> CoreExpr
+wrapTypeLet Nothing      body = body
+wrapTypeLet (Just (b,t)) body = Let (NonRec b (Type t)) body
 
 {-
 Note [Inline prag in simplOpt]
