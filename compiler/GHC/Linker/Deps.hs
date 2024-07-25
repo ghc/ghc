@@ -217,9 +217,8 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
           Just lnk -> adjust_linkable lnk
 
       LinkByteCodeModule iface wcb -> do
-        details <- initModDetails (ldHscEnv opts) iface
         t <- getCurrentTime
-        initWholeCoreBindings (ldHscEnv opts) iface details $ LM t (mi_module iface) [CoreBindings wcb]
+        initWholeCoreBindingsEps (ldHscEnv opts) iface $ LM t (mi_module iface) [CoreBindings wcb]
 
     -- See Note [Using Byte Code rather than Object Code for Template Haskell]
     homeModLinkable :: HomeModInfo -> Maybe Linkable
