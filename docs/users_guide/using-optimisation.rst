@@ -664,10 +664,11 @@ as such you shouldn't need to set any of them explicitly. A flag
     :category:
 
     :default: off
+    :since: 9.10.1
 
     The type-class specialiser and call-pattern specialisation both
     generate so-called "auto" RULES.  These rules are usually exposed
-    to importing modules in the interface file. But an auto rule is the
+    to importing modules in the interface file. But when an auto rule is the
     sole reason for keeping a function alive, both the rule and the function
     are discarded, by default. That reduces code bloat, but risks the same
     function being specialised again in an importing module.
