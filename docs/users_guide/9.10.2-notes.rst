@@ -64,6 +64,10 @@ Compiler
 - Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
   on certain programs. (#24941)
 
+- The flag :ghc-flag:`-fkeep-auto-rules` that forces GHC to keep auto generated
+  specialization rules was added. It was actually added ghc-9.10.1 already but
+  mistakenly not mentioned in the 9.10.1 changelog.
+
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
 
