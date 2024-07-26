@@ -470,23 +470,6 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
       new_code = concatMap insert_stack_insn code
     return (CmmProc info lbl live (ListGraph new_code), retargetList)
 
--- -----------------------------------------------------------------------------
--- Machine's assembly language
-
--- We have a few common "instructions" (nearly all the pseudo-ops) but
--- mostly all of 'Instr' is machine-specific.
-
--- RV64 reference card: https://cs61c.org/sp23/pdfs/resources/reference-card.pdf
--- RV64 pseudo instructions: https://github.com/riscv-non-isa/riscv-asm-manual/blob/master/riscv-asm.md#-a-listing-of-standard-risc-v-pseudoinstructions
--- We will target: RV64G(C). That is G = I+A+F+S+D
--- I: Integer Multiplication and Division
--- A: Atomic Instructions
--- F: Single Precision
--- D: Double Precision
--- C: Compressed (though we won't use that).
-
--- This most notably leaves out B. (Bit Manipulation) instructions.
-
 data Instr
     -- | Comment pseudo-op
     = COMMENT SDoc
@@ -592,7 +575,6 @@ data Instr
     --
     -- @if(o2 cond o3) op <- 1 else op <- 0@
     | CSET Operand Operand Operand Cond
-
     -- | A jump instruction with data for switch/jump tables
     | J_TBL [Maybe BlockId] (Maybe CLabel) Reg
     -- | Unconditional jump (no linking)
