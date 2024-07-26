@@ -268,12 +268,15 @@ pprDataImm p (ImmConstantSum a b) = pprDataImm p a <> char '+' <> pprDataImm p b
 pprDataImm p (ImmConstantDiff a b) = pprDataImm p a <> char '-'
                    <> lparen <> pprDataImm p b <> rparen
 
+-- | Comment @c@ with @# c@
 asmComment :: SDoc -> SDoc
 asmComment c = text "#" <+> c
 
+-- | Commen @c@ with @// c@
 asmDoubleslashComment :: SDoc -> SDoc
 asmDoubleslashComment c = text "//" <+> c
 
+-- | Comment @c@ with @/* c */@ (multiline comment)
 asmMultilineComment :: SDoc -> SDoc
 asmMultilineComment c =  text "/*" $+$ c $+$ text "*/"
 
@@ -290,11 +293,15 @@ pprOpImm platform im = case im of
   ImmCLbl l -> char '=' <> pprAsmLabel platform l
   _ -> pprPanic "RV64.Ppr.pprOpImm" (text "Unsupported immediate for instruction operands" <> colon <+> (text . show) im)
 
+-- | Negate integer immediate operand
+--
+-- This function is partial and will panic if the operand is not an integer.
 negOp :: Operand -> Operand
 negOp (OpImm (ImmInt i)) = OpImm (ImmInt (negate i))
 negOp (OpImm (ImmInteger i)) = OpImm (ImmInteger (negate i))
 negOp op = pprPanic "RV64.negOp" (text $ show op)
 
+-- | Pretty print an operand
 pprOp :: IsLine doc => Platform -> Operand -> doc
 pprOp plat op = case op of
   OpReg w r           -> pprReg w r
@@ -302,6 +309,10 @@ pprOp plat op = case op of
   OpAddr (AddrRegImm r1 im) -> pprOpImm plat im <> char '(' <> pprReg W64 r1 <> char ')'
   OpAddr (AddrReg r1)       -> text "0(" <+> pprReg W64 r1 <+> char ')'
 
+-- | Pretty print register with calling convention name
+--
+-- This representation makes it easier to reason about the emitted assembly
+-- code.
 pprReg :: forall doc. IsLine doc => Width -> Reg -> doc
 pprReg w r = case r of
   RegReal    (RealRegSingle i) -> ppr_reg_no i
@@ -414,6 +425,9 @@ isLabel :: Target -> Bool
 isLabel (TBlock _) = True
 isLabel _ = False
 
+-- | Get the pretty-printed label from a `Target`
+--
+-- This function is partial and will panic if the `Target` is not a label.
 getLabel :: (IsLine doc) => Platform -> Target -> doc
 getLabel platform (TBlock bid) = pprBlockId platform bid
   where
@@ -421,9 +435,12 @@ getLabel platform (TBlock bid) = pprBlockId platform bid
     pprBlockId platform bid = pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
 getLabel _platform _other = panic "Cannot turn this into a label"
 
+-- | Pretty-print an `Instr`
+--
+-- This function is partial and will panic if the `Instr` is not supported. This
+-- can happen due to invalid operands or unexpected meta instructions.
 pprInstr :: IsDoc doc => Platform -> Instr -> doc
 pprInstr platform instr = case instr of
-  -- Meta Instructions ---------------------------------------------------------
   -- see Note [dualLine and dualDoc] in GHC.Utils.Outputable
   COMMENT s  -> dualDoc (asmComment s) empty
   MULTILINE_COMMENT s -> dualDoc (asmMultilineComment s) empty
@@ -435,8 +452,6 @@ pprInstr platform instr = case instr of
   NEWBLOCK _ -> panic "PprInstr: NEWBLOCK"
   LDATA _ _  -> panic "pprInstr: LDATA"
 
-  -- Pseudo Instructions -------------------------------------------------------
-
   PUSH_STACK_FRAME -> lines_ [ text "\taddi sp, sp, -16"
                              , text "\tsd x1, 8(sp)"     -- store RA
                              , text "\tsd x8, 0(sp)"     -- store FP/s0
@@ -445,9 +460,7 @@ pprInstr platform instr = case instr of
   POP_STACK_FRAME -> lines_  [ text "\tld x8, 0(sp)" -- restore FP/s0
                              , text "\tld x1, 8(sp)" -- restore RA
                              , text "\taddi sp, sp, 16" ]
-  -- ===========================================================================
-  -- AArch64 Instruction Set
-  -- 1. Arithmetic Instructions ------------------------------------------------
+ 
   ADD  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfadd." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     -- This case is used for sign extension: SEXT.W op
@@ -474,10 +487,6 @@ pprInstr platform instr = case instr of
     | isImmOp o3 -> op3 (text "\taddi") o1 o2 (negOp o3)
     | otherwise -> op3 (text "\tsub")  o1 o2 o3
   DIVU o1 o2 o3 -> op3 (text "\tdivu") o1 o2 o3
-
-  -- 2. Bit Manipulation Instructions ------------------------------------------
-
-  -- 3. Logical and Move Instructions ------------------------------------------
   AND o1 o2 o3 | isImmOp o3 -> op3 (text "\tandi") o1 o2 o3
                | otherwise  -> op3 (text "\tand") o1 o2 o3
   OR o1 o2 o3   -> op3 (text "\tor") o1 o2 o3
@@ -516,7 +525,6 @@ pprInstr platform instr = case instr of
   ORI o1 o2 o3  -> op3 (text "\tori") o1 o2 o3
   XORI o1 o2 o3 -> op3 (text "\txori") o1 o2 o3
 
-  -- 4. Branch Instructions ----------------------------------------------------
   J_TBL _ _ r     -> pprInstr platform (B (TReg r))
   B l | isLabel l -> line $ text "\tjal" <+> pprOp platform x0 <> comma <+> getLabel platform l
   B (TReg r)      -> line $ text "\tjalr" <+> pprOp platform x0 <> comma <+> pprReg W64 r <> comma <+> text "0"
@@ -528,8 +536,6 @@ pprInstr platform instr = case instr of
 
   BCOND _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
 
-  -- 5. Atomic Instructions ----------------------------------------------------
-  -- 6. Conditional Instructions -----------------------------------------------
   CSET o l r c  -> case c of
     EQ | isIntOp l && isIntOp r -> lines_ [ subFor l r
                   , text "\tseqz" <+> pprOp platform o <> comma <+> pprOp platform o]
@@ -568,10 +574,6 @@ pprInstr platform instr = case instr of
       binOp :: (IsLine doc) => String -> doc
       binOp op = text op <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
 
-  -- 7. Load and Store Instructions --------------------------------------------
-  -- NOTE: GHC may do whacky things where it only load the lower part of an
-  --       address. Not observing the correct size when loading will lead
-  --       inevitably to crashes.
   STR II8  o1 o2 -> op2 (text "\tsb") o1 o2
   STR II16 o1 o2 -> op2 (text "\tsh") o1 o2
   STR II32 o1 o2 -> op2 (text "\tsw") o1 o2
@@ -585,14 +587,6 @@ pprInstr platform instr = case instr of
            ]
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) ->
-    -- fixing this is _really_ annoyin we need to generate code like:
-    -- 1: auipc x16, %pcrel_hi(<lbl>)
-    --    addi x16, x16, %pcrel_lo(1b)
-    -- I really dislike this (refer back to label 1 syntax from the assembler.)
-    --
-    -- So we'll go with pseudo ops. la and li it is.
-    -- op_adrp o1 (text "%pcrel_hi(" <> pprAsmLabel platform lbl <> text ")") $$
-    -- op_add o1 (text "%pcrel_lo(" <> pprAsmLabel platform lbl <> text ")")
     line $ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl
 
   LDR II8  o1 o2 -> op2 (text "\tlb") o1 o2
@@ -613,10 +607,8 @@ pprInstr platform instr = case instr of
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
 
-  -- 8. Synchronization Instructions -------------------------------------------
   FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
 
-  -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
   FCVT o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.s") o1 o2
   FCVT o1 o2 -> pprPanic "RV64.pprInstr - impossible float conversion" $
@@ -661,6 +653,10 @@ floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingle
 floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isDoubleOp l && isDoubleOp r = "d" -- double precision
 floatOpPrecision p l r = pprPanic "Cannot determine floating point precission" (text "op1" <+> pprOp p l <+> text "op2" <+> pprOp p r)
 
+-- | Pretty print a conditional branch
+--
+-- This function is partial and will panic if the conditional is not supported;
+-- i.e. if its floating point related.
 pprBcond :: (IsLine doc) => Cond -> doc
 pprBcond c = text "b" <> pprCond c
   where

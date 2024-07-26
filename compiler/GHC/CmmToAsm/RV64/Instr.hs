@@ -70,15 +70,12 @@ instance Outputable RegUsage where
 -- RegUsage = RU [<read regs>] [<write regs>]
 regUsageOfInstr :: Platform -> Instr -> RegUsage
 regUsageOfInstr platform instr = case instr of
-  -- 0. Meta Instructions
   ANN _ i                  -> regUsageOfInstr platform i
   COMMENT{}                -> usage ([], [])
   MULTILINE_COMMENT{}      -> usage ([], [])
   PUSH_STACK_FRAME         -> usage ([], [])
   POP_STACK_FRAME          -> usage ([], [])
   DELTA{}                  -> usage ([], [])
-
-  -- 1. Arithmetic Instructions ------------------------------------------------
   ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   NEG dst src              -> usage (regOp src, regOp dst)
@@ -88,9 +85,6 @@ regUsageOfInstr platform instr = case instr of
   REMU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   SUB dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   DIVU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-
-  -- 2. Bit Manipulation Instructions ------------------------------------------
-  -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   OR dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -101,24 +95,15 @@ regUsageOfInstr platform instr = case instr of
   -- ORI's third operand is always an immediate
   ORI dst src1 _           -> usage (regOp src1, regOp dst)
   XORI dst src1 _          -> usage (regOp src1, regOp dst)
-  -- 4. Branch Instructions ----------------------------------------------------
   J_TBL _ _ t              -> usage ([t], [])
   B t                      -> usage (regTarget t, [])
   BCOND _ l r t            -> usage (regTarget t ++ regOp l ++ regOp r, [])
   BL t ps                  -> usage (t : ps, callerSavedRegisters)
-
-  -- 5. Atomic Instructions ----------------------------------------------------
-  -- 6. Conditional Instructions -----------------------------------------------
   CSET dst l r _           -> usage (regOp l ++ regOp r, regOp dst)
-  -- 7. Load and Store Instructions --------------------------------------------
   STR _ src dst            -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
   LDRU _ dst src           -> usage (regOp src, regOp dst)
-
-  -- 8. Synchronization Instructions -------------------------------------------
   FENCE _ _                  -> usage ([], [])
-
-  -- 9. Floating Point Instructions --------------------------------------------
   FCVT dst src             -> usage (regOp src, regOp dst)
   SCVTF dst src            -> usage (regOp src, regOp dst)
   FCVTZS dst src           -> usage (regOp src, regOp dst)
@@ -127,7 +112,6 @@ regUsageOfInstr platform instr = case instr of
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
 
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
-
   where
         -- filtering the usage is necessary, otherwise the register
         -- allocator will try to allocate pre-defined fixed stg
@@ -169,14 +153,12 @@ callerSavedRegisters =
 -- | Apply a given mapping to all the register references in this instruction.
 patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 patchRegsOfInstr instr env = case instr of
-    -- 0. Meta Instructions
     ANN d i             -> ANN d (patchRegsOfInstr i env)
     COMMENT{}           -> instr
     MULTILINE_COMMENT{} -> instr
     PUSH_STACK_FRAME    -> instr
     POP_STACK_FRAME     -> instr
     DELTA{}             -> instr
-    -- 1. Arithmetic Instructions ----------------------------------------------
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
     MUL o1 o2 o3   -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
     NEG o1 o2      -> NEG (patchOp o1) (patchOp o2)
@@ -186,10 +168,6 @@ patchRegsOfInstr instr env = case instr of
     REMU o1 o2 o3  -> REMU (patchOp o1) (patchOp o2) (patchOp o3)
     SUB o1 o2 o3   -> SUB  (patchOp o1) (patchOp o2) (patchOp o3)
     DIVU o1 o2 o3  -> DIVU (patchOp o1) (patchOp o2) (patchOp o3)
-
-    -- 2. Bit Manipulation Instructions ----------------------------------------
-
-    -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
     OR o1 o2 o3    -> OR   (patchOp o1) (patchOp o2) (patchOp o3)
     ASR o1 o2 o3   -> ASR  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -200,26 +178,15 @@ patchRegsOfInstr instr env = case instr of
     -- o3 cannot be a register for ORI (always an immediate)
     ORI o1 o2 o3   -> ORI  (patchOp o1) (patchOp o2) (patchOp o3)
     XORI o1 o2 o3  -> XORI  (patchOp o1) (patchOp o2) (patchOp o3)
-
-    -- 4. Branch Instructions --------------------------------------------------
     J_TBL ids mbLbl t    -> J_TBL ids mbLbl (env t)
     B t            -> B (patchTarget t)
     BL t ps          -> BL (patchReg t) ps
     BCOND c o1 o2 t -> BCOND c (patchOp o1) (patchOp o2) (patchTarget t)
-
-    -- 5. Atomic Instructions --------------------------------------------------
-    -- 6. Conditional Instructions ---------------------------------------------
     CSET o l r c   -> CSET (patchOp o) (patchOp l) (patchOp r) c
-    -- 7. Load and Store Instructions ------------------------------------------
     STR f o1 o2    -> STR f (patchOp o1) (patchOp o2)
-    -- STLR f o1 o2   -> STLR f (patchOp o1) (patchOp o2)
     LDR f o1 o2    -> LDR f (patchOp o1) (patchOp o2)
     LDRU f o1 o2    -> LDRU f (patchOp o1) (patchOp o2)
-
-    -- 8. Synchronization Instructions -----------------------------------------
     FENCE o1 o2    -> FENCE o1 o2
-
-    -- 9. Floating Point Instructions ------------------------------------------
     FCVT o1 o2     -> FCVT (patchOp o1) (patchOp o2)
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
@@ -243,8 +210,6 @@ patchRegsOfInstr instr env = case instr of
 
         patchReg :: Reg -> Reg
         patchReg = env
-
---------------------------------------------------------------------------------
 
 -- | Checks whether this instruction is a jump/branch instruction.
 --
