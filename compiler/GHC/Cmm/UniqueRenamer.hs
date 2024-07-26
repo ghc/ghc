@@ -129,12 +129,6 @@ detRenameId i
   | isExternalName (varName i) = return i
   | otherwise = setIdUnique i <$> renameDetUniq (getUnique i)
 
--- | We want to rename uniques in Names, but ONLY internal ones.
-detRenameName :: Name -> DetRnM Name
-detRenameName n
-  | isExternalName n = return n
-  | otherwise = setNameUnique n <$> renameDetUniq (getUnique n)
-
 --------------------------------------------------------------------------------
 -- Traversals
 --------------------------------------------------------------------------------
@@ -176,18 +170,10 @@ instance UniqRenamable CmmStatics where
 
 instance UniqRenamable CmmInfoTable where
   uniqRename CmmInfoTable{cit_lbl, cit_rep, cit_prof, cit_srt, cit_clo}
-    = CmmInfoTable <$> uniqRename cit_lbl <*> pure cit_rep <*> cit_prof' <*> uniqRename cit_srt <*> cit_clo'
-      where
-        cit_prof' =
-          case cit_prof of
-            NoProfilingInfo -> pure NoProfilingInfo
-            ClosureProfilingInfo mod id -> ClosureProfilingInfo mod <$> detRenameId id
-            DataProfilingInfo dtycname dcname -> DataProfilingInfo <$> detRenameName dtycname <*> detRenameName dcname
-            ParsedProfilingInfo s1 s2 -> pure $ ParsedProfilingInfo s1 s2
-        cit_clo' =
-          case cit_clo of
+      = CmmInfoTable <$> uniqRename cit_lbl <*> pure cit_rep <*> pure cit_prof <*> uniqRename cit_srt <*>
+         (case cit_clo of
             Nothing -> pure Nothing
-            Just (an_id, ccs) -> Just . (,ccs) <$> detRenameId an_id
+            Just (an_id, ccs) -> Just . (,ccs) <$> detRenameId an_id)
 
 instance UniqRenamable Section where
   uniqRename (Section ty lbl) = Section ty <$> uniqRename lbl
