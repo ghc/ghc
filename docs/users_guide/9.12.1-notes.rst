@@ -131,6 +131,10 @@ GHCi
 - Fix a bug where GHCi would not start alongside a local file called ``Prelude.hs``
   or ``Prelude.lhs`` (:ghc-ticket:`10920`).
 
+- Structured errors were added to GHCi and assigned error codes, analogous to GHCs
+  diagnostics. This change will not be backwards compatible by tools that parse the error
+  messages that GHCi emits (:ghc-ticket:`23338`).
+
 
 Runtime system
 ~~~~~~~~~~~~~~

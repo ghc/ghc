@@ -50,6 +50,8 @@ import           GHC.Types.SrcLoc
 import           GHC.Types.Var
 import qualified GHC.Data.Strict as Strict
 
+import           GHCi.UI.Exception
+
 -- | Info about a module. This information is generated every time a
 -- module is loaded.
 data ModInfo = ModInfo
@@ -114,23 +116,19 @@ findLoc :: GhcMonad m
         => Map ModuleName ModInfo
         -> RealSrcSpan
         -> String
-        -> ExceptT SDoc m (ModInfo,Name,SrcSpan)
+        -> ExceptT GhciModuleError m (ModInfo,Name,SrcSpan)
 findLoc infos span0 string = do
-    name  <- maybeToExceptT "Couldn't guess that module name. Does it exist?" $
+    name  <- maybeToExceptT GhciNoModuleNameGuess $
              guessModule infos (srcSpanFilePath span0)
 
-    info  <- maybeToExceptT "No module info for current file! Try loading it?" $
+    info  <- maybeToExceptT GhciNoModuleInfoForCurrentFile $
              MaybeT $ pure $ M.lookup name infos
 
     name' <- findName infos span0 info string
 
     case getSrcSpan name' of
-        UnhelpfulSpan{} -> do
-            throwE ("Found a name, but no location information." <+>
-                    "The module is:" <+>
-                    maybe "<unknown>" (ppr . moduleName)
-                          (nameModule_maybe name'))
-
+        UnhelpfulSpan{} -> throwE $ GhciNoLocationInfoForModule
+          (maybe (ModuleName "<unknown>") moduleName (nameModule_maybe name'))
         span' -> return (info,name',span')
 
 -- | Find any uses of the given identifier in the codebase.
@@ -138,7 +136,7 @@ findNameUses :: (GhcMonad m)
              => Map ModuleName ModInfo
              -> RealSrcSpan
              -> String
-             -> ExceptT SDoc m [SrcSpan]
+             -> ExceptT GhciModuleError m [SrcSpan]
 findNameUses infos span0 string =
     locToSpans <$> findLoc infos span0 string
   where
@@ -166,7 +164,7 @@ findName :: GhcMonad m
          -> RealSrcSpan
          -> ModInfo
          -> String
-         -> ExceptT SDoc m Name
+         -> ExceptT GhciModuleError m Name
 findName infos span0 mi string =
     case resolveName (modinfoSpans mi) (spanInfoFromRealSrcSpan' span0) of
       Nothing -> tryExternalModuleResolution
@@ -178,7 +176,7 @@ findName infos span0 mi string =
     rdrs = modInfo_rdrs mi
     tryExternalModuleResolution =
       case find (matchName $ mkFastString string) rdrs of
-        Nothing -> throwE "Couldn't resolve to any modules."
+        Nothing -> throwE GhciNoResolvedModules
         Just imported -> resolveNameFromModule infos imported
 
     matchName :: FastString -> Name -> Bool
@@ -190,18 +188,11 @@ findName infos span0 mi string =
 resolveNameFromModule :: GhcMonad m
                       => Map ModuleName ModInfo
                       -> Name
-                      -> ExceptT SDoc m Name
+                      -> ExceptT GhciModuleError m Name
 resolveNameFromModule infos name = do
-     modL <- maybe (throwE $ "No module for" <+> ppr name) return $
-             nameModule_maybe name
-
-     info <- maybe (throwE (ppr (moduleUnit modL) <> ":" <>
-                            ppr modL)) return $
-             M.lookup (moduleName modL) infos
-
+     info <- maybe (throwE $ GhciNoModuleForName name) pure (nameModule_maybe name >>= \modL -> M.lookup (moduleName modL) infos)
      let all_names = modInfo_rdrs info
-
-     maybe (throwE "No matching export in any local modules.") return $
+     maybe (throwE GhciNoMatchingModuleExport) pure $
          find (matchName name) all_names
   where
     matchName :: Name -> Name -> Bool
@@ -218,12 +209,12 @@ findType :: GhcMonad m
          => Map ModuleName ModInfo
          -> RealSrcSpan
          -> String
-         -> ExceptT SDoc m (ModInfo, Type)
+         -> ExceptT GhciModuleError m (ModInfo, Type)
 findType infos span0 string = do
-    name  <- maybeToExceptT "Couldn't guess that module name. Does it exist?" $
+    name  <- maybeToExceptT GhciNoModuleNameGuess $
              guessModule infos (srcSpanFilePath span0)
 
-    info  <- maybeToExceptT "No module info for current file! Try loading it?" $
+    info  <- maybeToExceptT GhciNoModuleInfoForCurrentFile $
              MaybeT $ pure $ M.lookup name infos
 
     case resolveType (modinfoSpans info) (spanInfoFromRealSrcSpan' span0) of

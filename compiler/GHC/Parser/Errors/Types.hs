@@ -69,7 +69,7 @@ data PsMessage
         arbitrary messages to be embedded. The typical use case would be GHC plugins
         willing to emit custom diagnostics.
     -}
-    PsUnknownMessage (UnknownDiagnostic (DiagnosticOpts PsMessage))
+    PsUnknownMessage (UnknownDiagnosticFor PsMessage)
 
     {-| A group of parser messages emitted in 'GHC.Parser.Header'.
         See Note [Messages from GHC.Parser.Header].

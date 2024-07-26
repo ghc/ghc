@@ -27,7 +27,7 @@ import GHC.HsToCore.Pmc.Ppr
 instance Diagnostic DsMessage where
   type DiagnosticOpts DsMessage = NoDiagnosticOpts
   diagnosticMessage opts = \case
-    DsUnknownMessage (UnknownDiagnostic f m)
+    DsUnknownMessage (UnknownDiagnostic f _ m)
       -> diagnosticMessage (f opts) m
     DsEmptyEnumeration
       -> mkSimpleDecorated $ text "Enumeration is empty"

@@ -1,2 +1,4 @@
-macro name cannot start with a colon
+<interactive>: error: [GHCi-64996]
+    Macro ‘:abc’ cannot start with a colon
+
 1
