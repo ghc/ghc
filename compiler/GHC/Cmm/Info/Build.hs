@@ -613,7 +613,6 @@ cafLattice = DataflowLattice Set.empty add
         let !new' = old `Set.union` new
         in changedIf (Set.size new' > Set.size old) new'
 
-
 cafTransfers :: Platform -> LabelSet -> Label -> CLabel -> TransferFun CAFSet
 cafTransfers platform contLbls entry topLbl
   block@(BlockCC eNode middle xNode) fBase =

@@ -644,7 +644,6 @@ releaseRegs regs = do
          _                    -> loop (delFromUFM assig r) free rs
   loop assig free regs
 
-
 -- -----------------------------------------------------------------------------
 -- Clobber real registers
 

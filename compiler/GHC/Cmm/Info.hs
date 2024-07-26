@@ -54,6 +54,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Unique.DSM
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
 import Data.IORef
 
 -- When we split at proc points, we need an empty info table.
@@ -420,11 +421,12 @@ mkStdInfoTable profile (type_descr, closure_descr) cl_type srt layout_lit
 -------------------------------------------------------------------------
 
 mkProfLits :: Platform -> ProfilingInfo -> UniqDSM ((CmmLit,CmmLit), [RawCmmDecl])
-mkProfLits platform NoProfilingInfo = return ((zeroCLit platform, zeroCLit platform), [])
-mkProfLits _ (ProfilingInfo td cd)
-  = do { (td_lit, td_decl) <- newStringLit td
-       ; (cd_lit, cd_decl) <- newStringLit cd
-       ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
+mkProfLits platform profInfo = case renderProfInfo profInfo of
+  Nothing -> return ((zeroCLit platform, zeroCLit platform), [])
+  Just (td, cd)
+    -> do { (td_lit, td_decl) <- newStringLit (BS8.pack td)
+          ; (cd_lit, cd_decl) <- newStringLit (BS8.pack cd)
+          ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
 
 newStringLit :: ByteString -> UniqDSM (CmmLit, GenCmmDecl RawCmmStatics info stmt)
 newStringLit bytes

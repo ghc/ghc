@@ -1328,7 +1328,7 @@ reserveStackFrame psize preg body = do
 profilingInfo profile desc_str ty_str
   = if not (profileIsProfiling profile)
     then NoProfilingInfo
-    else ProfilingInfo (BS8.pack desc_str) (BS8.pack ty_str)
+    else ParsedProfilingInfo desc_str ty_str
 
 staticClosure :: UnitId -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload

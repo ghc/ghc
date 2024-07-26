@@ -35,7 +35,7 @@ module GHC.Cmm (
      , CmmTopInfo
      , CmmStackInfo(..), CmmInfoTable(..), topInfoTable, topInfoTableD,
      ClosureTypeInfo(..),
-     ProfilingInfo(..), ConstrDescription,
+     ProfilingInfo(..), renderProfInfo, ConstrDescription,
 
      -- * Statements, expressions and types
      module GHC.Cmm.Node,
@@ -46,8 +46,13 @@ module GHC.Cmm (
   ) where
 
 import GHC.Prelude
+import GHC.Utils.Panic (pprPanic)
 
 import GHC.Platform
+import GHC.Core.TyCo.Rep
+import GHC.Tc.Utils.TcType (tcSplitSigmaTy)
+import GHC.Unit.Types (Module)
+import GHC.Types.Name (Name, pprFullName, getOccString)
 import GHC.Types.Id
 import GHC.Types.CostCentre
 import GHC.Cmm.CLabel
@@ -63,7 +68,6 @@ import GHC.Utils.Outputable
 import Data.Void (Void)
 import Data.List (intersperse)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 
 -----------------------------------------------------------------------------
 --  Cmm, GenCmm
@@ -259,10 +263,73 @@ data CmmInfoTable
 instance OutputableP Platform CmmInfoTable where
     pdoc = pprInfoTable
 
+-----------------------------------------------------------------------------
+--              Profiling
+-----------------------------------------------------------------------------
+
 data ProfilingInfo
   = NoProfilingInfo
-  | ProfilingInfo ByteString ByteString -- closure_type, closure_desc
+  | ClosureProfilingInfo Module Id -- this_module, closure_id
+  | DataProfilingInfo Name Name -- datacon_tycon_name, datacon_name
+  | ParsedProfilingInfo String String
+  -- ^ Construct profiling info directly with the description and type strings (as in Cmm.Parser)
+  -- Note that if these strings leak non-deterministic uniques those will
+  -- ultimately leak into the object files regardless of the renaming pass.
+  -- In the parser they are stable since they're parsed directly as strings.
   deriving (Eq, Ord)
+
+-- | Render the profiling information as strings from a 'ProfilingInfo':
+-- the first string is the type and the second is the description.
+renderProfInfo :: ProfilingInfo -> Maybe (String {- type -}, String {- description -})
+renderProfInfo NoProfilingInfo = Nothing
+renderProfInfo (ClosureProfilingInfo mod_name id) = Just (ty_descr, val_descr)
+  where
+    ty_descr  = getTyDescription (idType id)
+    val_descr = closureDescription mod_name (idName id)
+renderProfInfo (DataProfilingInfo datacon_tycon_name datacon_name) = Just (ty_descr, val_descr)
+  where
+   ty_descr  = getOccString datacon_tycon_name
+   val_descr = getOccString datacon_name
+renderProfInfo (ParsedProfilingInfo ty_descr val_descr) = Just (ty_descr, val_descr)
+
+-- For "global" data constructors the description is simply occurrence
+-- name of the data constructor itself.  Otherwise it is determined by
+-- @closureDescription@ from the let binding information.
+
+closureDescription
+   :: Module            -- Module
+   -> Name              -- Id of closure binding
+   -> String
+        -- Not called for StgRhsCon which have global info tables built in
+        -- CgConTbls.hs with a description generated from the data constructor
+closureDescription mod_name name
+  = showSDocOneLine defaultSDocContext
+    (char '<' <> pprFullName mod_name name <> char '>')
+
+getTyDescription :: Type -> String
+getTyDescription ty
+  = case (tcSplitSigmaTy ty) of { (_, _, tau_ty) ->
+    case tau_ty of
+      TyVarTy _              -> "*"
+      AppTy fun _            -> getTyDescription fun
+      TyConApp tycon _       -> getOccString tycon
+      FunTy {}              -> '-' : fun_result tau_ty
+      ForAllTy _  ty         -> getTyDescription ty
+      LitTy n                -> getTyLitDescription n
+      CastTy ty _            -> getTyDescription ty
+      CoercionTy co          -> pprPanic "getTyDescription" (ppr co)
+    }
+  where
+    fun_result (FunTy { ft_res = res }) = '>' : fun_result res
+    fun_result other                    = getTyDescription other
+
+getTyLitDescription :: TyLit -> String
+getTyLitDescription l =
+  case l of
+    NumTyLit n -> show n
+    StrTyLit n -> show n
+    CharTyLit n -> show n
+
 -----------------------------------------------------------------------------
 --              Static Data
 -----------------------------------------------------------------------------
@@ -476,11 +543,11 @@ pprInfoTable platform (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_srt = srt })
   = vcat [ text "label: " <> pdoc platform lbl
          , text "rep: " <> ppr rep
-         , case prof_info of
-             NoProfilingInfo -> empty
-             ProfilingInfo ct cd ->
-               vcat [ text "type: " <> text (show (BS.unpack ct))
-                    , text "desc: " <> text (show (BS.unpack cd)) ]
+         , case renderProfInfo prof_info of
+             Nothing -> empty
+             Just (ct, cd) ->
+               vcat [ text "type: " <> text (show ct)
+                    , text "desc: " <> text (show cd) ]
          , text "srt: " <> pdoc platform srt ]
 
 -- --------------------------------------------------------------------------

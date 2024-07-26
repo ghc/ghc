@@ -78,6 +78,7 @@ import GHC.Cmm.Utils
 import GHC.StgToCmm.Types
 import GHC.StgToCmm.Sequel
 
+import GHC.Unit.Types (Module)
 import GHC.Types.CostCentre
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -86,8 +87,6 @@ import GHC.Types.Id.Info
 import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep
-import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Types.RepType
 import GHC.Types.Basic
@@ -96,7 +95,6 @@ import GHC.Utils.Panic
 import GHC.Data.Maybe (isNothing)
 
 import Data.Coerce (coerce)
-import qualified Data.ByteString.Char8 as BS8
 import GHC.StgToCmm.Config
 import GHC.Stg.InferTags.TagSig (isTaggedSig)
 
@@ -701,9 +699,9 @@ mkClosureInfo :: Profile
               -> Id
               -> LambdaFormInfo
               -> Int -> Int        -- Total and pointer words
-              -> String         -- String descriptor
+              -> Module
               -> ClosureInfo
-mkClosureInfo profile is_static id lf_info tot_wds ptr_wds val_descr
+mkClosureInfo profile is_static id lf_info tot_wds ptr_wds mod_name
   = ClosureInfo { closureName      = id
                 , closureLFInfo    = lf_info
                 , closureInfoLabel = info_lbl   -- These three fields are
@@ -711,7 +709,7 @@ mkClosureInfo profile is_static id lf_info tot_wds ptr_wds val_descr
                 , closureProf      = prof }     -- (we don't have an SRT yet)
   where
     sm_rep     = mkHeapRep profile is_static ptr_wds nonptr_wds (lfClosureType lf_info)
-    prof       = mkProfilingInfo profile id val_descr
+    prof       = mkProfilingInfo profile mod_name id
     nonptr_wds = tot_wds - ptr_wds
 
     info_lbl = mkClosureInfoTableLabel (profilePlatform profile) id lf_info
@@ -909,46 +907,24 @@ enterIdLabel platform id c
 --------------------------------------
 --   Profiling
 --------------------------------------
-
+--
 -- Profiling requires two pieces of information to be determined for
 -- each closure's info table --- description and type.
-
--- The description is stored directly in the @CClosureInfoTable@ when the
+--
+-- This information can be constructed from the current module and an Id.
+-- We store the latter two in @ProfilingInfo@ and construct the information
+-- with @renderProfInfo@ in GHC.Cmm.
+--
+-- The description is stored directly in the @ClosureInfoTable@ when the
 -- info table is built.
-
+--
 -- The type is determined from the type information stored with the @Id@
 -- in the closure info using @closureTypeDescr@.
 
-mkProfilingInfo :: Profile -> Id -> String -> ProfilingInfo
-mkProfilingInfo profile id val_descr
+mkProfilingInfo :: Profile -> Module -> Id -> ProfilingInfo
+mkProfilingInfo profile mod_name id
   | not (profileIsProfiling profile) = NoProfilingInfo
-  | otherwise                        = ProfilingInfo ty_descr_w8 (BS8.pack val_descr)
-  where
-    ty_descr_w8  = BS8.pack (getTyDescription (idType id))
-
-getTyDescription :: Type -> String
-getTyDescription ty
-  = case (tcSplitSigmaTy ty) of { (_, _, tau_ty) ->
-    case tau_ty of
-      TyVarTy _              -> "*"
-      AppTy fun _            -> getTyDescription fun
-      TyConApp tycon _       -> getOccString tycon
-      FunTy {}              -> '-' : fun_result tau_ty
-      ForAllTy _  ty         -> getTyDescription ty
-      LitTy n                -> getTyLitDescription n
-      CastTy ty _            -> getTyDescription ty
-      CoercionTy co          -> pprPanic "getTyDescription" (ppr co)
-    }
-  where
-    fun_result (FunTy { ft_res = res }) = '>' : fun_result res
-    fun_result other                    = getTyDescription other
-
-getTyLitDescription :: TyLit -> String
-getTyLitDescription l =
-  case l of
-    NumTyLit n -> show n
-    StrTyLit n -> show n
-    CharTyLit n -> show n
+  | otherwise                        = ClosureProfilingInfo mod_name id
 
 --------------------------------------
 --   CmmInfoTable-related things
@@ -970,10 +946,10 @@ mkDataConInfoTable profile data_con mn is_static ptr_wds nonptr_wds
                   -- of the info table of a data constructor.
 
    prof | not (profileIsProfiling profile) = NoProfilingInfo
-        | otherwise                        = ProfilingInfo ty_descr val_descr
+        | otherwise                        = DataProfilingInfo datacon_tycon_name datacon_name
 
-   ty_descr  = BS8.pack $ occNameString $ getOccName $ dataConTyCon data_con
-   val_descr = BS8.pack $ occNameString $ getOccName data_con
+   datacon_tycon_name = getName $ dataConTyCon data_con
+   datacon_name       = getName data_con
 
 -- We need a black-hole closure info to pass to @allocDynClosure@ when we
 -- want to allocate the black hole on entry to a CAF.
