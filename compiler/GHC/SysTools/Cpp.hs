@@ -203,11 +203,17 @@ generateMacros prefix name version =
 -- | Find out path to @ghcversion.h@ file
 getGhcVersionPathName :: DynFlags -> UnitEnv -> IO FilePath
 getGhcVersionPathName dflags unit_env = do
-  candidates <- case ghcVersionFile dflags of
-    Just path -> return [path]
-    Nothing -> do
-        ps <- mayThrowUnitErr (preloadUnitsInfo' unit_env [rtsUnitId])
-        return ((</> "ghcversion.h") <$> collectIncludeDirs ps)
+  let candidates = case ghcVersionFile dflags of
+        -- the user has provided an explicit `ghcversion.h` file to use.
+        Just path -> [path]
+        -- otherwise, try to find it in the rts' include-dirs.
+        -- Note: only in the RTS include-dirs! not all preload units less we may
+        -- use a wrong file. See #25106 where a globally installed
+        -- /usr/include/ghcversion.h file was used instead of the one provided
+        -- by the rts.
+        Nothing -> case lookupUnitId (ue_units unit_env) rtsUnitId of
+          Nothing   -> []
+          Just info -> (</> "ghcversion.h") <$> collectIncludeDirs [info]
 
   found <- filterM doesFileExist candidates
   case found of
