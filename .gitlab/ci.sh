@@ -705,6 +705,12 @@ function cabal_abi_test() {
   if [ -z "$OUT" ]; then
     fail "OUT not set"
   fi
+  if [ -z "$REVERSE_UNIQUES" ]; then
+    EXTRA_OPTS=""
+  else
+    # Count uniques in reverse one of the runs to get more non-determinism exposed
+    EXTRA_OPTS="-dinitial-unique=16777215 -dunique-increment=-1"
+  fi
 
   cp -r libraries/Cabal $DIR
   pushd $DIR
@@ -715,6 +721,8 @@ function cabal_abi_test() {
   run "$HC" \
     -hidir tmp -odir tmp -fforce-recomp -haddock \
     -iCabal/Cabal/src -XNoPolyKinds Distribution.Simple -j"$cores" \
+    -fobject-determinism \
+    $EXTRA_OPTS \
     "$@" 2>&1 | tee $OUT/log
   summarise_hi_files
   summarise_o_files
@@ -788,6 +796,8 @@ function check_objects(){
         fail "Mismatched object: $dump"
       fi
     done
+
+    fail "Some objects are mismatched, but theres no diff with --all-headers or --disassemble-all. Perhaps try objdump -s"
   fi
 
 }
@@ -802,7 +812,7 @@ function run_abi_test() {
   fi
   mkdir -p out
   OUT="$PWD/out/run1" DIR=$(mktemp -d XXXX-looooooooong) cabal_abi_test -O0
-  OUT="$PWD/out/run2" DIR=$(mktemp -d XXXX-short) cabal_abi_test -O0
+  OUT="$PWD/out/run2" DIR=$(mktemp -d XXXX-short) REVERSE_UNIQUES="yes" cabal_abi_test -O0
   check_interfaces out/run1 out/run2 abis "Mismatched ABI hash"
   check_interfaces out/run1 out/run2 interfaces "Mismatched interface hashes"
   check_objects out/run1 out/run2
