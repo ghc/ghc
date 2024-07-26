@@ -1592,9 +1592,9 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
         -- atomic_thread_fence(memory_order_acquire);
         -- atomic_thread_fence(memory_order_release);
         -- atomic_thread_fence(memory_order_seq_cst);
-        MO_AcquireFence -> pure (unitOL (DMBSY DmbRead DmbReadWrite))
-        MO_ReleaseFence -> pure (unitOL (DMBSY DmbReadWrite DmbWrite))
-        MO_SeqCstFence -> pure (unitOL (DMBSY DmbReadWrite DmbReadWrite))
+        MO_AcquireFence -> pure (unitOL (FENCE FenceRead FenceReadWrite))
+        MO_ReleaseFence -> pure (unitOL (FENCE FenceReadWrite FenceWrite))
+        MO_SeqCstFence -> pure (unitOL (FENCE FenceReadWrite FenceReadWrite))
 
         MO_Touch            -> pure nilOL -- Keep variables live (when using interior pointers)
         -- Prefetch
@@ -1638,12 +1638,12 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
                       MemOrderRelaxed -> unitOL $ ann moDescr (LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p))
                       MemOrderAcquire -> toOL [
                                                 ann moDescr (LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)),
-                                                DMBSY DmbRead DmbReadWrite
+                                                FENCE FenceRead FenceReadWrite
                                               ]
                       MemOrderSeqCst -> toOL [
-                                                ann moDescr (DMBSY DmbReadWrite DmbReadWrite),
+                                                ann moDescr (FENCE FenceReadWrite FenceReadWrite),
                                                 LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p),
-                                                DMBSY DmbRead DmbReadWrite
+                                                FENCE FenceRead FenceReadWrite
                                               ]
                       MemOrderRelease -> panic $ "Unexpected MemOrderRelease on an AtomicRead: " ++ show mo
                   dst = getRegisterReg platform (CmmLocal dst_reg)
@@ -1663,12 +1663,12 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
               let instrs = case ord of
                       MemOrderRelaxed -> unitOL $ ann moDescr (STR fmt_val (OpReg w val) (OpAddr $ AddrReg p))
                       MemOrderSeqCst  -> toOL [
-                                                ann moDescr (DMBSY DmbReadWrite DmbWrite),
+                                                ann moDescr (FENCE FenceReadWrite FenceWrite),
                                                 STR fmt_val (OpReg w val) (OpAddr $ AddrReg p),
-                                                DMBSY DmbReadWrite DmbReadWrite
+                                                FENCE FenceReadWrite FenceReadWrite
                                               ]
                       MemOrderRelease -> toOL [
-                                                ann moDescr (DMBSY DmbReadWrite DmbWrite),
+                                                ann moDescr (FENCE FenceReadWrite FenceWrite),
                                                 STR fmt_val (OpReg w val) (OpAddr $ AddrReg p)
                                               ]
                       MemOrderAcquire ->  panic $ "Unexpected MemOrderAcquire on an AtomicWrite" ++ show mo
@@ -1925,7 +1925,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       STR {} -> 1
       LDR {} -> 3
       LDRU {} -> 1
-      DMBSY {} -> 1
+      FENCE {} -> 1
       FCVT {} -> 1
       SCVTF {} -> 1
       FCVTZS {} -> 1

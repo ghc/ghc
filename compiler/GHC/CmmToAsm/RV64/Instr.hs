@@ -116,7 +116,7 @@ regUsageOfInstr platform instr = case instr of
   LDRU _ dst src           -> usage (regOp src, regOp dst)
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBSY _ _                  -> usage ([], [])
+  FENCE _ _                  -> usage ([], [])
 
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT dst src             -> usage (regOp src, regOp dst)
@@ -217,7 +217,7 @@ patchRegsOfInstr instr env = case instr of
     LDRU f o1 o2    -> LDRU f (patchOp o1) (patchOp o2)
 
     -- 8. Synchronization Instructions -----------------------------------------
-    DMBSY o1 o2    -> DMBSY o1 o2
+    FENCE o1 o2    -> FENCE o1 o2
 
     -- 9. Floating Point Instructions ------------------------------------------
     FCVT o1 o2     -> FCVT (patchOp o1) (patchOp o2)
@@ -586,7 +586,7 @@ data Instr
     -- | Fence instruction
     --
     -- Memory barrier.
-    | DMBSY DmbType DmbType
+    | FENCE FenceType FenceType
     -- | Floating point ConVerT
     | FCVT Operand Operand
     -- | Signed floating point ConVerT
@@ -604,8 +604,8 @@ data Instr
     -- - fnmadd: d = - r1 * r2 - r3
     | FMA FMASign Operand Operand Operand Operand
 
--- TODO: Rename to FenceType
-data DmbType = DmbRead | DmbWrite | DmbReadWrite
+-- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
+data FenceType = FenceRead | FenceWrite | FenceReadWrite
 
 instrCon :: Instr -> String
 instrCon i =
@@ -645,7 +645,7 @@ instrCon i =
       B{} -> "B"
       BL{} -> "BL"
       BCOND{} -> "BCOND"
-      DMBSY{} -> "DMBSY"
+      FENCE{} -> "FENCE"
       FCVT{} -> "FCVT"
       SCVTF{} -> "SCVTF"
       FCVTZS{} -> "FCVTZS"

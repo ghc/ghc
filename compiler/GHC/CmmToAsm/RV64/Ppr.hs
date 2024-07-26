@@ -614,7 +614,7 @@ pprInstr platform instr = case instr of
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBSY r w -> line $ text "\tfence" <+> pprDmbType r <> char ',' <+> pprDmbType w
+  FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
 
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
@@ -649,9 +649,9 @@ pprInstr platform instr = case instr of
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
        op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
-       pprDmbType DmbRead = text "r"
-       pprDmbType DmbWrite = text "w"
-       pprDmbType DmbReadWrite = text "rw"
+       pprFenceType FenceRead = text "r"
+       pprFenceType FenceWrite = text "w"
+       pprFenceType FenceReadWrite = text "rw"
        floatPrecission o | isSingleOp o = text "s"
                          | isDoubleOp o = text "d"
                          | otherwise  = pprPanic "Impossible floating point precission: " (pprOp platform o)
