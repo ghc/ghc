@@ -62,7 +62,7 @@ instance Diagnostic GhcMessage where
       -> diagnosticMessage (dsMessageOpts opts) m
     GhcDriverMessage m
       -> diagnosticMessage (driverMessageOpts opts) m
-    GhcUnknownMessage (UnknownDiagnostic f m)
+    GhcUnknownMessage (UnknownDiagnostic f _ m)
       -> diagnosticMessage (f opts) m
 
   diagnosticReason = \case
@@ -97,7 +97,7 @@ instance HasDefaultDiagnosticOpts DriverMessageOpts where
 instance Diagnostic DriverMessage where
   type DiagnosticOpts DriverMessage = DriverMessageOpts
   diagnosticMessage opts = \case
-    DriverUnknownMessage (UnknownDiagnostic f m)
+    DriverUnknownMessage (UnknownDiagnostic f _ m)
       -> diagnosticMessage (f opts) m
     DriverPsHeaderMessage m
       -> diagnosticMessage (psDiagnosticOpts opts) m

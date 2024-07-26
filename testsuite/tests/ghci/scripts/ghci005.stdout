@@ -1,9 +1,15 @@
 no macros defined
 the following macros are defined:
-echo
+  • echo
 hello, world!
 hello, world!
-macro 'echo' is already defined.  Use ':def!' to overwrite.
+<interactive>: error: [GHCi-93909]
+    Macro ‘echo’ is already defined
+    Suggested fix: Use ‘:def!’ to overwrite
+
 HELLO, WORLD!
 hello, world!
-macro 'f' is not defined
+<interactive>: error: [GHCi-40561] Macro ‘f’ is not defined
+
+<interactive>: error: [GHCi-40561] Macro ‘f’ is not defined
+
