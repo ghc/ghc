@@ -4,12 +4,15 @@
 
 if test -z "$1"
 then
-    echo "Usage: ./check.sh <HostOS> # example ./check.sh darwin"
+    echo "Usage: ./check.sh <ghc>"
     exit 1
 fi
 
+UNAME=$(uname)
+COMPILER="$1"
+
 # On darwin we need to pass -m to objdump on Mach-O files
-if test $1 == "darwin"
+if test $UNAME == "Darwin"
 then
     OBJDUMP="objdump -m"
 else
@@ -67,7 +70,7 @@ else
     OBJS=$(find . -type f)
     popd >/dev/null
 
-    compareHis "/home/matt/ghc-rodrigo/_build/stage1/bin/ghc" "$OBJS"
+    compareHis "$COMPILER" "$OBJS"
 
     exit 1
 
