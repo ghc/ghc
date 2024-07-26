@@ -70,7 +70,6 @@ import GHC.Driver.Env
 import GHC.Runtime.Context
 import GHC.Types.TyThing
 import GHC.Types.TyThing.Ppr
-import GHC.Tc.Utils.Monad
 import GHC.Core.TyCo.Ppr
 import GHC.Core.Type
 import GHC.Types.SafeHaskell ( getSafeMode )
@@ -1649,22 +1648,6 @@ normalize s = handleSourceError printGhciException $ do
     actArgs (_:xs) = actArgs xs
     trim = let f = reverse . dropWhile isSpace in f . f
 
-
--- TODO redefine all these using foldr and an accumulator
-buildNormSubst :: IfaceAppArgs -> [IfaceType] -> IfaceTySubst
-buildNormSubst args userArgs
-  = mkIfaceTySubst $ zip (freeVarsOfIfAppArgs args) userArgs
-  where
-    freeVarsOfIfAppArgs = freeVarsOfIfTypes . appArgsIfaceTypes
-    freeVarsOfIfTypes = concatMap freeVarsOfIfType
-    freeVarsOfIfType (IfaceTyVar l) = [l]
-    freeVarsOfIfType (IfaceTupleTy _ _ args) = freeVarsOfIfAppArgs args
-    freeVarsOfIfType (IfaceAppTy _ args) = freeVarsOfIfAppArgs args
-    freeVarsOfIfType (IfaceFunTy fun_flag _ arg res) = (freeVarsOfIfType arg) `union` (freeVarsOfIfType res)
-    freeVarsOfIfType (IfaceForAllTy bndr ty) = delete (ifForAllBndrName bndr) (freeVarsOfIfType ty)
-    freeVarsOfIfType _ = []
-
-lab :: GHC.GhcMonad m => String -> m SDoc
 lab str = do
   (ty,kind) <- GHC.typeKind True str
   case splitTyConApp_maybe ty of
@@ -1672,22 +1655,7 @@ lab str = do
     Just (head,args) -> do
       let ifaceArgs = map toIfaceType args
           iDecl = snd $ tyConToIfaceDecl emptyTidyEnv head
-      pure (enlightenUs iDecl)
-  where
-    enlightenUs decl
-      = vcat [pprIfaceDecl showToIface decl
-             ,nest 2 $ vcat [text "ifConArgTys:" <+> (nest 2 . vcat) (map (ppr . ifConArgTys) conDecls)
-             ,text "ifEqSpec:" <+> (nest 2 . vcat) (map (ppr . ifConEqSpec) conDecls)
-             ,text "ifConUserTvBinders:" <+> (nest 2 . vcat) (map (ppr . ifConUserTvBinders) conDecls)
-             ,text "ifConExTcvs:" <+> (nest 2 . vcat) (map (ppr . ifConExTCvs) conDecls)]
-             ,text "free variables:" <+> freeVarsOfIfType (retType (ifName ))
-             ,text "--------------------------"]
-      where
-        conDecls = (visibleIfConDecls . ifCons) decl
-        retType name binders = undefined
-
-        substIfaceConDecl :: GHC.GhcMonad m => m IfaceTySubst -> IfaceConDecl -> m IfaceConDecl
-        substIfaceConDecl = undefined
+      pure undefined
 
 -----------------------------------------------------------------------------
 -- :main
