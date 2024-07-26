@@ -1,20 +1,17 @@
 module GHC.CmmToAsm.RV64.Regs where
 
-import GHC.Prelude
+import GHC.Cmm
+import GHC.Cmm.CLabel (CLabel)
+import GHC.CmmToAsm.Format
 import GHC.Data.FastString
-
+import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
-import GHC.CmmToAsm.Format
-
-import GHC.Cmm
-import GHC.Cmm.CLabel           ( CLabel )
-import GHC.Types.Unique
-
 import GHC.Platform.Regs
+import GHC.Prelude
+import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Platform
 
 -- * Registers
 
@@ -95,8 +92,10 @@ fa7RegNo = d17RegNo
 zeroReg, raReg, spMachReg, ipReg :: Reg
 zeroReg = regSingle x0RegNo
 raReg = regSingle 1
+
 -- | Not to be confused with the `CmmReg` `spReg`
 spMachReg = regSingle 2
+
 ipReg = regSingle ipRegNo
 
 -- | All machine register numbers.
@@ -128,6 +127,7 @@ allFpArgRegs = map regSingle [fa0RegNo .. fa7RegNo]
 
 -- TODO: AddReg seems to be just a special case of AddrRegImm. Maybe we should
 -- replace it with AddrRegImm having an Imm of 0.
+
 -- | Addressing modes
 data AddrMode
   = -- | A register plus some integer, e.g. @8(sp)@ or @-16(sp)@. The offset
@@ -140,13 +140,13 @@ data AddrMode
 -- * Immediates
 
 data Imm
-  = ImmInt      Int
-  | ImmInteger  Integer     -- Sigh.
-  | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
-  | ImmLit      FastString
-  | ImmIndex    CLabel Int
-  | ImmFloat    Rational
-  | ImmDouble   Rational
+  = ImmInt Int
+  | ImmInteger Integer -- Sigh.
+  | ImmCLbl CLabel -- AbstractC Label (with baggage)
+  | ImmLit FastString
+  | ImmIndex CLabel Int
+  | ImmFloat Rational
+  | ImmDouble Rational
   | ImmConstantSum Imm Imm
   | ImmConstantDiff Imm Imm
   deriving (Eq, Show)
@@ -173,28 +173,26 @@ litToImm l = panic $ "RV64.Regs.litToImm: no match for " ++ show l
 -- == To satisfy GHC.CmmToAsm.Reg.Target =======================================
 
 -- squeese functions for the graph allocator -----------------------------------
+
 -- | regSqueeze_class reg
 --      Calculate the maximum number of register colors that could be
 --      denied to a node of this class due to having this reg
 --      as a neighbour.
---
 {-# INLINE virtualRegSqueeze #-}
 virtualRegSqueeze :: RegClass -> VirtualReg -> Int
-virtualRegSqueeze cls vr
- = case cls of
-        RcInteger
-         -> case vr of
-                VirtualRegI{}           -> 1
-                VirtualRegHi{}          -> 1
-                _other                  -> 0
-
-        RcDouble
-         -> case vr of
-                VirtualRegD{}           -> 1
-                VirtualRegF{}           -> 0
-                _other                  -> 0
-
+virtualRegSqueeze cls vr =
+  case cls of
+    RcInteger ->
+      case vr of
+        VirtualRegI {} -> 1
+        VirtualRegHi {} -> 1
         _other -> 0
+    RcDouble ->
+      case vr of
+        VirtualRegD {} -> 1
+        VirtualRegF {} -> 0
+        _other -> 0
+    _other -> 0
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> Int
@@ -214,12 +212,12 @@ realRegSqueeze cls rr =
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
-   | not (isFloatFormat format) = VirtualRegI u
-   | otherwise
-   = case format of
-        FF32    -> VirtualRegD u
-        FF64    -> VirtualRegD u
-        _       -> panic "RV64.mkVirtualReg"
+  | not (isFloatFormat format) = VirtualRegI u
+  | otherwise =
+      case format of
+        FF32 -> VirtualRegD u
+        FF64 -> VirtualRegD u
+        _ -> panic "RV64.mkVirtualReg"
 
 {-# INLINE classOfRealReg #-}
 classOfRealReg :: RealReg -> RegClass
@@ -228,8 +226,8 @@ classOfRealReg (RealRegSingle i)
   | otherwise = RcDouble
 
 regDotColor :: RealReg -> SDoc
-regDotColor reg
- = case classOfRealReg reg of
-        RcInteger       -> text "blue"
-        RcFloat         -> text "red"
-        RcDouble        -> text "green"
+regDotColor reg =
+  case classOfRealReg reg of
+    RcInteger -> text "blue"
+    RcFloat -> text "red"
+    RcDouble -> text "green"
