@@ -18,6 +18,7 @@ import GHC.Prelude hiding ((<*>))
 import GHC.Core          ( AltCon(..) )
 import GHC.Core.Opt.Arity( isOneShotBndr )
 import GHC.Runtime.Heap.Layout
+import GHC.Unit.Module
 
 import GHC.Stg.Syntax
 
@@ -52,6 +53,7 @@ import GHC.Stg.Utils
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Tickish ( tickishIsCode )
@@ -128,8 +130,10 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
 
   gen_code lf_info _closure_label
    = do { profile <- getProfile
+        ; let name = idName id
         ; mod_name <- getModuleName
-        ; let closure_info  = mkClosureInfo profile True id lf_info 0 0 mod_name
+        ; let descr         = closureDescription mod_name name
+              closure_info  = mkClosureInfo profile True id lf_info 0 0 descr
 
         -- We don't generate the static closure here, because we might
         -- want to add references to static closures to it later.  The
@@ -419,13 +423,15 @@ mkRhsClosure profile _use_ap _check_tags bndr cc fvs upd_flag args body
 
         -- MAKE CLOSURE INFO FOR THIS CLOSURE
         ; mod_name <- getModuleName
-        ; let   fv_details :: [(NonVoid Id, ByteOff)]
+        ; let   name  = idName bndr
+                descr = closureDescription mod_name name
+                fv_details :: [(NonVoid Id, ByteOff)]
                 header = if isLFThunk lf_info then ThunkHeader else StdHeader
                 (tot_wds, ptr_wds, fv_details)
                    = mkVirtHeapOffsets profile header (addIdReps reduced_fvs)
                 closure_info = mkClosureInfo profile False       -- Not static
                                              bndr lf_info tot_wds ptr_wds
-                                             mod_name
+                                             descr
 
         -- BUILD ITS INFO TABLE AND CODE
         ; forkClosureBody $
@@ -472,9 +478,10 @@ cgRhsStdThunk bndr lf_info payload
             = mkVirtHeapOffsets profile header
                 (addArgReps (nonVoidStgArgs payload))
 
+        descr = closureDescription mod_name (idName bndr)
         closure_info = mkClosureInfo profile False       -- Not static
                                      bndr lf_info tot_wds ptr_wds
-                                     mod_name
+                                     descr
 
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
   ; let use_cc = cccsExpr platform; blame_cc = cccsExpr platform
@@ -876,3 +883,20 @@ link_caf node = do
 
   ; return (CmmReg (CmmLocal bh)) }
 
+------------------------------------------------------------------------
+--              Profiling
+------------------------------------------------------------------------
+
+-- For "global" data constructors the description is simply occurrence
+-- name of the data constructor itself.  Otherwise it is determined by
+-- @closureDescription@ from the let binding information.
+
+closureDescription
+   :: Module            -- Module
+   -> Name              -- Id of closure binding
+   -> String
+        -- Not called for StgRhsCon which have global info tables built in
+        -- CgConTbls.hs with a description generated from the data constructor
+closureDescription mod_name name
+  = showSDocOneLine defaultSDocContext
+    (char '<' <> pprFullName mod_name name <> char '>')
