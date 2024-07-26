@@ -46,6 +46,7 @@ import GHC.ByteCode.Types
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
+import GHC.CoreToIface
 import GHC.Driver.Flags
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
@@ -69,13 +70,24 @@ import GHC.Driver.Env
 import GHC.Runtime.Context
 import GHC.Types.TyThing
 import GHC.Types.TyThing.Ppr
+import GHC.Tc.Utils.Monad
 import GHC.Core.TyCo.Ppr
+import GHC.Core.Type
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.SourceError ( SourceError )
 import GHC.Types.Name
 import GHC.Types.Breakpoint
 import GHC.Types.Var ( varType )
-import GHC.Iface.Syntax ( showToHeader )
+import GHC.Types.Var.Env ( emptyTidyEnv )
+import GHC.Iface.Syntax ( showToHeader, showToIface, pprIfaceDecl
+                        , IfaceDecl(..), IfaceEqSpec, IfaceConDecls(..)
+                        , IfaceConDecl(..), visibleIfConDecls, IfaceAppArgs
+                        , )
+import GHC.Iface.Decl ( tyConToIfaceDecl )
+import GHC.Iface.Type ( IfaceType (..), IfaceTySubst, mkIfaceTySubst
+                      , substIfaceTyVar, inDomIfaceTySubst
+                      , IfLclName (..), appArgsIfaceTypes
+                      , ifForAllBndrName )
 import GHC.Builtin.Names
 import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName, greName, globalRdrEnvElts)
@@ -126,7 +138,8 @@ import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( elemIndices, find, intercalate, intersperse, minimumBy,
-                   isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
+                   isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\),
+                   delete, union )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 import Data.Maybe
@@ -222,6 +235,7 @@ ghciCommands = map mkCmd [
   ("help",      keepGoingMulti help,                 noCompletion),
   ("history",   keepGoingMulti historyCmd,           noCompletion),
   ("info",      keepGoingMulti' (info False),        completeIdentifier),
+  ("normalize", keepGoingMulti' normalize,           completeIdentifier),
   ("info!",     keepGoingMulti' (info True),         completeIdentifier),
   ("issafe",    keepGoing' isSafeCmd,           completeModule),
   ("ignore",    keepGoing ignoreCmd,            noCompletion),
@@ -1612,6 +1626,68 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
   $$ showFixity thing fixity
   $$ vcat (map GHC.pprInstance cls_insts)
   $$ vcat (map GHC.pprFamInst  fam_insts)
+
+-----------------------------------------------------------------------------
+-- :normalize
+
+-- NOTE we could also call this :members or something like that.
+normalize :: GHC.GhcMonad m => String -> m ()
+nomralize "" = throwGhcException (CmdLineError "syntax ':n <(constructor arguments)>'")
+normalize s = handleSourceError printGhciException $ do
+  forM_ (map trim $ actArgs s) $ \str -> do
+    sdoc <- lab str
+    rendered <- showSDocForUser' sdoc
+    liftIO (putStrLn rendered)
+  where
+    actArgs [] = []    -- FIXME doesn't throw an error when there is no ending parenthesis
+    actArgs ('(':xs) =
+      let
+        (inside,rest) = break (== ')') xs
+        afterParen = if null rest then [] else tail rest
+      in
+        inside : actArgs afterParen
+    actArgs (_:xs) = actArgs xs
+    trim = let f = reverse . dropWhile isSpace in f . f
+
+
+-- TODO redefine all these using foldr and an accumulator
+buildNormSubst :: IfaceAppArgs -> [IfaceType] -> IfaceTySubst
+buildNormSubst args userArgs
+  = mkIfaceTySubst $ zip (freeVarsOfIfAppArgs args) userArgs
+  where
+    freeVarsOfIfAppArgs = freeVarsOfIfTypes . appArgsIfaceTypes
+    freeVarsOfIfTypes = concatMap freeVarsOfIfType
+    freeVarsOfIfType (IfaceTyVar l) = [l]
+    freeVarsOfIfType (IfaceTupleTy _ _ args) = freeVarsOfIfAppArgs args
+    freeVarsOfIfType (IfaceAppTy _ args) = freeVarsOfIfAppArgs args
+    freeVarsOfIfType (IfaceFunTy fun_flag _ arg res) = (freeVarsOfIfType arg) `union` (freeVarsOfIfType res)
+    freeVarsOfIfType (IfaceForAllTy bndr ty) = delete (ifForAllBndrName bndr) (freeVarsOfIfType ty)
+    freeVarsOfIfType _ = []
+
+lab :: GHC.GhcMonad m => String -> m SDoc
+lab str = do
+  (ty,kind) <- GHC.typeKind True str
+  case splitTyConApp_maybe ty of
+    Nothing -> throwGhcException (CmdLineError "Something Bad happend!")
+    Just (head,args) -> do
+      let ifaceArgs = map toIfaceType args
+          iDecl = snd $ tyConToIfaceDecl emptyTidyEnv head
+      pure (enlightenUs iDecl)
+  where
+    enlightenUs decl
+      = vcat [pprIfaceDecl showToIface decl
+             ,nest 2 $ vcat [text "ifConArgTys:" <+> (nest 2 . vcat) (map (ppr . ifConArgTys) conDecls)
+             ,text "ifEqSpec:" <+> (nest 2 . vcat) (map (ppr . ifConEqSpec) conDecls)
+             ,text "ifConUserTvBinders:" <+> (nest 2 . vcat) (map (ppr . ifConUserTvBinders) conDecls)
+             ,text "ifConExTcvs:" <+> (nest 2 . vcat) (map (ppr . ifConExTCvs) conDecls)]
+             ,text "free variables:" <+> freeVarsOfIfType (retType (ifName ))
+             ,text "--------------------------"]
+      where
+        conDecls = (visibleIfConDecls . ifCons) decl
+        retType name binders = undefined
+
+        substIfaceConDecl :: GHC.GhcMonad m => m IfaceTySubst -> IfaceConDecl -> m IfaceConDecl
+        substIfaceConDecl = undefined
 
 -----------------------------------------------------------------------------
 -- :main

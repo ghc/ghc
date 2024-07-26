@@ -14,6 +14,7 @@ module GHC.Iface.Decl
    ( coAxiomToIfaceDecl
    , tyThingToIfaceDecl -- Converting things to their Iface equivalents
    , toIfaceBooleanFormula
+   , tyConToIfaceDecl
    )
 where
 

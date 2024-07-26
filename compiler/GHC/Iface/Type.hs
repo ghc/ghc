@@ -26,6 +26,7 @@ module GHC.Iface.Type (
         IfaceForAllSpecBndr,
         IfaceForAllBndr, ForAllTyFlag(..), FunTyFlag(..), ShowForAllFlag(..),
         ShowSub(..), ShowHowMuch(..), AltPpr(..),
+        IfaceTySubst,
         mkIfaceForAllTvBndr,
         mkIfaceTyConKind,
         ifaceForAllSpecToBndrs, ifaceForAllSpecToBndr,
