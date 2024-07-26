@@ -464,7 +464,7 @@ pprInstr platform instr = case instr of
   -- TODO: This must (likely) be refined regarding width
     -> op3 (text "\tfdiv." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
   DIV o1 o2 o3 -> op3 (text "\tdiv") o1 o2 o3
-  REM o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
+  REM o1 o2 o3 | isFloatOp o1 || isFloatOp o2 || isFloatOp o3
     -> panic "pprInstr - REM not implemented for floats (yet)"
   REM o1 o2 o3 -> op3 (text "\trem") o1 o2 o3
   REMU o1 o2 o3 -> op3 (text "\tremu") o1 o2 o3
