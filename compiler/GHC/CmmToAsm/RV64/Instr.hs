@@ -488,118 +488,131 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 -- This most notably leaves out B. (Bit Manipulation) instructions.
 
 data Instr
-    -- 0. Pseudo Instructions --------------------------------------------------
-    -- comment pseudo-op
+    -- | Comment pseudo-op
     = COMMENT SDoc
+    -- | Multi-line comment pseudo-op
     | MULTILINE_COMMENT SDoc
-
-    -- Annotated instruction. Should print <instr> # <doc>
+    -- | Annotated instruction. Should print <instr> # <doc>
     | ANN SDoc Instr
-
-    -- location pseudo-op (file, line, col, name)
+    -- | Location pseudo-op @.loc@ (file, line, col, name)
     | LOCATION Int Int Int LexicalFastString
-
-    -- some static data spat out during code
-    -- generation.  Will be extracted before
-    -- pretty-printing.
+    -- | Static data spat out during code generation.
     | LDATA   Section RawCmmStatics
-
-    -- start a new basic block.  Useful during
-    -- codegen, removed later.  Preceding
-    -- instruction should be a jump, as per the
-    -- invariants for a BasicBlock (see Cmm).
+    -- | Start a new basic block.
+    --
+    -- Useful during codegen, removed later. Preceding instruction should be a
+    -- jump, as per the invariants for a BasicBlock (see Cmm).
     | NEWBLOCK BlockId
-
-    -- specify current stack offset for
-    -- benefit of subsequent passes
+    -- | Specify current stack offset for benefit of subsequent passes
     | DELTA   Int
-
+    -- | Push a minimal stack frame consisting of the return address (RA) and the frame pointer (FP).
     | PUSH_STACK_FRAME
+    -- | Pop the minimal stack frame of prior `PUSH_STACK_FRAME`.
     | POP_STACK_FRAME
-
-    -- == Base Instructions (I) ================================================
-    -- 1. Arithmetic Instructions ----------------------------------------------
-    -- all of these instructions can also take an immediate, in which case they
-    -- hafe a suffix I (except for U suffix, where it's IU then. E.g. SLTIU).
-    | ADD Operand Operand Operand -- rd = rs1 + rs2
-    | SUB Operand Operand Operand -- rd = rs1 - rs2
-
-    | AND Operand Operand Operand -- rd = rs1 & rs2
-    | OR  Operand Operand Operand -- rd = rs1 | rs2
-    -- | XOR Operand Operand Operand -- rd = rs1 ^ rs2
-    | LSL {- SLL -} Operand Operand Operand -- rd = rs1 << rs2 (zero ext)
-    | LSR {- SRL -} Operand Operand Operand -- rd = rs1 >> rs2 (zero ext)
-    | ASR {- SRA -} Operand Operand Operand -- rd = rs1 >> rs2 (sign ext)
-
-    -- 2. Memory Load/Store Instructions ---------------------------------------
-    -- Unlike arm, we don't have register shorthands for size.
-    -- We do however have {L,S}{B,H,W,D}[U] instructions for Load/Store, Byte, Half, Word, Double, (Unsigned).
-    -- Reusing the arm logic with the _format_ specifier will hopefully work.
-    | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
-    | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr (sign-extended)
-    | LDRU Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr (unsigned)
-
-    -- 3. Control Flow ---------------------------------------------------------
-    -- B{EQ,GE,GEU,LT,LTU}, these are effectively BCOND from AArch64;
-    -- however, AArch64 desugars them into CMP + BCOND. So these are a bit more
-    -- powerful.
-    -- JAL / JARL are effectively the BL instruction from AArch64.
-
-    | MUL Operand Operand Operand -- rd = rn × rm
-
-
-    -- Pseudo/synthesized:
-    | NEG Operand Operand -- rd = -op2
-
-    | DIV Operand Operand Operand -- rd = rn ÷ rm
-    | REM Operand Operand Operand -- rd = rn % rm (signed)
-    | REMU Operand Operand Operand -- rd = rn % rm (unsigned)
-
+    -- | Arithmetic addition (both integer and floating point)
+    --
+    -- @rd = rs1 + rs2@
+    | ADD Operand Operand Operand
+    -- | Arithmetic subtraction (both integer and floating point)
+    --
+    -- @rd = rs1 - rs2@
+    | SUB Operand Operand Operand
+    -- | Logical AND (integer only)
+    --
+    -- @rd = rs1 & rs2@
+    | AND Operand Operand Operand
+    -- | Logical OR (integer only)
+    --
+    -- @rd = rs1 | rs2@
+    | OR  Operand Operand Operand
+    -- | Logical left shift (zero extened, integer only)
+    --
+    -- @rd = rs1 << rs2@
+    | LSL {- SLL -} Operand Operand Operand
+    -- | Logical right shift (zero extened, integer only)
+    --
+    -- @rd = rs1 >> rs2@
+    | LSR {- SRL -} Operand Operand Operand
+    -- | Arithmetic right shift (sign-extened, integer only)
+    --
+    -- @rd = rs1 >> rs2@
+    | ASR {- SRA -} Operand Operand Operand
+    -- | Store to memory (both, integer and floating point)
+    | STR Format Operand Operand
+    -- | Load from memory (sign-extended, integer and floating point)
+    | LDR Format Operand Operand
+    -- | Load from memory (unsigned, integer and floating point)
+    | LDRU Format Operand Operand
+    -- | Arithmetic multiplication (both, integer and floating point)
+    --
+    -- @rd = rn × rm@
+    | MUL Operand Operand Operand
+    -- | Negation (both, integer and floating point)
+    --
+    -- @rd = -op2@
+    | NEG Operand Operand
+    -- | Division (both, integer and floating point)
+    --
+    -- @rd = rn ÷ rm@
+    | DIV Operand Operand Operand
+    -- | Remainder (integer only, signed)
+    --
+    -- @rd = rn % rm@
+    | REM Operand Operand Operand --
+    -- | Remainder (integer only, unsigned)
+    --
+    -- @rd = |rn % rm|@
+    | REMU Operand Operand Operand
     -- TODO: Rename: MULH
+    -- | High part of a multiplication that doesn't fit into 64bits (integer only)
+    --
+    -- E.g. for a multiplication with 64bits width: @rd = (rs1 * rs2) >> 64@.
     | SMULH Operand Operand Operand
-    | DIVU Operand Operand Operand -- rd = rn ÷ rm
-
-    -- 2. Bit Manipulation Instructions ----------------------------------------
-
-    -- 3. Logical and Move Instructions ----------------------------------------
-    -- | AND Operand Operand Operand -- rd = rn & op2
-    -- | ANDS Operand Operand Operand -- rd = rn & op2
-    -- | ASR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
-    | XOR Operand Operand Operand -- rd = rn ⊕ op2
-    -- | LSL Operand Operand Operand -- rd = rn ≪ rm  or rd = rn ≪ #i, i is 6 bits
-    -- | LSR Operand Operand Operand -- rd = rn ≫ rm  or rd = rn ≫ #i, i is 6 bits
-    | MOV Operand Operand -- rd = rn  or  rd = #i
-    | ORI Operand Operand Operand -- rd = rn | op2
-    | XORI Operand Operand Operand -- rd = rn `xor` imm
-    -- Load and stores.
-
-    -- Conditional instructions
-
+    -- | Unsigned division (integer only)
+    --
+    -- @rd = |rn ÷ rm|@
+    | DIVU Operand Operand Operand
+    -- | XOR (integer only)
+    --
+    -- @rd = rn ⊕ op2@
+    | XOR Operand Operand Operand
+    -- | ORI with immediate (integer only)
+    --
+    -- @rd = rn | op2@
+    | ORI Operand Operand Operand
+    -- | OR with immediate (integer only)
+    --
+    -- @rd = rn ⊕ op2@
+    | XORI Operand Operand Operand
+    -- | Move to register (integer and floating point)
+    --
+    -- @rd = rn@  or  @rd = #imm@
+    | MOV Operand Operand
     -- | Pseudo-op for conditional setting of a register.
     --
     -- @if(o2 cond o3) op <- 1 else op <- 0@
     | CSET Operand Operand Operand Cond
 
-    -- Branching.
     -- | A jump instruction with data for switch/jump tables
     | J_TBL [Maybe BlockId] (Maybe CLabel) Reg
     -- | Unconditional jump (no linking)
     | B Target
     -- | Unconditional jump, links return address (sets @ra@/@x1@)
     | BL Reg [Reg]
-    | BCOND Cond Operand Operand Target   -- branch with condition. b.<cond>
-    -- | pseudo-op for far branch targets
-
-    -- 8. Synchronization Instructions -----------------------------------------
+    -- | branch with condition (integer only)
+    | BCOND Cond Operand Operand Target
+    -- | Fence instruction
+    --
+    -- Memory barrier.
     | DMBSY DmbType DmbType
-    -- 9. Floating Point Instructions
-    -- | Float ConVerT
+    -- | Floating point ConVerT
     | FCVT Operand Operand
-    -- | Signed ConVerT Float
+    -- | Signed floating point ConVerT
     | SCVTF Operand Operand
-    -- | Float ConVerT to Zero Signed
+    -- TODO: Same as SCVTF?
+    -- | Floating point ConVerT to Zero Signed
     | FCVTZS Operand Operand
-    -- | Float ABSolute value
+    -- | Floating point ABSolute value
     | FABS Operand Operand
     -- | Floating-point fused multiply-add instructions
     --
@@ -609,6 +622,7 @@ data Instr
     -- - fnmadd: d = - r1 * r2 - r3
     | FMA FMASign Operand Operand Operand Operand
 
+-- TODO: Rename to FenceType
 data DmbType = DmbRead | DmbWrite | DmbReadWrite
 
 instrCon :: Instr -> String
