@@ -716,9 +716,9 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
 {-# SPECIALISE pprName :: Name -> SDoc #-}
 {-# SPECIALISE pprName :: Name -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
--- | Print fully qualified name (with unit-id, module and unique)
+-- | Print fully qualified name (with unit-id and module, but no unique)
 pprFullName :: Module -> Name -> SDoc
-pprFullName this_mod Name{n_sort = sort, n_uniq = uniq, n_occ = occ} =
+pprFullName this_mod Name{n_sort = sort, n_occ = occ} =
   let mod = case sort of
         WiredIn  m _ _ -> m
         External m     -> m
@@ -727,8 +727,6 @@ pprFullName this_mod Name{n_sort = sort, n_uniq = uniq, n_occ = occ} =
       in ftext (unitIdFS (moduleUnitId mod))
          <> colon    <> ftext (moduleNameFS $ moduleName mod)
          <> dot      <> ftext (occNameFS occ)
-         <> char '_' <> pprUniqueAlways uniq
-
 
 -- | Print a ticky ticky styled name
 --
