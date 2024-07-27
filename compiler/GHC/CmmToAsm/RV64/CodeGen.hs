@@ -535,7 +535,15 @@ getRegister' config plat expr =
               format = cmmTypeFormat rep
               width = typeWidth rep
           (off_r, _off_format, off_code) <- getSomeReg $ CmmLit (CmmInt (fromIntegral off) width)
-          return (Any format (\dst -> off_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op `snocOL` ADD (OpReg width dst) (OpReg width dst) (OpReg width off_r)))
+          return
+            ( Any
+                format
+                ( \dst ->
+                    off_code
+                      `snocOL` LDR format (OpReg (formatToWidth format) dst) op
+                      `snocOL` ADD (OpReg width dst) (OpReg width dst) (OpReg width off_r)
+                )
+            )
         CmmLabelDiffOff {} -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
@@ -547,7 +555,14 @@ getRegister' config plat expr =
         w
           | w <= W64 ->
               -- Load without sign-extension. See Note [Signed arithmetic on RISCV64]
-              pure (Any format (\dst -> addr_code `snocOL` LDRU format (OpReg width dst) (OpAddr addr)))
+              pure
+                ( Any
+                    format
+                    ( \dst ->
+                        addr_code
+                          `snocOL` LDRU format (OpReg width dst) (OpAddr addr)
+                    )
+                )
         _ ->
           pprPanic ("Width too big! Cannot load: " ++ show width) (pdoc plat expr)
     CmmStackSlot _ _ ->
@@ -567,7 +582,14 @@ getRegister' config plat expr =
     CmmRegOff reg off -> do
       (off_r, _off_format, off_code) <- getSomeReg $ CmmLit (CmmInt (fromIntegral off) width)
       (reg, _format, code) <- getSomeReg $ CmmReg reg
-      return $ Any (intFormat width) (\dst -> off_code `appOL` code `snocOL` ADD (OpReg width dst) (OpReg width reg) (OpReg width off_r))
+      return
+        $ Any
+          (intFormat width)
+          ( \dst ->
+              off_code
+                `appOL` code
+                `snocOL` ADD (OpReg width dst) (OpReg width reg) (OpReg width off_r)
+          )
       where
         width = typeWidth (cmmRegType reg)
 
@@ -588,7 +610,14 @@ getRegister' config plat expr =
                 ann (text "not") (XORI (OpReg w' dst) (OpReg w' reg) (OpImm (ImmInt (-1))))
                 `appOL` truncateReg w' w dst -- See Note [Signed arithmetic on RISCV64]
         MO_S_Neg w -> negate code w reg
-        MO_F_Neg w -> return $ Any (floatFormat w) (\dst -> code `snocOL` NEG (OpReg w dst) (OpReg w reg))
+        MO_F_Neg w ->
+          return
+            $ Any
+              (floatFormat w)
+              ( \dst ->
+                  code
+                    `snocOL` NEG (OpReg w dst) (OpReg w reg)
+              )
         -- TODO: Can this case happen?
         MO_SF_Conv from to | from < W32 -> do
           -- extend to the smallest available representation
@@ -596,9 +625,20 @@ getRegister' config plat expr =
           pure
             $ Any
               (floatFormat to)
-              (\dst -> code `appOL` code_x `snocOL` annExpr expr (SCVTF (OpReg to dst) (OpReg from reg_x))) -- (Signed ConVerT Float)
-        MO_SF_Conv from to -> pure $ Any (floatFormat to) (\dst -> code `snocOL` annExpr expr (SCVTF (OpReg to dst) (OpReg from reg))) -- (Signed ConVerT Float)
-        -- TODO: Can this case happen?
+              ( \dst ->
+                  code
+                    `appOL` code_x
+                    `snocOL` annExpr expr (SCVTF (OpReg to dst) (OpReg from reg_x)) -- (Signed ConVerT Float)
+              )
+        MO_SF_Conv from to ->
+          pure
+            $ Any
+              (floatFormat to)
+              ( \dst ->
+                  code
+                    `snocOL` annExpr expr (SCVTF (OpReg to dst) (OpReg from reg)) -- (Signed ConVerT Float)
+                    -- TODO: Can this case happen?
+              )
         MO_FS_Conv from to
           | to < W32 ->
               pure
@@ -768,7 +808,9 @@ getRegister' config plat expr =
         $ Any
           (intFormat w)
           ( \dst ->
-              code_x `appOL` code_x' `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpImm (ImmInteger n)))
+              code_x
+                `appOL` code_x'
+                `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpImm (ImmInteger n)))
           )
     CmmMachOp (MO_S_Shr w) [x, y] -> do
       (reg_x, format_x, code_x) <- getSomeReg x
@@ -778,36 +820,73 @@ getRegister' config plat expr =
         $ Any
           (intFormat w)
           ( \dst ->
-              code_x `appOL` code_x' `appOL` code_y `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpReg w reg_y))
+              code_x
+                `appOL` code_x'
+                `appOL` code_y
+                `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpReg w reg_y))
           )
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W8,
         0 <= n,
         n < 8 -> do
           (reg_x, format_x, code_x) <- getSomeReg x
-          return $ Any (intFormat w) (\dst -> code_x `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+          return
+            $ Any
+              (intFormat w)
+              ( \dst ->
+                  code_x
+                    `appOL` truncateReg (formatToWidth format_x) w reg_x
+                    `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
+              )
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W16,
         0 <= n,
         n < 16 -> do
           (reg_x, format_x, code_x) <- getSomeReg x
-          return $ Any (intFormat w) (\dst -> code_x `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+          return
+            $ Any
+              (intFormat w)
+              ( \dst ->
+                  code_x
+                    `appOL` truncateReg (formatToWidth format_x) w reg_x
+                    `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
+              )
     CmmMachOp (MO_U_Shr w) [x, y] | w == W8 || w == W16 -> do
       (reg_x, format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+      return
+        $ Any
+          (intFormat w)
+          ( \dst ->
+              code_x
+                `appOL` code_y
+                `appOL` truncateReg (formatToWidth format_x) w reg_x
+                `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y))
+          )
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W32,
         0 <= n,
         n < 32 -> do
           (reg_x, _format_x, code_x) <- getSomeReg x
-          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+          return
+            $ Any
+              (intFormat w)
+              ( \dst ->
+                  code_x
+                    `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
+              )
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W64,
         0 <= n,
         n < 64 -> do
           (reg_x, _format_x, code_x) <- getSomeReg x
-          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+          return
+            $ Any
+              (intFormat w)
+              ( \dst ->
+                  code_x
+                    `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
+              )
 
     -- 3. Logic &&, ||
     CmmMachOp (MO_And w) [CmmReg reg, CmmLit (CmmInt n _)]
@@ -874,14 +953,28 @@ getRegister' config plat expr =
             (reg_fx, format_x, code_fx) <- getFloatReg x
             (reg_fy, format_y, code_fy) <- getFloatReg y
             massertPpr (isFloatFormat format_x && isFloatFormat format_y) $ text "floatOp: non-float"
-            return $ Any (floatFormat w) (\dst -> code_fx `appOL` code_fy `appOL` op (OpReg w dst) (OpReg w reg_fx) (OpReg w reg_fy))
+            return
+              $ Any
+                (floatFormat w)
+                ( \dst ->
+                    code_fx
+                      `appOL` code_fy
+                      `appOL` op (OpReg w dst) (OpReg w reg_fx) (OpReg w reg_fy)
+                )
 
           -- need a special one for conditionals, as they return ints
           floatCond w op = do
             (reg_fx, format_x, code_fx) <- getFloatReg x
             (reg_fy, format_y, code_fy) <- getFloatReg y
             massertPpr (isFloatFormat format_x && isFloatFormat format_y) $ text "floatCond: non-float"
-            return $ Any (intFormat w) (\dst -> code_fx `appOL` code_fy `appOL` op (OpReg w dst) (OpReg w reg_fx) (OpReg w reg_fy))
+            return
+              $ Any
+                (intFormat w)
+                ( \dst ->
+                    code_fx
+                      `appOL` code_fy
+                      `appOL` op (OpReg w dst) (OpReg w reg_fx) (OpReg w reg_fy)
+                )
 
       case op of
         -- Integer operations
@@ -1251,8 +1344,14 @@ assignReg_IntCode _ reg src =
     let dst = getRegisterReg platform reg
     r <- getRegister src
     return $ case r of
-      Any _ code -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` code dst
-      Fixed format freg fcode -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` (fcode `snocOL` MOV (OpReg (formatToWidth format) dst) (OpReg (formatToWidth format) freg))
+      Any _ code ->
+        COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src)))
+          `consOL` code dst
+      Fixed format freg fcode ->
+        COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src)))
+          `consOL` ( fcode
+                       `snocOL` MOV (OpReg (formatToWidth format) dst) (OpReg (formatToWidth format) freg)
+                   )
 
 -- Let's treat Floating point stuff
 -- as integer code for now. Opaque.
@@ -1446,7 +1545,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
       moveStackDown i =
         toOL
           [ PUSH_STACK_FRAME,
-            SUB (OpReg W64 (spMachReg)) (OpReg W64 (spMachReg)) (OpImm (ImmInt (8 * i))),
+            SUB (OpReg W64 spMachReg) (OpReg W64 spMachReg) (OpImm (ImmInt (8 * i))),
             DELTA (-8 * i - 16)
           ]
       moveStackUp 0 =
@@ -1457,7 +1556,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
       moveStackUp i | odd i = moveStackUp (i + 1)
       moveStackUp i =
         toOL
-          [ ADD (OpReg W64 (spMachReg)) (OpReg W64 (spMachReg)) (OpImm (ImmInt (8 * i))),
+          [ ADD (OpReg W64 (spMachReg)) (OpReg W64 spMachReg) (OpImm (ImmInt (8 * i))),
             POP_STACK_FRAME,
             DELTA 0
           ]
@@ -1512,7 +1611,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
     passArguments [] [] ((r, format, hint, code_r) : args) stackSpaceWords accumRegs accumCode = do
       let w = formatToWidth format
           spOffet = 8 * stackSpaceWords
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (spMachReg) (ImmInt spOffet)))
+          str = STR format (OpReg w r) (OpAddr (AddrRegImm spMachReg (ImmInt spOffet)))
           stackCode =
             if hint == SignedHint
               then
@@ -1528,7 +1627,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
     passArguments [] fpRegs ((r, format, _hint, code_r) : args) stackSpaceWords accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
           spOffet = 8 * stackSpaceWords
-          str = STR format (OpReg w r) (OpAddr (AddrRegImm (spMachReg) (ImmInt spOffet)))
+          str = STR format (OpReg w r) (OpAddr (AddrRegImm spMachReg (ImmInt spOffet)))
           stackCode =
             code_r
               `snocOL` ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
