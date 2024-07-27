@@ -78,12 +78,6 @@ import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text)
 import GHC.Utils.Error (withTiming)
 import GHC.Utils.Monad (mapMaybeM)
 
-#if defined(mingw32_HOST_OS)
-import System.IO
-import GHC.IO.Encoding.CodePage (mkLocaleEncoding)
-import GHC.IO.Encoding.Failure (CodingFailureMode(TransliterateCodingFailure))
-#endif
-
 import Haddock.GhcUtils (moduleString, pretty)
 import Haddock.Interface.AttachInstances (attachInstances)
 import Haddock.Interface.Create (createInterface1, createInterface1')
@@ -92,6 +86,7 @@ import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
 import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
+import qualified Haddock.Compat as Compat
 
 -- | Create 'Interface's and a link environment by typechecking the list of
 -- modules using the GHC API and processing the resulting syntax trees.
@@ -104,12 +99,7 @@ processModules
   -> Ghc ([Interface], LinkEnv) -- ^ Resulting list of interfaces and renaming
                                 -- environment
 processModules verbosity modules flags extIfaces = do
-#if defined(mingw32_HOST_OS)
-  -- Avoid internal error: <stderr>: hPutChar: invalid argument (invalid character)' non UTF-8 Windows
-  liftIO $ hSetEncoding stdout $ mkLocaleEncoding TransliterateCodingFailure
-  liftIO $ hSetEncoding stderr $ mkLocaleEncoding TransliterateCodingFailure
-#endif
-
+  liftIO Compat.setEncoding
   dflags <- getDynFlags
 
   -- Map from a module to a corresponding installed interface

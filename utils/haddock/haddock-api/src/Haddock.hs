@@ -83,6 +83,7 @@ import Haddock.InterfaceFile
 import Haddock.Options
 import Haddock.Utils
 import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir, getSupportedLanguagesAndExtensions)
+import Haddock.Compat (getProcessID)
 
 --------------------------------------------------------------------------------
 -- * Exception handling
