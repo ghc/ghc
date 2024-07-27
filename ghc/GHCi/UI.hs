@@ -44,6 +44,7 @@ import GHCi.RemoteTypes
 import GHCi.BreakArray( breakOn, breakOff )
 import GHC.ByteCode.Types
 import GHC.Core.DataCon
+import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
 import GHC.CoreToIface
@@ -77,7 +78,7 @@ import GHC.Types.SourceError ( SourceError )
 import GHC.Types.Name
 import GHC.Types.Breakpoint
 import GHC.Types.Var ( varType )
-import GHC.Types.Var.Env ( emptyTidyEnv )
+import GHC.Types.Var.Env ( emptyTidyEnv, TidyEnv )
 import GHC.Iface.Syntax ( showToHeader, showToIface, pprIfaceDecl
                         , IfaceDecl(..), IfaceEqSpec, IfaceConDecls(..)
                         , IfaceConDecl(..), visibleIfConDecls, IfaceAppArgs
@@ -1629,7 +1630,6 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
 -----------------------------------------------------------------------------
 -- :normalize
 
--- NOTE we could also call this :members or something like that.
 normalize :: GHC.GhcMonad m => String -> m ()
 nomralize "" = throwGhcException (CmdLineError "syntax ':n <(constructor arguments)>'")
 normalize s = handleSourceError printGhciException $ do
@@ -1652,10 +1652,32 @@ lab str = do
   (ty,kind) <- GHC.typeKind True str
   case splitTyConApp_maybe ty of
     Nothing -> throwGhcException (CmdLineError "Something Bad happend!")
-    Just (head,args) -> do
-      let ifaceArgs = map toIfaceType args
-          iDecl = snd $ tyConToIfaceDecl emptyTidyEnv head
-      pure undefined
+    Just (head,args) -> pure . pprIfaceDecl showToIface $ toNormalizedIfaceDecl head args kind
+
+-- TODO we may also need to apply the substitution to our TyCon.
+-- NOTE we'll have to make sure that stheta in TyCon and stheta in DataCon are the same.
+toNormalizedIfaceDecl :: TyCon -> [Type] -> Kind -> IfaceDecl
+toNormalizedIfaceDecl tyCon args resKind = (snd . tyConToIfaceDecl emptyTidyEnv) newTyCon
+  where
+    dataCons = tyConDataCons tyCon
+    normalizedCons = map (normalizeDataConAt args) dataCons
+    newRhs = mkDataTyConRhs normalizedCons
+    newKind = mkTyConKind (tyConBinders tyCon) resKind
+    newStupidTheta = tyConStupidTheta tyCon -- FIXME
+    newRoles = tyConRoles tyCon -- FIXME
+    newCType = tyConCType_maybe tyCon
+    flavour = algTyConFlavour tyCon
+    newTyCon
+      = mkAlgTyCon (tyConName tyCon) (tyConBinders tyCon) resKind newRoles
+                   newCType newStupidTheta newRhs flavour
+                   (isGadtSyntaxTyCon tyCon)
+
+
+{- Note [Why do we normalize a DataCon instead of an IfaceConDecl]
+TODO
+summary because we'll have to reduce and do all other sorts of stuff. Otherwise
+we'll have to convert back and forth between IfaceConDecl and DataCon.
+-}
 
 -----------------------------------------------------------------------------
 -- :main

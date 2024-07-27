@@ -100,6 +100,7 @@ module GHC.Core.TyCon(
         synTyConDefn_maybe, synTyConRhs_maybe,
         famTyConFlav_maybe,
         algTyConRhs,
+        algTyConFlavour, -- FIXME
         newTyConRhs, newTyConEtadArity, newTyConEtadRhs,
         unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
         newTyConDataCon_maybe,
@@ -1251,6 +1252,11 @@ okParent _       (DataFamInstTyCon _ fam_tc tys) = tys `lengthAtLeast` tyConArit
 isNoParent :: AlgTyConFlav -> Bool
 isNoParent (VanillaAlgTyCon {}) = True
 isNoParent _                   = False
+
+algTyConFlavour :: TyCon -> AlgTyConFlav
+algTyConFlavour tc@(TyCon { tyConDetails = details })
+  | AlgTyCon {algTcFlavour = flavour} <- details = flavour
+  | otherwise                                   = pprPanic "algTyConFlavour" (ppr tc)
 
 --------------------
 

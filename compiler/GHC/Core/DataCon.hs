@@ -27,6 +27,9 @@ module GHC.Core.DataCon (
         -- ** Type construction
         mkHsSrcBang, mkDataCon, fIRST_TAG,
 
+        -- ** Creating an instantiated dummy data constructor for the normalize command
+        normalizeDataConAt,
+
         -- ** Type deconstruction
         dataConRepType, dataConInstSig, dataConFullSig,
         dataConName, dataConIdentity, dataConTag, dataConTagZ,
@@ -484,7 +487,7 @@ data DataCon
 
                 -- The next two fields give the type context of the data constructor
                 --      (aside from the GADT constraints,
-                --       which are given by the dcExpSpec)
+                --       which are given by the dcEqSpec)
                 -- In GADT form, this is *exactly* what the programmer writes, even if
                 -- the context constrains only universally quantified variables
                 --      MkT :: forall a b. (a ~ b, Ord b) => a -> T a b
@@ -1908,6 +1911,38 @@ dataConUserTyVarsNeedWrapper dc@(MkData { dcUnivTyVars = univ_tvs
   where
     answer = (univ_tvs ++ ex_tvs) /= dataConUserTyVars dc
               -- Worker tyvars         Wrapper tyvars
+
+
+{- Note [Creating dummy constructors for the normalize command]
+
+-}
+-- See Note [Why do we normalize a DataCon instead of an IfaceConDecl]
+-- FIXME better name
+normalizeDataConAt :: [Type] -> DataCon -> DataCon
+normalizeDataConAt args con@(MkData { dcUnivTyVars = univ_tvs
+                                    , dcExTyCoVars = ex_tvs
+                                    , dcEqSpec = eq_spec
+                                    , dcOtherTheta = other_theta
+                                    , dcStupidTheta = stupid_theta
+                                    , dcOrigArgTys = orig_arg_tys
+                                    , dcOrigResTy = orig_res_ty })
+  = con { dcUnivTyVars = i_univ_ty_vars
+        , dcExTyCoVars = i_ex_tyco_vars
+        , dcEqSpec = i_eq_spec
+        , dcOtherTheta = i_other_theta
+        , dcStupidTheta = i_stupid_theta
+        , dcOrigArgTys = i_arg_tys
+        , dcOrigResTy = i_res_ty }
+  where
+    univ_subst = zipTvSubst univ_tvs args
+    i_eq_spec = eq_spec
+    i_univ_ty_vars = filter (flip elemSubst univ_subst) univ_tvs
+    i_other_theta = substTheta subst other_theta
+    i_stupid_theta = substTheta subst stupid_theta
+    i_arg_tys = substScaledTys subst orig_arg_tys
+    i_res_ty = substTy subst orig_res_ty
+    (subst,i_ex_tyco_vars) = substVarBndrs univ_subst ex_tvs
+
 
 
 {-
