@@ -483,7 +483,7 @@ pprInstr platform instr = case instr of
   MUL o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     | otherwise -> op3 (text "\tmul") o1 o2 o3
-  SMULH o1 o2 o3 -> op3 (text "\tmulh") o1 o2 o3
+  MULH o1 o2 o3 -> op3 (text "\tmulh") o1 o2 o3
   NEG o1 o2 | isFloatOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfneg.s") o1 o2
   NEG o1 o2 | isFloatOp o1 && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfneg.d") o1 o2
   NEG o1 o2 -> op2 (text "\tneg") o1 o2
@@ -506,11 +506,11 @@ pprInstr platform instr = case instr of
     | isImmOp o3 -> op3 (text "\tandi") o1 o2 o3
     | otherwise -> op3 (text "\tand") o1 o2 o3
   OR o1 o2 o3 -> op3 (text "\tor") o1 o2 o3
-  ASR o1 o2 o3 | isImmOp o3 -> op3 (text "\tsrai") o1 o2 o3
-  ASR o1 o2 o3 -> op3 (text "\tsra") o1 o2 o3
+  SRA o1 o2 o3 | isImmOp o3 -> op3 (text "\tsrai") o1 o2 o3
+  SRA o1 o2 o3 -> op3 (text "\tsra") o1 o2 o3
   XOR o1 o2 o3 -> op3 (text "\txor") o1 o2 o3
-  LSL o1 o2 o3 -> op3 (text "\tsll") o1 o2 o3
-  LSR o1 o2 o3 -> op3 (text "\tsrl") o1 o2 o3
+  SLL o1 o2 o3 -> op3 (text "\tsll") o1 o2 o3
+  SRL o1 o2 o3 -> op3 (text "\tsrl") o1 o2 o3
   MOV o1 o2
     | isFloatOp o1 && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.d") o1 o2 -- fmv.d rd, rs is pseudo op fsgnj.d rd, rs, rs
     | isFloatOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.s") o1 o2 -- fmv.s rd, rs is pseudo op fsgnj.s rd, rs, rs

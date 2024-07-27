@@ -205,7 +205,7 @@ genSwitch config expr targets = do
           `appOL` t_code
           `appOL` toOL
             [ COMMENT (ftext "Jump table for switch"),
-              annExpr expr (LSL (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt1) reg) (OpImm (ImmInt 3))),
+              annExpr expr (SLL (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt1) reg) (OpImm (ImmInt 3))),
               ADD (OpReg W64 tmp) (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt2) tableReg),
               LDRU II64 (OpReg W64 tmp) (OpAddr (AddrRegImm tmp (ImmInt 0))),
               J_TBL ids (Just lbl) tmp
@@ -681,9 +681,9 @@ getRegister' config plat expr =
                   `appOL` toOL
                     [ ann
                         (text "MO_SS_Conv: narrow register signed" <+> ppr reg <+> ppr from <> text "->" <> ppr to)
-                        (LSL (OpReg to dst) (OpReg from reg) (OpImm (ImmInt shift))),
+                        (SLL (OpReg to dst) (OpReg from reg) (OpImm (ImmInt shift))),
                       -- signed right shift
-                      ASR (OpReg to dst) (OpReg to dst) (OpImm (ImmInt shift))
+                      SRA (OpReg to dst) (OpReg to dst) (OpImm (ImmInt shift))
                     ]
                   `appOL` truncateReg from to dst
           | otherwise =
@@ -745,7 +745,7 @@ getRegister' config plat expr =
               (intFormat w)
               ( \dst ->
                   code_x
-                    `snocOL` annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
+                    `snocOL` annExpr expr (SLL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
                     `appOL` truncateReg w w dst
               )
     CmmMachOp (MO_Shl w) [x, CmmLit (CmmInt n _)]
@@ -758,7 +758,7 @@ getRegister' config plat expr =
               (intFormat w)
               ( \dst ->
                   code_x
-                    `snocOL` annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
+                    `snocOL` annExpr expr (SLL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)))
                     `appOL` truncateReg w w dst
               )
     CmmMachOp (MO_S_Shr w) [x, CmmLit (CmmInt n _)] | fitsIn12bitImm n -> do
@@ -768,7 +768,7 @@ getRegister' config plat expr =
         $ Any
           (intFormat w)
           ( \dst ->
-              code_x `appOL` code_x' `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x') (OpImm (ImmInteger n)))
+              code_x `appOL` code_x' `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpImm (ImmInteger n)))
           )
     CmmMachOp (MO_S_Shr w) [x, y] -> do
       (reg_x, format_x, code_x) <- getSomeReg x
@@ -778,36 +778,36 @@ getRegister' config plat expr =
         $ Any
           (intFormat w)
           ( \dst ->
-              code_x `appOL` code_x' `appOL` code_y `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x') (OpReg w reg_y))
+              code_x `appOL` code_x' `appOL` code_y `snocOL` annExpr expr (SRA (OpReg w dst) (OpReg w reg_x') (OpReg w reg_y))
           )
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W8,
         0 <= n,
         n < 8 -> do
           (reg_x, format_x, code_x) <- getSomeReg x
-          return $ Any (intFormat w) (\dst -> code_x `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+          return $ Any (intFormat w) (\dst -> code_x `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W16,
         0 <= n,
         n < 16 -> do
           (reg_x, format_x, code_x) <- getSomeReg x
-          return $ Any (intFormat w) (\dst -> code_x `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+          return $ Any (intFormat w) (\dst -> code_x `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
     CmmMachOp (MO_U_Shr w) [x, y] | w == W8 || w == W16 -> do
       (reg_x, format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W32,
         0 <= n,
         n < 32 -> do
           (reg_x, _format_x, code_x) <- getSomeReg x
-          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
     CmmMachOp (MO_U_Shr w) [x, CmmLit (CmmInt n _)]
       | w == W64,
         0 <= n,
         n < 64 -> do
           (reg_x, _format_x, code_x) <- getSomeReg x
-          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+          return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SRL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
     -- 3. Logic &&, ||
     CmmMachOp (MO_And w) [CmmReg reg, CmmLit (CmmInt n _)]
@@ -928,9 +928,9 @@ getRegister' config plat expr =
         MO_And w -> bitOp w (\d x y -> unitOL $ annExpr expr (AND d x y))
         MO_Or w -> bitOp w (\d x y -> unitOL $ annExpr expr (OR d x y))
         MO_Xor w -> bitOp w (\d x y -> unitOL $ annExpr expr (XOR d x y))
-        MO_Shl w -> intOp False w (\d x y -> unitOL $ annExpr expr (LSL d x y))
-        MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (LSR d x y))
-        MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (ASR d x y))
+        MO_Shl w -> intOp False w (\d x y -> unitOL $ annExpr expr (SLL d x y))
+        MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (SRL d x y))
+        MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (SRA d x y))
         op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ pprMachOp op <+> text "in" <+> pdoc plat expr
 
     -- Generic ternary case.
@@ -992,9 +992,9 @@ getRegister' config plat expr =
                 `appOL` code_y
                 `appOL` signExtend (formatToWidth format_y) W64 reg_y reg_y
                 `appOL` toOL
-                  [ annExpr expr (SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y)),
+                  [ annExpr expr (MULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y)),
                     MUL (OpReg w lo) (OpReg w reg_x) (OpReg w reg_y),
-                    ASR (OpReg w lo) (OpReg w lo) (OpImm (ImmInt (widthInBits W64 - 1))),
+                    SRA (OpReg w lo) (OpReg w lo) (OpImm (ImmInt (widthInBits W64 - 1))),
                     ann
                       (text "Set flag if result of MULH contains more than sign bits.")
                       (XOR (OpReg w hi) (OpReg w hi) (OpReg w lo)),
@@ -1078,9 +1078,9 @@ signExtend w w' r r' =
   toOL
     [ ann
         (text "narrow register signed" <+> ppr r <> char ':' <> ppr w <> text "->" <> ppr r <> char ':' <> ppr w')
-        (LSL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
+        (SLL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
       -- signed (arithmetic) right shift
-      ASR (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
+      SRA (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
     ]
   where
     shift = 64 - widthInBits w
@@ -1105,9 +1105,9 @@ signExtendAdjustPrecission w w' r r'
       toOL
         [ ann
             (text "narrow register signed" <+> ppr r <> char ':' <> ppr w <> text "->" <> ppr r <> char ':' <> ppr w')
-            (LSL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
+            (SLL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
           -- signed (arithmetic) right shift
-          ASR (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
+          SRA (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
         ]
   where
     shift = 64 - widthInBits w'
@@ -1115,9 +1115,9 @@ signExtendAdjustPrecission w w' r r' =
   toOL
     [ ann
         (text "sign extend register" <+> ppr r <> char ':' <> ppr w <> text "->" <> ppr r <> char ':' <> ppr w')
-        (LSL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
+        (SLL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
       -- signed (arithmetic) right shift
-      ASR (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
+      SRA (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
     ]
   where
     shift = 64 - widthInBits w
@@ -1135,9 +1135,9 @@ truncateReg w w' r =
   toOL
     [ ann
         (text "truncate register" <+> ppr r <+> ppr w <> text "->" <> ppr w')
-        (LSL (OpReg w' r) (OpReg w r) (OpImm (ImmInt shift))),
+        (SLL (OpReg w' r) (OpReg w r) (OpImm (ImmInt shift))),
       -- SHL ignores signedness!
-      LSR (OpReg w' r) (OpReg w r) (OpImm (ImmInt shift))
+      SRL (OpReg w' r) (OpReg w r) (OpImm (ImmInt shift))
     ]
   where
     shift = 64 - widthInBits w'
@@ -1986,7 +1986,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       POP_STACK_FRAME -> 4
       ADD {} -> 1
       MUL {} -> 1
-      SMULH {} -> 1
+      MULH {} -> 1
       NEG {} -> 1
       DIV {} -> 1
       REM {} -> 1
@@ -1995,10 +1995,10 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       DIVU {} -> 1
       AND {} -> 1
       OR {} -> 1
-      ASR {} -> 1
+      SRA {} -> 1
       XOR {} -> 1
-      LSL {} -> 1
-      LSR {} -> 1
+      SLL {} -> 1
+      SRL {} -> 1
       MOV {} -> 2
       ORI {} -> 1
       XORI {} -> 1

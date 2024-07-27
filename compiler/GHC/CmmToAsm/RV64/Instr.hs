@@ -75,7 +75,7 @@ regUsageOfInstr platform instr = case instr of
   ADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   MUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   NEG dst src -> usage (regOp src, regOp dst)
-  SMULH dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  MULH dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   DIV dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   REM dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   REMU dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -83,10 +83,10 @@ regUsageOfInstr platform instr = case instr of
   DIVU dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   AND dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   OR dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ASR dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SRA dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   XOR dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  LSL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  LSR dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SLL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SRL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   MOV dst src -> usage (regOp src, regOp dst)
   -- ORI's third operand is always an immediate
   ORI dst src1 _ -> usage (regOp src1, regOp dst)
@@ -159,7 +159,7 @@ patchRegsOfInstr instr env = case instr of
   ADD o1 o2 o3 -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
   MUL o1 o2 o3 -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
   NEG o1 o2 -> NEG (patchOp o1) (patchOp o2)
-  SMULH o1 o2 o3 -> SMULH (patchOp o1) (patchOp o2) (patchOp o3)
+  MULH o1 o2 o3 -> MULH (patchOp o1) (patchOp o2) (patchOp o3)
   DIV o1 o2 o3 -> DIV (patchOp o1) (patchOp o2) (patchOp o3)
   REM o1 o2 o3 -> REM (patchOp o1) (patchOp o2) (patchOp o3)
   REMU o1 o2 o3 -> REMU (patchOp o1) (patchOp o2) (patchOp o3)
@@ -167,10 +167,10 @@ patchRegsOfInstr instr env = case instr of
   DIVU o1 o2 o3 -> DIVU (patchOp o1) (patchOp o2) (patchOp o3)
   AND o1 o2 o3 -> AND (patchOp o1) (patchOp o2) (patchOp o3)
   OR o1 o2 o3 -> OR (patchOp o1) (patchOp o2) (patchOp o3)
-  ASR o1 o2 o3 -> ASR (patchOp o1) (patchOp o2) (patchOp o3)
+  SRA o1 o2 o3 -> SRA (patchOp o1) (patchOp o2) (patchOp o3)
   XOR o1 o2 o3 -> XOR (patchOp o1) (patchOp o2) (patchOp o3)
-  LSL o1 o2 o3 -> LSL (patchOp o1) (patchOp o2) (patchOp o3)
-  LSR o1 o2 o3 -> LSR (patchOp o1) (patchOp o2) (patchOp o3)
+  SLL o1 o2 o3 -> SLL (patchOp o1) (patchOp o2) (patchOp o3)
+  SRL o1 o2 o3 -> SRL (patchOp o1) (patchOp o2) (patchOp o3)
   MOV o1 o2 -> MOV (patchOp o1) (patchOp o2)
   -- o3 cannot be a register for ORI (always an immediate)
   ORI o1 o2 o3 -> ORI (patchOp o1) (patchOp o2) (patchOp o3)
@@ -479,15 +479,15 @@ data Instr
   | -- | Logical left shift (zero extened, integer only)
     --
     -- @rd = rs1 << rs2@
-    LSL {- SLL -} Operand Operand Operand
+    SLL Operand Operand Operand
   | -- | Logical right shift (zero extened, integer only)
     --
     -- @rd = rs1 >> rs2@
-    LSR {- SRL -} Operand Operand Operand
+    SRL Operand Operand Operand
   | -- | Arithmetic right shift (sign-extened, integer only)
     --
     -- @rd = rs1 >> rs2@
-    ASR {- SRA -} Operand Operand Operand
+    SRA Operand Operand Operand
   | -- | Store to memory (both, integer and floating point)
     STR Format Operand Operand
   | -- | Load from memory (sign-extended, integer and floating point)
@@ -514,12 +514,10 @@ data Instr
     --
     -- @rd = |rn % rm|@
     REMU Operand Operand Operand
-  | -- TODO: Rename: MULH
-
-    -- | High part of a multiplication that doesn't fit into 64bits (integer only)
+  | -- | High part of a multiplication that doesn't fit into 64bits (integer only)
     --
     -- E.g. for a multiplication with 64bits width: @rd = (rs1 * rs2) >> 64@.
-    SMULH Operand Operand Operand
+    MULH Operand Operand Operand
   | -- | Unsigned division (integer only)
     --
     -- @rd = |rn ÷ rm|@
@@ -596,14 +594,14 @@ instrCon i =
     DIV {} -> "DIV"
     REM {} -> "REM"
     REMU {} -> "REMU"
-    SMULH {} -> "SMULH"
+    MULH {} -> "MULH"
     SUB {} -> "SUB"
     DIVU {} -> "DIVU"
     AND {} -> "AND"
-    ASR {} -> "ASR"
+    SRA {} -> "SRA"
     XOR {} -> "XOR"
-    LSL {} -> "LSL"
-    LSR {} -> "LSR"
+    SLL {} -> "SLL"
+    SRL {} -> "SRL"
     MOV {} -> "MOV"
     ORI {} -> "ORI"
     XORI {} -> "ORI"
