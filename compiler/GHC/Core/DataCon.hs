@@ -87,6 +87,8 @@ import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
 import GHC.Types.SourceText
 import GHC.Core.Class
+import {-# SOURCE #-} GHC.Core.FamInstEnv
+import GHC.Core.Reduction
 import GHC.Types.Name
 import GHC.Builtin.Names
 import GHC.Core.Predicate
@@ -102,6 +104,7 @@ import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
 import GHC.Data.Graph.UnVar  -- UnVarSet and operations
 
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( ConcreteTyVars )
+
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -1918,31 +1921,31 @@ dataConUserTyVarsNeedWrapper dc@(MkData { dcUnivTyVars = univ_tvs
 -}
 -- See Note [Why do we normalize a DataCon instead of an IfaceConDecl]
 -- FIXME better name
-normalizeDataConAt :: [Type] -> DataCon -> DataCon
-normalizeDataConAt args con@(MkData { dcUnivTyVars = univ_tvs
-                                    , dcExTyCoVars = ex_tvs
-                                    , dcEqSpec = eq_spec
-                                    , dcOtherTheta = other_theta
-                                    , dcStupidTheta = stupid_theta
-                                    , dcOrigArgTys = orig_arg_tys
-                                    , dcOrigResTy = orig_res_ty })
+normalizeDataConAt :: FamInstEnvs -> [Type] -> DataCon -> DataCon
+normalizeDataConAt famEnv args con@(MkData { dcUnivTyVars = univ_tvs
+                                           , dcExTyCoVars = ex_tvs
+                                           , dcEqSpec = eq_spec
+                                           , dcOtherTheta = other_theta
+                                           , dcStupidTheta = stupid_theta
+                                           , dcOrigArgTys = orig_arg_tys
+                                           , dcOrigResTy = orig_res_ty })
   = con { dcUnivTyVars = i_univ_ty_vars
         , dcExTyCoVars = i_ex_tyco_vars
-        , dcEqSpec = i_eq_spec
+        , dcEqSpec = eq_spec
         , dcOtherTheta = i_other_theta
         , dcStupidTheta = i_stupid_theta
         , dcOrigArgTys = i_arg_tys
         , dcOrigResTy = i_res_ty }
   where
     univ_subst = zipTvSubst univ_tvs args
-    i_eq_spec = eq_spec
+    i_eq_spec = filter undefined eq_spec -- (elem x "things in scope")
     i_univ_ty_vars = filter (flip elemSubst univ_subst) univ_tvs
     i_other_theta = substTheta subst other_theta
     i_stupid_theta = substTheta subst stupid_theta
-    i_arg_tys = substScaledTys subst orig_arg_tys
+    i_arg_tys =  map (mapScaledType (reductionReducedType . normaliseType famEnv Nominal))
+                     $ substScaledTys subst orig_arg_tys
     i_res_ty = substTy subst orig_res_ty
     (subst,i_ex_tyco_vars) = substVarBndrs univ_subst ex_tvs
-
 
 
 {-

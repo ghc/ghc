@@ -45,6 +45,7 @@ import GHCi.BreakArray( breakOn, breakOff )
 import GHC.ByteCode.Types
 import GHC.Core.DataCon
 import GHC.Core.TyCon
+import GHC.Core.FamInstEnv
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
 import GHC.CoreToIface
@@ -55,7 +56,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
-import GHC.Driver.Monad ( modifySession )
+import GHC.Driver.Monad ( modifySession, withSession )
 import GHC.Driver.Make ( newIfaceCache, ModIfaceCache(..) )
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Diagnostic
@@ -64,7 +65,7 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
              GetDocsFailure(..), pushLogHookM,
              getModuleGraph, handleSourceError, ms_mod )
-import GHC.Driver.Main (hscParseModuleWithLocation, hscParseStmtWithLocation)
+import GHC.Driver.Main (hscParseModuleWithLocation, hscParseStmtWithLocation, getHscEnv)
 import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Env
@@ -108,6 +109,8 @@ import GHC.Utils.Logger
 
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
+import GHC.Tc.Instance.Family
+import GHC.Tc.Utils.Monad ( initTcInteractive )
 import GHC.Settings.Config
 import GHC.Data.Graph.Directed
 import GHC.Utils.Encoding
@@ -1648,30 +1651,37 @@ normalize s = handleSourceError printGhciException $ do
     actArgs (_:xs) = actArgs xs
     trim = let f = reverse . dropWhile isSpace in f . f
 
+lab :: GHC.GhcMonad m => String -> m SDoc
 lab str = do
   (ty,kind) <- GHC.typeKind True str
+  rendered <- showSDocForUser' (ppr kind)
+  liftIO (putStrLn rendered)
   case splitTyConApp_maybe ty of
     Nothing -> throwGhcException (CmdLineError "Something Bad happend!")
-    Just (head,args) -> pure . pprIfaceDecl showToIface $ toNormalizedIfaceDecl head args kind
+    Just (head,args) -> do
+      (_,famInstEnvs) <- withSession $ \hsc_env0 -> do
+        hsc_env <- GHC.getSession
+        liftIO $ initTcInteractive hsc_env tcGetFamInstEnvs
+      case famInstEnvs of
+        Just fie -> pure . pprIfaceDecl showToIface $ toNormalizedIfaceDecl fie head args kind
+        Nothing -> throwGhcException (CmdLineError "Couldn't retrieve family instances")
 
--- TODO we may also need to apply the substitution to our TyCon.
 -- NOTE we'll have to make sure that stheta in TyCon and stheta in DataCon are the same.
-toNormalizedIfaceDecl :: TyCon -> [Type] -> Kind -> IfaceDecl
-toNormalizedIfaceDecl tyCon args resKind = (snd . tyConToIfaceDecl emptyTidyEnv) newTyCon
+toNormalizedIfaceDecl :: FamInstEnvs -> TyCon -> [Type] -> Kind -> IfaceDecl
+toNormalizedIfaceDecl famInstEnvs tyCon args resKind = (snd . tyConToIfaceDecl emptyTidyEnv) newTyCon
   where
     dataCons = tyConDataCons tyCon
-    normalizedCons = map (normalizeDataConAt args) dataCons
+    normalizedCons = map (normalizeDataConAt famInstEnvs args) dataCons
     newRhs = mkDataTyConRhs normalizedCons
-    newKind = mkTyConKind (tyConBinders tyCon) resKind
-    newStupidTheta = tyConStupidTheta tyCon -- FIXME
+    newStupidTheta = tyConStupidTheta tyCon
     newRoles = tyConRoles tyCon -- FIXME
     newCType = tyConCType_maybe tyCon
+    newTyConBinders = drop (length args) (tyConBinders tyCon)
     flavour = algTyConFlavour tyCon
     newTyCon
-      = mkAlgTyCon (tyConName tyCon) (tyConBinders tyCon) resKind newRoles
+      = mkAlgTyCon (tyConName tyCon) newTyConBinders resKind newRoles
                    newCType newStupidTheta newRhs flavour
                    (isGadtSyntaxTyCon tyCon)
-
 
 {- Note [Why do we normalize a DataCon instead of an IfaceConDecl]
 TODO
