@@ -36,6 +36,7 @@ import GHC.Unit.Module (moduleNameString)
 import qualified GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable (ppr)
 import GHC.Types.Unique.DSM
+import GHC.Cmm.UniqueRenamer
 
 {-
 Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
@@ -199,9 +200,10 @@ generateCgIPEStub
      , Map CmmInfoTable (Maybe IpeSourceLocation)
      , IPEStats
      , DUniqSupply
+     , DetUniqFM
      )
   -> Stream IO CmmGroupSRTs CmmCgInfos
-generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesWithTickishes, initStats, dus) = do
+generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesWithTickishes, initStats, dus, detRnEnv) = do
   let dflags   = hsc_dflags hsc_env
       platform = targetPlatform dflags
       logger   = hsc_logger hsc_env
@@ -213,9 +215,9 @@ generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesW
   let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
       ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv')
 
-  -- TODO: Renaming here
+      (_detRnEnv', rn_ipeCmmGroup) = detRenameCmmGroup detRnEnv ipeCmmGroup
 
-  (_, _, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) dus (removeDeterm ipeCmmGroup)
+  (_, _, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) dus rn_ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs
 
   ipeStub <-

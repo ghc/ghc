@@ -215,6 +215,7 @@ import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 import GHC.Cmm.Parser
+import GHC.Cmm.UniqueRenamer
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -299,7 +300,6 @@ import GHC.Stg.InferTags.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
-import GHC.Types.Unique.DSM
 import GHC.Cmm.Config (CmmConfig)
 
 {- **********************************************************************
@@ -2172,11 +2172,11 @@ doCodeGen hsc_env this_mod denv data_tycons
     putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG
         (pprGenStgTopBindings stg_ppr_opts stg_binds_w_fvs)
 
-    let stg_to_cmm dflags mod = case stgToCmmHook hooks of
-                        Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags mod)
-                        Just h  -> h                             (initStgToCmmConfig dflags mod)
+    let stg_to_cmm dflags mod a b c d e = case stgToCmmHook hooks of
+          Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags mod) a b c d e
+          Just h  -> (,emptyDetUFM) <$> h          (initStgToCmmConfig dflags mod) a b c d e
 
-    let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
+    let cmm_stream :: Stream IO CmmGroup (ModuleLFInfos, DetUniqFM)
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs hpc_info
@@ -2198,11 +2198,11 @@ doCodeGen hsc_env this_mod denv data_tycons
 
         pipeline_stream :: Stream IO CmmGroupSRTs CmmCgInfos
         pipeline_stream = do
-          ((mod_srt_info, ipes, ipe_stats, dus), lf_infos) <-
+          ((mod_srt_info, ipes, ipe_stats, dus), (lf_infos, detRnEnv)) <-
             {-# SCC "cmmPipeline" #-}
             Stream.mapAccumL_ (pipeline_action logger cmm_config) (emptySRT this_mod, M.empty, mempty, initDUniqSupply 'u' 1) ppr_stream1
           let nonCaffySet = srtMapNonCAFs (moduleSRTMap mod_srt_info)
-          cmmCgInfos <- generateCgIPEStub hsc_env this_mod denv (nonCaffySet, lf_infos, ipes, ipe_stats, dus)
+          cmmCgInfos <- generateCgIPEStub hsc_env this_mod denv (nonCaffySet, lf_infos, ipes, ipe_stats, dus, detRnEnv)
           return cmmCgInfos
 
         pipeline_action

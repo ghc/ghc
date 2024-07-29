@@ -77,7 +77,8 @@ codeGen :: Logger
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ModuleLFInfos       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup (ModuleLFInfos, DetUniqFM)
+                                       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) data_tycons
@@ -160,7 +161,7 @@ codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) data_tycons
         ; rn_mapping <- liftIO (readIORef uniqRnRef)
         ; liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
 
-        ; return generatedInfo
+        ; return (generatedInfo, rn_mapping)
         }
 
 ---------------------------------------------------------------
