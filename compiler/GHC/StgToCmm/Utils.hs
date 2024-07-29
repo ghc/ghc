@@ -90,7 +90,7 @@ import GHC.Types.Unique.Map
 import Data.Maybe
 import qualified Data.List.NonEmpty as NE
 import GHC.Core.DataCon
-import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
 import GHC.Data.Maybe
 import Control.Monad
 import qualified Data.Map.Strict as Map
@@ -673,7 +673,7 @@ pprIPEStats (IPEStats{..}) =
 -- for stack info tables skipped during 'generateCgIPEStub'. As the fold
 -- progresses, counts of tables per closure type will be accumulated.
 convertInfoProvMap :: StgToCmmConfig -> Module -> InfoTableProvMap -> IPEStats -> [CmmInfoTable] -> (IPEStats, [InfoProvEnt])
-convertInfoProvMap cfg this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTableToSourceLocationMap) initStats cmits =
+convertInfoProvMap cfg this_mod (InfoTableProvMap dcenv denv infoTableToSourceLocationMap) initStats cmits =
     foldl' convertInfoProvMap' (initStats, []) cmits
   where
     convertInfoProvMap' :: (IPEStats, [InfoProvEnt]) -> CmmInfoTable -> (IPEStats, [InfoProvEnt])
@@ -694,7 +694,7 @@ convertInfoProvMap cfg this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTable
         lookupDataConMap = (closureIpeStats cn,) <$> do
             UsageSite _ n <- hasIdLabelInfo cl >>= getConInfoTableLocation
             -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
-            (dc, ns) <- hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique
+            (dc, ns) <- hasHaskellName cl >>= lookupUDFM_Directly dcenv . getUnique
             -- Lookup is linear but lists will be small (< 100)
             return $ (InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns)))
 
