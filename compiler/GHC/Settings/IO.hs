@@ -234,7 +234,7 @@ initSettings top_dir = do
       , toolSettings_opt_windres = []
       , toolSettings_opt_lo      = []
       , toolSettings_opt_lc      = []
-      , toolSettings_opt_las     = []
+      , toolSettings_opt_las     = ["--target=" ++ llvmTarget]
       , toolSettings_opt_i       = []
 
       , toolSettings_extraGccViaCFlags = extraGccViaCFlags
