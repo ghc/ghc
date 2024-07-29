@@ -234,7 +234,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
           , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
           , "Windows" : { "unknown_versioning" :  windows }
-          , "Linux_Alpine" : { "( >= 3.12 && < 3.18 )": alpine3_12
+          , "Linux_Alpine" : { "( >= 3.12 && < 3.20 )": alpine3_12
                              , ">= 3.20": alpine3_20
                              , "unknown_versioning": alpine3_12 }
 
@@ -242,7 +242,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
 
     a32 = { "Linux_Debian": { "( >= 10 && < 12 )": deb10_i386
                             , ">= 12": deb12_i386
-                            , "unknown versioning": deb10_i386 }
+                            , "unknown_versioning": deb10_i386 }
           , "Linux_Ubuntu": { "unknown_versioning": deb10_i386 }
           , "Linux_Mint" : { "unknown_versioning": deb10_i386 }
           , "Linux_UnknownLinux" : { "unknown_versioning": deb10_i386 }
