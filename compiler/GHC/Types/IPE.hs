@@ -13,6 +13,7 @@ import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Core.DataCon
 
+import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Map
 import GHC.Core.Type
 import Data.List.NonEmpty
@@ -38,7 +39,7 @@ type ClosureMap = UniqMap Name  -- The binding
 -- the constructor was used at, if possible and a string which names
 -- the source location. This is the same information as is the payload
 -- for the 'GHC.Core.SourceNote' constructor.
-type DCMap = UniqMap DataCon (NonEmpty (Int, Maybe IpeSourceLocation))
+type DCMap = UniqDFM DataCon (DataCon, NonEmpty (Int, Maybe IpeSourceLocation))
 
 type InfoTableToSourceLocationMap = Map.Map CLabel (Maybe IpeSourceLocation)
 
@@ -49,4 +50,4 @@ data InfoTableProvMap = InfoTableProvMap
                           }
 
 emptyInfoTableProvMap :: InfoTableProvMap
-emptyInfoTableProvMap = InfoTableProvMap emptyUniqMap emptyUniqMap Map.empty
+emptyInfoTableProvMap = InfoTableProvMap emptyUDFM emptyUniqMap Map.empty
