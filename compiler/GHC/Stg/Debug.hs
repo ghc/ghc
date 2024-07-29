@@ -11,6 +11,7 @@ import GHC.Prelude
 
 import GHC.Stg.Syntax
 
+import GHC.Types.Unique.DFM
 import GHC.Types.Id
 import GHC.Types.Tickish
 import GHC.Core.DataCon
@@ -166,13 +167,13 @@ numberDataCon dc ts = do
     env <- lift get
     mcc <- asks rSpan
     let !mbest_span = (\(SpanWithLabel rss l) -> (rss, l)) <$> (selectTick ts <|> mcc)
-    let !dcMap' = alterUniqMap (maybe (Just ((0, mbest_span) :| [] ))
-                        (\xs@((k, _):|_) -> Just $! ((k + 1, mbest_span) `NE.cons` xs))) (provDC env) dc
+    let !dcMap' = alterUDFM (maybe (Just (dc, (0, mbest_span) :| [] ))
+                        (\(_dc, xs@((k, _):|_)) -> Just $! (dc, (k + 1, mbest_span) `NE.cons` xs))) (provDC env) dc
     lift $ put (env { provDC = dcMap' })
-    let r = lookupUniqMap dcMap' dc
+    let r = lookupUDFM dcMap' dc
     return $ case r of
       Nothing -> NoNumber
-      Just res -> Numbered (fst (NE.head res))
+      Just (_, res) -> Numbered (fst (NE.head res))
 
 selectTick :: [StgTickish] -> Maybe SpanWithLabel
 selectTick [] = Nothing

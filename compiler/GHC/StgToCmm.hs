@@ -44,6 +44,7 @@ import GHC.Types.Id.Info
 import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
+import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Env
 
@@ -61,7 +62,6 @@ import GHC.Utils.TmpFs
 
 import GHC.Data.Stream
 import GHC.Data.OrdList
-import GHC.Types.Unique.Map
 
 import Control.Monad (when,void, forM_)
 import GHC.Utils.Misc
@@ -82,7 +82,7 @@ codeGen :: Logger
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
+codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
@@ -137,7 +137,7 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
 
         -- Emit special info tables for everything used in this module
         -- This will only do something if  `-fdistinct-info-tables` is turned on.
-        ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (UsageSite (stgToCmmThisModule cfg) k) dc)) (nonDetEltsUFM denv)
+        ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (UsageSite (stgToCmmThisModule cfg) k) dc)) (eltsUDFM denv)
 
         ; final_state <- liftIO (readIORef cgref)
         ; let cg_id_infos = cgs_binds final_state
