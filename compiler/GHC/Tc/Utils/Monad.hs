@@ -160,7 +160,7 @@ import GHC.Builtin.Names
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLocEnv
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.TcRef

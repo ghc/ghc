@@ -16,7 +16,7 @@ import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Class( safeOverlap, matchEqualityInst )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLocEnv
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.EvTerm( evCallStack )
 import GHC.Tc.Solver.InertSet

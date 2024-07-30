@@ -56,7 +56,7 @@ import GHC.Prelude
 
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.CtLocEnv( CtLoc, ctLocOrigin, ctLocSpan, ctLocLevel )
+import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin, ctLocSpan, ctLocLevel )
 import GHC.Tc.Solver.Types
 import GHC.Tc.Utils.TcType
 

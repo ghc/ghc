@@ -16,7 +16,7 @@ import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Types( findFunEqsByTyCon )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLocEnv
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcType

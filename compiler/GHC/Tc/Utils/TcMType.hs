@@ -111,7 +111,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.Unify( unifyInvisibleType, tcSubMult )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.CtLocEnv( CtLoc, ctLocOrigin )
+import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin )
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types

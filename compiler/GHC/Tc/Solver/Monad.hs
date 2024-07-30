@@ -160,7 +160,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.CtLocEnv
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Constraint
 
 import GHC.Builtin.Names ( unsatisfiableClassNameKey )

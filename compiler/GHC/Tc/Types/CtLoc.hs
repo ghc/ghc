@@ -1,14 +1,4 @@
-module GHC.Tc.Types.CtLocEnv (
-
-  -- * SubGoalDepth
-  CtLocEnv(..),
-  getCtLocEnvLoc, setCtLocEnvLoc, setCtLocRealLoc,
-  getCtLocEnvLvl, setCtLocEnvLvl,
-  ctLocEnvInGeneratedCode,
-
-  -- * SubGoalDepth
-  SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
-  bumpSubGoalDepth, subGoalDepthExceeded,
+module GHC.Tc.Types.CtLoc (
 
   -- * CtLoc
   CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
@@ -16,6 +6,16 @@ module GHC.Tc.Types.CtLocEnv (
   ctLocDepth, bumpCtLocDepth, isGivenLoc, mkGivenLoc, mkKindEqLoc,
   setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
   pprCtLoc, adjustCtLoc, adjustCtLocTyConBinder,
+
+  -- * CtLocEnv
+  CtLocEnv(..),
+  getCtLocEnvLoc, setCtLocEnvLoc, setCtLocRealLoc,
+  getCtLocEnvLvl, setCtLocEnvLvl,
+  ctLocEnvInGeneratedCode,
+
+  -- * SubGoalDepth
+  SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
+  bumpSubGoalDepth, subGoalDepthExceeded
 
   ) where
 

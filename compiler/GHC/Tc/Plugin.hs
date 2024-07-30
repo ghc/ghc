@@ -67,7 +67,7 @@ import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
                                , unsafeTcPluginTcM
                                , liftIO, traceTc )
 import GHC.Tc.Types.Constraint ( Ct, CtEvidence(..) )
-import GHC.Tc.Types.CtLocEnv   ( CtLoc )
+import GHC.Tc.Types.CtLoc      ( CtLoc )
 
 import GHC.Tc.Utils.TcMType    ( TcTyVar, TcType )
 import GHC.Tc.Utils.Env        ( TcTyThing )

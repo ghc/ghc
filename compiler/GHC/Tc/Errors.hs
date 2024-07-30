@@ -30,7 +30,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLocEnv
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Utils.TcType
