@@ -1093,6 +1093,14 @@ primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Int#
 primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
+primop   DoubleMinOp   "minDouble#"      GenPrimOp
+   Double# -> Double# -> Double#
+   with commutable = True
+
+primop   DoubleMaxOp   "maxDouble#"      GenPrimOp
+   Double# -> Double# -> Double#
+   with commutable = True
+
 primop   DoubleAddOp   "+##"   GenPrimOp
    Double# -> Double# -> Double#
    with commutable = True
@@ -1258,6 +1266,14 @@ primop   FloatNeOp  "neFloat#"   Compare
 
 primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> Int#
 primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Int#
+
+primop   FloatMinOp   "minFloat#"      GenPrimOp
+   Float# -> Float# -> Float#
+   with commutable = True
+
+primop   FloatMaxOp   "maxFloat#"      GenPrimOp
+   Float# -> Float# -> Float#
+   with commutable = True
 
 primop   FloatAddOp   "plusFloat#"      GenPrimOp
    Float# -> Float# -> Float#
@@ -4219,6 +4235,18 @@ primop VecShuffleOp "shuffle#" GenPrimOp
   {Shuffle elements of the concatenation of the input two vectors
   into the result vector.}
    with vector = ALL_VECTOR_TYPES
+
+primop VecMinOp "min#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR
+   {Component-wise minimum of two vectors.}
+   with
+      vector = ALL_VECTOR_TYPES
+
+primop VecMaxOp "max#" GenPrimOp
+   VECTOR -> VECTOR -> VECTOR
+   {Component-wise maximum of two vectors.}
+   with
+      vector = ALL_VECTOR_TYPES
 
 ------------------------------------------------------------------------
 

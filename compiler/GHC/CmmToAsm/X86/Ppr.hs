@@ -43,6 +43,7 @@ import GHC.Types.Unique ( pprUniqueAlways )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.List ( intersperse )
 import Data.Word
 
 -- Note [Subsections Via Symbols]
@@ -1041,6 +1042,11 @@ pprInstr platform i = case i of
    PUNPCKLQDQ format from to
      -> pprOpReg (text "punpcklqdq") format from to
 
+   MINMAX minMax ty fmt src dst
+     -> pprMinMax False minMax ty fmt [src, dst]
+   VMINMAX minMax ty fmt src1 src2 dst
+     -> pprMinMax True minMax ty fmt [src1, OpReg src2, OpReg dst]
+
   where
    gtab :: Line doc
    gtab  = char '\t'
@@ -1374,3 +1380,14 @@ pprInstr platform i = case i of
            comma,
            pprReg platform format reg
        ]
+
+   pprMinMax :: Bool -> MinOrMax -> MinMaxType -> Format -> [Operand] -> doc
+   pprMinMax wantV minOrMax mmTy fmt regs
+     = line $ hcat ( instr : intersperse comma ( map ( pprOperand platform fmt ) regs ) )
+      where
+        instr =  (if wantV then text "v" else empty)
+              <> (case mmTy of { IntVecMinMax {} -> text "p"; FloatMinMax -> empty })
+              <> (case minOrMax of { Min -> text "min"; Max -> text "max" })
+              <> (case mmTy of { IntVecMinMax wantSigned -> if wantSigned then text "s" else text "u"; FloatMinMax -> empty })
+              <> pprFormat fmt
+              <> space

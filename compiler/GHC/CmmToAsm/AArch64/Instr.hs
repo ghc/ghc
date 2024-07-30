@@ -145,6 +145,8 @@ regUsageOfInstr platform instr = case instr of
   FCVTZS dst src           -> usage (regOp src, regOp dst)
   FABS dst src             -> usage (regOp src, regOp dst)
   FSQRT dst src            -> usage (regOp src, regOp dst)
+  FMIN dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
+  FMAX dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
 
@@ -299,6 +301,8 @@ patchRegsOfInstr instr env = case instr of
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
     FABS o1 o2     -> FABS (patchOp o1) (patchOp o2)
     FSQRT o1 o2    -> FSQRT (patchOp o1) (patchOp o2)
+    FMIN o1 o2 o3  -> FMIN (patchOp o1) (patchOp o2) (patchOp o3)
+    FMAX o1 o2 o3  -> FMAX (patchOp o1) (patchOp o2) (patchOp o3)
     FMA s o1 o2 o3 o4 ->
       FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
 
@@ -681,6 +685,10 @@ data Instr
     | FCVTZS Operand Operand
     -- Float ABSolute value
     | FABS Operand Operand
+    -- Float minimum
+    | FMIN Operand Operand Operand
+    -- Float maximum
+    | FMAX Operand Operand Operand
     -- Float SQuare RooT
     | FSQRT Operand Operand
 
@@ -760,6 +768,8 @@ instrCon i =
       FCVTZS{} -> "FCVTZS"
       FABS{} -> "FABS"
       FSQRT{} -> "FSQRT"
+      FMIN {} -> "FMIN"
+      FMAX {} -> "FMAX"
       FMA variant _ _ _ _ ->
         case variant of
           FMAdd  -> "FMADD"

@@ -1480,6 +1480,9 @@ emitPrimOp cfg primop =
   DoubleGtOp     -> opTranslate (MO_F_Gt W64)
   DoubleLtOp     -> opTranslate (MO_F_Lt W64)
 
+  DoubleMinOp     -> opTranslate (MO_F_Min W64)
+  DoubleMaxOp     -> opTranslate (MO_F_Max W64)
+
   DoubleAddOp    -> opTranslate (MO_F_Add W64)
   DoubleSubOp    -> opTranslate (MO_F_Sub W64)
   DoubleMulOp    -> opTranslate (MO_F_Mul W64)
@@ -1511,6 +1514,9 @@ emitPrimOp cfg primop =
   FloatFNMAdd   -> fmaOp FNMAdd 1 W32
   FloatFNMSub   -> fmaOp FNMSub 1 W32
 
+  FloatMinOp    -> opTranslate (MO_F_Min W32)
+  FloatMaxOp    -> opTranslate (MO_F_Max W32)
+
 -- Vector ops
 
   (VecAddOp  FloatVec n w) -> opTranslate (MO_VF_Add  n w)
@@ -1520,6 +1526,8 @@ emitPrimOp cfg primop =
   (VecQuotOp FloatVec _ _) -> \_ -> panic "unsupported primop"
   (VecRemOp  FloatVec _ _) -> \_ -> panic "unsupported primop"
   (VecNegOp  FloatVec n w) -> opTranslate (MO_VF_Neg  n w)
+  (VecMinOp  FloatVec n w) -> opTranslate (MO_VF_Min  n w)
+  (VecMaxOp  FloatVec n w) -> opTranslate (MO_VF_Max  n w)
 
   (VecAddOp  IntVec n w) -> opTranslate (MO_V_Add   n w)
   (VecSubOp  IntVec n w) -> opTranslate (MO_V_Sub   n w)
@@ -1528,6 +1536,8 @@ emitPrimOp cfg primop =
   (VecQuotOp IntVec n w) -> opTranslate (MO_VS_Quot n w)
   (VecRemOp  IntVec n w) -> opTranslate (MO_VS_Rem  n w)
   (VecNegOp  IntVec n w) -> opTranslate (MO_VS_Neg  n w)
+  (VecMinOp  IntVec n w) -> opTranslate (MO_VS_Min  n w)
+  (VecMaxOp  IntVec n w) -> opTranslate (MO_VS_Max  n w)
 
   (VecAddOp  WordVec n w) -> opTranslate (MO_V_Add   n w)
   (VecSubOp  WordVec n w) -> opTranslate (MO_V_Sub   n w)
@@ -1536,6 +1546,8 @@ emitPrimOp cfg primop =
   (VecQuotOp WordVec n w) -> opTranslate (MO_VU_Quot n w)
   (VecRemOp  WordVec n w) -> opTranslate (MO_VU_Rem  n w)
   (VecNegOp  WordVec _ _) -> \_ -> panic "unsupported primop"
+  (VecMinOp  WordVec n w) -> opTranslate (MO_VU_Min  n w)
+  (VecMaxOp  WordVec n w) -> opTranslate (MO_VU_Max  n w)
 
   -- Vector FMA instructions
   VecFMAdd  _ n w -> fmaOp FMAdd  n w

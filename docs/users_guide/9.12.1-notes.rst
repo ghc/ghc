@@ -202,6 +202,12 @@ Cmm
   and indices ``(# 4#, 3#, 6#, 1# #)``, will return a vector with components
   ``(# 44.1#, 33.1#, 66.1#, 11.1# #)``.
 
+- New instructions for minimum/maximum, such as `minDouble#` and
+  `minFloatX4#`. These instructions compute the minimum/maximum of their inputs,
+  working component-wise for SIMD vectors. Supported argument types are vector
+  integer values (e.g. `Word16X8#`, `Int32X4#` etc) and both scalar and vector
+  floating point values (e.g. `Float#`, `DoubleX2#`, `FloatX8#` etc).
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

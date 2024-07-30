@@ -130,7 +130,8 @@ module GHC.JS.Make
   -- $math
   , math_log, math_sin, math_cos, math_tan, math_exp, math_acos, math_asin,
     math_atan, math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh,
-    math_cosh, math_sinh, math_tanh, math_expm1, math_log1p, math_fround
+    math_cosh, math_sinh, math_tanh, math_expm1, math_log1p, math_fround,
+    math_min, math_max
   -- * Statement helpers
   , Solo(..)
   , decl
@@ -672,7 +673,8 @@ math_ op args = ApplExpr (math .^ op) args
 
 math_log, math_sin, math_cos, math_tan, math_exp, math_acos, math_asin, math_atan,
   math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh, math_sign,
-  math_sinh, math_cosh, math_tanh, math_expm1, math_log1p, math_fround
+  math_sinh, math_cosh, math_tanh, math_expm1, math_log1p, math_fround,
+  math_min, math_max
   :: [JStgExpr] -> JStgExpr
 math_log   = math_ "log"
 math_sin   = math_ "sin"
@@ -695,6 +697,8 @@ math_tanh  = math_ "tanh"
 math_expm1 = math_ "expm1"
 math_log1p = math_ "log1p"
 math_fround = math_ "fround"
+math_min    = math_ "min"
+math_max    = math_ "max"
 
 instance Num JStgExpr where
     x + y = InfixExpr AddOp x y

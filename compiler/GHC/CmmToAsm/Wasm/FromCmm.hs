@@ -821,6 +821,18 @@ lower_CmmMachOp lbl (MO_F_Lt w0) xs =
     lbl
     (cmmFloat w0)
     xs
+lower_CmmMachOp lbl (MO_F_Min w0) xs =
+  lower_MO_Bin_Homo
+    WasmMin
+    lbl
+    (cmmFloat w0)
+    xs
+lower_CmmMachOp lbl (MO_F_Max w0) xs =
+  lower_MO_Bin_Homo
+    WasmMax
+    lbl
+    (cmmFloat w0)
+    xs
 lower_CmmMachOp lbl (MO_And w0) xs =
   lower_MO_Bin_Homo
     WasmAnd

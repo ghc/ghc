@@ -42,6 +42,7 @@ test('simd010', [], compile_and_run, [''])
 test('simd011', [ unless(have_cpu_feature('fma'), skip)
                 , extra_hc_opts('-mfma')
                 ], compile_and_run, [''])
+test('simd012', [], compile_and_run, [''])
 
 
 test('T22187', [],compile,[''])
