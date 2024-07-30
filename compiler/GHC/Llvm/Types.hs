@@ -91,6 +91,15 @@ ppLlvmType t = case t of
 {-# SPECIALIZE ppLlvmType :: LlvmType -> SDoc #-}
 {-# SPECIALIZE ppLlvmType :: LlvmType -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
+-- | Pretty-print a short name for a scalar or vector type, e.g. @"i16"@ or @"v4f32"@.
+ppLlvmTypeShort :: LlvmType -> String
+ppLlvmTypeShort t = case t of
+  LMInt w  -> 'i' : show w
+  LMFloat  -> "f32"
+  LMDouble -> "f64"
+  LMVector l t -> "v" ++ show l ++ ppLlvmTypeShort t
+  _ -> pprPanic "ppLlvmTypeShort" (ppLlvmType t)
+
 ppParams :: IsLine doc => LlvmParameterListType -> [LlvmParameter] -> doc
 ppParams varg p
   = let varg' = case varg of

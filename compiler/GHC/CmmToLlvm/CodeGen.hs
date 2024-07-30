@@ -1493,6 +1493,8 @@ genMachOp _ op [x] = case op of
     MO_F_Sub        _ -> panicOp
     MO_F_Mul        _ -> panicOp
     MO_F_Quot       _ -> panicOp
+    MO_F_Min        _ -> panicOp
+    MO_F_Max        _ -> panicOp
 
     MO_FMA _ _ _      -> panicOp
 
@@ -1519,9 +1521,13 @@ genMachOp _ op [x] = case op of
 
     MO_VS_Quot    _ _ -> panicOp
     MO_VS_Rem     _ _ -> panicOp
+    MO_VS_Min     _ _ -> panicOp
+    MO_VS_Max     _ _ -> panicOp
 
     MO_VU_Quot    _ _ -> panicOp
     MO_VU_Rem     _ _ -> panicOp
+    MO_VU_Min     _ _ -> panicOp
+    MO_VU_Max     _ _ -> panicOp
 
     MO_VF_Insert  _ _ -> panicOp
     MO_VF_Extract _ _ -> panicOp
@@ -1533,6 +1539,8 @@ genMachOp _ op [x] = case op of
     MO_VF_Sub     _ _ -> panicOp
     MO_VF_Mul     _ _ -> panicOp
     MO_VF_Quot    _ _ -> panicOp
+    MO_VF_Min     _ _ -> panicOp
+    MO_VF_Max     _ _ -> panicOp
 
     where
         negate ty v2 negOp = do
@@ -1732,6 +1740,16 @@ genMachOp_slow opt op [x, y] = case op of
 
     MO_VF_Neg {} -> panicOp
 
+    -- Min/max
+    MO_F_Min  {} -> genMinMaxOp "minnum" x y
+    MO_F_Max  {} -> genMinMaxOp "maxnum" x y
+    MO_VF_Min {} -> genMinMaxOp "minnum" x y
+    MO_VF_Max {} -> genMinMaxOp "maxnum" x y
+    MO_VU_Min {} -> genMinMaxOp "umin"   x y
+    MO_VU_Max {} -> genMinMaxOp "umax"   x y
+    MO_VS_Min {} -> genMinMaxOp "smin"   x y
+    MO_VS_Max {} -> genMinMaxOp "smax"   x y
+
     MO_RelaxedRead {} -> panicOp
 
     MO_AlignmentCheck {} -> panicOp
@@ -1785,6 +1803,19 @@ genMachOp_slow opt op [x, y] = case op of
         genBinCastYMach op = binLlvmOp getVarType (LlvmOp op) True
 
         genCastBinMach ty op = binCastLlvmOp ty (LlvmOp op)
+
+        genMinMaxOp intrin x y = runExprData $ do
+            vx <- exprToVarW x
+            vy <- exprToVarW y
+            let tx = getVarType vx
+                ty = getVarType vy
+                fname = "llvm." ++ intrin ++ "." ++ ppLlvmTypeShort ty
+            Panic.massertPpr
+              (tx == ty)
+              (vcat [ text (fname ++ ": mismatched arg types")
+                    , ppLlvmType tx, ppLlvmType ty ])
+            fptr <- liftExprData $ getInstrinct (fsLit fname) ty [tx, ty]
+            doExprW tx $ Call StdCall fptr [vx, vy] [ReadNone, NoUnwind]
 
         -- Detect if overflow will occur in signed multiply of the two
         -- CmmExpr's. This is the LLVM assembly equivalent of the NCG

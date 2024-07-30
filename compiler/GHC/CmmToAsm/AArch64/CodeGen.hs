@@ -812,6 +812,15 @@ getRegister' config plat expr
         MO_Add {} -> notUnary
         MO_Sub {} -> notUnary
 
+        MO_F_Min {} -> notUnary
+        MO_F_Max {} -> notUnary
+        MO_VU_Min {} -> notUnary
+        MO_VU_Max {} -> notUnary
+        MO_VS_Min {} -> notUnary
+        MO_VS_Max {} -> notUnary
+        MO_VF_Min {} -> notUnary
+        MO_VF_Max {} -> notUnary
+
         MO_AlignmentCheck {} ->
           pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
 
@@ -1126,6 +1135,8 @@ getRegister' config plat expr
         MO_F_Sub w   -> floatOp w (\d x y -> unitOL $ SUB d x y)
         MO_F_Mul w   -> floatOp w (\d x y -> unitOL $ MUL d x y)
         MO_F_Quot w  -> floatOp w (\d x y -> unitOL $ SDIV d x y)
+        MO_F_Min w   -> floatOp w (\d x y -> unitOL $ FMIN d x y)
+        MO_F_Max w   -> floatOp w (\d x y -> unitOL $ FMAX d x y)
 
         -- Floating point comparison
         MO_F_Eq w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d EQ ])
@@ -1187,6 +1198,12 @@ getRegister' config plat expr
         MO_VF_Quot {} -> vectorsNeedLlvm
         MO_V_Shuffle {} -> vectorsNeedLlvm
         MO_VF_Shuffle {} -> vectorsNeedLlvm
+        MO_VU_Min {} -> vectorsNeedLlvm
+        MO_VU_Max {} -> vectorsNeedLlvm
+        MO_VS_Min {} -> vectorsNeedLlvm
+        MO_VS_Max {} -> vectorsNeedLlvm
+        MO_VF_Min {} -> vectorsNeedLlvm
+        MO_VF_Max {} -> vectorsNeedLlvm
         where
           notDyadic =
             pprPanic "getRegister' (non-dyadic CmmMachOp with 2 arguments): " $

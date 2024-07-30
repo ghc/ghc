@@ -535,13 +535,20 @@ pprMachOpApp' platform mop args
 
     -- ternary
     args@[_,_,_] ->
-      pprMachOp_for_C platform mop <> parens (pprWithCommas pprArg args)
+      let (_fixity, op) = pprMachOp_for_C platform mop
+      in op <> parens (pprWithCommas pprArg args)
 
     -- dyadic
-    [x,y] -> pprArg x <+> pprMachOp_for_C platform mop <+> pprArg y
+    args@[x,y] ->
+      let (fixity, op) = pprMachOp_for_C platform mop
+      in case fixity of
+            Infix -> pprArg x <+> op <+> pprArg y
+            Prefix -> op <> parens (pprWithCommas pprArg args)
 
     -- unary
-    [x]   -> pprMachOp_for_C platform mop <> parens (pprArg x)
+    [x]   ->
+      let (_fixity, op) = pprMachOp_for_C platform mop
+      in op <> parens (pprArg x)
 
     _     -> panic "PprC.pprMachOp : machop with wrong number of args"
 
@@ -701,36 +708,41 @@ pprBlockId b = char '_' <> ppr (getUnique b)
 -- Print a MachOp in a way suitable for emitting via C.
 --
 
-pprMachOp_for_C :: Platform -> MachOp -> SDoc
+data Fixity = Prefix | Infix
+  deriving ( Eq, Show )
+
+pprMachOp_for_C :: Platform -> MachOp -> (Fixity, SDoc)
 
 pprMachOp_for_C platform mop = case mop of
 
         -- Integer operations
-        MO_Add          _ -> char '+'
-        MO_Sub          _ -> char '-'
-        MO_Eq           _ -> text "=="
-        MO_Ne           _ -> text "!="
-        MO_Mul          _ -> char '*'
+        MO_Add          _ -> (Infix, char '+')
+        MO_Sub          _ -> (Infix, char '-')
+        MO_Eq           _ -> (Infix, text "==")
+        MO_Ne           _ -> (Infix, text "!=")
+        MO_Mul          _ -> (Infix, char '*')
 
-        MO_S_Quot       _ -> char '/'
-        MO_S_Rem        _ -> char '%'
-        MO_S_Neg        _ -> char '-'
+        MO_S_Quot       _ -> (Infix, char '/')
+        MO_S_Rem        _ -> (Infix, char '%')
+        MO_S_Neg        _ -> (Infix, char '-')
 
-        MO_U_Quot       _ -> char '/'
-        MO_U_Rem        _ -> char '%'
+        MO_U_Quot       _ -> (Infix, char '/')
+        MO_U_Rem        _ -> (Infix, char '%')
 
         -- Floating-point operations
-        MO_F_Add        _ -> char '+'
-        MO_F_Sub        _ -> char '-'
-        MO_F_Neg        _ -> char '-'
-        MO_F_Mul        _ -> char '*'
-        MO_F_Quot       _ -> char '/'
+        MO_F_Add        _ -> (Infix, char '+')
+        MO_F_Sub        _ -> (Infix, char '-')
+        MO_F_Neg        _ -> (Infix, char '-')
+        MO_F_Mul        _ -> (Infix, char '*')
+        MO_F_Quot       _ -> (Infix, char '/')
+        MO_F_Min        _ -> (Prefix, text "fmin")
+        MO_F_Max        _ -> (Prefix, text "fmax")
 
         -- Floating-point fused multiply-add operations
         MO_FMA FMAdd 1 w ->
           case w of
-            W32 -> text "fmaf"
-            W64 -> text "fma"
+            W32 -> (Prefix, text "fmaf")
+            W64 -> (Prefix, text "fma")
             _   ->
               pprTrace "offending mop:"
                 (text "FMAdd")
@@ -747,34 +759,34 @@ pprMachOp_for_C platform mop = case mop of
               (panic $ "PprC.pprMachOp_for_C: unsupported vector operation")
 
         -- Signed comparisons
-        MO_S_Ge         _ -> text ">="
-        MO_S_Le         _ -> text "<="
-        MO_S_Gt         _ -> char '>'
-        MO_S_Lt         _ -> char '<'
+        MO_S_Ge         _ -> (Infix, text ">=")
+        MO_S_Le         _ -> (Infix, text "<=")
+        MO_S_Gt         _ -> (Infix, char '>')
+        MO_S_Lt         _ -> (Infix, char '<')
 
         -- & Unsigned comparisons
-        MO_U_Ge         _ -> text ">="
-        MO_U_Le         _ -> text "<="
-        MO_U_Gt         _ -> char '>'
-        MO_U_Lt         _ -> char '<'
+        MO_U_Ge         _ -> (Infix, text ">=")
+        MO_U_Le         _ -> (Infix, text "<=")
+        MO_U_Gt         _ -> (Infix, char '>')
+        MO_U_Lt         _ -> (Infix, char '<')
 
         -- & Floating-point comparisons
-        MO_F_Eq         _ -> text "=="
-        MO_F_Ne         _ -> text "!="
-        MO_F_Ge         _ -> text ">="
-        MO_F_Le         _ -> text "<="
-        MO_F_Gt         _ -> char '>'
-        MO_F_Lt         _ -> char '<'
+        MO_F_Eq         _ -> (Infix, text "==")
+        MO_F_Ne         _ -> (Infix, text "!=")
+        MO_F_Ge         _ -> (Infix, text ">=")
+        MO_F_Le         _ -> (Infix, text "<=")
+        MO_F_Gt         _ -> (Infix, char '>')
+        MO_F_Lt         _ -> (Infix, char '<')
 
         -- Bitwise operations.  Not all of these may be supported at all
         -- sizes, and only integral MachReps are valid.
-        MO_And          _ -> char '&'
-        MO_Or           _ -> char '|'
-        MO_Xor          _ -> char '^'
-        MO_Not          _ -> char '~'
-        MO_Shl          _ -> text "<<"
-        MO_U_Shr        _ -> text ">>" -- unsigned shift right
-        MO_S_Shr        _ -> text ">>" -- signed shift right
+        MO_And          _ -> (Infix, char '&')
+        MO_Or           _ -> (Infix, char '|')
+        MO_Xor          _ -> (Infix, char '^')
+        MO_Not          _ -> (Infix, char '~')
+        MO_Shl          _ -> (Infix, text "<<")
+        MO_U_Shr        _ -> (Infix, text ">>") -- unsigned shift right
+        MO_S_Shr        _ -> (Infix, text ">>") -- signed shift right
 
 -- Conversions.  Some of these will be NOPs, but never those that convert
 -- between ints and floats.
@@ -785,11 +797,11 @@ pprMachOp_for_C platform mop = case mop of
 -- bitcasts, in the C backend these are performed with __builtin_memcpy.
 -- See rts/include/stg/Prim.h
 
-        MO_FW_Bitcast W32 -> text "hs_bitcastfloat2word"
-        MO_FW_Bitcast W64 -> text "hs_bitcastdouble2word64"
+        MO_FW_Bitcast W32 -> (Prefix, text "hs_bitcastfloat2word")
+        MO_FW_Bitcast W64 -> (Prefix, text "hs_bitcastdouble2word64")
 
-        MO_WF_Bitcast W32 -> text "hs_bitcastword2float"
-        MO_WF_Bitcast W64 -> text "hs_bitcastword642double"
+        MO_WF_Bitcast W32 -> (Prefix, text "hs_bitcastword2float")
+        MO_WF_Bitcast W64 -> (Prefix, text "hs_bitcastword642double")
 
         MO_FW_Bitcast w -> pprTrace "offending mop:"
                                 (text "MO_FW_Bitcast")
@@ -805,20 +817,20 @@ pprMachOp_for_C platform mop = case mop of
 
 
 -- noop casts
-        MO_UU_Conv from to | from == to -> empty
-        MO_UU_Conv _from to -> parens (machRep_U_CType platform to)
+        MO_UU_Conv from to | from == to -> (Prefix, empty)
+        MO_UU_Conv _from to -> (Prefix, parens (machRep_U_CType platform to))
 
-        MO_SS_Conv from to | from == to -> empty
-        MO_SS_Conv _from to -> parens (machRep_S_CType platform to)
+        MO_SS_Conv from to | from == to -> (Prefix, empty)
+        MO_SS_Conv _from to -> (Prefix, parens (machRep_S_CType platform to))
 
-        MO_XX_Conv from to | from == to -> empty
-        MO_XX_Conv _from to -> parens (machRep_U_CType platform to)
+        MO_XX_Conv from to | from == to -> (Prefix, empty)
+        MO_XX_Conv _from to -> (Prefix,parens (machRep_U_CType platform to))
 
-        MO_FF_Conv from to | from == to -> empty
-        MO_FF_Conv _from to -> parens (machRep_F_CType to)
+        MO_FF_Conv from to | from == to -> (Prefix, empty)
+        MO_FF_Conv _from to -> (Prefix,parens (machRep_F_CType to))
 
-        MO_SF_Round    _from to -> parens (machRep_F_CType to)
-        MO_FS_Truncate _from to -> parens (machRep_S_CType platform to)
+        MO_SF_Round    _from to -> (Prefix,parens (machRep_F_CType to))
+        MO_FS_Truncate _from to -> (Prefix,parens (machRep_S_CType platform to))
 
         MO_RelaxedRead _ -> pprTrace "offending mop:"
                                 (text "MO_RelaxedRead")
@@ -916,6 +928,30 @@ pprMachOp_for_C platform mop = case mop of
         MO_VF_Quot {}     -> pprTrace "offending mop:"
                                 (text "MO_VF_Quot")
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Quot"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VU_Min {}      -> pprTrace "offending mop:"
+                                (text "MO_VU_Min")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Min"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VU_Max {}      -> pprTrace "offending mop:"
+                                (text "MO_VU_Max")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Max"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VS_Min {}      -> pprTrace "offending mop:"
+                                (text "MO_VS_Min")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VS_Min"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VS_Max {}      -> pprTrace "offending mop:"
+                                (text "MO_VS_Max")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VS_Max"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VF_Min {}      -> pprTrace "offending mop:"
+                                (text "MO_VF_Min")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Min"
+                                      ++ "unsupported by the unregisterised backend")
+        MO_VF_Max {}      -> pprTrace "offending mop:"
+                                (text "MO_VF_Max")
+                                (panic $ "PprC.pprMachOp_for_C: MO_VU_Max"
                                       ++ "unsupported by the unregisterised backend")
 
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints

@@ -126,6 +126,9 @@ data MachOp
   | MO_F_Gt Width
   | MO_F_Lt Width
 
+  | MO_F_Min Width
+  | MO_F_Max Width
+
   -- Bitwise operations.  Not all of these may be supported
   -- at all sizes, and only integral Widths are valid.
   | MO_And   Width
@@ -191,6 +194,14 @@ data MachOp
   | MO_VF_Neg  Length Width      -- unary negation
   | MO_VF_Mul  Length Width
   | MO_VF_Quot Length Width
+
+  -- Min/max operations
+  | MO_VS_Min Length Width
+  | MO_VS_Max Length Width
+  | MO_VU_Min Length Width
+  | MO_VU_Max Length Width
+  | MO_VF_Min Length Width
+  | MO_VF_Max Length Width
 
   -- | An atomic read with no memory ordering. Address msut
   -- be naturally aligned.
@@ -322,6 +333,8 @@ isCommutableMachOp mop =
         MO_Xor _                -> True
         MO_F_Add _              -> True
         MO_F_Mul _              -> True
+        MO_F_Min {}             -> True
+        MO_F_Max {}             -> True
         _other                  -> False
 
 -- ----------------------------------------------------------------------------
@@ -464,6 +477,8 @@ machOpResultType platform mop tys =
     MO_F_Mul r          -> cmmFloat r
     MO_F_Quot r         -> cmmFloat r
     MO_F_Neg r          -> cmmFloat r
+    MO_F_Min r          -> cmmFloat r
+    MO_F_Max r          -> cmmFloat r
 
     MO_FMA _ l r        -> if l == 1 then cmmFloat r else cmmVec l (cmmFloat r)
 
@@ -502,9 +517,13 @@ machOpResultType platform mop tys =
     MO_VS_Quot l w      -> cmmVec l (cmmBits w)
     MO_VS_Rem  l w      -> cmmVec l (cmmBits w)
     MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
+    MO_VS_Min  l w      -> cmmVec l (cmmBits w)
+    MO_VS_Max  l w      -> cmmVec l (cmmBits w)
 
     MO_VU_Quot l w      -> cmmVec l (cmmBits w)
     MO_VU_Rem  l w      -> cmmVec l (cmmBits w)
+    MO_VU_Min  l w      -> cmmVec l (cmmBits w)
+    MO_VU_Max  l w      -> cmmVec l (cmmBits w)
 
     MO_V_Shuffle  l w _ -> cmmVec l (cmmBits w)
     MO_VF_Shuffle l w _ -> cmmVec l (cmmFloat w)
@@ -518,6 +537,8 @@ machOpResultType platform mop tys =
     MO_VF_Mul  l w      -> cmmVec l (cmmFloat w)
     MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
     MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Min  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Max  l w      -> cmmVec l (cmmFloat w)
 
     MO_RelaxedRead r    -> cmmBits r
     MO_AlignmentCheck _ _ -> ty1
@@ -566,6 +587,8 @@ machOpArgReps platform op =
     MO_F_Mul r          -> [r,r]
     MO_F_Quot r         -> [r,r]
     MO_F_Neg r          -> [r]
+    MO_F_Min r          -> [r,r]
+    MO_F_Max r          -> [r,r]
 
     MO_FMA _ l r        -> [vecwidth l r, vecwidth l r, vecwidth l r]
 
@@ -611,9 +634,13 @@ machOpArgReps platform op =
     MO_VS_Quot l w      -> [vecwidth l w, vecwidth l w]
     MO_VS_Rem  l w      -> [vecwidth l w, vecwidth l w]
     MO_VS_Neg  l w      -> [vecwidth l w]
+    MO_VS_Min  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VS_Max  l w      -> [vecwidth l w, vecwidth l w]
 
     MO_VU_Quot l w      -> [vecwidth l w, vecwidth l w]
     MO_VU_Rem  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VU_Min  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VU_Max  l w      -> [vecwidth l w, vecwidth l w]
 
     -- NOTE: The below is owing to the fact that floats use the SSE registers
     MO_VF_Add  l w      -> [vecwidth l w, vecwidth l w]
@@ -621,6 +648,8 @@ machOpArgReps platform op =
     MO_VF_Mul  l w      -> [vecwidth l w, vecwidth l w]
     MO_VF_Quot l w      -> [vecwidth l w, vecwidth l w]
     MO_VF_Neg  l w      -> [vecwidth l w]
+    MO_VF_Min  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Max  l w      -> [vecwidth l w, vecwidth l w]
 
     MO_RelaxedRead _    -> [wordWidth platform]
     MO_AlignmentCheck _ r -> [r]
