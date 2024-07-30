@@ -73,6 +73,11 @@ test('multipleHomeUnits_shared', [extra_files([ 'A.hs', 'unitShared1', 'unitShar
 
 test('multipleHomeUnits_shared_ghci', [extra_files([ 'shared.script', 'A.hs', 'unitShared1', 'unitShared2']), extra_run_opts('-unit @unitShared1 -unit @unitShared2')], ghci_script, ['shared.script'])
 
+test('T25122',
+    [ extra_files(
+        [ 'T25122', 'unitSame1', 'unitSame2'])
+    ], multiunit_compile, [['unitSame1', 'unitSame2'], '-v0 -fhide-source-paths -Werror -Wmissing-home-modules'])
+
 
 
 

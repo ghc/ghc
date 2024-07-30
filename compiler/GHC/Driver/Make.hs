@@ -337,9 +337,11 @@ warnMissingHomeModules dflags targets mod_graph =
     -- Note also that we can't always infer the associated module name
     -- directly from the filename argument.  See #13727.
     is_known_module mod =
-      (Map.lookup (moduleName (ms_mod mod)) mod_targets == Just (ms_unitid mod))
+      is_module_target mod
       ||
       maybe False is_file_target (ml_hs_file (ms_location mod))
+
+    is_module_target mod = (moduleName (ms_mod mod), ms_unitid mod) `Set.member` mod_targets
 
     is_file_target file = Set.member (withoutExt file) file_targets
 
@@ -351,7 +353,7 @@ warnMissingHomeModules dflags targets mod_graph =
         TargetFile file _ ->
           Just (withoutExt (augmentByWorkingDirectory dflags file))
 
-    mod_targets = Map.fromList (mod_target <$> targets)
+    mod_targets = Set.fromList (mod_target <$> targets)
 
     mod_target Target {targetUnitId, targetId} =
       case targetId of
