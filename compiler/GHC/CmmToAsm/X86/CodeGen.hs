@@ -834,7 +834,7 @@ iselExpr64ParallelBin op e1 e2 = do
 -- This is a helper data type which helps reduce the code duplication for
 -- the code generation of arithmetic operations. This is not specifically
 -- targetted for any particular type like Int8, Int32 etc
-data VectorArithInstns = VA_Add | VA_Sub | VA_Mul | VA_Div
+data VectorArithInstns = VA_Add | VA_Sub | VA_Mul | VA_Div | VA_Min | VA_Max
 
 getRegister :: CmmExpr -> NatM Register
 getRegister e = do platform <- getPlatform
@@ -1108,6 +1108,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_F_Le {}   -> incorrectOperands
       MO_F_Gt {}   -> incorrectOperands
       MO_F_Lt {}   -> incorrectOperands
+      MO_F_Min {}  -> incorrectOperands
+      MO_F_Max {}  -> incorrectOperands
       MO_And {}    -> incorrectOperands
       MO_Or {}     -> incorrectOperands
       MO_Xor {}    -> incorrectOperands
@@ -1125,6 +1127,12 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_VU_Rem {}        -> incorrectOperands
       MO_V_Shuffle {}     -> incorrectOperands
       MO_VF_Shuffle {}    -> incorrectOperands
+      MO_VU_Min {}  -> incorrectOperands
+      MO_VU_Max {}  -> incorrectOperands
+      MO_VS_Min {}  -> incorrectOperands
+      MO_VS_Max {}  -> incorrectOperands
+      MO_VF_Min {}  -> incorrectOperands
+      MO_VF_Max {}  -> incorrectOperands
 
       MO_VF_Extract {}    -> incorrectOperands
       MO_VF_Add {}        -> incorrectOperands
@@ -1290,6 +1298,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_F_Sub  w -> trivialFCode_sse2 w SUB  x y
       MO_F_Quot w -> trivialFCode_sse2 w FDIV x y
       MO_F_Mul  w -> trivialFCode_sse2 w MUL  x y
+      MO_F_Min  w -> trivialFCode_sse2 w (MINMAX Min FloatMinMax) x y
+      MO_F_Max  w -> trivialFCode_sse2 w (MINMAX Max FloatMinMax) x y
 
       MO_Add rep -> add_code rep x y
       MO_Sub rep -> sub_code rep x y
@@ -1346,6 +1356,12 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_VF_Quot l w        | avx       -> vector_float_op_avx VA_Div l w x y
                             | otherwise -> vector_float_op_sse VA_Div l w x y
 
+      MO_VF_Min l w         | avx       -> vector_float_op_avx VA_Min l w x y
+                            | otherwise -> vector_float_op_sse VA_Min l w x y
+
+      MO_VF_Max l w         | avx       -> vector_float_op_avx VA_Max l w x y
+                            | otherwise -> vector_float_op_sse VA_Max l w x y
+
       -- SIMD NCG TODO: integer vector operations
       MO_V_Shuffle {} -> needLlvm mop
       MO_V_Add {} -> needLlvm mop
@@ -1355,6 +1371,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_VS_Rem {} -> needLlvm mop
       MO_VU_Quot {} -> needLlvm mop
       MO_VU_Rem {} -> needLlvm mop
+
+      MO_VU_Min {} -> needLlvm mop
+      MO_VU_Max {} -> needLlvm mop
+      MO_VS_Min {} -> needLlvm mop
+      MO_VS_Max {} -> needLlvm mop
 
       -- Unary MachOps
       MO_S_Neg {} -> incorrectOperands
@@ -1585,6 +1606,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
             VA_Sub -> arithInstr VSUB
             VA_Mul -> arithInstr VMUL
             VA_Div -> arithInstr VDIV
+            VA_Min -> arithInstr (VMINMAX Min FloatMinMax)
+            VA_Max -> arithInstr (VMINMAX Max FloatMinMax)
             where
               -- opcode src2 src1 dst <==> dst = src1 `opcode` src2
               arithInstr instr = exp1 `appOL` exp2 `snocOL`
@@ -1610,6 +1633,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
             VA_Sub -> arithInstr SUB
             VA_Mul -> arithInstr MUL
             VA_Div -> arithInstr FDIV
+            VA_Min -> arithInstr (MINMAX Min FloatMinMax)
+            VA_Max -> arithInstr (MINMAX Max FloatMinMax)
             where
               -- opcode src2 src1 <==> src1 = src1 `opcode` src2
               arithInstr instr

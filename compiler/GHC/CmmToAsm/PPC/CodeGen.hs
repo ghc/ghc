@@ -589,6 +589,8 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_F_Sub w  -> triv_float w FSUB
       MO_F_Mul w  -> triv_float w FMUL
       MO_F_Quot w -> triv_float w FDIV
+      MO_F_Min w  -> triv_float w FMIN
+      MO_F_Max w  -> triv_float w FMAX
 
          -- optimize addition with 32-bit immediate
          -- (needed for PIC)
@@ -671,6 +673,12 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_VF_Quot {} -> vectorsNeedLlvm
       MO_V_Shuffle {} -> vectorsNeedLlvm
       MO_VF_Shuffle {} -> vectorsNeedLlvm
+      MO_VU_Min {} -> vectorsNeedLlvm
+      MO_VU_Max {} -> vectorsNeedLlvm
+      MO_VS_Min {} -> vectorsNeedLlvm
+      MO_VS_Max {} -> vectorsNeedLlvm
+      MO_VF_Min {} -> vectorsNeedLlvm
+      MO_VF_Max {} -> vectorsNeedLlvm
 
       _ -> panic "PPC.CodeGen.getRegister: no match"
 

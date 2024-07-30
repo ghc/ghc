@@ -40,6 +40,7 @@ module GHC.CmmToAsm.X86.Instr
    , isMetaInstr
    , isJumpishInstr
    , movdOutFormat
+   , MinOrMax(..), MinMaxType(..)
    )
 where
 
@@ -329,8 +330,20 @@ data Instr
         | PSLLDQ     Format Operand Reg
         | PSRLDQ     Format Operand Reg
 
+        -- min/max
+        | MINMAX  MinOrMax MinMaxType Format Operand Operand
+        | VMINMAX MinOrMax MinMaxType Format Operand Reg Reg
+
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
 
+-- | 'MIN' or 'MAX'
+data MinOrMax = Min | Max
+  deriving ( Eq, Show )
+-- | What kind of min/max operation: signed or unsigned vector integer min/max,
+-- or (scalar or vector) floating point min/max?
+data MinMaxType =
+  IntVecMinMax { minMaxSigned :: Bool } | FloatMinMax
+  deriving ( Eq, Show )
 
 data Operand
         = OpReg  Reg            -- register
@@ -507,6 +520,10 @@ regUsageOfInstr platform instr
     PUNPCKLQDQ fmt src dst
       -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
+    MINMAX _ _ fmt src dst
+      -> mkRU (use_R fmt src $ use_R fmt dst []) (use_R fmt dst [])
+    VMINMAX _ _ fmt src1 src2 dst
+      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
     _other              -> panic "regUsage: unrecognised instr"
  where
     -- # Definitions
@@ -742,6 +759,11 @@ patchRegsOfInstr platform instr env
       -> MOVHLPS fmt (env src) (env dst)
     PUNPCKLQDQ fmt src dst
       -> PUNPCKLQDQ fmt (patchOp src) (env dst)
+
+    MINMAX minMax ty fmt src dst
+      -> MINMAX minMax ty fmt (patchOp src) (patchOp dst)
+    VMINMAX minMax ty fmt src1 src2 dst
+      -> VMINMAX minMax ty fmt (patchOp src1) (env src2) (env dst)
 
   where
     patch1 :: (Operand -> a) -> Operand -> a

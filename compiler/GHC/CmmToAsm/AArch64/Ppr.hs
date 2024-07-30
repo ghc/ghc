@@ -536,6 +536,8 @@ pprInstr platform instr = case instr of
   FCVTZS o1 o2 -> op2 (text "\tfcvtzs") o1 o2
   FABS o1 o2 -> op2 (text "\tfabs") o1 o2
   FSQRT o1 o2 -> op2 (text "\tfsqrt") o1 o2
+  FMIN o1 o2 o3 -> op3 (text "\tfmin") o1 o2 o3
+  FMAX o1 o2 o3 -> op3 (text "\tfmax") o1 o2 o3
   FMA variant d r1 r2 r3 ->
     let fma = case variant of
                 FMAdd  -> text "\tfmadd"

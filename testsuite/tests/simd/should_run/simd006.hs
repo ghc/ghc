@@ -120,6 +120,15 @@ instance Arbitrary Word64 where
 instance Arbitrary Word32 where
     arbitrary = wordDownsize <$> arbitraryWord64
 
+class HasMinMax a where
+  mini, maxi :: a -> a -> a
+instance HasMinMax FloatNT where
+  mini (FloatNT (F# f1)) (FloatNT (F# f2)) = FloatNT (F# (minFloat# f1 f2))
+  maxi (FloatNT (F# f1)) (FloatNT (F# f2)) = FloatNT (F# (maxFloat# f1 f2))
+instance HasMinMax DoubleNT where
+  mini (DoubleNT (D# d1)) (DoubleNT (D# d2)) = DoubleNT (D# (minDouble# d1 d2))
+  maxi (DoubleNT (D# d1)) (DoubleNT (D# d2)) = DoubleNT (D# (maxDouble# d1 d2))
+
 newtype FloatNT = FloatNT Float
   deriving newtype (Show, Num)
 instance Eq FloatNT where
@@ -167,6 +176,9 @@ instance Num FloatX4 where
   abs = error "no"
   signum = error "no"
   fromInteger = error "no"
+instance HasMinMax FloatX4 where
+  mini (FX4# a) (FX4# b) = FX4# (minFloatX4# a b)
+  maxi (FX4# a) (FX4# b) = FX4# (maxFloatX4# a b)
 
 data DoubleX2 = DX2# DoubleX2#
 instance Show DoubleX2 where
@@ -195,6 +207,9 @@ instance Num DoubleX2 where
   abs = error "no"
   signum = error "no"
   fromInteger = error "no"
+instance HasMinMax DoubleX2 where
+  mini (DX2# a) (DX2# b) = DX2# (minDoubleX2# a b)
+  maxi (DX2# a) (DX2# b) = DX2# (maxDoubleX2# a b)
 
 data Expr a where
   Lit :: a -> Expr a
@@ -202,6 +217,8 @@ data Expr a where
   Sub :: Expr a -> Expr a -> Expr a
   Neg :: Expr a -> Expr a
   Mul :: Expr a -> Expr a -> Expr a
+  Min :: Expr a -> Expr a -> Expr a
+  Max :: Expr a -> Expr a -> Expr a
   deriving (Show, Eq)
 fmapExpr :: (a -> b) -> Expr a -> Expr b
 fmapExpr f (Lit a) = Lit (f a)
@@ -209,6 +226,8 @@ fmapExpr f (Add a b) = Add (fmapExpr f a) (fmapExpr f b)
 fmapExpr f (Sub a b) = Sub (fmapExpr f a) (fmapExpr f b)
 fmapExpr f (Neg a) = Neg (fmapExpr f a)
 fmapExpr f (Mul a b) = Mul (fmapExpr f a) (fmapExpr f b)
+fmapExpr f (Min a b) = Min (fmapExpr f a) (fmapExpr f b)
+fmapExpr f (Max a b) = Max (fmapExpr f a) (fmapExpr f b)
 
 instance Arbitrary a => Arbitrary (Expr a) where
   arbitrary = do
@@ -218,15 +237,18 @@ instance Arbitrary a => Arbitrary (Expr a) where
       2 -> Sub <$> arbitrary <*> arbitrary
       3 -> Neg <$> arbitrary
       4 -> Mul <$> arbitrary <*> arbitrary
+      5 -> Min <$> arbitrary <*> arbitrary
+      6 -> Max <$> arbitrary <*> arbitrary
       _ -> Lit <$> arbitrary
 
-eval :: Num a => Expr a -> a
+eval :: (Num a, HasMinMax a) => Expr a -> a
 eval (Lit a) = a
 eval (Add a b) = eval a + eval b
 eval (Sub a b) = eval a - eval b
 eval (Neg a) = negate (eval a)
 eval (Mul a b) = eval a * eval b
-
+eval (Min a b) = mini (eval a) (eval b)
+eval (Max a b) = maxi (eval a) (eval b)
 
 int64ToInt :: Int64 -> Int
 #if WORD_SIZE_IN_BITS == 64

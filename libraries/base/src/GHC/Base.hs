@@ -204,6 +204,71 @@ import GHC.Prim hiding
   , shuffleWord8X16#
   , shuffleWord8X32#
   , shuffleWord8X64#
+  -- Don't re-export min/max primops
+  , maxDouble#
+  , maxDoubleX2#
+  , maxDoubleX4#
+  , maxDoubleX8#
+  , maxFloat#
+  , maxFloatX16#
+  , maxFloatX4#
+  , maxFloatX8#
+  , maxInt16X16#
+  , maxInt16X32#
+  , maxInt16X8#
+  , maxInt32X16#
+  , maxInt32X4#
+  , maxInt32X8#
+  , maxInt64X2#
+  , maxInt64X4#
+  , maxInt64X8#
+  , maxInt8X16#
+  , maxInt8X32#
+  , maxInt8X64#
+  , maxWord16X16#
+  , maxWord16X32#
+  , maxWord16X8#
+  , maxWord32X16#
+  , maxWord32X4#
+  , maxWord32X8#
+  , maxWord64X2#
+  , maxWord64X4#
+  , maxWord64X8#
+  , maxWord8X16#
+  , maxWord8X32#
+  , maxWord8X64#
+  , minDouble#
+  , minDoubleX2#
+  , minDoubleX4#
+  , minDoubleX8#
+  , minFloat#
+  , minFloatX16#
+  , minFloatX4#
+  , minFloatX8#
+  , minInt16X16#
+  , minInt16X32#
+  , minInt16X8#
+  , minInt32X16#
+  , minInt32X4#
+  , minInt32X8#
+  , minInt64X2#
+  , minInt64X4#
+  , minInt64X8#
+  , minInt8X16#
+  , minInt8X32#
+  , minInt8X64#
+  , minWord16X16#
+  , minWord16X32#
+  , minWord16X8#
+  , minWord32X16#
+  , minWord32X4#
+  , minWord32X8#
+  , minWord64X2#
+  , minWord64X4#
+  , minWord64X8#
+  , minWord8X16#
+  , minWord8X32#
+  , minWord8X64#
   )
 
 import GHC.Prim.Ext

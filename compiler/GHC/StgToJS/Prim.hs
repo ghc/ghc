@@ -477,6 +477,8 @@ genPrim prof bound ty op = case op of
   DoubleDivOp       -> \[r] [x,y] -> pure $ PrimInline $ r |= Div x y
   DoubleNegOp       -> \[r] [x]   -> pure $ PrimInline $ r |= Negate x
   DoubleFabsOp      -> \[r] [x]   -> pure $ PrimInline $ r |= math_abs [x]
+  DoubleMinOp       -> \[r] [x,y] -> pure $ PrimInline $ r |= math_min [x,y]
+  DoubleMaxOp       -> \[r] [x,y] -> pure $ PrimInline $ r |= math_max [x,y]
   DoubleToIntOp     -> \[r] [x]   -> pure $ PrimInline $ r |= toI32 x
   DoubleToFloatOp   -> \[r] [x]   -> pure $ PrimInline $ r |= math_fround [x]
   DoubleExpOp       -> \[r] [x]   -> pure $ PrimInline $ r |= math_exp  [x]
@@ -520,6 +522,8 @@ genPrim prof bound ty op = case op of
   FloatMulOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= math_fround [Mul x y]
   FloatDivOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= math_fround [Div x y]
   FloatNegOp        -> \[r] [x]   -> pure $ PrimInline $ r |= Negate x
+  FloatMinOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= math_min [x,y]
+  FloatMaxOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= math_max [x,y]
   FloatFabsOp       -> \[r] [x]   -> pure $ PrimInline $ r |= math_abs [x]
   FloatToIntOp      -> \[r] [x]   -> pure $ PrimInline $ r |= toI32 x
   FloatExpOp        -> \[r] [x]   -> pure $ PrimInline $ r |= math_fround [math_exp [x]]
@@ -1206,6 +1210,8 @@ genPrim prof bound ty op = case op of
   VecReadScalarOffAddrOp _ _ _      -> unhandledPrimop op
   VecWriteScalarOffAddrOp _ _ _     -> unhandledPrimop op
   VecShuffleOp _ _ _                -> unhandledPrimop op
+  VecMinOp {}                       -> unhandledPrimop op
+  VecMaxOp {}                       -> unhandledPrimop op
 
   PrefetchByteArrayOp3              -> noOp
   PrefetchMutableByteArrayOp3       -> noOp
