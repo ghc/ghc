@@ -133,7 +133,12 @@ data DocStructureItem
                             -- > module M (module X) where
                             -- > import R0 as X
                             -- > import R1 as X
+                            --
+                            -- Invariant: This list of ModuleNames must be
+                            -- sorted to guarantee interface file determinism.
       !Avails
+                            -- ^ Invariant: This list of Avails must be sorted
+                            -- to guarantee interface file determinism.
 
 instance Binary DocStructureItem where
   put_ bh = \case
