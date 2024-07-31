@@ -356,16 +356,16 @@ initTcDsForSolver thing_inside
   = do { (gbl, lcl) <- getEnvs
        ; hsc_env    <- getTopEnv
 
+         -- The DsGblEnv is used to inform the typechecker's solver of a few
+         -- key pieces of information:
+         --
+         --  - ds_fam_inst_env tells it how to reduce type families,
+         --  - ds_gbl_rdr_env  tells it which newtypes it can unwrap.
        ; let DsGblEnv { ds_mod = mod
                       , ds_fam_inst_env = fam_inst_env
-                      , ds_gbl_rdr_env  = rdr_env }      = gbl
-       -- This is *the* use of ds_gbl_rdr_env:
-       -- Make sure the solver (used by the pattern-match overlap checker) has
-       -- access to the GlobalRdrEnv and FamInstEnv for the module, so that it
-       -- knows how to reduce type families, and which newtypes it can unwrap.
-
-
-             DsLclEnv { dsl_loc = loc }                  = lcl
+                      , ds_gbl_rdr_env  = rdr_env
+                      } = gbl
+             DsLclEnv { dsl_loc = loc } = lcl
 
        ; (msgs, mb_ret) <- liftIO $ initTc hsc_env HsSrcFile False mod loc $
          updGblEnv (\tc_gbl -> tc_gbl { tcg_fam_inst_env = fam_inst_env

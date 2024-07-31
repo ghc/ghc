@@ -36,6 +36,7 @@ import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils (tracePm, traceWhenFailPm, mkPmId)
+import GHC.HsToCore.Types (DsGblEnv(..))
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Config
@@ -51,10 +52,13 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.SDFM
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Var      (EvVar)
+import GHC.Types.Name.Reader (lookupGRE_Name, GlobalRdrEnv)
+import GHC.Types.Var         (EvVar)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
+
+import GHC.Tc.Utils.Monad   (getGblEnv)
 
 import GHC.Core
 import GHC.Core.FVs         (exprFreeVars)
@@ -96,6 +100,7 @@ import Data.Monoid   (Any(..))
 import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
+
 
 --
 -- * Main exports
@@ -1959,13 +1964,16 @@ generateInhabitingPatterns mode (x:xs) n nabla = do
               -- No COMPLETE sets ==> inhabited
               generateInhabitingPatterns mode xs n newty_nabla
             Just clss -> do
-              -- Try each COMPLETE set, pick the one with the smallest number of
-              -- inhabitants
+              -- Try each COMPLETE set.
               nablass' <- forM clss (instantiate_cons y rep_ty xs n newty_nabla)
-              let nablas' = minimumBy (comparing length) nablass'
-              if null nablas' && vi_bot vi /= IsNotBot
-                then generateInhabitingPatterns mode xs n newty_nabla -- bot is still possible. Display a wildcard!
-                else pure nablas'
+              if any null nablass' && vi_bot vi /= IsNotBot
+              then generateInhabitingPatterns mode xs n newty_nabla -- bot is still possible. Display a wildcard!
+              else do
+                -- Pick the residual COMPLETE set with the smallest cost (see 'completeSetCost').
+                -- See Note [Prefer in-scope COMPLETE matches].
+                DsGblEnv { ds_gbl_rdr_env = rdr_env } <- getGblEnv
+                let bestSet = map snd $ minimumBy (comparing $ completeSetCost rdr_env) nablass'
+                pure bestSet
 
     -- Instantiates a chain of newtypes, beginning at @x@.
     -- Turns @x nabla [T,U,V]@ to @(y, nabla')@, where @nabla'@ we has the fact
@@ -1979,13 +1987,13 @@ generateInhabitingPatterns mode (x:xs) n nabla = do
       nabla' <- addConCt nabla x (PmAltConLike (RealDataCon dc)) [] [y]
       instantiate_newtype_chain y nabla' dcs
 
-    instantiate_cons :: Id -> Type -> [Id] -> Int -> Nabla -> [ConLike] -> DsM [Nabla]
+    instantiate_cons :: Id -> Type -> [Id] -> Int -> Nabla -> [ConLike] -> DsM [(Maybe ConLike, Nabla)]
     instantiate_cons _ _  _  _ _     []       = pure []
     instantiate_cons _ _  _  0 _     _        = pure []
     instantiate_cons _ ty xs n nabla _
       -- We don't want to expose users to GHC-specific constructors for Int etc.
       | fmap (isTyConTriviallyInhabited . fst) (splitTyConApp_maybe ty) == Just True
-      = generateInhabitingPatterns mode xs n nabla
+      = map (Nothing,) <$> generateInhabitingPatterns mode xs n nabla
     instantiate_cons x ty xs n nabla (cl:cls) = do
       -- The following line is where we call out to the inhabitationTest!
       mb_nabla <- runMaybeT $ instCon 4 nabla x cl
@@ -2002,7 +2010,54 @@ generateInhabitingPatterns mode (x:xs) n nabla = do
         -- inhabited, otherwise the inhabitation test would have refuted.
         Just nabla' -> generateInhabitingPatterns mode xs n nabla'
       other_cons_nablas <- instantiate_cons x ty xs (n - length con_nablas) nabla cls
-      pure (con_nablas ++ other_cons_nablas)
+      pure (map (Just cl,) con_nablas ++ other_cons_nablas)
+
+-- | If multiple residual COMPLETE sets apply, pick one as follows:
+--
+--  - prefer COMPLETE sets in which all constructors are in scope,
+--    as per Note [Prefer in-scope COMPLETE matches],
+--  - if there are ties, pick the one with the fewest (residual) ConLikes,
+--  - if there are ties, pick the one with the fewest "trivially inhabited" types,
+--  - if there are ties, pick the one with the fewest PatSyns,
+--  - if there are still ties, pick the one that comes first in the list of
+--    COMPLETE pragmas, which means the one that was brought into scope first.
+completeSetCost :: GlobalRdrEnv -> [(Maybe ConLike, a)] -> (Bool, Int, Int, Int)
+completeSetCost _ [] = (False, 0, 0, 0)
+completeSetCost rdr_env ((mb_con, _) : cons) =
+  let con_out_of_scope
+        | Just con <- mb_con
+        = isNothing $ lookupGRE_Name rdr_env (conLikeName con)
+        | otherwise
+        = False
+      (any_out_of_scope, nb_cons, nb_triv, nb_ps) = completeSetCost rdr_env cons
+  in ( any_out_of_scope || con_out_of_scope
+     , nb_cons + 1
+     , nb_triv + case mb_con of { Nothing -> 1; _ -> 0 }
+     , nb_ps   + case mb_con of { Just (PatSynCon {}) -> 1; _ -> 0 }
+     )
+
+{- Note [Prefer in-scope COMPLETE matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We prefer using COMPLETE pragmas in which all ConLikes are in scope, as this
+improves error messages. See for example T25115:
+
+  - T25115a defines pattern Foo :: a with {-# COMPLETE Foo #-}
+  - T25115 imports T25115a, but not Foo.
+    (This means it imports the COMPLETE pragma, which behaves like an instance.)
+
+    Then, for the following incomplete pattern match in T25115:
+
+      baz :: Ordering -> Int
+      baz = \case
+        EQ -> 5
+
+    we would prefer reporting that 'LT' and 'GT' are not matched, rather than
+    saying that 'T25115a.Foo' is not matched.
+
+    However, if ALL ConLikes are out of scope, then we should still report
+    something, so we don't want to outright filter out all COMPLETE sets
+    with an out-of-scope ConLike.
+-}
 
 pickApplicableCompleteSets :: TyState -> Type -> ResidualCompleteMatches -> DsM DsCompleteMatches
 -- See Note [Implementation of COMPLETE pragmas] on what "applicable" means
