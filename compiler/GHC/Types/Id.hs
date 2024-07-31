@@ -296,26 +296,28 @@ mkGlobalId :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId = Var.mkGlobalVar
 
 -- | Make a global 'Id' without any extra information at all
-mkVanillaGlobal :: Name -> Type -> Id
+mkVanillaGlobal :: HasDebugCallStack => Name -> Type -> Id
 mkVanillaGlobal name ty = mkVanillaGlobalWithInfo name ty vanillaIdInfo
 
 -- | Make a global 'Id' with no global information but some generic 'IdInfo'
-mkVanillaGlobalWithInfo :: Name -> Type -> IdInfo -> Id
-mkVanillaGlobalWithInfo = mkGlobalId VanillaId
-
+mkVanillaGlobalWithInfo :: HasDebugCallStack => Name -> Type -> IdInfo -> Id
+mkVanillaGlobalWithInfo nm =
+  assertPpr (not $ isFieldNameSpace $ nameNameSpace nm)
+    (text "mkVanillaGlobalWithInfo called on record field:" <+> ppr nm) $
+    mkGlobalId VanillaId nm
 
 -- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
 mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
 mkLocalId name w ty = mkLocalIdWithInfo name w (assert (not (isCoVarType ty)) ty) vanillaIdInfo
 
 -- | Make a local CoVar
-mkLocalCoVar :: Name -> Type -> CoVar
+mkLocalCoVar :: HasDebugCallStack => Name -> Type -> CoVar
 mkLocalCoVar name ty
   = assert (isCoVarType ty) $
     Var.mkLocalVar CoVarId name ManyTy ty vanillaIdInfo
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
-mkLocalIdOrCoVar :: Name -> Mult -> Type -> Id
+mkLocalIdOrCoVar :: HasDebugCallStack => Name -> Mult -> Type -> Id
 mkLocalIdOrCoVar name w ty
   -- We should assert (eqType w Many) in the isCoVarType case.
   -- However, currently this assertion does not hold.
@@ -339,7 +341,10 @@ mkExportedLocalId details name ty = Var.mkExportedLocalVar details name ty vanil
         -- Note [Free type variables]
 
 mkExportedVanillaId :: Name -> Type -> Id
-mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaIdInfo
+mkExportedVanillaId name ty =
+  assertPpr (not $ isFieldNameSpace $ nameNameSpace name)
+    (text "mkExportedVanillaId called on record field:" <+> ppr name) $
+    Var.mkExportedLocalVar VanillaId name ty vanillaIdInfo
         -- Note [Free type variables]
 
 
