@@ -587,12 +587,9 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               -- When compiling with -fprefer-byte-code, always
               -- compile foreign stubs as shared objects to ensure
               -- they can be properly loaded.
-              let hsc_env_stub
-                    | gopt Opt_ByteCodeAndObjectCode dflags = hscUpdateFlags setDynamicNow hsc_env
-                    | otherwise = hsc_env
-              stub_o <- mapM (compileStub hsc_env_stub) mStub
+              stub_o <- mapM (compileStub hsc_env) mStub
               foreign_os <-
-                mapM (uncurry (compileForeign hsc_env_stub)) foreign_files
+                mapM (uncurry (compileForeign hsc_env)) foreign_files
               let fos = maybe [] return stub_o ++ foreign_os
 
               final_iface <- mkFullIface hsc_env partial_iface stg_infos cg_infos
