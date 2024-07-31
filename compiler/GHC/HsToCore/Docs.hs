@@ -160,7 +160,7 @@ mkDocStructureFromExportList mdl import_avails export_list =
       (IEGroup _ level doc, _)         -> DsiSectionHeading level (unLoc doc)
       (IEDoc _ doc, _)                 -> DsiDocChunk (unLoc doc)
       (IEDocNamed _ name, _)           -> DsiNamedChunkRef name
-      (_, avails)                      -> DsiExports (nubAvails avails)
+      (_, avails)                      -> DsiExports (sortAvails (nubAvails avails))
 
     moduleExport :: ModuleName -- Alias
                  -> Avails
@@ -199,7 +199,7 @@ mkDocStructureFromDecls env all_exports decls =
     map unLoc (sortLocated (docs ++ avails))
   where
     avails :: [Located DocStructureItem]
-    avails = flip fmap all_exports $ \avail ->
+    avails = flip fmap (sortAvails all_exports) $ \avail ->
       case M.lookup (availName avail) name_locs of
         Just loc -> L loc (DsiExports [avail])
         -- FIXME: This is just a workaround that we use when handling e.g.
