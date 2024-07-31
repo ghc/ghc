@@ -241,6 +241,8 @@ instance H.Builder Builder where
             -- GHC from the previous stage is used to build artifacts in the
             -- current stage. Need the previous stage's GHC deps.
             ghcdeps <- ghcBinDeps (predStage stage)
+            libffi_adjustors <- useLibffiForAdjustors
+            use_system_ffi <- flag UseSystemFfi
 
             return $ [ unlitPath ]
                   ++ ghcdeps
@@ -249,6 +251,13 @@ instance H.Builder Builder where
                      -- proxy for the entire mingw toolchain that
                      -- we have in inplace/mingw initially, and then at
                      -- root -/- mingw.
+                  -- ffi.h needed by the compiler when using libffi_adjustors (#24864)
+                  -- It would be nicer to not duplicate this logic between here
+                  -- and needRtsLibffiTargets and libffiHeaderFiles but this doesn't change
+                  -- very often.
+                  ++ [ root -/- buildDir (rtsContext stage) -/- "include" -/- header
+                     | header <- ["ffi.h", "ffitarget.h"]
+                     , libffi_adjustors && not use_system_ffi ]
 
         Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage
         Make dir  -> return [dir -/- "Makefile"]
