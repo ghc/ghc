@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -26,7 +27,7 @@ import GHC.Driver.Errors.Types
 import GHC.Types.Error
   ( DiagnosticCode(..) )
 import GHC.Types.Error.Codes
-  ( constructorCodes )
+  ( GHC, constructorCodes )
 
 -- ghc (API usage)
 import GHC
@@ -77,7 +78,7 @@ import Language.Haskell.Syntax.Module.Name
 -- | The diagnostic codes that are statically reachable from the
 -- 'GhcMessage' datatype.
 staticallyUsedCodes :: Map DiagnosticCode String
-staticallyUsedCodes = constructorCodes @GhcMessage
+staticallyUsedCodes = constructorCodes @GHC @GhcMessage
 
 --------------------------------------------------------------------------------
 

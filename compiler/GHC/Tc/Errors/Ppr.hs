@@ -3279,7 +3279,7 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedTypeSyntaxInTerms syntax
       -> [suggestExtension (typeSyntaxExtension syntax)]
 
-  diagnosticCode = constructorCode
+  diagnosticCode = constructorCode @GHC
 
 
 note :: SDoc -> SDoc
