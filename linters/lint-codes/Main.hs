@@ -67,7 +67,7 @@ listOutdatedCodes famEqnCodes = do
 --
 -- Assumes we are in a GHC Git tree, as we look at all testsuite .stdout and
 -- .stderr files.
-testCodes ::  Map DiagnosticCode ( FamEqnIndex, String, Use ) -> IO ()
+testCodes :: Map DiagnosticCode ( FamEqnIndex, String, Use ) -> IO ()
 testCodes famEqnCodes = do
 
   ------------------------------

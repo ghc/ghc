@@ -89,7 +89,7 @@ instance Diagnostic GhcMessage where
     GhcUnknownMessage m
       -> diagnosticHints m
 
-  diagnosticCode = constructorCode
+  diagnosticCode = constructorCode @GHC
 
 instance HasDefaultDiagnosticOpts DriverMessageOpts where
   defaultOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage) (defaultDiagnosticOpts @IfaceMessage)
@@ -409,4 +409,4 @@ instance Diagnostic DriverMessage where
     DriverInstantiationNodeInDependencyGeneration {}
       -> noHints
 
-  diagnosticCode = constructorCode
+  diagnosticCode = constructorCode @GHC
