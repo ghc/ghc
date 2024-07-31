@@ -59,7 +59,7 @@ instance Diagnostic IfaceMessage where
 
   diagnosticHints = interfaceErrorHints
 
-  diagnosticCode = constructorCode
+  diagnosticCode = constructorCode @GHC
 
 interfaceErrorHints :: IfaceMessage -> [GhcHint]
 interfaceErrorHints = \ case

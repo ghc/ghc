@@ -16,22 +16,30 @@
 -- A diagnostic code is a numeric unique identifier for a diagnostic.
 -- See Note [Diagnostic codes].
 module GHC.Types.Error.Codes
-  ( GhcDiagnosticCode, constructorCode, constructorCodes )
+  ( -- * General diagnostic code infrastructure
+    DiagnosticCodeNameSpace(NameSpaceTag, DiagnosticCodeFor, ConRecursIntoFor)
+  , Outdated
+  , constructorCode, constructorCodes
+    -- * GHC diagnostic codes
+  , GHC, GhcDiagnosticCode, ConRecursInto
+  )
   where
 
 import GHC.Prelude
-import GHC.Types.Error  ( DiagnosticCode(..), UnknownDiagnostic (..), diagnosticCode, NoDiagnosticOpts )
 
-import GHC.Hs.Extension ( GhcRn )
-
-import GHC.Core.InstEnv (LookupInstanceErrReason)
-import GHC.Iface.Errors.Types
-import GHC.Driver.Errors.Types   ( DriverMessage, GhcMessageOpts, DriverMessageOpts )
-import GHC.Parser.Errors.Types   ( PsMessage, PsHeaderMessage )
-import GHC.HsToCore.Errors.Types ( DsMessage )
-import GHC.Tc.Errors.Types
+import GHC.Core.InstEnv         ( LookupInstanceErrReason )
+import GHC.Hs.Extension         ( GhcRn )
+import GHC.Types.Error          ( DiagnosticCode(..), UnknownDiagnostic (..), NoDiagnosticOpts
+                                , diagnosticCode )
 import GHC.Unit.Module.Warnings ( WarningTxt )
 import GHC.Utils.Panic.Plain
+
+-- Import all the structured error data types
+import GHC.Driver.Errors.Types   ( DriverMessage, GhcMessageOpts, DriverMessageOpts )
+import GHC.HsToCore.Errors.Types ( DsMessage )
+import GHC.Iface.Errors.Types
+import GHC.Parser.Errors.Types   ( PsMessage, PsHeaderMessage )
+import GHC.Tc.Errors.Types
 
 import Data.Kind    ( Type, Constraint )
 import GHC.Exts     ( proxy# )
@@ -57,7 +65,11 @@ To ensure uniqueness across GHC versions, we proceed as follows:
   - a diagnostic code never gets deleted from the GhcDiagnosticCode type family
     in GHC.Types.Error.Codes, even if it is no longer used.
     Older versions of GHC might still display the code, and we don't want that
-    old code to get confused with the error code of a different, new, error message.
+    old code to get confused with the error code of a different, new, error message.*
+
+Note that this module also provides a 'DiagnosticCodeNameSpace' typeclass which
+allows diagnostic codes to be emitted in different namespaces than the GHC
+namespace; see Note [Diagnostic code namespaces].
 
 [Instructions for adding a new diagnostic code]
 
@@ -99,8 +111,80 @@ To ensure uniqueness across GHC versions, we proceed as follows:
 
   Never remove a return value from the 'GhcDiagnosticCode' type family!
   Outdated error messages must still be tracked to ensure uniqueness
-  of diagnostic codes across GHC versions.
+  of diagnostic codes across GHC versions. Instead, you should wrap the
+  return value in the 'Outdated' type synonym. The presence of this type synonym
+  is used by the 'codes' test to determine which diagnostic codes to check
+  for testsuite coverage.
 -}
+
+{- *********************************************************************
+*                                                                      *
+                 DiagnosticCode infrastructure
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Diagnostic code namespaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The machinery for GHC diagnostic codes described in Note [Diagnostic codes]
+works for other namespaces than the GHC namespaces; one example is GHCi-specific
+diagnostic codes.
+
+To achieve this, we parametrise all the machinery over a namespace type-level
+argument, using the 'DiagnosticCodeNameSpace' class.
+To provide diagnostic codes, one needs to supply an instance of this class,
+which means supplying the following pieces of information:
+
+  - a type that represents the namespace, e.g. `data GHC` can be used to
+    represent the GHC namespace,
+  - a type family equation for 'NameSpaceTag', e.g. 'NameSpaceTag GHC = "GHC"',
+  - a diagnostic code type family, e.g. 'DiagnosticCodeFor GHC con = GhcDiagnosticCode con',
+  - a type family that specifies how to recur into constructor arguments,
+    e.g. 'ConRecursIntoFor GHC con = ConRecursInto con'.
+
+This allows any tool that imports the GHC library to re-use the diagnostic
+code machinery that GHC uses.
+-}
+
+-- | A constraint for a namespace which has its own diagnostic codes.
+--
+-- See Note [Diagnostic code namespaces].
+type DiagnosticCodeNameSpace :: Type -> Constraint
+class DiagnosticCodeNameSpace namespace where
+  -- | The symbolic tag for a namespace.
+  type NameSpaceTag namespace = (r :: Symbol) | r -> namespace
+    -- NB: the injectivity annotation ensures uniqueness of namespaces,
+    -- e.g. it prevents two different namespaces from using the same symbolic tag.
+  -- | A diagnostic code in a given namespace.
+  type DiagnosticCodeFor namespace (c :: Symbol) :: Nat
+  -- | Specify that one should recur into an argument of a constructor
+  -- in order to obtain a diagnostic code. See Note [Diagnostic codes].
+  type ConRecursIntoFor namespace (c :: Symbol) :: Maybe Type
+
+-- | Use this type synonym to mark a diagnostic code as outdated.
+--
+-- The presence of this type synonym is used by the 'codes' test to determine
+-- which diagnostic codes to check for testsuite coverage.
+type Outdated a = a
+
+-- | This function obtains a diagnostic code by looking up the constructor
+-- name using generics, and using the 'DiagnosticCode' type family.
+constructorCode :: forall namespace diag
+                .  (Generic diag, GDiagnosticCode namespace (Rep diag))
+                => diag -> Maybe DiagnosticCode
+constructorCode diag = gdiagnosticCode @namespace (from diag)
+
+-- | This function computes all diagnostic codes that occur inside a given
+-- type using generics and the 'DiagnosticCode' type family.
+--
+-- For example, if @T = MkT1 | MkT2@, @GhcDiagnosticCode \"MkT1\" = 123@ and
+-- @GhcDiagnosticCode \"MkT2\" = 456@, then we will get
+-- > constructorCodes @GHC @T = fromList [ (DiagnosticCode "GHC" 123, \"MkT1\"), (DiagnosticCode "GHC" 456, \"MkT2\") ]
+constructorCodes :: forall namespace diag
+                 .  (Generic diag, GDiagnosticCodes namespace '[diag] (Rep diag))
+                 => Map DiagnosticCode String
+constructorCodes = gdiagnosticCodes @namespace @'[diag] @(Rep diag)
+  -- See Note [diagnosticCodes: don't recur into already-seen types]
+  -- for the @'[diag] type argument.
 
 {- *********************************************************************
 *                                                                      *
@@ -108,23 +192,12 @@ To ensure uniqueness across GHC versions, we proceed as follows:
 *                                                                      *
 ********************************************************************* -}
 
--- | This function obtain a diagnostic code by looking up the constructor
--- name using generics, and using the 'GhcDiagnosticCode' type family.
-constructorCode :: (Generic diag, GDiagnosticCode (Rep diag))
-                => diag -> Maybe DiagnosticCode
-constructorCode diag = gdiagnosticCode (from diag)
-
--- | This function computes all diagnostic codes that occur inside a given
--- type using generics and the 'GhcDiagnosticCode' type family.
---
--- For example, if @T = MkT1 | MkT2@, @GhcDiagnosticCode \"MkT1\" = 123@ and
--- @GhcDiagnosticCode \"MkT2\" = 456@, then we will get
--- > constructorCodes @T = fromList [ (123, \"MkT1\"), (456, \"MkT2\") ]
-constructorCodes :: forall diag. (Generic diag, GDiagnosticCodes '[diag] (Rep diag))
-                 => Map DiagnosticCode String
-constructorCodes = gdiagnosticCodes @'[diag] @(Rep diag)
-  -- See Note [diagnosticCodes: don't recur into already-seen types]
-  -- for the @'[diag] type argument.
+-- | The GHC namespace for diagnostic codes.
+data GHC
+instance DiagnosticCodeNameSpace GHC where
+  type instance NameSpaceTag      GHC = "GHC"
+  type instance DiagnosticCodeFor GHC con = GhcDiagnosticCode con
+  type instance ConRecursIntoFor  GHC con =     ConRecursInto con
 
 -- | Type family computing the numeric diagnostic code for a given error message constructor.
 --
@@ -904,7 +977,9 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- NB: never remove a return value from this type family!
   -- We need to ensure uniquess of diagnostic codes across GHC versions,
   -- and this includes outdated diagnostic codes for errors that GHC
-  -- no longer reports. These are collected below.
+  -- no longer reports. These are mostly collected below, but for ease
+  -- of rebasing it is often better to simply declare a constructor outdated
+  -- without moving it down here.
 
   GhcDiagnosticCode "TcRnIllegalInstanceHeadDecl"                   = Outdated 12222
   GhcDiagnosticCode "TcRnNoClassInstHead"                           = Outdated 56538
@@ -924,12 +999,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnHsigNoIface"                               = Outdated 93010
   GhcDiagnosticCode "TcRnInterfaceLookupError"                      = Outdated 52243
   GhcDiagnosticCode "TcRnForallIdentifier"                          = Outdated 64088
-
--- | Use this type synonym to mark a diagnostic code as outdated.
---
--- The presence of this type synonym is used by the 'codes' test to determine
--- which diagnostic codes to check for testsuite coverage.
-type Outdated a = a
 
 {- *********************************************************************
 *                                                                      *
@@ -1098,7 +1167,7 @@ type family ConRecursInto con where
 
 {- Note [Diagnostic codes using generics]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Diagnostic codes are specified at the type-level using the injective
+Diagnostic codes for GHC are specified at the type-level using the injective
 type family 'GhcDiagnosticCode'. This ensures uniqueness of diagnostic
 codes, giving quick feedback (in the form of a type error).
 
@@ -1135,7 +1204,12 @@ To achieve this, we use a variant of the 'typed' lens from 'generic-lens'
     first, and decide whether to recur into it using the
     HasTypeQ type family.
   - The two different behaviours are controlled by two main instances (*) and (**).
-    - (*) recurses into a subtype, when we have a type family equation such as:
+    - (*) directly uses the constructor name, by using the 'DiagnosticCodeFor'
+      type family. The 'KnownConstructor' context (ERR2) on the instance provides
+      a custom error message in case of a missing diagnostic code, which points
+      GHC contributors to the documentation explaining how to add diagnostic codes
+      for their diagnostics.
+    - (**) recurses into a subtype, when we have a type family equation such as:
 
         ConRecursInto "TcRnCannotDeriveInstance" = 'Just DeriveInstanceErrReason
 
@@ -1143,94 +1217,87 @@ To achieve this, we use a variant of the 'typed' lens from 'generic-lens'
       type 'DeriveInstanceErrReason'.
       The overlapping instance (ERR1) provides an error message in case a constructor
       does not have the type specified by the 'ConRecursInto' type family.
-    - (**) directly uses the constructor name, by using the 'GhcDiagnosticCode'
-      type family. The 'KnownConstructor' context (ERR2) on the instance provides
-      a custom error message in case of a missing diagnostic code, which points
-      GHC contributors to the documentation explaining how to add diagnostic codes
-      for their diagnostics.
 -}
 
 -- | Use the generic representation of a type to retrieve the
--- diagnostic code, using the 'GhcDiagnosticCode' type family.
+-- diagnostic code, using 'DiagnosticCodeFor namespace' type family.
 --
 -- See Note [Diagnostic codes using generics] in GHC.Types.Error.Codes.
-type GDiagnosticCode :: (Type -> Type) -> Constraint
-class GDiagnosticCode f where
+type GDiagnosticCode :: Type -> (Type -> Type) -> Constraint
+class GDiagnosticCode namespace f where
   gdiagnosticCode :: f a -> Maybe DiagnosticCode
 -- | Use the generic representation of a type to retrieve the collection
 -- of all diagnostic codes it can give rise to.
-type GDiagnosticCodes :: [Type] -> (Type -> Type) -> Constraint
-class GDiagnosticCodes seen f where
+type GDiagnosticCodes :: Type -> [Type] -> (Type -> Type) -> Constraint
+class GDiagnosticCodes namespace seen f where
   gdiagnosticCodes :: Map DiagnosticCode String
 
-type ConstructorCode :: Symbol -> (Type -> Type)  -> Maybe Type -> Constraint
-class ConstructorCode con f recur where
+type ConstructorCode :: Type -> Symbol -> (Type -> Type)  -> Maybe Type -> Constraint
+class ConstructorCode namespace con f recur where
   gconstructorCode :: f a -> Maybe DiagnosticCode
-type ConstructorCodes :: Symbol -> (Type -> Type) -> [Type] -> Maybe Type -> Constraint
-class ConstructorCodes con f seen recur where
+type ConstructorCodes :: Type -> Symbol -> (Type -> Type) -> [Type] -> Maybe Type -> Constraint
+class ConstructorCodes namespace con f seen recur where
   gconstructorCodes :: Map DiagnosticCode String
-
-instance (KnownConstructor con, KnownSymbol con) => ConstructorCode con f 'Nothing where
-  gconstructorCode _ = Just $ DiagnosticCode "GHC" $ natVal' @(GhcDiagnosticCode con) proxy#
-instance (KnownConstructor con, KnownSymbol con) => ConstructorCodes con f seen 'Nothing where
-  gconstructorCodes =
-    Map.singleton
-      (DiagnosticCode "GHC" $ natVal' @(GhcDiagnosticCode con) proxy#)
-      (symbolVal' @con proxy#)
 
 -- If we recur into the 'UnknownDiagnostic' existential datatype,
 -- unwrap the existential and obtain the error code.
 instance {-# OVERLAPPING #-}
-         ( ConRecursInto con ~ 'Just (UnknownDiagnostic opts)
-         , HasType (UnknownDiagnostic opts) con f )
-      => ConstructorCode con f ('Just (UnknownDiagnostic opts)) where
-  gconstructorCode diag = case getType @(UnknownDiagnostic opts) @con @f diag of
+         ( ConRecursIntoFor namespace con ~ 'Just (UnknownDiagnostic opts)
+         , HasType namespace (UnknownDiagnostic opts) con f )
+      => ConstructorCode namespace con f ('Just (UnknownDiagnostic opts)) where
+  gconstructorCode diag = case getType @namespace @(UnknownDiagnostic opts) @con @f diag of
     UnknownDiagnostic _ diag -> diagnosticCode diag
 instance {-# OVERLAPPING #-}
-         ( ConRecursInto con ~ 'Just (UnknownDiagnostic opts) )
-      => ConstructorCodes con f seen ('Just (UnknownDiagnostic opts)) where
+         ( ConRecursIntoFor namespace con ~ 'Just (UnknownDiagnostic opts) )
+      => ConstructorCodes namespace con f seen ('Just (UnknownDiagnostic opts)) where
   gconstructorCodes = Map.empty
 
--- (*) Recursive instance: Recur into the given type.
-instance ( ConRecursInto con ~ 'Just ty, HasType ty con f
-         , Generic ty, GDiagnosticCode (Rep ty) )
-      => ConstructorCode con f ('Just ty) where
-  gconstructorCode diag = gdiagnosticCode (from $ getType @ty @con @f diag)
-instance ( ConRecursInto con ~ 'Just ty, HasType ty con f
-         , Generic ty, GDiagnosticCodes (Insert ty seen) (Rep ty)
+-- | (*) Base instance: use the diagnostic code for this constructor in this namespace.
+instance (KnownNameSpace namespace, KnownConstructor namespace con, KnownSymbol con)
+      => ConstructorCode namespace con f 'Nothing where
+  gconstructorCode _ = Just $ DiagnosticCode (symbolVal' @(NameSpaceTag namespace) proxy#) $ natVal' @(DiagnosticCodeFor namespace con) proxy#
+instance ( KnownNameSpace namespace, KnownConstructor namespace con, KnownSymbol con) => ConstructorCodes namespace con f seen 'Nothing where
+  gconstructorCodes =
+    Map.singleton
+      (DiagnosticCode (symbolVal' @(NameSpaceTag namespace) proxy#) $ natVal' @(DiagnosticCodeFor namespace con) proxy#)
+      (symbolVal' @con proxy#)
+
+-- | (**) Recursive instance: recur into the given type.
+instance ( ConRecursIntoFor namespace con ~ 'Just ty, HasType namespace ty con f
+         , Generic ty, GDiagnosticCode namespace (Rep ty) )
+      => ConstructorCode namespace con f ('Just ty) where
+  gconstructorCode diag = gdiagnosticCode @namespace (from $ getType @namespace @ty @con @f diag)
+instance ( ConRecursIntoFor namespace con ~ 'Just ty, HasType namespace ty con f
+         , Generic ty, GDiagnosticCodes namespace (Insert ty seen) (Rep ty)
          , Seen seen ty )
-      => ConstructorCodes con f seen ('Just ty) where
+      => ConstructorCodes namespace con f seen ('Just ty) where
   gconstructorCodes =
     -- See Note [diagnosticCodes: don't recur into already-seen types]
     if wasSeen @seen @ty
     then Map.empty
-    else gdiagnosticCodes @(Insert ty seen) @(Rep ty)
+    else gdiagnosticCodes @namespace @(Insert ty seen) @(Rep ty)
 
--- (**) Constructor instance: handle constructors directly.
---
--- Obtain the code from the 'GhcDiagnosticCode'
--- type family, applied to the name of the constructor.
-instance (ConstructorCode con f recur, recur ~ ConRecursInto con, KnownSymbol con)
-      => GDiagnosticCode (M1 i ('MetaCons con x y) f) where
-  gdiagnosticCode (M1 x) = gconstructorCode @con @f @recur x
-instance (ConstructorCodes con f seen recur, recur ~ ConRecursInto con, KnownSymbol con)
-      => GDiagnosticCodes seen (M1 i ('MetaCons con x y) f) where
-  gdiagnosticCodes = gconstructorCodes @con @f @seen @recur
+instance (ConstructorCode namespace con f recur, recur ~ ConRecursIntoFor namespace con, KnownSymbol con)
+      => GDiagnosticCode namespace (M1 i ('MetaCons con x y) f) where
+  gdiagnosticCode (M1 x) = gconstructorCode @namespace @con @f @recur x
+instance (ConstructorCodes namespace con f seen recur, recur ~ ConRecursIntoFor namespace con, KnownSymbol con)
+      => GDiagnosticCodes namespace seen (M1 i ('MetaCons con x y) f) where
+  gdiagnosticCodes = gconstructorCodes @namespace @con @f @seen @recur
 
 -- Handle sum types (the diagnostic types are sums of constructors).
-instance (GDiagnosticCode f, GDiagnosticCode g) => GDiagnosticCode (f :+: g) where
-  gdiagnosticCode (L1 x) = gdiagnosticCode @f x
-  gdiagnosticCode (R1 y) = gdiagnosticCode @g y
-instance (GDiagnosticCodes seen f, GDiagnosticCodes seen g) => GDiagnosticCodes seen (f :+: g) where
-  gdiagnosticCodes = Map.union (gdiagnosticCodes @seen @f) (gdiagnosticCodes @seen @g)
+instance (GDiagnosticCode namespace f, GDiagnosticCode namespace g) => GDiagnosticCode namespace (f :+: g) where
+  gdiagnosticCode (L1 x) = gdiagnosticCode @namespace @f x
+  gdiagnosticCode (R1 y) = gdiagnosticCode @namespace @g y
+instance (GDiagnosticCodes namespace seen f, GDiagnosticCodes namespace seen g) => GDiagnosticCodes namespace seen (f :+: g) where
+  gdiagnosticCodes = Map.union (gdiagnosticCodes @namespace @seen @f) (gdiagnosticCodes @namespace @seen @g)
 
 -- Discard metadata we don't need.
-instance GDiagnosticCode f
-      => GDiagnosticCode (M1 i ('MetaData nm mod pkg nt) f) where
-  gdiagnosticCode (M1 x) = gdiagnosticCode @f x
-instance GDiagnosticCodes seen f
-      => GDiagnosticCodes seen (M1 i ('MetaData nm mod pkg nt) f) where
-  gdiagnosticCodes = gdiagnosticCodes @seen @f
+instance GDiagnosticCode namespace f
+      => GDiagnosticCode namespace (M1 i ('MetaData nm mod pkg nt) f) where
+  gdiagnosticCode (M1 x) = gdiagnosticCode @namespace @f x
+instance GDiagnosticCodes namespace seen f
+      => GDiagnosticCodes namespace seen (M1 i ('MetaData nm mod pkg nt) f) where
+  gdiagnosticCodes = gdiagnosticCodes @namespace @seen @f
 
 -- | Decide whether to pick the left or right branch
 -- when deciding how to recurse into a product.
@@ -1257,30 +1324,30 @@ type family Alt (m1 :: Maybe a) (m2 :: Maybe a) :: Maybe a where
   Alt ('Just a) _ = 'Just a
   Alt _ b = b
 
-type HasType :: Type -> Symbol -> (Type -> Type) -> Constraint
-class HasType ty orig f where
+type HasType :: Type -> Type -> Symbol -> (Type -> Type) -> Constraint
+class HasType namespace ty orig f where
   getType :: f a -> ty
 
-instance HasType ty orig (M1 i s (K1 x ty)) where
+instance HasType namespace ty orig (M1 i s (K1 x ty)) where
   getType (M1 (K1 x)) = x
-instance HasTypeProd ty (HasTypeQ ty f) orig f g => HasType ty orig (f :*: g) where
-  getType = getTypeProd @ty @(HasTypeQ ty f) @orig
+instance HasTypeProd namespace ty (HasTypeQ ty f) orig f g => HasType namespace ty orig (f :*: g) where
+  getType = getTypeProd @namespace @ty @(HasTypeQ ty f) @orig
 
 -- The lr parameter tells us whether to pick the left or right
 -- branch in a product, and is computed using 'HasTypeQ'.
 --
 -- If it's @Just l@, then we have found the type in the left branch,
 -- so use that. Otherwise, look in the right branch.
-class HasTypeProd ty lr orig f g where
+class HasTypeProd namespace ty lr orig f g where
   getTypeProd :: (f :*: g) a -> ty
 
 -- Pick the left branch.
-instance HasType ty orig  f => HasTypeProd ty ('Just l) orig f g where
-  getTypeProd (x :*: _) = getType @ty @orig @f x
+instance HasType namespace ty orig  f => HasTypeProd namespace ty ('Just l) orig f g where
+  getTypeProd (x :*: _) = getType @namespace @ty @orig @f x
 
 -- Pick the right branch.
-instance HasType ty orig g => HasTypeProd ty 'Nothing orig f g where
-  getTypeProd (_ :*: y) = getType @ty @orig @g y
+instance HasType namespace ty orig g => HasTypeProd namespace ty 'Nothing orig f g where
+  getTypeProd (_ :*: y) = getType @namespace @ty @orig @g y
 
 {- Note [diagnosticCodes: don't recur into already-seen types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1304,7 +1371,7 @@ of the form
 
 This would cause an infinite loop. We thus keep track of a list of types we
 have already encountered, and when we recur into a type we have already
-encountered, we simply skip taking that union (see (*)).
+encountered, we simply skip taking that union (see (**)).
 
 Note that 'constructorCodes' starts by marking the initial type itself as "seen",
 which precisely avoids the loop above when calling 'constructorCodes @TcRnMessage'.
@@ -1339,27 +1406,42 @@ instance {-# OVERLAPPABLE #-}
     ':$$: 'Text "does not have any argument of type '" ':<>: 'ShowType ty ':<>: 'Text "'."
     ':$$: 'Text ""
     ':$$: 'Text "This is likely due to an incorrect type family equation:"
-    ':$$: 'Text "  ConRecursInto \"" ':<>: 'Text orig ':<>: 'Text "\" = " ':<>: 'ShowType ty )
-  => HasType ty orig f where
+    ':$$: 'Text "  ConRecursIntoFor " ':<>: 'ShowType namespace ':<>: Text " \"" ':<>: 'Text orig ':<>: 'Text "\" = " ':<>: 'ShowType ty )
+  => HasType namespace ty orig f where
   getType = panic "getType: unreachable"
 
 -- (ERR2) Improve error messages for missing 'GhcDiagnosticCode' equations.
-type KnownConstructor :: Symbol -> Constraint
-type family KnownConstructor con where
-  KnownConstructor con =
+type KnownConstructor :: Type -> Symbol -> Constraint
+type family KnownConstructor namespace con where
+  KnownConstructor namespace con =
     KnownNatOrErr
       ( TypeError
-        (     'Text "Missing diagnostic code for constructor "
+        (     'Text "Missing " ':<>: 'ShowType namespace ':<>: Text " diagnostic code for constructor "
         ':<>: 'Text "'" ':<>: 'Text con ':<>: 'Text "'."
         ':$$: 'Text ""
         ':$$: 'Text "Note [Diagnostic codes] in GHC.Types.Error.Codes"
         ':$$: 'Text "contains instructions for adding a new diagnostic code."
         )
       )
-      (GhcDiagnosticCode con)
+      (DiagnosticCodeFor namespace con)
 
 type KnownNatOrErr :: Constraint -> Nat -> Constraint
 type KnownNatOrErr err n = (Assert err n, KnownNat n)
+
+-- (ERR3) Improve error messages for invalid namespaces.
+type KnownNameSpace :: Type -> Constraint
+type family KnownNameSpace namespace where
+  KnownNameSpace namespace =
+    ValidNameSpaceOrErr
+      ( TypeError
+        (     'Text "Please provide a 'DiagnosticCodeNameSpace' instance for " ':<>: 'ShowType namespace ':<>: Text ","
+        ':$$: 'Text "including an associated type family equation for 'NameSpaceTag'."
+        )
+      )
+      (NameSpaceTag namespace)
+
+type ValidNameSpaceOrErr :: Constraint -> Symbol -> Constraint
+type ValidNameSpaceOrErr err s = (Assert err s, KnownSymbol s)
 
 -- Detecting a stuck type family using a data family.
 -- See https://blog.csongor.co.uk/report-stuck-families/.
