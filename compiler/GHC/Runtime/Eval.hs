@@ -626,8 +626,10 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
         -- saved/restored, but not the linker state.  See #1743, test break026.
    mkNewId :: OccName -> Type -> Id -> IO Id
    mkNewId occ ty old_id
-     = do { name <- newInteractiveBinder hsc_env occ (getSrcSpan old_id)
-          ; return (Id.mkVanillaGlobalWithInfo name ty (idInfo old_id)) }
+     = do { name <- newInteractiveBinder hsc_env (mkVarOccFS (occNameFS occ)) (getSrcSpan old_id)
+              -- NB: use variable namespace.
+              -- Don't use record field namespaces, lest we cause #25109.
+          ; return $ Id.mkVanillaGlobalWithInfo name ty (idInfo old_id) }
 
    newTyVars :: UniqSupply -> [TcTyVar] -> Subst
      -- Similarly, clone the type variables mentioned in the types
