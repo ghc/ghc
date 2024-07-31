@@ -19,6 +19,7 @@ module GHC.Types.Avail (
     filterAvail,
     filterAvails,
     nubAvails,
+    sortAvails,
   ) where
 
 import GHC.Prelude
@@ -36,7 +37,7 @@ import GHC.Utils.Constants (debugIsOn)
 import Control.DeepSeq
 import Data.Data ( Data )
 import Data.Functor.Classes ( liftCompare )
-import Data.List ( find )
+import Data.List ( find, sortBy )
 import qualified Data.Semigroup as S
 
 -- -----------------------------------------------------------------------------
@@ -130,6 +131,20 @@ availSubordinateNames (Avail {}) = []
 availSubordinateNames avail@(AvailTC _ ns)
   | availExportsDecl avail = tail ns
   | otherwise              = ns
+
+-- | Sort 'Avails'/'AvailInfo's
+sortAvails :: Avails -> Avails
+sortAvails = sortBy stableAvailCmp . map sort_subs
+  where
+    sort_subs :: AvailInfo -> AvailInfo
+    sort_subs (Avail n) = Avail n
+    sort_subs (AvailTC n []) = AvailTC n []
+    sort_subs (AvailTC n (m:ms))
+       | n == m
+       = AvailTC n (m:sortBy stableNameCmp ms)
+       | otherwise
+       = AvailTC n (sortBy stableNameCmp (m:ms))
+       -- Maintain the AvailTC Invariant
 
 -- -----------------------------------------------------------------------------
 -- Utility
