@@ -500,18 +500,7 @@ mkIfaceImports = map go
     go (ImpUserSpec decl (ImpUserEverythingBut ns)) = IfaceImport decl (ImpIfaceEverythingBut ns)
 
 mkIfaceExports :: [AvailInfo] -> [IfaceExport]  -- Sort to make canonical
-mkIfaceExports exports
-  = sortBy stableAvailCmp (map sort_subs exports)
-  where
-    sort_subs :: AvailInfo -> AvailInfo
-    sort_subs (Avail n) = Avail n
-    sort_subs (AvailTC n []) = AvailTC n []
-    sort_subs (AvailTC n (m:ms))
-       | n == m
-       = AvailTC n (m:sortBy stableNameCmp ms)
-       | otherwise
-       = AvailTC n (sortBy stableNameCmp (m:ms))
-       -- Maintain the AvailTC Invariant
+mkIfaceExports = sortAvails
 
 {-
 Note [Original module]

@@ -147,7 +147,6 @@ mkDocStructure _ _ Nothing rn_decls all_exports def_meths_env =
 -- TODO:
 -- * Maybe remove items that export nothing?
 -- * Combine sequences of DsiExports?
--- * Check the ordering of avails in DsiModExport
 mkDocStructureFromExportList
   :: Module                         -- ^ The current module
   -> ImportAvails
@@ -168,7 +167,7 @@ mkDocStructureFromExportList mdl import_avails export_list =
                  -> Avails
                  -> DocStructureItem
     moduleExport alias avails =
-        DsiModExport (nubSortNE orig_names) (nubAvails avails)
+        DsiModExport (nubSortNE orig_names) (sortAvails (nubAvails avails))
       where
         orig_names = M.findWithDefault aliasErr alias aliasMap
         aliasErr = error $ "mkDocStructureFromExportList: "
