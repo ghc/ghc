@@ -859,7 +859,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalOrPat{}                           -> [suggestExtension LangExt.OrPatterns]
     PsErrTypeSyntaxInPat{}                        -> noHints
 
-  diagnosticCode = constructorCode
+  diagnosticCode = constructorCode @GHC
 
 psHeaderMessageDiagnostic :: PsHeaderMessage -> DecoratedSDoc
 psHeaderMessageDiagnostic = \case
