@@ -237,23 +237,33 @@ cmmMachOpFoldM _ MO_Add{} [ CmmMachOp op@MO_Add{} [pic, CmmLit lit]
   = Just $! CmmMachOp op [pic, CmmLit $ cmmOffsetLit lit off ]
   where off = fromIntegral (narrowS rep n)
 
--- Make a RegOff if we can
+-- Make a RegOff if we can. We don't perform this optimization if rep is greater
+-- than the host word size because we use an Int to store the offset. See
+-- #24893 and #24700. This should be fixed to ensure that optimizations don't
+-- depend on the compiler host platform.
 cmmMachOpFoldM _ (MO_Add _) [CmmReg reg, CmmLit (CmmInt n rep)]
+  | validOffsetRep rep
   = Just $! cmmRegOff reg (fromIntegral (narrowS rep n))
 cmmMachOpFoldM _ (MO_Add _) [CmmRegOff reg off, CmmLit (CmmInt n rep)]
+  | validOffsetRep rep
   = Just $! cmmRegOff reg (off + fromIntegral (narrowS rep n))
 cmmMachOpFoldM _ (MO_Sub _) [CmmReg reg, CmmLit (CmmInt n rep)]
+  | validOffsetRep rep
   = Just $! cmmRegOff reg (- fromIntegral (narrowS rep n))
 cmmMachOpFoldM _ (MO_Sub _) [CmmRegOff reg off, CmmLit (CmmInt n rep)]
+  | validOffsetRep rep
   = Just $! cmmRegOff reg (off - fromIntegral (narrowS rep n))
 
 -- Fold label(+/-)offset into a CmmLit where possible
 
 cmmMachOpFoldM _ (MO_Add _) [CmmLit lit, CmmLit (CmmInt i rep)]
+  | validOffsetRep rep
   = Just $! CmmLit (cmmOffsetLit lit (fromIntegral (narrowU rep i)))
 cmmMachOpFoldM _ (MO_Add _) [CmmLit (CmmInt i rep), CmmLit lit]
+  | validOffsetRep rep
   = Just $! CmmLit (cmmOffsetLit lit (fromIntegral (narrowU rep i)))
 cmmMachOpFoldM _ (MO_Sub _) [CmmLit lit, CmmLit (CmmInt i rep)]
+  | validOffsetRep rep
   = Just $! CmmLit (cmmOffsetLit lit (fromIntegral (negate (narrowU rep i))))
 
 
@@ -408,6 +418,13 @@ cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
 -- Anything else is just too hard.
 
 cmmMachOpFoldM _ _ _ = Nothing
+
+-- | Check that a literal width is compatible with the host word size used to
+-- store offsets. This should be fixed properly (using larger types to store
+-- literal offsets). See #24893
+validOffsetRep :: Width -> Bool
+validOffsetRep rep = widthInBits rep <= finiteBitSize (undefined :: Int)
+
 
 {- Note [Comparison operators]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
