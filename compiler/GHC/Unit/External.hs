@@ -45,6 +45,8 @@ type PackageCompleteMatches  = CompleteMatches
 type PackageIfaceTable = ModuleEnv ModIface
         -- Domain = modules in the imported packages
 
+type PackageTypeTable = ModuleEnv TypeEnv
+
 -- | Constructs an empty PackageIfaceTable
 emptyPackageIfaceTable :: PackageIfaceTable
 emptyPackageIfaceTable = emptyModuleEnv
@@ -68,6 +70,7 @@ initExternalPackageState = EPS
   , eps_PIT              = emptyPackageIfaceTable
   , eps_free_holes       = emptyInstalledModuleEnv
   , eps_PTE              = emptyTypeEnv
+  , eps_PTT              = emptyModuleEnv
   , eps_inst_env         = emptyInstEnv
   , eps_fam_inst_env     = emptyFamInstEnv
   , eps_rule_base        = mkRuleBase builtinRules
@@ -138,6 +141,8 @@ data ExternalPackageState
                 -- ^ Result of typechecking all the external package
                 -- interface files we have sucked in. The domain of
                 -- the mapping is external-package modules
+
+        eps_PTT :: !PackageTypeTable,
 
         eps_inst_env     :: !PackageInstEnv,   -- ^ The total 'InstEnv' accumulated
                                                -- from all the external-package modules

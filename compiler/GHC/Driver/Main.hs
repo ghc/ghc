@@ -277,7 +277,8 @@ import GHC.SysTools (initSysTools)
 import GHC.SysTools.BaseDir (findTopDir)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.List        ( nub, isPrefixOf, partition )
+import Data.Foldable (fold)
+import Data.List ( nub, isPrefixOf, partition )
 import qualified Data.List.NonEmpty as NE
 import Control.Monad
 import Data.IORef
@@ -1002,10 +1003,10 @@ initWcbWithTcEnv ::
   HscEnv ->
   HscEnv ->
   ModIface ->
-  ModDetails ->
+  TypeEnv ->
   Linkable ->
   IO Linkable
-initWcbWithTcEnv tc_hsc_env hsc_env mod_iface details (LM utc_time this_mod uls) = do
+initWcbWithTcEnv tc_hsc_env hsc_env mod_iface type_env (LM utc_time this_mod uls) = do
   -- If a module is compiled with -fbyte-code-and-object-code and it
   -- makes use of foreign stubs, then the interface file will also
   -- contain serialized stub dynamic objects, and we can simply write
@@ -1024,15 +1025,15 @@ initWcbWithTcEnv tc_hsc_env hsc_env mod_iface details (LM utc_time this_mod uls)
       -- the laziness is OK because generateByteCode just depends on things already loaded
       -- in the interface file.
       LoadedBCOs <$> (unsafeInterleaveIO $ do
-        type_env <- newIORef (md_types details)
+        kv <- newIORef type_env
         let
           tc_hsc_env_with_kv = tc_hsc_env {
             hsc_type_env_vars =
-              knotVarsFromModuleEnv (mkModuleEnv [(this_mod, type_env)])
+              knotVarsFromModuleEnv (mkModuleEnv [(this_mod, kv)])
           }
         core_binds <- initIfaceCheck (text "l") tc_hsc_env_with_kv $
-                      typecheckWholeCoreBindings type_env fi
-        let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
+                      typecheckWholeCoreBindings kv fi
+        let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons type_env) NoStubs Nothing []
         trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> ppr this_mod)
         generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
     go ul = return ul
@@ -1041,15 +1042,15 @@ initWcbWithTcEnv tc_hsc_env hsc_env mod_iface details (LM utc_time this_mod uls)
 -- can obtain a 'ModDetails'.
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
 initWholeCoreBindings hsc_env iface details =
-  initWcbWithTcEnv (add_iface_to_hpt iface details hsc_env) hsc_env iface details
+  initWcbWithTcEnv (add_iface_to_hpt iface details hsc_env) hsc_env iface (md_types details)
 
 -- | Hydrate core bindings for a module in the external package state.
 -- This is used for home modules as well when compiling in oneshot mode.
 initWholeCoreBindingsEps :: HscEnv -> ModIface -> Linkable -> IO Linkable
 initWholeCoreBindingsEps hsc_env iface lnk = do
-  -- details <- genModDetails hsc_env iface
-  details <- initIfaceLoadModule hsc_env (mi_module iface) (typecheckIface iface)
-  initWcbWithTcEnv hsc_env hsc_env iface details lnk
+  eps <- hscEPS hsc_env
+  let type_env = fold (lookupModuleEnv (eps_PTT eps) (mi_module iface))
+  initWcbWithTcEnv hsc_env hsc_env iface type_env lnk
 
 
 {-
