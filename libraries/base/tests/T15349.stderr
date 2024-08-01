@@ -1,4 +1,11 @@
-T15349: <<loop>>
+T15349: Exception:
+
+<<loop>>
+
+Package: ghc-internal
+Module: GHC.Internal.Control.Exception.Base
+Type: NonTermination
+
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO

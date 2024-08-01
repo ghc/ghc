@@ -1,1 +1,7 @@
-conc068: foo
+conc068: Exception:
+
+foo
+
+Package: ghc-internal
+Module: GHC.Internal.Exception
+Type: ErrorCall

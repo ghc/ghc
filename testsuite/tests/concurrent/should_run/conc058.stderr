@@ -1,1 +1,7 @@
-conc058: I'm Interruptible
+conc058: Exception:
+
+I'm Interruptible
+
+Package: ghc-internal
+Module: GHC.Internal.Exception
+Type: ErrorCall

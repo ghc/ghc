@@ -1,1 +1,7 @@
-T7087: thread killed
+T7087: Exception:
+
+thread killed
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: SomeAsyncException

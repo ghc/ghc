@@ -46,7 +46,8 @@ module GHC.Internal.Exception.Type
        ) where
 
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.Typeable (Typeable, cast)
+import GHC.Internal.Data.Typeable (Typeable, TypeRep, cast)
+import qualified GHC.Internal.Data.Typeable as Typeable
    -- loop: GHC.Internal.Data.Typeable -> GHC.Internal.Err -> GHC.Internal.Exception
 import GHC.Internal.Base
 import GHC.Internal.Show
@@ -211,7 +212,23 @@ instance Exception SomeException where
     fromException = Just
     backtraceDesired (SomeException e) = backtraceDesired e
     displayException (SomeException e) =
-        displayException e ++ "\n" ++ displayContext ?exceptionContext
+        displayException e
+          ++ displayTypeInfo (Typeable.typeOf e)
+          ++ "\n\n"
+          ++ (displayContext ?exceptionContext)
+        where
+            displayTypeInfo :: TypeRep -> String
+            displayTypeInfo rep =
+              mconcat
+                [ "\n\nPackage: ",
+                  Typeable.tyConPackage tyCon,
+                  "\nModule: ",
+                  Typeable.tyConModule tyCon,
+                  "\nType: ",
+                  Typeable.tyConName tyCon
+                ]
+                where
+                  tyCon = Typeable.typeRepTyCon rep
 
 displayContext :: ExceptionContext -> String
 displayContext (ExceptionContext anns0) = go anns0

@@ -1,1 +1,7 @@
-compact_mutable: compaction failed: cannot compact mutable objects
+compact_mutable: Exception:
+
+compaction failed: cannot compact mutable objects
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: CompactionFailed

@@ -1,1 +1,7 @@
-fptrfail01: GHC.Internal.ForeignPtr: attempt to mix Haskell and C finalizers in the same ForeignPtr
+fptrfail01: Exception:
+
+GHC.Internal.ForeignPtr: attempt to mix Haskell and C finalizers in the same ForeignPtr
+
+Package: ghc-internal
+Module: GHC.Internal.Exception
+Type: ErrorCall

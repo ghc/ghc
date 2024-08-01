@@ -1,1 +1,7 @@
-allocLimit1: allocation limit exceeded
+allocLimit1: Exception:
+
+allocation limit exceeded
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: SomeAsyncException

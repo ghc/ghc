@@ -1,1 +1,7 @@
-T10481: arithmetic overflow
+T10481: Exception:
+
+arithmetic overflow
+
+Package: ghc-internal
+Module: GHC.Internal.Exception.Type
+Type: ArithException

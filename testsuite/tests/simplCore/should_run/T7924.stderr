@@ -1,4 +1,11 @@
-T7924: Boom
+T7924: Exception:
+
+Boom
+
+Package: main
+Module: Main
+Type: Boom
+
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO

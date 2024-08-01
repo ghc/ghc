@@ -1,8 +1,15 @@
-T10284: T10284.hs:7:5: error: [GHC-83865]
+T10284: Exception:
+
+T10284.hs:7:5: error: [GHC-83865]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: 'a'
       In an equation for ‘a’: a = 'a'
 (deferred type error)
+
+Package: ghc-internal
+Module: GHC.Internal.Control.Exception.Base
+Type: TypeError
+
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception

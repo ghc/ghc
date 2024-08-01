@@ -1,1 +1,7 @@
-DsMonadCompFailMsg: user error (Pattern match failure in monad comprehension at DsMonadCompFailMsg.hs:2:14-19)
+DsMonadCompFailMsg: Exception:
+
+user error (Pattern match failure in monad comprehension at DsMonadCompFailMsg.hs:2:14-19)
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: IOException

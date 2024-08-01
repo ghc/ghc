@@ -113,6 +113,13 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Add exception type metadata to SomeException's displayException and
+  "Exception:" header to the default handler
+  (i.e. ``GHC.Conc.Sync.uncaughtExceptionHandler``):
+
+  https://github.com/haskell/core-libraries-committee/issues/231
+  https://github.com/haskell/core-libraries-committee/issues/261
+
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~

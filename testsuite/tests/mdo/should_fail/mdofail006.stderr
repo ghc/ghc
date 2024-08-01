@@ -1,4 +1,11 @@
-mdofail006: cyclic evaluation in fixIO
+mdofail006: Exception:
+
+cyclic evaluation in fixIO
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: FixIOException
+
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO

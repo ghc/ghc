@@ -1,2 +1,7 @@
-bkprun05: this is an error
+bkprun05: Exception:
 
+this is an error
+
+Package: ghc-internal
+Module: GHC.Internal.Exception
+Type: ErrorCall

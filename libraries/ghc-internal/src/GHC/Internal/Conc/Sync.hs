@@ -951,7 +951,9 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
       defaultHandler :: SomeException -> IO ()
       defaultHandler se = do
          (hFlush stdout) `catchAny` (\ _ -> return ())
-         let msg = displayException se
+
+         let exMsg = displayException se
+             msg = "Exception:\n\n" ++ exMsg
          withCString "%s" $ \cfmt ->
           withCString msg $ \cmsg ->
             errorBelch cfmt cmsg

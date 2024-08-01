@@ -1,9 +1,16 @@
 Without -fignore-asserts
 [1 of 2] Compiling Main             ( main.hs, main.o )
 [2 of 2] Linking main
-main: Assertion failed
+main: Exception:
+
+Assertion failed
 CallStack (from HasCallStack):
   assert, called at main.hs:3:8 in main:Main
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: AssertionFailed
+
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
@@ -18,13 +25,19 @@ OK
 Without -fignore-asserts
 [1 of 2] Compiling Main             ( main.hs, main.o ) [Optimisation flags changed]
 [2 of 2] Linking main [Objects changed]
-main: Assertion failed
+main: Exception:
+
+Assertion failed
 CallStack (from HasCallStack):
   assert, called at main.hs:3:8 in main:Main
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: AssertionFailed
+
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
   throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:453:5 in ghc-internal:GHC.Internal.IO.Exception
   assert, called at main.hs:3:8 in main:Main
-
 

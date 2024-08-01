@@ -1,1 +1,7 @@
-T13832: user error (setNumCapabilities: Capability count (0) must be positive)
+T13832: Exception:
+
+user error (setNumCapabilities: Capability count (0) must be positive)
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: IOException
