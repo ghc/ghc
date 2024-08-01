@@ -109,3 +109,10 @@ test('TcPlugin_CtId'
     , [ 'TcPlugin_CtId.hs'
       , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
     )
+
+test('T11462', [js_broken(22261), req_th, req_plugins], multi_compile,
+     [None, [('T11462_Plugin.hs', '-package ghc'), ('T11462.hs', '')],
+      '-dynamic' if have_dynamic() else ''])
+test('T11525', [js_broken(22261), req_th, req_plugins], multi_compile,
+     [None, [('T11525_Plugin.hs', '-package ghc'), ('T11525.hs', '')],
+      '-dynamic' if have_dynamic() else ''])
