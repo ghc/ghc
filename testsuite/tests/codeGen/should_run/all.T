@@ -247,4 +247,6 @@ test('MulMayOflo_full',
 test('T24295a', normal, compile_and_run, ['-O -floopification'])
 test('T24295b', normal, compile_and_run, ['-O -floopification -fpedantic-bottoms'])
 test('T23034', req_c, compile_and_run, ['-O2 T23034_c.c'])
+test('T24700', normal, compile_and_run, ['-O'])
+test('T24893', normal, compile_and_run, ['-O'])
 
