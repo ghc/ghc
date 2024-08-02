@@ -523,7 +523,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                = tidy_items1
 
          -- First, deal with any out-of-scope errors:
-       ; let (out_of_scope, other_holes, not_conc_errs) = partition_errors tidy_errs
+       ; let (out_of_scope, other_holes, not_conc_errs, mult_co_errs) = partition_errors tidy_errs
                -- don't suppress out-of-scope errors
              ctxt_for_scope_errs = ctxt { cec_suppress = False }
        ; (_, no_out_of_scope) <- askNoErrs $
@@ -539,6 +539,13 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
           -- holes never suppress
 
        ; reportNotConcreteErrs ctxt_for_insols not_conc_errs
+
+       -- We only want to report multiplicity coercion errors for multiplicity
+       -- constraints which are /solved/ with a non-reflexivity coercion. We
+       -- over approximate here: we only report multiplicity coercion errors
+       -- when /all/ constraints are solved.
+       -- See wrinkle (DME1) in Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify.
+       ; when (null simples) $ reportMultiplicityCoercionErrs ctxt_for_insols mult_co_errs
 
           -- See Note [Suppressing confusing errors]
        ; let (suppressed_items, items0) = partition suppress tidy_items
@@ -572,21 +579,23 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     tidy_cts  = bagToList (mapBag (tidyCt env)   simples)
     tidy_errs = bagToList (mapBag (tidyDelayedError env) errs)
 
-    partition_errors :: [DelayedError] -> ([Hole], [Hole], [NotConcreteError])
-    partition_errors = go [] [] []
+    partition_errors :: [DelayedError] -> ([Hole], [Hole], [NotConcreteError], [(TcCoercion, CtLoc)])
+    partition_errors = go [] [] [] []
       where
-        go out_of_scope other_holes syn_eqs []
-          = (out_of_scope, other_holes, syn_eqs)
-        go es1 es2 es3 (err:errs)
-          | (es1, es2, es3) <- go es1 es2 es3 errs
+        go out_of_scope other_holes syn_eqs mult_co_errs []
+          = (out_of_scope, other_holes, syn_eqs, mult_co_errs)
+        go es1 es2 es3 es4 (err:errs)
+          | (es1, es2, es3, es4) <- go es1 es2 es3 es4 errs
           = case err of
               DE_Hole hole
                 | isOutOfScopeHole hole
-                -> (hole : es1, es2, es3)
+                -> (hole : es1, es2, es3, es4)
                 | otherwise
-                -> (es1, hole : es2, es3)
+                -> (es1, hole : es2, es3, es4)
               DE_NotConcrete err
-                -> (es1, es2, err : es3)
+                -> (es1, es2, err : es3, es4)
+              DE_Multiplicity mult_co loc
+                -> (es1, es2, es3, (mult_co, loc):es4)
 
       -- See Note [Suppressing confusing errors]
     suppress :: ErrorItem -> Bool
@@ -1049,6 +1058,18 @@ reportNotConcreteErrs ctxt errs@(err0:_)
                   , frr_info_not_concrete = Nothing }
                 : frr_errs
 
+reportMultiplicityCoercionErrs :: SolverReportErrCtxt -> [(TcCoercion, CtLoc)] -> TcM ()
+reportMultiplicityCoercionErrs ctxt errs = mapM_ reportOne errs
+  where
+    reportOne :: (TcCoercion, CtLoc) -> TcM ()
+    reportOne (_co, loc)
+      = do { msg <- mkErrorReport (ctLocEnv loc) diag (Just ctxt) []
+           ; reportDiagnostic msg }
+
+    diag = TcRnSolverReport
+             (SolverReportWithCtxt ctxt MultiplicityCoercionsNotSupported)
+             ErrorWithoutFlag
+
 {- Note [Skip type holes rapidly]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have module with a /lot/ of partial type signatures, and we
@@ -1368,22 +1389,22 @@ With #10283, you can now opt out of deferred type error warnings.
 
 Note [No deferring for multiplicity errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As explained in Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify,
+As explained in Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify,
 linear types do not support casts and any nontrivial coercion will raise
-an error during desugaring.
+an error at the end of typechecking (a delayed error).
 
 This means that even if we defer a multiplicity mismatch during typechecking,
-the desugarer will refuse to compile anyway. Worse: the error raised
-by the desugarer would shadow the type mismatch warnings (#20083).
-As a solution, we refuse to defer submultiplicity constraints. Test: T20083.
+the desugarer will refuse to compile anyway. Worse: the delayed error would
+shadow the type mismatch warnings (#20083).  As a solution, we refuse to defer
+submultiplicity constraints. Test: T20083.
 
 To determine whether a constraint arose from a submultiplicity check, we
 look at the CtOrigin. All calls to tcSubMult use origins which are not
 used outside of linear types.
 
-In the future, we should compile 'WpMultCoercion' to a runtime error with
--fdefer-type-errors, but the current implementation does not always
-place the wrapper in the right place and the resulting program can fail Lint.
+In the future, we should compile unsolved multiplicity constraints to a runtime error with
+-fdefer-type-errors, but there's currently no good way to insert this type error
+in the desugared  program. Especially in a way that would pass the linter.
 This plan is tracked in #20083.
 
 Note [Deferred errors for coercion holes]

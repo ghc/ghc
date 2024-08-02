@@ -109,8 +109,6 @@ data DsMessage
 
   | DsUselessSpecialiseForNoInlineFunction !Id
 
-  | DsMultiplicityCoercionsNotSupported
-
   | DsOrphanRule !CoreRule
 
   | DsRuleLhsTooComplicated !CoreExpr !CoreExpr

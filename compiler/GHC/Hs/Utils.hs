@@ -1341,7 +1341,6 @@ instance IsPass p => CollectPass (GhcPass p) where
       GhcTc -> case ext of
         AbsBinds { abs_exports = dbinds } -> (map abe_poly dbinds ++)
         -- I don't think we want the binders from the abe_binds
-
         -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Zonk.Type
 
   collectXSplicePat flag ext =

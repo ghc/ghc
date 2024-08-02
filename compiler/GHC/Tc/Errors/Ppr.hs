@@ -4113,6 +4113,8 @@ pprTcSolverReportMsg _ (UnsafeOverlap item match unsafe_overlapped) =
     pred        = errorItemPred item
     (clas, tys) = getClassPredTys pred
 
+pprTcSolverReportMsg _ MultiplicityCoercionsNotSupported = text "GHC bug #19517: GHC currently does not support programs using GADTs or type families to witness equality of multiplicities"
+
 pprCannotUnifyVariableReason :: SolverReportErrCtxt -> CannotUnifyVariableReason -> SDoc
 pprCannotUnifyVariableReason ctxt (CannotUnifyWithPolytype item tv1 ty2 mb_tv_info) =
   vcat [ (if isSkolemTyVar tv1
@@ -4923,6 +4925,8 @@ tcSolverReportMsgHints ctxt = \case
   OverlappingInstances {}
     -> noHints
   UnsafeOverlap {}
+   -> noHints
+  MultiplicityCoercionsNotSupported {}
    -> noHints
 
 mismatchMsgHints :: SolverReportErrCtxt -> MismatchMsg -> [GhcHint]

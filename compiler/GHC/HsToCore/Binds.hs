@@ -1404,11 +1404,6 @@ ds_hs_wrapper is_rule_lhs wrap = go wrap
 
                                 ; k (\e -> app_ev is_specable e core_tm) }
 
-  -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-    go (WpMultCoercion co) k = do { unless (isReflexiveCo co) $
-                                    diagnosticDs DsMultiplicityCoercionsNotSupported
-                                  ; k $ \e -> e }
-
 -- We are about to construct an evidence application `f dict`.  If the dictionary is
 -- non-specialisable, instead construct
 --     nospec f dict

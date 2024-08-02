@@ -149,7 +149,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DsTopLevelBindsNotAllowed"                     = 48099
   GhcDiagnosticCode "DsUselessSpecialiseForClassMethodSelector"     = 93315
   GhcDiagnosticCode "DsUselessSpecialiseForNoInlineFunction"        = 38524
-  GhcDiagnosticCode "DsMultiplicityCoercionsNotSupported"           = 59840
   GhcDiagnosticCode "DsOrphanRule"                                  = 58181
   GhcDiagnosticCode "DsRuleLhsTooComplicated"                       = 69441
   GhcDiagnosticCode "DsRuleIgnoredDueToConstructor"                 = 00828
@@ -338,7 +337,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "CannotResolveInstance"                         = 39999
   GhcDiagnosticCode "OverlappingInstances"                          = 43085
   GhcDiagnosticCode "UnsafeOverlap"                                 = 36705
-
+  GhcDiagnosticCode "MultiplicityCoercionsNotSupported"             = 59840
   -- Type mismatch errors
   GhcDiagnosticCode "BasicMismatch"                                 = 18872
   GhcDiagnosticCode "KindMismatch"                                  = 89223

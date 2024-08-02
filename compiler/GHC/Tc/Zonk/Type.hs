@@ -1232,7 +1232,6 @@ zonkCoFn (WpTyLam tv)  = assert (isImmutableTyVar tv) $
                          WpTyLam <$> zonkTyBndrX tv
 zonkCoFn (WpTyApp ty)  = WpTyApp <$> noBinders (zonkTcTypeToTypeX ty)
 zonkCoFn (WpLet bs)    = WpLet   <$> zonkTcEvBinds bs
-zonkCoFn (WpMultCoercion co) = WpMultCoercion <$> noBinders (zonkCoToCo co)
 
 -------------------------------------------------------------------------
 zonkOverLit :: HsOverLit GhcTc -> ZonkTcM (HsOverLit GhcTc)
@@ -1632,11 +1631,10 @@ zonkConStuff (InfixCon p1 p2)
 
 zonkConStuff (RecCon (HsRecFields x rpats dd))
   = do  { pats' <- zonkPats (map (hfbRHS . unLoc) rpats)
-        ; x' <- mapM (noBinders . zonkCoToCo) x
         ; let rpats' = zipWith (\(L l rp) p' ->
                                   L l (rp { hfbRHS = p' }))
                                rpats pats'
-        ; return (RecCon (HsRecFields x' rpats' dd)) }
+        ; return (RecCon (HsRecFields x rpats' dd)) }
         -- Field selectors have declared types; hence no zonking
 
 ---------------------------

@@ -92,7 +92,7 @@ import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
 
 import Control.Monad
-import Data.Foldable (find)
+import Data.Foldable (find, traverse_)
 
 {-
 ************************************************************************
@@ -192,14 +192,7 @@ tcTopBinds :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
 -- The TcLclEnv has an extended type envt for the new bindings
 tcTopBinds binds sigs
   = do  { -- Pattern synonym bindings populate the global environment
-          (binds', wrap, (tcg_env, tcl_env)) <- tcValBinds TopLevel binds sigs getEnvs
-        ; massertPpr (isIdHsWrapper wrap)
-                     (text "Non-identity multiplicity wrapper at toplevel:" <+> ppr wrap)
-          -- The wrapper (`wrap`) is always the identity because toplevel
-          -- binders are unrestricted (and `tcSubmult _ ManyTy` returns the
-          -- identity wrapper). Therefore it's safe to drop it altogether.
-          --
-          -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+          (binds', (tcg_env, tcl_env)) <- tcValBinds TopLevel binds sigs getEnvs
         ; specs <- tcImpPrags sigs   -- SPECIALISE prags for imported Ids
 
 
@@ -229,17 +222,16 @@ tcHsBootSigs binds sigs
 
 ------------------------
 
--- Why an HsWrapper? See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
 tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
-             -> TcM (HsLocalBinds GhcTc, HsWrapper, thing)
+             -> TcM (HsLocalBinds GhcTc, thing)
 
 tcLocalBinds (EmptyLocalBinds x) thing_inside
   = do  { thing <- thing_inside
-        ; return (EmptyLocalBinds x, idHsWrapper, thing) }
+        ; return (EmptyLocalBinds x, thing) }
 
 tcLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
-  = do  { (binds', wrapper, thing) <- tcValBinds NotTopLevel binds sigs thing_inside
-        ; return (HsValBinds x (XValBindsLR (NValBinds binds' sigs)), wrapper, thing) }
+  = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
+        ; return (HsValBinds x (XValBindsLR (NValBinds binds' sigs)), thing) }
 tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
@@ -251,10 +243,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
         ; (ev_binds, result) <- checkConstraints (IPSkol ips)
                                   [] given_ips thing_inside
 
-        -- We don't have linear implicit parameters, yet. So the wrapper can be
-        -- the identity.
-        -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-        ; return (HsIPBinds x (IPBinds ev_binds ip_binds') , idHsWrapper, result) }
+        ; return (HsIPBinds x (IPBinds ev_binds ip_binds') , result) }
   where
     ips = [ip | (L _ (IPBind _ (L _ ip) _)) <- ip_binds]
 
@@ -280,11 +269,10 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
 
--- Why an HsWrapper? See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
 tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
            -> TcM thing
-           -> TcM ([(RecFlag, LHsBinds GhcTc)], HsWrapper, thing)
+           -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 
 tcValBinds top_lvl binds sigs thing_inside
   = do  {   -- Typecheck the signatures
@@ -303,7 +291,7 @@ tcValBinds top_lvl binds sigs thing_inside
         -- For the moment, let bindings and top-level bindings introduce
         -- only unrestricted variables.
         ; tcExtendSigIds top_lvl poly_ids $
-     do { (binds', wrapper, (extra_binds', thing))
+     do { (binds', (extra_binds', thing))
               <- tcBindGroups top_lvl sig_fn prag_fn binds $
                  do { thing <- thing_inside
                        -- See Note [Pattern synonym builders don't yield dependencies]
@@ -312,17 +300,16 @@ tcValBinds top_lvl binds sigs thing_inside
                     ; let extra_binds = [ (NonRecursive, builder)
                                         | builder <- patsyn_builders ]
                     ; return (extra_binds, thing) }
-        ; return (binds' ++ extra_binds', wrapper, thing) }}
+        ; return (binds' ++ extra_binds', thing) }}
   where
     patsyns = getPatSynBinds binds
     prag_fn = mkPragEnv sigs (concatMap snd binds)
 
 ------------------------
 
--- Why an HsWrapper? See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
 tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
              -> [(RecFlag, LHsBinds GhcRn)] -> TcM thing
-             -> TcM ([(RecFlag, LHsBinds GhcTc)], HsWrapper, thing)
+             -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 -- Typecheck a whole lot of value bindings,
 -- one strongly-connected component at a time
 -- Here a "strongly connected component" has the straightforward
@@ -331,16 +318,16 @@ tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
 
 tcBindGroups _ _ _ [] thing_inside
   = do  { thing <- thing_inside
-        ; return ([], idHsWrapper, thing) }
+        ; return ([], thing) }
 
 tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
   = do  { -- See Note [Closed binder groups]
           type_env <- getLclTypeEnv
         ; let closed = isClosedBndrGroup type_env (snd group)
-        ; (group', outer_wrapper, (groups', inner_wrapper, thing))
+        ; (group', (groups', thing))
                 <- tc_group top_lvl sig_fn prag_fn group closed $
                    tcBindGroups top_lvl sig_fn prag_fn groups thing_inside
-        ; return (group' ++ groups', outer_wrapper <.> inner_wrapper, thing) }
+        ; return (group' ++ groups', thing) }
 
 -- Note [Closed binder groups]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -363,7 +350,7 @@ tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
 tc_group :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
          -> (RecFlag, LHsBinds GhcRn) -> IsGroupClosed -> TcM thing
-         -> TcM ([(RecFlag, LHsBinds GhcTc)], HsWrapper, thing)
+         -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 
 -- Typecheck one strongly-connected component of the original program.
 -- We get a list of groups back, because there may
@@ -377,9 +364,9 @@ tc_group top_lvl sig_fn prag_fn (NonRecursive, binds) closed thing_inside
                  [bind] -> bind
                  []     -> panic "tc_group: empty list of binds"
                  _      -> panic "tc_group: NonRecursive binds is not a singleton bag"
-       ; (bind', wrapper, thing) <- tc_single top_lvl sig_fn prag_fn bind closed
-                                     thing_inside
-       ; return ( [(NonRecursive, bind')], wrapper, thing) }
+       ; (bind', thing) <- tc_single top_lvl sig_fn prag_fn bind closed
+                             thing_inside
+       ; return ( [(NonRecursive, bind')], thing) }
 
 tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
   =     -- To maximise polymorphism, we do a new
@@ -390,8 +377,8 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
         ; whenIsJust mbFirstPatSyn $ \lpat_syn ->
             recursivePatSynErr (locA $ getLoc lpat_syn) binds
-        ; (binds1, wrapper, thing) <- go sccs
-        ; return ([(Recursive, binds1)], wrapper, thing) }
+        ; (binds1, thing) <- go sccs
+        ; return ([(Recursive, binds1)], thing) }
                 -- Rec them all together
   where
     mbFirstPatSyn = find (isPatSyn . unLoc) binds
@@ -401,15 +388,15 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     sccs :: [SCC (LHsBind GhcRn)]
     sccs = stronglyConnCompFromEdgedVerticesUniq (mkEdges sig_fn binds)
 
-    go :: [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTc, HsWrapper, thing)
+    go :: [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTc, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
                          -- recursive bindings must be unrestricted
                          -- (the ids added to the environment here are the name of the recursive definitions).
-                        ; ((binds2, inner_wrapper, thing), outer_wrapper) <-
+                        ; (binds2, thing) <-
                               tcExtendLetEnv top_lvl sig_fn closed ids1
                               (go sccs)
-                        ; return (binds1 ++ binds2, outer_wrapper <.> inner_wrapper, thing) }
-    go []         = do  { thing <- thing_inside; return ([], idHsWrapper, thing) }
+                        ; return (binds1 ++ binds2, thing) }
+    go []         = do  { thing <- thing_inside; return ([], thing) }
 
     tc_scc (AcyclicSCC bind) = tc_sub_group NonRecursive [bind]
     tc_scc (CyclicSCC binds) = tc_sub_group Recursive    binds
@@ -428,13 +415,13 @@ recursivePatSynErr loc binds
 tc_single :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
-          -> TcM (LHsBinds GhcTc, HsWrapper, thing)
+          -> TcM (LHsBinds GhcTc, thing)
 tc_single _top_lvl sig_fn prag_fn
           (L loc (PatSynBind _ psb))
           _ thing_inside
   = do { (aux_binds, tcg_env) <- tcPatSynDecl (L loc psb) sig_fn prag_fn
        ; thing <- setGblEnv tcg_env thing_inside
-       ; return (aux_binds, idHsWrapper, thing)
+       ; return (aux_binds, thing)
        }
 
 tc_single top_lvl sig_fn prag_fn lbind closed thing_inside
@@ -442,8 +429,8 @@ tc_single top_lvl sig_fn prag_fn lbind closed thing_inside
                                       NonRecursive NonRecursive
                                       closed
                                       [lbind]
-       ; (thing, wrapper) <- tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
-       ; return (binds1, wrapper, thing) }
+       ; thing <- tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
+       ; return (binds1, thing) }
 
 ------------------------
 type BKey = Int -- Just number off the bindings
@@ -735,7 +722,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
 
        -- AbsBinds which are PatBinds can't be linear.
        -- See Note [Non-variable pattern bindings aren't linear]
-       ; binds' <- manyIfPats binds'
+       ; manyIfPats binds'
 
        ; traceTc "tcPolyInfer" (ppr apply_mr $$ ppr (map mbi_sig mono_infos))
 
@@ -773,17 +760,12 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
        ; return ([abs_bind], scaled_poly_ids) }
          -- poly_ids are guaranteed zonked by mkExport
   where
-    manyIfPat bind@(L _ (PatBind{pat_lhs=(L _ (VarPat{}))}))
-      = return bind
-    manyIfPat (L loc pat@(PatBind {pat_mult=mult_ann, pat_lhs=lhs, pat_ext =(pat_ty,_)}))
-      = do { mult_co_wrap <- tcSubMult (NonLinearPatternOrigin GeneralisedPatternReason nlWildPatName) ManyTy (getTcMultAnn mult_ann)
-           -- The wrapper checks for correct multiplicities.
-           -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-           ; let lhs' = mkLHsWrapPat mult_co_wrap lhs pat_ty
-           ; return $ L loc pat {pat_lhs=lhs'}
-           }
-    manyIfPat bind = return bind
-    manyIfPats binds' = traverse manyIfPat binds'
+    manyIfPat (L _ (PatBind{pat_lhs=(L _ (VarPat{}))}))
+      = return ()
+    manyIfPat (L _ (PatBind {pat_mult=mult_ann}))
+      = tcSubMult (NonLinearPatternOrigin GeneralisedPatternReason nlWildPatName) ManyTy (getTcMultAnn mult_ann)
+    manyIfPat _ = return ()
+    manyIfPats binds' = traverse_ manyIfPat binds'
 
 checkMonomorphismRestriction :: [MonoBindInfo] -> [LHsBind GhcRn] -> TcM Bool
 -- True <=> apply the MR

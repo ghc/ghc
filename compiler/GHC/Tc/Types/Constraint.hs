@@ -57,7 +57,7 @@ module GHC.Tc.Types.Constraint (
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, dropMisleading, addSimples, addImplics, addHoles,
-        addNotConcreteError, addDelayedErrors,
+        addNotConcreteError, addMultiplicityCoercionError, addDelayedErrors,
         tyCoVarsOfWC, tyCoVarsOfWCList,
         insolubleWantedCt, insolubleCt, insolubleIrredCt,
         insolubleImplic, nonDefaultableTyVarsOfWC,
@@ -365,10 +365,16 @@ data DelayedError
     -- ^ A type could not be ensured to be concrete.
     --
     -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
+  | DE_Multiplicity TcCoercion CtLoc
+    -- ^ An error if the TcCoercion isn't a reflexivity constraint.
+    --
+    -- See Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify.
+
 
 instance Outputable DelayedError where
   ppr (DE_Hole hole) = ppr hole
   ppr (DE_NotConcrete err) = ppr err
+  ppr (DE_Multiplicity co _) = ppr co
 
 -- | A hole stores the information needed to report diagnostics
 -- about holes in terms (unbound identifiers or underscores) or
@@ -951,6 +957,7 @@ tyCoFVsOfImplic (Implic { ic_skols = skols
 tyCoFVsOfDelayedError :: DelayedError -> FV
 tyCoFVsOfDelayedError (DE_Hole hole) = tyCoFVsOfHole hole
 tyCoFVsOfDelayedError (DE_NotConcrete {}) = emptyFV
+tyCoFVsOfDelayedError (DE_Multiplicity co _) = tyCoFVsOfCo co
 
 tyCoFVsOfHole :: Hole -> FV
 tyCoFVsOfHole (Hole { hole_ty = ty }) = tyCoFVsOfType ty
@@ -1227,6 +1234,11 @@ addNotConcreteError :: WantedConstraints -> NotConcreteError -> WantedConstraint
 addNotConcreteError wc err
   = wc { wc_errors = unitBag (DE_NotConcrete err) `unionBags` wc_errors wc }
 
+-- See Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify.
+addMultiplicityCoercionError :: WantedConstraints -> TcCoercion -> CtLoc -> WantedConstraints
+addMultiplicityCoercionError wc mult_co loc
+  = wc { wc_errors = unitBag (DE_Multiplicity mult_co loc) `unionBags` wc_errors wc }
+
 addDelayedErrors :: WantedConstraints -> Bag DelayedError -> WantedConstraints
 addDelayedErrors wc errs
   = wc { wc_errors = errs `unionBags` wc_errors wc }
@@ -1254,6 +1266,7 @@ dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_errors = errors 
 
     keep_delayed_error (DE_Hole hole) = isOutOfScopeHole hole
     keep_delayed_error (DE_NotConcrete {}) = True
+    keep_delayed_error (DE_Multiplicity {}) = True
 
 isSolvedStatus :: ImplicStatus -> Bool
 isSolvedStatus (IC_Solved {}) = True
@@ -1313,6 +1326,7 @@ nonDefaultableTyVarsOfWC (WC { wc_simple = simples, wc_impl = implics, wc_errors
         = case err of
             NCE_FRR { nce_frr_origin = frr } -> tyCoVarsOfType (frr_type frr)
       non_defaultable_tvs_of_err (DE_Hole {}) = emptyVarSet
+      non_defaultable_tvs_of_err (DE_Multiplicity {}) = emptyVarSet
 
 insolubleWC :: WantedConstraints -> Bool
 insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
@@ -1323,6 +1337,7 @@ insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
     where
       is_insoluble (DE_Hole hole) = isOutOfScopeHole hole -- See Note [Insoluble holes]
       is_insoluble (DE_NotConcrete {}) = True
+      is_insoluble (DE_Multiplicity {}) = False
 
 insolubleWantedCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints

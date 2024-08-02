@@ -92,7 +92,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import {-# SOURCE #-} GHC.Tc.Utils.TcMType ( tcCheckUsage )
 import GHC.Tc.Types.LclEnv
-import GHC.Tc.Types.Evidence (HsWrapper, idHsWrapper, (<.>))
 
 import GHC.Core.InstEnv
 import GHC.Core.DataCon ( DataCon, dataConTyCon, flSelector )
@@ -622,7 +621,7 @@ tcExtendSigIds top_lvl sig_ids thing_inside
 
 
 tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
-                  -> [Scaled TcId] -> TcM a -> TcM (a, HsWrapper)
+                  -> [Scaled TcId] -> TcM a -> TcM a
 -- Used for both top-level value bindings and nested let/where-bindings
 -- Adds to the TcBinderStack too
 tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
@@ -632,7 +631,7 @@ tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
           [ (idName id, ATcId { tct_id   = id
                               , tct_info = mk_tct_info id })
           | Scaled _ id <- ids ] $
-    foldr check_usage ((, idHsWrapper) <$> thing_inside) scaled_names
+    foldr check_usage thing_inside scaled_names
   where
     mk_tct_info id
       | type_closed && isEmptyNameSet rhs_fvs = ClosedLet
@@ -643,10 +642,9 @@ tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
         type_closed = isTypeClosedLetBndr id &&
                       (fv_type_closed || hasCompleteSig sig_fn name)
     scaled_names = [Scaled p (idName id) | Scaled p id <- ids ]
-    check_usage :: Scaled Name -> TcM (a, HsWrapper) -> TcM (a, HsWrapper)
+    check_usage :: Scaled Name -> TcM a -> TcM a
     check_usage (Scaled p id) thing_inside = do
-      ((res, inner_wrap), outer_wrap) <- tcCheckUsage id p thing_inside
-      return $ (res, outer_wrap <.> inner_wrap)
+      tcCheckUsage id p thing_inside
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
 -- For lambda-bound and case-bound Ids

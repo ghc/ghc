@@ -52,7 +52,7 @@ import GHC.Core.Reduction( Reduction, reductionCoercion )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.Make
-import GHC.Core.Coercion( mkNomReflCo, isReflCo )
+import GHC.Core.Coercion( mkNomReflCo, isReflCo, isReflexiveCo )
 import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -3265,11 +3265,17 @@ simplifyDelayedErrors :: Bag DelayedError -> TcS (Bag DelayedError)
 --     (_ : Int) unpredictably, depending on which we happen to see
 --     first.  Doesn't matter much; there is a type error anyhow.
 --     T17139 is a case in point.
-simplifyDelayedErrors = mapBagM simpl_err
+simplifyDelayedErrors = mapMaybeBagM simpl_err
   where
-    simpl_err :: DelayedError -> TcS DelayedError
-    simpl_err (DE_Hole hole) = DE_Hole <$> simpl_hole hole
-    simpl_err err@(DE_NotConcrete {}) = return err
+    simpl_err :: DelayedError -> TcS (Maybe DelayedError)
+    simpl_err (DE_Hole hole) = Just . DE_Hole <$> simpl_hole hole
+    simpl_err err@(DE_NotConcrete {}) = return $ Just err
+    simpl_err (DE_Multiplicity mult_co loc)
+      = do { mult_co' <- TcS.zonkCo mult_co
+           ; if isReflexiveCo mult_co' then
+               return Nothing
+             else
+               return $ Just (DE_Multiplicity mult_co' loc) }
 
     simpl_hole :: Hole -> TcS Hole
 

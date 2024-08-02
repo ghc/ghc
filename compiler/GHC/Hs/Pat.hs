@@ -188,7 +188,7 @@ type instance XConPatTyArg GhcTc = NoExtField
 
 type instance XHsRecFields GhcPs = NoExtField
 type instance XHsRecFields GhcRn = NoExtField
-type instance XHsRecFields GhcTc = MultiplicityCheckCoercions
+type instance XHsRecFields GhcTc = NoExtField
 
 type instance XHsFieldBind _ = [AddEpAnn]
 

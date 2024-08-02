@@ -4,7 +4,7 @@ import GHC.Prelude
 import GHC.Core.Type         ( Mult )
 import GHC.Tc.Utils.TcType   ( TcTauType )
 import GHC.Tc.Types          ( TcM )
-import GHC.Tc.Types.Evidence ( TcCoercion, HsWrapper )
+import GHC.Tc.Types.Evidence ( TcCoercion )
 import GHC.Tc.Types.Origin   ( CtOrigin, TypedThing )
 
 
@@ -14,4 +14,4 @@ import GHC.Tc.Types.Origin   ( CtOrigin, TypedThing )
 unifyType          :: Maybe TypedThing -> TcTauType -> TcTauType -> TcM TcCoercion
 unifyInvisibleType :: TcTauType -> TcTauType -> TcM TcCoercion
 
-tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
+tcSubMult :: CtOrigin -> Mult -> Mult -> TcM ()

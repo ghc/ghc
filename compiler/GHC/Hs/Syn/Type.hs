@@ -200,7 +200,6 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
     go (WpTyLam tv)       = liftPRType $ mkForAllTy (Bndr tv Inferred)
     go (WpTyApp ta)       = \(ty,tas) -> (ty, ta:tas)
     go (WpLet _)          = id
-    go (WpMultCoercion _) = id
 
 lhsCmdTopType :: LHsCmdTop GhcTc -> Type
 lhsCmdTopType (L _ (HsCmdTop (CmdTopTc _ ret_ty _) _)) = ret_ty

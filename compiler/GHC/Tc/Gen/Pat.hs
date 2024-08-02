@@ -101,12 +101,8 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
                        , pe_ctxt = ctxt
                        , pe_orig = PatOrigin }
        ; dflags <- getDynFlags
-       ; mult_co_wrap <- manyIfLazy dflags pat
-       -- The wrapper checks for correct multiplicities.
-       -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-       ; (pat', r) <- tc_lpat pat_ty penv pat thing_inside
-       ; pat_ty' <- readExpType (scaledThing pat_ty)
-       ; return (mkLHsWrapPat mult_co_wrap pat' pat_ty', r) }
+       ; manyIfLazy dflags pat
+       ; tc_lpat pat_ty penv pat thing_inside }
   where
     -- The logic is partly duplicated from decideBangHood in
     -- GHC.HsToCore.Utils. Ugh…
@@ -116,10 +112,10 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
       where
         xstrict p@(L _ (LazyPat _ _)) = checkManyPattern LazyPatternReason p pat_ty
         xstrict (L _ (ParPat _ p)) = xstrict p
-        xstrict _ = return WpHole
+        xstrict _ = return ()
 
-        not_xstrict (L _ (BangPat _ _)) = return WpHole
-        not_xstrict (L _ (VarPat _ _)) = return WpHole
+        not_xstrict (L _ (BangPat _ _)) = return ()
+        not_xstrict (L _ (VarPat _ _)) = return ()
         not_xstrict (L _ (ParPat _ p)) = not_xstrict p
         not_xstrict p = checkManyPattern LazyPatternReason p pat_ty
 
@@ -471,8 +467,7 @@ tc_lpats tys penv pats
                (zipEqual "tc_lpats" pats tys)
 
 --------------------
--- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-checkManyPattern :: NonLinearPatternReason -> LPat GhcRn -> Scaled a -> TcM HsWrapper
+checkManyPattern :: NonLinearPatternReason -> LPat GhcRn -> Scaled a -> TcM ()
 checkManyPattern reason pat pat_ty = tcSubMult (NonLinearPatternOrigin reason pat) ManyTy (scaledMult pat_ty)
 
 
@@ -628,11 +623,10 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
   VarPat x (L l name) -> do
         { (wrap, id) <- tcPatBndr penv name pat_ty
-        ; (res, mult_wrap) <- tcCheckUsage name (scaledMult pat_ty) $
+        ; res <- tcCheckUsage name (scaledMult pat_ty) $
                               tcExtendIdEnv1 name id thing_inside
-            -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; return (mkHsWrapPat (wrap <.> mult_wrap) (VarPat x (L l id)) pat_ty, res) }
+        ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
 
   ParPat x pat -> do
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
@@ -653,8 +647,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
     ; return (OrPat pat_ty pats', res) }
 
   LazyPat x pat -> do
-        { mult_wrap <- checkManyPattern LazyPatternReason (noLocA ps_pat) pat_ty
-            -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        { checkManyPattern LazyPatternReason (noLocA ps_pat) pat_ty
         ; (pat', (res, pat_ct))
                 <- tc_lpat pat_ty (makeLazy penv) pat $
                    captureConstraints thing_inside
@@ -668,18 +661,16 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; _ <- unifyType Nothing (typeKind pat_ty) liftedTypeKind
 
-        ; return (mkHsWrapPat mult_wrap (LazyPat x pat') pat_ty, res) }
+        ; return ((LazyPat x pat'), res) }
 
   WildPat _ -> do
-        { mult_wrap <- checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
-            -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        { checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
         ; res <- thing_inside
         ; pat_ty <- expTypeToType (scaledThing pat_ty)
-        ; return (mkHsWrapPat mult_wrap (WildPat pat_ty) pat_ty, res) }
+        ; return (WildPat pat_ty, res) }
 
   AsPat x (L nm_loc name) pat -> do
-        { mult_wrap <- checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
-            -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        { checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
         ; (wrap, bndr_id) <- setSrcSpanA nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat (pat_ty `scaledSet`(mkCheckExpType $ idType bndr_id))
@@ -692,11 +683,10 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
             --
             -- If you fix it, don't forget the bindInstsOfPatIds!
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; return (mkHsWrapPat (wrap <.> mult_wrap) (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
+        ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
 
   ViewPat _ expr pat -> do
-        { mult_wrap <- checkManyPattern ViewPatternReason (noLocA ps_pat) pat_ty
-         -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        { checkManyPattern ViewPatternReason (noLocA ps_pat) pat_ty
          --
          -- It should be possible to have view patterns at linear (or otherwise
          -- non-Many) multiplicity. But it is not clear at the moment what
@@ -729,7 +719,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
           -- NB: pat_ty comes from matchActualFunTy, so it has a
           -- fixed RuntimeRep, as needed to call mkWpFun.
         ; let
-              expr_wrap = expr_wrap2' <.> expr_wrap1 <.> mult_wrap
+              expr_wrap = expr_wrap2' <.> expr_wrap1
 
         ; return $ (ViewPat pat_ty (mkLHsWrap expr_wrap expr') pat', res) }
 
@@ -861,9 +851,7 @@ Fortunately that's what matchActualFunTy returns anyway.
 --
 -- When there is no negation, neg_lit_ty and lit_ty are the same
   NPat _ (L l over_lit) mb_neg eq -> do
-        { mult_wrap <- checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
-          -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-          --
+        { checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
           -- It may be possible to refine linear pattern so that they work in
           -- linear environments. But it is not clear how useful this is.
         ; let orig = LiteralOrigin over_lit
@@ -886,7 +874,7 @@ Fortunately that's what matchActualFunTy returns anyway.
 
         ; res <- thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; return (mkHsWrapPat mult_wrap (NPat pat_ty (L l lit') mb_neg' eq') pat_ty, res) }
+        ; return (NPat pat_ty (L l lit') mb_neg' eq', res) }
 
 {-
 Note [NPlusK patterns]
@@ -914,8 +902,7 @@ AST is used for the subtraction operation.
 -- See Note [NPlusK patterns]
   NPlusKPat _ (L nm_loc name)
                (L loc lit) _ ge minus -> do
-        { mult_wrap <- checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
-            -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        { checkManyPattern OtherPatternReason (noLocA ps_pat) pat_ty
         ; let pat_exp_ty = scaledThing pat_ty
               orig = LiteralOrigin lit
         ; (lit1', ge')
@@ -958,7 +945,7 @@ AST is used for the subtraction operation.
                              -- we get warnings if we try. #17783
               pat' = NPlusKPat pat_ty (L nm_loc bndr_id) (L loc lit1') lit2'
                                ge' minus''
-        ; return (mkHsWrapPat mult_wrap pat' pat_ty, res) }
+        ; return (pat', res) }
 
 -- Here we get rid of it and add the finalizers to the global environment.
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
@@ -1298,8 +1285,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
 
         ; when (any isEqPred prov_theta) warnMonoLocalBinds
 
-        ; mult_wrap <- checkManyPattern PatternSynonymReason nlWildPatName pat_ty
-            -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        ; checkManyPattern PatternSynonymReason nlWildPatName pat_ty
 
         ; (univ_ty_args, ex_ty_args) <- splitConTyArgs con_like arg_pats
 
@@ -1356,7 +1342,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
                                  }
                                }
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; return (mkHsWrapPat (wrap <.> mult_wrap) res_pat pat_ty, res) }
+        ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
 checkFixedRuntimeRep :: DataCon -> [Scaled TcSigmaTypeFRR] -> TcM ()
 checkFixedRuntimeRep data_con arg_tys
@@ -1607,9 +1593,6 @@ pattern. However, this is *the only check* for omitted record fields: if it
 weren't for linearity checking, the type checker could ignore b altogether. So
 we have a function check_omitted_fields_multiplicity, whose purpose is to do the
 linearity checking on the omitted fields.
-
-check_omitted_fields_multiplicity returns coercions which all need to be
-reflexivity after zonking: see Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
 -}
 
 tcConValArgs :: ConLike
@@ -1640,11 +1623,10 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
     where
       con_arity  = conLikeArity con_like
 
-  RecCon (HsRecFields _ rpats dd) -> do
-        { mult_cos <- check_omitted_fields_multiplicity
-           -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+  RecCon (HsRecFields x rpats dd) -> do
+        { check_omitted_fields_multiplicity
         ; (rpats', res) <- tcMultiple tc_field penv rpats thing_inside
-        ; return ((RecCon (HsRecFields mult_cos rpats' dd)), res) }
+        ; return ((RecCon (HsRecFields x rpats' dd)), res) }
     where
       tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                           (LHsRecField GhcTc (LPat GhcTc))
@@ -1658,11 +1640,10 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
              ; return (L l (HsFieldBind ann (L loc (FieldOcc sel' (L lr rdr))) pat'
                                                                         pun), res) }
       -- See Note [Omitted record fields and linearity]
-      check_omitted_fields_multiplicity :: TcM MultiplicityCheckCoercions
+      check_omitted_fields_multiplicity :: TcM ()
       check_omitted_fields_multiplicity = do
-        mult_coss <- forM omitted_field_tys $ \(fl, pat_ty) ->
-          tcSubMult' (OmittedFieldOrigin fl) ManyTy (scaledMult pat_ty)
-        return $ concat mult_coss
+        forM_ omitted_field_tys $ \(fl, pat_ty) ->
+          tcSubMult (OmittedFieldOrigin fl) ManyTy (scaledMult pat_ty)
 
       find_field_ty :: Name -> FastString -> TcM (Scaled TcType)
       find_field_ty sel lbl

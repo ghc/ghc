@@ -838,7 +838,7 @@ when typechecking the [d| .. |] quote, and typecheck them later.
 tcRecSelBinds :: [(Id, LHsBind GhcRn)] -> TcM TcGblEnv
 tcRecSelBinds sel_bind_prs
   = tcExtendGlobalValEnv [sel_id | (L _ (XSig (IdSig sel_id))) <- sigs] $
-    do { (rec_sel_binds, _, tcg_env) <- discardWarnings $
+    do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                        -- See Note [Impredicative record selectors]
                                        setXOptM LangExt.ImpredicativeTypes $
                                        tcValBinds TopLevel binds sigs getGblEnv

@@ -39,7 +39,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
-  TcMCoercion, TcMCoercionN, TcMCoercionR, MultiplicityCheckCoercions,
+  TcMCoercion, TcMCoercionN, TcMCoercionR,
   Role(..), LeftOrRight(..), pickLR,
   maybeSymCo,
   unwrapIP, wrapIP,
@@ -110,10 +110,6 @@ type TcMCoercion  = MCoercion
 type TcMCoercionN = MCoercionN  -- nominal
 type TcMCoercionR = MCoercionR  -- representational
 
-type MultiplicityCheckCoercions = [TcCoercion]
--- Coercions which must all be reflexivity after zonking.
--- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-
 
 -- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
 maybeSymCo :: SwapFlag -> TcCoercion -> TcCoercion
@@ -176,10 +172,6 @@ data HsWrapper
 
   | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
                                 -- so that the identity coercion is always exactly WpHole
-
-  | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
-                                -- error in the desugarer. See GHC.Tc.Utils.Unify
-                                -- Note [Coercions returned from tcSubMult]
   deriving Data.Data
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
@@ -321,7 +313,6 @@ hsWrapDictBinders wrap = go wrap
    go (WpTyLam {})        = emptyBag
    go (WpTyApp {})        = emptyBag
    go (WpLet   {})        = emptyBag
-   go (WpMultCoercion {}) = emptyBag
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,
@@ -940,8 +931,6 @@ pprHsWrapper wrap pp_thing_inside
     help it (WpEvLam id)  = add_parens $ sep [ text "\\" <> pprLamBndr id <> dot, it False]
     help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pprLamBndr tv <> dot, it False]
     help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
-    help it (WpMultCoercion co)   = add_parens $ sep [it False, nest 2 (text "<multiplicity coercion>"
-                                              <+> pprParendCo co)]
 
 pprLamBndr :: Id -> SDoc
 pprLamBndr v = pprBndr LambdaBind v

@@ -89,8 +89,6 @@ instance Diagnostic DsMessage where
     DsUselessSpecialiseForNoInlineFunction poly_id
       -> mkSimpleDecorated $
           text "Ignoring useless SPECIALISE pragma for NOINLINE function:" <+> quotes (ppr poly_id)
-    DsMultiplicityCoercionsNotSupported
-      -> mkSimpleDecorated $ text "GHC bug #19517: GHC currently does not support programs using GADTs or type families to witness equality of multiplicities"
     DsOrphanRule rule
       -> mkSimpleDecorated $ text "Orphan rule:" <+> ppr rule
     DsRuleLhsTooComplicated orig_lhs lhs2
@@ -226,7 +224,6 @@ instance Diagnostic DsMessage where
     DsTopLevelBindsNotAllowed{}                 -> ErrorWithoutFlag
     DsUselessSpecialiseForClassMethodSelector{} -> WarningWithoutFlag
     DsUselessSpecialiseForNoInlineFunction{}    -> WarningWithoutFlag
-    DsMultiplicityCoercionsNotSupported{}       -> ErrorWithoutFlag
     DsOrphanRule{}                              -> WarningWithFlag Opt_WarnOrphans
     DsRuleLhsTooComplicated{}                   -> WarningWithoutFlag
     DsRuleIgnoredDueToConstructor{}             -> WarningWithoutFlag
@@ -263,7 +260,6 @@ instance Diagnostic DsMessage where
     DsTopLevelBindsNotAllowed{}                 -> noHints
     DsUselessSpecialiseForClassMethodSelector{} -> noHints
     DsUselessSpecialiseForNoInlineFunction{}    -> noHints
-    DsMultiplicityCoercionsNotSupported         -> noHints
     DsOrphanRule{}                              -> noHints
     DsRuleLhsTooComplicated{}                   -> noHints
     DsRuleIgnoredDueToConstructor{}             -> noHints

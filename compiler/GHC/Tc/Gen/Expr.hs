@@ -432,11 +432,9 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 -}
 
 tcExpr (HsLet x binds expr) res_ty
-  = do  { (binds', wrapper, expr') <- tcLocalBinds binds $
-                                      tcMonoExpr expr res_ty
-          -- The wrapper checks for correct multiplicities.
-          -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-        ; return (HsLet x binds' (mkLHsWrap wrapper expr')) }
+  = do  { (binds', expr') <- tcLocalBinds binds $
+                             tcMonoExpr expr res_ty
+        ; return (HsLet x binds' expr') }
 
 tcExpr (HsCase ctxt scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.
@@ -459,8 +457,8 @@ tcExpr (HsCase ctxt scrut matches) res_ty
         ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRho scrut
 
         ; hasFixedRuntimeRep_syntactic FRRCase scrut_ty
-        ; (mult_co_wrap, matches') <- tcCaseMatches tcBody (Scaled mult scrut_ty) matches res_ty
-        ; return (HsCase ctxt (mkLHsWrap mult_co_wrap scrut') matches') }
+        ; matches' <- tcCaseMatches tcBody (Scaled mult scrut_ty) matches res_ty
+        ; return (HsCase ctxt scrut' matches') }
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
@@ -720,12 +718,12 @@ tcXExpr (PopErrCtxt (L loc e)) res_ty
 tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc s@LetStmt{}) <- o
   , HsLet x binds e <- e'
-  =  do { (binds', wrapper, e') <-  setSrcSpanA loc $
-                            addStmtCtxt s $
-                            tcLocalBinds binds $
-                            tcMonoExprNC e res_ty -- NB: Do not call tcMonoExpr here as it adds
-                                                  -- a duplicate error context
-        ; return $ mkExpandedStmtTc ls (HsLet x binds' (mkLHsWrap wrapper e'))
+  =  do { (binds', e') <-  setSrcSpanA loc $
+                           addStmtCtxt s $
+                           tcLocalBinds binds $
+                           tcMonoExprNC e res_ty -- NB: Do not call tcMonoExpr here as it adds
+                                                 -- a duplicate error context
+        ; return $ mkExpandedStmtTc ls (HsLet x binds' e')
         }
   | OrigStmt ls@(L loc s@LastStmt{}) <- o
   =  setSrcSpanA loc $
@@ -1641,9 +1639,9 @@ tcRecordBinds
         -> HsRecordBinds GhcRn
         -> TcM (HsRecordBinds GhcTc)
 
-tcRecordBinds con_like arg_tys (HsRecFields _ rbinds dd)
+tcRecordBinds con_like arg_tys (HsRecFields x rbinds dd)
   = do  { mb_binds <- mapM do_bind rbinds
-        ; return (HsRecFields [] (catMaybes mb_binds) dd) }
+        ; return (HsRecFields x (catMaybes mb_binds) dd) }
   where
     fields = map flSelector $ conLikeFieldLabels con_like
     flds_w_tys = zipEqual "tcRecordBinds" fields arg_tys

@@ -14,7 +14,7 @@ module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
   tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeDS,
-  tcSubTypeAmbiguity, tcSubMult, tcSubMult',
+  tcSubTypeAmbiguity, tcSubMult,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
@@ -1540,8 +1540,8 @@ message) is very conservative:
                           where type instance F [x] t = t
 
 
-Note [Coercions returned from tcSubMult]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Coercion errors in tcSubMult]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At the moment, we insist that all sub-multiplicity tests turn out
 (once the typechecker has finished its work) to be equalities,
 i.e. implementable by ReflCo.  Why?  Because our type system has
@@ -1552,61 +1552,66 @@ It might not be `Refl` *yet*.
 
 [TODO: add counterexample #25130]
 
-So we take a two-stage approach:
-* Generate a coercion now, and hang it in the HsSyn syntax tree
-* In the desugarer, after zonking, check that it is Refl.
+So we take the following approach
 
-We "hang it in the tree" in two different ways:
-A) In a HsWrapper, in the WpMultCoercion alternative. The
-   desugarer checks that WpMultCoercions are Refl, and then
-   discards them.  See `GHC.HsToCore.Binds.dsHsWrapper`
-B) In an extension field.  For example, in the extension
-   field of `HsRecFields`.  See `check_omitted_fields_multiplicity`
-   in `GHC.Tc.Gen.Pat.tcDataConPat`
+* In `tcEqMult`:
+  - Emit a perfectly ordinary Wanted equality constraint for the equality,
+    returning a coercion.
 
-The former mechanism (A) seemed convenient at the time, but has
-turned out to add a lot of friction, so we plan to move towards
-(B): see #25128
+  - Wrap that coercion with `DE_Multiplicity` to make a `DelayedError`, and put
+    that delayed error into `wc_errors` of the current WantedConstraints.  This
+    is done by `ensureReflMultiplicityCo`.
 
-An alternative would be to have a kind of constraint which can
-only produce trivial evidence. This would allow such checks to happen
-in the constraint solver (#18756).
-This would be similar to the existing setup for Concrete, see
-  Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete
-    (PHASE 1 in particular).
+* When solving constraints, discard any `DE_Multiplicity` errors that wrap a
+  reflective coercion, of kind `ty ~ ty`.  This is done in
+  `GHC.Tc.Solver.simplifyDelayedErrors`
+
+* After constraint solving is complete report an error if there are any
+  remaining `DE_Multiplicity` errors.  See
+  `GHC.Tc.Errors.reportMultiplicityCoercionErrs`
+
+Wrinkles
+
+(DME1) If the multiplicity constraint is /solved/, but with a non-reflective
+   coercion, we'll have just a `DE_Multiplicity` error left over.
+
+   But if the multiplicity constraint is /unsolved/ (e.g. ManyTy ~ OneTy), we
+   will have /both/ an unsolved Wanted in `wc_simple`, /and/ a `DE_Multiplicity`
+   in `wc_errors`.  We don't want to report both.  Solution: suppress all
+   `DE_Multiplicity` constraints if there are any unsolved wanted.
+
+   This way, the delayed error is indeed only reported when the constraint is
+   solved with a non-reflexivity coercion.
+
+An alternative would be to have a kind of constraint which can only produce
+trivial evidence. This would allow such checks to happen in the constraint
+solver (#18756).  This would be similar to the existing setup for Concrete, see
+Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete (PHASE 1 in particular).
 
 -}
 
-tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
-tcSubMult' :: CtOrigin -> Mult -> Mult -> TcM MultiplicityCheckCoercions
-tcSubMult origin w_actual w_expected =
-  do { mult_cos <- tcSubMult' origin w_actual w_expected
-     ; return (foldMap WpMultCoercion mult_cos) }
-tcSubMult' origin w_actual w_expected
+tcSubMult :: CtOrigin -> Mult -> Mult -> TcM ()
+tcSubMult origin w_actual w_expected
   | Just (w1, w2) <- isMultMul w_actual =
-  do { w1 <- tcSubMult' origin w1 w_expected
-     ; w2 <- tcSubMult' origin w2 w_expected
-     ; return (w1 ++ w2) }
+  do { tcSubMult origin w1 w_expected
+     ; tcSubMult origin w2 w_expected }
   -- Currently, we consider p*q and sup p q to be equal.  Therefore, p*q <= r is
   -- equivalent to p <= r and q <= r.  For other cases, we approximate p <= q by p
   -- ~ q.  This is not complete, but it's sound. See also Note [Overapproximating
   -- multiplicities] in Multiplicity.
-tcSubMult' origin w_actual w_expected =
+tcSubMult origin w_actual w_expected =
   case submult w_actual w_expected of
-    Submult -> return []
-    Unknown -> tcEqMult' origin w_actual w_expected
+    Submult -> return ()
+    Unknown -> tcEqMult origin w_actual w_expected
 
-tcEqMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
-tcEqMult' :: CtOrigin -> Mult -> Mult -> TcM MultiplicityCheckCoercions
-tcEqMult origin w_actual w_expected =
-  do { mult_cos <- tcEqMult' origin w_actual w_expected
-     ; return (foldMap WpMultCoercion mult_cos) }
-tcEqMult' origin w_actual w_expected = do
+tcEqMult :: CtOrigin -> Mult -> Mult -> TcM ()
+tcEqMult origin w_actual w_expected = do
   {
   -- Note that here we do not call to `submult`, so we check
   -- for strict equality.
   ; coercion <- unifyTypeAndEmit TypeLevel origin w_actual w_expected
-  ; return $ if isReflCo coercion then [] else [coercion] }
+  -- See Note [Coercion errors in tcSubMult].
+  ; ensureReflMultiplicityCo coercion origin }
 
 
 {- *********************************************************************
@@ -1864,10 +1869,9 @@ tc_sub_type_deep unify inst_orig ctxt ty_actual ty_expected
         do { arg_wrap  <- tc_sub_type_ds Deep unify given_orig GenSigCtxt exp_arg act_arg
                           -- GenSigCtxt: See Note [Setting the argument context]
            ; res_wrap  <- tc_sub_type_deep unify inst_orig ctxt act_res exp_res
-           ; mult_wrap <- tcEqMult inst_orig act_mult exp_mult
-                          -- See Note [Multiplicity in deep subsumption]
-           ; return (mult_wrap <.>
-                     mkWpFun arg_wrap res_wrap (Scaled exp_mult exp_arg) exp_res) }
+           ; tcEqMult inst_orig act_mult exp_mult
+             -- See Note [Multiplicity in deep subsumption]
+           ; return (mkWpFun arg_wrap res_wrap (Scaled exp_mult exp_arg) exp_res) }
                      -- arg_wrap :: exp_arg ~> act_arg
                      -- res_wrap :: act-res ~> exp_res
       where

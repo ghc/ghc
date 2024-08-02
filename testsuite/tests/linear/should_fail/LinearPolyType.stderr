@@ -1,6 +1,5 @@
+LinearPolyType.hs:16:12: error: [GHC-59840]
+    • GHC bug #19517: GHC currently does not support programs using GADTs or type families to witness equality of multiplicities
+    • In the pattern: _
+      In an equation for ‘dep’: dep SFalse _ = 0
 
-LinearPolyType.hs:15:1: error: [GHC-59840]
-    GHC bug #19517: GHC currently does not support programs using GADTs or type families to witness equality of multiplicities
-
-LinearPolyType.hs:15:1: error: [GHC-59840]
-    GHC bug #19517: GHC currently does not support programs using GADTs or type families to witness equality of multiplicities

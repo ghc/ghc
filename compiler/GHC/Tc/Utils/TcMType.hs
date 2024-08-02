@@ -2269,27 +2269,24 @@ a \/\a in the final result but all the occurrences of a will be zonked to ()
 
 -- | @tcCheckUsage name mult thing_inside@ runs @thing_inside@, checks that the
 -- usage of @name@ is a submultiplicity of @mult@, and removes @name@ from the
--- usage environment. See also Note [Coercions returned from tcSubMult] in
--- GHC.Tc.Utils.Unify, which applies to the wrapper returned from this function.
-tcCheckUsage :: Name -> Mult -> TcM a -> TcM (a, HsWrapper)
+-- usage environment.
+tcCheckUsage :: Name -> Mult -> TcM a -> TcM a
 tcCheckUsage name id_mult thing_inside
   = do { (local_usage, result) <- tcCollectingUsage thing_inside
-       ; wrapper <- check_then_add_usage local_usage
-       ; return (result, wrapper) }
+       ; check_usage (lookupUE local_usage name)
+       ; tcEmitBindingUsage (deleteUE local_usage name)
+       ; return result }
     where
-    check_then_add_usage :: UsageEnv -> TcM HsWrapper
+    check_usage :: Usage -> TcM ()
     -- Checks that the usage of the newly introduced binder is compatible with
-    -- its multiplicity, and combines the usage of non-new binders to |uenv|
-    check_then_add_usage uenv
-      = do { let actual_u = lookupUE uenv name
-           ; traceTc "check_then_add_usage" (ppr id_mult $$ ppr actual_u)
-           ; wrapper <- case actual_u of
-               Bottom -> return idHsWrapper
+    -- its multiplicity.
+    check_usage actual_u
+      = do { traceTc "check_usage" (ppr id_mult $$ ppr actual_u)
+           ; case actual_u of
+               Bottom -> return ()
                Zero     -> tcSubMult (UsageEnvironmentOf name) ManyTy id_mult
                MUsage m -> do { m <- promote_mult m
-                              ; tcSubMult (UsageEnvironmentOf name) m id_mult }
-           ; tcEmitBindingUsage (deleteUE uenv name)
-           ; return wrapper }
+                              ; tcSubMult (UsageEnvironmentOf name) m id_mult } }
 
     -- This is gross. The problem is in test case typecheck/should_compile/T18998:
     --   f :: a %1-> Id n a -> Id n a

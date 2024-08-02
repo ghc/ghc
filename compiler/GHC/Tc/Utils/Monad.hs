@@ -102,7 +102,7 @@ module GHC.Tc.Utils.Monad(
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
-  emitImplication, emitImplications,
+  emitImplication, emitImplications, ensureReflMultiplicityCo,
   emitDelayedErrors, emitHole, emitHoles, emitNotConcreteError,
   discardConstraints, captureConstraints, tryCaptureConstraints,
   pushLevelAndCaptureConstraints,
@@ -233,6 +233,7 @@ import GHC.Types.Unique.DFM
 import GHC.Iface.Errors.Types
 import GHC.Iface.Errors.Ppr
 import GHC.Tc.Types.LclEnv
+import GHC.Core.Coercion (isReflCo)
 
 {-
 ************************************************************************
@@ -1867,6 +1868,15 @@ emitNotConcreteError err
   = do { traceTc "emitNotConcreteError" (ppr err)
        ; lie_var <- getConstraintVar
        ; updTcRef lie_var (`addNotConcreteError` err) }
+
+-- See Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify.
+ensureReflMultiplicityCo :: TcCoercion -> CtOrigin -> TcM ()
+ensureReflMultiplicityCo mult_co origin
+  = do { traceTc "ensureReflMultiplicityCo" (ppr mult_co)
+       ; unless (isReflCo mult_co) $ do
+           { loc <- getCtLocM origin Nothing
+           ; lie_var <- getConstraintVar
+           ; updTcRef lie_var (\w -> addMultiplicityCoercionError w mult_co loc) } }
 
 -- | Throw out any constraints emitted by the thing_inside
 discardConstraints :: TcM a -> TcM a

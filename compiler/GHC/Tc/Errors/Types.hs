@@ -5587,6 +5587,8 @@ data TcSolverReportMsg
     , unsafeOverlap_match   :: ClsInst
     , unsafeOverlapped      :: NE.NonEmpty ClsInst }
 
+  | MultiplicityCoercionsNotSupported
+
   deriving Generic
 
 data MismatchMsg
