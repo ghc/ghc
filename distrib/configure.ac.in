@@ -214,6 +214,9 @@ FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlvmAsCmd="$LLVMAS"
 AC_SUBST([LlvmAsCmd])
 
+dnl ** Which LLVM assembler arguments to use (e.g. `--target=...`)?
+FP_PROG_LLVM_AS_ARGS()
+
 dnl ** Check gcc version and flags we need to pass it **
 FP_GCC_VERSION
 FP_GCC_SUPPORTS_NO_PIE

@@ -392,6 +392,7 @@ mkTarget opts = do
     normalised_triple <- normaliseTriple (optTriple opts)
     -- Use Llvm target if specified, otherwise use triple as llvm target
     let tgtLlvmTarget = fromMaybe normalised_triple (optLlvmTriple opts)
+        tgtLlvmAsArgs = ["--target=" <> tgtLlvmTarget]
 
     (archOs, tgtVendor) <- do
       cc0 <- findBasicCc (optCc opts)
@@ -478,6 +479,7 @@ mkTarget opts = do
                    , tgtSupportsIdentDirective
                    , tgtSupportsGnuNonexecStack
                    , tgtLlvmTarget
+                   , tgtLlvmAsArgs
                    }
     return t
 

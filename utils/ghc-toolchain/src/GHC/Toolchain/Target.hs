@@ -48,6 +48,7 @@ data Target = Target
     , tgtEndianness :: Endianness
     , tgtSymbolsHaveLeadingUnderscore :: Bool
     , tgtLlvmTarget :: String
+    , tgtLlvmAsArgs :: [String]
 
       -- GHC capabilities
     , tgtUnregisterised :: Bool
@@ -107,6 +108,7 @@ instance Show Target where
     , ", tgtEndianness = " ++ show tgtEndianness
     , ", tgtSymbolsHaveLeadingUnderscore = " ++ show tgtSymbolsHaveLeadingUnderscore
     , ", tgtLlvmTarget = " ++ show tgtLlvmTarget
+    , ", tgtLlvmAsArgs = " ++ show tgtLlvmAsArgs
     , ", tgtUnregisterised = " ++ show tgtUnregisterised
     , ", tgtTablesNextToCode = " ++ show tgtTablesNextToCode
     , ", tgtUseLibffiForAdjustors = " ++ show tgtUseLibffiForAdjustors

@@ -167,6 +167,7 @@ initSettings top_dir = do
   lc_prog <- getSetting "LLVM llc command"
   lo_prog <- getSetting "LLVM opt command"
   las_prog <- getSetting "LLVM llvm-as command"
+  las_args <- unescapeArgs <$> getToolSetting "LLVM llvm-as flags"
 
   let iserv_prog = libexec "ghc-iserv"
 
@@ -234,7 +235,7 @@ initSettings top_dir = do
       , toolSettings_opt_windres = []
       , toolSettings_opt_lo      = []
       , toolSettings_opt_lc      = []
-      , toolSettings_opt_las     = ["--target=" ++ llvmTarget]
+      , toolSettings_opt_las     = las_args
       , toolSettings_opt_i       = []
 
       , toolSettings_extraGccViaCFlags = extraGccViaCFlags
