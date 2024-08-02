@@ -67,19 +67,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T15323.hs:5:19 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: v}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T15323.hs:5:19 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: v})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       (HsDataDefn
        (NoExtField)
@@ -134,18 +138,22 @@
                  [])
                 (EpaComments
                  []))
-               (UserTyVar
+               (HsTvb
                 []
                 (SpecifiedSpec)
-                (L
-                 (EpAnn
-                  (EpaSpan { T15323.hs:6:27 })
-                  (NameAnnTrailing
-                   [])
-                  (EpaComments
-                   []))
-                 (Unqual
-                  {OccName: v}))))]))
+                (HsBndrVar
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { T15323.hs:6:27 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (Unqual
+                   {OccName: v})))
+                (HsBndrNoKind
+                 (NoExtField))))]))
            (Just
             (L
              (EpAnn

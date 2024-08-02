@@ -151,9 +151,16 @@ renameForAllTelescope (HsForAllInvis x bndrs) =
   HsForAllInvis x <$> mapM renameLBinder bndrs
 
 renameBinder :: HsTyVarBndr flag GhcRn -> Rename (IdP GhcRn) (HsTyVarBndr flag GhcRn)
-renameBinder (UserTyVar x fl lname) = UserTyVar x fl <$> locatedN renameName lname
-renameBinder (KindedTyVar x fl lname lkind) =
-  KindedTyVar x fl <$> locatedN renameName lname <*> located renameType lkind
+renameBinder (HsTvb x fl bvar lkind) =
+  HsTvb x fl <$> renameBinderVar bvar <*> renameBinderKind lkind
+
+renameBinderVar :: HsBndrVar GhcRn -> Rename (IdP GhcRn) (HsBndrVar GhcRn)
+renameBinderVar (HsBndrVar x lname) = HsBndrVar x <$> locatedN renameName lname
+renameBinderVar (HsBndrWildCard x) = return (HsBndrWildCard x)
+
+renameBinderKind :: HsBndrKind GhcRn -> Rename (IdP GhcRn) (HsBndrKind GhcRn)
+renameBinderKind (HsBndrNoKind x) = return (HsBndrNoKind x)
+renameBinderKind (HsBndrKind x k) = HsBndrKind x <$> located renameType k
 
 renameLBinder :: LHsTyVarBndr flag GhcRn -> Rename (IdP GhcRn) (LHsTyVarBndr flag GhcRn)
 renameLBinder = located renameBinder

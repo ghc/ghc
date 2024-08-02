@@ -3175,6 +3175,21 @@ data TcRnMessage where
     :: !(LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
     -> TcRnMessage
 
+  {-| 'TcRnIllegalWildcardTyVarBndr' is an error that occurs
+      when a wildcard binder is used in a type declaration
+      without enabling the @TypeAbstractions@ extension.
+
+      Example:
+        {-# LANGUAGE NoTypeAbstractions #-}         -- extension disabled
+        type Const a _ = a
+                     ^
+
+      Test case: T23501_fail_ext
+  -}
+  TcRnIllegalWildcardTyVarBndr
+    :: !(LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
+    -> TcRnMessage
+
   {-| 'TcRnInvalidInvisTyVarBndr' is an error that occurs
       when an invisible type variable binder has no corresponding
       @forall k.@ quantifier in the standalone kind signature.
@@ -4723,6 +4738,10 @@ data BadAnonWildcardContext
   | ExtraConstraintWildcardNotAllowed
       SoleExtraConstraintWildcardAllowed
   | WildcardsNotAllowedAtAll
+
+  -- See Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type
+  | WildcardBndrInForallTelescope
+  | WildcardBndrInTyFamResultVar
 
 -- | Whether a sole extra-constraint wildcard is allowed,
 -- e.g. @_ => ..@ as opposed to @( .., _ ) => ..@.

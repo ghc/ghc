@@ -4086,22 +4086,31 @@ instance ExactPrintTVFlag flag => ExactPrint (HsTyVarBndr flag GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (UserTyVar an flag n) = do
+  exact (HsTvb an flag n (HsBndrNoKind _)) = do
     r <- exactTVDelimiters an flag $ \ani -> do
            n' <- markAnnotated n
-           return (ani, UserTyVar an flag n')
+           return (ani, HsTvb an flag n' (HsBndrNoKind noExtField))
     case r of
-      (an', flag', UserTyVar _ _ n'') -> return (UserTyVar an' flag' n'')
-      _ -> error "KindedTyVar should never happen here"
-  exact (KindedTyVar an flag n k) = do
+      (an', flag', HsTvb _ _ n'' k'') -> return (HsTvb an' flag' n'' k'')
+  exact (HsTvb an flag n (HsBndrKind _ k)) = do
     r <- exactTVDelimiters an flag $ \ani -> do
           n' <- markAnnotated n
           an0 <- markEpAnnL ani lidl AnnDcolon
           k' <- markAnnotated k
-          return (an0, KindedTyVar an0 flag n' k')
+          return (an0, HsTvb an0 flag n' (HsBndrKind noExtField k'))
     case r of
-      (an',flag', KindedTyVar _ _ n'' k'') -> return (KindedTyVar an' flag' n'' k'')
-      _ -> error "UserTyVar should never happen here"
+      (an',flag', HsTvb _ _ n'' k'') -> return (HsTvb an' flag' n'' k'')
+
+instance ExactPrint (HsBndrVar GhcPs) where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+
+  exact (HsBndrVar x n) = do
+    n' <- markAnnotated n
+    return (HsBndrVar x n')
+  exact (HsBndrWildCard x) = do
+    printStringAdvance "_"
+    return (HsBndrWildCard x)
 
 -- ---------------------------------------------------------------------
 

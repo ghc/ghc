@@ -31,7 +31,10 @@ module GHC.Hs.Type (
         pprHsArrow,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsForAllTelescope(..), EpAnnForallTy, HsTyVarBndr(..), LHsTyVarBndr,
+        HsForAllTelescope(..), EpAnnForallTy,
+        HsTyVarBndr(..), LHsTyVarBndr,
+        HsBndrKind(..),
+        HsBndrVar(..),
         HsBndrVis(..), isHsBndrInvisible,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -74,9 +77,10 @@ module GHC.Hs.Type (
         mkEmptyWildCardBndrs,
         mkHsForAllVisTele, mkHsForAllInvisTele,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
-        isHsKindedTyVar, hsTvbAllKinded,
+        isHsKindedTyVar, hsBndrVar, hsBndrKind, hsTvbAllKinded,
         hsScopedTvs, hsScopedKvs, hsWcScopedTvs, dropWildCards,
-        hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
+        hsTyVarLName, hsTyVarName,
+        hsAllLTyVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarNames, hsForAllTelescopeNames,
         hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
@@ -355,39 +359,46 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 
 --------------------------------------------------
 
-type instance XUserTyVar    (GhcPass _) = [AddEpAnn]
-type instance XKindedTyVar  (GhcPass _) = [AddEpAnn]
-
+type instance XTyVarBndr    (GhcPass _) = [AddEpAnn]
 type instance XXTyVarBndr   (GhcPass _) = DataConCantHappen
+
+type instance XBndrKind   (GhcPass p) = NoExtField
+type instance XBndrNoKind (GhcPass p) = NoExtField
+type instance XXBndrKind  (GhcPass p) = DataConCantHappen
+
+type instance XBndrVar (GhcPass p) = NoExtField
+type instance XBndrWildCard (GhcPass p) = NoExtField
+type instance XXBndrVar (GhcPass p) = DataConCantHappen
 
 -- | Return the attached flag
 hsTyVarBndrFlag :: HsTyVarBndr flag (GhcPass pass) -> flag
-hsTyVarBndrFlag (UserTyVar _ fl _)     = fl
-hsTyVarBndrFlag (KindedTyVar _ fl _ _) = fl
+hsTyVarBndrFlag = tvb_flag
 -- By specialising to (GhcPass p) we know that XXTyVarBndr is DataConCantHappen
--- so these two equations are exhaustive: extension construction can't happen
+-- so the equation is exhaustive: extension construction can't happen
 
 -- | Set the attached flag
 setHsTyVarBndrFlag :: flag -> HsTyVarBndr flag' (GhcPass pass)
   -> HsTyVarBndr flag (GhcPass pass)
-setHsTyVarBndrFlag f (UserTyVar x _ l)     = UserTyVar x f l
-setHsTyVarBndrFlag f (KindedTyVar x _ l k) = KindedTyVar x f l k
+setHsTyVarBndrFlag fl tvb = tvb { tvb_flag = fl }
 
 -- | Update the attached flag
 updateHsTyVarBndrFlag
   :: (flag -> flag')
   -> HsTyVarBndr flag  (GhcPass pass)
   -> HsTyVarBndr flag' (GhcPass pass)
-updateHsTyVarBndrFlag f (UserTyVar   x flag name)    = UserTyVar   x (f flag) name
-updateHsTyVarBndrFlag f (KindedTyVar x flag name ki) = KindedTyVar x (f flag) name ki
+updateHsTyVarBndrFlag f tvb = tvb { tvb_flag = f (tvb_flag tvb) }
+
+-- | Get the variable of the type variable binder
+hsBndrVar :: HsTyVarBndr flag (GhcPass pass) -> HsBndrVar (GhcPass pass)
+hsBndrVar = tvb_var
+
+-- | Get the kind of the type variable binder
+hsBndrKind :: HsTyVarBndr flag (GhcPass pass) -> HsBndrKind (GhcPass pass)
+hsBndrKind = tvb_kind
 
 -- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
 hsTvbAllKinded :: LHsQTyVars (GhcPass p) -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
-
-instance NamedThing (HsTyVarBndr flag GhcRn) where
-  getName (UserTyVar _ _ v) = unLoc v
-  getName (KindedTyVar _ _ v _) = unLoc v
 
 type instance XBndrRequired (GhcPass _) = NoExtField
 
@@ -396,6 +407,41 @@ type instance XBndrInvisible GhcRn = NoExtField
 type instance XBndrInvisible GhcTc = NoExtField
 
 type instance XXBndrVis (GhcPass _) = DataConCantHappen
+
+{- Note [Wildcard binders in disallowed contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In contexts where a type variable binder is expected (HsTyVarBndr), we usually
+allow both named binders and wildcards, e.g.
+
+  type Const1 a b = a     -- ok
+  type Const2 a _ = a     -- ok, too
+
+This applies to LHSs of data, newtype, type, class, type family and data family
+declarations. However, we choose to reject wildcards in forall telescopes and
+type family result variables (the latter being part of TypeFamilyDependencies):
+
+  type family Fd a = _    -- disallowed  (WildcardBndrInTyFamResultVar)
+  fn :: forall _. Int     -- disallowed  (WildcardBndrInForallTelescope)
+
+This restriction is placed solely because such binders have not been proposed
+and there is no known use case for them. If we see user demand for wildcard
+binders in these contexts, adding support for them would be as easy as dropping
+the checks that reject them. The rest of the compiler can handle all wildcard
+binders regardless of context by generating a fresh name (see `tcHsBndrVarName`
+in GHC.Tc.Gen.HsType and `repHsBndrVar` in GHC.HsToCore.Quote).
+
+That is, in type declarations we have:
+
+  type F _  = ...  -- equivalent to ...
+  type F _a = ...  -- where _a is fresh
+
+and the same principle could be applied to foralls:
+
+  fn :: forall _.  Int   -- equivalent to ...
+  fn :: forall _a. Int   -- where _a is fresh
+
+except the `forall _.` example is rejected by checkForAllTelescopeWildcardBndrs.
+-}
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
@@ -551,18 +597,20 @@ hsScopedKvs  (L _ HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndr
 hsScopedKvs _ = []
 
 ---------------------
-hsTyVarLName :: HsTyVarBndr flag (GhcPass p) -> LIdP (GhcPass p)
-hsTyVarLName (UserTyVar _ _ n)     = n
-hsTyVarLName (KindedTyVar _ _ n _) = n
+hsTyVarLName :: HsTyVarBndr flag (GhcPass p) -> Maybe (LIdP (GhcPass p))
+hsTyVarLName tvb =
+  case hsBndrVar tvb of
+    HsBndrVar      _ n -> Just n
+    HsBndrWildCard _   -> Nothing
 
-hsTyVarName :: HsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
-hsTyVarName = unLoc . hsTyVarLName
+hsTyVarName :: HsTyVarBndr flag (GhcPass p) -> Maybe (IdP (GhcPass p))
+hsTyVarName = fmap unLoc . hsTyVarLName
 
-hsLTyVarName :: LHsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
+hsLTyVarName :: LHsTyVarBndr flag (GhcPass p) -> Maybe (IdP (GhcPass p))
 hsLTyVarName = hsTyVarName . unLoc
 
 hsLTyVarNames :: [LHsTyVarBndr flag (GhcPass p)] -> [IdP (GhcPass p)]
-hsLTyVarNames = map hsLTyVarName
+hsLTyVarNames = mapMaybe hsLTyVarName
 
 hsForAllTelescopeNames :: HsForAllTelescope (GhcPass p) -> [IdP (GhcPass p)]
 hsForAllTelescopeNames (HsForAllVis _ bndrs) = hsLTyVarNames bndrs
@@ -570,7 +618,7 @@ hsForAllTelescopeNames (HsForAllInvis _ bndrs) = hsLTyVarNames bndrs
 
 hsExplicitLTyVarNames :: LHsQTyVars (GhcPass p) -> [IdP (GhcPass p)]
 -- Explicit variables only
-hsExplicitLTyVarNames qtvs = map hsLTyVarName (hsQTvExplicit qtvs)
+hsExplicitLTyVarNames qtvs = hsLTyVarNames (hsQTvExplicit qtvs)
 
 hsAllLTyVarNames :: LHsQTyVars GhcRn -> [Name]
 -- All variables
@@ -579,12 +627,12 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
   = kvs ++ hsLTyVarNames tvs
 
 hsLTyVarLocName :: Anno (IdGhcP p) ~ SrcSpanAnnN
-                => LHsTyVarBndr flag (GhcPass p) -> LocatedN (IdP (GhcPass p))
+                => LHsTyVarBndr flag (GhcPass p) -> Maybe (LocatedN (IdP (GhcPass p)))
 hsLTyVarLocName (L _ a) = hsTyVarLName a
 
 hsLTyVarLocNames :: Anno (IdGhcP p) ~ SrcSpanAnnN
                  => LHsQTyVars (GhcPass p) -> [LocatedN (IdP (GhcPass p))]
-hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
+hsLTyVarLocNames qtvs = mapMaybe hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Get the kind signature of a type, ignoring parentheses:
 --
@@ -1122,27 +1170,39 @@ instance Outputable OpName where
 ************************************************************************
 -}
 
+instance OutputableBndrId p => Outputable (HsBndrVar (GhcPass p)) where
+  ppr (HsBndrVar _ name) = ppr name
+  ppr (HsBndrWildCard _) = char '_'
+
 class OutputableBndrFlag flag p where
-    pprTyVarBndr :: OutputableBndrId p => HsTyVarBndr flag (GhcPass p) -> SDoc
+  pprTyVarBndr :: OutputableBndrId p => HsTyVarBndr flag (GhcPass p) -> SDoc
 
 instance OutputableBndrFlag () p where
-    pprTyVarBndr (UserTyVar _ _ n)     = ppr n
-    pprTyVarBndr (KindedTyVar _ _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
+  pprTyVarBndr (HsTvb _ _ bvar bkind) = decorate (ppr_hs_tvb bvar bkind)
+    where decorate :: SDoc -> SDoc
+          decorate d = parens_if_kind bkind d
 
 instance OutputableBndrFlag Specificity p where
-    pprTyVarBndr (UserTyVar _ SpecifiedSpec n)     = ppr n
-    pprTyVarBndr (UserTyVar _ InferredSpec n)      = braces $ ppr n
-    pprTyVarBndr (KindedTyVar _ SpecifiedSpec n k) = parens $ hsep [ppr n, dcolon, ppr k]
-    pprTyVarBndr (KindedTyVar _ InferredSpec n k)  = braces $ hsep [ppr n, dcolon, ppr k]
+  pprTyVarBndr (HsTvb _ spec bvar bkind) = decorate (ppr_hs_tvb bvar bkind)
+    where decorate :: SDoc -> SDoc
+          decorate d = case spec of
+            InferredSpec  -> braces d
+            SpecifiedSpec -> parens_if_kind bkind d
 
 instance OutputableBndrFlag (HsBndrVis (GhcPass p')) p where
-    pprTyVarBndr (UserTyVar _ vis n) = pprHsBndrVis vis $ ppr n
-    pprTyVarBndr (KindedTyVar _ vis n k) =
-      pprHsBndrVis vis $ parens $ hsep [ppr n, dcolon, ppr k]
+  pprTyVarBndr (HsTvb _ bvis bvar bkind) = decorate (ppr_hs_tvb bvar bkind)
+    where decorate :: SDoc -> SDoc
+          decorate d = case bvis of
+            HsBndrRequired  _ -> parens_if_kind bkind d
+            HsBndrInvisible _ -> char '@' <> parens_if_kind bkind d
 
-pprHsBndrVis :: HsBndrVis (GhcPass p) -> SDoc -> SDoc
-pprHsBndrVis (HsBndrRequired _) d = d
-pprHsBndrVis (HsBndrInvisible _) d = char '@' <> d
+ppr_hs_tvb :: OutputableBndrId p => HsBndrVar (GhcPass p) -> HsBndrKind (GhcPass p) -> SDoc
+ppr_hs_tvb bvar (HsBndrNoKind _) = ppr bvar
+ppr_hs_tvb bvar (HsBndrKind _ k) = hsep [ppr bvar, dcolon, ppr k]
+
+parens_if_kind :: HsBndrKind (GhcPass p) -> SDoc -> SDoc
+parens_if_kind (HsBndrNoKind _) d = d
+parens_if_kind (HsBndrKind _ _) d = parens d
 
 instance OutputableBndrId p => Outputable (HsSigType (GhcPass p)) where
     ppr (HsSig { sig_bndrs = outer_bndrs, sig_body = body }) =
@@ -1293,19 +1353,6 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
     ppr_names :: [LFieldOcc (GhcPass p)] -> SDoc
     ppr_names [n] = pprPrefixOcc n
     ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
-
-{-
-Note [Printing KindedTyVars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#3830 reminded me that we should really only print the kind
-signature on a KindedTyVar if the kind signature was put there by the
-programmer.  During kind inference GHC now adds a PostTcKind to UserTyVars,
-rather than converting to KindedTyVars as before.
-
-(As it happens, the message in #3830 comes out a different way now,
-and the problem doesn't show up; but having the flag on a KindedTyVar
-seems like the Right Thing anyway.)
--}
 
 -- Printing works more-or-less as for Types
 

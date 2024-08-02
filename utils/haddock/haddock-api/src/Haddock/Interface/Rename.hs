@@ -452,17 +452,20 @@ renameHsForAllTelescope tele = case tele of
     pure $ HsForAllInvis noExtField bndrs'
 
 renameLTyVarBndr :: (flag -> RnM flag') -> LHsTyVarBndr flag GhcRn -> RnM (LHsTyVarBndr flag' DocNameI)
-renameLTyVarBndr rn_flag (L loc (UserTyVar _ fl (L l n))) =
+renameLTyVarBndr rn_flag (L loc (HsTvb _ fl n kind)) =
   do
     fl' <- rn_flag fl
-    n' <- renameName n
-    return (L loc (UserTyVar noExtField fl' (L l n')))
-renameLTyVarBndr rn_flag (L loc (KindedTyVar _ fl (L lv n) kind)) =
-  do
-    fl' <- rn_flag fl
-    n' <- renameName n
-    kind' <- renameLKind kind
-    return (L loc (KindedTyVar noExtField fl' (L lv n') kind'))
+    n' <- renameHsBndrVar n
+    kind' <- renameHsBndrKind kind
+    return (L loc (HsTvb noExtField fl' n' kind'))
+
+renameHsBndrVar :: HsBndrVar GhcRn -> RnM (HsBndrVar DocNameI)
+renameHsBndrVar (HsBndrVar _ n) = HsBndrVar noExtField <$> renameNameL n
+renameHsBndrVar (HsBndrWildCard _) = return (HsBndrWildCard noExtField)
+
+renameHsBndrKind :: HsBndrKind GhcRn -> RnM (HsBndrKind DocNameI)
+renameHsBndrKind (HsBndrNoKind _) = return (HsBndrNoKind noExtField)
+renameHsBndrKind (HsBndrKind _ k) = HsBndrKind noExtField <$> renameLKind k
 
 renameLContext :: LocatedC [LHsType GhcRn] -> RnM (LocatedC [LHsType DocNameI])
 renameLContext (L loc context) = do

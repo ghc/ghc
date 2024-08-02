@@ -317,9 +317,15 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
     -- docs for con_names on why it is a list to begin with.
     name = commaSeparate sDocContext . toList $ unL <$> getConNames con
 
-    tyVarArg (UserTyVar _ _ n) = HsTyVar noAnn NotPromoted n
-    tyVarArg (KindedTyVar _ _ n lty) = HsKindSig noAnn (reL (HsTyVar noAnn NotPromoted n)) lty
-    tyVarArg _ = panic "ppCtor"
+    tyVarArg (HsTvb { tvb_var = bvar, tvb_kind = bkind }) = tvk
+      where
+        tv, tvk :: HsType GhcRn
+        tv = case bvar of
+          HsBndrVar _ n -> HsTyVar noAnn NotPromoted n
+          HsBndrWildCard _ -> HsWildCardTy noExtField
+        tvk = case bkind of
+          HsBndrNoKind _   -> tv
+          HsBndrKind _ lty -> HsKindSig noAnn (reL tv) lty
 
     resType =
       apps $

@@ -256,6 +256,10 @@ instance Diagnostic TcRnMessage where
                 hang notAllowed 2 sole_msg
           WildcardsNotAllowedAtAll ->
             notAllowed
+          WildcardBndrInForallTelescope ->
+            notAllowed
+          WildcardBndrInTyFamResultVar ->
+            notAllowed
       where
         notAllowed, what, wildcard, how :: SDoc
         notAllowed = what <+> quotes wildcard <+> how
@@ -267,11 +271,19 @@ instance Diagnostic TcRnMessage where
           = text "Named wildcard"
           | ExtraConstraintWildcardNotAllowed {} <- bad
           = text "Extra-constraint wildcard"
+          | WildcardBndrInForallTelescope {} <- bad
+          = text "Wildcard binder"
+          | WildcardBndrInTyFamResultVar {} <- bad
+          = text "Wildcard binder"
           | otherwise
           = text "Wildcard"
         how = case bad of
           WildcardNotLastInConstraint
             -> text "not allowed in a constraint"
+          WildcardBndrInForallTelescope
+            -> text "not allowed in a forall telescope"
+          WildcardBndrInTyFamResultVar
+            -> text "not allowed in a type family result"
           _ -> text "not allowed"
         constraint_hint_msg :: SDoc
         constraint_hint_msg
@@ -1894,6 +1906,10 @@ instance Diagnostic TcRnMessage where
       mkSimpleDecorated $
         hang (text "Illegal invisible type variable binder:")
            2 (ppr bndr)
+    TcRnIllegalWildcardTyVarBndr bndr ->
+      mkSimpleDecorated $
+        hang (text "Illegal wildcard binder:")
+           2 (ppr bndr)
 
     TcRnInvalidInvisTyVarBndr name hs_bndr ->
       mkSimpleDecorated $
@@ -2596,6 +2612,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnMissingRoleAnnotations
     TcRnIllegalInvisTyVarBndr{}
       -> ErrorWithoutFlag
+    TcRnIllegalWildcardTyVarBndr{}
+      -> ErrorWithoutFlag
     TcRnDeprecatedInvisTyArgInConPat {}
       -> WarningWithFlag Opt_WarnDeprecatedTypeAbstractions
     TcRnInvalidInvisTyVarBndr{}
@@ -3281,6 +3299,8 @@ instance Diagnostic TcRnMessage where
     TcRnMissingRoleAnnotation{}
       -> noHints
     TcRnIllegalInvisTyVarBndr{}
+      -> [suggestExtension LangExt.TypeAbstractions]
+    TcRnIllegalWildcardTyVarBndr{}
       -> [suggestExtension LangExt.TypeAbstractions]
     TcRnDeprecatedInvisTyArgInConPat{}
       -> [suggestExtension LangExt.TypeAbstractions]

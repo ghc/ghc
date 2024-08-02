@@ -510,6 +510,16 @@ deriving instance (Data flag) => Data (HsTyVarBndr flag GhcPs)
 deriving instance (Data flag) => Data (HsTyVarBndr flag GhcRn)
 deriving instance (Data flag) => Data (HsTyVarBndr flag GhcTc)
 
+-- deriving instance Data (HsBndrVar p)
+deriving instance Data (HsBndrVar GhcPs)
+deriving instance Data (HsBndrVar GhcRn)
+deriving instance Data (HsBndrVar GhcTc)
+
+-- deriving instance (DataIdLR p p) => Data (HsBndrKind p)
+deriving instance Data (HsBndrKind GhcPs)
+deriving instance Data (HsBndrKind GhcRn)
+deriving instance Data (HsBndrKind GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsType p)
 deriving instance Data (HsType GhcPs)
 deriving instance Data (HsType GhcRn)
