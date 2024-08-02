@@ -473,7 +473,7 @@ ppTySyn
         hsep
           ( keyword "type"
               : ppDocBinder name
-              : map ppSymName (tyvarNames ltyvars)
+              : map ppWcSymName (tyvarNames ltyvars)
           )
       full = hdr <+> char '=' <+> ppLType unicode ltype
 ppTySyn _ _ _ = error "declaration not supported by ppTySyn"
@@ -636,8 +636,8 @@ ppHsForAllTelescope tele unicode = case tele of
 ppTyVars :: RenderableBndrFlag flag => Bool -> [LHsTyVarBndr flag DocNameI] -> [LaTeX]
 ppTyVars unicode tvs = map (ppHsTyVarBndr unicode . unLoc) tvs
 
-tyvarNames :: LHsQTyVars DocNameI -> [Name]
-tyvarNames = map (getName . hsLTyVarNameI) . hsQTvExplicit
+tyvarNames :: LHsQTyVars DocNameI -> [Maybe Name]
+tyvarNames = map (fmap getName . hsLTyVarNameI) . hsQTvExplicit
 
 declWithDoc :: LaTeX -> Maybe LaTeX -> LaTeX
 declWithDoc decl doc =
@@ -1132,9 +1132,9 @@ ppAppNameTypeArgs n args unicode =
   ppDocName n <+> hsep (map (ppLHsTypeArg unicode) args)
 
 -- | Print an application of a DocName and a list of Names
-ppAppDocNameNames :: Bool -> DocName -> [Name] -> LaTeX
+ppAppDocNameNames :: Bool -> DocName -> [Maybe Name] -> LaTeX
 ppAppDocNameNames _summ n ns =
-  ppTypeApp n ns (ppBinder . nameOccName . getName) ppSymName
+  ppTypeApp n ns (ppBinder . nameOccName . getName) ppWcSymName
 
 -- | General printing of type applications
 ppTypeApp :: DocName -> [a] -> (DocName -> LaTeX) -> (a -> LaTeX) -> LaTeX
@@ -1233,28 +1233,40 @@ class RenderableBndrFlag flag where
   ppHsTyVarBndr :: Bool -> HsTyVarBndr flag DocNameI -> LaTeX
 
 instance RenderableBndrFlag () where
-  ppHsTyVarBndr _ (UserTyVar _ _ (L _ name)) = ppDocName name
-  ppHsTyVarBndr unicode (KindedTyVar _ _ (L _ name) kind) =
-    parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
+  ppHsTyVarBndr unicode (HsTvb _ _ bvar bkind) =
+    decorate (pp_hs_tvb unicode bvar bkind)
+    where decorate :: LaTeX -> LaTeX
+          decorate d = parens_if_kind bkind d
 
 instance RenderableBndrFlag Specificity where
-  ppHsTyVarBndr _ (UserTyVar _ SpecifiedSpec (L _ name)) = ppDocName name
-  ppHsTyVarBndr _ (UserTyVar _ InferredSpec (L _ name)) = braces $ ppDocName name
-  ppHsTyVarBndr unicode (KindedTyVar _ SpecifiedSpec (L _ name) kind) =
-    parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
-  ppHsTyVarBndr unicode (KindedTyVar _ InferredSpec (L _ name) kind) =
-    braces (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
+  ppHsTyVarBndr unicode (HsTvb _ spec bvar bkind) =
+    decorate (pp_hs_tvb unicode bvar bkind)
+    where decorate :: LaTeX -> LaTeX
+          decorate d = case spec of
+            InferredSpec  -> braces d
+            SpecifiedSpec -> parens_if_kind bkind d
 
 instance RenderableBndrFlag (HsBndrVis DocNameI) where
-  ppHsTyVarBndr _ (UserTyVar _ bvis (L _ name)) =
-    ppHsBndrVis bvis $ ppDocName name
-  ppHsTyVarBndr unicode (KindedTyVar _ bvis (L _ name) kind) =
-    ppHsBndrVis bvis $
-      parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
+  ppHsTyVarBndr unicode (HsTvb _ bvis bvar bkind) =
+    decorate (pp_hs_tvb unicode bvar bkind)
+    where decorate :: LaTeX -> LaTeX
+          decorate d = case bvis of
+            HsBndrRequired  _ -> parens_if_kind bkind d
+            HsBndrInvisible _ -> atSign <> parens_if_kind bkind d
 
-ppHsBndrVis :: HsBndrVis DocNameI -> LaTeX -> LaTeX
-ppHsBndrVis (HsBndrRequired _) d = d
-ppHsBndrVis (HsBndrInvisible _) d = atSign <> d
+ppHsBndrVar :: HsBndrVar DocNameI -> LaTeX
+ppHsBndrVar (HsBndrVar _ name) = ppDocName (unLoc name)
+ppHsBndrVar (HsBndrWildCard _) = char '_'
+
+pp_hs_tvb :: Bool -> HsBndrVar DocNameI -> HsBndrKind DocNameI -> LaTeX
+pp_hs_tvb _       bvar (HsBndrNoKind _) = ppHsBndrVar bvar
+pp_hs_tvb unicode bvar (HsBndrKind _ k) =
+  ppHsBndrVar bvar <+> dcolon unicode
+                   <+> ppLKind unicode k
+
+parens_if_kind :: HsBndrKind DocNameI -> LaTeX -> LaTeX
+parens_if_kind (HsBndrNoKind _) d = d
+parens_if_kind (HsBndrKind _ _) d = parens d
 
 ppLKind :: Bool -> LHsKind DocNameI -> LaTeX
 ppLKind unicode y = ppKind unicode (unLoc y)
@@ -1363,6 +1375,9 @@ ppSymName :: Name -> LaTeX
 ppSymName name
   | isNameSym name = parens $ ppName name
   | otherwise = ppName name
+
+ppWcSymName :: Maybe Name -> LaTeX
+ppWcSymName = maybe (char '_') ppSymName
 
 ppIPName :: HsIPName -> LaTeX
 ppIPName = text . ('?' :) . unpackFS . hsIPNameFS

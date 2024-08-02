@@ -874,9 +874,16 @@ type instance XHsForAllVis DocNameI = NoExtField
 type instance XHsForAllInvis DocNameI = NoExtField
 type instance XXHsForAllTelescope DocNameI = DataConCantHappen
 
-type instance XUserTyVar DocNameI = NoExtField
-type instance XKindedTyVar DocNameI = NoExtField
+type instance XTyVarBndr DocNameI = NoExtField
 type instance XXTyVarBndr DocNameI = DataConCantHappen
+
+type instance XBndrVar DocNameI = NoExtField
+type instance XBndrWildCard DocNameI = NoExtField
+type instance XXBndrVar DocNameI = DataConCantHappen
+
+type instance XBndrKind DocNameI = NoExtField
+type instance XBndrNoKind DocNameI = NoExtField
+type instance XXBndrKind DocNameI = DataConCantHappen
 
 type instance XCFieldOcc DocNameI = DocName
 type instance XXFieldOcc DocNameI = NoExtField

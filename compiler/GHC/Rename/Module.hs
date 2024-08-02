@@ -77,7 +77,7 @@ import Control.Arrow ( first )
 import Data.Foldable ( toList, for_ )
 import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
-import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
+import Data.Maybe ( isNothing, fromMaybe, mapMaybe, maybeToList )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {- | @rnSourceDecl@ "renames" declarations.
@@ -2263,15 +2263,21 @@ rnFamResultSig doc (TyVarSig _ tvbndr)
           --         class C a b where
           --            type F b = a | a -> b
           rdr_env <- getLocalRdrEnv
-       ;  let resName = hsLTyVarName tvbndr
-       ;  when (resName `elemLocalRdrEnv` rdr_env) $
-          addErrAt (getLocA tvbndr) $
-            TcRnShadowedTyVarNameInFamResult resName
+
+       ; case hsBndrVar (unLoc tvbndr) of
+          HsBndrWildCard _ ->
+            -- See Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type
+            addErrAt (getLocA tvbndr) $
+              TcRnIllegalWildcardInType Nothing WildcardBndrInTyFamResultVar
+          HsBndrVar _ (L _ resName) ->
+            when (resName `elemLocalRdrEnv` rdr_env) $
+            addErrAt (getLocA tvbndr) $
+              TcRnShadowedTyVarNameInFamResult resName
 
        ; bindLHsTyVarBndr doc Nothing -- This might be a lie, but it's used for
                                       -- scoping checks that are irrelevant here
                           tvbndr $ \ tvbndr' ->
-         return (TyVarSig noExtField tvbndr', unitFV (hsLTyVarName tvbndr')) }
+         return (TyVarSig noExtField tvbndr', maybe emptyFVs unitFV (hsLTyVarName tvbndr')) }
 
 -- Note [Renaming injectivity annotation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2317,7 +2323,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
  = do
    { (injDecl'@(L _ (InjectivityAnn _ injFrom' injTo')), noRnErrors)
           <- askNoErrs $
-             bindLocalNames [hsLTyVarName resTv] $
+             bindLocalNames (maybeToList (hsLTyVarName resTv)) $
              -- The return type variable scopes over the injectivity annotation
              -- e.g.   type family F a = (r::*) | r -> a
              do { injFrom' <- rnLTyVar injFrom
@@ -2327,8 +2333,11 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
                 ; return $ L (l2l srcSpan) (InjectivityAnn x injFrom' injTo') }
 
    ; let tvNames  = Set.fromList $ hsAllLTyVarNames tvBndrs
-         resName  = hsLTyVarName resTv
-         -- See Note [Renaming injectivity annotation]
+
+   ; case hsLTyVarName resTv of { Nothing -> return ()
+                                ; Just resName -> do {
+
+   ; let -- See Note [Renaming injectivity annotation]
          lhsValid = EQ == (stableNameCmp resName (unLoc injFrom'))
          rhsValid = Set.fromList (map unLoc injTo') `Set.difference` tvNames
 
@@ -2342,7 +2351,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
    ; when (noRnErrors && not (Set.null rhsValid)) $
       do { let errorVars = Set.toList rhsValid
          ; addErrAt (locA srcSpan) $
-              TcRnUnknownTyVarsOnRhsOfInjCond errorVars }
+              TcRnUnknownTyVarsOnRhsOfInjCond errorVars } } }
 
    ; return injDecl' }
 

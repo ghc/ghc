@@ -2589,9 +2589,10 @@ kcCheckDeclHeader_sig sig_kind name flav
                   , hsq_explicit = hs_tv_bndrs }) kc_res_ki
   = addTyConFlavCtxt name flav $
     do { skol_info <- mkSkolemInfo (TyConSkol flav name)
+       ; let avoid_occs = map nameOccName (hsLTyVarNames hs_tv_bndrs)
        ; (sig_tcbs :: [TcTyConBinder], sig_res_kind :: Kind)
              <- splitTyConKind skol_info emptyInScopeSet
-                               (map getOccName hs_tv_bndrs) sig_kind
+                               avoid_occs sig_kind
 
        ; traceTc "kcCheckDeclHeader_sig {" $
            vcat [ text "sig_kind:" <+> ppr sig_kind
@@ -2744,7 +2745,7 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
       = -- Visible TyConBinder, so match up with the hs_bndrs
         do { let Bndr tv vis = tcb
                  tv' = updateTyVarKind (substTy subst) $
-                       setTyVarName tv (getName hs_bndr)
+                       maybe tv (setTyVarName tv) (hsLTyVarName hs_bndr)
                    -- Give the skolem the Name of the HsTyVarBndr, so that if it
                    -- appears in an error message it has a name and binding site
                    -- that come from the type declaration, not the kind signature
@@ -2775,13 +2776,11 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
           failWithTc (TcRnInvalidInvisTyVarBndr name hs_bndr)
 
     tc_hs_bndr :: HsTyVarBndr (HsBndrVis GhcRn) GhcRn -> TcKind -> TcM ()
-    tc_hs_bndr (UserTyVar _ _ _) _
-      = return ()
-    tc_hs_bndr (KindedTyVar _ _ (L _ hs_nm) lhs_kind) expected_kind
-      = do { sig_kind <- tcLHsKindSig (TyVarBndrKindCtxt hs_nm) lhs_kind
-           ; traceTc "musd3:unifying" (ppr sig_kind $$ ppr expected_kind)
-           ; discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
-             unifyKind (Just (NameThing hs_nm)) sig_kind expected_kind }
+    tc_hs_bndr (HsTvb { tvb_kind = HsBndrNoKind _ }) _ = return ()
+    tc_hs_bndr (HsTvb { tvb_kind = HsBndrKind _ kind, tvb_var = bvar })
+               expected_kind
+      = do { traceTc "musd3:unifying" (ppr kind $$ ppr expected_kind)
+           ; tcHsTvbKind bvar kind expected_kind }
 
     -- See GHC Proposal #425, section "Kind checking",
     -- where zippable and skippable are defined.
@@ -2797,6 +2796,18 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
     -- where zippable and skippable are defined.
     skippable :: TyConBndrVis -> Bool
     skippable vis = not (isVisibleTcbVis vis)
+
+-- Check the kind of a type variable binder
+tcHsTvbKind :: HsBndrVar GhcRn -> LHsKind GhcRn -> TcKind -> TcM ()
+tcHsTvbKind bvar kind expected_kind =
+  do { sig_kind <- tcLHsKindSig ctxt kind
+     ; traceTc "tcHsTvbKind:unifying" (ppr sig_kind $$ ppr expected_kind)
+     ; discardResult $ -- See Note [discardResult in tcHsTvbKind]
+       unifyKind mb_thing sig_kind expected_kind }
+  where
+    (ctxt, mb_thing) = case bvar of
+      HsBndrVar _ (L _ hs_nm) -> (TyVarBndrKindCtxt hs_nm, Just (NameThing hs_nm))
+      HsBndrWildCard _ -> (KindSigCtxt, Nothing)
 
 substTyConBinderX :: Subst -> TyConBinder -> (Subst, TyConBinder)
 substTyConBinderX subst (Bndr tv vis)
@@ -2903,8 +2914,8 @@ Rather, it is determined by the declaration of the family:
 The matching-up of kind signature with the declaration itself is done by
 `matchUpWithSigDecl`.
 
-Note [discardResult in kcCheckDeclHeader_sig]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [discardResult in tcHsTvbKind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use 'unifyKind' to check inline kind annotations in declaration headers
 against the signature.
 
@@ -3485,33 +3496,46 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
             --   e.g. forall k (a::k). blah
             -- NB: tv's Name may differ from hs_tv's
             -- See Note [Cloning for type variable binders]
-            ; (tvs,res) <- tcExtendNameTyVarEnv [(hsTyVarName hs_tv, tv)] $
+            ; (tvs,res) <- tcExtendNameTyVarEnv (mk_tvb_pairs hs_tv tv) $
                            go hs_tvs
             ; return (Bndr tv (hsTyVarBndrFlag hs_tv):tvs, res) }
 
-
-    tc_hs_bndr lcl_env (UserTyVar _ _ (L _ name))
+    tc_hs_bndr :: TcTypeEnv -> HsTyVarBndr flag GhcRn -> TcM TcTyVar
+    tc_hs_bndr lcl_env (HsTvb { tvb_var = bvar, tvb_kind = kind })
       | check_parent
+      , HsBndrVar _ (L _ name) <- bvar
       , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
-      = return tv
-      | otherwise
-      = do { kind <- newExpectedKind ctxt_kind
-           ; newTyVarBndr skol_mode name kind }
-
-    tc_hs_bndr lcl_env (KindedTyVar _ _ (L _ name) lhs_kind)
-      | check_parent
-      , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
-      = do { kind <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) lhs_kind
-           ; discardResult $
-             unifyKind (Just . NameThing $ name) kind (tyVarKind tv)
-                          -- This unify rejects:
-                          --    class C (m :: * -> *) where
-                          --      type F (m :: *) = ...
+      = do { check_hs_bndr_kind name (tyVarKind tv) kind
            ; return tv }
-
       | otherwise
-      = do { kind <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) lhs_kind
-           ; newTyVarBndr skol_mode name kind }
+      = do { name <- tcHsBndrVarName bvar
+           ; kind' <- tc_hs_bndr_kind name kind
+           ; newTyVarBndr skol_mode name kind' }
+
+    tc_hs_bndr_kind :: Name -> HsBndrKind GhcRn -> TcM Kind
+    tc_hs_bndr_kind _    (HsBndrNoKind _)    = newExpectedKind ctxt_kind
+    tc_hs_bndr_kind name (HsBndrKind _ kind) = tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) kind
+
+    -- Check the HsBndrKind against the kind of the parent type variable,
+    -- e.g. the following is rejected:
+    --   class C (m :: * -> *) where
+    --     type F (m :: *) = ...
+    check_hs_bndr_kind :: Name -> Kind -> HsBndrKind GhcRn -> TcM ()
+    check_hs_bndr_kind _    _           (HsBndrNoKind _)    = return ()
+    check_hs_bndr_kind name parent_kind (HsBndrKind _ kind) =
+      do { kind' <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) kind
+         ; discardResult $
+           unifyKind (Just $ NameThing name) kind' parent_kind }
+
+tcHsBndrVarName :: HsBndrVar GhcRn -> TcM Name
+tcHsBndrVarName (HsBndrVar _ (L _ name)) = return name
+tcHsBndrVarName (HsBndrWildCard _) = newSysName (mkTyVarOcc "_")
+
+mk_tvb_pairs :: HsTyVarBndr flag GhcRn -> TcTyVar -> [(Name, TcTyVar)]
+mk_tvb_pairs tvb tv =
+  case hsTyVarName tvb of
+    Nothing -> []
+    Just nm -> [(nm, tv)]
 
 newTyVarBndr :: SkolemMode -> Name -> Kind -> TcM TcTyVar
 newTyVarBndr (SM { sm_clone = clone, sm_tvtv = tvtv }) name kind
@@ -4434,12 +4458,14 @@ tc_bndr_in_pat :: HsTyVarBndr flag GhcRn
                                               -- the scoped type variables
                       , TcType)               -- The type
 tc_bndr_in_pat bndr wcs imp_ns expected_kind = do
+  let HsTvb { tvb_var = bvar, tvb_kind = bkind } = bndr
   traceTc "tc_bndr_in_pat 1" (ppr expected_kind)
-  case bndr of
-    UserTyVar _ _ (L _ name) -> do
-      tv <- newPatTyVar name expected_kind
-      pure ([], [(name,tv)], mkTyVarTy tv)
-    KindedTyVar _ _ (L _ name) ki -> do
+  name <- tcHsBndrVarName bvar
+  tv <- newPatTyVar name expected_kind
+  case bkind of
+    HsBndrNoKind _ ->
+      pure ([], mk_tvb_pairs bndr tv, mkTyVarTy tv)
+    HsBndrKind _ ki -> do
       tkv_prs <- mapM new_implicit_tv imp_ns
       wcs <- addTypeCtxt ki              $
              solveEqualities "tc_bndr_in_pat" $
@@ -4447,14 +4473,10 @@ tc_bndr_in_pat bndr wcs imp_ns expected_kind = do
                -- and c.f #16033
              bindNamedWildCardBinders wcs $ \ wcs ->
              tcExtendNameTyVarEnv tkv_prs $
-             do { sig_kind <- tcLHsKindSig (TyVarBndrKindCtxt name) ki
-                ; discardResult $
-                  unifyKind (Just (NameThing name)) sig_kind expected_kind
+             do { tcHsTvbKind bvar ki expected_kind
                 ; pure wcs }
 
       mapM_ emitNamedTypeHole wcs
-
-      tv <- newPatTyVar name expected_kind
 
       traceTc "tc_bndr_in_pat 2" $ vcat
         [ text "expected_kind" <+> ppr expected_kind
@@ -4462,7 +4484,8 @@ tc_bndr_in_pat bndr wcs imp_ns expected_kind = do
         , text "(name,tv)" <+>  ppr (name,tv)
         , text "tkv_prs" <+> ppr tkv_prs]
 
-      pure (wcs, (name,tv) : tkv_prs, mkTyVarTy tv)
+      let tvb_prs = mk_tvb_pairs bndr tv
+      pure (wcs, tvb_prs ++ tkv_prs, mkTyVarTy tv)
   where
     new_implicit_tv name
       = do { kind <- newMetaKindVar
@@ -4530,13 +4553,22 @@ tyPatToBndr :: HsTyPat GhcRn -> Maybe (HsTyVarBndr () GhcRn)
 tyPatToBndr HsTP{hstp_body = (L _ hs_ty)} = go hs_ty where
   go :: HsType GhcRn -> Maybe (HsTyVarBndr () GhcRn)
   go (HsParTy _ (L _ ty)) = go ty
-  go (HsTyVar an _ name)
+  go (HsKindSig _ (L _ ty) ki) = do
+    bvar <- go_bvar ty
+    let bkind = HsBndrKind noExtField ki
+    Just (HsTvb noAnn () bvar bkind)
+  go ty = do
+    bvar <- go_bvar ty
+    let bkind = HsBndrNoKind noExtField
+    Just (HsTvb noAnn () bvar bkind)
+
+  go_bvar :: HsType GhcRn -> Maybe (HsBndrVar GhcRn)
+  go_bvar (HsTyVar _ _ name)
     | isTyVarName (unLoc name)
-    = Just (UserTyVar an () name)
-  go (HsKindSig an (L _ (HsTyVar _ _ name)) ki)
-    | isTyVarName (unLoc name)
-    = Just (KindedTyVar an () name ki)
-  go _ = Nothing
+    = Just (HsBndrVar noExtField name)
+  go_bvar (HsWildCardTy _)
+    = Just (HsBndrWildCard noExtField)
+  go_bvar _ = Nothing
 
 {- Note [Type patterns: binders and unifiers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4553,13 +4585,14 @@ type pattern:
 
 Binder type patterns are a subset of type patterns described by the following grammar:
 
+  bvar ::= tv  | '_'        -- type variable or wildcard
   tp_bndr ::=
-      tv                    -- type variable
-    | tv '::' kind          -- type variable with kind annotation
+      bvar                  -- plain binder
+    | bvar '::' kind        -- binder with kind annotation
     | '(' tp_bndr ')'       -- parentheses
 
 This subset of HsTyPat can be represented by HsTyVarBndr, which is also used
-in foralls and type declaration headers. We could also extend this with wildcards (#23501).
+in foralls and type declaration headers.
 
 Unifier type patterns include all other forms of type patterns, such as `Maybe x`.
 This distinction allows the typechecker to accept more programs.

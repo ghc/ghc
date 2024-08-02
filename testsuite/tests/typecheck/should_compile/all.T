@@ -923,4 +923,6 @@ test('T25094', normal, compile, [''])
 test('T25029', normal, compile, [''])
 test('T25125', normal, compile, [''])
 test('T24845a', normal, compile, [''])
+test('T23501a', normal, compile, [''])
+test('T23501b', normal, compile, [''])
 

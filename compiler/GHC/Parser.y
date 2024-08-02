@@ -2304,6 +2304,7 @@ atype :: { LHsType GhcPs }
         : ntgtycon                       {% amsA' (sL1 $1 (HsTyVar [] NotPromoted $1)) }      -- Not including unit tuples
         -- See Note [%shift: atype -> tyvar]
         | tyvar %shift                   {% amsA' (sL1 $1 (HsTyVar [] NotPromoted $1)) }      -- (See Note [Unit tuples])
+        | '_'   %shift                   { sL1a $1 $ mkAnonWildCardTy }
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1a $1 (HsStarTy noExtField (isUnicode $1)) } }
 
@@ -2359,7 +2360,6 @@ atype :: { LHsType GhcPs }
                                                                      (getSTRING  $1) }
         | STRING_MULTI         { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGMULTIs $1)
                                                                      (getSTRINGMULTI  $1) }
-        | '_'                  { sL1a $1 $ mkAnonWildCardTy }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
         | QVARID                      {% let qname = mkQual tvName (getQVARID $1)
@@ -2398,12 +2398,32 @@ tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
 
 tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
         : tv_bndr_no_braces             { $1 }
-        | '{' tyvar '}'                 {% amsA' (sLL $1 $> (UserTyVar   [moc $1, mcc $3] InferredSpec $2)) }
-        | '{' tyvar '::' kind '}'       {% amsA' (sLL $1 $> (KindedTyVar [moc $1,mu AnnDcolon $3 ,mcc $5] InferredSpec $2 $4)) }
+        | '{' tyvar '}'                 {% amsA' (sLL $1 $>
+                                                (HsTvb { tvb_ext  = [moc $1, mcc $3]
+                                                       , tvb_flag = InferredSpec
+                                                       , tvb_var  = HsBndrVar noExtField $2
+                                                       , tvb_kind = HsBndrNoKind noExtField })) }
+        | '{' tyvar '::' kind '}'       {% amsA' (sLL $1 $>
+                                                (HsTvb { tvb_ext  = [moc $1,mu AnnDcolon $3,mcc $5]
+                                                       , tvb_flag = InferredSpec
+                                                       , tvb_var  = HsBndrVar noExtField $2
+                                                       , tvb_kind = HsBndrKind noExtField $4 })) }
 
 tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
-        : tyvar                         {% amsA' (sL1 $1    (UserTyVar   [] SpecifiedSpec $1)) }
-        | '(' tyvar '::' kind ')'       {% amsA' (sLL $1 $> (KindedTyVar [mop $1,mu AnnDcolon $3 ,mcp $5] SpecifiedSpec $2 $4)) }
+        : tyvar_wc                      {% amsA' (sL1 $1
+                                                (HsTvb { tvb_ext  = []
+                                                       , tvb_flag = SpecifiedSpec
+                                                       , tvb_var  = unLoc $1
+                                                       , tvb_kind = HsBndrNoKind noExtField })) }
+        | '(' tyvar_wc '::' kind ')'    {% amsA' (sLL $1 $>
+                                                (HsTvb { tvb_ext  = [mop $1,mu AnnDcolon $3,mcp $5]
+                                                       , tvb_flag = SpecifiedSpec
+                                                       , tvb_var  = unLoc $2
+                                                       , tvb_kind = HsBndrKind noExtField $4 })) }
+
+tyvar_wc :: { Located (HsBndrVar GhcPs) }
+        : tyvar                         { sL1 $1 (HsBndrVar noExtField $1) }
+        | '_'                           { sL1 $1 (HsBndrWildCard noExtField) }
 
 fds :: { Located ([AddEpAnn],[LHsFunDep GhcPs]) }
         : {- empty -}                   { noLoc ([],[]) }

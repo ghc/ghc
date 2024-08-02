@@ -682,8 +682,7 @@ type family XXHsForAllTelescope x
 
 -- ---------------------------------------------------------------------
 -- HsTyVarBndr type families
-type family XUserTyVar   x
-type family XKindedTyVar x
+type family XTyVarBndr   x
 type family XXTyVarBndr  x
 
 -- ---------------------------------------------------------------------

@@ -1697,48 +1697,40 @@ class RenderableBndrFlag flag where
   ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr flag DocNameI -> Html
 
 instance RenderableBndrFlag () where
-  ppHsTyVarBndr _ qual (UserTyVar _ _ (L _ name)) =
-    ppDocName qual Raw False name
-  ppHsTyVarBndr unicode qual (KindedTyVar _ _ name kind) =
-    parens
-      ( ppDocName qual Raw False (unL name)
-          <+> dcolon unicode
-          <+> ppLKind unicode qual kind
-      )
+  ppHsTyVarBndr unicode qual (HsTvb _ _ bvar bkind) =
+    decorate (pp_hs_tvb unicode qual bvar bkind)
+    where decorate :: Html -> Html
+          decorate d = parens_if_kind bkind d
 
 instance RenderableBndrFlag Specificity where
-  ppHsTyVarBndr _ qual (UserTyVar _ SpecifiedSpec (L _ name)) =
-    ppDocName qual Raw False name
-  ppHsTyVarBndr _ qual (UserTyVar _ InferredSpec (L _ name)) =
-    braces $ ppDocName qual Raw False name
-  ppHsTyVarBndr unicode qual (KindedTyVar _ SpecifiedSpec name kind) =
-    parens
-      ( ppDocName qual Raw False (unL name)
-          <+> dcolon unicode
-          <+> ppLKind unicode qual kind
-      )
-  ppHsTyVarBndr unicode qual (KindedTyVar _ InferredSpec name kind) =
-    braces
-      ( ppDocName qual Raw False (unL name)
-          <+> dcolon unicode
-          <+> ppLKind unicode qual kind
-      )
+  ppHsTyVarBndr unicode qual (HsTvb _ spec bvar bkind) =
+    decorate (pp_hs_tvb unicode qual bvar bkind)
+    where decorate :: Html -> Html
+          decorate d = case spec of
+            InferredSpec  -> braces d
+            SpecifiedSpec -> parens_if_kind bkind d
 
 instance RenderableBndrFlag (HsBndrVis DocNameI) where
-  ppHsTyVarBndr _ qual (UserTyVar _ bvis (L _ name)) =
-    ppHsBndrVis bvis $
-      ppDocName qual Raw False name
-  ppHsTyVarBndr unicode qual (KindedTyVar _ bvis name kind) =
-    ppHsBndrVis bvis $
-      parens
-        ( ppDocName qual Raw False (unL name)
-            <+> dcolon unicode
-            <+> ppLKind unicode qual kind
-        )
+  ppHsTyVarBndr unicode qual (HsTvb _ bvis bvar bkind) =
+    decorate (pp_hs_tvb unicode qual bvar bkind)
+    where decorate :: Html -> Html
+          decorate d = case bvis of
+            HsBndrRequired  _ -> parens_if_kind bkind d
+            HsBndrInvisible _ -> atSign <> parens_if_kind bkind d
 
-ppHsBndrVis :: HsBndrVis DocNameI -> Html -> Html
-ppHsBndrVis (HsBndrRequired _) d = d
-ppHsBndrVis (HsBndrInvisible _) d = atSign <> d
+ppHsBndrVar :: Qualification -> HsBndrVar DocNameI -> Html
+ppHsBndrVar qual (HsBndrVar _ name) = ppDocName qual Raw False (unLoc name)
+ppHsBndrVar _    (HsBndrWildCard _) = char '_'
+
+pp_hs_tvb :: Unicode -> Qualification -> HsBndrVar DocNameI -> HsBndrKind DocNameI -> Html
+pp_hs_tvb _       qual bvar (HsBndrNoKind _) = ppHsBndrVar qual bvar
+pp_hs_tvb unicode qual bvar (HsBndrKind _ k) =
+  ppHsBndrVar qual bvar <+> dcolon unicode
+                        <+> ppLKind unicode qual k
+
+parens_if_kind :: HsBndrKind DocNameI -> Html -> Html
+parens_if_kind (HsBndrNoKind _) d = d
+parens_if_kind (HsBndrKind _ _) d = parens d
 
 ppLKind :: Unicode -> Qualification -> LHsKind DocNameI -> Html
 ppLKind unicode qual y = ppKind unicode qual (unLoc y)

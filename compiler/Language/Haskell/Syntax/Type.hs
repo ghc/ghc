@@ -26,8 +26,12 @@ module Language.Haskell.Syntax.Type (
 
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
+        HsBndrVar(..), XBndrVar, XBndrWildCard, XXBndrVar,
+        HsBndrKind(..), XBndrKind, XBndrNoKind, XXBndrKind,
         isHsBndrInvisible,
-        HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
+        isHsBndrWildCard,
+        HsForAllTelescope(..),
+        HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
         HsWildCardBndrs(..),
@@ -700,27 +704,12 @@ hsIPNameFS (HsIPName n) = n
 --------------------------------------------------
 
 -- | Haskell Type Variable Binder
--- The flag annotates the binder. It is 'Specificity' in places where
--- explicit specificity is allowed (e.g. x :: forall {a} b. ...) or
--- '()' in other places.
+-- See Note [Type variable binders]
 data HsTyVarBndr flag pass
-  = UserTyVar        -- no explicit kinding
-         (XUserTyVar pass)
-         flag
-         (LIdP pass)
-        -- See Note [Located RdrNames] in GHC.Hs.Expr
-
-  | KindedTyVar
-         (XKindedTyVar pass)
-         flag
-         (LIdP pass)
-         (LHsKind pass)  -- The user-supplied kind signature
-        -- ^
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
-        --          'GHC.Parser.Annotation.AnnDcolon', 'GHC.Parser.Annotation.AnnClose'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-
+  = HsTvb { tvb_ext  :: XTyVarBndr pass
+          , tvb_flag :: flag
+          , tvb_var  :: HsBndrVar pass
+          , tvb_kind :: HsBndrKind pass }
   | XTyVarBndr
       !(XXTyVarBndr pass)
 
@@ -735,7 +724,7 @@ data HsBndrVis pass
       --     type KindOf @k (a :: k) = k
       --                ^^^
 
-  | XXBndrVis !(XXBndrVis pass)
+  | XBndrVis !(XXBndrVis pass)
 
 type family XBndrRequired  p
 type family XBndrInvisible p
@@ -744,13 +733,110 @@ type family XXBndrVis      p
 isHsBndrInvisible :: HsBndrVis pass -> Bool
 isHsBndrInvisible HsBndrInvisible{} = True
 isHsBndrInvisible HsBndrRequired{}  = False
-isHsBndrInvisible (XXBndrVis _)     = False
+isHsBndrInvisible (XBndrVis _)      = False
+
+data HsBndrVar pass
+  = HsBndrVar !(XBndrVar pass) !(LIdP pass)
+  | HsBndrWildCard !(XBndrWildCard pass)
+  | XBndrVar !(XXBndrVar pass)
+
+type family XBndrVar p
+type family XBndrWildCard p
+type family XXBndrVar p
+
+isHsBndrWildCard :: HsBndrVar pass -> Bool
+isHsBndrWildCard HsBndrWildCard{} = True
+isHsBndrWildCard HsBndrVar{}      = False
+isHsBndrWildCard (XBndrVar _)     = False
+
+data HsBndrKind pass
+  = HsBndrKind   !(XBndrKind pass) (LHsKind pass)
+  | HsBndrNoKind !(XBndrNoKind pass)
+  | XBndrKind    !(XXBndrKind pass)
+
+type family XBndrKind   p
+type family XBndrNoKind p
+type family XXBndrKind  p
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
 isHsKindedTyVar :: HsTyVarBndr flag pass -> Bool
-isHsKindedTyVar (UserTyVar {})   = False
-isHsKindedTyVar (KindedTyVar {}) = True
-isHsKindedTyVar (XTyVarBndr {})  = False
+isHsKindedTyVar (HsTvb { tvb_kind = kind }) =
+  case kind of
+    HsBndrKind _ _ -> True
+    HsBndrNoKind _ -> False
+    XBndrKind    _ -> False
+isHsKindedTyVar (XTyVarBndr {}) = False
+
+
+{- Note [Type variable binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Type variable binders, represented by the HsTyVarBndr type, can occur in the
+following contexts:
+
+1. On the left-hand sides of type/class declarations (TyClDecl)
+
+      data D a b = ...       -- data types     (DataDecl)
+      newtype N a b = ...    -- newtypes       (DataDecl)
+      type T a b = ...       -- type synonyms  (SynDecl)
+      class C a b where ...  -- classes        (ClassDecl)
+      type family TF a b     -- type families  (FamDecl)
+      data family DF a b     -- data families  (FamDecl)
+
+   The `a` and `b` in these examples are type variable binders.
+
+2. In forall telescopes (HsForAllTy and HsOuterTyVarBndrs)
+
+    2-Invis. forall {a} b. ...    -- invisible forall (HsForAllInvis)
+    2-Vis.   forall a b -> ...    -- visible forall   (HsForAllVis)
+
+   Again, `a` and `b` are type variable binders.
+
+3. In type family result signatures (FamilyResultSig), which are
+   part of the TypeFamilyDependencies extension
+
+      type family F a = r | r -> a  -- result sig (TyVarSig)
+
+   The `r` immediately to the right of `=` is a type variable binder.
+
+4. In constructor patterns, as long as the conditions outlined in
+   Note [Type patterns: binders and unifiers] are satisfied
+
+      fn (MkT @a @b x y) = ...  -- type arguments (HsConPatTyArg)
+                                -- in constructor patterns (ConPat)
+
+   Here, the `a` and `b` are type variable binders iff
+   `GHC.Tc.Gen.HsType.tyPatToBndr` returns `Just`.
+
+A type variable binder has three parts:
+  * flag      (HsBndrVis, Specificity, or () -- depending on context)
+  * variable  (HsBndrVar)
+  * kind      (HsBndrKind)
+
+Details about each part:
+
+* The binder variable (HsBndrVar) is either a type variable name or a wildcard,
+  i.e. `a` vs `_` (HsBndrVar vs HsBndrWildCard).
+
+* The binder kind (HsBndrKind) stores the optional kind annotation,
+  i.e. `a` vs `a :: k` (HsBndrNoKind vs HsBndrKind).
+
+* The binder flag is instantiated to one of the following types,
+  depending on the context where it occurs (contexts 1..4 are listed above)
+
+    (a) flag=HsBndrVis records `a` vs `@a` (HsBndrRequired vs HsBndrInvisible)
+          (used in contexts: 1)
+    (b) flag=Specificity records `a` vs `{a}` (SpecifiedSpec vs InferredSpec)
+          (used in contexts: 2-Invis)
+    (c) flag=() is used when there is no distinction to record
+          (used in contexts: 2-Vis, 3, 4)
+
+All in all, we have the following forms of type variable binders in the language
+
+  a, (a :: k), @a, @(a :: k), {a}, {a :: k}
+  _, (_ :: k), @_, @(_ :: k)
+
+The forms {_}, {_ :: k} are representable but never valid, see
+Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type -}
 
 -- | Haskell Type
 data HsType pass

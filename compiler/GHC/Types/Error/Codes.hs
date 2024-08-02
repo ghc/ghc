@@ -654,6 +654,7 @@ type family GhcDiagnosticCode c = n | n -> c where
 
   -- Invisible binders
   GhcDiagnosticCode "TcRnIllegalInvisTyVarBndr"                     = 58589
+  GhcDiagnosticCode "TcRnIllegalWildcardTyVarBndr"                  = 12211
   GhcDiagnosticCode "TcRnInvalidInvisTyVarBndr"                     = 57916
   GhcDiagnosticCode "TcRnInvisBndrWithoutSig"                       = 92337
 

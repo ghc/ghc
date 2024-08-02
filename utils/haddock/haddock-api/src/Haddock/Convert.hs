@@ -115,12 +115,14 @@ tyThingToLHsDecl prr t = case t of
 
             cvt :: HsTyVarBndr flag GhcRn -> HsType GhcRn
             -- Without this signature, we trigger GHC#18932
-            cvt (UserTyVar _ _ n) = HsTyVar noAnn NotPromoted n
-            cvt (KindedTyVar _ _ (L name_loc n) kind) =
-              HsKindSig
-                noAnn
-                (L (l2l name_loc) (HsTyVar noAnn NotPromoted (L name_loc n)))
-                kind
+            cvt (HsTvb { tvb_var = bvar, tvb_kind = bkind }) =
+              case bkind of
+                HsBndrNoKind _    -> cvt' bvar
+                HsBndrKind _ kind -> HsKindSig noAnn (noLocA (cvt' bvar)) kind
+
+            cvt' :: HsBndrVar GhcRn -> HsType GhcRn
+            cvt' (HsBndrVar _ nm)   = HsTyVar noAnn NotPromoted nm
+            cvt' (HsBndrWildCard _) = HsWildCardTy noExtField
 
             -- \| Convert a LHsTyVarBndr to an equivalent LHsType.
             hsLTyVarBndrToType :: LHsTyVarBndr flag GhcRn -> LHsType GhcRn
@@ -280,10 +282,13 @@ synifyTyCon prr _coax tc
           }
   where
     -- tyConTyVars doesn't work on fun/prim, but we can make them up:
-    mk_hs_tv realKind fakeTyVar
-      | isLiftedTypeKind realKind = noLocA $ UserTyVar noAnn (HsBndrRequired noExtField) (noLocA (getName fakeTyVar))
-      | otherwise = noLocA $ KindedTyVar noAnn (HsBndrRequired noExtField) (noLocA (getName fakeTyVar)) (synifyKindSig realKind)
-
+    mk_hs_tv realKind fakeTyVar = noLocA $
+      HsTvb { tvb_ext  = noAnn
+            , tvb_flag = HsBndrRequired noExtField
+            , tvb_var  = HsBndrVar noExtField (noLocA (getName fakeTyVar))
+            , tvb_kind = if isLiftedTypeKind realKind
+                         then HsBndrNoKind noExtField
+                         else HsBndrKind noExtField (synifyKindSig realKind) }
     conKind = defaultType prr (tyConKind tc)
     tyVarKinds = fst . splitFunTys . snd . splitInvisPiTys $ conKind
 synifyTyCon _prr _coax tc
@@ -450,7 +455,12 @@ synifyFamilyResultSig Nothing kind
   | otherwise =
       noLocA $ KindSig noExtField (synifyKindSig kind)
 synifyFamilyResultSig (Just name) kind =
-  noLocA $ TyVarSig noExtField (noLocA $ KindedTyVar noAnn () (noLocA name) (synifyKindSig kind))
+      noLocA $ TyVarSig noExtField (noLocA tvb)
+  where
+      tvb = HsTvb { tvb_ext  = noAnn
+                  , tvb_flag = ()
+                  , tvb_var  = HsBndrVar noExtField (noLocA name)
+                  , tvb_kind = HsBndrKind noExtField (synifyKindSig kind) }
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax) for any
 -- constructor that would be misrepresented by omitting its result-type. But you
@@ -607,12 +617,14 @@ synifyTyVarBndr' no_kinds (Bndr tv spec) = synify_ty_var no_kinds spec tv
 -- | Like 'synifyTyVarBndr', but accepts a set of variables for which to omit kind
 -- signatures (even if they don't have the lifted type kind).
 synify_ty_var :: VarSet -> flag -> TyVar -> LHsTyVarBndr flag GhcRn
-synify_ty_var no_kinds flag tv
-  | isLiftedTypeKind kind || tv `elemVarSet` no_kinds =
-      noLocA (UserTyVar noAnn flag (noLocA name))
-  | otherwise =
-      noLocA (KindedTyVar noAnn flag (noLocA name) (synifyKindSig kind))
+synify_ty_var no_kinds flag tv =
+  noLocA (HsTvb noAnn flag bndr_var bndr_kind)
   where
+    bndr_var  = HsBndrVar noExtField (noLocA name)
+    bndr_kind | isLiftedTypeKind kind || tv `elemVarSet` no_kinds
+              = HsBndrNoKind noExtField
+              | otherwise
+              = HsBndrKind noExtField (synifyKindSig kind)
     kind = tyVarKind tv
     name = getName tv
 

@@ -305,19 +305,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544_kw.hs:21:11 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544_kw.hs:21:11 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       [(L

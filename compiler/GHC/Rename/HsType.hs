@@ -897,7 +897,7 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
              bndrs, all_implicit_kvs :: [LocatedN RdrName]
-             bndrs        = map hsLTyVarLocName hs_tv_bndrs
+             bndrs        = mapMaybe hsLTyVarLocName hs_tv_bndrs
              all_implicit_kvs = filterFreeVarsToBind bndrs $
                bndr_kv_occs ++ body_kv_occs
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
@@ -952,9 +952,16 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     -- include surrounding parens. for error messages to be
     -- compatible, we recreate the location from the contents
     get_bndr_loc :: LHsTyVarBndr flag GhcPs -> SrcSpan
-    get_bndr_loc (L _ (UserTyVar   _ _ ln)) = getLocA ln
-    get_bndr_loc (L _ (KindedTyVar _ _ ln lk))
-      = combineSrcSpans (getLocA ln) (getLocA lk)
+    get_bndr_loc (L l tvb) =
+      combineSrcSpans
+        (case hsBndrVar tvb of
+          HsBndrWildCard _ ->
+            locA l -- this should rather be the location of the wildcard,
+                   -- but we don't have it
+          HsBndrVar _ ln   -> getLocA ln)
+        (case hsBndrKind tvb of
+          HsBndrNoKind _ -> noSrcSpan
+          HsBndrKind _ lk -> getLocA lk)
 
 {- Note [bindHsQTyVars examples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1101,7 +1108,8 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
       -- will use class variables for any names the user meant to bring in
       -- scope here. This is an explicit forall, so we want fresh names, not
       -- class variables. Thus: always pass Nothing.
-      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' -> do
+        checkForAllTelescopeWildcardBndrs doc exp_bndrs'
         thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
                                        , hso_bndrs     = exp_bndrs' }
 
@@ -1127,11 +1135,27 @@ bindHsForAllTelescope :: HsDocContext
 bindHsForAllTelescope doc tele thing_inside =
   case tele of
     HsForAllVis { hsf_vis_bndrs = bndrs } ->
-      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' -> do
+        checkForAllTelescopeWildcardBndrs doc bndrs'
         thing_inside $ mkHsForAllVisTele noAnn bndrs'
     HsForAllInvis { hsf_invis_bndrs = bndrs } ->
-      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' -> do
+        checkForAllTelescopeWildcardBndrs doc bndrs'
         thing_inside $ mkHsForAllInvisTele noAnn bndrs'
+
+-- See Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type
+checkForAllTelescopeWildcardBndrs :: HsDocContext
+                                  -> [LHsTyVarBndr flag (GhcPass p)]
+                                  -> RnM ()
+checkForAllTelescopeWildcardBndrs doc tvbs = mapM_ report_err wc_bndr_locs
+  where
+    report_err :: SrcSpan -> RnM ()
+    report_err loc =
+      addErrAt loc $ TcRnWithHsDocContext doc $
+        TcRnIllegalWildcardInType Nothing WildcardBndrInForallTelescope
+
+    wc_bndr_locs :: [SrcSpan]
+    wc_bndr_locs = [locA l | L l (HsTvb _ _ HsBndrWildCard{} _) <- tvbs ]
 
 -- | Should GHC warn if a quantified type variable goes unused? Usually, the
 -- answer is \"yes\", but in the particular case of binding 'LHsQTyVars', we
@@ -1158,7 +1182,7 @@ bindLHsTyVarBndrs doc wuf mb_assoc tv_bndrs thing_inside
        ; checkDupRdrNames tv_names_w_loc
        ; go tv_bndrs thing_inside }
   where
-    tv_names_w_loc = map hsLTyVarLocName tv_bndrs
+    tv_names_w_loc = mapMaybe hsLTyVarLocName tv_bndrs
 
     go []     thing_inside = thing_inside []
     go (b:bs) thing_inside = bindLHsTyVarBndr doc mb_assoc b $ \ b' ->
@@ -1176,22 +1200,30 @@ bindLHsTyVarBndr :: HsDocContext
                  -> LHsTyVarBndr flag GhcPs
                  -> (LHsTyVarBndr flag GhcRn -> RnM (b, FreeVars))
                  -> RnM (b, FreeVars)
-bindLHsTyVarBndr _doc mb_assoc (L loc
-                                 (UserTyVar x fl
-                                    lrdr@(L lv _))) thing_inside
-  = do { nm <- newTyVarNameRn mb_assoc lrdr
-       ; bindLocalNamesFV [nm] $
-         thing_inside (L loc (UserTyVar x fl (L lv nm))) }
+bindLHsTyVarBndr doc mb_assoc (L loc (HsTvb x fl bvar kind)) thing_inside
+  = do { (kind', fvs1) <- rnHsBndrKind doc kind
+       ; (b, fvs2) <- bindHsBndrVar mb_assoc bvar $ \bvar' ->
+            thing_inside (L loc (HsTvb x fl bvar' kind'))
+       ; return (b, fvs1 `plusFV` fvs2) }
 
-bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x fl lrdr@(L lv _) kind))
-                 thing_inside
-  = do { sig_ok <- xoptM LangExt.KindSignatures
-           ; unless sig_ok (badKindSigErr doc kind)
-           ; (kind', fvs1) <- rnLHsKind doc kind
-           ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
-           ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
-               $ thing_inside (L loc (KindedTyVar x fl (L lv tv_nm) kind'))
-           ; return (b, fvs1 `plusFV` fvs2) }
+bindHsBndrVar :: Maybe a   -- associated class
+              -> HsBndrVar GhcPs
+              -> (HsBndrVar GhcRn -> RnM (b, FreeVars))
+              -> RnM (b, FreeVars)
+bindHsBndrVar mb_assoc (HsBndrVar _ lrdr@(L lv _)) thing_inside
+  = do { tv_nm  <- newTyVarNameRn mb_assoc lrdr
+       ; bindLocalNamesFV [tv_nm] $
+         thing_inside (HsBndrVar noExtField (L lv tv_nm)) }
+bindHsBndrVar _ (HsBndrWildCard _) thing_inside
+  = thing_inside (HsBndrWildCard noExtField)
+
+rnHsBndrKind :: HsDocContext -> HsBndrKind GhcPs -> RnM (HsBndrKind GhcRn, FreeVars)
+rnHsBndrKind _ (HsBndrNoKind _) = return (HsBndrNoKind noExtField, emptyFVs)
+rnHsBndrKind doc (HsBndrKind _ kind) =
+  do { sig_ok <- xoptM LangExt.KindSignatures
+     ; unless sig_ok (badKindSigErr doc kind)
+     ; (kind', fvs) <- rnLHsKind doc kind
+     ; return (HsBndrKind noExtField kind', fvs) }
 
 -- Check for TypeAbstractions and update the type parameter of HsBndrVis.
 -- The binder itself is already renamed and is returned unmodified.
@@ -1200,9 +1232,11 @@ rnLHsTyVarBndrVisFlag
   -> RnM (LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
 rnLHsTyVarBndrVisFlag (L loc bndr) = do
   let lbndr = L loc (updateHsTyVarBndrFlag rnHsBndrVis bndr)
-  unlessXOptM LangExt.TypeAbstractions $
+  unlessXOptM LangExt.TypeAbstractions $ do
     when (isHsBndrInvisible (hsTyVarBndrFlag bndr)) $
       addErr (TcRnIllegalInvisTyVarBndr lbndr)
+    when (isHsBndrWildCard (hsBndrVar bndr)) $
+      addErr (TcRnIllegalWildcardTyVarBndr lbndr)
   return lbndr
 
 -- rnHsBndrVis is almost a no-op, it simply discards the token for "@".
@@ -1629,10 +1663,13 @@ checkDataKinds env thing
 
 warnUnusedForAll :: OutputableBndrFlag flag 'Renamed
                  => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
-warnUnusedForAll doc (L loc tv) used_names
-  = unless (hsTyVarName tv `elemNameSet` used_names) $ do
-      let msg = TcRnUnusedQuantifiedTypeVar doc (HsTyVarBndrExistentialFlag tv)
-      addDiagnosticAt (locA loc) msg
+warnUnusedForAll doc (L loc tvb) used_names =
+  case hsBndrVar tvb of
+    HsBndrWildCard _ -> return ()
+    HsBndrVar _ (L _ tv) ->
+      unless (tv `elemNameSet` used_names) $ do
+        let msg = TcRnUnusedQuantifiedTypeVar doc (HsTyVarBndrExistentialFlag tvb)
+        addDiagnosticAt (locA loc) msg
 
 warnCapturedTerm :: LocatedN RdrName -> Either [GlobalRdrElt] Name -> TcM ()
 warnCapturedTerm (L loc tv) shadowed_term_names
@@ -1718,7 +1755,7 @@ annotation on the LHS, for example:
   data Proxy (a :: k) = Proxy
   type KindOf (a :: k) = k
 
-Here 'k' is in the kind annotation of a type variable binding, KindedTyVar, and
+Here 'k' is in the kind annotation of a type variable binding, HsBndrKind, and
 we want to implicitly quantify over it.  This is easy: just extract all free
 variables from the kind signature. That's what we do in extract_hs_tv_bndrs_kvs
 
@@ -1982,8 +2019,9 @@ extractHsTyVarBndrsKVs tv_bndrs = extract_hs_tv_bndrs_kvs tv_bndrs
 -- See Note [Ordering of implicit variables].
 extractRdrKindSigVars :: LFamilyResultSig GhcPs -> FreeKiTyVars
 extractRdrKindSigVars (L _ resultSig) = case resultSig of
-  KindSig _ k                            -> extractHsTyRdrTyVars k
-  TyVarSig _ (L _ (KindedTyVar _ _ _ k)) -> extractHsTyRdrTyVars k
+  KindSig _ k -> extractHsTyRdrTyVars k
+  TyVarSig _ (L _ tvb) | HsTvb { tvb_kind = HsBndrKind _ k } <- tvb
+    -> extractHsTyRdrTyVars k
   _ -> []
 
 -- | Extracts free type and kind variables from an argument in a GADT
@@ -2117,7 +2155,7 @@ extract_hs_tv_bndrs tv_bndrs acc_vars body_vars = new_vars ++ acc_vars
     -- NB: delete all tv_bndr_rdrs from bndr_vars as well as body_vars.
     -- See Note [Kind variable scoping]
     bndr_vars = extract_hs_tv_bndrs_kvs tv_bndrs
-    tv_bndr_rdrs = map hsLTyVarLocName tv_bndrs
+    tv_bndr_rdrs = mapMaybe hsLTyVarLocName tv_bndrs
 
 extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr flag GhcPs] -> FreeKiTyVars
 -- Returns the free kind variables of any explicitly-kinded binders, returning
@@ -2128,7 +2166,7 @@ extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr flag GhcPs] -> FreeKiTyVars
 --          the function returns [k1,k2], even though k1 is bound here
 extract_hs_tv_bndrs_kvs tv_bndrs =
     foldr extract_lty []
-          [k | L _ (KindedTyVar _ _ _ k) <- tv_bndrs]
+          [k | L _ (HsTvb { tvb_kind = HsBndrKind _ k }) <- tv_bndrs]
 
 extract_tv :: LocatedN RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_tv tv acc =

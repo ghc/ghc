@@ -296,3 +296,34 @@ quantifiers continues to match the order of binders in the header::
 
     -- Inferred kind: forall k. k -> forall j. j -> Type
     data B @(k :: Type) (a :: k) @(j :: Type) (b :: j)
+
+.. _wildcard-binders-in-type-declarations:
+
+Wildcard Binders in Type Declarations
+-------------------------------------
+
+**Since:** GHC 9.12
+
+Unused type variable binders may be replaced with wildcards:
+::
+
+    type UConst a b = a   -- unused named binder `b`
+    type WConst a _ = a   -- wildcard binder
+
+Just like a named binder, a wildcard binder ``_`` can be:
+
+* plain: ``_``
+* kinded: ``(_ :: k -> Type)``
+* invisible, plain:  ``@_``
+* invisible, kinded: ``@(_ :: k -> Type)``
+
+Wildcard binders and type abstractions are, in principle, separate features.
+However, both are included in the :extension:`TypeAbstractions` extension for
+administrative convenience. The two features can be used together to skip over a
+prefix of invisible type variables: ::
+
+    type D :: forall k1 k2 k3. k1 -> k2 -> k3 -> Type
+    data D @_ @_ @k3 a b c = ...
+
+In this example we are interested in ``k3`` and use wildcards ``@_`` to avoid
+binding ``k1`` and ``k2``.

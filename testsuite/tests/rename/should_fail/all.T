@@ -229,3 +229,5 @@ test('T23570b', [extra_files(['T23570_aux.hs'])], multimod_compile, ['T23570b', 
 test('T17594b', req_th, compile_fail, [''])
 test('T14032c', normal, compile_fail, [''])
 test('T14032f', normal, compile_fail, [''])
+test('T23501_fail', normal, compile_fail, [''])
+test('T23501_fail_ext', normal, compile_fail, [''])

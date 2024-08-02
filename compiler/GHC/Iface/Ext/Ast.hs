@@ -1968,14 +1968,15 @@ instance (ToHie tm, ToHie ty) => ToHie (HsArg (GhcPass p) tm ty) where
   toHie (HsArgPar sp) = locOnly sp
 
 instance Data flag => ToHie (TVScoped (LocatedA (HsTyVarBndr flag GhcRn))) where
-  toHie (TVS tsc sc (L span bndr)) = concatM $ makeNodeA bndr span : case bndr of
-      UserTyVar _ _ var ->
-        [ toHie $ C (TyVarBind sc tsc) var
-        ]
-      KindedTyVar _ _ var kind ->
-        [ toHie $ C (TyVarBind sc tsc) var
-        , toHie kind
-        ]
+  toHie (TVS tsc sc (L span bndr)) =
+    concatM $ makeNodeA bndr span : (name' ++ kind')
+    where
+      name' = case hsBndrVar bndr of
+        HsBndrWildCard _ -> []
+        HsBndrVar _ tv   -> [toHie $ C (TyVarBind sc tsc) tv]
+      kind' = case hsBndrKind bndr of
+        HsBndrNoKind _ -> []
+        HsBndrKind _ k -> [toHie k]
 
 instance ToHie (TScoped (LHsQTyVars GhcRn)) where
   toHie (TS sc (HsQTvs implicits vars)) = concatM $

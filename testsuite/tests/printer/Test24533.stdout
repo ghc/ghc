@@ -357,40 +357,44 @@
               (EpaBlockComment
                "{- Weird4 -}")
               { Test24533.hs:11:66-67 }))]))
-         (KindedTyVar
+         (HsTvb
           [(AddEpAnn AnnOpenP (EpaSpan { Test24533.hs:11:37 }))
           ,(AddEpAnn AnnCloseP (EpaSpan { Test24533.hs:11:99 }))
           ,(AddEpAnn AnnDcolon (EpaSpan { Test24533.hs:11:66-67 }))]
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { Test24533.hs:11:51 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))
-          (L
-           (EpAnn
-            (EpaSpan { Test24533.hs:11:82-85 })
-            (AnnListItem
-             [])
-            (EpaComments
-             []))
-           (HsTyVar
-            []
-            (NotPromoted)
-            (L
-             (EpAnn
-              (EpaSpan { Test24533.hs:11:82-85 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: Type}))))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { Test24533.hs:11:51 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrKind
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { Test24533.hs:11:82-85 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             []
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { Test24533.hs:11:82-85 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Type})))))))])
       (Prefix)
       []
       []
@@ -939,40 +943,44 @@
            [])
           (EpaComments
            []))
-         (KindedTyVar
+         (HsTvb
           [(AddEpAnn AnnOpenP (EpaSpan { Test24533.ppr.hs:4:11 }))
           ,(AddEpAnn AnnCloseP (EpaSpan { Test24533.ppr.hs:4:21 }))
           ,(AddEpAnn AnnDcolon (EpaSpan { Test24533.ppr.hs:4:14-15 }))]
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { Test24533.ppr.hs:4:12 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))
-          (L
-           (EpAnn
-            (EpaSpan { Test24533.ppr.hs:4:17-20 })
-            (AnnListItem
-             [])
-            (EpaComments
-             []))
-           (HsTyVar
-            []
-            (NotPromoted)
-            (L
-             (EpAnn
-              (EpaSpan { Test24533.ppr.hs:4:17-20 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: Type}))))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { Test24533.ppr.hs:4:12 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrKind
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { Test24533.ppr.hs:4:17-20 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             []
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { Test24533.ppr.hs:4:17-20 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Type})))))))])
       (Prefix)
       []
       []

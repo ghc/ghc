@@ -71,6 +71,12 @@ Language
     g = f (forall a. Show a => a -> String)
       where f :: forall a -> ...
 
+- In accordance with `GHC Proposal #425 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_,
+  GHC now permits wildcard binders in type declarations: ::
+
+    type Const a b = a   -- before: the `b` had to be named even if unused on the RHS
+    type Const a _ = a   -- now: the compiler accepts a wildcard binder `_`
+
 Compiler
 ~~~~~~~~
 

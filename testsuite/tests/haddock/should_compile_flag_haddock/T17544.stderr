@@ -72,19 +72,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:5:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:5:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       [(L
@@ -230,19 +234,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:9:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:9:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       [(L
@@ -386,19 +394,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:13:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:13:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       [(L
@@ -545,19 +557,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:17:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:17:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       [(L
@@ -770,19 +786,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:22:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:22:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       []
@@ -816,19 +836,23 @@
               [])
              (EpaComments
               []))
-            (UserTyVar
+            (HsTvb
              []
              (HsBndrRequired
               (NoExtField))
-             (L
-              (EpAnn
-               (EpaSpan { T17544.hs:22:28 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              (Unqual
-               {OccName: a}))))])
+             (HsBndrVar
+              (NoExtField)
+              (L
+               (EpAnn
+                (EpaSpan { T17544.hs:22:28 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               (Unqual
+                {OccName: a})))
+             (HsBndrNoKind
+              (NoExtField))))])
          (Prefix)
          (L
           (EpAnn
@@ -1097,19 +1121,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:28:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:28:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       []
@@ -1143,19 +1171,23 @@
               [])
              (EpaComments
               []))
-            (UserTyVar
+            (HsTvb
              []
              (HsBndrRequired
               (NoExtField))
-             (L
-              (EpAnn
-               (EpaSpan { T17544.hs:28:28 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              (Unqual
-               {OccName: a}))))])
+             (HsBndrVar
+              (NoExtField)
+              (L
+               (EpAnn
+                (EpaSpan { T17544.hs:28:28 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               (Unqual
+                {OccName: a})))
+             (HsBndrNoKind
+              (NoExtField))))])
          (Prefix)
          (L
           (EpAnn
@@ -1424,19 +1456,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:34:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:34:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       []
@@ -1470,19 +1506,23 @@
               [])
              (EpaComments
               []))
-            (UserTyVar
+            (HsTvb
              []
              (HsBndrRequired
               (NoExtField))
-             (L
-              (EpAnn
-               (EpaSpan { T17544.hs:34:28 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              (Unqual
-               {OccName: a}))))])
+             (HsBndrVar
+              (NoExtField)
+              (L
+               (EpAnn
+                (EpaSpan { T17544.hs:34:28 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               (Unqual
+                {OccName: a})))
+             (HsBndrNoKind
+              (NoExtField))))])
          (Prefix)
          (L
           (EpAnn
@@ -1751,19 +1791,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:40:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:40:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       []
@@ -1797,19 +1841,23 @@
               [])
              (EpaComments
               []))
-            (UserTyVar
+            (HsTvb
              []
              (HsBndrRequired
               (NoExtField))
-             (L
-              (EpAnn
-               (EpaSpan { T17544.hs:40:28 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              (Unqual
-               {OccName: a}))))])
+             (HsBndrVar
+              (NoExtField)
+              (L
+               (EpAnn
+                (EpaSpan { T17544.hs:40:28 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               (Unqual
+                {OccName: a})))
+             (HsBndrNoKind
+              (NoExtField))))])
          (Prefix)
          (L
           (EpAnn
@@ -2078,19 +2126,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:46:10 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:46:10 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       []
@@ -2124,19 +2176,23 @@
               [])
              (EpaComments
               []))
-            (UserTyVar
+            (HsTvb
              []
              (HsBndrRequired
               (NoExtField))
-             (L
-              (EpAnn
-               (EpaSpan { T17544.hs:46:28 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              (Unqual
-               {OccName: a}))))])
+             (HsBndrVar
+              (NoExtField)
+              (L
+               (EpAnn
+                (EpaSpan { T17544.hs:46:28 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               (Unqual
+                {OccName: a})))
+             (HsBndrNoKind
+              (NoExtField))))])
          (Prefix)
          (L
           (EpAnn
@@ -2405,19 +2461,23 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
-          (L
-           (EpAnn
-            (EpaSpan { T17544.hs:52:11 })
-            (NameAnnTrailing
-             [])
-            (EpaComments
-             []))
-           (Unqual
-            {OccName: a}))))])
+          (HsBndrVar
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { T17544.hs:52:11 })
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              []))
+            (Unqual
+             {OccName: a})))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       []
@@ -2451,19 +2511,23 @@
               [])
              (EpaComments
               []))
-            (UserTyVar
+            (HsTvb
              []
              (HsBndrRequired
               (NoExtField))
-             (L
-              (EpAnn
-               (EpaSpan { T17544.hs:52:30 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              (Unqual
-               {OccName: a}))))])
+             (HsBndrVar
+              (NoExtField)
+              (L
+               (EpAnn
+                (EpaSpan { T17544.hs:52:30 })
+                (NameAnnTrailing
+                 [])
+                (EpaComments
+                 []))
+               (Unqual
+                {OccName: a})))
+             (HsBndrNoKind
+              (NoExtField))))])
          (Prefix)
          (L
           (EpAnn
