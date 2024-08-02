@@ -34,7 +34,6 @@ import GHC.IORef (readIORef)
 import GHC.Unit.Types
 import GHC.Hs
 import GHC.Types.Avail
-import GHC.Unit.Module
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import GHC.Unit.Module.Imported
@@ -184,13 +183,12 @@ mkDocStructureFromExportList mdl import_avails export_list =
     aliasMap =
         M.fromListWith (<>) $
           (this_mdl_name, this_mdl_name :| [])
-          : (flip concatMap (moduleEnvToList imported) $ \(mdl, imvs) ->
+          : (flip concatMap (M.toList imported) $ \(mdl, imvs) ->
               [(imv_name imv, moduleName mdl :| []) | imv <- imvs])
       where
         this_mdl_name = moduleName mdl
 
-    imported :: ModuleEnv [ImportedModsVal]
-    imported = mapModuleEnv importedByUser (imp_mods import_avails)
+    imported = M.map importedByUser (imp_mods import_avails)
 
 -- | Figure out the documentation structure by correlating
 -- the module exports with the located declarations.

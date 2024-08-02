@@ -66,6 +66,7 @@ import Data.List (sortBy, partition, nub)
 import Data.List.NonEmpty ( pattern (:|), NonEmpty )
 import Data.Function ( on )
 import qualified Data.Semigroup as S
+import qualified Data.Map as M
 
 {-
 ************************************************************************
@@ -339,7 +340,7 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   -- What import statements provide "Mod" at all
   -- or, if this is an unqualified name, are not qualified imports
   interesting_imports = [ (mod, imp)
-    | (mod, mod_imports) <- moduleEnvToList (imp_mods imports)
+    | (mod, mod_imports) <- M.toList (imp_mods imports)
     , Just imp <- return $ pick (importedByUser mod_imports)
     ]
 

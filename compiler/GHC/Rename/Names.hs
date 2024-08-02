@@ -573,7 +573,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
 
 
   in ImportAvails {
-          imp_mods       = unitModuleEnv (mi_module iface) [imported_by],
+          imp_mods       = Map.singleton (mi_module iface) [imported_by],
           imp_orphs      = orphans,
           imp_finsts     = finsts,
           imp_sig_mods   = sig_mods,

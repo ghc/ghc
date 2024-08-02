@@ -245,6 +245,9 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- doesn't affect the hash of this module)
                 -- NOT STRICT!  we read this field lazily from the interface file
                 -- It is *only* consulted by the recompilation checker
+                --
+                -- The elements must be *deterministically* sorted to guarantee
+                -- deterministic interface files
 
         mi_exports_  :: ![IfaceExport],
                 -- ^ Exports

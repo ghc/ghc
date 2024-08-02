@@ -176,6 +176,7 @@ import GHCi.RemoteTypes
 
 import Data.Set      ( Set )
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Data.Dynamic  ( Dynamic )
 import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
@@ -916,7 +917,7 @@ plusModDeps = plusInstalledModuleEnv plus_mod_dep
       -- perf/compiler/MultiLayerModules
 
 emptyImportAvails :: ImportAvails
-emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
+emptyImportAvails = ImportAvails { imp_mods          = M.empty,
                                    imp_direct_dep_mods = emptyInstalledModuleEnv,
                                    imp_dep_direct_pkgs = S.empty,
                                    imp_sig_mods      = [],
@@ -947,7 +948,7 @@ plusImportAvails
                   imp_sig_mods = sig_mods2,
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
-  = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
+  = ImportAvails { imp_mods          = M.unionWith (++) mods1 mods2,
                    imp_direct_dep_mods = ddmods1 `plusModDeps` ddmods2,
                    imp_dep_direct_pkgs      = ddpkgs1 `S.union` ddpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,

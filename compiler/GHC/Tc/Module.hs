@@ -178,6 +178,7 @@ import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Data.Foldable ( for_ )
 import Data.Traversable ( for )
 
@@ -432,7 +433,7 @@ tcRnImports hsc_env import_decls
                 -- Check type-family consistency between imports.
                 -- See Note [The type family instance consistency story]
         ; traceRn "rn1: checking family instance consistency {" empty
-        ; let { dir_imp_mods = moduleEnvKeys
+        ; let { dir_imp_mods = M.keys
                              . imp_mods
                              $ imports }
         ; checkFamInstConsistency dir_imp_mods

@@ -208,7 +208,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
     safe_implicit_imps_req = uc_safe_implicit_imps_req uc
 
     used_mods    = moduleEnvKeys ent_map
-    dir_imp_mods = moduleEnvKeys direct_imports
+    dir_imp_mods = Map.keys direct_imports
     all_mods     = used_mods ++ filter (`notElem` used_mods) dir_imp_mods
     usage_mods   = sortBy stableModuleCmp all_mods
                         -- canonical order is imported, to avoid interface-file
@@ -289,7 +289,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
         by_is_safe (ImportedByUser imv) = imv_is_safe imv
         by_is_safe _ = False
         (is_direct_import, imp_safe)
-            = case lookupModuleEnv direct_imports mod of
+            = case Map.lookup mod direct_imports of
                 -- ezyang: I'm not sure if any is the correct
                 -- metric here. If safety was guaranteed to be uniform
                 -- across all imports, why did the old code only look
