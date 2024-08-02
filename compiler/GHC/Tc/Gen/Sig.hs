@@ -306,9 +306,9 @@ no_anon_wc_tele tele = case tele of
   HsForAllInvis { hsf_invis_bndrs = ltvs } -> all no_anon_wc_tvb ltvs
 
 no_anon_wc_tvb :: LHsTyVarBndr flag GhcRn -> Bool
-no_anon_wc_tvb (L _ tvb) = case tvb of
-  UserTyVar _ _ _      -> True
-  KindedTyVar _ _ _ ki -> no_anon_wc_ty ki
+no_anon_wc_tvb (L _ tvb) = case hsBndrKind tvb of
+  HsBndrNoKind _  -> True
+  HsBndrKind _ ki -> no_anon_wc_ty ki
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

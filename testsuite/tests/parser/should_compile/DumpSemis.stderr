@@ -1290,7 +1290,7 @@
            [])
           (EpaComments
            []))
-         (KindedTyVar
+         (HsTvb
           [(AddEpAnn AnnOpenP (EpaSpan { DumpSemis.hs:28:22 }))
           ,(AddEpAnn AnnOpenP (EpaSpan { DumpSemis.hs:28:23 }))
           ,(AddEpAnn AnnCloseP (EpaSpan { DumpSemis.hs:28:37 }))
@@ -1307,25 +1307,27 @@
              []))
            (Unqual
             {OccName: trans}))
-          (L
-           (EpAnn
-            (EpaSpan { DumpSemis.hs:28:33-36 })
-            (AnnListItem
-             [])
-            (EpaComments
-             []))
-           (HsTyVar
-            []
-            (NotPromoted)
-            (L
-             (EpAnn
-              (EpaSpan { DumpSemis.hs:28:33-36 })
-              (NameAnnTrailing
-               [])
-              (EpaComments
-               []))
-             (Unqual
-              {OccName: Type}))))))])
+          (HsBndrKind
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { DumpSemis.hs:28:33-36 })
+             (AnnListItem
+              [])
+             (EpaComments
+              []))
+            (HsTyVar
+             []
+             (NotPromoted)
+             (L
+              (EpAnn
+               (EpaSpan { DumpSemis.hs:28:33-36 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              (Unqual
+               {OccName: Type})))))))])
       (Prefix)
       []
       [(L

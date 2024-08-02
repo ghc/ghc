@@ -952,8 +952,8 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     -- include surrounding parens. for error messages to be
     -- compatible, we recreate the location from the contents
     get_bndr_loc :: LHsTyVarBndr flag GhcPs -> SrcSpan
-    get_bndr_loc (L _ (UserTyVar   _ _ ln)) = getLocA ln
-    get_bndr_loc (L _ (KindedTyVar _ _ ln lk))
+    get_bndr_loc (L _ (HsTvb _ _ ln (HsBndrNoKind _))) = getLocA ln
+    get_bndr_loc (L _ (HsTvb _ _ ln (HsBndrKind _ lk)))
       = combineSrcSpans (getLocA ln) (getLocA lk)
 
 {- Note [bindHsQTyVars examples]
@@ -1176,22 +1176,21 @@ bindLHsTyVarBndr :: HsDocContext
                  -> LHsTyVarBndr flag GhcPs
                  -> (LHsTyVarBndr flag GhcRn -> RnM (b, FreeVars))
                  -> RnM (b, FreeVars)
-bindLHsTyVarBndr _doc mb_assoc (L loc
-                                 (UserTyVar x fl
-                                    lrdr@(L lv _))) thing_inside
-  = do { nm <- newTyVarNameRn mb_assoc lrdr
-       ; bindLocalNamesFV [nm] $
-         thing_inside (L loc (UserTyVar x fl (L lv nm))) }
-
-bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x fl lrdr@(L lv _) kind))
+bindLHsTyVarBndr doc mb_assoc (L loc (HsTvb x fl lrdr@(L lv _) kind))
                  thing_inside
-  = do { sig_ok <- xoptM LangExt.KindSignatures
-           ; unless sig_ok (badKindSigErr doc kind)
-           ; (kind', fvs1) <- rnLHsKind doc kind
-           ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
-           ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
-               $ thing_inside (L loc (KindedTyVar x fl (L lv tv_nm) kind'))
-           ; return (b, fvs1 `plusFV` fvs2) }
+  = do { (kind', fvs1) <- rnHsBndrKind doc kind
+       ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
+       ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
+           $ thing_inside (L loc (HsTvb x fl (L lv tv_nm) kind'))
+       ; return (b, fvs1 `plusFV` fvs2) }
+
+rnHsBndrKind :: HsDocContext -> HsBndrKind GhcPs -> RnM (HsBndrKind GhcRn, FreeVars)
+rnHsBndrKind _ (HsBndrNoKind _) = return (HsBndrNoKind noExtField, emptyFVs)
+rnHsBndrKind doc (HsBndrKind _ kind) =
+  do { sig_ok <- xoptM LangExt.KindSignatures
+     ; unless sig_ok (badKindSigErr doc kind)
+     ; (kind', fvs) <- rnLHsKind doc kind
+     ; return (HsBndrKind noExtField kind', fvs) }
 
 -- Check for TypeAbstractions and update the type parameter of HsBndrVis.
 -- The binder itself is already renamed and is returned unmodified.
@@ -1718,7 +1717,7 @@ annotation on the LHS, for example:
   data Proxy (a :: k) = Proxy
   type KindOf (a :: k) = k
 
-Here 'k' is in the kind annotation of a type variable binding, KindedTyVar, and
+Here 'k' is in the kind annotation of a type variable binding, HsBndrKind, and
 we want to implicitly quantify over it.  This is easy: just extract all free
 variables from the kind signature. That's what we do in extract_hs_tv_bndrs_kvs
 
@@ -1982,8 +1981,8 @@ extractHsTyVarBndrsKVs tv_bndrs = extract_hs_tv_bndrs_kvs tv_bndrs
 -- See Note [Ordering of implicit variables].
 extractRdrKindSigVars :: LFamilyResultSig GhcPs -> FreeKiTyVars
 extractRdrKindSigVars (L _ resultSig) = case resultSig of
-  KindSig _ k                            -> extractHsTyRdrTyVars k
-  TyVarSig _ (L _ (KindedTyVar _ _ _ k)) -> extractHsTyRdrTyVars k
+  KindSig _ k -> extractHsTyRdrTyVars k
+  TyVarSig _ (L _ (HsTvb _ _ _ (HsBndrKind _ k))) -> extractHsTyRdrTyVars k
   _ -> []
 
 -- | Extracts free type and kind variables from an argument in a GADT
@@ -2128,7 +2127,7 @@ extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr flag GhcPs] -> FreeKiTyVars
 --          the function returns [k1,k2], even though k1 is bound here
 extract_hs_tv_bndrs_kvs tv_bndrs =
     foldr extract_lty []
-          [k | L _ (KindedTyVar _ _ _ k) <- tv_bndrs]
+          [k | L _ (HsTvb _ _ _ (HsBndrKind _ k)) <- tv_bndrs]
 
 extract_tv :: LocatedN RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_tv tv acc =

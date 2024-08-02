@@ -64,7 +64,7 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
@@ -76,7 +76,9 @@
             (EpaComments
              []))
            (Unqual
-            {OccName: v}))))])
+            {OccName: v}))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       (HsDataDefn
        (NoExtField)
@@ -131,7 +133,7 @@
                  [])
                 (EpaComments
                  []))
-               (UserTyVar
+               (HsTvb
                 []
                 (SpecifiedSpec)
                 (L
@@ -142,7 +144,9 @@
                   (EpaComments
                    []))
                  (Unqual
-                  {OccName: v}))))]))
+                  {OccName: v}))
+                (HsBndrNoKind
+                 (NoExtField))))]))
            (Just
             (L
              (EpAnn

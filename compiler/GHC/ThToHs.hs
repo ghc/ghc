@@ -1577,12 +1577,12 @@ cvt_tv :: CvtFlag flag flag' => (TH.TyVarBndr flag) -> CvtM (LHsTyVarBndr flag' 
 cvt_tv (TH.PlainTV nm fl)
   = do { nm' <- tNameN nm
        ; let fl' = cvtFlag fl
-       ; returnLA $ UserTyVar noAnn fl' nm' }
+       ; returnLA $ HsTvb noAnn fl' nm' (HsBndrNoKind noExtField) }
 cvt_tv (TH.KindedTV nm fl ki)
   = do { nm' <- tNameN nm
        ; let fl' = cvtFlag fl
        ; ki' <- cvtKind ki
-       ; returnLA $ KindedTyVar noAnn fl' nm' ki' }
+       ; returnLA $ HsTvb noAnn fl' nm' (HsBndrKind noExtField ki') }
 
 cvtRole :: TH.Role -> Maybe Coercion.Role
 cvtRole TH.NominalR          = Just Coercion.Nominal

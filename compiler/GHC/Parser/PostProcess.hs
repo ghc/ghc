@@ -450,16 +450,12 @@ fromSpecTyVarBndrs = mapM fromSpecTyVarBndr
 -- annotations. Only accepts specified variables, and errors if the provided
 -- binder has an 'InferredSpec' annotation.
 fromSpecTyVarBndr :: LHsTyVarBndr Specificity GhcPs -> P (LHsTyVarBndr () GhcPs)
-fromSpecTyVarBndr bndr = case bndr of
-  (L loc (UserTyVar xtv flag idp))     -> (check_spec flag loc)
-                                          >> return (L loc $ UserTyVar xtv () idp)
-  (L loc (KindedTyVar xtv flag idp k)) -> (check_spec flag loc)
-                                          >> return (L loc $ KindedTyVar xtv () idp k)
-  where
-    check_spec :: Specificity -> SrcSpanAnnA -> P ()
-    check_spec SpecifiedSpec _   = return ()
-    check_spec InferredSpec  loc = addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
+fromSpecTyVarBndr (L loc (HsTvb xtv flag idp k)) = do
+  case flag of
+    SpecifiedSpec -> return ()
+    InferredSpec  -> addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
                                      PsErrInferredTypeVarNotAllowed
+  return $ L loc (HsTvb xtv () idp k)
 
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
 annBinds :: AddEpAnn -> EpAnnComments -> HsLocalBinds GhcPs
@@ -972,14 +968,14 @@ checkTyVars pp_what equals_or_where tc tparms
                 an = (reverse ops) ++ cps
               in
                 return (L (widenLocatedAn (l Semi.<> annt) (for_widening bvis:an))
-                       (KindedTyVar (an ++ annk ++ ann) bvis (L lv tv) k))
+                       (HsTvb (an ++ annk ++ ann) bvis (L lv tv) (HsBndrKind noExtField k)))
     chk ops cps bvis (L l (HsTyVar ann _ (L ltv tv)))
         | isRdrTyVar tv
             = let
                 an = (reverse ops) ++ cps
               in
                 return (L (widenLocatedAn l (for_widening bvis:an))
-                                     (UserTyVar (an ++ ann) bvis (L ltv tv)))
+                                     (HsTvb (an ++ ann) bvis (L ltv tv) (HsBndrNoKind noExtField)))
     chk _ _ _ t@(L loc _)
         = addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
             (PsErrUnexpectedTypeInDecl t pp_what (unLoc tc) tparms equals_or_where)
@@ -1015,14 +1011,11 @@ mkRuleBndrs = fmap (fmap cvt_one)
 
 -- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
 mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr () GhcPs]
-mkRuleTyVarBndrs = fmap cvt_one
-  where cvt_one (L l (RuleTyTmVar ann v Nothing))
-          = L (l2l l) (UserTyVar ann () (fmap tm_to_ty v))
-        cvt_one (L l (RuleTyTmVar ann v (Just sig)))
-          = L (l2l l) (KindedTyVar ann () (fmap tm_to_ty v) sig)
-    -- takes something in namespace 'varName' to something in namespace 'tvName'
-        tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
-        tm_to_ty _ = panic "mkRuleTyVarBndrs"
+mkRuleTyVarBndrs = fmap (setLHsTyVarBndrNameSpace tvName . cvt_one)
+  where cvt_one (L l (RuleTyTmVar ann v msig))
+          = L (l2l l) (HsTvb ann () v (cvt_sig msig))
+        cvt_sig Nothing    = HsBndrNoKind noExtField
+        cvt_sig (Just sig) = HsBndrKind   noExtField sig
 
 -- See Note [Parsing explicit foralls in Rules] in Parser.y
 checkRuleTyVarBndrNames :: [LHsTyVarBndr flag GhcPs] -> P ()
@@ -2235,17 +2228,15 @@ withArrowParsingMode' = withArrowParsingMode
 setTelescopeBndrsNameSpace :: NameSpace -> HsForAllTelescope GhcPs -> HsForAllTelescope GhcPs
 setTelescopeBndrsNameSpace ns forall_telescope =
   case forall_telescope of
-    HsForAllInvis x bndrs -> HsForAllInvis x (map set_bndr_ns bndrs)
-    HsForAllVis   x bndrs -> HsForAllVis   x (map set_bndr_ns bndrs)
+    HsForAllInvis x bndrs -> HsForAllInvis x (set_bndrs_ns bndrs)
+    HsForAllVis   x bndrs -> HsForAllVis   x (set_bndrs_ns bndrs)
   where
-    set_bndr_ns :: LHsTyVarBndr flag GhcPs -> LHsTyVarBndr flag GhcPs
-    set_bndr_ns (L l bndr) =
-      L l $ case bndr of
-        UserTyVar   x flag rdr      -> UserTyVar   x flag (set_rdr_ns rdr)
-        KindedTyVar x flag rdr kind -> KindedTyVar x flag (set_rdr_ns rdr) kind
+    set_bndrs_ns :: [LHsTyVarBndr flag GhcPs] -> [LHsTyVarBndr flag GhcPs]
+    set_bndrs_ns = map (setLHsTyVarBndrNameSpace ns)
 
-    set_rdr_ns :: LocatedN RdrName -> LocatedN RdrName
-    set_rdr_ns (L l rdr) = L l (setRdrNameSpace rdr ns)
+setLHsTyVarBndrNameSpace :: NameSpace -> LHsTyVarBndr flag GhcPs -> LHsTyVarBndr flag GhcPs
+setLHsTyVarBndrNameSpace ns (L l (HsTvb x flag (L l' rdr) kind)) =
+  L l (HsTvb x flag (L l' rdr') kind) where rdr' = setRdrNameSpace rdr ns
 
 -- | Ensure that a literal pattern isn't of type Addr#, Float#, Double#.
 checkUnboxedLitPat :: Located (HsLit GhcPs) -> PV ()

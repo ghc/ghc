@@ -2031,10 +2031,9 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
         -- Note [GND and QuantifiedConstraints].
 
         mk_hs_tvb :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcPs
-        mk_hs_tvb (Bndr tv flag) = noLocA $ KindedTyVar noAnn
-                                                        flag
-                                                        (noLocA (getRdrName tv))
-                                                        (nlHsCoreTy (tyVarKind tv))
+        mk_hs_tvb (Bndr tv flag) = noLocA $
+          HsTvb noAnn flag (noLocA (getRdrName tv))
+                (HsBndrKind noExtField (nlHsCoreTy (tyVarKind tv)))
 
         meth_RDR = getRdrName meth_id
         loc_meth_RDR = L locn meth_RDR

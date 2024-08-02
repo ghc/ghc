@@ -1225,22 +1225,22 @@ class RenderableBndrFlag flag where
   ppHsTyVarBndr :: Bool -> HsTyVarBndr flag DocNameI -> LaTeX
 
 instance RenderableBndrFlag () where
-  ppHsTyVarBndr _ (UserTyVar _ _ (L _ name)) = ppDocName name
-  ppHsTyVarBndr unicode (KindedTyVar _ _ (L _ name) kind) =
+  ppHsTyVarBndr _ (HsTvb _ _ (L _ name) (HsBndrNoKind _)) = ppDocName name
+  ppHsTyVarBndr unicode (HsTvb _ _ (L _ name) (HsBndrKind _ kind)) =
     parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 
 instance RenderableBndrFlag Specificity where
-  ppHsTyVarBndr _ (UserTyVar _ SpecifiedSpec (L _ name)) = ppDocName name
-  ppHsTyVarBndr _ (UserTyVar _ InferredSpec (L _ name)) = braces $ ppDocName name
-  ppHsTyVarBndr unicode (KindedTyVar _ SpecifiedSpec (L _ name) kind) =
+  ppHsTyVarBndr _ (HsTvb _ SpecifiedSpec (L _ name) (HsBndrNoKind _)) = ppDocName name
+  ppHsTyVarBndr _ (HsTvb _ InferredSpec  (L _ name) (HsBndrNoKind _)) = braces $ ppDocName name
+  ppHsTyVarBndr unicode (HsTvb _ SpecifiedSpec (L _ name) (HsBndrKind _ kind)) =
     parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
-  ppHsTyVarBndr unicode (KindedTyVar _ InferredSpec (L _ name) kind) =
+  ppHsTyVarBndr unicode (HsTvb _ InferredSpec  (L _ name) (HsBndrKind _ kind)) =
     braces (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 
 instance RenderableBndrFlag (HsBndrVis DocNameI) where
-  ppHsTyVarBndr _ (UserTyVar _ bvis (L _ name)) =
+  ppHsTyVarBndr _ (HsTvb _ bvis (L _ name) (HsBndrNoKind _)) =
     ppHsBndrVis bvis $ ppDocName name
-  ppHsTyVarBndr unicode (KindedTyVar _ bvis (L _ name) kind) =
+  ppHsTyVarBndr unicode (HsTvb _ bvis (L _ name) (HsBndrKind _ kind)) =
     ppHsBndrVis bvis $
       parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 

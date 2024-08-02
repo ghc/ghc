@@ -317,8 +317,8 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
     -- docs for con_names on why it is a list to begin with.
     name = commaSeparate sDocContext . toList $ unL <$> getConNames con
 
-    tyVarArg (UserTyVar _ _ n) = HsTyVar noAnn NotPromoted n
-    tyVarArg (KindedTyVar _ _ n lty) = HsKindSig noAnn (reL (HsTyVar noAnn NotPromoted n)) lty
+    tyVarArg (HsTvb _ _ n (HsBndrNoKind _)) = HsTyVar noAnn NotPromoted n
+    tyVarArg (HsTvb _ _ n (HsBndrKind _ lty)) = HsKindSig noAnn (reL (HsTyVar noAnn NotPromoted n)) lty
     tyVarArg _ = panic "ppCtor"
 
     resType =

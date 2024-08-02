@@ -1678,9 +1678,9 @@ class RenderableBndrFlag flag where
   ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr flag DocNameI -> Html
 
 instance RenderableBndrFlag () where
-  ppHsTyVarBndr _ qual (UserTyVar _ _ (L _ name)) =
+  ppHsTyVarBndr _ qual (HsTvb _ _ (L _ name) (HsBndrNoKind _)) =
     ppDocName qual Raw False name
-  ppHsTyVarBndr unicode qual (KindedTyVar _ _ name kind) =
+  ppHsTyVarBndr unicode qual (HsTvb _ _ name (HsBndrKind _ kind)) =
     parens
       ( ppDocName qual Raw False (unL name)
           <+> dcolon unicode
@@ -1688,17 +1688,17 @@ instance RenderableBndrFlag () where
       )
 
 instance RenderableBndrFlag Specificity where
-  ppHsTyVarBndr _ qual (UserTyVar _ SpecifiedSpec (L _ name)) =
+  ppHsTyVarBndr _ qual (HsTvb _ SpecifiedSpec (L _ name) (HsBndrNoKind _)) =
     ppDocName qual Raw False name
-  ppHsTyVarBndr _ qual (UserTyVar _ InferredSpec (L _ name)) =
+  ppHsTyVarBndr _ qual (HsTvb _ InferredSpec (L _ name) (HsBndrNoKind _)) =
     braces $ ppDocName qual Raw False name
-  ppHsTyVarBndr unicode qual (KindedTyVar _ SpecifiedSpec name kind) =
+  ppHsTyVarBndr unicode qual (HsTvb _ SpecifiedSpec name (HsBndrKind _ kind)) =
     parens
       ( ppDocName qual Raw False (unL name)
           <+> dcolon unicode
           <+> ppLKind unicode qual kind
       )
-  ppHsTyVarBndr unicode qual (KindedTyVar _ InferredSpec name kind) =
+  ppHsTyVarBndr unicode qual (HsTvb _ InferredSpec name (HsBndrKind _ kind)) =
     braces
       ( ppDocName qual Raw False (unL name)
           <+> dcolon unicode
@@ -1706,10 +1706,10 @@ instance RenderableBndrFlag Specificity where
       )
 
 instance RenderableBndrFlag (HsBndrVis DocNameI) where
-  ppHsTyVarBndr _ qual (UserTyVar _ bvis (L _ name)) =
+  ppHsTyVarBndr _ qual (HsTvb _ bvis (L _ name) (HsBndrNoKind _)) =
     ppHsBndrVis bvis $
       ppDocName qual Raw False name
-  ppHsTyVarBndr unicode qual (KindedTyVar _ bvis name kind) =
+  ppHsTyVarBndr unicode qual (HsTvb _ bvis name (HsBndrKind _ kind)) =
     ppHsBndrVis bvis $
       parens
         ( ppDocName qual Raw False (unL name)

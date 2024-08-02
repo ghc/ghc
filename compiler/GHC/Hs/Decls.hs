@@ -561,9 +561,9 @@ famResultKindSignature :: FamilyResultSig (GhcPass p) -> Maybe (LHsKind (GhcPass
 famResultKindSignature (NoSig _) = Nothing
 famResultKindSignature (KindSig _ ki) = Just ki
 famResultKindSignature (TyVarSig _ bndr) =
-  case unLoc bndr of
-    UserTyVar _ _ _ -> Nothing
-    KindedTyVar _ _ _ ki -> Just ki
+  case hsBndrKind (unLoc bndr) of
+    HsBndrNoKind _  -> Nothing
+    HsBndrKind _ ki -> Just ki
 
 -- | Maybe return name of the result type variable
 resultVariableName :: FamilyResultSig (GhcPass a) -> Maybe (IdP (GhcPass a))

@@ -2754,10 +2754,10 @@ matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
           failWithTc (TcRnInvalidInvisTyVarBndr name hs_bndr)
 
     tc_hs_bndr :: HsTyVarBndr (HsBndrVis GhcRn) GhcRn -> TcKind -> TcM ()
-    tc_hs_bndr (UserTyVar _ _ _) _
+    tc_hs_bndr (HsTvb _ _ _ (HsBndrNoKind _)) _
       = return ()
-    tc_hs_bndr (KindedTyVar _ _ (L _ hs_nm) lhs_kind) expected_kind
-      = do { sig_kind <- tcLHsKindSig (TyVarBndrKindCtxt hs_nm) lhs_kind
+    tc_hs_bndr (HsTvb _ _ (L _ hs_nm) (HsBndrKind _ kind)) expected_kind
+      = do { sig_kind <- tcLHsKindSig (TyVarBndrKindCtxt hs_nm) kind
            ; traceTc "musd3:unifying" (ppr sig_kind $$ ppr expected_kind)
            ; discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
              unifyKind (Just (NameThing hs_nm)) sig_kind expected_kind }
@@ -3468,29 +3468,30 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
                            go hs_tvs
             ; return (Bndr tv (hsTyVarBndrFlag hs_tv):tvs, res) }
 
-
-    tc_hs_bndr lcl_env (UserTyVar _ _ (L _ name))
+    tc_hs_bndr :: TcTypeEnv -> HsTyVarBndr flag GhcRn -> TcM TcTyVar
+    tc_hs_bndr lcl_env (HsTvb _ _ (L _ name) kind)
       | check_parent
       , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
-      = return tv
-      | otherwise
-      = do { kind <- newExpectedKind ctxt_kind
-           ; newTyVarBndr skol_mode name kind }
-
-    tc_hs_bndr lcl_env (KindedTyVar _ _ (L _ name) lhs_kind)
-      | check_parent
-      , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
-      = do { kind <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) lhs_kind
-           ; discardResult $
-             unifyKind (Just . NameThing $ name) kind (tyVarKind tv)
-                          -- This unify rejects:
-                          --    class C (m :: * -> *) where
-                          --      type F (m :: *) = ...
+      = do { check_hs_bndr_kind name (tyVarKind tv) kind
            ; return tv }
+    tc_hs_bndr _ (HsTvb _ _ (L _ name) kind)
+      = do { kind' <- tc_hs_bndr_kind name kind
+           ; newTyVarBndr skol_mode name kind' }
 
-      | otherwise
-      = do { kind <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) lhs_kind
-           ; newTyVarBndr skol_mode name kind }
+    tc_hs_bndr_kind :: Name -> HsBndrKind GhcRn -> TcM Kind
+    tc_hs_bndr_kind _    (HsBndrNoKind _)    = newExpectedKind ctxt_kind
+    tc_hs_bndr_kind name (HsBndrKind _ kind) = tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) kind
+
+    -- Check the HsBndrKind against the kind of the parent type variable,
+    -- e.g. the following is rejected:
+    --   class C (m :: * -> *) where
+    --     type F (m :: *) = ...
+    check_hs_bndr_kind :: Name -> Kind -> HsBndrKind GhcRn -> TcM ()
+    check_hs_bndr_kind _    _           (HsBndrNoKind _)    = return ()
+    check_hs_bndr_kind name parent_kind (HsBndrKind _ kind) =
+      do { kind' <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) kind
+         ; discardResult $
+           unifyKind (Just $ NameThing name) kind' parent_kind }
 
 newTyVarBndr :: SkolemMode -> Name -> Kind -> TcM TcTyVar
 newTyVarBndr (SM { sm_clone = clone, sm_tvtv = tvtv }) name kind
@@ -4415,10 +4416,10 @@ tc_bndr_in_pat :: HsTyVarBndr flag GhcRn
 tc_bndr_in_pat bndr wcs imp_ns expected_kind = do
   traceTc "tc_bndr_in_pat 1" (ppr expected_kind)
   case bndr of
-    UserTyVar _ _ (L _ name) -> do
+    HsTvb _ _ (L _ name) (HsBndrNoKind _) -> do
       tv <- newPatTyVar name expected_kind
       pure ([], [(name,tv)], mkTyVarTy tv)
-    KindedTyVar _ _ (L _ name) ki -> do
+    HsTvb _ _ (L _ name) (HsBndrKind _ ki) -> do
       tkv_prs <- mapM new_implicit_tv imp_ns
       wcs <- addTypeCtxt ki              $
              solveEqualities "tc_bndr_in_pat" $
@@ -4511,10 +4512,10 @@ tyPatToBndr HsTP{hstp_body = (L _ hs_ty)} = go hs_ty where
   go (HsParTy _ (L _ ty)) = go ty
   go (HsTyVar an _ name)
     | isTyVarName (unLoc name)
-    = Just (UserTyVar an () name)
+    = Just (HsTvb an () name (HsBndrNoKind noExtField))
   go (HsKindSig an (L _ (HsTyVar _ _ name)) ki)
     | isTyVarName (unLoc name)
-    = Just (KindedTyVar an () name ki)
+    = Just (HsTvb an () name (HsBndrKind noExtField ki))
   go _ = Nothing
 
 {- Note [Type patterns: binders and unifiers]

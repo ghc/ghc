@@ -194,7 +194,7 @@
             [])
            (EpaComments
             []))
-          (UserTyVar
+          (HsTvb
            []
            (HsBndrRequired
             (NoExtField))
@@ -206,7 +206,9 @@
              (EpaComments
               []))
             (Unqual
-             {OccName: a}))))])
+             {OccName: a}))
+           (HsBndrNoKind
+            (NoExtField))))])
        (Prefix)
        (L
         (EpAnn
@@ -247,7 +249,7 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
@@ -259,7 +261,9 @@
             (EpaComments
              []))
            (Unqual
-            {OccName: a}))))])
+            {OccName: a}))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       (L
        (EpAnn
@@ -447,7 +451,7 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
@@ -459,7 +463,9 @@
             (EpaComments
              []))
            (Unqual
-            {OccName: a}))))])
+            {OccName: a}))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       (L
        (EpAnn
@@ -1254,7 +1260,7 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
@@ -1266,7 +1272,9 @@
             (EpaComments
              []))
            (Unqual
-            {OccName: b}))))])
+            {OccName: b}))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       (L
        (EpAnn

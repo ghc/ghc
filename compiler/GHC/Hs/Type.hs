@@ -31,7 +31,9 @@ module GHC.Hs.Type (
         pprHsArrow,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsForAllTelescope(..), EpAnnForallTy, HsTyVarBndr(..), LHsTyVarBndr,
+        HsForAllTelescope(..), EpAnnForallTy,
+        HsTyVarBndr(..), LHsTyVarBndr,
+        HsBndrKind(..),
         HsBndrVis(..), isHsBndrInvisible,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -74,9 +76,10 @@ module GHC.Hs.Type (
         mkEmptyWildCardBndrs,
         mkHsForAllVisTele, mkHsForAllInvisTele,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
-        isHsKindedTyVar, hsTvbAllKinded,
+        isHsKindedTyVar, hsBndrKind, hsTvbAllKinded,
         hsScopedTvs, hsScopedKvs, hsWcScopedTvs, dropWildCards,
-        hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
+        hsTyVarLName, hsTyVarName,
+        hsAllLTyVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarNames, hsForAllTelescopeNames,
         hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
@@ -355,39 +358,41 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 
 --------------------------------------------------
 
-type instance XUserTyVar    (GhcPass _) = [AddEpAnn]
-type instance XKindedTyVar  (GhcPass _) = [AddEpAnn]
-
+type instance XTyVarBndr    (GhcPass _) = [AddEpAnn]
 type instance XXTyVarBndr   (GhcPass _) = DataConCantHappen
+
+type instance XBndrKind   (GhcPass p) = NoExtField
+type instance XBndrNoKind (GhcPass p) = NoExtField
+type instance XXBndrKind  (GhcPass p) = DataConCantHappen
 
 -- | Return the attached flag
 hsTyVarBndrFlag :: HsTyVarBndr flag (GhcPass pass) -> flag
-hsTyVarBndrFlag (UserTyVar _ fl _)     = fl
-hsTyVarBndrFlag (KindedTyVar _ fl _ _) = fl
+hsTyVarBndrFlag (HsTvb _ fl _ _) = fl
 -- By specialising to (GhcPass p) we know that XXTyVarBndr is DataConCantHappen
--- so these two equations are exhaustive: extension construction can't happen
+-- so the equation is exhaustive: extension construction can't happen
 
 -- | Set the attached flag
 setHsTyVarBndrFlag :: flag -> HsTyVarBndr flag' (GhcPass pass)
   -> HsTyVarBndr flag (GhcPass pass)
-setHsTyVarBndrFlag f (UserTyVar x _ l)     = UserTyVar x f l
-setHsTyVarBndrFlag f (KindedTyVar x _ l k) = KindedTyVar x f l k
+setHsTyVarBndrFlag f (HsTvb x _ l k) = HsTvb x f l k
 
 -- | Update the attached flag
 updateHsTyVarBndrFlag
   :: (flag -> flag')
   -> HsTyVarBndr flag  (GhcPass pass)
   -> HsTyVarBndr flag' (GhcPass pass)
-updateHsTyVarBndrFlag f (UserTyVar   x flag name)    = UserTyVar   x (f flag) name
-updateHsTyVarBndrFlag f (KindedTyVar x flag name ki) = KindedTyVar x (f flag) name ki
+updateHsTyVarBndrFlag f (HsTvb x flag name kind) = HsTvb x (f flag) name kind
+
+-- | Get the kind of the type variable binder
+hsBndrKind :: HsTyVarBndr flag (GhcPass pass) -> HsBndrKind (GhcPass pass)
+hsBndrKind (HsTvb _ _ _ k) = k
 
 -- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
 hsTvbAllKinded :: LHsQTyVars (GhcPass p) -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
 
 instance NamedThing (HsTyVarBndr flag GhcRn) where
-  getName (UserTyVar _ _ v) = unLoc v
-  getName (KindedTyVar _ _ v _) = unLoc v
+  getName (HsTvb _ _ v _) = unLoc v
 
 type instance XBndrRequired (GhcPass _) = NoExtField
 
@@ -552,8 +557,7 @@ hsScopedKvs _ = []
 
 ---------------------
 hsTyVarLName :: HsTyVarBndr flag (GhcPass p) -> LIdP (GhcPass p)
-hsTyVarLName (UserTyVar _ _ n)     = n
-hsTyVarLName (KindedTyVar _ _ n _) = n
+hsTyVarLName (HsTvb _ _ n _) = n
 
 hsTyVarName :: HsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
 hsTyVarName = unLoc . hsTyVarLName
@@ -1126,18 +1130,18 @@ class OutputableBndrFlag flag p where
     pprTyVarBndr :: OutputableBndrId p => HsTyVarBndr flag (GhcPass p) -> SDoc
 
 instance OutputableBndrFlag () p where
-    pprTyVarBndr (UserTyVar _ _ n)     = ppr n
-    pprTyVarBndr (KindedTyVar _ _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
+    pprTyVarBndr (HsTvb _ _ n (HsBndrNoKind _)) = ppr n
+    pprTyVarBndr (HsTvb _ _ n (HsBndrKind _ k)) = parens $ hsep [ppr n, dcolon, ppr k]
 
 instance OutputableBndrFlag Specificity p where
-    pprTyVarBndr (UserTyVar _ SpecifiedSpec n)     = ppr n
-    pprTyVarBndr (UserTyVar _ InferredSpec n)      = braces $ ppr n
-    pprTyVarBndr (KindedTyVar _ SpecifiedSpec n k) = parens $ hsep [ppr n, dcolon, ppr k]
-    pprTyVarBndr (KindedTyVar _ InferredSpec n k)  = braces $ hsep [ppr n, dcolon, ppr k]
+    pprTyVarBndr (HsTvb _ SpecifiedSpec n (HsBndrNoKind _)) = ppr n
+    pprTyVarBndr (HsTvb _ InferredSpec  n (HsBndrNoKind _)) = braces $ ppr n
+    pprTyVarBndr (HsTvb _ SpecifiedSpec n (HsBndrKind _ k)) = parens $ hsep [ppr n, dcolon, ppr k]
+    pprTyVarBndr (HsTvb _ InferredSpec  n (HsBndrKind _ k)) = braces $ hsep [ppr n, dcolon, ppr k]
 
 instance OutputableBndrFlag (HsBndrVis (GhcPass p')) p where
-    pprTyVarBndr (UserTyVar _ vis n) = pprHsBndrVis vis $ ppr n
-    pprTyVarBndr (KindedTyVar _ vis n k) =
+    pprTyVarBndr (HsTvb _ vis n (HsBndrNoKind _)) = pprHsBndrVis vis $ ppr n
+    pprTyVarBndr (HsTvb _ vis n (HsBndrKind _ k)) =
       pprHsBndrVis vis $ parens $ hsep [ppr n, dcolon, ppr k]
 
 pprHsBndrVis :: HsBndrVis (GhcPass p) -> SDoc -> SDoc
@@ -1293,19 +1297,6 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
     ppr_names :: [LFieldOcc (GhcPass p)] -> SDoc
     ppr_names [n] = pprPrefixOcc n
     ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
-
-{-
-Note [Printing KindedTyVars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#3830 reminded me that we should really only print the kind
-signature on a KindedTyVar if the kind signature was put there by the
-programmer.  During kind inference GHC now adds a PostTcKind to UserTyVars,
-rather than converting to KindedTyVars as before.
-
-(As it happens, the message in #3830 comes out a different way now,
-and the problem doesn't show up; but having the flag on a KindedTyVar
-seems like the Right Thing anyway.)
--}
 
 -- Printing works more-or-less as for Types
 

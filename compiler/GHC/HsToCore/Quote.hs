@@ -1335,10 +1335,10 @@ addTyVarBinds fresh_or_reuse exp_tvs imp_tvs thing_inside
 -- | Represent a type variable binder
 repTyVarBndr :: RepTV flag flag'
              => LHsTyVarBndr flag GhcRn -> MetaM (Core (M (TH.TyVarBndr flag')))
-repTyVarBndr (L _ (UserTyVar _ fl (L _ nm)) )
+repTyVarBndr (L _ (HsTvb _ fl (L _ nm) (HsBndrNoKind _)) )
   = do { nm' <- lookupBinder nm
        ; repPlainTV nm' fl }
-repTyVarBndr (L _ (KindedTyVar _ fl (L _ nm) ki))
+repTyVarBndr (L _ (HsTvb _ fl (L _ nm) (HsBndrKind _ ki)))
   = do { nm' <- lookupBinder nm
        ; ki' <- repLTy ki
        ; repKindedTV nm' fl ki' }

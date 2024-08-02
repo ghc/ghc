@@ -2379,12 +2379,12 @@ tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
 
 tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
         : tv_bndr_no_braces             { $1 }
-        | '{' tyvar '}'                 {% amsA' (sLL $1 $> (UserTyVar   [moc $1, mcc $3] InferredSpec $2)) }
-        | '{' tyvar '::' kind '}'       {% amsA' (sLL $1 $> (KindedTyVar [moc $1,mu AnnDcolon $3 ,mcc $5] InferredSpec $2 $4)) }
+        | '{' tyvar '}'                 {% amsA' (sLL $1 $> (HsTvb [moc $1, mcc $3] InferredSpec $2 (HsBndrNoKind noExtField))) }
+        | '{' tyvar '::' kind '}'       {% amsA' (sLL $1 $> (HsTvb [moc $1,mu AnnDcolon $3 ,mcc $5] InferredSpec $2 (HsBndrKind noExtField $4))) }
 
 tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
-        : tyvar                         {% amsA' (sL1 $1    (UserTyVar   [] SpecifiedSpec $1)) }
-        | '(' tyvar '::' kind ')'       {% amsA' (sLL $1 $> (KindedTyVar [mop $1,mu AnnDcolon $3 ,mcp $5] SpecifiedSpec $2 $4)) }
+        : tyvar                         {% amsA' (sL1 $1    (HsTvb [] SpecifiedSpec $1 (HsBndrNoKind noExtField))) }
+        | '(' tyvar '::' kind ')'       {% amsA' (sLL $1 $> (HsTvb [mop $1,mu AnnDcolon $3 ,mcp $5] SpecifiedSpec $2 (HsBndrKind noExtField $4))) }
 
 fds :: { Located ([AddEpAnn],[LHsFunDep GhcPs]) }
         : {- empty -}                   { noLoc ([],[]) }

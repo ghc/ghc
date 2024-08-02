@@ -26,8 +26,10 @@ module Language.Haskell.Syntax.Type (
 
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
+        HsBndrKind(..), XBndrKind, XBndrNoKind, XXBndrKind,
         isHsBndrInvisible,
-        HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
+        HsForAllTelescope(..),
+        HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
         HsWildCardBndrs(..),
@@ -704,22 +706,10 @@ hsIPNameFS (HsIPName n) = n
 -- explicit specificity is allowed (e.g. x :: forall {a} b. ...) or
 -- '()' in other places.
 data HsTyVarBndr flag pass
-  = UserTyVar        -- no explicit kinding
-         (XUserTyVar pass)
-         flag
-         (LIdP pass)
-        -- See Note [Located RdrNames] in GHC.Hs.Expr
-
-  | KindedTyVar
-         (XKindedTyVar pass)
-         flag
-         (LIdP pass)
-         (LHsKind pass)  -- The user-supplied kind signature
-        -- ^
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
-        --          'GHC.Parser.Annotation.AnnDcolon', 'GHC.Parser.Annotation.AnnClose'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+  = HsTvb (XTyVarBndr pass)
+          flag
+          (LIdP pass)
+          (HsBndrKind pass)
 
   | XTyVarBndr
       !(XXTyVarBndr pass)
@@ -735,7 +725,7 @@ data HsBndrVis pass
       --     type KindOf @k (a :: k) = k
       --                ^^^
 
-  | XXBndrVis !(XXBndrVis pass)
+  | XBndrVis !(XXBndrVis pass)
 
 type family XBndrRequired  p
 type family XBndrInvisible p
@@ -744,13 +734,25 @@ type family XXBndrVis      p
 isHsBndrInvisible :: HsBndrVis pass -> Bool
 isHsBndrInvisible HsBndrInvisible{} = True
 isHsBndrInvisible HsBndrRequired{}  = False
-isHsBndrInvisible (XXBndrVis _)     = False
+isHsBndrInvisible (XBndrVis _)      = False
+
+data HsBndrKind pass
+  = HsBndrKind   !(XBndrKind pass) (LHsKind pass)
+  | HsBndrNoKind !(XBndrNoKind pass)
+  | XBndrKind    !(XXBndrKind pass)
+
+type family XBndrKind   p
+type family XBndrNoKind p
+type family XXBndrKind  p
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
 isHsKindedTyVar :: HsTyVarBndr flag pass -> Bool
-isHsKindedTyVar (UserTyVar {})   = False
-isHsKindedTyVar (KindedTyVar {}) = True
-isHsKindedTyVar (XTyVarBndr {})  = False
+isHsKindedTyVar (HsTvb _ _ _ kind) =
+  case kind of
+    HsBndrKind _ _ -> True
+    HsBndrNoKind _ -> False
+    XBndrKind    _ -> False
+isHsKindedTyVar (XTyVarBndr {}) = False
 
 -- | Haskell Type
 data HsType pass

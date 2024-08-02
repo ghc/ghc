@@ -148,12 +148,10 @@ hsTyVarBndrName
    . (XXTyVarBndr n ~ DataConCantHappen, UnXRec n)
   => HsTyVarBndr flag n
   -> IdP n
-hsTyVarBndrName (UserTyVar _ _ name) = unXRec @n name
-hsTyVarBndrName (KindedTyVar _ _ name _) = unXRec @n name
+hsTyVarBndrName (HsTvb _ _ name _) = unXRec @n name
 
 hsTyVarNameI :: HsTyVarBndr flag DocNameI -> DocName
-hsTyVarNameI (UserTyVar _ _ (L _ n)) = n
-hsTyVarNameI (KindedTyVar _ _ (L _ n) _) = n
+hsTyVarNameI (HsTvb _ _ (L _ n) _) = n
 
 hsLTyVarNameI :: LHsTyVarBndr flag DocNameI -> DocName
 hsLTyVarNameI = hsTyVarNameI . unLoc
@@ -517,9 +515,13 @@ reparenHsForAllTelescope v@XHsForAllTelescope{} = v
 
 -- | Add parenthesis around the types in a 'HsTyVarBndr' (see 'reparenTypePrec')
 reparenTyVar :: XRecCond a => HsTyVarBndr flag a -> HsTyVarBndr flag a
-reparenTyVar (UserTyVar x flag n) = UserTyVar x flag n
-reparenTyVar (KindedTyVar x flag n kind) = KindedTyVar x flag n (reparenLType kind)
+reparenTyVar (HsTvb x flag n kind) = HsTvb x flag n (reparenBndrKind kind)
 reparenTyVar v@XTyVarBndr{} = v
+
+reparenBndrKind :: XRecCond a => HsBndrKind a -> HsBndrKind a
+reparenBndrKind (HsBndrNoKind x) = HsBndrNoKind x
+reparenBndrKind (HsBndrKind x k) = HsBndrKind x (reparenLType k)
+reparenBndrKind v@XBndrKind{} = v
 
 -- | Add parenthesis around the types in a 'ConDeclField' (see 'reparenTypePrec')
 reparenConDeclField :: XRecCond a => ConDeclField a -> ConDeclField a

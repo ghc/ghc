@@ -302,7 +302,7 @@
            [])
           (EpaComments
            []))
-         (UserTyVar
+         (HsTvb
           []
           (HsBndrRequired
            (NoExtField))
@@ -314,7 +314,9 @@
             (EpaComments
              []))
            (Unqual
-            {OccName: a}))))])
+            {OccName: a}))
+          (HsBndrNoKind
+           (NoExtField))))])
       (Prefix)
       []
       [(L

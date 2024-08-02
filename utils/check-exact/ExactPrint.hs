@@ -3975,22 +3975,20 @@ instance ExactPrintTVFlag flag => ExactPrint (HsTyVarBndr flag GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (UserTyVar an flag n) = do
-    r <- exactTVDelimiters an flag $ do
+  exact (HsTvb an flag n (HsBndrNoKind _)) = do
+    ~(an', HsTvb _ flag'' n'' k') <-  -- lazy pattern to work around a spurious MonadFail constraint
+      exactTVDelimiters an flag $ do
            n' <- markAnnotated n
-           return (UserTyVar an flag n')
-    case r of
-      (an', UserTyVar _ flag'' n'') -> return (UserTyVar an' flag'' n'')
-      _ -> error "KindedTyVar should never happen here"
-  exact (KindedTyVar an flag n k) = do
-    r <- exactTVDelimiters an flag $ do
+           return (HsTvb an flag n' (HsBndrNoKind noExtField))
+    return (HsTvb an' flag'' n'' k')
+  exact (HsTvb an flag n (HsBndrKind _ k)) = do
+    ~(an', HsTvb _ flag'' n'' k'') <- -- lazy pattern to work around a spurious MonadFail constraint
+      exactTVDelimiters an flag $ do
           n' <- markAnnotated n
           an0 <- markEpAnnL an lidl AnnDcolon
           k' <- markAnnotated k
-          return (KindedTyVar an0 flag n' k')
-    case r of
-      (an',KindedTyVar _ flag'' n'' k'') -> return (KindedTyVar an' flag'' n'' k'')
-      _ -> error "UserTyVar should never happen here"
+          return (HsTvb an0 flag n' (HsBndrKind noExtField k'))
+    return (HsTvb an' flag'' n'' k'')
 
 -- ---------------------------------------------------------------------
 
