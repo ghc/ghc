@@ -1489,7 +1489,7 @@ checkSafeImports tcg_env
   where
     impInfo  = tcg_imports tcg_env     -- ImportAvails
     imports  = imp_mods impInfo        -- ImportedMods
-    imports1 = moduleEnvToList imports -- (Module, [ImportedBy])
+    imports1 = M.toList imports -- (Module, [ImportedBy])
     imports' = map (fmap importedByUser) imports1 -- (Module, [ImportedModsVal])
     pkgReqs  = imp_trust_pkgs impInfo  -- [Unit]
 

@@ -52,6 +52,7 @@ import Control.Monad ( when )
 import qualified Data.List.NonEmpty as NE
 import Data.Traversable   ( for )
 import Data.List ( sortBy )
+import qualified Data.Map as Map
 
 {-
 ************************************************************************
@@ -307,7 +308,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
       = [gre]
 
     imported_modules = [ imv_name imv
-                       | xs <- moduleEnvElts $ imp_mods imports
+                       | xs <- Map.elems $ imp_mods imports
                        , imv <- importedByUser xs ]
 
     exports_from_item :: ExportAccum -> LIE GhcPs

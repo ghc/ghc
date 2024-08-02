@@ -2886,7 +2886,7 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
   if (reifMod == this_mod) then reifyThisModule else reifyFromIface reifMod
     where
       reifyThisModule = do
-        usages <- fmap (map modToTHMod . moduleEnvKeys . imp_mods) getImports
+        usages <- fmap (map modToTHMod . Map.keys . imp_mods) getImports
         return $ TH.ModuleInfo usages
 
       reifyFromIface reifMod = do
