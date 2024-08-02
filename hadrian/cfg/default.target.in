@@ -9,6 +9,7 @@ Target
 , tgtEndianness = @TargetEndianness@
 , tgtSymbolsHaveLeadingUnderscore = @LeadingUnderscoreBool@
 , tgtLlvmTarget = "@LlvmTarget@"
+, tgtLlvmAsArgs = @LlvmAsArgsTargetList@
 , tgtUnregisterised = @UnregisterisedBool@
 , tgtTablesNextToCode = @TablesNextToCodeBool@
 , tgtUseLibffiForAdjustors = @UseLibffiForAdjustorsBool@

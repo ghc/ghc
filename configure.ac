@@ -545,6 +545,9 @@ FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlvmAsCmd="$LLVMAS"
 AC_SUBST([LlvmAsCmd])
 
+dnl ** Which LLVM assembler arguments to use (e.g. `--target=...`)?
+FP_PROG_LLVM_AS_ARGS()
+
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------

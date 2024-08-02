@@ -128,6 +128,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsOptCommand="$OptCmd"
 
     SettingsLlvmAsCommand="$LlvmAsCmd"
+    SettingsLlvmAsArgs="$LlvmAsArgs"
 
     # Mac-only tools
     if test -z "$OtoolCmd"; then
@@ -168,4 +169,5 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsOptCommand)
     AC_SUBST(SettingsLlvmAsCommand)
     AC_SUBST(SettingsUseDistroMINGW)
+    AC_SUBST(SettingsLlvmAsArgs)
 ])

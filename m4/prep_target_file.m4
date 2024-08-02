@@ -154,6 +154,8 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_LIST([CONF_CPP_OPTS_STAGE2])
     PREP_LIST([CONF_CXX_OPTS_STAGE2])
     PREP_LIST([CONF_CC_OPTS_STAGE2])
+    PREP_LIST([LlvmAsArgsHost])
+    PREP_LIST([LlvmAsArgsTarget])
 
     dnl Host target
     PREP_BOOLEAN([ArSupportsAtFile_STAGE0])

@@ -491,6 +491,7 @@ generateSettings settingsFile = do
         , ("LLVM llc command", expr $ settingsFileSetting ToolchainSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting ToolchainSetting_OptCommand)
         , ("LLVM llvm-as command", expr $ settingsFileSetting ToolchainSetting_LlvmAsCommand)
+        , ("LLVM llvm-as flags", queryTarget llvmAsFlags)
         , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
 
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
@@ -537,6 +538,7 @@ generateSettings settingsFile = do
     arSupportsDashL' = yesNo . arSupportsDashL . tgtAr
     ranlibPath  = maybe "" (prgPath . ranlibProgram) . tgtRanlib
     mergeObjsSupportsResponseFiles' = maybe "NO" (yesNo . mergeObjsSupportsResponseFiles) . tgtMergeObjs
+    llvmAsFlags = escapeArgs . tgtLlvmAsArgs
 
 isBigEndian, wordSize :: Toolchain.Target -> String
 isBigEndian = yesNo . (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness

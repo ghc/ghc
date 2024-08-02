@@ -9,6 +9,7 @@ Target
 , tgtEndianness = LittleEndian
 , tgtSymbolsHaveLeadingUnderscore = False
 , tgtLlvmTarget = "@HostPlatform@"
+, tgtLlvmAsArgs = @LlvmAsArgsHostList@
 , tgtUnregisterised = False
 , tgtTablesNextToCode = True
 , tgtUseLibffiForAdjustors = True
