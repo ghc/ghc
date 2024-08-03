@@ -11,7 +11,7 @@ The bits common to GHC.Tc.TyCl.Instance and GHC.Tc.Deriv.
 
 module GHC.Core.InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
-        Canonical, PotentialUnifiers(..), getPotentialUnifiers, nullUnifiers,
+        CanonicalEvidence(..), PotentialUnifiers(..), getPotentialUnifiers, nullUnifiers,
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprDFunId, pprInstances,
         instanceWarning, instanceHead, instanceSig, mkLocalClsInst, mkImportedClsInst,
@@ -787,8 +787,11 @@ GHC's specialiser relies on the Coherence Assumption: that if
       d1 :: C tys
       d2 :: C tys
 then the dictionary d1 can be used in place of d2 and vice versa; it is as if
-(C tys) is a singleton type.  How do we guarantee this?  Let's use this
-example
+(C tys) is a singleton type.  If d1 and d2 are interchangeable, we say that
+they constitute /canonical evidence/ for (C tys).  We have a special data type,
+`CanonoicalEvidence`, for recording whether evidence is canonical.
+
+Let's use this example
   class C a where { op :: a -> Int }
   instance                     C [a]         where {...}   -- (I1)
   instance {-# OVERLAPPING #-} C [Int]       where {...}   -- (I2)
@@ -807,7 +810,7 @@ example
   programmer can contrive, with some effort), all bets are off; we really
   can't make any guarantees at all.
 
-* But what about [W] C [b], which might arise from
+* But what about [W] C [b]? This might arise from
      risky :: b -> Int
      risky x = op [x]
   We can't pick (I2) because `b` is not Int. But if we pick (I1), and later
@@ -863,20 +866,21 @@ In short, sometimes we want to specialise on these incoherently-selected diction
 and sometimes we don't.  It would be best to have a per-instance pragma, but for now
 we have a global flag:
 
-* If an instance has an `{-# INCOHERENT #-}` pragma, we use its `OverlapFlag` to
-  label it as either
-  * `Incoherent`: meaning incoherent but still specialisable, or
-  * `NonCanonical`: meaning incoherent and not specialisable.
+* If an instance has an `{-# INCOHERENT #-}` pragma, we the  `OverlapFlag` of the
+  `ClsInst` to label it as either
+    * `Incoherent`: meaning incoherent but still specialisable, or
+    * `NonCanonical`: meaning incoherent and not specialisable.
+  The module-wide `-fspecialise-incoherents` flag determines which choice is made.
 
-The module-wide `-fspecialise-incoherents` flag determines which
-choice is made.  The rest of this note describes what happens for
-`NonCanonical` instances, i.e. with `-fno-specialise-incoherents`.
+  See GHC.Tc.Utils.Instantiate.getOverlapFlag.
+
+The rest of this note describes what happens for `NonCanonical`
+instances, i.e. with `-fno-specialise-incoherents`.
 
 To avoid this incoherence breaking the specialiser,
 
-* We label as "non-canonical" the dictionary constructed by a
-  (potentially) incoherent use of an instance declaration whose
-  `OverlapFlag` is `NonCanonical`.
+* We label as "non-canonical" the dictionary constructed by a (potentiall))
+  incoherent use of an ClsInst whose `OverlapFlag` is `NonCanonical`.
 
 * We do not specialise a function if there is a non-canonical
   dictionary in the /transistive dependencies/ of its dictionary
@@ -1016,10 +1020,21 @@ data LookupInstanceErrReason =
   LookupInstErrNotFound
   deriving (Generic)
 
-type Canonical = Bool
+-- | `CanonicalEvidence` says whether a piece of evidence has a singleton type;
+-- For example, given (d1 :: C Int), will any other (d2 :: C Int) do equally well?
+-- See Note [Coherence and specialisation: overview] above, and
+-- Note [Desugaring non-canonical evidence] in GHC.HsToCore.Binds
+data CanonicalEvidence
+  = EvCanonical
+  | EvNonCanonical
+
+andCanEv :: CanonicalEvidence -> CanonicalEvidence -> CanonicalEvidence
+-- Only canonical if both are
+andCanEv EvCanonical EvCanonical = EvCanonical
+andCanEv _           _           = EvNonCanonical
 
 -- See Note [Recording coherence information in `PotentialUnifiers`]
-data PotentialUnifiers = NoUnifiers Canonical
+data PotentialUnifiers = NoUnifiers CanonicalEvidence
                        -- NoUnifiers True: We have a unique solution modulo canonicity
                        -- NoUnifiers False: The solutions is not canonical, and thus
                        --   we shouldn't specialise on it.
@@ -1031,7 +1046,6 @@ data PotentialUnifiers = NoUnifiers Canonical
 
 {- Note [Recording coherence information in `PotentialUnifiers`]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When we find a matching instance, there might be other instances that
 could potentially unify with the goal. For `INCOHERENT` instances, we
 don't care (see steps IL4 and IL6 in Note [Rules for instance
@@ -1047,12 +1061,16 @@ unifiers is empty, we record in `NoUnifiers` if the one solution is
 `Canonical`.
 -}
 
+instance Outputable CanonicalEvidence where
+  ppr EvCanonical    = text "canonical"
+  ppr EvNonCanonical = text "non-canonical"
+
 instance Outputable PotentialUnifiers where
-  ppr (NoUnifiers c) = text "NoUnifiers" <+> if c then text "canonical" else text "non-canonical"
+  ppr (NoUnifiers c) = text "NoUnifiers" <+> ppr c
   ppr xs = ppr (getPotentialUnifiers xs)
 
 instance Semigroup PotentialUnifiers where
-  NoUnifiers c1 <> NoUnifiers c2 = NoUnifiers (c1 && c2)
+  NoUnifiers c1 <> NoUnifiers c2 = NoUnifiers (c1 `andCanEv` c2)
   NoUnifiers _ <> u = u
   OneOrMoreUnifiers (unifier :| unifiers) <> u = OneOrMoreUnifiers (unifier :| (unifiers <> getPotentialUnifiers u))
 
@@ -1099,11 +1117,11 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
 
 
     noncanonically_matched :: PotentialUnifiers -> PotentialUnifiers
-    noncanonically_matched (NoUnifiers _) = NoUnifiers False
-    noncanonically_matched u = u
+    noncanonically_matched (NoUnifiers _) = NoUnifiers EvNonCanonical
+    noncanonically_matched u              = u
 
     check_unifier :: [ClsInst] -> PotentialUnifiers
-    check_unifier [] = NoUnifiers True
+    check_unifier [] = NoUnifiers EvCanonical
     check_unifier (item@ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys }:items)
       | not (instIsVisible vis_mods item)
       = check_unifier items  -- See Note [Instance lookup and orphan instances]
@@ -1172,7 +1190,7 @@ lookupInstEnv check_overlap_safe
 
     -- If the selected match is incoherent, discard all unifiers
     final_unifs = case final_matches of
-                    (m:_) | isIncoherent (fst m) -> NoUnifiers True
+                    (m:_) | isIncoherent (fst m) -> NoUnifiers EvCanonical
                     _                            -> all_unifs
 
     -- Note [Safe Haskell isSafeOverlap]

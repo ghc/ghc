@@ -106,10 +106,11 @@ data ClsInstResult
 
   | OneInst { cir_new_theta   :: [TcPredType]
             , cir_mk_ev       :: [EvExpr] -> EvTerm
-            , cir_canonical   :: Canonical --   cir_canonical=True => you can specialise on this instance
-                                           --   cir_canonical= False => you cannot specialise on this instance
-                                           --                           (its OverlapFlag is NonCanonical)
-                                           -- See Note [Coherence and specialisation: overview]
+            , cir_canonical   :: CanonicalEvidence
+                  --   cir_canonical=EvCanonical    => you can specialise on this instance
+                  --   cir_canonical=EvNonCanonical => you cannot specialise on this instance
+                  --                           (its OverlapFlag is NonCanonical)
+                  -- See Note [Coherence and specialisation: overview]
             , cir_what        :: InstanceWhat }
 
   | NotSure      -- Multiple matches and/or one or more unifiers
@@ -194,7 +195,7 @@ matchInstEnv dflags short_cut_solver clas tys
                 -> do { let dfun_id = instanceDFunId ispec
                             warn    = instanceWarning ispec
                       ; traceTc "matchClass success" $
-                        vcat [text "dict" <+> ppr pred <+> parens (if canonical then text "canonical" else text "non-canonical"),
+                        vcat [text "dict" <+> ppr pred <+> ppr canonical,
                               text "witness" <+> ppr dfun_id
                                              <+> ppr (idType dfun_id) ]
                                 -- Record that this dfun is needed
@@ -209,7 +210,7 @@ matchInstEnv dflags short_cut_solver clas tys
    where
      pred = mkClassPred clas tys
 
-match_one :: SafeOverlapping -> Canonical -> DFunId -> [DFunInstType]
+match_one :: SafeOverlapping -> CanonicalEvidence -> DFunId -> [DFunInstType]
           -> Maybe (WarningTxt GhcRn) -> TcM ClsInstResult
 match_one so canonical dfun_id mb_inst_tys warn
   = do { traceTc "match_one" (ppr dfun_id $$ ppr mb_inst_tys)
@@ -254,7 +255,7 @@ matchCTuple :: Class -> [Type] -> TcM ClsInstResult
 matchCTuple clas tys   -- (isCTupleClass clas) holds
   = return (OneInst { cir_new_theta   = tys
                     , cir_mk_ev       = tuple_ev
-                    , cir_canonical   = True
+                    , cir_canonical   = EvCanonical
                     , cir_what        = BuiltinInstance })
             -- The dfun *is* the data constructor!
   where
@@ -418,7 +419,7 @@ makeLitDict clas ty et
     , let ev_tm = mkEvCast et (mkSymCo (mkTransCo co_dict co_rep))
     = return $ OneInst { cir_new_theta   = []
                        , cir_mk_ev       = \_ -> ev_tm
-                       , cir_canonical   = True
+                       , cir_canonical   = EvCanonical
                        , cir_what        = BuiltinInstance }
 
     | otherwise
@@ -467,7 +468,7 @@ matchWithDict [cls, mty]
 
        ; return $ OneInst { cir_new_theta   = [mkPrimEqPred mty inst_meth_ty]
                           , cir_mk_ev       = mk_ev
-                          , cir_canonical   = False -- See (WD6) in Note [withDict]
+                          , cir_canonical   = EvNonCanonical -- See (WD6) in Note [withDict]
                           , cir_what        = BuiltinInstance }
        }
 
@@ -938,7 +939,7 @@ matchDataToTag dataToTagClass [levity, dty] = do
      -> addUsedDataCons rdr_env repTyCon -- See wrinkles DTW2 and DTW3
           $> OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
                      , cir_mk_ev = mk_ev
-                     , cir_canonical = True
+                     , cir_canonical = EvCanonical
                      , cir_what = BuiltinInstance
                      }
      | otherwise -> pure NoInstance
@@ -989,7 +990,7 @@ doFunTy :: Class -> Type -> Mult -> Type -> Type -> TcM ClsInstResult
 doFunTy clas ty mult arg_ty ret_ty
   = return $ OneInst { cir_new_theta   = preds
                      , cir_mk_ev       = mk_ev
-                     , cir_canonical   = True
+                     , cir_canonical   = EvCanonical
                      , cir_what        = BuiltinInstance }
   where
     preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
@@ -1006,7 +1007,7 @@ doTyConApp clas ty tc kind_args
   | tyConIsTypeable tc
   = return $ OneInst { cir_new_theta   = map (mk_typeable_pred clas) kind_args
                      , cir_mk_ev       = mk_ev
-                     , cir_canonical   = True
+                     , cir_canonical   = EvCanonical
                      , cir_what        = BuiltinTypeableInstance tc }
   | otherwise
   = return NoInstance
@@ -1038,7 +1039,7 @@ doTyApp clas ty f tk
   | otherwise
   = return $ OneInst { cir_new_theta   = map (mk_typeable_pred clas) [f, tk]
                      , cir_mk_ev       = mk_ev
-                     , cir_canonical   = True
+                     , cir_canonical   = EvCanonical
                      , cir_what        = BuiltinInstance }
   where
     mk_ev [t1,t2] = evTypeable ty $ EvTypeableTyApp (EvExpr t1) (EvExpr t2)
@@ -1059,7 +1060,7 @@ doTyLit kc t = do { kc_clas <- tcLookupClass kc
                         mk_ev _    = panic "doTyLit"
                   ; return (OneInst { cir_new_theta   = [kc_pred]
                                     , cir_mk_ev       = mk_ev
-                                    , cir_canonical   = True
+                                    , cir_canonical   = EvCanonical
                                     , cir_what        = BuiltinInstance }) }
 
 {- Note [Typeable (T a b c)]
@@ -1300,7 +1301,7 @@ matchHasField dflags short_cut clas tys
                                  -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
                              ; return OneInst { cir_new_theta   = theta
                                               , cir_mk_ev       = mk_ev
-                                              , cir_canonical   = True
+                                              , cir_canonical   = EvCanonical
                                               , cir_what        = BuiltinInstance } }
                      else matchInstEnv dflags short_cut clas tys }
 

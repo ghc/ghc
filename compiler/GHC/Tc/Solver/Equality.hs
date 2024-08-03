@@ -350,7 +350,7 @@ can_eq_nc rewritten rdr_env envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
 -- Literals
 can_eq_nc _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
  | l1 == l2
-  = do { setEvBindIfWanted ev True (evCoercion $ mkReflCo (eqRelRole eq_rel) ty1)
+  = do { setEvBindIfWanted ev EvCanonical (evCoercion $ mkReflCo (eqRelRole eq_rel) ty1)
        ; stopWith ev "Equal LitTy" }
 
 -- Decompose FunTy: (s -> t) and (c => t)
@@ -1925,7 +1925,7 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
 
        -- Provide Refl evidence for the constraint
        -- Ignore 'swapped' because it's Refl!
-       ; setEvBindIfWanted new_ev True $
+       ; setEvBindIfWanted new_ev EvCanonical $
          evCoercion (mkNomReflCo final_rhs)
 
        -- Kick out any constraints that can now be rewritten
@@ -2038,7 +2038,7 @@ canEqReflexive :: CtEvidence    -- ty ~ ty
                -> TcType        -- ty
                -> TcS (StopOrContinue a)   -- always Stop
 canEqReflexive ev eq_rel ty
-  = do { setEvBindIfWanted ev True $
+  = do { setEvBindIfWanted ev EvCanonical $
          evCoercion (mkReflCo (eqRelRole eq_rel) ty)
        ; stopWith ev "Solved by reflexivity" }
 
@@ -2617,7 +2617,7 @@ tryInertEqs work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
   = Stage $
     do { inerts <- getInertCans
        ; if | Just (ev_i, swapped) <- inertsCanDischarge inerts work_item
-            -> do { setEvBindIfWanted ev True $
+            -> do { setEvBindIfWanted ev EvCanonical $
                     evCoercion (maybeSymCo swapped $
                                 downgradeRole (eqRelRole eq_rel)
                                               (ctEvRewriteRole ev_i)
