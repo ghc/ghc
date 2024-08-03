@@ -51,7 +51,6 @@ import GHC.Core.Predicate
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
-import GHC.Core.Multiplicity
 import GHC.Core.Rules
 import GHC.Core.TyCo.Compare( eqType )
 
@@ -355,7 +354,7 @@ dsAbsBinds dflags tyvars dicts exports
                             mkLet aux_binds $
                             tup_expr
 
-       ; poly_tup_id <- newSysLocalDs ManyTy (exprType poly_tup_rhs)
+       ; poly_tup_id <- newSysLocalMDs (exprType poly_tup_rhs)
 
         -- Find corresponding global or make up a new one: sometimes
         -- we need to make new export to desugar strict binds, see
@@ -366,7 +365,7 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [ABExport wrapper] in "GHC.Hs.Binds"
-                = do { tup_id  <- newSysLocalDs ManyTy tup_ty
+                = do { tup_id  <- newSysLocalMDs tup_ty
                      ; dsHsWrapper wrap $ \core_wrap -> do
                      { let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
                                  mkBigTupleSelector all_locals local tup_id $
@@ -426,7 +425,7 @@ dsAbsBinds dflags tyvars dicts exports
             ([],[]) lcls
 
     mk_export local =
-      do global <- newSysLocalDs ManyTy
+      do global <- newSysLocalMDs
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
          return (ABE { abe_poly  = global
                      , abe_mono  = local
