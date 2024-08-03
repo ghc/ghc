@@ -2341,6 +2341,8 @@ atype :: { LHsType GhcPs }
                                                                         (getCHAR $1) }
         | STRING               { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
+        | MULTILINESTRING      { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getMULTILINESTRINGs $1)
+                                                                     (getMULTILINESTRING  $1) }
         | '_'                  { sL1a $1 $ mkAnonWildCardTy }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
