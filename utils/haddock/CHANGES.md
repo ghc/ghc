@@ -3,6 +3,8 @@
 
  * Add incremental mode to support rendering documentation one module at a time.
 
+ * Fix large margin on top of small headings
+
 ## Changes in 2.28.0
  * `hi-haddock` is integrated, which means docstrings are no longer extracted
    through typchecked module results. Instead, docstrings are taken from Haskell
