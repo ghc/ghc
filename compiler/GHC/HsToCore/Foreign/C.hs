@@ -175,14 +175,14 @@ dsCFExportDynamic id co0 cconv = do
             (moduleStableString mod ++ "$" ++ toCName id)
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
-    cback <- newSysLocalDs arg_mult arg_ty
+    cback <- newSysLocalDs scaled_arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
-    stbl_value <- newSysLocalDs ManyTy stable_ptr_ty
+    stbl_value <- newSysLocalMDs stable_ptr_ty
     (h_code, c_code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
@@ -219,10 +219,11 @@ dsCFExportDynamic id co0 cconv = do
     return ([fed], h_code, c_code)
 
  where
-  ty                       = coercionLKind co0
-  (tvs,sans_foralls)       = tcSplitForAllInvisTyVars ty
-  ([Scaled arg_mult arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
-  Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
+  ty                           = coercionLKind co0
+  (tvs,sans_foralls)           = tcSplitForAllInvisTyVars ty
+  ([scaled_arg_ty], fn_res_ty) = tcSplitFunTys sans_foralls
+  arg_ty                       = scaledThing scaled_arg_ty
+  Just (io_tc, res_ty)         = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
 
 

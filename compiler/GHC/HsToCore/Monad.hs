@@ -19,9 +19,9 @@ module GHC.HsToCore.Monad (
         foldlM, foldrM, whenGOptM, unsetGOptM, unsetWOptM, xoptM,
         Applicative(..),(<$>),
 
-        duplicateLocalDs, newSysLocalDs,
-        newSysLocalsDs, newUniqueId,
-        newFailLocalDs, newPredVarDs,
+        duplicateLocalDs, newSysLocalDs, newSysLocalsDs,
+        newSysLocalMDs, newSysLocalsMDs, newFailLocalMDs,
+        newUniqueId, newPredVarDs,
         getSrcSpanDs, putSrcSpanDs, putSrcSpanDsA,
         mkNamePprCtxDs,
         newUnique,
@@ -438,12 +438,19 @@ newPredVarDs :: PredType -> DsM Var
 newPredVarDs
  = mkSysLocalOrCoVarM (fsLit "ds") ManyTy  -- like newSysLocalDs, but we allow covars
 
-newSysLocalDs, newFailLocalDs :: Mult -> Type -> DsM Id
-newSysLocalDs = mkSysLocalM (fsLit "ds")
-newFailLocalDs = mkSysLocalM (fsLit "fail")
+newSysLocalMDs, newFailLocalMDs :: Type -> DsM Id
+-- Implicitly have ManyTy multiplicity, hence the "M"
+newSysLocalMDs  = mkSysLocalM (fsLit "ds")    ManyTy
+newFailLocalMDs = mkSysLocalM (fsLit "fail") ManyTy
+
+newSysLocalsMDs :: [Type] -> DsM [Id]
+newSysLocalsMDs = mapM newSysLocalMDs
+
+newSysLocalDs :: Scaled Type -> DsM Id
+newSysLocalDs (Scaled w t) = mkSysLocalM (fsLit "ds") w t
 
 newSysLocalsDs :: [Scaled Type] -> DsM [Id]
-newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs w t)
+newSysLocalsDs = mapM newSysLocalDs
 
 {-
 We can also reach out and either set/grab location information from

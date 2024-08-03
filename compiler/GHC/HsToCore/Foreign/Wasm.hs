@@ -113,7 +113,7 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
       ([Scaled ManyTy arg_ty], io_jsval_ty) = tcSplitFunTys fun_ty
       sp_ty = mkTyConApp sp_tycon [arg_ty]
       (real_arg_tys, _) = tcSplitFunTys arg_ty
-  sp_id <- newSysLocalDs ManyTy sp_ty
+  sp_id <- newSysLocalMDs sp_ty
   work_uniq <- newUnique
   work_export_name <- uniqueCFunName
   deRefStablePtr_id <- lookupGhcInternalVarId "GHC.Internal.Stable" "deRefStablePtr"
@@ -315,7 +315,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
       jsval_ty <- mkTyConTy <$> lookupGhcInternalTyCon "GHC.Internal.Wasm.Prim.Types" "JSVal"
       bindIO_id <- dsLookupGlobalId bindIOName
       returnIO_id <- dsLookupGlobalId returnIOName
-      promise_id <- newSysLocalDs ManyTy jsval_ty
+      promise_id <- newSysLocalMDs jsval_ty
       blockPromise_id <- lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Imports" "stg_blockPromise"
       msgPromise_id <-
         lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Imports" $ "stg_messagePromise" ++ ffiType res_ty
@@ -388,8 +388,8 @@ importBindingRHS mUnitId safety cfun_name tvs arg_tys orig_res_ty res_trans =
     -- res_wrapper: turn the_call to (IO a) or a
     (ccall_action_ty, res_wrapper) <- case tcSplitIOType_maybe orig_res_ty of
       Just (io_tycon, res_ty) -> do
-        s0_id <- newSysLocalDs ManyTy realWorldStatePrimTy
-        s1_id <- newSysLocalDs ManyTy realWorldStatePrimTy
+        s0_id <- newSysLocalMDs realWorldStatePrimTy
+        s1_id <- newSysLocalMDs realWorldStatePrimTy
         let io_data_con = tyConSingleDataCon io_tycon
             toIOCon = dataConWorkId io_data_con
             (ccall_res_ty, wrap)

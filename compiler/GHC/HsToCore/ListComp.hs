@@ -365,8 +365,8 @@ dfBindComp c_id n_id (pat, core_list1) quals = do
     let b_ty   = idType n_id
 
     -- create some new local id's
-    b <- newSysLocalDs ManyTy b_ty
-    x <- newSysLocalDs ManyTy x_ty
+    b <- newSysLocalMDs b_ty
+    x <- newSysLocalMDs x_ty
 
     -- build rest of the comprehension
     core_rest <- dfListComp c_id b quals
@@ -396,11 +396,11 @@ mkZipBind :: [Type] -> DsM (Id, CoreExpr)
 --                              (a2:as'2) -> (a1, a2) : zip as'1 as'2)]
 
 mkZipBind elt_tys = do
-    ass  <- mapM (newSysLocalDs ManyTy)  elt_list_tys
-    as'  <- mapM (newSysLocalDs ManyTy)  elt_tys
-    as's <- mapM (newSysLocalDs ManyTy)  elt_list_tys
+    ass  <- newSysLocalsMDs elt_list_tys
+    as'  <- newSysLocalsMDs elt_tys
+    as's <- newSysLocalsMDs elt_list_tys
 
-    zip_fn <- newSysLocalDs ManyTy zip_fn_ty
+    zip_fn <- newSysLocalMDs zip_fn_ty
 
     let inner_rhs = mkConsExpr elt_tuple_ty
                         (mkBigCoreVarTup as')
@@ -435,13 +435,13 @@ mkUnzipBind :: TransForm -> [Type] -> DsM (Maybe (Id, CoreExpr))
 mkUnzipBind ThenForm _
  = return Nothing    -- No unzipping for ThenForm
 mkUnzipBind _ elt_tys
-  = do { ax  <- newSysLocalDs ManyTy elt_tuple_ty
-       ; axs <- newSysLocalDs ManyTy elt_list_tuple_ty
-       ; ys  <- newSysLocalDs ManyTy elt_tuple_list_ty
-       ; xs  <- mapM (newSysLocalDs ManyTy) elt_tys
-       ; xss <- mapM (newSysLocalDs ManyTy) elt_list_tys
+  = do { ax  <- newSysLocalMDs elt_tuple_ty
+       ; axs <- newSysLocalMDs elt_list_tuple_ty
+       ; ys  <- newSysLocalMDs elt_tuple_list_ty
+       ; xs  <- newSysLocalsMDs elt_tys
+       ; xss <- newSysLocalsMDs elt_list_tys
 
-       ; unzip_fn <- newSysLocalDs ManyTy unzip_fn_ty
+       ; unzip_fn <- newSysLocalMDs unzip_fn_ty
 
        ; let nil_tuple = mkBigCoreTup (map mkNilExpr elt_tys)
              concat_expressions = map mkConcatExpression (zip3 elt_tys (map Var xs) (map Var xss))
@@ -541,7 +541,7 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
        -- Build a pattern that ensures the consumer binds into the NEW binders,
        -- which hold monads rather than single values
        ; body        <- dsMcStmts stmts_rest
-       ; n_tup_var'  <- newSysLocalDs ManyTy n_tup_ty'
+       ; n_tup_var'  <- newSysLocalMDs n_tup_ty'
        ; tup_n_expr' <- mkMcUnzipM form fmap_op n_tup_var' from_bndr_tys
        ; let rhs'  = mkApps usingExpr' usingArgs'
        ; body'       <- mkBigTupleCase to_bndrs body tup_n_expr'
@@ -588,7 +588,7 @@ matchTuple :: [Id] -> CoreExpr -> DsM CoreExpr
 --       returns the Core term
 --  \x. case x of (a,b,c) -> body
 matchTuple ids body
-  = do { tup_id <- newSysLocalDs ManyTy (mkBigCoreVarTupTy ids)
+  = do { tup_id <- newSysLocalMDs (mkBigCoreVarTupTy ids)
        ; tup_case <- mkBigTupleCase ids body (Var tup_id)
        ; return (Lam tup_id tup_case) }
 
@@ -646,9 +646,9 @@ mkMcUnzipM ThenForm _ ys _
 
 mkMcUnzipM _ fmap_op ys elt_tys
   = do { fmap_op' <- dsExpr fmap_op
-       ; xs       <- mapM (newSysLocalDs ManyTy) elt_tys
+       ; xs       <- newSysLocalsMDs elt_tys
        ; let tup_ty = mkBigCoreTupTy elt_tys
-       ; tup_xs   <- newSysLocalDs ManyTy tup_ty
+       ; tup_xs   <- newSysLocalMDs tup_ty
 
        ; let mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
                            [ Type tup_ty, Type (getNth elt_tys i)

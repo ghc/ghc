@@ -423,10 +423,10 @@ converting to core it must become a CO.
 -}
 
 dsExpr (ExplicitTuple _ tup_args boxity)
-  = do { let go (lam_vars, args) (Missing (Scaled mult ty))
+  = do { let go (lam_vars, args) (Missing st)
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
-               = do { lam_var <- newSysLocalDs mult ty
+               = do { lam_var <- newSysLocalDs st
                     ; return (lam_var : lam_vars, Var lam_var : args) }
              go (lam_vars, args) (Present _ expr)
                     -- Expressions that are present don't generate
