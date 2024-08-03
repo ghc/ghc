@@ -152,7 +152,7 @@ unboxArg arg
     tc `hasKey` boolTyConKey
   = do dflags <- getDynFlags
        let platform = targetPlatform dflags
-       prim_arg <- newSysLocalDs ManyTy intPrimTy
+       prim_arg <- newSysLocalMDs intPrimTy
        return (Var prim_arg,
               \ body -> Case (mkIfThenElse arg (mkIntLit platform 1) (mkIntLit platform 0))
                              prim_arg
@@ -164,8 +164,8 @@ unboxArg arg
   | is_product_type && data_con_arity == 1
   = assertPpr (isUnliftedType data_con_arg_ty1) (pprType arg_ty) $
                         -- Typechecker ensures this
-    do case_bndr <- newSysLocalDs ManyTy arg_ty
-       prim_arg <- newSysLocalDs ManyTy data_con_arg_ty1
+    do case_bndr <- newSysLocalMDs arg_ty
+       prim_arg <- newSysLocalMDs data_con_arg_ty1
        return (Var prim_arg,
                \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) [prim_arg] body]
               )
@@ -179,7 +179,7 @@ unboxArg arg
     Just arg3_tycon <- maybe_arg3_tycon,
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
-  = do case_bndr <- newSysLocalDs ManyTy arg_ty
+  = do case_bndr <- newSysLocalMDs arg_ty
        vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs (map unrestricted data_con_arg_tys)
        return (Var arr_cts_var,
                \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) vars body]
@@ -228,7 +228,7 @@ boxResult result_ty
 
         ; (ccall_res_ty, the_alt) <- mk_alt return_result res
 
-        ; state_id <- newSysLocalDs ManyTy realWorldStatePrimTy
+        ; state_id <- newSysLocalMDs realWorldStatePrimTy
         ; let io_data_con = head (tyConDataCons io_tycon)
               toIOCon     = dataConWrapId io_data_con
 
@@ -264,7 +264,7 @@ mk_alt :: (Expr Var -> Expr Var -> Expr Var)
        -> DsM (Type, CoreAlt)
 mk_alt return_result (Nothing, wrap_result)
   = do -- The ccall returns ()
-       state_id <- newSysLocalDs ManyTy realWorldStatePrimTy
+       state_id <- newSysLocalMDs realWorldStatePrimTy
        let
              the_rhs = return_result (Var state_id)
                                      (wrap_result (panic "boxResult"))
@@ -278,8 +278,8 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
   = -- The ccall returns a non-() value
     assertPpr (isPrimitiveType prim_res_ty) (ppr prim_res_ty) $
              -- True because resultWrapper ensures it is so
-    do { result_id <- newSysLocalDs ManyTy prim_res_ty
-       ; state_id <- newSysLocalDs ManyTy realWorldStatePrimTy
+    do { result_id <- newSysLocalMDs prim_res_ty
+       ; state_id <- newSysLocalMDs realWorldStatePrimTy
        ; let the_rhs = return_result (Var state_id)
                                 (wrap_result (Var result_id))
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]

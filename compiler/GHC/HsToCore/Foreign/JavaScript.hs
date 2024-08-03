@@ -263,7 +263,8 @@ dsJsFExportDynamic id co0 cconv = do
     let
       ty                            = coercionLKind co0
       (tvs,sans_foralls)            = tcSplitForAllTyVars ty
-      ([Scaled arg_mult arg_ty], fn_res_ty)  = tcSplitFunTys sans_foralls
+      ([scaled_arg_ty], fn_res_ty)  = tcSplitFunTys sans_foralls
+      arg_ty                        = scaledThing scaled_arg_ty
       (io_tc, res_ty)               = expectJust "dsJsFExportDynamic: IO type expected"
                                         -- Must have an IO type; hence Just
                                         $ tcSplitIOType_maybe fn_res_ty
@@ -272,14 +273,14 @@ dsJsFExportDynamic id co0 cconv = do
             ("h$" ++ moduleStableString mod ++ "$" ++ toJsName id)
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
-    cback <- newSysLocalDs arg_mult arg_ty
+    cback <- newSysLocalDs scaled_arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
-    stbl_value <- newSysLocalDs ManyTy stable_ptr_ty
+    stbl_value <- newSysLocalMDs stable_ptr_ty
     (h_code, c_code, typestring) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
@@ -414,8 +415,8 @@ unboxJsArg arg
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc; also Ptr, ForeignPtr
   | is_product_type && data_con_arity == 1
-    = do case_bndr <- newSysLocalDs ManyTy arg_ty
-         prim_arg <- newSysLocalDs ManyTy (scaledThing data_con_arg_ty1)
+    = do case_bndr <- newSysLocalMDs arg_ty
+         prim_arg <- newSysLocalMDs (scaledThing data_con_arg_ty1)
          return (Var prim_arg,
                \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) [prim_arg] body]
               )
@@ -429,7 +430,7 @@ unboxJsArg arg
     Just arg3_tycon <- maybe_arg3_tycon,
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
-  = do case_bndr <- newSysLocalDs ManyTy arg_ty
+  = do case_bndr <- newSysLocalMDs arg_ty
        vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs data_con_arg_tys
        return (Var arr_cts_var,
                \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) vars body]
@@ -476,7 +477,7 @@ boxJsResult result_ty
 
         ; (ccall_res_ty, the_alt) <- mk_alt return_result res
 
-        ; state_id <- newSysLocalDs ManyTy realWorldStatePrimTy
+        ; state_id <- newSysLocalMDs realWorldStatePrimTy
         ; let io_data_con = head (tyConDataCons io_tycon)
               toIOCon     = dataConWrapId io_data_con
 
@@ -511,7 +512,7 @@ mk_alt :: (Expr Var -> Expr Var -> Expr Var)
        -> DsM (Type, CoreAlt)
 mk_alt return_result (Nothing, wrap_result)
   = do -- The ccall returns ()
-       state_id <- newSysLocalDs ManyTy realWorldStatePrimTy
+       state_id <- newSysLocalMDs realWorldStatePrimTy
        let
              the_rhs = return_result (Var state_id)
                                      (wrap_result $ panic "jsBoxResult")
@@ -525,8 +526,8 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     let
         ls = dropRuntimeRepArgs (tyConAppArgs prim_res_ty)
         arity = 1 + length ls
-    args_ids <- mapM (newSysLocalDs ManyTy) ls
-    state_id <- newSysLocalDs ManyTy realWorldStatePrimTy
+    args_ids <- newSysLocalsMDs ls
+    state_id <- newSysLocalMDs realWorldStatePrimTy
     let
         result_tup = mkCoreUnboxedTuple (map Var args_ids)
         the_rhs = return_result (Var state_id)
@@ -538,8 +539,8 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     return (ccall_res_ty, the_alt)
 
   | otherwise = do
-    result_id <- newSysLocalDs ManyTy prim_res_ty
-    state_id <- newSysLocalDs ManyTy realWorldStatePrimTy
+    result_id <- newSysLocalMDs prim_res_ty
+    state_id <- newSysLocalMDs realWorldStatePrimTy
     let
         the_rhs = return_result (Var state_id)
                                 (wrap_result (Var result_id))
@@ -561,7 +562,7 @@ jsResultWrapper result_ty
   , isUnboxedTupleTyCon tc {- && False -} = do
     let args' = dropRuntimeRepArgs args
     (tys, wrappers) <- unzip <$> mapM jsResultWrapper args'
-    matched <- mapM (mapM (newSysLocalDs ManyTy)) tys
+    matched <- mapM (mapM newSysLocalMDs) tys
     let tys'    = catMaybes tys
         -- arity   = length args'
         -- resCon  = tupleDataCon Unboxed (length args)
@@ -590,7 +591,7 @@ jsResultWrapper result_ty
   , isBoxedTupleTyCon tc = do
       let innerTy = mkTupleTy Unboxed args
       (inner_res, w) <- jsResultWrapper innerTy
-      matched <- mapM (newSysLocalDs ManyTy) args
+      matched <- newSysLocalsMDs args
       let inner e = mkWildCase (w e) (unrestricted innerTy) result_ty
                                [ Alt (DataAlt (tupleDataCon Unboxed (length args)))
                                      matched
