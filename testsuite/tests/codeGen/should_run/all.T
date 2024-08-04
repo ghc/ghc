@@ -250,3 +250,5 @@ test('CtzClz0', normal, compile_and_run, [''])
 test('T23034', req_c, compile_and_run, ['-O2 T23034_c.c'])
 test('T24700', normal, compile_and_run, ['-O'])
 test('T24893', normal, compile_and_run, ['-O'])
+
+test('CCallConv', [req_c, when(arch('wasm32'), fragile(25249))], compile_and_run, ['CCallConv_c.c'])
