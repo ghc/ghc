@@ -4,8 +4,9 @@
 
 #include "elf_plt_arm.h"
 #include "elf_plt_aarch64.h"
+#include "elf_plt_riscv64.h"
 
-#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
+#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH) || defined (riscv64_HOST_ARCH)
 
 #if defined(OBJFORMAT_ELF)
 
@@ -21,6 +22,8 @@
 #define __suffix__ Arm
 #elif defined(__mips__)
 #define __suffix__ Mips
+#elif defined(__riscv)
+#define __suffix__ RISCV64
 #else
 #error "unknown architecture"
 #endif
@@ -34,10 +37,10 @@ unsigned  numberOfStubsForSection( ObjectCode *oc, unsigned sectionIndex);
 #define STUB_SIZE          ADD_SUFFIX(stubSize)
 
 bool findStub(Section * section, void* * addr, uint8_t flags);
-bool makeStub(Section * section, void* * addr, uint8_t flags);
+bool makeStub(Section * section, void* * addr, void* got_addr, uint8_t flags);
 
 void freeStubs(Section * section);
 
 #endif // OBJECTFORMAT_ELF
 
-#endif // arm/aarch64_HOST_ARCH
+#endif // arm/aarch64_HOST_ARCH/riscv64_HOST_ARCH

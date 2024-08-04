@@ -16,7 +16,7 @@ SymbolExtra* makeArmSymbolExtra( ObjectCode const* oc,
                                  unsigned long target,
                                  bool fromThumb,
                                  bool toThumb );
-#elif defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#elif defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(riscv64_HOST_ARCH)
 SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
                               unsigned long symbolNumber,
                               unsigned long target );
