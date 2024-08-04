@@ -40,6 +40,7 @@
 /compiler/GHC/HsToCore/Foreign/Wasm.hs @TerrorJack
 /compiler/GHC/Tc/Deriv/            @RyanGlScott
 /compiler/GHC/CmmToAsm/            @simonmar @bgamari @AndreasK
+/compiler/GHC/CmmToAsm/RV64/       @supersven @angerman
 /compiler/GHC/CmmToAsm/Wasm/       @TerrorJack
 /compiler/GHC/CmmToLlvm/           @angerman
 /compiler/GHC/StgToCmm/            @simonmar @osa1
