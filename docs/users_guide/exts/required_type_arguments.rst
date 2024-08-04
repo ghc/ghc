@@ -262,15 +262,36 @@ Outside a required type argument, it is illegal to use ``type``:
 
   r4 = type Int  -- illegal use of ‘type’
 
-Finally, there are types that require the ``type`` keyword only due to
-limitations of the current implementation::
+Types in terms
+~~~~~~~~~~~~~~
 
-  a1 = f (type (Int -> Bool))                       -- function type
-  a2 = f (type (Read T => T))                       -- constrained type
-  a3 = f (type (forall a. a))                       -- universally quantified type
-  a4 = f (type (forall a. Read a => String -> a))   -- a combination of the above
+**Since:** GHC 9.12
 
-This restriction will be relaxed in a future release of GHC.
+:extension:`RequiredTypeArguments` extends the grammar of term-level
+expressions with syntax that is typically found only in types:
+
+* function types: ``a -> b``, ``a ⊸ b``, ``a %m -> b``
+* constrained types: ``ctx => t``
+* universally quantified types: ``forall tvs. t``, ``forall tvs -> t``
+
+These so-called "types in terms" make it possible to pass any types as required
+type arguments::
+
+  a1 = f (Int -> Bool)                       -- function type
+  a2 = f (Int %1 -> String)                  -- linear function type
+  a3 = f (Read T => T)                       -- constrained type
+  a4 = f (forall a. a)                       -- universally quantified type
+  a5 = f (forall a. Read a => String -> a)   -- a combination of the above
+
+A few limitations apply:
+
+* The ``*`` syntax of :extension:`StarIsType` is not available due to a
+  conflict with the multiplication operator.
+  What to do instead: use ``Type`` from the ``Data.Kind`` module.
+
+* The ``'`` syntax of :extension:`DataKinds` is not available due to a conflict
+  with :extension:`TemplateHaskell` name quotation.
+  What to do instead: simply omit the ``'``.
 
 Effect on implicit quantification
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
