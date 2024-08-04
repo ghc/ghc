@@ -468,9 +468,11 @@ library
                  linker/elf_got.c
                  linker/elf_plt.c
                  linker/elf_plt_aarch64.c
+                 linker/elf_plt_riscv64.c
                  linker/elf_plt_arm.c
                  linker/elf_reloc.c
                  linker/elf_reloc_aarch64.c
+                 linker/elf_reloc_riscv64.c
                  linker/elf_tlsgd.c
                  linker/elf_util.c
                  sm/BlockAlloc.c

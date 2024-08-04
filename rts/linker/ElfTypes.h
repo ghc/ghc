@@ -156,6 +156,7 @@ typedef
 struct _Stub {
     void * addr;
     void * target;
+    void* got_addr;
     /* flags can hold architecture specific information they are used during
      * lookup of stubs as well. Thus two stubs for the same target with
      * different flags are considered unequal.
