@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
+#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH) || defined(riscv64_HOST_ARCH)
 #if defined(OBJFORMAT_ELF)
 
 #define STRINGIFY(x) #x
@@ -49,11 +49,13 @@ findStub(Section * section,
 bool
 makeStub(Section * section,
           void* * addr,
+          void* got_addr,
           uint8_t flags) {
 
     Stub * s = calloc(1, sizeof(Stub));
     ASSERT(s != NULL);
     s->target = *addr;
+    s->got_addr = got_addr;
     s->flags  = flags;
     s->next = NULL;
     s->addr = (uint8_t *)section->info->stub_offset + 8

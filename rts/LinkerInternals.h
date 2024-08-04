@@ -208,7 +208,7 @@ typedef struct _Segment {
     int n_sections;
 } Segment;
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH) || defined(riscv64_HOST_ARCH)
 #define NEED_SYMBOL_EXTRAS 1
 #endif
 
@@ -220,8 +220,9 @@ typedef struct _Segment {
 #define NEED_M32 1
 #endif
 
-/* Jump Islands are sniplets of machine code required for relative
- * address relocations on the PowerPC, x86_64 and ARM.
+/* Jump Islands are sniplets of machine code required for relative address
+ * relocations on the PowerPC, x86_64 and ARM. On RISCV64 we use symbolextras
+ * like a GOT for locals where SymbolExtra represents one entry.
  */
 typedef struct {
 #if defined(powerpc_HOST_ARCH)
@@ -237,6 +238,8 @@ typedef struct {
     uint8_t     jumpIsland[8];
 #elif defined(arm_HOST_ARCH)
     uint8_t     jumpIsland[16];
+#elif defined(riscv64_HOST_ARCH)
+    uint64_t    addr;
 #endif
 } SymbolExtra;
 
