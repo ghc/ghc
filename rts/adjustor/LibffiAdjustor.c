@@ -12,6 +12,7 @@
 #include "Adjustor.h"
 
 #include "rts/ghc_ffi.h"
+#include <stdint.h>
 #include <string.h>
 
 // Note that ffi_alloc_prep_closure is a non-standard libffi closure
@@ -174,5 +175,21 @@ createAdjustor (StgStablePtr hptr,
         barf("createAdjustor: failed to allocate memory");
     }
 
-    return (void*)code;
+#if defined(riscv64_HOST_ARCH)
+    // Synchronize the memory and instruction cache to prevent illegal
+    // instruction exceptions.
+
+    // We expect two instructions for address loading, one for the jump.
+    int instrCount = 3;
+    // On Linux the parameters of __builtin___clear_cache are currently unused.
+    // Add them anyways for future compatibility. (I.e. the parameters couldn't
+    // be checked during development.)
+    // TODO: Check the upper boundary e.g. with a debugger.
+    __builtin___clear_cache((void *)code,
+                            (void *)((uint64_t *) code + instrCount));
+    // Memory barrier to ensure nothing circumvents the fence.i / cache flush.
+    SEQ_CST_FENCE();
+#endif
+
+    return (void *)code;
 }
