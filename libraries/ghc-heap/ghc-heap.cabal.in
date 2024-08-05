@@ -27,8 +27,11 @@ library
                   , rts              == 1.0.*
                   , containers       >= 0.6.2.1 && < 0.8
 
-  if impl(ghc >= 9.9)
-    build-depends:  ghc-internal     >= 9.1001 && < 9.1002
+  if impl(ghc >= 9.11)
+    build-depends:  ghc-internal     >= 9.1101 && < 9.1102
+  else
+    if impl(ghc >= 9.9)
+      build-depends:  ghc-internal     >= 9.1001 && < 9.1002
 
   ghc-options:      -Wall
   if !os(ghcjs)

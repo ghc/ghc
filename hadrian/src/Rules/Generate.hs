@@ -342,6 +342,7 @@ templateRules = do
     ]
   templateRule "libraries/ghci/ghci.cabal" $ projectVersion
   templateRule "libraries/ghc-heap/ghc-heap.cabal" $ projectVersion
+  templateRule "libraries/ghc-internal/ghc-internal.cabal" $ projectVersion
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
   templateRule "libraries/template-haskell/template-haskell.cabal" $ mconcat
     [ projectVersion
