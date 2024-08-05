@@ -1970,10 +1970,10 @@ W/W-transformed /caller of/ 'f' would immediately rebox any unboxed arguments
 that is applied to the wrapper of 'f'. When the wrapper is inlined, that kind of
 reboxing does not happen.
 
-But now we have functions with OPAQUE pragmas, which by definition (See Note
-[OPAQUE pragma]) do not get W/W-transformed. So in order to avoid reboxing
-workers of any W/W-transformed /callers of/ 'f' we need to strip all boxity
-information from 'f' in the demand analysis. This will inform the
+But now we have functions with OPAQUE pragmas, which by definition
+(See Note [OPAQUE pragma]) do not get W/W-transformed. So in order to avoid
+reboxing workers of any W/W-transformed /callers of/ 'f' we need to strip all
+boxity information from 'f' in the demand analysis. This will inform the
 W/W-transformation code that boxed arguments of 'f' must definitely be passed
 along in boxed form and as such dissuade the creation of reboxing workers.
 -}

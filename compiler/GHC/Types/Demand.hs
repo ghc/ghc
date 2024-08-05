@@ -606,22 +606,8 @@ multCard (Card a) (Card b)
 --   * How many times a variable is evaluated, via a 'Card'inality, and
 --   * How deep its value was evaluated in turn, via a 'SubDemand'.
 --
--- Examples (using Note [Demand notation]):
---
---   * 'seq' puts demand `1A` on its first argument: It evaluates the argument
---     strictly (`1`), but not any deeper (`A`).
---   * 'fst' puts demand `1P(1L,A)` on its argument: It evaluates the argument
---     pair strictly and the first component strictly, but no nested info
---     beyond that (`L`). Its second argument is not used at all.
---   * '$' puts demand `1C(1,L)` on its first argument: It calls (`C`) the
---     argument function with one argument, exactly once (`1`). No info
---     on how the result of that call is evaluated (`L`).
---   * 'maybe' puts demand `MC(M,L)` on its second argument: It evaluates
---     the argument function at most once ((M)aybe) and calls it once when
---     it is evaluated.
---   * `fst p + fst p` puts demand `SP(SL,A)` on `p`: It's `1P(1L,A)`
---     multiplied by two, so we get `S` (used at least once, possibly multiple
---     times).
+-- See also Note [Demand notation]
+-- and Note [Demand examples].
 --
 -- This data type is quite similar to `'Scaled' 'SubDemand'`, but it's scaled
 -- by 'Card', which is an /interval/ on 'Multiplicity', the upper bound of
@@ -2656,12 +2642,8 @@ So, L can denote a 'Card', polymorphic 'SubDemand' or polymorphic 'Demand',
 but it's always clear from context which "overload" is meant. It's like
 return-type inference of e.g. 'read'.
 
-Examples are in the haddock for 'Demand'.  Here are some more:
-   SA                 Strict, but does not look at subcomponents (`seq`)
-   SP(L,L)            Strict boxed pair, components lazy
-   S!P(L,L)           Strict unboxed pair, components lazy
-   LP(SA,SA)          Lazy pair, but if it is evaluated will evaluated its components
-   LC(1C(L))          Lazy, but if called will apply the result exactly once
+An example of the demand syntax is 1!P(1!L,A), the demand of fst's argument.
+See Note [Demand examples] for more examples and their semantics.
 
 This is the syntax for demand signatures:
 
@@ -2679,7 +2661,39 @@ This is the syntax for demand signatures:
            (omitted if empty)                     (omitted if
                                                 no information)
 
+Note [Demand examples]
+~~~~~~~~~~~~~~~~~~~~~~
+Here are some examples of the demand notation, specified in Note [Demand notation],
+in action. In each case we give the demand on the variable `x`.
 
+Demand on x    Example            Explanation
+  1!A           seq x y             Evaluates `x` exactly once (`1`), but not
+                                    any deeper (`A`), and discards the box (`!`).
+  S!A           seq x (seq x y)     Twice the previous demand; hence eval'd
+                                    more than once (`S` for strict).
+  1!P(1!L,A)    fst x               Evaluates pair `x` exactly once, first
+                                    component exactly once. No info that (`L`).
+                                    Second component is absent. Discards boxes (`!`).
+  1P(1L,A)      opq_fst x           Like fst, but all boxes are retained.
+  SP(1!L,A)     opq_seq x (fst x)   Two evals of x but exactly one of its first component.
+                                    Box of x retained, but box of first component discarded.
+  1!C(1,L)      x $ 3               Evals x exactly once ( 1 ) and calls it
+                                    exactly once ( C(1,_) ). No info on how the
+                                    result is evaluated ( L ).
+  MC(M,L)       maybe y x           Evals x at most once ( 1 ) and calls it at
+                                    most once ( C(1,_) ). No info on how the
+                                    result is evaluated ( L ).
+  LP(SL,A)      map (+ fst x)       Evals x lazily and multiple times ( L ),
+                                    but when it is evaluated, the first
+                                    component is evaluated (strictly) as well.
+
+In the examples above, `opq_fst` is an opaque wrapper around `fst`, i.e.
+
+  opq_fst = fst
+  {-# OPAQUE opq_fst #-}
+
+Similarly for `seq`. The effect of an OPAQUE pragma is that it discards any
+boxity flags in the demand signature, as described in Note [OPAQUE pragma].
 -}
 
 -- | See Note [Demand notation]
