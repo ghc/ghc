@@ -165,6 +165,7 @@ GHC.Types.CompleteMatch
 GHC.Types.CostCentre
 GHC.Types.CostCentre.State
 GHC.Types.Cpr
+GHC.Types.DefaultEnv
 GHC.Types.Demand
 GHC.Types.Error
 GHC.Types.Error.Codes

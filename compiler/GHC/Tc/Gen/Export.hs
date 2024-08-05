@@ -25,6 +25,7 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.Warnings
 import GHC.Core.TyCon
+import GHC.Utils.Misc (sndOf3, thdOf3)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.ConLike
@@ -41,6 +42,8 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.DefaultEnv (ClassDefaults (cd_class, cd_module), DefaultEnv,
+                             emptyDefaultEnv, filterDefaultEnv, isEmptyDefaultEnv)
 import GHC.Types.Avail
 import GHC.Types.SourceFile
 import GHC.Types.Id
@@ -189,6 +192,7 @@ rnExports explicit_mod exports
         ; let dflags = hsc_dflags hsc_env
               TcGblEnv { tcg_mod     = this_mod
                        , tcg_rdr_env = rdr_env
+                       , tcg_default = defaults
                        , tcg_imports = imports
                        , tcg_warns   = warns
                        , tcg_src     = hsc_src } = tcg_env
@@ -224,13 +228,17 @@ rnExports explicit_mod exports
 
         -- Final processing
         ; let final_ns = availsToNameSet final_avails
+              drop_defaults (spans, _defaults, avails) = (spans, avails)
 
         ; traceRn "rnExports: Exports:" (ppr final_avails)
 
         ; return (tcg_env { tcg_exports    = final_avails
                           , tcg_rn_exports = case tcg_rn_exports tcg_env of
                                                 Nothing -> Nothing
-                                                Just _  -> rn_exports
+                                                Just _  -> map drop_defaults <$> rn_exports
+                          , tcg_default_exports = case exports of
+                              Nothing -> filterDefaultEnv ((Just this_mod ==) . cd_module) defaults
+                              _ -> foldMap (foldMap sndOf3) rn_exports
                           , tcg_dus = tcg_dus tcg_env `plusDU`
                                       usesOnly final_ns
                           , tcg_warns = insertWarnExports
@@ -244,6 +252,43 @@ type ExportWarnSpanNames = [(Name, WarningTxt GhcRn, SrcSpan)]
 --   the spans of export list items that are missing those warnings
 type DontWarnExportNames = NameEnv (NE.NonEmpty SrcSpan)
 
+
+{- Note [Default exports]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Named default declarations (see Note [Named default declarations] in
+GHC.Tc.Gen.Default) can be exported. A named default declaration is
+exported when
+
+* there is no export list, and we export all locally-declared defaults
+
+* or it is specified in the export list, using the `default` keyword
+  and the class name.  For example:
+
+    module TextWrap (Text, default IsString) where
+      import Data.String (IsString)
+      import Data.Text (Text)
+      default IsString (Text, String)
+
+The export item `default IsString` is parsed into the `IE` item
+
+    IEThingAbs ext (L loc (IEDefault ext "IsString")) doc
+
+If exported, a default is imported automatically much like a class instance. For
+example,
+
+    import TextWrap ()
+
+would import the above `default IsString (Text, String)` declaration into the
+importing module.
+
+The `cd_module` field of `ClassDefaults` tracks the module whence the default was
+imported from, for the purpose of warning reports. The said warning report may be
+triggered by `-Wtype-defaults` or by a user-defined `WARNING` pragma attached to
+the default export. In the latter case the warning text is stored in the
+`cd_warn` field. See test `testsuite/tests/default/ExportWarn.hs` for an example
+of a user-defined warning on default.
+-}
+
 exports_from_avail :: Maybe (LocatedL [LIE GhcPs])
                          -- ^ 'Nothing' means no explicit export list
                    -> GlobalRdrEnv
@@ -252,7 +297,7 @@ exports_from_avail :: Maybe (LocatedL [LIE GhcPs])
                          -- @module Foo@ export is valid (it's not valid
                          -- if we didn't import @Foo@!)
                    -> Module
-                   -> RnM (Maybe [(LIE GhcRn, Avails)], Avails, ExportWarnNames GhcRn)
+                   -> RnM (Maybe [(LIE GhcRn, DefaultEnv, Avails)], Avails, ExportWarnNames GhcRn)
                          -- (Nothing, _, _) <=> no explicit export list
                          -- if explicit export list is present it contains
                          -- each renamed export item together with its exported
@@ -286,12 +331,12 @@ exports_from_avail Nothing rdr_env _imports _this_mod
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
   = do (ie_avails, export_warn_spans, dont_warn_export)
          <- accumExports do_litem rdr_items
-       let final_exports = nubAvails (concatMap snd ie_avails) -- Combine families
+       let final_exports = nubAvails (concatMap thdOf3 ie_avails) -- Combine families
        export_warn_names <- aggregate_warnings export_warn_spans dont_warn_export
        return (Just ie_avails, final_exports, export_warn_names)
   where
     do_litem :: ExportAccum -> LIE GhcPs
-             -> RnM (ExportAccum, Maybe (LIE GhcRn, Avails))
+             -> RnM (ExportAccum, Maybe (LIE GhcRn, DefaultEnv, Avails))
     do_litem acc lie = setSrcSpan (getLocA lie) (exports_from_item acc lie)
 
     -- Maps a parent to its in-scope children
@@ -312,7 +357,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        , imv <- importedByUser xs ]
 
     exports_from_item :: ExportAccum -> LIE GhcPs
-                      -> RnM (ExportAccum, Maybe (LIE GhcRn, Avails))
+                      -> RnM (ExportAccum, Maybe (LIE GhcRn, DefaultEnv, Avails))
     exports_from_item expacc@ExportAccum{
                         expacc_exp_occs   = occs,
                         expacc_mods       = earlier_mods,
@@ -373,21 +418,25 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                    , expacc_mods       = mods
                                    , expacc_warn_spans = export_warn_spans'
                                    , expacc_dont_warn  = dont_warn_export' }
-                     , Just (L loc (IEModuleContents warn_txt_rn lmod), new_exports) ) }
+                     , Just (L loc (IEModuleContents warn_txt_rn lmod), emptyDefaultEnv, new_exports) ) }
 
     exports_from_item acc lie = do
         m_doc_ie <- lookup_doc_ie lie
         case m_doc_ie of
-          Just new_ie -> return (acc, Just (new_ie, []))
+          Just new_ie -> return (acc, Just (new_ie, emptyDefaultEnv, []))
           Nothing -> do
             m_ie <- lookup_ie acc lie
             case m_ie of
               Nothing -> return (acc, Nothing)
-              Just (acc', new_ie, avail)
-                -> return (acc', Just (new_ie, [avail]))
+              Just (acc', new_ie, Left cls) -> do
+                defaults <- tcg_default <$> getGblEnv
+                let exported_default = filterDefaultEnv ((cls ==) . nameOccName . tyConName . cd_class) defaults
+                return (acc', Just (new_ie, exported_default, []))
+              Just (acc', new_ie, Right avail)
+                -> return (acc', Just (new_ie, emptyDefaultEnv, [avail]))
 
     -------------
-    lookup_ie :: ExportAccum -> LIE GhcPs -> RnM (Maybe (ExportAccum, LIE GhcRn, AvailInfo))
+    lookup_ie :: ExportAccum -> LIE GhcPs -> RnM (Maybe (ExportAccum, LIE GhcRn, Either OccName AvailInfo))
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
@@ -411,7 +460,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEVar warn_txt_rn (replaceLWrappedName l name) doc')
-                      , avail )
+                      , Right avail )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
@@ -432,11 +481,21 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                     (locA loc)
 
                doc' <- traverse rnLHsDoc doc
+               avail' <- case unLoc l of
+                 -- see Note [Default exports]
+                 IEDefault _ cls -> do
+                   let defaultOccName = nameOccName . tyConName . cd_class
+                       occName = rdrNameOcc (unLoc cls)
+                   defaults <- tcg_default <$> getGblEnv
+                   when (isEmptyDefaultEnv $ filterDefaultEnv ((occName ==) . defaultOccName) defaults)
+                        (addErr $ TcRnExportHiddenDefault ie)
+                   pure (Left occName)
+                 _ -> pure (Right avail)
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEThingAbs (warn_txt_rn, ann) (replaceLWrappedName l name) doc')
-                      , avail )
+                      , avail' )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
@@ -463,7 +522,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEThingAll (warn_txt_rn, ann) (replaceLWrappedName l name) doc')
-                      , AvailTC name all_names )
+                      , Right (AvailTC name all_names) )
 
     lookup_ie expacc@ExportAccum{
             expacc_exp_occs   = occs,
@@ -500,7 +559,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
                       , L loc (IEThingWith (warn_txt_rn, ann) (replaceLWrappedName l name) wc subs doc')
-                      , AvailTC name all_names )
+                      , Right (AvailTC name all_names) )
 
     lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier
 

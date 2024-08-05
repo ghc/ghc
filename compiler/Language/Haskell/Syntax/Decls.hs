@@ -1505,18 +1505,18 @@ data DerivStrategy pass
 \subsection[DefaultDecl]{A @default@ declaration}
 *                                                                      *
 ************************************************************************
-
-There can only be one default declaration per module, but it is hard
-for the parser to check that; we pass them all through in the abstract
-syntax, and that restriction must be checked in the front end.
 -}
 
 -- | Located Default Declaration
 type LDefaultDecl pass = XRec pass (DefaultDecl pass)
 
+-- See Note [Named default declarations] in GHC.Tc.Gen.Default
 -- | Default Declaration
 data DefaultDecl pass
-  = DefaultDecl (XCDefaultDecl pass) [LHsType pass]
+  = DefaultDecl
+      { defd_ext      :: XCDefaultDecl pass
+      , defd_class    :: Maybe (LIdP pass)  -- Nothing in absence of NamedDefaults
+      , defd_defaults :: [LHsType pass] }
         -- ^ - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnDefault',
         --          'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose'
 

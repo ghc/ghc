@@ -31,6 +31,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv
 import GHC.Core.Type
 
+import GHC.Types.DefaultEnv ( DefaultEnv, emptyDefaultEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Name
@@ -269,8 +270,8 @@ data InteractiveContext
          ic_fix_env :: FixityEnv,
             -- ^ Fixities declared in let statements
 
-         ic_default :: Maybe [Type],
-             -- ^ The current default types, set by a 'default' declaration
+         ic_default :: DefaultEnv,
+             -- ^ The current default classes and types, set by 'default' declarations
 
          ic_resume :: [Resume],
              -- ^ The stack of breakpoint contexts
@@ -319,7 +320,7 @@ emptyInteractiveContext dflags
        ic_fix_env    = emptyNameEnv,
        ic_monad      = ioTyConName,  -- IO monad by default
        ic_int_print  = printName,    -- System.IO.print by default
-       ic_default    = Nothing,
+       ic_default    = emptyDefaultEnv,
        ic_resume     = [],
        ic_cwd        = Nothing,
        ic_plugins    = emptyPlugins
@@ -362,7 +363,7 @@ icNamePprCtx unit_env ictxt = mkNamePprCtx ptc unit_env (icReaderEnv ictxt)
 extendInteractiveContext :: InteractiveContext
                          -> [TyThing]
                          -> InstEnv -> [FamInst]
-                         -> Maybe [Type]
+                         -> DefaultEnv
                          -> FixityEnv
                          -> InteractiveContext
 extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults fix_env

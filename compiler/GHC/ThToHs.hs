@@ -270,7 +270,7 @@ cvtDec (TH.InfixD fx th_ns_spec nm)
 
 cvtDec (TH.DefaultD tys)
   = do  { tys' <- traverse cvtType tys
-        ; returnJustLA (Hs.DefD noExtField $ DefaultDecl noAnn tys') }
+        ; returnJustLA (Hs.DefD noExtField $ DefaultDecl noAnn Nothing tys') }
 
 cvtDec (PragmaD prag)
   = cvtPragmaD prag

@@ -1,0 +1,4 @@
+
+default-fail01.hs:3:1: error: [GHC-26555]
+    • ‘Integer’ is not a class
+    • When checking the types in a default declaration

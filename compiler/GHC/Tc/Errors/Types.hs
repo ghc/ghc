@@ -195,6 +195,7 @@ import GHC.Types.TyThing (TyThing)
 import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar, Specificity)
 import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
+import GHC.Types.DefaultEnv (ClassDefaults)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import GHC.Core.Class (Class, ClassMinimalDef, ClassOpItem, ClassATItem)
@@ -1454,15 +1455,28 @@ data TcRnMessage where
   TcRnLazyBangOnUnliftedType :: !Type -> TcRnMessage
 
   {-| TcRnMultipleDefaultDeclarations is an error that occurs when a module has
-      more than one default declaration.
+      more than one default declaration for the same class.
 
       Example:
-      default (Integer, Int)
+      default (Integer, Int)  -- implicitly applies to Num
       default (Double, Float) -- 2nd default declaration not allowed
 
      Text cases: module/mod58
   -}
-  TcRnMultipleDefaultDeclarations :: [LDefaultDecl GhcRn] -> TcRnMessage
+  TcRnMultipleDefaultDeclarations :: TyCon -> [LDefaultDecl GhcRn] -> TcRnMessage
+
+  {-| TcRnWarnClashingDefaultImports is a warning that occurs when a module imports
+      more than one default declaration for the same class, and they are not all
+      subsumed by one of them nor by a local `default` declaration.
+
+      See Note [Named default declarations] in GHC.Tc.Gen.Default
+
+     Test cases: default/Import07.hs
+  -}
+  TcRnWarnClashingDefaultImports :: TyCon -- ^ class
+                                 -> Maybe [Type] -- ^ locally declared defaults
+                                 -> NE.NonEmpty ClassDefaults -- ^ imported defaults
+                                 -> TcRnMessage
 
   {-| TcRnBadDefaultType is an error that occurs when a type used in a default
       declaration does not have an instance for any of the applicable classes.
@@ -1473,7 +1487,7 @@ data TcRnMessage where
 
      Test cases: typecheck/should_fail/T11974b
   -}
-  TcRnBadDefaultType :: Type -> [Class] -> TcRnMessage
+  TcRnBadDefaultType :: Type -> [TyCon] -> TcRnMessage
 
   {-| TcRnPatSynBundledWithNonDataCon is an error that occurs when a module's
       export list bundles a pattern synonym with a type that is not a proper
@@ -1556,6 +1570,15 @@ data TcRnMessage where
      Test cases: None
   -}
   TcRnExportHiddenComponents :: IE GhcPs -> TcRnMessage
+
+  {-| TcRnExportHiddenDefault is an error that occurs when an export contains
+      a class default (with language extension NamedDefaults) that is not visible.
+
+      Example(s): None
+
+     Test cases: default/fail06.hs
+  -}
+  TcRnExportHiddenDefault :: IE GhcPs -> TcRnMessage
 
   {-| TcRnDuplicateExport is a warning (controlled by -Wduplicate-exports) that occurs
       when an identifier appears in an export list more than once.
@@ -1802,7 +1825,7 @@ data TcRnMessage where
                  deriving/should_fail/drvfail009
                  deriving/should_fail/drvfail006
   -}
-  TcRnNonUnaryTypeclassConstraint :: !(LHsSigType GhcRn) -> TcRnMessage
+  TcRnNonUnaryTypeclassConstraint :: !UserTypeCtxt -> !(LHsSigType GhcRn) -> TcRnMessage
 
   {-| TcRnPartialTypeSignatures is a warning (controlled by -Wpartial-type-signatures)
       that occurs when a wildcard '_' is found in place of a type in a signature or a
@@ -2199,6 +2222,26 @@ data TcRnMessage where
     Test cases: deriving/should_fail/T5922
   -}
   TcRnIllegalDerivingItem :: !(LHsSigType GhcRn) -> TcRnMessage
+
+  {-| TcRnIllegalDefaultClass is an error for when something other than a type class
+     appears in a default declaration after the keyword.
+
+     Example(s):
+     default Integer (Int)
+
+    Test cases: default/fail01
+  -}
+  TcRnIllegalDefaultClass :: !(LHsSigType GhcRn) -> TcRnMessage
+
+  {-| TcRnIllegalNamedDefault is an error for specifying an explicit default class name
+     without @-XNamedDefaults@.
+
+     Example(s):
+     default Num (Integer)
+
+    Test cases: default/fail02
+  -}
+  TcRnIllegalNamedDefault :: !(LDefaultDecl GhcRn) -> TcRnMessage
 
   {-| TcRnUnexpectedAnnotation indicates the erroroneous use of an annotation such
      as strictness, laziness, or unpacking.
@@ -5957,6 +6000,8 @@ data PragmaWarningInfo
                         , pwarn_impmod :: ModuleName }
   | PragmaWarningInstance { pwarn_dfunid :: DFunId
                           , pwarn_ctorig :: CtOrigin }
+  | PragmaWarningDefault { pwarn_class :: TyCon
+                         , pwarn_impmod :: ModuleName }
 
 
 -- | The context for an "empty statement group" error.

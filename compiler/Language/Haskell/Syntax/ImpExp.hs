@@ -195,6 +195,7 @@ data IEWildcard
 -- ParsedSource, and API Annotation placement.
 data IEWrappedName p
   = IEName    (XIEName p)    (LIdP p)  -- ^ unadorned name, e.g @myFun@
+  | IEDefault (XIEDefault p) (LIdP p)  -- ^ @default X ()@, see Note [Named default declarations] in GHC.Tc.Gen.Default
   | IEPattern (XIEPattern p) (LIdP p)  -- ^ @pattern X@
                                        --
                                        -- exactprint: the location of @pattern@ keyword is captured via 'GHC.Parser.Annotation.EpaLocation'

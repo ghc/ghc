@@ -142,6 +142,7 @@ module Language.Haskell.TH where
     | DeepSubsumption
     | RelaxedPolyRec
     | ExtendedDefaultRules
+    | NamedDefaults
     | ForeignFunctionInterface
     | UnliftedFFITypes
     | InterruptibleFFI
@@ -745,6 +746,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | DeepSubsumption
     | RelaxedPolyRec
     | ExtendedDefaultRules
+    | NamedDefaults
     | ForeignFunctionInterface
     | UnliftedFFITypes
     | InterruptibleFFI
@@ -1823,6 +1825,7 @@ module Language.Haskell.TH.Syntax where
     | DeepSubsumption
     | RelaxedPolyRec
     | ExtendedDefaultRules
+    | NamedDefaults
     | ForeignFunctionInterface
     | UnliftedFFITypes
     | InterruptibleFFI

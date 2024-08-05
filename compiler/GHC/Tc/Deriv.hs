@@ -576,7 +576,7 @@ derivePred tc tys mb_lderiv_strat via_tvs deriv_pred =
       , text "via_tvs"         <+> ppr via_tvs ]
     (cls_tvs, cls, cls_tys, cls_arg_kinds) <- tcHsDeriv deriv_pred
     when (cls_arg_kinds `lengthIsNot` 1) $
-      failWithTc (TcRnNonUnaryTypeclassConstraint deriv_pred)
+      failWithTc (TcRnNonUnaryTypeclassConstraint DerivClauseCtxt deriv_pred)
     let [cls_arg_kind] = cls_arg_kinds
         mb_deriv_strat = fmap unLoc mb_lderiv_strat
     if (className cls == typeableClassName)

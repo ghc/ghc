@@ -137,6 +137,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Predicate
 
+import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
@@ -467,8 +468,8 @@ data TcGblEnv
           -- ^ What kind of module (regular Haskell, hs-boot, hsig)
 
         tcg_rdr_env :: GlobalRdrEnv,   -- ^ Top level envt; used during renaming
-        tcg_default :: Maybe [Type],
-          -- ^ Types used for defaulting. @Nothing@ => no @default@ decl
+        tcg_default         :: DefaultEnv,     -- ^ All class defaults in scope in the module
+        tcg_default_exports :: DefaultEnv,     -- ^ All class defaults exported from the module
 
         tcg_fix_env :: FixityEnv,      -- ^ Just for things in this module
 

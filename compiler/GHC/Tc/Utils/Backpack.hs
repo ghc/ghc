@@ -728,7 +728,8 @@ mergeSignatures
     failIfErrsM
 
     -- Save the exports
-    setGblEnv tcg_env { tcg_rn_exports = mb_lies } $ do
+    let drop_defaults (spans, _defaults, avails) = (spans, avails)
+    setGblEnv tcg_env { tcg_rn_exports = map drop_defaults <$> mb_lies } $ do
     tcg_env <- getGblEnv
 
     let home_unit = hsc_home_unit hsc_env

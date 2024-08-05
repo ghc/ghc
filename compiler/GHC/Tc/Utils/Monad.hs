@@ -198,6 +198,7 @@ import GHC.Utils.Logger
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Error
+import GHC.Types.DefaultEnv ( DefaultEnv, emptyDefaultEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -307,10 +308,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_src            = hsc_src,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
-                tcg_default        = if moduleUnit mod == primUnit
-                                     || moduleUnit mod == bignumUnit
-                                     then Just []  -- See Note [Default types]
-                                     else Nothing,
+                tcg_default        = emptyDefaultEnv,
+                tcg_default_exports = emptyDefaultEnv,
                 tcg_type_env       = emptyNameEnv,
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
@@ -435,24 +434,6 @@ initTcInteractive hsc_env thing_inside
            thing_inside
   where
     interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
-
-{- Note [Default types]
-~~~~~~~~~~~~~~~~~~~~~~~
-The Integer type is simply not available in ghc-prim and ghc-bignum packages (it
-is declared in ghc-bignum). So we set the defaulting types to (Just []), meaning
-there are no default types, rather than Nothing, which means "use the default
-default types of Integer, Double".
-
-If you don't do this, attempted defaulting in package ghc-prim causes
-an actual crash (attempting to look up the Integer type).
-
-
-************************************************************************
-*                                                                      *
-                Initialisation
-*                                                                      *
-************************************************************************
--}
 
 initTcRnIf :: Char              -- ^ Tag for unique supply
            -> HscEnv
@@ -946,7 +927,7 @@ extendFixityEnv new_bit
   = updGblEnv (\env@(TcGblEnv { tcg_fix_env = old_fix_env }) ->
                 env {tcg_fix_env = extendNameEnvList old_fix_env new_bit})
 
-getDeclaredDefaultTys :: TcRn (Maybe [Type])
+getDeclaredDefaultTys :: TcRn DefaultEnv
 getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
 
 addDependentFiles :: [FilePath] -> TcRn ()

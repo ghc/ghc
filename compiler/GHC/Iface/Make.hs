@@ -43,7 +43,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Ppr
-import GHC.Core.RoughMap( RoughMatchTc(..) )
+import GHC.Core.RoughMap ( RoughMatchTc(..) )
 
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
@@ -60,6 +60,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.DefaultEnv ( ClassDefaults (..), DefaultEnv, defaultList )
 import GHC.Types.Unique.DSet
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
@@ -289,7 +290,8 @@ mkIface_ hsc_env
          this_mod core_prog hsc_src used_th deps rdr_env import_decls fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
          docs mod_summary
-         ModDetails{  md_insts     = insts,
+         ModDetails{  md_defaults  = defaults,
+                      md_insts     = insts,
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
                       md_anns      = anns,
@@ -348,6 +350,8 @@ mkIface_ hsc_env
           & set_mi_usages           usages
           & set_mi_exports          (mkIfaceExports exports)
 
+          & set_mi_defaults         (defaultsToIfaceDefaults defaults)
+
           -- Sort these lexicographically, so that
           -- the result is stable across compilations
           & set_mi_insts            (sortBy cmp_inst     iface_insts)
@@ -398,6 +402,16 @@ mkIface_ hsc_env
 
      ifFamInstTcName = ifFamInstFam
 
+--------------------------
+defaultsToIfaceDefaults :: DefaultEnv -> [IfaceDefault]
+defaultsToIfaceDefaults = map toIface . defaultList
+  where
+    toIface ClassDefaults { cd_class = clsTyCon
+                          , cd_types = tys
+                          , cd_warn = warn }
+      = IfaceDefault { ifDefaultCls = toIfaceTyCon clsTyCon
+                     , ifDefaultTys = map toIfaceType tys
+                     , ifDefaultWarn = fmap toIfaceWarningTxt warn }
 
 --------------------------
 instanceToIfaceInst :: ClsInst -> IfaceClsInst

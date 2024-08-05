@@ -55,6 +55,12 @@ Language
 - :extension:`UnliftedFFITypes`: GHC will now accept FFI types like: ``(# #) -> T`` where ``(# #)``
   is used as the one and only function argument.
 
+- The venerable ``default`` declarations have been generalized. They can now name a class
+  other than ``Num`` and the class defaults can be exported. The functionality is guarded
+  by the new ``NamedDefaults`` language extension. See the `GHC proposal
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0409-exportable-named-default.rst>`__
+  for details.
+
 - GHC now takes COMPLETE pragmas into consideration when deciding whether
   pattern matches in do notation are fallible.
 

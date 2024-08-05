@@ -27,6 +27,7 @@ import GHC.Linker.Types ( SptEntry(..) )
 import GHC.Types.Annotations ( Annotation )
 import GHC.Types.Avail
 import GHC.Types.CompleteMatch
+import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.ForeignStubs
 import GHC.Types.HpcInfo
@@ -62,6 +63,7 @@ data ModGuts
                                          -- Used for creating interface files.
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
+        mg_defaults  :: !DefaultEnv    , -- ^ Class defaults exported from this module
         mg_insts     :: ![ClsInst],      -- ^ Class instances declared in this module
         mg_fam_insts :: ![FamInst],
                                          -- ^ Family instances declared in this module

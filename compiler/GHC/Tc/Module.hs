@@ -133,6 +133,8 @@ import GHC.Utils.Logger
 
 import GHC.Types.Error
 import GHC.Types.Name.Reader
+import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults (ClassDefaults, cd_class, cd_types),
+                              emptyDefaultEnv, isEmptyDefaultEnv, unitDefaultEnv, lookupDefaultEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
@@ -173,7 +175,7 @@ import Control.Monad
 import Control.Monad.Trans.Writer.CPS
 import Data.Data ( Data )
 import Data.Functor.Classes ( liftEq )
-import Data.List ( sortBy, sort )
+import Data.List ( sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord
@@ -288,8 +290,8 @@ tcRnModuleTcRnM hsc_env mod_sum
                   ++ withReason "is an extra sig import" (map mkImport raw_sig_imports)
                   ++ withReason "is an implicit req import" (map mkImport raw_req_imports) }
         ; -- OK now finally rename the imports
-          tcg_env <- {-# SCC "tcRnImports" #-}
-                     tcRnImports hsc_env all_imports
+          (defaultImportsByClass, tcg_env) <-
+            {-# SCC "tcRnImports" #-} tcRnImports hsc_env all_imports
 
         -- Put a version of the header without identifier info into the tcg_env
         -- Make sure to do this before 'tcRnSrcDecls', because we need the
@@ -344,6 +346,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         -- a function with no type signature we can give the
                         -- inferred type
                       ; reportUnusedNames tcg_env hsc_src
+                      ; reportClashingDefaultImports defaultImportsByClass (tcg_default tcg_env)
 
                       -- Rename the module header properly after we have renamed everything else
                       ; maybe_doc_hdr <- traverse rnLHsDoc maybe_doc_hdr;
@@ -364,6 +367,76 @@ tcRnModuleTcRnM hsc_env mod_sum
         }
       }
 
+{- Note [Disambiguation of multiple default declarations]
+
+See Note [Named default declarations] in GHC.Tc.Gen.Default
+
+Only a single default declaration can be in effect in any single module for
+any particular class.
+
+* Two declarations for the same class explicitly declared in the same module
+  are considered a static error.
+
+* Definition: given two default declarations for the same class
+
+  default C (Type_1a , … , Type_ma)
+  default C (Type_1b , … , Type_nb)
+
+  if the first type sequence Type_1a , … , Type_ma is a sub-sequence of the
+  second sequence Type_1b , … , Type_nb (i.e., the former can be obtained by
+  removing a number of Type_ib items from the latter), we say that the second
+  declaration *subsumes* the first one.
+
+* A default declaration in a module takes precedence over any imported default
+  declarations for the same class. However the compiler warns the user if an
+  imported declaration is not subsumed by the local declaration.
+
+* For any two imported default declarations for the same class where one
+  subsumes the other, we ignore the subsumed declaration.
+
+* If a class has neither a local default declaration nor an imported default
+  declaration that subsumes all other imported default declarations for the
+  class, the conflict between the imports is unresolvable. The effect is to
+  ignore all default declarations for the class, so that no declaration is in
+  effect in the module. The compiler emits a warning in this case, but no
+  error.
+-}
+
+-- See Note [Disambiguation of multiple default declarations]
+-- | Warn about any imported default declaration that is not subsumed by either
+-- a local or an imported default declaration.
+reportClashingDefaultImports :: [NonEmpty ClassDefaults] -> DefaultEnv -> TcM ()
+reportClashingDefaultImports importsByClass local = mapM_ check importsByClass
+  where
+    check cds@(ClassDefaults{cd_class = cls} :| _) = do
+      let cdLocal  = lookupDefaultEnv local (tyConName cls)
+      case cdLocal of
+        Just ClassDefaults{cd_types = localTypes}
+          | all ((`isTypeSubsequenceOf` localTypes) . cd_types) cds -> pure ()
+        Nothing
+          | not (isEmptyDefaultEnv $ subsume cds) -> pure ()
+        _ -> do
+          warn_default <- woptM Opt_WarnTypeDefaults
+          diagnosticTc warn_default $
+            TcRnWarnClashingDefaultImports cls (cd_types <$> cdLocal) cds
+
+-- | Collapse a non-empty list of @default@ declarations for the same class to
+-- the single declaration among them that subsumes all others, or to no
+-- declaration otherwise.
+subsume :: NonEmpty ClassDefaults -> DefaultEnv
+subsume (deft :| []) = unitDefaultEnv deft
+subsume (deft :| deft' : defts)
+  | cd_types deft  `isTypeSubsequenceOf` cd_types deft' = subsume (deft' :| defts)
+  | cd_types deft' `isTypeSubsequenceOf` cd_types deft  = subsume (deft  :| defts)
+  | otherwise = emptyDefaultEnv
+
+isTypeSubsequenceOf :: [Type] -> [Type] -> Bool
+isTypeSubsequenceOf [] _ = True
+isTypeSubsequenceOf _ [] = False
+isTypeSubsequenceOf (t1:t1s) (t2:t2s)
+  | tcEqType t1 t2 = isTypeSubsequenceOf t1s t2s
+  | otherwise = isTypeSubsequenceOf (t1:t1s) t2s
+
 {-
 ************************************************************************
 *                                                                      *
@@ -372,12 +445,14 @@ tcRnModuleTcRnM hsc_env mod_sum
 ************************************************************************
 -}
 
-tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM TcGblEnv
+tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM ([NonEmpty ClassDefaults], TcGblEnv)
 tcRnImports hsc_env import_decls
-  = do  { (rn_imports, imp_user_spec, rdr_env, imports, hpc_info) <- rnImports import_decls ;
+  = do  { (rn_imports, imp_user_spec, rdr_env, imports, defaults, hpc_info) <- rnImports import_decls ;
 
         ; this_mod <- getModule
         ; gbl_env <- getGblEnv
+        ; let unitId = homeUnitId $ hsc_home_unit hsc_env
+              mnwib = GWIB (moduleName this_mod)(hscSourceToIsBoot (tcg_src gbl_env))
         ; let { -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except
                 -- ourselves.  The 'except ourselves' is so that we don't
@@ -387,7 +462,7 @@ tcRnImports hsc_env import_decls
                 -- which are not below this one.
               ; (home_insts, home_fam_insts) =
 
-                    hptInstancesBelow hsc_env (homeUnitId $ hsc_home_unit hsc_env) (GWIB (moduleName this_mod)(hscSourceToIsBoot (tcg_src gbl_env)))
+                    hptInstancesBelow hsc_env unitId mnwib
 
               } ;
 
@@ -398,6 +473,8 @@ tcRnImports hsc_env import_decls
                   updateEps_ $ \eps  -> eps { eps_is_boot = imp_boot_mods imports }
                }
 
+                -- Type check the imported default declarations
+        ; tc_defaults <- initIfaceTcRn (tcIfaceDefaults this_mod defaults)
                 -- Update the gbl env
         ; updGblEnv ( \ gbl ->
             gbl {
@@ -405,6 +482,7 @@ tcRnImports hsc_env import_decls
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
               tcg_import_decls = imp_user_spec,
               tcg_rn_imports   = rn_imports,
+              tcg_default      = foldMap subsume tc_defaults,
               tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
                                                       home_fam_insts,
@@ -439,7 +517,8 @@ tcRnImports hsc_env import_decls
         ; checkFamInstConsistency dir_imp_mods
         ; traceRn "rn1: } checking family instance consistency" empty
 
-        ; getGblEnv } }
+        ; gbl_env <- getGblEnv
+        ; return (tc_defaults, gbl_env) } }
 
 {-
 ************************************************************************
@@ -1713,8 +1792,8 @@ tcTyClsInstDecls tycl_decls deriv_decls default_decls binds
           --
           -- But only after we've typechecked 'default' declarations.
           -- See Note [Typechecking default declarations]
-          default_tys <- tcDefaults default_decls ;
-          updGblEnv (\gbl -> gbl { tcg_default = default_tys }) $ do {
+          defaults <- tcDefaults default_decls ;
+          updGblEnv (\gbl -> gbl { tcg_default = defaults }) $ do {
 
 
           -- Careful to quit now in case there were instance errors, so that
@@ -2581,8 +2660,8 @@ tcRnImportDecls :: HscEnv
 -- decls.  In contract tcRnImports *extends* the TcGblEnv.
 tcRnImportDecls hsc_env import_decls
  =  runTcInteractive hsc_env $
-    do { gbl_env <- updGblEnv zap_rdr_env $
-                    tcRnImports hsc_env $ map (,text "is directly imported") import_decls
+    do { (_, gbl_env) <- updGblEnv zap_rdr_env $
+                         tcRnImports hsc_env $ map (,text "is directly imported") import_decls
        ; return (tcg_rdr_env gbl_env) }
   where
     zap_rdr_env gbl_env = gbl_env { tcg_rdr_env = emptyGlobalRdrEnv }

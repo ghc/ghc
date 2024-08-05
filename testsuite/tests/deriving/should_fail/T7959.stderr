@@ -6,5 +6,5 @@ T7959.hs:5:1: error: [GHC-38178]
       Perhaps you intended to use the ‘DeriveAnyClass’ extension
 
 T7959.hs:6:17: error: [GHC-73993]
-    • ‘A’ is not a unary constraint, as expected by a deriving clause
+    • ‘A’ is not a unary constraint, as expected by a `deriving' clause
     • In the data declaration for ‘B’

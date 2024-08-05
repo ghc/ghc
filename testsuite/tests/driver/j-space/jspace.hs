@@ -42,17 +42,18 @@ initGhcM xs = do
       performGC
       [ys] <- filter (isPrefixOf (ghcUnitId <> ":GHC.Unit.Module.ModDetails.ModDetails")) . lines <$> readFile "jspace.hp"
       let (n :: Int) = read (last (words ys))
-      -- The output should be 50 * 8 * word_size (i.e. 3200, or 1600 on 32-bit architectures):
+      -- The output should be 50 * 8 * word_size (i.e. 3600, or 1600 on 32-bit architectures):
       -- the test contains DEPTH + WIDTH + 2 = 50 modules J, H_0, .., H_DEPTH, W_1, .., W_WIDTH,
-      -- and each ModDetails contains 1 (info table) + 7 word-sized fields.
+      -- and each ModDetails contains 1 (info table) + 8 word-sized fields.
       -- If this number changes DO NOT ACCEPT THE TEST, you have introduced a space leak.
       --
       -- There is some unexplained behaviour where the result is infrequently 3264.. but
       -- this resisted investigation using ghc-debug so the test actually checks whether there
       -- are less than 51 live ModDetails which is still a big improvement over before.
-      when (n > (51 * word_size * 8)) $ do
+      when (n > (51 * word_size * 9)) $ do
         putStrLn "Space leak detected by jspace test:"
-        putStrLn $ (show (n `div` (word_size * 8))) ++ " live ModDetails when <= 51 are expected"
+        putStrLn $ (show (n `div` (word_size * 9))) ++ " live ModDetails when <= 51 are expected"
+        readFile "jspace.hp" >>= putStrLn
         exitFailure
     return ()
 

@@ -1045,6 +1045,11 @@ export  :: { LIE GhcPs }
                                                           ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
                                                            in reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) Nothing }
+        | maybe_warning_pragma 'default' qtycon          {% do { let { span = (maybe comb2 comb3 $1) $2 $>
+                                                                   ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
+                                                          ; locImpExp <- return (sL span (IEThingAbs ($1, [mj AnnExport $2]) (sLLa $2 $> (IEDefault (glAA $2) $3)) Nothing))
+                                                          ; return $ reLoc $ locImpExp } }
+
 
 export_subspec :: { Located ([AddEpAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
@@ -1273,8 +1278,7 @@ topdecl :: { LHsDecl GhcPs }
         | inst_decl                             { L (getLoc $1) (InstD noExtField (unLoc $1)) }
         | stand_alone_deriving                  { L (getLoc $1) (DerivD noExtField (unLoc $1)) }
         | role_annot                            { L (getLoc $1) (RoleAnnotD noExtField (unLoc $1)) }
-        | 'default' '(' comma_types0 ')'        {% amsA' (sLL $1 $>
-                                                    (DefD noExtField (DefaultDecl [mj AnnDefault $1,mop $2,mcp $4] $3))) }
+        | default_decl                          { L (getLoc $1) (DefD noExtField (unLoc $1)) }
         | 'foreign' fdecl                       {% amsA' (sLL $1 $> ((snd $ unLoc $2) (mj AnnForeign $1:(fst $ unLoc $2)))) }
         | '{-# DEPRECATED' deprecations '#-}'   {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ([mo $1,mc $3], (getDEPRECATED_PRAGs $1)) (fromOL $2))) }
         | '{-# WARNING' warnings '#-}'          {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ([mo $1,mc $3], (getWARNING_PRAGs $1)) (fromOL $2))) }
@@ -1295,6 +1299,13 @@ cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
                 {% (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4))
                         (mj AnnClass $1:(fst $ unLoc $3)++(fstOf3 $ unLoc $4)) }
+
+-- Default declarations (toplevel)
+--
+default_decl :: { LDefaultDecl GhcPs }
+             : 'default' opt_class '(' comma_types0 ')'
+               {% amsA' (sLL $1 $> (DefaultDecl [mj AnnDefault $1,mop $3,mcp $5] $2 $4)) }
+
 
 -- Type declarations (toplevel)
 --
@@ -1424,6 +1435,11 @@ deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
   | 'newtype'                   {% fmap Just $ amsA' (sL1 $1 (NewtypeStrategy [mj AnnNewtype $1])) }
   | deriv_strategy_via          { Just $1 }
   | {- empty -}                 { Nothing }
+
+-- Optional class reference for default declarations
+opt_class :: { Maybe (LIdP GhcPs) }
+          : {- empty -}         { Nothing }
+          | qtycon              {% fmap Just $ amsA' (reLoc $1) }
 
 -- Injective type families
 

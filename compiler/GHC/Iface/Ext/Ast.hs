@@ -2105,8 +2105,9 @@ instance ToHie (LocatedA (FixitySig GhcRn)) where
 
 instance ToHie (LocatedA (DefaultDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      DefaultDecl _ typs ->
-        [ toHie typs
+      DefaultDecl _ cl typs ->
+        [ maybe (pure []) (toHie . C Use) cl
+        , toHie typs
         ]
 
 instance ToHie (LocatedA (ForeignDecl GhcRn)) where
@@ -2233,6 +2234,9 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
 
 instance ToHie (IEContext (LocatedA (IEWrappedName GhcRn))) where
   toHie (IEC c (L span iewn)) = concatM $ makeNodeA iewn span : case iewn of
+      IEDefault _ (L l p) ->
+        [ toHie $ C (IEThing c) (L l p)
+        ]
       IEName _ (L l n) ->
         [ toHie $ C (IEThing c) (L l n)
         ]

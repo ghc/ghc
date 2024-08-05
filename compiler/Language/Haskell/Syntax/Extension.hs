@@ -720,6 +720,7 @@ type family XXIE               x
 -- -------------------------------------
 -- IEWrappedName type families
 type family XIEName p
+type family XIEDefault p
 type family XIEPattern p
 type family XIEType p
 type family XXIEWrappedName p

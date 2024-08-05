@@ -1,4 +1,4 @@
 
 drvfail006.hs:9:45: error: [GHC-73993]
-    • ‘MonadState’ is not a unary constraint, as expected by a deriving clause
+    • ‘MonadState’ is not a unary constraint, as expected by a `deriving' clause
     • In the newtype declaration for ‘T’

@@ -1,6 +1,6 @@
 
 drvfail009.hs:10:31: error: [GHC-73993]
-    • ‘C’ is not a unary constraint, as expected by a deriving clause
+    • ‘C’ is not a unary constraint, as expected by a `deriving' clause
     • In the newtype declaration for ‘T1’
 
 drvfail009.hs:13:31: error: [GHC-62016]

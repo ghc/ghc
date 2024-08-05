@@ -2849,12 +2849,13 @@ instance ExactPrint (DefaultDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (DefaultDecl an tys) = do
+  exact (DefaultDecl an cl tys) = do
     an0 <- markEpAnnL an lidl AnnDefault
     an1 <- markEpAnnL an0 lidl AnnOpenP
+    cl' <- markAnnotated cl
     tys' <- markAnnotated tys
     an2 <- markEpAnnL an1 lidl AnnCloseP
-    return (DefaultDecl an2 tys')
+    return (DefaultDecl an2 cl' tys')
 
 -- ---------------------------------------------------------------------
 
@@ -4664,6 +4665,10 @@ instance ExactPrint (IEWrappedName GhcPs) where
   exact (IEName x n) = do
     n' <- markAnnotated n
     return (IEName x n')
+  exact (IEDefault r n) = do
+    r' <- printStringAtAA r "default"
+    n' <- markAnnotated n
+    return (IEDefault r' n')
   exact (IEPattern r n) = do
     r' <- printStringAtAA r "pattern"
     n' <- markAnnotated n

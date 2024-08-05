@@ -419,8 +419,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnFamInstNotInjective"                       = 05175
   GhcDiagnosticCode "TcRnBangOnUnliftedType"                        = 55666
   GhcDiagnosticCode "TcRnLazyBangOnUnliftedType"                    = 71444
-  GhcDiagnosticCode "TcRnMultipleDefaultDeclarations"               = 99565
-  GhcDiagnosticCode "TcRnBadDefaultType"                            = 88933
   GhcDiagnosticCode "TcRnPatSynBundledWithNonDataCon"               = 66775
   GhcDiagnosticCode "TcRnPatSynBundledWithWrongType"                = 66025
   GhcDiagnosticCode "TcRnDupeModuleExport"                          = 51876
@@ -428,6 +426,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNullExportedModule"                        = 64649
   GhcDiagnosticCode "TcRnMissingExportList"                         = 85401
   GhcDiagnosticCode "TcRnExportHiddenComponents"                    = 94558
+  GhcDiagnosticCode "TcRnExportHiddenDefault"                       = 74775
   GhcDiagnosticCode "TcRnDuplicateExport"                           = 47854
   GhcDiagnosticCode "TcRnExportedParentChildMismatch"               = 88993
   GhcDiagnosticCode "TcRnConflictingExports"                        = 69158
@@ -466,7 +465,6 @@ type family GhcDiagnosticCode c = n | n -> c where
 
   GhcDiagnosticCode "TcRnUntickedPromotedThing"                     = 49957
   GhcDiagnosticCode "TcRnIllegalBuiltinSyntax"                      = 39716
-  GhcDiagnosticCode "TcRnWarnDefaulting"                            = 18042
   GhcDiagnosticCode "TcRnForeignImportPrimExtNotSet"                = 49692
   GhcDiagnosticCode "TcRnForeignImportPrimSafeAnn"                  = 26133
   GhcDiagnosticCode "TcRnForeignFunctionImportAsValue"              = 76251
@@ -839,6 +837,14 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "LookupInstErrNotExact"                         = 10372
   GhcDiagnosticCode "LookupInstErrFlexiVar"                         = 10373
   GhcDiagnosticCode "LookupInstErrNotFound"                         = 10374
+
+  -- Diagnostic codes for default declarations and type defaulting
+  GhcDiagnosticCode "TcRnMultipleDefaultDeclarations"               = 99565
+  GhcDiagnosticCode "TcRnIllegalDefaultClass"                       = 26555
+  GhcDiagnosticCode "TcRnIllegalNamedDefault"                       = 55756
+  GhcDiagnosticCode "TcRnBadDefaultType"                            = 88933
+  GhcDiagnosticCode "TcRnWarnDefaulting"                            = 18042
+  GhcDiagnosticCode "TcRnWarnClashingDefaultImports"                = 77007
 
   -- TcRnEmptyStmtsGroupError/EmptyStatementGroupErrReason
   GhcDiagnosticCode "EmptyStmtsGroupInParallelComp"                 = 41242

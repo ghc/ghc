@@ -794,10 +794,10 @@ rep_fix_d loc (FixitySig ns_spec names (Fixity prec dir))
        ; mapM do_one names }
 
 repDefD :: LDefaultDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
-repDefD (L loc (DefaultDecl _ tys)) = do { tys1 <- repLTys tys
-                                         ; MkC tys2 <- coreListM typeTyConName tys1
-                                         ; dec <- rep2 defaultDName [tys2]
-                                         ; return (locA loc, dec)}
+repDefD (L loc (DefaultDecl _ _ tys)) = do { tys1 <- repLTys tys
+                                           ; MkC tys2 <- coreListM typeTyConName tys1
+                                           ; dec <- rep2 defaultDName [tys2]
+                                           ; return (locA loc, dec)}
 
 repRuleD :: LRuleDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repRuleD (L loc (HsRule { rd_name = n

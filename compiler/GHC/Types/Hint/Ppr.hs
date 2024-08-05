@@ -270,6 +270,9 @@ instance Outputable GhcHint where
     SuggestBindTyVarExplicitly tv
       -> text "bind" <+> quotes (ppr tv)
          <+> text "explicitly with" <+> quotes (char '@' <> ppr tv)
+    SuggestDefaultDeclaration cls tys
+      -> hang (text "Consider declaring")
+            2 (text "default" <+> ppr cls <+> parens (pprWithCommas ppr tys))
     SuggestExplicitDerivingClauseStrategies assumed_derivings ->
       hang
         (text "Use explicit deriving strategies:")

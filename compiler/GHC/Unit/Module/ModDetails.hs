@@ -10,6 +10,7 @@ import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
 
 import GHC.Types.Avail
 import GHC.Types.CompleteMatch
+import GHC.Types.DefaultEnv ( DefaultEnv, emptyDefaultEnv )
 import GHC.Types.TypeEnv
 import GHC.Types.Annotations ( Annotation )
 
@@ -22,6 +23,9 @@ data ModDetails = ModDetails
    , md_types     :: !TypeEnv
       -- ^ Local type environment for this particular module
       -- Includes Ids, TyCons, PatSyns
+
+   , md_defaults  :: !DefaultEnv
+      -- ^ default declarations exported by this module
 
    , md_insts     :: InstEnv
       -- ^ 'DFunId's for the instances in this module
@@ -43,6 +47,7 @@ emptyModDetails :: ModDetails
 emptyModDetails = ModDetails
    { md_types            = emptyTypeEnv
    , md_exports          = []
+   , md_defaults         = emptyDefaultEnv
    , md_insts            = emptyInstEnv
    , md_rules            = []
    , md_fam_insts        = []

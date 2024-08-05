@@ -21,6 +21,7 @@ module GHC.Unit.Module.ModIface
       , mi_warns
       , mi_anns
       , mi_decls
+      , mi_defaults
       , mi_extra_decls
       , mi_top_env
       , mi_insts
@@ -55,6 +56,7 @@ module GHC.Unit.Module.ModIface
    , set_mi_fam_insts
    , set_mi_rules
    , set_mi_decls
+   , set_mi_defaults
    , set_mi_extra_decls
    , set_mi_top_env
    , set_mi_hpc
@@ -285,6 +287,9 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- combined with mi_decls allows us to restart code generation.
                 -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
 
+        mi_defaults_ :: [IfaceDefault],
+                -- ^ default declarations exported by the module
+
         mi_top_env_  :: !(Maybe IfaceTopEnv),
                 -- ^ Just enough information to reconstruct the top level environment in
                 -- the /original source/ code for this module. which
@@ -456,6 +461,7 @@ instance Binary ModIface where
                  mi_anns_      = anns,
                  mi_decls_     = decls,
                  mi_extra_decls_ = extra_decls,
+                 mi_defaults_  = defaults,
                  mi_insts_     = insts,
                  mi_fam_insts_ = fam_insts,
                  mi_rules_     = rules,
@@ -500,6 +506,7 @@ instance Binary ModIface where
         lazyPut bh anns
         put_ bh decls
         put_ bh extra_decls
+        put_ bh defaults
         put_ bh insts
         put_ bh fam_insts
         lazyPut bh rules
@@ -532,6 +539,7 @@ instance Binary ModIface where
         anns        <- {-# SCC "bin_anns" #-} lazyGet bh
         decls       <- {-# SCC "bin_tycldecls" #-} get bh
         extra_decls <- get bh
+        defaults    <- get bh
         insts       <- {-# SCC "bin_insts" #-} get bh
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
@@ -562,6 +570,7 @@ instance Binary ModIface where
                  mi_decls_       = decls,
                  mi_extra_decls_ = extra_decls,
                  mi_top_env_     = Nothing,
+                 mi_defaults_    = defaults,
                  mi_insts_       = insts,
                  mi_fam_insts_   = fam_insts,
                  mi_rules_       = rules,
@@ -609,6 +618,7 @@ emptyPartialModIface mod
         mi_fixities_    = [],
         mi_warns_       = IfWarnSome [] [],
         mi_anns_        = [],
+        mi_defaults_    = [],
         mi_insts_       = [],
         mi_fam_insts_   = [],
         mi_rules_       = [],
@@ -667,7 +677,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
   rnf (PrivateModIface
                { mi_module_, mi_sig_of_, mi_hsc_src_, mi_hi_bytes_, mi_deps_, mi_usages_
                , mi_exports_, mi_used_th_, mi_fixities_, mi_warns_, mi_anns_
-               , mi_decls_, mi_extra_decls_, mi_top_env_, mi_insts_
+               , mi_decls_, mi_defaults_, mi_extra_decls_, mi_top_env_, mi_insts_
                , mi_fam_insts_, mi_rules_, mi_hpc_, mi_trust_, mi_trust_pkg_
                , mi_complete_matches_, mi_docs_, mi_final_exts_
                , mi_ext_fields_, mi_src_hash_ })
@@ -683,6 +693,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_warns_
     `seq` rnf mi_anns_
     `seq` rnf mi_decls_
+    `seq` rnf mi_defaults_
     `seq` rnf mi_extra_decls_
     `seq` rnf mi_top_env_
     `seq` rnf mi_insts_
@@ -844,6 +855,9 @@ set_mi_rules val iface = clear_mi_hi_bytes $ iface { mi_rules_ = val }
 set_mi_decls :: [IfaceDeclExts phase] -> ModIface_ phase -> ModIface_ phase
 set_mi_decls val iface = clear_mi_hi_bytes $ iface { mi_decls_ = val }
 
+set_mi_defaults :: [IfaceDefault] -> ModIface_ phase -> ModIface_ phase
+set_mi_defaults val iface = clear_mi_hi_bytes $ iface { mi_defaults_ = val }
+
 set_mi_extra_decls :: Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> ModIface_ phase -> ModIface_ phase
 set_mi_extra_decls val iface = clear_mi_hi_bytes $ iface { mi_extra_decls_ = val }
 
@@ -962,7 +976,7 @@ pattern ModIface ::
   Module -> Maybe Module -> HscSource -> Dependencies -> [Usage] ->
   [IfaceExport] -> Bool -> [(OccName, Fixity)] -> IfaceWarnings ->
   [IfaceAnnotation] -> [IfaceDeclExts phase] -> Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] ->
-  Maybe IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
+  [IfaceDefault] -> Maybe IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
   AnyHpcUsage -> IfaceTrustInfo -> Bool -> [IfaceCompleteMatch] -> Maybe Docs ->
   IfaceBackendExts phase -> ExtensibleFields -> Fingerprint -> IfaceBinHandle phase ->
   ModIface_ phase
@@ -979,6 +993,7 @@ pattern ModIface
   , mi_anns
   , mi_decls
   , mi_extra_decls
+  , mi_defaults
   , mi_top_env
   , mi_insts
   , mi_fam_insts
@@ -1005,6 +1020,7 @@ pattern ModIface
     , mi_anns_ = mi_anns
     , mi_decls_ = mi_decls
     , mi_extra_decls_ = mi_extra_decls
+    , mi_defaults_ = mi_defaults
     , mi_top_env_ = mi_top_env
     , mi_insts_ = mi_insts
     , mi_fam_insts_ = mi_fam_insts

@@ -621,7 +621,7 @@ toIfaceCon (DataAlt dc) = IfaceDataAlt (getName dc)
 toIfaceCon (LitAlt l)   = assertPpr (not (isLitRubbish l)) (ppr l) $
                           -- assert: see Note [Rubbish literals] wrinkle (b)
                           IfaceLitAlt l
-toIfaceCon DEFAULT      = IfaceDefault
+toIfaceCon DEFAULT      = IfaceDefaultAlt
 
 ---------------------
 toIfaceApp :: Expr CoreBndr -> [Arg CoreBndr] -> IfaceExpr

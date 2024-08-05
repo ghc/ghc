@@ -138,6 +138,7 @@ deSugar hsc_env
                             tcg_rules        = rules,
                             tcg_patsyns      = patsyns,
                             tcg_tcs          = tcs,
+                            tcg_default_exports = defaults,
                             tcg_insts        = insts,
                             tcg_fam_insts    = fam_insts,
                             tcg_hpc          = other_hpc_info,
@@ -155,6 +156,7 @@ deSugar hsc_env
      do { -- Desugar the program
         ; let export_set = availsToNameSet exports
               bcknd      = backend dflags
+              -- See Note [Named default declarations] in GHC.Tc.Gen.Default
 
         ; (binds_cvr, m_tickInfo)
                          <- if not (isHsBootOrSig hsc_src)
@@ -268,6 +270,7 @@ deSugar hsc_env
                 mg_warns        = warns,
                 mg_anns         = anns,
                 mg_tcs          = tcs,
+                mg_defaults     = defaults,
                 mg_insts        = fixSafeInstances safe_mode insts,
                 mg_fam_insts    = fam_insts,
                 mg_inst_env     = inst_env,

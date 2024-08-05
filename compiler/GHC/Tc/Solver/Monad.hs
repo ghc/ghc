@@ -172,6 +172,7 @@ import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.TyThing
 import GHC.Types.Name.Reader
+import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
@@ -1318,7 +1319,7 @@ reportUnifications (TcS thing_inside)
        ; TcM.updTcRef (tcs_unified env) (+ n_unifs)
        ; return (n_unifs, res) }
 
-getDefaultInfo ::  TcS ([Type], (Bool, Bool))
+getDefaultInfo ::  TcS (DefaultEnv, Bool)
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 
 getWorkList :: TcS WorkList

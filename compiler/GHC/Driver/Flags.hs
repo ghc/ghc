@@ -124,6 +124,7 @@ extensionName = \case
   LangExt.DeepSubsumption -> "DeepSubsumption"
   LangExt.RelaxedPolyRec -> "RelaxedPolyRec"           -- Deprecated
   LangExt.ExtendedDefaultRules -> "ExtendedDefaultRules"     -- Use GHC's extended rules for defaulting
+  LangExt.NamedDefaults -> "NamedDefaults"
   LangExt.ForeignFunctionInterface -> "ForeignFunctionInterface"
   LangExt.UnliftedFFITypes -> "UnliftedFFITypes"
   LangExt.InterruptibleFFI -> "InterruptibleFFI"
