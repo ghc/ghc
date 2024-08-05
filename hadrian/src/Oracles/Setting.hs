@@ -66,6 +66,7 @@ data Setting = CursesIncludeDir
              | ProjectVersion
              | ProjectVersionInt
              | ProjectVersionMunged
+             | ProjectVersionForLib
              | ProjectPatchLevel
              | ProjectPatchLevel1
              | ProjectPatchLevel2
@@ -122,6 +123,7 @@ setting key = lookupSystemConfig $ case key of
     ProjectName        -> "project-name"
     ProjectVersion     -> "project-version"
     ProjectVersionMunged -> "project-version-munged"
+    ProjectVersionForLib -> "project-version-for-lib"
     ProjectVersionInt  -> "project-version-int"
     ProjectPatchLevel  -> "project-patch-level"
     ProjectPatchLevel1 -> "project-patch-level1"

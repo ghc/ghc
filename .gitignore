@@ -169,6 +169,9 @@ _darcs/
 /libraries/ghc-boot-th-next/ghc-boot-th-next.cabal
 /libraries/ghc-boot-th/ghc.mk
 /libraries/ghc-heap/ghc-heap.cabal
+/libraries/ghc-internal/ghc-internal.cabal
+/libraries/ghc-experimental/ghc-experimental.cabal
+/libraries/base/base.cabal
 /libraries/ghci/GNUmakefile
 /libraries/ghci/ghci.cabal
 /libraries/ghci/ghc.mk
