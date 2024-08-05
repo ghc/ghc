@@ -619,7 +619,7 @@ getRegister' config plat expr =
                     `snocOL` NEG (OpReg w dst) (OpReg w reg)
               )
         -- TODO: Can this case happen?
-        MO_SF_Conv from to | from < W32 -> do
+        MO_SF_Round from to | from < W32 -> do
           -- extend to the smallest available representation
           (reg_x, code_x) <- signExtendReg from W32 reg
           pure
@@ -630,16 +630,16 @@ getRegister' config plat expr =
                     `appOL` code_x
                     `snocOL` annExpr expr (SCVTF (OpReg to dst) (OpReg from reg_x)) -- (Signed ConVerT Float)
               )
-        MO_SF_Conv from to ->
+        MO_SF_Round from to ->
           pure
             $ Any
               (floatFormat to)
               ( \dst ->
                   code
                     `snocOL` annExpr expr (SCVTF (OpReg to dst) (OpReg from reg)) -- (Signed ConVerT Float)
-                    -- TODO: Can this case happen?
               )
-        MO_FS_Conv from to
+        -- TODO: Can this case happen?
+        MO_FS_Truncate from to
           | to < W32 ->
               pure
                 $ Any
@@ -651,7 +651,7 @@ getRegister' config plat expr =
                         annExpr expr (FCVTZS (OpReg W32 dst) (OpReg from reg))
                         `appOL` signExtendAdjustPrecission W32 to dst dst -- (float convert (-> zero) signed)
                   )
-        MO_FS_Conv from to ->
+        MO_FS_Truncate from to ->
           pure
             $ Any
               (intFormat to)
@@ -680,6 +680,9 @@ getRegister' config plat expr =
               )
         MO_SS_Conv from to -> ss_conv from to reg code
         MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` annExpr e (FCVT (OpReg to dst) (OpReg from reg)))
+        MO_WF_Bitcast w    -> return $ Any (floatFormat w)  (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
+        MO_FW_Bitcast w    -> return $ Any (intFormat w)    (\dst -> code `snocOL` MOV (OpReg w dst) (OpReg w reg))
+
         -- Conversions
         -- TODO: Duplication with MO_UU_Conv
         MO_XX_Conv from to
@@ -1874,7 +1877,7 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
       config <- getConfig
       target <-
         cmmMakeDynamicReference config CallReference
-          $ mkForeignLabel name Nothing ForeignLabelInThisPackage IsFunction
+          $ mkForeignLabel name ForeignLabelInThisPackage IsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs
 

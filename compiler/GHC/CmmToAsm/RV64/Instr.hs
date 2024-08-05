@@ -221,6 +221,18 @@ isJumpishInstr instr = case instr of
   BCOND {} -> True
   _ -> False
 
+canFallthroughTo :: Instr -> BlockId -> Bool
+canFallthroughTo insn bid =
+  case insn of
+    B (TBlock target) -> bid == target
+    BCOND _ _ _ (TBlock target) -> bid == target
+    J_TBL targets _ _ -> all isTargetBid targets
+    _ -> False
+  where
+    isTargetBid target = case target of
+      Nothing -> True
+      Just target -> target == bid
+
 -- | Get the `BlockId`s of the jump destinations (if any)
 jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
