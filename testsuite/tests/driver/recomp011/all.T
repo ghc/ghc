@@ -2,5 +2,6 @@
 
 test('recomp011',
      [ extra_files(['Main.hs'])
+     , js_broken(23013)
      ],
      makefile_test, [])
