@@ -872,15 +872,7 @@ addForeignFile = addForeignSource
 -- >   ]
 addForeignSource :: ForeignSrcLang -> String -> Q ()
 addForeignSource lang src = do
-  let suffix = case lang of
-                 LangC      -> "c"
-                 LangCxx    -> "cpp"
-                 LangObjc   -> "m"
-                 LangObjcxx -> "mm"
-                 LangAsm    -> "s"
-                 LangJs     -> "js"
-                 RawObject  -> "a"
-  path <- addTempFile suffix
+  path <- addTempFile (foreignSrcLangSuffix lang)
   runIO $ writeFile path src
   addForeignFilePath lang path
 

@@ -96,6 +96,7 @@ import GHC.Runtime.Loader      ( initializePlugins )
 
 import GHC.Types.Basic       ( SuccessFlag(..), ForeignSrcLang(..) )
 import GHC.Types.Error       ( singleMessage, getMessages, mkSimpleUnknownDiagnostic, defaultDiagnosticOpts )
+import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -421,7 +422,7 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
                   return Succeeded
           else do
 
-        let getOfiles LM{ linkableUnlinked } = map nameOfObject (filter isObject linkableUnlinked)
+        let getOfiles LM{ linkableUnlinked } = concatMap namesOfObjects (filter isObject linkableUnlinked)
             obj_files = concatMap getOfiles linkables
             platform  = targetPlatform dflags
             arch_os   = platformArchOS platform
@@ -794,9 +795,7 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
   else
     case result of
       HscUpdate iface ->  return (iface, emptyHomeModInfoLinkable)
-      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing []) <*> pure emptyHomeModInfoLinkable
-    -- TODO: Why is there not a linkable?
-    -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
+      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing NoStubs []) <*> pure emptyHomeModInfoLinkable
 
 hscGenBackendPipeline :: P m
   => PipeEnv
@@ -815,8 +814,8 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
       -- No object file produced, bytecode or NoBackend
       Nothing -> return mlinkable
       Just o_fp -> do
-        unlinked_time <- liftIO (liftIO getCurrentTime)
-        final_unlinked <- DotO <$> use (T_MergeForeign pipe_env hsc_env o_fp fos)
+        unlinked_time <- liftIO getCurrentTime
+        final_unlinked <- flip DotO False <$> use (T_MergeForeign pipe_env hsc_env o_fp fos)
         let !linkable = LM unlinked_time (ms_mod mod_sum) [final_unlinked]
         -- Add the object linkable to the potential bytecode linkable which was generated in HscBackend.
         return (mlinkable { homeMod_object = Just linkable })
@@ -929,7 +928,7 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    as :: P m => Bool -> m (Maybe FilePath)
    as use_cpp = asPipeline use_cpp pipe_env hsc_env Nothing input_fn
 
-   objFromLinkable (_, homeMod_object -> Just (LM _ _ [DotO lnk])) = Just lnk
+   objFromLinkable (_, homeMod_object -> Just (LM _ _ [DotO lnk _])) = Just lnk
    objFromLinkable _ = Nothing
 
    fromPhase :: P m => Phase -> m (Maybe FilePath)

@@ -1,7 +1,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 module GHC.Internal.ForeignSrcLang
   ( ForeignSrcLang(..)
+  , foreignSrcLangSuffix
   ) where
 
 #ifdef BOOTSTRAP_TH
@@ -23,3 +25,13 @@ data ForeignSrcLang
   | LangJs     -- ^ JavaScript
   | RawObject  -- ^ Object (.o)
   deriving (Eq, Show, Generic)
+
+foreignSrcLangSuffix :: ForeignSrcLang -> String
+foreignSrcLangSuffix = \case
+  LangC      -> "c"
+  LangCxx    -> "cpp"
+  LangObjc   -> "m"
+  LangObjcxx -> "mm"
+  LangAsm    -> "s"
+  LangJs     -> "js"
+  RawObject  -> "a"

@@ -166,7 +166,7 @@ to inject the appropriate dependencies.
 -- modules and direct object files for pkg dependencies
 mkObjectUsage :: PackageIfaceTable -> Plugins -> FinderCache -> HomeUnitGraph-> [Linkable] -> PkgsLoaded -> IO [Usage]
 mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
-      let ls = ordNubOn linkableModule  (th_links_needed ++ plugins_links_needed)
+      let ls = ordNubOn linkableModule (th_links_needed ++ plugins_links_needed)
           ds = concatMap loaded_pkg_hs_objs $ eltsUDFM (plusUDFM th_pkgs_needed plugin_pkgs_needed) -- TODO possibly record loaded_pkg_non_hs_objs as well
           (plugins_links_needed, plugin_pkgs_needed) = loadedPluginDeps plugins
       concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)

@@ -52,6 +52,7 @@ import Control.Applicative
 
 import qualified Data.Set as Set
 import qualified Data.Map as M
+import Data.List (isSuffixOf)
 
 import System.FilePath
 import System.Directory
@@ -139,7 +140,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
-      lnks_needed <- mapM get_linkable mods_needed
+      lnks_needed <- mapM (get_linkable (ldObjSuffix opts)) mods_needed
 
       return $ LinkDeps
         { ldNeededLinkables = lnks_needed
@@ -265,7 +266,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         then homeModInfoByteCode hmi <|> homeModInfoObject hmi
         else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
 
-    get_linkable mod      -- A home-package module
+    get_linkable osuf mod      -- A home-package module
         | Just mod_info <- lookupHugByModule mod (ue_home_unit_graph unit_env)
         = adjust_linkable (expectJust "getLinkDeps" (homeModLinkable mod_info))
         | otherwise
@@ -298,25 +299,23 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                 | otherwise =
                         return lnk
 
-            adjust_ul new_osuf (DotO file) = do
-                -- file may already has new_osuf suffix. One example
-                -- is when we load bytecode from whole core bindings,
-                -- then the corresponding foreign stub objects are
-                -- compiled as shared objects and file may already has
-                -- .dyn_o suffix. And it's okay as long as the file to
-                -- load is already there.
-                let new_file = file -<.> new_osuf
+            adjust_ul new_osuf (DotO file False) = do
+                massert (osuf `isSuffixOf` file)
+                let file_base = fromJust (stripExtension osuf file)
+                    new_file = file_base <.> new_osuf
                 ok <- doesFileExist new_file
                 if (not ok)
                    then dieWith opts span $
                           text "cannot find object file "
                                 <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file)
+                   else return (DotO new_file False)
+            adjust_ul _ (DotO file True) = pure (DotO file True)
             adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
             adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
             adjust_ul _ l@(BCOs {}) = return l
             adjust_ul _ l@LoadedBCOs{} = return l
-            adjust_ul _ (CoreBindings (WholeCoreBindings _ mod _))     = pprPanic "Unhydrated core bindings" (ppr mod)
+            adjust_ul _ (CoreBindings WholeCoreBindings {wcb_module}) =
+              pprPanic "Unhydrated core bindings" (ppr wcb_module)
 
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]

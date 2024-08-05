@@ -292,8 +292,6 @@ import GHC.Types.TypeEnv
 import System.IO
 import {-# SOURCE #-} GHC.Driver.Pipeline
 import Data.Time
-import Data.Traversable
-import qualified Data.ByteString as BS
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
@@ -970,6 +968,7 @@ loadByteCode iface mod_sum = do
     case mi_extra_decls iface of
       Just extra_decls -> do
           let fi = WholeCoreBindings extra_decls this_mod (ms_location mod_sum)
+                   (mi_foreign iface)
           return (UpToDateItem (LM if_date this_mod [CoreBindings fi]))
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 --------------------------------------------------------------
@@ -993,34 +992,31 @@ initModDetails hsc_env iface =
 
 -- Hydrate any WholeCoreBindings linkables into BCOs
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
-initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = do
-  -- If a module is compiled with -fbyte-code-and-object-code and it
-  -- makes use of foreign stubs, then the interface file will also
-  -- contain serialized stub dynamic objects, and we can simply write
-  -- them to temporary objects and refer to them as unlinked items
-  -- directly.
-  stub_uls <- for (mi_stub_objs mod_iface) $ \stub_obj -> do
-    f <- newTempName (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)) TFL_GhcSession "dyn_o"
-    BS.writeFile f stub_obj
-    pure $ DotO f
-  bytecode_uls <- for uls go
-  pure $ LM utc_time this_mod $ stub_uls ++ bytecode_uls
+initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) =
+  LM utc_time this_mod <$> mapM go uls
   where
-    go (CoreBindings fi) = do
-        let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
-                                (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+    go (CoreBindings wcb@WholeCoreBindings {wcb_foreign, wcb_mod_location}) = do
+        -- If a module is compiled with -fbyte-code-and-object-code and it makes
+        -- use of foreign stubs, then the interface file will also contain
+        -- serialized stub objects, and we can simply write them to temporary
+        -- objects and refer to them as unlinked items directly.
+        -- See Note [Foreign stubs and TH bytecode linking]
         types_var <- newIORef (md_types details)
-        let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
-        let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
+        let act hpt = addToHpt hpt (moduleName $ mi_module mod_iface)
+                      (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+            kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
+            hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
         -- The bytecode generation itself is lazy because otherwise even when doing
         -- recompilation checking the bytecode will be generated (which slows things down a lot)
         -- the laziness is OK because generateByteCode just depends on things already loaded
         -- in the interface file.
-        LoadedBCOs <$> (unsafeInterleaveIO $ do
-                  core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
-                  let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
-                  trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
-                  generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
+        ~(bcos, fos) <- unsafeInterleaveIO $ do
+          core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var wcb
+          (stubs, foreign_files) <- decodeIfaceForeign (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (tmpDir (hsc_dflags hsc_env)) wcb_foreign
+          let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) stubs foreign_files Nothing []
+          trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
+          generateByteCode hsc_env cgi_guts wcb_mod_location
+        pure (LoadedBCOs bcos fos)
     go ul = return ul
 
 {-
@@ -1989,13 +1985,14 @@ data CgInteractiveGuts = CgInteractiveGuts { cgi_module :: Module
                                            , cgi_binds  :: CoreProgram
                                            , cgi_tycons :: [TyCon]
                                            , cgi_foreign :: ForeignStubs
+                                           , cgi_foreign_files :: [(ForeignSrcLang, FilePath)]
                                            , cgi_modBreaks ::  Maybe ModBreaks
                                            , cgi_spt_entries :: [SptEntry]
                                            }
 
 mkCgInteractiveGuts :: CgGuts -> CgInteractiveGuts
-mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_modBreaks, cg_spt_entries}
-  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_modBreaks cg_spt_entries
+mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_modBreaks, cg_spt_entries}
+  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_modBreaks cg_spt_entries
 
 hscInteractive :: HscEnv
                -> CgInteractiveGuts
@@ -2047,21 +2044,12 @@ hscInteractive hsc_env cgguts location = do
 generateByteCode :: HscEnv
   -> CgInteractiveGuts
   -> ModLocation
-  -> IO [Unlinked]
+  -> IO (Unlinked, [FilePath])
 generateByteCode hsc_env cgguts mod_location = do
   (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
-
-  stub_o <- case hasStub of
-            Nothing -> return []
-            Just stub_c -> do
-                -- Always compile foreign stubs as shared objects so
-                -- they can be properly loaded later when the bytecode
-                -- is loaded.
-                stub_o <- compileForeign (hscUpdateFlags setDynamicNow hsc_env) LangC stub_c
-                return [DotO stub_o]
-
-  let hs_unlinked = [BCOs comp_bc spt_entries]
-  return (hs_unlinked ++ stub_o)
+  stub_o <- traverse (compileForeign hsc_env LangC) hasStub
+  foreign_files_o <- traverse (uncurry (compileForeign hsc_env)) (cgi_foreign_files cgguts)
+  pure (BCOs comp_bc spt_entries, maybeToList stub_o ++ foreign_files_o)
 
 generateFreshByteCode :: HscEnv
   -> ModuleName
@@ -2069,10 +2057,9 @@ generateFreshByteCode :: HscEnv
   -> ModLocation
   -> IO Linkable
 generateFreshByteCode hsc_env mod_name cgguts mod_location = do
-  ul <- generateByteCode hsc_env cgguts mod_location
+  (bcos, fos) <- generateByteCode hsc_env cgguts mod_location
   unlinked_time <- getCurrentTime
-  let !linkable = LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) ul
-  return linkable
+  return (LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) (bcos : (flip DotO True <$> fos)))
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)

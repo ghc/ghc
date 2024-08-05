@@ -6,6 +6,7 @@
 --
 -----------------------------------------------------------------------------
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
 module GHC.Linker.Types
    ( Loader (..)
    , LoaderState (..)
@@ -26,13 +27,18 @@ module GHC.Linker.Types
    , isObjectLinkable
    , linkableObjs
    , isObject
-   , nameOfObject
+   , namesOfObjects
+   , namesOfObjects_maybe
    , nameOfObject_maybe
    , isInterpretable
    , byteCodeOfObject
    , LibrarySpec(..)
    , LoadedPkgInfo(..)
    , PkgsLoaded
+   , byteCodes
+   , linkableFilter
+   , linkableFilterObjects
+   , linkableFilterByteCode
    )
 where
 
@@ -52,11 +58,11 @@ import GHC.Utils.Panic
 
 import Control.Concurrent.MVar
 import Data.Time               ( UTCTime )
-import Data.Maybe
 import GHC.Unit.Module.Env
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Unit.Module.WholeCoreBindings
+import Data.Maybe (fromMaybe)
 
 
 {- **********************************************************************
@@ -233,7 +239,7 @@ unionLinkableSet = plusModuleEnv_C go
 
 instance Outputable Linkable where
   ppr (LM when_made mod unlinkeds)
-     = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod)
+     = (text "Linkable" <+> parens (text (show when_made)) <+> ppr mod)
        $$ nest 3 (ppr unlinkeds)
 
 type ObjFile = FilePath
@@ -241,12 +247,16 @@ type ObjFile = FilePath
 -- | Objects which have yet to be linked by the compiler
 data Unlinked
   = DotO ObjFile       -- ^ An object file (.o)
+         Bool          -- ^ Whether the object is an internal, intermediate
+                       -- build product that should not be adapted to the
+                       -- interpreter's way.
+                       -- Used for foreign stubs loaded from interfaces.
   | DotA FilePath      -- ^ Static archive file (.a)
   | DotDLL FilePath    -- ^ Dynamically linked library file (.so, .dll, .dylib)
   | CoreBindings WholeCoreBindings -- ^ Serialised core which we can turn into BCOs (or object files), or used by some other backend
                        -- See Note [Interface Files with Core Definitions]
-  | LoadedBCOs [Unlinked] -- ^ A list of BCOs, but hidden behind extra indirection to avoid
-                          -- being too strict.
+  | LoadedBCOs Unlinked -- ^ Some BCOs, but hidden behind extra indirection to avoid
+               [FilePath] -- being too strict.
   | BCOs CompiledByteCode
          [SptEntry]    -- ^ A byte-code object, lives only in memory. Also
                        -- carries some static pointer table entries which
@@ -255,7 +265,9 @@ data Unlinked
                        -- "GHC.Iface.Tidy.StaticPtrTable".
 
 instance Outputable Unlinked where
-  ppr (DotO path)   = text "DotO" <+> text path
+  ppr (DotO path int) =
+    text "DotO" <+> text path <+>
+    if int then brackets (text "internal") else empty
   ppr (DotA path)   = text "DotA" <+> text path
   ppr (DotDLL path) = text "DotDLL" <+> text path
   ppr (BCOs bcos spt) = text "BCOs" <+> ppr bcos <+> ppr spt
@@ -271,46 +283,96 @@ instance Outputable SptEntry where
 
 
 isObjectLinkable :: Linkable -> Bool
-isObjectLinkable l = not (null unlinked) && all isObject unlinked
+isObjectLinkable l = not (null unlinked) && any isObject unlinked
   where unlinked = linkableUnlinked l
         -- A linkable with no Unlinked's is treated as a BCO.  We can
         -- generate a linkable with no Unlinked's as a result of
-        -- compiling a module in NoBackend mode, and this choice
-        -- happens to work well with checkStability in module GHC.
+        -- compiling a module in NoBackend mode.
 
 linkableObjs :: Linkable -> [FilePath]
-linkableObjs l = [ f | DotO f <- linkableUnlinked l ]
+linkableObjs l = concatMap unlinkedDotOPaths (linkableUnlinked l)
 
 -------------------------------------------
 
 -- | Is this an actual file on disk we can link in somehow?
 isObject :: Unlinked -> Bool
-isObject (DotO _)   = True
-isObject (DotA _)   = True
-isObject (DotDLL _) = True
-isObject _          = False
+isObject = \case
+  DotO _ _  -> True
+  DotA _ -> True
+  DotDLL _ -> True
+  LoadedBCOs _ _ -> True
+  _ -> False
 
 -- | Is this a bytecode linkable with no file on disk?
 isInterpretable :: Unlinked -> Bool
-isInterpretable = not . isObject
+isInterpretable = \case
+  BCOs _ _  -> True
+  LoadedBCOs _ _ -> True
+  _ -> False
 
 nameOfObject_maybe :: Unlinked -> Maybe FilePath
-nameOfObject_maybe (DotO fn)   = Just fn
+nameOfObject_maybe (DotO fn _)   = Just fn
 nameOfObject_maybe (DotA fn)   = Just fn
 nameOfObject_maybe (DotDLL fn) = Just fn
 nameOfObject_maybe (CoreBindings {}) = Nothing
 nameOfObject_maybe (LoadedBCOs{}) = Nothing
 nameOfObject_maybe (BCOs {})   = Nothing
 
+namesOfObjects_maybe :: Unlinked -> Maybe [FilePath]
+namesOfObjects_maybe (DotO fn _)   = Just [fn]
+namesOfObjects_maybe (DotA fn)   = Just [fn]
+namesOfObjects_maybe (DotDLL fn) = Just [fn]
+namesOfObjects_maybe (CoreBindings {}) = Nothing
+namesOfObjects_maybe (LoadedBCOs _ os) = Just os
+namesOfObjects_maybe (BCOs {})   = Nothing
+
 -- | Retrieve the filename of the linkable if possible. Panic if it is a byte-code object
-nameOfObject :: Unlinked -> FilePath
-nameOfObject o = fromMaybe (pprPanic "nameOfObject" (ppr o)) (nameOfObject_maybe o)
+namesOfObjects :: Unlinked -> [FilePath]
+namesOfObjects o = fromMaybe (pprPanic "namesOfObjects" (ppr o)) (namesOfObjects_maybe o)
+
+byteCodes :: Unlinked -> Maybe [CompiledByteCode]
+byteCodes = \case
+  BCOs bc _ -> Just [bc]
+  LoadedBCOs ul _ -> byteCodes ul
+  _       -> Nothing
 
 -- | Retrieve the compiled byte-code if possible. Panic if it is a file-based linkable
 byteCodeOfObject :: Unlinked -> [CompiledByteCode]
 byteCodeOfObject (BCOs bc _) = [bc]
-byteCodeOfObject (LoadedBCOs ul) = concatMap byteCodeOfObject ul
+byteCodeOfObject (LoadedBCOs ul _) = byteCodeOfObject ul
 byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
+
+linkableFilter :: (Unlinked -> [Unlinked]) -> Linkable -> Maybe Linkable
+linkableFilter f linkable =
+  case concatMap f (linkableUnlinked linkable) of
+    [] -> Nothing
+    new -> Just linkable {linkableUnlinked = new}
+
+unlinkedDotOPaths :: Unlinked -> [FilePath]
+unlinkedDotOPaths = \case
+  DotO f _  -> [f]
+  LoadedBCOs _ os -> os
+  _ -> []
+
+unlinkedObjects :: Unlinked -> [Unlinked]
+unlinkedObjects = \case
+  u@DotO {}  -> [u]
+  u@DotA {} -> [u]
+  u@DotDLL {} -> [u]
+  LoadedBCOs _ os -> [DotO f True | f <- os]
+  _ -> []
+
+linkableFilterObjects :: Linkable -> Maybe Linkable
+linkableFilterObjects = linkableFilter unlinkedObjects
+
+unlinkedByteCode :: Unlinked -> [Unlinked]
+unlinkedByteCode = \case
+  u@BCOs {}  -> [u]
+  LoadedBCOs bcos _ -> [bcos]
+  _ -> []
+
+linkableFilterByteCode :: Linkable -> Maybe Linkable
+linkableFilterByteCode = linkableFilter unlinkedByteCode
 
 {- **********************************************************************
 

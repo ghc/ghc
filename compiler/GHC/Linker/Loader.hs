@@ -725,8 +725,11 @@ loadModuleLinkables :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (Load
 loadModuleLinkables interp hsc_env pls linkables
   = mask_ $ do  -- don't want to be interrupted by ^C in here
 
-        let (objs, bcos) = partition isObjectLinkable
-                              (concatMap partitionLinkable linkables)
+        debugTraceMsg (hsc_logger hsc_env) 4 $
+          hang (text "Loading module linkables") 2 $ vcat [
+            hang (text "Objects:") 2 (vcat (ppr <$> objs)),
+            hang (text "Bytecode:") 2 (vcat (ppr <$> bcos))
+          ]
 
                 -- Load objects first; they can't depend on BCOs
         (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
@@ -736,6 +739,9 @@ loadModuleLinkables interp hsc_env pls linkables
           else do
                 pls2 <- dynLinkBCOs interp pls1 bcos
                 return (pls2, Succeeded)
+  where
+    objs = mapMaybe linkableFilterObjects linkables
+    bcos = mapMaybe linkableFilterByteCode linkables
 
 
 -- HACK to support f-x-dynamic in the interpreter; no other purpose
@@ -777,7 +783,7 @@ loadObjects interp hsc_env pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
             unlinkeds                = concatMap linkableUnlinked new_objs
-            wanted_objs              = map nameOfObject unlinkeds
+            wanted_objs              = concatMap namesOfObjects unlinkeds
 
         if interpreterDynamic interp
             then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
@@ -1045,7 +1051,7 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
         -- not much benefit.
 
       | otherwise
-      = mapM_ (unloadObj interp) [f | DotO f <- linkableUnlinked lnk]
+      = mapM_ (unloadObj interp) (linkableObjs lnk)
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.
                 --

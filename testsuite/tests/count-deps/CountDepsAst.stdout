@@ -196,6 +196,7 @@ GHC.Unit.Module.Imported
 GHC.Unit.Module.Location
 GHC.Unit.Module.ModIface
 GHC.Unit.Module.Warnings
+GHC.Unit.Module.WholeCoreBindings
 GHC.Unit.Parser
 GHC.Unit.Ppr
 GHC.Unit.State
