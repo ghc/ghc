@@ -42,6 +42,7 @@ instance Instruction RV64.Instr where
   regUsageOfInstr = RV64.regUsageOfInstr
   patchRegsOfInstr = RV64.patchRegsOfInstr
   isJumpishInstr = RV64.isJumpishInstr
+  canFallthroughTo = RV64.canFallthroughTo
   jumpDestsOfInstr = RV64.jumpDestsOfInstr
   patchJumpInstr = RV64.patchJumpInstr
   mkSpillInstr = RV64.mkSpillInstr
