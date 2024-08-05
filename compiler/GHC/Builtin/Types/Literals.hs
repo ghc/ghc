@@ -157,9 +157,8 @@ tryInteractTopFam :: BuiltInSynFamily -> TyCon -> [Type] -> Type
                   -> [(CoAxiomRule, TypeEqn)]
 -- The returned CoAxiomRule is always unary
 tryInteractTopFam fam fam_tc tys r
-  = [(BuiltInFamInj ax_rule, eqn_out)
-    | ax_rule  <- sfInteract fam
-    , Just eqn_out <- [bifinj_proves ax_rule eqn_in] ]
+  = [(bifinj_axr bif, eqn_out) | bif  <- sfInteract fam
+                               , Just eqn_out <- [bifinj_proves bif eqn_in] ]
   where
     eqn_in :: TypeEqn
     eqn_in = Pair (mkTyConApp fam_tc tys) r
@@ -168,21 +167,20 @@ tryInteractInertFam :: BuiltInSynFamily -> TyCon
                     -> [Type] -> [Type] -- F tys1 ~ F tys2
                     -> [(CoAxiomRule, TypeEqn)]
 tryInteractInertFam builtin_fam fam_tc tys1 tys2
-  = [(BuiltInFamInj ax_rule, eqn_out)
-    | ax_rule  <- sfInteract builtin_fam
-    , Just eqn_out <- [bifinj_proves ax_rule eqn_in] ]
+  = [(bifinj_axr bif, eqn_out) | bif <- sfInteract builtin_fam
+                               , Just eqn_out <- [bifinj_proves bif eqn_in] ]
   where
     eqn_in = Pair (mkTyConApp fam_tc tys1) (mkTyConApp fam_tc tys2)
 
 tryMatchFam :: BuiltInSynFamily -> [Type]
-            -> Maybe (BuiltInFamRewrite, [Type], Type)
+            -> Maybe (CoAxiomRule, [Type], Type)
 -- Does this reduce on the given arguments?
 -- If it does, returns (CoAxiomRule, types to instantiate the rule at, rhs type)
 -- That is: mkAxiomCo (BuiltInFamRew ax) (map mkNomReflCo ts)
 --              :: F tys ~r rhs,
 tryMatchFam builtin_fam arg_tys
   = listToMaybe $   -- Pick first rule to match
-    [ (rw_ax, inst_tys, res_ty)
+    [ (bifrw_axr rw_ax, inst_tys, res_ty)
     | rw_ax <- sfMatchFam builtin_fam
     , Just (inst_tys,res_ty) <- [bifrw_match rw_ax arg_tys] ]
 
@@ -197,18 +195,21 @@ mkUnaryConstFoldAxiom :: TyCon -> String
 -- For the definitional axioms, like  (3+4 --> 7)
 {-# INLINE mkUnaryConstFoldAxiom #-}  -- See Note [Inlining axiom constructors]
 mkUnaryConstFoldAxiom fam_tc str isReqTy f
-  = BIF_Rewrite
-      { bifrw_name      = fsLit str
-      , bifrw_fam_tc    = fam_tc
-      , bifrw_arity     = 1
-      , bifrw_match     = \ts -> do { [t1] <- return ts
-                                    ; t1' <- isReqTy t1
-                                    ; res <- f t1'
-                                    ; return ([t1], res) }
-      , bifrw_proves    = \cs -> do { [Pair s1 s2] <- return cs
-                                    ; s2' <- isReqTy s2
-                                    ; z   <- f s2'
-                                    ; return (mkTyConApp fam_tc [s1] === z) }
+  = bif
+  where
+    bif = BIF_Rewrite
+      { bifrw_name   = fsLit str
+      , bifrw_axr    = BuiltInFamRew bif
+      , bifrw_fam_tc = fam_tc
+      , bifrw_arity  = 1
+      , bifrw_match  = \ts -> do { [t1] <- return ts
+                                 ; t1' <- isReqTy t1
+                                 ; res <- f t1'
+                                 ; return ([t1], res) }
+      , bifrw_proves = \cs -> do { [Pair s1 s2] <- return cs
+                                 ; s2' <- isReqTy s2
+                                 ; z   <- f s2'
+                                 ; return (mkTyConApp fam_tc [s1] === z) }
       }
 
 mkBinConstFoldAxiom :: TyCon -> String
@@ -219,20 +220,23 @@ mkBinConstFoldAxiom :: TyCon -> String
 -- For the definitional axioms, like  (3+4 --> 7)
 {-# INLINE mkBinConstFoldAxiom #-}  -- See Note [Inlining axiom constructors]
 mkBinConstFoldAxiom fam_tc str isReqTy1 isReqTy2 f
-  = BIF_Rewrite
-      { bifrw_name      = fsLit str
-      , bifrw_fam_tc    = fam_tc
-      , bifrw_arity     = 2
-      , bifrw_match     = \ts -> do { [t1,t2] <- return ts
-                                    ; t1' <- isReqTy1 t1
-                                    ; t2' <- isReqTy2 t2
-                                    ; res <- f t1' t2'
-                                    ; return ([t1,t2], res) }
-      , bifrw_proves    = \cs -> do { [Pair s1 s2, Pair t1 t2] <- return cs
-                                    ; s2' <- isReqTy1 s2
-                                    ; t2' <- isReqTy2 t2
-                                    ; z   <- f s2' t2'
-                                    ; return (mkTyConApp fam_tc [s1,t1] === z) }
+  = bif
+  where
+    bif = BIF_Rewrite
+      { bifrw_name   = fsLit str
+      , bifrw_axr    = BuiltInFamRew bif
+      , bifrw_fam_tc = fam_tc
+      , bifrw_arity  = 2
+      , bifrw_match  = \ts -> do { [t1,t2] <- return ts
+                                 ; t1' <- isReqTy1 t1
+                                 ; t2' <- isReqTy2 t2
+                                 ; res <- f t1' t2'
+                                 ; return ([t1,t2], res) }
+      , bifrw_proves = \cs -> do { [Pair s1 s2, Pair t1 t2] <- return cs
+                                 ; s2' <- isReqTy1 s2
+                                 ; t2' <- isReqTy2 t2
+                                 ; z   <- f s2' t2'
+                                 ; return (mkTyConApp fam_tc [s1,t1] === z) }
       }
 
 mkRewriteAxiom :: TyCon -> String
@@ -243,13 +247,16 @@ mkRewriteAxiom :: TyCon -> String
 -- See Note [Inlining axiom constructors]
 mkRewriteAxiom fam_tc str tpl_tvs lhs_tys rhs_ty
   = assertPpr (tyConArity fam_tc == length lhs_tys) (text str <+> ppr lhs_tys) $
-    BIF_Rewrite
+    bif
+  where
+    bif = BIF_Rewrite
       { bifrw_name   = fsLit str
+      , bifrw_axr    = BuiltInFamRew bif
       , bifrw_fam_tc = fam_tc
       , bifrw_arity  = bif_arity
       , bifrw_match  = match_fn
       , bifrw_proves = inst_fn }
-  where
+
     bif_arity = length tpl_tvs
 
     match_fn :: [Type] -> Maybe ([Type],Type)
@@ -274,12 +281,15 @@ mkTopUnaryFamDeduction :: String -> TyCon
 -- Deduction from (F s ~ r) where `F` is a unary type function
 {-# INLINE mkTopUnaryFamDeduction #-}  -- See Note [Inlining axiom constructors]
 mkTopUnaryFamDeduction str fam_tc f
-  = BIF_Interact
-    { bifinj_name      = fsLit str
-    , bifinj_proves    = \(Pair lhs rhs)
-                         -> do { (tc, [a]) <- splitTyConApp_maybe lhs
-                               ; massertPpr (tc == fam_tc) (ppr tc $$ ppr fam_tc)
-                               ; f a rhs } }
+  = bif
+  where
+    bif = BIF_Interact
+      { bifinj_name   = fsLit str
+      , bifinj_axr    = BuiltInFamInj bif
+      , bifinj_proves = \(Pair lhs rhs)
+                        -> do { (tc, [a]) <- splitTyConApp_maybe lhs
+                              ; massertPpr (tc == fam_tc) (ppr tc $$ ppr fam_tc)
+                              ; f a rhs } }
 
 mkTopBinFamDeduction :: String -> TyCon
                      -> (Type -> Type -> Type -> Maybe TypeEqn)
@@ -287,20 +297,25 @@ mkTopBinFamDeduction :: String -> TyCon
 -- Deduction from (F s t  ~ r) where `F` is a binary type function
 {-# INLINE mkTopBinFamDeduction #-}  -- See Note [Inlining axiom constructors]
 mkTopBinFamDeduction str fam_tc f
-  = BIF_Interact
-    { bifinj_name      = fsLit str
-    , bifinj_proves    = \(Pair lhs rhs) ->
-                         do { (tc, [a,b]) <- splitTyConApp_maybe lhs
-                            ; massertPpr (tc == fam_tc) (ppr tc $$ ppr fam_tc)
-                            ; f a b rhs } }
+  = bif
+  where
+    bif = BIF_Interact
+      { bifinj_name   = fsLit str
+      , bifinj_axr    = BuiltInFamInj bif
+      , bifinj_proves = \(Pair lhs rhs) ->
+                        do { (tc, [a,b]) <- splitTyConApp_maybe lhs
+                           ; massertPpr (tc == fam_tc) (ppr tc $$ ppr fam_tc)
+                           ; f a b rhs } }
 
 mkUnaryBIF :: String -> TyCon -> BuiltInFamInjectivity
 -- Not higher order, no benefit in inlining
 -- See Note [Inlining axiom constructors]
 mkUnaryBIF str fam_tc
-  = BIF_Interact { bifinj_name   = fsLit str
-                 , bifinj_proves = proves }
+  = bif
   where
+    bif = BIF_Interact { bifinj_name   = fsLit str
+                       , bifinj_axr    = BuiltInFamInj bif
+                       , bifinj_proves = proves }
     proves (Pair lhs rhs)
       = do { (tc2, [x2]) <- splitTyConApp_maybe rhs
            ; guard (tc2 == fam_tc)
@@ -314,9 +329,11 @@ mkBinBIF :: String -> TyCon
          -> BuiltInFamInjectivity
 {-# INLINE mkBinBIF #-}  -- See Note [Inlining axiom constructors]
 mkBinBIF str fam_tc eq1 eq2 check_me
-  = BIF_Interact { bifinj_name   = fsLit str
-                 , bifinj_proves = proves }
+  = bif
   where
+    bif = BIF_Interact { bifinj_name   = fsLit str
+                       , bifinj_axr    = BuiltInFamInj bif
+                       , bifinj_proves = proves }
     proves (Pair lhs rhs)
       = do { (tc2, [x2,y2]) <- splitTyConApp_maybe rhs
            ; guard (tc2 == fam_tc)
@@ -376,8 +393,8 @@ typeNatCoAxiomRules
   = listToUFM $
     [ pr | tc <- typeNatTyCons
          , Just ops <- [isBuiltInSynFamTyCon_maybe tc]
-         , pr <- [ (bifinj_name bif, BuiltInFamInj bif)  | bif <- sfInteract ops ]
-              ++ [ (bifrw_name bif,  BuiltInFamRew  bif) | bif <- sfMatchFam ops ] ]
+         , pr <- [ (bifinj_name bif, bifinj_axr bif) | bif <- sfInteract ops ]
+              ++ [ (bifrw_name bif,  bifrw_axr bif)  | bif <- sfMatchFam ops ] ]
 
 -------------------------------------------------------------------------------
 --                   Addition (+)

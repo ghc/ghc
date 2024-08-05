@@ -283,12 +283,12 @@ data CoAxBranch
   deriving Data.Data
 
 toBranchedAxiom :: CoAxiom br -> CoAxiom Branched
-toBranchedAxiom (CoAxiom unique name role tc branches implicit)
-  = CoAxiom unique name role tc (toBranched branches) implicit
+toBranchedAxiom ax@(CoAxiom { co_ax_branches = branches })
+  = ax { co_ax_branches = toBranched branches }
 
 toUnbranchedAxiom :: CoAxiom br -> CoAxiom Unbranched
-toUnbranchedAxiom (CoAxiom unique name role tc branches implicit)
-  = CoAxiom unique name role tc (toUnbranched branches) implicit
+toUnbranchedAxiom ax@(CoAxiom { co_ax_branches = branches })
+  = ax { co_ax_branches = toUnbranched branches }
 
 coAxiomNumPats :: CoAxiom br -> Int
 coAxiomNumPats = length . coAxBranchLHS . (flip coAxiomNthBranch 0)
@@ -605,6 +605,20 @@ CoAxiomRules come in four flavours:
     - Newtypes
     - Data family instances
     - Open type family instances
+
+Note [Avoiding allocating lots of CoAxiomRules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CoAxiomRule is a sum type of four alternatives, which is very nice. But
+there is a danger of allocating lots of (BuiltInFamRew bif) objects, every
+time we (say) need a type-family rewrite.
+
+To avoid this allocation, we cache the appropraite CoAxiomRule inside each
+   BuiltInFamRewrite, BuiltInFamInjectivity
+making a little circular data structure.  See the `bifrw_axr` field of
+BuiltInFamRewrite, and similarly the others.
+
+It's simple to do this, and saves a percent or two of allocation in programs
+that do a lot of type-family work.
 -}
 
 -- | CoAxiomRule describes a built-in axiom, one that we assume to be true
@@ -686,7 +700,10 @@ data BuiltInSynFamily = BuiltInSynFamily
 
 data BuiltInFamInjectivity  -- Argument and result role are always Nominal
   = BIF_Interact
-      { bifinj_name   :: FastString
+      { bifinj_name :: FastString
+      , bifinj_axr  :: CoAxiomRule -- Cached copy of (BuiltInFamINj this-bif)
+                                   -- See Note [Avoiding allocating lots of CoAxiomRules]
+
       , bifinj_proves :: TypeEqn -> Maybe TypeEqn
             -- ^ Always unary: just one TypeEqn argument
             -- Returns @Nothing@ when it doesn't like the supplied argument.
@@ -697,6 +714,9 @@ data BuiltInFamInjectivity  -- Argument and result role are always Nominal
 data BuiltInFamRewrite  -- Argument roles and result role are always Nominal
   = BIF_Rewrite
       { bifrw_name   :: FastString
+      , bifrw_axr    :: CoAxiomRule -- Cached copy of (BuiltInFamRew this-bif)
+                                    -- See Note [Avoiding allocating lots of CoAxiomRules]
+
       , bifrw_fam_tc :: TyCon       -- Needed for tyConsOfType
 
       , bifrw_arity  :: Arity       -- Number of type arguments needed

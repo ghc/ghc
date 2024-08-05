@@ -1198,7 +1198,7 @@ reduceTyFamApp_maybe envs role tc tys
 
   | Just builtin_fam  <- isBuiltInSynFamTyCon_maybe tc
   , Just (rewrite,ts,ty) <- tryMatchFam builtin_fam tys
-  = let co = mkAxiomCo (BuiltInFamRew rewrite) (map mkNomReflCo ts)
+  = let co = mkAxiomCo rewrite (map mkNomReflCo ts)
     in Just $ mkReduction co ty
 
   | otherwise
