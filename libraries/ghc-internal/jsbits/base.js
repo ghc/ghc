@@ -285,7 +285,7 @@ function h$rename(old_path, old_path_off, new_path, new_path_off) {
 #ifndef GHCJS_BROWSER
   if (h$isNode()) {
     try {
-      fs.renameSync(h$decodeUtf8z(old_path, old_path_off), h$decodeUtf8z(new_path, new_path_off));
+      h$fs.renameSync(h$decodeUtf8z(old_path, old_path_off), h$decodeUtf8z(new_path, new_path_off));
       return 0;
     } catch(e) {
       h$setErrno(e);
@@ -318,7 +318,7 @@ function h$realpath(path,off,resolved,resolved_off) {
 #ifndef GHCJS_BROWSER
   if (h$isNode()) {
     try {
-      var rp = h$encodeUtf8(fs.realpathSync(h$decodeUtf8z(path,off)));
+      var rp = h$encodeUtf8(h$fs.realpathSync(h$decodeUtf8z(path,off)));
       if (resolved !== null) {
         h$copyMutableByteArray(rp, 0, resolved, resolved_off, Math.min(resolved.len - resolved_off, rp.len));
         RETURN_UBX_TUP2(resolved, resolved_off);
@@ -1023,7 +1023,7 @@ function h$opendir(path) {
     throw "h$opendir unsupported";
   }
 
-  const d = fs.opendirSync(h$decodeUtf8z(path,0));
+  const d = h$fs.opendirSync(h$decodeUtf8z(path,0));
   RETURN_UBX_TUP2(d,0);
 }
 
