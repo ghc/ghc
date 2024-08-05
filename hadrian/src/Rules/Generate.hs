@@ -280,11 +280,12 @@ runInterpolations (Interpolations mk_substs) input = do
 interpolateSetting :: String -> Setting -> Interpolations
 interpolateSetting name settng = interpolateVar name $ setting settng
 
--- | Interpolate the @ProjectVersion@ and @ProjectVersionMunged@ variables.
+-- | Interpolate the @ProjectVersion@, @ProjectVersionMunged@, and @ProjectVersionForLib@ variables.
 projectVersion :: Interpolations
 projectVersion = mconcat
     [ interpolateSetting "ProjectVersion" ProjectVersion
     , interpolateSetting "ProjectVersionMunged" ProjectVersionMunged
+    , interpolateSetting "ProjectVersionForLib" ProjectVersionForLib
     ]
 
 packageVersions :: Interpolations
@@ -342,6 +343,9 @@ templateRules = do
     ]
   templateRule "libraries/ghci/ghci.cabal" $ projectVersion
   templateRule "libraries/ghc-heap/ghc-heap.cabal" $ projectVersion
+  templateRule "libraries/ghc-internal/ghc-internal.cabal" $ projectVersion
+  templateRule "libraries/ghc-experimental/ghc-experimental.cabal" $ projectVersion
+  templateRule "libraries/base/base.cabal" $ projectVersion
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
   templateRule "libraries/template-haskell/template-haskell.cabal" $ mconcat
     [ projectVersion

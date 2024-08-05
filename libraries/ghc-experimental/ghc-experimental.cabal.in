@@ -1,4 +1,8 @@
 cabal-version:      3.0
+
+-- WARNING: ghc-experimental.cabal is automatically generated from ghc-experimental.cabal.in
+-- Make sure you are editing ghc-experimental.cabal.in, not ghc-experimental.cabal
+
 name:               ghc-experimental
 version:            0.1.0.0
 synopsis:           Experimental features of GHC's standard library
@@ -33,7 +37,7 @@ library
         exposed-modules:  GHC.Wasm.Prim
     other-extensions:
     build-depends:    base ^>=4.20,
-                      ghc-internal >= 9.1001 && < 9.1002,
+                      ghc-internal == @ProjectVersionForLib@.*,
                       ghc-prim >= 0.11 && < 0.12
     hs-source-dirs:   src
     default-language: Haskell2010
