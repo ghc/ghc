@@ -103,4 +103,25 @@ AC_DEFUN([FP_SETUP_PROJECT_VERSION],
       ProjectVersionMunged="${VERSION_MAJOR}.${VERSION_MINOR}"
     fi
     AC_SUBST([ProjectVersionMunged])
+
+    # The version used for libraries tightly coupled with GHC (e.g.
+    # ghc-internal) which need a major version bump for every minor/patchlevel
+    # GHC version.
+    # Example: for GHC=9.10.1, ProjectVersionForLib=9.1001
+    #
+    # Just like with project version munged, we don't want to use the
+    # patchlevel version which changes every day, so if using GHC HEAD, the
+    # patchlevel = 00.
+    case $VERSION_MINOR in
+      ?) ProjectVersionForLibUpperHalf=${VERSION_MAJOR}.0${VERSION_MINOR} ;;
+      ??) ProjectVersionForLibUpperHalf=${VERSION_MAJOR}.${VERSION_MINOR} ;;
+      *) AC_MSG_ERROR([bad minor version in $PACKAGE_VERSION]) ;;
+    esac
+    # GHC HEAD uses patch level version > 20000000
+    case $ProjectPatchLevel1 in
+      ?) ProjectVersionForLib=${ProjectVersionForLibUpperHalf}0${ProjectPatchLevel1} ;;
+      ??) ProjectVersionInt=${ProjectVersionForLibUpperHalf}${ProjectPatchLevel1} ;;
+      *) ProjectVersionForLib=${ProjectVersionForLibUpperHalf}00
+    esac
+    AC_SUBST([ProjectVersionForLib])
 ])# FP_SETUP_PROJECT_VERSION

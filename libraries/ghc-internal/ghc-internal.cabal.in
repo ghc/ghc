@@ -1,8 +1,10 @@
 cabal-version:  3.0
+-- WARNING: ghc-internal.cabal is automatically generated from ghc-internal.cabal.in by
+-- the top-level ./configure script. Make sure you are editing ghc-internal.cabal.in, not ghc-internal.cabal.
 name:           ghc-internal
-version:        9.1001.0
--- NOTE: Don't forget to update ./changelog.md
-
+-- The project is ghc's version plus ghc-internal's version suffix.
+-- For example, for ghc=9.10.1, ghc-internal's version will be 9.1001.0.
+version:        @ProjectVersionForLib@.0
 license:        BSD-3-Clause
 license-file:   LICENSE
 maintainer:     Core Libraries Committee <core-libraries-committee@haskell.org>

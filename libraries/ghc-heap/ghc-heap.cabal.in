@@ -28,7 +28,7 @@ library
                   , containers       >= 0.6.2.1 && < 0.8
 
   if impl(ghc >= 9.9)
-    build-depends:  ghc-internal     >= 9.1001 && < 9.1002
+    build-depends:  ghc-internal     >= 9.900 && < @ProjectVersionForLib@.99999
 
   ghc-options:      -Wall
   if !os(ghcjs)
