@@ -1538,7 +1538,7 @@ function h$copyFromHeap(src, buf_d, buf_o, len) {
 
 // malloc and initialize a buffer on the HEAP
 function h$initHeapBufferLen(buf_d, buf_o, len) {
-  var buf_ptr = _malloc(len);
+  var buf_ptr = Module._malloc(len);
   h$copyToHeap(buf_d, buf_o, buf_ptr, len);
   return buf_ptr;
 }
@@ -1555,11 +1555,11 @@ function h$initHeapBuffer(str_d, str_o) {
 // temporarily malloc and initialize a buffer on the HEAP, pass it to the
 // continuation, then release the buffer
 function h$withOutBufferOnHeap(ptr_d, ptr_o, len, cont) {
-  var ptr = _malloc(len);
+  var ptr = Module._malloc(len);
   h$copyToHeap(ptr_d, ptr_o, ptr, len);
   var ret = cont(ptr);
   h$copyFromHeap(ptr, ptr_d, ptr_o, len);
-  _free(ptr);
+  Module._free(ptr);
   return ret;
 }
 
@@ -1567,10 +1567,10 @@ function h$withOutBufferOnHeap(ptr_d, ptr_o, len, cont) {
 // continuation. The buffer is freed from the heap when the continuation
 // returns.
 function h$withCBufferOnHeap(str_d, str_o, len, cont) {
-    var str = _malloc(len);
+    var str = Module._malloc(len);
     if(str_d !== null) h$copyToHeap(str_d, str_o, str, len);
     var ret = cont(str);
-    _free(str);
+    Module._free(str);
     return ret;
 }
 
@@ -1602,16 +1602,16 @@ function h$putHeapAddr(a,o,offset) {
 function h$copyCStringFromHeap(offset) {
   if(offset == 0) return null;
   var len = 0;
-  while(HEAPU8[offset+len] !== 0){ len++; };
+  while(Module.HEAPU8[offset+len] !== 0){ len++; };
   var str = h$newByteArray(len+1);
-  str.u8.set(HEAPU8.subarray(offset,offset+len+1));
+  str.u8.set(Module.HEAPU8.subarray(offset,offset+len+1));
   return str;
 }
 
 // get an array of n pointers from HEAP
 function h$copyPtrArrayFromHeap(offset,n) {
   var ptr = h$newByteArray(4*n);
-  ptr.u8.set(HEAPU8.subarray(offset, offset+4*n));
+  ptr.u8.set(Module.HEAPU8.subarray(offset, offset+4*n));
   return ptr;
 }
 
@@ -1641,13 +1641,15 @@ function h$registerFunPtrOnHeap(funptr_d, funptr_o, ask_ptr, ty, mkfn) {
   // same slot. Warning: this hack doesn't work if addFunction is called in
   // mkfn, but we check this with an assertion.
   if (ask_ptr) {
-    var cb_ptr = getEmptyTableSlot();
+    var cb_ptr = Module.getEmptyTableSlot();
     Module.removeFunction(cb_ptr);
 
     var cb  = mkfn(fun,cb_ptr);
     var ptr = Module.addFunction(cb,ty);
 
-    assert(cb_ptr === ptr, "h$registerJSFunPtrOnHeap: got different pointer offsets: " + cb_ptr + " and " + ptr);
+    if (cb_ptr !== ptr) {
+      throw ("h$registerJSFunPtrOnHeap: got different pointer offsets: " + cb_ptr + " and " + ptr);
+    }
     return ptr;
   }
   else {

@@ -795,14 +795,21 @@ rtsExterns =
     , "/** @extends {Uint8Array} @constructor */ function Buffer(arg1, encoding) {}"
     , "/** @return {!Buffer} */ Buffer.alloc = function() {}"
       -- Emscripten Module
+      -- Emscripten RTS's definitions we use in mem.js to support C sources.
+      -- When we link with emcc the actual definitions are linked, but when we
+      -- don't use C sources we don't use emcc and these variables are detected
+      -- as undefined.
     , "/** @type {*} */ var Module"
+    , "/** @type {!Int8Array} */ Module.HEAP8"
+    , "/** @type {!Uint8Array} */ Module.HEAPU8"
+    , "/** @return {number} */ Module.getEmptyTableSlot = function() {}"
+    , "/** @return {*} */ Module._free = function() {}"
+    , "/** @return {*} */ Module._malloc = function() {}"
       -- Mozilla's Narcissus (JS in JS interpreter implemented on top of SpiderMonkey) environment
     , "/** @type {*} */ var putstr"
     , "/** @type {*} */ var printErr"
       -- Apples's JavaScriptCore environment
     , "/** @type {*} */ var debug"
-      -- We use only Heap8 from Emscripten
-    , "/** @type {!Int8Array} */ Module.HEAP8"
     ])
 
 writeExterns :: FilePath -> IO ()
