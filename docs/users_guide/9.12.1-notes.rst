@@ -157,6 +157,7 @@ Runtime system
   https://github.com/haskell/core-libraries-committee/issues/231
   https://github.com/haskell/core-libraries-committee/issues/261
 
+- The `deprecation process of GHC.Pack <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>` has come its term. The module has now been removed from ``base``.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~

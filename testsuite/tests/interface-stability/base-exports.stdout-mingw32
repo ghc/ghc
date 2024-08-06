@@ -9251,15 +9251,6 @@ module GHC.OverloadedLabels where
     fromLabel :: a
     {-# MINIMAL fromLabel #-}
 
-module GHC.Pack where
-  -- Safety: None
-  packCString# :: [GHC.Types.Char] -> GHC.Prim.ByteArray#
-  unpackAppendCString# :: GHC.Prim.Addr# -> [GHC.Types.Char] -> [GHC.Types.Char]
-  unpackCString :: forall a. GHC.Internal.Ptr.Ptr a -> [GHC.Types.Char]
-  unpackCString# :: GHC.Prim.Addr# -> [GHC.Types.Char]
-  unpackFoldrCString# :: forall a. GHC.Prim.Addr# -> (GHC.Types.Char -> a -> a) -> a -> a
-  unpackNBytes# :: GHC.Prim.Addr# -> GHC.Prim.Int# -> [GHC.Types.Char]
-
 module GHC.Profiling where
   -- Safety: Safe
   requestHeapCensus :: GHC.Types.IO ()

@@ -217,7 +217,6 @@ Library
         , GHC.Num
         , GHC.OldList
         , GHC.OverloadedLabels
-        , GHC.Pack
         , GHC.Profiling
         , GHC.Ptr
         , GHC.Read
