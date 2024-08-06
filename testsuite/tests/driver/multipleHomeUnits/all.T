@@ -70,6 +70,7 @@ test('multipleHomeUnits_recomp_th', [filter_stdout_lines(r'.*Compiling.*'), copy
 test('multipleHomeUnits_shared', [extra_files([ 'A.hs', 'unitShared1', 'unitShared2'])], multiunit_compile, [['unitShared1', 'unitShared2'], '-fhide-source-paths'])
 
 test('multipleHomeUnits_shared_ghci', [extra_files([ 'shared.script', 'A.hs', 'unitShared1', 'unitShared2']), extra_run_opts('-unit @unitShared1 -unit @unitShared2')], ghci_script, ['shared.script'])
+test('t25139', [extra_files(['t25139/'])], multiunit_compile, [['t25139/u1', 't25139/u2', 't25139/u3', 't25139/u4'], '-v0'])
 
 test('T25122',
     [ extra_files(
