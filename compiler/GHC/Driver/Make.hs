@@ -58,6 +58,7 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
+import GHC.Driver.DynFlags (ReexportedModule(..))
 import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
@@ -365,7 +366,7 @@ warnMissingHomeModules dflags targets mod_graph =
 -- Check that any modules we want to reexport or hide are actually in the package.
 warnUnknownModules :: HscEnv -> DynFlags -> ModuleGraph -> IO DriverMessages
 warnUnknownModules hsc_env dflags mod_graph = do
-  reexported_warns <- filterM check_reexport (Set.toList reexported_mods)
+  reexported_warns <- filterM check_reexport reexported_mods
   return $ final_msgs hidden_warns reexported_warns
   where
     diag_opts = initDiagOpts dflags
@@ -382,7 +383,7 @@ warnUnknownModules hsc_env dflags mod_graph = do
     lookupModule mn = findImportedModule hsc_env mn NoPkgQual
 
     check_reexport mn = do
-      fr <- lookupModule mn
+      fr <- lookupModule (reexportFrom mn)
       case fr of
         Found _ m -> return (moduleUnitId m == homeUnitId_ dflags)
         _ -> return True
@@ -2217,9 +2218,9 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
               | isHaskellSigFilename src_fn = HsigFile
               | otherwise                   = HsSrcFile
 
-        when (pi_mod_name /= wanted_mod) $
+        when (pi_mod_name /= moduleName mod) $
                 throwE $ singleMessage $ mkPlainErrorMsgEnvelope pi_mod_name_loc
-                       $ DriverFileModuleNameMismatch pi_mod_name wanted_mod
+                       $ DriverFileModuleNameMismatch pi_mod_name (moduleName mod)
 
         let instantiations = homeUnitInstantiations home_unit
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name instantiations)) $

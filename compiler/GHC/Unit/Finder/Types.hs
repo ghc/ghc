@@ -102,7 +102,7 @@ data FinderOpts = FinderOpts
   , finder_workingDirectory :: Maybe OsPath
   , finder_thisPackageName  :: Maybe FastString
   , finder_hiddenModules    :: Set.Set ModuleName
-  , finder_reexportedModules :: Set.Set ModuleName
+  , finder_reexportedModules :: M.Map ModuleName ModuleName -- Reverse mapping, if you are looking for this name then look for this module.
   , finder_hieDir :: Maybe OsPath
   , finder_hieSuf :: OsString
   , finder_hiDir :: Maybe OsPath
@@ -112,4 +112,4 @@ data FinderOpts = FinderOpts
   , finder_objectSuf :: OsString
   , finder_dynObjectSuf :: OsString
   , finder_stubDir :: Maybe OsPath
-  } deriving Show
+  }

@@ -165,8 +165,8 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
     home_pkg_import (uid, opts)
       -- If the module is reexported, then look for it as if it was from the perspective
       -- of that package which reexports it.
-      | mod_name `Set.member` finder_reexportedModules opts =
-        findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) mod_name NoPkgQual
+      | Just real_mod_name <- mod_name `M.lookup` finder_reexportedModules opts =
+        findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) real_mod_name NoPkgQual
       | mod_name `Set.member` finder_hiddenModules opts =
         return (mkHomeHidden uid)
       | otherwise =

@@ -24,7 +24,7 @@ import GHC.Prelude
 import Data.Bifunctor
 import Data.Typeable
 
-import GHC.Driver.DynFlags (DynFlags, PackageArg, gopt)
+import GHC.Driver.DynFlags (DynFlags, PackageArg, gopt, ReexportedModule)
 import GHC.Driver.Flags (GeneralFlag (Opt_BuildingCabalPackage))
 import GHC.Types.Error
 import GHC.Unit.Module
@@ -152,7 +152,7 @@ data DriverMessage where
   {-| DriverUnknown is a warning that arises when a user tries to
       reexport a module which isn't part of that unit.
   -}
-  DriverUnknownReexportedModules :: UnitId -> [ModuleName] -> DriverMessage
+  DriverUnknownReexportedModules :: UnitId -> [ReexportedModule] -> DriverMessage
 
   {-| DriverUnknownHiddenModules is a warning that arises when a user tries to
       hide a module which isn't part of that unit.
