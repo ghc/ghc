@@ -46,6 +46,7 @@ static Arena *prof_arena;
 
 static unsigned int CC_ID  = 1;
 static unsigned int CCS_ID = 1;
+static unsigned int DUMPED_CC_ID  = 0; // we have dumped all CCs up to this id to the eventlog
 
 /* Globals for opening the profiling log file(s)
  */
@@ -138,10 +139,11 @@ dumpCostCentresToEventLog(void)
 {
 #if defined(PROFILING)
     CostCentre *cc, *next;
-    for (cc = CC_LIST; cc != NULL; cc = next) {
+    for (cc = CC_LIST; cc != NULL && cc->ccID != DUMPED_CC_ID; cc = next) {
         next = cc->link;
         traceHeapProfCostCentre(cc->ccID, cc->label, cc->module,
                                 cc->srcloc, cc->is_caf);
+        DUMPED_CC_ID = cc->ccID < DUMPED_CC_ID ? DUMPED_CC_ID : cc->ccID;
     }
 #endif
 }
@@ -193,8 +195,6 @@ void initProfiling (void)
     if (RtsFlags.CcFlags.doCostCentres) {
         initTimeProfiling();
     }
-
-    traceInitEvent(dumpCostCentresToEventLog);
 }
 
 
@@ -205,6 +205,7 @@ void initProfiling (void)
 void refreshProfilingCCSs (void)
 {
     ACQUIRE_LOCK(&ccs_mutex);
+    traceInitEvent(dumpCostCentresToEventLog);
     // make CCS_MAIN the parent of all the pre-defined CCSs.
     CostCentreStack *next;
     for (CostCentreStack *ccs = CCS_LIST; ccs != NULL; ) {
