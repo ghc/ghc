@@ -1848,7 +1848,7 @@ ppr_iface_tc_app pp ctxt_prec tc tys =
      -> ppr_kind_type ctxt_prec
 
      | not (isSymOcc (nameOccName (ifaceTyConName tc)))
-     -> pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
+     -> pprIfacePrefixApp ctxt_prec (pprInfixIfaceTycon tc) (map (pp appPrec) tys)
 
      | [ ty1@(_, Required), ty2@(_, Required) ] <- tys
          -- Infix, two visible arguments (we know nothing of precedence though).
@@ -1857,7 +1857,7 @@ ppr_iface_tc_app pp ctxt_prec tc tys =
      -> pprIfaceInfixApp ctxt_prec (ppr tc) (pp opPrec ty1) (pp opPrec ty2)
 
      | otherwise
-     -> pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
+     -> pprIfacePrefixApp ctxt_prec (pprPrefixIfaceTycon tc) (map (pp appPrec) tys)
 
 data TupleOrSum = IsSum | IsTuple TupleSort
   deriving (Eq)
@@ -2070,7 +2070,13 @@ instance Outputable IfLclName where
   ppr = ppr . ifLclNameFS
 
 instance Outputable IfaceTyCon where
-  ppr tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
+  ppr = pprInfixIfaceTycon
+
+pprInfixIfaceTycon :: IfaceTyCon -> SDoc
+pprInfixIfaceTycon tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
+
+pprPrefixIfaceTycon :: IfaceTyCon -> SDoc
+pprPrefixIfaceTycon tc = pprPromotionQuote tc <> parens (ppr (ifaceTyConName tc))
 
 instance Outputable IfaceTyConInfo where
   ppr (IfaceTyConInfo { ifaceTyConIsPromoted = prom

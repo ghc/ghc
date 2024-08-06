@@ -209,3 +209,5 @@ test('Test24755', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24755'])
 test('Test24753', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24753'])
 test('Test24771', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24771'])
 test('Test24159', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24159'])
+
+test('T24237', normal, compile_fail, [''])
