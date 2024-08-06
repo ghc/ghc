@@ -1847,17 +1847,16 @@ ppr_iface_tc_app pp ctxt_prec tc tys =
      | tc `ifaceTyConHasKey` liftedTypeKindTyConKey
      -> ppr_kind_type ctxt_prec
 
-     | not (isSymOcc (nameOccName (ifaceTyConName tc)))
-     -> pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
+     | isSymOcc (nameOccName (ifaceTyConName tc))
 
-     | [ ty1@(_, Required), ty2@(_, Required) ] <- tys
+     , [ ty1@(_, Required), ty2@(_, Required) ] <- tys
          -- Infix, two visible arguments (we know nothing of precedence though).
          -- Don't apply this special case if one of the arguments is invisible,
          -- lest we print something like (@LiftedRep -> @LiftedRep) (#15941).
-     -> pprIfaceInfixApp ctxt_prec (ppr tc) (pp opPrec ty1) (pp opPrec ty2)
+     -> pprIfaceInfixApp ctxt_prec (pprIfaceTyCon tc) (pp opPrec ty1) (pp opPrec ty2)
 
      | otherwise
-     -> pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
+     -> pprIfacePrefixApp ctxt_prec (pprParendIfaceTyCon tc) (map (pp appPrec) tys)
 
 data TupleOrSum = IsSum | IsTuple TupleSort
   deriving (Eq)
@@ -2070,7 +2069,18 @@ instance Outputable IfLclName where
   ppr = ppr . ifLclNameFS
 
 instance Outputable IfaceTyCon where
-  ppr tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
+  ppr = pprIfaceTyCon
+
+-- | Print an `IfaceTyCon` with a promotion tick if needed, without parens,
+-- suitable for use in infix contexts
+pprIfaceTyCon :: IfaceTyCon -> SDoc
+pprIfaceTyCon tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
+
+-- | Print an `IfaceTyCon` with a promotion tick if needed, possibly with parens,
+-- suitable for use in prefix contexts
+pprParendIfaceTyCon :: IfaceTyCon -> SDoc
+pprParendIfaceTyCon tc = pprPromotionQuote tc <> pprPrefixVar (isSymOcc (nameOccName tc_name)) (ppr tc_name)
+  where tc_name = ifaceTyConName tc
 
 instance Outputable IfaceTyConInfo where
   ppr (IfaceTyConInfo { ifaceTyConIsPromoted = prom
