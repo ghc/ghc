@@ -120,10 +120,9 @@ linker_error3:
 
 .PHONY: T7072
 T7072:
-	"$(TEST_HC)" -c T7072-obj.c -o T7072-obj.o
-	"$(TEST_HC)" -c T7072-main.c -o T7072-main.o
-	"$(TEST_HC)" T7072-main.c -o T7072-main -no-hs-main -debug
-	./T7072-main T7072-obj.o
+	"$(TEST_HC)" load-object.c -o load-object -no-hs-main -debug
+	"$(TEST_HC)" -c T7072.c -o T7072.o
+	./load-object T7072.o
 
 .PHONY: T20494
 T20494:
@@ -140,3 +139,9 @@ T20918:
 T21618:
 	"$(TEST_HC)" -c T21618_c.c -o T21618_c.o
 	echo main | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T21618_c.o T21618.hs
+
+.PHONY: reloc-none
+reloc-none:
+	"$(TEST_HC)" load-object.c -o load-object -no-hs-main -debug
+	"$(TEST_HC)" -c reloc-none.c -o reloc-none.o
+	./load-object reloc-none.o

@@ -12,10 +12,10 @@ int main (int argc, char *argv[])
 
     initLinker_(0);
 
-    // Load object file argv[1] repeatedly
+    // Load object file argv[1] once
 
     if (argc != 2) {
-        errorBelch("usage: T7072-main <object-file>");
+        errorBelch("usage: load-object <object-file>");
         exit(1);
     }
 
