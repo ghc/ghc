@@ -55,7 +55,7 @@ import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 
 import GHC.CmmToAsm.Config
 

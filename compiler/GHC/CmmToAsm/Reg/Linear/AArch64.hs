@@ -3,7 +3,7 @@ module GHC.CmmToAsm.Reg.Linear.AArch64 where
 import GHC.Prelude
 
 import GHC.CmmToAsm.AArch64.Regs
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.Platform.Reg
 
 import GHC.Utils.Outputable

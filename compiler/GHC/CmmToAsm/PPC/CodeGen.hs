@@ -41,7 +41,7 @@ import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.PIC
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Config
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Reg.Target
 import GHC.Platform

@@ -120,7 +120,9 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class (RegClass(..))
+import GHC.Platform.Reg.Class (RegArch (..), registerArch)
+import qualified GHC.Platform.Reg.Class.Separate as Separate
+import qualified GHC.Platform.Reg.Class.Unified  as Unified
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
@@ -705,11 +707,7 @@ saveClobberedTemps clobbered dying
             platform <- getPlatform
 
             freeRegs <- getFreeRegsR
-            let regclass
-                  | isIntFormat fmt
-                  = RcInteger
-                  | otherwise
-                  = RcFloatOrVector
+            let regclass = targetClassOfRealReg platform reg
                 freeRegs_thisClass = frGetFreeRegs platform regclass freeRegs
 
             case filter (`notElem` clobbered) freeRegs_thisClass of
@@ -751,11 +749,13 @@ clobberRegs clobbered
  = do   platform <- getPlatform
         freeregs <- getFreeRegsR
 
-        let gpRegs  = frGetFreeRegs platform RcInteger       freeregs :: [RealReg]
-            vecRegs = frGetFreeRegs platform RcFloatOrVector freeregs :: [RealReg]
+        let allRegClasses =
+               case registerArch (platformArch platform) of
+                 Unified  ->  Unified.allRegClasses
+                 Separate -> Separate.allRegClasses
+            allFreeRegs = foldMap (\ rc -> frGetFreeRegs platform rc freeregs) allRegClasses
 
-        let extra_clobbered = [ r | r <- clobbered
-                                  , r `elem` (gpRegs ++ vecRegs) ]
+        let extra_clobbered = [ r | r <- clobbered, r `elem` allFreeRegs ]
 
         setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs extra_clobbered
 
@@ -877,7 +877,7 @@ allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
 allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegFormat vr fmt) rs assig spill_loc
  = do   platform <- getPlatform
         freeRegs <- getFreeRegsR
-        let regclass = if isIntFormat fmt then RcInteger else RcFloatOrVector
+        let regclass = classOfVirtualReg (platformArch platform) vr
             freeRegs_thisClass = frGetFreeRegs platform regclass freeRegs :: [RealReg]
 
         -- Can we put the variable into a register it already was?

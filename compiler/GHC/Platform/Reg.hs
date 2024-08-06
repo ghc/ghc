@@ -36,6 +36,9 @@ import GHC.Utils.Panic
 import GHC.Types.Unique
 import GHC.Builtin.Uniques
 import GHC.Platform.Reg.Class
+import qualified GHC.Platform.Reg.Class.Unified  as Unified
+import qualified GHC.Platform.Reg.Class.Separate as Separate
+import GHC.Platform.ArchOS
 
 -- | An identifier for a primitive real machine register.
 type RegNo
@@ -92,14 +95,27 @@ instance Outputable VirtualReg where
 renameVirtualReg :: Unique -> VirtualReg -> VirtualReg
 renameVirtualReg u r = r { virtualRegUnique = u }
 
-classOfVirtualReg :: VirtualReg -> RegClass
-classOfVirtualReg vr
+classOfVirtualReg :: Arch -> VirtualReg -> RegClass
+classOfVirtualReg arch vr
   = case vr of
-        VirtualRegI{}   -> RcInteger
-        VirtualRegHi{}  -> RcInteger
-        VirtualRegD{}   -> RcFloatOrVector
-        VirtualRegV128{} -> RcFloatOrVector
-
+        VirtualRegI{} ->
+          case regArch of
+            Unified  ->  Unified.RcInteger
+            Separate -> Separate.RcInteger
+        VirtualRegHi{} ->
+          case regArch of
+            Unified  ->  Unified.RcInteger
+            Separate -> Separate.RcInteger
+        VirtualRegD{} ->
+          case regArch of
+            Unified  ->  Unified.RcFloatOrVector
+            Separate -> Separate.RcFloat
+        VirtualRegV128{} ->
+          case regArch of
+            Unified  ->  Unified.RcFloatOrVector
+            Separate -> Separate.RcVector
+  where
+    regArch = registerArch arch
 
 -- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform
 -- when supplied with the vreg for the lower-half of the quantity.

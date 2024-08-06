@@ -9,6 +9,8 @@ import GHC.Prelude
 
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
+import qualified GHC.Platform.Reg.Class.Unified  as Unified
+import qualified GHC.Platform.Reg.Class.Separate as Separate
 
 import GHC.CmmToAsm.Config
 import GHC.Utils.Panic
@@ -68,6 +70,11 @@ instance FR AArch64.FreeRegs where
 -- | For debugging output.
 allFreeRegs :: FR freeRegs => Platform -> freeRegs -> [RealReg]
 allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs plat rcls fr) allRegClasses
+  where
+    allRegClasses =
+      case registerArch (platformArch plat) of
+        Unified  -> Unified.allRegClasses
+        Separate -> Separate.allRegClasses
 
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config = case platformArch (ncgPlatform config) of

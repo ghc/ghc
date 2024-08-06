@@ -139,7 +139,7 @@ targetRegDotColor platform
 targetClassOfReg :: Platform -> Reg -> RegClass
 targetClassOfReg platform reg
  = case reg of
-   RegVirtual vr -> classOfVirtualReg vr
+   RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
    RegReal rr -> targetClassOfRealReg platform rr
 
 mapRegFormatSet :: HasDebugCallStack => (Reg -> Reg) -> UniqSet RegFormat -> UniqSet RegFormat

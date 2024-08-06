@@ -49,7 +49,7 @@ import GHC.Prelude
 import GHC.Data.FastString
 
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.CmmToAsm.Format
 
 import GHC.Cmm

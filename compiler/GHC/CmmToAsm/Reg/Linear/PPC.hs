@@ -4,7 +4,7 @@ module GHC.CmmToAsm.Reg.Linear.PPC where
 import GHC.Prelude
 
 import GHC.CmmToAsm.PPC.Regs
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.Platform.Reg
 
 import GHC.Utils.Outputable

@@ -52,7 +52,7 @@ import GHC.Data.FastString
 
 import GHC.Platform.Regs
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )

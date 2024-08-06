@@ -322,7 +322,7 @@ buildGraph platform code
         -- Add the reg-reg conflicts to the graph.
         let conflictBag         = unionManyBags conflictList
         let graph_conflict
-                = foldr graphAddConflictSet Color.initGraph conflictBag
+                = foldr (graphAddConflictSet platform) Color.initGraph conflictBag
 
         -- Add the coalescences edges to the graph.
         let moveBag
@@ -330,7 +330,7 @@ buildGraph platform code
                             (unionManyBags moveList)
 
         let graph_coalesce
-                = foldr graphAddCoalesce graph_conflict moveBag
+                = foldr (graphAddCoalesce platform) graph_conflict moveBag
 
         return  graph_coalesce
 
@@ -338,17 +338,19 @@ buildGraph platform code
 -- | Add some conflict edges to the graph.
 --   Conflicts between virtual and real regs are recorded as exclusions.
 graphAddConflictSet
-        :: UniqSet RegFormat
+        :: Platform
+        -> UniqSet RegFormat
         -> Color.Graph VirtualReg RegClass RealReg
         -> Color.Graph VirtualReg RegClass RealReg
 
-graphAddConflictSet regs graph
- = let  virtuals = takeVirtualRegs regs
+graphAddConflictSet platform regs graph
+ = let  arch = platformArch platform
+        virtuals = takeVirtualRegs regs
         reals    = takeRealRegs regs
 
-        graph1  = Color.addConflicts virtuals classOfVirtualReg graph
+        graph1  = Color.addConflicts virtuals (classOfVirtualReg arch) graph
 
-        graph2  = foldr (\(r1, r2) -> Color.addExclusion r1 classOfVirtualReg r2)
+        graph2  = foldr (\(r1, r2) -> Color.addExclusion r1 (classOfVirtualReg arch) r2)
                         graph1
                         [ (vr, rr)
                         | vr <- nonDetEltsUniqSet virtuals
@@ -361,24 +363,25 @@ graphAddConflictSet regs graph
 -- | Add some coalescence edges to the graph
 --   Coalescences between virtual and real regs are recorded as preferences.
 graphAddCoalesce
-        :: (Reg, Reg)
+        :: Platform
+        -> (Reg, Reg)
         -> Color.Graph VirtualReg RegClass RealReg
         -> Color.Graph VirtualReg RegClass RealReg
 
-graphAddCoalesce (r1, r2) graph
+graphAddCoalesce platform (r1, r2) graph
         | RegReal rr            <- r1
         , RegVirtual vr         <- r2
-        = Color.addPreference (vr, classOfVirtualReg vr) rr graph
+        = Color.addPreference (vr, classOfVirtualReg arch vr) rr graph
 
         | RegReal rr            <- r2
         , RegVirtual vr         <- r1
-        = Color.addPreference (vr, classOfVirtualReg vr) rr graph
+        = Color.addPreference (vr, classOfVirtualReg arch vr) rr graph
 
         | RegVirtual vr1        <- r1
         , RegVirtual vr2        <- r2
         = Color.addCoalesce
-                (vr1, classOfVirtualReg vr1)
-                (vr2, classOfVirtualReg vr2)
+                (vr1, classOfVirtualReg arch vr1)
+                (vr2, classOfVirtualReg arch vr2)
                 graph
 
         -- We can't coalesce two real regs, but there could well be existing
@@ -387,6 +390,8 @@ graphAddCoalesce (r1, r2) graph
         | RegReal _             <- r1
         , RegReal _             <- r2
         = graph
+        where
+          arch = platformArch platform
 
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.

@@ -7,11 +7,13 @@ where
 import GHC.Prelude
 
 import GHC.Platform.Reg.Class
+import qualified GHC.Platform.Reg.Class.Unified  as Unified
+import qualified GHC.Platform.Reg.Class.Separate as Separate
 import GHC.Platform.Reg
 
 import GHC.Data.Graph.Base
 
-import GHC.Types.Unique.Set
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet, UniqSet )
 import GHC.Platform
 import GHC.Utils.Panic
 
@@ -101,75 +103,56 @@ trivColorable
         -> (RegClass -> RealReg    -> Int)
         -> Triv VirtualReg RegClass RealReg
 
-trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
-        | -- Allocatable are all regs of this class, where freeReg == True (MachRegs.h)
-          let cALLOCATABLE_REGS_INTEGER
-                  =        (case platformArch platform of
-                            ArchX86       -> 3
-                            ArchX86_64    -> 5
-                            ArchPPC       -> 16
-                            ArchPPC_64 _  -> 15
-                            ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            -- N.B. x18 is reserved by the platform on AArch64/Darwin
-                            -- 32 - Base - Sp - Hp - R1..R6 - SpLim - IP0 - SP - LR - FP - X18
-                            -- -> 32 - 15 = 17
-                            -- (one stack pointer for Haskell, one for C)
-                            ArchAArch64   -> 17
-                            ArchAlpha     -> panic "trivColorable ArchAlpha"
-                            ArchMipseb    -> panic "trivColorable ArchMipseb"
-                            ArchMipsel    -> panic "trivColorable ArchMipsel"
-                            ArchS390X     -> panic "trivColorable ArchS390X"
-                            ArchRISCV64   -> panic "trivColorable ArchRISCV64"
-                            ArchLoongArch64->panic "trivColorable ArchLoongArch64"
-                            ArchJavaScript-> panic "trivColorable ArchJavaScript"
-                            ArchWasm32    -> panic "trivColorable ArchWasm32"
-                            ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_INTEGER
-                                (virtualRegSqueeze RcInteger)
-                                conflicts
+trivColorable platform virtualRegSqueeze realRegSqueeze rc conflicts exclusions =
+  let allocatableRegsThisClass = allocatableRegs (platformArch platform) rc
+      count2 = accSqueeze 0       allocatableRegsThisClass (virtualRegSqueeze rc) conflicts
+      count3 = accSqueeze count2  allocatableRegsThisClass (realRegSqueeze    rc) exclusions
+  in count3 < allocatableRegsThisClass
 
-        , count3        <- accSqueeze  count2    cALLOCATABLE_REGS_INTEGER
-                                (realRegSqueeze   RcInteger)
-                                exclusions
-
-        = count3 < cALLOCATABLE_REGS_INTEGER
-
-trivColorable platform virtualRegSqueeze realRegSqueeze RcFloatOrVector conflicts exclusions
-        | let cALLOCATABLE_REGS_DOUBLE
-                  =        (case platformArch platform of
-                            ArchX86       -> 8
-                            -- in x86 32bit mode sse2 there are only
-                            -- 8 XMM registers xmm0 ... xmm7
-                            ArchX86_64    -> 10
-                            -- in x86_64 there are 16 XMM registers
-                            -- xmm0 .. xmm15, here 10 is a
-                            -- "don't need to solve conflicts" count that
-                            -- was chosen at some point in the past.
-                            ArchPPC       -> 26
-                            ArchPPC_64 _  -> 20
-                            ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchAArch64   -> 24 -- 32 - F1 .. F4, D1..D4 - it's odd but see Note [AArch64 Register assignments] for our reg use.
-                                                -- Seems we reserve different registers for D1..D4 and F1 .. F4 somehow, we should fix this.
-                            ArchAlpha     -> panic "trivColorable ArchAlpha"
-                            ArchMipseb    -> panic "trivColorable ArchMipseb"
-                            ArchMipsel    -> panic "trivColorable ArchMipsel"
-                            ArchS390X     -> panic "trivColorable ArchS390X"
-                            ArchRISCV64   -> panic "trivColorable ArchRISCV64"
-                            ArchLoongArch64->panic "trivColorable ArchLoongArch64"
-                            ArchJavaScript-> panic "trivColorable ArchJavaScript"
-                            ArchWasm32    -> panic "trivColorable ArchWasm32"
-                            ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_DOUBLE
-                                (virtualRegSqueeze RcFloatOrVector)
-                                conflicts
-
-        , count3        <- accSqueeze  count2    cALLOCATABLE_REGS_DOUBLE
-                                (realRegSqueeze   RcFloatOrVector)
-                                exclusions
-
-        = count3 < cALLOCATABLE_REGS_DOUBLE
-
-
+allocatableRegs :: Arch -> RegClass -> Int
+allocatableRegs arch rc =
+  case arch of
+    ArchX86 -> case rc of
+      Unified.RcInteger       -> 3
+      Unified.RcFloatOrVector -> 8
+        -- in x86 32bit mode sse2 there are only
+        -- 8 XMM registers xmm0 ... xmm7
+    ArchX86_64    -> case rc of
+      Unified.RcInteger       -> 5
+      Unified.RcFloatOrVector -> 10
+        -- in x86_64 there are 16 XMM registers
+        -- xmm0 .. xmm15, here 10 is a
+        -- "don't need to solve conflicts" count that
+        -- was chosen at some point in the past.
+    ArchPPC       -> case rc of
+      Unified.RcInteger       -> 16
+      Unified.RcFloatOrVector -> 26
+    ArchPPC_64 _  -> case rc of
+      Unified.RcInteger       -> 15
+      Unified.RcFloatOrVector -> 20
+    ArchARM _ _ _ -> panic "trivColorable ArchARM"
+    ArchAArch64   -> case rc of
+      Unified.RcInteger       -> 17
+        -- N.B. x18 is reserved by the platform on AArch64/Darwin
+        -- 32 - Base - Sp - Hp - R1..R6 - SpLim - IP0 - SP - LR - FP - X18
+        -- -> 32 - 15 = 17
+        -- (one stack pointer for Haskell, one for C)
+      Unified.RcFloatOrVector -> 24
+        -- 32 - F1 .. F4, D1..D4 - it's odd but see Note [AArch64 Register assignments] for our reg use.
+        -- Seems we reserve different registers for D1..D4 and F1 .. F4 somehow, we should fix this.
+    ArchAlpha     -> panic "trivColorable ArchAlpha"
+    ArchMipseb    -> panic "trivColorable ArchMipseb"
+    ArchMipsel    -> panic "trivColorable ArchMipsel"
+    ArchS390X     -> panic "trivColorable ArchS390X"
+    ArchRISCV64   -> case rc of
+      -- TODO for Sven Tennie
+      Separate.RcInteger -> 14
+      Separate.RcFloat   -> 20
+      Separate.RcVector  -> 20
+    ArchLoongArch64->panic "trivColorable ArchLoongArch64"
+    ArchJavaScript-> panic "trivColorable ArchJavaScript"
+    ArchWasm32    -> panic "trivColorable ArchWasm32"
+    ArchUnknown   -> panic "trivColorable ArchUnknown"
 
 
 -- Specification Code ----------------------------------------------------------

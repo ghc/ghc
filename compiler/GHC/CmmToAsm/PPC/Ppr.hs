@@ -22,7 +22,7 @@ import GHC.CmmToAsm.PPC.Cond
 import GHC.CmmToAsm.Ppr
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
@@ -510,7 +510,7 @@ pprInstr platform instr = case instr of
         char '\t',
         case targetClassOfReg platform reg1 of
             RcInteger -> text "mr"
-            _ -> text "fmr",
+            RcFloatOrVector -> text "fmr",
         char '\t',
         pprReg reg1,
         text ", ",

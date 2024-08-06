@@ -15,7 +15,7 @@ import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 
 import GHC.Platform.Regs
 import GHC.Cmm.BlockId
