@@ -294,10 +294,13 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
         for (unsigned i = 0; i < relTab->n_relocations; i++) {
             Elf_Rel *rel = &relTab->relocations[i];
 
+            if(ELF64_R_TYPE(rel->r_info) == COMPAT_R_AARCH64_NONE)
+              continue;
+
             ElfSymbol *symbol =
                     findSymbol(oc,
                                relTab->sectionHeader->sh_link,
-                               ELF64_R_SYM((Elf64_Xword)rel->r_info));
+                               ELF64_R_SYM(rel->r_info));
 
             CHECK(0x0 != symbol);
 
@@ -320,10 +323,13 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
 
             Elf_Rela *rel = &relaTab->relocations[i];
 
+            if(ELF64_R_TYPE(rel->r_info) == COMPAT_R_AARCH64_NONE)
+              continue;
+
             ElfSymbol *symbol =
                     findSymbol(oc,
                                relaTab->sectionHeader->sh_link,
-                               ELF64_R_SYM((Elf64_Xword)rel->r_info));
+                               ELF64_R_SYM(rel->r_info));
 
             CHECK(0x0 != symbol);
             CHECK(0x0 != symbol->addr);
