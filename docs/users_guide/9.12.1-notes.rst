@@ -223,3 +223,4 @@ for further change information.
     libraries/Win32/Win32.cabal:                         Dependency of ``ghc`` library
     libraries/xhtml/xhtml.cabal:                         Dependency of ``haddock`` executable
     libraries/os-string/os-string.cabal:                 Dependency of ``filepath`` library
+    libraries/file-io/file-io.cabal:                     Dependency of ``directory`` library

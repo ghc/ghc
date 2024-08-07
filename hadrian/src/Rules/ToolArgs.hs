@@ -138,6 +138,7 @@ toolTargets = [ cabalSyntax
               , directory
               , process
               , filepath
+              , fileio
               , osString
               -- , ghc     -- # depends on ghc library
               -- , runGhc  -- # depends on ghc library
