@@ -119,11 +119,11 @@ cpsTop logger platform cfg dus proc =
       (proc_points, dus) <-
          if splitting_proc_points
             then do
-              let (pp, dus) = {-# SCC "minimalProcPointSet" #-} runUniqueDSM dus $
+              let (pp, dus') = {-# SCC "minimalProcPointSet" #-} runUniqueDSM dus $
                     minimalProcPointSet platform call_pps g
               dumpWith logger Opt_D_dump_cmm_proc "Proc points"
                     FormatCMM (pdoc platform l $$ ppr pp $$ pdoc platform g)
-              return (pp, dus)
+              return (pp, dus')
             else
               return (call_pps, dus)
 
