@@ -118,3 +118,6 @@
 [submodule "hadrian/vendored/Cabal"]
 	path = hadrian/vendored/Cabal
 	url = https://gitlab.haskell.org/ghc/packages/Cabal.git
+[submodule "libraries/file-io"]
+	path = libraries/file-io
+	url = https://gitlab.haskell.org/ghc/packages/file-io.git

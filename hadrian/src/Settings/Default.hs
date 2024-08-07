@@ -83,8 +83,9 @@ stage0Packages = do
     return $ [ cabalSyntax
              , cabal
              , compiler
-             , directory -- depends on filepath
+             , directory -- depends on filepath, fileIo
              , filepath -- depends on os-string
+             , fileio
              , ghc
              , ghcBoot
              , ghcBootThNext
