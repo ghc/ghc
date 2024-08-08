@@ -1939,12 +1939,14 @@ primop  UnsafePinMutableByteArrayOp "unsafePinMutableByteArray#" GenPrimOp
    which can break code using compact region. If this is a concern it's always possible
    to explicitly allocate a new array and copy over the contents.}
    with out_of_line = True
-        has_side_effects = True
+        effect = ReadWriteEffect
 
 primop  MutableByteArrayIsPinnedOp "isMutableByteArrayPinned#" GenPrimOp
    MutableByteArray# s -> Int#
    {Determine whether a 'MutableByteArray#' is guaranteed not to move.}
    with out_of_line = True
+        -- This disallows speculative execution
+        effect = CanFail
 
 primop  MutableByteArrayIsGcPinnedOp "isMutableByteArrayGcPinned#" GenPrimOp
    MutableByteArray# s -> Int#

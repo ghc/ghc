@@ -1114,7 +1114,7 @@ Pinned Byte Arrays
 
 A pinned byte array is one that is not allowed
 to move. Consequently, it has a stable address that can be safely
-requested with ``byteArrayContents#``. Not that being pinned doesn't
+requested with ``byteArrayContents#``. Note that being pinned doesn't
 prevent the byteArray from being gc'ed in the same fashion a regular
 byte array would be.
 There are a handful of primitive functions in :base-ref:`GHC.Exts.`
