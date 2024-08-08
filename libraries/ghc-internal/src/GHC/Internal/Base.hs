@@ -755,7 +755,7 @@ efficient translations anyway.
 
 -- | @since base-4.9.0.0
 instance Semigroup (NonEmpty a) where
-        (a :| as) <> ~(b :| bs) = a :| (as ++ b : bs)
+        (a :| as) <> (b :| bs) = a :| (as ++ b : bs)
 
 -- | @since base-4.9.0.0
 instance Semigroup b => Semigroup (a -> b) where
@@ -1720,10 +1720,10 @@ instance Applicative NonEmpty where
 
 -- | @since base-4.9.0.0
 instance Monad NonEmpty where
-  ~(a :| as) >>= f = b :| (bs ++ bs')
+  (a :| as) >>= f = b :| (bs ++ bs')
     where b :| bs = f a
           bs' = as >>= toList . f
-          toList ~(c :| cs) = c : cs
+          toList (c :| cs) = c : cs
 
 
 ----------------------------------------------

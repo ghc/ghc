@@ -69,7 +69,7 @@ instance IsList (NonEmpty a) where
   fromList (a:as) = a :| as
   fromList [] = errorWithoutStackTrace "NonEmpty.fromList: empty list"
 
-  toList ~(a :| as) = a : as
+  toList (a :| as) = a : as
 
 -- | @since base-4.8.0.0
 instance IsList Version where
