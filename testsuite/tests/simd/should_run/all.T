@@ -43,6 +43,12 @@ test('simd011', [ unless(have_cpu_feature('fma'), skip)
                 , extra_hc_opts('-mfma')
                 ], compile_and_run, [''])
 test('simd012', [], compile_and_run, [''])
+test('simd013',
+     [ req_c
+     , unless(arch('x86_64'), skip) # because the C file uses Intel intrinsics
+     ],
+     compile_and_run, ['simd013C.c'])
+
 
 
 test('T22187', [],compile,[''])
