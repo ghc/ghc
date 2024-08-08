@@ -34,6 +34,7 @@ import GHC.Core.Map.Type
 import GHC.Core.Predicate
 import GHC.Core.TyCon
 import GHC.Core.TyCon.Env
+import GHC.Builtin.Names( anyTyConKey )
 
 import GHC.Data.Bag
 import GHC.Data.Maybe
@@ -192,7 +193,9 @@ emptyFunEqs :: TcAppMap a
 emptyFunEqs = emptyTcAppMap
 
 findFunEq :: FunEqMap a -> TyCon -> [Type] -> Maybe a
-findFunEq m tc tys = findTcApp m tc tys
+findFunEq m tc tys
+  | tc `hasKey` anyTyConKey = Nothing
+  | otherwise               = findTcApp m tc tys
 
 findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- Get inert function equation constraints that have the given tycon

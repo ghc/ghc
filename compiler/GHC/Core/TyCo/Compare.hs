@@ -37,6 +37,7 @@ import GHC.Types.Var
 import GHC.Types.Unique
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Builtin.Names( anyTyConKey )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -226,6 +227,9 @@ tcEqTypeNoKindCheck = eqTypeNoKindCheck
 -- are different, just checks the common prefix of arguments.
 tcEqTyConApps :: TyCon -> [Type] -> TyCon -> [Type] -> Bool
 tcEqTyConApps tc1 args1 tc2 args2
+  | tc1 `hasKey` anyTyConKey
+  = False
+  | otherwise
   = tc1 == tc2 &&
     and (zipWith tcEqTypeNoKindCheck args1 args2)
     -- No kind check necessary: if both arguments are well typed, then
