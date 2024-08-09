@@ -14,6 +14,7 @@ module GHC.Utils.Monad
         , zipWith3MNE
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
         , mapAccumLM
+        , foldMapM
         , mapSndM
         , concatMapM
         , mapMaybeM
@@ -207,6 +208,12 @@ concatMapM f xs = liftM concat (mapM f xs)
 mapMaybeM :: Applicative m => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM f = foldr g (pure [])
   where g a = liftA2 (maybe id (:)) (f a)
+
+-- | Like 'foldMap', but with an applicative or monadic function.
+foldMapM :: forall b m f a. (Monoid b, Applicative m, Foldable f) => (a -> m b) -> f a -> m b
+foldMapM f = foldr (\ a b -> mappend <$> f a <*> b) (pure mempty)
+{-# INLINE foldMapM #-}
+  -- INLINE to benefit from foldr fusion
 
 -- | Monadic version of 'any', aborts the computation at the first @True@ value
 anyM :: (Monad m, Foldable f) => (a -> m Bool) -> f a -> m Bool

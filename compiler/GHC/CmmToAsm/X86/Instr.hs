@@ -892,7 +892,7 @@ mkLoadInstr config (RegFormat reg fmt) delta slot =
 
 -- | A move instruction for moving the entire contents of an operand
 -- at the given 'Format'.
-movInstr :: NCGConfig -> Format -> (Operand -> Operand -> Instr)
+movInstr :: HasDebugCallStack => NCGConfig -> Format -> (Operand -> Operand -> Instr)
 movInstr config fmt =
   case fmt of
     VecFormat _ sFmt ->
@@ -914,17 +914,38 @@ movInstr config fmt =
         _ -> sorry $ "Unhandled SIMD vector width: " ++ show (8 * bytes) ++ " bits"
     _ -> MOV fmt
   where
+    plat    = ncgPlatform config
     bytes   = formatInBytes fmt
     avx     = ncgAvxEnabled config
     avx2    = ncgAvx2Enabled config
     avx512f = ncgAvx512fEnabled config
     avx_move sFmt =
       if isFloatScalarFormat sFmt
-      then VMOVU   fmt
+      then \ op1 op2 ->
+              if
+                | OpReg r1 <- op1
+                , OpReg r2 <- op2
+                , targetClassOfReg plat r1 /= targetClassOfReg plat r2
+                -> pprPanic "movInstr: VMOVU between incompatible registers"
+                     ( vcat [ text "fmt:" <+> ppr fmt
+                            , text "r1:" <+> ppr r1
+                            , text "r2:" <+> ppr r2 ] )
+                | otherwise
+                -> VMOVU   fmt op1 op2
       else VMOVDQU fmt
     sse_move sFmt =
       if isFloatScalarFormat sFmt
-      then MOVU   fmt
+      then \ op1 op2 ->
+              if
+                | OpReg r1 <- op1
+                , OpReg r2 <- op2
+                , targetClassOfReg plat r1 /= targetClassOfReg plat r2
+                -> pprPanic "movInstr: MOVU between incompatible registers"
+                     ( vcat [ text "fmt:" <+> ppr fmt
+                            , text "r1:" <+> ppr r1
+                            , text "r2:" <+> ppr r2 ] )
+                | otherwise
+                -> MOVU   fmt op1 op2
       else MOVDQU fmt
     -- NB: we are using {V}MOVU and not {V}MOVA, because we have no guarantees
     -- about the stack being sufficiently aligned (even for even numbered stack slots).
@@ -989,12 +1010,7 @@ mkRegRegMoveInstr
     -> Reg
     -> Instr
 mkRegRegMoveInstr config fmt src dst =
-  assertPpr (targetClassOfReg platform src == targetClassOfReg platform dst)
-    (vcat [ text "mkRegRegMoveInstr: incompatible register classes"
-          , text "fmt:" <+> ppr fmt
-          , text "src:" <+> ppr src
-          , text "dst:" <+> ppr dst ]) $
-    movInstr config fmt' (OpReg src) (OpReg dst)
+  movInstr config fmt' (OpReg src) (OpReg dst)
       -- Move the platform word size, at a minimum
   where
     platform = ncgPlatform config
