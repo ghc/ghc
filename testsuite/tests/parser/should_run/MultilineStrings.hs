@@ -1,6 +1,8 @@
 {-# LANGUAGE MultilineStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-tabs #-}
 
+import Language.Haskell.TH (runQ)
 import Text.Printf (printf)
 
 {-
@@ -65,6 +67,14 @@ main = do
         
       b
         """
+
+  putStrLn "\n-- TH"
+  prints $ runQ [|
+      """
+      hello
+      world
+      """
+    |]
   where
     prints :: String -> IO ()
     prints = print

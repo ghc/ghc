@@ -46,3 +46,6 @@
 "\n"
 "\\n"
 "a\n\n  b"
+
+-- TH
+LitE (StringL "hello\nworld")
