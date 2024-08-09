@@ -2507,14 +2507,6 @@ case where `e` is trivial):
 And here are a few more technical criteria for when it is *not* sound to
 eta-reduce that are specific to Core and GHC:
 
-(L) With linear types, eta-reduction can break type-checking:
-      f :: A ⊸ B
-      g :: A -> B
-      g = \x. f x
-    The above is correct, but eta-reducing g would yield g=f, the linter will
-    complain that g and f don't have the same type. NB: Not unsound in the
-    dynamic semantics, but unsound according to the static semantics of Core.
-
 (J) We may not undersaturate join points.
     See Note [Invariants on join points] in GHC.Core, and #20599.
 
@@ -2774,7 +2766,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
       | fun `elemUnVarSet` rec_ids          -- Criterion (R)
       = False -- Don't eta-reduce in fun in its own recursive RHSs
 
-      | cantEtaReduceFun fun                -- Criteria (L), (J), (W), (B)
+      | cantEtaReduceFun fun                -- Criteria (J), (W), (B)
       = False -- Function can't be eta reduced to arity 0
               -- without violating invariants of Core and GHC
 
@@ -2844,7 +2836,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_arg _ _ _ _ = Nothing
 
 -- | Can we eta-reduce the given function
--- See Note [Eta reduction soundness], criteria (B), (J), (W) and (L).
+-- See Note [Eta reduction soundness], criteria (B), (J), and (W).
 cantEtaReduceFun :: Id -> Bool
 cantEtaReduceFun fun
   =    hasNoBinding fun -- (B)
@@ -2857,11 +2849,6 @@ cantEtaReduceFun fun
     || (isJust (idCbvMarks_maybe fun)) -- (W)
        -- Don't undersaturate StrictWorkerIds.
        -- See Note [CBV Function Ids] in GHC.Types.Id.Info.
-
-    ||  isLinearType (idType fun) -- (L)
-       -- Don't perform eta reduction on linear types.
-       -- If `f :: A %1-> B` and `g :: A -> B`,
-       -- then `g x = f x` is OK but `g = f` is not.
 
 
 {- *********************************************************************

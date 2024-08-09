@@ -3170,6 +3170,19 @@ examples are documented in the linear-type implementation wiki page
 
     The rule "ex" must match . So the linter must accept `m' f`.
 
+* EXAMPLE 4: eta-reduction
+   Eta-expansion can change linear functions into unrestricted functions
+
+     f :: A %1 -> B
+
+     g :: A %Many -> B
+     g = \x -> f x
+
+   Eta-reduction undoes this and produces:
+
+     g :: A %Many -> B
+     g = f
+
 Historical note: In the original linear-types implementation, we had tried to
 make every optimisation pass produce code that passes `-dlinear-core-lint`. It
 had proved very difficult. We kept finding corner case after corner
