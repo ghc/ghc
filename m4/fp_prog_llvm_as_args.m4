@@ -4,10 +4,14 @@
 # Sets the arguments of the LLVM assembler ($LLVMAS; usually clang.)
 AC_DEFUN([FP_PROG_LLVM_AS_ARGS],
 [
+AC_REQUIRE([GHC_LLVM_TARGET_SET_VAR])
+AC_REQUIRE([GHC_LLVM_HOST_TARGET_SET_VAR])
 # Cross-compiling: We need to define the target triple for the LLVM assembler.
-# Though, it does not hurt to define it for the non-cross case as well.
-LlvmAsArgsTarget="--target=$TargetPlatform"
-LlvmAsArgsHost="--target=$HostPlatform"
+# Otherwise, LLVMAS tries to build for the host architecture. Defining the host
+# target is not strictly necessary, but it usually helps to be specific about
+# the build options.
+LlvmAsArgsTarget="--target=$LlvmTarget"
+LlvmAsArgsHost="--target=$LlvmHostTarget"
 
 # Create a minimal LLVM IR file for testing
 cat > test.ll <<EOF

@@ -57,3 +57,13 @@ AC_DEFUN([GHC_LLVM_TARGET_SET_VAR], [
     GHC_LLVM_TARGET([$target],[$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
   fi
 ])
+
+# GHC_LLVM_HOST_TARGET_SET_VAR
+# -----------------------
+#
+# Sets the cannonical target variable of the host. This stub exists so other
+# macros can require it.
+AC_DEFUN([GHC_LLVM_HOST_TARGET_SET_VAR], [
+  AC_REQUIRE([FPTOOLS_SET_PLATFORMS_VARS])
+  GHC_LLVM_TARGET([$host],[$host_cpu],[$host_vendor],[$host_os],[LlvmHostTarget])
+])
