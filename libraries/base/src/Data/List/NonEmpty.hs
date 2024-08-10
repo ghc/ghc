@@ -222,7 +222,7 @@ singleton a = a :| []
 
 -- | Prepend an element to the stream.
 (<|) :: a -> NonEmpty a -> NonEmpty a
-a <| (b :| bs) = a :| b : bs
+a <| bs = a :| toList bs
 
 -- | Synonym for '<|'.
 cons :: a -> NonEmpty a -> NonEmpty a
