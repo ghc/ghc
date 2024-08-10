@@ -1,6 +1,9 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ParallelListComp #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -73,22 +76,29 @@ import GHC.Types.Tickish ( GenTickish(..) )
 import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:
+import GHC.Data.Maybe ( expectJust )
 import GHC.Types.ForeignCall ( CCallConv(..) )
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
+import GHC.Utils.Monad ( foldMapM )
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Types.Unique.DSM ( getUniqueM )
 
+import qualified Data.Semigroup as S
+
 import Control.Monad
+import Control.Monad.Trans.State.Strict
+  ( StateT, evalStateT, get, put )
+import Control.Monad.Trans.Class (lift)
 import Data.Foldable (fold)
 import Data.Int
 import Data.Maybe
 import Data.Word
 
-import qualified Data.Map as M
+import qualified Data.Map as Map
 
 is32BitPlatform :: NatM Bool
 is32BitPlatform = do
@@ -227,7 +237,7 @@ addSpUnwindings instr@(DELTA d) = do
     let platform = ncgPlatform config
     if ncgDwarfUnwindings config
         then do lbl <- mkAsmTempLabel <$> getUniqueM
-                let unwind = M.singleton MachSp (Just $ UwReg (GlobalRegUse MachSp (bWord platform)) $ negate d)
+                let unwind = Map.singleton MachSp (Just $ UwReg (GlobalRegUse MachSp (bWord platform)) $ negate d)
                 return $ toOL [ instr, UNWIND lbl unwind ]
         else return (unitOL instr)
 addSpUnwindings instr = return $ unitOL instr
@@ -328,10 +338,10 @@ stmtToInstrs bid stmt = do
 
       CmmUnwind regs -> do
         let to_unwind_entry :: (GlobalReg, Maybe CmmExpr) -> UnwindTable
-            to_unwind_entry (reg, expr) = M.singleton reg (fmap (toUnwindExpr platform) expr)
+            to_unwind_entry (reg, expr) = Map.singleton reg (fmap (toUnwindExpr platform) expr)
         case foldMap to_unwind_entry regs of
-          tbl | M.null tbl -> return nilOL
-              | otherwise  -> do
+          tbl | Map.null tbl -> return nilOL
+              | otherwise    -> do
                   lbl <- mkAsmTempLabel <$> getUniqueM
                   return $ unitOL $ UNWIND lbl tbl
 
@@ -836,12 +846,12 @@ iselExpr64ParallelBin op e1 e2 = do
 -- targetted for any particular type like Int8, Int32 etc
 data VectorArithInstns = VA_Add | VA_Sub | VA_Mul | VA_Div | VA_Min | VA_Max
 
-getRegister :: CmmExpr -> NatM Register
+getRegister :: HasDebugCallStack => CmmExpr -> NatM Register
 getRegister e = do platform <- getPlatform
                    is32Bit <- is32BitPlatform
                    getRegister' platform is32Bit e
 
-getRegister' :: Platform -> Bool -> CmmExpr -> NatM Register
+getRegister' :: HasDebugCallStack => Platform -> Bool -> CmmExpr -> NatM Register
 
 getRegister' platform is32Bit (CmmReg reg)
   = case reg of
@@ -2264,7 +2274,7 @@ getNonClobberedOperand (CmmLit lit) =
     return (OpAddr addr, code)
   else do
     platform <- getPlatform
-    if is32BitLit platform lit && not (isFloatType (cmmLitType platform lit))
+    if is32BitLit platform lit && isIntFormat (cmmTypeFormat (cmmLitType platform lit))
     then return (OpImm (litToImm lit), nilOL)
     else getNonClobberedOperand_generic (CmmLit lit)
 
@@ -2321,13 +2331,13 @@ getOperand (CmmLit lit) = do
     else do
 
   platform <- getPlatform
-  if is32BitLit platform lit && not (isFloatType (cmmLitType platform lit))
+  if is32BitLit platform lit && (isIntFormat $ cmmTypeFormat (cmmLitType platform lit))
     then return (OpImm (litToImm lit), nilOL)
     else getOperand_generic (CmmLit lit)
 
 getOperand (CmmLoad mem ty _) = do
   is32Bit <- is32BitPlatform
-  if not (isFloatType ty) && (if is32Bit then not (isWord64 ty) else True)
+  if isIntFormat (cmmTypeFormat ty) && (if is32Bit then not (isWord64 ty) else True)
      then do
        Amode src mem_code <- getAmode mem
        return (OpAddr src, mem_code)
@@ -2358,7 +2368,7 @@ addAlignmentCheck align reg =
   where
     check :: Format -> Reg -> InstrBlock
     check fmt reg =
-        assert (not $ isFloatFormat fmt) $
+        assert (isIntFormat fmt) $
         toOL [ TEST fmt (OpImm $ ImmInt $ align-1) (OpReg reg)
              , JXX_GBL NE $ ImmCLbl mkBadAlignmentLabel
              ]
@@ -2403,7 +2413,7 @@ isSuitableFloatingPointLit _ = False
 getRegOrMem :: CmmExpr -> NatM (Operand, InstrBlock)
 getRegOrMem e@(CmmLoad mem ty _) = do
   is32Bit <- is32BitPlatform
-  if not (isFloatType ty) && (if is32Bit then not (isWord64 ty) else True)
+  if isIntFormat (cmmTypeFormat ty) && (if is32Bit then not (isWord64 ty) else True)
      then do
        Amode src mem_code <- getAmode mem
        return (OpAddr src, mem_code)
@@ -3246,6 +3256,15 @@ genCCall bid addr conv dest_regs args = do
     else genCCall64 addr conv dest_regs args'
   return (instrs0 `appOL` instrs1)
 
+maybePromoteCArg :: Platform -> Width -> (CmmExpr, ForeignHint) -> CmmExpr
+maybePromoteCArg platform wto (arg, hint)
+ | wfrom < wto = case hint of
+     SignedHint -> CmmMachOp (MO_SS_Conv wfrom wto) [arg]
+     _          -> CmmMachOp (MO_UU_Conv wfrom wto) [arg]
+ | otherwise   = arg
+ where
+   wfrom = cmmExprWidth platform arg
+
 genCCall32 :: CmmExpr           -- ^ address of the function to call
            -> ForeignConvention -- ^ calling convention
            -> [CmmFormal]       -- ^ where to put the result
@@ -3278,7 +3297,7 @@ genCCall32 addr (ForeignConvention _ argHints _ _) dest_regs args = do
                                      DELTA (delta-8)]
                     )
 
-              | isFloatType arg_ty = do
+              | isFloatType arg_ty || isVecType arg_ty = do
                 (reg, code) <- getSomeReg arg
                 delta <- getDeltaNat
                 setDeltaNat (delta-size)
@@ -3288,11 +3307,10 @@ genCCall32 addr (ForeignConvention _ argHints _ _) dest_regs args = do
                                       let addr = AddrBaseIndex (EABaseReg esp)
                                                                 EAIndexNone
                                                                 (ImmInt 0)
-                                          format = floatFormat (typeWidth arg_ty)
+                                          format = cmmTypeFormat arg_ty
                                       in
 
-                                      -- assume SSE2
-                                       MOV format (OpReg reg) (OpAddr addr)
+                                       movInstr config format (OpReg reg) (OpAddr addr)
 
                                      ]
                                )
@@ -3316,7 +3334,7 @@ genCCall32 addr (ForeignConvention _ argHints _ _) dest_regs args = do
         let
             -- Align stack to 16n for calls, assuming a starting stack
             -- alignment of 16n - word_size on procedure entry. Which we
-            -- maintiain. See Note [Stack Alignment on X86] in rts/StgCRun.c.
+            -- maintain. See Note [Stack Alignment on X86] in rts/StgCRun.c.
             sizes               = map (arg_size_bytes . cmmExprType platform) (reverse args)
             raw_arg_size        = sum sizes + platformWordSizeInBytes platform
             arg_pad_size        = (roundTo 16 $ raw_arg_size) - raw_arg_size
@@ -3361,6 +3379,8 @@ genCCall32 addr (ForeignConvention _ argHints _ _) dest_regs args = do
             -- assign the results, if necessary
             assign_code []     = nilOL
             assign_code [dest]
+              | isVecType ty
+              = unitOL (mkRegRegMoveInstr config (cmmTypeFormat ty) xmm0 r_dest)
               | isFloatType ty =
                   -- we assume SSE2
                   let tmp_amode = AddrBaseIndex (EABaseReg esp)
@@ -3402,188 +3422,89 @@ genCCall64 :: CmmExpr           -- ^ address of function to call
 genCCall64 addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
     config <- getConfig
     let platform = ncgPlatform config
-    -- load up the register arguments
-    let args_hints = zip args (argHints ++ repeat NoHint)
-    let prom_args = map (maybePromoteCArg platform W32) args_hints
+        args_hints = zip args (argHints ++ repeat NoHint)
+        prom_args = map (maybePromoteCArg platform W32) args_hints
+        word_size = platformWordSizeInBytes platform
+        wordFmt = archWordFormat (target32Bit platform)
 
-    let load_args :: [CmmExpr]
-                  -> [RegWithFormat]         -- int regs avail for args
-                  -> [RegWithFormat]         -- FP regs avail for args
-                  -> InstrBlock    -- code computing args
-                  -> InstrBlock    -- code assigning args to ABI regs
-                  -> NatM ([CmmExpr],[RegWithFormat],[RegWithFormat],InstrBlock,InstrBlock)
-        -- no more regs to use
-        load_args args [] [] code acode     =
-            return (args, [], [], code, acode)
-
-        -- no more args to push
-        load_args [] aregs fregs code acode =
-            return ([], aregs, fregs, code, acode)
-
-        load_args (arg : rest) aregs fregs code acode
-            | isFloatType arg_rep = case fregs of
-                 []     -> push_this_arg
-                 (RegWithFormat r _fmt:rs) -> do
-                    (code',acode') <- reg_this_arg r
-                    load_args rest aregs rs code' acode'
-            | otherwise           = case aregs of
-                 []     -> push_this_arg
-                 (RegWithFormat r _fmt:rs) -> do
-                    (code',acode') <- reg_this_arg r
-                    load_args rest rs fregs code' acode'
-            where
-
-              -- put arg into the list of stack pushed args
-              push_this_arg = do
-                 (args',ars,frs,code',acode')
-                     <- load_args rest aregs fregs code acode
-                 return (arg:args', ars, frs, code', acode')
-
-              -- pass the arg into the given register
-              reg_this_arg r
-                -- "operand" args can be directly assigned into r
-                | isOperand platform arg = do
-                    arg_code <- getAnyReg arg
-                    return (code, (acode `appOL` arg_code r))
-                -- The last non-operand arg can be directly assigned after its
-                -- computation without going into a temporary register
-                | all (isOperand platform) rest = do
-                    arg_code   <- getAnyReg arg
-                    return (code `appOL` arg_code r,acode)
-
-                -- other args need to be computed beforehand to avoid clobbering
-                -- previously assigned registers used to pass parameters (see
-                -- #11792, #12614). They are assigned into temporary registers
-                -- and get assigned to proper call ABI registers after they all
-                -- have been computed.
-                | otherwise     = do
-                    arg_code <- getAnyReg arg
-                    tmp      <- getNewRegNat arg_fmt
-                    let
-                      code'  = code `appOL` arg_code tmp
-                      acode' = acode `snocOL` mkRegRegMoveInstr config arg_fmt tmp r
-                    return (code',acode')
-
-              arg_rep = cmmExprType platform arg
-              arg_fmt = cmmTypeFormat arg_rep
-
-        load_args_win :: [CmmExpr]
-                      -> [RegWithFormat]        -- used int regs
-                      -> [RegWithFormat]        -- used FP regs
-                      -> [(Reg, Reg)] -- (int, FP) regs avail for args
-                      -> InstrBlock
-                      -> NatM ([CmmExpr],[RegWithFormat],[RegWithFormat],InstrBlock,InstrBlock)
-        load_args_win args usedInt usedFP [] code
-            = return (args, usedInt, usedFP, code, nilOL)
-            -- no more regs to use
-        load_args_win [] usedInt usedFP _ code
-            = return ([], usedInt, usedFP, code, nilOL)
-            -- no more args to push
-        load_args_win (arg : rest) usedInt usedFP
-                      ((ireg, freg) : regs) code
-            | isFloatType arg_rep = do
-                 arg_code <- getAnyReg arg
-                 load_args_win rest (RegWithFormat ireg II64: usedInt) (RegWithFormat freg FF64 : usedFP) regs
-                               (code `appOL`
-                                arg_code freg `snocOL`
-                                -- If we are calling a varargs function
-                                -- then we need to define ireg as well
-                                -- as freg
-                                MOVD FF64 (OpReg freg) (OpReg ireg))
-            | otherwise = do
-                 arg_code <- getAnyReg arg
-                 load_args_win rest (RegWithFormat ireg II64: usedInt) usedFP regs
-                               (code `appOL` arg_code ireg)
-            where
-              arg_rep = cmmExprType platform arg
-
-        arg_size = 8 -- always, at the mo
-
-        push_args [] code = return code
-        push_args (arg:rest) code
-           | isFloatType arg_rep = do
-             (arg_reg, arg_code) <- getSomeReg arg
-             delta <- getDeltaNat
-             setDeltaNat (delta-arg_size)
-             let fmt = floatFormat width
-                 code' = code `appOL` arg_code `appOL` toOL [
-                            SUB (intFormat (wordWidth platform)) (OpImm (ImmInt arg_size)) (OpReg rsp),
-                            DELTA (delta-arg_size),
-                            MOV fmt (OpReg arg_reg) (OpAddr (spRel platform 0))]
-             push_args rest code'
-
-           | otherwise = do
-             -- Arguments can be smaller than 64-bit, but we still use @PUSH
-             -- II64@ - the usual calling conventions expect integers to be
-             -- 8-byte aligned.
-             massert (width <= W64)
-             (arg_op, arg_code) <- getOperand arg
-             delta <- getDeltaNat
-             setDeltaNat (delta-arg_size)
-             let code' = code `appOL` arg_code `appOL` toOL [
-                                    PUSH II64 arg_op,
-                                    DELTA (delta-arg_size)]
-             push_args rest code'
-            where
-              arg_rep = cmmExprType platform arg
-              width = typeWidth arg_rep
-
-        leaveStackSpace n = do
-             delta <- getDeltaNat
-             setDeltaNat (delta - n * arg_size)
-             return $ toOL [
-                         SUB II64 (OpImm (ImmInt (n * platformWordSizeInBytes platform))) (OpReg rsp),
-                         DELTA (delta - n * arg_size)]
-
-    (stack_args, int_regs_used, fp_regs_used, load_args_code, assign_args_code)
-         <-
-        if platformOS platform == OSMinGW32
-        then load_args_win prom_args [] [] (allArgRegs platform) nilOL
-        else do
-           let intArgRegs = map (\r -> RegWithFormat r II64) $ allIntArgRegs platform
-               fpArgRegs = map (\r -> RegWithFormat r FF64) $ allFPArgRegs platform
-           (stack_args, aregs, fregs, load_args_code, assign_args_code)
-               <- load_args prom_args intArgRegs fpArgRegs nilOL nilOL
-           let used_regs rs as = dropTail (length rs) as
-               fregs_used      = used_regs fregs fpArgRegs
-               aregs_used      = used_regs aregs intArgRegs
-           return (stack_args, aregs_used, fregs_used, load_args_code
-                                                      , assign_args_code)
+    -- Compute the code for loading arguments into registers,
+    -- returning the leftover arguments that will need to be passed on the stack.
+    --
+    -- NB: the code for loading references to data into registers is computed
+    -- later (in 'pushArgs'), because we don't yet know where the data will be
+    -- placed (due to alignment requirements).
+    LoadArgs
+      { stackArgs       = proper_stack_args
+      , stackDataArgs   = stack_data_args
+      , usedRegs        = arg_regs_used
+      , computeArgsCode = compute_args_code
+      , assignArgsCode  = assign_args_code
+      }
+      <- loadArgs config prom_args
 
     let
-        wordFmt = archWordFormat (target32Bit platform)
-        arg_regs_used = int_regs_used ++ fp_regs_used
-        arg_regs = [RegWithFormat eax wordFmt] ++ arg_regs_used
-                -- for annotating the call instruction with
-        sse_regs = length fp_regs_used
-        arg_stack_slots = if platformOS platform == OSMinGW32
-                          then length stack_args + length (allArgRegs platform)
-                          else length stack_args
-        tot_arg_size = arg_size * arg_stack_slots
 
+    -- Pad all arguments and data passed on stack to align them properly.
+        (stk_args_with_padding, args_aligned_16) =
+          padStackArgs platform (proper_stack_args, stack_data_args)
 
     -- Align stack to 16n for calls, assuming a starting stack
     -- alignment of 16n - word_size on procedure entry. Which we
     -- maintain. See Note [Stack Alignment on X86] in rts/StgCRun.c
-    let word_size = platformWordSizeInBytes platform
-    (real_size, adjust_rsp) <-
-        if (tot_arg_size + word_size) `rem` 16 == 0
-            then return (tot_arg_size, nilOL)
-            else do -- we need to adjust...
-                delta <- getDeltaNat
-                setDeltaNat (delta - word_size)
-                return (tot_arg_size + word_size, toOL [
-                                SUB II64 (OpImm (ImmInt word_size)) (OpReg rsp),
-                                DELTA (delta - word_size) ])
+        need_realign_call = args_aligned_16
+    align_call_code <-
+      if need_realign_call
+      then addStackPadding word_size
+      else return nilOL
 
-    -- push the stack args, right to left
-    push_code <- push_args (reverse stack_args) nilOL
-    -- On Win64, we also have to leave stack space for the arguments
-    -- that we are passing in registers
-    lss_code <- if platformOS platform == OSMinGW32
-                then leaveStackSpace (length (allArgRegs platform))
-                else return nilOL
+    -- Compute the code that pushes data to the stack, and also
+    -- the code that loads references to that data into registers,
+    -- when the data is passed by reference in a register.
+    (load_data_refs, push_code) <-
+      pushArgs config proper_stack_args stk_args_with_padding
+
+    -- On Windows, leave stack space for the arguments that we are passing
+    -- in registers (the so-called shadow space).
+    let shadow_space =
+          if platformOS platform == OSMinGW32
+          then 8 * length (allArgRegs platform)
+            -- NB: the shadow store is always 8 * 4 = 32 bytes large,
+            -- i.e. the cumulative size of rcx, rdx, r8, r9 (see 'allArgRegs').
+          else 0
+    shadow_space_code <- addStackPadding shadow_space
+
+    let total_args_size
+          = shadow_space
+          + sum (map (stackArgSpace platform) stk_args_with_padding)
+        real_size =
+          total_args_size + if need_realign_call then word_size else 0
+
+    -- End of argument passing.
+    --
+    -- Next step: emit the appropriate call instruction.
     delta <- getDeltaNat
+
+    let -- The System V AMD64 ABI requires us to set %al to the number of SSE2
+        -- registers that contain arguments, if the called routine
+        -- is a varargs function.  We don't know whether it's a
+        -- varargs function or not, so we have to assume it is.
+        --
+        -- It's not safe to omit this assignment, even if the number
+        -- of SSE2 regs in use is zero.  If %al is larger than 8
+        -- on entry to a varargs function, seg faults ensue.
+        nb_sse_regs_used = count (isFloatFormat . regWithFormat_format) arg_regs_used
+        assign_eax_sse_regs
+          = unitOL (MOV II32 (OpImm (ImmInt nb_sse_regs_used)) (OpReg eax))
+          -- Note: we do this on Windows as well. It's not entirely clear why
+          -- it's needed (the Windows X86_64 calling convention does not
+          -- dictate it), but we get segfaults without it.
+          --
+          -- One test case exhibiting the issue is T20030_test1j;
+          -- if you change this, make sure to run it in a loop for a while
+          -- with at least -j8 to check.
+
+        -- Live registers we are annotating the call instruction with
+        arg_regs = [RegWithFormat eax wordFmt] ++ arg_regs_used
 
     -- deal with static vs dynamic call targets
     (callinsns,_cconv) <- case addr of
@@ -3592,17 +3513,6 @@ genCCall64 addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
       _ -> do
         (dyn_r, dyn_c) <- getSomeReg addr
         return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
-
-    let
-        -- The x86_64 ABI requires us to set %al to the number of SSE2
-        -- registers that contain arguments, if the called routine
-        -- is a varargs function.  We don't know whether it's a
-        -- varargs function or not, so we have to assume it is.
-        --
-        -- It's not safe to omit this assignment, even if the number
-        -- of SSE2 regs in use is zero.  If %al is larger than 8
-        -- on entry to a varargs function, seg faults ensue.
-        assign_eax n = unitOL (MOV II32 (OpImm (ImmInt n)) (OpReg eax))
 
     let call = callinsns `appOL`
                toOL (
@@ -3619,7 +3529,7 @@ genCCall64 addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
         assign_code []     = nilOL
         assign_code [dest] =
           unitOL $
-            movInstr config fmt (OpReg reg) (OpReg r_dest)
+            mkRegRegMoveInstr config fmt reg r_dest
           where
             reg = if isIntFormat fmt then rax else xmm0
             fmt = cmmTypeFormat rep
@@ -3627,24 +3537,621 @@ genCCall64 addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
             r_dest = getRegisterReg platform (CmmLocal dest)
         assign_code _many = panic "genForeignCall.assign_code many"
 
-    return (adjust_rsp          `appOL`
+    return (align_call_code     `appOL`
             push_code           `appOL`
-            load_args_code      `appOL`
+            compute_args_code   `appOL`
             assign_args_code    `appOL`
-            lss_code            `appOL`
-            assign_eax sse_regs `appOL`
+            load_data_refs      `appOL`
+            shadow_space_code   `appOL`
+            assign_eax_sse_regs `appOL`
             call                `appOL`
             assign_code dest_regs)
 
+-- -----------------------------------------------------------------------------
+-- Loading arguments into registers for 64-bit C calls.
 
-maybePromoteCArg :: Platform -> Width -> (CmmExpr, ForeignHint) -> CmmExpr
-maybePromoteCArg platform wto (arg, hint)
- | wfrom < wto = case hint of
-     SignedHint -> CmmMachOp (MO_SS_Conv wfrom wto) [arg]
-     _          -> CmmMachOp (MO_UU_Conv wfrom wto) [arg]
- | otherwise   = arg
- where
-   wfrom = cmmExprWidth platform arg
+-- | Information needed to know how to pass arguments in a C call,
+-- and in particular how to load them into registers.
+data LoadArgs
+  = LoadArgs
+  -- | Arguments that should be passed on the stack
+  { stackArgs     :: [RawStackArg]
+  -- | Additional values to store onto the stack.
+  , stackDataArgs :: [CmmExpr]
+  -- | Which registers are we using for argument passing?
+  , usedRegs      :: [RegWithFormat]
+  -- | The code to compute arguments into (possibly temporary) registers.
+  , computeArgsCode :: InstrBlock
+  -- | The code to assign arguments to registers used for argument passing.
+  , assignArgsCode :: InstrBlock
+  }
+instance Semigroup LoadArgs where
+  LoadArgs a1 d1 r1 i1 j1 <> LoadArgs a2 d2 r2 i2 j2
+    = LoadArgs (a1 ++ a2) (d1 ++ d2) (r1 ++ r2) (i1 S.<> i2) (j1 S.<> j2)
+instance Monoid LoadArgs where
+  mempty = LoadArgs [] [] [] nilOL nilOL
+
+-- | An argument passed on the stack, either directly or by reference.
+--
+-- The padding information hasn't yet been computed (see 'StackArg').
+data RawStackArg
+  -- | Pass the argument on the stack directly.
+  = RawStackArg { stackArgExpr :: CmmExpr }
+  -- | Pass the argument by reference.
+  | RawStackArgRef
+    { stackRef :: StackRef
+       -- ^ is the reference passed in a register, or on the stack?
+    , stackRefArgSize :: Int
+        -- ^ the size of the data pointed to
+    }
+  deriving ( Show )
+
+-- | An argument passed on the stack, either directly or by reference,
+-- with additional padding information.
+data StackArg
+  -- | Pass the argument on the stack directly.
+  = StackArg
+      { stackArgExpr :: CmmExpr
+      , stackArgPadding :: Int
+        -- ^ padding required (in bytes)
+      }
+  -- | Pass the argument by reference.
+  | StackArgRef
+     { stackRef :: StackRef
+        -- ^ where the reference is passed
+     , stackRefArgSize :: Int
+        -- ^ the size of the data pointed to
+     , stackRefArgPadding :: Int
+       -- ^ padding of the data pointed to
+       -- (the reference itself never requires padding)
+     }
+  deriving ( Show )
+
+-- | Where is a reference to data on the stack passed?
+data StackRef
+  -- | In a register.
+  = InReg Reg
+  -- | On the stack.
+  | OnStack
+  deriving ( Eq, Ord, Show )
+
+newtype Padding = Padding { paddingBytes :: Int }
+  deriving ( Show, Eq, Ord )
+
+-- | How much space does this 'StackArg' take up on the stack?
+--
+-- Only counts the "reference" part for references, not the data it points to.
+stackArgSpace :: Platform -> StackArg -> Int
+stackArgSpace platform = \case
+  StackArg arg padding ->
+    argSize platform arg + padding
+  StackArgRef { stackRef = ref } ->
+    case ref of
+      InReg   {} -> 0
+      OnStack {} -> 8
+
+-- | Pad arguments, assuming we start aligned to a 16-byte boundary.
+--
+-- Returns padded arguments, together with whether we end up aligned
+-- to a 16-byte boundary.
+padStackArgs :: Platform
+             -> ([RawStackArg], [CmmExpr])
+             -> ([StackArg], Bool)
+padStackArgs platform (args0, data_args0) =
+  let
+    -- Pad the direct args
+    (args, align_16_mid) = pad_args True args0
+
+    -- Pad the data section
+    (data_args, align_16_end) = pad_args align_16_mid (map RawStackArg data_args0)
+
+    -- Now figure out where the data is placed relative to the direct arguments,
+    -- in order to resolve references.
+    resolve_args :: [(RawStackArg, Padding)] -> [Padding] -> [StackArg]
+    resolve_args [] _ = []
+    resolve_args ((stk_arg, Padding pad):rest) pads =
+      let (this_arg, pads') =
+            case stk_arg of
+              RawStackArg arg -> (StackArg arg pad, pads)
+              RawStackArgRef ref size ->
+                let (Padding arg_pad : rest_pads) = pads
+                    arg =
+                      StackArgRef
+                        { stackRef = ref
+                        , stackRefArgSize = size
+                        , stackRefArgPadding = arg_pad }
+                in (arg, rest_pads)
+      in this_arg : resolve_args rest pads'
+
+  in
+    ( resolve_args args (fmap snd data_args) ++
+        [ case data_arg of
+            RawStackArg arg -> StackArg arg pad
+            RawStackArgRef {} -> panic "padStackArgs: reference in data section"
+        | (data_arg, Padding pad) <- data_args
+        ]
+    , align_16_end )
+
+  where
+    pad_args :: Bool -> [RawStackArg] -> ([(RawStackArg, Padding)], Bool)
+    pad_args aligned_16 [] = ([], aligned_16)
+    pad_args aligned_16 (arg:args)
+      | needed_alignment > 16
+      -- We don't know if the stack is aligned to 8 (mod 32) or 24 (mod 32).
+      -- This makes aligning the stack to a 32 or 64 byte boundary more
+      -- complicated, in particular with DELTA.
+      = sorry $ unlines
+        [ "X86_86 C call: unsupported argument."
+        , "  Alignment requirement: " ++ show needed_alignment ++ " bytes."
+        , if platformOS platform == OSMinGW32
+          then "  The X86_64 NCG does not (yet) support Windows C calls with 256/512 bit vectors."
+          else "  The X86_64 NCG cannot (yet) pass 256/512 bit vectors on the stack for C calls."
+        , "  Please use the LLVM backend (-fllvm)." ]
+      | otherwise
+      = let ( rest, final_align_16 ) = pad_args next_aligned_16 args
+        in  ( (arg, Padding padding) : rest, final_align_16 )
+
+      where
+        needed_alignment = case arg of
+          RawStackArg arg   -> argSize platform arg
+          RawStackArgRef {} -> platformWordSizeInBytes platform
+        padding
+          | needed_alignment < 16 || aligned_16
+          = 0
+          | otherwise
+          = 8
+        next_aligned_16 = not ( aligned_16 && needed_alignment < 16 )
+
+-- | Load arguments into available registers.
+loadArgs :: NCGConfig -> [CmmExpr] -> NatM LoadArgs
+loadArgs config args
+  | platformOS platform == OSMinGW32
+  = evalStateT (loadArgsWin config args) (allArgRegs platform)
+  | otherwise
+  = evalStateT (loadArgsSysV config args) (allIntArgRegs platform
+                                          ,allFPArgRegs  platform)
+  where
+    platform = ncgPlatform config
+
+-- | Load arguments into available registers (System V AMD64 ABI).
+loadArgsSysV :: NCGConfig
+             -> [CmmExpr]
+             -> StateT ([Reg], [Reg]) NatM LoadArgs
+loadArgsSysV _ [] = return mempty
+loadArgsSysV config (arg:rest) = do
+  (iregs, fregs) <- get
+  -- No available registers: pass everything on the stack (shortcut).
+  if null iregs && null fregs
+  then return $
+          LoadArgs
+            { stackArgs       = map RawStackArg (arg:rest)
+            , stackDataArgs   = []
+            , computeArgsCode = nilOL
+            , assignArgsCode  = nilOL
+            , usedRegs        = []
+            }
+  else do
+    mbReg <-
+      if
+        | isIntFormat arg_fmt
+        , ireg:iregs' <- iregs
+        -> do put (iregs', fregs)
+              return $ Just ireg
+        | isFloatFormat arg_fmt || isVecFormat arg_fmt
+        , freg:fregs' <- fregs
+        -> do put (iregs, fregs')
+              return $ Just freg
+        | otherwise
+        -> return Nothing
+    this_arg <-
+      case mbReg of
+        Just reg -> do
+          (compute_code, assign_code) <- lift $ loadArgIntoReg config arg rest reg
+          return $
+            LoadArgs
+                { stackArgs       = [] -- passed in register
+                , stackDataArgs   = []
+                , computeArgsCode = compute_code
+                , assignArgsCode  = assign_code
+                , usedRegs        = [RegWithFormat reg arg_fmt]
+                }
+        Nothing -> do
+          return $
+            -- No available register for this argument: pass it on the stack.
+            LoadArgs
+                { stackArgs       = [RawStackArg arg]
+                , stackDataArgs   = []
+                , computeArgsCode = nilOL
+                , assignArgsCode  = nilOL
+                , usedRegs        = []
+                }
+    others <- loadArgsSysV config rest
+    return $ this_arg S.<> others
+
+  where
+    platform = ncgPlatform config
+    arg_fmt = cmmTypeFormat (cmmExprType platform arg)
+
+-- | Compute all things that will need to be pushed to the stack.
+--
+-- On Windows, an argument passed by reference will require two pieces of data:
+--
+--  - the reference (returned in the first position)
+--  - the actual data (returned in the second position)
+computeWinPushArgs :: Platform -> [CmmExpr] -> ([RawStackArg], [CmmExpr])
+computeWinPushArgs platform = go
+  where
+    go :: [CmmExpr] -> ([RawStackArg], [CmmExpr])
+    go [] = ([], [])
+    go (arg:args) =
+      let
+        arg_size = argSize platform arg
+        (this_arg, add_this_arg)
+          | arg_size > 8
+          = ( RawStackArgRef OnStack arg_size, (arg :) )
+          | otherwise
+          = ( RawStackArg arg, id )
+        (stk_args, stk_data) = go args
+      in
+        (this_arg:stk_args, add_this_arg stk_data)
+
+-- | Load arguments into available registers (Windows C X64 calling convention).
+loadArgsWin :: NCGConfig -> [CmmExpr] -> StateT [(Reg,Reg)] NatM LoadArgs
+loadArgsWin _ [] = return mempty
+loadArgsWin config (arg:rest) = do
+  regs <- get
+  case regs of
+    reg:regs' -> do
+      put regs'
+      this_arg <- lift $ load_arg_win reg
+      rest <- loadArgsWin config rest
+      return $ this_arg S.<> rest
+    [] -> do
+      -- No more registers available: pass all (remaining) arguments on the stack.
+      let (stk_args, data_args) = computeWinPushArgs platform (arg:rest)
+      return $
+        LoadArgs
+          { stackArgs       = stk_args
+          , stackDataArgs   = data_args
+          , computeArgsCode = nilOL
+          , assignArgsCode  = nilOL
+          , usedRegs        = []
+          }
+  where
+    platform = ncgPlatform config
+    arg_fmt = cmmTypeFormat $ cmmExprType platform arg
+    load_arg_win (ireg, freg)
+      | isVecFormat arg_fmt
+       -- Vectors are passed by reference.
+       -- See Note [The Windows X64 C calling convention].
+      = do return $
+             LoadArgs
+                -- Pass the reference in a register,
+                -- and the argument data on the stack.
+                { stackArgs       = [RawStackArgRef (InReg ireg) (argSize platform arg)]
+                , stackDataArgs   = [arg]
+                , computeArgsCode = nilOL -- we don't yet know where the data will reside,
+                , assignArgsCode  = nilOL -- so we defer computing the reference and storing it
+                                          -- in the register until later
+                , usedRegs        = [RegWithFormat ireg II64]
+                }
+      | otherwise
+      = do let arg_reg
+                  | isFloatFormat arg_fmt
+                  = freg
+                  | otherwise
+                  = ireg
+           (compute_code, assign_code) <- loadArgIntoReg config arg rest arg_reg
+           -- Recall that, for varargs, we must pass floating-point
+           -- arguments in both fp and integer registers.
+           let (assign_code', regs')
+                | isFloatFormat arg_fmt =
+                    ( assign_code `snocOL` MOVD FF64 (OpReg freg) (OpReg ireg),
+                      [ RegWithFormat freg FF64
+                      , RegWithFormat ireg II64 ])
+                | otherwise = (assign_code, [RegWithFormat ireg II64])
+           return $
+             LoadArgs
+               { stackArgs       = [] -- passed in register
+               , stackDataArgs   = []
+               , computeArgsCode = compute_code
+               , assignArgsCode = assign_code'
+               , usedRegs = regs'
+               }
+
+
+-- | Return two pieces of code:
+--
+--  - code to compute a the given 'CmmExpr' into some (possibly temporary) register
+--  - code to assign the resulting value to the specified register
+--
+-- Using two separate pieces of code handles clobbering issues reported
+-- in e.g. #11792, #12614.
+loadArgIntoReg :: NCGConfig -> CmmExpr -> [CmmExpr] -> Reg -> NatM (InstrBlock, InstrBlock)
+loadArgIntoReg config arg rest reg
+  -- "operand" args can be directly assigned into the register
+  | isOperand platform arg
+  = do arg_code <- getAnyReg arg
+       return (nilOL, arg_code reg)
+  -- The last non-operand arg can be directly assigned after its
+  -- computation without going into a temporary register
+  | all (isOperand platform) rest
+  = do arg_code <- getAnyReg arg
+       return (arg_code reg, nilOL)
+  -- Other args need to be computed beforehand to avoid clobbering
+  -- previously assigned registers used to pass parameters (see
+  -- #11792, #12614). They are assigned into temporary registers
+  -- and get assigned to proper call ABI registers after they all
+  -- have been computed.
+  | otherwise
+  = do arg_code <- getAnyReg arg
+       tmp      <- getNewRegNat arg_fmt
+       return (arg_code tmp, unitOL $ mkRegRegMoveInstr config arg_fmt tmp reg)
+  where
+    platform = ncgPlatform config
+    arg_fmt = cmmTypeFormat $ cmmExprType platform arg
+
+-- -----------------------------------------------------------------------------
+-- Pushing arguments onto the stack for 64-bit C calls.
+
+-- | The size of an argument (in bytes).
+--
+-- Never smaller than the platform word width.
+argSize :: Platform -> CmmExpr -> Int
+argSize platform arg =
+  max (platformWordSizeInBytes platform) $
+    widthInBytes (typeWidth $ cmmExprType platform arg)
+
+-- | Add the given amount of padding on the stack.
+addStackPadding :: Int -- ^ padding (in bytes)
+                -> NatM InstrBlock
+addStackPadding pad_bytes
+  | pad_bytes == 0
+  = return nilOL
+  | otherwise
+  = do delta <- getDeltaNat
+       setDeltaNat (delta - pad_bytes)
+       return $
+         toOL [ SUB II64 (OpImm (ImmInt pad_bytes)) (OpReg rsp)
+              , DELTA (delta - pad_bytes)
+              ]
+
+-- | Push one argument directly to the stack (by value).
+--
+-- Assumes the current stack pointer fulfills any necessary alignment requirements.
+pushArgByValue :: NCGConfig -> CmmExpr -> NatM InstrBlock
+pushArgByValue config arg
+   -- For 64-bit integer arguments, use PUSH II64.
+   --
+   -- Note: we *must not* do this for smaller arguments.
+   -- For example, if we tried to push an argument such as @CmmLoad addr W32 aln@,
+   -- we could end up reading unmapped memory and segfaulting.
+   | isIntFormat fmt
+   , formatInBytes fmt == 8
+   = do
+     (arg_op, arg_code) <- getOperand arg
+     delta <- getDeltaNat
+     setDeltaNat (delta-arg_size)
+     return $
+       arg_code `appOL` toOL
+       [ PUSH II64 arg_op
+       , DELTA (delta-arg_size) ]
+
+   | otherwise
+   = do
+     (arg_reg, arg_code) <- getSomeReg arg
+     delta <- getDeltaNat
+     setDeltaNat (delta-arg_size)
+     return $ arg_code `appOL` toOL
+        [ SUB (intFormat (wordWidth platform)) (OpImm (ImmInt arg_size)) (OpReg rsp)
+        , DELTA (delta-arg_size)
+        , movInstr config fmt (OpReg arg_reg) (OpAddr (spRel platform 0)) ]
+
+    where
+      platform = ncgPlatform config
+      arg_size = argSize platform arg
+      arg_rep = cmmExprType platform arg
+      fmt = cmmTypeFormat arg_rep
+
+-- | Load an argument into a register or push it to the stack.
+loadOrPushArg :: NCGConfig -> (StackArg, Maybe Int) -> NatM (InstrBlock, InstrBlock)
+loadOrPushArg config (stk_arg, mb_off) =
+  case stk_arg of
+    StackArg arg pad -> do
+      push_code <- pushArgByValue config arg
+      pad_code  <- addStackPadding pad
+      return (nilOL, push_code `appOL` pad_code)
+    StackArgRef { stackRef = ref } ->
+      case ref of
+        -- Pass the reference in a register
+        InReg ireg ->
+          return (unitOL $ LEA II64 (OpAddr (spRel platform off)) (OpReg ireg), nilOL)
+        -- Pass the reference on the stack
+        OnStack {} -> do
+          tmp <- getNewRegNat II64
+          delta <- getDeltaNat
+          setDeltaNat (delta-arg_ref_size)
+          let push_code = toOL
+                [ SUB (intFormat (wordWidth platform)) (OpImm (ImmInt arg_ref_size)) (OpReg rsp)
+                , DELTA (delta-arg_ref_size)
+                , LEA II64 (OpAddr (spRel platform off)) (OpReg tmp)
+                , MOV II64 (OpReg tmp) (OpAddr (spRel platform 0)) ]
+          return (nilOL, push_code)
+      where off = expectJust "push_arg_win offset" mb_off
+    where
+      arg_ref_size = 8 -- passing a reference to the argument
+      platform = ncgPlatform config
+
+-- | Push arguments to the stack, right to left.
+--
+-- On Windows, some arguments may need to be passed by reference,
+-- which requires separately passing the data and the reference.
+-- See Note [The Windows X64 C calling convention].
+pushArgs :: NCGConfig
+         -> [RawStackArg]
+            -- ^ arguments proper (i.e. don't include the data for arguments passed by reference)
+         -> [StackArg]
+            -- ^ arguments we are passing on the stack
+         -> NatM (InstrBlock, InstrBlock)
+pushArgs config proper_args all_stk_args
+  = do { let
+            vec_offs :: [Maybe Int]
+            vec_offs
+              | platformOS platform == OSMinGW32
+              = go stack_arg_size all_stk_args
+              | otherwise
+              = repeat Nothing
+
+    ---------------------
+    -- Windows-only code
+
+            -- Size of the arguments we are passing on the stack, counting only
+            -- the reference part for arguments passed by reference.
+            stack_arg_size = 8 * count not_in_reg proper_args
+            not_in_reg (RawStackArg {}) = True
+            not_in_reg (RawStackArgRef { stackRef = ref }) =
+              case ref of
+                InReg {} -> False
+                OnStack {} -> True
+
+            -- Check an offset is valid (8-byte aligned), for assertions.
+            ok off = off `rem` 8 == 0
+
+            -- Tricky code: compute the stack offset to the vector data
+            -- for this argument.
+            --
+            -- If you're confused, Note [The Windows X64 C calling convention]
+            -- contains a helpful diagram.
+            go :: Int -> [StackArg] -> [Maybe Int]
+            go _ [] = []
+            go off (stk_arg:args) =
+              assertPpr (ok off) (text "unaligned offset:" <+> ppr off) $
+              case stk_arg of
+                StackArg {} ->
+                  -- Only account for the stack pointer movement.
+                  let off' = off - stackArgSpace platform stk_arg
+                  in Nothing : go off' args
+                StackArgRef
+                  { stackRefArgSize    = data_size
+                  , stackRefArgPadding = data_pad } ->
+                  assertPpr (ok data_size) (text "unaligned data size:" <+> ppr data_size) $
+                  assertPpr (ok data_pad) (text "unaligned data padding:" <+> ppr data_pad) $
+                  let off' = off
+                        -- Next piece of data is after the data for this reference
+                           + data_size + data_pad
+                        -- ... and account for the stack pointer movement.
+                           - stackArgSpace platform stk_arg
+                  in Just (data_pad + off) : go off' args
+
+    -- end of Windows-only code
+    ----------------------------
+
+         -- Push the stack arguments (right to left),
+         -- including both the reference and the data for arguments passed by reference.
+       ; (load_regs, push_args) <- foldMapM (loadOrPushArg config) (reverse $ zip all_stk_args vec_offs)
+       ; return (load_regs, push_args) }
+  where
+    platform = ncgPlatform config
+
+{- Note [The Windows X64 C calling convention]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here are a few facts about the Windows X64 C calling convention that
+are important:
+
+  - any argument larger than 8 bytes must be passed by reference,
+    and arguments smaller than 8 bytes are padded to 8 bytes.
+
+  - the first four arguments are passed in registers:
+      - floating-point scalar arguments are passed in %xmm0, %xmm1, %xmm2, %xmm3
+      - other arguments are passed in %rcx, %rdx, %r8, %r9
+        (this includes vector arguments, passed by reference)
+
+    For variadic functions, it is additionally expected that floating point
+    scalar arguments are copied to the corresponding integer register, e.g.
+    the data in xmm2 should also be copied to r8.
+
+    There is no requirement about setting %al like there is for the
+    System V AMD64 ABI.
+
+  - subsequent arguments are passed on the stack.
+
+There are also alignment requirements:
+
+  - the data for vectors must be aligned to the size of the vector,
+    e.g. a 32 byte vector must be aligned on a 32 byte boundary,
+
+  - the call instruction must be aligned to 16 bytes.
+  (This differs from the System V AMD64 ABI, which mandates that the call
+  instruction must be aligned to 32 bytes if there are any 32 byte vectors
+  passed on the stack.)
+
+This motivates our handling of vector values. Suppose we have a function call
+with many arguments, several of them being vectors. We proceed as follows:
+
+ - Add some padding, if necessary, to ensure the stack, when executing the call
+    instruction, is 16-byte aligned. Whether this padding is necessary depends
+    on what happens next. (Recall also that we start off at 8 (mod 16) alignment,
+    as per Note [Stack Alignment on X86] in rts/StgCRun.c)
+  - Push all the vectors to the stack first, adding padding after each one
+    if necessary.
+  - Then push the arguments:
+      - for non-vectors, proceed as usual,
+      - for vectors, push the address of the vector data we pushed above.
+  - Then assign the registers:
+      - for non-vectors, proceed as usual,
+      - for vectors, store the address in a general-purpose register, as opposed
+        to storing the data in an xmm register.
+
+For a concrete example, suppose we have a call of the form:
+
+  f x1 x2 x3 x4 x5 x6 x7
+
+in which:
+
+  - x2, x3, x5 and x7 are 16 byte vectors
+  - the other arguments are all 8 byte wide
+
+Now, x1, x2, x3, x4 will get passed in registers, except that we pass
+x2 and x3 by reference, because they are vectors. We proceed as follows:
+
+  - push the vectors to the stack: x7, x5, x3, x2 (in that order)
+  - push the stack arguments in order: addr(x7), x6, addr(x5)
+  - load the remaining arguments into registers: x4, addr(x3), addr(x2), x1
+
+The tricky part is to get the right offsets for the addresses of the vector
+data. The following visualisation will hopefully clear things up:
+
+                                  ┌──┐
+                                  │▓▓│ ─── padding to align the call instruction
+                      ╭─╴         ╞══╡     (ensures Sp, below, is 16-byte aligned)
+                      │           │  │
+                      │  x7  ───╴ │  │
+                      │           ├──┤
+                      │           │  │
+                      │  x5  ───╴ │  │
+                      │           ├──┤
+     vector data  ────┤           │  │
+(individually padded) │  x3  ───╴ │  │
+                      │           ├──┤
+                      │           │  │
+                      │  x2  ───╴ │  │
+                      │           ├┄┄┤
+                      │           │▓▓│ ─── padding to align x2 to 16 bytes
+               ╭─╴    ╰─╴         ╞══╡
+               │    addr(x7) ───╴ │  │    ╭─ from here: x7 is +64
+               │                  ├──┤ ╾──╯    = 64 (position of x5)
+     stack  ───┤         x6  ───╴ │  │         + 16 (size of x5) + 0 (padding of x7)
+   arguments   │                  ├──┤         - 2 * 8 (x7 is 2 arguments higher than x5)
+               │    addr(x5) ───╴ │  │
+               ╰─╴            ╭─╴ ╞══╡ ╾─── from here:
+                              │   │  │       - x2 is +32 = 24 (stack_arg_size) + 8 (padding of x2)
+                   shadow  ───┤   │  │       - x3 is +48 = 32 (position of x2) + 16 (size of x2) + 0 (padding of x3)
+                    space     │   │  │       - x5 is +64 = 48 (position of x3) + 16 (size of x3) + 0 (padding of x5)
+                              │   │  │
+                              ╰─╴ └──┘ ╾─── Sp
+
+This is all tested in the simd013 test.
+-}
 
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch

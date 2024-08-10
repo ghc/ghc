@@ -887,7 +887,7 @@ mkLoadInstr config (RegWithFormat reg fmt) delta slot =
 
 -- | A move instruction for moving the entire contents of an operand
 -- at the given 'Format'.
-movInstr :: NCGConfig -> Format -> (Operand -> Operand -> Instr)
+movInstr :: HasDebugCallStack => NCGConfig -> Format -> (Operand -> Operand -> Instr)
 movInstr config fmt =
   case fmt of
     VecFormat _ sFmt ->
