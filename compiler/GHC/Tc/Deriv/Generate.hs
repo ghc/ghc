@@ -1699,12 +1699,16 @@ coercing from.  So from, say,
   instance C a <rep-ty> => C a (T x) where
     op @c = coerce @(a -> [<rep-ty>] -> c -> Int)
                    @(a -> [T x]      -> c -> Int)
-                   op
+                   (op @c)
 
 In addition to the type applications, we also use a type abstraction to bring
-the method-bound variable `c` into scope over the two type applications.
-See Note [GND and QuantifiedConstraints] for more information on why this
-is important.
+the method-bound variable `c` into scope. We do this for two reasons:
+
+* We need to bring `c` into scope over the two type applications to `coerce`.
+  See Note [GND and QuantifiedConstraints] for more information on why this
+  is important.
+* We need to bring `c` into scope over the type application to `op`. See
+  Note [GND and ambiguity] for more information on why this is important.
 
 (In the surface syntax, only specified type variables can be used in type
 abstractions. Since a method signature could contain both specified and
@@ -1736,6 +1740,27 @@ appropriate for machine generated code: it's simple and robust.
 However, to allow VTA with polytypes we must switch on
 -XImpredicativeTypes locally in GHC.Tc.Deriv.genInst.
 See #8503 for more discussion.
+
+The following Notes describe further nuances of GeneralizedNewtypeDeriving:
+
+-----
+-- In GHC.Tc.Deriv
+-----
+
+* Note [Newtype deriving]
+* Note [Newtype representation]
+* Note [Recursive newtypes]
+* Note [Determining whether newtype-deriving is appropriate]
+* Note [GND and associated type families]
+* Note [Bindings for Generalised Newtype Deriving]
+
+-----
+-- In GHC.Tc.Deriv.Generate
+-----
+
+* Note [Newtype-deriving trickiness]
+* Note [GND and QuantifiedConstraints]
+* Note [GND and ambiguity]
 
 Note [Inferred invisible patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1915,27 +1940,68 @@ coerce with a polytype, and we can only do that with VTA or QuickLook.
 Note [GND and ambiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 We make an effort to make the code generated through GND be robust w.r.t.
-ambiguous type variables. As one example, consider the following example
-(from #15637):
+ambiguous type variables. Here are a couple of examples to illustrate this:
 
-  class C a where f :: String
-  instance C () where f = "foo"
-  newtype T = T () deriving C
+* In this example (from #15637), the class-bound type variable `a` is ambiguous
+  in the type of `f`:
 
-A naïve attempt and generating a C T instance would be:
+    class C a where
+      f :: String    -- f :: forall a. C a => String
+    instance C ()
+      where f = "foo"
+    newtype T = T ()
+      deriving C
 
-  instance C T where
-    f = coerce @String @String f
+  A naïve attempt and generating a C T instance would be:
 
-This isn't going to typecheck, however, since GHC doesn't know what to
-instantiate the type variable `a` with in the call to `f` in the method body.
-(Note that `f :: forall a. String`!) To compensate for the possibility of
-ambiguity here, we explicitly instantiate `a` like so:
+    instance C T where
+      f = coerce @String @String f
 
-  instance C T where
-    f = coerce @String @String (f @())
+  This isn't going to typecheck, however, since GHC doesn't know what to
+  instantiate the type variable `a` with in the call to `f` in the method body.
+  (Note that `f :: forall a. String`!) To compensate for the possibility of
+  ambiguity here, we explicitly instantiate `a` like so:
 
-All better now.
+    instance C T where
+      f = coerce @String @String (f @())
+
+  All better now.
+
+* In this example (adapted from #25148), the ambiguity arises from the `n`
+  type variable bound by the type signature for `fact1`:
+
+    class Facts a where
+      fact1 :: forall n. Proxy a -> Dict (0 <= n)
+    newtype T a = MkT a
+      deriving newtype Facts
+
+  When generating code for the derived `Facts` instance, we must use a type
+  abstraction to bring `n` into scope over the type applications to `coerce`
+  (see Note [Newtype-deriving instances] for more why this is needed). A first
+  attempt at generating the instance would be:
+
+    instance Facts a => Facts (T a) where
+      fact1 @n = coerce @(Proxy    a  -> Dict (0 <= n))
+                        @(Proxy (T a) -> Dict (0 <= n))
+                        (fact1 @a)
+
+  This still won't typecheck, however, as GHC doesn't know how to instantiate
+  `n` in the call to `fact1 @a`. To compensate for the possibility of ambiguity
+  here, we also visibly apply `n` in the call to `fact1` on the RHS:
+
+    instance Facts a => Facts (T a) where
+      fact1 @n = coerce @(Proxy    a  -> Dict (0 <= n))
+                        @(Proxy (T a) -> Dict (0 <= n))
+                        (fact1 @a @n) -- Note the @n here!
+
+  This takes advantage of the fact that we *already* need to bring `n` into
+  scope using a type abstraction, and so we are able to use it both for
+  instantiating the call to `coerce` and instantiating the call to `fact1`.
+
+  Note that we use this same type abstractions-based approach for resolving
+  ambiguity in default methods, as described in Note [Default methods in
+  instances] (Wrinkle: Ambiguous types from vanilla method type signatures) in
+  GHC.Tc.TyCl.Instance.
 -}
 
 gen_Newtype_binds :: SrcSpan
@@ -2002,11 +2068,16 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
                                       `nlHsAppType`     to_tau
                                       `nlHsApp`         meth_app
 
-        -- The class method, applied to all of the class instance types
-        -- (including the representation type) to avoid potential ambiguity.
-        -- See Note [GND and ambiguity]
+        -- The class method, applied to the following types to avoid potential
+        -- ambiguity:
+        --
+        -- 1. All of the class instance types (including the representation type)
+        -- 2. All of `to_tvbs`
+        --
+        -- See Note [GND and ambiguity].
         meth_app = foldl' nlHsAppType (nlHsVar meth_RDR) $
-                   filterOutInferredTypes (classTyCon cls) underlying_inst_tys
+                   filterOutInferredTypes (classTyCon cls) underlying_inst_tys ++ -- (1)
+                   [mkTyVarTy tv | Bndr tv spec <- to_tvbs, spec /= InferredSpec] -- (2)
                      -- Filter out any inferred arguments, since they can't be
                      -- applied with visible type application.
 

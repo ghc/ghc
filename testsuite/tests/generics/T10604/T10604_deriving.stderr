@@ -542,7 +542,7 @@ Derived type family instances:
 
 ==================== Filling in method body ====================
 GHC.Internal.Base.Functor [T10604_deriving.Proxy @(*)]
-  GHC.Internal.Base.<$ = GHC.Internal.Base.$dm<$
-                           @(T10604_deriving.Proxy @(*))
+  (GHC.Internal.Base.<$) @a @b
+    = GHC.Internal.Base.$dm<$ @(T10604_deriving.Proxy @(*)) @a @b
 
 

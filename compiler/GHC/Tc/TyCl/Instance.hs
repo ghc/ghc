@@ -1846,8 +1846,8 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
                    meth_bind = mkVarBind meth_id $ mkLHsWrap lam_wrapper meth_rhs
              ; return (meth_id, meth_bind, Nothing) }
 
-      Just (dm_name, _) ->
-        do { (meth_bind, inline_prags) <- mkDefMethBind inst_loc dfun_id clas sel_id dm_name
+      Just (dm_name, dm_spec) ->
+        do { (meth_bind, inline_prags) <- mkDefMethBind inst_loc dfun_id clas sel_id dm_name dm_spec
            ; tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
                           dfun_ev_binds is_derived hs_sig_fn
                           spec_inst_prags inline_prags
@@ -2194,14 +2194,15 @@ mk_meth_spec_prags meth_id spec_inst_prags spec_prags_for_me
 
 
 mkDefMethBind :: SrcSpan -> DFunId -> Class -> Id -> Name
+              -> DefMethSpec Type
               -> TcM (LHsBind GhcRn, [LSig GhcRn])
 -- The is a default method (vanailla or generic) defined in the class
--- So make a binding   op = $dmop @t1 @t2
--- where $dmop is the name of the default method in the class,
--- and t1,t2 are the instance types.
--- See Note [Default methods in instances] for why we use
--- visible type application here
-mkDefMethBind loc dfun_id clas sel_id dm_name
+-- So make a binding   op @m1 @m2 @m3 = $dmop @i1 @i2 @m1 @m2 @m3
+-- where $dmop is the name of the default method in the class;
+-- i1 and t2 are the instance types; and m1, m2, and m3 are the type variables
+-- from the method's type signature. See Note [Default methods in instances] for
+-- why we use visible type application here.
+mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
   = do  { logger <- getLogger
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
@@ -2212,28 +2213,63 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
                  -- Copy the inline pragma (if any) from the default method
                  -- to this version. Note [INLINE and default methods]
 
-              fn   = noLocA (idName sel_id)
-              visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
-                                      , tyConBinderForAllTyFlag tcb /= Inferred ]
-              rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
-              bind = L (noAnnSrcSpan loc)
-                    $ mkTopFunBind (Generated OtherExpansion SkipPmc) fn
-                        [mkSimpleMatch (mkPrefixFunRhs fn) (noLocA []) rhs]
-
         ; liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Filling in method body"
                    FormatHaskell
                    (vcat [ppr clas <+> ppr inst_tys,
-                          nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
+                          nest 2 (ppr bind)]))
 
        ; return (bind, inline_prags) }
   where
     (_, _, _, inst_tys) = tcSplitDFunTy (idType dfun_id)
+    (_, _, sel_tau) = tcSplitMethodTy (idType sel_id)
+    (sel_tvbs, _) = tcSplitForAllInvisTVBinders sel_tau
+
+    -- Compute the instance types to use in the visible type application. See
+    -- Note [Default methods in instances].
+    visible_inst_tys =
+      [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
+           , tyConBinderForAllTyFlag tcb /= Inferred ]
+
+    visible_sel_tvbs =
+      case dm_spec of
+        -- When dealing with a vanilla default method, compute the type
+        -- variables from the method's type signature. That way, we can bind
+        -- them with TypeAbstractions (visible_sel_pats) and use them in the
+        -- visible type application (visible_sel_tys). See Note [Default methods
+        -- in instances] (Wrinkle: Ambiguous types from vanilla method type
+        -- signatures).
+        VanillaDM -> filter (\tvb -> binderFlag tvb /= InferredSpec) sel_tvbs
+        -- If we are dealing with a generic default method, on the other hand,
+        -- don't bother doing any of this. See Note [Default methods
+        -- in instances] (Wrinkle: Ambiguous types from generic default method
+        -- type signatures).
+        GenericDM {} -> []
+    visible_sel_pats = map mk_ty_pat visible_sel_tvbs
+    visible_sel_tys = map (mkTyVarTy . binderVar) visible_sel_tvbs
+
+    fn   = noLocA (idName sel_id)
+    rhs  = foldl' mk_vta (nlHsVar dm_name) $
+           visible_inst_tys ++ visible_sel_tys
+    bind = L (noAnnSrcSpan loc)
+          $ mkTopFunBind (Generated OtherExpansion SkipPmc) fn
+              [mkSimpleMatch (mkPrefixFunRhs fn) (noLocA visible_sel_pats) rhs]
+
+    mk_ty_pat :: VarBndr TyVar Specificity -> LPat GhcRn
+    mk_ty_pat (Bndr tv spec) =
+      noLocA $
+      InvisPat spec $
+      HsTP (HsTPRn [] [tyVarName tv] []) $
+      nlHsTyVar NotPromoted $
+      tyVarName tv
 
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
     mk_vta fun ty = noLocA (HsAppType noExtField fun
-        (mkEmptyWildCardBndrs $ nlHsParTy $ noLocA $ XHsType ty))
+        (mkEmptyWildCardBndrs $ type_to_hs_type ty))
        -- NB: use visible type application
        -- See Note [Default methods in instances]
+
+    type_to_hs_type :: Type -> LHsType GhcRn
+    type_to_hs_type = parenthesizeHsType appPrec . noLocA . XHsType
 
 ----------------------
 derivBindCtxt :: Id -> Class -> [Type ] -> SDoc
@@ -2277,8 +2313,8 @@ From the class decl we get
    $dmfoo :: forall v x. Baz v x => x -> x
    $dmfoo y = <blah>
 
-Notice that the type is ambiguous.  So we use Visible Type Application
-to disambiguate:
+Notice that the type of `v` is ambiguous.  So we use Visible Type Application
+(VTA) to disambiguate:
 
    $dBazIntInt = MkBaz fooIntInt
    fooIntInt = $dmfoo @Int @Int
@@ -2290,6 +2326,151 @@ equally to vanilla default methods (#1061) and generic default methods
 Historical note: before we had VTA we had to generate
 post-type-checked code, which took a lot more code, and didn't work for
 generic default methods.
+
+-----
+-- Wrinkle: Ambiguous types from vanilla method type signatures
+-----
+
+In the Bar example above, the ambiguity arises from `v`, a type variable
+arising from the class header. It is also possible for the ambiguity to arise
+from a type variable bound by the method's type signature itself (see #14266
+and #25148). For example:
+
+   class A t where
+      f :: forall x m. Monoid x => t m -> m
+      f = <blah>
+
+   instance A []
+
+The class declaration gives rise to the following default function:
+
+  $dmf :: forall t. A t => forall x m. Monoid x => t m -> m
+  $dmf = <blah>
+
+And the instance declaration gives rise to generated code that looks roughly
+like this:
+
+   instance A [] where
+      f = $dmf @[] ...
+
+In this example, it is not enough to use VTA to specify the type of `t`, since
+the type of `x` (bound by `f`'s type signature) is also ambiguous. We need to
+generate code that looks more like this:
+
+   instance A [] where
+      f = $dmf @[] @x @m
+
+But where should `x` and `m` be bound? It's tempting to use ScopedTypeVariables
+and InstanceSigs to accomplish this:
+
+   instance A [] where
+      f :: forall x m. Monoid x => [m] -> m
+      f = $dmf @[] @x @m
+
+GHC will reject this code, however, as the type signature for `f` will fail the
+subtype check for InstanceSigs:
+
+    • Could not deduce (Monoid x0)
+      from the context: Monoid x
+        bound by the type signature for:
+                   f :: forall x m. Monoid x => [m] -> m
+      The type variable ‘x0’ is ambiguous
+    • When checking that instance signature for ‘f’
+        is more general than its signature in the class
+        Instance sig: forall x m. Monoid x => [m] -> m
+           Class sig: forall x m. Monoid x => [m] -> m
+      In the instance declaration for ‘A []’
+
+See #17898. To avoid this problem, we instead bind `x` and `m` using
+TypeAbstractions:
+
+   instance A [] where
+      f @x @m = $dmf @[] @x @m
+
+This resolves the ambiguity and avoids the need for a subtype check. (We also
+use a similar trick for resolving ambiguity in GeneralizedNewtypeDeriving: see
+also Note [GND and ambiguity] in GHC.Tc.Deriv.Generate.)
+
+-----
+-- Wrinkle: Ambiguous types from generic default method type signatures
+-----
+
+Note that the approach described above (in Wrinkle: Ambiguous types from
+vanilla method type signatures) will only work for vanilla default methods and
+/not/ for generic default methods (i.e., methods using DefaultSignatures). This
+is because for vanilla default methods, the type of the generated $dm* function
+will always quantify the same type variables as the method's original type
+signature, in the same order and with the same specificities. For example, the
+type of the $dmf function will be:
+
+   $dmf :: forall t. A t => forall x m. Monoid x => t m -> m
+
+As such, it is guaranteed that the type variables from the method's original
+type signature will line up exactly with the type variables from the $dm*
+function (after instantiating all of the class variables):
+
+   instance A [] where
+      f @x @m = $dmf @[] @x @m
+
+We cannot guarantee this property for generic default methods, however. As
+such, we must be more conservative and generate code without instantiating any
+of the type variables bound by the method's type signature (only the type
+variables bound by the class header):
+
+   instance A [] where
+      f = $dmf @[]
+
+There are a number of reasons why we cannot reliably instantiate the type
+variables bound by a generic default method's type signature:
+
+* Default methods can quantify type variables in a different order, e.g.,
+
+    class A t where
+       f :: forall x m. Monoid x => t m -> m
+       default f :: forall m x. Monoid x => t m -> m
+       f = <blah>
+
+  Note that the default signature quantifies the type variables in the opposite
+  order from the method's original type signature. As such, the type of $dmf
+  will be:
+
+    $dmf :: forall t. A t => forall m x. Monoid x => t m -> m
+
+  Therefore, `f @x @m = $dmf @[] @x @m` would be incorrect. Nor would it be
+  straightforward to infer what the correct order of type variables should be.
+
+* Default methods can quantify a different number of type variables, e.g.,
+
+    class A t where
+       f :: forall x m. Monoid x => t m -> m
+       default f :: forall p q r m. C a t p q r => t m -> m
+       f = <blah>
+
+  This gives rise to:
+
+    $dmf :: forall t. A t => forall p q r m. C a t p q r => t m -> m
+
+  And thus generating `f @x @m = $dmf @[] @x @m` would be incorrect, for
+  similar reasons as in the example above.
+
+* Default methods can use different type variable specificities, e.g.,
+
+    class A t where
+       f :: forall x m. Monoid x => t m -> m
+       default f :: forall {x} m. Monoid x => t m -> m
+       f = <blah>
+
+  This gives rise to:
+
+    $dmf :: forall t. A t => forall {x} m. Monoid x => t m -> m
+
+  Therefore, generating `f @x @m = $dmf @[] @x @m` would be incorrect because
+  the `x` in the type of $dmf is inferred, so it is not eligible for visible
+  type application.
+
+As such, we do not bother trying to resolve the ambiguity of any method-bound
+type variables when dealing with generic defaults. This means that GHC won't be
+able to typecheck the default method examples above, but so be it.
 
 Note [INLINE and default methods]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,6 +1,6 @@
-
 UnsatDefault.hs:14:10: error: [GHC-22250]
     • Please define the method manually. You can try...
-    • In the expression: UnsatDefault.$dmmethod @(Int)
-      In an equation for ‘method’: method = UnsatDefault.$dmmethod @(Int)
+    • In the expression: UnsatDefault.$dmmethod @Int
+      In an equation for ‘method’: method = UnsatDefault.$dmmethod @Int
       In the instance declaration for ‘C Int’
+
