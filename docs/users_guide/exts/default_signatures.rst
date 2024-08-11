@@ -189,3 +189,15 @@ default type signatures.
 
   This works, but at the expense of changing ``p``'s behavior with respect to
   :ref:`visible-type-application`.
+
+- The default signature cannot use any ambiguous type variables. For example,
+  GHC will not permit instances of the following class: ::
+
+      class A t where
+        f :: forall x m. Monoid x => t m -> m
+        default :: forall x m. Monoid x => t m -> m
+        f = ...
+
+  Note that ``x`` is ambiguous, as none of the argument or result types
+  determine what type ``x`` should be when calling ``f``. GHC will reject
+  instances of ``A``, even if :extension:`AllowAmbiguousTypes` is enabled.

@@ -90,121 +90,121 @@ Derived type family instances:
 
 ==================== Filling in method body ====================
 GHC.Internal.Show.Show [T14682.Foo]
-  GHC.Internal.Show.show = GHC.Internal.Show.$dmshow @(T14682.Foo)
+  GHC.Internal.Show.show = GHC.Internal.Show.$dmshow @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Show.Show [T14682.Foo]
-  GHC.Internal.Show.showList = GHC.Internal.Show.$dmshowList
-                                 @(T14682.Foo)
+  GHC.Internal.Show.showList
+    = GHC.Internal.Show.$dmshowList @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.dataCast1 = GHC.Internal.Data.Data.$dmdataCast1
-                                       @(T14682.Foo)
+  GHC.Internal.Data.Data.dataCast1 @t @c
+    = GHC.Internal.Data.Data.$dmdataCast1 @T14682.Foo @t @c
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.dataCast2 = GHC.Internal.Data.Data.$dmdataCast2
-                                       @(T14682.Foo)
+  GHC.Internal.Data.Data.dataCast2 @t @c
+    = GHC.Internal.Data.Data.$dmdataCast2 @T14682.Foo @t @c
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.gmapT = GHC.Internal.Data.Data.$dmgmapT
-                                   @(T14682.Foo)
+  GHC.Internal.Data.Data.gmapT
+    = GHC.Internal.Data.Data.$dmgmapT @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.gmapQl = GHC.Internal.Data.Data.$dmgmapQl
-                                    @(T14682.Foo)
+  GHC.Internal.Data.Data.gmapQl @r @r'
+    = GHC.Internal.Data.Data.$dmgmapQl @T14682.Foo @r @r'
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.gmapQr = GHC.Internal.Data.Data.$dmgmapQr
-                                    @(T14682.Foo)
+  GHC.Internal.Data.Data.gmapQr @r @r'
+    = GHC.Internal.Data.Data.$dmgmapQr @T14682.Foo @r @r'
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.gmapQ = GHC.Internal.Data.Data.$dmgmapQ
-                                   @(T14682.Foo)
+  GHC.Internal.Data.Data.gmapQ @u
+    = GHC.Internal.Data.Data.$dmgmapQ @T14682.Foo @u
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.gmapQi = GHC.Internal.Data.Data.$dmgmapQi
-                                    @(T14682.Foo)
+  GHC.Internal.Data.Data.gmapQi @u
+    = GHC.Internal.Data.Data.$dmgmapQi @T14682.Foo @u
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.gmapM = GHC.Internal.Data.Data.$dmgmapM
-                                   @(T14682.Foo)
+  GHC.Internal.Data.Data.gmapM @m
+    = GHC.Internal.Data.Data.$dmgmapM @T14682.Foo @m
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.gmapMp = GHC.Internal.Data.Data.$dmgmapMp
-                                    @(T14682.Foo)
+  GHC.Internal.Data.Data.gmapMp @m
+    = GHC.Internal.Data.Data.$dmgmapMp @T14682.Foo @m
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Data.Data.Data [T14682.Foo]
-  GHC.Internal.Data.Data.gmapMo = GHC.Internal.Data.Data.$dmgmapMo
-                                    @(T14682.Foo)
+  GHC.Internal.Data.Data.gmapMo @m
+    = GHC.Internal.Data.Data.$dmgmapMo @T14682.Foo @m
 
 
 
 ==================== Filling in method body ====================
 GHC.Classes.Eq [T14682.Foo]
-  GHC.Classes./= = GHC.Classes.$dm/= @(T14682.Foo)
+  (GHC.Classes./=) = GHC.Classes.$dm/= @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
 GHC.Classes.Ord [T14682.Foo]
-  GHC.Classes.max = GHC.Classes.$dmmax @(T14682.Foo)
+  GHC.Classes.max = GHC.Classes.$dmmax @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
 GHC.Classes.Ord [T14682.Foo]
-  GHC.Classes.min = GHC.Classes.$dmmin @(T14682.Foo)
+  GHC.Classes.min = GHC.Classes.$dmmin @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Ix.Ix [T14682.Foo]
-  GHC.Internal.Ix.index = GHC.Internal.Ix.$dmindex @(T14682.Foo)
+  GHC.Internal.Ix.index = GHC.Internal.Ix.$dmindex @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Ix.Ix [T14682.Foo]
-  GHC.Internal.Ix.rangeSize = GHC.Internal.Ix.$dmrangeSize
-                                @(T14682.Foo)
+  GHC.Internal.Ix.rangeSize
+    = GHC.Internal.Ix.$dmrangeSize @T14682.Foo
 
 
 
 ==================== Filling in method body ====================
 GHC.Internal.Ix.Ix [T14682.Foo]
-  GHC.Internal.Ix.unsafeRangeSize = GHC.Internal.Ix.$dmunsafeRangeSize
-                                      @(T14682.Foo)
+  GHC.Internal.Ix.unsafeRangeSize
+    = GHC.Internal.Ix.$dmunsafeRangeSize @T14682.Foo
 
 

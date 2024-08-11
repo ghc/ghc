@@ -8,7 +8,7 @@ Derived class instances:
           @(GHC.Internal.Data.Functor.Const.Const a b)
           @(GHC.Internal.Data.Functor.Const.Const
               (DerivingInferredTyArg.T a) b)
-          (DerivingInferredTyArg.m @a)
+          (DerivingInferredTyArg.m @a @b)
   
   instance DerivingInferredTyArg.C2 a =>
            DerivingInferredTyArg.C2 (DerivingInferredTyArg.T a) where
@@ -26,7 +26,7 @@ Derived class instances:
           @(GHC.Internal.Data.Functor.Const.Const a p)
           @(GHC.Internal.Data.Functor.Const.Const
               (DerivingInferredTyArg.T a) p)
-          (DerivingInferredTyArg.m3 @a)
+          (DerivingInferredTyArg.m3 @a @b)
   
   instance DerivingInferredTyArg.C4 a =>
            DerivingInferredTyArg.C4 (DerivingInferredTyArg.T a) where
@@ -35,7 +35,7 @@ Derived class instances:
           @(GHC.Internal.Data.Functor.Const.Const a p)
           @(GHC.Internal.Data.Functor.Const.Const
               (DerivingInferredTyArg.T a) p)
-          (DerivingInferredTyArg.m4 @a)
+          (DerivingInferredTyArg.m4 @a @b)
   
   instance DerivingInferredTyArg.C5 a =>
            DerivingInferredTyArg.C5 (DerivingInferredTyArg.T a) where

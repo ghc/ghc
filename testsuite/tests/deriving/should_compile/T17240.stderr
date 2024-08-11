@@ -31,12 +31,12 @@ Derived type family instances:
 
 ==================== Filling in method body ====================
 GHC.Classes.Eq [T17240.Nullary]
-  GHC.Classes./= = GHC.Classes.$dm/= @(T17240.Nullary)
+  (GHC.Classes./=) = GHC.Classes.$dm/= @T17240.Nullary
 
 
 
 ==================== Filling in method body ====================
 GHC.Classes.Eq [T17240.T]
-  GHC.Classes./= = GHC.Classes.$dm/= @(T17240.T)
+  (GHC.Classes./=) = GHC.Classes.$dm/= @T17240.T
 
 
