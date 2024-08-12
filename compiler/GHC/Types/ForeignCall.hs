@@ -189,7 +189,7 @@ isCLabelString :: CLabelString -> Bool  -- Checks to see if this is a valid C la
 isCLabelString lbl
   = all ok (unpackFS lbl)
   where
-    ok c = isAlphaNum c || c == '_' || c == '.'
+    ok c = isAlphaNum c || c == '_' || c == '.' || c == '@'
         -- The '.' appears in e.g. "foo.so" in the
         -- module part of a ExtName.  Maybe it should be separate
 
