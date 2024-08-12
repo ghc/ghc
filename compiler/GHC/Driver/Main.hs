@@ -956,8 +956,8 @@ checkByteCode :: ModIface -> ModSummary -> Maybe Linkable -> IO (MaybeValidated 
 checkByteCode iface mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
-      | not (isObjectLinkable old_linkable)
-      -> return $ (UpToDateItem old_linkable)
+      | linkableContainsByteCode old_linkable
+      -> return (UpToDateItem old_linkable)
     _ -> loadByteCode iface mod_sum
 
 loadByteCode :: ModIface -> ModSummary -> IO (MaybeValidated Linkable)
@@ -2749,8 +2749,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     deps <- getLinkDeps link_opts interp pls srcspan needed_mods
     -- We update the LinkerState even if the JS interpreter maintains its linker
     -- state independently to load new objects here.
-    let (objs, _bcos) = partition isObjectLinkable
-                          (concatMap partitionLinkable (ldNeededLinkables deps))
+    let objs = mapMaybe linkableFilterObjectCode (ldNeededLinkables deps)
 
     let (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
 

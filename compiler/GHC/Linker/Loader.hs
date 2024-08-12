@@ -32,7 +32,6 @@ module GHC.Linker.Loader
    , rmDupLinkables
    , modifyLoaderState
    , initLinkDepsOpts
-   , partitionLinkable
    )
 where
 
@@ -740,21 +739,8 @@ loadModuleLinkables interp hsc_env pls linkables
                 pls2 <- dynLinkBCOs interp pls1 bcos
                 return (pls2, Succeeded)
   where
-    objs = mapMaybe linkableFilterObjects linkables
-    bcos = mapMaybe linkableFilterByteCode linkables
+    (objs, bcos) = partitionLinkables linkables
 
-
--- HACK to support f-x-dynamic in the interpreter; no other purpose
-partitionLinkable :: Linkable -> [Linkable]
-partitionLinkable li
-   = let li_uls = linkableUnlinked li
-         li_uls_obj = filter isObject li_uls
-         li_uls_bco = filter isInterpretable li_uls
-     in
-         case (li_uls_obj, li_uls_bco) of
-            (_:_, _:_) -> [li {linkableUnlinked=li_uls_obj},
-                           li {linkableUnlinked=li_uls_bco}]
-            _ -> [li]
 
 linkableInSet :: Linkable -> LinkableSet -> Bool
 linkableInSet l objs_loaded =
@@ -782,8 +768,7 @@ loadObjects
 loadObjects interp hsc_env pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
-            unlinkeds                = concatMap linkableUnlinked new_objs
-            wanted_objs              = concatMap namesOfObjects unlinkeds
+            wanted_objs = concatMap linkableObjectCodePaths new_objs
 
         if interpreterDynamic interp
             then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
@@ -899,11 +884,9 @@ dynLinkBCOs interp pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
-            unlinkeds :: [Unlinked]
-            unlinkeds                = concatMap linkableUnlinked new_bcos
 
             cbcs :: [CompiledByteCode]
-            cbcs      = concatMap byteCodeOfObject unlinkeds
+            cbcs = concatMap linkableByteCode new_bcos
 
 
             le1 = linker_env pls
@@ -1010,7 +993,7 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
   -- we're unloading some code.  -fghci-leak-check with the tests in
   -- testsuite/ghci can detect space leaks here.
 
-  let (objs_to_keep', bcos_to_keep') = partition isObjectLinkable keep_linkables
+  let (objs_to_keep', bcos_to_keep') = partitionLinkables keep_linkables
       objs_to_keep = mkLinkableSet objs_to_keep'
       bcos_to_keep = mkLinkableSet bcos_to_keep'
 

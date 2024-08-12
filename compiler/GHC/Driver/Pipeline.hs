@@ -422,8 +422,7 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
                   return Succeeded
           else do
 
-        let getOfiles LM{ linkableUnlinked } = concatMap namesOfObjects (filter isObject linkableUnlinked)
-            obj_files = concatMap getOfiles linkables
+        let obj_files = concatMap linkableObjectCodePaths linkables
             platform  = targetPlatform dflags
             arch_os   = platformArchOS platform
             exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)

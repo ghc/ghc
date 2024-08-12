@@ -27,18 +27,17 @@ module GHC.Linker.Types
    , isObjectLinkable
    , linkableObjs
    , isObject
-   , namesOfObjects
-   , namesOfObjects_maybe
    , nameOfObject_maybe
-   , isInterpretable
-   , byteCodeOfObject
    , LibrarySpec(..)
    , LoadedPkgInfo(..)
    , PkgsLoaded
-   , byteCodes
    , linkableFilter
-   , linkableFilterObjects
+   , linkableFilterObjectCode
    , linkableFilterByteCode
+   , partitionLinkables
+   , linkableObjectCodePaths
+   , linkableByteCode
+   , linkableContainsByteCode
    )
 where
 
@@ -54,7 +53,6 @@ import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filte
 import GHC.Types.Name          ( Name )
 
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 
 import Control.Concurrent.MVar
 import Data.Time               ( UTCTime )
@@ -62,7 +60,7 @@ import GHC.Unit.Module.Env
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Unit.Module.WholeCoreBindings
-import Data.Maybe (fromMaybe)
+import Data.Maybe (mapMaybe)
 
 
 {- **********************************************************************
@@ -255,8 +253,18 @@ data Unlinked
   | DotDLL FilePath    -- ^ Dynamically linked library file (.so, .dll, .dylib)
   | CoreBindings WholeCoreBindings -- ^ Serialised core which we can turn into BCOs (or object files), or used by some other backend
                        -- See Note [Interface Files with Core Definitions]
-  | LoadedBCOs Unlinked -- ^ Some BCOs, but hidden behind extra indirection to avoid
-               [FilePath] -- being too strict.
+
+    -- | Bytecode and object files generated from data loaded from interfaces
+    -- with @-fprefer-byte-code@.
+    -- Both fields are outputs of a lazy IO thunk in
+    -- 'GHC.Driver.Main.initWholeCoreBindings', to avoid the overhead of
+    -- compiling Core bindings when the bytecode isn't used by TH.
+  | LoadedBCOs
+     -- | A 'BCOs' value.
+    Unlinked
+    -- | Objects generated from foreign stubs and files.
+    [FilePath]
+
   | BCOs CompiledByteCode
          [SptEntry]    -- ^ A byte-code object, lives only in memory. Also
                        -- carries some static pointer table entries which
@@ -281,20 +289,35 @@ data SptEntry = SptEntry Id Fingerprint
 instance Outputable SptEntry where
   ppr (SptEntry id fpr) = ppr id <> colon <+> ppr fpr
 
+-------------------------------------------
 
+-- TODO still dodgy: Since it used @all isObject@ before, there might be some
+-- other use case with multiple @Unlinked@ that I'm not aware of, or not.
+--
+-- It had quite a few consumers, and it seems unlikely that those all
+-- specifically wanted "Linkables that contain one or more objects but not mixed
+-- with other Unlinked".
+--
+-- Consumers: several in @HomeModInfo@, @checkObjects@
 isObjectLinkable :: Linkable -> Bool
-isObjectLinkable l = not (null unlinked) && any isObject unlinked
+isObjectLinkable l = not (null unlinked) && all isObject unlinked
   where unlinked = linkableUnlinked l
         -- A linkable with no Unlinked's is treated as a BCO.  We can
         -- generate a linkable with no Unlinked's as a result of
         -- compiling a module in NoBackend mode.
 
-linkableObjs :: Linkable -> [FilePath]
-linkableObjs l = concatMap unlinkedDotOPaths (linkableUnlinked l)
 
--------------------------------------------
+-- TODO still dodgy: this used to only match on DotO, so we'll have to decide
+-- whether foreign stubs are desired by its consumers.
+--
+-- Consumers: Twice used in @unload_wkr@
+linkableObjs :: Linkable -> [FilePath]
+linkableObjs l = concatMap unlinkedObjectPaths (linkableUnlinked l)
 
 -- | Is this an actual file on disk we can link in somehow?
+--
+-- TODO still dodgy: Used in many places, but those probably don't expect
+-- LoadedBCOs.
 isObject :: Unlinked -> Bool
 isObject = \case
   DotO _ _  -> True
@@ -303,13 +326,8 @@ isObject = \case
   LoadedBCOs _ _ -> True
   _ -> False
 
--- | Is this a bytecode linkable with no file on disk?
-isInterpretable :: Unlinked -> Bool
-isInterpretable = \case
-  BCOs _ _  -> True
-  LoadedBCOs _ _ -> True
-  _ -> False
-
+-- TODO still dodgy: Used in HsToCore.Usage. Unclear what that would want to do
+-- with foreign stubs.
 nameOfObject_maybe :: Unlinked -> Maybe FilePath
 nameOfObject_maybe (DotO fn _)   = Just fn
 nameOfObject_maybe (DotA fn)   = Just fn
@@ -318,61 +336,99 @@ nameOfObject_maybe (CoreBindings {}) = Nothing
 nameOfObject_maybe (LoadedBCOs{}) = Nothing
 nameOfObject_maybe (BCOs {})   = Nothing
 
-namesOfObjects_maybe :: Unlinked -> Maybe [FilePath]
-namesOfObjects_maybe (DotO fn _)   = Just [fn]
-namesOfObjects_maybe (DotA fn)   = Just [fn]
-namesOfObjects_maybe (DotDLL fn) = Just [fn]
-namesOfObjects_maybe (CoreBindings {}) = Nothing
-namesOfObjects_maybe (LoadedBCOs _ os) = Just os
-namesOfObjects_maybe (BCOs {})   = Nothing
+-- | Return the paths of all object files (.o) contained in this 'Unlinked'.
+unlinkedObjectPaths :: Unlinked -> [FilePath]
+unlinkedObjectPaths = \case
+  DotO f _ -> [f]
+  LoadedBCOs _ os -> os
+  _ -> []
 
--- | Retrieve the filename of the linkable if possible. Panic if it is a byte-code object
-namesOfObjects :: Unlinked -> [FilePath]
-namesOfObjects o = fromMaybe (pprPanic "namesOfObjects" (ppr o)) (namesOfObjects_maybe o)
+-- | Return the paths of all object code files (.o, .a, .so) contained in this
+-- 'Unlinked'.
+unlinkedObjectCodePaths :: Unlinked -> [FilePath]
+unlinkedObjectCodePaths = \case
+  DotO f _ -> [f]
+  DotA f -> [f]
+  DotDLL f -> [f]
+  LoadedBCOs _ os -> os
+  _ -> []
 
-byteCodes :: Unlinked -> Maybe [CompiledByteCode]
-byteCodes = \case
-  BCOs bc _ -> Just [bc]
-  LoadedBCOs ul _ -> byteCodes ul
-  _       -> Nothing
+-- | Return the paths of all object code files (.o, .a, .so) contained in this
+-- 'Unlinked'.
+linkableObjectCodePaths :: Linkable -> [FilePath]
+linkableObjectCodePaths = concatMap unlinkedObjectCodePaths . linkableUnlinked
 
--- | Retrieve the compiled byte-code if possible. Panic if it is a file-based linkable
-byteCodeOfObject :: Unlinked -> [CompiledByteCode]
-byteCodeOfObject (BCOs bc _) = [bc]
-byteCodeOfObject (LoadedBCOs ul _) = byteCodeOfObject ul
-byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
+-- | Produce a flat list of 'Unlinked' containing only object code files (.o,
+-- .a, .so), eliminating 'LoadedBCOs'.
+unlinkedFilterObjectCode :: Unlinked -> [Unlinked]
+unlinkedFilterObjectCode = \case
+  u@DotO {} -> [u]
+  u@DotA {} -> [u]
+  u@DotDLL {} -> [u]
+  LoadedBCOs _ os -> [DotO f True | f <- os]
+  _ -> []
 
+-- | Produce a flat list of 'Unlinked' containing only byte code, eliminating
+-- 'LoadedBCOs'.
+unlinkedFilterByteCode :: Unlinked -> [Unlinked]
+unlinkedFilterByteCode = \case
+  u@BCOs {}  -> [u]
+  LoadedBCOs bcos _ -> [bcos]
+  _ -> []
+
+-- | Transform the 'Unlinked' list in this 'Linkable' by applying the supplied
+-- function.
+-- If the result is empty, return 'Nothing'.
 linkableFilter :: (Unlinked -> [Unlinked]) -> Linkable -> Maybe Linkable
 linkableFilter f linkable =
   case concatMap f (linkableUnlinked linkable) of
     [] -> Nothing
     new -> Just linkable {linkableUnlinked = new}
 
-unlinkedDotOPaths :: Unlinked -> [FilePath]
-unlinkedDotOPaths = \case
-  DotO f _  -> [f]
-  LoadedBCOs _ os -> os
-  _ -> []
+-- | Transform the 'Unlinked' list in this 'Linkable' to contain only object
+-- code files (.o, .a, .so) without 'LoadedBCOs'.
+-- If no 'Unlinked' remains, return 'Nothing'.
+linkableFilterObjectCode :: Linkable -> Maybe Linkable
+linkableFilterObjectCode = linkableFilter unlinkedFilterObjectCode
 
-unlinkedObjects :: Unlinked -> [Unlinked]
-unlinkedObjects = \case
-  u@DotO {}  -> [u]
-  u@DotA {} -> [u]
-  u@DotDLL {} -> [u]
-  LoadedBCOs _ os -> [DotO f True | f <- os]
-  _ -> []
-
-linkableFilterObjects :: Linkable -> Maybe Linkable
-linkableFilterObjects = linkableFilter unlinkedObjects
-
-unlinkedByteCode :: Unlinked -> [Unlinked]
-unlinkedByteCode = \case
-  u@BCOs {}  -> [u]
-  LoadedBCOs bcos _ -> [bcos]
-  _ -> []
-
+-- | Transform the 'Unlinked' list in this 'Linkable' to contain only byte code
+-- without 'LoadedBCOs'.
+-- If no 'Unlinked' remains, return 'Nothing'.
 linkableFilterByteCode :: Linkable -> Maybe Linkable
-linkableFilterByteCode = linkableFilter unlinkedByteCode
+linkableFilterByteCode = linkableFilter unlinkedFilterByteCode
+
+-- | Split the 'Unlinked' lists in each 'Linkable' into only object code files
+-- (.o, .a, .so) and only byte code, without 'LoadedBCOs', and return two lists
+-- containing the nonempty 'Linkable's for each.
+partitionLinkables :: [Linkable] -> ([Linkable], [Linkable])
+partitionLinkables linkables =
+  (
+    mapMaybe linkableFilterObjectCode linkables,
+    mapMaybe linkableFilterByteCode linkables
+  )
+
+-- | Return the 'CompiledByteCode' if the argument contains any, or 'Nothing'.
+unlinkedByteCode :: Unlinked -> Maybe CompiledByteCode
+unlinkedByteCode = \case
+  BCOs bc _ -> Just bc
+  LoadedBCOs bcos _ -> unlinkedByteCode bcos
+  _ -> Nothing
+
+-- | Return all 'CompiledByteCode' values contained in this 'Linkable'.
+linkableByteCode :: Linkable -> [CompiledByteCode]
+linkableByteCode = mapMaybe unlinkedByteCode . linkableUnlinked
+
+-- | Indicate whether the argument is one of the byte code constructors.
+unlinkedContainsByteCode :: Unlinked -> Bool
+unlinkedContainsByteCode = \case
+  BCOs {} -> True
+  LoadedBCOs {} -> True
+  _ -> False
+
+-- | Indicate whether any 'Unlinked' in this 'Linkable' is one of the byte code
+-- constructors.
+linkableContainsByteCode :: Linkable -> Bool
+linkableContainsByteCode = any unlinkedContainsByteCode . linkableUnlinked
 
 {- **********************************************************************
 
