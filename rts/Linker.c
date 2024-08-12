@@ -472,14 +472,35 @@ initLinker_ (int retain_cafs)
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
+    IF_DEBUG(linker, debugBelch("populating linker symbol table with built-in RTS symbols\n"));
     for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
+        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
         if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
                                     symhash, sym->lbl, sym->addr,
                                     sym->strength, sym->type, NULL)) {
             barf("ghciInsertSymbolTable failed");
         }
-        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
     }
+    IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
+
+    /* Add extra symbols. rtsExtraSyms() is a weakly defined symbol in the rts,
+     * that can be overrided by linking in an object with a corresponding
+     * definition later. This is useful to build an external-interpreter or some
+     * other process with extra symbols (mostly libc, or similar).
+     * See Note [Extra RTS symbols]
+     */
+    IF_DEBUG(linker, debugBelch("populating linker symbol table with extra RTS symbols\n"));
+    if(rtsExtraSyms && rtsExtraSyms() != NULL) {
+        for(RtsSymbolVal *sym = rtsExtraSyms(); sym->lbl != NULL; sym++) {
+            IF_DEBUG(linker, debugBelch("initLinker: inserting extra rts symbol %s, %p\n", sym->lbl, sym->addr));
+            if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
+                                        symhash, sym->lbl, sym->addr,
+                                        sym->strength, sym->type, NULL)) {
+                barf("ghciInsertSymbolTable failed");
+            }
+        }
+    }
+    IF_DEBUG(linker, debugBelch("done with extra RTS symbols\n"));
 
     // Redirect newCAF to newRetainedCAF if retain_cafs is true.
     if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,

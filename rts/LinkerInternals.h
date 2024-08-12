@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Rts.h"
+#include "RtsSymbols.h"
 #include "Hash.h"
 #include "linker/M32Alloc.h"
 
@@ -33,8 +34,6 @@ void printLoadedObjects(void);
 #  define OBJFORMAT_WASM32
 #endif
 
-typedef void SymbolAddr;
-typedef char SymbolName;
 typedef struct _ObjectCode ObjectCode;
 typedef struct _Section    Section;
 
@@ -52,22 +51,6 @@ typedef struct _Section    Section;
  * when TNTC is in use). In these cases we have to rather fail and ask the user
  * to recompile their program as position-independent.
  */
-
-/* What kind of thing a symbol identifies. We need to know this to determine how
- * to process overflowing relocations. See Note [Processing overflowed relocations].
- * This is bitfield however only the option SYM_TYPE_DUP_DISCARD can be combined
- * with the other values. */
-typedef enum _SymType {
-    SYM_TYPE_CODE = 1 << 0, /* the symbol is a function and can be relocated via a jump island */
-    SYM_TYPE_DATA = 1 << 1, /* the symbol is data */
-    SYM_TYPE_INDIRECT_DATA = 1 << 2, /* see Note [_iob_func symbol] */
-    SYM_TYPE_DUP_DISCARD = 1 << 3, /* the symbol is a symbol in a BFD import library
-                                      however if a duplicate is found with a mismatching
-                                      SymType then discard this one.  */
-    SYM_TYPE_HIDDEN = 1 << 4, /* the symbol is hidden and should not be exported */
-
-} SymType;
-
 
 #if defined(OBJFORMAT_ELF)
 #  include "linker/ElfTypes.h"
@@ -424,12 +407,6 @@ typedef void (*init_t) (int argc, char **argv, char **env);
 
 /* Type of a finalizer */
 typedef void (*fini_t) (void);
-
-typedef enum _SymStrength {
-    STRENGTH_NORMAL,
-    STRENGTH_WEAK,
-    STRENGTH_STRONG,
-} SymStrength;
 
 /* SymbolInfo tracks a symbol's address, the object code from which
    it originated, and whether or not it's weak.

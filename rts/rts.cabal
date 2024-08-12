@@ -250,7 +250,7 @@ library
       include-dirs: include
       includes: Rts.h
       autogen-includes: ghcautoconf.h ghcplatform.h
-      install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
+      install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         -- ^ from include
                         DerivedConstants.h
