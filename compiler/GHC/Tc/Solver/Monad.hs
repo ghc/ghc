@@ -819,7 +819,8 @@ data TcSEnv
 
       tcs_unified     :: IORef Int,
          -- The number of unification variables we have filled
-         -- The important thing is whether it is non-zero
+         -- The important thing is whether it is non-zero, so it
+         -- could equally well be a Bool instead of an Int.
 
       tcs_unif_lvl  :: IORef (Maybe TcLevel),
          -- The Unification Level Flag
@@ -1312,6 +1313,9 @@ unifyTyVar tv ty
        ; TcM.updTcRef (tcs_unified env) (+1) }
 
 reportUnifications :: TcS a -> TcS (Int, a)
+-- Record how many unifications are done by thing_inside
+-- We could return a Bool instead of an Int;
+-- all that matters is whether it is no-zero
 reportUnifications (TcS thing_inside)
   = TcS $ \ env ->
     do { inner_unified <- TcM.newTcRef 0
