@@ -889,6 +889,7 @@ Library
         GHC.Types.SourceError
         GHC.Types.SourceFile
         GHC.Types.SourceText
+        GHC.Types.SptEntry
         GHC.Types.SrcLoc
         GHC.Types.Target
         GHC.Types.Tickish

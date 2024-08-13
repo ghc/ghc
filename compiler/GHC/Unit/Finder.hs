@@ -68,6 +68,7 @@ import GHC.Driver.Env
 import GHC.Driver.Config.Finder
 import qualified Data.Set as Set
 import qualified System.OsPath as OsPath
+import qualified Data.List.NonEmpty as NE
 
 type FileExt = OsString -- Filename extension
 type BaseName = OsPath  -- Basename of file
@@ -747,7 +748,7 @@ findObjectLinkableMaybe mod locn
 -- Make an object linkable when we know the object file exists, and we know
 -- its modification time.
 findObjectLinkable :: Module -> FilePath -> UTCTime -> IO Linkable
-findObjectLinkable mod obj_fn obj_time = return (LM obj_time mod [DotO obj_fn])
+findObjectLinkable mod obj_fn obj_time = return (Linkable obj_time mod (NE.singleton (DotO obj_fn)))
   -- We used to look for _stub.o files here, but that was a bug (#706)
   -- Now GHC merges the stub.o into the main .o (#3687)
 
