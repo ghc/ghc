@@ -34,6 +34,7 @@ import GHC.Core.Class
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.Make
+import GHC.Core.Coercion( mkNomReflCo )
 import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
@@ -50,7 +51,8 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Solve   ( solveSimpleGivens, solveSimpleWanteds )
 import GHC.Tc.Solver.Dict    ( makeSuperClasses, solveCallStack )
 import GHC.Tc.Solver.Rewrite ( rewriteType )
-import GHC.Tc.Utils.Unify    ( buildTvImplication )
+import GHC.Tc.Utils.Unify    ( buildTvImplication, touchabilityAndShapeTest
+                             , simpleUnifyCheck, UnifyCheckCaller(..) )
 import GHC.Tc.Utils.TcMType as TcM
 import GHC.Tc.Utils.Monad   as TcM
 import GHC.Tc.Zonk.TcType     as TcM
@@ -85,8 +87,8 @@ import Data.Foldable      ( toList, traverse_ )
 import Data.List          ( partition, intersect )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.Monoid        (First (First, getFirst))
-import GHC.Data.Maybe     ( catMaybes, mapMaybe, runMaybeT, MaybeT )
+import GHC.Data.Maybe     ( isJust, mapMaybe, catMaybes )
+import Data.Monoid     ( First(..) )
 
 {-
 *********************************************************************************
@@ -495,76 +497,70 @@ report_unsolved_equalities skol_info_anon skol_tvs tclvl wanted
 -- | Simplify top-level constraints, but without reporting any unsolved
 -- constraints nor unsafe overlapping.
 simplifyTopWanteds :: WantedConstraints -> TcS WantedConstraints
-    -- See Note [Top-level Defaulting Plan]
 simplifyTopWanteds wanteds
-  = do { wc_first_go <- nestTcS (solveWanteds wanteds)
-                            -- This is where the main work happens
-       ; dflags <- getDynFlags
-       ; wc_defaulted <- try_tyvar_defaulting dflags wc_first_go
+  = do { -- Solve the constraints
+         wc_first_go <- nestTcS (solveWanteds wanteds)
 
-       -- See Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors,
-       -- point (C).
-       ; useUnsatisfiableGivens wc_defaulted }
-  where
-    try_tyvar_defaulting :: DynFlags -> WantedConstraints -> TcS WantedConstraints
-    try_tyvar_defaulting dflags wc
-      | isEmptyWC wc
-      = return wc
-      | insolubleWC wc
-      , gopt Opt_PrintExplicitRuntimeReps dflags -- See Note [Defaulting insolubles]
-      = try_class_defaulting wc
-      | otherwise
-      = do { -- Need to zonk first, as the WantedConstraints are not yet zonked.
-           ; free_tvs <- TcS.zonkTyCoVarsAndFVList (tyCoVarsOfWCList wc)
-           ; let defaultable_tvs = filter can_default free_tvs
-                 can_default tv
-                   =   isTyVar tv
-                       -- Weed out coercion variables.
+         -- Now try defaulting:
+         -- see Note [Top-level Defaulting Plan]
+       ; tryDefaulting wc_first_go }
 
-                    && isMetaTyVar tv
-                       -- Weed out runtime-skolems in GHCi, which we definitely
-                       -- shouldn't try to default.
+--------------------------
+tryDefaulting :: WantedConstraints -> TcS WantedConstraints
+tryDefaulting wc
+ = do { dflags <- getDynFlags
+      ; traceTcS "tryDefaulting:before" (ppr wc)
+      ; wc1 <- tryTyVarDefaulting dflags wc
+      ; wc2 <- tryConstraintDefaulting wc1
+      ; wc3 <- tryTypeClassDefaulting wc2
+      ; wc4 <- tryUnsatisfiableGivens wc3
+      ; traceTcS "tryDefaulting:after" (ppr wc)
+      ; return wc4 }
 
-                    && not (tv `elemVarSet` nonDefaultableTyVarsOfWC wc)
-                       -- Weed out variables for which defaulting would be unhelpful,
-                       -- e.g. alpha appearing in [W] alpha[conc] ~# rr[sk].
+solveAgainIf :: Bool -> WantedConstraints -> TcS WantedConstraints
+-- If the Bool is true, solve the wanted constraints again
+-- See Note [Must simplify after defaulting]
+solveAgainIf False wc = return wc
+solveAgainIf True  wc = nestTcS (solveWanteds wc)
 
-           ; defaulted <- mapM defaultTyVarTcS defaultable_tvs -- Has unification side effects
-           ; if or defaulted
-             then do { wc_residual <- nestTcS (solveWanteds wc)
-                            -- See Note [Must simplify after defaulting]
-                     ; try_class_defaulting wc_residual }
-             else try_class_defaulting wc }     -- No defaulting took place
+--------------------------
+tryTyVarDefaulting  :: DynFlags -> WantedConstraints -> TcS WantedConstraints
+tryTyVarDefaulting dflags wc
+  | isEmptyWC wc
+  = return wc
+  | insolubleWC wc
+  , gopt Opt_PrintExplicitRuntimeReps dflags -- See Note [Defaulting insolubles]
+  = return wc
+  | otherwise
+  = do { -- Need to zonk first, as the WantedConstraints are not yet zonked.
+       ; free_tvs <- TcS.zonkTyCoVarsAndFVList (tyCoVarsOfWCList wc)
+       ; let defaultable_tvs = filter can_default free_tvs
+             can_default tv
+               =   isTyVar tv
+                   -- Weed out coercion variables.
 
-    try_class_defaulting :: WantedConstraints -> TcS WantedConstraints
-    try_class_defaulting wc
-      | isEmptyWC wc || insolubleWC wc -- See Note [Defaulting insolubles]
-      = try_callstack_defaulting wc
-      | otherwise  -- See Note [When to do type-class defaulting]
-      = do { something_happened <- applyDefaultingRules wc
-                                   -- See Note [Top-level Defaulting Plan]
-           ; if something_happened
-             then do { wc_residual <- nestTcS (solveWanteds wc)
-                     ; try_class_defaulting wc_residual }
-                  -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-             else try_callstack_defaulting wc }
+                && isMetaTyVar tv
+                   -- Weed out runtime-skolems in GHCi, which we definitely
+                   -- shouldn't try to default.
 
-    try_callstack_defaulting :: WantedConstraints -> TcS WantedConstraints
-    try_callstack_defaulting wc
-      = defaultConstraints [defaultCallStack, defaultExceptionContext] wc
+                && not (tv `elemVarSet` nonDefaultableTyVarsOfWC wc)
+                   -- Weed out variables for which defaulting would be unhelpful,
+                   -- e.g. alpha appearing in [W] alpha[conc] ~# rr[sk].
 
--- | If an implication contains a Given of the form @Unsatisfiable msg@, use
--- it to solve all Wanteds within the implication.
+       ; unification_s <- mapM defaultTyVarTcS defaultable_tvs -- Has unification side effects
+       ; solveAgainIf (or unification_s) wc }
+             -- solveAgainIf: see Note [Must simplify after defaulting]
+
+----------------------------
+-- | If an implication contains a Given of the form @Unsatisfiable msg@,
+-- use it to solve all Wanteds within the implication.
+-- See point (C) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors.
 --
 -- This does a complete walk over the implication tree.
---
--- See point (C) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors.
-useUnsatisfiableGivens :: WantedConstraints -> TcS WantedConstraints
-useUnsatisfiableGivens wc =
+tryUnsatisfiableGivens :: WantedConstraints -> TcS WantedConstraints
+tryUnsatisfiableGivens wc =
   do { (final_wc, did_work) <- (`runStateT` False) $ go_wc wc
-     ; if did_work
-       then nestTcS (solveWanteds final_wc)
-       else return final_wc }
+     ; solveAgainIf did_work final_wc }
   where
     go_wc (WC { wc_simple = wtds, wc_impl = impls, wc_errors = errs })
       = do impls' <- mapMaybeBagM go_impl impls
@@ -614,7 +610,7 @@ solveImplicationUsingUnsatGiven
     go_simple ct = case ctEvidence ct of
       CtWanted { ctev_pred = pty, ctev_dest = dst }
         -> do { ev_expr <- unsatisfiableEvExpr unsat_given pty
-              ; setWantedEvTerm dst True $ EvExpr ev_expr }
+              ; setWantedEvTerm dst EvNonCanonical $ EvExpr ev_expr }
       _ -> return ()
 
 -- | Create an evidence expression for an arbitrary constraint using
@@ -696,69 +692,122 @@ This allows us to indirectly box constraints with different representations
 (such as primitive equality constraints).
 -}
 
--- | A 'TcS' action which can may default a 'Ct'.
-type CtDefaultingStrategy = Ct -> MaybeT TcS ()
+-- | A 'TcS' action which can may solve a `Ct`
+type CtDefaultingStrategy = Ct -> TcS Bool
+  -- True <=> I solved the constraint
+
+--------------------------------
+tryConstraintDefaulting :: WantedConstraints -> TcS WantedConstraints
+-- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+tryConstraintDefaulting wc
+  | isEmptyWC wc
+  = return wc
+  | otherwise
+  = do { (n_unifs, better_wc) <- reportUnifications (go_wc wc)
+         -- We may have done unifications; so solve again
+       ; solveAgainIf (n_unifs > 0) better_wc }
+  where
+    go_wc :: WantedConstraints -> TcS WantedConstraints
+    go_wc wc@(WC { wc_simple = simples, wc_impl = implics })
+      = do { mb_simples <- mapMaybeBagM go_simple simples
+           ; mb_implics <- mapMaybeBagM go_implic implics
+           ; return (wc { wc_simple = mb_simples, wc_impl   = mb_implics }) }
+
+    go_simple :: Ct -> TcS (Maybe Ct)
+    go_simple ct = do { solved <- tryCtDefaultingStrategy ct
+                      ; if solved then return Nothing
+                                  else return (Just ct) }
+
+    go_implic :: Implication -> TcS (Maybe Implication)
+    -- The Maybe is because solving the CallStack constraint
+    -- may well allow us to discard the implication entirely
+    go_implic implic
+      | isSolvedStatus (ic_status implic)
+      = return (Just implic)  -- Nothing to solve inside here
+      | otherwise
+      = do { wanteds <- setEvBindsTcS (ic_binds implic) $
+                        -- defaultCallStack sets a binding, so
+                        -- we must set the correct binding group
+                        go_wc (ic_wanted implic)
+           ; setImplicationStatus (implic { ic_wanted = wanteds }) }
+
+tryCtDefaultingStrategy :: CtDefaultingStrategy
+-- The composition of all the CtDefaultingStrategies we want
+tryCtDefaultingStrategy
+  = foldr1 combineStrategies
+    [ defaultCallStack
+    , defaultExceptionContext
+    , defaultEquality ]
 
 -- | Default @ExceptionContext@ constraints to @emptyExceptionContext@.
 defaultExceptionContext :: CtDefaultingStrategy
 defaultExceptionContext ct
-  = do { ClassPred cls tys <- pure $ classifyPredType (ctPred ct)
-       ; Just {} <- pure $ isExceptionContextPred cls tys
-       ; emptyEC <- Var <$> lift (lookupId emptyExceptionContextName)
+  | ClassPred cls tys <- classifyPredType (ctPred ct)
+  , isJust (isExceptionContextPred cls tys)
+  = do { warnTcS $ TcRnDefaultedExceptionContext (ctLoc ct)
+       ; empty_ec_id <- lookupId emptyExceptionContextName
        ; let ev = ctEvidence ct
-       ; let ev_tm = mkEvCast emptyEC (wrapIP (ctEvPred ev))
-       ; lift $ warnTcS $ TcRnDefaultedExceptionContext (ctLoc ct)
-       ; lift $ setEvBindIfWanted ev False ev_tm
-       }
+             ev_tm = mkEvCast (Var empty_ec_id) (wrapIP (ctEvPred ev))
+       ; setEvBindIfWanted ev EvCanonical ev_tm
+         -- EvCanonical: see Note [CallStack and ExecptionContext hack]
+         --              in GHC.Tc.Solver.Dict
+       ; return True }
+  | otherwise
+  = return False
 
 -- | Default any remaining @CallStack@ constraints to empty @CallStack@s.
 -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
 defaultCallStack :: CtDefaultingStrategy
 defaultCallStack ct
-  = do { ClassPred cls tys <- pure $ classifyPredType (ctPred ct)
-       ; Just {} <- pure $ isCallStackPred cls tys
-       ; lift $ solveCallStack (ctEvidence ct) EvCsEmpty
+  | ClassPred cls tys <- classifyPredType (ctPred ct)
+  , isJust (isCallStackPred cls tys)
+  = do { solveCallStack (ctEvidence ct) EvCsEmpty
+       ; return True }
+  | otherwise
+  = return False
+
+defaultEquality :: CtDefaultingStrategy
+-- See Note [Defaulting equalities]
+defaultEquality ct
+  | EqPred NomEq ty1 ty2 <- classifyPredType (ctPred ct)
+  , Just tv1 <- getTyVar_maybe ty1
+  = do { -- Remember: `ct` may not be zonked;
+         -- see (DE3) in Note [Defaulting equalities]
+         z_ty1 <- TcS.zonkTcTyVar tv1
+       ; z_ty2 <- TcS.zonkTcType  ty2
+       ; case getTyVar_maybe z_ty1 of
+           Just z_tv1 | defaultable z_tv1 z_ty2
+                      -> do { default_tv z_tv1 z_ty2
+                            ; return True }
+           _          -> return False }
+   | otherwise
+   = return False
+  where
+    defaultable tv1 ty2
+      =  -- Do the standard unification checks;
+         --   c.f. uUnfilledVar2 in GHC.Tc.Utils.Unify
+         -- EXCEPT drop the untouchability test
+         tyVarKind tv1 `tcEqType` typeKind ty2
+      && touchabilityAndShapeTest topTcLevel tv1 ty2
+          -- topTcLevel makes the untoucability test vacuous,
+          -- which is the Whole Point of `defaultEquality`
+          -- See (DE2) in Note [Defaulting equalities]
+      && simpleUnifyCheck UC_Defaulting tv1 ty2
+
+    default_tv tv1 ty2
+      = do { unifyTyVar tv1 ty2   -- NB: unifyTyVar adds to the
+                                  -- TcS unification counter
+           ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
+             evCoercion (mkNomReflCo ty2) }
+
+combineStrategies :: CtDefaultingStrategy -> CtDefaultingStrategy -> CtDefaultingStrategy
+combineStrategies default1 default2 ct
+  = do { solved <- default1 ct
+       ; case solved of
+           True  -> return True  -- default1 solved it!
+           False -> default2 ct  -- default1 failed, try default2
        }
 
-defaultConstraints :: [CtDefaultingStrategy]
-                   -> WantedConstraints
-                   -> TcS WantedConstraints
--- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-defaultConstraints defaulting_strategies wanteds
-  | isEmptyWC wanteds = return wanteds
-  | otherwise
-  = do simples <- handle_simples (wc_simple wanteds)
-       mb_implics <- mapBagM handle_implic (wc_impl wanteds)
-       return (wanteds { wc_simple = simples
-                       , wc_impl = catBagMaybes mb_implics })
-
-  where
-  handle_simples :: Bag Ct -> TcS (Bag Ct)
-  handle_simples simples
-    = catBagMaybes <$> mapBagM handle_simple simples
-    where
-      handle_simple :: Ct -> TcS (Maybe Ct)
-      handle_simple ct = go defaulting_strategies
-        where
-          go [] = return (Just ct)
-          go (f:fs) = do
-              mb <- runMaybeT (f ct)
-              case mb of
-                Just () -> return Nothing
-                Nothing -> go fs
-
-  handle_implic :: Implication -> TcS (Maybe Implication)
-  -- The Maybe is because solving the CallStack constraint
-  -- may well allow us to discard the implication entirely
-  handle_implic implic
-    | isSolvedStatus (ic_status implic)
-    = return (Just implic)
-    | otherwise
-    = do { wanteds <- setEvBindsTcS (ic_binds implic) $
-                      -- defaultCallStack sets a binding, so
-                      -- we must set the correct binding group
-                      defaultConstraints defaulting_strategies (ic_wanted implic)
-         ; setImplicationStatus (implic { ic_wanted = wanteds }) }
 
 {- Note [When to do type-class defaulting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -786,6 +835,56 @@ stupid, but perhaps a little strange.
 Another potential alternative would be to suppress *all* non-insoluble
 errors if there are *any* insoluble errors, anywhere, but that seems
 too drastic.
+
+Note [Defaulting equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f :: forall a. (forall t. (F t ~ Int) => a -> Int) -> Int
+
+  g :: Int
+  g = f id
+
+We'll typecheck
+  id :: forall t. (F t ~ Int) => alpha[1] -> Int
+where the `alpha[1]` comes from instantiating `f`. So we'll end up
+with the implication constraint
+   forall[2] t. (F t ~ Int) => alpha[1] ~ Int
+And that can't be solved because `alpha` is untouchable under the
+equality (F t ~ Int).
+
+This is tiresome, and gave rise to user complaints: #25125 and #25029.
+Moreover, in this case there is no good reason not to unify alpha:=Int.
+Doing so solves the constraint, and since `alpha` is not otherwise
+constrained, it does no harm.  So the new plan is this:
+
+  * For the Wanted constraint
+        [W] alpha ~ ty
+    if the only reason for not unifying is untouchability, then during
+    top-level defaulting, go ahead and unify
+
+In top-level defaulting, we already do several other somewhat-ad-hoc,
+but terribly convenient, unifications. This is just one more.
+
+Wrinkles:
+
+(DE1) Note carefully that this does not threaten principal types.
+  The original worry about unifying untouchable type variables was this:
+
+     data T a where
+       T1 :: T Bool
+     f x = case x of T1 -> True
+
+  Should we infer f :: T a -> Bool, or f :: T a -> a.  Both are valid, but
+  neither is more general than the other
+
+(DE2) We still can't unify if there is a skolem-escape check, or an occurs check,
+  or it it'd mean unifying a TyVarTv with a non-tyvar.  It's only the
+  "untouchability test" that we lift.  We can lift it by saying that the innermost
+  given equality is at top level.
+
+(DE3) The contraint we are looking at may not be fully zonked; for example,
+  an earlier deafaulting might have affected it. So we zonk-on-the fly in
+  `defaultEquality`.
 
 Note [Don't default in syntactic equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1027,11 +1126,12 @@ last example above.
 
 ------------------
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
-simplifyAmbiguityCheck ty wanteds
+simplifyAmbiguityCheck ty wc
   = do { traceTc "simplifyAmbiguityCheck {" $
-         text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds
+         text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wc
 
-       ; (final_wc, _) <- runTcS $ useUnsatisfiableGivens =<< solveWanteds wanteds
+       ; (final_wc, _) <- runTcS $ do { wc1 <- solveWanteds wc
+                                      ; tryUnsatisfiableGivens wc1 }
              -- NB: no defaulting!  See Note [No defaulting in the ambiguity check]
              -- Note: we do still use Unsatisfiable Givens to solve Wanteds,
              -- see Wrinkle [Ambiguity] under point (C) of
@@ -2881,11 +2981,11 @@ setImplicationStatus :: Implication -> TcS (Maybe Implication)
 -- setting the ic_status field
 -- Precondition: the ic_status field is not already IC_Solved
 -- Return Nothing if we can discard the implication altogether
-setImplicationStatus implic@(Implic { ic_status     = status
+setImplicationStatus implic@(Implic { ic_status     = old_status
                                     , ic_info       = info
                                     , ic_wanted     = wc
                                     , ic_given      = givens })
- | assertPpr (not (isSolvedStatus status)) (ppr info) $
+ | assertPpr (not (isSolvedStatus old_status)) (ppr info) $
    -- Precondition: we only set the status if it is not already solved
    not (isSolvedWC pruned_wc)
  = do { traceTcS "setImplicationStatus(not-all-solved) {" (ppr implic)
@@ -3389,28 +3489,34 @@ The constraint in f's signature is redundant; not used to typecheck
 be an ambiguous variable in `g`.
 -}
 
+type UnificationDone = Bool
+
+noUnification, didUnification :: UnificationDone
+noUnification  = False
+didUnification = True
+
 -- | Like 'defaultTyVar', but in the TcS monad.
-defaultTyVarTcS :: TcTyVar -> TcS Bool
+defaultTyVarTcS :: TcTyVar -> TcS UnificationDone
 defaultTyVarTcS the_tv
   | isTyVarTyVar the_tv
     -- TyVarTvs should only be unified with a tyvar
     -- never with a type; c.f. GHC.Tc.Utils.TcMType.defaultTyVar
     -- and Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
-  = return False
+  = return noUnification
   | isRuntimeRepVar the_tv
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
-       ; return True }
+       ; return didUnification }
   | isLevityVar the_tv
   = do { traceTcS "defaultTyVarTcS Levity" (ppr the_tv)
        ; unifyTyVar the_tv liftedDataConTy
-       ; return True }
+       ; return didUnification }
   | isMultiplicityVar the_tv
   = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
        ; unifyTyVar the_tv ManyTy
-       ; return True }
+       ; return didUnification }
   | otherwise
-  = return False  -- the common case
+  = return noUnification  -- the common case
 
 approximateWC :: Bool   -- See Wrinkle (W3) in Note [ApproximateWC]
               -> WantedConstraints
@@ -3681,6 +3787,15 @@ Wrinkle (DP2): Interactions between defaulting mechanisms
 
 -}
 
+tryTypeClassDefaulting :: WantedConstraints -> TcS WantedConstraints
+tryTypeClassDefaulting wc
+  | isEmptyWC wc || insolubleWC wc -- See Note [Defaulting insolubles]
+  = return wc
+  | otherwise  -- See Note [When to do type-class defaulting]
+  = do { something_happened <- applyDefaultingRules wc
+                               -- See Note [Top-level Defaulting Plan]
+       ; solveAgainIf something_happened wc }
+
 applyDefaultingRules :: WantedConstraints -> TcS Bool
 -- True <=> I did some defaulting, by unifying a meta-tyvar
 -- Input WantedConstraints are not necessarily zonked
@@ -3720,8 +3835,10 @@ applyDefaultingRules wanteds
        ; traceTcS "applyDefaultingRules }" (ppr something_happeneds)
 
        ; return $ or something_happeneds || or plugin_defaulted }
-    where run_defaulting_plugin wanteds p =
-            do { groups <- runTcPluginTcS (p wanteds)
+
+    where
+      run_defaulting_plugin wanteds p
+          = do { groups <- runTcPluginTcS (p wanteds)
                ; defaultedGroups <-
                     filterM (\g -> disambigMultiGroup
                                    wanteds
@@ -3737,9 +3854,7 @@ applyDefaultingRules wanteds
                      -- Note [Defaulting plugins]). So we re-zonk to make sure later
                      -- defaulting doesn't try to solve the same metavars.
                      wanteds' <- TcS.zonkWC wanteds
-                     return (wanteds', True)
-               }
-
+                     return (wanteds', True) }
 
 findDefaultableGroups
     :: ( [ClassDefaults]

@@ -194,7 +194,7 @@ solveCallStack ev ev_cs
 
 {- Note [CallStack and ExecptionContext hack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It isn't really right thta we treat CallStack and ExceptionContext dictionaries
+It isn't really right that we treat CallStack and ExceptionContext dictionaries
 as canonical, in the sense of Note [Coherence and specialisation: overview].
 They definitely are not!
 

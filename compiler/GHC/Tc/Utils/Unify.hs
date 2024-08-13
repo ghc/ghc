@@ -2906,18 +2906,20 @@ data UnifyCheckCaller
   = UC_OnTheFly   -- Called from the on-the-fly unifier
   | UC_QuickLook  -- Called from Quick Look
   | UC_Solver     -- Called from constraint solver
+  | UC_Defaulting -- Called when doing top-level defaulting
 
 simpleUnifyCheck :: UnifyCheckCaller -> TcTyVar -> TcType -> Bool
 -- simpleUnifyCheck does a fast check: True <=> unification is OK
 -- If it says 'False' then unification might still be OK, but
 -- it'll take more work to do -- use the full checkTypeEq
 --
+-- * Rejects if lhs_tv occurs in rhs_ty (occurs check)
 -- * Rejects foralls unless
 --      lhs_tv is RuntimeUnk (used by GHCi debugger)
 --          or is a QL instantiation variable
 -- * Rejects a non-concrete type if lhs_tv is concrete
 -- * Rejects type families unless fam_ok=True
--- * Does a level-check for type variables
+-- * Does a level-check for type variables, to avoid skolem escape
 --
 -- This function is pretty heavily used, so it's optimised not to allocate
 simpleUnifyCheck caller lhs_tv rhs
@@ -2939,9 +2941,10 @@ simpleUnifyCheck caller lhs_tv rhs
     --   families, so we let it through there (not very principled, but let's
     --   see if it bites us)
     fam_ok = case caller of
-               UC_Solver    -> True
-               UC_QuickLook -> True
-               UC_OnTheFly  -> False
+               UC_Solver     -> True
+               UC_QuickLook  -> True
+               UC_OnTheFly   -> False
+               UC_Defaulting -> True
 
     go (TyVarTy tv)
       | lhs_tv == tv                                    = False
