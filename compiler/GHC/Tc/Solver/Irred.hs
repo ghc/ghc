@@ -73,9 +73,9 @@ try_inert_irreds inerts irred_w@(IrredCt { ir_ev = ev_w, ir_reason = reason })
          vcat [ text "wanted:" <+> (ppr ct_w $$ ppr (ctOrigin ct_w))
               , text "inert: " <+> (ppr ct_i $$ ppr (ctOrigin ct_i)) ]
        ; case solveOneFromTheOther ct_i ct_w of
-            KeepInert -> do { setEvBindIfWanted ev_w True (swap_me swap ev_i)
+            KeepInert -> do { setEvBindIfWanted ev_w EvCanonical (swap_me swap ev_i)
                             ; return (Stop ev_w (text "Irred equal:KeepInert" <+> ppr ct_w)) }
-            KeepWork ->  do { setEvBindIfWanted ev_i True (swap_me swap ev_w)
+            KeepWork ->  do { setEvBindIfWanted ev_i EvCanonical (swap_me swap ev_w)
                             ; updInertCans (updIrreds (\_ -> others))
                             ; continueWith () } }
 

@@ -16,7 +16,8 @@ lower levels it is preserved with @let@/@letrec@s).
 
 module GHC.HsToCore.Binds
    ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec
-   , dsHsWrapper, dsHsWrappers, dsEvTerm, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
+   , dsHsWrapper, dsHsWrappers
+   , dsEvTerm, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
    , dsWarnOrphanRule
    )
 where
@@ -31,6 +32,8 @@ import GHC.Unit.Module
 import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsLExpr )
 import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 
+import GHC.HsToCore.Pmc.Utils( tracePm )
+
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.GuardedRHSs
@@ -41,7 +44,7 @@ import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
 import GHC.Core.SimpleOpt    ( simpleOptExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
-import GHC.Core.InstEnv ( Canonical )
+import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 import GHC.Core.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity     ( etaExpand )
@@ -837,7 +840,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                -- perhaps with the body of the lambda wrapped in some WpLets
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
 
-       ; dsHsWrapper spec_app $ \core_app -> do
+       ; dsHsWrapperForRuleLHS spec_app $ \core_app -> do
 
        { let ds_lhs  = core_app (Var poly_id)
              spec_ty = mkLamTypes spec_bndrs (exprType ds_lhs)
@@ -864,6 +867,12 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
        ; dsWarnOrphanRule rule
 
+       ; tracePm "dsSpec" (vcat
+            [ text "fun:" <+> ppr poly_id
+            , text "spec_co:" <+> ppr spec_co
+            , text "spec_bndrs:" <+>  ppr spec_bndrs
+            , text "ds_lhs:" <+> ppr ds_lhs
+            , text "args:" <+>  ppr rule_lhs_args ])
        ; return (Just (unitOL (spec_id, spec_rhs), rule))
             -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
             --     makeCorePair overwrites the unfolding, which we have
@@ -1331,37 +1340,74 @@ inter-evidence dependency analysis to generate well-scoped
 bindings. We then record this specialisability information in the
 dsl_unspecables field of DsM's local environment.
 
+Wrinkle:
+
+(NC1) Don't do this in the LHS of a RULE.  In paritcular, if we have
+     f :: (Num a, HasCallStack) => a -> a
+     {-# SPECIALISE f :: Int -> Int #-}
+  then making a rule like
+        RULE   forall d1:Num Int, d2:HasCallStack.
+               f @Int d1 d2 = $sf
+  is pretty dodgy, because $sf won't get the call stack passed in d2.
+  But that's what you asked for in the SPECIALISE pragma, so we'll obey.
+
+  We definitely can't desugar that LHS into this!
+      nospec (f @Int d1) d2
+
+  Hence the `is_rule_lhs` flag in `ds_hs_wrapper`.
 -}
 
+dsHsWrappers :: [HsWrapper] -> ([CoreExpr -> CoreExpr] -> DsM a) -> DsM a
+dsHsWrappers (wp:wps) k = dsHsWrapper wp $ \wrap -> dsHsWrappers wps $ \wraps -> k (wrap:wraps)
+dsHsWrappers []       k = k []
+
 dsHsWrapper :: HsWrapper -> ((CoreExpr -> CoreExpr) -> DsM a) -> DsM a
-dsHsWrapper WpHole            k = k $ \e -> e
-dsHsWrapper (WpTyApp ty)      k = k $ \e -> App e (Type ty)
-dsHsWrapper (WpEvLam ev)      k = k $ Lam ev
-dsHsWrapper (WpTyLam tv)      k = k $ Lam tv
-dsHsWrapper (WpLet ev_binds)  k = do { dsTcEvBinds ev_binds $ \bs -> do
-                                     { k (mkCoreLets bs) } }
-dsHsWrapper (WpCompose c1 c2) k = do { dsHsWrapper c1 $ \w1 -> do
-                                     { dsHsWrapper c2 $ \w2 -> do
-                                     { k (w1 . w2) } } }
-dsHsWrapper (WpFun c1 c2 (Scaled w t1)) k -- See Note [Desugaring WpFun]
-                                = do { x <- newSysLocalDs w t1
-                                     ; dsHsWrapper c1 $ \w1 -> do
-                                     { dsHsWrapper c2 $ \w2 -> do
-                                     { let app f a = mkCoreAppDs (text "dsHsWrapper") f a
-                                           arg     = w1 (Var x)
-                                     ; k (\e -> (Lam x (w2 (app e arg)))) } } }
-dsHsWrapper (WpCast co)       k = assert (coercionRole co == Representational) $
-                                  k $ \e -> mkCastDs e co
-dsHsWrapper (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
-                                     ; unspecables <- getUnspecables
-                                     ; let vs = exprFreeVarsList core_tm
-                                           is_unspecable_var v = v `S.member` unspecables
-                                           is_specable = not $ any (is_unspecable_var) vs -- See Note [Desugaring non-canonical evidence]
-                                     ; k (\e -> app_ev is_specable e core_tm) }
+dsHsWrapper = ds_hs_wrapper False
+
+dsHsWrapperForRuleLHS :: HsWrapper -> ((CoreExpr -> CoreExpr) -> DsM a) -> DsM a
+dsHsWrapperForRuleLHS = ds_hs_wrapper True
+
+ds_hs_wrapper :: Bool    -- True <=> LHS of a RULE
+                         -- See (NC1) in Note [Desugaring non-canonical evidence]
+              -> HsWrapper
+              -> ((CoreExpr -> CoreExpr) -> DsM a)
+              -> DsM a
+ds_hs_wrapper is_rule_lhs wrap = go wrap
+  where
+    go WpHole            k = k $ \e -> e
+    go (WpTyApp ty)      k = k $ \e -> App e (Type ty)
+    go (WpEvLam ev)      k = k $ Lam ev
+    go (WpTyLam tv)      k = k $ Lam tv
+    go (WpCast co)       k = assert (coercionRole co == Representational) $
+                             k $ \e -> mkCastDs e co
+    go (WpLet ev_binds)  k = dsTcEvBinds ev_binds $ \bs ->
+                             k (mkCoreLets bs)
+    go (WpCompose c1 c2) k = go c1 $ \w1 ->
+                             go c2 $ \w2 ->
+                             k (w1 . w2)
+    go (WpFun c1 c2 st)  k = -- See Note [Desugaring WpFun]
+                             do { x <- newSysLocalDs st
+                                ; go c1 $ \w1 ->
+                                  go c2 $ \w2 ->
+                                  let app f a = mkCoreAppDs (text "dsHsWrapper") f a
+                                      arg     = w1 (Var x)
+                                  in k (\e -> (Lam x (w2 (app e arg)))) }
+    go (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
+
+                                  -- See Note [Desugaring non-canonical evidence]
+                                ; unspecables <- getUnspecables
+                                ; let vs = exprFreeVarsList core_tm
+                                      is_unspecable_var v = v `S.member` unspecables
+                                      is_specable
+                                        | is_rule_lhs = True
+                                        | otherwise   = not $ any (is_unspecable_var) vs
+
+                                ; k (\e -> app_ev is_specable e core_tm) }
+
   -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
-dsHsWrapper (WpMultCoercion co) k = do { unless (isReflexiveCo co) $
-                                           diagnosticDs DsMultiplicityCoercionsNotSupported
-                                       ; k $ \e -> e }
+    go (WpMultCoercion co) k = do { unless (isReflexiveCo co) $
+                                    diagnosticDs DsMultiplicityCoercionsNotSupported
+                                  ; k $ \e -> e }
 
 -- We are about to construct an evidence application `f dict`.  If the dictionary is
 -- non-specialisable, instead construct
@@ -1374,10 +1420,6 @@ app_ev is_specable k core_tm
 
     | otherwise
     = k `App` core_tm
-
-dsHsWrappers :: [HsWrapper] -> ([CoreExpr -> CoreExpr] -> DsM a) -> DsM a
-dsHsWrappers (wp:wps) k = dsHsWrapper wp $ \wrap -> dsHsWrappers wps $ \wraps -> k (wrap:wraps)
-dsHsWrappers [] k = k []
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> ([CoreBind] -> DsM a) -> DsM a
@@ -1399,18 +1441,19 @@ dsEvBinds ev_binds thing_inside
        ; let comps = sort_ev_binds ds_binds
        ; go comps thing_inside }
   where
-    go ::[SCC (Node EvVar (Canonical, CoreExpr))] -> ([CoreBind] -> DsM a) -> DsM a
+    go ::[SCC (Node EvVar (CanonicalEvidence, CoreExpr))] -> ([CoreBind] -> DsM a) -> DsM a
     go (comp:comps) thing_inside
       = do { unspecables <- getUnspecables
            ; let (core_bind, new_unspecables) = ds_component unspecables comp
-           ; addUnspecables new_unspecables $ go comps $ \ core_binds -> thing_inside (core_bind:core_binds) }
+           ; addUnspecables new_unspecables $ go comps $ \ core_binds ->
+               thing_inside (core_bind:core_binds) }
     go [] thing_inside = thing_inside []
 
     ds_component unspecables (AcyclicSCC node) = (NonRec v rhs, new_unspecables)
       where
         ((v, rhs), (this_canonical, deps)) = unpack_node node
-        transitively_unspecable = not this_canonical || any is_unspecable deps
-        is_unspecable dep = dep `S.member` unspecables
+        transitively_unspecable = is_unspecable this_canonical || any is_unspecable_dep deps
+        is_unspecable_dep dep = dep `S.member` unspecables
         new_unspecables
             | transitively_unspecable = S.singleton v
             | otherwise = mempty
@@ -1419,7 +1462,8 @@ dsEvBinds ev_binds thing_inside
         (pairs, direct_canonicity) = unzip $ map unpack_node nodes
 
         is_unspecable_remote dep = dep `S.member` unspecables
-        transitively_unspecable = or [ not this_canonical || any is_unspecable_remote deps | (this_canonical, deps) <- direct_canonicity ]
+        transitively_unspecable = or [ is_unspecable this_canonical || any is_unspecable_remote deps
+                                     | (this_canonical, deps) <- direct_canonicity ]
             -- Bindings from a given SCC are transitively specialisable if
             -- all are specialisable and all their remote dependencies are
             -- also specialisable; see Note [Desugaring non-canonical evidence]
@@ -1428,19 +1472,24 @@ dsEvBinds ev_binds thing_inside
             | transitively_unspecable = S.fromList [ v | (v, _) <- pairs]
             | otherwise = mempty
 
-    unpack_node DigraphNode { node_key = v, node_payload = (canonical, rhs), node_dependencies = deps } = ((v, rhs), (canonical, deps))
+    unpack_node DigraphNode { node_key = v, node_payload = (canonical, rhs), node_dependencies = deps }
+       = ((v, rhs), (canonical, deps))
 
-sort_ev_binds :: Bag (Id, Canonical, CoreExpr) -> [SCC (Node EvVar (Canonical, CoreExpr))]
+    is_unspecable :: CanonicalEvidence -> Bool
+    is_unspecable EvNonCanonical = True
+    is_unspecable EvCanonical    = False
+
+sort_ev_binds :: Bag (Id, CanonicalEvidence, CoreExpr) -> [SCC (Node EvVar (CanonicalEvidence, CoreExpr))]
 -- We do SCC analysis of the evidence bindings, /after/ desugaring
 -- them. This is convenient: it means we can use the GHC.Core
 -- free-variable functions rather than having to do accurate free vars
 -- for EvTerm.
 sort_ev_binds ds_binds = stronglyConnCompFromEdgedVerticesUniqR edges
   where
-    edges :: [ Node EvVar (Canonical, CoreExpr) ]
+    edges :: [ Node EvVar (CanonicalEvidence, CoreExpr) ]
     edges = foldr ((:) . mk_node) [] ds_binds
 
-    mk_node :: (Id, Canonical, CoreExpr) -> Node EvVar (Canonical, CoreExpr)
+    mk_node :: (Id, CanonicalEvidence, CoreExpr) -> Node EvVar (CanonicalEvidence, CoreExpr)
     mk_node (var, canonical, rhs)
       = DigraphNode { node_payload = (canonical, rhs)
                     , node_key = var
@@ -1451,11 +1500,11 @@ sort_ev_binds ds_binds = stronglyConnCompFromEdgedVerticesUniqR edges
       -- is still deterministic even if the edges are in nondeterministic order
       -- as explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 
-dsEvBind :: EvBind -> DsM (Id, Canonical, CoreExpr)
+dsEvBind :: EvBind -> DsM (Id, CanonicalEvidence, CoreExpr)
 dsEvBind (EvBind { eb_lhs = v, eb_rhs = r, eb_info = info }) = do
     e <- dsEvTerm r
     let canonical = case info of
-            EvBindGiven{} -> True
+            EvBindGiven{} -> EvCanonical
             EvBindWanted{ ebi_canonical = canonical } -> canonical
     return (v, canonical, e)
 
