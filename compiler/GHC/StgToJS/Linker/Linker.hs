@@ -56,7 +56,7 @@ import GHC.SysTools.Cpp
 import GHC.SysTools
 
 import GHC.Linker.Static.Utils (exeFileName)
-import GHC.Linker.Types (Unlinked(..), linkableUnlinked)
+import GHC.Linker.Types (linkableObjs)
 import GHC.Linker.External
 
 import GHC.StgToJS.Linker.Types
@@ -506,17 +506,13 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
             Nothing  -> pprPanic "getDeps: Couldn't find object file for home-module: " (pprModule mod)
             Just lnk -> pure lnk
 
-        case linkableUnlinked linkable of
-              [DotO p] -> do
-                  (bis, req_b) <- loadObjBlockInfo [p]
-                  -- Store new required blocks in IORef
-                  modifyIORef new_required_blocks_var ((++) req_b)
-                  case M.lookup mod bis of
-                    Nothing -> pprPanic "getDeps: Didn't load any block info for home-module: " (pprModule mod)
-                    Just bi -> pure bi
-              ul -> pprPanic "getDeps: Unrecognized linkable for home-module: "
-                      (vcat [ pprModule mod
-                            , ppr ul])
+        -- load block infos from the object files
+        (bis, req_b) <- loadObjBlockInfo (linkableObjs linkable)
+        -- Store new required blocks in IORef
+        modifyIORef new_required_blocks_var ((++) req_b)
+        case M.lookup mod bis of
+          Nothing -> pprPanic "getDeps: Didn't load any block info for home-module: " (pprModule mod)
+          Just bi -> pure bi
 
   -- required blocks have no dependencies, so don't have to use them as roots in
   -- the traversal

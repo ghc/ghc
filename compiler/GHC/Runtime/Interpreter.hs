@@ -685,15 +685,11 @@ fromEvalResult (EvalSuccess a) = return a
 getModBreaks :: HomeModInfo -> ModBreaks
 getModBreaks hmi
   | Just linkable <- homeModInfoByteCode hmi,
-    [cbc] <- mapMaybe onlyBCOs $ linkableUnlinked linkable
+    -- The linkable may have 'DotO's as well; only consider BCOs. See #20570.
+    [cbc] <- linkableBCOs linkable
   = fromMaybe emptyModBreaks (bc_breaks cbc)
   | otherwise
   = emptyModBreaks -- probably object code
-  where
-    -- The linkable may have 'DotO's as well; only consider BCOs. See #20570.
-    onlyBCOs :: Unlinked -> Maybe CompiledByteCode
-    onlyBCOs (BCOs cbc _) = Just cbc
-    onlyBCOs _            = Nothing
 
 -- | Interpreter uses Profiling way
 interpreterProfiled :: Interp -> Bool

@@ -69,6 +69,7 @@ import GHC.Driver.Main
 import GHC.Driver.MakeSem
 
 import GHC.Parser.Header
+import GHC.ByteCode.Types
 
 import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
@@ -1324,10 +1325,9 @@ addSptEntries :: HscEnv -> Maybe Linkable -> IO ()
 addSptEntries hsc_env mlinkable =
   hscAddSptEntries hsc_env
      [ spt
-     | Just linkable <- [mlinkable]
-     , unlinked <- linkableUnlinked linkable
-     , BCOs _ spts <- pure unlinked
-     , spt <- spts
+     | linkable <- maybeToList mlinkable
+     , bco <- linkableBCOs linkable
+     , spt <- bc_spt_entries bco
      ]
 
 {- Note [-fno-code mode]
