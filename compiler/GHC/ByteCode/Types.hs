@@ -28,6 +28,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
+import GHC.Types.SptEntry
 import GHC.Types.SrcLoc
 import GHCi.BreakArray
 import GHCi.RemoteTypes
@@ -50,12 +51,25 @@ import Language.Haskell.Syntax.Module.Name (ModuleName)
 -- Compiled Byte Code
 
 data CompiledByteCode = CompiledByteCode
-  { bc_bcos   :: [UnlinkedBCO]  -- Bunch of interpretable bindings
-  , bc_itbls  :: ItblEnv        -- A mapping from DataCons to their itbls
-  , bc_ffis   :: [FFIInfo]      -- ffi blocks we allocated
-  , bc_strs   :: AddrEnv        -- malloc'd top-level strings
-  , bc_breaks :: Maybe ModBreaks -- breakpoint info (Nothing if we're not
-                                 -- creating breakpoints, for some reason)
+  { bc_bcos   :: [UnlinkedBCO]
+    -- ^ Bunch of interpretable bindings
+
+  , bc_itbls  :: ItblEnv
+    -- ^ Mapping from DataCons to their info tables
+
+  , bc_ffis   :: [FFIInfo]
+    -- ^ ffi blocks we allocated
+
+  , bc_strs   :: AddrEnv
+    -- ^ top-level strings (heap allocated)
+
+  , bc_breaks :: Maybe ModBreaks
+    -- ^ breakpoint info (Nothing if breakpoints are disabled)
+
+  , bc_spt_entries :: ![SptEntry]
+    -- ^ Static pointer table entries which should be loaded along with the
+    -- BCOs. See Note [Grand plan for static forms] in
+    -- "GHC.Iface.Tidy.StaticPtrTable".
   }
                 -- ToDo: we're not tracking strings that we malloc'd
 newtype FFIInfo = FFIInfo (RemotePtr C_ffi_cif)
