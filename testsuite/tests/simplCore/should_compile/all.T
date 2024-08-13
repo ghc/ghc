@@ -529,3 +529,4 @@ test('T24944', [extra_files(['T24944a.hs'])], multimod_compile, ['T24944', '-v0 
 test('T24625', [ grep_errmsg(r'case lazy') ], compile, ['-O -fno-ignore-asserts -ddump-simpl -dsuppress-uniques'])
 test('T24725a', [ grep_errmsg(r'testedRule')], compile, ['-O -ddump-rule-firings'])
 test('T25033', normal, compile, ['-O'])
+test('T25160', normal, compile, ['-O -ddump-rules'])

@@ -425,7 +425,7 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
 
       ; ev_binds <- emitImplicationTcS lvl skol_info_anon skol_tvs given_ev_vars wanteds
 
-      ; setWantedEvTerm dest True $
+      ; setWantedEvTerm dest EvCanonical $
         EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
               , et_binds = ev_binds, et_body = w_id }
 
@@ -557,7 +557,7 @@ finish_rewrite ev@(CtWanted { ctev_dest = dest
   = do { mb_new_ev <- newWanted loc rewriters' new_pred
        ; let ev_rw_role = ctEvRewriteRole ev
        ; massert (coercionRole co == ev_rw_role)
-       ; setWantedEvTerm dest True $
+       ; setWantedEvTerm dest EvCanonical $
             mkEvCast (getEvExpr mb_new_ev)
                      (downgradeRole Representational ev_rw_role (mkSymCo co))
        ; case mb_new_ev of
@@ -632,7 +632,8 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1 })
   where
     setEv :: (EvTerm,Ct) -> TcS ()
     setEv (ev,ct) = case ctEvidence ct of
-      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest True ev -- TODO: plugins should be able to signal non-canonicity
+      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest EvCanonical ev
+           -- TODO: plugins should be able to signal non-canonicity
       _ -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"
 
 -- | A pair of (given, wanted) constraints to pass to plugins

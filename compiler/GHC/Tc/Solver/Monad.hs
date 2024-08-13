@@ -44,6 +44,7 @@ module GHC.Tc.Solver.Monad (
 
     -- Evidence creation and transformation
     MaybeNew(..), freshGoals, isFresh, getEvExpr,
+    CanonicalEvidence(..),
 
     newTcEvBinds, newNoTcEvBinds,
     newWantedEq, emitNewWantedEq,
@@ -1694,7 +1695,7 @@ setWantedEq (HoleDest hole) co
 setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
 
 -- | Good for both equalities and non-equalities
-setWantedEvTerm :: TcEvDest -> Canonical -> EvTerm -> TcS ()
+setWantedEvTerm :: TcEvDest -> CanonicalEvidence -> EvTerm -> TcS ()
 setWantedEvTerm (HoleDest hole) _canonical tm
   | Just co <- evTermCoercion_maybe tm
   = do { useVars (coVarsOfCo co)
@@ -1702,7 +1703,7 @@ setWantedEvTerm (HoleDest hole) _canonical tm
   | otherwise
   = -- See Note [Yukky eq_sel for a HoleDest]
     do { let co_var = coHoleCoVar hole
-       ; setEvBind (mkWantedEvBind co_var True tm)
+       ; setEvBind (mkWantedEvBind co_var EvCanonical tm)
        ; fillCoercionHole hole (mkCoVarCo co_var) }
 
 setWantedEvTerm (EvVarDest ev_id) canonical tm
@@ -1732,7 +1733,7 @@ fillCoercionHole hole co
   = do { wrapTcS $ TcM.fillCoercionHole hole co
        ; kickOutAfterFillingCoercionHole hole }
 
-setEvBindIfWanted :: CtEvidence -> Canonical -> EvTerm -> TcS ()
+setEvBindIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev canonical tm
   = case ev of
       CtWanted { ctev_dest = dest } -> setWantedEvTerm dest canonical tm
