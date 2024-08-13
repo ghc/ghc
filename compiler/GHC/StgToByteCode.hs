@@ -67,6 +67,7 @@ import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Name.Env (mkNameEnv)
 import GHC.Types.Tickish
+import GHC.Types.SptEntry
 
 import Data.List ( genericReplicate, genericLength, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
@@ -100,8 +101,9 @@ byteCodeGen :: HscEnv
             -> [CgStgTopBinding]
             -> [TyCon]
             -> Maybe ModBreaks
+            -> [SptEntry]
             -> IO CompiledByteCode
-byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
+byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
    = withTiming logger
                 (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
@@ -128,10 +130,10 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
-        cbc <- assembleBCOs interp profile proto_bcos tycs stringPtrs
-          (case modBreaks of
+        let mod_breaks = case modBreaks of
              Nothing -> Nothing
-             Just mb -> Just mb{ modBreaks_breakInfo = breakInfo })
+             Just mb -> Just mb{ modBreaks_breakInfo = breakInfo }
+        cbc <- assembleBCOs interp profile proto_bcos tycs stringPtrs mod_breaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi

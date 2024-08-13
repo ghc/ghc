@@ -1,3 +1,6 @@
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
+
 -----------------------------------------------------------------------------
 --
 -- Types for the linkers and the loader
@@ -5,7 +8,6 @@
 -- (c) The University of Glasgow 2019
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE TypeApplications #-}
 module GHC.Linker.Types
    ( Loader (..)
    , LoaderState (..)
@@ -16,47 +18,54 @@ module GHC.Linker.Types
    , ClosureEnv
    , emptyClosureEnv
    , extendClosureEnv
-   , Linkable(..)
    , LinkableSet
    , mkLinkableSet
    , unionLinkableSet
    , ObjFile
-   , Unlinked(..)
    , SptEntry(..)
-   , isObjectLinkable
-   , linkableObjs
-   , isObject
-   , nameOfObject
-   , nameOfObject_maybe
-   , isInterpretable
-   , byteCodeOfObject
    , LibrarySpec(..)
    , LoadedPkgInfo(..)
    , PkgsLoaded
+
+   -- * Linkable
+   , Linkable(..)
+   , LinkablePart(..)
+   , linkableIsNativeCodeOnly
+   , linkableObjs
+   , linkableLibs
+   , linkableFiles
+   , linkableBCOs
+   , linkableNativeParts
+   , linkablePartitionParts
+   , linkablePartPath
+   , linkablePartAllBCOs
+   , isNativeCode
+   , isNativeLib
+   , isInterpretable
    )
 where
 
 import GHC.Prelude
 import GHC.Unit                ( UnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, AddrEnv, CompiledByteCode )
-import GHC.Fingerprint.Type    ( Fingerprint )
 import GHCi.RemoteTypes        ( ForeignHValue, RemotePtr )
 import GHCi.Message            ( LoadedDLL )
 
-import GHC.Types.Var           ( Id )
 import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filterNameEnv )
 import GHC.Types.Name          ( Name )
+import GHC.Types.SptEntry
 
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 
 import Control.Concurrent.MVar
 import Data.Time               ( UTCTime )
-import Data.Maybe
 import GHC.Unit.Module.Env
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Unit.Module.WholeCoreBindings
+import Data.List.NonEmpty (NonEmpty)
+import Data.Maybe (mapMaybe)
+import qualified Data.List.NonEmpty as NE
 
 
 {- **********************************************************************
@@ -162,7 +171,7 @@ data LinkerEnv = LinkerEnv
   , itbl_env    :: !ItblEnv
       -- ^ The current global mapping from RdrNames of DataCons to
       -- info table addresses.
-      -- When a new Unlinked is linked into the running image, or an existing
+      -- When a new LinkablePart is linked into the running image, or an existing
       -- module in the image is replaced, the itbl_env must be updated
       -- appropriately.
 
@@ -208,15 +217,17 @@ instance Outputable LoadedPkgInfo where
 
 
 -- | Information we can use to dynamically link modules into the compiler
-data Linkable = LM {
-  linkableTime     :: !UTCTime,         -- ^ Time at which this linkable was built
-                                        -- (i.e. when the bytecodes were produced,
-                                        --       or the mod date on the files)
-  linkableModule   :: !Module,          -- ^ The linkable module itself
-  linkableUnlinked :: [Unlinked]
-    -- ^ Those files and chunks of code we have yet to link.
-    --
-    -- INVARIANT: A valid linkable always has at least one 'Unlinked' item.
+data Linkable = Linkable
+  { linkableTime     :: !UTCTime
+      -- ^ Time at which this linkable was built
+      -- (i.e. when the bytecodes were produced,
+      --       or the mod date on the files)
+
+  , linkableModule   :: !Module
+      -- ^ The linkable module itself
+
+  , linkableParts :: NonEmpty LinkablePart
+    -- ^ Files and chunks of code to link.
  }
 
 type LinkableSet = ModuleEnv Linkable
@@ -224,6 +235,9 @@ type LinkableSet = ModuleEnv Linkable
 mkLinkableSet :: [Linkable] -> LinkableSet
 mkLinkableSet ls = mkModuleEnv [(linkableModule l, l) | l <- ls]
 
+-- | Union of LinkableSets.
+--
+-- In case of conflict, keep the most recent Linkable (as per linkableTime)
 unionLinkableSet :: LinkableSet -> LinkableSet -> LinkableSet
 unionLinkableSet = plusModuleEnv_C go
   where
@@ -232,85 +246,122 @@ unionLinkableSet = plusModuleEnv_C go
       | otherwise = l2
 
 instance Outputable Linkable where
-  ppr (LM when_made mod unlinkeds)
-     = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod)
-       $$ nest 3 (ppr unlinkeds)
+  ppr (Linkable when_made mod parts)
+     = (text "Linkable" <+> parens (text (show when_made)) <+> ppr mod)
+       $$ nest 3 (ppr parts)
 
 type ObjFile = FilePath
 
 -- | Objects which have yet to be linked by the compiler
-data Unlinked
-  = DotO ObjFile       -- ^ An object file (.o)
-  | DotA FilePath      -- ^ Static archive file (.a)
-  | DotDLL FilePath    -- ^ Dynamically linked library file (.so, .dll, .dylib)
-  | CoreBindings WholeCoreBindings -- ^ Serialised core which we can turn into BCOs (or object files), or used by some other backend
-                       -- See Note [Interface Files with Core Definitions]
-  | LoadedBCOs [Unlinked] -- ^ A list of BCOs, but hidden behind extra indirection to avoid
-                          -- being too strict.
+data LinkablePart
+  = DotO ObjFile
+      -- ^ An object file (.o)
+
+  | DotA FilePath
+      -- ^ Static archive file (.a)
+
+  | DotDLL FilePath
+      -- ^ Dynamically linked library file (.so, .dll, .dylib)
+
+  | CoreBindings WholeCoreBindings
+      -- ^ Serialised core which we can turn into BCOs (or object files), or
+      -- used by some other backend See Note [Interface Files with Core
+      -- Definitions]
+
+  | LazyBCOs (NonEmpty LinkablePart)
+    -- ^ Some BCOs generated on-demand when forced. This is used for
+    -- WholeCoreBindings, see Note [Interface Files with Core Definitions]
+    --
+    -- We use `NonEmpty LinkablePart` instead of `CompiledByteCode` because the list
+    -- also contains the stubs objects (DotO) for the BCOs.
+
   | BCOs CompiledByteCode
-         [SptEntry]    -- ^ A byte-code object, lives only in memory. Also
-                       -- carries some static pointer table entries which
-                       -- should be loaded along with the BCOs.
-                       -- See Note [Grand plan for static forms] in
-                       -- "GHC.Iface.Tidy.StaticPtrTable".
+    -- ^ A byte-code object, lives only in memory.
 
-instance Outputable Unlinked where
-  ppr (DotO path)   = text "DotO" <+> text path
-  ppr (DotA path)   = text "DotA" <+> text path
-  ppr (DotDLL path) = text "DotDLL" <+> text path
-  ppr (BCOs bcos spt) = text "BCOs" <+> ppr bcos <+> ppr spt
-  ppr (LoadedBCOs{})  = text "LoadedBCOs"
-  ppr (CoreBindings {})       = text "FI"
+instance Outputable LinkablePart where
+  ppr (DotO path)       = text "DotO" <+> text path
+  ppr (DotA path)       = text "DotA" <+> text path
+  ppr (DotDLL path)     = text "DotDLL" <+> text path
+  ppr (BCOs bco)        = text "BCOs" <+> ppr bco
+  ppr (LazyBCOs{})      = text "LazyBCOs"
+  ppr (CoreBindings {}) = text "CoreBindings"
 
--- | An entry to be inserted into a module's static pointer table.
--- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
-data SptEntry = SptEntry Id Fingerprint
+-- | Return true if the linkable only consists of native code (no BCO)
+linkableIsNativeCodeOnly :: Linkable -> Bool
+linkableIsNativeCodeOnly l = all isNativeCode (NE.toList (linkableParts l))
 
-instance Outputable SptEntry where
-  ppr (SptEntry id fpr) = ppr id <> colon <+> ppr fpr
+-- | List the BCOs parts of a linkable.
+--
+-- This excludes the LazyBCOs and the CoreBindings parts
+linkableBCOs :: Linkable -> [CompiledByteCode]
+linkableBCOs l = [ cbc | BCOs cbc <- NE.toList (linkableParts l) ]
 
+-- | List the native linkable parts (.o/.so/.dll) of a linkable
+linkableNativeParts :: Linkable -> [LinkablePart]
+linkableNativeParts l = NE.filter isNativeCode (linkableParts l)
 
-isObjectLinkable :: Linkable -> Bool
-isObjectLinkable l = not (null unlinked) && all isObject unlinked
-  where unlinked = linkableUnlinked l
-        -- A linkable with no Unlinked's is treated as a BCO.  We can
-        -- generate a linkable with no Unlinked's as a result of
-        -- compiling a module in NoBackend mode, and this choice
-        -- happens to work well with checkStability in module GHC.
+-- | Split linkable parts into (native code parts, BCOs parts)
+linkablePartitionParts :: Linkable -> ([LinkablePart],[LinkablePart])
+linkablePartitionParts l = NE.partition isNativeCode (linkableParts l)
 
+-- | List the native objects (.o) of a linkable
 linkableObjs :: Linkable -> [FilePath]
-linkableObjs l = [ f | DotO f <- linkableUnlinked l ]
+linkableObjs l = [ f | DotO f <- NE.toList (linkableParts l) ]
+
+-- | List the native libraries (.so/.dll) of a linkable
+linkableLibs :: Linkable -> [LinkablePart]
+linkableLibs l = NE.filter isNativeLib (linkableParts l)
+
+-- | List the paths of the native objects and libraries (.o/.so/.dll)
+linkableFiles :: Linkable -> [FilePath]
+linkableFiles l = mapMaybe linkablePartPath (NE.toList (linkableParts l))
 
 -------------------------------------------
 
--- | Is this an actual file on disk we can link in somehow?
-isObject :: Unlinked -> Bool
-isObject (DotO _)   = True
-isObject (DotA _)   = True
-isObject (DotDLL _) = True
-isObject _          = False
+-- | Is the part a native object or library? (.o/.so/.dll)
+isNativeCode :: LinkablePart -> Bool
+isNativeCode = \case
+  DotO {}         -> True
+  DotA {}         -> True
+  DotDLL {}       -> True
+  BCOs {}         -> False
+  LazyBCOs{}      -> False
+  CoreBindings {} -> False
+
+-- | Is the part a native library? (.so/.dll)
+isNativeLib :: LinkablePart -> Bool
+isNativeLib = \case
+  DotO {}         -> False
+  DotA {}         -> True
+  DotDLL {}       -> True
+  BCOs {}         -> False
+  LazyBCOs{}      -> False
+  CoreBindings {} -> False
 
 -- | Is this a bytecode linkable with no file on disk?
-isInterpretable :: Unlinked -> Bool
-isInterpretable = not . isObject
+isInterpretable :: LinkablePart -> Bool
+isInterpretable = not . isNativeCode
 
-nameOfObject_maybe :: Unlinked -> Maybe FilePath
-nameOfObject_maybe (DotO fn)   = Just fn
-nameOfObject_maybe (DotA fn)   = Just fn
-nameOfObject_maybe (DotDLL fn) = Just fn
-nameOfObject_maybe (CoreBindings {}) = Nothing
-nameOfObject_maybe (LoadedBCOs{}) = Nothing
-nameOfObject_maybe (BCOs {})   = Nothing
+-- | Get the FilePath of linkable part (if applicable)
+linkablePartPath :: LinkablePart -> Maybe FilePath
+linkablePartPath = \case
+  DotO fn         -> Just fn
+  DotA fn         -> Just fn
+  DotDLL fn       -> Just fn
+  CoreBindings {} -> Nothing
+  LazyBCOs {}     -> Nothing
+  BCOs {}         -> Nothing
 
--- | Retrieve the filename of the linkable if possible. Panic if it is a byte-code object
-nameOfObject :: Unlinked -> FilePath
-nameOfObject o = fromMaybe (pprPanic "nameOfObject" (ppr o)) (nameOfObject_maybe o)
-
--- | Retrieve the compiled byte-code if possible. Panic if it is a file-based linkable
-byteCodeOfObject :: Unlinked -> [CompiledByteCode]
-byteCodeOfObject (BCOs bc _) = [bc]
-byteCodeOfObject (LoadedBCOs ul) = concatMap byteCodeOfObject ul
-byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
+-- | Retrieve the compiled byte-code from the linkable part.
+--
+-- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
+--
+-- Warning: this may force byte-code for LazyBCOs.
+linkablePartAllBCOs :: LinkablePart -> [CompiledByteCode]
+linkablePartAllBCOs = \case
+  BCOs bco    -> [bco]
+  LazyBCOs ps -> concatMap linkablePartAllBCOs (NE.toList ps)
+  _           -> []
 
 {- **********************************************************************
 

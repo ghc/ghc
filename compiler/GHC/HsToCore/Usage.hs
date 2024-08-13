@@ -42,6 +42,7 @@ import Data.List (sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.List.NonEmpty as NE
 
 import GHC.Linker.Types
 import GHC.Unit.Finder
@@ -171,14 +172,14 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
           (plugins_links_needed, plugin_pkgs_needed) = loadedPluginDeps plugins
       concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
   where
-    linkableToUsage (LM _ m uls) = mapM (unlinkedToUsage m) uls
+    linkableToUsage (Linkable _ m uls) = mapM (partToUsage m) (NE.toList uls)
 
     msg m = moduleNameString (moduleName m) ++ "[TH] changed"
 
     fing mmsg fn = UsageFile (mkFastString fn) <$> lookupFileCache fc fn <*> pure mmsg
 
-    unlinkedToUsage m ul =
-      case nameOfObject_maybe ul of
+    partToUsage m part =
+      case linkablePartPath part of
         Just fn -> fing (Just (msg m)) fn
         Nothing ->  do
           -- This should only happen for home package things but oneshot puts

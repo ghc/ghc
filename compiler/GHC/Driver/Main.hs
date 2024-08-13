@@ -935,7 +935,7 @@ checkObjects dflags mb_old_linkable summary = do
         | obj_date >= if_date ->
             case mb_old_linkable of
               Just old_linkable
-                | isObjectLinkable old_linkable, linkableTime old_linkable == obj_date
+                | linkableIsNativeCodeOnly old_linkable, linkableTime old_linkable == obj_date
                 -> return $ UpToDateItem old_linkable
               _ -> UpToDateItem <$> findObjectLinkable this_mod obj_fn obj_date
       _ -> return $ outOfDateItemBecause MissingObjectFile Nothing
@@ -947,7 +947,7 @@ checkByteCode :: ModIface -> ModSummary -> Maybe Linkable -> IO (MaybeValidated 
 checkByteCode iface mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
-      | not (isObjectLinkable old_linkable)
+      | not (linkableIsNativeCodeOnly old_linkable)
       -> return $ (UpToDateItem old_linkable)
     _ -> loadByteCode iface mod_sum
 
@@ -959,7 +959,7 @@ loadByteCode iface mod_sum = do
     case mi_extra_decls iface of
       Just extra_decls -> do
           let fi = WholeCoreBindings extra_decls this_mod (ms_location mod_sum)
-          return (UpToDateItem (LM if_date this_mod [CoreBindings fi]))
+          return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 --------------------------------------------------------------
 -- Compilers
@@ -982,7 +982,7 @@ initModDetails hsc_env iface =
 
 -- Hydrate any WholeCoreBindings linkables into BCOs
 initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
-initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM utc_time this_mod <$> mapM go uls
+initWholeCoreBindings hsc_env mod_iface details (Linkable utc_time this_mod uls) = Linkable utc_time this_mod <$> mapM go uls
   where
     go (CoreBindings fi) = do
         let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
@@ -994,7 +994,7 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM 
         -- recompilation checking the bytecode will be generated (which slows things down a lot)
         -- the laziness is OK because generateByteCode just depends on things already loaded
         -- in the interface file.
-        LoadedBCOs <$> (unsafeInterleaveIO $ do
+        LazyBCOs <$> (unsafeInterleaveIO $ do
                   core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
                   -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
                   -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
@@ -1981,7 +1981,7 @@ mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_modBre
 hscInteractive :: HscEnv
                -> CgInteractiveGuts
                -> ModLocation
-               -> IO (Maybe FilePath, CompiledByteCode, [SptEntry])
+               -> IO (Maybe FilePath, CompiledByteCode) -- ^ .c stub path (if any) and ByteCode
 hscInteractive hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
@@ -2019,18 +2019,19 @@ hscInteractive hsc_env cgguts location = do
     let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
     -----------------  Generate byte code ------------------
-    comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
+    comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks spt_entries
+
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
         <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
-    return (istub_c_exists, comp_bc, spt_entries)
+    return (istub_c_exists, comp_bc)
 
 generateByteCode :: HscEnv
   -> CgInteractiveGuts
   -> ModLocation
-  -> IO [Unlinked]
+  -> IO (NonEmpty LinkablePart)
 generateByteCode hsc_env cgguts mod_location = do
-  (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
+  (hasStub, comp_bc) <- hscInteractive hsc_env cgguts mod_location
 
   stub_o <- case hasStub of
             Nothing -> return []
@@ -2038,8 +2039,7 @@ generateByteCode hsc_env cgguts mod_location = do
                 stub_o <- compileForeign hsc_env LangC stub_c
                 return [DotO stub_o]
 
-  let hs_unlinked = [BCOs comp_bc spt_entries]
-  return (hs_unlinked ++ stub_o)
+  return (BCOs comp_bc :| stub_o)
 
 generateFreshByteCode :: HscEnv
   -> ModuleName
@@ -2047,10 +2047,9 @@ generateFreshByteCode :: HscEnv
   -> ModLocation
   -> IO Linkable
 generateFreshByteCode hsc_env mod_name cgguts mod_location = do
-  ul <- generateByteCode hsc_env cgguts mod_location
-  unlinked_time <- getCurrentTime
-  let !linkable = LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) ul
-  return linkable
+  bco_time <- getCurrentTime
+  bco <- generateByteCode hsc_env cgguts mod_location
+  return $! Linkable bco_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) bco
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
@@ -2365,7 +2364,9 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     let !CgGuts{ cg_module    = this_mod,
                  cg_binds     = core_binds,
                  cg_tycons    = tycons,
-                 cg_modBreaks = mod_breaks } = tidy_cg
+                 cg_modBreaks = mod_breaks,
+                 cg_spt_entries = spt_entries
+                 } = tidy_cg
 
         !ModDetails { md_insts     = cls_insts
                     , md_fam_insts = fam_insts } = mod_details
@@ -2397,7 +2398,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen hsc_env this_mod
-                                stg_binds data_tycons mod_breaks
+                                stg_binds data_tycons mod_breaks spt_entries
 
     let src_span = srcLocSpan interactiveSrcLoc
     _ <- liftIO $ loadDecls interp hsc_env src_span cbc
@@ -2673,7 +2674,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
       bcos <- byteCodeGen hsc_env
                 this_mod
                 stg_binds
-                [] Nothing
+                []
+                Nothing -- modbreaks
+                [] -- spt entries
 
       {- load it -}
       (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan bcos
@@ -2732,7 +2735,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     deps <- getLinkDeps link_opts interp pls srcspan needed_mods
     -- We update the LinkerState even if the JS interpreter maintains its linker
     -- state independently to load new objects here.
-    let (objs, _bcos) = partition isObjectLinkable
+    let (objs, _bcos) = partition linkableIsNativeCodeOnly
                           (concatMap partitionLinkable (ldNeededLinkables deps))
 
     let (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
