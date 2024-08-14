@@ -86,6 +86,7 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Rename.Env ( irrefutableConLikeTc )
 import GHC.Tc.Types.Evidence
 
 import Control.Monad    ( unless, zipWithM )

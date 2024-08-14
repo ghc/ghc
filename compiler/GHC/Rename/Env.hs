@@ -41,6 +41,8 @@ module GHC.Rename.Env (
         lookupConstructorInfo, lookupConstructorFields,
         lookupGREInfo,
 
+        irrefutableConLikeRn, irrefutableConLikeTc,
+
         lookupGreAvailRn,
 
         -- Rebindable Syntax
@@ -92,6 +94,7 @@ import GHC.Types.TyThing ( tyThingGREInfo )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -104,6 +107,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Rename.Unbound
 import GHC.Rename.Utils
 import GHC.Data.Bag
+import GHC.Types.CompleteMatch
 import GHC.Types.PkgQual
 import GHC.Types.GREInfo
 
@@ -2007,8 +2011,9 @@ lookupGREInfo hsc_env nm
                  mod ImportBySystem
           mb_ty_thing <- lookupType hsc_env nm
           case mb_ty_thing of
-            Nothing -> pprPanic "lookupGREInfo" $
-                         vcat [ text "lookup failed:" <+> ppr nm ]
+            Nothing -> do
+              pprPanic "lookupGREInfo" $
+                      vcat [ text "lookup failed:" <+> ppr nm ]
             Just ty_thing -> return $ tyThingGREInfo ty_thing
 
 {-
@@ -2392,3 +2397,67 @@ lookupQualifiedDoName ctxt std_name
   = case qualifiedDoModuleName_maybe ctxt of
       Nothing -> lookupSyntaxName std_name
       Just modName -> lookupNameWithQualifier std_name modName
+
+--------------------------------------------------------------------------------
+-- Helper functions for 'isIrrefutableHsPat'.
+--
+-- (Defined here to avoid import cycles.)
+
+-- | Check irrefutability of a 'ConLike' in a 'ConPat GhcRn'
+-- (the 'Irref-ConLike' condition of Note [Irrefutability of ConPat]).
+irrefutableConLikeRn :: HasDebugCallStack
+                     => HscEnv
+                     -> GlobalRdrEnv
+                     -> CompleteMatches -- ^ in-scope COMPLETE pragmas
+                     -> Name -- ^ the 'Name' of the 'ConLike'
+                     -> Bool
+irrefutableConLikeRn hsc_env rdr_env comps con_nm
+  | Just gre <- lookupGRE_Name rdr_env con_nm
+  = go $ greInfo gre
+  | otherwise
+  = go $ lookupGREInfo hsc_env con_nm
+  where
+    go ( IAmConLike conInfo ) =
+      case conLikeInfo conInfo of
+        ConIsData { conLikeDataCons = tc_cons } ->
+          length tc_cons == 1
+        ConIsPatSyn ->
+          in_single_complete_match con_nm comps
+    go _ = False
+
+-- | Check irrefutability of the 'ConLike' in a 'ConPat GhcTc'
+-- (the 'Irref-ConLike' condition of Note [Irrefutability of ConPat]),
+-- given all in-scope COMPLETE pragmas ('CompleteMatches' in the typechecker,
+-- 'DsCompleteMatches' in the desugarer).
+irrefutableConLikeTc :: NamedThing con
+                     => [CompleteMatchX con]
+                         -- ^ in-scope COMPLETE pragmas
+                     -> ConLike
+                     -> Bool
+irrefutableConLikeTc comps con =
+  case con of
+    RealDataCon dc -> length (tyConDataCons (dataConTyCon dc)) == 1
+    PatSynCon {}   -> in_single_complete_match con_nm comps
+  where
+    con_nm = conLikeName con
+
+-- | Internal helper function: check whether a 'ConLike' is the single member
+-- of a COMPLETE set without a result 'TyCon'.
+--
+-- Why 'without a result TyCon'? See Wrinkle [Irrefutability and COMPLETE pragma result TyCons]
+-- in Note [Irrefutability of ConPat].
+in_single_complete_match :: NamedThing con => Name -> [CompleteMatchX con] -> Bool
+in_single_complete_match con_nm = go
+  where
+    go [] = False
+    go (comp:comps)
+      | Nothing <- cmResultTyCon comp
+        -- conservative, as we don't have enough info to compute
+        -- 'completeMatchAppliesAtType'
+      , let comp_nms = mapUniqDSet getName $ cmConLikes comp
+      , comp_nms == mkUniqDSet [con_nm]
+      = True
+      | otherwise
+      = go comps
+
+--------------------------------------------------------------------------------

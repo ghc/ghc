@@ -55,6 +55,7 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
+import GHC.Rename.Env ( irrefutableConLikeTc )
 
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv

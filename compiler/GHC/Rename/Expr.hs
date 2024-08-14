@@ -85,6 +85,7 @@ import Control.Arrow (first)
 import Data.Ord
 import Data.Array
 import qualified Data.List.NonEmpty as NE
+import GHC.Driver.Env (HscEnv)
 
 {- Note [Handling overloaded and rebindable constructs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2211,6 +2212,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeBind before after) tail tail_fvs = do
   return (stmts2, fvs1 `plusFV` fvs2)
 
 stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
+   hscEnv <- getTopEnv
    rdrEnv <- getGlobalRdrEnv
    comps <- getCompleteMatchesTcM
    pairs <- mapM (stmtTreeArg ctxt tail_fvs) trees
@@ -2218,7 +2220,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    let (stmts', fvss) = unzip pairs
    let (need_join, tail') =
      -- See Note [ApplicativeDo and refutable patterns]
-         if any (hasRefutablePattern strict rdrEnv comps) stmts'
+         if any (hasRefutablePattern strict hscEnv rdrEnv comps) stmts'
          then (True, tail)
          else needJoin monad_names tail Nothing
 
@@ -2410,13 +2412,14 @@ of a refutable pattern, in order for the types to work out.
 -}
 
 hasRefutablePattern :: Bool -- ^ is -XStrict enabled?
+                    -> HscEnv
                     -> GlobalRdrEnv
                     -> CompleteMatches
                     -> ApplicativeArg GhcRn -> Bool
-hasRefutablePattern is_strict rdr_env comps arg =
+hasRefutablePattern is_strict hsc_env rdr_env comps arg =
   case arg of
     ApplicativeArgOne { app_arg_pattern = pat, is_body_stmt = False}
-      -> not (isIrrefutableHsPat is_strict (irrefutableConLikeRn rdr_env comps) pat)
+      -> not (isIrrefutableHsPat is_strict (irrefutableConLikeRn hsc_env rdr_env comps) pat)
     _ -> False
 
 isLetStmt :: LStmt (GhcPass a) b -> Bool
@@ -2725,11 +2728,12 @@ monadFailOp :: LPat GhcRn
             -> RnM (FailOperator GhcRn, FreeVars)
 monadFailOp pat ctxt = do
     strict <- xoptM LangExt.Strict
+    hscEnv <- getTopEnv
     rdrEnv <- getGlobalRdrEnv
     comps <- getCompleteMatchesTcM
         -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
         -- we should not need to fail.
-    if | isIrrefutableHsPat strict (irrefutableConLikeRn rdrEnv comps) pat
+    if | isIrrefutableHsPat strict (irrefutableConLikeRn hscEnv rdrEnv comps) pat
        -> return (Nothing, emptyFVs)
 
         -- For non-monadic contexts (e.g. guard patterns, list
