@@ -14,9 +14,6 @@ T16135.hs:11:18: error: [GHC-83865]
              a 'do' block
         at T16135.hs:10:5-10
     • In the first argument of ‘MkT’, namely ‘fa’
+      In the second argument of ‘($)’, namely ‘MkT fa’
       In a stmt of a 'do' block: return $ MkT fa
-      In the expression:
-        do return ()
-           MkT fa <- runf
-           return $ MkT fa
     • Relevant bindings include fa :: f a (bound at T16135.hs:10:9)

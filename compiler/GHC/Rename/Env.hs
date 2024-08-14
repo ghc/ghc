@@ -318,21 +318,19 @@ lookupLocatedTopBndrRnN = wrapLocMA (lookupTopBndrRn WL_Anything)
 lookupExactOcc_either :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
 lookupExactOcc_either name
   | Just thing <- wiredInNameTyThing_maybe name
-  , Just (tycon, mkInfo)
-      <- case thing of
-          ATyCon tc ->
-            Just (tc, IAmTyCon . TupleFlavour . tupleSortBoxity)
-          AConLike (RealDataCon dc) ->
-            let tc = dataConTyCon dc
-            in Just (tc, IAmConLike . (\ _ -> mkConInfo (ConIsData $ map dataConName $ tyConDataCons tc) (dataConSourceArity dc) []))
-          _ -> Nothing
+  , Just tycon <- case thing of
+                    ATyCon tc                 -> Just tc
+                    AConLike (RealDataCon dc) -> Just (dataConTyCon dc)
+                    _                         -> Nothing
   , Just tupleSort <- tyConTuple_maybe tycon
   = do { let tupArity = case tupleSort of
                -- Unboxed tuples have twice as many arguments because of the
                -- 'RuntimeRep's (#17837)
                UnboxedTuple -> tyConArity tycon `div` 2
                _ -> tyConArity tycon
-       ; let info = mkInfo tupleSort
+       ; let info = case thing of
+               ATyCon {} -> IAmTyCon $ TupleFlavour $ tupleSortBoxity tupleSort
+               _         -> IAmConLike $ mkConInfo tupArity []
        ; checkTupSize tupArity
        ; return $ Right $ mkExactGRE name info }
 
@@ -437,7 +435,7 @@ lookupConstructorInfo con_name
   = do { info <- lookupGREInfo_GRE con_name
        ; case info of
             IAmConLike con_info -> return con_info
-            UnboundGRE          -> return $ ConInfo (ConIsData []) ConHasPositionalArgs
+            UnboundGRE          -> return ConHasPositionalArgs
             _ -> pprPanic "lookupConstructorInfo: not a ConLike" $
                       vcat [ text "name:" <+> ppr con_name ]
        }

@@ -314,13 +314,13 @@ tyThingLocalGREs ty_thing =
               -- Note [Parents] in GHC.Types.Name.Reader.
             RealDataCon dc1 ->
               (ParentIs $ tyConName $ dataConTyCon dc1
-              , [ (DataConName $ dataConName $ dc, ConInfo conInfo (ConHasRecordFields (fld :| flds)))
+              , [ (DataConName $ dataConName $ dc, ConHasRecordFields (fld :| flds))
                 | dc <- tyConDataCons $ dataConTyCon dc1
                 -- Go through all the data constructors of the parent TyCon,
                 -- to ensure that all the record fields have the correct set
                 -- of parent data constructors. See #23546.
                 , let con_info = conLikeConInfo (RealDataCon dc)
-                , ConInfo conInfo (ConHasRecordFields flds0) <- [con_info]
+                , ConHasRecordFields flds0 <- [con_info]
                 , let flds1 = NE.toList flds0 `intersect` dataConFieldLabels dc
                 , fld:flds <- [flds1]
                 ])

@@ -12,7 +12,6 @@ module GHC.Unit.Home.ModInfo
    , emptyHomePackageTable
    , lookupHpt
    , eltsHpt
-   , concatHpt
    , filterHpt
    , allHpt
    , anyHpt
@@ -146,13 +145,6 @@ lookupHptDirectly = lookupUDFM_Directly
 
 eltsHpt :: HomePackageTable -> [HomeModInfo]
 eltsHpt = eltsUDFM
-
--- | Like @concatMap f . 'eltsHpt'@, but filters out all 'HomeModInfo' for which
--- @f@ returns the empty list before doing the sort inherent to 'eltsUDFM'.
-concatHpt :: (HomeModInfo -> [a]) -> HomePackageTable -> [a]
-concatHpt f = concat . eltsUDFM . mapMaybeUDFM g
-  where
-    g hmi = case f hmi of { [] -> Nothing; as -> Just as }
 
 filterHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> HomePackageTable
 filterHpt = filterUDFM

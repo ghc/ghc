@@ -132,13 +132,13 @@ isInhabited (MkNablas ds) = pure (not (null ds))
 
 -- | Update the COMPLETE sets of 'ResidualCompleteMatches', or 'Nothing'
 -- if there was no change as per the update function.
-updRcm :: (DsCompleteMatch -> (Bool, DsCompleteMatch))
+updRcm :: (CompleteMatch          -> (Bool, CompleteMatch))
        -> ResidualCompleteMatches -> (Maybe ResidualCompleteMatches)
 updRcm f (RCM vanilla pragmas)
   | not any_change = Nothing
   | otherwise      = Just (RCM vanilla' pragmas')
   where
-    f' :: DsCompleteMatch -> (Any, DsCompleteMatch)
+    f' ::  CompleteMatch          -> (Any,  CompleteMatch)
     f' = coerce f
     (chgd, vanilla')  = traverse f' vanilla
     (chgds, pragmas') = traverse (traverse f') pragmas
@@ -147,7 +147,7 @@ updRcm f (RCM vanilla pragmas)
 -- | A pseudo-'CompleteMatch' for the vanilla complete set of the given data
 -- 'TyCon'.
 -- Ex.: @vanillaCompleteMatchTC 'Maybe' ==> Just ("Maybe", {'Just','Nothing'})@
-vanillaCompleteMatchTC :: TyCon -> Maybe DsCompleteMatch
+vanillaCompleteMatchTC :: TyCon -> Maybe CompleteMatch
 vanillaCompleteMatchTC tc =
   let mb_dcs | -- TYPE acts like an empty data type on the term level (#14086),
                -- but it is a PrimTyCon, so tyConDataCons_maybe returns Nothing.
@@ -197,8 +197,9 @@ markMatched (PmAltConLike cl) rcm = do
         Just _  -> (True,  cm { cmConLikes = delOneFromUniqDSet (cmConLikes cm) cl })
   pure $ updRcm go rcm'
 
-{- Note [Implementation of COMPLETE pragmas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Implementation of COMPLETE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A COMPLETE set represents a set of conlikes (i.e., constructors or
 pattern synonyms) such that if they are all pattern-matched against in a
 function, it gives rise to a total function. An example is:
@@ -1413,7 +1414,7 @@ anyConLikeSolution p = any (go . paca_con)
 -- original Nabla, not a proper refinement! No positive information will be
 -- added, only negative information from failed instantiation attempts,
 -- entirely as an optimisation.
-instCompleteSet :: Int -> Nabla -> Id -> DsCompleteMatch -> MaybeT DsM Nabla
+instCompleteSet :: Int -> Nabla -> Id -> CompleteMatch -> MaybeT DsM Nabla
 instCompleteSet fuel nabla x cs
   | anyConLikeSolution (`elementOfUniqDSet` (cmConLikes cs)) (vi_pos vi)
   -- No need to instantiate a constructor of this COMPLETE set if we already
@@ -1426,7 +1427,7 @@ instCompleteSet fuel nabla x cs
   where
     vi = lookupVarInfo (nabla_tm_st nabla) x
 
-    sorted_candidates :: DsCompleteMatch -> [ConLike]
+    sorted_candidates :: CompleteMatch -> [ConLike]
     sorted_candidates cm
       -- If there aren't many candidates, we can try to sort them by number of
       -- strict fields, type constraints, etc., so that we are fast in the
@@ -2059,14 +2060,14 @@ improves error messages. See for example T25115:
     with an out-of-scope ConLike.
 -}
 
-pickApplicableCompleteSets :: TyState -> Type -> ResidualCompleteMatches -> DsM DsCompleteMatches
+pickApplicableCompleteSets :: TyState -> Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
 -- See Note [Implementation of COMPLETE pragmas] on what "applicable" means
 pickApplicableCompleteSets ty_st ty rcm = do
   let cl_res_ty_ok :: ConLike -> DsM Bool
       cl_res_ty_ok cl = do
         env <- dsGetFamInstEnvs
         isJust <$> matchConLikeResTy env ty_st ty cl
-  let cm_applicable :: DsCompleteMatch -> DsM Bool
+  let cm_applicable :: CompleteMatch -> DsM Bool
       cm_applicable cm = do
         cls_ok <- allM cl_res_ty_ok (uniqDSetToList (cmConLikes cm))
         let match_ty_ok = completeMatchAppliesAtType ty cm

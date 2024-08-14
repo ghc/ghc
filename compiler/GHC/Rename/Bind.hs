@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -28,10 +27,7 @@ module GHC.Rename.Bind (
    HsSigCtxt(..),
 
    -- Utility for hs-boot files
-   rejectBootDecls,
-
-   -- Utility for COMPLETE pragmas
-   localCompletePragmas
+   rejectBootDecls
    ) where
 
 import GHC.Prelude
@@ -68,9 +64,8 @@ import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.CompleteMatch
 import GHC.Types.Unique.Set
-import GHC.Data.Maybe          ( orElse, mapMaybe )
+import GHC.Data.Maybe          ( orElse )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -79,7 +74,6 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import Control.Monad
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import GHC.Types.Unique.DSet (mkUniqDSet)
 
 {-
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -332,12 +326,7 @@ rnValBindsRHS :: HsSigCtxt
 
 rnValBindsRHS ctxt (ValBinds _ mbinds sigs)
   = do { (sigs', sig_fvs) <- renameSigs ctxt sigs
-
-       -- Update the TcGblEnv with renamed COMPLETE pragmas from the current
-       -- module, for pattern irrefutability checking in do notation.
-       ; let localCompletePrags = localCompletePragmas sigs'
-       ; updGblEnv (\gblEnv -> gblEnv { tcg_complete_matches = tcg_complete_matches gblEnv ++ localCompletePrags}) $
-    do { binds_w_dus <- mapM (rnLBind (mkScopedTvFn sigs')) mbinds
+       ; binds_w_dus <- mapM (rnLBind (mkScopedTvFn sigs')) mbinds
        ; let !(anal_binds, anal_dus) = depAnalBinds binds_w_dus
 
        ; let patsyn_fvs = foldr (unionNameSet . psb_ext) emptyNameSet $
@@ -355,7 +344,7 @@ rnValBindsRHS ctxt (ValBinds _ mbinds sigs)
                             -- so that the binders are removed from
                             -- the uses in the sigs
 
-        ; return (XValBindsLR (NValBinds anal_binds sigs'), valbind'_dus) } }
+        ; return (XValBindsLR (NValBinds anal_binds sigs'), valbind'_dus) }
 
 rnValBindsRHS _ b = pprPanic "rnValBindsRHS" (ppr b)
 
@@ -959,12 +948,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        ; (spec_prags', spg_fvs) <- renameSigs sig_ctxt spec_prags
        ; (other_sigs', sig_fvs) <- bindLocalNamesFV ktv_names $
                                       renameSigs sig_ctxt other_sigs
-       ; let localCompletePrags = localCompletePragmas spec_prags'
 
-       -- Update the TcGblEnv with renamed COMPLETE pragmas from the current
-       -- module, for pattern irrefutability checking in do notation.
-       ; updGblEnv (\gblEnv -> gblEnv { tcg_complete_matches = tcg_complete_matches gblEnv ++ localCompletePrags}) $
-    do {
        -- Rename the bindings RHSs.  Again there's an issue about whether the
        -- type variables from the class/instance head are in scope.
        -- Answer no in Haskell 2010, but yes if you have -XScopedTypeVariables
@@ -975,7 +959,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
                  ; return (map fstOf3 binds_w_dus, bind_fvs) }
 
        ; return ( binds'', spec_prags' ++ other_sigs'
-                , sig_fvs `plusFV` spg_fvs `plusFV` bind_fvs) } }
+                , sig_fvs `plusFV` spg_fvs `plusFV` bind_fvs) }
 
 {- Note [Type variable scoping in SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1271,18 +1255,6 @@ checkDupMinimalSigs sigs
   = case filter isMinimalLSig sigs of
       sig1 : sig2 : otherSigs -> dupMinimalSigErr sig1 sig2 otherSigs
       _ -> return ()
-
-localCompletePragmas :: [LSig GhcRn] -> CompleteMatches
-localCompletePragmas sigs = mapMaybe (getCompleteSig . unLoc) $ reverse sigs
-  where
-    getCompleteSig = \case
-      CompleteMatchSig _ cons mbTyCon ->
-        Just $ CompleteMatch (mkUniqDSet $ map unLoc cons) (fmap unLoc mbTyCon)
-      _ -> Nothing
-  -- SG: for some reason I haven't investigated further, the signatures come in
-  -- backwards wrt. declaration order. So we reverse them here, because it makes
-  -- a difference for incomplete match suggestions.
-
 
 {-
 ************************************************************************

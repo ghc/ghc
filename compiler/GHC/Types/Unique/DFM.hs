@@ -42,7 +42,6 @@ module GHC.Types.Unique.DFM (
         mapUDFM,
         mapWithInternalKeyUDFM,
         mapMaybeUDFM,
-        mapMUDFM,
         plusUDFM,
         plusUDFM_C, plusUDFM_CK,
         lookupUDFM, lookupUDFM_Directly,

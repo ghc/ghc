@@ -28,7 +28,7 @@ module GHC.Rename.Names (
         printMinimalImports,
         renamePkgQual, renameRawPkgQual,
         classifyGREs,
-        ImportDeclUsage
+        ImportDeclUsage,
     ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -79,7 +79,7 @@ import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.HpcInfo
 import GHC.Types.PkgQual
-import GHC.Types.GREInfo (ConInfo(..), ConFieldInfo (..), ConLikeInfo (ConIsData))
+import GHC.Types.GREInfo (ConInfo(..))
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
@@ -893,9 +893,9 @@ getLocalNonValBinders fixity_env
     mk_fld_env :: [(Name, Maybe [Located Int])] -> IntMap FieldLabel
                -> [(ConLikeName, ConInfo)]
     mk_fld_env names flds =
-      [ (DataConName con, ConInfo (ConIsData (map fst names)) fld_info)
+      [ (DataConName con, con_info)
       | (con, mb_fl_indxs) <- names
-      , let fld_info = case fmap (map ((flds IntMap.!) . unLoc)) mb_fl_indxs of
+      , let con_info = case fmap (map ((flds IntMap.!) . unLoc)) mb_fl_indxs of
               Nothing         -> ConHasPositionalArgs
               Just []         -> ConIsNullary
               Just (fld:flds) -> ConHasRecordFields $ fld NE.:| flds ]

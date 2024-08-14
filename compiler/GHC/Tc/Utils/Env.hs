@@ -207,6 +207,7 @@ addTypecheckedBinds tcg_env binds
   | otherwise = tcg_env { tcg_binds = foldr (++)
                                             (tcg_binds tcg_env)
                                             binds }
+
 {-
 ************************************************************************
 *                                                                      *

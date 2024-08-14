@@ -186,23 +186,11 @@ We need to know:
   - We can fill in the dots if you say `T1 {..}` in construction or pattern matching
     See GHC.Rename.Pat.rnHsRecFields.rn_dotdot
 
-  This information is stored in ConFieldInfo.
-
 * Whether the constructor is nullary.
   We need to know this to accept `T2 {..}`, and `T3 {..}`, but reject `T4 {..}`,
   in both construction and pattern matching.
   See GHC.Rename.Pat.rnHsRecFields.rn_dotdot
   and Note [Nullary constructors and empty record wildcards]
-
-  This information is stored in ConFieldInfo.
-
-* Whether the constructor is a data constructor or a pattern synonym, and,
-  if it is a data constructor, what are the other data constructors of the
-  parent type. This is used for computing irrefutability of pattern matches
-  when deciding how to desugar do blocks (whether to use a fail operation).
-  See GHC.Hs.Pat.isIrrefutableHsPat.
-
-  This information is stored in ConLikeInfo.
 
 Note [Nullary constructors and empty record wildcards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -214,84 +202,32 @@ match or usage on nullary constructors would be accepted.
 This is done as as per https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0496-empty-record-wildcards.rst
 -}
 
--- | Information known to the renamer about a data constructor or pattern synonym.
---
--- See Note [Local constructor info in the renamer].
-data ConInfo
-  = ConInfo
-  { conLikeInfo  :: !ConLikeInfo
-  , conFieldInfo :: !ConFieldInfo
-  }
-  deriving stock Eq
-  deriving Data
-
--- | Whether a constructor is a data constructor or a pattern synonym.
---
--- See Note [Local constructor info in the renamer].
-data ConLikeInfo
-  = ConIsData
-    { conLikeDataCons :: [Name]
-      -- ^ All the 'DataCon's of the parent 'TyCon',
-      -- including the 'ConLike' itself.
-      --
-      -- Used in 'GHC.Hs.Pat.isIrrefutableHsPat'.
-    }
-  | ConIsPatSyn
-  deriving stock Eq
-  deriving Data
-
-instance NFData ConInfo where
-  rnf (ConInfo a b) = rnf a `seq` rnf b
-
-instance NFData ConLikeInfo where
-  rnf (ConIsData a) = rnf a
-  rnf ConIsPatSyn = ()
-
-
 -- | Information about the record fields of a constructor.
 --
 -- See Note [Local constructor info in the renamer]
-data ConFieldInfo
+data ConInfo
   = ConHasRecordFields (NonEmpty FieldLabel)
   | ConHasPositionalArgs
   | ConIsNullary
   deriving stock Eq
   deriving Data
 
-instance NFData ConFieldInfo where
+instance NFData ConInfo where
   rnf ConIsNullary = ()
   rnf ConHasPositionalArgs = ()
   rnf (ConHasRecordFields flds) = rnf flds
 
-mkConInfo :: ConLikeInfo -> Arity -> [FieldLabel] -> ConInfo
-mkConInfo con_ty n flds =
-  ConInfo { conLikeInfo  = con_ty
-          , conFieldInfo = mkConFieldInfo n flds }
-
-mkConFieldInfo :: Arity -> [FieldLabel] -> ConFieldInfo
-mkConFieldInfo 0 _ = ConIsNullary
-mkConFieldInfo _ fields = maybe ConHasPositionalArgs ConHasRecordFields
+mkConInfo :: Arity -> [FieldLabel] -> ConInfo
+mkConInfo 0 _ = ConIsNullary
+mkConInfo _ fields = maybe ConHasPositionalArgs ConHasRecordFields
                    $ NonEmpty.nonEmpty fields
 
 conInfoFields :: ConInfo -> [FieldLabel]
-conInfoFields = conFieldInfoFields . conFieldInfo
-
-conFieldInfoFields :: ConFieldInfo -> [FieldLabel]
-conFieldInfoFields (ConHasRecordFields fields) = NonEmpty.toList fields
-conFieldInfoFields ConHasPositionalArgs = []
-conFieldInfoFields ConIsNullary = []
+conInfoFields (ConHasRecordFields fields) = NonEmpty.toList fields
+conInfoFields ConHasPositionalArgs = []
+conInfoFields ConIsNullary = []
 
 instance Outputable ConInfo where
-  ppr (ConInfo { conLikeInfo = con_ty, conFieldInfo = fld_info })
-    = text "ConInfo" <+> braces
-    (text "con_ty:" <+> ppr con_ty <> comma
-    <+> text "fields:" <+> ppr fld_info)
-
-instance Outputable ConLikeInfo where
-  ppr (ConIsData cons) = text "ConIsData" <+> parens (ppr cons)
-  ppr ConIsPatSyn      = text "ConIsPatSyn"
-
-instance Outputable ConFieldInfo where
   ppr ConIsNullary = text "ConIsNullary"
   ppr ConHasPositionalArgs = text "ConHasPositionalArgs"
   ppr (ConHasRecordFields fieldLabels) =
@@ -308,10 +244,6 @@ data ConLikeName
 
 instance Outputable ConLikeName where
   ppr = ppr . conLikeName_Name
-
-instance OutputableBndr ConLikeName where
-    pprInfixOcc con = pprInfixName (conLikeName_Name con)
-    pprPrefixOcc con = pprPrefixName (conLikeName_Name con)
 
 instance Uniquable ConLikeName where
   getUnique = getUnique . conLikeName_Name

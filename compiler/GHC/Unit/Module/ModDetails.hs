@@ -34,7 +34,7 @@ data ModDetails = ModDetails
       -- ^ Annotations present in this module: currently
       -- they only annotate things also declared in this module
 
-   , md_complete_matches :: CompleteMatches
+   , md_complete_matches :: [CompleteMatch]
       -- ^ Complete match pragmas for this module
    }
 

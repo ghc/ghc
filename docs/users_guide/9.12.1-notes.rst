@@ -55,8 +55,6 @@ Language
 - :extension:`UnliftedFFITypes`: GHC will now accept FFI types like: ``(# #) -> T`` where ``(# #)``
   is used as the one and only function argument.
 
-- GHC now takes COMPLETE pragmas into consideration when deciding whether
-  pattern matches in do notation are fallible.
 
 - As part of `GHC Proposal #281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
   GHC now accepts type syntax in expressions, namely function type arrow ``a -> b``,

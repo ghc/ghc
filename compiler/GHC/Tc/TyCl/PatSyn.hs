@@ -60,12 +60,9 @@ import GHC.Tc.TyCl.Utils
 import GHC.Core.ConLike
 import GHC.Types.FieldLabel
 import GHC.Rename.Env
-import GHC.Rename.Utils (wrapGenSpan)
+import GHC.Rename.Utils (wrapGenSpan, isIrrefutableHsPat)
 import GHC.Utils.Misc
 import GHC.Driver.DynFlags ( getDynFlags, xopt_FieldSelectors )
-
-import qualified GHC.LanguageExtensions as LangExt
-
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition, mapAccumL )
@@ -776,8 +773,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
        ; cont         <- newSysLocalId (fsLit "cont")  ManyTy cont_ty
        ; fail         <- newSysLocalId (fsLit "fail")  ManyTy fail_ty
 
-       ; is_strict    <- xoptM LangExt.Strict
-       ; comps        <- getCompleteMatchesTcM
+       ; dflags       <- getDynFlags
        ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
@@ -791,7 +787,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
 
              args = noLocA $ map nlVarPat [scrutinee, cont, fail]
              lwpat = noLocA $ WildPat pat_ty
-             cases = if isIrrefutableHsPat is_strict (irrefutableConLikeTc comps) lpat
+             cases = if isIrrefutableHsPat dflags lpat
                      then [mkHsCaseAlt lpat  cont']
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']

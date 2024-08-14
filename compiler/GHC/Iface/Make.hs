@@ -40,6 +40,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
+import GHC.Core.ConLike
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Ppr
@@ -473,7 +474,7 @@ coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
 
 mkIfaceCompleteMatch :: CompleteMatch -> IfaceCompleteMatch
 mkIfaceCompleteMatch (CompleteMatch cls mtc) =
-  IfaceCompleteMatch (uniqDSetToList cls) mtc
+  IfaceCompleteMatch (map conLikeName (uniqDSetToList cls)) (toIfaceTyCon <$> mtc)
 
 
 {-

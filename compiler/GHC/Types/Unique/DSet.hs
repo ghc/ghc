@@ -33,7 +33,7 @@ module GHC.Types.Unique.DSet (
         lookupUniqDSet,
         uniqDSetToList,
         partitionUniqDSet,
-        mapUniqDSet, strictFoldUniqDSet, mapMUniqDSet
+        mapUniqDSet, strictFoldUniqDSet
     ) where
 
 import GHC.Prelude
@@ -130,13 +130,6 @@ mapUniqDSet f (UniqDSet m) = UniqDSet $ unsafeCastUDFMKey $ mapUDFM f m
   -- The identification of keys and elements prevents a derived Functor
   -- instance, but `unsafeCastUDFMKey` makes it possible to apply the strict
   -- mapping from DFM.
-
--- | Like 'mapUniqDSet' but for 'mapM'. Assumes the function we are mapping
--- over the 'UniqDSet' does not modify uniques, as per
--- Note [UniqSet invariant] in GHC.Types.Unique.Set.
-mapMUniqDSet :: (Monad m, Uniquable b) => (a -> m b) -> UniqDSet a -> m (UniqDSet b)
-mapMUniqDSet f (UniqDSet m) = UniqDSet . unsafeCastUDFMKey <$> mapMUDFM f m
-{-# INLINEABLE mapMUniqDSet #-}
 
 strictFoldUniqDSet :: (a -> r -> r) -> r -> UniqDSet a -> r
 strictFoldUniqDSet k r s = foldl' (\ !r e -> k e r) r $

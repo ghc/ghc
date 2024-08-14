@@ -41,7 +41,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr, tcPolyLExpr )
 
-import GHC.Rename.Utils ( bindLocalNames )
+import GHC.Rename.Utils ( bindLocalNames, isIrrefutableHsPat )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -70,6 +70,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Driver.DynFlags ( getDynFlags )
 
 import GHC.Types.Name
 import GHC.Types.Id
@@ -1066,9 +1067,8 @@ tcMonadFailOp :: CtOrigin
 -- isIrrefutableHsPat test is still required here for some reason I haven't
 -- yet determined.
 tcMonadFailOp orig pat fail_op res_ty = do
-    is_strict <- xoptM LangExt.Strict
-    comps <- getCompleteMatchesTcM
-    if isIrrefutableHsPat is_strict (irrefutableConLikeTc comps) pat
+    dflags <- getDynFlags
+    if isIrrefutableHsPat dflags pat
       then return Nothing
       else Just . snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
                             (mkCheckExpType res_ty) $ \_ _ -> return ())

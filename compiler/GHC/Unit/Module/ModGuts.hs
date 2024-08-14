@@ -74,7 +74,7 @@ data ModGuts
         -- ^ Files to be compiled with the C compiler
         mg_warns     :: !(Warnings GhcRn),  -- ^ Warnings declared in the module
         mg_anns      :: [Annotation],    -- ^ Annotations declared in this module
-        mg_complete_matches :: CompleteMatches, -- ^ Complete Matches
+        mg_complete_matches :: [CompleteMatch], -- ^ Complete Matches
         mg_hpc_info  :: !HpcInfo,        -- ^ Coverage tick boxes in the module
         mg_modBreaks :: !(Maybe ModBreaks), -- ^ Breakpoints for the module
 

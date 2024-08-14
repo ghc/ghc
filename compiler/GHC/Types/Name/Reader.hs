@@ -810,7 +810,7 @@ mkLocalFieldGREs p cons =
          $ Map.fromListWith unionUniqSets
          [ (S.Arg (flSelector fl) fl, unitUniqSet con)
          | (con, con_info) <- cons
-         , ConInfo _ (ConHasRecordFields fls) <- [con_info]
+         , ConHasRecordFields fls <- [con_info]
          , fl <- NE.toList fls ]
 
 instance HasOccName (GlobalRdrEltX info) where

@@ -65,7 +65,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
-import GHC.Types.CompleteMatch
+import GHC.Types.CompleteMatch (CompleteMatch(..))
 import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
                             , fractionalLitFromRational
                             , FractionalExponentBase(..))
@@ -258,19 +258,19 @@ initTmState = TmSt emptyUSDFM emptyCoreMap emptyDVarSet
 -- See also Note [Implementation of COMPLETE pragmas]
 data ResidualCompleteMatches
   = RCM
-  { rcm_vanilla :: !(Maybe DsCompleteMatch)
+  { rcm_vanilla :: !(Maybe CompleteMatch)
   -- ^ The residual set for the vanilla COMPLETE set from the data defn.
   -- Tracked separately from 'rcm_pragmas', because it might only be
   -- known much later (when we have enough type information to see the 'TyCon'
   -- of the match), or not at all even. Until that happens, it is 'Nothing'.
-  , rcm_pragmas :: !(Maybe DsCompleteMatches)
+  , rcm_pragmas :: !(Maybe [CompleteMatch])
   -- ^ The residual sets for /all/ COMPLETE sets from pragmas that are
   -- visible when compiling this module. Querying that set with
   -- 'dsGetCompleteMatches' requires 'DsM', so we initialise it with 'Nothing'
   -- until first needed in a 'DsM' context.
   }
 
-getRcm :: ResidualCompleteMatches -> DsCompleteMatches
+getRcm :: ResidualCompleteMatches -> [CompleteMatch]
 getRcm (RCM vanilla pragmas) = maybeToList vanilla ++ fromMaybe [] pragmas
 
 isRcmInitialised :: ResidualCompleteMatches -> Bool
