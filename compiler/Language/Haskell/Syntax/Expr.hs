@@ -666,6 +666,8 @@ data HsExpr p
   -- See Note [Types in terms]
   | HsFunArr (XFunArr p) (HsArrowOf (LHsExpr p) p) (LHsExpr p) (LHsExpr p)
 
+  | HsPartial (XPartial p)  -- ^ partial node
+
   | XExpr       !(XXExpr p)
   -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the
   -- general idea, and Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr

@@ -103,6 +103,7 @@ lhsExprType (L _ e) = hsExprType e
 hsExprType :: HsExpr GhcTc -> Type
 hsExprType (HsVar _ (L _ id)) = idType id
 hsExprType (HsUnboundVar (HER _ ty _) _) = ty
+hsExprType (HsPartial _) = error "Jello from hsExprType"
 hsExprType (HsRecSel _ (FieldOcc id _)) = idType id
 hsExprType (HsOverLabel v _) = dataConCantHappen v
 hsExprType (HsIPVar v _) = dataConCantHappen v

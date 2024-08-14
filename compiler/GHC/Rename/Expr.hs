@@ -358,6 +358,9 @@ rnExpr (HsIPVar x v)
 rnExpr (HsUnboundVar _ v)
   = return (HsUnboundVar noExtField v, emptyFVs)
 
+rnExpr (HsPartial _)
+  = return (HsPartial noExtField, emptyFVs)
+
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel src v)
   = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName

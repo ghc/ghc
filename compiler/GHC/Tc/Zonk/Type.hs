@@ -1031,6 +1031,9 @@ zonkExpr (HsLet x binds expr)
     do { new_expr <- zonkLExpr expr
        ; return (HsLet x new_binds new_expr) }
 
+zonkExpr (HsPartial x)
+  = return (HsPartial x)
+
 zonkExpr (HsDo ty do_or_lc (L l stmts))
   = do new_stmts <- don'tBind $ zonkStmts zonkLExpr stmts
        new_ty <- zonkTcTypeToTypeX ty

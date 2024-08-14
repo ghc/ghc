@@ -764,7 +764,7 @@ TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 %monad { P } { >>= } { return }
-%lexer { (lexerDbg True) } { L _ ITeof }
+%lexer { (lexer True) } { L _ ITeof }
   -- Replace 'lexer' above with 'lexerDbg'
   -- to dump the tokens fed to the parser.
 %tokentype { (Located Token) }
@@ -784,6 +784,12 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %name parseBackpack backpack
 %partial parseHeader header
 %%
+
+-----------------------------------------------------------------------------
+-- catch wrappers
+catch_missing_tok(TOK) :: { Located Token }
+        : TOK { $1 }
+        | catch { noLoc (ITunknown "")}
 
 -----------------------------------------------------------------------------
 -- Identifiers; one of the entry points
@@ -986,10 +992,6 @@ header  :: { Located (HsModule GhcPs) }
                 {% fileSrcSpan >>= \ loc ->
                    return (L loc (HsModule (XModulePs noAnn EpNoLayout Nothing Nothing) Nothing Nothing $1 [])) }
 
-
-catch_tok(TOK) :: { Maybe (Located Token) }
-        : TOK { Just $1 }
-        | catch {% return Nothing }
 
 header_body :: { [LImportDecl GhcPs] }
         :  '{'            header_top            { $2 }
@@ -1866,7 +1868,6 @@ decls   :: { Located ([AddEpAnn], OrdList (LHsDecl GhcPs)) }
                                        return (sLZ $1 $> (fst $ unLoc $1
                                                       , snocOL hs t')) }
         | decl                          { sL1 $1 ([], unitOL $1) }
-        | catch ';' decl                { sLL $2 $> ((msemiA $2), unitOL $3) } -- The SrcLocs are probably incorrect
         | {- empty -}                   { noLoc ([],nilOL) }
 
 decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
@@ -3091,39 +3092,40 @@ aexp2   :: { ECP }
         | INTEGER   { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsIntegral   (getINTEGER  $1)) }
         | RATIONAL  { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsFractional (getRATIONAL $1)) }
 
+        | catch                             { catchHsExpr }
         -- N.B.: sections get parsed by these next two productions.
         -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't
         -- correct Haskell (you'd have to write '((+ 3), (4 -))')
         -- but the less cluttered version fell out of having texps.
-        | '(' texp ')'                  { ECP $
-                                           unECP $2 >>= \ $2 ->
-                                           mkHsParPV (comb2 $1 $>) (epTok $1) $2 (epTok $3) }
-        | '(' tup_exprs ')'             { ECP $
-                                           $2 >>= \ $2 ->
-                                           mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
-                                                [mop $1,mcp $3]}
+        | '(' texp catch_missing_tok(')')                  { ECP $
+                                                      unECP $2 >>= \ $2 ->
+                                                      mkHsParPV (comb2 $1 $>) (epTok $1) $2 (epTok $3) }
+        | '(' tup_exprs catch_missing_tok(')')             { ECP $
+                                                      $2 >>= \ $2 ->
+                                                      mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
+                                                      [mop $1,mcp $3]}
 
-        | '(' orpats(exp2) ')'          {% do
-                                              { pat <- hintOrPats (sL1a $2 (OrPat NoExtField (unLoc $2)))
-                                              ; fmap ecpFromPat
-                                                (amsA' (sLL $1 $> (ParPat (epTok $1, epTok $>) pat))) }}
+        | '(' orpats(exp2) catch_missing_tok(')')          {% do
+                                                      { pat <- hintOrPats (sL1a $2 (OrPat NoExtField (unLoc $2)))
+                                                      ; fmap ecpFromPat
+                                                        (amsA' (sLL $1 $> (ParPat (epTok $1, epTok $>) pat))) }}
 
         -- This case is only possible when 'OverloadedRecordDotBit' is enabled.
-        | '(' projection ')'            { ECP $
-                                            amsA' (sLL $1 $> $ mkRdrProjection (NE.reverse (unLoc $2)) (AnnProjection (glAA $1) (glAA $3)) )
-                                            >>= ecpFromExp'
-                                        }
+        | '(' projection catch_missing_tok(')')            { ECP $
+                                                      amsA' (sLL $1 $> $ mkRdrProjection (NE.reverse (unLoc $2)) (AnnProjection (glAA $1) (glAA $3)) )
+                                                      >>= ecpFromExp'
+                                                   }
 
-        | '(#' texp '#)'                { ECP $
-                                           unECP $2 >>= \ $2 ->
-                                           mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Unboxed (Tuple [Right $2])
-                                                 [moh $1,mch $3] }
-        | '(#' tup_exprs '#)'           { ECP $
-                                           $2 >>= \ $2 ->
-                                           mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Unboxed $2
-                                                [moh $1,mch $3] }
+        | '(#' texp catch_missing_tok('#)')                { ECP $
+                                                      unECP $2 >>= \ $2 ->
+                                                      mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Unboxed (Tuple [Right $2])
+                                                            [moh $1,mch $3] }
+        | '(#' tup_exprs catch_missing_tok('#)')          { ECP $
+                                                     $2 >>= \ $2 ->
+                                                     mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Unboxed $2
+                                                          [moh $1,mch $3] }
 
-        | '[' list ']'      { ECP $ $2 (comb2 $1 $>) (mos $1,mcs $3) }
+        | '[' list catch_missing_tok(']')                 { ECP $ $2 (comb2 $1 $>) (mos $1,mcs $3) }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
 
         -- Template Haskell Extension
@@ -3218,17 +3220,19 @@ texp :: { ECP }
         -- Then when converting expr to pattern we unravel it again
         -- Meanwhile, the renamer checks that real sections appear
         -- inside parens.
-        | infixexp qop
+        | infixexp qop %shift
                              {% runPV (unECP $1) >>= \ $1 ->
                                 runPV (rejectPragmaPV $1) >>
                                 runPV $2 >>= \ $2 ->
                                 return $ ecpFromExp $
                                 sLLa $1 $> $ SectionL noExtField $1 (n2l $2) }
-        | qopm infixexp      { ECP $
+        | qopm infixexp
+                             { ECP $
                                 superInfixOp $
                                 unECP $2 >>= \ $2 ->
                                 $1 >>= \ $1 ->
                                 mkHsSectionR_PV (comb2 $1 $>) (n2l $1) $2 }
+
 
 orpats(EXP) :: { Located (NonEmpty (LPat GhcPs)) }
         -- See Note [%shift: orpats -> exp]
@@ -3273,14 +3277,14 @@ commas_tup_tail : commas tup_tail
 
 -- Always follows a comma
 tup_tail :: { forall b. DisambECP b => PV [Either (EpAnn Bool) (LocatedA b)] }
-          : texp commas_tup_tail { unECP $1 >>= \ $1 ->
-                                   $2 >>= \ $2 ->
-                                   do { t <- amsA $1 [AddCommaAnn (srcSpan2e $ fst $2)]
+          : texp commas_tup_tail  { unECP $1 >>= \ $1 ->
+                                    $2 >>= \ $2 ->
+                                    do { t <- amsA $1 [AddCommaAnn (srcSpan2e $ fst $2)]
                                       ; return (Right t : snd $2) } }
-          | texp                 { unECP $1 >>= \ $1 ->
-                                   return [Right $1] }
+          | texp                  { unECP $1 >>= \ $1 ->
+                                    return [Right $1] }
           -- See Note [%shift: tup_tail -> {- empty -}]
-          | {- empty -} %shift   { return [Left noAnn] }
+          | {- empty -} %shift    { return [Left noAnn] }
 
 -----------------------------------------------------------------------------
 -- List expressions
@@ -3293,10 +3297,10 @@ list :: { forall b. DisambECP b => SrcSpan -> (AddEpAnn, AddEpAnn) -> PV (Locate
                             mkHsExplicitListPV loc [$1] (AnnList Nothing (Just ao) (Just ac) [] []) }
         | lexps   { \loc (ao,ac) -> $1 >>= \ $1 ->
                             mkHsExplicitListPV loc (reverse $1) (AnnList Nothing (Just ao) (Just ac) [] []) }
-        | texp '..'  { \loc (ao,ac) -> unECP $1 >>= \ $1 ->
+        | texp '..' %shift  { \loc (ao,ac) -> unECP $1 >>= \ $1 ->
                                   amsA' (L loc $ ArithSeq [ao,mj AnnDotdot $2,ac] Nothing (From $1))
                                       >>= ecpFromExp' }
-        | texp ',' exp2 '..' { \loc (ao,ac) ->
+        | texp ',' exp2 '..' %shift { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
                                    amsA' (L loc $ ArithSeq [ao,mj AnnComma $2,mj AnnDotdot $4,ac] Nothing (FromThen $1 $3))
@@ -3330,6 +3334,7 @@ lexps :: { forall b. DisambECP b => PV [LocatedA b] }
                                       unECP $3 >>= \ $3 ->
                                       do { h <- addTrailingCommaA $1 (gl $2)
                                          ; return [$3,h] }}
+
 
 -----------------------------------------------------------------------------
 -- List Comprehensions
@@ -4145,6 +4150,14 @@ bars :: { ([SrcSpan],Int) }     -- One or more bars
         | '|'                    { ([gl $1],1) }
 
 {
+-----------------------------------------------------------------------------
+-- Error Recovery utilities and definitions
+catchHsExpr :: ECP
+catchHsExpr = ecpFromExp (noLocA (HsPartial noExtField))
+
+
+
+-----------------------------------------------------------------------------
 happyError :: P a
 happyError = srcParseFail
 

@@ -30,6 +30,8 @@ module GHC.Rename.Utils (
 
         genHsLet,
 
+        genHsPartial,
+
         newLocalBndrRn, newLocalBndrsRn,
 
         bindLocalNames, bindLocalNamesFV, delLocalNames,
@@ -778,6 +780,9 @@ genFunBind fn ms
 
 genHsLet :: HsLocalBindsLR GhcRn GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
 genHsLet bindings body = HsLet noExtField bindings body
+
+genHsPartial :: HsExpr GhcRn
+genHsPartial = HsPartial noExtField
 
 genHsLamDoExp :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
         => HsDoFlavour

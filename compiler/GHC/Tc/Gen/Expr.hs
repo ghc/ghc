@@ -315,6 +315,10 @@ tcExpr (HsUnboundVar _ occ) res_ty
                                        -- (#18491)
        ; return (HsUnboundVar her occ) }
 
+tcExpr (HsPartial _) res_ty
+  = do { tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
+       ; return (HsPartial noExtField) }
+
 tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit
        ; tcWrapResult e (HsLit x (convertLit lit)) lit_ty res_ty }

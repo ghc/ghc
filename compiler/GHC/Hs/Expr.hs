@@ -228,7 +228,7 @@ type instance XOverLabel     GhcTc = DataConCantHappen
 -- ---------------------------------------------------------------------
 
 type instance XVar           (GhcPass _) = NoExtField
-
+type instance XPartial       (GhcPass _) = NoExtField
 type instance XUnboundVar    GhcPs = Maybe EpAnnUnboundVar
 type instance XUnboundVar    GhcRn = NoExtField
 type instance XUnboundVar    GhcTc = HoleExprRef
@@ -655,6 +655,7 @@ ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
 ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
+ppr_expr (HsPartial _)       = text "partial node"
 ppr_expr (HsRecSel _ f)      = pprPrefixOcc f
 ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel s l) = case ghcPass @p of
@@ -975,6 +976,7 @@ hsExprNeedsParens prec = go
     go :: HsExpr (GhcPass p) -> Bool
     go (HsVar{})                      = False
     go (HsUnboundVar{})               = False
+    go (HsPartial{})                  = False
     go (HsIPVar{})                    = False
     go (HsOverLabel{})                = False
     go (HsLit _ l)                    = hsLitNeedsParens prec l

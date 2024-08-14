@@ -739,6 +739,7 @@ exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
 exprCtOrigin (HsIf {})           = IfThenElseOrigin
 exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
+exprCtOrigin (HsPartial _)       = Shouldn'tHappenOrigin "partial node"
 exprCtOrigin (HsDo {})           = DoOrigin
 exprCtOrigin (RecordCon {})      = Shouldn'tHappenOrigin "record construction"
 exprCtOrigin (RecordUpd {})      = RecordUpdOrigin

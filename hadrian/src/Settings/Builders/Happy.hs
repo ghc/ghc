@@ -4,10 +4,12 @@ import Settings.Builders.Common
 
 happyBuilderArgs :: Args
 happyBuilderArgs = builder Happy ? mconcat [ arg =<< (\s -> "-i" ++ pwdname s ++ "-" ++ filename s ++ ".hinfo") <$> getInput
-                                           , arg "-dagc"
+                                           -- , arg "-dagc"
+                                           , arg "-agc"
                                            , arg "--strict"
                                            , arg =<< getInput
                                            , arg "-o", arg =<< getOutput ]
 
+filename,pwdname :: String -> String
 filename = reverse . takeWhile (/= '/') . drop 1 . dropWhile (/='.') . reverse
 pwdname = reverse . takeWhile (/= '/') . drop 1 . dropWhile (/= '/') . reverse
