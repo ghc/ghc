@@ -1916,20 +1916,15 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
     -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
     -- the linker can correctly load the object files.  This isn't necessary
     -- when using -fexternal-interpreter.
-    dynamic_too_enable enable_spec ms
+    dynamic_too_enable _ ms
       = hostIsDynamic && not hostIsProfiled && internalInterpreter &&
             not isDynWay && not isProfWay &&  not dyn_too_enabled
-              && enable_object
       where
        lcl_dflags   = ms_hspp_opts ms
        internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
        dyn_too_enabled = gopt Opt_BuildDynamicToo lcl_dflags
        isDynWay    = hasWay (ways lcl_dflags) WayDyn
        isProfWay   = hasWay (ways lcl_dflags) WayProf
-       enable_object = case enable_spec of
-                            EnableByteCode -> False
-                            EnableByteCodeAndObject -> True
-                            EnableObject -> True
 
     -- #16331 - when no "internal interpreter" is available but we
     -- need to process some TemplateHaskell or QuasiQuotes, we automatically

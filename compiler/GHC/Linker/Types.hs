@@ -245,10 +245,6 @@ type ObjFile = FilePath
 -- | Objects which have yet to be linked by the compiler
 data Unlinked
   = DotO ObjFile       -- ^ An object file (.o)
-         Bool          -- ^ Whether the object is an internal, intermediate
-                       -- build product that should not be adapted to the
-                       -- interpreter's way.
-                       -- Used for foreign stubs loaded from interfaces.
   | DotA FilePath      -- ^ Static archive file (.a)
   | DotDLL FilePath    -- ^ Dynamically linked library file (.so, .dll, .dylib)
   | CoreBindings WholeCoreBindings -- ^ Serialised core which we can turn into BCOs (or object files), or used by some other backend
@@ -273,9 +269,7 @@ data Unlinked
                        -- "GHC.Iface.Tidy.StaticPtrTable".
 
 instance Outputable Unlinked where
-  ppr (DotO path int) =
-    text "DotO" <+> text path <+>
-    if int then brackets (text "internal") else empty
+  ppr (DotO path) = text "DotO" <+> text path
   ppr (DotA path)   = text "DotA" <+> text path
   ppr (DotDLL path) = text "DotDLL" <+> text path
   ppr (BCOs bcos spt) = text "BCOs" <+> ppr bcos <+> ppr spt
@@ -320,7 +314,7 @@ linkableObjs l = concatMap unlinkedObjectPaths (linkableUnlinked l)
 -- LoadedBCOs.
 isObject :: Unlinked -> Bool
 isObject = \case
-  DotO _ _  -> True
+  DotO _  -> True
   DotA _ -> True
   DotDLL _ -> True
   LoadedBCOs _ _ -> True
@@ -329,7 +323,7 @@ isObject = \case
 -- TODO still dodgy: Used in HsToCore.Usage. Unclear what that would want to do
 -- with foreign stubs.
 nameOfObject_maybe :: Unlinked -> Maybe FilePath
-nameOfObject_maybe (DotO fn _)   = Just fn
+nameOfObject_maybe (DotO fn)   = Just fn
 nameOfObject_maybe (DotA fn)   = Just fn
 nameOfObject_maybe (DotDLL fn) = Just fn
 nameOfObject_maybe (CoreBindings {}) = Nothing
@@ -339,7 +333,7 @@ nameOfObject_maybe (BCOs {})   = Nothing
 -- | Return the paths of all object files (.o) contained in this 'Unlinked'.
 unlinkedObjectPaths :: Unlinked -> [FilePath]
 unlinkedObjectPaths = \case
-  DotO f _ -> [f]
+  DotO f -> [f]
   LoadedBCOs _ os -> os
   _ -> []
 
@@ -347,7 +341,7 @@ unlinkedObjectPaths = \case
 -- 'Unlinked'.
 unlinkedObjectCodePaths :: Unlinked -> [FilePath]
 unlinkedObjectCodePaths = \case
-  DotO f _ -> [f]
+  DotO f -> [f]
   DotA f -> [f]
   DotDLL f -> [f]
   LoadedBCOs _ os -> os
@@ -365,7 +359,7 @@ unlinkedFilterObjectCode = \case
   u@DotO {} -> [u]
   u@DotA {} -> [u]
   u@DotDLL {} -> [u]
-  LoadedBCOs _ os -> [DotO f True | f <- os]
+  LoadedBCOs _ os -> DotO <$> os
   _ -> []
 
 -- | Produce a flat list of 'Unlinked' containing only byte code, eliminating

@@ -2059,7 +2059,7 @@ generateFreshByteCode :: HscEnv
 generateFreshByteCode hsc_env mod_name cgguts mod_location = do
   (bcos, fos) <- generateByteCode hsc_env cgguts mod_location
   unlinked_time <- getCurrentTime
-  return (LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) (bcos : (flip DotO True <$> fos)))
+  return (LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) (bcos : (DotO <$> fos)))
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)

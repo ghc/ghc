@@ -507,7 +507,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
             Just lnk -> pure lnk
 
         case linkableUnlinked linkable of
-              [DotO p _] -> do
+              [DotO p] -> do
                   (bis, req_b) <- loadObjBlockInfo [p]
                   -- Store new required blocks in IORef
                   modifyIORef new_required_blocks_var ((++) req_b)

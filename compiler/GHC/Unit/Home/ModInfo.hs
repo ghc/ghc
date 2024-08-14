@@ -26,6 +26,7 @@ module GHC.Unit.Home.ModInfo
    , listToHpt
    , listHMIToHpt
    , pprHPT
+   , homeModInfoByteCodeDyn
    )
 where
 
@@ -44,6 +45,7 @@ import GHC.Utils.Outputable
 import Data.List (sortOn)
 import Data.Ord
 import GHC.Utils.Panic
+import Control.Applicative ((<|>))
 
 -- | Information about modules in the package being compiled
 data HomeModInfo = HomeModInfo
@@ -76,18 +78,23 @@ data HomeModInfo = HomeModInfo
 homeModInfoByteCode :: HomeModInfo -> Maybe Linkable
 homeModInfoByteCode = homeMod_bytecode . hm_linkable
 
+homeModInfoByteCodeDyn :: HomeModInfo -> Maybe Linkable
+homeModInfoByteCodeDyn HomeModInfo {hm_linkable} =
+  homeMod_bytecodeDyn hm_linkable <|> homeMod_bytecode hm_linkable
+
 homeModInfoObject :: HomeModInfo -> Maybe Linkable
 homeModInfoObject = homeMod_object . hm_linkable
 
 emptyHomeModInfoLinkable :: HomeModLinkable
-emptyHomeModInfoLinkable = HomeModLinkable Nothing Nothing
+emptyHomeModInfoLinkable = HomeModLinkable Nothing Nothing Nothing
 
 -- See Note [Home module build products]
 data HomeModLinkable = HomeModLinkable { homeMod_bytecode :: !(Maybe Linkable)
+                                       , homeMod_bytecodeDyn :: !(Maybe Linkable)
                                        , homeMod_object   :: !(Maybe Linkable) }
 
 instance Outputable HomeModLinkable where
-  ppr (HomeModLinkable l1 l2) = ppr l1 $$ ppr l2
+  ppr (HomeModLinkable l1 l2 l3) = ppr l1 $$ ppr l2 $$ ppr l3
 
 justBytecode :: Linkable -> HomeModLinkable
 justBytecode lm =
@@ -102,7 +109,7 @@ justObjects lm =
 bytecodeAndObjects :: Linkable -> Linkable -> HomeModLinkable
 bytecodeAndObjects bc o =
   assertPpr (not (isObjectLinkable bc) && isObjectLinkable o) (ppr bc $$ ppr o)
-    (HomeModLinkable (Just bc) (Just o))
+    (HomeModLinkable (Just bc) (Just o) Nothing)
 
 
 {-

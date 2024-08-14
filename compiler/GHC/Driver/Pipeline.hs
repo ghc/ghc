@@ -778,7 +778,7 @@ hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction
 hscBackendPipeline pipe_env hsc_env mod_sum result =
   if backendGeneratesCode (backend (hsc_dflags hsc_env)) then
     do
-      res <- hscGenBackendPipeline pipe_env hsc_env mod_sum result
+      (iface, hml) <- hscGenBackendPipeline pipe_env hsc_env mod_sum result
       -- Only run dynamic-too if the backend generates object files
       -- See Note [Writing interface files]
       -- If we are writing a simple interface (not . backendWritesFiles), then
@@ -787,10 +787,12 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
       -- generating a duplicate linkable.
       -- We must not run the backend a second time with `dynamicNow` enable because
       -- all the work has already been done in the first pipeline.
-      when (gopt Opt_BuildDynamicToo (hsc_dflags hsc_env) && backendWritesFiles (backend (hsc_dflags hsc_env)) ) $ do
+      if (gopt Opt_BuildDynamicToo (hsc_dflags hsc_env) && backendWritesFiles (backend (hsc_dflags hsc_env)) )
+      then do
           let dflags' = setDynamicNow (hsc_dflags hsc_env) -- set "dynamicNow"
-          () <$ hscGenBackendPipeline pipe_env (hscSetFlags dflags' hsc_env) mod_sum result
-      return res
+          (_, hmi_dyn) <- hscGenBackendPipeline pipe_env (hscSetFlags dflags' hsc_env) mod_sum result
+          pure (iface, hml {homeMod_bytecodeDyn = homeMod_bytecode hmi_dyn})
+      else return (iface, hml)
   else
     case result of
       HscUpdate iface ->  return (iface, emptyHomeModInfoLinkable)
@@ -814,7 +816,7 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
       Nothing -> return mlinkable
       Just o_fp -> do
         unlinked_time <- liftIO getCurrentTime
-        final_unlinked <- flip DotO False <$> use (T_MergeForeign pipe_env hsc_env o_fp fos)
+        final_unlinked <- DotO <$> use (T_MergeForeign pipe_env hsc_env o_fp fos)
         let !linkable = LM unlinked_time (ms_mod mod_sum) [final_unlinked]
         -- Add the object linkable to the potential bytecode linkable which was generated in HscBackend.
         return (mlinkable { homeMod_object = Just linkable })
@@ -927,7 +929,7 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    as :: P m => Bool -> m (Maybe FilePath)
    as use_cpp = asPipeline use_cpp pipe_env hsc_env Nothing input_fn
 
-   objFromLinkable (_, homeMod_object -> Just (LM _ _ [DotO lnk _])) = Just lnk
+   objFromLinkable (_, homeMod_object -> Just (LM _ _ [DotO lnk])) = Just lnk
    objFromLinkable _ = Nothing
 
    fromPhase :: P m => Phase -> m (Maybe FilePath)
