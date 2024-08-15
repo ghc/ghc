@@ -1,5 +1,6 @@
 module C where
 
 import E
+import {-# source #-} F
 
-data C
+data C = C F

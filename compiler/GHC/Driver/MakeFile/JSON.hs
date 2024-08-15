@@ -135,28 +135,42 @@ data Deps =
   deriving stock (Generic)
   deriving (Semigroup, Monoid) via (Generically Deps)
 
-newtype DepJSON = DepJSON (Map.Map ModuleName Deps)
+data ModuleDeps =
+  ModuleDeps {
+    source :: Deps,
+    boot :: Maybe Deps
+  }
+  deriving stock (Generic)
+  deriving (Semigroup, Monoid) via (Generically ModuleDeps)
+
+newtype DepJSON = DepJSON (Map.Map ModuleName ModuleDeps)
 
 instance ToJson DepJSON where
   json (DepJSON m) =
     JSObject [
-      (moduleNameString target, JSObject [
-        ("sources", array sources normalise),
-        ("modules", array (fst modules) moduleNameString),
-        ("modules-boot", array (snd modules) moduleNameString),
-        ("packages",
-          JSArray [
-            package name unit_id package_id mods |
-            ((name, unit_id, package_id), mods) <- Map.toList packages
-          ]
-        ),
-        ("cpp", array cpp id),
-        ("options", array options id),
-        ("preprocessor", maybe JSNull JSString preprocessor)
-      ])
-      | (target, Deps {packages = PackageDeps packages, ..}) <- Map.toList m
+      (moduleNameString target, module_deps md)
+      | (target, md) <- Map.toList m
     ]
     where
+      module_deps ModuleDeps {source, boot} =
+        JSObject (("boot", maybe JSNull (JSObject . deps) boot) : deps source)
+
+      deps Deps {packages = PackageDeps packages, ..} =
+        [
+          ("sources", array sources normalise),
+          ("modules", array (fst modules) moduleNameString),
+          ("modules-boot", array (snd modules) moduleNameString),
+          ("packages",
+            JSArray [
+              package name unit_id package_id mods |
+              ((name, unit_id, package_id), mods) <- Map.toList packages
+            ]
+          ),
+          ("cpp", array cpp id),
+          ("options", array options id),
+          ("preprocessor", maybe JSNull JSString preprocessor)
+        ]
+
       package name unit_id (PackageId package_id) mods =
         JSObject [
           ("id", JSString (unitIdString unit_id)),
@@ -170,23 +184,17 @@ instance ToJson DepJSON where
 initDepJSON :: IO (IORef DepJSON)
 initDepJSON = newIORef $ DepJSON Map.empty
 
-insertDepJSON :: [ModuleName] -> Deps -> DepJSON -> DepJSON
-insertDepJSON targets dep (DepJSON m0) =
-  DepJSON
-    $ foldl'
-      ( \acc target ->
-          Map.insertWith
-            (Semigroup.<>)
-            target
-            dep
-            acc
-      )
-      m0
-      targets
+insertDepJSON :: ModuleName -> IsBootInterface -> Deps -> DepJSON -> DepJSON
+insertDepJSON target is_boot dep (DepJSON m0) =
+  DepJSON $ Map.insertWith (Semigroup.<>) target new m0
+  where
+    new
+      | IsBoot <- is_boot = mempty {boot = Just dep}
+      | otherwise = mempty {source = dep}
 
 updateDepJSON :: Bool -> Maybe FilePath -> DepNode -> [Dep] -> DepJSON -> DepJSON
 updateDepJSON include_pkgs preprocessor DepNode {..} deps =
-  insertDepJSON [moduleName dn_mod] payload
+  insertDepJSON (moduleName dn_mod) dn_boot payload
   where
     payload = node_data Semigroup.<> foldMap dep deps
 
