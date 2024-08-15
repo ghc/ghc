@@ -33,7 +33,7 @@ module GHC.Iface.Load (
         WhereFrom(..),
 
         pprModIfaceSimple,
-        ifaceStats, pprModIface, showIface,
+        ifaceStats, pprModIface, showIface, showIfaceAbiHash,
 
         module Iface_Errors -- avoids boot files in Ppr modules
    ) where
@@ -1105,6 +1105,19 @@ showIface logger dflags unit_state name_cache filename = do
    logMsg logger MCDump noSrcSpan
       $ withPprStyle (mkDumpStyle name_ppr_ctx)
       $ pprModIface unit_state iface
+
+-- | Read binary interface, and print ABI hash. Unlike the
+-- @--abi-hash@ major mode, the output is the ABI hash deserialized
+-- from the interface directly.
+showIfaceAbiHash :: Logger -> DynFlags -> NameCache -> FilePath -> IO ()
+showIfaceAbiHash logger dflags name_cache filename = do
+   let profile = targetProfile dflags
+
+   -- skip the hi way check and silence warnings
+   iface <- readBinIface profile name_cache IgnoreHiWay QuietBinIFace filename
+
+   logMsg logger MCDump noSrcSpan
+      $ ppr $ mi_mod_hash $ mi_final_exts iface
 
 -- | Show a ModIface but don't display details; suitable for ModIfaces stored in
 -- the EPT.
