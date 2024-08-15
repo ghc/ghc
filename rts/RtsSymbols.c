@@ -656,6 +656,8 @@ extern char **environ;
       SymI_HasDataProto(stg_newAlignedPinnedByteArrayzh)                    \
       SymI_HasDataProto(stg_isByteArrayPinnedzh)                            \
       SymI_HasDataProto(stg_isMutableByteArrayPinnedzh)                     \
+      SymI_HasDataProto(stg_isByteArrayWeaklyPinnedzh)                      \
+      SymI_HasDataProto(stg_isMutableByteArrayWeaklyPinnedzh)               \
       SymI_HasDataProto(stg_shrinkMutableByteArrayzh)                       \
       SymI_HasDataProto(stg_resizzeMutableByteArrayzh)                      \
       SymI_HasDataProto(stg_shrinkSmallMutableArrayzh)                       \

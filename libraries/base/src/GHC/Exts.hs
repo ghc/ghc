@@ -112,7 +112,9 @@ module GHC.Exts
 
 import GHC.Internal.Exts
 import GHC.Internal.ArrayArray
-import GHC.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
+import GHC.Prim hiding (
+  coerce, dataToTagSmall#, dataToTagLarge#, whereFrom#,
+  isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned# )
   -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
   -- be exposed from base (not even GHC.Exts)

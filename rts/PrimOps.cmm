@@ -215,10 +215,27 @@ stg_isByteArrayPinnedzh ( gcptr ba )
     return (flags & BF_PINNED != 0);
 }
 
+stg_isByteArrayWeaklyPinnedzh ( gcptr ba )
+// ByteArray# s -> Int#
+{
+    W_ bd, flags;
+    bd = Bdescr(ba);
+    // See #22255 and the primop docs.
+    flags = TO_W_(bdescr_flags(bd));
+
+    return (flags & (BF_PINNED | BF_COMPACT | BF_LARGE) != 0);
+}
+
 stg_isMutableByteArrayPinnedzh ( gcptr mba )
 // MutableByteArray# s -> Int#
 {
     jump stg_isByteArrayPinnedzh(mba);
+}
+
+stg_isMutableByteArrayWeaklyPinnedzh ( gcptr mba )
+// MutableByteArray# s -> Int#
+{
+    jump stg_isByteArrayWeaklyPinnedzh(mba);
 }
 
 /* Note [LDV profiling and resizing arrays]

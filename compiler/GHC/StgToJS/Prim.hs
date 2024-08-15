@@ -670,6 +670,8 @@ genPrim prof bound ty op = case op of
   NewAlignedPinnedByteArrayOp_Char  -> \[r]   [l,_align] -> pure $ PrimInline (newByteArray r l)
   MutableByteArrayIsPinnedOp        -> \[r]   [_]        -> pure $ PrimInline $ r |= one_
   ByteArrayIsPinnedOp               -> \[r]   [_]        -> pure $ PrimInline $ r |= one_
+  ByteArrayIsWeaklyPinnedOp         -> \[r]   [_]        -> pure $ PrimInline $ r |= one_
+  MutableByteArrayIsWeaklyPinnedOp  -> \[r]   [_]        -> pure $ PrimInline $ r |= one_
   ByteArrayContents_Char            -> \[a,o] [b]        -> pure $ PrimInline $ mconcat [a |= b, o |= zero_]
   MutableByteArrayContents_Char     -> \[a,o] [b]        -> pure $ PrimInline $ mconcat [a |= b, o |= zero_]
   ShrinkMutableByteArrayOp_Char     -> \[]    [a,n]      -> pure $ PrimInline $ appS hdShrinkMutableByteArrayStr [a,n]

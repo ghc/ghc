@@ -163,6 +163,12 @@ Runtime system
 ~~~~~~~~~~~~~~~~~~~~
 
 - Usage of deprecated primops is now correctly reported (#19629).
+- New primops `isMutableByteArrayWeaklyPinned#` and `isByteArrayWeaklyPinned#`
+  to allow users to avoid copying large arrays safely when dealing with ffi.
+  See the users guide for more details on the different kinds of
+  pinned arrays in 9.12.
+
+  This need for this distinction originally surfaced in https://gitlab.haskell.org/ghc/ghc/-/issues/22255
 
 
 ``ghc`` library
