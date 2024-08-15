@@ -1,18 +1,12 @@
-ghc: Exception:
+ghc-9.11.20240830: Exception:
 
 default output name would overwrite the input file; must specify -o explicitly
 Usage: For basic information, try the `--help' option.
 
-Package: ghc-inplace
+Package: ghc-9.11-inplace
 Module: GHC.Utils.Panic
 Type: GhcException
 
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
-    throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:371:12 in exceptions-0.10.7-inplace:Control.Monad.Catch
-    throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:860:84 in exceptions-0.10.7-inplace:Control.Monad.Catch
-    onException, called at compiler/GHC/Driver/Make.hs:2974:23 in ghc-9.9-inplace:GHC.Driver.Make
-
-
+  bracket, called at compiler/GHC/Driver/Make.hs:2936:3 in ghc-9.11-inplace:GHC.Driver.Make
 
