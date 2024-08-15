@@ -35,7 +35,7 @@ import GHC.Driver.LlvmConfigCache  (LlvmConfigCache)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
 
-import GHC.Data.OsPath
+import GHC.Data.OsPath hiding ((</>), (<.>))
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
@@ -262,7 +262,10 @@ outputForeignStubs
 outputForeignStubs logger tmpfs dflags unit_state mod location stubs
  = do
    let stub_h = unsafeDecodeUtf $ mkStubPaths (initFinderOpts dflags) (moduleName mod) location
-   stub_c <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
+   tmp_dir <- getTempDir logger tmpfs (tmpDir dflags)
+   let stub_c = tmp_dir </> (unitIdString (moduleUnitId mod) ++ "_" ++ moduleNameString (moduleName mod) ++ "_stub") <.> "c"
+
+   addFilesToClean tmpfs TFL_CurrentModule [stub_c]
 
    case stubs of
      NoStubs ->

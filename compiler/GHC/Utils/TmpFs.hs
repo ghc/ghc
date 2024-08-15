@@ -10,6 +10,7 @@ module GHC.Utils.TmpFs
     , emptyPathsToClean
     , TempFileLifetime(..)
     , TempDir (..)
+    , getTempDir
     , cleanTempDirs
     , cleanTempFiles
     , cleanCurrentModuleTempFiles
@@ -63,6 +64,8 @@ data TmpFs = TmpFs
       -- atomically.
       --
       -- Shared with forked TmpFs.
+
+  , tmp_dir_prefix :: String
 
   , tmp_files_to_clean :: IORef PathsToClean
       -- ^ Files to clean (per session or per module)
@@ -121,6 +124,7 @@ initTmpFs = do
         , tmp_subdirs_to_clean = subdirs
         , tmp_dirs_to_clean    = dirs
         , tmp_next_suffix      = next
+        , tmp_dir_prefix       = "tmp"
         }
 
 -- | Initialise an empty TmpFs sharing unique numbers and per-process temporary
@@ -132,11 +136,16 @@ forkTmpFsFrom :: TmpFs -> IO TmpFs
 forkTmpFsFrom old = do
     files <- newIORef emptyPathsToClean
     subdirs <- newIORef emptyPathsToClean
+    counter <- newIORef 0
+    prefix  <- newTempSuffix old
+
+
     return $ TmpFs
         { tmp_files_to_clean   = files
         , tmp_subdirs_to_clean = subdirs
         , tmp_dirs_to_clean    = tmp_dirs_to_clean old
-        , tmp_next_suffix      = tmp_next_suffix old
+        , tmp_next_suffix      = counter
+        , tmp_dir_prefix       = prefix
         }
 
 -- | Merge the first TmpFs into the second.
@@ -259,9 +268,11 @@ changeTempFilesLifetime tmpfs lifetime files = do
   addFilesToClean tmpfs lifetime existing_files
 
 -- Return a unique numeric temp file suffix
-newTempSuffix :: TmpFs -> IO Int
-newTempSuffix tmpfs =
-  atomicModifyIORef' (tmp_next_suffix tmpfs) $ \n -> (n+1,n)
+newTempSuffix :: TmpFs -> IO String
+newTempSuffix tmpfs = do
+  n <- atomicModifyIORef' (tmp_next_suffix tmpfs) $ \n -> (n+1,n)
+  return $ tmp_dir_prefix tmpfs ++ "_" ++ show n
+
 
 -- Find a temporary name that doesn't already exist.
 newTempName :: Logger -> TmpFs -> TempDir -> TempFileLifetime -> Suffix -> IO FilePath
@@ -271,8 +282,8 @@ newTempName logger tmpfs tmp_dir lifetime extn
   where
     findTempName :: FilePath -> IO FilePath
     findTempName prefix
-      = do n <- newTempSuffix tmpfs
-           let filename = prefix ++ show n <.> extn
+      = do suffix <- newTempSuffix tmpfs
+           let filename = prefix ++ suffix <.> extn
            b <- doesFileExist filename
            if b then findTempName prefix
                 else do -- clean it up later
@@ -295,8 +306,8 @@ newTempSubDir logger tmpfs tmp_dir
   where
     findTempDir :: FilePath -> IO FilePath
     findTempDir prefix
-      = do n <- newTempSuffix tmpfs
-           let name = prefix ++ show n
+      = do suffix <- newTempSuffix tmpfs
+           let name = prefix ++ suffix
            b <- doesDirectoryExist name
            if b then findTempDir prefix
                 else (do
@@ -314,8 +325,8 @@ newTempLibName logger tmpfs tmp_dir lifetime extn
   where
     findTempName :: FilePath -> String -> IO (FilePath, FilePath, String)
     findTempName dir prefix
-      = do n <- newTempSuffix tmpfs -- See Note [Deterministic base name]
-           let libname = prefix ++ show n
+      = do suffix <- newTempSuffix tmpfs -- See Note [Deterministic base name]
+           let libname = prefix ++ suffix
                filename = dir </> "lib" ++ libname <.> extn
            b <- doesFileExist filename
            if b then findTempName dir prefix
@@ -340,8 +351,8 @@ getTempDir logger tmpfs (TempDir tmp_dir) = do
 
     mkTempDir :: FilePath -> IO FilePath
     mkTempDir prefix = do
-        n <- newTempSuffix tmpfs
-        let our_dir = prefix ++ show n
+        suffix <- newTempSuffix tmpfs
+        let our_dir = prefix ++ suffix
 
         -- 1. Speculatively create our new directory.
         createDirectory our_dir
