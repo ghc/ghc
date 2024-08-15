@@ -19,7 +19,6 @@ import GHC.Settings
 import GHC.SysTools.Process
 
 import GHC.Driver.Session
-
 import GHC.Utils.Exception as Exception
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -28,10 +27,16 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import GHC.Utils.Panic
 
+import Control.Monad
 import Data.List (tails, isPrefixOf)
 import Data.Maybe (fromMaybe)
 import System.IO
 import System.Process
+import GHC.Driver.Config.Diagnostic
+import GHC.Driver.Errors
+import GHC.Driver.Errors.Types (GhcMessage(..), DriverMessage (DriverNoConfiguredLLVMToolchain))
+import GHC.Driver.CmdLine (warnsToMessages)
+import GHC.Types.SrcLoc (noLoc)
 
 {-
 ************************************************************************
@@ -277,12 +282,26 @@ runEmscripten logger dflags args = traceSystoolCommand logger "emcc" $ do
 figureLlvmVersion :: Logger -> DynFlags -> IO (Maybe LlvmVersion)
 figureLlvmVersion logger dflags = traceSystoolCommand logger "llc" $ do
   let (pgm,opts) = pgm_lc dflags
+      diag_opts = initDiagOpts dflags
       args = filter notNull (map showOpt opts)
       -- we grab the args even though they should be useless just in
       -- case the user is using a customised 'llc' that requires some
       -- of the options they've specified. llc doesn't care what other
       -- options are specified when '-version' is used.
       args' = args ++ ["-version"]
+  -- Since !12001, when GHC is not configured with llc/opt with
+  -- supported version range, configure script will leave llc/opt
+  -- commands as blank in settings. In this case, we should bail out
+  -- with a proper error, see #25011.
+  --
+  -- Note that this does not make the -Wunsupported-llvm-version
+  -- warning logic redundant! Power users might want to use
+  -- -pgmlc/-pgmlo to override llc/opt locations to test LLVM outside
+  -- officially supported version range, and the driver will produce
+  -- the warning and carry on code generation.
+  when (null pgm) $
+    printOrThrowDiagnostics logger (initPrintConfig dflags) diag_opts
+      (GhcDriverMessage <$> warnsToMessages diag_opts [noLoc DriverNoConfiguredLLVMToolchain])
   catchIO (do
               (pin, pout, perr, p) <- runInteractiveProcess pgm args'
                                               Nothing Nothing
@@ -360,4 +379,3 @@ runWindres logger dflags args = traceSystoolCommand logger "windres" $ do
       opts = map Option (getOpts dflags opt_windres)
   mb_env <- getGccEnv cc_args
   runSomethingFiltered logger id "Windres" windres (opts ++ args) Nothing mb_env
-
