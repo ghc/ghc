@@ -139,5 +139,7 @@ test('callee-no-local', [
   ['-ddump-cmm-raw']
 )
 
+test('T25166', [req_cmm], makefile_test, [])
+
 # dump Core to ensure that d is defined as: d = D 10## RUBBISH(IntRep)
 test('T25177', normal, compile, ['-O2 -dno-typeable-binds -ddump-simpl -dsuppress-all -dsuppress-uniques -v0'])

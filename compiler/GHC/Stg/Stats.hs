@@ -46,6 +46,7 @@ data CounterType
   | ReEntrantBinds   Bool{-ditto-}
   | SingleEntryBinds Bool{-ditto-}
   | UpdatableBinds   Bool{-ditto-}
+  | JoinPointBinds   Bool{-ditto-}
   deriving (Eq, Ord)
 
 type Count      = Int
@@ -94,6 +95,7 @@ showStgStats prog
     s (ReEntrantBinds _)      = "ReEntrantBindsBinds_Nested "
     s (SingleEntryBinds _)    = "SingleEntryBinds_Nested    "
     s (UpdatableBinds _)      = "UpdatableBinds_Nested      "
+    s (JoinPointBinds _)      = "JoinPointBinds_Nested      "
 
 gatherStgStats :: [StgTopBinding] -> StatEnv
 gatherStgStats binds = combineSEs (map statTopBinding binds)
@@ -132,6 +134,7 @@ statRhs top (_, StgRhsClosure _ _ u _ body _)
         ReEntrant   -> ReEntrantBinds   top
         Updatable   -> UpdatableBinds   top
         SingleEntry -> SingleEntryBinds top
+        JumpedTo    -> JoinPointBinds   top
     )
 
 {-

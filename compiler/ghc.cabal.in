@@ -702,6 +702,7 @@ Library
         GHC.Stg.InferTags.Rewrite
         GHC.Stg.InferTags.TagSig
         GHC.Stg.InferTags.Types
+        GHC.Stg.Make
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.Subst

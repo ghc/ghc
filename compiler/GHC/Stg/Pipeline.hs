@@ -31,6 +31,8 @@ import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( StgLiftConfig, stgLiftLams )
 import GHC.Unit.Module ( Module )
 
+import GHC.Core.DataCon (DataCon)
+
 import GHC.Utils.Error
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -52,6 +54,12 @@ data StgPipelineOpts = StgPipelineOpts
   , stgPipeline_pprOpts     :: !StgPprOpts
   , stgPlatform             :: !Platform
   , stgPipeline_forBytecode :: !Bool
+
+  , stgPipeline_allowTopLevelConApp  :: Module -> DataCon -> [StgArg] -> Bool
+    -- ^ Is a top-level (static) StgConApp allowed or not. If not, use dynamic allocation.
+    --
+    -- This is typically used to support dynamic linking on Windows and the
+    -- -fexternal-dynamic-refs flag. See GHC.Stg.Utils.allowTopLevelConApp.
   }
 
 newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
@@ -136,7 +144,7 @@ stg2stg logger extra_vars opts this_mod binds
           StgUnarise -> do
             us <- getUniqueSupplyM
             liftIO (stg_linter False "Pre-unarise" binds)
-            let binds' = {-# SCC "StgUnarise" #-} unarise us binds
+            let binds' = {-# SCC "StgUnarise" #-} unarise us (stgPipeline_allowTopLevelConApp opts this_mod) binds
             liftIO (dump_when Opt_D_dump_stg_unarised "Unarised STG:" binds')
             liftIO (stg_linter True "Unarise" binds')
             return binds'

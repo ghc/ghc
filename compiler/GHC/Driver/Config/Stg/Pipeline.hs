@@ -7,6 +7,7 @@ import GHC.Prelude
 import Control.Monad (guard)
 
 import GHC.Stg.Pipeline
+import GHC.Stg.Utils
 
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Stg.Lift
@@ -15,15 +16,19 @@ import GHC.Driver.DynFlags
 
 -- | Initialize STG pretty-printing options from DynFlags
 initStgPipelineOpts :: DynFlags -> Bool -> StgPipelineOpts
-initStgPipelineOpts dflags for_bytecode = StgPipelineOpts
-  { stgPipeline_lint = do
-      guard $ gopt Opt_DoStgLinting dflags
-      Just $ initDiagOpts dflags
-  , stgPipeline_pprOpts = initStgPprOpts dflags
-  , stgPipeline_phases = getStgToDo for_bytecode dflags
-  , stgPlatform = targetPlatform dflags
-  , stgPipeline_forBytecode = for_bytecode
-  }
+initStgPipelineOpts dflags for_bytecode =
+  let !platform = targetPlatform dflags
+      !ext_dyn_refs = gopt Opt_ExternalDynamicRefs dflags
+  in StgPipelineOpts
+    { stgPipeline_lint = do
+        guard $ gopt Opt_DoStgLinting dflags
+        Just $ initDiagOpts dflags
+    , stgPipeline_pprOpts = initStgPprOpts dflags
+    , stgPipeline_phases = getStgToDo for_bytecode dflags
+    , stgPlatform = platform
+    , stgPipeline_forBytecode = for_bytecode
+    , stgPipeline_allowTopLevelConApp = allowTopLevelConApp platform ext_dyn_refs
+    }
 
 -- | Which Stg-to-Stg passes to run. Depends on flags, ways etc.
 getStgToDo

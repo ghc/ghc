@@ -9,9 +9,12 @@ module GHC.Stg.Utils
     , idArgs
 
     , mkUnarisedId, mkUnarisedIds
+
+    , allowTopLevelConApp
     ) where
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.Types.Id
 import GHC.Core.Type
@@ -22,6 +25,8 @@ import GHC.Types.Tickish
 import GHC.Types.Unique.Supply
 
 import GHC.Types.RepType
+import GHC.Types.Name        ( isDynLinkName )
+import GHC.Unit.Module       ( Module )
 import GHC.Stg.Syntax
 
 import GHC.Utils.Outputable
@@ -122,3 +127,54 @@ stripStgTicksTopE :: (StgTickish -> Bool) -> GenStgExpr p -> GenStgExpr p
 stripStgTicksTopE p = go
    where go (StgTick t e) | p t = go e
          go other               = other
+
+-- | Do we allow the given top-level (static) ConApp?
+allowTopLevelConApp
+  :: Platform
+  -> Bool          -- is Opt_ExternalDynamicRefs enabled?
+  -> Module
+  -> DataCon
+  -> [StgArg]
+  -> Bool
+allowTopLevelConApp platform ext_dyn_refs this_mod con args
+  -- we're not using dynamic linking
+  | not ext_dyn_refs = True
+  -- if the target OS is Windows, we only allow top-level ConApps if they don't
+  -- reference external names (Windows DLLs have a problem with static cross-DLL
+  -- refs)
+  | platformOS platform == OSMinGW32 = not is_external_con_app
+  -- otherwise, allowed
+  -- Sylvain: shouldn't this be False when (ext_dyn_refs && is_external_con_app)?
+  | otherwise = True
+  where
+    is_external_con_app = isDynLinkName platform this_mod (dataConName con) || any is_dll_arg args
+
+    -- NB: typePrimRep1 is legit because any free variables won't have
+    -- unlifted type (there are no unlifted things at top level)
+    is_dll_arg :: StgArg -> Bool
+    is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep1 (idType v))
+                             && isDynLinkName platform this_mod (idName v)
+    is_dll_arg _             = False
+
+-- True of machine addresses; these are the things that don't work across DLLs.
+-- The key point here is that VoidRep comes out False, so that a top level
+-- nullary GADT constructor is True for allowTopLevelConApp
+--
+--    data T a where
+--      T1 :: T Int
+--
+-- gives
+--
+--    T1 :: forall a. (a~Int) -> T a
+--
+-- and hence the top-level binding
+--
+--    $WT1 :: T Int
+--    $WT1 = T1 Int (Coercion (Refl Int))
+--
+-- The coercion argument here gets VoidRep
+isAddrRep :: PrimOrVoidRep -> Bool
+isAddrRep (NVRep AddrRep)      = True
+isAddrRep (NVRep (BoxedRep _)) = True -- FIXME: not true for JavaScript
+isAddrRep _                    = False
+

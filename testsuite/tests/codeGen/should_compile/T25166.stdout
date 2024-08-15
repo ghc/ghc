@@ -1,0 +1,6 @@
+[section ""data" . Test.foo_closure" {
+     Test.foo_closure:
+         const Test.D_con_info;
+         const GHC.Types.True_closure+2;
+         const 2;
+         const 3;
