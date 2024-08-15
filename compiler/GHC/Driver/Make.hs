@@ -2924,19 +2924,22 @@ runParPipelines worker_limit plugin_hsc_env diag_wrapper mHscMessager all_pipeli
     atomically $ writeTVar stopped_var True
     wait_log_thread
 
-withLocalTmpFS :: RunMakeM a -> RunMakeM a
-withLocalTmpFS act = do
+withLocalTmpFS :: TmpFs -> (TmpFs -> IO a) -> IO a
+withLocalTmpFS tmpfs act = do
   let initialiser = do
-        MakeEnv{..} <- ask
-        lcl_tmpfs <- liftIO $ forkTmpFsFrom (hsc_tmpfs hsc_env)
-        return $ hsc_env { hsc_tmpfs  = lcl_tmpfs }
-      finaliser lcl_env = do
-        gbl_env <- ask
-        liftIO $ mergeTmpFsInto (hsc_tmpfs lcl_env) (hsc_tmpfs (hsc_env gbl_env))
+        liftIO $ forkTmpFsFrom tmpfs
+      finaliser tmpfs_local = do
+        liftIO $ mergeTmpFsInto tmpfs_local tmpfs
        -- Add remaining files which weren't cleaned up into local tmp fs for
        -- clean-up later.
        -- Clear the logQueue if this node had it's own log queue
-  MC.bracket initialiser finaliser $ \lcl_hsc_env -> local (\env -> env { hsc_env = lcl_hsc_env}) act
+  MC.bracket initialiser finaliser act
+
+withLocalTmpFSMake :: MakeEnv -> (MakeEnv -> IO a) -> IO a
+withLocalTmpFSMake env k =
+  withLocalTmpFS (hsc_tmpfs (hsc_env env)) $ \lcl_tmpfs
+    -> k (env { hsc_env = (hsc_env env) { hsc_tmpfs = lcl_tmpfs }})
+
 
 -- | Run the given actions and then wait for them all to finish.
 runAllPipelines :: WorkerLimit -> MakeEnv -> [MakeAction] -> IO ()
@@ -2958,16 +2961,18 @@ runAllPipelines worker_limit env acts = do
 runLoop :: (((forall a. IO a -> IO a) -> IO ()) -> IO a) -> MakeEnv -> [MakeAction] -> IO [a]
 runLoop _ _env [] = return []
 runLoop fork_thread env (MakeAction act res_var :acts) = do
-  new_thread <-
+
+  -- withLocalTmpFs has to occur outside of fork to remain deterministic
+  new_thread <- withLocalTmpFSMake env $ \lcl_env ->
     fork_thread $ \unmask -> (do
-            mres <- (unmask $ run_pipeline (withLocalTmpFS act))
+            mres <- (unmask $ run_pipeline lcl_env act)
                       `MC.onException` (putMVar res_var Nothing) -- Defensive: If there's an unhandled exception then still signal the failure.
             putMVar res_var mres)
   threads <- runLoop fork_thread env acts
   return (new_thread : threads)
   where
-      run_pipeline :: RunMakeM a -> IO (Maybe a)
-      run_pipeline p = runMaybeT (runReaderT p env)
+      run_pipeline :: MakeEnv -> RunMakeM a -> IO (Maybe a)
+      run_pipeline env p = runMaybeT (runReaderT p env)
 
 data MakeAction = forall a . MakeAction !(RunMakeM a) !(MVar (Maybe a))
 
