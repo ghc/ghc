@@ -454,6 +454,8 @@ RTS_FUN_DECL(stg_newPinnedByteArrayzh);
 RTS_FUN_DECL(stg_newAlignedPinnedByteArrayzh);
 RTS_FUN_DECL(stg_isByteArrayPinnedzh);
 RTS_FUN_DECL(stg_isMutableByteArrayPinnedzh);
+RTS_FUN_DECL(stg_isByteArrayWeaklyPinnedzh);
+RTS_FUN_DECL(stg_isMutableByteArrayWeaklyPinnedzh);
 RTS_FUN_DECL(stg_shrinkMutableByteArrayzh);
 RTS_FUN_DECL(stg_resizzeMutableByteArrayzh);
 RTS_FUN_DECL(stg_shrinkSmallMutableArrayzh);

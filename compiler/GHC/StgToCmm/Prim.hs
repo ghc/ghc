@@ -1668,10 +1668,12 @@ emitPrimOp cfg primop =
   NewPinnedByteArrayOp_Char -> alwaysExternal
   NewAlignedPinnedByteArrayOp_Char -> alwaysExternal
   MutableByteArrayIsPinnedOp -> alwaysExternal
+  MutableByteArrayIsWeaklyPinnedOp -> alwaysExternal
   DoubleDecode_2IntOp -> alwaysExternal
   DoubleDecode_Int64Op -> alwaysExternal
   FloatDecode_IntOp -> alwaysExternal
   ByteArrayIsPinnedOp -> alwaysExternal
+  ByteArrayIsWeaklyPinnedOp -> alwaysExternal
   ShrinkMutableByteArrayOp_Char -> alwaysExternal
   ResizeMutableByteArrayOp_Char -> alwaysExternal
   ShrinkSmallMutableArrayOp_Char -> alwaysExternal

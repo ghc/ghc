@@ -1,3 +1,12 @@
+## 0.13.0
+
+- Shipped with GHC 9.12.1
+
+- Add primops that allow users to distinguish weakly pinned byte arrays from unpinned ones.
+
+         isMutableByteArrayWeaklyPinned# :: MutableByteArray# s -> Int#
+         isByteArrayWeaklyPinned# :: ByteArray# s -> Int#
+
 ## 0.12.0
 
 - Shipped with GHC 9.10.1
