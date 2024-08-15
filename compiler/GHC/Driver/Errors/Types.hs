@@ -402,6 +402,14 @@ data DriverMessage where
        Backpack 'InstantiationNode's. -}
   DriverInstantiationNodeInDependencyGeneration :: InstantiatedUnit -> DriverMessage
 
+  {-| DriverNoConfiguredLLVMToolchain is an error that occurs if there is no
+     LLVM toolchain configured but -fllvm is passed as an option to the compiler.
+
+    Test cases: None.
+
+  -}
+  DriverNoConfiguredLLVMToolchain :: DriverMessage
+
 deriving instance Generic DriverMessage
 
 data DriverMessageOpts =
