@@ -20,6 +20,7 @@ import GHC.StgToJS.Symbols
 import GHC.Data.FastString
 import GHC.Types.Literal
 import GHC.Types.Basic
+import GHC.Types.RepType
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -92,7 +93,25 @@ genStaticLit = \case
   LitDouble r              -> return [ DoubleLit . SaneDouble . r2d $ r ]
   LitLabel name _size fod  -> return [ LabelLit (fod == IsFunction) (mkRawSymbol True name)
                                      , IntLit 0 ]
-  l -> pprPanic "genStaticLit" (ppr l)
+  LitRubbish _ rep ->
+    let prim_reps = runtimeRepPrimRep (text "GHC.StgToJS.Literal.genStaticLit") rep
+    in case expectOnly "GHC.StgToJS.Literal.genStaticLit" prim_reps of -- Note [Post-unarisation invariants]
+        BoxedRep _  -> pure [ NullLit ]
+        AddrRep     -> pure [ NullLit, IntLit 0 ]
+        IntRep      -> pure [ IntLit 0 ]
+        Int8Rep     -> pure [ IntLit 0 ]
+        Int16Rep    -> pure [ IntLit 0 ]
+        Int32Rep    -> pure [ IntLit 0 ]
+        Int64Rep    -> pure [ IntLit 0, IntLit 0 ]
+        WordRep     -> pure [ IntLit 0 ]
+        Word8Rep    -> pure [ IntLit 0 ]
+        Word16Rep   -> pure [ IntLit 0 ]
+        Word32Rep   -> pure [ IntLit 0 ]
+        Word64Rep   -> pure [ IntLit 0, IntLit 0 ]
+        FloatRep    -> pure [ DoubleLit (SaneDouble 0) ]
+        DoubleRep   -> pure [ DoubleLit (SaneDouble 0) ]
+        VoidRep     -> panic "GHC.StgToJS.Literal.getStaticLit: LitRubbish(VoidRep)"
+        VecRep {}   -> pprPanic "GHC.StgToJS.Literal.genStaticLit: LitRubbish(VecRep) isn't supported" (ppr rep)
 
 -- make an unsigned 32 bit number from this unsigned one, lower 32 bits
 toU32Expr :: Integer -> JExpr
