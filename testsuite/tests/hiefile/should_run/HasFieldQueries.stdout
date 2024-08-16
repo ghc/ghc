@@ -1,0 +1,34 @@
+==========================
+At point (21,17), we found:
+==========================
+┌
+│ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
+│     is an evidence variable bound by a let, depending on: [field1]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ field1 at HasFieldQueries.hs:1:1, of type: Thing -> Char
+   │     is a usage of an external evidence variable
+   │     Defined at HasFieldQueries.hs:17:21
+   └
+
+==========================
+At point (21,33), we found:
+==========================
+┌
+│ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field2" Thing Bool
+│     is an evidence variable bound by a let, depending on: [field2]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ field2 at HasFieldQueries.hs:1:1, of type: Thing -> Bool
+   │     is a usage of an external evidence variable
+   │     Defined at HasFieldQueries.hs:17:37
+   └
+
