@@ -91,7 +91,7 @@ module GHC.Builtin.Types (
         cTupleSelId, cTupleSelIdName,
 
         -- * Any
-        anyTyCon, anyTy, anyTypeOfKind,
+        anyTyCon, anyTy, anyTypeOfKind, zonkAnyTyCon,
 
         -- * Recovery TyCon
         makeRecoveryTyCon,
@@ -184,7 +184,7 @@ import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Class     ( Class, mkClass )
 import GHC.Core.Map.Type  ( TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap )
-import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
+import qualified GHC.Core.TyCo.Rep as TyCoRep ( Type(TyConApp) )
 
 import GHC.Types.TyThing
 import GHC.Types.SourceText
@@ -309,6 +309,7 @@ wiredInTyCons = map (dataConTyCon . snd) boxingDataCons
                 , soloTyCon
 
                 , anyTyCon
+                , zonkAnyTyCon
                 , boolTyCon
                 , charTyCon
                 , stringTyCon
@@ -419,57 +420,106 @@ doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#")     
 {-
 Note [Any types]
 ~~~~~~~~~~~~~~~~
-The type constructor Any,
+The type constructors `Any` and `ZonkAny` are closed type families declared thus:
 
-    type family Any :: k where { }
+    type family Any     :: forall k.        k where { }
+    type family ZonkAny :: forall k. Nat -> k where { }
 
-It has these properties:
+They are used when we want a type of a particular kind, but we don't really care
+what that type is.  The leading example is this: `ZonkAny` is used to instantiate
+un-constrained type variables after type checking. For example, consider the
+term (length [] :: Int), where
 
-  * Note that 'Any' is kind polymorphic since in some program we may
-    need to use Any to fill in a type variable of some kind other than *
-    (see #959 for examples).  Its kind is thus `forall k. k``.
+  length :: forall a. [a] -> Int
+  []     :: forall a. [a]
 
-  * It is defined in module GHC.Types, and exported so that it is
-    available to users.  For this reason it's treated like any other
+We must type-apply `length` and `[]`, but to what type? It doesn't matter!
+The typechecker will end up with
+
+  length @alpha ([] @alpha)
+
+where `alpha` is an un-constrained unification variable.  The "zonking" process zaps
+that unconstrained `alpha` to an arbitrary type (ZonkAny @Type 3), where the `3` is
+arbitrary (see wrinkle (Any5) below).  This is done in `GHC.Tc.Zonk.Type.commitFlexi`.
+So we end up with
+
+  length @(ZonkAny @Type 3) ([] @(ZonkAny @Type 3))
+
+`Any` and `ZonkAny` differ only in the presence of the `Nat` argument; see
+wrinkle (Any4).
+
+Wrinkles:
+
+(Any1) `Any` and `ZonkAny` are kind polymorphic since in some program we may
+   need to use `ZonkAny` to fill in a type variable of some kind other than *
+   (see #959 for examples).
+
+(Any2) They are /closed/ type families, with no instances.  For example, suppose that
+   with  alpha :: '(k1, k2)  we add a given coercion
+             g :: alpha ~ (Fst alpha, Snd alpha)
+   and we zonked alpha = ZonkAny @(k1,k2) n.  Then, if `ZonkAny` was a /data/ type,
+   we'd get inconsistency because we'd have a Given equality with `ZonkAny` on one
+   side and '(,) on the other. See also #9097 and #9636.
+
+   See #25244 for a suggestion that we instead use an /open/ type family for which
+   you cannot provide instances.  Probably the difference is not very important.
+
+(Any3) They do not claim to be /data/ types, and that's important for
+   the code generator, because the code gen may /enter/ a data value
+   but never enters a function value.
+
+(Any4) `ZonkAny` takes a `Nat` argument so that we can readily make up /distinct/
+   types (#24817).  Consider
+
+     data SBool a where { STrue :: SBool True; SFalse :: SBool False }
+
+     foo :: forall a b. (SBool a, SBool b)
+
+     bar :: Bool
+     bar = case foo @alpha @beta of
+             (STrue, SFalse) -> True   -- This branch is not inaccessible!
+             _               -> False
+
+   Now, what are `alpha` and `beta`? If we zonk both of them to the same type
+   `Any @Type`, the pattern-match checker will (wrongly) report that the first
+   branch is inaccessible.  So we zonk them to two /different/ types:
+       alpha :=  ZonkAny @Type 4   and   beta :=  ZonkAny @Type k 5
+   (The actual numbers are arbitrary; they just need to differ.)
+
+   The unique-name generation comes from field `tcg_zany_n` of `TcGblEnv`; and
+   `GHC.Tc.Zonk.Type.commitFlexi` calls `GHC.Tc.Utils.Monad.newZonkAnyType` to
+   make up a fresh type.
+
+   If this example seems unconvincing (e.g. in this case foo must be bottom)
+   see #24817 for larger but more compelling examples.
+
+(Any5) `Any` and `ZonkAny` are wired-in so we can easily refer to it where we
+    don't have a name environment (e.g. see Rules.matchRule for one example)
+
+(Any6) `Any` is defined in library module ghc-prim:GHC.Types, and exported so that
+    it is available to users.  For this reason it's treated like any other
     wired-in type:
       - has a fixed unique, anyTyConKey,
       - lives in the global name cache
+    Currently `ZonkAny` is not available to users; but it could easily be.
 
-  * It is a *closed* type family, with no instances.  This means that
-    if   ty :: '(k1, k2)  we add a given coercion
-             g :: ty ~ (Fst ty, Snd ty)
-    If Any was a *data* type, then we'd get inconsistency because 'ty'
-    could be (Any '(k1,k2)) and then we'd have an equality with Any on
-    one side and '(,) on the other. See also #9097 and #9636.
+(Any7) Properties of `Any`:
+  * When `Any` is instantiated at a lifted type it is inhabited by at least one value,
+    namely bottom.
 
-  * When instantiated at a lifted type it is inhabited by at least one value,
-    namely bottom
+  * You can safely coerce any /lifted/ type to `Any` and back with `unsafeCoerce`.
 
   * You can safely coerce any /lifted/ type to Any, and back with unsafeCoerce.
+  * You can safely coerce any /unlifted/ type to `Any` and back with `unsafeCoerceUnlifted`.
 
-  * It does not claim to be a *data* type, and that's important for
-    the code generator, because the code gen may *enter* a data value
-    but never enters a function value.
+  * You can coerce /any/ type to `Any` and back with `unsafeCoerce#`, but it's only safe when
+    the kinds of both the type and `Any` match.
 
-  * It is wired-in so we can easily refer to it where we don't have a name
-    environment (e.g. see Rules.matchRule for one example)
+  * For lifted/unlifted types `unsafeCoerce[Unlifted]` should be preferred over
+    `unsafeCoerce#` as they prevent accidentally coercing between types with kinds
+    that don't match.
 
-It's used to instantiate un-constrained type variables after type checking. For
-example, 'length' has type
-
-  length :: forall a. [a] -> Int
-
-and the list datacon for the empty list has type
-
-  [] :: forall a. [a]
-
-In order to compose these two terms as @length []@ a type
-application is required, but there is no constraint on the
-choice.  In this situation GHC uses 'Any',
-
-> length @(Any @Type) ([] @(Any @Type))
-
-Above, we print kinds explicitly, as if with -fprint-explicit-kinds.
+    See examples in ghc-prim:GHC.Types
 
 The Any tycon used to be quite magic, but we have since been able to
 implement it merely with an empty kind polymorphic type family. See #10886 for a
@@ -482,6 +532,7 @@ anyTyConName =
     mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Any") anyTyConKey anyTyCon
 
 anyTyCon :: TyCon
+-- See Note [Any types]
 anyTyCon = mkFamilyTyCon anyTyConName binders res_kind Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
@@ -495,6 +546,24 @@ anyTy = mkTyConTy anyTyCon
 
 anyTypeOfKind :: Kind -> Type
 anyTypeOfKind kind = mkTyConApp anyTyCon [kind]
+
+zonkAnyTyConName :: Name
+zonkAnyTyConName =
+    mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "ZonkAny") zonkAnyTyConKey zonkAnyTyCon
+
+zonkAnyTyCon :: TyCon
+-- ZonkAnyTyCon :: forall k. Nat -> k
+-- See Note [Any types]
+zonkAnyTyCon = mkFamilyTyCon zonkAnyTyConName
+                         [ mkNamedTyConBinder Specified kv
+                         , mkAnonTyConBinder nat_kv ]
+                         (mkTyVarTy kv)
+                         Nothing
+                         (ClosedSynFamilyTyCon Nothing)
+                         Nothing
+                         NotInjective
+  where
+    [kv,nat_kv] = mkTemplateKindVars [liftedTypeKind, naturalTy]
 
 -- | Make a fake, recovery 'TyCon' from an existing one.
 -- Used when recovering from errors in type declarations

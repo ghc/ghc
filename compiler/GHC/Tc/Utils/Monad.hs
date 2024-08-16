@@ -142,7 +142,7 @@ module GHC.Tc.Utils.Monad(
   getCCIndexM, getCCIndexTcM,
 
   -- * Zonking
-  liftZonkM,
+  liftZonkM, newZonkAnyType,
 
   -- * Types etc.
   module GHC.Tc.Types,
@@ -153,6 +153,7 @@ import GHC.Prelude
 
 
 import GHC.Builtin.Names
+import GHC.Builtin.Types( zonkAnyTyCon )
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types     -- Re-export all
@@ -175,6 +176,7 @@ import GHC.Core.UsageEnv
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import GHC.Core.Type( mkNumLitTy )
 
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -254,6 +256,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         infer_var    <- newIORef True ;
         infer_reasons_var <- newIORef emptyMessages ;
         dfun_n_var   <- newIORef emptyOccSet ;
+        zany_n_var   <- newIORef 0 ;
         let { type_env_var = hsc_type_env_vars hsc_env };
 
         dependent_files_var <- newIORef [] ;
@@ -345,6 +348,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_patsyns        = [],
                 tcg_merged         = [],
                 tcg_dfun_n         = dfun_n_var,
+                tcg_zany_n         = zany_n_var,
                 tcg_keep           = keep_var,
                 tcg_hdr_info        = (Nothing,Nothing),
                 tcg_hpc            = False,
@@ -1801,6 +1805,18 @@ chooseUniqueOccTc fn =
      ; let occ = fn set
      ; writeTcRef dfun_n_var (extendOccSet set occ)
      ; return occ }
+
+newZonkAnyType :: Kind -> TcM Type
+-- Return a type (ZonkAny @k n), where n is fresh
+-- Recall  ZonkAny :: forall k. Natural -> k
+-- See Note [Any types] in GHC.Builtin.Types, wrinkle (Any4)
+newZonkAnyType kind
+  = do { env <- getGblEnv
+       ; let zany_n_var = tcg_zany_n env
+       ; i <- readTcRef zany_n_var
+       ; let !i2 = i+1
+       ; writeTcRef zany_n_var i2
+       ; return (mkTyConApp zonkAnyTyCon [kind, mkNumLitTy i]) }
 
 getConstraintVar :: TcM (TcRef WantedConstraints)
 getConstraintVar = do { env <- getLclEnv; return (tcl_lie env) }

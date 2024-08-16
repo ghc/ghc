@@ -1,4 +1,4 @@
-Just (InfoProv {ipName = "sat_s237_info", ipDesc = THUNK, ipTyDesc = "Any", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "10:23-39"})
-Just (InfoProv {ipName = "sat_s23r_info", ipDesc = THUNK, ipTyDesc = "Any", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "11:23-42"})
-Just (InfoProv {ipName = "sat_s23L_info", ipDesc = THUNK, ipTyDesc = "Any", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "12:23-46"})
-Just (InfoProv {ipName = "sat_s245_info", ipDesc = THUNK, ipTyDesc = "Any", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "13:23-44"})
+Just (InfoProv {ipName = "sat_s1Rh_info", ipDesc = THUNK, ipTyDesc = "ZonkAny 0", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "10:23-39"})
+Just (InfoProv {ipName = "sat_s1RB_info", ipDesc = THUNK, ipTyDesc = "ZonkAny 1", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "11:23-42"})
+Just (InfoProv {ipName = "sat_s1RV_info", ipDesc = THUNK, ipTyDesc = "ZonkAny 2", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "12:23-46"})
+Just (InfoProv {ipName = "sat_s1Sf_info", ipDesc = THUNK, ipTyDesc = "ZonkAny 3", ipLabel = "main", ipUnitId = "main", ipMod = "Main", ipSrcFile = "staticcallstack002.hs", ipSrcSpan = "13:23-44"})
