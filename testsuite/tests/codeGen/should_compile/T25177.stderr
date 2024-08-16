@@ -1,0 +1,17 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 25, types: 31, coercions: 6, joins: 0/0}
+
+foo = \ ds -> case ds of { D a ds1 -> W# a }
+
+d = D 10## RUBBISH(IntRep)
+
+lvl = foo d
+
+bar1 = \ _ eta -> case lvl of { W# ipv -> (# eta, () #) }
+
+bar = bar1 `cast` <Co:6> :: ...
+
+
+
