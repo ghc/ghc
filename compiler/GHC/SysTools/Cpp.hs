@@ -106,6 +106,9 @@ command line looks like:
 -- See Note [Preprocessing invocations].
 --
 -- UnitEnv is needed to compute MIN_VERSION macros
+--
+-- If you change the macros defined by this function make sure to update the
+-- user guide.
 doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> CppOpts -> FilePath -> FilePath -> IO ()
 doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
