@@ -128,3 +128,6 @@ test('T21710a', [ unless(tables_next_to_code(), skip) , when(wordsize(32), skip)
                 , grep_errmsg('(call)',[1]) ]
                 , compile, ['-ddump-cmm -dno-typeable-binds'])
 test('T23002', normal, compile, ['-fregs-graph'])
+# dump Core to ensure that d is defined as: d = D 10## RUBBISH(IntRep)
+test('T25177', normal, compile, ['-O2 -dno-typeable-binds -ddump-simpl -dsuppress-all -dsuppress-uniques -v0'])
+
