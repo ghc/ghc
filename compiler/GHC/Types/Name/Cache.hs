@@ -3,6 +3,7 @@
 -- | The Name Cache
 module GHC.Types.Name.Cache
   ( NameCache (..)
+  , newNameCache
   , initNameCache
   , takeUniqFromNameCache
   , updateNameCache'
@@ -13,6 +14,10 @@ module GHC.Types.Name.Cache
   , lookupOrigNameCache
   , extendOrigNameCache'
   , extendOrigNameCache
+
+  -- * Known-key names
+  , knownKeysOrigNameCache
+  , isKnownOrigName_maybe
   )
 where
 
@@ -23,13 +28,14 @@ import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Types
 import GHC.Builtin.Names
+import GHC.Builtin.Utils
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Control.Applicative
 import Control.Concurrent.MVar
 import Control.Monad
-import Control.Applicative
 
 {-
 
@@ -57,36 +63,48 @@ site, we fix it up.
 
 Note [Built-in syntax and the OrigNameCache]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Built-in syntax refers to names that are always in scope and can't be imported
+or exported. Such names come in two varieties:
 
-Built-in syntax like unboxed sums and punned syntax like tuples are quite
-ubiquitous. To lower their cost we use two tricks,
+* Simple names (finite): `[]`, `:`, `->`
+* Families of names (infinite):
+    * boxed tuples `()`, `(,)`, `(,,)`, `(,,,)`, ...
+    * unboxed tuples `(##)`, `(#,#)`, `(#,,#)`, ...
+    * unboxed sum type syntax `(#|#)`, `(#||#)`, `(#|||#)`, ...
+    * unboxed sum data syntax `(#_|#)`, `(#|_#)`, `(#_||#), ...
 
-  a. We specially encode tuple and sum Names in interface files' symbol tables
-     to avoid having to look up their names while loading interface files.
-     Namely these names are encoded as by their Uniques. We know how to get from
-     a Unique back to the Name which it represents via the mapping defined in
-     the SumTupleUniques module. See Note [Symbol table representation of names]
-     in GHC.Iface.Binary and for details.
+Concretely, a built-in name is a WiredIn Name that has a BuiltInSyntax flag.
 
-  b. We don't include them in the Orig name cache but instead parse their
-     OccNames (in isBuiltInOcc_maybe and isPunOcc_maybe) to avoid bloating
-     the name cache with them.
+Historically, GHC used to avoid putting any built-in syntax in the OrigNameCache
+to avoid dealing with infinite families of names (tuples and sums). This measure
+has become inadequate with the introduction of NoListTuplePuns (GHC Proposal #475).
+Nowadays tuples and sums also use Names that are WiredIn, but are not BuiltInSyntax:
 
-Why is the second measure necessary? Good question; afterall, 1) the parser
-emits built-in and punned syntax directly as Exact RdrNames, and 2) built-in
-and punned syntax never needs to looked-up during interface loading due to (a).
-It turns out that there are two reasons why we might look up an Orig RdrName
-for built-in and punned syntax,
+* boxed tuples      (tycons):   Unit, Solo, Tuple2, Tuple3, Tuple4, ...
+* unboxed tuples    (tycons):   Unit#, Solo#, Tuple2#, Tuple3#, Tuple4#, ...
+* constraint tuples (tycons):   CUnit, CSolo, CTuple2, CTuple3, CTuple4, ...
+* one-tuples      (datacons):   MkSolo, MkSolo#
 
-  * If you use setRdrNameSpace on an Exact RdrName it may be
-    turned into an Orig RdrName.
+We can't put infinitely many names in a finite data structure (OrigNameCache).
+So we deal with them in lookupOrigNameCache by means of isInfiniteFamilyOrigName_maybe.
 
-  * Template Haskell turns a BuiltInSyntax Name into a TH.NameG
-    (GHC.HsToCore.Quote.globalVar), and parses a NameG into an Orig RdrName
-    (GHC.ThToHs.thRdrName).  So, e.g. $(do { reify '(,); ... }) will
-    go this route (#8954).
+At the same time, simple finite built-in names (`[]`, `:`, `->`) can be put in
+the OrigNameCache without any issues (they end up there because they're
+knownKeyNames). It doesn't matter that they're built-in syntax.
 
+One might wonder: what's the point of having any built-in syntax in the
+OrigNameCache at all?  Good question; after all,
+  1) The parser emits built-in and punned syntax directly as Exact RdrNames
+  2) Template Haskell conversion (GHC.ThToHs) matches on built-in and punned
+     syntax directly to immediately produce Exact names (GHC.ThToHs.thRdrName)
+  3) Loading of interface files encodes names via Uniques, as detailed in
+     Note [Symbol table representation of names] in GHC.Iface.Binary
+
+It turns out that we end up looking up built-in syntax in the cache when we
+generate Haddock documentation. E.g. if we don't find tuple data constructors
+there, hyperlinks won't work as expected. Test case: haddockHtmlTest (Bug923.hs)
 -}
+
 -- | The NameCache makes sure that there is just one Unique assigned for
 -- each original name; i.e. (module-name, occ-name) pair and provides
 -- something of a lookup mechanism for those names.
@@ -102,18 +120,14 @@ takeUniqFromNameCache :: NameCache -> IO Unique
 takeUniqFromNameCache (NameCache c _) = uniqFromTag c
 
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
-lookupOrigNameCache nc mod occ
-  | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_INTERNAL_TUPLE || mod == gHC_CLASSES
-  , Just name <- isBuiltInOcc_maybe occ <|> isPunOcc_maybe mod occ
-  =     -- See Note [Known-key names], 3(c) in GHC.Builtin.Names
-        -- Special case for tuples; there are too many
-        -- of them to pre-populate the original-name cache
-    Just name
-
-  | otherwise
-  = case lookupModuleEnv nc mod of
-        Nothing      -> Nothing
-        Just occ_env -> lookupOccEnv occ_env occ
+lookupOrigNameCache nc mod occ = lookup_infinite <|> lookup_normal
+  where
+    -- See Note [Known-key names], 3(c) in GHC.Builtin.Names
+    -- and Note [Infinite families of known-key names]
+    lookup_infinite = isInfiniteFamilyOrigName_maybe mod occ
+    lookup_normal = do
+      occ_env <- lookupModuleEnv nc mod
+      lookupOccEnv occ_env occ
 
 extendOrigNameCache' :: OrigNameCache -> Name -> OrigNameCache
 extendOrigNameCache' nc name
@@ -126,8 +140,11 @@ extendOrigNameCache nc mod occ name
   where
     combine _ occ_env = extendOccEnv occ_env occ name
 
+newNameCache :: Char -> OrigNameCache -> IO NameCache
+newNameCache c nc = NameCache c <$> newMVar nc
+
 initNameCache :: Char -> [Name] -> IO NameCache
-initNameCache c names = NameCache c <$> newMVar (initOrigNames names)
+initNameCache c names = newNameCache c (initOrigNames names)
 
 initOrigNames :: [Name] -> OrigNameCache
 initOrigNames names = foldl' extendOrigNameCache' emptyModuleEnv names
@@ -159,3 +176,10 @@ updateNameCache
   -> IO c
 updateNameCache name_cache !_mod !_occ upd_fn
   = updateNameCache' name_cache upd_fn
+
+{-# NOINLINE knownKeysOrigNameCache #-}
+knownKeysOrigNameCache :: OrigNameCache
+knownKeysOrigNameCache = initOrigNames knownKeyNames
+
+isKnownOrigName_maybe :: Module -> OccName -> Maybe Name
+isKnownOrigName_maybe = lookupOrigNameCache knownKeysOrigNameCache

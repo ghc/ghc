@@ -123,9 +123,10 @@ mkQualName env = qual_name where
             , fUNTyConName, unrestrictedFunTyConName
             , oneDataConName
             , listTyConName
-            , manyDataConName ]
-          || isJust (isTupleTyOcc_maybe mod occ)
-          || isJust (isSumTyOcc_maybe mod occ)
+            , manyDataConName
+            , soloDataConName ]
+          || isJust (isTupleTyOrigName_maybe mod occ)
+          || isJust (isSumTyOrigName_maybe mod occ)
 
         right_name gre = greDefinitionModule gre == Just mod
 

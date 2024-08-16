@@ -110,7 +110,8 @@ import Control.DeepSeq
 import Data.Data
 import qualified Data.Semigroup as S
 import GHC.Types.Basic (Boxity(Boxed, Unboxed))
-import GHC.Builtin.Uniques (isTupleTyConUnique, isSumTyConUnique, isTupleDataConLikeUnique)
+import GHC.Builtin.Uniques ( isTupleTyConUnique, isCTupleTyConUnique,
+                             isSumTyConUnique, isTupleDataConLikeUnique )
 
 {-
 ************************************************************************
@@ -263,7 +264,7 @@ Note [About the NameSorts]
    A WiredIn Name contains contains a TyThing, so we don't have to look it up.
 
    The BuiltInSyntax flag => It's a syntactic form, not "in scope" (e.g. [])
-   All built-in syntax thigs are WiredIn.
+   All built-in syntax things are WiredIn.
 -}
 
 instance HasOccName Name where
@@ -384,13 +385,16 @@ namePun_maybe name
   | getUnique name == getUnique listTyCon = Just (fsLit "[]")
 
   | Just (boxity, ar) <- isTupleTyConUnique (getUnique name)
-  , ar /= 1 =
-    let
-      (lpar, rpar) =
-        case boxity of
+  , ar /= 1
+  = let (lpar, rpar) = case boxity of
           Boxed -> ("(", ")")
           Unboxed -> ("(#", "#)")
     in Just (fsLit $ lpar ++ commas ar ++ rpar)
+
+  | Just ar <- isCTupleTyConUnique (getUnique name)
+  , ar /= 1
+  = Just (fsLit $ "(" ++ commas ar ++ ")")
+      -- constraint tuples look just like boxed tuples
 
   | Just ar <- isSumTyConUnique (getUnique name)
   = Just (fsLit $ "(# " ++ bars ar ++ " #)")

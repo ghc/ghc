@@ -202,7 +202,6 @@ import GHC.Tc.Zonk.Env ( ZonkFlexi (DefaultFlexi) )
 import GHC.Stg.Syntax
 import GHC.Stg.Pipeline ( stg2stg, StgCgInfos )
 
-import GHC.Builtin.Utils
 import GHC.Builtin.Names
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
@@ -244,7 +243,7 @@ import GHC.Types.IPE
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Name
-import GHC.Types.Name.Cache ( initNameCache )
+import GHC.Types.Name.Cache ( newNameCache, knownKeysOrigNameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
@@ -321,7 +320,7 @@ newHscEnv top_dir dflags = do
 
 newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
 newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
-    nc_var  <- initNameCache 'r' knownKeyNames
+    nc_var  <- newNameCache 'r' knownKeysOrigNameCache
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs

@@ -1464,15 +1464,10 @@ finish_tuple :: HsType GhcRn
 finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
   traceTc "finish_tuple" (ppr tup_sort $$ ppr tau_kinds $$ ppr exp_kind)
   case tup_sort of
-    ConstraintTuple
-      |  [tau_ty] <- tau_tys
-         -- Drop any uses of 1-tuple constraints here.
-         -- See Note [Ignore unary constraint tuples]
-      -> check_expected_kind tau_ty constraintKind
-      |  otherwise
-      -> do let tycon = cTupleTyCon arity
-            checkCTupSize arity
-            check_expected_kind (mkTyConApp tycon tau_tys) constraintKind
+    ConstraintTuple -> do
+      let tycon = cTupleTyCon arity
+      checkCTupSize arity
+      check_expected_kind (mkTyConApp tycon tau_tys) constraintKind
     BoxedTuple -> do
       let tycon = tupleTyCon Boxed arity
       checkTupSize arity
@@ -1490,47 +1485,6 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
     arity = length tau_tys
     check_expected_kind ty act_kind =
       checkExpectedKind rn_ty ty act_kind exp_kind
-
-{-
-Note [Ignore unary constraint tuples]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-GHC provides unary tuples and unboxed tuples (see Note [One-tuples] in
-GHC.Builtin.Types) but does *not* provide unary constraint tuples. Why? First,
-recall the definition of a unary tuple data type:
-
-  data Solo a = Solo a
-
-Note that `Solo a` is *not* the same thing as `a`, since Solo is boxed and
-lazy. Therefore, the presence of `Solo` matters semantically. On the other
-hand, suppose we had a unary constraint tuple:
-
-  class a => Solo% a
-
-This compiles down a newtype (i.e., a cast) in Core, so `Solo% a` is
-semantically equivalent to `a`. Therefore, a 1-tuple constraint would have
-no user-visible impact, nor would it allow you to express anything that
-you couldn't otherwise.
-
-We could simply add Solo% for consistency with tuples (Solo) and unboxed
-tuples (Solo#), but that would require even more magic to wire in another
-magical class, so we opt not to do so. We must be careful, however, since
-one can try to sneak in uses of unary constraint tuples through Template
-Haskell, such as in this program (from #17511):
-
-  f :: $(pure (ForallT [] [TupleT 1 `AppT` (ConT ''Show `AppT` ConT ''Int)]
-                       (ConT ''String)))
-  -- f :: Solo% (Show Int) => String
-  f = "abc"
-
-This use of `TupleT 1` will produce an HsBoxedOrConstraintTuple of arity 1,
-and since it is used in a Constraint position, GHC will attempt to treat
-it as thought it were a constraint tuple, which can potentially lead to
-trouble if one attempts to look up the name of a constraint tuple of arity
-1 (as it won't exist). To avoid this trouble, we simply take any unary
-constraint tuples discovered when typechecking and drop them—i.e., treat
-"Solo% a" as though the user had written "a". This is always safe to do
-since the two constraints should be semantically equivalent.
--}
 
 {- *********************************************************************
 *                                                                      *

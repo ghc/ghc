@@ -54,14 +54,13 @@ This is accomplished through a combination of mechanisms:
   1. When parsing source code, the RdrName-decorated AST has some
      RdrNames which are Exact. These are wired-in RdrNames where
      we could directly tell from the parsed syntax what Name to
-     use. For example, when we parse a [] in a type we can just insert
-     an Exact RdrName Name with the listTyConKey.
+     use. For example, when we parse a [] in a type and ListTuplePuns
+     are enabled, we can just insert (Exact listTyConName :: RdrName).
 
-     Currently, I believe this is just an optimisation: it would be
-     equally valid to just output Orig RdrNames that correctly record
-     the module etc we expect the final Name to come from. However,
-     were we to eliminate isBuiltInOcc_maybe it would become essential
-     (see point 3).
+     This is just an optimisation: it would be equally valid to output
+     Orig RdrNames that correctly record the module (and package) that
+     we expect the final Name to come from. The name would be looked up
+     in the OrigNameCache (see point 3).
 
   2. The knownKeyNames (which consist of the basicKnownKeyNames from
      the module, and those names reachable via the wired-in stuff from
@@ -78,9 +77,10 @@ This is accomplished through a combination of mechanisms:
   3. For "infinite families" of known-key names (i.e. tuples and sums), we
      have to be extra careful. Because there are an infinite number of
      these things, we cannot add them to the list of known-key names
-     used to initialise the OrigNameCache. Instead, we have to
-     rely on never having to look them up in that cache. See
-     Note [Infinite families of known-key names] for details.
+     used to initialise the OrigNameCache. Instead, lookupOrigNameCache pretends
+     that these names are in the cache by using isInfiniteFamilyOrigName_maybe
+     before the actual lookup.
+     See Note [Infinite families of known-key names] for details.
 
 
 Note [Infinite families of known-key names]
@@ -98,25 +98,14 @@ things,
 
   b) The known infinite families of names are specially serialised by
      GHC.Iface.Binary.putName, with that special treatment detected when we read
-     back to ensure that we get back to the correct uniques. See Note [Symbol
-     table representation of names] in GHC.Iface.Binary and Note [How tuples
-     work] in GHC.Builtin.Types.
+     back to ensure that we get back to the correct uniques.
+     See Note [Symbol table representation of names] in GHC.Iface.Binary and
+     Note [How tuples work] in GHC.Builtin.Types.
 
-Most of the infinite families cannot occur in source code, so mechanisms (a) and (b)
-suffice to ensure that they always have the right Unique. In particular,
-implicit param TyCon names, constraint tuples and Any TyCons cannot be mentioned
-by the user. For those things that *can* appear in source programs,
-
-  c) GHC.Iface.Env.lookupOrigNameCache uses isBuiltInOcc_maybe to map built-in syntax
-     directly onto the corresponding name, rather than trying to find it in the
-     original-name cache.
-
+  c) GHC.Iface.Env.lookupOrigNameCache uses isInfiniteFamilyOrigName_maybe to
+     map tuples and sums onto their exact names, rather than trying to find them
+     in the original-name cache.
      See also Note [Built-in syntax and the OrigNameCache]
-
-Note that one-tuples are an exception to the rule, as they do get assigned
-known keys. See
-Note [One-tuples] (Wrinkle: Make boxed one-tuple names have known keys)
-in GHC.Builtin.Types.
 
 -}
 

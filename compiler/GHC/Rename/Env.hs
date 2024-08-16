@@ -2266,7 +2266,7 @@ lookupLocalTcNames ctxt what ns_spec rdr
   where
     -- Guard against the built-in syntax (ex: `infixl 6 :`), see #15233
     guard_builtin_syntax this_mod rdr (Right name)
-      | Just _ <- isBuiltInOcc_maybe (occName rdr)
+      | isBuiltInOcc (occName rdr)
       , this_mod /= nameModule name
       = Left $ TcRnIllegalBuiltinSyntax what rdr
       | otherwise

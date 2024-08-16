@@ -1,0 +1,202 @@
+T25180.hs:12:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: ()
+    • In an equation for ‘tup0’: tup0 = _
+    • Relevant bindings include tup0 :: () (bound at T25180.hs:12:1)
+      Valid hole fits include
+        tup0 :: () (bound at T25180.hs:12:1)
+        () :: () (bound at <wired into compiler>)
+        mempty :: forall a. Monoid a => a
+          with mempty @()
+          (imported from ‘Prelude’ at T25180.hs:3:8-13
+           (and originally defined in ‘GHC.Internal.Base’))
+        maxBound :: forall a. Bounded a => a
+          with maxBound @()
+          (imported from ‘Prelude’ at T25180.hs:3:8-13
+           (and originally defined in ‘GHC.Internal.Enum’))
+        minBound :: forall a. Bounded a => a
+          with minBound @()
+          (imported from ‘Prelude’ at T25180.hs:3:8-13
+           (and originally defined in ‘GHC.Internal.Enum’))
+
+T25180.hs:19:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> Solo a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 tup1 :: forall a. a -> Solo a
+               at T25180.hs:18:1-19
+    • In an equation for ‘tup1’: tup1 = _
+    • Relevant bindings include
+        tup1 :: a -> Solo a (bound at T25180.hs:19:1)
+      Valid hole fits include
+        tup1 :: a -> Solo a (bound at T25180.hs:19:1)
+        MkSolo :: forall a. a -> Solo a
+          with MkSolo @a
+          (imported from ‘Data.Tuple’ at T25180.hs:6:1-17
+           (and originally defined in ‘GHC.Tuple’))
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+          with return @Solo @a
+          (imported from ‘Prelude’ at T25180.hs:3:8-13
+           (and originally defined in ‘GHC.Internal.Base’))
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+          with pure @Solo @a
+          (imported from ‘Prelude’ at T25180.hs:3:8-13
+           (and originally defined in ‘GHC.Internal.Base’))
+
+T25180.hs:26:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> b -> (a, b)
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 tup2 :: forall a b. a -> b -> (a, b)
+               at T25180.hs:25:1-28
+    • In an equation for ‘tup2’: tup2 = _
+    • Relevant bindings include
+        tup2 :: a -> b -> (a, b) (bound at T25180.hs:26:1)
+      Valid hole fits include
+        tup2 :: a -> b -> (a, b) (bound at T25180.hs:26:1)
+        (,) :: forall a b. a -> b -> (a, b)
+          with (,) @a @b
+          (bound at <wired into compiler>)
+
+T25180.hs:33:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> b -> c -> (a, b, c)
+      Where: ‘a’, ‘b’, ‘c’ are rigid type variables bound by
+               the type signature for:
+                 tup3 :: forall a b c. a -> b -> c -> (a, b, c)
+               at T25180.hs:32:1-35
+    • In an equation for ‘tup3’: tup3 = _
+    • Relevant bindings include
+        tup3 :: a -> b -> c -> (a, b, c) (bound at T25180.hs:33:1)
+      Valid hole fits include
+        tup3 :: a -> b -> c -> (a, b, c) (bound at T25180.hs:33:1)
+        (,,) :: forall a b c. a -> b -> c -> (a, b, c)
+          with (,,) @a @b @c
+          (bound at <wired into compiler>)
+
+T25180.hs:38:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: (# #)
+    • In an equation for ‘utup0’: utup0 _ = _
+    • Relevant bindings include
+        utup0 :: () -> (# #) (bound at T25180.hs:38:1)
+      Valid hole fits include
+        (##) :: (# #) (bound at <wired into compiler>)
+
+T25180.hs:45:9: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> (# a #)
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 utup1 :: forall a. a -> (# a #)
+               at T25180.hs:44:1-21
+    • In an equation for ‘utup1’: utup1 = _
+    • Relevant bindings include
+        utup1 :: a -> (# a #) (bound at T25180.hs:45:1)
+      Valid hole fits include
+        utup1 :: a -> (# a #) (bound at T25180.hs:45:1)
+        MkSolo# :: forall a. a -> (# a #)
+          with MkSolo# @LiftedRep @a
+          (imported from ‘GHC.Types’ at T25180.hs:7:1-16)
+
+T25180.hs:52:9: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> b -> (# a, b #)
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 utup2 :: forall a b. a -> b -> (# a, b #)
+               at T25180.hs:51:1-29
+    • In an equation for ‘utup2’: utup2 = _
+    • Relevant bindings include
+        utup2 :: a -> b -> (# a, b #) (bound at T25180.hs:52:1)
+      Valid hole fits include
+        utup2 :: a -> b -> (# a, b #) (bound at T25180.hs:52:1)
+        (#,#) :: forall a b. a -> b -> (# a, b #)
+          with (#,#) @LiftedRep @LiftedRep @a @b
+          (bound at <wired into compiler>)
+
+T25180.hs:59:9: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> b -> c -> (# a, b, c #)
+      Where: ‘a’, ‘b’, ‘c’ are rigid type variables bound by
+               the type signature for:
+                 utup3 :: forall a b c. a -> b -> c -> (# a, b, c #)
+               at T25180.hs:58:1-37
+    • In an equation for ‘utup3’: utup3 = _
+    • Relevant bindings include
+        utup3 :: a -> b -> c -> (# a, b, c #) (bound at T25180.hs:59:1)
+      Valid hole fits include
+        utup3 :: a -> b -> c -> (# a, b, c #) (bound at T25180.hs:59:1)
+        (#,,#) :: forall a b c. a -> b -> c -> (# a, b, c #)
+          with (#,,#) @LiftedRep @LiftedRep @LiftedRep @a @b @c
+          (bound at <wired into compiler>)
+
+T25180.hs:66:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> (# a | b #)
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 usum2_1 :: forall a b. a -> (# a | b #)
+               at T25180.hs:65:1-27
+    • In an equation for ‘usum2_1’: usum2_1 = _
+    • Relevant bindings include
+        usum2_1 :: a -> (# a | b #) (bound at T25180.hs:66:1)
+      Valid hole fits include
+        usum2_1 :: a -> (# a | b #) (bound at T25180.hs:66:1)
+        (# _| #) :: forall a b. a -> (# a | b #)
+          with (# _| #) @LiftedRep @LiftedRep @a @b
+          (bound at <wired into compiler>)
+
+T25180.hs:73:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: b -> (# a | b #)
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 usum2_2 :: forall b a. b -> (# a | b #)
+               at T25180.hs:72:1-27
+    • In an equation for ‘usum2_2’: usum2_2 = _
+    • Relevant bindings include
+        usum2_2 :: b -> (# a | b #) (bound at T25180.hs:73:1)
+      Valid hole fits include
+        usum2_2 :: b -> (# a | b #) (bound at T25180.hs:73:1)
+        (# |_ #) :: forall a b. b -> (# a | b #)
+          with (# |_ #) @LiftedRep @LiftedRep @a @b
+          (bound at <wired into compiler>)
+
+T25180.hs:80:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> (# a | b | c #)
+      Where: ‘a’, ‘b’, ‘c’ are rigid type variables bound by
+               the type signature for:
+                 usum3_1 :: forall a b c. a -> (# a | b | c #)
+               at T25180.hs:79:1-31
+    • In an equation for ‘usum3_1’: usum3_1 = _
+    • Relevant bindings include
+        usum3_1 :: a -> (# a | b | c #) (bound at T25180.hs:80:1)
+      Valid hole fits include
+        usum3_1 :: a -> (# a | b | c #) (bound at T25180.hs:80:1)
+        (# _| | #) :: forall a b c. a -> (# a | b | c #)
+          with (# _| | #) @LiftedRep @LiftedRep @LiftedRep @a @b @c
+          (bound at <wired into compiler>)
+
+T25180.hs:87:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: b -> (# a | b | c #)
+      Where: ‘a’, ‘b’, ‘c’ are rigid type variables bound by
+               the type signature for:
+                 usum3_2 :: forall b a c. b -> (# a | b | c #)
+               at T25180.hs:86:1-31
+    • In an equation for ‘usum3_2’: usum3_2 = _
+    • Relevant bindings include
+        usum3_2 :: b -> (# a | b | c #) (bound at T25180.hs:87:1)
+      Valid hole fits include
+        usum3_2 :: b -> (# a | b | c #) (bound at T25180.hs:87:1)
+        (# |_| #) :: forall a b c. b -> (# a | b | c #)
+          with (# |_| #) @LiftedRep @LiftedRep @LiftedRep @a @b @c
+          (bound at <wired into compiler>)
+
+T25180.hs:94:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: c -> (# a | b | c #)
+      Where: ‘a’, ‘b’, ‘c’ are rigid type variables bound by
+               the type signature for:
+                 usum3_3 :: forall c a b. c -> (# a | b | c #)
+               at T25180.hs:93:1-31
+    • In an equation for ‘usum3_3’: usum3_3 = _
+    • Relevant bindings include
+        usum3_3 :: c -> (# a | b | c #) (bound at T25180.hs:94:1)
+      Valid hole fits include
+        usum3_3 :: c -> (# a | b | c #) (bound at T25180.hs:94:1)
+        (# | |_ #) :: forall a b c. c -> (# a | b | c #)
+          with (# | |_ #) @LiftedRep @LiftedRep @LiftedRep @a @b @c
+          (bound at <wired into compiler>)
+

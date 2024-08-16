@@ -33,7 +33,6 @@ import GHC.Data.Maybe (catMaybes)
 import GHC.Hs.Expr (prependQualified, HsExpr(..), HsLamVariant(..), lamCaseKeyword)
 import GHC.Hs.Type (pprLHsContext, pprHsArrow, pprHsForAll)
 import GHC.Builtin.Names (allNameStringList)
-import GHC.Builtin.Types (filterCTuple)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.List.NonEmpty (NonEmpty((:|)))
 import GHC.Hs.Pat (Pat(..), LPat)
@@ -497,19 +496,14 @@ instance Diagnostic PsMessage where
        -> mkSimpleDecorated $
             vcat [ text "Unexpected type" <+> quotes (ppr t)
                  , text "In the" <+> what
-                   <+> text "declaration for" <+> quotes tc'
+                   <+> text "declaration for" <+> quotes (ppr tc)
                  , vcat[ (text "A" <+> what
                           <+> text "declaration should have form")
                  , nest 2
                    (what
-                    <+> tc'
+                    <+> ppr tc
                     <+> hsep (map text (takeList tparms allNameStringList))
                     <+> equals_or_where) ] ]
-           where
-             -- Avoid printing a constraint tuple in the error message. Print
-             -- a plain old tuple instead (since that's what the user probably
-             -- wrote). See #14907
-             tc' = ppr $ filterCTuple tc
     PsErrInvalidPackageName pkg
       -> mkSimpleDecorated $ vcat
             [ text "Parse error" <> colon <+> quotes (ftext pkg)

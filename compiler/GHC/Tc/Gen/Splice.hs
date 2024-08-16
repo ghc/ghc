@@ -137,7 +137,9 @@ import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
 import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
+import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
+import qualified GHC.LanguageExtensions as LangExt
 
 -- THSyntax gives access to internal functions and data types
 import qualified GHC.Internal.TH.Syntax as TH
@@ -1085,16 +1087,17 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
 
 runQResult
   :: (a -> String)
-  -> (Origin -> SrcSpan -> a -> b)
+  -> (EnumSet LangExt.Extension -> Origin -> SrcSpan -> a -> b)
   -> (ForeignHValue -> TcM a)
   -> SrcSpan
   -> ForeignHValue {- TH.Q a -}
   -> TcM b
 runQResult show_th f runQ expr_span hval
-  = do { th_result <- runQ hval
+  = do { exts <- fmap extensionFlags getDynFlags
+       ; th_result <- runQ hval
        ; th_origin <- getThSpliceOrigin
        ; traceTc "Got TH result:" (text (show_th th_result))
-       ; return (f th_origin expr_span th_result) }
+       ; return (f exts th_origin expr_span th_result) }
 
 
 -----------------
@@ -1439,9 +1442,10 @@ instance TH.Quasi TcM where
     liftIO $ newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession suffix
 
   qAddTopDecls thds = do
+      exts <- fmap extensionFlags getDynFlags
       l <- getSrcSpanM
       th_origin <- getThSpliceOrigin
-      let either_hval = convertToHsDecls th_origin l thds
+      let either_hval = convertToHsDecls exts th_origin l thds
       ds <- case either_hval of
               Left exn -> failWithTc $ TcRnTHError $ AddTopDeclsError $
                 AddTopDeclsRunSpliceFailure exn
@@ -1883,9 +1887,10 @@ reifyInstances' :: TH.Name
                 -- be class instances, or 'Right' if they are family instances.
 reifyInstances' th_nm th_tys
    = addErrCtxt (ReifyInstancesCtxt th_nm th_tys) $
-     do { loc <- getSrcSpanM
+     do { exts <- fmap extensionFlags getDynFlags
+        ; loc <- getSrcSpanM
         ; th_origin <- getThSpliceOrigin
-        ; rdr_ty <- cvt th_origin loc (mkThAppTs (TH.ConT th_nm) th_tys)
+        ; rdr_ty <- cvt exts th_origin loc (mkThAppTs (TH.ConT th_nm) th_tys)
           -- #9262 says to bring vars into scope, like in HsForAllTy case
           -- of rnHsTyKi
         ; tv_rdrs <- filterInScopeM $ extractHsTyRdrTyVars rdr_ty
@@ -1932,8 +1937,8 @@ reifyInstances' th_nm th_tys
     doc = ClassInstanceCtx
     bale_out msg = failWithTc msg
 
-    cvt :: Origin -> SrcSpan -> TH.Type -> TcM (LHsType GhcPs)
-    cvt origin loc th_ty = case convertToHsType origin loc th_ty of
+    cvt :: EnumSet LangExt.Extension -> Origin -> SrcSpan -> TH.Type -> TcM (LHsType GhcPs)
+    cvt exts origin loc th_ty = case convertToHsType exts origin loc th_ty of
       Left msg -> failWithTc (TcRnTHError $ THSpliceFailed $ RunSpliceFailure msg)
       Right ty -> return ty
 
@@ -2013,7 +2018,8 @@ lookupThName th_name = do
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 lookupThName_maybe th_name
-  =  do { let guesses = thRdrNameGuesses th_name
+  =  do { listTuplePuns <- xoptM LangExt.ListTuplePuns
+        ; let guesses = thRdrNameGuesses listTuplePuns th_name
         ; case guesses of
         { [for_sure] -> lookupSameOccRn_maybe for_sure
         ; _ ->

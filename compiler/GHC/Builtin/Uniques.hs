@@ -26,6 +26,7 @@ module GHC.Builtin.Uniques
     , mkCTupleTyConUnique
     , mkCTupleDataConUnique
     , mkCTupleSelIdUnique
+    , isCTupleTyConUnique
 
       -- ** Making built-in uniques
     , mkAlphaTyVarUnique
@@ -122,6 +123,7 @@ mkSumTyConUnique arity =
               -- alternative
     mkUniqueInt 'z' (arity `shiftL` 8 .|. 0xfc)
 
+-- | Inverse of 'mkSumTyConUnique'
 isSumTyConUnique :: Unique -> Maybe Arity
 isSumTyConUnique u =
   case (tag, n .&. 0xfc) of
@@ -234,6 +236,17 @@ mkCTupleSelIdUnique sc_pos arity
   | otherwise
   = mkUniqueInt 'j' (arity `shiftL` cTupleSelIdArityBits + sc_pos)
 
+-- | Inverse of 'mkCTupleTyConUnique'
+isCTupleTyConUnique :: Unique -> Maybe Arity
+isCTupleTyConUnique u =
+  case (tag, i) of
+    ('k', 0) -> Just arity
+    _        -> Nothing
+  where
+    (tag, n) = unpkUnique u
+    (arity', i) = quotRem n 2
+    arity = word64ToInt arity'
+
 getCTupleTyConName :: Int -> Name
 getCTupleTyConName n =
     case n `divMod` 2 of
@@ -282,7 +295,7 @@ mkTupleTyConUnique :: Boxity -> Arity -> Unique
 mkTupleTyConUnique Boxed           a  = mkUniqueInt '4' (2*a)
 mkTupleTyConUnique Unboxed         a  = mkUniqueInt '5' (2*a)
 
--- | This function is an inverse of `mkTupleTyConUnique`
+-- | Inverse of 'mkTupleTyConUnique'
 isTupleTyConUnique :: Unique -> Maybe (Boxity, Arity)
 isTupleTyConUnique u =
   case (tag, i) of
@@ -294,7 +307,7 @@ isTupleTyConUnique u =
     (arity', i) = quotRem n 2
     arity = word64ToInt arity'
 
--- | This function is an inverse of `mkTupleTyDataUnique` that also matches the worker and promoted tycon.
+-- | Inverse of 'mkTupleTyDataUnique' that also matches the worker and promoted tycon.
 isTupleDataConLikeUnique :: Unique -> Maybe (Boxity, Arity)
 isTupleDataConLikeUnique u =
   case tag of

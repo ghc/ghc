@@ -45,9 +45,11 @@ import GHC.Core.TyCon( TyCon, isGenerativeTyCon )
 import GHC.Core.TyCo.Rep( Type(..) )
 import GHC.Core.DataCon
 import GHC.Core.Predicate( Pred(..), classifyPredType, eqRelRole )
+import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names ( gHC_INTERNAL_ERR, gHC_INTERNAL_UNSAFE_COERCE )
+import GHC.Builtin.Types ( tupleDataConName, unboxedSumDataConName )
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -85,6 +87,10 @@ import qualified Data.Set as Set
 import GHC.Types.SrcLoc
 import GHC.Data.FastString (NonDetFastString(..))
 import GHC.Types.Unique.Map
+
+import GHC.Data.EnumSet (EnumSet)
+import qualified GHC.Data.EnumSet as EnumSet
+import qualified GHC.LanguageExtensions as LangExt
 
 
 {-
@@ -530,6 +536,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
      ; sortingAlg <- getHoleFitSortingAlg
      ; dflags <- getDynFlags
+     ; let exts = extensionFlags dflags
      ; hfPlugs <- tcg_hf_plugins <$> getGblEnv
      ; let findVLimit = if sortingAlg > HFSNoSorting then Nothing else maxVSubs
            refLevel = refLevelHoleFits dflags
@@ -551,7 +558,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
            locals = removeBindingShadowing $
                       map IdHFCand lclBinds ++ map GreHFCand lcl
            globals = map GreHFCand gbl
-           syntax = map NameHFCand builtIns
+           syntax = map NameHFCand (builtIns exts)
            -- If the hole is a rigid type-variable, then we only check the
            -- locals, since only they can match the type (in a meaningful way).
            only_locals = any isImmutableTyVar $ getTyVar_maybe hole_ty
@@ -613,8 +620,28 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
     hole_lvl = ctLocLevel ct_loc
 
     -- BuiltInSyntax names like (:) and []
-    builtIns :: [Name]
-    builtIns = filter isBuiltInSyntax knownKeyNames
+    builtIns :: EnumSet LangExt.Extension -> [Name]
+    builtIns exts = filter isBuiltInSyntax (knownKeyNames ++ infFamNames)
+      where
+        -- Tuples and sums of are not included in knownKeyName as there are infinitely many of them.
+        -- See Note [Infinite families of known-key names] in GHC.Builtin.Names.
+        infFamNames =
+             [tupleDataConName Boxed   n | n <- [0..max_tup]]
+          ++ [tupleDataConName Unboxed n | unboxedTuples, n <- [0..max_tup]]
+          ++ [unboxedSumDataConName k  n | unboxedSums, n <- [2..max_sum], k <- [1..n]]
+
+        -- The upper limits on arity are small to avoid bloating the list with
+        -- too many names, which would incur a performance cost.
+        -- Users are unlikely to care about larger tuples/sums anyway.
+        max_tup = 7
+          -- Tuples up to (,,,,,,). Common limit, e.g. this is the highest tuple
+          -- arity that has a Functor instance.
+        max_sum = 7
+          -- Sums up to (#||||||#). Results in 27 sum constructors because there
+          -- are [1..n] data constructors at each arity.
+
+        unboxedTuples = EnumSet.member LangExt.UnboxedTuples exts
+        unboxedSums   = EnumSet.member LangExt.UnboxedSums exts
 
     -- We make a refinement type by adding a new type variable in front
     -- of the type of t h hole, going from e.g. [Integer] -> Integer

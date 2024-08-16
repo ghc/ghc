@@ -87,7 +87,6 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         Nothing :: forall a. Maybe a
         Just :: forall a. a -> Maybe a
         [] :: forall a. [a]
-        MkSolo :: forall a. a -> Solo a
         asTypeOf :: forall a. a -> a -> a
         id :: forall a. a -> a
         until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
@@ -177,6 +176,7 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         realToFrac :: forall a b. (Real a, Fractional b) => a -> b
         Left :: forall a b. a -> Either a b
         Right :: forall a b. b -> Either a b
+        (,) :: forall a b. a -> b -> (a, b)
         const :: forall a b. a -> b -> a
         maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
         fst :: forall a b. (a, b) -> a
@@ -193,6 +193,7 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         round :: forall a b. (RealFrac a, Integral b) => a -> b
         truncate :: forall a b. (RealFrac a, Integral b) => a -> b
         seq :: forall a b. a -> b -> b
+        (,,) :: forall a b c. a -> b -> c -> (a, b, c)
         ($!) :: forall a b. (a -> b) -> a -> b
         (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
         either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
@@ -202,7 +203,14 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         zip3 :: forall a b c. [a] -> [b] -> [c] -> [(a, b, c)]
         zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
         ($) :: forall a b. (a -> b) -> a -> b
+        (,,,) :: forall a b c d. a -> b -> c -> d -> (a, b, c, d)
         flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         zipWith3 :: forall a b c d.
                     (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
+        (,,,,) :: forall a b c d e.
+                  a -> b -> c -> d -> e -> (a, b, c, d, e)
+        (,,,,,) :: forall a b c d e f.
+                   a -> b -> c -> d -> e -> f -> (a, b, c, d, e, f)
+        (,,,,,,) :: forall a b c d e f g.
+                    a -> b -> c -> d -> e -> f -> g -> (a, b, c, d, e, f, g)
 

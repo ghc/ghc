@@ -45,7 +45,7 @@ import qualified GHC.Internal.TH.Syntax as TH
 import qualified GHC.Internal.TH.Ppr as TH
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, filterCTuple, pretendNameIsInScope )
+import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )
 
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.ModIface
@@ -1337,7 +1337,7 @@ instance Diagnostic TcRnMessage where
               Right lcl_name -> quotes (ppr lcl_name) <+> text "defined at"
                 <+> ppr (nameSrcLoc lcl_name)
     TcRnBindingOfExistingName name -> mkSimpleDecorated $
-      text "Illegal binding of an existing name:" <+> ppr (filterCTuple name)
+      text "Illegal binding of an existing name:" <+> ppr name
     TcRnMultipleFixityDecls loc rdr_name -> mkSimpleDecorated $
       vcat [text "Multiple fixity declarations for" <+> quotes (ppr rdr_name),
             text "also at " <+> ppr loc]

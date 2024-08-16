@@ -17,7 +17,7 @@ T24124.testFun1
         of
         sat
         {
-        __DEFAULT -> MkSolo# [sat];
+        __DEFAULT -> GHC.Types.MkSolo# [sat];
         };
         };
 

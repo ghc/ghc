@@ -43,8 +43,9 @@ main = do
       th_t <- runQ [t| forall k {j}.
                        forall (a :: k) (b :: j) ->
                        () |]
-      let hs_t = fromRight (error "convertToHsType") $
-                 convertToHsType (Generated OtherExpansion SkipPmc) noSrcSpan th_t
+      let exts = extensionFlags dflags
+          hs_t = fromRight (error "convertToHsType") $
+                 convertToHsType exts (Generated OtherExpansion SkipPmc) noSrcSpan th_t
       (messages, mres) <-
         tcRnType hsc_env SkolemiseFlexi True hs_t
       let (warnings, errors) = partitionMessages messages
