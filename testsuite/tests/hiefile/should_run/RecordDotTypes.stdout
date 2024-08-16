@@ -1,5 +1,14 @@
 At (22,6), got type: MyRecord
 At (22,20), got type: Integer
+MyRecord -> Integer
+forall {k} (x :: k) r a. HasField x r a => r -> a
+forall (x :: Symbol) r a. HasField x r a => r -> a
 At (22,25), got type: MyRecord
 At (22,28), got type: String
+MyChild -> String
+forall {k} (x :: k) r a. HasField x r a => r -> a
+forall (x :: Symbol) r a. HasField x r a => r -> a
 At (22,29), got type: String
+MyChild -> String
+forall {k} (x :: k) r a. HasField x r a => r -> a
+forall (x :: Symbol) r a. HasField x r a => r -> a
