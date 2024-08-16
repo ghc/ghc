@@ -130,3 +130,14 @@ test('T21710a', [ unless(tables_next_to_code(), skip) , when(wordsize(32), skip)
 test('T23002', normal, compile, ['-fregs-graph'])
 test('T24264', [req_cmm, grep_errmsg(r'(.*\().*(\) returns to)', [1,2])],
      compile, ['-O -ddump-cmm-from-stg -dno-typeable-binds'])
+
+test('callee-no-local', [
+    req_cmm, unless(arch('wasm32') or unregisterised(), skip),
+    grep_errmsg('ccall')
+  ],
+  compile,
+  ['-ddump-cmm-raw']
+)
+
+# dump Core to ensure that d is defined as: d = D 10## RUBBISH(IntRep)
+test('T25177', normal, compile, ['-O2 -dno-typeable-binds -ddump-simpl -dsuppress-all -dsuppress-uniques -v0'])
