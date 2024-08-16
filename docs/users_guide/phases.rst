@@ -523,7 +523,7 @@ defined by your local GHC installation, the following trick is useful:
 ``arch_HOST_ARCH=1``
     This define allows conditional compilation based on the host
     architecture, where⟨arch⟩ is the name of the current architecture
-    (eg. ``i386``, ``x86_64``, ``powerpc``, ``sparc``, etc.).
+    (eg. ``i386``, ``x86_64``, ``aarch64``, ``powerpc``, ``sparc``, etc.).
 
 ``VERSION_pkgname``
     This macro is available starting GHC 8.0.  It is defined for every
@@ -538,6 +538,16 @@ defined by your local GHC installation, the following trick is useful:
     conditionals testing if a package version is ``x.y.z`` or
     later.  It is identical in behavior to the ``MIN_VERSION_pkgname``
     macros that Cabal defines.
+
+SIMD macros
+    .. index::
+        single: SIMD Macros
+
+    These are defined conditionally based on the SIMD
+    flags used for compilation:
+
+    ``__SSE__``, ``__SSE2__``, ``__SSE4_2__``, ``__FMA__``,
+    ``__AVX__``, ``__AVX2__``, ``__AVX512CD__``, ``__AVX512ER__``, ``__AVX512F__``, ``__AVX512PF__``,
 
 .. _cpp-string-gaps:
 
