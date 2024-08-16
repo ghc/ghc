@@ -1,4 +1,3 @@
-
 T13292a.hs:4:12: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • Ambiguous type variable ‘m0’ arising from a use of ‘return’
       prevents the constraint ‘(Monad m0)’ from being solved.
@@ -15,14 +14,15 @@ T13292a.hs:4:12: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘someFunc’: someFunc = return ()
 
 T13292.hs:6:1: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘GHC.Types.Any’ with ‘IO’
+    • Couldn't match type ‘GHC.Types.ZonkAny 0’ with ‘IO’
       Expected: IO ()
-        Actual: GHC.Types.Any ()
+        Actual: GHC.Types.ZonkAny 0 ()
     • When checking the type of the IO action ‘main’
 
 T13292.hs:6:1: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘GHC.Types.Any’ with ‘IO’
+    • Couldn't match type ‘GHC.Types.ZonkAny 0’ with ‘IO’
       Expected: IO ()
-        Actual: GHC.Types.Any ()
+        Actual: GHC.Types.ZonkAny 0 ()
     • In the expression: main
       When checking the type of the IO action ‘main’
+

@@ -54,7 +54,7 @@ import GHC.Tc.Types.TcRef
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.Env ( tcLookupGlobalOnly )
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Monad ( setSrcSpanA, liftZonkM, traceTc, addErr )
+import GHC.Tc.Utils.Monad ( newZonkAnyType, setSrcSpanA, liftZonkM, traceTc, addErr )
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types
@@ -469,8 +469,9 @@ commitFlexi tv zonked_kind
            -> do { addErr $ TcRnZonkerMessage (ZonkerCannotDefaultConcrete origin)
                  ; return (anyTypeOfKind zonked_kind) }
            | otherwise
-           -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
-                 ; return (anyTypeOfKind zonked_kind) }
+           -> do { traceTc "Defaulting flexi tyvar to ZonkAny:" (pprTyVar tv)
+                   -- See Note [Any types] in GHC.Builtin.Types, esp wrinkle (Any4)
+                 ; newZonkAnyType zonked_kind }
 
          RuntimeUnkFlexi
            -> do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVar tv)
