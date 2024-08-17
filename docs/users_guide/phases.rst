@@ -1151,8 +1151,9 @@ for example).
     :shortdesc: Control whether the RTS behaviour can be tweaked via command-line
         flags and the ``GHCRTS`` environment variable. Using ``none``
         means no RTS flags can be given; ``some`` means only a minimum
-        of safe options can be given (the default); ``all`` (or no
-        argument at all) means that all RTS flags are permitted; ``ignore``
+        of safe options can be given (the default, if ``-rtsopts`` is
+        not passed); ``all`` means that all RTS flags are permitted (the
+        default, if ``-rtsopts`` is passed with no argument); ``ignore``
         means RTS flags can be given, but are treated as regular arguments and
         passed to the Haskell program as arguments; ``ignoreAll`` is the same as
         ``ignore``, but ``GHCRTS`` is also ignored. ``-rtsopts`` does not
@@ -1161,11 +1162,12 @@ for example).
     :type: dynamic
     :category: linking
 
-    :default: some
+    :default: ``some``, if ``-rtsopts`` is not passed; ``all``, if ``-rtsopts``
+        is passed with no argument.
 
     This option affects the processing of RTS control options given
     either on the command line or via the :envvar:`GHCRTS` environment
-    variable. There are five possibilities:
+    variable. There are six possibilities:
 
     ``-rtsopts=none``
         Disable all processing of RTS options. If ``+RTS`` appears
@@ -1181,17 +1183,21 @@ for example).
         ``GHCRTS`` options will be processed normally.
 
     ``-rtsopts=ignoreAll``
-        Same as ``ignore`` but also ignores ``GHCRTS``.
+        Same as ``ignore`` with the exception of ``GHCRTS`` options, which are
+        also ignored.
 
     ``-rtsopts=some``
-        [this is the default setting] Enable only the "safe" RTS
-        options: (Currently only ``-?`` and ``--info``.) Any other RTS
-        options on the command line or in the ``GHCRTS`` environment
-        variable causes the program with to abort with an error message.
+        [this is the default setting, if ``-rtsopts`` is not passed] Enable only
+        the "safe" RTS options: (Currently only ``-?`` and ``--info``.) Any
+        other RTS options on the command line or in the ``GHCRTS`` environment
+        variable causes the program to abort with an error message.
 
-    ``-rtsopts=all`` or just ``-rtsopts``
+    ``-rtsopts=all``
         Enable *all* RTS option processing, both on the command line and
         through the ``GHCRTS`` environment variable.
+
+    ``-rtsopts``
+        Equivalent to ``-rtsopts=all``.
 
     In GHC 6.12.3 and earlier, the default was to process all RTS
     options. However, since RTS options can be used to write logging
