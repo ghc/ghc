@@ -7,7 +7,7 @@
 
 #include <stdbool.h>
 #include <windows.h>
-#include "isMINTTY.h"
+#include "isMinTTY.h"
 
 bool isMinTTY() {
   const HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
