@@ -438,19 +438,54 @@ instance Show IOException where
          "" -> id
          _  -> showString " (" . showString s . showString ")")
 
--- Note the use of "lazy". This means that
---     assert False (throw e)
--- will throw the assertion failure rather than e. See trac #5561.
 assertError :: (?callStack :: CallStack) => Bool -> a -> a
 assertError predicate v
-  | predicate = lazy v
-  | otherwise = unsafeDupablePerformIO $ do
+  | predicate = v
+  | otherwise = lazy $ unsafeDupablePerformIO $ do -- lazy: See Note [Strictness of assertError]
     ccsStack <- currentCallStack
     let
       implicitParamCallStack = prettyCallStackLines ?callStack
       ccsCallStack = showCCSStack ccsStack
       stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
     throwIO (AssertionFailed ("Assertion failed\n" ++ stack))
+
+{- Note [Strictness of assertError]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is vital that Demand Analysis does not see `assertError p e` as strict in e.
+#5561 details what happens otherwise, tested by libraries/base/tests/assert.hs:
+
+  let e1 i = throw Overflow
+  in assertError False (e1 5)
+
+This should *not* throw the Overflow exception; rather it should throw an
+AssertionError.
+Hence we use GHC.Exts.lazy to make assertError appear lazy in e, so that it
+is not called by-value.
+(Note that the reason we need `lazy` in the first place is that error has a
+bottoming result, which is strict in all free variables.)
+The way we achieve this is a bit subtle; before #24625 we defined it as
+
+  assertError p e | p         = lazy e
+                  | otherwise = error "assertion"
+
+but this means that in the following example (full code in T24625) we cannot
+cancel away the allocation of `Just x` because of the intervening `lazy`:
+
+  case assertError False (Just x) of Just y -> y
+  ==> { simplify }
+  case lazy (Just x) of Just y -> y
+
+Instead, we put `lazy` in the otherwise branch, thus
+
+  assertError p e | p         = e
+                  | otherwise = lazy $ error "assertion"
+
+The effect on #5561 is the same: since the otherwise branch appears lazy in e,
+the overall demand on `e` must be lazy as well.
+Furthermore, since there is no intervening `lazy` on the expected code path,
+the Simplifier may perform case-of-case on e and simplify the `Just x` example
+to `x`.
+-}
 
 unsupportedOperation :: IOError
 unsupportedOperation =
@@ -480,4 +515,3 @@ untangle coded message
           _         -> (loc, "")
         }
     not_bar c = c /= '|'
-
