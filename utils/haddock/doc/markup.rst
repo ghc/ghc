@@ -13,27 +13,26 @@ modules being processed.
 Documenting a Top-Level Declaration
 -----------------------------------
 
-The simplest example of a documentation annotation is for documenting
-any top-level declaration (function type signature, type declaration, or
-class declaration). For example, if the source file contains the
-following type signature: ::
+A Haddock documentation annotation is a comment that begins with ``-- |`` or
+``-- ^``. Seen as ordinary comments, these are ignored by the Haskell compiler.
 
-    square :: Int -> Int
-    square x = x * x
+We can document top-level declarations, such as ``square``, by **adding** a ``--
+|`` comment **before** the declaration or a ``-- ^`` comment **after** the
+declaration (each shown as a diff).
 
-Then we can document it like this: ::
+.. code-block:: diff
 
-    -- |The 'square' function squares an integer.
-    square :: Int -> Int
-    square x = x * x
+    + -- |The 'square' function squares an integer.
+      square :: Int -> Int
+      square x = x * x
 
-The ``-- |`` syntax begins a documentation annotation, which applies
-to the *following* declaration in the source file. Note that the
-annotation is just a comment in Haskell — it will be ignored by the
-Haskell compiler.
+.. code-block:: diff
 
-The declaration following a documentation annotation should be one of
-the following:
+      square :: Int -> Int
+    + -- ^The 'square' function squares an integer.
+      square x = x * x
+
+These annotations can document declarations that are:
 
 -  A type signature for a top-level function,
 
@@ -55,15 +54,7 @@ the following:
 
 -  A ``data instance`` or ``type instance`` declaration.
 
-If the annotation is followed by a different kind of declaration, it
-will probably be ignored by Haddock.
-
-Some people like to write their documentation *after* the declaration;
-this is possible in Haddock too: ::
-
-    square :: Int -> Int
-    -- ^The 'square' function squares an integer.
-    square x = x * x
+Other kinds of declaration will probably be ignored by Haddock.
 
 Since Haddock uses the GHC API internally, it can infer types for
 top-level functions without type signatures. However, you're
