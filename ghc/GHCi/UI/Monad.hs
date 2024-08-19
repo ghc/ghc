@@ -33,7 +33,10 @@ module GHCi.UI.Monad (
         turnOffBuffering, turnOffBuffering_,
         flushInterpBuffers,
         runInternal,
-        mkEvalWrapper
+        mkEvalWrapper,
+
+        NormDecl,
+        runNormDecl
     ) where
 
 import GHCi.UI.Info (ModInfo)
@@ -50,6 +53,11 @@ import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Driver.Make (ModIfaceCache(..))
 import GHC.Unit
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Tc.Instance.Family
+import GHC.Tc.Utils.Env
+import GHC.Tc.Types
 import GHC.Types.Name.Reader as RdrName (mkOrig)
 import qualified GHC.Types.Name.Ppr as Ppr (mkNamePprCtx)
 import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
@@ -570,3 +578,15 @@ runInternal =
 
 compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
 compileGHCiExpr expr = runInternal $ GHC.compileExprRemote expr
+
+------------------------------------------------------------------------------
+-- normalize command
+
+type NormDecl m a = ReaderT (Bool,GHC.TyCon,[GHC.Type],FamInstEnvs) m a
+
+runNormDecl :: GhcMonad m => NormDecl TcRn a -> Bool -> GHC.TyCon -> [GHC.Type] -> m (Maybe a)
+runNormDecl comp removeSatConstr tyCon args
+  = withSession $ \hsc_env ->
+    liftIO . fmap snd . GHC.runTcInteractive hsc_env $ do
+    { famInsts <- tcGetFamInstEnvs
+    ; runReaderT comp (removeSatConstr, tyCon, args, famInsts) }

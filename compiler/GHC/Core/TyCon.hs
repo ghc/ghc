@@ -100,6 +100,7 @@ module GHC.Core.TyCon(
         synTyConDefn_maybe, synTyConRhs_maybe,
         famTyConFlav_maybe,
         algTyConRhs,
+        algTyConFlavour,
         newTyConRhs, newTyConEtadArity, newTyConEtadRhs,
         unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
         newTyConDataCon_maybe,
@@ -1178,6 +1179,12 @@ visibleDataCons (SumTyCon{ data_cons = cs })  = cs
 -- | Describes the flavour of an algebraic type constructor. For
 -- classes and data families, this flavour includes a reference to
 -- the parent 'TyCon'.
+
+algTyConFlavour :: TyCon -> Maybe AlgTyConFlav
+algTyConFlavour (TyCon { tyConDetails = d})
+  | AlgTyCon { algTcFlavour } <- d = Just algTcFlavour
+  | otherwise = Nothing
+
 data AlgTyConFlav
   = -- | An ordinary algebraic type constructor. This includes unlifted and
     -- representation-polymorphic datatypes and newtypes and unboxed tuples,
@@ -1463,7 +1470,7 @@ tyConRepModOcc tc_module tc_occ = (rep_module, mkTyConRepOcc tc_occ)
   where
     rep_module
       | tc_module == gHC_PRIM = gHC_TYPES
-      | otherwise             = tc_module
+      | otherwise            = tc_module
 
 
 {- *********************************************************************

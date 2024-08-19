@@ -38,6 +38,8 @@ import GHCi.UI.Exception
 import GHC.Runtime.Debugger
 import GHC.Runtime.Eval (mkTopLevEnv)
 
+import GHC.Core.TyCo.FVs -- FIXME remove me
+
 -- The GHC interface
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
@@ -45,7 +47,9 @@ import GHCi.BreakArray( breakOn, breakOff )
 import GHC.ByteCode.Types
 import GHC.Core.DataCon
 import GHC.Core.ConLike
+import GHC.Core.FamInstEnv
 import GHC.Core.PatSyn
+import GHC.Core.InstEnv
 import GHC.Driver.Flags
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
@@ -61,21 +65,37 @@ import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
              GetDocsFailure(..), pushLogHookM,
-             getModuleGraph, handleSourceError, ms_mod )
+             getModuleGraph, handleSourceError, ms_mod,
+             TyCon, runTcInteractive)
 import GHC.Driver.Main (hscParseModuleWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Env
+import GHC.Driver.Monad ( withSession )
 import GHC.Runtime.Context
 import GHC.Types.TyThing
 import GHC.Types.TyThing.Ppr
 import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCo.Rep ( Type(TyConApp) )
+import GHC.Core.TyCo.Compare ( eqType )
+import GHC.Core.Type
+import GHC.Core.TyCon
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.SourceError ( SourceError )
 import GHC.Types.Name
 import GHC.Types.Breakpoint
 import GHC.Types.Var ( varType )
-import GHC.Iface.Syntax ( showToHeader )
+import GHC.Types.Var.Set -- FIXME remove me
+import GHC.Types.Var.Env ( emptyTidyEnv, TidyEnv )
+import GHC.Iface.Syntax ( showToHeader, showToIface, pprIfaceDecl
+                        , IfaceDecl(..), IfaceEqSpec, IfaceConDecls(..)
+                        , IfaceConDecl(..), visibleIfConDecls, IfaceAppArgs
+                        , )
+import GHC.Iface.Decl ( tyThingToIfaceDecl )
+import GHC.Iface.Type ( IfaceType (..)
+                      , substIfaceTyVar, inDomIfaceTySubst
+                      , IfLclName (..), appArgsIfaceTypes
+                      , ifForAllBndrName )
 import GHC.Builtin.Names
 import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName, greName, globalRdrEnvElts)
@@ -93,9 +113,14 @@ import GHC.Unit.Module.ModSummary
 import GHC.Data.StringBuffer
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad ( initTcInteractive, TcRn )
+import GHC.Tc.Utils.Instantiate
+import GHC.Tc.TyCl.Build ( mkNewTyConRhs )
 
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
+import GHC.Tc.Instance.Family
 import GHC.Settings.Config
 import GHC.Data.Graph.Directed
 import GHC.Utils.Encoding
@@ -119,6 +144,7 @@ import Control.Monad.Catch as MC
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
+import Control.Monad.Trans.Reader
 
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
@@ -223,6 +249,8 @@ ghciCommands = map mkCmd [
   ("history",   keepGoingMulti historyCmd,           noCompletion),
   ("info",      keepGoingMulti' (info False),        completeIdentifier),
   ("info!",     keepGoingMulti' (info True),         completeIdentifier),
+  ("normalize", keepGoingMulti' (normalize False),  completeIdentifier),
+  ("normalize!", keepGoingMulti' (normalize True),   completeIdentifier),
   ("issafe",    keepGoing' isSafeCmd,           completeModule),
   ("ignore",    keepGoing ignoreCmd,            noCompletion),
   ("kind",      keepGoingMulti' (kindOfType False),  completeIdentifier),
@@ -1612,6 +1640,82 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
   $$ showFixity thing fixity
   $$ vcat (map GHC.pprInstance cls_insts)
   $$ vcat (map GHC.pprFamInst  fam_insts)
+
+-----------------------------------------------------------------------------
+-- :normalize
+
+normalize :: GHC.GhcMonad m => Bool -> String -> m ()
+nomralize rmSatConstrs "" = throwGhcException (UsageError "syntax ':n <(constructor arguments)>'")
+normalize rmSatConstrs s = handleSourceError printGhciException $ do
+  forM_ (map trim $ actArgs s) $ \str -> do
+    sdoc <- pprNormalizedIfaceDecl rmSatConstrs str
+    rendered <- showSDocForUser' sdoc
+    liftIO (putStrLn rendered)
+  where
+    actArgs [] = []    -- FIXME extremely hacky! (doesn't work for anything involving two levels of parenthesis)
+    actArgs ('(':xs) =
+      let
+        (inside,rest) = break (== ')') xs
+        afterParen = if null rest then [] else tail rest
+      in
+        inside : actArgs afterParen
+    actArgs (_:xs) = actArgs xs
+    trim = let f = reverse . dropWhile isSpace in f . f
+
+pprNormalizedIfaceDecl :: GHC.GhcMonad m => Bool -> String -> m SDoc
+pprNormalizedIfaceDecl rmSatConstrs str = do
+  (ty,_) <- GHC.typeKind True str
+  case splitTyConApp_maybe ty of
+    Nothing -> throwGhcException (CmdLineError "Something Bad happend!")
+    Just (head,args) -> do
+       res <- runNormDecl toNormalizedIfaceDecl rmSatConstrs head args
+       case res of
+          Just x -> pure $ pprIfaceDecl showToIface  x
+          Nothing -> throwGhcException (CmdLineError "Something bad happened!")
+
+toNormalizedIfaceDecl :: NormDecl TcRn IfaceDecl
+toNormalizedIfaceDecl = tyThingToIfaceDecl False . ATyCon <$> mkNormalizedTyCon
+  where
+    mkNormalizedTyConRhs tyCon
+      | isNewTyCon tyCon
+      = mkNormalizedNewTyConRhs
+      | isDataFamilyTyCon tyCon
+      = throwGhcException (Sorry "Can't normalize data families yet!")
+      | isClassTyCon tyCon
+      = throwGhcException (Sorry "Can't normalize classes yet!")
+      | otherwise
+      = mkNormalizedDataTyConRhs
+
+    mkNormalizedNewTyConRhs = do
+        (removeSatConstrs,tyCon,args,famInstEnvs) <- ask
+        lift $ mkNewTyConRhs (tyConName tyCon) tyCon . head
+             . mapMaybe (normalizeDataConAt removeSatConstrs famInstEnvs tyCon args)
+             $ tyConDataCons tyCon
+
+    mkNormalizedDataTyConRhs = do
+      (removeSatConstrs,tyCon,args,famInstEnvs) <- ask
+      pure . mkDataTyConRhs
+           . mapMaybe (normalizeDataConAt removeSatConstrs famInstEnvs tyCon args)
+           $ tyConDataCons tyCon
+
+    mkNormalizedTyCon = do
+      (tyCon,args) <- asks (\(_,t,a,_) -> (t,a))
+      normalizedRhs <- mkNormalizedTyConRhs tyCon
+      pure $ mkAlgTyCon (tyConName tyCon)
+                        (drop (length args) (tyConBinders tyCon))
+                        (tyConResKind tyCon)
+                        (tyConRoles tyCon)
+                        (tyConCType_maybe tyCon)
+                        (tyConStupidTheta tyCon)
+                        normalizedRhs
+                        (fromJust $ algTyConFlavour tyCon)
+                        (isGadtSyntaxTyCon tyCon)
+
+{- Note [Why do we normalize a DataCon instead of an IfaceConDecl]
+TODO
+summary because we'll have to reduce and do all other sorts of stuff. Otherwise
+we'll have to convert back and forth between IfaceConDecl and DataCon.
+-}
 
 -----------------------------------------------------------------------------
 -- :main

@@ -53,6 +53,8 @@ module GHC.Core.DataCon (
 
         splitDataProductType_maybe,
 
+        normalizeDataConAt,
+
         -- ** Predicates on DataCons
         isNullarySrcDataCon, isNullaryRepDataCon,
         isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
@@ -78,7 +80,10 @@ import GHC.Core.Coercion
 import GHC.Core.Unify
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Subst
+import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Compare( eqType )
+import {-# SOURCE #-} GHC.Core.FamInstEnv
+import GHC.Core.Reduction
 import GHC.Core.Multiplicity
 import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
@@ -87,8 +92,10 @@ import GHC.Core.Class
 import GHC.Types.Name
 import GHC.Builtin.Names
 import GHC.Core.Predicate
+import {-# SOURCE #-} GHC.Core.InstEnv
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Unit.Types
@@ -1909,6 +1916,71 @@ dataConUserTyVarsNeedWrapper dc@(MkData { dcUnivTyVars = univ_tvs
     answer = (univ_tvs ++ ex_tvs) /= dataConUserTyVars dc
               -- Worker tyvars         Wrapper tyvars
 
+
+{- Note [Creating dummy constructors for the normalize command]
+
+-}
+-- See Note [Why do we normalize a DataCon instead of an IfaceConDecl]
+normalizeDataConAt :: Bool -> FamInstEnvs -> TyCon -> [Type] -> DataCon -> Maybe DataCon
+normalizeDataConAt removeSaturatedClass famEnv head args
+                   con@(MkData { dcUnivTyVars = univ_tvs
+                               , dcExTyCoVars = ex_tvs
+                               , dcUserTyVarBinders = ty_var_binders
+                               , dcEqSpec = eq_spec
+                               , dcOtherTheta = other_theta
+                               , dcOrigArgTys = orig_arg_tys
+                               , dcOrigResTy = orig_res_ty })
+  | not remains
+  = Nothing
+  | otherwise
+  = Just $
+    con { dcUnivTyVars = i_univ_ty_vars
+        , dcExTyCoVars = i_ex_tyco_vars
+        , dcEqSpec = i_eq_spec
+        , dcUserTyVarBinders = i_ty_var_binders
+        , dcOtherTheta = i_other_theta
+        , dcOrigArgTys = i_arg_tys
+        , dcOrigResTy = i_res_ty }
+  where
+    orig_res_ty_args = tyConAppArgs orig_res_ty
+    dom = shallowTyCoVarsOfType orig_res_ty
+    univ_subst = uncurry zipTvSubst
+               . unzip
+               . prune $ zip orig_res_ty_args args
+
+    prune = foldr step []
+      where
+        step (t,ty) xs
+          | Just tyVar <- getTyVar_maybe t = (tyVar,ty) : xs
+          | otherwise = xs
+
+    i_ty_var_binders = filter (flip notElemSubst subst . binderVar) ty_var_binders
+    i_eq_spec = filter (not . flip elemVarSet dom . eqSpecTyVar) eq_spec
+    i_univ_ty_vars = filter (`isInScope` univ_subst) univ_tvs
+
+    i_other_theta = normalize_theta other_theta
+
+    i_arg_tys = map (mapScaledType substReduce) orig_arg_tys
+    i_res_ty = substReduce orig_res_ty
+    (subst, i_ex_tyco_vars) = substVarBndrs univ_subst ex_tvs
+
+    remains = mkTyConApp head (args ++ drop (length args) orig_res_ty_args)
+              `eqType`
+              i_res_ty
+
+    substReduce = reductionReducedType
+                . normaliseType famEnv Nominal
+                . substTy subst
+
+    normalize_theta = foldr (step . substReduce) []
+      where
+        step :: PredType -> [PredType] -> [PredType]
+        step pred preds
+          | removeSaturatedClass
+          , isEmptyVarSet . shallowTyCoVarsOfType $ pred
+          = preds
+          | otherwise
+          = pred : preds
 
 {-
 %************************************************************************
