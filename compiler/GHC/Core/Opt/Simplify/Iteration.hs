@@ -2306,14 +2306,19 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
 -- See Note [Rewrite rules and inlining]
 -- See also Note [Trying rewrite rules]
 rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_rewrite = TryRules nr_wanted rules }) cont
-  | nr_wanted == 0 || no_more_args
-  = -- We've accumulated a simplified call in <fun,rev_args>
-    -- so try rewrite rules; see Note [RULES apply to simplified arguments]
+                              , ai_dmds = dms, ai_rewrite = TryRules rules }) cont
+  -- romes:todo: note on trying rules twice: one on unsimplified args, the other on simplified args.
+  | null rev_args || no_more_args
+  = -- We try rules twice: once on unsimplified args and once after
+    -- we've accumulated a simplified call in <fun,rev_args>
+    -- See Note [RULES apply to simplified arguments] (TODO: EDIT NOTE AND TITLE)
     -- See also Note [Rules for recursive functions]
-    do { mb_match <- tryRules env rules fun (reverse rev_args) cont
+    do { let (rules_args, cont')
+              | null rev_args = contArgsSpec dms cont -- Unsimplified args
+              | otherwise = (reverse rev_args, cont) -- Simplified args
+       ; mb_match <- tryRules env rules fun rules_args cont'
        ; case mb_match of
-             Just (env', rhs, cont') -> simplExprF env' rhs cont'
+             Just (env', rhs, cont'') -> simplExprF env' rhs cont''
              Nothing -> rebuildCall env (info { ai_rewrite = TryInlining }) cont }
   where
     -- If we have run out of arguments, just try the rules; there might
@@ -2425,7 +2430,7 @@ tryInlining env logger var cont
   = return Nothing
 
   where
-    (lone_variable, arg_infos, call_cont) = contArgs cont
+    (lone_variable, arg_infos, call_cont) = contArgsSummary cont
     interesting_cont = interestingCallContext env call_cont
 
     log_inlining doc
@@ -2467,6 +2472,7 @@ So we try to apply rules if either
   (a) no_more_args: we've run out of argument that the rules can "see"
   (b) nr_wanted: none of the rules wants any more arguments
 
+romes:TODO: Update this note after nr_wanted is gone
 
 Note [RULES apply to simplified arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2480,6 +2486,8 @@ we match f's rules against the un-simplified RHS, it won't match.  This
 makes a particularly big difference when superclass selectors are involved:
         op ($p1 ($p2 (df d)))
 We want all this to unravel in one sweep.
+
+ROMES:TODO: RULES now twice per pass, to unsimplified args and to simplified args
 
 Note [Rewrite rules and inlining]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

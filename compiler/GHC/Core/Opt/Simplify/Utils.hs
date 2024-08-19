@@ -24,7 +24,7 @@ module GHC.Core.Opt.Simplify.Utils (
         SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contArgs, contIsRhs,
+        contIsTrivial, contArgsSpec, contArgsSummary, contIsRhs,
         countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
@@ -83,6 +83,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Control.Monad    ( when )
+import Data.Bifunctor   ( first )
 import Data.List        ( sortBy )
 import GHC.Types.Name.Env
 import Data.Graph
@@ -344,7 +345,7 @@ data ArgInfo
 
 data RewriteCall  -- What rewriting to try next for this call
                   -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
-  = TryRules FullArgCount [CoreRule]
+  = TryRules [CoreRule]
   | TryInlining
   | TryNothing
 
@@ -379,14 +380,14 @@ addValArgTo ai arg hole_ty
   = ai { ai_args    = arg_spec : ai_args ai
        , ai_dmds    = dmds
        , ai_discs   = discs
-       , ai_rewrite = decArgCount rew }
+       , ai_rewrite = rew }
   | otherwise
   = pprPanic "addValArgTo" (ppr ai $$ ppr arg)
     -- There should always be enough demands and discounts
 
 addTyArgTo :: ArgInfo -> OutType -> OutType -> ArgInfo
 addTyArgTo ai arg_ty hole_ty = ai { ai_args    = arg_spec : ai_args ai
-                                  , ai_rewrite = decArgCount (ai_rewrite ai) }
+                                  , ai_rewrite = ai_rewrite ai }
   where
     arg_spec = TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
 
@@ -434,10 +435,6 @@ argInfoExpr fun rev_args
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
-decArgCount :: RewriteCall -> RewriteCall
-decArgCount (TryRules n rules) = TryRules (n-1) rules
-decArgCount rew                = rew
-
 mkRewriteCall :: Id -> RuleEnv -> RewriteCall
 -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
 -- We try to skip any unnecessary stages:
@@ -447,11 +444,10 @@ mkRewriteCall :: Id -> RuleEnv -> RewriteCall
 -- quite a heavy hammer, so skipping stages is a good plan.
 -- And it's extremely simple to do.
 mkRewriteCall fun rule_env
-  | not (null rules) = TryRules n_required rules
+  | not (null rules) = TryRules rules
   | canUnfold unf    = TryInlining
   | otherwise        = TryNothing
   where
-    n_required = maximum (map ruleArity rules)
     rules = getRules rule_env fun
     unf   = idUnfolding fun
 
@@ -569,11 +565,25 @@ countValArgs (CastIt     { sc_cont = cont }) = countValArgs cont
 countValArgs _                               = 0
 
 -------------------
-contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
+
+-- | Get the ArgSpecs of the continuation arguments given the function demands.
+-- The returned continuation is stripped of the args.
+contArgsSpec :: [Demand] -> SimplCont -> ([ArgSpec], SimplCont)
+contArgsSpec ds (ApplyToTy  { sc_arg_ty = arg
+                            , sc_hole_ty = hole
+                            , sc_cont = cont }) = first (TyArg arg hole :) (contArgsSpec ds cont)
+contArgsSpec (d:ds) (ApplyToVal
+                            { sc_arg = arg
+                            , sc_hole_ty = hole
+                            , sc_cont = cont }) = first (ValArg d arg hole :) (contArgsSpec ds cont)
+contArgsSpec ds (CastIt     { sc_cont = cont }) = contArgsSpec ds cont
+contArgsSpec _ cont                            = ([], cont)
+
+contArgsSummary :: SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Summarises value args, discards type args and coercions
 -- The returned continuation of the call is only used to
 -- answer questions like "are you interesting?"
-contArgs cont
+contArgsSummary cont
   | lone cont = (True, [], cont)
   | otherwise = go [] cont
   where
