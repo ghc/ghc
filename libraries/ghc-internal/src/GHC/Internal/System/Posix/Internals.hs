@@ -537,11 +537,11 @@ foreign import javascript interruptible "h$base_lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
 foreign import javascript interruptible "h$base_lstat"
    lstat :: CFilePath -> Ptr CStat -> IO CInt
-foreign import javascript interruptible "h$base_open"
+foreign import javascript interruptible "h$open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
-foreign import javascript interruptible "h$base_open"
+foreign import javascript interruptible "h$open"
    c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
-foreign import javascript interruptible "h$base_open"
+foreign import javascript interruptible "h$open"
    c_safe_open_ :: CFilePath -> CInt -> CMode -> IO CInt
 foreign import javascript interruptible "h$base_read"
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize

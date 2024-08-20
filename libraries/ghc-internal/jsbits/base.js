@@ -138,6 +138,126 @@ function h$base_fstat(fd, stat, stat_off, c) {
         h$unsupported(-1, c);
 }
 
+function h$stat(path, path_off, stat, stat_off) {
+#ifndef GHCJS_BROWSER
+  if(h$isNode()) {
+    try {
+      var stats = h$fs.statSync(h$decodeUtf8z(path, path_off));
+      h$base_fillStat(stats, stat, stat_off);
+      return 0;
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  }
+  else
+#endif
+    h$unsupported(-1);
+}
+
+function h$lstat(path, path_off, stat, stat_off) {
+#ifndef GHCJS_BROWSER
+  if(h$isNode()) {
+    try {
+      var stats = h$fs.lstatSync(h$decodeUtf8z(path, path_off));
+      h$base_fillStat(stats, stat, stat_off);
+      return 0;
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  }
+  else
+#endif
+    h$unsupported(-1);
+}
+
+function h$fstatat(dirfd, path, path_off, stat, stat_off, flag) {
+#ifndef GHCJS_BROWSER
+  if(h$isNode()) {
+    var fp = h$calculate_at(dirfd, path, path_off);
+    try {
+      if (flag & h$base_at_symlink_nofollow) {
+        var fs = h$fs.lstatSync(fp);
+        h$base_fillStat(fs, stat, stat_off);
+        return 0;
+      }
+      else {
+        var fs = h$fs.statSync(fp);
+        h$base_fillStat(fs, stat, stat_off);
+        return 0;
+      }
+
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  }
+#endif
+
+  return h$unsupported(-1);
+}
+
+function h$unlinkat(dirfd, path, path_off, flag) {
+#ifndef GHCJS_BROWSER
+  if(h$isNode()) {
+    var fp = h$calculate_at(dirfd, path, path_off);
+    try {
+      if (flag & h$base_at_removedir) {
+        h$fs.rmdirSync(fp);
+        return 0;
+      }
+      else {
+        h$fs.unlinkSync(fp);
+        return 0;
+      }
+
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  }
+#endif
+
+  return h$unsupported(-1);
+}
+
+function h$dup(fd) {
+#ifndef GHCJS_BROWSER
+  if(h$isNode()) {
+    try {
+      // NodeJS doesn't provide "dup" (see
+      // https://github.com/nodejs/node/issues/41733), so we do this hack that
+      // probably only works on Linux.
+      return h$fs.openSync("/proc/self/fd/"+fd);
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  }
+  else
+#endif
+    h$unsupported(-1);
+}
+
+function h$fdopendir(fd) {
+#ifndef GHCJS_BROWSER
+  if(h$isNode()) {
+    try {
+      // NodeJS doesn't provide "fdopendir", so we do this hack that probably
+      // only works on Linux.
+      return h$fs.opendirSync("/proc/self/fd/"+fd);
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  }
+  else
+#endif
+    h$unsupported(-1);
+}
+
+
 function h$base_isatty(fd) {
     TRACE_IO("base_isatty " + fd)
     //  return 1; // fixme debug
@@ -333,25 +453,55 @@ function h$realpath(path,off,resolved,resolved_off) {
     h$unsupported(-1);
 }
 
-function h$base_open(file, file_off, how, mode, c) {
-  return h$open(file,file_off,how,mode,c);
+function h$path_is_abs(path) {
+ return path.charAt(0) === '/';
 }
 
-function h$openat(dirfd, file, file_off, how, mode) {
-  if (dirfd != h$base_at_fdcwd) {
-    // we only support AT_FDWCD (open) until NodeJS provides "openat"
+function h$path_join2(p1,p2) {
+  // Emscripten would normalize the path here. We don't for now.
+ return (p1 + '/' + p2);
+}
+
+// Compute path from a FD and a path
+function h$calculate_at(dirfd, file, file_off) {
+  var path = h$decodeUtf8z(file,file_off);
+
+  if (h$path_is_abs(path)) {
+    return path;
+  }
+
+  // relative path
+  var dir;
+  if (dirfd == h$base_at_fdcwd) {
+    dir = h$process.cwd();
+  }
+#ifndef GHCJS_BROWSER
+  else if (h$isNode()) {
+    // hack that probably only works on Linux with /proc mounted
+    dir = h$fs.readlinkSync("/proc/self/fd/"+dirfd);
+  }
+#endif
+  else {
     return h$unsupported(-1);
   }
-  else {
-    return h$open(file,file_off,how,mode,undefined);
-  }
+
+  return h$path_join2(dir,path);
 }
 
-function h$open(file, file_off, how, mode,c) {
+function h$openat(dirfd, file, file_off, how, mode, c) {
+  var path = h$calculate_at(dirfd, file, file_off);
+  return h$base_open(path, how, mode, c);
+}
+
+function h$open(file, file_off, how, mode, c) {
+  var path = h$decodeUtf8z(file, file_off);
+  return h$base_open(path, how, mode, c);
+}
+
+function h$base_open(fp, how, mode, c) {
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         var flags, off;
-        var fp   = h$decodeUtf8z(file, file_off);
         TRACE_IO("open: " + fp)
         var acc  = how & h$base_o_accmode;
         // passing a number lets node.js use it directly as the flags (undocumented)
@@ -586,6 +736,9 @@ const h$base_o_noctty   = 0x20000;
 const h$base_o_nonblock = 0x00004;
 const h$base_o_binary   = 0x00000;
 const h$base_at_fdcwd   = -100;
+const h$base_at_symlink_nofollow = 0x100;
+const h$base_at_removedir        = 0x200;
+const h$base_at_symlink_follow   = 0x400;
 
 
 function h$base_stat_check_mode(mode,p) {
