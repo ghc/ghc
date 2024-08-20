@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 -- | Module location
 module GHC.Unit.Module.Location
    ( ModLocation(..)
@@ -7,12 +8,15 @@ module GHC.Unit.Module.Location
    , addBootSuffixLocn
    , addBootSuffixLocnOut
    , removeBootSuffix
+   , ensureNonBootLocation
    )
 where
 
 import GHC.Prelude
 import GHC.Unit.Types
 import GHC.Utils.Outputable
+
+import Data.List (stripPrefix)
 
 -- | Module Location
 --
@@ -113,4 +117,15 @@ addBootSuffixLocnOut locn
          , ml_hie_file = addBootSuffix (ml_hie_file locn)
          }
 
-
+ensureNonBootLocation :: ModLocation -> ModLocation
+ensureNonBootLocation ModLocation {..} =
+  ModLocation {
+    ml_hs_file = strip <$> ml_hs_file,
+    ml_hi_file = strip ml_hi_file,
+    ml_dyn_hi_file = strip ml_dyn_hi_file,
+    ml_obj_file = strip ml_obj_file,
+    ml_dyn_obj_file = strip ml_dyn_obj_file,
+    ml_hie_file = strip ml_hie_file
+  }
+  where
+    strip p = maybe p reverse (stripPrefix "toob-" (reverse p))
