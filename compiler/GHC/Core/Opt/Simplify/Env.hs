@@ -939,7 +939,7 @@ So we want to look up the inner X.g_34 in the substitution, where we'll
 find that it has been substituted by b.  (Or conceivably cloned.)
 -}
 
-substId :: SimplEnv -> InId -> SimplSR
+substId :: HasDebugCallStack => SimplEnv -> InId -> SimplSR
 -- Returns DoneEx only on a non-Var expression
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of  -- Note [Global Ids in the substitution]
@@ -953,7 +953,7 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
         --
         -- See also Note [In-scope set as a substitution] in GHC.Core.Opt.Simplify.
 
-refineFromInScope :: InScopeSet -> Var -> Var
+refineFromInScope :: HasDebugCallStack => InScopeSet -> Var -> Var
 refineFromInScope in_scope v
   | isLocalId v = case lookupInScope in_scope v of
                   Just v' -> v'
@@ -961,7 +961,7 @@ refineFromInScope in_scope v
                              -- c.f #19074 for a subtle place where this went wrong
   | otherwise = v
 
-lookupRecBndr :: SimplEnv -> InId -> OutId
+lookupRecBndr :: HasDebugCallStack => SimplEnv -> InId -> OutId
 -- Look up an Id which has been put into the envt by simplRecBndrs,
 -- but where we have not yet done its RHS
 lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v

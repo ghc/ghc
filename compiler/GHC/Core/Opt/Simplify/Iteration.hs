@@ -1156,20 +1156,21 @@ simplExprC env expr cont
           return (wrapFloats floats expr') }
 
 --------------------------------------------------
-simplExprF :: SimplEnv
+simplExprF :: HasDebugCallStack
+           => SimplEnv
            -> InExpr     -- A term-valued expression, never (Type ty)
            -> SimplCont
            -> SimplM (SimplFloats, OutExpr)
 
 simplExprF !env e !cont -- See Note [Bangs in the Simplifier]
-  = {- pprTrace "simplExprF" (vcat
+  = pprTrace "simplExprF" (vcat
       [ ppr e
       , text "cont =" <+> ppr cont
       , text "inscope =" <+> ppr (seInScope env)
       , text "tvsubst =" <+> ppr (seTvSubst env)
       , text "idsubst =" <+> ppr (seIdSubst env)
       , text "cvsubst =" <+> ppr (seCvSubst env)
-      ]) $ -}
+      ]) $
     simplExprF1 env e cont
 
 simplExprF1 :: HasDebugCallStack
@@ -2233,7 +2234,7 @@ simplVar env var
         DoneId var1          -> return (Var var1)
         DoneEx e _           -> return e
 
-simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplIdF :: HasDebugCallStack => SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplIdF env var cont
   | isDataConWorkId var         -- See Note [Fast path for data constructors]
   = rebuild env (Var var) cont
@@ -2313,13 +2314,13 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
     -- we've accumulated a simplified call in <fun,rev_args>
     -- See Note [RULES apply to simplified arguments] (TODO: EDIT NOTE AND TITLE)
     -- See also Note [Rules for recursive functions]
-    do { let (rules_args, cont')
-              | null rev_args = contArgsSpec dms cont -- Unsimplified args
-              | otherwise = (reverse rev_args, cont) -- Simplified args
-       ; mb_match <- tryRules env rules fun rules_args cont'
+    --
+    -- tryRules will take arguments from the continuation as needed if already
+    -- simplified args (rev_args) are not enough.
+    do { mb_match <- tryRules env rules fun (reverse rev_args) cont
        ; case mb_match of
-             Just (env', rhs, cont'') -> simplExprF env' rhs cont''
-             Nothing -> rebuildCall env (info { ai_rewrite = TryInlining }) cont }
+             Just (env', rhs, cont') -> simplExprF env' rhs cont'
+             Nothing -> rebuildCall env (info { ai_rewrite = if no_more_args then TryInlining else TryRules rules }) cont }
   where
     -- If we have run out of arguments, just try the rules; there might
     -- be some with lower arity.  Casts get in the way -- they aren't
@@ -2579,32 +2580,41 @@ See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 ************************************************************************
 -}
 
-tryRules :: SimplEnv -> [CoreRule]
-         -> Id
-         -> [ArgSpec]   -- In /normal, forward/ order
-         -> SimplCont
+-- | 'tryRules' will try to apply a rule from the given rules to an application
+-- of function to N arguments, where N is the arity of the rule.
+--
+-- Note that there may not be enough simplified arguments @[ArgSpec]@ to
+-- satisfy the rule arity, thus 'tryRules' will look into the continuation for
+-- the remaining unsimplified arguments needed.
+--
+-- See also Note [Try RULES twice: on unsimplified and simplified args] 
+tryRules :: SimplEnv
+         -> [CoreRule] -- ^ List of rules to try
+         -> Id         -- ^ Function identifier
+         -> [ArgSpec]  -- ^ Simplified function arguments in /normal, forward/ order
+         -> SimplCont  -- ^ The continuation (note: may contain more, unsimplified,
+                       -- function arguments, if the simplified ones are not enough)
          -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
-
 tryRules env rules fn args call_cont
   | null rules
   = return Nothing
 
-  | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
+  | Just (rule, rule_rhs, cont') <- lookupRule ropts (getUnfoldingInRuleMatch env)
                                         (activeRule (seMode env)) fn
-                                        (argInfoAppArgs args) rules
+                                        (argInfoAppArgs args) call_cont rules
   -- Fire a rule for the function
   = do { logger <- getLogger
        ; checkedTick (RuleFired (ruleName rule))
-       ; let cont' = pushSimplifiedArgs zapped_env
+       ; let cont'' = pushSimplifiedArgs zapped_env
                                         (drop (ruleArity rule) args)
-                                        call_cont
+                                        cont'
                      -- (ruleArity rule) says how
                      -- many args the rule consumed
 
              occ_anald_rhs = occurAnalyseExpr rule_rhs
                  -- See Note [Occurrence-analyse after rule firing]
        ; dump logger rule rule_rhs
-       ; return (Just (zapped_env, occ_anald_rhs, cont')) }
+       ; return (Just (zapped_env, occ_anald_rhs, cont'')) }
             -- The occ_anald_rhs and cont' are all Out things
             -- hence zapping the environment
 
@@ -2625,7 +2635,7 @@ tryRules env rules fn args call_cont
     dump logger rule rule_rhs
       | logHasDumpFlag logger Opt_D_dump_rule_rewrites
       = log_rule Opt_D_dump_rule_rewrites "Rule fired" $ vcat
-          [ text "Rule:" <+> ftext (ruleName rule)
+          [ text "Rule:" <+> ppr (rule)
           , text "Module:" <+>  printRuleModule rule
           , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
           , text "After: " <+> hang (pprCoreExpr rule_rhs) 2

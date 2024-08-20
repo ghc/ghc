@@ -566,19 +566,6 @@ countValArgs _                               = 0
 
 -------------------
 
--- | Get the ArgSpecs of the continuation arguments given the function demands.
--- The returned continuation is stripped of the args.
-contArgsSpec :: [Demand] -> SimplCont -> ([ArgSpec], SimplCont)
-contArgsSpec ds (ApplyToTy  { sc_arg_ty = arg
-                            , sc_hole_ty = hole
-                            , sc_cont = cont }) = first (TyArg arg hole :) (contArgsSpec ds cont)
-contArgsSpec (d:ds) (ApplyToVal
-                            { sc_arg = arg
-                            , sc_hole_ty = hole
-                            , sc_cont = cont }) = first (ValArg d arg hole :) (contArgsSpec ds cont)
-contArgsSpec ds (CastIt     { sc_cont = cont }) = contArgsSpec ds cont
-contArgsSpec _ cont                            = ([], cont)
-
 contArgsSummary :: SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Summarises value args, discards type args and coercions
 -- The returned continuation of the call is only used to
