@@ -257,11 +257,7 @@ baseDependencies ghcPath = do
 
     (comp, _, cfg) <- configure normal (Just ghcPath) Nothing
         defaultProgramDb
-#if MIN_VERSION_Cabal(1,23,0)
     pkgIndex <- getInstalledPackages normal comp [GlobalPackageDB] cfg
-#else
-    pkgIndex <- getInstalledPackages normal [GlobalPackageDB] cfg
-#endif
     let
       pkgs =
         [ "array"
