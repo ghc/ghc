@@ -579,6 +579,8 @@ contArgs (ApplyToVal { sc_arg = arg
                      , sc_env = env
                      , sc_cont = cont })
                      | isEmptyVarEnv (seIdSubst env) -- could we not be a bit smarter? for example, apply the substitution straight away eg if the arg is just a single var?
+                     , isEmptyVarEnv (seTvSubst env)
+                     , isEmptyVarEnv (seCvSubst env)
                      = arg : (contArgs cont)
                      | otherwise
                      = []
