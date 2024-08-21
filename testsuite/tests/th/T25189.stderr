@@ -1,0 +1,5 @@
+T25189.hs:8:9: error: [GHC-18157]
+    GHC stage restriction:
+      ‘foo’ is used in a top-level splice, quasi-quote, or annotation,
+      and must be imported, not defined locally
+

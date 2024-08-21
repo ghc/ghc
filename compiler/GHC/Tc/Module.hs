@@ -1701,6 +1701,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Foreign import declarations next.
         traceTc "Tc4" empty ;
         (fi_ids, fi_decls, fi_gres) <- tcForeignImports foreign_decls ;
+        fi_th_bndrs <- tcTyThValBinders fi_ids ;
+        updLclCtxt (\tcl_env -> tcl_env { tcl_th_bndrs = fi_th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
         tcExtendGlobalValEnv fi_ids     $ do {
 
                 -- Value declarations next.

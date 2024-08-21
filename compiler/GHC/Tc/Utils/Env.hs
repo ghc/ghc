@@ -19,7 +19,7 @@ module GHC.Tc.Utils.Env(
         -- Global environment
         tcExtendGlobalEnv, tcExtendTyConEnv,
         tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
-        tcExtendGlobalValEnv, tcTyThBinders,
+        tcExtendGlobalValEnv, tcTyThBinders, tcTyThValBinders,
         tcLookupLocatedGlobal, tcLookupGlobal, tcLookupGlobalOnly,
         tcLookupTyCon, tcLookupClass,
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
@@ -463,6 +463,10 @@ tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
   -- Same deal as tcExtendGlobalEnv, but for Ids
 tcExtendGlobalValEnv ids thing_inside
   = tcExtendGlobalEnvImplicit [AnId id | id <- ids] thing_inside
+
+tcTyThValBinders :: [Id] -> TcM ThBindEnv
+  -- Same deal as tcTyThBinders, but for Ids
+tcTyThValBinders ids = tcTyThBinders [AnId id | id <- ids]
 
 tcExtendRecEnv :: [(Name,TyThing)] -> TcM r -> TcM r
 -- Extend the global environments for the type/class knot tying game
