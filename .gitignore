@@ -35,6 +35,7 @@ Thumbs.db
 __pycache__
 .mypy_cache
 *.SYMDEF*
+a.out
 
 log
 tags
