@@ -542,16 +542,12 @@ lookupRule :: RuleOpts -> InScopeEnv
            -> (Activation -> Bool) -- ^ When rule is active
            -> Id -- ^ Function head
            -> [CoreExpr] -- ^ Args
-           -> SimplCont  -- ^ Continuation, when given simplified args are not enough we'll look here for more unsimplified ones
            -> [CoreRule] -- ^ Rules
-           -> Maybe (CoreRule, CoreExpr, SimplCont)
-           -- If we used arguments from the given continuation, the returned
-           -- continuation will no longer have those arguments since they are
-           -- returned in the RHS of the rule.
+           -> Maybe (CoreRule, CoreExpr)
 
 -- See Note [Extra args in the target]
 -- See comments on matchRule
-lookupRule opts rule_env@(ISE in_scope _) is_active fn args cont rules
+lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
   = -- pprTrace "lookupRule" (ppr fn <+> ppr args $$ ppr rules $$ ppr in_scope) $
     case go [] rules of
         []     -> Nothing

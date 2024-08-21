@@ -1163,14 +1163,14 @@ simplExprF :: HasDebugCallStack
            -> SimplM (SimplFloats, OutExpr)
 
 simplExprF !env e !cont -- See Note [Bangs in the Simplifier]
-  = pprTrace "simplExprF" (vcat
+  = {- pprTrace "simplExprF" (vcat
       [ ppr e
       , text "cont =" <+> ppr cont
       , text "inscope =" <+> ppr (seInScope env)
       , text "tvsubst =" <+> ppr (seTvSubst env)
       , text "idsubst =" <+> ppr (seIdSubst env)
       , text "cvsubst =" <+> ppr (seCvSubst env)
-      ]) $
+      ]) $ -}
     simplExprF1 env e cont
 
 simplExprF1 :: HasDebugCallStack
@@ -2307,9 +2307,10 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
 -- See Note [Rewrite rules and inlining]
 -- See also Note [Trying rewrite rules]
 rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_dmds = dms, ai_rewrite = TryRules rules }) cont
+                              , ai_rewrite = TryRules have_tried_unsimp rules }) cont
   -- romes:todo: note on trying rules twice: one on unsimplified args, the other on simplified args.
-  | null rev_args || no_more_args
+  | {- pprTrace "rebuildTryRules" (ppr fun <+> ppr rev_args) $ -}
+    null rev_args || no_more_args
   = -- We try rules twice: once on unsimplified args and once after
     -- we've accumulated a simplified call in <fun,rev_args>
     -- See Note [RULES apply to simplified arguments] (TODO: EDIT NOTE AND TITLE)
@@ -2320,7 +2321,12 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
     do { mb_match <- tryRules env rules fun (reverse rev_args) cont
        ; case mb_match of
              Just (env', rhs, cont') -> simplExprF env' rhs cont'
-             Nothing -> rebuildCall env (info { ai_rewrite = if no_more_args then TryInlining else TryRules rules }) cont }
+             Nothing -> rebuildCall env (info
+               { ai_rewrite =
+                  if have_tried_unsimp || no_more_args
+                     then TryInlining
+                     else TryRules True rules {- try once again after simplifying args -}
+               }) cont }
   where
     -- If we have run out of arguments, just try the rules; there might
     -- be some with lower arity.  Casts get in the way -- they aren't
@@ -2599,22 +2605,23 @@ tryRules env rules fn args call_cont
   | null rules
   = return Nothing
 
-  | Just (rule, rule_rhs, cont') <- lookupRule ropts (getUnfoldingInRuleMatch env)
+  | Just (rule, rule_rhs) <- {- pprTrace "tryRules" (ppr (argInfoAppArgs args ++ contArgs call_cont)) $ -}
+                             lookupRule ropts (getUnfoldingInRuleMatch env)
                                         (activeRule (seMode env)) fn
-                                        (argInfoAppArgs args) call_cont rules
+                                        (argInfoAppArgs args ++ contArgs call_cont) rules
   -- Fire a rule for the function
   = do { logger <- getLogger
        ; checkedTick (RuleFired (ruleName rule))
-       ; let cont'' = pushSimplifiedArgs zapped_env
+       ; let cont' = pushSimplifiedArgs zapped_env
                                         (drop (ruleArity rule) args)
-                                        cont'
+                                        (contDropArgs (ruleArity rule - min (ruleArity rule) (length args)) call_cont)
                      -- (ruleArity rule) says how
                      -- many args the rule consumed
 
              occ_anald_rhs = occurAnalyseExpr rule_rhs
                  -- See Note [Occurrence-analyse after rule firing]
        ; dump logger rule rule_rhs
-       ; return (Just (zapped_env, occ_anald_rhs, cont'')) }
+       ; return (Just (zapped_env, occ_anald_rhs, cont')) }
             -- The occ_anald_rhs and cont' are all Out things
             -- hence zapping the environment
 
@@ -2624,6 +2631,7 @@ tryRules env rules fn args call_cont
        ; return Nothing }
 
   where
+
     ropts      = seRuleOpts env
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
 

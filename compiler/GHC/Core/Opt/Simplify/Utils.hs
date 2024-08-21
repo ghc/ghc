@@ -24,7 +24,7 @@ module GHC.Core.Opt.Simplify.Utils (
         SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contArgsSpec, contArgsSummary, contIsRhs,
+        contIsTrivial, contArgs, contDropArgs, contArgsSummary, contIsRhs,
         countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
@@ -72,6 +72,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Tickish
 import GHC.Types.Demand
 import GHC.Types.Var.Set
+import GHC.Types.Var.Env ( isEmptyVarEnv )
 import GHC.Types.Basic
 
 import GHC.Data.OrdList ( isNilOL )
@@ -83,7 +84,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Control.Monad    ( when )
-import Data.Bifunctor   ( first )
 import Data.List        ( sortBy )
 import GHC.Types.Name.Env
 import Data.Graph
@@ -345,7 +345,10 @@ data ArgInfo
 
 data RewriteCall  -- What rewriting to try next for this call
                   -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
-  = TryRules [CoreRule]
+  = TryRules
+      Bool -- True if these rules have already been tried on unsimplified arguments
+           -- See Note [Try rules twice in one pass]
+      [CoreRule]
   | TryInlining
   | TryNothing
 
@@ -444,7 +447,7 @@ mkRewriteCall :: Id -> RuleEnv -> RewriteCall
 -- quite a heavy hammer, so skipping stages is a good plan.
 -- And it's extremely simple to do.
 mkRewriteCall fun rule_env
-  | not (null rules) = TryRules rules
+  | not (null rules) = TryRules False rules
   | canUnfold unf    = TryInlining
   | otherwise        = TryNothing
   where
@@ -565,6 +568,29 @@ countValArgs (CastIt     { sc_cont = cont }) = countValArgs cont
 countValArgs _                               = 0
 
 -------------------
+-- | Get the immediately available independent arguments out of the continuation.
+-- This means if we find some argument that depends on an idsubst we don't include it in the result and stop.
+-- Casts also stop the argument retrieval...
+contArgs :: SimplCont -> [CoreExpr]
+contArgs (ApplyToTy  { sc_arg_ty = arg
+                     , sc_cont = cont })
+                     = Type arg : (contArgs cont)
+contArgs (ApplyToVal { sc_arg = arg
+                     , sc_env = env
+                     , sc_cont = cont })
+                     | isEmptyVarEnv (seIdSubst env) -- could we not be a bit smarter? for example, apply the substitution straight away eg if the arg is just a single var?
+                     = arg : (contArgs cont)
+                     | otherwise
+                     = []
+-- contArgs (CastIt     { sc_cont = cont }) = contArgs cont
+contArgs _cont       = []
+
+-- | Drops N arguments from the continuation or until there are no more args.
+contDropArgs :: Int -> SimplCont -> SimplCont
+contDropArgs 0 cont = cont
+contDropArgs n (ApplyToTy  { sc_cont = cont }) = contDropArgs (n-1) cont
+contDropArgs n (ApplyToVal { sc_cont = cont }) = contDropArgs (n-1) cont
+contDropArgs _n cont = cont
 
 contArgsSummary :: SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Summarises value args, discards type args and coercions
