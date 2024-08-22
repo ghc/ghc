@@ -51,12 +51,12 @@ dsWasmJSImport ::
   Coercion ->
   CImportSpec ->
   Safety ->
-  DsM ([Binding], CHeader, CStub, [Id])
+  DsM ([Binding], [CStub], [Id])
 dsWasmJSImport id co (CFunction (StaticTarget _ js_src mUnitId _)) safety
   | js_src == "wrapper" = dsWasmJSDynamicExport id co mUnitId
   | otherwise = do
-      (bs, h, c) <- dsWasmJSStaticImport id co (unpackFS js_src) mUnitId safety
-      pure (bs, h, c, [])
+      (bs, stub) <- dsWasmJSStaticImport id co (unpackFS js_src) mUnitId safety
+      pure (bs, [stub], [])
 dsWasmJSImport _ _ _ _ = panic "dsWasmJSImport: unreachable"
 
 {-
@@ -105,7 +105,7 @@ when we call freeJSVal, the Haskell function can be freed as well.
 -}
 
 dsWasmJSDynamicExport ::
-  Id -> Coercion -> Maybe Unit -> DsM ([Binding], CHeader, CStub, [Id])
+  Id -> Coercion -> Maybe Unit -> DsM ([Binding], [CStub], [Id])
 dsWasmJSDynamicExport fn_id co mUnitId = do
   sp_tycon <- dsLookupTyCon stablePtrTyConName
   let ty = coercionLKind co
@@ -136,7 +136,7 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
             (Var unsafeDupablePerformIO_id)
             [Type arg_ty, mkApps (Var deRefStablePtr_id) [Type arg_ty, Var sp_id]]
       work_ty = exprType work_rhs
-  (work_h, work_c, _, work_ids, work_bs) <-
+  (work_stub, _, work_ids, work_bs) <-
     dsWasmJSExport
       work_id
       (mkRepReflCo work_ty)
@@ -164,7 +164,7 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
           ++ "($1"
           ++ mconcat [",a" ++ show i | i <- [1 .. length real_arg_tys]]
           ++ ")"
-  (adjustor_bs, adjustor_h, adjustor_c) <-
+  (adjustor_bs, adjustor_stub) <-
     dsWasmJSStaticImport
       adjustor_id
       (mkRepReflCo adjustor_ty)
@@ -183,8 +183,7 @@ dsWasmJSDynamicExport fn_id co mUnitId = do
             ]
   pure
     ( [(fn_id, Cast wrap_rhs co), (work_id, work_rhs)] ++ work_bs ++ adjustor_bs,
-      work_h `mappend` adjustor_h,
-      work_c `mappend` adjustor_c,
+      [work_stub, adjustor_stub],
       work_ids
     )
 
@@ -271,7 +270,7 @@ dsWasmJSStaticImport ::
   String ->
   Maybe Unit ->
   Safety ->
-  DsM ([Binding], CHeader, CStub)
+  DsM ([Binding], CStub)
 dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
   cfun_name <- uniqueCFunName
   let ty = coercionLKind co
@@ -302,13 +301,13 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
           id
       pure
         ( [(fn_id, Cast rhs co)],
-          CHeader commonCDecls,
-          importCStub
-            PlayRisky
-            cfun_name
-            (map scaledThing arg_tys)
-            res_ty
-            js_src
+          simpleCStub commonCDecls $
+            importCStub
+              PlayRisky
+              cfun_name
+              (map scaledThing arg_tys)
+              res_ty
+              js_src
         )
     _ -> do
       io_tycon <- dsLookupTyCon ioTyConName
@@ -356,13 +355,13 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId safety = do
             )
       pure
         ( [(fn_id, Cast rhs co)],
-          CHeader commonCDecls,
-          importCStub
-            PlaySafe
-            cfun_name
-            (map scaledThing arg_tys)
-            jsval_ty
-            js_src
+          simpleCStub commonCDecls $
+            importCStub
+              PlaySafe
+              cfun_name
+              (map scaledThing arg_tys)
+              jsval_ty
+              js_src
         )
 
 uniqueCFunName :: DsM FastString
@@ -456,8 +455,8 @@ importBindingRHS mUnitId safety cfun_name tvs arg_tys orig_res_ty res_trans =
               (zip args_unevaled args_evaled)
     pure rhs
 
-importCStub :: Safety -> FastString -> [Type] -> Type -> String -> CStub
-importCStub safety cfun_name arg_tys res_ty js_src = CStub c_doc [] []
+importCStub :: Safety -> FastString -> [Type] -> Type -> String -> SDoc
+importCStub safety cfun_name arg_tys res_ty js_src = c_doc
   where
     import_name = fromJust $ stripPrefix "ghczuwasmzujsffi" (unpackFS cfun_name)
     import_asm =
@@ -597,7 +596,7 @@ dsWasmJSExport ::
   Id ->
   Coercion ->
   CLabelString ->
-  DsM (CHeader, CStub, String, [Id], [Binding])
+  DsM (CStub, String, [Id], [Binding])
 dsWasmJSExport fn_id co ext_name = do
   work_uniq <- newUnique
   let ty = coercionRKind co
@@ -694,8 +693,7 @@ dsWasmJSExport fn_id co ext_name = do
           $+$ cstub_proto
           $+$ cstub_body
   pure
-    ( CHeader commonCDecls,
-      CStub cstub [] [],
+    ( simpleCStub commonCDecls cstub,
       "",
       [work_id],
       [(work_id, work_rhs)]

@@ -28,7 +28,7 @@ import GHC.Types.ForeignStubs
 import GHC.Types.ForeignCall
 
 dsPrimCall :: Id -> Coercion -> ForeignCall
-           -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
+           -> DsM ([(Id, Expr TyVar)], CStub)
 dsPrimCall fn_id co fcall = do
     let
         ty                   = coercionLKind co
@@ -42,4 +42,4 @@ dsPrimCall fn_id co fcall = do
         call_app = mkFCall ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
         rhs'     = Cast rhs co
-    return ([(fn_id, rhs')], mempty, mempty)
+    return ([(fn_id, rhs')], mempty)

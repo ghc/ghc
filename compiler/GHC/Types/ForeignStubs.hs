@@ -1,92 +1,94 @@
 -- | Foreign export stubs
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE TypeApplications #-}
-module GHC.Types.ForeignStubs
-   ( ForeignStubs (..)
-   , CHeader(..)
-   , CStub(..)
-   , initializerCStub
-   , finalizerCStub
-   , appendStubC
-   )
-where
+{-# LANGUAGE DerivingStrategies #-}
+module GHC.Types.ForeignStubs (
+  CStub (..),
+  ForeignStubs,
+  simpleCStub,
+  initializerCStub,
+  finalizerCStub,
+  CDoc (..),
+  getCDoc,
+  renderCStubs,
+  renderSimpleCStubs,
+) where
 
 import {-# SOURCE #-} GHC.Cmm.CLabel
 
 import GHC.Platform
+import GHC.Prelude
 import GHC.Utils.Outputable
-import Data.List ((++))
-import Data.Monoid
-import Data.Semigroup
-import Data.Coerce
+import Data.Semigroup (Semigroup (..), All (All))
+import GHC.Generics (Generically (Generically), Generic)
+import Data.Coerce (coerce)
+import Data.List.NonEmpty (nonEmpty)
+import Data.Foldable (fold)
 
-data CStub = CStub { getCStub :: SDoc
-                   , getInitializers :: [CLabel]
-                     -- ^ Initializers to be run at startup
-                     -- See Note [Initializers and finalizers in Cmm] in
-                     -- "GHC.Cmm.InitFini".
-                   , getFinalizers :: [CLabel]
-                     -- ^ Finalizers to be run at shutdown
-                   }
+newtype CDoc = CDoc SDoc
 
-emptyCStub :: CStub
-emptyCStub = CStub empty [] []
+getCDoc :: CDoc -> SDoc
+getCDoc = coerce
 
-instance Monoid CStub where
-  mempty = emptyCStub
+instance Outputable CDoc where
+  ppr (CDoc d) = ppr d
 
-instance Semigroup CStub where
-  CStub a0 b0 c0 <> CStub a1 b1 c1 =
-      CStub (a0 $$ a1) (b0 ++ b1) (c0 ++ c1)
+instance Semigroup CDoc where
+  CDoc l <> CDoc r = CDoc (l $$ r)
+
+instance Monoid CDoc where
+  mempty = CDoc empty
+
+data CStub =
+  CStub {
+    header :: CDoc,
+    source :: CDoc,
+    initializers :: [CLabel],
+    finalizers :: [CLabel],
+    simple :: All
+  }
+  deriving (Generic)
+  deriving (Semigroup, Monoid) via (Generically CStub)
+
+simpleCStub :: SDoc -> SDoc -> CStub
+simpleCStub header source = mempty {header = CDoc header, source = CDoc source}
 
 functionCStub :: Platform -> CLabel -> SDoc -> SDoc -> CStub
 functionCStub platform clbl declarations body =
-    CStub body' [] []
+  mempty {
+    source,
+    simple = All False
+  }
   where
-    body' = vcat
-        [ declarations
-        , hsep [text "void", pprCLabel platform clbl, text "(void)"]
-        , braces body
-        ]
+    source = CDoc $ vcat
+      [ declarations
+      , hsep [text "void", pprCLabel platform clbl, text "(void)"]
+      , braces body
+      ]
 
 -- | @initializerCStub fn_nm decls body@ is a 'CStub' containing C initializer
 -- function (e.g. an entry of the @.init_array@ section) named
 -- @fn_nm@ with the given body and the given set of declarations.
 initializerCStub :: Platform -> CLabel -> SDoc -> SDoc -> CStub
 initializerCStub platform clbl declarations body =
-    functionCStub platform clbl declarations body
-    `mappend` CStub empty [clbl] []
+  (functionCStub platform clbl declarations body) {initializers = [clbl]}
 
 -- | @finalizerCStub fn_nm decls body@ is a 'CStub' containing C finalizer
 -- function (e.g. an entry of the @.fini_array@ section) named
 -- @fn_nm@ with the given body and the given set of declarations.
 finalizerCStub :: Platform -> CLabel -> SDoc -> SDoc -> CStub
 finalizerCStub platform clbl declarations body =
-    functionCStub platform clbl declarations body
-    `mappend` CStub empty [] [clbl]
+  (functionCStub platform clbl declarations body) {finalizers = [clbl]}
 
-newtype CHeader = CHeader { getCHeader :: SDoc }
+type ForeignStubs = [CStub]
 
-instance Monoid CHeader where
-  mempty = CHeader empty
-  mconcat = coerce (vcat @SDoc)
+renderCStubs :: [CStub] -> Maybe CStub
+renderCStubs =
+  fmap fold .
+  nonEmpty
 
-instance Semigroup CHeader where
-    (<>) = coerce (($$) @SDoc)
-
--- | Foreign export stubs
-data ForeignStubs
-  = NoStubs
-      -- ^ We don't have any stubs
-  | ForeignStubs CHeader CStub
-      -- ^ There are some stubs. Parameters:
-      --
-      --  1) Header file prototypes for
-      --     "foreign exported" functions
-      --
-      --  2) C stubs to use when calling
-      --     "foreign exported" functions
-
-appendStubC :: ForeignStubs -> CStub -> ForeignStubs
-appendStubC NoStubs         c_code = ForeignStubs mempty c_code
-appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c `mappend` c_code)
+renderSimpleCStubs :: [CStub] -> Maybe CStub
+renderSimpleCStubs =
+  renderCStubs .
+  filter (\ CStub {simple = All simple} -> simple)

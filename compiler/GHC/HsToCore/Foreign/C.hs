@@ -70,8 +70,7 @@ dsCFExport:: Id                 -- Either the exported Id,
           -> Bool               -- True => foreign export dynamic
                                 --         so invoke IO action that's hanging off
                                 --         the first argument's stable pointer
-          -> DsM ( CHeader      -- contents of Module_stub.h
-                 , CStub        -- contents of Module_stub.c
+          -> DsM ( CStub        -- contents of Module_stub.h and Module_stub.c
                  , String       -- string describing type to pass to createAdj.
                  )
 
@@ -106,7 +105,7 @@ dsCImport :: Id
           -> CCallConv
           -> Safety
           -> Maybe Header
-          -> DsM ([Binding], CHeader, CStub)
+          -> DsM ([Binding], CStub)
 dsCImport id co (CLabel cid) _ _ _ = do
    let ty  = coercionLKind co
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
@@ -120,7 +119,7 @@ dsCImport id co (CLabel cid) _ _ _ = do
         rhs = foRhs (Lit (LitLabel cid fod))
         rhs' = Cast rhs co
     in
-    return ([(id, rhs')], mempty, mempty)
+    return ([(id, rhs')], mempty)
 
 dsCImport id co (CFunction target) cconv@PrimCallConv safety _
   = dsPrimCall id co (CCall (CCallSpec target cconv safety))
@@ -168,7 +167,7 @@ f_helper(StablePtr s, HsBool b, HsInt i)
 dsCFExportDynamic :: Id
                  -> Coercion
                  -> CCallConv
-                 -> DsM ([Binding], CHeader, CStub)
+                 -> DsM ([Binding], CStub)
 dsCFExportDynamic id co0 cconv = do
     mod <- getModule
     let fe_nm = mkFastString $ zEncodeString
@@ -183,7 +182,7 @@ dsCFExportDynamic id co0 cconv = do
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalDs ManyTy stable_ptr_ty
-    (h_code, c_code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv True
+    (code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
           The arguments to the external function which will
@@ -216,7 +215,7 @@ dsCFExportDynamic id co0 cconv = do
                -- Never inline the f.e.d. function, because the litlit
                -- might not be in scope in other modules.
 
-    return ([fed], h_code, c_code)
+    return ([fed], code)
 
  where
   ty                       = coercionLKind co0
@@ -228,7 +227,7 @@ dsCFExportDynamic id co0 cconv = do
 
 -- | Foreign calls
 dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
-        -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
+        -> DsM ([(Id, Expr TyVar)], CStub)
 dsFCall fn_id co fcall mDeclHeader = do
     let
         (ty,ty1)             = (coercionLKind co, coercionRKind co)
@@ -321,7 +320,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                                                 StableSystemSrc (length args)
                                                 wrap_rhs'
 
-    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], mempty, CStub cDoc [] [])
+    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], simpleCStub empty cDoc)
 
 
 toCName :: Id -> String
@@ -380,14 +379,12 @@ mkFExportCBits :: DynFlags
                -> Type
                -> Bool          -- True <=> returns an IO type
                -> CCallConv
-               -> (CHeader,
-                   CStub,
+               -> (CStub,
                    String       -- the argument reps
                   )
 mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
  =
-   ( header_bits
-   , CStub body [] []
+   ( simpleCStub header_bits body
    , type_string
     )
  where
@@ -453,7 +450,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   -- Now we can cook up the prototype for the exported function.
   pprCconv = ccallConvAttribute cc
 
-  header_bits = CHeader (text "extern" <+> fun_proto <> semi)
+  header_bits = text "extern" <+> fun_proto <> semi
 
   fun_args
     | null aug_arg_info = text "void"

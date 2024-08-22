@@ -53,7 +53,7 @@ import GHC.Driver.Plugins
 
 import GHC.Types.Id
 import GHC.Types.Fixity.Env
-import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
+import GHC.Types.ForeignStubs (ForeignStubs)
 import GHC.Types.SafeHaskell
 import GHC.Types.Annotations
 import GHC.Types.Name
@@ -279,7 +279,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                    docs mod_summary
                    mod_details
 
-          mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
+          mkFullIface hsc_env partial_iface Nothing Nothing [] []
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv -> [ImportUserSpec]

@@ -82,7 +82,7 @@ codeOutput
     -> Module
     -> FilePath
     -> ModLocation
-    -> (a -> ForeignStubs)
+    -> (a -> Maybe CStub)
     -> [(ForeignSrcLang, FilePath)]
     -- ^ additional files to be compiled with the C compiler
     -> Set UnitId -- ^ Dependencies
@@ -115,7 +115,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                 ; return cmm
                 }
 
-        ; let final_stream :: Stream IO RawCmmGroup (ForeignStubs, a)
+        ; let final_stream :: Stream IO RawCmmGroup (Maybe CStub, a)
               final_stream = do
                   { a <- linted_cmm_stream
                   ; let stubs = genForeignStubs a
@@ -133,10 +133,9 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
         }
 
 -- | See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini for details.
-emitInitializerDecls :: Module -> ForeignStubs -> Stream IO RawCmmGroup ()
-emitInitializerDecls this_mod (ForeignStubs _ cstub)
-  | initializers <- getInitializers cstub
-  , not $ null initializers =
+emitInitializerDecls :: Module -> Maybe CStub -> Stream IO RawCmmGroup ()
+emitInitializerDecls this_mod (Just CStub {initializers})
+  | not $ null initializers =
       let init_array = CmmData sect statics
           lbl = mkInitializerArrayLabel this_mod
           sect = Section InitArray lbl
@@ -255,7 +254,7 @@ outputForeignStubs
     -> UnitState
     -> Module
     -> ModLocation
-    -> ForeignStubs
+    -> Maybe CStub
     -> IO (Bool,         -- Header file created
            Maybe FilePath) -- C file created
 outputForeignStubs logger tmpfs dflags unit_state mod location stubs
@@ -263,10 +262,10 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
    stub_c <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
 
    case stubs of
-     NoStubs ->
+     Nothing ->
         return (False, Nothing)
 
-     ForeignStubs (CHeader h_code) (CStub c_code _ _) -> do
+     Just CStub {header = CDoc h_code, source = CDoc c_code} -> do
         let
             stub_c_output_d = pprCode c_code
             stub_c_output_w = showSDoc dflags stub_c_output_d

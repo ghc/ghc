@@ -74,8 +74,7 @@ dsJsFExport
   -> Bool               -- True => foreign export dynamic
                         --         so invoke IO action that's hanging off
                         --         the first argument's stable pointer
-  -> DsM ( CHeader      -- contents of Module_stub.h
-         , CStub        -- contents of Module_stub.c
+  -> DsM ( CStub        -- contents of Module_stub.h and Module_stub.c
          , String       -- string describing type to pass to createAdj.
          )
 
@@ -111,12 +110,11 @@ mkFExportJSBits
   -> Type
   -> Bool          -- True <=> returns an IO type
   -> CCallConv
-  -> (CHeader,
-      CStub,
+  -> (CStub,
       String       -- the argument reps
      )
 mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
- = (header_bits, js_bits, type_string)
+ = (simpleCStub header_bits js_bits, type_string)
  where
   -- list the arguments to the JS function
   arg_info :: [(SDoc,           -- arg name
@@ -142,9 +140,9 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
   unboxResType | res_hty_is_unit = text "h$rts_getUnit"
                | otherwise       = unpackHObj res_hty
 
-  header_bits = maybe mempty idTag maybe_target
+  header_bits = maybe empty idTag maybe_target
   idTag i = let (tag, u) = unpkUnique (getUnique i)
-            in  CHeader (char tag <> word64 u)
+            in  char tag <> word64 u
 
   normal_args = map (\(nm,_ty,_,_) -> nm) arg_info
   all_args
@@ -193,10 +191,7 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
                <> parens (acc <> comma <> mkHObj arg_hty <> parens arg_cname)
 
   -- finally, the whole darn thing
-  js_bits = CStub { getCStub        = js_sdoc
-                  , getInitializers = mempty
-                  , getFinalizers   = mempty
-                  }
+  js_bits = js_sdoc
        where js_sdoc = space
                $$ fun_proto
                $$ vcat
@@ -230,7 +225,7 @@ dsJsImport
   -> CCallConv
   -> Safety
   -> Maybe Header
-  -> DsM ([Binding], CHeader, CStub)
+  -> DsM ([Binding], CStub)
 dsJsImport id co (CLabel cid) _ _ _ = do
    let ty = coercionLKind co
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
@@ -243,7 +238,7 @@ dsJsImport id co (CLabel cid) _ _ _ = do
    let rhs = foRhs (Lit (LitLabel cid fod))
        rhs' = Cast rhs co
 
-   return ([(id, rhs')], mempty, mempty)
+   return ([(id, rhs')], mempty)
 
 dsJsImport id co (CFunction target) cconv@PrimCallConv safety _
   = dsPrimCall id co (CCall (CCallSpec target cconv safety))
@@ -258,7 +253,7 @@ dsJsImport id co CWrapper cconv _ _
 dsJsFExportDynamic :: Id
                  -> Coercion
                  -> CCallConv
-                 -> DsM ([Binding], CHeader, CStub)
+                 -> DsM ([Binding], CStub)
 dsJsFExportDynamic id co0 cconv = do
     let
       ty                            = coercionLKind co0
@@ -280,7 +275,7 @@ dsJsFExportDynamic id co0 cconv = do
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalDs ManyTy stable_ptr_ty
-    (h_code, c_code, typestring) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv True
+    (code, typestring) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
           The arguments to the external function which will
@@ -313,13 +308,13 @@ dsJsFExportDynamic id co0 cconv = do
                -- Never inline the f.e.d. function, because the litlit
                -- might not be in scope in other modules.
 
-    return ([fed], h_code, c_code)
+    return ([fed], code)
 
 toJsName :: Id -> String
 toJsName i = renderWithContext defaultSDocContext (pprCode (ppr (idName i)))
 
 dsJsCall :: Id -> Coercion -> ForeignCall -> Maybe Header
-        -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
+        -> DsM ([(Id, Expr TyVar)], CStub)
 dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
     let
         ty                   = coercionLKind co
@@ -358,7 +353,7 @@ dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
                        mkInlineUnfoldingWithArity simpl_opts VanillaSrc
                                                   (length args)  wrap_rhs'
 
-    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], mempty, mempty)
+    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], mempty)
 
 
 mkHObj :: Type -> SDoc

@@ -2008,9 +2008,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                     return a
                   rawcmms1 = Stream.mapM dump rawcmms0
 
-              let foreign_stubs st = foreign_stubs0
-                                     `appendStubC` prof_init
-                                     `appendStubC` cgIPEStub st
+              let foreign_stubs st = renderCStubs (foreign_stubs0 ++ [prof_init, cgIPEStub st])
 
               (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
                   <- {-# SCC "codeOutput" #-}
@@ -2079,7 +2077,7 @@ hscInteractive hsc_env cgguts location = do
 
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
+        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location (renderCStubs foreign_stubs)
     return (istub_c_exists, comp_bc)
 
 -- | Compile Core bindings and foreign inputs that were loaded from an
@@ -2158,10 +2156,10 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
             rawCmms = Stream.mapM dump rawCmms0
 
         let foreign_stubs _
-              | not $ null ipe_ents =
-                  let ip_init = ipInitCode do_info_table platform cmm_mod
-                  in NoStubs `appendStubC` ip_init
-              | otherwise     = NoStubs
+              | not $ null ipe_ents
+              = Just (ipInitCode do_info_table platform cmm_mod)
+              | otherwise
+              = Nothing
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
           <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
              rawCmms
@@ -2816,13 +2814,12 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     pure (pls', (ldAllLinkables deps, emptyUDFM {- ldNeededUnits deps -}) )
 
 
-  let foreign_stubs    = NoStubs
-      spt_entries      = mempty
+  let spt_entries      = mempty
       cost_centre_info = mempty
 
   -- codegen into object file whose path is in out_obj
   out_obj <- newTempName logger tmpfs tmp_dir TFL_CurrentModule "o"
-  stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs cost_centre_info out_obj
+  stgToJS logger js_config stg_binds this_mod spt_entries [] cost_centre_info out_obj
 
   let TxtI id_sym = makeIdentForId binding_id Nothing IdPlain this_mod
   -- link code containing binding "id_sym = expr", using id_sym as root

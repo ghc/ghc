@@ -25,6 +25,7 @@ import Data.Traversable (for)
 import Data.Word (Word8)
 import Data.Maybe (fromMaybe)
 import System.FilePath (takeExtension)
+import Data.Semigroup (All(All))
 
 {-
 Note [Interface Files with Core Definitions]
@@ -387,8 +388,8 @@ encodeIfaceForeign ::
   IO IfaceForeign
 encodeIfaceForeign logger dflags foreign_stubs lang_paths = do
   files <- read_foreign_files
-  stubs <- encode_stubs foreign_stubs
-  let iff = IfaceForeign {stubs, files}
+  let stubs = encode_stubs <$> renderSimpleCStubs foreign_stubs
+      iff = IfaceForeign {stubs, files}
   debugTraceMsg logger 3 $
     hang (text "Encoding foreign data for iface:") 2 (ppr iff)
   pure iff
@@ -400,15 +401,12 @@ encodeIfaceForeign logger dflags foreign_stubs lang_paths = do
         source <- readFile path
         pure IfaceForeignFile {lang, source, extension = takeExtension path}
 
-    encode_stubs = \case
-      NoStubs ->
-        pure Nothing
-      ForeignStubs (CHeader header) (CStub source inits finals) ->
-        pure $ Just IfaceCStubs {
+    encode_stubs CStub {..} =
+        IfaceCStubs {
           header = render header,
           source = render source,
-          initializers = encode_label <$> inits,
-          finalizers = encode_label <$> finals
+          initializers = encode_label <$> initializers,
+          finalizers = encode_label <$> finalizers
         }
 
     encode_label clabel =
@@ -419,7 +417,7 @@ encodeIfaceForeign logger dflags foreign_stubs lang_paths = do
       "-fwrite-if-simplified-core is incompatible with this foreign stub:"
       (pprCLabel (targetPlatform dflags) clabel)
 
-    render = renderWithContext (initSDocContext dflags PprCode)
+    render = renderWithContext (initSDocContext dflags PprCode) . getCDoc
 
 -- | Decode serialized foreign stubs and foreign files.
 --
@@ -437,12 +435,16 @@ decodeIfaceForeign logger tmpfs tmp_dir iff@IfaceForeign {stubs, files} = do
     f <- newTempName logger tmpfs tmp_dir TFL_GhcSession extension
     writeFile f source
     pure (lang, f)
-  pure (maybe NoStubs decode_stubs stubs, lang_paths)
+  pure (foldMap decode_stubs stubs, lang_paths)
   where
     decode_stubs IfaceCStubs {header, source, initializers, finalizers} =
-      ForeignStubs
-      (CHeader (text header))
-      (CStub (text source) (labels initializers) (labels finalizers))
+      pure CStub {
+        header = CDoc (text header),
+        source = CDoc (text source),
+        initializers = labels initializers,
+        finalizers = labels finalizers,
+        simple = All True
+      }
 
     labels ls = [fromCStubLabel l | IfaceCLabel l <- ls]
 

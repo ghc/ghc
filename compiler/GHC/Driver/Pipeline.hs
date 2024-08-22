@@ -96,7 +96,6 @@ import GHC.Runtime.Loader      ( initializePlugins )
 
 import GHC.Types.Basic       ( SuccessFlag(..), ForeignSrcLang(..) )
 import GHC.Types.Error       ( singleMessage, getMessages, mkSimpleUnknownDiagnostic, defaultDiagnosticOpts )
-import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -796,7 +795,7 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
   else
     case result of
       HscUpdate iface ->  return (iface, emptyHomeModInfoLinkable)
-      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing NoStubs []) <*> pure emptyHomeModInfoLinkable
+      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing Nothing [] []) <*> pure emptyHomeModInfoLinkable
 
 hscGenBackendPipeline :: P m
   => PipeEnv

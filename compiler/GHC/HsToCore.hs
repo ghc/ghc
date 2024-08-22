@@ -197,7 +197,7 @@ deSugar hsc_env
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
                                    , spec_rules ++ ds_rules
-                                   , ds_fords `appendStubC` hpc_init) } }
+                                   , hpc_init : ds_fords) } }
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;

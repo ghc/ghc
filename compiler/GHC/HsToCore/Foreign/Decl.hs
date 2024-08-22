@@ -66,37 +66,35 @@ dsForeigns fos = do
 dsForeigns' :: [LForeignDecl GhcTc]
             -> DsM (ForeignStubs, OrdList Binding)
 dsForeigns' []
-  = return (NoStubs, nilOL)
+  = return ([], nilOL)
 dsForeigns' fos = do
     mod <- getModule
     platform <- targetPlatform <$> getDynFlags
     fives <- mapM do_ldecl fos
     let
-        (hs, cs, idss, bindss) = unzip4 fives
+        (stubs, idss, bindss) = unzip3 fives
         fe_ids = concat idss
         fe_init_code = foreignExportsInitialiser platform mod fe_ids
     --
-    return (ForeignStubs
-             (mconcat hs)
-             (mconcat cs `mappend` fe_init_code),
+    return (fe_init_code : concat stubs,
             foldr (appOL . toOL) nilOL bindss)
   where
    do_ldecl (L loc decl) = putSrcSpanDs (locA loc) (do_decl decl)
 
-   do_decl :: ForeignDecl GhcTc -> DsM (CHeader, CStub, [Id], [Binding])
+   do_decl :: ForeignDecl GhcTc -> DsM ([CStub], [Id], [Binding])
    do_decl (ForeignImport { fd_name = id, fd_i_ext = co, fd_fi = spec }) = do
       traceIf (text "fi start" <+> ppr id)
       let id' = unLoc id
-      (bs, h, c, ids) <- dsFImport id' co spec
+      (bs, stubs, ids) <- dsFImport id' co spec
       traceIf (text "fi end" <+> ppr id)
-      return (h, c, ids, bs)
+      return (stubs, ids, bs)
 
    do_decl (ForeignExport { fd_name = L _ id
                           , fd_e_ext = co
                           , fd_fe = CExport _
                               (L _ (CExportStatic _ ext_nm cconv)) }) = do
-      (h, c, _, ids, bs) <- dsFExport id co ext_nm cconv False
-      return (h, c, ids, bs)
+      (stubs, _, ids, bs) <- dsFExport id co ext_nm cconv False
+      return ([stubs], ids, bs)
 
 {-
 ************************************************************************
@@ -127,20 +125,20 @@ because it exposes the boxing to the call site.
 dsFImport :: Id
           -> Coercion
           -> ForeignImport (GhcPass p)
-          -> DsM ([Binding], CHeader, CStub, [Id])
+          -> DsM ([Binding], [CStub], [Id])
 dsFImport id co (CImport _ cconv safety mHeader spec) = do
   platform <- getPlatform
   let cconv' = unLoc cconv
       safety' = unLoc safety
   case (platformArch platform, cconv') of
     (ArchJavaScript, _) -> do
-      (bs, h, c) <- dsJsImport id co spec cconv' safety' mHeader
-      pure (bs, h, c, [])
+      (bs, stubs) <- dsJsImport id co spec cconv' safety' mHeader
+      pure (bs, [stubs], [])
     (ArchWasm32, JavaScriptCallConv) ->
       dsWasmJSImport id co spec safety'
     _ -> do
-      (bs, h, c) <- dsCImport id co spec cconv' safety' mHeader
-      pure (bs, h, c, [])
+      (bs, stubs) <- dsCImport id co spec cconv' safety' mHeader
+      pure (bs, [stubs], [])
 
 {-
 ************************************************************************
@@ -170,8 +168,7 @@ dsFExport :: Id                 -- Either the exported Id,
           -> Bool               -- True => foreign export dynamic
                                 --         so invoke IO action that's hanging off
                                 --         the first argument's stable pointer
-          -> DsM ( CHeader      -- contents of Module_stub.h
-                 , CStub        -- contents of Module_stub.c
+          -> DsM ( CStub        -- contents of Module_stub.c
                  , String       -- string describing type to pass to createAdj.
                  , [Id]         -- function closures to be registered as GC roots
                  , [Binding]    -- additional bindings used by desugared foreign export
@@ -180,13 +177,13 @@ dsFExport fn_id co ext_name cconv is_dyn = do
   platform <- getPlatform
   case (platformArch platform, cconv) of
     (ArchJavaScript, _) -> do
-      (h, c, ts) <- dsJsFExport fn_id co ext_name cconv is_dyn
-      pure (h, c, ts, [fn_id], [])
+      (stubs, ts) <- dsJsFExport fn_id co ext_name cconv is_dyn
+      pure (stubs, ts, [fn_id], [])
     (ArchWasm32, JavaScriptCallConv) ->
       dsWasmJSExport fn_id co ext_name
     _ -> do
-      (h, c, ts) <- dsCFExport fn_id co ext_name cconv is_dyn
-      pure (h, c, ts, [fn_id], [])
+      (stubs, ts) <- dsCFExport fn_id co ext_name cconv is_dyn
+      pure (stubs, ts, [fn_id], [])
 
 
 foreignExportsInitialiser :: Platform -> Module -> [Id] -> CStub

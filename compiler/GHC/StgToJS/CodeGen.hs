@@ -44,7 +44,7 @@ import GHC.Unit.Module
 import GHC.Linker.Types (SptEntry (..))
 
 import GHC.Types.CostCentre
-import GHC.Types.ForeignStubs (ForeignStubs (..), getCHeader, getCStub)
+import GHC.Types.ForeignStubs (ForeignStubs, CStub (..), CDoc (CDoc))
 import GHC.Types.RepType
 import GHC.Types.Id
 import GHC.Types.Unique
@@ -162,9 +162,7 @@ genUnits m ss spt_entries foreign_stubs = do
 
       generateExportsBlock :: HasDebugCallStack => G LinkableUnit
       generateExportsBlock = do
-        let (f_hdr, f_c) = case foreign_stubs of
-                                  NoStubs            -> (empty, empty)
-                                  ForeignStubs hdr c -> (getCHeader hdr, getCStub c)
+        let CStub {header = CDoc f_hdr, source = CDoc f_c} = mconcat foreign_stubs
             unique_deps = map mkUniqueDep (lines $ renderWithContext defaultSDocContext f_hdr)
             mkUniqueDep (tag:xs) = mkUnique tag (read xs)
             mkUniqueDep []       = panic "mkUniqueDep"

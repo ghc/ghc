@@ -73,7 +73,6 @@ import GHC.Utils.Logger as Logger
 import qualified GHC.Utils.Error as Err
 
 import GHC.Types.DefaultEnv ( emptyDefaultEnv )
-import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var
@@ -429,7 +428,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
 
   let all_foreign_stubs = case mcstub of
         Nothing    -> foreign_stubs
-        Just cstub -> foreign_stubs `appendStubC` cstub
+        Just cstub -> cstub : foreign_stubs
 
       -- The completed type environment is gotten from
       --      a) the types and classes defined here (plus implicit things)
