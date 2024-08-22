@@ -36,7 +36,7 @@ Examples
 +-----------------------+------------------------+---------------------------+
 | Expression            | Output                 | Notes                     |
 +=======================+========================+===========================+
-| .. code-block:: text  | .. code-block::        |                           |
+| .. code-block:: text  | ::                     |                           |
 |                       |                        |                           |
 |    """                |       "Line 1\n"       |                           |
 |    Line 1             |    ++ "Line 2\n"       |                           |
@@ -44,7 +44,7 @@ Examples
 |    Line 3             |                        |                           |
 |    """                |                        |                           |
 +-----------------------+------------------------+---------------------------+
-| .. code-block:: text  | .. code-block::        |                           |
+| .. code-block:: text  | ::                     |                           |
 |                       |                        | Characters on the same    |
 |    """Test            |       "Test\n"         | line as the delimiter are |
 |    Line 1             |    ++ "Line 1\n"       | still included            |
@@ -52,7 +52,7 @@ Examples
 |    Line 3             |    ++ "Line 3\n"       |                           |
 |    """                |                        |                           |
 +-----------------------+------------------------+---------------------------+
-| .. code-block:: text  | .. code-block::        |                           |
+| .. code-block:: text  | ::                     |                           |
 |                       |                        | Omit the trailing newline |
 |    """                |       "Line 1\n"       | with string gaps          |
 |    Line 1             |    ++ "Line 2\n"       |                           |
@@ -60,7 +60,7 @@ Examples
 |    Line 3\            |                        |                           |
 |    \"""               |                        |                           |
 +-----------------------+------------------------+---------------------------+
-| .. code-block:: text  | .. code-block::        |                           |
+| .. code-block:: text  | ::                     |                           |
 |                       |                        | Double quotes don't need  |
 |    """                |       "\"Hello\"\n"    | to be escaped unless      |
 |    "Hello"            |    ++ "\"\"\"\n"       | they're triple quoted     |
@@ -68,7 +68,7 @@ Examples
 |    \"""               |                        |                           |
 |    """                |                        |                           |
 +-----------------------+------------------------+---------------------------+
-| .. code-block:: text  | .. code-block::        |                           |
+| .. code-block:: text  | ::                     |                           |
 |                       |                        | Only common indentation   |
 |    """                |       "<div>\n"        | is stripped               |
 |      <div>            |    ++ "  <p>ABC</p>\n" |                           |
@@ -76,7 +76,7 @@ Examples
 |      </div>           |                        |                           |
 |    """                |                        |                           |
 +-----------------------+------------------------+---------------------------+
-| .. code-block:: text  | .. code-block::        |                           |
+| .. code-block:: text  | ::                     |                           |
 |                       |                        | Use ``\&`` to keep        |
 |    """                |       "  Line 1\n"     | leading indentation for   |
 |      \&  Line 1       |    ++ "  Line 2\n"     | each line                 |
