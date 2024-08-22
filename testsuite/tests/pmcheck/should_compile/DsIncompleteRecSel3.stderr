@@ -1,80 +1,48 @@
-
 DsIncompleteRecSel3.hs:29:7: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘x’ may fail for the following constructors: T2
+    Selecting the record field ‘x’ may fail for the following constructors:
+      T2
 
 DsIncompleteRecSel3.hs:34:7: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:13: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:19: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:25: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:31: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:37: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:43: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:49: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:55: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:34:61: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
 
 DsIncompleteRecSel3.hs:37:5: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘y’ may fail for the following constructors: G2
-                                                                                     G3
-                                                                                     G4
-                                                                                     G5
-                                                                                     ...
+    Selecting the record field ‘y’ may fail for the following constructors:
+      G2, G3, G4, G5, ...
+

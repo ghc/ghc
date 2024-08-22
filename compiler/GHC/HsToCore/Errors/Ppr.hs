@@ -207,10 +207,12 @@ instance Diagnostic DsMessage where
                           <+> text "for"<+> quotes (ppr lhs_id)
                           <+> text "might fire first")
                 ]
-    DsIncompleteRecordSelector name cons_wo_field not_full_examples -> mkSimpleDecorated $
-      text "The application of the record field" <+> quotes (ppr name)
-      <+> text "may fail for the following constructors:"
-      <+> vcat (map ppr cons_wo_field ++ [text "..." | not_full_examples])
+    DsIncompleteRecordSelector name cons maxCons -> mkSimpleDecorated $
+      hang (text "Selecting the record field" <+> quotes (ppr name)
+              <+> text "may fail for the following constructors:")
+           2
+           (hsep $ punctuate comma $
+            map ppr (take maxCons cons) ++ [ text "..." | lengthExceeds cons maxCons ])
 
   diagnosticReason = \case
     DsUnknownMessage m          -> diagnosticReason m

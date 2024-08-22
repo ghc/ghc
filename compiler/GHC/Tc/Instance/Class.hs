@@ -1290,10 +1290,12 @@ matchHasField dflags short_cut clas tys
                      then do { -- See Note [Unused name reporting and HasField]
                                addUsedGRE AllDeprecationWarnings gre
                              ; keepAlive name
+                             ; let maxCons = maxUncoveredPatterns dflags
+                             ; let (_, fallible_cons) = sel_cons (idDetails sel_id)
                              ; suppress <- getSuppressIncompleteRecSelsTc
                                -- See (7) of Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
-                             ; unless (null (snd $ sel_cons $ idDetails sel_id) || suppress) $ do
-                                 addDiagnostic $ TcRnHasFieldResolvedIncomplete name
+                             ; unless (null fallible_cons || suppress) $ do
+                                 addDiagnostic $ TcRnHasFieldResolvedIncomplete name fallible_cons maxCons
                              ; return OneInst { cir_new_theta   = theta
                                               , cir_mk_ev       = mk_ev
                                               , cir_canonical   = EvCanonical

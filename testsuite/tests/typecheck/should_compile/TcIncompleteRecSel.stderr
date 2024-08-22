@@ -1,3 +1,4 @@
-
 TcIncompleteRecSel.hs:16:5: warning: [GHC-86894] [-Wincomplete-record-selectors]
-    The invocation of `getField` on the record field ‘x’ may produce an error since it is not defined for all data constructors
+    Selecting the record field ‘x’ may fail for the following constructors:
+      T2
+

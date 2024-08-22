@@ -163,7 +163,9 @@ data DsMessage
        DsIncompleteRecSel2
        DsIncompleteRecSel3
   -}
-  | DsIncompleteRecordSelector !Name ![ConLike] !Bool
+  | DsIncompleteRecordSelector !Name       -- ^ The selector
+                               ![ConLike]  -- ^ The partial constructors
+                               !Int        -- ^ The max number of constructors reported
 
   deriving Generic
 

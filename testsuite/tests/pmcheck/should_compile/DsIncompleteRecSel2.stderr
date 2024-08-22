@@ -1,6 +1,8 @@
-
 DsIncompleteRecSel2.hs:22:8: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘x’ may fail for the following constructors: T4
+    Selecting the record field ‘x’ may fail for the following constructors:
+      T4
 
 DsIncompleteRecSel2.hs:28:19: warning: [GHC-17335] [-Wincomplete-record-selectors]
-    The application of the record field ‘x’ may fail for the following constructors: P
+    Selecting the record field ‘x’ may fail for the following constructors:
+      P
+

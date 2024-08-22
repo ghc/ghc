@@ -395,13 +395,11 @@ pmcRecSel sel_id arg
           sel_name = varName sel_id
           warn_incomplete arg_id uncov_nablas = do
             dflags <- getDynFlags
-            let maxConstructors = maxUncoveredPatterns dflags
-            unc_examples <- getNFirstUncovered MinimalCover [arg_id] (maxConstructors + 1) uncov_nablas
+            let maxPatterns = maxUncoveredPatterns dflags
+            unc_examples <- getNFirstUncovered MinimalCover [arg_id] (maxPatterns + 1) uncov_nablas
             let cons = [con | unc_example <- unc_examples
                       , Just (PACA (PmAltConLike con) _ _) <- [lookupSolution unc_example arg_id]]
-                not_full_examples = length cons == (maxConstructors + 1)
-                cons' = take maxConstructors cons
-            diagnosticDs $ DsIncompleteRecordSelector sel_name cons' not_full_examples
+            diagnosticDs $ DsIncompleteRecordSelector sel_name cons maxPatterns
 
 pmcRecSel _ _ = return ()
 

@@ -3573,7 +3573,10 @@ data TcRnMessage where
      Test cases:
        TcIncompleteRecSel
   -}
-  TcRnHasFieldResolvedIncomplete :: !Name -> TcRnMessage
+  TcRnHasFieldResolvedIncomplete :: !Name         -- ^ The selector
+                                 -> ![ConLike]    -- ^ The partial constructors
+                                 -> !Int          -- ^ The max number of constructors reported
+                                 -> TcRnMessage
 
   {-| TcRnBadFieldAnnotation is an error/warning group indicating that a
     strictness/unpack related data type field annotation is invalid.
