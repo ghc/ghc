@@ -86,6 +86,8 @@ module GHC.Unit.Types
    , GenWithIsBoot (..)
    , ModuleNameWithIsBoot
    , ModuleWithIsBoot
+   , InstalledModuleWithIsBoot
+   , notBoot
    )
 where
 
@@ -713,6 +715,8 @@ type ModuleNameWithIsBoot = GenWithIsBoot ModuleName
 
 type ModuleWithIsBoot = GenWithIsBoot Module
 
+type InstalledModuleWithIsBoot = GenWithIsBoot InstalledModule
+
 instance Binary a => Binary (GenWithIsBoot a) where
   put_ bh (GWIB { gwib_mod, gwib_isBoot }) = do
     put_ bh gwib_mod
@@ -726,3 +730,6 @@ instance Outputable a => Outputable (GenWithIsBoot a) where
   ppr (GWIB  { gwib_mod, gwib_isBoot }) = hsep $ ppr gwib_mod : case gwib_isBoot of
     IsBoot -> [ text "{-# SOURCE #-}" ]
     NotBoot -> []
+
+notBoot :: mod -> GenWithIsBoot mod
+notBoot gwib_mod = GWIB {gwib_mod, gwib_isBoot = NotBoot}

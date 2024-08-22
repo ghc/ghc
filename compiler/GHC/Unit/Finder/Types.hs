@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
 --
-type FinderCacheState = InstalledModuleEnv InstalledFindResult
+type FinderCacheState = InstalledModuleWithIsBootEnv InstalledFindResult
 type FileCacheState   = M.Map FilePath Fingerprint
 data FinderCache = FinderCache { fcModuleCache :: (IORef FinderCacheState)
                                , fcFileCache   :: (IORef FileCacheState)

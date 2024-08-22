@@ -2055,25 +2055,43 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
         let fopts = initFinderOpts (hsc_dflags hsc_env)
+            src_path = src_fn
 
-        -- Make a ModLocation for this file
-        let location = mkHomeModLocation fopts pi_mod_name src_fn
+            is_boot = case takeExtension src_fn of
+              ".hs-boot" -> IsBoot
+              ".lhs-boot" -> IsBoot
+              _ -> NotBoot
+
+            (path_without_boot, hsc_src)
+              | isHaskellSigFilename src_fn = (src_path, HsigFile)
+              | IsBoot <- is_boot = (removeBootSuffix src_path, HsBootFile)
+              | otherwise = (src_path, HsSrcFile)
+
+            -- Make a ModLocation for the Finder, who only has one entry for
+            -- each @ModuleName@, and therefore needs to use the locations for
+            -- the non-boot files.
+            location_without_boot =
+              mkHomeModLocation fopts pi_mod_name path_without_boot
+
+            -- Make a ModLocation for this file, adding the @-boot@ suffix to
+            -- all paths if the original was a boot file.
+            location
+              | IsBoot <- is_boot
+              = addBootSuffixLocn location_without_boot
+              | otherwise
+              = location_without_boot
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
         mod <- liftIO $ do
           let home_unit = hsc_home_unit hsc_env
           let fc        = hsc_FC hsc_env
-          addHomeModuleToFinder fc home_unit pi_mod_name location
+          addHomeModuleToFinder fc home_unit (GWIB pi_mod_name is_boot) location
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_hash = src_hash
-            , nms_is_boot = NotBoot
-            , nms_hsc_src =
-                if isHaskellSigFilename src_fn
-                   then HsigFile
-                   else HsSrcFile
+            , nms_hsc_src = hsc_src
             , nms_location = location
             , nms_mod = mod
             , nms_preimps = preimps
@@ -2101,9 +2119,10 @@ checkSummaryHash
            -- Also, only add to finder cache for non-boot modules as the finder cache
            -- makes sure to add a boot suffix for boot files.
            _ <- do
-              let fc        = hsc_FC hsc_env
+              let fc = hsc_FC hsc_env
+                  gwib = GWIB (ms_mod old_summary) (isBootSummary old_summary)
               case ms_hsc_src old_summary of
-                HsSrcFile -> addModuleToFinder fc (ms_mod old_summary) location
+                HsSrcFile -> addModuleToFinder fc gwib location
                 _ -> return ()
 
            hi_timestamp <- modificationTimeIfExists (ml_hi_file location)
@@ -2241,7 +2260,6 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_hash = src_hash
-            , nms_is_boot = is_boot
             , nms_hsc_src = hsc_src
             , nms_location = location
             , nms_mod = mod
@@ -2254,7 +2272,6 @@ data MakeNewModSummary
   = MakeNewModSummary
       { nms_src_fn :: FilePath
       , nms_src_hash :: Fingerprint
-      , nms_is_boot :: IsBootInterface
       , nms_hsc_src :: HscSource
       , nms_location :: ModLocation
       , nms_mod :: Module
