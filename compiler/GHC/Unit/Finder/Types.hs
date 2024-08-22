@@ -30,9 +30,9 @@ data FinderCache = FinderCache { flushFinderCaches :: UnitEnv -> IO ()
                                -- ^ remove all the home modules from the cache; package modules are
                                -- assumed to not move around during a session; also flush the file hash
                                -- cache.
-                               , addToFinderCache  :: InstalledModule -> InstalledFindResult -> IO ()
+                               , addToFinderCache  :: InstalledModuleWithIsBoot -> InstalledFindResult -> IO ()
                                -- ^ Add a found location to the cache for the module.
-                               , lookupFinderCache :: InstalledModule -> IO (Maybe InstalledFindResult)
+                               , lookupFinderCache :: InstalledModuleWithIsBoot -> IO (Maybe InstalledFindResult)
                                -- ^ Look for a location in the cache.
                                , lookupFileCache   :: FilePath -> IO Fingerprint
                                -- ^ Look for the hash of a file in the cache. This should add it to the

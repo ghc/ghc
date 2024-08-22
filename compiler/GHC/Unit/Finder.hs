@@ -89,23 +89,23 @@ type BaseName = OsPath  -- Basename of file
 
 initFinderCache :: IO FinderCache
 initFinderCache = do
-  mod_cache <- newIORef emptyInstalledModuleEnv
+  mod_cache <- newIORef emptyInstalledModuleWithIsBootEnv
   file_cache <- newIORef M.empty
   let flushFinderCaches :: UnitEnv -> IO ()
       flushFinderCaches ue = do
-        atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
+        atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleWithIsBootEnv is_ext fm, ())
         atomicModifyIORef' file_cache $ \_ -> (M.empty, ())
        where
-        is_ext mod _ = not (isUnitEnvInstalledModule ue mod)
+        is_ext mod _ = not (isUnitEnvInstalledModule ue (gwib_mod mod))
 
-      addToFinderCache :: InstalledModule -> InstalledFindResult -> IO ()
+      addToFinderCache :: InstalledModuleWithIsBoot -> InstalledFindResult -> IO ()
       addToFinderCache key val =
-        atomicModifyIORef' mod_cache $ \c -> (extendInstalledModuleEnv c key val, ())
+        atomicModifyIORef' mod_cache $ \c -> (extendInstalledModuleWithIsBootEnv c key val, ())
 
-      lookupFinderCache :: InstalledModule -> IO (Maybe InstalledFindResult)
+      lookupFinderCache :: InstalledModuleWithIsBoot -> IO (Maybe InstalledFindResult)
       lookupFinderCache key = do
          c <- readIORef mod_cache
-         return $! lookupInstalledModuleEnv c key
+         return $! lookupInstalledModuleWithIsBootEnv c key
 
       lookupFileCache :: FilePath -> IO Fingerprint
       lookupFileCache key = do
@@ -255,7 +255,7 @@ orIfNotFound this or_this = do
 homeSearchCache :: FinderCache -> UnitId -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
 homeSearchCache fc home_unit mod_name do_this = do
   let mod = mkModule home_unit mod_name
-  modLocationCache fc mod do_this
+  modLocationCache fc (notBoot mod) do_this
 
 findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> PkgQual -> IO FindResult
 findExposedPackageModule fc fopts units mod_name mb_pkg =
@@ -312,7 +312,7 @@ findLookupResult fc fopts r = case r of
                        , fr_unusables = []
                        , fr_suggestions = suggest' })
 
-modLocationCache :: FinderCache -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
+modLocationCache :: FinderCache -> InstalledModuleWithIsBoot -> IO InstalledFindResult -> IO InstalledFindResult
 modLocationCache fc mod do_this = do
   m <- lookupFinderCache fc mod
   case m of
@@ -322,17 +322,17 @@ modLocationCache fc mod do_this = do
         addToFinderCache fc mod result
         return result
 
-addModuleToFinder :: FinderCache -> Module -> ModLocation -> IO ()
+addModuleToFinder :: FinderCache -> ModuleWithIsBoot -> ModLocation -> IO ()
 addModuleToFinder fc mod loc = do
-  let imod = toUnitId <$> mod
-  addToFinderCache fc imod (InstalledFound loc imod)
+  let imod = fmap toUnitId <$> mod
+  addToFinderCache fc imod (InstalledFound loc (gwib_mod imod))
 
 -- This returns a module because it's more convenient for users
-addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleName -> ModLocation -> IO Module
+addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleNameWithIsBoot -> ModLocation -> IO Module
 addHomeModuleToFinder fc home_unit mod_name loc = do
-  let mod = mkHomeInstalledModule home_unit mod_name
-  addToFinderCache fc mod (InstalledFound loc mod)
-  return (mkHomeModule home_unit mod_name)
+  let mod = mkHomeInstalledModule home_unit <$> mod_name
+  addToFinderCache fc mod (InstalledFound loc (gwib_mod mod))
+  return (mkHomeModule home_unit (gwib_mod mod_name))
 
 -- -----------------------------------------------------------------------------
 --      The internal workers
@@ -466,7 +466,7 @@ findPackageModule_ :: FinderCache -> FinderOpts -> InstalledModule -> UnitInfo -
 findPackageModule_ fc fopts mod pkg_conf = do
   massertPpr (moduleUnit mod == unitId pkg_conf)
              (ppr (moduleUnit mod) <+> ppr (unitId pkg_conf))
-  modLocationCache fc mod $
+  modLocationCache fc (notBoot mod) $
 
     -- special case for GHC.Prim; we won't find it in the filesystem.
     if mod `installedModuleEq` gHC_PRIM
