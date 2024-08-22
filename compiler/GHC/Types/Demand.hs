@@ -1913,7 +1913,7 @@ multDmdType :: Card -> DmdType -> DmdType
 multDmdType n (DmdType fv args)
   = -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
     DmdType (multDmdEnv n fv)
-            (map (multDmd n) args)
+            (strictMap (multDmd n) args)
 
 peelFV :: DmdType -> Var -> (DmdType, Demand)
 peelFV (DmdType fv ds) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
