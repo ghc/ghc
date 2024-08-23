@@ -20,7 +20,8 @@ ToDo [Oct 2013]
 
 module GHC.Core.Opt.SpecConstr(
         specConstrProgram,
-        SpecConstrAnnotation(..)
+        SpecConstrAnnotation(..),
+        SpecFailWarning(..)
     ) where
 
 import GHC.Prelude
@@ -51,6 +52,7 @@ import GHC.Core.Make    ( mkImpossibleExpr )
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 
+import GHC.Types.Error (MessageClass(..), Severity(..), DiagnosticReason(WarningWithoutFlag), ResolvedDiagnosticReason (..))
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..) )
@@ -526,9 +528,11 @@ sc_force to True when calling specLoop. This flag does four things:
         (see argToPat; #4448)
 (FS4) Only specialise on recursive types a finite number of times
         (see sc_recursive; #5550; Note [Limit recursive specialisation])
-(FS5) Lift the restriction on the maximum number of arguments which
-        the optimisation will specialise.
-        (see `too_many_worker_args` in `callsToNewPats`; #14003)
+(FS5) Use a different restriction on the maximum number of arguments which
+        the optimisation will specialise. We tried removing the limit on worker
+        args for forced specs (#14003) but this caused issues when specializing
+        code for large data structures (#25197).
+        This is handled by `too_many_worker_args` in `callsToNewPats`
 
 The flag holds only for specialising a single binding group, and NOT
 for nested bindings.  (So really it should be passed around explicitly
@@ -771,16 +775,25 @@ specConstrProgram :: ModGuts -> CoreM ModGuts
 specConstrProgram guts
   = do { env0 <- initScEnv guts
        ; us   <- getUniqueSupplyM
-       ; let (_usg, binds') = initUs_ us $
+       ; let (_usg, binds', warnings) = initUs_ us $
                               scTopBinds env0 (mg_binds guts)
+
+       ; when (not (null warnings)) $ msg specConstr_warn_class (warn_msg warnings)
 
        ; return (guts { mg_binds = binds' }) }
 
-scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind])
-scTopBinds _env []     = return (nullUsage, [])
-scTopBinds env  (b:bs) = do { (usg, b', bs') <- scBind TopLevel env b $
+  where
+    specConstr_warn_class = MCDiagnostic SevWarning (ResolvedDiagnosticReason WarningWithoutFlag) Nothing
+    warn_msg :: SpecFailWarnings -> SDoc
+    warn_msg warnings = text "SpecConstr encountered one or more function(s) with a SPEC argument that resulted in too many arguments," $$
+                        text "which resulted in no specialization being generated for these functions:" $$
+                        nest 2 (vcat (map ppr warnings)) $$
+                        (text "If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.")
+scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecFailWarning])
+scTopBinds _env []     = return (nullUsage, [], [])
+scTopBinds env  (b:bs) = do { (usg, b', bs', warnings) <- scBind TopLevel env b $
                                                 (\env -> scTopBinds env bs)
-                            ; return (usg, b' ++ bs') }
+                            ; return (usg, b' ++ bs', warnings) }
 
 {-
 ************************************************************************
@@ -894,6 +907,12 @@ data SpecConstrOpts = SpecConstrOpts
   -- ^ The threshold at which a worker-wrapper transformation used as part of
   -- this pass will no longer happen, measured in the number of arguments.
 
+  , sc_max_forced_args  :: !Int
+  -- ^ The threshold at which a worker-wrapper transformation used as part of
+  -- this pass will no longer happen even if a SPEC arg was used to force
+  -- specialization. Measured in the number of arguments.
+  -- See Note [Forcing specialisation]
+
   , sc_debug     :: !Bool
   -- ^ Whether to print debug information
 
@@ -962,6 +981,7 @@ instance Outputable Value where
 initScOpts :: DynFlags -> Module -> SpecConstrOpts
 initScOpts dflags this_mod = SpecConstrOpts
         { sc_max_args    = maxWorkerArgs dflags,
+          sc_max_forced_args = maxForcedSpecArgs dflags,
           sc_debug       = hasPprDebug dflags,
           sc_uf_opts     = unfoldingOpts dflags,
           sc_module      = this_mod,
@@ -1375,29 +1395,29 @@ creates specialised versions of functions.
 -}
 
 scBind :: TopLevelFlag -> ScEnv -> InBind
-       -> (ScEnv -> UniqSM (ScUsage, a))   -- Specialise the scope of the binding
-       -> UniqSM (ScUsage, [OutBind], a)
+       -> (ScEnv -> UniqSM (ScUsage, a, [SpecFailWarning]))   -- Specialise the scope of the binding
+       -> UniqSM (ScUsage, [OutBind], a, [SpecFailWarning])
 scBind top_lvl env (NonRec bndr rhs) do_body
   | isTyVar bndr         -- Type-lets may be created by doBeta
-  = do { (final_usage, body') <- do_body (extendScSubst env bndr rhs)
-       ; return (final_usage, [], body') }
+  = do { (final_usage, body', warnings) <- do_body (extendScSubst env bndr rhs)
+       ; return (final_usage, [], body', warnings) }
 
   | not (isTopLevel top_lvl)  -- Nested non-recursive value binding
     -- See Note [Specialising local let bindings]
   = do  { let (body_env, bndr') = extendBndr env bndr
               -- Not necessary at top level; but here we are nested
 
-        ; rhs_info  <- scRecRhs env (bndr',rhs)
+        ; (rhs_info, rhs_ws)  <- scRecRhs env (bndr',rhs)
 
         ; let body_env2 = extendHowBound body_env [bndr'] RecFun
               rhs'      = ri_new_rhs rhs_info
               body_env3 = extendValEnv body_env2 bndr' (isValue (sc_vals env) rhs')
 
-        ; (body_usg, body') <- do_body body_env3
+        ; (body_usg, body', warnings_body) <- do_body body_env3
 
           -- Now make specialised copies of the binding,
           -- based on calls in body_usg
-        ; (spec_usg, specs) <- specNonRec env (scu_calls body_usg) rhs_info
+        ; (spec_usg, specs, warnings_bnd) <- specNonRec env (scu_calls body_usg) rhs_info
           -- NB: For non-recursive bindings we inherit sc_force flag from
           -- the parent function (see Note [Forcing specialisation])
 
@@ -1406,7 +1426,7 @@ scBind top_lvl env (NonRec bndr rhs) do_body
               bind_usage = (body_usg `delCallsFor` [bndr'])
                            `combineUsage` spec_usg -- Note [spec_usg includes rhs_usg]
 
-        ; return (bind_usage, spec_bnds, body')
+        ; return (bind_usage, spec_bnds, body', mconcat [warnings_bnd, warnings_body, rhs_ws])
         }
 
   | otherwise  -- Top-level, non-recursive value binding
@@ -1418,15 +1438,15 @@ scBind top_lvl env (NonRec bndr rhs) do_body
     --
     -- I tried always specialising non-recursive top-level bindings too,
     -- but found some regressions (see !8135).  So I backed off.
-  = do { (rhs_usage, rhs')   <- scExpr env rhs
+  = do { (rhs_usage, rhs', ws_rhs)   <- scExpr env rhs
 
        -- At top level, we've already put all binders into scope; see initScEnv
        -- Hence no need to call `extendBndr`. But we still want to
        -- extend the `ValueEnv` to record the value of this binder.
        ; let body_env = extendValEnv env bndr (isValue (sc_vals env) rhs')
-       ; (body_usage, body') <- do_body body_env
+       ; (body_usage, body', body_warnings) <- do_body body_env
 
-       ; return (rhs_usage `combineUsage` body_usage, [NonRec bndr rhs'], body') }
+       ; return (rhs_usage `combineUsage` body_usage, [NonRec bndr rhs'], body', body_warnings ++ ws_rhs) }
 
 scBind top_lvl env (Rec prs) do_body
   | isTopLevel top_lvl
@@ -1437,19 +1457,20 @@ scBind top_lvl env (Rec prs) do_body
     -- ToDo: I'm honestly not sure of the rationale of this size-testing, nor
     --       why it only applies at top level. But that's the way it has been
     --       for a while. See #21456.
-    do  { (body_usg, body') <- do_body rhs_env2
-        ; (rhs_usgs, rhss') <- mapAndUnzipM (scExpr env) rhss
+    do  { (body_usg, body', warnings_body) <- do_body rhs_env2
+        ; (rhs_usgs, rhss', rhs_ws) <- mapAndUnzip3M (scExpr env) rhss
         ; let all_usg = (combineUsages rhs_usgs `combineUsage` body_usg)
                         `delCallsFor` bndrs'
               bind'   = Rec (bndrs' `zip` rhss')
-        ; return (all_usg, [bind'], body') }
+        ; return (all_usg, [bind'], body', warnings_body ++ concat rhs_ws) }
 
   | otherwise
-  = do  { rhs_infos <- mapM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
-        ; (body_usg, body') <- do_body rhs_env2
+  = do  { (rhs_infos, rhs_wss) <- mapAndUnzipM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
+        ; let rhs_ws = mconcat rhs_wss
+        ; (body_usg, body', warnings_body) <- do_body rhs_env2
 
-        ; (spec_usg, specs) <- specRec (scForce rhs_env2 force_spec)
-                                       (scu_calls body_usg) rhs_infos
+        ; (spec_usg, specs, spec_ws) <- specRec (scForce rhs_env2 force_spec)
+                                          (scu_calls body_usg) rhs_infos
                 -- Do not unconditionally generate specialisations from rhs_usgs
                 -- Instead use them only if we find an unspecialised call
                 -- See Note [Seeding recursive groups]
@@ -1460,7 +1481,7 @@ scBind top_lvl env (Rec prs) do_body
                         -- zipWithEqual: length of returned [SpecInfo]
                         -- should be the same as incoming [RhsInfo]
 
-        ; return (all_usg, [bind'], body') }
+        ; return (all_usg, [bind'], body', mconcat [warnings_body,rhs_ws,spec_ws]) }
   where
     (bndrs,rhss) = unzip prs
     force_spec   = any (forceSpecBndr env) bndrs    -- Note [Forcing specialisation]
@@ -1488,59 +1509,63 @@ recursive function, but that's not essential and might even be
 harmful.  I'm not sure.
 -}
 
+withWarnings :: SpecFailWarnings -> (ScUsage, CoreExpr, SpecFailWarnings) -> (ScUsage, CoreExpr, SpecFailWarnings)
+withWarnings ws (use,expr,ws2) = (use,expr,ws ++ ws2)
+
 ------------------------
-scExpr, scExpr' :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr)
+scExpr, scExpr' :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr, SpecFailWarnings)
         -- The unique supply is needed when we invent
         -- a new name for the specialised function and its args
 
 scExpr env e = scExpr' env e
 
 scExpr' env (Var v)      = case scSubstId env v of
-                            Var v' -> return (mkVarUsage env v' [], Var v')
+                            Var v' -> return (mkVarUsage env v' [], Var v', [])
                             e'     -> scExpr (zapScSubst env) e'
 
 scExpr' env (Type t)     =
   let !(MkSolo ty') = scSubstTy env t
-  in return (nullUsage, Type ty')
-scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c))
-scExpr' _   e@(Lit {})   = return (nullUsage, e)
-scExpr' env (Tick t e)   = do (usg, e') <- scExpr env e
-                              return (usg, Tick (scTickish env t) e')
-scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
-                              return (usg, mkCast e' (scSubstCo env co))
+  in return (nullUsage, Type ty', [])
+scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c), [])
+scExpr' _   e@(Lit {})   = return (nullUsage, e, [])
+scExpr' env (Tick t e)   = do (usg, e', ws) <- scExpr env e
+                              return (usg, Tick (scTickish env t) e', ws)
+scExpr' env (Cast e co)  = do (usg, e', ws) <- scExpr env e
+                              return (usg, mkCast e' (scSubstCo env co), ws)
                               -- Important to use mkCast here
                               -- See Note [SpecConstr call patterns]
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
 scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
-                              (usg, e') <- scExpr env' e
-                              return (usg, Lam b' e')
+                              (usg, e', ws) <- scExpr env' e
+                              return (usg, Lam b' e', ws)
 
 scExpr' env (Let bind body)
-  = do { (final_usage, binds', body') <- scBind NotTopLevel env bind $
+  = do { (final_usage, binds', body', ws) <- scBind NotTopLevel env bind $
                                          (\env -> scExpr env body)
-       ; return (final_usage, mkLets binds' body') }
+       ; return (final_usage, mkLets binds' body', ws) }
 
 scExpr' env (Case scrut b ty alts)
-  = do  { (scrut_usg, scrut') <- scExpr env scrut
+  = do  { (scrut_usg, scrut', ws) <- scExpr env scrut
         ; case isValue (sc_vals env) scrut' of
                 Just (ConVal args_are_work_free con args)
-                   | args_are_work_free -> sc_con_app con args scrut'
+                   | args_are_work_free -> sc_con_app con args scrut' ws
                      -- Don't duplicate work!!  #7865
                      -- See Note [ConVal work-free-ness] (1)
-                _other -> sc_vanilla scrut_usg scrut'
+                _other -> sc_vanilla scrut_usg scrut' ws
         }
   where
-    sc_con_app con args scrut'  -- Known constructor; simplify
+    sc_con_app con args scrut' ws  -- Known constructor; simplify
      = do { let Alt _ bs rhs = findAlt con alts
                                   `orElse` Alt DEFAULT [] (mkImpossibleExpr ty "SpecConstr")
                 alt_env'     = extendScSubstList env ((b,scrut') : bs `zip` trimConArgs con args)
-          ; scExpr alt_env' rhs }
+          ; (use',expr',ws_new) <- scExpr alt_env' rhs
+          ; return (use',expr',ws ++ ws_new) }
 
-    sc_vanilla scrut_usg scrut' -- Normal case
+    sc_vanilla scrut_usg scrut' ws -- Normal case
      = do { let (alt_env,b') = extendBndrWith RecArg env b
                         -- Record RecArg for the components
 
-          ; (alt_usgs, alt_occs, alts') <- mapAndUnzip3M (sc_alt alt_env scrut' b') alts
+          ; (alt_usgs, alt_occs, alts', ws_alts) <- mapAndUnzip4M (sc_alt alt_env scrut' b') alts
 
           ; let scrut_occ  = foldr combineOcc NoOcc alt_occs
                 scrut_usg' = setScrutOcc env scrut_usg scrut' scrut_occ
@@ -1550,21 +1575,21 @@ scExpr' env (Case scrut b ty alts)
           ; let !(MkSolo ty') = scSubstTy env ty
 
           ; return (foldr combineUsage scrut_usg' alt_usgs,
-                    Case scrut' b' ty'  alts') }
+                    Case scrut' b' ty'  alts', ws ++ concat ws_alts) }
 
     single_alt = isSingleton alts
 
     sc_alt env scrut' b' (Alt con bs rhs)
      = do { let (env1, bs1) = extendBndrsWith RecArg env bs
                 (env2, bs2) = extendCaseBndrs env1 scrut' b' con bs1
-          ; (usg, rhs') <- scExpr env2 rhs
+          ; (usg, rhs', ws) <- scExpr env2 rhs
           ; let (usg', b_occ:arg_occs) = lookupOccs usg (b':bs2)
                 scrut_occ = case con of
                                DataAlt dc -- See Note [Do not specialise evals]
                                   | not (single_alt && all deadArgOcc arg_occs)
                                   -> ScrutOcc (unitUFM dc arg_occs)
                                _  -> UnkOcc
-          ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs') }
+          ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs', ws) }
 
 
 -- | Substitute the free variables captured by a breakpoint.
@@ -1613,19 +1638,20 @@ follows.
   still worth specialising on x. Hence the /single-alternative/ guard.
 -}
 
-scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr)
+scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr, SpecFailWarnings)
 
 scApp env (Var fn, args)        -- Function is a variable
   = assert (not (null args)) $
     do  { args_w_usgs <- mapM (scExpr env) args
-        ; let (arg_usgs, args') = unzip args_w_usgs
+        ; let (arg_usgs, args', arg_ws) = unzip3 args_w_usgs
               arg_usg = combineUsages arg_usgs
+              arg_w = concat arg_ws
         ; case scSubstId env fn of
-            fn'@(Lam {}) -> scExpr (zapScSubst env) (doBeta fn' args')
+            fn'@(Lam {}) -> withWarnings arg_w <$> scExpr (zapScSubst env) (doBeta fn' args')
                         -- Do beta-reduction and try again
 
             Var fn' -> return (arg_usg' `combineUsage` mkVarUsage env fn' args',
-                               mkApps (Var fn') args')
+                               mkApps (Var fn') args', arg_w )
                where
                  -- arg_usg': see Note [Specialising on dictionaries]
                  arg_usg' | Just cls <- isClassOpId_maybe fn'
@@ -1634,7 +1660,7 @@ scApp env (Var fn, args)        -- Function is a variable
                           | otherwise
                           = arg_usg
 
-            other_fn' -> return (arg_usg, mkApps other_fn' args') }
+            other_fn' -> return (arg_usg, mkApps other_fn' args', arg_w) }
                 -- NB: doing this ignores any usage info from the substituted
                 --     function, but I don't think that matters.  If it does
                 --     we can fix it.
@@ -1648,9 +1674,9 @@ scApp env (Var fn, args)        -- Function is a variable
 -- which it may, we can get
 --      (let f = ...f... in f) arg1 arg2
 scApp env (other_fn, args)
-  = do  { (fn_usg,   fn')   <- scExpr env other_fn
-        ; (arg_usgs, args') <- mapAndUnzipM (scExpr env) args
-        ; return (combineUsages arg_usgs `combineUsage` fn_usg, mkApps fn' args') }
+  = do  { (fn_usg,   fn', fn_ws)   <- scExpr env other_fn
+        ; (arg_usgs, args', arg_ws) <- mapAndUnzip3M (scExpr env) args
+        ; return (combineUsages arg_usgs `combineUsage` fn_usg, mkApps fn' args', combineSpecWarning fn_ws (concat arg_ws)) }
 
 ----------------------
 mkVarUsage :: ScEnv -> Id -> [CoreExpr] -> ScUsage
@@ -1666,16 +1692,16 @@ mkVarUsage env fn args
             | otherwise = evalScrutOcc
 
 ----------------------
-scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM RhsInfo
+scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (RhsInfo, SpecFailWarnings)
 scRecRhs env (bndr,rhs)
   = do  { let (arg_bndrs,body)       = collectBinders rhs
               (body_env, arg_bndrs') = extendBndrsWith RecArg env arg_bndrs
-        ; (body_usg, body')         <- scExpr body_env body
+        ; (body_usg, body', body_ws)         <- scExpr body_env body
         ; let (rhs_usg, arg_occs)    = lookupOccs body_usg arg_bndrs'
         ; return (RI { ri_rhs_usg = rhs_usg
                      , ri_fn = bndr, ri_new_rhs = mkLams arg_bndrs' body'
                      , ri_lam_bndrs = arg_bndrs, ri_lam_body = body
-                     , ri_arg_occs = arg_occs }) }
+                     , ri_arg_occs = arg_occs }, body_ws) }
                 -- The arg_occs says how the visible,
                 -- lambda-bound binders of the RHS are used
                 -- (including the TyVar binders)
@@ -1744,7 +1770,7 @@ initSpecInfo (RI { ri_rhs_usg = rhs_usg })
 specNonRec :: ScEnv
            -> CallEnv         -- Calls in body
            -> RhsInfo         -- Structure info usage info for un-specialised RHS
-           -> UniqSM (ScUsage, SpecInfo)       -- Usage from RHSs (specialised and not)
+           -> UniqSM (ScUsage, SpecInfo, [SpecFailWarning])       -- Usage from RHSs (specialised and not)
                                                --     plus details of specialisations
 
 specNonRec env body_calls rhs_info
@@ -1754,11 +1780,12 @@ specNonRec env body_calls rhs_info
 specRec :: ScEnv
         -> CallEnv                         -- Calls in body
         -> [RhsInfo]                       -- Structure info and usage info for un-specialised RHSs
-        -> UniqSM (ScUsage, [SpecInfo])    -- Usage from all RHSs (specialised and not)
+        -> UniqSM (ScUsage, [SpecInfo], SpecFailWarnings)
+                                           -- Usage from all RHSs (specialised and not)
                                            --     plus details of specialisations
 
 specRec env body_calls rhs_infos
-  = go 1 body_calls nullUsage (map initSpecInfo rhs_infos)
+  = go 1 body_calls nullUsage (map initSpecInfo rhs_infos) []
     -- body_calls: see Note [Seeding recursive groups]
     -- NB: 'go' always calls 'specialise' once, which in turn unleashes
     --     si_mb_unspec if there are any boring calls in body_calls,
@@ -1773,23 +1800,25 @@ specRec env body_calls rhs_infos
                               -- Two accumulating parameters:
                  -> ScUsage      -- Usage from earlier specialisations
                  -> [SpecInfo]   -- Details of specialisations so far
-                 -> UniqSM (ScUsage, [SpecInfo])
-    go n_iter seed_calls usg_so_far spec_infos
+                 -> SpecFailWarnings -- Warnings so far
+                 -> UniqSM (ScUsage, [SpecInfo], SpecFailWarnings)
+    go n_iter seed_calls usg_so_far spec_infos ws_so_far
       = -- pprTrace "specRec3" (vcat [ text "bndrs" <+> ppr (map ri_fn rhs_infos)
         --                           , text "iteration" <+> int n_iter
         --                          , text "spec_infos" <+> ppr (map (map os_pat . si_specs) spec_infos)
         --                    ]) $
         do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
-            ; let (extra_usg_s, all_spec_infos) = unzip specs_w_usg
+
+            ; let (extra_usg_s, all_spec_infos, extra_ws ) = unzip3 specs_w_usg
                   extra_usg = combineUsages extra_usg_s
                   all_usg   = usg_so_far `combineUsage` extra_usg
                   new_calls = scu_calls extra_usg
-            ; go_again n_iter new_calls all_usg all_spec_infos }
+            ; go_again n_iter new_calls all_usg all_spec_infos (ws_so_far ++ concat extra_ws) }
 
     -- go_again deals with termination
-    go_again n_iter seed_calls usg_so_far spec_infos
+    go_again n_iter seed_calls usg_so_far spec_infos ws_so_far
       | isEmptyVarEnv seed_calls
-      = return (usg_so_far, spec_infos)
+      = return (usg_so_far, spec_infos, ws_so_far)
 
       -- Limit recursive specialisation
       -- See Note [Limit recursive specialisation]
@@ -1803,10 +1832,10 @@ specRec env body_calls rhs_infos
         -- for the unspecialised function, since it may now be called
         -- pprTrace "specRec2" (ppr (map (map os_pat . si_specs) spec_infos)) $
         let rhs_usgs = combineUsages (mapMaybe si_mb_unspec spec_infos)
-        in return (usg_so_far `combineUsage` rhs_usgs, spec_infos)
+        in return (usg_so_far `combineUsage` rhs_usgs, spec_infos, ws_so_far)
 
       | otherwise
-      = go (n_iter + 1) seed_calls usg_so_far spec_infos
+      = go (n_iter + 1) seed_calls usg_so_far spec_infos ws_so_far
 
     -- See Note [Limit recursive specialisation]
     the_limit = case sc_count opts of
@@ -1819,7 +1848,7 @@ specialise
    -> CallEnv                     -- Info on newly-discovered calls to this function
    -> RhsInfo
    -> SpecInfo                    -- Original RHS plus patterns dealt with
-   -> UniqSM (ScUsage, SpecInfo)  -- New specialised versions and their usage
+   -> UniqSM (ScUsage, SpecInfo, [SpecFailWarning])  -- New specialised versions and their usage
 
 -- See Note [spec_usg includes rhs_usg]
 
@@ -1837,7 +1866,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
   | isDeadEndId fn  -- Note [Do not specialise diverging functions]
                     -- /and/ do not generate specialisation seeds from its RHS
   = -- pprTrace "specialise bot" (ppr fn) $
-    return (nullUsage, spec_info)
+    return (nullUsage, spec_info, [])
 
   | not (isNeverActive (idInlineActivation fn))
       -- See Note [Transfer activation]
@@ -1848,7 +1877,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
   , not (null arg_bndrs)                         -- Only specialise functions
   , Just all_calls <- lookupVarEnv bind_calls fn -- Some calls to it
   = -- pprTrace "specialise entry {" (ppr fn <+> ppr all_calls) $
-    do  { (boring_call, pats_discarded, new_pats)
+    do  { (boring_call, pats_discarded, new_pats, warnings)
              <- callsToNewPats env fn spec_info arg_occs all_calls
 
         ; let n_pats = length new_pats
@@ -1863,7 +1892,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
 --                                       , text "new_pats" <+> ppr new_pats])
 
         ; let spec_env = decreaseSpecCount env n_pats
-        ; (spec_usgs, new_specs) <- mapAndUnzipM (spec_one spec_env fn arg_bndrs body)
+        ; (spec_usgs, new_specs, new_wss) <- mapAndUnzip3M (spec_one spec_env fn arg_bndrs body)
                                                  (new_pats `zip` [spec_count..])
                 -- See Note [Specialise original body]
 
@@ -1887,15 +1916,16 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
 
         ; return (new_usg, SI { si_specs     = new_specs ++ specs
                               , si_n_specs   = spec_count + n_pats
-                              , si_mb_unspec = mb_unspec' }) }
+                              , si_mb_unspec = mb_unspec' }
+                 ,warnings ++ concat new_wss) }
 
   | otherwise  -- No calls, inactive, or not a function
                -- Behave as if there was a single, boring call
   = -- pprTrace "specialise inactive" (ppr fn $$ ppr mb_unspec) $
     case mb_unspec of    -- Behave as if there was a single, boring call
-      Just rhs_usg -> return (rhs_usg, spec_info { si_mb_unspec = Nothing })
+      Just rhs_usg -> return (rhs_usg, spec_info { si_mb_unspec = Nothing }, [])
                          -- See Note [spec_usg includes rhs_usg]
-      Nothing      -> return (nullUsage, spec_info)
+      Nothing      -> return (nullUsage, spec_info, [])
 
 
 ---------------------
@@ -1904,7 +1934,7 @@ spec_one :: ScEnv
          -> [InVar]     -- Lambda-binders of RHS; should match patterns
          -> InExpr      -- Body of the original function
          -> (CallPat, Int)
-         -> UniqSM (ScUsage, OneSpec)   -- Rule and binding
+         -> UniqSM (ScUsage, OneSpec, SpecFailWarnings)   -- Rule and binding, warnings if any
 
 -- spec_one creates a specialised copy of the function, together
 -- with a rule for using it.  I'm very proud of how short this
@@ -1956,7 +1986,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 
         -- Specialise the body
         -- ; pprTraceM "body_subst_for" $ ppr (spec_occ) $$ ppr (sc_subst body_env)
-        ; (spec_usg, spec_body) <- scExpr body_env body
+        ; (spec_usg, spec_body, body_warnings) <- scExpr body_env body
 
                 -- And build the results
         ; (qvars', pats') <- generaliseDictPats qvars pats
@@ -2005,7 +2035,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 --               ]
         ; return (spec_usg, OS { os_pat = call_pat, os_rule = rule
                                , os_id = spec_id
-                               , os_rhs = spec_rhs }) }
+                               , os_rhs = spec_rhs }, body_warnings) }
 
 generaliseDictPats :: [Var] -> [CoreExpr]  -- Quantified vars and pats
                    -> UniqSM ([Var], [CoreExpr]) -- New quantified vars and pats
@@ -2385,12 +2415,26 @@ instance Outputable CallPat where
                                , text "cp_args =" <+> ppr args
                                , text "cp_strict_args = " <> ppr strict ])
 
+newtype SpecFailWarning = SpecFailForcedArgCount { spec_failed_fun_name :: Name }
+
+type SpecFailWarnings = [SpecFailWarning]
+
+instance Outputable SpecFailWarning where
+  ppr (SpecFailForcedArgCount name) = ppr name <+> pprDefinedAt name
+
+combineSpecWarning :: SpecFailWarnings -> SpecFailWarnings -> SpecFailWarnings
+combineSpecWarning = (++)
+
+data ArgCountResult = WorkerSmallEnough | WorkerTooLarge | WorkerTooLargeForced Name
+
 callsToNewPats :: ScEnv -> Id
                -> SpecInfo
                -> [ArgOcc] -> [Call]
                -> UniqSM ( Bool        -- At least one boring call
                          , Bool        -- Patterns were discarded
-                         , [CallPat] ) -- Patterns to specialise
+                         , [CallPat]   -- Patterns to specialise
+                         , [SpecFailWarning] -- Things that didn't specialise we want to warn the user about)
+                         )
 -- Result has no duplicate patterns,
 -- nor ones mentioned in si_specs (hence "new" patterns)
 -- Bool indicates that there was at least one boring pattern
@@ -2416,12 +2460,18 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
               non_dups = subsumePats in_scope new_pats
 
               -- Remove ones that have too many worker variables
-              small_pats = filterOut too_many_worker_args non_dups
+              (small_pats, arg_count_warnings) = partitionByWorkerSize too_many_worker_args non_dups
 
-              too_many_worker_args _
-                | sc_force env = False -- See (FS5) of Note [Forcing specialisation]
+              -- too_many_worker_args :: CallPat -> Either SpecFailWarning Bool
               too_many_worker_args (CP { cp_qvars = vars, cp_args = args })
-                = not (isWorkerSmallEnough (sc_max_args $ sc_opts env) (valArgCount args) vars)
+                | sc_force env
+                -- See (FS5) of Note [Forcing specialisation]
+                = if (isWorkerSmallEnough (sc_max_forced_args $ sc_opts env) (valArgCount args) vars)
+                    then WorkerSmallEnough
+                    else WorkerTooLargeForced (idName fn)
+                | (isWorkerSmallEnough (sc_max_args $ sc_opts env) (valArgCount args) vars)
+                = WorkerSmallEnough
+                | otherwise = WorkerTooLarge
                   -- We are about to construct w/w pair in 'spec_one'.
                   -- Omit specialisation leading to high arity workers.
                   -- See Note [Limit w/w arity] in GHC.Core.Opt.WorkWrap.Utils
@@ -2437,10 +2487,21 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
 --                                        , text "done_specs:" <+> ppr (map os_pat done_specs)
 --                                        , text "trimmed_pats:" <+> ppr trimmed_pats ])
 
-        ; return (have_boring_call, pats_were_discarded, trimmed_pats) }
+        ; return (have_boring_call, pats_were_discarded, trimmed_pats, arg_count_warnings) }
           -- If any of the calls does not give rise to a specialisation, either
           -- because it is boring, or because there are too many specialisations,
           -- return a flag to say so, so that we know to keep the original function.
+  where
+    partitionByWorkerSize worker_size pats = go pats [] []
+      where
+        go [] small warnings = (small, warnings)
+        go (p:ps) small warnings
+          | WorkerSmallEnough <- worker_size p
+          = go ps (p:small) warnings
+          | WorkerTooLarge <- worker_size p
+          = go ps small warnings
+          | WorkerTooLargeForced name <- worker_size p
+          = go ps small (SpecFailForcedArgCount name : warnings)
 
 
 trim_pats :: ScEnv -> Id -> SpecInfo -> [CallPat] -> (Bool, [CallPat])
