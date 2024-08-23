@@ -870,6 +870,21 @@ as such you shouldn't need to set any of them explicitly. A flag
     value arguments of the resulting worker exceeds both that of the original
     function and this setting.
 
+.. ghc-flag:: -fmax-forced-spec-args=⟨n⟩
+    :shortdesc: *default: 333.* Maximum number of value arguments for forced SpecConstr specializations.
+    :type: dynamic
+    :category:
+
+    :default: 512
+
+    When using ``SPEC`` from ``GHC.Types`` to force SpecConstr to fire on a function
+    sometimes this can result in functions taking a ridicolously large number of arguments
+    resulting a very large compile time hits for minor performance benefits.
+
+    Since this is usually unintended we prevent SpecConstr from firing and generate
+    a warning if the number of arguments in the resulting function would exceed
+    the value given by ``-fmax-forced-spec-args``.
+
 .. ghc-flag:: -fno-opt-coercion
     :shortdesc: Turn off the coercion optimiser
     :type: dynamic
