@@ -2882,7 +2882,7 @@ def normalise_errmsg(s: str) -> str:
 
     # normalise slashes to minimise Windows/Unix filename differences,
     # but don't normalize backslashes in chars
-    s = re.sub(r"(?!')\\", '/', s)
+    s = re.sub(r"(?<!('|‘))\\", '/', s)
 
     # Normalize the name of the GHC executable. Specifically,
     # this catches the cases that:

@@ -1,6 +1,2 @@
-
 MultilineStringsSmartQuotes.hs:9:3: [GHC-31623]
     Unicode character '”' ('\8221') looks like '"' (Quotation Mark), but it is not
-
-MultilineStringsSmartQuotes.hs:10:1: [GHC-21231]
-    lexical error in string/character literal at end of input

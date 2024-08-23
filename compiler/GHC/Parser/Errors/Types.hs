@@ -591,8 +591,6 @@ data LexErr
    | LexUnknownPragma       -- ^ Unknown pragma
    | LexErrorInPragma       -- ^ Lexical error in pragma
    | LexNumEscapeRange      -- ^ Numeric escape sequence out of range
-   | LexStringCharLit       -- ^ Lexical error in string/character literal
-   | LexStringCharLitEOF    -- ^ Unexpected end-of-file in string/character literal
    | LexUnterminatedComment -- ^ Unterminated `{-'
    | LexUnterminatedOptions -- ^ Unterminated OPTIONS pragma
    | LexUnterminatedQQ      -- ^ Unterminated quasiquotation

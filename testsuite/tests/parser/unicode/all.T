@@ -33,3 +33,6 @@ test('T18225B', normal, compile_fail, [''])
 
 test('T18158', normal, compile, [''])
 test('T18158b', normal, compile_fail, [''])
+
+test('lex_unispace', normal, compile, [''])
+test('lex_unicode_ids', normal, compile, [''])
