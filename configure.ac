@@ -111,6 +111,14 @@ AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
   [EnableBootstrapWithDevelSnaphost=NO]
 )
 
+AC_ARG_ENABLE(ignore-build-platform-mismatch,
+[AS_HELP_STRING([--ignore-build-platform-mismatch],
+                [Ignore when the target platform reported by the bootstrap compiler doesn''t match the configured build platform. This flag is used to correct mistakes when the target platform is incorrectly reported by the bootstrap (#25200). ])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [IgnoreBuildPlatformMismatch])],
+  [IgnoreBuildPlatformMismatch=NO]
+)
+
+
 AC_ARG_ENABLE(tarballs-autodownload,
 [AS_HELP_STRING([--enable-tarballs-autodownload],
                 [Automatically download Windows distribution binaries if needed.])],
@@ -279,10 +287,13 @@ FP_PROG_SH
 # code for the requested build platform.
 if test "$BuildPlatform" != "$bootstrap_target"
 then
+    if test "$IgnoreBuildPlatformMismatch" = "NO"
+    then
     echo "This GHC (${WithGhc}) does not generate code for the build platform"
     echo "   GHC target platform    : $bootstrap_target"
     echo "   Desired build platform : $BuildPlatform"
     exit 1
+    fi
 fi
 
 dnl ** Do an unregisterised build?

@@ -409,7 +409,7 @@ opsysVariables _ FreeBSD13 = mconcat
   , "GHC_VERSION" =: "9.6.4"
   , "CABAL_INSTALL_VERSION" =: "3.10.2.0"
   ]
-opsysVariables _ (Linux distro) = distroVariables distro
+opsysVariables arch (Linux distro) = distroVariables arch distro
 opsysVariables AArch64 (Darwin {}) =
   mconcat [ "NIX_SYSTEM" =: "aarch64-darwin"
           , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
@@ -441,25 +441,30 @@ opsysVariables _ (Windows {}) =
           , "GHC_VERSION" =: "9.6.4" ]
 opsysVariables _ _ = mempty
 
-alpineVariables = mconcat
+alpineVariables :: Arch -> Variables
+alpineVariables arch = mconcat $
   [ -- Due to #20266
     "CONFIGURE_ARGS" =: "--disable-ld-override"
   , "INSTALL_CONFIGURE_ARGS" =: "--disable-ld-override"
     -- encoding004: due to lack of locale support
     -- T10458, ghcilink002: due to #17869
   , "BROKEN_TESTS" =: "encoding004 T10458"
+  ] ++
+  [-- Bootstrap compiler has incorrectly configured target triple #
+    "CONFIGURE_ARGS" =: "--ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux"
+    |  AArch64 <- [arch]
   ]
 
 
-distroVariables :: LinuxDistro -> Variables
-distroVariables Alpine312 = alpineVariables
-distroVariables Alpine318 = alpineVariables
-distroVariables Alpine320 = alpineVariables
-distroVariables Centos7 = mconcat [
+distroVariables :: Arch -> LinuxDistro -> Variables
+distroVariables arch Alpine312 = alpineVariables arch
+distroVariables arch Alpine318 = alpineVariables arch
+distroVariables arch Alpine320 = alpineVariables arch
+distroVariables _ Centos7 = mconcat [
     "HADRIAN_ARGS" =: "--docs=no-sphinx"
   , "BROKEN_TESTS" =: "T22012" -- due to #23979
   ]
-distroVariables Fedora33 = mconcat
+distroVariables _ Fedora33 = mconcat
   -- LLC/OPT do not work for some reason in our fedora images
   -- These tests fail with this error: T11649 T5681 T7571 T8131b
   -- +/opt/llvm/bin/opt: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/opt)
@@ -467,7 +472,7 @@ distroVariables Fedora33 = mconcat
   [ "LLC" =: "/bin/false"
   , "OPT" =: "/bin/false"
   ]
-distroVariables _ = mempty
+distroVariables _ _ = mempty
 
 -----------------------------------------------------------------------------
 -- Cache settings, what to cache and when can we share the cache
