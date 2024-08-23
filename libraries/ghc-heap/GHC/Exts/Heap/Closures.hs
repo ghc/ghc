@@ -6,6 +6,9 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+-- Late cost centres introduce a thunk in the asBox function, which leads to
+-- an additional wrapper being added to any value placed inside a box.
+{-# OPTIONS_GHC -fno-prof-late  #-}
 
 module GHC.Exts.Heap.Closures (
     -- * Closures
