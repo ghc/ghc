@@ -98,3 +98,5 @@ test('T22388', [ grep_errmsg(r'^\S+\$w\S+') ], compile, ['-dsuppress-uniques -dd
 test('T22997', normal, compile, [''])
 test('T23398', normal, compile, ['-dsuppress-uniques -ddump-simpl -dno-typeable-binds'])
 test('T24623', normal, compile, [''])
+test('T25196', [ req_th, collect_compiler_stats('bytes allocated', 10) ],
+               multimod_compile, ['T25196', '-v0'])

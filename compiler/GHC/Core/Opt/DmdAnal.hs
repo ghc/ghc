@@ -426,7 +426,7 @@ dmdAnalStar env (n :* sd) e
   , n' <- anticipateANF e n
       -- See Note [Anticipating ANF in demand analysis]
       -- and Note [Analysing with absent demand]
-  = (discardArgDmds $ multDmdType n' dmd_ty, e')
+  = (multDmdEnv n' (discardArgDmds dmd_ty), e')
 
 -- Main Demand Analysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
