@@ -51,7 +51,7 @@ module GHC.Types.Demand (
 
     -- * Demand environments
     DmdEnv(..), addVarDmdEnv, mkTermDmdEnv, nopDmdEnv, plusDmdEnv, plusDmdEnvs,
-    reuseEnv,
+    multDmdEnv, reuseEnv,
 
     -- * Demand types
     DmdType(..), dmdTypeDepth,
@@ -1910,7 +1910,8 @@ splitDmdTy ty@DmdType{dt_args=dmd:args} = (dmd, ty{dt_args=args})
 splitDmdTy ty@DmdType{dt_env=env}       = (defaultArgDmd (de_div env), ty)
 
 multDmdType :: Card -> DmdType -> DmdType
-multDmdType n (DmdType fv args)
+multDmdType C_11 dmd_ty = dmd_ty -- a vital optimisation for T25196
+multDmdType n    (DmdType fv args)
   = -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
     DmdType (multDmdEnv n fv)
             (strictMap (multDmd n) args)
