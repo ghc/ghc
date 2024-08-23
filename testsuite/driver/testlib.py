@@ -2959,11 +2959,27 @@ def normalise_prof (s: str) -> str:
     s = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',s)
 
     # sip results for CAFs, these tend to change unpredictably
-    s = re.sub('[ \t]*(CAF|IDLE).*\n','',s)
+    s = re.sub('\n[ \t]*(CAF|IDLE).*\n','',s)
 
     # XXX Ignore Main.main.  Sometimes this appears under CAF, and
     # sometimes under MAIN.
     s = re.sub('[ \t]*main[ \t]+Main.*\n','',s)
+
+    # The next step assumes none of the fields have no spaces in, which is broke
+    # when the src = <no location info>
+    s = re.sub('no location info','no-location-info', s)
+
+    # Source locations from internal libraries, remove the source location,
+    # double colon variant.
+    # > libraries/ghc-internal/src/path/Foo.hs:204:1-18
+    # => ghc-internal/src/path/Foo.hs
+    s = re.sub('\slibraries/(\S+)(:\S+){2}\s',' \\1 ', s)
+
+    # Source locations from internal libraries, remove the source location,
+    # single colon variant
+    # > libraries/ghc-internal/src/path/Foo.hs::(2,1)-(5,38)
+    # => ghc-internal/src/path/Foo.hs
+    s = re.sub('\slibraries/(\S+)(:\S+){1}\s',' \\1 ', s)
 
     # We have something like this:
     #
