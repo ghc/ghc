@@ -1,3 +1,2 @@
+ghci022.hs:2:5: error: [GHC-21231] lexical error at character '\n'
 
-ghci022.hs:2:6: error: [GHC-21231]
-    lexical error in string/character literal at character '\n'

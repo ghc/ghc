@@ -1,3 +1,3 @@
-
 utf8_021.hs:2:8: error: [GHC-21231]
-    lexical error in string/character literal (UTF-8 decoding error)
+    lexical error (UTF-8 decoding error)
+
