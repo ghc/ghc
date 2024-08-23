@@ -1,0 +1,6 @@
+T25197.hs: warning:
+    SpecConstr encountered one or more function(s) with a SPEC argument that resulted in too many arguments,
+    which resulted in no specialization being generated for these functions:
+    $wgo Defined at T25197.hs:26:5
+    If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.
+
