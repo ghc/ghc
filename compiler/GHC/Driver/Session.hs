@@ -1770,6 +1770,8 @@ dynamic_flags_deps = [
 
   , make_ord_flag defFlag "fmax-worker-args"
       (intSuffix (\n d -> d {maxWorkerArgs = n}))
+  , make_ord_flag defFlag "fmax-forced-spec-args"
+      (intSuffix (\n d -> d {maxForcedSpecArgs = n}))
   , make_ord_flag defGhciFlag "fghci-hist-size"
       (intSuffix (\n d -> d {ghciHistSize = n}))
   , make_ord_flag defGhcFlag "fmax-inline-alloc-size"
