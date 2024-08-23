@@ -1,6 +1,2 @@
-
-T21843c.hs:3:19: [GHC-31623]
+T21843c.hs:3:13: [GHC-31623]
     Unicode character '”' ('\8221') looks like '"' (Quotation Mark), but it is not
-
-T21843c.hs:3:20: [GHC-21231]
-    lexical error in string/character literal at character '\n'

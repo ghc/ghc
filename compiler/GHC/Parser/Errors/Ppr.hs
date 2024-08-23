@@ -157,8 +157,6 @@ instance Diagnostic PsMessage where
               LexUnknownPragma       -> text "unknown pragma"
               LexErrorInPragma       -> text "lexical error in pragma"
               LexNumEscapeRange      -> text "numeric escape sequence out of range"
-              LexStringCharLit       -> text "lexical error in string/character literal"
-              LexStringCharLitEOF    -> text "unexpected end-of-file in string/character literal"
               LexUnterminatedComment -> text "unterminated `{-'"
               LexUnterminatedOptions -> text "unterminated OPTIONS pragma"
               LexUnterminatedQQ      -> text "unterminated quasiquotation"
