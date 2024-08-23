@@ -395,6 +395,7 @@ data DynFlags = DynFlags {
   unfoldingOpts         :: !UnfoldingOpts,
 
   maxWorkerArgs         :: Int,
+  maxForcedSpecArgs     :: Int,
 
   ghciHistSize          :: Int,
 
@@ -677,6 +678,8 @@ defaultDynFlags mySettings =
 
         unfoldingOpts = defaultUnfoldingOpts,
         maxWorkerArgs = 10,
+        maxForcedSpecArgs = 333,
+        -- 333 is fairly arbitrary, see Note [Forcing specialisation]:FS5
 
         ghciHistSize = 50, -- keep a log of length 50 by default
 
