@@ -25,10 +25,8 @@ TARGETS=(
     # Windows
     #########################
 
-    # Windows x86
-    "i386-unknown-windows"
-    "i686-unknown-windows"
-    "x86_64-unknown-windows"
+    # Windows
+    "x86_64-unknown-windows-gnu"
 
     #########################
     # Linux

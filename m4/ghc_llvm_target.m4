@@ -14,7 +14,7 @@ AC_DEFUN([GHC_LLVM_TARGET], [
       ;;
     *-mingw32|*-mingw64|*-msys)
       llvm_target_vendor="unknown"
-      llvm_target_os="windows"
+      llvm_target_os="windows-gnu"
       ;;
     # apple is a bit about their naming scheme for
     # aarch64; and clang on macOS doesn't know that
