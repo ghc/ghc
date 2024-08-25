@@ -2285,8 +2285,9 @@ of ``-W(no-)*``.
     This flag warns when ``Typeable`` is listed in a deriving clause
     or derived with :extension:`StandaloneDeriving`.
 
-    Since GHC 7.10, ``Typeable`` is automatically derived for all types.
-    Thus, deriving ``Typeable`` yourself is redundant.
+    Since GHC 7.10, ``Typeable`` is automatically derived for all types (save
+    for the exceptions listed in :ref:`deriving-typeable`). Thus, deriving
+    ``Typeable`` yourself is redundant.
 
 .. ghc-flag:: -Wambiguous-fields
     :shortdesc: warn about ambiguous field selectors or updates

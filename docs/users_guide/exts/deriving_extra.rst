@@ -514,6 +514,44 @@ The class ``Typeable`` is very special:
           instance Typeable 0       -- Type natural literals
           instance Typeable "Hello" -- Type-level symbols
 
+-  Although GHC is able to solve ``Typeable`` constraints for most types, there
+   are a handful of exceptions where it cannot. These include:
+
+   -  Unboxed sums (see :ref:`unboxed-sums`). For example, GHC would not give a
+      ``Typeable`` instance to the type ``(# Bool | Int #)``.
+
+   -  Data constructors for data family instances (see :ref:`data-families`).
+      For example, GHC would not give a ``Typeable`` instance to the promoted
+      ``MkK`` data constructor in the following code: ::
+
+        data family K
+        data instance K = MkK
+
+      Note that GHC *does* give a ``Typeable`` instance for ``K``, however.
+
+   -  Higher-rank types (see :ref:`arbitrary-rank-polymorphism`). For example,
+      GHC would not give a ``Typeable`` instance to the promoted ``MkFoo`` data
+      constructor in the following code: ::
+
+        newtype Foo = MkFoo (forall a. a)
+
+      This is because ``MkFoo`` has the type ``(forall a. a) -> Foo``, which
+      contains a higher-rank type. (Again, GHC *does* give a ``Typeable``
+      instance to ``Foo``, so it is only the promoted data constructor that is
+      a problem.)
+
+   -  Types that contain type families (see :ref:`type-families`). For example,
+      given the following code: ::
+
+        type family A a where
+          A () = Bool
+
+        data B = MkB (A ())
+
+      GHC would give a ``Typeable`` instance to ``B``, but *not* the promoted
+      ``MkB`` data constructor, whose type ``A () -> B`` contains the type
+      family ``A``.
+
 .. _deriving-lift:
 
 Deriving ``Lift`` instances
