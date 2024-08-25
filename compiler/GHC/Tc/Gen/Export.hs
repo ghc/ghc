@@ -237,7 +237,15 @@ rnExports explicit_mod exports
                                                 Nothing -> Nothing
                                                 Just _  -> map drop_defaults <$> rn_exports
                           , tcg_default_exports = case exports of
-                              Nothing -> filterDefaultEnv ((Just this_mod ==) . cd_module) defaults
+                              Nothing ->
+                                if xopt LangExt.NamedDefaults dflags then
+                                  -- NamedDefaults on: implicitly export the defaults declared in this module.
+                                  -- Test case: default/DefaultImport04.hs
+                                  filterDefaultEnv ((Just this_mod ==) . cd_module) defaults
+                                else
+                                  -- NamedDefaults off: do not export any defaults (fixes #25206).
+                                  -- Test case: default/T25206.hs
+                                  emptyDefaultEnv
                               _ -> foldMap (foldMap sndOf3) rn_exports
                           , tcg_dus = tcg_dus tcg_env `plusDU`
                                       usesOnly final_ns
