@@ -1,5 +1,5 @@
 
-T7019.hs:11:1: error: [GHC-91510]
+T7019.hs:14:1: error: [GHC-91510]
     • Illegal polymorphic type: forall a. c (Free c a)
       A constraint must be a monotype
     • In the type synonym declaration for ‘C’
