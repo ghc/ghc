@@ -11,8 +11,6 @@ test('default11', normal, compile_and_run, [''])
 test('DefaultImport01', [extra_files(['ExportMonoidSum.hs'])], multimod_compile_and_run, ['DefaultImport01', ''])
 test('DefaultImport02', [extra_files(['ExportMonoidProduct.hs', 'ExportMonoidSum.hs'])], multimod_compile_and_run, ['DefaultImport02', ''])
 test('DefaultImport03', [extra_files(['ExportMonoidSum.hs', 'ReExportMonoidSum.hs'])], multimod_compile_and_run, ['DefaultImport03', ''])
-test('DefaultImport04', [extra_files(['ExportImplicitMonoidProduct.hs', 'ExportShowSum.hs', 'ReExportShowSumModule.hs'])],
-                 multimod_compile_and_run, ['DefaultImport04', ''])
 test('DefaultImport05', [extra_files(['ExportBitsInt.hs'])], multimod_compile_and_run, ['DefaultImport05', ''])
 test('DefaultImport07', [extra_files(['ExportMonoidProduct.hs', 'ExportMonoidSum.hs'])], multimod_compile, ['DefaultImport07', '-Wtype-defaults'])
 test('DefaultImport08', [extra_files(['ExportMonoidProduct.hs'])], multimod_compile, ['DefaultImport08', '-Wtype-defaults'])
@@ -22,6 +20,8 @@ test('DefaultImportFail03', [extra_files(['ExportMonoidSum.hs', 'UnExportMonoidS
 test('DefaultImportFail04', [extra_files(['ExportShowSum.hs', 'ReExportShowSumModule.hs'])], multimod_compile_fail, ['DefaultImportFail04', ''])
 test('DefaultImportFail05', [extra_files(['ExportMonoidProduct.hs', 'ExportShowSum.hs'])], multimod_compile_fail, ['DefaultImportFail05', ''])
 test('DefaultImportFail06', [extra_files(['ExportBitsInt.hs'])], multimod_compile_fail, ['DefaultImportFail06', ''])
+test('DefaultImportFail07', [extra_files(['ExportImplicitMonoidProduct.hs', 'ExportShowSum.hs', 'ReExportShowSumModule.hs'])],
+                 multimod_compile_fail, ['DefaultImportFail07', ''])
 test('default-fail01', normal, compile_fail, [''])
 test('default-fail02', normal, compile_fail, [''])
 test('default-fail03', normal, compile_fail, [''])

@@ -42,7 +42,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.DefaultEnv (ClassDefaults (cd_class, cd_module), DefaultEnv,
+import GHC.Types.DefaultEnv (ClassDefaults (cd_class), DefaultEnv,
                              emptyDefaultEnv, filterDefaultEnv, isEmptyDefaultEnv)
 import GHC.Types.Avail
 import GHC.Types.SourceFile
@@ -192,7 +192,6 @@ rnExports explicit_mod exports
         ; let dflags = hsc_dflags hsc_env
               TcGblEnv { tcg_mod     = this_mod
                        , tcg_rdr_env = rdr_env
-                       , tcg_default = defaults
                        , tcg_imports = imports
                        , tcg_warns   = warns
                        , tcg_src     = hsc_src } = tcg_env
@@ -237,15 +236,7 @@ rnExports explicit_mod exports
                                                 Nothing -> Nothing
                                                 Just _  -> map drop_defaults <$> rn_exports
                           , tcg_default_exports = case exports of
-                              Nothing ->
-                                if xopt LangExt.NamedDefaults dflags then
-                                  -- NamedDefaults on: implicitly export the defaults declared in this module.
-                                  -- Test case: default/DefaultImport04.hs
-                                  filterDefaultEnv ((Just this_mod ==) . cd_module) defaults
-                                else
-                                  -- NamedDefaults off: do not export any defaults (fixes #25206).
-                                  -- Test case: default/T25206.hs
-                                  emptyDefaultEnv
+                              Nothing -> emptyDefaultEnv
                               _ -> foldMap (foldMap sndOf3) rn_exports
                           , tcg_dus = tcg_dus tcg_env `plusDU`
                                       usesOnly final_ns
@@ -265,17 +256,16 @@ type DontWarnExportNames = NameEnv (NE.NonEmpty SrcSpan)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Named default declarations (see Note [Named default declarations] in
 GHC.Tc.Gen.Default) can be exported. A named default declaration is
-exported when
-
-* there is no export list, and we export all locally-declared defaults
-
-* or it is specified in the export list, using the `default` keyword
-  and the class name.  For example:
+exported only when it's specified in the export list, using the `default`
+keyword and the class name.  For example:
 
     module TextWrap (Text, default IsString) where
       import Data.String (IsString)
       import Data.Text (Text)
       default IsString (Text, String)
+
+A module with no explicit export list does not export any default
+declarations, and neither does the re-export of a whole imported module.
 
 The export item `default IsString` is parsed into the `IE` item
 
