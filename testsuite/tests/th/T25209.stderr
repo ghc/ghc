@@ -1,0 +1,6 @@
+T25209.hs:(7,2)-(9,7): Splicing declarations
+    [d| f :: Proxy a -> Proxy a
+        f @(a :: k) p = p |]
+  ======>
+    f :: Proxy a -> Proxy a
+    f @(a :: k) p = p

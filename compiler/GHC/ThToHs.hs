@@ -1519,7 +1519,7 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; wrapParLA gParPat $ ViewPat noAnn e' p'}
 cvtp (TypeP t)         = do { t' <- cvtType t
                             ; return $ EmbTyPat noAnn (mkHsTyPat t') }
-cvtp (InvisP t)        = do { t' <- cvtType t
+cvtp (InvisP t)        = do { t' <- parenthesizeHsType appPrec <$> cvtType t
                             ; pure (InvisPat noAnn (mkHsTyPat t'))}
 cvtp (OrP ps)          = do { ps' <- cvtPats ps
                             ; pure (OrPat noExtField ps')}
