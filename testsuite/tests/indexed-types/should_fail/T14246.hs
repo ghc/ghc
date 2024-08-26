@@ -17,7 +17,7 @@ data L
 
 type KLN :: k -> Nat
 type family KLN n where
-    KLN (f :: v -> k) = S (KLN (forall t. f t))
+    KLN (f :: v -> Type) = S (KLN (forall t. f t))
     KLN (f :: Type) = Z
 
 type Reveal :: forall k. forall (n :: k) -> Vect (KLN n) L -> Type
