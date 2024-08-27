@@ -190,13 +190,9 @@ Even if that wasn't an issue, they are compiled for the session's 'Way', not its
 associated module's, so the dynamic variant wouldn't be available when building
 only static outputs.
 
-For now, this doesn't have much of an impact, since we're only supporting
-foreign imports initially, which produce very simple objects that can easily be
-handled by the linker when 'GHC.Linker.Loader.dynLoadObjs' creates a shared
-library from all object file inputs.
-However, for more complex circumstances, we should compile foreign stubs
-specially for TH according to the interpreter 'Way', or request dynamic products
-for TH dependencies like it happens for the conventional case.
+To mitigate this, we instead build foreign objects specially for the
+interpreter, updating the build flags in 'compile_for_interpreter' to use the
+interpreter's way.
 
 Problem 4:
 
