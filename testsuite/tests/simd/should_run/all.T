@@ -48,8 +48,12 @@ test('simd013',
      , unless(arch('x86_64'), skip) # because the C file uses Intel intrinsics
      ],
      compile_and_run, ['simd013C.c'])
-
-
+test('simd014',
+     [ unless(arch('x86_64'), skip) ],
+        # ^ the test uses hand-written low-level Cmm which makes use
+        # of the XMM4 register, which may not be mapped to a real machine
+        # register on non-x86 architectures.
+     compile_and_run, ['simd014Cmm.cmm'])
 
 test('T22187', [],compile,[''])
 test('T22187_run', [],compile_and_run,[''])
@@ -62,3 +66,5 @@ test('T25062_V64', [ unless(have_cpu_feature('avx512f'), skip)
                    , only_ways(llvm_ways) # SIMD NCG TODO: support 512 bit wide vectors
                    ]
                  , compile_and_run, [''])
+
+test('T25169', [], compile_and_run, [''])
