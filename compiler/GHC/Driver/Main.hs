@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -293,12 +292,12 @@ import Data.Time
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
+import GHC.Platform.Ways
 import GHC.Stg.InferTags.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Cmm.Config (CmmConfig)
-
 
 {- **********************************************************************
 %*                                                                      *
@@ -980,6 +979,27 @@ initModDetails hsc_env iface =
     -- any further typechecking.  It's much more useful
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env' iface
+
+-- | Modify flags such that objects are compiled for the interpreter's way.
+-- This is necessary when building foreign objects for Template Haskell, since
+-- those are object code built outside of the pipeline, which means they aren't
+-- subject to the mechanism in 'enableCodeGenWhen' that requests dynamic build
+-- outputs for dependencies when the interpreter used for TH is dynamic but the
+-- main outputs aren't.
+-- Furthermore, the HPT only stores one set of objects with different names for
+-- bytecode linking in 'HomeModLinkable', so the usual hack for switching
+-- between ways in 'get_link_deps' doesn't work.
+compile_for_interpreter :: HscEnv -> (HscEnv -> IO a) -> IO a
+compile_for_interpreter hsc_env use =
+  use (hscUpdateFlags update hsc_env)
+  where
+    update dflags = dflags {
+      targetWays_ = adapt_way interpreterDynamic WayDyn $
+                    adapt_way interpreterProfiled WayProf $
+                    targetWays_ dflags
+      }
+
+    adapt_way want = if want (hscInterp hsc_env) then addWay else removeWay
 
 -- | If the 'Linkable' contains Core bindings loaded from an interface, replace
 -- them with a lazy IO thunk that compiles them to bytecode and foreign objects.
@@ -2054,9 +2074,10 @@ generateByteCode :: HscEnv
   -> IO (CompiledByteCode, [FilePath])
 generateByteCode hsc_env cgguts mod_location = do
   (hasStub, comp_bc) <- hscInteractive hsc_env cgguts mod_location
-  stub_o <- traverse (compileForeign hsc_env LangC) hasStub
-  foreign_files_o <- traverse (uncurry (compileForeign hsc_env)) (cgi_foreign_files cgguts)
-  pure (comp_bc, maybeToList stub_o ++ foreign_files_o)
+  compile_for_interpreter hsc_env $ \ i_env -> do
+    stub_o <- traverse (compileForeign i_env LangC) hasStub
+    foreign_files_o <- traverse (uncurry (compileForeign i_env)) (cgi_foreign_files cgguts)
+    pure (comp_bc, maybeToList stub_o ++ foreign_files_o)
 
 generateFreshByteCode :: HscEnv
   -> ModuleName
