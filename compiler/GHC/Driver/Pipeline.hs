@@ -544,28 +544,28 @@ oneShot orig_hsc_env stop_phase srcs = do
 
 compileFile :: HscEnv -> StopPhase -> (FilePath, Maybe Phase) -> IO (Maybe FilePath)
 compileFile hsc_env stop_phase (src, mb_phase) = do
-   exists <- doesFileExist src
-   when (not exists) $
-        throwGhcExceptionIO (CmdLineError ("does not exist: " ++ src))
+   let offset_file = augmentByWorkingDirectory dflags src
+       dflags    = hsc_dflags hsc_env
+       mb_o_file = outputFile dflags
+       ghc_link  = ghcLink dflags      -- Set by -c or -no-link
+       notStopPreprocess | StopPreprocess <- stop_phase = False
+                         | _              <- stop_phase = True
+       -- When linking, the -o argument refers to the linker's output.
+       -- otherwise, we use it as the name for the pipeline's output.
+       output
+        | not (backendGeneratesCode (backend dflags)), notStopPreprocess = NoOutputFile
+               -- avoid -E -fno-code undesirable interactions. see #20439
+        | NoStop <- stop_phase, not (isNoLink ghc_link) = Persistent
+               -- -o foo applies to linker
+        | isJust mb_o_file = SpecificFile
+               -- -o foo applies to the file we are compiling now
+        | otherwise = Persistent
+       pipe_env = mkPipeEnv stop_phase offset_file mb_phase output
+       pipeline = pipelineStart pipe_env (setDumpPrefix pipe_env hsc_env) offset_file mb_phase
 
-   let
-        dflags    = hsc_dflags hsc_env
-        mb_o_file = outputFile dflags
-        ghc_link  = ghcLink dflags      -- Set by -c or -no-link
-        notStopPreprocess | StopPreprocess <- stop_phase = False
-                          | _              <- stop_phase = True
-        -- When linking, the -o argument refers to the linker's output.
-        -- otherwise, we use it as the name for the pipeline's output.
-        output
-         | not (backendGeneratesCode (backend dflags)), notStopPreprocess = NoOutputFile
-                -- avoid -E -fno-code undesirable interactions. see #20439
-         | NoStop <- stop_phase, not (isNoLink ghc_link) = Persistent
-                -- -o foo applies to linker
-         | isJust mb_o_file = SpecificFile
-                -- -o foo applies to the file we are compiling now
-         | otherwise = Persistent
-        pipe_env = mkPipeEnv stop_phase src mb_phase output
-        pipeline = pipelineStart pipe_env (setDumpPrefix pipe_env hsc_env) src mb_phase
+   exists <- doesFileExist offset_file
+   when (not exists) $
+        throwGhcExceptionIO (CmdLineError ("does not exist: " ++ offset_file))
    runPipeline (hsc_hooks hsc_env) pipeline
 
 
