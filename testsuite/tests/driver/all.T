@@ -331,3 +331,5 @@ test('T21722', normal, compile_fail, ['-fno-show-error-context'])
 test('T22669', js_skip, makefile_test, [])
 test('T23339', js_skip, makefile_test, [])
 test('T23339B', [extra_files(['T23339.hs']), js_skip], makefile_test, [])
+test('t25150', [extra_files(["t25150"])], multimod_compile, ['Main.hs', '-v0 -working-dir t25150/dir a.c'])
+
