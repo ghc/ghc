@@ -1,1 +1,1 @@
--working-dir c-file C c-file/c.c -Iinclude
+-working-dir c-file C c.c -Iinclude
