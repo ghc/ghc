@@ -478,13 +478,13 @@ add_where an@(AddEpAnn _ (EpaSpan (RealSrcSpan rs _))) (EpAnn a (AnnList anc o c
 add_where (AddEpAnn _ _) _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
-valid_anchor :: Anchor -> Bool
+valid_anchor :: EpaLocation -> Bool
 valid_anchor (EpaSpan (RealSrcSpan r _)) = srcSpanStartLine r >= 0
 valid_anchor _ = False
 
 -- If the decl list for where binds is empty, the anchor ends up
 -- invalid. In this case, use the parent one
-patch_anchor :: RealSrcSpan -> Anchor -> Anchor
+patch_anchor :: RealSrcSpan -> EpaLocation -> EpaLocation
 patch_anchor r EpaDelta{} = EpaSpan (RealSrcSpan r Strict.Nothing)
 patch_anchor r1 (EpaSpan (RealSrcSpan r0 mb)) = EpaSpan (RealSrcSpan r mb)
   where
@@ -495,9 +495,9 @@ fixValbindsAnn :: EpAnn AnnList -> EpAnn AnnList
 fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
   = (EpAnn (widenAnchor anchor (r ++ map trailingAnnToAddEpAnn t)) (AnnList ma o c r t) cs)
 
--- | The 'Anchor' for a stmtlist is based on either the location or
+-- | The anchor for a stmtlist is based on either the location or
 -- the first semicolon annotion.
-stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Maybe Anchor
+stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Maybe EpaLocation
 stmtsAnchor (L (RealSrcSpan l mb) ((ConsOL (AddEpAnn _ (EpaSpan (RealSrcSpan r rb))) _), _))
   = Just $ widenAnchorS (EpaSpan (RealSrcSpan l mb)) (RealSrcSpan r rb)
 stmtsAnchor (L (RealSrcSpan l mb) _) = Just $ EpaSpan (RealSrcSpan l mb)

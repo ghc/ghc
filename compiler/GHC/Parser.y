@@ -4483,13 +4483,13 @@ gl = getLoc
 glA :: HasLoc a => a -> SrcSpan
 glA = getHasLoc
 
-glR :: HasLoc a => a -> Anchor
+glR :: HasLoc a => a -> EpaLocation
 glR !la = EpaSpan (getHasLoc la)
 
-glEE :: (HasLoc a, HasLoc b) => a -> b -> Anchor
+glEE :: (HasLoc a, HasLoc b) => a -> b -> EpaLocation
 glEE !x !y = spanAsAnchor $ comb2 x y
 
-glRM :: Located a -> Maybe Anchor
+glRM :: Located a -> Maybe EpaLocation
 glRM (L !l _) = Just $ spanAsAnchor l
 
 glAA :: HasLoc a => a -> EpaLocation
@@ -4609,11 +4609,11 @@ hsDoAnn :: Located a -> LocatedAn t b -> AnnKeywordId -> AnnList
 hsDoAnn (L l _) (L ll _) kw
   = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddEpAnn kw (srcSpan2e l)] []
 
-listAsAnchor :: [LocatedAn t a] -> Located b -> Anchor
+listAsAnchor :: [LocatedAn t a] -> Located b -> EpaLocation
 listAsAnchor [] (L l _) = spanAsAnchor l
 listAsAnchor (h:_) s = spanAsAnchor (comb2 h s)
 
-listAsAnchorM :: [LocatedAn t a] -> Maybe Anchor
+listAsAnchorM :: [LocatedAn t a] -> Maybe EpaLocation
 listAsAnchorM [] = Nothing
 listAsAnchorM (L l _:_) =
   case locA l of
