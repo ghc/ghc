@@ -175,8 +175,8 @@ data EPState = EPState
              { uAnchorSpan :: !RealSrcSpan -- ^ in pre-changed AST
                                           -- reference frame, from
                                           -- Annotation
-             , uExtraDP :: !(Maybe Anchor) -- ^ Used to anchor a
-                                             -- list
+             , uExtraDP :: !(Maybe EpaLocation) -- ^ Used to anchor a
+                                                -- list
              , pAcceptSpan :: Bool -- ^ When we have processed an
                                    -- entry of EpaDelta, accept the
                                    -- next `EpaSpan` start as the
@@ -214,21 +214,21 @@ class HasTrailing a where
   setTrailing :: a -> [TrailingAnn] -> a
 
 setAnchorEpa :: (HasTrailing an, NoAnn an)
-             => EpAnn an -> Anchor -> [TrailingAnn] -> EpAnnComments -> EpAnn an
+             => EpAnn an -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> EpAnn an
 setAnchorEpa (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing an ts)          cs
 
-setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
+setAnchorHsModule :: HsModule GhcPs -> EpaLocation -> EpAnnComments -> HsModule GhcPs
 setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn = an'} }
   where
     anc' = anc
     an' = setAnchorEpa (hsmodAnn $ hsmodExt hsmod) anc' [] cs
 
 setAnchorAn :: (HasTrailing an, NoAnn an)
-             => LocatedAn an a -> Anchor -> [TrailingAnn] -> EpAnnComments -> LocatedAn an a
+             => LocatedAn an a -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> LocatedAn an a
 setAnchorAn (L (EpAnn _ an _) a) anc ts cs = (L (EpAnn anc (setTrailing an ts) cs) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
-setAnchorEpaL :: EpAnn AnnList -> Anchor -> [TrailingAnn] -> EpAnnComments -> EpAnn AnnList
+setAnchorEpaL :: EpAnn AnnList -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> EpAnn AnnList
 setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_anchor = Nothing}) ts) cs
 
 -- ---------------------------------------------------------------------
@@ -250,14 +250,14 @@ data CanUpdateAnchor = CanUpdateAnchor
                      | NoCanUpdateAnchor
                    deriving (Eq, Show)
 
-data Entry = Entry Anchor [TrailingAnn] EpAnnComments FlushComments CanUpdateAnchor
+data Entry = Entry EpaLocation [TrailingAnn] EpAnnComments FlushComments CanUpdateAnchor
            | NoEntryVal
 
 -- | For flagging whether to capture comments in an EpaDelta or not
 data CaptureComments = CaptureComments
                      | NoCaptureComments
 
-mkEntry :: Anchor -> [TrailingAnn] -> EpAnnComments -> Entry
+mkEntry :: EpaLocation -> [TrailingAnn] -> EpAnnComments -> Entry
 mkEntry anc ts cs = Entry anc ts cs NoFlushComments CanUpdateAnchor
 
 instance (HasTrailing a) => HasEntry (EpAnn a) where
@@ -642,7 +642,7 @@ withPpr a = do
 -- 'ppr'.
 class (Typeable a) => ExactPrint a where
   getAnnotationEntry :: a -> Entry
-  setAnnotationAnchor :: a -> Anchor -> [TrailingAnn] -> EpAnnComments -> a
+  setAnnotationAnchor :: a -> EpaLocation -> [TrailingAnn] -> EpAnnComments -> a
   exact :: (Monad m, Monoid w) => a -> EP w m a
 
 -- ---------------------------------------------------------------------
@@ -4277,7 +4277,7 @@ instance ExactPrint (LocatedN RdrName) where
 locFromAdd :: AddEpAnn -> EpaLocation
 locFromAdd (AddEpAnn _ loc) = loc
 
-printUnicode :: (Monad m, Monoid w) => Anchor -> RdrName -> EP w m Anchor
+printUnicode :: (Monad m, Monoid w) => EpaLocation -> RdrName -> EP w m EpaLocation
 printUnicode anc n = do
   let str = case (showPprUnsafe n) of
             -- TODO: unicode support?
@@ -4977,10 +4977,10 @@ setPosP l = do
   debugM $ "setPosP:" ++ show l
   modify (\s -> s {epPos = l})
 
-getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe Anchor)
+getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
 getExtraDP = gets uExtraDP
 
-setExtraDP :: (Monad m, Monoid w) => Maybe Anchor -> EP w m ()
+setExtraDP :: (Monad m, Monoid w) => Maybe EpaLocation -> EP w m ()
 setExtraDP md = do
   debugM $ "setExtraDP:" ++ show md
   modify (\s -> s {uExtraDP = md})
