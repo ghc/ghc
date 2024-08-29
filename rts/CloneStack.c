@@ -60,7 +60,10 @@ StgStack* cloneStack(Capability* capability, const StgStack* stack)
     // check whether the stack ends in an underflow frame
     StgUnderflowFrame *frame = (StgUnderflowFrame *) (last_stack->stack
       + last_stack->stack_size - sizeofW(StgUnderflowFrame));
-    if (frame->info == &stg_stack_underflow_frame_info) {
+    if (frame->info == &stg_stack_underflow_frame_d_info
+      ||frame->info == &stg_stack_underflow_frame_v16_info
+      ||frame->info == &stg_stack_underflow_frame_v32_info
+      ||frame->info == &stg_stack_underflow_frame_v64_info) {
       StgStack *s = cloneStackChunk(capability, frame->next_chunk);
       frame->next_chunk = s;
       last_stack = s;
@@ -136,7 +139,10 @@ StgWord getStackFrameCount(StgStack* stack) {
     // check whether the stack ends in an underflow frame
     StgUnderflowFrame *frame = (StgUnderflowFrame *) (last_stack->stack
       + last_stack->stack_size - sizeofW(StgUnderflowFrame));
-    if (frame->info == &stg_stack_underflow_frame_info) {
+    if (frame->info == &stg_stack_underflow_frame_d_info
+      ||frame->info == &stg_stack_underflow_frame_v16_info
+      ||frame->info == &stg_stack_underflow_frame_v32_info
+      ||frame->info == &stg_stack_underflow_frame_v64_info) {
       last_stack = frame->next_chunk;
     } else {
       break;
@@ -187,7 +193,10 @@ static void copyPtrsToArray(StgArrBytes* arr, StgStack* stack) {
     // check whether the stack ends in an underflow frame
     StgUnderflowFrame *frame = (StgUnderflowFrame *) (last_stack->stack
       + last_stack->stack_size - sizeofW(StgUnderflowFrame));
-    if (frame->info == &stg_stack_underflow_frame_info) {
+    if (frame->info == &stg_stack_underflow_frame_d_info
+      ||frame->info == &stg_stack_underflow_frame_v16_info
+      ||frame->info == &stg_stack_underflow_frame_v32_info
+      ||frame->info == &stg_stack_underflow_frame_v64_info) {
       last_stack = frame->next_chunk;
     } else {
       break;

@@ -626,8 +626,23 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             } else if (c == (StgWord)&stg_prompt_frame_info) {
                 debugBelch("stg_prompt_frame_info\n");
 #if defined(PROFILING)
-            } else if (c == (StgWord)&stg_restore_cccs_info) {
-                debugBelch("stg_restore_cccs_info\n" );
+            } else if (c == (StgWord)&stg_restore_cccs_d_info) {
+                debugBelch("stg_restore_cccs_d_info\n" );
+                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                debugBelch("\n" );
+                continue;
+            } else if (c == (StgWord)&stg_restore_cccs_v16_info) {
+                debugBelch("stg_restore_cccs_v16_info\n" );
+                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                debugBelch("\n" );
+                continue;
+            } else if (c == (StgWord)&stg_restore_cccs_v32_info) {
+                debugBelch("stg_restore_cccs_v32_info\n" );
+                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                debugBelch("\n" );
+                continue;
+            } else if (c == (StgWord)&stg_restore_cccs_v64_info) {
+                debugBelch("stg_restore_cccs_v64_info\n" );
                 fprintCCS(stderr, (CostCentreStack*)sp[1]);
                 debugBelch("\n" );
                 continue;

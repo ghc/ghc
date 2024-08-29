@@ -39,6 +39,7 @@ import GHC.Data.SizedSeq
 
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Cmm.Expr
+import GHC.Cmm.Reg             ( GlobalArgRegs(..) )
 import GHC.Cmm.CallConv        ( allArgRegsCover )
 import GHC.Platform
 import GHC.Platform.Profile
@@ -638,7 +639,7 @@ return_non_tuple V64 = error "return_non_tuple: vector"
   Note [unboxed tuple bytecodes and tuple_BCO].
 
   If needed, you can support larger tuples by adding more in
-  StgMiscClosures.cmm, Interpreter.c and MiscClosures.h and
+  Jumps.cmm, StgMiscClosures.cmm, Interpreter.c and MiscClosures.h and
   raising this limit.
 
   Note that the limit is the number of words passed on the stack.
@@ -692,7 +693,9 @@ mkNativeCallInfoSig platform NativeCallInfo{..}
     reg_bit x (r, n)
       | r `elemRegSet` nativeCallRegs = x .|. 1 `shiftL` n
       | otherwise                     = x
-    argRegs = zip (allArgRegsCover platform) [0..]
+    argRegs = zip (allArgRegsCover platform SCALAR_ARG_REGS) [0..]
+      -- The bytecode interpreter does not (currently) handle vector registers,
+      -- so we only use the scalar argument-passing registers here.
 
 mkNativeCallInfoLit :: Platform -> NativeCallInfo -> Literal
 mkNativeCallInfoLit platform call_info =

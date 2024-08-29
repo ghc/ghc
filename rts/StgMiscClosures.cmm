@@ -51,56 +51,33 @@ INFO_TABLE_RET (stg_orig_thunk_info_frame, RET_SMALL,
                 W_ thunk_info_ptr)
     /* no args => explicit stack */
 {
+
+    /*
+
+    !!!!!!!!!!!!!!!!!
+    !!! IMPORTANT !!!
+    !!!!!!!!!!!!!!!!!
+
+    The body of this function MUST NOT use any floating-point
+    or vector registers. DO NOT add any e.g. debug printing logic that
+    has any chance whatsoever of using floating-point or vector registers.
+    If you DO want to edit the function in such a way that it may use
+    vector registers, you will need to define multiple different copies
+    of this function, as we do e.g. for stg_stack_underflow_frame
+    (see Jumps.h).
+
+    See Note [realArgRegsCover] in GHC.Cmm.CallConv for more details.
+
+    */
+
     unwind Sp = W_[Sp + SIZEOF_StgOrigThunkInfoFrame];
     Sp = Sp + SIZEOF_StgOrigThunkInfoFrame;
-    jump %ENTRY_CODE(Sp(0)) [*]; // NB. all registers live!
-}
-
-/* ----------------------------------------------------------------------------
-   Stack underflow
-   ------------------------------------------------------------------------- */
-
-INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
-                W_ info_ptr, P_ unused)
-    /* no args => explicit stack */
-{
-    unwind Sp = W_[Sp + WDS(2)];
-
-    W_ new_tso;
-    W_ ret_off;
-
-    SAVE_REGS();
-
-    SAVE_THREAD_STATE();
-    (ret_off) = foreign "C" threadStackUnderflow(MyCapability() "ptr",
-                                                 CurrentTSO);
-    LOAD_THREAD_STATE();
-
-    RESTORE_REGS();
-
-    jump %ENTRY_CODE(Sp(ret_off)) [*]; // NB. all registers live!
+    jump %ENTRY_CODE(Sp(0)) GP_ARG_REGS; // NB. all GP arg regs live!
 }
 
 /* ----------------------------------------------------------------------------
    Restore a saved cost centre
    ------------------------------------------------------------------------- */
-
-INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ info_ptr, W_ cccs)
-{
-    W_ _unused;
-
-    unwind Sp = Sp + WDS(2);
-#if defined(PROFILING)
-    CCCS = Sp(1);
-#endif
-    Sp_adj(2);
-
-    IF_DEBUG(sanity,
-      (_unused) = ccall checkStackFrame(Sp "ptr"));
-
-    jump %ENTRY_CODE(Sp(0)) [*]; // NB. all registers live!
-}
-
 
 INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
     return (P_ ret)
@@ -292,7 +269,7 @@ INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
 
 #define MK_STG_CTOI_T(N) INFO_TABLE_RET( \
   stg_ctoi_t ## N, RET_BCO ) \
-  { Sp_adj(N); jump stg_ctoi_t [*]; }
+  { Sp_adj(N); jump stg_ctoi_t SCALAR_ARG_REGS; }
 
 MK_STG_CTOI_T(0)
 MK_STG_CTOI_T(1)
@@ -391,7 +368,7 @@ stg_ctoi_t
 
     Sp = Sp - WDS(tuple_stack);
 
-    PUSH_ARG_REGS(tuple_info);
+    PUSH_SCALAR_ARG_REGS(tuple_info);
 
     /* jump to the BCO that will finish the return of the tuple */
     Sp_adj(-3);
@@ -412,10 +389,10 @@ INFO_TABLE_RET( stg_ret_t, RET_BCO )
     /* number of words spilled on stack */
     tuple_stack  = (tuple_info >> 24) & 0xff;
 
-    POP_ARG_REGS(tuple_info);
+    POP_SCALAR_ARG_REGS(tuple_info);
 
     /* Sp points to the topmost argument now */
-    jump %ENTRY_CODE(Sp(tuple_stack)) [*]; // NB. all registers live!
+    jump %ENTRY_CODE(Sp(tuple_stack)) SCALAR_ARG_REGS; // NB. all scalar registers live!
 }
 
 
@@ -456,11 +433,11 @@ INFO_TABLE_RET ( stg_primcall, RET_BCO )
 
     /* Sp points to the top of the register arguments now,
        load them into actual registers */
-    POP_ARG_REGS(args_info);
+    POP_SCALAR_ARG_REGS(args_info);
 
     /* Sp points to the topmost stack argument now */
 
-    jump prim_fun [*]; // NB. all registers live!
+    jump prim_fun SCALAR_ARG_REGS; // NB. all scalar registers live!
 }
 
 /*

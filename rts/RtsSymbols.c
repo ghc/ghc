@@ -451,7 +451,10 @@ extern char **environ;
 #define RTS_PROF_SYMBOLS                        \
       SymI_HasProto(CCS_DONT_CARE)              \
       SymI_HasProto(CC_LIST)                    \
-      SymI_HasProto(stg_restore_cccs_info)      \
+      SymI_HasProto(stg_restore_cccs_d_info)    \
+      SymI_HasProto(stg_restore_cccs_v16_info)  \
+      SymI_HasProto(stg_restore_cccs_v32_info)  \
+      SymI_HasProto(stg_restore_cccs_v64_info)  \
       SymI_HasProto(enterFunCCS)                \
       SymI_HasProto(pushCostCentre)             \
       SymI_HasProto(mkCostCentre)               \

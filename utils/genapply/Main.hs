@@ -142,6 +142,9 @@ compile AutoApply_V32.cmm without -mavx2 using the LLVM backend, LLVM would
 attempt to compile usage of ymm registers into usage of pairs of xmm registers.
 This violates the expected calling convention, and leads to segfaults
 (e.g. in test T25062_V32).
+
+See also Note [realArgRegsCover] in GHC.Cmm.CallConv, which deals with similar
+concerns.
 -}
 
 data TargetInfo = TargetInfo
@@ -398,9 +401,21 @@ mkJumpSaveCCCS :: TargetInfo
                -> [ArgRep]  -- Jump arguments
                -> Doc
 mkJumpSaveCCCS targetInfo jump live args =
-  text "jump_SAVE_CCCS" <> parens (hcat (punctuate comma (jump : map text liveRegs))) <+> semi
+  text "jump_SAVE_CCCS" <> parens (hcat (punctuate comma (restoreCCCS_info : jump : map text liveRegs))) <+> semi
   where
     liveRegs = mkJumpLiveRegs targetInfo live args
+    restoreCCCS_info = text (stgRestoreCCCSInfo args)
+
+stgRestoreCCCSInfo :: [ArgRep] -> String
+stgRestoreCCCSInfo args
+  | null args
+  = "stg_restore_cccs_d_info"
+  | otherwise
+  = case maximum args of
+      V64 -> "stg_restore_cccs_v64_info"
+      V32 -> "stg_restore_cccs_v32_info"
+      V16 -> "stg_restore_cccs_v16_info"
+      _   -> "stg_restore_cccs_d_info"
 
 -- Calculate live registers for a jump
 mkJumpLiveRegs :: TargetInfo
@@ -654,7 +669,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
                (if prof
                  then
                    loadSpWordOff "W_" (sp_stk_args + stack_args_size - 3)
-                     <> text " = stg_restore_cccs_info;" $$
+                     <> text " = " <> text (stgRestoreCCCSInfo args) <> semi $$
                    loadSpWordOff "W_" (sp_stk_args + stack_args_size - 2)
                      <> text " = CCCS;"
                  else empty) $$
@@ -1238,7 +1253,10 @@ main = do
               , wantArgs argReps
               , let str = concatMap showArg argReps ],
                 text "import CLOSURE stg_gc_fun_info;",
-                text "import CLOSURE stg_restore_cccs_info;",
+                text "import CLOSURE stg_restore_cccs_d_info;",
+                text "import CLOSURE stg_restore_cccs_v16_info;",
+                text "import CLOSURE stg_restore_cccs_v32_info;",
+                text "import CLOSURE stg_restore_cccs_v64_info;",
                 text "#endif // !defined(UnregisterisedCompiler)",
 
          -- NB: the vector apply/save functions are defined in separate modules,

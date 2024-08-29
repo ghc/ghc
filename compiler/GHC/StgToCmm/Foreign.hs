@@ -38,6 +38,7 @@ import GHC.StgToCmm.Layout
 
 import GHC.Cmm.BlockId (newBlockId)
 import GHC.Cmm
+import GHC.Cmm.Reg ( GlobalArgRegs(..) )
 import GHC.Cmm.Utils
 import GHC.Cmm.Graph
 import GHC.Cmm.CallConv
@@ -390,18 +391,18 @@ saveThreadState profile = do
 -- loaded any live STG registers into variables for us, but in
 -- hand-written low-level Cmm code where we don't know which registers
 -- are live, we might have to save them all.
-emitSaveRegs :: FCode ()
-emitSaveRegs = do
+emitSaveRegs :: GlobalArgRegs -> FCode ()
+emitSaveRegs argRegs = do
    platform <- getPlatform
-   let regs = realArgRegsCover platform
+   let regs = realArgRegsCover platform argRegs
        save = catAGraphs (map (callerSaveGlobalReg platform) regs)
    emit save
 
 -- | Restore STG registers (see 'emitSaveRegs')
-emitRestoreRegs :: FCode ()
-emitRestoreRegs = do
+emitRestoreRegs :: GlobalArgRegs -> FCode ()
+emitRestoreRegs argRegs = do
    platform <- getPlatform
-   let regs    = realArgRegsCover platform
+   let regs    = realArgRegsCover platform argRegs
        restore = catAGraphs (map (callerRestoreGlobalReg platform) regs)
    emit restore
 
@@ -427,10 +428,10 @@ emitRestoreRegs = do
 --
 -- See Note [GHCi and native call registers]
 
-emitPushArgRegs :: CmmExpr -> FCode ()
-emitPushArgRegs regs_live = do
+emitPushArgRegs :: GlobalArgRegs -> CmmExpr -> FCode ()
+emitPushArgRegs argRegs regs_live = do
   platform <- getPlatform
-  let regs = zip (allArgRegsCover platform) [0..]
+  let regs = zip (allArgRegsCover platform argRegs) [0..]
       save_arg (reg, n) =
         let reg_ty   = globalRegSpillType platform reg
             mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
@@ -445,10 +446,10 @@ emitPushArgRegs regs_live = do
   emit . catAGraphs =<< mapM save_arg (reverse $ regs)
 
 -- | Pop a subset of STG registers from the stack (see 'emitPushArgRegs')
-emitPopArgRegs :: CmmExpr -> FCode ()
-emitPopArgRegs regs_live = do
+emitPopArgRegs :: GlobalArgRegs ->CmmExpr -> FCode ()
+emitPopArgRegs argRegs regs_live = do
   platform <- getPlatform
-  let regs = zip (allArgRegsCover platform) [0..]
+  let regs = zip (allArgRegsCover platform argRegs) [0..]
       save_arg (reg, n) =
         let reg_ty   = globalRegSpillType platform reg
             mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))

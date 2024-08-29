@@ -18,6 +18,7 @@ module GHC.Cmm.Lexer (
 import GHC.Prelude
 
 import GHC.Cmm.Expr
+import GHC.Cmm.Reg (GlobalArgRegs(..))
 
 import GHC.Parser.Lexer
 import GHC.Cmm.Parser.Monad
@@ -124,6 +125,12 @@ $white_no_nl+           ;
   MachSp                { global_reg  MachSp           bWord }
   UnwindReturnReg       { global_reg  UnwindReturnReg  bWord }
 
+  GP_ARG_REGS           { kw (CmmT_GlobalArgRegs GP_ARG_REGS) }
+  SCALAR_ARG_REGS       { kw (CmmT_GlobalArgRegs SCALAR_ARG_REGS) }
+  V16_ARG_REGS          { kw (CmmT_GlobalArgRegs V16_ARG_REGS) }
+  V32_ARG_REGS          { kw (CmmT_GlobalArgRegs V32_ARG_REGS) }
+  V64_ARG_REGS          { kw (CmmT_GlobalArgRegs V64_ARG_REGS) }
+
   $namebegin $namechar* { name }
 
   0 @octal              { tok_octal }
@@ -182,11 +189,12 @@ data CmmToken
   | CmmT_float32
   | CmmT_float64
   | CmmT_gcptr
-  | CmmT_GlobalReg GlobalRegUse
-  | CmmT_Name      FastString
-  | CmmT_String    String
-  | CmmT_Int       Integer
-  | CmmT_Float     Rational
+  | CmmT_GlobalReg     GlobalRegUse
+  | CmmT_GlobalArgRegs GlobalArgRegs
+  | CmmT_Name          FastString
+  | CmmT_String        String
+  | CmmT_Int           Integer
+  | CmmT_Float         Rational
   | CmmT_EOF
   | CmmT_False
   | CmmT_True

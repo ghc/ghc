@@ -165,6 +165,12 @@ Cmm
 - The ``bits128``, ``bits256`` and ``bits512`` types have been removed, in
   favour of ``vec128``, ``vec256`` and ``vec512``.
 
+- The ``[*]`` jump annotation ("all registers live") has been removed, in favour
+  of more specific annotations ``GP_ARG_REGS`` (all general-purpose registers
+  live), ``SCALAR_ARG_REGS`` (all scalar registers live), and ``V16_ARG_REGS``,
+  ``V32_ARG_REGS`` and ``V64_ARG_REGS`` (meaning: all scalar registers plus
+  all vector registers up to the given vector width in bytes).
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

@@ -834,8 +834,12 @@ checkGlobalTSOList (bool checkTSOs)
               StgUnderflowFrame *frame =
                   (StgUnderflowFrame*) (stack->stack + stack->stack_size
                           - sizeofW(StgUnderflowFrame));
-              if (frame->info != &stg_stack_underflow_frame_info
-                      || frame->next_chunk == (StgStack*)END_TSO_QUEUE) {
+              if (frame->next_chunk == (StgStack*)END_TSO_QUEUE ||
+                  (  frame->info != &stg_stack_underflow_frame_d_info
+                  && frame->info != &stg_stack_underflow_frame_v16_info
+                  && frame->info != &stg_stack_underflow_frame_v32_info
+                  && frame->info != &stg_stack_underflow_frame_v64_info
+                  )) {
                   break;
               }
               stack = frame->next_chunk;

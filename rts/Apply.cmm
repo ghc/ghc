@@ -15,7 +15,6 @@
 /*
 Note [import CLOSURE annotations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When the Cmm syntax refers to an undefined symbol without a corresponding import
 statement, the parser always creates a CLabel with function kind, even if it
 refers to data instead (e.g. info tables or static closures). This is a huge

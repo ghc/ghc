@@ -327,6 +327,9 @@ rtsPackageArgs = package rts ? do
             -- AutoApply_V16.cmm, as that would lock out targets with SSE2 but not AVX.
           , inputs ["**/AutoApply_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
           , inputs ["**/AutoApply_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
+
+          , inputs ["**/Jumps_V32.cmm"] ? pure [ "-mavx2"    | x86 ]
+          , inputs ["**/Jumps_V64.cmm"] ? pure [ "-mavx512f" | x86 ]
           ]
 
     let cArgs = mconcat
@@ -394,6 +397,7 @@ rtsPackageArgs = package rts ? do
           -- generates dynamic references.
           , speedHack ?
             inputs [ "**/Updates.c", "**/StgMiscClosures.c"
+                   , "**/Jumps_D.c", "**/Jumps_V16.c", "**/Jumps_V32.c", "**/Jumps_V64.c"
                    , "**/PrimOps.c", "**/Apply.c"
                    , "**/AutoApply.c"
                    , "**/AutoApply_V16.c"
@@ -403,6 +407,9 @@ rtsPackageArgs = package rts ? do
             -- See Note [AutoApply.cmm for vectors] in genapply/Main.hs
           , inputs ["**/AutoApply_V32.c"] ? pure [ "-mavx2"    | x86 ]
           , inputs ["**/AutoApply_V64.c"] ? pure [ "-mavx512f" | x86 ]
+
+          , inputs ["**/Jumps_V32.c"] ? pure [ "-mavx2"    | x86 ]
+          , inputs ["**/Jumps_V64.c"] ? pure [ "-mavx512f" | x86 ]
 
           -- inlining warnings happen in Compact
           , inputs ["**/Compact.c"] ? arg "-Wno-inline"

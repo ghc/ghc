@@ -52,7 +52,7 @@ data ArgRep = P   -- GC Ptr
             | V16 -- 16-byte (128-bit) vectors of Float/Double/Int8/Word32/etc.
             | V32 -- 32-byte (256-bit) vectors of Float/Double/Int8/Word32/etc.
             | V64 -- 64-byte (512-bit) vectors of Float/Double/Int8/Word32/etc.
-            deriving Eq
+            deriving ( Eq, Ord )
 instance Outputable ArgRep where ppr = text . argRepString
 
 argRepString :: ArgRep -> String

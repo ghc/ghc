@@ -11,6 +11,7 @@
 #include "RtsFlags.h"
 
 #include "Capability.h"
+#include "CheckVectorSupport.h"
 #include "Updates.h"
 #include "Threads.h"
 #include "STM.h"
@@ -688,9 +689,25 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
             // overflow, being replaced by a non-moving 32k chunk.
             //
         } else {
+
             new_stack->sp -= sizeofW(StgUnderflowFrame);
             frame = (StgUnderflowFrame*)new_stack->sp;
-            frame->info = &stg_stack_underflow_frame_info;
+
+            // See Note [realArgRegsCover] in GHC.Cmm.CallConv.
+            switch (vectorSupportGlobalVar) {
+              case 3:
+                frame->info = &stg_stack_underflow_frame_v64_info;
+                break;
+              case 2:
+                frame->info = &stg_stack_underflow_frame_v32_info;
+                break;
+              case 1:
+                frame->info = &stg_stack_underflow_frame_v16_info;
+                break;
+              default:
+                frame->info = &stg_stack_underflow_frame_d_info;
+                break;
+            }
             frame->next_chunk  = old_stack;
         }
 
@@ -736,7 +753,10 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
 
     frame = (StgUnderflowFrame*)(old_stack->stack + old_stack->stack_size
                                  - sizeofW(StgUnderflowFrame));
-    ASSERT(frame->info == &stg_stack_underflow_frame_info);
+    ASSERT( frame->info == &stg_stack_underflow_frame_d_info
+         || frame->info == &stg_stack_underflow_frame_v16_info
+         || frame->info == &stg_stack_underflow_frame_v32_info
+         || frame->info == &stg_stack_underflow_frame_v64_info );
 
     new_stack = (StgStack*)frame->next_chunk;
     tso->stackobj = new_stack;
