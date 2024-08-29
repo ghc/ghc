@@ -509,8 +509,8 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
           -- way we do the import depends on whether we're currently compiling
           -- the base package or not.
                  ++ (if platformOS platform == OSMinGW32 &&
-                        isHomeUnitId home_unit baseUnitId
-                          then [ "-DCOMPILING_BASE_PACKAGE" ]
+                        isHomeUnitId home_unit ghcInternalUnitId
+                          then [ "-DCOMPILING_GHC_INTERNAL_PACKAGE" ]
                           else [])
 
                  -- GCC 4.6+ doesn't like -Wimplicit when compiling C++.
