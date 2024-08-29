@@ -426,9 +426,6 @@ rnImportDecl this_mod
        WarnAll txt -> addDiagnostic (TcRnDeprecatedModule imp_mod_name txt)
        _           -> return ()
 
-    -- Complain about -Wcompat-unqualified-imports violations.
-    warnUnqualifiedImport decl iface
-
     let new_imp_decl = ImportDecl
           { ideclExt       = ideclExt decl
           , ideclName      = ideclName decl
@@ -594,32 +591,6 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
           imp_trust_own_pkg = pkg_trust_req
      }
 
-
--- | Issue a warning if the user imports Data.List without either an import
--- list or `qualified`. This is part of the migration plan for the
--- `Data.List.singleton` proposal. See #17244.
-warnUnqualifiedImport :: ImportDecl GhcPs -> ModIface -> RnM ()
-warnUnqualifiedImport decl iface =
-    when bad_import $ do
-      addDiagnosticAt loc (TcRnCompatUnqualifiedImport decl)
-  where
-    mod = mi_module iface
-    loc = getLocA $ ideclName decl
-
-    is_qual = isImportDeclQualified (ideclQualified decl)
-    has_import_list =
-      -- We treat a `hiding` clause as not having an import list although
-      -- it's not entirely clear this is the right choice.
-      case ideclImportList decl of
-        Just (Exactly, _) -> True
-        _               -> False
-    bad_import =
-         not is_qual
-      && not has_import_list
-      && mod `elemModuleSet` qualifiedMods
-
-    -- Modules for which we warn if we see unqualified imports
-    qualifiedMods = mkModuleSet [ dATA_LIST ]
 
 {-
 ************************************************************************

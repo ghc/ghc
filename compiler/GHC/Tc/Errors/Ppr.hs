@@ -1742,13 +1742,6 @@ instance Diagnostic TcRnMessage where
           (extra, msg) = case txt of
             WarningTxt _ _ msg -> ("", msg)
             DeprecatedTxt _ msg -> (" is deprecated", msg)
-    TcRnCompatUnqualifiedImport decl
-      -> mkSimpleDecorated $
-         vcat
-         [ text "To ensure compatibility with future core libraries changes"
-         , text "imports to" <+> ppr (ideclName decl) <+> text "should be"
-         , text "either qualified or have an explicit import list."
-         ]
     TcRnRedundantSourceImport mod_name
       -> mkSimpleDecorated $
          text "Unnecessary {-# SOURCE #-} in the import of module" <+> quotes (ppr mod_name)
@@ -2544,8 +2537,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnDeprecatedModule _ txt
       -> WarningWithCategory (warningTxtCategory txt)
-    TcRnCompatUnqualifiedImport{}
-      -> WarningWithFlag Opt_WarnCompatUnqualifiedImports
     TcRnRedundantSourceImport{}
       -> WarningWithoutFlag
     TcRnImportLookup{}
@@ -3223,8 +3214,6 @@ instance Diagnostic TcRnMessage where
     TcRnSafeImportsDisabled{}
       -> [SuggestSafeHaskell]
     TcRnDeprecatedModule{}
-      -> noHints
-    TcRnCompatUnqualifiedImport{}
       -> noHints
     TcRnRedundantSourceImport{}
       -> noHints
