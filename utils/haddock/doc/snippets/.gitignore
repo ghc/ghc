@@ -1,0 +1,12 @@
+*.html
+*.tex
+haddock-bundle.min.js
+haddock.sty
+linuwial.css
+main.tex
+meta.json
+quick-jump.css
+synopsis.png
+
+!Snippet*.html
+!Snippet*.tex

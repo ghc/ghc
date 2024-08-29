@@ -1004,99 +1004,162 @@ Itemized and Enumerated Lists
 
 A bulleted item is represented by preceding a paragraph with either
 “``*``” or “``-``”. A sequence of bulleted paragraphs is rendered as an
-itemized list in the generated documentation, e.g.: ::
+itemized list in the generated documentation, e.g.
 
-    -- | This is a bulleted list:
-    --
-    --     * first item
-    --
-    --     * second item
+.. literalinclude:: snippets/Lists.hs
+    :lines: 3-7
+
+.. admonition:: Result
+    :class: result
+
+    .. only:: html
+
+        .. raw:: html
+            :file: snippets/Snippet-List-Bulleted.html
+
+    .. only:: latex
+
+        .. raw:: latex
+            :file: snippets/Snippet-List-Bulleted.tex
+
+.. warning::
+
+    Separate lists from any preceding markup with at least one blank line
+    otherwise the list and its items will be rendered with the preceding
+    content.
+
+.. literalinclude:: snippets/Lists.hs
+    :lines: 10-12
+
+.. admonition:: Result
+    :class: result
+
+    .. only:: html
+
+        .. raw:: html
+            :file: snippets/Snippet-List-Not-Separated.html
+
+    .. only:: latex
+
+        .. raw:: latex
+            :file: snippets/Snippet-List-Not-Separated.tex
 
 An enumerated list is similar, except each paragraph must be preceded by
-either “``(n)``” or “``n.``” where n is any integer. e.g. ::
+either “``(n)``” or “``n.``” where n is any integer. e.g.
 
-    -- | This is an enumerated list:
-    --
-    --     (1) first item
-    --
-    --     2. second item
+.. literalinclude:: snippets/Lists.hs
+    :lines: 15-19
 
-Lists of the same type don't have to be separated by a newline: ::
+.. admonition:: Result
+    :class: result
 
-    -- | This is an enumerated list:
-    --
-    --     (1) first item
-    --     2. second item
-    --
-    -- This is a bulleted list:
-    --
-    --     * first item
-    --     * second item
+    .. only:: html
 
-You can have more than one line of content in a list element: ::
+        .. raw:: html
+            :file: snippets/Snippet-List-Enumerated.html
 
-    -- |
-    -- * first item
-    -- and more content for the first item
-    -- * second item
-    -- and more content for the second item
+    .. only:: latex
+
+        .. raw:: latex
+            :file: snippets/Snippet-List-Enumerated.tex
+
+Lists of the same type don't have to be separated by a newline:
+
+.. literalinclude:: snippets/Lists.hs
+    :lines: 22-30
+
+.. admonition:: Result
+    :class: result
+
+    .. only:: html
+
+        .. raw:: html
+            :file: snippets/Snippet-List-Not-Newline.html
+
+    .. only:: latex
+
+        .. raw:: latex
+            :file: snippets/Snippet-List-Not-Newline.tex
+
+You can have more than one line of content in a list element:
+
+.. literalinclude:: snippets/Lists.hs
+    :lines: 33-37
+
+.. admonition:: Result
+    :class: result
+
+    .. only:: html
+
+        .. raw:: html
+            :file: snippets/Snippet-List-Multiline-Item.html
+
+    .. only:: latex
+
+        .. raw:: latex
+            :file: snippets/Snippet-List-Multiline-Item.tex
 
 You can even nest whole paragraphs inside of list elements. The rules
 are 4 spaces for each indentation level. You're required to use a
-newline before such nested paragraphs: ::
+newline before such nested paragraphs:
 
-    {-|
-    * Beginning of list
-    This belongs to the list above!
+.. literalinclude:: snippets/Lists.hs
+    :lines: 40-61
 
-        > nested
-        > bird
-        > tracks
+.. admonition:: Result
+    :class: result
 
-        * Next list
-        More of the indented list.
+    .. only:: html
 
-            * Deeper
+        .. raw:: html
+            :file: snippets/Snippet-List-Nested-Item.html
 
-                @
-                even code blocks work
-                @
+    .. only:: latex
 
-                * Deeper
-
-                        1. Even deeper!
-                        2. No newline separation even in indented lists.
-    -}
+        .. raw:: latex
+            :file: snippets/Snippet-List-Nested-Item.tex
 
 The indentation of the first list item is honoured. That is, in the
 following example the items are on the same level. Before Haddock
 2.16.1, the second item would have been nested under the first item
-which was unexpected. ::
+which was unexpected.
 
-    {-|
-        * foo
+.. literalinclude:: snippets/Lists.hs
+    :lines: 64-68
 
-        * bar
-    -}
+.. admonition:: Result
+    :class: result
+
+    .. only:: html
+
+        .. raw:: html
+            :file: snippets/Snippet-List-Indentation.html
+
+    .. only:: latex
+
+        .. raw:: latex
+            :file: snippets/Snippet-List-Indentation.tex
 
 Definition Lists
 ~~~~~~~~~~~~~~~~
 
-Definition lists are written as follows: ::
+Definition lists are written as follows:
 
-    -- | This is a definition list:
-    --
-    --   [@foo@]: The description of @foo@.
-    --
-    --   [@bar@]: The description of @bar@.
+.. literalinclude:: snippets/Lists.hs
+    :lines: 71-75
 
-To produce output something like this:
+.. admonition:: Result
+    :class: result
 
-``foo``
-    The description of ``foo``.
+    .. only:: html
 
-``bar``
-    The description of ``bar``.
+        .. raw:: html
+            :file: snippets/Snippet-List-Definition.html
+
+    .. only:: latex
+
+        .. raw:: latex
+            :file: snippets/Snippet-List-Definition.tex
 
 Each paragraph should be preceded by the “definition term” enclosed in
 square brackets and followed by a colon. Other markup operators may be

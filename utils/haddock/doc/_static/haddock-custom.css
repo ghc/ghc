@@ -1,0 +1,11 @@
+.result.admonition {
+  background-color: #fcf8e3;
+  border-color: #eee;
+  padding: 10px 30px;
+  margin: 20px 0px;
+}
+
+/* Use a small font size for code blocks so that they don't overflow. */
+pre {
+  font-size: 0.8em;
+}

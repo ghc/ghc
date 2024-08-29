@@ -1,0 +1,47 @@
+\newcommand{\haddockbegindoc}{\hfill\\[1ex]}
+\newcommand{\haddockverb}{\small}
+  {\haddockbegindoc
+    \vbox{
+      \begin{itemize}
+        \item
+          Beginning of list
+          This belongs to the list above!\par
+          \begin{quote}
+            {\haddockverb
+              \begin{verbatim}
+nested
+bird
+tracks
+            \end{verbatim}}
+          \end{quote}
+          \vbox{
+            \begin{itemize}
+              \item
+                Next list
+                More of the indented list.\par
+                \vbox{
+                  \begin{itemize}
+                    \item
+                      Deeper\par
+                      \begin{quote}
+                        {\haddockverb
+                          \begin{verbatim}
+even code blocks work
+                        \end{verbatim}}
+                      \end{quote}
+                      \vbox{
+                        \begin{itemize}
+                          \item
+                            Deeper\par
+                            \vbox{
+                              \begin{enumerate}
+                                \item
+                                  Even deeper!\par
+                                \item
+                                  No newline separation even in
+                                  indented lists.\par
+                              \end{enumerate}}
+                        \end{itemize}}
+                  \end{itemize}}
+            \end{itemize}}
+      \end{itemize}}}

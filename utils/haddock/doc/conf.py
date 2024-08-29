@@ -31,6 +31,12 @@ pygments_style = 'tango'
 
 htmlhelp_basename = 'Haddockdoc'
 
+html_static_path = ['_static']
+
+html_css_files = [
+    'haddock-custom.css',
+]
+
 
 # -- Options for LaTeX output ---------------------------------------------
 
