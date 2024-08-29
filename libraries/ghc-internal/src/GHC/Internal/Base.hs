@@ -1336,7 +1336,7 @@ class Applicative m => Monad m where
     -- @
     --
     -- An alternative name for this function is \'bind\', but some people
-    -- may refer to it as \'flatMap\', which results from it being equivialent
+    -- may refer to it as \'flatMap\', which results from it being equivalent
     -- to
     --
     -- @\\x f -> 'join' ('fmap' f x) :: Monad m => m a -> (a -> m b) -> m b@
