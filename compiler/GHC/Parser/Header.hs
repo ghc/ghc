@@ -136,10 +136,11 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 
       is_prelude_import (L _ decl) =
         unLoc (ideclName decl) == pRELUDE_NAME
-        -- allow explicit "base" package qualifier (#19082, #17045)
+        -- See #17045, package qualified imports are never counted as
+        -- explicit prelude imports
         && case ideclPkgQual decl of
             NoRawPkgQual -> True
-            RawPkgQual b -> sl_fs b == unitIdFS baseUnitId
+            RawPkgQual {} -> False
 
 
       loc' = noAnnSrcSpan loc
