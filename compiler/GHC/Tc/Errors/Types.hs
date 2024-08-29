@@ -3885,16 +3885,6 @@ data TcRnMessage where
                        -> !(WarningTxt GhcRn) -- ^ The pragma data
                        -> TcRnMessage
 
-  {-| TcRnCompatUnqualifiedImport is a warning indicating that a special
-    module (right now only Data.List) was imported unqualified without
-    import list, for compatibility reasons.
-
-    Test cases:
-      T17244A
-  -}
-  TcRnCompatUnqualifiedImport :: !(ImportDecl GhcPs) -- ^ The import
-                              -> TcRnMessage
-
   {-| TcRnRedundantSourceImport is a warning indicating that a {-# SOURCE #-}
     import was used when there is no import cycle.
 
