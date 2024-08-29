@@ -568,8 +568,8 @@ gHC_PRIMOPWRAPPERS = mkPrimModule (fsLit "GHC.PrimopWrappers")
 
 gHC_INTERNAL_TUPLE                  = mkPrimModule (fsLit "GHC.Tuple")
 
-cONTROL_MONAD_ZIP :: Module
-cONTROL_MONAD_ZIP  = mkBaseModule (fsLit "Control.Monad.Zip")
+gHC_INTERNAL_CONTROL_MONAD_ZIP :: Module
+gHC_INTERNAL_CONTROL_MONAD_ZIP  = mkGhcInternalModule (fsLit "GHC.Internal.Control.Monad.Zip")
 
 gHC_INTERNAL_NUM_INTEGER, gHC_INTERNAL_NUM_NATURAL, gHC_INTERNAL_NUM_BIGNAT :: Module
 gHC_INTERNAL_NUM_INTEGER            = mkBignumModule (fsLit "GHC.Num.Integer")
@@ -1581,7 +1581,7 @@ loopAName          = varQual gHC_INTERNAL_ARROW (fsLit "loop")      loopAIdKey
 guardMName, liftMName, mzipName :: Name
 guardMName         = varQual gHC_INTERNAL_MONAD (fsLit "guard")    guardMIdKey
 liftMName          = varQual gHC_INTERNAL_MONAD (fsLit "liftM")    liftMIdKey
-mzipName           = varQual cONTROL_MONAD_ZIP (fsLit "mzip") mzipIdKey
+mzipName           = varQual gHC_INTERNAL_CONTROL_MONAD_ZIP (fsLit "mzip") mzipIdKey
 
 
 -- Annotation type checking

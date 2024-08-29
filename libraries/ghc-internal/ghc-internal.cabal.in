@@ -106,6 +106,7 @@ Library
         GHC.Internal.Control.Monad.Fix
         GHC.Internal.Control.Monad.IO.Class
         GHC.Internal.Control.Monad.ST
+        GHC.Internal.Control.Monad.Zip
         GHC.Internal.Control.Monad.ST.Lazy
         GHC.Internal.Control.Monad.ST.Imp
         GHC.Internal.Control.Monad.ST.Lazy.Imp
