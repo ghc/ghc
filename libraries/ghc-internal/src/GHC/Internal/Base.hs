@@ -1725,6 +1725,7 @@ instance Monad NonEmpty where
           bs' = as >>= toList . f
           toList ~(c :| cs) = c : cs
 
+
 ----------------------------------------------
 -- The list type
 

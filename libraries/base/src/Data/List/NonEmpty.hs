@@ -115,8 +115,8 @@ import           GHC.Internal.Data.Foldable       hiding (length, toList)
 import qualified GHC.Internal.Data.Foldable       as Foldable
 import           GHC.Internal.Data.Function       (on)
 import           GHC.Internal.Data.Ord            (comparing)
-import           GHC.Internal.Base            (NonEmpty(..))
 import           GHC.Internal.Stack.Types     (HasCallStack)
+import           GHC.Internal.Data.List.NonEmpty
 
 infixr 5 <|
 
@@ -537,16 +537,6 @@ isPrefixOf (y:ys) (x :| xs) = (y == x) && List.isPrefixOf ys xs
   | otherwise = error "NonEmpty.!! negative index"
 infixl 9 !!
 
--- | The 'zip' function takes two streams and returns a stream of
--- corresponding pairs.
-zip :: NonEmpty a -> NonEmpty b -> NonEmpty (a,b)
-zip ~(x :| xs) ~(y :| ys) = (x, y) :| List.zip xs ys
-
--- | The 'zipWith' function generalizes 'zip'. Rather than tupling
--- the elements, the elements are combined using the function
--- passed as the first argument.
-zipWith :: (a -> b -> c) -> NonEmpty a -> NonEmpty b -> NonEmpty c
-zipWith f ~(x :| xs) ~(y :| ys) = f x y :| List.zipWith f xs ys
 
 -- | The 'unzip' function is the inverse of the 'zip' function.
 unzip :: Functor f => f (a,b) -> (f a, f b)
