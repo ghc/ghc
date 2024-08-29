@@ -1,0 +1,8 @@
+T19082.hs:3:13: error: [GHC-87543]
+    Ambiguous occurrence ‘String’.
+    It could refer to
+       either ‘Prelude.String’,
+              imported from ‘Prelude’ at T19082.hs:3:8-10
+              (and originally defined in ‘GHC.Internal.Base’),
+           or ‘Foo.String’, defined at T19082.hs:7:1.
+

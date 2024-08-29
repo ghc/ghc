@@ -177,7 +177,7 @@ test('T18130', normal, compile, [''])
 test('T18834a', normal, compile, [''])
 test('T18834b', normal, compile, [''])
 test('T12862', normal, compile, [''])
-test('T19082', normal, compile, [''])
+test('T19082', normal, compile_fail, [''])
 test('T19521', normal, compile, [''])
 
 test('T20186', normal, compile, [''])
@@ -205,3 +205,4 @@ test('T22155', normal, compile, ['-dsuppress-uniques -ddump-simpl -dsuppress-all
 
 test('T25132', normal, compile, [''])
 test('T25258', normal, compile, [''])
+test('T17045b', extra_files(["T17045"]), multimod_compile, ['-iT17045 Test', '-v0'])

@@ -1,6 +1,0 @@
-
-T17045.hs:7:11: error: [GHC-76037]
-    Not in scope: type constructor or class ‘String’
-    Suggested fix:
-      Add ‘String’ to the import list in the import of ‘Prelude’
-      (at T17045.hs:5:1-27).

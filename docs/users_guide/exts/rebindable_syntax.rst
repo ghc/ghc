@@ -11,6 +11,14 @@ Rebindable syntax and the implicit Prelude import
 
     Implicitly import the ``Prelude`` module by default.
 
+    The implicit import can be refined in a module by explicitly writing an
+    import of the form::
+
+      import Prelude (foo)
+
+    This will only import ``foo`` from ``Prelude`` rather than the whole module
+    as the implicit import.
+
 GHC normally imports the ``Prelude`` module for
 you. If you'd rather it didn't, then give it a ``-XNoImplicitPrelude``
 option. The idea is that you can then import a Prelude of your own.
@@ -112,7 +120,7 @@ Here is an example that compiles: ::
 
 The new ``Prelude`` is implicitly imported in ``B.hs``.
 
-Here is an example that does not compile: ::
+Here is an example that does not compile::
 
     $ cat Prelude.hs
     module Prelude where
@@ -127,6 +135,68 @@ Here is an example that does not compile: ::
 The original ``Prelude`` module is shadowed by the custom Prelude in this case.
 To include the original Prelude in your custom Prelude, you can explicitly
 import it with the ``-XPackageImports`` option and ``import "base" Prelude``.
+
+Writing an explicit import of ``Prelude`` will suppress the implicit import. This
+allows you to refine the implicit import::
+
+    $ cat Prelude.hs
+    module Prelude where
+
+    a = ()
+
+    b = ()
+
+    $ cat B.hs
+    module B where
+
+    import Prelude (b)
+
+    -- a is now not in scope, there is no implicit Prelude import
+    foo = a
+    qux = b
+
+    $ ghc Prelude.hs B.hs
+    [1 of 2] Compiling Prelude          ( Prelude.hs, Prelude.o )
+    [2 of 2] Compiling B                ( B.hs, B.o )
+      B.hs:5:7: error: [GHC-88464]
+          Variable not in scope: a
+          Suggested fix:
+            Add 'a' to the import list in the import of 'Prelude'
+            (at B.hs:3:1-18).
+        |
+      5 | foo = a
+        |
+
+
+.. note::
+  Importing a module named ``Prelude`` with the :extension:`PackageImports` extension will
+  not affect the implicit ``Prelude`` import::
+
+    > cat Prelude.hs
+    module Prelude where
+
+    a = ()
+
+    > cat B.hs
+    {-# LANGUAGE PackageImports #-}
+    module B where
+
+    import "base" Prelude
+
+    -- This definition comes from the implicit prelude import
+    foo = a
+
+    -- These definitions come from the package import
+    baz :: Int -> Int -> Int
+    baz = (+)
+
+    > ghc B.hs
+    [1 of 2] Compiling Prelude          ( Prelude.hs, Prelude.o )
+    [2 of 2] Compiling B                ( B.hs, B.o )
+
+  If you want to use package imports then you should explicitly disable the import
+  of the implicit prelude module by enabling :extension:`NoImplicitPrelude`.
+
 
 Things unaffected by :extension:`RebindableSyntax`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
