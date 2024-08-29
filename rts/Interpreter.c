@@ -611,7 +611,10 @@ do_return_pointer:
         // NOTE: not using get_itbl().
         info = ((StgClosure *)Sp)->header.info;
 
-        if (info == (StgInfoTable *)&stg_restore_cccs_info ||
+        if (info == (StgInfoTable *)&stg_restore_cccs_d_info ||
+            info == (StgInfoTable *)&stg_restore_cccs_v16_info ||
+            info == (StgInfoTable *)&stg_restore_cccs_v32_info ||
+            info == (StgInfoTable *)&stg_restore_cccs_v64_info ||
             info == (StgInfoTable *)&stg_restore_cccs_eval_info) {
             cap->r.rCCCS = (CostCentreStack*)SpW(1);
             Sp_addW(2);
@@ -1376,7 +1379,7 @@ run_BCO:
 #if defined(PROFILING)
             Sp_subW(2);
             SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_info;
+            SpW(0) = (W_)&stg_restore_cccs_d_info;
 #endif
             goto nextInsn;
         }
@@ -1389,7 +1392,7 @@ run_BCO:
 #if defined(PROFILING)
             Sp_subW(2);
             SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_info;
+            SpW(0) = (W_)&stg_restore_cccs_d_info;
 #endif
             goto nextInsn;
         }
@@ -1402,7 +1405,7 @@ run_BCO:
 #if defined(PROFILING)
             Sp_subW(2);
             SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_info;
+            SpW(0) = (W_)&stg_restore_cccs_d_info;
 #endif
             goto nextInsn;
         }
@@ -1415,7 +1418,7 @@ run_BCO:
 #if defined(PROFILING)
             Sp_subW(2);
             SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_info;
+            SpW(0) = (W_)&stg_restore_cccs_d_info;
 #endif
             goto nextInsn;
         }
@@ -1428,7 +1431,7 @@ run_BCO:
 #if defined(PROFILING)
             Sp_subW(2);
             SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_info;
+            SpW(0) = (W_)&stg_restore_cccs_d_info;
 #endif
             goto nextInsn;
         }
@@ -1441,7 +1444,7 @@ run_BCO:
 #if defined(PROFILING)
             Sp_subW(2);
             SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_info;
+            SpW(0) = (W_)&stg_restore_cccs_d_info;
 #endif
             goto nextInsn;
         }

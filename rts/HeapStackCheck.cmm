@@ -432,6 +432,24 @@ __stg_gc_fun /* explicit stack */
     W_ info;
     W_ type;
 
+    /*
+
+    !!!!!!!!!!!!!!!!!
+    !!! IMPORTANT !!!
+    !!!!!!!!!!!!!!!!!
+
+    The body of this function MUST NOT use any floating-point
+    or vector registers. DO NOT add any e.g. debug printing logic that
+    has any chance whatsoever of using floating-point or vector registers.
+    If you DO want to edit the function in such a way that it may use
+    vector registers, you will need to define multiple different copies
+    of this function, as we do e.g. for stg_stack_underflow_frame
+    (see Jumps.h).
+
+    See Note [realArgRegsCover] in GHC.Cmm.CallConv for more details.
+
+    */
+
     info = %GET_FUN_INFO(UNTAG(R1));
 
     // cache the size
@@ -473,7 +491,10 @@ __stg_gc_fun /* explicit stack */
         // DEBUG_ONLY(foreign "C" debugBelch("stg_fun_gc_gen(ARG_GEN)"););
         jump stg_gc_noregs [];
     } else {
-        jump W_[stg_stack_save_entries + WDS(type)] [*]; // all regs live
+
+/* !!! See IMPORTANT comment above !!! */
+
+        jump W_[stg_stack_save_entries + WDS(type)] GP_ARG_REGS; // all GP arg regs live
             // jumps to stg_gc_noregs after saving stuff
     }
 #endif /* !NO_ARG_REGS */

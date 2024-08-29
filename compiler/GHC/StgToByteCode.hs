@@ -22,6 +22,7 @@ import GHC.ByteCode.Types
 
 import GHC.Cmm.CallConv
 import GHC.Cmm.Expr
+import GHC.Cmm.Reg ( GlobalArgRegs(..) )
 import GHC.Cmm.Node
 import GHC.Cmm.Utils
 
@@ -1212,7 +1213,7 @@ layoutNativeCall profile call_type start_off arg_rep reps =
 
       -- sort the register parameters by register and add them to the stack
       regs_order :: Map.Map GlobalReg Int
-      regs_order = Map.fromList $ zip (allArgRegsCover platform) [0..]
+      regs_order = Map.fromList $ zip (allArgRegsCover platform SCALAR_ARG_REGS) [0..]
 
       reg_order :: GlobalReg -> (Int, GlobalReg)
       reg_order reg | Just n <- Map.lookup reg regs_order = (n, reg)

@@ -16,13 +16,13 @@ stg_foo {
 
    BaseReg = faketso;
 
-   SAVE_REGS();
+   SAVE_SCALAR_ARG_REGS();
 
    (_unused) = ccall puts(msg "ptr");
 
-   RESTORE_REGS();
+   RESTORE_SCALAR_ARG_REGS();
 
-   jump stg_myExit [*]; // all registers live
+   jump stg_myExit SCALAR_ARG_REGS; // all scalar arg regs live
 }
 
 INFO_TABLE_CONSTR(ZCMain_main,0,0,0,CONSTR_NOCAF,"MAIN","MAIN")

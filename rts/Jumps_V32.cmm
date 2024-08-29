@@ -1,0 +1,4 @@
+#include "Cmm.h"
+
+#define ARG_REGS_V32 1
+#include "Jumps.h"

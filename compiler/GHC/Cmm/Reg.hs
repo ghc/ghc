@@ -16,6 +16,8 @@ module GHC.Cmm.Reg
     , currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg
     , node, baseReg
     , GlobalRegUse(..), pprGlobalRegUse
+
+    , GlobalArgRegs(..)
     ) where
 
 import GHC.Prelude
@@ -339,3 +341,24 @@ isArgReg (XmmReg {})     = True
 isArgReg (YmmReg {})     = True
 isArgReg (ZmmReg {})     = True
 isArgReg _               = False
+
+-- --------------------------------------------------------------------------
+
+-- | Global registers used for argument passing.
+--
+-- See Note [realArgRegsCover] in GHC.Cmm.CallConv.
+data GlobalArgRegs
+  -- | General-purpose (integer) argument-passing registers.
+  = GP_ARG_REGS
+  -- | Scalar (integer & floating-point) argument-passing registers.
+  | SCALAR_ARG_REGS
+  -- | 16 byte vector argument-passing registers, together with
+  -- integer & floating-point argument-passing scalar registers.
+  | V16_ARG_REGS
+  -- | 32 byte vector argument-passing registers, together with
+  -- integer & floating-point argument-passing scalar registers.
+  | V32_ARG_REGS
+  -- | 64 byte vector argument-passing registers, together with
+  -- integer & floating-point argument-passing scalar registers.
+  | V64_ARG_REGS
+  deriving ( Show, Eq, Ord )

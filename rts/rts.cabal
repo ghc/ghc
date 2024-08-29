@@ -250,7 +250,7 @@ library
       include-dirs: include
       includes: Rts.h
       autogen-includes: ghcautoconf.h ghcplatform.h
-      install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
+      install-includes: Cmm.h HsFFI.h MachDeps.h Jumps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         -- ^ from include
                         DerivedConstants.h
@@ -344,6 +344,10 @@ library
                    ContinuationOps.cmm
                    Exception.cmm
                    HeapStackCheck.cmm
+                   Jumps_D.cmm
+                   Jumps_V16.cmm
+                   Jumps_V32.cmm
+                   Jumps_V64.cmm
                    PrimOps.cmm
                    StgMiscClosures.cmm
                    StgStartup.cmm
@@ -381,6 +385,7 @@ library
                  Arena.c
                  Capability.c
                  CheckUnload.c
+                 CheckVectorSupport.c
                  CloneStack.c
                  ClosureFlags.c
                  ClosureSize.c

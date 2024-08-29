@@ -263,6 +263,7 @@ import GHC.StgToCmm.InfoTableProv
 import GHC.Cmm.Opt
 import GHC.Cmm.Graph
 import GHC.Cmm
+import GHC.Cmm.Reg        ( GlobalArgRegs(..) )
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch     ( mkSwitchTargets )
 import GHC.Cmm.Info
@@ -394,6 +395,12 @@ import qualified Data.ByteString.Char8 as BS8
         STRING          { L _ (CmmT_String    $$) }
         INT             { L _ (CmmT_Int       $$) }
         FLOAT           { L _ (CmmT_Float     $$) }
+
+        GP_ARG_REGS     { L _ (CmmT_GlobalArgRegs GP_ARG_REGS) }
+        SCALAR_ARG_REGS { L _ (CmmT_GlobalArgRegs SCALAR_ARG_REGS) }
+        V16_ARG_REGS    { L _ (CmmT_GlobalArgRegs V16_ARG_REGS) }
+        V32_ARG_REGS    { L _ (CmmT_GlobalArgRegs V32_ARG_REGS) }
+        V64_ARG_REGS    { L _ (CmmT_GlobalArgRegs V64_ARG_REGS) }
 
 %monad { PD } { >>= } { return }
 %lexer { cmmlex } { L _ CmmT_EOF }
@@ -773,12 +780,26 @@ safety  :: { Safety }
 
 vols    :: { [GlobalRegUse] }
         : '[' ']'                       { [] }
-        | '[' '*' ']'                   {% do platform <- PD.getPlatform;
+        | GP_ARG_REGS                   {% do platform <- PD.getPlatform;
                                               return
                                                 [ GlobalRegUse r (globalRegSpillType platform r)
-                                                | r <- realArgRegsCover platform ] }
-                                               -- All of them. See comment attached
-                                               -- to realArgRegsCover
+                                                | r <- realArgRegsCover platform GP_ARG_REGS ] }
+        | SCALAR_ARG_REGS               {% do platform <- PD.getPlatform;
+                                              return
+                                                [ GlobalRegUse r (globalRegSpillType platform r)
+                                                | r <- realArgRegsCover platform SCALAR_ARG_REGS ] }
+        | V16_ARG_REGS                  {% do platform <- PD.getPlatform;
+                                              return
+                                                [ GlobalRegUse r (globalRegSpillType platform r)
+                                                | r <- realArgRegsCover platform V16_ARG_REGS ] }
+        | V32_ARG_REGS                  {% do platform <- PD.getPlatform;
+                                              return
+                                                [ GlobalRegUse r (globalRegSpillType platform r)
+                                                | r <- realArgRegsCover platform V32_ARG_REGS ] }
+        | V64_ARG_REGS                  {% do platform <- PD.getPlatform;
+                                              return
+                                                [ GlobalRegUse r (globalRegSpillType platform r)
+                                                | r <- realArgRegsCover platform V64_ARG_REGS ] }
         | '[' globals ']'               { $2 }
 
 globals :: { [GlobalRegUse] }
@@ -1277,11 +1298,19 @@ stmtMacros = listToUFM [
   ( fsLit "LOAD_THREAD_STATE",     \[] -> emitLoadThreadState ),
   ( fsLit "SAVE_THREAD_STATE",     \[] -> emitSaveThreadState ),
 
-  ( fsLit "SAVE_REGS",             \[] -> emitSaveRegs ),
-  ( fsLit "RESTORE_REGS",          \[] -> emitRestoreRegs ),
+  ( fsLit "SAVE_GP_ARG_REGS",         \[] -> emitSaveRegs GP_ARG_REGS ),
+  ( fsLit "RESTORE_GP_ARG_REGS",      \[] -> emitRestoreRegs GP_ARG_REGS ),
+  ( fsLit "SAVE_SCALAR_ARG_REGS",     \[] -> emitSaveRegs SCALAR_ARG_REGS ),
+  ( fsLit "RESTORE_SCALAR_ARG_REGS",  \[] -> emitRestoreRegs SCALAR_ARG_REGS ),
+  ( fsLit "SAVE_V16_ARG_REGS",        \[] -> emitSaveRegs V16_ARG_REGS ),
+  ( fsLit "RESTORE_V16_ARG_REGS",     \[] -> emitRestoreRegs V16_ARG_REGS ),
+  ( fsLit "SAVE_V32_ARG_REGS",        \[] -> emitSaveRegs V32_ARG_REGS ),
+  ( fsLit "RESTORE_V32_ARG_REGS",     \[] -> emitRestoreRegs V32_ARG_REGS ),
+  ( fsLit "SAVE_V64_ARG_REGS",         \[] -> emitSaveRegs V64_ARG_REGS ),
+  ( fsLit "RESTORE_V64_ARG_REGS",      \[] -> emitRestoreRegs V64_ARG_REGS ),
 
-  ( fsLit "PUSH_ARG_REGS",         \[live_regs] -> emitPushArgRegs live_regs ),
-  ( fsLit "POP_ARG_REGS",          \[live_regs] -> emitPopArgRegs live_regs ),
+  ( fsLit "PUSH_SCALAR_ARG_REGS",     \[live_regs] -> emitPushArgRegs SCALAR_ARG_REGS live_regs ),
+  ( fsLit "POP_SCALAR_ARG_REGS",      \[live_regs] -> emitPopArgRegs SCALAR_ARG_REGS live_regs ),
 
   ( fsLit "LDV_ENTER",             \[e] -> ldvEnter e ),
   ( fsLit "PROF_HEADER_CREATE",     \[e] -> profHeaderCreate e ),

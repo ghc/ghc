@@ -42,6 +42,7 @@
 #include "LibdwPool.h"
 #include "sm/CNF.h"
 #include "TopHandler.h"
+#include "CheckVectorSupport.h"
 
 #if defined(PROFILING)
 # include "ProfHeap.h"
@@ -333,6 +334,9 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 
     /* Based on the RTS flags, decide which I/O manager to use. */
     selectIOManager();
+
+    /* Set the supported level of vector registers */
+    setVectorSupport();
 
     /* Initialize console Codepage.  */
 #if defined(mingw32_HOST_OS)
