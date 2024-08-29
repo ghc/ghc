@@ -244,6 +244,8 @@ data ExternalPlugin = ExternalPlugin
 data StaticPlugin = StaticPlugin
   { spPlugin :: PluginWithArgs
   -- ^ the actual plugin together with its commandline arguments
+  , spInitialised :: Bool
+  -- ^ has this plugin been initialised (i.e. driverPlugin has been run)
   }
 
 lpModuleName :: LoadedPlugin -> ModuleName

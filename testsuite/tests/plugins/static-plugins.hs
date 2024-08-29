@@ -35,23 +35,23 @@ main = do
 
       -- Start with a pure plugin, this should trigger recomp.
       liftIO $ putStrLn "==pure.0"
-      loadWithPlugins [StaticPlugin $ PluginWithArgs plugin0_pure []]
+      loadWithPlugins [StaticPlugin (PluginWithArgs plugin0_pure []) False]
 
       -- The same (or a different) pure plugin shouldn't trigger recomp.
       liftIO $ putStrLn "==pure.1"
-      loadWithPlugins [StaticPlugin $ PluginWithArgs plugin0_pure []]
+      loadWithPlugins [StaticPlugin (PluginWithArgs plugin0_pure []) False]
 
       -- Next try with a fingerprint plugin, should trigger recomp.
       liftIO $ putStrLn "==fp0.0"
-      loadWithPlugins [StaticPlugin $ PluginWithArgs plugin_fp0 []]
+      loadWithPlugins [StaticPlugin (PluginWithArgs plugin_fp0 []) False]
 
       -- With the same fingerprint plugin, should not trigger recomp.
       liftIO $ putStrLn "==fp0.1"
-      loadWithPlugins [StaticPlugin $ PluginWithArgs plugin_fp0 []]
+      loadWithPlugins [StaticPlugin (PluginWithArgs plugin_fp0 []) False]
 
       -- Change the plugin fingerprint, should trigger recomp.
       liftIO $ putStrLn "==fp1"
-      loadWithPlugins [StaticPlugin $ PluginWithArgs plugin_fp1 []]
+      loadWithPlugins [StaticPlugin (PluginWithArgs plugin_fp1 []) False]
 
       -- TODO: this currently doesn't work, patch pending
       -- -- Even though the plugin is now pure we should still recomp since we

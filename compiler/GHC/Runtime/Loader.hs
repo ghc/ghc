@@ -121,14 +121,15 @@ initializePlugins hsc_env
   , external_plugins <- externalPlugins (hsc_plugins hsc_env)
   , check_external_plugins external_plugins (externalPluginSpecs dflags)
 
-    -- FIXME: we should check static plugins too
+    -- ensure we have initialised static plugins
+  , all spInitialised (staticPlugins (hsc_plugins hsc_env))
 
   = return hsc_env -- no change, no need to reload plugins
 
   | otherwise
   = do (loaded_plugins, links, pkgs) <- loadPlugins hsc_env
        external_plugins <- loadExternalPlugins (externalPluginSpecs dflags)
-       let plugins' = (hsc_plugins hsc_env) { staticPlugins    = staticPlugins (hsc_plugins hsc_env)
+       let plugins' = (hsc_plugins hsc_env) { staticPlugins    = map (\sp -> sp{ spInitialised = True }) $ staticPlugins (hsc_plugins hsc_env)
                                             , externalPlugins  = external_plugins
                                             , loadedPlugins    = loaded_plugins
                                             , loadedPluginDeps = (links, pkgs)
