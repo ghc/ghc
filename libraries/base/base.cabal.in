@@ -323,8 +323,4 @@ Library
         System.CPUTime.Posix.Times
         System.CPUTime.Posix.RUsage
 
-    -- We need to set the unit id to base (without a version number)
-    -- as it's magic.
-    ghc-options: -this-unit-id base
-
     hs-source-dirs: src

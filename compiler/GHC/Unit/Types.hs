@@ -63,7 +63,6 @@ module GHC.Unit.Types
    , primUnitId
    , bignumUnitId
    , ghcInternalUnitId
-   , baseUnitId
    , rtsUnitId
    , mainUnitId
    , thisGhcUnitId
@@ -72,7 +71,6 @@ module GHC.Unit.Types
    , primUnit
    , bignumUnit
    , ghcInternalUnit
-   , baseUnit
    , rtsUnit
    , mainUnit
    , thisGhcUnit
@@ -600,16 +598,15 @@ Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 
 -}
 
-bignumUnitId, primUnitId, ghcInternalUnitId, baseUnitId, rtsUnitId,
+bignumUnitId, primUnitId, ghcInternalUnitId, rtsUnitId,
   mainUnitId, thisGhcUnitId, interactiveUnitId :: UnitId
 
-bignumUnit, primUnit, ghcInternalUnit, baseUnit, rtsUnit,
+bignumUnit, primUnit, ghcInternalUnit, rtsUnit,
   mainUnit, thisGhcUnit, interactiveUnit :: Unit
 
 primUnitId        = UnitId (fsLit "ghc-prim")
 bignumUnitId      = UnitId (fsLit "ghc-bignum")
 ghcInternalUnitId = UnitId (fsLit "ghc-internal")
-baseUnitId        = UnitId (fsLit "base")
 rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit cProjectUnitId) -- See Note [GHC's Unit Id]
 interactiveUnitId = UnitId (fsLit "interactive")
@@ -617,7 +614,6 @@ interactiveUnitId = UnitId (fsLit "interactive")
 primUnit          = RealUnit (Definite primUnitId)
 bignumUnit        = RealUnit (Definite bignumUnitId)
 ghcInternalUnit   = RealUnit (Definite ghcInternalUnitId)
-baseUnit          = RealUnit (Definite baseUnitId)
 rtsUnit           = RealUnit (Definite rtsUnitId)
 thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
 interactiveUnit   = RealUnit (Definite interactiveUnitId)
@@ -636,7 +632,6 @@ wiredInUnitIds =
    [ primUnitId
    , bignumUnitId
    , ghcInternalUnitId
-   , baseUnitId
    , rtsUnitId
    ]
    -- NB: ghc is no longer part of the wired-in units since its unit-id, given

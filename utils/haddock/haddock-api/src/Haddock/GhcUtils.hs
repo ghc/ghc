@@ -40,11 +40,9 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
 import GHC
-import GHC.Builtin.Names
 import GHC.Builtin.Types (liftedRepTy)
 import GHC.Core.TyCo.Rep (Type (..))
 import GHC.Core.Type (binderVar, isRuntimeRepVar)
-import GHC.Data.FastString
 import GHC.Data.StringBuffer (StringBuffer)
 import qualified GHC.Data.StringBuffer as S
 import GHC.Driver.Session
@@ -130,12 +128,6 @@ isClassD _ = False
 
 pretty :: Outputable a => SDocContext -> a -> String
 pretty sDocContext thing = Outputable.renderWithContext sDocContext (ppr thing)
-
-dataListModule :: Module
-dataListModule = mkBaseModule (fsLit "Data.List")
-
-dataTupleModule :: Module
-dataTupleModule = mkBaseModule (fsLit "Data.Tuple")
 
 -- ---------------------------------------------------------------------
 

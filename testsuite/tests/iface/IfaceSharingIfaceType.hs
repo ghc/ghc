@@ -18,11 +18,13 @@ import GHC
 
 [u1,u2,u3,u4,u5] = map mkPreludeMiscIdUnique [10000..10004]
 
-names = [ mkExternalName u1 pRELUDE f1 noSrcSpan
-        , mkExternalName u2 pRELUDE f2 noSrcSpan
-        , mkExternalName u3 pRELUDE f3 noSrcSpan
-        , mkExternalName u4 pRELUDE f4 noSrcSpan
-        , mkExternalName u5 pRELUDE f5 noSrcSpan ]
+m = gHC_PRIM
+
+names = [ mkExternalName u1 m f1 noSrcSpan
+        , mkExternalName u2 m f2 noSrcSpan
+        , mkExternalName u3 m f3 noSrcSpan
+        , mkExternalName u4 m f4 noSrcSpan
+        , mkExternalName u5 m f5 noSrcSpan ]
 
 -- Int
 intIfaceTy = toIfaceType intTy
