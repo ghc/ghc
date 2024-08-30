@@ -14,25 +14,27 @@ import GHC.Prelude
 import GHC.Llvm
 
 import GHC.Cmm.Expr
+import GHC.CmmToAsm.Format
 import GHC.Platform
 import GHC.Data.FastString
 import GHC.Utils.Panic ( panic )
 import GHC.Types.Unique
 
+
 -- | Get the LlvmVar function variable storing the real register
-lmGlobalRegVar :: Platform -> GlobalReg -> LlvmVar
+lmGlobalRegVar :: Platform -> GlobalRegUse -> LlvmVar
 lmGlobalRegVar platform = pVarLift . lmGlobalReg platform "_Var"
 
 -- | Get the LlvmVar function argument storing the real register
-lmGlobalRegArg :: Platform -> GlobalReg -> LlvmVar
+lmGlobalRegArg :: Platform -> GlobalRegUse -> LlvmVar
 lmGlobalRegArg platform = lmGlobalReg platform "_Arg"
 
 {- Need to make sure the names here can't conflict with the unique generated
    names. Uniques generated names containing only base62 chars. So using say
    the '_' char guarantees this.
 -}
-lmGlobalReg :: Platform -> String -> GlobalReg -> LlvmVar
-lmGlobalReg platform suf reg
+lmGlobalReg :: Platform -> String -> GlobalRegUse -> LlvmVar
+lmGlobalReg platform suf (GlobalRegUse reg ty)
   = case reg of
         BaseReg        -> ptrGlobal $ "Base" ++ suf
         Sp             -> ptrGlobal $ "Sp" ++ suf
@@ -88,13 +90,26 @@ lmGlobalReg platform suf reg
         ptrGlobal    name = LMNLocalVar (fsLit name) (llvmWordPtr platform)
         floatGlobal  name = LMNLocalVar (fsLit name) LMFloat
         doubleGlobal name = LMNLocalVar (fsLit name) LMDouble
-        xmmGlobal    name = LMNLocalVar (fsLit name) (LMVector 4 (LMInt 32))
-        ymmGlobal    name = LMNLocalVar (fsLit name) (LMVector 8 (LMInt 32))
-        zmmGlobal    name = LMNLocalVar (fsLit name) (LMVector 16 (LMInt 32))
+        fmt = cmmTypeFormat ty
+        xmmGlobal    name = LMNLocalVar (fsLit name) (formatLlvmType fmt)
+        ymmGlobal    name = LMNLocalVar (fsLit name) (formatLlvmType fmt)
+        zmmGlobal    name = LMNLocalVar (fsLit name) (formatLlvmType fmt)
+
+formatLlvmType :: Format -> LlvmType
+formatLlvmType II8 = LMInt 8
+formatLlvmType II16 = LMInt 16
+formatLlvmType II32 = LMInt 32
+formatLlvmType II64 = LMInt 64
+formatLlvmType FF32 = LMFloat
+formatLlvmType FF64 = LMDouble
+formatLlvmType (VecFormat l sFmt) = LMVector l (formatLlvmType $ scalarFormatFormat sFmt)
 
 -- | A list of STG Registers that should always be considered alive
-alwaysLive :: [GlobalReg]
-alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
+alwaysLive :: Platform -> [GlobalRegUse]
+alwaysLive platform =
+  [ GlobalRegUse r (globalRegSpillType platform r)
+  | r <- [BaseReg, Sp, Hp, SpLim, HpLim, node]
+  ]
 
 -- | STG Type Based Alias Analysis hierarchy
 stgTBAA :: [(Unique, LMString, Maybe Unique)]
