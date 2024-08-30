@@ -10865,6 +10865,7 @@ module System.Posix.Internals where
   st_mtime :: GHC.Internal.Ptr.Ptr CStat -> GHC.Types.IO GHC.Internal.Foreign.C.Types.CTime
   st_size :: GHC.Internal.Ptr.Ptr CStat -> GHC.Types.IO GHC.Internal.Int.Int64
   statGetType :: GHC.Internal.Ptr.Ptr CStat -> GHC.Types.IO GHC.Internal.IO.Device.IODeviceType
+  statGetType_maybe :: GHC.Internal.Ptr.Ptr CStat -> GHC.Types.IO (GHC.Internal.Maybe.Maybe GHC.Internal.IO.Device.IODeviceType)
   throwInternalNulError :: forall a. GHC.Internal.IO.FilePath -> GHC.Types.IO a
   withFilePath :: forall a. GHC.Internal.IO.FilePath -> (GHC.Internal.Foreign.C.String.CWString -> GHC.Types.IO a) -> GHC.Types.IO a
 

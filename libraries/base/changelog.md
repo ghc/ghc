@@ -16,6 +16,7 @@
   * Add `firstA` and `secondA` to `Data.Bitraversable`. ([CLC proposal #172](https://github.com/haskell/core-libraries-committee/issues/172))
   * Deprecate `GHC.TypeNats.Internal`, `GHC.TypeLits.Internal`, `GHC.ExecutionStack.Internal` ([CLC proposal #217](https://github.com/haskell/core-libraries-committee/issues/217))
   * Define `Eq1`, `Ord1`, `Show1` and `Read1` instances for basic `Generic` representation types. ([CLC proposal #273](https://github.com/haskell/core-libraries-committee/issues/273))
+  * `setNonBlockingMode` will no longer throw an exception when called on a FD associated with a unknown device type. ([CLC proposal #282](https://github.com/haskell/core-libraries-committee/issues/282))
   * Add exception type metadata to default exception handler output.
     ([CLC proposal #231](https://github.com/haskell/core-libraries-committee/issues/231)
     and [CLC proposal #261](https://github.com/haskell/core-libraries-committee/issues/261))
