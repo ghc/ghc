@@ -57,6 +57,7 @@ import GHC.Internal.Foreign.Storable
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.Marshal.Utils
+import GHC.Internal.Foreign.Marshal.Alloc (allocaBytes)
 
 import qualified GHC.Internal.System.Posix.Internals
 import GHC.Internal.System.Posix.Internals hiding (FD, setEcho, getEcho)
@@ -476,10 +477,15 @@ setNonBlockingMode fd set = do
   -- O_NONBLOCK has no effect on regular files and block devices;
   -- utilities inspecting fdIsNonBlocking (such as readRawBufferPtr)
   -- should not be tricked to think otherwise.
-  is_nonblock <- if set then do
-    (fd_type, _, _) <- fdStat (fdFD fd)
-    pure $ fd_type /= RegularFile && fd_type /= RawDevice
-    else pure False
+  is_nonblock <-
+    if set
+      then do
+        allocaBytes sizeof_stat $ \ p_stat -> do
+          throwErrnoIfMinus1Retry_ "fileSize" $
+            c_fstat (fdFD fd) p_stat
+          fd_type <- statGetType_maybe p_stat
+          pure $ fd_type /= Just RegularFile && fd_type /= Just RawDevice
+      else pure False
   setNonBlockingFD (fdFD fd) is_nonblock
 #if defined(mingw32_HOST_OS)
   return fd
