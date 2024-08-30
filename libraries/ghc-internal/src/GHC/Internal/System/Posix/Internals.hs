@@ -140,17 +140,30 @@ fdStat fd =
 fdType :: FD -> IO IODeviceType
 fdType fd = do (ty,_,_) <- fdStat fd; return ty
 
+-- | Return a known device type or throw an exception if the device
+-- type is unknown.
 statGetType :: Ptr CStat -> IO IODeviceType
 statGetType p_stat = do
+   dev_ty_m <- statGetType_maybe p_stat
+   case dev_ty_m of
+      Nothing -> ioError ioe_unknownfiletype
+      Just dev_ty -> pure dev_ty
+
+-- | Unlike @statGetType@, @statGetType_maybe@ will not throw an exception
+-- if the CStat refers to a unknown device type.
+--
+-- @since base-4.20.1.0
+statGetType_maybe :: Ptr CStat -> IO (Maybe IODeviceType)
+statGetType_maybe p_stat = do
   c_mode <- st_mode p_stat :: IO CMode
   case () of
-      _ | s_isdir c_mode        -> return Directory
+      _ | s_isdir c_mode        -> return $ Just Directory
         | s_isfifo c_mode || s_issock c_mode || s_ischr  c_mode
-                                -> return Stream
-        | s_isreg c_mode        -> return RegularFile
+                                -> return $ Just Stream
+        | s_isreg c_mode        -> return $ Just RegularFile
          -- Q: map char devices to RawDevice too?
-        | s_isblk c_mode        -> return RawDevice
-        | otherwise             -> ioError ioe_unknownfiletype
+        | s_isblk c_mode        -> return $ Just RawDevice
+        | otherwise             -> return Nothing
 
 ioe_unknownfiletype :: IOException
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
