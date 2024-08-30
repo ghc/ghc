@@ -37,13 +37,14 @@ import GHC.Utils.Outputable
 import qualified GHC.Utils.Panic as Panic
 import GHC.Utils.Misc
 
+import Control.Applicative (Alternative((<|>)))
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad
 
 import qualified Data.Semigroup as Semigroup
 import Data.List ( nub )
-import Data.Maybe ( catMaybes )
+import Data.Maybe ( catMaybes, isJust )
 
 type Atomic = Maybe MemoryOrdering
 type LlvmStatements = OrdList LlvmStatement
@@ -57,7 +58,7 @@ genLlvmProc :: RawCmmDecl -> LlvmM [LlvmCmmDecl]
 genLlvmProc (CmmProc infos lbl live graph) = do
     let blocks = toBlockListEntryFirstFalseFallthrough graph
 
-    (lmblocks, lmdata) <- basicBlocksCodeGen (map globalRegUse_reg live) blocks
+    (lmblocks, lmdata) <- basicBlocksCodeGen live blocks
     let info = mapLookup (g_entry graph) infos
         proc = CmmProc info lbl live (ListGraph lmblocks)
     return (proc:lmdata)
@@ -76,7 +77,7 @@ newtype UnreachableBlockId = UnreachableBlockId BlockId
 -- | Generate code for a list of blocks that make up a complete
 -- procedure. The first block in the list is expected to be the entry
 -- point.
-basicBlocksCodeGen :: LiveGlobalRegs -> [CmmBlock]
+basicBlocksCodeGen :: LiveGlobalRegUses -> [CmmBlock]
                       -> LlvmM ([LlvmBasicBlock], [LlvmCmmDecl])
 basicBlocksCodeGen _    []                     = panic "no entry block!"
 basicBlocksCodeGen live cmmBlocks
@@ -152,7 +153,7 @@ stmtToInstrs ubid stmt = case stmt of
 
     -- Tail call
     CmmCall { cml_target = arg,
-              cml_args_regs = live } -> genJump arg $ map globalRegUse_reg live
+              cml_args_regs = live } -> genJump arg live
 
     _ -> panic "Llvm.CodeGen.stmtToInstrs"
 
@@ -1050,7 +1051,7 @@ cmmPrimOpFunctions mop = do
 
 
 -- | Tail function calls
-genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData
+genJump :: CmmExpr -> LiveGlobalRegUses -> LlvmM StmtData
 
 -- Call to known function
 genJump (CmmLit (CmmLabel lbl)) live = do
@@ -2056,14 +2057,13 @@ getCmmReg (CmmLocal (LocalReg un _))
            -- have been assigned a value at some point, triggering
            -- "funPrologue" to allocate it on the stack.
 
-getCmmReg (CmmGlobal g)
-  = do let r = globalRegUse_reg g
-       onStack  <- checkStackReg r
+getCmmReg (CmmGlobal ru@(GlobalRegUse r _))
+  = do onStack  <- checkStackReg r
        platform <- getPlatform
        if onStack
-         then return (lmGlobalRegVar platform r)
+         then return (lmGlobalRegVar platform ru)
          else pprPanic "getCmmReg: Cmm register " $
-                ppr g <> text " not stack-allocated!"
+                ppr r <> text " not stack-allocated!"
 
 -- | Return the value of a given register, as well as its type. Might
 -- need to be load from stack.
@@ -2074,7 +2074,7 @@ getCmmRegVal reg =
       onStack <- checkStackReg (globalRegUse_reg g)
       platform <- getPlatform
       if onStack then loadFromStack else do
-        let r = lmGlobalRegArg platform (globalRegUse_reg g)
+        let r = lmGlobalRegArg platform g
         return (r, getVarType r, nilOL)
     _ -> loadFromStack
  where loadFromStack = do
@@ -2187,8 +2187,9 @@ convertMemoryOrdering MemOrderSeqCst  = SyncSeqCst
 -- question is never written. Therefore we skip it where we can to
 -- save a few lines in the output and hopefully speed compilation up a
 -- bit.
-funPrologue :: LiveGlobalRegs -> [CmmBlock] -> LlvmM StmtData
+funPrologue :: LiveGlobalRegUses -> [CmmBlock] -> LlvmM StmtData
 funPrologue live cmmBlocks = do
+  platform <- getPlatform
 
   let getAssignedRegs :: CmmNode O O -> [CmmReg]
       getAssignedRegs (CmmAssign reg _)  = [reg]
@@ -2196,7 +2197,8 @@ funPrologue live cmmBlocks = do
       getAssignedRegs _                  = []
       getRegsBlock (_, body, _)          = concatMap getAssignedRegs $ blockToList body
       assignedRegs = nub $ concatMap (getRegsBlock . blockSplit) cmmBlocks
-      isLive r     = r `elem` alwaysLive || r `elem` live
+      mbLive r     =
+        lookupRegUse r (alwaysLive platform) <|> lookupRegUse r live
 
   platform <- getPlatform
   stmtss <- forM assignedRegs $ \reg ->
@@ -2205,12 +2207,12 @@ funPrologue live cmmBlocks = do
         let (newv, stmts) = allocReg reg
         varInsert un (pLower $ getVarType newv)
         return stmts
-      CmmGlobal (GlobalRegUse r _) -> do
-        let reg   = lmGlobalRegVar platform r
-            arg   = lmGlobalRegArg platform r
+      CmmGlobal ru@(GlobalRegUse r _) -> do
+        let reg   = lmGlobalRegVar platform ru
+            arg   = lmGlobalRegArg platform ru
             ty    = (pLower . getVarType) reg
             trash = LMLitVar $ LMUndefLit ty
-            rval  = if isLive r then arg else trash
+            rval  = if isJust (mbLive r) then arg else trash
             alloc = Assignment reg $ Alloca (pLower $ getVarType reg) 1
         markStackReg r
         return $ toOL [alloc, Store rval reg Nothing []]
@@ -2222,7 +2224,7 @@ funPrologue live cmmBlocks = do
 
 -- | Function epilogue. Load STG variables to use as argument for call.
 -- STG Liveness optimisation done here.
-funEpilogue :: LiveGlobalRegs -> LlvmM ([LlvmVar], LlvmStatements)
+funEpilogue :: LiveGlobalRegUses -> LlvmM ([LlvmVar], LlvmStatements)
 funEpilogue live = do
     platform <- getPlatform
 
@@ -2248,12 +2250,16 @@ funEpilogue live = do
     let allRegs = activeStgRegs platform
     loads <- forM allRegs $ \r -> if
       -- load live registers
-      | r `elem` alwaysLive  -> loadExpr (GlobalRegUse r (globalRegSpillType platform r))
-      | r `elem` live        -> loadExpr (GlobalRegUse r (globalRegSpillType platform r))
+      | Just ru <- lookupRegUse r (alwaysLive platform)
+      -> loadExpr ru
+      | Just ru <- lookupRegUse r live
+      -> loadExpr ru
       -- load all non Floating-Point Registers
-      | not (isFPR r)        -> loadUndef r
+      | not (isFPR r)
+      -> loadUndef (GlobalRegUse r (globalRegSpillType platform r))
       -- load padding Floating-Point Registers
-      | r `elem` paddingRegs -> loadUndef r
+      | Just ru <- lookupRegUse r paddingRegs
+      -> loadUndef ru
       | otherwise            -> return (Nothing, nilOL)
 
     let (vars, stmts) = unzip loads
@@ -2263,7 +2269,7 @@ funEpilogue live = do
 --
 -- This is for Haskell functions, function type is assumed, so doesn't work
 -- with foreign functions.
-getHsFunc :: LiveGlobalRegs -> CLabel -> LlvmM ExprData
+getHsFunc :: LiveGlobalRegUses -> CLabel -> LlvmM ExprData
 getHsFunc live lbl
   = do fty <- llvmFunTy live
        name <- strCLabel_llvm lbl

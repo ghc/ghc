@@ -12,7 +12,7 @@
 module GHC.CmmToLlvm.Base (
 
         LlvmCmmDecl, LlvmBasicBlock,
-        LiveGlobalRegs,
+        LiveGlobalRegs, LiveGlobalRegUses,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
         LlvmM,
@@ -28,6 +28,8 @@ module GHC.CmmToLlvm.Base (
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
         llvmPtrBits, tysToParams, llvmFunSection, padLiveArgs, isFPR,
+
+        lookupRegUse,
 
         strCLabel_llvm,
         getGlobalPtr, generateExternDecls,
@@ -59,9 +61,11 @@ import GHC.Types.Unique.Supply
 import qualified GHC.Types.Unique.DSM as DSM
 import GHC.Utils.Logger
 
-import Data.Maybe (fromJust)
 import Control.Monad.Trans.State (StateT (..))
-import Data.List (isPrefixOf)
+import Control.Applicative (Alternative((<|>)))
+import Data.Maybe (fromJust, mapMaybe)
+
+import Data.List (find, isPrefixOf)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord (comparing)
 
@@ -74,6 +78,7 @@ type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Global registers live on proc entry
 type LiveGlobalRegs = [GlobalReg]
+type LiveGlobalRegUses = [GlobalRegUse]
 
 -- | Unresolved code.
 -- Of the form: (data label, data type, unresolved data)
@@ -117,16 +122,16 @@ llvmGhcCC platform
  | otherwise                       = CC_Ghc
 
 -- | Llvm Function type for Cmm function
-llvmFunTy :: LiveGlobalRegs -> LlvmM LlvmType
+llvmFunTy :: LiveGlobalRegUses -> LlvmM LlvmType
 llvmFunTy live = return . LMFunction =<< llvmFunSig' live (fsLit "a") ExternallyVisible
 
 -- | Llvm Function signature
-llvmFunSig :: LiveGlobalRegs ->  CLabel -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
+llvmFunSig :: LiveGlobalRegUses ->  CLabel -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
 llvmFunSig live lbl link = do
   lbl' <- strCLabel_llvm lbl
   llvmFunSig' live lbl' link
 
-llvmFunSig' :: LiveGlobalRegs -> LMString -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
+llvmFunSig' :: LiveGlobalRegUses -> LMString -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
 llvmFunSig' live lbl link
   = do let toParams x | isPointer x = (x, [NoAlias, NoCapture])
                       | otherwise   = (x, [])
@@ -150,16 +155,25 @@ llvmFunSection opts lbl
     | otherwise               = Nothing
 
 -- | A Function's arguments
-llvmFunArgs :: Platform -> LiveGlobalRegs -> [LlvmVar]
+llvmFunArgs :: Platform -> LiveGlobalRegUses -> [LlvmVar]
 llvmFunArgs platform live =
-    map (lmGlobalRegArg platform) (filter isPassed allRegs)
+    map (lmGlobalRegArg platform) (mapMaybe isPassed allRegs)
     where allRegs = activeStgRegs platform
           paddingRegs = padLiveArgs platform live
-          isLive r = r `elem` alwaysLive
-                     || r `elem` live
-                     || r `elem` paddingRegs
-          isPassed r = not (isFPR r) || isLive r
+          isLive :: GlobalReg -> Maybe GlobalRegUse
+          isLive r =
+            lookupRegUse r (alwaysLive platform)
+              <|>
+            lookupRegUse r live
+              <|>
+            lookupRegUse r paddingRegs
+          isPassed r =
+            if not (isFPR r)
+            then Just $ GlobalRegUse r (globalRegSpillType platform r)
+            else isLive r
 
+lookupRegUse :: GlobalReg -> [GlobalRegUse] -> Maybe GlobalRegUse
+lookupRegUse r = find ((== r) . globalRegUse_reg)
 
 isFPR :: GlobalReg -> Bool
 isFPR (FloatReg _)  = True
@@ -180,7 +194,7 @@ isFPR _             = False
 -- Invariant: Cmm FPR regs with number "n" maps to real registers with number
 -- "n" If the calling convention uses registers in a different order or if the
 -- invariant doesn't hold, this code probably won't be correct.
-padLiveArgs :: Platform -> LiveGlobalRegs -> LiveGlobalRegs
+padLiveArgs :: Platform -> LiveGlobalRegUses -> LiveGlobalRegUses
 padLiveArgs platform live =
       if platformUnregisterised platform
         then [] -- not using GHC's register convention for platform.
@@ -189,7 +203,7 @@ padLiveArgs platform live =
     ----------------------------------
     -- handle floating-point registers (FPR)
 
-    fprLive = filter isFPR live  -- real live FPR registers
+    fprLive = filter (isFPR . globalRegUse_reg) live  -- real live FPR registers
 
     -- we group live registers sharing the same classes, i.e. that use the same
     -- set of real registers to be passed. E.g. FloatReg, DoubleReg and XmmReg
@@ -197,39 +211,44 @@ padLiveArgs platform live =
     --
     classes         = NE.groupBy sharesClass fprLive
     sharesClass a b = globalRegsOverlap platform (norm a) (norm b) -- check if mapped to overlapping registers
-    norm x          = fpr_ctor x 1                                 -- get the first register of the family
+    norm x = globalRegUse_reg (fpr_ctor x 1)                  -- get the first register of the family
 
     -- For each class, we just have to fill missing registers numbers. We use
     -- the constructor of the greatest register to build padding registers.
     --
     -- E.g. sortedRs = [   F2,   XMM4, D5]
     --      output   = [D1,   D3]
+    padded :: [GlobalRegUse]
     padded      = concatMap padClass classes
+
+    padClass :: NE.NonEmpty GlobalRegUse -> [GlobalRegUse]
     padClass rs = go (NE.toList sortedRs) 1
       where
-         sortedRs = NE.sortBy (comparing fpr_num) rs
+         sortedRs = NE.sortBy (comparing (fpr_num . globalRegUse_reg)) rs
          maxr     = NE.last sortedRs
          ctor     = fpr_ctor maxr
 
          go [] _ = []
-         go (c1:c2:_) _   -- detect bogus case (see #17920)
+         go (GlobalRegUse c1 _: GlobalRegUse c2 _:_) _   -- detect bogus case (see #17920)
             | fpr_num c1 == fpr_num c2
             , Just real <- globalRegMaybe platform c1
             = sorryDoc "LLVM code generator" $
                text "Found two different Cmm registers (" <> ppr c1 <> text "," <> ppr c2 <>
                text ") both alive AND mapped to the same real register: " <> ppr real <>
                text ". This isn't currently supported by the LLVM backend."
-         go (c:cs) f
-            | fpr_num c == f = go cs f                    -- already covered by a real register
-            | otherwise      = ctor f : go (c:cs) (f + 1) -- add padding register
+         go (cu@(GlobalRegUse c _):cs) f
+            | fpr_num c == f = go cs f                     -- already covered by a real register
+            | otherwise      = ctor f : go (cu:cs) (f + 1) -- add padding register
 
-    fpr_ctor :: GlobalReg -> Int -> GlobalReg
-    fpr_ctor (FloatReg _)  = FloatReg
-    fpr_ctor (DoubleReg _) = DoubleReg
-    fpr_ctor (XmmReg _)    = XmmReg
-    fpr_ctor (YmmReg _)    = YmmReg
-    fpr_ctor (ZmmReg _)    = ZmmReg
-    fpr_ctor _ = error "fpr_ctor expected only FPR regs"
+    fpr_ctor :: GlobalRegUse -> Int -> GlobalRegUse
+    fpr_ctor (GlobalRegUse r fmt) i =
+      case r of
+        FloatReg _  -> GlobalRegUse (FloatReg  i) fmt
+        DoubleReg _ -> GlobalRegUse (DoubleReg i) fmt
+        XmmReg _    -> GlobalRegUse (XmmReg    i) fmt
+        YmmReg _    -> GlobalRegUse (YmmReg    i) fmt
+        ZmmReg _    -> GlobalRegUse (ZmmReg    i) fmt
+        _           -> error "fpr_ctor expected only FPR regs"
 
     fpr_num :: GlobalReg -> Int
     fpr_num (FloatReg i)  = i
