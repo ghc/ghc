@@ -1916,10 +1916,15 @@ dataConUserTyVarsNeedWrapper dc@(MkData { dcUnivTyVars = univ_tvs
     answer = (univ_tvs ++ ex_tvs) /= dataConUserTyVars dc
               -- Worker tyvars         Wrapper tyvars
 
-
-{- Note [Creating dummy constructors for the normalize command]
-
+{- Note [Why do we normalize a DataCon instaed of an IfaceConDecl]
+Although it is theoretically possible to normalize IfaceDecls instead of DataCons,
+it is much more convinient and efficient to do the latter then the former.
+There are two main reasons behind this:
+  - Substitution
+  - Normalizing Type Family application
+It is much more easier to do these operations on Types than on IfaceTypes.
 -}
+
 -- See Note [Why do we normalize a DataCon instead of an IfaceConDecl]
 normalizeDataConAt :: Bool -> FamInstEnvs -> TyCon -> [Type] -> DataCon -> Maybe DataCon
 normalizeDataConAt removeSaturatedClass famEnv head args
@@ -1930,7 +1935,8 @@ normalizeDataConAt removeSaturatedClass famEnv head args
                                , dcOtherTheta = other_theta
                                , dcOrigArgTys = orig_arg_tys
                                , dcOrigResTy = orig_res_ty })
-  | not remains
+  | not remains  -- The constructor doesn't have the requested return type
+               -- so we don't need it anymore
   = Nothing
   | otherwise
   = Just $
@@ -1943,40 +1949,47 @@ normalizeDataConAt removeSaturatedClass famEnv head args
         , dcOrigResTy = i_res_ty }
   where
     orig_res_ty_args = tyConAppArgs orig_res_ty
+    -- Domain of the substitution
     dom = shallowTyCoVarsOfType orig_res_ty
+    -- Build the substitution according to the return type
     univ_subst = uncurry zipTvSubst
                . unzip
                . prune $ zip orig_res_ty_args args
-
+    -- Build the range of substitution
     prune = foldr step []
       where
         step (t,ty) xs
           | Just tyVar <- getTyVar_maybe t = (tyVar,ty) : xs
           | otherwise = xs
-
+    -- Remaining user type variable binders
     i_ty_var_binders = filter (flip notElemSubst subst . binderVar) ty_var_binders
+    -- Remaining equality constraints
     i_eq_spec = filter (not . flip elemVarSet dom . eqSpecTyVar) eq_spec
+    -- Remaining universals
     i_univ_ty_vars = filter (`isInScope` univ_subst) univ_tvs
-
+    -- Instantiated constraints
     i_other_theta = normalize_theta other_theta
-
+    -- Instantiated argument types
     i_arg_tys = map (mapScaledType substReduce) orig_arg_tys
+    -- Instantiated return types
     i_res_ty = substReduce orig_res_ty
+    -- Final subsitution and the new existentials
     (subst, i_ex_tyco_vars) = substVarBndrs univ_subst ex_tvs
-
+    -- In the of GADTs, the return type might not match the return type we are looking for
+    -- In that case, we don't need to keep the constructor.
     remains = mkTyConApp head (args ++ drop (length args) orig_res_ty_args)
               `eqType`
               i_res_ty
-
+    -- Apply the substitution and reduce possible type family applications.
     substReduce = reductionReducedType
                 . normaliseType famEnv Nominal
                 . substTy subst
-
+    -- Substitute and then normalize the constraints
     normalize_theta = foldr (step . substReduce) []
       where
         step :: PredType -> [PredType] -> [PredType]
         step pred preds
-          | removeSaturatedClass
+          | removeSaturatedClass   -- Remove fully saturated constraints if the user has asked us
           , isEmptyVarSet . shallowTyCoVarsOfType $ pred
           = preds
           | otherwise

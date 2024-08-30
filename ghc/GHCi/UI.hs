@@ -1644,7 +1644,17 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
 -----------------------------------------------------------------------------
 -- :normalize
 
-normalize :: GHC.GhcMonad m => Bool -> String -> m ()
+{- Note [Arguments of the normalize command]
+The arguments of the normalize command should always be enclosed in parenthesis.
+This is because the command can take multiple arguments, and we need to have a clean
+way to disntinguish between actual arguments and arguments with which we want to normalize
+our type constructors.
+-}
+
+normalize :: GHC.GhcMonad m =>
+            Bool ->    -- Remove fully saturated constraints
+            String ->  -- List of arguments to normalize
+            m ()
 nomralize rmSatConstrs "" = throwGhcException (UsageError "syntax ':n <(constructor arguments)>'")
 normalize rmSatConstrs s =
   handleSourceError printGhciException $ do
@@ -1653,6 +1663,7 @@ normalize rmSatConstrs s =
       rendered <- showSDocForUser' sdoc
       liftIO . putStrLn $ rendered ++ "\n"
   where
+    -- Retrieve the actual arguments from the user input
     actArgs = go (0, 0) ("", [])
     go (n, m) (on, processed) (c:cs)
       | c == '(' = go (n + 1, m) ('(' : on, processed) cs
@@ -1664,17 +1675,21 @@ normalize rmSatConstrs s =
       | otherwise = go (n, m) (c : on, processed) cs
     go (n, m) (on, processed) [] = reverse processed
 
-pprNormalizedIfaceDecl :: GHC.GhcMonad m => Bool -> String -> m SDoc
+pprNormalizedIfaceDecl :: GHC.GhcMonad m =>
+                         Bool ->        -- Remove saturated constraints
+                         String ->      -- Actual arguments
+                         m SDoc
 pprNormalizedIfaceDecl rmSatConstrs str = do
   (ty,_) <- GHC.typeKind True str
   case splitTyConApp_maybe ty of
-    Nothing -> throwGhcException (CmdLineError "Something Bad happend!")
+    Nothing -> throwGhcException (UsageError (str ++ " is not a type constructor"))
     Just (head,args) -> do
        res <- runNormDecl toNormalizedIfaceDecl rmSatConstrs head args
        case res of
           Just x -> pure $ pprIfaceDecl showToIface  x
           Nothing -> throwGhcException (CmdLineError "Something bad happened!")
 
+-- See Note [Why do we normalize a DataCon instead of an IfaceConDecl]
 toNormalizedIfaceDecl :: NormDecl TcRn IfaceDecl
 toNormalizedIfaceDecl = tyThingToIfaceDecl False . ATyCon <$> mkNormalizedTyCon
   where
@@ -1687,19 +1702,19 @@ toNormalizedIfaceDecl = tyThingToIfaceDecl False . ATyCon <$> mkNormalizedTyCon
       = throwGhcException (Sorry "Can't normalize classes yet!")
       | otherwise
       = mkNormalizedDataTyConRhs
-
+    -- Normalize The RHS of a Newtype TyCon
     mkNormalizedNewTyConRhs = do
         (removeSatConstrs,tyCon,args,famInstEnvs) <- ask
         lift $ mkNewTyConRhs (tyConName tyCon) tyCon . head
              . mapMaybe (normalizeDataConAt removeSatConstrs famInstEnvs tyCon args)
              $ tyConDataCons tyCon
-
+    -- Normalize The RHS of a Datatype TyCon
     mkNormalizedDataTyConRhs = do
       (removeSatConstrs,tyCon,args,famInstEnvs) <- ask
       pure . mkDataTyConRhs
            . mapMaybe (normalizeDataConAt removeSatConstrs famInstEnvs tyCon args)
            $ tyConDataCons tyCon
-
+    -- Make a normalized Algebraic TyCon
     mkNormalizedTyCon = do
       (tyCon,args) <- asks (\(_,t,a,_) -> (t,a))
       normalizedRhs <- mkNormalizedTyConRhs tyCon
@@ -1710,14 +1725,8 @@ toNormalizedIfaceDecl = tyThingToIfaceDecl False . ATyCon <$> mkNormalizedTyCon
                         (tyConCType_maybe tyCon)
                         (tyConStupidTheta tyCon)
                         normalizedRhs
-                        (fromJust $ algTyConFlavour tyCon)
+                        (fromJust $ algTyConFlavour tyCon) -- FIXME
                         (isGadtSyntaxTyCon tyCon)
-
-{- Note [Why do we normalize a DataCon instead of an IfaceConDecl]
-TODO
-summary because we'll have to reduce and do all other sorts of stuff. Otherwise
-we'll have to convert back and forth between IfaceConDecl and DataCon.
--}
 
 -----------------------------------------------------------------------------
 -- :main
