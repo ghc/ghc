@@ -1646,21 +1646,23 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
 
 normalize :: GHC.GhcMonad m => Bool -> String -> m ()
 nomralize rmSatConstrs "" = throwGhcException (UsageError "syntax ':n <(constructor arguments)>'")
-normalize rmSatConstrs s = handleSourceError printGhciException $ do
-  forM_ (map trim $ actArgs s) $ \str -> do
-    sdoc <- pprNormalizedIfaceDecl rmSatConstrs str
-    rendered <- showSDocForUser' sdoc
-    liftIO (putStrLn rendered)
+normalize rmSatConstrs s =
+  handleSourceError printGhciException $ do
+    forM_ (actArgs s) $ \str -> do
+      sdoc <- pprNormalizedIfaceDecl rmSatConstrs str
+      rendered <- showSDocForUser' sdoc
+      liftIO . putStrLn $ rendered ++ "\n"
   where
-    actArgs [] = []    -- FIXME extremely hacky! (doesn't work for anything involving two levels of parenthesis)
-    actArgs ('(':xs) =
-      let
-        (inside,rest) = break (== ')') xs
-        afterParen = if null rest then [] else tail rest
-      in
-        inside : actArgs afterParen
-    actArgs (_:xs) = actArgs xs
-    trim = let f = reverse . dropWhile isSpace in f . f
+    actArgs = go (0, 0) ("", [])
+    go (n, m) (on, processed) (c:cs)
+      | c == '(' = go (n + 1, m) ('(' : on, processed) cs
+      | c == ')' =
+        if n == m + 1
+          then let trimmed = dropWhile isSpace . reverse $ ')' : on
+                in go (0, 0) ("", trimmed : processed) cs
+          else go (n, m + 1) (')' : on, processed) cs
+      | otherwise = go (n, m) (c : on, processed) cs
+    go (n, m) (on, processed) [] = reverse processed
 
 pprNormalizedIfaceDecl :: GHC.GhcMonad m => Bool -> String -> m SDoc
 pprNormalizedIfaceDecl rmSatConstrs str = do
