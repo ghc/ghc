@@ -244,7 +244,7 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- > throw e + error "boom" ===> error "boom"
 -- > throw e + error "boom" ===> throw e
 --
--- are both valid reductions and the compiler may pick any (loop, even), whereas
+-- are both valid reductions and the compiler may pick any, whereas
 --
 -- > throwIO e >> error "boom" ===> throwIO e
 --
@@ -448,40 +448,66 @@ seq# :: forall a s. a -> State# s -> (# State# s, a #)
 {-# NOINLINE seq# #-}  -- seq# is inlined manually in CorePrep
 seq# a s = let !a' = lazy a in (# s, a' #)
 
--- | Evaluate the argument to weak head normal form.
---
--- 'evaluate' is typically used to uncover any exceptions that a lazy value
--- may contain, and possibly handle them.
---
--- 'evaluate' only evaluates to /weak head normal form/. If deeper
--- evaluation is needed, the @force@ function from @Control.DeepSeq@
--- may be handy:
---
--- > evaluate $ force x
---
--- There is a subtle difference between @'evaluate' x@ and @'return' '$!' x@,
--- analogous to the difference between 'throwIO' and 'throw'. If the lazy
--- value @x@ throws an exception, @'return' '$!' x@ will fail to return an
--- 'IO' action and will throw an exception instead. @'evaluate' x@, on the
--- other hand, always produces an 'IO' action; that action will throw an
--- exception upon /execution/ iff @x@ throws an exception upon /evaluation/.
---
--- The practical implication of this difference is that due to the
--- /imprecise exceptions/ semantics,
---
--- > (return $! error "foo") >> error "bar"
---
--- may throw either @"foo"@ or @"bar"@, depending on the optimizations
--- performed by the compiler. On the other hand,
---
--- > evaluate (error "foo") >> error "bar"
---
--- is guaranteed to throw @"foo"@.
---
--- The rule of thumb is to use 'evaluate' to force or handle exceptions in
--- lazy values. If, on the other hand, you are forcing a lazy value for
--- efficiency reasons only and do not care about exceptions, you may
--- use @'return' '$!' x@.
+{- |
+Evaluate the argument to weak head normal form.
+
+'evaluate' is typically used to uncover any exceptions that a lazy
+value may contain, and possibly handle them. The rule of thumb is to
+use 'evaluate' to force or handle exceptions in lazy values. If, on
+the other hand, you are forcing a lazy value for efficiency reasons
+only and do not care about exceptions, you may use @'return' '$!' x@.
+
+'evaluate' only evaluates to /weak head normal form/. If deeper
+evaluation is needed, the @force@ function from @Control.DeepSeq@
+may be handy:
+
+> evaluate $ force x
+
+There is a subtle difference between @'evaluate' x@ and @'return' '$!' x@,
+analogous to the difference between 'throwIO' and 'throw'. If the lazy
+value @x@ throws an exception, @'return' '$!' x@ will fail to return an
+'IO' action and will throw an exception instead. @'evaluate' x@, on the
+other hand, always produces an 'IO' action; that action will throw an
+exception upon /execution/ iff @x@ throws an exception upon /evaluation/.
+
+One practical implication of this difference is that due to the
+/imprecise exceptions/ semantics,
+
+> (return $! error "foo") >> (return $! error "bar")
+
+may throw either @"foo"@ or @"bar"@, depending on the optimizations
+performed by the compiler. On the other hand,
+
+> evaluate (error "foo") >> evaluate (error "bar")
+
+is guaranteed to throw @"foo"@. However, for historical reasons, the
+sequencing guarantees provided by @evaluate@ are slightly weaker than
+those provided by precise exceptions ('throwIO').  In particular,
+although @throwIO foo >> throw bar@ is guaranteed to throw @foo@
+rather than @bar@, @evaluate (throw foo) >> throw bar@ may throw
+either @foo@ or @bar@.  This may sometimes require care to avoid the
+intended sequencing of evaulations being defeated by strictness
+analysis.  Consider these two functions:
+
+> fun1, fun2 :: Int -> Int -> IO ()
+> fun1 x y = do
+>   evaluate x
+>   evaluate y
+>   print $! x + y
+> fun2 x y = do
+>   evaluate x
+>   y' <- evaluate y
+>   print $! x + y'
+
+Because @evaluate@ does not produce true precise exceptions, @fun1@ is
+strict in the @print $! x + y@ action, which in turn is strict in both
+@x@ and @y@.  Consequently, although a call @fun1 x y@ must evaluate
+@x@ and @y@ before printing anything, it is free to evaluate @y@
+before @x@. The example @fun2@ shows how to work around this: The
+value @y'@ is not available before the @evaluate y@ action has
+executed, and so its use in @print $! x + y'@ cannot cause @y@ to be
+evaluated earlier than expected.
+-}
 evaluate :: a -> IO a
 evaluate a = IO $ \s -> seq# a s -- NB. see #2273, #5129
 

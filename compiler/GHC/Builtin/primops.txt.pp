@@ -3651,18 +3651,12 @@ primop  ParOp "par#" GenPrimOp a -> Int#
       -- gets evaluated strictly, which it should *not* be
    effect = ReadWriteEffect
    code_size = { primOpCodeSizeForeignCall }
-   -- `par#` was suppose to be deprecated in favor of `spark#` [1], however it
-   -- wasn't clear how to replace it with `spark#` [2] and `par#` is still used
-   -- to implement `GHC.Internal.Conc.Sync.par`. So we undeprecated it until
-   -- everything is sorted out (see #24825).
-   --
-   -- [1] https://gitlab.haskell.org/ghc/ghc/-/issues/15227#note_154293
-   -- [2] https://gitlab.haskell.org/ghc/ghc/-/merge_requests/5548#note_347791
-   --
-   -- deprecated_msg = { Use 'spark#' instead }
+   deprecated_msg = { Use 'spark#' instead }
 
 primop SparkOp "spark#" GenPrimOp
    a -> State# s -> (# State# s, a #)
+   { Create a new spark concurrently evaluating the given argument.
+     The return value is exactly the same as the given value. }
    with effect = ReadWriteEffect
    code_size = { primOpCodeSizeForeignCall }
 

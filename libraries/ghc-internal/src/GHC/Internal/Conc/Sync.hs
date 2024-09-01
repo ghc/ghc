@@ -513,24 +513,54 @@ labelThreadByteArray# :: ThreadId -> ByteArray# -> IO ()
 labelThreadByteArray# (ThreadId t) str =
     IO $ \s -> case labelThread# t str s of s1 -> (# s1, () #)
 
+-- | @'pseq' x y@ evaluates @x@ and then evaluates @y@, in that order.
+-- If evaluating @x@ does not throw an exception, it returns @y@.
+--
+-- Note that if y is used strictly by some other component of a larger
+-- expression, it may happen that @y@ gets evaluated by that other
+-- component before @pseq x y@ gets the chance to evaluate either @x@
+-- or @y@.  For example, @pseq x y + y@ may evaluate @y@ as the second
+-- argument of @(+)@ before it evaluates @x@
+{-# INLINE pseq #-}
+pseq :: a -> b -> b
 --      Nota Bene: 'pseq' used to be 'seq'
 --                 but 'seq' is now defined in GHC.Prim
 --
 -- "pseq" is defined a bit weirdly (see below)
+-- The state token threading robustly ensures that we cannot move the
+-- eval of y before the eval of x.  See #23699 and #23233 for examples
+-- of what can go wrong if we rely only on laziness for this sequencing.
 --
--- The reason for the strange "lazy" call is that
--- it fools the compiler into thinking that pseq  and par are non-strict in
--- their second argument (even if it inlines pseq at the call site).
--- If it thinks pseq is strict in "y", then it often evaluates
--- "y" before "x", which is totally wrong.
+-- Because `seq#` is considered lazy, we also explicitly make pseq seq
+-- in its first argument with (no-hash) seq.  But it must remain lazy
+-- in its second argument, for the same reasons as `seq#` is
+-- considered lazy. See Note [seq# magic], wrinkle SEQ3.
+pseq x y = x `seq` case seq# x realWorld# of
+  -- Using realWorld# directly like this should scare you! But
+  -- evaluating x really is a pure operation; we don't care if it gets
+  -- CSE'd, so we don't need any special runRW# precautions.
+  (# s, _ #) -> case seq# y s of
+    (# _, y' #) -> y' -- We must use y' rather than y here, to stay lazy.
 
-{-# INLINE pseq  #-}
-pseq :: a -> b -> b
-pseq  x y = x `seq` lazy y
-
+-- | Indicates that it may be beneficial to evaluate the first
+-- argument in parallel with the second.  Returns the value of the
+-- second argument.
+--
+-- @a ``par`` b@ is exactly equivalent semantically to @b@, except
+-- when evaluating @a@ would be undefined behavior.
 {-# INLINE par  #-}
 par :: a -> b -> b
-par  x y = case (par# x) of { _ -> lazy y }
+-- Although re-ordering of evaluations in par would not be as big of
+-- a deal for `par` as it is for `pseq`, we use the same state-token
+-- threading mechanism to ensure that a call `par x y` does not evaluate
+-- `y` until after attempting to spark concurrent evaluation of `x`.
+par x y = case spark# x realWorld# of
+  -- Using realWorld# directly like this should scare you! But
+  -- scheduling x for concurrent evaluation is almost a pure operation;
+  -- we don't care if it gets CSE'd, so we don't need any special
+  -- runRW# precautions.
+  (# s, _ #) -> case seq# y s of
+    (# _, y' #) -> y' -- We must use y' rather than y here, to stay lazy.
 
 -- | Internal function used by the RTS to run sparks.
 runSparks :: IO ()

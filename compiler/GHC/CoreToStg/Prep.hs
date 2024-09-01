@@ -891,7 +891,7 @@ cpeRhsE env (Case scrut bndr _ alts@[Alt con [covar] _])
        ; return (floats, rhs) }
 
 cpeRhsE env (Case scrut bndr _ [Alt (DataAlt dc) [token_out, res] rhs])
-  -- See item (SEQ4) of Note [seq# magic]. We want to match
+  -- See item (SEQ6) of Note [seq# magic]. We want to match
   --   case seq# @a @RealWorld <ok-to-discard> s of (# s', _ #) -> rhs[s']
   -- and simplify to rhs[s]. Triggers in T15226.
   | isUnboxedTupleDataCon dc
@@ -1295,10 +1295,9 @@ cpeApp top_env expr
 
       AIApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
-               = case (ss, isLazyExpr arg) of
-                   (_   : ss_rest, True)  -> (topDmd, ss_rest)
-                   (ss1 : ss_rest, False) -> (ss1,    ss_rest)
-                   ([],            _)     -> (topDmd, [])
+               = case ss of
+                   ss1 : ss_rest -> (ss1,    ss_rest)
+                   []            -> (topDmd, [])
         (fs, arg') <- cpeArg top_env ss1 arg
         rebuild_app' env as (App fun' arg') (fs `zipFloats` floats) ss_rest rt_ticks (req_depth-1)
 
@@ -1316,13 +1315,6 @@ cpeApp top_env expr
         | otherwise
         -- See [Floating Ticks in CorePrep]
         -> rebuild_app' env as fun' (snocFloat floats (FloatTick tickish)) ss rt_ticks req_depth
-
-isLazyExpr :: CoreExpr -> Bool
--- See Note [lazyId magic] in GHC.Types.Id.Make
-isLazyExpr (Cast e _)              = isLazyExpr e
-isLazyExpr (Tick _ e)              = isLazyExpr e
-isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
-isLazyExpr _                       = False
 
 {- Note [runRW magic]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -2390,12 +2382,11 @@ we are optimizing away 'lazy' (see Note [lazyId magic], and also
 which is a perfectly fine, non-trivial thunk, but then CorePrep will drop
 'lazy', giving us 'x = y' which is trivial and impermissible.  The solution is
 CorePrep to have a miniature inlining pass which deals with cases like this.
-We can then drop the let-binding altogether.
+We can then drop the let-binding altogether. (But see also #24188.)
 
 Why does the removal of 'lazy' have to occur in CorePrep?  The gory details
 are in Note [lazyId magic] in GHC.Types.Id.Make, but the main reason is that
-lazy must appear in unfoldings (optimizer output) and it must prevent
-call-by-value for catch# (which is implemented by CorePrep.)
+lazy must appear in unfoldings (optimizer output).
 
 An alternate strategy for solving this problem is to have the inliner treat
 'lazy e' as a trivial expression if 'e' is trivial.  We decided not to adopt

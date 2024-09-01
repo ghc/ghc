@@ -324,3 +324,4 @@ test('T23697',
   , when(opsys('darwin'), skip)  # permission denied
   ], makefile_test, ['T23697'])
 test('stimesEndo', normal, compile_and_run, [''])
+test('T23233', normal, compile_and_run, [''])

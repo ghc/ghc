@@ -3251,7 +3251,7 @@ Note [DataAlt occ info]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Our general goal is to preserve dead-ness occ-info on the field binders of a
 case alternative. Why? It's generally a good idea, but one specific reason is to
-support (SEQ4) of Note [seq# magic].
+support (SEQ6) of Note [seq# magic].
 
 But we have to be careful: even if the field binder is not mentioned in the case
 alternative and thus annotated IAmDead by OccurAnal, it might "come back to

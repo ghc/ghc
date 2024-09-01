@@ -2128,45 +2128,48 @@ See also: Note [User-defined RULES for seq] in GHC.Core.Opt.Simplify.
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
 lazy :: forall a. a -> a
+lazy x = x
 
-'lazy' is used to make sure that a sub-expression, and its free variables,
-are truly used call-by-need, with no code motion.  Key examples:
-
-* pseq:    pseq a b = a `seq` lazy b
-  We want to make sure that the free vars of 'b' are not evaluated
-  before 'a', even though the expression is plainly strict in 'b'.
-
-* catch:   catch a b = catch# (lazy a) b
-  Again, it's clear that 'a' will be evaluated strictly (and indeed
-  applied to a state token) but we want to make sure that any exceptions
-  arising from the evaluation of 'a' are caught by the catch (see
-  #11555).
-
-Implementing 'lazy' is a bit tricky:
+As described in its documentation, it exists to circumvent strictness
+analysis.  Implementing 'lazy' is a bit tricky:
 
 * It must not have a strictness signature: by being a built-in Id,
   all the info about lazyId comes from here, not from GHC.Magic.hi.
-  This is important, because the strictness analyser will spot it as
-  strict!
+  This is important, because the strictness analyser will spot its
+  definition as strict!
 
 * It must not have an unfolding: it gets "inlined" by a HACK in
   CorePrep. It's very important to do this inlining *after* unfoldings
-  are exposed in the interface file.  Otherwise, the unfolding for
-  (say) pseq in the interface file will not mention 'lazy', so if we
-  inline 'pseq' we'll totally miss the very thing that 'lazy' was
-  there for in the first place. See #3259 for a real world
-  example.
+  are exposed in the interface file.  Otherwise, the unfolding for a
+  function written using 'lazy' in the interface file will not mention
+  'lazy'. Then, if it is inlined in another module, demand analysis in
+  will defeat whatever purpose that 'lazy' was originally meant to serve
+  See #3259 for a real world example using a now-obsolete definition of 'par'.
+  For a more "reasonable" example, look at Data.Map.Lazy.insert from containers:
+    https://hackage.haskell.org/package/containers-0.6.6/docs/src/Data.Map.Internal.html#insert
+  (In particular, their "Note: Avoiding worker/wrapper" should continue
+  to work even when 'insert' gets specialized in another module.)
 
-* Suppose CorePrep sees (catch# (lazy e) b).  At all costs we must
-  avoid using call by value here:
-     case e of r -> catch# r b
-  Avoiding that is the whole point of 'lazy'.  So in CorePrep (which
-  generate the 'case' expression for a call-by-value call) we must
-  spot the 'lazy' on the arg (in CorePrep.cpeApp), and build a 'let'
-  instead.
-
-* lazyId is defined in GHC.Base, so we don't *have* to inline it.  If it
+* lazyId is defined in GHC.Magic, so we don't *have* to inline it.  If it
   appears un-applied, we'll end up just calling it.
+
+Historical aside: 'lazy' was once supposed to ensure that a
+sub-expression, and its free variables, are truly used call-by-need,
+with no code motion.  The key example was:
+
+* pseq:    pseq a b = a `seq` lazy b
+
+We wanted to make sure that the free vars of 'b' are not evaluated
+before 'a', even though the expression is plainly strict in 'b'.
+But it turns out that even if strictness analysis can't see this, our
+other program transformations may float out the entire 'lazy b'
+sub-expression and evaluate that earlier, or otherwise delay
+evaluation of 'a' until after evaluation of 'lazy b'.  See also #23699
+and #23233.  Robustly fixing this problem with 'lazy' is somewhere
+between "not worth doing" and "impossible," so now we use a different
+primitive (seq#) to implement pseq, and document the lack of real
+ordering guarantees provided by 'lazy'.
+
 
 Note [noinlineId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -2260,18 +2263,38 @@ Its (NOINLINE) definition in GHC.Magic is simply
 Things to note
 
 (SEQ1)
-  It must be NOINLINE, because otherwise the eval !a' would be decoupled from
-  the state token s, and GHC's optimisations, in particular strictness analysis,
-  would happily move the eval around.
+  Obviously a call `seq# x s` is strict in x in the sense that whenever
+  evaluation of `x` diverges, so does evaluation of `seq# x s`.
+  However, there is another sense in which `seq# x s` is not strict in x:
+  It is not generally sound in Core to rewrite a call `seq# x s`
+  into `case x of x' { __DEFAULT -> seq# x' s }`, because the outer
+  eval on x would be decoupled from the state token s, and GHC's
+  optimisations, in particular strictness analysis, would happily move
+  the eval around, defeating the sequencing guarantees that seq# is
+  meant to provide.
+
+(SEQ2)
+  For basically the same reason, it is not generally sound to inline
+  seq# during simplification.
 
   However, we *do* inline saturated applications of seq# in CorePrep, where
   evaluation order is fixed; see the implementation notes below.
   This is one reason why we need seq# to be known-key.
 
-(SEQ2)
-  The use of `lazy` ensures that strictness analysis does not see the eval
-  that takes place, so the final demand signature is <L><L>, not <1L><L>.
-  This is important for a definition like
+(SEQ3)
+  What demand signature should seq# have? Per SEQ1, there is one sense
+  in which seq# is strict and another in which it is not strict.  And
+  it turns out that demand analysis is mostly interested in the latter
+  sense of strictness.  After all, one of the main ideas of strictness
+  analysis is to find out when a variable or function argument
+
+   1. will certainly be evaluated later in program execution,
+   2. such that it is safe to evaluate it eagerly at birth rather than
+      creating a thunk to enable lazy evaluation.
+
+  Considering seq# strict for the purposes of demand analysis would be
+  OK with respect to part 1 but not part 2.  This is important for a
+  definition like
 
     foo x y = evaluate y >> evaluate x
 
@@ -2279,23 +2302,58 @@ Things to note
   they want to evaluate y *before* x.
   But if strictness analysis sees the evals, it infers foo as strict in
   both parameters. This strictness would be exploited in the backend by
-  picking a call-by-value calling convention for foo, one that would evaluate
+  picking a call-by-value calling convention for foo, one that may evaluate
   x *before* y. Nononono!
 
-  Because the definition of seq# uses `lazy`, it must live in a different module
-  (GHC.Internal.IO); otherwise strictness analysis uses its own strictness
-  signature for the definition of `lazy` instead of the one we wire in.
+  We hide the eval that takes place in the definition of seq# from
+  strictness analysis using the magic id `lazy` (see Note [lazyId magic]),
+  so that its final demand signature is <L><L>, not <1L><L>.
+  In principle we could do a bit better, and give seq# a demand signature
+  of <ML><L>, indicating that it only evaluates its argument once.
 
-(SEQ3)
-  Why does seq# return the value? Consider
+  (Because the definition of seq# uses `lazy`, it must live in a different module
+  (GHC.Internal.IO); otherwise strictness analysis uses its own strictness
+  signature for the definition of `lazy` instead of the one we wire in.)
+
+(SEQ4)
+  Historically, seq# used to be a primop, and the majority of primops
+  should return False in exprMayThrowPreciseException, so we do the same
+  for seq# for back compat.  It's unclear whether this behavior is more
+  or less surprising for users than the alternative.  See also the
+  discussion at #22935.
+
+(SEQ5)
+  Why do seq#/evaluate return the value? Contrast these two functions:
+
+     fun1, fun2 :: Int -> Int -> IO ()
+     fun1 y x = do
+       evaluate x
+       evaluate y
+       print $! x + y
+     fun2 y x = do
+       evaluate x
+       y' <- evaluate y
+       print $! x + y'
+
+  Due to wrinkle SEQ4, both of these functions are strict in their
+  `print $! ...` actions, and therefore `fun1 y x` is strict in both
+  `x` and `y`, which may cause the function to actually evaluate `y`
+  before `x`, even though this may not have been what the programmer
+  intended.  In `fun2 y x`, although the corresponding `print $! ...`
+  action is strict in `y'`, the variable `y'` is not available until
+  after the `evaluate y` action is completed, and that action remains
+  sequenced-after the `evaluate x` action.  (This idea is also used
+  in the implementations of the base functions `pseq` and `par`.)
+
+  There are also some niche performance-related benefits. Consider
      let x = e in
      case seq# x s of (# _, x' #) -> ... x' ... case x' of __DEFAULT -> ...
-  Here, we could simply use x instead of x', but doing so would
+  Even if we can safely use x instead of x', doing so may
   introduce an unnecessary indirection and tag check at runtime;
   also we can attach an evaldUnfolding to x' to discard any
   subsequent evals such as the `case x' of __DEFAULT`.
 
-(SEQ4)
+(SEQ6)
   T15226 demonstrates that we want to discard ok-for-discard seq#s. That is,
   simplify `case seq# <ok-to-discard> s of (# s', _ #) -> rhs[s']` to `rhs[s]`.
   You might wonder whether the Simplifier could do this. But see the excellent
@@ -2304,22 +2362,19 @@ Things to note
 
 Implementing seq#.  The compiler has magic for `seq#` in
 
-- GHC.CoreToStg.Prep.cpeRhsE: Implement (SEQ4).
+- GHC.CoreToStg.Prep.cpeRhsE: Implement (SEQ6).
 
-- Simplify.addEvals records evaluated-ness for the result (cf. (SEQ3)); see
+- Simplify.addEvals records evaluated-ness for the result (cf. (SEQ5)); see
   Note [Adding evaluatedness info to pattern-bound variables]
   in GHC.Core.Opt.Simplify.Iteration
 
-- GHC.Core.Opt.DmdAnal.exprMayThrowPreciseException:
-  Historically, seq# used to be a primop, and the majority of primops
-  should return False in exprMayThrowPreciseException, so we do the same
-  for seq# for back compat.
+- GHC.Core.Opt.DmdAnal.exprMayThrowPreciseException: Implement (SEQ4)
 
 - GHC.CoreToStg.Prep: Inline saturated applications to a Case, e.g.,
 
     seq# (f 13) s
     ==>
-    case f 13 of sat of __DEFAULT -> (# s, sat #)
+    case f 13 of sat { __DEFAULT -> (# s, sat #) }
 
   This is implemented in `cpeApp`, not unlike Note [runRW magic].
   We are only inlining seq#, leaving opportunities for case-of-known-con
@@ -2327,9 +2382,9 @@ Implementing seq#.  The compiler has magic for `seq#` in
 
     case seq# f 13 s of (# s', r #) -> rhs
     ==> {Prep}
-    case f 13 of sat of __DEFAULT -> case (# s, sat #) of (# s', r #) -> rhs
+    case f 13 of sat { __DEFAULT -> case (# s, sat #) of (# s', r #) -> rhs }
     ==> {Unarise}
-    case f 13 of sat of __DEFAULT -> rhs[s/s',sat/r]
+    case f 13 of sat { __DEFAULT -> rhs[s/s',sat/r] }
 
   Note that CorePrep really allocates a CaseBound FloatingBind for `f 13`.
   That's OK, because the telescope of Floats always stays in the same order

@@ -70,14 +70,16 @@ noinline x = x
 -- identity function.
 --
 -- This behaviour is occasionally useful when controlling evaluation
--- order. Notably, 'lazy' is used in the library definition of
--- 'Control.Parallel.par':
+-- order across opaque function calls.  However, when there is no
+-- opaque function call boundary it may happen that an entire @lazy x@
+-- expression gets let-bound, then floated out, and then eagerly
+-- evaluated.  (See GHC issue 23699 for an example.  This problem is
+-- inherent to the design of @lazy@ and will not be fixed.  If you
+-- need reliable sequencing of evaluations, try using @GHC.Conc.pseq@
+-- or @Control.Exception.evaluate@ instead.)
 --
--- > par :: a -> b -> b
--- > par x y = case (par# x) of _ -> lazy y
---
--- If 'lazy' were not lazy, 'Control.Parallel.par' would look strict in
--- @y@ which would defeat the whole purpose of 'Control.Parallel.par'.
+-- The @lazy@ function is also occasionally useful for preventing
+-- problematic unboxing.
 lazy :: a -> a
 {-# NOINLINE lazy #-}  -- lazy is inlined manually in CorePrep
 lazy x = x
