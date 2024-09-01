@@ -184,10 +184,93 @@ annExpr e {- debugIsOn -} = ANN (text . show $ e)
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
+-- Note [RISCV64 Jump Tables]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Jump tables are implemented by generating a table of relative addresses,
+-- where each entry is the relative offset to the target block from the first
+-- entry / table label (`generateJumpTableForInstr`). Using the jump table means
+-- loading the entry's value and jumping to the calculated absolute address
+-- (`genSwitch`).
+--
+-- For example, this Cmm switch
+--
+--   switch [1 .. 10] _s2wn::I64 {
+--       case 1 : goto c347;
+--       case 2 : goto c348;
+--       case 3 : goto c349;
+--       case 4 : goto c34a;
+--       case 5 : goto c34b;
+--       case 6 : goto c34c;
+--       case 7 : goto c34d;
+--       case 8 : goto c34e;
+--       case 9 : goto c34f;
+--       case 10 : goto c34g;
+--   }   // CmmSwitch
+--
+-- leads to this jump table in Assembly
+--
+--   .section .rodata
+--           .balign 8
+--   .Ln34G:
+--           .quad   0
+--           .quad   .Lc347-(.Ln34G)+0
+--           .quad   .Lc348-(.Ln34G)+0
+--           .quad   .Lc349-(.Ln34G)+0
+--           .quad   .Lc34a-(.Ln34G)+0
+--           .quad   .Lc34b-(.Ln34G)+0
+--           .quad   .Lc34c-(.Ln34G)+0
+--           .quad   .Lc34d-(.Ln34G)+0
+--           .quad   .Lc34e-(.Ln34G)+0
+--           .quad   .Lc34f-(.Ln34G)+0
+--           .quad   .Lc34g-(.Ln34G)+0
+--
+-- and this indexing code where the jump should be done (register t0 contains
+-- the index)
+--
+--           addi t0, t0, 0 // silly move (ignore it)
+--           la t1, .Ln34G // load the table's address
+--           sll t0, t0, 3 // index * 8 -> offset in bytes
+--           add t0, t0, t1 // address of the table's entry
+--           ld t0, 0(t0) // load entry
+--           add t0, t0, t1 // relative to absolute address
+--           jalr zero, t0, 0 // jump to the block
+--
+-- In object code (disassembled) the table looks like
+--
+--   0000000000000000 <.Ln34G>:
+--        ...
+--        8: R_RISCV_ADD64        .Lc347
+--        8: R_RISCV_SUB64        .Ln34G
+--        10: R_RISCV_ADD64       .Lc348
+--        10: R_RISCV_SUB64       .Ln34G
+--        18: R_RISCV_ADD64       .Lc349
+--        18: R_RISCV_SUB64       .Ln34G
+--        20: R_RISCV_ADD64       .Lc34a
+--        20: R_RISCV_SUB64       .Ln34G
+--        28: R_RISCV_ADD64       .Lc34b
+--        28: R_RISCV_SUB64       .Ln34G
+--        30: R_RISCV_ADD64       .Lc34c
+--        30: R_RISCV_SUB64       .Ln34G
+--        38: R_RISCV_ADD64       .Lc34d
+--        38: R_RISCV_SUB64       .Ln34G
+--        40: R_RISCV_ADD64       .Lc34e
+--        40: R_RISCV_SUB64       .Ln34G
+--        48: R_RISCV_ADD64       .Lc34f
+--        48: R_RISCV_SUB64       .Ln34G
+--        50: R_RISCV_ADD64       .Lc34g
+--        50: R_RISCV_SUB64       .Ln34G
+--
+-- I.e. the relative offset calculations are done by the linker via relocations.
+-- This seems to be PIC compatible; at least `scanelf` (pax-utils) does not
+-- complain.
+
+
 -- | Generate jump to jump table target
 --
 -- The index into the jump table is calulated by evaluating @expr@. The
--- corresponding table entry contains the address to jump to.
+-- corresponding table entry contains the relative address to jump to (relative
+-- to the jump table's first entry / the table's own label).
 genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch config expr targets = do
   (reg, fmt1, e_code) <- getSomeReg indexExpr
@@ -205,9 +288,15 @@ genSwitch config expr targets = do
           `appOL` t_code
           `appOL` toOL
             [ COMMENT (ftext "Jump table for switch"),
+              -- index to offset into the table (relative to tableReg)
               annExpr expr (SLL (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt1) reg) (OpImm (ImmInt 3))),
+              -- calculate table entry address
               ADD (OpReg W64 tmp) (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt2) tableReg),
+              -- load table entry (relative offset from tableReg (first entry) to target label)
               LDRU II64 (OpReg W64 tmp) (OpAddr (AddrRegImm tmp (ImmInt 0))),
+              -- calculate absolute address of the target label
+              ADD (OpReg W64 tmp) (OpReg W64 tmp) (OpReg W64 tableReg),
+              -- prepare jump to target label
               J_TBL ids (Just lbl) tmp
             ]
   return code
@@ -226,9 +315,9 @@ genSwitch config expr targets = do
 
 -- | Generate jump table data (if required)
 --
--- Relies on PIC relocations. The idea is to emit one table entry per case. The
--- entry is the label of the block to jump to. This will be relocated to be the
--- address of the jump target.
+-- The idea is to emit one table entry per case. The entry is the relative
+-- address of the block to jump to (relative to the table's first entry /
+-- table's own label.) The calculation itself is done by the linker.
 generateJumpTableForInstr ::
   NCGConfig ->
   Instr ->
@@ -240,7 +329,13 @@ generateJumpTableForInstr config (J_TBL ids (Just lbl) _) =
           jumpTableEntryRel Nothing =
             CmmStaticLit (CmmInt 0 (ncgWordWidth config))
           jumpTableEntryRel (Just blockid) =
-            CmmStaticLit (CmmLabel blockLabel)
+            CmmStaticLit
+              ( CmmLabelDiffOff
+                  blockLabel
+                  lbl
+                  0
+                  (ncgWordWidth config)
+              )
             where
               blockLabel = blockLbl blockid
    in Just (CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl jumpTable))
