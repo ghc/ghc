@@ -646,23 +646,23 @@ pprInstr platform instr = case instr of
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
-  FCVT o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
-  FCVT o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.s") o1 o2
-  FCVT o1 o2 ->
-    pprPanic "RV64.pprInstr - impossible float conversion"
+  FCVT FloatToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
+  FCVT FloatToFloat o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.s") o1 o2
+  FCVT FloatToFloat o1 o2 ->
+    pprPanic "RV64.pprInstr - impossible float to float conversion"
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
-  SCVTF o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.w") o1 o2
-  SCVTF o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.l") o1 o2
-  SCVTF o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.w") o1 o2
-  SCVTF o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.l") o1 o2
-  SCVTF o1 o2 ->
+  FCVT IntToFloat o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.w") o1 o2
+  FCVT IntToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.l") o1 o2
+  FCVT IntToFloat o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.d.w") o1 o2
+  FCVT IntToFloat o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.l") o1 o2
+  FCVT IntToFloat o1 o2 ->
     pprPanic "RV64.pprInstr - impossible integer to float conversion"
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
-  FCVTZS o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.w.s") o1 o2
-  FCVTZS o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.w.d") o1 o2
-  FCVTZS o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.l.s") o1 o2
-  FCVTZS o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.l.d") o1 o2
-  FCVTZS o1 o2 ->
+  FCVT FloatToInt o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.w.s") o1 o2
+  FCVT FloatToInt o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.w.d") o1 o2
+  FCVT FloatToInt o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.l.s") o1 o2
+  FCVT FloatToInt o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.l.d") o1 o2
+  FCVT FloatToInt o1 o2 ->
     pprPanic "RV64.pprInstr - impossible float to integer conversion"
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
   FABS o1 o2 | isSingleOp o2 -> op2 (text "\tfabs.s") o1 o2

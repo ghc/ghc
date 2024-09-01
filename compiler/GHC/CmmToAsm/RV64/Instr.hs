@@ -104,9 +104,7 @@ regUsageOfInstr platform instr = case instr of
   LDR _ dst src -> usage (regOp src, regOp dst)
   LDRU _ dst src -> usage (regOp src, regOp dst)
   FENCE _ _ -> usage ([], [])
-  FCVT dst src -> usage (regOp src, regOp dst)
-  SCVTF dst src -> usage (regOp src, regOp dst)
-  FCVTZS dst src -> usage (regOp src, regOp dst)
+  FCVT _variant dst src -> usage (regOp src, regOp dst)
   FABS dst src -> usage (regOp src, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
@@ -189,9 +187,7 @@ patchRegsOfInstr instr env = case instr of
   LDR f o1 o2 -> LDR f (patchOp o1) (patchOp o2)
   LDRU f o1 o2 -> LDRU f (patchOp o1) (patchOp o2)
   FENCE o1 o2 -> FENCE o1 o2
-  FCVT o1 o2 -> FCVT (patchOp o1) (patchOp o2)
-  SCVTF o1 o2 -> SCVTF (patchOp o1) (patchOp o2)
-  FCVTZS o1 o2 -> FCVTZS (patchOp o1) (patchOp o2)
+  FCVT variant o1 o2 -> FCVT variant (patchOp o1) (patchOp o2)
   FABS o1 o2 -> FABS (patchOp o1) (patchOp o2)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
@@ -591,14 +587,8 @@ data Instr
     --
     -- Memory barrier.
     FENCE FenceType FenceType
-  | -- | Floating point ConVerT
-    FCVT Operand Operand
-  | -- | Signed floating point ConVerT
-    SCVTF Operand Operand
-  | -- TODO: Same as SCVTF?
-
-    -- | Floating point ConVerT to Zero Signed
-    FCVTZS Operand Operand
+  | -- | Floating point conversion
+    FCVT FcvtVariant Operand Operand
   | -- | Floating point ABSolute value
     FABS Operand Operand
   | -- | Floating-point fused multiply-add instructions
@@ -611,6 +601,9 @@ data Instr
 
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
 data FenceType = FenceRead | FenceWrite | FenceReadWrite
+
+-- | Variant of a floating point conversion instruction
+data FcvtVariant = FloatToFloat | IntToFloat | FloatToInt
 
 instrCon :: Instr -> String
 instrCon i =
@@ -652,8 +645,6 @@ instrCon i =
     BCOND {} -> "BCOND"
     FENCE {} -> "FENCE"
     FCVT {} -> "FCVT"
-    SCVTF {} -> "SCVTF"
-    FCVTZS {} -> "FCVTZS"
     FABS {} -> "FABS"
     FMA variant _ _ _ _ ->
       case variant of
