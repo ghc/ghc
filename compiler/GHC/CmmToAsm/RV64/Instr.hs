@@ -299,10 +299,18 @@ mkSpillInstr _config reg delta slot =
     fmt = case reg of
       RegReal (RealRegSingle n) | n < d0RegNo -> II64
       _ -> FF64
-    mkStrSpImm imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
-    movImmToIp imm = ANN (text "Spill: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
-    addSpToIp = ANN (text "Spill: IP <- SP + IP ") $ ADD ip ip sp
-    mkStrIp = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ipReg))
+    mkStrSpImm imm =
+      ANN (text "Spill@" <> int (off - delta))
+        $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+    movImmToIp imm =
+      ANN (text "Spill: IP <- " <> int imm)
+        $ MOV ip (OpImm (ImmInt imm))
+    addSpToIp =
+      ANN (text "Spill: IP <- SP + IP ")
+        $ ADD ip ip sp
+    mkStrIp =
+      ANN (text "Spill@" <> int (off - delta))
+        $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ipReg))
 
     off = spillSlotToOffset slot
 
@@ -328,10 +336,18 @@ mkLoadInstr _config reg delta slot =
     fmt = case reg of
       RegReal (RealRegSingle n) | n < d0RegNo -> II64
       _ -> FF64
-    mkLdrSpImm imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
-    movImmToIp imm = ANN (text "Reload: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
-    addSpToIp = ANN (text "Reload: IP <- SP + IP ") $ ADD ip ip sp
-    mkLdrIp = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ipReg))
+    mkLdrSpImm imm =
+      ANN (text "Reload@" <> int (off - delta))
+        $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
+    movImmToIp imm =
+      ANN (text "Reload: IP <- " <> int imm)
+        $ MOV ip (OpImm (ImmInt imm))
+    addSpToIp =
+      ANN (text "Reload: IP <- SP + IP ")
+        $ ADD ip ip sp
+    mkLdrIp =
+      ANN (text "Reload@" <> int (off - delta))
+        $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ipReg))
 
     off = spillSlotToOffset slot
 
