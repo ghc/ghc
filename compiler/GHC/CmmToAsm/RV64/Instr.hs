@@ -1,3 +1,6 @@
+-- All instructions will be rendered eventually. Thus, there's no benefit in
+-- being lazy in data types.
+{-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module GHC.CmmToAsm.RV64.Instr where
