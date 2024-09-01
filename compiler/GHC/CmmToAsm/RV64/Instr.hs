@@ -71,6 +71,7 @@ regUsageOfInstr platform instr = case instr of
   MULTILINE_COMMENT {} -> usage ([], [])
   PUSH_STACK_FRAME -> usage ([], [])
   POP_STACK_FRAME -> usage ([], [])
+  LOCATION {} -> usage ([], [])
   DELTA {} -> usage ([], [])
   ADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   MUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -155,6 +156,7 @@ patchRegsOfInstr instr env = case instr of
   MULTILINE_COMMENT {} -> instr
   PUSH_STACK_FRAME -> instr
   POP_STACK_FRAME -> instr
+  LOCATION {} -> instr
   DELTA {} -> instr
   ADD o1 o2 o3 -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
   MUL o1 o2 o3 -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
@@ -255,23 +257,26 @@ patchJumpInstr instr patchF =
     _ -> panic $ "patchJumpInstr: " ++ instrCon instr
 
 -- -----------------------------------------------------------------------------
--- Note [Spills and Reloads]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~
--- We reserve @RESERVED_C_STACK_BYTES@ on the C stack for spilling and reloading
--- registers.  AArch64s maximum displacement for SP relative spills and reloads
--- is essentially [-256,255], or [0, 0xFFF]*8 = [0, 32760] for 64bits.
+-- Note [RISCV64 Spills and Reloads]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- The @RESERVED_C_STACK_BYTES@ is 16k, so we can't address any location in a
--- single instruction.  The idea is to use the Inter Procedure 0 (ip) register
--- to perform the computations for larger offsets.
+-- We reserve @RESERVED_C_STACK_BYTES@ on the C stack for spilling and reloading
+-- registers. The load and store instructions of RISCV64 address with a signed
+-- 12-bit immediate + a register; machine stackpointer (sp/x2) in this case.
+--
+-- The @RESERVED_C_STACK_BYTES@ is 16k, so we can't always address into it in a
+-- single load/store instruction. There are offsets to sp (not to be confused
+-- with STG's SP!) which need a register to be calculated.
 --
 -- Using sp to compute the offset will violate assumptions about the stack pointer
 -- pointing to the top of the stack during signal handling.  As we can't force
 -- every signal to use its own stack, we have to ensure that the stack pointer
 -- always points to the top of the stack, and we can't use it for computation.
 --
+-- So, we reserve one register (ip) for this purpose (and other, unrelated
+-- intermediate operations.) See Note [The made-up RISCV64 IP register]
 
--- | An instruction to spill a register into a spill slot.
+-- | Generate instructions to spill a register into a spill slot.
 mkSpillInstr ::
   (HasCallStack) =>
   NCGConfig ->
@@ -301,6 +306,7 @@ mkSpillInstr _config reg delta slot =
 
     off = spillSlotToOffset slot
 
+-- | Generate instructions to load a register from a spill slot.
 mkLoadInstr ::
   NCGConfig ->
   -- | register to load
