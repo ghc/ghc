@@ -31,6 +31,11 @@ else
     AC_MSG_RESULT([no])
     AC_MSG_WARN([\$LLVMAS ($LLVMAS) does not support host flags: $LlvmAsArgsHost.])
     AC_MSG_WARN([Falling back to no flags (won't be able to build stages for the host architecture with \$LLVMAS).])
+
+    # TODO: Delete this debug output
+    DEFAULT_TRIPLE=`clang -print-target-triple`
+    AC_MSG_WARN([Default target triple: $DEFAULT_TRIPLE])
+
     # Here LLVMAS cannot assemble for the host. I.e. we won't be able to use it
     # to build intermediate GHC stages (with host target). This ressembles old
     # behaviour and is added for backwards compatibility.
