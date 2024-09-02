@@ -5,6 +5,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -17,6 +18,7 @@
 module GHC.Driver.Make (
         depanal, depanalE, depanalPartial, checkHomeUnitsClosed,
         load, loadWithCache, load', AnyGhcDiagnostic, LoadHowMuch(..), ModIfaceCache(..), noIfaceCache, newIfaceCache,
+        computeBuildPlan,
         instantiationNodes,
 
         downsweep,
@@ -89,6 +91,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Fingerprint
+import GHC.Utils.Json
 import GHC.Utils.TmpFs
 
 import GHC.Types.Basic
@@ -116,6 +119,7 @@ import qualified Data.Set as Set
 import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
+import Control.Exception (evaluate)
 import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import qualified Control.Monad.Catch as MC
@@ -481,6 +485,15 @@ newIfaceCache = do
 load :: GhcMonad f => LoadHowMuch -> f SuccessFlag
 load how_much = loadWithCache noIfaceCache mkUnknownDiagnostic how_much
 
+computeBuildPlan :: GhcMonad m => m [BuildPlan]
+computeBuildPlan = do
+    (errs, mod_graph) <- depanalE [] False
+    unless (isEmptyMessages errs) $ throwErrors (fmap GhcDriverMessage errs)
+    modifySession $ \hsc_env -> hsc_env { hsc_mod_graph = mod_graph }
+    guessOutputFile
+
+    liftIO $ evaluate $ createBuildPlan mod_graph Nothing
+
 mkBatchMsg :: HscEnv -> Messager
 mkBatchMsg hsc_env =
   if length (hsc_all_home_unit_ids hsc_env) > 1
@@ -573,6 +586,19 @@ instance Outputable BuildPlan where
   ppr (ResolvedCycle mgn)   = text "ResolvedCycle:" <+> ppr mgn
   ppr (UnresolvedCycle mgn) = text "UnresolvedCycle:" <+> ppr mgn
 
+instance ToJson BuildPlan where
+  json (SingleModule mgn) = JSObject [
+    ("type", json "single-module"),
+    ("node", json mgn)
+    ]
+  json (ResolvedCycle mgn) = JSObject [
+    ("type", json "resolved-cycle"),
+    ("nodes", JSArray $ map (either json (\(ModuleGraphNodeWithBootFile mgn _) -> json mgn)) mgn)
+    ]
+  json (UnresolvedCycle mgn) = JSObject [
+    ("type", json "unresolved-cycle"),
+    ("nodes", JSArray $ map json mgn)
+    ]
 
 -- Just used for an assertion
 countMods :: BuildPlan -> Int
