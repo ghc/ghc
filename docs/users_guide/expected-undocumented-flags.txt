@@ -1,6 +1,7 @@
 -#include
 --abi-hash
 --backpack
+--buildplan
 --show-packages
 -Onot
 -Walternative-layout-rule-transitional

@@ -57,8 +57,10 @@ import GHC.Types.SourceFile ( hscSourceString )
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
+import GHC.Utils.Json
 import GHC.Utils.Outputable
 import GHC.Utils.Misc ( partitionWith )
+import GHC.Utils.Panic
 
 import System.FilePath
 import qualified Data.Map as Map
@@ -106,6 +108,22 @@ instance Outputable ModuleGraphNode where
     ModuleNode nks ms -> ppr (msKey ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
 
+instance ToJson ModuleGraphNode where
+  json (InstantiationNode {}) = panic "--buildplan: backpack not supported"
+  json (ModuleNode nks ms) = JSObject [
+    ("compile-or-link", json "compile"),
+    ("dependencies", JSArray $ map json nks),
+    ("unit_id", JSString $ unitIdString $ ms_unitid ms),
+    ("module_name", JSString $ moduleNameString $ moduleName $ ms_mod ms),
+    ("is_boot", JSBool $ isBootSummary ms == IsBoot),
+    ("hs_path", JSString $ normalise $ msHsFilePath ms)
+    ]
+  json (LinkNode nks uid) = JSObject [
+    ("compile-or-link", json "link"),
+    ("dependencies", JSArray $ map json nks),
+    ("unit_id", JSString $ unitIdString uid)
+    ]
+
 instance Eq ModuleGraphNode where
   (==) = (==) `on` mkNodeKey
 
@@ -119,6 +137,11 @@ data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit
 
 instance Outputable NodeKey where
   ppr nk = pprNodeKey nk
+
+instance ToJson NodeKey where
+  json (NodeKey_Unit {}) = panic "--buildplan: backpack not supported"
+  json (NodeKey_Module (ModNodeKeyWithUid mnwib uid)) = JSObject $ [("unit_id", JSString $ unitIdString uid), ("module_name", JSString $ moduleNameString $ gwib_mod mnwib), ("is_boot", JSBool $ gwib_isBoot mnwib == IsBoot)]
+  json (NodeKey_Link uid) = JSObject [("unit_id", JSString $ unitIdString uid)]
 
 pprNodeKey :: NodeKey -> SDoc
 pprNodeKey (NodeKey_Unit iu) = ppr iu
