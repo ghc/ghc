@@ -117,9 +117,11 @@ import GHC.Types.SourceFile ( hscSourceString, isHsigFile )
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types
+import GHC.Utils.Json
 import GHC.Utils.Outputable
 import GHC.Unit.Module.ModIface
 import GHC.Utils.Misc ( partitionWith )
+import GHC.Utils.Panic
 
 import System.FilePath
 import qualified Data.Map as Map
@@ -247,6 +249,29 @@ instance Outputable ModuleGraphNode where
     ModuleNode nks ms -> ppr (msKey ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
     UnitNode _ uid  -> text "P:" <+> ppr uid
+
+instance ToJson ModuleGraphNode where
+  json (InstantiationNode {}) = panic "--buildplan: backpack not supported"
+  json (ModuleNode nks ms) = JSObject [
+    ("node-kind", json "compile"),
+    ("dependencies", JSArray $ map json nks),
+    ("unit_id", JSString $ unitIdString $ ms_unitid ms),
+    ("module_name", JSString $ moduleNameString $ moduleName $ ms_mod ms),
+    ("is_boot", JSBool $ isBootSummary ms == IsBoot),
+    ("hs_path", JSString $ normalise $ msHsFilePath ms),
+    ("uses_th", JSBool $ isTemplateHaskellOrQQNonBoot ms)
+    ]
+  json (LinkNode nks uid) = JSObject [
+    ("node-kind", json "link"),
+    ("dependencies", JSArray $ map json nks),
+    ("unit_id", JSString $ unitIdString uid)
+    ]
+  json (UnitNode nks uid) = JSObject [
+    ("node-kind", json "unit"),
+    ("dependencies", JSArray $ map (JSString . unitIdString) nks),
+    ("unit_id", JSString $ unitIdString uid)
+    ]
+
 
 instance Eq ModuleGraphNode where
   (==) = (==) `on` mkNodeKey
@@ -479,6 +504,12 @@ instance Outputable NodeKey where
   ppr (NodeKey_Module mk) = ppr mk
   ppr (NodeKey_Link uid)  = ppr uid
   ppr (NodeKey_ExternalUnit uid) = ppr uid
+
+instance ToJson NodeKey where
+  json (NodeKey_Unit {}) = panic "--buildplan: backpack not supported"
+  json (NodeKey_Module (ModNodeKeyWithUid mnwib uid)) = JSObject $ [("unit_id", JSString $ unitIdString uid), ("module_name", JSString $ moduleNameString $ gwib_mod mnwib), ("is_boot", JSBool $ gwib_isBoot mnwib == IsBoot)]
+  json (NodeKey_Link uid) = JSObject [("unit_id", JSString $ unitIdString uid)]
+  json (NodeKey_ExternalUnit uid) = JSObject [("unit_id", JSString $ unitIdString uid)]
 
 mkNodeKey :: ModuleGraphNode -> NodeKey
 mkNodeKey = \case

@@ -28,6 +28,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
+import GHC.Driver.Make ( computeBuildPlan )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
@@ -68,6 +69,8 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Monad       ( liftIO, mapMaybeM )
 import GHC.Utils.Binary        ( openBinMem, put_ )
 import GHC.Utils.Logger
+import GHC.Utils.Json
+import qualified GHC.Utils.Ppr as Ppr
 
 import GHC.Settings.Config
 import GHC.Settings.Constants
@@ -182,6 +185,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
                DoEval _        -> (CompManager, interpreterBackend,  LinkInMemory)
                DoRun           -> (CompManager, interpreterBackend,  LinkInMemory)
                DoMake          -> (CompManager, dflt_backend, LinkBinary)
+               DoBuildPlan _   -> (CompManager, dflt_backend, LinkBinary)
                DoBackpack      -> (CompManager, dflt_backend, LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_backend, LinkBinary)
@@ -309,6 +313,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
                                                     (hsc_NC     hsc_env)
                                                     f
        DoMake                 -> doMake units srcs
+       DoBuildPlan f          -> doBuildPlan f units srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> ghciUI units srcs Nothing
@@ -502,6 +507,7 @@ data PostLoadMode
   | StopBefore StopPhase    -- ghc -E | -C | -S
                             -- StopBefore StopLn is the default
   | DoMake                  -- ghc --make
+  | DoBuildPlan FilePath    -- ghc --buildplan
   | DoBackpack              -- ghc --backpack foo.bkp
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
@@ -518,6 +524,9 @@ doInteractiveMode = mkPostLoadMode DoInteractive
 doRunMode = mkPostLoadMode DoRun
 doAbiHashMode = mkPostLoadMode DoAbiHash
 showUnitsMode = mkPostLoadMode ShowPackages
+
+doBuildPlanMode :: FilePath -> Mode
+doBuildPlanMode f = mkPostLoadMode (DoBuildPlan f)
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -584,6 +593,7 @@ isLinkMode _                   = False
 isCompManagerMode :: PostLoadMode -> Bool
 isCompManagerMode DoRun         = True
 isCompManagerMode DoMake        = True
+isCompManagerMode (DoBuildPlan _) = True
 isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
 isCompManagerMode _             = False
@@ -665,6 +675,7 @@ mode_flags =
   , defFlag "S"            (PassFlag (setMode (stopBeforeMode StopAs)))
   , defFlag "-run"         (PassFlag (setMode doRunMode))
   , defFlag "-make"        (PassFlag (setMode doMakeMode))
+  , defFlag "-buildplan"   (HasArg (\f -> setMode (doBuildPlanMode f) "--buildplan"))
   , defFlag "unit"         (SepArg   (\s -> addUnit s "-unit"))
   , defFlag "-backpack"    (PassFlag (setMode doBackpackMode))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
@@ -763,6 +774,23 @@ doMake units targets = do
       GHC.setTargets targets'
       ok_flag <- GHC.load LoadAllTargets
       when (failed ok_flag) (liftIO $ exitWith (ExitFailure 1))
+
+doBuildPlan :: FilePath -> [String] -> [(String, Maybe Phase)] -> Ghc ()
+doBuildPlan out units targets = do
+  hs_srcs <- case NE.nonEmpty units of
+    Just ne_units -> do
+      initMulti ne_units
+    Nothing -> do
+      s <- initMake targets
+      return $ map (uncurry (,Nothing,)) s
+  build_plan <- case hs_srcs of
+    [] -> pure []
+    _  -> do
+      targets' <- mapM (\(src, uid, phase) -> GHC.guessTarget src uid phase) hs_srcs
+      GHC.setTargets targets'
+      computeBuildPlan
+  liftIO $ withBinaryFile out WriteMode $ \h ->
+    printSDoc defaultSDocContext Ppr.OneLineMode h $ renderJSON $ JSArray $ map json build_plan
 
 initMake :: [(String,Maybe Phase)] -> Ghc [(String, Maybe Phase)]
 initMake srcs  = do
