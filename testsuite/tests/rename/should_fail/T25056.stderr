@@ -1,0 +1,5 @@
+T25056.hs:7:10: error: [GHC-01928]
+    • Illegal term-level use of the type constructor ‘T’
+    • imported from ‘T25056b’ at T25056.hs:4:1-14
+      (and originally defined in ‘T25056a’ at T25056a.hs:8:1-14)
+

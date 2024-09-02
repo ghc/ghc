@@ -280,7 +280,7 @@ tcLookupConLike name = do
     thing <- tcLookupGlobal name
     case thing of
         AConLike cl -> return cl
-        ATyCon tc   -> failIllegalTyCon WL_Constructor tc
+        ATyCon  {}  -> failIllegalTyCon WL_Constructor name
         _           -> wrongThingErr WrongThingConLike (AGlobal thing) name
 
 tcLookupRecSelParent :: HsRecUpdParent GhcRn -> TcM RecSelParent
@@ -353,19 +353,20 @@ instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
     lookupThing = tcLookupGlobal
 
 -- Illegal term-level use of type things
-failIllegalTyCon :: WhatLooking -> TyCon -> TcM a
+failIllegalTyCon :: WhatLooking -> Name -> TcM a
 failIllegalTyVal :: Name -> TcM a
 (failIllegalTyCon, failIllegalTyVal) = (fail_tycon, fail_tyvar)
   where
-    fail_tycon what_looking tc = do
+    fail_tycon what_looking tc_nm = do
       gre <- getGlobalRdrEnv
-      let nm = tyConName tc
-          pprov = case lookupGRE_Name gre nm of
+      let mb_gre = lookupGRE_Name gre tc_nm
+          pprov = case mb_gre of
                       Just gre -> nest 2 (pprNameProvenance gre)
                       Nothing  -> empty
-          err | isClassTyCon tc = ClassTE
-              | otherwise       = TyConTE
-      fail_with_msg what_looking dataName nm pprov err
+          err = case greInfo <$> mb_gre of
+            Just (IAmTyCon ClassFlavour) -> ClassTE
+            _ -> TyConTE
+      fail_with_msg what_looking dataName tc_nm pprov err
 
     fail_tyvar nm =
       let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc nm))
