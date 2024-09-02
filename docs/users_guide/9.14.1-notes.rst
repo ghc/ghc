@@ -23,6 +23,8 @@ Language
 Compiler
 ~~~~~~~~
 
+- An improved error message is introduced to refer users to the heap-controlling flags of the RTS when there is a heap overflow during compilation. (#25198)
+
 GHCi
 ~~~~
 

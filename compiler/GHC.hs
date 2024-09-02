@@ -483,6 +483,8 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
                          liftIO $ throwIO UserInterrupt
                      Just StackOverflow ->
                          fm "stack overflow: use +RTS -K<size> to increase it"
+                     Just HeapOverflow ->
+                         fm "heap overflow: use +RTS -M<size> to increase maximum heap size"
                      _ -> case fromException exception of
                           Just (ex :: ExitCode) -> liftIO $ throwIO ex
                           _ ->

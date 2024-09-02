@@ -1,0 +1,1 @@
+heap overflow: use +RTS -M<size> to increase maximum heap size
