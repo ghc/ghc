@@ -8,7 +8,4 @@ g1 :: Int -> Unit
 g1 Int = ()
 
 g2 :: Int
-g2 = Int{}
-
-g3 :: Int
-g3 = Int
+g2 = Int

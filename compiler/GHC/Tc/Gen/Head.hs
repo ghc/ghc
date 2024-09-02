@@ -841,7 +841,7 @@ tc_infer_id id_name
 
              AGlobal (AConLike (RealDataCon con)) -> tcInferDataCon con
              AGlobal (AConLike (PatSynCon ps)) -> tcInferPatSyn id_name ps
-             (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Anything tc -- TyCon or TcTyCon
+             (tcTyThingTyCon_maybe -> Just tc) -> failIllegalTyCon WL_Anything (tyConName tc)
              ATyVar name _ -> failIllegalTyVal name
 
              _ -> failWithTc $ TcRnExpectedValueId thing }

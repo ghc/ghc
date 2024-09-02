@@ -442,6 +442,7 @@ lookupConstructorInfo con_name
        ; case info of
             IAmConLike con_info -> return con_info
             UnboundGRE          -> return $ ConInfo (ConIsData []) ConHasPositionalArgs
+            IAmTyCon {}         -> failIllegalTyCon WL_Constructor con_name
             _ -> pprPanic "lookupConstructorInfo: not a ConLike" $
                       vcat [ text "name:" <+> ppr con_name ]
        }
@@ -1035,24 +1036,12 @@ lookupOccRn' which_suggest rdr_name
 lookupOccRn :: RdrName -> RnM Name
 lookupOccRn = lookupOccRn' WL_Anything
 
--- lookupOccRnConstr looks up an occurrence of a RdrName and displays
--- constructors and pattern synonyms as suggestions if it is not in scope
+-- | Look up an occurrence of a 'RdrName'.
 --
--- There is a fallback to the type level, when the first lookup fails.
--- This is required to implement a pat-to-type transformation
--- (See Note [Pattern to type (P2T) conversion] in GHC.Tc.Gen.Pat)
--- Consider this example:
+-- Displays constructors and pattern synonyms as suggestions if
+-- it is not in scope.
 --
---   data VisProxy a where VP :: forall a -> VisProxy a
---
---   f :: VisProxy Int -> ()
---   f (VP Int) = ()
---
--- Here `Int` is actually a type, but it stays on position where
--- we expect a data constructor.
---
--- In all other cases we just use this additional lookup for better
--- error messaging (See Note [Promotion]).
+-- See Note [lookupOccRnConstr]
 lookupOccRnConstr :: RdrName -> RnM Name
 lookupOccRnConstr rdr_name
   = do { mb_gre <- lookupOccRn_maybe rdr_name
@@ -1063,6 +1052,28 @@ lookupOccRnConstr rdr_name
             ; case mb_ty_gre of
               Just gre -> return $ greName gre
               Nothing ->  reportUnboundName' WL_Constructor rdr_name} }
+
+{- Note [lookupOccRnConstr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lookupOccRnConstr looks up a data constructor or pattern synonym. Simple.
+
+However, there is a fallback to the type level when the lookup fails.
+This is required to implement a pat-to-type transformation
+(See Note [Pattern to type (P2T) conversion] in GHC.Tc.Gen.Pat)
+
+Consider this example:
+
+  data VisProxy a where VP :: forall a -> VisProxy a
+
+  f :: VisProxy Int -> ()
+  f (VP Int) = ()
+
+Here `Int` is actually a type, but it occurs in a position in which we expect
+a data constructor.
+
+In all other cases we just use this additional lookup for better
+error messaging (See Note [Promotion]).
+-}
 
 -- lookupOccRnRecField looks up an occurrence of a RdrName and displays
 -- record fields as suggestions if it is not in scope
