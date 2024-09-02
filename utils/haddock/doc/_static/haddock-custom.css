@@ -1,8 +1,16 @@
 .result.admonition {
-  background-color: #fcf8e3;
-  border-color: #eee;
-  padding: 10px 30px;
-  margin: 20px 0px;
+  border: solid 3px #eee;
+  border-top: none;
+  background-color: transparent;
+  padding: 1px 0px 10px 10px;
+  margin: 0px 0px -20px 0px;
+  position: relative;
+  top: -18px;
+}
+
+.result.admonition p.admonition-title{
+  position: absolute;
+  visibility: hidden;
 }
 
 /* Use a small font size for code blocks so that they don't overflow. */
