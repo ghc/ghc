@@ -1,0 +1,32 @@
+T21752A.hs:4:5: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘newBCO#’ (imported from GHC.Exts):
+    Deprecated: "The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14
+                 These symbols should be imported from ghc-internal instead if needed."
+
+T21752A.hs:4:5: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘newBCO#’ (imported from GHC.Exts):
+    Deprecated: "The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14
+                 These symbols should be imported from ghc-internal instead if needed."
+
+T21752A.hs:4:5: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘mkApUpd0#’ (imported from GHC.Exts):
+    Deprecated: "The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14
+                 These symbols should be imported from ghc-internal instead if needed."
+
+T21752A.hs:4:5: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of ‘mkApUpd0#’ (imported from GHC.Exts):
+    Deprecated: "The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14
+                 These symbols should be imported from ghc-internal instead if needed."
+
+T21752A.hs:4:5: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘BCO’
+    (imported from GHC.Exts):
+    Deprecated: "The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14
+                 These symbols should be imported from ghc-internal instead if needed."
+
+T21752A.hs:4:5: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘BCO’
+    (imported from GHC.Exts):
+    Deprecated: "The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14
+                 These symbols should be imported from ghc-internal instead if needed."
+

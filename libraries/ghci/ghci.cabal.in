@@ -86,9 +86,10 @@ library
         array            == 0.5.*,
         base             >= 4.8 && < 4.21,
         -- ghc-internal     == @ProjectVersionForLib@.*
-        -- TODO: Use GHC.Internal.Desugar from ghc-internal instead of ignoring
-        -- the deprecation warning of GHC.Desugar when we require ghc-internal
-        -- of the bootstrap compiler
+        -- TODO: Use GHC.Internal.Desugar and GHC.Internal.Base from
+        -- ghc-internal instead of ignoring the deprecation warning in GHCi.TH
+        -- and GHCi.CreateBCO when we require ghc-internal of the bootstrap
+        -- compiler
         ghc-prim         >= 0.5.0 && < 0.12,
         binary           == 0.8.*,
         bytestring       >= 0.10 && < 0.13,
