@@ -258,8 +258,10 @@ instance Show a => Show (ExceptionWithContext a) where
 
 instance Exception a => Exception (ExceptionWithContext a) where
     toException (ExceptionWithContext ctxt e) =
-        SomeException e
-      where ?exceptionContext = ctxt
+        case toException e of
+          SomeException c ->
+            let ?exceptionContext = ctxt
+            in SomeException c
     fromException se = do
         e <- fromException se
         return (ExceptionWithContext (someExceptionContext se) e)
