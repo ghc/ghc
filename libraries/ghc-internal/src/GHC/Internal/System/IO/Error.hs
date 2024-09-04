@@ -90,6 +90,7 @@ import GHC.Internal.Data.Either
 import GHC.Internal.Data.Maybe
 
 import GHC.Internal.Base
+import GHC.Internal.Exception.Type
 import GHC.Internal.IO
 import GHC.Internal.IO.Exception
 import GHC.Internal.IO.Handle.Types
@@ -320,7 +321,7 @@ ioeSetFileName    ioe filename = ioe{ ioe_filename = Just filename }
 -- | Catch any 'IOError' that occurs in the computation and throw a
 -- modified version.
 modifyIOError :: (IOError -> IOError) -> IO a -> IO a
-modifyIOError f io = catch io (\e -> ioError (f e))
+modifyIOError f io = catch io (\e -> throwIO (NoBacktrace $ f e))
 
 -- -----------------------------------------------------------------------------
 -- annotating an IOError

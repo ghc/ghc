@@ -79,6 +79,7 @@ import GHC.Internal.Real
 import GHC.Internal.Word
 import GHC.Internal.Base
 import GHC.Internal.Exception
+import GHC.Internal.Exception.Type
 import GHC.Internal.Num          ( Num(..) )
 import GHC.Internal.Show
 import GHC.Internal.IORef
@@ -178,13 +179,13 @@ do_operation :: String -> Handle -> (Handle__ -> IO a) -> MVar Handle__ -> IO a
 do_operation fun h act m = do
   h_ <- takeMVar m
   checkHandleInvariants h_
-  act h_ `catchException` handler h_
+  act h_ `catchExceptionNoPropagate` handler h_
   where
-    handler h_ e = do
+    handler h_ (ExceptionWithContext c e) = do
       putMVar m h_
       case () of
         _ | Just ioe <- fromException e ->
-            ioError (augmentIOError ioe fun h)
+            rethrowIO (ExceptionWithContext c $ augmentIOError ioe fun h)
         _ | Just async_ex <- fromException e -> do -- see Note [async]
             let _ = async_ex :: SomeAsyncException
             t <- myThreadId

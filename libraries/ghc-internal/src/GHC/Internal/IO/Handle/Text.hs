@@ -41,6 +41,7 @@ import GHC.Internal.IO.Buffer
 import qualified GHC.Internal.IO.BufferedIO as Buffered
 import GHC.Internal.IO.Exception
 import GHC.Internal.Exception
+import GHC.Internal.Exception.Type
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.IO.Handle.Internals
 import qualified GHC.Internal.IO.Device as IODevice
@@ -495,7 +496,7 @@ hGetContents' handle = do
       Left e ->
           case fromException e of
             Just ioe -> throwIO (augmentIOError ioe "hGetContents'" handle)
-            Nothing -> throwIO e
+            Nothing -> throwIO (NoBacktrace e)
 
 strictRead :: Handle -> Handle__ -> IO (Handle__, Either SomeException String)
 strictRead h handle_@Handle__{..} = do

@@ -38,6 +38,8 @@ module Control.Exception
      someExceptionContext,
      annotateIO,
      ExceptionWithContext(..),
+     WhileHandling(..),
+
      -- * Concrete exception types
      IOException,
      ArithException(..),
@@ -65,6 +67,7 @@ module Control.Exception
      -- *  Throwing exceptions
      throw,
      throwIO,
+     rethrowIO,
      ioError,
      throwTo,
      -- *  Catching Exceptions
@@ -73,6 +76,7 @@ module Control.Exception
      -- $catchall
      -- **  The @catch@ functions
      catch,
+     catchNoPropagate,
      catches,
      Handler(..),
      catchJust,
@@ -81,6 +85,7 @@ module Control.Exception
      handleJust,
      -- **  The @try@ functions
      try,
+     tryWithContext,
      tryJust,
      -- **  The @evaluate@ function
      evaluate,
@@ -111,11 +116,11 @@ module Control.Exception
      bracketOnError,
      finally,
      onException
+
      ) where
 
 import GHC.Internal.Control.Exception
 import GHC.Internal.Exception.Type
-import GHC.Internal.IO (annotateIO)
 
 {- $catching
 

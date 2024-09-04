@@ -1,4 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -27,12 +28,13 @@ module GHC.Internal.IO.Handle.FD (
 
 import GHC.Internal.Base
 import GHC.Internal.Show
-import GHC.Internal.Control.Exception (try)
+import GHC.Internal.Control.Exception (tryWithContext)
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Either (either)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.MVar
+import GHC.Internal.Exception.Type
 import GHC.Internal.IO
 import GHC.Internal.IO.Encoding
 import GHC.Internal.IO.Device as IODevice
@@ -116,6 +118,18 @@ addFilePathToIOError :: String -> FilePath -> IOException -> IOException
 addFilePathToIOError fun fp ioe
   = ioe{ ioe_location = fun, ioe_filename = Just fp }
 
+-- It could be good in future to use native exception annotation here rather than
+-- modifying IOException
+catchAndAnnotate :: FilePath -> String -> IO a -> IO a
+catchAndAnnotate fp s a =
+  catchExceptionNoPropagate @IOError a
+    (\(ExceptionWithContext c e) -> rethrowIO (ExceptionWithContext c (addFilePathToIOError s fp e)))
+
+-- | Specialised 'rethrowIO' to 'IOError', helpful for type inference
+rethrowError :: ExceptionWithContext IOError -> IO a
+rethrowError = rethrowIO
+
+
 -- | Computation 'openFile' @file mode@ allocates and returns a new, open
 -- handle to manage the file @file@.  It manages input if @mode@
 -- is 'ReadMode', output if @mode@ is 'WriteMode' or 'AppendMode',
@@ -151,9 +165,9 @@ addFilePathToIOError fun fp ioe
 -- be using 'openBinaryFile'.
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im =
-  catchException
+  catchAndAnnotate
+    fp "openFile"
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True)
-    (\e -> ioError (addFilePathToIOError "openFile" fp e))
 
 -- | @'withFile' name mode act@ opens a file like 'openFile' and passes
 -- the resulting handle to the computation @act@.  The handle will be
@@ -166,10 +180,9 @@ openFile fp im =
 withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFile fp im act = do
   -- Only annotate when setup or teardown of withFile' raised the exception
-  catchException
-    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True (try . act))
-    (\e -> ioError (addFilePathToIOError "withFile" fp e))
-    >>= either ioError pure
+  catchAndAnnotate fp "withFile"
+    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True (tryWithContext . act))
+    >>= either rethrowError pure
 
 -- | Like 'openFile', but opens the file in ordinary blocking mode.
 -- This can be useful for opening a FIFO for writing: if we open in
@@ -187,9 +200,8 @@ withFile fp im act = do
 -- @since base-4.4.0.0
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking fp im =
-  catchException
+  catchAndAnnotate fp "openFileBlocking"
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False)
-    (\e -> ioError (addFilePathToIOError "openFileBlocking" fp e))
 
 -- | @'withFileBlocking' name mode act@ opens a file like 'openFileBlocking'
 -- and passes the resulting handle to the computation @act@.  The handle will
@@ -202,10 +214,9 @@ openFileBlocking fp im =
 withFileBlocking :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFileBlocking fp im act = do
   -- Only annotate when setup or teardown of withFile' raised the exception
-  catchException
-    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False (try . act))
-    (\e -> ioError (addFilePathToIOError "withFileBlocking" fp e))
-    >>= either ioError pure
+  catchAndAnnotate fp "withFileBlocking"
+    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False (tryWithContext . act))
+    >>= either rethrowError pure
 
 -- | Like 'openFile', but open the file in binary mode.
 -- On Windows, reading a file in text mode (which is the default)
@@ -220,9 +231,8 @@ withFileBlocking fp im act = do
 -- described in "Control.Exception".
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
-  catchException
+  catchAndAnnotate fp "openBinaryFile"
     (openFile' fp m True True)
-    (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
 -- | A version of `openBinaryFile` that takes an action to perform
 -- with the handle. If an exception occurs in the action, then
@@ -234,10 +244,9 @@ openBinaryFile fp m =
 withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withBinaryFile fp im act =
   -- Only annotate when setup or teardown of withFile' raised the exception
-  catchException
-    (withFile' fp im True True (try . act))
-    (\e -> ioError (addFilePathToIOError "withBinaryFile" fp e))
-    >>= either ioError pure
+  catchAndAnnotate fp "withBinaryFile"
+    (withFile' fp im True True (tryWithContext . act))
+    >>= either rethrowError pure
 
 -- | Open a file and perform an action with it. If the action throws an
 -- exception, then the file will be closed. If the last argument is 'True',

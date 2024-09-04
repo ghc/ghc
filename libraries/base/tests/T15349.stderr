@@ -6,10 +6,14 @@ Package: ghc-internal
 Module: GHC.Internal.Control.Exception.Base
 Type: NonTermination
 
+While handling thread blocked indefinitely in an MVar operation
+  |
+  | Package: ghc-internal
+  | Module: GHC.Internal.IO.Exception
+  | Type: BlockedIndefinitelyOnMVar
+
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
-    throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/ST/Imp.hs:58:37 in ghc-internal:GHC.Internal.Control.Monad.ST.Imp
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:284:11 in ghc-internal:GHC.Internal.IO
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/ST/Imp.hs:58:37 in ghc-internal:GHC.Internal.Control.Monad.ST.Imp
 

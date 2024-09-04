@@ -22,6 +22,14 @@
     and [CLC proposal #261](https://github.com/haskell/core-libraries-committee/issues/261))
   * The [deprecation process of GHC.Pack](https://gitlab.haskell.org/ghc/ghc/-/issues/21461) has come its term. The module has now been removed from `base`.
   * Propagate HasCallStack from `errorCallWithCallStackException` to exception backtraces, fixing a bug in the implementation of [CLC proposal #164](https://github.com/haskell/core-libraries-committee/issues/164).
+  * Annotate re-thrown exceptions with the backtrace as per [CLC proposal #202](https://github.com/haskell/core-libraries-committee/issues/202) (introduces `WhileHandling` and modifies such as `catch` and `onException` accordingly to propagate or rethrow exceptions)
+  * Introduced `catchNoPropagate`, `rethrowIO` and `tryWithContext` as part of
+      [CLC proposal #202](https://github.com/haskell/core-libraries-committee/issues/202) to
+      facilitate *re*throwing exceptions without adding a `WhileHandling`
+      context -- if *re*throwing `e`, you don't want to add `WhileHandling e` to
+      the context since it will be redundant. These functions are mostly useful
+      for libraries that define exception-handling combinators like `catch` and
+      `onException`, such as `base`, or the `exceptions` package.
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1

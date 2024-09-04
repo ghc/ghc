@@ -62,13 +62,17 @@ module GHC.Internal.Control.Exception (
         -- * Throwing exceptions
         throw,
         throwIO,
+        rethrowIO,
         ioError,
         throwTo,
 
         -- ** The @catch@ functions
         catch,
+        catchNoPropagate,
         catches, Handler(..),
         catchJust,
+
+        -- ** Exception annotation
 
         -- ** The @handle@ functions
         handle,
@@ -76,6 +80,7 @@ module GHC.Internal.Control.Exception (
 
         -- ** The @try@ functions
         try,
+        tryWithContext,
         tryJust,
 
         -- ** The @evaluate@ function
@@ -104,6 +109,12 @@ module GHC.Internal.Control.Exception (
 
         finally,
         onException,
+
+        -- * Annotating exceptions
+
+        ExceptionContext(..),
+        annotateIO,
+        WhileHandling(..),
 
   ) where
 

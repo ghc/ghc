@@ -46,6 +46,7 @@ module GHC.Internal.Control.Exception.Base (
 
         -- * Throwing exceptions
         throwIO,
+        rethrowIO,
         throw,
         ioError,
         throwTo,
@@ -54,6 +55,7 @@ module GHC.Internal.Control.Exception.Base (
 
         -- ** The @catch@ functions
         catch,
+        catchNoPropagate,
         catchJust,
 
         -- ** The @handle@ functions
@@ -62,6 +64,7 @@ module GHC.Internal.Control.Exception.Base (
 
         -- ** The @try@ functions
         try,
+        tryWithContext,
         tryJust,
         onException,
 
@@ -85,6 +88,13 @@ module GHC.Internal.Control.Exception.Base (
 
         assert,
 
+        -- * Annotating exceptions
+
+        ExceptionContext(..),
+        annotateIO,
+        WhileHandling(..),
+
+
         -- * Utilities
 
         bracket,
@@ -105,6 +115,7 @@ import           GHC.Internal.Base
 import           GHC.Internal.Exception
 import           GHC.Internal.IO           hiding (bracket, finally, onException)
 import           GHC.Internal.IO.Exception
+import           GHC.Internal.Exception.Type
 import           GHC.Internal.Show
 -- import GHC.Internal.Exception hiding ( Exception )
 import           GHC.Internal.Conc.Sync
@@ -132,10 +143,11 @@ catchJust
         -> IO a                   -- ^ Computation to run
         -> (b -> IO a)            -- ^ Handler
         -> IO a
-catchJust p a handler = catch a handler'
-  where handler' e = case p e of
-                        Nothing -> throwIO e
-                        Just b  -> handler b
+catchJust p a handler = catchNoPropagate a handler'
+  where handler' ec@(ExceptionWithContext _ e) =
+                    case p e of
+                        Nothing -> rethrowIO ec
+                        Just b  -> annotateIO (whileHandling ec) (handler b)
 
 -- | A version of 'catch' with the arguments swapped around; useful in
 -- situations where the code for the handler is shorter.  For example:
@@ -176,23 +188,23 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 try :: Exception e => IO a -> IO (Either e a)
 try a = catch (a >>= \ v -> return (Right v)) (\e -> return (Left e))
 
+-- | Like 'try' but also returns the exception context, which is useful if you intend
+-- to rethrow the exception later.
+tryWithContext :: Exception e => IO a -> IO (Either (ExceptionWithContext e) a)
+tryWithContext a = catchNoPropagate (a >>= \v -> return (Right v)) (\e -> return (Left e))
+
 -- | A variant of 'try' that takes an exception predicate to select
 -- which exceptions are caught (c.f. 'catchJust').  If the exception
 -- does not match the predicate, it is re-thrown.
 tryJust :: Exception e => (e -> Maybe b) -> IO a -> IO (Either b a)
-tryJust p a = do
-  r <- try a
-  case r of
-        Right v -> return (Right v)
-        Left  e -> case p e of
-                        Nothing -> throwIO e
-                        Just b  -> return (Left b)
+tryJust p a = catchJust p (Right `fmap` a) (return . Left)
 
 -- | Like 'finally', but only performs the final action if there was an
 -- exception raised by the computation.
 onException :: IO a -> IO b -> IO a
-onException io what = io `catch` \e -> do _ <- what
-                                          throwIO (e :: SomeException)
+onException io what = io `catchNoPropagate` \e -> do
+                        _ <- what
+                        rethrowIO (e :: ExceptionWithContext SomeException)
 
 -----------------------------------------------------------------------------
 -- Some Useful Functions

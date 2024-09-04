@@ -315,7 +315,7 @@ ioException     :: HasCallStack => IOException -> IO a
 ioException err = throwIO err
 
 -- | Raise an 'IOError' in the 'IO' monad.
-ioError         :: IOError -> IO a
+ioError         :: HasCallStack => IOError -> IO a
 ioError         =  ioException
 
 -- ---------------------------------------------------------------------------
