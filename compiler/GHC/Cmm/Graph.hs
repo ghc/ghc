@@ -73,12 +73,12 @@ data CgStmt
   | CgLast  (CmmNode O C)
   | CgFork  BlockId CmmAGraph CmmTickScope
 
-flattenCmmAGraph :: BlockId -> CmmAGraphScoped -> CmmGraph
+flattenCmmAGraph :: BlockId -> CmmAGraphScoped -> DCmmGraph
 flattenCmmAGraph id (stmts_t, tscope) =
     CmmGraph { g_entry = id,
                g_graph = GMany NothingO body NothingO }
   where
-  body = foldr addBlock emptyBody $ flatten id stmts_t tscope []
+  body = DWrap [(entryLabel b, b) | b <- flatten id stmts_t tscope [] ]
 
   --
   -- flatten: given an entry label and a CmmAGraph, make a list of blocks.
@@ -169,13 +169,13 @@ outOfLine      :: BlockId -> CmmAGraphScoped -> CmmAGraph
 outOfLine l (c,s) = unitOL (CgFork l c s)
 
 -- | allocate a fresh label for the entry point
-lgraphOfAGraph :: CmmAGraphScoped -> UniqDSM CmmGraph
+lgraphOfAGraph :: CmmAGraphScoped -> UniqDSM DCmmGraph
 lgraphOfAGraph g = do
   u <- getUniqueDSM
   return (labelAGraph (mkBlockId u) g)
 
 -- | use the given BlockId as the label of the entry point
-labelAGraph    :: BlockId -> CmmAGraphScoped -> CmmGraph
+labelAGraph    :: BlockId -> CmmAGraphScoped -> DCmmGraph
 labelAGraph lbl ag = flattenCmmAGraph lbl ag
 
 ---------- No-ops

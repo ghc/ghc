@@ -20,7 +20,7 @@ import GHC.Driver.Env.Types (HscEnv)
 import GHC.Driver.Flags (GeneralFlag (..), DumpFlag(Opt_D_ipe_stats))
 import GHC.Driver.DynFlags (gopt, targetPlatform)
 import GHC.Driver.Config.StgToCmm
-import GHC.Driver.Config.Cmm
+import GHC.Driver.Config.Cmm ( initCmmConfig )
 import GHC.Prelude
 import GHC.Runtime.Heap.Layout (isStackRep)
 import GHC.Settings (platformTablesNextToCode)
@@ -213,7 +213,9 @@ generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesW
   let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
       ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv')
 
-  (_, ipeCmmGroupSRTs) <- liftEff $ withDUS $ cmmPipeline logger cmm_cfg (emptySRT this_mod) ipeCmmGroup
+  -- TODO: Renaming here
+
+  (_, ipeCmmGroupSRTs) <- liftEff $ withDUS $ cmmPipeline logger cmm_cfg (emptySRT this_mod) (removeDeterm ipeCmmGroup)
   Stream.yield ipeCmmGroupSRTs
 
   ipeStub <-
