@@ -19,6 +19,7 @@ import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import GHC.Cmm.Dataflow.Label
 
 import Data.Maybe (fromMaybe)
 
@@ -29,7 +30,7 @@ data Env = Env { platform :: Platform
 annotateTSAN :: Platform -> CmmGraph -> UniqSM CmmGraph
 annotateTSAN platform graph = do
     env <- Env platform <$> getUniqueSupplyM
-    return $ modifyGraph (mapGraphBlocks (annotateBlock env)) graph
+    return $ modifyGraph (mapGraphBlocks mapMap (annotateBlock env)) graph
 
 mapBlockList :: (forall e' x'. n e' x' -> Block n e' x')
              -> Block n e x -> Block n e x

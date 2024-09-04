@@ -14,7 +14,7 @@
 module GHC.CmmToAsm.Reg.Liveness (
         RegSet,
         RegMap, emptyRegMap,
-        BlockMap, mapEmpty,
+        BlockMap,
         LiveCmmDecl,
         InstrSR   (..),
         LiveInstr (..),
@@ -260,7 +260,7 @@ instance OutputableP Platform LiveInfo where
         =  (pdoc env mb_static)
         $$ text "# entryIds         = " <> ppr entryIds
         $$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
-        $$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)
+        $$ text "# liveSlotsOnEntry = " <> ppr liveSlotsOnEntry
 
 
 
