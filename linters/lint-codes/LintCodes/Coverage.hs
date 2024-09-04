@@ -32,7 +32,7 @@ import System.Directory
 
 -- filepath
 import System.FilePath
-  ( (</>), takeExtension )
+  ( (</>), normalise, takeExtension )
 
 -- ghc
 import GHC.Types.Error
@@ -63,7 +63,7 @@ getCoveredCodes =
   do { top <- dropWhileEnd isSpace
           <$> readProcess "git" ["rev-parse", "--show-toplevel"] ""
        -- TODO: would be better to avoid using git entirely.
-     ; let testRoot = top </> "testsuite" </> "tests"
+     ; let testRoot = normalise $ top </> "testsuite" </> "tests"
      ; traverseFilesFrom includeFile diagnosticCodesIn testRoot
      }
 
