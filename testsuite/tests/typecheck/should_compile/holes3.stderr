@@ -1,4 +1,3 @@
-
 holes3.hs:3:5: error: [GHC-88464]
     • Found hole: _ :: p
       Where: ‘p’ is a rigid type variable bound by
@@ -95,7 +94,9 @@ holes3.hs:11:15: error: [GHC-88464]
         asTypeOf :: forall a. a -> a -> a
         id :: forall a. a -> a
         until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
-        ioError :: forall a. IOError -> IO a
+        ioError :: forall a.
+                   GHC.Internal.Stack.Types.HasCallStack =>
+                   IOError -> IO a
         (!!) :: forall a.
                 GHC.Internal.Stack.Types.HasCallStack =>
                 [a] -> Int -> a
@@ -207,3 +208,4 @@ holes3.hs:11:15: error: [GHC-88464]
         flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         zipWith3 :: forall a b c d.
                     (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
+

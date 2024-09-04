@@ -27,12 +27,12 @@ instance [safe] Eq w => Eq (Maybe w)
   -- Defined in ‘GHC.Internal.Maybe’
 instance GHC.Internal.Generics.Generic [w]
   -- Defined in ‘GHC.Internal.Generics’
-instance Monoid [w] -- Defined in ‘GHC.Internal.Base’
-instance Semigroup [w] -- Defined in ‘GHC.Internal.Base’
 instance Read w => Read [w] -- Defined in ‘GHC.Internal.Read’
 instance Eq w => Eq [w] -- Defined in ‘GHC.Classes’
 instance Ord w => Ord [w] -- Defined in ‘GHC.Classes’
 instance Show w => Show [w] -- Defined in ‘GHC.Internal.Show’
+instance Monoid [w] -- Defined in ‘GHC.Internal.Base’
+instance Semigroup [w] -- Defined in ‘GHC.Internal.Base’
 instance [safe] MyShow w => MyShow [w]
   -- Defined at ghci064.hs:8:10
 instance GHC.Internal.Generics.Generic [T]
