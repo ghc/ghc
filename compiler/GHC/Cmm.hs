@@ -12,22 +12,28 @@
 
 module GHC.Cmm (
      -- * Cmm top-level datatypes
+     DCmmGroup,
      CmmProgram, CmmGroup, CmmGroupSRTs, RawCmmGroup, GenCmmGroup,
-     CmmDecl, CmmDeclSRTs, GenCmmDecl(..),
-     CmmDataDecl, cmmDataDeclCmmDecl,
-     CmmGraph, GenCmmGraph(..),
+     CmmDecl, DCmmDecl, CmmDeclSRTs, GenCmmDecl(..),
+     CmmDataDecl, cmmDataDeclCmmDecl, DCmmGraph,
+     CmmGraph, GenCmmGraph, GenGenCmmGraph(..),
      toBlockMap, revPostorder, toBlockList,
      CmmBlock, RawCmmDecl,
      Section(..), SectionType(..),
      GenCmmStatics(..), type CmmStatics, type RawCmmStatics, CmmStatic(..),
      SectionProtection(..), sectionProtection,
 
+     DWrap(..), unDeterm, removeDeterm, removeDetermDecl, removeDetermGraph,
+
      -- ** Blocks containing lists
      GenBasicBlock(..), blockId,
      ListGraph(..), pprBBlock,
 
      -- * Info Tables
-     CmmTopInfo(..), CmmStackInfo(..), CmmInfoTable(..), topInfoTable,
+     GenCmmTopInfo(..)
+     , DCmmTopInfo
+     , CmmTopInfo
+     , CmmStackInfo(..), CmmInfoTable(..), topInfoTable, topInfoTableD,
      ClosureTypeInfo(..),
      ProfilingInfo(..), ConstrDescription,
 
@@ -74,6 +80,8 @@ import qualified Data.ByteString as BS
 type CmmProgram = [CmmGroup]
 
 type GenCmmGroup d h g = [GenCmmDecl d h g]
+-- | Cmm group after STG generation
+type DCmmGroup    = GenCmmGroup CmmStatics    DCmmTopInfo              DCmmGraph
 -- | Cmm group before SRT generation
 type CmmGroup     = GenCmmGroup CmmStatics    CmmTopInfo               CmmGraph
 -- | Cmm group with SRTs
@@ -117,6 +125,7 @@ instance (OutputableP Platform d, OutputableP Platform info, OutputableP Platfor
       => OutputableP Platform (GenCmmDecl d info i) where
     pdoc = pprTop
 
+type DCmmDecl    = GenCmmDecl CmmStatics DCmmTopInfo DCmmGraph
 type CmmDecl     = GenCmmDecl CmmStatics    CmmTopInfo CmmGraph
 type CmmDeclSRTs = GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
 type CmmDataDecl = GenCmmDataDecl CmmStatics
@@ -139,7 +148,11 @@ type RawCmmDecl
 -----------------------------------------------------------------------------
 
 type CmmGraph = GenCmmGraph CmmNode
-data GenCmmGraph n = CmmGraph { g_entry :: BlockId, g_graph :: Graph n C C }
+type DCmmGraph = GenGenCmmGraph DWrap CmmNode
+
+type GenCmmGraph n = GenGenCmmGraph LabelMap n
+
+data GenGenCmmGraph s n = CmmGraph { g_entry :: BlockId, g_graph :: Graph' s Block n C C }
 type CmmBlock = Block CmmNode C C
 
 instance OutputableP Platform CmmGraph where
@@ -171,8 +184,16 @@ toBlockList g = mapElems $ toBlockMap g
 
 -- | CmmTopInfo is attached to each CmmDecl (see defn of CmmGroup), and contains
 -- the extra info (beyond the executable code) that belongs to that CmmDecl.
-data CmmTopInfo   = TopInfo { info_tbls  :: LabelMap CmmInfoTable
-                            , stack_info :: CmmStackInfo }
+data GenCmmTopInfo f = TopInfo { info_tbls  :: f CmmInfoTable
+                               , stack_info :: CmmStackInfo }
+
+newtype DWrap a = DWrap [(BlockId, a)]
+
+unDeterm :: DWrap a -> [(BlockId, a)]
+unDeterm (DWrap f) = f
+
+type DCmmTopInfo = GenCmmTopInfo DWrap
+type CmmTopInfo  = GenCmmTopInfo LabelMap
 
 instance OutputableP Platform CmmTopInfo where
     pdoc = pprTopInfo
@@ -182,7 +203,12 @@ pprTopInfo platform (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
   vcat [text "info_tbls: " <> pdoc platform info_tbl,
         text "stack_info: " <> ppr stack_info]
 
-topInfoTable :: GenCmmDecl a CmmTopInfo (GenCmmGraph n) -> Maybe CmmInfoTable
+topInfoTableD :: GenCmmDecl a DCmmTopInfo (GenGenCmmGraph s n) -> Maybe CmmInfoTable
+topInfoTableD (CmmProc infos _ _ g) = case (info_tbls infos) of
+                                          DWrap xs -> lookup (g_entry g) xs
+topInfoTableD _                     = Nothing
+
+topInfoTable :: GenCmmDecl a CmmTopInfo (GenGenCmmGraph s n) -> Maybe CmmInfoTable
 topInfoTable (CmmProc infos _ _ g) = mapLookup (g_entry g) (info_tbls infos)
 topInfoTable _                     = Nothing
 
@@ -237,6 +263,7 @@ data ProfilingInfo
   = NoProfilingInfo
   | ProfilingInfo ByteString ByteString -- closure_type, closure_desc
   deriving (Eq, Ord)
+
 -----------------------------------------------------------------------------
 --              Static Data
 -----------------------------------------------------------------------------
@@ -327,6 +354,61 @@ instance OutputableP Platform (GenCmmStatics a) where
 
 type CmmStatics    = GenCmmStatics 'False
 type RawCmmStatics = GenCmmStatics 'True
+
+{-
+-----------------------------------------------------------------------------
+--              Deterministic Cmm / Info Tables
+-----------------------------------------------------------------------------
+
+Note [DCmmGroup vs CmmGroup or: Deterministic Info Tables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consulting Note [Object determinism] one will learn that in order to produce
+deterministic objects just after cmm is produced we perform a renaming pass which
+provides fresh uniques for all unique-able things in the input Cmm.
+
+After this point, we use a deterministic unique supply (an incrementing counter)
+so any resulting labels which make their way into object code have a deterministic name.
+
+A key assumption to this process is that the input is deterministic modulo the uniques
+and the order that bindings appear in the definitions is the same.
+
+CmmGroup uses LabelMap in two places:
+
+* In CmmProc for info tables
+* In CmmGraph for the blocks of the graph
+
+LabelMap is not a deterministic structure, so traversing a LabelMap can process
+elements in different order (depending on the given uniques).
+
+Therefore before we do the renaming we need to use a deterministic structure, one
+which we can traverse in a guaranteed order. A list does the job perfectly.
+
+Once the renaming happens it is converted back into a LabelMap, which is now deterministic
+due to the uniques being generated and assigned in a deterministic manner.
+
+We prefer using the renamed LabelMap rather than the list in the rest of the
+code generation because it is much more efficient than lists for the needs of
+the code generator.
+-}
+
+-- Converting out of deterministic Cmm
+
+removeDeterm :: DCmmGroup -> CmmGroup
+removeDeterm = map removeDetermDecl
+
+removeDetermDecl :: DCmmDecl -> CmmDecl
+removeDetermDecl (CmmProc h e r g) = CmmProc (removeDetermTop h) e r (removeDetermGraph g)
+removeDetermDecl (CmmData a b) = CmmData a b
+
+removeDetermTop :: DCmmTopInfo -> CmmTopInfo
+removeDetermTop (TopInfo a b) = TopInfo (mapFromList $ unDeterm a) b
+
+removeDetermGraph :: DCmmGraph -> CmmGraph
+removeDetermGraph (CmmGraph x y) =
+  let y' = case y of
+            GMany a (DWrap b) c -> GMany a (mapFromList b) c
+  in CmmGraph x y'
 
 -- -----------------------------------------------------------------------------
 -- Basic blocks consisting of lists

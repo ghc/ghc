@@ -2121,12 +2121,14 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
         mod_name = mkModuleName $ "Cmm$" ++ original_filename
         cmm_mod = mkHomeModule home_unit mod_name
         cmmpConfig = initCmmParserConfig dflags
-    (cmm, ipe_ents) <- ioMsgMaybe
+    (dcmm, ipe_ents) <- ioMsgMaybe
                $ do
                   (warns,errs,cmm) <- withTiming logger (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile cmmpConfig cmm_mod home_unit filename
                   let msgs = warns `unionMessages` errs
                   return (GhcPsMessage <$> msgs, cmm)
+    -- Probably need to rename cmm here
+    let cmm = removeDeterm dcmm
     liftIO $ do
         putDumpFileMaybe logger Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
 

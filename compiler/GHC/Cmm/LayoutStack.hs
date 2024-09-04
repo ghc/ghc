@@ -282,12 +282,18 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
   where
     (updfr, cont_info)  = collectContInfo blocks
 
-    init_stackmap = mapSingleton entry StackMap{ sm_sp   = entry_args
-                                               , sm_args = entry_args
-                                               , sm_ret_off = updfr
-                                               , sm_regs = emptyUFM
-                                               }
+    init_stackmap = mapSingleton entry
+                      StackMap{ sm_sp   = entry_args
+                              , sm_args = entry_args
+                              , sm_ret_off = updfr
+                              , sm_regs = emptyUFM
+                              }
 
+    go :: [Block CmmNode C C]
+       -> LabelMap StackMap
+       -> StackLoc
+       -> [CmmBlock]
+       -> UniqDSM (LabelMap StackMap, StackLoc, [CmmBlock])
     go [] acc_stackmaps acc_hwm acc_blocks
       = return (acc_stackmaps, acc_hwm, acc_blocks)
 
@@ -1180,7 +1186,7 @@ lowerSafeForeignCall profile block
                                copyout <*>
                                mkLast jump, tscp)
 
-    case toBlockList graph' of
+    case toBlockList (removeDetermGraph graph') of
       [one] -> let (_, middle', last) = blockSplit one
                in return (blockJoin entry (middle `blockAppend` middle') last)
       _ -> panic "lowerSafeForeignCall0"
