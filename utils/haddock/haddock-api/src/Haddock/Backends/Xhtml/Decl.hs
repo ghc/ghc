@@ -10,7 +10,7 @@
 -----------------------------------------------------------------------------
 
 -- |
--- Module      :  Haddock.Backends.Html.Decl
+-- Module      :  Haddock.Backends.Xhtml.Decl
 -- Copyright   :  (c) Simon Marlow   2003-2006,
 --                    David Waern    2006-2009,
 --                    Mark Lentczner 2010
@@ -28,7 +28,7 @@ import Data.Foldable (toList)
 import Data.List (intersperse, sort)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
-import Data.Maybe
+import qualified Data.Maybe as Maybe
 import GHC hiding (LexicalFixity (..), fromMaybeContext)
 import GHC.Core.Type (Specificity (..))
 import GHC.Data.BooleanFormula
@@ -279,13 +279,17 @@ ppTypeOrFunSig
   qual
   emptyCtxts
     | summary = pref1
-    | Map.null argDocs = topDeclElem links loc splice docnames pref1 +++ docSection curname pkg qual doc
+    | Map.null argDocs = topDeclElem links loc splice docName pref1 +++ docSection curname pkg qual doc
     | otherwise =
-        topDeclElem links loc splice docnames pref2
+        topDeclElem links loc splice docName pref2
           +++ subArguments pkg qual (ppSubSigLike unicode qual typ argDocs [] sep emptyCtxts)
           +++ docSection curname pkg qual doc
     where
-      curname = getName <$> listToMaybe docnames
+      curname = getName <$> Maybe.listToMaybe docnames
+      docName =
+        case Maybe.listToMaybe docnames of
+          Nothing -> error "No docnames. An invariant was broken. Please report this to the Haddock project"
+          Just hd -> hd
 
 -- | This splits up a type signature along @->@ and adds docs (when they exist)
 -- to the arguments.
@@ -489,11 +493,15 @@ ppSimpleSig
   -> HsSigType DocNameI
   -> Html
 ppSimpleSig links splice unicode qual emptyCtxts loc names typ =
-  topDeclElem' names $ ppTypeSig True occNames ppTyp unicode
+  topDeclElem' docName $ ppTypeSig True occNames ppTyp unicode
   where
     topDeclElem' = topDeclElem links loc splice
     ppTyp = ppSigType unicode qual emptyCtxts typ
     occNames = map getOccName names
+    docName =
+      case Maybe.listToMaybe names of
+        Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
+        Just hd -> hd
 
 --------------------------------------------------------------------------------
 
@@ -530,13 +538,13 @@ ppFamDecl summary associated links instances fixities loc doc decl splice unicod
     curname = Just $ getName docname
 
     header_ =
-      topDeclElem links loc splice [docname] $
+      topDeclElem links loc splice docname $
         ppFamHeader summary associated decl unicode qual <+> ppFixities fixities qual
 
     instancesBit
       | FamilyDecl{fdInfo = ClosedTypeFamily mb_eqns} <- decl
       , not summary =
-          subEquations pkg qual $ map (ppFamDeclEqn . unLoc) $ fromMaybe [] mb_eqns
+          subEquations pkg qual $ map (ppFamDeclEqn . unLoc) $ Maybe.fromMaybe [] mb_eqns
       | otherwise =
           ppInstances links (OriginFamily docname) instances splice unicode pkg qual
 
@@ -706,7 +714,7 @@ ppLContextNoArrow c u q h = ppContextNoArrow (unLoc c) u q h
 
 ppContextNoArrow :: HsContext DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
 ppContextNoArrow cxt unicode qual emptyCtxts =
-  fromMaybe noHtml $
+  Maybe.fromMaybe noHtml $
     ppContextNoLocsMaybe (map unLoc cxt) unicode qual emptyCtxts
 
 ppContextNoLocs :: [HsType DocNameI] -> Unicode -> Qualification -> HideEmptyContexts -> Html
@@ -790,9 +798,9 @@ ppShortClassDecl
   pkg
   qual =
     if not (any isUserLSig sigs) && null ats
-      then (if summary then id else topDeclElem links loc splice [nm]) hdr
+      then (if summary then id else topDeclElem links loc splice nm) hdr
       else
-        (if summary then id else topDeclElem links loc splice [nm]) (hdr <+> keyword "where")
+        (if summary then id else topDeclElem links loc splice nm) (hdr <+> keyword "where")
           +++ shortSubDecls
             False
             ( [ ppAssocType summary links doc at [] splice unicode pkg qual | at <- ats, let doc = lookupAnySubdoc (unL $ fdLName $ unL at) subdocs
@@ -814,8 +822,12 @@ ppShortClassDecl
                   pkg
                   qual
                 | L _ (ClassOpSig _ False lnames typ) <- sigs
-                , let doc = lookupAnySubdoc (head names) subdocs
-                      names = map unLoc lnames
+                , let names = map unLoc lnames
+                      subdocName =
+                        case Maybe.listToMaybe names of
+                          Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
+                          Just hd -> hd
+                      doc = lookupAnySubdoc subdocName subdocs
                 ]
                 -- FIXME: is taking just the first name ok? Is it possible that
                 -- there are different subdocs for different names in a single
@@ -876,8 +888,8 @@ ppClassDecl
       sigs = map unLoc lsigs
 
       classheader
-        | any isUserLSig lsigs = topDeclElem links loc splice [nm] (hdr unicode qual <+> keyword "where" <+> fixs)
-        | otherwise = topDeclElem links loc splice [nm] (hdr unicode qual <+> fixs)
+        | any isUserLSig lsigs = topDeclElem links loc splice nm (hdr unicode qual <+> keyword "where" <+> fixs)
+        | otherwise = topDeclElem links loc splice nm (hdr unicode qual <+> fixs)
 
       -- Only the fixity relevant to the class header
       fixs = ppFixities [f | f@(n, _) <- fixities, n == unLoc lname] qual
@@ -890,7 +902,7 @@ ppClassDecl
       atBit =
         subAssociatedTypes
           [ ppAssocType summary links doc at subfixs splice unicode pkg qual
-            <+> subDefaults (maybeToList defTys)
+            <+> subDefaults (Maybe.maybeToList defTys)
           | at <- ats
           , let name = unLoc . fdLName $ unLoc at
                 doc = lookupAnySubdoc name subdocs
@@ -941,7 +953,7 @@ ppClassDecl
             unicode
             pkg
             qual
-            <+> subDefaults (maybeToList defSigs)
+            <+> subDefaults (Maybe.maybeToList defSigs)
           | ClassOpSig _ False lnames typ <- sigs
           , name <- map unLoc lnames
           , let doc = lookupAnySubdoc name subdocs
@@ -1111,7 +1123,7 @@ ppInstanceAssocTys
   -> [DocInstance DocNameI]
   -> [Html]
 ppInstanceAssocTys links splice unicode qual orphan insts =
-  maybeToList $
+  Maybe.maybeToList $
     subTableSrc Nothing qual links True $
       zipWith
         mkInstHead
@@ -1137,10 +1149,14 @@ ppInstanceSigs links splice unicode qual sigs = do
       L _ rtyp = dropWildCards typ
   -- Instance methods signatures are synified and thus don't have a useful
   -- SrcSpan value. Use the methods name location instead.
-  return $ ppSimpleSig links splice unicode qual HideEmptyContexts (getLocA $ head lnames) names rtyp
+  let lname =
+        case Maybe.listToMaybe lnames of
+          Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
+          Just hd -> hd
+  return $ ppSimpleSig links splice unicode qual HideEmptyContexts (getLocA lname) names rtyp
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
-lookupAnySubdoc n = fromMaybe noDocForDecl . lookup n
+lookupAnySubdoc n = Maybe.fromMaybe noDocForDecl . lookup n
 
 instanceId :: InstOrigin DocName -> Int -> Bool -> InstHead DocNameI -> String
 instanceId origin no orphan ihd =
@@ -1256,7 +1272,7 @@ ppDataDecl
         ConDeclGADT{} -> False
 
       header_ =
-        topDeclElem links loc splice [docname] $
+        topDeclElem links loc splice docname $
           ppDataHeader summary dataDecl unicode qual <+> whereBit <+> fix
 
       fix = ppFixities (filter (\(n, _) -> n == docname) fixities) qual
@@ -1531,7 +1547,10 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (foExt $ unLoc $ head names) subdocs >>= combineDocumentation . fst
+    mbDoc = lookup (foExt $ unLoc declName) subdocs >>= combineDocumentation . fst
+    declName = case Maybe.listToMaybe names of
+      Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
+      Just hd -> hd
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
 ppShortField summary unicode qual (ConDeclField _ names ltype _) =

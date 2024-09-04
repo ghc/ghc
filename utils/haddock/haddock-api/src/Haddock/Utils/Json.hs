@@ -371,10 +371,9 @@ instance FromJSON Char where
   parseJSONList v = typeMismatch "String" v
 
 parseChar :: String -> Parser Char
-parseChar t =
-  if length t == 1
-    then pure $ head t
-    else prependContext "Char" $ fail "expected a string of length 1"
+parseChar [c] = pure c
+parseChar [] = prependContext "Char" $ fail "expected a string of length 1, got an empty string"
+parseChar (_ : _) = prependContext "Char" $ fail "expected a string of length 1, got a longer string"
 
 parseRealFloat :: RealFloat a => String -> Value -> Parser a
 parseRealFloat _ (Number s) = pure $ realToFrac s

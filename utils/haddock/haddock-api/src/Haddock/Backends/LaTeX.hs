@@ -26,20 +26,20 @@ import Data.Foldable (toList)
 import Data.List (sort)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
-import Data.Maybe
+import qualified Data.Maybe as Maybe
 import GHC hiding (fromMaybeContext)
 import GHC.Core.Type (Specificity (..))
 import GHC.Data.FastString (unpackFS)
 import GHC.Types.Name (getOccString, nameOccName, tidyNameOcc)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (rdrNameOcc)
+import GHC.Utils.Ppr hiding (Doc, quote)
+import qualified GHC.Utils.Ppr as Pretty
 import System.Directory
 import System.FilePath
 import Prelude hiding ((<>))
 
 import Documentation.Haddock.Markup
-import GHC.Utils.Ppr hiding (Doc, quote)
-import qualified GHC.Utils.Ppr as Pretty
 import Haddock.Doc (combineDocumentation)
 import Haddock.GhcUtils
 import Haddock.Types
@@ -90,7 +90,7 @@ ppLaTeX
 ppLaTeX title packageStr visible_ifaces odir prologue maybe_style libdir =
   do
     createDirectoryIfMissing True odir
-    when (isNothing maybe_style) $
+    when (Maybe.isNothing maybe_style) $
       copyFile (libdir </> "latex" </> haddockSty) (odir </> haddockSty)
     ppLaTeXTop title packageStr odir prologue maybe_style visible_ifaces
     mapM_ (ppLaTeXModule title odir) visible_ifaces
@@ -139,7 +139,7 @@ ppLaTeXTop doctitle packageStr odir prologue maybe_style ifaces = do
 
       mods = sort (map (moduleBasename . ifaceMod) ifaces)
 
-      filename = odir </> (fromMaybe "haddock" packageStr <.> "tex")
+      filename = odir </> (Maybe.fromMaybe "haddock" packageStr <.> "tex")
 
   writeUtf8File filename (show tex)
 
@@ -174,7 +174,7 @@ ppLaTeXModule _title odir iface = do
         ]
 
     description =
-      (fromMaybe empty . documentationToLaTeX . ifaceRnDoc) iface
+      (Maybe.fromMaybe empty . documentationToLaTeX . ifaceRnDoc) iface
 
     body = processExports exports
   --
@@ -201,7 +201,7 @@ exportListItem
      in sep (punctuate comma [leader <+> ppDocBinder name | name <- names])
           <> case subdocs of
             [] -> empty
-            _ -> parens (sep (punctuate comma (mapMaybe go subdocs)))
+            _ -> parens (sep (punctuate comma (Maybe.mapMaybe go subdocs)))
 exportListItem (ExportNoDecl y []) =
   ppDocBinder y
 exportListItem (ExportNoDecl y subs) =
@@ -368,7 +368,7 @@ ppFamDecl associated doc instances decl unicode =
     (if null body then Nothing else Just (vcat body))
     $$ instancesBit
   where
-    body = catMaybes [familyEqns, documentationToLaTeX doc]
+    body = Maybe.catMaybes [familyEqns, documentationToLaTeX doc]
 
     whereBit = case fdInfo (tcdFam decl) of
       ClosedTypeFamily _ -> keyword "where"
@@ -544,7 +544,7 @@ ppTypeOrFunSig typ (doc, argDocs) (pref1, pref2, sep0) unicode
           text "\\haddockbeginargs"
             $$ vcat (map (uncurry (<->)) (ppSubSigLike unicode typ argDocs [] sep0))
             $$ text "\\end{tabulary}\\par"
-            $$ fromMaybe empty (documentationToLaTeX doc)
+            $$ Maybe.fromMaybe empty (documentationToLaTeX doc)
 
 -- | This splits up a type signature along @->@ and adds docs (when they exist)
 -- to the arguments. The output is a list of (leader/seperator, argument and
@@ -741,7 +741,7 @@ ppClassDecl
 
       hdr = ppClassHdr False lctxt (unLoc lname) ltyvars lfds
 
-      body = catMaybes [documentationToLaTeX doc, body_]
+      body = Maybe.catMaybes [documentationToLaTeX doc, body_]
 
       body_
         | null lsigs, null ats, null at_defs = Nothing
@@ -764,9 +764,13 @@ ppClassDecl
             | L _ (ClassOpSig _ is_def lnames typ) <- lsigs
             , let doc
                     | is_def = noDocForDecl
-                    | otherwise = lookupAnySubdoc (head names) subdocs
+                    | otherwise = lookupAnySubdoc firstName subdocs
                   names = map (cleanName . unLoc) lnames
                   leader = if is_def then Just (keyword "default") else Nothing
+                  firstName =
+                    case Maybe.listToMaybe names of
+                      Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
+                      Just hd -> hd
             ]
       -- N.B. taking just the first name is ok. Signatures with multiple
       -- names are expanded so that each name gets its own signature.
@@ -853,7 +857,7 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
   where
     cons = dd_cons (tcdDataDefn dataDecl)
 
-    body = catMaybes [doc >>= documentationToLaTeX, constrBit, patternBit]
+    body = Maybe.catMaybes [doc >>= documentationToLaTeX, constrBit, patternBit]
 
     (whereBit, leaders)
       | null cons
@@ -1031,7 +1035,11 @@ ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (foExt $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
+    mbDoc = lookup (foExt $ unLoc name) subdocs >>= fmap _doc . combineDocumentation . fst
+    name =
+      case Maybe.listToMaybe names of
+        Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
+        Just hd -> hd
 
 -- | Pretty-print a bundled pattern synonym
 ppSideBySidePat
@@ -1157,7 +1165,7 @@ ppContextNoLocsMaybe cxt unicode = Just $ pp_hs_context cxt unicode
 
 ppContextNoArrow :: HsContext DocNameI -> Bool -> LaTeX
 ppContextNoArrow cxt unicode =
-  fromMaybe empty $
+  Maybe.fromMaybe empty $
     ppContextNoLocsMaybe (map unLoc cxt) unicode
 
 ppContextNoLocs :: [HsType DocNameI] -> Bool -> LaTeX

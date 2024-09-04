@@ -311,9 +311,9 @@ declElem = paragraph ! [theclass "src"]
 
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
-topDeclElem :: LinksInfo -> SrcSpan -> Bool -> [DocName] -> Html -> Html
-topDeclElem lnks loc splice names html =
-  declElem << (html <+> (links lnks loc splice Nothing $ head names))
+topDeclElem :: LinksInfo -> SrcSpan -> Bool -> DocName -> Html -> Html
+topDeclElem lnks loc splice name html =
+  declElem << (html <+> links lnks loc splice Nothing name)
 
 -- FIXME: is it ok to simply take the first name?
 
