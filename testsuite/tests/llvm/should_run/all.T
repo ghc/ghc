@@ -13,3 +13,4 @@ def ignore_llvm_and_vortex( msg ):
      return re.sub(r".* is not a recognized processor for this target.*\n",r"",msg)
 
 test('T25770', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile_and_run, [''])
+test('T22487', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile_and_run, [''])
