@@ -39,13 +39,16 @@ module GHC.Internal.Exception.Type
        , emptyExceptionContext
        , mergeExceptionContext
        , ExceptionWithContext(..)
+         -- * Exception propagation
+       , WhileHandling(..)
+       , whileHandling
          -- * Arithmetic exceptions
        , ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , underflowException
        ) where
 
-import GHC.Internal.Data.OldList (intersperse)
+import GHC.Internal.Data.OldList (intersperse, lines, unlines, null)
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable (Typeable, TypeRep, cast)
 import qualified GHC.Internal.Data.Typeable as Typeable
@@ -68,6 +71,27 @@ will be subject to defaulting, as described above.
 @since base-4.20.0.0
 -}
 type HasExceptionContext = (?exceptionContext :: ExceptionContext)
+
+{- | @WhileHandling@ is used to annotate rethrow exceptions. By inspecting
+ the @WhileHandling@ annotation, all the places the exception has been rethrow
+ can be recovered.
+-}
+
+data WhileHandling = WhileHandling SomeException deriving Show
+
+instance ExceptionAnnotation WhileHandling where
+  displayExceptionAnnotation (WhileHandling e) =
+    "While handling " ++ case lines $ displayException e of
+      [] -> ""
+      (l1:ls) ->
+        -- Indent lines forward.
+        -- displayException may be ill prepared for this?...
+        unlines $ l1:[if null l then "  |" else "  | " ++ l | l <- ls]
+
+
+-- | Create 'SomeException' from an explicit context and exception.
+whileHandling :: Exception e => ExceptionWithContext e -> WhileHandling
+whileHandling e = WhileHandling (toException e)
 
 {- |
 The @SomeException@ type is the root of the exception type hierarchy.
