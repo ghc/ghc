@@ -137,7 +137,9 @@ compileCmmForRegAllocStats logger home_unit dflags cmmFile ncgImplF us = do
     -- parse the cmm file and output any warnings or errors
     let fake_mod = mkHomeModule home_unit (mkModuleName "fake")
         cmmpConfig = initCmmParserConfig dflags
-    (warnings, errors, parsedCmm) <- parseCmmFile cmmpConfig fake_mod home_unit cmmFile
+    (warnings, errors, dparsedCmm) <- parseCmmFile cmmpConfig fake_mod home_unit cmmFile
+
+    let parsedCmm = removeDeterm (fst (fromJust dparsedCmm))
 
     -- print parser errors or warnings
     let !diag_opts = initDiagOpts dflags
