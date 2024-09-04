@@ -21,10 +21,6 @@ instance Applicative Solo -- Defined in ‘GHC.Internal.Base’
 instance Foldable Solo -- Defined in ‘GHC.Internal.Data.Foldable’
 instance Functor Solo -- Defined in ‘GHC.Internal.Base’
 instance Monad Solo -- Defined in ‘GHC.Internal.Base’
-instance Monoid a => Monoid (Solo a)
-  -- Defined in ‘GHC.Internal.Base’
-instance Semigroup a => Semigroup (Solo a)
-  -- Defined in ‘GHC.Internal.Base’
 instance Bounded a => Bounded (Solo a)
   -- Defined in ‘GHC.Internal.Enum’
 instance Enum a => Enum (Solo a) -- Defined in ‘GHC.Internal.Enum’
@@ -32,6 +28,10 @@ instance Read a => Read (Solo a) -- Defined in ‘GHC.Internal.Read’
 instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Classes’
 instance Ord a => Ord (Solo a) -- Defined in ‘GHC.Classes’
 instance Show a => Show (Solo a) -- Defined in ‘GHC.Internal.Show’
+instance Monoid a => Monoid (Solo a)
+  -- Defined in ‘GHC.Internal.Base’
+instance Semigroup a => Semigroup (Solo a)
+  -- Defined in ‘GHC.Internal.Base’
 () :: Unit
 (##) :: Unit#
 (   ) :: Unit

@@ -40,7 +40,8 @@ module GHC.Internal.IO (
 
         FilePath,
 
-        catch, catchException, catchAny, throwIO,
+        catch, catchNoPropagate, catchException, catchExceptionNoPropagate, catchAny, throwIO,
+        rethrowIO,
         mask, mask_, uninterruptibleMask, uninterruptibleMask_,
         MaskingState(..), getMaskingState,
         unsafeUnmask, interruptible,
@@ -51,7 +52,7 @@ module GHC.Internal.IO (
 import GHC.Internal.Base
 import GHC.Internal.ST
 import GHC.Internal.Exception
-import GHC.Internal.Exception.Type (NoBacktrace(..))
+import GHC.Internal.Exception.Type (NoBacktrace(..), WhileHandling(..), HasExceptionContext, ExceptionWithContext(..))
 import GHC.Internal.Show
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
@@ -152,6 +153,10 @@ have to work around that in the definition of catch below).
 catchException :: Exception e => IO a -> (e -> IO a) -> IO a
 catchException !io handler = catch io handler
 
+-- | A variant of 'catchException' which does not annotate the handler with 'WhileHandling'
+catchExceptionNoPropagate :: Exception e => IO a -> (ExceptionWithContext e -> IO a) -> IO a
+catchExceptionNoPropagate !io handler = catchNoPropagate io handler
+
 -- | This is the simplest of the exception-catching functions.  It
 -- takes a single argument, runs it, and if an exception is raised
 -- the \"handler\" is executed, with the value of the exception passed as an
@@ -194,6 +199,23 @@ catch (IO io) handler = IO $ catch# io handler'
   where
     handler' e =
       case fromException e of
+        Just e' -> unIO (annotateIO (WhileHandling e) (handler e'))
+        Nothing -> raiseIO# e
+
+-- | A variant of 'catch' which doesn't annotate the handler with the exception
+-- which was caught. This function should be used when you are implementing your own
+-- error handling functions which may rethrow the exceptions.
+--
+-- In the case where you rethrow an exception without modifying it, you should
+-- rethrow the exception with the old exception context.
+catchNoPropagate :: Exception e
+                 => IO a
+                 -> (ExceptionWithContext e -> IO a)
+                 -> IO a
+catchNoPropagate (IO io) handler = IO $ catch# io handler'
+  where
+    handler' e =
+      case fromException e of
         Just e' -> unIO (handler e')
         Nothing -> raiseIO# e
 
@@ -202,10 +224,12 @@ catch (IO io) handler = IO $ catch# io handler'
 -- Note that this function is /strict/ in the action. That is,
 -- @catchAny undefined b == _|_@. See #exceptions_and_strictness# for
 -- details.
-catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
+--
+-- If you rethrow an exception, you should reuse the supplied ExceptionContext.
+catchAny :: IO a -> (forall e . (HasExceptionContext, Exception e) => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
   where
-    handler' (SomeException e) = unIO (handler e)
+    handler' se@(SomeException e) = unIO (annotateIO (WhileHandling se) (handler e))
 
 -- | Execute an 'IO' action, adding the given 'ExceptionContext'
 -- to any thrown synchronous exceptions.
@@ -259,6 +283,11 @@ throwIO :: (HasCallStack, Exception e) => e -> IO a
 throwIO e = do
     se <- toExceptionWithBacktrace e
     IO (raiseIO# se)
+
+-- | A utility to use when rethrowing exceptions, no new backtrace will be attached
+-- when rethrowing an exception but you must supply the existing context.
+rethrowIO :: Exception e => ExceptionWithContext e -> IO a
+rethrowIO e = throwIO (NoBacktrace e)
 
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery
@@ -332,9 +361,9 @@ getMaskingState  = IO $ \s ->
                              _  -> MaskedInterruptible #)
 
 onException :: IO a -> IO b -> IO a
-onException io what = io `catchException` \e -> do
+onException io what = io `catchExceptionNoPropagate` \e -> do
     _ <- what
-    throwIO $ NoBacktrace (e :: SomeException)
+    rethrowIO (e :: ExceptionWithContext SomeException)
 
 -- | Executes an IO computation with asynchronous
 -- exceptions /masked/.  That is, any thread which attempts to raise
