@@ -969,13 +969,18 @@ llvmOptions llvm_config dflags =
     ++ [("", "-target-abi=" ++ abi) | not (null abi) ]
 
   where target = platformMisc_llvmTarget $ platformMisc dflags
+        target_os = platformOS (targetPlatform dflags)
         Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets llvm_config)
 
         -- Relocation models
-        rmodel | gopt Opt_PIC dflags         = "pic"
-               | positionIndependent dflags  = "pic"
-               | ways dflags `hasWay` WayDyn = "dynamic-no-pic"
-               | otherwise                   = "static"
+        rmodel |  gopt Opt_PIC dflags
+               || positionIndependent dflags
+               || target_os == OSMinGW32 -- #22487: use PIC on (64-bit) Windows
+               = "pic"
+               | ways dflags `hasWay` WayDyn
+               = "dynamic-no-pic"
+               | otherwise
+               = "static"
 
         platform = targetPlatform dflags
         arch = platformArch platform
