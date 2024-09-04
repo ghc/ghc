@@ -29,6 +29,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Utils.Panic
+import GHC.Cmm.Dataflow.Label
 
 import GHC.Data.Stream (Stream)
 import GHC.Types.Unique.DSM (UniqDSMT)
@@ -150,7 +151,7 @@ fixStgRegisters :: Platform -> RawCmmDecl -> RawCmmDecl
 fixStgRegisters _ top@(CmmData _ _) = top
 
 fixStgRegisters platform (CmmProc info lbl live graph) =
-  let graph' = modifyGraph (mapGraphBlocks (fixStgRegBlock platform)) graph
+  let graph' = modifyGraph (mapGraphBlocks mapMap (fixStgRegBlock platform)) graph
   in CmmProc info lbl live graph'
 
 fixStgRegBlock :: Platform -> Block CmmNode e x -> Block CmmNode e x
