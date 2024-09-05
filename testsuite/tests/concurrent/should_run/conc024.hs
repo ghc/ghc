@@ -11,5 +11,5 @@ main = do
   id <- myThreadId
   forkIO (catch (do m <- newEmptyMVar; takeMVar m)
                 (\e -> throwTo id (e::SomeException)))
-  catch (do yield; performGC; threadDelay 1000000)
+  catch (do yield; performGC; threadDelay 2000000)
         (\e -> print (e::SomeException))
