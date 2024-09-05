@@ -1874,12 +1874,6 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
     MO_Prefetch_Data _n -> pure nilOL -- Prefetch hint.
 
     -- Memory copy/set/move/cmp, with alignment for optimization
-
-    -- TODO Optimize and use e.g. quad registers to move memory around instead
-    -- of offloading this to memcpy. For small memcpys we can utilize
-    -- the 128bit quad registers in NEON to move block of bytes around.
-    -- Might also make sense of small memsets? Use xzr? What's the function
-    -- call overhead?
     MO_Memcpy _align -> mkCCall "memcpy"
     MO_Memset _align -> mkCCall "memset"
     MO_Memmove _align -> mkCCall "memmove"
