@@ -478,3 +478,46 @@ It is worth noting that :extension:`UnliftedDatatypes` is *not* required to give
 the data families themselves return kinds involving ``TYPE``, such as the
 ``G`` example above. The extension is only required for ``data instance``
 declarations, such as ``FInt`` and ``GBool`` above.
+
+.. _primitive-string-literals:
+
+Primitive string literals
+-------------------------
+
+Primitive string literals, also called unboxed string literals or ``Addr#`` literals,
+are string literals with a postfix hash sign ``#``.
+They are enabled by the :extension:`MagicHash` extension and have type ``Addr#``.
+
+A primitive string literal represents a sequence of bytes.
+You can embed a NUL byte like ``"foo\0bar"#``, which corresponds to the bytes
+``[102,111,111,0,98,97,114] :: [Word8]`` (with an implicit NUL at the end).
+Further, you can only embed a character whose code is less than 256; ``"\xFF"#`` is valid
+and represents ``[255] :: [Word8]``, but ``"\x3B1"#`` is invalid.
+In other words, it is encoded in Latin-1.
+
+Like C strings, primitive string literals are implicitly terminated by a NUL byte.
+
+Primitive string literals are immutable and attempting to write to their address results in undefined behavior.
+
+.. _desugaring-of-string-literals:
+
+Desugaring of string literals
+-----------------------------
+
+An ASCII string literal without a NUL byte is desugared into a call to
+``GHC.CString.unpackCString#`` with the content as a primitive string literal.
+For example, ``"some string"`` is translated into ``GHC.CString.unpackCString# "some string"#``.
+
+If the string contains NUL bytes or non-ASCII characters (characters with code points >= 128),
+the string is encoded in Modified UTF-8 and then passed to ``GHC.CString.unpackCStringUtf8#``.
+Modified UTF-8 differs from standard UTF-8 in two ways:
+
+- The NUL byte is encoded as ``"\xC0\x80"#`` (i.e. an over-long encoding of U+0000).
+- Surrogate code points are allowed and encoded like other code points.
+
+Examples:
+
+- ``"Hello\0world!"`` is desugared to ``GHC.CString.unpackCStringUtf8# "Hello\xC0\x80world!"#``.
+- ``"café"`` is desugared to ``GHC.CString.unpackCStringUtf8# "caf\xC3\xA9"#``.
+- ``"\x732B\x1F431"`` is desugared to ``GHC.CString.unpackCStringUtf8# "\xE7\x8C\xAB\xF0\x9F\x90\xB1"#``.
+- ``"\xDFFF\xD800"`` is desugared to ``GHC.CString.unpackCStringUtf8# "\xED\xBF\xBF\xED\xA0\x80"#``.

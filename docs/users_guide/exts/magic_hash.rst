@@ -30,7 +30,7 @@ The :extension:`MagicHash` also enables some new forms of literals (see
 
 -  ``'x'#`` has type ``Char#``
 
--  ``"foo"#`` has type ``Addr#``
+-  ``"foo"#`` has type ``Addr#`` (see :ref:`primitive-string-literals`).
 
 -  ``3#`` has type ``Int#``. In general, any Haskell integer lexeme
    followed by a ``#`` is an ``Int#`` literal, e.g. ``-0x3A#`` as well as
