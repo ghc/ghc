@@ -118,7 +118,7 @@ int32_t decodeAddendRISCV64(Section *section STG_UNUSED,
 
 // Make sure that V can be represented as an N bit signed integer.
 void checkInt(inst_t *loc, int32_t v, int n) {
-  if (v != signExtend32(v, n)) {
+  if (!isInt(n, v)) {
     barf("Relocation at 0x%x is out of range. value: 0x%x (%d), "
                "sign-extended value: 0x%x (%d), max bits 0x%x (%d)\n",
                *loc, v, v, signExtend32(v, n), signExtend32(v, n), n, n);
