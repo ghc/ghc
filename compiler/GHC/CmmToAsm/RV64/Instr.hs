@@ -267,7 +267,7 @@ patchJumpInstr instr patchF =
 -- single load/store instruction. There are offsets to sp (not to be confused
 -- with STG's SP!) which need a register to be calculated.
 --
--- Using sp to compute the offset will violate assumptions about the stack pointer
+-- Using sp to compute the offset would violate assumptions about the stack pointer
 -- pointing to the top of the stack during signal handling.  As we can't force
 -- every signal to use its own stack, we have to ensure that the stack pointer
 -- always points to the top of the stack, and we can't use it for computation.

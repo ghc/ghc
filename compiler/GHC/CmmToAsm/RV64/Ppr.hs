@@ -222,7 +222,7 @@ pprGloblDecl platform lbl
 -- (PLT)s, and thus the lookup wouldn't point to the function, but into the
 -- jump table.
 --
--- Fun fact: The LLVMMangler exists to patch this issue su on the LLVM side as
+-- Fun fact: The LLVMMangler exists to patch this issue on the LLVM side as
 -- well.
 pprLabelType' :: (IsLine doc) => Platform -> CLabel -> doc
 pprLabelType' platform lbl =

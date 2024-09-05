@@ -163,7 +163,7 @@ ann doc instr {- debugIsOn -} = ANN doc instr
 -- going back to the exact CmmExpr representation can be laborious and adds
 -- indirections to find the matches that lead to the assembly.
 --
--- An improvement oculd be to have
+-- An improvement could be to have
 --
 --    (pprExpr genericPlatform e) <> parens (text. show e)
 --
