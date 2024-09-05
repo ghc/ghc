@@ -578,7 +578,8 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                            , cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
-                           , cid_datafam_insts = adts })
+                           , cid_datafam_insts = adts
+                           , cid_modifiers = modifiers })
   = do { checkInferredVars ctxt inst_ty
        ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
@@ -629,11 +630,14 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
        ; let all_fvs = meth_fvs `plusFV` more_fvs
                                 `plusFV` inst_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
+       -- MODS_TODO do I care about free vars in modifiers?
+       ; modifiers' <- mapM (fmap fst . rnLHsType ctxt) modifiers
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
                              , cid_overlap_mode = oflag
-                             , cid_datafam_insts = adts' },
+                             , cid_datafam_insts = adts'
+                             , cid_modifiers = modifiers' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
              -- that they can be entered into the list of type declarations

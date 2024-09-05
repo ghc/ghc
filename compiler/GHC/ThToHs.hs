@@ -336,7 +336,9 @@ cvtDec (InstanceD o ctxt ty decs)
                       , cid_sigs = Hs.mkClassOpSigs sigs'
                       , cid_tyfam_insts = ats', cid_datafam_insts = adts'
                       , cid_overlap_mode
-                                   = fmap (L (l2l loc) . overlap) o } }
+                                   = fmap (L (l2l loc) . overlap) o
+                      , cid_modifiers = [] -- MODS_TODO: add to InstanceD?
+                      } }
   where
   overlap pragma =
     case pragma of

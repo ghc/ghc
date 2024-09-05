@@ -848,6 +848,7 @@ renameClsInstD
           , cid_sigs = []
           , cid_tyfam_insts = lATs'
           , cid_datafam_insts = lADTs'
+          , cid_modifiers = [] -- MODS_TODO: do we need these?
           }
       )
 

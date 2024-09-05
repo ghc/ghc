@@ -2323,8 +2323,8 @@ instance ExactPrint (ClsInstDecl GhcPs) where
                               , cid_poly_ty = inst_ty', cid_binds = binds'
                               , cid_sigs = sigs', cid_tyfam_insts = ats'
                               , cid_overlap_mode = mbOverlap'
-                              , cid_datafam_insts = adts' })
-
+                              , cid_datafam_insts = adts'
+                              , cid_modifiers = [] }) -- MODS_TODO
       where
         top_matter = do
           i' <- markEpToken i
