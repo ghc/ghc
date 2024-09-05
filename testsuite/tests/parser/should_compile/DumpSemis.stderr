@@ -183,6 +183,7 @@
         (NormalSyntax))
        (Nothing)
        (Nothing))
+      []
       [(L
         (EpAnn
          (EpaSpan { DumpSemis.hs:9:1-3 })
@@ -493,6 +494,7 @@
         (NormalSyntax))
        (Nothing)
        (Nothing))
+      []
       [(L
         (EpAnn
          (EpaSpan { DumpSemis.hs:14:1-3 })
@@ -767,6 +769,7 @@
         (NormalSyntax))
        (Nothing)
        (Nothing))
+      []
       [(L
         (EpAnn
          (EpaSpan { DumpSemis.hs:21:1-3 })
@@ -1390,6 +1393,7 @@
        (EpVirtualBraces
         (3))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -1499,11 +1503,14 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnannotated
-              (EpArrow
-               (EpUniTok
-                (EpaSpan { DumpSemis.hs:29:18-19 })
-                (NormalSyntax))))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { DumpSemis.hs:29:18-19 })
+                 (NormalSyntax)))))
              (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:29:12-16 })
@@ -1562,6 +1569,7 @@
         (NormalSyntax))
        (Nothing)
        (Nothing))
+      []
       [(L
         (EpAnn
          (EpaSpan { DumpSemis.hs:31:1 })
@@ -1716,11 +1724,14 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnannotated
-              (EpArrow
-               (EpUniTok
-                (EpaSpan { DumpSemis.hs:31:27-28 })
-                (NormalSyntax))))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { DumpSemis.hs:31:27-28 })
+                 (NormalSyntax)))))
              (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:31:25 })

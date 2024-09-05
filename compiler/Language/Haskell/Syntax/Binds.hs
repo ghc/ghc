@@ -153,24 +153,22 @@ other interesting cases. Namely,
     (x) = e
     x :: Ty = e
 
-Note [Multiplicity annotations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Multiplicity annotations are stored in the pat_mult field on PatBinds,
-represented by the HsMultAnn data type
+Note [Modifiers on bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Modifiers on bindings are stored in the pat_mods field on PatBinds. During
+typechecking, the multiplicity (given by a modifier, or inferred) is stored in
+the XPatBind binding point.
 
-  HsNoMultAnn <=> no annotation in the source file
-  HsPct1Ann   <=> the %1 annotation
-  HsMultAnn   <=> the %t annotation, where `t` is some type
+We don't need to store a multiplicity or modifiers on FunBinds, because:
+- let %1 x = … is parsed as a PatBind. So we don't need an annotation on
+  FunBinds before typechecking.
+- the multiplicity that the typechecker infers for a FunBind is stored in the
+  binder's Var for the desugarer to use. It's only relevant for strict FunBinds,
+  see Wrinkle 1 in Note [Desugar Strict binds] in GHC.HsToCore.Binds as, in
+  Core, let expressions don't have multiplicity annotations.
 
-In case of HsNoMultAnn the typechecker infers a multiplicity.
-
-We don't need to store a multiplicity on FunBinds:
-- let %1 x = … is parsed as a PatBind. So we don't need an annotation before
-  typechecking.
-- the multiplicity that the typechecker infers is stored in the binder's Var for
-  the desugarer to use. It's only relevant for strict FunBinds, see Wrinkle 1 in
-  Note [Desugar Strict binds] in GHC.HsToCore.Binds as, in Core, let expressions
-  don't have multiplicity annotations.
+See also Note [Modifiers on patterns vs bindings] in
+Language.Haskell.Syntax.Pat.
 -}
 
 -- | Haskell Binding with separate Left and Right id's
@@ -212,8 +210,8 @@ data HsBindLR idL idR
   | PatBind {
         pat_ext    :: XPatBind idL idR,
         pat_lhs    :: LPat idL,
-        pat_mult   :: HsMultAnn idL,
-        -- ^ See Note [Multiplicity annotations].
+        pat_mods   :: [HsModifier idL],
+        -- ^ See Note [Modifiers on bindings].
         pat_rhs    :: GRHSs idR (LHsExpr idR)
     }
 
@@ -305,6 +303,7 @@ data Sig pass
       -- more specific.
     TypeSig
        (XTypeSig pass)
+       [HsModifier pass]     -- Attached modifiers
        [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 

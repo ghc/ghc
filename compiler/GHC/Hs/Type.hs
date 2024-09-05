@@ -15,10 +15,9 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 
 module GHC.Hs.Type (
         Mult,
-        HsMultAnn, HsMultAnnOf(..),
-        multAnnToHsType, expandHsMultAnnOf,
-        EpLinear(..), EpArrowOrColon(..),
-        pprHsArrow, pprHsMultAnn,
+        HsFunArr(..), HsModifiedFunArr, HsModifiedFunArrOf(..),
+        EpArrowOrColon(..),
+        pprHsModifiedFunArr, pprHsModifier, pprHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsTypeGhcPsExt(..),
@@ -36,6 +35,7 @@ module GHC.Hs.Type (
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, fromMaybeContext,
+        HsModifierOf(..), HsModifier, ModifierPrintsAs(..),
         HsLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs, pprHsArgsApp,
@@ -108,14 +108,14 @@ import GHC.Base ( Multiplicity(..) )
 import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.SourceText
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..), noUserRdr )
+import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..) )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Names ( negateName )
-import GHC.Builtin.Types( oneDataConName, mkTupleStr )
+import GHC.Builtin.Types( mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
-import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
+import GHC.Core.Multiplicity( pprArrowWithModifiers )
 import GHC.Hs.Doc
 import GHC.Generics (Generic, Generically(..))
 import GHC.Types.Basic
@@ -425,6 +425,14 @@ and the same principle could be applied to foralls:
 except the `forall _.` example is rejected by checkForAllTelescopeWildcardBndrs.
 -}
 
+-- | The modifier %1 is (with -XLinearTypes) renamed to %One, but we still want
+-- it to print as %1 if that's what it was written as.
+data ModifierPrintsAs = ModifierPrintsAs1 | ModifierPrintsAsSelf
+
+type instance XModifier GhcPs = EpToken "%"
+type instance XModifier GhcRn = ModifierPrintsAs
+type instance XModifier GhcTc = ModifierPrintsAs
+
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
 type instance XTyVar           (GhcPass _) = EpToken "'"
@@ -502,67 +510,32 @@ are not needed; instead the data is stored in `HsConDeclField`. It is an error
 if it turns out the extensions were used outside of a constructor field type.
 -}
 
+type instance XHsModifiedFunArr _ _ = NoExtField
+
 data EpArrowOrColon
   = EpArrow !TokRarrow
   | EpColon !TokDcolon
-  | EpPatBind
   deriving Data
 
-data EpLinear
-  = EpPct1 !(EpToken "%1") !EpArrowOrColon
-  | EpLolly !(EpToken "⊸")
-  deriving Data
+type instance XHsStandardArr GhcPs = EpArrowOrColon
+type instance XHsStandardArr GhcRn = NoExtField
+type instance XHsStandardArr GhcTc = NoExtField
 
-instance NoAnn EpLinear where
-  noAnn = EpPct1 noAnn (EpArrow noAnn)
+type instance XHsLinearArr GhcPs = EpToken "⊸"
+type instance XHsLinearArr GhcRn = NoExtField
+type instance XHsLinearArr GhcTc = NoExtField
 
-type instance XUnannotated  _ GhcPs = EpArrowOrColon
-type instance XUnannotated  _ GhcRn = NoExtField
-type instance XUnannotated  _ GhcTc = Mult
-
-type instance XLinearAnn    _ GhcPs = EpLinear
-type instance XLinearAnn    _ GhcRn = NoExtField
-type instance XLinearAnn    _ GhcTc = Mult
-
-type instance XExplicitMult _ GhcPs = (EpToken "%", EpArrowOrColon)
-type instance XExplicitMult _ GhcRn = NoExtField
-type instance XExplicitMult _ GhcTc = Mult
-
-type instance XXMultAnnOf   _ (GhcPass _) = DataConCantHappen
-
-multAnnToHsType :: HsMultAnn GhcRn -> Maybe (LHsType GhcRn)
-multAnnToHsType = expandHsMultAnnOf (HsTyVar noAnn NotPromoted . fmap noUserRdr)
-
--- | Convert an multiplicity annotation into its corresponding multiplicity.
--- If no annotation was written, `Nothing` is returned.
--- In this polymorphic function, `t` can be `HsType` or `HsExpr`
-expandHsMultAnnOf :: (LocatedN Name -> t GhcRn)
-                  -> HsMultAnnOf (LocatedA (t GhcRn)) GhcRn
-                  -> Maybe (LocatedA (t GhcRn))
-expandHsMultAnnOf _mk_var HsUnannotated{} = Nothing
-expandHsMultAnnOf mk_var (HsLinearAnn _) = Just (noLocA (mk_var (noLocA oneDataConName)))
-expandHsMultAnnOf _mk_var (HsExplicitMult _ p) = Just p
-
-instance
-      (Outputable mult, OutputableBndrId pass) =>
-      Outputable (HsMultAnnOf mult (GhcPass pass)) where
-  ppr arr = parens (pprHsArrow arr)
-
--- See #18846
-pprHsArrow :: (Outputable mult, OutputableBndrId pass) => HsMultAnnOf mult (GhcPass pass) -> SDoc
-pprHsArrow (HsUnannotated _)    = pprArrowWithMultiplicity visArgTypeLike (Left Many)
-pprHsArrow (HsLinearAnn _)      = pprArrowWithMultiplicity visArgTypeLike (Left One)
-pprHsArrow (HsExplicitMult _ p) = pprArrowWithMultiplicity visArgTypeLike (Right $ ppr p)
-  -- NB: 'ppr p' will put the parentheses where the user did.
-
--- Used to print, for instance, let bindings:
---   let %1 x = …
--- and record field declarations:
---   { x %1 :: … }
-pprHsMultAnn :: forall id. OutputableBndrId id => HsMultAnn (GhcPass id) -> SDoc
-pprHsMultAnn (HsUnannotated _) = empty
-pprHsMultAnn (HsLinearAnn _) = text "%1"
-pprHsMultAnn (HsExplicitMult _ p) = text "%" <> ppr p
+pprHsModifiedFunArr :: (Outputable mult, OutputableBndrId pass)
+                    => HsModifiedFunArrOf mult (GhcPass pass)
+                    -> SDoc
+pprHsModifiedFunArr (HsModifiedFunArr _ mods arr) =
+  -- `pprArrowWithModifiers` prepends % to the modifiers it's passed, and
+  -- `pprHsModifiers` does the same. So we can't pass the modifiers in to it.
+  pprHsModifiers mods <+> pprArrowWithModifiers [] visArgTypeLike mult
+ where
+  mult = case arr of
+    HsStandardArr _ -> Many
+    HsLinearArr _ -> One
 
 type instance XConDeclRecField  (GhcPass _) = NoExtField
 type instance XXConDeclRecField (GhcPass _) = DataConCantHappen
@@ -575,8 +548,9 @@ instance OutputableBndrId p
       ppr_names [n] = pprPrefixOcc n
       ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
 
-      ppr_mult :: HsMultAnn (GhcPass p) -> SDoc -> SDoc
-      ppr_mult mult tyDoc = pprHsMultAnn mult <+> dcolon <+> tyDoc
+      ppr_mult :: HsModifiedFunArr (GhcPass p) -> SDoc -> SDoc
+      ppr_mult (HsModifiedFunArr _ mods _) tyDoc =
+        pprHsModifiers mods <+> dcolon <+> tyDoc
 
 ---------------------
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
@@ -1203,6 +1177,21 @@ instance Outputable OpName where
 ************************************************************************
 -}
 
+-- | There's no 'Outputable' instance for 'HsModifierOf', because it's rare to
+-- want to ppr just one of them. For a list, 'pprHsModifiers' gives the expected
+-- output: @%a %b@ rather than @[%a, %b]@.
+pprHsModifier :: forall p ty . (OutputableBndrId p, Outputable ty) => HsModifierOf ty (GhcPass p) -> SDoc
+pprHsModifier (HsModifier x ty) = char '%' <> case ghcPass @p of
+  GhcPs -> ppr ty
+  GhcRn -> maybe_as_1 x ty
+  GhcTc -> maybe_as_1 x ty
+  where
+    maybe_as_1 ModifierPrintsAs1 _ = char '1'
+    maybe_as_1 ModifierPrintsAsSelf ty = ppr ty
+
+pprHsModifiers :: (OutputableBndrId p, Outputable ty) => [HsModifierOf ty (GhcPass p)] -> SDoc
+pprHsModifiers mods = hsep $ pprHsModifier <$> mods
+
 instance OutputableBndrId p => Outputable (HsBndrVar (GhcPass p)) where
   ppr (HsBndrVar _ name) = ppr name
   ppr (HsBndrWildCard _) = char '_'
@@ -1308,7 +1297,7 @@ instance (Outputable arg, Outputable rec)
   ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
 
 pprHsConDeclFieldWith :: (OutputableBndrId p)
-                      => (HsMultAnn (GhcPass p) -> SDoc -> SDoc)
+                      => (HsModifiedFunArr (GhcPass p) -> SDoc -> SDoc)
                       -> HsConDeclField (GhcPass p) -> SDoc
 pprHsConDeclFieldWith ppr_mult (CDF _ prag mark mult ty doc) =
   pprMaybeWithDoc doc (ppr_mult mult (ppr prag <+> ppr mark <> ppr ty))
@@ -1317,9 +1306,9 @@ pprHsConDeclFieldNoMult :: (OutputableBndrId p) => HsConDeclField (GhcPass p) ->
 pprHsConDeclFieldNoMult = pprHsConDeclFieldWith (\_ d -> d)
 
 hsPlainTypeField :: LHsType GhcPs -> HsConDeclField GhcPs
-hsPlainTypeField = mkConDeclField (HsUnannotated (EpColon noAnn))
+hsPlainTypeField = mkConDeclField $ HsModifiedFunArr noExtField [] $ HsStandardArr $ EpColon noAnn
 
-mkConDeclField :: HsMultAnn GhcPs -> LHsType GhcPs -> HsConDeclField GhcPs
+mkConDeclField :: HsModifiedFunArr GhcPs -> LHsType GhcPs -> HsConDeclField GhcPs
 mkConDeclField mult (L _ (HsDocTy _ ty lds)) = (mkConDeclField mult ty) { cdf_doc = Just lds }
 mkConDeclField mult (L _ (XHsType (HsBangTy ann (HsSrcBang srcTxt unp str) t))) = CDF (ann, srcTxt) unp str mult t Nothing
 mkConDeclField mult t = CDF noAnn NoSrcUnpack NoSrcStrict mult t Nothing
@@ -1489,11 +1478,11 @@ ppr_infix_ty _ = Nothing
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId p)
-           => HsMultAnn (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
+           => HsModifiedFunArr (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
 ppr_fun_ty mult ty1 ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
-        arr = pprHsArrow mult
+        arr = pprHsModifiedFunArr mult
     in
     sep [p1, arr <+> p2]
 

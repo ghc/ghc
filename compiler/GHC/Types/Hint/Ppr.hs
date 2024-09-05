@@ -29,6 +29,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Driver.Flags
 
 import Language.Haskell.Syntax.Basic (FieldLabelString)
+import Language.Haskell.Syntax.Type (HsModifierOf(..))
 
 import Data.List (partition)
 import qualified Data.List.NonEmpty as NE
@@ -300,6 +301,11 @@ instance Outputable GhcHint where
       -> text "Split the SPECIALISE pragma into multiple pragmas, one for each type signature"
     SuggestDataKeyword
       -> text "Use the" <+> quotes (text "data") <+> "keyword instead."
+    SuggestModifierSignature (HsModifier _ ty) name
+      -> hang
+           (text "Perhaps it should have a kind signature, like")
+           2
+           (hsep [text "%(" <> ppr ty, text "::", ppr name <> text ")"])
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

@@ -1164,14 +1164,15 @@ expr_to_type earg =
       unwrap_wc t
     go (L l (HsFunArr _ mult arg res)) =
       do { arg' <- go arg
-         ; mult' <- go_arrow mult
+         ; mult' <- go_arrow
          ; res' <- go res
          ; return (L l (HsFunTy noExtField mult' arg' res'))}
          where
-          go_arrow :: HsMultAnnOf (LHsExpr GhcRn) GhcRn -> TcM (HsMultAnn GhcRn)
-          go_arrow (HsUnannotated _) = pure (HsUnannotated noExtField)
-          go_arrow (HsLinearAnn{}) = pure (HsLinearAnn noExtField)
-          go_arrow (HsExplicitMult _ exp) = HsExplicitMult noExtField <$> go exp
+          go_arrow = do
+            let HsModifiedFunArr _ mods arr = mult
+            mods' <- mapM go_modifier mods
+            pure $ HsModifiedFunArr noExtField mods' arr
+          go_modifier (HsModifier x ty) = HsModifier x <$> go ty
     go (L l (HsForAll _ tele expr)) =
       do { ty <- go expr
          ; return (L l (HsForAllTy noExtField tele ty))}

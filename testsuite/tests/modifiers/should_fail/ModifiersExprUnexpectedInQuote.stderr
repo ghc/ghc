@@ -1,0 +1,5 @@
+ModifiersExprUnexpectedInQuote.hs:8:19: error: [GHC-65904]
+    Modifier not (yet) handled by Template Haskell
+      At most one modifier is supported
+      %1 %1
+

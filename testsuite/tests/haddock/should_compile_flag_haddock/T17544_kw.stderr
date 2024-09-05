@@ -177,6 +177,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T17544_kw.hs:13:6-8 })
@@ -224,6 +225,7 @@
             (EpUniTok
              (EpaSpan { T17544_kw.hs:14:15-16 })
              (NormalSyntax)))
+           []
            (:|
             (L
              (EpAnn
@@ -281,6 +283,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T17544_kw.hs:16:9-11 })
@@ -327,6 +330,7 @@
            (EpUniTok
             (EpaSpan { T17544_kw.hs:17:15-16 })
             (NormalSyntax)))
+          []
           (:|
            (L
             (EpAnn
@@ -360,11 +364,14 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpArrow
-               (EpUniTok
-                (EpaSpan { T17544_kw.hs:17:21-22 })
-                (NormalSyntax))))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { T17544_kw.hs:17:21-22 })
+                 (NormalSyntax)))))
              (L
               (EpAnn
                (EpaSpan { T17544_kw.hs:17:18-19 })
@@ -427,6 +434,7 @@
        (EpVirtualBraces
         (5))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn

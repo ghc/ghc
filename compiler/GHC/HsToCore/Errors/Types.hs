@@ -202,6 +202,8 @@ data ThRejectionReason
   | ThSplicesWithinDeclBrackets
   | ThNonLinearDataCon
   | ThDataConVisibleForall
+  | ThUnexpectedModifier [HsModifier GhcRn]
+  | ThUnexpectedModifierExpr [HsModifierOf (LocatedA (HsExpr GhcRn)) GhcRn]
 
 -- | Why is a @SPECIALISE@ pragmas useless?
 data UselessSpecialisePragmaReason

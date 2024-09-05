@@ -267,6 +267,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrLambdaCase"                               = 51179
   GhcDiagnosticCode "PsErrEmptyLambda"                              = 71614
   GhcDiagnosticCode "PsErrLinearFunction"                           = 31574
+  GhcDiagnosticCode "PsErrModifierSyntax"                           = 61252
   GhcDiagnosticCode "PsErrMultiWayIf"                               = 28985
   GhcDiagnosticCode "PsErrOverloadedRecordUpdateNotEnabled"         = 82135
   GhcDiagnosticCode "PsErrNumUnderscores"                           = 62330
@@ -357,7 +358,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrUnexpectedTypeInDecl"                     = 77878
   GhcDiagnosticCode "PsErrInvalidPackageName"                       = 21926
   GhcDiagnosticCode "PsErrParseRightOpSectionInPat"                 = 72516
-  GhcDiagnosticCode "PsErrIllegalGadtRecordMultiplicity"            = 37475
+  GhcDiagnosticCode "PsErrIllegalGadtRecordModifier"                = 37475
   GhcDiagnosticCode "PsErrInvalidCApiImport"                        = 72744
   GhcDiagnosticCode "PsErrMultipleConForNewtype"                    = 05380
   GhcDiagnosticCode "PsErrUnicodeCharLooksLike"                     = 31623
@@ -697,6 +698,9 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnexpectedTypeSyntaxInTerms"               = 31244
   GhcDiagnosticCode "TcRnTypeApplicationsDisabled"                  = 23482
   GhcDiagnosticCode "TcRnUnpromotableLit"                           = 51819
+  GhcDiagnosticCode "TcRnUnrecognisedModifier"                      = 49969
+  GhcDiagnosticCode "TcRnUnknownModifierKind"                       = 38026
+  GhcDiagnosticCode "TcRnTooManyMultiplicities"                     = 65505
 
   -- TcRnIllegalInvisibleTypePattern
   GhcDiagnosticCode "InvisPatWithoutFlag"                           = 78249

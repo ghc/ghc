@@ -148,6 +148,7 @@
          (True)
          {NameSet:
           [{Name: DumpRenamedAst.Peano}]})
+        []
         (L
          (EpAnn
           (EpaSpan { DumpRenamedAst.hs:9:6-10 })
@@ -189,6 +190,7 @@
               []))
             (ConDeclH98
              (NoExtField)
+             []
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:9:14-17 })
@@ -212,6 +214,7 @@
               []))
             (ConDeclH98
              (NoExtField)
+             []
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:9:21-24 })
@@ -233,8 +236,11 @@
                  (NoSourceText))
                 (NoSrcUnpack)
                 (NoSrcStrict)
-                (HsUnannotated
-                 (NoExtField))
+                (HsModifiedFunArr
+                 (NoExtField)
+                 []
+                 (HsStandardArr
+                  (NoExtField)))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:9:26-30 })
@@ -691,8 +697,11 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnannotated
-             (NoExtField))
+            (HsModifiedFunArr
+             (NoExtField)
+             []
+             (HsStandardArr
+              (NoExtField)))
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:11:16-18 })
@@ -806,8 +815,11 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnannotated
-              (NoExtField))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (NoExtField)))
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:16:20 })
@@ -838,8 +850,11 @@
                 []))
               (HsFunTy
                (NoExtField)
-               (HsUnannotated
-                (NoExtField))
+               (HsModifiedFunArr
+                (NoExtField)
+                []
+                (HsStandardArr
+                 (NoExtField)))
                (L
                 (EpAnn
                  (EpaSpan { DumpRenamedAst.hs:16:25 })
@@ -902,6 +917,7 @@
          {NameSet:
           [{Name: a}
           ,{Name: f}]})
+        []
         (L
          (EpAnn
           (EpaSpan { DumpRenamedAst.hs:22:6 })
@@ -1017,6 +1033,7 @@
               []))
             (ConDeclH98
              (NoExtField)
+             []
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:22:21-23 })
@@ -1038,8 +1055,11 @@
                  (NoSourceText))
                 (NoSrcUnpack)
                 (NoSrcStrict)
-                (HsUnannotated
-                 (NoExtField))
+                (HsModifiedFunArr
+                 (NoExtField)
+                 []
+                 (HsStandardArr
+                  (NoExtField)))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:22:25-29 })
@@ -1440,8 +1460,11 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnannotated
-                 (NoExtField))
+                (HsModifiedFunArr
+                 (NoExtField)
+                 []
+                 (HsStandardArr
+                  (NoExtField)))
                 (L
                  (EpAnn
                   (EpaSpan { DumpRenamedAst.hs:25:31 })
@@ -1553,8 +1576,11 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnannotated
-             (NoExtField))
+            (HsModifiedFunArr
+             (NoExtField)
+             []
+             (HsStandardArr
+              (NoExtField)))
             (L
              (EpAnn
               (EpaSpan { DumpRenamedAst.hs:24:12 })
@@ -1585,8 +1611,11 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnannotated
-               (NoExtField))
+              (HsModifiedFunArr
+               (NoExtField)
+               []
+               (HsStandardArr
+                (NoExtField)))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:24:17-27 })
@@ -1607,8 +1636,11 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnannotated
-                   (NoExtField))
+                  (HsModifiedFunArr
+                   (NoExtField)
+                   []
+                   (HsStandardArr
+                    (NoExtField)))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:24:18 })
@@ -1686,6 +1718,7 @@
        (ClassDecl
         {NameSet:
          []}
+        []
         (Nothing)
         (L
          (EpAnn
@@ -1847,6 +1880,7 @@
         (NoExtField)
         (ClsInstDecl
          (Nothing)
+         []
          (L
           (EpAnn
            (EpaSpan { DumpRenamedAst.hs:31:10-14 })
@@ -2180,8 +2214,11 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnannotated
-                   (NoExtField))
+                  (HsModifiedFunArr
+                   (NoExtField)
+                   []
+                   (HsStandardArr
+                    (NoExtField)))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:19:28 })
@@ -2250,8 +2287,11 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnannotated
-               (NoExtField))
+              (HsModifiedFunArr
+               (NoExtField)
+               []
+               (HsStandardArr
+                (NoExtField)))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:19:42-52 })
@@ -2272,8 +2312,11 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnannotated
-                   (NoExtField))
+                  (HsModifiedFunArr
+                   (NoExtField)
+                   []
+                   (HsStandardArr
+                    (NoExtField)))
                   (L
                    (EpAnn
                     (EpaSpan { DumpRenamedAst.hs:19:43 })
@@ -2347,6 +2390,7 @@
                []))
              (ConDeclGADT
               (NoExtField)
+              []
               (:|
                (L
                 (EpAnn
@@ -2380,8 +2424,11 @@
                   (NoSourceText))
                  (NoSrcUnpack)
                  (NoSrcStrict)
-                 (HsUnannotated
-                  (NoExtField))
+                 (HsModifiedFunArr
+                  (NoExtField)
+                  []
+                  (HsStandardArr
+                   (NoExtField)))
                  (L
                   (EpAnn
                    (EpaSpan { DumpRenamedAst.hs:20:10-34 })
@@ -2445,8 +2492,11 @@
                         []))
                       (HsFunTy
                        (NoExtField)
-                       (HsUnannotated
-                        (NoExtField))
+                       (HsModifiedFunArr
+                        (NoExtField)
+                        []
+                        (HsStandardArr
+                         (NoExtField)))
                        (L
                         (EpAnn
                          (EpaSpan { DumpRenamedAst.hs:20:22-25 })

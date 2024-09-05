@@ -227,13 +227,13 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
         return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
-                         , pat_ext = (ty, (rhs_tick, var_ticks))
+                         , pat_ext = ext
                          })
   = do  { rhss_nablas <- pmcGRHSs PatBindGuards grhss
-        ; body_expr <- dsGuarded grhss ty rhss_nablas
-        ; let body' = mkOptTickBox rhs_tick body_expr
+        ; body_expr <- dsGuarded grhss (patBindGRHSType ext) rhss_nablas
+        ; let body' = mkOptTickBox (patBindRHSTicks ext) body_expr
               pat'  = decideBangHood dflags pat
-        ; (force_var,sel_binds) <- mkSelectorBinds var_ticks pat PatBindRhs body'
+        ; (force_var,sel_binds) <- mkSelectorBinds (patBindVarsTicks ext) pat PatBindRhs body'
           -- We silently ignore inline pragmas; no makeCorePair
           -- Not so cool, but really doesn't matter
         ; let force_var' = if isBangedLPat pat'

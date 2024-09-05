@@ -539,7 +539,7 @@ data HsExpr p
   -- | Function types @a -> b@.
   -- Used with @RequiredTypeArguments@, e.g. @fn (Int -> Bool)@.
   -- See Note [Types in terms]
-  | HsFunArr (XFunArr p) (HsMultAnnOf (LHsExpr p) p) (LHsExpr p) (LHsExpr p)
+  | HsFunArr (XFunArr p) (HsModifiedFunArrOf (LHsExpr p) p) (LHsExpr p) (LHsExpr p)
 
   | XExpr       !(XXExpr p)
   -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the

@@ -342,7 +342,7 @@ hsScopedTvBinders binds
 
 get_scoped_tvs :: LSig GhcRn -> [Name]
 get_scoped_tvs (L _ signature)
-  | TypeSig _ _ sig <- signature
+  | TypeSig _ _ _ sig <- signature
   = get_scoped_tvs_from_sig (hswc_body sig)
   | ClassOpSig _ _ _ sig <- signature
   = get_scoped_tvs_from_sig sig
@@ -786,10 +786,11 @@ rep_fix_d loc (FixitySig ns_spec names (Fixity prec dir))
        ; mapM do_one names }
 
 repDefD :: LDefaultDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
-repDefD (L loc (DefaultDecl _ _ tys)) = do { tys1 <- repLTys tys
-                                           ; MkC tys2 <- coreListM typeTyConName tys1
-                                           ; dec <- rep2 defaultDName [tys2]
-                                           ; return (locA loc, dec)}
+repDefD (L loc (DefaultDecl _ _ _ tys)) =
+  do { tys1 <- repLTys tys
+     ; MkC tys2 <- coreListM typeTyConName tys1
+     ; dec <- rep2 defaultDName [tys2]
+     ; return (locA loc, dec)}
 
 repRuleD :: LRuleDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repRuleD (L loc (HsRule { rd_name = n
@@ -997,7 +998,7 @@ rep_sigs :: [LSig GhcRn] -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_sigs = concatMapM rep_sig
 
 rep_sig :: LSig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
-rep_sig (L loc (TypeSig _ nms ty))
+rep_sig (L loc (TypeSig _ _ nms ty))
   = mapM (rep_wc_ty_sig sigDName (locA loc) ty) nms
 rep_sig (L loc (PatSynSig _ nms ty))
   = mapM (rep_patsyn_ty_sig (locA loc) ty) nms
@@ -1452,7 +1453,8 @@ repTy (HsAppKindTy _ ty ki) = do
 repTy (HsFunTy _ w f a) = do
                             f1   <- repLTy f
                             a1   <- repLTy a
-                            case multAnnToHsType w of
+                            mMult <- getSingleMult w (HsTyVar noAnn NotPromoted)
+                            case mMult of
                               Nothing -> do
                                 tcon <- repArrowTyCon
                                 repTapps tcon [f1, a1]
@@ -1460,6 +1462,13 @@ repTy (HsFunTy _ w f a) = do
                                 w1 <- repLTy m
                                 tcon <- repMulArrowTyCon
                                 repTapps tcon [w1, f1, a1]
+  where
+    getSingleMult (HsModifiedFunArr _ mods arr) mk_var = case (arr, mods) of
+      (HsStandardArr _, []) -> pure Nothing
+      (HsStandardArr _, [HsModifier _ m]) -> pure $ Just m
+      (HsStandardArr _, mods) -> notHandled $ ThUnexpectedModifier mods
+      (HsLinearArr _, []) -> pure $ Just $ noLocA $ mk_var $ noLocA $ noUserRdr oneDataConName
+      (HsLinearArr _, mods) -> notHandled $ ThUnexpectedModifier mods
 repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
@@ -1749,12 +1758,19 @@ repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
 repE e@(HsStar{}) = notHandled (ThExpressionForm e)
 
-repFunArrMult :: HsMultAnnOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
-repFunArrMult mult = case multAnnToHsExpr mult of
-  Nothing -> repConName unrestrictedFunTyConName
-  Just e -> do { fun <- repConName fUNTyConName
-               ; mult' <- repLE e
-               ; repApp fun mult' }
+repFunArrMult :: HsModifiedFunArrOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
+repFunArrMult (HsModifiedFunArr _ mods arr) = case (arr, mods) of
+  (HsStandardArr _, []) -> repConName unrestrictedFunTyConName
+  (HsStandardArr _, [HsModifier _ m]) -> do
+    fun <- repConName fUNTyConName
+    mult' <- repLE m
+    repApp fun mult'
+  (HsStandardArr _, mods) -> notHandled $ ThUnexpectedModifierExpr mods
+  (HsLinearArr _, []) -> do
+    fun <- repConName fUNTyConName
+    mult' <- repLE $ noLocA $ HsVar noExtField $ noLocA $ noUserRdr oneDataConName
+    repApp fun mult'
+  (HsLinearArr _, mods) -> notHandled $ ThUnexpectedModifierExpr mods
 
 repConName :: Name -> MetaM (Core (M TH.Exp))
 repConName n = do
@@ -2904,13 +2920,16 @@ repGadtDataCons cons details res_ty
 verifyLinearFields :: IsPrefixConGADT -> [HsConDeclField GhcRn] -> MetaM ()
 verifyLinearFields isPrefixConGADT ps = do
   linear <- lift $ unannotatedMultIsLinear isPrefixConGADT
-  let allGood = all (hsMultIsLinear linear . cdf_multiplicity) ps
+  allGood <- and <$> mapM (hsMultIsLinear linear . cdf_multiplicity) ps
   unless allGood $ notHandled ThNonLinearDataCon
   where
-    hsMultIsLinear linear HsUnannotated{} = linear
-    hsMultIsLinear _ HsLinearAnn{} = True
-    hsMultIsLinear _ (HsExplicitMult _ (L _ (HsTyVar _ _ (L _ n)))) = getName n == oneDataConName
-    hsMultIsLinear _ _ = False
+    hsMultIsLinear linear (HsModifiedFunArr _ mods arr) = case (arr, mods) of
+      (HsStandardArr _, []) -> pure linear
+      (HsStandardArr _, [HsModifier ModifierPrintsAs1 _]) -> pure True
+      (HsStandardArr _, [_]) -> pure False
+      (HsStandardArr _, mods) -> notHandled $ ThUnexpectedModifier mods
+      (HsLinearArr _, []) -> pure True
+      (HsLinearArr _, mods) -> notHandled $ ThUnexpectedModifier mods
 
 -- Desugar the arguments in a data constructor declared with prefix syntax.
 repPrefixConArgs :: IsPrefixConGADT -> [HsConDeclField GhcRn] -> MetaM (Core [M TH.BangType])

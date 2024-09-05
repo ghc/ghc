@@ -85,10 +85,10 @@ filterSigNames p (FixSig _ (FixitySig ns_spec ns ty)) =
     [] -> Nothing
     filtered -> Just (FixSig noAnn (FixitySig ns_spec filtered ty))
 filterSigNames _ orig@(MinimalSig _ _) = Just orig
-filterSigNames p (TypeSig _ ns ty) =
+filterSigNames p (TypeSig _ mods ns ty) =
   case filter (p . unLoc) ns of
     [] -> Nothing
-    filtered -> Just (TypeSig noAnn filtered ty)
+    filtered -> Just (TypeSig noAnn mods filtered ty)
 filterSigNames p (ClassOpSig _ is_default ns ty) =
   case filter (p . unLoc) ns of
     [] -> Nothing
@@ -107,7 +107,7 @@ sigName :: LSig GhcRn -> [IdP GhcRn]
 sigName (L _ sig) = sigNameNoLoc' emptyOccEnv sig
 
 sigNameNoLoc' :: forall pass w. UnXRec pass => w -> Sig pass -> [IdP pass]
-sigNameNoLoc' _ (TypeSig _ ns _) = map (unXRec @pass) ns
+sigNameNoLoc' _ (TypeSig _ _ ns _) = map (unXRec @pass) ns
 sigNameNoLoc' _ (ClassOpSig _ _ ns _) = map (unXRec @pass) ns
 sigNameNoLoc' _ (PatSynSig _ ns _) = map (unXRec @pass) ns
 sigNameNoLoc' _ (SpecSig _ n _ _) = [unXRec @pass n]
@@ -232,7 +232,7 @@ getGADTConType
         PrefixConGADT _ pos_args -> foldr hsConDeclFieldToFunTy res_ty pos_args
 
       mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
-      mkFunTy a b = noLocA (HsFunTy noAnn (HsUnannotated noExtField) a b)
+      mkFunTy a b = noLocA (HsFunTy noAnn (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) a b)
 
       mkQualTy :: LHsContext DocNameI -> LHsType DocNameI -> LHsType DocNameI
       mkQualTy ctxt body =
@@ -258,8 +258,8 @@ getMainDeclBinderI (ValD _ d) =
     [] -> []
     (name : _) -> [name]
 getMainDeclBinderI (SigD _ d) = sigNameNoLoc' emptyOccEnv d
-getMainDeclBinderI (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
-getMainDeclBinderI (ForD _ (ForeignExport _ _ _ _)) = []
+getMainDeclBinderI (ForD _ (ForeignImport _ _ name _ _)) = [unLoc name]
+getMainDeclBinderI (ForD _ (ForeignExport _ _ _ _ _)) = []
 getMainDeclBinderI _ = []
 
 familyDeclLNameI :: FamilyDecl DocNameI -> LocatedN DocName
@@ -277,7 +277,7 @@ tcdNameI = unLoc . tyClDeclLNameI
 addClassContext :: Name -> LHsQTyVars GhcRn -> LSig GhcRn -> LSig GhcRn
 -- Add the class context to a class-op signature
 addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype)) =
-  L pos (TypeSig noAnn lname (mkEmptyWildCardBndrs (go_sig_ty ltype)))
+  L pos (TypeSig noAnn [] lname (mkEmptyWildCardBndrs (go_sig_ty ltype)))
   where
     go_sig_ty (L loc (HsSig{sig_bndrs = bndrs, sig_body = ty})) =
       L
@@ -582,7 +582,7 @@ instance Parent (TyClDecl GhcRn) where
       concatMap (toList . getConNames . unLoc) (dd_cons dd)
     | ClassDecl{ tcdSigs = sigs, tcdATs = ats } <- d
     = map (unLoc . fdLName . unLoc) ats
-      ++ [unLoc n | L _ (TypeSig _ ns _) <- sigs, n <- ns]
+      ++ [unLoc n | L _ (TypeSig _ _ ns _) <- sigs, n <- ns]
     | otherwise = []
 
 -- | A parent and its children

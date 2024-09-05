@@ -1847,7 +1847,8 @@ instance ExactPrint (ForeignDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (ForeignImport (tf,ti,td) n ty fimport) = do
+  exact (ForeignImport (tf,ti,td) mods n ty fimport) = do
+    mods' <- mapM markAnnotated mods
     tf' <- markEpToken tf
     ti' <- markEpToken ti
 
@@ -1856,16 +1857,17 @@ instance ExactPrint (ForeignDecl GhcPs) where
     n' <- markAnnotated n
     td' <- markEpUniToken td
     ty' <- markAnnotated ty
-    return (ForeignImport (tf',ti',td') n' ty' fimport')
+    return (ForeignImport (tf',ti',td') mods' n' ty' fimport')
 
-  exact (ForeignExport (tf,te,td) n ty fexport) = do
+  exact (ForeignExport (tf,te,td) mods n ty fexport) = do
+    mods' <- mapM markAnnotated mods
     tf' <- markEpToken tf
     te' <- markEpToken te
     fexport' <- markAnnotated fexport
     n' <- markAnnotated n
     td' <- markEpUniToken td
     ty' <- markAnnotated ty
-    return (ForeignExport (tf',te',td') n' ty' fexport')
+    return (ForeignExport (tf',te',td') mods' n' ty' fexport')
 
 -- ---------------------------------------------------------------------
 
@@ -2216,9 +2218,10 @@ instance ExactPrint (ClsInstDecl GhcPs) where
                      , cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
                      , cid_overlap_mode = mbOverlap
-                     , cid_datafam_insts = adts })
+                     , cid_datafam_insts = adts
+                     , cid_modifiers = mods })
       = do
-          (mbWarn', i', w', mbOverlap', inst_ty') <- top_matter
+          (mbWarn', i', w', mbOverlap', inst_ty', mods') <- top_matter
           oc' <- markEpToken oc
           semis' <- mapM markEpToken semis
           (sortKey', ds) <- withSortKey sortKey
@@ -2237,16 +2240,17 @@ instance ExactPrint (ClsInstDecl GhcPs) where
                               , cid_poly_ty = inst_ty', cid_binds = binds'
                               , cid_sigs = sigs', cid_tyfam_insts = ats'
                               , cid_overlap_mode = mbOverlap'
-                              , cid_datafam_insts = adts' })
-
+                              , cid_datafam_insts = adts'
+                              , cid_modifiers = mods' })
       where
         top_matter = do
+          mods' <- mapM markAnnotated mods
           i' <- markEpToken i
           mw <- mapM markAnnotated mbWarn
           mo <- mapM markAnnotated mbOverlap
           it <- markAnnotated inst_ty
           w' <- markEpToken w -- Optional
-          return (mw, i', w', mo,it)
+          return (mw, i', w', mo, it, mods')
 
 -- ---------------------------------------------------------------------
 
@@ -2314,7 +2318,8 @@ instance ExactPrint (HsBind GhcPs) where
     return (FunBind x fun_id' matches')
 
   exact (PatBind x pat q grhss) = do
-    (q', pat') <- markMultAnnOf q (markAnnotated pat)
+    q' <- markAnnotated q
+    pat' <- markAnnotated pat
     grhss' <- markAnnotated grhss
     return (PatBind x pat' q' grhss')
   exact (PatSynBind x bind) = do
@@ -2611,9 +2616,10 @@ instance ExactPrint (Sig GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (TypeSig (AnnSig dc mp md) vars ty)  = do
+  exact (TypeSig (AnnSig dc mp md) mods vars ty)  = do
+    mods' <- markAnnotated mods
     (dc', vars', ty') <- exactVarSig dc vars ty
-    return (TypeSig (AnnSig dc' mp md) vars' ty')
+    return (TypeSig (AnnSig dc' mp md) mods' vars' ty')
 
   exact (PatSynSig (AnnSig dc mp md) lns typ) = do
     mp' <- mapM markEpToken mp
@@ -2742,13 +2748,14 @@ instance ExactPrint (DefaultDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (DefaultDecl (d,op,cp) cl tys) = do
+  exact (DefaultDecl (d,op,cp) mods cl tys) = do
+    mods' <- markAnnotated mods
     d' <- markEpToken d
     cl' <- markAnnotated cl
     op' <- markEpToken op
     tys' <- markAnnotated tys
     cp' <- markEpToken cp
-    return (DefaultDecl (d',op',cp') cl' tys')
+    return (DefaultDecl (d',op',cp') mods' cl' tys')
 
 -- ---------------------------------------------------------------------
 
@@ -3134,7 +3141,7 @@ instance ExactPrint (HsExpr GhcPs) where
     return (HsStar tokstar')
 
   exact (HsFunArr _ mult arg res) = do
-    (mult', arg') <- markMultAnnOf mult (markAnnotated arg)
+    (mult', arg') <- markModifiedFunArrOf mult (markAnnotated arg)
     res' <- markAnnotated res
     return (HsFunArr noExtField mult' arg' res')
 
@@ -3580,11 +3587,12 @@ instance ExactPrint (TyClDecl GhcPs) where
                     , tcdRhs = rhs' })
 
   exact (DataDecl { tcdDExt = x, tcdLName = ltycon, tcdTyVars = tyvars
-                  , tcdFixity = fixity, tcdDataDefn = defn }) = do
+                  , tcdFixity = fixity, tcdDataDefn = defn, tcdModifiers = mods }) = do
+    mods' <- mapM markAnnotated mods
     (_,ltycon', tyvars', _, defn') <-
       exactDataDefn (exactVanillaDeclHead ltycon tyvars fixity) defn
     return (DataDecl { tcdDExt = x, tcdLName = ltycon', tcdTyVars = tyvars'
-                     , tcdFixity = fixity, tcdDataDefn = defn' })
+                     , tcdFixity = fixity, tcdDataDefn = defn', tcdModifiers = mods' })
 
   -- -----------------------------------
 
@@ -3594,11 +3602,12 @@ instance ExactPrint (TyClDecl GhcPs) where
                     tcdFDs  = fds,
                     tcdSigs = sigs, tcdMeths = methods,
                     tcdATs = ats, tcdATDefs = at_defs,
-                    tcdDocs = _docs})
+                    tcdDocs = _docs,
+                    tcdModifiers = mods})
       -- TODO: add a test that demonstrates tcdDocs
       | null sigs && null methods && null ats && null at_defs -- No "where" part
       = do
-          (c', w', vb', fds', lclas', tyvars',context') <- top_matter
+          (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
           oc' <- markEpToken oc
           cc' <- markEpToken cc
           return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' oc' cc' semis, lo, sortKey),
@@ -3607,11 +3616,12 @@ instance ExactPrint (TyClDecl GhcPs) where
                              tcdFDs  = fds',
                              tcdSigs = sigs, tcdMeths = methods,
                              tcdATs = ats, tcdATDefs = at_defs,
-                             tcdDocs = _docs})
+                             tcdDocs = _docs,
+                             tcdModifiers = mods'})
 
       | otherwise       -- Laid out
       = do
-          (c', w', vb', fds', lclas', tyvars',context') <- top_matter
+          (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
           oc' <- markEpToken oc
           semis' <- mapM markEpToken semis
           (sortKey', ds) <- withSortKey sortKey
@@ -3633,9 +3643,11 @@ instance ExactPrint (TyClDecl GhcPs) where
                              tcdFDs  = fds',
                              tcdSigs = sigs', tcdMeths = methods',
                              tcdATs = ats', tcdATDefs = at_defs',
-                             tcdDocs = _docs})
+                             tcdDocs = _docs,
+                             tcdModifiers = mods'})
       where
         top_matter = do
+          mods' <- markAnnotated mods
           epTokensToComments "(" ops
           epTokensToComments ")" cps
           c' <- markEpToken c
@@ -3647,7 +3659,7 @@ instance ExactPrint (TyClDecl GhcPs) where
               fds' <- markAnnotated fds
               return (vb', fds')
           w' <- markEpToken w
-          return (c', w', vb', fds', lclas', tyvars',context')
+          return (mods', c', w', vb', fds', lclas', tyvars',context')
 
 
 -- ---------------------------------------------------------------------
@@ -3952,7 +3964,7 @@ instance ExactPrint (HsType GhcPs) where
     ki' <- markAnnotated ki
     return (HsAppKindTy at' ty' ki')
   exact (HsFunTy an mult ty1 ty2) = do
-    (mult', ty1') <- markMultAnnOf mult (markAnnotated ty1)
+    (mult', ty1') <- markModifiedFunArrOf mult (markAnnotated ty1)
     ty2' <- markAnnotated ty2
     return (HsFunTy an mult' ty1' ty2')
   exact (HsListTy an tys) = do
@@ -4264,7 +4276,9 @@ instance ExactPrint (ConDecl GhcPs) where
                     , con_ex_tvs = ex_tvs
                     , con_mb_cxt = mcxt
                     , con_args = args
+                    , con_modifiers = mods
                     , con_doc = doc }) = do
+    mods' <- mapM markAnnotated mods
     tforall' <- if has_forall
       then markEpUniToken tforall
       else return tforall
@@ -4284,6 +4298,7 @@ instance ExactPrint (ConDecl GhcPs) where
                        , con_ex_tvs = ex_tvs'
                        , con_mb_cxt = mcxt'
                        , con_args = args'
+                       , con_modifiers = mods'
                        , con_doc = doc })
 
     where
@@ -4310,7 +4325,9 @@ instance ExactPrint (ConDecl GhcPs) where
                      , con_outer_bndrs = outer_bndrs
                      , con_inner_bndrs = inner_bndrs
                      , con_mb_cxt = mcxt, con_g_args = args
+                     , con_modifiers = mods
                      , con_res_ty = res_ty, con_doc = doc }) = do
+    mods' <- mapM markAnnotated mods
     cons' <- mapM markAnnotated cons
     dcol' <- markEpUniToken dcol
     epTokensToComments "(" ops
@@ -4339,6 +4356,7 @@ instance ExactPrint (ConDecl GhcPs) where
                         , con_outer_bndrs = outer_bndrs'
                         , con_inner_bndrs = inner_bndrs'
                         , con_mb_cxt = mcxt', con_g_args = args'
+                        , con_modifiers = mods'
                         , con_res_ty = res_ty', con_doc = doc })
 
 -- ---------------------------------------------------------------------
@@ -4390,39 +4408,30 @@ instance ExactPrint (HsConDeclField GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
   exact cdf@(CDF { cdf_ext, cdf_bang, cdf_multiplicity, cdf_type }) = do
-    (mult, (an, t)) <- markMultAnnOf cdf_multiplicity ((,) <$> exactBang cdf_ext cdf_bang <*> markAnnotated cdf_type)
+    (mult, (an, t)) <- markModifiedFunArrOf cdf_multiplicity ((,) <$> exactBang cdf_ext cdf_bang <*> markAnnotated cdf_type)
     return (cdf { cdf_ext = an, cdf_multiplicity = mult, cdf_type = t })
 
-markMultAnnOf :: (Monad m, Monoid w, ExactPrint a) => HsMultAnnOf a GhcPs -> EP w m b -> EP w m (HsMultAnnOf a GhcPs, b)
-markMultAnnOf (HsUnannotated arrOrCol) tyM = do
-  ((), arrOrCol', ty') <- markArrOrCol (pure ()) arrOrCol tyM
-  return (HsUnannotated arrOrCol', ty')
-markMultAnnOf (HsLinearAnn (EpPct1 pct1 arrOrCol)) tyM = do
-  (pct1', arrOrCol', ty') <- markArrOrCol (markEpToken pct1) arrOrCol tyM
-  return (HsLinearAnn (EpPct1 pct1' arrOrCol'), ty')
-markMultAnnOf (HsLinearAnn (EpLolly arr)) tyM = do
-  ty' <- tyM
-  arr' <- markEpToken arr
-  return (HsLinearAnn (EpLolly arr'), ty')
-markMultAnnOf (HsExplicitMult (pct, arrOrCol) t) tyM = do
-  ((pct', t'), arrOrCol', ty') <- markArrOrCol ((,) <$> markEpToken pct <*> markAnnotated t) arrOrCol tyM
-  return (HsExplicitMult (pct', arrOrCol') t', ty')
-
-markArrOrCol :: (Monad m, Monoid w) => EP w m a -> EpArrowOrColon -> EP w m b -> EP w m (a, EpArrowOrColon, b)
-markArrOrCol multM (EpArrow arr) tyM = do
-  ty' <- tyM
-  mult' <- multM
-  arr' <- markEpUniToken arr
-  return (mult', EpArrow arr', ty')
-markArrOrCol multM (EpColon col) tyM = do
-  mult' <- multM
-  col' <- markEpUniToken col
-  ty' <- tyM
-  return (mult', EpColon col', ty')
-markArrOrCol multM EpPatBind patM = do
-  mult' <- multM
-  pat' <- patM
-  return (mult', EpPatBind, pat')
+markModifiedFunArrOf :: (Monad m, Monoid w, ExactPrint a)
+                     => HsModifiedFunArrOf a GhcPs
+                     -> EP w m b
+                     -> EP w m (HsModifiedFunArrOf a GhcPs, b)
+markModifiedFunArrOf (HsModifiedFunArr _ mods arr) tyM = do
+  ty' <- if isColon then pure (Left ()) else Right <$> tyM
+  mods' <- markAnnotated mods
+  arr' <- case arr of
+    HsStandardArr (EpArrow a) -> HsStandardArr . EpArrow <$> markEpUniToken a
+    HsStandardArr (EpColon c) -> HsStandardArr . EpColon <$> markEpUniToken c
+    HsLinearArr a -> HsLinearArr <$> markEpToken a
+  ty'' <- either (\() -> tyM) pure ty'
+  return (HsModifiedFunArr noExtField mods' arr', ty'')
+ where
+  -- `tyM` is the type "on the left" of the arrow, but that means it comes on
+  -- the right if the arrow is a colon. That is, it's t in `t -> a`, `t ⊸ a`, or
+  -- `{ x :: t }`.
+  isColon = case arr of
+    HsStandardArr (EpArrow _) -> False
+    HsStandardArr (EpColon _) -> True
+    HsLinearArr _ -> False
 
 exactBang :: (Monoid w, Monad m) => XConDeclField GhcPs -> SrcStrictness -> EP w m (XConDeclField GhcPs)
 exactBang ((o,c,tk), mt) str = do
@@ -4440,6 +4449,16 @@ exactBang ((o,c,tk), mt) str = do
       SrcStrict   -> printStringAtAA tk "!"
       NoSrcStrict -> return tk
   return ((o',c',tk'), mt)
+
+-- ---------------------------------------------------------------------
+
+instance ExactPrint t => ExactPrint (HsModifierOf t GhcPs) where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact (HsModifier pct t) = do
+    pct' <- markEpToken pct
+    t' <- markAnnotated t
+    return (HsModifier pct' t')
 
 -- ---------------------------------------------------------------------
 
@@ -4752,6 +4771,11 @@ instance ExactPrint (Pat GhcPs) where
     tokat' <- markEpToken tokat
     tp' <- markAnnotated tp
     pure (InvisPat (tokat', spec) tp')
+
+  exact (ModifiedPat x mods pat) = do
+    mods' <- markAnnotated mods
+    pat' <- markAnnotated pat
+    return (ModifiedPat x mods' pat')
 
 -- ---------------------------------------------------------------------
 

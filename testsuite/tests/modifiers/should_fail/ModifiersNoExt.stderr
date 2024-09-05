@@ -1,0 +1,7 @@
+ModifiersNoExt.hs:3:1: warning: [GHC-47082] [-Woperator-whitespace-ext-conflict (in -Wdefault)]
+    The prefix use of a ‘%’ would denote a multiplicity annotation
+      were the Modifiers or LinearTypes extensions enabled.
+    Suggested fix: Add whitespace after the ‘%’.
+
+ModifiersNoExt.hs:3:1: error: [GHC-58481] parse error on input ‘%’
+

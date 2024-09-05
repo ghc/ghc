@@ -25,6 +25,7 @@
          (True)
          {NameSet:
           [{Name: GHC.Internal.Types.Int}]})
+        []
         (L
          (EpAnn
           (EpaSpan { T14189.hs:6:6-11 })
@@ -66,6 +67,7 @@
               []))
             (ConDeclH98
              (NoExtField)
+             []
              (L
               (EpAnn
                (EpaSpan { T14189.hs:6:15-16 })
@@ -87,8 +89,11 @@
                  (NoSourceText))
                 (NoSrcUnpack)
                 (NoSrcStrict)
-                (HsUnannotated
-                 (NoExtField))
+                (HsModifiedFunArr
+                 (NoExtField)
+                 []
+                 (HsStandardArr
+                  (NoExtField)))
                 (L
                  (EpAnn
                   (EpaSpan { T14189.hs:6:18-20 })
@@ -123,6 +128,7 @@
               []))
             (ConDeclH98
              (NoExtField)
+             []
              (L
               (EpAnn
                (EpaSpan { T14189.hs:6:24-25 })
@@ -146,6 +152,7 @@
               []))
             (ConDeclH98
              (NoExtField)
+             []
              (L
               (EpAnn
                (EpaSpan { T14189.hs:6:29 })
@@ -208,8 +215,11 @@
                     (NoSourceText))
                    (NoSrcUnpack)
                    (NoSrcStrict)
-                   (HsUnannotated
-                    (NoExtField))
+                   (HsModifiedFunArr
+                    (NoExtField)
+                    []
+                    (HsStandardArr
+                     (NoExtField)))
                    (L
                     (EpAnn
                      (EpaSpan { T14189.hs:6:38-40 })

@@ -30,6 +30,7 @@ module GHC.Parser.PostProcess (
         fromSpecTyVarBndr, fromSpecTyVarBndrs,
         annBinds,
         stmtsAnchor, stmtsLoc,
+        addModifiersToDecl,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -67,9 +68,7 @@ module GHC.Parser.PostProcess (
         addFatalError, hintBangPat,
         mkBangTy,
         UnpackednessPragma(..),
-        mkMultAnn,
         mkMultField,
-        mkConDeclField,
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -225,7 +224,8 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
                                   , tcdSigs = mkClassOpSigs sigs
                                   , tcdMeths = binds
                                   , tcdATs = ats, tcdATDefs = at_defs
-                                  , tcdDocs  = docs })) }
+                                  , tcdDocs = docs
+                                  , tcdModifiers = [] })) }
 
 mkTyData :: SrcSpan
          -> Bool
@@ -249,7 +249,8 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
        ; return (L loc (DataDecl { tcdDExt = noExtField,
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
-                                   tcdDataDefn = defn })) }
+                                   tcdDataDefn = defn,
+                                   tcdModifiers = [] })) }
 
 mkDataDefn :: Maybe (LocatedP (CType GhcPs))
            -> Maybe (LHsContext GhcPs)
@@ -779,17 +780,19 @@ recordPatSynErr loc pat =
     addFatalError $ mkPlainErrorMsgEnvelope loc $
       (PsErrRecordSyntaxInPatSynDecl pat)
 
-mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
+mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> [HsModifier GhcPs]
+             -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
                 -> Maybe (LHsContext GhcPs) -> HsConDeclH98Details GhcPs
                 -> ConDecl GhcPs
 
-mkConDeclH98 (tdarrow, (tforall,tdot)) name mb_forall mb_cxt args
+mkConDeclH98 (tdarrow, (tforall,tdot)) mods name mb_forall mb_cxt args
   = ConDeclH98 { con_ext    = AnnConDeclH98 tforall tdot tdarrow
                , con_name   = name
                , con_forall = isJust mb_forall
                , con_ex_tvs = mb_forall `orElse` []
                , con_mb_cxt = mb_cxt
                , con_args   = args
+               , con_modifiers = mods
                , con_doc    = Nothing }
 
 -- | Construct a GADT-style data constructor from the constructor names and
@@ -800,19 +803,20 @@ mkConDeclH98 (tdarrow, (tforall,tdot)) name mb_forall mb_cxt args
 --   records whether this is a prefix or record GADT constructor. See
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
 mkGadtDecl :: SrcSpan
+           -> [HsModifier GhcPs]
            -> NonEmpty (LocatedN RdrName)
            -> TokDcolon
            -> LHsSigType GhcPs
            -> P (LConDecl GhcPs)
-mkGadtDecl loc names dcol ty = do
+mkGadtDecl loc mods names dcol ty = do
 
   (args, res_ty, (ops, cps), csa) <-
     case body_ty of
      L ll (HsFunTy _ hsArr (L (EpAnn anc _ cs) (XHsType (HsRecTy an rf))) res_ty) -> do
        arr <- case hsArr of
-         HsUnannotated (EpArrow arr) -> return arr
+         HsModifiedFunArr _ [] (HsStandardArr (EpArrow arr)) -> return arr
          _ -> do addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
-                                 (PsErrIllegalGadtRecordMultiplicity hsArr)
+                                 (PsErrIllegalGadtRecordModifier hsArr)
                  return noAnn
 
        return ( RecConGADT arr (L (EpAnn anc an cs) rf), res_ty
@@ -831,6 +835,7 @@ mkGadtDecl loc names dcol ty = do
                      , con_mb_cxt = mcxt
                      , con_g_args = args
                      , con_res_ty = res_ty
+                     , con_modifiers = mods
                      , con_doc    = Nothing }
   where
     (outer_bndrs, inner_bndrs, mcxt, body_ty) = splitLHsGadtTy ty
@@ -1435,6 +1440,8 @@ checkAPat loc e0 = do
      p <- checkLPat e
      return (ParPat (lpar, rpar) p)
 
+   PatBuilderModifiers mods pat -> ModifiedPat noExtField mods <$> checkLPat pat
+
    _           -> do
      details <- fromParseContext <$> askParseContext
      patFail (locA loc) (PsErrInPat e0 details)
@@ -1463,35 +1470,48 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
+-- We distinguish between modifiers attached to bindings (which are used for
+-- multiplicity annotations) and modifiers attached to patterns (which are
+-- currently unused). Both are parsed as PatBuilderModifiers; if that's the
+-- top-level constructor, it's attached to the binding.
+--
+-- Binding: let %m p = ... (PatBuilderModifiers ...)
+-- Pattern: let (%m p) = ... (PatBuilderPar (PatBuilderModifiers ...))
+-- Pattern: let %m x:y = ... (PatBuilderOpApp (PatBuilderModifiers ...) ":" (...))
+--
+-- See Note [Modifiers on patterns vs bindings] in Language.Haskell.Syntax.Pat.
+extract_pat_builder_modifiers
+  :: LocatedA (PatBuilder p) -> (LocatedA (PatBuilder p), [HsModifier p])
+extract_pat_builder_modifiers = \case
+  L _ (PatBuilderModifiers m p) -> (p, m)
+  x -> (x, [])
+
 checkValDef :: SrcSpan
             -> LocatedA (PatBuilder GhcPs)
-            -> (HsMultAnn GhcPs, Maybe (TokDcolon, LHsType GhcPs))
+            -> Maybe (TokDcolon, LHsType GhcPs)
             -> Located (GRHSs GhcPs (LHsExpr GhcPs))
             -> P (HsBind GhcPs)
 
-checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
+checkValDef loc lhs (Just (sigAnn, sig)) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
-  = do lhs' <- runPV $ mkHsTySigPV (combineLocsA lhs sig) lhs sig sigAnn
+  = do let (lhs', mods) = extract_pat_builder_modifiers lhs
+       lhs'' <- runPV $ mkHsTySigPV (combineLocsA lhs' sig) lhs' sig sigAnn
                         >>= checkLPat
-       checkPatBind loc lhs' grhss mult
+       checkPatBind loc lhs'' grhss mods
 
-checkValDef loc lhs (mult_ann, Nothing) grhss
-  | HsUnannotated{} <- mult_ann
-  = do  { mb_fun <- isFunLhs lhs
-        ; case mb_fun of
-            Just (fun, is_infix, pats, ops, cps) -> do
+checkValDef loc lhs Nothing grhss
+        -- %p x = rhs  parses as a *pattern* binding
+  = do let (lhs', mods) = extract_pat_builder_modifiers lhs
+       mb_fun <- isFunLhs lhs'
+       case (mods, mb_fun) of
+         ([], Just (fun, is_infix, pats, ops, cps)) -> do
               let ann_fun = mk_ann_funrhs ops cps
               let l = listLocation pats
               checkFunBind loc ann_fun
                            fun is_infix (L l pats) grhss
-            Nothing -> do
-              lhs' <- checkPattern lhs
-              checkPatBind loc lhs' grhss mult_ann }
-
-checkValDef loc lhs (mult_ann, Nothing) ghrss
-        -- %p x = rhs  parses as a *pattern* binding
-  = do lhs' <- checkPattern lhs
-       checkPatBind loc lhs' ghrss mult_ann
+         _ -> do
+              lhs'' <- checkPattern lhs'
+              checkPatBind loc lhs'' grhss mods
 
 mk_ann_funrhs :: [EpToken "("] -> [EpToken ")"] -> AnnFunRhs
 mk_ann_funrhs ops cps = AnnFunRhs NoEpTok ops cps
@@ -1534,10 +1554,10 @@ makeFunBind fn ms
 checkPatBind :: SrcSpan
              -> LPat GhcPs
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
-             -> HsMultAnn GhcPs
+             -> [HsModifier GhcPs]
              -> P (HsBind GhcPs)
 checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
-                        (L _match_span grhss) (HsUnannotated _)
+                        (L _match_span grhss) []
       = return (makeFunBind v (L (noAnnSrcSpan loc)
                 [L (noAnnSrcSpan loc) (m an v)]))
   where
@@ -1549,8 +1569,8 @@ checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
                   , m_pats = noLocA []
                  , m_grhss = grhss }
 
-checkPatBind _loc lhs (L _ grhss) mult = do
-  return (PatBind noExtField lhs mult grhss)
+checkPatBind _loc lhs (L _ grhss) mods = do
+  return (PatBind noExtField lhs mods grhss)
 
 
 checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)
@@ -1822,10 +1842,10 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpan -> LocatedA (InfixOp b) -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "(a -> b)" (view pattern or function type arrow)
   mkHsArrowPV
-    :: SrcSpan -> ArrowParsingMode lhs b -> LocatedA lhs -> HsMultAnnOf (LocatedA b) GhcPs -> LocatedA b -> PV (LocatedA b)
+    :: SrcSpan -> ArrowParsingMode lhs b -> LocatedA lhs -> HsModifiedFunArrOf (LocatedA b) GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "%m" to the left of "->" (multiplicity)
   mkHsMultPV
-    :: EpToken "%" -> LocatedA b -> PV (TokRarrow -> HsMultAnnOf (LocatedA b) GhcPs)
+    :: Located [HsModifierOf (LocatedA b) GhcPs] -> TokRarrow -> PV (HsModifiedFunArrOf (LocatedA b) GhcPs)
   -- | Disambiguate "forall a. b" and "forall a -> b" (forall telescope)
   mkHsForallPV :: SrcSpan -> HsForAllTelescope GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "(a,b,c)" to the left of "=>" (constraint list)
@@ -1844,6 +1864,9 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> (EpaLocation, EpaLocation) -> PV (LocatedA b)
   -- | Disambiguate "type t" (embedded type)
   mkHsEmbTyPV :: SrcSpan -> EpToken "type" -> LHsType GhcPs -> PV (LocatedA b)
+  -- | Disambiguate modifiers (%a)
+  mkHsModifiedPV
+    :: SrcSpan -> [HsModifier GhcPs] -> LocatedA b -> PV (LocatedA b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
   rejectPragmaPV :: LocatedA b -> PV ()
 
@@ -1960,11 +1983,11 @@ instance DisambECP (HsCmd GhcPs) where
     in pp_op <> ppr c
   mkHsArrowPV l mode a arr b = cmdFail l $
     case mode of  -- matching on the mode brings Outputable instances into scope
-      ArrowIsViewPat -> ppr a <+> pprHsArrow arr <+> ppr b
-      ArrowIsFunType -> ppr a <+> pprHsArrow arr <+> ppr b
-  mkHsMultPV pct mult = cmdFail l $
-    ppr pct <> ppr mult
-    where l = getHasLoc pct `combineSrcSpans` getHasLoc mult
+      ArrowIsViewPat -> ppr a <+> pprHsModifiedFunArr arr <+> ppr b
+      ArrowIsFunType -> ppr a <+> pprHsModifiedFunArr arr <+> ppr b
+  mkHsMultPV lMods tok = case unLoc lMods of
+    [] -> pure $ HsModifiedFunArr noExtField [] $ HsStandardArr (EpArrow tok)
+    mods -> cmdFail (getLoc lMods) $ pprHsModifiers mods
   mkHsForallPV l tele cmd = cmdFail l $
     pprHsForAll tele Nothing <+> ppr cmd
   checkContextPV ctxt = cmdFail (getLocA ctxt) $ ppr ctxt
@@ -1978,6 +2001,7 @@ instance DisambECP (HsCmd GhcPs) where
     text "!" <> ppr c
   mkSumOrTuplePV l boxity a _ = cmdFail (locA l) (pprSumOrTuple boxity a)
   mkHsEmbTyPV l _ ty = cmdFail l (text "type" <+> ppr ty)
+  mkHsModifiedPV l mods _ = cmdFail l (text "modifiers" <+> pprHsModifiers mods)
   rejectPragmaPV _ = return ()
 
 cmdFail :: SrcSpan -> SDoc -> PV a
@@ -2084,8 +2108,10 @@ instance DisambECP (HsExpr GhcPs) where
     exprArrowParsingMode mode $
     return $ L (noAnnSrcSpan l) $
       HsFunArr noExtField arr arg res
-  mkHsMultPV pct t =
-    return $ mkMultExpr pct t
+  mkHsMultPV lMods tok =
+    return $ HsModifiedFunArr noExtField
+                              (reverse $ unLoc lMods)
+                              (HsStandardArr (EpArrow tok))
   mkHsForallPV l telescope ty =
     return $ L (noAnnSrcSpan l) $
       HsForAll noExtField (setTelescopeBndrsNameSpace varName telescope) ty
@@ -2093,6 +2119,9 @@ instance DisambECP (HsExpr GhcPs) where
   mkQualPV l qual ty =
     return $ L (noAnnSrcSpan l) $
       HsQual noExtField qual ty
+  mkHsModifiedPV l _ _ = do
+    addError $ mkPlainErrorMsgEnvelope l $ PsErrModifierSyntax DontSuggestModifiers
+    return $ L (noAnnSrcSpan l) parseError
   rejectPragmaPV (L _ (OpApp _ _ _ e)) =
     -- assuming left-associative parsing of operators
     rejectPragmaPV e
@@ -2167,15 +2196,15 @@ instance DisambECP (PatBuilder GhcPs) where
     where
       tok :: TokRarrow
       tok = case arr of
-        HsUnannotated (EpArrow x) -> x
+        HsModifiedFunArr _ [] (HsStandardArr (EpArrow x)) -> x
         _ -> -- unreachable case because in Parser.y the reduction rules for
              -- (a %m -> b) and (a ->. b) use ArrowIsFunType
-             panic "mkHsArrowPV ArrowIsViewPat: expected HsUnannotated"
+             panic "mkHsArrowPV ArrowIsViewPat: expected HsModifiedFunArr _ [] (HsStandardArr _)"
   mkHsArrowPV l ArrowIsFunType a arr b =
     patFail l (PsErrTypeSyntaxInPat (PETS_FunctionArrow a arr b))
-  mkHsMultPV tok arg =
-    let l = getHasLoc tok `combineSrcSpans` getLocA arg in
-    patFail l (PsErrTypeSyntaxInPat (PETS_Multiplicity tok arg))
+  mkHsMultPV lMods tok = case unLoc lMods of
+    [] -> pure $ HsModifiedFunArr noExtField [] $ HsStandardArr (EpArrow tok)
+    mods -> patFail (getLoc lMods) $ PsErrTypeSyntaxInPat $ PETS_Multiplicity mods
   mkHsForallPV l tele body = patFail l (PsErrTypeSyntaxInPat (PETS_ForallTelescope tele body))
   checkContextPV ctx = patFail (getLocA ctx) (PsErrTypeSyntaxInPat (PETS_ConstraintContext ctx))
   mkQualPV _ _ _ =  -- unreachable because mkQualPV is only called on the result
@@ -2199,6 +2228,8 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsEmbTyPV l toktype ty =
     return $ L (noAnnSrcSpan l) $
       PatBuilderPat (EmbTyPat toktype (mkHsTyPat ty))
+  mkHsModifiedPV l mods p = do
+    return $ L (noAnnSrcSpan l) (PatBuilderModifiers mods p)
   rejectPragmaPV _ = return ()
 
 -- For reasons of backwards compatibility, we can't simply add the pattern
@@ -3168,6 +3199,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
           , fd_name   = v
           , fd_sig_ty = ty
           , fd_fi     = spec
+          , fd_modifiers = []
           }
 
 
@@ -3240,7 +3272,8 @@ mkExport :: Located CCallConv
 mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
  = return $ \tforeign -> ForD noExtField $
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
-                 , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic entity' cconv)) }
+                 , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic entity' cconv))
+                 , fd_modifiers = [] }
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity
@@ -3716,38 +3749,8 @@ mkLHsOpTy x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
   in L (noAnnSrcSpan loc) (HsOpTy noExtField x op y)
 
-mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsMultAnnOf (LHsExpr GhcPs) GhcPs
-mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
-  -- See #18888 for the use of (SourceText "1") above
-  = HsLinearAnn (EpPct1 pct1 (EpArrow arr))
-  where
-    -- The location of "%" combined with the location of "1".
-    pct1 :: EpToken "%1"
-    pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultExpr pct t arr = HsExplicitMult (pct, EpArrow arr) t
-
-mkMultAnn :: EpToken "%" -> LHsType GhcPs -> EpArrowOrColon -> HsMultAnn GhcPs
-mkMultAnn pct t@(L _ (HsTyLit _ (HsNatural _ il))) ep
-  | SourceText (unpackFS -> "1") <- il_text il
-  -- See #18888 for the use of (SourceText "1") above
-  = HsLinearAnn (EpPct1 pct1 ep)
-  where
-    -- The location of "%" combined with the location of "1".
-    pct1 :: EpToken "%1"
-    pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultAnn pct t ep = HsExplicitMult (pct, ep) t
-
-mkMultField :: EpToken "%" -> LHsType GhcPs -> TokDcolon -> LHsType GhcPs -> HsConDeclField GhcPs
-mkMultField pct mult col t = mkConDeclField (mkMultAnn pct mult (EpColon col)) t
-
--- Precondition: the EpToken has EpaSpan, never EpaDelta.
-epTokenWidenR :: EpToken tok -> SrcSpan -> EpToken tok'
-epTokenWidenR NoEpTok _ = NoEpTok
-epTokenWidenR (EpTok l) (UnhelpfulSpan _) = EpTok l
-epTokenWidenR (EpTok (EpaSpan s1)) s2 = EpTok (EpaSpan (combineSrcSpans s1 s2))
-epTokenWidenR (EpTok EpaDelta{}) _ =
-  -- Never happens because the parser does not produce EpaDelta.
-  panic "epTokenWidenR: EpaDelta"
+mkMultField :: [HsModifier GhcPs] -> TokDcolon -> LHsType GhcPs -> HsConDeclField GhcPs
+mkMultField mods col t = mkConDeclField (HsModifiedFunArr noExtField mods $ HsStandardArr (EpColon col)) t
 
 -----------------------------------------------------------------------------
 -- Token symbols
@@ -3898,3 +3901,58 @@ mkListSyntaxTy1 brkOpen t brkClose =
 
 parseError :: HsExpr GhcPs
 parseError = HsHole HoleError
+
+addModifiersToDecl :: Located [HsModifier GhcPs]
+                   -> LHsDecl GhcPs
+                   -> P (LHsDecl GhcPs)
+addModifiersToDecl (L lMods mods) (L (EpAnn lDecl anns1 cs1) topDecl) = do
+  cs <- getCommentsFor srcSpan
+  let newLoc = EpAnn (spanAsAnchor srcSpan) anns1 (cs Semi.<> cs1)
+  fmap (L newLoc) $ case topDecl of
+    TyClD x decl -> TyClD x <$> case decl of
+      FamDecl{} -> forbidden decl
+      SynDecl{} -> forbidden decl
+      DataDecl{tcdModifiers = mods'} ->
+        pure $ decl { tcdModifiers = mods ++ mods' }
+      ClassDecl{tcdModifiers = mods'} ->
+        pure $ decl { tcdModifiers = mods ++ mods'}
+    InstD x decl -> InstD x <$> case decl of
+      ClsInstD x' d@(ClsInstDecl { cid_modifiers = mods' }) ->
+        pure $ ClsInstD x' (d { cid_modifiers = mods ++ mods' })
+      DataFamInstD{} -> forbidden decl
+      TyFamInstD{} -> forbidden decl
+    SigD x decl -> SigD x <$> case decl of
+      TypeSig x' mods' a b -> pure $ TypeSig x' (mods ++ mods') a b
+      PatSynSig{}        -> forbidden decl
+      ClassOpSig{}       -> forbidden decl
+      FixSig{}           -> forbidden decl
+      InlineSig{}        -> forbidden decl
+      SpecSig{}          -> forbidden decl
+      SpecSigE{}         -> forbidden decl
+      SpecInstSig{}      -> forbidden decl
+      MinimalSig{}       -> forbidden decl
+      SCCFunSig{}        -> forbidden decl
+      CompleteMatchSig{} -> forbidden decl
+    DefD x d@(DefaultDecl{defd_modifiers = mods'}) ->
+      pure $ DefD x (d { defd_modifiers = mods ++ mods' })
+    ForD x decl -> ForD x <$> case decl of
+      ForeignImport{fd_modifiers = mods'} ->
+        pure $ decl { fd_modifiers = mods ++ mods'}
+      ForeignExport{fd_modifiers = mods'} ->
+        pure $ decl { fd_modifiers = mods ++ mods'}
+    DerivD{}     -> forbidden topDecl
+    ValD{}       -> forbidden topDecl
+    KindSigD{}   -> forbidden topDecl
+    WarningD{}   -> forbidden topDecl
+    AnnD{}       -> forbidden topDecl
+    RuleD{}      -> forbidden topDecl
+    SpliceD{}    -> forbidden topDecl
+    DocD{}       -> forbidden topDecl
+    RoleAnnotD{} -> forbidden topDecl
+ where
+  srcSpan = combineSrcSpans (getHasLoc lMods) (getHasLoc lDecl)
+
+  forbidden :: a -> P a
+  forbidden decl = do
+    addError $ mkPlainErrorMsgEnvelope srcSpan $ PsErrModifierSyntax DontSuggestModifiers
+    pure decl

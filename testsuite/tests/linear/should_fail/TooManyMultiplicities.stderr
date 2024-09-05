@@ -1,0 +1,4 @@
+TooManyMultiplicities.hs:5:6: error: [GHC-65505]
+    • Too many Multiplicity modifiers
+    • In the type signature: f :: a %1 %1 -> b
+

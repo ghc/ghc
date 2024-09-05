@@ -71,6 +71,7 @@
         (NormalSyntax))
        (Nothing)
        (Nothing))
+      []
       [(L
         (EpAnn
          (EpaSpan { T23315.hsig:3:1 })

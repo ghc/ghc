@@ -538,9 +538,6 @@ type instance XFunRhs  = AnnFunRhs
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnLW
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
 
-multAnnToHsExpr :: HsMultAnnOf (LocatedA (HsExpr GhcRn)) GhcRn -> Maybe (LocatedA (HsExpr GhcRn))
-multAnnToHsExpr = expandHsMultAnnOf mkHsVar
-
 mkHsVar :: forall p. IsPass p => LIdP (GhcPass p) -> HsExpr (GhcPass p)
 mkHsVar n = HsVar noExtField $
   case ghcPass @p of
@@ -1022,7 +1019,7 @@ ppr_expr (HsForAll _ tele ty)
   = sep [pprHsForAll tele Nothing, ppr_lexpr ty]
 
 ppr_expr (HsFunArr _ arr arg res)
-  = sep [ppr_lexpr arg, pprHsArrow arr <+> ppr_lexpr res]
+  = sep [ppr_lexpr arg, pprHsModifiedFunArr arr <+> ppr_lexpr res]
 
 ppr_expr (XExpr x) = case ghcPass @p of
   GhcRn -> ppr x

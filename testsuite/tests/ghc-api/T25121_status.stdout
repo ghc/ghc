@@ -111,7 +111,7 @@ T(OpApp) match = GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn 
 T(ForAll) match = HsForAllTelescope P -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
 T(Qual) match = GenLocated (EpAnn AnnContext) [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
 T(Star) match = HsExpr P
-T(FunArr) match = HsMultAnnOf (GenLocated (EpAnn AnnListItem) (HsExpr P)) P -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+T(FunArr) match = HsModifiedFunArrOf (GenLocated (EpAnn AnnListItem) (HsExpr P)) P -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
 T(ExprWithTySig) mismatch
   >>> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsWildCardBndrs P (GenLocated (EpAnn AnnListItem) (HsSigType P)) -> HsExpr P
   <<< GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P

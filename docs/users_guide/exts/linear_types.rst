@@ -5,9 +5,10 @@ Linear types
 
 .. extension:: LinearTypes
     :shortdesc: Allow writing of linear arrow types.
-        Implies :extension:`MonoLocalBinds`.
+        Implies :extension:`MonoLocalBinds` and :extension:`Modifiers`.
 
     :implies: :extension:`MonoLocalBinds`
+    :implies: :extension:`Modifiers`
 
     :since: 9.0.1
     :status: Experimental
@@ -42,23 +43,23 @@ With ``-XLinearTypes``, you can write ``f :: a %1 -> b`` to mean that
 written as ``⊸``.
 
 To allow uniform handling of linear ``a %1 -> b`` and unrestricted ``a
--> b`` functions, there is a new function type ``a %m -> b``.
-Here, ``m`` is a type of new kind ``Multiplicity``. We have:
+-> b`` functions, there is a new function type ``a %(m :: Multiplicity) -> b``.
+We have:
 
 ::
 
     data Multiplicity = One | Many  -- Defined in GHC.Types
 
     type a %1 -> b = a %One  -> b
-    type a  -> b = a %Many -> b
+    type a    -> b = a %Many -> b
 
-(See :ref:`promotion`).
+(See :ref:`promotion` and :extension:`Modifiers`.)
 
 We say that a variable whose multiplicity constraint is ``Many`` is
 *unrestricted*.
 
-The multiplicity-polymorphic arrow ``a %m -> b`` is available in a prefix
-version as ``GHC.Exts.FUN m a b``, which can be applied
+The multiplicity-polymorphic arrow ``a %(m :: Multiplicity) -> b`` is available
+in a prefix version as ``GHC.Exts.FUN m a b``, which can be applied
 partially. See, however :ref:`linear-types-limitations`.
 
 Linear and multiplicity-polymorphic arrows are *always declared*,
@@ -235,8 +236,8 @@ the value ``MkT1 x`` can be constructed and deconstructed in a linear context:
     deconstruct (MkT1 x) = x  -- must consume `x` exactly once
 
 When used as a value, ``MkT1`` is given a multiplicity-polymorphic
-type: ``MkT1 :: forall {m} a. a %m -> T1 a``. This makes it possible
-to use ``MkT1`` in higher order functions. The additional multiplicity
+type: ``MkT1 :: forall {m :: Multiplicity} a. a %m -> T1 a``. This makes it
+possible to use ``MkT1`` in higher order functions. The additional multiplicity
 argument ``m`` is marked as inferred (see
 :ref:`inferred-vs-specified`), so that there is no conflict with
 visible type application. When displaying types, unless
@@ -278,16 +279,17 @@ It is also possible to define a multiplicity-polymorphic field:
 
 ::
 
-    data T3 a m where
+    data T3 a (m :: Multiplicity) where
         MkT3 :: a %m -> T3 a m
 
 or using record syntax:
 
 ::
 
-    data T3 a m = MkT3 { x %m :: a }
+    data T3 a (m :: Multiplicity) = MkT3 { x %m :: a }
 
-While linear fields are generalized (``MkT1 :: forall {m} a. a %m -> T1 a``
+While linear fields are generalized
+(``MkT1 :: forall {m :: Multiplicity} a. a %m -> T1 a``
 in the previous example), multiplicity-polymorphic fields are not;
 it is not possible to directly use ``MkT3`` as a function ``a -> T3 a One``.
 
@@ -305,13 +307,35 @@ Printing multiplicity-polymorphic types
 If :extension:`LinearTypes` is disabled, multiplicity variables in types are defaulted
 to ``Many`` when printing, in the same manner as described in :ref:`printing-representation-polymorphic-types`.
 In other words, without :extension:`LinearTypes`, multiplicity-polymorphic functions
-``a %m -> b`` are printed as normal Haskell2010 functions ``a -> b``. This allows
+``a %(m :: Multiplicity) -> b`` are printed as normal Haskell2010 functions
+``a -> b``. This allows
 existing libraries to be generalized to linear types in a backwards-compatible
 manner; the general types are visible only if the user has enabled
 :extension:`LinearTypes`.
 (Note that a library can declare a linear function in the contravariant position,
 i.e. take a linear function as an argument. In this case, linearity cannot be
 hidden; it is an essential part of the exposed interface.)
+
+Interaction with Modifiers
+--------------------------
+Since GHC version 9.16, Linear types use :extension:`Modifiers` syntax, and by
+default enable that extension. In earlier versions, linear types used a more
+restricted variant of that syntax.
+
+It's possible to explicitly disable :extension:`Modifiers`: ``-XLinearTypes
+-XNoModifiers``. That introduces backwards compatible behavior (but see the
+limitations of :extension:`Modifiers`):
+
+* Only ``Multiplicity`` modifiers are permitted, and only in the places they're
+  recognized for linear types. Any other use of a modifier is an error.
+
+* The kind of a modifier is determined by checking for ``Multiplicity``, not
+  through synthesis. So ``Int %m -> Bool`` is forbidden with
+  ``-XLinearTypes -XModifiers``, because ``m`` has unknown kind. But it's
+  permitted with ``-XLinearTypes -XNoModifiers``, equivalently to
+  ``Int %(m :: Multiplicity) -> Bool``.
+
+This may be deprecated in future.
 
 .. _linear-types-limitations:
 

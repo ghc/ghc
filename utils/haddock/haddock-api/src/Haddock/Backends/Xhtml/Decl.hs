@@ -77,7 +77,7 @@ ppDecl summ links (L loc decl) pats (mbDoc, fnArgsDoc) instances fixities subdoc
   TyClD _ d@(DataDecl{}) -> ppDataDecl summ links instances fixities subdocs (locA loc) mbDoc d pats splice unicode pkg qual
   TyClD _ d@(SynDecl{}) -> ppTySyn summ links fixities (locA loc) (mbDoc, fnArgsDoc) d splice unicode pkg qual
   TyClD _ d@(ClassDecl{}) -> ppClassDecl summ links instances fixities (locA loc) mbDoc subdocs d splice unicode pkg qual
-  SigD _ (TypeSig _ lnames lty) ->
+  SigD _ (TypeSig _ _ lnames lty) ->
     ppLFunSig
       summ
       links
@@ -413,7 +413,7 @@ ppFor
   links
   loc
   doc
-  (ForeignImport _ (L _ name) typ _)
+  (ForeignImport _ _ (L _ name) typ _)
   fixities
   splice
   unicode
@@ -1151,7 +1151,7 @@ ppInstanceSigs
   -> [Sig DocNameI]
   -> [Html]
 ppInstanceSigs links splice unicode qual sigs = do
-  TypeSig _ lnames typ <- sigs
+  TypeSig _ _ lnames typ <- sigs
   let names = map unLoc lnames
       L _ rtyp = dropWildCardsI typ
   -- Instance methods signatures are synified and thus don't have a useful
@@ -1564,10 +1564,10 @@ ppSideBySideField subdocs unicode qual (HsConDeclRecField _ names ltype) =
 -- don't use cdf_doc for same reason we don't use con_doc above
 -- Where there is more than one name, they all have the same documentation
 ppRecFieldMultAnn :: Unicode -> Qualification -> HsConDeclField DocNameI -> Html
-ppRecFieldMultAnn unicode qual (CDF { cdf_multiplicity = ann }) = case ann of
-  HsUnannotated _ -> noHtml
-  HsLinearAnn _ -> toHtml ("%1" :: LText)
-  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode qual HideEmptyContexts
+ppRecFieldMultAnn unicode qual (CDF { cdf_multiplicity = ann }) = case arr of
+  HsStandardArr _ -> ppr_modifiers mods unicode qual HideEmptyContexts
+  HsLinearArr _ -> toHtml ("%1" :: LText) <+> ppr_modifiers mods unicode qual HideEmptyContexts
+  where HsModifiedFunArr _ mods arr = ann
 
 ppShortField :: Bool -> Unicode -> Qualification -> HsConDeclRecField DocNameI -> Html
 ppShortField summary unicode qual (HsConDeclRecField _ names ltype) =
@@ -1822,16 +1822,15 @@ ppr_mono_ty (HsTyVar _ prom (L _ name)) _ q _
   | otherwise = ppDocName q Prefix True name
 ppr_mono_ty (HsStarTy _) u _ _ =
   toHtml (if u then "★" else "*" :: LText)
-ppr_mono_ty (HsFunTy _ mult ty1 ty2) u q e =
+ppr_mono_ty (HsFunTy _ (HsModifiedFunArr _ mods arr) ty1 ty2) u q e =
   hsep
     [ ppr_mono_lty ty1 u q HideEmptyContexts
-    , arr <+> ppr_mono_lty ty2 u q e
+    , ppr_modifiers mods u q e <+> arr' <+> ppr_mono_lty ty2 u q e
     ]
   where
-    arr = case mult of
-      HsLinearAnn _ -> lollipop u
-      HsUnannotated _ -> arrow u
-      HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u q e <+> arrow u
+    arr' = case arr of
+      HsStandardArr _ -> arrow u
+      HsLinearArr _ -> lollipop u
 ppr_mono_ty (HsTupleTy _ con tys) u q _ =
   tupleParens con (map (ppLType u q HideEmptyContexts) tys)
 ppr_mono_ty (HsSumTy _ tys) u q _ =
@@ -1897,3 +1896,10 @@ ppr_tylit (HsNatural _ n) = toHtml (show (il_value n))
 ppr_tylit (HsString  _ s) = toHtml (show s)
 ppr_tylit (HsChar    _ c) = toHtml (show c)
 ppr_tylit _               = error "ppr_tylit: unsupported lit"
+
+ppr_modifiers :: [HsModifier DocNameI] -> Unicode -> Qualification -> HideEmptyContexts -> Html
+ppr_modifiers mods unicode qual emptyCtxts = foldr ((<+>) . ppr_modifier) mempty mods
+  where
+    ppr_modifier (HsModifier ModifierPrintsAs1 _) = multAnnotation <> char '1'
+    ppr_modifier (HsModifier ModifierPrintsAsSelf ty) =
+      multAnnotation <> ppr_mono_lty ty unicode qual emptyCtxts

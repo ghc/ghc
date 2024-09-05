@@ -187,6 +187,7 @@ tyThingToLHsDecl prr t = case t of
                 , tcdATDefs = catMaybes atDefFamDecls
                 , tcdDocs = [] -- we don't have any docs at this point
                 , tcdCExt = emptyNameSet
+                , tcdModifiers = []
                 }
     | otherwise ->
         synifyTyCon prr Nothing tc >>= allOK . TyClD noExtField
@@ -200,6 +201,7 @@ tyThingToLHsDecl prr t = case t of
         noExtField
         ( TypeSig
             noAnn
+            []
             [synifyNameN dc]
             (synifySigWcType ImplicitizeForAll [] (dataConWrapperType dc))
         )
@@ -283,6 +285,7 @@ synifyTyCon prr _coax tc
                 , dd_derivs = []
                 }
           , tcdDExt = DataDeclRn False emptyNameSet
+          , tcdModifiers = []
           }
   where
     -- tyConTyVars doesn't work on fun/prim, but we can make them up:
@@ -413,6 +416,7 @@ synifyTyCon _prr coax tc
           , tcdFixity = synifyFixity name
           , tcdDataDefn = defn
           , tcdDExt = DataDeclRn False emptyNameSet
+          , tcdModifiers = []
           }
 
 -- | Compute type variable binders & inline kind signature for the TyCon of a
@@ -621,6 +625,7 @@ synifyDataCon use_gadt_syntax dc =
               , con_mb_cxt = ctx
               , con_g_args = hat
               , con_res_ty = synifyType WithinType emptyVarSet res_ty
+              , con_modifiers = []
               , con_doc = Nothing
               }
       else do
@@ -634,6 +639,7 @@ synifyDataCon use_gadt_syntax dc =
               , con_ex_tvs = map (synifyTyVarBndr . (mkForAllTyBinder InferredSpec)) ex_tvs
               , con_mb_cxt = ctx
               , con_args = hat
+              , con_modifiers = []
               , con_doc = Nothing
               }
 
@@ -661,7 +667,7 @@ synifyIdSig
   -> Id
   -- ^ the 'Id' from which to get the type signature
   -> Sig GhcRn
-synifyIdSig prr s boundTvs i = TypeSig noAnn [n] (synifySigWcType s boundTvs t)
+synifyIdSig prr s boundTvs i = TypeSig noAnn [] [n] (synifySigWcType s boundTvs t)
   where
     !n = force $ synifyNameN i
     t = defaultType prr (varType i)
@@ -1086,16 +1092,21 @@ noKindSigTyVars (ForAllTy _ t) = noKindSigTyVars t
 noKindSigTyVars (CastTy t _) = noKindSigTyVars t
 noKindSigTyVars _ = emptyVarSet
 
-synifyMultArrow :: TyVarSet -> Mult -> HsMultAnn GhcRn
-synifyMultArrow boundTvs t = case t of
-  OneTy -> HsLinearAnn noExtField
-  ManyTy -> HsUnannotated noExtField
-  ty -> HsExplicitMult noExtField (synifyType WithinType boundTvs ty)
+synifyMultArrow :: TyVarSet -> Mult -> HsModifiedFunArr GhcRn
+synifyMultArrow boundTvs t = HsModifiedFunArr noExtField mods (HsStandardArr noExtField)
+ where
+  mods = case t of
+    ManyTy -> []
+    -- We turn OneTy into `%1 ->`, not into `⊸` or `%One ->`.
+    OneTy -> [HsModifier ModifierPrintsAs1 $ synifyType WithinType boundTvs t]
+    _ -> [HsModifier ModifierPrintsAsSelf $ synifyType WithinType boundTvs t]
 
-synifyMultRec :: TyVarSet -> Mult -> HsMultAnn GhcRn
-synifyMultRec boundTvs t = case t of
-  OneTy -> HsUnannotated noExtField
-  ty -> HsExplicitMult noExtField (synifyType WithinType boundTvs ty)
+synifyMultRec :: TyVarSet -> Mult -> HsModifiedFunArr GhcRn
+synifyMultRec boundTvs t = HsModifiedFunArr noExtField mods (HsStandardArr noExtField)
+ where
+  mods = case t of
+    OneTy -> []
+    ty -> [HsModifier ModifierPrintsAsSelf $ synifyType WithinType boundTvs ty]
 
 synifyPatSynType :: PatSyn -> LHsType GhcRn
 synifyPatSynType ps =

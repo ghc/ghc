@@ -1305,6 +1305,8 @@ topdecl :: { LHsDecl GhcPs }
         | '{-# RULES' rules '#-}'               {% amsA' (sLL $1 $> $ RuleD noExtField (HsRules ((glR $1,epTok $3), (getRULES_PRAGs $1)) (reverse $2))) }
         | annotation { $1 }
         | decl_no_th                            { $1 }
+        | modifiers1 semis1 topdecl             {% do { hintModifiers (getLoc $1)
+                                                      ; addModifiersToDecl (fmap reverse $1) $3 }}
 
         -- Template Haskell Extension
         -- The $(..) form is one possible form of infixexp
@@ -1325,7 +1327,7 @@ cl_decl :: { LTyClDecl GhcPs }
 --
 default_decl :: { LDefaultDecl GhcPs }
              : 'default' opt_class '(' comma_types0 ')'
-               {% amsA' (sLL $1 $> (DefaultDecl (epTok $1,epTok $3,epTok $5) $2 $4)) }
+               {% amsA' (sLL $1 $> (DefaultDecl (epTok $1,epTok $3,epTok $5) [] $2 $4)) }
 
 
 -- Type declarations (toplevel)
@@ -1402,6 +1404,30 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
              return (sLL $1 $> ($3 : h' : t)) }
   | oqtycon { sL1 $1 [$1] }
 
+modifier :: { Located (HsModifier GhcPs) }
+  : PREFIX_PERCENT atype     { sLL $1 $2 (HsModifier (epTok $1) $2) }
+
+modifiers :: { Located [HsModifier GhcPs] }
+  : modifiers1               { $1 }
+  | {- empty -}              { sL0 [] }
+
+modifiers1 :: { Located [HsModifier GhcPs] }
+  : modifiers modifier       { sLL $1 $2 (unLoc $2 : unLoc $1) }
+
+expModifier :: { forall b. DisambECP b => PV (Located (HsModifierOf (LocatedA b) GhcPs)) }
+  : PREFIX_PERCENT aexp      { unECP $2 >>= \ $2 ->
+                               return $ sLL $1 $2 (HsModifier (epTok $1) $2) }
+
+-- | Modifiers that hold Exprs instead of Types (attached to expression arrows).
+expModifiers :: { forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+  : expModifiers1            { $1 }
+  | {- empty -}              { return $ sL0 [] }
+
+expModifiers1 :: { forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+  : expModifiers expModifier { $1 >>= \ $1 ->
+                               $2 >>= \ $2 ->
+                               return $ sLL $1 $2 (unLoc $2 : unLoc $1) }
+
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst
        {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $5)
@@ -1413,7 +1439,8 @@ inst_decl :: { LInstDecl GhcPs }
                                   , cid_sigs = mkClassOpSigs sigs
                                   , cid_tyfam_insts = ats
                                   , cid_overlap_mode = $3
-                                  , cid_datafam_insts = adts }
+                                  , cid_datafam_insts = adts
+                                  , cid_modifiers = [] }
              ; amsA' (L (comb3 $1 $4 $5)
                              (ClsInstD { cid_d_ext = noExtField, cid_inst = cid }))
                    } }
@@ -2291,22 +2318,23 @@ is connected to the first type too.
 type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
-        | btype '->' ctype             {% amsA' (sLL $1 $>
-                                            $ HsFunTy noExtField (HsUnannotated (EpArrow (epUniTok $2))) $1 $3) }
+        | btype '->' ctype             {% let arr = HsModifiedFunArr noExtField
+                                                                     []
+                                                                     (HsStandardArr $ EpArrow $ epUniTok $2)
+                                          in amsA' (sLL $1 $>
+                                            $ HsFunTy noExtField arr $1 $3) }
 
-        | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> let arr = (unLoc $2) (epUniTok $3)
+        | btype modifiers1 '->' ctype  {% hintLinear (getLoc $2)
+                                       >> let arr = HsModifiedFunArr noExtField
+                                                                     (reverse $ unLoc $2)
+                                                                     (HsStandardArr $ EpArrow $ epUniTok $3)
                                           in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
 
-        | btype '->.' ctype            {% hintLinear (getLoc $2) >>
-                                          amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearAnn (EpLolly (epTok $2))) $1 $3) }
-
-mult :: { Located (EpUniToken "->" "\8594" -> HsMultAnn GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultAnn (epTok $1) $2 . EpArrow) }
-
-expmult :: { forall b. DisambECP b => PV (Located (EpUniToken "->" "\8594" -> HsMultAnnOf (LocatedA b) GhcPs)) }
-expmult : PREFIX_PERCENT aexp           { unECP $2 >>= \ $2 ->
-                                          fmap (sLL $1 $>) (mkHsMultPV (epTok $1) $2) }
+        | btype modifiers '->.' ctype  {% hintLinear (getLoc $3) >>
+                                          let arr = HsModifiedFunArr noExtField
+                                                                     (reverse $ unLoc $2)
+                                                                     (HsLinearArr $ epTok $3)
+                                          in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
@@ -2549,8 +2577,9 @@ gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
     -- TODO:AZ capture the optSemi. Why leading?
-        : optSemi con_list '::' sigtype
-                {% mkGadtDecl (comb2 $2 $>) (unLoc $2) (epUniTok $3) $4 }
+        : optSemi modifiers con_list '::' sigtype
+                {% do { unless (null $ unLoc $2) $ hintModifiers (getLoc $2)
+                      ; mkGadtDecl (comb3 $2 $3 $>) (reverse $ unLoc $2) (unLoc $3) (epUniTok $4) $5 } }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2575,19 +2604,23 @@ constrs1 :: { Located [LConDecl GhcPs] }
         | constr                         { sL1 $1 [$1] }
 
 constr :: { LConDecl GhcPs }
-        : forall context '=>' constr_stuff
-                {% amsA' (let (con,details) = unLoc $4 in
-                  (L (comb4 $1 $2 $3 $4) (mkConDeclH98
-                                                       (epUniTok $3,(fst $ unLoc $1))
+        : modifiers forall context '=>' constr_stuff
+                {% unless (null $ unLoc $1) (hintModifiers (getLoc $1))
+                >> amsA' (let (con,details) = unLoc $5 in
+                  (L (comb5 $1 $2 $3 $4 $5) (mkConDeclH98
+                                                       (epUniTok $4,(fst $ unLoc $2))
+                                                       (reverse $ unLoc $1)
                                                        con
-                                                       (snd $ unLoc $1)
-                                                       (Just $2)
+                                                       (snd $ unLoc $2)
+                                                       (Just $3)
                                                        details))) }
-        | forall constr_stuff
-                {% amsA' (let (con,details) = unLoc $2 in
-                  (L (comb2 $1 $2) (mkConDeclH98 (noAnn, fst $ unLoc $1)
+        | modifiers forall constr_stuff
+                {% unless (null $ unLoc $1) (hintModifiers (getLoc $1))
+                >> amsA' (let (con,details) = unLoc $3 in
+                  (L (comb3 $1 $2 $3) (mkConDeclH98 (noAnn, fst $ unLoc $2)
+                                                      (reverse $ unLoc $1)
                                                       con
-                                                      (snd $ unLoc $1)
+                                                      (snd $ unLoc $2)
                                                       Nothing   -- No context
                                                       details))) }
 
@@ -2617,17 +2650,19 @@ fielddecls1 :: { [LHsConDeclRecField GhcPs] }
 fielddecl :: { LHsConDeclRecField GhcPs }
                                               -- A list because of   f,g :: Int
         : sig_vars '::' ctype
-            {% amsA' (L (comb2 $1 $3)
+            {% let arr = HsModifiedFunArr noExtField [] $ HsStandardArr (EpColon (epUniTok $2))
+               in amsA' (L (comb2 $1 $3)
                       (HsConDeclRecField noExtField
                                     (reverse (map (\ln@(L l n)
                                                -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1)))
-                                    (mkConDeclField (HsUnannotated (EpColon (epUniTok $2))) $3)))}
-        | sig_vars PREFIX_PERCENT atype '::' ctype
-            {% amsA' (L (comb4 $1 $2 $3 $5)
+                                    (mkConDeclField arr $3)))}
+        | sig_vars modifiers1 '::' ctype
+            {% do { hintLinear (getLoc $2)
+                  ; amsA' (L (comb3 $1 $2 $4)
                       (HsConDeclRecField noExtField
                                     (reverse (map (\ln@(L l n)
                                                -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1)))
-                                    (mkMultField (epTok $2) $3 (epUniTok $4) $5)))}
+                                    (mkMultField (reverse $ unLoc $2) (epUniTok $3) $4)))} }
 
 -- Reversed!
 maybe_derivings :: { Located (HsDeriving GhcPs) }
@@ -2693,21 +2728,13 @@ decl_no_th :: { LHsDecl GhcPs }
 
         | infixexp opt_sig rhs  {% runPV (unECP $1) >>= \ $1 ->
                                        do { let { l = comb2 $1 $> }
-                                          ; r <- checkValDef l $1 (HsUnannotated EpPatBind, $2) $3;
+                                          ; r <- checkValDef l $1 $2 $3;
                                         -- Depending upon what the pattern looks like we might get either
-                                        -- a FunBind or PatBind back from checkValDef. See Note
-                                        -- [FunBind vs PatBind]
-                                          ; !cs <- getCommentsFor l
-                                          ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
-        | PREFIX_PERCENT atype infixexp opt_sig rhs {% runPV (unECP $3) >>= \ $3 ->
-                                       do { let { l = comb2 $1 $> }
-                                          ; r <- checkValDef l $3 (mkMultAnn (epTok $1) $2 EpPatBind, $4) $5;
-                                        -- parses bindings of the form %p x or
-                                        -- %p x :: sig
-                                        --
-                                        -- Depending upon what the pattern looks like we might get either
-                                        -- a FunBind or PatBind back from checkValDef. See Note
-                                        -- [FunBind vs PatBind]
+                                        -- a FunBind or PatBind back from checkValDef; and attached modifiers
+                                        -- may get moved from the pattern to the binding. See
+                                        -- Note [FunBind vs PatBind] in Language.Haskell.Syntax.Binds and
+                                        -- Note [Modifiers on patterns vs bindings] in
+                                        -- Language.Haskell.Syntax.Pat.
                                           ; !cs <- getCommentsFor l
                                           ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
         | pattern_synonym_decl  { $1 }
@@ -2747,11 +2774,13 @@ sigdecl :: { LHsDecl GhcPs }
                         {% do { $1 <- runPV (unECP $1)
                               ; v <- checkValSigLhs $1
                               ; amsA' (sLL $1 $> $ SigD noExtField $
-                                  TypeSig (AnnSig (epUniTok $2) Nothing Nothing) [v] (mkHsWildCardBndrs $3))} }
+                                  TypeSig (AnnSig (epUniTok $2) Nothing Nothing) [] [v] (mkHsWildCardBndrs $3))} }
 
         | var ',' sig_vars '::' sigtype
            {% do { v <- addTrailingCommaN $1 (gl $2)
-                 ; let sig = TypeSig (AnnSig (epUniTok $4) Nothing Nothing) (v : reverse (unLoc $3))
+                 ; let sig = TypeSig (AnnSig (epUniTok $4) Nothing Nothing)
+                                      []
+                                      (v : reverse (unLoc $3))
                                       (mkHsWildCardBndrs $5)
                  ; amsA' (sLL $1 $> $ SigD noExtField sig ) }}
 
@@ -2896,7 +2925,7 @@ infixexp2 :: { ECP }
         | '*' '->' infixexp2s   { ECP $
                                   mkStarPV (epUniTok $1) >>= \ $1 ->
                                   unECP $3    >>= \ $3 ->
-                                  let arr = HsUnannotated (EpArrow (epUniTok $2))
+                                  let arr = HsModifiedFunArr noExtField [] $ HsStandardArr (EpArrow (epUniTok $2))
                                   in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $3 }
 
         -- View patterns and function arrows
@@ -2905,23 +2934,26 @@ infixexp2 :: { ECP }
                                   withArrowParsingMode' $ \mode ->
                                   unECP $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
-                                  let arr = HsUnannotated (EpArrow (epUniTok $2))
+                                  let arr = HsModifiedFunArr noExtField [] $ HsStandardArr (EpArrow $ epUniTok $2)
                                   in mkHsArrowPV (comb2 $1 $>) mode $1 arr $3 }
-        | infixexp expmult '->'  infixexp2s
+        | infixexp expModifiers1 '->'  infixexp2s
                                 { ECP $
                                   unECP $1         >>= \ $1 ->
                                   $2               >>= \ $2 ->
                                   unECP $4         >>= \ $4 ->
                                   hintLinear (getLoc $2) >>
-                                  let arr = (unLoc $2) (epUniTok $3)
-                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
-        | infixexp      '->.' infixexp2s
+                                  mkHsMultPV $2 (epUniTok $3) >>= \ arr ->
+                                  mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
+        | infixexp expModifiers '->.' infixexp2s
                                 { ECP $
-                                  hintLinear (getLoc $2) >>
+                                  hintLinear (getLoc $3) >>
                                   unECP $1 >>= \ $1 ->
-                                  unECP $3 >>= \ $3 ->
-                                  let arr = HsLinearAnn (EpLolly (epTok $2))
-                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $3 }
+                                  $2       >>= \ $2 ->
+                                  unECP $4 >>= \ $4 ->
+                                  let arr = HsModifiedFunArr noExtField
+                                                             (reverse $ unLoc $2)
+                                                             (HsLinearArr (epTok $3))
+                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
         | expcontext    '=>'  infixexp2s
                                 { ECP $
                                         $1 >>= \ $1 ->
@@ -3044,6 +3076,10 @@ fexp    :: { ECP }
                                         amsA' (sLL $1 $> $ HsStatic (epTok $1) $2) }
 
         | aexp                       { $1 }
+        | modifiers1 aexp            { ECP $ do
+                                         { hintLinear (getLoc $1)
+                                         ; $2 <- unECP $2
+                                         ; mkHsModifiedPV (comb2 $1 $2) (reverse $ unLoc $1) $2 } }
 
 aexp    :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
@@ -4464,11 +4500,21 @@ fileSrcSpan = do
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
 
--- Hint about linear types
+-- Hint about linear types. These can be parsed given either -XLinearTypes or
+-- -XModifiers.
 hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
+  modifiersEnabled <- getBit ModifiersBit
   linearEnabled <- getBit LinearTypesBit
-  unless linearEnabled $ addError $ mkPlainErrorMsgEnvelope span $ PsErrLinearFunction
+  unless (modifiersEnabled || linearEnabled) $
+    addError $ mkPlainErrorMsgEnvelope span $ PsErrLinearFunction
+
+-- Hint about enabling modifiers, somewhere that -XLinearTypes doesn't cover.
+hintModifiers :: MonadP m => SrcSpan -> m ()
+hintModifiers span = do
+  modifiersEnabled <- getBit ModifiersBit
+  unless modifiersEnabled $
+    addError $ mkPlainErrorMsgEnvelope span $ PsErrModifierSyntax SuggestModifiers
 
 -- Does this look like (a %m)?
 looksLikeMult :: LHsType GhcPs -> LHsType GhcPs -> LHsType GhcPs -> Bool

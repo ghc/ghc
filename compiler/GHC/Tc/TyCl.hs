@@ -2204,7 +2204,7 @@ kcConArgTys :: ConArgKind                      -- Expected kind of the argument(
 kcConArgTys exp_kind arg_tys
   = forM_ arg_tys $ \(CDF { cdf_multiplicity, cdf_type }) ->
     do { _ <- tcCheckLHsTypeInContext cdf_type exp_kind
-       ; maybe (pure ()) (void . tcMult) (multAnnToHsType cdf_multiplicity) }
+       ; void $ tcMult cdf_multiplicity }
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
 
 -- Kind-check the types of arguments to a Haskell98 data constructor.
@@ -4434,12 +4434,10 @@ unannotatedMultIsLinear isPrefixConGADT = do
   else
     return True
 
-tcDataConMult :: IsPrefixConGADT -> HsMultAnn GhcRn -> TcM Mult
-tcDataConMult isPrefixConGADT arr = case multAnnToHsType arr of
-  Nothing -> do
-    isLinear <- unannotatedMultIsLinear isPrefixConGADT
-    return $ if isLinear then oneDataConTy else manyDataConTy
-  Just ty -> tcMult ty
+tcDataConMult :: IsPrefixConGADT -> HsModifiedFunArr GhcRn -> TcM Mult
+tcDataConMult isPrefixConGADT mult = do
+  isLinear <- unannotatedMultIsLinear isPrefixConGADT
+  tcMultDefault (if isLinear then oneDataConTy else manyDataConTy) mult
 
 {-
 Note [Function arrows in GADT constructors]

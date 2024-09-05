@@ -1,6 +1,15 @@
-LinearPartialSig.hs:5:9: error: [GHC-88464]
-    • Found type wildcard ‘_’
-        standing for ‘Many :: GHC.Internal.Types.Multiplicity’
-      To use the inferred type, enable PartialTypeSignatures
+LinearPartialSig.hs:7:6: error: [GHC-38026]
+    • Modifier %_ has unknown kind
     • In the type signature: f :: a %_ -> a
+    Suggested fix:
+      Perhaps it should have a kind signature, like %(_ :: Multiplicity)
+
+LinearPartialSig.hs:10:6: error: [GHC-38026]
+    • Modifier %(_ :: k) has unknown kind
+    • In the type signature: g :: a %(_ :: k) -> a
+
+LinearPartialSig.hs:13:10: error: [GHC-88464]
+    • Found type wildcard ‘_’ standing for ‘Many :: Multiplicity’
+      To use the inferred type, enable PartialTypeSignatures
+    • In the type signature: h :: a %(_ :: Multiplicity) -> a
 

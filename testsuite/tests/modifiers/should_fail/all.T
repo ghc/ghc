@@ -1,0 +1,5 @@
+test('ModifiersUnknownKind', normal, compile_fail, [''])
+test('ModifiersUnexpectedInQuote', normal, compile_fail, [''])
+test('ModifiersExprUnexpectedInQuote', normal, compile_fail, [''])
+test('ModifiersNoExt', normal, compile_fail, [''])
+test('ModifiersForbiddenHere', normal, compile_fail, [''])

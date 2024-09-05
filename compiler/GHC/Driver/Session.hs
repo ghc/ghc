@@ -322,7 +322,7 @@ import qualified GHC.LanguageExtensions as LangExt
 -- described in the User's Guide. Please update the flag description in the
 -- users guide (docs/users_guide) whenever you add or change a flag.
 -- Please make sure you add ":since:" information to new flags.
-
+--
 -- Note [Supporting CLI completion]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -2444,6 +2444,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnRuleLhsEqualities -> warnSpec x
   Opt_WarnUnusableUnpackPragmas -> warnSpec x
   Opt_WarnPatternNamespaceSpecifier -> warnSpec x
+  Opt_WarnUnrecognisedModifiers -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups

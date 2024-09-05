@@ -188,10 +188,13 @@ tcTySig (L _ (XSig (IdSig id)))
              sig = completeSigFromId ctxt id
        ; return [TcIdSig (TcCompleteSig sig)] }
 
-tcTySig (L loc (TypeSig _ names sig_ty))
+tcTySig (L loc (TypeSig _ mods names sig_ty))
   = setSrcSpanA loc $
     do { sigs <- sequence [ tcUserTypeSig (locA loc) sig_ty (Just name)
                           | L _ name <- names ]
+         -- We don't do anything with modifiers, but we do need to make sure
+         -- they type check.
+       ; _ <- tcModifiersAndWarn mods
        ; return (map TcIdSig sigs) }
 
 tcTySig (L loc (PatSynSig _ names sig_ty))
@@ -289,7 +292,10 @@ no_anon_wc_ty lty = go lty
       HsWildCardTy _                 -> False
       HsAppTy _ ty1 ty2              -> go ty1 && go ty2
       HsAppKindTy _ ty ki            -> go ty && go ki
-      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && all go (multAnnToHsType w)
+      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go_mult w
+        where
+          go_mult (HsModifiedFunArr _ mods _) = all go_mod mods
+          go_mod (HsModifier _ ty) = go ty
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys

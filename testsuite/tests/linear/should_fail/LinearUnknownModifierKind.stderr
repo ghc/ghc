@@ -1,0 +1,10 @@
+LinearUnknownModifierKind.hs:7:6: error: [GHC-38026]
+    • Modifier %m has unknown kind
+    • In the type signature: f :: a %m -> a
+    Suggested fix:
+      Perhaps it should have a kind signature, like %(m :: Multiplicity)
+
+LinearUnknownModifierKind.hs:10:6: error: [GHC-38026]
+    • Modifier %(m :: k) has unknown kind
+    • In the type signature: g :: a %(m :: k) -> a
+

@@ -1,0 +1,8 @@
+Modifier1Linear.hs:8:6: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %(1 :: Nat)
+    • In the type signature: f :: a %1 %01 %(1 :: Nat) -> a
+
+Modifier1Linear.hs:8:6: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %01
+    • In the type signature: f :: a %1 %01 %(1 :: Nat) -> a
+

@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -9,8 +10,10 @@
 module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
+        rnModifier, rnModifierWith,
+        rnModifierContext, rnModifiersContext, rnModifiersContextAndWarn,
         rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsMultAnnWith,
+        rnHsSigType, rnHsWcType, rnHsModifiedFunArrWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
         rnHsConDeclRecFields,
@@ -47,6 +50,7 @@ import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName, check
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
+import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Rename.Env
 import GHC.Rename.Doc
@@ -62,17 +66,20 @@ import GHC.Tc.Utils.Monad
 import GHC.Unit.Module ( getModule )
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
+import GHC.Builtin.Types
 import GHC.Types.Hint ( UntickedPromotedThing(..) )
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
+import GHC.Types.SourceText
 
 import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity )
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -438,6 +445,70 @@ isRnKindLevel (RTKE { rtke_level = KindLevel }) = True
 isRnKindLevel _                                 = False
 
 --------------
+rnModifierContext :: HsDocContext -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeNames)
+rnModifierContext ctxt = rnModifier (mkTyKiEnv ctxt TypeLevel RnTypeBody)
+
+rnModifiersContext :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeNames)
+rnModifiersContext ctxt = rnModifiers (mkTyKiEnv ctxt TypeLevel RnTypeBody)
+
+rnModifiersContextAndWarn :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeNames)
+rnModifiersContextAndWarn ctxt = rnModifiersAndWarn (mkTyKiEnv ctxt TypeLevel RnTypeBody)
+
+rnModifierWith :: (mPs -> Maybe mRn)
+               -> (mPs -> RnM (mRn, FreeNames))
+               -> HsModifierOf mPs GhcPs
+               -> RnM (HsModifierOf mRn GhcRn, FreeNames)
+rnModifierWith acceptLiteral1 rn (HsModifier _ ty) = do
+  -- If we see a %1 modifier, and have LinearTypes enabled, treat it the same as
+  -- %One. Only %1 counts, not e.g. %01. See #18888. With NoLinearTypes, it's
+  -- not special and means the same as %(1 :: Nat), but we still mark it
+  -- ModifierPrintsAs1 so that later we can suggest enabling LinearTypes.
+  linearEnabled <- xoptM LangExt.LinearTypes
+  case acceptLiteral1 ty of
+    Just literal1Rn
+      | linearEnabled -> return (HsModifier ModifierPrintsAs1 literal1Rn, mempty)
+      | otherwise -> do
+          (ty', fns) <- rn ty
+          return (HsModifier ModifierPrintsAs1 ty', fns)
+    Nothing -> do
+      (ty', fns) <- rn ty
+      return (HsModifier ModifierPrintsAsSelf ty', fns)
+
+rnModifier :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeNames)
+rnModifier env =
+  rnModifierWith (\ty -> if isLiteral1 ty then Just oneType else Nothing)
+                 (rnLHsTyKi env)
+  where
+    isLiteral1 ty = case ty of
+      (L _ (HsTyLit _ (HsNatural _ il)))
+        | SourceText (unpackFS -> "1") <- il_text il -> True
+      _ -> False
+    oneType = noLocA $ HsTyVar noAnn NotPromoted $ noLocA $ noUserRdr oneDataConName
+
+rnModifierAndWarn :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeNames)
+rnModifierAndWarn env mod = do
+  (mod', fns) <- rnModifier env mod
+  warn_unrecognised <- woptM Opt_WarnUnrecognisedModifiers
+  let HsModifier modPrintsAs _ = mod'
+      suggestLinear = case modPrintsAs of
+        ModifierPrintsAs1 -> SuggestLinear
+        ModifierPrintsAsSelf -> DontSuggestLinear
+  diagnosticTc warn_unrecognised $ TcRnUnrecognisedModifier mod' suggestLinear
+  return (mod', fns)
+
+rnModifiersWith :: (HsModifierOf mPs GhcPs -> RnM (HsModifierOf mRn GhcRn, FreeNames))
+                -> [HsModifierOf mPs GhcPs]
+                -> RnM ([HsModifierOf mRn GhcRn], FreeNames)
+rnModifiersWith rnSingle mods = do
+  (mods', fns) <- unzip <$> traverse rnSingle mods
+  return (mods', mconcat fns)
+
+rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeNames)
+rnModifiers env = rnModifiersWith (rnModifier env)
+
+rnModifiersAndWarn :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeNames)
+rnModifiersAndWarn env = rnModifiersWith (rnModifierAndWarn env)
+
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
@@ -451,7 +522,7 @@ rnHsConDeclField doc = rnHsConDeclFieldTyKi (mkTyKiEnv doc TypeLevel RnTypeBody)
 rnHsConDeclFieldTyKi :: RnTyKiEnv -> HsConDeclField GhcPs
                      -> RnM (HsConDeclField GhcRn, FreeNames)
 rnHsConDeclFieldTyKi env cdf@(CDF { cdf_multiplicity, cdf_type, cdf_doc }) = do
-  (w , fvs_w) <- rnHsMultAnnWith (rnLHsTyKi env) cdf_multiplicity
+  (w , fvs_w) <- rnHsModifiedFunArrWith (rnModifier env) cdf_multiplicity
   (ty, fvs) <- rnLHsTyKi env cdf_type
   doc <- traverse rnLHsDoc cdf_doc
   return (cdf { cdf_multiplicity = w, cdf_type = ty, cdf_doc = doc }, fvs `plusFN` fvs_w)
@@ -566,7 +637,7 @@ rnHsTyKi env (HsParTy _ ty)
 rnHsTyKi env (HsFunTy u mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
-       ; (mult', w_fvs) <- rnHsMultAnnWith (rnLHsTyKi env) mult
+       ; (mult', w_fvs) <- rnHsModifiedFunArrWith (rnModifier env) mult
        ; return (HsFunTy u mult' ty1' ty2'
                 , plusFNs [fvs1, fvs2, w_fvs]) }
 
@@ -711,13 +782,15 @@ and it is not, the program is not well-staged, otherwise it is".
 [1]: https://github.com/ghc-proposals/ghc-proposals/blob/8e4d0e9340c04b904373f9dfe5cbcebc354cd01f/proposals/0682-explicit-level-imports.rst
 -}
 
-rnHsMultAnnWith :: (LocatedA (mult GhcPs) -> RnM (LocatedA (mult GhcRn), FreeNames))
-                  -> HsMultAnnOf (LocatedA (mult GhcPs)) GhcPs
-                  -> RnM (HsMultAnnOf (LocatedA (mult GhcRn)) GhcRn, FreeNames)
-rnHsMultAnnWith _rn (HsUnannotated _) = pure (HsUnannotated noExtField, emptyFNs)
-rnHsMultAnnWith _rn (HsLinearAnn _) = pure (HsLinearAnn noExtField, emptyFNs)
-rnHsMultAnnWith rn (HsExplicitMult _ p)
-  =  (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rn p
+rnHsModifiedFunArrWith :: (HsModifierOf multPs GhcPs -> RnM (HsModifierOf multRn GhcRn, FreeNames))
+                       -> HsModifiedFunArrOf multPs GhcPs
+                       -> RnM (HsModifiedFunArrOf multRn GhcRn, FreeNames)
+rnHsModifiedFunArrWith rn (HsModifiedFunArr _ mods arr) = do
+  (mods', fns) <- rnModifiersWith rn mods
+  let modArr' = HsModifiedFunArr noExtField mods' $ case arr of
+        HsStandardArr _ -> HsStandardArr noExtField
+        HsLinearArr _ -> HsLinearArr noExtField
+  pure (modArr', fns)
 
 {-
 Note [Renaming HsCoreTys]
@@ -2105,7 +2178,7 @@ extract_scaled_ltys args acc = foldr extract_scaled_lty acc args
 extract_scaled_lty :: HsConDeclField GhcPs
                    -> FreeKiTyVars -> FreeKiTyVars
 extract_scaled_lty (CDF { cdf_multiplicity, cdf_type }) acc
-  = extract_lty cdf_type $ extract_hs_mult_ann cdf_multiplicity acc
+  = extract_lty cdf_type $ extract_hs_modified_fun_arr cdf_multiplicity acc
 
 extract_ltys :: [LHsType GhcPs] -> FreeKiTyVars -> FreeKiTyVars
 extract_ltys tys acc = foldr extract_lty acc tys
@@ -2122,7 +2195,7 @@ extract_lty (L _ ty) acc
       HsTupleTy _ _ tys           -> extract_ltys tys acc
       HsSumTy _ tys               -> extract_ltys tys acc
       HsFunTy _ m ty1 ty2         -> extract_lty ty1 $
-                                     extract_hs_mult_ann m $ -- See Note [Ordering of implicit variables]
+                                     extract_hs_modified_fun_arr m $ -- See Note [Ordering of implicit variables]
                                      extract_lty ty2 acc
       HsIParamTy _ _ ty           -> extract_lty ty acc
       HsOpTy _ ty1 op ty2         -> extract_lty ty1 $
@@ -2163,9 +2236,14 @@ extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
 extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
   extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
 
-extract_hs_mult_ann :: HsMultAnn GhcPs -> FreeKiTyVars -> FreeKiTyVars
-extract_hs_mult_ann (HsExplicitMult _ p) acc = extract_lty p acc
-extract_hs_mult_ann _ acc = acc
+extract_hs_modifier :: HsModifier GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modifier (HsModifier _ ty) acc = extract_lty ty acc
+
+extract_hs_modifiers :: [HsModifier GhcPs] -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modifiers mods acc = foldr extract_hs_modifier acc mods
+
+extract_hs_modified_fun_arr :: HsModifiedFunArr GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modified_fun_arr (HsModifiedFunArr _ mods _) = extract_hs_modifiers mods
 
 extract_hs_for_all_telescope :: HsForAllTelescope GhcPs
                              -> FreeKiTyVars -- Accumulator

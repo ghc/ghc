@@ -2060,6 +2060,15 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
       text "Unexpected" <+> pprTypeSyntaxName syntax
 
+    TcRnUnrecognisedModifier mod _ -> mkSimpleDecorated $
+      text "Unrecognised modifier" <+> pprHsModifier mod
+
+    TcRnUnknownModifierKind mod _ -> mkSimpleDecorated $
+      text "Modifier" <+> pprHsModifier mod <+> "has unknown kind"
+
+    TcRnTooManyMultiplicities -> mkSimpleDecorated $
+      text "Too many Multiplicity modifiers"
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2700,6 +2709,12 @@ instance Diagnostic TcRnMessage where
     TcRnOutOfArityTyVar{}
       -> ErrorWithoutFlag
     TcRnUnexpectedTypeSyntaxInTerms{}
+      -> ErrorWithoutFlag
+    TcRnUnrecognisedModifier{}
+      -> WarningWithFlag Opt_WarnUnrecognisedModifiers
+    TcRnUnknownModifierKind{}
+      -> ErrorWithoutFlag
+    TcRnTooManyMultiplicities{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3427,6 +3442,16 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnexpectedTypeSyntaxInTerms syntax
       -> [suggestExtension (typeSyntaxExtension syntax)]
+    TcRnUnrecognisedModifier _ sl
+      -> case sl of
+           SuggestLinear -> [suggestExtension LangExt.LinearTypes]
+           DontSuggestLinear -> noHints
+    TcRnUnknownModifierKind mod@(HsModifier _ ty) mName
+      -> case (mName, hsTyKindSig ty) of
+           (Just name, Nothing) -> [SuggestModifierSignature mod name]
+           _ -> noHints
+    TcRnTooManyMultiplicities{}
+      -> noHints
 
   diagnosticCode = constructorCode @GHC
 

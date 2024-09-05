@@ -171,19 +171,18 @@ ds_val_bind _ (is_rec, binds) _body
 -- would transform a linear definition into a non-linear one. See Wrinkle 2
 -- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
 ds_val_bind dflags (NonRecursive, hsbinds) body
-  | [L _loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann
-                     , pat_ext = (ty, (rhs_tick, _var_ticks))})] <- hsbinds
+  | [L _loc (PatBind { pat_lhs = pat, pat_rhs = grhss
+                     , pat_ext = ext })] <- hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
   , pat' <- decideBangHood dflags pat
   , isBangedLPat pat'
   = do { rhss_nablas <- pmcGRHSs PatBindGuards grhss
-        ; rhs_expr <- dsGuarded grhss ty rhss_nablas
-        ; let rhs' = mkOptTickBox rhs_tick rhs_expr
+        ; rhs_expr <- dsGuarded grhss (patBindGRHSType ext) rhss_nablas
+        ; let rhs' = mkOptTickBox (patBindRHSTicks ext) rhs_expr
         ; let body_ty = exprType body
-        ; let mult = getTcMultAnn mult_ann
         ; error_expr <- mkErrorAppDs pAT_ERROR_ID body_ty (ppr pat)
                         -- Show the original user-written `pat` in error msg
-        ; matchSimply rhs' PatBindRhs mult pat' body error_expr }
+        ; matchSimply rhs' PatBindRhs (patBindMult ext) pat' body error_expr }
     -- This is the one place where matchSimply is given a non-ManyTy
     -- multiplicity argument.
     --
@@ -251,11 +250,11 @@ dsUnliftedBind (FunBind { fun_id = L l fun
        ; return (bindNonRec fun rhs' body) } }
 
 dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
-                        , pat_ext = (ty, _) }) body
+                        , pat_ext = ext }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
     do { match_nablas <- pmcGRHSs PatBindGuards grhss
-       ; rhs          <- dsGuarded grhss ty match_nablas
+       ; rhs          <- dsGuarded grhss (patBindGRHSType ext) match_nablas
        ; let eqn = EqnMatch { eqn_pat = pat, eqn_rest = EqnDone (cantFailMatchResult body) }
        ; var    <- selectMatchVar ManyTy (unLoc pat)
                     -- `var` will end up in a let binder, so the multiplicity

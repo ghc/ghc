@@ -1,0 +1,202 @@
+Modifiers.hs:7:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:9:5: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:10:5: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %True
+
+Modifiers.hs:11:5: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %False
+
+Modifiers.hs:11:5: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %True
+    • In the definition of data constructor ‘D3’
+      In the data type declaration for ‘D’
+
+Modifiers.hs:11:5: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %True
+    • In the definition of data constructor ‘D3’
+      In the data type declaration for ‘D’
+
+Modifiers.hs:12:5: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %Bool
+
+Modifiers.hs:14:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:16:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:17:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %True
+
+Modifiers.hs:18:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %False
+
+Modifiers.hs:18:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %True
+    • In the definition of data constructor ‘D3'’
+      In the data type declaration for ‘D'’
+
+Modifiers.hs:18:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %True
+    • In the definition of data constructor ‘D3'’
+      In the data type declaration for ‘D'’
+
+Modifiers.hs:19:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %Bool
+
+Modifiers.hs:21:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:22:13: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %True
+
+Modifiers.hs:22:13: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %False
+    • In the definition of data constructor ‘N’
+      In the newtype declaration for ‘N’
+
+Modifiers.hs:22:13: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %False
+    • In the definition of data constructor ‘N’
+      In the newtype declaration for ‘N’
+
+Modifiers.hs:24:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:26:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %True
+
+Modifiers.hs:26:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %False
+    • In the definition of data constructor ‘N'’
+      In the newtype declaration for ‘N'’
+
+Modifiers.hs:26:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %False
+    • In the definition of data constructor ‘N'’
+      In the newtype declaration for ‘N'’
+
+Modifiers.hs:28:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:30:5: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:31:5: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %True
+
+Modifiers.hs:33:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:35:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:36:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %True
+
+Modifiers.hs:38:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %True
+
+Modifiers.hs:38:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:41:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %False
+
+Modifiers.hs:41:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %True
+
+Modifiers.hs:41:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:46:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:49:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %True
+    • When checking declaration:
+        %True
+        foreign import ccall safe "test" someImport :: Int
+
+Modifiers.hs:52:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %True
+    • When checking declaration:
+        %True
+        foreign export ccall "someImport" someImport :: Int
+
+Modifiers.hs:55:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:60:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+Modifiers.hs:63:2: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %1
+    • In the pattern: %1 pat
+      In a pattern binding:
+        (%1 pat)
+          = ()
+          where
+              x = \ (%() y) -> y
+
+Modifiers.hs:64:15: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %()
+    • In the pattern: %() y
+      In the expression: \ (%() y) -> y
+      In an equation for ‘x’: x = \ (%() y) -> y
+
+Modifiers.hs:66:32: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %m
+    • In the type signature: f1 :: forall (m :: Bool) a b. a %m -> b
+
+Modifiers.hs:75:7: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %()
+    • In the type signature: f4 :: a %() -> b
+
+Modifiers.hs:79:8: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %(Just m)
+    • In the type signature: f5a :: a %(Just m) -> b
+
+Modifiers.hs:82:8: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %Just
+    • In the type signature: f5b :: a %Just -> b
+
+Modifiers.hs:85:8: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %Nothing
+    • In the type signature: f5c :: a %Nothing -> b
+
+Modifiers.hs:100:21: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %()
+    • In the type ‘Int %() -> Int’
+      In the expression: idt (Int %() -> Int) (+ 1)
+      In an equation for ‘visForallApp’:
+          visForallApp = idt (Int %() -> Int) (+ 1)
+
+Modifiers.hs:108:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %a
+
+Modifiers.hs:111:14: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %a
+
+Modifiers.hs:122:12: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %a
+
+Modifiers.hs:125:3: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %a
+
+Modifiers.hs:151:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %CT1
+
+Modifiers.hs:154:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %CT2Con
+
+Modifiers.hs:157:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %CT2Con'
+
+Modifiers.hs:161:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %CT3
+

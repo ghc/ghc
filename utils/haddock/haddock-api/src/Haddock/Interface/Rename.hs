@@ -352,10 +352,19 @@ renameMaybeInjectivityAnn
   -> RnM (Maybe (LInjectivityAnn DocNameI))
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
-renameMultAnn :: HsMultAnn GhcRn -> RnM (HsMultAnn DocNameI)
-renameMultAnn (HsUnannotated _) = return (HsUnannotated noExtField)
-renameMultAnn (HsLinearAnn _) = return (HsLinearAnn noExtField)
-renameMultAnn (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
+renameModifier :: HsModifier GhcRn -> RnM (HsModifier DocNameI)
+renameModifier (HsModifier x ty) = HsModifier x <$> renameLType ty
+
+renameModifiers :: [HsModifier GhcRn] -> RnM [HsModifier DocNameI]
+renameModifiers = mapM renameModifier
+
+renameModifiedFunArr :: HsModifiedFunArr GhcRn -> RnM (HsModifiedFunArr DocNameI)
+renameModifiedFunArr (HsModifiedFunArr _ mods arr) = do
+  mods' <- renameModifiers mods
+  let arr' = case arr of
+        HsStandardArr _ -> HsStandardArr noExtField
+        HsLinearArr _ -> HsLinearArr noExtField
+  pure $ HsModifiedFunArr noExtField mods' arr'
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
@@ -386,7 +395,7 @@ renameType t = case t of
   HsFunTy _ w a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    w' <- renameMultAnn w
+    w' <- renameModifiedFunArr w
     return (HsFunTy noAnn w' a' b')
   HsListTy _ ty -> return . (HsListTy noAnn) =<< renameLType ty
   HsIParamTy _ n ty -> liftM (HsIParamTy noAnn n) (renameLType ty)
@@ -568,10 +577,11 @@ renameTyClD d = case d of
           , tcdRhs = rhs'
           }
       )
-  DataDecl{tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdDataDefn = defn} -> do
+  DataDecl{tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdDataDefn = defn, tcdModifiers = mods} -> do
     lname' <- renameNameL lname
     tyvars' <- renameLHsQTyVars tyvars
     defn' <- renameDataDefn defn
+    mods' <- renameModifiers mods
     return
       ( DataDecl
           { tcdDExt = noExtField
@@ -579,6 +589,7 @@ renameTyClD d = case d of
           , tcdTyVars = tyvars'
           , tcdFixity = fixity
           , tcdDataDefn = defn'
+          , tcdModifiers = mods'
           }
       )
   ClassDecl
@@ -590,6 +601,7 @@ renameTyClD d = case d of
     , tcdSigs = lsigs
     , tcdATs = ats
     , tcdATDefs = at_defs
+    , tcdModifiers = mods
     } -> do
       lcontext' <- traverse renameLContext lcontext
       lname' <- renameNameL lname
@@ -598,6 +610,7 @@ renameTyClD d = case d of
       lsigs' <- mapM renameLSig lsigs
       ats' <- mapM (renameLThing renameFamilyDecl) ats
       at_defs' <- mapM (mapM renameTyFamDefltD) at_defs
+      mods' <- renameModifiers mods
       -- we don't need the default methods or the already collected doc entities
       return
         ( ClassDecl
@@ -612,6 +625,7 @@ renameTyClD d = case d of
             , tcdATs = ats'
             , tcdATDefs = at_defs'
             , tcdDocs = []
+            , tcdModifiers = mods'
             }
         )
   where
@@ -699,12 +713,14 @@ renameCon
           , con_args = details
           , con_doc = mbldoc
           , con_forall = forall_
+          , con_modifiers = mods
           }
         ) = do
     lname' <- renameNameL lname
     ltyvars' <- mapM (renameLTyVarBndr return) ltyvars
     lcontext' <- traverse renameLContext lcontext
     details' <- renameH98Details details
+    mods' <- renameModifiers mods
     mbldoc' <- mapM (renameLDocHsSyn) mbldoc
     return
       ( decl
@@ -714,6 +730,7 @@ renameCon
           , con_mb_cxt = lcontext'
           , con_forall = forall_ -- Remove when #18311 is fixed
           , con_args = details'
+          , con_modifiers = mods'
           , con_doc = mbldoc'
           }
       )
@@ -725,6 +742,7 @@ renameCon
     , con_mb_cxt = lcontext
     , con_g_args = details
     , con_res_ty = res_ty
+    , con_modifiers = mods
     , con_doc = mbldoc
     } = do
     lnames' <- mapM renameNameL lnames
@@ -733,6 +751,7 @@ renameCon
     lcontext' <- traverse renameLContext lcontext
     details' <- renameGADTDetails details
     res_ty' <- renameLType res_ty
+    mods' <- renameModifiers mods
     mbldoc' <- mapM renameLDocHsSyn mbldoc
     return
       ( ConDeclGADT
@@ -743,6 +762,7 @@ renameCon
           , con_mb_cxt = lcontext'
           , con_g_args = details'
           , con_res_ty = res_ty'
+          , con_modifiers = mods'
           , con_doc = mbldoc'
           }
       )
@@ -751,7 +771,7 @@ renameHsConDeclField
   :: HsConDeclField GhcRn
   -> RnM (HsConDeclField DocNameI)
 renameHsConDeclField cdf = do
-  w <- renameMultAnn (cdf_multiplicity cdf)
+  w <- renameModifiedFunArr (cdf_multiplicity cdf)
   ty <- renameLType (cdf_type cdf)
   doc <- mapM renameLDocHsSyn (cdf_doc cdf)
   return
@@ -796,10 +816,11 @@ renameLFieldOcc (L l (FieldOcc rdr (L n sel))) = do
 
 renameSig :: Sig GhcRn -> RnM (Sig DocNameI)
 renameSig sig = case sig of
-  TypeSig _ lnames ltype -> do
+  TypeSig _ mods lnames ltype -> do
     lnames' <- mapM renameNameL lnames
     ltype' <- renameLSigWcType ltype
-    return (TypeSig noExtField lnames' ltype')
+    mods' <- renameModifiers mods
+    return (TypeSig noExtField mods' lnames' ltype')
   ClassOpSig _ is_default lnames sig_ty -> do
     lnames' <- mapM renameNameL lnames
     ltype' <- renameLSigType sig_ty
@@ -829,14 +850,16 @@ bfTraverse f = go
     go (Parens bf ) = Parens <$> traverse go bf
 
 renameForD :: ForeignDecl GhcRn -> RnM (ForeignDecl DocNameI)
-renameForD (ForeignImport _ lname ltype x) = do
+renameForD (ForeignImport _ modifiers lname ltype x) = do
   lname' <- renameNameL lname
   ltype' <- renameLSigType ltype
-  return (ForeignImport noExtField lname' ltype' (renameForI x))
-renameForD (ForeignExport _ lname ltype x) = do
+  modifiers' <- renameModifiers modifiers
+  return (ForeignImport noExtField modifiers' lname' ltype' (renameForI x))
+renameForD (ForeignExport _ modifiers lname ltype x) = do
   lname' <- renameNameL lname
   ltype' <- renameLSigType ltype
-  return (ForeignExport noExtField lname' ltype' (renameForE x))
+  modifiers' <- renameModifiers modifiers
+  return (ForeignExport noExtField modifiers' lname' ltype' (renameForE x))
 
 renameForI :: ForeignImport GhcRn -> ForeignImport DocNameI
 renameForI (CImport _ cconv safety mHeader spec) =
@@ -908,11 +931,13 @@ renameClsInstD
       , cid_poly_ty = ltype
       , cid_tyfam_insts = lATs
       , cid_datafam_insts = lADTs
+      , cid_modifiers = mods
       }
     ) = do
     ltype' <- renameLSigType ltype
     lATs' <- mapM (mapM renameTyFamInstD) lATs
     lADTs' <- mapM (mapM renameDataFamInstD) lADTs
+    mods' <- renameModifiers mods
     return
       ( ClsInstDecl
           { cid_ext = noExtField
@@ -922,6 +947,7 @@ renameClsInstD
           , cid_sigs = []
           , cid_tyfam_insts = lATs'
           , cid_datafam_insts = lADTs'
+          , cid_modifiers = mods'
           }
       )
 

@@ -116,10 +116,14 @@ type instance XFunBind    (GhcPass pL) GhcTc = (HsWrapper, [CoreTickish])
 
 type instance XPatBind    GhcPs (GhcPass pR) = NoExtField
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- See Note [Bind free vars]
-type instance XPatBind    GhcTc (GhcPass pR) =
-    ( Type                  -- Type of the GRHSs
-    , ( [CoreTickish]       -- Ticks to put on the rhs, if any
-      , [[CoreTickish]] ) ) -- and ticks to put on the bound variables.
+type instance XPatBind    GhcTc (GhcPass pR) = XPatBindTc
+
+data XPatBindTc = XPatBindTc
+  { patBindGRHSType :: Type -- ^ Type of the GRHSs
+  , patBindRHSTicks :: [CoreTickish] -- ^ Ticks to put on the rhs
+  , patBindVarsTicks :: [[CoreTickish]] -- ^ Ticks to put on the bound variables
+  , patBindMult :: Mult -- ^ Multiplicity, given by a modifier or inferred
+  }
 
 type instance XVarBind (GhcPass pL) (GhcPass pR) = XVarBindGhc pL pR
 type family XVarBindGhc pL pR where
@@ -149,16 +153,6 @@ data AnnPSB
 
 instance NoAnn AnnPSB where
   noAnn = AnnPSB noAnn noAnn noAnn noAnn noAnn
-
-setTcMultAnn :: Mult -> HsMultAnn GhcRn -> HsMultAnn GhcTc
-setTcMultAnn mult (HsLinearAnn _)   = HsLinearAnn mult
-setTcMultAnn mult (HsExplicitMult _ p) = HsExplicitMult mult p
-setTcMultAnn mult (HsUnannotated _) = HsUnannotated mult
-
-getTcMultAnn :: HsMultAnn GhcTc -> Mult
-getTcMultAnn (HsLinearAnn mult)   = mult
-getTcMultAnn (HsExplicitMult mult _) = mult
-getTcMultAnn (HsUnannotated mult) = mult
 
 -- ---------------------------------------------------------------------
 
@@ -553,8 +547,8 @@ ppr_monobind :: forall idL idR.
                 (OutputableBndrId idL, OutputableBndrId idR)
              => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
-ppr_monobind (PatBind { pat_lhs = pat, pat_mult = mult_ann, pat_rhs = grhss })
-  = pprHsMultAnn @idL mult_ann
+ppr_monobind (PatBind { pat_lhs = pat, pat_mods = mods, pat_rhs = grhss })
+  = pprHsModifiers mods
     <+> pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
   = sep [pprBndr CasePatBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
@@ -833,7 +827,8 @@ instance OutputableBndrId p => Outputable (Sig (GhcPass p)) where
 
 ppr_sig :: forall p. (IsPass p, OutputableBndrId p)
         => Sig (GhcPass p) -> SDoc
-ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (TypeSig _ mods vars ty) =
+  pprHsModifiers mods $$ pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)

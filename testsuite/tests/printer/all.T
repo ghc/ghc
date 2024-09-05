@@ -219,3 +219,4 @@ test('Test25885', [ignore_stderr, req_ppr_deps], makefile_test, ['Test25885'])
 
 test('TestLevelImports', [ignore_stderr, req_ppr_deps], makefile_test, ['TestLevelImports'])
 test('TestNamedDefaults', [ignore_stderr, req_ppr_deps], makefile_test, ['TestNamedDefaults'])
+test('PprModifiers', [ignore_stderr,req_ppr_deps], makefile_test, ['PprModifiers'])

@@ -340,7 +340,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
 -- TODO: Revisit this
 addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
                                     , pat_rhs = rhs
-                                    , pat_ext = (grhs_ty, initial_ticks)}))) = do
+                                    , pat_ext = ext }))) = do
 
   let simplePatId = isSimplePat lhs
 
@@ -362,19 +362,20 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
     rhs_tick <- bindTick density name (locA pos) fvs
 
     let mbCons = maybe id (:)
-        (initial_rhs_ticks, initial_patvar_tickss) = initial_ticks
-        rhs_ticks = rhs_tick `mbCons` initial_rhs_ticks
+        rhs_ticks = rhs_tick `mbCons` patBindRHSTicks ext
 
     patvar_tickss <- case simplePatId of
-      Just{} -> return initial_patvar_tickss
+      Just{} -> return $ patBindVarsTicks ext
       Nothing -> do
         let patvars = map getOccString (collectPatBinders CollNoDictBinders lhs)
         patvar_ticks <- mapM (\v -> bindTick density v (locA pos) fvs) patvars
         return
           (zipWith mbCons patvar_ticks
-                          (initial_patvar_tickss ++ repeat []))
+                          (patBindVarsTicks ext ++ repeat []))
 
-    return $ L pos $ pat' { pat_ext = (grhs_ty, (rhs_ticks, patvar_tickss)) }
+    let ext' = ext { patBindRHSTicks = rhs_ticks
+                   , patBindVarsTicks = patvar_tickss }
+    return $ L pos $ pat' { pat_ext = ext' }
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
@@ -1413,6 +1414,7 @@ instance CollectFldBinders (Pat GhcTc) where
     go sels (XPat (ExpansionPat _ p)) = go sels p
     go sels (ListPat _ ps) = plusVarEnvList (map (go sels . unLoc) ps)
     go sels (TuplePat _ ps _) = plusVarEnvList (map (go sels . unLoc) ps)
+    go sels (ModifiedPat _ _ (L _ p)) = go sels p
     go _ WildPat{} = emptyVarEnv
     go _ OrPat{} = emptyVarEnv
     go _ LitPat{} = emptyVarEnv

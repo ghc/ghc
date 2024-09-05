@@ -199,6 +199,10 @@ instance Diagnostic DsMessage where
                -> mkMsg "Non-linear fields in data constructors" empty
              ThDataConVisibleForall
                -> mkMsg "Visible forall in data constructors" empty
+             ThUnexpectedModifier mods
+               -> mkMsg "Modifier" $ text "At most one modifier is supported" $$ pprHsModifiers mods
+             ThUnexpectedModifierExpr mods
+               -> mkMsg "Modifier" $ text "At most one modifier is supported" $$ pprHsModifiers mods
          where
            mkMsg what doc =
              mkSimpleDecorated $

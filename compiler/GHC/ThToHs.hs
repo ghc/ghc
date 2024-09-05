@@ -243,7 +243,7 @@ cvtDec (TH.ValD pat body ds)
           PatBind { pat_lhs = pat'
                   , pat_rhs = GRHSs emptyComments body' ds'
                   , pat_ext = noExtField
-                  , pat_mult = HsUnannotated EpPatBind
+                  , pat_mods = []
                   } }
 
 cvtDec (TH.FunD nm cls)
@@ -259,7 +259,7 @@ cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameN nm
         ; ty' <- cvtSigType typ
         ; returnJustLA $ Hs.SigD noExtField
-                                    (TypeSig noAnn [nm'] (mkHsWildCardBndrs ty')) }
+                                    (TypeSig noAnn [] [nm'] (mkHsWildCardBndrs ty')) }
 
 cvtDec (TH.KiSigD nm ki)
   = do  { nm' <- tconNameN nm
@@ -283,7 +283,7 @@ cvtDec (TH.InfixD fx th_ns_spec nm)
 
 cvtDec (TH.DefaultD tys)
   = do  { tys' <- traverse cvtType tys
-        ; returnJustLA (Hs.DefD noExtField $ DefaultDecl noAnn Nothing tys') }
+        ; returnJustLA (Hs.DefD noExtField $ DefaultDecl noAnn [] Nothing tys') }
 
 cvtDec (PragmaD prag)
   = cvtPragmaD prag
@@ -314,7 +314,8 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
           DataDecl { tcdDExt = noExtField
                    , tcdLName = tc', tcdTyVars = tvs'
                    , tcdFixity = Prefix
-                   , tcdDataDefn = defn } }
+                   , tcdDataDefn = defn
+                   , tcdModifiers = [] } }
 
 cvtDec (TypeDataD tc tvs ksig constrs)
   = cvtTypeDataDec tc tvs ksig constrs
@@ -331,8 +332,9 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                     , tcdFixity = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
-                    , tcdATs = fams', tcdATDefs = at_defs', tcdDocs = [] }
-                                                     -- no docs in TH ^^
+                    , tcdATs = fams', tcdATDefs = at_defs'
+                    , tcdDocs = [] -- no docs in TH
+                    , tcdModifiers = [] }
         }
 
 cvtDec (InstanceD o ctxt ty decs)
@@ -349,7 +351,9 @@ cvtDec (InstanceD o ctxt ty decs)
                       , cid_sigs = Hs.mkClassOpSigs sigs'
                       , cid_tyfam_insts = ats', cid_datafam_insts = adts'
                       , cid_overlap_mode
-                                   = fmap (L (l2l loc) . overlap) o } }
+                                   = fmap (L (l2l loc) . overlap) o
+                      , cid_modifiers = []
+                      } }
   where
   overlap pragma =
     case pragma of
@@ -527,7 +531,8 @@ cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
           DataDecl { tcdDExt = noExtField
                    , tcdLName = tc', tcdTyVars = tvs'
                    , tcdFixity = Prefix
-                   , tcdDataDefn = defn } }
+                   , tcdDataDefn = defn
+                   , tcdModifiers = [] } }
 
 -- Convert a set of data constructors.
 cvtDataDefnCons ::
@@ -702,19 +707,19 @@ cvtConstr :: TH.Name -- ^ name of first constructor of parent type
 cvtConstr _ do_con_name (NormalC c strtys)
   = do  { c'   <- do_con_name c
         ; tys' <- mapM cvt_arg strtys
-        ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing (PrefixCon tys') }
+        ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing (PrefixCon tys') }
 
 cvtConstr parent_con do_con_name (RecC c varstrtys)
   = do  { c'    <- do_con_name c
         ; args' <- mapM (cvt_id_arg parent_con) varstrtys
-        ; con_decl <- wrapParLA (mkConDeclH98 noAnn c' Nothing Nothing . RecCon) args'
+        ; con_decl <- wrapParLA (mkConDeclH98 noAnn [] c' Nothing Nothing . RecCon) args'
         ; returnLA con_decl }
 
 cvtConstr _ do_con_name (InfixC st1 c st2)
   = do  { c'   <- do_con_name c
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
-        ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing
+        ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing
                        (InfixCon st1' st2') }
 
 cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
@@ -782,6 +787,7 @@ mk_gadt_decl names args res_ty
                    , con_mb_cxt = Nothing
                    , con_g_args = args
                    , con_res_ty = res_ty
+                   , con_modifiers = []
                    , con_doc    = Nothing }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
@@ -800,7 +806,7 @@ cvt_arg (Bang su ss, ty)
        ; let ty' = parenthesizeHsType appPrec ty''
              su' = cvtSrcUnpackedness su
              ss' = cvtSrcStrictness ss
-       ; return $ CDF noAnn su' ss' (HsUnannotated (EpColon noAnn)) ty' Nothing }
+       ; return $ CDF noAnn su' ss' (HsModifiedFunArr noExtField [] $ HsStandardArr $ EpColon noAnn) ty' Nothing }
 
 cvt_id_arg :: TH.Name -- ^ parent constructor name
            -> (TH.Name, TH.Bang, TH.Type) -> CvtM (LHsConDeclRecField GhcPs)
@@ -860,7 +866,8 @@ cvtForD (ImportF callconv safety from nm ty) =
            ; return (ForeignImport { fd_i_ext = noAnn
                                    , fd_name = nm'
                                    , fd_sig_ty = ty'
-                                   , fd_fi = impspec })
+                                   , fd_fi = impspec
+                                   , fd_modifiers = []})
            }
     safety' = case safety of
                      Unsafe     -> PlayRisky
@@ -879,7 +886,8 @@ cvtForD (ExportF callconv as nm ty)
         ; return $ ForeignExport { fd_e_ext = noAnn
                                  , fd_name = nm'
                                  , fd_sig_ty = ty'
-                                 , fd_fe = e } }
+                                 , fd_fe = e
+                                 , fd_modifiers = [] } }
 
 cvt_conv :: TH.Callconv -> CCallConv
 cvt_conv TH.CCall      = CCallConv
@@ -1724,7 +1732,7 @@ cvtTypeKind typeOrKind ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnLA (HsFunTy noExtField (HsUnannotated (EpArrow noAnn)) x'' y'')
+                 returnLA (HsFunTy noExtField (HsModifiedFunArr noExtField [] $ HsStandardArr $ EpArrow noAnn) x'' y'')
              | otherwise
              -> do { fun_tc <- returnLA $ getRdrName unrestrictedFunTyCon
                    ; mk_apps (HsTyVar noAnn NotPromoted fun_tc) tys' }
@@ -1887,12 +1895,14 @@ cvtTypeKind typeOrKind ty
            _ -> failWith (MalformedType typeOrKind ty)
     }
 
-hsTypeToArrow :: LHsType GhcPs -> HsMultAnn GhcPs
-hsTypeToArrow w = case unLoc w of
+hsTypeToArrow :: LHsType GhcPs -> HsModifiedFunArr GhcPs
+hsTypeToArrow w = HsModifiedFunArr noExtField mods arr
+ where
+  (mods, arr) = case unLoc w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
-                        | n == oneDataConName -> HsLinearAnn noAnn
-                        | n == manyDataConName -> HsUnannotated (EpArrow noAnn)
-                     _ -> HsExplicitMult (noAnn, EpArrow noAnn) w
+                        | n == oneDataConName -> ([], HsLinearArr noAnn)
+                        | n == manyDataConName -> ([], HsStandardArr (EpArrow noAnn))
+                     _ -> ([HsModifier noAnn w], HsStandardArr (EpArrow noAnn))
 
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only

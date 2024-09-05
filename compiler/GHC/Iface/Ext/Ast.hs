@@ -1070,6 +1070,8 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
       InvisPat _ tp ->
         [ toHie $ TS (ResolvedScopes [scope, pscope]) tp
         ]
+      ModifiedPat _ mods pat ->
+        toHie (PS rsp scope pscope pat) : (toHie <$> mods)
       XPat e ->
         case hiePass @p of
           HieRn -> case e of
@@ -1323,7 +1325,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         HieTc -> dataConCantHappen x
       HsFunArr x mult arg res -> case hiePass @p of
         HieRn ->
-          [ toHie (multAnnToHsExpr mult)
+          [ toHie mult
           , toHie arg
           , toHie res
           ]
@@ -1809,7 +1811,7 @@ instance ToHie (LocatedL [LocatedA (HsConDeclRecField GhcRn)]) where
 
 instance ToHie (HsConDeclField GhcRn) where
   toHie (CDF { cdf_multiplicity, cdf_type, cdf_doc }) = concatM
-    [ toHie (multAnnToHsType cdf_multiplicity)
+    [ toHie cdf_multiplicity
     , toHie cdf_type
     , toHie cdf_doc
     ]
@@ -1843,10 +1845,11 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
     case hiePass @p of
       HieTc -> pure []
       HieRn -> concatM $ makeNodeA sig sp : case sig of
-        TypeSig _ names typ ->
+        TypeSig _ mods names typ ->
           [ toHie $ map (C TyDecl) names
           , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
           ]
+            ++ (toHie <$> mods)
         PatSynSig _ names typ ->
           [ toHie $ map (C TyDecl) names
           , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
@@ -1926,8 +1929,8 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie ty
         , toHie ki
         ]
-      HsFunTy _ w a b ->
-        [ toHie (multAnnToHsType w)
+      HsFunTy _ mult a b ->
+        [ toHie mult
         , toHie a
         , toHie b
         ]
@@ -1973,6 +1976,12 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsWildCardTy _ -> []
       HsStarTy _ -> []
       XHsType _ -> []
+
+instance ToHie ty => ToHie (HsModifierOf ty pass) where
+  toHie (HsModifier _ ty) = toHie ty
+
+instance ToHie ty => ToHie (HsModifiedFunArrOf ty pass) where
+  toHie (HsModifiedFunArr _ mods _) = concatM $ toHie <$> mods
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg (GhcPass p) tm ty) where
   toHie (HsValArg _ tm) = toHie tm
@@ -2174,10 +2183,11 @@ instance ToHie (LocatedA (FixitySig GhcRn)) where
 
 instance ToHie (LocatedA (DefaultDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      DefaultDecl _ cl typs ->
+      DefaultDecl _ mods cl typs ->
         [ maybe (pure []) (toHie . C Use) cl
         , toHie typs
         ]
+          ++ (toHie <$> mods)
 
 instance ToHie (LocatedA (ForeignDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of

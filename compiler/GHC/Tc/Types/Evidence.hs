@@ -97,6 +97,7 @@ import GHC.Types.SrcLoc
 import Data.IORef( IORef )
 import GHC.Types.Unique.Set
 import GHC.Core.Multiplicity
+import GHC.Base ( Multiplicity(..) )
 
 import qualified Data.Semigroup as S
 
@@ -1444,7 +1445,7 @@ instance Outputable EvTypeable where
   ppr (EvTypeableTyLit t1)       = text "TyLit" <> ppr t1
   ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
     where
-      arr = pprArrowWithMultiplicity visArgTypeLike (Right (ppr tm))
+      arr = pprArrowWithModifiers [ppr tm] visArgTypeLike Many
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

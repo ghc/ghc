@@ -30,7 +30,7 @@ module GHC.Core.Multiplicity
   , IsSubmult(..)
   , submult
   , mapScaledType
-  , pprArrowWithMultiplicity
+  , pprArrowWithModifiers
   , MultiplicityFlag(..)
   ) where
 
@@ -44,6 +44,7 @@ import GHC.Types.Var( isFUNArg )
 import {-# SOURCE #-} GHC.Builtin.Types ( multMulTyCon )
 import GHC.Builtin.Names (multMulTyConKey)
 import GHC.Types.Unique (hasKey)
+import GHC.Utils.Panic (assertPpr)
 
 {-
 Note [Linear types]
@@ -375,39 +376,36 @@ submult OneTy OneTy  = Submult
 submult OneTy _    = Submult
 submult _     _    = Unknown
 
-pprArrowWithMultiplicity :: FunTyFlag -> Either Multiplicity SDoc -> SDoc
--- ^ Prints a thin arrow (->) with its multiplicity.
+-- | Pretty print a function arrow, with modifiers preceding it.
 --
--- The multiplicity itself is described by the @Either Multiplicity SDoc@
--- argument:
---
---    - Left Many: ->
---    - Left One : ⊸
---    - Right w  : %w ->
---
--- In the Right case, the 'SDoc' should be in parens (if not atomic).
-pprArrowWithMultiplicity af mult
+-- Each modifier is prefixed with @%@, but it's the caller's responsibility to
+-- ensure they're parenthesized correctly if not atomic.
+pprArrowWithModifiers
+  :: [SDoc] -- ^ Modifiers.
+  -> FunTyFlag -- ^ Is this @->@/@⊸@ or @=>@? See Note [FunTyFlag].
+  -> Multiplicity -- ^ Is this @->@ or @⊸@?
+  -> SDoc
+pprArrowWithModifiers mods af mult
   | isFUNArg af
   = getPprStyle $ \sty ->
     getPprDebug $ \debug ->
     sdocOption sdocLinearTypes $ \ show_linear_types ->
-      case mult of
-        Left w ->
-          case w of
-            Many -> arrow
-            One ->
-              if show_linear_types || dumpStyle sty || debug
-              then lollipop
-              else arrow
-        Right w ->
-          -- With -XLinearTypes disabled, we usually default away multiplicities.
-          -- However, consider "(forall m. a %m -> b) -> ()". We don't default
-          -- away the 'forall m' because it does not appear at the top-level.
-          -- Hence we should display the multiplicity, as displaying
-          -- "(forall m. a -> b) -> ()" would be jolly confusing.
-            text "%" <> w <+> arrow
+      hsep (map (text "%" <>) mods)
+        <+> case mult of
+          Many -> arrow
+          One ->
+            if show_linear_types || dumpStyle sty || debug
+            then lollipop
+            else arrow
   | otherwise
-  = ppr (funTyFlagTyCon af)
+  = assertPpr multIsMany (text "invalid linear constraint arrow") $
+    assertPpr (null mods) (text "modifiers on constraint arrow") $
+    ppr (funTyFlagTyCon af)
+ where
+  multIsMany = case mult of
+    Many -> True
+    One -> False
+{-# INLINEABLE pprArrowWithModifiers #-}
 
 -- | In Core, without `-dlinear-core-lint`, some function must ignore
 -- multiplicities. See Note [Linting linearity] in GHC.Core.Lint.

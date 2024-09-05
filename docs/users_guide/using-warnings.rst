@@ -2706,6 +2706,21 @@ of ``-W(no-)*``.
 
         import Data.List.NonEmpty (data (:|))
 
+.. ghc-flag:: -Wunrecognised-modifiers
+    :shortdesc: warn when an unrecognised modifier is used
+    :type: dynamic
+    :reverse: -Wno-unrecognised-modifiers
+
+    :since: 9.16
+
+    :default: on
+
+    Emits a warning when a modifier is used with a kind that isn't expected in
+    this context. Examples: ::
+
+      f :: a %True -> a
+      g :: a %(k :: Int) -> a
+
 ----
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.

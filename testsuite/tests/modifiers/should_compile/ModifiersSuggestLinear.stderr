@@ -1,0 +1,104 @@
+ModifiersSuggestLinear.hs:8:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %()
+
+ModifiersSuggestLinear.hs:8:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %One
+
+ModifiersSuggestLinear.hs:8:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %(1 :: Nat)
+
+ModifiersSuggestLinear.hs:8:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %01
+
+ModifiersSuggestLinear.hs:8:1: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    Unrecognised modifier %1
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %()
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %One
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %(1 :: Nat)
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %01
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %1
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %()
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %One
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %(1 :: Nat)
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %01
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+
+ModifiersSuggestLinear.hs:9:10: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %1
+    • In the definition of data constructor ‘D’
+      In the data type declaration for ‘D’
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:11:6: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %()
+    • In the type signature:
+        l :: Int %1 %01 %(1 :: Nat) %One %() -> Int
+
+ModifiersSuggestLinear.hs:11:6: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %One
+    • In the type signature:
+        l :: Int %1 %01 %(1 :: Nat) %One %() -> Int
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+
+ModifiersSuggestLinear.hs:11:6: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %(1 :: Nat)
+    • In the type signature:
+        l :: Int %1 %01 %(1 :: Nat) %One %() -> Int
+
+ModifiersSuggestLinear.hs:11:6: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %01
+    • In the type signature:
+        l :: Int %1 %01 %(1 :: Nat) %One %() -> Int
+
+ModifiersSuggestLinear.hs:11:6: warning: [GHC-49969] [-Wunrecognised-modifiers (in -Wdefault)]
+    • Unrecognised modifier %1
+    • In the type signature:
+        l :: Int %1 %01 %(1 :: Nat) %One %() -> Int
+    Suggested fix:
+      Perhaps you intended to use the ‘LinearTypes’ extension
+

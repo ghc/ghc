@@ -24,7 +24,7 @@ module GHC.Types.Hint (
   ) where
 
 import Language.Haskell.Syntax.Expr (LHsExpr)
-import Language.Haskell.Syntax (LPat, LIdP, LHsSigType, LHsSigWcType, Sig)
+import Language.Haskell.Syntax (HsModifier, LPat, LIdP, LHsSigType, LHsSigWcType, Sig)
 
 import GHC.Prelude
 
@@ -534,6 +534,9 @@ data GhcHint
 
   {-| Suggest using the `data` keyword -}
   | SuggestDataKeyword
+
+  {-| Suggest adding signature to modifier -}
+  | SuggestModifierSignature (HsModifier GhcRn) Name
 
 -- | The deriving strategy that was assumed when not explicitly listed in the
 --   source. This is used solely by the missing-deriving-strategies warning.

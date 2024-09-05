@@ -37,7 +37,7 @@ fQualTy :: T ((Ord a, Num a) => a) -> (P (Ord a), P (Num a), P a)
 fQualTy (MkT @((c1, c2) => a)) = (MkP @c1, MkP @c2, MkP @a)
 
 fFunTy :: T (Int -> Bool) -> (P Int, P Bool, P Many)
-fFunTy (MkT @(a %m -> b)) = (MkP @a, MkP @b, MkP @m)
+fFunTy (MkT @(a %(m :: Multiplicity) -> b)) = (MkP @a, MkP @b, MkP @m)
 
 fListTy :: T [Int] -> P Int
 fListTy (MkT @[a]) = MkP @a

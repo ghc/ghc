@@ -438,10 +438,10 @@ instance HasHaddock (HsDecl GhcPs) where
   --      :: Int  -- ^ Comment on Int
   --      -> Bool -- ^ Comment on Bool
   --
-  addHaddock (SigD _ (TypeSig x names t)) = do
+  addHaddock (SigD _ (TypeSig x mods names t)) = do
       traverse_ registerHdkA names
       t' <- addHaddock t
-      pure (SigD noExtField (TypeSig x names t'))
+      pure (SigD noExtField (TypeSig x mods names t'))
 
   -- Pattern synonym type signatures:
   --
@@ -487,7 +487,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --     deriving newtype (Ord {- ^ Comment on Ord N -})
   --
   addHaddock (TyClD x decl)
-    | DataDecl { tcdDExt, tcdLName, tcdTyVars, tcdFixity, tcdDataDefn = defn } <- decl
+    | DataDecl { tcdDExt, tcdLName, tcdTyVars, tcdFixity, tcdDataDefn = defn, tcdModifiers } <- decl
     = do
         registerHdkA tcdLName
         defn' <- addHaddock defn
@@ -495,7 +495,7 @@ instance HasHaddock (HsDecl GhcPs) where
           TyClD x (DataDecl {
             tcdDExt,
             tcdLName, tcdTyVars, tcdFixity,
-            tcdDataDefn = defn' })
+            tcdDataDefn = defn', tcdModifiers })
 
   -- Class declarations:
   --
@@ -508,7 +508,7 @@ instance HasHaddock (HsDecl GhcPs) where
   addHaddock (TyClD _ decl)
     | ClassDecl { tcdCExt = (x, layout, NoAnnSortKey),
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
-                  tcdSigs, tcdMeths, tcdATs, tcdATDefs } <- decl
+                  tcdSigs, tcdMeths, tcdATs, tcdATDefs, tcdModifiers } <- decl
     = do
         registerHdkA tcdLName
         registerEpTokenHdkA (acd_where x)
@@ -523,7 +523,7 @@ instance HasHaddock (HsDecl GhcPs) where
                                 , tcdMeths = tcdMeths'
                                 , tcdATs = tcdATs'
                                 , tcdATDefs = tcdATDefs'
-                                , tcdDocs }
+                                , tcdDocs, tcdModifiers }
           in TyClD noExtField decl'
 
   -- Data family instances:
@@ -706,7 +706,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
     extendHdkA (locA l_con_decl) $
     case con_decl of
       ConDeclGADT { con_g_ext, con_names, con_outer_bndrs, con_inner_bndrs
-                  , con_mb_cxt, con_g_args, con_res_ty } -> do
+                  , con_mb_cxt, con_g_args, con_res_ty, con_modifiers } -> do
         con_doc' <- getConDoc (getLocA (NE.head con_names))
         con_g_args' <-
           case con_g_args of
@@ -717,18 +717,18 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
           ConDeclGADT { con_g_ext, con_names,
-                        con_outer_bndrs, con_inner_bndrs, con_mb_cxt,
+                        con_outer_bndrs, con_inner_bndrs, con_mb_cxt, con_modifiers,
                         con_doc = lexLHsDocString <$> con_doc',
                         con_g_args = con_g_args',
                         con_res_ty = con_res_ty' }
-      ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args } ->
+      ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args, con_modifiers } ->
         let
           -- See Note [Leading and trailing comments on H98 constructors]
           getTrailingLeading :: HdkM (LocatedA (ConDecl GhcPs))
           getTrailingLeading = do
             con_doc' <- getPrevNextDoc (locA l_con_decl)
             return $ L l_con_decl $
-              ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args
+              ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args, con_modifiers
                          , con_doc = lexLHsDocString <$> con_doc' }
 
           -- See Note [Leading and trailing comments on H98 constructors]
@@ -739,7 +739,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
                 con_doc' <- getConDoc (getLocA con_name)
                 ts' <- traverse addHaddock ts
                 pure $ L l_con_decl $
-                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
+                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
                                con_args = PrefixCon ts' }
               InfixCon t1 t2 -> do
@@ -747,14 +747,14 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
                 con_doc' <- getConDoc (getLocA con_name)
                 t2' <- addHaddock t2
                 pure $ L l_con_decl $
-                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
+                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
                                con_args = InfixCon t1' t2' }
               RecCon (L l_rec flds) -> do
                 con_doc' <- getConDoc (getLocA con_name)
                 flds' <- traverse addHaddock flds
                 pure $ L l_con_decl $
-                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
+                  ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_modifiers,
                                con_doc = lexLHsDocString <$> con_doc',
                                con_args = RecCon (L l_rec flds') }
         in

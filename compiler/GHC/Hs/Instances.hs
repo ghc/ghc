@@ -83,6 +83,8 @@ deriving instance Data (HsBindLR GhcPs GhcRn)
 deriving instance Data (HsBindLR GhcRn GhcRn)
 deriving instance Data (HsBindLR GhcTc GhcTc)
 
+deriving instance Data XPatBindTc
+
 deriving instance Data AbsBinds
 
 deriving instance Data ABExport
@@ -528,6 +530,15 @@ deriving instance (Data body) => Data (HsRecFields GhcTc body)
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Type ----------------------------------
 
+-- deriving instance Data (HsModifierOf ty p)
+deriving instance Data ModifierPrintsAs
+deriving instance Data (HsModifierOf (LocatedA (HsType GhcPs)) GhcPs)
+deriving instance Data (HsModifierOf (LocatedA (HsType GhcRn)) GhcRn)
+deriving instance Data (HsModifierOf (LocatedA (HsType GhcRn)) GhcTc)
+deriving instance Data (HsModifierOf (LocatedA (HsExpr GhcPs)) GhcPs)
+deriving instance Data (HsModifierOf (LocatedA (HsExpr GhcRn)) GhcRn)
+deriving instance Data (HsModifierOf (LocatedA (HsExpr GhcTc)) GhcTc)
+
 -- deriving instance Data (HsBndrVis p)
 deriving instance Data (HsBndrVis GhcPs)
 deriving instance Data (HsBndrVis GhcRn)
@@ -590,13 +601,18 @@ deriving instance Data (HsType GhcTc)
 
 deriving instance Data HsTypeGhcPsExt
 
--- deriving instance (Data mult, DataIdLR p p) => Data (HsMultAnnOf mult p)
-deriving instance Data (HsMultAnnOf (LocatedA (HsType GhcPs)) GhcPs)
-deriving instance Data (HsMultAnnOf (LocatedA (HsType GhcRn)) GhcRn)
-deriving instance Data (HsMultAnnOf (LocatedA (HsType GhcRn)) GhcTc)
-deriving instance Data (HsMultAnnOf (LocatedA (HsExpr GhcPs)) GhcPs)
-deriving instance Data (HsMultAnnOf (LocatedA (HsExpr GhcRn)) GhcRn)
-deriving instance Data (HsMultAnnOf (LocatedA (HsExpr GhcTc)) GhcTc)
+-- deriving instance (DataIdLR p p) => Data (HsFunArr p)
+deriving instance Data (HsFunArr GhcPs)
+deriving instance Data (HsFunArr GhcRn)
+deriving instance Data (HsFunArr GhcTc)
+
+-- deriving instance (Data mult, DataIdLR p p) => Data (HsModifiedFunArrOf mult p)
+deriving instance Data (HsModifiedFunArrOf (LocatedA (HsType GhcPs)) GhcPs)
+deriving instance Data (HsModifiedFunArrOf (LocatedA (HsType GhcRn)) GhcRn)
+deriving instance Data (HsModifiedFunArrOf (LocatedA (HsType GhcRn)) GhcTc)
+deriving instance Data (HsModifiedFunArrOf (LocatedA (HsExpr GhcPs)) GhcPs)
+deriving instance Data (HsModifiedFunArrOf (LocatedA (HsExpr GhcRn)) GhcRn)
+deriving instance Data (HsModifiedFunArrOf (LocatedA (HsExpr GhcTc)) GhcTc)
 
 -- deriving instance (Data a, Data b) => Data (HsArg p a b)
 deriving instance (Data a, Data b) => Data (HsArg GhcPs a b)

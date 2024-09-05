@@ -438,8 +438,12 @@ data PsMessage
    -- | Invalid rule activation marker
    | PsErrInvalidRuleActivationMarker
 
-   -- | Linear function found but LinearTypes not enabled
+   -- | Linear function found but neither Modifiers nor LinearTypes enabled
    | PsErrLinearFunction
+
+   -- | Other modifier syntax found, but it's illegal here or Modifiers not
+   -- enabled
+   | PsErrModifierSyntax SuggestModifiers
 
    -- | Multi-way if-expression found but MultiWayIf not enabled
    | PsErrMultiWayIf
@@ -474,8 +478,10 @@ data PsMessage
    -- TODO: embed the proper operator, if possible
    | PsErrParseRightOpSectionInPat !RdrName !(PatBuilder GhcPs)
 
-   -- | Illegal linear arrow or multiplicity annotation in GADT record syntax
-   | PsErrIllegalGadtRecordMultiplicity !(HsMultAnn GhcPs)
+   -- | Illegal modifier or linear arrow in GADT record syntax, e.g.
+   --
+   -- > data T where MkT :: { a :: Int } %1 -> T
+   | PsErrIllegalGadtRecordModifier !(HsModifiedFunArr GhcPs)
 
    | PsErrInvalidCApiImport
 
@@ -587,11 +593,10 @@ data PsErrPunDetails
 data PsErrTypeSyntaxDetails
   = PETS_FunctionArrow
       !(LocatedA (PatBuilder GhcPs))
-      !(HsMultAnnOf (LocatedA (PatBuilder GhcPs)) GhcPs)
+      !(HsModifiedFunArrOf (LocatedA (PatBuilder GhcPs)) GhcPs)
       !(LocatedA (PatBuilder GhcPs))
   | PETS_Multiplicity
-      !(EpToken "%")
-      !(LocatedA (PatBuilder GhcPs))
+      ![HsModifierOf (LocatedA (PatBuilder GhcPs)) GhcPs]
   | PETS_ForallTelescope
       !(HsForAllTelescope GhcPs)
       !(LocatedA (PatBuilder GhcPs))
@@ -647,3 +652,15 @@ data FileHeaderPragmaType
   | IncludePrag
   | LanguagePrag
   | DocOptionsPrag
+
+-- | Whether or not to add a hint about enabling -XModifiers, when we throw an
+-- error about modifier syntax.
+--
+-- We suggest enabling it when modifier syntax is used in a place it's
+-- recognized, but the extension is disabled. We don't suggest enabling it when
+-- modifier syntax is used in a place it's not recognized.
+--
+-- See Note [Overview of Modifiers] in Language.Haskell.Syntax.Type.
+data SuggestModifiers
+  = SuggestModifiers
+  | DontSuggestModifiers

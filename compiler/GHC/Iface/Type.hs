@@ -76,7 +76,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , liftedRepTyCon, liftedDataConTyCon
                                  , sumTyCon )
 import GHC.Base ( Multiplicity(..) )
-import GHC.Core.Multiplicity ( pprArrowWithMultiplicity )
+import GHC.Core.Multiplicity ( pprArrowWithModifiers )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
 import GHC.Core.TyCo.Rep( CoSel, UnivCoProvenance(..) )
 import GHC.Core.TyCo.Compare( eqForAllVis )
@@ -1121,15 +1121,15 @@ pprPrecIfaceType prec ty =
   hideNonStandardTypes (ppr_ty prec) ty
 
 pprTypeArrow :: FunTyFlag -> IfaceMult -> SDoc
-pprTypeArrow af mult = pprArrowWithMultiplicity af ppr_mult
+pprTypeArrow af mult = pprArrowWithModifiers mods af arr
   where
-    ppr_mult = case mult of
+    (arr, mods) = case mult of
       IfaceTyConApp tc IA_Nil
         | tc `ifaceTyConHasKey` manyDataConKey
-        -> Left Many
+        -> (Many, [])
         | tc `ifaceTyConHasKey` oneDataConKey
-        -> Left One
-      _ -> Right $ pprPrecIfaceType appPrec mult
+        -> (One, [])
+      _ -> (Many, [pprPrecIfaceType appPrec mult])
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty
@@ -2050,14 +2050,13 @@ ppr_co ctxt_prec (IfaceFunCo r co_mult co1 co2)
     ppr_fun_tail co_mult1 other_co
       = [ppr_arrow co_mult1 <> ppr_role r <+> pprIfaceCoercion other_co]
 
-    ppr_arrow = pprArrowWithMultiplicity visArgTypeLike . ppr_mult
-    ppr_mult (IfaceReflCo (IfaceTyConApp tc IA_Nil))
+    ppr_arrow (IfaceReflCo (IfaceTyConApp tc IA_Nil))
       | tc `ifaceTyConHasKey` manyDataConKey
-      = Left Many
+      = pprArrowWithModifiers [] visArgTypeLike Many
       | tc `ifaceTyConHasKey` oneDataConKey
-      = Left One
-    ppr_mult w =
-      Right $ ppr_co appPrec w
+      = pprArrowWithModifiers [] visArgTypeLike One
+    ppr_arrow w =
+      pprArrowWithModifiers [ppr_co appPrec w] visArgTypeLike Many
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
   = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r

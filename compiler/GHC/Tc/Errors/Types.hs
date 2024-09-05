@@ -121,6 +121,7 @@ module GHC.Tc.Errors.Types (
   , NonCanonical_Monad(..)
   , TypeSyntax(..)
   , typeSyntaxExtension
+  , SuggestLinear(..)
 
     -- * Errors for hs-boot and signature files
   , BadBootDecls(..)
@@ -4436,6 +4437,36 @@ data TcRnMessage where
     Test cases: T24159_type_syntax_rn_fail
   -}
   TcRnUnexpectedTypeSyntaxInTerms :: TypeSyntax -> TcRnMessage
+
+  {- | TcRnUnrecognisedModifier is a warning controlled by
+       -Wunrecognised-modifiers, and raised when a modifier is used that we
+       don't know what to do with.
+
+       Examples:
+
+         %() instance C a
+         foo :: a %True -> b
+  -}
+  TcRnUnrecognisedModifier :: HsModifier GhcRn -> SuggestLinear -> TcRnMessage
+
+  {- | TcRnUnknownModifierKind is an error raised when a modifier is used with
+       unknown kind.
+
+       Examples:
+
+         foo :: a %m -> b
+  -}
+  TcRnUnknownModifierKind :: HsModifier GhcRn -> Maybe Name -> TcRnMessage
+
+  {- | TcRnTooManyMultiplicities is an error raised when more than one
+       Multiplicity modifier is used in a place where zero or one are expected.
+
+       Examples:
+
+         foo :: a %1 %1 -> b
+         bar :: a %1 ⊸ b
+  -}
+  TcRnTooManyMultiplicities :: TcRnMessage
   deriving Generic
 
 ----
@@ -7181,3 +7212,15 @@ typeSyntaxExtension ContextArrowSyntax    = LangExt.RequiredTypeArguments
 typeSyntaxExtension FunctionArrowSyntax   = LangExt.RequiredTypeArguments
 typeSyntaxExtension ForallTelescopeSyntax = LangExt.RequiredTypeArguments
 typeSyntaxExtension StarKindSyntax        = LangExt.RequiredTypeArguments
+
+-- | Whether or not to add a hint about enabling -XLinearTypes, when
+-- encountering an unrecognised modifier. We suggest enabling it when
+--
+-- * A Multiplicity modifier is used in a place where -XLinearTypes would
+--   recognize it;
+-- * Or a %1 modifier is used anywhere.
+--
+-- See Note [Overview of Modifiers] in Language.Haskell.Syntax.Type.
+data SuggestLinear
+  = SuggestLinear
+  | DontSuggestLinear

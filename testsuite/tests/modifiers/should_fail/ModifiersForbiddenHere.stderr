@@ -1,0 +1,3 @@
+ModifiersForbiddenHere.hs:4:1: error: [GHC-61252]
+    Illegal use of modifier syntax
+

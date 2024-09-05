@@ -44,6 +44,30 @@ Language
 
 - Implement ``-XQualifiedStrings`` (`proposal <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0723-qualified-strings.rst>`_)
 
+- The experimental :extension:`Modifiers` extension now allows ``%foo`` syntax
+  to attach types to various places in the syntax tree.
+
+- Some previously-valid uses of :extension:`LinearTypes` are now rejected, since
+  its syntax has been generalized for use with :extension:`Modifiers`. In
+  particular, some kind annotations must be added::
+
+    f :: Int %m -> Int -- no longer accepted
+    f :: forall (m :: Multiplicity). Int %m -> Int -- still accepted
+
+  Alternatively, most previously-valid code can still be accepted by setting
+  ``-XLinearTypes -XNoModifiers``. But this doesn't reliably work with
+  ``-XStrict``, and sometimes parentheses must be added::
+
+    let %1 x:xs = ... in ... -- previously accepted with -XLinearTypes -XStrict
+    let %1 (x:xs) = ... in ... -- still accepeted
+
+    let %1 Just x = ... in ... -- previously accepted with -XLinearTypes -XStrict
+    let %1 (Just x) = ... in ... -- still accepeted
+
+  ``-XLinearTypes -XNoModifiers`` doesn't accept the old versions, because
+  modifiers now bind tighter than constructors. The first now parses as
+  ``let (%1 x):xs = ... in ...``, and the second no longer parses at all.
+
 Compiler
 ~~~~~~~~
 

@@ -10,6 +10,7 @@ types implementation.
 module Data.OldList where
 
 import GHC.Base
+import GHC.Types (Multiplicity)
 
 sortBy :: forall a . (a -> a -> Ordering) -> [a]
 sortBy cmp = []
@@ -24,11 +25,11 @@ sortBy cmp = []
       | a `cmp` b == GT = descending b (a:as) bs
     descending a as bs  = (a:as): sequences bs
 
-    ascending :: a -> (forall i . [a] %i -> [a]) -> [a] -> [[a]]
+    ascending :: a -> (forall (i :: Multiplicity) . [a] %i -> [a]) -> [a] -> [[a]]
     ascending a as (b:bs)
       | a `cmp` b /= GT = ascending b foo bs
       where
-        foo :: [a] %k -> [a]
+        foo :: [a] %(k :: Multiplicity) -> [a]
         foo ys = as (a:ys)
     ascending a as bs   = let !x = as [a]
                           in x : sequences bs

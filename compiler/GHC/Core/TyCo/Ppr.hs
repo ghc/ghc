@@ -42,7 +42,7 @@ import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
 import GHC.Core.Class
 import GHC.Core.Predicate( scopedSort )
-import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
+import GHC.Core.Multiplicity( pprArrowWithModifiers )
 
 import GHC.Types.Var
 
@@ -243,11 +243,10 @@ debug_ppr_ty prec (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = re
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
   where
-    arr = pprArrowWithMultiplicity af $
-          case mult of
-            OneTy  -> Left One
-            ManyTy -> Left Many
-            _      -> Right (debug_ppr_ty appPrec mult)
+    arr = case mult of
+      OneTy  -> pprArrowWithModifiers [] af One
+      ManyTy -> pprArrowWithModifiers [] af Many
+      _      -> pprArrowWithModifiers [debug_ppr_ty appPrec mult] af Many
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc

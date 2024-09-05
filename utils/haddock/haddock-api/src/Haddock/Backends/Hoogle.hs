@@ -163,8 +163,8 @@ ppExportD
       f (TyClD _ d@SynDecl{}) = ppSynonym sDocContext d
       f (TyClD _ d@ClassDecl{}) = ppClass sDocContext d subdocs
       f (TyClD _ (FamDecl _ d)) = ppFam sDocContext d
-      f (ForD _ (ForeignImport _ name typ _)) = [ppSig sDocContext [name] typ]
-      f (ForD _ (ForeignExport _ name typ _)) = [ppSig sDocContext [name] typ]
+      f (ForD _ (ForeignImport _ _ name typ _)) = [ppSig sDocContext [name] typ]
+      f (ForD _ (ForeignExport _ _ name typ _)) = [ppSig sDocContext [name] typ]
       f (SigD _ sig) = ppSigWithDoc sDocContext sig []
       f _ = []
 
@@ -175,7 +175,7 @@ ppExportD
 
 ppSigWithDoc :: SDocContext -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppSigWithDoc sDocContext sig subdocs = case sig of
-  TypeSig _ names t -> concatMap (mkDocSig "" (dropWildCards t)) names
+  TypeSig _ _ names t -> concatMap (mkDocSig "" (dropWildCards t)) names
   PatSynSig _ names t -> concatMap (mkDocSig "pattern " t) names
   _ -> []
   where
@@ -303,7 +303,7 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
           | r <- map unLoc recs
           ]
 
-    funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsUnannotated noExtField) x y)
+    funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) x y)
     apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
     typeSig nm flds =
@@ -357,9 +357,8 @@ ppCtor
             case args of
               PrefixConGADT _ pos_args -> map cdf_type pos_args
               RecConGADT _ (L _ flds) -> map (cdf_type . cdrf_spec . unL) flds
-
           mkFunTy :: LHsType GhcRn -> LHsType GhcRn -> LHsType GhcRn
-          mkFunTy a b = noLocA (HsFunTy noExtField (HsUnannotated noExtField) a b)
+          mkFunTy a b = noLocA (HsFunTy noExtField (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) a b)
 
           mkQualTy :: LHsContext GhcRn -> LHsType GhcRn -> LHsType GhcRn
           mkQualTy ctxt body =

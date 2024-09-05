@@ -1,0 +1,12 @@
+ModifiersUnknownKind.hs:7:7: error: [GHC-38026]
+    • Modifier %m has unknown kind
+    • In the type signature: f1 :: a %m -> b
+    Suggested fix:
+      Perhaps it should have a kind signature, like %(m :: Multiplicity)
+
+ModifiersUnknownKind.hs:10:33: error: [GHC-38026]
+    • Modifier %m has unknown kind
+    • In the type signature: f2 :: a %(m :: Multiplicity) -> b %m -> c
+    Suggested fix:
+      Perhaps it should have a kind signature, like %(m :: Multiplicity)
+

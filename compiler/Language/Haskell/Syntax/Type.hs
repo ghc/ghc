@@ -11,8 +11,8 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Type (
-        HsMultAnn, HsMultAnnOf(..),
-        XUnannotated, XLinearAnn, XExplicitMult, XXMultAnnOf,
+        HsFunArr(..), HsModifiedFunArr, HsModifiedFunArrOf(..),
+        XHsStandardArr, XHsLinearArr, XHsModifiedFunArr,
 
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
@@ -30,6 +30,7 @@ module Language.Haskell.Syntax.Type (
         HsTyPat(..), LHsTyPat,
         HsTupleSort(..),
         HsContext, LHsContext,
+        HsModifierOf(..), HsModifier, XModifier,
         HsLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
@@ -270,6 +271,84 @@ type LHsContext pass = XRec pass (HsContext pass)
 
 -- | Haskell Context
 type HsContext pass = [LHsType pass]
+
+-- | Modifier. Usually a modifier holds an 'LHsType', but inside expressions, it
+-- has an 'LHsExpr'. See Note [Overview of Modifiers].
+data HsModifierOf ty pass = HsModifier !(XModifier pass) ty
+type family XModifier pass
+
+type HsModifier pass = HsModifierOf (LHsType (NoGhcTc pass)) pass
+
+{-
+Note [Overview of Modifiers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Modifiers were introduced in GHC proposal #370
+(https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0370-modifiers.rst).
+They are the @%foo@s in, for example:
+
+* @f :: Int %1 -> Int@
+* @data D = %X D1 | %Y D2@
+* @%X; class A a where ...@
+
+Wherever a modifier (@%foo@ where @foo@ is a type) is recognized in syntax, a
+list of 'HsModifier's is added to the syntax tree. Most commonly, the list is
+then renamed and possibly typechecked, and all modifiers are warned about but
+otherwise ignored.
+
+The places the modifiers may show up are:
+
+* Type and class declarations (see 'tcdModifiers' in 'TyClDecl)
+* Class instance declarations ('cid_modifiers' in 'ClsInstDecl')
+* Foreign declarations ('fd_modifiers' in 'ForeignDecl')
+* Default declarations ('defd_modifiers' in 'DefaultDecl')
+* Type signatures ('TypeSig' in 'Sig')
+* Patterns ('ModifiedPat' in 'Pat')
+* Data constructors ('con_modifiers' in 'ConDecl')
+* Record field declarations ('cdf_multiplicity' in 'HsConDeclField')
+* GADT-style constructor arguments (also 'cdf_multiplicity', see
+  Note [HsConDeclField on pass])
+* Function arrows ('HsFunTy')
+
+In more detail, the moving parts are:
+
+* Parsing: A list of modifiers @['HsModifier' pass]@ (where each 'HsModifier'
+  holds a type) is attached to the syntax tree at each of the places listed
+  above. For the last three, the modifiers may be accompanied by a linear arrow
+  (@⊸@) which affects typechecking. So for these, they're attached in an
+  'HsModifiedFunArr' which bundles them with the arrow.
+
+* Renaming: each modifier is renamed as a type ('rnModifiersContext',
+  'rnHsModifiedFunArrWith'). Most modifiers are subsequently typechecked. A
+  known bug is that some modifiers aren't typechecked (e.g. 'cid_modifiers'),
+  because they appear in contexts that don't themselves get typechecked.
+  Modifiers which won't get typechecked are currently all ignored, and warned
+  about ('rnModifiersContextAndWarn').
+
+* Typechecking: most commonly, modifiers are typechecked as types
+  ('tcModifiersAndWarn'), and warned about but otherwise ignored.
+
+Warnings are controlled by @-Wunrecognised-modifiers@ (on by default).
+
+The only current use of modifiers is multiplicity annotations for linear types.
+These modifiers are recognized in pattern bindings, @let %1 x = ...@;
+constructor arguments (both record style, @data A = B { %1 x :: Int }@; and GADT
+style, @data A where B :: Int %1 -> A@); and function arrows, @Int %1 -> Int@.
+
+Modifiers in these positions are typechecked with 'tcModifiersMult' (pattern
+bindings) or 'tcMult' (when we have an 'HsModifiedFunArr'), and modifiers of
+kind 'Multiplicity' affect typechecking. Non-'Multiplicity' modifiers in these
+positions are treated the same as any other modifiers. See
+Note [Typechecking Multiplicity modifiers] in GHC.Tc.Gen.HsType.
+
+The modifier @%1@ is a special case, interpreted differently depending on linear
+types. With @-XLinearTypes@, @%1@ means the same as @%'One'@. (Specifically
+@'One' :: 'Multiplicity'@, not just whatever @One@ happens to be in scope.) With
+@-XNoLinearTypes@, it means the same as @%(1 :: 'Nat')@. When warning about this
+modifier being unrecognised, we always suggest enabling linear types, even if it
+still won't be recognised then. The rationale is that a modifier unrecognised by
+GHC might be recognised by other tooling, and it would be an unpleasant surprise
+if its meaning changed unexpectedly when a user enabled linear types.
+-}
 
 -- | Located Haskell Type
 type LHsType pass = XRec pass (HsType pass)
@@ -823,7 +902,7 @@ data HsType pass
                         (LHsKind pass)
 
   | HsFunTy             (XFunTy pass)
-                        (HsMultAnn pass) -- multiplicty annotations, includes the arrow
+                        (HsModifiedFunArr pass) -- multiplicty annotations, includes the arrow
                         (LHsType pass)   -- function type
                         (LHsType pass)
 
@@ -888,31 +967,35 @@ data HsType pass
   | XHsType
       !(XXType pass)
 
-type HsMultAnn pass = HsMultAnnOf (LHsType (NoGhcTc pass)) pass
+type HsModifiedFunArr pass = HsModifiedFunArrOf (LHsType (NoGhcTc pass)) pass
 
--- | Denotes multiplicity annotations in the surface language.
--- The `mult` type argument is usually `LHsType (NoGhcTc pass)`, but when the annotation
--- is part of a type used in a term, it is `LHsExpr pass`. See Note [Types in terms].
-data HsMultAnnOf mult pass
-  = HsUnannotated !(XUnannotated mult pass)
-    -- ^ a -> b or a → b or { nm :: a }
+-- | Denotes function arrows with optional modifiers attached.
+--
+-- The `mult` type argument is usually `LHsType (NoGhcTc pass)`, but when the
+-- annotation is part of a type used in a term, it is `LHsExpr pass`. See Note
+-- [Types in terms].
+data HsModifiedFunArrOf mult pass
+  = HsModifiedFunArr
+      !(XHsModifiedFunArr mult pass) -- ^ extension field
+      [HsModifierOf mult pass] -- ^ attached modifiers
+      (HsFunArr pass) -- ^ the actual arrow
 
-  | HsLinearAnn !(XLinearAnn mult pass)
-    -- ^ a %1 -> b or a %1 → b, or a ⊸ b, or { nm %1 :: a }
+type family XHsModifiedFunArr mult p
 
-  | HsExplicitMult !(XExplicitMult mult pass) !mult
-    -- ^ a %m -> b or a %m → b or { nm %m :: a }
-    -- (very much including `a %Many -> b`!
-    -- This is how the programmer wrote it). It is stored as an
-    -- `HsType` so as to preserve the syntax as written in the
-    -- program.
+-- | Denotes a function arrow, which could be @->@ or @⊸@ or @::@. @::@ counts
+-- as an "arrow" for these purposes, because in `HsConDeclField` we need to
+-- support both
+--
+-- > data T where MkT :: Int -> Bool -> T
+-- > data T where MkT :: { x :: Int, y :: Bool } -> T
+data HsFunArr pass
+  = HsStandardArr !(XHsStandardArr pass)
+    -- ^ @a -> b@ or @a → b@ or @{ nm :: a }@.
+  | HsLinearArr !(XHsLinearArr pass)
+    -- ^ @a ⊸ b@.
 
-  | XMultAnnOf !(XXMultAnnOf mult pass)
-
-type family XUnannotated  mult p
-type family XLinearAnn    mult p
-type family XExplicitMult mult p
-type family XXMultAnnOf   mult p
+type family XHsStandardArr p
+type family XHsLinearArr p
 
 {-
 Note [Unit tuples]
@@ -1057,7 +1140,7 @@ data HsConDeclField pass
           -- E.g. data T a = MkT !a
           --   or data T a where MtT :: !a -> T a
 
-        , cdf_multiplicity :: HsMultAnn pass
+        , cdf_multiplicity :: HsModifiedFunArr pass
           -- ^ User-specified multiplicity, if any
           -- E.g. data T a = MkT { t %Many :: a }
           --   or data T a where MtT :: a %1 -> T a

@@ -100,7 +100,7 @@ renameType (HsTyVar x ip name) = HsTyVar x ip <$> renameLNameOcc name
 renameType t@(HsStarTy _) = pure t
 renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
 renameType (HsAppKindTy x lt lk) = HsAppKindTy x <$> renameLType lt <*> renameLKind lk
-renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsMultAnn w <*> renameLType la <*> renameLType lr
+renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsModifiedFunArr w <*> renameLType la <*> renameLType lr
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
 renameType (HsSumTy x lt) = HsSumTy x <$> mapM renameLType lt
@@ -119,9 +119,17 @@ renameType (HsExplicitTupleTy x ip ltys) =
 renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 
-renameHsMultAnn :: HsMultAnn GhcRn -> Rename (IdP GhcRn) (HsMultAnn GhcRn)
-renameHsMultAnn (HsExplicitMult x p) = HsExplicitMult x <$> renameLType p
-renameHsMultAnn mult = pure mult
+renameModifier :: HsModifier GhcRn -> Rename (IdP GhcRn) (HsModifier GhcRn)
+renameModifier (HsModifier x ty) = HsModifier x <$> renameLType ty
+
+renameModifiers :: [HsModifier GhcRn] -> Rename (IdP GhcRn) [HsModifier GhcRn]
+renameModifiers = mapM renameModifier
+
+renameHsModifiedFunArr :: HsModifiedFunArr GhcRn
+                       -> Rename (IdP GhcRn) (HsModifiedFunArr GhcRn)
+renameHsModifiedFunArr (HsModifiedFunArr _ mods arr) = do
+  mods' <- renameModifiers mods
+  pure $ HsModifiedFunArr noExtField mods' arr
 
 renameLType :: LHsType GhcRn -> Rename (IdP GhcRn) (LHsType GhcRn)
 renameLType = located renameType

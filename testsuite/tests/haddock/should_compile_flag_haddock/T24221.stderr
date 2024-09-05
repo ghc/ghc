@@ -48,6 +48,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T24221.hs:3:6-9 })
@@ -95,6 +96,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:5:5-8 })
@@ -117,9 +119,12 @@
                (NoSourceText))
               (NoSrcUnpack)
               (NoSrcStrict)
-              (HsUnannotated
-               (EpColon
-                (NoEpUniTok)))
+              (HsModifiedFunArr
+               (NoExtField)
+               []
+               (HsStandardArr
+                (EpColon
+                 (NoEpUniTok))))
               (L
                (EpAnn
                 (EpaSpan { T24221.hs:5:10-12 })
@@ -167,6 +172,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:7:5-8 })
@@ -189,9 +195,12 @@
                (NoSourceText))
               (NoSrcUnpack)
               (NoSrcStrict)
-              (HsUnannotated
-               (EpColon
-                (NoEpUniTok)))
+              (HsModifiedFunArr
+               (NoExtField)
+               []
+               (HsStandardArr
+                (EpColon
+                 (NoEpUniTok))))
               (L
                (EpAnn
                 (EpaSpan { T24221.hs:7:10-12 })
@@ -237,6 +246,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:9:9-10 })
@@ -259,9 +269,12 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpColon
-               (NoEpUniTok)))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpColon
+                (NoEpUniTok))))
              (L
               (EpAnn
                (EpaSpan { T24221.hs:9:5-7 })
@@ -291,9 +304,12 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpColon
-               (NoEpUniTok)))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpColon
+                (NoEpUniTok))))
              (L
               (EpAnn
                (EpaSpan { T24221.hs:9:12-15 })
@@ -339,6 +355,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T24221.hs:11:6-9 })
@@ -384,6 +401,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:12:7-8 })
@@ -406,9 +424,12 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpColon
-               (NoEpUniTok)))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpColon
+                (NoEpUniTok))))
              (L
               (EpAnn
                (EpaSpan { T24221.hs:12:3-5 })
@@ -438,9 +459,12 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpColon
-               (NoEpUniTok)))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpColon
+                (NoEpUniTok))))
              (L
               (EpAnn
                (EpaSpan { T24221.hs:12:10-13 })
@@ -486,6 +510,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T24221.hs:14:6-9 })
@@ -531,6 +556,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:16:3-4 })
@@ -553,9 +579,12 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpColon
-               (NoEpUniTok)))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpColon
+                (NoEpUniTok))))
              (L
               (EpAnn
                (EpaSpan { T24221.hs:15:3-5 })
@@ -597,9 +626,12 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpColon
-               (NoEpUniTok)))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpColon
+                (NoEpUniTok))))
              (L
               (EpAnn
                (EpaSpan { T24221.hs:17:3-6 })
@@ -657,6 +689,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T24221.hs:19:6-9 })
@@ -702,6 +735,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:23:3-4 })
@@ -724,9 +758,12 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpColon
-               (NoEpUniTok)))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpColon
+                (NoEpUniTok))))
              (L
               (EpAnn
                (EpaSpan { T24221.hs:21:3-5 })
@@ -768,9 +805,12 @@
               (NoSourceText))
              (NoSrcUnpack)
              (NoSrcStrict)
-             (HsUnannotated
-              (EpColon
-               (NoEpUniTok)))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpColon
+                (NoEpUniTok))))
              (L
               (EpAnn
                (EpaSpan { T24221.hs:25:3-6 })
@@ -828,6 +868,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T24221.hs:27:6-9 })
@@ -873,6 +914,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:28:3-8 })
@@ -938,11 +980,14 @@
                   (NoSourceText))
                  (NoSrcUnpack)
                  (NoSrcStrict)
-                 (HsUnannotated
-                  (EpColon
-                   (EpUniTok
-                    (EpaSpan { T24221.hs:28:15-16 })
-                    (NormalSyntax))))
+                 (HsModifiedFunArr
+                  (NoExtField)
+                  []
+                  (HsStandardArr
+                   (EpColon
+                    (EpUniTok
+                     (EpaSpan { T24221.hs:28:15-16 })
+                     (NormalSyntax)))))
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:28:18-20 })
@@ -1011,11 +1056,14 @@
                   (NoSourceText))
                  (NoSrcUnpack)
                  (NoSrcStrict)
-                 (HsUnannotated
-                  (EpColon
-                   (EpUniTok
-                    (EpaSpan { T24221.hs:29:15-16 })
-                    (NormalSyntax))))
+                 (HsModifiedFunArr
+                  (NoExtField)
+                  []
+                  (HsStandardArr
+                   (EpColon
+                    (EpUniTok
+                     (EpaSpan { T24221.hs:29:15-16 })
+                     (NormalSyntax)))))
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:29:18-20 })
@@ -1061,6 +1109,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T24221.hs:31:6-9 })
@@ -1106,6 +1155,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:32:3-8 })
@@ -1171,11 +1221,14 @@
                   (NoSourceText))
                  (NoSrcUnpack)
                  (NoSrcStrict)
-                 (HsUnannotated
-                  (EpColon
-                   (EpUniTok
-                    (EpaSpan { T24221.hs:33:10-11 })
-                    (NormalSyntax))))
+                 (HsModifiedFunArr
+                  (NoExtField)
+                  []
+                  (HsStandardArr
+                   (EpColon
+                    (EpUniTok
+                     (EpaSpan { T24221.hs:33:10-11 })
+                     (NormalSyntax)))))
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:33:13-15 })
@@ -1244,11 +1297,14 @@
                   (NoSourceText))
                  (NoSrcUnpack)
                  (NoSrcStrict)
-                 (HsUnannotated
-                  (EpColon
-                   (EpUniTok
-                    (EpaSpan { T24221.hs:34:10-11 })
-                    (NormalSyntax))))
+                 (HsModifiedFunArr
+                  (NoExtField)
+                  []
+                  (HsStandardArr
+                   (EpColon
+                    (EpUniTok
+                     (EpaSpan { T24221.hs:34:10-11 })
+                     (NormalSyntax)))))
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:34:13-15 })
@@ -1306,6 +1362,7 @@
      (NoExtField)
      (DataDecl
       (NoExtField)
+      []
       (L
        (EpAnn
         (EpaSpan { T24221.hs:36:6-9 })
@@ -1351,6 +1408,7 @@
             (NoEpUniTok)
             (NoEpTok)
             (NoEpUniTok))
+           []
            (L
             (EpAnn
              (EpaSpan { T24221.hs:38:3-8 })
@@ -1416,11 +1474,14 @@
                   (NoSourceText))
                  (NoSrcUnpack)
                  (NoSrcStrict)
-                 (HsUnannotated
-                  (EpColon
-                   (EpUniTok
-                    (EpaSpan { T24221.hs:40:8-9 })
-                    (NormalSyntax))))
+                 (HsModifiedFunArr
+                  (NoExtField)
+                  []
+                  (HsStandardArr
+                   (EpColon
+                    (EpUniTok
+                     (EpaSpan { T24221.hs:40:8-9 })
+                     (NormalSyntax)))))
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:40:11-13 })
@@ -1489,11 +1550,14 @@
                   (NoSourceText))
                  (NoSrcUnpack)
                  (NoSrcStrict)
-                 (HsUnannotated
-                  (EpColon
-                   (EpUniTok
-                    (EpaSpan { T24221.hs:42:8-9 })
-                    (NormalSyntax))))
+                 (HsModifiedFunArr
+                  (NoExtField)
+                  []
+                  (HsStandardArr
+                   (EpColon
+                    (EpUniTok
+                     (EpaSpan { T24221.hs:42:8-9 })
+                     (NormalSyntax)))))
                  (L
                   (EpAnn
                    (EpaSpan { T24221.hs:42:11-13 })

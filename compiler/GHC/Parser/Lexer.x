@@ -1787,7 +1787,7 @@ varsym opws@OpWsPrefix = sym $ \span exts s ->
   if | s == fsLit "@" ->
          return ITtypeApp  -- regardless of TypeApplications for better error messages
      | s == fsLit "%" ->
-         if xtest LinearTypesBit exts
+         if xtest ModifiersBit exts || xtest LinearTypesBit exts
          then return ITpercent
          else warnExtConflict OperatorWhitespaceSymbol_PrefixPercent
      | s == fsLit "$" ->
@@ -2813,6 +2813,7 @@ data ExtBits
   | MultiWayIfBit
   | GadtSyntaxBit
   | ImportQualifiedPostBit
+  | ModifiersBit
   | LinearTypesBit
   | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
   | OverloadedRecordDotBit
@@ -2898,6 +2899,7 @@ mkParserOpts extensionFlags diag_opts
       .|. MultiWayIfBit               `xoptBit` LangExt.MultiWayIf
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
       .|. ImportQualifiedPostBit      `xoptBit` LangExt.ImportQualifiedPost
+      .|. ModifiersBit                `xoptBit` LangExt.Modifiers
       .|. LinearTypesBit              `xoptBit` LangExt.LinearTypes
       .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
       .|. OverloadedRecordDotBit      `xoptBit` LangExt.OverloadedRecordDot

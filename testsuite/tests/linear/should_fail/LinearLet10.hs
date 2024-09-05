@@ -1,4 +1,4 @@
-{-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE LinearTypes, NoModifiers #-}
 
 module LinearLet10 where
 

@@ -62,6 +62,7 @@
        (EpVirtualBraces
         (3))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -148,11 +149,14 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnannotated
-              (EpArrow
-               (EpUniTok
-                (EpaSpan { T17544.hs:6:11-12 })
-                (NormalSyntax))))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { T17544.hs:6:11-12 })
+                 (NormalSyntax)))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:6:9 })
@@ -241,6 +245,7 @@
        (EpVirtualBraces
         (3))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -327,11 +332,14 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnannotated
-              (EpArrow
-               (EpUniTok
-                (EpaSpan { T17544.hs:10:11-12 })
-                (NormalSyntax))))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { T17544.hs:10:11-12 })
+                 (NormalSyntax)))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:10:9 })
@@ -418,6 +426,7 @@
        (EpVirtualBraces
         (3))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -504,11 +513,14 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnannotated
-              (EpArrow
-               (EpUniTok
-                (EpaSpan { T17544.hs:14:11-12 })
-                (NormalSyntax))))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { T17544.hs:14:11-12 })
+                 (NormalSyntax)))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:14:9 })
@@ -598,6 +610,7 @@
        (EpVirtualBraces
         (3))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -684,11 +697,14 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnannotated
-              (EpArrow
-               (EpUniTok
-                (EpaSpan { T17544.hs:18:11-12 })
-                (NormalSyntax))))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { T17544.hs:18:11-12 })
+                 (NormalSyntax)))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:18:9 })
@@ -771,11 +787,14 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnannotated
-              (EpArrow
-               (EpUniTok
-                (EpaSpan { T17544.hs:20:11-12 })
-                (NormalSyntax))))
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (EpArrow
+                (EpUniTok
+                 (EpaSpan { T17544.hs:20:11-12 })
+                 (NormalSyntax)))))
              (L
               (EpAnn
                (EpaSpan { T17544.hs:20:9 })
@@ -844,6 +863,7 @@
         (EpTok (EpaSpan { T17544.hs:22:18 }))
         (EpTok (EpaSpan { T17544.hs:22:30 })))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -985,6 +1005,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { T17544.hs:23:10-15 })
@@ -1126,6 +1147,7 @@
                  (EpUniTok
                   (EpaSpan { T17544.hs:25:10-11 })
                   (NormalSyntax)))
+                []
                 (:|
                  (L
                   (EpAnn
@@ -1227,6 +1249,7 @@
         (EpTok (EpaSpan { T17544.hs:28:18 }))
         (EpTok (EpaSpan { T17544.hs:28:30 })))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -1368,6 +1391,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { T17544.hs:29:10-15 })
@@ -1509,6 +1533,7 @@
                  (EpUniTok
                   (EpaSpan { T17544.hs:31:10-11 })
                   (NormalSyntax)))
+                []
                 (:|
                  (L
                   (EpAnn
@@ -1610,6 +1635,7 @@
         (EpTok (EpaSpan { T17544.hs:34:18 }))
         (EpTok (EpaSpan { T17544.hs:34:30 })))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -1751,6 +1777,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { T17544.hs:35:10-15 })
@@ -1892,6 +1919,7 @@
                  (EpUniTok
                   (EpaSpan { T17544.hs:37:10-11 })
                   (NormalSyntax)))
+                []
                 (:|
                  (L
                   (EpAnn
@@ -1993,6 +2021,7 @@
         (EpTok (EpaSpan { T17544.hs:40:18 }))
         (EpTok (EpaSpan { T17544.hs:40:30 })))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -2134,6 +2163,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { T17544.hs:41:10-15 })
@@ -2275,6 +2305,7 @@
                  (EpUniTok
                   (EpaSpan { T17544.hs:43:10-11 })
                   (NormalSyntax)))
+                []
                 (:|
                  (L
                   (EpAnn
@@ -2376,6 +2407,7 @@
         (EpTok (EpaSpan { T17544.hs:46:18 }))
         (EpTok (EpaSpan { T17544.hs:46:30 })))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -2517,6 +2549,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { T17544.hs:47:10-15 })
@@ -2658,6 +2691,7 @@
                  (EpUniTok
                   (EpaSpan { T17544.hs:49:10-11 })
                   (NormalSyntax)))
+                []
                 (:|
                  (L
                   (EpAnn
@@ -2759,6 +2793,7 @@
         (EpTok (EpaSpan { T17544.hs:52:19 }))
         (EpTok (EpaSpan { T17544.hs:52:32 })))
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -2900,6 +2935,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { T17544.hs:53:10-16 })
@@ -3041,6 +3077,7 @@
                  (EpUniTok
                   (EpaSpan { T17544.hs:55:11-12 })
                   (NormalSyntax)))
+                []
                 (:|
                  (L
                   (EpAnn

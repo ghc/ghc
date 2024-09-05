@@ -25,7 +25,7 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Data.Maybe (catMaybes)
 import GHC.Hs.Expr (prependQualified, HsExpr(..), HsLamVariant(..), lamCaseKeyword)
-import GHC.Hs.Type (pprLHsContext, pprHsArrow, pprHsForAll)
+import GHC.Hs.Type (pprLHsContext, pprHsForAll, pprHsModifiedFunArr, pprHsModifiers)
 import GHC.Builtin.Names (allNameStringList)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.List.NonEmpty (NonEmpty((:|)))
@@ -81,12 +81,12 @@ instance Diagnostic PsMessage where
       -> let mk_prefix_msg extension_name syntax_meaning =
                   text "The prefix use of a" <+> quotes (pprOperatorWhitespaceSymbol sym)
                     <+> text "would denote" <+> syntax_meaning
-               $$ nest 2 (text "were the" <+> extension_name <+> text "extension enabled.")
+               $$ nest 2 (text "were the" <+> extension_name <+> text "enabled.")
          in mkSimpleDecorated $
          case sym of
-           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg (text "LinearTypes") (text "a multiplicity annotation")
-           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg (text "TemplateHaskell") (text "an untyped splice")
-           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg (text "TemplateHaskell") (text "a typed splice")
+           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg (text "Modifiers or LinearTypes extensions") (text "a multiplicity annotation")
+           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg (text "TemplateHaskell extension") (text "an untyped splice")
+           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg (text "TemplateHaskell extension") (text "a typed splice")
     PsWarnOperatorWhitespace sym occ_type
       -> let mk_msg occ_type_str =
                   text "The" <+> text occ_type_str <+> text "use of a" <+> quotes (ftext sym)
@@ -209,6 +209,8 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "A lambda requires at least one parameter"
     PsErrLinearFunction
       -> mkSimpleDecorated $ text "Illegal use of linear functions"
+    PsErrModifierSyntax _
+      -> mkSimpleDecorated $ text "Illegal use of modifier syntax"
     PsErrOverloadedRecordUpdateNotEnabled
       -> mkSimpleDecorated $ text "Illegal overloaded record update"
     PsErrMultiWayIf
@@ -521,10 +523,10 @@ instance Diagnostic PsMessage where
               text "character in package name"
             ]
 
-    PsErrIllegalGadtRecordMultiplicity arr
+    PsErrIllegalGadtRecordModifier arr
       -> mkSimpleDecorated $ vcat
-            [ text "Parse error" <> colon <+> quotes (ppr arr)
-            , text "Record constructors in GADTs must use an ordinary, non-linear arrow."
+            [ text "Parse error" <> colon <+> quotes (pprHsModifiedFunArr arr)
+            , text "Record constructors in GADTs must use an ordinary, non-modified arrow."
             ]
     PsErrInvalidCApiImport {} -> mkSimpleDecorated $ vcat [ text "Wrapper stubs can't be used with CApiFFI."]
 
@@ -567,8 +569,8 @@ instance Diagnostic PsMessage where
         , text "Type syntax in patterns isn't supported at the time"]
         where
           (what, ctx') = case ctx of
-            PETS_FunctionArrow arg arr res -> ("function arrow", ppr arg <+> pprHsArrow arr <+> ppr res)
-            PETS_Multiplicity tok p        -> ("multiplicity annotation", ppr tok <> ppr p)
+            PETS_FunctionArrow arg arr res -> ("function arrow", ppr arg <+> pprHsModifiedFunArr arr <+> ppr res)
+            PETS_Multiplicity mods         -> ("multiplicity annotation", pprHsModifiers mods)
             PETS_ForallTelescope tele body -> ("forall telescope", pprHsForAll tele Nothing <+> ppr body)
             PETS_ConstraintContext ctx     -> ("constraint context", ppr ctx)
 
@@ -616,6 +618,7 @@ instance Diagnostic PsMessage where
     PsErrLambdaCase{}                             -> ErrorWithoutFlag
     PsErrEmptyLambda{}                            -> ErrorWithoutFlag
     PsErrLinearFunction{}                         -> ErrorWithoutFlag
+    PsErrModifierSyntax{}                         -> ErrorWithoutFlag
     PsErrMultiWayIf{}                             -> ErrorWithoutFlag
     PsErrOverloadedRecordUpdateNotEnabled{}       -> ErrorWithoutFlag
     PsErrNumUnderscores{}                         -> ErrorWithoutFlag
@@ -702,7 +705,7 @@ instance Diagnostic PsMessage where
     PsErrUnexpectedTypeInDecl{}                   -> ErrorWithoutFlag
     PsErrInvalidPackageName{}                     -> ErrorWithoutFlag
     PsErrParseRightOpSectionInPat{}               -> ErrorWithoutFlag
-    PsErrIllegalGadtRecordMultiplicity{}          -> ErrorWithoutFlag
+    PsErrIllegalGadtRecordModifier{}              -> ErrorWithoutFlag
     PsErrInvalidCApiImport {}                     -> ErrorWithoutFlag
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
     PsErrUnicodeCharLooksLike{}                   -> ErrorWithoutFlag
@@ -758,6 +761,8 @@ instance Diagnostic PsMessage where
     PsErrLambdaCase{}                             -> [suggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
     PsErrLinearFunction{}                         -> [suggestExtension LangExt.LinearTypes]
+    PsErrModifierSyntax SuggestModifiers          -> [suggestExtension LangExt.Modifiers]
+    PsErrModifierSyntax DontSuggestModifiers      -> []
     PsErrMultiWayIf{}                             -> [suggestExtension LangExt.MultiWayIf]
     PsErrOverloadedRecordUpdateNotEnabled{}       -> [suggestExtension LangExt.OverloadedRecordUpdate]
     PsErrNumUnderscores{}                         -> [suggestExtension LangExt.NumericUnderscores]
@@ -878,7 +883,7 @@ instance Diagnostic PsMessage where
         pattern_RDR = mkUnqual varName (fsLit "pattern")
     PsErrUnexpectedTypeInDecl{}                   -> noHints
     PsErrInvalidPackageName{}                     -> noHints
-    PsErrIllegalGadtRecordMultiplicity{}          -> noHints
+    PsErrIllegalGadtRecordModifier{}              -> noHints
     PsErrInvalidCApiImport {}                     -> noHints
     PsErrMultipleConForNewtype {}                 -> noHints
     PsErrUnicodeCharLooksLike{}                   -> noHints

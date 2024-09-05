@@ -156,7 +156,7 @@ tcDefaultDecls decls =
       -- but we must still make sure not to error if we fail to look up e.g. the 'Num'
       -- typeclass when typechecking such a default declaration. To do this, we wrap
       -- calls of 'tcLookupClass' in 'tryTc'.
-      (True, [L _ (DefaultDecl _ Nothing [])]) -> do
+      (True, [L _ (DefaultDecl _ _ Nothing [])]) -> do
         h2010_dflt_clss <- foldMapM (fmap maybeToList . fmap fst . tryTc . tcLookupClass) =<< getH2010DefaultNames
         case NE.nonEmpty h2010_dflt_clss of
           Nothing -> return []
@@ -190,7 +190,7 @@ tcDefaultDecls decls =
            ; return $ numClassName :| extra_clss_names
            }
     declarationParts :: NonEmpty Class -> LDefaultDecl GhcRn -> TcM (Maybe (Maybe Class, LDefaultDecl GhcRn, [Type]))
-    declarationParts h2010_dflt_clss decl@(L locn (DefaultDecl _ mb_cls_name dflt_hs_tys))
+    declarationParts h2010_dflt_clss decl@(L locn (DefaultDecl _ _ mb_cls_name dflt_hs_tys))
       = setSrcSpan (locA locn) $
           case mb_cls_name of
             -- Haskell 98 default declaration

@@ -189,6 +189,11 @@ data Pat p
   -- ^ Type abstraction which brings into scope type variables associated with invisible forall.
   -- E.g. @fn \@t ... = rhs@. Used by @-XTypeAbstractions@.
 
+  | ModifiedPat (XModifiedPat p) [HsModifier p] (LPat p)
+  -- ^ Pattern with attached modifiers. See Note [Overview of Modifiers] and
+  -- Note [Modifiers on patterns vs bindings].
+  -- E.g. @(%X x) = ...@
+
   -- See Note [Invisible binders in functions] in GHC.Hs.Pat
 
   | -- | TTG Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
@@ -196,6 +201,63 @@ data Pat p
 
 type family ConLikeP x
 
+{-
+Note [Modifiers on patterns vs bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Modifiers can be attached both to patterns and to bindings. Modifiers on
+bindings are used with @-XLinearTypes@ (see Note [Modifiers on bindings] in
+Language.Haskell.Syntax.Binds). Modifiers on patterns are currently unused.
+
+The modifiers proposal
+(https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0370-modifiers.rst)
+specifies that modifiers can be attached to patterns. These modifiers are
+currently unused. The proposal also takes as a given that they can be attached
+to bindings. (That syntax already existed when the proposal was written.) These
+modifiers are used with @-XLinearTypes@, see Note [Modifiers on bindings] in
+Language.Haskell.Syntax.Binds.
+
+But the proposal isn't explicit about how to parse @let %m p = ...@. Naively it
+could be either of
+
+- @PatBind [%m] p@
+- @PatBind [] (ModifiedPat [%m] p)@
+
+But we need it to work with linear types, so we need to pick the first. We pick
+it by parsing @%m p@ as a pattern (actually a 'PatBuilder'), and moving
+modifiers at the root of the pattern to the binding, so that a 'PatBind' never
+directly contains a 'ModifiedPat'. This logic is implemented in
+'extract_pat_builder_modifiers' in GHC.Parser.PostProcess. In source code:
+
+- @let %m p = ...@ attaches the modifier to the binding: @PatBind [%m] p@.
+- @let (%m p) = ...@ attaches it to the pattern:
+  @PatBind [] (ParPat (ModifiedPat [%m] p))@.
+- @let %m x:xs = ...@ attaches it to the subpattern @x@:
+  @PatBind [] (ConPat : [ModifiedPat [%m] x, xs])@.
+
+This last is a breaking change: before modifiers were implemented, it would
+instead have attached the %m to the binding. (And @let %m Just x = ...@ would
+have done the same, where now it fails to parse.) So some programs that used to
+be accepted with @-XLinearTypes@ are no longer accepted; but since linear
+bindings must be strict, such programs would be rare.
+
+Another possible solution (untried) might have been to specifically recognize
+modifiers at the start of the binding, and not parse them as part of a pattern,
+such that:
+
+- @let %m p = ...@ and @let (%m p) = ...@ would be as above.
+- @let %m x:xs = ...@ would be @PatBind [%m] (ConPat : [x, xs])@.
+- @let %m Just x = ...@ would be @PatBind [%m] (ConPat Just [x])@.
+
+This would make modifier parsing significantly different from how strict
+bindings are parsed:
+
+- @let !x = ...@ is a 'FunBind' with a 'SrcStrict' annotation.
+- @let (!p) x = ...@ is a PatBind' holding a 'BangPat'.
+- @let !x:y = ...@ parses like @let (!x):y = ...@.
+- @let !Just x = ...@ fails to parse.
+
+See Note [FunBind vs PatBind] in Language.Haskell.Syntax.Binds.
+-}
 
 -- ---------------------------------------------------------------------
 

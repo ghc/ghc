@@ -188,6 +188,7 @@ module Language.Haskell.TH where
     | InstanceSigs
     | ApplicativeDo
     | LinearTypes
+    | Modifiers
     | RequiredTypeArguments
     | StandaloneDeriving
     | DeriveDataTypeable
@@ -798,6 +799,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | InstanceSigs
     | ApplicativeDo
     | LinearTypes
+    | Modifiers
     | RequiredTypeArguments
     | StandaloneDeriving
     | DeriveDataTypeable
@@ -1542,6 +1544,7 @@ module Language.Haskell.TH.Syntax where
     | InstanceSigs
     | ApplicativeDo
     | LinearTypes
+    | Modifiers
     | RequiredTypeArguments
     | StandaloneDeriving
     | DeriveDataTypeable

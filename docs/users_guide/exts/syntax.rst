@@ -26,3 +26,4 @@ Syntax
     typed_holes
     arrows
     lexical_negation
+    modifiers

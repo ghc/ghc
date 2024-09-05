@@ -61,8 +61,8 @@ module GHC.Tc.Gen.HsType (
         tcLHsKindSig, checkDataKindSig, DataSort(..),
         checkClassKindSig,
 
-        -- Multiplicity
-        tcMult,
+        -- Modifiers
+        tcModifiersAndWarn, tcMult, tcMultDefault, tcModifiersMult,
 
         -- Pattern type signatures
         tcHsPatSigType, tcHsTyPat, tcRuleBndrSig,
@@ -974,8 +974,18 @@ concern things that the renamer can't handle.
 
 -}
 
-tcMult :: LHsType GhcRn -> TcM Mult
-tcMult ty = tc_check_lhs_type typeLevelMode ty multiplicityTy
+tcMult :: HsModifiedFunArr GhcRn -> TcM (Maybe Mult)
+tcMult = tc_mult typeLevelMode
+
+tcMultDefault :: Mult -> HsModifiedFunArr GhcRn -> TcM Mult
+tcMultDefault def ann = fromMaybe def <$> tcMult ann
+
+tcModifiersAndWarn :: [HsModifier GhcRn] -> TcM [TcType]
+tcModifiersAndWarn mods =
+  tc_modifiers typeLevelMode mods Nothing (const $ Left DontSuggestLinear)
+
+tcModifiersMult :: [HsModifier GhcRn] -> TcM (Maybe Mult)
+tcModifiersMult = tc_modifiers_mult typeLevelMode
 
 -- | Info about the context in which we're checking a type. Currently,
 -- differentiates only between types and kinds, but this will likely
@@ -1149,7 +1159,7 @@ tcHsType mode (HsFunTy _ mult ty1 ty2) exp_kind
 tcHsType mode (HsOpTy _ ty1 tyop ty2) exp_kind
   | L _ (HsTyVar _ _ op) <- tyop
   , unLocWithUserRdr op `hasKey` unrestrictedFunTyConKey
-  = tc_fun_type mode (HsUnannotated noExtField) ty1 ty2 exp_kind
+  = tc_fun_type mode (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) ty1 ty2 exp_kind
 
 --------- Foralls
 tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
@@ -1404,7 +1414,142 @@ Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo
 -}
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> HsMultAnn GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
+
+tc_mult :: TcTyMode -> HsModifiedFunArr GhcRn -> TcM (Maybe Mult)
+tc_mult mode (HsModifiedFunArr _ mods arr) = do
+  mMult <- tc_modifiers_mult mode mods
+  case (arr, mMult) of
+    (HsStandardArr _, _) -> pure mMult
+    (HsLinearArr _, Nothing) -> pure $ Just oneDataConTy
+    (HsLinearArr _, Just _) -> failWithTc TcRnTooManyMultiplicities
+
+-- | Extract the optional Multiplicity modifier from a list. Nothing if none of
+-- them are Multiplicities, error if more than one is. Non-Multiplicity
+-- modifiers generate warnings but are otherwise ignored.
+--
+-- See Note [Typechecking Multiplicity modifiers].
+tc_modifiers_mult :: TcTyMode -> [HsModifier GhcRn] -> TcM (Maybe Mult)
+tc_modifiers_mult mode mods = do
+  modifiers <- xoptM LangExt.Modifiers
+  linearTypes <- xoptM LangExt.LinearTypes
+  case (linearTypes, modifiers) of
+    (False, _) ->
+      go_infer $ \k -> if isMultiplicityTy k
+        then Left SuggestLinear
+        else Left DontSuggestLinear
+    (True, False) -> go_check
+    (True, True) ->
+      go_infer $ \k -> if isMultiplicityTy k
+        then Right ()
+        else Left DontSuggestLinear
+  where
+    go_infer is_mult = do
+      mults <- tc_modifiers mode mods (Just multiplicityTyConName) is_mult
+      case mults of
+        [] -> pure Nothing
+        [m] -> pure $ Just m
+        _ -> failWithTc TcRnTooManyMultiplicities
+
+    go_check = case mods of
+      [] -> pure Nothing
+      [HsModifier _ m] -> Just <$> tc_check_lhs_type mode m multiplicityTy
+      _ -> failWithTc TcRnTooManyMultiplicities
+
+-- | Typecheck a single modifier.
+--
+-- If the modifier's kind is unknown, emit an error, optionally suggesting the
+-- name of a kind to give as a type signature.
+--
+-- If it has a known kind, it's passed to the @check_expected_kind@ argument to
+-- determine if the modifier is recognised in this context. @'Right' '()'@
+-- indicates that it's recognised, and we return 'Just' the modifier's type.
+-- @'Left' 'DontSuggestLinear'@ indicates that it's not recognised, and we
+-- return 'Nothing'. @'Left' 'SuggestLinear' indicates that it's not recognised,
+-- but the user may want to enable @-XLinearTypes@.
+--
+-- For example, when typechecking function arrows, this argument is
+--
+-- > if isMultiplicityTy k then Right () else Left DontSuggestLinear
+--
+-- That means that if we see
+--
+-- * @Int %m -> Int@, we emit an error (unless @m@'s kind is known from context)
+-- * @Int %(m :: Multiplicity) -> Int@, we return @'Just' m@
+-- * @Int %True -> Int@, we return 'Nothing' and emit a warning.
+tc_modifier :: TcTyMode
+            -> HsModifier GhcRn
+            -> Maybe Name -- ^ If modifier has unknown kind, suggest this one.
+            -> (TcKind -> Either SuggestLinear ())
+               -- ^ Given the Kind of a modifier, is the modifier expected?
+            -> TcM (Maybe TcType)
+tc_modifier mode mod@(HsModifier modPrintsAs ty) mSuggestKind check_expected_kind = do
+  (inf_ty, inf_kind) <- tc_infer_lhs_type mode ty
+  -- bug: zonking here means that (1) is rejected, but (2) is accepted.
+  --     (1): Int %(m :: Multiplicity) -> Int %m -> Int
+  --     (2): Int %m -> Int %(m :: Multiplicity) -> Int
+  inf_kind' <- liftZonkM $ zonkTcType inf_kind
+  case inf_kind' of
+    -- This checks for a modifier of unknown kind. It doesn't detect poly-kinded
+    -- modifiers. e.g. %Just and %Nothing don't fail here, and possibly they
+    -- should.
+    TyVarTy _ -> failWithTc $ TcRnUnknownModifierKind mod mSuggestKind
+    _ -> case check_expected_kind inf_kind' of
+      Right () -> return $ Just inf_ty
+      Left suggestLinear -> do
+        linearTypes <- xoptM LangExt.LinearTypes
+        warn_unrecognised <- woptM Opt_WarnUnrecognisedModifiers
+        let suggestLinear' = case modPrintsAs of
+              ModifierPrintsAs1 | not linearTypes -> SuggestLinear
+              _ -> suggestLinear
+        diagnosticTc warn_unrecognised $ TcRnUnrecognisedModifier mod suggestLinear'
+        pure Nothing
+
+tc_modifiers :: TcTyMode
+             -> [HsModifier GhcRn]
+             -> Maybe Name
+             -> (TcKind -> Either SuggestLinear ())
+             -> TcM [TcType]
+tc_modifiers mode mods mSuggestName is_expected_kind =
+  catMaybes <$> mapM (\m -> tc_modifier mode m mSuggestName is_expected_kind) mods
+
+{-
+Note [Typechecking Multiplicity modifiers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When looking for Multiplicity modifiers, we need to consider various
+combinations of extensions.
+
+- -XLinearTypes -XModifiers is the basic case. We infer the kind of each
+   modifier, modifier to see whether it's a Multiplicity. If there's more than
+   one Multiplicity modifier, we throw an error.
+
+     %One %True           => Just One; warning (unrecognised modifier True)
+     %True                => Nothing; warning (unrecognised modifier True)
+     %One %One            => error (too many multiplicities)
+     %(m :: Multiplicity) => Just m
+     %m                   => error (modifier m has unknown kind)
+
+- With -XLinearTypes -XNoModifiers, we permit at most one modfier. We /check/
+  that its kind is Multiplicity, rather than inferring, which has less need for
+  type annotations. This is for backwards compatibility with the days when
+  LinearTypes existed but Modifiers didn't.
+
+     %One %True           => error (too many multiplicities)
+     %True                => error (True is not of kind Multiplicity)
+     %(m :: Multiplicity) => Just m
+     %m                   => Just m
+
+- With -XNoLinearTypes, we never return a Multiplicity, and we warn about all
+  modifiers. We don't need to check for -XModifiers, because with
+  -XNoLinearTypes -XNoModifiers, there won't be any modifiers to typecheck in
+  the first place.
+
+     %One %True => Nothing; warning (unrecognised modifier One, suggest enabling
+                   -XLinearTypes); warning (unrecognised modifier True)
+     %m         => error (modifier m has unknown kind)
+-}
+
+------------------------------------------
+tc_fun_type :: TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType
 tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
   TypeLevel ->
@@ -1413,21 +1558,17 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
        ; res_k <- newOpenTypeKind
        ; ty1'  <- tc_check_lhs_type mode ty1 arg_k
        ; ty2'  <- tc_check_lhs_type mode ty2 res_k
-       ; mult' <- tc_mult mode mult
+       ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')
                       liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1'  <- tc_check_lhs_type mode ty1 liftedTypeKind
        ; ty2'  <- tc_check_lhs_type mode ty2 liftedTypeKind
-       ; mult' <- tc_mult mode mult
+       ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')
                       liftedTypeKind exp_kind }
-  where
-    tc_mult mode mult = case multAnnToHsType mult of
-      Just mult' -> tc_check_lhs_type mode mult' multiplicityTy
-      Nothing    -> return manyDataConTy
 
 {- Note [Skolem escape and forall-types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

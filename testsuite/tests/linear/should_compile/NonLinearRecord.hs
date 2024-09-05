@@ -3,9 +3,9 @@ module NonLinearRecord where
 
 import GHC.Exts (Multiplicity(..))
 
-data C m = C { linC %1 :: Int, urC %Many :: Char, varC %m :: String, noC :: Bool }
+data C (m :: Multiplicity) = C { linC %1 :: Int, urC %Many :: Char, varC %m :: String, noC :: Bool }
 
-data G mult where
+data G (mult :: Multiplicity) where
   G :: { linG %1 :: Int, urG %Many :: Char, varG %m :: String, noG :: Bool } -> G m
 
 testC :: Int %1 -> Char -> String -> Bool %1 -> C Many

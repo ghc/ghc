@@ -125,7 +125,7 @@ import GHC.Core.ConLike
 import GHC.Core.Make   ( mkChunkified )
 import GHC.Core.Type   ( Type, isUnliftedType )
 
-import GHC.Builtin.Types ( unitTy, manyDataConTy )
+import GHC.Builtin.Types ( unitTy )
 
 import GHC.Types.Id
 import GHC.Types.Name
@@ -617,12 +617,12 @@ nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f t)
 nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA $ noUserRdrP @p x))
-nlHsFunTy a b = noLocA (HsFunTy noExtField (HsUnannotated x) a b)
+nlHsFunTy a b = noLocA (HsFunTy noExtField (HsModifiedFunArr noExtField [] $ HsStandardArr x) a b)
   where
     x = case ghcPass @p of
       GhcPs -> EpArrow noAnn
       GhcRn -> noExtField
-      GhcTc -> manyDataConTy
+      GhcTc -> noExtField
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
 nlHsTyConApp :: forall p a. IsSrcSpanAnn p a
@@ -766,7 +766,8 @@ mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
 mkClassOpSigs sigs
   = map fiddle sigs
   where
-    fiddle (L loc (TypeSig anns nms ty))
+    -- This drops modifiers, but they can't be parsed here anyway.
+    fiddle (L loc (TypeSig anns _ nms ty))
       = L loc (ClassOpSig anns False nms (dropWildCards ty))
     fiddle sig = sig
 
@@ -1275,6 +1276,7 @@ collect_pat flag pat bndrs = case pat of
   SplicePat ext _       -> collectXSplicePat @p flag ext bndrs
   EmbTyPat _ tp         -> collect_ty_pat_bndrs flag tp bndrs
   InvisPat _ tp         -> collect_ty_pat_bndrs flag tp bndrs
+  ModifiedPat _ _ pat   -> collect_lpat flag pat bndrs
 
   -- See Note [Dictionary binders in ConPatOut]
   ConPat {pat_args=ps}  -> case flag of

@@ -710,15 +710,16 @@ zonk_lbind = wrapLocZonkMA zonk_bind
 
 zonk_bind :: HsBind GhcTc -> ZonkTcM (HsBind GhcTc)
 zonk_bind bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
-                        , pat_mult = mult_ann
-                        , pat_ext = (ty, ticks)})
+                        , pat_mods = mods
+                        , pat_ext = ext })
   = do  { new_pat   <- don'tBind $ zonkPat pat            -- Env already extended
         ; new_grhss <- zonkGRHSs zonkLExpr grhss
-        ; new_ty    <- zonkTcTypeToTypeX ty
-        ; new_mult  <- zonkMultAnn mult_ann
+        ; new_ty    <- zonkTcTypeToTypeX $ patBindGRHSType ext
+        ; new_mult  <- zonkTcTypeToTypeX $ patBindMult ext
         ; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss
-                       , pat_mult = new_mult
-                       , pat_ext = (new_ty, ticks) }) }
+                       , pat_mods = mods
+                       , pat_ext = ext { patBindGRHSType = new_ty
+                                       , patBindMult = new_mult }}) }
 
 zonk_bind (VarBind { var_ext = x
                    , var_id = var, var_rhs = expr })
@@ -807,17 +808,6 @@ zonk_bind (PatSynBind x bind@(PSB { psb_id   = L loc id
                        , psb_args = details'
                        , psb_def  = lpat'
                        , psb_dir  = dir' } } }
-
-zonkMultAnn :: HsMultAnn GhcTc -> ZonkTcM (HsMultAnn GhcTc)
-zonkMultAnn (HsUnannotated mult)
-  = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsUnannotated mult') }
-zonkMultAnn (HsLinearAnn mult)
-  = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsLinearAnn mult') }
-zonkMultAnn (HsExplicitMult mult hs_ty)
-  = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsExplicitMult mult' hs_ty) }
 
 zonkPatSynDetails :: HsPatSynDetails GhcTc
                   -> ZonkTcM (HsPatSynDetails GhcTc)
@@ -1639,6 +1629,10 @@ zonk_pat (InvisPat ty tp)
   = do { ty' <- noBinders $ zonkTcTypeToTypeX ty
        ; return (InvisPat ty' tp) }
 
+zonk_pat (ModifiedPat x mods p)
+  = do  { p' <- zonkPat p
+        ; return (ModifiedPat x mods p') }
+
 zonk_pat (XPat ext) = case ext of
   { ExpansionPat orig pat ->
     do { pat' <- zonk_pat pat
@@ -1650,7 +1644,8 @@ zonk_pat (XPat ext) = case ext of
        ; return (XPat $ CoPat co_fn' pat' ty')
        } }
 
-zonk_pat pat = pprPanic "zonk_pat" (ppr pat)
+zonk_pat pat@(SplicePat {}) = pprPanic "zonk_pat" (ppr pat)
+zonk_pat pat@(QualLitPat {}) = pprPanic "zonk_pat" (ppr pat)
 
 ---------------------------
 zonkConStuff :: HsConPatDetails GhcTc
@@ -1731,11 +1726,11 @@ zonkForeignExports ls = mapM (wrapLocZonkMA zonkForeignExport) ls
 
 zonkForeignExport :: ForeignDecl GhcTc -> ZonkTcM (ForeignDecl GhcTc)
 zonkForeignExport (ForeignExport { fd_name = i, fd_e_ext = co
-                                 , fd_fe = spec })
+                                 , fd_fe = spec, fd_modifiers = mods })
   = do { i' <- zonkLIdOcc i
        ; return (ForeignExport { fd_name = i'
                                , fd_sig_ty = undefined, fd_e_ext = co
-                               , fd_fe = spec }) }
+                               , fd_fe = spec, fd_modifiers = mods }) }
 zonkForeignExport for_imp
   = return for_imp     -- Foreign imports don't need zonking
 

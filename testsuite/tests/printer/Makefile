@@ -912,3 +912,8 @@ TestLevelImports:
 TestNamedDefaults:
 	$(CHECK_PPR)   $(LIBDIR) TestNamedDefaults.hs
 	$(CHECK_EXACT) $(LIBDIR) TestNamedDefaults.hs
+
+.PHONY: PprModifiers
+PprModifiers:
+	$(CHECK_PPR)   $(LIBDIR) PprModifiers.hs
+	$(CHECK_EXACT) $(LIBDIR) PprModifiers.hs

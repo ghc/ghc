@@ -451,12 +451,12 @@ rnBindLHS :: NameMaker
           -- (i.e., any free variables of the pattern)
           -> RnM (HsBindLR GhcRn GhcPs)
 
-rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat, pat_mult = pat_mult })
+rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat, pat_mods = pat_mods })
   = do
       -- we don't actually use the FV processing of rnPatsAndThen here
       (pat',pat'_fvs) <- rnBindPat name_maker pat
-      (pat_mult', mult'_fvs) <- rnHsMultAnnWith (rnLHsType PatCtx) pat_mult
-      return (bind { pat_lhs = pat', pat_ext = pat'_fvs `plusFN` mult'_fvs, pat_mult = pat_mult' })
+      (pat_mods', mods'_fvs) <- rnModifiersContext PatCtx pat_mods
+      return (bind { pat_lhs = pat', pat_ext = pat'_fvs `plusFN` mods'_fvs, pat_mods = pat_mods' })
                 -- We temporarily store the pat's FVs in bind_fvs;
                 -- gets updated to the FVs of the whole bind
                 -- when doing the RHS below
@@ -590,6 +590,7 @@ isOkNoBindPattern (L _ pat) =
           TuplePat _ lps _ -> any lpatternContainsSplice lps
           SumPat _ lp _ _ -> lpatternContainsSplice lp
           ConPat _ _ cpd  -> any lpatternContainsSplice (hsConPatArgs cpd)
+          ModifiedPat _ _ lp -> lpatternContainsSplice lp
           XPat (HsPatExpanded _orig new) -> patternContainsSplice new
 
           -- The behavior of this case is unimportant, as GHC will throw an error shortly
@@ -686,7 +687,7 @@ mkScopedTvFn sigs = \n -> lookupNameEnv env n `orElse` []
     -- Returns (binders, scoped tvs for those binders)
     get_scoped_tvs (L _ (ClassOpSig _ _ names sig_ty))
       = Just (names, hsScopedTvs sig_ty)
-    get_scoped_tvs (L _ (TypeSig _ names sig_ty))
+    get_scoped_tvs (L _ (TypeSig _ _ names sig_ty))
       = Just (names, hsWcScopedTvs sig_ty)
     get_scoped_tvs (L _ (PatSynSig _ names sig_ty))
       = Just (names, hsScopedTvs sig_ty)
@@ -1065,11 +1066,12 @@ renameSigs ctxt sigs
 
 ----------------------
 renameSig :: HsSigCtxt -> Sig GhcPs -> RnM (Sig GhcRn, FreeNames)
-renameSig ctxt sig@(TypeSig _ vs ty)
+renameSig ctxt sig@(TypeSig _ mods vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx vs
         ; (new_ty, fvs) <- rnHsSigWcType doc ty
-        ; return (TypeSig noAnn new_vs new_ty, fvs) }
+        ; (mods', mods_fvs) <- rnModifiersContext doc mods
+        ; return (TypeSig noAnn mods' new_vs new_ty, fvs `plusFN` mods_fvs) }
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
@@ -1254,7 +1256,7 @@ findDupSigs sigs
     expand_sig :: Sig GhcPs -> [(LocatedN RdrName, Sig GhcPs)] -- AZ
     expand_sig sig@(FixSig _ (FixitySig _ ns _)) = zip ns (repeat sig)
     expand_sig sig@(InlineSig _ n _)             = [(n,sig)]
-    expand_sig sig@(TypeSig _ ns _)              = [(n,sig) | n <- ns]
+    expand_sig sig@(TypeSig _ _ ns _)            = [(n,sig) | n <- ns]
     expand_sig sig@(ClassOpSig _ _ ns _)         = [(n,sig) | n <- ns]
     expand_sig sig@(PatSynSig _ ns  _ )          = [(n,sig) | n <- ns]
     expand_sig sig@(SCCFunSig (_, _) n _)           = [(n,sig)]

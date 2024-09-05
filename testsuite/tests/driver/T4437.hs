@@ -36,7 +36,7 @@ check title expected got
 
 -- See Note [Adding a language extension] in compiler/GHC/Driver/Session.hs.
 expectedGhcOnlyExtensions :: [String]
-expectedGhcOnlyExtensions = [ "QualifiedStrings" ]
+expectedGhcOnlyExtensions = [ "QualifiedStrings", "Modifiers" ]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",

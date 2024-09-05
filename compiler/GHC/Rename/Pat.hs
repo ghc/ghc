@@ -87,7 +87,6 @@ import Data.Ratio
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import Data.Functor ((<&>))
 import Data.Coerce
 
 {-
@@ -693,6 +692,12 @@ rnPatAndThen _ (InvisPat (_, spec) tp)
        ; tp' <- rnHsTyPat HsTypePatCtx tp
        ; liftCps $ addErr (TcRnIllegalInvisibleTypePattern tp' InvisPatMisplaced)
        ; return (InvisPat spec tp')
+       }
+
+rnPatAndThen mk (ModifiedPat _ mods pat)
+  = do { mods' <- liftCpsFV $ rnModifiersContext PatCtx mods
+       ; pat' <- rnLPatAndThen mk pat
+       ; return $ ModifiedPat noExtField mods' pat'
        }
 
 --------------------
@@ -1367,7 +1372,7 @@ rn_ty_pat (HsAppKindTy _ ty ki) = do
 
 rn_ty_pat (HsFunTy an mult lhs rhs) = do
   lhs' <- rn_lty_pat lhs
-  mult' <- rn_ty_pat_mult mult
+  mult' <- rn_ty_pat_modified_fun_arr mult
   rhs' <- rn_lty_pat rhs
   pure (HsFunTy an mult' lhs' rhs')
 
@@ -1456,11 +1461,20 @@ rn_ty_pat ty@(XHsType{}) = do
   ctxt <- askDocContext
   liftRnFV $ rnHsType ctxt ty
 
-rn_ty_pat_mult :: HsMultAnn GhcPs -> TPRnM (HsMultAnn GhcRn)
-rn_ty_pat_mult (HsUnannotated _) = pure (HsUnannotated noExtField)
-rn_ty_pat_mult (HsLinearAnn _) = pure (HsLinearAnn noExtField)
-rn_ty_pat_mult (HsExplicitMult _ p)
-  = rn_lty_pat p <&> (\mult -> HsExplicitMult noExtField mult)
+-- Does this need to handle %1? Haven't found a situation where it matters.
+rn_modifier_pat :: HsModifier GhcPs -> TPRnM (HsModifier GhcRn)
+rn_modifier_pat (HsModifier _ ty) = HsModifier ModifierPrintsAsSelf <$> rn_lty_pat ty
+
+rn_modifiers_pat :: [HsModifier GhcPs] -> TPRnM [HsModifier GhcRn]
+rn_modifiers_pat mods = traverse rn_modifier_pat mods
+
+rn_ty_pat_modified_fun_arr :: HsModifiedFunArr GhcPs -> TPRnM (HsModifiedFunArr GhcRn)
+rn_ty_pat_modified_fun_arr (HsModifiedFunArr _ mods arr) = do
+  mods' <- rn_modifiers_pat mods
+  let arr' = case arr of
+        HsStandardArr _ -> HsStandardArr noExtField
+        HsLinearArr _ -> HsLinearArr noExtField
+  pure $ HsModifiedFunArr noExtField mods' arr'
 
 check_data_kinds :: HsType GhcPs -> TPRnM ()
 check_data_kinds thing = liftRn $ do

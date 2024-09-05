@@ -239,7 +239,7 @@ isSimpleSig
       ( RnExportD
           { rnExpDExpD =
             ExportD
-              { expDDecl = L _ (SigD _ (TypeSig _ lnames t))
+              { expDDecl = L _ (SigD _ (TypeSig _ _ lnames t))
               , expDMbDoc = (Documentation Nothing Nothing, argDocs)
               }
           }
@@ -282,10 +282,10 @@ declNames
      )
 declNames (L _ decl) = case decl of
   TyClD _ d -> (empty, [tcdNameI d])
-  SigD _ (TypeSig _ lnames _) -> (empty, map unLoc lnames)
+  SigD _ (TypeSig _ _ lnames _) -> (empty, map unLoc lnames)
   SigD _ (PatSynSig _ lnames _) -> (text "pattern", map unLoc lnames)
-  ForD _ (ForeignImport _ (L _ n) _ _) -> (empty, [n])
-  ForD _ (ForeignExport _ (L _ n) _ _) -> (empty, [n])
+  ForD _ (ForeignImport _ _ (L _ n) _ _) -> (empty, [n])
+  ForD _ (ForeignExport _ _ (L _ n) _ _) -> (empty, [n])
   _ -> error "declaration not supported by declNames"
 
 forSummary :: (ExportItem DocNameI) -> Bool
@@ -328,7 +328,7 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
   TyClD _ d@DataDecl{} -> ppDataDecl pats instances subdocs (Just doc) d unicode
   TyClD _ d@SynDecl{} -> ppTySyn (doc, fnArgsDoc) d unicode
   TyClD _ d@ClassDecl{} -> ppClassDecl instances doc subdocs d unicode
-  SigD _ (TypeSig _ lnames ty) -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (dropWildCardsI ty) unicode
+  SigD _ (TypeSig _ _ lnames ty) -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (dropWildCardsI ty) unicode
   SigD _ (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
   ForD _ d -> ppFor (doc, fnArgsDoc) d unicode
   InstD _ _ -> empty
@@ -338,7 +338,7 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
     unicode = False
 
 ppFor :: DocForDecl DocName -> ForeignDecl DocNameI -> Bool -> LaTeX
-ppFor doc (ForeignImport _ (L _ name) typ _) unicode =
+ppFor doc (ForeignImport _ _ (L _ name) typ _) unicode =
   ppFunSig Nothing doc [name] typ unicode
 ppFor _ _ _ = error "ppFor error in Haddock.Backends.LaTeX"
 
@@ -1054,10 +1054,10 @@ ppSideBySideField subdocs unicode (HsConDeclRecField _ names ltype) =
 -- don't use cdf_doc for same reason we don't use con_doc above
 -- Where there is more than one name, they all have the same documentation
 ppRecFieldMultAnn :: Bool -> HsConDeclField DocNameI -> LaTeX
-ppRecFieldMultAnn unicode (CDF { cdf_multiplicity = ann }) = case ann of
-  HsUnannotated _ -> empty
-  HsLinearAnn _ -> text "%1"
-  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode
+ppRecFieldMultAnn unicode (CDF { cdf_multiplicity = ann }) = case arr of
+  HsStandardArr _ -> ppr_modifiers mods unicode
+  HsLinearArr _ -> text "%1" <+> ppr_modifiers mods unicode
+  where HsModifiedFunArr _ mods arr = ann
 
 -- | Pretty-print a bundled pattern synonym
 ppSideBySidePat
@@ -1316,16 +1316,15 @@ ppr_mono_ty (HsQualTy _ ctxt ty) unicode =
     [ ppLContext (Just ctxt) unicode
     , ppr_mono_lty ty unicode
     ]
-ppr_mono_ty (HsFunTy _ mult ty1 ty2) u =
+ppr_mono_ty (HsFunTy _ (HsModifiedFunArr _ mods arr) ty1 ty2) u =
   sep
     [ ppr_mono_lty ty1 u
-    , arr <+> ppr_mono_lty ty2 u
+    , ppr_modifiers mods u <+> arr' <+> ppr_mono_lty ty2 u
     ]
   where
-    arr = case mult of
-      HsLinearAnn _ -> lollipop u
-      HsUnannotated _ -> arrow u
-      HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
+    arr' = case arr of
+      HsStandardArr _ -> arrow u
+      HsLinearArr _ -> lollipop u
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
 ppr_mono_ty (HsTyVar _ IsPromoted (L _ name)) _ = char '\'' <> ppDocName name
 ppr_mono_ty (HsTupleTy _ con tys) u = tupleParens con (map (ppLType u) tys)
@@ -1385,6 +1384,13 @@ ppr_tylit _               _ = error "ppr_tylit: unsupported lit"
 
 -- XXX: Ok in verbatim, but not otherwise
 -- XXX: Do something with Unicode parameter?
+
+ppr_modifiers :: [HsModifier DocNameI] -> Bool -> LaTeX
+ppr_modifiers mods unicode = foldr ((<+>) . ppr_modifier) empty mods
+  where
+    ppr_modifier (HsModifier ModifierPrintsAs1 _) = multAnnotation <> char '1'
+    ppr_modifier (HsModifier ModifierPrintsAsSelf ty) =
+      multAnnotation <> ppr_mono_lty ty unicode
 
 -------------------------------------------------------------------------------
 

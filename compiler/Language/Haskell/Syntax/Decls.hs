@@ -408,6 +408,7 @@ data TyClDecl pass
 
   | -- | @data@ declaration
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
+             , tcdModifiers :: [HsModifier pass]   -- ^ Modifiers
              , tcdLName    :: LIdP pass             -- ^ Type constructor
              , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
                               -- See Note [TyVar binders for associated decls]
@@ -415,6 +416,7 @@ data TyClDecl pass
              , tcdDataDefn :: HsDataDefn pass }
 
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
+                tcdModifiers :: [HsModifier pass],     -- ^ Modifiers
                 tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
                 tcdLName   :: LIdP pass,               -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
@@ -952,6 +954,7 @@ type LConDecl pass = XRec pass (ConDecl pass)
 data ConDecl pass
   = ConDeclGADT
       { con_g_ext   :: XConDeclGADT pass
+      , con_modifiers :: [HsModifier pass]
       , con_names   :: NonEmpty (LIdP pass)
       -- The following fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
@@ -972,6 +975,7 @@ data ConDecl pass
 
   | ConDeclH98
       { con_ext     :: XConDeclH98 pass
+      , con_modifiers :: [HsModifier pass]
       , con_name    :: LIdP pass
 
       , con_forall  :: Bool
@@ -1253,6 +1257,7 @@ type LClsInstDecl pass = XRec pass (ClsInstDecl pass)
 data ClsInstDecl pass
   = ClsInstDecl
       { cid_ext     :: XCClsInstDecl pass
+      , cid_modifiers :: [HsModifier pass] -- Modifiers
       , cid_poly_ty :: LHsSigType pass    -- Context => Class Instance-type
                                           -- Using a polytype means that the renamer conveniently
                                           -- figures out the quantified type variables for us.
@@ -1355,6 +1360,7 @@ type LDefaultDecl pass = XRec pass (DefaultDecl pass)
 data DefaultDecl pass
   = DefaultDecl
       { defd_ext      :: XCDefaultDecl pass
+      , defd_modifiers :: [HsModifier pass]
       , defd_class    :: Maybe (LIdP pass)  -- Nothing in absence of NamedDefaults
       , defd_defaults :: [LHsType pass] }
   | XDefaultDecl !(XXDefaultDecl pass)

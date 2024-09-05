@@ -375,11 +375,12 @@ rnAnnProvenance provenance = do
 -}
 
 rnDefaultDecl :: DefaultDecl GhcPs -> RnM (DefaultDecl GhcRn, FreeNames)
-rnDefaultDecl (DefaultDecl _ mb_cls tys)
+rnDefaultDecl (DefaultDecl _ mods mb_cls tys)
   = do {
        ; mb_cls' <- traverse (traverse $ lookupOccRn WL_TyCon) mb_cls
        ; (tys', ty_fvs) <- rnLHsTypes doc_str tys
-       ; return (DefaultDecl noExtField mb_cls' tys', ty_fvs) }
+       ; (mods', mods_fvs) <- rnModifiersContextAndWarn doc_str mods
+       ; return (DefaultDecl noExtField mods' mb_cls' tys', ty_fvs `plusFN` mods_fvs) }
   where
     doc_str = DefaultDeclCtx
 
@@ -392,26 +393,33 @@ rnDefaultDecl (DefaultDecl _ mb_cls tys)
 -}
 
 rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeNames)
-rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
+rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec, fd_modifiers = modifiers })
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRnN WL_TermVariable name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
+       ; let ctxt = ForeignDeclCtx name
+       ; (ty', fvs) <- rnHsSigType ctxt TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
        ; let home_unit = hsc_home_unit topEnv
              spec'  = patchForeignImport (homeUnitAsUnit home_unit) spec
 
+       ; (modifiers', mods_fvs) <- rnModifiersContext ctxt modifiers
+
        ; return (ForeignImport { fd_i_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
-                               , fd_fi = spec' }, fvs) }
+                               , fd_fi = spec', fd_modifiers = modifiers' }
+                , fvs `plusFN` mods_fvs) }
 
-rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
+rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec, fd_modifiers = modifiers })
   = do { name' <- lookupLocatedOccRn WL_TermVariable name
+       ; let ctxt = ForeignDeclCtx name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
+       ; (modifiers', mods_fvs) <- rnModifiersContext ctxt modifiers
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
-                               , fd_fe = (\(CExport x c) -> CExport x c) spec }
-                , fvs `addOneFN` unLoc name') }
+                               , fd_fe = (\(CExport x c) -> CExport x c) spec
+                               , fd_modifiers = modifiers' }
+                , fvs `plusFN` mods_fvs `addOneFN` unLoc name') }
         -- NB: a foreign export is an *occurrence site* for name, so
         --     we add it to the free-variable list.  It might, for example,
         --     be imported from another module
@@ -588,7 +596,8 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                            , cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = omode
-                           , cid_datafam_insts = adts })
+                           , cid_datafam_insts = adts
+                           , cid_modifiers = modifiers })
   = do { rec { let ctxt = ClassInstanceCtx head_ty'
              ; checkInferredVars ctxt inst_ty
              ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
@@ -662,14 +671,17 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                    ; return ( (ats', adts'), at_fvs `plusFN` adt_fvs) }
 
        ; let omode'  = rnOverlapMode omode
+       ; (modifiers', mods_fvs) <- rnModifiersContextAndWarn ctxt modifiers
        ; let all_fvs = meth_fvs `plusFN` more_fvs
                                 `plusFN` inst_fvs
+                                `plusFN` mods_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
                              , cid_overlap_mode = omode'
-                             , cid_datafam_insts = adts' },
+                             , cid_datafam_insts = adts'
+                             , cid_modifiers = modifiers' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
              -- that they can be entered into the list of type declarations
@@ -1879,7 +1891,8 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
 rnTyClDecl (DataDecl
     { tcdLName = tycon, tcdTyVars = tyvars,
       tcdFixity = fixity,
-      tcdDataDefn = defn@HsDataDefn{ dd_cons = cons, dd_kindSig = kind_sig} })
+      tcdDataDefn = defn@HsDataDefn{ dd_cons = cons, dd_kindSig = kind_sig},
+      tcdModifiers = mods })
   = do { tycon' <- lookupLocatedTopBndrRnN WL_TyCon tycon
        ; let kvs = extractDataDefnKindVars defn
              doc = TyDataCtx tycon
@@ -1891,17 +1904,19 @@ rnTyClDecl (DataDecl
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr free_rhs_kvs)
+       ; (mods', mods_fvs) <- rnModifiersContextAndWarn doc mods
        ; return (DataDecl { tcdLName    = tycon'
                           , tcdTyVars   = tyvars'
                           , tcdFixity   = fixity
                           , tcdDataDefn = defn'
-                          , tcdDExt     = rn_info }, fvs) } }
+                          , tcdDExt     = rn_info
+                          , tcdModifiers = mods' }, fvs `plusFN` mods_fvs) } }
 
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
                         tcdFDs = fds, tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
-                        tcdDocs = docs})
+                        tcdDocs = docs, tcdModifiers = modifiers})
   = do  { lcls' <- lookupLocatedTopBndrRnN WL_TyCon lcls
         ; let cls' = unLoc lcls'
               kvs = []  -- No scoped kind vars except those in
@@ -1949,13 +1964,14 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
                 -- and the methods are already in scope
 
-        ; let all_fvs = meth_fvs `plusFN` stuff_fvs `plusFN` fv_at_defs
+        ; (modifiers', mods_fvs) <- rnModifiersContextAndWarn cls_doc modifiers
+        ; let all_fvs = meth_fvs `plusFN` stuff_fvs `plusFN` fv_at_defs `plusFN` mods_fvs
         ; docs' <- traverse rnLDocDecl docs
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
-                              tcdDocs = docs', tcdCExt = all_fvs },
+                              tcdDocs = docs', tcdCExt = all_fvs, tcdModifiers = modifiers' },
                   all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls
@@ -2544,7 +2560,8 @@ rnConDecls = mapFvRn (wrapLocFstMA rnConDecl)
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeNames)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
-                           , con_doc = mb_doc, con_forall = forall_ })
+                           , con_doc = mb_doc, con_forall = forall_
+                           , con_modifiers = mods })
   = do  { _        <- addLocM checkConName name
         ; new_name <- lookupLocatedTopBndrRnN WL_ConLike name
 
@@ -2562,7 +2579,8 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                             Nothing ex_tvs $ \ new_ex_tvs ->
     do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
         ; (new_args,    fvs2) <- rnConDeclH98Details (unLoc new_name) ctxt args
-        ; let all_fvs  = fvs1 `plusFN` fvs2
+        ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
+        ; let all_fvs  = fvs1 `plusFN` fvs2 `plusFN` mods_fvs
         ; traceRn "rnConDecl (ConDeclH98)" (ppr name <+> vcat
              [ text "ex_tvs:" <+> ppr ex_tvs
              , text "new_ex_dqtvs':" <+> ppr new_ex_tvs ])
@@ -2572,7 +2590,8 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                        , con_name = new_name, con_ex_tvs = new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
                        , con_doc = mb_doc'
-                       , con_forall = forall_ }, -- Remove when #18311 is fixed
+                       , con_forall = forall_ -- Remove when #18311 is fixed
+                       , con_modifiers = mods' },
                   all_fvs) }}
 
 rnConDecl (ConDeclGADT { con_names   = names
@@ -2581,6 +2600,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                        , con_mb_cxt  = mcxt
                        , con_g_args  = args
                        , con_res_ty  = res_ty
+                       , con_modifiers = mods
                        , con_doc     = mb_doc })
   = do  { mapM_ (addLocM checkConName) names
         ; new_names <- mapM (lookupLocatedTopBndrRnN WL_ConLike) names
@@ -2604,6 +2624,7 @@ rnConDecl (ConDeclGADT { con_names   = names
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+        ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
 
          -- Ensure that there are no nested `forall`s or contexts, per
          -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
@@ -2611,7 +2632,7 @@ rnConDecl (ConDeclGADT { con_names   = names
        ; addNoNestedForallsContextsErr ctxt
            NFC_GadtConSig new_res_ty
 
-        ; let all_fvs = fvs1 `plusFN` fvs2 `plusFN` fvs3
+        ; let all_fvs = fvs1 `plusFN` fvs2 `plusFN` fvs3 `plusFN` mods_fvs
 
         ; traceRn "rnConDecl (ConDeclGADT)"
             (ppr names $$ ppr outer_bndrs' $$ ppr inner_bndrs')
@@ -2621,7 +2642,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                               , con_inner_bndrs = inner_bndrs'
                               , con_mb_cxt = new_cxt
                               , con_g_args = new_args, con_res_ty = new_res_ty
-                              , con_doc = new_mb_doc },
+                              , con_doc = new_mb_doc, con_modifiers = mods' },
                   all_fvs) } }
 
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)

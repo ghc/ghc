@@ -59,7 +59,7 @@ import GHC.Core.Type (mkStrLitTy, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
-import GHC.Builtin.Types ( mkConstraintTupleTy, multiplicityTy, oneDataConTy  )
+import GHC.Builtin.Types ( mkConstraintTupleTy )
 import GHC.Builtin.Types.Prim
 import GHC.Unit.Module
 
@@ -207,7 +207,7 @@ tcHsBootSigs binds sigs
             rejectBootDecls HsBoot BootBindsRn (concatMap snd binds)
         ; concatMapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
-    tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
+    tc_boot_sig (TypeSig _ _ lnames hs_ty) = mapM f lnames
       where
         f (L _ name)
           = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name NoRRC) hs_ty
@@ -681,11 +681,13 @@ https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0111-linear
 
 To address this we to do a few things
 
-- (NVP1) When a pattern is annotated with a multiplicity annotation `let %q pat = rhs
-  in body` (note: multiplicity-annotated bindings are always parsed as a
-  PatBind, see Note [Multiplicity annotations] in Language.Haskell.Syntax.Binds),
+- (NVP1) When a pattern is annotated with a modifier `let %q pat = rhs in body`
+  (note: modifier-annotated bindings are always parsed as a PatBind, see
+  Note [Modifiers on bindings] in Language.Haskell.Syntax.Binds),
   then the let is never generalised (we use the NoGen plan). We do this with a
-  dedicated test in decideGeneralisationPlan.
+  dedicated test in decideGeneralisationPlan. We do this for all modifiers, not
+  just multiplicity modifiers, because we can't tell which ones are
+  multiplicities.
 - (NVP2) Whenever the typechecker infers an AbsBind *and* the inner binding is a
   non-variable PatBind, then the multiplicity of the binding is inferred to be
   Many. We do this by calling manyIfPats in tcPolyInfer. This is a little
@@ -769,8 +771,8 @@ tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
   where
     manyIfPat (L _ (PatBind{pat_lhs=(L _ (VarPat{}))}))
       = return ()
-    manyIfPat (L _ (PatBind {pat_mult=mult_ann}))
-      = tcSubMult (NonLinearPatternOrigin GeneralisedPatternReason nlWildPatName) ManyTy (getTcMultAnn mult_ann)
+    manyIfPat (L _ (PatBind {pat_ext=XPatBindTc {patBindMult=mult}}))
+      = tcSubMult (NonLinearPatternOrigin GeneralisedPatternReason nlWildPatName) ManyTy mult
     manyIfPat _ = return ()
     manyIfPats binds' = traverse_ manyIfPat binds'
 
@@ -1322,11 +1324,11 @@ tcMonoBinds is_rec sig_fn no_gen
 
 -- SPECIAL CASE 2: see Note [Special case for non-recursive pattern bindings]
 tcMonoBinds is_rec sig_fn no_gen
-           [L b_loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann })]
+           [L b_loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mods = mods })]
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , all (isNothing . sig_fn) bndrs
   = addErrCtxt (PatMonoBindsCtxt pat grhss) $
-    do { mult <- tcMultAnnOnPatBind mult_ann
+    do { mult <- tcMultiplicityOnPatBind mods
 
        ; (grhss', pat_ty) <- runInferRhoFRR FRRPatBind $ \ exp_ty ->
                           -- runInferRhoFRR: the type of each let-binder must have
@@ -1364,12 +1366,16 @@ tcMonoBinds is_rec sig_fn no_gen
 
        ; return ( singleton $ L b_loc $
                      PatBind { pat_lhs = pat', pat_rhs = grhss'
-                             , pat_ext = (pat_ty, ([],[]))
-                             , pat_mult = setTcMultAnn mult mult_ann }
+                             , pat_ext = XPatBindTc { patBindGRHSType = pat_ty
+                                                    , patBindRHSTicks = []
+                                                    , patBindVarsTicks = []
+                                                    , patBindMult = mult }
+                             , pat_mods = lift_mod <$> mods }
 
                 , mbis ) }
   where
     bndrs = collectPatBinders CollNoDictBinders pat
+    lift_mod (HsModifier x t) = HsModifier x t
 
 -- GENERAL CASE
 tcMonoBinds _ sig_fn no_gen binds
@@ -1474,7 +1480,7 @@ switch to inference when we have no signature for any of the binders.
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
   = TcFunBind  MonoBindInfo  SrcSpan Mult (MatchGroup GhcRn (LHsExpr GhcRn))
-  | TcPatBind [MonoBindInfo] (LPat GhcTc) Mult (HsMultAnn GhcRn) (GRHSs GhcRn (LHsExpr GhcRn))
+  | TcPatBind [MonoBindInfo] (LPat GhcTc) Mult [HsModifier GhcRn] (GRHSs GhcRn (LHsExpr GhcRn))
               TcSigmaTypeFRR
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind GhcRn -> TcM TcMonoBind
@@ -1506,14 +1512,14 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
                              , mbi_mono_mult = mult}
        ; return (TcFunBind mono_info (locA nm_loc) mult matches) }
 
-tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_ann })
+tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mods = mods })
   = -- See Note [Typechecking pattern bindings]
     do  { sig_mbis <- mapM (tcLhsSigId no_gen) sig_names
 
         ; let inst_sig_fun = lookupNameEnv $ mkNameEnv $
                              [ (mbi_poly_name mbi, mbi_mono_id mbi)
                              | mbi <- sig_mbis ]
-        ; mult <- tcMultAnnOnPatBind mult_ann
+        ; mult <- tcMultiplicityOnPatBind mods
             -- See Note [Typechecking pattern bindings]
         ; ((pat', nosig_mbis), pat_ty)
             <- addErrCtxt (PatMonoBindsCtxt pat grhss) $
@@ -1530,7 +1536,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = mult_a
                                 | mbi <- mbis, let id = mbi_mono_id mbi ]
                            $$ ppr no_gen)
 
-        ; return (TcPatBind mbis pat' mult mult_ann grhss pat_ty) }
+        ; return (TcPatBind mbis pat' mult mods grhss pat_ty) }
   where
     bndr_names = collectPatBinders CollNoDictBinders pat
     (nosig_names, sig_names) = partitionWith find_sig bndr_names
@@ -1593,7 +1599,7 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
                            , fun_ext     = (co_fn, [])
                            } ) }
 
-tcRhs (TcPatBind infos pat' mult mult_ann grhss pat_ty)
+tcRhs (TcPatBind infos pat' mult mods grhss pat_ty)
   = -- When we are doing pattern bindings we *don't* bring any scoped
     -- type variables into scope unlike function bindings
     -- Wny not?  They are not completely rigid.
@@ -1604,17 +1610,22 @@ tcRhs (TcPatBind infos pat' mult mult_ann grhss pat_ty)
                     tcGRHSsPat mult grhss (mkCheckExpType pat_ty)
 
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
-                           , pat_ext = (pat_ty, ([],[]))
-                           , pat_mult = setTcMultAnn mult mult_ann } )}
+                           , pat_ext = XPatBindTc { patBindGRHSType = pat_ty
+                                                  , patBindRHSTicks = []
+                                                  , patBindVarsTicks = []
+                                                  , patBindMult = mult }
+                           , pat_mods = lift_mod <$> mods } )}
+  where
+    lift_mod (HsModifier x t) = HsModifier x t
 
 
--- | @'tcMultAnnOnPatBind' ann@ takes an optional multiplicity annotation. If
--- present the multiplicity is returned, otherwise a fresh unification variable
--- is generated so that multiplicity can be inferred.
-tcMultAnnOnPatBind :: HsMultAnn GhcRn -> TcM Mult
-tcMultAnnOnPatBind (HsLinearAnn _) = return oneDataConTy
-tcMultAnnOnPatBind (HsExplicitMult _ p) = tcCheckLHsTypeInContext p (TheKind multiplicityTy)
-tcMultAnnOnPatBind (HsUnannotated _) = newMultiplicityVar
+-- | @'tcMultiplicityOnPatBind' mods@ takes a list of modifiers that may contain
+-- a multiplicity. If present the multiplicity is returned, otherwise a fresh
+-- unification variable is generated so that multiplicity can be inferred.
+tcMultiplicityOnPatBind :: [HsModifier GhcRn] -> TcM Mult
+tcMultiplicityOnPatBind mods = do
+  mult <- tcModifiersMult mods
+  maybe newMultiplicityVar pure mult
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvForRhs Nothing thing_inside
@@ -1841,7 +1852,7 @@ decideGeneralisationPlan dflags top_lvl closed_type sig_fn lbinds
       Just (TcIdSig (TcPartialSig {})) -> True
       _                                -> False
     has_mult_anns_and_pats = any has_mult_ann_and_pat lbinds
-    has_mult_ann_and_pat (L _ (PatBind{pat_mult=HsUnannotated{}})) = False
+    has_mult_ann_and_pat (L _ (PatBind{pat_mods=[]})) = False
     has_mult_ann_and_pat (L _ (PatBind{pat_lhs=(L _ (VarPat{}))})) = False
     has_mult_ann_and_pat (L _ (PatBind{})) = True
     has_mult_ann_and_pat _ = False

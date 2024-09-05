@@ -64,6 +64,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { Test24533.hs:(5,3)-(8,13) })
@@ -330,6 +331,7 @@
         [])
        (EpNoLayout)
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -467,6 +469,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { Test24533.hs:14:10-15 })
@@ -741,6 +744,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { Test24533.ppr.hs:3:10-40 })
@@ -981,6 +985,7 @@
         [])
        (EpNoLayout)
        (NoAnnSortKey))
+      []
       (Nothing)
       (L
        (EpAnn
@@ -1071,6 +1076,7 @@
          []
          (NoEpTok))
         (NoAnnSortKey))
+       []
        (L
         (EpAnn
          (EpaSpan { Test24533.ppr.hs:5:10-15 })
