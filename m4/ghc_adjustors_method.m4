@@ -4,7 +4,7 @@ dnl Use libffi for adjustors?
 AC_DEFUN([GHC_ADJUSTORS_METHOD],
 [
   case [$]{$1[Arch]} in
-      i386|x86_64)
+      i386|x86_64|javascript)
           # We have native adjustor support on these platforms
           HaveNativeAdjustor=yes
           ;;
