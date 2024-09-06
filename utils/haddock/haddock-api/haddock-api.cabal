@@ -14,7 +14,7 @@ copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
 
-extra-source-files:
+extra-doc-files:
   CHANGES.md
 
 data-dir:
