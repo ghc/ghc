@@ -275,7 +275,7 @@ genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch config expr targets = do
   (reg, fmt1, e_code) <- getSomeReg indexExpr
   let fmt = II64
-  tmp <- getNewRegNat fmt
+  targetReg <- getNewRegNat fmt
   lbl <- getNewLabelNat
   dynRef <- cmmMakeDynamicReference config DataReference lbl
   (tableReg, fmt2, t_code) <- getSomeReg dynRef
@@ -291,13 +291,13 @@ genSwitch config expr targets = do
               -- index to offset into the table (relative to tableReg)
               annExpr expr (SLL (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt1) reg) (OpImm (ImmInt 3))),
               -- calculate table entry address
-              ADD (OpReg W64 tmp) (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt2) tableReg),
+              ADD (OpReg W64 targetReg) (OpReg (formatToWidth fmt1) reg) (OpReg (formatToWidth fmt2) tableReg),
               -- load table entry (relative offset from tableReg (first entry) to target label)
-              LDRU II64 (OpReg W64 tmp) (OpAddr (AddrRegImm tmp (ImmInt 0))),
+              LDRU II64 (OpReg W64 targetReg) (OpAddr (AddrRegImm targetReg (ImmInt 0))),
               -- calculate absolute address of the target label
-              ADD (OpReg W64 tmp) (OpReg W64 tmp) (OpReg W64 tableReg),
+              ADD (OpReg W64 targetReg) (OpReg W64 targetReg) (OpReg W64 tableReg),
               -- prepare jump to target label
-              J_TBL ids (Just lbl) tmp
+              J_TBL ids (Just lbl) targetReg
             ]
   return code
   where
@@ -434,8 +434,8 @@ getSomeReg expr = do
   r <- getRegister expr
   case r of
     Any rep code -> do
-      tmp <- getNewRegNat rep
-      return (tmp, rep, code tmp)
+      newReg <- getNewRegNat rep
+      return (newReg, rep, code newReg)
     Fixed rep reg code ->
       return (reg, rep, code)
 
@@ -448,14 +448,14 @@ getFloatReg expr = do
   r <- getRegister expr
   case r of
     Any rep code | isFloatFormat rep -> do
-      tmp <- getNewRegNat rep
-      return (tmp, rep, code tmp)
+      newReg <- getNewRegNat rep
+      return (newReg, rep, code newReg)
     Any II32 code -> do
-      tmp <- getNewRegNat FF32
-      return (tmp, FF32, code tmp)
+      newReg <- getNewRegNat FF32
+      return (newReg, FF32, code newReg)
     Any II64 code -> do
-      tmp <- getNewRegNat FF64
-      return (tmp, FF64, code tmp)
+      newReg <- getNewRegNat FF64
+      return (newReg, FF64, code newReg)
     Any _w _code -> do
       config <- getConfig
       pprPanic "can't do getFloatReg on" (pdoc (ncgPlatform config) expr)
@@ -586,29 +586,29 @@ getRegister' config plat expr =
         CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
         CmmFloat f W32 -> do
           let word = castFloatToWord32 (fromRational f) :: Word32
-          tmp <- getNewRegNat (intFormat W32)
+          intReg <- getNewRegNat (intFormat W32)
           return
             ( Any
                 (floatFormat W32)
                 ( \dst ->
                     toOL
                       [ annExpr expr
-                          $ MOV (OpReg W32 tmp) (OpImm (ImmInteger (fromIntegral word))),
-                        MOV (OpReg W32 dst) (OpReg W32 tmp)
+                          $ MOV (OpReg W32 intReg) (OpImm (ImmInteger (fromIntegral word))),
+                        MOV (OpReg W32 dst) (OpReg W32 intReg)
                       ]
                 )
             )
         CmmFloat f W64 -> do
           let word = castDoubleToWord64 (fromRational f) :: Word64
-          tmp <- getNewRegNat (intFormat W64)
+          intReg <- getNewRegNat (intFormat W64)
           return
             ( Any
                 (floatFormat W64)
                 ( \dst ->
                     toOL
                       [ annExpr expr
-                          $ MOV (OpReg W64 tmp) (OpImm (ImmInteger (fromIntegral word))),
-                        MOV (OpReg W64 dst) (OpReg W64 tmp)
+                          $ MOV (OpReg W64 intReg) (OpImm (ImmInteger (fromIntegral word))),
+                        MOV (OpReg W64 dst) (OpReg W64 intReg)
                       ]
                 )
             )
@@ -1541,12 +1541,13 @@ genCondJump bid expr = do
             -- ensure we get float regs
             (reg_fx, _format_fx, code_fx) <- getFloatReg x
             (reg_fy, _format_fy, code_fy) <- getFloatReg y
+            condOpReg <- OpReg W64 <$> getNewRegNat II64
             oneReg <- getNewRegNat II64
             return $ code_fx
               `appOL` code_fy
-              `snocOL` annExpr expr (CSET ip (OpReg w reg_fx) (OpReg w reg_fy) cmp)
+              `snocOL` annExpr expr (CSET condOpReg (OpReg w reg_fx) (OpReg w reg_fy) cmp)
               `snocOL` MOV (OpReg W64 oneReg) (OpImm (ImmInt 1))
-              `snocOL` BCOND EQ ip (OpReg w oneReg) (TBlock bid)
+              `snocOL` BCOND EQ condOpReg (OpReg w oneReg) (TBlock bid)
 
       case mop of
         MO_F_Eq w -> fbcond w EQ
@@ -1654,7 +1655,7 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
       moveStackUp i | odd i = moveStackUp (i + 1)
       moveStackUp i =
         toOL
-          [ ADD (OpReg W64 (spMachReg)) (OpReg W64 spMachReg) (OpImm (ImmInt (8 * i))),
+          [ ADD (OpReg W64 spMachReg) (OpReg W64 spMachReg) (OpImm (ImmInt (8 * i))),
             POP_STACK_FRAME,
             DELTA 0
           ]
@@ -1714,8 +1715,8 @@ genCCall target@(ForeignTarget expr _cconv) dest_regs arg_regs = do
             if hint == SignedHint
               then
                 code_r
-                  `appOL` signExtend w W64 r ipReg
-                  `snocOL` ann (text "Pass signed argument (size " <> ppr w <> text ") on the stack: " <> ppr ipReg) str
+                  `appOL` signExtend w W64 r tmpReg
+                  `snocOL` ann (text "Pass signed argument (size " <> ppr w <> text ") on the stack: " <> ppr tmpReg) str
               else
                 code_r
                   `snocOL` ann (text "Pass unsigned argument (size " <> ppr w <> text ") on the stack: " <> ppr r) str
@@ -2052,8 +2053,8 @@ genCondFarJump cond op1 op2 far_target = do
           $ BCOND cond op1 op2 (TBlock jmp_lbl_id),
         B (TBlock skip_lbl_id),
         NEWBLOCK jmp_lbl_id,
-        LDR II64 (OpReg W64 ipReg) (OpImm (ImmCLbl (blockLbl far_target))),
-        B (TReg ipReg),
+        LDR II64 (OpReg W64 tmpReg) (OpImm (ImmCLbl (blockLbl far_target))),
+        B (TReg tmpReg),
         NEWBLOCK skip_lbl_id
       ]
 
@@ -2066,8 +2067,8 @@ genFarJump far_target =
   return
     $ toOL
       [ ann (text "Unconditional far jump to: " <> ppr far_target)
-          $ LDR II64 (OpReg W64 ipReg) (OpImm (ImmCLbl (blockLbl far_target))),
-        B (TReg ipReg)
+          $ LDR II64 (OpReg W64 tmpReg) (OpImm (ImmCLbl (blockLbl far_target))),
+        B (TReg tmpReg)
       ]
 
 -- See Note [RISCV64 far jumps]

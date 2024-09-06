@@ -1136,7 +1136,7 @@ freeReg 4 = False
 -- frame pointer
 freeReg 8 = False
 -- made-up inter-procedural (ip) register
--- See Note [The made-up RISCV64 IP register]
+-- See Note [The made-up RISCV64 TMP (IP) register]
 freeReg 31 = False
 
 # if defined(REG_Base)

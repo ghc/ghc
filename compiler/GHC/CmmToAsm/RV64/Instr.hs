@@ -272,8 +272,8 @@ patchJumpInstr instr patchF =
 -- every signal to use its own stack, we have to ensure that the stack pointer
 -- always points to the top of the stack, and we can't use it for computation.
 --
--- So, we reserve one register (ip) for this purpose (and other, unrelated
--- intermediate operations.) See Note [The made-up RISCV64 IP register]
+-- So, we reserve one register (TMP) for this purpose (and other, unrelated
+-- intermediate operations.) See Note [The made-up RISCV64 TMP (IP) register]
 
 -- | Generate instructions to spill a register into a spill slot.
 mkSpillInstr ::
@@ -290,9 +290,9 @@ mkSpillInstr _config reg delta slot =
   case off - delta of
     imm | fitsIn12bitImm imm -> [mkStrSpImm imm]
     imm ->
-      [ movImmToIp imm,
-        addSpToIp,
-        mkStrIp
+      [ movImmToTmp imm,
+        addSpToTmp,
+        mkStrTmp
       ]
   where
     fmt = case reg of
@@ -301,15 +301,15 @@ mkSpillInstr _config reg delta slot =
     mkStrSpImm imm =
       ANN (text "Spill@" <> int (off - delta))
         $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
-    movImmToIp imm =
-      ANN (text "Spill: IP <- " <> int imm)
-        $ MOV ip (OpImm (ImmInt imm))
-    addSpToIp =
-      ANN (text "Spill: IP <- SP + IP ")
-        $ ADD ip ip sp
-    mkStrIp =
+    movImmToTmp imm =
+      ANN (text "Spill: TMP <- " <> int imm)
+        $ MOV tmp (OpImm (ImmInt imm))
+    addSpToTmp =
+      ANN (text "Spill: TMP <- SP + TMP ")
+        $ ADD tmp tmp sp
+    mkStrTmp =
       ANN (text "Spill@" <> int (off - delta))
-        $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ipReg))
+        $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
 
     off = spillSlotToOffset slot
 
@@ -327,9 +327,9 @@ mkLoadInstr _config reg delta slot =
   case off - delta of
     imm | fitsIn12bitImm imm -> [mkLdrSpImm imm]
     imm ->
-      [ movImmToIp imm,
-        addSpToIp,
-        mkLdrIp
+      [ movImmToTmp imm,
+        addSpToTmp,
+        mkLdrTmp
       ]
   where
     fmt = case reg of
@@ -338,15 +338,15 @@ mkLoadInstr _config reg delta slot =
     mkLdrSpImm imm =
       ANN (text "Reload@" <> int (off - delta))
         $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm spMachReg (ImmInt imm)))
-    movImmToIp imm =
-      ANN (text "Reload: IP <- " <> int imm)
-        $ MOV ip (OpImm (ImmInt imm))
-    addSpToIp =
-      ANN (text "Reload: IP <- SP + IP ")
-        $ ADD ip ip sp
-    mkLdrIp =
+    movImmToTmp imm =
+      ANN (text "Reload: TMP <- " <> int imm)
+        $ MOV tmp (OpImm (ImmInt imm))
+    addSpToTmp =
+      ANN (text "Reload: TMP <- SP + TMP ")
+        $ ADD tmp tmp sp
+    mkLdrTmp =
       ANN (text "Reload@" <> int (off - delta))
-        $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ipReg))
+        $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg tmpReg))
 
     off = spillSlotToOffset slot
 
@@ -417,8 +417,8 @@ moveSp n
       -- This ends up in three effective instructions. We could get away with
       -- two for intMax12bit < n < 3 * intMax12bit by recursing once. However,
       -- this way is likely less surprising.
-      [ ANN desc (MOV ip (OpImm (ImmInt n))),
-        ADD sp sp ip
+      [ ANN desc (MOV tmp (OpImm (ImmInt n))),
+        ADD sp sp tmp
       ]
   where
     desc = text "Move SP:" <+> int n
@@ -672,14 +672,14 @@ operandFromReg = OpReg W64
 operandFromRegNo :: RegNo -> Operand
 operandFromRegNo = operandFromReg . regSingle
 
-zero, ra, sp, gp, tp, fp, ip :: Operand
+zero, ra, sp, gp, tp, fp, tmp :: Operand
 zero = operandFromReg zeroReg
 ra = operandFromReg raReg
 sp = operandFromReg spMachReg
 gp = operandFromRegNo 3
 tp = operandFromRegNo 4
 fp = operandFromRegNo 8
-ip = operandFromReg ipReg
+tmp = operandFromReg tmpReg
 
 x0, x1, x2, x3, x4, x5, x6, x7 :: Operand
 x8, x9, x10, x11, x12, x13, x14, x15 :: Operand
