@@ -12,7 +12,7 @@
 
 module GHC.Rename.HsType (
         -- Type related stuff
-        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
+        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext, rnModifier,
         rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsTyLit, rnHsArrowWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
@@ -444,6 +444,12 @@ isRnKindLevel (RTKE { rtke_level = KindLevel }) = True
 isRnKindLevel _                                 = False
 
 --------------
+-- MODS_TODO will any callers of this function care about free vars in modifiers?
+rnModifier :: HsDocContext -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
+rnModifier ctxt (HsModifier _ ty) = do
+  (ty', fvs) <- rnLHsType ctxt ty
+  return (HsModifier NoExtField ty', fvs)
+
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 

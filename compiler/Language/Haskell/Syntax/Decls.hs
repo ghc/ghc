@@ -1388,7 +1388,7 @@ data ClsInstDecl pass
          --                                    'GHC.Parser.Annotation.AnnClose',
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-      , cid_modifiers     :: [LHsType pass]
+      , cid_modifiers     :: [HsModifier pass]
       }
   | XClsInstDecl !(XXClsInstDecl pass)
 

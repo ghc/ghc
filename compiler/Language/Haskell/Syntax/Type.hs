@@ -40,6 +40,7 @@ module Language.Haskell.Syntax.Type (
         HsTyPat(..), LHsTyPat,
         HsTupleSort(..),
         HsContext, LHsContext,
+        HsModifier(..), XModifier,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
@@ -301,6 +302,10 @@ type LHsContext pass = XRec pass (HsContext pass)
 
 -- | Haskell Context
 type HsContext pass = [LHsType pass]
+
+-- | Modifier
+data HsModifier pass = HsModifier !(XModifier pass) (LHsType pass)
+type family XModifier pass
 
 -- | Located Haskell Type
 type LHsType pass = XRec pass (HsType pass)

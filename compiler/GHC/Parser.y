@@ -1373,19 +1373,18 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
              return (sLL $1 $> ($3 : h' : t)) }
   | oqtycon { sL1 $1 [$1] }
 
-modifier :: { LHsType GhcPs }
+modifier :: { HsModifier GhcPs }
 modifier
-  -- MODS_TODO: something something annotation %?
-  : PREFIX_PERCENT atype     { $2 }
+  : PREFIX_PERCENT atype     { HsModifier (epTok $1) $2 }
 
-modifiers0 :: { [LHsType GhcPs] }
+modifiers0 :: { [HsModifier GhcPs] }
   : modifier modifiers0       { $1 : $2 }
   | {- empty -}               { [] }
 
-modifiers1 :: { [LHsType GhcPs] }
+modifiers1 :: { [HsModifier GhcPs] }
   : modifier modifiers0       { $1 : $2 }
 
-modifiers :: {  [LHsType GhcPs] }
+modifiers :: {  [HsModifier GhcPs] }
   : modifiers1 ';'            { $1 }
   | modifiers0                { $1 }
 

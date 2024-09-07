@@ -45,6 +45,7 @@ module GHC.Hs.Type (
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, fromMaybeContext,
+        HsModifier(..),
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs, pprHsArgsApp,
@@ -451,6 +452,10 @@ and the same principle could be applied to foralls:
 
 except the `forall _.` example is rejected by checkForAllTelescopeWildcardBndrs.
 -}
+
+type instance XModifier GhcPs = EpToken "%"
+type instance XModifier GhcRn = NoExtField
+type instance XModifier GhcTc = NoExtField
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField

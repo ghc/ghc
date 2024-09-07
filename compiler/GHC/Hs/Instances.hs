@@ -467,6 +467,11 @@ deriving instance (Data body) => Data (HsRecFields GhcTc body)
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Type ----------------------------------
 
+-- deriving instance Data (HsModifier p)
+deriving instance Data (HsModifier GhcPs)
+deriving instance Data (HsModifier GhcRn)
+deriving instance Data (HsModifier GhcTc)
+
 -- deriving instance Data (HsBndrVis p)
 deriving instance Data (HsBndrVis GhcPs)
 deriving instance Data (HsBndrVis GhcRn)

@@ -2302,9 +2302,10 @@ instance ExactPrint (ClsInstDecl GhcPs) where
                      , cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
                      , cid_overlap_mode = mbOverlap
-                     , cid_datafam_insts = adts })
+                     , cid_datafam_insts = adts
+                     , cid_modifiers = mods })
       = do
-          (mbWarn', i', w', mbOverlap', inst_ty') <- top_matter
+          (mbWarn', i', w', mbOverlap', inst_ty', mods') <- top_matter
           oc' <- markEpToken oc
           semis' <- mapM markEpToken semis
           (sortKey', ds) <- withSortKey sortKey
@@ -2324,7 +2325,7 @@ instance ExactPrint (ClsInstDecl GhcPs) where
                               , cid_sigs = sigs', cid_tyfam_insts = ats'
                               , cid_overlap_mode = mbOverlap'
                               , cid_datafam_insts = adts'
-                              , cid_modifiers = [] }) -- MODS_TODO
+                              , cid_modifiers = mods' })
       where
         top_matter = do
           i' <- markEpToken i
@@ -2332,7 +2333,8 @@ instance ExactPrint (ClsInstDecl GhcPs) where
           mo <- mapM markAnnotated mbOverlap
           it <- markAnnotated inst_ty
           w' <- markEpToken w -- Optional
-          return (mw, i', w', mo,it)
+          mods' <- mapM markAnnotated mods -- MODS_TODO did I do this right?
+          return (mw, i', w', mo, it, mods')
 
 -- ---------------------------------------------------------------------
 
@@ -4467,6 +4469,17 @@ instance ExactPrint (FieldOcc GhcPs) where
   exact (FieldOcc x n) = do
       n' <- markAnnotated n
       return (FieldOcc x n')
+
+-- ---------------------------------------------------------------------
+
+instance ExactPrint (HsModifier GhcPs) where
+  getAnnotationEntry = error "MODS_TODO"
+  setAnnotationAnchor = error "MODS_TODO"
+  exact (HsModifier pct t) = do
+    -- MODS_TODO: dunno if this is right or how to test
+    t' <- markAnnotated t
+    pct' <- markEpToken pct
+    return (HsModifier pct' t')
 
 -- ---------------------------------------------------------------------
 

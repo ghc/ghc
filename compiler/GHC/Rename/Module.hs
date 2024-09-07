@@ -630,8 +630,8 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
        ; let all_fvs = meth_fvs `plusFV` more_fvs
                                 `plusFV` inst_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       -- MODS_TODO do I care about free vars in modifiers?
-       ; modifiers' <- mapM (fmap fst . rnLHsType ctxt) modifiers
+       -- MODS_TODO do I care about free vars in modifiers here?
+       ; modifiers' <- mapM (fmap fst . rnModifier ctxt) modifiers
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
