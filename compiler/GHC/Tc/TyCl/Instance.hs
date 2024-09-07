@@ -490,10 +490,14 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
                                   , cid_poly_ty = hs_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_overlap_mode = overlap_mode
-                                  , cid_datafam_insts = adts }))
+                                  , cid_datafam_insts = adts
+                                  , cid_modifiers = modifiers }))
   = setSrcSpanA loc                   $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
-    do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
+    do  { warn_unknown <- woptM Opt_WarnUnknownModifiers
+        ; mapM_ (diagnosticTc warn_unknown . TcRnUnknownModifier) modifiers
+
+        ; dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
              -- NB: tcHsClsInstType does checkValidInstance
         ; skol_info <- mkSkolemInfo (mkClsInstSkol clas inst_tys)

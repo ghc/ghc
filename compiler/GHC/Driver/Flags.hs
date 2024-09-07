@@ -1062,6 +1062,7 @@ data WarningFlag =
    | Opt_WarnDeprecatedTypeAbstractions              -- Since 9.10
    | Opt_WarnDefaultedExceptionContext               -- Since 9.10
    | Opt_WarnViewPatternSignatures                   -- Since 9.12
+   | Opt_WarnUnknownModifiers                        -- Since MODS_TODO
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1179,6 +1180,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnDeprecatedTypeAbstractions              -> "deprecated-type-abstractions" :| []
   Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
   Opt_WarnViewPatternSignatures                   -> "view-pattern-signatures" :| []
+  Opt_WarnUnknownModifiers                        -> "unknown-modifiers" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

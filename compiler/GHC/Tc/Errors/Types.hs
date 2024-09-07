@@ -4398,6 +4398,17 @@ data TcRnMessage where
     Test cases: T24159_type_syntax_rn_fail
   -}
   TcRnUnexpectedTypeSyntaxInTerms :: TypeSyntax -> TcRnMessage
+
+  {- | TcRnUnknownModifier is a warning controlled by -Wunknown-modifiers, and
+       raised when a modifier is used that we don't know what to do with.
+
+       Examples:
+
+         %() instance C a
+         foo :: a %True -> b
+  -}
+  -- MODS_TODO should this be GhcTc?
+  TcRnUnknownModifier :: HsModifier GhcRn -> TcRnMessage
   deriving Generic
 
 ----

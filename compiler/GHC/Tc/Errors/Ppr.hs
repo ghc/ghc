@@ -2001,6 +2001,9 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
       text "Unexpected" <+> pprTypeSyntaxName syntax
 
+    TcRnUnknownModifier (HsModifier _ ty) -> mkSimpleDecorated $
+      text "Unknown modifier" <+> ppr (unLoc ty)
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2651,6 +2654,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnexpectedTypeSyntaxInTerms{}
       -> ErrorWithoutFlag
+    TcRnUnknownModifier{}
+      -> WarningWithFlag Opt_WarnUnknownModifiers
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3339,6 +3344,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnexpectedTypeSyntaxInTerms syntax
       -> [suggestExtension (typeSyntaxExtension syntax)]
+    TcRnUnknownModifier{}
+      -> noHints -- MODS_TODO sometimes there should be hints, right?
 
   diagnosticCode = constructorCode
 

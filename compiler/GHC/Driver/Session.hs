@@ -302,6 +302,8 @@ import qualified GHC.LanguageExtensions as LangExt
 -- described in the User's Guide. Please update the flag description in the
 -- users guide (docs/users_guide) whenever you add or change a flag.
 -- Please make sure you add ":since:" information to new flags.
+--
+-- MODS_TODO: need to do this.
 
 -- Note [Supporting CLI completion]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2349,6 +2351,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnDeprecatedTypeAbstractions -> warnSpec x
   Opt_WarnDefaultedExceptionContext -> warnSpec x
   Opt_WarnViewPatternSignatures -> warnSpec x
+  Opt_WarnUnknownModifiers -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups
