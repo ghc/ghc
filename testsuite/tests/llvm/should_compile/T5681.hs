@@ -1,6 +1,10 @@
 {-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MagicHash, UnboxedTuples #-}
 -- Test case for #5681
+
+{-# OPTIONS_GHC -Wno-deprecations #-}
+  -- The use of the (now-deprecated) primop par# is an
+  -- essential part of the issue that this is meant to test.
 module Main where
 
 import GHC.Exts
