@@ -494,6 +494,30 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
                                   , cid_modifiers = modifiers }))
   = setSrcSpanA loc                   $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
+          -- MODS_TODO: the context for this warning is just the first line of
+          -- the instance, which might just be modifiers with no extra info, and
+          -- maybe doesn't even include the modifier in question. E.g.
+          --
+          --     %()
+          --       %Bool
+          --       instance Show MyVoid where show = undefined
+          --
+          --     test.hs:4:1: warning: [GHC-49969] [-Wunknown-modifiers]
+          --         • Unknown modifier Bool
+          --         • In the instance declaration for ‘Show MyVoid’
+          --       |
+          --     4 | %()
+          --       | ^^^...
+          --
+          --     test.hs:4:1: warning: [GHC-49969] [-Wunknown-modifiers]
+          --         • Unknown modifier ()
+          --         • In the instance declaration for ‘Show MyVoid’
+          --       |
+          --     4 | %()
+          --       | ^^^...
+          --
+          -- They're also in opposite order than I'd expect (but `modifiers` are
+          -- in the right order, as demonstrated by `take 1 modifiers`).
     do  { warn_unknown <- woptM Opt_WarnUnknownModifiers
         ; mapM_ (diagnosticTc warn_unknown . TcRnUnknownModifier) modifiers
 

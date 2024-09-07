@@ -1373,18 +1373,21 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
              return (sLL $1 $> ($3 : h' : t)) }
   | oqtycon { sL1 $1 [$1] }
 
-modifier :: { HsModifier GhcPs }
+modifier :: { Located (HsModifier GhcPs) }
 modifier
-  : PREFIX_PERCENT atype     { HsModifier (epTok $1) $2 }
+  : PREFIX_PERCENT atype     { sLL $1 $2 (HsModifier (epTok $1) $2) }
 
-modifiers0 :: { [HsModifier GhcPs] }
-  : modifier modifiers0       { $1 : $2 }
-  | {- empty -}               { [] }
+modifiers0 :: { Located [HsModifier GhcPs] }
+  : modifier modifiers0       { sLL $1 $2 (unLoc $1 : unLoc $2) }
+  | {- empty -}               { sL0 [] }
 
-modifiers1 :: { [HsModifier GhcPs] }
-  : modifier modifiers0       { $1 : $2 }
+modifiers1 :: { Located [HsModifier GhcPs] }
+  : modifier modifiers0       { sLL $1 $2 (unLoc $1 : unLoc $2) }
 
-modifiers :: {  [HsModifier GhcPs] }
+modifiers :: {  Located [HsModifier GhcPs] }
+  -- MODS_TODO: are multiple semis allowed here? Do we need annotations for
+  -- exact printing in case they're literal semis? See `semis`, `semis1`. I
+  -- think we don't need the location of the semi.
   : modifiers1 ';'            { $1 }
   | modifiers0                { $1 }
 
@@ -1400,8 +1403,8 @@ inst_decl :: { LInstDecl GhcPs }
                                   , cid_tyfam_insts = ats
                                   , cid_overlap_mode = $4
                                   , cid_datafam_insts = adts
-                                  , cid_modifiers = $1 }
-             ; amsA' (L (comb3 $2 $5 $6)
+                                  , cid_modifiers = unLoc $1 }
+             ; amsA' (L (comb4 $1 $2 $5 $6)
                              (ClsInstD { cid_d_ext = noExtField, cid_inst = cid }))
                    } }
 
