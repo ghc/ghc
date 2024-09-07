@@ -1154,14 +1154,17 @@ tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
              -- Do not kind-generalise here!  See Note [Kind generalisation]
            ; return (mkForAllTys tv_bndrs ty') }
 
-tcHsType mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
+tcHsType mode t@(HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   | null (unLoc ctxt)
   = tcLHsType mode rn_ty exp_kind
-    -- See Note [Body kind of a HsQualTy]
-  | Check kind <- exp_kind, isConstraintLikeKind kind
+    -- See Note [Body kind of a HsQualTy], point (BK1)
+  | Check kind <- exp_kind     -- Checking mode
+  , isConstraintLikeKind kind  -- CONSTRAINT rep
   = do { ctxt' <- tc_hs_context mode ctxt
-      ; ty'   <- tc_check_lhs_type mode rn_ty constraintKind
-      ; return (tcMkDFunPhiTy ctxt' ty') }
+         -- See Note [Body kind of a HsQualTy], point (BK2)
+       ; ty'   <- tc_check_lhs_type mode rn_ty constraintKind
+       ; let res_ty = tcMkDFunPhiTy ctxt' ty'
+       ; checkExpKind t res_ty constraintKind exp_kind }
 
   | otherwise
   = do { ctxt' <- tc_hs_context mode ctxt
@@ -1170,8 +1173,7 @@ tcHsType mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
                                 -- be TYPE r, for any r, hence newOpenTypeKind
       ; ty' <- tc_check_lhs_type mode rn_ty ek
       ; let res_ty = tcMkPhiTy ctxt' ty'
-      ; checkExpKind (unLoc rn_ty) res_ty
-                      liftedTypeKind exp_kind }
+      ; checkExpKind t res_ty liftedTypeKind exp_kind }
 
 --------- Lists, arrays, and tuples
 tcHsType mode rn_ty@(HsListTy _ elt_ty) exp_kind
@@ -2110,22 +2112,36 @@ However, consider
     instance Eq a => Eq [a] where ...
 or
     f :: (Eq a => Eq [a]) => blah
-Here both body-kind of the HsQualTy is Constraint rather than *.
+Here both body-kind and result kind of the HsQualTy is Constraint rather than *.
 Rather crudely we tell the difference by looking at exp_kind. It's
 very convenient to typecheck instance types like any other HsSigType.
 
-Admittedly the '(Eq a => Eq [a]) => blah' case is erroneous, but it's
-better to reject in checkValidType.  If we say that the body kind
-should be '*' we risk getting TWO error messages, one saying that Eq
-[a] doesn't have kind '*', and one saying that we need a Constraint to
-the left of the outer (=>).
+(BK1) How do we figure out the right body kind?
 
-How do we figure out the right body kind?  Well, it's a bit of a
-kludge: I just look at the expected kind.  If it's Constraint, we
-must be in this instance situation context. It's a kludge because it
-wouldn't work if any unification was involved to compute that result
-kind -- but it isn't.  (The true way might be to use the 'mode'
-parameter, but that seemed like a sledgehammer to crack a nut.)
+Well, it's a bit of a kludge: I just look at the expected kind, `exp_kind`.
+If we are in checking mode (`exp_kind` = `Check k`), and the pushed-in kind
+`k` is `CONSTRAINT rep`, then we check that the body type has kind `Constraint` too.
+
+This is a kludge because it wouldn't work if any unification was
+involved to compute that result kind -- but it isn't.
+
+Note that in the kludgy "figure out whether we are in a type or constraint"
+check, we only check if `k` is a `CONSTRAINT rep`, not `Constraint`.
+That turns out to give a better error message in T25243.
+
+(BK2)
+
+Note that, once we are in the constraint case, we check that the body has
+kind Constraint; see the call to tc_check_lhs_type. (In contrast, for
+types we check that the body has kind TYPE kappa for some fresh unification
+variable kappa.)
+Reason: we don't yet have support for constraints that are not lifted: it's
+not possible to declare a class returning a different type than CONSTRAINT LiftedRep.
+Evidence is always lifted, the fat arrow c => t requires c to be
+a lifted constraint. In a far future, if we add support for non-lifted
+constraints, we could allow c1 => c2 where
+c1 :: CONSTRAINT rep1, c2 :: CONSTRAINT rep2
+have arbitrary representations rep1 and rep2.
 
 Note [Inferring tuple kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
