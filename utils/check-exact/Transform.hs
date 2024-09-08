@@ -63,7 +63,7 @@ module Transform
         -- *** Low level operations used in 'HasDecls'
         , balanceComments
         , balanceCommentsList
-        , balanceCommentsList'
+        , balanceCommentsListA
         , anchorEof
 
         -- ** Managing lists, pure functions
@@ -92,6 +92,7 @@ import qualified Control.Monad.Fail as Fail
 
 import GHC  hiding (parseModule, parsedSource)
 import GHC.Data.FastString
+import GHC.Types.SrcLoc
 
 import Data.Data
 import Data.Maybe
@@ -154,6 +155,7 @@ logDataWithAnnsTr str ast = do
 
 -- |If we need to add new elements to the AST, they need their own
 -- 'SrcSpan' for this.
+-- This should no longer be needed, we use an @EpaDelta@ location instead.
 uniqueSrcSpanT :: (Monad m) => TransformT m SrcSpan
 uniqueSrcSpanT = do
   col <- get
@@ -168,15 +170,6 @@ isUniqueSrcSpan ss = srcSpanStartLine' ss == -1
 srcSpanStartLine' :: SrcSpan -> Int
 srcSpanStartLine' (RealSrcSpan s _) = srcSpanStartLine s
 srcSpanStartLine' _ = 0
-
--- ---------------------------------------------------------------------
-
-captureOrderBinds :: [LHsDecl GhcPs] -> AnnSortKey BindTag
-captureOrderBinds ls = AnnSortKey $ map go ls
-  where
-    go (L _ (ValD _ _))       = BindTag
-    go (L _ (SigD _ _))       = SigDTag
-    go d      = error $ "captureOrderBinds:" ++ showGhc d
 
 -- ---------------------------------------------------------------------
 
@@ -253,7 +246,7 @@ setEntryDPDecl d dp = setEntryDP d dp
 
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
-setEntryDP :: NoAnn t => LocatedAn t a -> DeltaPos -> LocatedAn t a
+setEntryDP :: LocatedAn t a -> DeltaPos -> LocatedAn t a
 setEntryDP (L (EpAnn (EpaSpan ss@(UnhelpfulSpan _)) an cs) a) dp
   = L (EpAnn (EpaDelta ss dp []) an cs) a
 setEntryDP (L (EpAnn (EpaSpan ss) an (EpaComments [])) a) dp
@@ -293,7 +286,7 @@ setEntryDP (L (EpAnn (EpaSpan ss@(RealSrcSpan r _)) an cs) a) dp
         L (EpAnn (EpaDelta ss edp csd) an cs'') a
               where
                 cs'' = setPriorComments cs []
-                csd = L (EpaDelta ss dp NoComments) c:cs'
+                csd = L (EpaDelta ss dp NoComments) c:commentOrigDeltas cs'
                 lc = last $ (L ca c:cs')
                 delta = case getLoc lc of
                           EpaSpan (RealSrcSpan rr _) -> ss2delta (ss2pos rr) r
@@ -335,18 +328,15 @@ setEntryDPFromAnchor  off (EpaSpan (RealSrcSpan anc _)) ll@(L la _) = setEntryDP
 
 -- |Take the annEntryDelta associated with the first item and associate it with the second.
 -- Also transfer any comments occurring before it.
-transferEntryDP :: (Monad m, NoAnn t2, Typeable t1, Typeable t2)
-  => LocatedAn t1 a -> LocatedAn t2 b -> TransformT m (LocatedAn t2 b)
-transferEntryDP (L (EpAnn anc1 an1 cs1) _) (L (EpAnn _anc2 an2 cs2) b) = do
-  logTr $ "transferEntryDP': EpAnn,EpAnn"
+transferEntryDP :: (Typeable t1, Typeable t2)
+  => LocatedAn t1 a -> LocatedAn t2 b -> (LocatedAn t2 b)
+transferEntryDP (L (EpAnn anc1 an1 cs1) _) (L (EpAnn _anc2 an2 cs2) b) =
   -- Problem: if the original had preceding comments, blindly
   -- transferring the location is not correct
   case priorComments cs1 of
-    [] -> return (L (EpAnn anc1 (combine an1 an2) cs2) b)
+    [] -> (L (EpAnn anc1 (combine an1 an2) cs2) b)
     -- TODO: what happens if the receiving side already has comments?
-    (L anc _:_) -> do
-      logDataWithAnnsTr "transferEntryDP':priorComments anc=" anc
-      return (L (EpAnn anc1 (combine an1 an2) (cs1 <> cs2)) b)
+    (L _ _:_) -> (L (EpAnn anc1 (combine an1 an2) (cs1 <> cs2)) b)
 
 
 -- |If a and b are the same type return first arg, else return second
@@ -356,10 +346,11 @@ combine x y = fromMaybe y (cast x)
 -- |Take the annEntryDelta associated with the first item and associate it with the second.
 -- Also transfer any comments occurring before it.
 -- TODO: call transferEntryDP, and use pushDeclDP
-transferEntryDP' :: (Monad m) => LHsDecl GhcPs -> LHsDecl GhcPs -> TransformT m (LHsDecl GhcPs)
-transferEntryDP' la lb = do
-  (L l2 b) <- transferEntryDP la lb
-  return (L l2 (pushDeclDP b (SameLine 0)))
+transferEntryDP' :: LHsDecl GhcPs -> LHsDecl GhcPs -> (LHsDecl GhcPs)
+transferEntryDP' la lb =
+  let
+    (L l2 b) = transferEntryDP la lb
+  in (L l2 (pushDeclDP b (SameLine 0)))
 
 
 pushDeclDP :: HsDecl GhcPs -> DeltaPos -> HsDecl GhcPs
@@ -375,13 +366,24 @@ pushDeclDP d _dp = d
 
 -- ---------------------------------------------------------------------
 
-balanceCommentsList :: (Monad m) => [LHsDecl GhcPs] -> TransformT m [LHsDecl GhcPs]
-balanceCommentsList [] = return []
-balanceCommentsList [x] = return [x]
-balanceCommentsList (a:b:ls) = do
-  (a',b') <- balanceComments a b
-  r <- balanceCommentsList (b':ls)
-  return (a':r)
+-- | If we compile in haddock mode, the haddock processing inserts
+-- DocDecls to carry the Haddock Documentation. We ignore these in
+-- exact printing, as all the comments are also available in their
+-- normal location, and the haddock processing is lossy, in that it
+-- does not preserve all haddock-like comments. When we balance
+-- comments in a list, we migrate some to preceding or following
+-- declarations in the list. We must make sure we do not move any to
+-- these DocDecls, which are not printed.
+balanceCommentsList :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+balanceCommentsList decls = balanceCommentsList' (filter notDocDecl decls)
+
+balanceCommentsList' :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+balanceCommentsList' [] = []
+balanceCommentsList' [x] = [x]
+balanceCommentsList' (a:b:ls) = (a':r)
+  where
+    (a',b') = balanceComments a b
+    r = balanceCommentsList' (b':ls)
 
 -- |The GHC parser puts all comments appearing between the end of one AST
 -- item and the beginning of the next as 'annPriorComments' for the second one.
@@ -389,28 +391,27 @@ balanceCommentsList (a:b:ls) = do
 -- from the second one to the 'annFollowingComments' of the first if they belong
 -- to it instead. This is typically required before deleting or duplicating
 -- either of the AST elements.
-balanceComments :: (Monad m)
-  => LHsDecl GhcPs -> LHsDecl GhcPs
-  -> TransformT m (LHsDecl GhcPs, LHsDecl GhcPs)
-balanceComments first second = do
+balanceComments :: LHsDecl GhcPs -> LHsDecl GhcPs
+                -> (LHsDecl GhcPs, LHsDecl GhcPs)
+balanceComments first second =
   case first of
-    (L l (ValD x fb@(FunBind{}))) -> do
-      (L l' fb',second') <- balanceCommentsFB (L l fb) second
-      return (L l' (ValD x fb'), second')
-    _ -> balanceComments' first second
+    (L l (ValD x fb@(FunBind{}))) ->
+      let
+        (L l' fb',second') = balanceCommentsFB (L l fb) second
+      in (L l' (ValD x fb'), second')
+    _ -> balanceCommentsA first second
 
--- |Once 'balanceComments' has been called to move trailing comments to a
+-- |Once 'balanceCommentsA has been called to move trailing comments to a
 -- 'FunBind', these need to be pushed down from the top level to the last
 -- 'Match' if that 'Match' needs to be manipulated.
-balanceCommentsFB :: (Monad m)
-  => LHsBind GhcPs -> LocatedA b -> TransformT m (LHsBind GhcPs, LocatedA b)
-balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)))) second = do
-  debugM $ "balanceCommentsFB entered: " ++ showGhc (ss2range $ locA lf)
+balanceCommentsFB :: LHsBind GhcPs -> LocatedA b -> (LHsBind GhcPs, LocatedA b)
+balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)))) second
+  = balanceCommentsA (packFunBind bind) second'
   -- There are comments on lf.  We need to
   -- + Keep the prior ones here
   -- + move the interior ones to the first match,
   -- + move the trailing ones to the last match.
-  let
+  where
     (before,middle,after) = case entry lf of
         EpaSpan (RealSrcSpan ss _) ->
           let
@@ -426,40 +427,29 @@ balanceCommentsFB (L lf (FunBind x n (MG o (L lm matches)))) second = do
               getFollowingComments $ comments lf)
 
     lf' = setCommentsEpAnn lf (EpaComments before)
-  debugM $ "balanceCommentsFB (before, after): " ++ showAst (before, after)
-  debugM $ "balanceCommentsFB lf': " ++ showAst lf'
-  -- let matches' = case matches of
-  let matches' :: [LocatedA (Match GhcPs (LHsExpr GhcPs))]
-      matches' = case matches of
-                    (L lm' m':ms') ->
-                      (L (addCommentsToEpAnn lm' (EpaComments middle )) m':ms')
-                    _ -> error "balanceCommentsFB"
-  matches'' <- balanceCommentsList' matches'
-  let (m,ms) = case reverse matches'' of
-                 (L lm' m':ms') ->
-                   (L (addCommentsToEpAnn lm' (EpaCommentsBalanced [] after)) m',ms')
-                   -- (L (addCommentsToEpAnnS lm' (EpaCommentsBalanced [] after)) m',ms')
-                 _ -> error "balanceCommentsFB4"
-  debugM $ "balanceCommentsFB: (m,ms):" ++ showAst (m,ms)
-  (m',second') <- balanceComments' m second
-  m'' <- balanceCommentsMatch m'
-  let (m''',lf'') = case ms of
-        [] -> moveLeadingComments m'' lf'
-        _  -> (m'',lf')
-  debugM $ "balanceCommentsFB: (lf'', m'''):" ++ showAst (lf'',m''')
-  debugM $ "balanceCommentsFB done"
-  let bind = L lf'' (FunBind x n (MG o (L lm (reverse (m''':ms)))))
-  debugM $ "balanceCommentsFB returning:" ++ showAst bind
-  balanceComments' (packFunBind bind) second'
-balanceCommentsFB f s = balanceComments' f s
+    matches' :: [LocatedA (Match GhcPs (LHsExpr GhcPs))]
+    matches' = case matches of
+                  (L lm' m0:ms') ->
+                    (L (addCommentsToEpAnn lm' (EpaComments middle )) m0:ms')
+                  _ -> error "balanceCommentsFB"
+    matches'' = balanceCommentsListA matches'
+    (m,ms) = case reverse matches'' of
+               (L lm' m0:ms') ->
+                 (L (addCommentsToEpAnn lm' (EpaCommentsBalanced [] after)) m0,ms')
+               _ -> error "balanceCommentsFB4"
+    (m',second') = balanceCommentsA m second
+    m'' = balanceCommentsMatch m'
+    (m''',lf'') = case ms of
+      [] -> moveLeadingComments m'' lf'
+      _  -> (m'',lf')
+    bind = L lf'' (FunBind x n (MG o (L lm (reverse (m''':ms)))))
+balanceCommentsFB f s = balanceCommentsA f s
 
 -- | Move comments on the same line as the end of the match into the
 -- GRHS, prior to the binds
-balanceCommentsMatch :: (Monad m)
-  => LMatch GhcPs (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LHsExpr GhcPs))
-balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
-  logTr $ "balanceCommentsMatch: (logInfo)=" ++ showAst (logInfo)
-  return (L l'' (Match am mctxt pats (GRHSs xg grhss' binds')))
+balanceCommentsMatch :: LMatch GhcPs (LHsExpr GhcPs) -> (LMatch GhcPs (LHsExpr GhcPs))
+balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds)))
+  = (L l'' (Match am mctxt pats (GRHSs xg grhss' binds')))
   where
     simpleBreak (r,_) = r /= 0
     an1 = l
@@ -468,7 +458,7 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
     (move',stay') = break simpleBreak (trailingCommentsDeltas (anchorFromLocatedA (L l ())) cs1f)
     move = map snd move'
     stay = map snd stay'
-    (l'', grhss', binds', logInfo)
+    (l'', grhss', binds', _logInfo)
       = case reverse grhss of
           [] -> (l, [], binds,                 (EpaComments [], noSrcSpanA))
           (L lg (GRHS ag grs rhs):gs) ->
@@ -491,26 +481,24 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
 pushTrailingComments :: WithWhere -> EpAnnComments -> HsLocalBinds GhcPs -> (Bool, HsLocalBinds GhcPs)
 pushTrailingComments _ _cs b@EmptyLocalBinds{} = (False, b)
 pushTrailingComments _ _cs (HsIPBinds _ _) = error "TODO: pushTrailingComments:HsIPBinds"
-pushTrailingComments w cs lb@(HsValBinds an _)
-  = (True, HsValBinds an' vb)
+pushTrailingComments w cs lb@(HsValBinds an _) = (True, HsValBinds an' vb)
   where
     decls = hsDeclsLocalBinds lb
     (an', decls') = case reverse decls of
       [] -> (addCommentsToEpAnn an cs, decls)
       (L la d:ds) -> (an, L (addCommentsToEpAnn la cs) d:ds)
-    (vb,_ws2) = case runTransform (replaceDeclsValbinds w lb (reverse decls')) of
-      ((HsValBinds _ vb'), _, ws2') -> (vb', ws2')
-      _ -> (ValBinds NoAnnSortKey [] [], [])
+    vb = case replaceDeclsValbinds w lb (reverse decls') of
+      (HsValBinds _ vb') -> vb'
+      _ -> ValBinds NoAnnSortKey [] []
 
 
-balanceCommentsList' :: (Monad m) => [LocatedA a] -> TransformT m [LocatedA a]
-balanceCommentsList' [] = return []
-balanceCommentsList' [x] = return [x]
-balanceCommentsList' (a:b:ls) = do
-  logTr $ "balanceCommentsList' entered"
-  (a',b') <- balanceComments' a b
-  r <- balanceCommentsList' (b':ls)
-  return (a':r)
+balanceCommentsListA :: [LocatedA a] -> [LocatedA a]
+balanceCommentsListA [] = []
+balanceCommentsListA [x] = [x]
+balanceCommentsListA (a:b:ls) = (a':r)
+  where
+    (a',b') = balanceCommentsA a b
+    r = balanceCommentsListA (b':ls)
 
 -- |Prior to moving an AST element, make sure any trailing comments belonging to
 -- it are attached to it, and not the following element. Of necessity this is a
@@ -518,13 +506,8 @@ balanceCommentsList' (a:b:ls) = do
 -- with a passed-in decision function.
 -- The initial situation is that all comments for a given anchor appear as prior comments
 -- Many of these should in fact be following comments for the previous anchor
-balanceComments' :: (Monad m) => LocatedA a -> LocatedA b -> TransformT m (LocatedA a, LocatedA b)
-balanceComments' la1 la2 = do
-  debugM $ "balanceComments': (anc1)=" ++ showAst (anc1)
-  debugM $ "balanceComments': (cs1s)=" ++ showAst (cs1s)
-  debugM $ "balanceComments': (cs1stay,cs1move)=" ++ showAst (cs1stay,cs1move)
-  debugM $ "balanceComments': (an1',an2')=" ++ showAst (an1',an2')
-  return (la1', la2')
+balanceCommentsA :: LocatedA a -> LocatedA b -> (LocatedA a, LocatedA b)
+balanceCommentsA la1 la2 = (la1', la2')
   where
     simpleBreak n (r,_) = r > n
     L an1 f = la1
@@ -532,26 +515,31 @@ balanceComments' la1 la2 = do
     anc1 = comments an1
     anc2 = comments an2
 
-    cs1s = splitCommentsEnd (anchorFromLocatedA la1) anc1
-    cs1p = priorCommentsDeltas    (anchorFromLocatedA la1) (priorComments        cs1s)
-    cs1f = trailingCommentsDeltas (anchorFromLocatedA la1) (getFollowingComments cs1s)
+    (p1,m1,f1) = splitComments (anchorFromLocatedA la1) anc1
+    cs1p = priorCommentsDeltas    (anchorFromLocatedA la1) p1
 
-    cs2s = splitCommentsEnd (anchorFromLocatedA la2) anc2
-    cs2p = priorCommentsDeltas    (anchorFromLocatedA la2) (priorComments        cs2s)
-    cs2f = trailingCommentsDeltas (anchorFromLocatedA la2) (getFollowingComments cs2s)
+    -- Split cs1 following comments into those before any
+    -- TrailingAnn's on an1, and any after
+    cs1f = splitCommentsEnd (fullSpanFromLocatedA la1) $ EpaComments f1
+    cs1fp = priorCommentsDeltas    (anchorFromLocatedA la1) (priorComments        cs1f)
+    cs1ff = trailingCommentsDeltas (anchorFromLocatedA la1) (getFollowingComments cs1f)
 
-    -- Split cs1f into those that belong on an1 and ones that must move to an2
-    (cs1move,cs1stay) = break (simpleBreak 1) cs1f
+    -- Split cs1ff into those that belong on an1 and ones that must move to an2
+    (cs1move,cs1stay) = break (simpleBreak 1) cs1ff
+
+    (p2,m2,f2) = splitComments (anchorFromLocatedA la2) anc2
+    cs2p = priorCommentsDeltas    (anchorFromLocatedA la2) p2
+    cs2f = trailingCommentsDeltas (anchorFromLocatedA la2) f2
 
     (stay'',move') = break (simpleBreak 1) cs2p
     -- Need to also check for comments more closely attached to la1,
     -- ie trailing on the same line
     (move'',stay') = break (simpleBreak 0) (trailingCommentsDeltas (anchorFromLocatedA la1) (map snd stay''))
-    move = sortEpaComments $ map snd (cs1move ++ move'' ++ move')
-    stay = sortEpaComments $ map snd (cs1stay ++ stay')
+    move = sortEpaComments $ map snd (cs1fp ++ cs1move ++ move'' ++ move')
+    stay = sortEpaComments $ m2 ++ map snd (cs1stay ++ stay')
 
-    an1' = setCommentsEpAnn (getLoc la1) (EpaCommentsBalanced (map snd cs1p) move)
-    an2' = setCommentsEpAnn (getLoc la2) (EpaCommentsBalanced stay (map snd cs2f))
+    an1' = setCommentsEpAnn (getLoc la1) (epaCommentsBalanced (m1 ++ map snd cs1p) move)
+    an2' = setCommentsEpAnn (getLoc la2) (epaCommentsBalanced stay (map snd cs2f))
     la1' = L an1' f
     la2' = L an2' s
 
@@ -569,10 +557,9 @@ trailingCommentsDeltas r (la@(L l _):las)
         (al,_) = ss2posEnd rs'
         (ll,_) = ss2pos (anchor loc)
 
--- AZ:TODO: this is identical to commentsDeltas
 priorCommentsDeltas :: RealSrcSpan -> [LEpaComment]
                     -> [(Int, LEpaComment)]
-priorCommentsDeltas r cs = go r (reverse $ sortEpaComments cs)
+priorCommentsDeltas r cs = go r (sortEpaComments cs)
   where
     go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
     go _   [] = []
@@ -590,6 +577,21 @@ priorCommentsDeltas r cs = go r (reverse $ sortEpaComments cs)
 
 -- | Split comments into ones occurring before the end of the reference
 -- span, and those after it.
+splitComments :: RealSrcSpan -> EpAnnComments -> ([LEpaComment], [LEpaComment], [LEpaComment])
+splitComments p cs = (before, middle, after)
+  where
+    cmpe (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
+    cmpe (L _ _) = True
+
+    cmpb (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2pos p
+    cmpb (L _ _) = True
+
+    (beforeEnd, after) = break cmpe ((priorComments cs) ++ (getFollowingComments cs))
+    (before, middle) = break cmpb beforeEnd
+
+
+-- | Split comments into ones occurring before the end of the reference
+-- span, and those after it.
 splitCommentsEnd :: RealSrcSpan -> EpAnnComments -> EpAnnComments
 splitCommentsEnd p (EpaComments cs) = cs'
   where
@@ -598,8 +600,8 @@ splitCommentsEnd p (EpaComments cs) = cs'
     (before, after) = break cmp cs
     cs' = case after of
       [] -> EpaComments cs
-      _ -> EpaCommentsBalanced before after
-splitCommentsEnd p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
+      _ -> epaCommentsBalanced before after
+splitCommentsEnd p (EpaCommentsBalanced cs ts) = epaCommentsBalanced cs' ts'
   where
     cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
     cmp (L _ _) = True
@@ -617,8 +619,8 @@ splitCommentsStart p (EpaComments cs) = cs'
     (before, after) = break cmp cs
     cs' = case after of
       [] -> EpaComments cs
-      _ -> EpaCommentsBalanced before after
-splitCommentsStart p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
+      _ -> epaCommentsBalanced before after
+splitCommentsStart p (EpaCommentsBalanced cs ts) = epaCommentsBalanced cs' ts'
   where
     cmp (L (EpaSpan (RealSrcSpan l _)) _) = ss2pos l > ss2posEnd p
     cmp (L _ _) = True
@@ -638,8 +640,8 @@ moveLeadingComments (L la a) lb = (L la' a, lb')
     -- TODO: need to set an entry delta on lb' to zero, and move the
     -- original spacing to the first comment.
 
-    la' = setCommentsEpAnn la (EpaCommentsBalanced [] after)
-    lb' = addCommentsToEpAnn lb (EpaCommentsBalanced before [])
+    la' = setCommentsEpAnn la (epaCommentsBalanced [] after)
+    lb' = addCommentsToEpAnn lb (epaCommentsBalanced before [])
 
 -- | A GHC comment includes the span of the preceding (non-comment)
 -- token.  Takes an original list of comments, and converts the
@@ -662,17 +664,27 @@ addCommentOrigDeltasAnn (EpAnn e a cs) = EpAnn e a (addCommentOrigDeltas cs)
 anchorFromLocatedA :: LocatedA a -> RealSrcSpan
 anchorFromLocatedA (L (EpAnn anc _ _) _) = anchor anc
 
+-- | Get the full span of interest for comments from a LocatedA.
+-- This extends up to the last TrailingAnn
+fullSpanFromLocatedA :: LocatedA a -> RealSrcSpan
+fullSpanFromLocatedA (L (EpAnn anc (AnnListItem tas)  _) _) = rr
+  where
+    r = anchor anc
+    trailing_loc ta = case ta_location ta of
+        EpaSpan (RealSrcSpan s _) -> [s]
+        _ -> []
+    rr = case reverse (concatMap trailing_loc tas) of
+        [] -> r
+        (s:_) -> combineRealSrcSpans r s
+
 -- ---------------------------------------------------------------------
 
-balanceSameLineComments :: (Monad m)
-  => LMatch GhcPs (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LHsExpr GhcPs))
-balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
-  logTr $ "balanceSameLineComments: (la)=" ++ showGhc (ss2range $ locA la)
-  logTr $ "balanceSameLineComments: [logInfo]=" ++ showAst logInfo
-  return (L la' (Match anm mctxt pats (GRHSs x grhss' lb)))
+balanceSameLineComments :: LMatch GhcPs (LHsExpr GhcPs) -> (LMatch GhcPs (LHsExpr GhcPs))
+balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb)))
+  = (L la' (Match anm mctxt pats (GRHSs x grhss' lb)))
   where
     simpleBreak n (r,_) = r > n
-    (la',grhss', logInfo) = case reverse grhss of
+    (la',grhss', _logInfo) = case reverse grhss of
       [] -> (la,grhss,[])
       (L lg (GRHS ga gs rhs):grs) -> (la'',reverse $ (L lg (GRHS ga' gs rhs)):grs,[(gac,(csp,csf))])
         where
@@ -684,7 +696,7 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
           (move',stay') = break (simpleBreak 0) (trailingCommentsDeltas (anchor anc) csf)
           move = map snd move'
           stay = map snd stay'
-          cs1 = EpaCommentsBalanced csp stay
+          cs1 = epaCommentsBalanced csp stay
 
           gac = epAnnComments ga
           gfc = getFollowingComments gac
@@ -734,24 +746,21 @@ addComma (EpAnn anc (AnnListItem as) cs)
 -- | Insert a declaration into an AST element having sub-declarations
 -- (@HasDecls@) according to the given location function.
 insertAt :: (HasDecls ast)
-              => (LHsDecl GhcPs
-                  -> [LHsDecl GhcPs]
-                  -> [LHsDecl GhcPs])
-              -> ast
-              -> LHsDecl GhcPs
-              -> Transform ast
-insertAt f t decl = do
-  oldDecls <- hsDecls t
-  oldDeclsb <- balanceCommentsList oldDecls
-  let oldDecls' = oldDeclsb
-  replaceDecls t (f decl oldDecls')
+         => (LHsDecl GhcPs
+              -> [LHsDecl GhcPs]
+              -> [LHsDecl GhcPs])
+         -> ast
+         -> LHsDecl GhcPs
+         -> ast
+insertAt f t decl = replaceDecls t (f decl oldDecls')
+  where
+    oldDecls = hsDecls t
+    oldDeclsb = balanceCommentsList oldDecls
+    oldDecls' = oldDeclsb
 
 -- |Insert a declaration at the beginning or end of the subdecls of the given
 -- AST item
-insertAtStart, insertAtEnd :: (HasDecls ast)
-              => ast
-              -> LHsDecl GhcPs
-              -> Transform ast
+insertAtStart, insertAtEnd :: HasDecls ast => ast -> LHsDecl GhcPs -> ast
 
 insertAtEnd   = insertAt (\x xs -> xs ++ [x])
 
@@ -766,11 +775,11 @@ insertAtStart = insertAt insertFirst
 
 -- |Insert a declaration at a specific location in the subdecls of the given
 -- AST item
-insertAfter, insertBefore :: (HasDecls (LocatedA ast))
+insertAfter, insertBefore :: HasDecls (LocatedA ast)
                           => LocatedA old
                           -> LocatedA ast
                           -> LHsDecl GhcPs
-                          -> Transform (LocatedA ast)
+                          -> LocatedA ast
 insertAfter (getLocA -> k) = insertAt findAfter
   where
     findAfter x xs =
@@ -797,10 +806,10 @@ class (Data t) => HasDecls t where
     -- given syntax phrase. They are always returned in the wrapped 'HsDecl'
     -- form, even if orginating in local decls. This is safe, as annotations
     -- never attach to the wrapper, only to the wrapped item.
-    hsDecls :: (Monad m) => t -> TransformT m [LHsDecl GhcPs]
+    hsDecls :: t -> [LHsDecl GhcPs]
 
     -- | Replace the directly enclosed decl list by the given
-    --  decl list. Runs in the 'Transform' monad to be able to update list order
+    --  decl list. As part of replacing it will update list order
     --  annotations, and rebalance comments and other layout changes as needed.
     --
     -- For example, a call on replaceDecls for a wrapped 'FunBind' having no
@@ -818,96 +827,86 @@ class (Data t) => HasDecls t where
     --   where
     --     nn = 2
     -- @
-    replaceDecls :: (Monad m) => t -> [LHsDecl GhcPs] -> TransformT m t
+    replaceDecls :: t -> [LHsDecl GhcPs] -> t
 
 -- ---------------------------------------------------------------------
 
 instance HasDecls ParsedSource where
-  hsDecls (L _ (HsModule (XModulePs _ _lo _ _) _mn _exps _imps decls)) = return decls
+  hsDecls (L _ (HsModule (XModulePs _ _lo _ _) _mn _exps _imps decls)) = decls
 
   replaceDecls (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps _decls)) decls
-    = do
-        logTr "replaceDecls LHsModule"
-        return (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps decls))
+    = (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps decls))
 
 -- ---------------------------------------------------------------------
 
 instance HasDecls (LocatedA (HsDecl GhcPs)) where
-  hsDecls (L _ (TyClD _ c@ClassDecl{}))  = return $ hsDeclsClassDecl c
-  hsDecls decl = do
-    error $ "hsDecls:decl=" ++ showAst decl
-  replaceDecls (L l (TyClD e dec@ClassDecl{})) decls = do
-    let decl' = replaceDeclsClassDecl dec decls
-    return (L l (TyClD e decl'))
-  replaceDecls decl _decls = do
-    error $ "replaceDecls:decl=" ++ showAst decl
+  hsDecls (L _ (TyClD _ c@ClassDecl{}))  = hsDeclsClassDecl c
+  hsDecls decl = error $ "hsDecls:decl=" ++ showAst decl
+  replaceDecls (L l (TyClD e dec@ClassDecl{})) decls =
+    let
+        decl' = replaceDeclsClassDecl dec decls
+    in (L l (TyClD e decl'))
+  replaceDecls decl _decls
+      = error $ "replaceDecls:decl=" ++ showAst decl
 
 -- ---------------------------------------------------------------------
 
 instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
-  hsDecls (L _ (Match _ _ _ (GRHSs _ _ lb))) = return $ hsDeclsLocalBinds lb
+  hsDecls (L _ (Match _ _ _ (GRHSs _ _ lb))) = hsDeclsLocalBinds lb
 
   replaceDecls (L l (Match xm c p (GRHSs xr rhs binds))) []
-    = do
-        logTr "replaceDecls LMatch empty decls"
-        binds'' <- replaceDeclsValbinds WithoutWhere binds []
-        return (L l (Match xm c p (GRHSs xr rhs binds'')))
+    = let
+        binds'' = replaceDeclsValbinds WithoutWhere binds []
+      in (L l (Match xm c p (GRHSs xr rhs binds'')))
 
   replaceDecls m@(L l (Match xm c p (GRHSs xr rhs binds))) newBinds
-    = do
-        logTr "replaceDecls LMatch nonempty decls"
+    = let
         -- Need to throw in a fresh where clause if the binds were empty,
         -- in the annotations.
-        (l', rhs') <- case binds of
-          EmptyLocalBinds{} -> do
-            logTr $ "replaceDecls LMatch empty binds"
-
-            logDataWithAnnsTr "Match.replaceDecls:balancing comments:m" m
-            L l' m' <- balanceSameLineComments m
-            logDataWithAnnsTr "Match.replaceDecls:(m1')" (L l' m')
-            return (l', grhssGRHSs $ m_grhss m')
-          _ -> return (l, rhs)
-        binds'' <- replaceDeclsValbinds WithWhere binds newBinds
-        logDataWithAnnsTr "Match.replaceDecls:binds'" binds''
-        return (L l' (Match xm c p (GRHSs xr rhs' binds'')))
+        (l', rhs') = case binds of
+          EmptyLocalBinds{} ->
+            let
+              L l0 m' = balanceSameLineComments m
+            in (l0, grhssGRHSs $ m_grhss m')
+          _ -> (l, rhs)
+        binds'' = replaceDeclsValbinds WithWhere binds newBinds
+      in (L l' (Match xm c p (GRHSs xr rhs' binds'')))
 
 -- ---------------------------------------------------------------------
 
 instance HasDecls (LocatedA (HsExpr GhcPs)) where
-  hsDecls (L _ (HsLet _ decls _ex)) = return $ hsDeclsLocalBinds decls
-  hsDecls _                         = return []
+  hsDecls (L _ (HsLet _ decls _ex)) = hsDeclsLocalBinds decls
+  hsDecls _                         = []
 
   replaceDecls (L ll (HsLet (tkLet, tkIn) binds ex)) newDecls
-    = do
-        logTr "replaceDecls HsLet"
-        let lastAnc = realSrcSpan $ spanHsLocaLBinds binds
+    = let
+        lastAnc = realSrcSpan $ spanHsLocaLBinds binds
         -- TODO: may be an intervening comment, take account for lastAnc
-        let (tkLet', tkIn', ex',newDecls') = case (tkLet, tkIn) of
-              (EpTok l, EpTok i) ->
-                let
-                  off = case l of
-                          (EpaSpan (RealSrcSpan r _)) -> LayoutStartCol $ snd $ ss2pos r
-                          (EpaSpan (UnhelpfulSpan _)) -> LayoutStartCol 0
-                          (EpaDelta _ (SameLine _) _) -> LayoutStartCol 0
-                          (EpaDelta _ (DifferentLine _ c) _) -> LayoutStartCol c
-                  ex'' = setEntryDPFromAnchor off i ex
-                  newDecls'' = case newDecls of
-                    [] -> newDecls
-                    (d:ds) -> setEntryDPDecl d (SameLine 0) : ds
-                in ( EpTok l
-                   , EpTok (addEpaLocationDelta off lastAnc i)
-                   , ex''
-                   , newDecls'')
-              (_,_) -> (tkLet, tkIn, ex, newDecls)
-        binds' <- replaceDeclsValbinds WithoutWhere binds newDecls'
-        return (L ll (HsLet (tkLet', tkIn') binds' ex'))
+        (tkLet', tkIn', ex',newDecls') = case (tkLet, tkIn) of
+          (EpTok l, EpTok i) ->
+            let
+              off = case l of
+                      (EpaSpan (RealSrcSpan r _)) -> LayoutStartCol $ snd $ ss2pos r
+                      (EpaSpan (UnhelpfulSpan _)) -> LayoutStartCol 0
+                      (EpaDelta _ (SameLine _) _) -> LayoutStartCol 0
+                      (EpaDelta _ (DifferentLine _ c) _) -> LayoutStartCol c
+              ex'' = setEntryDPFromAnchor off i ex
+              newDecls'' = case newDecls of
+                [] -> newDecls
+                (d:ds) -> setEntryDPDecl d (SameLine 0) : ds
+            in ( EpTok l
+               , EpTok (addEpaLocationDelta off lastAnc i)
+               , ex''
+               , newDecls'')
+          (_,_) -> (tkLet, tkIn, ex, newDecls)
+        binds' = replaceDeclsValbinds WithoutWhere binds newDecls'
+      in (L ll (HsLet (tkLet', tkIn') binds' ex'))
 
   -- TODO: does this make sense? Especially as no hsDecls for HsPar
   replaceDecls (L l (HsPar x e)) newDecls
-    = do
-        logTr "replaceDecls HsPar"
-        e' <- replaceDecls e newDecls
-        return (L l (HsPar x e'))
+    = let
+        e' = replaceDecls e newDecls
+      in (L l (HsPar x e'))
   replaceDecls old _new = error $ "replaceDecls (LHsExpr GhcPs) undefined for:" ++ showGhc old
 
 -- ---------------------------------------------------------------------
@@ -934,53 +933,51 @@ hsDeclsPatBind x = error $ "hsDeclsPatBind called for:" ++ showGhc x
 -- cannot be a member of 'HasDecls' because a 'FunBind' is not idempotent
 -- for 'hsDecls' \/ 'replaceDecls'. 'hsDeclsPatBindD' \/ 'replaceDeclsPatBindD' is
 -- idempotent.
-replaceDeclsPatBindD :: (Monad m) => LHsDecl GhcPs -> [LHsDecl GhcPs]
-                     -> TransformT m (LHsDecl GhcPs)
-replaceDeclsPatBindD (L l (ValD x d)) newDecls = do
-  (L _ d') <- replaceDeclsPatBind (L l d) newDecls
-  return (L l (ValD x d'))
+replaceDeclsPatBindD :: LHsDecl GhcPs -> [LHsDecl GhcPs] -> (LHsDecl GhcPs)
+replaceDeclsPatBindD (L l (ValD x d)) newDecls =
+  let
+    (L _ d') = replaceDeclsPatBind (L l d) newDecls
+  in (L l (ValD x d'))
 replaceDeclsPatBindD x _ = error $ "replaceDeclsPatBindD called for:" ++ showGhc x
 
 -- | Replace the immediate declarations for a 'PatBind'. This
 -- cannot be a member of 'HasDecls' because a 'FunBind' is not idempotent
 -- for 'hsDecls' \/ 'replaceDecls'. 'hsDeclsPatBind' \/ 'replaceDeclsPatBind' is
 -- idempotent.
-replaceDeclsPatBind :: (Monad m) => LHsBind GhcPs -> [LHsDecl GhcPs]
-                    -> TransformT m (LHsBind GhcPs)
+replaceDeclsPatBind :: LHsBind GhcPs -> [LHsDecl GhcPs] -> (LHsBind GhcPs)
 replaceDeclsPatBind (L l (PatBind x a p (GRHSs xr rhss binds))) newDecls
-    = do
-        logTr "replaceDecls PatBind"
-        binds'' <- replaceDeclsValbinds WithWhere binds newDecls
-        return (L l (PatBind x a p (GRHSs xr rhss binds'')))
+  =  (L l (PatBind x a p (GRHSs xr rhss binds'')))
+  where
+    binds'' = replaceDeclsValbinds WithWhere binds newDecls
 replaceDeclsPatBind x _ = error $ "replaceDeclsPatBind called for:" ++ showGhc x
 
 -- ---------------------------------------------------------------------
 
 instance HasDecls (LocatedA (Stmt GhcPs (LocatedA (HsExpr GhcPs)))) where
-  hsDecls (L _ (LetStmt _ lb))      = return $ hsDeclsLocalBinds lb
+  hsDecls (L _ (LetStmt _ lb))      = hsDeclsLocalBinds lb
   hsDecls (L _ (LastStmt _ e _ _))  = hsDecls e
   hsDecls (L _ (BindStmt _ _pat e)) = hsDecls e
   hsDecls (L _ (BodyStmt _ e _ _))  = hsDecls e
-  hsDecls _                         = return []
+  hsDecls _                         = []
 
   replaceDecls (L l (LetStmt x lb)) newDecls
-    = do
-        lb'' <- replaceDeclsValbinds WithWhere lb newDecls
-        return (L l (LetStmt x lb''))
+    = let
+        lb'' = replaceDeclsValbinds WithWhere lb newDecls
+      in (L l (LetStmt x lb''))
   replaceDecls (L l (LastStmt x e d se)) newDecls
-    = do
-        e' <- replaceDecls e newDecls
-        return (L l (LastStmt x e' d se))
+    = let
+        e' = replaceDecls e newDecls
+      in (L l (LastStmt x e' d se))
   replaceDecls (L l (BindStmt x pat e)) newDecls
-    = do
-      e' <- replaceDecls e newDecls
-      return (L l (BindStmt x pat e'))
+    = let
+        e' = replaceDecls e newDecls
+      in (L l (BindStmt x pat e'))
 
   replaceDecls (L l (BodyStmt x e a b)) newDecls
-    = do
-      e' <- replaceDecls e newDecls
-      return (L l (BodyStmt x e' a b))
-  replaceDecls x _newDecls = return x
+    = let
+        e' = replaceDecls e newDecls
+      in (L l (BodyStmt x e' a b))
+  replaceDecls x _newDecls = x
 
 -- =====================================================================
 -- end of HasDecls instances
@@ -1062,61 +1059,55 @@ data WithWhere = WithWhere
 -- care, as this does not manage the declaration order, the
 -- ordering should be done by the calling function from the 'HsLocalBinds'
 -- context in the AST.
-replaceDeclsValbinds :: (Monad m)
-                     => WithWhere
+replaceDeclsValbinds :: WithWhere
                      -> HsLocalBinds GhcPs -> [LHsDecl GhcPs]
-                     -> TransformT m (HsLocalBinds GhcPs)
-replaceDeclsValbinds _ _ [] = do
-  return (EmptyLocalBinds NoExtField)
+                     -> HsLocalBinds GhcPs
+replaceDeclsValbinds _ _ [] = EmptyLocalBinds NoExtField
 replaceDeclsValbinds w b@(HsValBinds a _) new
-    = do
-        logTr "replaceDeclsValbinds"
-        let oldSpan = spanHsLocaLBinds b
-        an <- oldWhereAnnotation a w (realSrcSpan oldSpan)
-        let decs = concatMap decl2Bind new
-        let sigs = concatMap decl2Sig new
-        let sortKey = captureOrderBinds new
-        return (HsValBinds an (ValBinds sortKey decs sigs))
+    = let
+        oldSpan = spanHsLocaLBinds b
+        an = oldWhereAnnotation a w (realSrcSpan oldSpan)
+        decs = concatMap decl2Bind new
+        sigs = concatMap decl2Sig new
+        sortKey = captureOrderBinds new
+      in (HsValBinds an (ValBinds sortKey decs sigs))
 replaceDeclsValbinds _ (HsIPBinds {}) _new    = error "undefined replaceDecls HsIPBinds"
 replaceDeclsValbinds w (EmptyLocalBinds _) new
-    = do
-        logTr "replaceDecls HsLocalBinds"
-        an <- newWhereAnnotation w
-        let newBinds = concatMap decl2Bind new
-            newSigs  = concatMap decl2Sig  new
-        let decs = newBinds
-        let sigs = newSigs
-        let sortKey = captureOrderBinds new
-        return (HsValBinds an (ValBinds sortKey decs sigs))
+    = let
+        an = newWhereAnnotation w
+        decs = concatMap decl2Bind new
+        sigs = concatMap decl2Sig  new
+        sortKey = captureOrderBinds new
+      in (HsValBinds an (ValBinds sortKey decs sigs))
 
-oldWhereAnnotation :: (Monad m)
-  => EpAnn AnnList -> WithWhere -> RealSrcSpan -> TransformT m (EpAnn AnnList)
-oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
-  -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation, change the AnnList anchor to have the correct DP too
-  let (AnnList ancl o c _r t) = an
-  let w = case ww of
-        WithWhere -> [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])]
-        WithoutWhere -> []
-  (anc', ancl') <- do
-        case ww of
-          WithWhere -> return (anc, ancl)
-          WithoutWhere -> return (anc, ancl)
-  let an' = EpAnn anc'
-                  (AnnList ancl' o c w t)
-                  cs
-  return an'
+oldWhereAnnotation :: EpAnn AnnList -> WithWhere -> RealSrcSpan -> (EpAnn AnnList)
+oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = an'
+  -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation,
+  -- change the AnnList anchor to have the correct DP too
+  where
+    (AnnList ancl o c _r t) = an
+    w = case ww of
+      WithWhere -> [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])]
+      WithoutWhere -> []
+    (anc', ancl') =
+          case ww of
+            WithWhere -> (anc, ancl)
+            WithoutWhere -> (anc, ancl)
+    an' = EpAnn anc'
+                (AnnList ancl' o c w t)
+                cs
 
-newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (EpAnn AnnList)
-newWhereAnnotation ww = do
-  let anc  = EpaDelta noSrcSpan (DifferentLine 1 3) []
-  let anc2 = EpaDelta noSrcSpan (DifferentLine 1 5) []
-  let w = case ww of
-        WithWhere -> [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])]
-        WithoutWhere -> []
-  let an = EpAnn anc
-                  (AnnList (Just anc2) Nothing Nothing w [])
-                  emptyComments
-  return an
+newWhereAnnotation :: WithWhere -> (EpAnn AnnList)
+newWhereAnnotation ww = an
+  where
+  anc  = EpaDelta noSrcSpan (DifferentLine 1 3) []
+  anc2 = EpaDelta noSrcSpan (DifferentLine 1 5) []
+  w = case ww of
+    WithWhere -> [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])]
+    WithoutWhere -> []
+  an = EpAnn anc
+              (AnnList (Just anc2) Nothing Nothing w [])
+              emptyComments
 
 -- ---------------------------------------------------------------------
 
@@ -1127,32 +1118,32 @@ type PMatch = LMatch GhcPs (LHsExpr GhcPs)
 -- declarations are extracted and returned after modification. For a
 -- 'FunBind' the supplied 'SrcSpan' is used to identify the specific
 -- 'Match' to be transformed, for when there are multiple of them.
-modifyValD :: forall m t. (HasTransform m)
-                => SrcSpan
+modifyValD :: forall t.
+                   SrcSpan
                 -> Decl
-                -> (PMatch -> [Decl] -> m ([Decl], Maybe t))
-                -> m (Decl,Maybe t)
+                -> (PMatch -> [Decl] -> ([Decl], Maybe t))
+                -> (Decl,Maybe t)
 modifyValD p pb@(L ss (ValD _ (PatBind {} ))) f =
   if (locA ss) == p
-     then do
-       let ds = hsDeclsPatBindD pb
-       (ds',r) <- f (error "modifyValD.PatBind should not touch Match") ds
-       pb' <- liftT $ replaceDeclsPatBindD pb ds'
-       return (pb',r)
-     else return (pb,Nothing)
-modifyValD p decl f = do
-  (decl',r) <- runStateT (everywhereM (mkM doModLocal) (unpackFunDecl decl)) Nothing
-  return (packFunDecl decl',r)
+     then
+       let
+           ds = hsDeclsPatBindD pb
+           (ds',r) = f (error "modifyValD.PatBind should not touch Match") ds
+           pb' = replaceDeclsPatBindD pb ds'
+       in (pb',r)
+     else (pb,Nothing)
+modifyValD p decl f = (packFunDecl decl', r)
   where
-    doModLocal :: PMatch -> StateT (Maybe t) m PMatch
+    (decl',r) = runState (everywhereM (mkM doModLocal) (unpackFunDecl decl)) Nothing
+    doModLocal :: PMatch -> State (Maybe t) PMatch
     doModLocal  (match@(L ss _) :: PMatch) = do
          if (locA ss) == p
            then do
-             ds <- lift $ liftT $ hsDecls match
-                `debug` ("modifyValD: match=" ++ showAst match)
-             (ds',r) <- lift $ f match ds
-             put r
-             match' <- lift $ liftT $ replaceDecls match ds'
+             let
+               ds = hsDecls match
+               (ds',r0) = f match ds
+             put r0
+             let match' = replaceDecls match ds'
              return match'
            else return match
 
@@ -1172,6 +1163,6 @@ modifyDeclsT :: (HasDecls t,HasTransform m)
              => ([LHsDecl GhcPs] -> m [LHsDecl GhcPs])
              -> t -> m t
 modifyDeclsT action t = do
-  decls <- liftT $ hsDecls t
+  let decls = hsDecls t
   decls' <- action decls
-  liftT $ replaceDecls t decls'
+  return $ replaceDecls t decls'

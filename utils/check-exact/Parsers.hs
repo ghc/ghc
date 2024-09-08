@@ -260,7 +260,7 @@ parseModuleEpAnnsWithCppInternal cppOptions dflags file = do
       GHC.PFailed pst
         -> Left (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
       GHC.POk _ pmod
-        -> Right $ (injectedComments, dflags', fixModuleTrailingComments pmod)
+        -> Right $ (injectedComments, dflags', fixModuleComments pmod)
 
 -- | Internal function. Exposed if you want to muck with DynFlags
 -- before parsing. Or after parsing.
@@ -269,8 +269,10 @@ postParseTransform
   -> Either a (GHC.ParsedSource)
 postParseTransform parseRes = fmap mkAnns parseRes
   where
-    -- TODO:AZ perhaps inject the comments into the parsedsource here already
-    mkAnns (_cs, _, m) = fixModuleTrailingComments m
+    mkAnns (_cs, _, m) = fixModuleComments m
+
+fixModuleComments :: GHC.ParsedSource -> GHC.ParsedSource
+fixModuleComments p = fixModuleHeaderComments $ fixModuleTrailingComments p
 
 fixModuleTrailingComments :: GHC.ParsedSource -> GHC.ParsedSource
 fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
@@ -292,6 +294,47 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
               cs'' = GHC.EpaCommentsBalanced (pc <> prior) f
             in cs''
           _ -> cs
+
+-- Deal with https://gitlab.haskell.org/ghc/ghc/-/issues/23984
+-- The Lexer works bottom-up, so does not have module declaration info
+-- when the first top decl processed
+fixModuleHeaderComments :: GHC.ParsedSource -> GHC.ParsedSource
+fixModuleHeaderComments (GHC.L l p) = GHC.L l p'
+  where
+    moveComments :: GHC.EpaLocation -> GHC.LHsDecl GHC.GhcPs -> GHC.EpAnnComments
+                 -> (GHC.LHsDecl GHC.GhcPs, GHC.EpAnnComments)
+    moveComments GHC.EpaDelta{} dd cs = (dd,cs)
+    moveComments (GHC.EpaSpan (GHC.UnhelpfulSpan _)) dd cs = (dd,cs)
+    moveComments (GHC.EpaSpan (GHC.RealSrcSpan r _)) (GHC.L (GHC.EpAnn anc an csd) a) cs = (dd,css)
+      where
+        -- Move any comments on the decl that occur prior to the location
+        pc = GHC.priorComments csd
+        fc = GHC.getFollowingComments csd
+        bf (GHC.L anch _) = GHC.anchor anch > r
+        (move,keep) = break bf pc
+        csd' = GHC.EpaCommentsBalanced keep fc
+
+        dd = GHC.L (GHC.EpAnn anc an csd') a
+        css = cs <> GHC.EpaComments move
+
+    (ds',an') = rebalance (GHC.hsmodDecls p, GHC.hsmodAnn $ GHC.hsmodExt p)
+    p' = p { GHC.hsmodExt = (GHC.hsmodExt p){ GHC.hsmodAnn = an' },
+             GHC.hsmodDecls = ds'
+           }
+
+    rebalance :: ([GHC.LHsDecl GHC.GhcPs], GHC.EpAnn GHC.AnnsModule)
+              -> ([GHC.LHsDecl GHC.GhcPs], GHC.EpAnn GHC.AnnsModule)
+    rebalance (ds, GHC.EpAnn a an cs) = (ds1, GHC.EpAnn a an cs')
+      where
+        (ds1,cs') = case break (\(GHC.AddEpAnn k _) -> k == GHC.AnnWhere) (GHC.am_main an) of
+                     (_, (GHC.AddEpAnn _ whereLoc:_)) ->
+                           case GHC.hsmodDecls p of
+                               (d:ds0) -> (d':ds0, cs0)
+                                   where (d',cs0) = moveComments whereLoc d cs
+                               ds0 -> (ds0,cs)
+                     _ -> (ds,cs)
+
+
 
 -- | Internal function. Initializes DynFlags value for parsing.
 --
