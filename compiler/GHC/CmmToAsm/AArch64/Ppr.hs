@@ -425,6 +425,7 @@ pprInstr platform instr = case instr of
 
   -- 4. Branch Instructions ----------------------------------------------------
   J t            -> pprInstr platform (B t)
+  J_TBL _ _ r    -> pprInstr platform (B (TReg r))
   B (TBlock bid) -> line $ text "\tb" <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   B (TLabel lbl) -> line $ text "\tb" <+> pprAsmLabel platform lbl
   B (TReg r)     -> line $ text "\tbr" <+> pprReg W64 r

@@ -29,7 +29,7 @@ import GHC.Types.Unique.DSM
 
 import GHC.Utils.Panic
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, catMaybes)
 
 import GHC.Stack
 
@@ -120,6 +120,7 @@ regUsageOfInstr platform instr = case instr of
   ORR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- 4. Branch Instructions ----------------------------------------------------
   J t                      -> usage (regTarget t, [])
+  J_TBL _ _ t              -> usage ([t], [])
   B t                      -> usage (regTarget t, [])
   BCOND _ t                -> usage (regTarget t, [])
   BL t ps                  -> usage (regTarget t ++ ps, callerSavedRegisters)
@@ -275,10 +276,11 @@ patchRegsOfInstr instr env = case instr of
     ORR o1 o2 o3   -> ORR  (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 4. Branch Instructions --------------------------------------------------
-    J t            -> J (patchTarget t)
-    B t            -> B (patchTarget t)
-    BL t rs        -> BL (patchTarget t) rs
-    BCOND c t      -> BCOND c (patchTarget t)
+    J t               -> J (patchTarget t)
+    J_TBL ids mbLbl t -> J_TBL ids mbLbl (env t)
+    B t               -> B (patchTarget t)
+    BL t rs           -> BL (patchTarget t) rs
+    BCOND c t         -> BCOND c (patchTarget t)
 
     -- 5. Atomic Instructions --------------------------------------------------
     -- 6. Conditional Instructions ---------------------------------------------
@@ -332,6 +334,7 @@ isJumpishInstr instr = case instr of
     CBZ{} -> True
     CBNZ{} -> True
     J{} -> True
+    J_TBL{} -> True
     B{} -> True
     BL{} -> True
     BCOND{} -> True
@@ -345,6 +348,7 @@ jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
 jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BL t _) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
@@ -353,6 +357,11 @@ jumpDestsOfInstr _ = []
 canFallthroughTo :: Instr -> BlockId -> Bool
 canFallthroughTo (ANN _ i) bid = canFallthroughTo i bid
 canFallthroughTo (J (TBlock target)) bid = bid == target
+canFallthroughTo (J_TBL targets _ _) bid = all isTargetBid targets
+  where
+    isTargetBid target = case target of
+      Nothing -> True
+      Just target -> target == bid
 canFallthroughTo (B (TBlock target)) bid = bid == target
 canFallthroughTo _ _ = False
 
@@ -366,6 +375,7 @@ patchJumpInstr instr patchF
         CBZ r (TBlock bid) -> CBZ r (TBlock (patchF bid))
         CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
         J (TBlock bid) -> J (TBlock (patchF bid))
+        J_TBL ids mbLbl r -> J_TBL (map (fmap patchF) ids) mbLbl r
         B (TBlock bid) -> B (TBlock (patchF bid))
         BL (TBlock bid) ps -> BL (TBlock (patchF bid)) ps
         BCOND c (TBlock bid) -> BCOND c (TBlock (patchF bid))
@@ -540,6 +550,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 
       insert_dealloc insn r = case insn of
         J _ -> dealloc ++ (insn : r)
+        J_TBL {} -> dealloc ++ (insn : r)
         ANN _ (J _) -> dealloc ++ (insn : r)
         _other | jumpDestsOfInstr insn /= []
             -> patchJumpInstr insn retarget : r
@@ -668,6 +679,7 @@ data Instr
     | CBNZ Operand Target -- if op /= 0, then branch.
     -- Branching.
     | J Target            -- like B, but only generated from genJump. Used to distinguish genJumps from others.
+    | J_TBL [Maybe BlockId] (Maybe CLabel) Reg -- A jump instruction with data for switch/jump tables
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
     | BL Target [Reg] -- branch and link (e.g. set x30 to next pc, and branch)
     | BCOND Cond Target   -- branch with condition. b.<cond>
@@ -758,6 +770,7 @@ instrCon i =
       CBZ{} -> "CBZ"
       CBNZ{} -> "CBNZ"
       J{} -> "J"
+      J_TBL {} -> "J_TBL"
       B{} -> "B"
       BL{} -> "BL"
       BCOND{} -> "BCOND"
