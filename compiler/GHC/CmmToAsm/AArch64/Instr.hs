@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module GHC.CmmToAsm.AArch64.Instr
