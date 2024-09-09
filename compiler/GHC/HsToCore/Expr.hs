@@ -293,10 +293,7 @@ dsExpr e@(XExpr ext_expr_tc)
       WrapExpr {}   -> dsApp e
       ConLikeTc {}  -> dsApp e
 
-      ExpandedThingTc o e
-        | OrigStmt (L loc _) <- o
-        -> putSrcSpanDsA loc $ dsExpr e
-        | otherwise -> dsExpr e
+      ExpandedThingTc _ e -> dsExpr e
       -- Hpc Support
       HsTick tickish e -> do
         e' <- dsLExpr e
