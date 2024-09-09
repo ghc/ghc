@@ -1,4 +1,3 @@
-
 T3613.hs:14:20: error: [GHC-83865]
     • Couldn't match type ‘IO’ with ‘Maybe’
       Expected: Maybe ()
@@ -11,7 +10,7 @@ T3613.hs:17:24: error: [GHC-83865]
     • Couldn't match type ‘IO’ with ‘Maybe’
       Expected: Maybe ()
         Actual: IO ()
-    • In a stmt of a 'do' block: bar
+    • In the expression: bar
       In the first argument of ‘fooThen’, namely
         ‘(do bar
              undefined)’
@@ -19,3 +18,4 @@ T3613.hs:17:24: error: [GHC-83865]
         fooThen
           (do bar
               undefined)
+

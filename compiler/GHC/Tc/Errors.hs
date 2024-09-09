@@ -21,6 +21,10 @@ import GHC.Driver.Config.Diagnostic
 
 import GHC.Rename.Unbound
 
+import Language.Haskell.Syntax (DotFieldOcc (..))
+import Language.Haskell.Syntax.Basic (FieldLabelString (..))
+import GHC.Hs.Expr (SrcCodeOrigin (..), HsExpr (..))
+
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Errors.Types
@@ -2408,6 +2412,43 @@ mk_dict_err ctxt (item, (matches, pot_unifiers, unsafe_overlapped))
             same_occ_names = nameOccName n1 == nameOccName n2
         in different_names && same_occ_names
       | otherwise = False
+
+    -- See Note [Out-of-scope fields with -XOverloadedRecordDot]
+    record_field_suggestions :: ErrorItem -> TcM ([ImportError], [GhcHint])
+    record_field_suggestions item = flip (maybe $ return ([], noHints)) record_field $ \name ->
+       do { glb_env <- getGlobalRdrEnv
+          ; lcl_env <- getLocalRdrEnv
+          ; let field_name_hints = report_no_fieldnames item
+          ; (errs, hints) <- if occ_name_in_scope glb_env lcl_env name
+              then return ([], noHints)
+              else unknownNameSuggestions emptyLocalRdrEnv WL_RecField (mkRdrUnqual name)
+          ; pure (errs, hints ++ field_name_hints)
+          }
+
+    -- get type names from instance
+    -- resolve the type - if it's in scope is it a record?
+    -- if it's a record, report an error - the record name + the field that could not be found
+    report_no_fieldnames :: ErrorItem -> [GhcHint]
+    report_no_fieldnames item
+       | Just (EvVarDest evvar) <- ei_evdest item
+       -- we can assume that here we have a `HasField @Symbol x r a` instance
+       -- because of GetFieldOrigin in record_field
+       , Just (_, [_symbol, x, r, a]) <- tcSplitTyConApp_maybe (varType evvar)
+       , Just (r_tycon, _) <- tcSplitTyConApp_maybe r
+       , Just x_name <- isStrLitTy x
+       -- we check that this is a record type by checking whether it has any
+       -- fields (in scope)
+       , not . null $ tyConFieldLabels r_tycon
+       = [RemindRecordMissingField x_name r a]
+       | otherwise = []
+
+    occ_name_in_scope glb_env lcl_env occ_name = not $
+      null (lookupGRE glb_env (LookupOccName occ_name (RelevantGREsFOS WantNormal))) &&
+      isNothing (lookupLocalRdrOcc lcl_env occ_name)
+
+    record_field = case orig of
+      ExpansionOrigin (OrigExpr (HsGetField _ _ (L _ name))) -> Just (mkVarOccFS (field_label $ unLoc $ dfoLabel name))
+      _                   -> Nothing
 
 {- Note [Report candidate instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

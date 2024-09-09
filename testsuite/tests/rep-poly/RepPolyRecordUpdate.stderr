@@ -13,8 +13,7 @@ RepPolyRecordUpdate.hs:7:35: error: [GHC-55287]
       X a :: TYPE rep
 
 RepPolyRecordUpdate.hs:13:9: error: [GHC-55287]
-    • The argument ‘fld’ of ‘MkX’
-      does not have a fixed runtime representation.
+    • The field ‘fld’ does not have a fixed runtime representation.
       Its type is:
         a0 :: TYPE rep0
       When unifying:
