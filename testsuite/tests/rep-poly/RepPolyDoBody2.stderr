@@ -1,5 +1,5 @@
 RepPolyDoBody2.hs:23:3: error: [GHC-55287]
-    • The first argument of the rebindable syntax operator ‘(>>)’
+    • The expression ‘return ()’
         arising from a do statement
       does not have a fixed runtime representation.
       Its type is:
