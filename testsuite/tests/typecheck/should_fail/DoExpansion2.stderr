@@ -1,4 +1,3 @@
-
 DoExpansion2.hs:13:20: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the first argument of ‘(+)’, namely ‘x’
@@ -57,7 +56,7 @@ DoExpansion2.hs:34:22: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefaul
                   with actual type: IO String
     • The function ‘getVal’ is applied to two visible arguments,
         but its type ‘Int -> IO String’ has only one
-      In a stmt of a 'do' block: Just x <- getVal 3 4
+      In the expression: getVal 3 4
       In the expression:
         do Just x <- getVal 3 4
            return x
@@ -71,3 +70,4 @@ DoExpansion2.hs:39:19: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefaul
       In the expression:
         do x <- getVal 3
            return x
+
