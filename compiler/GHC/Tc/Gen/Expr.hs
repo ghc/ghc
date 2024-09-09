@@ -13,11 +13,12 @@
 module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
          tcCheckMonoExpr, tcCheckMonoExprNC,
-         tcMonoExpr, tcMonoExprNC,
          tcInferExpr, tcInferSigma,
          tcInferRho, tcInferRhoNC,
+         tcMonoLExpr, tcMonoLExprNC,
          tcInferRhoFRR, tcInferRhoFRRNC,
-         tcPolyLExpr, tcPolyExpr, tcExpr, tcPolyLExprSig,
+         tcPolyLExpr,  tcPolyLExprSig, tcPolyLExprNC,
+         tcPolyExpr, tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
          ) where
@@ -116,11 +117,10 @@ tcCheckPolyExprNC expr res_ty = tcPolyLExprNC expr (mkCheckExpType res_ty)
 -----------------
 -- These versions take an ExpType
 tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
-                           -> TcM (LHsExpr GhcTc)
+                            -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr (L loc expr) res_ty
-  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -178,7 +178,7 @@ tcPolyExprCheck expr res_ty
 
       -- The special case for lambda: go to tcLambdaMatches, passing pat_tys
       tc_body e@(HsLam x lam_variant matches)
-        = do { (wrap, matches') <- tcLambdaMatches e lam_variant matches pat_tys
+        = do { (wrap, matches') <-  tcLambdaMatches e lam_variant matches pat_tys
                                                    (mkCheckExpType rho_ty)
                -- NB: tcLambdaMatches concludes with deep skolemisation,
                --     if DeepSubsumption is on;  hence no need to do that here
@@ -250,8 +250,7 @@ tcInferExprNC = tc_infer_expr_NC IFRR_Any
 
 tc_infer_expr, tc_infer_expr_NC :: InferFRRFlag -> InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
 tc_infer_expr ifrr iif (L loc expr)
-  = setSrcSpanA loc  $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do { (expr', rho) <- runInfer iif ifrr (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -266,23 +265,22 @@ tcCheckMonoExpr, tcCheckMonoExprNC
     -> TcRhoType         -- Expected type
                          -- Definitely no foralls at the top
     -> TcM (LHsExpr GhcTc)
-tcCheckMonoExpr   expr res_ty = tcMonoExpr   expr (mkCheckExpType res_ty)
-tcCheckMonoExprNC expr res_ty = tcMonoExprNC expr (mkCheckExpType res_ty)
+tcCheckMonoExpr   expr res_ty = tcMonoLExpr  expr (mkCheckExpType res_ty)
+tcCheckMonoExprNC expr res_ty = tcMonoLExprNC expr (mkCheckExpType res_ty)
 
 ---------------
-tcMonoExpr, tcMonoExprNC
+tcMonoLExpr, tcMonoLExprNC
     :: LHsExpr GhcRn     -- Expression to type check
     -> ExpRhoType        -- Expected type
                          -- Definitely no foralls at the top
     -> TcM (LHsExpr GhcTc)
 
-tcMonoExpr (L loc expr) res_ty
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+tcMonoLExpr (L loc expr) res_ty
+  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
-tcMonoExprNC (L loc expr) res_ty
+tcMonoLExprNC (L loc expr) res_ty
   = setSrcSpanA loc $
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
@@ -309,13 +307,14 @@ tcExpr :: HsExpr GhcRn
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
+-- Se Note [Overview of Typechecking an XExpr]
 tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
 tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
 
-tcExpr (XExpr e)                 res_ty = tcXExpr e res_ty
+tcExpr (XExpr e')                res_ty = tcXExpr e' res_ty
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -336,11 +335,11 @@ tcExpr e@(HsLit x lit) res_ty
        ; tcWrapResult e (HsLit x (convertLit lit)) lit_ty res_ty }
 
 tcExpr (HsPar x expr) res_ty
-  = do { expr' <- tcMonoExprNC expr res_ty
+  = do { expr' <- tcMonoLExprNC expr res_ty
        ; return (HsPar x expr') }
 
 tcExpr (HsPragE x prag expr) res_ty
-  = do { expr' <- tcMonoExpr expr res_ty
+  = do { expr' <- tcMonoLExpr expr res_ty
        ; return (HsPragE x (tcExprPrag prag) expr') }
 
 tcExpr (NegApp x expr neg_expr) res_ty
@@ -493,7 +492,7 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 
 tcExpr (HsLet x binds expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
-                             tcMonoExpr expr res_ty
+                             tcMonoLExpr expr res_ty
         ; return (HsLet x binds' expr') }
 
 tcExpr (HsCase ctxt scrut matches) res_ty
@@ -520,8 +519,8 @@ tcExpr (HsCase ctxt scrut matches) res_ty
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
-       ; (u1,b1') <- tcCollectingUsage $ tcMonoExpr b1 res_ty
-       ; (u2,b2') <- tcCollectingUsage $ tcMonoExpr b2 res_ty
+       ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty
+       ; (u2,b2') <- tcCollectingUsage $ tcMonoLExpr b2 res_ty
        ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf x pred' b1' b2') }
 
@@ -672,23 +671,24 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
                              , recUpdFields  = rbnds }
                        })
        res_ty
-  = assert (notNull rbnds) $
+  = assert (notNull rbnds) $ mkExpandedExprTc expr <$>
     do  { -- Expand the record update. See Note [Record Updates].
-        ; (ds_expr, ds_res_ty, err_ctxt)
+
+        ; (ds_expr, ds_res_ty, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
+        ; addExpansionErrCtxt (OrigExpr expr) err_msg $
+          do { -- Typecheck the expanded expression.
+               expr' <- tcExpr ds_expr (Check ds_res_ty)
+               -- NB: it's important to use ds_res_ty and not res_ty here.
+               -- Test case: T18802b.
 
-          -- Typecheck the expanded expression.
-        ; expr' <- addErrCtxt err_ctxt $
-                   tcExpr (mkExpandedExpr expr ds_expr) (Check ds_res_ty)
-            -- NB: it's important to use ds_res_ty and not res_ty here.
-            -- Test case: T18802b.
-
-        ; addErrCtxt err_ctxt $ tcWrapResultMono expr expr' ds_res_ty res_ty
-            -- We need to unify the result type of the expanded
-            -- expression with the expected result type.
-            --
-            -- See Note [Unifying result types in tcRecordUpd].
-            -- Test case: T10808.
+             ; tcWrapResultMono expr expr' ds_res_ty res_ty
+             -- We need to unify the result type of the expanded
+             -- expression with the expected result type.
+             --
+             -- See Note [Unifying result types in tcRecordUpd].
+             -- Test case: T10808.
+             }
         }
 
 tcExpr e@(RecordUpd { rupd_flds = OverloadedRecUpdFields {}}) _
@@ -731,7 +731,7 @@ tcExpr (HsProjection _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsProjection: Not 
 -- Here we get rid of it and add the finalizers to the global environment.
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
 tcExpr (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
-tcExpr e@(HsTypedBracket _ext body)    res_ty = tcTypedBracket e body res_ty
+tcExpr e@(HsTypedBracket _ext body) res_ty = tcTypedBracket e body res_ty
 
 tcExpr e@(HsUntypedBracket ps body) res_ty = tcUntypedBracket e body ps res_ty
 tcExpr (HsUntypedSplice splice _)   res_ty
@@ -765,36 +765,60 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 ************************************************************************
 -}
 
+{- Note [Overview of Typechecking an XExpr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Certain constructs undergo expansion right before type checking.
+
+   tcExpr ue@(RecordUpd{}) rho = do { ee <- expand e; tcExpr ee rho }
+
+See Note [Handling overloaded and rebindable constructs] and
+Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
+for details about which constructs are expanded.
+
+The expansion process typically takes a user written thing
+       L lspan ue
+and returns
+       L lspan (XExpr (ExpandedThingRn { xrn_orig = ue
+                                       , xrn_expanded = ee } ))
+
+where `ee` is the expansion of the user written thing `ue`
+
+Now, when a `tcMonoLHsExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)`
+gets a located expression, It does 2 things:
+1. calls `addLExprCtxt` to perform error context management, and;
+2. calls tcExpr to typecheck the expression.
+
+The type checker context has 2 key fields:
+
+     TcLclCtxt { tcl_loc         :: RealSrcSpan
+               , tcl_err_ctxt    :: [ErrCtxt]
+               , ... }
+
+When called on an XExpr, `addLExprCtxt` updates the location of `tcl_loc` with
+the `lspan` above and adds an ErrCtxt on top of the `tcl_err_ctxt`. If the
+`lspan` is generated, then `addLExprCtxt` is a no-op.
+
+The type checker error stack element `GHC.Tc.Types.ErrCtxt.ErrCtxt` has two fields
+
+     ErrCtxt = EC CodeSrcFlag ErrCtxtMsgM
+
+`CodeSrcFlag` says whether we are typechecking an expanded thing, and what that expanded thing is
+`ErrCtxtMsgM` stores the pre-text error message itself. When called on an `XExpr`, `addLExprCtxt`,
+adds the user written thing `ue`, and the error message provided by the caller on the `ErrCtxtStack`
+See Note [ErrCtxtStack Manipulation] for more details.
+
+-}
+
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcXExpr (ExpandedThingRn o e) res_ty
+   = mkExpandedTc o <$> -- necessary for hpc ticks
+         -- Need to call tcExpr and not tcApp
+         -- as e can be let statement which tcApp cannot gracefully handle
+         tcExpr e res_ty
 
-tcXExpr (PopErrCtxt (L loc e)) res_ty
-  = popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-      setSrcSpanA loc $
-      tcExpr e res_ty
-
-tcXExpr xe@(ExpandedThingRn o e') res_ty
-  | OrigStmt ls@(L loc s@LetStmt{}) <- o
-  , HsLet x binds e <- e'
-  =  do { (binds', e') <-  setSrcSpanA loc $
-                           addStmtCtxt s $
-                           tcLocalBinds binds $
-                           tcMonoExprNC e res_ty -- NB: Do not call tcMonoExpr here as it adds
-                                                 -- a duplicate error context
-        ; return $ mkExpandedStmtTc ls (HsLet x binds' e')
-        }
-  | OrigStmt ls@(L loc s@LastStmt{}) <- o
-  =  setSrcSpanA loc $
-          addStmtCtxt s $
-          mkExpandedStmtTc ls <$> tcExpr e' res_ty
-                -- It is important that we call tcExpr (and not tcApp) here as
-                -- `e` is the last statement's body expression
-                -- and not a HsApp of a generated (>>) or (>>=)
-                -- This improves error messages e.g. tests: DoExpansion1, DoExpansion2, DoExpansion3
-  | OrigStmt ls@(L loc _) <- o
-  = setSrcSpanA loc $
-       mkExpandedStmtTc ls <$> tcApp (XExpr xe) res_ty
-
+-- For record selection, same as HsVar case
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
+
 
 {-
 ************************************************************************
@@ -934,7 +958,7 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan)
+  = do { (expr, _, sigma) <- tcInferAppHead (op, noSrcSpan)
              -- Ugh!! But all this code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
@@ -1016,7 +1040,7 @@ tcSynArgE orig op sigma_ty syn_ty thing_inside
                -- fixed RuntimeRep, as needed to call mkWpFun.
            ; return (result, match_wrapper <.> fun_wrap) }
       where
-        herald = ExpectedFunTySyntaxOp orig op
+        herald = ExpectedFunTySyntaxOp 1 orig op
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypePat orig GenSigCtxt the_ty rho_ty
@@ -1045,7 +1069,7 @@ tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
               thing_inside (arg_results ++ res_results) (map scaledMult arg_tys ++ arg_res_mults)
        ; return (result, match_wrapper, arg_wrappers, res_wrapper) }
   where
-    herald = ExpectedFunTySyntaxOp orig op
+    herald = ExpectedFunTySyntaxOp (length arg_shapes) orig op
 
     tc_syn_args_e :: [TcSigmaTypeFRR] -> [SyntaxOpType]
                   -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
@@ -1338,7 +1362,7 @@ expandRecordUpd :: LHsExpr GhcRn
                            -- error context to push when typechecking
                            -- the expanded code
                         )
-expandRecordUpd record_expr possible_parents rbnds res_ty
+expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
   = do {  -- STEP 0: typecheck the record_expr, the record to be updated.
           --
           -- Until GHC proposal #366 is implemented, we still use the type of
@@ -1501,12 +1525,12 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
                                       generatedSrcSpan
                        in (genVarPat fld_nm, genLHsVar fld_nm)
 
-       -- STEP 2 (b): expand to HsCase, as per note [Record Updates]
+       -- STEP 2 (b): expand to HsCase, as per Note [Record Updates]
        ; let ds_expr :: HsExpr GhcRn
-             ds_expr = HsLet noExtField let_binds (L gen case_expr)
+             ds_expr = HsLet noExtField let_binds (wrapGenSpan case_expr)
 
              case_expr :: HsExpr GhcRn
-             case_expr = HsCase RecUpd record_expr
+             case_expr = HsCase RecUpd (wrapGenSpan' (locA lspan) (unLoc record_expr))
                        $ mkMatchGroup (Generated OtherExpansion DoPmc) (wrapGenSpan matches)
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat (NE.toList relevant_cons)
@@ -1518,11 +1542,10 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
              upd_ids_lhs = [ (NonRecursive, [genSimpleFunBind (idName id) [] rhs])
                            | (_, (id, rhs)) <- upd_ids ]
              mk_idSig :: (Name, (Id, LHsExpr GhcRn)) -> LSig GhcRn
-             mk_idSig (_, (id, _)) = L gen $ XSig $ IdSig id
+             mk_idSig (_, (id, _)) = wrapGenSpan (XSig $ IdSig id)
                -- We let-bind variables using 'IdSig' in order to accept
                -- record updates involving higher-rank types.
                -- See Wrinkle [Using IdSig] in Note [Record Updates].
-             gen = noAnnSrcSpan generatedSrcSpan
 
         ; traceTc "expandRecordUpd" $
             vcat [ text "relevant_con:" <+> ppr relevant_con
@@ -1530,7 +1553,6 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
                  , text "ds_res_ty:" <+> ppr ds_res_ty
                  , text "ds_expr:" <+> ppr ds_expr
                  ]
-
         ; return (ds_expr, ds_res_ty, RecordUpdCtxt relevant_cons upd_fld_names ex_tvs) }
 
 

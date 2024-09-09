@@ -501,7 +501,7 @@ rnExpr (ExplicitList _ exps)
        ; let rn_list  = ExplicitList noExtField exps'
              lit_n    = mkIntegralLit (length exps)
              hs_lit   = genHsIntegralLit lit_n
-             exp_list = genHsApps' (L (noAnnSrcSpan loc) from_list_n_name) [hs_lit, wrapGenSpan rn_list]
+             exp_list = genHsApps' (wrapGenSpan' loc from_list_n_name) [hs_lit, wrapGenSpan rn_list]
        ; return ( mkExpandedExpr rn_list exp_list
                 , fvs `plusFV` fvs') } }
 
@@ -2243,7 +2243,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
              -- Need 'pureAName' and not 'returnMName' here, so that it requires
              -- 'Applicative' and not 'Monad' whenever possible (until #20540 is fixed).
              (pure_name, _) <- lookupQualifiedDoName (HsDoStmt ctxt) pureAName
-             let expr = HsApp noExtField (noLocA (genHsVar pure_name)) tup
+             let expr = (genHsApps pure_name [tup])
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
               { xarg_app_arg_many = noExtField

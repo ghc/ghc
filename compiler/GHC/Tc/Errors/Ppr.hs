@@ -5735,12 +5735,10 @@ pprArising :: CtLoc -> SDoc
 -- Used for the main, top-level error message
 -- We've done special processing for TypeEq, KindEq, givens
 pprArising ct_loc
-  | in_generated_code = empty  -- See Note ["Arising from" messages in generated code]
   | suppress_origin   = empty
   | otherwise         = pprCtOrigin orig
   where
     orig = ctLocOrigin ct_loc
-    in_generated_code = ctLocEnvInGeneratedCode (ctLocEnv ct_loc)
     suppress_origin
       | isGivenOrigin orig = True
       | otherwise          = case orig of
@@ -7677,8 +7675,8 @@ pprTyConInstFlavour
 
 pprErrCtxtMsg :: ErrCtxtMsg -> SDoc
 pprErrCtxtMsg = \case
-  ExprCtxt expr ->
-    hang (text "In the expression:")
+  ExprCtxt expr
+    -> hang (text "In the expression:")
        2 (ppr (stripParensHsExpr expr))
   ThetaCtxt ctxt theta ->
     vcat [ text "In the context:" <+> pprTheta theta
@@ -7882,11 +7880,6 @@ pprErrCtxtMsg = \case
     | otherwise
     -> hang (text "In a stmt of" <+> pprAStmtContext ctxt <> colon)
        2 (ppr_stmt stmt)
-    where
-      -- For Group and Transform Stmts, don't print the nested stmts!
-      ppr_stmt (TransStmt { trS_by = by, trS_using = using
-                          , trS_form = form }) = pprTransStmt by using form
-      ppr_stmt stmt = pprStmt stmt
 
   DerivInstCtxt pred ->
     text "When deriving the instance for" <+> parens (ppr pred)
@@ -7963,6 +7956,13 @@ pprErrCtxtMsg = \case
       text "While checking that" <+> quotes (ppr impl_mod) <+>
       text "implements signature" <+> quotes (ppr req_mod_name) <+>
       text "in" <+> quotes (ppr req_uid) <> dot
+
+
+  where
+    -- For Group and Transform Stmts, don't print the nested stmts!
+    ppr_stmt (TransStmt { trS_by = by, trS_using = using
+                        , trS_form = form }) = pprTransStmt by using form
+    ppr_stmt stmt = pprStmt stmt
 
 --------------------------------------------------------------------------------
 
