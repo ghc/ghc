@@ -10,7 +10,7 @@ T24064.hs:42:3: error: [GHC-25897]
         the type signature for:
           test :: forall (m :: * -> *). (C2 m, F2 m ~ Y) => m ()
         at T24064.hs:40:1-32
-    • In a stmt of a 'do' block: fun1
+    • In the expression: fun1
       In the expression:
         do fun1
            fun2
