@@ -23,6 +23,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc( ctLocEnv, ctLocOrigin, setCtLocOrigin )
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..), reportRedundantConstraints )
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc( mkGivenLoc )
 import GHC.Tc.Solver.InertSet

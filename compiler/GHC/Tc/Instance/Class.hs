@@ -22,7 +22,6 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, isHasFieldOrigin )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcLookupDataFamInst, FamInstEnvs )
-
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
 import GHC.Builtin.Types
@@ -61,9 +60,8 @@ import GHC.Data.FastString
 
 import GHC.Unit.Module.Warnings
 
-import GHC.Hs.Extension
+import GHC.Hs
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Tc.Errors.Types
 
 import Data.Maybe

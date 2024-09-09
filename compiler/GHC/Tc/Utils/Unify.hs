@@ -60,8 +60,8 @@ module GHC.Tc.Utils.Unify (
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Tc.Errors.Types ( ErrCtxtMsg(..) )
-import GHC.Tc.Errors.Ppr   ( pprErrCtxtMsg )
+import GHC.Tc.Errors.Types ( HsCtxt(..) )
+import GHC.Tc.Errors.Ppr   ( pprHsCtxt )
 import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -76,6 +76,8 @@ import GHC.Tc.Types.CtLoc
   , tyConAppRoleExplanation, appTyRoleExplanation
   )
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..), ReportRedundantConstraints(..)
+                           , pprUserTypeCtxt  )
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Utils.TcMType qualified as TcM
 
@@ -97,12 +99,13 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Builtin.Types
 import GHC.Types.Name
-import GHC.Types.Id( idType )
+import GHC.Types.Id( idType, isDataConId )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
+import GHC.Types.SrcLoc (unLoc)
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -136,7 +139,7 @@ import Data.Traversable (for)
 --
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchActualFunTy
-  :: ExpectedFunTyOrigin
+  :: ExpectedFunTyCtxt
       -- ^ See Note [Herald for matchExpectedFunTys]
   -> Maybe TypedThing
       -- ^ The thing with type TcSigmaType
@@ -204,7 +207,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go ty = addErrCtxtM (mk_ctxt ty) (defer ty)
+    go ty = addErrCtxt (mk_ctxt ty) (defer ty)
 
     ------------
     defer fun_ty
@@ -215,7 +218,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
            ; return (co, arg_ty, res_ty) }
 
     ------------
-    mk_ctxt :: TcType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+    mk_ctxt :: TcType -> HsCtxt
     mk_ctxt _res_ty = mkFunTysMsg herald err_info
 
 {- Note [matchActualFunTy error handling]
@@ -246,7 +249,7 @@ Ugh!
 -- INVARIANT: the returned argument types all have a syntactically fixed RuntimeRep
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
-matchActualFunTys :: ExpectedFunTyOrigin -- ^ See Note [Herald for matchExpectedFunTys]
+matchActualFunTys :: ExpectedFunTyCtxt -- ^ See Note [Herald for matchExpectedFunTys]
                   -> CtOrigin
                   -> Arity
                   -> TcSigmaType
@@ -790,7 +793,7 @@ Example:
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchExpectedFunTys :: forall a.
-                       ExpectedFunTyOrigin  -- See Note [Herald for matchExpectedFunTys]
+                       ExpectedFunTyCtxt  -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
                     -> VisArity
                     -> ExpSigmaType
@@ -930,7 +933,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
     check n_req rev_pat_tys res_ty
-      = addErrCtxtM (mkFunTysMsg herald (arity, top_ty))  $
+      = addErrCtxt (mkFunTysMsg herald (arity, top_ty))  $
         defer n_req rev_pat_tys res_ty
 
     ------------
@@ -944,29 +947,27 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
            ; co <- unifyType Nothing (mkScaledFunTys more_arg_tys res_ty) fun_ty
            ; return (mkWpCastN co, result) }
 
-new_infer_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled ExpRhoTypeFRR)
+new_infer_arg_ty :: ExpectedFunTyCtxt -> Int -> TcM (Scaled ExpRhoTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
   = do { mult     <- newFlexiTyVarTy multiplicityTy
        ; inf_hole <- newInferExpTypeFRR IIF_DeepRho (FRRExpectedFunTy herald arg_pos)
        ; return (mkScaled mult inf_hole) }
 
-new_check_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled TcType)
+new_check_arg_ty :: ExpectedFunTyCtxt -> Int -> TcM (Scaled TcType)
 new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first arg
   = do { mult   <- newFlexiTyVarTy multiplicityTy
        ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy herald arg_pos)
        ; return (mkScaled mult arg_ty) }
 
-mkFunTysMsg :: ExpectedFunTyOrigin
+mkFunTysMsg :: ExpectedFunTyCtxt
             -> (VisArity, TcType)
-            -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+            -> HsCtxt
 -- See Note [Reporting application arity errors]
-mkFunTysMsg herald (n_vis_args_in_call, fun_ty) env
-  = do { (env', fun_ty) <- zonkTidyTcType env fun_ty
-
-       ; let (pi_ty_bndrs, _) = splitPiTys fun_ty
+mkFunTysMsg herald (n_vis_args_in_call, fun_ty)
+  = do { let (pi_ty_bndrs, _) = splitPiTys fun_ty
              n_fun_args = count isVisiblePiTyBinder pi_ty_bndrs
 
-       ; return (env', FunTysCtxt herald fun_ty n_vis_args_in_call n_fun_args) }
+       ; FunTysCtxt herald fun_ty n_vis_args_in_call n_fun_args }
 
 
 {- Note [Reporting application arity errors]
@@ -1523,15 +1524,9 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
  , isRhoExpTy ty_expected   -- TypeEqOrigin stuff (added by the _NC functions)
  = thing_inside             -- gives enough context by itself
  | otherwise
- = addErrCtxtM mk_msg thing_inside
-  where
-    mk_msg tidy_env
-      = do { (tidy_env, ty_actual)   <- zonkTidyTcType tidy_env ty_actual
-           ; ty_expected             <- readExpType ty_expected
-                   -- A worry: might not be filled if we're debugging. Ugh.
-           ; (tidy_env, ty_expected) <- zonkTidyTcType tidy_env ty_expected
-           ; return (tidy_env, SubTypeCtxt ty_expected ty_actual) }
-
+ = do ty_expected  <- readExpType ty_expected
+      addErrCtxt (SubTypeCtxt ty_expected ty_actual) $
+        thing_inside
 
 ---------------
 tc_sub_type :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
@@ -2075,14 +2070,36 @@ getDeepSubsumptionFlag =
 getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
 getDeepSubsumptionFlag_DataConHead app_head =
   do { user_ds <- xoptM LangExt.DeepSubsumption
+     ; traceTc "getDeepSubsumptionFlag_DataConHead" (ppr app_head)
      ; return $
          if | user_ds
             -> Deep DeepSub
-            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-            -> Deep TopSub
             | otherwise
-            -> Shallow
-    }
+            -> go app_head
+     }
+  where
+    go :: HsExpr GhcTc -> DeepSubsumptionFlag
+    go app_head
+     | XExpr (ConLikeTc (RealDataCon {})) <- app_head
+     = Deep TopSub
+     | XExpr (ExpandedThingTc _ f) <- app_head
+     = go f
+     | XExpr (WrapExpr _ f) <- app_head
+     = go f
+     | HsVar _ f <- app_head
+     , isDataConId (unLoc f)
+     = Deep TopSub
+     | HsApp _ f _ <- app_head
+     = go (unLoc f)
+     | HsAppType _ f _ <- app_head
+     = go (unLoc f)
+     | OpApp _ _ f _ <- app_head
+     = go (unLoc f)
+     | HsPar _ f <- app_head
+     = go (unLoc f)
+     | otherwise
+     = Shallow
+
 
 -- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
 --
@@ -2524,7 +2541,7 @@ unifyTypeAndEmit t_or_k orig ty1 ty2
                       , u_given_eq_lvl = cur_lvl
                       , u_rewriters = emptyCoHoleSet  -- ToDo: check this
                       , u_defer = ref, u_what = WU_None }
-
+       ; traceTc "unifyTypeAndEmit" (ppr t_or_k)
        -- The hard work happens here
        ; co <- uType env ty1 ty2
 
@@ -2727,7 +2744,7 @@ uType_defer (UE { u_loc = loc, u_defer = ref
                 vcat ( ppr role
                      : debugPprType ty1
                      : debugPprType ty2
-                     : map pprErrCtxtMsg err_ctxt )
+                     : map pprHsCtxt err_ctxt )
             ; traceTc "utype_defer2" (ppr co) }
 
        ; return co }

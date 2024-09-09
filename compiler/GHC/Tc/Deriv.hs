@@ -21,6 +21,7 @@ import GHC.Driver.Session
 import GHC.Tc.Errors.Types
 import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..) )
 import GHC.Tc.Deriv.Infer
 import GHC.Tc.Deriv.Utils
 import GHC.Tc.Deriv.Generate
@@ -179,7 +180,7 @@ data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- See @Note [Scoped tyvars in a TcTyCon]@ in
                              -- "GHC.Core.TyCon".
                            , di_clauses :: [LHsDerivingClause GhcRn]
-                           , di_ctxt    :: ErrCtxtMsg -- ^ error context
+                           , di_ctxt    :: HsCtxt -- ^ error context
                            }
 
 {-
@@ -522,7 +523,7 @@ deriveClause :: TyCon
              -> Maybe (LDerivStrategy GhcRn)
              -> LocatedC [LHsSigType GhcRn]
                 -- ^ The location refers to the @(Show, Eq)@ part of @deriving (Show, Eq)@.
-             -> ErrCtxtMsg
+             -> HsCtxt
              -> TcM [EarlyDerivSpec]
 deriveClause rep_tc scoped_tvs mb_lderiv_strat (L loc deriv_preds) err_ctxt
   = setSrcSpanA loc $
@@ -695,7 +696,7 @@ deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mo
   = setSrcSpanA loc                       $
     addErrCtxt (StandaloneDerivCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; let ctxt = GHC.Tc.Types.Origin.InstDeclCtxt True
+       ; let ctxt = GHC.Tc.Types.ErrCtxt.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
        ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
@@ -2360,4 +2361,3 @@ derivingThingErrMechanism mechanism why
     newtype_deriving
       = if isDerivSpecNewtype mechanism then YesGeneralizedNewtypeDeriving
                                         else NoGeneralizedNewtypeDeriving
-

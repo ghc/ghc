@@ -170,6 +170,7 @@ findName infos span0 mi string =
       Just name ->
         case getSrcSpan name of
           UnhelpfulSpan {} -> tryExternalModuleResolution
+          GeneratedSrcSpan {} -> tryExternalModuleResolution
           RealSrcSpan   {} -> return (getName name)
   where
     rdrs = modInfo_rdrs mi

@@ -9,7 +9,7 @@
 module GHC.Tc.Errors.Ppr
   ( pprTypeDoesNotHaveFixedRuntimeRep
   , pprScopeError
-  , pprErrCtxtMsg
+  , pprHsCtxt
   --
   , tidySkolemInfo
   , tidySkolemInfoAnon
@@ -188,12 +188,12 @@ instance Diagnostic TcRnMessage where
     TcRnTypeDoesNotHaveFixedRuntimeRep ty prov err_ctxt
       -> mkDecorated $
           (pprTypeDoesNotHaveFixedRuntimeRep ty prov)
-          : map pprErrCtxtMsg err_ctxt
+          : map pprHsCtxt err_ctxt
     TcRnImplicitLift id_or_name err_ctxt
       -> mkDecorated $
            ( text "The variable" <+> quotes (ppr id_or_name) <+>
              text "is implicitly lifted in the TH quotation"
-           ) : map pprErrCtxtMsg err_ctxt
+           ) : map pprHsCtxt err_ctxt
     TcRnUnusedPatternBinds bind
       -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
     TcRnDodgyImports (DodgyImportsEmptyParent ie ns_spec gre)
@@ -3657,7 +3657,7 @@ messageWithInfoDiagnosticMessage :: UnitState
                                  -> DecoratedSDoc
 messageWithInfoDiagnosticMessage unit_state (ErrInfo {..}) show_ctxt important =
   let ctxt = pprWithUnitState unit_state
-           $ vcat $ map pprErrCtxtMsg  [ ctx | ctx <- errInfoContext, show_ctxt ]
+           $ vcat $ map pprHsCtxt  [ ctx | ctx <- errInfoContext, show_ctxt ]
 
       supp = case errInfoSupplementary of
         Nothing -> empty
@@ -5722,12 +5722,10 @@ pprArising :: CtLoc -> SDoc
 -- Used for the main, top-level error message
 -- We've done special processing for TypeEq, KindEq, givens
 pprArising ct_loc
-  | in_generated_code = empty  -- See Note ["Arising from" messages in generated code]
   | suppress_origin   = empty
   | otherwise         = pprCtOrigin orig
   where
     orig = ctLocOrigin ct_loc
-    in_generated_code = ctLocEnvInGeneratedCode (ctLocEnv ct_loc)
     suppress_origin
       | isGivenOrigin orig = True
       | otherwise          = case orig of
@@ -7663,10 +7661,10 @@ pprTyConInstFlavour
       }
   ) = (if is_dflt then text "default" else empty) <+> ppr flav <+> text "instance"
 
-pprErrCtxtMsg :: ErrCtxtMsg -> SDoc
-pprErrCtxtMsg = \case
-  ExprCtxt expr ->
-    hang (text "In the expression:")
+pprHsCtxt :: HsCtxt -> SDoc
+pprHsCtxt = \case
+  ExprCtxt expr
+    -> hang (text "In the expression:")
        2 (ppr (stripParensHsExpr expr))
   ThetaCtxt ctxt theta ->
     vcat [ text "In the context:" <+> pprTheta theta
@@ -7708,11 +7706,17 @@ pprErrCtxtMsg = \case
      make_lines_msg [last]  = ppr last <> dot
      make_lines_msg [l1,l2] = l1 $$ text "and" <+> l2 <> dot
      make_lines_msg (l:ls)  = l <> comma $$ make_lines_msg ls
+
   PatSigErrCtxt sig_ty res_ty ->
     vcat [ hang (text "When checking that the pattern signature:")
               4 (ppr sig_ty)
-         , nest 2 (hang (text "fits the type of its context:")
-                      2 (ppr res_ty)) ]
+         , nest 2 (hang (text "fits the type of its context:") 2 pp_res_ty) ]
+    where
+      -- Zonking will have turned Infer into Check
+      pp_res_ty = case res_ty of
+                    Check ty -> ppr ty
+                    Infer ir -> text "OOPS" <+> ppr ir
+
   PatCtxt pat ->
     hang (text "In the pattern:") 2 (ppr pat)
   PatSynDeclCtxt name ->
@@ -7795,6 +7799,7 @@ pprErrCtxtMsg = \case
 
     | otherwise
     -> empty
+      -- text "Debug" <+> vcat [ppr fun, ppr n_val_args, ppr res_fun, ppr res_env, ppr n_fun, ppr n_env]
     where
       not_fun ty   -- ty is definitely not an arrow type,
                    -- and cannot conceivably become one
@@ -7864,17 +7869,14 @@ pprErrCtxtMsg = \case
 
   StmtErrCtxt ctxt stmt
     -- For [ e | .. ], do not mutter about "stmts"
-    | LastStmt _ e _ _ <- stmt
+    | (L _ (LastStmt _ e _ _)) <- stmt
     , isComprehensionContext ctxt
     -> hang (text "In the expression:") 2 (ppr e)
     | otherwise
     -> hang (text "In a stmt of" <+> pprAStmtContext ctxt <> colon)
-       2 (ppr_stmt stmt)
-    where
-      -- For Group and Transform Stmts, don't print the nested stmts!
-      ppr_stmt (TransStmt { trS_by = by, trS_using = using
-                          , trS_form = form }) = pprTransStmt by using form
-      ppr_stmt stmt = pprStmt stmt
+       2 (ppr_stmt (unLoc stmt))
+
+  StmtErrCtxtPat{} -> empty
 
   DerivInstCtxt pred ->
     text "When deriving the instance for" <+> parens (ppr pred)
@@ -7951,6 +7953,13 @@ pprErrCtxtMsg = \case
       text "While checking that" <+> quotes (ppr impl_mod) <+>
       text "implements signature" <+> quotes (ppr req_mod_name) <+>
       text "in" <+> quotes (ppr req_uid) <> dot
+
+
+  where
+    -- For Group and Transform Stmts, don't print the nested stmts!
+    ppr_stmt (TransStmt { trS_by = by, trS_using = using
+                        , trS_form = form }) = pprTransStmt by using form
+    ppr_stmt stmt = pprStmt stmt
 
 --------------------------------------------------------------------------------
 

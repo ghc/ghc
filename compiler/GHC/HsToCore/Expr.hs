@@ -41,6 +41,7 @@ import GHC.Hs
 --     needs to see source types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Instance.Class (lookupHasFieldLabel)
 
@@ -308,9 +309,10 @@ dsExpr e@(XExpr ext_expr_tc)
       ConLikeTc {}  -> dsApp e
 
       ExpandedThingTc o e
-        | OrigStmt (L loc _) <- o
+        | StmtErrCtxt _ (L loc _) <- o -- c.f. T14546d. We have lost the location of the first statement in the GhcRn -> GhcTc
         -> putSrcSpanDsA loc $ dsExpr e
         | otherwise -> dsExpr e
+
       -- Hpc Support
       HsTick tickish e -> do
         e' <- dsLExpr e
@@ -1277,8 +1279,8 @@ Other places that requires from the same treatment:
 
 -- Warn about certain types of values discarded in monadic bindings (#3263)
 warnDiscardedDoBindings :: LHsExpr GhcTc -> Type -> Type -> DsM ()
-warnDiscardedDoBindings rhs m_ty elt_ty
-  = do { warn_unused <- woptM Opt_WarnUnusedDoBind
+warnDiscardedDoBindings rhs@(L rhs_loc _) m_ty elt_ty
+  = putSrcSpanDsA rhs_loc $ do { warn_unused <- woptM Opt_WarnUnusedDoBind
        ; warn_wrong <- woptM Opt_WarnWrongDoBind
        ; when (warn_unused || warn_wrong) $
     do { fam_inst_envs <- dsGetFamInstEnvs

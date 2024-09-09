@@ -1,4 +1,3 @@
-
 T7851.hs:5:10: error: [GHC-83865]
     • Couldn't match expected type: IO a0
                   with actual type: a1 -> IO ()
@@ -11,3 +10,4 @@ T7851.hs:5:10: error: [GHC-83865]
           bar
             = do print
                  print "Hello"
+

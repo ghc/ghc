@@ -32,6 +32,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..) )
 import GHC.Tc.TyCl.Build
 
 import GHC.Core.Multiplicity

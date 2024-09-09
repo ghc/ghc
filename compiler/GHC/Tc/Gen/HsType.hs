@@ -353,7 +353,7 @@ funsSigCtxt :: [LocatedN Name] -> UserTypeCtxt
 funsSigCtxt (L _ name1 : _) = FunSigCtxt name1 NoRRC
 funsSigCtxt []              = panic "funSigCtxt"
 
-addSigCtxt :: UserTypeCtxt -> UserSigType GhcRn -> TcM a -> TcM a
+addSigCtxt :: UserTypeCtxt -> UserSigType -> TcM a -> TcM a
 addSigCtxt ctxt hs_ty thing_inside
   = setSrcSpan l $
     addErrCtxt (UserSigCtxt ctxt hs_ty) $

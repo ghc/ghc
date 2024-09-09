@@ -50,7 +50,7 @@ import GHC.HsToCore.Pmc.Desugar
 import GHC.HsToCore.Pmc.Check
 import GHC.HsToCore.Pmc.Solver
 import GHC.HsToCore.Types
-import GHC.Types.Basic (Origin(..), isDoExpansionGenerated)
+import GHC.Types.Basic (Origin(..))
 import GHC.Core
 import GHC.Driver.DynFlags
 import GHC.Hs
@@ -68,7 +68,7 @@ import GHC.Data.Bag
 import GHC.Data.OrdList
 import GHC.Generics (Generic, Generically(..))
 
-import Control.Monad (when, unless, forM_)
+import Control.Monad (when, forM_)
 import qualified Data.Semigroup as Semi
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
@@ -178,17 +178,17 @@ pmcMatches
   -> [Id]                            -- ^ Match variables, i.e. x and y above
   -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
   -> DsM [(LdiNablas, NonEmpty LdiNablas)] -- ^ One covered 'Nablas' per Match and
-                                           --   GRHS, for long distance info.
+                                     --   GRHS, for long distance info.
 pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-}
   whenDoingPmc (initNablasMatches NoPmc matches) $ \ !missing -> do
-      -- We have to force @missing@ before printing out the trace message,
-      -- otherwise we get interleaved output from the solver. This function
-      -- should be strict in @missing@ anyway!
-    tracePm "pmcMatches {" $
-            hang (vcat [ppr origin, ppr ctxt, ppr vars, text "Matches:"])
-                 2
-                 ((ppr matches) $$ (text "missing:" <+> ppr missing))
-    case NE.nonEmpty matches of
+  -- We have to force @missing@ before printing out the trace message,
+  -- otherwise we get interleaved output from the solver. This function
+  -- should be strict in @missing@ anyway!
+  tracePm "pmcMatches {" $
+          hang (vcat [ppr origin, ppr ctxt, ppr vars, text "Matches:"])
+               2
+               ((ppr matches) $$ (text "missing:" <+> ppr missing))
+  case NE.nonEmpty matches of
       Nothing -> do
         -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
         let var = only vars
@@ -204,8 +204,7 @@ pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-}
         result  <- {-# SCC "checkMatchGroup" #-}
                    unCA (checkMatchGroup matches) missing
         tracePm "}: " (ppr (cr_uncov result))
-        unless (isDoExpansionGenerated origin) -- Do expansion generated code shouldn't emit overlapping warnings
-          ({-# SCC "formatReportWarnings" #-}
+        ({-# SCC "formatReportWarnings" #-}
           formatReportWarnings ReportMatchGroup ctxt vars result)
         return (NE.toList (ldiMatchGroup (cr_ret result)))
 
@@ -601,18 +600,18 @@ reportWarnings dflags report_mode (DsMatchContext kind loc) vars
           approx   = precision == Approximate
 
       when (approx && (exists_u || exists_i)) $
-        putSrcSpanDs loc (diagnosticDs (DsMaxPmCheckModelsReached (maxPmCheckModels dflags)))
+        maybePutSrcSpanDs loc (diagnosticDs (DsMaxPmCheckModelsReached (maxPmCheckModels dflags)))
 
       when exists_b $ forM_ redundant_bangs $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (diagnosticDs (DsRedundantBangPatterns kind q))
+        maybePutSrcSpanDs l (diagnosticDs (DsRedundantBangPatterns kind q))
 
       when exists_r $ forM_ redundant_rhss $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (diagnosticDs (DsOverlappingPatterns kind q))
+        maybePutSrcSpanDs l (diagnosticDs (DsOverlappingPatterns kind q))
       when exists_i $ forM_ inaccessible_rhss $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (diagnosticDs (DsInaccessibleRhs kind q))
+        maybePutSrcSpanDs l (diagnosticDs (DsInaccessibleRhs kind q))
 
       when exists_u $
-        putSrcSpanDs loc (diagnosticDs (DsNonExhaustivePatterns kind check_type maxPatterns vars unc_examples))
+        maybePutSrcSpanDs loc (diagnosticDs (DsNonExhaustivePatterns kind check_type maxPatterns vars unc_examples))
   where
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
@@ -623,6 +622,15 @@ reportWarnings dflags report_mode (DsMatchContext kind loc) vars
       _               -> MinimalCover
 
     maxPatterns = maxUncoveredPatterns dflags
+
+    -- we only want to report warnings for source constructs and not compiler generated constructors
+    -- c.f. Typeable1
+    maybePutSrcSpanDs :: SrcSpan -> DsM () -> DsM ()
+    maybePutSrcSpanDs l thing_inside =
+      if isGeneratedSrcSpan l
+      then return ()
+      else putSrcSpanDs l thing_inside
+
 
 getNFirstUncovered :: GenerateInhabitingPatternsMode -> [Id] -> Int -> Nablas -> DsM [Nabla]
 getNFirstUncovered mode vars n (MkNablas nablas) = go n (bagToList nablas)
