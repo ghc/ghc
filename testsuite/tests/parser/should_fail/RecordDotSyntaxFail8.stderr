@@ -27,7 +27,7 @@ RecordDotSyntaxFail8.hs:50:17: error: [GHC-39999]
            ...
 
 RecordDotSyntaxFail8.hs:53:17: error: [GHC-39999]
-    • No instance for ‘HasField "quux3" Quux r0’
+    • No instance for ‘HasField "quux3" Quux a0’
         arising from selecting the field ‘quux3’
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
     • In the second argument of ‘($)’, namely ‘....baz.quux3.wob’

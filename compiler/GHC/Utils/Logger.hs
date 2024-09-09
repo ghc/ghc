@@ -398,7 +398,7 @@ jsonLogActionWithHandle out logflags msg_class srcSpan msg
                                                 , ("endCol", json $ srcSpanEndCol rss)
                                                 ]
                    where file = unpackFS $ srcSpanFile rss
-                 UnhelpfulSpan _ -> JSNull
+                 _ -> JSNull
 
 -- | The default 'LogAction' prints to 'stdout' and 'stderr'.
 --
@@ -707,4 +707,3 @@ class HasLogger m where
 
 class ContainsLogger t where
     extractLogger :: t -> Logger
-

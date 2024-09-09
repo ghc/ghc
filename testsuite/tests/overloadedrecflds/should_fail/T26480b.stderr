@@ -50,6 +50,7 @@ T26480b.hs:47:10: error: [GHC-39999]
 
 T26480b.hs:50:10: error: [GHC-39999]
     • No instance for ‘HasField "xyzzywyzzydyzze" G H’
+        arising from the record selector ‘field1.xyzzywyzzydyzze’
       NB: ‘G’ does not have a record field named ‘xyzzywyzzydyzze’.
     • In the expression: (.field1.xyzzywyzzydyzze)
       In an equation for ‘test3b’: test3b = (.field1.xyzzywyzzydyzze)
@@ -66,6 +67,7 @@ T26480b.hs:54:12: error: [GHC-39999]
 
 T26480b.hs:57:12: error: [GHC-39999]
     • No instance for ‘HasField "xyzzywyzzydyzzg" G H’
+        arising from a record update
       NB: ‘G’ does not have a record field named ‘xyzzywyzzydyzzg’.
     • In the expression: d {field1.xyzzywyzzydyzzg = MkH 3}
       In an equation for ‘test4b’:

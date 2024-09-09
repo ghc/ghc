@@ -487,10 +487,10 @@ getSrcSpanDs = do { env <- getLclEnv
                   ; return (RealSrcSpan (dsl_loc env) Strict.Nothing) }
 
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
-putSrcSpanDs (UnhelpfulSpan {}) thing_inside
-  = thing_inside
 putSrcSpanDs (RealSrcSpan real_span _) thing_inside
   = updLclEnv (\ env -> env {dsl_loc = real_span}) thing_inside
+putSrcSpanDs _ thing_inside
+  = thing_inside
 
 putSrcSpanDsA :: EpAnn ann -> DsM a -> DsM a
 putSrcSpanDsA loc = putSrcSpanDs (locA loc)

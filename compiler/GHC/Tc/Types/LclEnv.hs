@@ -21,10 +21,14 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvTypeEnv
   , modifyLclEnvTcLevel
 
+  , getLclEnvSrcCodeOrigin
+  , setLclEnvSrcCodeOrigin
+  , setLclCtxtSrcCodeOrigin
   , lclEnvInGeneratedCode
 
   , addLclEnvErrCtxt
 
+  , ErrCtxtStack
   , ArrowCtxt(..)
   , ThBindEnv
   , TcTypeEnv
@@ -32,6 +36,7 @@ module GHC.Tc.Types.LclEnv (
 
 import GHC.Prelude
 
+import GHC.Hs ( SrcCodeOrigin (..) )
 import GHC.Tc.Utils.TcType ( TcLevel )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
@@ -86,14 +91,48 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 
+{-
+
+Note [ErrCtxtStack Manipulation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ErrCtxtStack is a list of ErrCtxt
+
+This data structure keeps track of two things:
+1. Are we type checking a compiler generated/non-user written code.
+2. The trail of the error messages that have been added in route to the current expression
+
+* When the `ErrCtxtStack` is a `UserCodeCtxt`,
+  - the current expression being typechecked is user written
+* When the `ErrorCtxtStack` is a `ExpansionCodeCtxt`
+  - the current expression being typechecked is compiler generated/expanded;
+  - the original source code thing is stored in `src_code_origin` field.
+  - the `src_code_origin` is what will be used in the error message displayed to the user
+
+In the current design, if the top of the ErrCtxtStack is an ExpansionCodeCtxt
+i.e. we are currently typechecking a compiler generated expression, and we encounter
+an XExpr, then we _replace_ the top of the stack with the new XExpr. Otherwise, we
+push the new expression error message on top of the stack. cf. `LclEnv.setLclCtxtSrcCodeOrigin`
+
+-}
+
+
+-- See Note [ErrCtxtStack Manipulation]
+type ErrCtxtStack = [ErrCtxt]
+
+-- | Get the original source code
+get_src_code_origin :: ErrCtxtStack -> Maybe SrcCodeOrigin
+get_src_code_origin (MkErrCtxt (ExpansionCodeCtxt origSrcCode) _ : _) = Just origSrcCode
+                   -- we are in generated code, due to the expansion of the original syntax origSrcCode
+get_src_code_origin _ = Nothing
+                   -- we are in user code, so blame the expression in hand
+
 data TcLclCtxt
   = TcLclCtxt {
-        tcl_loc        :: RealSrcSpan,     -- Source span
-        tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and XXExprGhcRn]
-        tcl_tclvl      :: TcLevel,
-        tcl_bndrs      :: TcBinderStack,   -- Used for reporting relevant bindings,
-                                           -- and for tidying type
+        tcl_loc         :: RealSrcSpan,     -- Source span
+        tcl_err_ctxt    :: ErrCtxtStack,    -- See Note [ErrCtxtStack Manipulation]
+        tcl_tclvl       :: TcLevel,
+        tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
+                                            -- and for tidying type
 
         tcl_rdr :: LocalRdrEnv,         -- Local name envt
                 -- Maintained during renaming, of course, but also during
@@ -155,16 +194,42 @@ getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 getLclEnvLoc = tcl_loc . tcl_lcl_ctxt
 
 getLclEnvErrCtxt :: TcLclEnv -> [ErrCtxt]
-getLclEnvErrCtxt = tcl_ctxt . tcl_lcl_ctxt
+getLclEnvErrCtxt = tcl_err_ctxt . tcl_lcl_ctxt
 
-setLclEnvErrCtxt :: [ErrCtxt] -> TcLclEnv -> TcLclEnv
-setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt })
+setLclEnvErrCtxt :: ErrCtxtStack -> TcLclEnv -> TcLclEnv
+setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 
+-- See Note [ErrCtxtStack Manipulation]
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
-addLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt : (tcl_ctxt env) })
+addLclEnvErrCtxt ec = setLclEnvSrcCodeOrigin ec
+
+getLclEnvSrcCodeOrigin :: TcLclEnv -> Maybe SrcCodeOrigin
+getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt
+
+setLclEnvSrcCodeOrigin :: ErrCtxt -> TcLclEnv -> TcLclEnv
+setLclEnvSrcCodeOrigin ec = modifyLclCtxt (setLclCtxtSrcCodeOrigin ec)
+
+-- See Note [ErrCtxtStack Manipulation]
+setLclCtxtSrcCodeOrigin :: ErrCtxt -> TcLclCtxt -> TcLclCtxt
+setLclCtxtSrcCodeOrigin ec lclCtxt
+  | ecs@(MkErrCtxt (ExpansionCodeCtxt{}) _ : _) <- tcl_err_ctxt lclCtxt
+  , MkErrCtxt (ExpansionCodeCtxt OrigExpr{}) _ <- ec
+  = lclCtxt { tcl_err_ctxt =  ec : ecs }
+  | MkErrCtxt (ExpansionCodeCtxt{}) _ : ecs <- tcl_err_ctxt lclCtxt
+  , MkErrCtxt (ExpansionCodeCtxt{}) _ <- ec
+  = lclCtxt { tcl_err_ctxt =  ec : ecs }
+  | otherwise
+  = lclCtxt { tcl_err_ctxt = ec : tcl_err_ctxt lclCtxt }
+
+lclCtxtInGeneratedCode :: TcLclCtxt -> Bool
+lclCtxtInGeneratedCode lclCtxt
+  | (MkErrCtxt (ExpansionCodeCtxt _) _ : _) <- tcl_err_ctxt lclCtxt
+  = True
+  | otherwise
+  = False
 
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
-lclEnvInGeneratedCode = tcl_in_gen_code . tcl_lcl_ctxt
+lclEnvInGeneratedCode =  lclCtxtInGeneratedCode . tcl_lcl_ctxt
 
 getLclEnvBinderStack :: TcLclEnv -> TcBinderStack
 getLclEnvBinderStack = tcl_bndrs . tcl_lcl_ctxt

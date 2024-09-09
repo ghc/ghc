@@ -787,7 +787,6 @@ getSeverityColour severity = case severity of
   SevIgnore -> const mempty
 
 getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
-getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
 getCaretDiagnostic msg_class (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
@@ -861,7 +860,7 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
         caretEllipsis | multiline = "..."
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
-
+getCaretDiagnostic _ _ = pure empty
 --
 -- Queries
 --

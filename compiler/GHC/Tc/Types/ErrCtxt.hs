@@ -1,7 +1,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Tc.Types.ErrCtxt
-  ( ErrCtxt, ErrCtxtMsg(..)
+  ( ErrCtxt (..), ErrCtxtMsg(..), ErrCtxtMsgM,  CodeSrcFlag (..), srcCodeOriginErrCtxMsg
   , UserSigType(..), FunAppCtxtFunArg(..)
   , TyConInstFlavour(..)
   )
@@ -14,13 +14,13 @@ import GHC.Hs.Extension
 import GHC.Parser.Annotation ( LocatedN, SrcSpanAnnA )
 
 import GHC.Tc.Errors.Types.PromotionErr ( TermLevelUseCtxt )
-import GHC.Tc.Types.Origin   ( CtOrigin, UserTypeCtxt, ExpectedFunTyOrigin )
+import GHC.Tc.Types.Origin   ( CtOrigin, UserTypeCtxt )
 import GHC.Tc.Utils.TcType   ( TcType, TcTyCon )
 import GHC.Tc.Zonk.Monad     ( ZonkM )
 
 import GHC.Types.Basic       ( TyConFlavour )
 import GHC.Types.Name        ( Name )
-import GHC.Types.SrcLoc      ( SrcSpan )
+import GHC.Types.SrcLoc      ( SrcSpan, unLoc )
 import GHC.Types.Var         ( Id, TyCoVar )
 import GHC.Types.Var.Env     ( TidyEnv )
 
@@ -45,15 +45,25 @@ import qualified Data.List.NonEmpty as NE
 
 --------------------------------------------------------------------------------
 
+type ErrCtxtMsgM = TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+
 -- | Additional context to include in an error message, e.g.
 -- "In the type signature ...", "In the ambiguity check for ...", etc.
-type ErrCtxt = (Bool, TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg))
-        -- Monadic so that we have a chance
-        -- to deal with bound type variables just before error
-        -- message construction
+data ErrCtxt = MkErrCtxt
 
-        -- Bool:  True <=> this is a landmark context; do not
-        --                 discard it when trimming for display
+                 CodeSrcFlag
+                 -- LandmarkUserSrcCode <=> this is a landmark context; do not
+                 --                         discard it when trimming for display
+
+                 ErrCtxtMsgM
+                 -- Monadic so that we have a chance
+                 -- to deal with bound type variables just before error
+                 -- message construction
+
+
+data CodeSrcFlag = VanillaUserSrcCode
+                 | LandmarkUserSrcCode
+                 | ExpansionCodeCtxt SrcCodeOrigin
 
 --------------------------------------------------------------------------------
 -- Error message contexts
@@ -117,7 +127,7 @@ data ErrCtxtMsg
   -- | In a function application.
   | FunAppCtxt !FunAppCtxtFunArg !Int
   -- | In a function call.
-  | FunTysCtxt !ExpectedFunTyOrigin !Type !Int !Int
+  | FunTysCtxt !CtOrigin !Type !Int !Int
   -- | In the result of a function call.
   | FunResCtxt !(HsExpr GhcTc) !Int !Type !Type !Int !Int
   -- | In the declaration of a type constructor.
@@ -218,3 +228,9 @@ data ErrCtxtMsg
   | MergeSignaturesCtxt !UnitState !ModuleName ![InstantiatedModule]
   -- | While checking that a module implements a Backpack signature.
   | CheckImplementsCtxt !UnitState !Module !InstantiatedModule
+
+
+srcCodeOriginErrCtxMsg :: SrcCodeOrigin -> ErrCtxtMsg
+srcCodeOriginErrCtxMsg (OrigExpr e) = ExprCtxt e
+srcCodeOriginErrCtxMsg (OrigStmt s f) = StmtErrCtxt (HsDoStmt f) (unLoc s)
+srcCodeOriginErrCtxMsg (OrigPat s _) = StmtErrCtxt (HsDoStmt (DoExpr Nothing)) (unLoc s)
