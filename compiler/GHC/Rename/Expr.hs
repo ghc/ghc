@@ -2256,7 +2256,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
              -- Need 'pureAName' and not 'returnMName' here, so that it requires
              -- 'Applicative' and not 'Monad' whenever possible (until #20540 is fixed).
              (pure_name, _) <- lookupQualifiedDoName (HsDoStmt ctxt) pureAName
-             let expr = HsApp noExtField (noLocA (genHsVar pure_name)) tup
+             let expr = (genHsApps pure_name [tup])
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
               { xarg_app_arg_many = noExtField
