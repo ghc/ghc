@@ -658,8 +658,8 @@ def onlyHsParLocs(x):
     """
     ls = x.split("\n")
     filteredLines = (loc.strip() for (loc,hspar) in zip(ls,ls[5:])
-                      if hspar.strip().startswith("(HsPar")
-                        and not "<no location info>" in loc)
+		      if hspar.strip().startswith("(HsPar")
+			and not "<no location info>" in loc)
     return '\n'.join(filteredLines)
 test('T15242', normalise_errmsg_fun(onlyHsParLocs), compile, [''])
 test('T15431', normal, compile, [''])
@@ -961,4 +961,4 @@ test('T26746', normal, compile, [''])
 test('T26737', normal, compile, [''])
 test('T26805a', normal, compile, [''])
 test('T24464', normal, compile, [''])
-
+test('ExpansionQLIm', normal, compile, [''])
