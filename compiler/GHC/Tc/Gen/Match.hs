@@ -599,7 +599,7 @@ tcLcStmt :: TyCon       -- The list type constructor ([])
 
 tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside
   = do { -- see (LCL3) in Note [List comprehension isn't linear]
-         body' <- tcScalingUsage ManyTy $ tcLMonoExprNC body elt_ty
+         body' <- tcScalingUsage ManyTy $ tcMonoLExprNC body elt_ty
        ; thing <- thing_inside (panic "tcLcStmt: thing_inside")
        ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 
