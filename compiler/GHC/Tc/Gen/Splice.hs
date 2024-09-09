@@ -1480,9 +1480,11 @@ instance TH.Quasi TcM where
   qLocation = do { m <- getModule
                  ; l <- getSrcSpanM
                  ; r <- case l of
+                        RealSrcSpan s _ -> return s
+                        GeneratedSrcSpan l -> pprPanic "qLocation: generatedSrcSpan"
+                                                    (pprGeneratedSrcSpanDetails l)
                         UnhelpfulSpan _ -> pprPanic "qLocation: Unhelpful location"
                                                     (ppr l)
-                        RealSrcSpan s _ -> return s
                  ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
                                   , TH.loc_module   = moduleNameString (moduleName m)
                                   , TH.loc_package  = unitString (moduleUnit m)

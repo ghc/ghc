@@ -65,6 +65,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Export
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Instance.Family
 import GHC.Tc.Gen.Annotation

@@ -5,7 +5,8 @@ tcfail128.hs:18:16: error: [GHC-39999]
       Probable fix: use a type annotation to specify what ‘b0’ should be.
       one instance involving out-of-scope types
       (use -fprint-potential-instances to see them all)
-    • In a stmt of a 'do' block: v <- thaw tmp
+    • In the expression: thaw tmp
+      In a stmt of a 'do' block: v <- thaw tmp
       In the expression:
         do let sL = [...]
                dim = length sL
@@ -13,11 +14,4 @@ tcfail128.hs:18:16: error: [GHC-39999]
                ...
            v <- thaw tmp
            return ()
-      In an equation for ‘main’:
-          main
-            = do let sL = ...
-                     dim = length sL
-                     ...
-                 v <- thaw tmp
-                 return ()
 
