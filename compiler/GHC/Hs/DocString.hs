@@ -172,7 +172,7 @@ isEmptyDocString (GeneratedDocString x) = nullHDSC x
 docStringChunks :: HsDocString -> [LHsDocStringChunk]
 docStringChunks (MultiLineDocString _ (x:|xs)) = x:xs
 docStringChunks (NestedDocString _ x) = [x]
-docStringChunks (GeneratedDocString x) = [L (UnhelpfulSpan UnhelpfulGenerated) x]
+docStringChunks (GeneratedDocString x) = [L (GeneratedSrcSpan UnhelpfulGenerated) x]
 
 -- | Pretty print with decorators, exactly as the user wrote it
 pprHsDocString :: HsDocString -> SDoc

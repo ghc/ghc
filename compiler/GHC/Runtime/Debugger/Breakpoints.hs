@@ -1,4 +1,3 @@
-
 -- | GHC API debugger module for finding and setting breakpoints.
 --
 -- This module is user facing and is at least used by `GHCi` and `ghc-debugger`
@@ -86,6 +85,7 @@ leftmostLargestRealSrcSpan = on compare realSrcSpanStart S.<> on (flip compare) 
 -- | Returns the span of the largest tick containing the srcspan given
 enclosingTickSpan :: TickArray -> SrcSpan -> RealSrcSpan
 enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
+enclosingTickSpan _ (GeneratedSrcSpan _) = panic "generatedSrcSpan UnhelpfulSpan"
 enclosingTickSpan ticks (RealSrcSpan src _) =
   assert (inRange (bounds ticks) line) $
     List.minimumBy leftmostLargestRealSrcSpan $ enclosing_spans
@@ -295,4 +295,3 @@ getCurrentBreakModule = do
           return $ Just $ getBreakSourceMod ibi brks
       ix ->
           Just <$> getHistoryModule hug (resumeHistory r !! (ix-1))
-

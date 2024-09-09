@@ -305,8 +305,6 @@ fixModuleHeaderComments (GHC.L l p) = GHC.L l p'
   where
     moveComments :: GHC.EpaLocation -> GHC.LHsDecl GHC.GhcPs -> GHC.EpAnnComments
                  -> (GHC.LHsDecl GHC.GhcPs, GHC.EpAnnComments)
-    moveComments GHC.EpaDelta{} dd cs = (dd,cs)
-    moveComments (GHC.EpaSpan (GHC.UnhelpfulSpan _)) dd cs = (dd,cs)
     moveComments (GHC.EpaSpan (GHC.RealSrcSpan r _)) (GHC.L (GHC.EpAnn anc an csd) a) cs = (dd,css)
       where
         -- Move any comments on the decl that occur prior to the location
@@ -318,11 +316,13 @@ fixModuleHeaderComments (GHC.L l p) = GHC.L l p'
 
         dd = GHC.L (GHC.EpAnn anc an csd') a
         css = cs <> GHC.EpaComments move
+    moveComments _ dd cs = (dd,cs)
 
     (ds',an') = rebalance (GHC.hsmodDecls p, GHC.hsmodAnn $ GHC.hsmodExt p)
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p){ GHC.hsmodAnn = an' },
              GHC.hsmodDecls = ds'
            }
+
 
     rebalance :: ([GHC.LHsDecl GHC.GhcPs], GHC.EpAnn GHC.AnnsModule)
               -> ([GHC.LHsDecl GHC.GhcPs], GHC.EpAnn GHC.AnnsModule)

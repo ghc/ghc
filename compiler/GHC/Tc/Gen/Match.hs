@@ -35,7 +35,7 @@ where
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoFRRNC
-                                       , tcMonoExprNC, tcExpr
+                                       , tcMonoLExprNC, tcMonoLExpr, tcExpr
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr, tcPolyLExpr )
 
@@ -74,7 +74,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Id
 import GHC.Types.SrcLoc
-import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
+import GHC.Types.Basic( VisArity )
 
 import qualified GHC.Data.List.NonEmpty as NE
 
@@ -113,7 +113,7 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
   = assertPpr (funBindPrecondition matches) (pprMatches matches) $
     do  {  -- Check that they all have the same no of arguments
           arity <- checkArgCounts matches
-
+        ; let herald = ExpectedFunTyMatches arity (NameThing fun_name) matches
         ; traceTc "tcFunBindMatches 1" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
 
         ; (wrap_fun, r)
@@ -133,7 +133,7 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
         ; return (wrap_fun, r) }
   where
     mctxt  = mkPrefixFunRhs (noLocA fun_name) noAnn
-    herald = ExpectedFunTyMatches (NameThing fun_name) matches
+
 
 funBindPrecondition :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
 funBindPrecondition (MG { mg_alts = L _ alts })
@@ -153,21 +153,13 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
 
         ; (wrapper, r)
             <- matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
-               tcMatches ctxt tc_body (invis_pat_tys ++ pat_tys) rhs_ty matches
+               tcMatches ctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches
 
         ; return (wrapper, r) }
   where
     ctxt   = LamAlt lam_variant
     herald = ExpectedFunTyLam lam_variant e
              -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
-
-    tc_body | isDoExpansionGenerated (mg_ext matches)
-              -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in
-              -- `GHC.Tc.Gen.Do`. Testcase: Typeable1
-            = tcBodyNC -- NB: Do not add any error contexts
-                       -- It has already been done
-            | otherwise
-            = tcBody
 
 {-
 @tcCaseMatches@ doesn't do the argument-count check because the
@@ -333,6 +325,7 @@ tcMatch tc_body pat_tys rhs_ty match
         add_match_ctxt thing_inside = case ctxt of
             LamAlt LamSingle -> thing_inside
             StmtCtxt (HsDoStmt{}) -> thing_inside -- this is an expanded do stmt
+            RecUpd -> thing_inside -- record update is Expanded out so ignore it
             _          -> addErrCtxt (MatchInCtxt match) thing_inside
 
 -------------
@@ -392,39 +385,42 @@ tcDoStmts ListComp (L l stmts) res_ty
                             (mkCheckExpType elt_ty)
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
+tcDoStmts MonadComp (L l stmts) res_ty
+  = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
+        ; res_ty <- readExpType res_ty
+        ; return (HsDo res_ty MonadComp (L l stmts')) }
+
+tcDoStmts ctxt@GhciStmtCtxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
+
 tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
   = do  { isApplicativeDo <- xoptM LangExt.ApplicativeDo
         ; if isApplicativeDo
           then do { stmts' <- tcStmts (HsDoStmt doExpr) tcDoStmt stmts res_ty
                   ; res_ty <- readExpType res_ty
                   ; return (HsDo res_ty doExpr (L l stmts')) }
-          else do { expanded_expr <- expandDoStmts doExpr stmts
-                                               -- Do expansion on the fly
-                  ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$>
-                    tcExpr (unLoc expanded_expr) res_ty }
+          else do { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
+                  ; traceTc "tcDoStmts" (ppr expanded_expr)
+                  ; let orig = HsDo noExtField doExpr ss
+                  ; mkExpandedExprTc orig <$> (
+                       -- We lose the location on the first statement location in GhcTc, unfortunately.
+                       -- It is needed for get the pattern match warnings right cf. T14546d
+                       -- That location is currently recovered from the location stored in OrigStmt
+                       -- in dsExpr of ExpandedThingTc
+                        unLoc <$> tcMonoLExpr expanded_expr res_ty)
+                  }
         }
 
-tcDoStmts mDoExpr@(MDoExpr _) ss@(L _ stmts) res_ty
+tcDoStmts mDoExpr ss@(L _ stmts) res_ty
   = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
-        ; mkExpandedExprTc (HsDo noExtField mDoExpr ss) <$>
-          tcExpr (unLoc expanded_expr) res_ty  }
-
-tcDoStmts MonadComp (L l stmts) res_ty
-  = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
-        ; res_ty <- readExpType res_ty
-        ; return (HsDo res_ty MonadComp (L l stmts')) }
-tcDoStmts ctxt@GhciStmtCtxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
+        ; let orig = HsDo noExtField mDoExpr ss
+        ; e' <- tcMonoLExpr expanded_expr res_ty
+        ; return (mkExpandedExprTc orig (unLoc e'))
+        }
 
 tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
         ; tcPolyLExpr body res_ty
-        }
-
-tcBodyNC :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
-tcBodyNC body res_ty
-  = do  { traceTc "tcBodyNC" (ppr res_ty)
-        ; tcMonoExprNC body res_ty
         }
 
 {-
@@ -572,7 +568,7 @@ tcLcStmt :: TyCon       -- The list type constructor ([])
          -> TcExprStmtChecker
 
 tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside
-  = do { body' <- tcMonoExprNC body elt_ty
+  = do { body' <- tcMonoLExprNC body elt_ty
        ; thing <- thing_inside (panic "tcLcStmt: thing_inside")
        ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 
@@ -975,7 +971,7 @@ tcMcStmt _ stmt _ _
 tcDoStmt :: TcExprStmtChecker
 
 tcDoStmt _ (LastStmt x body noret _) res_ty thing_inside
-  = do { body' <- tcMonoExprNC body res_ty
+  = do { body' <- tcMonoLExprNC body res_ty
        ; thing <- thing_inside (panic "tcDoStmt: thing_inside")
        ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 tcDoStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
@@ -985,7 +981,7 @@ tcDoStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
                 -- in full generality; see #1537
 
           ((rhs_ty, rhs', pat_mult, pat', new_res_ty, thing), bind_op')
-            <- tcSyntaxOp DoOrigin (xbsrn_bindOp xbsrn) [SynRho, SynFun SynAny SynRho] res_ty $
+            <- tcSyntaxOp DoStmtOrigin (xbsrn_bindOp xbsrn) [SynRho, SynFun SynAny SynRho] res_ty $
                 \ [rhs_ty, pat_ty, new_res_ty] [rhs_mult,fun_mult,pat_mult] ->
                 do { rhs' <-tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
                    ; (pat', thing) <- tcScalingUsage fun_mult $ tcCheckPat (StmtCtxt ctxt) pat (Scaled pat_mult pat_ty) $
@@ -1009,7 +1005,7 @@ tcDoStmt _ (BodyStmt _ rhs then_op _) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax;
                 --   (>>) :: rhs_ty -> new_res_ty -> res_ty
         ; ((rhs', rhs_ty, new_res_ty, thing), then_op')
-            <- tcSyntaxOp DoOrigin then_op [SynRho, SynRho] res_ty $
+            <- tcSyntaxOp DoStmtOrigin then_op [SynRho, SynRho] res_ty $
                \ [rhs_ty, new_res_ty] [rhs_mult,fun_mult] ->
                do { rhs' <- tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
                   ; thing <- tcScalingUsage fun_mult $ thing_inside (mkCheckExpType new_res_ty)
@@ -1036,18 +1032,18 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
                              -- Unify the types of the "final" Ids (which may
                              -- be polymorphic) with those of "knot-tied" Ids
                       ; (_, ret_op')
-                          <- tcSyntaxOp DoOrigin ret_op [synKnownType tup_ty]
+                          <- tcSyntaxOp DoStmtOrigin ret_op [synKnownType tup_ty]
                                         inner_res_ty $ \_ _ -> return ()
                       ; return (ret_op', tup_rets) }
 
         ; ((_, mfix_op'), mfix_res_ty)
             <- runInferRho $ \ exp_ty ->
-               tcSyntaxOp DoOrigin mfix_op
+               tcSyntaxOp DoStmtOrigin mfix_op
                           [synKnownType (mkVisFunTyMany tup_ty stmts_ty)] exp_ty $
                \ _ _ -> return ()
 
         ; ((thing, new_res_ty), bind_op')
-            <- tcSyntaxOp DoOrigin bind_op
+            <- tcSyntaxOp DoStmtOrigin bind_op
                           [ synKnownType mfix_res_ty
                           , SynFun (synKnownType tup_ty) SynRho ]
                           res_ty $
@@ -1076,7 +1072,7 @@ tcDoStmt ctxt (XStmtLR (ApplicativeStmt _ pairs mb_join)) res_ty thing_inside
             Nothing -> (, Nothing) <$> tc_app_stmts res_ty
             Just join_op ->
               second Just <$>
-              (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
+              (tcSyntaxOp DoStmtOrigin join_op [SynRho] res_ty $
                \ [rhs_ty] [rhs_mult] -> tcScalingUsage rhs_mult $ tc_app_stmts (mkCheckExpType rhs_ty))
 
         ; return (XStmtLR $ ApplicativeStmt body_ty pairs' mb_join', thing) }
@@ -1193,7 +1189,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
     goOps _ [] = return []
     goOps t_left ((op,t_i,exp_ty) : ops)
       = do { (_, op')
-               <- tcSyntaxOp DoOrigin op
+               <- tcSyntaxOp DoStmtOrigin op
                              [synKnownType t_left, synKnownType exp_ty] t_i $
                    \ _ _ -> return ()
            ; t_i <- readExpType t_i

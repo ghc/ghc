@@ -1,4 +1,3 @@
-
 test-defaulting-plugin.hs:28:11: warning: [GHC-18042] [-Wtype-defaults (in -Wall)]
     • Defaulting the type variable ‘a0’ to type ‘0’ in the following constraint
         KnownNat a0 arising from a use of ‘q’
@@ -35,3 +34,4 @@ test-defaulting-plugin.hs:29:11: warning: [GHC-18042] [-Wtype-defaults (in -Wall
       In the expression:
         do print $ q + w
            print $ mc Proxy Proxy
+

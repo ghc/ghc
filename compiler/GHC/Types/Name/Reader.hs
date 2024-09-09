@@ -2077,9 +2077,12 @@ bestImport iss = NE.head $ NE.sortBy best iss
      -- False < True, so if e1 is explicit and e2 is not, we get GT
 
     compareGenerated UnhelpfulSpan{} UnhelpfulSpan{} = EQ
-    compareGenerated UnhelpfulSpan{} RealSrcSpan{} = LT
-    compareGenerated RealSrcSpan{} UnhelpfulSpan{} = GT
+    compareGenerated UnhelpfulSpan{} _ = LT
+    compareGenerated GeneratedSrcSpan{} UnhelpfulSpan{} = GT
+    compareGenerated GeneratedSrcSpan{} GeneratedSrcSpan{} = EQ
+    compareGenerated GeneratedSrcSpan{} _ = LT
     compareGenerated RealSrcSpan{} RealSrcSpan{} = EQ
+    compareGenerated RealSrcSpan{} _ = GT
 
 {- Note [Choosing the best import declaration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2212,6 +2215,7 @@ instance Outputable ImportSpec where
 pprLoc :: SrcSpan -> SDoc
 pprLoc (RealSrcSpan s _)  = text "at" <+> ppr s
 pprLoc (UnhelpfulSpan {}) = empty
+pprLoc (GeneratedSrcSpan {}) = empty
 
 -- | Indicate if the given name is the "@" operator
 opIsAt :: RdrName -> Bool

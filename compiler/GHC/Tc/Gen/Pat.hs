@@ -450,7 +450,7 @@ tc_lpat :: Scaled ExpSigmaTypeFRR
         -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_lpat pat_ty penv (L span pat) thing_inside
   = setSrcSpanA span $
-    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat pat_ty penv pat)
+    do  { (pat', res) <- maybeWrapPatCtxt (locA span) pat (tc_pat pat_ty penv pat)
                                           thing_inside
         ; return (L span pat', res) }
 
@@ -470,7 +470,7 @@ checkManyPattern reason pat pat_ty = tcSubMult (NonLinearPatternOrigin reason pa
 tc_forall_lpat :: TcTyVar -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_forall_lpat tv penv (L span pat) thing_inside
   = setSrcSpanA span $
-    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_forall_pat tv penv pat)
+    do  { (pat', res) <- maybeWrapPatCtxt (locA span) pat (tc_forall_pat tv penv pat)
                                           thing_inside
         ; return (L span pat', res) }
 
@@ -689,7 +689,6 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
        -- First infer the type of 'view_expr'; the overall type of the pattern
        -- is the argument type of 'view_expr', and the inner pattern type is
        -- checked against the result type of 'view_expr'.
-
       { checkManyPattern ViewPatternReason (noLocA ps_pat) scaled_exp_pat_ty
           -- It should be possible to have view patterns at linear (or otherwise
           -- non-Many) multiplicity. But it is not clear at the moment what
@@ -704,7 +703,7 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
 
         -- 'view_expr' must be a function; expose its argument/result types
         -- using 'matchActualFunTy'.
-      ; let herald = ExpectedFunTyViewPat $ unLoc view_expr
+      ; let herald = ExpectedFunTyViewPat 1 $ unLoc view_expr
       ; (view_expr_co1, Scaled _mult view_arg_ty, view_res_ty)
           <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc view_expr)
                (1, view_expr_rho) view_expr_rho
@@ -1917,17 +1916,19 @@ pattern (perhaps deeply)
 See also Note [Typechecking pattern bindings] in GHC.Tc.Gen.Bind
 -}
 
-maybeWrapPatCtxt :: Pat GhcRn -> (TcM a -> TcM b) -> TcM a -> TcM b
+maybeWrapPatCtxt :: SrcSpan -> Pat GhcRn -> (TcM a -> TcM b) -> TcM a -> TcM b
 -- Not all patterns are worth pushing a context
-maybeWrapPatCtxt pat tcm thing_inside
-  | not (worth_wrapping pat) = tcm thing_inside
+maybeWrapPatCtxt span pat tcm thing_inside
+  | not (worth_wrapping span pat) = tcm thing_inside
   | otherwise                = addErrCtxt (PatCtxt pat) $ tcm $ popErrCtxt thing_inside
                                -- Remember to pop before doing thing_inside
   where
-   worth_wrapping (VarPat {}) = False
-   worth_wrapping (ParPat {}) = False
-   worth_wrapping (AsPat {})  = False
-   worth_wrapping _           = True
+   worth_wrapping _ (VarPat {}) = False
+   worth_wrapping _ (ParPat {}) = False
+   worth_wrapping _ (AsPat {})  = False
+   worth_wrapping span _
+      | isGeneratedSrcSpan span = False -- cf. T12957a
+   worth_wrapping _  _          = True
 
 -----------------------------------------------
 
