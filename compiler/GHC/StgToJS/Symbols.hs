@@ -1212,3 +1212,6 @@ hdStlStr = fsLit "h$stl"
 
 hdStiStr :: FastString
 hdStiStr = fsLit "h$sti"
+
+hdStrStr :: FastString
+hdStrStr = fsLit "h$str"

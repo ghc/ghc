@@ -284,7 +284,7 @@ instance ToJExpr StaticLit where
   toJExpr (IntLit i)            = toJExpr i
   toJExpr NullLit               = null_
   toJExpr (DoubleLit d)         = toJExpr (unSaneDouble d)
-  toJExpr (StringLit t)         = app hdStr    [toJExpr t]
+  toJExpr (StringLit t)         = app hdStrStr [toJExpr t]
   toJExpr (BinLit b)            = app hdRawStr [toJExpr (map toInteger (BS.unpack b))]
   toJExpr (LabelLit _isFun lbl) = global lbl
 
