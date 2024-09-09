@@ -605,12 +605,12 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
        ; return (HsDo srcloc cxt (L l stmts')) }
   where
-        forQual = case cxt of
+    forQual = case cxt of
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
 addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o@(OrigStmt (L pos LastStmt{})) e
+addTickHsExpanded o@(OrigStmt (L pos LastStmt{}) _) e
   -- LastStmt always gets a tick for breakpoint and hpc coverage
   = do d <- getDensity
        case d of
