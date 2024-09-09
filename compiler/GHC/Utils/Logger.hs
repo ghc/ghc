@@ -83,6 +83,9 @@ where
 import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Types.Error
+  ( MessageClass (..), Severity (..)
+  , mkLocMessageWarningGroups,getCaretDiagnostic )
+-- import GHC.Types.Error ()
 import GHC.Types.SrcLoc
 
 import qualified GHC.Utils.Ppr as Pretty
@@ -398,7 +401,7 @@ jsonLogActionWithHandle out logflags msg_class srcSpan msg
                                                 , ("endCol", json $ srcSpanEndCol rss)
                                                 ]
                    where file = unpackFS $ srcSpanFile rss
-                 UnhelpfulSpan _ -> JSNull
+                 _ -> JSNull
 
 -- | The default 'LogAction' prints to 'stdout' and 'stderr'.
 --
@@ -707,4 +710,3 @@ class HasLogger m where
 
 class ContainsLogger t where
     extractLogger :: t -> Logger
-

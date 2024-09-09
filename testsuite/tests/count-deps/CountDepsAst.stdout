@@ -148,7 +148,6 @@ GHC.Tc.Types.Rank
 GHC.Tc.Types.TH
 GHC.Tc.Types.TcRef
 GHC.Tc.Utils.TcType
-GHC.Tc.Zonk.Monad
 GHC.Types.Annotations
 GHC.Types.Arity
 GHC.Types.Avail

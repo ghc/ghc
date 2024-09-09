@@ -49,7 +49,7 @@ module GHC.Tc.Zonk.TcType
   , tidyCt, tidyEvVar, tidyDelayedError
 
     -- ** Zonk & tidy
-  , zonkTidyTcType, zonkTidyTcTypes
+  , zonkTidyTcType, zonkTidyTcTypes, zonkTidyHsCtxt
   , zonkTidyOrigin, zonkTidyOrigins
   , zonkTidyFRRInfos
 
@@ -91,11 +91,13 @@ import GHC.Core.Predicate
 import GHC.Utils.Constants
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc
-import GHC.Utils.Monad ( mapAccumLM )
+import GHC.Utils.Monad ( mapAccumLM, liftIO )
 import GHC.Utils.Panic
 
 import GHC.Data.Bag
 import GHC.Data.Pair
+
+import GHC.IORef (readIORef)
 
 import Data.Semigroup
 import Data.Maybe
@@ -793,3 +795,40 @@ tidyFRROrigin env (FixedRuntimeRepOrigin ty orig)
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
   -- No need for tidyOpenType because all the free tyvars are already tidied
+
+
+zonkTidyHsCtxt :: TidyEnv -> HsCtxt -> ZonkM (TidyEnv, HsCtxt)
+zonkTidyHsCtxt env e@(ExprCtxt{}) = return (env, e)
+zonkTidyHsCtxt env (ThetaCtxt ctxt theta_ty) = do
+  (env', theta_ty') <- zonkTidyTcTypes env theta_ty
+  return $ (env', ThetaCtxt ctxt theta_ty')
+zonkTidyHsCtxt env (InferredTypeCtxt n ty) = do
+  (env', ty') <- zonkTidyTcType env ty
+  return $ (env', InferredTypeCtxt n ty')
+zonkTidyHsCtxt env (ClassOpCtxt n ty) = do
+  (env', ty') <- zonkTidyTcType env ty
+  return $ (env', ClassOpCtxt n ty')
+zonkTidyHsCtxt env (MethSigCtxt n ty1 ty2) = do
+  (env', ty1) <- zonkTidyTcType env ty1
+  (env', ty2) <- zonkTidyTcType env' ty2
+  return $ (env',  MethSigCtxt n ty1 ty2)
+zonkTidyHsCtxt env e@(FunAppCtxt{}) = return (env, e)
+zonkTidyHsCtxt env (FunTysCtxt ctxt ty i1 i2) = do
+  (env', ty') <- zonkTidyTcType env ty
+  return $ (env', FunTysCtxt ctxt ty' i1 i2)
+zonkTidyHsCtxt env (FunResCtxt e i1 ty1 ty2 i2 i3) = do
+  (env', ty1') <- zonkTidyTcType env ty1
+  (env', ty2') <- zonkTidyTcType env' ty2
+  return $ (env', FunResCtxt e i1 ty1' ty2' i2 i3)
+zonkTidyHsCtxt env (PatSigErrCtxt sig_ty res_ty) = do
+  (env', sig_ty') <- zonkTidyTcType env sig_ty
+  (env', res_ty') <-
+    case res_ty of
+      Check ty -> zonkTidyTcType env' ty
+      Infer (IR {ir_ref = ref}) -> do -- inlining readExpTyp_maybe to avoid module dep loops
+        mb_ty <- liftIO $ readIORef ref
+        case mb_ty of
+          Nothing -> error "zonkTidyHsCtxt PatSigErrCtxt"
+          Just ty -> zonkTidyTcType env' ty
+  return (env', PatSigErrCtxt sig_ty' (Check res_ty'))
+zonkTidyHsCtxt env p = return (env, p)

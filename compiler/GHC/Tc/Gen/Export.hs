@@ -1008,7 +1008,7 @@ checkPatSynParent parent NoParent nm
 
             _ -> failWithDcErr parent nm [] }
   where
-    handle_pat_syn :: ErrCtxtMsg
+    handle_pat_syn :: HsCtxt
                    -> TyCon      -- Parent TyCon
                    -> PatSyn     -- Corresponding bundled PatSyn
                                  -- and pretty printed origin

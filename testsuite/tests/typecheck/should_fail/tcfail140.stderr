@@ -17,7 +17,8 @@ tcfail140.hs:13:10: error: [GHC-83865]
 
 tcfail140.hs:15:15: error: [GHC-83865]
     • Couldn't match expected type ‘t -> b’ with actual type ‘Int’
-    • In the first argument of ‘map’, namely ‘(3 `f`)’
+    • Possible cause: ‘f’ is applied to too many arguments
+      In the first argument of ‘map’, namely ‘(3 `f`)’
       In the expression: map (3 `f`) xs
       In an equation for ‘bot’: bot xs = map (3 `f`) xs
     • Relevant bindings include
