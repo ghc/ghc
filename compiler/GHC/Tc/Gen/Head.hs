@@ -301,7 +301,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
     top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
     top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
     top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
-    top_ctxt n (XExpr (ExpandedThingRn (OrigExpr fun) _ _))
+    top_ctxt n (XExpr (ExpandedThingRn (OrigExpr fun) _))
                                            = VACall fun  n noSrcSpan
     top_ctxt n other_fun                   = VACall other_fun n noSrcSpan
 
@@ -326,7 +326,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
             HsQuasiQuote _ _ (L l _)      -> set l ctxt -- l :: SrcAnn NoEpAnns
 
     -- See Note [Looking through ExpandedThingRn]
-    go (XExpr (ExpandedThingRn o e _)) ctxt args
+    go (XExpr (ExpandedThingRn o e)) ctxt args
       = go e (VAExpansion o (appCtxtLoc ctxt) (appCtxtLoc ctxt))
                (EWrap (EExpand o) : args)
 
@@ -568,8 +568,6 @@ addHeadCtxt fun_ctxt thing_inside
     do case fun_ctxt of
          VAExpansion (OrigExpr orig) _ _
            -> addExprCtxt orig thing_inside
-         VAExpansion (OrigPat _ flav (Just (L loc stmt))) _ _
-           -> setSrcSpanA loc $ addStmtCtxt stmt flav thing_inside
          _ -> thing_inside
   where
     fun_loc = appCtxtLoc fun_ctxt
