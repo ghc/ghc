@@ -1041,6 +1041,7 @@ binder_of :: SDoc -> SDoc
 binder_of what = text "The binder of the" <+> what <+> text "expression"
 
 
+
 -- | Print CtOrigin briefly, with a one-liner
 pprCtOriginBriefly :: CtOrigin -> SDoc
 pprCtOriginBriefly = ppr_br  -- ppr_br is a local function with a short name!
@@ -1126,6 +1127,7 @@ ppr_br (ExpectedFunTyViewPat{}) = text "a view pattern"
 ppr_br (ExpectedFunTyArg{}) = text "a funtion head"
 ppr_br (ExpectedFunTyMatches{}) = text "a match statement"
 ppr_br (ExpectedFunTyLam{}) = text "a lambda expression"
+
 
 pprNonLinearPatternReason :: HasDebugCallStack => NonLinearPatternReason -> SDoc
 pprNonLinearPatternReason LazyPatternReason = parens (text "non-variable lazy pattern aren't linear")
