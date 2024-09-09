@@ -58,6 +58,7 @@ import GHC.Tc.Instance.Family
 import GHC.Tc.Types.ErrCtxt ( TyConInstFlavour(..) )
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 
 import GHC.Builtin.Types ( oneDataConTy,  unitTy, makeRecoveryTyCon, manyDataConTy )
 
@@ -3543,7 +3544,7 @@ tcTySynRhs roles_info tc_name hs_ty
   where
     skol_info = TyConSkol TypeSynonymFlavour tc_name
 
-tcDataDefn :: ErrCtxtMsg -> RolesInfo -> Name
+tcDataDefn :: HsCtxt -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
   -- NB: not used for newtype/data instances (whether associated or not)
 tcDataDefn err_ctxt roles_info tc_name
@@ -5899,7 +5900,7 @@ checkValidRoles tc
 ************************************************************************
 -}
 
-tcMkDeclCtxt :: TyClDecl GhcRn -> ErrCtxtMsg
+tcMkDeclCtxt :: TyClDecl GhcRn -> HsCtxt
 tcMkDeclCtxt decl =
   TyConDeclCtxt (tcdName decl) (tyClDeclFlavour decl)
 
@@ -5909,7 +5910,7 @@ addVDQNote :: TcTyCon -> TcM a -> TcM a
 addVDQNote tycon thing_inside
   | assertPpr (isMonoTcTyCon tycon) (ppr tycon $$ ppr tc_kind)
     has_vdq
-  = addLandmarkErrCtxt (VDQWarningCtxt tycon) thing_inside
+  = addErrCtxt (VDQWarningCtxt tycon) thing_inside
   | otherwise
   = thing_inside
   where
@@ -5942,7 +5943,7 @@ tcAddOpenTyFamInstCtxt mb_assoc decl
          , tyConInstIsDefault = False
          }
 
-tcMkDataFamInstCtxt :: AssocInstInfo -> NewOrData -> DataFamInstDecl GhcRn -> ErrCtxtMsg
+tcMkDataFamInstCtxt :: AssocInstInfo -> NewOrData -> DataFamInstDecl GhcRn -> HsCtxt
 tcMkDataFamInstCtxt mb_assoc new_or_data (DataFamInstDecl { dfid_eqn = eqn })
   = TyConInstCtxt (unLoc (feqn_tycon eqn))
       (TyConInstFlavour

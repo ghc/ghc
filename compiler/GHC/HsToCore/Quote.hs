@@ -41,6 +41,7 @@ import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.TyCl ( IsPrefixConGADT(..), unannotatedMultIsLinear )
 
 import GHC.Core.Class
@@ -1735,17 +1736,14 @@ repE (HsFunArr _ mult arg res) = do
   res' <- repLE res
   repApps fun [arg', res']
 repE e@(XExpr (ExpandedThingRn o x))
-  | OrigExpr e <- o
+  | ExprCtxt e <- o
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
          then repE x
          else repE e }
   | otherwise
   = notHandled (ThExpressionForm e)
-
-repE (XExpr (PopErrCtxt (L _ e))) = repE e
 repE (XExpr (HsRecSelRn (FieldOcc _ (L _ x)))) = repE (mkHsVar (noLocA x))
-
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)

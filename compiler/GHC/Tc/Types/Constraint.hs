@@ -120,6 +120,7 @@ import GHC.Types.Var
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.CtLoc
 
 import GHC.Builtin.Names

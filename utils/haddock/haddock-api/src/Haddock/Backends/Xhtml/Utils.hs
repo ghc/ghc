@@ -53,7 +53,7 @@ module Haddock.Backends.Xhtml.Utils
   , collapseControl
   ) where
 
-import GHC (Name, SrcSpan (..), srcSpanStartLine)
+import GHC (Name, SrcSpan (..), GeneratedSrcSpanDetails (..), srcSpanStartLine)
 import GHC.Types.Name (getOccString, isValOcc, nameOccName)
 import GHC.Unit.Module (Module, ModuleName, moduleName, moduleNameString)
 import Text.XHtml hiding (name, p, quote, title)
@@ -103,6 +103,10 @@ spliceURL' maybe_mod maybe_name maybe_loc = run
         case span_ of
           RealSrcSpan span__ _ ->
             show $ srcSpanStartLine span__
+          GeneratedSrcSpan sp ->
+            case sp of
+              OrigSpan span__ -> show $ srcSpanStartLine span__
+              _ -> ""
           UnhelpfulSpan _ -> ""
 
     run "" = ""

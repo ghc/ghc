@@ -38,6 +38,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated )
@@ -2088,7 +2089,7 @@ tcMethodBody is_vanilla_dm clas tyvars dfun_ev_vars inst_tys
         -- we want to print out the full source code if there's an error
         -- because otherwise the user won't see the code at all
     add_meth_ctxt thing
-      | is_derived = addLandmarkErrCtxt (DerivBindCtxt sel_id clas inst_tys) thing
+      | is_derived = addErrCtxt (DerivBindCtxt sel_id clas inst_tys) thing
       | otherwise  = thing
 
 tcMethodBodyHelp :: HsSigFun -> Id -> TcId
@@ -2109,7 +2110,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                 -- The instance-sig is the focus here; the class-meth-sig
                                 -- is fixed (#18036)
                    ; let orig = InstanceSigOrigin sel_name sig_ty local_meth_ty
-                   ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name sig_ty local_meth_ty) $
+                   ; hs_wrap <- addErrCtxt (MethSigCtxt sel_name sig_ty local_meth_ty) $
                                 tcSubTypeSigma orig ctxt sig_ty local_meth_ty
                    ; return (sig_ty, hs_wrap) }
 
@@ -2177,11 +2178,6 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
     poly_meth_ty  = mkSpecSigmaTy tyvars theta local_meth_ty
     theta         = map idType dfun_ev_vars
 
-methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
-methSigCtxt sel_name sig_ty meth_ty env0
-  = do { (env1, sig_ty)  <- zonkTidyTcType env0 sig_ty
-       ; (env2, meth_ty) <- zonkTidyTcType env1 meth_ty
-       ; return (env2, MethSigCtxt sel_name sig_ty meth_ty) }
 
 {- Note [Instance method signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2687,11 +2683,11 @@ tcSpecInst _  _ = panic "tcSpecInst"
 ************************************************************************
 -}
 
-instDeclCtxt1 :: LHsSigType GhcRn -> ErrCtxtMsg
+instDeclCtxt1 :: LHsSigType GhcRn -> HsCtxt
 instDeclCtxt1 hs_inst_ty
   = InstDeclErrCtxt $ Left $ getLHsInstDeclHead hs_inst_ty
 
-instDeclCtxt2 :: Type -> ErrCtxtMsg
+instDeclCtxt2 :: Type -> HsCtxt
 instDeclCtxt2 dfun_ty
   = InstDeclErrCtxt $ Right $ head_ty
   where

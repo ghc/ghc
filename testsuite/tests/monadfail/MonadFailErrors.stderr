@@ -1,4 +1,3 @@
-
 MonadFailErrors.hs:14:5: error: [GHC-39999]
     • Could not deduce ‘MonadFail m’
         arising from a do statement
@@ -15,10 +14,6 @@ MonadFailErrors.hs:14:5: error: [GHC-39999]
       In the expression:
         do Just x <- undefined
            undefined
-      In an equation for ‘general’:
-          general
-            = do Just x <- undefined
-                 undefined
 
 MonadFailErrors.hs:28:5: error: [GHC-39999]
     • No instance for ‘MonadFail Identity’
@@ -28,10 +23,6 @@ MonadFailErrors.hs:28:5: error: [GHC-39999]
       In the expression:
         do Just x <- undefined
            undefined
-      In an equation for ‘identity’:
-          identity
-            = do Just x <- undefined
-                 undefined
 
 MonadFailErrors.hs:42:5: error: [GHC-39999]
     • No instance for ‘MonadFail ((->) r)’
@@ -41,7 +32,4 @@ MonadFailErrors.hs:42:5: error: [GHC-39999]
       In the expression:
         do Just x <- undefined
            undefined
-      In an equation for ‘reader’:
-          reader
-            = do Just x <- undefined
-                 undefined
+

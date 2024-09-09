@@ -22,7 +22,7 @@ module GHC.Tc.Types.BasicTypes (
 
 import GHC.Prelude
 
-import GHC.Tc.Types.Origin( UserTypeCtxt )
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt )
 import GHC.Tc.Utils.TcType
 
 import GHC.Types.Id

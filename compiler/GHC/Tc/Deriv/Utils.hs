@@ -37,6 +37,7 @@ import GHC.Tc.Deriv.Generics
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint (WantedConstraints, mkNonCanonical)
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt( InstDeclCtxt, DerivClauseCtxt ) )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify (tcSubTypeSigma)

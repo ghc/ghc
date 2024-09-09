@@ -105,10 +105,13 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
     parsePlainTok inPrag = do
       (bInit, lInit) <- lift getInput
       L sp tok <- tryP (Lexer.lexer False return)
-      (bEnd, _) <- lift getInput
       case sp of
-        UnhelpfulSpan _ -> pure ([], False) -- pretend the token never existed
-        RealSrcSpan rsp _ -> do
+        RealSrcSpan rsp _ -> tryParse inPrag rsp bInit lInit sp tok
+        GeneratedSrcSpan (OrigSpan rsp) -> tryParse inPrag rsp bInit lInit sp tok
+        _ -> pure ([], False) -- pretend the token never existed
+
+    tryParse inPrag rsp bInit lInit sp tok = do
+          (bEnd, _) <- lift getInput
           let typ = if inPrag then TkPragma else classify tok
               RealSrcLoc lStart _ = srcSpanStart sp -- safe since @sp@ is real
               (spaceBStr, bStart) = spanPosition lInit lStart bInit
