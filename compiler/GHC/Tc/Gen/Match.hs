@@ -50,7 +50,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Gen.Do
-import GHC.Tc.Gen.Head( tcCheckId )
+import GHC.Tc.Gen.Head( tcCheckId, addExprCtxt )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Bind
@@ -79,7 +79,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Id
 import GHC.Types.SrcLoc
-import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
+import GHC.Types.Basic( VisArity )
 
 import qualified GHC.Data.List.NonEmpty as NE
 
@@ -158,21 +158,13 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
 
         ; (wrapper, r)
             <- matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
-               tcMatches ctxt tc_body (invis_pat_tys ++ pat_tys) rhs_ty matches
+               tcMatches ctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches
 
         ; return (wrapper, r) }
   where
     ctxt   = LamAlt lam_variant
     herald = ExpectedFunTyLam lam_variant e
              -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
-
-    tc_body | isDoExpansionGenerated (mg_ext matches)
-              -- See Part 3. B. of Note [Expanding HsDo with XXExprGhcRn] in
-              -- `GHC.Tc.Gen.Do`. Testcase: Typeable1
-            = tcBodyNC -- NB: Do not add any error contexts
-                       -- It has already been done
-            | otherwise
-            = tcBody
 
 {-
 @tcCaseMatches@ doesn't do the argument-count check because the
@@ -397,39 +389,35 @@ tcDoStmts ListComp (L l stmts) res_ty
                             (mkCheckExpType elt_ty)
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
+tcDoStmts MonadComp (L l stmts) res_ty
+  = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
+        ; res_ty <- readExpType res_ty
+        ; return (HsDo res_ty MonadComp (L l stmts')) }
+
+tcDoStmts ctxt@GhciStmtCtxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
+
 tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
   = do  { isApplicativeDo <- xoptM LangExt.ApplicativeDo
         ; if isApplicativeDo
           then do { stmts' <- tcStmts (HsDoStmt doExpr) tcDoStmt stmts res_ty
                   ; res_ty <- readExpType res_ty
                   ; return (HsDo res_ty doExpr (L l stmts')) }
-          else do { expanded_expr <- expandDoStmts doExpr stmts
-                                               -- Do expansion on the fly
-                  ; mkExpandedExprTc (HsDo noExtField doExpr ss) <$>
-                    tcExpr (unLoc expanded_expr) res_ty }
+          else do { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
+                  ; let orig = HsDo noExtField doExpr ss
+                  ; addExprCtxt expanded_expr $
+                      mkExpandedExprTc orig <$> tcExpr expanded_expr res_ty }
         }
 
-tcDoStmts mDoExpr@(MDoExpr _) ss@(L _ stmts) res_ty
+tcDoStmts mDoExpr ss@(L _ stmts) res_ty
   = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
-        ; mkExpandedExprTc (HsDo noExtField mDoExpr ss) <$>
-          tcExpr (unLoc expanded_expr) res_ty  }
-
-tcDoStmts MonadComp (L l stmts) res_ty
-  = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
-        ; res_ty <- readExpType res_ty
-        ; return (HsDo res_ty MonadComp (L l stmts')) }
-tcDoStmts ctxt@GhciStmtCtxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
+        ; let orig = HsDo noExtField mDoExpr ss
+        ; addExprCtxt expanded_expr $
+            mkExpandedExprTc orig <$> tcExpr expanded_expr res_ty  }
 
 tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
         ; tcPolyLExpr body res_ty
-        }
-
-tcBodyNC :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
-tcBodyNC body res_ty
-  = do  { traceTc "tcBodyNC" (ppr res_ty)
-        ; tcMonoExprNC body res_ty
         }
 
 {-

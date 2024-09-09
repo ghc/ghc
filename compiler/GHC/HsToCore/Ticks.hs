@@ -654,7 +654,7 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
        ; return (HsDo srcloc cxt (L l stmts')) }
   where
-        forQual = case cxt of
+    forQual = case cxt of
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
