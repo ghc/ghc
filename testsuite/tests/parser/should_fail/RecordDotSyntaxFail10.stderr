@@ -1,5 +1,10 @@
 RecordDotSyntaxFail10.hs:40:11: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘[Char]’
+        arising from a functional dependency between:
+          constraint ‘HasField "quux" Quux String’
+            arising from a record update
+          instance ‘HasField "quux" Quux Int’
+            at RecordDotSyntaxFail10.hs:34:10-33
     • In the second argument of ‘($)’, namely ‘a {foo.bar.baz.quux}’
       In a stmt of a 'do' block: print $ a {foo.bar.baz.quux}
       In the expression:

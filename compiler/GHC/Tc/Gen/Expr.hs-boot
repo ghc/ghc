@@ -15,7 +15,7 @@ tcCheckPolyExpr, tcCheckPolyExprNC ::
        -> TcSigmaType
        -> TcM (LHsExpr GhcTc)
 
-tcMonoExpr, tcMonoExprNC ::
+tcMonoLExpr, tcMonoLExprNC ::
           LHsExpr GhcRn
        -> ExpRhoType
        -> TcM (LHsExpr GhcTc)

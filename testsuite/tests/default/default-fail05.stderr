@@ -11,7 +11,7 @@ default-fail05.hs:11:10: error: [GHC-39999]
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘($)’, namely ‘toList’
       In the first argument of ‘print’, namely ‘(toList $ pure 21)’
-      In a stmt of a 'do' block: print (toList $ pure 21)
+      In the expression: print (toList $ pure 21)
 
 default-fail05.hs:11:19: error: [GHC-39999]
     • Ambiguous type variable ‘t0’ arising from a use of ‘pure’
@@ -25,7 +25,7 @@ default-fail05.hs:11:19: error: [GHC-39999]
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘($)’, namely ‘pure 21’
       In the first argument of ‘print’, namely ‘(toList $ pure 21)’
-      In a stmt of a 'do' block: print (toList $ pure 21)
+      In the expression: print (toList $ pure 21)
 
 default-fail05.hs:12:3: error: [GHC-39999]
     • Ambiguous type variable ‘t1’ arising from a use of ‘traverse’

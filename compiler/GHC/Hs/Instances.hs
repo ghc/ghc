@@ -591,7 +591,7 @@ deriving instance Eq (IE GhcTc)
 
 -- ---------------------------------------------------------------------
 
-deriving instance Data HsThingRn
+deriving instance Data SrcCodeOrigin
 deriving instance Data XXExprGhcRn
 deriving instance Data a => Data (WithUserRdr a)
 

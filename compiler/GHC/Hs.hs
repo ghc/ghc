@@ -36,7 +36,8 @@ module GHC.Hs (
         Fixity,
 
         HsModule(..), AnnsModule(..),
-        HsParsedModule(..), XModulePs(..)
+        HsParsedModule(..), XModulePs(..),
+
 ) where
 
 -- friends:
