@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Head
        , nonBidirectionalErr
 
        , pprArgInst
-       , addHeadCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
+       , addHeadCtxt, addThingCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -201,14 +201,11 @@ type family XEVAType (p :: TcPass) where   -- Value arguments
 data QLFlag = DoQL | NoQL
 
 data EWrap = EPar    AppCtxt
-           | EExpand HsThingRn
+           | EExpand (HsExpr GhcRn)
            | EHsWrap HsWrapper
 
 data AppCtxt
   = VAExpansion
-       HsThingRn
-       SrcSpan
-       SrcSpan
 
   | VACall
        (HsExpr GhcRn) Int  -- In the third argument of function f
@@ -244,19 +241,19 @@ a second time.
 -}
 
 appCtxtLoc :: AppCtxt -> SrcSpan
-appCtxtLoc (VAExpansion _ l _) = l
+appCtxtLoc VAExpansion = generatedSrcSpan
 appCtxtLoc (VACall _ _ l)    = l
 
 insideExpansion :: AppCtxt -> Bool
 insideExpansion (VAExpansion {}) = True
-insideExpansion (VACall {})      = False -- but what if the VACall has a generated context?
+insideExpansion (VACall _ _ loc)   = isGeneratedSrcSpan loc
 
 instance Outputable QLFlag where
   ppr DoQL = text "DoQL"
   ppr NoQL = text "NoQL"
 
 instance Outputable AppCtxt where
-  ppr (VAExpansion e l _) = text "VAExpansion" <+> ppr e <+> ppr l
+  ppr VAExpansion       = text "VAExpansion"
   ppr (VACall f n l)    = text "VACall" <+> int n <+> ppr f  <+> ppr l
 
 type family XPass (p :: TcPass) where
@@ -279,6 +276,7 @@ addArgWrap wrap args
  | isIdHsWrapper wrap = args
  | otherwise          = EWrap (EHsWrap wrap) : args
 
+
 splitHsApps :: HsExpr GhcRn
             -> TcM ( (HsExpr GhcRn, AppCtxt)  -- Head
                    , [HsExprArg 'TcpRn])      -- Args
@@ -293,14 +291,13 @@ splitHsApps e = go e (top_ctxt 0 e) []
     -- Always returns VACall fun n_val_args noSrcSpan
     -- to initialise the argument splitting in 'go'
     -- See Note [AppCtxt]
-    top_ctxt n (HsPar _ fun)               = top_lctxt n fun
-    top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
-    top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
-    top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
-    top_ctxt n (XExpr (ExpandedThingRn o _))
-      | OrigExpr fun <- o                  = VACall fun  n noSrcSpan
-    top_ctxt n other_fun                   = VACall other_fun n noSrcSpan
+    top_ctxt n (HsPar _ fun)        = top_lctxt n fun
+    top_ctxt n (HsPragE _ _ fun)    = top_lctxt n fun
+    top_ctxt n (HsAppType _ fun _)  = top_lctxt (n+1) fun
+    top_ctxt n (HsApp _ fun _)      = top_lctxt (n+1) fun
+    top_ctxt n other_fun            = VACall other_fun n noSrcSpan
 
+    top_lctxt :: Int -> LHsExpr GhcRn -> AppCtxt
     top_lctxt n (L _ fun) = top_ctxt n fun
 
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
@@ -314,36 +311,13 @@ splitHsApps e = go e (top_ctxt 0 e) []
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) ctxt args
       = do { fun <- getUntypedSpliceBody splice_res
-           ; go fun ctxt' (EWrap (EExpand (OrigExpr e)) : args) }
+           ; go fun ctxt' (EWrap (EExpand e) : args) }
       where
         ctxt' :: AppCtxt
         ctxt' = case splice of
             HsUntypedSpliceExpr _ (L l _) -> set l ctxt -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> set l ctxt -- l :: SrcAnn NoEpAnns
             (XUntypedSplice (HsImplicitLiftSplice (L l _))) -> set l ctxt
-
-    -- See Note [Looking through ExpandedThingRn]
-    go (XExpr (ExpandedThingRn o e)) ctxt args
-      | isHsThingRnExpr o
-      = go e (VAExpansion o (appCtxtLoc ctxt) (appCtxtLoc ctxt))
-               (EWrap (EExpand o) : args)
-
-      | OrigStmt (L _ stmt) <- o                -- so that we set `(>>)` as generated
-      , BodyStmt{} <- stmt                      -- and get the right unused bind warnings
-      = go e (VAExpansion o generatedSrcSpan generatedSrcSpan)
-                                                -- See Part 3. in Note [Expanding HsDo with XXExprGhcRn]
-               (EWrap (EExpand o) : args)       -- in `GHC.Tc.Gen.Do`
-
-
-      | OrigPat (L loc _) <- o                              -- so that we set the compiler generated fail context
-      = go e (VAExpansion o (locA loc) (locA loc))          -- to be originating from a failable pattern
-                                                            -- See Part 1. Wrinkle 2. of
-               (EWrap (EExpand o) : args)                   -- Note [Expanding HsDo with XXExprGhcRn]
-                                                            -- in `GHC.Tc.Gen.Do`
-
-      | otherwise
-      = go e (VAExpansion o (appCtxtLoc ctxt) (appCtxtLoc ctxt))
-               (EWrap (EExpand o) : args)
 
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
@@ -352,18 +326,18 @@ splitHsApps e = go e (top_ctxt 0 e) []
                : mkEValArg (VACall op 2 generatedSrcSpan) arg2
                     -- generatedSrcSpan because this the span of the call,
                     -- and its hard to say exactly what that is
-               : EWrap (EExpand (OrigExpr e))
+               : EWrap (EExpand e)
                : args )
 
     go e ctxt args = pure ((e,ctxt), args)
 
     set :: EpAnn ann -> AppCtxt -> AppCtxt
     set l (VACall f n _)          = VACall f n (locA l)
-    set l (VAExpansion orig ol _) = VAExpansion orig ol (locA l)
+    set _ ctx = ctx
 
     dec :: EpAnn ann -> AppCtxt -> AppCtxt
     dec l (VACall f n _)          = VACall f (n-1) (locA l)
-    dec l (VAExpansion orig ol _) = VAExpansion orig ol (locA l)
+    dec _ ctx = ctx
 
 -- | Rebuild an application: takes a type-checked application head
 -- expression together with arguments in the form of typechecked 'HsExprArg's
@@ -389,18 +363,12 @@ rebuildHsApps (fun, ctxt) (arg : args)
         -> rebuildHsApps (HsPragE noExtField p lfun, ctxt') args
       EWrap (EPar ctxt')
         -> rebuildHsApps (gHsPar lfun, ctxt') args
-      EWrap (EExpand orig)
-        | OrigExpr oe <- orig
-        -> rebuildHsApps (mkExpandedExprTc oe fun, ctxt) args
-        | otherwise
-        -> rebuildHsApps (fun, ctxt) args
+      EWrap (EExpand o)
+        -> rebuildHsApps (mkExpandedExprTc o fun, ctxt) args
       EWrap (EHsWrap wrap)
         -> rebuildHsApps (mkHsWrap wrap fun, ctxt) args
   where
-    lfun = L (noAnnSrcSpan $ appCtxtLoc' ctxt) fun
-    appCtxtLoc' (VAExpansion _ _ l) = l
-    appCtxtLoc' v = appCtxtLoc v
-
+    lfun = L (noAnnSrcSpan $ appCtxtLoc ctxt) fun
 
 isHsValArg :: HsExprArg id -> Bool
 isHsValArg (EValArg {}) = True
@@ -564,27 +532,21 @@ tcInferAppHead_maybe :: HsExpr GhcRn
 -- Returns Nothing for a complicated head
 tcInferAppHead_maybe fun
   = case fun of
-      HsVar _ nm                -> Just <$> tcInferId nm
-      XExpr (HsRecSelRn f)      -> Just <$> tcInferRecSelId f
-      ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
-      HsOverLit _ lit           -> Just <$> tcInferOverLit lit
-      _                         -> return Nothing
+      HsVar _ nm                  -> Just <$> tcInferId nm
+      XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
+      XExpr (ExpandedThingRn _ e) -> tcInferAppHead_maybe e
+      XExpr (PopErrCtxt e)        -> tcInferAppHead_maybe e
+      ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
+      HsOverLit _ lit             -> Just <$> tcInferOverLit lit
+      _                           -> return Nothing
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
-addHeadCtxt (VAExpansion (OrigStmt (L loc stmt)) _ _) thing_inside =
-  do setSrcSpanA loc $
-       addStmtCtxt stmt
-         thing_inside
 addHeadCtxt fun_ctxt thing_inside
-  | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
-  = thing_inside                  -- => context is already set
+  | not (isGoodSrcSpan fun_loc)       -- noSrcSpan => no arguments
+  = thing_inside                      -- => context is already set
   | otherwise
-  = setSrcSpan fun_loc $
-    do case fun_ctxt of
-         VAExpansion (OrigExpr orig) _ _ -> addExprCtxt orig thing_inside
-         _                               -> thing_inside
-  where
-    fun_loc = appCtxtLoc fun_ctxt
+  = setSrcSpan fun_loc thing_inside
+  where fun_loc = appCtxtLoc fun_ctxt
 
 
 {- *********************************************************************
@@ -1209,16 +1171,27 @@ mis-match in the number of value arguments.
 *                                                                      *
 ********************************************************************* -}
 
-addStmtCtxt :: ExprStmt GhcRn -> TcRn a -> TcRn a
-addStmtCtxt stmt =
-  addErrCtxt (StmtErrCtxt (HsDoStmt (DoExpr Nothing)) stmt)
+
+addStmtCtxt :: ExprStmt GhcRn -> HsDoFlavour -> TcRn a -> TcRn a
+addStmtCtxt stmt flav =
+  addErrCtxt (StmtErrCtxt (HsDoStmt flav) stmt)
+
+addThingCtxt :: HsThingRn -> TcRn a -> TcRn a
+addThingCtxt (OrigStmt (L loc stmt) flav) thing_inside =
+  setSrcSpanA loc $
+    addStmtCtxt stmt flav $
+    setInGeneratedCode thing_inside
+addThingCtxt (OrigExpr e) thing_inside =
+  addExprCtxt e $
+      setInGeneratedCode thing_inside
 
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
       HsHole _ -> thing_inside
-      _ -> addErrCtxt (ExprCtxt e) thing_inside
    -- The HsHole special case addresses situations like
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
+      XExpr (ExpandedThingRn o _) -> addThingCtxt o thing_inside
+      _ -> addErrCtxt (ExprCtxt e) thing_inside -- no op in generated code
