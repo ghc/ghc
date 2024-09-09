@@ -531,7 +531,6 @@ data HsThingRn = OrigExpr (HsExpr GhcRn)                -- ^ The source, user wr
                | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
                | OrigPat  (LPat GhcRn)              -- ^ The source, user written, pattern
                           HsDoFlavour               -- ^ which kind of do-block did this statement come from
-                          (Maybe (ExprLStmt GhcRn)) -- ^ Optional statement binding this pattern
 
 isHsThingRnExpr, isHsThingRnStmt, isHsThingRnPat :: HsThingRn -> Bool
 isHsThingRnExpr (OrigExpr{}) = True
@@ -546,9 +545,7 @@ isHsThingRnPat _ = False
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: HsThingRn       -- The original source thing to be used for error messages
                     , xrn_expanded :: HsExpr GhcRn    -- The compiler generated expanded thing
-                    , xrn_doTcApp  :: Bool    }       -- A Hint to the type checker of how to proceed
-                                                      --      True  <=> use GHC.Tc.Gen.Expr.tcApp on xrn_expanded
-                                                      --      False <=> use GHC.Tc.Gen.Expr.tcExpr on xrn_expanded
+                    }
 
   | PopErrCtxt                                     -- A hint for typechecker to pop
     {-# UNPACK #-} !(LHsExpr GhcRn)                -- the top of the error context stack
@@ -577,8 +574,7 @@ mkExpandedExpr
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigExpr oExpr
-                                                    , xrn_expanded = eExpr
-                                                    , xrn_doTcApp = False })
+                                                    , xrn_expanded = eExpr })
 
 -- | Build an expression using the extension constructor `XExpr`,
 --   and the two components of the expansion: original do stmt and
@@ -586,22 +582,18 @@ mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigExpr oExpr
 mkExpandedStmt
   :: ExprLStmt GhcRn      -- ^ source statement
   -> HsDoFlavour          -- ^ source statement do flavour
-  -> Bool                 -- ^ should this be type checked using tcApp?
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedStmt oStmt flav doTcApp eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigStmt oStmt flav
-                                                                 , xrn_expanded = eExpr
-                                                                 , xrn_doTcApp = doTcApp})
+mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigStmt oStmt flav
+                                                         , xrn_expanded = eExpr })
 
 mkExpandedPatRn
   :: LPat   GhcRn             -- ^ source pattern
   -> HsDoFlavour              -- ^ source statement do flavour
-  -> Maybe (ExprLStmt GhcRn)  -- ^ pattern statement origin
   -> HsExpr GhcRn             -- ^ expanded expression
   -> HsExpr GhcRn             -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedPatRn oPat flav mb_stmt eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigPat oPat flav mb_stmt
-                                                                 , xrn_expanded = eExpr
-                                                                 , xrn_doTcApp = False})
+mkExpandedPatRn oPat flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigPat oPat flav
+                                                         , xrn_expanded = eExpr })
 
 -- | Build an expression using the extension constructor `XExpr`,
 --   and the two components of the expansion: original do stmt and
@@ -611,14 +603,13 @@ mkExpandedStmtAt
   -> SrcSpanAnnA          -- ^ Location for the expansion expression
   -> ExprLStmt GhcRn      -- ^ source statement
   -> HsDoFlavour          -- ^ the flavour of the statement
-  -> Bool                 -- ^ should type check with tcApp?
   -> HsExpr GhcRn         -- ^ expanded expression
   -> LHsExpr GhcRn        -- ^ suitably wrapped located 'XXExprGhcRn'
-mkExpandedStmtAt addPop loc oStmt flav doTcApp eExpr
+mkExpandedStmtAt addPop loc oStmt flav eExpr
   | addPop
-  = mkPopErrCtxtExprAt loc (L loc $ mkExpandedStmt oStmt flav doTcApp eExpr)
+  = mkPopErrCtxtExprAt loc (L loc $ mkExpandedStmt oStmt flav eExpr)
   | otherwise
-  = L loc $ mkExpandedStmt oStmt flav doTcApp eExpr
+  = L loc $ mkExpandedStmt oStmt flav eExpr
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
@@ -931,12 +922,12 @@ instance Outputable HsThingRn where
     = case thing of
         OrigExpr x     -> ppr_builder "<OrigExpr>:" x
         OrigStmt x _   -> ppr_builder "<OrigStmt>:" x
-        OrigPat  x _ mb_stmt -> ifPprDebug (braces (text "<OrigPat>" <+> parens (ppr x) <+> parens (ppr mb_stmt))) (ppr x)
+        OrigPat  x _   -> ifPprDebug (braces (text "<OrigPat>:" <+> parens (ppr x))) (ppr x)
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where
-  ppr (ExpandedThingRn o e _) = ifPprDebug (braces $ vcat [ppr o, text ";;" , ppr e]) (ppr o)
-  ppr (PopErrCtxt e)          = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
+  ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [ppr o, text ";;" , ppr e]) (ppr o)
+  ppr (PopErrCtxt e)        = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
   ppr (HsRecSelRn f)        = pprPrefixOcc f
 
 instance Outputable XXExprGhcTc where
@@ -978,7 +969,7 @@ ppr_infix_expr (XExpr x)            = case ghcPass @p of
 ppr_infix_expr _ = Nothing
 
 ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
-ppr_infix_expr_rn (ExpandedThingRn thing _ _) = ppr_infix_hs_expansion thing
+ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
 ppr_infix_expr_rn (PopErrCtxt (L _ a)) = ppr_infix_expr a
 ppr_infix_expr_rn (HsRecSelRn f)            = Just (pprInfixOcc f)
 
@@ -1095,7 +1086,7 @@ hsExprNeedsParens prec = go
     go_x_tc (HsRecSelTc{})                   = False
 
     go_x_rn :: XXExprGhcRn -> Bool
-    go_x_rn (ExpandedThingRn thing _ _)    = hsExpandedNeedsParens thing
+    go_x_rn (ExpandedThingRn thing _ )   = hsExpandedNeedsParens thing
     go_x_rn (PopErrCtxt (L _ a))         = hsExprNeedsParens prec a
     go_x_rn (HsRecSelRn{})               = False
 
@@ -1148,7 +1139,7 @@ isAtomicHsExpr (XExpr x)
     go_x_tc (HsRecSelTc{})            = True
 
     go_x_rn :: XXExprGhcRn -> Bool
-    go_x_rn (ExpandedThingRn thing _ _)    = isAtomicExpandedThingRn thing
+    go_x_rn (ExpandedThingRn thing _)    = isAtomicExpandedThingRn thing
     go_x_rn (PopErrCtxt (L _ a))         = isAtomicHsExpr a
     go_x_rn (HsRecSelRn{})            = True
 
