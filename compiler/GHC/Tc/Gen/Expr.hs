@@ -654,7 +654,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
 
           -- Typecheck the expanded expression.
         ; expr' <- addErrCtxt err_ctxt $
-                   tcExpr (mkExpandedExpr expr ds_expr) (Check ds_res_ty)
+                   tcExpr ds_expr (Check ds_res_ty)
             -- NB: it's important to use ds_res_ty and not res_ty here.
             -- Test case: T18802b.
 
@@ -742,34 +742,18 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
-tcXExpr (PopErrCtxt (L loc e)) res_ty
+tcXExpr (PopErrCtxt e) res_ty
   = popErrCtxt $ -- See Part 3 of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-      setSrcSpanA loc $
+      addExprCtxt e $
       tcExpr e res_ty
 
-tcXExpr xe@(ExpandedThingRn o e') res_ty
-  | OrigStmt ls@(L loc s@LetStmt{}) <- o
-  , HsLet x binds e <- e'
-  =  do { (binds', e') <-  setSrcSpanA loc $
-                           addStmtCtxt s $
-                           tcLocalBinds binds $
-                           tcMonoExprNC e res_ty -- NB: Do not call tcMonoExpr here as it adds
-                                                 -- a duplicate error context
-        ; return $ mkExpandedStmtTc ls (HsLet x binds' e')
-        }
-  | OrigStmt ls@(L loc s@LastStmt{}) <- o
-  =  setSrcSpanA loc $
-          addStmtCtxt s $
-          mkExpandedStmtTc ls <$> tcExpr e' res_ty
-                -- It is important that we call tcExpr (and not tcApp) here as
-                -- `e` is the last statement's body expression
-                -- and not a HsApp of a generated (>>) or (>>=)
-                -- This improves error messages e.g. tests: DoExpansion1, DoExpansion2, DoExpansion3
-  | OrigStmt ls@(L loc _) <- o
-  = setSrcSpanA loc $
-       mkExpandedStmtTc ls <$> tcApp (XExpr xe) res_ty
+tcXExpr (ExpandedThingRn o e) res_ty
+   = mkExpandedTc o <$> -- necessary for breakpoints
+       do setInGeneratedCode $ tcExpr e res_ty
 
+-- For record selection, same as HsVar case
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
+
 
 {-
 ************************************************************************
