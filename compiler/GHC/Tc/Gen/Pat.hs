@@ -685,10 +685,19 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
 
     ViewPat _ view_expr inner_pat -> do
 
+<<<<<<< HEAD
        -- The pattern is a view pattern, 'pat = (view_expr -> inner_pat)'.
        -- First infer the type of 'view_expr'; the overall type of the pattern
        -- is the argument type of 'view_expr', and the inner pattern type is
        -- checked against the result type of 'view_expr'.
+=======
+         -- Expression must be a function
+        ; let herald = ExpectedFunTyViewPat 1 $ unLoc expr
+        ; (expr_wrap1, Scaled _mult inf_arg_ty, inf_res_sigma)
+            <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc expr) (1,expr_rho) expr_rho
+               -- See Note [View patterns and polymorphism]
+               -- expr_wrap1 :: expr_rho "->" (inf_arg_ty -> inf_res_sigma)
+>>>>>>> bab55788a9 (This commit:)
 
       { checkManyPattern ViewPatternReason (noLocA ps_pat) scaled_exp_pat_ty
           -- It should be possible to have view patterns at linear (or otherwise
