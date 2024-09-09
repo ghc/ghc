@@ -295,10 +295,7 @@ dsExpr e@(XExpr ext_expr_tc)
       WrapExpr {}   -> dsApp e
       ConLikeTc {}  -> dsApp e
 
-      ExpandedThingTc o e
-        | OrigStmt (L loc _) <- o
-        -> putSrcSpanDsA loc $ dsExpr e
-        | otherwise -> dsExpr e
+      ExpandedThingTc _ e -> dsExpr e
       -- Hpc Support
       HsTick tickish e -> do
         e' <- dsLExpr e
@@ -1228,8 +1225,8 @@ Other places that requires from the same treatment:
 
 -- Warn about certain types of values discarded in monadic bindings (#3263)
 warnDiscardedDoBindings :: LHsExpr GhcTc -> Type -> Type -> DsM ()
-warnDiscardedDoBindings rhs m_ty elt_ty
-  = do { warn_unused <- woptM Opt_WarnUnusedDoBind
+warnDiscardedDoBindings rhs@(L rhs_loc _) m_ty elt_ty
+  = putSrcSpanDsA rhs_loc $ do { warn_unused <- woptM Opt_WarnUnusedDoBind
        ; warn_wrong <- woptM Opt_WarnWrongDoBind
        ; when (warn_unused || warn_wrong) $
     do { fam_inst_envs <- dsGetFamInstEnvs
