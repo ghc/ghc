@@ -82,6 +82,8 @@ import qualified GHC.Data.Strict as Strict
 
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax (HsExpr (RecordUpd, HsGetField, HsProjection))
+import GHC.Hs.Expr (SrcCodeOrigin(..))
 
 import Control.Monad      ( when, foldM, forM_ )
 import Data.Bifunctor     ( bimap )
@@ -2776,6 +2778,10 @@ isHasFieldOrigin = \case
   RecordUpdOrigin {} -> True
   RecordFieldProjectionOrigin {} -> True
   GetFieldOrigin {} -> True
+  ExpansionOrigin (OrigExpr e)
+    | HsGetField{} <- e -> True
+    | RecordUpd{} <- e -> True
+    | HsProjection{} <- e -> True
   _ -> False
 
 -----------------------

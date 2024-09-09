@@ -97,12 +97,13 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Builtin.Types
 import GHC.Types.Name
-import GHC.Types.Id( idType )
+import GHC.Types.Id( idType, isDataConId )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
+import GHC.Types.SrcLoc (unLoc)
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -136,7 +137,7 @@ import Data.Traversable (for)
 --
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchActualFunTy
-  :: ExpectedFunTyOrigin
+  :: CtOrigin
       -- ^ See Note [Herald for matchExpectedFunTys]
   -> Maybe TypedThing
       -- ^ The thing with type TcSigmaType
@@ -175,7 +176,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
 
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
-      do { (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald 1) arg_ty
+      do { (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy (updatePositionCtOrigin 1 herald) 1) arg_ty
          ; let fun_co = mkFunCo Nominal af
                           (mkReflCo Nominal w)
                           arg_co
@@ -246,7 +247,7 @@ Ugh!
 -- INVARIANT: the returned argument types all have a syntactically fixed RuntimeRep
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
-matchActualFunTys :: ExpectedFunTyOrigin -- ^ See Note [Herald for matchExpectedFunTys]
+matchActualFunTys :: CtOrigin -- ^ See Note [Herald for matchExpectedFunTys]
                   -> CtOrigin
                   -> Arity
                   -> TcSigmaType
@@ -790,7 +791,7 @@ Example:
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchExpectedFunTys :: forall a.
-                       ExpectedFunTyOrigin  -- See Note [Herald for matchExpectedFunTys]
+                       CtOrigin  -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
                     -> VisArity
                     -> ExpSigmaType
@@ -872,7 +873,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
                                    , ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
         do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
-           ; (arg_co, arg_ty_frr) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
+           ; (arg_co, arg_ty_frr) <- hasFixedRuntimeRep (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos) arg_ty
            ; let scaled_arg_ty_frr = Scaled mult arg_ty_frr
            ; (res_wrap, result) <- check (n_req - 1)
                                          (mkCheckExpFunPatTy scaled_arg_ty_frr : rev_pat_tys)
@@ -944,19 +945,19 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
            ; co <- unifyType Nothing (mkScaledFunTys more_arg_tys res_ty) fun_ty
            ; return (mkWpCastN co, result) }
 
-new_infer_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled ExpRhoTypeFRR)
+new_infer_arg_ty :: CtOrigin -> Int -> TcM (Scaled ExpRhoTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
   = do { mult     <- newFlexiTyVarTy multiplicityTy
-       ; inf_hole <- newInferExpTypeFRR IIF_DeepRho (FRRExpectedFunTy herald arg_pos)
+       ; inf_hole <- newInferExpTypeFRR IIF_DeepRho (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos)
        ; return (mkScaled mult inf_hole) }
 
-new_check_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled TcType)
+new_check_arg_ty :: CtOrigin -> Int -> TcM (Scaled TcType)
 new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first arg
   = do { mult   <- newFlexiTyVarTy multiplicityTy
-       ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy herald arg_pos)
+       ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos)
        ; return (mkScaled mult arg_ty) }
 
-mkFunTysMsg :: ExpectedFunTyOrigin
+mkFunTysMsg :: CtOrigin
             -> (VisArity, TcType)
             -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 -- See Note [Reporting application arity errors]
@@ -2040,14 +2041,36 @@ getDeepSubsumptionFlag =
 getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
 getDeepSubsumptionFlag_DataConHead app_head =
   do { user_ds <- xoptM LangExt.DeepSubsumption
+     ; traceTc "getDeepSubsumptionFlag_DataConHead" (ppr app_head)
      ; return $
          if | user_ds
             -> Deep DeepSub
-            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-            -> Deep TopSub
             | otherwise
-            -> Shallow
-    }
+            -> go app_head
+     }
+  where
+    go :: HsExpr GhcTc -> DeepSubsumptionFlag
+    go app_head
+     | XExpr (ConLikeTc (RealDataCon {})) <- app_head
+     = Deep TopSub
+     | XExpr (ExpandedThingTc _ f) <- app_head
+     = go f
+     | XExpr (WrapExpr _ f) <- app_head
+     = go f
+     | HsVar _ f <- app_head
+     , isDataConId (unLoc f)
+     = Deep TopSub
+     | HsApp _ f _ <- app_head
+     = go (unLoc f)
+     | HsAppType _ f _ <- app_head
+     = go (unLoc f)
+     | OpApp _ _ f _ <- app_head
+     = go (unLoc f)
+     | HsPar _ f <- app_head
+     = go (unLoc f)
+     | otherwise
+     = Shallow
+
 
 -- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
 --
@@ -2487,7 +2510,7 @@ unifyTypeAndEmit t_or_k orig ty1 ty2
                       , u_given_eq_lvl = cur_lvl
                       , u_rewriters = emptyCoHoleSet  -- ToDo: check this
                       , u_defer = ref, u_what = WU_None }
-
+       ; traceTc "unifyTypeAndEmit" (ppr t_or_k)
        -- The hard work happens here
        ; co <- uType env ty1 ty2
 

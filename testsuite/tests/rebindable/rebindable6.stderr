@@ -1,9 +1,8 @@
-
 rebindable6.hs:110:17: error: [GHC-39999]
     • Ambiguous type variable ‘t0’ arising from a do statement
       prevents the constraint ‘(HasSeq
                                   (IO a -> t0 -> IO b))’ from being solved.
-        (maybe you haven't applied a function to enough arguments?)
+      (maybe you haven't applied a function to enough arguments?)
       Relevant bindings include
         g :: IO (Maybe b) (bound at rebindable6.hs:108:19)
         f :: IO a (bound at rebindable6.hs:108:17)
@@ -28,7 +27,7 @@ rebindable6.hs:111:17: error: [GHC-39999]
     • Ambiguous type variables ‘t1’, ‘t0’ arising from a do statement
       prevents the constraint ‘(HasBind
                                   (IO (Maybe b) -> (Maybe b -> t1) -> t0))’ from being solved.
-        (maybe you haven't applied a function to enough arguments?)
+      (maybe you haven't applied a function to enough arguments?)
       Relevant bindings include
         g :: IO (Maybe b) (bound at rebindable6.hs:108:19)
         test_do :: IO a -> IO (Maybe b) -> IO b
@@ -52,7 +51,7 @@ rebindable6.hs:111:17: error: [GHC-39999]
 rebindable6.hs:112:17: error: [GHC-39999]
     • Ambiguous type variable ‘t1’ arising from a use of ‘return’
       prevents the constraint ‘(HasReturn (b -> t1))’ from being solved.
-        (maybe you haven't applied a function to enough arguments?)
+      (maybe you haven't applied a function to enough arguments?)
       Relevant bindings include
         b :: b (bound at rebindable6.hs:111:23)
         g :: IO (Maybe b) (bound at rebindable6.hs:108:19)
@@ -71,3 +70,4 @@ rebindable6.hs:112:17: error: [GHC-39999]
             = do f
                  Just (b :: b) <- g
                  return b
+
