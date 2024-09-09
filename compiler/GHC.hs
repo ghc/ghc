@@ -288,7 +288,7 @@ module GHC (
         SrcLoc(..), RealSrcLoc,
         mkSrcLoc, noSrcLoc,
         srcLocFile, srcLocLine, srcLocCol,
-        SrcSpan(..), RealSrcSpan,
+        SrcSpan(..), RealSrcSpan, GeneratedSrcSpanDetails (..),
         mkSrcSpan, srcLocSpan, isGoodSrcSpan, noSrcSpan,
         srcSpanStart, srcSpanEnd,
         srcSpanFile,
@@ -1617,6 +1617,7 @@ addSourceToTokens _ _ [] = []
 addSourceToTokens loc buf (t@(L span _) : ts)
     = case span of
       UnhelpfulSpan _ -> (t,"") : addSourceToTokens loc buf ts
+      GeneratedSrcSpan _ -> (t,"") : addSourceToTokens loc buf ts
       RealSrcSpan s _ -> (t,str) : addSourceToTokens newLoc newBuf ts
         where
           (newLoc, newBuf, str) = go "" loc buf
@@ -1637,12 +1638,14 @@ showRichTokenStream ts = go startLoc ts ""
     where sourceFile = getFile $ map (getLoc . fst) ts
           getFile [] = panic "showRichTokenStream: No source file found"
           getFile (UnhelpfulSpan _ : xs) = getFile xs
+          getFile (GeneratedSrcSpan _ : xs) = getFile xs
           getFile (RealSrcSpan s _ : _) = srcSpanFile s
           startLoc = mkRealSrcLoc sourceFile 1 1
           go _ [] = id
           go loc ((L span _, str):ts)
               = case span of
                 UnhelpfulSpan _ -> go loc ts
+                GeneratedSrcSpan _ -> go loc ts
                 RealSrcSpan s _
                  | locLine == tokLine -> ((replicate (tokCol - locCol) ' ') ++)
                                        . (str ++)
