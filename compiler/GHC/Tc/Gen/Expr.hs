@@ -744,12 +744,7 @@ tcXExpr (PopErrCtxt (L loc e)) res_ty
       setSrcSpanA loc $
       tcExpr e res_ty
 
-tcXExpr xe@(ExpandedThingRn o e' doTcApp) res_ty
-  | OrigPat (L loc _) flav (Just s) <- o   -- testcase T16628
-  = setSrcSpanA loc $
-    addStmtCtxt (unLoc s) flav $
-    tcApp (XExpr xe) res_ty
-
+tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc s) flav <- o
   , HsLet x binds e <- e'
   =  do { (binds', e') <-  setSrcSpanA loc $
@@ -760,22 +755,14 @@ tcXExpr xe@(ExpandedThingRn o e' doTcApp) res_ty
         ; return $ mkExpandedStmtTc ls flav (HsLet x binds' e')
         }
 
+  | OrigStmt s@(L loc LastStmt{}) flav <- o
+  = setSrcSpanA loc $
+    addStmtCtxt (unLoc s) flav $
+    mkExpandedStmtTc s flav <$> tcApp e' res_ty
+
   | OrigStmt ls@(L loc _) flav <- o
-  , doTcApp
   = setSrcSpanA loc $
     mkExpandedStmtTc ls flav <$> tcApp (XExpr xe) res_ty
-
-    -- There are currently 2 `do`-statements that require calling `tcExpr` and not `tcApp`:
-    -- `LastStmt`, `AppStmt`
-    -- The reason is that the expanded expression `e` is the last statement's body expression
-    -- (or the the argument expression of an applicative statement)
-    -- It is not an HsApp of a generated (>>) or (>>=)
-    -- This improves error messages e.g. tests: DoExpansion1, DoExpansion2, DoExpansion3, ado002 etc.
-  | OrigStmt ls@(L loc s) flav <- o
-  , not doTcApp
-  = setSrcSpanA loc $
-    addStmtCtxt s flav $
-    mkExpandedStmtTc ls flav <$> tcExpr e' res_ty
 
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 
