@@ -100,7 +100,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import qualified Data.Semigroup as Semi
 }
 
-%error { srcParseFail } { srcParseFail' }
+%error { srcParseAbort } { srcParseReport }
 %error.expected
 %expect 0 -- shift/reduce conflicts
 
@@ -2289,7 +2289,7 @@ infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
 
 ftype :: { forall b. DisambTD b => PV (LocatedA b) }
         : atype                         { mkHsAppTyHeadPV $1 }
-        | tyop                          { failOpFewArgs (fst $1) }
+        | tyop                          { failOpFewArgs (fst $1) >> mkHsAppTyHeadPV (sL1a (fst $1) $ mkAnonWildCardTy) } -- TODO!
         | ftype tyarg                   { $1 >>= \ $1 ->
                                           mkHsAppTyPV $1 $2 }
         | ftype PREFIX_AT atype         { $1 >>= \ $1 ->
@@ -4159,7 +4159,7 @@ catchHsExpr = ecpFromExp (noLocA (HsPartial noExtField))
 
 -----------------------------------------------------------------------------
 happyError :: P a
-happyError = srcParseFail
+happyError = srcParseAbort
 
 getVARID          (L _ (ITvarid    x)) = x
 getCONID          (L _ (ITconid    x)) = x

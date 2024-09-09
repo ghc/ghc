@@ -1234,7 +1234,7 @@ isPtrGlobalRegUse (GlobalRegUse reg ty)
     go _              = False
 
 happyError :: PD a
-happyError = PD $ \_ _ s -> unP srcParseFail s
+happyError = PD $ \_ _ s -> unP srcParseAbort s
 
 -- -----------------------------------------------------------------------------
 -- Statement-level macros

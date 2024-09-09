@@ -61,7 +61,7 @@ module GHC.Parser.Lexer (
    allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..), getBit,
    getRealSrcLoc, getPState,
-   failMsgP, failLocMsgP, srcParseFail, srcParseFail', srcParseErr,
+   failMsgP, failLocMsgP, srcParseReport, srcParseAbort, srcParseErr,
    getPsErrorMessages, getPsMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
@@ -3264,11 +3264,11 @@ srcParseErr options buf len loc expected = mkPlainErrorMsgEnvelope loc (PsErrPar
      , ped_expected        = expected
      }
 
--- Report a parse failure, giving the span of the previous token as
+-- Report a fatal parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
-srcParseFail :: P a
-srcParseFail =
+srcParseAbort :: P a
+srcParseAbort =
   P $ \s@PState{ buffer = buf
                , options = o
                , last_len = len
@@ -3300,12 +3300,16 @@ srcParseWarn options buf len loc expected = mkPlainWarningMsgEnvelope loc (PsErr
      , ped_expected        = expected
      }
 
-srcParseFail' :: Located Token -> [String] -> P a -> P a
-srcParseFail' (L loc _last_tk) expected_toks resume =
+-- Report a resumable parse failure, giving the span of the previous token as
+-- the location of the error.  This is the entry point for errors
+-- detected during parsing.
+srcParseReport :: Located Token -> [String] -> P a -> P a
+srcParseReport (L loc _last_tk) expected_toks resume =
   do P $ \s@PState{ buffer = buf
                   , options = o
-                  , last_len = len } ->
-         unP (addWarning $ srcParseWarn o buf len loc expected_toks) s
+                  , last_len = len
+                  , last_loc = last_loc } ->
+         unP (addError $ srcParseErr o buf len (mkSrcSpanPs last_loc) []) s
      resume
 
 -- A lexical error is reported at a particular position in the source file,

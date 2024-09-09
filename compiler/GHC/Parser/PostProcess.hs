@@ -146,6 +146,7 @@ import GHC.Parser.Errors.Types
 import GHC.Utils.Lexeme ( okConOcc )
 import GHC.Types.TyThing
 import GHC.Core.Type    ( Specificity(..) )
+import GHC.Builtin.Names ( wildCardName )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, sumDataCon,
@@ -1077,12 +1078,14 @@ checkTyClHdr is_cls ty
            ; return (L a' (Unqual name), acc, fix
                     , (reverse ops') ++ cps', cs) }
 
-    go cs l (HsTyVar _ _ ltc@(L _ tc)) acc ops cps fix
-      | isRdrTc tc               = return (ltc, acc, fix, (reverse ops) ++ cps, cs Semi.<> comments l)
-    go cs l (HsOpTy _ _ t1 ltc@(L _ tc) t2) acc ops cps _fix
-      | isRdrTc tc               = return (ltc, lhs:rhs:acc, Infix, (reverse ops) ++ cps, cs Semi.<> comments l)
-      where lhs = HsValArg noExtField t1
-            rhs = HsValArg noExtField t2
+    go cs l (HsTyVar _ _ ltc@(L _ tc)) acc ops cps fix = do
+      unless (isRdrTc tc) $ reportMalformed ty l
+      return (ltc, acc, fix, (reverse ops) ++ cps, cs Semi.<> comments l)
+    go cs l (HsOpTy _ _ t1 ltc@(L _ tc) t2) acc ops cps _fix = do
+      unless (isRdrTc tc) $ reportMalformed ty l
+      let lhs = HsValArg noExtField t1
+          rhs = HsValArg noExtField t2
+      return (ltc, lhs:rhs:acc, Infix, (reverse ops) ++ cps, cs Semi.<> comments l)
     go cs l (HsParTy _ ty)    acc ops cps fix = goL (cs Semi.<> comments l) ty acc (o:ops) (c:cps) fix
       where
         (o,c) = mkParensEpAnn (realSrcSpan (locA l))
@@ -1096,9 +1099,16 @@ checkTyClHdr is_cls ty
         tup_name | is_cls    = cTupleTyConName arity
                  | otherwise = getName (tupleTyCon Boxed arity)
           -- See Note [Unit tuples] in GHC.Hs.Type  (TODO: is this still relevant?)
-    go _ l _ _ _ _ _
-      = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $
-          (PsErrMalformedTyOrClDecl ty)
+    go cs l this_ty acc ops cps fix = do
+      reportMalformed ty l
+      case this_ty of
+        HsWildCardTy{} -> -- This is actually the partial node case
+          return (L (l2l l) (nameRdrName wildCardName), acc, fix, (reverse ops) ++ cps, cs Semi.<> comments l)
+        _ ->
+          P PFailed
+
+    reportMalformed ty l =
+      addError $ mkPlainErrorMsgEnvelope (locA l) (PsErrMalformedTyOrClDecl ty)
 
     -- Combine the annotations from the HsParTy and HsStarTy into a
     -- new one for the LocatedN RdrName
@@ -3253,11 +3263,11 @@ failImportQualifiedTwice loc =
 warnStarIsType :: SrcSpan -> P ()
 warnStarIsType span = addPsMessage span PsWarnStarIsType
 
-failOpFewArgs :: MonadP m => LocatedN RdrName -> m a
+failOpFewArgs :: MonadP m => LocatedN RdrName -> m ()
 failOpFewArgs (L loc op) =
   do { star_is_type <- getBit StarIsTypeBit
      ; let is_star_type = if star_is_type then StarIsType else StarIsNotType
-     ; addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
+     ; addError $ mkPlainErrorMsgEnvelope (locA loc) $
          (PsErrOpFewArgs is_star_type op) }
 
 requireExplicitNamespaces :: MonadP m => SrcSpan -> m ()
