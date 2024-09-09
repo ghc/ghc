@@ -654,16 +654,16 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
        ; return (HsDo srcloc cxt (L l stmts')) }
   where
-        forQual = case cxt of
+    forQual = case cxt of
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
-addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
+addTickHsExpanded :: SrcCodeOrigin -> HsExpr GhcTc -> TM (HsExpr GhcTc)
 addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
   -- We always want statements to get a tick, so we can step over each one.
   -- To avoid duplicates we blacklist SrcSpans we already inserted here.
-  OrigStmt (L pos _) -> do_tick_black pos
-  _                  -> skip
+  OrigStmt (L pos _) _ -> do_tick_black pos
+  _                    -> skip
   where
     skip = addTickHsExpr e
     do_tick_black pos = do
