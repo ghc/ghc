@@ -137,7 +137,7 @@ import Data.Traversable (for)
 --
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchActualFunTy
-  :: ExpectedFunTyOrigin
+  :: CtOrigin
       -- ^ See Note [Herald for matchExpectedFunTys]
   -> Maybe TypedThing
       -- ^ The thing with type TcSigmaType
@@ -176,7 +176,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
 
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
-      do { hasFixedRuntimeRep_syntactic (FRRExpectedFunTy herald 1) arg_ty
+      do { hasFixedRuntimeRep_syntactic (FRRExpectedFunTy (updatePositionCtOrigin 1 herald) 1) arg_ty
          ; return (idHsWrapper, Scaled w arg_ty, res_ty) }
 
     go ty@(TyVarTy tv)
@@ -243,7 +243,7 @@ Ugh!
 -- INVARIANT: the returned argument types all have a syntactically fixed RuntimeRep
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
-matchActualFunTys :: ExpectedFunTyOrigin -- ^ See Note [Herald for matchExpectedFunTys]
+matchActualFunTys :: CtOrigin -- ^ See Note [Herald for matchExpectedFunTys]
                   -> CtOrigin
                   -> Arity
                   -> TcSigmaType
@@ -782,7 +782,7 @@ Example:
 -- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 -- See Note [Return arguments with a fixed RuntimeRep].
 matchExpectedFunTys :: forall a.
-                       ExpectedFunTyOrigin  -- See Note [Herald for matchExpectedFunTys]
+                       CtOrigin  -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
                     -> VisArity
                     -> ExpSigmaType
@@ -864,7 +864,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
                                    , ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
         do { let arg_pos = arity - n_req + 1   -- 1 for the first argument etc
-           ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
+           ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos) arg_ty
            ; (wrap_res, result) <- check (n_req - 1)
                                          (mkCheckExpFunPatTy (Scaled mult arg_ty) : rev_pat_tys)
                                          res_ty
@@ -917,19 +917,19 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
            ; co <- unifyType Nothing (mkScaledFunTys more_arg_tys res_ty) fun_ty
            ; return (mkWpCastN co, result) }
 
-new_infer_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled ExpRhoTypeFRR)
+new_infer_arg_ty :: CtOrigin -> Int -> TcM (Scaled ExpRhoTypeFRR)
 new_infer_arg_ty herald arg_pos -- position for error messages only
   = do { mult     <- newFlexiTyVarTy multiplicityTy
-       ; inf_hole <- newInferExpTypeFRR IIF_DeepRho (FRRExpectedFunTy herald arg_pos)
+       ; inf_hole <- newInferExpTypeFRR IIF_DeepRho (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos)
        ; return (mkScaled mult inf_hole) }
 
-new_check_arg_ty :: ExpectedFunTyOrigin -> Int -> TcM (Scaled TcType)
+new_check_arg_ty :: CtOrigin -> Int -> TcM (Scaled TcType)
 new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first arg
   = do { mult   <- newFlexiTyVarTy multiplicityTy
-       ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy herald arg_pos)
+       ; arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy (updatePositionCtOrigin arg_pos herald) arg_pos)
        ; return (mkScaled mult arg_ty) }
 
-mkFunTysMsg :: ExpectedFunTyOrigin
+mkFunTysMsg :: CtOrigin
             -> (VisArity, TcType)
             -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 -- See Note [Reporting application arity errors]

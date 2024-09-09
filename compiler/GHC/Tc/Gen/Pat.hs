@@ -700,7 +700,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
                -- But we must do top-instantiation to expose the arrow to matchActualFunTy
 
          -- Expression must be a function
-        ; let herald = ExpectedFunTyViewPat $ unLoc expr
+        ; let herald = ExpectedFunTyViewPat 1 $ unLoc expr
         ; (expr_wrap1, Scaled _mult inf_arg_ty, inf_res_sigma)
             <- matchActualFunTy herald (Just . HsExprRnThing $ unLoc expr) (1,expr_rho) expr_rho
                -- See Note [View patterns and polymorphism]
