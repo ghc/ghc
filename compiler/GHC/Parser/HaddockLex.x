@@ -145,6 +145,7 @@ lexStringLiteral identParser (L l sl@(StringLiteral _ fs _))
     plausibleIdents = case l of
       RealSrcSpan span _ -> [(RealSrcSpan span' Strict.Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) bs]
       UnhelpfulSpan reason -> [(UnhelpfulSpan reason, tok) | (_, tok) <- alexScanTokens fakeLoc bs]
+      GeneratedSrcSpan span -> [(GeneratedSrcSpan span, tok) | (_, tok) <- alexScanTokens fakeLoc bs]
 
     fakeLoc = mkRealSrcLoc nilFS 0 0
 
@@ -166,6 +167,8 @@ lexHsDoc identParser doc =
       = [(RealSrcSpan span' Strict.Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) s]
     plausibleIdents (L (UnhelpfulSpan reason) (HsDocStringChunk s))
       = [(UnhelpfulSpan reason, tok) | (_, tok) <- alexScanTokens fakeLoc s] -- preserve the original reason
+    plausibleIdents (L (GeneratedSrcSpan span) (HsDocStringChunk s))
+      = [(GeneratedSrcSpan span, tok) | (_, tok) <- alexScanTokens fakeLoc s] -- preserve the original reason
 
     fakeLoc = mkRealSrcLoc nilFS 0 0
 
@@ -181,11 +184,13 @@ validateIdentWith identParser mloc str0 =
       buffer = stringBufferFromByteString str0
       realSrcLc = case mloc of
         RealSrcSpan loc _ -> realSrcSpanStart loc
-        UnhelpfulSpan _ -> mkRealSrcLoc nilFS 0 0
+        GeneratedSrcSpan{} -> mkRealSrcLoc nilFS 0 0
+        UnhelpfulSpan{} -> mkRealSrcLoc nilFS 0 0
       pstate = initParserState pflags buffer realSrcLc
   in case unP identParser pstate of
     POk _ name -> Just $ case mloc of
        RealSrcSpan _ _ -> reLoc name
-       UnhelpfulSpan _ -> L mloc (unLoc name) -- Preserve the original reason
+       GeneratedSrcSpan{} -> L mloc (unLoc name) -- Preserve the original reason
+       UnhelpfulSpan{} -> L mloc (unLoc name) -- Preserve the original reason
     _ -> Nothing
 }

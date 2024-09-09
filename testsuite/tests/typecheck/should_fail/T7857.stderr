@@ -1,4 +1,3 @@
-
 T7857.hs:8:11: error: [GHC-39999]
     • Could not deduce ‘PrintfType a0’ arising from a use of ‘printf’
       from the context: PrintfArg t
@@ -15,3 +14,4 @@ T7857.hs:8:11: error: [GHC-39999]
     • In the second argument of ‘($)’, namely ‘printf "" i’
       In the expression: f $ printf "" i
       In an equation for ‘g’: g i = f $ printf "" i
+

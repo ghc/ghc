@@ -307,10 +307,8 @@ dsExpr e@(XExpr ext_expr_tc)
       WrapExpr {}   -> dsApp e
       ConLikeTc {}  -> dsApp e
 
-      ExpandedThingTc o e
-        | OrigStmt (L loc _) <- o
-        -> putSrcSpanDsA loc $ dsExpr e
-        | otherwise -> dsExpr e
+      ExpandedThingTc (HSE _ e) -> dsLExpr e
+
       -- Hpc Support
       HsTick tickish e -> do
         e' <- dsLExpr e
@@ -722,13 +720,13 @@ ds_app (XExpr (ConLikeTc con)) _hs_args core_args
 ds_app (XExpr (HsRecSelTc (FieldOcc { foLabel = L _ sel_id }))) _hs_args core_args
   = ds_app_rec_sel sel_id sel_id core_args
 
-ds_app (XExpr (ExpandedThingTc _orig e)) hs_args core_args
-  = ds_app e hs_args core_args
+ds_app (XExpr (ExpandedThingTc (HSE _orig e))) hs_args core_args
+  = ds_app (unLoc e) hs_args core_args
   -- NB: this is important for the 'getField' case of 'ds_app_var', which needs
   -- to see all type arguments to 'getField' at once, while for record field
   -- projections such as (.fld) we may get:
   --
-  --   XExpr (ExpandedThingTc (.fld) (getField @Symbol @LiftedRep @LiftedRep "fld"))
+  --   XExpr (ExpandedThingTc (HSE (.fld) (getField @Symbol @LiftedRep @LiftedRep "fld")))
   --     `HsAppType` rec_ty `HsAppType` fld
 
 ds_app (HsVar _ lfun) hs_args core_args
@@ -1277,8 +1275,8 @@ Other places that requires from the same treatment:
 
 -- Warn about certain types of values discarded in monadic bindings (#3263)
 warnDiscardedDoBindings :: LHsExpr GhcTc -> Type -> Type -> DsM ()
-warnDiscardedDoBindings rhs m_ty elt_ty
-  = do { warn_unused <- woptM Opt_WarnUnusedDoBind
+warnDiscardedDoBindings rhs@(L rhs_loc _) m_ty elt_ty
+  = putSrcSpanDsA rhs_loc $ do { warn_unused <- woptM Opt_WarnUnusedDoBind
        ; warn_wrong <- woptM Opt_WarnWrongDoBind
        ; when (warn_unused || warn_wrong) $
     do { fam_inst_envs <- dsGetFamInstEnvs

@@ -17,12 +17,14 @@ module GHC.Rename.Utils (
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
+        wrapGenSpan, wrapGenSpan', wrapNoSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
         genLHsApp, genAppType,
         genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
         genSimpleFunBind, genFunBind,
         genHsLamDoExp, genHsCaseAltDoExp, genSimpleMatch, genHsLet,
+
+        mkExpandedRn, mkExpandedExpr, mkExpandedStmt, mkExpandedLExpr, mkExpandedTc, mkExpandedExprTc,
 
         mkRnSyntaxExpr,
 
@@ -45,7 +47,6 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
--- import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -701,6 +702,19 @@ wrapGenSpan :: (HasAnnotation an) => a -> GenLocated an a
 -- See Note [Rebindable syntax and XXExprGhcRn]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
 
+wrapGenSpan' :: (HasAnnotation an) => SrcSpan -> a -> GenLocated an a
+wrapGenSpan' s x = case s of
+  RealSrcSpan s _ -> L (noAnnSrcSpan $ GeneratedSrcSpan (OrigSpan s)) x
+  GeneratedSrcSpan{} -> wrapGenSpan x
+  UnhelpfulSpan{} -> wrapGenSpan x
+
+
+wrapNoSpan :: (HasAnnotation an) => a -> GenLocated an a
+-- Wrap something in a "noSrcSpan"
+-- See Note [Rebindable syntax and XXExprGhcRn]
+wrapNoSpan x = L (noAnnSrcSpan noSrcSpan) x
+
+
 -- | Make a 'SyntaxExpr' from a 'Name' (the "rn" is because this is used in the
 -- renamer).
 mkRnSyntaxExpr :: Name -> SyntaxExprRn
@@ -805,3 +819,51 @@ genSimpleMatch ctxt pats rhs
   = wrapGenSpan $
     Match { m_ext = noExtField, m_ctxt = ctxt, m_pats = noLocA pats
           , m_grhss = unguardedGRHSs generatedSrcSpan rhs noAnn }
+
+
+-- | Build an expression using the extension constructor `XExpr`,
+--   and the two components of the expansion: original expression and
+--   expanded expressions.
+mkExpandedExpr
+  :: HsExpr GhcRn         -- ^ source expression context
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedExpr oExpr eExpr = mkExpandedRn (ExprCtxt oExpr) (wrapGenSpan eExpr)
+
+mkExpandedLExpr
+  :: HsExpr GhcRn         -- ^ source expression context
+  -> LHsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedLExpr oExpr eExpr = mkExpandedRn (ExprCtxt oExpr) eExpr
+
+-- | Build an expression using the extension constructor `XExpr`,
+--   and the two components of the expansion: original do stmt and
+--   expanded expression
+mkExpandedStmt
+  :: ExprLStmt GhcRn      -- ^ source statement context
+  -> HsDoFlavour          -- ^ source statements do flavour
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedStmt oStmt flav eExpr = mkExpandedRn (StmtErrCtxt (HsDoStmt flav) oStmt) (wrapGenSpan eExpr)
+
+mkExpandedRn
+  :: HsCtxt          -- ^ source, user written do statement/expression
+  -> LHsExpr GhcRn           -- ^ expanded typechecked expression
+  -> HsExpr GhcRn          -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedRn o e = XExpr (ExpandedThingRn (HSE o e))
+
+
+-- | Build a 'XXExprGhcRn' out of an extension constructor,
+--   and the two components of the expansion: original and
+--   expanded typechecked expressions.
+mkExpandedExprTc
+  :: HsExpr GhcRn           -- ^ source expression
+  -> HsExpr GhcTc           -- ^ expanded typechecked expression
+  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedExprTc oExpr eExpr = mkExpandedTc (ExprCtxt oExpr) (wrapGenSpan eExpr)
+
+mkExpandedTc
+  :: HsCtxt          -- ^ source, user written do statement/expression
+  -> LHsExpr GhcTc           -- ^ expanded typechecked expression
+  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcTc'
+mkExpandedTc o e = XExpr (ExpandedThingTc (HSE o e))

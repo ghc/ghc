@@ -47,6 +47,7 @@ import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Tickish
 import GHC.Types.ProfAuto
+import GHC.Tc.Types.ErrCtxt
 
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
@@ -120,8 +121,9 @@ addTicksToBinds logger cfg
                       , inScope      = emptyVarSet
                       , blackList    = Set.fromList $
                                        mapMaybe (\tyCon -> case getSrcSpan (tyConName tyCon) of
-                                                             RealSrcSpan l _ -> Just l
-                                                             UnhelpfulSpan _ -> Nothing)
+                                                             RealSrcSpan l _    -> Just l
+                                                             GeneratedSrcSpan{} -> Nothing
+                                                             UnhelpfulSpan{} -> Nothing)
                                                 tyCons
                       , density      = mkDensity tickish $ ticks_profAuto cfg
                       , this_mod     = mod
@@ -414,7 +416,7 @@ addTickLHsExpr e@(L pos e0) = do
   d <- getDensity
   case d of
     TickForBreakPoints | isGoodBreakExpr e0 -> tick_it
-    TickForCoverage    | XExpr (ExpandedThingTc OrigStmt{} _) <- e0 -- expansion ticks are handled separately
+    TickForCoverage    | XExpr (ExpandedThingTc (HSE StmtErrCtxt{} _)) <- e0 -- expansion ticks are handled separately
                        -> dont_tick_it
                        | otherwise -> tick_it
     TickCallSites      | isCallSite e0      -> tick_it
@@ -483,15 +485,15 @@ addTickLHsExprNever (L pos e0) = do
 -- General heuristic: expressions which are calls (do not denote
 -- values) are good break points.
 isGoodBreakExpr :: HsExpr GhcTc -> Bool
-isGoodBreakExpr (XExpr (ExpandedThingTc (OrigStmt{}) _)) = False
+isGoodBreakExpr (XExpr (ExpandedThingTc (HSE StmtErrCtxt{} _))) = False -- Expansion ticks are handled separately
 isGoodBreakExpr e = isCallSite e
 
 isCallSite :: HsExpr GhcTc -> Bool
 isCallSite HsApp{}     = True
 isCallSite HsAppType{} = True
 isCallSite HsCase{}    = True
-isCallSite (XExpr (ExpandedThingTc _ e))
-  = isCallSite e
+isCallSite (XExpr (ExpandedThingTc (HSE _ e)))
+  = isCallSite (unLoc e)
 
 -- NB: OpApp, SectionL, SectionR are all expanded out
 isCallSite _           = False
@@ -637,7 +639,7 @@ addTickHsExpr (HsProc x pat cmdtop) =
 addTickHsExpr (XExpr (WrapExpr w e)) =
         liftM (XExpr . WrapExpr w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
-addTickHsExpr (XExpr (ExpandedThingTc o e)) = addTickHsExpanded o e
+addTickHsExpr (XExpr (ExpandedThingTc hse)) = addTickHsExpanded hse
 
 addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually
@@ -656,18 +658,18 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
        ; return (HsDo srcloc cxt (L l stmts')) }
   where
-        forQual = case cxt of
+    forQual = case cxt of
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
-addTickHsExpanded :: HsThingRn -> HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
+addTickHsExpanded :: HsExpansion GhcTc -> TM (HsExpr GhcTc)
+addTickHsExpanded (HSE o e) = liftM (XExpr . ExpandedThingTc . HSE o) $ case o of
   -- We always want statements to get a tick, so we can step over each one.
   -- To avoid duplicates we blacklist SrcSpans we already inserted here.
-  OrigStmt (L pos _) -> do_tick_black pos
-  _                  -> skip
+  StmtErrCtxt _ (L pos _) -> do_tick_black pos
+  _                    -> skip
   where
-    skip = addTickHsExpr e
+    skip = addTickLHsExpr e
     do_tick_black pos = do
       d <- getDensity
       case d of
@@ -675,9 +677,9 @@ addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
          TickForBreakPoints -> tick_it_black pos
          _                  -> skip
     tick_it_black pos =
-      unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
+      allocTickBox (ExpBox False) False False (locA pos)
                              (withBlackListed (locA pos) $
-                               addTickHsExpr e)
+                               addTickHsExpr (unLoc e))
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
 addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
@@ -1191,7 +1193,8 @@ getFileName = fileName `liftM` getEnv
 
 isGoodSrcSpan' :: SrcSpan -> Bool
 isGoodSrcSpan' pos@(RealSrcSpan _ _) = srcSpanStart pos /= srcSpanEnd pos
-isGoodSrcSpan' (UnhelpfulSpan _) = False
+isGoodSrcSpan' UnhelpfulSpan{} = False
+isGoodSrcSpan' GeneratedSrcSpan{} = False
 
 isGoodTickSrcSpan :: SrcSpan -> TM Bool
 isGoodTickSrcSpan pos = do
@@ -1217,11 +1220,13 @@ bindLocals from (TM m) = TM $ \env st ->
 
 withBlackListed :: SrcSpan -> TM a -> TM a
 withBlackListed (RealSrcSpan ss _) = withEnv (\ env -> env { blackList = Set.insert ss (blackList env) })
-withBlackListed (UnhelpfulSpan _)  = id
+withBlackListed GeneratedSrcSpan{}  = id
+withBlackListed UnhelpfulSpan{}  = id
 
 isBlackListed :: SrcSpan -> TM Bool
 isBlackListed (RealSrcSpan pos _) = TM $ \ env st -> (Set.member pos (blackList env), noFVs, st)
-isBlackListed (UnhelpfulSpan _) = return False
+isBlackListed GeneratedSrcSpan{} = return False
+isBlackListed UnhelpfulSpan{} = return False
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations

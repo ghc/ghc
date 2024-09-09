@@ -809,6 +809,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
           (vcat [ ppr ctxt
                 , text "scrs" <+> ppr scrs
                 , text "matches group" <+> ppr matches
+                , text "new_vars" <+> ppr new_vars
                 , text "matchPmChecked" <+> ppr (isMatchContextPmChecked dflags origin ctxt)])
         ; matches_nablas <-
             if isMatchContextPmChecked dflags origin ctxt
@@ -1165,10 +1166,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- we have to compare the wrappers
     exp (XExpr (WrapExpr h e)) (XExpr (WrapExpr h' e')) =
       wrap h h' && exp e e'
-    exp (XExpr (ExpandedThingTc o x)) (XExpr (ExpandedThingTc o' x'))
-      | isHsThingRnExpr o
-      , isHsThingRnExpr o'
-      = exp x x'
+    exp (XExpr (ExpandedThingTc (HSE _ x))) (XExpr (ExpandedThingTc (HSE _ x')))
+      = lexp x x'
     exp (HsVar _ i) (HsVar _ i') = i == i'
     exp (HsIPVar _ i) (HsIPVar _ i') =
       -- the instance for IPName derives using the id, so follow the HsVar case

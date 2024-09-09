@@ -170,6 +170,7 @@ findName infos span0 mi string =
       Just name ->
         case getSrcSpan name of
           UnhelpfulSpan {} -> tryExternalModuleResolution
+          GeneratedSrcSpan {} -> tryExternalModuleResolution
           RealSrcSpan   {} -> return (getName name)
   where
     rdrs = modInfo_rdrs mi
@@ -392,7 +393,8 @@ processAllTypeCheckedModule tcm
     toSpanInfo :: (Maybe Id,SrcSpan,Type) -> Maybe SpanInfo
     toSpanInfo (n,RealSrcSpan spn _,typ)
         = Just $ spanInfoFromRealSrcSpan spn (Just typ) n
-    toSpanInfo _ = Nothing
+    toSpanInfo (_, GeneratedSrcSpan{}, _) = Nothing
+    toSpanInfo (_, UnhelpfulSpan{}, _) = Nothing
 
 -- helper stolen from @syb@ package
 type GenericQ r = forall a. Data a => a -> r

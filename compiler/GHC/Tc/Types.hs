@@ -1,5 +1,4 @@
 {-# LANGUAGE PatternSynonyms            #-}
-
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-2002
@@ -35,7 +34,7 @@ module GHC.Tc.Types(
         FrontendResult(..),
 
         -- Renamer types
-        ErrCtxt,
+        HsCtxt,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         ImportUserSpec(..),
         ImpUserList(..),

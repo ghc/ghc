@@ -37,6 +37,7 @@ import Language.Haskell.Syntax.Decls.Foreign (CType(..), Header(..))
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension (Anno)
 import Language.Haskell.Syntax.Binds.InlinePragma (ActivationX(..), InlinePragma(..))
+import GHC.Tc.Types.ErrCtxt
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -638,13 +639,21 @@ deriving instance Eq (IE GhcRn)
 deriving instance Eq (IE GhcTc)
 
 -- ---------------------------------------------------------------------
+instance Data HsCtxt where
+  gunfold _ _ _ = error "no gunfold for HsCtxt"
+  gfoldl _ k z = k z
+  toConstr = error "no toConstr for HsCtxt"
+  dataTypeOf = error "no dataTypeOf for HsCtxt"
 
-deriving instance Data HsThingRn
 deriving instance Data XXExprGhcRn
+
+deriving instance Data (HsExpansion GhcRn)
+deriving instance Data (HsExpansion GhcTc)
+
 deriving instance Data a => Data (WithUserRdr a)
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------
+--------------------------------------
 deriving instance Data XXExprGhcTc
 deriving instance Data XXPatGhcTc
 

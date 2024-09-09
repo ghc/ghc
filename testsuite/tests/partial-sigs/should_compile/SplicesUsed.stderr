@@ -1,6 +1,5 @@
 [1 of 2] Compiling Splices          ( Splices.hs, Splices.o )
 [2 of 2] Compiling SplicesUsed      ( SplicesUsed.hs, SplicesUsed.o )
-
 SplicesUsed.hs:7:15: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Maybe Bool’
     • In the type signature: maybeBool :: _
@@ -21,8 +20,7 @@ SplicesUsed.hs:8:26: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefau
     • Found type wildcard ‘_’ standing for ‘Bool’
     • In the first argument of ‘Maybe’, namely ‘_’
       In an expression type signature: Maybe _
-      In the first argument of ‘id :: _a -> _a’, namely
-        ‘(Just True :: Maybe _)’
+      In the expression: Just True :: Maybe _
     • Relevant bindings include
         maybeBool :: Maybe Bool (bound at SplicesUsed.hs:8:1)
 
@@ -78,3 +76,4 @@ SplicesUsed.hs:18:2: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefau
                the inferred type of bar :: Bool -> w -> (Bool, w)
                at SplicesUsed.hs:18:2-11
     • In the type signature: bar :: _a -> _b -> (_a, _b)
+

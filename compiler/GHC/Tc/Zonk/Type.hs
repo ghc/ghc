@@ -152,7 +152,7 @@ I.1. GHC.Tc.Zonk.Monad - the ZonkM monad
   as used in GHC.Tc.Zonk.TcType.
 
   Crucially, it never errors. It is the monad we use when reporting errors
-  (see ErrCtxt), and it would be quite bad if we could error in the middle
+  (see HsCtxt), and it would be quite bad if we could error in the middle
   of reporting an error!
 
 I.2. GHC.Tc.Zonk.TcType - zonking types in the typechecker
@@ -1096,9 +1096,9 @@ zonkExpr (XExpr (WrapExpr co_fn expr))
     do new_expr <- zonkExpr expr
        return (XExpr (WrapExpr new_co_fn new_expr))
 
-zonkExpr (XExpr (ExpandedThingTc thing e))
-  = do e' <- zonkExpr e
-       return $ XExpr (ExpandedThingTc thing e')
+zonkExpr (XExpr (ExpandedThingTc (HSE thing e)))
+  = do e' <- zonkLExpr e
+       return $ XExpr (ExpandedThingTc (HSE thing e'))
 
 zonkExpr e@(XExpr (ConLikeTc {}))
   = return e
@@ -2016,4 +2016,3 @@ Quantifying here is awkward because (a) the data type is big and (b)
 finding the free type vars of an expression is necessarily monadic
 operation. (consider /\a -> f @ b, where b is side-effected to a)
 -}
-

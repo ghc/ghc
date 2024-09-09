@@ -33,6 +33,7 @@ import GHC.Tc.Zonk.Type
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( redundantConstraintsSpan )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Instantiate
@@ -1447,7 +1448,7 @@ mkErrorReport :: CtLocEnv
                   -- ^ Suggested fixes
               -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReport tcl_env msg mb_ctxt supp hints
-  = do { mb_context <- traverse (\ ctxt -> mkErrCtxt (cec_tidy ctxt) (ctl_ctxt tcl_env)) mb_ctxt
+  = do { mb_context <- traverse (\ ctxt -> tidyErrCtxt (cec_tidy ctxt) (ctl_ctxt tcl_env)) mb_ctxt
        ; unit_state <- hsc_units <$> getTopEnv
        ; hfdc <- getHoleFitDispConfig
        ; let

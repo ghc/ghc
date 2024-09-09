@@ -39,7 +39,6 @@ import GHC.Core.Multiplicity
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Zonk.TcType
 import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
@@ -406,7 +405,7 @@ so that tcPat can extend the environment for the thing_inside, but also
 so that constraints arising in the thing_inside can be discharged by the
 pattern.
 
-This does not work so well for the ErrCtxt carried by the monad: we don't
+This does not work so well for the HsCtxt carried by the monad: we don't
 want the error-context for the pattern to scope over the RHS.
 Hence the getErrCtxt/setErrCtxt stuff in tcMultiple
 -}
@@ -450,7 +449,7 @@ tc_lpat :: Scaled ExpSigmaTypeFRR
         -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_lpat pat_ty penv (L span pat) thing_inside
   = setSrcSpanA span $
-    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat pat_ty penv pat)
+    do  { (pat', res) <- maybeWrapPatCtxt (locA span) pat (tc_pat pat_ty penv pat)
                                           thing_inside
         ; return (L span pat', res) }
 
@@ -470,7 +469,7 @@ checkManyPattern reason pat pat_ty = tcSubMult (NonLinearPatternOrigin reason pa
 tc_forall_lpat :: TcTyVar -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_forall_lpat tv penv (L span pat) thing_inside
   = setSrcSpanA span $
-    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_forall_pat tv penv pat)
+    do  { (pat', res) <- maybeWrapPatCtxt (locA span) pat (tc_forall_pat tv penv pat)
                                           thing_inside
         ; return (L span pat', res) }
 
@@ -688,7 +687,6 @@ tc_pat scaled_exp_pat_ty@(Scaled w_pat exp_pat_ty) penv ps_pat thing_inside =
        -- First infer the type of 'view_expr'; the overall type of the pattern
        -- is the argument type of 'view_expr', and the inner pattern type is
        -- checked against the result type of 'view_expr'.
-
       { checkManyPattern ViewPatternReason (noLocA ps_pat) scaled_exp_pat_ty
           -- It should be possible to have view patterns at linear (or otherwise
           -- non-Many) multiplicity. But it is not clear at the moment what
@@ -1023,7 +1021,7 @@ tcPatSig in_pat_bind sig res_ty
         ; case NE.nonEmpty sig_tvs of
             Nothing -> do {
                 -- Just do the subsumption check and return
-                  wrap <- addErrCtxtM (mk_msg sig_ty) $
+                ; wrap <- addErrCtxt (PatSigErrCtxt sig_ty res_ty) $
                           tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
                 ; return (sig_ty, [], sig_wcs, wrap)
                 }
@@ -1037,18 +1035,12 @@ tcPatSig in_pat_bind sig res_ty
                 (addErr (TcRnCannotBindScopedTyVarInPatSig sig_tvs_ne))
 
               -- Now do a subsumption check of the pattern signature against res_ty
-              wrap <- addErrCtxtM (mk_msg sig_ty) $
+              wrap <- addErrCtxt (PatSigErrCtxt sig_ty res_ty) $
                       tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
 
               -- Phew!
               return (sig_ty, sig_tvs, sig_wcs, wrap)
        }
-  where
-    mk_msg sig_ty tidy_env
-       = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
-            ; res_ty <- readExpType res_ty   -- should be filled in by now
-            ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
-            ; return (tidy_env, PatSigErrCtxt sig_ty res_ty) }
 
 {- *********************************************************************
 *                                                                      *
@@ -1918,17 +1910,19 @@ pattern (perhaps deeply)
 See also Note [Typechecking pattern bindings] in GHC.Tc.Gen.Bind
 -}
 
-maybeWrapPatCtxt :: Pat GhcRn -> (TcM a -> TcM b) -> TcM a -> TcM b
+maybeWrapPatCtxt :: SrcSpan -> Pat GhcRn -> (TcM a -> TcM b) -> TcM a -> TcM b
 -- Not all patterns are worth pushing a context
-maybeWrapPatCtxt pat tcm thing_inside
-  | not (worth_wrapping pat) = tcm thing_inside
+maybeWrapPatCtxt span pat tcm thing_inside
+  | not (worth_wrapping span pat) = tcm thing_inside
   | otherwise                = addErrCtxt (PatCtxt pat) $ tcm $ popErrCtxt thing_inside
                                -- Remember to pop before doing thing_inside
   where
-   worth_wrapping (VarPat {}) = False
-   worth_wrapping (ParPat {}) = False
-   worth_wrapping (AsPat {})  = False
-   worth_wrapping _           = True
+   worth_wrapping _ (VarPat {}) = False
+   worth_wrapping _ (ParPat {}) = False
+   worth_wrapping _ (AsPat {})  = False
+   worth_wrapping span _
+      | isGeneratedSrcSpan span = False -- cf. T12957a
+   worth_wrapping _  _          = True
 
 -----------------------------------------------
 

@@ -21,10 +21,13 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvTypeEnv
   , modifyLclEnvTcLevel
 
+  , setLclEnvHsCtxt
+  , setLclCtxtHsCtxt
   , lclEnvInGeneratedCode
 
   , addLclEnvErrCtxt
 
+  , ErrCtxtStack
   , ArrowCtxt(..)
   , ThBindEnv
   , TcTypeEnv
@@ -86,14 +89,15 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 
+
 data TcLclCtxt
   = TcLclCtxt {
-        tcl_loc        :: RealSrcSpan,     -- Source span
-        tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and XXExprGhcRn]
-        tcl_tclvl      :: TcLevel,
-        tcl_bndrs      :: TcBinderStack,   -- Used for reporting relevant bindings,
-                                           -- and for tidying type
+        tcl_loc         :: RealSrcSpan,     -- Source span
+        tcl_in_gen_code :: Bool,            -- Are we type checking a generated expression?
+        tcl_err_ctxt    :: ErrCtxtStack,
+        tcl_tclvl       :: TcLevel,
+        tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
+                                            -- and for tidying type
 
         tcl_rdr :: LocalRdrEnv,         -- Local name envt
                 -- Maintained during renaming, of course, but also during
@@ -154,17 +158,30 @@ setLclEnvLoc loc = modifyLclCtxt (\lenv -> lenv { tcl_loc = loc })
 getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 getLclEnvLoc = tcl_loc . tcl_lcl_ctxt
 
-getLclEnvErrCtxt :: TcLclEnv -> [ErrCtxt]
-getLclEnvErrCtxt = tcl_ctxt . tcl_lcl_ctxt
+getLclEnvErrCtxt :: TcLclEnv -> ErrCtxtStack
+getLclEnvErrCtxt = tcl_err_ctxt . tcl_lcl_ctxt
 
-setLclEnvErrCtxt :: [ErrCtxt] -> TcLclEnv -> TcLclEnv
-setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt })
+setLclEnvErrCtxt :: ErrCtxtStack -> TcLclEnv -> TcLclEnv
+setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 
-addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
-addLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_ctxt = ctxt : (tcl_ctxt env) })
+addLclEnvErrCtxt :: HsCtxt -> TcLclEnv -> TcLclEnv
+addLclEnvErrCtxt ec = setLclEnvHsCtxt ec
+
+setLclEnvHsCtxt :: HsCtxt -> TcLclEnv -> TcLclEnv
+setLclEnvHsCtxt ec = modifyLclCtxt (setLclCtxtHsCtxt ec)
+
+setLclCtxtHsCtxt :: HsCtxt -> TcLclCtxt -> TcLclCtxt
+setLclCtxtHsCtxt ec lclCtxt
+  -- Never stack 2 do statement error messages on top of each other
+  -- See Part 3 A of Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
+  | StmtErrCtxt{} : ecs <- tcl_err_ctxt lclCtxt
+  , StmtErrCtxt{} <- ec
+  = lclCtxt { tcl_err_ctxt =  ec : ecs }
+  | otherwise
+  = lclCtxt { tcl_err_ctxt = ec : tcl_err_ctxt lclCtxt }
 
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
-lclEnvInGeneratedCode = tcl_in_gen_code . tcl_lcl_ctxt
+lclEnvInGeneratedCode =  tcl_in_gen_code . tcl_lcl_ctxt
 
 getLclEnvBinderStack :: TcLclEnv -> TcBinderStack
 getLclEnvBinderStack = tcl_bndrs . tcl_lcl_ctxt
