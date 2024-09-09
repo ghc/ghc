@@ -1689,7 +1689,6 @@ repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel) 
 repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]
-
 repE (HsQual _ (L _ ctx) body) = do
   ctx' <- repLEs ctx
   body' <- repLE body
@@ -1709,7 +1708,7 @@ repE (HsFunArr _ mult arg res) = do
   arg' <- repLE arg
   res' <- repLE res
   repApps fun [arg', res']
-repE e@(XExpr (ExpandedThingRn o x _))
+repE e@(XExpr (ExpandedThingRn o x))
   | OrigExpr e <- o
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
