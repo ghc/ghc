@@ -651,7 +651,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
   where
     fun_orig = case fun_ctxt of
       VAExpansion (OrigStmt{}) _ _    -> DoOrigin
-      VAExpansion (OrigPat pat _ _) _ _ -> DoPatOrigin pat
+      VAExpansion (OrigPat pat _) _ _ -> DoPatOrigin pat
       VAExpansion (OrigExpr e) _ _    -> exprCtOrigin e
       VACall e _ _                    -> exprCtOrigin e
 
@@ -912,6 +912,8 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
              -> setSrcSpanA arg_loc $
                   addStmtCtxt stmt flav $
                   thing_inside
+           VAExpansion (OrigStmt (L _ (XStmtLR (ApplicativeStmt{}))) _) _ _
+             -> thing_inside
            VAExpansion (OrigStmt (L loc stmt) flav) _ _
              -> setSrcSpanA loc $
                   addStmtCtxt stmt flav $
@@ -1062,7 +1064,7 @@ expr_to_type earg =
       | otherwise = not_in_scope
       where occ = occName rdr
             not_in_scope = failWith $ mkTcRnNotInScope rdr NotInScope
-    go (L l (XExpr (ExpandedThingRn (OrigExpr orig) _ _))) =
+    go (L l (XExpr (ExpandedThingRn (OrigExpr orig) _))) =
       -- Use the original, user-written expression (before expansion).
       -- Example. Say we have   vfun :: forall a -> blah
       --          and the call  vfun (Maybe [1,2,3])
