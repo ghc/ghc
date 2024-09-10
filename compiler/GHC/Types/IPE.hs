@@ -14,7 +14,6 @@ import GHC.Types.SrcLoc
 import GHC.Core.DataCon
 
 import GHC.Types.Unique.DFM
-import GHC.Types.Unique.Map
 import GHC.Core.Type
 import Data.List.NonEmpty
 import GHC.Cmm.CLabel (CLabel)
@@ -26,8 +25,8 @@ type IpeSourceLocation = (RealSrcSpan, LexicalFastString)
 
 -- | A map from a 'Name' to the best approximate source position that
 -- name arose from.
-type ClosureMap = UniqMap Name  -- The binding
-                          (Type, Maybe IpeSourceLocation)
+type ClosureMap = UniqDFM Name  -- The binding
+                          (Name, (Type, Maybe IpeSourceLocation))
                           -- The best approximate source position.
                           -- (rendered type, source position, source note
                           -- label)
@@ -50,4 +49,4 @@ data InfoTableProvMap = InfoTableProvMap
                           }
 
 emptyInfoTableProvMap :: InfoTableProvMap
-emptyInfoTableProvMap = InfoTableProvMap emptyUDFM emptyUniqMap Map.empty
+emptyInfoTableProvMap = InfoTableProvMap emptyUDFM emptyUDFM Map.empty

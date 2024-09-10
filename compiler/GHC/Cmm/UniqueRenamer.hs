@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase, RecordWildCards, MagicHash, UnboxedTuples, PatternSynonyms, ExplicitNamespaces #-}
 module GHC.Cmm.UniqueRenamer
   ( detRenameCmmGroup
+  , detRenameIPEMap
   , MonadGetUnique(..)
 
   -- Careful! Not for general use!
@@ -10,7 +11,7 @@ module GHC.Cmm.UniqueRenamer
   )
   where
 
-import Prelude
+import GHC.Prelude
 import GHC.Utils.Monad.State.Strict
 import Data.Tuple (swap)
 import GHC.Word
@@ -22,12 +23,13 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Switch
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Id
 import GHC.Types.Unique.DSM
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
-
+import GHC.Types.IPE
 
 {-
 Note [Renaming uniques deterministically]
@@ -103,6 +105,12 @@ detRenameId :: Id -> DetRnM Id
 detRenameId i
   | isExternalName (varName i) = return i
   | otherwise = setIdUnique i <$> renameDetUniq (getUnique i)
+
+-- | Similar to `detRenameId`, but for `Name`.
+detRenameName :: Name -> DetRnM Name
+detRenameName n
+  | isExternalName n = return n
+  | otherwise = setNameUnique n <$> renameDetUniq (getUnique n)
 
 detRenameCmmGroup :: DetUniqFM -> DCmmGroup -> (DetUniqFM, CmmGroup)
 detRenameCmmGroup dufm group = swap (runState (mapM detRenameCmmDecl group) dufm)
@@ -251,3 +259,19 @@ detRenameCmmGroup dufm group = swap (runState (mapM detRenameCmmDecl group) dufm
     detRenameMaybe f (Just x) = Just <$> f x
 
     detRenamePair f g (a, b) = (,) <$> f a <*> g b
+
+detRenameIPEMap :: DetUniqFM -> InfoTableProvMap -> (DetUniqFM, InfoTableProvMap)
+detRenameIPEMap dufm InfoTableProvMap{ provDC, provClosure, provInfoTables } =
+    (dufm2, InfoTableProvMap { provDC, provClosure = cm, provInfoTables })
+  where
+    (cm, dufm2) = runState (detRenameClosureMap provClosure) dufm
+
+    detRenameClosureMap :: ClosureMap -> DetRnM ClosureMap
+    detRenameClosureMap m =
+      -- `eltsUDFM` preserves the deterministic order, but it doesn't matter
+      -- since we will rename all uniques deterministically, thus the
+      -- reconstructed map will necessarily be deterministic too.
+      listToUDFM <$> mapM (\(n,r) -> do
+        n' <- detRenameName n
+        return (n', (n', r))
+        ) (eltsUDFM m)

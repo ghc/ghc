@@ -24,7 +24,6 @@ import Control.Monad (when)
 import Control.Monad.Trans.Reader
 import GHC.Utils.Monad.State.Strict
 import Control.Monad.Trans.Class
-import GHC.Types.Unique.Map
 import GHC.Types.SrcLoc
 import Control.Applicative
 import qualified Data.List.NonEmpty as NE
@@ -154,7 +153,7 @@ recordStgIdPosition id best_span ss = do
     --Useful for debugging why a certain Id gets given a certain span
     --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr best_span $$ ppr ss)
     let mbspan = (\(SpanWithLabel rss d) -> (rss, d)) <$> (best_span <|> cc <|> ss)
-    lift $ modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (idType id, mbspan) })
+    lift $ modify (\env -> env { provClosure = addToUDFM (provClosure env) (idName id) (idName id, (idType id, mbspan)) })
 
 numberDataCon :: DataCon -> [StgTickish] -> M ConstructorNumber
 -- Unboxed tuples and sums do not allocate so they

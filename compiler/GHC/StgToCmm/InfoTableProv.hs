@@ -13,6 +13,7 @@ import GHC.IO (unsafePerformIO)
 import GHC.Prelude
 import GHC.Platform
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
+import GHC.Types.Unique.DSM
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Data.FastString (fastStringToShortText, unpackFS, LexicalFastString(..))
@@ -70,16 +71,26 @@ construction.
 emitIpeBufferListNode ::
      Module
   -> [InfoProvEnt]
-  -> FCode ()
-emitIpeBufferListNode _ [] = return ()
-emitIpeBufferListNode this_mod ents = do
+  -> DUniqSupply -- ^ Symbols created source uniques deterministically
+                 -- All uniques must be created from this supply.
+                 -- NB: If you are creating a new symbol within this function,
+                 -- make sure it is local only (as in not `externallyVisibleCLabel`).
+                 -- If you need it to be global, reconsider the comment on the
+                 -- call of emitIpeBufferListNode in Cmm.Parser.
+  -> FCode DUniqSupply
+emitIpeBufferListNode _ [] dus = return dus
+emitIpeBufferListNode this_mod ents dus0 = do
     cfg <- getStgToCmmConfig
 
-    tables_lbl  <- mkStringLitLabel <$> newUnique
-    strings_lbl <- mkStringLitLabel <$> newUnique
-    entries_lbl <- mkStringLitLabel <$> newUnique
+    let (u1, dus1) = takeUniqueFromDSupply dus0
+        (u2, dus2) = takeUniqueFromDSupply dus1
+        (u3, dus3) = takeUniqueFromDSupply dus2
 
-    let ctx      = stgToCmmContext cfg
+        tables_lbl  = mkStringLitLabel u1
+        strings_lbl = mkStringLitLabel u2
+        entries_lbl = mkStringLitLabel u3
+
+        ctx      = stgToCmmContext cfg
         platform = stgToCmmPlatform cfg
         int n    = mkIntCLit platform n
 
@@ -165,6 +176,8 @@ emitIpeBufferListNode this_mod ents = do
     emitDecl $ CmmData
       (Section Data ipe_buffer_lbl)
       (CmmStaticsRaw ipe_buffer_lbl ipe_buffer_node)
+
+    return dus3
 
 -- | Emit the fields of an IpeBufferEntry struct for each entry in a given list.
 toIpeBufferEntries ::

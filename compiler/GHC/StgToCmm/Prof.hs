@@ -43,6 +43,7 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
+import GHC.Types.Unique.DSM
 import GHC.Types.CostCentre
 import GHC.Types.IPE
 import GHC.Types.ForeignStubs
@@ -279,8 +280,8 @@ sizeof_ccs_words platform
 -- Note that the stats passed to this function will (rather, should) only ever
 -- contain stats for skipped STACK info tables accumulated in
 -- 'generateCgIPEStub'.
-initInfoTableProv :: IPEStats -> [CmmInfoTable] -> InfoTableProvMap -> FCode (Maybe (IPEStats, CStub))
-initInfoTableProv stats infos itmap
+initInfoTableProv :: IPEStats -> [CmmInfoTable] -> InfoTableProvMap -> DUniqSupply -> FCode (Maybe (IPEStats, CStub), DUniqSupply)
+initInfoTableProv stats infos itmap dus
   = do
        cfg <- getStgToCmmConfig
        let (stats', ents) = convertInfoProvMap cfg this_mod itmap stats infos
@@ -288,13 +289,13 @@ initInfoTableProv stats infos itmap
            platform      = stgToCmmPlatform     cfg
            this_mod      = stgToCmmThisModule   cfg
        case ents of
-         [] -> return Nothing
+         [] -> return (Nothing, dus)
          _  -> do
            -- Emit IPE buffer
-           emitIpeBufferListNode this_mod ents
+           dus' <- emitIpeBufferListNode this_mod ents dus
 
            -- Create the C stub which initialises the IPE map
-           return (Just (stats', ipInitCode info_table platform this_mod))
+           return (Just (stats', ipInitCode info_table platform this_mod), dus')
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack

@@ -278,6 +278,7 @@ import GHC.Parser.Lexer
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr
 
+import GHC.Types.Unique.DSM
 import GHC.Types.CostCentre
 import GHC.Types.ForeignCall
 import GHC.Unit.Module
@@ -1599,7 +1600,13 @@ parseCmmFile cmmpConfig this_mod home_unit filename = do
                     | otherwise = []
                     where
                       do_ipe = stgToCmmInfoTableMap $ cmmpStgToCmmConfig cmmpConfig
-              ((), cmm2) <- getCmm $ emitIpeBufferListNode this_mod used_info
+              -- We need to pass a deterministic unique supply to generate IPE
+              -- symbols deterministically. The symbols created by
+              -- emitIpeBufferListNode must all be local to the object (see
+              -- comment on its definition). If the symbols weren't local, using a
+              -- counter starting from zero for every Cmm file would cause
+              -- conflicts when compiling more than one Cmm file together.
+              (_, cmm2) <- getCmm $ emitIpeBufferListNode this_mod used_info (initDUniqSupply 'P' 0)
               return (cmm ++ cmm2, used_info)
             (cmm, _) = runC (cmmpStgToCmmConfig cmmpConfig) fstate st fcode
             (warnings,errors) = getPsMessages pst

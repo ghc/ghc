@@ -1204,6 +1204,9 @@ instance OutputableP env a => OutputableP env [a] where
 instance OutputableP env a => OutputableP env (Maybe a) where
    pdoc env xs = ppr (fmap (pdoc env) xs)
 
+instance OutputableP env () where
+   pdoc _ _ = ppr ()
+
 instance (OutputableP env a, OutputableP env b) => OutputableP env (a, b) where
     pdoc env (a,b) = ppr (pdoc env a, pdoc env b)
 

@@ -86,7 +86,6 @@ import GHC.Types.IPE
 import qualified Data.Map as M
 import Data.List (sortBy)
 import Data.Ord
-import GHC.Types.Unique.Map
 import Data.Maybe
 import qualified Data.List.NonEmpty as NE
 import GHC.Core.DataCon
@@ -686,7 +685,7 @@ convertInfoProvMap cfg this_mod (InfoTableProvMap dcenv denv infoTableToSourceLo
         tyString = renderWithContext defaultSDocContext . ppr
 
         lookupClosureMap :: Maybe (IPEStats, InfoProvEnt)
-        lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
+        lookupClosureMap = case hasHaskellName cl >>= fmap snd . lookupUDFM denv of
                                 Just (ty, mbspan) -> Just (closureIpeStats cn, (InfoProvEnt cl cn (tyString ty) this_mod mbspan))
                                 Nothing -> Nothing
 

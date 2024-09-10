@@ -195,6 +195,7 @@ generateCgIPEStub
   :: HscEnv
   -> Module
   -> InfoTableProvMap
+  -- ^ If the CmmInfoTables map refer Cmm symbols which were deterministically renamed, the info table provenance map must also be accordingly renamed.
   -> ( NonCaffySet
      , ModuleLFInfos
      , Map CmmInfoTable (Maybe IpeSourceLocation)
@@ -209,11 +210,20 @@ generateCgIPEStub hsc_env this_mod denv (nonCaffySet, moduleLFInfos, infoTablesW
       cmm_cfg  = initCmmConfig dflags
   cgState <- liftIO initC
 
-  -- Yield Cmm for Info Table Provenance Entries (IPEs)
-  let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
-      ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv')
+  -- NB: For determinism, don't use DetUniqFM to rename the IPE Cmm because
+  -- detRenameCmm isn't idempotent and this Cmm references symbols in the rest
+  -- of the code!  Instead, make sure all labels generated for IPE related code
+  -- sources uniques from the DUniqSupply gotten from CgStream (see its use in
+  -- initInfoTableProv/emitIpeBufferListNode).
+  (mIpeStub, ipeCmmGroup) <- liftEff $ UDSMT $ \dus -> do
 
-  -- TODO: Renaming here
+    -- Yield Cmm for Info Table Provenance Entries (IPEs)
+    let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
+        (((mIpeStub, dus'), ipeCmmGroup), _) =
+            runC (initStgToCmmConfig dflags this_mod) fstate cgState $
+              getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv' dus)
+
+    return ((mIpeStub, ipeCmmGroup), dus')
 
   (_, ipeCmmGroupSRTs) <- liftEff $ withDUS $ cmmPipeline logger cmm_cfg (emptySRT this_mod) (removeDeterm ipeCmmGroup)
   Stream.yield ipeCmmGroupSRTs

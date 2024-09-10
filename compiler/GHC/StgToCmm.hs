@@ -158,7 +158,7 @@ codeGen logger tmpfs cfg (InfoTableProvMap denv _ _) data_tycons
         ; rn_mapping <- liftIO (readIORef uniqRnRef)
         ; liftIO $ debugTraceMsg logger 3 (text "DetRnM mapping:" <+> ppr rn_mapping)
 
-        ; return generatedInfo
+        ; return (generatedInfo, rn_mapping)
         }
 
 {-
