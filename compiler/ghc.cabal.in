@@ -246,6 +246,7 @@ Library
         GHC.Cmm.Switch
         GHC.Cmm.Switch.Implement
         GHC.Cmm.ThreadSanitizer
+        GHC.Cmm.UniqueRenamer
         GHC.CmmToAsm
         GHC.Cmm.LRegSet
         GHC.CmmToAsm.AArch64

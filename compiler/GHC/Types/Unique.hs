@@ -246,12 +246,17 @@ use `deriving' because we want {\em precise} control of ordering
 -- is to get ABI compatible binaries given the same inputs and environment.
 -- The motivation behind that is that if the ABI doesn't change the
 -- binaries can be safely reused.
--- Note that this is weaker than bit-for-bit identical binaries and getting
--- bit-for-bit identical binaries is not a goal for now.
--- This means that we don't care about nondeterminism that happens after
--- the interface files are created, in particular we don't care about
--- register allocation and code generation.
--- To track progress on bit-for-bit determinism see #12262.
+--
+-- Besides ABI/interface determinism, we also guarantee bit-for-bit identical
+-- binaries (when -fobject-determinism is given), also known as object
+-- determinism (#12935)
+--
+-- To achieve this, we must take care to non-determinism in the code
+-- generation, and, in particular, guarantee that the existing uniques are
+-- renamed deterministically and new ones are produced deterministically too.
+-- The overview of object determinism is given by Note [Object determinism].
+-- References to this note identify code where the unique determinism may
+-- impact object determinism more specifically.
 
 eqUnique :: Unique -> Unique -> Bool
 eqUnique (MkUnique u1) (MkUnique u2) = u1 == u2
