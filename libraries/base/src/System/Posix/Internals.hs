@@ -27,4 +27,4 @@ module System.Posix.Internals
   ( module GHC.Internal.System.Posix.Internals -- TODO: deprecate
   ) where
 
-import GHC.Internal.System.Posix.Internals
+import GHC.Internal.System.Posix.Internals hiding (fdWithCStat)

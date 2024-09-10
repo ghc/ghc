@@ -57,7 +57,6 @@ import GHC.Internal.Foreign.Storable
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.Marshal.Utils
-import GHC.Internal.Foreign.Marshal.Alloc (allocaBytes)
 
 import qualified GHC.Internal.System.Posix.Internals
 import GHC.Internal.System.Posix.Internals hiding (FD, setEcho, getEcho)
@@ -470,9 +469,7 @@ setNonBlockingMode fd set = do
   is_nonblock <-
     if set
       then do
-        allocaBytes sizeof_stat $ \ p_stat -> do
-          throwErrnoIfMinus1Retry_ "fileSize" $
-            c_fstat (fdFD fd) p_stat
+        fdWithCStat (fdFD fd) $ \ p_stat -> do
           fd_type <- statGetType_maybe p_stat
           pure $ fd_type /= Just RegularFile && fd_type /= Just RawDevice
       else pure False
