@@ -665,13 +665,83 @@ should add the arity later for all binders.  But it works fine like this.
 *                                                                      *
 ************************************************************************
 
-Note [Handling SPECIALISE pragmas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Overview of SPECIALISE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The basic idea is this:
 
    foo :: Num a => a -> b -> a
-   {-# SPECIALISE foo :: Int -> b -> Int #-}
+   foo = rhs
+   {-# SPECIALISE foo :: Int -> b -> Int #-}   -- Old form
+   {-# SPECIALISE foo @Float #-}               -- New form
 
+Generally:
+* Rename as usual
+* Typecheck, attaching info to the ABExport record of the AbsBinds for foo
+* Desugar by generating
+   - a specialised binding $sfoo = rhs @Float
+   - a rewrite rule like   RULE "USPEC foo" foo @Float = $sfoo
+
+There are two major routes:
+
+* Old form
+  - Handled by `SpecSig` and `SpecPrag`
+  - Deals with SPECIALISE pragmas have multiple signatures
+       {-# SPECIALISE f :: Int -> Int, Float -> Float #-}
+  - See Note [Handling old-form SPECIALISE pragmas]
+
+* New form, described in GHC Proposal #493
+  - Handled by `SpecSigE` and `SpecPragE`
+  - Deals with SPECIALISE pramgas which may have value arguments
+       {-# SPECIALISE f @Int 3 #-}
+  - See Note [Handling new-form SPECIALISE pragmas]
+
+Note [Handling new-form SPECIALISE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+New-form SPECIALISE pragmas are described by GHC Proposal #493.
+
+The thing in the SpecPragE is very, very like the LHS of a RULE
+
+In particular, the pragma takes the form of a function application,
+possibly with intervening parens and type signatures, with a variable
+at the head.  It may have rule for-alls at the top.  e.g.
+    {-# SPECIALISE f1 @Int 3 #-}
+    {-# SPECIALISE forall x xs. f2 (x:xs) #-}
+    {-# SPECIALISE f3 :: Int -> Int #-}
+    {-# SPECIALISE (f4 :: Int -> Int) 5 #-}
+
+See `GHC.Rename.Bind.checkSpecESigShape` for the shape-check.
+
+
+Example:
+  f :: forall a b. (Eq a, Eq b, Ord c) => a -> b -> c -> Bool -> blah
+  {-# SPECIALISE forall x y. f (x::Int) y y True #-}
+
+We want to generate:
+
+  RULE forall @p (d1::Eq Int) (d2::Eq p) (d3::Ord p) (x::Int) (y::p).
+     f @Int @p @p d1 d2 d3 x y y True
+        = $sf @p d1 d2 d3 x y
+  $sf @p (d1::Eq Int) (d2::Eq p) (d3::Ord p) (x::Int) (y::p)
+     = let d1a = $fEqint
+           d2a = d2
+           d3a = d3
+       in let f = <f-rhs>
+       in f @p @p @Int (d1a::Eq p) (d2a::Eq p) (d3a::OrdInt) y y True
+
+Note that
+
+* In the RULE we have separate binders for `d1` and `d2` even though
+  they are the same (Eq p) dictionary. Reason: we don't want to force
+  them to be visibly equal at the call site.
+
+* The specialised function $sf takes all three dictionaries as
+  arguments; but the constraint solver does not use d1 (short-cut
+  solved).  We rely on the Simplifier to drop the dead arguments.
+  It isn't strictly necessary to pass d2 either, but it does no harm.
+
+
+Note [Handling old-form SPECIALISE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We check that
    (forall a b. Num a => a -> b -> a)
       is more polymorphic than
@@ -814,42 +884,9 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
            ; wrap    <- tcSpecWrapper (FunSigCtxt name (lhsSigTypeContextSpan hs_ty)) poly_ty spec_ty
            ; return (SpecPrag poly_id wrap inl) }
 
-{- Note [SPECIALISE for expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ToDo; write this Note
-The thing in the SpecPragE is very very like the LHS of a RULE
-
-Example:
-  f :: forall a b. (Eq a, Eq b, Ord c) => a -> b -> c -> Bool -> blah
-  {-# SPECIALISE forall x y. f (x::Int) y y True #-}
-
-We want to generate:
-
-  RULE forall @p (d1::Eq Int) (d2::Eq p) (d3::Ord p) (x::Int) (y::p).
-     f @Int @p @p d1 d2 d3 x y y True
-        = $sf @p d1 d2 d3 x y
-  $sf @p (d1::Eq Int) (d2::Eq p) (d3::Ord p) (x::Int) (y::p)
-     = let d1a = $fEqint
-           d2a = d2
-           d3a = d3
-       in let f = <f-rhs>
-       in f @p @p @Int (d1a::Eq p) (d2a::Eq p) (d3a::OrdInt) y y True
-
-Note that
-
-* In the RULE we have separate binders for `d1` and `d2` even though
-  they are the same (Eq p) dictionary. Reason: we don't want to force
-  them to be visibly equal at the call site.
-
-* The specialised function $sf takes all three dictionaries as
-  arguments; but the constraint solver does not use d1 (short-cut
-  solved).  We rely on the Simplifier to drop the dead arguments.
-  It isn't strictly necessary to pass d2 either, but it does no harm.
-
--}
-
-tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
-  = do { let skol_info_anon = SpecESkol nm
+tcSpecPrag poly_id (SpecSigE nm bndrs spec_e inl)
+  = do { -- Typecheck the expression, spec_e, capturing its constraints
+         let skol_info_anon = SpecESkol nm
        ; skol_info <- mkSkolemInfo skol_info_anon
        ; (tc_lvl, wanted, (id_bndrs, spec_e', rho))
             <- pushLevelAndCaptureConstraints $
@@ -859,7 +896,8 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
                     do { (spec_e', rho) <- tcInferRho spec_e
                        ; return (id_bndrs, spec_e', rho) } }
 
-       -- Solve unfication constraints
+       -- Solve unification constraints
+       -- c.f. Note [The SimplifyRule Plan] step 1
        ; cloned_wanted <- cloneWC wanted  -- See Note [Simplify cloned constraints]
        ; _ <- setTcLevel tc_lvl $ runTcS $ solveWanteds cloned_wanted
 
@@ -895,15 +933,15 @@ tcSpecPrag _poly_id (SpecSigE nm bndrs spec_e inl)
               , text "rhs_evs:" <+> ppr rhs_evs
               , text "spec_e:" <+> ppr spec_e'
               , text "inl:" <+> ppr inl ]
-       ; return [SpecPragE { spe_tv_bndrs     = qtkvs
+       ; return [SpecPragE { spe_poly_id      = poly_id
+                           , spe_tv_bndrs     = qtkvs
                            , spe_id_bndrs     = id_bndrs
                            , spe_lhs_ev_bndrs = lhs_evs
                            , spe_lhs_binds    = lhs_binds
+                           , spe_call         = spec_e'
                            , spe_rhs_ev_bndrs = rhs_evs
                            , spe_rhs_binds    = rhs_binds
-
-                           , spe_call = spec_e'
-                           , spe_inl  = inl }] }
+                           , spe_inl          = inl }] }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 

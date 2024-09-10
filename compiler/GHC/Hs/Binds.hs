@@ -800,23 +800,27 @@ data TcSpecPrags
 type LTcSpecPrag = Located TcSpecPrag
 
 -- | Type checker Specification Pragma
+-- This data type is used briefly, to communicate between the typechecker and renamer
 data TcSpecPrag
   = SpecPrag Id HsWrapper InlinePragma
       -- ^ The Id to be specialised, a wrapper that specialises the
       -- polymorphic function, and inlining spec for the specialised function
 
-   | SpecPragE { spe_tv_bndrs     :: [TyVar]
+   | SpecPragE { spe_poly_id      :: Id             -- THe Id being specialised
+               , spe_tv_bndrs     :: [TyVar]
                , spe_id_bndrs     :: [Id]
 
                , spe_lhs_ev_bndrs :: [EvVar]
-               , spe_lhs_binds    :: TcEvBinds  -- Closes spe_call using variables in
-                                                -- tv_bndrs, lhs_ev_bndrs, id_bndrs
+               , spe_lhs_binds    :: TcEvBinds
+               , spe_lhs_call     :: LHsExpr GhcTc  -- The LHS of the RULE: a call of f
+                    -- spe_lhs_binds closes spe_call using variables in
+                    -- spe_tv_bndrs, spe_id_bndrs, spe_lhs_ev_bndrs
 
                , spe_rhs_ev_bndrs :: [EvVar]
-               , spe_rhs_binds    :: TcEvBinds  -- Closes spe_call using variables in
-                                                -- tv_bndrs, rhs_ev_bndrs, id_bndrs
+               , spe_rhs_binds    :: TcEvBinds
+                    -- spe_rhs_binds closes spe_call using variables in
+                    -- spe_tv_bndrs, spe_id_bndrs, spe_rhs_ev_bndrs
 
-               , spe_call         :: LHsExpr GhcTc
                , spe_inl          :: InlinePragma }
 
 noSpecPrags :: TcSpecPrags
@@ -966,7 +970,7 @@ instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
     = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
   ppr (SpecPragE { spe_tv_bndrs = tv_bndrs, spe_id_bndrs = id_bndrs
-                 , spe_call = spec_e, spe_inl = inl })
+                 , spe_lhs_call = spec_e, spe_inl = inl })
     = text (extractSpecPragName $ inl_src inl)
        <+> hang (ppr (tv_bndrs ++ id_bndrs)) 2 (pprLExpr spec_e)
 

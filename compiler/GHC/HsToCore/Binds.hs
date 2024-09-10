@@ -802,48 +802,54 @@ dsSpecs :: CoreExpr     -- Its rhs
         -> TcSpecPrags
         -> DsM ( OrdList (Id,CoreExpr)  -- Binding for specialised Ids
                , [CoreRule] )           -- Rules for the Global Ids
--- See Note [Handling SPECIALISE pragmas] in GHC.Tc.Gen.Sig
+-- See Note [Overview of SPECIALISE pragmas] in GHC.Tc.Gen.Sig
 dsSpecs _ IsDefaultMethod = return (nilOL, [])
 dsSpecs poly_rhs (SpecPrags sps)
   = do { pairs <- mapMaybeM (dsSpec (Just poly_rhs)) sps
        ; let (spec_binds_s, rules) = unzip pairs
        ; return (concatOL spec_binds_s, rules) }
 
+dsLSpec :: Maybe CoreExpr -> Located TcSpecPrag
+        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
+dsLSpec mb_poly_rhs (L loc prag)
+  = putSrcSpanDs loc $ dsSpec mb_poly_rhs prag
+
 dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
                                 -- Nothing => RULE is for an imported Id
                                 --            rhs is in the Id's unfolding
-       -> Located TcSpecPrag
+       -> TcSpecPrag
        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
+dsSpec mb_poly_rhs (SpecPrag poly_id spec_co spec_inl)
+  -- SpecPrag case: See Note [Handling old-form SPECIALISE pragmas] in GHC.Tc.Gen.Sig
   | isJust (isClassOpId_maybe poly_id)
-  = putSrcSpanDs loc $
-    do { diagnosticDs (DsUselessSpecialiseForClassMethodSelector poly_id)
-       ; return Nothing  }  -- There is no point in trying to specialise a class op
-                            -- Moreover, classops don't (currently) have an inl_sat arity set
-                            -- (it would be Just 0) and that in turn makes makeCorePair bleat
+  = failBecauseOfClassOp poly_id
 
   | (spec_bndrs, spec_app) <- collectHsWrapBinders spec_co
                -- spec_co looks like
                --         \spec_bndrs. [] spec_args
                -- perhaps with the body of the lambda wrapped in some WpLets
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
-  = putSrcSpanDs loc $
-    dsHsWrapper spec_app $ \core_app ->
+  = dsHsWrapper spec_app $ \core_app ->
     finishSpecPrag mb_poly_rhs
                    spec_bndrs (core_app (Var poly_id))
                    spec_bndrs (\_ poly_rhs -> core_app poly_rhs)
                    spec_inl
 
-dsSpec mb_poly_rhs (L loc (SpecPragE { spe_tv_bndrs  = tv_bndrs
-                                     , spe_id_bndrs  = id_bndrs
-                                     , spe_lhs_ev_bndrs = lhs_evs
-                                     , spe_lhs_binds = lhs_binds
-                                     , spe_call      = the_call
-                                     , spe_rhs_ev_bndrs = rhs_evs
-                                     , spe_rhs_binds = rhs_binds
-                                     , spe_inl       = inl }))
-  = putSrcSpanDs loc $
-    dsTcEvBinds lhs_binds $ \ ds_lhs_binds ->
+dsSpec mb_poly_rhs (SpecPragE { spe_poly_id = poly_id
+                              , spe_tv_bndrs     = tv_bndrs
+                              , spe_id_bndrs     = id_bndrs
+                              , spe_lhs_ev_bndrs = lhs_evs
+                              , spe_lhs_binds    = lhs_binds
+                              , spe_call         = the_call
+                              , spe_rhs_ev_bndrs = rhs_evs
+                              , spe_rhs_binds    = rhs_binds
+                              , spe_inl          = inl })
+  -- SpecPragE case: See Note [Handling new-form SPECIALISE pragmas] in GHC.Tc.Gen.Sig
+  | isJust (isClassOpId_maybe poly_id)
+  = failBecauseOfClassOp poly_id
+
+  | otherwise
+  = dsTcEvBinds lhs_binds $ \ ds_lhs_binds ->
     dsTcEvBinds rhs_binds $ \ ds_rhs_binds ->
     do { ds_call <- dsLExpr the_call
        ; let core_call = mkLets ds_lhs_binds ds_call
@@ -858,6 +864,14 @@ dsSpec mb_poly_rhs (L loc (SpecPragE { spe_tv_bndrs  = tv_bndrs
                         (tv_bndrs ++ lhs_evs ++ id_bndrs) core_call
                         (tv_bndrs ++ rhs_evs ++ id_bndrs) mk_spec_call
                         inl }
+
+failBecauseOfClassOp :: Id -> DsM (Maybe a)
+-- There is no point in trying to specialise a class op
+-- Moreover, classops don't (currently) have an inl_sat arity set
+-- (it would be Just 0) and that in turn makes makeCorePair bleat
+failBecauseOfClassOp loc poly_id
+  = do { diagnosticDs (DsUselessSpecialiseForClassMethodSelector poly_id)
+       ; return Nothing  }
 
 finishSpecPrag :: Maybe CoreExpr  -- See the first param of dsSpec
                -> [Var]           -- LHS binders

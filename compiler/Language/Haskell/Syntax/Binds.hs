@@ -424,7 +424,7 @@ data Sig pass
                 (LIdP pass)        -- Function name
                 InlinePragma       -- Never defaultInlinePragma
 
-        -- | A specialisation pragma
+        -- | An old-form specialisation pragma
         --
         -- > {-# SPECIALISE f :: Int -> Int #-}
         --
@@ -434,7 +434,6 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnVal',
         --      'GHC.Parser.Annotation.AnnClose' @']'@ and @'\#-}'@,
         --      'GHC.Parser.Annotation.AnnDcolon'
-
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
                 (LIdP pass)        -- Specialise a function or datatype  ...
@@ -443,6 +442,9 @@ data Sig pass
                                    -- If it's just defaultInlinePragma, then we said
                                    --    SPECIALISE, not SPECIALISE_INLINE
 
+        -- | A new-form specialisation pragma (see GHC Proposal #493)
+        --   e.g.  {-# SPECIALISE f @Int 1 :: Int -> Int #-}
+        --   See Note [Overview of SPECIALISE pramgas]
   | SpecSigE    (XSpecSigE pass)
                 (RuleBndrs pass)
                 (LHsExpr pass)     -- Expression to specialise
