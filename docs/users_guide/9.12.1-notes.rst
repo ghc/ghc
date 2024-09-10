@@ -125,6 +125,12 @@ Compiler
 - A new warning :ghc-flag:`-Wview-pattern-signatures` is introduced to notify users about
   future changes in parsing of view patterns in combination with pattern signatures
 
+- GHC now includes a new experimental flag, :ghc-flag:`-fobject-determinism`,
+  which enables deterministic object code generation, with a minor trade-off in
+  compilation speed (typically a 1-2% regression). Note, however, that this
+  flag doesn't yet ensure determinism across all compilation configurations; we
+  anticipate these cases will be addressed in future updates (:ghc-ticket:`12935`).
+
 GHCi
 ~~~~
 

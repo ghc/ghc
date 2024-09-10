@@ -1290,6 +1290,8 @@ dynamic_flags_deps = [
         (NoArg (unSetGeneralFlag Opt_KeepOFiles))
 
         ------- Miscellaneous ----------------------------------------------
+  , make_ord_flag defGhcFlag "fobject-determinism"
+        (NoArg (setGeneralFlag Opt_ObjectDeterminism))
   , make_ord_flag defGhcFlag "no-auto-link-packages"
         (NoArg (unSetGeneralFlag Opt_AutoLinkPackages))
   , make_ord_flag defGhcFlag "no-hs-main"

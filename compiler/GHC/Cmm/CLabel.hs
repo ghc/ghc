@@ -139,6 +139,7 @@ module GHC.Cmm.CLabel (
         CStubLabel (..),
         cStubLabel,
         fromCStubLabel,
+        mapInternalNonDetUniques
     ) where
 
 import GHC.Prelude
@@ -341,20 +342,32 @@ newtype NeedExternDecl
    deriving (Ord,Eq)
 
 -- This is laborious, but necessary. We can't derive Ord because
--- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the
--- implementation. See Note [No Ord for Unique]
--- This is non-deterministic but we do not currently support deterministic
--- code-generation. See Note [Unique Determinism and code generation]
+-- Unique has a special Ord instance that cares for object determinism.
+-- Note nonDetCmpUnique and stableNameCmp in the implementation:
+--  * If -fobject-determinism, the internal uniques will be renamed, thus the
+--  comparison will actually be deterministic
+--  * Stable name compare guarantees deterministic ordering of Names despite
+--  the non-deterministic uniques underlying external names (which aren't
+--  renamed on -fobject-determinism).
+-- See Note [Unique Determinism and code generation] and Note [Object determinism]
 instance Ord CLabel where
+  compare (IdLabel a1 b1 c1)
+          (IdLabel a2 b2 c2)
+          | isExternalName a1, isExternalName a2 = stableNameCmp a1 a2 S.<> compare b1 b2 S.<> compare c1 c2
+          | isExternalName a1 = GT
+          | isExternalName a2 = LT
+
   compare (IdLabel a1 b1 c1) (IdLabel a2 b2 c2) =
+    -- Comparing names here should deterministic because all unique should have
+    -- been renamed deterministically, and external names compared above.
     compare a1 a2 S.<>
     compare b1 b2 S.<>
     compare c1 c2
   compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
     compare a1 a2 S.<>
     compare b1 b2 S.<>
-    -- This non-determinism is "safe" in the sense that it only affects object code,
-    -- which is currently not covered by GHC's determinism guarantees. See #12935.
+    -- This is not non-deterministic because the uniques have been deterministically renamed.
+    -- See Note [Object determinism]
     uniqCompareFS c1 c2 S.<>
     compare d1 d2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
@@ -1908,3 +1921,35 @@ fromCStubLabel (CStubLabel {csl_is_initializer, csl_module, csl_name}) =
       if csl_is_initializer
       then MLK_Initializer
       else MLK_Finalizer
+
+-- | A utility for renaming uniques in CLabels to produce deterministic object.
+-- Note that not all Uniques are mapped over. Only those that can be safely alpha
+-- renamed, e.g. uniques of local symbols, but not of external ones.
+-- See Note [Renaming uniques deterministically].
+mapInternalNonDetUniques :: Applicative m => (Unique -> m Unique) -> CLabel -> m CLabel
+-- todo: Can we do less work here, e.g., do we really need to rename AsmTempLabel, LocalBlockLabel?
+mapInternalNonDetUniques f x = case x of
+  IdLabel name cafInfo idLabelInfo
+    | not (isExternalName name) -> IdLabel . setNameUnique name <$> f (nameUnique name) <*> pure cafInfo <*> pure idLabelInfo
+    | otherwise -> pure x
+  cl@CmmLabel{} -> pure cl
+  RtsLabel rtsLblInfo -> pure $ RtsLabel rtsLblInfo
+  LocalBlockLabel unique -> LocalBlockLabel <$> f unique
+  fl@ForeignLabel{} -> pure fl
+  AsmTempLabel unique -> AsmTempLabel <$> f unique
+  AsmTempDerivedLabel clbl fs -> AsmTempDerivedLabel <$> mapInternalNonDetUniques f clbl <*> pure fs
+  StringLitLabel unique -> StringLitLabel <$> f unique
+  CC_Label  cc -> pure $ CC_Label cc
+  CCS_Label ccs -> pure $ CCS_Label ccs
+  IPE_Label ipe@InfoProvEnt{infoTablePtr} ->
+    (\cl' -> IPE_Label ipe{infoTablePtr = cl'}) <$> mapInternalNonDetUniques f infoTablePtr
+  ml@ModuleLabel{} -> pure ml
+  DynamicLinkerLabel dlli clbl -> DynamicLinkerLabel dlli <$> mapInternalNonDetUniques f clbl
+  PicBaseLabel -> pure PicBaseLabel
+  DeadStripPreventer clbl -> DeadStripPreventer <$> mapInternalNonDetUniques f clbl
+  HpcTicksLabel mod -> pure $ HpcTicksLabel mod
+  SRTLabel unique -> SRTLabel <$> f unique
+  LargeBitmapLabel unique -> LargeBitmapLabel <$> f unique
+-- This is called *a lot* if renaming Cmm uniques, and won't specialise without this pragma:
+{-# INLINABLE mapInternalNonDetUniques #-}
+

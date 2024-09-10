@@ -63,6 +63,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmDoBoundsCheck  :: !Bool              -- ^ decides whether to check array bounds in StgToCmm.Prim
                                                  -- or not
   , stgToCmmDoTagCheck     :: !Bool              -- ^ Verify tag inference predictions.
+  , stgToCmmObjectDeterminism :: !Bool           -- ^ Enable deterministic code generation (more precisely, the deterministic unique-renaming pass in StgToCmm)
   ------------------------------ Backend Flags ----------------------------------
   , stgToCmmAllowArith64              :: !Bool   -- ^ Allowed to emit 64-bit arithmetic operations
   , stgToCmmAllowQuot64               :: !Bool   -- ^ Allowed to emit 64-bit division operations

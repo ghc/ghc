@@ -935,6 +935,19 @@ as such you shouldn't need to set any of them explicitly. A flag
     off. Consider also recompiling all libraries with this optimization
     turned off, if you need to guarantee interruptibility.
 
+.. ghc-flag:: -fobject-determinism
+    :shortdesc: Produce fully deterministic object code
+    :type: dynamic
+    :reverse: -fno-object-determinism
+    :category:
+
+    :default: object determinism is disabled
+
+    Tell GHC to produce fully deterministic object code.  Producing
+    deterministic objects requires an additional renaming pass before the Cmm
+    pipeline that renames all Uniques deterministically. This may slightly
+    regress compilation speed, but guarantees deterministic objects.
+
 .. ghc-flag:: -fpedantic-bottoms
     :shortdesc: Make GHC be more precise about its treatment of bottom (but see
         also :ghc-flag:`-fno-state-hack`). In particular, GHC will not
