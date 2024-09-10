@@ -29,6 +29,7 @@ library
     exposed-modules:
       Data.Sum.Experimental
       Data.Tuple.Experimental
+      GHC.PrimOps
       GHC.Profiling.Eras
       GHC.TypeLits.Experimental
       GHC.TypeNats.Experimental

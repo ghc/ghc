@@ -14,6 +14,9 @@
 --
 -- Note: no other @base@ module should import this module.
 
+-- See Note [Where do we export PrimOps] for details about how to expose primops
+-- to users.
+
 module GHC.Exts
     (-- **  Pointer types
      Ptr(..),
