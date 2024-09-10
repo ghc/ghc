@@ -4,7 +4,7 @@ module GHC.Cmm.Switch (
      SwitchTargets,
      mkSwitchTargets,
      switchTargetsCases, switchTargetsDefault, switchTargetsRange, switchTargetsSigned,
-     mapSwitchTargets, switchTargetsToTable, switchTargetsFallThrough,
+     mapSwitchTargets, mapSwitchTargetsA, switchTargetsToTable, switchTargetsFallThrough,
      switchTargetsToList, eqSwitchTargetWith,
 
      SwitchPlan(..),
@@ -135,6 +135,11 @@ mkSwitchTargets signed range@(lo,hi) mbdef ids
 mapSwitchTargets :: (Label -> Label) -> SwitchTargets -> SwitchTargets
 mapSwitchTargets f (SwitchTargets signed range mbdef branches)
     = SwitchTargets signed range (fmap f mbdef) (fmap f branches)
+
+-- | Changes all labels mentioned in the SwitchTargets value
+mapSwitchTargetsA :: Applicative m => (Label -> m Label) -> SwitchTargets -> m SwitchTargets
+mapSwitchTargetsA f (SwitchTargets signed range mbdef branches)
+    = SwitchTargets signed range <$> traverse f mbdef <*> traverse f branches
 
 -- | Returns the list of non-default branches of the SwitchTargets value
 switchTargetsCases :: SwitchTargets -> [(Integer, Label)]
