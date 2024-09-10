@@ -105,11 +105,16 @@ type FD = CInt
 -- ---------------------------------------------------------------------------
 -- stat()-related stuff
 
-fdFileSize :: FD -> IO Integer
-fdFileSize fd =
+fdWithCStat :: FD -> (Ptr CStat -> IO a) -> IO a
+fdWithCStat fd fun = do
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry_ "fileSize" $
-        c_fstat fd p_stat
+      c_fstat fd p_stat
+    fun p_stat
+
+fdFileSize :: FD -> IO Integer
+fdFileSize fd =
+  fdWithCStat fd $ \ p_stat -> do
     c_mode <- st_mode p_stat :: IO CMode
     if not (s_isreg c_mode)
         then return (-1)
@@ -129,9 +134,7 @@ fileType file =
 -- referring to file handles. i.e., it'll fail for socket FDs.
 fdStat :: FD -> IO (IODeviceType, CDev, CIno)
 fdStat fd =
-  allocaBytes sizeof_stat $ \ p_stat -> do
-    throwErrnoIfMinus1Retry_ "fdType" $
-        c_fstat fd p_stat
+  fdWithCStat fd $ \ p_stat -> do
     ty <- statGetType p_stat
     dev <- st_dev p_stat
     ino <- st_ino p_stat
