@@ -2633,7 +2633,7 @@ module Data.Tuple.Experimental where
   type Solo :: * -> *
   data Solo a = MkSolo a
   type Solo# :: forall (k :: GHC.Types.RuntimeRep). TYPE k -> TYPE (GHC.Types.TupleRep '[k])
-  data Solo# a = ...
+  data Solo# a = MkSolo# a
   type Tuple0 :: *
   type Tuple0 = ()
   type Tuple0# :: GHC.Types.ZeroBitType
@@ -4620,6 +4620,9 @@ module GHC.PrimOps where
   asinFloat# :: Float# -> Float#
   asinhDouble# :: Double# -> Double#
   asinhFloat# :: Float# -> Float#
+  asyncDoProc# :: Addr# -> Addr# -> State# RealWorld -> (# State# RealWorld, Int#, Int# #)
+  asyncRead# :: Int# -> Int# -> Int# -> Addr# -> State# RealWorld -> (# State# RealWorld, Int#, Int# #)
+  asyncWrite# :: Int# -> Int# -> Int# -> Addr# -> State# RealWorld -> (# State# RealWorld, Int#, Int# #)
   atanDouble# :: Double# -> Double#
   atanFloat# :: Float# -> Float#
   atanhDouble# :: Double# -> Double#
@@ -6155,6 +6158,23 @@ module GHC.Profiling.Eras where
   incrementUserEra :: GHC.Types.Word -> GHC.Types.IO GHC.Types.Word
   setUserEra :: GHC.Types.Word -> GHC.Types.IO ()
 
+module GHC.TypeLits.Experimental where
+  -- Safety: Safe-Inferred
+  appendSSymbol :: forall (a :: GHC.Types.Symbol) (b :: GHC.Types.Symbol). GHC.Internal.TypeLits.SSymbol a -> GHC.Internal.TypeLits.SSymbol b -> GHC.Internal.TypeLits.SSymbol (GHC.Internal.TypeLits.AppendSymbol a b)
+  consSSymbol :: forall (a :: GHC.Types.Char) (b :: GHC.Types.Symbol). GHC.Internal.TypeLits.SChar a -> GHC.Internal.TypeLits.SSymbol b -> GHC.Internal.TypeLits.SSymbol (GHC.Internal.TypeLits.ConsSymbol a b)
+  sCharToSNat :: forall (a :: GHC.Types.Char). GHC.Internal.TypeLits.SChar a -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeLits.CharToNat a)
+  sNatToSChar :: forall (n :: GHC.Num.Natural.Natural). (n GHC.Internal.Data.Type.Ord.<= 1114111) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeLits.SChar (GHC.Internal.TypeLits.NatToChar n)
+
+module GHC.TypeNats.Experimental where
+  -- Safety: None
+  divSNat :: forall (m :: GHC.Num.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Div n m)
+  log2SNat :: forall (n :: GHC.Num.Natural.Natural). (1 GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Log2 n)
+  minusSNat :: forall (m :: GHC.Internal.TypeNats.Nat) (n :: GHC.Internal.TypeNats.Nat). (m GHC.Internal.Data.Type.Ord.<= n) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.- m)
+  modSNat :: forall (m :: GHC.Num.Natural.Natural) (n :: GHC.Internal.TypeNats.Nat). (1 GHC.Internal.Data.Type.Ord.<= m) => GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (GHC.Internal.TypeNats.Mod n m)
+  plusSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.+ m)
+  powerSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.^ m)
+  timesSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.* m)
+
 module Prelude.Experimental where
   -- Safety: Trustworthy
   type CSolo :: Constraint -> Constraint
@@ -7314,7 +7334,7 @@ module Prelude.Experimental where
   data List a = ...
   pattern Solo :: forall a. a -> Solo a
   type Solo :: * -> *
-  data Solo a = MkSolo a
+  data Solo a = ...
   type Solo# :: forall (k :: GHC.Types.RuntimeRep). TYPE k -> TYPE (GHC.Types.TupleRep '[k])
   data Solo# a = ...
   type Sum10# :: forall (k0 :: GHC.Types.RuntimeRep) (k1 :: GHC.Types.RuntimeRep) (k2 :: GHC.Types.RuntimeRep) (k3 :: GHC.Types.RuntimeRep) (k4 :: GHC.Types.RuntimeRep) (k5 :: GHC.Types.RuntimeRep) (k6 :: GHC.Types.RuntimeRep) (k7 :: GHC.Types.RuntimeRep) (k8 :: GHC.Types.RuntimeRep) (k9 :: GHC.Types.RuntimeRep). TYPE k0 -> TYPE k1 -> TYPE k2 -> TYPE k3 -> TYPE k4 -> TYPE k5 -> TYPE k6 -> TYPE k7 -> TYPE k8 -> TYPE k9 -> TYPE (GHC.Types.SumRep [k0, k1, k2, k3, k4, k5, k6, k7, k8, k9])

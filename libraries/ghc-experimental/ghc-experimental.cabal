@@ -23,6 +23,7 @@ common warnings
 library
     import:           warnings
     exposed-modules:
+      GHC.PrimOps
       GHC.Profiling.Eras
       Data.Tuple.Experimental
       Data.Sum.Experimental
