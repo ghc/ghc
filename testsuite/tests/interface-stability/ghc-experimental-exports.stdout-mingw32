@@ -4620,6 +4620,9 @@ module GHC.PrimOps where
   asinFloat# :: Float# -> Float#
   asinhDouble# :: Double# -> Double#
   asinhFloat# :: Float# -> Float#
+  asyncDoProc# :: Addr# -> Addr# -> State# RealWorld -> (# State# RealWorld, Int#, Int# #)
+  asyncRead# :: Int# -> Int# -> Int# -> Addr# -> State# RealWorld -> (# State# RealWorld, Int#, Int# #)
+  asyncWrite# :: Int# -> Int# -> Int# -> Addr# -> State# RealWorld -> (# State# RealWorld, Int#, Int# #)
   atanDouble# :: Double# -> Double#
   atanFloat# :: Float# -> Float#
   atanhDouble# :: Double# -> Double#

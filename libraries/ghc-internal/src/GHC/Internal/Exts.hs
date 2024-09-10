@@ -18,10 +18,42 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- GHC Extensions: this is the Approved Way to get at GHC-specific extensions.
+-- GHC Extensions: This is a unstable way to get at GHC-specific extensions.
+--                 If possible prefer using GHC.PrimOps from ghc-experimental
+--                 or GHC.Exts from base.
 --
--- Note: no other base module should import this module.
+-- Note: no other ghc-internal module should import this module.
 -----------------------------------------------------------------------------
+
+{- Note [Where do we export PrimOps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Built in primops are automatically exported via the magical module
+GHC.Prim (See Note [GHC.Prim]).
+However we don't want users to use GHC.Prim directly. Among other reasons that
+would prevent us from giving those primops a regular haskell or cmm
+implementation in the future.
+
+So instead we provide a hirarchy of Modules through which we expose PrimOps.
+* ghc-internal:GHC.Exts.Internal re-exports GHC.Prim along with some other
+  builtin functionality. It gives zero stability guarantee and is mostly inteded
+  for ghc internal use.
+* ghc-experimental:GHC.PrimOps contains a more stable subset of GHC.Exts.Internal.
+  This module does not offer any more stability *guarantees* than ghc-internal,
+  but we try to keep things slightly more stable there and be backwards compatible
+  if it's easy to do. For example an export from ghc-experimental is likely to get
+  deprecated before being removed. While exports from ghc-internal could be removed
+  without advanced notice between ghc versions!
+* base:GHC.Exts: Contains all kinds of re-exports from ghc-internal:GHC.Exts.Internal
+  which have been grandfathered into this module from pre ghc-9.10.
+  Starting with 9.10.1 only definitions with a fairly high level of expected
+  stability should be exposed through GHC.Exts and changing the API provided by
+  this module now follows the CLC process.
+
+If there is a desire to create a module for a specific group of primitives they
+should still be exported by the catch-all modules GHC.Exts.Internal and GHC.PrimOps,
+with their specific module being placed under ghc-experimental:GHC.PrimOps
+in the module structure.
+-}
 
 module GHC.Internal.Exts
        (
