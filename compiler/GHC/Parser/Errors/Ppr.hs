@@ -693,15 +693,10 @@ instance Diagnostic PsMessage where
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
     PsErrUnicodeCharLooksLike{}                   -> ErrorWithoutFlag
     PsErrInvalidPun {}                            -> ErrorWithoutFlag
-<<<<<<< HEAD
     PsErrIllegalOrPat{}                           -> ErrorWithoutFlag
     PsErrTypeSyntaxInPat{}                        -> ErrorWithoutFlag
     PsErrSpecEpxrMultipleTypeAscription{}         -> ErrorWithoutFlag
-||||||| constructed merge base
-    PsErrSpecEpxrMultipleTypeAscription{}         -> ErrorWithoutFlag
-=======
     PsErrSpecExprMultipleTypeAscription{}         -> ErrorWithoutFlag
->>>>>>> Wibbles
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
