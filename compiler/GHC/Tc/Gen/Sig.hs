@@ -938,7 +938,7 @@ tcSpecPrag poly_id (SpecSigE nm bndrs spec_e inl)
                            , spe_id_bndrs     = id_bndrs
                            , spe_lhs_ev_bndrs = lhs_evs
                            , spe_lhs_binds    = lhs_binds
-                           , spe_call         = spec_e'
+                           , spe_lhs_call     = spec_e'
                            , spe_rhs_ev_bndrs = rhs_evs
                            , spe_rhs_binds    = rhs_binds
                            , spe_inl          = inl }] }
@@ -1173,11 +1173,12 @@ tcRule (HsRule { rd_ext  = ext
                                  , rd_bndrs = mkTcRuleBndrs bndrs (qtkvs ++ tpl_ids)
                                  , rd_lhs   = mkHsDictLet lhs_binds lhs'
                                  , rd_rhs   = mkHsDictLet rhs_binds rhs' } }
-
-mkTcRuleBndrs (RuleBndrs { rb_tyvs = tyvs }) vars
-  = RuleBndrs { rb_ext = noAnn
-              , rb_tyvs = tyvs -- preserved for ppr-ing
-              , rb_tmvs = map (noLocA . RuleBndr noAnn . noLocA) vars }
+  where
+    mkTcRuleBndrs (RuleBndrs { rb_tyvs = tyvs }) vars
+      = RuleBndrs { rb_ext = noAnn
+                  , rb_tyvs = tyvs -- preserved for ppr-ing
+                  , rb_tmvs = map (noLocA . RuleBndr noAnn . noLocA) vars }
+    mkTcRuleBndrs (XRuleBndrs {}) _ = panic "mkTCRuleBndrs"
 
 generateRuleConstraints :: SkolemInfo
                         -> RuleBndrs GhcRn

@@ -24,8 +24,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import GHC.Types.FieldLabel
-import GHC.Types.Name.Reader
+
 import GHC.Rename.HsType
 import GHC.Rename.Bind
 import GHC.Rename.Doc
@@ -37,6 +36,7 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
                         , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
@@ -50,29 +50,28 @@ import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monoidClassName, mappendName
                         )
 
+import GHC.Types.FieldLabel
+import GHC.Types.Name.Reader
 import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.Basic  ( TypeOrKind(..), RuleName )
+import GHC.Types.Basic  ( Arity, TypeOrKind(..), RuleName )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
-
-
+import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
+
 import GHC.Driver.DynFlags
+import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
+
 import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
 import GHC.Utils.Panic
-import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
-import GHC.Types.Unique.Set
-
 import GHC.Utils.Outputable
 
 import GHC.Data.FastString
-import GHC.Data.Bag
 import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
-
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.DataCon ( isSrcStrict )

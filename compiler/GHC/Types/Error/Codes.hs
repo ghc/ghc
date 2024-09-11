@@ -291,7 +291,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrInvalidPun"                               = 52943
   GhcDiagnosticCode "PsErrIllegalOrPat"                             = 29847
   GhcDiagnosticCode "PsErrTypeSyntaxInPat"                          = 32181
-  GhcDiagnosticCode "PsErrSpecEpxrMultipleTypeAscription"           = 62037
   GhcDiagnosticCode "PsErrSpecExprMultipleTypeAscription"           = 62037
 
   -- Driver diagnostic codes

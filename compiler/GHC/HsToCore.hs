@@ -293,7 +293,7 @@ deSugar hsc_env
 
 dsImpSpecs :: [LTcSpecPrag] -> DsM (OrdList (Id,CoreExpr), [CoreRule])
 dsImpSpecs imp_specs
- = do { spec_prs <- mapMaybeM (dsSpec Nothing) imp_specs
+ = do { spec_prs <- mapMaybeM (dsSpec Nothing . unLoc) imp_specs
       ; let (spec_binds, spec_rules) = unzip spec_prs
       ; return (concatOL spec_binds, spec_rules) }
 

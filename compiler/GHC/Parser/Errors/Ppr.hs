@@ -695,7 +695,6 @@ instance Diagnostic PsMessage where
     PsErrInvalidPun {}                            -> ErrorWithoutFlag
     PsErrIllegalOrPat{}                           -> ErrorWithoutFlag
     PsErrTypeSyntaxInPat{}                        -> ErrorWithoutFlag
-    PsErrSpecEpxrMultipleTypeAscription{}         -> ErrorWithoutFlag
     PsErrSpecExprMultipleTypeAscription{}         -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -866,7 +865,6 @@ instance Diagnostic PsMessage where
     PsErrInvalidPun {}                            -> [suggestExtension LangExt.ListTuplePuns]
     PsErrIllegalOrPat{}                           -> [suggestExtension LangExt.OrPatterns]
     PsErrTypeSyntaxInPat{}                        -> noHints
-    PsErrSpecEpxrMultipleTypeAscription {}        -> noHints
     PsErrSpecExprMultipleTypeAscription {}        -> noHints
 
   diagnosticCode = constructorCode

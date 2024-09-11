@@ -805,7 +805,7 @@ dsSpecs :: CoreExpr     -- Its rhs
 -- See Note [Overview of SPECIALISE pragmas] in GHC.Tc.Gen.Sig
 dsSpecs _ IsDefaultMethod = return (nilOL, [])
 dsSpecs poly_rhs (SpecPrags sps)
-  = do { pairs <- mapMaybeM (dsSpec (Just poly_rhs)) sps
+  = do { pairs <- mapMaybeM (dsLSpec (Just poly_rhs)) sps
        ; let (spec_binds_s, rules) = unzip pairs
        ; return (concatOL spec_binds_s, rules) }
 
@@ -829,7 +829,7 @@ dsSpec mb_poly_rhs (SpecPrag poly_id spec_co spec_inl)
                --         \spec_bndrs. [] spec_args
                -- perhaps with the body of the lambda wrapped in some WpLets
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
-  = dsHsWrapper spec_app $ \core_app ->
+  = dsHsWrapperForRuleLHS spec_app $ \core_app ->
     finishSpecPrag mb_poly_rhs
                    spec_bndrs (core_app (Var poly_id))
                    spec_bndrs (\_ poly_rhs -> core_app poly_rhs)
@@ -840,7 +840,7 @@ dsSpec mb_poly_rhs (SpecPragE { spe_poly_id = poly_id
                               , spe_id_bndrs     = id_bndrs
                               , spe_lhs_ev_bndrs = lhs_evs
                               , spe_lhs_binds    = lhs_binds
-                              , spe_call         = the_call
+                              , spe_lhs_call     = the_call
                               , spe_rhs_ev_bndrs = rhs_evs
                               , spe_rhs_binds    = rhs_binds
                               , spe_inl          = inl })
@@ -869,7 +869,7 @@ failBecauseOfClassOp :: Id -> DsM (Maybe a)
 -- There is no point in trying to specialise a class op
 -- Moreover, classops don't (currently) have an inl_sat arity set
 -- (it would be Just 0) and that in turn makes makeCorePair bleat
-failBecauseOfClassOp loc poly_id
+failBecauseOfClassOp poly_id
   = do { diagnosticDs (DsUselessSpecialiseForClassMethodSelector poly_id)
        ; return Nothing  }
 
@@ -919,9 +919,7 @@ finishSpecPrag mb_poly_rhs
 
        ; tracePm "dsSpec" (vcat
             [ text "fun:" <+> ppr poly_id
-            , text "spec_co:" <+> ppr spec_co
             , text "spec_bndrs:" <+>  ppr spec_bndrs
-            , text "ds_lhs:" <+> ppr ds_lhs
             , text "args:" <+>  ppr rule_lhs_args ])
        ; return (Just (unitOL (spec_id, spec_rhs), rule))
             -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
@@ -1261,7 +1259,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
          Of course, the ($dfEqlist d) in the pattern makes it less likely
          to match, but there is no other way to get d:Eq a
 
-   NB 2: We do drop_dicts *before* simplOptEpxr, so that we expect all
+   NB 2: We do drop_dicts *before* simplOptExpr, so that we expect all
          the evidence bindings to be wrapped around the outside of the
          LHS.  (After simplOptExpr they'll usually have been inlined.)
          dsHsWrapper does dependency analysis, so that civilised ones
