@@ -329,7 +329,7 @@ instance HasTrailing AnnExplicitSum where
   trailing _ = []
   setTrailing a _ = a
 
-instance HasTrailing (Maybe EpAnnUnboundVar) where
+instance HasTrailing (Maybe EpAnnHole) where
   trailing _ = []
   setTrailing a _ = a
 
@@ -3042,16 +3042,16 @@ instance ExactPrint (HsExpr GhcPs) where
       then markAnnotated n
       else return n
     return (HsVar x n')
-  exact (HsUnboundVar an n) = do
+  exact x@(HsHole an) = do
     case an of
-      Just (EpAnnUnboundVar (ob,cb) l) -> do
-        ob' <-  printStringAtAA ob "`"
+      Just (EpAnnHole (ob,cb) l) -> do
+        ob' <- printStringAtAA ob "`"
         l' <- printStringAtAA l  "_"
         cb' <- printStringAtAA cb "`"
-        return (HsUnboundVar (Just (EpAnnUnboundVar (ob',cb') l')) n)
-      _ -> do
-        printStringAdvanceA "_" >> return ()
-        return (HsUnboundVar an n)
+        return (HsHole (Just (EpAnnHole (ob',cb') l')))
+      Nothing -> do
+        printStringAdvanceA "_"
+        return x
   exact x@(HsOverLabel src l) = do
     printStringAdvanceA "#" >> return ()
     case src of

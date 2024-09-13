@@ -925,9 +925,9 @@ zonkExpr (HsVar x (L l id))
   do { id' <- zonkIdOcc id
      ; return (HsVar x (L l id')) }
 
-zonkExpr (HsUnboundVar her occ)
+zonkExpr (XExpr (HsUnboundVarTc her occ))
   = do her' <- zonk_her her
-       return (HsUnboundVar her' occ)
+       return (XExpr (HsUnboundVarTc her' occ))
   where
     zonk_her :: HoleExprRef -> ZonkTcM HoleExprRef
     zonk_her (HER ref ty u)
@@ -1079,6 +1079,7 @@ zonkExpr (HsEmbTy x _) = dataConCantHappen x
 zonkExpr (HsQual x _ _) = dataConCantHappen x
 zonkExpr (HsForAll x _ _) = dataConCantHappen x
 zonkExpr (HsFunArr x _ _ _) = dataConCantHappen x
+zonkExpr (HsHole x) = dataConCantHappen x
 
 zonkExpr (XExpr (WrapExpr (HsWrap co_fn expr)))
   = runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->

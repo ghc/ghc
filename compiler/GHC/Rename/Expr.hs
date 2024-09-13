@@ -320,7 +320,7 @@ rnUnboundVar v = do
   deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
   -- See Note [Reporting unbound names] for difference between qualified and unqualified names.
   unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
-  return (HsUnboundVar noExtField v, emptyFVs)
+  return (XExpr (HsUnboundVarRn v), emptyFVs)
 
 rnExpr (HsVar _ (L l v))
   = do { dflags <- getDynFlags
@@ -355,8 +355,8 @@ rnExpr (HsVar _ (L l v))
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
 
-rnExpr (HsUnboundVar _ v)
-  = return (HsUnboundVar noExtField v, emptyFVs)
+rnExpr (HsHole _)
+  = return (XExpr (HsUnboundVarRn (mkUnqual varName (fsLit "_"))), emptyFVs)
 
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel src v)
@@ -862,8 +862,8 @@ See #18151.
 Note [Reporting unbound names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Faced with an out-of-scope `RdrName` there are two courses of action
-A. Report an error immediately (and return a HsUnboundVar). This will halt GHC after the renamer is complete
-B. Return a HsUnboundVar without reporting an error.  That will allow the typechecker to run, which in turn
+A. Report an error immediately (and return a HsUnboundVarRn). This will halt GHC after the renamer is complete
+B. Return a HsUnboundVarRn without reporting an error.  That will allow the typechecker to run, which in turn
    can give a better error message, notably giving the type of the variable via the "typed holes" mechanism.
 
 When `-fdefer-out-of-scope-variables` is on we follow plan B.

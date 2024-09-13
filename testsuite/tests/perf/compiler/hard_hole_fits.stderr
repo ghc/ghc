@@ -17,14 +17,12 @@ hard_hole_fits.hs:14:22: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Internal.Enum’))
 
-hard_hole_fits.hs:15:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
-    • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (HsUnboundVar xuv uv) = _
-    • Relevant bindings include
-        uv :: GHC.Types.Name.Reader.RdrName
-          (bound at hard_hole_fits.hs:15:26)
-        xuv :: Language.Haskell.Syntax.Extension.XUnboundVar GhcPs
-          (bound at hard_hole_fits.hs:15:22)
+hard_hole_fits.hs:15:21: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+     Found hole: _ :: Int
+     In an equation for ‘testMe’: testMe (HsHole a) = _
+     Relevant bindings include
+        a :: Language.Haskell.Syntax.Extension.XHole GhcPs
+          (bound at hard_hole_fits.hs:15:16)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
         maxBound :: forall a. Bounded a => a

@@ -102,7 +102,6 @@ lhsExprType (L _ e) = hsExprType e
 -- | Compute the 'Type' of an @'HsExpr' 'GhcTc'@ in a pure fashion.
 hsExprType :: HsExpr GhcTc -> Type
 hsExprType (HsVar _ (L _ id)) = idType id
-hsExprType (HsUnboundVar (HER _ ty _) _) = ty
 hsExprType (HsRecSel _ (FieldOcc id _)) = idType id
 hsExprType (HsOverLabel v _) = dataConCantHappen v
 hsExprType (HsIPVar v _) = dataConCantHappen v
@@ -146,6 +145,7 @@ hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
 hsExprType (HsStatic (_, ty) _s) = ty
 hsExprType (HsPragE _ _ e) = lhsExprType e
 hsExprType (HsEmbTy x _) = dataConCantHappen x
+hsExprType (HsHole x) = dataConCantHappen x
 hsExprType (HsQual x _ _) = dataConCantHappen x
 hsExprType (HsForAll x _ _) = dataConCantHappen x
 hsExprType (HsFunArr x _ _ _) = dataConCantHappen x
@@ -154,6 +154,7 @@ hsExprType (XExpr (ExpandedThingTc _ e))  = hsExprType e
 hsExprType (XExpr (ConLikeTc con _ _)) = conLikeType con
 hsExprType (XExpr (HsTick _ e)) = lhsExprType e
 hsExprType (XExpr (HsBinTick _ _ e)) = lhsExprType e
+hsExprType (XExpr (HsUnboundVarTc (HER _ ty _) _)) = ty
 
 arithSeqInfoType :: ArithSeqInfo GhcTc -> Type
 arithSeqInfoType asi = mkListTy $ case asi of

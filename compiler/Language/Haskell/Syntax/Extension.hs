@@ -448,6 +448,7 @@ type family XTick           x
 type family XBinTick        x
 type family XPragE          x
 type family XEmbTy          x
+type family XHole           x
 type family XForAll         x
 type family XQual           x
 type family XFunArr         x
