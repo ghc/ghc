@@ -86,7 +86,6 @@ import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-
 import Control.Monad
 import qualified Data.List.NonEmpty as NE
 
@@ -288,7 +287,21 @@ tcExpr :: HsExpr GhcRn
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
-tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
+tcExpr e@(HsVar Bound _)              res_ty = tcApp e res_ty
+
+tcExpr (HsVar (Unbound ()) (L l occ)) res_ty
+  = do { ty <- expTypeToType res_ty    -- Allow Int# etc (#12531)
+       -- FIXME: both HER and the HsVar _ id now contain id, this is redundant
+       ; let id = mkLocalId occ ManyTy ty -- FIXME: is assert (not (isCoVarType ty)) needed?
+       ; her <- emitNewExprHole id
+       ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
+                                       -- (#18491)
+       ; return (HsVar (Unbound her) (L l id)) }
+tcExpr (HsHole NoExtField locatedName) res_ty
+  -- FIXME: haxxx
+  = do { HsVar (Unbound her) id <- tcExpr (HsVar (Unbound ()) locatedName) res_ty
+       ; return $ HsHole her id }
+
 tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
@@ -303,17 +316,6 @@ tcExpr e@(HsOverLit _ lit) res_ty
        ; case mb_res of
            Just lit' -> return (HsOverLit noExtField lit')
            Nothing   -> tcApp e res_ty }
-
--- Typecheck an occurrence of an unbound Id
---
--- Some of these started life as a true expression hole "_".
--- Others might simply be variables that accidentally have no binding site
-tcExpr (HsUnboundVar _ occ) res_ty
-  = do { ty <- expTypeToType res_ty    -- Allow Int# etc (#12531)
-       ; her <- emitNewExprHole occ ty
-       ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
-                                       -- (#18491)
-       ; return (HsUnboundVar her occ) }
 
 tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit
@@ -342,7 +344,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
+                   (fromDict ipClass ip_name ip_ty (HsVar Bound (noLocA ip_var)))
                    ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.

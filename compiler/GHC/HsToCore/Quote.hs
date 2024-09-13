@@ -98,7 +98,7 @@ import Data.List.NonEmpty ( NonEmpty(..), toList )
 import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
-import GHC.Types.Name.Reader (RdrName(..))
+import GHC.Types.Name.Reader (RdrName(..), getRdrName)
 
 data MetaWrappers = MetaWrappers {
       -- Applies its argument to a type argument `m` and dictionary `Quote m`
@@ -1533,7 +1533,7 @@ repLE :: LHsExpr GhcRn -> MetaM (Core (M TH.Exp))
 repLE (L loc e) = mapReaderT (putSrcSpanDs (locA loc)) (repE e)
 
 repE :: HsExpr GhcRn -> MetaM (Core (M TH.Exp))
-repE (HsVar _ (L _ x)) =
+repE (HsVar Bound (L _ x)) =
   do { mb_val <- lift $ dsLookupMetaEnv x
      ; case mb_val of
         Nothing            -> do { str <- lift $ globalVar x
@@ -1541,10 +1541,13 @@ repE (HsVar _ (L _ x)) =
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
                                  ; return (MkC e') } }
+repE (HsVar (Unbound ()) (L _ uv)) = do
+  name <- repRdrName (getRdrName uv)
+  repUnboundVar name
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ s) = repOverLabel s
 
-repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
+repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar Bound (noLocA x))
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
@@ -1680,9 +1683,6 @@ repE (HsTypedSplice n _) = rep_splice n
 repE (HsUntypedSplice (HsUntypedSpliceNested n) _)  = rep_splice n
 repE e@(HsUntypedSplice (HsUntypedSpliceTop _ _) _) = pprPanic "repE: top level splice" (ppr e)
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
-repE (HsUnboundVar _ uv)   = do
-                               name <- repRdrName uv
-                               repUnboundVar name
 repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
   repGetField e1 f
@@ -1723,6 +1723,7 @@ repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
+repE e@(HsHole{}) = notHandled (ThExpressionForm e)
 
 repFunArr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
 repFunArr HsUnrestrictedArrow{} = repConName unrestrictedFunTyConName

@@ -1400,7 +1400,7 @@ addDFunPrags dfun_id sc_meth_ids
    is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> Id -> HsExpr GhcTc
-wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLocA id))
+wrapId wrapper id = mkHsWrap wrapper (HsVar Bound (noLocA id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

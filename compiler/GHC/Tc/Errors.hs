@@ -1562,14 +1562,15 @@ maybeAddDeferredBindings :: SolverReportErrCtxt
                          -> TcM ()
 maybeAddDeferredBindings ctxt hole report = do
   case hole_sort hole of
-    ExprHole (HER ref ref_ty _) -> do
+    ExprHole (HER ref ref_id) -> do
       -- Only add bindings for holes in expressions
       -- not for holes in partial type signatures
       -- cf. addDeferredBinding
       when (deferringAnyBindings ctxt) $ do
-        err_tm <- mkErrorTerm ctxt (hole_loc hole) ref_ty report
-          -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
-          -- See Note [Holes] in GHC.Tc.Types.Constraint
+        err_tm <- mkErrorTerm ctxt (hole_loc hole) (idType ref_id) report
+          -- FIXME: verify this comment makes sense after HER change
+          -- NB: ref_id, not hole_id. hole_id might be rewritten.
+          -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint
         writeMutVar ref err_tm
     _ -> pure ()
 

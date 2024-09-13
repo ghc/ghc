@@ -2365,11 +2365,11 @@ lookupSyntaxNames :: [Name]                         -- Standard names
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
-             return (map (HsVar noExtField . noLocA) std_names, emptyFVs)
+             return (map (HsVar Bound . noLocA) std_names, emptyFVs)
         else
           do { usr_names <-
                  mapM (lookupOccRnNone . mkRdrUnqual . nameOccName) std_names
-             ; return (map (HsVar noExtField . noLocA) usr_names, mkFVs usr_names) } }
+             ; return (map (HsVar Bound . noLocA) usr_names, mkFVs usr_names) } }
 
 
 {-

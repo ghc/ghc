@@ -109,7 +109,6 @@ module GHC.Parser.PostProcess (
         withArrowParsingMode, withArrowParsingMode',
         setTelescopeBndrsNameSpace,
         PatBuilder,
-        hsHoleExpr,
 
         -- Type/datacon ambiguity resolution
         DisambTD(..),
@@ -1634,12 +1633,12 @@ type Fbind b = Either (LHsRecField GhcPs (LocatedA b)) (LHsRecProj GhcPs (Locate
 class DisambInfixOp b where
   mkHsVarOpPV :: LocatedN RdrName -> PV (LocatedN b)
   mkHsConOpPV :: LocatedN RdrName -> PV (LocatedN b)
-  mkHsInfixHolePV :: LocatedN (HsExpr GhcPs) -> PV (LocatedN b)
+  mkHsInfixHolePV :: LocatedN RdrName -> PV (LocatedN b)
 
 instance DisambInfixOp (HsExpr GhcPs) where
   mkHsVarOpPV v = return $ L (getLoc v) (HsVar noExtField v)
   mkHsConOpPV v = return $ L (getLoc v) (HsVar noExtField v)
-  mkHsInfixHolePV h = return h
+  mkHsInfixHolePV v = return $ L (getLoc v) (HsHole noExtField v)
 
 instance DisambInfixOp RdrName where
   mkHsConOpPV (L l v) = return $ L l v
@@ -1920,11 +1919,11 @@ instance DisambECP (HsExpr GhcPs) where
   type Body (HsExpr GhcPs) = HsExpr
   ecpFromCmd' (L l c) = do
     addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowCmdInExpr c
-    return (L l (hsHoleExpr noAnn))
+    return (L l hsHoleExprNoAnn)
   ecpFromExp' = return
   ecpFromPat' p@(L l _) = do
     addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrOrPatInExpr p
-    return (L l (hsHoleExpr noAnn))
+    return (L l hsHoleExprNoAnn)
   mkHsProjUpdatePV l fields arg isPun anns = do
     !cs <- getCommentsFor l
     return $ mkRdrProjUpdate (EpAnn (spanAsAnchor l) noAnn cs) fields arg isPun anns
@@ -1973,7 +1972,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsOverLitPV (L (EpAnn l an csIn) a) = do
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn  l an (cs Semi.<> csIn)) (HsOverLit NoExtField a)
-  mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (hsHoleExpr noAnn)
+  mkHsWildCardPV l = return $ L (noAnnSrcSpan l) hsHoleExprNoAnn
   mkHsTySigPV l@(EpAnn anc an csIn) a sig anns = do
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn anc an (csIn Semi.<> cs)) (ExprWithTySig anns a (hsTypeToHsSigWcType sig))
@@ -1994,11 +1993,11 @@ instance DisambECP (HsExpr GhcPs) where
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (SectionR noExtField op e)
   mkHsAsPatPV l v _ e   = addError (mkPlainErrorMsgEnvelope l $ PsErrTypeAppWithoutSpace (unLoc v) e)
-                          >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
+                          >> return (L (noAnnSrcSpan l) hsHoleExprNoAnn)
   mkHsLazyPatPV l e   _ = addError (mkPlainErrorMsgEnvelope l $ PsErrLazyPatWithoutSpace e)
-                          >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
+                          >> return (L (noAnnSrcSpan l) hsHoleExprNoAnn)
   mkHsBangPatPV l e   _ = addError (mkPlainErrorMsgEnvelope l $ PsErrBangPatWithoutSpace e)
-                          >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
+                          >> return (L (noAnnSrcSpan l) hsHoleExprNoAnn)
   mkSumOrTuplePV = mkSumOrTupleExpr
   mkHsEmbTyPV l toktype ty =
     return $ L (noAnnSrcSpan l) $
@@ -2024,9 +2023,6 @@ instance DisambECP (HsExpr GhcPs) where
   rejectPragmaPV (L l (HsPragE _ prag _)) = addError $ mkPlainErrorMsgEnvelope (locA l) $
                                                          (PsErrUnallowedPragma prag)
   rejectPragmaPV _                        = return ()
-
-hsHoleExpr :: Maybe EpAnnUnboundVar -> HsExpr GhcPs
-hsHoleExpr anns = HsUnboundVar anns (mkRdrUnqual (mkVarOccFS (fsLit "_")))
 
 instance DisambECP (PatBuilder GhcPs) where
   type Body (PatBuilder GhcPs) = PatBuilder
@@ -3695,3 +3691,6 @@ mkListSyntaxTy1 brkOpen t brkClose =
 
     annsKeyword = [AddEpAnn AnnOpenS brkOpen, AddEpAnn AnnCloseS brkClose]
     annParen = AnnParen AnnParensSquare brkOpen brkClose
+
+hsHoleExprNoAnn :: HsExpr GhcPs
+hsHoleExprNoAnn = HsHole noExtField (L noSrcSpanA (mkUnqual varName (fsLit "_")))

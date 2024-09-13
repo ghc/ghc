@@ -778,7 +778,7 @@ tcInferOverLit lit@(OverLit { ol_val = val
        ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
                         HsLit noExtField hs_lit
              from_expr = mkHsWrap (wrap2 <.> wrap1) $
-                         HsVar noExtField (L loc from_id)
+                         HsVar Bound (L loc from_id)
              witness = HsApp noExtField (L (l2l loc) from_expr) lit_expr
              lit' = lit { ol_ext = OverLitTc { ol_rebindable = rebindable
                                              , ol_witness = witness
@@ -798,7 +798,7 @@ tcCheckId name res_ty
        ; addFunResCtxt expr [] actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOf name) rn_fun expr actual_res_ty res_ty }
   where
-    rn_fun = HsVar noExtField (noLocA name)
+    rn_fun = HsVar Bound (noLocA name)
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -823,7 +823,7 @@ tc_infer_assert assert_name
   = do { assert_error_id <- tcLookupId assertErrorName
        ; (wrap, id_rho) <- topInstantiate (OccurrenceOf assert_name)
                                           (idType assert_error_id)
-       ; return (mkHsWrap wrap (HsVar noExtField (noLocA assert_error_id)), id_rho)
+       ; return (mkHsWrap wrap (HsVar Bound (noLocA assert_error_id)), id_rho)
        }
 
 tc_infer_id :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -846,7 +846,7 @@ tc_infer_id id_name
 
              _ -> failWithTc $ TcRnExpectedValueId thing }
   where
-    return_id id = return (HsVar noExtField (noLocA id), idType id)
+    return_id id = return (HsVar Bound (noLocA id), idType id)
 
 {- Note [Suppress hints with RequiredTypeArguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1105,7 +1105,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
         ; lift <- if isStringTy id_ty then
                      do { sid <- tcLookupId GHC.Builtin.Names.TH.liftStringName
                                      -- See Note [Lifting strings]
-                        ; return (HsVar noExtField (noLocA sid)) }
+                        ; return (HsVar Bound (noLocA sid)) }
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
@@ -1281,9 +1281,12 @@ addStmtCtxt stmt thing_inside
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside
   = case e of
-      HsUnboundVar {} -> thing_inside
+      HsVar (Unbound ()) _ -> thing_inside
+      HsHole _ _           -> thing_inside
       _ -> addErrCtxt (exprCtxt e) thing_inside
-   -- The HsUnboundVar special case addresses situations like
+   -- TODO: Is this still correct now that there is unboundvar/hole distinction?
+   -- The HsVar (Unbound _) and HsHole special cases address
+   -- situations like
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself

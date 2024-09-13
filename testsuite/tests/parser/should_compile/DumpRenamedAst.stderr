@@ -102,7 +102,7 @@
                        (EpaComments
                         []))
                       (HsVar
-                       (NoExtField)
+                       (Bound)
                        (L
                         (EpAnn
                          (EpaSpan { DumpRenamedAst.hs:35:8-15 })

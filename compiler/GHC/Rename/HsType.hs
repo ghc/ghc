@@ -1464,11 +1464,12 @@ data NegationHandling = ReassociateNegation | KeepNegationIntact
 
 ----------------------------
 
+-- TODO: What is the purpose of this function? What about holes?
 get_op :: LHsExpr GhcRn -> OpName
--- An unbound name could be either HsVar or HsUnboundVar
+-- An unbound name could be either (HsVar Bound _) or (HsVar Unbound _) -- FIXME: ???
 -- See GHC.Rename.Expr.rnUnboundVar
-get_op (L _ (HsVar _ n))         = NormalOp (unLoc n)
-get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
+get_op (L _ (HsVar Bound n))         = NormalOp (unLoc n)
+get_op (L _ (HsVar (Unbound _) n))  = UnboundOp (unLoc n) -- TODO: is it valid to store Name in an Unbound HsVar??
 get_op (L _ (HsRecSel _ fld))    = RecFldOp fld
 get_op other                     = pprPanic "get_op" (ppr other)
 

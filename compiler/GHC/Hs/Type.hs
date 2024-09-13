@@ -1149,11 +1149,11 @@ ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
 *                                                                      *
 ************************************************************************
 -}
-
+-- TODO: Can't an operator be a hole? Why?
 -- | Name of an operator in an operator application or section
 data OpName = NormalOp Name             -- ^ A normal identifier
             | NegateOp                  -- ^ Prefix negation
-            | UnboundOp RdrName         -- ^ An unbound identifier
+            | UnboundOp Name            -- ^ An unbound identifier
             | RecFldOp (FieldOcc GhcRn) -- ^ A record field occurrence
 
 instance Outputable OpName where
