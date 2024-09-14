@@ -226,6 +226,7 @@ Library
         GHC.Internal.IO.Handle.Text
         GHC.Internal.IO.Handle.Types
         GHC.Internal.IO.IOMode
+        GHC.Internal.IO.Magic
         GHC.Internal.IO.Unsafe
         GHC.Internal.IO.StdHandles
         GHC.Internal.IO.SubSystem

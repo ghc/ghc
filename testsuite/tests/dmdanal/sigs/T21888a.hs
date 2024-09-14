@@ -5,7 +5,7 @@ module T21888a where
 -- in GHC.Core.Opt.DmdAnal
 
 -- We should get a worker-wrapper split on g
--- and on wombat, even though f uses x unboxed
+-- and on wombat, even though f uses x boxed
 
 {-# NOINLINE f #-}
 f x = Just x

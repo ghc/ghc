@@ -608,7 +608,7 @@ exprMayThrowPreciseException envs e
   , op /= RaiseIOOp
   = False -- 2. in the Note
   | Var f <- fn
-  , f `hasKey` seqHashKey
+  , f `hasKey` seqHashKey || f `hasKey` hideEvalBarriersKey
   = False -- 3. in the Note
   | Var f <- fn
   , Just fcall <- isFCallId_maybe f
@@ -805,7 +805,8 @@ For an expression @f a1 ... an :: ty@ we determine that
             (Why not simply unboxed pairs as above? This is motivated by
             T13380{d,e}.)
   2. False  If f is a PrimOp, and it is *not* raiseIO#
-  3. False  If f is the PrimOp-like `seq#`, cf. Note [seq# magic].
+  3. False  If f is the PrimOp-like `seq#`, cf. Note [seq# magic],
+            or the function `hideEvalBarriers#`
   4. False  If f is an unsafe FFI call ('PlayRisky')
   _. True   Otherwise "give up".
 
@@ -813,6 +814,8 @@ It is sound to return False in those cases, because
   1. We don't give any guarantees for unsafePerformIO, so no precise exceptions
      from pure code.
   2. raiseIO# is the only primop that may throw a precise exception.
+       FIXME: Other primops like catch# or keepAlive# can throw precise
+       exceptions, too, under some conditions.
   3. `seq#` used to be a primop that did not throw a precise exception.
      We keep it that way for back-compat.
      See the implementation bits of Note [seq# magic] in GHC.Types.Id.Make.

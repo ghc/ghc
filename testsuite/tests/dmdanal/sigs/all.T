@@ -1,5 +1,5 @@
 # This directory contains tests where we annotate functions with expected
-# type signatures, and verify that these actually those found by the compiler
+# demand signatures, and verify that these actually those found by the compiler
 
 setTestOpts(extra_hc_opts('-ddump-dmd-signatures -ddump-cpr-signatures -dno-typeable-binds'))
 
@@ -40,3 +40,4 @@ test('T21888', normal, compile, [''])
 test('T21888a', normal, compile, [''])
 test('T22241', normal, compile, [''])
 test('T21737', normal, compile, [''])
+test('T23847', normal, compile, [''])

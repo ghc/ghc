@@ -26,6 +26,7 @@ module GHC.Internal.IO.Unsafe (
   ) where
 
 import GHC.Internal.Base
+import GHC.Internal.IO.Magic
 
 {-
 Note [unsafePerformIO and strictness]
@@ -142,7 +143,10 @@ like 'GHC.Internal.Control.Exception.bracket' cannot be used safely within
 -}
 unsafeDupablePerformIO  :: IO a -> a
 -- See Note [unsafePerformIO and strictness]
-unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> lazy a
+unsafeDupablePerformIO (IO m) = runRW# $ \s0 ->
+  case hideEvalBarriers# m s0 of
+    (# s1, a0 #) -> case seq# a0 s1 of
+      (# _, a1 #) -> a1
 
 {-|
 'unsafeInterleaveIO' allows an 'IO' computation to be deferred lazily.

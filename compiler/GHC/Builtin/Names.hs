@@ -276,6 +276,13 @@ basicKnownKeyNames
         -- seq#
         seqHashName,
 
+        -- considerExceptionsPrecise#
+        considerExceptionsPreciseName,
+        -- evalBarrier#
+        evalBarrierName,
+        -- hideEvalBarriers#
+        hideEvalBarriersName,
+
         -- Dynamic
         toDynName,
 
@@ -307,7 +314,7 @@ basicKnownKeyNames
         fmapName,
 
         -- Monad stuff
-        thenIOName, bindIOName, returnIOName, failIOName, bindMName, thenMName,
+        thenIOName, bindIOName, returnIOName, bindMName, thenMName,
         returnMName, joinMName,
 
         -- MonadFail
@@ -584,7 +591,7 @@ gHC_INTERNAL_BASE, gHC_INTERNAL_ENUM,
     gHC_INTERNAL_LIST, gHC_INTERNAL_TUPLE, gHC_INTERNAL_DATA_EITHER,
     gHC_INTERNAL_DATA_FOLDABLE, gHC_INTERNAL_DATA_TRAVERSABLE,
     gHC_INTERNAL_EXCEPTION_CONTEXT,
-    gHC_INTERNAL_CONC, gHC_INTERNAL_IO, gHC_INTERNAL_IO_Exception,
+    gHC_INTERNAL_CONC, gHC_INTERNAL_IO_EXCEPTION, gHC_INTERNAL_IO_MAGIC,
     gHC_INTERNAL_ST, gHC_INTERNAL_IX, gHC_INTERNAL_STABLE, gHC_INTERNAL_PTR, gHC_INTERNAL_ERR, gHC_INTERNAL_REAL,
     gHC_INTERNAL_FLOAT, gHC_INTERNAL_TOP_HANDLER, gHC_INTERNAL_SYSTEM_IO, gHC_INTERNAL_DYNAMIC,
     gHC_INTERNAL_TYPEABLE, gHC_INTERNAL_TYPEABLE_INTERNAL, gHC_INTERNAL_GENERICS,
@@ -607,8 +614,8 @@ gHC_INTERNAL_DATA_STRING            = mkGhcInternalModule (fsLit "GHC.Internal.D
 gHC_INTERNAL_DATA_FOLDABLE          = mkGhcInternalModule (fsLit "GHC.Internal.Data.Foldable")
 gHC_INTERNAL_DATA_TRAVERSABLE       = mkGhcInternalModule (fsLit "GHC.Internal.Data.Traversable")
 gHC_INTERNAL_CONC                   = mkGhcInternalModule (fsLit "GHC.Internal.GHC.Conc")
-gHC_INTERNAL_IO                     = mkGhcInternalModule (fsLit "GHC.Internal.IO")
-gHC_INTERNAL_IO_Exception           = mkGhcInternalModule (fsLit "GHC.Internal.IO.Exception")
+gHC_INTERNAL_IO_EXCEPTION           = mkGhcInternalModule (fsLit "GHC.Internal.IO.Exception")
+gHC_INTERNAL_IO_MAGIC               = mkGhcInternalModule (fsLit "GHC.Internal.IO.Magic")
 gHC_INTERNAL_ST                     = mkGhcInternalModule (fsLit "GHC.Internal.ST")
 gHC_INTERNAL_IX                     = mkGhcInternalModule (fsLit "GHC.Internal.Ix")
 gHC_INTERNAL_STABLE                 = mkGhcInternalModule (fsLit "GHC.Internal.Stable")
@@ -1417,7 +1424,25 @@ dataToTagClassName    = clsQual gHC_MAGIC      (fsLit "DataToTag") dataToTagClas
 
 -- seq#
 seqHashName :: Name
-seqHashName = varQual gHC_INTERNAL_IO (fsLit "seq#") seqHashKey
+seqHashName = varQual gHC_INTERNAL_IO_MAGIC (fsLit "seq#") seqHashKey
+
+-- considerExceptionsPrecise#
+considerExceptionsPreciseName :: Name
+considerExceptionsPreciseName
+  = varQual gHC_INTERNAL_IO_MAGIC (fsLit "considerExceptionsPrecise#")
+      considerExceptionsPreciseKey
+
+-- evalBarrier#
+evalBarrierName :: Name
+evalBarrierName
+  = varQual gHC_INTERNAL_IO_MAGIC (fsLit "evalBarrier#") evalBarrierKey
+
+-- hideEvalBarriers#
+hideEvalBarriersName :: Name
+hideEvalBarriersName
+  = varQual gHC_INTERNAL_IO_MAGIC (fsLit "hideEvalBarriers#")
+      hideEvalBarriersKey
+
 
 -- Custom type errors
 errorMessageTypeErrorFamName
@@ -1467,7 +1492,7 @@ dataClassName = clsQual gHC_INTERNAL_DATA_DATA (fsLit "Data") dataClassKey
 
 -- Error module
 assertErrorName    :: Name
-assertErrorName   = varQual gHC_INTERNAL_IO_Exception (fsLit "assertError") assertErrorIdKey
+assertErrorName   = varQual gHC_INTERNAL_IO_EXCEPTION (fsLit "assertError") assertErrorIdKey
 
 -- GHC.Internal.Debug.Trace
 traceName          :: Name
@@ -1529,13 +1554,12 @@ ghciStepIoMName = varQual gHC_INTERNAL_GHCI (fsLit "ghciStepIO") ghciStepIoMClas
 
 -- IO things
 ioTyConName, ioDataConName,
-  thenIOName, bindIOName, returnIOName, failIOName :: Name
+  thenIOName, bindIOName, returnIOName :: Name
 ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
 ioDataConName     = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
 thenIOName        = varQual gHC_INTERNAL_BASE  (fsLit "thenIO")   thenIOIdKey
 bindIOName        = varQual gHC_INTERNAL_BASE  (fsLit "bindIO")   bindIOIdKey
 returnIOName      = varQual gHC_INTERNAL_BASE  (fsLit "returnIO") returnIOIdKey
-failIOName        = varQual gHC_INTERNAL_IO    (fsLit "failIO")   failIOIdKey
 
 -- IO things
 printName :: Name
@@ -2373,7 +2397,7 @@ rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
 runMainKey                    = mkPreludeMiscIdUnique 102
 
-thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey, seqHashKey :: Unique
+thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
 assertErrorIdKey              = mkPreludeMiscIdUnique 105
@@ -2408,7 +2432,11 @@ rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 132
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 133
 
-seqHashKey             = mkPreludeMiscIdUnique 134
+seqHashKey, considerExceptionsPreciseKey, evalBarrierKey, hideEvalBarriersKey :: Unique
+seqHashKey                   = mkPreludeMiscIdUnique 134
+considerExceptionsPreciseKey = mkPreludeMiscIdUnique 135
+evalBarrierKey               = mkPreludeMiscIdUnique 136
+hideEvalBarriersKey          = mkPreludeMiscIdUnique 137
 
 coerceKey :: Unique
 coerceKey                     = mkPreludeMiscIdUnique 157

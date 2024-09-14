@@ -105,7 +105,9 @@ module GHC.Internal.Exts
         currentCallStack,
 
         -- * Ids with special behaviour
-        inline, noinline, lazy, oneShot, considerAccessible, seq#,
+        inline, noinline, lazy, oneShot, considerAccessible,
+        seq#, considerExceptionsPrecise#, evalBarrier#, hideEvalBarriers#,
+
 
         -- * SpecConstr annotations
         SpecConstrAnnotation(..), SPEC (..),
@@ -278,7 +280,7 @@ import GHC.Types
 import qualified GHC.Prim.Ext
 import GHC.Internal.ArrayArray
 import GHC.Internal.Base hiding ( coerce )
-import GHC.Internal.IO (seq#)
+import GHC.Internal.IO.Magic
 import GHC.Internal.Ptr
 import GHC.Internal.Stack
 import GHC.Internal.IsList (IsList(..)) -- for re-export

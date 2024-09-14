@@ -1175,6 +1175,17 @@ cpeApp top_env expr
              ; let float = mkCaseFloat is_unlifted case_bndr thing
              ; return (floats1 `appFloats` floats2 `snocFloat` float, tup) }
 
+    -- See Note [...]. This is the step for CorePrep
+    cpe_app env (Var f) (AIApp _rep@Type{} : AIApp _res_ty@Type{} : AIApp action : AIApp tokenExpr : rest)
+        | f `hasKey` considerExceptionsPreciseKey
+        = cpe_io_barrier_primitive env action tokenExpr rest
+    cpe_app env (Var f) (AIApp _rep@Type{} : AIApp _res_ty@Type{} : AIApp _token_flavour@Type{} : AIApp action : AIApp tokenExpr : rest)
+        | f `hasKey` hideEvalBarriersKey
+        = cpe_io_barrier_primitive env action tokenExpr rest
+    cpe_app env (Var f) [AIApp tokenExpr]
+        | f `hasKey` evalBarrierKey
+        = cpeApp env tokenExpr
+
     cpe_app env (Var v) args
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
@@ -1213,6 +1224,17 @@ cpeApp top_env expr
                           -- we'll end up case-binding it
            ; (app, floats,unsat_ticks) <- rebuild_app env args fun' fun_floats [] Nothing
            ; mb_saturate Nothing app floats unsat_ticks (val_args args) }
+
+    -- Used for considerExceptionsPrecise# and hideEvalBarriers#.
+    -- See Note [...], wrinkle ...
+    cpe_io_barrier_primitive :: CorePrepEnv -> CoreArg -> CoreArg -> [ArgInfo] -> UniqSM (Floats, CpeRhs)
+    cpe_io_barrier_primitive env action tokenExpr rest
+      = do { (floats1, tokenVarExpr) <- cpeArg env topDmd tokenExpr
+           ; (floats2, res) <- case action of
+               Lam s body -> cpe_app (extendCorePrepEnvExpr env s tokenVarExpr) body rest
+               _          -> cpe_app env action (AIApp tokenVarExpr : rest)
+           ; pure (floats1 `appFloats` floats2, res)
+           }
 
     -- Count the number of value arguments *and* coercions (since we don't eliminate the later in STG)
     val_args :: [ArgInfo] -> Int
@@ -2363,7 +2385,8 @@ wantFloatLocal is_rec rhs_dmd rhs_is_unlifted floats rhs
 --                      The environment
 -- ---------------------------------------------------------------------------
 
-{- Note [Inlining in CorePrep]
+{-
+Note [Inlining in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There is a subtle but important invariant that must be upheld in the output
 of CorePrep: there are no "trivial" updatable thunks.  Thus, this Core
