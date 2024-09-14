@@ -106,6 +106,7 @@ data Opsys
 
 data LinuxDistro
   = Debian12
+  | Debian12Riscv
   | Debian11
   | Debian11Js
   | Debian10
@@ -305,6 +306,7 @@ distroName :: LinuxDistro -> String
 distroName Debian12   = "deb12"
 distroName Debian11   = "deb11"
 distroName Debian11Js = "deb11-emsdk-closure"
+distroName Debian12Riscv = "deb12-riscv"
 distroName Debian10   = "deb10"
 distroName Debian9    = "deb9"
 distroName Fedora33   = "fedora33"
@@ -627,6 +629,7 @@ data ValidateRule =
             FullCI       -- ^ Run this job when the "full-ci" label is present.
           | LLVMBackend  -- ^ Run this job when the "LLVM backend" label is present
           | JSBackend    -- ^ Run this job when the "javascript" label is present
+          | RiscV        -- ^ Run this job when the "RISC-V" label is present
           | WasmBackend  -- ^ Run this job when the "wasm" label is present
           | FreeBSDLabel -- ^ Run this job when the "FreeBSD" label is set.
           | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
@@ -674,6 +677,7 @@ validateRuleString FullCI = or_all ([ labelString "full-ci"
 
 validateRuleString LLVMBackend  = labelString "LLVM backend"
 validateRuleString JSBackend    = labelString "javascript"
+validateRuleString RiscV        = labelString "RISC-V"
 validateRuleString WasmBackend  = labelString "wasm"
 validateRuleString FreeBSDLabel = labelString "FreeBSD"
 validateRuleString NonmovingGc  = labelString "non-moving GC"
@@ -1122,6 +1126,9 @@ cross_jobs :: [JobGroup Job]
 cross_jobs = [
   -- x86 -> aarch64
     validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+
+  -- x86_64 -> riscv
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian12Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
 
   -- Javascript
   , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
