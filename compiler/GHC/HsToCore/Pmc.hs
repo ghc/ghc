@@ -189,6 +189,7 @@ pmcMatches origin ctxt vars matches = {-# SCC "pmcMatches" #-} do
     Just matches -> do
       matches <- {-# SCC "desugarMatches" #-}
                  noCheckDs $ desugarMatches vars matches
+      tracePm "desugared matches" (ppr matches)
       result  <- {-# SCC "checkMatchGroup" #-}
                  unCA (checkMatchGroup matches) missing
       tracePm "}: " (ppr (cr_uncov result))
