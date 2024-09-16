@@ -745,8 +745,13 @@ foreign import capi unsafe "HsBase.h read"
 foreign import capi safe "HsBase.h read"
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
+#if !defined(HAVE_UMASK)
+c_umask :: CMode -> IO CMode
+c_umask _ = ioError (ioeSetLocation unsupportedOperation "umask")
+#else
 foreign import ccall unsafe "HsBase.h umask"
    c_umask :: CMode -> IO CMode
+#endif
 
 -- See Note [Windows types]
 foreign import capi unsafe "HsBase.h write"
