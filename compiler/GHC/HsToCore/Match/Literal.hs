@@ -447,7 +447,7 @@ getLHsIntegralLit (L _ e) = go e
     go (XExpr (HsBinTick _ _ e))  = getLHsIntegralLit e
 
     -- The literal might be wrapped in a case with -XOverloadedLists
-    go (XExpr (WrapExpr (HsWrap _ e))) = go e
+    go (XExpr (WrapExpr _ e)) = go e
     go _ = Nothing
 
 -- | If 'Integral', extract the value and type of the overloaded literal.

@@ -970,8 +970,8 @@ warnUnusedBindValue fun arg@(L loc _) arg_ty
     fish_var :: LHsExpr GhcTc -> Maybe (SrcSpan , Id)
     fish_var (L l (HsVar _ id)) = return (locA l, unLoc id)
     fish_var (L _ (HsAppType _ e _)) = fish_var e
-    fish_var (L l (XExpr (WrapExpr (HsWrap _ e)))) = do (l, e') <- fish_var (L l e)
-                                                        return (l, e')
+    fish_var (L l (XExpr (WrapExpr _ e))) = do (l, e') <- fish_var (L l e)
+                                               return (l, e')
     fish_var (L l (XExpr (ExpandedThingTc _ e))) = fish_var (L l e)
     fish_var _ = Nothing
 
@@ -1019,7 +1019,7 @@ dsHsWrapped orig_hs_expr
   where
     go wrap (HsPar _ (L _ hs_e))
        = go wrap hs_e
-    go wrap1 (XExpr (WrapExpr (HsWrap wrap2 hs_e)))
+    go wrap1 (XExpr (WrapExpr wrap2 hs_e))
        = go (wrap1 <.> wrap2) hs_e
     go wrap (HsAppType ty (L _ hs_e) _)
        = go (wrap <.> WpTyApp ty) hs_e
