@@ -238,7 +238,7 @@ copyRules = do
             copyFile ("utils/jsffi" -/- makeRelative prefix file) file
             makeExecutable file
 
-        prefix -/- "prelude.js"        <~ pure "utils/jsffi"
+        prefix -/- "prelude.mjs"       <~ pure "utils/jsffi"
 
         prefix -/- "html/**"           <~ return "utils/haddock/haddock-api/resources"
         prefix -/- "latex/**"          <~ return "utils/haddock/haddock-api/resources"
