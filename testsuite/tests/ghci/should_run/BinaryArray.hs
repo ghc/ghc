@@ -1,13 +1,14 @@
 {-# LANGUAGE FlexibleContexts, MagicHash, ScopedTypeVariables #-}
 import Data.Binary.Get
 import Data.Binary.Put
-import Data.Binary (get, put)
+import Data.Binary (Binary, get, put)
 import Data.Array.Byte
 import Data.Array.Unboxed as AU
 import Data.Array.IO (IOUArray)
 import Data.Array.MArray (MArray)
 import Data.Array as A
 import Data.Array.Base as A
+import Foreign.Storable
 import GHCi.BinaryArray
 import GHCi.ResolvedBCO
 import GHC.Word
@@ -22,7 +23,8 @@ roundtripTest arr =
            | otherwise    -> putStrLn "failed to round-trip"
          Left _           -> putStrLn "deserialization failed"
 
-roundtripTestByteArray :: forall a . (IArray UArray a, MArray IOUArray a IO, Eq a)
+-- See Note [BCOByteArray serialization]
+roundtripTestByteArray :: forall a . (IArray UArray a, MArray IOUArray a IO, Eq a, Binary a, Storable a)
               => UArray Int a -> IO ()
 roundtripTestByteArray (UArray _ _ _ arr#) =
     let val  = BCOByteArray arr# :: BCOByteArray a
