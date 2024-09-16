@@ -52,11 +52,14 @@ function parseSections(mod) {
   return recs;
 }
 
-
 export async function postLink(mod) {
-  let src = await fs.readFile(path.join(import.meta.dirname, "prelude.js"), {
-    encoding: "utf-8",
-  });
+  let src = (
+    await fs.readFile(path.join(import.meta.dirname, "prelude.mjs"), {
+      encoding: "utf-8",
+    })
+  ).replaceAll("export ", ""); // we only use it as code template, don't export stuff
+
+  // Keep this in sync with dyld.mjs!
   src = `${src}\nexport default (__exports) => {`;
   src = `${src}\nconst __ghc_wasm_jsffi_jsval_manager = new JSValManager();`;
   src = `${src}\nconst __ghc_wasm_jsffi_finalization_registry = new FinalizationRegistry(sp => __exports.rts_freeStablePtr(sp));`;
