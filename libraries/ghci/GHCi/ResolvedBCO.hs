@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards, DeriveGeneric, GeneralizedNewtypeDeriving,
     BangPatterns, CPP, MagicHash, FlexibleInstances, FlexibleContexts,
-    TypeApplications, ScopedTypeVariables, UnboxedTuples #-}
+    TypeApplications, ScopedTypeVariables, UnboxedTuples, UndecidableInstances #-}
 module GHCi.ResolvedBCO
   ( ResolvedBCO(..)
   , ResolvedBCOPtr(..)
@@ -15,18 +15,12 @@ import GHCi.RemoteTypes
 import GHCi.BreakArray
 
 import Data.Binary
-import Data.Binary.Put (putBuilder)
 import GHC.Generics
 
-import Foreign.Ptr
-import Data.Array.Byte
-import qualified Data.Binary.Get.Internal as Binary
-import qualified Data.ByteString.Builder as BB
-import qualified Data.ByteString.Builder.Internal as BB
+import Foreign.Storable
 import GHC.Exts
-import Data.Array.Base (UArray(..))
+import Data.Array.Base (IArray, UArray(..))
 
-import GHC.IO
 
 #include "MachDeps.h"
 
@@ -63,6 +57,12 @@ data BCOByteArray a
         getBCOByteArray :: !ByteArray#
   }
 
+fromBCOByteArray :: forall a . Storable a => BCOByteArray a -> UArray Int a
+fromBCOByteArray (BCOByteArray ba#) = UArray 0 (n - 1) n ba#
+  where
+    len# = sizeofByteArray# ba#
+    n = (I# len#) `div` sizeOf (undefined :: a)
+
 mkBCOByteArray :: UArray Int a -> BCOByteArray a
 mkBCOByteArray (UArray _ _ _ arr) = BCOByteArray arr
 
@@ -87,9 +87,10 @@ instance Binary ResolvedBCO where
     put resolvedBCOPtrs
   get = ResolvedBCO <$> get <*> get <*> get <*> get <*> get <*> get
 
-instance Binary (BCOByteArray a) where
-  put = putBCOByteArray
-  get = decodeBCOByteArray
+-- See Note [BCOByteArray serialization]
+instance (Binary a, Storable a, IArray UArray a) => Binary (BCOByteArray a) where
+  put = put . fromBCOByteArray
+  get = mkBCOByteArray <$> get
 
 
 data ResolvedBCOPtr
@@ -107,64 +108,29 @@ data ResolvedBCOPtr
 
 instance Binary ResolvedBCOPtr
 
--- --------------------------------------------------------
--- Serialisers for 'BCOByteArray'
--- --------------------------------------------------------
-
-putBCOByteArray :: BCOByteArray a -> Put
-putBCOByteArray (BCOByteArray bar) = do
-  put (I# (sizeofByteArray# bar))
-  putBuilder $ byteArrayBuilder bar
-
-decodeBCOByteArray :: Get (BCOByteArray a)
-decodeBCOByteArray = do
-  n <- get
-  getByteArray n
-
-byteArrayBuilder :: ByteArray# -> BB.Builder
-byteArrayBuilder arr# = BB.builder $ go 0 (I# (sizeofByteArray# arr#))
-  where
-    go :: Int -> Int -> BB.BuildStep a -> BB.BuildStep a
-    go !inStart !inEnd k (BB.BufferRange outStart outEnd)
-      -- There is enough room in this output buffer to write all remaining array
-      -- contents
-      | inRemaining <= outRemaining = do
-          copyByteArrayToAddr arr# inStart outStart inRemaining
-          k (BB.BufferRange (outStart `plusPtr` inRemaining) outEnd)
-      -- There is only enough space for a fraction of the remaining contents
-      | otherwise = do
-          copyByteArrayToAddr arr# inStart outStart outRemaining
-          let !inStart' = inStart + outRemaining
-          return $! BB.bufferFull 1 outEnd (go inStart' inEnd k)
-      where
-        inRemaining  = inEnd - inStart
-        outRemaining = outEnd `minusPtr` outStart
-
-    copyByteArrayToAddr :: ByteArray# -> Int -> Ptr a -> Int -> IO ()
-    copyByteArrayToAddr src# (I# src_off#) (Ptr dst#) (I# len#) =
-        IO $ \s -> case copyByteArrayToAddr# src# src_off# dst# len# s of
-                     s' -> (# s', () #)
-
-getByteArray :: Int -> Get (BCOByteArray a)
-getByteArray nbytes@(I# nbytes#) = do
-    let !(MutableByteArray arr#) = unsafeDupablePerformIO $
-          IO $ \s -> case newByteArray# nbytes# s of
-                (# s', mbar #) -> (# s', MutableByteArray mbar #)
-    let go 0 _ = return ()
-        go !remaining !off = do
-            Binary.readNWith n $ \ptr ->
-              copyAddrToByteArray ptr arr# off n
-            go (remaining - n) (off + n)
-          where n = min chunkSize remaining
-    go nbytes 0
-    return $! unsafeDupablePerformIO $
-      IO $ \s -> case unsafeFreezeByteArray# arr# s of
-          (# s', bar #) -> (# s', BCOByteArray bar #)
-  where
-    chunkSize = 10*1024
-
-    copyAddrToByteArray :: Ptr a -> MutableByteArray# RealWorld
-                        -> Int -> Int -> IO ()
-    copyAddrToByteArray (Ptr src#) dst# (I# dst_off#) (I# len#) =
-        IO $ \s -> case copyAddrToByteArray# src# dst# dst_off# len# s of
-                     s' -> (# s', () #)
+-- Note [BCOByteArray serialization]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- !12142 changed some BCO blob types from UArray to
+-- BCOByteArray(ByteArray#) to save a little space. Unfortunately, a
+-- nasty serialization bug has surfaced since then. It happens when we
+-- need to pass BCOByteArray between host/target with mismatching word
+-- sizes. When 32-bit iserv receives a `BCOByteArray Word` from 64-bit
+-- host GHC, it would parse the buffer assuming each Word=Word32, even
+-- if host GHC assumes each Word=Word64, and of course it's horribly
+-- wrong!
+--
+-- The root issue here is the usage of platform sized integer types in
+-- BCO (and any messages we pass between ghc/iserv really), we should
+-- do what we already do for RemotePtr: always use Word64 instead of
+-- Word. But that takes much more work, and there's an easier
+-- mitigation: keep BCOByteArray as ByteArray#, but serialize it as
+-- UArray, given the Binary instances are independent of platform word
+-- size and endianness, so each Word/Int is always serialized as
+-- 64-bit big-endian Word64/Int64, and the entire UArray is serialized
+-- as a list (length+elements).
+--
+-- Since we erase the metadata in UArray, we need to find a way to
+-- calculate the item count by dividing the ByteArray# length with
+-- element size. The element size comes from Storable's sizeOf method,
+-- thus the addition of Storable constraint.
