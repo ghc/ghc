@@ -42,3 +42,4 @@ test('T22043', normal, compile, [''])
 test('T22774', unless(js_arch() or arch('wasm32'), expect_fail), compile, [''])
 
 test('T24034', normal, compile, [''])
+test('T25255', normal, compile, ['-dppr-debug'])
