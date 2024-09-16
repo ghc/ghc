@@ -112,12 +112,20 @@ forkOS_entry stableAction = do
         action <- deRefStablePtr stableAction
         action
 
-foreign import ccall forkOS_createThread
-    :: StablePtr (IO ()) -> IO CInt
+
 
 failNonThreaded :: IO a
 failNonThreaded = fail $ "RTS doesn't support multiple OS threads "
                        ++"(use ghc -threaded when linking)"
+
+#if defined(wasm32_HOST_ARCH)
+
+forkOS _ = failNonThreaded
+
+#else
+
+foreign import ccall forkOS_createThread
+    :: StablePtr (IO ()) -> IO CInt
 
 forkOS action0
     | rtsSupportsBoundThreads = do
@@ -141,6 +149,7 @@ forkOS action0
         freeStablePtr entry
         return tid
     | otherwise = failNonThreaded
+#endif
 
 -- | Like 'forkIOWithUnmask', but the child thread is a bound thread,
 -- as with 'forkOS'.
