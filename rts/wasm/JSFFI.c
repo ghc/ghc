@@ -63,7 +63,7 @@ int __main_argc_argv(int argc, char *argv[]) {
 // here to ensure hs_init_ghc() sees everything it needs to see.
 __attribute__((constructor(102))) static void __ghc_wasm_jsffi_init(void) {
   // See
-  // https://gitlab.haskell.org/ghc/wasi-libc/-/blob/main/libc-bottom-half/sources/__main_void.c
+  // https://gitlab.haskell.org/ghc/wasi-libc/-/blob/master/libc-bottom-half/sources/__main_void.c
   // for its definition. It initializes some libc state, then calls
   // __main_argc_argv defined above.
   __main_void();
