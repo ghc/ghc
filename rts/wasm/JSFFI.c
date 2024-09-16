@@ -83,6 +83,10 @@ JSValKey __imported_newJSVal(HsJSVal);
 __attribute__((import_module("ghc_wasm_jsffi"),
                import_name("freeJSVal"))) void __imported_freeJSVal(JSValKey);
 
+static void __wrapped_freeJSVal(JSValKey k) {
+  __imported_freeJSVal(k);
+}
+
 HaskellObj rts_mkJSVal(Capability*, HsJSVal);
 HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   JSValKey k = __imported_newJSVal(v);
@@ -95,7 +99,7 @@ HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
       (StgCFinalizerList *)allocate(cap, sizeofW(StgCFinalizerList));
   SET_HDR(cfin, &stg_C_FINALIZER_LIST_info, CCS_SYSTEM);
   cfin->link = &stg_NO_FINALIZER_closure;
-  cfin->fptr = (void (*)(void))__imported_freeJSVal;
+  cfin->fptr = (void (*)(void))__wrapped_freeJSVal;
   cfin->ptr = (void *)k;
   cfin->flag = 0;
 
