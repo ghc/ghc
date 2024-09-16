@@ -569,7 +569,7 @@ mkExpandedStmtPopAt loc oStmt eExpr = mkPopErrCtxtExprAt loc $ mkExpandedStmtAt 
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
-      {-# UNPACK #-} !(HsWrap HsExpr)
+      HsWrapper (HsExpr GhcTc)
 
   | ExpandedThingTc                         -- See Note [Rebindable syntax and XXExprGhcRn]
                                             -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
@@ -881,7 +881,7 @@ instance Outputable XXExprGhcRn where
   ppr (PopErrCtxt e)        = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
 
 instance Outputable XXExprGhcTc where
-  ppr (WrapExpr (HsWrap co_fn e))
+  ppr (WrapExpr co_fn e)
     = pprHsWrapper co_fn (\_parens -> pprExpr e)
 
   ppr (ExpandedThingTc o e)
@@ -922,7 +922,7 @@ ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
 ppr_infix_expr_rn (PopErrCtxt (L _ a)) = ppr_infix_expr a
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
-ppr_infix_expr_tc (WrapExpr (HsWrap _ e))    = ppr_infix_expr e
+ppr_infix_expr_tc (WrapExpr _ e)    = ppr_infix_expr e
 ppr_infix_expr_tc (ExpandedThingTc thing _)  = ppr_infix_hs_expansion thing
 ppr_infix_expr_tc (ConLikeTc {})             = Nothing
 ppr_infix_expr_tc (HsTick {})                = Nothing
@@ -1025,7 +1025,7 @@ hsExprNeedsParens prec = go
                      GhcRn -> go_x_rn x
 
     go_x_tc :: XXExprGhcTc -> Bool
-    go_x_tc (WrapExpr (HsWrap _ e))          = hsExprNeedsParens prec e
+    go_x_tc (WrapExpr _ e)                   = hsExprNeedsParens prec e
     go_x_tc (ExpandedThingTc thing _)        = hsExpandedNeedsParens thing
     go_x_tc (ConLikeTc {})                   = False
     go_x_tc (HsTick _ (L _ e))               = hsExprNeedsParens prec e
@@ -1077,7 +1077,7 @@ isAtomicHsExpr (XExpr x)
   | GhcRn <- ghcPass @p          = go_x_rn x
   where
     go_x_tc :: XXExprGhcTc -> Bool
-    go_x_tc (WrapExpr      (HsWrap _ e))     = isAtomicHsExpr e
+    go_x_tc (WrapExpr _ e)                   = isAtomicHsExpr e
     go_x_tc (ExpandedThingTc thing _)        = isAtomicExpandedThingRn thing
     go_x_tc (ConLikeTc {})                   = True
     go_x_tc (HsTick {}) = False

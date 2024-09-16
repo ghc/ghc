@@ -1328,7 +1328,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       XExpr x
         | HieTc <- hiePass @p
         -> case x of
-             WrapExpr (HsWrap w a)
+             WrapExpr w a
                -> [ toHie $ L mspan a
                   , toHie (L mspan w) ]
              ExpandedThingTc _ e

@@ -780,7 +780,7 @@ mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
 mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
-mkHsWrap co_fn e                       = XExpr (WrapExpr $ HsWrap co_fn e)
+mkHsWrap co_fn e                       = XExpr (WrapExpr co_fn e)
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
            -> HsExpr GhcTc -> HsExpr GhcTc

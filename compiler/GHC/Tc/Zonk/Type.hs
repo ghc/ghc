@@ -1080,10 +1080,10 @@ zonkExpr (HsQual x _ _) = dataConCantHappen x
 zonkExpr (HsForAll x _ _) = dataConCantHappen x
 zonkExpr (HsFunArr x _ _ _) = dataConCantHappen x
 
-zonkExpr (XExpr (WrapExpr (HsWrap co_fn expr)))
+zonkExpr (XExpr (WrapExpr co_fn expr))
   = runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->
     do new_expr <- zonkExpr expr
-       return (XExpr (WrapExpr (HsWrap new_co_fn new_expr)))
+       return (XExpr (WrapExpr new_co_fn new_expr))
 
 zonkExpr (XExpr (ExpandedThingTc thing e))
   = do e' <- zonkExpr e
