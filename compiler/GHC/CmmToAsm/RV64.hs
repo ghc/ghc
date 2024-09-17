@@ -40,7 +40,7 @@ ncgRV64 config =
 -- | `Instruction` instance for RV64
 instance Instruction RV64.Instr where
   regUsageOfInstr = RV64.regUsageOfInstr
-  patchRegsOfInstr = RV64.patchRegsOfInstr
+  patchRegsOfInstr _ = RV64.patchRegsOfInstr
   isJumpishInstr = RV64.isJumpishInstr
   canFallthroughTo = RV64.canFallthroughTo
   jumpDestsOfInstr = RV64.jumpDestsOfInstr
@@ -49,8 +49,8 @@ instance Instruction RV64.Instr where
   mkLoadInstr = RV64.mkLoadInstr
   takeDeltaInstr = RV64.takeDeltaInstr
   isMetaInstr = RV64.isMetaInstr
-  mkRegRegMoveInstr _ = RV64.mkRegRegMoveInstr
-  takeRegRegMoveInstr = RV64.takeRegRegMoveInstr
+  mkRegRegMoveInstr _ _ = RV64.mkRegRegMoveInstr
+  takeRegRegMoveInstr _ = RV64.takeRegRegMoveInstr
   mkJumpInstr = RV64.mkJumpInstr
   mkStackAllocInstr = RV64.mkStackAllocInstr
   mkStackDeallocInstr = RV64.mkStackDeallocInstr

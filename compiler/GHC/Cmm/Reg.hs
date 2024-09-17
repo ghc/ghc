@@ -61,14 +61,14 @@ register are less easily stated. Some examples are:
 -- See Note [GlobalReg vs GlobalRegUse] for more information.
 data GlobalRegUse
   = GlobalRegUse
-    { globalRegUseGlobalReg :: !GlobalReg
+    { globalRegUse_reg  :: !GlobalReg
       -- ^ The underlying 'GlobalReg'
-    , globalRegUseType      :: !CmmType
+    , globalRegUse_type :: !CmmType
       -- ^ The 'CmmType' at which we are using the 'GlobalReg'.
       --
       -- Its width must be less than the width of the 'GlobalReg':
       --
-      -- > typeWidth ty <= typeWidth (globalRegSpillType reg)
+      -- > typeWidth ty <= typeWidth (globalRegSpillType platform reg)
     }
   deriving Show
 
@@ -96,12 +96,12 @@ instance Outputable CmmReg where
 pprReg :: CmmReg -> SDoc
 pprReg r
    = case r of
-        CmmLocal  local                   -> pprLocalReg  local
-        CmmGlobal (GlobalRegUse global _) -> pprGlobalReg global
+        CmmLocal  local                     -> pprLocalReg  local
+        CmmGlobal (GlobalRegUse global _ty) -> pprGlobalReg global
 
 cmmRegType :: CmmReg -> CmmType
 cmmRegType (CmmLocal  reg) = localRegType reg
-cmmRegType (CmmGlobal reg) = globalRegUseType reg
+cmmRegType (CmmGlobal reg) = globalRegUse_type reg
 
 cmmRegWidth :: CmmReg -> Width
 cmmRegWidth = typeWidth . cmmRegType
@@ -202,6 +202,13 @@ data GlobalReg
   | LongReg             -- long int registers (64-bit, really)
         {-# UNPACK #-} !Int     -- its number
 
+  -- I think we should redesign 'GlobalReg', for example instead of
+  -- FloatReg/DoubleReg/XmmReg/YmmReg/ZmmReg we could have a single VecReg
+  -- which also stores the type we are storing in it.
+  --
+  -- We might then be able to get rid of GlobalRegUse, as the type information
+  -- would already be contained in a 'GlobalReg'.
+
   | XmmReg                      -- 128-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
 
@@ -212,39 +219,40 @@ data GlobalReg
         {-# UNPACK #-} !Int     -- its number
 
   -- STG registers
-  | Sp                  -- Stack ptr; points to last occupied stack location.
-  | SpLim               -- Stack limit
-  | Hp                  -- Heap ptr; points to last occupied heap location.
-  | HpLim               -- Heap limit register
-  | CCCS                -- Current cost-centre stack
-  | CurrentTSO          -- pointer to current thread's TSO
-  | CurrentNursery      -- pointer to allocation area
-  | HpAlloc             -- allocation count for heap check failure
+  | Sp                  -- ^ Stack ptr; points to last occupied stack location.
+  | SpLim               -- ^ Stack limit
+  | Hp                  -- ^ Heap ptr; points to last occupied heap location.
+  | HpLim               -- ^ Heap limit register
+  | CCCS                -- ^ Current cost-centre stack
+  | CurrentTSO          -- ^ pointer to current thread's TSO
+  | CurrentNursery      -- ^ pointer to allocation area
+  | HpAlloc             -- ^ allocation count for heap check failure
 
                 -- We keep the address of some commonly-called
                 -- functions in the register table, to keep code
                 -- size down:
-  | EagerBlackholeInfo  -- stg_EAGER_BLACKHOLE_info
-  | GCEnter1            -- stg_gc_enter_1
-  | GCFun               -- stg_gc_fun
+  | EagerBlackholeInfo  -- ^ address of stg_EAGER_BLACKHOLE_info
+  | GCEnter1            -- ^ address of stg_gc_enter_1
+  | GCFun               -- ^ address of stg_gc_fun
 
-  -- Base offset for the register table, used for accessing registers
+  -- | Base offset for the register table, used for accessing registers
   -- which do not have real registers assigned to them.  This register
   -- will only appear after we have expanded GlobalReg into memory accesses
   -- (where necessary) in the native code generator.
   | BaseReg
 
-  -- The register used by the platform for the C stack pointer. This is
+  -- | The register used by the platform for the C stack pointer. This is
   -- a break in the STG abstraction used exclusively to setup stack unwinding
   -- information.
   | MachSp
 
-  -- The is a dummy register used to indicate to the stack unwinder where
+  -- | A dummy register used to indicate to the stack unwinder where
   -- a routine would return to.
   | UnwindReturnReg
 
-  -- Base Register for PIC (position-independent code) calculations
-  -- Only used inside the native code generator. It's exact meaning differs
+  -- | Base Register for PIC (position-independent code) calculations.
+  --
+  -- Only used inside the native code generator. Its exact meaning differs
   -- from platform to platform (see module PositionIndependentCode).
   | PicBaseReg
 

@@ -4,7 +4,7 @@ module GHC.CmmToAsm.Reg.Linear.PPC where
 import GHC.Prelude
 
 import GHC.CmmToAsm.PPC.Regs
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.Platform.Reg
 
 import GHC.Utils.Outputable
@@ -41,10 +41,10 @@ initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]        -- lazily
-getFreeRegs cls (FreeRegs g f)
-    | RcFloat <- cls = [] -- no float regs on PowerPC, use double
-    | RcDouble <- cls = go f (0x80000000) 63
-    | RcInteger <- cls = go g (0x80000000) 31
+getFreeRegs cls (FreeRegs g f) =
+    case cls of
+      RcFloatOrVector -> go f (0x80000000) 63
+      RcInteger       -> go g (0x80000000) 31
     where
         go _ 0 _ = []
         go x m i | x .&. m /= 0 = RealRegSingle i : (go x (m `shiftR` 1) $! i-1)

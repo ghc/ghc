@@ -665,10 +665,23 @@ mkNativeCallInfoSig platform NativeCallInfo{..}
               text "Use -fobject-code to get around this limit"
              )
   | otherwise
-  = assertPpr (length regs <= 24) (text "too many registers for bitmap:" <+> ppr (length regs)) {- 24 bits for register bitmap -}
-    assertPpr (cont_offset < 255) (text "continuation offset too large:" <+> ppr cont_offset) {- 8 bits for continuation offset (only for NativeTupleReturn) -}
-    assertPpr (all (`elem` regs) (regSetToList nativeCallRegs)) (text "not all registers accounted for") {- all regs accounted for -}
-    foldl' reg_bit 0 (zip regs [0..]) .|. (cont_offset `shiftL` 24)
+  = -- 24 bits for register bitmap
+    assertPpr (length argRegs <= 24) (text "too many registers for bitmap:" <+> ppr (length argRegs))
+
+    -- 8 bits for continuation offset (only for NativeTupleReturn)
+    assertPpr (cont_offset < 255) (text "continuation offset too large:" <+> ppr cont_offset)
+
+    -- all regs accounted for
+    assertPpr (all (`elem` (map fst argRegs)) (regSetToList nativeCallRegs))
+      ( vcat
+        [ text "not all registers accounted for"
+        , text "argRegs:" <+> ppr argRegs
+        , text "nativeCallRegs:" <+> ppr nativeCallRegs
+        ] ) $
+      -- SIMD GHCi TODO: the above assertion doesn't account for register overlap;
+      -- it will need to be adjusted for SIMD vector support in the bytecode interpreter.
+
+    foldl' reg_bit 0 argRegs .|. (cont_offset `shiftL` 24)
   where
     cont_offset :: Word32
     cont_offset
@@ -679,7 +692,7 @@ mkNativeCallInfoSig platform NativeCallInfo{..}
     reg_bit x (r, n)
       | r `elemRegSet` nativeCallRegs = x .|. 1 `shiftL` n
       | otherwise                     = x
-    regs = allArgRegsCover platform
+    argRegs = zip (allArgRegsCover platform) [0..]
 
 mkNativeCallInfoLit :: Platform -> NativeCallInfo -> Literal
 mkNativeCallInfoLit platform call_info =

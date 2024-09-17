@@ -1093,6 +1093,103 @@ doCase d s p scrut bndr alts
 -- The native calling convention uses registers for tuples, but in the
 -- bytecode interpreter, all values live on the stack.
 
+{- Note [GHCi and native call registers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The GHCi bytecode interpreter does not have access to the STG registers
+that the native calling convention uses for passing arguments. It uses
+helper stack frames to move values between the stack and registers.
+
+If only a single register needs to be moved, GHCi uses a specific stack
+frame. For example stg_ctoi_R1p saves a heap pointer value from STG register
+R1 and stg_ctoi_D1 saves a double precision floating point value from D1.
+In the other direction, helpers stg_ret_p and stg_ret_d move a value from
+the stack to the R1 and D1 registers, respectively.
+
+When GHCi needs to move more than one register it cannot use a specific
+helper frame. It would simply be impossible to create a helper for all
+possible combinations of register values. Instead, there are generic helper
+stack frames that use a call_info word that describes the active registers
+and the number of stack words used by the arguments of a call.
+
+These helper stack frames are currently:
+
+    - stg_ret_t:    return a tuple to the continuation at the top of
+                        the stack
+    - stg_ctoi_t:   convert a tuple return value to be used in
+                        bytecode
+    - stg_primcall: call a function
+
+
+The call_info word contains a bitmap of the active registers
+for the call and and a stack offset. The layout is as follows:
+
+  - bit 0-23:  Bitmap of active registers for the call, the
+               order corresponds to the list returned by
+               allArgRegsCover.
+               For example if bit 0 (the least significant bit) is set, the
+               first register in the allArgRegsCover
+               list is active. Bit 1 for the
+               second register in the list and so on.
+
+  - bit 24-31: Unsigned byte indicating the stack offset
+               of the continuation in words. For tuple returns
+               this is the number of words returned on the
+               stack. For primcalls this field is unused, since
+               we don't jump to a continuation.
+
+The upper 32 bits on 64 bit platforms are currently unused.
+
+If a register is smaller than a word on the stack (for example a
+single precision float on a 64 bit system), then the stack slot
+is padded to a whole word.
+
+  Example:
+
+    If a tuple is returned in three registers and an additional two
+    words on the stack, then three bits in the register bitmap
+    (bits 0-23) would be set. And bit 24-31 would be
+    00000010 (two in binary).
+
+    The values on the stack before a call to POP_ARG_REGS would
+    be as follows:
+
+      ...
+      continuation
+      stack_arg_1
+      stack_arg_2
+      register_arg_3
+      register_arg_2
+      register_arg_1 <- Sp
+
+    A call to POP_ARG_REGS(call_info) would move register_arg_1
+    to the register corresponding to the lowest set bit in the
+    call_info word. register_arg_2 would be moved to the register
+    corresponding to the second lowest set bit, and so on.
+
+    After POP_ARG_REGS(call_info), the stack pointer Sp points
+    to the topmost stack argument, so the stack looks as follows:
+
+      ...
+      continuation
+      stack_arg_1
+      stack_arg_2 <- Sp
+
+    At this point all the arguments are in place and we are ready
+    to jump to the continuation, the location (offset from Sp) of
+    which is found by inspecting the value of bits 24-31. In this
+    case the offset is two words.
+
+On x86_64, the double precision (Dn) and single precision
+floating (Fn) point registers overlap, e.g. D1 uses the same
+physical register as F1. On this platform, the list returned
+by allArgRegsCover contains only entries for the double
+precision registers. If an argument is passed in register
+Fn, the bit corresponding to Dn should be set.
+
+Note: if anything changes in how registers for native calls overlap,
+         make sure to also update GHC.StgToByteCode.layoutNativeCall
+-}
+
 layoutNativeCall :: Profile
                  -> NativeCallType
                  -> ByteOff

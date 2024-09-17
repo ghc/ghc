@@ -27,7 +27,7 @@ foo (# | | dx2 #) =
                 (# double2Float# d1
                 ,  int2Float#    e1
                 ,  double2Float# d2
-                ,  int2Float#    e1 #)
+                ,  int2Float#    e2 #)
       in (# | (# v, m1, m2 #) | #)
 
 show_it :: (# Integer | (# FloatX4#, Int64#, Int64# #) | Char #) -> String

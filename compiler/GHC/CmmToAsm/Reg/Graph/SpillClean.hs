@@ -35,7 +35,9 @@ module GHC.CmmToAsm.Reg.Graph.SpillClean (
 ) where
 import GHC.Prelude
 
+import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 
@@ -48,13 +50,13 @@ import GHC.Builtin.Uniques
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Platform
 import GHC.Cmm.Dataflow.Label
 
 import Data.List (nub, foldl1', find)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import qualified Data.IntSet    as IntSet
+
 
 
 -- | The identification number of a spill slot.
@@ -66,23 +68,23 @@ type Slot = Int
 -- | Clean out unneeded spill\/reloads from this top level thing.
 cleanSpills
         :: Instruction instr
-        => Platform
+        => NCGConfig
         -> LiveCmmDecl statics instr
         -> LiveCmmDecl statics instr
 
-cleanSpills platform cmm
-        = evalState (cleanSpin platform 0 cmm) initCleanS
+cleanSpills config cmm
+        = evalState (cleanSpin config 0 cmm) initCleanS
 
 
 -- | Do one pass of cleaning.
 cleanSpin
         :: Instruction instr
-        => Platform
+        => NCGConfig
         -> Int                              -- ^ Iteration number for the cleaner.
         -> LiveCmmDecl statics instr        -- ^ Liveness annotated code to clean.
         -> CleanM (LiveCmmDecl statics instr)
 
-cleanSpin platform spinCount code
+cleanSpin config spinCount code
  = do
         -- Initialise count of cleaned spill and reload instructions.
         modify $ \s -> s
@@ -90,7 +92,7 @@ cleanSpin platform spinCount code
                 , sCleanedReloadsAcc    = 0
                 , sReloadedBy           = emptyUFM }
 
-        code_forward    <- mapBlockTopM (cleanBlockForward platform) code
+        code_forward    <- mapBlockTopM (cleanBlockForward config) code
         code_backward   <- cleanTopBackward code_forward
 
         -- During the cleaning of each block we collected information about
@@ -112,7 +114,7 @@ cleanSpin platform spinCount code
            then return code
 
         -- otherwise go around again
-           else cleanSpin platform (spinCount + 1) code_backward
+           else cleanSpin config (spinCount + 1) code_backward
 
 
 -------------------------------------------------------------------------------
@@ -120,11 +122,11 @@ cleanSpin platform spinCount code
 --   while walking forward over the code.
 cleanBlockForward
         :: Instruction instr
-        => Platform
+        => NCGConfig
         -> LiveBasicBlock instr
         -> CleanM (LiveBasicBlock instr)
 
-cleanBlockForward platform (BasicBlock blockId instrs)
+cleanBlockForward config (BasicBlock blockId instrs)
  = do
         -- See if we have a valid association for the entry to this block.
         jumpValid       <- gets sJumpValid
@@ -132,7 +134,7 @@ cleanBlockForward platform (BasicBlock blockId instrs)
                                 Just assoc      -> assoc
                                 Nothing         -> emptyAssoc
 
-        instrs_reload   <- cleanForward platform blockId assoc [] instrs
+        instrs_reload   <- cleanForward config blockId assoc [] instrs
         return  $ BasicBlock blockId instrs_reload
 
 
@@ -145,7 +147,7 @@ cleanBlockForward platform (BasicBlock blockId instrs)
 --
 cleanForward
         :: Instruction instr
-        => Platform
+        => NCGConfig
         -> BlockId                  -- ^ the block that we're currently in
         -> Assoc Store              -- ^ two store locations are associated if
                                     --     they have the same value
@@ -158,24 +160,23 @@ cleanForward _ _ _ acc []
 
 -- Rewrite live range joins via spill slots to just a spill and a reg-reg move
 -- hopefully the spill will be also be cleaned in the next pass
-cleanForward platform blockId assoc acc (li1 : li2 : instrs)
-
-        | LiveInstr (SPILL  reg1  slot1) _      <- li1
-        , LiveInstr (RELOAD slot2 reg2)  _      <- li2
+cleanForward config blockId assoc acc (li1 : li2 : instrs)
+        | LiveInstr (SPILL  reg1  slot1) _ <- li1
+        , LiveInstr (RELOAD slot2 reg2)  _ <- li2
         , slot1 == slot2
         = do
                 modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
-                cleanForward platform blockId assoc acc
-                 $ li1 : LiveInstr (mkRegRegMoveInstr platform reg1 reg2) Nothing
+                cleanForward config blockId assoc acc
+                 $ li1 : LiveInstr (mkRegRegMoveInstr config (regWithFormat_format reg2) (regWithFormat_reg reg1) (regWithFormat_reg reg2)) Nothing
                        : instrs
 
-cleanForward platform blockId assoc acc (li@(LiveInstr i1 _) : instrs)
-        | Just (r1, r2) <- takeRegRegMoveInstr i1
+cleanForward config blockId assoc acc (li@(LiveInstr i1 _) : instrs)
+        | Just (r1, r2) <- takeRegRegMoveInstr (ncgPlatform config) i1
         = if r1 == r2
                 -- Erase any left over nop reg reg moves while we're here
                 -- this will also catch any nop moves that the previous case
                 -- happens to add.
-                then cleanForward platform blockId assoc acc instrs
+                then cleanForward config blockId assoc acc instrs
 
                 -- If r1 has the same value as some slots and we copy r1 to r2,
                 --      then r2 is now associated with those slots instead
@@ -183,26 +184,26 @@ cleanForward platform blockId assoc acc (li@(LiveInstr i1 _) : instrs)
                                         $ delAssoc (SReg r2)
                                         $ assoc
 
-                        cleanForward platform blockId assoc' (li : acc) instrs
+                        cleanForward config blockId assoc' (li : acc) instrs
 
 
-cleanForward platform blockId assoc acc (li : instrs)
+cleanForward config blockId assoc acc (li : instrs)
 
         -- Update association due to the spill.
         | LiveInstr (SPILL reg slot) _  <- li
-        = let   assoc'  = addAssoc (SReg reg)  (SSlot slot)
+        = let   assoc'  = addAssoc (SReg $ regWithFormat_reg reg)  (SSlot slot)
                         $ delAssoc (SSlot slot)
                         $ assoc
-          in    cleanForward platform blockId assoc' (li : acc) instrs
+          in    cleanForward config blockId assoc' (li : acc) instrs
 
         -- Clean a reload instr.
         | LiveInstr (RELOAD{}) _        <- li
-        = do    (assoc', mli)   <- cleanReload platform blockId assoc li
+        = do    (assoc', mli)   <- cleanReload config blockId assoc li
                 case mli of
-                 Nothing        -> cleanForward platform blockId assoc' acc
+                 Nothing        -> cleanForward config blockId assoc' acc
                                                 instrs
 
-                 Just li'       -> cleanForward platform blockId assoc' (li' : acc)
+                 Just li'       -> cleanForward config blockId assoc' (li' : acc)
                                                 instrs
 
         -- Remember the association over a jump.
@@ -210,26 +211,26 @@ cleanForward platform blockId assoc acc (li : instrs)
         , targets               <- jumpDestsOfInstr instr
         , not $ null targets
         = do    mapM_ (accJumpValid assoc) targets
-                cleanForward platform blockId assoc (li : acc) instrs
+                cleanForward config blockId assoc (li : acc) instrs
 
         -- Writing to a reg changes its value.
         | LiveInstr instr _     <- li
-        , RU _ written          <- regUsageOfInstr platform instr
-        = let assoc'    = foldr delAssoc assoc (map SReg $ nub written)
-          in  cleanForward platform blockId assoc' (li : acc) instrs
+        , RU _ written          <- regUsageOfInstr (ncgPlatform config) instr
+        = let assoc'    = foldr delAssoc assoc (map SReg $ nub $ map regWithFormat_reg written)
+          in  cleanForward config blockId assoc' (li : acc) instrs
 
 
 
 -- | Try and rewrite a reload instruction to something more pleasing
 cleanReload
         :: Instruction instr
-        => Platform
+        => NCGConfig
         -> BlockId
         -> Assoc Store
         -> LiveInstr instr
         -> CleanM (Assoc Store, Maybe (LiveInstr instr))
 
-cleanReload platform blockId assoc li@(LiveInstr (RELOAD slot reg) _)
+cleanReload config blockId assoc li@(LiveInstr (RELOAD slot (RegWithFormat reg fmt)) _)
 
         -- If the reg we're reloading already has the same value as the slot
         --      then we can erase the instruction outright.
@@ -247,7 +248,7 @@ cleanReload platform blockId assoc li@(LiveInstr (RELOAD slot reg) _)
                                 $ assoc
 
                 return  ( assoc'
-                        , Just $ LiveInstr (mkRegRegMoveInstr platform reg2 reg) Nothing)
+                        , Just $ LiveInstr (mkRegRegMoveInstr config fmt reg2 reg) Nothing )
 
         -- Gotta keep this instr.
         | otherwise

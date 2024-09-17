@@ -127,7 +127,7 @@ import GHC.Utils.Outputable( JoinPointHood(..) )
 
 import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
-import Foreign hiding (shiftL, shiftR, void)
+import Foreign hiding (bit, setBit, clearBit, shiftL, shiftR, void)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe

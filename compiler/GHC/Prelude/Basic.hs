@@ -18,11 +18,13 @@
 --     like pprTrace.
 
 module GHC.Prelude.Basic
-  (module X
-  ,Applicative (..)
-  ,module Bits
-  ,shiftL, shiftR
-  ,head, tail
+  ( module X
+  , Applicative (..)
+  , module Bits
+  , bit
+  , shiftL, shiftR
+  , setBit, clearBit
+  , head, tail
   ) where
 
 
@@ -61,14 +63,14 @@ import Data.Foldable as X (Foldable(elem, foldMap, foldr, foldl, foldl', foldr1,
 import GHC.Stack.Types (HasCallStack)
 
 #if MIN_VERSION_base(4,16,0)
-import GHC.Bits as Bits hiding (shiftL, shiftR)
+import GHC.Bits as Bits hiding (bit, shiftL, shiftR, setBit, clearBit)
 # if defined(DEBUG)
 import qualified GHC.Bits as Bits (shiftL, shiftR)
 # endif
 
 #else
 --base <4.15
-import Data.Bits as Bits hiding (shiftL, shiftR)
+import Data.Bits as Bits hiding (bit, shiftL, shiftR, setBit, clearBit)
 # if defined(DEBUG)
 import qualified Data.Bits as Bits (shiftL, shiftR)
 # endif
@@ -78,7 +80,7 @@ import qualified Data.Bits as Bits (shiftL, shiftR)
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The safe shifts can introduce branches which come
 at the cost of performance. We still want the additional
-debugability for debug builds. So we define it as one or the
+debuggability for debug builds. So we define it as one or the
 other depending on the DEBUG setting.
 
 Why do we then continue on to re-export the rest of Data.Bits?
@@ -108,6 +110,16 @@ shiftR = Bits.shiftR
 shiftL = Bits.unsafeShiftL
 shiftR = Bits.unsafeShiftR
 #endif
+
+{-# INLINE bit #-}
+bit :: (Num a, Bits.Bits a) => Int -> a
+bit = \ i -> 1 `shiftL` i
+{-# INLINE setBit #-}
+setBit :: (Num a, Bits.Bits a) => a -> Int -> a
+setBit = \ x i -> x Bits..|. bit i
+{-# INLINE clearBit #-}
+clearBit :: (Num a, Bits.Bits a) => a -> Int -> a
+clearBit = \ x i -> x Bits..&. Bits.complement (bit i)
 
 {- Note [Proxies for head and tail]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

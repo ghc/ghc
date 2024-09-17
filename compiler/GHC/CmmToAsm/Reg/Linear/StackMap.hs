@@ -24,6 +24,7 @@ import GHC.Prelude
 
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
+import GHC.CmmToAsm.Format
 
 
 -- | Identifier for a stack slot.
@@ -47,13 +48,16 @@ emptyStackMap = StackMap 0 emptyUFM
 -- | If this vreg unique already has a stack assignment then return the slot number,
 --      otherwise allocate a new slot, and update the map.
 --
-getStackSlotFor :: StackMap -> Unique -> (StackMap, Int)
+getStackSlotFor :: StackMap -> Format -> Unique -> (StackMap, Int)
 
-getStackSlotFor fs@(StackMap _ reserved) reg
-  | Just slot <- lookupUFM reserved reg  =  (fs, slot)
+getStackSlotFor fs@(StackMap _ reserved) _fmt regUnique
+  | Just slot <- lookupUFM reserved regUnique  =  (fs, slot)
 
-getStackSlotFor (StackMap freeSlot reserved) reg =
-    (StackMap (freeSlot+1) (addToUFM reserved reg freeSlot), freeSlot)
+getStackSlotFor (StackMap freeSlot reserved) fmt regUnique =
+  let
+    nbSlots = (formatInBytes fmt + 7) `div` 8
+  in
+    (StackMap (freeSlot+nbSlots) (addToUFM reserved regUnique freeSlot), freeSlot)
 
 -- | Return the number of stack slots that were allocated
 getStackUse :: StackMap -> Int

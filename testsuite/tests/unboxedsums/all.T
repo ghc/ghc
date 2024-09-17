@@ -36,10 +36,6 @@ test('T20858b', [extra_files(['T20858.hs'])
               , ghci_script, ['T20858b.script'])
 test('T20859', normal, compile, [''])
 
-test('T22187',[only_ways(llvm_ways)],compile,[''])
-test('T22187_run',[only_ways(llvm_ways)
-                  ,unless(arch('x86_64') or arch('aarch64'), skip)],compile_and_run,[''])
-
 test('unpack_sums_1', normal, compile_and_run, ['-O'])
 test('unpack_sums_2', normal, compile, ['-O'])
 test('unpack_sums_3', normal, compile_and_run, ['-O'])

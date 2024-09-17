@@ -107,9 +107,15 @@
 #define REG_MachSp  rsp
 
 /*
-Map both Fn and Dn to register xmmn so that we can pass a function any
-combination of up to six Float# or Double# arguments without touching
-the stack. See Note [Overlapping global registers] for implications.
+Map Fn, Dn and XMMn to register xmmn.
+This unfortunately conflicts with the C calling convention, where the first
+argument and destination registers is xmm0, but the GHC calling convention in
+LLVM starts with xmm1 instead (and we can't easily change that).
+
+The aliasing allows us to pass a function any combination of up to
+six Float#, Double# or vector arguments without touching the stack
+(when using the System V calling convention).
+See Note [Overlapping global registers] for implications.
 */
 
 #define REG_F1    xmm1

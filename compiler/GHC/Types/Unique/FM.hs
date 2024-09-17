@@ -71,7 +71,7 @@ module GHC.Types.Unique.FM (
         nonDetStrictFoldUFM_Directly,
         anyUFM, allUFM, seqEltsUFM,
         mapUFM, mapUFM_Directly, strictMapUFM,
-        mapMaybeUFM, mapMaybeWithKeyUFM,
+        mapMaybeUFM, mapMaybeUFM_sameUnique, mapMaybeWithKeyUFM,
         elemUFM, elemUFM_Directly,
         filterUFM, filterUFM_Directly, partitionUFM,
         sizeUFM,
@@ -389,7 +389,12 @@ mapUFM :: (elt1 -> elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapUFM f (UFM m) = UFM (M.map f m)
 
 mapMaybeUFM :: (elt1 -> Maybe elt2) -> UniqFM key elt1 -> UniqFM key elt2
-mapMaybeUFM f (UFM m) = UFM (M.mapMaybe f m)
+mapMaybeUFM = mapMaybeUFM_sameUnique
+
+-- | Like 'Data.Map.mapMaybe', but you must ensure the passed-in function does
+-- not modify the unique.
+mapMaybeUFM_sameUnique :: (elt1 -> Maybe elt2) -> UniqFM key1 elt1 -> UniqFM key2 elt2
+mapMaybeUFM_sameUnique f (UFM m) = UFM (M.mapMaybe f m)
 
 mapMaybeWithKeyUFM :: (Unique -> elt1 -> Maybe elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapMaybeWithKeyUFM f (UFM m) = UFM (M.mapMaybeWithKey (f . mkUniqueGrimily) m)

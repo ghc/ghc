@@ -7,6 +7,7 @@ import GHC.Data.FastString
 import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Separate
 import GHC.Platform.Regs
 import GHC.Prelude
 import GHC.Types.Unique
@@ -184,12 +185,14 @@ virtualRegSqueeze cls vr =
         VirtualRegI {} -> 1
         VirtualRegHi {} -> 1
         _other -> 0
-    RcDouble ->
+    RcFloat ->
       case vr of
         VirtualRegD {} -> 1
-        VirtualRegF {} -> 0
         _other -> 0
-    _other -> 0
+    RcVector ->
+      case vr of
+        VirtualRegV128 {} -> 1
+        _other -> 0
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> Int
@@ -198,14 +201,25 @@ realRegSqueeze cls rr =
     RcInteger ->
       case rr of
         RealRegSingle regNo
-          | regNo < d0RegNo -> 1
-          | otherwise -> 0
-    RcDouble ->
+          | regNo < d0RegNo
+          -> 1
+          | otherwise
+          -> 0
+    RcFloat ->
       case rr of
         RealRegSingle regNo
-          | regNo < d0RegNo -> 0
-          | otherwise -> 1
-    _other -> 0
+          |  regNo < d0RegNo
+          || regNo > d31RegNo
+          -> 0
+          | otherwise
+          -> 1
+    RcVector ->
+      case rr of
+        RealRegSingle regNo
+          | regNo > d31RegNo
+          -> 1
+          | otherwise
+          -> 0
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
@@ -220,11 +234,12 @@ mkVirtualReg u format
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
   | i < d0RegNo = RcInteger
-  | otherwise = RcDouble
+  | i > d31RegNo = RcVector
+  | otherwise = RcFloat
 
 regDotColor :: RealReg -> SDoc
 regDotColor reg =
   case classOfRealReg reg of
     RcInteger -> text "blue"
     RcFloat -> text "red"
-    RcDouble -> text "green"
+    RcVector -> text "green"

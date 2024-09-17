@@ -145,7 +145,6 @@ defaults
    cheap            = { primOpOkForSpeculation _thisOp }
    strictness       = { \ arity -> mkClosedDmdSig (replicate arity topDmd) topDiv }
    fixity           = Nothing
-   llvm_only        = False
    vector           = []
    deprecated_msg   = {}      -- A non-empty message indicates deprecation
 
@@ -4050,86 +4049,73 @@ section "SIMD Vectors"
   ,<Word8,Word8#,64>,<Word16,Word16#,32>,<Word32,Word32#,16>,<Word64,Word64#,8>]
 
 primtype VECTOR
-   with llvm_only = True
-        vector = ALL_VECTOR_TYPES
+   with vector = ALL_VECTOR_TYPES
 
 primop VecBroadcastOp "broadcast#" GenPrimOp
    SCALAR -> VECTOR
    { Broadcast a scalar to all elements of a vector. }
-   with llvm_only = True
-        vector = ALL_VECTOR_TYPES
+   with vector = ALL_VECTOR_TYPES
 
 primop VecPackOp "pack#" GenPrimOp
    VECTUPLE -> VECTOR
    { Pack the elements of an unboxed tuple into a vector. }
-   with llvm_only = True
-        vector = ALL_VECTOR_TYPES
+   with vector = ALL_VECTOR_TYPES
 
 primop VecUnpackOp "unpack#" GenPrimOp
    VECTOR -> VECTUPLE
    { Unpack the elements of a vector into an unboxed tuple. #}
-   with llvm_only = True
-        vector = ALL_VECTOR_TYPES
+   with vector = ALL_VECTOR_TYPES
 
 primop VecInsertOp "insert#" GenPrimOp
    VECTOR -> SCALAR -> Int# -> VECTOR
    { Insert a scalar at the given position in a vector. }
    with effect = CanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecAddOp "plus#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Add two vectors element-wise. }
    with commutable = True
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecSubOp "minus#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Subtract two vectors element-wise. }
-   with llvm_only = True
-        vector = ALL_VECTOR_TYPES
+   with vector = ALL_VECTOR_TYPES
 
 primop VecMulOp "times#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Multiply two vectors element-wise. }
    with commutable = True
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecDivOp "divide#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Divide two vectors element-wise. }
    with effect = CanFail
-        llvm_only = True
         vector = FLOAT_VECTOR_TYPES
 
 primop VecQuotOp "quot#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Rounds towards zero element-wise. }
    with effect = CanFail
-        llvm_only = True
         vector = INT_VECTOR_TYPES
 
 primop VecRemOp "rem#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Satisfies @('quot#' x y) 'times#' y 'plus#' ('rem#' x y) == x@. }
    with effect = CanFail
-        llvm_only = True
         vector = INT_VECTOR_TYPES
 
 primop VecNegOp "negate#" GenPrimOp
    VECTOR -> VECTOR
    { Negate element-wise. }
-   with llvm_only = True
-        vector = SIGNED_VECTOR_TYPES
+   with vector = SIGNED_VECTOR_TYPES
 
 primop VecIndexByteArrayOp "indexArray#" GenPrimOp
    ByteArray# -> Int# -> VECTOR
    { Read a vector from specified index of immutable array. }
    with effect = CanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadByteArrayOp "readArray#" GenPrimOp
@@ -4137,7 +4123,6 @@ primop VecReadByteArrayOp "readArray#" GenPrimOp
    { Read a vector from specified index of mutable array. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteByteArrayOp "writeArray#" GenPrimOp
@@ -4145,14 +4130,12 @@ primop VecWriteByteArrayOp "writeArray#" GenPrimOp
    { Write a vector to specified index of mutable array. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecIndexOffAddrOp "indexOffAddr#" GenPrimOp
    Addr# -> Int# -> VECTOR
    { Reads vector; offset in bytes. }
    with effect = CanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
@@ -4160,7 +4143,6 @@ primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
    { Reads vector; offset in bytes. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
@@ -4168,7 +4150,6 @@ primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
    { Write vector; offset in bytes. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 
@@ -4176,7 +4157,6 @@ primop VecIndexScalarByteArrayOp "indexArrayAs#" GenPrimOp
    ByteArray# -> Int# -> VECTOR
    { Read a vector from specified index of immutable array of scalars; offset is in scalar elements. }
    with effect = CanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
@@ -4184,7 +4164,6 @@ primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
    { Read a vector from specified index of mutable array of scalars; offset is in scalar elements. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
@@ -4192,14 +4171,12 @@ primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
    { Write a vector to specified index of mutable array of scalars; offset is in scalar elements. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecIndexScalarOffAddrOp "indexOffAddrAs#" GenPrimOp
    Addr# -> Int# -> VECTOR
    { Reads vector; offset in scalar elements. }
    with effect = CanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
@@ -4207,7 +4184,6 @@ primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
    { Reads vector; offset in scalar elements. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp
@@ -4215,7 +4191,6 @@ primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp
    { Write vector; offset in scalar elements. }
    with effect = ReadWriteEffect
         can_fail_warning = YesWarnCanFail
-        llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 ------------------------------------------------------------------------

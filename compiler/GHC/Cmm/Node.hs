@@ -118,7 +118,7 @@ data CmmNode e x where
           -- occur in CmmExprs, namely as (CmmLit (CmmBlock b)) or
           -- (CmmStackSlot (Young b) _).
 
-      cml_args_regs :: [GlobalReg],
+      cml_args_regs :: [GlobalRegUse],
           -- The argument GlobalRegs (Rx, Fx, Dx, Lx) that are passed
           -- to the call.  This is essential information for the
           -- native code generator's register allocator; without
@@ -544,7 +544,7 @@ instance UserOfRegs LocalReg (CmmNode e x) where
                => (b -> LocalReg -> b) -> b -> a -> b
           fold f z n = foldRegsUsed platform f z n
 
-instance UserOfRegs GlobalReg (CmmNode e x) where
+instance UserOfRegs GlobalRegUse (CmmNode e x) where
   {-# INLINEABLE foldRegsUsed #-}
   foldRegsUsed platform f !z n = case n of
     CmmAssign _ expr -> fold f z expr
@@ -555,8 +555,8 @@ instance UserOfRegs GlobalReg (CmmNode e x) where
     CmmCall {cml_target=tgt, cml_args_regs=args} -> fold f (fold f z args) tgt
     CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
     _ -> z
-    where fold :: forall a b.  UserOfRegs GlobalReg a
-               => (b -> GlobalReg -> b) -> b -> a -> b
+    where fold :: forall a b.  UserOfRegs GlobalRegUse a
+               => (b -> GlobalRegUse -> b) -> b -> a -> b
           fold f z n = foldRegsUsed platform f z n
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r ForeignTarget where
   -- The (Ord r) in the context is necessary here
@@ -576,7 +576,7 @@ instance DefinerOfRegs LocalReg (CmmNode e x) where
                => (b -> LocalReg -> b) -> b -> a -> b
           fold f z n = foldRegsDefd platform f z n
 
-instance DefinerOfRegs GlobalReg (CmmNode e x) where
+instance DefinerOfRegs GlobalRegUse (CmmNode e x) where
   {-# INLINEABLE foldRegsDefd #-}
   foldRegsDefd platform f !z n = case n of
     CmmAssign lhs _ -> fold f z lhs
@@ -585,12 +585,13 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
     CmmForeignCall {} -> fold f z activeRegs
                       -- See Note [Safe foreign calls clobber STG registers]
     _ -> z
-    where fold :: forall a b. DefinerOfRegs GlobalReg a
-               => (b -> GlobalReg -> b) -> b -> a -> b
+    where fold :: forall a b. DefinerOfRegs GlobalRegUse a
+               => (b -> GlobalRegUse -> b) -> b -> a -> b
           fold f z n = foldRegsDefd platform f z n
 
-          activeRegs = activeStgRegs platform
-          activeCallerSavesRegs = filter (callerSaves platform) activeRegs
+          activeRegs :: [GlobalRegUse]
+          activeRegs = map (\ r -> GlobalRegUse r (globalRegSpillType platform r)) $ activeStgRegs platform
+          activeCallerSavesRegs = filter (callerSaves platform . globalRegUse_reg) activeRegs
 
           foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns)) = []
           foreignTargetRegs _ = activeCallerSavesRegs

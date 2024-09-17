@@ -118,16 +118,21 @@ module GHC.Exts
 
 import GHC.Internal.Exts
 import GHC.Internal.ArrayArray
-import GHC.Prim hiding (
-  coerce, dataToTagSmall#, dataToTagLarge#, whereFrom#,
-  isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned#,
-  -- Deprecated
-  BCO, mkApUpd0#, newBCO# )
-import qualified GHC.Prim as Prim ( BCO, mkApUpd0#, newBCO# )
+import GHC.Prim hiding
+  ( coerce
   -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
   -- be exposed from base (not even GHC.Exts)
-   -- whereFrom# is similarly internal.
+  , dataToTagSmall#, dataToTagLarge#
+  -- whereFrom# is similarly internal.
+  , whereFrom#
+  , isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned#
+
+  -- deprecated
+  , BCO, mkApUpd0#, newBCO#
+  )
+import qualified GHC.Prim as Prim
+  ( BCO, mkApUpd0#, newBCO# )
 
 import GHC.Prim.Ext
 

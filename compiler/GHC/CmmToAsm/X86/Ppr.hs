@@ -319,16 +319,16 @@ pprReg platform f r
       RegReal    (RealRegSingle i) ->
           if target32Bit platform then ppr32_reg_no f i
                                   else ppr64_reg_no f i
-      RegVirtual (VirtualRegI  u)  -> text "%vI_"   <> pprUniqueAlways u
-      RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
-      RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
-      RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegI    u) -> text "%vI_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegHi   u) -> text "%vHi_"  <> pprUniqueAlways u
+      RegVirtual (VirtualRegD    u) -> text "%vD_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegV128 u) -> text "%vV128_" <> pprUniqueAlways u
 
   where
     ppr32_reg_no :: Format -> Int -> doc
     ppr32_reg_no II8   = ppr32_reg_byte
     ppr32_reg_no II16  = ppr32_reg_word
-    ppr32_reg_no _     = ppr32_reg_long
+    ppr32_reg_no fmt   = ppr32_reg_long fmt
 
     ppr32_reg_byte i =
       case i of {
@@ -346,20 +346,20 @@ pprReg platform f r
         _  -> text "very naughty I386 word register"
       }
 
-    ppr32_reg_long i =
+    ppr32_reg_long fmt i =
       case i of {
          0 -> text "%eax";    1 -> text "%ebx";
          2 -> text "%ecx";    3 -> text "%edx";
          4 -> text "%esi";    5 -> text "%edi";
          6 -> text "%ebp";    7 -> text "%esp";
-         _  -> ppr_reg_float i
+         _  -> ppr_reg_float fmt i
       }
 
     ppr64_reg_no :: Format -> Int -> doc
     ppr64_reg_no II8   = ppr64_reg_byte
     ppr64_reg_no II16  = ppr64_reg_word
     ppr64_reg_no II32  = ppr64_reg_long
-    ppr64_reg_no _     = ppr64_reg_quad
+    ppr64_reg_no fmt   = ppr64_reg_quad fmt
 
     ppr64_reg_byte i =
       case i of {
@@ -400,7 +400,7 @@ pprReg platform f r
         _  -> text "very naughty x86_64 register"
       }
 
-    ppr64_reg_quad i =
+    ppr64_reg_quad fmt i =
       case i of {
          0 -> text "%rax";     1 -> text "%rbx";
          2 -> text "%rcx";     3 -> text "%rdx";
@@ -410,11 +410,35 @@ pprReg platform f r
         10 -> text "%r10";    11 -> text "%r11";
         12 -> text "%r12";    13 -> text "%r13";
         14 -> text "%r14";    15 -> text "%r15";
-        _  -> ppr_reg_float i
+        _  -> ppr_reg_float fmt i
       }
 
-ppr_reg_float :: IsLine doc => Int -> doc
-ppr_reg_float i = case i of
+ppr_reg_float :: IsLine doc => Format -> Int -> doc
+ppr_reg_float fmt i
+  | W256 <- size
+  = case i of
+        16 -> text "%ymm0" ;   17 -> text "%ymm1"
+        18 -> text "%ymm2" ;   19 -> text "%ymm3"
+        20 -> text "%ymm4" ;   21 -> text "%ymm5"
+        22 -> text "%ymm6" ;   23 -> text "%ymm7"
+        24 -> text "%ymm8" ;   25 -> text "%ymm9"
+        26 -> text "%ymm10";   27 -> text "%ymm11"
+        28 -> text "%ymm12";   29 -> text "%ymm13"
+        30 -> text "%ymm14";   31 -> text "%ymm15"
+        _  -> text "very naughty x86 register"
+  | W512 <- size
+  = case i of
+        16 -> text "%zmm0" ;   17 -> text "%zmm1"
+        18 -> text "%zmm2" ;   19 -> text "%zmm3"
+        20 -> text "%zmm4" ;   21 -> text "%zmm5"
+        22 -> text "%zmm6" ;   23 -> text "%zmm7"
+        24 -> text "%zmm8" ;   25 -> text "%zmm9"
+        26 -> text "%zmm10";   27 -> text "%zmm11"
+        28 -> text "%zmm12";   29 -> text "%zmm13"
+        30 -> text "%zmm14";   31 -> text "%zmm15"
+        _  -> text "very naughty x86 register"
+  | otherwise
+  = case i of
         16 -> text "%xmm0" ;   17 -> text "%xmm1"
         18 -> text "%xmm2" ;   19 -> text "%xmm3"
         20 -> text "%xmm4" ;   21 -> text "%xmm5"
@@ -424,6 +448,7 @@ ppr_reg_float i = case i of
         28 -> text "%xmm12";   29 -> text "%xmm13"
         30 -> text "%xmm14";   31 -> text "%xmm15"
         _  -> text "very naughty x86 register"
+  where size = formatToWidth fmt
 
 pprFormat :: IsLine doc => Format -> doc
 pprFormat x = case x of
@@ -433,6 +458,13 @@ pprFormat x = case x of
   II64  -> text "q"
   FF32  -> text "ss"      -- "scalar single-precision float" (SSE2)
   FF64  -> text "sd"      -- "scalar double-precision float" (SSE2)
+  VecFormat _ FmtFloat  -> text "ps"
+  VecFormat _ FmtDouble -> text "pd"
+  -- TODO: this is shady because it only works for certain instructions
+  VecFormat _ FmtInt8   -> text "b"
+  VecFormat _ FmtInt16  -> text "w"
+  VecFormat _ FmtInt32  -> text "l"
+  VecFormat _ FmtInt64  -> text "q"
 
 pprFormat_x87 :: IsLine doc => Format -> doc
 pprFormat_x87 x = case x of
@@ -533,35 +565,39 @@ pprAlignForSection platform seg = line $
            CString           -> int 1
            _                 -> int 8
 
-pprDataItem :: IsDoc doc => NCGConfig -> CmmLit -> doc
-pprDataItem config lit
-  = lines_ (ppr_item (cmmTypeFormat $ cmmLitType platform lit) lit)
+pprDataItem :: forall doc. IsDoc doc => NCGConfig -> CmmLit -> doc
+pprDataItem config lit =
+  let (itemFmt, items) = itemFormatAndItems (cmmTypeFormat $ cmmLitType platform lit)
+  in line $ itemFmt <> hsep (punctuate comma (items lit))
     where
         platform = ncgPlatform config
-        imm = litToImm lit
 
-        -- These seem to be common:
-        ppr_item II8   _ = [text "\t.byte\t" <> pprImm platform imm]
-        ppr_item II16  _ = [text "\t.word\t" <> pprImm platform imm]
-        ppr_item II32  _ = [text "\t.long\t" <> pprImm platform imm]
+        pprLitImm, pprII64AsII32x2 :: CmmLit -> [Line doc]
+        pprLitImm = (:[]) . pprImm platform . litToImm
+        pprII64AsII32x2 (CmmInt x _)
+          = [ int (fromIntegral (fromIntegral x :: Word32))
+            , int (fromIntegral (fromIntegral (x `shiftR` 32) :: Word32)) ]
+        pprII64AsII32x2 x
+          = pprPanic "X86 pprDataItem II64" (ppr x)
 
-        ppr_item FF32 _ = [text "\t.float\t" <> pprImm platform imm]
-        ppr_item FF64 _ = [text "\t.double\t" <> pprImm platform imm]
-
-        ppr_item II64 _
-            = case platformOS platform of
+        itemFormatAndItems :: Format -> (Line doc, CmmLit -> [Line doc])
+        itemFormatAndItems = \case
+          II8  -> ( text "\t.byte\t", pprLitImm )
+          II16 -> ( text "\t.word\t", pprLitImm )
+          II32 -> ( text "\t.long\t", pprLitImm )
+          II64 ->
+            case platformOS platform of
               OSDarwin
-               | target32Bit platform ->
-                  case lit of
-                  CmmInt x _ ->
-                      [text "\t.long\t"
-                          <> int (fromIntegral (fromIntegral x :: Word32)),
-                       text "\t.long\t"
-                          <> int (fromIntegral
-                              (fromIntegral (x `shiftR` 32) :: Word32))]
-                  _ -> panic "X86.Ppr.ppr_item: no match for II64"
-              _ -> [text "\t.quad\t" <> pprImm platform imm]
-
+                | target32Bit platform
+                -> ( text "\t.long\t", pprII64AsII32x2 )
+              _ -> ( text "\t.quad\t", pprLitImm )
+          FF32 -> ( text "\t.float\t", pprLitImm )
+          FF64 -> ( text "\t.double\t", pprLitImm )
+          VecFormat _ sFmt ->
+            let (fmtTxt, pprElt) = itemFormatAndItems (scalarFormatFormat sFmt)
+            in (fmtTxt, \ case { CmmVec elts -> pprElt =<< elts
+                               ; x -> pprPanic "X86 pprDataItem VecFormat" (ppr x)
+                               })
 
 asmComment :: IsLine doc => doc -> doc
 asmComment c = whenPprDebug $ text "# " <> c
@@ -613,8 +649,12 @@ pprInstr platform i = case i of
                 II64 -> II32          -- 32-bit version is equivalent, and smaller
                 _    -> format
 
-   MOV format src dst
-     -> pprFormatOpOp (text "mov") format src dst
+   MOV fmt src dst
+     -> pprFormatOpOp (text "mov") fmt' src dst
+       where
+          fmt' = case fmt of
+            VecFormat _l sFmt -> scalarFormatFormat sFmt
+            _ -> fmt
 
    CMOV cc format src dst
      -> pprCondOpReg (text "cmov") format cc src dst
@@ -707,6 +747,9 @@ pprInstr platform i = case i of
 
    XOR FF64 src dst
       ->  pprOpOp (text "xorpd") FF64 src dst
+
+   XOR format@(VecFormat _ sfmt) src dst | isIntScalarFormat sfmt
+       -> pprOpOp (text "pxor") format src dst
 
    XOR format src dst
       -> pprFormatOpOp (text "xor") format src dst
@@ -937,6 +980,65 @@ pprInstr platform i = case i of
    CMPXCHG format src dst
       -> pprFormatOpOp (text "cmpxchg") format src dst
 
+   -- Vector Instructions
+   VADD format s1 s2 dst
+     -> pprFormatOpRegReg (text "vadd") format s1 s2 dst
+   VSUB format s1 s2 dst
+     -> pprFormatOpRegReg (text "vsub") format s1 s2 dst
+   VMUL format s1 s2 dst
+     -> pprFormatOpRegReg (text "vmul") format s1 s2 dst
+   VDIV format s1 s2 dst
+     -> pprFormatOpRegReg (text "vdiv") format s1 s2 dst
+   VBROADCAST format from to
+     -> pprBroadcast (text "vbroadcast") format from to
+   VMOVU format from to
+     -> pprFormatOpOp (text "vmovu") format from to
+   MOVU format from to
+     -> pprFormatOpOp (text "movu") format from to
+   MOVL format from to
+     -> pprFormatOpOp (text "movl") format from to
+   MOVH format from to
+     -> pprFormatOpOp (text "movh") format from to
+
+   MOVDQU  format from to
+     -> pprOpOp (text "movdqu") format from to
+   VMOVDQU format from to
+     -> pprOpOp vmovdqu_op format from to
+     where
+      vmovdqu_op = case format of
+        VecFormat 8  FmtInt64 -> text "vmovdqu64"
+        VecFormat 16 FmtInt32 -> text "vmovdqu32"
+        VecFormat 32 FmtInt16 -> text "vmovdqu32" -- NB: not using vmovdqu16/8, as they
+        VecFormat 64 FmtInt8  -> text "vmovdqu32" -- require the additional AVX512BW extension
+        _ -> text "vmovdqu"
+
+   VPXOR format s1 s2 dst
+     -> pprXor (text "vpxor") format s1 s2 dst
+   VEXTRACT format offset from to
+     -> pprFormatImmRegOp (text "vextract") format offset from to
+   INSERTPS format offset addr dst
+     -> pprInsert (text "insertps") format offset addr dst
+   VPSHUFD format offset src dst
+     -> pprShuf (text "vpshufd") format offset src dst
+   PSHUFD format offset src dst
+     -> pprShuf (text "pshufd") format offset src dst
+   SHUFPS format offset src dst
+     -> pprShuf (text "shufps") format offset src dst
+   SHUFPD format offset src dst
+     -> pprShuf (text "shufpd") format offset src dst
+   VSHUFPS format offset src1 src2 dst
+     -> pprVShuf (text "vshufps") format offset src1 src2 dst
+   VSHUFPD format offset src1 src2 dst
+     -> pprVShuf (text "vshufpd") format offset src1 src2 dst
+   PSLLDQ format offset dst
+     -> pprDoubleShift (text "pslldq") format offset dst
+   PSRLDQ format offset dst
+     -> pprDoubleShift (text "psrldq") format offset dst
+
+   MOVHLPS format from to
+     -> pprOpReg (text "movhlps") format (OpReg from) to
+   PUNPCKLQDQ format from to
+     -> pprOpReg (text "punpcklqdq") format from to
 
   where
    gtab :: Line doc
@@ -976,6 +1078,25 @@ pprInstr platform i = case i of
       char '\t' <> name <> pprFormat format <> space
 
 
+   pprGenMnemonic  :: Line doc -> Format -> Line doc
+   pprGenMnemonic name _ =
+      char '\t' <> name <> text "" <> space
+
+   pprBroadcastMnemonic  :: Line doc -> Format -> Line doc
+   pprBroadcastMnemonic name format =
+      char '\t' <> name <> pprBroadcastFormat format <> space
+
+   pprBroadcastFormat :: Format -> Line doc
+   pprBroadcastFormat (VecFormat _ f)
+     = case f of
+         FmtFloat  -> text "ss"
+         FmtDouble -> text "sd"
+         FmtInt8   -> text "b"
+         FmtInt16  -> text "w"
+         FmtInt32  -> text "d"
+         FmtInt64  -> text "q"
+   pprBroadcastFormat _ = panic "Scalar Format invading vector operation"
+
    pprFormatImmOp :: Line doc -> Format -> Imm -> Operand -> doc
    pprFormatImmOp name format imm op1
      = line $ hcat [
@@ -985,7 +1106,6 @@ pprInstr platform i = case i of
            comma,
            pprOperand platform format op1
        ]
-
 
    pprFormatOp_ :: Line doc -> Format -> Operand -> doc
    pprFormatOp_ name format op1
@@ -1021,28 +1141,33 @@ pprInstr platform i = case i of
              FF32 -> text "d"
              FF64 -> text "q"
              _    -> panic "X86.Ppr.pprMovdOpOp: improper format for movd/movq."
-           out_fmt = case format of
-             II32 -> FF32
-             II64 -> FF64
-             FF32 -> II32
-             FF64 -> II64
-             _    -> panic "X86.Ppr.pprMovdOpOp: improper format for movd/movq."
        in line $ hcat [
            char '\t' <> name <> instr <> space,
            pprOperand platform format op1,
            comma,
-           pprOperand platform out_fmt op2
+           pprOperand platform (movdOutFormat format) op2
            ]
 
+   pprFormatImmRegOp :: Line doc -> Format -> Imm -> Reg -> Operand -> doc
+   pprFormatImmRegOp name format off reg1 op2
+     = line $ hcat [
+           pprMnemonic name format,
+           pprDollImm off,
+           comma,
+           pprReg platform format reg1,
+           comma,
+           pprOperand platform format op2
+       ]
+
    pprFormatOpRegReg :: Line doc -> Format -> Operand -> Reg -> Reg -> doc
-   pprFormatOpRegReg name format op1 op2 op3
+   pprFormatOpRegReg name format op1 reg2 reg3
      = line $ hcat [
            pprMnemonic name format,
            pprOperand platform format op1,
            comma,
-           pprReg platform format op2,
+           pprReg platform format reg2,
            comma,
-           pprReg platform format op3
+           pprReg platform format reg3
        ]
 
    pprFMAPermutation :: FMAPermutation -> Line doc
@@ -1066,6 +1191,15 @@ pprInstr platform i = case i of
            pprReg platform (archWordFormat (target32Bit platform)) reg1,
            comma,
            pprReg platform (archWordFormat (target32Bit platform)) reg2
+       ]
+
+   pprOpReg :: Line doc -> Format -> Operand -> Reg -> doc
+   pprOpReg name format op reg
+     = line $ hcat [
+           pprMnemonic_ name,
+           pprOperand platform format op,
+           comma,
+           pprReg platform (archWordFormat (target32Bit platform)) reg
        ]
 
 
@@ -1153,3 +1287,70 @@ pprInstr platform i = case i of
    pprCondInstr :: Line doc -> Cond -> Line doc -> doc
    pprCondInstr name cond arg
      = line $ hcat [ char '\t', name, pprCond cond, space, arg]
+
+   -- Custom pretty printers
+   -- These instructions currently don't follow a uniform suffix pattern
+   -- in their names, so we have custom pretty printers for them.
+   pprBroadcast :: Line doc -> Format -> AddrMode -> Reg -> doc
+   pprBroadcast name format op dst
+     = line $ hcat [
+           pprBroadcastMnemonic name format,
+           pprAddr platform op,
+           comma,
+           pprReg platform format dst
+       ]
+
+   pprXor :: Line doc -> Format -> Reg -> Reg -> Reg -> doc
+   pprXor name format reg1 reg2 reg3
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprReg platform format reg1,
+           comma,
+           pprReg platform format reg2,
+           comma,
+           pprReg platform format reg3
+       ]
+
+   pprInsert :: Line doc -> Format -> Imm -> Operand -> Reg -> doc
+   pprInsert name format off src dst
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprDollImm off,
+           comma,
+           pprOperand platform format src,
+           comma,
+           pprReg platform format dst
+       ]
+
+   pprShuf :: Line doc -> Format -> Imm -> Operand -> Reg -> doc
+   pprShuf name format imm1 op2 reg3
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprDollImm imm1,
+           comma,
+           pprOperand platform format op2,
+           comma,
+           pprReg platform format reg3
+       ]
+
+   pprVShuf :: Line doc -> Format -> Imm -> Operand -> Reg -> Reg -> doc
+   pprVShuf name format imm1 op2 reg3 reg4
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprDollImm imm1,
+           comma,
+           pprOperand platform format op2,
+           comma,
+           pprReg platform format reg3,
+           comma,
+           pprReg platform format reg4
+       ]
+
+   pprDoubleShift :: Line doc -> Format -> Operand -> Reg -> doc
+   pprDoubleShift name format off reg
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprOperand platform format off,
+           comma,
+           pprReg platform format reg
+       ]

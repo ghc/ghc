@@ -15,7 +15,7 @@ import Data.Word
 import GHC.CmmToAsm.RV64.Regs
 import GHC.Platform
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Separate
 import GHC.Prelude
 import GHC.Stack
 import GHC.Utils.Outputable
@@ -63,10 +63,13 @@ initFreeRegs platform = foldl' (flip releaseReg) noFreeRegs (allocatableRegs pla
 
 -- | Get all free `RealReg`s (i.e. those where the corresponding bit is 1)
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]
-getFreeRegs cls (FreeRegs g f)
-  | RcFloat <- cls = [] -- For now we only support double and integer registers, floats will need to be promoted.
-  | RcDouble <- cls = go 32 f allocatableDoubleRegs
-  | RcInteger <- cls = go 0 g allocatableIntRegs
+getFreeRegs cls (FreeRegs g f) =
+  case cls of
+    RcInteger -> go 0 g allocatableIntRegs
+    RcFloat -> go 32 f allocatableDoubleRegs
+    RcVector ->
+      sorry "Linear.RV64.getFreeRegs: vector registers are not supported"
+
   where
     go _ _ [] = []
     go off x (i : is)

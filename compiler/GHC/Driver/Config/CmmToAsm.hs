@@ -60,6 +60,9 @@ initNCGConfig dflags this_mod = NCGConfig
             ArchX86_64 -> v
             ArchX86    -> v
             _          -> Nothing
+   , ncgAvxEnabled = isAvxEnabled dflags
+   , ncgAvx2Enabled = isAvx2Enabled dflags
+   , ncgAvx512fEnabled = isAvx512fEnabled dflags
 
    , ncgDwarfEnabled        = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0 && platformArch (targetPlatform dflags) /= ArchAArch64
    , ncgDwarfUnwindings     = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0

@@ -262,7 +262,7 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
 
 
   let liveness = cmmGlobalLiveness platform g
-  let ppLiveness pp = filter isArgReg $ regSetToList $
+  let ppLiveness pp = filter (isArgReg . globalRegUse_reg) $ regSetToList $
                         expectJust "ppLiveness" $ mapLookup pp liveness
   graphEnv <- return $ foldlGraphBlocks add_block mapEmpty g
 

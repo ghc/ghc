@@ -312,27 +312,29 @@ pprStatsLifeConflict stats graph
 --      Lets us see how well the register allocator has done.
 countSRMs
         :: Instruction instr
-        => LiveCmmDecl statics instr -> (Int, Int, Int)
+        => Platform
+        -> LiveCmmDecl statics instr -> (Int, Int, Int)
 
-countSRMs cmm
-        = execState (mapBlockTopM countSRM_block cmm) (0, 0, 0)
+countSRMs platform cmm
+        = execState (mapBlockTopM (countSRM_block platform) cmm) (0, 0, 0)
 
 
 countSRM_block
         :: Instruction instr
-        => GenBasicBlock (LiveInstr instr)
+        => Platform
+        -> GenBasicBlock (LiveInstr instr)
         -> State (Int, Int, Int) (GenBasicBlock (LiveInstr instr))
 
-countSRM_block (BasicBlock i instrs)
- = do   instrs' <- mapM countSRM_instr instrs
+countSRM_block platform (BasicBlock i instrs)
+ = do   instrs' <- mapM (countSRM_instr platform) instrs
         return  $ BasicBlock i instrs'
 
 
 countSRM_instr
         :: Instruction instr
-        => LiveInstr instr -> State (Int, Int, Int) (LiveInstr instr)
+        => Platform -> LiveInstr instr -> State (Int, Int, Int) (LiveInstr instr)
 
-countSRM_instr li
+countSRM_instr platform li
         | LiveInstr SPILL{} _    <- li
         = do    modify  $ \(s, r, m)    -> (s + 1, r, m)
                 return li
@@ -342,7 +344,7 @@ countSRM_instr li
                 return li
 
         | LiveInstr instr _     <- li
-        , Just _        <- takeRegRegMoveInstr instr
+        , Just _        <- takeRegRegMoveInstr platform instr
         = do    modify  $ \(s, r, m)    -> (s, r, m + 1)
                 return li
 

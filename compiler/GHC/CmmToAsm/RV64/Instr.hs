@@ -21,6 +21,7 @@ import GHC.Data.FastString (LexicalFastString)
 import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Platform.Regs
+import GHC.Platform.Reg.Class.Separate
 import GHC.Prelude
 import GHC.Stack
 import GHC.Types.Unique.DSM
@@ -116,8 +117,21 @@ regUsageOfInstr platform instr = case instr of
     usage :: ([Reg], [Reg]) -> RegUsage
     usage (srcRegs, dstRegs) =
       RU
-        (filter (interesting platform) srcRegs)
-        (filter (interesting platform) dstRegs)
+        (map mkFmt $ filter (interesting platform) srcRegs)
+        (map mkFmt $ filter (interesting platform) dstRegs)
+
+      -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
+      -- As the RISCV64 NCG does not currently support SIMD registers,
+      -- this simple logic is OK.
+    mkFmt r = RegWithFormat r fmt
+      where
+        fmt = case cls of
+                RcInteger -> II64
+                RcFloat   -> FF64
+                RcVector  -> sorry "The RISCV64 NCG does not (yet) support vectors; please use -fllvm."
+        cls = case r of
+                RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
+                RegReal rr -> classOfRealReg rr
 
     regAddr :: AddrMode -> [Reg]
     regAddr (AddrRegImm r1 _imm) = [r1]
@@ -280,13 +294,13 @@ mkSpillInstr ::
   (HasCallStack) =>
   NCGConfig ->
   -- | register to spill
-  Reg ->
+  RegWithFormat ->
   -- | current stack delta
   Int ->
   -- | spill slot to use
   Int ->
   [Instr]
-mkSpillInstr _config reg delta slot =
+mkSpillInstr _config (RegWithFormat reg _fmt) delta slot =
   case off - delta of
     imm | fitsIn12bitImm imm -> [mkStrSpImm imm]
     imm ->
@@ -317,13 +331,13 @@ mkSpillInstr _config reg delta slot =
 mkLoadInstr ::
   NCGConfig ->
   -- | register to load
-  Reg ->
+  RegWithFormat ->
   -- | current stack delta
   Int ->
   -- | spill slot to use
   Int ->
   [Instr]
-mkLoadInstr _config reg delta slot =
+mkLoadInstr _config (RegWithFormat reg _fmt) delta slot =
   case off - delta of
     imm | fitsIn12bitImm imm -> [mkLdrSpImm imm]
     imm ->
@@ -828,6 +842,5 @@ isFloatOp _ = False
 
 isFloatReg :: Reg -> Bool
 isFloatReg (RegReal (RealRegSingle i)) | i > 31 = True
-isFloatReg (RegVirtual (VirtualRegF _)) = True
 isFloatReg (RegVirtual (VirtualRegD _)) = True
 isFloatReg _ = False

@@ -5,7 +5,7 @@ import GHC.Prelude
 import GHC.Data.FastString
 
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.CmmToAsm.Format
 
 import GHC.Cmm
@@ -109,13 +109,11 @@ virtualRegSqueeze cls vr
                 VirtualRegHi{}          -> 1
                 _other                  -> 0
 
-        RcDouble
+        RcFloatOrVector
          -> case vr of
                 VirtualRegD{}           -> 1
-                VirtualRegF{}           -> 0
+                VirtualRegV128{}        -> 1
                 _other                  -> 0
-
-        _other -> 0
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> Int
@@ -127,13 +125,11 @@ realRegSqueeze cls rr
                         | regNo < 32    -> 1     -- first fp reg is 32
                         | otherwise     -> 0
 
-        RcDouble
+        RcFloatOrVector
          -> case rr of
                 RealRegSingle regNo
                         | regNo < 32    -> 0
                         | otherwise     -> 1
-
-        _other -> 0
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
@@ -148,18 +144,10 @@ mkVirtualReg u format
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
         | i < 32        = RcInteger
-        | otherwise     = RcDouble
-
-fmtOfRealReg :: RealReg -> Format
-fmtOfRealReg real_reg =
-  case classOfRealReg real_reg of
-            RcInteger -> II64
-            RcDouble  -> FF64
-            RcFloat   -> panic "No float regs on arm"
+        | otherwise     = RcFloatOrVector
 
 regDotColor :: RealReg -> SDoc
 regDotColor reg
  = case classOfRealReg reg of
         RcInteger       -> text "blue"
-        RcFloat         -> text "red"
-        RcDouble        -> text "green"
+        RcFloatOrVector -> text "red"

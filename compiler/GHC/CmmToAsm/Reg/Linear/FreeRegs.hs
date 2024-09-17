@@ -1,5 +1,6 @@
 module GHC.CmmToAsm.Reg.Linear.FreeRegs (
     FR(..),
+    allFreeRegs,
     maxSpillSlots
 )
 where
@@ -8,6 +9,9 @@ import GHC.Prelude
 
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
+import qualified GHC.Platform.Reg.Class.Unified   as Unified
+import qualified GHC.Platform.Reg.Class.Separate  as Separate
+import qualified GHC.Platform.Reg.Class.NoVectors as NoVectors
 
 import GHC.CmmToAsm.Config
 import GHC.Utils.Panic
@@ -71,6 +75,15 @@ instance FR RV64.FreeRegs where
     frGetFreeRegs = const RV64.getFreeRegs
     frInitFreeRegs = RV64.initFreeRegs
     frReleaseReg = const RV64.releaseReg
+
+allFreeRegs :: FR freeRegs => Platform -> freeRegs -> [RealReg]
+allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs plat rcls fr) allRegClasses
+  where
+    allRegClasses =
+      case registerArch (platformArch plat) of
+        Unified   ->   Unified.allRegClasses
+        Separate  ->  Separate.allRegClasses
+        NoVectors -> NoVectors.allRegClasses
 
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config = case platformArch (ncgPlatform config) of

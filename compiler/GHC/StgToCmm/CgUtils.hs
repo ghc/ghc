@@ -171,7 +171,7 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
             in case reg `elem` activeStgRegs platform of
                 True  -> CmmAssign (CmmGlobal reg_use) src
                 False -> CmmStore baseAddr src NaturallyAligned
-          where reg = globalRegUseGlobalReg reg_use
+          where reg = globalRegUse_reg reg_use
         other_stmt -> other_stmt
 
     fixExpr expr = case expr of
@@ -184,7 +184,7 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
             -- to mean the address of the reg table in MainCapability,
             -- and for all others we generate an indirection to its
             -- location in the register table.
-            let reg = globalRegUseGlobalReg reg_use in
+            let reg = globalRegUse_reg reg_use in
             case reg `elem` activeStgRegs platform of
                 True  -> expr
                 False ->
@@ -192,7 +192,7 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
                     in case reg of
                         BaseReg -> baseAddr
                         _other  -> CmmLoad baseAddr
-                                     (globalRegSpillType platform reg)
+                                     (globalRegUse_type reg_use)
                                      NaturallyAligned
 
         CmmRegOff greg@(CmmGlobal reg) offset ->
@@ -202,7 +202,7 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
             -- NB: to ensure type correctness we need to ensure the Add
             --     as well as the Int need to be of the same size as the
             --     register.
-            case globalRegUseGlobalReg reg `elem` activeStgRegs platform of
+            case globalRegUse_reg reg `elem` activeStgRegs platform of
                 True  -> expr
                 False -> CmmMachOp (MO_Add (cmmRegWidth greg)) [
                                     fixExpr (CmmReg greg),

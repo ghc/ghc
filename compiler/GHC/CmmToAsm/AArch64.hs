@@ -44,7 +44,7 @@ ncgAArch64 config
 -- | Instruction instance for aarch64
 instance Instruction AArch64.Instr where
         regUsageOfInstr         = AArch64.regUsageOfInstr
-        patchRegsOfInstr        = AArch64.patchRegsOfInstr
+        patchRegsOfInstr _      = AArch64.patchRegsOfInstr
         isJumpishInstr          = AArch64.isJumpishInstr
         jumpDestsOfInstr        = AArch64.jumpDestsOfInstr
         canFallthroughTo        = AArch64.canFallthroughTo
@@ -54,7 +54,7 @@ instance Instruction AArch64.Instr where
         takeDeltaInstr          = AArch64.takeDeltaInstr
         isMetaInstr             = AArch64.isMetaInstr
         mkRegRegMoveInstr _     = AArch64.mkRegRegMoveInstr
-        takeRegRegMoveInstr     = AArch64.takeRegRegMoveInstr
+        takeRegRegMoveInstr _   = AArch64.takeRegRegMoveInstr
         mkJumpInstr             = AArch64.mkJumpInstr
         mkStackAllocInstr       = AArch64.mkStackAllocInstr
         mkStackDeallocInstr     = AArch64.mkStackDeallocInstr

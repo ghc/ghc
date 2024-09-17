@@ -158,8 +158,8 @@ data MachOp
   | MO_FW_Bitcast Width      -- Float/Double  -> Word32/Word64
 
   -- Vector element insertion and extraction operations
-  | MO_V_Insert  Length Width   -- Insert scalar into vector
-  | MO_V_Extract Length Width   -- Extract scalar from vector
+  | MO_V_Insert    Length Width -- Insert scalar into vector
+  | MO_V_Extract   Length Width -- Extract scalar from vector
 
   -- Integer vector operations
   | MO_V_Add Length Width
@@ -176,8 +176,8 @@ data MachOp
   | MO_VU_Rem  Length Width
 
   -- Floating point vector element insertion and extraction operations
-  | MO_VF_Insert  Length Width   -- Insert scalar into vector
-  | MO_VF_Extract Length Width   -- Extract scalar from vector
+  | MO_VF_Insert    Length Width   -- Insert scalar into vector
+  | MO_VF_Extract   Length Width   -- Extract scalar from vector
 
   -- Floating point vector operations
   | MO_VF_Add  Length Width
@@ -410,16 +410,16 @@ isFloatComparison mop =
 maybeInvertComparison :: MachOp -> Maybe MachOp
 maybeInvertComparison op
   = case op of  -- None of these Just cases include floating point
-        MO_Eq r   -> Just (MO_Ne r)
-        MO_Ne r   -> Just (MO_Eq r)
-        MO_U_Lt r -> Just (MO_U_Ge r)
-        MO_U_Gt r -> Just (MO_U_Le r)
-        MO_U_Le r -> Just (MO_U_Gt r)
-        MO_U_Ge r -> Just (MO_U_Lt r)
-        MO_S_Lt r -> Just (MO_S_Ge r)
-        MO_S_Gt r -> Just (MO_S_Le r)
-        MO_S_Le r -> Just (MO_S_Gt r)
-        MO_S_Ge r -> Just (MO_S_Lt r)
+        MO_Eq w   -> Just (MO_Ne w)
+        MO_Ne w   -> Just (MO_Eq w)
+        MO_U_Lt w -> Just (MO_U_Ge w)
+        MO_U_Gt w -> Just (MO_U_Le w)
+        MO_U_Le w -> Just (MO_U_Gt w)
+        MO_U_Ge w -> Just (MO_U_Lt w)
+        MO_S_Lt w -> Just (MO_S_Ge w)
+        MO_S_Gt w -> Just (MO_S_Le w)
+        MO_S_Le w -> Just (MO_S_Gt w)
+        MO_S_Ge w -> Just (MO_S_Lt w)
         _other    -> Nothing
 
 -- ----------------------------------------------------------------------------
@@ -433,13 +433,13 @@ machOpResultType platform mop tys =
   case mop of
     MO_Add {}           -> ty1  -- Preserve GC-ptr-hood
     MO_Sub {}           -> ty1  -- of first arg
-    MO_Mul    r         -> cmmBits r
-    MO_S_MulMayOflo r   -> cmmBits r
-    MO_S_Quot r         -> cmmBits r
-    MO_S_Rem  r         -> cmmBits r
-    MO_S_Neg  r         -> cmmBits r
-    MO_U_Quot r         -> cmmBits r
-    MO_U_Rem  r         -> cmmBits r
+    MO_Mul    w         -> cmmBits w
+    MO_S_MulMayOflo w   -> cmmBits w
+    MO_S_Quot w         -> cmmBits w
+    MO_S_Rem  w         -> cmmBits w
+    MO_S_Neg  w         -> cmmBits w
+    MO_U_Quot w         -> cmmBits w
+    MO_U_Rem  w         -> cmmBits w
 
     MO_Eq {}            -> comparisonResultRep platform
     MO_Ne {}            -> comparisonResultRep platform
@@ -453,13 +453,13 @@ machOpResultType platform mop tys =
     MO_U_Gt {}          -> comparisonResultRep platform
     MO_U_Lt {}          -> comparisonResultRep platform
 
-    MO_F_Add r          -> cmmFloat r
-    MO_F_Sub r          -> cmmFloat r
-    MO_F_Mul r          -> cmmFloat r
-    MO_F_Quot r         -> cmmFloat r
-    MO_F_Neg r          -> cmmFloat r
+    MO_F_Add w          -> cmmFloat w
+    MO_F_Sub w          -> cmmFloat w
+    MO_F_Mul w          -> cmmFloat w
+    MO_F_Quot w         -> cmmFloat w
+    MO_F_Neg w          -> cmmFloat w
 
-    MO_FMA _ r          -> cmmFloat r
+    MO_FMA _ w        -> cmmFloat w
 
     MO_F_Eq  {}         -> comparisonResultRep platform
     MO_F_Ne  {}         -> comparisonResultRep platform
@@ -471,10 +471,10 @@ machOpResultType platform mop tys =
     MO_And {}           -> ty1  -- Used for pointer masking
     MO_Or {}            -> ty1
     MO_Xor {}           -> ty1
-    MO_Not   r          -> cmmBits r
-    MO_Shl   r          -> cmmBits r
-    MO_U_Shr r          -> cmmBits r
-    MO_S_Shr r          -> cmmBits r
+    MO_Not   w          -> cmmBits w
+    MO_Shl   w          -> cmmBits w
+    MO_U_Shr w          -> cmmBits w
+    MO_S_Shr w          -> cmmBits w
 
     MO_SS_Conv _ to     -> cmmBits to
     MO_UU_Conv _ to     -> cmmBits to
@@ -508,7 +508,7 @@ machOpResultType platform mop tys =
     MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
     MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
 
-    MO_RelaxedRead r    -> cmmBits r
+    MO_RelaxedRead w    -> cmmBits w
     MO_AlignmentCheck _ _ -> ty1
   where
     (ty1:_) = tys
@@ -528,50 +528,50 @@ comparisonResultRep = bWord  -- is it?
 machOpArgReps :: Platform -> MachOp -> [Width]
 machOpArgReps platform op =
   case op of
-    MO_Add    r         -> [r,r]
-    MO_Sub    r         -> [r,r]
-    MO_Eq     r         -> [r,r]
-    MO_Ne     r         -> [r,r]
-    MO_Mul    r         -> [r,r]
-    MO_S_MulMayOflo r   -> [r,r]
-    MO_S_Quot r         -> [r,r]
-    MO_S_Rem  r         -> [r,r]
-    MO_S_Neg  r         -> [r]
-    MO_U_Quot r         -> [r,r]
-    MO_U_Rem  r         -> [r,r]
+    MO_Add    w         -> [w,w]
+    MO_Sub    w         -> [w,w]
+    MO_Eq     w         -> [w,w]
+    MO_Ne     w         -> [w,w]
+    MO_Mul    w         -> [w,w]
+    MO_S_MulMayOflo w   -> [w,w]
+    MO_S_Quot w         -> [w,w]
+    MO_S_Rem  w         -> [w,w]
+    MO_S_Neg  w         -> [w]
+    MO_U_Quot w         -> [w,w]
+    MO_U_Rem  w         -> [w,w]
 
-    MO_S_Ge r           -> [r,r]
-    MO_S_Le r           -> [r,r]
-    MO_S_Gt r           -> [r,r]
-    MO_S_Lt r           -> [r,r]
+    MO_S_Ge w           -> [w,w]
+    MO_S_Le w           -> [w,w]
+    MO_S_Gt w           -> [w,w]
+    MO_S_Lt w           -> [w,w]
 
-    MO_U_Ge r           -> [r,r]
-    MO_U_Le r           -> [r,r]
-    MO_U_Gt r           -> [r,r]
-    MO_U_Lt r           -> [r,r]
+    MO_U_Ge w           -> [w,w]
+    MO_U_Le w           -> [w,w]
+    MO_U_Gt w           -> [w,w]
+    MO_U_Lt w           -> [w,w]
 
-    MO_F_Add r          -> [r,r]
-    MO_F_Sub r          -> [r,r]
-    MO_F_Mul r          -> [r,r]
-    MO_F_Quot r         -> [r,r]
-    MO_F_Neg r          -> [r]
+    MO_F_Add w          -> [w,w]
+    MO_F_Sub w          -> [w,w]
+    MO_F_Mul w          -> [w,w]
+    MO_F_Quot w         -> [w,w]
+    MO_F_Neg w          -> [w]
 
-    MO_FMA _ r          -> [r,r,r]
+    MO_FMA _ w          -> [w,w,w]
 
-    MO_F_Eq  r          -> [r,r]
-    MO_F_Ne  r          -> [r,r]
-    MO_F_Ge  r          -> [r,r]
-    MO_F_Le  r          -> [r,r]
-    MO_F_Gt  r          -> [r,r]
-    MO_F_Lt  r          -> [r,r]
+    MO_F_Eq  w          -> [w,w]
+    MO_F_Ne  w          -> [w,w]
+    MO_F_Ge  w          -> [w,w]
+    MO_F_Le  w          -> [w,w]
+    MO_F_Gt  w          -> [w,w]
+    MO_F_Lt  w          -> [w,w]
 
-    MO_And   r          -> [r,r]
-    MO_Or    r          -> [r,r]
-    MO_Xor   r          -> [r,r]
-    MO_Not   r          -> [r]
-    MO_Shl   r          -> [r, wordWidth platform]
-    MO_U_Shr r          -> [r, wordWidth platform]
-    MO_S_Shr r          -> [r, wordWidth platform]
+    MO_And   w          -> [w,w]
+    MO_Or    w          -> [w,w]
+    MO_Xor   w          -> [w,w]
+    MO_Not   w          -> [w]
+    MO_Shl   w          -> [w, wordWidth platform]
+    MO_U_Shr w          -> [w, wordWidth platform]
+    MO_S_Shr w          -> [w, wordWidth platform]
 
     MO_SS_Conv from _     -> [from]
     MO_UU_Conv from _     -> [from]
@@ -582,31 +582,34 @@ machOpArgReps platform op =
     MO_WF_Bitcast w       -> [w]
     MO_FW_Bitcast w       -> [w]
 
-    MO_V_Insert   l r   -> [typeWidth (vec l (cmmBits r)),r, W32]
-    MO_V_Extract  l r   -> [typeWidth (vec l (cmmBits r)), W32]
-    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,W32]
-    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),W32]
+    MO_V_Insert   l w   -> [vecwidth l w, w, W32]
+    MO_V_Extract  l w   -> [vecwidth l w, W32]
+    MO_VF_Insert  l w   -> [vecwidth l w, w, W32]
+    MO_VF_Extract l w   -> [vecwidth l w, W32]
       -- SIMD vector indices are always 32 bit
 
-    MO_V_Add _ r        -> [r,r]
-    MO_V_Sub _ r        -> [r,r]
-    MO_V_Mul _ r        -> [r,r]
+    MO_V_Add l w        -> [vecwidth l w, vecwidth l w]
+    MO_V_Sub l w        -> [vecwidth l w, vecwidth l w]
+    MO_V_Mul l w        -> [vecwidth l w, vecwidth l w]
 
-    MO_VS_Quot _ r      -> [r,r]
-    MO_VS_Rem  _ r      -> [r,r]
-    MO_VS_Neg  _ r      -> [r]
+    MO_VS_Quot l w      -> [vecwidth l w, vecwidth l w]
+    MO_VS_Rem  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VS_Neg  l w      -> [vecwidth l w]
 
-    MO_VU_Quot _ r      -> [r,r]
-    MO_VU_Rem  _ r      -> [r,r]
+    MO_VU_Quot l w      -> [vecwidth l w, vecwidth l w]
+    MO_VU_Rem  l w      -> [vecwidth l w, vecwidth l w]
 
-    MO_VF_Add  _ r      -> [r,r]
-    MO_VF_Sub  _ r      -> [r,r]
-    MO_VF_Mul  _ r      -> [r,r]
-    MO_VF_Quot _ r      -> [r,r]
-    MO_VF_Neg  _ r      -> [r]
+    -- NOTE: The below is owing to the fact that floats use the SSE registers
+    MO_VF_Add  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Sub  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Mul  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Quot l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Neg  l w      -> [vecwidth l w]
 
     MO_RelaxedRead _    -> [wordWidth platform]
-    MO_AlignmentCheck _ r -> [r]
+    MO_AlignmentCheck _ w -> [w]
+  where
+    vecwidth l w = widthFromBytes (l * widthInBytes w)
 
 -----------------------------------------------------------------------------
 -- CallishMachOp
