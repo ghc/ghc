@@ -58,7 +58,7 @@ module GHC.Hs.Utils(
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
-  mkLocatedList,
+  mkLocatedList, nlAscribe,
 
   -- * Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mkSimpleGeneratedFunBind, mkTopFunBind,
@@ -768,6 +768,13 @@ mkClassOpSigs sigs
     fiddle (L loc (TypeSig anns nms ty))
       = L loc (ClassOpSig anns False nms (dropWildCards ty))
     fiddle sig = sig
+
+
+-- | Type ascription: (e :: ty)
+nlAscribe :: RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
+nlAscribe ty e = noLocA $ ExprWithTySig noAnn e
+                           $ mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType
+                           $ nlHsTyVar NotPromoted ty
 
 {- *********************************************************************
 *                                                                      *

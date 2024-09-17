@@ -33,7 +33,7 @@ main :: IO ()
 main = do
     moduleName:outFile:files <- getArgs
     let badFiles = -- These fail with an error like
-                   --     MakeTable: Enum.toEnum{Word8}: tag (33088) is outside of bounds (0,255)
+                   --     MakeTable: Enum.toEnum{Word8}: tag (33088) is outside of enumeration's range (0,255)
                    -- I have no idea what's going on, so for now we just
                    -- skip them.
                    ["CPs/CP932.TXT",

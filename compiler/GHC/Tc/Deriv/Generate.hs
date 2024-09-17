@@ -594,9 +594,7 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
                         -- mean more tests (dynamically)
         nlHsIf (ascribeBool $ genPrimOpApp a_expr eq_op b_expr) eq gt
   where
-    ascribeBool e = noLocA $ ExprWithTySig noAnn e
-                           $ mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType
-                           $ nlHsTyVar NotPromoted boolTyCon_RDR
+    ascribeBool = nlAscribe boolTyCon_RDR
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
@@ -700,10 +698,9 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
 
     to_enum tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc toEnum_RDR (noLocA [a_Pat]) $
-        nlHsIf (nlHsApps and_RDR
-                [nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
-                 nlHsApps le_RDR [ nlHsVar a_RDR
-                                 , nlHsVar maxtag_RDR]])
+        let to_word = nlHsApp (nlHsVar enumIntToWord_RDR)
+            -- cast to Word to check both bounds (0,maxtag) with one comparison
+        in nlHsIf (nlHsApps le_RDR [ to_word (nlHsVar a_RDR), to_word (nlHsVar maxtag_RDR)])
              (nlHsVarApps tag2con_RDR [a_RDR])
              (nlHsApps toEnumError_RDR
                        [ nlHsLit (mkHsString occ_nm)

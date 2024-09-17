@@ -1,10 +1,10 @@
 Testing Enum Int: 
     (succ (0::Int)) = 1
     (succ (minBound::Int)) = -2147483647
-    (succ (maxBound::Int)) = error "Prelude.Enum.succ{Int}: tried to take `succ' of maxBound"
+    (succ (maxBound::Int)) = error "Enum.succ{Int}: tried to take `succ' of last tag in enumeration"
     pred (1::Int) = 0
     pred (maxBound::Int) = 2147483646
-    pred (minBound::Int) = error "Prelude.Enum.pred{Int}: tried to take `pred' of minBound"
+    pred (minBound::Int) = error "Enum.pred{Int}: tried to take `pred' of first tag in enumeration"
     (map (toEnum::Int->Int) [1,minBound,maxBound]) = [1,-2147483648,2147483647]
     (map fromEnum [(1::Int),minBound,maxBound]) = [1,-2147483648,2147483647]
     (take 7 [(1::Int)..]) = [1,2,3,4,5,6,7]

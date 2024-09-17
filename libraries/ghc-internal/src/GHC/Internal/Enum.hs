@@ -30,7 +30,8 @@ module GHC.Internal.Enum
   , toEnumError
   , fromEnumError
   , succError
-  , predError,
+  , predError
+  , enumIntToWord
 
   -- Instances for Bounded and Enum: (), Char, Int
   )
@@ -570,10 +571,10 @@ instance  Bounded Int where
 -- | @since base-2.01
 instance  Enum Int  where
     succ x
-       | x == maxBound  = errorWithoutStackTrace "Prelude.Enum.succ{Int}: tried to take `succ' of maxBound"
+       | x == maxBound  = succError "Int"
        | otherwise      = x + 1
     pred x
-       | x == minBound  = errorWithoutStackTrace "Prelude.Enum.pred{Int}: tried to take `pred' of minBound"
+       | x == minBound  = predError "Int"
        | otherwise      = x - 1
 
     toEnum   x = x
@@ -1093,6 +1094,9 @@ enumNegDeltaToNatural x0 ndelta lim = go x0
          | x >= ndelta = x : go (x-ndelta)
          | otherwise   = [x]
 
+-- | Convert an Int into a Word (used in derived Enum instances)
+enumIntToWord :: Int -> Word
+enumIntToWord (I# i) = W# (int2Word# i)
 
 -- Instances from GHC.Types
 

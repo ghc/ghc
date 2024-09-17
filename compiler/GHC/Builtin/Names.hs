@@ -751,12 +751,13 @@ left_RDR, right_RDR :: RdrName
 left_RDR                = nameRdrName leftDataConName
 right_RDR               = nameRdrName rightDataConName
 
-fromEnum_RDR, toEnum_RDR, toEnumError_RDR, succError_RDR, predError_RDR :: RdrName
+fromEnum_RDR, toEnum_RDR, toEnumError_RDR, succError_RDR, predError_RDR, enumIntToWord_RDR :: RdrName
 fromEnum_RDR            = varQual_RDR gHC_INTERNAL_ENUM (fsLit "fromEnum")
 toEnum_RDR              = varQual_RDR gHC_INTERNAL_ENUM (fsLit "toEnum")
 toEnumError_RDR         = varQual_RDR gHC_INTERNAL_ENUM (fsLit "toEnumError")
 succError_RDR           = varQual_RDR gHC_INTERNAL_ENUM (fsLit "succError")
 predError_RDR           = varQual_RDR gHC_INTERNAL_ENUM (fsLit "predError")
+enumIntToWord_RDR       = varQual_RDR gHC_INTERNAL_ENUM (fsLit "enumIntToWord")
 
 enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
 enumFrom_RDR            = nameRdrName enumFromName
@@ -1303,6 +1304,7 @@ fromIntegralName    = varQual  gHC_INTERNAL_REAL (fsLit "fromIntegral")fromInteg
 realToFracName      = varQual  gHC_INTERNAL_REAL (fsLit "realToFrac")  realToFracIdKey
 mkRationalBase2Name  = varQual  gHC_INTERNAL_REAL  (fsLit "mkRationalBase2")  mkRationalBase2IdKey
 mkRationalBase10Name = varQual  gHC_INTERNAL_REAL  (fsLit "mkRationalBase10") mkRationalBase10IdKey
+
 -- GHC.Internal.Float classes
 floatingClassName, realFloatClassName :: Name
 floatingClassName  = clsQual gHC_INTERNAL_FLOAT (fsLit "Floating")  floatingClassKey
