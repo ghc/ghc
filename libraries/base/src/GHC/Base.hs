@@ -139,12 +139,16 @@ module GHC.Base
     ) where
 
 import GHC.Internal.Base
-import GHC.Prim hiding (dataToTagLarge#, dataToTagSmall#, whereFrom#,
-                        isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned#)
-   -- Hide dataToTagLarge# because it is expected to break for
-   -- GHC-internal reasons in the near future, and shouldn't
-   -- be exposed from base (not even GHC.Exts)
-   -- whereFrom# is similarly internal.
+import GHC.Prim hiding
+  (
+  -- Hide dataToTag# ops because they are expected to break for
+  -- GHC-internal reasons in the near future, and shouldn't
+  -- be exposed from base
+    dataToTagSmall#, dataToTagLarge#
+  -- whereFrom# is similarly internal.
+  , whereFrom#
+  , isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned#
+  )
 
 import GHC.Prim.Ext
 import GHC.Prim.PtrEq

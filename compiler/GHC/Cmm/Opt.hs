@@ -78,7 +78,6 @@ cmmMachOpFoldM
     -> MachOp
     -> [CmmExpr]
     -> Maybe CmmExpr
-
 cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
   = Just $! case op of
       MO_S_Neg _ -> CmmLit (CmmInt (-x) rep)
@@ -92,7 +91,6 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
       MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
       MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
       MO_XX_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
-
       _ -> panic $ "cmmMachOpFoldM: unknown unary op: " ++ show op
 
 -- Eliminate shifts that are wider than the shiftee

@@ -758,8 +758,66 @@ getRegister' config plat expr
         -- Conversions
         MO_XX_Conv _from to -> swizzleRegisterRep (intFormat to) <$> getRegister e
 
-        _ -> pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
+        MO_Eq {} -> notUnary
+        MO_Ne {} -> notUnary
+        MO_Mul {} -> notUnary
+        MO_S_MulMayOflo {} -> notUnary
+        MO_S_Quot {} -> notUnary
+        MO_S_Rem {} -> notUnary
+        MO_U_Quot {} -> notUnary
+        MO_U_Rem {} -> notUnary
+        MO_S_Ge {} -> notUnary
+        MO_S_Le {} -> notUnary
+        MO_S_Gt {} -> notUnary
+        MO_S_Lt {} -> notUnary
+        MO_U_Ge {} -> notUnary
+        MO_U_Le {} -> notUnary
+        MO_U_Gt {} -> notUnary
+        MO_U_Lt {} -> notUnary
+        MO_F_Add {} -> notUnary
+        MO_F_Sub {} -> notUnary
+        MO_F_Mul {} -> notUnary
+        MO_F_Quot {} -> notUnary
+        MO_FMA {} -> notUnary
+        MO_F_Eq {} -> notUnary
+        MO_F_Ne {} -> notUnary
+        MO_F_Ge {} -> notUnary
+        MO_F_Le {} -> notUnary
+        MO_F_Gt {} -> notUnary
+        MO_F_Lt {} -> notUnary
+        MO_And {} -> notUnary
+        MO_Or {} -> notUnary
+        MO_Xor {} -> notUnary
+        MO_Shl {} -> notUnary
+        MO_U_Shr {} -> notUnary
+        MO_S_Shr {} -> notUnary
+        MO_V_Insert {} -> notUnary
+        MO_V_Extract {} -> notUnary
+        MO_V_Add {} -> notUnary
+        MO_V_Sub {} -> notUnary
+        MO_V_Mul {} -> notUnary
+        MO_VS_Quot {} -> notUnary
+        MO_VS_Rem {} -> notUnary
+        MO_VS_Neg {} -> notUnary
+        MO_VU_Quot {} -> notUnary
+        MO_VU_Rem {} -> notUnary
+        MO_VF_Insert {} -> notUnary
+        MO_VF_Extract {} -> notUnary
+        MO_VF_Add {} -> notUnary
+        MO_VF_Sub {} -> notUnary
+        MO_VF_Mul {} -> notUnary
+        MO_VF_Quot {} -> notUnary
+        MO_Add {} -> notUnary
+        MO_Sub {} -> notUnary
+
+        MO_AlignmentCheck {} ->
+          pprPanic "getRegister' (monadic CmmMachOp):" (pdoc plat expr)
+
+        MO_VF_Neg {} -> vectorsNeedLlvm
       where
+        notUnary = pprPanic "getRegister' (non-unary CmmMachOp with 1 argument):" (pdoc plat expr)
+        vectorsNeedLlvm =
+            sorry "SIMD operations on AArch64 currently require the LLVM backend"
         toImm W8 =  (OpImm (ImmInt 7))
         toImm W16 = (OpImm (ImmInt 15))
         toImm W32 = (OpImm (ImmInt 31))
@@ -1087,10 +1145,46 @@ getRegister' config plat expr
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ LSR d x y)
         MO_S_Shr w -> intOp True  w (\d x y -> unitOL $ ASR d x y)
 
-        -- TODO
+        -- Non-dyadic MachOp with 2 arguments
+        MO_S_Neg {} -> notDyadic
+        MO_F_Neg {} -> notDyadic
+        MO_FMA {} -> notDyadic
+        MO_Not {} -> notDyadic
+        MO_SF_Round {} -> notDyadic
+        MO_FS_Truncate {} -> notDyadic
+        MO_SS_Conv {} -> notDyadic
+        MO_UU_Conv {} -> notDyadic
+        MO_XX_Conv {} -> notDyadic
+        MO_FF_Conv {} -> notDyadic
+        MO_WF_Bitcast {} -> notDyadic
+        MO_FW_Bitcast {} -> notDyadic
+        MO_V_Insert {} -> notDyadic
+        MO_VF_Insert {} -> notDyadic
+        MO_AlignmentCheck {} -> notDyadic
+        MO_RelaxedRead {} -> notDyadic
 
-        op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $
-                (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
+        -- Vector operations: currently unsupported in the AArch64 NCG.
+        MO_V_Extract {} -> vectorsNeedLlvm
+        MO_V_Add {} -> vectorsNeedLlvm
+        MO_V_Sub {} -> vectorsNeedLlvm
+        MO_V_Mul {} -> vectorsNeedLlvm
+        MO_VS_Quot {} -> vectorsNeedLlvm
+        MO_VS_Rem {} -> vectorsNeedLlvm
+        MO_VS_Neg {} -> vectorsNeedLlvm
+        MO_VU_Quot {} -> vectorsNeedLlvm
+        MO_VU_Rem {} -> vectorsNeedLlvm
+        MO_VF_Extract {} -> vectorsNeedLlvm
+        MO_VF_Add {} -> vectorsNeedLlvm
+        MO_VF_Sub {} -> vectorsNeedLlvm
+        MO_VF_Neg {} -> vectorsNeedLlvm
+        MO_VF_Mul {} -> vectorsNeedLlvm
+        MO_VF_Quot {} -> vectorsNeedLlvm
+        where
+          notDyadic =
+            pprPanic "getRegister' (non-dyadic CmmMachOp with 2 arguments): " $
+              (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
+          vectorsNeedLlvm =
+            sorry "SIMD operations on AArch64 currently require the LLVM backend"
 
     -- Generic ternary case.
     CmmMachOp op [x, y, z] ->
@@ -1110,10 +1204,15 @@ getRegister' config plat expr
           FNMAdd -> float3Op w (\d n m a -> unitOL $ FMA FMSub  d n m a)
           FNMSub -> float3Op w (\d n m a -> unitOL $ FMA FNMAdd d n m a)
 
+        MO_V_Insert {} -> vectorsNeedLlvm
+        MO_VF_Insert {} -> vectorsNeedLlvm
+
         _ -> pprPanic "getRegister' (unhandled ternary CmmMachOp): " $
                 (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
 
       where
+          vectorsNeedLlvm =
+            sorry "SIMD operations on AArch64 currently require the LLVM backend"
           float3Op w op = do
             (reg_fx, format_x, code_fx) <- getFloatReg x
             (reg_fy, format_y, code_fy) <- getFloatReg y

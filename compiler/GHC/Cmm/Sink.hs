@@ -709,7 +709,7 @@ conflicts platform (r, rhs, addr) node
 globalRegistersConflict :: Platform -> CmmExpr -> CmmNode e x -> Bool
 globalRegistersConflict platform expr node =
    -- See Note [Inlining foldRegsDefd]
-   inline foldRegsDefd platform (\b r -> b || globalRegUsedIn platform r expr)
+   inline foldRegsDefd platform (\b r -> b || globalRegUsedIn platform (globalRegUse_reg r) expr)
                 False node
 
 -- Returns True if node defines any local registers that are used in the

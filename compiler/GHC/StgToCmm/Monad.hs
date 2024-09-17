@@ -781,7 +781,7 @@ emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel
 emitProcWithConvention conv mb_info lbl args blocks
   = emitProcWithStackFrame conv mb_info lbl [] args blocks True
 
-emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
+emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalRegUse] -> CmmAGraphScoped
          -> Int -> Bool -> FCode ()
 emitProc mb_info lbl live blocks offset do_layout
   = do  { l <- newBlockId

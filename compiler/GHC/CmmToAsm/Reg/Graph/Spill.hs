@@ -9,13 +9,15 @@ module GHC.CmmToAsm.Reg.Graph.Spill (
 
 import GHC.Prelude
 
+import GHC.CmmToAsm.Format ( RegWithFormat(..) )
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
-import GHC.Cmm hiding (RegSet)
+import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
+
 
 import GHC.Utils.Monad
 import GHC.Utils.Monad.State.Strict
@@ -27,7 +29,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
-import Data.List (nub, (\\), intersect)
+import Data.Function ( on )
+import Data.List (intersectBy, nubBy)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import qualified Data.IntSet    as IntSet
@@ -141,7 +144,7 @@ regSpill_top platform regSlotMap cmm
         -- then record the fact that these slots are now live in those blocks
         -- in the given slotmap.
         patchLiveSlot
-                :: BlockMap IntSet -> BlockId -> RegSet -> BlockMap IntSet
+                :: BlockMap IntSet -> BlockId -> UniqSet RegWithFormat-> BlockMap IntSet
 
         patchLiveSlot slotMap blockId regsLive
          = let
@@ -150,7 +153,7 @@ regSpill_top platform regSlotMap cmm
                                 $ mapLookup blockId slotMap
 
                 moreSlotsLive   = IntSet.fromList
-                                $ mapMaybe (lookupUFM regSlotMap)
+                                $ mapMaybe (lookupUFM regSlotMap . regWithFormat_reg)
                                 $ nonDetEltsUniqSet regsLive
                     -- See Note [Unique Determinism and code generation]
 
@@ -191,23 +194,25 @@ regSpill_instr platform regSlotMap (LiveInstr instr (Just _)) = do
 
   -- sometimes a register is listed as being read more than once,
   --      nub this so we don't end up inserting two lots of spill code.
-  let rsRead_             = nub rlRead
-  let rsWritten_          = nub rlWritten
+  let rsRead_             = nubBy ((==) `on` getUnique) rlRead
+      rsWritten_          = nubBy ((==) `on` getUnique) rlWritten
 
   -- if a reg is modified, it appears in both lists, want to undo this..
-  let rsRead              = rsRead_    \\ rsWritten_
-  let rsWritten           = rsWritten_ \\ rsRead_
-  let rsModify            = intersect rsRead_ rsWritten_
+  let rsModify            = intersectBy ((==) `on` getUnique) rsRead_ rsWritten_
+      modified            = mkUniqSet rsModify
+      rsRead              = filter (\ r -> not $ elementOfUniqSet r modified) rsRead_
+      rsWritten           = filter (\ r -> not $ elementOfUniqSet r modified) rsWritten_
+
 
   -- work out if any of the regs being used are currently being spilled.
-  let rsSpillRead         = filter (\r -> elemUFM r regSlotMap) rsRead
-  let rsSpillWritten      = filter (\r -> elemUFM r regSlotMap) rsWritten
-  let rsSpillModify       = filter (\r -> elemUFM r regSlotMap) rsModify
+  let rsSpillRead         = filter (\r -> elemUFM (regWithFormat_reg r) regSlotMap) rsRead
+  let rsSpillWritten      = filter (\r -> elemUFM (regWithFormat_reg r) regSlotMap) rsWritten
+  let rsSpillModify       = filter (\r -> elemUFM (regWithFormat_reg r) regSlotMap) rsModify
 
   -- rewrite the instr and work out spill code.
-  (instr1, prepost1)      <- mapAccumLM (spillRead   regSlotMap) instr  rsSpillRead
-  (instr2, prepost2)      <- mapAccumLM (spillWrite  regSlotMap) instr1 rsSpillWritten
-  (instr3, prepost3)      <- mapAccumLM (spillModify regSlotMap) instr2 rsSpillModify
+  (instr1, prepost1)      <- mapAccumLM (spillRead   platform regSlotMap) instr  rsSpillRead
+  (instr2, prepost2)      <- mapAccumLM (spillWrite  platform regSlotMap) instr1 rsSpillWritten
+  (instr3, prepost3)      <- mapAccumLM (spillModify platform regSlotMap) instr2 rsSpillModify
 
   let (mPrefixes, mPostfixes) = unzip (prepost1 ++ prepost2 ++ prepost3)
   let prefixes                = concat mPrefixes
@@ -225,20 +230,21 @@ regSpill_instr platform regSlotMap (LiveInstr instr (Just _)) = do
 --   writes to a vreg that is being spilled.
 spillRead
         :: Instruction instr
-        => UniqFM Reg Int
+        => Platform
+        -> UniqFM Reg Int
         -> instr
-        -> Reg
+        -> RegWithFormat
         -> SpillM (instr, ([LiveInstr instr'], [LiveInstr instr']))
 
-spillRead regSlotMap instr reg
+spillRead platform regSlotMap instr (RegWithFormat reg fmt)
  | Just slot     <- lookupUFM regSlotMap reg
- = do    (instr', nReg)  <- patchInstr reg instr
+ = do    (instr', nReg)  <- patchInstr platform reg instr
 
          modify $ \s -> s
                 { stateSpillSL  = addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 0, 1) }
 
          return  ( instr'
-                 , ( [LiveInstr (RELOAD slot nReg) Nothing]
+                 , ( [LiveInstr (RELOAD slot (RegWithFormat nReg fmt)) Nothing]
                  , []) )
 
  | otherwise     = panic "RegSpill.spillRead: no slot defined for spilled reg"
@@ -248,21 +254,22 @@ spillRead regSlotMap instr reg
 --   writes to a vreg that is being spilled.
 spillWrite
         :: Instruction instr
-        => UniqFM Reg Int
+        => Platform
+        -> UniqFM Reg Int
         -> instr
-        -> Reg
+        -> RegWithFormat
         -> SpillM (instr, ([LiveInstr instr'], [LiveInstr instr']))
 
-spillWrite regSlotMap instr reg
+spillWrite platform regSlotMap instr (RegWithFormat reg fmt)
  | Just slot     <- lookupUFM regSlotMap reg
- = do    (instr', nReg)  <- patchInstr reg instr
+ = do    (instr', nReg)  <- patchInstr platform reg instr
 
          modify $ \s -> s
                 { stateSpillSL  = addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 1, 0) }
 
          return  ( instr'
                  , ( []
-                   , [LiveInstr (SPILL nReg slot) Nothing]))
+                   , [LiveInstr (SPILL (RegWithFormat nReg fmt) slot) Nothing]))
 
  | otherwise     = panic "RegSpill.spillWrite: no slot defined for spilled reg"
 
@@ -271,21 +278,22 @@ spillWrite regSlotMap instr reg
 --   both reads and writes to a vreg that is being spilled.
 spillModify
         :: Instruction instr
-        => UniqFM Reg Int
+        => Platform
+        -> UniqFM Reg Int
         -> instr
-        -> Reg
+        -> RegWithFormat
         -> SpillM (instr, ([LiveInstr instr'], [LiveInstr instr']))
 
-spillModify regSlotMap instr reg
+spillModify platform regSlotMap instr (RegWithFormat reg fmt)
  | Just slot     <- lookupUFM regSlotMap reg
- = do    (instr', nReg)  <- patchInstr reg instr
+ = do    (instr', nReg)  <- patchInstr platform reg instr
 
          modify $ \s -> s
                 { stateSpillSL  = addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 1, 1) }
 
          return  ( instr'
-                 , ( [LiveInstr (RELOAD slot nReg) Nothing]
-                   , [LiveInstr (SPILL nReg slot) Nothing]))
+                 , ( [LiveInstr (RELOAD slot (RegWithFormat nReg fmt)) Nothing]
+                   , [LiveInstr (SPILL (RegWithFormat nReg fmt) slot) Nothing]))
 
  | otherwise     = panic "RegSpill.spillModify: no slot defined for spilled reg"
 
@@ -294,9 +302,9 @@ spillModify regSlotMap instr reg
 --   virtual reg.
 patchInstr
         :: Instruction instr
-        => Reg -> instr -> SpillM (instr, Reg)
+        => Platform -> Reg -> instr -> SpillM (instr, Reg)
 
-patchInstr reg instr
+patchInstr platform reg instr
  = do   nUnique         <- newUnique
 
         -- The register we're rewriting is supposed to be virtual.
@@ -309,19 +317,19 @@ patchInstr reg instr
                 RegReal{}
                  -> panic "RegAlloc.Graph.Spill.patchIntr: not patching real reg"
 
-        let instr'      = patchReg1 reg nReg instr
+        let instr'      = patchReg1 platform reg nReg instr
         return          (instr', nReg)
 
 
 patchReg1
         :: Instruction instr
-        => Reg -> Reg -> instr -> instr
+        => Platform -> Reg -> Reg -> instr -> instr
 
-patchReg1 old new instr
+patchReg1 platform old new instr
  = let  patchF r
                 | r == old      = new
                 | otherwise     = r
-   in   patchRegsOfInstr instr patchF
+   in   patchRegsOfInstr platform instr patchF
 
 
 -- Spiller monad --------------------------------------------------------------

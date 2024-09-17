@@ -12,10 +12,11 @@ import GHC.Platform.Reg
 import GHC.Cmm
 import GHC.Data.Bag
 import GHC.Data.Graph.Directed
+import GHC.Platform (Platform)
+import GHC.Types.Unique (getUnique)
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
-
+import GHC.Types.Unique.Set
 
 -- | Do register coalescing on this top level thing
 --
@@ -25,18 +26,19 @@ import GHC.Types.Unique.Supply
 --   safely erased.
 regCoalesce
         :: Instruction instr
-        => [LiveCmmDecl statics instr]
+        => Platform
+        -> [LiveCmmDecl statics instr]
         -> UniqSM [LiveCmmDecl statics instr]
 
-regCoalesce code
+regCoalesce platform code
  = do
         let joins       = foldl' unionBags emptyBag
-                        $ map slurpJoinMovs code
+                        $ map (slurpJoinMovs platform) code
 
         let alloc       = foldl' buildAlloc emptyUFM
                         $ bagToList joins
 
-        let patched     = map (patchEraseLive (sinkReg alloc)) code
+        let patched     = map (patchEraseLive platform (sinkReg alloc)) code
 
         return patched
 
@@ -67,10 +69,11 @@ sinkReg fm r
 --   eliminate the move.
 slurpJoinMovs
         :: Instruction instr
-        => LiveCmmDecl statics instr
+        => Platform
+        -> LiveCmmDecl statics instr
         -> Bag (Reg, Reg)
 
-slurpJoinMovs live
+slurpJoinMovs platform live
         = slurpCmm emptyBag live
  where
         slurpCmm   rs  CmmData{}
@@ -84,9 +87,9 @@ slurpJoinMovs live
 
         slurpLI    rs (LiveInstr _      Nothing)    = rs
         slurpLI    rs (LiveInstr instr (Just live))
-                | Just (r1, r2) <- takeRegRegMoveInstr instr
-                , elementOfUniqSet r1 $ liveDieRead live
-                , elementOfUniqSet r2 $ liveBorn live
+                | Just (r1, r2) <- takeRegRegMoveInstr platform instr
+                , elemUniqSet_Directly (getUnique r1) $ liveDieRead live
+                , elemUniqSet_Directly (getUnique r2) $ liveBorn live
 
                 -- only coalesce movs between two virtuals for now,
                 -- else we end up with allocatable regs in the live

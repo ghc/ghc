@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.CmmToAsm.Reg.Graph.SpillCost (
@@ -34,6 +35,7 @@ import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Utils.Monad.State.Strict
 import GHC.CmmToAsm.CFG
+import GHC.CmmToAsm.Format
 
 import Data.List        (nub, minimumBy)
 import Data.Maybe
@@ -99,7 +101,7 @@ slurpSpillCostInfo platform cfg cmm
         countBlock info freqMap (BasicBlock blockId instrs)
                 | LiveInfo _ _ blockLive _ <- info
                 , Just rsLiveEntry  <- mapLookup blockId blockLive
-                , rsLiveEntry_virt  <- takeVirtuals rsLiveEntry
+                , rsLiveEntry_virt  <- takeVirtualRegs rsLiveEntry
                 = countLIs (ceiling $ blockFreq freqMap blockId) rsLiveEntry_virt instrs
 
                 | otherwise
@@ -129,13 +131,13 @@ slurpSpillCostInfo platform cfg cmm
 
                 -- Increment counts for what regs were read/written from.
                 let (RU read written)   = regUsageOfInstr platform instr
-                mapM_ (incUses scale) $ mapMaybe takeVirtualReg $ nub read
-                mapM_ (incDefs scale) $ mapMaybe takeVirtualReg $ nub written
+                mapM_ (incUses scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) read
+                mapM_ (incDefs scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) written
 
                 -- Compute liveness for entry to next instruction.
-                let liveDieRead_virt    = takeVirtuals (liveDieRead  live)
-                let liveDieWrite_virt   = takeVirtuals (liveDieWrite live)
-                let liveBorn_virt       = takeVirtuals (liveBorn     live)
+                let liveDieRead_virt    = takeVirtualRegs (liveDieRead  live)
+                let liveDieWrite_virt   = takeVirtualRegs (liveDieWrite live)
+                let liveBorn_virt       = takeVirtualRegs (liveBorn     live)
 
                 let rsLiveAcross
                         = rsLiveEntry `minusUniqSet` liveDieRead_virt
@@ -156,13 +158,6 @@ slurpSpillCostInfo platform cfg cmm
           = max 1.0 (10000 * freq)
           | otherwise
           = 1.0 -- Only if no cfg given
-
--- | Take all the virtual registers from this set.
-takeVirtuals :: UniqSet Reg -> UniqSet VirtualReg
-takeVirtuals set = mkUniqSet
-  [ vr | RegVirtual vr <- nonDetEltsUniqSet set ]
-  -- See Note [Unique Determinism and code generation]
-
 
 -- | Choose a node to spill from this graph
 chooseSpill

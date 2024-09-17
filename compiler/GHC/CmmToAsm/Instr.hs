@@ -16,6 +16,9 @@ import GHC.Cmm.BlockId
 
 import GHC.CmmToAsm.Config
 import GHC.Data.FastString
+import GHC.CmmToAsm.Format
+
+import GHC.Utils.Misc (HasDebugCallStack)
 
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.
@@ -29,8 +32,8 @@ import GHC.Data.FastString
 --
 data RegUsage
         = RU    {
-                reads :: [Reg],
-                writes :: [Reg]
+                reads :: [RegWithFormat],
+                writes :: [RegWithFormat]
                 }
         deriving Show
 
@@ -59,7 +62,9 @@ class Instruction instr where
         -- | Apply a given mapping to all the register references in this
         --      instruction.
         patchRegsOfInstr
-                :: instr
+                :: HasDebugCallStack
+                => Platform
+                -> instr
                 -> (Reg -> Reg)
                 -> instr
 
@@ -94,20 +99,22 @@ class Instruction instr where
 
         -- | An instruction to spill a register into a spill slot.
         mkSpillInstr
-                :: NCGConfig
-                -> Reg          -- ^ the reg to spill
+                :: HasDebugCallStack
+                => NCGConfig
+                -> RegWithFormat    -- ^ the reg to spill
                 -> Int          -- ^ the current stack delta
-                -> Int          -- ^ spill slot to use
-                -> [instr]        -- ^ instructions
+                -> Int          -- ^ spill slots to use
+                -> [instr]      -- ^ instructions
 
 
         -- | An instruction to reload a register from a spill slot.
         mkLoadInstr
-                :: NCGConfig
-                -> Reg          -- ^ the reg to reload.
+                :: HasDebugCallStack
+                => NCGConfig
+                -> RegWithFormat    -- ^ the reg to reload.
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ the spill slot to use
-                -> [instr]        -- ^ instructions
+                -> [instr]      -- ^ instructions
 
         -- | See if this instruction is telling us the current C stack delta
         takeDeltaInstr
@@ -130,15 +137,18 @@ class Instruction instr where
         -- | Copy the value in a register to another one.
         --      Must work for all register classes.
         mkRegRegMoveInstr
-                :: Platform
-                -> Reg          -- ^ source register
-                -> Reg          -- ^ destination register
+                :: HasDebugCallStack
+                => NCGConfig
+                -> Format
+                -> Reg -- ^ source register
+                -> Reg -- ^ destination register
                 -> instr
 
         -- | Take the source and destination from this reg -> reg move instruction
         --      or Nothing if it's not one
         takeRegRegMoveInstr
-                :: instr
+                :: Platform
+                -> instr
                 -> Maybe (Reg, Reg)
 
         -- | Make an unconditional jump instruction.

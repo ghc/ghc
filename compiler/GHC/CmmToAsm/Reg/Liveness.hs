@@ -12,7 +12,6 @@
 -----------------------------------------------------------------------------
 
 module GHC.CmmToAsm.Reg.Liveness (
-        RegSet,
         RegMap, emptyRegMap,
         BlockMap,
         LiveCmmDecl,
@@ -42,18 +41,21 @@ import GHC.Platform.Reg
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
-import GHC.Cmm hiding (RegSet, emptyRegSet)
+import GHC.Cmm
+import GHC.CmmToAsm.Reg.Target
 
 import GHC.Data.Graph.Directed
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
+import GHC.Types.Unique (Uniquable(..))
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
@@ -63,9 +65,9 @@ import GHC.Utils.Monad.State.Strict
 import Data.List (mapAccumL, partition)
 import Data.Maybe
 import Data.IntSet              (IntSet)
+import GHC.Utils.Misc
 
 -----------------------------------------------------------------------------
-type RegSet = UniqSet Reg
 
 -- | Map from some kind of register to a.
 --
@@ -76,9 +78,6 @@ type RegMap a = UniqFM Reg a
 
 emptyRegMap :: RegMap a
 emptyRegMap = emptyUFM
-
-emptyRegSet :: RegSet
-emptyRegSet = emptyUniqSet
 
 type BlockMap a = LabelMap a
 
@@ -98,29 +97,32 @@ type LiveCmmDecl statics instr
 --   so we'll keep those here.
 data InstrSR instr
         -- | A real machine instruction
-        = Instr  instr
+        = Instr  !instr
 
         -- | spill this reg to a stack slot
-        | SPILL  Reg Int
+        | SPILL  !RegWithFormat !Int
 
         -- | reload this reg from a stack slot
-        | RELOAD Int Reg
+        | RELOAD !Int !RegWithFormat
 
         deriving (Functor)
 
 instance Instruction instr => Instruction (InstrSR instr) where
         regUsageOfInstr platform i
          = case i of
-                Instr  instr    -> regUsageOfInstr platform instr
-                SPILL  reg _    -> RU [reg] []
-                RELOAD _ reg    -> RU [] [reg]
+                Instr  instr  -> regUsageOfInstr platform instr
+                SPILL  reg _  -> RU [reg] []
+                RELOAD _ reg  -> RU [] [reg]
 
-        patchRegsOfInstr i f
+        patchRegsOfInstr platform i f
          = case i of
-                Instr instr     -> Instr (patchRegsOfInstr instr f)
-                SPILL  reg slot -> SPILL (f reg) slot
-                RELOAD slot reg -> RELOAD slot (f reg)
+                Instr instr     -> Instr (patchRegsOfInstr platform instr f)
+                SPILL  reg slot -> SPILL (updReg f reg) slot
+                RELOAD slot reg -> RELOAD slot (updReg f reg)
+          where
+            updReg g (RegWithFormat reg fmt) = RegWithFormat (g reg) fmt
 
+        isJumpishInstr :: Instruction instr => InstrSR instr -> Bool
         isJumpishInstr i
          = case i of
                 Instr instr     -> isJumpishInstr instr
@@ -154,12 +156,12 @@ instance Instruction instr => Instruction (InstrSR instr) where
                 Instr instr     -> isMetaInstr instr
                 _               -> False
 
-        mkRegRegMoveInstr platform r1 r2
-            = Instr (mkRegRegMoveInstr platform r1 r2)
+        mkRegRegMoveInstr platform fmt r1 r2
+            = Instr (mkRegRegMoveInstr platform fmt r1 r2)
 
-        takeRegRegMoveInstr i
+        takeRegRegMoveInstr platform i
          = case i of
-                Instr instr     -> takeRegRegMoveInstr instr
+                Instr instr     -> takeRegRegMoveInstr platform instr
                 _               -> Nothing
 
         mkJumpInstr target      = map Instr (mkJumpInstr target)
@@ -189,9 +191,9 @@ data LiveInstr instr
 
 data Liveness
         = Liveness
-        { liveBorn      :: RegSet       -- ^ registers born in this instruction (written to for first time).
-        , liveDieRead   :: RegSet       -- ^ registers that died because they were read for the last time.
-        , liveDieWrite  :: RegSet }     -- ^ registers that died because they were clobbered by something.
+        { liveBorn      :: UniqSet RegWithFormat      -- ^ registers born in this instruction (written to for first time).
+        , liveDieRead   :: UniqSet RegWithFormat      -- ^ registers that died because they were read for the last time.
+        , liveDieWrite  :: UniqSet RegWithFormat}     -- ^ registers that died because they were clobbered by something.
 
 
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
@@ -200,7 +202,7 @@ data LiveInfo
                 (LabelMap RawCmmStatics)  -- cmm info table static stuff
                 [BlockId]                 -- entry points (first one is the
                                           -- entry point for the proc).
-                (BlockMap RegSet)         -- argument locals live on entry to this block
+                (BlockMap (UniqSet RegWithFormat))         -- argument locals live on entry to this block
                 (BlockMap IntSet)         -- stack slots live on entry to this block
 
 
@@ -215,7 +217,7 @@ instance Outputable instr
         ppr (Instr realInstr)
            = ppr realInstr
 
-        ppr (SPILL reg slot)
+        ppr (SPILL (RegWithFormat reg _fmt) slot)
            = hcat [
                 text "\tSPILL",
                 char ' ',
@@ -223,7 +225,7 @@ instance Outputable instr
                 comma,
                 text "SLOT" <> parens (int slot)]
 
-        ppr (RELOAD slot reg)
+        ppr (RELOAD slot (RegWithFormat reg _fmt))
            = hcat [
                 text "\tRELOAD",
                 char ' ',
@@ -246,7 +248,7 @@ instance Outputable instr
                         , pprRegs (text "# w_dying: ") (liveDieWrite live) ]
                     $+$ space)
 
-         where  pprRegs :: SDoc -> RegSet -> SDoc
+         where  pprRegs :: SDoc -> UniqSet RegWithFormat -> SDoc
                 pprRegs name regs
                  | isEmptyUniqSet regs  = empty
                  | otherwise            = name <>
@@ -328,10 +330,11 @@ mapGenBlockTopM f (CmmProc header label live (ListGraph blocks))
 --
 slurpConflicts
         :: Instruction instr
-        => LiveCmmDecl statics instr
-        -> (Bag (UniqSet Reg), Bag (Reg, Reg))
+        => Platform
+        -> LiveCmmDecl statics instr
+        -> (Bag (UniqSet RegWithFormat), Bag (Reg, Reg))
 
-slurpConflicts live
+slurpConflicts platform live
         = slurpCmm (emptyBag, emptyBag) live
 
  where  slurpCmm   rs  CmmData{}                = rs
@@ -381,7 +384,7 @@ slurpConflicts live
                 --
                 rsConflicts     = unionUniqSets rsLiveNext rsOrphans
 
-          in    case takeRegRegMoveInstr instr of
+          in    case takeRegRegMoveInstr platform instr of
                  Just rr        -> slurpLIs rsLiveNext
                                         ( consBag rsConflicts conflicts
                                         , consBag rr moves) lis
@@ -458,12 +461,12 @@ slurpReloadCoalesce live
         slurpLI slotMap li
 
                 -- remember what reg was stored into the slot
-                | LiveInstr (SPILL reg slot) _  <- li
-                , slotMap'                      <- addToUFM slotMap slot reg
+                | LiveInstr (SPILL (RegWithFormat reg _fmt) slot) _  <- li
+                , slotMap'                                       <- addToUFM slotMap slot reg
                 = return (slotMap', Nothing)
 
                 -- add an edge between the this reg and the last one stored into the slot
-                | LiveInstr (RELOAD slot reg) _ <- li
+                | LiveInstr (RELOAD slot (RegWithFormat reg _fmt)) _ <- li
                 = case lookupUFM slotMap slot of
                         Just reg2
                          | reg /= reg2  -> return (slotMap, Just (reg, reg2))
@@ -609,11 +612,12 @@ eraseDeltasLive cmm
 --   also erase reg -> reg moves when the reg is the same.
 --   also erase reg -> reg moves when the destination dies in this instr.
 patchEraseLive
-        :: Instruction instr
-        => (Reg -> Reg)
+        :: (Instruction instr, HasDebugCallStack)
+        => Platform
+        -> (Reg -> Reg)
         -> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
-patchEraseLive patchF cmm
+patchEraseLive platform patchF cmm
         = patchCmm cmm
  where
         patchCmm cmm@CmmData{}  = cmm
@@ -621,9 +625,8 @@ patchEraseLive patchF cmm
         patchCmm (CmmProc info label live sccs)
          | LiveInfo static id blockMap mLiveSlots <- info
          = let
-                patchRegSet set = mkUniqSet $ map patchF $ nonDetEltsUFM set
                   -- See Note [Unique Determinism and code generation]
-                blockMap'       = mapMap (patchRegSet . getUniqSet) blockMap
+                blockMap'       = mapMap (mapRegFormatSet patchF) blockMap
 
                 info'           = LiveInfo static id blockMap' mLiveSlots
            in   CmmProc info' label live $ map patchSCC sccs
@@ -638,22 +641,22 @@ patchEraseLive patchF cmm
         patchInstrs (li : lis)
 
                 | LiveInstr i (Just live)       <- li'
-                , Just (r1, r2) <- takeRegRegMoveInstr i
+                , Just (r1, r2) <- takeRegRegMoveInstr platform i
                 , eatMe r1 r2 live
                 = patchInstrs lis
 
                 | otherwise
                 = li' : patchInstrs lis
 
-                where   li'     = patchRegsLiveInstr patchF li
+                where   li'     = patchRegsLiveInstr platform patchF li
 
         eatMe   r1 r2 live
                 -- source and destination regs are the same
                 | r1 == r2      = True
 
                 -- destination reg is never used
-                | elementOfUniqSet r2 (liveBorn live)
-                , elementOfUniqSet r2 (liveDieRead live) || elementOfUniqSet r2 (liveDieWrite live)
+                | elemUniqSet_Directly (getUnique r2) (liveBorn live)
+                , elemUniqSet_Directly (getUnique r2) (liveDieRead live) || elemUniqSet_Directly (getUnique r2) (liveDieWrite live)
                 = True
 
                 | otherwise     = False
@@ -662,25 +665,25 @@ patchEraseLive patchF cmm
 -- | Patch registers in this LiveInstr, including the liveness information.
 --
 patchRegsLiveInstr
-        :: Instruction instr
-        => (Reg -> Reg)
+        :: (Instruction instr, HasDebugCallStack)
+        => Platform
+        -> (Reg -> Reg)
         -> LiveInstr instr -> LiveInstr instr
 
-patchRegsLiveInstr patchF li
+patchRegsLiveInstr platform patchF li
  = case li of
         LiveInstr instr Nothing
-         -> LiveInstr (patchRegsOfInstr instr patchF) Nothing
+         -> LiveInstr (patchRegsOfInstr platform instr patchF) Nothing
 
         LiveInstr instr (Just live)
          -> LiveInstr
-                (patchRegsOfInstr instr patchF)
+                (patchRegsOfInstr platform instr patchF)
                 (Just live
                         { -- WARNING: have to go via lists here because patchF changes the uniq in the Reg
-                          liveBorn      = mapUniqSet patchF $ liveBorn live
-                        , liveDieRead   = mapUniqSet patchF $ liveDieRead live
-                        , liveDieWrite  = mapUniqSet patchF $ liveDieWrite live })
+                          liveBorn      = mapRegFormatSet patchF $ liveBorn live
+                        , liveDieRead   = mapRegFormatSet patchF $ liveDieRead live
+                        , liveDieWrite  = mapRegFormatSet patchF $ liveDieWrite live })
                           -- See Note [Unique Determinism and code generation]
-
 
 --------------------------------------------------------------------------------
 -- | Convert a NatCmmDecl to a LiveCmmDecl, with liveness information
@@ -869,7 +872,7 @@ computeLiveness
         -> [SCC (LiveBasicBlock instr)]
         -> ([SCC (LiveBasicBlock instr)],       -- instructions annotated with list of registers
                                                 -- which are "dead after this instruction".
-               BlockMap RegSet)                 -- blocks annotated with set of live registers
+               BlockMap (UniqSet RegWithFormat))                 -- blocks annotated with set of live registers
                                                 -- on entry to the block.
 
 computeLiveness platform sccs
@@ -884,11 +887,11 @@ computeLiveness platform sccs
 livenessSCCs
        :: Instruction instr
        => Platform
-       -> BlockMap RegSet
+       -> BlockMap (UniqSet RegWithFormat)
        -> [SCC (LiveBasicBlock instr)]          -- accum
        -> [SCC (LiveBasicBlock instr)]
        -> ( [SCC (LiveBasicBlock instr)]
-          , BlockMap RegSet)
+          , BlockMap (UniqSet RegWithFormat))
 
 livenessSCCs _ blockmap done []
         = (done, blockmap)
@@ -917,8 +920,8 @@ livenessSCCs platform blockmap done
 
             linearLiveness
                 :: Instruction instr
-                => BlockMap RegSet -> [LiveBasicBlock instr]
-                -> (BlockMap RegSet, [LiveBasicBlock instr])
+                => BlockMap (UniqSet RegWithFormat) -> [LiveBasicBlock instr]
+                -> (BlockMap (UniqSet RegWithFormat), [LiveBasicBlock instr])
 
             linearLiveness = mapAccumL (livenessBlock platform)
 
@@ -926,9 +929,8 @@ livenessSCCs platform blockmap done
                 -- BlockMaps for equality.
             equalBlockMaps a b
                 = a' == b'
-              where a' = map f $ mapToList a
-                    b' = map f $ mapToList b
-                    f (key,elt) = (key, nonDetEltsUniqSet elt)
+              where a' = mapToList a
+                    b' = mapToList b
                     -- See Note [Unique Determinism and code generation]
 
 
@@ -938,9 +940,9 @@ livenessSCCs platform blockmap done
 livenessBlock
         :: Instruction instr
         => Platform
-        -> BlockMap RegSet
+        -> BlockMap (UniqSet RegWithFormat)
         -> LiveBasicBlock instr
-        -> (BlockMap RegSet, LiveBasicBlock instr)
+        -> (BlockMap (UniqSet RegWithFormat), LiveBasicBlock instr)
 
 livenessBlock platform blockmap (BasicBlock block_id instrs)
  = let
@@ -960,7 +962,7 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
 livenessForward
         :: Instruction instr
         => Platform
-        -> RegSet                       -- regs live on this instr
+        -> UniqSet RegWithFormat -- regs live on this instr
         -> [LiveInstr instr] -> [LiveInstr instr]
 
 livenessForward _        _           []  = []
@@ -971,7 +973,8 @@ livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
                 -- Regs that are written to but weren't live on entry to this instruction
                 --      are recorded as being born here.
                 rsBorn          = mkUniqSet
-                                $ filter (\r -> not $ elementOfUniqSet r rsLiveEntry) written
+                                $ filter (\ r -> not $ elemUniqSet_Directly (getUnique r) rsLiveEntry)
+                                $ written
 
                 rsLiveNext      = (rsLiveEntry `unionUniqSets` rsBorn)
                                         `minusUniqSet` (liveDieRead live)
@@ -990,11 +993,11 @@ livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
 livenessBack
         :: Instruction instr
         => Platform
-        -> RegSet                       -- regs live on this instr
-        -> BlockMap RegSet              -- regs live on entry to other BBs
+        -> UniqSet RegWithFormat            -- regs live on this instr
+        -> BlockMap (UniqSet RegWithFormat) -- regs live on entry to other BBs
         -> [LiveInstr instr]            -- instructions (accum)
         -> [LiveInstr instr]            -- instructions
-        -> (RegSet, [LiveInstr instr])
+        -> (UniqSet RegWithFormat, [LiveInstr instr])
 
 livenessBack _        liveregs _        done []  = (liveregs, done)
 
@@ -1007,10 +1010,10 @@ livenessBack platform liveregs blockmap acc (instr : instrs)
 liveness1
         :: Instruction instr
         => Platform
-        -> RegSet
-        -> BlockMap RegSet
+        -> UniqSet RegWithFormat
+        -> BlockMap (UniqSet RegWithFormat)
         -> LiveInstr instr
-        -> (RegSet, LiveInstr instr)
+        -> (UniqSet RegWithFormat, LiveInstr instr)
 
 liveness1 _ liveregs _ (LiveInstr instr _)
         | isMetaInstr instr
@@ -1029,7 +1032,7 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
         = (liveregs_br, LiveInstr instr
                         (Just $ Liveness
                         { liveBorn      = emptyUniqSet
-                        , liveDieRead   = mkUniqSet r_dying_br
+                        , liveDieRead   = r_dying_br
                         , liveDieWrite  = w_dying }))
 
         where
@@ -1043,12 +1046,15 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             -- registers that are not live beyond this point, are recorded
             --  as dying here.
             r_dying     = mkUniqSet
-                          [ reg | reg <- read, reg `notElem` written,
-                              not (elementOfUniqSet reg liveregs) ]
+                          [ reg
+                          | reg@(RegWithFormat r _) <- read
+                          , not $ any (\ w -> getUnique w == getUnique r) written
+                          , not (elementOfUniqSet reg liveregs) ]
 
             w_dying     = mkUniqSet
-                          [ reg | reg <- written,
-                             not (elementOfUniqSet reg liveregs) ]
+                          [ reg
+                          | reg <- written
+                          , not (elementOfUniqSet reg liveregs) ]
 
             -- union in the live regs from all the jump destinations of this
             -- instruction.
@@ -1058,7 +1064,7 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             targetLiveRegs target
                   = case mapLookup target blockmap of
                                 Just ra -> ra
-                                Nothing -> emptyRegSet
+                                Nothing -> emptyUniqSet
 
             live_from_branch = unionManyUniqSets (map targetLiveRegs targets)
 
@@ -1067,6 +1073,5 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             -- registers that are live only in the branch targets should
             -- be listed as dying here.
             live_branch_only = live_from_branch `minusUniqSet` liveregs
-            r_dying_br  = nonDetEltsUniqSet (r_dying `unionUniqSets`
-                                             live_branch_only)
+            r_dying_br  = (r_dying `unionUniqSets` live_branch_only)
                           -- See Note [Unique Determinism and code generation]

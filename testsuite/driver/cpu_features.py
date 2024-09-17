@@ -9,7 +9,7 @@ SUPPORTED_CPU_FEATURES = {
 
     # x86:
     'sse', 'sse2', 'sse3', 'ssse3', 'sse4_1', 'sse4_2',
-    'avx', 'avx2',
+    'avx', 'avx2', 'avx512f',
     'fma',
     'popcnt', 'bmi1', 'bmi2'
 }

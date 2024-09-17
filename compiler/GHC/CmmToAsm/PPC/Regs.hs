@@ -28,7 +28,6 @@ module GHC.CmmToAsm.PPC.Regs (
         callClobberedRegs,
         allMachRegNos,
         classOfRealReg,
-        showReg,
         toRegNo,
 
         -- machine specific
@@ -50,7 +49,7 @@ import GHC.Prelude
 import GHC.Data.FastString
 
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.CmmToAsm.Format
 
 import GHC.Cmm
@@ -83,13 +82,11 @@ virtualRegSqueeze cls vr
                 VirtualRegHi{}          -> 1
                 _other                  -> 0
 
-        RcDouble
+        RcFloatOrVector
          -> case vr of
                 VirtualRegD{}           -> 1
-                VirtualRegF{}           -> 0
+                VirtualRegV128{}        -> 1
                 _other                  -> 0
-
-        _other -> 0
 
 {-# INLINE realRegSqueeze #-}
 realRegSqueeze :: RegClass -> RealReg -> Int
@@ -102,14 +99,12 @@ realRegSqueeze cls rr
                         | otherwise     -> 0
 
 
-        RcDouble
+        RcFloatOrVector
          -> case rr of
                 RealRegSingle regNo
                         | regNo < 32    -> 0
                         | otherwise     -> 1
 
-
-        _other -> 0
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
@@ -124,8 +119,7 @@ regDotColor :: RealReg -> SDoc
 regDotColor reg
  = case classOfRealReg reg of
         RcInteger       -> text "blue"
-        RcFloat         -> text "red"
-        RcDouble        -> text "green"
+        RcFloatOrVector -> text "red"
 
 
 
@@ -235,14 +229,8 @@ allMachRegNos   = [0..63]
 {-# INLINE classOfRealReg      #-}
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
-        | i < 32        = RcInteger
-        | otherwise     = RcDouble
-
-showReg :: RegNo -> String
-showReg n
-    | n >= 0 && n <= 31   = "%r" ++ show n
-    | n >= 32 && n <= 63  = "%f" ++ show (n - 32)
-    | otherwise           = "%unknown_powerpc_real_reg_" ++ show n
+        | i < 32    = RcInteger
+        | otherwise = RcFloatOrVector
 
 toRegNo :: Reg -> RegNo
 toRegNo (RegReal (RealRegSingle n)) = n

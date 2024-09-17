@@ -2491,8 +2491,9 @@ getUnfoldingCache bh = do
                            , uf_is_work_free = wf, uf_expandable = exp })
 
 infixl 9 .<<|.
-(.<<|.) :: (Bits a) => a -> Bool -> a
+(.<<|.) :: (Num a, Bits a) => a -> Bool -> a
 x .<<|. b = (if b then (`setBit` 0) else id) (x `shiftL` 1)
+{-# INLINE (.<<|.) #-}
 
 instance Binary IfaceAlt where
     put_ bh (IfaceAlt a b c) = do

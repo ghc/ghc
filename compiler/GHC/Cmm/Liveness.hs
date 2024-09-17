@@ -59,7 +59,7 @@ cmmLocalLiveness platform graph =
     check facts =
         noLiveOnEntry entry (expectJust "check" $ mapLookup entry facts) facts
 
-cmmGlobalLiveness :: Platform -> CmmGraph -> BlockEntryLiveness GlobalReg
+cmmGlobalLiveness :: Platform -> CmmGraph -> BlockEntryLiveness GlobalRegUse
 cmmGlobalLiveness platform graph =
     analyzeCmmBwd liveLattice (xferLive platform) graph mapEmpty
 
@@ -92,7 +92,7 @@ xferLive platform (BlockCC eNode middle xNode) fBase =
         !result = foldNodesBwdOO (gen_kill platform) middle joined
     in mapSingleton (entryLabel eNode) result
 {-# SPECIALIZE xferLive :: Platform -> TransferFun (CmmLive LocalReg) #-}
-{-# SPECIALIZE xferLive :: Platform -> TransferFun (CmmLive GlobalReg) #-}
+{-# SPECIALIZE xferLive :: Platform -> TransferFun (CmmLive GlobalRegUse) #-}
 
 -----------------------------------------------------------------------------
 -- | Specialization that only retains the keys for local variables.

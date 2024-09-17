@@ -659,6 +659,9 @@ Library
         GHC.Platform.Profile
         GHC.Platform.Reg
         GHC.Platform.Reg.Class
+        GHC.Platform.Reg.Class.NoVectors
+        GHC.Platform.Reg.Class.Separate
+        GHC.Platform.Reg.Class.Unified
         GHC.Platform.Regs
         GHC.Platform.RISCV64
         GHC.Platform.S390X

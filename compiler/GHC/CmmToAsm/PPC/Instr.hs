@@ -43,7 +43,7 @@ import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.Platform.Reg
 
 import GHC.Platform.Regs
@@ -219,11 +219,11 @@ data Instr
                                     --    Just True:  branch likely taken
                                     --    Just False: branch likely not taken
                                     --    Nothing:    no hint
-    | JMP     CLabel [Reg]          -- same as branch,
+    | JMP     CLabel [RegWithFormat]    -- same as branch,
                                     -- but with CLabel instead of block ID
                                     -- and live global registers
     | MTCTR   Reg
-    | BCTR    [Maybe BlockId] (Maybe CLabel) [Reg]
+    | BCTR    [Maybe BlockId] (Maybe CLabel) [RegWithFormat]
                                     -- with list of local destinations, and
                                     -- jump table location if necessary
     | BL      CLabel [Reg]          -- with list of argument regs
@@ -331,9 +331,9 @@ regUsageOfInstr platform instr
     CMPL    _ reg ri         -> usage (reg : regRI ri,[])
     BCC     _ _ _            -> noUsage
     BCCFAR  _ _ _            -> noUsage
-    JMP     _ regs           -> usage (regs, [])
+    JMP     _ regs           -> usage (map regWithFormat_reg regs, [])
     MTCTR   reg              -> usage ([reg],[])
-    BCTR    _ _ regs         -> usage (regs, [])
+    BCTR    _ _ regs         -> usage (map regWithFormat_reg regs, [])
     BL      _ params         -> usage (params, callClobberedRegs platform)
     BCTRL   params           -> usage (params, callClobberedRegs platform)
 
@@ -389,8 +389,15 @@ regUsageOfInstr platform instr
     FMADD _ _ rt ra rc rb   -> usage ([ra, rc, rb], [rt])
     _                       -> noUsage
   where
-    usage (src, dst) = RU (filter (interesting platform) src)
-                          (filter (interesting platform) dst)
+    usage (src, dst) = RU (map mkFmt $ filter (interesting platform) src)
+                          (map mkFmt $ filter (interesting platform) dst)
+      -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
+      -- As the PowerPC NCG does not currently support SIMD registers,
+      -- this simple logic is OK.
+    mkFmt r = RegWithFormat r fmt
+      where fmt = case targetClassOfReg platform r of
+                    RcInteger -> archWordFormat (target32Bit platform)
+                    RcFloatOrVector -> FF64
     regAddr (AddrRegReg r1 r2) = [r1, r2]
     regAddr (AddrRegImm r1 _)  = [r1]
 
@@ -545,12 +552,12 @@ patchJumpInstr insn patchF
 -- | An instruction to spill a register into a spill slot.
 mkSpillInstr
    :: NCGConfig
-   -> Reg       -- register to spill
+   -> RegWithFormat -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> [Instr]
 
-mkSpillInstr config reg delta slot
+mkSpillInstr config (RegWithFormat reg _fmt) delta slot
   = let platform = ncgPlatform config
         off      = spillSlotToOffset platform slot
         arch     = platformArch platform
@@ -559,8 +566,7 @@ mkSpillInstr config reg delta slot
                 RcInteger -> case arch of
                                 ArchPPC -> II32
                                 _       -> II64
-                RcDouble  -> FF64
-                _         -> panic "PPC.Instr.mkSpillInstr: no match"
+                RcFloatOrVector  -> FF64
         instr = case makeImmediate W32 True (off-delta) of
                 Just _  -> ST
                 Nothing -> STFAR -- pseudo instruction: 32 bit offsets
@@ -570,12 +576,12 @@ mkSpillInstr config reg delta slot
 
 mkLoadInstr
    :: NCGConfig
-   -> Reg       -- register to load
+   -> RegWithFormat -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> [Instr]
 
-mkLoadInstr config reg delta slot
+mkLoadInstr config (RegWithFormat reg _fmt) delta slot
   = let platform = ncgPlatform config
         off      = spillSlotToOffset platform slot
         arch     = platformArch platform
@@ -584,8 +590,7 @@ mkLoadInstr config reg delta slot
                 RcInteger ->  case arch of
                                  ArchPPC -> II32
                                  _       -> II64
-                RcDouble  -> FF64
-                _         -> panic "PPC.Instr.mkLoadInstr: no match"
+                RcFloatOrVector  -> FF64
         instr = case makeImmediate W32 True (off-delta) of
                 Just _  -> LD
                 Nothing -> LDFAR -- pseudo instruction: 32 bit offsets
@@ -663,12 +668,14 @@ isMetaInstr instr
 -- | Copy the value in a register to another one.
 -- Must work for all register classes.
 mkRegRegMoveInstr
-    :: Reg
+    :: Format
+    -> Reg
     -> Reg
     -> Instr
 
-mkRegRegMoveInstr src dst
+mkRegRegMoveInstr _fmt src dst
     = MR dst src
+    -- SIMD NCG TODO: handle vector format
 
 
 -- | Make an unconditional jump instruction.

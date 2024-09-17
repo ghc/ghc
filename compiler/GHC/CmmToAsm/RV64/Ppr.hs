@@ -333,7 +333,6 @@ pprReg w r = case r of
   RegReal (RealRegSingle i) -> ppr_reg_no i
   -- virtual regs should not show up, but this is helpful for debugging.
   RegVirtual (VirtualRegI u) -> text "%vI_" <> pprUniqueAlways u
-  RegVirtual (VirtualRegF u) -> text "%vF_" <> pprUniqueAlways u
   RegVirtual (VirtualRegD u) -> text "%vD_" <> pprUniqueAlways u
   _ -> pprPanic "RiscV64.pprReg" (text (show r) <+> ppr w)
   where

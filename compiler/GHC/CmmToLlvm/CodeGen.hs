@@ -57,7 +57,7 @@ genLlvmProc :: RawCmmDecl -> LlvmM [LlvmCmmDecl]
 genLlvmProc (CmmProc infos lbl live graph) = do
     let blocks = toBlockListEntryFirstFalseFallthrough graph
 
-    (lmblocks, lmdata) <- basicBlocksCodeGen live blocks
+    (lmblocks, lmdata) <- basicBlocksCodeGen (map globalRegUse_reg live) blocks
     let info = mapLookup (g_entry graph) infos
         proc = CmmProc info lbl live (ListGraph lmblocks)
     return (proc:lmdata)
@@ -152,7 +152,7 @@ stmtToInstrs ubid stmt = case stmt of
 
     -- Tail call
     CmmCall { cml_target = arg,
-              cml_args_regs = live } -> genJump arg live
+              cml_args_regs = live } -> genJump arg $ map globalRegUse_reg live
 
     _ -> panic "Llvm.CodeGen.stmtToInstrs"
 
@@ -1147,7 +1147,7 @@ genStore_fast :: CmmExpr -> GlobalRegUse -> Int -> CmmExpr -> AlignmentSpec
 genStore_fast addr r n val alignment
   = do platform <- getPlatform
        (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
-       meta          <- getTBAARegMeta (globalRegUseGlobalReg r)
+       meta          <- getTBAARegMeta (globalRegUse_reg r)
        let (ix,rem) = n `divMod` ((llvmWidthInBits platform . pLower) grt  `div` 8)
        case isPointer grt && rem == 0 of
             True -> do
@@ -1676,7 +1676,7 @@ genMachOp_slow opt op [x, y] = case op of
     MO_F_Mul  _ -> genBinMach LM_MO_FMul
     MO_F_Quot _ -> genBinMach LM_MO_FDiv
 
-    MO_FMA _ _ -> panicOp
+    MO_FMA _ _  -> panicOp
 
     MO_And _   -> genBinMach LM_MO_And
     MO_Or  _   -> genBinMach LM_MO_Or
@@ -1714,10 +1714,9 @@ genMachOp_slow opt op [x, y] = case op of
     MO_WF_Bitcast _to ->  panicOp
     MO_FW_Bitcast _to ->  panicOp
 
-    MO_V_Insert  {} -> panicOp
-
     MO_VS_Neg {} -> panicOp
 
+    MO_V_Insert  {} -> panicOp
     MO_VF_Insert  {} -> panicOp
 
     MO_VF_Neg {} -> panicOp
@@ -1808,17 +1807,15 @@ genMachOp_slow opt op [x, y] = case op of
                     pprPanic "isSMulOK: Not bit type! " $
                         lparen <> ppr word <> rparen
 
-        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-binary op encountered"
+        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-binary op encountered "
                        ++ "with two arguments! (" ++ show op ++ ")"
 
 genMachOp_slow _opt op [x, y, z] = do
-  platform <- getPlatform
   let
-    neg x = CmmMachOp (MO_F_Neg (cmmExprWidth platform x)) [x]
-    panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-ternary op encountered"
+    panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-ternary op encountered "
                    ++ "with three arguments! (" ++ show op ++ ")"
   case op of
-    MO_FMA var _ ->
+    MO_FMA var width ->
       case var of
         -- LLVM only has the fmadd variant.
         FMAdd   -> genFmaOp x y z
@@ -1827,6 +1824,8 @@ genMachOp_slow _opt op [x, y, z] = do
         FMSub   -> genFmaOp x y (neg z)
         FNMAdd  -> genFmaOp (neg x) y z
         FNMSub  -> genFmaOp (neg x) y (neg z)
+      where
+        neg x = CmmMachOp (MO_F_Neg width) [x]
     _ -> panicOp
 
 -- More than three expressions, invalid!
@@ -1848,7 +1847,7 @@ genFmaOp x y z = runExprData $ do
   let fname = case tx of
         LMFloat  -> fsLit "llvm.fma.f32"
         LMDouble -> fsLit "llvm.fma.f64"
-        _ -> pprPanic "fma: type not LMFloat or LMDouble" (ppLlvmType tx)
+        _ -> pprPanic "CmmToLlvm.genFmaOp: unsupported type" (ppLlvmType tx)
   fptr <- liftExprData $ getInstrinct fname ty [tx, ty, tz]
   doExprW tx $ Call StdCall fptr [vx, vy, vz] [ReadNone, NoUnwind]
 
@@ -1889,7 +1888,7 @@ genLoad_fast :: Atomic -> CmmExpr -> GlobalRegUse -> Int -> CmmType
 genLoad_fast atomic e r n ty align = do
     platform <- getPlatform
     (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
-    meta          <- getTBAARegMeta (globalRegUseGlobalReg r)
+    meta          <- getTBAARegMeta (globalRegUse_reg r)
     let ty'      = cmmToLlvmType ty
         (ix,rem) = n `divMod` ((llvmWidthInBits platform . pLower) grt  `div` 8)
     case isPointer grt && rem == 0 of
@@ -1979,7 +1978,7 @@ getCmmReg (CmmLocal (LocalReg un _))
            -- "funPrologue" to allocate it on the stack.
 
 getCmmReg (CmmGlobal g)
-  = do let r = globalRegUseGlobalReg g
+  = do let r = globalRegUse_reg g
        onStack  <- checkStackReg r
        platform <- getPlatform
        if onStack
@@ -1993,10 +1992,10 @@ getCmmRegVal :: CmmReg -> LlvmM (LlvmVar, LlvmType, LlvmStatements)
 getCmmRegVal reg =
   case reg of
     CmmGlobal g -> do
-      onStack <- checkStackReg (globalRegUseGlobalReg g)
+      onStack <- checkStackReg (globalRegUse_reg g)
       platform <- getPlatform
       if onStack then loadFromStack else do
-        let r = lmGlobalRegArg platform (globalRegUseGlobalReg g)
+        let r = lmGlobalRegArg platform (globalRegUse_reg g)
         return (r, getVarType r, nilOL)
     _ -> loadFromStack
  where loadFromStack = do

@@ -208,7 +208,7 @@ mkJump profile conv e actuals updfr_off =
 
 -- | A jump where the caller says what the live GlobalRegs are.  Used
 -- for low-level hand-written Cmm.
-mkRawJump       :: Profile -> CmmExpr -> UpdFrameOffset -> [GlobalReg]
+mkRawJump       :: Profile -> CmmExpr -> UpdFrameOffset -> [GlobalRegUse]
                 -> CmmAGraph
 mkRawJump profile e updfr_off vols =
   lastWithArgs profile Jump Old NativeNodeCall [] updfr_off $
@@ -297,7 +297,7 @@ stackStubExpr w = CmmLit (CmmInt 0 w)
 copyInOflow  :: Profile -> Convention -> Area
              -> [CmmFormal]
              -> [CmmFormal]
-             -> (Int, [GlobalReg], CmmAGraph)
+             -> (Int, [GlobalRegUse], CmmAGraph)
 
 copyInOflow profile conv area formals extra_stk
   = (offset, gregs, catAGraphs $ map mkMiddle nodes)
@@ -308,9 +308,9 @@ copyInOflow profile conv area formals extra_stk
 copyIn :: Profile -> Convention -> Area
        -> [CmmFormal]
        -> [CmmFormal]
-       -> (ByteOff, [GlobalReg], [CmmNode O O])
+       -> (ByteOff, [GlobalRegUse], [CmmNode O O])
 copyIn profile conv area formals extra_stk
-  = (stk_size, [r | (_, RegisterParam r) <- args], map ci (stk_args ++ args))
+  = (stk_size, [GlobalRegUse r (localRegType lr)| (lr, RegisterParam r) <- args], map ci (stk_args ++ args))
   where
     platform = profilePlatform profile
 
@@ -365,7 +365,7 @@ data Transfer = Call | JumpRet | Jump | Ret deriving Eq
 copyOutOflow :: Profile -> Convention -> Transfer -> Area -> [CmmExpr]
              -> UpdFrameOffset
              -> [CmmExpr] -- extra stack args
-             -> (Int, [GlobalReg], CmmAGraph)
+             -> (Int, [GlobalRegUse], CmmAGraph)
 
 -- Generate code to move the actual parameters into the locations
 -- required by the calling convention.  This includes a store for the
@@ -383,8 +383,8 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
     (regs, graph) = foldr co ([], mkNop) (setRA ++ args ++ stack_params)
 
     co :: (CmmExpr, ParamLocation)
-       -> ([GlobalReg], CmmAGraph)
-       -> ([GlobalReg], CmmAGraph)
+       -> ([GlobalRegUse], CmmAGraph)
+       -> ([GlobalRegUse], CmmAGraph)
     co (v, RegisterParam r@(VanillaReg {})) (rs, ms) =
         let width = cmmExprWidth platform v
             value
@@ -393,12 +393,14 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
                 | width < wordWidth platform =
                     CmmMachOp (MO_XX_Conv width (wordWidth platform)) [v]
                 | otherwise = panic "Parameter width greater than word width"
+            ru = GlobalRegUse r (cmmExprType platform value)
 
-        in (r:rs, mkAssign (CmmGlobal $ GlobalRegUse r (cmmExprType platform value)) value <*> ms)
+        in (ru:rs, mkAssign (CmmGlobal ru) value <*> ms)
 
     -- Non VanillaRegs
     co (v, RegisterParam r) (rs, ms) =
-        (r:rs, mkAssign (CmmGlobal $ GlobalRegUse r (cmmExprType platform v)) v <*> ms)
+      let ru = GlobalRegUse r (cmmExprType platform v)
+      in (ru:rs, mkAssign (CmmGlobal ru) v <*> ms)
 
     co (v, StackParam off)  (rs, ms)
       = (rs, mkStore (CmmStackSlot area off) (value v) <*> ms)
@@ -461,13 +463,13 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
 
 
 mkCallEntry :: Profile -> Convention -> [CmmFormal] -> [CmmFormal]
-            -> (Int, [GlobalReg], CmmAGraph)
+            -> (Int, [GlobalRegUse], CmmAGraph)
 mkCallEntry profile conv formals extra_stk
   = copyInOflow profile conv Old formals extra_stk
 
 lastWithArgs :: Profile -> Transfer -> Area -> Convention -> [CmmExpr]
              -> UpdFrameOffset
-             -> (ByteOff -> [GlobalReg] -> CmmAGraph)
+             -> (ByteOff -> [GlobalRegUse] -> CmmAGraph)
              -> CmmAGraph
 lastWithArgs profile transfer area conv actuals updfr_off last =
   lastWithArgsAndExtraStack profile transfer area conv actuals
@@ -476,7 +478,7 @@ lastWithArgs profile transfer area conv actuals updfr_off last =
 lastWithArgsAndExtraStack :: Profile
              -> Transfer -> Area -> Convention -> [CmmExpr]
              -> UpdFrameOffset -> [CmmExpr]
-             -> (ByteOff -> [GlobalReg] -> CmmAGraph)
+             -> (ByteOff -> [GlobalRegUse] -> CmmAGraph)
              -> CmmAGraph
 lastWithArgsAndExtraStack profile transfer area conv actuals updfr_off
                           extra_stack last =
@@ -490,7 +492,7 @@ noExtraStack :: [CmmExpr]
 noExtraStack = []
 
 toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> ByteOff
-       -> ByteOff -> [GlobalReg]
+       -> ByteOff -> [GlobalRegUse]
        -> CmmAGraph
 toCall e cont updfr_off res_space arg_space regs =
   mkLast $ CmmCall e cont regs arg_space res_space updfr_off

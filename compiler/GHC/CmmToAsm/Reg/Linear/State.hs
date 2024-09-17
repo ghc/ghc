@@ -42,9 +42,9 @@ import GHC.CmmToAsm.Reg.Linear.Stats
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Linear.Base
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
-import GHC.Platform.Reg
 import GHC.Cmm.BlockId
 
 import GHC.Platform
@@ -114,17 +114,17 @@ makeRAStats state
 
 
 spillR :: Instruction instr
-       => Reg -> Unique -> RegM freeRegs ([instr], Int)
+       => RegWithFormat -> Unique -> RegM freeRegs ([instr], Int)
 
 spillR reg temp = mkRegM $ \s ->
-  let (stack1,slot) = getStackSlotFor (ra_stack s) temp
-      instr  = mkSpillInstr (ra_config s) reg (ra_delta s) slot
+  let (stack1,slots) = getStackSlotFor (ra_stack s) (regWithFormat_format reg) temp
+      instr  = mkSpillInstr (ra_config s) reg (ra_delta s) slots
   in
-  RA_Result s{ra_stack=stack1} (instr,slot)
+  RA_Result s{ra_stack=stack1} (instr,slots)
 
 
 loadR :: Instruction instr
-      => Reg -> Int -> RegM freeRegs [instr]
+      => RegWithFormat -> Int -> RegM freeRegs [instr]
 
 loadR reg slot = mkRegM $ \s ->
   RA_Result s (mkLoadInstr (ra_config s) reg (ra_delta s) slot)

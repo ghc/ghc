@@ -43,7 +43,7 @@ ncgPPC config = NcgImpl
 -- | Instruction instance for powerpc
 instance Instruction PPC.Instr where
    regUsageOfInstr     = PPC.regUsageOfInstr
-   patchRegsOfInstr    = PPC.patchRegsOfInstr
+   patchRegsOfInstr _  = PPC.patchRegsOfInstr
    isJumpishInstr      = PPC.isJumpishInstr
    jumpDestsOfInstr    = PPC.jumpDestsOfInstr
    canFallthroughTo    = PPC.canFallthroughTo
@@ -53,7 +53,7 @@ instance Instruction PPC.Instr where
    takeDeltaInstr      = PPC.takeDeltaInstr
    isMetaInstr         = PPC.isMetaInstr
    mkRegRegMoveInstr _ = PPC.mkRegRegMoveInstr
-   takeRegRegMoveInstr = PPC.takeRegRegMoveInstr
+   takeRegRegMoveInstr _ = PPC.takeRegRegMoveInstr
    mkJumpInstr         = PPC.mkJumpInstr
    mkStackAllocInstr   = PPC.mkStackAllocInstr
    mkStackDeallocInstr = PPC.mkStackDeallocInstr

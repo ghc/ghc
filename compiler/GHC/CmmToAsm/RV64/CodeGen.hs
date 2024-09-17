@@ -422,7 +422,7 @@ getRegisterReg :: Platform -> CmmReg -> Reg
 getRegisterReg _ (CmmLocal (LocalReg u pk)) =
   RegVirtual $ mkVirtualReg u (cmmTypeFormat pk)
 getRegisterReg platform (CmmGlobal mid) =
-  case globalRegMaybe platform (globalRegUseGlobalReg mid) of
+  case globalRegMaybe platform (globalRegUse_reg mid) of
     Just reg -> RegReal reg
     Nothing -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
 

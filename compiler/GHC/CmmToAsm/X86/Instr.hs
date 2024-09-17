@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
@@ -30,12 +32,14 @@ module GHC.CmmToAsm.X86.Instr
    , mkStackDeallocInstr
    , mkSpillInstr
    , mkRegRegMoveInstr
+   , movInstr
    , jumpDestsOfInstr
    , canFallthroughTo
    , patchRegsOfInstr
    , patchJumpInstr
    , isMetaInstr
    , isJumpishInstr
+   , movdOutFormat
    )
 where
 
@@ -45,18 +49,20 @@ import GHC.Data.FastString
 import GHC.CmmToAsm.X86.Cond
 import GHC.CmmToAsm.X86.Regs
 import GHC.CmmToAsm.Format
+import GHC.CmmToAsm.Reg.Target (targetClassOfReg)
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
-import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
-import GHC.CmmToAsm.Reg.Target
+import GHC.Platform.Reg.Class.Unified
+
 import GHC.CmmToAsm.Config
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.Platform.Regs
 import GHC.Cmm
+import GHC.Utils.Constants ( debugIsOn )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
@@ -67,8 +73,9 @@ import GHC.Types.Unique
 import GHC.Types.Unique.DSM
 import GHC.Types.Basic (Alignment)
 import GHC.Cmm.DebugBlock (UnwindTable)
+import GHC.Utils.Misc ( HasDebugCallStack )
 
-import Data.Maybe       (fromMaybe)
+import GHC.Data.Maybe
 
 -- Format of an x86/x86_64 memory address, in bytes.
 --
@@ -79,96 +86,6 @@ archWordFormat is32Bit
 
 -- -----------------------------------------------------------------------------
 -- Intel x86 instructions
-
-{-
-Intel, in their infinite wisdom, selected a stack model for floating
-point registers on x86.  That might have made sense back in 1979 --
-nowadays we can see it for the nonsense it really is.  A stack model
-fits poorly with the existing nativeGen infrastructure, which assumes
-flat integer and FP register sets.  Prior to this commit, nativeGen
-could not generate correct x86 FP code -- to do so would have meant
-somehow working the register-stack paradigm into the register
-allocator and spiller, which sounds very difficult.
-
-We have decided to cheat, and go for a simple fix which requires no
-infrastructure modifications, at the expense of generating ropey but
-correct FP code.  All notions of the x86 FP stack and its insns have
-been removed.  Instead, we pretend (to the instruction selector and
-register allocator) that x86 has six floating point registers, %fake0
-.. %fake5, which can be used in the usual flat manner.  We further
-claim that x86 has floating point instructions very similar to SPARC
-and Alpha, that is, a simple 3-operand register-register arrangement.
-Code generation and register allocation proceed on this basis.
-
-When we come to print out the final assembly, our convenient fiction
-is converted to dismal reality.  Each fake instruction is
-independently converted to a series of real x86 instructions.
-%fake0 .. %fake5 are mapped to %st(0) .. %st(5).  To do reg-reg
-arithmetic operations, the two operands are pushed onto the top of the
-FP stack, the operation done, and the result copied back into the
-relevant register.  There are only six %fake registers because 2 are
-needed for the translation, and x86 has 8 in total.
-
-The translation is inefficient but is simple and it works.  A cleverer
-translation would handle a sequence of insns, simulating the FP stack
-contents, would not impose a fixed mapping from %fake to %st regs, and
-hopefully could avoid most of the redundant reg-reg moves of the
-current translation.
-
-We might as well make use of whatever unique FP facilities Intel have
-chosen to bless us with (let's not be churlish, after all).
-Hence GLDZ and GLD1.  Bwahahahahahahaha!
--}
-
-{-
-Note [x86 Floating point precision]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Intel's internal floating point registers are by default 80 bit
-extended precision.  This means that all operations done on values in
-registers are done at 80 bits, and unless the intermediate values are
-truncated to the appropriate size (32 or 64 bits) by storing in
-memory, calculations in registers will give different results from
-calculations which pass intermediate values in memory (eg. via
-function calls).
-
-One solution is to set the FPU into 64 bit precision mode.  Some OSs
-do this (eg. FreeBSD) and some don't (eg. Linux).  The problem here is
-that this will only affect 64-bit precision arithmetic; 32-bit
-calculations will still be done at 64-bit precision in registers.  So
-it doesn't solve the whole problem.
-
-There's also the issue of what the C library is expecting in terms of
-precision.  It seems to be the case that glibc on Linux expects the
-FPU to be set to 80 bit precision, so setting it to 64 bit could have
-unexpected effects.  Changing the default could have undesirable
-effects on other 3rd-party library code too, so the right thing would
-be to save/restore the FPU control word across Haskell code if we were
-to do this.
-
-gcc's -ffloat-store gives consistent results by always storing the
-results of floating-point calculations in memory, which works for both
-32 and 64-bit precision.  However, it only affects the values of
-user-declared floating point variables in C, not intermediate results.
-GHC in -fvia-C mode uses -ffloat-store (see the -fexcess-precision
-flag).
-
-Another problem is how to spill floating point registers in the
-register allocator.  Should we spill the whole 80 bits, or just 64?
-On an OS which is set to 64 bit precision, spilling 64 is fine.  On
-Linux, spilling 64 bits will round the results of some operations.
-This is what gcc does.  Spilling at 80 bits requires taking up a full
-128 bit slot (so we get alignment).  We spill at 80-bits and ignore
-the alignment problems.
-
-In the future [edit: now available in GHC 7.0.1, with the -msse2
-flag], we'll use the SSE registers for floating point.  This requires
-a CPU that supports SSE2 (ordinary SSE only supports 32 bit precision
-float ops), which means P4 or Xeon and above.  Using SSE will solve
-all these problems, because the SSE registers use fixed 32 bit or 64
-bit precision.
-
---SDM 1/2003
--}
 
 data Instr
         -- comment pseudo-op
@@ -196,9 +113,13 @@ data Instr
         -- This carries a BlockId so it can be used in unwinding information.
         | DELTA  Int
 
-        -- Moves.
-        | MOV         Format Operand Operand
-             -- ^ N.B. Due to AT&T assembler quirks, when used with 'II64'
+        -- | X86 scalar move instruction.
+        --
+        -- When used at a vector format, only moves the lower 64 bits of data;
+        -- the rest of the data in the destination may either be zeroed or
+        -- preserved, depending on the specific format and operands.
+        | MOV Format Operand Operand
+             -- N.B. Due to AT&T assembler quirks, when used with 'II64'
              -- 'Format' immediate source and memory target operand, the source
              -- operand is interpreted to be a 32-bit sign-extended value.
              -- True 64-bit operands need to be either first moved to a register or moved
@@ -209,7 +130,7 @@ data Instr
                                         -- (bitcast between a general purpose
                                         -- register and a float register).
                                         -- Format is input format, output format is
-                                        -- calculated in Ppr.hs
+                                        -- calculated in the 'movdOutFormat' function.
         | CMOV   Cond Format Operand Reg
         | MOVZxL      Format Operand Operand
               -- ^ The format argument is the size of operand 1 (the number of bits we keep)
@@ -286,7 +207,7 @@ data Instr
         -- | FMA3 fused multiply-add operations.
         | FMA3         Format FMASign FMAPermutation Operand Reg Reg
           -- src3 (r/m), src2 (r), dst/src1 (r)
-          -- The is exactly reversed from how intel lists the arguments.
+          -- This is exactly reversed from how intel lists the arguments.
 
         -- use ADD, SUB, and SQRT for arithmetic.  In both cases, operands
         -- are  Operand Reg.
@@ -313,7 +234,7 @@ data Instr
         --  | POPA
 
         -- Jumping around.
-        | JMP         Operand [Reg] -- including live Regs at the call
+        | JMP         Operand [RegWithFormat] -- including live Regs at the call
         | JXX         Cond BlockId  -- includes unconditional branches
         | JXX_GBL     Cond Imm      -- non-local version of JXX
         -- Table jump
@@ -323,7 +244,7 @@ data Instr
                       CLabel    -- Label of jump table
         -- | X86 call instruction
         | CALL        (Either Imm Reg) -- ^ Jump target
-                      [Reg]            -- ^ Arguments (required for register allocation)
+                      [RegWithFormat]  -- ^ Arguments (required for register allocation)
 
         -- Other things.
         | CLTD Format            -- sign extend %eax into %edx:%eax
@@ -359,6 +280,54 @@ data Instr
         | XCHG        Format Operand Reg     -- src (r/m), dst (r/m)
         | MFENCE
 
+        -- Vector Instructions --
+        -- NOTE: Instructions follow the AT&T syntax
+        -- Constructors and deconstructors
+        | VBROADCAST  Format AddrMode Reg
+        | VEXTRACT    Format Imm Reg Operand
+        | INSERTPS    Format Imm Operand Reg
+
+        -- move operations
+
+        -- | SSE2 unaligned move of floating-point vectors
+        | MOVU        Format Operand Operand
+        -- | AVX unaligned move of floating-point vectors
+        | VMOVU       Format Operand Operand
+        -- | SSE2 move between memory and low-part of an xmm register
+        | MOVL        Format Operand Operand
+        -- | SSE move between memory and high-part of an xmm register
+        | MOVH        Format Operand Operand
+        -- | SSE2 unaligned move of integer vectors
+        | MOVDQU      Format Operand Operand
+        -- | AVX unaligned move of integer vectors
+        | VMOVDQU     Format Operand Operand
+
+        -- logic operations
+        | VPXOR       Format Reg Reg Reg
+
+        -- Arithmetic
+        | VADD       Format Operand Reg Reg
+        | VSUB       Format Operand Reg Reg
+        | VMUL       Format Operand Reg Reg
+        | VDIV       Format Operand Reg Reg
+
+        -- Shuffle
+        | VPSHUFD    Format Imm Operand Reg
+        | PSHUFD     Format Imm Operand Reg
+        | SHUFPS     Format Imm Operand Reg
+        | VSHUFPS    Format Imm Operand Reg Reg
+        | SHUFPD     Format Imm Operand Reg
+        | VSHUFPD    Format Imm Operand Reg Reg
+
+        -- | Move two 32-bit floats from the high part of an xmm register
+        -- to the low part of another xmm register.
+        | MOVHLPS    Format Reg Reg
+        | PUNPCKLQDQ Format Operand Reg
+
+        -- Shift
+        | PSLLDQ     Format Operand Reg
+        | PSRLDQ     Format Operand Reg
+
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
 
 
@@ -375,98 +344,164 @@ data FMAPermutation = FMA132 | FMA213 | FMA231
 regUsageOfInstr :: Platform -> Instr -> RegUsage
 regUsageOfInstr platform instr
  = case instr of
-    MOV    _ src dst    -> usageRW src dst
-    MOVD   _ src dst    -> usageRW src dst
-    CMOV _ _ src dst    -> mkRU (use_R src [dst]) [dst]
-    MOVZxL _ src dst    -> usageRW src dst
-    MOVSxL _ src dst    -> usageRW src dst
-    LEA    _ src dst    -> usageRW src dst
-    ADD    _ src dst    -> usageRM src dst
-    ADC    _ src dst    -> usageRM src dst
-    SUB    _ src dst    -> usageRM src dst
-    SBB    _ src dst    -> usageRM src dst
-    IMUL   _ src dst    -> usageRM src dst
+    MOV fmt src dst
+      -- MOVSS/MOVSD preserve the upper half of vector registers,
+      -- but only for reg-2-reg moves
+      | VecFormat _ sFmt <- fmt
+      , isFloatScalarFormat sFmt
+      , OpReg {} <- src
+      , OpReg {} <- dst
+      -> usageRM fmt src dst
+      -- other MOV instructions zero any remaining upper part of the destination
+      -- (largely to avoid partial register stalls)
+      | otherwise
+      -> usageRW fmt src dst
+    MOVD   fmt src dst    ->
+      -- NB: MOVD/MOVQ always zero any remaining upper part of destination
+      mkRU (use_R fmt src []) (use_R (movdOutFormat fmt) dst [])
+    CMOV _ fmt src dst    -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    MOVZxL fmt src dst    -> usageRW fmt src dst
+    MOVSxL fmt src dst    -> usageRW fmt src dst
+    LEA    fmt src dst    -> usageRW fmt src dst
+    ADD    fmt src dst    -> usageRM fmt src dst
+    ADC    fmt src dst    -> usageRM fmt src dst
+    SUB    fmt src dst    -> usageRM fmt src dst
+    SBB    fmt src dst    -> usageRM fmt src dst
+    IMUL   fmt src dst    -> usageRM fmt src dst
 
     -- Result of IMULB will be in just in %ax
-    IMUL2  II8 src       -> mkRU (eax:use_R src []) [eax]
+    IMUL2  II8 src       -> mkRU (mk II8 eax:use_R II8 src []) [mk II8 eax]
     -- Result of IMUL for wider values, will be split between %dx/%edx/%rdx and
     -- %ax/%eax/%rax.
-    IMUL2  _ src        -> mkRU (eax:use_R src []) [eax,edx]
+    IMUL2  fmt src        -> mkRU (mk fmt eax:use_R fmt src []) [mk fmt eax,mk fmt edx]
 
-    MUL    _ src dst    -> usageRM src dst
-    MUL2   _ src        -> mkRU (eax:use_R src []) [eax,edx]
-    DIV    _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
-    IDIV   _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
-    ADD_CC _ src dst    -> usageRM src dst
-    SUB_CC _ src dst    -> usageRM src dst
-    AND    _ src dst    -> usageRM src dst
-    OR     _ src dst    -> usageRM src dst
+    MUL    fmt src dst    -> usageRM fmt src dst
+    MUL2   fmt src        -> mkRU (mk fmt eax:use_R fmt src []) [mk fmt eax,mk fmt edx]
+    DIV    fmt op -> mkRU (mk fmt eax:mk fmt edx:use_R fmt op []) [mk fmt eax, mk fmt edx]
+    IDIV   fmt op -> mkRU (mk fmt eax:mk fmt edx:use_R fmt op []) [mk fmt eax, mk fmt edx]
+    ADD_CC fmt src dst    -> usageRM fmt src dst
+    SUB_CC fmt src dst    -> usageRM fmt src dst
+    AND    fmt src dst    -> usageRM fmt src dst
+    OR     fmt src dst    -> usageRM fmt src dst
 
-    XOR    _ (OpReg src) (OpReg dst)
-        | src == dst    -> mkRU [] [dst]
+    XOR    fmt (OpReg src) (OpReg dst)
+        | src == dst    -> mkRU [] [mk fmt dst]
 
-    XOR    _ src dst    -> usageRM src dst
-    NOT    _ op         -> usageM op
-    BSWAP  _ reg        -> mkRU [reg] [reg]
-    NEGI   _ op         -> usageM op
-    SHL    _ imm dst    -> usageRM imm dst
-    SAR    _ imm dst    -> usageRM imm dst
-    SHR    _ imm dst    -> usageRM imm dst
-    SHLD   _ imm dst1 dst2 -> usageRMM imm dst1 dst2
-    SHRD   _ imm dst1 dst2 -> usageRMM imm dst1 dst2
-    BT     _ _   src    -> mkRUR (use_R src [])
+    XOR    fmt src dst    -> usageRM fmt src dst
+    NOT    fmt op         -> usageM fmt op
+    BSWAP  fmt reg        -> mkRU [mk fmt reg] [mk fmt reg]
+    NEGI   fmt op         -> usageM fmt op
+    SHL    fmt imm dst    -> usageRM fmt imm dst
+    SAR    fmt imm dst    -> usageRM fmt imm dst
+    SHR    fmt imm dst    -> usageRM fmt imm dst
+    SHLD   fmt imm dst1 dst2 -> usageRMM fmt imm dst1 dst2
+    SHRD   fmt imm dst1 dst2 -> usageRMM fmt imm dst1 dst2
+    BT     fmt _   src    -> mkRUR (use_R fmt src [])
 
-    PUSH   _ op         -> mkRUR (use_R op [])
-    POP    _ op         -> mkRU [] (def_W op)
-    TEST   _ src dst    -> mkRUR (use_R src $! use_R dst [])
-    CMP    _ src dst    -> mkRUR (use_R src $! use_R dst [])
-    SETCC  _ op         -> mkRU [] (def_W op)
+    PUSH   fmt op         -> mkRUR (use_R fmt op [])
+    POP    fmt op         -> mkRU [] (def_W fmt op)
+    TEST   fmt src dst    -> mkRUR (use_R fmt src $! use_R fmt dst [])
+    CMP    fmt src dst    -> mkRUR (use_R fmt src $! use_R fmt dst [])
+    SETCC  _ op         -> mkRU [] (def_W II8 op)
     JXX    _ _          -> mkRU [] []
     JXX_GBL _ _         -> mkRU [] []
-    JMP     op regs     -> mkRUR (use_R op regs)
-    JMP_TBL op _ _ _    -> mkRUR (use_R op [])
-    CALL (Left _)  params   -> mkRU params (callClobberedRegs platform)
-    CALL (Right reg) params -> mkRU (reg:params) (callClobberedRegs platform)
-    CLTD   _            -> mkRU [eax] [edx]
+    JMP     op regs     -> mkRU (use_R addrFmt op regs) []
+    JMP_TBL op _ _ _    -> mkRU (use_R addrFmt op []) []
+    CALL (Left _)  params   -> mkRU params (map mkFmt $ callClobberedRegs platform)
+    CALL (Right reg) params -> mkRU (mk addrFmt reg:params) (map mkFmt $ callClobberedRegs platform)
+    CLTD   fmt          -> mkRU [mk fmt eax] [mk fmt edx]
     NOP                 -> mkRU [] []
 
-    X87Store    _  dst    -> mkRUR ( use_EA dst [])
+    X87Store _fmt  dst -> mkRUR (use_EA dst [])
 
-    CVTSS2SD   src dst  -> mkRU [src] [dst]
-    CVTSD2SS   src dst  -> mkRU [src] [dst]
-    CVTTSS2SIQ _ src dst -> mkRU (use_R src []) [dst]
-    CVTTSD2SIQ _ src dst -> mkRU (use_R src []) [dst]
-    CVTSI2SS   _ src dst -> mkRU (use_R src []) [dst]
-    CVTSI2SD   _ src dst -> mkRU (use_R src []) [dst]
-    FDIV _     src dst  -> usageRM src dst
-    SQRT _ src dst      -> mkRU (use_R src []) [dst]
+    CVTSS2SD   src dst  -> mkRU [mk FF32 src] [mk FF64 dst]
+    CVTSD2SS   src dst  -> mkRU [mk FF64 src] [mk FF32 dst]
+    CVTTSS2SIQ fmt src dst -> mkRU (use_R FF32 src []) [mk fmt dst]
+    CVTTSD2SIQ fmt src dst -> mkRU (use_R FF64 src []) [mk fmt dst]
+    CVTSI2SS   fmt src dst -> mkRU (use_R fmt src []) [mk FF32 dst]
+    CVTSI2SD   fmt src dst -> mkRU (use_R fmt src []) [mk FF64 dst]
+    FDIV fmt     src dst  -> usageRM fmt src dst
+    SQRT fmt src dst      -> mkRU (use_R fmt src []) [mk fmt dst]
 
-    FETCHGOT reg        -> mkRU [] [reg]
-    FETCHPC  reg        -> mkRU [] [reg]
+    FETCHGOT reg        -> mkRU [] [mk addrFmt reg]
+    FETCHPC  reg        -> mkRU [] [mk addrFmt reg]
 
     COMMENT _           -> noUsage
     LOCATION{}          -> noUsage
     UNWIND{}            -> noUsage
     DELTA   _           -> noUsage
 
-    POPCNT _ src dst -> mkRU (use_R src []) [dst]
-    LZCNT  _ src dst -> mkRU (use_R src []) [dst]
-    TZCNT  _ src dst -> mkRU (use_R src []) [dst]
-    BSF    _ src dst -> mkRU (use_R src []) [dst]
-    BSR    _ src dst -> mkRU (use_R src []) [dst]
+    POPCNT fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
+    LZCNT  fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
+    TZCNT  fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
+    BSF    fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
+    BSR    fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
 
-    PDEP   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
-    PEXT   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
+    PDEP   fmt src mask dst -> mkRU (use_R fmt src $ use_R fmt mask []) [mk fmt dst]
+    PEXT   fmt src mask dst -> mkRU (use_R fmt src $ use_R fmt mask []) [mk fmt dst]
 
-    FMA3 _ _ _ src3 src2 dst -> usageFMA src3 src2 dst
+    FMA3 fmt _ _ src3 src2 dst -> usageFMA fmt src3 src2 dst
 
     -- note: might be a better way to do this
-    PREFETCH _  _ src -> mkRU (use_R src []) []
+    PREFETCH _  fmt src -> mkRU (use_R fmt src []) []
     LOCK i              -> regUsageOfInstr platform i
-    XADD _ src dst      -> usageMM src dst
-    CMPXCHG _ src dst   -> usageRMM src dst (OpReg eax)
-    XCHG _ src dst      -> usageMM src (OpReg dst)
+    XADD fmt src dst      -> usageMM fmt src dst
+    CMPXCHG fmt src dst   -> usageRMM fmt src dst (OpReg eax)
+    XCHG fmt src dst      -> usageMM fmt src (OpReg dst)
     MFENCE -> noUsage
+
+    -- vector instructions
+    VBROADCAST fmt src dst   -> mkRU (use_EA src []) [mk fmt dst]
+    VEXTRACT     fmt _off src dst -> mkRU [mk fmt src] (use_R fmt dst [])
+    INSERTPS     fmt (ImmInt off) src dst
+      -> mkRU ((use_R fmt src []) ++ [mk fmt dst | not doesNotReadDst]) [mk fmt dst]
+        where
+          -- Compute whether the instruction reads the destination register or not.
+          -- Immediate bits: ss_dd_zzzz s = src pos, d = dst pos, z = zeroed components.
+          doesNotReadDst = and [ testBit off i | i <- [0, 1, 2, 3], i /= pos ]
+            -- Check whether the positions in which we are not inserting
+            -- are being zeroed.
+            where pos = ( off `shiftR` 4 ) .&. 0b11
+    INSERTPS fmt _off src dst
+      -> mkRU ((use_R fmt src []) ++ [mk fmt dst]) [mk fmt dst]
+
+    VMOVU        fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
+    MOVU         fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
+    MOVL         fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
+    MOVH         fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
+    MOVDQU       fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
+    VMOVDQU      fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
+
+    VPXOR        fmt s1 s2 dst
+      | s1 == s2, s1 == dst
+      -> mkRU [] [mk fmt dst]
+      | otherwise
+      -> mkRU [mk fmt s1, mk fmt s2] [mk fmt dst]
+
+    VADD         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
+    VSUB         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
+    VMUL         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
+    VDIV         fmt s1 s2 dst -> mkRU ((use_R fmt s1 []) ++ [mk fmt s2]) [mk fmt dst]
+
+    VPSHUFD fmt _off src dst
+      -> mkRU (use_R fmt src []) [mk fmt dst]
+    PSHUFD fmt _off src dst
+      -> mkRU (use_R fmt src []) [mk fmt dst]
+    SHUFPD fmt _off src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    SHUFPS fmt _off src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    VSHUFPD fmt _off src1 src2 dst
+      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+    VSHUFPS fmt _off src1 src2 dst
+      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+
+    PSLLDQ fmt off dst -> mkRU (use_R fmt off []) [mk fmt dst]
+
+    MOVHLPS    fmt src dst
+      -> mkRU [mk fmt src] [mk fmt dst]
+    PUNPCKLQDQ fmt src dst
+      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     _other              -> panic "regUsage: unrecognised instr"
  where
@@ -480,84 +515,104 @@ regUsageOfInstr platform instr
     -- are read.
 
     -- 2 operand form; first operand Read; second Written
-    usageRW :: Operand -> Operand -> RegUsage
-    usageRW op (OpReg reg)      = mkRU (use_R op []) [reg]
-    usageRW op (OpAddr ea)      = mkRUR (use_R op $! use_EA ea [])
-    usageRW _ _                 = panic "X86.RegInfo.usageRW: no match"
+    usageRW :: HasDebugCallStack => Format -> Operand -> Operand -> RegUsage
+    usageRW fmt op (OpReg reg)      = mkRU (use_R fmt op []) [mk fmt reg]
+    usageRW fmt op (OpAddr ea)      = mkRUR (use_R fmt op $! use_EA ea [])
+    usageRW _ _ _                   = panic "X86.RegInfo.usageRW: no match"
 
     -- 2 operand form; first operand Read; second Modified
-    usageRM :: Operand -> Operand -> RegUsage
-    usageRM op (OpReg reg)      = mkRU (use_R op [reg]) [reg]
-    usageRM op (OpAddr ea)      = mkRUR (use_R op $! use_EA ea [])
-    usageRM _ _                 = panic "X86.RegInfo.usageRM: no match"
+    usageRM :: HasDebugCallStack => Format -> Operand -> Operand -> RegUsage
+    usageRM fmt op (OpReg reg)      = mkRU (use_R fmt op [mk fmt reg]) [mk fmt reg]
+    usageRM fmt op (OpAddr ea)      = mkRUR (use_R fmt op $! use_EA ea [])
+    usageRM _ _ _                   = panic "X86.RegInfo.usageRM: no match"
 
     -- 2 operand form; first operand Modified; second Modified
-    usageMM :: Operand -> Operand -> RegUsage
-    usageMM (OpReg src) (OpReg dst) = mkRU [src, dst] [src, dst]
-    usageMM (OpReg src) (OpAddr ea) = mkRU (use_EA ea [src]) [src]
-    usageMM (OpAddr ea) (OpReg dst) = mkRU (use_EA ea [dst]) [dst]
-    usageMM _ _                     = panic "X86.RegInfo.usageMM: no match"
+    usageMM :: HasDebugCallStack => Format -> Operand -> Operand -> RegUsage
+    usageMM fmt (OpReg src) (OpReg dst) = mkRU [mk fmt src, mk fmt dst] [mk fmt src, mk fmt dst]
+    usageMM fmt (OpReg src) (OpAddr ea) = mkRU (use_EA ea [mk fmt src]) [mk fmt src]
+    usageMM fmt (OpAddr ea) (OpReg dst) = mkRU (use_EA ea [mk fmt dst]) [mk fmt dst]
+    usageMM _ _ _                       = panic "X86.RegInfo.usageMM: no match"
 
     -- 3 operand form; first operand Read; second Modified; third Modified
-    usageRMM :: Operand -> Operand -> Operand -> RegUsage
-    usageRMM (OpReg src) (OpReg dst) (OpReg reg) = mkRU [src, dst, reg] [dst, reg]
-    usageRMM (OpReg src) (OpAddr ea) (OpReg reg) = mkRU (use_EA ea [src, reg]) [reg]
-    usageRMM _ _ _                               = panic "X86.RegInfo.usageRMM: no match"
+    usageRMM :: HasDebugCallStack => Format -> Operand -> Operand -> Operand -> RegUsage
+    usageRMM fmt (OpReg src) (OpReg dst) (OpReg reg) = mkRU [mk fmt src, mk fmt dst, mk fmt reg] [mk fmt dst, mk fmt reg]
+    usageRMM fmt (OpReg src) (OpAddr ea) (OpReg reg) = mkRU (use_EA ea [mk fmt src, mk fmt reg]) [mk fmt reg]
+    usageRMM _ _ _ _                                 = panic "X86.RegInfo.usageRMM: no match"
 
     -- 3 operand form of FMA instructions.
-    usageFMA :: Operand -> Reg -> Reg -> RegUsage
-    usageFMA (OpReg src1) src2 dst
-      = mkRU [src1, src2, dst] [dst]
-    usageFMA (OpAddr ea1) src2 dst
-      = mkRU (use_EA ea1 [src2, dst]) [dst]
-    usageFMA _ _ _
+    usageFMA :: HasDebugCallStack => Format -> Operand -> Reg -> Reg -> RegUsage
+    usageFMA fmt (OpReg src1) src2 dst =
+      mkRU [mk fmt src1, mk fmt src2, mk fmt dst] [mk fmt dst]
+    usageFMA fmt (OpAddr ea1) src2 dst
+      = mkRU (use_EA ea1 [mk fmt src2, mk fmt  dst]) [mk fmt dst]
+    usageFMA _ _ _ _
       = panic "X86.RegInfo.usageFMA: no match"
 
     -- 1 operand form; operand Modified
-    usageM :: Operand -> RegUsage
-    usageM (OpReg reg)          = mkRU [reg] [reg]
-    usageM (OpAddr ea)          = mkRUR (use_EA ea [])
-    usageM _                    = panic "X86.RegInfo.usageM: no match"
+    usageM :: HasDebugCallStack => Format -> Operand -> RegUsage
+    usageM fmt (OpReg reg) =
+      let r' = mk fmt reg
+      in mkRU [r'] [r']
+    usageM _ (OpAddr ea) = mkRUR (use_EA ea [])
+    usageM _ _ = panic "X86.RegInfo.usageM: no match"
 
     -- Registers defd when an operand is written.
-    def_W (OpReg reg)           = [reg]
-    def_W (OpAddr _ )           = []
-    def_W _                     = panic "X86.RegInfo.def_W: no match"
+    def_W fmt (OpReg reg)         = [mk fmt reg]
+    def_W _   (OpAddr _ )         = []
+    def_W _   _                   = panic "X86.RegInfo.def_W: no match"
 
     -- Registers used when an operand is read.
-    use_R (OpReg reg)  tl = reg : tl
-    use_R (OpImm _)    tl = tl
-    use_R (OpAddr ea)  tl = use_EA ea tl
+    use_R :: HasDebugCallStack => Format -> Operand -> [RegWithFormat] -> [RegWithFormat]
+    use_R fmt (OpReg reg)  tl = mk fmt reg : tl
+    use_R _   (OpImm _)    tl = tl
+    use_R _   (OpAddr ea)  tl = use_EA ea tl
 
     -- Registers used to compute an effective address.
     use_EA (ImmAddr _ _) tl = tl
     use_EA (AddrBaseIndex base index _) tl =
         use_base base $! use_index index tl
-        where use_base (EABaseReg r)  tl = r : tl
+        where use_base (EABaseReg r)  tl = mk addrFmt r : tl
               use_base _              tl = tl
               use_index EAIndexNone   tl = tl
-              use_index (EAIndex i _) tl = i : tl
+              use_index (EAIndex i _) tl = mk addrFmt i : tl
 
-    mkRUR src = src' `seq` RU src' []
-        where src' = filter (interesting platform) src
+    mkRUR :: [RegWithFormat] -> RegUsage
+    mkRUR src = mkRU src []
 
+    mkRU :: [RegWithFormat] -> [RegWithFormat] -> RegUsage
     mkRU src dst = src' `seq` dst' `seq` RU src' dst'
-        where src' = filter (interesting platform) src
-              dst' = filter (interesting platform) dst
+        where src' = filter (interesting platform . regWithFormat_reg) src
+              dst' = filter (interesting platform . regWithFormat_reg) dst
+
+    addrFmt = archWordFormat (target32Bit platform)
+    mk :: Format -> Reg -> RegWithFormat
+    mk fmt r = RegWithFormat r fmt
+
+    mkFmt :: Reg -> RegWithFormat
+    mkFmt r = RegWithFormat r $ case targetClassOfReg platform r of
+      RcInteger -> addrFmt
+      RcFloatOrVector -> FF64
 
 -- | Is this register interesting for the register allocator?
 interesting :: Platform -> Reg -> Bool
 interesting _        (RegVirtual _)              = True
 interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
 
+movdOutFormat :: Format -> Format
+movdOutFormat format = case format of
+  II32 -> FF32
+  II64 -> FF64
+  FF32 -> II32
+  FF64 -> II64
+  _    -> pprPanic "X86: improper format for movd/movq" (ppr format)
 
 
 -- | Applies the supplied function to all registers in instructions.
 -- Typically used to change virtual registers to real registers.
-patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
-patchRegsOfInstr instr env
- = case instr of
-    MOV  fmt src dst     -> patch2 (MOV  fmt) src dst
+patchRegsOfInstr :: HasDebugCallStack => Platform -> Instr -> (Reg -> Reg) -> Instr
+patchRegsOfInstr platform instr env
+  = case instr of
+    MOV fmt src dst      -> MOV fmt (patchOp src) (patchOp dst)
     MOVD fmt src dst     -> patch2 (MOVD fmt) src dst
     CMOV cc fmt src dst  -> CMOV cc fmt (patchOp src) (env dst)
     MOVZxL fmt src dst   -> patch2 (MOVZxL fmt) src dst
@@ -635,11 +690,55 @@ patchRegsOfInstr instr env
 
     PREFETCH lvl format src -> PREFETCH lvl format (patchOp src)
 
-    LOCK i               -> LOCK (patchRegsOfInstr i env)
+    LOCK i               -> LOCK (patchRegsOfInstr platform i env)
     XADD fmt src dst     -> patch2 (XADD fmt) src dst
     CMPXCHG fmt src dst  -> patch2 (CMPXCHG fmt) src dst
     XCHG fmt src dst     -> XCHG fmt (patchOp src) (env dst)
     MFENCE               -> instr
+
+    -- vector instructions
+    VBROADCAST   fmt src dst   -> VBROADCAST fmt (lookupAddr src) (env dst)
+    VEXTRACT     fmt off src dst
+      -> VEXTRACT fmt off (env src) (patchOp dst)
+    INSERTPS    fmt off src dst
+      -> INSERTPS fmt off (patchOp src) (env dst)
+
+    VMOVU      fmt src dst   -> VMOVU fmt (patchOp src) (patchOp dst)
+    MOVU       fmt src dst   -> MOVU  fmt (patchOp src) (patchOp dst)
+    MOVL       fmt src dst   -> MOVL  fmt (patchOp src) (patchOp dst)
+    MOVH       fmt src dst   -> MOVH  fmt (patchOp src) (patchOp dst)
+    MOVDQU     fmt src dst   -> MOVDQU  fmt (patchOp src) (patchOp dst)
+    VMOVDQU    fmt src dst   -> VMOVDQU fmt (patchOp src) (patchOp dst)
+
+    VPXOR      fmt s1 s2 dst -> VPXOR fmt (env s1) (env s2) (env dst)
+
+    VADD       fmt s1 s2 dst -> VADD fmt (patchOp s1) (env s2) (env dst)
+    VSUB       fmt s1 s2 dst -> VSUB fmt (patchOp s1) (env s2) (env dst)
+    VMUL       fmt s1 s2 dst -> VMUL fmt (patchOp s1) (env s2) (env dst)
+    VDIV       fmt s1 s2 dst -> VDIV fmt (patchOp s1) (env s2) (env dst)
+
+    VPSHUFD      fmt off src dst
+      -> VPSHUFD fmt off (patchOp src) (env dst)
+    PSHUFD       fmt off src dst
+      -> PSHUFD  fmt off (patchOp src) (env dst)
+    SHUFPS      fmt off src dst
+      -> SHUFPS fmt off (patchOp src) (env dst)
+    SHUFPD      fmt off src dst
+      -> SHUFPD fmt off (patchOp src) (env dst)
+    VSHUFPS      fmt off src1 src2 dst
+      -> VSHUFPS fmt off (patchOp src1) (env src2) (env dst)
+    VSHUFPD      fmt off src1 src2 dst
+      -> VSHUFPD fmt off (patchOp src1) (env src2) (env dst)
+
+    PSLLDQ       fmt off dst
+      -> PSLLDQ  fmt (patchOp off) (env dst)
+    PSRLDQ       fmt off dst
+      -> PSRLDQ  fmt (patchOp off) (env dst)
+
+    MOVHLPS    fmt src dst
+      -> MOVHLPS fmt (env src) (env dst)
+    PUNPCKLQDQ fmt src dst
+      -> PUNPCKLQDQ fmt (patchOp src) (env dst)
 
     _other              -> panic "patchRegs: unrecognised instr"
 
@@ -723,41 +822,108 @@ patchJumpInstr insn patchF
 -- -----------------------------------------------------------------------------
 -- | Make a spill instruction.
 mkSpillInstr
-    :: NCGConfig
-    -> Reg      -- register to spill
-    -> Int      -- current stack delta
-    -> Int      -- spill slot to use
+    :: HasDebugCallStack
+    => NCGConfig
+    -> RegWithFormat -- register to spill
+    -> Int       -- current stack delta
+    -> Int       -- spill slot to use
     -> [Instr]
 
-mkSpillInstr config reg delta slot
-  = let off     = spillSlotToOffset platform slot - delta
-    in
-    case targetClassOfReg platform reg of
-           RcInteger   -> [MOV (archWordFormat is32Bit)
-                                   (OpReg reg) (OpAddr (spRel platform off))]
-           RcDouble    -> [MOV FF64 (OpReg reg) (OpAddr (spRel platform off))]
-           _         -> panic "X86.mkSpillInstr: no match"
-    where platform = ncgPlatform config
-          is32Bit = target32Bit platform
+mkSpillInstr config (RegWithFormat reg fmt) delta slot =
+  [ movInstr config fmt' (OpReg reg) (OpAddr (spRel platform off)) ]
+  where
+    fmt'
+      | isVecFormat fmt
+      = fmt
+      | otherwise
+      = scalarMoveFormat platform fmt
+      -- Spill the platform word size, at a minimum
+    platform = ncgPlatform config
+    off = spillSlotToOffset platform slot - delta
 
 -- | Make a spill reload instruction.
 mkLoadInstr
-    :: NCGConfig
-    -> Reg      -- register to load
+    :: HasDebugCallStack
+    => NCGConfig
+    -> RegWithFormat      -- register to load
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> [Instr]
 
-mkLoadInstr config reg delta slot
-  = let off     = spillSlotToOffset platform slot - delta
-    in
-        case targetClassOfReg platform reg of
-              RcInteger -> ([MOV (archWordFormat is32Bit)
-                                 (OpAddr (spRel platform off)) (OpReg reg)])
-              RcDouble  -> ([MOV FF64 (OpAddr (spRel platform off)) (OpReg reg)])
-              _         -> panic "X86.mkLoadInstr"
-    where platform = ncgPlatform config
-          is32Bit = target32Bit platform
+mkLoadInstr config (RegWithFormat reg fmt) delta slot =
+  [ movInstr config fmt' (OpAddr (spRel platform off)) (OpReg reg) ]
+  where
+    fmt'
+      | isVecFormat fmt
+      = fmt
+      | otherwise
+      = scalarMoveFormat platform fmt
+        -- Load the platform word size, at a minimum
+    platform = ncgPlatform config
+    off = spillSlotToOffset platform slot - delta
+
+-- | A move instruction for moving the entire contents of an operand
+-- at the given 'Format'.
+movInstr :: NCGConfig -> Format -> (Operand -> Operand -> Instr)
+movInstr config fmt =
+  case fmt of
+    VecFormat _ sFmt ->
+      case formatToWidth fmt of
+        W512 ->
+          if avx512f
+          then avx_move sFmt
+          else sorry "512-bit wide vectors require -mavx512f"
+        W256 ->
+          if avx2
+          then avx_move sFmt
+          else sorry "256-bit wide vectors require -mavx2"
+        W128 ->
+          if avx
+            -- Prefer AVX instructions over SSE when available
+            -- (usually results in better performance).
+          then avx_move sFmt
+          else sse_move sFmt
+        w -> sorry $ "Unhandled SIMD vector width: " ++ show w ++ " bits"
+    _ -> MOV fmt
+  where
+
+    assertCompatibleRegs :: ( Operand -> Operand -> Instr ) -> Operand -> Operand -> Instr
+    assertCompatibleRegs f
+      | debugIsOn
+      = \ op1 op2 ->
+          if | OpReg r1 <- op1
+             , OpReg r2 <- op2
+             , targetClassOfReg plat r1 /= targetClassOfReg plat r2
+             -> assertPpr False
+                  ( vcat [ text "movInstr: move between incompatible registers"
+                         , text "fmt:" <+> ppr fmt
+                         , text "r1:" <+> ppr r1
+                         , text "r2:" <+> ppr r2 ]
+                  ) f op1 op2
+             | otherwise
+             -> f op1 op2
+      | otherwise
+      = f
+
+    plat    = ncgPlatform config
+    avx     = ncgAvxEnabled config
+    avx2    = ncgAvx2Enabled config
+    avx512f = ncgAvx512fEnabled config
+    avx_move sFmt =
+      if isFloatScalarFormat sFmt
+      then assertCompatibleRegs $
+           VMOVU   fmt
+      else VMOVDQU fmt
+    sse_move sFmt =
+      if isFloatScalarFormat sFmt
+      then assertCompatibleRegs $
+           MOVU   fmt
+      else MOVDQU fmt
+    -- NB: we are using {V}MOVU and not {V}MOVA, because we have no guarantees
+    -- about the stack being sufficiently aligned (even for even numbered stack slots).
+    --
+    -- (Ben Gamari told me that using MOVA instead of MOVU does not make a
+    -- difference in practice when moving between registers.)
 
 spillSlotSize :: Platform -> Int
 spillSlotSize platform
@@ -809,36 +975,85 @@ isMetaInstr instr
 
 -- | Make a reg-reg move instruction.
 mkRegRegMoveInstr
-    :: Platform
+    :: HasDebugCallStack
+    => NCGConfig
+    -> Format
     -> Reg
     -> Reg
     -> Instr
+mkRegRegMoveInstr config fmt src dst =
+  movInstr config fmt' (OpReg src) (OpReg dst)
+    -- Move the platform word size, at a minimum.
+    --
+    -- This ensures the upper part of the register is properly cleared
+    -- and avoids partial register stalls.
+    --
+    -- See also the 'ArithInt8' and 'ArithWord8' tests,
+    -- which fail without this logic.
+  where
+    platform = ncgPlatform config
+    fmt'
+      | isVecFormat fmt
+      = fmt
+      | otherwise
+      = scalarMoveFormat platform fmt
 
-mkRegRegMoveInstr platform src dst
- = case targetClassOfReg platform src of
-        RcInteger -> case platformArch platform of
-                     ArchX86    -> MOV II32 (OpReg src) (OpReg dst)
-                     ArchX86_64 -> MOV II64 (OpReg src) (OpReg dst)
-                     _          -> panic "X86.mkRegRegMoveInstr: Bad arch"
-        RcDouble    ->  MOV FF64 (OpReg src) (OpReg dst)
-        -- this code is the lie we tell ourselves because both float and double
-        -- use the same register class.on x86_64 and x86 32bit with SSE2,
-        -- more plainly, both use the XMM registers
-        _     -> panic "X86.RegInfo.mkRegRegMoveInstr: no match"
+scalarMoveFormat :: Platform -> Format -> Format
+scalarMoveFormat platform fmt
+  | isFloatFormat fmt
+  = FF64
+  | II64 <- fmt
+  = II64
+  | otherwise
+  = archWordFormat (target32Bit platform)
 
 -- | Check whether an instruction represents a reg-reg move.
 --      The register allocator attempts to eliminate reg->reg moves whenever it can,
 --      by assigning the src and dest temporaries to the same real register.
 --
 takeRegRegMoveInstr
-        :: Instr
+        :: Platform
+        -> Instr
         -> Maybe (Reg,Reg)
 
-takeRegRegMoveInstr (MOV _ (OpReg r1) (OpReg r2))
-        = Just (r1,r2)
+takeRegRegMoveInstr platform = \case
+  MOV fmt (OpReg r1) (OpReg r2)
+    -- When used with vector registers, MOV only moves the lower part,
+    -- so it is not a real move. For example, MOVSS/MOVSD between xmm registers
+    -- preserves the upper half, and MOVQ between xmm registers zeroes the upper half.
+    | not $ isVecFormat fmt
+    -- Don't eliminate a move between e.g. RAX and XMM:
+    -- even though we might be using XMM to store a scalar integer value,
+    -- some instructions only support XMM registers.
+    , targetClassOfReg platform r1 == targetClassOfReg platform r2
+    -> Just (r1, r2)
+  MOVD {}
+    -- MOVD moves between xmm registers and general-purpose registers,
+    -- and we don't want to eliminate those moves (as noted for MOV).
+    -> Nothing
 
-takeRegRegMoveInstr _  = Nothing
+  -- SSE2/AVX move instructions always move the full register.
+  MOVU _ (OpReg r1) (OpReg r2)
+    -> Just (r1, r2)
+  VMOVU _ (OpReg r1) (OpReg r2)
+    -> Just (r1, r2)
+  MOVDQU _ (OpReg r1) (OpReg r2)
+    -> Just (r1, r2)
+  VMOVDQU _ (OpReg r1) (OpReg r2)
+    -> Just (r1, r2)
 
+  -- TODO: perhaps we can eliminate MOVZxL in certain situations?
+  MOVZxL {} -> Nothing
+  MOVSxL {} -> Nothing
+
+  -- MOVL, MOVH and MOVHLPS preserve some part of the destination register,
+  -- so are not simple moves.
+  MOVL {} -> Nothing
+  MOVH {} -> Nothing
+  MOVHLPS {} -> Nothing
+
+  -- Other instructions are not moves.
+  _ -> Nothing
 
 -- | Make an unconditional branch instruction.
 mkJumpInstr
@@ -917,7 +1132,7 @@ mkStackAllocInstr platform amount
         case platformArch platform of
             ArchX86_64 | needs_probe_call platform amount ->
                            [ MOV II64 (OpImm (ImmInt amount)) (OpReg rax)
-                           , CALL (Left $ strImmLit (fsLit "___chkstk_ms")) [rax]
+                           , CALL (Left $ strImmLit (fsLit "___chkstk_ms")) [RegWithFormat rax II64]
                            , SUB II64 (OpReg rax) (OpReg rsp)
                            ]
                        | otherwise ->

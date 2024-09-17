@@ -29,16 +29,17 @@ import GHC.Utils.Panic
 import GHC.Utils.Monad (concatMapM)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
 
 import GHC.Utils.Outputable
+import GHC.CmmToAsm.Format
+import GHC.Types.Unique.Set
 
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --
 joinToTargets
         :: (FR freeRegs, Instruction instr)
-        => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
+        => BlockMap (UniqSet RegWithFormat) -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
         -> BlockId                      -- ^ id of the current block
@@ -62,7 +63,7 @@ joinToTargets block_live id instr
 -----
 joinToTargets'
         :: (FR freeRegs, Instruction instr)
-        => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
+        => BlockMap (UniqSet RegWithFormat) -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
         -> [NatBasicBlock instr]        -- ^ acc blocks of fixup code.
@@ -106,7 +107,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
          Nothing
           -> joinToTargets_first
                         block_live new_blocks block_id instr dest dests
-                        block_assig adjusted_assig to_free
+                        block_assig adjusted_assig $ map realReg to_free
 
          Just (_, dest_assig)
           -> joinToTargets_again
@@ -116,7 +117,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 -- this is the first time we jumped to this block.
 joinToTargets_first :: (FR freeRegs, Instruction instr)
-                    => BlockMap RegSet
+                    => BlockMap (UniqSet RegWithFormat)
                     -> [NatBasicBlock instr]
                     -> BlockId
                     -> instr
@@ -145,7 +146,7 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 
 -- we've jumped to this block before
 joinToTargets_again :: (Instruction instr, FR freeRegs)
-                    => BlockMap RegSet
+                    => BlockMap (UniqSet RegWithFormat)
                     -> [NatBasicBlock instr]
                     -> BlockId
                     -> instr
@@ -327,15 +328,15 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --      require a fixup.
 --
 handleComponent delta instr
-        (CyclicSCC ((DigraphNode vreg (InReg sreg) ((InReg dreg: _))) : rest))
+        (CyclicSCC ((DigraphNode vreg (InReg (RealRegUsage sreg scls)) ((InReg (RealRegUsage dreg dcls): _))) : rest))
         -- dest list may have more than one element, if the reg is also InMem.
  = do
         -- spill the source into its slot
         (instrSpill, slot)
-                        <- spillR (RegReal sreg) vreg
+                        <- spillR (RegWithFormat (RegReal sreg) scls) vreg
 
         -- reload into destination reg
-        instrLoad       <- loadR (RegReal dreg) slot
+        instrLoad       <- loadR (RegWithFormat (RegReal dreg) dcls) slot
 
         remainingFixUps <- mapM (handleComponent delta instr)
                                 (stronglyConnCompFromEdgedVerticesOrdR rest)
@@ -360,18 +361,16 @@ makeMove
 
 makeMove delta vreg src dst
  = do config <- getConfig
-      let platform = ncgPlatform config
-
       case (src, dst) of
-          (InReg s, InReg d) ->
+          (InReg (RealRegUsage s _), InReg (RealRegUsage d fmt)) ->
               do recordSpill (SpillJoinRR vreg)
-                 return $ [mkRegRegMoveInstr platform (RegReal s) (RegReal d)]
-          (InMem s, InReg d) ->
+                 return $ [mkRegRegMoveInstr config fmt (RegReal s) (RegReal d)]
+          (InMem s, InReg (RealRegUsage d cls)) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkLoadInstr config (RegReal d) delta s
-          (InReg s, InMem d) ->
+                 return $ mkLoadInstr config (RegWithFormat (RegReal d) cls) delta s
+          (InReg (RealRegUsage s cls), InMem d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkSpillInstr config (RegReal s) delta d
+                 return $ mkSpillInstr config (RegWithFormat (RegReal s) cls) delta d
           _ ->
               -- we don't handle memory to memory moves.
               -- they shouldn't happen because we don't share

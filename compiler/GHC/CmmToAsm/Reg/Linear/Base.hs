@@ -11,6 +11,7 @@ module GHC.CmmToAsm.Reg.Linear.Base (
 
         Loc(..),
         regsOfLoc,
+        RealRegUsage(..),
 
         -- for stats
         SpillReason(..),
@@ -36,6 +37,9 @@ import GHC.Types.Unique.DSM
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Reg.Utils
+import GHC.CmmToAsm.Format
+
+import Data.Function ( on )
 
 data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 
@@ -76,8 +80,8 @@ updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
     combWithExisting old_reg _ = Just $ old_reg
 
     fromLoc :: Loc -> Maybe RealReg
-    fromLoc (InReg rr) = Just rr
-    fromLoc (InBoth rr _) = Just rr
+    fromLoc (InReg rr) = Just $ realReg rr
+    fromLoc (InBoth rr _) = Just $ realReg rr
     fromLoc _ = Nothing
 
 
@@ -94,23 +98,41 @@ updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
 --
 data Loc
         -- | vreg is in a register
-        = InReg   !RealReg
+        = InReg   {-# UNPACK #-} !RealRegUsage
 
-        -- | vreg is held in a stack slot
+        -- | vreg is held in stack slots
         | InMem   {-# UNPACK #-}  !StackSlot
 
 
-        -- | vreg is held in both a register and a stack slot
-        | InBoth   !RealReg
+        -- | vreg is held in both a register and stack slots
+        | InBoth   {-# UNPACK #-} !RealRegUsage
                    {-# UNPACK #-} !StackSlot
-        deriving (Eq, Show, Ord)
+        deriving (Eq, Ord, Show)
 
 instance Outputable Loc where
         ppr l = text (show l)
 
+-- | A 'RealReg', together with the specific 'Format' it is used at.
+data RealRegUsage
+  = RealRegUsage
+    { realReg :: !RealReg
+    , realRegFormat :: !Format
+    } deriving Show
+
+instance Outputable RealRegUsage where
+  ppr (RealRegUsage r fmt) = ppr r <> dcolon <+> ppr fmt
+
+-- NB: these instances only compare the underlying 'RealReg', as that is what
+-- is important for register allocation.
+--
+-- (It would nonetheless be a good idea to remove these instances.)
+instance Eq RealRegUsage where
+  (==) = (==) `on` realReg
+instance Ord RealRegUsage where
+  compare = compare `on` realReg
 
 -- | Get the reg numbers stored in this Loc.
-regsOfLoc :: Loc -> [RealReg]
+regsOfLoc :: Loc -> [RealRegUsage]
 regsOfLoc (InReg r)    = [r]
 regsOfLoc (InBoth r _) = [r]
 regsOfLoc (InMem _)    = []

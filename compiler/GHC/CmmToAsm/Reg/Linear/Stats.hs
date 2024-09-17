@@ -18,6 +18,7 @@ import GHC.Types.Unique.FM
 
 import GHC.Utils.Outputable
 import GHC.Utils.Monad.State.Strict
+import GHC.Platform (Platform)
 
 -- | Build a map of how many times each reg was alloced, clobbered, loaded etc.
 binSpillReasons
@@ -38,9 +39,10 @@ binSpillReasons reasons
 -- | Count reg-reg moves remaining in this code.
 countRegRegMovesNat
         :: Instruction instr
-        => NatCmmDecl statics instr -> Int
+        => Platform
+        -> NatCmmDecl statics instr -> Int
 
-countRegRegMovesNat cmm
+countRegRegMovesNat platform cmm
         = execState (mapGenBlockTopM countBlock cmm) 0
  where
         countBlock b@(BasicBlock _ instrs)
@@ -48,7 +50,7 @@ countRegRegMovesNat cmm
                 return  b
 
         countInstr instr
-                | Just _        <- takeRegRegMoveInstr instr
+                | Just _        <- takeRegRegMoveInstr platform instr
                 = do    modify (+ 1)
                         return instr
 
@@ -59,9 +61,9 @@ countRegRegMovesNat cmm
 -- | Pretty print some RegAllocStats
 pprStats
         :: Instruction instr
-        => [NatCmmDecl statics instr] -> [RegAllocStats] -> SDoc
+        => Platform -> [NatCmmDecl statics instr] -> [RegAllocStats] -> SDoc
 
-pprStats code statss
+pprStats platform code statss
  = let  -- sum up all the instrs inserted by the spiller
         -- See Note [UniqFM and the register allocator]
         spills :: UniqFM Unique [Int]
@@ -75,7 +77,7 @@ pprStats code statss
                         -- See Note [Unique Determinism and code generation]
 
         -- count how many reg-reg-moves remain in the code
-        moves           = sum $ map countRegRegMovesNat code
+        moves           = sum $ map (countRegRegMovesNat platform) code
 
         pprSpill (reg, spills)
                 = parens $ (hcat $ punctuate (text ", ")  (doubleQuotes (ppr reg) : map ppr spills))

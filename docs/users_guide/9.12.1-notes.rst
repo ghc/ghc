@@ -96,6 +96,12 @@ Compiler
 
 - :ghc-flag:`-Wderiving-typeable` has been added to :ghc-flag:`-Wall`.
 
+- SIMD support has been added to the X86 native code generator.
+  For the time being, only 128 bit wide vectors are supported, with most
+  floating-point operations implemented, together with a few integer vector
+  operations. Other operations still require the LLVM backend. Contributors
+  welcome!
+
 - i386 Windows support is now completely removed amid massive cleanup
   of legacy code to pave way for Arm64 Windows support (`#24883
   <https://gitlab.haskell.org/ghc/ghc/-/issues/24883>`_). Rest
@@ -152,6 +158,12 @@ Runtime system
   The default is currently ``--read-tix-file=yes`` but will change to ``--read-tix-file=no`` in a future version of GHC.
   For this reason, a warning is emitted if a .tix file is read in implicitly. You can silence this warning by explicitly passing ``--read-tix-file=yes``.
   Details can be found in `GHC proposal 612 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0612-fhpc-accumulation.md>`__.
+
+Cmm
+~~~
+
+- The ``bits128``, ``bits256`` and ``bits512`` types have been removed, in
+  favour of ``vec128``, ``vec256`` and ``vec512``.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~

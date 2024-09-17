@@ -728,9 +728,9 @@ stmt    :: { CmmParse () }
 unwind_regs
         :: { CmmParse [(GlobalReg, Maybe CmmExpr)] }
         : GLOBALREG '=' expr_or_unknown ',' unwind_regs
-                { do e <- $3; rest <- $5; return ((globalRegUseGlobalReg $1, e) : rest) }
+                { do e <- $3; rest <- $5; return ((globalRegUse_reg $1, e) : rest) }
         | GLOBALREG '=' expr_or_unknown
-                { do e <- $3; return [(globalRegUseGlobalReg $1, e)] }
+                { do e <- $3; return [(globalRegUse_reg $1, e)] }
 
 -- | A memory ordering
 mem_ordering :: { CmmParse MemoryOrdering }
@@ -771,13 +771,15 @@ safety  :: { Safety }
         : {- empty -}                   { PlayRisky }
         | STRING                        {% parseSafety $1 }
 
-vols    :: { [GlobalReg] }
+vols    :: { [GlobalRegUse] }
         : '[' ']'                       { [] }
-        | '[' '*' ']'                   {% do platform <- PD.getPlatform
-                                         ; return (realArgRegsCover platform) }
-                                           -- All of them. See comment attached
-                                           -- to realArgRegsCover
-        | '[' globals ']'               { map globalRegUseGlobalReg $2 }
+        | '[' '*' ']'                   {% do platform <- PD.getPlatform;
+                                              return
+                                                [ GlobalRegUse r (globalRegSpillType platform r)
+                                                | r <- realArgRegsCover platform ] }
+                                               -- All of them. See comment attached
+                                               -- to realArgRegsCover
+        | '[' globals ']'               { $2 }
 
 globals :: { [GlobalRegUse] }
         : GLOBALREG                     { [$1] }
@@ -1378,7 +1380,7 @@ mkReturnSimple profile actuals updfr_off =
   where e = entryCode platform (cmmLoadGCWord platform (CmmStackSlot Old updfr_off))
         platform = profilePlatform profile
 
-doRawJump :: CmmParse CmmExpr -> [GlobalReg] -> CmmParse ()
+doRawJump :: CmmParse CmmExpr -> [GlobalRegUse] -> CmmParse ()
 doRawJump expr_code vols = do
   profile <- getProfile
   expr <- expr_code

@@ -240,6 +240,7 @@ finishNativeGen logger config modLoc bufh ngs
 
         -- dump global NCG stats for graph coloring allocator
         let stats = concat (ngs_colorStats ngs)
+            platform = ncgPlatform config
         unless (null stats) $ do
 
           -- build the global register conflict graph
@@ -250,7 +251,7 @@ finishNativeGen logger config modLoc bufh ngs
 
           dump_stats (Color.pprStats stats graphGlobal)
 
-          let platform = ncgPlatform config
+
           putDumpFileMaybe logger
                   Opt_D_dump_asm_conflicts "Register conflict graph"
                   FormatText
@@ -265,7 +266,7 @@ finishNativeGen logger config modLoc bufh ngs
         -- dump global NCG stats for linear allocator
         let linearStats = concat (ngs_linearStats ngs)
         unless (null linearStats) $
-          dump_stats (Linear.pprStats (concat (ngs_natives ngs)) linearStats)
+          dump_stats (Linear.pprStats platform (concat (ngs_natives ngs)) linearStats)
 
         -- write out the imports
         let ctx = ncgAsmContext config
@@ -502,7 +503,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
          if ( ncgRegsGraph config || ncgRegsIterative config )
           then do
                 -- the regs usable for allocation
-                let (alloc_regs :: UniqFM RegClass (UniqSet RealReg))
+                let alloc_regs :: UniqFM RegClass (UniqSet RealReg)
                         = foldr (\r -> plusUFM_C unionUniqSets
                                         $ unitUFM (targetClassOfRealReg platform r) (unitUniqSet r))
                                 emptyUFM

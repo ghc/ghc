@@ -14,7 +14,8 @@ module GHC.CmmToAsm.Reg.Target (
         targetClassOfRealReg,
         targetMkVirtualReg,
         targetRegDotColor,
-        targetClassOfReg
+        targetClassOfReg,
+        mapRegFormatSet,
 )
 
 where
@@ -26,8 +27,10 @@ import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
 
 import GHC.Utils.Outputable
+import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Types.Unique
+import GHC.Types.Unique.Set
 import GHC.Platform
 
 import qualified GHC.CmmToAsm.X86.Regs       as X86
@@ -136,5 +139,8 @@ targetRegDotColor platform
 targetClassOfReg :: Platform -> Reg -> RegClass
 targetClassOfReg platform reg
  = case reg of
-   RegVirtual vr -> classOfVirtualReg vr
+   RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
    RegReal rr -> targetClassOfRealReg platform rr
+
+mapRegFormatSet :: HasDebugCallStack => (Reg -> Reg) -> UniqSet RegWithFormat -> UniqSet RegWithFormat
+mapRegFormatSet f = mapUniqSet (\ ( RegWithFormat r fmt ) -> RegWithFormat ( f r ) fmt)

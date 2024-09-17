@@ -108,7 +108,7 @@ data GenCmmDecl d h g
   = CmmProc     -- A procedure
      h                 -- Extra header such as the info table
      CLabel            -- Entry label
-     [GlobalReg]       -- Registers live on entry. Note that the set of live
+     [GlobalRegUse]    -- Registers live on entry. Note that the set of live
                        -- registers will be correct in generated C-- code, but
                        -- not in hand-written C-- code. However,
                        -- splitAtProcPoints calculates correct liveness

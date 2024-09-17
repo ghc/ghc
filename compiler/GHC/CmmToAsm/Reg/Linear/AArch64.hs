@@ -3,7 +3,7 @@ module GHC.CmmToAsm.Reg.Linear.AArch64 where
 import GHC.Prelude
 
 import GHC.CmmToAsm.AArch64.Regs
-import GHC.Platform.Reg.Class
+import GHC.Platform.Reg.Class.Unified
 import GHC.Platform.Reg
 
 import GHC.Utils.Outputable
@@ -115,10 +115,10 @@ def CC_AArch64_GHC : CallingConv<[
 -}
 
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]
-getFreeRegs cls (FreeRegs g f)
-  | RcFloat   <- cls = [] -- For now we only support double and integer registers, floats will need to be promoted.
-  | RcDouble  <- cls = go 32 f 31
-  | RcInteger <- cls = go  0 g 18
+getFreeRegs cls (FreeRegs g f) =
+  case cls of
+    RcFloatOrVector -> go 32 f 31
+    RcInteger       -> go  0 g 18
     where
         go _   _ i | i < 0 = []
         go off x i | testBit x i = RealRegSingle (off + i) : (go off x $! i - 1)

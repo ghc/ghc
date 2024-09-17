@@ -120,7 +120,7 @@ detRenameCmmGroup dufm group = swap (runState (mapM detRenameCmmDecl group) dufm
       = do
         h' <- detRenameCmmTop h
         lbl' <- detRenameCLabel lbl
-        regs' <- mapM detRenameGlobalReg regs
+        regs' <- mapM detRenameGlobalRegUse regs
         g' <- detRenameCmmGraph g
         return (CmmProc h' lbl' regs' g')
     detRenameCmmDecl (CmmData sec d)
@@ -207,7 +207,7 @@ detRenameCmmGroup dufm group = swap (runState (mapM detRenameCmmDecl group) dufm
         CmmCondBranch <$> detRenameCmmExpr pred <*> detRenameLabel t <*> detRenameLabel f <*> pure likely
       CmmSwitch e sts -> CmmSwitch <$> detRenameCmmExpr e <*> mapSwitchTargetsA detRenameLabel sts
       CmmCall tgt cont regs args retargs retoff ->
-        CmmCall <$> detRenameCmmExpr tgt <*> detRenameMaybe detRenameLabel cont <*> mapM detRenameGlobalReg regs
+        CmmCall <$> detRenameCmmExpr tgt <*> detRenameMaybe detRenameLabel cont <*> mapM detRenameGlobalRegUse regs
                 <*> pure args <*> pure retargs <*> pure retoff
       CmmForeignCall tgt res args succ retargs retoff intrbl ->
         CmmForeignCall <$> detRenameForeignTarget tgt <*> mapM detRenameLocalReg res <*> mapM detRenameCmmExpr args
@@ -248,8 +248,11 @@ detRenameCmmGroup dufm group = swap (runState (mapM detRenameCmmDecl group) dufm
     detRenameLocalReg (LocalReg uq t)
       = LocalReg <$> renameDetUniq uq <*> pure t
 
+    -- Global registers don't need to be renamed.
     detRenameGlobalReg :: GlobalReg -> DetRnM GlobalReg
-    detRenameGlobalReg = pure -- Nothing needs to be renamed here
+    detRenameGlobalReg = pure
+    detRenameGlobalRegUse :: GlobalRegUse -> DetRnM GlobalRegUse
+    detRenameGlobalRegUse = pure
 
     -- todo: We may have to change this to get deterministic objects with ticks.
     detRenameCmmTick :: CmmTickScope -> DetRnM CmmTickScope
