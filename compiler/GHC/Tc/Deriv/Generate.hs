@@ -681,7 +681,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
         untag_Expr [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsVar maxtag_RDR,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
-             (illegal_Expr "succ" occ_nm "tried to take `succ' of last tag in enumeration")
+             (nlHsApp (nlHsVar succError_RDR) (nlHsLit (mkHsString occ_nm)))
              (nlHsApp (nlHsVar tag2con_RDR)
                     (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
                                         nlHsIntLit 1]))
@@ -691,7 +691,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
         untag_Expr [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
-             (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
+             (nlHsApp (nlHsVar predError_RDR) (nlHsLit (mkHsString occ_nm)))
              (nlHsApp (nlHsVar tag2con_RDR)
                       (nlHsApps plus_RDR
                             [ nlHsVarApps intDataCon_RDR [ah_RDR]
@@ -705,7 +705,12 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
                  nlHsApps le_RDR [ nlHsVar a_RDR
                                  , nlHsVar maxtag_RDR]])
              (nlHsVarApps tag2con_RDR [a_RDR])
-             (illegal_toEnum_tag occ_nm maxtag_RDR)
+             (nlHsApps toEnumError_RDR
+                       [ nlHsLit (mkHsString occ_nm)
+                       , nlHsVar a_RDR
+                       , mkLHsTupleExpr [nlHsIntLit 0, nlHsVar maxtag_RDR] noAnn
+                       ])
+
 
     enum_from tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc enumFrom_RDR (noLocA [a_Pat]) $
@@ -2536,32 +2541,6 @@ nested_compose_Expr (e:es)
 -- We generate these to keep the desugarer from complaining that they *might* happen!
 error_Expr :: FastString -> LHsExpr GhcPs
 error_Expr string = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsStringFS string))
-
--- illegal_Expr is used when signalling error conditions in the RHS of a derived
--- method. It is currently only used by Enum.{succ,pred}
-illegal_Expr :: String -> String -> String -> LHsExpr GhcPs
-illegal_Expr meth tp msg =
-   nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString (meth ++ '{':tp ++ "}: " ++ msg)))
-
--- illegal_toEnum_tag is an extended version of illegal_Expr, which also allows you
--- to include the value of a_RDR in the error string.
-illegal_toEnum_tag :: String -> RdrName -> LHsExpr GhcPs
-illegal_toEnum_tag tp maxtag =
-   nlHsApp (nlHsVar error_RDR)
-           (nlHsApp (nlHsApp (nlHsVar append_RDR)
-                       (nlHsLit (mkHsString ("toEnum{" ++ tp ++ "}: tag ("))))
-                    (nlHsApp (nlHsApp (nlHsApp
-                           (nlHsVar showsPrec_RDR)
-                           (nlHsIntLit 0))
-                           (nlHsVar a_RDR))
-                           (nlHsApp (nlHsApp
-                               (nlHsVar append_RDR)
-                               (nlHsLit (mkHsString ") is outside of enumeration's range (0,")))
-                               (nlHsApp (nlHsApp (nlHsApp
-                                        (nlHsVar showsPrec_RDR)
-                                        (nlHsIntLit 0))
-                                        (nlHsVar maxtag))
-                                        (nlHsLit (mkHsString ")"))))))
 
 parenify :: LHsExpr GhcPs -> LHsExpr GhcPs
 parenify e@(L _ (HsVar _ _)) = e

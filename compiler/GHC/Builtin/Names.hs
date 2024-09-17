@@ -751,9 +751,12 @@ left_RDR, right_RDR :: RdrName
 left_RDR                = nameRdrName leftDataConName
 right_RDR               = nameRdrName rightDataConName
 
-fromEnum_RDR, toEnum_RDR :: RdrName
+fromEnum_RDR, toEnum_RDR, toEnumError_RDR, succError_RDR, predError_RDR :: RdrName
 fromEnum_RDR            = varQual_RDR gHC_INTERNAL_ENUM (fsLit "fromEnum")
 toEnum_RDR              = varQual_RDR gHC_INTERNAL_ENUM (fsLit "toEnum")
+toEnumError_RDR         = varQual_RDR gHC_INTERNAL_ENUM (fsLit "toEnumError")
+succError_RDR           = varQual_RDR gHC_INTERNAL_ENUM (fsLit "succError")
+predError_RDR           = varQual_RDR gHC_INTERNAL_ENUM (fsLit "predError")
 
 enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
 enumFrom_RDR            = nameRdrName enumFromName

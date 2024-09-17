@@ -22,14 +22,19 @@
 
 #include "MachDeps.h"
 
-module GHC.Internal.Enum(
-        Bounded(..), Enum(..),
-        boundedEnumFrom, boundedEnumFromThen,
-        toEnumError, fromEnumError, succError, predError,
+module GHC.Internal.Enum
+  ( Bounded(..)
+  , Enum(..)
+  , boundedEnumFrom
+  , boundedEnumFromThen
+  , toEnumError
+  , fromEnumError
+  , succError
+  , predError,
 
-        -- Instances for Bounded and Enum: (), Char, Int
-
-   ) where
+  -- Instances for Bounded and Enum: (), Char, Int
+  )
+where
 
 import GHC.Internal.Base hiding ( many )
 import GHC.Internal.Char
@@ -246,11 +251,11 @@ Alternatives might be
 
 {-# NOINLINE toEnumError #-}
 toEnumError :: (Show a) => String -> Int -> (a,a) -> b
-toEnumError inst_ty i bnds =
+toEnumError inst_ty i (mi,ma) =
     errorWithoutStackTrace $ "Enum.toEnum{" ++ inst_ty ++ "}: tag (" ++
             show i ++
-            ") is outside of bounds " ++
-            show bnds
+            ") is outside of enumeration's range (" ++
+            show mi ++ "," ++ show ma ++ ")"
 
 {-# NOINLINE fromEnumError #-}
 fromEnumError :: (Show a) => String -> a -> b
@@ -263,12 +268,12 @@ fromEnumError inst_ty x =
 {-# NOINLINE succError #-}
 succError :: String -> a
 succError inst_ty =
-    errorWithoutStackTrace $ "Enum.succ{" ++ inst_ty ++ "}: tried to take `succ' of maxBound"
+    errorWithoutStackTrace $ "Enum.succ{" ++ inst_ty ++ "}: tried to take `succ' of last tag in enumeration"
 
 {-# NOINLINE predError #-}
 predError :: String -> a
 predError inst_ty =
-    errorWithoutStackTrace $ "Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of minBound"
+    errorWithoutStackTrace $ "Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of first tag in enumeration"
 
 ------------------------------------------------------------------------
 -- Tuples
