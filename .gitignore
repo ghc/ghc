@@ -63,6 +63,7 @@ _*
 .hadrian_ghci
 .hadrian_ghci_multi/
 .hie-bios
+hadrian/bootstrap/jq-bin
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files

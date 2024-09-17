@@ -1,18 +1,10 @@
 packages: ./
           ../utils/ghc-toolchain/
           ../libraries/ghc-platform/
-          -- Note these are vendored separately from the libraries/Cabal versions
-          -- because we don't want to tie the version of Cabal we build hadrian with
-          -- to the version we distribute with GHC.
-
-          -- These should be removed when there is a released version of Cabal library
-          -- which supports profiled+dynamic way
-          vendored/Cabal/Cabal
-          vendored/Cabal/Cabal-syntax
 
 -- This essentially freezes the build plan for hadrian
 -- It would be wise to keep this up to date with the state set in ci.sh
-index-state: 2024-05-13T15:04:38Z
+index-state: 2024-09-17T22:56:00Z
 
 -- unordered-containers-0.2.20-r1 requires template-haskell < 2.22
 -- ghc-9.10 has template-haskell-2.22.0.0

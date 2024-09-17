@@ -369,7 +369,7 @@ write_inplace_conf pkg_path res_path pd lbi = do
                       prefix = "${pkgroot}/../../../"
               let installedPkgInfo =
 
-                    C.inplaceInstalledPackageInfo (cwd </> pkg_path) (C.makeSymbolicPath build_dir) pd (C.mkAbiHash "inplace") lib lbi clbi
+                    C.inplaceInstalledPackageInfo (C.AbsolutePath $ C.makeSymbolicPath $ cwd </> pkg_path) (C.makeSymbolicPath build_dir) pd (C.mkAbiHash "inplace") lib lbi clbi
 
                   build_dir = "${pkgroot}/../" ++ pkg_path ++ "/build"
                   pkg_name = C.display (C.pkgName (CP.sourcePackageId installedPkgInfo))
