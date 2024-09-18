@@ -1,0 +1,42 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 63, types: 72, coercions: 0, joins: 0/0}
+
+x14
+  = \ a b c ->
+      case a of wild { I# x# ->
+      case c of { I# x#1 -> case b of { I# x#2 -> wild } }
+      }
+
+x13
+  = \ a b c ->
+      case a of wild { I# x# ->
+      case b of { I# x#1 -> case c of { I# y# -> wild } }
+      }
+
+x12 = x14
+
+x11 = x14
+
+x10 = x13
+
+x8 = \ a b -> case b of { I# x# -> a }
+
+x7 = x8
+
+x6
+  = \ a b -> case a of wild { I# x# -> case b of { I# y# -> wild } }
+
+x5 = x6
+
+x4 = x6
+
+x3 = x6
+
+x2 = x6
+
+x1 = x6
+
+
+

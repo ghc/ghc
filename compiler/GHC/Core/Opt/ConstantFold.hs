@@ -3056,6 +3056,11 @@ andFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
     -- (l1 or x) and (l2 or y) ==> (l1 and l2) or (x and l2) or (l1 and y) or (x and y)
     -- increase operation numbers
 
+    -- x and (y or ... or x or ... or z) ==> x
+    (x, is_or_list num_ops -> Just xs)
+      | any (cheapEqExpr x) xs
+      -> Just x
+
     _ -> Nothing
     where
       mkL = Lit . mkNumLiteral platform num_ops
@@ -3078,6 +3083,11 @@ orFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
     -- (l1 and x) or (l2 or y) ==> (l1 and l2 and x) or (l1 and x and y)
     -- (l1 and x) or (l2 and y) ==> (l1 and l2) or (x and l2) or (l1 and y) or (x and y)
     -- increase operation numbers
+
+    -- x or (y and ... and x and ... and z) ==> x
+    (x, is_and_list num_ops -> Just xs)
+      | any (cheapEqExpr x) xs
+      -> Just x
 
     _ -> Nothing
     where
@@ -3117,7 +3127,7 @@ is_op op e = case e of
  App (OpVal op') x | op == op' -> Just x
  _                             -> Nothing
 
-is_add, is_sub, is_mul, is_and, is_or, is_div :: NumOps -> CoreExpr -> Maybe (Arg CoreBndr, Arg CoreBndr)
+is_add, is_sub, is_mul, is_and, is_or, is_div :: NumOps -> CoreExpr -> Maybe (CoreArg, CoreArg)
 is_add num_ops e = is_binop (numAdd num_ops) e
 is_sub num_ops e = is_binop (numSub num_ops) e
 is_mul num_ops e = is_binop (numMul num_ops) e
@@ -3127,6 +3137,25 @@ is_div num_ops e = numDiv num_ops >>= \op -> is_binop op e
 
 is_neg :: NumOps -> CoreExpr -> Maybe (Arg CoreBndr)
 is_neg num_ops e = numNeg num_ops >>= \op -> is_op op e
+
+-- Return a list of operands for a given operation.
+-- E.e. is_and_list (a and ... and z) => [a,...,z] for any nesting of the and
+-- operation
+is_list :: (CoreExpr -> Maybe (CoreArg,CoreArg)) -> CoreExpr -> Maybe [CoreArg]
+is_list f e_org = case f e_org of -- do we have the operator at all?
+  Just (a,b) -> Just (go [a,b])
+  Nothing    -> Nothing
+  where
+    go = \case
+      []     -> []
+      (e:es) -> case f e of
+        -- we can't split any more: add to the result list
+        Nothing    -> e : go es
+        Just (a,b) -> go (a:b:es)
+
+is_and_list, is_or_list :: NumOps -> CoreExpr -> Maybe [CoreArg]
+is_and_list ops = is_list (is_and ops)
+is_or_list  ops = is_list (is_or  ops)
 
 -- match operation with a literal (handles commutativity)
 is_lit_add, is_lit_mul, is_lit_and, is_lit_or :: NumOps -> CoreExpr -> Maybe (Integer, Arg CoreBndr)
