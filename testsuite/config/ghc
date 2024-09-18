@@ -125,6 +125,8 @@ config.way_flags = {
     'ext-interp'   : ['-fexternal-interpreter'],
     'nonmoving'    : [],
     'nonmoving_thr': ['-threaded'],
+    'nonmoving_prof': ['-prof'],
+    'nonmoving_thr_prof': ['-prof', '-threaded'],
     'nonmoving_thr_sanity': ['-threaded', '-debug'],
     'nonmoving_thr_ghc': ['+RTS', '-xn', '-N2', '-RTS', '-threaded'],
     'compacting_gc': [],

@@ -848,15 +848,12 @@ def _collect_stats(name: TestName, opts, metrics, deviation: Optional[int],
     if config.compiler_debugged and is_compiler_stats_test:
         opts.skip = True
 
-    # If there are any residency testing metrics then turn on RESIDENCY_OPTS and
-    # omit nonmoving GC ways, which don't support profiling.
+    # If there are any residency testing metrics then turn on RESIDENCY_OPTS
     if residency_testing_metrics() & metrics:
         if is_compiler_stats_test:
             _extra_hc_opts(name, opts, RESIDENCY_OPTS)
         else:
             _extra_run_opts(name, opts, RESIDENCY_OPTS)
-        # The nonmoving collector does not support -G1
-        _omit_ways(name, opts, [WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
 
     # How to read the result of the performance test
     def read_stats_file(way, metric_name):
@@ -1025,6 +1022,9 @@ def have_dynamic_prof( ) -> bool:
 ''' Were libraries built in the profiled way? '''
 def have_profiling( ) -> bool:
     return config.have_profiling
+
+def have_threaded( ) -> bool:
+    return config.ghc_with_threaded_rts
 
 def in_tree_compiler( ) -> bool:
     return config.in_tree_compiler
