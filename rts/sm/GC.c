@@ -854,6 +854,18 @@ GarbageCollect (struct GcConfig config,
       }
   }
 
+#if defined(PROFILING)
+  // resetStaticObjectForProfiling() must be called before
+  // zeroing below.
+  // It must also be called before nonMovingCollect() as that
+  // swaps out the value of static_flag used as a sentinel
+  // in gct->scavenged_static_objects
+  // Not doing this lead to #25232 and #23958
+
+  // ToDo: fix the gct->scavenged_static_objects below
+  resetStaticObjectForProfiling(&g_retainerTraverseState, gct->scavenged_static_objects);
+#endif
+
   // Mark and sweep the oldest generation.
   // N.B. This can only happen after we've moved
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
@@ -945,14 +957,6 @@ GarbageCollect (struct GcConfig config,
   if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
       checkUnload();
   }
-
-#if defined(PROFILING)
-  // resetStaticObjectForProfiling() must be called before
-  // zeroing below.
-
-  // ToDo: fix the gct->scavenged_static_objects below
-  resetStaticObjectForProfiling(&g_retainerTraverseState, gct->scavenged_static_objects);
-#endif
 
   // Start any pending finalizers.  Must be after
   // updateStableTables() and stableUnlock() (see #4221).
