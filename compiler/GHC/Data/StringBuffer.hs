@@ -9,6 +9,7 @@ Buffers for scanning string input stored in external arrays.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -O2 #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -47,6 +48,7 @@ module GHC.Data.StringBuffer
 
          -- * Parsing integers
         parseUnsignedInteger,
+        findHashOffset,
 
         -- * Checking for bi-directional format characters
         containsBidirectionalFormatChar,
@@ -417,3 +419,15 @@ parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
                '_'  -> go (i + 1) x    -- skip "_" (#14473)
                char -> go (i + 1) (x * radix + toInteger (char_to_int char))
   in go 0 0
+
+-- | Find the offset of the '#' character in the StringBuffer.
+--
+-- Make sure that it contains one before calling this function!
+findHashOffset :: StringBuffer -> Int
+findHashOffset (StringBuffer buf _ cur)
+  = inlinePerformIO $ withForeignPtr buf $ \ptr -> do
+      let
+        go p = peek p >>= \case
+          (0x23 :: Word8) -> pure $! ((p `minusPtr` ptr) - cur)
+          _               -> go (p `plusPtr` 1)
+      go (ptr `plusPtr` cur)

@@ -35,11 +35,10 @@ The primitive numeric types allowed are:
 - ``Word64#``
 - ``Word#``
 
-All types permit any nonnegative Haskell integer lexeme, e.g. ``70``, ``0x2A``,
-``0o1276``, ``0b1010`` (with :extension:`BinaryLiterals`). The signed ``Int``
-types also permit negative integer lexemes. Defining a literal with a value that
-can't fit in its requested type will emit an overflow warning by default, the
-same as boxed numeric literals.
+All types permit any positive and negative Haskell integer lexeme. Defining a
+literal with a value that can't fit in its requested type will emit an overflow
+warning by default, the same as boxed numeric literals (see
+:ghc-flag:`-Woverflowed-literals`).
 
 As with :extension:`MagicHash`, this extension does not bring anything into
 scope, nor change any semantics. The syntax only applies to numeric literals.
