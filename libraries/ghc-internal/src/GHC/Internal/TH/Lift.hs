@@ -350,8 +350,9 @@ instance Lift Bytes where
   lift bytes@Bytes{} = -- See Note [Why FinalPtr]
     [| Bytes
       { bytesPtr = ForeignPtr $(Lib.litE (BytesPrimL bytes)) FinalPtr
-      , bytesOffset = 0
-      , bytesSize = $(lift (bytesSize bytes))
+      -- we cannot use Lift Word here because of #25267 and #25272
+      , bytesOffset = W# 0##
+      , bytesSize = W# $(Lib.litE . WordPrimL . fromIntegral $ bytesSize bytes)
       }
     |]
 -- | @since template-haskell-2.22.1.0

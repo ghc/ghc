@@ -159,6 +159,8 @@ Runtime system
 
 - The `deprecation process of GHC.Pack <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>` has come its term. The module has now been removed from ``base``.
 
+- Fix `Lift ByteArray` instance when using a user overriden `fromInteger` function through `RebindableSyntax`.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 

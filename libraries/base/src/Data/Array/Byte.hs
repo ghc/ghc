@@ -203,7 +203,8 @@ instance Show ByteArray where
 instance Lift ByteArray where
   liftTyped = unsafeCodeCoerce . lift
   lift (ByteArray b) =
-    [| addrToByteArray $(lift len)
+    -- we cannot use Lift Int here because of #25267 and #25272
+    [| addrToByteArray $(pure . LitE . IntPrimL $ fromIntegral len)
                        $(pure . LitE . BytesPrimL $ Bytes ptr 0 (fromIntegral len))
     |]
     where
@@ -221,8 +222,8 @@ instance Lift ByteArray where
       ptr = ForeignPtr (byteArrayContents# pb) (PlainPtr (unsafeCoerce# pb))
 
 {-# NOINLINE addrToByteArray #-}
-addrToByteArray :: Int -> Addr# -> ByteArray
-addrToByteArray (I# len) addr = runST $ ST $
+addrToByteArray :: Int# -> Addr# -> ByteArray
+addrToByteArray len addr = runST $ ST $
   \s -> case newByteArray# len s of
     (# s', mb #) -> case copyAddrToByteArray# addr mb 0# len s' of
       s'' -> case unsafeFreezeByteArray# mb s'' of

@@ -630,3 +630,4 @@ test('T25252',
    req_th,
    req_c],
   compile_and_run, ['-fPIC T25252_c.c'])
+test('T25272', normal, compile, [''])

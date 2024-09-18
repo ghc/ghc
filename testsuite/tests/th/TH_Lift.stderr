@@ -182,7 +182,7 @@ TH_Lift.hs:(93,10)-(99,13): Splicing expression
     Bytes
       {bytesPtr = GHC.Internal.ForeignPtr.ForeignPtr
                     "Hello"# GHC.Internal.ForeignPtr.FinalPtr,
-       bytesOffset = 0, bytesSize = 5}
+       bytesOffset = GHC.Types.W# 0##, bytesSize = GHC.Types.W# 5##}
 TH_Lift.hs:90:10-59: Splicing expression
     examineCode [|| 3 + 4 ||] `bindCode` liftTyped
   ======>
