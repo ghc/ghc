@@ -296,10 +296,9 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
               | platformMisc_libFFI $ platformMisc dflags = "#include \"rts/ghc_ffi.h\"\n"
               | otherwise = ""
 
-        stub_h_file_exists <-
-          if null stub_h_output_w
-          then pure False
-          else do
+        stub_h_file_exists <- case ml_hs_file_ospath location of
+          Nothing -> pure False
+          Just _ -> do
             -- The header path is computed from the module source path, which
             -- does not exist when loading interface core bindings for Template
             -- Haskell.
