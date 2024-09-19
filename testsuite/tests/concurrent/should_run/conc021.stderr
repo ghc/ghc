@@ -1,12 +1,8 @@
-conc021: Exception:
+conc021: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 wurble
 CallStack (from HasCallStack):
   error, called at conc021.hs:9:9 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

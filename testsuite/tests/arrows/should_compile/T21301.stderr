@@ -1,14 +1,10 @@
-T21301: Exception:
+T21301: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.PatternMatchFail:
 
 T21301.hs:(8,7)-(10,6): Non-exhaustive patterns in case
 
-Package: ghc-internal
-Module: GHC.Internal.Control.Exception.Base
-Type: PatternMatchFail
 
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
-    throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:422:30 in ghc-internal:GHC.Internal.Control.Exception.Base
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:422:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 

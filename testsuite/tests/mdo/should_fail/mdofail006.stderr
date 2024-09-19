@@ -1,15 +1,9 @@
-mdofail006: Exception:
+mdofail006: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.FixIOException:
 
 cyclic evaluation in fixIO
 
-Package: ghc-internal
-Module: GHC.Internal.IO.Exception
-Type: FixIOException
-
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
-    throwIO, called at libraries/ghc-internal/src/GHC/Internal/System/IO.hs:426:37 in ghc-internal:GHC.Internal.System.IO
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/System/IO.hs:641:37 in ghc-internal:GHC.Internal.System.IO
 

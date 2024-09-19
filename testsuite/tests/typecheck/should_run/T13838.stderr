@@ -1,4 +1,4 @@
-T13838: Exception:
+T13838: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.TypeError:
 
 T13838.hs:6:1: error: [GHC-83865]
     • Couldn't match expected type: IO t0
@@ -8,14 +8,8 @@ T13838.hs:6:1: error: [GHC-83865]
       When checking the type of the IO action ‘main’
 (deferred type error)
 
-Package: ghc-internal
-Module: GHC.Internal.Control.Exception.Base
-Type: TypeError
-
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
-    throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:423:30 in ghc-internal:GHC.Internal.Control.Exception.Base
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:423:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 

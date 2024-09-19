@@ -1,18 +1,12 @@
-assert: Exception:
+assert: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.AssertionFailed:
 
 Assertion failed
 CallStack (from HasCallStack):
   assert, called at assert.hs:9:11 in main:Main
 
-Package: ghc-internal
-Module: GHC.Internal.IO.Exception
-Type: AssertionFailed
-
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
-    throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:453:5 in ghc-internal:GHC.Internal.IO.Exception
-    assert, called at assert.hs:9:11 in main:Main
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:450:5 in ghc-internal:GHC.Internal.IO.Exception
+  assert, called at assert.hs:9:11 in main:Main
 

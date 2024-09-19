@@ -1,12 +1,8 @@
-ghc-e005-prog: Exception:
+ghc-e005-prog: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 foo
 CallStack (from HasCallStack):
   error, called at ghc-e005.hs:12:10 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
@@ -15,12 +11,12 @@ HasCallStack backtrace:
   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   throwM, called at compiler/GHC/Driver/Monad.hs:167:54 in ghc-9.11-inplace:GHC.Driver.Monad
   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
-  throwM, called at ghc/GHCi/UI/Monad.hs:288:15 in ghc-bin-9.11.20240823-inplace:GHCi.UI.Monad
+  throwM, called at ghc/GHCi/UI/Monad.hs:288:15 in ghc-bin-9.11.20240920-inplace:GHCi.UI.Monad
   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   throwM, called at libraries/haskeline/System/Console/Haskeline/InputT.hs:53:39 in haskeline-0.8.2.1-inplace:System.Console.Haskeline.InputT
-  throwM, called at ghc/GHCi/UI/Monad.hs:215:52 in ghc-bin-9.11.20240823-inplace:GHCi.UI.Monad
+  throwM, called at ghc/GHCi/UI/Monad.hs:215:52 in ghc-bin-9.11.20240920-inplace:GHCi.UI.Monad
 

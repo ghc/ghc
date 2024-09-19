@@ -27,15 +27,11 @@ main = do
     trace "hello, trace" $
       catch (getEnv "__WURBLE__" >> return ()) (\ (e :: SomeException) -> error "hello, error")
 hello, trace
-cgrun025: Exception:
+cgrun025: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 hello, error
 CallStack (from HasCallStack):
   error, called at cgrun025.hs:25:75 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

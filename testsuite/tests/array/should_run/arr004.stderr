@@ -1,7 +1,3 @@
-arr004: Exception:
+arr004: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 (Array.!): undefined array element
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall

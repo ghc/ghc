@@ -1,13 +1,9 @@
-hpc: Exception:
+hpc: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 hash in tix file for module Main (1234567890)
 does not match hash in ./.hpc/Main.mix (2454134535)
 CallStack (from HasCallStack):
   error, called at libraries/hpc/Trace/Hpc/Mix.hs:120:17 in hpc-0.7.0.1-inplace:Trace.Hpc.Mix
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

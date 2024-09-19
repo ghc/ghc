@@ -1,12 +1,8 @@
-ghc-9.11.20240830: Exception:
+ghc: Uncaught exception ghc-9.11-inplace:GHC.Utils.Panic.GhcException:
 
 default output name would overwrite the input file; must specify -o explicitly
 Usage: For basic information, try the `--help' option.
 
-Package: ghc-9.11-inplace
-Module: GHC.Utils.Panic
-Type: GhcException
-
 HasCallStack backtrace:
-  bracket, called at compiler/GHC/Driver/Make.hs:2936:3 in ghc-9.11-inplace:GHC.Driver.Make
+  bracket, called at compiler/GHC/Driver/Make.hs:2953:3 in ghc-9.11-inplace:GHC.Driver.Make
 

@@ -1,7 +1,3 @@
-T7319: Exception:
+T7319: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 test
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall

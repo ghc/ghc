@@ -1,7 +1,3 @@
-conc009: Exception:
+conc009: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 hello
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
