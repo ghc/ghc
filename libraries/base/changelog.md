@@ -31,6 +31,8 @@
       for libraries that define exception-handling combinators like `catch` and
       `onException`, such as `base`, or the `exceptions` package.
   * Move `Lift ByteArray` and `Lift Fixed` instances into `base` from `template-haskell`. See [CLC proposal #287](https://github.com/haskell/core-libraries-committee/issues/287).
+  * Modify the implementation of `Control.Exception.throw` to avoid call-sites being inferred as diverging via precise exception.
+    ([GHC #25066](https://gitlab.haskell.org/ghc/ghc/-/issues/25066), [CLC proposal #290](https://github.com/haskell/core-libraries-committee/issues/290))
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1

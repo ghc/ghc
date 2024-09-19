@@ -40,6 +40,11 @@
 -- be compiled with debugging information (e.g. using GHC\'s @-g@ flag).
 
 
+-- Note [Backtrace mechanisms]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- See module docstring above.
+
+
 module Control.Exception.Backtrace
     ( -- * Backtrace mechanisms
       BacktraceMechanism(..)
