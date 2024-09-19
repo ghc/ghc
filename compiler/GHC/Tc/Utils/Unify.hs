@@ -25,7 +25,7 @@ module GHC.Tc.Utils.Unify (
   -- Various unifications
   unifyType, unifyKind, unifyInvisibleType, unifyExpectedType,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
-  swapOverTyVars, touchabilityAndShapeTest, lhsPriority,
+  swapOverTyVars, touchabilityAndShapeTest, checkTopShape, lhsPriority,
   UnifyEnv(..), updUEnvLoc, setUEnvRole,
   uType,
 
@@ -3133,6 +3133,9 @@ data LevelCheck
   | LC_Promote    -- Do a level check between the LHS tyvar and the occurrence tyvar
                   -- If the level check fails, and the occurrence is a unification
                   -- variable, promote it
+      Bool        --   False <=> don't promote under type families (the common case)
+                  --   True  <=> promote even under type families
+                  --             see Note [Defaulting equalities] in GHC.Tc.Solver
 
 instance Outputable (TyEqFlags a) where
   ppr (TEF { .. }) = text "TEF" <> braces (
@@ -3144,7 +3147,7 @@ instance Outputable (TyEqFlags a) where
 
 instance Outputable (TyEqFamApp a) where
   ppr TEFA_Fail       = text "TEFA_Fail"
-  ppr TEFA_Recurse    = text "TEFA_Fail"
+  ppr TEFA_Recurse    = text "TEFA_Recurse"
   ppr (TEFA_Break {}) = text "TEFA_Break"
 
 instance Outputable AreUnifying where
@@ -3153,9 +3156,9 @@ instance Outputable AreUnifying where
          braces (ppr mi <> comma <+> ppr lvl <> comma <+> ppr lc)
 
 instance Outputable LevelCheck where
-  ppr LC_None    = text "LC_None"
-  ppr LC_Check   = text "LC_Check"
-  ppr LC_Promote = text "LC_Promote"
+  ppr LC_None        = text "LC_None"
+  ppr LC_Check       = text "LC_Check"
+  ppr (LC_Promote b) = text "LC_Promote" <> ppWhen b (text "(deep)")
 
 famAppArgFlags :: TyEqFlags a -> TyEqFlags a
 -- Adjust the flags when going undter a type family
@@ -3169,15 +3172,18 @@ famAppArgFlags flags@(TEF { tef_unifying = unifying })
           , tef_occurs   = cteSolubleOccurs }
             -- tef_occurs: under a type family, an occurs check is not definitely-insoluble
   where
-    zap_promotion (Unifying info lvl LC_Promote) = Unifying info lvl LC_Check
-    zap_promotion unifying                       = unifying
+    zap_promotion (Unifying info lvl (LC_Promote deeply))
+              | not deeply = Unifying info lvl LC_Check
+    zap_promotion unifying = unifying
 
 type FamAppBreaker a = TcType -> TcM (PuResult a Reduction)
      -- Given a family-application ty, return a Reduction :: ty ~ cvb
      -- where 'cbv' is a fresh loop-breaker tyvar (for Given), or
      -- just a fresh TauTv (for Wanted)
 
-checkTyEqRhs :: forall a. TyEqFlags a -> TcType -> TcM (PuResult a Reduction)
+checkTyEqRhs :: forall a. TyEqFlags a
+                       -> TcType           -- Already zonked
+                       -> TcM (PuResult a Reduction)
 checkTyEqRhs flags ty
   = case ty of
       LitTy {}        -> okCheckRefl ty
@@ -3228,7 +3234,7 @@ checkCo (TEF { tef_lhs = TyVarLHS lhs_tv
   = failCheckWith (cteProblem cteCoercionHole)
 
   -- Occurs check (can promote)
-  | Unifying _ lhs_tv_lvl LC_Promote <- unifying
+  | Unifying _ lhs_tv_lvl (LC_Promote {}) <- unifying
   = do { reason <- checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl (tyCoVarsOfCo co)
        ; if cterHasNoProblem reason
          then return (pure co)
@@ -3403,8 +3409,9 @@ checkFamApp flags@(TEF { tef_unifying = unifying, tef_occurs = occ_prob
   = case fam_app_flag of
       TEFA_Fail -> failCheckWith (cteProblem cteTypeFamily)
 
+      -- Occurs check: F ty ~ ...(F ty)...
       _ | TyFamLHS lhs_tc lhs_tys <- lhs
-        , tcEqTyConApps lhs_tc lhs_tys tc tys   -- F ty ~ ...(F ty)...
+        , tcEqTyConApps lhs_tc lhs_tys tc tys
         -> case fam_app_flag of
              TEFA_Recurse       -> failCheckWith (cteProblem occ_prob)
              TEFA_Break breaker -> breaker fam_app
@@ -3420,7 +3427,11 @@ checkFamApp flags@(TEF { tef_unifying = unifying, tef_occurs = occ_prob
               ; traceTc "under" (ppr tc $$ pprPur tys_res $$ ppr flags)
               ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
 
-      TEFA_Break breaker    -- Recurse; and break if there is a problem
+      -- For TEFA_Break, try recursion; and break if there is a problem
+      -- e.g.  alpha[2] ~ Maybe (F beta[2])    No problem: just unify
+      --       alpha[2] ~ Maybe (F beta[4])    Level-check problem: break
+      -- NB: in the latter case, don't promote beta[4]; hence arg_flags!
+      TEFA_Break breaker
         -> do { tys_res <- mapCheck (checkTyEqRhs arg_flags) tys
               ; case tys_res of
                   PuOK cts redns -> return (PuOK cts (mkTyConAppRedn Nominal tc redns))
@@ -3457,7 +3468,7 @@ checkTyVar (TEF { tef_lhs = lhs, tef_unifying = unifying, tef_occurs = occ_prob 
                Nothing -> check_unif info lvl prom lhs_tv }
 
     ---------------------
-    -- We are in the Unifying branch of AreUnifing
+    -- We are in the Unifying branch of AreUnifying; and occ_tv is unfilled
     check_unif :: MetaInfo -> TcLevel -> LevelCheck
                -> TcTyVar -> TcM (PuResult a Reduction)
     check_unif lhs_tv_info lhs_tv_lvl prom lhs_tv
@@ -3471,7 +3482,7 @@ checkTyVar (TEF { tef_lhs = lhs, tef_unifying = unifying, tef_occurs = occ_prob 
       = case prom of
            LC_None    -> pprPanic "check_unif" (ppr lhs_tv $$ ppr occ_tv)
            LC_Check   -> failCheckWith (cteProblem cteSkolemEscape)
-           LC_Promote
+           LC_Promote {}
              | isSkolemTyVar occ_tv  -> failCheckWith (cteProblem cteSkolemEscape)
              | otherwise             -> promote lhs_tv lhs_tv_info lhs_tv_lvl
 

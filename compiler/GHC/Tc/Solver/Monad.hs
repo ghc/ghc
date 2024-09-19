@@ -2092,7 +2092,7 @@ checkTouchableTyVarEq
 --   with extra wanteds 'cts'
 -- If it returns (PuFail reason) we can't unify, and the reason explains why.
 checkTouchableTyVarEq ev lhs_tv rhs
-  | simpleUnifyCheck UC_Solver lhs_tv rhs
+  | simpleUnifyCheck UC_Solver lhs_tv rhs   -- An (optional) short-cut
   = do { traceTcS "checkTouchableTyVarEq: simple-check wins" (ppr lhs_tv $$ ppr rhs)
        ; return (pure (mkReflRedn Nominal rhs)) }
 
@@ -2125,12 +2125,13 @@ checkTouchableTyVarEq ev lhs_tv rhs
 
     flags = TEF { tef_foralls  = False -- isRuntimeUnkSkol lhs_tv
                 , tef_fam_app  = mkTEFA_Break ev NomEq break_wanted
-                , tef_unifying = Unifying lhs_tv_info lhs_tv_lvl LC_Promote
+                , tef_unifying = Unifying lhs_tv_info lhs_tv_lvl (LC_Promote False)
                 , tef_lhs      = TyVarLHS lhs_tv
                 , tef_occurs   = cteInsolubleOccurs }
 
     arg_flags = famAppArgFlags flags
 
+    break_wanted :: FamAppBreaker Ct
     break_wanted fam_app
       -- Occurs check or skolem escape; so flatten
       = do { let fam_app_kind = typeKind fam_app
