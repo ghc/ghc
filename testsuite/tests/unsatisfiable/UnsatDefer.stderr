@@ -1,4 +1,4 @@
-UnsatDefer: Exception:
+UnsatDefer: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.TypeError:
 
 UnsatDefer.hs:20:7: error: [GHC-22250]
     • Equality is not reflexive on Double
@@ -6,14 +6,8 @@ UnsatDefer.hs:20:7: error: [GHC-22250]
       In an equation for ‘foo’: foo = reflexiveEq 0 (0 :: Double)
 (deferred type error)
 
-Package: ghc-internal
-Module: GHC.Internal.Control.Exception.Base
-Type: TypeError
-
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
-    throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:423:30 in ghc-internal:GHC.Internal.Control.Exception.Base
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 

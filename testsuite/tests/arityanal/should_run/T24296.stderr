@@ -1,12 +1,8 @@
-T24296: Exception:
+T24296: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 tricky called with at least two args
 CallStack (from HasCallStack):
   error, called at T24296.hs:12:7 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

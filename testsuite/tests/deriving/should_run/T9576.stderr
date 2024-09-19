@@ -1,4 +1,4 @@
-T9576: Exception:
+T9576: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.TypeError:
 
 T9576.hs:6:31: error: [GHC-39999]
     • No instance for ‘Show Foo’ arising from a use of ‘showsPrec’
@@ -12,14 +12,8 @@ T9576.hs:6:31: error: [GHC-39999]
         To see the code I am typechecking, use -ddump-deriv
 (deferred type error)
 
-Package: ghc-internal
-Module: GHC.Internal.Control.Exception.Base
-Type: TypeError
-
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
-    throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:423:30 in ghc-internal:GHC.Internal.Control.Exception.Base
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 

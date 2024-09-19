@@ -1,3 +1,14 @@
 == CP936
+Failed to roundtrip given mutant byte at index 891 (251 /= 123 at index 891)
+Failed to roundtrip given mutant byte at index 1605 (197 /= 69 at index 1605)
+Failed to roundtrip given mutant byte at index 2411 (235 /= 107 at index 2411)
+Failed to roundtrip given mutant byte at index 6480 (208 /= 80 at index 6480)
+Failed to roundtrip given mutant byte at index 6482 (210 /= 82 at index 6482)
+Failed to roundtrip given mutant byte at index 6484 (212 /= 84 at index 6484)
+Failed to roundtrip given mutant byte at index 6496 (224 /= 96 at index 6496)
+Failed to roundtrip given mutant byte at index 7243 (203 /= 75 at index 7243)
+Failed to roundtrip given mutant byte at index 7277 (237 /= 109 at index 7277)
+Failed to roundtrip given mutant byte at index 8027 (219 /= 91 at index 8027)
+Failed to roundtrip given mutant byte at index 8801 (225 /= 97 at index 8801)
 == CP1251
 == UTF-8

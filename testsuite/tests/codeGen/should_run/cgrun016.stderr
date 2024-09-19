@@ -1,12 +1,8 @@
-cgrun016: Exception:
+cgrun016: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 6th call to error
 CallStack (from HasCallStack):
   error, called at cgrun016.hs:8:8 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

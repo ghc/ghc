@@ -1,16 +1,10 @@
-T15349: Exception:
+T15349: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.NonTermination:
 
 <<loop>>
 
-Package: ghc-internal
-Module: GHC.Internal.Control.Exception.Base
-Type: NonTermination
-
-While handling thread blocked indefinitely in an MVar operation
+While handling ghc-internal:GHC.Internal.IO.Exception.BlockedIndefinitelyOnMVar:
   |
-  | Package: ghc-internal
-  | Module: GHC.Internal.IO.Exception
-  | Type: BlockedIndefinitelyOnMVar
+  | thread blocked indefinitely in an MVar operation
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
