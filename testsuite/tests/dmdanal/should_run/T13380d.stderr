@@ -1,7 +1,3 @@
-T13380d: Exception:
+T13380d: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
 
 user error (What)
-
-Package: ghc-internal
-Module: GHC.Internal.IO.Exception
-Type: IOException

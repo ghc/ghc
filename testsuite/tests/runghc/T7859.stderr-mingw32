@@ -1,28 +1,9 @@
-runghc.exe: Exception:
+runghc-9.13.20241015.exe: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
 
 defer-type-errors: rawSystem: does not exist (No such file or directory)
 
-Package: ghc-internal
-Module: GHC.Internal.IO.Exception
-Type: IOException
-
 While handling rawSystem: does not exist (No such file or directory)
-  |
-  | Package: ghc-internal
-  | Module: GHC.Internal.IO.Exception
-  | Type: IOException
-  |
-  | HasCallStack backtrace:
-  |   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.Exception
-  |   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:<line>:<column> in <package-id>:GHC.Internal.IO
-  |   throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.IO.Exception
-  |   ioException, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.IO.Exception
-  |   ioError, called at libraries/ghc-internal/src/GHC/Internal/Foreign/C/Error.hs:<line>:<column> in <package-id>:GHC.Internal.Foreign.C.Error
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:<line>:<column> in <package-id>:GHC.Internal.IO
-  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.IO.Exception
-  ioException, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:<line>:<column> in <package-id>:GHC.Internal.IO.Exception
-  ioError, called at libraries/process/System/Process/Common.hs:<line>:<column> in <package-id>:System.Process.Common
+  ioError, called at libraries\process\System\Process\Common.hs:239:16 in process-1.6.25.0-inplace:System.Process.Common
 

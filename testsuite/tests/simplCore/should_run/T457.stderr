@@ -1,12 +1,8 @@
-T457: Exception:
+T457: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 Correct
 CallStack (from HasCallStack):
   error, called at T457.hs:5:22 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

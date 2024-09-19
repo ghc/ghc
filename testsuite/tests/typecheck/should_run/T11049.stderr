@@ -1,10 +1,6 @@
-T11049: Exception:
+T11049: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 look ma, no stack!
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
 

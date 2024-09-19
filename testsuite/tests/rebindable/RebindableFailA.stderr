@@ -1,12 +1,8 @@
-RebindableFailA: Exception:
+RebindableFailA: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 Failed with error
 CallStack (from HasCallStack):
   error, called at RebindableFailA.hs:10:10 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

@@ -1,12 +1,8 @@
-T16066: Exception:
+T16066: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 exit never happens
 CallStack (from HasCallStack):
   error, called at T16066.hs:27:3 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

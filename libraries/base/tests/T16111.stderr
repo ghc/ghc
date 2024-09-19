@@ -1,7 +1,3 @@
-T16111: Exception:
+T16111: Uncaught exception ghc-internal:GHC.Internal.Exception.Type.ArithException:
 
 arithmetic overflow
-
-Package: ghc-internal
-Module: GHC.Internal.Exception.Type
-Type: ArithException

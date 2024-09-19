@@ -1,12 +1,8 @@
-T16893: Exception:
+T16893: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 Prelude.undefined
 CallStack (from HasCallStack):
   undefined, called at ./Complex.hs:47:28 in main:Complex
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
