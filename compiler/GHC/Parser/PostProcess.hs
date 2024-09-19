@@ -1522,7 +1522,7 @@ isFunLhs e = go e [] [] []
           reassociate _other = Nothing
    go (L l (PatBuilderAppType (L lp pat) tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
              = go (L lp' pat) (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
-             where invis_pat = InvisPat tok ty_pat
+             where invis_pat = InvisPat (tok, SpecifiedSpec) ty_pat
                    anc' = case tok of
                      NoEpTok -> anc
                      EpTok l -> widenAnchor anc [AddEpAnn AnnAnyclass l]

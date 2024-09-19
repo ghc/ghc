@@ -507,11 +507,11 @@ rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
 rnLArgPatAndThen :: NameMaker -> LocatedA (Pat GhcPs) -> CpsRn (LocatedA (Pat GhcRn))
 rnLArgPatAndThen mk = wrapSrcSpanCps rnArgPatAndThen where
 
-  rnArgPatAndThen (InvisPat _ tp) = do
+  rnArgPatAndThen (InvisPat (_, spec) tp) = do
     liftCps $ unlessXOptM LangExt.TypeAbstractions $
       addErr (TcRnIllegalInvisibleTypePattern tp)
     tp' <- rnHsTyPat HsTypePatCtx tp
-    pure (InvisPat noExtField tp')
+    pure (InvisPat spec tp')
   rnArgPatAndThen p = rnPatAndThen mk p
 
 -- ----------- Entry point 3: rnLPatAndThen -------------------
@@ -677,12 +677,12 @@ rnPatAndThen mk (SplicePat _ splice)
 rnPatAndThen _ (EmbTyPat _ tp)
   = do { tp' <- rnHsTyPat HsTypePatCtx tp
        ; return (EmbTyPat noExtField tp') }
-rnPatAndThen _ (InvisPat _ tp)
+rnPatAndThen _ (InvisPat (_, spec) tp)
   = do { liftCps $ addErr (TcRnMisplacedInvisPat tp)
          -- Invisible patterns are handled in `rnLArgPatAndThen`
          -- so unconditionally emit error here
        ; tp' <- rnHsTyPat HsTypePatCtx tp
-       ; return (InvisPat noExtField tp')
+       ; return (InvisPat spec tp')
        }
 
 --------------------

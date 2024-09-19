@@ -1697,16 +1697,20 @@ coercing from.  So from, say,
   newtype T x = MkT <rep-ty>
 
   instance C a <rep-ty> => C a (T x) where
-    op :: forall c. a -> [T x] -> c -> Int
-    op = coerce @(a -> [<rep-ty>] -> c -> Int)
-                @(a -> [T x]      -> c -> Int)
-                op
+    op @c = coerce @(a -> [<rep-ty>] -> c -> Int)
+                   @(a -> [T x]      -> c -> Int)
+                   op
 
-In addition to the type applications, we also have an explicit
-type signature on the entire RHS. This brings the method-bound variable
-`c` into scope over the two type applications.
+In addition to the type applications, we also use a type abstraction to bring
+the method-bound variable `c` into scope over the two type applications.
 See Note [GND and QuantifiedConstraints] for more information on why this
 is important.
+
+(In the surface syntax, only specified type variables can be used in type
+abstractions. Since a method signature could contain both specified and
+inferred type variables, we need an internal-only way to represent the inferred
+case. We handle this by smuggling a Specificity field in XInvisPat. See
+Note [Inferred invisible patterns].)
 
 Giving 'coerce' two explicitly-visible type arguments grants us finer control
 over how it should be instantiated. Recall
@@ -1720,7 +1724,6 @@ a polytype.  E.g.
    class C a where op :: a -> forall b. b -> b
    newtype T x = MkT <rep-ty>
    instance C <rep-ty> => C (T x) where
-     op :: T x -> forall b. b -> b
      op = coerce @(<rep-ty> -> forall b. b -> b)
                  @(T x      -> forall b. b -> b)
                 op
@@ -1733,6 +1736,74 @@ appropriate for machine generated code: it's simple and robust.
 However, to allow VTA with polytypes we must switch on
 -XImpredicativeTypes locally in GHC.Tc.Deriv.genInst.
 See #8503 for more discussion.
+
+Note [Inferred invisible patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following:
+
+  class R a where
+    r :: forall b. Proxy b -> a
+
+When newtype-deriving an instance of `R`, following
+Note [GND and QuantifiedConstraints], we might generate the following code:
+
+  instance R <rep-ty> => R <new-ty> where
+    r = \ @b -> coerce @(Proxy b -> <rep-ty>)
+                      @(Proxy b -> <new-ty>)
+                      r
+
+The code being generated is an HsSyn AST, except for the arguments to coerce,
+which are XHsTypes carrying Core types. As Core types, they must be fully
+elaborated, so we actually want something more like the following:
+
+  instance R <rep-ty> => R <new-ty> where
+    r = \ @b -> coerce @(Proxy @{k} b -> <rep-ty>)
+                      @(Proxy @{k} b -> <new-ty>)
+                      r
+
+where the `k` corresponds to the `k` in the elaborated type of `r`:
+
+  class R (a :: Type) where
+    r :: forall {k :: Type} (b :: k). Proxy @{k} b -> a
+
+However, `k` is not bound in the definition of `r` in the derived instance, and
+binding it requires a way to create an inferred (because `k` is inferred in the
+signature of `r`) invisible pattern.
+
+So we actually generate the following for `R`:
+
+  instance R <rep-ty> => R <new-ty> where
+    r = \ @{k :: Type} -> \ @(b :: k) ->
+            coerce @(Proxy @{k} b -> <rep-ty>)
+                   @(Proxy @{k} b -> <new-ty>)
+                   r
+
+The `\ @{k :: Type} ->` (note the braces!) is the big lambda that binds `k`, and
+represents an inferred invisible pattern. Inferred invisible patterns aren't
+allowed in the surface syntax of Haskell, for the reason that the order in
+which inferred foralls are added to a signature is not specified, so it is
+ambiguous which pattern would bind to which forall. But when deriving an
+instance, the patterns are being created after the type of the method has been
+elaborated, so an order for the inferred foralls has already been determined.
+This makes inferred invisible patterns safe for internal use.
+
+(You might wonder if you could bring `k` into scope via the pattern signature
+in `\ @(b :: k)`, but that does not work in general; e.g. if
+`r :: Proxy Any -> a`; see `C5` in test `deriving-inferred-ty-arg`.)
+
+The implementation is straightforward: we have a Specificity field in
+XInvisPat, which is always SpecifiedSpec when coming from the parser or
+Template Haskell, but takes the specificity of the corresponding forall from
+the method type during instance deriving. When type checking an invisible
+pattern, we allow inferred patterns to bind inferred foralls just like we allow
+specified patterns to bind specified foralls.
+
+More discussion of this scenario and some rejected alternatives at
+https://gitlab.haskell.org/ghc/ghc/-/merge_requests/13190
+
+See also https://github.com/ghc-proposals/ghc-proposals/pull/675, which
+was triggered by this ticket, and explores source-language syntax in this
+space.
 
 Note [Newtype-deriving trickiness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1805,16 +1876,15 @@ See Note [Instances in no-evidence implications] in GHC.Tc.Solver.Equality.
 But this isn't the death knell for combining QuantifiedConstraints with GND.
 On the contrary, if we generate GND bindings in a slightly different way, then
 we can avoid this situation altogether. Instead of applying `coerce` to two
-polymorphic types, we instead let an instance signature do the polymorphic
-instantiation, and omit the `forall`s in the type applications.
-More concretely, we generate the following code instead:
+polymorphic types, we instead use a type abstraction to bind the type
+variables, and omit the `forall`s in the type applications. More concretely, we
+generate the following code instead:
 
   instance (C m, forall p q. Coercible p q => Coercible (m p) (m q)) =>
       C (T m) where
-    join :: forall a. T m (T m a) -> T m a
-    join = coerce @(  m   (m a) ->   m a)
-                  @(T m (T m a) -> T m a)
-                  join
+    join @a = coerce @(  m   (m a) ->   m a)
+                     @(T m (T m a) -> T m a)
+                     join
 
 Now the visible type arguments are both monotypes, so we don't need any of this
 funny quantified constraint instantiation business. While this particular
@@ -1823,119 +1893,24 @@ ImpredicativeTypes to typecheck GND-generated code for class methods with
 higher-rank types. See Note [Newtype-deriving instances].
 
 You might think that that second @(T m (T m a) -> T m a) argument is redundant
-in the presence of the instance signature, but in fact leaving it off will
-break this example (from the T15290d test case):
+with the type information provided by the class, but in fact leaving it off
+will break the following example (from the T12616 test case):
 
-  class C a where
-    c :: Int -> forall b. b -> a
+  type m ~> n = forall a. m a -> n a
+  data StateT s m a = ...
+  newtype OtherStateT s m a = OtherStateT (StateT s m a)
 
-  instance C Int
+  class MonadTrans t where
+    lift :: (Monad m) => m ~> t m
 
-  instance C Age where
-    c :: Int -> forall b. b -> Age
-    c = coerce @(Int -> forall b. b -> Int)
-               c
+  instance MonadTrans (StateT s)
+
+  instance MonadTrans (OtherStateT s) where
+    lift @m = coerce @(m ~> StateT s m)
+                     lift
 
 That is because we still need to instantiate the second argument of
 coerce with a polytype, and we can only do that with VTA or QuickLook.
-
-Be aware that the use of an instance signature doesn't /solve/ this
-problem; it just makes it less likely to occur. For example, if a class has
-a truly higher-rank type like so:
-
-  class CProblem m where
-    op :: (forall b. ... (m b) ...) -> Int
-
-Then the same situation will arise again. But at least it won't arise for the
-common case of methods with ordinary, prenex-quantified types.
-
------
--- Wrinkle: Use HsOuterExplicit
------
-
-One minor complication with the plan above is that we need to ensure that the
-type variables from a method's instance signature properly scope over the body
-of the method. For example, recall:
-
-  instance (C m, forall p q. Coercible p q => Coercible (m p) (m q)) =>
-      C (T m) where
-    join :: forall a. T m (T m a) -> T m a
-    join = coerce @(  m   (m a) ->   m a)
-                  @(T m (T m a) -> T m a)
-                  join
-
-In the example above, it is imperative that the `a` in the instance signature
-for `join` scope over the body of `join` by way of ScopedTypeVariables.
-This might sound obvious, but note that in gen_Newtype_binds, which is
-responsible for generating the code above, the type in `join`'s instance
-signature is given as a Core type, whereas gen_Newtype_binds will eventually
-produce HsBinds (i.e., source Haskell) that is renamed and typechecked. We
-must ensure that `a` is in scope over the body of `join` during renaming
-or else the generated code will be rejected.
-
-In short, we need to convert the instance signature from a Core type to an
-HsType (i.e., a source Haskell type). Two possible options are:
-
-1. Convert the Core type entirely to an HsType (i.e., a source Haskell type).
-2. Embed the entire Core type using HsCoreTy.
-
-Neither option is quite satisfactory:
-
-1. Converting a Core type to an HsType in full generality is surprisingly
-   complicated. Previous versions of GHCs did this, but it was the source of
-   numerous bugs (see #14579 and #16518, for instance).
-2. While HsCoreTy is much less complicated that option (1), it's not quite
-   what we want. In order for `a` to be in scope over the body of `join` during
-   renaming, the `forall` must be contained in an HsOuterExplicit.
-   (See Note [Lexically scoped type variables] in GHC.Hs.Type.) HsCoreTy
-   bypasses HsOuterExplicit, so this won't work either.
-
-As a compromise, we adopt a combination of the two options above:
-
-* Split apart the top-level ForAllTys in the instance signature's Core type,
-* Convert the top-level ForAllTys to an HsOuterExplicit, and
-* Embed the remainder of the Core type in an HsCoreTy.
-
-This retains most of the simplicity of option (2) while still ensuring that
-the type variables are correctly scoped.
-
-Note that splitting apart top-level ForAllTys will expand any type synonyms
-in the Core type itself. This ends up being important to fix a corner case
-observed in #18914. Consider this example:
-
-  type T f = forall a. f a
-
-  class C f where
-    m :: T f
-
-  newtype N f a = MkN (f a)
-    deriving C
-
-What code should `deriving C` generate? It will have roughly the following
-shape:
-
-  instance C f => C (N f) where
-    m :: T (N f)
-    m = coerce @(...) (...) (m @f)
-
-At a minimum, we must instantiate `coerce` with `@(T f)` and `@(T (N f))`, but
-with the `forall`s removed in order to make them monotypes. However, the
-`forall` is hidden underneath the `T` type synonym, so we must first expand `T`
-before we can strip of the `forall`. Expanding `T`, we get
-`coerce @(forall a. f a) @(forall a. N f a)`, and after omitting the `forall`s,
-we get `coerce @(f a) @(N f a)`.
-
-We can't stop there, however, or else we would end up with this code:
-
-  instance C f => C (N f) where
-    m :: T (N f)
-    m = coerce @(f a) @(N f a) (m @f)
-
-Notice that the type variable `a` is completely unbound. In order to make sure
-that `a` is in scope, we must /also/ expand the `T` in `m :: T (N f)` to get
-`m :: forall a. N f a`. Fortunately, we will do just that in the plan outlined
-above, since when we split off the top-level ForAllTys in the instance
-signature, we must first expand the T type synonym.
 
 Note [GND and ambiguity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1950,7 +1925,6 @@ ambiguous type variables. As one example, consider the following example
 A naïve attempt and generating a C T instance would be:
 
   instance C T where
-    f :: String
     f = coerce @String @String f
 
 This isn't going to typecheck, however, since GHC doesn't know what to
@@ -1959,7 +1933,6 @@ instantiate the type variable `a` with in the call to `f` in the method body.
 ambiguity here, we explicitly instantiate `a` like so:
 
   instance C T where
-    f :: String
     f = coerce @String @String (f @())
 
 All better now.
@@ -1972,22 +1945,19 @@ gen_Newtype_binds :: SrcSpan
                              -- newtype itself)
                   -> [Type]  -- instance head parameters (incl. newtype)
                   -> Type    -- the representation type
-                  -> (LHsBinds GhcPs, [LSig GhcPs])
+                  -> LHsBinds GhcPs
 -- See Note [Newtype-deriving instances]
 gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
-  = (binds, sigs)
+  = map mk_bind (classMethods cls)
   where
-    (binds, sigs) = mapAndUnzip mk_bind_and_sig (classMethods cls)
-
     -- Same as inst_tys, but with the last argument type replaced by the
     -- representation type.
     underlying_inst_tys :: [Type]
     underlying_inst_tys = changeLast inst_tys rhs_ty
 
     locn = noAnnSrcSpan loc'
-    loca = noAnnSrcSpan loc'
-    -- For each class method, generate its derived binding and instance
-    -- signature. Using the first example from
+    -- For each class method, generate its derived binding. Using the first
+    -- example from
     -- Note [Newtype-deriving instances]:
     --
     --   class C a b where
@@ -1999,43 +1969,30 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
     --
     --   instance C a <rep-ty> => C a (T x) where
     --     <derived-op-impl>
-    mk_bind_and_sig :: Id -> (LHsBind GhcPs, LSig GhcPs)
-    mk_bind_and_sig meth_id
-      = ( -- The derived binding, e.g.,
-          --
-          --   op = coerce @(a -> [<rep-ty>] -> c -> Int)
-          --               @(a -> [T x]      -> c -> Int)
-          --               op
-          mkRdrFunBind loc_meth_RDR [mkSimpleMatch
-                                        (mkPrefixFunRhs loc_meth_RDR)
-                                        (noLocA []) rhs_expr]
-        , -- The derived instance signature, e.g.,
-          --
-          --   op :: forall c. a -> [T x] -> c -> Int
-          --
-          -- Make sure that `forall c` is in an HsOuterExplicit so that it
-          -- scopes over the body of `op`. See "Wrinkle: Use HsOuterExplicit" in
-          -- Note [GND and QuantifiedConstraints].
-          L loca $ ClassOpSig noAnn False [loc_meth_RDR]
-                 $ L loca $ mkHsExplicitSigType noAnn
-                              (map mk_hs_tvb to_tvbs)
-                              (nlHsCoreTy to_rho)
-        )
+    mk_bind :: Id -> LHsBind GhcPs
+    mk_bind meth_id
+      = -- The derived binding, e.g.,
+        --
+        --   op @c = coerce @(a -> [<rep-ty>] -> c -> Int)
+        --                  @(a -> [T x]      -> c -> Int)
+        --                  op
+        mkRdrFunBind loc_meth_RDR [mkSimpleMatch
+                                      (mkPrefixFunRhs loc_meth_RDR)
+                                      (noLocA (map mk_ty_pat to_tvbs)) rhs_expr]
+
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
         (_, _, from_tau)  = tcSplitSigmaTy from_ty
         (to_tvbs, to_rho) = tcSplitForAllInvisTVBinders to_ty
         (_, to_tau)       = tcSplitPhiTy to_rho
-        -- The use of tcSplitForAllInvisTVBinders above expands type synonyms,
-        -- which is important to ensure correct type variable scoping.
-        -- See "Wrinkle: Use HsOuterExplicit" in
-        -- Note [GND and QuantifiedConstraints].
+        -- The `to_tvbs` bind variables that are mentioned in `to_rho` and
+        -- hence in `to_tau`. So we bring `to_tvbs` into scope via the
+        -- `mkSimpleMatch` above, so that their use in `to_tau` in `rhs_expr`
+        -- is well-scoped.
 
-        mk_hs_tvb :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcPs
-        mk_hs_tvb (Bndr tv flag) = noLocA $ KindedTyVar noAnn
-                                                        flag
-                                                        (noLocA (getRdrName tv))
-                                                        (nlHsCoreTy (tyVarKind tv))
+        mk_ty_pat :: VarBndr TyVar Specificity -> LPat GhcPs
+        mk_ty_pat (Bndr tv spec) = noLocA $ InvisPat (noAnn, spec) $ mkHsTyPat $
+          nlHsTyVar NotPromoted $ getRdrName tv
 
         meth_RDR = getRdrName meth_id
         loc_meth_RDR = L locn meth_RDR

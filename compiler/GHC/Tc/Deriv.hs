@@ -281,8 +281,9 @@ renameDeriv inst_infos bagBinds
     setXOptM LangExt.KindSignatures $
     -- Derived decls (for newtype-deriving) can use ScopedTypeVariables &
     -- KindSignatures
+    setXOptM LangExt.TypeAbstractions $
     setXOptM LangExt.TypeApplications $
-    -- GND/DerivingVia uses TypeApplications in generated code
+    -- GND/DerivingVia uses TypeAbstractions & TypeApplications in generated code
     -- (See Note [Newtype-deriving instances] in GHC.Tc.Deriv.Generate)
     unsetXOptM LangExt.RebindableSyntax $
     -- See Note [Avoid RebindableSyntax when deriving]
@@ -1971,12 +1972,9 @@ genInstBinds spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
     extensions
       | isDerivSpecNewtype mechanism || isDerivSpecVia mechanism
       = [
-          -- Both these flags are needed for higher-rank uses of coerce...
-          LangExt.ImpredicativeTypes, LangExt.RankNTypes
-          -- ...and this flag is needed to support the instance signatures
-          -- that bring type variables into scope.
+          -- Both these flags are needed for higher-rank uses of coerce
           -- See Note [Newtype-deriving instances] in GHC.Tc.Deriv.Generate
-        , LangExt.InstanceSigs
+          LangExt.ImpredicativeTypes, LangExt.RankNTypes
           -- Skip unboxed tuples checking for derived instances when imported
           -- in a different module, see #20524
         , LangExt.UnboxedTuples
@@ -2010,8 +2008,8 @@ genInstBinds spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
             -> gen_newtype_or_via via_ty
 
     gen_newtype_or_via ty = do
-      let (binds, sigs) = gen_Newtype_binds loc clas tyvars inst_tys ty
-      return (binds, sigs, emptyBag, [])
+      let binds = gen_Newtype_binds loc clas tyvars inst_tys ty
+      return (binds, [], emptyBag, [])
 
 -- | Generate the associated type family instances for a derived instance.
 genFamInsts :: DerivSpec theta -> TcM [FamInst]

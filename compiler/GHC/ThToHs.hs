@@ -1520,9 +1520,12 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
 cvtp (TypeP t)         = do { t' <- cvtType t
                             ; return $ EmbTyPat noAnn (mkHsTyPat t') }
 cvtp (InvisP t)        = do { t' <- parenthesizeHsType appPrec <$> cvtType t
-                            ; pure (InvisPat noAnn (mkHsTyPat t'))}
+                            ; pure (InvisPat noAnnSpecified (mkHsTyPat t'))}
 cvtp (OrP ps)          = do { ps' <- cvtPats ps
                             ; pure (OrPat noExtField ps')}
+
+noAnnSpecified :: XInvisPat GhcPs
+noAnnSpecified = (noAnn, Hs.SpecifiedSpec)
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)

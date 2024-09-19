@@ -192,8 +192,11 @@ type instance XHsRecFields GhcTc = MultiplicityCheckCoercions
 
 type instance XHsFieldBind _ = [AddEpAnn]
 
-type instance XInvisPat GhcPs = EpToken "@"
-type instance XInvisPat GhcRn = NoExtField
+-- The specificity of an invisible pattern from the parser is always
+-- SpecifiedSpec. The specificity field supports code generated when deriving
+-- newtype or via; see Note [Inferred invisible patterns].
+type instance XInvisPat GhcPs = (EpToken "@", Specificity)
+type instance XInvisPat GhcRn = Specificity
 type instance XInvisPat GhcTc = Type
 
 
@@ -474,7 +477,17 @@ pprPat (ConPat { pat_con = con
                        , cpt_binds = binds
                        } = ext
 pprPat (EmbTyPat _ tp) = text "type" <+> ppr tp
-pprPat (InvisPat _ tp) = char '@' <> ppr tp
+pprPat (InvisPat x tp) = char '@' <> delimit (ppr tp)
+  where
+    delimit
+      | inferred     = braces
+      | needs_parens = parens
+      | otherwise    = id
+    inferred = case ghcPass @p of
+      GhcPs -> snd x == InferredSpec
+      GhcRn -> x == InferredSpec
+      GhcTc -> False
+    needs_parens = hsTypeNeedsParens appPrec $ unLoc $ hstp_body tp
 
 pprPat (XPat ext) = case ghcPass @p of
   GhcRn -> case ext of

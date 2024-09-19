@@ -4877,10 +4877,10 @@ instance ExactPrint (Pat GhcPs) where
     tp' <- markAnnotated tp
     return (EmbTyPat toktype' tp')
 
-  exact (InvisPat tokat tp) = do
+  exact (InvisPat (tokat, spec) tp) = do
     tokat' <- markEpToken tokat
     tp' <- markAnnotated tp
-    pure (InvisPat tokat' tp')
+    pure (InvisPat (tokat', spec) tp')
 
 -- ---------------------------------------------------------------------
 

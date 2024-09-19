@@ -175,8 +175,11 @@ tcMatchPats match_ctxt pats pat_tys thing_inside
                -- E.g.    f :: forall a. Bool -> a -> blah
                --         f @b True  x = rhs1  -- b is bound to skolem a
                --         f @c False y = rhs2  -- c is bound to skolem a
-               | L _ (InvisPat _ tp) <- pat
-               , isSpecifiedForAllTyFlag vis
+               -- Also handles invisible (Inferred) case originating from type
+               -- class deriving; see Note [Inferred invisible patterns]
+               | L _ (InvisPat pat_spec tp) <- pat
+               , Invisible spec <- vis
+               , pat_spec == spec
                = do { (_p, (ps, res)) <- tc_ty_pat tp tv $
                                          loop pats pat_tys
                     ; return (ps, res) }
