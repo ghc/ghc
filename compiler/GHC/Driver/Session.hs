@@ -3610,6 +3610,9 @@ needSourceNotes dflags = debugLevel dflags > 0
 -- | Should we use `-XLinker -rpath` when linking or not?
 -- See Note [-fno-use-rpaths]
 useXLinkerRPath :: DynFlags -> OS -> Bool
+-- wasm shared libs don't have RPATH at all and wasm-ld doesn't accept
+-- any RPATH-related flags
+useXLinkerRPath dflags _ | ArchWasm32 <- platformArch $ targetPlatform dflags = False
 useXLinkerRPath _ OSDarwin = False -- See Note [Dynamic linking on macOS]
 useXLinkerRPath dflags _ = gopt Opt_RPath dflags
 
