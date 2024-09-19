@@ -1,16 +1,10 @@
-topHandler04: Exception:
+topHandler04: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 error
 out-of-band
 
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
-
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
-    throw, called at topHandler04.hs:5:8 in main:Main
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
+  throw, called at topHandler04.hs:5:8 in main:Main
 

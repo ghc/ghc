@@ -1,36 +1,30 @@
-<interactive>: Exception:
+<interactive>: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
 
 IO error:  "Abcde" does not exist
 
-Package: ghc-9.11-inplace
-Module: GHC.Utils.Panic
-Type: GhcException
-
-While handling IO error:  "Abcde" does not exist
+While handling ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
   |
-  | Package: ghc-9.11-inplace
-  | Module: GHC.Utils.Panic
-  | Type: GhcException
+  | IO error:  "Abcde" does not exist
   |
   | HasCallStack backtrace:
   |   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
   |   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:284:11 in ghc-internal:GHC.Internal.IO
   |   throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:371:12 in exceptions-0.10.7-inplace:Control.Monad.Catch
   |   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
-  |   throwM, called at compiler/GHC/Driver/Monad.hs:167:54 in ghc-9.11-inplace:GHC.Driver.Monad
+  |   throwM, called at compiler/GHC/Driver/Monad.hs:167:54 in ghc-9.13-inplace:GHC.Driver.Monad
   |   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
-  |   throwM, called at ghc/GHCi/UI/Monad.hs:288:15 in ghc-bin-9.11.20240923-inplace:GHCi.UI.Monad
+  |   throwM, called at ghc/GHCi/UI/Monad.hs:288:15 in ghc-bin-9.13.20240930-inplace:GHCi.UI.Monad
   |   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   |   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   |   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   |   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   |   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:490:21 in exceptions-0.10.7-inplace:Control.Monad.Catch
   |   throwM, called at libraries/haskeline/System/Console/Haskeline/InputT.hs:53:39 in haskeline-0.8.2.1-inplace:System.Console.Haskeline.InputT
-  |   throwM, called at ghc/GHCi/UI/Monad.hs:215:52 in ghc-bin-9.11.20240923-inplace:GHCi.UI.Monad
+  |   throwM, called at ghc/GHCi/UI/Monad.hs:215:52 in ghc-bin-9.13.20240930-inplace:GHCi.UI.Monad
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:284:11 in ghc-internal:GHC.Internal.IO
-  throwIO, called at compiler/GHC/Utils/Error.hs:512:19 in ghc-9.11-inplace:GHC.Utils.Error
+  throwIO, called at compiler/GHC/Utils/Error.hs:512:19 in ghc-9.13-inplace:GHC.Utils.Error
 
 1

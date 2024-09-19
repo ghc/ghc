@@ -1,7 +1,3 @@
-arr007: Exception:
+arr007: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 Ix{Int}.index: Index (1) out of range ((1,0))
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall

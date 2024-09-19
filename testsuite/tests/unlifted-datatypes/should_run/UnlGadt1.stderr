@@ -1,12 +1,8 @@
-UnlGadt1: Exception:
+UnlGadt1: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 boom
 CallStack (from HasCallStack):
   error, called at UnlGadt1.hs:20:13 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

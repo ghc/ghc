@@ -1,7 +1,3 @@
-bkprun05: Exception:
+bkprun05: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 this is an error
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall

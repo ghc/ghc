@@ -1,12 +1,8 @@
-cgrun059: Exception:
+cgrun059: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 Error: File not found
 CallStack (from HasCallStack):
   error, called at cgrun059.hs:12:28 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

@@ -1,12 +1,8 @@
-T21973a: Exception:
+T21973a: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 True
 CallStack (from HasCallStack):
   error, called at T21973a.hs:42:23 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
