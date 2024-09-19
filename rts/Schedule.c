@@ -485,9 +485,14 @@ run_thread:
     }
 
     case ThreadInterpret:
+
+#if defined(wasm32_HOST_ARCH) && !defined(DYNAMIC)
+        barf("bytecode interpreter is unsupported in static RTS on wasm");
+#else
         cap = interpretBCO(cap);
         ret = cap->r.rRet;
         break;
+#endif
 
     default:
         barf("schedule: invalid prev_what_next=%u field", prev_what_next);
