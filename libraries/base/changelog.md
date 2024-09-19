@@ -4,6 +4,8 @@
   * Shipped with GHC 9.10.2
   * `setNonBlockingMode` will no longer throw an exception when called on a FD associated with a unknown device type. ([CLC proposal #282](https://github.com/haskell/core-libraries-committee/issues/282))
   * Propagate HasCallStack from `errorCallWithCallStackException` to exception backtraces, fixing a bug in the implementation of [CLC proposal #164](https://github.com/haskell/core-libraries-committee/issues/164).
+  * Modify the implementation of `Control.Exception.throw` to avoid call-sites being inferred as diverging via precise exception.
+    ([GHC #25066](https://gitlab.haskell.org/ghc/ghc/-/issues/25066), [CLC proposal #290](https://github.com/haskell/core-libraries-committee/issues/290))
 
 ## 4.20.0.1 *May 2024*
   * Not shipped with any GHC: This is a documentation only release to fix various issues with base-4.20.0.0 docs due to the GHC internal split
