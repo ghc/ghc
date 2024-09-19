@@ -323,3 +323,4 @@ test('T23697',
   ], makefile_test, ['T23697'])
 test('stimesEndo', normal, compile_and_run, [''])
 test('T24807', exit_code(1), compile_and_run, [''])
+test('T25066', [only_ways(['optasm']), grep_errmsg('T25066.g')], compile, ['-ddump-dmd-signatures'])
