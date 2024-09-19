@@ -1,12 +1,8 @@
-T5626: Exception:
+T5626: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 Prelude.undefined
 CallStack (from HasCallStack):
   undefined, called at T5626.hs:6:30 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

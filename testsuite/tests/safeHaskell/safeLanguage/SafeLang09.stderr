@@ -1,12 +1,8 @@
-SafeLang09: Exception:
+SafeLang09: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 This curry is poisoned!
 CallStack (from HasCallStack):
   error, called at ./SafeLang09_B.hs:14:13 in main:SafeLang09_B
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

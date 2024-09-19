@@ -243,21 +243,16 @@ instance Exception SomeException where
           dc -> msg ++ "\n\n" ++ dc
         where
             msg =
-              displayException e
-                ++ displayTypeInfo (Typeable.typeOf e)
+              displayExceptionInfo (Typeable.typeOf e)
+              ++ "\n\n"
+              ++ displayException e
 
-            displayTypeInfo :: TypeRep -> String
-            displayTypeInfo rep =
-              mconcat
-                [ "\n\nPackage: ",
-                  Typeable.tyConPackage tyCon,
-                  "\nModule: ",
-                  Typeable.tyConModule tyCon,
-                  "\nType: ",
-                  Typeable.tyConName tyCon
-                ]
-                where
-                  tyCon = Typeable.typeRepTyCon rep
+            displayExceptionInfo :: TypeRep -> String
+            displayExceptionInfo rep =
+                tyMsg ++ ":"
+              where
+                tyMsg = Typeable.tyConPackage tyCon ++ ":" ++ Typeable.tyConModule tyCon ++ "." ++ Typeable.tyConName tyCon
+                tyCon = Typeable.typeRepTyCon rep
 
 displayContext :: ExceptionContext -> String
 displayContext (ExceptionContext anns0) = mconcat $ intersperse "\n" $ map go anns0

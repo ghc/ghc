@@ -1,10 +1,6 @@
-withBinaryFile001: Exception:
+withBinaryFile001: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
 
 test.bin: withBinaryFile: does not exist (No such file or directory)
-
-Package: ghc-internal
-Module: GHC.Internal.IO.Exception
-Type: IOException
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

@@ -1,12 +1,8 @@
-cgrun051: Exception:
+cgrun051: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 OK
 CallStack (from HasCallStack):
   error, called at cgrun051.hs:7:25 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
