@@ -81,8 +81,85 @@ import GHC.Internal.Exception.Type
 throw :: forall (r :: RuntimeRep). forall (a :: TYPE r). forall e.
          (HasCallStack, Exception e) => e -> a
 throw e =
-    let !se = unsafePerformIO (toExceptionWithBacktrace e)
+    -- Note the absolutely crucial bang "!" on this binding!
+    --   See Note [Capturing the backtrace in throw]
+    -- Note also the absolutely crucial `noinine` in the RHS!
+    --   See Note [Hiding precise exception signature in throw]
+    let se :: SomeException
+        !se = noinline (unsafePerformIO (toExceptionWithBacktrace e))
     in raise# se
+
+-- Note [Capturing the backtrace in throw]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- When `throw` captures a backtrace, it must be the backtrace *at the moment
+-- that `throw` is called*.   That is why the binding of `se` is marked strict,
+-- via the `!`:
+--
+--     !se = <rhs>
+--
+-- GHC can capture /four/ different sorts of backtraces (See Note [Backtrace
+-- mechanisms] in "Control.Exception.Backtrace" for details). One of them
+-- (`CallStack` constraints) does not need this strict-binding treatment,
+-- because the `CallStack` constraint is captured in the thunk. However, the
+-- other two (DWARF stack unwinding, and native Haskell stack unwinding) are
+-- much more fragile, and can only be captured right at the call of `throw`.
+--
+-- However, making `se` strict has downsides: see
+-- Note [Hiding precise exception signature in throw] below.
+--
+--
+-- Note [Hiding precise exception signature in throw]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In 'throw' we use `unsafePerformIO . toExceptionWithBacktrace' to collect
+-- the backtraces which will be attached as the exception's 'ExceptionContext'.
+-- We must ensure that this is evaluated immediately in `throw` since
+-- `toExceptionWithBacktrace` must capture the execution state at the moment
+-- that the exception is thrown (see Note [Capturing the backtrace in throw]).
+-- Unfortunately, unless we take particular care this can lead to a
+-- catastrophic regression in 'throw's demand signature which will infect
+-- all callers (#25066)
+--
+-- Specifically, GHC's demand analysis has an approximate heuristic for tracking
+-- whether divergent functions diverge with precise or imprecise exceptions (namely
+-- the 'ExnOrDiv' and 'Diverges' constructors of 'GHC.Types.Demand.Divergence',
+-- respectively). This is because we can take considerably more liberties in
+-- optimising around functions which are known not to diverge via precise
+-- exception (see Note [Precise exceptions and strictness analysis]).
+-- For this reason, it is important that 'throw' have a 'Diverges' divergence
+-- type.
+--
+-- Unfortunately, this is broken if we allow `unsafePerformIO` to inline. Specifically,
+-- if we allow this inlining we will end up with Core of the form:
+--
+--   throw = \e ->
+--     case runRW# (\s -> ... toExceptionWithBacktrace e s ...) of
+--       se -> raise# se
+--
+-- so far this is fine; the demand analyzer's divergence heuristic
+-- will give 'throw' the expected 'Diverges' divergence.
+--
+-- However, the simplifier will subsequently notice that `raise#` can be fruitfully
+-- floated into the body of the `runRW#`:
+--
+--   throw = \e ->
+--     runRW# (\s -> case toExceptionWithBacktrace e s of
+--                     (# s', se #) -> raise# se)
+--
+-- This is problematic as one of the demand analyser's heuristics examines
+-- `case` scrutinees, looking for those that result in a `RealWorld#` token
+-- (see Note [Which scrutinees may throw precise exceptions], test (1)). The
+-- `case toExceptionWithBacktrace e of ...` here fails this check, causing the
+-- heuristic to conclude that `throw` may indeed diverge with a precise
+-- exception. This resulted in the significant performance regression noted in
+-- #25066.
+--
+-- To avoid this, we use `noinline` to ensure that `unsafePerformIO` does not unfold,
+-- meaning that the `raise#` cannot be floated under the `toExceptionWithBacktrace`
+-- case analysis.
+--
+-- Ultimately this is a bit of a horrible hack; the right solution would be to have
+-- primops which allow more precise guidance of the demand analyser's heuristic
+-- (e.g. #23847).
 
 -- | @since base-4.20.0.0
 toExceptionWithBacktrace :: (HasCallStack, Exception e)
