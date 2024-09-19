@@ -29,30 +29,13 @@ module GHC.Tc.Solver(
 
 import GHC.Prelude
 
-import GHC.Data.Bag
-import GHC.Core.Class
-import GHC.Core
-import GHC.Core.DataCon
-import GHC.Core.Make
-import GHC.Core.Coercion( mkNomReflCo )
-import GHC.Driver.DynFlags
-import GHC.Data.FastString
-import GHC.Data.List.SetOps
-import GHC.Types.Name
-import GHC.Types.DefaultEnv ( ClassDefaults (..), defaultList )
-import GHC.Types.Unique.Set
-import GHC.Types.Id
-import GHC.Utils.Outputable
-import GHC.Builtin.Utils
-import GHC.Builtin.Names
 import GHC.Tc.Errors
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Solve   ( solveSimpleGivens, solveSimpleWanteds )
 import GHC.Tc.Solver.Dict    ( makeSuperClasses, solveCallStack )
 import GHC.Tc.Solver.Rewrite ( rewriteType )
-import GHC.Tc.Utils.Unify    ( buildTvImplication, touchabilityAndShapeTest
-                             , simpleUnifyCheck, UnifyCheckCaller(..) )
+import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcMType as TcM
 import GHC.Tc.Utils.Monad   as TcM
 import GHC.Tc.Zonk.TcType     as TcM
@@ -61,17 +44,30 @@ import GHC.Tc.Solver.Monad  as TcS
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc( mkGivenLoc )
 import GHC.Tc.Instance.FunDeps
-import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
+
+import GHC.Core.Class
+import GHC.Core.Reduction( Reduction, reductionCoercion )
+import GHC.Core
+import GHC.Core.DataCon
+import GHC.Core.Make
+import GHC.Core.Coercion( mkNomReflCo, isReflCo )
+import GHC.Core.Unify    ( tcMatchTyKis )
+import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Ppr
 import GHC.Core.TyCon    ( TyCon, TyConBinder, isTypeFamilyTyCon )
+
+import GHC.Types.Name
+import GHC.Types.DefaultEnv ( ClassDefaults (..), defaultList )
+import GHC.Types.Unique.Set
+import GHC.Types.Id
+
+import GHC.Builtin.Utils
+import GHC.Builtin.Names
 import GHC.Builtin.Types
-import GHC.Core.Unify    ( tcMatchTyKis )
-import GHC.Unit.Module ( getModule )
-import GHC.Utils.Misc
-import GHC.Utils.Panic
+
 import GHC.Types.TyThing ( MonadThings(lookupId) )
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -79,6 +75,18 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Id.Make  ( unboxedUnitExpr )
 import GHC.Types.Error
+
+import GHC.Driver.DynFlags
+import GHC.Unit.Module ( getModule )
+
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+
+import GHC.Data.FastString
+import GHC.Data.List.SetOps
+import GHC.Data.Bag
+
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -515,7 +523,7 @@ tryDefaulting wc
       ; wc2 <- tryConstraintDefaulting wc1
       ; wc3 <- tryTypeClassDefaulting wc2
       ; wc4 <- tryUnsatisfiableGivens wc3
-      ; traceTcS "tryDefaulting:after" (ppr wc)
+      ; traceTcS "tryDefaulting:after" (ppr wc4)
       ; return wc4 }
 
 solveAgainIf :: Bool -> WantedConstraints -> TcS WantedConstraints
@@ -771,35 +779,66 @@ defaultEquality :: CtDefaultingStrategy
 -- See Note [Defaulting equalities]
 defaultEquality ct
   | EqPred NomEq ty1 ty2 <- classifyPredType (ctPred ct)
-  , Just tv1 <- getTyVar_maybe ty1
   = do { -- Remember: `ct` may not be zonked;
          -- see (DE3) in Note [Defaulting equalities]
-         z_ty1 <- TcS.zonkTcTyVar tv1
-       ; z_ty2 <- TcS.zonkTcType  ty2
-       ; case getTyVar_maybe z_ty1 of
-           Just z_tv1 | defaultable z_tv1 z_ty2
-                      -> do { default_tv z_tv1 z_ty2
-                            ; return True }
-           _          -> return False }
-   | otherwise
-   = return False
-  where
-    defaultable tv1 ty2
-      =  -- Do the standard unification checks;
-         --   c.f. uUnfilledVar2 in GHC.Tc.Utils.Unify
-         -- EXCEPT drop the untouchability test
-         tyVarKind tv1 `tcEqType` typeKind ty2
-      && touchabilityAndShapeTest topTcLevel tv1 ty2
-          -- topTcLevel makes the untoucability test vacuous,
-          -- which is the Whole Point of `defaultEquality`
-          -- See (DE2) in Note [Defaulting equalities]
-      && simpleUnifyCheck UC_Defaulting tv1 ty2
+         z_ty1 <- TcS.zonkTcType ty1
+       ; z_ty2 <- TcS.zonkTcType ty2
 
-    default_tv tv1 ty2
-      = do { unifyTyVar tv1 ty2   -- NB: unifyTyVar adds to the
-                                  -- TcS unification counter
-           ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
-             evCoercion (mkNomReflCo ty2) }
+       -- Now see if either LHS or RHS is a bare type variable
+       -- You might think the type variable will only be on the LHS
+       -- but with a type function we might get   F t1 ~ alpha
+       ; case (getTyVar_maybe z_ty1, getTyVar_maybe z_ty2) of
+           (Just z_tv1, _) -> try_default_tv z_tv1 z_ty2
+           (_, Just z_tv2) -> try_default_tv z_tv2 z_ty1
+           _               -> return False }
+  | otherwise
+  = return False
+
+  where
+    try_default_tv lhs_tv rhs_ty
+      | MetaTv { mtv_info = info, mtv_tclvl = lvl } <- tcTyVarDetails lhs_tv
+      , tyVarKind lhs_tv `tcEqType` typeKind rhs_ty
+      , checkTopShape info rhs_ty
+      -- Do not test for touchability of lhs_tv; that is the whole point!
+      -- See (DE2) in Note [Defaulting equalities]
+      = do { traceTcS "defaultEquality 1" (ppr lhs_tv $$ ppr rhs_ty)
+
+           -- checkTyEqRhs: check that we can in fact unify lhs_tv := rhs_ty
+           -- See Note [Defaulting equalities]
+           --   LC_Promote: promote deeper unification variables (DE4)
+           --   LC_Promote True: ...including under type families (DE5)
+           ; let flags :: TyEqFlags ()
+                 flags = TEF { tef_foralls  = False
+                             , tef_fam_app  = TEFA_Recurse
+                             , tef_lhs      = TyVarLHS lhs_tv
+                             , tef_unifying = Unifying info lvl (LC_Promote True)
+                             , tef_occurs   = cteInsolubleOccurs }
+           ; res :: PuResult () Reduction <- wrapTcS (checkTyEqRhs flags rhs_ty)
+
+           ; case res of
+               PuFail {}   -> cant_default_tv "checkTyEqRhs"
+               PuOK _ redn -> assertPpr (isReflCo (reductionCoercion redn)) (ppr redn) $
+                               -- With TEFA_Recurse we never get any reductions
+                              default_tv }
+      | otherwise
+      = cant_default_tv "fall through"
+
+      where
+        cant_default_tv msg
+          = do { traceTcS ("defaultEquality fails: " ++ msg) $
+                 vcat [ ppr lhs_tv <+> char '~' <+>  ppr rhs_ty
+                      , ppr (tyVarKind lhs_tv)
+                      , ppr (typeKind rhs_ty) ]
+               ; return False }
+
+        -- All tests passed: do the unification
+        default_tv
+          = do { traceTcS "defaultEquality success:" (ppr rhs_ty)
+               ; unifyTyVar lhs_tv rhs_ty  -- NB: unifyTyVar adds to the
+                                           -- TcS unification counter
+               ; setEvBindIfWanted (ctEvidence ct) EvCanonical $
+                 evCoercion (mkNomReflCo rhs_ty)
+               ; return True }
 
 combineStrategies :: CtDefaultingStrategy -> CtDefaultingStrategy -> CtDefaultingStrategy
 combineStrategies default1 default2 ct
@@ -884,22 +923,20 @@ Wrinkles:
   given equality is at top level.
 
 (DE3) The contraint we are looking at may not be fully zonked; for example,
-  an earlier deafaulting might have affected it. So we zonk-on-the fly in
+  an earlier defaulting might have affected it. So we zonk-on-the fly in
   `defaultEquality`.
 
-Note [Don't default in syntactic equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When there are unsolved syntactic equalities such as
+(DE4) Promotion. Suppose we see  alpha[2] := Maybe beta[4].  We want to promote
+  beta[4] to level 2 and unify alpha[2] := Maybe beta'[2].  This is done by
+  checkTyEqRhs.
 
-  rr[sk] ~S# alpha[conc]
+(DE5) Promotion. Suppose we see  alpha[2] := F beta[4], where F is a type
+  family. Then we still want to promote beta to beta'[2], and unify. This is
+  unusual: more commonly, we don't promote unification variables under a
+  type family.  But here we want to.  (This mattered in #25251.)
 
-we should not default alpha, lest we obtain a poor error message such as
-
-  Couldn't match kind `rr' with `LiftedRep'
-
-We would rather preserve the original syntactic equality to be
-reported to the user, especially as the concrete metavariable alpha
-might store an informative origin for the user.
+  Hence the Bool flag on LC_Promote, and its use in `tef_unifying` in
+  `defaultEquality`.
 
 Note [Must simplify after defaulting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
