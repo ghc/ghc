@@ -1,12 +1,8 @@
-cgrun045: Exception:
+cgrun045: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 hello world!
 CallStack (from HasCallStack):
   error, called at cgrun045.hs:6:13 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

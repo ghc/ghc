@@ -1,15 +1,10 @@
-T20024: Exception:
+T20024: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.PatternMatchFail:
 
 T20024.hs:2:12-32: Non-exhaustive guards in pattern binding
 
-Package: ghc-internal
-Module: GHC.Internal.Control.Exception.Base
-Type: PatternMatchFail
 
 HasCallStack backtrace:
-    collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-    toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
-    throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:419:30 in ghc-internal:GHC.Internal.Control.Exception.Base
-
-
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:431:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 

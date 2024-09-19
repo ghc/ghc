@@ -1,12 +1,8 @@
-Main: Exception:
+Main: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 test
 CallStack (from HasCallStack):
   error, called at callstack/./Main.hs:4:8 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

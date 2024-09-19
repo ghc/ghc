@@ -1,12 +1,8 @@
-T21694a: Exception:
+T21694a: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 Urkh! But expected!
 CallStack (from HasCallStack):
   error, called at T21694a.hs:24:33 in main:Main
-
-Package: ghc-internal
-Module: GHC.Internal.Exception
-Type: ErrorCall
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

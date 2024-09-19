@@ -1,10 +1,6 @@
-T4808: Exception:
+T4808: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
 
 T4808.test: hGetLine: illegal operation (handle is closed)
-
-Package: ghc-internal
-Module: GHC.Internal.IO.Exception
-Type: IOException
 
 HasCallStack backtrace:
   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
