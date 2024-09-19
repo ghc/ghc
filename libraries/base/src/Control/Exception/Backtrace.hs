@@ -10,6 +10,11 @@
 -- Mechanisms for collecting diagnostic backtraces and their representation.
 --
 
+-- Note [Backtrace mechanisms]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- See module docstring above.
+
+
 module Control.Exception.Backtrace
     ( -- * Backtrace mechanisms
       BacktraceMechanism(..)

@@ -2,6 +2,8 @@
 
 ## 4.22.0.0 *TBA*
   * Restrict `Data.List.NonEmpty.unzip` to `NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)`. ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+  * Modify the implementation of `Control.Exception.throw` to avoid call-sites being inferred as diverging via precise exception.
+    ([GHC #25066](https://gitlab.haskell.org/ghc/ghc/-/issues/25066), [CLC proposal #290](https://github.com/haskell/core-libraries-committee/issues/290))
 
 ## 4.21.0.0 *TBA*
   * `GHC.Desugar` has been deprecated and should be removed in GHC 9.14. ([CLC proposal #216](https://github.com/haskell/core-libraries-committee/issues/216))
