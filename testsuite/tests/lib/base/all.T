@@ -2,6 +2,7 @@ test('DataTypeOrd', normal, compile_and_run, [''])
 test('T16586', normal, compile_and_run, ['-O2'])
 # Event-manager not supported on Windows
 test('T16916', [when(opsys('mingw32'), skip), js_broken(22261), fragile(16966)], compile_and_run, ['-O2 -threaded -with-rtsopts="-I0" -rtsopts'])
+test('T24672', [when(opsys('mingw32'), skip), js_broken(22261),req_process], compile_and_run, [''])
 test('T17310', normal, compile, [''])
 test('T19691', normal, compile, [''])
 test('executablePath', [extra_run_opts(config.os), js_broken(22261)], compile_and_run, [''])
