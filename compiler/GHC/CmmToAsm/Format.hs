@@ -28,6 +28,7 @@ module GHC.CmmToAsm.Format (
     scalarWidth,
     formatInBytes,
     isFloatScalarFormat,
+    isFloatOrFloatVecFormat,
     floatScalarFormat,
     scalarFormatFormat,
     VirtualRegWithFormat(..),
@@ -133,6 +134,11 @@ isFloatScalarFormat = \case
   FmtFloat -> True
   FmtDouble -> True
   _ -> False
+
+isFloatOrFloatVecFormat :: Format -> Bool
+isFloatOrFloatVecFormat = \case
+  VecFormat _ sFmt -> isFloatScalarFormat sFmt
+  fmt -> isFloatFormat fmt
 
 floatScalarFormat :: Width -> ScalarFormat
 floatScalarFormat W32 = FmtFloat

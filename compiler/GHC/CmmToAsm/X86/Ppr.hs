@@ -1016,6 +1016,8 @@ pprInstr platform i = case i of
         VecFormat 64 FmtInt8  -> text "vmovdqu32" -- require the additional AVX512BW extension
         _ -> text "vmovdqu"
 
+   PXOR format src dst
+     -> pprPXor (text "pxor") format src dst
    VPXOR format s1 s2 dst
      -> pprXor (text "vpxor") format s1 s2 dst
    VEXTRACT format offset from to
@@ -1318,6 +1320,15 @@ pprInstr platform i = case i of
            pprReg platform format reg2,
            comma,
            pprReg platform format reg3
+       ]
+
+   pprPXor :: Line doc -> Format -> Operand -> Reg -> doc
+   pprPXor name format src dst
+     = line $ hcat [
+           pprGenMnemonic name format,
+           pprOperand platform format src,
+           comma,
+           pprReg platform format dst
        ]
 
    pprVxor :: Format -> Operand -> Reg -> Reg -> doc

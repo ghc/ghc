@@ -913,20 +913,6 @@ getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W16) [x])
   ro <- getNewRegNat II16
   return $ Fixed II16 ro (code `appOL` toOL [ MOVZxL II16 (OpReg rlo) (OpReg ro) ])
 
-getRegister' _ _ (CmmLit lit@(CmmFloat f w)) =
-  float_const_sse2  where
-  float_const_sse2
-    | f == 0.0 = do
-      -- TODO: this mishandles negative zero floating point literals.
-      let
-          format = floatFormat w
-          code dst = unitOL  (XOR format (OpReg dst) (OpReg dst))
-        -- I don't know why there are xorpd, xorps, and pxor instructions.
-        -- They all appear to do the same thing --SDM
-      return (Any format code)
-
-   | otherwise = getFloatLitRegister lit
-
 -- catch simple cases of zero- or sign-extended load
 getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad addr _ _]) = do
   code <- intLoadCode (MOVZxL II8) addr
@@ -1932,7 +1918,7 @@ getRegister' platform is32Bit load@(CmmLoad mem ty _)
   | isFloatType ty
   = do
     Amode addr mem_code <- getAmode mem
-    loadFloatAmode width addr mem_code
+    loadAmode (floatFormat width) addr mem_code
 
   | is32Bit && not (isWord64 ty)
   = do
@@ -1960,20 +1946,6 @@ getRegister' platform is32Bit load@(CmmLoad mem ty _)
     format = cmmTypeFormat ty
     width = typeWidth ty
 
-getRegister' _ is32Bit (CmmLit (CmmInt 0 width))
-  = let
-        format = intFormat width
-
-        -- x86_64: 32-bit xor is one byte shorter, and zero-extends to 64 bits
-        format1 = if is32Bit then format
-                           else case format of
-                                II64 -> II32
-                                _ -> format
-        code dst
-           = unitOL (XOR format1 (OpReg dst) (OpReg dst))
-    in
-        return (Any format code)
-
 -- Handle symbol references with LEA and %rip-relative addressing.
 -- See Note [%rip-relative addressing on x86-64].
 getRegister' platform is32Bit (CmmLit lit)
@@ -1990,79 +1962,90 @@ getRegister' platform is32Bit (CmmLit lit)
     is_label (CmmLabelDiffOff {}) = True
     is_label _                    = False
 
-  -- optimisation for loading small literals on x86_64: take advantage
-  -- of the automatic zero-extension from 32 to 64 bits, because the 32-bit
-  -- instruction forms are shorter.
-getRegister' platform is32Bit (CmmLit lit)
-  | not is32Bit, isWord64 (cmmLitType platform lit), not (isBigLit lit)
-  = let
-        imm = litToImm lit
-        code dst = unitOL (MOV II32 (OpImm imm) (OpReg dst))
-    in
-        return (Any II64 code)
-  where
-   isBigLit (CmmInt i _) = i < 0 || i > 0xffffffff
-   isBigLit _ = False
+getRegister' platform is32Bit (CmmLit lit) = do
+  avx <- avxEnabled
+
+  -- TODO: this function mishandles floating-point negative zero,
+  -- because -0.0 == 0.0 returns True and because we represent CmmFloat as
+  -- Rational, which can't properly represent negative zero.
+
+  if
+    -- Zero: use XOR.
+    | isZeroLit lit
+    -> let code dst
+             | isIntFormat fmt
+             = let fmt'
+                     | is32Bit
+                     = fmt
+                     | otherwise
+                     -- x86_64: 32-bit xor is one byte shorter,
+                     -- and zero-extends to 64 bits
+                     = case fmt of
+                         II64 -> II32
+                         _ -> fmt
+               in unitOL (XOR fmt' (OpReg dst) (OpReg dst))
+             | avx
+             = if float_or_floatvec
+               then unitOL (VXOR fmt (OpReg dst) dst dst)
+               else unitOL (VPXOR fmt dst dst dst)
+             | otherwise
+             = if float_or_floatvec
+               then unitOL (XOR fmt (OpReg dst) (OpReg dst))
+               else unitOL (PXOR fmt (OpReg dst) dst)
+       in return $ Any fmt code
+
+    -- Constant vector: use broadcast.
+    | VecFormat l sFmt <- fmt
+    , CmmVec (f:fs) <- lit
+    , all (== f) fs
+    -> do let w = scalarWidth sFmt
+              broadcast = if isFloatScalarFormat sFmt
+                          then MO_VF_Broadcast l w
+                          else MO_V_Broadcast l w
+          valCode <- getAnyReg (CmmMachOp broadcast [CmmLit f])
+          return $ Any fmt valCode
+
+    -- Optimisation for loading small literals on x86_64: take advantage
+    -- of the automatic zero-extension from 32 to 64 bits, because the 32-bit
+    -- instruction forms are shorter.
+    | not is32Bit, isWord64 cmmTy, not (isBigLit lit)
+    -> let
+          imm = litToImm lit
+          code dst = unitOL (MOV II32 (OpImm imm) (OpReg dst))
+      in
+          return (Any II64 code)
+
+    -- Scalar integer: use an immediate.
+    | isIntFormat fmt
+    -> let imm = litToImm lit
+           code dst = unitOL (MOV fmt (OpImm imm) (OpReg dst))
+       in return (Any fmt code)
+
+    -- General case: load literal from data address.
+    | otherwise
+    -> do let w = formatToWidth fmt
+          Amode addr addr_code <- memConstant (mkAlignment $ widthInBytes w) lit
+          loadAmode fmt addr addr_code
+
+    where
+      cmmTy = cmmLitType platform lit
+      fmt = cmmTypeFormat cmmTy
+      float_or_floatvec = isFloatOrFloatVecFormat fmt
+      isZeroLit (CmmInt i _) = i == 0
+      isZeroLit (CmmFloat f _) = f == 0 -- TODO: mishandles negative zero
+      isZeroLit (CmmVec fs) = all isZeroLit fs
+      isZeroLit _ = False
+
+      isBigLit (CmmInt i _) = i < 0 || i > 0xffffffff
+      isBigLit _ = False
         -- note1: not the same as (not.is32BitLit), because that checks for
         -- signed literals that fit in 32 bits, but we want unsigned
         -- literals here.
         -- note2: all labels are small, because we're assuming the
         -- small memory model. See Note [%rip-relative addressing on x86-64].
 
-getRegister' platform _ (CmmLit lit) = do
-  avx <- avxEnabled
-  case fmt of
-    VecFormat l sFmt
-      | CmmVec fs <- lit
-      , all is_zero fs
-      -> let code dst
-               | avx
-               = if isFloatScalarFormat sFmt
-                 then unitOL (VXOR fmt (OpReg dst) dst dst)
-                 else unitOL (VPXOR fmt dst dst dst)
-               | otherwise
-               = unitOL (XOR fmt (OpReg dst) (OpReg dst))
-         in return (Any fmt code)
-      | CmmVec (f:fs) <- lit
-      , all (== f) fs
-      -- TODO: mishandles negative zero (because -0.0 == 0.0 returns True), and because we
-      -- represent CmmFloat as Rational which can't properly represent negative zero.
-      -> do let w = scalarWidth sFmt
-                broadcast = if isFloatScalarFormat sFmt
-                            then MO_VF_Broadcast l w
-                            else MO_V_Broadcast l w
-            valCode <- getAnyReg (CmmMachOp broadcast [CmmLit f])
-            return $ Any fmt valCode
-
-      | otherwise
-      -> do
-           let w = formatToWidth fmt
-           config <- getConfig
-           Amode addr addr_code <- memConstant (mkAlignment $ widthInBytes w) lit
-           let code dst = addr_code `snocOL`
-                            movInstr config fmt (OpAddr addr) (OpReg dst)
-           return (Any fmt code)
-       where
-        is_zero (CmmInt i _) = i == 0
-        is_zero (CmmFloat f _) = f == 0 -- TODO: mishandles negative zero
-        is_zero _ = False
-
-    _ -> let imm = litToImm lit
-             code dst = unitOL (MOV fmt (OpImm imm) (OpReg dst))
-         in return (Any fmt code)
-  where
-    cmmTy = cmmLitType platform lit
-    fmt = cmmTypeFormat cmmTy
-
 getRegister' platform _ slot@(CmmStackSlot {}) =
   pprPanic "getRegister(x86) CmmStackSlot" (pdoc platform slot)
-
-getFloatLitRegister :: CmmLit -> NatM Register
-getFloatLitRegister lit = do
-  let w :: Width
-      w = case lit of { CmmInt _ w -> w; CmmFloat _ w -> w; _ -> panic "getFloatLitRegister" (ppr lit) }
-  Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
-  loadFloatAmode w addr code
 
 intLoadCode :: (Operand -> Operand -> Instr) -> CmmExpr
    -> NatM (Reg -> InstrBlock)
@@ -2392,15 +2375,12 @@ memConstant align lit = do
         `consOL` addr_code
   return (Amode addr code)
 
-
-loadFloatAmode :: Width -> AddrMode -> InstrBlock -> NatM Register
-loadFloatAmode w addr addr_code = do
-  let format = floatFormat w
-      code dst = addr_code `snocOL`
-                    MOV format (OpAddr addr) (OpReg dst)
-
-  return (Any format code)
-
+-- | Load the value at the given address into any register.
+loadAmode :: Format -> AddrMode -> InstrBlock -> NatM Register
+loadAmode fmt addr addr_code = do
+  config <- getConfig
+  let load dst = movInstr config fmt (OpAddr addr) (OpReg dst)
+  return $ Any fmt (\ dst -> addr_code `snocOL` load dst)
 
 -- if we want a floating-point literal as an operand, we can
 -- use it directly from memory.  However, if the literal is
