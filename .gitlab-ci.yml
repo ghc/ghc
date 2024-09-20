@@ -400,8 +400,8 @@ hadrian-ghc-in-ghci:
     - x86_64-linux
   script:
     - git clean -xdf && git submodule foreach git clean -xdf
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
+    - . .gitlab/ci.sh setup
+    - . .gitlab/ci.sh configure
     # Enable -Werror when building hadrian
     - "echo 'package hadrian'  > hadrian/cabal.project.local"
     - "echo '  ghc-options: -Werror'  >> hadrian/cabal.project.local"
@@ -454,8 +454,8 @@ hadrian-multi:
     - export HC=$root/bin/ghc
     # This GHC means, use this GHC to configure with
     - export GHC=$root/bin/ghc
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
+    - . .gitlab/ci.sh setup
+    - . .gitlab/ci.sh configure
     # Now GHC means, use this GHC for hadrian
     - export GHC=$BOOT_HC
     - export CORES="$(mk/detect-cpu-count.sh)"
@@ -481,8 +481,8 @@ stack-hadrian-build:
   extends: hadrian-ghc-in-ghci
   stage: quick-build
   script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
+    - . .gitlab/ci.sh setup
+    - . .gitlab/ci.sh configure
     - hadrian/build-stack --version
 
 ####################################
@@ -622,8 +622,8 @@ hackage-doc-tarball:
   script:
     - cd ghc*/
     - mv .gitlab/rel_eng/upload_ghc_libs.py .
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
+    - . .gitlab/ci.sh setup
+    - . .gitlab/ci.sh configure
     - ./upload_ghc_libs.py prepare --bindist ghc*linux/
     - mv .upload-libs/docs ../hackage_docs
   rules:
@@ -641,8 +641,8 @@ source-tarball:
       - ghc-*.tar.xz
   script:
     - sudo chown ghc:ghc -R .
-    - ./boot
-    - ./configure
+    - . .gitlab/ci.sh setup
+    - . .gitlab/ci.sh configure
     - ./hadrian/build source-dist
     - mv _build/source-dist/*.xz  .
   rules:
