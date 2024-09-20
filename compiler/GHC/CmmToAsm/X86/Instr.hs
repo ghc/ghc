@@ -307,6 +307,7 @@ data Instr
         | VMOVDQU     Format Operand Operand
 
         -- logic operations
+        | PXOR        Format Operand Reg
         | VPXOR       Format Reg Reg Reg
 
         -- Arithmetic
@@ -492,6 +493,12 @@ regUsageOfInstr platform instr
     MOVH         fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
     MOVDQU       fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
     VMOVDQU      fmt src dst   -> mkRU (use_R fmt src []) (use_R fmt dst [])
+
+    PXOR fmt (OpReg src) dst
+      | src == dst
+      -> mkRU [] [mk fmt dst]
+      | otherwise
+      -> mkRU [mk fmt src, mk fmt dst] [mk fmt dst]
 
     VPXOR        fmt s1 s2 dst
       | s1 == s2, s1 == dst
@@ -734,6 +741,7 @@ patchRegsOfInstr platform instr env
     MOVDQU     fmt src dst   -> MOVDQU  fmt (patchOp src) (patchOp dst)
     VMOVDQU    fmt src dst   -> VMOVDQU fmt (patchOp src) (patchOp dst)
 
+    PXOR       fmt src dst   -> PXOR fmt (patchOp src) (env dst)
     VPXOR      fmt s1 s2 dst -> VPXOR fmt (env s1) (env s2) (env dst)
 
     VADD       fmt s1 s2 dst -> VADD fmt (patchOp s1) (env s2) (env dst)
