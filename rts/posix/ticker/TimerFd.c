@@ -192,6 +192,14 @@ initTicker (Time interval, TickProc handle_tick)
     it.it_value.tv_nsec = TimeToNS(itimer_interval) % 1000000000;
     it.it_interval = it.it_value;
 
+    if (timerfd != -1) {
+        // don't leak the old file descriptors after a fork (#25280)
+        close(timerfd);
+        close(pipefds[0]);
+        close(pipefds[1]);
+        timerfd = -1;
+    }
+
     timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
     if (timerfd == -1) {
         barf("timerfd_create: %s", strerror(errno));
