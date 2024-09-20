@@ -1965,6 +1965,17 @@ getRegister' platform is32Bit (CmmLit lit)
 getRegister' platform is32Bit (CmmLit lit) = do
   avx <- avxEnabled
 
+  -- NB: it is important that the code produced here (to load a literal into
+  -- a register) doesn't clobber any registers other than the destination
+  -- register; the code for generating C calls relies on this property.
+  --
+  -- In particular, we have:
+  --
+  -- > loadIntoRegMightClobberOtherReg (CmmLit _) = False
+  --
+  -- which means that we assume that loading a literal into a register
+  -- will not clobber any other registers.
+
   -- TODO: this function mishandles floating-point negative zero,
   -- because -0.0 == 0.0 returns True and because we represent CmmFloat as
   -- Rational, which can't properly represent negative zero.
@@ -3080,10 +3091,8 @@ genSimplePrim _   op                   dst     args           = do
   platform <- ncgPlatform <$> getConfig
   pprPanic "genSimplePrim: unhandled primop" (ppr (pprCallishMachOp op, dst, fmap (pdoc platform) args))
 
-{-
-Note [Evaluate C-call arguments before placing in destination registers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Evaluate C-call arguments before placing in destination registers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When producing code for C calls we must take care when placing arguments
 in their final registers. Specifically, we must ensure that temporary register
 usage due to evaluation of one argument does not clobber a register in which we
@@ -3134,15 +3143,11 @@ genForeignCall{32,64}.
 -- | See Note [Evaluate C-call arguments before placing in destination registers]
 evalArgs :: BlockId -> [CmmActual] -> NatM (InstrBlock, [CmmActual])
 evalArgs bid actuals
-  | any mightContainMachOp actuals = do
+  | any loadIntoRegMightClobberOtherReg actuals = do
       regs_blks <- mapM evalArg actuals
       return (concatOL $ map fst regs_blks, map snd regs_blks)
   | otherwise = return (nilOL, actuals)
   where
-    mightContainMachOp (CmmReg _)      = False
-    mightContainMachOp (CmmRegOff _ _) = False
-    mightContainMachOp (CmmLit _)      = False
-    mightContainMachOp _               = True
 
     evalArg :: CmmActual -> NatM (InstrBlock, CmmExpr)
     evalArg actual = do
@@ -3155,6 +3160,16 @@ evalArgs bid actuals
 
     newLocalReg :: CmmType -> NatM LocalReg
     newLocalReg ty = LocalReg <$> getUniqueM <*> pure ty
+
+-- | Might the code to put this expression into a register
+-- clobber any other registers?
+loadIntoRegMightClobberOtherReg :: CmmExpr -> Bool
+loadIntoRegMightClobberOtherReg (CmmReg _)      = False
+loadIntoRegMightClobberOtherReg (CmmRegOff _ _) = False
+loadIntoRegMightClobberOtherReg (CmmLit _)      = False
+  -- NB: this last 'False' is slightly risky, because the code for loading
+  -- a literal into a register is not entirely trivial.
+loadIntoRegMightClobberOtherReg _               = True
 
 -- Note [DIV/IDIV for bytes]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3421,7 +3436,6 @@ genCCall64 addr conv dest_regs args = do
       { stackArgs       = proper_stack_args
       , stackDataArgs   = stack_data_args
       , usedRegs        = arg_regs_used
-      , computeArgsCode = compute_args_code
       , assignArgsCode  = assign_args_code
       }
       <- loadArgs config args
@@ -3523,7 +3537,6 @@ genCCall64 addr conv dest_regs args = do
 
     return (align_call_code     `appOL`
             push_code           `appOL`
-            compute_args_code   `appOL`
             assign_args_code    `appOL`
             load_data_refs      `appOL`
             shadow_space_code   `appOL`
@@ -3544,16 +3557,14 @@ data LoadArgs
   , stackDataArgs :: [CmmExpr]
   -- | Which registers are we using for argument passing?
   , usedRegs      :: [RegWithFormat]
-  -- | The code to compute arguments into (possibly temporary) registers.
-  , computeArgsCode :: InstrBlock
   -- | The code to assign arguments to registers used for argument passing.
   , assignArgsCode :: InstrBlock
   }
 instance Semigroup LoadArgs where
-  LoadArgs a1 d1 r1 i1 j1 <> LoadArgs a2 d2 r2 i2 j2
-    = LoadArgs (a1 ++ a2) (d1 ++ d2) (r1 ++ r2) (i1 S.<> i2) (j1 S.<> j2)
+  LoadArgs a1 d1 r1 j1 <> LoadArgs a2 d2 r2 j2
+    = LoadArgs (a1 ++ a2) (d1 ++ d2) (r1 ++ r2) (j1 S.<> j2)
 instance Monoid LoadArgs where
-  mempty = LoadArgs [] [] [] nilOL nilOL
+  mempty = LoadArgs [] [] [] nilOL
 
 -- | An argument passed on the stack, either directly or by reference.
 --
@@ -3710,7 +3721,6 @@ loadArgsSysV config (arg:rest) = do
           LoadArgs
             { stackArgs       = map RawStackArg (arg:rest)
             , stackDataArgs   = []
-            , computeArgsCode = nilOL
             , assignArgsCode  = nilOL
             , usedRegs        = []
             }
@@ -3730,12 +3740,11 @@ loadArgsSysV config (arg:rest) = do
     this_arg <-
       case mbReg of
         Just reg -> do
-          (compute_code, assign_code) <- lift $ loadArgIntoReg config arg rest reg
+          assign_code <- lift $ loadArgIntoReg arg reg
           return $
             LoadArgs
                 { stackArgs       = [] -- passed in register
                 , stackDataArgs   = []
-                , computeArgsCode = compute_code
                 , assignArgsCode  = assign_code
                 , usedRegs        = [RegWithFormat reg arg_fmt]
                 }
@@ -3745,7 +3754,6 @@ loadArgsSysV config (arg:rest) = do
             LoadArgs
                 { stackArgs       = [RawStackArg arg]
                 , stackDataArgs   = []
-                , computeArgsCode = nilOL
                 , assignArgsCode  = nilOL
                 , usedRegs        = []
                 }
@@ -3797,7 +3805,6 @@ loadArgsWin config (arg:rest) = do
         LoadArgs
           { stackArgs       = stk_args
           , stackDataArgs   = data_args
-          , computeArgsCode = nilOL
           , assignArgsCode  = nilOL
           , usedRegs        = []
           }
@@ -3813,8 +3820,7 @@ loadArgsWin config (arg:rest) = do
                 -- Pass the reference in a register,
                 -- and the argument data on the stack.
                 { stackArgs       = [RawStackArgRef (InReg ireg) (argSize platform arg)]
-                , stackDataArgs   = [arg]
-                , computeArgsCode = nilOL -- we don't yet know where the data will reside,
+                , stackDataArgs   = [arg] -- we don't yet know where the data will reside,
                 , assignArgsCode  = nilOL -- so we defer computing the reference and storing it
                                           -- in the register until later
                 , usedRegs        = [RegWithFormat ireg II64]
@@ -3825,7 +3831,7 @@ loadArgsWin config (arg:rest) = do
                   = freg
                   | otherwise
                   = ireg
-           (compute_code, assign_code) <- loadArgIntoReg config arg rest arg_reg
+           assign_code <- loadArgIntoReg arg arg_reg
            -- Recall that, for varargs, we must pass floating-point
            -- arguments in both fp and integer registers.
            let (assign_code', regs')
@@ -3838,42 +3844,23 @@ loadArgsWin config (arg:rest) = do
              LoadArgs
                { stackArgs       = [] -- passed in register
                , stackDataArgs   = []
-               , computeArgsCode = compute_code
                , assignArgsCode = assign_code'
                , usedRegs = regs'
                }
 
-
--- | Return two pieces of code:
+-- | Load an argument into a register.
 --
---  - code to compute a the given 'CmmExpr' into some (possibly temporary) register
---  - code to assign the resulting value to the specified register
---
--- Using two separate pieces of code handles clobbering issues reported
--- in e.g. #11792, #12614.
-loadArgIntoReg :: NCGConfig -> CmmExpr -> [CmmExpr] -> Reg -> NatM (InstrBlock, InstrBlock)
-loadArgIntoReg config arg rest reg
-  -- "operand" args can be directly assigned into the register
-  | isOperand platform arg
-  = do arg_code <- getAnyReg arg
-       return (nilOL, arg_code reg)
-  -- The last non-operand arg can be directly assigned after its
-  -- computation without going into a temporary register
-  | all (isOperand platform) rest
-  = do arg_code <- getAnyReg arg
-       return (arg_code reg, nilOL)
-  -- Other args need to be computed beforehand to avoid clobbering
-  -- previously assigned registers used to pass parameters (see
-  -- #11792, #12614). They are assigned into temporary registers
-  -- and get assigned to proper call ABI registers after they all
-  -- have been computed.
-  | otherwise
-  = do arg_code <- getAnyReg arg
-       tmp      <- getNewRegNat arg_fmt
-       return (arg_code tmp, unitOL $ mkRegRegMoveInstr config arg_fmt tmp reg)
-  where
-    platform = ncgPlatform config
-    arg_fmt = cmmTypeFormat $ cmmExprType platform arg
+-- Assumes that the expression does not contain any MachOps,
+-- as per Note [Evaluate C-call arguments before placing in destination registers].
+loadArgIntoReg :: CmmExpr -> Reg -> NatM InstrBlock
+loadArgIntoReg arg reg = do
+  when (debugIsOn && loadIntoRegMightClobberOtherReg arg) $ do
+    platform <- getPlatform
+    massertPpr False $
+      vcat [ text "loadArgIntoReg: arg might contain MachOp"
+           , text "arg:" <+> pdoc platform arg ]
+  arg_code <- getAnyReg arg
+  return $ arg_code reg
 
 -- -----------------------------------------------------------------------------
 -- Pushing arguments onto the stack for 64-bit C calls.
