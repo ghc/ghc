@@ -1233,7 +1233,7 @@ replaceLeavesMatch _res_ty leaves
   = let
         (leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', L loc (match { m_ext = noAnn, m_grhss = GRHSs x grhss' binds }))
+    (leaves', L loc (match { m_ext = noExtField, m_grhss = GRHSs x grhss' binds }))
 
 replaceLeavesGRHS
         :: ( Anno (Match GhcTc (LocatedA (body' GhcTc))) ~ Anno (Match GhcTc (LocatedA (body GhcTc)))

@@ -791,7 +791,7 @@ identifier :: { LocatedN RdrName }
         | qvarop                        { $1 }
         | qconop                        { $1 }
     | '->'              {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
-                                (NameAnnRArrow (isUnicode $1) Nothing (glAA $1) Nothing []) }
+                                (NameAnnRArrow (isUnicode $1) Nothing (glR $1) Nothing []) }
 
 -----------------------------------------------------------------------------
 -- Backpack stuff
@@ -1044,10 +1044,10 @@ export  :: { LIE GhcPs }
                                                           ; locImpExp <- return (sL span (IEModuleContents ($1, [mj AnnModule $2]) $3))
                                                           ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
-                                                           in reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) Nothing }
+                                                           in reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glR $2) $3)) Nothing }
         | maybe_warning_pragma 'default' qtycon          {% do { let { span = (maybe comb2 comb3 $1) $2 $>
                                                                    ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
-                                                          ; locImpExp <- return (sL span (IEThingAbs ($1, [mj AnnExport $2]) (sLLa $2 $> (IEDefault (glAA $2) $3)) Nothing))
+                                                          ; locImpExp <- return (sL span (IEThingAbs ($1, [mj AnnExport $2]) (sLLa $2 $> (IEDefault (glR $2) $3)) Nothing))
                                                           ; return $ reLoc $ locImpExp } }
 
 
@@ -1085,7 +1085,7 @@ qcname_ext_w_wildcard :: { Located ([AddEpAnn], LocatedA ImpExpQcSpec) }
 qcname_ext :: { LocatedA ImpExpQcSpec }
         :  qcname                   { sL1a $1 (ImpExpQcName $1) }
         |  'type' oqtycon           {% do { n <- mkTypeImpExp $2
-                                          ; return $ sLLa $1 $> (ImpExpQcType (glAA $1) n) }}
+                                          ; return $ sLLa $1 $> (ImpExpQcType (glR $1) n) }}
 
 qcname  :: { LocatedN RdrName }  -- Variable or type constructor
         :  qvar                 { $1 } -- Things which look like functions
@@ -1101,14 +1101,14 @@ qcname  :: { LocatedN RdrName }  -- Variable or type constructor
 
 -- One or more semicolons
 semis1  :: { Located [TrailingAnn] }
-semis1  : semis1 ';'  { if isZeroWidthSpan (gl $2) then (sL1 $1 $ unLoc $1) else (sLL $1 $> $ AddSemiAnn (glAA $2) : (unLoc $1)) }
+semis1  : semis1 ';'  { if isZeroWidthSpan (gl $2) then (sL1 $1 $ unLoc $1) else (sLL $1 $> $ AddSemiAnn (glR $2) : (unLoc $1)) }
         | ';'         { case msemi $1 of
                           [] -> noLoc []
                           ms -> sL1 $1 $ ms }
 
 -- Zero or more semicolons
 semis   :: { [TrailingAnn] }
-semis   : semis ';'   { if isZeroWidthSpan (gl $2) then $1 else (AddSemiAnn (glAA $2) : $1) }
+semis   : semis ';'   { if isZeroWidthSpan (gl $2) then $1 else (AddSemiAnn (glR $2) : $1) }
         | {- empty -} { [] }
 
 -- No trailing semicolons, non-empty
@@ -1133,7 +1133,7 @@ importdecl :: { LImportDecl GhcPs }
                   ; checkImportDecl mPreQual mPostQual
                   ; let anns
                          = EpAnnImportDecl
-                             { importDeclAnnImport    = glAA $1
+                             { importDeclAnnImport    = glR $1
                              , importDeclAnnPragma    = fst $ fst $2
                              , importDeclAnnSafe      = fst $3
                              , importDeclAnnQualified = fst $ importDeclQualifiedStyle mPreQual mPostQual
@@ -1153,12 +1153,12 @@ importdecl :: { LImportDecl GhcPs }
 
 
 maybe_src :: { ((Maybe (EpaLocation,EpaLocation),SourceText),IsBootInterface) }
-        : '{-# SOURCE' '#-}'        { ((Just (glAA $1,glAA $2),getSOURCE_PRAGs $1)
+        : '{-# SOURCE' '#-}'        { ((Just (glR $1,glR $2),getSOURCE_PRAGs $1)
                                       , IsBoot) }
         | {- empty -}               { ((Nothing,NoSourceText),NotBoot) }
 
 maybe_safe :: { (Maybe EpaLocation,Bool) }
-        : 'safe'                                { (Just (glAA $1),True) }
+        : 'safe'                                { (Just (glR $1),True) }
         | {- empty -}                           { (Nothing,      False) }
 
 maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
@@ -1166,15 +1166,15 @@ maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
                         ; unless (looksLikePackageName (unpackFS pkgFS)) $
                              addError $ mkPlainErrorMsgEnvelope (getLoc $1) $
                                (PsErrInvalidPackageName pkgFS)
-                        ; return (Just (glAA $1), RawPkgQual (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
+                        ; return (Just (glR $1), RawPkgQual (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
         | {- empty -}                           { (Nothing,NoRawPkgQual) }
 
 optqualified :: { Located (Maybe EpaLocation) }
-        : 'qualified'                           { sL1 $1 (Just (glAA $1)) }
+        : 'qualified'                           { sL1 $1 (Just (glR $1)) }
         | {- empty -}                           { noLoc Nothing }
 
 maybeas :: { (Maybe EpaLocation,Located (Maybe (LocatedA ModuleName))) }
-        : 'as' modid                           { (Just (glAA $1)
+        : 'as' modid                           { (Just (glR $1)
                                                  ,sLL $1 $> (Just $2)) }
         | {- empty -}                          { (Nothing,noLoc Nothing) }
 
@@ -1218,7 +1218,7 @@ importlist1 :: { OrdList (LIE GhcPs) }
 import  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImpExp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
         | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, [mj AnnModule $1]) $2)) }
-        | 'pattern' qcon            { unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (glAA $1) $2)) Nothing }
+        | 'pattern' qcon            { unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (glR $1) $2)) Nothing }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations
@@ -2075,7 +2075,7 @@ stringlist :: { Located (OrdList (Located StringLiteral)) }
                                                   (L (gl $3) (getStringLiteral $3))))
                                 else case (unLoc $1) of
                                    SnocOL hs t -> do
-                                     let { t' = addTrailingCommaS t (glAA $2) }
+                                     let { t' = addTrailingCommaS t (glR $2) }
                                      return (sLL $1 $> (snocOL hs t' `snocOL`
                                                   (L (gl $3) (getStringLiteral $3))))
 
@@ -2144,9 +2144,9 @@ fspec :: { Located ([AddEpAnn]
 -----------------------------------------------------------------------------
 -- Type signatures
 
-opt_sig :: { Maybe (AddEpAnn, LHsType GhcPs) }
+opt_sig :: { Maybe (EpUniToken "::" "∷", LHsType GhcPs) }
         : {- empty -}                   { Nothing }
-        | '::' ctype                    { Just (mu AnnDcolon $1, $2) }
+        | '::' ctype                    { Just (epUniTok $1, $2) }
 
 opt_tyconsig :: { ([AddEpAnn], Maybe (LocatedN RdrName)) }
              : {- empty -}              { ([], Nothing) }
@@ -2294,10 +2294,10 @@ tyop :: { (LocatedN RdrName, PromotionFlag) }
         : qtyconop                      { ($1, NotPromoted) }
         | tyvarop                       { ($1, NotPromoted) }
         | SIMPLEQUOTE qconop            {% do { op <- amsr (sLL $1 $> (unLoc $2))
-                                                           (NameAnnQuote (glAA $1) (gl $2) [])
+                                                           (NameAnnQuote (glR $1) (gl $2) [])
                                               ; return (op, IsPromoted) } }
         | SIMPLEQUOTE varop             {% do { op <- amsr (sLL $1 $> (unLoc $2))
-                                                           (NameAnnQuote (glAA $1) (gl $2) [])
+                                                           (NameAnnQuote (glR $1) (gl $2) [])
                                               ; return (op, IsPromoted) } }
 
 atype :: { LHsType GhcPs }
@@ -2321,13 +2321,13 @@ atype :: { LHsType GhcPs }
         | '(' ktype ',' comma_types1 ')' {% do { h <- addTrailingCommaA $2 (gl $3)
                                                ; amsA' . sLL $1 $> =<< (mkTupleSyntaxTy (glR $1) (h : $4) (glR $>)) }}
         | '(#' '#)'                   {% do { requireLTPuns PEP_TupleSyntaxType $1 $>
-                                            ; amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParensHash (glAA $1) (glAA $2)) HsUnboxedTuple []) } }
+                                            ; amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParensHash (glR $1) (glR $2)) HsUnboxedTuple []) } }
         | '(#' comma_types1 '#)'      {% do { requireLTPuns PEP_TupleSyntaxType $1 $>
-                                            ; amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParensHash (glAA $1) (glAA $3)) HsUnboxedTuple $2) } }
+                                            ; amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParensHash (glR $1) (glR $3)) HsUnboxedTuple $2) } }
         | '(#' bar_types2 '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
-                                      ; amsA' (sLL $1 $> $ HsSumTy (AnnParen AnnParensHash (glAA $1) (glAA $3)) $2) } }
+                                      ; amsA' (sLL $1 $> $ HsSumTy (AnnParen AnnParensHash (glR $1) (glR $3)) $2) } }
         | '[' ktype ']'               {% amsA' . sLL $1 $> =<< (mkListSyntaxTy1 (glR $1) $2 (glR $3)) }
-        | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy  (AnnParen AnnParens       (glAA $1) (glAA $3)) $2) }
+        | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy  (AnnParen AnnParens       (glR $1) (glR $3)) $2) }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE '(' ')'         {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
                                             ; amsA' (sLL $1 $> $ HsExplicitTupleTy [mj AnnSimpleQuote $1,mop $2,mcp $3] []) }}
@@ -2618,9 +2618,9 @@ deriv_clause_types :: { LDerivClauseTys GhcPs }
                                            sL1a $1 $ HsTyVar noAnn NotPromoted $1 } in
                                 sL1a $1 (DctSingle noExtField tc) }
         | '(' ')'             {% amsr (sLL $1 $> (DctMulti noExtField []))
-                                      (AnnContext Nothing [glAA $1] [glAA $2]) }
+                                      (AnnContext Nothing [glR $1] [glR $2]) }
         | '(' deriv_types ')' {% amsr (sLL $1 $> (DctMulti noExtField $2))
-                                      (AnnContext Nothing [glAA $1] [glAA $3])}
+                                      (AnnContext Nothing [glR $1] [glR $3])}
 
 -----------------------------------------------------------------------------
 -- Value definitions
@@ -2697,7 +2697,7 @@ gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
 
 gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
         : '|' guardquals '=' exp  {% runPV (unECP $4) >>= \ $4 ->
-                                     acsA (comb2 $1 $>) (\loc cs -> L loc $ GRHS (EpAnn (glEE $1 $>) (GrhsAnn (Just $ glAA $1) (mj AnnEqual $3)) cs) (unLoc $2) $4) }
+                                     acsA (comb2 $1 $>) (\loc cs -> L loc $ GRHS (EpAnn (glEE $1 $>) (GrhsAnn (Just $ glR $1) (mj AnnEqual $3)) cs) (unLoc $2) $4) }
 
 sigdecl :: { LHsDecl GhcPs }
         :
@@ -2803,7 +2803,7 @@ exp_gen(IEXP) :: { ECP }
                                    unECP $1 >>= \ $1 ->
                                    rejectPragmaPV $1 >>
                                    mkHsTySigPV (noAnnSrcSpan $ comb2 $1 $>) $1 $3
-                                          [(mu AnnDcolon $2)] }
+                                          (epUniTok $2) }
         | IEXP '-<' exp_gen(IEXP)
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
@@ -2899,7 +2899,7 @@ exp10 :: { ECP }
         : '-' fexp %shift               { ECP $
                                            unECP $2 >>= \ $2 ->
                                            mkHsNegAppPV (comb2 $1 $>) $2
-                                                 [mj AnnMinus $1] }
+                                                 (epTok $1) }
         -- See Note [%shift: exp10 -> fexp]
         | fexp %shift                  { $1 }
 
@@ -2980,7 +2980,7 @@ fexp    :: { ECP }
 
         | 'static' aexp              {% runPV (unECP $2) >>= \ $2 ->
                                         fmap ecpFromExp $
-                                        amsA' (sLL $1 $> $ HsStatic [mj AnnStatic $1] $2) }
+                                        amsA' (sLL $1 $> $ HsStatic (epTok $1) $2) }
 
         | aexp                       { $1 }
 
@@ -2998,10 +2998,10 @@ aexp    :: { ECP }
                                    mkHsLazyPatPV (comb2 $1 $>) $2 [mj AnnTilde $1] }
         | PREFIX_BANG aexp      { ECP $
                                    unECP $2 >>= \ $2 ->
-                                   mkHsBangPatPV (comb2 $1 $>) $2 [mj AnnBang $1] }
+                                   mkHsBangPatPV (comb2 $1 $>) $2 (epTok $1) }
         | PREFIX_MINUS aexp     { ECP $
                                    unECP $2 >>= \ $2 ->
-                                   mkHsNegAppPV (comb2 $1 $>) $2 [mj AnnMinus $1] }
+                                   mkHsNegAppPV (comb2 $1 $>) $2 (epTok $1) }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
                                            mkHsLetPV (comb2 $1 $>) (epTok $1) (unLoc $2) (epTok $3) $4 }
@@ -3010,17 +3010,17 @@ aexp    :: { ECP }
                       mkHsLamPV (comb2 $1 $>) LamSingle
                             (sLLl $1 $>
                             [sLLa $1 $>
-                                         $ Match { m_ext = []
+                                         $ Match { m_ext = noExtField
                                                  , m_ctxt = LamAlt LamSingle
                                                  , m_pats = L (listLocation $2) $2
                                                  , m_grhss = unguardedGRHSs (comb2 $3 $4) $4 (EpAnn (glR $3) (GrhsAnn Nothing (mu AnnRarrow $3)) emptyComments) }])
-                            [mj AnnLam $1] }
+                            (EpAnnLam (glR $1) Nothing) }
         | '\\' 'lcase' altslist(pats1)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamPV (comb3 $1 $2 $>) LamCase $3 [mj AnnLam $1,mj AnnCase $2] }
+                 mkHsLamPV (comb3 $1 $2 $>) LamCase $3 (EpAnnLam (glR $1) (Just (glR $2))) }
         | '\\' 'lcases' altslist(argpats)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamPV (comb3 $1 $2 $>) LamCases $3 [mj AnnLam $1,mj AnnCases $2] }
+                 mkHsLamPV (comb3 $1 $2 $>) LamCases $3 (EpAnnLam (glR $1) (Just (glR $2))) }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                          {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                             return $ ECP $
@@ -3028,21 +3028,22 @@ aexp    :: { ECP }
                               unECP $8 >>= \ $8 ->
                               mkHsIfPV (comb2 $1 $>) $2 (snd $3) $5 (snd $6) $8
                                     (AnnsIf
-                                      { aiIf = glAA $1
-                                      , aiThen = glAA $4
-                                      , aiElse = glAA $7
+                                      { aiIf = glR $1
+                                      , aiThen = glR $4
+                                      , aiElse = glR $7
                                       , aiThenSemi = fst $3
                                       , aiElseSemi = fst $6})}
 
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>= \_ ->
                                            fmap ecpFromExp $
-                                           amsA' (sLL $1 $> $ HsMultiIf (mj AnnIf $1:(fst $ unLoc $2))
-                                                     (reverse $ snd $ unLoc $2)) }
+                                           do { let (L _ ((o,c),_)) = $2
+                                              ; amsA' (sLL $1 $> $ HsMultiIf (epTok $1, o, c)
+                                                     (reverse $ snd $ unLoc $2)) }}
         | 'case' exp 'of' altslist(pats1) {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                                              return $ ECP $
                                                $4 >>= \ $4 ->
                                                mkHsCasePV (comb3 $1 $3 $4) $2 $4
-                                                    (EpAnnHsCase (glAA $1) (glAA $3)) }
+                                                    (EpAnnHsCase (glR $1) (glR $3)) }
         -- QualifiedDo.
         | DO  stmtlist               {% do
                                       hintQualifiedDo $1
@@ -3063,7 +3064,7 @@ aexp    :: { ECP }
                        {% (checkPattern <=< runPV) (unECP $2) >>= \ p ->
                            runPV (unECP $4) >>= \ $4@cmd ->
                            fmap ecpFromExp $
-                           amsA' (sLL $1 $> $ HsProc [mj AnnProc $1,mu AnnRarrow $3] p (sLLa $1 $> $ HsCmdTop noExtField cmd)) }
+                           amsA' (sLL $1 $> $HsProc (epTok $1, epUniTok $3) p (sLLa $1 $> $ HsCmdTop noExtField cmd)) }
 
         | aexp1                 { $1 }
 
@@ -3080,7 +3081,7 @@ aexp1   :: { ECP }
         | aexp1 TIGHT_INFIX_PROJ field
             {% runPV (unECP $1) >>= \ $1 ->
                fmap ecpFromExp $ amsA' (
-                 let fl = sLLa $2 $> (DotFieldOcc (AnnFieldLabel (Just $ glAA $2)) $3) in
+                 let fl = sLLa $2 $> (DotFieldOcc (AnnFieldLabel (Just $ glR $2)) $3) in
                sLL $1 $> $ mkRdrGetField $1 fl)  }
 
 
@@ -3113,7 +3114,7 @@ aexp2   :: { ECP }
         | '(' tup_exprs ')'             { ECP $
                                            $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
-                                                [mop $1,mcp $3]}
+                                                (glR $1,glR $3)}
 
         | '(' orpats(exp2) ')'          {% do
                                               { pat <- hintOrPats (sL1a $2 (OrPat NoExtField (unLoc $2)))
@@ -3122,18 +3123,18 @@ aexp2   :: { ECP }
 
         -- This case is only possible when 'OverloadedRecordDotBit' is enabled.
         | '(' projection ')'            { ECP $
-                                            amsA' (sLL $1 $> $ mkRdrProjection (NE.reverse (unLoc $2)) (AnnProjection (glAA $1) (glAA $3)) )
+                                            amsA' (sLL $1 $> $ mkRdrProjection (NE.reverse (unLoc $2)) (AnnProjection (glR $1) (glR $3)) )
                                             >>= ecpFromExp'
                                         }
 
         | '(#' texp '#)'                { ECP $
                                            unECP $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Unboxed (Tuple [Right $2])
-                                                 [moh $1,mch $3] }
+                                                 (glR $1,glR $3) }
         | '(#' tup_exprs '#)'           { ECP $
                                            $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Unboxed $2
-                                                [moh $1,mch $3] }
+                                                (glR $1,glR $3) }
 
         | '[' list ']'      { ECP $ $2 (comb2 $1 $>) (mos $1,mcs $3) }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
@@ -3174,8 +3175,8 @@ projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-                             { sLL $1 $> ((sLLa $2 $> $ DotFieldOcc (AnnFieldLabel (Just $ glAA $2)) $3) `NE.cons` unLoc $1) }
-        | PREFIX_PROJ field  { sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (AnnFieldLabel (Just $ glAA $1)) $2) :| [])}
+                             { sLL $1 $> ((sLLa $2 $> $ DotFieldOcc (AnnFieldLabel (Just $ glR $2)) $3) `NE.cons` unLoc $1) }
+        | PREFIX_PROJ field  { sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (AnnFieldLabel (Just $ glR $1)) $2) :| [])}
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { fmap (HsUntypedSplice noExtField) (reLoc $1) }
@@ -3184,13 +3185,13 @@ splice_exp :: { LHsExpr GhcPs }
 splice_untyped :: { Located (HsUntypedSplice GhcPs) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : PREFIX_DOLLAR aexp2   {% runPV (unECP $2) >>= \ $2 ->
-                                   return (sLL $1 $> $ HsUntypedSpliceExpr [mj AnnDollar $1] $2) }
+                                   return (sLL $1 $> $ HsUntypedSpliceExpr (epTok $1) $2) }
 
-splice_typed :: { Located ([AddEpAnn], LHsExpr GhcPs) }
+splice_typed :: { Located (EpToken "$$", LHsExpr GhcPs) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : PREFIX_DOLLAR_DOLLAR aexp2
                                 {% runPV (unECP $2) >>= \ $2 ->
-                                   return (sLL $1 $> $ ([mj AnnDollarDollar $1], $2)) }
+                                   return (sLL $1 $> $ (epTok $1, $2)) }
 
 cmdargs :: { [LHsCmdTop GhcPs] }
         : cmdargs acmd                  { $2 : $1 }
@@ -3306,23 +3307,23 @@ list :: { forall b. DisambECP b => SrcSpan -> (AddEpAnn, AddEpAnn) -> PV (Locate
         | lexps   { \loc (ao,ac) -> $1 >>= \ $1 ->
                             mkHsExplicitListPV loc (reverse $1) (AnnList Nothing (Just ao) (Just ac) [] []) }
         | texp '..'  { \loc (ao,ac) -> unECP $1 >>= \ $1 ->
-                                  amsA' (L loc $ ArithSeq [ao,mj AnnDotdot $2,ac] Nothing (From $1))
+                                  amsA' (L loc $ ArithSeq  (AnnArithSeq (EpTok (addEpAnnLoc ao)) Nothing (epTok $2) (EpTok (addEpAnnLoc ac))) Nothing (From $1))
                                       >>= ecpFromExp' }
         | texp ',' exp2 '..' { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
-                                   amsA' (L loc $ ArithSeq [ao,mj AnnComma $2,mj AnnDotdot $4,ac] Nothing (FromThen $1 $3))
+                                   amsA' (L loc $ ArithSeq (AnnArithSeq (EpTok (addEpAnnLoc ao)) (Just (epTok $2)) (epTok $4) (EpTok (addEpAnnLoc ac))) Nothing (FromThen $1 $3))
                                        >>= ecpFromExp' }
         | texp '..' exp2  { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
-                                   amsA' (L loc $ ArithSeq [ao,mj AnnDotdot $2,ac] Nothing (FromTo $1 $3))
+                                   amsA' (L loc $ ArithSeq (AnnArithSeq (EpTok (addEpAnnLoc ao)) Nothing (epTok $2) (EpTok (addEpAnnLoc ac))) Nothing (FromTo $1 $3))
                                        >>= ecpFromExp' }
         | texp ',' exp2 '..' exp2 { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
                                    unECP $5 >>= \ $5 ->
-                                   amsA' (L loc $ ArithSeq [ao,mj AnnComma $2,mj AnnDotdot $4,ac] Nothing (FromThenTo $1 $3 $5))
+                                   amsA' (L loc $ ArithSeq (AnnArithSeq (EpTok (addEpAnnLoc ao)) (Just (epTok $2)) (epTok $4) (EpTok (addEpAnnLoc ac))) Nothing (FromThenTo $1 $3 $5))
                                        >>= ecpFromExp' }
         | texp '|' flattenedpquals
              { \loc (ao,ac) ->
@@ -3395,18 +3396,18 @@ transformqual :: { Located ([LStmt GhcPs (LHsExpr GhcPs)] -> Stmt GhcPs (LHsExpr
                         -- Function is applied to a list of stmts *in order*
     : 'then' exp              {% runPV (unECP $2) >>= \ $2 ->
                                  return (
-                                 sLL $1 $> (\ss -> (mkTransformStmt [mj AnnThen $1] ss $2))) }
+                                 sLL $1 $> (\ss -> (mkTransformStmt (AnnTransStmt (epTok $1) noAnn noAnn noAnn) ss $2))) }
     | 'then' exp 'by' exp     {% runPV (unECP $2) >>= \ $2 ->
                                  runPV (unECP $4) >>= \ $4 ->
-                                 return (sLL $1 $> (\ss -> (mkTransformByStmt [mj AnnThen $1,mj AnnBy $3] ss $2 $4))) }
+                                 return (sLL $1 $> (\ss -> (mkTransformByStmt (AnnTransStmt (epTok $1) noAnn (Just (epTok $3)) noAnn) ss $2 $4))) }
     | 'then' 'group' 'using' exp
             {% runPV (unECP $4) >>= \ $4 ->
-               return (sLL $1 $> (\ss -> (mkGroupUsingStmt [mj AnnThen $1,mj AnnGroup $2,mj AnnUsing $3] ss $4))) }
+               return (sLL $1 $> (\ss -> (mkGroupUsingStmt (AnnTransStmt (epTok $1) (Just (epTok $2)) noAnn (Just (epTok $3))) ss $4))) }
 
     | 'then' 'group' 'by' exp 'using' exp
             {% runPV (unECP $4) >>= \ $4 ->
                runPV (unECP $6) >>= \ $6 ->
-               return (sLL $1 $> (\ss -> (mkGroupByUsingStmt [mj AnnThen $1,mj AnnGroup $2,mj AnnBy $3,mj AnnUsing $5] ss $4 $6))) }
+               return (sLL $1 $> (\ss -> (mkGroupByUsingStmt (AnnTransStmt (epTok $1) (Just (epTok $2)) (Just (epTok $3)) (Just (epTok $5))) ss $4 $6))) }
 
 -- Note that 'group' is a special_id, which means that you can enable
 -- TransformListComp while still using Data.List.group. However, this
@@ -3469,7 +3470,7 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs 
 alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
         : PATS alt_rhs { $2 >>= \ $2 ->
                          amsA' (sLLAsl $1 $>
-                                         (Match { m_ext = []
+                                         (Match { m_ext = noExtField
                                                 , m_ctxt = CaseAlt -- for \case and \cases, this will be changed during post-processing
                                                 , m_pats = L (listLocation $1) $1
                                                 , m_grhss = unLoc $2 }))}
@@ -3494,16 +3495,16 @@ gdpats :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
 -- generate the open brace in addition to the vertical bar in the lexer, and
 -- we don't need it.
-ifgdpats :: { Located ([AddEpAnn],[LGRHS GhcPs (LHsExpr GhcPs)]) }
+ifgdpats :: { Located ((EpToken "{", EpToken "}"), [LGRHS GhcPs (LHsExpr GhcPs)]) }
          : '{' gdpats '}'                 {% runPV $2 >>= \ $2 ->
-                                             return $ sLL $1 $> ([moc $1,mcc $3],unLoc $2)  }
+                                             return $ sLL $1 $> ((epTok $1,epTok $3),unLoc $2)  }
          |     gdpats close               {% runPV $1 >>= \ $1 ->
-                                             return $ sL1 $1 ([],unLoc $1) }
+                                             return $ sL1 $1 ((NoEpTok, NoEpTok),unLoc $1) }
 
 gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
         : '|' guardquals '->' exp
                                    { unECP $4 >>= \ $4 ->
-                                     acsA (comb2 $1 $>) (\loc cs -> sL loc $ GRHS (EpAnn (glEE $1 $>) (GrhsAnn (Just $ glAA $1) (mu AnnRarrow $3)) cs) (unLoc $2) $4) }
+                                     acsA (comb2 $1 $>) (\loc cs -> sL loc $ GRHS (EpAnn (glEE $1 $>) (GrhsAnn (Just $ glR $1) (mu AnnRarrow $3)) cs) (unLoc $2) $4) }
 
 -- 'pat' recognises a pattern, including one with a bang at the top
 --      e.g.  "!x" or "!(x,y)" or "C a b" etc
@@ -3596,10 +3597,10 @@ stmt  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
 
 qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
     : bindpat '<-' exp                   { unECP $3 >>= \ $3 ->
-                                           amsA' (sLL $1 $> $ mkPsBindStmt [mu AnnLarrow $2] $1 $3) }
+                                           amsA' (sLL $1 $> $ mkPsBindStmt (epUniTok $2) $1 $3) }
     | exp                                { unECP $1 >>= \ $1 ->
                                            return $ sL1a $1 $ mkBodyStmt $1 }
-    | 'let' binds                        { amsA' (sLL $1 $> $ mkLetStmt [mj AnnLet $1] (unLoc $2)) }
+    | 'let' binds                        { amsA' (sLL $1 $> $ mkLetStmt (epTok $1) (unLoc $2)) }
 
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction
@@ -3637,7 +3638,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                             let top = sL1a $1 $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (L lf ())
-                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ glAA $2))  f) : t
+                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ glR $2))  f) : t
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = False
@@ -3653,7 +3654,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                             let top =  sL1a $1 $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (L lf ())
-                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ glAA $2)) f) : t
+                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ glR $2)) f) : t
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = True
@@ -3664,7 +3665,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
 fieldToUpdate :: { Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] }
 fieldToUpdate
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
-        : fieldToUpdate TIGHT_INFIX_PROJ field   { sLL $1 $> ((sLLa $2 $> (DotFieldOcc (AnnFieldLabel $ Just $ glAA $2) $3)) : unLoc $1) }
+        : fieldToUpdate TIGHT_INFIX_PROJ field   { sLL $1 $> ((sLLa $2 $> (DotFieldOcc (AnnFieldLabel $ Just $ glR $2) $3)) : unLoc $1) }
         | field       { sL1 $1 [sL1a $1 (DotFieldOcc (AnnFieldLabel Nothing) $1)] }
 
 -----------------------------------------------------------------------------
@@ -3746,12 +3747,12 @@ qcon :: { LocatedN RdrName }
 gen_qcon :: { LocatedN RdrName }
   : qconid                { $1 }
   | '(' qconsym ')'       {% amsr (sLL $1 $> (unLoc $2))
-                                  (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                  (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
 
 con     :: { LocatedN RdrName }
         : conid                 { $1 }
         | '(' consym ')'        {% amsr (sLL $1 $> (unLoc $2))
-                                        (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                        (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
         | syscon                { $1 }
 
 con_list :: { Located (NonEmpty (LocatedN RdrName)) }
@@ -3766,31 +3767,31 @@ qcon_list : qcon                  { [$1] }
 -- See Note [ExplicitTuple] in GHC.Hs.Expr
 sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors
         : '(' commas ')'        {% amsr (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
-                                       (NameAnnCommas NameParens (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
-        | '(#' '#)'             {% amsr (sLL $1 $> $ unboxedUnitDataCon) (NameAnnOnly NameParensHash (glAA $1) (glAA $2) []) }
+                                       (NameAnnCommas NameParens (glR $1) (map srcSpan2e (fst $2)) (glR $3) []) }
+        | '(#' '#)'             {% amsr (sLL $1 $> $ unboxedUnitDataCon) (NameAnnOnly NameParensHash (glR $1) (glR $2) []) }
         | '(#' commas '#)'      {% amsr (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
-                                       (NameAnnCommas NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
+                                       (NameAnnCommas NameParensHash (glR $1) (map srcSpan2e (fst $2)) (glR $3) []) }
 
 syscon :: { LocatedN RdrName }
         : sysdcon               {  L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
         | '(' '->' ')'          {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
-                                        (NameAnnRArrow (isUnicode $2) (Just $ glAA $1) (glAA $2) (Just $ glAA $3) []) }
+                                        (NameAnnRArrow (isUnicode $2) (Just $ glR $1) (glR $2) (Just $ glR $3) []) }
 
 -- See Note [Empty lists] in GHC.Hs.Expr
 sysdcon :: { LocatedN DataCon }
         : sysdcon_nolist                 { $1 }
-        | '(' ')'               {% amsr (sLL $1 $> unitDataCon) (NameAnnOnly NameParens (glAA $1) (glAA $2) []) }
-        | '[' ']'               {% amsr (sLL $1 $> nilDataCon)  (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
+        | '(' ')'               {% amsr (sLL $1 $> unitDataCon) (NameAnnOnly NameParens (glR $1) (glR $2) []) }
+        | '[' ']'               {% amsr (sLL $1 $> nilDataCon)  (NameAnnOnly NameSquare (glR $1) (glR $2) []) }
 
 conop :: { LocatedN RdrName }
         : consym                { $1 }
         | '`' conid '`'         {% amsr (sLL $1 $> (unLoc $2))
-                                          (NameAnn NameBackquotes (glAA $1) (glAA $2) (glAA $3) []) }
+                                          (NameAnn NameBackquotes (glR $1) (glR $2) (glR $3) []) }
 
 qconop :: { LocatedN RdrName }
         : qconsym               { $1 }
         | '`' qconid '`'        {% amsr (sLL $1 $> (unLoc $2))
-                                          (NameAnn NameBackquotes (glAA $1) (glAA $2) (glAA $3) []) }
+                                          (NameAnn NameBackquotes (glR $1) (glR $2) (glR $3) []) }
 
 ----------------------------------------------------------------------------
 -- Type constructors
@@ -3801,29 +3802,29 @@ qconop :: { LocatedN RdrName }
 gtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, including unit tuples
         : ntgtycon                     { $1 }
         | '(' ')'                      {% amsr (sLL $1 $> $ getRdrName unitTyCon)
-                                                (NameAnnOnly NameParens (glAA $1) (glAA $2) []) }
+                                                (NameAnnOnly NameParens (glR $1) (glR $2) []) }
         | '(#' '#)'                    {% amsr (sLL $1 $> $ getRdrName unboxedUnitTyCon)
-                                                (NameAnnOnly NameParensHash (glAA $1) (glAA $2) []) }
+                                                (NameAnnOnly NameParensHash (glR $1) (glR $2) []) }
         | '[' ']'               {% amsr (sLL $1 $> $ listTyCon_RDR)
-                                      (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
+                                      (NameAnnOnly NameSquare (glR $1) (glR $2) []) }
 
 ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit tuples
         : oqtycon               { $1 }
         | '(' commas ')'        {% do { n <- mkTupleSyntaxTycon Boxed (snd $2 + 1)
-                                      ; amsr (sLL $1 $> n) (NameAnnCommas NameParens (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }}
+                                      ; amsr (sLL $1 $> n) (NameAnnCommas NameParens (glR $1) (map srcSpan2e (fst $2)) (glR $3) []) }}
         | '(#' commas '#)'      {% do { n <- mkTupleSyntaxTycon Unboxed (snd $2 + 1)
-                                      ; amsr (sLL $1 $> n) (NameAnnCommas NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }}
+                                      ; amsr (sLL $1 $> n) (NameAnnCommas NameParensHash (glR $1) (map srcSpan2e (fst $2)) (glR $3) []) }}
         | '(#' bars '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
                                       ; amsr (sLL $1 $> $ (getRdrName (sumTyCon (snd $2 + 1))))
-                                       (NameAnnBars NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) } }
+                                       (NameAnnBars NameParensHash (glR $1) (map srcSpan2e (fst $2)) (glR $3) []) } }
         | '(' '->' ')'          {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
-                                       (NameAnnRArrow (isUnicode $2) (Just $ glAA $1) (glAA $2) (Just $ glAA $3) []) }
+                                       (NameAnnRArrow (isUnicode $2) (Just $ glR $1) (glR $2) (Just $ glR $3) []) }
 
 oqtycon :: { LocatedN RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
         : qtycon                        { $1 }
         | '(' qtyconsym ')'             {% amsr (sLL $1 $> (unLoc $2))
-                                                  (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                                  (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
 
 oqtycon_no_varcon :: { LocatedN RdrName }  -- Type constructor which cannot be mistaken
                                           -- for variable constructor in export lists
@@ -3831,13 +3832,13 @@ oqtycon_no_varcon :: { LocatedN RdrName }  -- Type constructor which cannot be m
         :  qtycon            { $1 }
         | '(' QCONSYM ')'    {% let { name :: Located RdrName
                                     ; name = sL1 $2 $! mkQual tcClsName (getQCONSYM $2) }
-                                in amsr (sLL $1 $> (unLoc name)) (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                in amsr (sLL $1 $> (unLoc name)) (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
         | '(' CONSYM ')'     {% let { name :: Located RdrName
                                     ; name = sL1 $2 $! mkUnqual tcClsName (getCONSYM $2) }
-                                in amsr (sLL $1 $> (unLoc name)) (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                in amsr (sLL $1 $> (unLoc name)) (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
         | '(' ':' ')'        {% let { name :: Located RdrName
                                     ; name = sL1 $2 $! consDataCon_RDR }
-                                in amsr (sLL $1 $> (unLoc name)) (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                in amsr (sLL $1 $> (unLoc name)) (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
 
 {- Note [Type constructors in export list]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -3863,7 +3864,7 @@ qtyconop :: { LocatedN RdrName } -- Qualified or unqualified
         -- See Note [%shift: qtyconop -> qtyconsym]
         : qtyconsym %shift              { $1 }
         | '`' qtycon '`'                {% amsr (sLL $1 $> (unLoc $2))
-                                                (NameAnn NameBackquotes (glAA $1) (glAA $2) (glAA $3) []) }
+                                                (NameAnn NameBackquotes (glR $1) (glR $2) (glR $3) []) }
 
 qtycon :: { LocatedN RdrName }   -- Qualified or unqualified
         : QCONID            { sL1n $1 $! mkQual tcClsName (getQCONID $1) }
@@ -3889,7 +3890,7 @@ tyconsym :: { LocatedN RdrName }
 otycon :: { LocatedN RdrName }
         : tycon                 { $1 }
         | '(' tyconsym ')'      {% amsr (sLL $1 $> (unLoc $2))
-                                        (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                        (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
 
 -----------------------------------------------------------------------------
 -- Operators
@@ -3898,12 +3899,12 @@ op      :: { LocatedN RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
         | '->'                  {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
-                                     (NameAnnRArrow (isUnicode $1) Nothing (glAA $1) Nothing []) }
+                                     (NameAnnRArrow (isUnicode $1) Nothing (glR $1) Nothing []) }
 
 varop   :: { LocatedN RdrName }
         : varsym                { $1 }
         | '`' varid '`'         {% amsr (sLL $1 $> (unLoc $2))
-                                           (NameAnn NameBackquotes (glAA $1) (glAA $2) (glAA $3) []) }
+                                           (NameAnn NameBackquotes (glR $1) (glR $2) (glR $3) []) }
 
 qop     :: { forall b. DisambInfixOp b => PV (LocatedN b) }   -- used in sections
         : qvarop                { mkHsVarOpPV $1 }
@@ -3916,17 +3917,17 @@ qopm    :: { forall b. DisambInfixOp b => PV (LocatedN b) }   -- used in section
         | hole_op               { mkHsInfixHolePV $1 }
 
 hole_op :: { LocatedN (HsExpr GhcPs) }   -- used in sections
-hole_op : '`' '_' '`'           { sLLa $1 $> (hsHoleExpr (Just $ EpAnnUnboundVar (glAA $1, glAA $3) (glAA $2))) }
+hole_op : '`' '_' '`'           { sLLa $1 $> (hsHoleExpr (Just $ EpAnnUnboundVar (glR $1, glR $3) (glR $2))) }
 
 qvarop :: { LocatedN RdrName }
         : qvarsym               { $1 }
         | '`' qvarid '`'        {% amsr (sLL $1 $> (unLoc $2))
-                                           (NameAnn NameBackquotes (glAA $1) (glAA $2) (glAA $3) []) }
+                                           (NameAnn NameBackquotes (glR $1) (glR $2) (glR $3) []) }
 
 qvaropm :: { LocatedN RdrName }
         : qvarsym_no_minus      { $1 }
         | '`' qvarid '`'        {% amsr (sLL $1 $> (unLoc $2))
-                                           (NameAnn NameBackquotes (glAA $1) (glAA $2) (glAA $3) []) }
+                                           (NameAnn NameBackquotes (glR $1) (glR $2) (glR $3) []) }
 
 -----------------------------------------------------------------------------
 -- Type variables
@@ -3936,7 +3937,7 @@ tyvar   : tyvarid               { $1 }
 
 tyvarop :: { LocatedN RdrName }
 tyvarop : '`' tyvarid '`'       {% amsr (sLL $1 $> (unLoc $2))
-                                           (NameAnn NameBackquotes (glAA $1) (glAA $2) (glAA $3) []) }
+                                           (NameAnn NameBackquotes (glR $1) (glR $2) (glR $3) []) }
 
 tyvarid :: { LocatedN RdrName }
         : VARID            { sL1n $1 $! mkUnqual tvName (getVARID $1) }
@@ -3954,14 +3955,14 @@ tyvarid :: { LocatedN RdrName }
 var     :: { LocatedN RdrName }
         : varid                 { $1 }
         | '(' varsym ')'        {% amsr (sLL $1 $> (unLoc $2))
-                                   (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                   (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
 
 qvar    :: { LocatedN RdrName }
         : qvarid                { $1 }
         | '(' varsym ')'        {% amsr (sLL $1 $> (unLoc $2))
-                                   (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                   (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
         | '(' qvarsym1 ')'      {% amsr (sLL $1 $> (unLoc $2))
-                                   (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
+                                   (NameAnn NameParens (glR $1) (glR $2) (glR $3) []) }
 -- We've inlined qvarsym here so that the decision about
 -- whether it's a qvar or a var can be postponed until
 -- *after* we see the close paren.
@@ -4512,9 +4513,6 @@ glEE !x !y = spanAsAnchor $ comb2 x y
 glRM :: Located a -> Maybe EpaLocation
 glRM (L !l _) = Just $ spanAsAnchor l
 
-glAA :: HasLoc a => a -> EpaLocation
-glAA = srcSpan2e . getHasLoc
-
 n2l :: LocatedN a -> LocatedA a
 n2l (L !la !a) = L (l2l la) a
 
@@ -4712,7 +4710,7 @@ addTrailingDarrowC :: LocatedC a -> Located Token -> EpAnnComments -> LocatedC a
 addTrailingDarrowC (L (EpAnn lr (AnnContext _ o c) csc) a) lt cs =
   let
     u = if (isUnicode lt) then UnicodeSyntax else NormalSyntax
-  in L (EpAnn lr (AnnContext (Just (u,glAA lt)) o c) (cs Semi.<> csc)) a
+  in L (EpAnn lr (AnnContext (Just (u,glR lt)) o c) (cs Semi.<> csc)) a
 
 -- -------------------------------------
 

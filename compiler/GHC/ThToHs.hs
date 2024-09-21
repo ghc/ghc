@@ -218,7 +218,7 @@ cvtDec :: TH.Dec -> CvtM (Maybe (LHsDecl GhcPs))
 cvtDec (TH.ValD pat body ds)
   | TH.VarP s <- pat
   = do  { s' <- vNameN s
-        ; cl' <- cvtClause (mkPrefixFunRhs s') (Clause [] body ds)
+        ; cl' <- cvtClause (mkPrefixFunRhs s' noAnn) (Clause [] body ds)
         ; th_origin <- getOrigin
         ; returnJustLA $ Hs.ValD noExtField $ mkFunBind th_origin s' [cl'] }
 
@@ -238,7 +238,7 @@ cvtDec (TH.FunD nm cls)
   = failWith $ FunBindLacksEquations nm
   | otherwise
   = do  { nm' <- vNameN nm
-        ; cls' <- mapM (cvtClause (mkPrefixFunRhs nm')) cls
+        ; cls' <- mapM (cvtClause (mkPrefixFunRhs nm' noAnn)) cls
         ; th_origin <- getOrigin
         ; returnJustLA $ Hs.ValD noExtField $ mkFunBind th_origin nm' cls' }
 
@@ -464,7 +464,7 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtDir _ Unidir          = return Unidirectional
     cvtDir _ ImplBidir       = return ImplicitBidirectional
     cvtDir n (ExplBidir cls) =
-      do { ms <- mapM (cvtClause (mkPrefixFunRhs n)) cls
+      do { ms <- mapM (cvtClause (mkPrefixFunRhs n noAnn)) cls
          ; th_origin <- getOrigin
          ; wrapParLA (ExplicitBidirectional . mkMatchGroup th_origin) ms }
 
@@ -1028,7 +1028,7 @@ cvtClause ctxt (Clause ps body wheres)
         ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs WhereClause wheres
-        ; returnLA $ Hs.Match noAnn ctxt (noLocA pps) (GRHSs emptyComments g' ds') }
+        ; returnLA $ Hs.Match noExtField ctxt (noLocA pps) (GRHSs emptyComments g' ds') }
 
 cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
@@ -1122,7 +1122,7 @@ cvtl e = wrapLA (cvt e)
          ; let px = parenthesizeHsExpr opPrec x'
                py = parenthesizeHsExpr opPrec y'
          ; wrapParLA gHsPar
-           $ OpApp noAnn px s' py }
+           $ OpApp noExtField px s' py }
            -- Parenthesise both arguments and result,
            -- to ensure this operator application does
            -- does not get re-associated
@@ -1179,7 +1179,7 @@ cvtl e = wrapLA (cvt e)
     cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap
                                          (L noSrcSpanA . DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
     cvt (TypedSpliceE e) = do { e' <- parenthesizeHsExpr appPrec <$> cvtl e
-                              ; return $ HsTypedSplice [] e' }
+                              ; return $ HsTypedSplice noAnn e' }
     cvt (TypedBracketE e) = do { e' <- cvtl e
                                ; return $ HsTypedBracket noAnn e' }
     cvt (TypeE t) = do { t' <- cvtType t
@@ -1320,7 +1320,7 @@ cvtOpApp x op1 (UInfixE y op2 z)
 cvtOpApp x op y
   = do { op' <- cvtl op
        ; y' <- cvtl y
-       ; return (OpApp noAnn x op' y') }
+       ; return (OpApp noExtField x op' y') }
 
 -------------------------------------
 --      Do notation and statements
@@ -1368,7 +1368,7 @@ cvtMatch ctxt (TH.Match p body decs)
                      _                -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs WhereClause decs
-        ; returnLA $ Hs.Match noAnn ctxt (noLocA [lp]) (GRHSs emptyComments g' decs') }
+        ; returnLA $ Hs.Match noExtField ctxt (noLocA [lp]) (GRHSs emptyComments g' decs') }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs

@@ -161,7 +161,7 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
 import Data.Either
-import Data.List        ( findIndex )
+import Data.List        ( findIndex, partition )
 import Data.Foldable
 import qualified Data.Semigroup as Semi
 import GHC.Unit.Module.Warnings
@@ -734,21 +734,25 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
                                  -- AZ: where should these anns come from?
-                         pat@(L _ (ConPat noAnn ln@(L _ name) details))
+                         pat@(L _ (ConPat conAnn ln@(L _ name) details))
                                _ rhs))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr (locA loc) decl
+           -- conAnn should only be AnnOpenP, AnnCloseP, so the rest should be empty
+           ; let (ann_fun, rest) = mk_ann_funrhs conAnn
+           ; unless (null rest) $ return $ panic "mkPatSynMatchGroup: unexpected anns"
            ; match <- case details of
-               PrefixCon _ pats -> return $ Match { m_ext = noAnn
+               PrefixCon _ pats -> return $ Match { m_ext = noExtField
                                                   , m_ctxt = ctxt, m_pats = L l pats
                                                   , m_grhss = rhs }
                    where
                      l = listLocation pats
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Prefix
-                                   , mc_strictness = NoSrcStrict }
+                                   , mc_strictness = NoSrcStrict
+                                   , mc_an = ann_fun }
 
-               InfixCon p1 p2 -> return $ Match { m_ext = noAnn
+               InfixCon p1 p2 -> return $ Match { m_ext = noExtField
                                                 , m_ctxt = ctxt
                                                 , m_pats = L l [p1, p2]
                                                 , m_grhss = rhs }
@@ -756,7 +760,8 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                      l = listLocation [p1, p2]
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Infix
-                                   , mc_strictness = NoSrcStrict }
+                                   , mc_strictness = NoSrcStrict
+                                   , mc_an = ann_fun }
 
                RecCon{} -> recordPatSynErr (locA loc) pat
            ; return $ L loc match }
@@ -1209,7 +1214,7 @@ checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
   where
     check :: ([EpaLocation],[EpaLocation],EpAnnComments)
         -> LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
-    check (oparens,cparens,cs) (L _ (ExplicitTuple [AddEpAnn _ ap_open, AddEpAnn _ ap_close] tup_args boxity))
+    check (oparens,cparens,cs) (L _ (ExplicitTuple (ap_open, ap_close) tup_args boxity))
              -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be a context
       | isBoxed boxity
       , Just es <- tupArgsPresent_maybe tup_args
@@ -1371,13 +1376,13 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 
 checkValDef :: SrcSpan
             -> LocatedA (PatBuilder GhcPs)
-            -> (HsMultAnn GhcPs, Maybe (AddEpAnn, LHsType GhcPs))
+            -> (HsMultAnn GhcPs, Maybe (EpUniToken "::" "∷", LHsType GhcPs))
             -> Located (GRHSs GhcPs (LHsExpr GhcPs))
             -> P (HsBind GhcPs)
 
 checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
-  = do lhs' <- runPV $ mkHsTySigPV (combineLocsA lhs sig) lhs sig [sigAnn]
+  = do lhs' <- runPV $ mkHsTySigPV (combineLocsA lhs sig) lhs sig sigAnn
                         >>= checkLPat
        checkPatBind loc lhs' grhss mult
 
@@ -1386,8 +1391,10 @@ checkValDef loc lhs (mult_ann, Nothing) grhss
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ann) -> do
+              let (ann_fun, ann_rest) = mk_ann_funrhs ann
+              unless (null ann_rest) $ panic "checkValDef: unexpected anns"
               let l = listLocation pats
-              checkFunBind NoSrcStrict loc ann
+              checkFunBind loc ann_fun
                            fun is_infix (L l pats) grhss
             Nothing -> do
               lhs' <- checkPattern lhs
@@ -1398,23 +1405,34 @@ checkValDef loc lhs (mult_ann, Nothing) ghrss
   = do lhs' <- checkPattern lhs
        checkPatBind loc lhs' ghrss mult_ann
 
-checkFunBind :: SrcStrictness
-             -> SrcSpan
-             -> [AddEpAnn]
+mk_ann_funrhs :: [AddEpAnn] -> (AnnFunRhs, [AddEpAnn])
+mk_ann_funrhs ann = (AnnFunRhs strict (map to_tok opens) (map to_tok closes), rest)
+  where
+    (opens, ra0) = partition (\(AddEpAnn kw _) -> kw == AnnOpenP) ann
+    (closes, ra1) = partition (\(AddEpAnn kw _) -> kw == AnnCloseP) ra0
+    (bangs, rest) = partition (\(AddEpAnn kw _) -> kw == AnnBang) ra1
+    strict = case bangs of
+               (AddEpAnn _ s:_) -> EpTok s
+               _ -> NoEpTok
+    to_tok (AddEpAnn _ s) = EpTok s
+
+checkFunBind :: SrcSpan
+             -> AnnFunRhs
              -> LocatedN RdrName
              -> LexicalFixity
              -> LocatedE [LocatedA (ArgPatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
-checkFunBind strictness locF ann (L lf fun) is_infix (L lp pats) (L _ grhss)
+checkFunBind locF ann_fun (L lf fun) is_infix (L lp pats) (L _ grhss)
   = do  ps <- runPV_details extraDetails (mapM checkLArgPat pats)
         let match_span = noAnnSrcSpan $ locF
         return (makeFunBind (L (l2l lf) fun) (L (noAnnSrcSpan $ locA match_span)
-                 [L match_span (Match { m_ext = ann
+                 [L match_span (Match { m_ext = noExtField
                                       , m_ctxt = FunRhs
                                           { mc_fun    = L lf fun
                                           , mc_fixity = is_infix
-                                          , mc_strictness = strictness }
+                                          , mc_strictness = NoSrcStrict
+                                          , mc_an = ann_fun }
                                       , m_pats = L lp ps
                                       , m_grhss = grhss })]))
         -- The span of the match covers the entire equation.
@@ -1443,10 +1461,11 @@ checkPatBind loc (L _ (BangPat ans (L _ (VarPat _ v))))
       = return (makeFunBind v (L (noAnnSrcSpan loc)
                 [L (noAnnSrcSpan loc) (m ans v)]))
   where
-    m a v = Match { m_ext = a
+    m a v = Match { m_ext = noExtField
                   , m_ctxt = FunRhs { mc_fun    = v
                                     , mc_fixity = Prefix
-                                    , mc_strictness = SrcStrict }
+                                    , mc_strictness = SrcStrict
+                                    , mc_an = AnnFunRhs a [] [] }
                   , m_pats = noLocA []
                  , m_grhss = grhss }
 
@@ -1672,7 +1691,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
              -> EpAnnHsCase -> PV (LocatedA b)
   -- | Disambiguate "\... -> ..." (lambda), "\case" and "\cases"
   mkHsLamPV :: SrcSpan -> HsLamVariant
-            -> (LocatedL [LMatch GhcPs (LocatedA b)]) -> [AddEpAnn]
+            -> (LocatedL [LMatch GhcPs (LocatedA b)]) -> EpAnnLam
             -> PV (LocatedA b)
   -- | Function argument representation
   type FunArg b
@@ -1711,7 +1730,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsWildCardPV :: (NoAnn a) => SrcSpan -> PV (LocatedAn a b)
   -- | Disambiguate "a :: t" (type annotation)
   mkHsTySigPV
-    :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> [AddEpAnn] -> PV (LocatedA b)
+    :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> EpUniToken "::" "∷" -> PV (LocatedA b)
   -- | Disambiguate "[a,b,c]" (list syntax)
   mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> AnnList -> PV (LocatedA b)
   -- | Disambiguate "$(...)" and "[quasi|...|]" (TH splices)
@@ -1726,7 +1745,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     [AddEpAnn] ->
     PV (LocatedA b)
   -- | Disambiguate "-a" (negation)
-  mkHsNegAppPV :: SrcSpan -> LocatedA b -> [AddEpAnn] -> PV (LocatedA b)
+  mkHsNegAppPV :: SrcSpan -> LocatedA b -> EpToken "-" -> PV (LocatedA b)
   -- | Disambiguate "(# a)" (right operator section)
   mkHsSectionR_PV
     :: SrcSpan -> LocatedA (InfixOp b) -> LocatedA b -> PV (LocatedA b)
@@ -1748,10 +1767,10 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Disambiguate "~a" (lazy pattern)
   mkHsLazyPatPV :: SrcSpan -> LocatedA b -> [AddEpAnn] -> PV (LocatedA b)
   -- | Disambiguate "!a" (bang pattern)
-  mkHsBangPatPV :: SrcSpan -> LocatedA b -> [AddEpAnn] -> PV (LocatedA b)
+  mkHsBangPatPV :: SrcSpan -> LocatedA b -> EpToken "!" -> PV (LocatedA b)
   -- | Disambiguate tuple sections and unboxed sums
   mkSumOrTuplePV
-    :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> [AddEpAnn] -> PV (LocatedA b)
+    :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> (EpaLocation, EpaLocation) -> PV (LocatedA b)
   -- | Disambiguate "type t" (embedded type)
   mkHsEmbTyPV :: SrcSpan -> EpToken "type" -> LHsType GhcPs -> PV (LocatedA b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
@@ -1916,7 +1935,7 @@ instance DisambECP (HsExpr GhcPs) where
   superInfixOp m = m
   mkHsOpAppPV l e1 op e2 = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ OpApp [] e1 (reLoc op) e2
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ OpApp noExtField e1 (reLoc op) e2
   mkHsCasePV l e (L lm m) anns = do
     !cs <- getCommentsFor l
     let mg = mkMatchGroup FromSource (L lm m)
@@ -2119,7 +2138,7 @@ instance DisambECP (PatBuilder GhcPs) where
 -- future parse by default. Until we're ready to make the breaking change,
 -- we need to do some extra work here to push the signature under the view
 -- pattern (and emit a warning).
-addSigPatP :: SrcSpanAnnA -> LPat GhcPs -> HsPatSigType GhcPs -> [AddEpAnn] -> PV (LPat GhcPs)
+addSigPatP :: SrcSpanAnnA -> LPat GhcPs -> HsPatSigType GhcPs -> EpUniToken "::" "∷" -> PV (LPat GhcPs)
 addSigPatP l viewpat@(L _ ViewPat{}) sig anns =
   -- Test case: T24159_viewpat
   do { let futureParse = L l (SigPat anns viewpat sig)
@@ -3433,7 +3452,7 @@ hintBangPat span e = do
       addError $ mkPlainErrorMsgEnvelope span $ PsErrIllegalBangPattern e
 
 mkSumOrTupleExpr :: SrcSpanAnnA -> Boxity -> SumOrTuple (HsExpr GhcPs)
-                 -> [AddEpAnn]
+                 -> (EpaLocation, EpaLocation)
                  -> PV (LHsExpr GhcPs)
 
 -- Tuple
@@ -3448,18 +3467,15 @@ mkSumOrTupleExpr l@(EpAnn anc an csIn) boxity (Tuple es) anns = do
 -- Sum
 -- mkSumOrTupleExpr l Unboxed (Sum alt arity e) =
 --     return $ L l (ExplicitSum noExtField alt arity e)
-mkSumOrTupleExpr l@(EpAnn anc anIn csIn) Unboxed (Sum alt arity e barsp barsa) anns = do
-    let an = case anns of
-               [AddEpAnn AnnOpenPH o, AddEpAnn AnnClosePH c] ->
-                 AnnExplicitSum o barsp barsa c
-               _ -> panic "mkSumOrTupleExpr"
+mkSumOrTupleExpr l@(EpAnn anc anIn csIn) Unboxed (Sum alt arity e barsp barsa) (o, c) = do
+    let an = AnnExplicitSum o barsp barsa c
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn anc anIn (csIn Semi.<> cs)) (ExplicitSum an alt arity e)
 mkSumOrTupleExpr l Boxed a@Sum{} _ =
     addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrUnsupportedBoxedSumExpr a
 
 mkSumOrTuplePat
-  :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> [AddEpAnn]
+  :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> (EpaLocation, EpaLocation)
   -> PV (LocatedA (PatBuilder GhcPs))
 
 -- Tuple

@@ -127,7 +127,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr034.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr035.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr036.hs" Nothing
- "../../testsuite/tests/printer/MatchPatComments.hs" Nothing
+ -- "../../testsuite/tests/printer/MatchPatComments.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr038.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr039.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr040.hs" Nothing
@@ -166,6 +166,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/T18052a.hs" Nothing
  -- "../../testsuite/tests/printer/T18247a.hs" Nothing
  -- "../../testsuite/tests/printer/Test10268.hs" Nothing
+ "../../testsuite/tests/printer/Test10269.hs" Nothing
  -- "../../testsuite/tests/printer/Test10276.hs" Nothing
  -- "../../testsuite/tests/printer/Test10278.hs" Nothing
  -- "../../testsuite/tests/printer/Test10312.hs" Nothing
@@ -205,6 +206,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/parser/should_compile/DumpSemis.hs" Nothing
  -- "../../testsuite/tests/ghc-api/exactprint/Test20239.hs" Nothing
  -- "../../testsuite/tests/printer/PprArrowLambdaCase.hs" Nothing
+ -- "../../testsuite/tests/printer/PprParenFunBind.hs" Nothing
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
  -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
 --  "../../testsuite/tests/printer/Test22765.hs" Nothing

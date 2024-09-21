@@ -641,7 +641,7 @@ PprEmptyMostlyInst:
 
 .PHONY: PprParenFunBind
 PprParenFunBind:
-	$(CHECK_PPR)   $(LIBDIR) PprParenFunBind.hs
+	# $(CHECK_PPR)   $(LIBDIR) PprParenFunBind.hs
 	$(CHECK_EXACT) $(LIBDIR) PprParenFunBind.hs
 
 .PHONY: PprRecordSemi

@@ -510,7 +510,7 @@ tidy1 _ _ (OrPat ty lpats)
   --   (1; 2; 3)
   -- to
   --   ((\case 1 -> True; 2 -> True; 3 -> True; _ -> False) -> True)
-  = return (idDsWrapper, ViewPat ty (noLocA (HsLam [] LamCase mg)) (mkPrefixConPat trueDataCon [] []))
+  = return (idDsWrapper, ViewPat ty (noLocA (HsLam noAnn LamCase mg)) (mkPrefixConPat trueDataCon [] []))
   where
     mg :: MatchGroup GhcTc (LHsExpr GhcTc)
     mg = MG mgtc (noLocA (map match_true (NE.toList lpats) ++ [match_false (noLocA $ WildPat ty)]))
@@ -526,7 +526,7 @@ tidy1 _ _ (OrPat ty lpats)
     match_false :: LPat GhcTc -> LMatch GhcTc (LHsExpr GhcTc)
     match_false lpat = mk_match lpat (hs_var falseDataConId)
     mk_match :: LPat GhcTc -> LHsExpr GhcTc -> LMatch GhcTc (LHsExpr GhcTc)
-    mk_match lpat body = noLocA $ Match [] CaseAlt (noLocA [lpat]) (single_grhs body)
+    mk_match lpat body = noLocA $ Match noExtField CaseAlt (noLocA [lpat]) (single_grhs body)
 
     hs_var :: Var -> LHsExpr GhcTc
     hs_var v = (noLocA $ HsVar noExtField (noLocA v))

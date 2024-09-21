@@ -84,7 +84,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -96,7 +96,11 @@
              (Unqual
               {OccName: bar}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -205,7 +209,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -217,7 +221,11 @@
              (Unqual
               {OccName: foo}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -316,7 +324,7 @@
                       (EpaComments
                        []))
                      (Match
-                      []
+                      (NoExtField)
                       (FunRhs
                        (L
                         (EpAnn
@@ -328,7 +336,11 @@
                         (Unqual
                          {OccName: doStuff}))
                        (Prefix)
-                       (NoSrcStrict))
+                       (NoSrcStrict)
+                       (AnnFunRhs
+                        (NoEpTok)
+                        []
+                        []))
                       (L
                        (EpaSpan { <no location info> })
                        [])
@@ -499,7 +511,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -511,7 +523,11 @@
              (Unqual
               {OccName: bar}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -608,7 +624,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -620,7 +636,11 @@
              (Unqual
               {OccName: foo}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -713,7 +733,7 @@
                       (EpaComments
                        []))
                      (Match
-                      []
+                      (NoExtField)
                       (FunRhs
                        (L
                         (EpAnn
@@ -725,7 +745,11 @@
                         (Unqual
                          {OccName: doStuff}))
                        (Prefix)
-                       (NoSrcStrict))
+                       (NoSrcStrict)
+                       (AnnFunRhs
+                        (NoEpTok)
+                        []
+                        []))
                       (L
                        (EpaSpan { <no location info> })
                        [])

@@ -876,7 +876,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     lbl      = flLabel fl
     sel_name = flSelector fl
     sel_lname = L locn sel_name
-    match_ctxt = mkPrefixFunRhs sel_lname
+    match_ctxt = mkPrefixFunRhs sel_lname noAnn
 
     sel_id = mkExportedLocalId rec_details sel_name sel_ty
 

@@ -950,7 +950,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -962,7 +962,11 @@
              (Unqual
               {OccName: qux}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { KindSigs.hs:23:5-7 })
             [(L
@@ -1615,7 +1619,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -1627,7 +1631,11 @@
              (Unqual
               {OccName: true}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])

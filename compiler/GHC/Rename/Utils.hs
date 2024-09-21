@@ -765,7 +765,7 @@ genSimpleFunBind :: Name -> [LPat GhcRn]
                  -> LHsExpr GhcRn -> LHsBind GhcRn
 genSimpleFunBind fun pats expr
   = noLocA $ genFunBind (noLocA fun)
-        [mkMatch (mkPrefixFunRhs (noLocA fun)) (noLocA pats) expr
+        [mkMatch (mkPrefixFunRhs (noLocA fun) noAnn) (noLocA pats) expr
                  emptyLocalBinds]
 
 genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
@@ -810,5 +810,5 @@ genSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 genSimpleMatch ctxt pats rhs
   = wrapGenSpan $
-    Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = noLocA pats
+    Match { m_ext = noExtField, m_ctxt = ctxt, m_pats = noLocA pats
           , m_grhss = unguardedGRHSs generatedSrcSpan rhs noAnn }

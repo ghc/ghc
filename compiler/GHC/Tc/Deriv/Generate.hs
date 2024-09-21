@@ -1658,7 +1658,7 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
     mk_untyped_bracket = HsUntypedBracket noAnn . ExpBr noExtField
     mk_typed_bracket = HsTypedBracket noAnn
 
-    mk_tsplice = HsTypedSplice []
+    mk_tsplice = HsTypedSplice noAnn
     mk_usplice = HsUntypedSplice noExtField . HsUntypedSpliceExpr noAnn
     data_cons = getPossibleDataCons tycon tycon_args
 
@@ -2045,7 +2045,7 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
         --                  @(a -> [T x]      -> c -> Int)
         --                  op
         mkRdrFunBind loc_meth_RDR [mkSimpleMatch
-                                      (mkPrefixFunRhs loc_meth_RDR)
+                                      (mkPrefixFunRhs loc_meth_RDR noAnn)
                                       (noLocA (map mk_ty_pat to_tvbs)) rhs_expr]
 
       where
@@ -2315,7 +2315,7 @@ mkFunBindSE :: Arity -> SrcSpan -> RdrName
 mkFunBindSE arity loc fun pats_and_exprs
   = mkRdrFunBindSE arity (L (noAnnSrcSpan loc) fun) matches
   where
-    matches = [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
+    matches = [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun) noAnn)
                               (noLocA (map (parenthesizePat appPrec) p)) e
                                emptyLocalBinds
               | (p,e) <-pats_and_exprs]
@@ -2336,7 +2336,7 @@ mkFunBindEC :: Arity -> SrcSpan -> RdrName
 mkFunBindEC arity loc fun catch_all pats_and_exprs
   = mkRdrFunBindEC arity catch_all (L (noAnnSrcSpan loc) fun) matches
   where
-    matches = [ mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
+    matches = [ mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun) noAnn)
                                 (noLocA (map (parenthesizePat appPrec) p)) e
                                 emptyLocalBinds
               | (p,e) <- pats_and_exprs ]
@@ -2363,7 +2363,7 @@ mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
    -- which can happen with -XEmptyDataDecls
    -- See #4302
    matches' = if null matches
-              then [mkMatch (mkPrefixFunRhs fun)
+              then [mkMatch (mkPrefixFunRhs fun noAnn)
                             (noLocA (replicate (arity - 1) (nlWildPat) ++ [z_Pat]))
                             (catch_all $ nlHsCase z_Expr [])
                             emptyLocalBinds]
@@ -2383,7 +2383,7 @@ mkRdrFunBindSE arity fun@(L loc fun_rdr) matches
    -- which can happen with -XEmptyDataDecls
    -- See #4302
    matches' = if null matches
-              then [mkMatch (mkPrefixFunRhs fun)
+              then [mkMatch (mkPrefixFunRhs fun noAnn)
                             (noLocA (replicate arity nlWildPat))
                             (error_Expr str) emptyLocalBinds]
               else matches
