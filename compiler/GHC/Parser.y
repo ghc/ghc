@@ -3022,7 +3022,7 @@ aexp    :: { ECP }
                                              return $ ECP $
                                                $4 >>= \ $4 ->
                                                mkHsCasePV (comb3 $1 $3 $4) $2 $4
-                                                    (EpAnnHsCase (glAA $1) (glAA $3) []) }
+                                                    (EpAnnHsCase (glAA $1) (glAA $3)) }
         -- QualifiedDo.
         | DO  stmtlist               {% do
                                       hintQualifiedDo $1

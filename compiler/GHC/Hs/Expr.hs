@@ -202,11 +202,10 @@ type instance XUntypedBracket GhcTc = HsBracketTc
 data EpAnnHsCase = EpAnnHsCase
       { hsCaseAnnCase :: EpaLocation
       , hsCaseAnnOf   :: EpaLocation
-      , hsCaseAnnsRest :: [AddEpAnn]
       } deriving Data
 
 instance NoAnn EpAnnHsCase where
-  noAnn = EpAnnHsCase noAnn noAnn noAnn
+  noAnn = EpAnnHsCase noAnn noAnn
 
 data EpAnnUnboundVar = EpAnnUnboundVar
      { hsUnboundBackquotes :: (EpaLocation, EpaLocation)

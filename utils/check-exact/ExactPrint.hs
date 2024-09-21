@@ -1211,7 +1211,6 @@ laiElseSemi k parent = fmap (\new -> parent { aiElseSemi = new })
 -- data EpAnnHsCase = EpAnnHsCase
 --       { hsCaseAnnCase :: EpaLocation
 --       , hsCaseAnnOf   :: EpaLocation
---       , hsCaseAnnsRest :: [AddEpAnn]
 --       } deriving Data
 
 lhsCaseAnnCase :: Lens EpAnnHsCase EpaLocation
@@ -1221,10 +1220,6 @@ lhsCaseAnnCase k parent = fmap (\new -> parent { hsCaseAnnCase = new })
 lhsCaseAnnOf :: Lens EpAnnHsCase EpaLocation
 lhsCaseAnnOf k parent = fmap (\new -> parent { hsCaseAnnOf = new })
                                (k (hsCaseAnnOf parent))
-
-lhsCaseAnnsRest :: Lens EpAnnHsCase [AddEpAnn]
-lhsCaseAnnsRest k parent = fmap (\new -> parent { hsCaseAnnsRest = new })
-                                (k (hsCaseAnnsRest parent))
 
 -- ---------------------------------------------------------------------
 
@@ -3161,11 +3156,8 @@ instance ExactPrint (HsExpr GhcPs) where
     an0 <- markLensKw an lhsCaseAnnCase AnnCase
     e' <- markAnnotated e
     an1 <- markLensKw an0 lhsCaseAnnOf AnnOf
-    an2 <- markEpAnnL an1 lhsCaseAnnsRest AnnOpenC
-    an3 <- markEpAnnAllL' an2 lhsCaseAnnsRest AnnSemi
     alts' <- setLayoutBoth $ markAnnotated alts
-    an4 <- markEpAnnL an3 lhsCaseAnnsRest AnnCloseC
-    return (HsCase an4 e' alts')
+    return (HsCase an1 e' alts')
 
   exact (HsIf an e1 e2 e3) = do
     an0 <- markLensKw an laiIf AnnIf
@@ -3635,11 +3627,8 @@ instance ExactPrint (HsCmd GhcPs) where
     an0 <- markLensKw an lhsCaseAnnCase AnnCase
     e' <- markAnnotated e
     an1 <- markLensKw an0 lhsCaseAnnOf AnnOf
-    an2 <- markEpAnnL an1 lhsCaseAnnsRest AnnOpenC
-    an3 <- markEpAnnAllL' an2 lhsCaseAnnsRest AnnSemi
     alts' <- markAnnotated alts
-    an4 <- markEpAnnL an3 lhsCaseAnnsRest AnnCloseC
-    return (HsCmdCase an4 e' alts')
+    return (HsCmdCase an1 e' alts')
 
   exact (HsCmdIf an a e1 e2 e3) = do
     an0 <- markLensKw an laiIf AnnIf
