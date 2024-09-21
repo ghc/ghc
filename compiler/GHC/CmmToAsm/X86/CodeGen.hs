@@ -3228,33 +3228,39 @@ genCCall
   -> [CmmFormal]
   -> [CmmActual]
   -> NatM InstrBlock
-genCCall bid addr conv dest_regs args = do
+genCCall bid addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
+  platform <- getPlatform
   is32Bit <- is32BitPlatform
-  (instrs0, args') <- evalArgs bid args
+  let args_hints = zip args (argHints ++ repeat NoHint)
+      prom_args = map (maybePromoteCArgToW32 platform) args_hints
+  (instrs0, args') <- evalArgs bid prom_args
   instrs1 <- if is32Bit
     then genCCall32 addr conv dest_regs args'
     else genCCall64 addr conv dest_regs args'
   return (instrs0 `appOL` instrs1)
 
-maybePromoteCArg :: Platform -> Width -> (CmmExpr, ForeignHint) -> CmmExpr
-maybePromoteCArg platform wto (arg, hint)
- | wfrom < wto = case hint of
-     SignedHint -> CmmMachOp (MO_SS_Conv wfrom wto) [arg]
-     _          -> CmmMachOp (MO_UU_Conv wfrom wto) [arg]
+maybePromoteCArgToW32 :: Platform -> (CmmExpr, ForeignHint) -> CmmExpr
+maybePromoteCArgToW32 platform (arg, hint)
+ | wfrom < wto =
+    -- As wto=W32, we only need to handle integer conversions,
+    -- never Float -> Double.
+    case hint of
+      SignedHint -> CmmMachOp (MO_SS_Conv wfrom wto) [arg]
+      _          -> CmmMachOp (MO_UU_Conv wfrom wto) [arg]
  | otherwise   = arg
  where
-   wfrom = cmmExprWidth platform arg
+   ty = cmmExprType platform arg
+   wfrom = typeWidth ty
+   wto = W32
 
 genCCall32 :: CmmExpr           -- ^ address of the function to call
            -> ForeignConvention -- ^ calling convention
            -> [CmmFormal]       -- ^ where to put the result
            -> [CmmActual]       -- ^ arguments (of mixed type)
            -> NatM InstrBlock
-genCCall32 addr (ForeignConvention _ argHints _ _) dest_regs args = do
+genCCall32 addr _conv dest_regs args = do
         config <- getConfig
         let platform = ncgPlatform config
-            args_hints = zip args (argHints ++ repeat NoHint)
-            prom_args = map (maybePromoteCArg platform W32) args_hints
 
             -- If the size is smaller than the word, we widen things (see maybePromoteCArg)
             arg_size_bytes :: CmmType -> Int
@@ -3324,7 +3330,7 @@ genCCall32 addr (ForeignConvention _ argHints _ _) dest_regs args = do
         delta0 <- getDeltaNat
         setDeltaNat (delta0 - arg_pad_size)
 
-        push_codes <- mapM push_arg (reverse prom_args)
+        push_codes <- mapM push_arg (reverse args)
         delta <- getDeltaNat
         massert (delta == delta0 - tot_arg_size)
 
@@ -3399,11 +3405,9 @@ genCCall64 :: CmmExpr           -- ^ address of function to call
            -> [CmmFormal]       -- ^ where to put the result
            -> [CmmActual]       -- ^ arguments (of mixed type)
            -> NatM InstrBlock
-genCCall64 addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
+genCCall64 addr conv dest_regs args = do
     config <- getConfig
     let platform = ncgPlatform config
-        args_hints = zip args (argHints ++ repeat NoHint)
-        prom_args = map (maybePromoteCArg platform W32) args_hints
         word_size = platformWordSizeInBytes platform
         wordFmt = archWordFormat (target32Bit platform)
 
@@ -3420,7 +3424,7 @@ genCCall64 addr conv@(ForeignConvention _ argHints _ _) dest_regs args = do
       , computeArgsCode = compute_args_code
       , assignArgsCode  = assign_args_code
       }
-      <- loadArgs config prom_args
+      <- loadArgs config args
 
     let
 
