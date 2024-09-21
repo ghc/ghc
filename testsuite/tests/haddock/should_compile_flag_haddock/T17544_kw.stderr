@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { T17544_kw.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { T17544_kw.hs:11:1-6 }))
+     (EpTok
+      (EpaSpan { T17544_kw.hs:13:13-17 }))
      []
      []
      (Just

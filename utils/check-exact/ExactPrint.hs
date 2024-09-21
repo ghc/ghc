@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns         #-}
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
@@ -996,15 +997,21 @@ lepa k epAnn = fmap (\newAnns -> epAnn { anns = newAnns })
 
 -- data AnnsModule
 --   = AnnsModule {
---     am_main  :: [AddEpAnn],
+--     am_sig :: Maybe (EpToken "signature"),
+--     am_mod :: Maybe (EpToken "module"),
+--     am_where :: Maybe (EpToken "where"),
 --     am_decls :: [TrailingAnn],
 --     am_cs    :: [LEpaComment],
 --     am_eof   :: Maybe (RealSrcSpan, RealSrcSpan)
 --     } deriving (Data, Eq)
 
-lam_main :: Lens AnnsModule [AddEpAnn]
-lam_main k annsModule = fmap (\newAnns -> annsModule { am_main = newAnns })
-                             (k (am_main annsModule))
+lam_mod :: Lens AnnsModule (EpToken "module")
+lam_mod k annsModule = fmap (\newAnns -> annsModule { am_mod = newAnns })
+                            (k (am_mod annsModule))
+
+lam_where :: Lens AnnsModule (EpToken "where")
+lam_where k annsModule = fmap (\newAnns -> annsModule { am_where = newAnns })
+                              (k (am_where annsModule))
 
 -- lam_decls :: Lens AnnsModule AnnList
 -- lam_decls k annsModule = fmap (\newAnns -> annsModule { am_decls = newAnns })
@@ -1366,6 +1373,12 @@ markLensKwM' a l kw = do
     go Nothing = return Nothing
     go (Just s) = Just <$> markKwA kw s
 
+markLensTok :: (Monad m, Monoid w, KnownSymbol sym)
+  => EpAnn a -> Lens a (EpToken sym) -> EP w m (EpAnn a)
+markLensTok (EpAnn anc a cs) l = do
+  new <- markEpToken (view l a)
+  return (EpAnn anc (set l new a) cs)
+
 -- ---------------------------------------------------------------------
 
 markEpAnnL' :: (Monad m, Monoid w)
@@ -1676,14 +1689,14 @@ instance ExactPrint (HsModule GhcPs) where
       case mmn of
         Nothing -> return (an, mmn, mdeprec, mexports)
         Just m -> do
-          an0 <- markEpAnnL' an lam_main AnnModule
+          an0 <- markLensTok an lam_mod
           m' <- markAnnotated m
 
           mdeprec' <- setLayoutTopLevelP $ markAnnotated mdeprec
 
           mexports' <- setLayoutTopLevelP $ markAnnotated mexports
 
-          an1 <- setLayoutTopLevelP $ markEpAnnL' an0 lam_main AnnWhere
+          an1 <- setLayoutTopLevelP $ markLensTok an0 lam_where
 
           return (an1, Just m', mdeprec', mexports')
 

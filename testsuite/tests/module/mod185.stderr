@@ -8,7 +8,9 @@
    (EpAnn
     (EpaSpan { mod185.hs:1:1 })
     (AnnsModule
-     []
+     (NoEpTok)
+     (NoEpTok)
+     (NoEpTok)
      []
      []
      (Just
