@@ -18,7 +18,7 @@ module GHC.Parser.Annotation (
   HasE(..),
 
   -- * In-tree Exact Print Annotations
-  AddEpAnn(..),
+  AddEpAnn(..), addEpAnnLoc,
   EpaLocation, EpaLocation'(..), epaLocationRealSrcSpan,
   TokenLocation(..),
   DeltaPos(..), deltaPos, getDeltaLine,
@@ -462,6 +462,9 @@ instance Outputable EpaComment where
 -- jump") function, and then it can be inserted into the appropriate
 -- annotation.
 data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
+
+addEpAnnLoc :: AddEpAnn -> EpaLocation
+addEpAnnLoc (AddEpAnn _ l) = l
 
 type EpaLocation = EpaLocation' [LEpaComment]
 
@@ -1336,6 +1339,9 @@ instance NoAnn (Maybe a) where
 
 instance (NoAnn a, NoAnn b) => NoAnn (a, b) where
   noAnn = (noAnn, noAnn)
+
+instance (NoAnn a, NoAnn b, NoAnn c) => NoAnn (a, b, c) where
+  noAnn = (noAnn, noAnn, noAnn)
 
 instance NoAnn Bool where
   noAnn = False

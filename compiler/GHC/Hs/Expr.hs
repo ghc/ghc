@@ -207,6 +207,16 @@ data EpAnnHsCase = EpAnnHsCase
 instance NoAnn EpAnnHsCase where
   noAnn = EpAnnHsCase noAnn noAnn
 
+data EpAnnLam = EpAnnLam
+      { epl_lambda :: EpaLocation -- ^ Location of '\' keyword
+      , epl_case   :: Maybe EpaLocation -- ^ Location of 'case' or
+                                        -- 'cases' keyword, depending
+                                        -- on related 'HsLamVariant'.
+      } deriving Data
+
+instance NoAnn EpAnnLam where
+  noAnn = EpAnnLam noAnn noAnn
+
 data EpAnnUnboundVar = EpAnnUnboundVar
      { hsUnboundBackquotes :: (EpaLocation, EpaLocation)
      , hsUnboundHole       :: EpaLocation
@@ -241,7 +251,7 @@ type instance XIPVar         GhcRn = NoExtField
 type instance XIPVar         GhcTc = DataConCantHappen
 type instance XOverLitE      (GhcPass _) = NoExtField
 type instance XLitE          (GhcPass _) = NoExtField
-type instance XLam           (GhcPass _) = [AddEpAnn]
+type instance XLam           (GhcPass _) = EpAnnLam
 type instance XApp           (GhcPass _) = NoExtField
 
 type instance XAppTypeE      GhcPs = EpToken "@"
@@ -250,7 +260,7 @@ type instance XAppTypeE      GhcTc = Type
 
 -- OpApp not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
-type instance XOpApp         GhcPs = [AddEpAnn]
+type instance XOpApp         GhcPs = NoExtField
 type instance XOpApp         GhcRn = Fixity
 type instance XOpApp         GhcTc = DataConCantHappen
 
@@ -264,7 +274,7 @@ type instance XSectionL      GhcTc = DataConCantHappen
 type instance XSectionR      GhcTc = DataConCantHappen
 
 
-type instance XNegApp        GhcPs = [AddEpAnn]
+type instance XNegApp        GhcPs = EpToken "-"
 type instance XNegApp        GhcRn = NoExtField
 type instance XNegApp        GhcTc = NoExtField
 
@@ -272,7 +282,7 @@ type instance XPar           GhcPs = (EpToken "(", EpToken ")")
 type instance XPar           GhcRn = NoExtField
 type instance XPar           GhcTc = NoExtField
 
-type instance XExplicitTuple GhcPs = [AddEpAnn]
+type instance XExplicitTuple GhcPs = (EpaLocation, EpaLocation)
 type instance XExplicitTuple GhcRn = NoExtField
 type instance XExplicitTuple GhcTc = NoExtField
 
@@ -288,7 +298,7 @@ type instance XIf            GhcPs = AnnsIf
 type instance XIf            GhcRn = NoExtField
 type instance XIf            GhcTc = NoExtField
 
-type instance XMultiIf       GhcPs = [AddEpAnn]
+type instance XMultiIf       GhcPs = (EpToken "if", EpToken "{", EpToken "}")
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
@@ -359,17 +369,17 @@ type instance XProjection     GhcTc = DataConCantHappen
 -- HsProjection is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XExprWithTySig GhcPs = [AddEpAnn]
+type instance XExprWithTySig GhcPs = EpUniToken "::" "∷"
 type instance XExprWithTySig GhcRn = NoExtField
 type instance XExprWithTySig GhcTc = NoExtField
 
-type instance XArithSeq      GhcPs = [AddEpAnn]
+type instance XArithSeq      GhcPs = AnnArithSeq
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XProc          (GhcPass _) = [AddEpAnn]
+type instance XProc          (GhcPass _) = (EpToken "proc", EpUniToken "->" "→")
 
-type instance XStatic        GhcPs = [AddEpAnn]
+type instance XStatic        GhcPs = EpToken "static"
 type instance XStatic        GhcRn = NameSet
 type instance XStatic        GhcTc = (NameSet, Type)
   -- Free variables and type of expression, this is stored for convenience as wiring in
@@ -394,6 +404,8 @@ type instance XFunArr        GhcRn = NoExtField
 type instance XFunArr        GhcTc = DataConCantHappen
 
 type instance XPragE         (GhcPass _) = NoExtField
+
+type instance XFunRhs  = AnnFunRhs
 
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnL
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
@@ -429,6 +441,17 @@ data AnnProjection
 instance NoAnn AnnProjection where
   noAnn = AnnProjection noAnn noAnn
 
+data AnnArithSeq
+  = AnnArithSeq {
+      aas_open   :: EpToken "[",
+      aas_comma  :: Maybe (EpToken ","),
+      aas_dotdot :: EpToken "..",
+      aas_close  :: EpToken "]"
+      } deriving Data
+
+instance NoAnn AnnArithSeq where
+  noAnn = AnnArithSeq noAnn noAnn noAnn noAnn
+
 data AnnsIf
   = AnnsIf {
       aiIf       :: EpaLocation,
@@ -440,6 +463,16 @@ data AnnsIf
 
 instance NoAnn AnnsIf where
   noAnn = AnnsIf noAnn noAnn noAnn Nothing Nothing
+
+data AnnFunRhs
+  = AnnFunRhs {
+       afr_strict :: EpToken "!",
+       afr_opens  :: [EpToken "("],
+       afr_closes :: [EpToken ")"]
+  } deriving Data
+
+instance NoAnn AnnFunRhs where
+  noAnn = AnnFunRhs noAnn noAnn noAnn
 
 -- ---------------------------------------------------------------------
 
@@ -1299,7 +1332,7 @@ type instance XCmdCase    GhcPs = EpAnnHsCase
 type instance XCmdCase    GhcRn = NoExtField
 type instance XCmdCase    GhcTc = NoExtField
 
-type instance XCmdLamCase (GhcPass _) = [AddEpAnn]
+type instance XCmdLamCase (GhcPass _) = EpAnnLam
 
 type instance XCmdIf      GhcPs = AnnsIf
 type instance XCmdIf      GhcRn = NoExtField
@@ -1503,7 +1536,7 @@ data MatchGroupTc
 
 type instance XXMatchGroup (GhcPass _) b = DataConCantHappen
 
-type instance XCMatch (GhcPass _) b = [AddEpAnn]
+type instance XCMatch (GhcPass _) b = NoExtField
 type instance XXMatch (GhcPass _) b = DataConCantHappen
 
 instance (OutputableBndrId pr, Outputable body)
@@ -1690,7 +1723,7 @@ data RecStmtTc =
 
 type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExtField
 
-type instance XBindStmt        (GhcPass _) GhcPs b = [AddEpAnn]
+type instance XBindStmt        (GhcPass _) GhcPs b = EpUniToken "<-" "←"
 type instance XBindStmt        (GhcPass _) GhcRn b = XBindStmtRn
 type instance XBindStmt        (GhcPass _) GhcTc b = XBindStmtTc
 
@@ -1714,13 +1747,13 @@ type instance XBodyStmt        (GhcPass _) GhcPs b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcRn b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcTc b = Type
 
-type instance XLetStmt         (GhcPass _) (GhcPass _) b = [AddEpAnn]
+type instance XLetStmt         (GhcPass _) (GhcPass _) b = EpToken "let"
 
 type instance XParStmt         (GhcPass _) GhcPs b = NoExtField
 type instance XParStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XParStmt         (GhcPass _) GhcTc b = Type
 
-type instance XTransStmt       (GhcPass _) GhcPs b = [AddEpAnn]
+type instance XTransStmt       (GhcPass _) GhcPs b = AnnTransStmt
 type instance XTransStmt       (GhcPass _) GhcRn b = NoExtField
 type instance XTransStmt       (GhcPass _) GhcTc b = Type
 
@@ -1731,6 +1764,18 @@ type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 type instance XXStmtLR         (GhcPass _) GhcPs b = DataConCantHappen
 type instance XXStmtLR         (GhcPass x) GhcRn b = ApplicativeStmt (GhcPass x) GhcRn
 type instance XXStmtLR         (GhcPass x) GhcTc b = ApplicativeStmt (GhcPass x) GhcTc
+
+data AnnTransStmt
+  = AnnTransStmt {
+      ats_then  :: EpToken "then",
+      ats_group :: Maybe (EpToken "group"),
+      ats_by    :: Maybe (EpToken "by"),
+      ats_using :: Maybe (EpToken "using")
+      } deriving Data
+
+instance NoAnn AnnTransStmt where
+  noAnn = AnnTransStmt noAnn noAnn noAnn noAnn
+
 
 -- | 'ApplicativeStmt' represents an applicative expression built with
 -- '<$>' and '<*>'.  It is generated by the renamer, and is desugared into the
@@ -1996,7 +2041,7 @@ data HsUntypedSpliceResult thing  -- 'thing' can be HsExpr or HsType
       }
   | HsUntypedSpliceNested SplicePointName -- A unique name to identify this splice point
 
-type instance XTypedSplice   GhcPs = [AddEpAnn]
+type instance XTypedSplice   GhcPs = EpToken "$$"
 type instance XTypedSplice   GhcRn = SplicePointName
 type instance XTypedSplice   GhcTc = DelayedSplice
 
@@ -2005,8 +2050,8 @@ type instance XUntypedSplice GhcRn = HsUntypedSpliceResult (HsExpr GhcRn)
 type instance XUntypedSplice GhcTc = DataConCantHappen
 
 -- HsUntypedSplice
-type instance XUntypedSpliceExpr GhcPs = [AddEpAnn]
-type instance XUntypedSpliceExpr GhcRn = [AddEpAnn]
+type instance XUntypedSpliceExpr GhcPs = EpToken "$"
+type instance XUntypedSpliceExpr GhcRn = EpToken "$"
 type instance XUntypedSpliceExpr GhcTc = DataConCantHappen
 
 type instance XQuasiQuote        p = NoExtField

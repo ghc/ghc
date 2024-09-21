@@ -48,7 +48,7 @@
                (EpaComments
                 []))
               (Match
-               []
+               (NoExtField)
                (FunRhs
                 (L
                  (EpAnn
@@ -59,7 +59,11 @@
                    []))
                  {Name: DumpRenamedAst.main})
                 (Prefix)
-                (NoSrcStrict))
+                (NoSrcStrict)
+                (AnnFunRhs
+                 (NoEpTok)
+                 []
+                 []))
                (L
                 (EpaSpan { <no location info> })
                 [])

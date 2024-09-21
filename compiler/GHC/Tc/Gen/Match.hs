@@ -282,7 +282,7 @@ tcMatch tc_body pat_tys rhs_ty match
              -- NB: pats' are just the /value/ patterns
              -- See Note [tcMatchPats] in GHC.Tc.Gen.Pat
 
-           ; return (wrapper, Match { m_ext   = noAnn
+           ; return (wrapper, Match { m_ext   = noExtField
                                     , m_ctxt  = ctxt
                                     , m_pats  = L l pats'
                                     , m_grhss = grhss' }) }

@@ -107,7 +107,7 @@ type instance XParPat  GhcPs = (EpToken "(", EpToken ")")
 type instance XParPat  GhcRn = NoExtField
 type instance XParPat  GhcTc = NoExtField
 
-type instance XBangPat GhcPs = [AddEpAnn] -- For '!'
+type instance XBangPat GhcPs = EpToken "!"
 type instance XBangPat GhcRn = NoExtField
 type instance XBangPat GhcTc = NoExtField
 
@@ -121,7 +121,7 @@ type instance XListPat GhcRn = NoExtField
 type instance XListPat GhcTc = Type
   -- List element type, for use in hsPatType.
 
-type instance XTuplePat GhcPs = [AddEpAnn]
+type instance XTuplePat GhcPs = (EpaLocation, EpaLocation)
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
 
@@ -153,15 +153,15 @@ type instance XSplicePat GhcTc = DataConCantHappen
 
 type instance XLitPat    (GhcPass _) = NoExtField
 
-type instance XNPat GhcPs = [AddEpAnn]
-type instance XNPat GhcRn = [AddEpAnn]
+type instance XNPat GhcPs = EpToken "-"
+type instance XNPat GhcRn = EpToken "-"
 type instance XNPat GhcTc = Type
 
 type instance XNPlusKPat GhcPs = EpaLocation -- Of the "+"
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = [AddEpAnn]
+type instance XSigPat GhcPs = EpUniToken "::" "∷"
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
@@ -271,13 +271,13 @@ discarded inside tcMatchPats, where we know if visible pattern retained or erase
 -- API Annotations types
 
 data EpAnnSumPat = EpAnnSumPat
-      { sumPatParens      :: [AddEpAnn]
+      { sumPatParens      :: (EpaLocation, EpaLocation)
       , sumPatVbarsBefore :: [EpaLocation]
       , sumPatVbarsAfter  :: [EpaLocation]
       } deriving Data
 
 instance NoAnn EpAnnSumPat where
-  noAnn = EpAnnSumPat [] [] []
+  noAnn = EpAnnSumPat (noAnn, noAnn) [] []
 
 -- ---------------------------------------------------------------------
 

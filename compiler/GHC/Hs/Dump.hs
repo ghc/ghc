@@ -4,6 +4,7 @@
 -}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds #-}
 
 -- | Contains a debug function to dump parts of the GHC.Hs AST. It uses a syb
 -- traversal which falls back to displaying based on the constructor name, so
@@ -34,6 +35,7 @@ import GHC.Utils.Outputable
 
 import Data.Data hiding (Fixity)
 import qualified Data.ByteString as B
+import GHC.TypeLits
 
 -- | Should source spans be removed from output.
 data BlankSrcSpan = BlankSrcSpan | BlankSrcSpanFile | NoBlankSrcSpan
@@ -65,6 +67,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationEpAnnImportDecl
               `extQ` annotationNoEpAnns
               `extQ` addEpAnn
+              `extQ` epTokenOC
+              `extQ` epTokenCC
               `extQ` annParen
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
@@ -190,6 +194,25 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                       $ text "blanked:" <+> text "AddEpAnn"
              NoBlankEpAnnotations ->
               parens $ text "AddEpAnn" <+> ppr a <+> epaAnchor s
+
+            epTokenOC :: EpToken "{" -> SDoc
+            epTokenOC  = epToken'
+
+            epTokenCC :: EpToken "}" -> SDoc
+            epTokenCC = epToken'
+
+            epToken' :: KnownSymbol sym => EpToken sym -> SDoc
+            epToken' (EpTok s) = case ba of
+             BlankEpAnnotations -> parens
+                                      $ text "blanked:" <+> text "EpToken"
+             NoBlankEpAnnotations ->
+              parens $ text "EpTok" <+> epaAnchor s
+            epToken' NoEpTok = case ba of
+             BlankEpAnnotations -> parens
+                                      $ text "blanked:" <+> text "EpToken"
+             NoBlankEpAnnotations ->
+              parens $ text "NoEpTok"
+
 
             var  :: Var -> SDoc
             var v      = braces $ text "Var:" <+> ppr v

@@ -2251,7 +2251,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; let loc' = noAnnSrcSpan $ locA loc
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq (locA loc)
-              matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it)) (noLocA []) rn_expr
+              matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it) noAnn) (noLocA []) rn_expr
                                    emptyLocalBinds]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource

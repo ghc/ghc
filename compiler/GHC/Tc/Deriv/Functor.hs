@@ -161,7 +161,7 @@ gen_Functor_binds loc (DerivInstTys{dit_rep_tc = tycon})
     fmap_eqns = [mkSimpleMatch fmap_match_ctxt
                                (noLocA [nlWildPat])
                                coerce_Expr]
-    fmap_match_ctxt = mkPrefixFunRhs fmap_name
+    fmap_match_ctxt = mkPrefixFunRhs fmap_name noAnn
 
 gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                        , dit_rep_tc_args = tycon_args })
@@ -172,7 +172,7 @@ gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     fmap_bind = mkRdrFunBindEC 2 id fmap_name fmap_eqns
-    fmap_match_ctxt = mkPrefixFunRhs fmap_name
+    fmap_match_ctxt = mkPrefixFunRhs fmap_name noAnn
 
     fmap_eqn con = flip evalState bs_RDRs $
                      match_for_con fmap_match_ctxt [f_Pat] con parts
@@ -211,7 +211,7 @@ gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     replace_bind = mkRdrFunBindEC 2 id replace_name replace_eqns
-    replace_match_ctxt = mkPrefixFunRhs replace_name
+    replace_match_ctxt = mkPrefixFunRhs replace_name noAnn
 
     replace_eqn con = flip evalState bs_RDRs $
         match_for_con replace_match_ctxt [z_Pat] con parts
@@ -824,7 +824,7 @@ gen_Foldable_binds loc (DerivInstTys{dit_rep_tc = tycon})
     foldMap_eqns = [mkSimpleMatch foldMap_match_ctxt
                                   (noLocA [nlWildPat, nlWildPat])
                                   mempty_Expr]
-    foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
+    foldMap_match_ctxt = mkPrefixFunRhs foldMap_name noAnn
 
 gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                         , dit_rep_tc_args = tycon_args })
@@ -845,7 +845,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldr con dit
-    foldr_match_ctxt = mkPrefixFunRhs foldr_name
+    foldr_match_ctxt = mkPrefixFunRhs foldr_name noAnn
 
     foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
 
@@ -859,7 +859,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldMap con dit
-    foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
+    foldMap_match_ctxt = mkPrefixFunRhs foldMap_name noAnn
 
     -- Given a list of NullM results, produce Nothing if any of
     -- them is NotNull, and otherwise produce a list of Maybes
@@ -872,7 +872,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       go (NullM a) = Just (Just a)
 
     null_name = L (noAnnSrcSpan loc) null_RDR
-    null_match_ctxt = mkPrefixFunRhs null_name
+    null_match_ctxt = mkPrefixFunRhs null_name noAnn
     null_bind = mkRdrFunBind null_name null_eqns
     null_eqns = map null_eqn data_cons
     null_eqn con
@@ -1059,7 +1059,7 @@ gen_Traversable_binds loc (DerivInstTys{dit_rep_tc = tycon})
         [mkSimpleMatch traverse_match_ctxt
                        (noLocA [nlWildPat, z_Pat])
                        (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
-    traverse_match_ctxt = mkPrefixFunRhs traverse_name
+    traverse_match_ctxt = mkPrefixFunRhs traverse_name noAnn
 
 gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                            , dit_rep_tc_args = tycon_args })
@@ -1077,7 +1077,7 @@ gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_trav con dit
-    traverse_match_ctxt = mkPrefixFunRhs traverse_name
+    traverse_match_ctxt = mkPrefixFunRhs traverse_name noAnn
 
     -- Yields 'Just' an expression if we're folding over a type that mentions
     -- the last type parameter of the datatype. Otherwise, yields 'Nothing'.

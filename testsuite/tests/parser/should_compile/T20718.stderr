@@ -118,7 +118,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -130,7 +130,11 @@
              (Unqual
               {OccName: x}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])

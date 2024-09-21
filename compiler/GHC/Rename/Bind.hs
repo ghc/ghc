@@ -529,7 +529,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
 
         ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                                 -- bindSigTyVars tests for LangExt.ScopedTyVars
-                                 rnMatchGroup (mkPrefixFunRhs name)
+                                 rnMatchGroup (mkPrefixFunRhs name noAnn)
                                               rnLExpr matches
         ; let is_infix = isInfixFunBind bind
         ; when is_infix $ checkPrecMatch plain_name matches'
@@ -807,7 +807,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
                 do { (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
-                                   rnMatchGroup (mkPrefixFunRhs (L l name))
+                                   rnMatchGroup (mkPrefixFunRhs (L l name) noAnn)
                                                 rnLExpr mg
                    ; return (ExplicitBidirectional mg', fvs) }
 
@@ -1359,7 +1359,7 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = L l pats, m_grhss = grhss })
                       (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
                                             -> mf { mc_fun = L lf funid }
                       _                     -> ctxt
-        ; return (Match { m_ext = noAnn, m_ctxt = mf', m_pats = L l pats'
+        ; return (Match { m_ext = noExtField, m_ctxt = mf', m_pats = L l pats'
                         , m_grhss = grhss'}, grhss_fvs ) }
 
 

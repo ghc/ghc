@@ -268,7 +268,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -280,7 +280,11 @@
              (Unqual
               {OccName: foo}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -561,7 +565,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -573,7 +577,11 @@
              (Unqual
               {OccName: bar}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -809,7 +817,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -821,7 +829,11 @@
              (Unqual
               {OccName: baz}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1012,7 +1024,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -1024,7 +1036,11 @@
              (Unqual
               {OccName: a}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1107,7 +1123,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -1119,7 +1135,11 @@
              (Unqual
               {OccName: b}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1203,7 +1223,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -1215,7 +1235,11 @@
              (Unqual
               {OccName: s}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1672,7 +1696,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -1684,7 +1708,11 @@
              (Unqual
               {OccName: f}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { DumpSemis.hs:32:3 })
             [(L
@@ -1787,7 +1815,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -1799,7 +1827,11 @@
              (Unqual
               {OccName: x}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { <no location info> })
             [])
@@ -1896,7 +1928,7 @@
                            (EpaComments
                             []))
                           (Match
-                           []
+                           (NoExtField)
                            (FunRhs
                             (L
                              (EpAnn
@@ -1908,7 +1940,11 @@
                              (Unqual
                               {OccName: y}))
                             (Prefix)
-                            (NoSrcStrict))
+                            (NoSrcStrict)
+                            (AnnFunRhs
+                             (NoEpTok)
+                             []
+                             []))
                            (L
                             (EpaSpan { <no location info> })
                             [])
@@ -1994,7 +2030,7 @@
                            (EpaComments
                             []))
                           (Match
-                           []
+                           (NoExtField)
                            (FunRhs
                             (L
                              (EpAnn
@@ -2006,7 +2042,11 @@
                              (Unqual
                               {OccName: z}))
                             (Prefix)
-                            (NoSrcStrict))
+                            (NoSrcStrict)
+                            (AnnFunRhs
+                             (NoEpTok)
+                             []
+                             []))
                            (L
                             (EpaSpan { <no location info> })
                             [])
@@ -2109,7 +2149,7 @@
            (EpaComments
             []))
           (Match
-           []
+           (NoExtField)
            (FunRhs
             (L
              (EpAnn
@@ -2121,7 +2161,11 @@
              (Unqual
               {OccName: fot}))
             (Prefix)
-            (NoSrcStrict))
+            (NoSrcStrict)
+            (AnnFunRhs
+             (NoEpTok)
+             []
+             []))
            (L
             (EpaSpan { DumpSemis.hs:36:5 })
             [(L
@@ -2216,7 +2260,7 @@
                       (EpaComments
                        []))
                      (Match
-                      []
+                      (NoExtField)
                       (CaseAlt)
                       (L
                        (EpaSpan { DumpSemis.hs:39:6 })
@@ -2228,7 +2272,7 @@
                           (EpaComments
                            []))
                          (NPat
-                          []
+                          (NoEpTok)
                           (L
                            (EpAnn
                             (EpaSpan { DumpSemis.hs:39:6 })
@@ -2285,7 +2329,7 @@
                       (EpaComments
                        []))
                      (Match
-                      []
+                      (NoExtField)
                       (CaseAlt)
                       (L
                        (EpaSpan { DumpSemis.hs:40:6 })
@@ -2297,7 +2341,7 @@
                           (EpaComments
                            []))
                          (NPat
-                          []
+                          (NoEpTok)
                           (L
                            (EpAnn
                             (EpaSpan { DumpSemis.hs:40:6 })
@@ -2356,7 +2400,7 @@
                       (EpaComments
                        []))
                      (Match
-                      []
+                      (NoExtField)
                       (CaseAlt)
                       (L
                        (EpaSpan { DumpSemis.hs:41:6 })
@@ -2368,7 +2412,7 @@
                           (EpaComments
                            []))
                          (NPat
-                          []
+                          (NoEpTok)
                           (L
                            (EpAnn
                             (EpaSpan { DumpSemis.hs:41:6 })
@@ -2429,7 +2473,7 @@
                       (EpaComments
                        []))
                      (Match
-                      []
+                      (NoExtField)
                       (CaseAlt)
                       (L
                        (EpaSpan { DumpSemis.hs:42:6 })
@@ -2441,7 +2485,7 @@
                           (EpaComments
                            []))
                          (NPat
-                          []
+                          (NoEpTok)
                           (L
                            (EpAnn
                             (EpaSpan { DumpSemis.hs:42:6 })

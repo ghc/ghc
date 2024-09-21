@@ -352,7 +352,7 @@ tcCmdMatchLambda env ctxt arity
                                 tcMatchPats match_ctxt pats (map ExpFunPatTy arg_tys) $
                                 tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-           ; return $ L mtch_loc (Match { m_ext = noAnn
+           ; return $ L mtch_loc (Match { m_ext = noExtField
                                         , m_ctxt = match_ctxt
                                         , m_pats = L l pats'
                                         , m_grhss = grhss' }) }
