@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { T23315.hsig:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnSignature (EpaSpan { T23315.hsig:1:1-9 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { T23315.hsig:1:18-22 }))]
+     (EpTok
+      (EpaSpan { T23315.hsig:1:1-9 }))
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { T23315.hsig:1:18-22 }))
      []
      []
      (Nothing))

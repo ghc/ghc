@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -292,7 +293,7 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
         Just _ ->
             -- We have a module name. Capture all comments up to the `where`
             let
-              (these, remaining) = splitOnWhere Before (am_main $ anns an) cs
+              (these, remaining) = splitOnWhere Before (am_where $ anns an) cs
               (EpAnn a anno ocs) = an :: EpAnn AnnsModule
               anm = EpAnn a anno (workInComments ocs these)
             in
@@ -336,9 +337,9 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
     -- Either hc0i or hc0d should have comments. Combine them
     hc0 = hc0i ++ hc0d
 
-    (hc1,hc_cs) = if null ( am_main $ anns an3)
+    (hc1,hc_cs) = if NoEpTok == (am_where $ anns an3)
         then (hc0,[])
-        else splitOnWhere After (am_main $ anns an3)  hc0
+        else splitOnWhere After (am_where $ anns an3)  hc0
     hc2 = workInComments (comments an3) hc1
     an4 = an3 { anns = (anns an3) {am_cs = hc_cs}, comments = hc2 }
 
@@ -355,15 +356,14 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
         (xs',rest') = allocPreceding xs rest
 
 data SplitWhere = Before | After
-splitOnWhere :: SplitWhere -> [AddEpAnn] -> [LEpaComment] -> ([LEpaComment], [LEpaComment])
-splitOnWhere _ [] csIn = (csIn,[])
-splitOnWhere w (AddEpAnn AnnWhere (EpaSpan (RealSrcSpan s _)):_) csIn = (hc, fc)
+
+splitOnWhere :: SplitWhere -> EpToken "where" -> [LEpaComment] -> ([LEpaComment], [LEpaComment])
+splitOnWhere w (EpTok (EpaSpan (RealSrcSpan s _))) csIn = (hc, fc)
   where
     splitFunc Before anc_pos c_pos = c_pos < anc_pos
     splitFunc After  anc_pos c_pos = anc_pos < c_pos
     (hc,fc) = break (\(L ll _) ->  splitFunc w (ss2pos $ anchor ll) (ss2pos s)) csIn
-splitOnWhere _ (AddEpAnn AnnWhere _:_) csIn = (csIn, [])
-splitOnWhere f (_:as) csIn = splitOnWhere f as csIn
+splitOnWhere _ _ csIn = (csIn,[])
 
 balanceFirstLocatedAComments :: [LocatedA a] -> ([LocatedA a], [LEpaComment])
 balanceFirstLocatedAComments [] = ([],[])

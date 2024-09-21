@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { Test20239.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { Test20239.hs:1:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { Test20239.hs:1:18-22 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { Test20239.hs:1:1-6 }))
+     (EpTok
+      (EpaSpan { Test20239.hs:1:18-22 }))
      []
      []
      (Just
@@ -351,6 +354,6 @@
          []))))))]))
 
 
-
 Test20239.hs:5:15: error: [GHC-76037]
     Not in scope: type constructor or class ‘Method’
+

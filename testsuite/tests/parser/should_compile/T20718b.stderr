@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { T20718b.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { T20718b.hs:4:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { T20718b.hs:4:16-20 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { T20718b.hs:4:1-6 }))
+     (EpTok
+      (EpaSpan { T20718b.hs:4:16-20 }))
      []
      []
      (Just

@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { ZeroWidthSemi.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { ZeroWidthSemi.hs:1:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { ZeroWidthSemi.hs:1:22-26 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { ZeroWidthSemi.hs:1:1-6 }))
+     (EpTok
+      (EpaSpan { ZeroWidthSemi.hs:1:22-26 }))
      []
      []
      (Just

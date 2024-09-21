@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { KindSigs.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { KindSigs.hs:6:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { KindSigs.hs:6:17-21 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { KindSigs.hs:6:1-6 }))
+     (EpTok
+      (EpaSpan { KindSigs.hs:6:17-21 }))
      []
      []
      (Just
