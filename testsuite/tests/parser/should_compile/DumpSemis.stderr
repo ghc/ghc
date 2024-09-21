@@ -2170,8 +2170,7 @@
                 (HsCase
                  (EpAnnHsCase
                   (EpaSpan { DumpSemis.hs:37:3-6 })
-                  (EpaSpan { DumpSemis.hs:37:10-11 })
-                  [])
+                  (EpaSpan { DumpSemis.hs:37:10-11 }))
                  (L
                   (EpAnn
                    (EpaSpan { DumpSemis.hs:37:8 })
