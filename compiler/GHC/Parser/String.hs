@@ -5,8 +5,8 @@
 
 module GHC.Parser.String (
   StringLexError (..),
+  StringType (..),
   lexString,
-  lexMultilineString,
 
   -- * Unicode smart quote helpers
   isDoubleSmartQuote,
@@ -37,13 +37,16 @@ import GHC.Utils.Panic (panic)
 type BufPos = Int
 data StringLexError = StringLexError LexErr BufPos
 
-lexString :: Int -> StringBuffer -> Either StringLexError String
-lexString = lexStringWith processChars processChars
+data StringType = StringTypeSingle | StringTypeMulti deriving (Show)
+
+lexString :: StringType -> Int -> StringBuffer -> Either StringLexError String
+lexString strType = lexStringWith processChars processChars
   where
     processChars :: HasChar c => [c] -> Either (c, LexErr) [c]
     processChars =
-          collapseGaps
-      >>> resolveEscapes
+      case strType of
+        StringTypeSingle -> processCharsSingle
+        StringTypeMulti -> processCharsMulti
 
 -- -----------------------------------------------------------------------------
 -- Lexing interface
@@ -121,6 +124,11 @@ bufferLocatedChars initialBuf len = go initialBuf
 
 -- -----------------------------------------------------------------------------
 -- Lexing phases
+
+processCharsSingle :: HasChar c => [c] -> Either (c, LexErr) [c]
+processCharsSingle =
+      collapseGaps
+  >>> resolveEscapes
 
 collapseGaps :: HasChar c => [c] -> [c]
 collapseGaps = go
@@ -255,19 +263,16 @@ isSingleSmartQuote = \case
 -- Assumes string is lexically valid. Skips the steps about splitting
 -- and rejoining lines, and instead manually find newline characters,
 -- for performance.
-lexMultilineString :: Int -> StringBuffer -> Either StringLexError String
-lexMultilineString = lexStringWith processChars processChars
+processCharsMulti :: HasChar c => [c] -> Either (c, LexErr) [c]
+processCharsMulti =
+      collapseGaps             -- Step 1
+  >>> expandLeadingTabs        -- Step 3
+  >>> rmCommonWhitespacePrefix -- Step 4
+  >>> collapseOnlyWsLines      -- Step 5
+  >>> rmFirstNewline           -- Step 7a
+  >>> rmLastNewline            -- Step 7b
+  >>> resolveEscapes           -- Step 8
   where
-    processChars :: HasChar c => [c] -> Either (c, LexErr) [c]
-    processChars =
-          collapseGaps             -- Step 1
-      >>> expandLeadingTabs        -- Step 3
-      >>> rmCommonWhitespacePrefix -- Step 4
-      >>> collapseOnlyWsLines      -- Step 5
-      >>> rmFirstNewline           -- Step 7a
-      >>> rmLastNewline            -- Step 7b
-      >>> resolveEscapes           -- Step 8
-
     -- expands all tabs, since the lexer will verify that tabs can only appear
     -- as leading indentation
     expandLeadingTabs :: HasChar c => [c] -> [c]

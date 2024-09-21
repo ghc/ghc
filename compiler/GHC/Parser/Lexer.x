@@ -991,9 +991,9 @@ data Token
                                          -- have a string literal as a label
                                          -- Note [Literal source text] in "GHC.Types.SourceText"
 
-  | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstringMulti SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITchar   SourceText Char                  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstring SourceText FastString StringType -- Note [Literal source text] in "GHC.Types.SourceText"
+
   | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
 
@@ -2234,7 +2234,7 @@ tok_string span buf len _buf2 = do
         addError err
       pure $ L span (ITprimstring src (unsafeMkByteString s))
     else
-      pure $ L span (ITstring src (mkFastString s))
+      pure $ L span (ITstring src (mkFastString s) StringTypeSingle)
   where
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
@@ -2263,10 +2263,10 @@ tok_string_multi startSpan startBuf _len _buf2 = do
   let contentLen = byteDiff contentStartBuf contentEndBuf
   s <-
     either (throwStringLexError (AI startLoc startBuf)) pure $
-      lexMultilineString contentLen contentStartBuf
+      lexString StringTypeMulti contentLen contentStartBuf
 
   setInput i'
-  pure $ L span $ ITstringMulti src (mkFastString s)
+  pure $ L span $ ITstring src (mkFastString s) StringTypeMulti
   where
     goContent i0 =
       case alexScan i0 string_multi_content of
@@ -2310,7 +2310,7 @@ tok_string_multi_content = panic "tok_string_multi_content unexpectedly invoked"
 lex_chars :: (String, String) -> PsSpan -> StringBuffer -> Int -> P String
 lex_chars (startDelim, endDelim) span buf len =
   either (throwStringLexError i0) pure $
-    lexString contentLen contentBuf
+    lexString StringTypeSingle contentLen contentBuf
   where
     i0@(AI _ contentBuf) = advanceInputBytes (length startDelim) $ AI (psSpanStart span) buf
 
