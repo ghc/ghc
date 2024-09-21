@@ -40,6 +40,9 @@ else
     # to build intermediate GHC stages (with host target). This ressembles old
     # behaviour and is added for backwards compatibility.
     LlvmAsArgsHost=""
+
+    # TODO: Delete this debug output
+    $LLVMAS -v $LlvmAsArgsHost test.ll
 fi
 
 AC_MSG_CHECKING([whether \$LLVMAS supports target flags passed by GHC when compiling])
@@ -48,6 +51,9 @@ if $LLVMAS $LlvmAsArgsTarget test.ll > /dev/null 2>&1 ; then
 else
     AC_MSG_RESULT([no])
     AC_MSG_ERROR([\$LLVMAS ($LLVMAS) does not support target flags: $LlvmAsArgsTarget])
+
+    # TODO: Delete this debug output
+    $LLVMAS -v $LlvmAsArgsTarget test.ll
 fi
 
 AC_SUBST(LlvmAsArgsHost)

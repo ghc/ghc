@@ -545,9 +545,6 @@ FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlvmAsCmd="$LLVMAS"
 AC_SUBST([LlvmAsCmd])
 
-dnl ** Which LLVM assembler arguments to use (e.g. `--target=...`)?
-FP_PROG_LLVM_AS_ARGS()
-
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------
@@ -654,6 +651,9 @@ dnl CONF_CC_OPTS_STAGE[012] accordingly.
 FP_CC_SUPPORTS_TARGET([$CC_STAGE0], [CONF_CC_OPTS_STAGE0], [CONF_CXX_OPTS_STAGE0])
 FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE1], [CONF_CXX_OPTS_STAGE1])
 FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE2], [CONF_CXX_OPTS_STAGE2])
+
+dnl ** Which LLVM assembler arguments to use (e.g. `--target=...`)?
+FP_PROG_LLVM_AS_ARGS()
 
 FP_PROG_CC_LINKER_TARGET([$CC_STAGE0], [CONF_CC_OPTS_STAGE0], [CONF_GCC_LINKER_OPTS_STAGE0])
 FP_PROG_CC_LINKER_TARGET([$CC], [CONF_CC_OPTS_STAGE1], [CONF_GCC_LINKER_OPTS_STAGE1])

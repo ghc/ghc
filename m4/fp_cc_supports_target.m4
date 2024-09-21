@@ -13,7 +13,7 @@
 AC_DEFUN([FP_CC_SUPPORTS_TARGET],
 [
    AC_REQUIRE([GHC_LLVM_TARGET_SET_VAR])
-   AC_MSG_CHECKING([whether $1 supports --target])
+   AC_MSG_CHECKING([whether $1 supports --target $LlvmTarget])
 
    echo 'int main() { return 0; }' > conftest.c
    if test "$target_cpu" = "javascript" ; then
@@ -32,6 +32,8 @@ AC_DEFUN([FP_CC_SUPPORTS_TARGET],
    if test $CONF_CC_SUPPORTS_TARGET = YES ; then
        $2="--target=$LlvmTarget $$2"
        $3="--target=$LlvmTarget $$3"
+       AC_MSG_NOTICE([Result 2: $2])
+       AC_MSG_NOTICE([Result 3: $3])
    fi
 ])
 
