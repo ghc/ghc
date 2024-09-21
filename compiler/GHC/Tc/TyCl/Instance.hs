@@ -2252,7 +2252,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
            visible_inst_tys ++ visible_sel_tys
     bind = L (noAnnSrcSpan loc)
           $ mkTopFunBind (Generated OtherExpansion SkipPmc) fn
-              [mkSimpleMatch (mkPrefixFunRhs fn) (noLocA visible_sel_pats) rhs]
+              [mkSimpleMatch (mkPrefixFunRhs fn noAnn) (noLocA visible_sel_pats) rhs]
 
     mk_ty_pat :: VarBndr TyVar Specificity -> LPat GhcRn
     mk_ty_pat (Bndr tv spec) =

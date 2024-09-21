@@ -224,7 +224,7 @@ dsUnliftedBind (FunBind { fun_id = L l fun
                         }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun)) Nothing matches
+  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun) noAnn) Nothing matches
        ; massert (null args) -- Functions aren't unlifted
        ; dsHsWrapper co_fn $ \core_wrap -> do -- Can be non-identity (#21516)
        { let rhs' = core_wrap (mkOptTickBox tick rhs)

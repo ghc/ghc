@@ -1578,6 +1578,7 @@ data HsMatchContext fn
       , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
       , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                        -- See Note [FunBind vs PatBind]
+      , mc_an         :: XFunRhs
       }
   | CaseAlt                     -- ^Patterns and guards in a case alternative
   | LamAlt HsLamVariant         -- ^Patterns and guards in @\@, @\case@ and @\cases@

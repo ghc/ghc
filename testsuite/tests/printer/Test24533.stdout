@@ -536,7 +536,7 @@
                (EpaComments
                 []))
               (Match
-               []
+               (NoExtField)
                (FunRhs
                 (L
                  (EpAnn
@@ -548,7 +548,11 @@
                  (Unqual
                   {OccName: ==}))
                 (Infix)
-                (NoSrcStrict))
+                (NoSrcStrict)
+                (AnnFunRhs
+                 (NoEpTok)
+                 []
+                 []))
                (L
                 (EpaSpan { Test24533.hs:16:3-12 })
                 [(L
@@ -1102,7 +1106,7 @@
                (EpaComments
                 []))
               (Match
-               []
+               (NoExtField)
                (FunRhs
                 (L
                  (EpAnn
@@ -1114,7 +1118,11 @@
                  (Unqual
                   {OccName: ==}))
                 (Infix)
-                (NoSrcStrict))
+                (NoSrcStrict)
+                (AnnFunRhs
+                 (NoEpTok)
+                 []
+                 []))
                (L
                 (EpaSpan { Test24533.ppr.hs:6:3-12 })
                 [(L

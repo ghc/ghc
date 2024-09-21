@@ -454,6 +454,10 @@ type family XFunArr         x
 type family XXExpr          x
 
 -- -------------------------------------
+-- HsMatchContext type families
+type family XFunRhs
+
+-- -------------------------------------
 -- DotFieldOcc type families
 type family XCDotFieldOcc  x
 type family XXDotFieldOcc  x

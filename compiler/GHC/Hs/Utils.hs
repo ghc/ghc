@@ -190,7 +190,7 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkSimpleMatch ctxt (L l pats) rhs
   = L loc $
-    Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = L l pats
+    Match { m_ext = noExtField, m_ctxt = ctxt, m_pats = L l pats
           , m_grhss = unguardedGRHSs (locA loc) rhs noAnn }
   where
     loc = case pats of
@@ -338,7 +338,7 @@ mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> AnnList
                -> HsExpr GhcPs
 
-mkNPat      :: LocatedAn NoEpAnns (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> [AddEpAnn]
+mkNPat      :: LocatedAn NoEpAnns (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpToken "-"
             -> Pat GhcPs
 mkNPlusKPat :: LocatedN RdrName -> LocatedAn NoEpAnns (HsOverLit GhcPs) -> EpaLocation
             -> Pat GhcPs
@@ -349,7 +349,7 @@ mkLastStmt :: IsPass idR => LocatedA (bodyR (GhcPass idR))
            -> StmtLR (GhcPass idL) (GhcPass idR) (LocatedA (bodyR (GhcPass idR)))
 mkBodyStmt :: LocatedA (bodyR GhcPs)
            -> StmtLR (GhcPass idL) GhcPs (LocatedA (bodyR GhcPs))
-mkPsBindStmt :: [AddEpAnn] -> LPat GhcPs -> LocatedA (bodyR GhcPs)
+mkPsBindStmt :: EpUniToken "<-" "←" -> LPat GhcPs -> LocatedA (bodyR GhcPs)
              -> StmtLR GhcPs GhcPs (LocatedA (bodyR GhcPs))
 mkRnBindStmt :: LPat GhcRn -> LocatedA (bodyR GhcRn)
              -> StmtLR GhcRn GhcRn (LocatedA (bodyR GhcRn))
@@ -409,17 +409,17 @@ mkNPat lit neg anns  = NPat anns lit neg noSyntaxExpr
 mkNPlusKPat id lit anns
   = NPlusKPat anns id lit (unLoc lit) noSyntaxExpr noSyntaxExpr
 
-mkTransformStmt    :: [AddEpAnn] -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkTransformStmt    :: AnnTransStmt -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkTransformByStmt  :: [AddEpAnn] -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkTransformByStmt  :: AnnTransStmt -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> LHsExpr GhcPs -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkGroupUsingStmt   :: [AddEpAnn] -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkGroupUsingStmt   :: AnnTransStmt -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkGroupByUsingStmt :: [AddEpAnn] -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkGroupByUsingStmt :: AnnTransStmt -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
 
-emptyTransStmt :: [AddEpAnn] -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
+emptyTransStmt :: AnnTransStmt -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
 emptyTransStmt anns = TransStmt { trS_ext = anns
                                 , trS_form = panic "emptyTransStmt: form"
                                 , trS_stmts = [], trS_bndrs = []
@@ -468,14 +468,14 @@ emptyRecStmtName = emptyRecStmt' noExtField
 emptyRecStmtId   = emptyRecStmt' unitRecStmtTc
                                         -- a panic might trigger during zonking
 
-mkLetStmt :: [AddEpAnn] -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
+mkLetStmt :: EpToken "let" -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
 mkLetStmt anns binds = LetStmt anns binds
 
 -------------------------------
 -- | A useful function for building @OpApps@.  The operator is always a
 -- variable, and we don't know the fixity yet.
 mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
-mkHsOpApp e1 op e2 = OpApp noAnn e1 (noLocA (HsVar noExtField (noLocA op))) e2
+mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLocA (HsVar noExtField (noLocA op))) e2
 
 mkHsString :: String -> HsLit (GhcPass p)
 mkHsString s = HsString NoSourceText (mkFastString s)
@@ -903,13 +903,14 @@ mkSimpleGeneratedFunBind loc fun pats expr
                                      [mkMatch ctxt pats expr emptyLocalBinds]
   where
     ctxt :: HsMatchContextPs
-    ctxt = mkPrefixFunRhs (L (noAnnSrcSpan loc) fun)
+    ctxt = mkPrefixFunRhs (L (noAnnSrcSpan loc) fun) noAnn
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
-mkPrefixFunRhs :: fn -> HsMatchContext fn
-mkPrefixFunRhs n = FunRhs { mc_fun        = n
+mkPrefixFunRhs :: fn -> AnnFunRhs -> HsMatchContext fn
+mkPrefixFunRhs n an = FunRhs { mc_fun        = n
                           , mc_fixity     = Prefix
-                          , mc_strictness = NoSrcStrict }
+                          , mc_strictness = NoSrcStrict
+                          , mc_an         = an }
 
 ------------
 mkMatch :: forall p. IsPass p
@@ -919,7 +920,7 @@ mkMatch :: forall p. IsPass p
         -> HsLocalBinds (GhcPass p)
         -> LMatch (GhcPass p) (LHsExpr (GhcPass p))
 mkMatch ctxt pats expr binds
-  = noLocA (Match { m_ext   = noAnn
+  = noLocA (Match { m_ext   = noExtField
                   , m_ctxt  = ctxt
                   , m_pats  = pats
                   , m_grhss = GRHSs emptyComments (unguardedRHS noAnn noSrcSpan expr) binds })
