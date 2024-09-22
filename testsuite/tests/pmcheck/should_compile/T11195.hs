@@ -54,9 +54,13 @@ etaForAllCo_maybe = undefined
 
 matchAxiom = undefined
 checkAxInstCo = undefined
-isAxiom_maybe = undefined
+
+isAxiomCo_maybe :: Coercion -> Maybe (SymFlag, CoAxiomRule, [Coercion])
+isAxiomCo_maybe co1 = undefined
+
 isCohLeft_maybe = undefined
 isCohRight_maybe = undefined
+matchNewtypeBranch = undefined
 
 opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
 opt_transList is = zipWith (opt_trans is)
@@ -75,18 +79,10 @@ opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
   | ty1 `eqCoercion` ty2
   , co1 `compatible_co` co2 = undefined
 
-opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
-                  in_co2@(UnivCo p2 r2 _tyl2 tyr2)
-  | Just prov' <- opt_trans_prov p1 p2 = undefined
-  where
+opt_trans_rule is (UnivCo { uco_prov = p1 })
+                  (UnivCo { uco_prov = p2 })
+  | p1 == p2 = undefined
     -- if the provenances are different, opt'ing will be very confusing
-    opt_trans_prov (PhantomProv kco1) (PhantomProv kco2)
-      = Just $ PhantomProv $ opt_trans is kco1 kco2
-    opt_trans_prov (ProofIrrelProv kco1) (ProofIrrelProv kco2)
-      = Just $ ProofIrrelProv $ opt_trans is kco1 kco2
-    opt_trans_prov (PluginProv str1 _) (PluginProv str2 _)
-      | str1 == str2 = Just p1
-    opt_trans_prov _ _ = Nothing
 
 -- Push transitivity down through matching top-level constructors.
 opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1)
@@ -117,61 +113,54 @@ opt_trans_rule is co1 co2
   | ForAllCo tv2 vl2 vr1 eta2 r2 <- co2
   , Just (tv1,vl1,vr2,eta1,r1) <- etaForAllCo_maybe co1 = undefined
 
-  where
-  push_trans tv1 eta1 r1 tv2 eta2 r2 = undefined
-
 -- Push transitivity inside axioms
 opt_trans_rule is co1 co2
-  | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
-  , True <- sym
-  , Just cos2 <- matchAxiom sym con ind co2
-  , let newAxInst = AxiomInstCo con ind
-                      (opt_transList is (map mkSymCo cos2) cos1)
-  , Nothing <- checkAxInstCo newAxInst
-  = undefined
-
-  -- TrPushAxR
-  | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
-  , False <- sym
-  , Just cos2 <- matchAxiom sym con ind co2
-  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
-  , Nothing <- checkAxInstCo newAxInst
-  = undefined
-
-  -- TrPushSymAxL
-  | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
-  , True <- sym
-  , Just cos1 <- matchAxiom (not sym) con ind co1
-  , let newAxInst = AxiomInstCo con ind
-                      (opt_transList is cos2 (map mkSymCo cos1))
-  , Nothing <- checkAxInstCo newAxInst
-  = undefined
-
-  -- TrPushAxL
-  | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
-  , False <- sym
-  , Just cos1 <- matchAxiom (not sym) con ind co1
-  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
-  , Nothing <- checkAxInstCo newAxInst
-  = undefined
-
-  -- TrPushAxSym/TrPushSymAx
-  | Just (sym1, con1, ind1, cos1) <- co1_is_axiom_maybe
-  , Just (sym2, con2, ind2, cos2) <- co2_is_axiom_maybe
-  , con1 == con2
-  , ind1 == ind2
+  | Just (sym1, axr1, cos1) <- isAxiomCo_maybe co1
+  , Just (sym2, axr2, cos2) <- isAxiomCo_maybe co2
+  , axr1 == axr2
   , sym1 == not sym2
-  , let branch = coAxiomNthBranch con1 ind1
-        qtvs = coAxBranchTyVars branch ++ coAxBranchCoVars branch
-        lhs  = coAxNthLHS con1 ind1
-        rhs  = coAxBranchRHS branch
+  , Just (tc, role, branch) <- coAxiomRuleBranch_maybe axr1
+  , let qtvs   = coAxBranchTyVars branch ++ coAxBranchCoVars branch
+        lhs    = mkTyConApp tc (coAxBranchLHS branch)
+        rhs    = coAxBranchRHS branch
         pivot_tvs = exactTyCoVarsOfType (if sym2 then rhs else lhs)
   , all (`elemVarSet` pivot_tvs) qtvs
-  = undefined
-  where
-    co1_is_axiom_maybe = isAxiom_maybe co1
-    co2_is_axiom_maybe = isAxiom_maybe co2
-    role = coercionRole co1 -- should be the same as coercionRole co2!
+  = Just $ if sym2
+       -- TrPushAxSym
+    then liftCoSubstWith role qtvs (opt_transList is cos1 (map mkSymCo cos2)) lhs
+       -- TrPushSymAx
+    else liftCoSubstWith role qtvs (opt_transList is (map mkSymCo cos1) cos2) rhs
+
+  -- See Note [Push transitivity inside axioms] and
+  -- Note [Push transitivity inside newtype axioms only]
+  -- TrPushSymAxR
+  | Just (sym, axr, cos1) <- isAxiomCo_maybe co1
+  , True <- sym
+  , Just cos2 <- matchNewtypeBranch sym axr co2
+  , let newAxInst = AxiomCo axr (opt_transList is (map mkSymCo cos2) cos1)
+  = Just (SymCo newAxInst)
+
+  -- TrPushAxR
+  | Just (sym, axr, cos1) <- isAxiomCo_maybe co1
+  , False <- sym
+  , Just cos2 <- matchNewtypeBranch sym axr co2
+  , let newAxInst = AxiomCo axr (opt_transList is cos1 cos2)
+  = Just newAxInst
+
+  -- TrPushSymAxL
+  | Just (sym, axr, cos2) <- isAxiomCo_maybe co2
+  , True <- sym
+  , Just cos1 <- matchNewtypeBranch (not sym) axr co1
+  , let newAxInst :: Coercion
+        newAxInst = AxiomCo axr (opt_transList is cos2 (map mkSymCo cos1))
+  = Just (SymCo newAxInst)
+
+  -- TrPushAxL
+  | Just (sym, axr, cos2) <- isAxiomCo_maybe co2
+  , False <- sym
+  , Just cos1 <- matchNewtypeBranch (not sym) axr co1
+  , let newAxInst = AxiomCo axr (opt_transList is cos1 cos2)
+  = Just newAxInst
 
 opt_trans_rule is co1 co2
   | Just (lco, lh) <- isCohRight_maybe co1

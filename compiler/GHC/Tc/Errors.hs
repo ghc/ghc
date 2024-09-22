@@ -30,6 +30,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Utils.TcType
@@ -53,7 +54,6 @@ import GHC.Types.Basic
 import GHC.Types.Error
 import qualified GHC.Types.Unique.Map as UM
 
---import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Unit.Module
 import qualified GHC.LanguageExtensions as LangExt
 

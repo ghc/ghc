@@ -24,7 +24,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Types.Name
 import GHC.Types.Var
 import GHC.Core.Class
 import GHC.Core.Predicate
@@ -42,7 +41,6 @@ import GHC.Tc.Utils.TcType( transSuperClasses )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
 import GHC.Utils.FV
@@ -68,8 +66,6 @@ The constraints ([Wanted] C Int Bool) and [Wanted] C Int alpha
 will generate the following FunDepEqn
      FDEqn { fd_qtvs = []
            , fd_eqs  = [Pair Bool alpha]
-           , fd_pred1 = C Int Bool
-           , fd_pred2 = C Int alpha
            , fd_loc = ... }
 However notice that a functional dependency may have more than one variable
 in the RHS which will create more than one pair of types in fd_eqs. Example:
@@ -79,8 +75,6 @@ in the RHS which will create more than one pair of types in fd_eqs. Example:
 Will generate:
      FDEqn { fd_qtvs = []
            , fd_eqs  = [Pair Bool alpha, Pair alpha beta]
-           , fd_pred1 = C Int Bool
-           , fd_pred2 = C Int alpha
            , fd_loc = ... }
 
 INVARIANT: Corresponding types aren't already equal
@@ -115,8 +109,7 @@ Wrinkles:
        FDEqn { fd_qtvs = [x], fd_eqs = [Pair (Maybe x) ty] }
 
     Note that the fd_qtvs can be free in the /first/ component of the Pair,
-
-    but not in the seconde (which comes from the [W] constraint.
+    but not in the second (which comes from the [W] constraint).
 
 (2) Multi-range fundeps. When these meta_tvs are involved, there is a subtle
     difference between the fundep (a -> b c) and the two fundeps (a->b, a->c).
@@ -149,8 +142,6 @@ data FunDepEqn loc
                                    -- free in ty1 but not in ty2.  See Wrinkle (1) of
                                    -- Note [Improving against instances]
 
-          , fd_pred1 :: PredType   -- The FunDepEqn arose from
-          , fd_pred2 :: PredType   --  combining these two constraints
           , fd_loc   :: loc  }
     deriving Functor
 
@@ -222,7 +213,7 @@ improveFromAnother loc pred1 pred2
   | Just (cls1, tys1) <- getClassPredTys_maybe pred1
   , Just (cls2, tys2) <- getClassPredTys_maybe pred2
   , cls1 == cls2
-  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2, fd_loc = loc }
+  = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_loc = loc }
     | let (cls_tvs, cls_fds) = classTvsFds cls1
     , fd <- cls_fds
     , let (ltys1, rs1) = instFD fd cls_tvs tys1
@@ -238,16 +229,14 @@ improveFromAnother _ _ _ = []
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 improveFromInstEnv :: InstEnvs
-                   -> (PredType -> SrcSpan -> loc)
+                   -> (ClsInst -> loc)
                    -> Class -> [Type]
                    -> [FunDepEqn loc] -- Needs to be a FunDepEqn because
                                       -- of quantified variables
 -- See Note [Improving against instances]
 -- Post: Equations oriented from the template (matching instance) to the workitem!
 improveFromInstEnv inst_env mk_loc cls tys
-  = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs
-            , fd_pred1 = p_inst, fd_pred2 = pred
-            , fd_loc = mk_loc p_inst (getSrcSpan (is_dfun ispec)) }
+  = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs, fd_loc = mk_loc ispec }
     | fd <- cls_fds             -- Iterate through the fundeps first,
                                 -- because there often are none!
     , let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
@@ -258,13 +247,11 @@ improveFromInstEnv inst_env mk_loc cls tys
     , ispec <- instances
     , (meta_tvs, eqs) <- improveClsFD cls_tvs fd ispec
                                       tys trimmed_tcs -- NB: orientation
-    , let p_inst = mkClassPred cls (is_tys ispec)
     ]
   where
     (cls_tvs, cls_fds) = classTvsFds cls
     instances          = classInstances inst_env cls
     rough_tcs          = RM_KnownTc (className cls) : roughMatchTcs tys
-    pred               = mkClassPred cls tys
 
 improveClsFD :: [TyVar] -> FunDep TyVar    -- One functional dependency from the class
              -> ClsInst                    -- An instance template

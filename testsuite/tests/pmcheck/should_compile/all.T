@@ -173,3 +173,4 @@ test('DsIncompleteRecSel3', [collect_compiler_stats('bytes allocated', 10)], com
 test('DoubleMatch', normal, compile, [overlapping_incomplete])
 test('T24817', normal, compile, [overlapping_incomplete])
 test('T25257', normal, compile, [overlapping_incomplete])
+test('T24845', [], compile, [overlapping_incomplete])

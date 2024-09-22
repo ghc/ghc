@@ -2467,18 +2467,27 @@ lintCoercion co@(FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
                               , text "res_co:" <+> ppr co2 ])
 
 -- See Note [Bad unsafe coercion]
-lintCoercion co@(UnivCo prov r ty1 ty2)
-  = do { ty1' <- lintType ty1
+lintCoercion co@(UnivCo { uco_role = r, uco_prov = prov
+                        , uco_lty = ty1, uco_rty = ty2, uco_deps = deps })
+  = do { -- Check the role.  PhantomProv must have Phantom role, otherwise any role is fine
+         case prov of
+            PhantomProv -> lintRole co Phantom r
+            _           -> return ()
+
+       -- Check the to and from types
+       ; ty1' <- lintType ty1
        ; ty2' <- lintType ty2
+
        ; let k1 = typeKind ty1'
              k2 = typeKind ty2'
-       ; prov' <- lint_prov k1 k2 prov
-
        ; when (r /= Phantom && isTYPEorCONSTRAINT k1
                             && isTYPEorCONSTRAINT k2)
               (checkTypes ty1 ty2)
 
-       ; return (UnivCo prov' r ty1' ty2') }
+       -- Check the coercions on which this UnivCo depends
+       ; deps' <- mapM lintCoercion deps
+
+       ; return (co { uco_lty = ty1', uco_rty = ty2', uco_deps = deps' }) }
    where
      report s = hang (text $ "Unsafe coercion: " ++ s)
                      2 (vcat [ text "From:" <+> ppr ty1
@@ -2520,32 +2529,6 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
                 Just False -> addWarnL (report "between float and integral values")
                 _          -> return ()
             }
-
-     lint_prov k1 k2 (PhantomProv kco)
-       = do { kco' <- lintStarCoercion kco
-            ; lintRole co Phantom r
-            ; check_kinds kco' k1 k2
-            ; return (PhantomProv kco') }
-
-     lint_prov k1 k2 (ProofIrrelProv kco)
-       = do { lintL (isCoercionTy ty1) (mkBadProofIrrelMsg ty1 co)
-            ; lintL (isCoercionTy ty2) (mkBadProofIrrelMsg ty2 co)
-            ; kco' <- lintStarCoercion kco
-            ; check_kinds kco k1 k2
-            ; return (ProofIrrelProv kco') }
-
-     lint_prov _ _ (PluginProv s cvs)
-        = do { subst <- getSubst
-             ; mapM_ (checkTyCoVarInScope subst) (dVarSetElems cvs)
-               -- Don't bother to return substituted fvs;
-               -- they don't matter to Lint
-             ; return (PluginProv s cvs) }
-
-     check_kinds kco k1 k2
-       = do { let Pair k1' k2' = coercionKind kco
-            ; ensureEqTys k1 k1' (mkBadUnivCoMsg CLeft  co)
-            ; ensureEqTys k2 k2' (mkBadUnivCoMsg CRight co) }
-
 
 lintCoercion (SymCo co)
   = do { co' <- lintCoercion co
@@ -2636,42 +2619,50 @@ lintCoercion (InstCo co arg)
 
          ; _ -> failWithL (text "Bad argument of inst") }}}
 
-lintCoercion co@(AxiomInstCo con ind cos)
-  = do { unless (0 <= ind && ind < numBranches (coAxiomBranches con))
-                (bad_ax (text "index out of range"))
-       ; let CoAxBranch { cab_tvs   = ktvs
-                        , cab_cvs   = cvs
-                        , cab_roles = roles } = coAxiomNthBranch con ind
-       ; unless (cos `equalLength` (ktvs ++ cvs)) $
-           bad_ax (text "lengths")
-       ; cos' <- mapM lintCoercion cos
-       ; subst <- getSubst
-       ; let empty_subst = zapSubst subst
-       ; _ <- foldlM check_ki (empty_subst, empty_subst)
-                              (zip3 (ktvs ++ cvs) roles cos')
-       ; let fam_tc = coAxiomTyCon con
-       ; case checkAxInstCo co of
-           Just bad_branch -> bad_ax $ text "inconsistent with" <+>
-                                       pprCoAxBranch fam_tc bad_branch
-           Nothing -> return ()
-       ; return (AxiomInstCo con ind cos') }
+lintCoercion this_co@(AxiomCo ax cos)
+  = do { cos' <- mapM lintCoercion cos
+       ; let arg_kinds :: [Pair Type] = map coercionKind cos'
+       ; lint_roles 0 (coAxiomRuleArgRoles ax) cos'
+       ; lint_ax ax arg_kinds
+       ; return (AxiomCo ax cos') }
   where
-    bad_ax what = addErrL (hang (text  "Bad axiom application" <+> parens what)
-                        2 (ppr co))
+    lint_ax :: CoAxiomRule -> [Pair Type] -> LintM ()
+    lint_ax (BuiltInFamRew  bif) prs
+      = checkL (isJust (bifrw_proves bif prs))  bad_bif
+    lint_ax (BuiltInFamInj bif) prs
+      = checkL (case prs of
+                  [pr] -> isJust (bifinj_proves bif pr)
+                  _    -> False)
+               bad_bif
+    lint_ax (UnbranchedAxiom ax) prs
+      = lintBranch this_co (coAxiomTyCon ax) (coAxiomSingleBranch ax) prs
+    lint_ax (BranchedAxiom ax ind) prs
+      = do { checkL (0 <= ind && ind < numBranches (coAxiomBranches ax))
+                    (bad_ax this_co (text "index out of range"))
+           ; lintBranch this_co (coAxiomTyCon ax) (coAxiomNthBranch ax ind) prs }
 
-    check_ki (subst_l, subst_r) (ktv, role, arg')
-      = do { let Pair s' t' = coercionKind arg'
-                 sk' = typeKind s'
-                 tk' = typeKind t'
-           ; lintRole arg' role (coercionRole arg')
-           ; let ktv_kind_l = substTy subst_l (tyVarKind ktv)
-                 ktv_kind_r = substTy subst_r (tyVarKind ktv)
-           ; unless (sk' `eqType` ktv_kind_l)
-                    (bad_ax (text "check_ki1" <+> vcat [ ppr co, ppr sk', ppr ktv, ppr ktv_kind_l ] ))
-           ; unless (tk' `eqType` ktv_kind_r)
-                    (bad_ax (text "check_ki2" <+> vcat [ ppr co, ppr tk', ppr ktv, ppr ktv_kind_r ] ))
-           ; return (extendTCvSubst subst_l ktv s',
-                     extendTCvSubst subst_r ktv t') }
+    bad_bif = bad_ax this_co (text "Proves returns Nothing")
+
+    err :: forall a. String -> [SDoc] -> LintM a
+    err m xs  = failWithL $
+                hang (text m) 2 $ vcat (text "Rule:" <+> ppr ax : xs)
+
+    lint_roles n (e : es) (co : cos)
+      | e == coercionRole co
+      = lint_roles (n+1) es cos
+      | otherwise = err "Argument roles mismatch"
+                        [ text "In argument:" <+> int (n+1)
+                        , text "Expected:" <+> ppr e
+                        , text "Found:" <+> ppr (coercionRole co) ]
+    lint_roles _ [] []  = return ()
+    lint_roles n [] rs  = err "Too many coercion arguments"
+                            [ text "Expected:" <+> int n
+                            , text "Provided:" <+> int (n + length rs) ]
+
+    lint_roles n es []  = err "Not enough coercion arguments"
+                            [ text "Expected:" <+> int (n + length es)
+                            , text "Provided:" <+> int n ]
+
 
 lintCoercion (KindCo co)
   = do { co' <- lintCoercion co
@@ -2682,40 +2673,14 @@ lintCoercion (SubCo co')
        ; lintRole co' Nominal (coercionRole co')
        ; return (SubCo co') }
 
-lintCoercion this@(AxiomRuleCo ax cos)
-  = do { cos' <- mapM lintCoercion cos
-       ; lint_roles 0 (coaxrAsmpRoles ax) cos'
-       ; case coaxrProves ax (map coercionKind cos') of
-           Nothing -> err "Malformed use of AxiomRuleCo" [ ppr this ]
-           Just _  -> return (AxiomRuleCo ax cos') }
-  where
-  err :: forall a. String -> [SDoc] -> LintM a
-  err m xs  = failWithL $
-              hang (text m) 2 $ vcat (text "Rule:" <+> ppr (coaxrName ax) : xs)
-
-  lint_roles n (e : es) (co : cos)
-    | e == coercionRole co = lint_roles (n+1) es cos
-    | otherwise = err "Argument roles mismatch"
-                      [ text "In argument:" <+> int (n+1)
-                      , text "Expected:" <+> ppr e
-                      , text "Found:" <+> ppr (coercionRole co) ]
-  lint_roles _ [] []  = return ()
-  lint_roles n [] rs  = err "Too many coercion arguments"
-                          [ text "Expected:" <+> int n
-                          , text "Provided:" <+> int (n + length rs) ]
-
-  lint_roles n es []  = err "Not enough coercion arguments"
-                          [ text "Expected:" <+> int (n + length es)
-                          , text "Provided:" <+> int n ]
-
 lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
 
 
 {-
-Note [Conflict checking with AxiomInstCo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Conflict checking for axiom applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following type family and axiom:
 
 type family Equal (a :: k) (b :: k) :: Bool
@@ -2743,28 +2708,53 @@ docs/core-spec, which defines the corresponding no_conflict function used by the
 Co_AxiomInstCo rule in the section "Coercion typing".
 -}
 
--- | Check to make sure that an AxInstCo is internally consistent.
+-- | Check to make sure that an axiom application is internally consistent.
 -- Returns the conflicting branch, if it exists
--- See Note [Conflict checking with AxiomInstCo]
-checkAxInstCo :: Coercion -> Maybe CoAxBranch
+-- Note [Conflict checking for axiom applications]
+lintBranch :: Coercion -> TyCon-> CoAxBranch -> [Pair Type] -> LintM ()
 -- defined here to avoid dependencies in GHC.Core.Coercion
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-checkAxInstCo (AxiomInstCo ax ind cos)
-  = let branch       = coAxiomNthBranch ax ind
-        tvs          = coAxBranchTyVars branch
-        cvs          = coAxBranchCoVars branch
-        incomps      = coAxBranchIncomps branch
-        (tys, cotys) = splitAtList tvs (map coercionLKind cos)
-        co_args      = map stripCoercionTy cotys
-        subst        = zipTvSubst tvs tys `composeTCvSubst`
-                       zipCvSubst cvs co_args
-        target   = Type.substTys subst (coAxBranchLHS branch)
-        in_scope = mkInScopeSet $
-                   unionVarSets (map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
-        flattened_target = flattenTys in_scope target in
-    check_no_conflict flattened_target incomps
+lintBranch this_co fam_tc branch arg_kinds
+  | CoAxBranch { cab_tvs = ktvs, cab_cvs = cvs } <- branch
+  = do { checkL (arg_kinds `equalLength` (ktvs ++ cvs)) $
+                (bad_ax this_co (text "lengths"))
+
+       ; subst <- getSubst
+       ; let empty_subst = zapSubst subst
+       ; _ <- foldlM check_ki (empty_subst, empty_subst)
+                              (zip (ktvs ++ cvs) arg_kinds)
+
+       ; case check_no_conflict flattened_target incomps of
+            Nothing -> return ()
+            Just bad_branch -> failWithL $ bad_ax this_co $
+                               text "inconsistent with" <+>
+                                 pprCoAxBranch fam_tc bad_branch }
   where
+    check_ki (subst_l, subst_r) (ktv, Pair s' t')
+      = do { let sk' = typeKind s'
+                 tk' = typeKind t'
+           ; let ktv_kind_l = substTy subst_l (tyVarKind ktv)
+                 ktv_kind_r = substTy subst_r (tyVarKind ktv)
+           ; checkL (sk' `eqType` ktv_kind_l)
+                    (bad_ax this_co (text "check_ki1" <+> vcat [ ppr this_co, ppr sk', ppr ktv, ppr ktv_kind_l ] ))
+           ; checkL (tk' `eqType` ktv_kind_r)
+                    (bad_ax this_co (text "check_ki2" <+> vcat [ ppr this_co, ppr tk', ppr ktv, ppr ktv_kind_r ] ))
+           ; return (extendTCvSubst subst_l ktv s',
+                     extendTCvSubst subst_r ktv t') }
+
+    tvs          = coAxBranchTyVars branch
+    cvs          = coAxBranchCoVars branch
+    incomps      = coAxBranchIncomps branch
+    (tys, cotys) = splitAtList tvs (map pFst arg_kinds)
+    co_args      = map stripCoercionTy cotys
+    subst        = zipTvSubst tvs tys `composeTCvSubst`
+                   zipCvSubst cvs co_args
+    target   = Type.substTys subst (coAxBranchLHS branch)
+    in_scope = mkInScopeSet $
+               unionVarSets (map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
+    flattened_target = flattenTys in_scope target
+
     check_no_conflict :: [Type] -> [CoAxBranch] -> Maybe CoAxBranch
     check_no_conflict _    [] = Nothing
     check_no_conflict flat (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
@@ -2773,7 +2763,10 @@ checkAxInstCo (AxiomInstCo ax ind cos)
       = check_no_conflict flat rest
       | otherwise
       = Just b
-checkAxInstCo _ = Nothing
+
+bad_ax :: Coercion -> SDoc -> SDoc
+bad_ax this_co what
+    = hang (text "Bad axiom application" <+> parens what) 2 (ppr this_co)
 
 
 {-
@@ -3800,17 +3793,6 @@ mk_cast_err thing_str co_str pp_thing co from_ty thing_ty
     from_msg     = text "From-" <> co_msg
     enclosed_msg = text "enclosed" <+> text thing_str
 
-mkBadUnivCoMsg :: LeftOrRight -> Coercion -> SDoc
-mkBadUnivCoMsg lr co
-  = text "Kind mismatch on the" <+> pprLeftOrRight lr <+>
-    text "side of a UnivCo:" <+> ppr co
-
-mkBadProofIrrelMsg :: Type -> Coercion -> SDoc
-mkBadProofIrrelMsg ty co
-  = hang (text "Found a non-coercion in a proof-irrelevance UnivCo:")
-       2 (vcat [ text "type:" <+> ppr ty
-               , text "co:" <+> ppr co ])
-
 mkBadTyVarMsg :: Var -> SDoc
 mkBadTyVarMsg tv
   = text "Non-tyvar used in TyVarTy:"
@@ -3874,10 +3856,6 @@ mkBadJoinPointRuleMsg bndr join_arity rule
          , text "Var:" <+> ppr bndr
          , text "Join arity:" <+> ppr join_arity
          , text "Rule:" <+> ppr rule ]
-
-pprLeftOrRight :: LeftOrRight -> SDoc
-pprLeftOrRight CLeft  = text "left"
-pprLeftOrRight CRight = text "right"
 
 dupVars :: [NonEmpty Var] -> SDoc
 dupVars vars

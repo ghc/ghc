@@ -111,6 +111,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.Unify( unifyInvisibleType, tcSubMult )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin )
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
@@ -1562,11 +1563,11 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (TyConAppCo _ _ cos)    = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)         = foldlM go_co dv [co1, co2]
     go_co dv (FunCo _ _ _ w co1 co2) = foldlM go_co dv [w, co1, co2]
-    go_co dv (AxiomInstCo _ _ cos)   = foldlM go_co dv cos
-    go_co dv (AxiomRuleCo _ cos)     = foldlM go_co dv cos
-    go_co dv (UnivCo prov _ t1 t2)   = do { dv1 <- go_prov dv prov
-                                          ; dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 t1
-                                          ; collect_cand_qtvs orig_ty True cur_lvl bound dv2 t2 }
+    go_co dv (AxiomCo _ cos)         = foldlM go_co dv cos
+    go_co dv (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                                     = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv t1
+                                          ; dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 t2
+                                          ; foldM go_co dv2 deps }
     go_co dv (SymCo co)              = go_co dv co
     go_co dv (TransCo co1 co2)       = foldlM go_co dv [co1, co2]
     go_co dv (SelCo _ co)            = go_co dv co
@@ -1589,13 +1590,6 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
 
     go_mco dv MRefl    = return dv
     go_mco dv (MCo co) = go_co dv co
-
-    go_prov dv (PhantomProv co)    = go_co dv co
-    go_prov dv (ProofIrrelProv co) = go_co dv co
-    go_prov dv (PluginProv _ cvs)  = strictFoldDVarSet zt_cv (return dv) cvs
-
-    zt_cv :: CoVar -> TcM CandidatesQTvs -> TcM CandidatesQTvs
-    zt_cv cv mdvs = do { dvs <- mdvs; go_cv dvs cv }
 
     go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
     go_cv dv@(DV { dv_cvs = cvs }) cv

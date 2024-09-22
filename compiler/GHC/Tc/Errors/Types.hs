@@ -170,6 +170,7 @@ module GHC.Tc.Errors.Types (
 import GHC.Prelude
 
 import GHC.Hs
+
 import GHC.Tc.Errors.Types.PromotionErr
 import GHC.Tc.Errors.Hole.FitTypes (HoleFit)
 import GHC.Tc.Types.Constraint
@@ -177,9 +178,13 @@ import GHC.Tc.Types.Evidence (EvBindsVar)
 import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
+import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin, SubGoalDepth )
 import GHC.Tc.Types.Rank (Rank)
+import GHC.Tc.Types.TH
+import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType,
                             PatersonCondFailure, PatersonCondFailureContext)
+
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Avail
@@ -189,6 +194,7 @@ import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)
 import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
+import GHC.Types.Name.Env (NameEnv)
 import GHC.Types.SourceFile (HsBootOrSig(..))
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
@@ -196,8 +202,12 @@ import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar, Specificity)
 import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Types.DefaultEnv (ClassDefaults)
+
 import GHC.Unit.Types (Module)
-import GHC.Utils.Outputable
+import GHC.Unit.State (UnitState)
+import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
+import GHC.Unit.Module.ModIface (ModIface)
+
 import GHC.Core.Class (Class, ClassMinimalDef, ClassOpItem, ClassATItem)
 import GHC.Core.Coercion (Coercion)
 import GHC.Core.Coercion.Axiom (CoAxBranch)
@@ -210,8 +220,10 @@ import GHC.Core.Predicate (EqRel, predTypeEqRel)
 import GHC.Core.TyCon (TyCon, Role, FamTyConFlav, AlgTyConRhs)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType, ForAllTyFlag)
 import GHC.Driver.Backend (Backend)
-import GHC.Unit.State (UnitState)
+
+import GHC.Utils.Outputable
 import GHC.Utils.Misc (filterOut)
+
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString (FastString)
 import GHC.Data.Pair
@@ -221,16 +233,11 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
-import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
 import qualified GHC.Internal.TH.Syntax as TH
 import Data.Map.Strict (Map)
 
 import GHC.Generics ( Generic )
-import GHC.Types.Name.Env (NameEnv)
 import GHC.Iface.Errors.Types
-import GHC.Unit.Module.ModIface (ModIface)
-import GHC.Tc.Types.TH
-import GHC.Tc.Types.BasicTypes
 
 
 

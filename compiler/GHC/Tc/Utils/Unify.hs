@@ -60,6 +60,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.CtLoc( CtLoc, mkKindEqLoc, adjustCtLoc )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Zonk.TcType
 

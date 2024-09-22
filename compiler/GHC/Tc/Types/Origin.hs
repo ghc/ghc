@@ -447,9 +447,9 @@ in the right place.  So we proceed as follows:
 * Typically a'' will have a nice pretty name like "a", but the point is
   that the foral-bound variables of the signature we report line up with
   the instantiated skolems lying  around in other types.
+-}
 
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
             CtOrigin
 *                                                                      *
@@ -973,6 +973,7 @@ pprNonLinearPatternReason GeneralisedPatternReason = parens (text "non-variable 
 pprNonLinearPatternReason PatternSynonymReason = parens (text "pattern synonyms aren't linear")
 pprNonLinearPatternReason ViewPatternReason = parens (text "view patterns aren't linear")
 pprNonLinearPatternReason OtherPatternReason = empty
+
 
 {- *********************************************************************
 *                                                                      *

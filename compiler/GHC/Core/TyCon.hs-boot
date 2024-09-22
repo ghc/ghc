@@ -12,6 +12,7 @@ instance Outputable TyCon
 
 type TyConRepName = Name
 
+isNewTyCon          :: TyCon -> Bool
 isTupleTyCon        :: TyCon -> Bool
 isUnboxedTupleTyCon :: TyCon -> Bool
 

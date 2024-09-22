@@ -39,7 +39,7 @@ import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Hs
 
-import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
+import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 import GHC.Core.Make( rEC_SEL_ERROR_ID )
@@ -132,30 +132,26 @@ synonymTyConsOfType ty
      go_mco MRefl    = emptyNameEnv
      go_mco (MCo co) = go_co co
 
-     go_co (Refl ty)              = go ty
-     go_co (GRefl _ ty mco)       = go ty `plusNameEnv` go_mco mco
-     go_co (TyConAppCo _ tc cs)   = go_tc tc `plusNameEnv` go_co_s cs
-     go_co (AppCo co co')         = go_co co `plusNameEnv` go_co co'
+     go_co (Refl ty)            = go ty
+     go_co (GRefl _ ty mco)     = go ty `plusNameEnv` go_mco mco
+     go_co (TyConAppCo _ tc cs) = go_tc tc `plusNameEnv` go_co_s cs
+     go_co (AppCo co co')       = go_co co `plusNameEnv` go_co co'
      go_co (ForAllCo { fco_kind = kind_co, fco_body = body_co })
-                                  = go_co kind_co `plusNameEnv` go_co body_co
+                                = go_co kind_co `plusNameEnv` go_co body_co
      go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
-                                  = go_co m `plusNameEnv` go_co a `plusNameEnv` go_co r
-     go_co (CoVarCo _)            = emptyNameEnv
-     go_co (HoleCo {})            = emptyNameEnv
-     go_co (AxiomInstCo _ _ cs)   = go_co_s cs
-     go_co (UnivCo p _ ty ty')    = go_prov p `plusNameEnv` go ty `plusNameEnv` go ty'
-     go_co (SymCo co)             = go_co co
-     go_co (TransCo co co')       = go_co co `plusNameEnv` go_co co'
-     go_co (SelCo _ co)           = go_co co
-     go_co (LRCo _ co)            = go_co co
-     go_co (InstCo co co')        = go_co co `plusNameEnv` go_co co'
-     go_co (KindCo co)            = go_co co
-     go_co (SubCo co)             = go_co co
-     go_co (AxiomRuleCo _ cs)     = go_co_s cs
-
-     go_prov (PhantomProv co)     = go_co co
-     go_prov (ProofIrrelProv co)  = go_co co
-     go_prov (PluginProv _ _)     = emptyNameEnv
+                                = go_co m `plusNameEnv` go_co a `plusNameEnv` go_co r
+     go_co (CoVarCo _)          = emptyNameEnv
+     go_co (HoleCo {})          = emptyNameEnv
+     go_co (AxiomCo _ cs)       = go_co_s cs
+     go_co (UnivCo { uco_lty = t1, uco_rty = t2})
+                                = go t1 `plusNameEnv` go t2
+     go_co (SymCo co)           = go_co co
+     go_co (TransCo co co')     = go_co co `plusNameEnv` go_co co'
+     go_co (SelCo _ co)         = go_co co
+     go_co (LRCo _ co)          = go_co co
+     go_co (InstCo co co')      = go_co co `plusNameEnv` go_co co'
+     go_co (KindCo co)          = go_co co
+     go_co (SubCo co)           = go_co co
 
      go_tc tc | isTypeSynonymTyCon tc = unitNameEnv (tyConName tc) tc
               | otherwise             = emptyNameEnv

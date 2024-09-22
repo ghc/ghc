@@ -66,7 +66,9 @@ import GHC.Core.FamInstEnv     ( FamInstEnv )
 import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
                                , unsafeTcPluginTcM
                                , liftIO, traceTc )
-import GHC.Tc.Types.Constraint ( Ct, CtLoc, CtEvidence(..) )
+import GHC.Tc.Types.Constraint ( Ct, CtEvidence(..) )
+import GHC.Tc.Types.CtLoc      ( CtLoc )
+
 import GHC.Tc.Utils.TcMType    ( TcTyVar, TcType )
 import GHC.Tc.Utils.Env        ( TcTyThing )
 import GHC.Tc.Types.Evidence   ( CoercionHole, EvTerm(..)
