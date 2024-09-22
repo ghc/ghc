@@ -42,7 +42,7 @@ solver :: [String]
        -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct]
        -> TcPluginM TcPluginSolveResult
 solver _args defs ev givens wanteds = do
-  let pluginCo = mkUnivCo (PluginProv "CtIdPlugin" emptyUniqDSet) Representational  -- Empty is fine. This plugin does not use "givens".
+  let pluginCo = mkUnivCo (PluginProv "CtIdPlugin") [] Representational  -- Empty is fine. This plugin does not use "givens".
   let substEvidence ct ct' =
         evCast (ctEvExpr $ ctEvidence ct') $ pluginCo (ctPred ct') (ctPred ct)
 

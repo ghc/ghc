@@ -11,8 +11,8 @@ module GHC.Data.Pair
    , unPair
    , toPair
    , swap
-   , pLiftFst
-   , pLiftSnd
+   , pLiftFst, pLiftSnd
+   , unzipPairs
    )
 where
 
@@ -58,3 +58,11 @@ pLiftFst f (Pair a b) = Pair (f a) b
 
 pLiftSnd :: (a -> a) -> Pair a -> Pair a
 pLiftSnd f (Pair a b) = Pair a (f b)
+
+unzipPairs :: [Pair a] -> ([a], [a])
+unzipPairs [] = ([], [])
+unzipPairs (Pair a b : prs) = (a:as, b:bs)
+  where
+    !(as,bs) = unzipPairs prs
+    -- This makes the unzip work eagerly, building no thunks at
+    -- the cost of doing all the work up-front.

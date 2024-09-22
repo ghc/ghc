@@ -14,6 +14,7 @@ import GHC.Tc.Solver.Rewrite( rewrite )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.CtLoc( ctLocEnv, ctLocOrigin, setCtLocOrigin )
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint

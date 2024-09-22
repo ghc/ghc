@@ -59,6 +59,7 @@ import GHC.Tc.Zonk.TcType     as TcM
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad  as TcS
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.CtLoc( mkGivenLoc )
 import GHC.Tc.Instance.FunDeps
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin

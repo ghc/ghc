@@ -14,7 +14,7 @@ unsafeToInteger :: forall (n :: Nat). Signed n -> Integer
 unsafeToInteger
   = unsafeToInteger1
     `cast` (forall (n :: <Nat>_N).
-            <Signed n>_R %<Many>_N ->_R OpaqueNoCastWW.N:Signed[0] <n>_P
+            <Signed n>_R %<Many>_N ->_R OpaqueNoCastWW.N:Signed <n>_P
             :: (forall (n :: Nat). Signed n -> Signed n)
                ~R# (forall (n :: Nat). Signed n -> Integer))
 
@@ -30,14 +30,13 @@ times
        (ds1 :: Signed n) ->
        * @Integer
          GHC.Internal.Num.$fNumInteger
-         (ds
-          `cast` (OpaqueNoCastWW.N:Signed[0] <m>_P :: Signed m ~R# Integer))
+         (ds `cast` (OpaqueNoCastWW.N:Signed <m>_P :: Signed m ~R# Integer))
          (ds1
-          `cast` (OpaqueNoCastWW.N:Signed[0] <n>_P :: Signed n ~R# Integer)))
+          `cast` (OpaqueNoCastWW.N:Signed <n>_P :: Signed n ~R# Integer)))
     `cast` (forall (m :: <Nat>_N) (n :: <Nat>_N).
             <Signed m>_R
             %<Many>_N ->_R <Signed n>_R
-            %<Many>_N ->_R Sym (OpaqueNoCastWW.N:Signed[0] <m + n>_P)
+            %<Many>_N ->_R Sym (OpaqueNoCastWW.N:Signed <m + n>_P)
             :: (forall (m :: Nat) (n :: Nat). Signed m -> Signed n -> Integer)
                ~R# (forall (m :: Nat) (n :: Nat).
                     Signed m -> Signed n -> Signed (m + n)))

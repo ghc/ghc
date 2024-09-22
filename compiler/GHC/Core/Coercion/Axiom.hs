@@ -30,7 +30,9 @@ module GHC.Core.Coercion.Axiom (
 
        Role(..), fsFromRole,
 
-       CoAxiomRule(..), TypeEqn,
+       CoAxiomRule(..), BuiltInFamRewrite(..), BuiltInFamInjectivity(..), TypeEqn,
+       coAxiomRuleArgRoles, coAxiomRuleRole,
+       coAxiomRuleBranch_maybe, isNewtypeAxiomRule_maybe,
        BuiltInSynFamily(..), trivialBuiltInFamily
        ) where
 
@@ -40,7 +42,7 @@ import Language.Haskell.Syntax.Basic (Role(..))
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprTyVar )
-import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
+import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon, isNewTyCon )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Name
@@ -79,12 +81,12 @@ axF :: {                                         F [Int] ~ Bool
        ; forall (k :: *) (a :: k -> *) (b :: k). F (a b) ~ Char
        }
 
-The axiom is used with the AxiomInstCo constructor of Coercion. If we wish
+The axiom is used with the AxiomCo constructor of Coercion. If we wish
 to have a coercion showing that F (Maybe Int) ~ Char, it will look like
 
 axF[2] <*> <Maybe> <Int> :: F (Maybe Int) ~ Char
 -- or, written using concrete-ish syntax --
-AxiomInstCo axF 2 [Refl *, Refl Maybe, Refl Int]
+AxiomRuleCo axF 2 [Refl *, Refl Maybe, Refl Int]
 
 Note that the index is 0-based.
 
@@ -127,8 +129,21 @@ type variable is accurate.
 ************************************************************************
 -}
 
-type BranchIndex = Int  -- The index of the branch in the list of branches
-                        -- Counting from zero
+{- Note [BranchIndex]
+~~~~~~~~~~~~~~~~~~~~
+A CoAxiom has 1 or more branches. Each branch has contains a list
+of the free type variables in that branch, the LHS type patterns,
+and the RHS type for that branch. When we apply an axiom to a list
+of coercions, we must choose which branch of the axiom we wish to
+use, as the different branches may have different numbers of free
+type variables. (The number of type patterns is always the same
+among branches, but that doesn't quite concern us here.)
+-}
+
+
+type BranchIndex = Int         -- Counting from zero
+      -- The index of the branch in the list of branches
+      -- See Note [BranchIndex]
 
 -- promoted data type
 data BranchFlag = Branched | Unbranched
@@ -250,7 +265,7 @@ data CoAxBranch
        -- cab_tvs and cab_lhs may be eta-reduced; see
        -- Note [Eta reduction for data families]
     , cab_cvs      :: [CoVar]
-       -- ^ Bound coercion variables
+      -- ^ Bound coercion variables
        -- Always empty, for now.
        -- See Note [Constraints in patterns]
        -- in GHC.Tc.TyCl
@@ -268,19 +283,15 @@ data CoAxBranch
   deriving Data.Data
 
 toBranchedAxiom :: CoAxiom br -> CoAxiom Branched
-toBranchedAxiom (CoAxiom unique name role tc branches implicit)
-  = CoAxiom unique name role tc (toBranched branches) implicit
+toBranchedAxiom ax@(CoAxiom { co_ax_branches = branches })
+  = ax { co_ax_branches = toBranched branches }
 
 toUnbranchedAxiom :: CoAxiom br -> CoAxiom Unbranched
-toUnbranchedAxiom (CoAxiom unique name role tc branches implicit)
-  = CoAxiom unique name role tc (toUnbranched branches) implicit
+toUnbranchedAxiom ax@(CoAxiom { co_ax_branches = branches })
+  = ax { co_ax_branches = toUnbranched branches }
 
 coAxiomNumPats :: CoAxiom br -> Int
 coAxiomNumPats = length . coAxBranchLHS . (flip coAxiomNthBranch 0)
-
-coAxiomNthBranch :: CoAxiom br -> BranchIndex -> CoAxBranch
-coAxiomNthBranch (CoAxiom { co_ax_branches = bs }) index
-  = branchesNth bs index
 
 coAxiomArity :: CoAxiom br -> BranchIndex -> Arity
 coAxiomArity ax index
@@ -296,16 +307,20 @@ coAxiomRole = co_ax_role
 coAxiomBranches :: CoAxiom br -> Branches br
 coAxiomBranches = co_ax_branches
 
+coAxiomNthBranch :: CoAxiom br -> BranchIndex -> CoAxBranch
+coAxiomNthBranch (CoAxiom { co_ax_branches = bs }) index
+  = branchesNth bs index
+
+coAxiomSingleBranch :: CoAxiom Unbranched -> CoAxBranch
+coAxiomSingleBranch (CoAxiom { co_ax_branches = MkBranches arr })
+  = arr ! 0
+
 coAxiomSingleBranch_maybe :: CoAxiom br -> Maybe CoAxBranch
 coAxiomSingleBranch_maybe (CoAxiom { co_ax_branches = MkBranches arr })
   | snd (bounds arr) == 0
   = Just $ arr ! 0
   | otherwise
   = Nothing
-
-coAxiomSingleBranch :: CoAxiom Unbranched -> CoAxBranch
-coAxiomSingleBranch (CoAxiom { co_ax_branches = MkBranches arr })
-  = arr ! 0
 
 coAxiomTyCon :: CoAxiom br -> TyCon
 coAxiomTyCon = co_ax_tc
@@ -552,30 +567,104 @@ instance Binary Role where
 *                                                                      *
 ************************************************************************
 
-Conditional axioms.  The general idea is that a `CoAxiomRule` looks like this:
+Note [CoAxiomRule]
+~~~~~~~~~~~~~~~~~~
+A CoAxiomRule is a built-in axiom, one that we assume to be true:
+CoAxiomRules come in four flavours:
 
-    forall as. (r1 ~ r2, s1 ~ s2) => t1 ~ t2
+* BuiltInFamRew: provides evidence for, say
+      (ax1)    3+4 ----> 7
+      (ax2)    s+0 ----> s
+  The evidence looks like
+      AxiomCo ax1 [3,4] :: 3+4 ~ 7
+      AxiomCo ax2 [s]   :: s+0 ~ s
+  The arguments in the AxiomCo are the /instantiating types/, or
+  more generally coercions (see Note [Coercion axioms applied to coercions]
+  in GHC.Core.TyCo.Rep).
 
-My intention is to reuse these for both (~) and (~#).
-The short-term plan is to use this datatype to represent the type-nat axioms.
-In the longer run, it may be good to unify this and `CoAxiom`,
-as `CoAxiom` is the special case when there are no assumptions.
+* BuiltInFamInj: provides evidence for the injectivity of type families
+  For example
+      (ax3)   g1: a+b ~ 0        --->  a~0
+      (ax4)   g2: a+b ~ 0        --->  b~0
+      (ax5)   g3: a+b1 ~ a~b2    --->  b1~b2
+  The argument to the AxiomCo is the full coercion (always just one).
+  So then:
+      AxiomCo ax3 [g1] :: a ~ 0
+      AxiomCo ax4 [g2] :: b ~ 0
+      AxiomCo ax5 [g3] :: b1 ~ b2
+
+* BranchedAxiom: used for closed type families
+      type family F a where
+        F Int  = Bool
+        F Bool = Char
+        F a    = a -> Int
+  We get one (CoAxiom Branched) for the entire family; when used in an
+  AxiomCo we pair it with the BranchIndex to say which branch to pick.
+
+* UnbranchedAxiom: used for several purposes;
+    - Newtypes
+    - Data family instances
+    - Open type family instances
+
+Note [Avoiding allocating lots of CoAxiomRules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+CoAxiomRule is a sum type of four alternatives, which is very nice. But
+there is a danger of allocating lots of (BuiltInFamRew bif) objects, every
+time we (say) need a type-family rewrite.
+
+To avoid this allocation, we cache the appropraite CoAxiomRule inside each
+   BuiltInFamRewrite, BuiltInFamInjectivity
+making a little circular data structure.  See the `bifrw_axr` field of
+BuiltInFamRewrite, and similarly the others.
+
+It's simple to do this, and saves a percent or two of allocation in programs
+that do a lot of type-family work.
 -}
 
--- | A more explicit representation for `t1 ~ t2`.
-type TypeEqn = Pair Type
+-- | CoAxiomRule describes a built-in axiom, one that we assume to be true
+-- See Note [CoAxiomRule]
+data CoAxiomRule
+  = BuiltInFamRew  BuiltInFamRewrite                   -- Built-in type-family rewrites
+                                                       --    e.g.  3+5 ~ 7
 
--- | For now, we work only with nominal equality.
-data CoAxiomRule = CoAxiomRule
-  { coaxrName      :: FastString
-  , coaxrAsmpRoles :: [Role]    -- roles of parameter equations
-  , coaxrRole      :: Role      -- role of resulting equation
-  , coaxrProves    :: [TypeEqn] -> Maybe TypeEqn
-        -- ^ coaxrProves returns @Nothing@ when it doesn't like
-        -- the supplied arguments.  When this happens in a coercion
-        -- that means that the coercion is ill-formed, and Core Lint
-        -- checks for that.
-  }
+  | BuiltInFamInj  BuiltInFamInjectivity               -- Built-in type-family deductions
+                                                       --    e.g.  a+b~0 ==>  a~0
+                                                       -- Always unary
+
+  | BranchedAxiom      (CoAxiom Branched) BranchIndex  -- Closed type family
+
+  | UnbranchedAxiom    (CoAxiom Unbranched)            -- Open type family instance,
+                                                       --    data family instances
+                                                       --    and newtypes
+
+instance Eq CoAxiomRule where
+  (BuiltInFamRew  bif1)  == (BuiltInFamRew  bif2)  = bifrw_name  bif1 == bifrw_name bif2
+  (BuiltInFamInj bif1)   == (BuiltInFamInj bif2)   = bifinj_name bif1 == bifinj_name bif2
+  (UnbranchedAxiom ax1)  == (UnbranchedAxiom ax2)  = getUnique ax1 == getUnique ax2
+  (BranchedAxiom ax1 i1) == (BranchedAxiom ax2 i2) = getUnique ax1 == getUnique ax2 && i1 == i2
+  _ == _ = False
+
+coAxiomRuleRole :: CoAxiomRule -> Role
+coAxiomRuleRole (BuiltInFamRew  {})  = Nominal
+coAxiomRuleRole (BuiltInFamInj {})   = Nominal
+coAxiomRuleRole (UnbranchedAxiom ax) = coAxiomRole ax
+coAxiomRuleRole (BranchedAxiom ax _) = coAxiomRole ax
+
+coAxiomRuleArgRoles :: CoAxiomRule -> [Role]
+coAxiomRuleArgRoles (BuiltInFamRew  bif) = replicate (bifrw_arity bif) Nominal
+coAxiomRuleArgRoles (BuiltInFamInj {})   = [Nominal]
+coAxiomRuleArgRoles (UnbranchedAxiom ax) = coAxBranchRoles (coAxiomSingleBranch ax)
+coAxiomRuleArgRoles (BranchedAxiom ax i) = coAxBranchRoles (coAxiomNthBranch ax i)
+
+coAxiomRuleBranch_maybe :: CoAxiomRule -> Maybe (TyCon, Role, CoAxBranch)
+coAxiomRuleBranch_maybe (UnbranchedAxiom ax) = Just (co_ax_tc ax, co_ax_role ax, coAxiomSingleBranch ax)
+coAxiomRuleBranch_maybe (BranchedAxiom ax i) = Just (co_ax_tc ax, co_ax_role ax, coAxiomNthBranch ax i)
+coAxiomRuleBranch_maybe _                    = Nothing
+
+isNewtypeAxiomRule_maybe :: CoAxiomRule -> Maybe (TyCon, CoAxBranch)
+isNewtypeAxiomRule_maybe (UnbranchedAxiom ax)
+  | let tc = coAxiomTyCon ax, isNewTyCon tc = Just (tc, coAxiomSingleBranch ax)
+isNewtypeAxiomRule_maybe _                  = Nothing
 
 instance Data.Data CoAxiomRule where
   -- don't traverse?
@@ -583,45 +672,72 @@ instance Data.Data CoAxiomRule where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "CoAxiomRule"
 
-instance Uniquable CoAxiomRule where
-  getUnique = getUnique . coaxrName
-
-instance Eq CoAxiomRule where
-  x == y = coaxrName x == coaxrName y
-
-instance Ord CoAxiomRule where
-  -- we compare lexically to avoid non-deterministic output when sets of rules
-  -- are printed
-  compare x y = lexicalCompareFS (coaxrName x) (coaxrName y)
-
 instance Outputable CoAxiomRule where
-  ppr = ppr . coaxrName
+  ppr (BuiltInFamRew  bif) = ppr (bifrw_name bif)
+  ppr (BuiltInFamInj bif)  = ppr (bifinj_name bif)
+  ppr (UnbranchedAxiom ax) = ppr (coAxiomName ax)
+  ppr (BranchedAxiom ax i) = ppr (coAxiomName ax) <> brackets (int i)
 
+{- *********************************************************************
+*                                                                      *
+                    Built-in families
+*                                                                      *
+********************************************************************* -}
+
+
+-- | A more explicit representation for `t1 ~ t2`.
+type TypeEqn = Pair Type
 
 -- Type checking of built-in families
 data BuiltInSynFamily = BuiltInSynFamily
-  { sfMatchFam      :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
-    -- Does this reduce on the given arguments?
-    -- If it does, returns (CoAxiomRule, types to instantiate the rule at, rhs type)
-    -- That is: mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts)
-    --              :: F tys ~r rhs,
-    -- where the r in the output is coaxrRole of the rule. It is up to the
-    -- caller to ensure that this role is appropriate.
-
-  , sfInteractTop   :: [Type] -> Type -> [TypeEqn]
+  { sfMatchFam :: [BuiltInFamRewrite]
+  , sfInteract :: [BuiltInFamInjectivity]
     -- If given these type arguments and RHS, returns the equalities that
-    -- are guaranteed to hold.
-
-  , sfInteractInert :: [Type] -> Type ->
-                       [Type] -> Type -> [TypeEqn]
-    -- If given one set of arguments and result, and another set of arguments
-    -- and result, returns the equalities that are guaranteed to hold.
+    -- are guaranteed to hold.  That is, if
+    --     (ar, Pair s1 s2)  is an element of  (sfInteract tys ty)
+    -- then  AxiomRule ar [co :: F tys ~ ty]  ::  s1~s2
   }
+
+data BuiltInFamInjectivity  -- Argument and result role are always Nominal
+  = BIF_Interact
+      { bifinj_name :: FastString
+      , bifinj_axr  :: CoAxiomRule -- Cached copy of (BuiltInFamINj this-bif)
+                                   -- See Note [Avoiding allocating lots of CoAxiomRules]
+
+      , bifinj_proves :: TypeEqn -> Maybe TypeEqn
+            -- ^ Always unary: just one TypeEqn argument
+            -- Returns @Nothing@ when it doesn't like the supplied argument.
+            -- When this happens in a coercion that means that the coercion is
+            -- ill-formed, and Core Lint checks for that.
+      }
+
+data BuiltInFamRewrite  -- Argument roles and result role are always Nominal
+  = BIF_Rewrite
+      { bifrw_name   :: FastString
+      , bifrw_axr    :: CoAxiomRule -- Cached copy of (BuiltInFamRew this-bif)
+                                    -- See Note [Avoiding allocating lots of CoAxiomRules]
+
+      , bifrw_fam_tc :: TyCon       -- Needed for tyConsOfType
+
+      , bifrw_arity  :: Arity       -- Number of type arguments needed
+                                    -- to instantiate this axiom
+
+      , bifrw_match :: [Type] -> Maybe ([Type], Type)
+           -- coaxrMatch: does this reduce on the given arguments?
+           -- If it does, returns (types to instantiate the rule at, rhs type)
+           -- That is: mkAxiomCo ax (zipWith mkReflCo coAxiomRuleArgRoles ts)
+           --              :: F tys ~N rhs,
+
+      , bifrw_proves :: [TypeEqn] -> Maybe TypeEqn }
+           -- length(inst_tys) = bifrw_arity
+
+      -- INVARIANT: bifrw_match and bifrw_proves are related as follows:
+      -- If    Just (inst_tys, res_ty) = bifrw_match ax arg_tys
+      -- then  * length arg_tys = tyConArity fam_tc
+      --       * length inst_tys = bifrw_arity
+       --      * bifrw_proves (map (return @Pair) inst_tys) = Just (return @Pair res_ty)
+
 
 -- Provides default implementations that do nothing.
 trivialBuiltInFamily :: BuiltInSynFamily
-trivialBuiltInFamily = BuiltInSynFamily
-  { sfMatchFam      = \_ -> Nothing
-  , sfInteractTop   = \_ _ -> []
-  , sfInteractInert = \_ _ _ _ -> []
-  }
+trivialBuiltInFamily = BuiltInSynFamily { sfMatchFam = [], sfInteract = [] }

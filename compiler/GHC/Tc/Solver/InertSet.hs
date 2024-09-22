@@ -56,6 +56,7 @@ import GHC.Prelude
 
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin, ctLocSpan, ctLocLevel )
 import GHC.Tc.Solver.Types
 import GHC.Tc.Utils.TcType
 
@@ -1478,8 +1479,8 @@ findMatchingIrreds irreds ev
   where
     pred = ctEvPred ev
     match_non_eq irred
-      | irredCtPred irred `tcEqTypeNoKindCheck` pred = Left (irred, NotSwapped)
-      | otherwise                                    = Right irred
+      | irredCtPred irred `tcEqType` pred = Left (irred, NotSwapped)
+      | otherwise                         = Right irred
 
     match_eq eq_rel1 lty1 rty1 irred
       | EqPred eq_rel2 lty2 rty2 <- classifyPredType (irredCtPred irred)
@@ -1490,9 +1491,9 @@ findMatchingIrreds irreds ev
       = Right irred
 
     match_eq_help lty1 rty1 lty2 rty2
-      | lty1 `tcEqTypeNoKindCheck` lty2, rty1 `tcEqTypeNoKindCheck` rty2
+      | lty1 `tcEqType` lty2, rty1 `tcEqType` rty2
       = Just NotSwapped
-      | lty1 `tcEqTypeNoKindCheck` rty2, rty1 `tcEqTypeNoKindCheck` lty2
+      | lty1 `tcEqType` rty2, rty1 `tcEqType` lty2
       = Just IsSwapped
       | otherwise
       = Nothing

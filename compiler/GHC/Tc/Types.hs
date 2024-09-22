@@ -119,6 +119,7 @@ import GHC.Hs
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.CtLoc( CtLoc )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.TH
 import GHC.Tc.Types.TcRef

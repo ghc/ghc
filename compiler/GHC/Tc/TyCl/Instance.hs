@@ -588,7 +588,7 @@ GADTs).
 
 tcTyFamInstDecl :: AssocInstInfo
                 -> LTyFamInstDecl GhcRn -> TcM FamInst
-  -- "type instance"
+  -- "type instance"; open type families only
   -- See Note [Associated type instances]
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
   = setSrcSpanA loc           $

@@ -7301,7 +7301,7 @@ module GHC.ForeignPtr where
   type ForeignPtr :: * -> *
   data ForeignPtr a = ForeignPtr GHC.Prim.Addr# ForeignPtrContents
   type ForeignPtrContents :: *
-  data ForeignPtrContents = PlainForeignPtr ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef[0] <Finalizers>_N)(GHC.Internal.IORef.IORef Finalizers) | FinalPtr | MallocPtr (GHC.Prim.MutableByteArray# GHC.Prim.RealWorld) ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef[0] <Finalizers>_N)(GHC.Internal.IORef.IORef Finalizers) | PlainPtr (GHC.Prim.MutableByteArray# GHC.Prim.RealWorld)
+  data ForeignPtrContents = PlainForeignPtr ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <Finalizers>_N)(GHC.Internal.IORef.IORef Finalizers) | FinalPtr | MallocPtr (GHC.Prim.MutableByteArray# GHC.Prim.RealWorld) ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <Finalizers>_N)(GHC.Internal.IORef.IORef Finalizers) | PlainPtr (GHC.Prim.MutableByteArray# GHC.Prim.RealWorld)
   addForeignPtrConcFinalizer :: forall a. ForeignPtr a -> GHC.Types.IO () -> GHC.Types.IO ()
   addForeignPtrFinalizer :: forall a. FinalizerPtr a -> ForeignPtr a -> GHC.Types.IO ()
   addForeignPtrFinalizerEnv :: forall env a. FinalizerEnvPtr env a -> GHC.Internal.Ptr.Ptr env -> ForeignPtr a -> GHC.Types.IO ()
@@ -7779,7 +7779,7 @@ module GHC.IO.Exception where
 module GHC.IO.FD where
   -- Safety: Safe
   type FD :: *
-  data FD = FD {fdFD :: ! {-# UNPACK #-}(GHC.Internal.Foreign.C.Types.N:CInt[0])GHC.Internal.Foreign.C.Types.CInt, fdIsNonBlocking :: {-# UNPACK #-}GHC.Types.Int}
+  data FD = FD {fdFD :: ! {-# UNPACK #-}GHC.Internal.Foreign.C.Types.N:CIntGHC.Internal.Foreign.C.Types.CInt, fdIsNonBlocking :: {-# UNPACK #-}GHC.Types.Int}
   mkFD :: GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.IO.IOMode.IOMode -> GHC.Internal.Maybe.Maybe (GHC.Internal.IO.Device.IODeviceType, GHC.Internal.System.Posix.Types.CDev, GHC.Internal.System.Posix.Types.CIno) -> GHC.Types.Bool -> GHC.Types.Bool -> GHC.Types.IO (FD, GHC.Internal.IO.Device.IODeviceType)
   openFile :: GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Types.Bool -> GHC.Types.IO (FD, GHC.Internal.IO.Device.IODeviceType)
   openFileWith :: forall r s. GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Types.Bool -> (FD -> GHC.Internal.IO.Device.IODeviceType -> GHC.Types.IO r) -> ((forall x. GHC.Types.IO x -> GHC.Types.IO x) -> r -> GHC.Types.IO s) -> GHC.Types.IO s
@@ -7975,11 +7975,11 @@ module GHC.IO.Handle.Types where
       (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-0.1.0.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) =>
       Handle__ {haDevice :: !dev,
                 haType :: HandleType,
-                haByteBuffer :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef[0] <GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8>_N)(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
+                haByteBuffer :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8>_N)(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
                 haBufferMode :: BufferMode,
-                haLastDecode :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef[0] <(dec_state, GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)>_N)(GHC.Internal.IORef.IORef (dec_state, GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
-                haCharBuffer :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef[0] <GHC.Internal.IO.Buffer.Buffer GHC.Internal.IO.Buffer.CharBufElem>_N)(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.IO.Buffer.CharBufElem)),
-                haBuffers :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef[0] <BufferList GHC.Internal.IO.Buffer.CharBufElem>_N)(GHC.Internal.IORef.IORef (BufferList GHC.Internal.IO.Buffer.CharBufElem)),
+                haLastDecode :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <(dec_state, GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)>_N)(GHC.Internal.IORef.IORef (dec_state, GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
+                haCharBuffer :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <GHC.Internal.IO.Buffer.Buffer GHC.Internal.IO.Buffer.CharBufElem>_N)(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.IO.Buffer.CharBufElem)),
+                haBuffers :: ! {-# UNPACK #-}(GHC.Internal.IORef.N:IORef <BufferList GHC.Internal.IO.Buffer.CharBufElem>_N)(GHC.Internal.IORef.IORef (BufferList GHC.Internal.IO.Buffer.CharBufElem)),
                 haEncoder :: GHC.Internal.Maybe.Maybe (GHC.Internal.IO.Encoding.Types.TextEncoder enc_state),
                 haDecoder :: GHC.Internal.Maybe.Maybe (GHC.Internal.IO.Encoding.Types.TextDecoder dec_state),
                 haCodec :: GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding,

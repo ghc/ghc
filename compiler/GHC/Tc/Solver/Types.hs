@@ -24,6 +24,7 @@ import GHC.Prelude
 
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin )
 import GHC.Tc.Utils.TcType
 
 import GHC.Types.Unique

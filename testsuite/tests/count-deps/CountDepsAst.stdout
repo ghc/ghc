@@ -2,6 +2,7 @@ Found Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
+GHC.Builtin.Types.Literals
 GHC.Builtin.Types.Prim
 GHC.Builtin.Uniques
 GHC.ByteCode.Types
@@ -130,7 +131,7 @@ GHC.Tc.Errors.Types
 GHC.Tc.Errors.Types.PromotionErr
 GHC.Tc.Types.BasicTypes
 GHC.Tc.Types.Constraint
-GHC.Tc.Types.CtLocEnv
+GHC.Tc.Types.CtLoc
 GHC.Tc.Types.ErrCtxt
 GHC.Tc.Types.Evidence
 GHC.Tc.Types.LclEnv

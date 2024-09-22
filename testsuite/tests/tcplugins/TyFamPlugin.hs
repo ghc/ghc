@@ -80,6 +80,6 @@ solveCt ( PluginDefs {..} ) ct@( classifyPredType . ctPred -> EqPred NomEq lhs r
   , let
       evTerm :: EvTerm
       evTerm = EvExpr . Coercion
-             $ mkUnivCo ( PluginProv "TyFamPlugin" emptyUniqDSet) Nominal lhs rhs  -- Empty is fine. This plugin does not use "givens".
+             $ mkUnivCo ( PluginProv "TyFamPlugin") [] Nominal lhs rhs  -- Empty is fine. This plugin does not use "givens".
   = pure $ Just ( evTerm, ct )
 solveCt _ ct = pure Nothing

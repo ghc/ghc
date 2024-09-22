@@ -34,7 +34,7 @@ module GHC.Tc.Solver.Monad (
     -- The pipeline
     StopOrContinue(..), continueWith, stopWith,
     startAgainWith, SolverStage(Stage, runSolverStage), simpleStage,
-    stopWithStage,
+    stopWithStage, nopStage,
 
     -- Tracing etc
     panicTcS, traceTcS, tryEarlyAbortTcS,
@@ -149,15 +149,20 @@ import GHC.Driver.DynFlags
 
 import GHC.Tc.Instance.Class( safeOverlap, instanceReturnsDictCon )
 import GHC.Tc.Instance.FunDeps( FunDepEqn(..) )
-import GHC.Tc.Utils.TcType
+
+
 import GHC.Tc.Solver.Types
 import GHC.Tc.Solver.InertSet
-import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types
+
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Unify
+
+import GHC.Tc.Types.Evidence
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Utils.Unify
 
 import GHC.Builtin.Names ( unsatisfiableClassNameKey )
 
@@ -285,6 +290,9 @@ instance Monad SolverStage where
                            StartAgain x   -> return (StartAgain x)
                            Stop ev d      -> return (Stop ev d)
                            ContinueWith x -> runSolverStage (k x) }
+
+nopStage :: a -> SolverStage a
+nopStage res = Stage (continueWith res)
 
 simpleStage :: TcS a -> SolverStage a
 -- Always does a ContinueWith; no Stop or StartAgain
@@ -1769,11 +1777,13 @@ newBoundEvVarId pred rhs
        ; setEvBind (mkGivenEvBind new_ev rhs)
        ; return new_ev }
 
-emitNewGivens :: CtLoc -> [(Role,TcType,TcType,TcCoercion)] -> TcS ()
+emitNewGivens :: CtLoc -> [(Role,TcCoercion)] -> TcS ()
 emitNewGivens loc pts
-  = do { evs <- mapM (newGivenEvVar loc) $
+  = do { traceTcS "emitNewGivens" (ppr pts)
+       ; evs <- mapM (newGivenEvVar loc) $
                 [ (mkPrimEqPredRole role ty1 ty2, evCoercion co)
-                | (role, ty1, ty2, co) <- pts
+                | (role, co) <- pts
+                , let Pair ty1 ty2 = coercionKind co
                 , not (ty1 `tcEqType` ty2) ] -- Kill reflexive Givens at birth
        ; emitWorkNC evs }
 

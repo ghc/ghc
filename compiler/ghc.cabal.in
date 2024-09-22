@@ -837,7 +837,7 @@ Library
         GHC.Tc.Types.EvTerm
         GHC.Tc.Types.Origin
         GHC.Tc.Types.Rank
-        GHC.Tc.Types.CtLocEnv
+        GHC.Tc.Types.CtLoc
         GHC.Tc.Types.ErrCtxt
         GHC.Tc.Types.LclEnv
         GHC.Tc.Types.TH

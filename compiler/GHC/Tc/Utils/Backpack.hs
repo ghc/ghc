@@ -54,6 +54,7 @@ import GHC.Tc.Gen.Export
 import GHC.Tc.Solver
 import GHC.Tc.TyCl.Utils
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.CtLoc( mkGivenLoc )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad

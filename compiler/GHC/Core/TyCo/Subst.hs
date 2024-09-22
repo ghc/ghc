@@ -57,10 +57,10 @@ import {-# SOURCE #-} GHC.Core.Coercion
    ( mkCoVarCo, mkKindCo, mkSelCo, mkTransCo
    , mkNomReflCo, mkSubCo, mkSymCo
    , mkFunCo2, mkForAllCo, mkUnivCo
-   , mkAxiomInstCo, mkAppCo, mkGReflCo
+   , mkAxiomCo, mkAppCo, mkGReflCo
    , mkInstCo, mkLRCo, mkTyConAppCo
    , mkCoercionType
-   , coercionKind, coercionLKind, coVarKindsTypesRole )
+   , coercionKind, coercionLKind, coVarTypesRole )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr )
@@ -878,8 +878,8 @@ subst_co subst co
     go :: Coercion -> Coercion
     go (Refl ty)             = mkNomReflCo $! (go_ty ty)
     go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
-    go (TyConAppCo r tc args)= let args' = map go args
-                               in  args' `seqList` mkTyConAppCo r tc args'
+    go (TyConAppCo r tc args)= mkTyConAppCo r tc $! go_cos args
+    go (AxiomCo con cos)     = mkAxiomCo con $! go_cos cos
     go (AppCo co arg)        = (mkAppCo $! go co) $! go arg
     go (ForAllCo tv visL visR kind_co co)
       = case substForAllCoBndrUnchecked subst tv kind_co of
@@ -887,9 +887,10 @@ subst_co subst co
           ((mkForAllCo $! tv') visL visR $! kind_co') $! subst_co subst' co
     go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
-    go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
-    go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov p) $! r) $!
-                                (go_ty t1)) $! (go_ty t2)
+    go (UnivCo { uco_prov = p, uco_role = r
+               , uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                             = ((((mkUnivCo $! p) $! go_cos deps) $! r) $!
+                                  (go_ty t1)) $! (go_ty t2)
     go (SymCo co)            = mkSymCo $! (go co)
     go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
     go (SelCo d co)          = mkSelCo d $! (go co)
@@ -897,13 +898,10 @@ subst_co subst co
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
     go (KindCo co)           = mkKindCo $! (go co)
     go (SubCo co)            = mkSubCo $! (go co)
-    go (AxiomRuleCo c cs)    = let cs1 = map go cs
-                                in cs1 `seqList` AxiomRuleCo c cs1
     go (HoleCo h)            = HoleCo $! go_hole h
 
-    go_prov (PhantomProv kco)    = PhantomProv (go kco)
-    go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
-    go_prov (PluginProv s cvs)   = PluginProv s $ substDCoVarSet subst cvs
+    go_cos cos = let cos' = map go cos
+                 in cos' `seqList` cos'
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
@@ -1088,7 +1086,7 @@ substCoVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
     new_var = uniqAway in_scope subst_old_var
     subst_old_var = mkCoVar (varName old_var) new_var_type
 
-    (_, _, t1, t2, role) = coVarKindsTypesRole old_var
+    (t1, t2, role) = coVarTypesRole old_var
     t1' = subst_fn subst t1
     t2' = subst_fn subst t2
     new_var_type = mkCoercionType role t1' t2'

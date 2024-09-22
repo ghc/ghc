@@ -11,6 +11,7 @@ import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
                       RewriteEnv(..),
                       runTcPluginM )
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.CtLoc( CtLoc, bumpCtLocDepth )
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type

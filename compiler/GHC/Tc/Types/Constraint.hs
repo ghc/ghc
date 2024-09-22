@@ -66,13 +66,6 @@ module GHC.Tc.Types.Constraint (
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         UserGiven, getUserGivensFromImplics,
         HasGivenEqs(..), checkImplicationInvariants,
-        SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
-        bumpSubGoalDepth, subGoalDepthExceeded,
-        CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
-        ctLocTypeOrKind_maybe,
-        ctLocDepth, bumpCtLocDepth, isGivenLoc,
-        setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
-        pprCtLoc, adjustCtLoc, adjustCtLocTyConBinder,
 
         -- CtLocEnv
         CtLocEnv(..), setCtLocEnvLoc, setCtLocEnvLvl, getCtLocEnvLoc, getCtLocEnvLvl, ctLocEnvInGeneratedCode,
@@ -83,7 +76,6 @@ module GHC.Tc.Types.Constraint (
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         ctEvRewriters, ctEvUnique, tcEvDestUnique,
-        mkKindEqLoc, toKindLoc, toInvisibleLoc, mkGivenLoc,
         ctEvRewriteRole, ctEvRewriteEqRel, setCtEvPredType, setCtEvLoc, arisesFromGivens,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
 
@@ -118,7 +110,7 @@ import GHC.Types.Var
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.CtLocEnv
+import GHC.Tc.Types.CtLoc
 
 import GHC.Core
 
@@ -126,11 +118,9 @@ import GHC.Core.TyCo.Ppr
 import GHC.Utils.FV
 import GHC.Types.Var.Set
 import GHC.Builtin.Names
-import GHC.Types.Basic
 import GHC.Types.Unique.Set
 
 import GHC.Utils.Outputable
-import GHC.Types.SrcLoc
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -967,9 +957,6 @@ tyCoFVsOfHole (Hole { hole_ty = ty }) = tyCoFVsOfType ty
 
 tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
 tyCoFVsOfBag tvs_of = foldr (unionFV . tvs_of) emptyFV
-
-isGivenLoc :: CtLoc -> Bool
-isGivenLoc loc = isGivenOrigin (ctLocOrigin loc)
 
 {-
 ************************************************************************
@@ -2059,7 +2046,7 @@ ctEvTerm ev = EvExpr (ctEvExpr ev)
 -- return an empty set.
 ctEvRewriters :: CtEvidence -> RewriterSet
 ctEvRewriters (CtWanted { ctev_rewriters = rewriters }) = rewriters
-ctEvRewriters _other                                    = emptyRewriterSet
+ctEvRewriters (CtGiven {})                              = emptyRewriterSet
 
 ctEvExpr :: HasDebugCallStack => CtEvidence -> EvExpr
 ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ })
@@ -2453,175 +2440,3 @@ eqCanRewriteFR (Wanted, NomEq) (Wanted, ReprEq) = False
 eqCanRewriteFR (Wanted, r1)    (Wanted, r2)     = eqCanRewrite r1 r2
 eqCanRewriteFR (Wanted, _)     (Given, _)       = False
 
-{-
-************************************************************************
-*                                                                      *
-            SubGoalDepth
-*                                                                      *
-************************************************************************
-
-Note [SubGoalDepth]
-~~~~~~~~~~~~~~~~~~~
-The 'SubGoalDepth' takes care of stopping the constraint solver from looping.
-
-The counter starts at zero and increases. It includes dictionary constraints,
-equality simplification, and type family reduction. (Why combine these? Because
-it's actually quite easy to mistake one for another, in sufficiently involved
-scenarios, like ConstraintKinds.)
-
-The flag -freduction-depth=n fixes the maximum level.
-
-* The counter includes the depth of type class instance declarations.  Example:
-     [W] d{7} : Eq [Int]
-  That is d's dictionary-constraint depth is 7.  If we use the instance
-     $dfEqList :: Eq a => Eq [a]
-  to simplify it, we get
-     d{7} = $dfEqList d'{8}
-  where d'{8} : Eq Int, and d' has depth 8.
-
-  For civilised (decidable) instance declarations, each increase of
-  depth removes a type constructor from the type, so the depth never
-  gets big; i.e. is bounded by the structural depth of the type.
-
-* The counter also increments when resolving
-equalities involving type functions. Example:
-  Assume we have a wanted at depth 7:
-    [W] d{7} : F () ~ a
-  If there is a type function equation "F () = Int", this would be rewritten to
-    [W] d{8} : Int ~ a
-  and remembered as having depth 8.
-
-  Again, without UndecidableInstances, this counter is bounded, but without it
-  can resolve things ad infinitum. Hence there is a maximum level.
-
-* Lastly, every time an equality is rewritten, the counter increases. Again,
-  rewriting an equality constraint normally makes progress, but it's possible
-  the "progress" is just the reduction of an infinitely-reducing type family.
-  Hence we need to track the rewrites.
-
-When compiling a program requires a greater depth, then GHC recommends turning
-off this check entirely by setting -freduction-depth=0. This is because the
-exact number that works is highly variable, and is likely to change even between
-minor releases. Because this check is solely to prevent infinite compilation
-times, it seems safe to disable it when a user has ascertained that their program
-doesn't loop at the type level.
-
--}
-
--- | See Note [SubGoalDepth]
-newtype SubGoalDepth = SubGoalDepth Int
-  deriving (Eq, Ord, Outputable)
-
-initialSubGoalDepth :: SubGoalDepth
-initialSubGoalDepth = SubGoalDepth 0
-
-bumpSubGoalDepth :: SubGoalDepth -> SubGoalDepth
-bumpSubGoalDepth (SubGoalDepth n) = SubGoalDepth (n + 1)
-
-maxSubGoalDepth :: SubGoalDepth -> SubGoalDepth -> SubGoalDepth
-maxSubGoalDepth (SubGoalDepth n) (SubGoalDepth m) = SubGoalDepth (n `max` m)
-
-subGoalDepthExceeded :: IntWithInf -> SubGoalDepth -> Bool
-subGoalDepthExceeded reductionDepth (SubGoalDepth d)
-  = mkIntWithInf d > reductionDepth
-
-{-
-************************************************************************
-*                                                                      *
-            CtLoc
-*                                                                      *
-************************************************************************
-
-The 'CtLoc' gives information about where a constraint came from.
-This is important for decent error message reporting because
-dictionaries don't appear in the original source code.
-
--}
-
-data CtLoc = CtLoc { ctl_origin   :: CtOrigin
-                   , ctl_env      :: CtLocEnv -- Everything we need to know about
-                                              -- the context this Ct arose in.
-                   , ctl_t_or_k   :: Maybe TypeOrKind  -- OK if we're not sure
-                   , ctl_depth    :: !SubGoalDepth }
-
-mkKindEqLoc :: TcType -> TcType   -- original *types* being compared
-            -> CtLoc -> CtLoc
-mkKindEqLoc s1 s2 ctloc
-  | CtLoc { ctl_t_or_k = t_or_k, ctl_origin = origin } <- ctloc
-  = ctloc { ctl_origin = KindEqOrigin s1 s2 origin t_or_k
-          , ctl_t_or_k = Just KindLevel }
-
-adjustCtLocTyConBinder :: TyConBinder -> CtLoc -> CtLoc
--- Adjust the CtLoc when decomposing a type constructor
-adjustCtLocTyConBinder tc_bndr loc
-  = adjustCtLoc is_vis is_kind loc
-  where
-    is_vis  = isVisibleTyConBinder tc_bndr
-    is_kind = isNamedTyConBinder tc_bndr
-
-adjustCtLoc :: Bool    -- True <=> A visible argument
-            -> Bool    -- True <=> A kind argument
-            -> CtLoc -> CtLoc
--- Adjust the CtLoc when decomposing a type constructor, application, etc
-adjustCtLoc is_vis is_kind loc
-  = loc2
-  where
-    loc1 | is_kind   = toKindLoc loc
-         | otherwise = loc
-    loc2 | is_vis    = loc1
-         | otherwise = toInvisibleLoc loc1
-
--- | Take a CtLoc and moves it to the kind level
-toKindLoc :: CtLoc -> CtLoc
-toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
-
-toInvisibleLoc :: CtLoc -> CtLoc
-toInvisibleLoc loc = updateCtLocOrigin loc toInvisibleOrigin
-
-mkGivenLoc :: TcLevel -> SkolemInfoAnon -> CtLocEnv -> CtLoc
-mkGivenLoc tclvl skol_info env
-  = CtLoc { ctl_origin   = GivenOrigin skol_info
-          , ctl_env      = setCtLocEnvLvl env tclvl
-          , ctl_t_or_k   = Nothing    -- this only matters for error msgs
-          , ctl_depth    = initialSubGoalDepth }
-
-ctLocEnv :: CtLoc -> CtLocEnv
-ctLocEnv = ctl_env
-
-ctLocLevel :: CtLoc -> TcLevel
-ctLocLevel loc = getCtLocEnvLvl (ctLocEnv loc)
-
-ctLocDepth :: CtLoc -> SubGoalDepth
-ctLocDepth = ctl_depth
-
-ctLocOrigin :: CtLoc -> CtOrigin
-ctLocOrigin = ctl_origin
-
-ctLocSpan :: CtLoc -> RealSrcSpan
-ctLocSpan (CtLoc { ctl_env = lcl}) = getCtLocEnvLoc lcl
-
-ctLocTypeOrKind_maybe :: CtLoc -> Maybe TypeOrKind
-ctLocTypeOrKind_maybe = ctl_t_or_k
-
-setCtLocSpan :: CtLoc -> RealSrcSpan -> CtLoc
-setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (setCtLocRealLoc lcl loc)
-
-bumpCtLocDepth :: CtLoc -> CtLoc
-bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth d }
-
-setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
-setCtLocOrigin ctl orig = ctl { ctl_origin = orig }
-
-updateCtLocOrigin :: CtLoc -> (CtOrigin -> CtOrigin) -> CtLoc
-updateCtLocOrigin ctl@(CtLoc { ctl_origin = orig }) upd
-  = ctl { ctl_origin = upd orig }
-
-setCtLocEnv :: CtLoc -> CtLocEnv -> CtLoc
-setCtLocEnv ctl env = ctl { ctl_env = env }
-
-pprCtLoc :: CtLoc -> SDoc
--- "arising from ... at ..."
--- Not an instance of Outputable because of the "arising from" prefix
-pprCtLoc (CtLoc { ctl_origin = o, ctl_env = lcl})
-  = sep [ pprCtOrigin o
-        , text "at" <+> ppr (getCtLocEnvLoc lcl)]

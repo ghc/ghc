@@ -76,6 +76,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin hiding ( Position(..) )
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Types.TH
 import GHC.Tc.Utils.TcType

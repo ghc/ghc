@@ -24,6 +24,9 @@ module GHC.Tc.Types.BasicTypes (
 
 import GHC.Prelude
 
+import GHC.Tc.Types.Origin( UserTypeCtxt )
+import GHC.Tc.Utils.TcType
+
 import GHC.Types.Id
 import GHC.Types.Basic
 import GHC.Types.Var
@@ -32,8 +35,6 @@ import GHC.Types.Name
 import GHC.Types.TyThing
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Tc.Types.Origin
-import GHC.Tc.Utils.TcType
 
 import GHC.Hs.Extension ( GhcRn )
 

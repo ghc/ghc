@@ -16,6 +16,7 @@ import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Types( findFunEqsByTyCon )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcType
@@ -43,7 +44,7 @@ import GHC.Types.Var.Set( anyVarSet )
 import GHC.Types.Name.Reader
 import GHC.Types.Basic
 
-import GHC.Builtin.Types ( anyTypeOfKind )
+import GHC.Builtin.Types.Literals ( tryInteractTopFam, tryInteractInertFam )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -115,7 +116,7 @@ solveEquality ev eq_rel ty1 ty2
                                 ; solveIrred irred_ct } ;
 
             Right eq_ct   -> do { tryInertEqs eq_ct
-                                ; tryFunDeps  eq_ct
+                                ; tryFunDeps  eq_rel eq_ct
                                 ; tryQCsEqCt  eq_ct
                                 ; simpleStage (updInertEqs eq_ct)
                                 ; stopWithStage (eqCtEvidence eq_ct) "Kept inert EqCt" } } }
@@ -1339,7 +1340,7 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
                    -- Remember: ty1/ty2 may be more fully zonked than evar
                    --           See the call to canonicaliseEquality in solveEquality.
              -> emitNewGivens loc
-                       [ (r, ty1, ty2, mkSelCo (SelTyCon i r) ev_co)
+                       [ (r, mkSelCo (SelTyCon i r) ev_co)
                        | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
                        , r /= Phantom
                        , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
@@ -1397,10 +1398,8 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
                    -- Remember: ty1/ty2 may be more fully zonked than evar
                    --           See the call to canonicaliseEquality in solveEquality.
              -> emitNewGivens loc
-                       [ (funRole role fs, ty1, ty2, mkSelCo (SelFun fs) ev_co)
-                       | (fs, ty1, ty2) <- [ (SelMult, m1, m2)
-                                           , (SelArg,  a1, a2)
-                                           , (SelRes,  r1, r2)] ]
+                       [ (funRole role fs, mkSelCo (SelFun fs) ev_co)
+                       | fs <- [SelMult, SelArg, SelRes] ]
 
     ; stopWith ev "Decomposed TyConApp" }
 
@@ -1716,18 +1715,11 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
     then finish_with_swapping
     else finish_without_swapping
 
-  | TyFamLHS fun_tc1 fun_args1 <- lhs1
-  , TyFamLHS fun_tc2 fun_args2 <- lhs2
+  | TyFamLHS _fun_tc1 fun_args1 <- lhs1
+  , TyFamLHS _fun_tc2 fun_args2 <- lhs2
   -- See Note [Decomposing type family applications]
   = do { traceTcS "canEqCanLHS2 two type families" (ppr lhs1 $$ ppr lhs2)
-
-       ; unifications_done <- tryFamFamInjectivity ev eq_rel
-                                   fun_tc1 fun_args1 fun_tc2 fun_args2 mco
-       ; if unifications_done
-         then -- Go round again, since the unifications affect lhs/rhs
-              startAgainWith (mkNonCanonical ev)
-         else
-    do { tclvl <- getTcLevel
+       ; tclvl <- getTcLevel
        ; let tvs1 = tyCoVarsOfTypes fun_args1
              tvs2 = tyCoVarsOfTypes fun_args2
 
@@ -1746,7 +1738,7 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
          -- if swap_for_rewriting doesn't care either way
        ; if swap_for_rewriting || (meta_tv_lhs == meta_tv_rhs && swap_for_size)
          then finish_with_swapping
-         else finish_without_swapping } }
+         else finish_without_swapping }
   where
     sym_mco = mkSymMCo mco
     role    = eqRelRole eq_rel
@@ -2945,75 +2937,51 @@ equality with the template on the left.  Delicate, but it works.
 
 -}
 
-tryFamFamInjectivity :: CtEvidence -> EqRel
-                     -> TyCon -> [TcType] -> TyCon -> [TcType] -> MCoercion
-                     -> TcS Bool  -- True <=> some unification happened
-tryFamFamInjectivity ev eq_rel fun_tc1 fun_args1 fun_tc2 fun_args2 mco
-  | ReprEq <- eq_rel
-  = return False   -- Injectivity applies only for Nominal equalities
-  | fun_tc1 /= fun_tc2
-  = return False   -- If the families don't match, stop.
-  | isGiven ev
-  = return False   -- See Note [No Given/Given fundeps] in GHC.Tc.Solver.Dict
-
-  -- So this is a [W] (F tys1 ~N# F tys2)
-
-  -- Is F an injective type family
-  | Injective inj <- tyConInjectivityInfo fun_tc1
-  = unifyFunDeps ev Nominal $ \uenv ->
-    uPairsTcM uenv [ Pair ty1 ty2
-                   | (ty1,ty2,True) <- zip3 fun_args1 fun_args2 inj ]
-
-    -- Built-in synonym families don't have an entry point for this
-    -- use case. So, we just use sfInteractInert and pass two equal
-    -- RHSs. We *could* add another entry point, but then there would
-    -- be a burden to make sure the new entry point and existing ones
-    -- were internally consistent. This is slightly distasteful, but
-    -- it works well in practice and localises the problem.  Ugh.
-  | Just ops <- isBuiltInSynFamTyCon_maybe fun_tc1
-  = let tc_kind = tyConKind fun_tc1
-        ki1 = piResultTys tc_kind fun_args1
-        ki2 | MRefl <- mco
-            = ki1   -- just a small optimisation
-            | otherwise
-            = piResultTys tc_kind fun_args2
-
-        fake_rhs1 = anyTypeOfKind ki1
-        fake_rhs2 = anyTypeOfKind ki2
-
-        eqs :: [TypeEqn]
-        eqs = sfInteractInert ops fun_args1 fake_rhs1 fun_args2 fake_rhs2
-    in
-    unifyFunDeps ev Nominal $ \uenv ->
-    uPairsTcM uenv eqs
-
-  | otherwise  -- ordinary, non-injective type family
-  = return False
-
 --------------------
-tryFunDeps :: EqCt -> SolverStage ()
-tryFunDeps work_item@(EqCt { eq_lhs = lhs, eq_ev = ev })
+tryFunDeps :: EqRel -> EqCt -> SolverStage ()
+tryFunDeps eq_rel work_item@(EqCt { eq_lhs = lhs, eq_ev = ev })
+  | NomEq <- eq_rel
+  , TyFamLHS tc args <- lhs
   = Stage $
-    case lhs of
-       TyFamLHS tc args -> do { inerts <- getInertCans
-                              ; imp1 <- improveLocalFunEqs inerts tc args work_item
-                              ; imp2 <- improveTopFunEqs tc args work_item
-                              ; if (imp1 || imp2)
-                                then startAgainWith (mkNonCanonical ev)
-                                else continueWith () }
-       TyVarLHS {} -> continueWith ()
+    do { inerts <- getInertCans
+       ; imp1 <- improveLocalFunEqs inerts tc args work_item
+       ; imp2 <- improveTopFunEqs tc args work_item
+       ; if (imp1 || imp2)
+         then startAgainWith (mkNonCanonical ev)
+         else continueWith () }
+  | otherwise
+  = nopStage ()
 
 --------------------
 improveTopFunEqs :: TyCon -> [TcType] -> EqCt -> TcS Bool
+-- TyCon is definitely a type family
 -- See Note [FunDep and implicit parameter reactions]
-improveTopFunEqs fam_tc args (EqCt { eq_ev = ev, eq_rhs = rhs })
-  | isGiven ev
-  = return False  -- See Note [No Given/Given fundeps]
+improveTopFunEqs fam_tc args (EqCt { eq_ev = ev, eq_rhs = rhs_ty })
+  | isGiven ev = improveGivenTopFunEqs  fam_tc args ev rhs_ty
+  | otherwise  = improveWantedTopFunEqs fam_tc args ev rhs_ty
 
+improveGivenTopFunEqs :: TyCon -> [TcType] -> CtEvidence -> Xi -> TcS Bool
+-- TyCon is definitely a type family
+-- Work-item is a Given
+improveGivenTopFunEqs fam_tc args ev rhs_ty
+  | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
+  = do { traceTcS "improveGivenTopFunEqs" (ppr fam_tc <+> ppr args $$ ppr ev $$ ppr rhs_ty)
+       ; emitNewGivens (ctEvLoc ev) $
+           [ (Nominal, new_co)
+           | (ax, _) <- tryInteractTopFam ops fam_tc args rhs_ty
+           , let new_co = mkAxiomCo ax [given_co] ]
+       ; return False }  -- False: no unifications
   | otherwise
-  = do { fam_envs <- getFamInstEnvs
-       ; eqns <- improve_top_fun_eqs fam_envs fam_tc args rhs
-       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
+  = return False
+  where
+    given_co :: Coercion = ctEvCoercion ev
+
+improveWantedTopFunEqs :: TyCon -> [TcType] -> CtEvidence -> Xi -> TcS Bool
+-- TyCon is definitely a type family
+-- Work-item is a Wanted
+improveWantedTopFunEqs fam_tc args ev rhs_ty
+  = do { eqns <- improve_wanted_top_fun_eqs fam_tc args rhs_ty
+       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs_ty
                                            , ppr eqns ])
        ; unifyFunDeps ev Nominal $ \uenv ->
          uPairsTcM (bump_depth uenv) (reverse eqns) }
@@ -3025,105 +2993,161 @@ improveTopFunEqs fam_tc args (EqCt { eq_ev = ev, eq_rhs = rhs })
         -- ToDo: this location is wrong; it should be FunDepOrigin2
         -- See #14778
 
-improve_top_fun_eqs :: FamInstEnvs
-                    -> TyCon -> [TcType] -> TcType
-                    -> TcS [TypeEqn]
-improve_top_fun_eqs fam_envs fam_tc args rhs_ty
+improve_wanted_top_fun_eqs :: TyCon -> [TcType] -> Xi
+                           -> TcS [TypeEqn]
+-- TyCon is definitely a type family
+improve_wanted_top_fun_eqs fam_tc lhs_tys rhs_ty
   | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
-  = return (sfInteractTop ops args rhs_ty)
+  = return (map snd $ tryInteractTopFam ops fam_tc lhs_tys rhs_ty)
 
-  -- see Note [Type inference for type families with injectivity]
-  | isOpenTypeFamilyTyCon fam_tc
-  , Injective injective_args <- tyConInjectivityInfo fam_tc
-  , let fam_insts = lookupFamInstEnvByTyCon fam_envs fam_tc
-  = -- it is possible to have several compatible equations in an open type
-    -- family but we only want to derive equalities from one such equation.
-    do { let improvs = buildImprovementData fam_insts
-                           fi_tvs fi_tys fi_rhs (const Nothing)
+  -- See Note [Type inference for type families with injectivity]
+  | Injective inj_args <- tyConInjectivityInfo fam_tc
+  = do { fam_envs <- getFamInstEnvs
+       ; top_eqns <- improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
+       ; let local_eqns = improve_injective_wanted_famfam  inj_args fam_tc lhs_tys rhs_ty
+       ; return (local_eqns ++ top_eqns) }
 
-       ; traceTcS "improve_top_fun_eqs2" (ppr improvs)
-       ; concatMapM (injImproveEqns injective_args) $
-         take 1 improvs }
-
-  | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
-  , Injective injective_args <- tyConInjectivityInfo fam_tc
-  = concatMapM (injImproveEqns injective_args) $
-    buildImprovementData (fromBranches (co_ax_branches ax))
-                         cab_tvs cab_lhs cab_rhs Just
-
-  | otherwise
+  | otherwise  -- No injectivity
   = return []
 
+improve_injective_wanted_top :: FamInstEnvs -> [Bool] -> TyCon -> [TcType] -> Xi -> TcS [TypeEqn]
+-- Interact with top-level instance declarations
+improve_injective_wanted_top fam_envs inj_args fam_tc lhs_tys rhs_ty
+  = concatMapM do_one branches
   where
-      in_scope = mkInScopeSet (tyCoVarsOfType rhs_ty)
+    branches :: [CoAxBranch]
+    branches | isOpenTypeFamilyTyCon fam_tc
+             , let fam_insts = lookupFamInstEnvByTyCon fam_envs fam_tc
+             = concatMap (fromBranches . coAxiomBranches . fi_axiom) fam_insts
 
-      buildImprovementData
-          :: [a]                     -- axioms for a TF (FamInst or CoAxBranch)
-          -> (a -> [TyVar])          -- get bound tyvars of an axiom
-          -> (a -> [Type])           -- get LHS of an axiom
-          -> (a -> Type)             -- get RHS of an axiom
-          -> (a -> Maybe CoAxBranch) -- Just => apartness check required
-          -> [( [Type], Subst, [TyVar], Maybe CoAxBranch )]
-             -- Result:
-             -- ( [arguments of a matching axiom]
-             -- , RHS-unifying substitution
-             -- , axiom variables without substitution
-             -- , Maybe matching axiom [Nothing - open TF, Just - closed TF ] )
-      buildImprovementData axioms axiomTVs axiomLHS axiomRHS wrap =
-          [ (ax_args, subst, unsubstTvs, wrap axiom)
-          | axiom <- axioms
-          , let ax_args = axiomLHS axiom
-                ax_rhs  = axiomRHS axiom
-                ax_tvs  = axiomTVs axiom
-                in_scope1 = in_scope `extendInScopeSetList` ax_tvs
-          , Just subst <- [tcUnifyTyWithTFs False in_scope1 ax_rhs rhs_ty]
-          , let notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
-                unsubstTvs    = filter (notInSubst <&&> isTyVar) ax_tvs ]
-                   -- The order of unsubstTvs is important; it must be
-                   -- in telescope order e.g. (k:*) (a:k)
+             | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
+             = fromBranches (coAxiomBranches ax)
 
-      injImproveEqns :: [Bool]
-                     -> ([Type], Subst, [TyCoVar], Maybe CoAxBranch)
-                     -> TcS [TypeEqn]
-      injImproveEqns inj_args (ax_args, subst, unsubstTvs, cabr)
-        = do { subst <- instFlexiX subst unsubstTvs
-                  -- If the current substitution bind [k -> *], and
-                  -- one of the un-substituted tyvars is (a::k), we'd better
-                  -- be sure to apply the current substitution to a's kind.
-                  -- Hence instFlexiX.   #13135 was an example.
+             | otherwise
+             = []
 
-             ; return [ Pair (substTy subst ax_arg) arg
-                        -- NB: the ax_arg part is on the left
-                        -- see Note [Improvement orientation]
-                      | case cabr of
-                          Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
-                          _          -> True
-                      , (ax_arg, arg, True) <- zip3 ax_args args inj_args ] }
+    do_one :: CoAxBranch -> TcS [TypeEqn]
+    do_one branch@(CoAxBranch { cab_tvs = branch_tvs, cab_lhs = branch_lhs_tys, cab_rhs = branch_rhs })
+      | let in_scope1 = in_scope `extendInScopeSetList` branch_tvs
+      , Just subst <- tcUnifyTyWithTFs False in_scope1 branch_rhs rhs_ty
+      = do { let inSubst tv = tv `elemVarEnv` getTvSubstEnv subst
+                 unsubstTvs = filterOut inSubst branch_tvs
+                 -- The order of unsubstTvs is important; it must be
+                 -- in telescope order e.g. (k:*) (a:k)
+
+           ; subst <- instFlexiX subst unsubstTvs
+                -- If the current substitution bind [k -> *], and
+                -- one of the un-substituted tyvars is (a::k), we'd better
+                -- be sure to apply the current substitution to a's kind.
+                -- Hence instFlexiX.   #13135 was an example.
+
+           ; if apartnessCheck (substTys subst branch_lhs_tys) branch
+             then return (mkInjectivityEqns inj_args (map (substTy subst) branch_lhs_tys) lhs_tys)
+                  -- NB: The fresh unification variables (from unsubstTvs) are on the left
+                  --     See Note [Improvement orientation]
+             else return [] }
+      | otherwise
+      = return []
+
+    in_scope = mkInScopeSet (tyCoVarsOfType rhs_ty)
 
 
-improveLocalFunEqs :: InertCans -> TyCon -> [TcType] -> EqCt -> TcS Bool
--- Generate improvement equalities, by comparing
--- the current work item with inert CFunEqs
+improve_injective_wanted_famfam :: [Bool] -> TyCon -> [TcType] -> Xi -> [TypeEqn]
+-- Interact with itself, specifically  F s1 s2 ~ F t1 t2
+improve_injective_wanted_famfam inj_args fam_tc lhs_tys rhs_ty
+  | Just (tc, rhs_tys) <- tcSplitTyConApp_maybe rhs_ty
+  , tc == fam_tc
+  = mkInjectivityEqns inj_args lhs_tys rhs_tys
+  | otherwise
+  = []
+
+mkInjectivityEqns :: [Bool] -> [TcType] -> [TcType] -> [TypeEqn]
+-- When F s1 s2 s3 ~ F t1 t2 t3, and F has injectivity info [True,False,True]
+-- return the equations [Pair s1 t1, Pair s3 t3]
+mkInjectivityEqns inj_args lhs_args rhs_args
+  = [ Pair lhs_arg rhs_arg | (True, lhs_arg, rhs_arg) <- zip3 inj_args lhs_args rhs_args ]
+
+---------------------------------------------
+improveLocalFunEqs :: InertCans
+                   -> TyCon -> [TcType] -> EqCt   -- F args ~ rhs
+                   -> TcS Bool
+-- Emit equalities from interaction between two equalities
+improveLocalFunEqs inerts fam_tc args (EqCt { eq_ev = work_ev, eq_rhs = rhs })
+  | isGiven work_ev = improveGivenLocalFunEqs  funeqs_for_tc fam_tc args work_ev rhs
+  | otherwise       = improveWantedLocalFunEqs funeqs_for_tc fam_tc args work_ev rhs
+  where
+    funeqs = inert_funeqs inerts
+    funeqs_for_tc :: [EqCt]   -- Mixture of Given and Wanted
+    funeqs_for_tc = [ funeq_ct | equal_ct_list <- findFunEqsByTyCon funeqs fam_tc
+                               , funeq_ct <- equal_ct_list
+                               , NomEq == eq_eq_rel funeq_ct ]
+                                  -- Representational equalities don't interact
+                                  -- with type family dependencies
+
+
+improveGivenLocalFunEqs :: [EqCt]    -- Inert items, mixture of Given and Wanted
+                        -> TyCon -> [TcType] -> CtEvidence -> Xi  -- Work item (Given)
+                        -> TcS Bool  -- Always False (no unifications)
+-- Emit equalities from interaction between two Given type-family equalities
+--    e.g.    (x+y1~z, x+y2~z) => (y1 ~ y2)
+improveGivenLocalFunEqs funeqs_for_tc fam_tc work_args work_ev work_rhs
+  | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
+  = do { mapM_ (do_one ops) funeqs_for_tc
+       ; return False }     -- False: no unifications
+  | otherwise
+  = return False
+  where
+    given_co :: Coercion = ctEvCoercion work_ev
+
+    do_one :: BuiltInSynFamily -> EqCt -> TcS ()
+    -- Used only work-item is Given
+    do_one ops EqCt { eq_ev  = inert_ev, eq_lhs = inert_lhs, eq_rhs = inert_rhs }
+      | isGiven inert_ev                    -- Given/Given interaction
+      , TyFamLHS _ inert_args <- inert_lhs  -- Inert item is F inert_args ~ inert_rhs
+      , work_rhs `tcEqType` inert_rhs       -- Both RHSs are the same
+      , -- So we have work_ev  : F work_args  ~ rhs
+        --            inert_ev : F inert_args ~ rhs
+        let pairs :: [(CoAxiomRule, TypeEqn)]
+            pairs = tryInteractInertFam ops fam_tc work_args inert_args
+      , not (null pairs)
+      = do { traceTcS "improveGivenLocalFunEqs" (vcat[ ppr fam_tc <+> ppr work_args
+                                                     , text "work_ev" <+>  ppr work_ev
+                                                     , text "inert_ev" <+> ppr inert_ev
+                                                     , ppr work_rhs
+                                                     , ppr pairs ])
+           ; emitNewGivens (ctEvLoc inert_ev) (map mk_ax_co pairs) }
+             -- This CtLoc for the new Givens doesn't reflect the
+             -- fact that it's a combination of Givens, but I don't
+             -- this that matters.
+      where
+        inert_co = ctEvCoercion inert_ev
+        mk_ax_co (ax,_) = (Nominal, mkAxiomCo ax [combined_co])
+          where
+            combined_co = given_co `mkTransCo` mkSymCo inert_co
+            -- given_co :: F work_args  ~ rhs
+            -- inert_co :: F inert_args ~ rhs
+            -- the_co :: F work_args ~ F inert_args
+
+    do_one _  _ = return ()
+
+improveWantedLocalFunEqs
+    :: [EqCt]     -- Inert items (Given and Wanted)
+    -> TyCon -> [TcType] -> CtEvidence -> Xi  -- Work item (Wanted)
+    -> TcS Bool   -- True <=> some unifications
+-- Emit improvement equalities for a Wanted constraint, by comparing
+-- the current work item with inert CFunEqs (boh Given and Wanted)
 -- E.g.   x + y ~ z,   x + y' ~ z   =>   [W] y ~ y'
 --
 -- See Note [FunDep and implicit parameter reactions]
-improveLocalFunEqs inerts fam_tc args (EqCt { eq_ev = work_ev, eq_rhs = rhs })
+improveWantedLocalFunEqs funeqs_for_tc fam_tc args work_ev rhs
   | null improvement_eqns
   = return False
   | otherwise
   = do { traceTcS "interactFunEq improvements: " $
                    vcat [ text "Eqns:" <+> ppr improvement_eqns
-                        , text "Candidates:" <+> ppr funeqs_for_tc
-                        , text "Inert eqs:" <+> ppr (inert_eqs inerts) ]
+                        , text "Candidates:" <+> ppr funeqs_for_tc ]
        ; emitFunDepWanteds work_ev improvement_eqns }
   where
-    funeqs        = inert_funeqs inerts
-    funeqs_for_tc :: [EqCt]
-    funeqs_for_tc = [ funeq_ct | equal_ct_list <- findFunEqsByTyCon funeqs fam_tc
-                               , funeq_ct <- equal_ct_list
-                               , NomEq == eq_eq_rel funeq_ct ]
-                                  -- representational equalities don't interact
-                                  -- with type family dependencies
     work_loc      = ctEvLoc work_ev
     work_pred     = ctEvPred work_ev
     fam_inj_info  = tyConInjectivityInfo fam_tc
@@ -3144,22 +3168,18 @@ improveLocalFunEqs inerts fam_tc args (EqCt { eq_ev = work_ev, eq_rhs = rhs })
 
     --------------------
     do_one_built_in ops rhs (EqCt { eq_lhs = TyFamLHS _ iargs, eq_rhs = irhs, eq_ev = inert_ev })
-      | not (isGiven inert_ev && isGiven work_ev)  -- See Note [No Given/Given fundeps]
-      = mk_fd_eqns inert_ev (sfInteractInert ops args rhs iargs irhs)
-
+      | irhs `tcEqType` rhs
+      = mk_fd_eqns inert_ev (map snd $ tryInteractInertFam ops fam_tc args iargs)
       | otherwise
       = []
-
     do_one_built_in _ _ _ = pprPanic "interactFunEq 1" (ppr fam_tc) -- TyVarLHS
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
     do_one_injective inj_args rhs (EqCt { eq_lhs = TyFamLHS _ inert_args
                                         , eq_rhs = irhs, eq_ev = inert_ev })
-      | not (isGiven inert_ev && isGiven work_ev) -- See Note [No Given/Given fundeps]
-      , rhs `tcEqType` irhs
-      = mk_fd_eqns inert_ev $ [ Pair arg iarg
-                              | (arg, iarg, True) <- zip3 args inert_args inj_args ]
+      | rhs `tcEqType` irhs
+      = mk_fd_eqns inert_ev $ mkInjectivityEqns inj_args args inert_args
       | otherwise
       = []
 
@@ -3170,14 +3190,12 @@ improveLocalFunEqs inerts fam_tc args (EqCt { eq_ev = work_ev, eq_rhs = rhs })
     mk_fd_eqns inert_ev eqns
       | null eqns  = []
       | otherwise  = [ FDEqn { fd_qtvs = [], fd_eqs = eqns
-                             , fd_pred1 = work_pred
-                             , fd_pred2 = inert_pred
                              , fd_loc   = (loc, inert_rewriters) } ]
       where
         initial_loc  -- start with the location of the Wanted involved
           | isGiven work_ev = inert_loc
           | otherwise       = work_loc
-        eqn_orig        = InjTFOrigin1 work_pred (ctLocOrigin work_loc) (ctLocSpan work_loc)
+        eqn_orig        = InjTFOrigin1 work_pred  (ctLocOrigin work_loc)  (ctLocSpan work_loc)
                                        inert_pred (ctLocOrigin inert_loc) (ctLocSpan inert_loc)
         eqn_loc         = setCtLocOrigin initial_loc eqn_orig
         inert_pred      = ctEvPred inert_ev
