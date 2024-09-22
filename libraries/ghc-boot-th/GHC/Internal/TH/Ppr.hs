@@ -398,7 +398,8 @@ pprPat _ (RecP nm fs)
             <+> braces (sep $ punctuate comma $
                         map (\(s,p) -> pprName' Applied s <+> equals <+> ppr p) fs)
 pprPat _ (ListP ps) = brackets (commaSep ps)
-pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> dcolon <+> ppr t
+pprPat i (SigP p t) = parensIf (i > noPrec) $ pprPat sigPrec p
+                                          <+> dcolon <+> pprType sigPrec t
 pprPat _ (ViewP e p) = parens $ pprExp noPrec e <+> text "->" <+> pprPat noPrec p
 pprPat _ (TypeP t) = parens $ text "type" <+> ppr t
 pprPat _ (InvisP t) = parens $ text "@" <+> ppr t
