@@ -3025,8 +3025,7 @@ repLiteral lit
                  HsDoublePrim _ _ -> Just doublePrimLName
                  HsChar _ _       -> Just charLName
                  HsCharPrim _ _   -> Just charPrimLName
-                 HsString _ _     -> Just stringLName
-                 HsMultilineString _ _ -> Just stringLName
+                 HsString _ _ _   -> Just stringLName
                  HsRat _ _ _      -> Just rationalLName
                  _                -> Nothing
 

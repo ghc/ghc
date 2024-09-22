@@ -51,9 +51,7 @@ data HsLit x
       -- ^ Character
   | HsCharPrim (XHsCharPrim x) {- SourceText -} Char
       -- ^ Unboxed character
-  | HsString (XHsString x) {- SourceText -} FastString
-      -- ^ String
-  | HsMultilineString (XHsMultilineString x) {- SourceText -} FastString
+  | HsString (XHsString x) {- SourceText -} HsStringType FastString
       -- ^ String
   | HsStringPrim (XHsStringPrim x) {- SourceText -} !ByteString
       -- ^ Packed bytes
@@ -145,3 +143,5 @@ instance Ord OverLitVal where
   compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `lexicalCompareFS` s2
   compare (HsIsString _ _)    (HsIntegral   _)    = GT
   compare (HsIsString _ _)    (HsFractional _)    = GT
+
+data HsStringType = HsStringTypeSingle | HsStringTypeMulti
