@@ -1,8 +1,6 @@
 T10796b.hs:8:15: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         Can't construct a pattern from name Data.Set.Internal.fromList
-CallStack (from HasCallStack):
-  error, called at libraries/ghc-internal/src/GHC/Internal/TH/Lift.hs:557:22 in ghc-internal:GHC.Internal.TH.Lift
       Code: (dataToPatQ (const Nothing) (fromList "test"))
     • In the untyped splice:
         $(dataToPatQ (const Nothing) (fromList "test"))

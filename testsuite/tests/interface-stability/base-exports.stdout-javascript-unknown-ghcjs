@@ -230,9 +230,8 @@ module Control.Exception where
   newtype CompactionFailed = CompactionFailed GHC.Internal.Base.String
   type Deadlock :: *
   data Deadlock = Deadlock
-  pattern ErrorCall :: GHC.Internal.Base.String -> ErrorCall
   type ErrorCall :: *
-  data ErrorCall = ErrorCallWithLocation GHC.Internal.Base.String GHC.Internal.Base.String
+  data ErrorCall = ErrorCall GHC.Internal.Base.String
   type Exception :: * -> Constraint
   class (ghc-internal-9.1100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
@@ -346,9 +345,8 @@ module Control.Exception.Base where
   newtype CompactionFailed = CompactionFailed GHC.Internal.Base.String
   type Deadlock :: *
   data Deadlock = Deadlock
-  pattern ErrorCall :: GHC.Internal.Base.String -> ErrorCall
   type ErrorCall :: *
-  data ErrorCall = ErrorCallWithLocation GHC.Internal.Base.String GHC.Internal.Base.String
+  data ErrorCall = ErrorCall GHC.Internal.Base.String
   type Exception :: * -> Constraint
   class (ghc-internal-9.1100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
@@ -5272,9 +5270,8 @@ module GHC.Exception where
   data ArithException = Overflow | Underflow | LossOfPrecision | DivideByZero | Denormal | RatioZeroDenominator
   type CallStack :: *
   data CallStack = ...
-  pattern ErrorCall :: GHC.Internal.Base.String -> ErrorCall
   type ErrorCall :: *
-  data ErrorCall = ErrorCallWithLocation GHC.Internal.Base.String GHC.Internal.Base.String
+  data ErrorCall = ErrorCall GHC.Internal.Base.String
   type Exception :: * -> Constraint
   class (ghc-internal-9.1100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
@@ -5296,7 +5293,6 @@ module GHC.Exception where
   prettyCallStackLines :: CallStack -> [GHC.Internal.Base.String]
   prettySrcLoc :: SrcLoc -> GHC.Internal.Base.String
   ratioZeroDenomException :: SomeException
-  showCCSStack :: [GHC.Internal.Base.String] -> [GHC.Internal.Base.String]
   throw :: forall (r :: GHC.Types.RuntimeRep) (a :: TYPE r) e. (GHC.Internal.Stack.Types.HasCallStack, Exception e) => e -> a
   underflowException :: SomeException
 

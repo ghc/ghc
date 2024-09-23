@@ -99,12 +99,7 @@ throwPlainGhcException = Exception.throw
 
 -- | Panics and asserts.
 panic, sorry, pgmError :: HasCallStack => String -> a
-panic    x = unsafeDupablePerformIO $ do
-   stack <- ccsToStrings =<< getCurrentCCS x
-   let doc = unlines $ fmap ("  "++) $ lines (prettyCallStack callStack)
-   if null stack
-      then throwPlainGhcException (PlainPanic (x ++ '\n' : doc))
-      else throwPlainGhcException (PlainPanic (x ++ '\n' : renderStack stack))
+panic    x = unsafeDupablePerformIO $ throwPlainGhcException (PlainPanic x)
 
 sorry    x = throwPlainGhcException (PlainSorry x)
 pgmError x = throwPlainGhcException (PlainProgramError x)
@@ -113,11 +108,7 @@ cmdLineError :: String -> a
 cmdLineError = unsafeDupablePerformIO . cmdLineErrorIO
 
 cmdLineErrorIO :: String -> IO a
-cmdLineErrorIO x = do
-  stack <- ccsToStrings =<< getCurrentCCS x
-  if null stack
-    then throwPlainGhcException (PlainCmdLineError x)
-    else throwPlainGhcException (PlainCmdLineError (x ++ '\n' : renderStack stack))
+cmdLineErrorIO x = throwPlainGhcException (PlainCmdLineError x)
 
 -- | Throw a failed assertion exception for a given filename and line number.
 assertPanic :: String -> Int -> a
@@ -127,12 +118,7 @@ assertPanic file line =
 
 
 assertPanic' :: HasCallStack => a
-assertPanic' =
-  let doc = unlines $ fmap ("  "++) $ lines (prettyCallStack callStack)
-  in
-  Exception.throw (Exception.AssertionFailed
-           ("ASSERT failed!\n"
-            ++ withFrozenCallStack doc))
+assertPanic' = Exception.throw (Exception.AssertionFailed "ASSERT failed!")
 
 assert :: HasCallStack => Bool -> a -> a
 {-# INLINE assert #-}

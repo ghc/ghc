@@ -1,6 +1,4 @@
 *** Exception: foo
-CallStack (from HasCallStack):
-  error, called at <interactive>:2:1 in interactive:Ghci1
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 Stopped in <exception thrown>, <unknown>
@@ -18,24 +16,12 @@ _result :: a
 Stopped at <unknown>
 _exception :: e
 already at the beginning of the history
-_exception = SomeException
-               (ErrorCallWithLocation
-                  "foo"
-                  "CallStack (from HasCallStack):
-  error, called at Test7.hs:2:18 in main:Main")
+_exception = SomeException (ErrorCall "foo")
 _result :: a = _
-_exception :: SomeException = SomeException
-                                (ErrorCallWithLocation
-                                   "foo"
-                                   "CallStack (from HasCallStack):
-  error, called at Test7.hs:2:18 in main:Main")
+_exception :: SomeException = SomeException (ErrorCall "foo")
 *** Exception: foo
-CallStack (from HasCallStack):
-  error, called at Test7.hs:2:18 in main:Main
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 *** Exception: foo
-CallStack (from HasCallStack):
-  error, called at Test7.hs:2:18 in main:Main
