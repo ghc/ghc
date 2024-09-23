@@ -1,12 +1,10 @@
-
 <interactive>:2:10: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         Prelude.undefined
-CallStack (from HasCallStack):
-  undefined, called at <interactive>:2:10 in interactive:Ghci1
       Code: undefined
     • In the Template Haskell splice $$undefined
       In the first argument of ‘print’, namely ‘($$undefined :: String)’
       In the first argument of ‘GHC.Internal.GHCi.ghciStepIO ::
                                   IO a -> IO a’, namely
         ‘(print ($$undefined :: String))’
+

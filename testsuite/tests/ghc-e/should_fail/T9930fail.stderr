@@ -3,35 +3,8 @@ ghc: Uncaught exception ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
 default output name would overwrite the input file; must specify -o explicitly
 Usage: For basic information, try the `--help' option.
 
-While handling ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
-  |
-  | default output name would overwrite the input file; must specify -o explicitly
+While handling default output name would overwrite the input file; must specify -o explicitly
   | Usage: For basic information, try the `--help' option.
-  |
-  | While handling ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
-  |   |
-  |   | default output name would overwrite the input file; must specify -o explicitly
-  |   | Usage: For basic information, try the `--help' option.
-  |   |
-  |   | While handling ghc-9.13-inplace:GHC.Utils.Panic.GhcException:
-  |   |   |
-  |   |   | default output name would overwrite the input file; must specify -o explicitly
-  |   |   | Usage: For basic information, try the `--help' option.
-  |   |   |
-  |   |   | HasCallStack backtrace:
-  |   |   |   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-  |   |   |   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
-  |   |   |   throw, called at compiler/GHC/Utils/Panic.hs:180:21 in ghc-9.13-inplace:GHC.Utils.Panic
-  |   |
-  |   | HasCallStack backtrace:
-  |   |   bracket_, called at libraries/semaphore-compat/src/System/Semaphore.hs:320:23 in semaphore-compat-1.0.0-inplace:System.Semaphore
-  |
-  | HasCallStack backtrace:
-  |   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-  |   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:284:11 in ghc-internal:GHC.Internal.IO
-  |   throwIO, called at libraries/exceptions/src/Control/Monad/Catch.hs:371:12 in exceptions-0.10.7-inplace:Control.Monad.Catch
-  |   throwM, called at libraries/exceptions/src/Control/Monad/Catch.hs:860:84 in exceptions-0.10.7-inplace:Control.Monad.Catch
-  |   onException, called at compiler/GHC/Driver/Make.hs:2988:23 in ghc-9.13-inplace:GHC.Driver.Make
 
 HasCallStack backtrace:
   bracket, called at compiler/GHC/Driver/Make.hs:2955:3 in ghc-9.13-inplace:GHC.Driver.Make

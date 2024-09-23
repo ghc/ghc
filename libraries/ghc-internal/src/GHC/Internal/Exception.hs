@@ -52,7 +52,7 @@ module GHC.Internal.Exception
     , ratioZeroDenomException
     , underflowException
       -- ** 'ErrorCall'
-    , ErrorCall(..,ErrorCall)
+    , ErrorCall(..)
     , errorCallException
     , errorCallWithCallStackException
     , toExceptionWithBacktrace
@@ -60,16 +60,14 @@ module GHC.Internal.Exception
       -- * Reexports
       -- Re-export CallStack and SrcLoc from GHC.Types
     , CallStack, fromCallSiteList, getCallStack, prettyCallStack
-    , prettyCallStackLines, showCCSStack
+    , prettyCallStackLines
     , SrcLoc(..), prettySrcLoc
     ) where
 
 import GHC.Internal.Base
 import GHC.Internal.Show
 import GHC.Internal.Stack.Types
-import GHC.Internal.Data.OldList
 import GHC.Internal.IO.Unsafe
-import {-# SOURCE #-} GHC.Internal.Stack.CCS
 import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc)
 import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectBacktraces)
 import GHC.Internal.Exception.Type
@@ -171,16 +169,14 @@ toExceptionWithBacktrace e
       return (addExceptionContext bt (toException e))
   | otherwise = return (toException e)
 
--- | This is thrown when the user calls 'error'. The first @String@ is the
--- argument given to 'error', second @String@ is the location.
-data ErrorCall = ErrorCallWithLocation String String
+-- | This is thrown when the user calls 'error'. The @String@ is the
+-- argument given to 'error'.
+--
+-- Historically, there was a second @String@ for the location, but it was subsumed by the backtrace mechanisms (since base-4.22).
+data ErrorCall = ErrorCall String
     deriving ( Eq  -- ^ @since base-4.7.0.0
              , Ord -- ^ @since base-4.7.0.0
              )
-
-pattern ErrorCall :: String -> ErrorCall
-pattern ErrorCall err <- ErrorCallWithLocation err _ where
-  ErrorCall err = ErrorCallWithLocation err ""
 
 {-# COMPLETE ErrorCall #-}
 
@@ -189,23 +185,13 @@ instance Exception ErrorCall
 
 -- | @since base-4.0.0.0
 instance Show ErrorCall where
-  showsPrec _ (ErrorCallWithLocation err "") = showString err
-  showsPrec _ (ErrorCallWithLocation err loc) =
-      showString err . showChar '\n' . showString loc
+  showsPrec _ (ErrorCall err) = showString err
 
 errorCallException :: String -> SomeException
 errorCallException s = toException (ErrorCall s)
 
 errorCallWithCallStackException :: String -> CallStack -> SomeException
 errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
-    ccsStack <- currentCallStack
-    let implicitParamCallStack = prettyCallStackLines stk
-        ccsCallStack = showCCSStack ccsStack
-        stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
-    toExceptionWithBacktrace (ErrorCallWithLocation s stack)
+    toExceptionWithBacktrace (ErrorCall s)
   where ?callStack = stk
-
-showCCSStack :: [String] -> [String]
-showCCSStack [] = []
-showCCSStack stk = "CallStack (from -prof):" : map ("  " ++) (reverse stk)
 

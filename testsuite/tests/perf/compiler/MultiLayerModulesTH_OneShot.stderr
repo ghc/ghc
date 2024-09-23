@@ -1,8 +1,6 @@
-
 MultiLayerModulesTH_OneShot.hs:334:8: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         deliberate error
-CallStack (from HasCallStack):
-  error, called at MultiLayerModulesTH_OneShot.hs:334:10 in main:MultiLayerModules
       Code: (error "deliberate error")
     • In the untyped splice: $(error "deliberate error")
+

@@ -1,11 +1,9 @@
 T16846: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 Prelude.undefined
-CallStack (from HasCallStack):
-  undefined, called at T16846.hs:22:3 in main:Main
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:127:5 in ghc-internal:GHC.Internal.Exception
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   undefined, called at T16846.hs:22:3 in main:Main
 
