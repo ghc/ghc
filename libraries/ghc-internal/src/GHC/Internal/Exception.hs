@@ -68,7 +68,7 @@ import GHC.Internal.Base
 import GHC.Internal.Show
 import GHC.Internal.Stack.Types
 import GHC.Internal.IO.Unsafe
-import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc)
+import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc, withFrozenCallStack)
 import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectBacktraces)
 import GHC.Internal.Exception.Type
 
@@ -192,6 +192,6 @@ errorCallException s = toException (ErrorCall s)
 
 errorCallWithCallStackException :: String -> CallStack -> SomeException
 errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
-    toExceptionWithBacktrace (ErrorCall s)
+    withFrozenCallStack $ toExceptionWithBacktrace (ErrorCall s)
   where ?callStack = stk
 

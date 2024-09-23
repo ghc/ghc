@@ -3,7 +3,5 @@ hpc: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 can not parse ./.hpc/NoParse.mix
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   error, called at libraries/hpc/Trace/Hpc/Mix.hs:94:43 in hpc-0.7.0.1-inplace:Trace.Hpc.Mix
 

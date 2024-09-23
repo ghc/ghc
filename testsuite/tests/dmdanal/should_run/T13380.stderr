@@ -3,7 +3,5 @@ T13380: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
 user error (What)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:284:11 in ghc-internal:GHC.Internal.IO
   throwIO, called at T13380.hs:6:21 in main:Main
 
