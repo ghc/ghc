@@ -9357,7 +9357,6 @@ module GHC.Stack where
   clearCCS :: forall a. GHC.Types.IO a -> GHC.Types.IO a
   currentCallStack :: GHC.Types.IO [GHC.Internal.Base.String]
   emptyCallStack :: CallStack
-  errorWithStackTrace :: forall a. GHC.Internal.Base.String -> a
   freezeCallStack :: CallStack -> CallStack
   fromCallSiteList :: [([GHC.Types.Char], SrcLoc)] -> CallStack
   getCCSOf :: forall a. a -> GHC.Types.IO (GHC.Internal.Ptr.Ptr CostCentreStack)

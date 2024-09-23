@@ -15,7 +15,7 @@
 -- @since 4.5.0.0
 
 module GHC.Stack
-    (errorWithStackTrace,
+    (
      -- *  Profiling call stacks
      currentCallStack,
      whoCreated,

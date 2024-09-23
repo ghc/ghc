@@ -59,6 +59,7 @@ import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Internal.Exception.Context ( ExceptionAnnotation )
 import GHC.Internal.Stack.Types ( HasCallStack )
+import {-# SOURCE #-} GHC.Internal.Stack ( withFrozenCallStack )
 import {-# SOURCE #-} GHC.Internal.IO.Exception ( userError, IOError )
 
 -- ---------------------------------------------------------------------------
@@ -280,7 +281,7 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- imprecise exceptions.
 --
 throwIO :: (HasCallStack, Exception e) => e -> IO a
-throwIO e = do
+throwIO e = withFrozenCallStack $ do
     se <- toExceptionWithBacktrace e
     IO (raiseIO# se)
 

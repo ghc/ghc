@@ -34,7 +34,5 @@ hello, error
 While handling __WURBLE__: getEnv: does not exist (no environment variable)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   error, called at cgrun025.hs:25:75 in main:Main
 
