@@ -4,8 +4,13 @@ import System.IO.Error
 import System.Process
 
 main :: IO ()
-main = do test1 `catchIOError` \e -> putStrLn ("Exc: " ++ show e)
-          test2 `catchIOError` \e -> putStrLn ("Exc: " ++ show e)
+main = do
+  -- N.B. Only show the error type since the exact error text
+  -- may depend upon precise system call which @process@ decided
+  -- to use.
+  let printError e = putStrLn ("Exc: " ++ show (ioeGetErrorType e))
+  test1 `catchIOError` printError
+  test2 `catchIOError` printError
 
 test1 :: IO ()
 test1 = do
