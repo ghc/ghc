@@ -3,7 +3,5 @@ T11193: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 error here!
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   error, called at T11193.hs:7:16 in main:Main
 

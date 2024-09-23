@@ -1,1 +1,1 @@
-Fail: never received  exception
+Success: caught UserInterrupt

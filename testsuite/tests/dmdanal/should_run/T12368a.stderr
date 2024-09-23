@@ -3,7 +3,5 @@ T12368a: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 This is good!
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   error, called at T12368a.hs:22:17 in main:Main
 

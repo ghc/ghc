@@ -6,9 +6,7 @@ main: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.AssertionFailed:
 Assertion failed
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:284:11 in ghc-internal:GHC.Internal.IO
-  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:443:5 in ghc-internal:GHC.Internal.IO.Exception
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:444:5 in ghc-internal:GHC.Internal.IO.Exception
   assert, called at main.hs:3:8 in main:Main
 
 With -fignore-asserts
@@ -23,8 +21,6 @@ main: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.AssertionFailed:
 Assertion failed
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:284:11 in ghc-internal:GHC.Internal.IO
-  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:443:5 in ghc-internal:GHC.Internal.IO.Exception
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:444:5 in ghc-internal:GHC.Internal.IO.Exception
   assert, called at main.hs:3:8 in main:Main
 
