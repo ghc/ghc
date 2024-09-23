@@ -247,6 +247,7 @@ extensionName = \case
   LangExt.ExtendedLiterals -> "ExtendedLiterals"
   LangExt.ListTuplePuns -> "ListTuplePuns"
   LangExt.MultilineStrings -> "MultilineStrings"
+  LangExt.MeaningfulMainReturn -> "MeaningfulMainReturn"
 
 -- | Is this extension known by any other names? For example
 -- -XGeneralizedNewtypeDeriving is accepted
@@ -1058,6 +1059,7 @@ data WarningFlag =
    | Opt_WarnDeprecatedTypeAbstractions              -- Since 9.10
    | Opt_WarnDefaultedExceptionContext               -- Since 9.10
    | Opt_WarnViewPatternSignatures                   -- Since 9.12
+   | Opt_WarnAmbiguousMainReturn                     -- Since 9.12
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1175,6 +1177,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnDeprecatedTypeAbstractions              -> "deprecated-type-abstractions" :| []
   Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
   Opt_WarnViewPatternSignatures                   -> "view-pattern-signatures" :| []
+  Opt_WarnAmbiguousMainReturn                     -> "ambiguous-main-return" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1316,7 +1319,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnInconsistentFlags,
         Opt_WarnDataKindsTC,
         Opt_WarnTypeEqualityOutOfScope,
-        Opt_WarnViewPatternSignatures
+        Opt_WarnViewPatternSignatures,
+        Opt_WarnAmbiguousMainReturn
       ]
 
 -- | Things you get with -W

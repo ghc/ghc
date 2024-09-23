@@ -1020,6 +1020,10 @@ rtsDeps =
           [ "runMainIO"
           , "topHandler"
           ]
+      , mkInternalFuns "GHC.Internal.TopHandler"
+          [ "runMainIOExitCodeName"
+          , "topHandler"
+          ]
       , mkInternalFuns "GHC.Internal.Base"
           ["$fMonadIO"]
       , mkInternalFuns "GHC.Internal.Maybe"
