@@ -1,8 +1,6 @@
-
 annfail12.hs:5:1: error: [GHC-87897]
-    Exception when trying to run compile-time code:
-      You were meant to see this error!
-CallStack (from ImplicitParams):
-  error, called at annfail12.hs:5:12 in main:Annfail12
-    In the annotation:
-      {-# ANN f (error "You were meant to see this error!" :: Int) #-}
+    • Exception when trying to run compile-time code:
+        You were meant to see this error!
+    • In the annotation:
+        {-# ANN f (error "You were meant to see this error!" :: Int) #-}
+

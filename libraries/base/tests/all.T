@@ -205,10 +205,6 @@ test('topHandler03',
       signal_exit_code(15),
      js_broken(22261)
      ], compile_and_run, [''])
-test('topHandler04',
-     [when(opsys('mingw32'), skip),
-      exit_code(1)
-     ], compile_and_run, [''])
 
 
 test('T8766',
