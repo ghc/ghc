@@ -1,11 +1,9 @@
 T19288: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 No more bug!
-CallStack (from HasCallStack):
-  error, called at T19288.hs:25:27 in main:Main
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:127:5 in ghc-internal:GHC.Internal.Exception
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   error, called at T19288.hs:25:27 in main:Main
 

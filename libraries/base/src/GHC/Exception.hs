@@ -44,7 +44,7 @@ module GHC.Exception
       -- * Reexports
       -- Re-export CallStack and SrcLoc from GHC.Types
     , CallStack, fromCallSiteList, getCallStack, prettyCallStack
-    , prettyCallStackLines, showCCSStack
+    , prettyCallStackLines
     , SrcLoc(..), prettySrcLoc
     ) where
 

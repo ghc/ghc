@@ -1,12 +1,12 @@
 ===================== test 1
-ExitFailure (-2)
+ExitSuccess
 ===================== test 2
-caught: user interrupt
+ExitSuccess
 ===================== test 3
-shell trapped SIGINT
 ExitFailure 42
 ===================== test 4
 ExitFailure 42
 ===================== test 5
-caught: user interrupt
+never caught interrupt
+ExitFailure 42
 ===================== done

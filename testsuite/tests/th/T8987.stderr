@@ -1,7 +1,5 @@
-
 T8987.hs:1:1: error: [GHC-87897]
     Exception when trying to run compile-time code:
       Prelude.undefined
-CallStack (from HasCallStack):
-  undefined, called at T8987.hs:6:23 in main:T8987
     Code: (reportWarning ['1', undefined] >> return [])
+
