@@ -27,7 +27,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.TopHandler (
-        runMainIO, runIO, runIOFastExit, runNonIO,
+        runMainIO, runMainIOExitCode, runIO, runIOFastExit, runNonIO,
         topHandler, topHandlerFastExit,
         reportStackOverflow, reportError,
         flushStdHandles
@@ -50,6 +50,7 @@ import GHC.Internal.IO.Handle
 import GHC.Internal.IO.StdHandles
 import GHC.Internal.IO.Exception
 import GHC.Internal.Weak
+import GHC.Internal.System.Exit
 
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.ConsoleHandler as GHC.ConsoleHandler
@@ -105,6 +106,13 @@ runMainIO main =
       main -- hs_exit() will flush
     `catch`
       topHandler
+
+-- To fix the behavior that by default programs ignore ExitCode, we replace the
+-- runMainIO with runMainIOExitCode when MeaningfulMainReturn is active and the
+-- main function return type unifies with IO ExitCode.
+-- See [MeaningfulMainReturn].
+runMainIOExitCode :: IO ExitCode -> IO a
+runMainIOExitCode main = runMainIO (main >>= exitWith)
 
 install_interrupt_handler :: IO () -> IO ()
 #if defined(javascript_HOST_ARCH)

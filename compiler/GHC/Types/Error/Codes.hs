@@ -898,6 +898,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TermVariablePE"                                = 45510
   GhcDiagnosticCode "TypeVariablePE"                                = 47557
 
+  GhcDiagnosticCode "TcRnAmbiguousMainReturn"                       = 48602
+
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
   --

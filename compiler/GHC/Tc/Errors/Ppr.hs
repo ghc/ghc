@@ -2001,6 +2001,10 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
       text "Unexpected" <+> pprTypeSyntaxName syntax
 
+    -- FIX: Properly present an error/warning here.
+    TcRnAmbiguousMainReturn -> mkSimpleDecorated $
+      text "Does not Unify"
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2651,6 +2655,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnexpectedTypeSyntaxInTerms{}
       -> ErrorWithoutFlag
+    TcRnAmbiguousMainReturn{}
+      -> WarningWithFlag Opt_WarnAmbiguousMainReturn
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3339,6 +3345,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnexpectedTypeSyntaxInTerms syntax
       -> [suggestExtension (typeSyntaxExtension syntax)]
+    TcRnAmbiguousMainReturn{}
+      -> noHints
 
   diagnosticCode = constructorCode
 

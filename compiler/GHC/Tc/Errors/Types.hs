@@ -4398,6 +4398,26 @@ data TcRnMessage where
     Test cases: T24159_type_syntax_rn_fail
   -}
   TcRnUnexpectedTypeSyntaxInTerms :: TypeSyntax -> TcRnMessage
+
+  {- TcRnAmbiguousMainReturn is an error raised when there is a chance that
+     the intended behavir for the exit code the main function does not match
+     what the program will actually do (see Note [MeaningulMainReturn]).
+
+     It can be emitted as an error or as a warning depending on the presence
+     of MeaningulMainReturn extension.
+
+     Examples:
+
+      -- Compile error, Int is potentially ambiguous. If NoMeaningfulMainReturn
+      -- than this would just be a warning.
+      main :: IO Int
+      main = pure 1
+
+     Test cases: T24848a T24848b T24848c T24848d
+  -}
+  -- FIX: Properly capture information here to emit the right error.
+  TcRnAmbiguousMainReturn :: TcRnMessage
+
   deriving Generic
 
 ----

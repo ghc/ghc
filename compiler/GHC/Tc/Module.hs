@@ -96,8 +96,7 @@ import GHC.Rename.Utils ( mkNameClashErr, mkRnSyntaxExpr )
 import GHC.Iface.Decl    ( coAxiomToIfaceDecl )
 import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Load
-
-import GHC.Builtin.Types ( mkListTy, anyTypeOfKind )
+import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
 
@@ -115,6 +114,7 @@ import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.TyCo.Ppr( debugPprType )
+import GHC.Core.Unify (tcUnifyTy)
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons, orphNamesOfFamInst
    , famInstEnvElts, extendFamInstEnvList, normaliseType )
@@ -1825,6 +1825,9 @@ checkMainType :: TcGblEnv -> TcRn WantedConstraints
 --   check that its type is of form IO tau.
 -- If not, do nothing
 -- See Note [Dealing with main]
+-- It warns if main does not unify with IO () or IO Void, or when
+--   MeaningfulMainReturn is active, IO ExitCode
+-- See Note [MeaningfulMainReturn]
 checkMainType tcg_env
   = do { hsc_env <- getTopEnv
        ; if tcg_mod tcg_env /= mainModIs (hsc_HUE hsc_env)
@@ -1842,9 +1845,10 @@ checkMainType tcg_env
     do { let main_name = greName main_gre
              ctxt      = FunSigCtxt main_name NoRRC
        ; main_id   <- tcLookupId main_name
+       ; let main_ty = idType main_id
+       ; checkMainTypeUnification main_ty
        ; (io_ty,_) <- getIOType
-       ; let main_ty   = idType main_id
-             eq_orig   = TypeEqOrigin { uo_actual   = main_ty
+       ; let eq_orig   = TypeEqOrigin { uo_actual   = main_ty
                                       , uo_expected = io_ty
                                       , uo_thing    = Nothing
                                       , uo_visible  = True }
@@ -1927,7 +1931,11 @@ generateMainBinding tcg_env main_name = do
             -- See Note [Root-main Id]
             -- Construct the binding
             --      :Main.main :: IO res_ty = runMainIO res_ty main
-    ; run_main_id <- tcLookupId runMainIOName
+
+    ; main_id <- tcLookupId main_name
+    ; let main_ty = idType main_id
+    ; run_main_id <- wrapMainFunctionId main_ty
+
     ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
                                (mkVarOccFS (fsLit "main"))
                                (getSrcSpan main_name)
@@ -2059,7 +2067,103 @@ exist. For this logic see GHC.IfaceToCore.mk_top_id.
 There is also some similar (probably dead) logic in GHC.Rename.Env which says it
 was added for External Core which faced a similar issue.
 
+Note [MeaningfulMainReturn]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The exit code behaviour from main can sometimes defy reasonable expectations, for
+example, the program bellow, exits with code 0.
 
+  main :: IO Int
+  main = pure 1
+
+To warn users, when MeaningfulMainReturn is disabled, GHC emits
+Wambiguous-main-return if main doesn't unify with IO () or IO Void.
+
+This becomes an error if MeaningfulMainReturn is enabled, and main doesn't unify
+  with IO (), IO Void or IO ExitCode.
+
+For more details see:
+https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0631-main-return-types.rst
+-}
+
+checkMainTypeUnification :: Type -> TcM ()
+checkMainTypeUnification mainType = do
+    extensionEnabled <- hasMeaningfulReturnTypeEnabled
+    if extensionEnabled
+    then emitErrorUnlessUnify mainType
+    else emitDiagnosticUnlessUnify mainType
+
+emitDiagnosticUnlessUnify :: Type -> TcM ()
+emitDiagnosticUnlessUnify mainType = do
+    ioUnitType <- mkIOUnitType
+    isIOUnit <- typesUnify mainType ioUnitType
+
+    ioVoidType <- mkIOVoidType
+    isIOVoid <- typesUnify mainType ioVoidType
+
+    unless (isIOUnit || isIOVoid) $ do
+      addDiagnostic TcRnAmbiguousMainReturn
+
+emitErrorUnlessUnify :: Type -> TcM ()
+emitErrorUnlessUnify mainType = do
+    ioUnitType <- mkIOUnitType
+    isIOUnit <- typesUnify mainType ioUnitType
+
+    ioVoidType <- mkIOVoidType
+    isIOVoid <- typesUnify mainType ioVoidType
+
+    ioExitCodeType <- mkIOExitCodeType
+    isIOExitCode <- typesUnify mainType ioExitCodeType
+
+    unless (isIOUnit || isIOVoid || isIOExitCode) $ do
+      addErrTc TcRnAmbiguousMainReturn
+
+unifiesWithIoExitCode :: Type -> TcM Bool
+unifiesWithIoExitCode mainType = do
+  ioExitCodeType <- mkIOExitCodeType
+  typesUnify mainType ioExitCodeType
+
+-- If main's type unifies with IO ExitCode, and MeaningfulMainReturn is enabled
+-- the resulting program behaves as if its entrypoint
+-- were realMain = main >>= exitWith, by using runMainIOExitCodeName as wrapper.
+-- See Note [MeaningfulMainReturn]
+wrapMainFunctionId :: Type -> TcM Id
+wrapMainFunctionId mainType = do
+  extensionEnabled <- hasMeaningfulReturnTypeEnabled
+  unifies <- unifiesWithIoExitCode mainType
+  if extensionEnabled && unifies
+        then tcLookupId runMainIOExitCodeName
+        else tcLookupId runMainIOName
+
+hasMeaningfulReturnTypeEnabled :: TcM Bool
+hasMeaningfulReturnTypeEnabled = do
+    hsc_env <- getTopEnv
+    let dflags = hsc_dflags hsc_env
+    return $ xopt LangExt.MeaningfulMainReturn dflags
+
+mkIOUnitType :: TcM Type
+mkIOUnitType = mkIOType unitTy
+
+mkIOVoidType :: TcM Type
+mkIOVoidType = do
+  voidType <- mkTyConTy <$> tcLookupTyCon voidTyConName
+  mkIOType voidType
+
+mkIOExitCodeType :: TcM Type
+mkIOExitCodeType = do
+  exitCodeType <- mkTyConTy <$> tcLookupTyCon exitCodeTyConName
+  mkIOType exitCodeType
+
+mkIOType :: Type -> TcM Type
+mkIOType resultType = do
+    ioTyCon <- tcLookupTyCon ioTyConName
+    return $ mkTyConApp ioTyCon [resultType]
+
+typesUnify :: Type -> Type -> TcM Bool
+typesUnify t1 t2 = do
+    let unification = tcUnifyTy t1 t2
+    return $ isJust unification
+
+{-
 *********************************************************
 *                                                       *
                 GHCi stuff

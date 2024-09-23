@@ -229,6 +229,7 @@ basicKnownKeyNames
         -- The IO type
         ioTyConName, ioDataConName,
         runMainIOName,
+        runMainIOExitCodeName,
         runRWName,
 
         -- Type representation types
@@ -480,6 +481,9 @@ basicKnownKeyNames
 
         -- The Void type
         , voidTyConName
+
+        -- The ExitCode type
+        , exitCodeTyConName
 
         -- Plugins
         , pluginTyConName
@@ -934,8 +938,10 @@ and it's convenient to write them all down in one place.
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
-runMainIOName, runRWName :: Name
+runMainIOName, runMainIOExitCodeName, runRWName :: Name
 runMainIOName = varQual gHC_INTERNAL_TOP_HANDLER (fsLit "runMainIO") runMainKey
+runMainIOExitCodeName = varQual gHC_INTERNAL_TOP_HANDLER
+  (fsLit "runMainIOExitCode") runMainExitCodeKey
 runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
 
 orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
@@ -954,6 +960,9 @@ rightDataConName  = dcQual gHC_INTERNAL_DATA_EITHER (fsLit "Right")  rightDataCo
 
 voidTyConName :: Name
 voidTyConName = tcQual gHC_INTERNAL_BASE (fsLit "Void") voidTyConKey
+
+exitCodeTyConName :: Name
+exitCodeTyConName = tcQual gHC_INTERNAL_IO_Exception (fsLit "ExitCode") exitCodeTyConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -1927,6 +1936,11 @@ eitherTyConKey                          = mkPreludeTyConUnique 84
 voidTyConKey :: Unique
 voidTyConKey                            = mkPreludeTyConUnique 85
 
+-- FIX: I am not sure this is the correct way to create ExitCode programatically
+-- I also don't know how to pick this number.
+exitCodeTyConKey :: Unique
+exitCodeTyConKey                        = mkPreludeTyConUnique 1009
+
 nonEmptyTyConKey :: Unique
 nonEmptyTyConKey                        = mkPreludeTyConUnique 86
 
@@ -2379,9 +2393,11 @@ leftSectionKey, rightSectionKey :: Unique
 leftSectionKey                = mkPreludeMiscIdUnique 45
 rightSectionKey               = mkPreludeMiscIdUnique 46
 
-rootMainKey, runMainKey :: Unique
+rootMainKey, runMainKey, runMainExitCodeKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
 runMainKey                    = mkPreludeMiscIdUnique 102
+-- FIX: How to chose the correct number to pick here?
+runMainExitCodeKey            = mkPreludeMiscIdUnique 542
 
 thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey, seqHashKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103

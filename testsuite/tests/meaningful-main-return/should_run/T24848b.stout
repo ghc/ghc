@@ -1,0 +1,2 @@
+T24848b.hs:1:1: warning: [GHC-48602] [-Wambiguous-main-return (in -Wdefault)]
+      Does not Unify
