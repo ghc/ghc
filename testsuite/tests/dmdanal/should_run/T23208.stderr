@@ -3,7 +3,5 @@ T23208: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 really important message
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   error, called at T23208_Lib.hs:4:7 in main:T23208_Lib
 

@@ -3,7 +3,5 @@ cgrun045: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 hello world!
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   error, called at cgrun045.hs:6:13 in main:Main
 
