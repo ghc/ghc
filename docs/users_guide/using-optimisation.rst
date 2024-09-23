@@ -531,7 +531,8 @@ as such you shouldn't need to set any of them explicitly. A flag
     * Use of the magic `inline` function to force inlining.
 
 .. ghc-flag:: -fexpose-overloaded-unfoldings
-    :shortdesc: Expose unfoldings carrying constraints, even for very large or recursive functions.
+    :shortdesc: Expose function unfoldings whose type contains constraints,
+        even for very large or recursive functions.
     :type: dynamic
     :reverse: -fno-expose-overloaded-unfoldings
     :category:
@@ -541,19 +542,24 @@ as such you shouldn't need to set any of them explicitly. A flag
     This experimental flag is a slightly less heavy weight alternative
     to :ghc-flag:`-fexpose-all-unfoldings`.
 
-    Instead of exposing all functions it only aims at exposing constrained functions.
+    Instead of exposing all functions it exposes only those functions which
+    contain constraints within their type.
     This is intended to be used for cases where specialization is considered
     crucial but :ghc-flag:`-fexpose-all-unfoldings` imposes too much compile
     time cost.
 
-    Currently this won't expose unfoldings where a type class is hidden under a
-    newtype. That is for cases like: ::
+    This doesn't guarantee *all* functions which might benefit from specialization
+    will be exposed, for example currently this won't expose unfoldings where a
+    type class is hidden under a newtype.
+
+    That is for cases like: ::
 
         newtype NT a = NT (Integral a => a)
 
         foo :: NT a -> T1 -> TR
 
-    GHC won't recognise `foo` as specialisable and won't expose the unfolding
+    GHC won't look under `NT` for constraints and therefore `foo` won't be
+    recognized as specialisable and this flag won't expose the unfolding
     even with :ghc-flag:`-fexpose-overloaded-unfoldings` enabled.
 
     All the other caveats about :ghc-flag:`-fexpose-overloaded-unfoldings`
