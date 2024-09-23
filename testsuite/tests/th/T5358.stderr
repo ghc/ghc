@@ -1,4 +1,3 @@
-
 T5358.hs:7:1: error: [GHC-83865]
     • Couldn't match expected type ‘Int’ with actual type ‘t1 -> t1’
     • The equation for ‘t1’ has one visible argument,
@@ -32,10 +31,9 @@ T5358.hs:10:21: error: [GHC-83865]
 T5358.hs:14:12: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         runTest called error: forall {t_0 :: *} . t_0 -> GHC.Types.Bool
-CallStack (from HasCallStack):
-  error, called at T5358.hs:15:18 in main:T5358
       Code: (do VarI _ t _ <- reify (mkName "prop_x1")
                 error $ ("runTest called error: " ++ pprint t))
     • In the untyped splice:
         $(do VarI _ t _ <- reify (mkName "prop_x1")
              error $ ("runTest called error: " ++ pprint t))
+

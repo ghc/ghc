@@ -1,11 +1,7 @@
 "Hello"
 "Hello"
 badCase
-CallStack (from HasCallStack):
-  error, called at subdir/tough2.lhs:40:14 in main:Main
 badCase
-CallStack (from HasCallStack):
-  error, called at subdir/tough2.lhs:40:14 in main:Main
 "Bark"
 "Hello"
 (1,2,3)

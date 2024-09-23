@@ -30,21 +30,11 @@ hello, trace
 cgrun025: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
 
 hello, error
-CallStack (from HasCallStack):
-  error, called at cgrun025.hs:25:75 in main:Main
 
-While handling ghc-internal:GHC.Internal.IO.Exception.IOException:
-  |
-  | __WURBLE__: getEnv: does not exist (no environment variable)
-  |
-  | HasCallStack backtrace:
-  |   collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-  |   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:284:11 in ghc-internal:GHC.Internal.IO
-  |   throwIO, called at libraries/ghc-internal/src/GHC/Internal/IO/Exception.hs:315:19 in ghc-internal:GHC.Internal.IO.Exception
-  |   ioException, called at libraries/ghc-internal/src/GHC/Internal/System/Environment.hs:192:26 in ghc-internal:GHC.Internal.System.Environment
+While handling __WURBLE__: getEnv: does not exist (no environment variable)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:127:5 in ghc-internal:GHC.Internal.Exception
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:91:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:118:5 in ghc-internal:GHC.Internal.Exception
   error, called at cgrun025.hs:25:75 in main:Main
 

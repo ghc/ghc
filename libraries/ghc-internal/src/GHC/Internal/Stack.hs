@@ -55,9 +55,9 @@ import GHC.Internal.Stack.CCS
 import GHC.Internal.Stack.Types
 import GHC.Internal.IO
 import GHC.Internal.Base
-import GHC.Internal.List
 import GHC.Internal.Data.OldList (intercalate)
 import GHC.Internal.Exception
+import GHC.Internal.IO (unsafeDupablePerformIO, throwIO)
 
 -- | Like the function 'error', but appends a stack trace to the error
 -- message if one is available.
@@ -66,11 +66,7 @@ import GHC.Internal.Exception
 {-# DEPRECATED errorWithStackTrace "'error' appends the call stack now" #-}
   -- DEPRECATED in 8.0.1
 errorWithStackTrace :: String -> a
-errorWithStackTrace x = unsafeDupablePerformIO $ do
-   stack <- ccsToStrings =<< getCurrentCCS x
-   if null stack
-      then throwIO (ErrorCall x)
-      else throwIO (ErrorCallWithLocation x (renderStack stack))
+errorWithStackTrace x = unsafeDupablePerformIO $ throwIO (ErrorCall x)
 
 
 -- | Pop the most recent call-site off the 'CallStack'.

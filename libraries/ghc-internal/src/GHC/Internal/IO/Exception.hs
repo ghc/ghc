@@ -59,8 +59,6 @@ import GHC.Internal.Show
 import GHC.Internal.Read
 import GHC.Internal.Exception
 import GHC.Internal.IO.Handle.Types
-import GHC.Internal.Data.OldList ( intercalate )
-import {-# SOURCE #-} GHC.Internal.Stack.CCS
 import GHC.Internal.Stack.Types (HasCallStack)
 import GHC.Internal.Foreign.C.Types
 
@@ -442,12 +440,7 @@ assertError :: (?callStack :: CallStack) => Bool -> a -> a
 assertError predicate v
   | predicate = v
   | otherwise = lazy $ unsafeDupablePerformIO $ do -- lazy: See Note [Strictness of assertError]
-    ccsStack <- currentCallStack
-    let
-      implicitParamCallStack = prettyCallStackLines ?callStack
-      ccsCallStack = showCCSStack ccsStack
-      stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
-    throwIO (AssertionFailed ("Assertion failed\n" ++ stack))
+    throwIO (AssertionFailed "Assertion failed")
 
 {- Note [Strictness of assertError]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
