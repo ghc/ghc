@@ -53,7 +53,6 @@ module GHC.Internal.Stack (
 import GHC.Internal.Show
 import GHC.Internal.Stack.CCS
 import GHC.Internal.Stack.Types
-import GHC.Internal.IO
 import GHC.Internal.Base
 import GHC.Internal.Data.OldList (intercalate)
 import GHC.Internal.Exception

@@ -60,6 +60,7 @@ import GHC.Internal.Read
 import GHC.Internal.Exception
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Stack.Types (HasCallStack)
+import {-# SOURCE #-} GHC.Internal.Stack ( withFrozenCallStack )
 import GHC.Internal.Foreign.C.Types
 
 import GHC.Internal.Data.Typeable ( cast )
@@ -310,11 +311,11 @@ data ExitCode
 instance Exception ExitCode
 
 ioException     :: HasCallStack => IOException -> IO a
-ioException err = throwIO err
+ioException err = withFrozenCallStack $ throwIO err
 
 -- | Raise an 'IOError' in the 'IO' monad.
 ioError         :: HasCallStack => IOError -> IO a
-ioError         =  ioException
+ioError         =  withFrozenCallStack ioException
 
 -- ---------------------------------------------------------------------------
 -- IOError type
