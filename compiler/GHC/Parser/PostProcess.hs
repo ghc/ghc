@@ -69,7 +69,6 @@ module GHC.Parser.PostProcess (
         addFatalError, hintBangPat,
         mkBangTy,
         UnpackednessPragma(..),
-        mkMultTy,
         mkMultAnn,
 
         -- Token location
@@ -3490,25 +3489,15 @@ mkLHsOpTy prom x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
-mkMultTy :: EpToken "%" -> LHsType GhcPs -> EpUniToken "->" "→" -> HsArrow GhcPs
-mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
-  -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow (EpPct1 pct1 arr)
-  where
-    -- The location of "%" combined with the location of "1".
-    pct1 :: EpToken "%1"
-    pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultTy pct t arr = HsExplicitMult (pct, arr) t
-
 mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> EpUniToken "->" "→" -> HsArrowOf (LHsExpr GhcPs) GhcPs
 mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
   -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow (EpPct1 pct1 arr)
+  = HsLinearArrow (EpPct1 pct1 arr) t -- MODS_TODO
   where
     -- The location of "%" combined with the location of "1".
     pct1 :: EpToken "%1"
     pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultExpr pct t arr = HsExplicitMult (pct, arr) t
+mkMultExpr _pct t arr = HsExplicitMult arr t
 
 mkMultAnn :: EpToken "%" -> LHsType GhcPs -> HsMultAnn GhcPs
 mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1)))

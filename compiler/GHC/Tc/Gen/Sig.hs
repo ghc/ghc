@@ -273,7 +273,13 @@ no_anon_wc_ty lty = go lty
       HsWildCardTy _                 -> False
       HsAppTy _ ty1 ty2              -> go ty1 && go ty2
       HsAppKindTy _ ty ki            -> go ty && go ki
-      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go (arrowToHsType w)
+      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go_arrow w
+        where
+          go_arrow w = case w of
+            HsUnrestrictedArrow _ -> True
+            HsLinearArrow _ mods -> all go_mod mods
+            HsExplicitMult _ mods -> all go_mod mods
+          go_mod (HsModifier _ ty) = go ty
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys

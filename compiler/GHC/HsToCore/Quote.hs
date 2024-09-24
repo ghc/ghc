@@ -1427,16 +1427,28 @@ repTy (HsAppKindTy _ ty ki) = do
                                 ty1 <- repLTy ty
                                 ki1 <- repLTy ki
                                 repTappKind ty1 ki1
-repTy (HsFunTy _ w f a) | isUnrestricted w = do
-                                f1   <- repLTy f
-                                a1   <- repLTy a
-                                tcon <- repArrowTyCon
-                                repTapps tcon [f1, a1]
-repTy (HsFunTy _ w f a) = do w1   <- repLTy (arrowToHsType w)
-                             f1   <- repLTy f
+repTy (HsFunTy _ w f a) = do f1   <- repLTy f
                              a1   <- repLTy a
-                             tcon <- repMulArrowTyCon
-                             repTapps tcon [w1, f1, a1]
+                             case mMult of
+                               Nothing -> do
+                                 tcon <- repArrowTyCon
+                                 repTapps tcon [f1, a1]
+                               Just mult -> do
+                                 w1   <- repLTy mult
+                                 tcon <- repMulArrowTyCon
+                                 repTapps tcon [w1, f1, a1]
+  where
+    -- MODS_TODO how do we figure out which modifiers are multiplicities and
+    -- warn for the others? Do we need to do `acceptModifier1` here like with
+    -- `tc_mult` in GHC.Tc.Gen.HsType?
+    mMult = case w of
+      HsUnrestrictedArrow _ -> Nothing
+      HsLinearArrow _ [] -> Just $ noLocA $ mk_var $ noLocA oneDataConName
+      HsLinearArrow _ _ -> error "MODS_TODO too many modifiers"
+      HsExplicitMult _ [] -> error "MODS_TODO should be impossible"
+      HsExplicitMult _ [HsModifier _ m] -> Just m
+      HsExplicitMult _ _ -> error "MODS_TODO too many modifiers"
+    mk_var = HsTyVar noAnn NotPromoted
 repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
@@ -2872,7 +2884,7 @@ verifyLinearFields ps = do
   linear <- lift $ xoptM LangExt.LinearTypes
   let allGood = all (\st -> case hsMult st of
                               HsUnrestrictedArrow _ -> not linear
-                              HsLinearArrow _       -> True
+                              HsLinearArrow _ _     -> True
                               _                     -> False) ps
   unless allGood $ notHandled ThNonLinearDataCon
 

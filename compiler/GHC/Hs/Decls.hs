@@ -900,8 +900,8 @@ pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
 
     -- Display linear arrows as unrestricted with -XNoLinearTypes
     -- (cf. dataConDisplayType in Note [Displaying linear fields] in GHC.Core.DataCon)
-    ppr_arr (HsLinearArrow _) = sdocOption sdocLinearTypes $ \show_linear_types ->
-                                  if show_linear_types then lollipop else arrow
+    ppr_arr (HsLinearArrow _ _) = sdocOption sdocLinearTypes $ \show_linear_types ->
+                                    if show_linear_types then lollipop else arrow
     ppr_arr arr = pprHsArrow arr
 
 ppr_con_names :: (OutputableBndr a) => [GenLocated l a] -> SDoc

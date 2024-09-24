@@ -12,7 +12,7 @@
 
 module GHC.Rename.HsType (
         -- Type related stuff
-        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext, rnModifier,
+        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext, rnModifier, rnModifier',
         rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsTyLit, rnHsArrowWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
@@ -444,11 +444,26 @@ isRnKindLevel (RTKE { rtke_level = KindLevel }) = True
 isRnKindLevel _                                 = False
 
 --------------
--- MODS_TODO will any callers of this function care about free vars in modifiers?
-rnModifier :: HsDocContext -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
-rnModifier ctxt (HsModifier _ ty) = do
+-- MODS_TODO will any callers of these functions care about free vars in
+-- modifiers? Probably yes, since they currently care about free vars in
+-- HsExplicitMult arrows.
+--
+-- rnModifier' is for when we don't have a full env, should we expose mkTyKiEnv
+-- instead? Or have a better name? Or?
+rnModifier' :: HsDocContext -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
+rnModifier' ctxt (HsModifier _ ty) = do
   (ty', fvs) <- rnLHsType ctxt ty
   return (HsModifier NoExtField ty', fvs)
+
+rnModifier :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
+rnModifier env (HsModifier _ ty) = do
+  (ty', fvs) <- rnLHsTyKi env ty
+  return (HsModifier NoExtField ty', fvs)
+
+rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiers env mods = do
+  (mods', fvs) <- unzip <$> traverse (rnModifier env) mods
+  return (mods', mconcat fvs)
 
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
@@ -710,13 +725,14 @@ rnHsTyLit (HsCharTy x c) = pure (HsCharTy x c)
 
 
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
-rnHsArrow env = rnHsArrowWith (rnLHsTyKi env)
+rnHsArrow env = rnHsArrowWith (rnModifiers env)
 
-rnHsArrowWith :: (LocatedA (mult GhcPs) -> RnM (LocatedA (mult GhcRn), FreeVars))
-              -> HsArrowOf (LocatedA (mult GhcPs)) GhcPs
-              -> RnM (HsArrowOf (LocatedA (mult GhcRn)) GhcRn, FreeVars)
+rnHsArrowWith :: (multPs -> RnM (multRn, FreeVars))
+              -> HsArrowOf multPs GhcPs
+              -> RnM (HsArrowOf multRn GhcRn, FreeVars)
 rnHsArrowWith _rn (HsUnrestrictedArrow _) = pure (HsUnrestrictedArrow noExtField, emptyFVs)
-rnHsArrowWith _rn (HsLinearArrow _) = pure (HsLinearArrow noExtField, emptyFVs)
+rnHsArrowWith rn (HsLinearArrow _ p)
+  =  (\(mult, fvs) -> (HsLinearArrow noExtField mult, fvs)) <$> rn p
 rnHsArrowWith rn (HsExplicitMult _ p)
   =  (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rn p
 
@@ -2120,10 +2136,17 @@ extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
 extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
   extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
 
+extract_hs_modifier :: HsModifier GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modifier (HsModifier _ ty) acc = extract_lty ty acc
+
+extract_hs_modifiers :: [HsModifier GhcPs] -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_modifiers mods acc = foldr extract_hs_modifier acc mods
+
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
                    FreeKiTyVars
-extract_hs_arrow (HsExplicitMult _ p) acc = extract_lty p acc
-extract_hs_arrow _ acc = acc
+extract_hs_arrow (HsUnrestrictedArrow _) acc = acc
+extract_hs_arrow (HsLinearArrow _ p) acc = extract_hs_modifiers p acc
+extract_hs_arrow (HsExplicitMult _ p) acc = extract_hs_modifiers p acc
 
 extract_hs_for_all_telescope :: HsForAllTelescope GhcPs
                              -> FreeKiTyVars -- Accumulator

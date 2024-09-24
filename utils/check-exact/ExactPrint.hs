@@ -835,18 +835,19 @@ markArrow :: (Monad m, Monoid w, ExactPrint a) => HsArrowOf a GhcPs -> EP w m (H
 markArrow (HsUnrestrictedArrow arr) = do
   arr' <- markEpUniToken arr
   return (HsUnrestrictedArrow arr')
-markArrow (HsLinearArrow (EpPct1 pct1 arr)) = do
+markArrow (HsLinearArrow (EpPct1 pct1 arr) t) = do
   pct1' <- markEpToken pct1
-  arr' <- markEpUniToken arr
-  return (HsLinearArrow (EpPct1 pct1' arr'))
-markArrow (HsLinearArrow (EpLolly arr)) = do
-  arr' <- markEpToken arr
-  return (HsLinearArrow (EpLolly arr'))
-markArrow (HsExplicitMult (pct, arr) t) = do
-  pct' <- markEpToken pct
   t' <- markAnnotated t
   arr' <- markEpUniToken arr
-  return (HsExplicitMult (pct', arr') t')
+  return (HsLinearArrow (EpPct1 pct1' arr') t')
+markArrow (HsLinearArrow (EpLolly arr) t) = do
+  arr' <- markEpToken arr
+  t' <- markAnnotated t
+  return (HsLinearArrow (EpLolly arr') t')
+markArrow (HsExplicitMult arr t) = do
+  t' <- markAnnotated t
+  arr' <- markEpUniToken arr
+  return (HsExplicitMult arr' t')
 
 -- ---------------------------------------------------------------------
 

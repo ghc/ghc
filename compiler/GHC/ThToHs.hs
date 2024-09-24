@@ -1858,9 +1858,9 @@ cvtTypeKind typeOrKind ty
 hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs
 hsTypeToArrow w = case unLoc w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
-                        | n == oneDataConName -> HsLinearArrow noAnn
+                        | n == oneDataConName -> HsLinearArrow noAnn []
                         | n == manyDataConName -> HsUnrestrictedArrow noAnn
-                     _ -> HsExplicitMult noAnn w
+                     _ -> HsExplicitMult noAnn [HsModifier noAnn w]
 
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only

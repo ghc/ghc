@@ -121,9 +121,16 @@ renameType (HsExplicitTupleTy x ltys) =
 renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 
+renameModifier :: HsModifier GhcRn -> Rename (IdP GhcRn) (HsModifier GhcRn)
+renameModifier (HsModifier x ty) = HsModifier x <$> renameLType ty
+
+renameModifiers :: [HsModifier GhcRn] -> Rename (IdP GhcRn) [HsModifier GhcRn]
+renameModifiers = mapM renameModifier
+
 renameHsArrow :: HsArrow GhcRn -> Rename (IdP GhcRn) (HsArrow GhcRn)
-renameHsArrow (HsExplicitMult x p) = HsExplicitMult x <$> renameLType p
-renameHsArrow mult = pure mult
+renameHsArrow arr@(HsUnrestrictedArrow _) = pure arr
+renameHsArrow (HsLinearArrow x p) = HsLinearArrow x <$> renameModifiers p
+renameHsArrow (HsExplicitMult x p) = HsExplicitMult x <$> renameModifiers p
 
 renameLType :: LHsType GhcRn -> Rename (IdP GhcRn) (LHsType GhcRn)
 renameLType = located renameType

@@ -984,11 +984,12 @@ noKindTyVars ts (FunTy _ w t1 t2) =
 noKindTyVars ts (CastTy t _) = noKindTyVars ts t
 noKindTyVars _ _ = emptyVarSet
 
+-- MODS_TODO: no idea what synify means so hard to say if I'm doing this right.
 synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
 synifyMult vs t = case t of
-  OneTy -> HsLinearArrow noExtField
   ManyTy -> HsUnrestrictedArrow noExtField
-  ty -> HsExplicitMult noExtField (synifyType WithinType vs ty)
+  -- We turn OneTy into `%1 ->`, not into `⊸`.
+  _ -> HsExplicitMult noExtField [HsModifier noExtField $ synifyType WithinType vs t]
 
 synifyPatSynType :: PatSyn -> LHsType GhcRn
 synifyPatSynType ps =

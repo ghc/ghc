@@ -2281,16 +2281,15 @@ type :: { LHsType GhcPs }
         | btype '->' ctype             {% amsA' (sLL $1 $>
                                             $ HsFunTy noExtField (HsUnrestrictedArrow (epUniTok $2)) $1 $3) }
 
-        | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> let arr = (unLoc $2) (epUniTok $3)
+        | btype modifiers1 '->' ctype  {% hintLinear (getLoc $2)
+                                       >> let arr = case unLoc $2 of
+                                                [] -> HsUnrestrictedArrow (epUniTok $3)
+                                                ms -> HsExplicitMult (epUniTok $3) ms
                                           in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
 
-        | btype '->.' ctype            {% hintLinear (getLoc $2) >>
-                                          amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (EpLolly (epTok $2))) $1 $3) }
+        | btype modifiers0 '->.' ctype {% hintLinear (getLoc $2) >>
+                                          amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (EpLolly (epTok $3)) (unLoc $2)) $1 $4) }
                                               -- [mu AnnLollyU $2] }
-
-mult :: { Located (EpUniToken "->" "\8594" -> HsArrow GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy (epTok $1) $2) }
 
 expmult :: { forall b. DisambECP b => PV (Located (EpUniToken "->" "\8594" -> HsArrowOf (LocatedA b) GhcPs)) }
 expmult : PREFIX_PERCENT aexp           { unECP $2 >>= \ $2 ->
@@ -2890,7 +2889,7 @@ infixexp2 :: { ECP }
                                   hintLinear (getLoc $2) >>
                                   unECP $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
-                                  let arr = HsLinearArrow (EpLolly (epTok $2))
+                                  let arr = HsLinearArrow (EpLolly (epTok $2)) undefined -- MODS_TODO
                                   in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $3 }
         | expcontext    '=>'  infixexp2
                                 { ECP $

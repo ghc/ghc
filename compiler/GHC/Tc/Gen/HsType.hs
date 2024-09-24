@@ -1369,8 +1369,48 @@ Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo
 -}
 
 ------------------------------------------
+-- MODS_TODO how do we figure out which modifiers are multiplicities and warn
+-- for the others?
 tc_mult :: TcTyMode -> HsArrow GhcRn -> TcM Mult
-tc_mult mode ty = tc_check_lhs_type mode (arrowToHsType ty) multiplicityTy
+tc_mult mode arr = do
+  mults <- case arr of
+    HsUnrestrictedArrow _ -> pure []
+    HsLinearArrow _ ms -> (oneDataConTy :) <$> go ms
+    HsExplicitMult _ ms -> go ms
+  return $ case mults of
+    [] -> manyDataConTy
+    [m] -> m
+    _ -> error "MODS_TODO too many multiplicities"
+  where
+    go mods = tc_modifiers mode (acceptModifier1 <$> mods) isMultiplicityTy
+
+tc_modifier :: TcTyMode -> HsModifier GhcRn -> (TcKind -> Bool) -> TcM (Maybe TcType)
+tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
+  (inf_ty, inf_kind) <- tc_infer_lhs_type mode ty
+  if is_expected_kind inf_kind
+    then return $ Just inf_ty
+    else do
+      warn_unknown <- woptM Opt_WarnUnknownModifiers
+      diagnosticTc warn_unknown $ TcRnUnknownModifier mod
+      pure Nothing
+
+tc_modifiers :: TcTyMode -> [HsModifier GhcRn] -> (TcKind -> Bool) -> TcM [TcType]
+tc_modifiers mode mods is_expected_kind =
+  catMaybes <$> mapM (\m -> tc_modifier mode m is_expected_kind) mods
+
+-- | If we see a %1 modifier, treat it the same as %One. Only %1 counts, not
+-- e.g. %01. See #18888.
+--
+-- MODS_TODO: is typechecking the appropriate place to do this? If we want %1 to
+-- count as %One in places other than arrows it'll need to be closer to parsing.
+-- But in parsing I'm not sure what we'd return that would get reliably
+-- renamed+typechecked into One.
+acceptModifier1 :: HsModifier GhcRn -> HsModifier GhcRn
+acceptModifier1 (HsModifier _ (L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))))
+  -- MODS_TODO should we attach a location here?
+  = HsModifier noExtField $ noLocA $ HsTyVar noAnn NotPromoted $ noLocA oneDataConName
+acceptModifier1 m = m
+
 ------------------------------------------
 tc_fun_type :: TcTyMode -> HsArrow GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType

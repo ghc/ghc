@@ -1746,7 +1746,8 @@ instance ToHie (LocatedP OverlapMode) where
   toHie (L span _) = locOnly (locA span)
 
 instance ToHie a => ToHie (HsScaled GhcRn a) where
-  toHie (HsScaled w t) = concatM [toHie (arrowToHsType w), toHie t]
+  -- MODS_TODO do we call `toHie` on every modifier's type?
+  toHie (HsScaled _w t) = concatM [{- toHie (arrowToHsType w), -} toHie t]
 
 instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
@@ -1906,9 +1907,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie ty
         , toHie ki
         ]
-      HsFunTy _ w a b ->
-        [ toHie (arrowToHsType w)
-        , toHie a
+      HsFunTy _ _w a b ->
+        [ {- toHie (arrowToHsType w) -- MODS_TODO: do we call `toHie` on the types of all modifiers?
+        , -} toHie a
         , toHie b
         ]
       HsListTy _ a ->

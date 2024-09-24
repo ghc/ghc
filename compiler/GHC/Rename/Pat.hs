@@ -1431,11 +1431,18 @@ rn_ty_pat ty@(XHsType{}) = do
   ctxt <- askDocContext
   liftRnFV $ rnHsType ctxt ty
 
+rn_modifier_pat :: HsModifier GhcPs -> TPRnM (HsModifier GhcRn)
+rn_modifier_pat (HsModifier _ ty) = HsModifier noExtField <$> rn_lty_pat ty
+
+rn_modifiers_pat :: [HsModifier GhcPs] -> TPRnM [HsModifier GhcRn]
+rn_modifiers_pat mods = traverse rn_modifier_pat mods
+
 rn_ty_pat_arrow :: HsArrow GhcPs -> TPRnM (HsArrow GhcRn)
 rn_ty_pat_arrow (HsUnrestrictedArrow _) = pure (HsUnrestrictedArrow noExtField)
-rn_ty_pat_arrow (HsLinearArrow _) = pure (HsLinearArrow noExtField)
+rn_ty_pat_arrow (HsLinearArrow _ p)
+  = rn_modifiers_pat p <&> (\mult -> HsLinearArrow noExtField mult)
 rn_ty_pat_arrow (HsExplicitMult _ p)
-  = rn_lty_pat p <&> (\mult -> HsExplicitMult noExtField mult)
+  = rn_modifiers_pat p <&> (\mult -> HsExplicitMult noExtField mult)
 
 check_data_kinds :: HsType GhcPs -> TPRnM ()
 check_data_kinds thing = liftRn $ do

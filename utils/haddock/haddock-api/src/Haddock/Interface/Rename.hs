@@ -337,10 +337,16 @@ renameMaybeInjectivityAnn
   -> RnM (Maybe (LInjectivityAnn DocNameI))
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
+renameModifier :: HsModifier GhcRn -> RnM (HsModifier DocNameI)
+renameModifier (HsModifier _ ty) = HsModifier noExtField <$> renameLType ty
+
+renameModifiers :: [HsModifier GhcRn] -> RnM [HsModifier DocNameI]
+renameModifiers = mapM renameModifier
+
 renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
 renameArrow (HsUnrestrictedArrow _) = return (HsUnrestrictedArrow noExtField)
-renameArrow (HsLinearArrow _) = return (HsLinearArrow noExtField)
-renameArrow (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
+renameArrow (HsLinearArrow _ p) = HsLinearArrow noExtField <$> renameModifiers p
+renameArrow (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameModifiers p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
@@ -834,11 +840,13 @@ renameClsInstD
       , cid_poly_ty = ltype
       , cid_tyfam_insts = lATs
       , cid_datafam_insts = lADTs
+      , cid_modifiers = mods
       }
     ) = do
     ltype' <- renameLSigType ltype
     lATs' <- mapM (mapM renameTyFamInstD) lATs
     lADTs' <- mapM (mapM renameDataFamInstD) lADTs
+    mods' <- renameModifiers mods
     return
       ( ClsInstDecl
           { cid_ext = noExtField
@@ -848,7 +856,7 @@ renameClsInstD
           , cid_sigs = []
           , cid_tyfam_insts = lATs'
           , cid_datafam_insts = lADTs'
-          , cid_modifiers = [] -- MODS_TODO: do we need these?
+          , cid_modifiers = mods'
           }
       )
 

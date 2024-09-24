@@ -985,9 +985,10 @@ expr_to_type earg =
          ; return (L l (HsFunTy noExtField mult' arg' res'))}
          where
           go_arrow :: HsArrowOf (LHsExpr GhcRn) GhcRn -> TcM (HsArrow GhcRn)
-          go_arrow (HsUnrestrictedArrow{}) = pure (HsUnrestrictedArrow noExtField)
-          go_arrow (HsLinearArrow{}) = pure (HsLinearArrow noExtField)
-          go_arrow (HsExplicitMult _ exp) = HsExplicitMult noExtField <$> go exp
+          go_arrow = undefined -- MODS_TODO
+          -- go_arrow (HsUnrestrictedArrow{}) = pure (HsUnrestrictedArrow noExtField)
+          -- go_arrow (HsLinearArrow{}) = pure (HsLinearArrow noExtField)
+          -- go_arrow (HsExplicitMult _ exp) = HsExplicitMult noExtField <$> go exp
     go (L l (HsForAll _ tele expr)) =
       do { ty <- go expr
          ; return (L l (HsForAllTy noExtField tele ty))}

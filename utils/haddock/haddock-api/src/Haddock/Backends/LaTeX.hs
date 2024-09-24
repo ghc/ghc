@@ -1310,10 +1310,11 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u =
     , arr <+> ppr_mono_lty ty2 u
     ]
   where
+    -- MODS_TODO: need to ppr modifiers
     arr = case mult of
-      HsLinearArrow _ -> lollipop u
+      HsLinearArrow _ _ -> lollipop u
       HsUnrestrictedArrow _ -> arrow u
-      HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
+      HsExplicitMult _ _ -> arrow u
 ppr_mono_ty (HsBangTy _ b ty) u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
 ppr_mono_ty (HsTyVar _ IsPromoted (L _ name)) _ = char '\'' <> ppDocName name
@@ -1615,8 +1616,8 @@ starSymbol unicode = text (if unicode then "★" else "*")
 atSign :: LaTeX
 atSign = char '@'
 
-multAnnotation :: LaTeX
-multAnnotation = char '%'
+-- multAnnotation :: LaTeX
+-- multAnnotation = char '%'
 
 dot :: LaTeX
 dot = char '.'

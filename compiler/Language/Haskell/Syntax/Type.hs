@@ -1022,14 +1022,18 @@ data HsTyLit pass
   | HsCharTy (XCharTy pass) Char
   | XTyLit   !(XXTyLit pass)
 
-type HsArrow pass = HsArrowOf (LHsType pass) pass
+type HsArrow pass = HsArrowOf [HsModifier pass] pass
 
 -- | Denotes the type of arrows in the surface language
+--
+-- MODS_TODO: do we want to keep HsUnrestrictedArrow? Anyway improve comments.
+-- And, do we want a function HsArrow -> [HsModifier] (or [LHsType]), that adds
+-- %One for linear arrows?
 data HsArrowOf mult pass
   = HsUnrestrictedArrow !(XUnrestrictedArrow mult pass)
     -- ^ a -> b or a → b
 
-  | HsLinearArrow !(XLinearArrow mult pass)
+  | HsLinearArrow !(XLinearArrow mult pass) !mult
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
 
   | HsExplicitMult !(XExplicitMult mult pass) !mult

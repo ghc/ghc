@@ -837,6 +837,8 @@ type instance XBndrRequired DocNameI = NoExtField
 type instance XBndrInvisible DocNameI = NoExtField
 type instance XXBndrVis DocNameI = DataConCantHappen
 
+type instance XModifier DocNameI = NoExtField
+
 type instance XUnrestrictedArrow _ DocNameI = NoExtField
 type instance XLinearArrow _ DocNameI = NoExtField
 type instance XExplicitMult _ DocNameI = NoExtField
