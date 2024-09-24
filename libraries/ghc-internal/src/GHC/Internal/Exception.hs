@@ -35,6 +35,7 @@ module GHC.Internal.Exception
 
       -- * 'SomeException'
     , SomeException(..)
+    , displayExceptionWithInfo
 
       -- * Exception context
     , someExceptionContext

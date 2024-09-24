@@ -29,6 +29,7 @@
 module GHC.Internal.Exception.Type
        ( Exception(..)    -- Class
        , SomeException(..)
+       , displayExceptionWithInfo
        , someExceptionContext
        , addExceptionContext
        , mapExceptionContext
@@ -213,22 +214,35 @@ instance Exception SomeException where
         in SomeException e
     fromException = Just
     backtraceDesired (SomeException e) = backtraceDesired e
-    displayException (SomeException e) =
-        case displayContext ?exceptionContext of
-          "" -> msg
-          dc -> msg ++ "\n\n" ++ dc
-        where
-            msg =
-              displayExceptionInfo (Typeable.typeOf e)
-              ++ "\n\n"
-              ++ displayException e
+    displayException (SomeException e) = displayException e
 
-            displayExceptionInfo :: TypeRep -> String
-            displayExceptionInfo rep =
-                tyMsg ++ ":"
-              where
-                tyMsg = Typeable.tyConPackage tyCon ++ ":" ++ Typeable.tyConModule tyCon ++ "." ++ Typeable.tyConName tyCon
-                tyCon = Typeable.typeRepTyCon rep
+-- | Displays a 'SomeException' with additional information:
+--
+--    * The type of the underlying exception
+--    * The exception context
+--
+-- By default, 'uncaughtExceptionHandler' uses 'displayExceptionWithInfo' to print uncaught exceptions.
+-- This default can be overriden with 'setUncaughtExceptionHandler', for
+-- instance, to present custom error messages on exceptions to the user.
+--
+-- @since base-4.21
+displayExceptionWithInfo :: SomeException -> String
+displayExceptionWithInfo (SomeException e) =
+    case displayContext ?exceptionContext of
+      "" -> msg
+      dc -> msg ++ "\n\n" ++ dc
+    where
+        msg =
+          displayExceptionType (Typeable.typeOf e)
+          ++ "\n\n"
+          ++ displayException e
+
+        displayExceptionType :: TypeRep -> String
+        displayExceptionType rep =
+            tyMsg ++ ":"
+          where
+            tyMsg = Typeable.tyConPackage tyCon ++ ":" ++ Typeable.tyConModule tyCon ++ "." ++ Typeable.tyConName tyCon
+            tyCon = Typeable.typeRepTyCon rep
 
 displayContext :: ExceptionContext -> String
 displayContext (ExceptionContext anns0) = mconcat $ intersperse "\n" $ map go anns0
