@@ -952,7 +952,7 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
       defaultHandler se = do
          (hFlush stdout) `catchAny` (\ _ -> return ())
 
-         let exMsg = displayException se
+         let exMsg = displayExceptionWithInfo se
              msg = "Uncaught exception " ++ exMsg
          withCString "%s" $ \cfmt ->
           withCString msg $ \cmsg ->
