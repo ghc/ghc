@@ -1577,7 +1577,8 @@ function h$withCBufferOnHeap(str_d, str_o, len, cont) {
 // Temporarily allocate a CString on the heap and pass it to the continuation.
 // The string is freed from the heap when the continuation returns.
 function h$withCStringOnHeap(str_d, str_o, cont) {
-  return h$withCBufferOnHeap(str_d, str_o, str_d === null ? 0 : h$strlen(str_d,str_o), cont);
+  // strlen + 1 for the null terminating byte (#25288)
+  return h$withCBufferOnHeap(str_d, str_o, str_d === null ? 0 : h$strlen(str_d,str_o)+1, cont);
 }
 
 // Dereference a heap pointer to a heap pointer (a 32-bit offset in the heap)
