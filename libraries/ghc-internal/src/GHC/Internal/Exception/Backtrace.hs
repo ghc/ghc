@@ -33,7 +33,7 @@ data BacktraceMechanism
   = CostCentreBacktrace
   -- | collect 'HasCallStack' backtraces
   | HasCallStackBacktrace
-  -- | collect backtraces from native execution stack unwinding
+  -- | collect backtraces via native execution stack unwinding (e.g. using DWARF debug information)
   | ExecutionBacktrace
   -- | collect backtraces from Info Table Provenance Entries
   | IPEBacktrace
