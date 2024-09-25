@@ -33,7 +33,6 @@ import GHC.Types.Basic
 import GHC.Data.BooleanFormula
 import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.ConLike           ( conLikeName )
-import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.FVs
 import GHC.Core.DataCon           ( dataConNonlinearType )
 import GHC.Types.FieldLabel
@@ -41,11 +40,12 @@ import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
 import GHC.Types.Id               ( isDataConId_maybe )
-import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
+import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..) )
 import GHC.Types.SrcLoc
 import GHC.Core.Type              ( Type )
+import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
 import GHC.Tc.Types
@@ -81,6 +81,8 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
 import Control.Applicative        ( (<|>) )
+import GHC.Types.TypeEnv          ( TypeEnv )
+import Control.Arrow              ( second )
 
 {- Note [Updating HieAst for changes in the GHC AST]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -229,6 +231,10 @@ data HieState = HieState
   -- These are placed at the top level Node in the HieAST after everything
   -- else has been generated
   -- This includes things like top level evidence bindings.
+  , type_env :: TypeEnv
+  -- tcg_type_env from TcGblEnv contains the type environment for the module
+  , entity_infos :: NameEntityInfo
+  -- ^ Information about entities in the module
   }
 
 addUnlocatedEvBind :: Var -> ContextInfo -> HieM ()
@@ -260,8 +266,20 @@ getUnlocatedEvBinds file = do
 
   pure $ (M.fromList nis, asts)
 
+lookupAndInsertEntityName :: Name -> HieM ()
+lookupAndInsertEntityName name = do
+  m <- lift $ gets type_env
+  let tyThing = lookupNameEnv m name <|> wiredInNameTyThing_maybe name
+  insertEntityInfo name $ maybe (nameEntityInfo name) tyThingEntityInfo tyThing
+
+-- | Insert entity information for an identifier
+insertEntityInfo :: Name -> S.Set EntityInfo -> HieM ()
+insertEntityInfo ident info = do
+  lift $ modify' $ \s ->
+    s { entity_infos = M.insertWith S.union ident info (entity_infos s) }
+
 initState :: HieState
-initState = HieState emptyNameEnv emptyDVarEnv
+initState = HieState emptyNameEnv emptyDVarEnv mempty mempty
 
 class ModifyState a where -- See Note [Name Remapping]
   addSubstitution :: a -> a -> HieState -> HieState
@@ -302,8 +320,9 @@ mkHieFileWithSource src_file src ms ts rs =
   let tc_binds = tcg_binds ts
       top_ev_binds = tcg_ev_binds ts
       insts = tcg_insts ts
+      tte = tcg_type_env ts
       tcs = tcg_tcs ts
-      (asts',arr) = getCompressedAsts tc_binds rs top_ev_binds insts tcs in
+      (asts',arr,entityInfos) = getCompressedAsts tc_binds rs top_ev_binds insts tcs tte in
   HieFile
       { hie_hs_file = src_file
       , hie_module = ms_mod ms
@@ -312,18 +331,20 @@ mkHieFileWithSource src_file src ms ts rs =
       -- mkIfaceExports sorts the AvailInfos for stability
       , hie_exports = mkIfaceExports (tcg_exports ts)
       , hie_hs_src = src
+      , hie_entity_infos = entityInfos
       }
 
-getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
-  -> (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
-getCompressedAsts ts rs top_ev_binds insts tcs =
-  let asts = enrichHie ts rs top_ev_binds insts tcs in
-  compressTypes asts
+getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon] -> TypeEnv
+  -> (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat, NameEntityInfo)
+getCompressedAsts ts rs top_ev_binds insts tcs tte =
+  let (asts, infos) = enrichHie ts rs top_ev_binds insts tcs tte
+      add c (a, b) = (a,b,c)
+  in add infos $ compressTypes asts
 
-enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
-  -> HieASTs Type
-enrichHie ts (hsGrp, imports, exports, docs, modName) ev_bs insts tcs =
-  runIdentity $ flip evalStateT initState $ flip runReaderT SourceInfo $ do
+enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon] -> TypeEnv
+  -> (HieASTs Type, NameEntityInfo)
+enrichHie ts (hsGrp, imports, exports, docs, modName) ev_bs insts tcs tte =
+  second entity_infos $ runIdentity $ flip runStateT initState{type_env=tte} $ flip runReaderT SourceInfo $ do
     modName <- toHie (IEC Export <$> modName)
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
@@ -418,6 +439,7 @@ bindingsOnly [] = pure []
 bindingsOnly (C c n : xs) = do
   org <- ask
   rest <- bindingsOnly xs
+  lookupAndInsertEntityName n
   pure $ case nameSrcSpan n of
     RealSrcSpan span _ -> Node (mkSourcedNodeInfo org nodeinfo) span [] : rest
       where nodeinfo = NodeInfo S.empty [] (M.singleton (Right n) info)
@@ -599,7 +621,7 @@ instance (ToHie a) => ToHie (Maybe a) where
 instance ToHie (IEContext (LocatedA ModuleName)) where
   toHie (IEC c (L (EpAnn (EpaSpan (RealSrcSpan span _)) _ _) mname)) = do
       org <- ask
-      pure $ [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
+      pure [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
     where details = mempty{identInfo = S.singleton (IEThing c)}
           idents = M.singleton (Left mname) details
   toHie _ = pure []
@@ -624,6 +646,9 @@ instance ToHie (Context (Located Var)) where
               ty = case isDataConId_maybe name' of
                       Nothing -> varType name'
                       Just dc -> dataConNonlinearType dc
+          -- insert the entity info for the name into the entity_infos map
+          insertEntityInfo (varName name) $ idEntityInfo name
+          insertEntityInfo (varName name') $ idEntityInfo name'
           pure
             [Node
               (mkSourcedNodeInfo org $ NodeInfo S.empty [] $
@@ -648,6 +673,9 @@ instance ToHie (Context (Located Name)) where
           let name = case lookupNameEnv m name' of
                 Just var -> varName var
                 Nothing -> name'
+          -- insert the entity info for the name into the entity_infos map
+          lookupAndInsertEntityName name
+          lookupAndInsertEntityName name'
           pure
             [Node
               (mkSourcedNodeInfo org $ NodeInfo S.empty [] $
