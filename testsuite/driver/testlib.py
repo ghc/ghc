@@ -2959,11 +2959,11 @@ def normalise_prof (s: str) -> str:
     s = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',s)
 
     # sip results for CAFs, these tend to change unpredictably
-    s = re.sub('\n[ \t]*(CAF|IDLE).*\n','',s)
+    s = re.sub('\n[ \t]*(CAF|IDLE).*\n','\n',s)
 
     # XXX Ignore Main.main.  Sometimes this appears under CAF, and
     # sometimes under MAIN.
-    s = re.sub('[ \t]*main[ \t]+Main.*\n','',s)
+    s = re.sub('[ \t]*main[ \t]+Main.*\n','\n',s)
 
     # The next step assumes none of the fields have no spaces in, which is broke
     # when the src = <no location info>
