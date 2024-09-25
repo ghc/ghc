@@ -23,7 +23,7 @@ module GHC.CmmToLlvm.Base (
         ghcInternalFunctions, getPlatform, getConfig,
 
         getMetaUniqueId,
-        setUniqMeta, getUniqMeta, liftIO,
+        setUniqMeta, getUniqMeta, liftIO, liftUDSMT,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
@@ -55,7 +55,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Utils.BufHandle   ( BufHandle )
 import GHC.Types.Unique.Set
-import GHC.Types.Unique.Supply
 import qualified GHC.Types.Unique.DSM as DSM
 import GHC.Utils.Logger
 
@@ -64,6 +63,7 @@ import Control.Monad.Trans.State (StateT (..))
 import Data.List (isPrefixOf)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord (comparing)
+import qualified Control.Monad.IO.Class as IO
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
@@ -277,13 +277,12 @@ data LlvmEnv = LlvmEnv
 type LlvmEnvMap = UniqFM Unique LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
-newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
+newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> DSM.UniqDSMT IO (a, LlvmEnv) }
     deriving stock (Functor)
-    deriving (Applicative, Monad) via StateT LlvmEnv IO
+    deriving (Applicative, Monad) via StateT LlvmEnv (DSM.UniqDSMT IO)
 
 instance HasLogger LlvmM where
     getLogger = LlvmM $ \env -> return (envLogger env, env)
-
 
 -- | Get target platform
 getPlatform :: LlvmM Platform
@@ -293,23 +292,30 @@ getConfig :: LlvmM LlvmCgConfig
 getConfig = LlvmM $ \env -> return (envConfig env, env)
 
 
--- TODO(#25274): If you want Llvm code to be deterministic, this instance should use a
--- deterministic unique supply to produce uniques, rather than using 'uniqFromTag'.
+-- This instance uses a deterministic unique supply from UniqDSMT, so new
+-- uniques within LlvmM will be sampled deterministically.
 instance DSM.MonadGetUnique LlvmM where
   getUniqueM = do
     tag <- getEnv envTag
-    liftIO $! uniqFromTag tag
+    liftUDSMT $! do
+      uq <- DSM.getUniqueM
+      return (newTagUnique uq tag)
 
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a
-liftIO m = LlvmM $ \env -> do x <- m
+liftIO m = LlvmM $ \env -> do x <- IO.liftIO m
                               return (x, env)
 
+-- | Lifting of UniqDSMT actions. Gives access to the deterministic unique supply being threaded through by LlvmM.
+liftUDSMT :: DSM.UniqDSMT IO a -> LlvmM a
+liftUDSMT m = LlvmM $ \env -> do x <- m
+                                 return (x, env)
+
 -- | Get initial Llvm environment.
-runLlvm :: Logger -> LlvmCgConfig -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
-runLlvm logger cfg ver out m = do
-    (a, _) <- runLlvmM m env
-    return a
+runLlvm :: Logger -> LlvmCgConfig -> LlvmVersion -> BufHandle -> DSM.DUniqSupply -> LlvmM a -> IO (a, DSM.DUniqSupply)
+runLlvm logger cfg ver out us m = do
+    ((a, _), us') <- DSM.runUDSMT us $ runLlvmM m env
+    return (a, us')
   where env = LlvmEnv { envFunMap    = emptyUFM
                       , envVarMap    = emptyUFM
                       , envStackRegs = []
