@@ -85,25 +85,23 @@ llvmCodeGen logger cfg h dus cmm_stream
            llvm_ver = fromMaybe supportedLlvmVersionLowerBound mb_ver
 
        -- run code generation
-       a <- runLlvm logger cfg llvm_ver bufh $
-         llvmCodeGen' cfg dus cmm_stream
+       (a, _) <- runLlvm logger cfg llvm_ver bufh dus $
+         llvmCodeGen' cfg cmm_stream
 
        bFlush bufh
 
        return a
 
 llvmCodeGen' :: LlvmCgConfig
-             -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream.
-                            -- See Note [Deterministic Uniques in the CG]
              -> CgStream RawCmmGroup a -> LlvmM a
-llvmCodeGen' cfg dus cmm_stream
+llvmCodeGen' cfg cmm_stream
   = do  -- Preamble
         renderLlvm (llvmHeader cfg) (llvmHeader cfg)
         ghcInternalFunctions
         cmmMetaLlvmPrelude
 
         -- Procedures
-        (a, _) <- runUDSMT dus $ Stream.consume cmm_stream (hoistUDSMT liftIO) (liftUDSMT . llvmGroupLlvmGens)
+        a <- Stream.consume cmm_stream (GHC.CmmToLlvm.Base.liftUDSMT) (llvmGroupLlvmGens)
 
         -- Declare aliases for forward references
         decls <- generateExternDecls
