@@ -607,6 +607,8 @@ generateConfigHs = do
     -- 'pkgUnitId' on 'compiler' (the ghc-library package) to create the
     -- unit-id in both situations.
     cProjectUnitId <- expr . (`pkgUnitId` compiler) =<< getStage
+
+    cGhcInternalUnitId <- expr . (`pkgUnitId` ghcInternal) =<< getStage
     return $ unlines
         [ "module GHC.Settings.Config"
         , "  ( module GHC.Version"
@@ -616,6 +618,7 @@ generateConfigHs = do
         , "  , cBooterVersion"
         , "  , cStage"
         , "  , cProjectUnitId"
+        , "  , cGhcInternalUnitId"
         , "  ) where"
         , ""
         , "import GHC.Prelude.Basic"
@@ -639,6 +642,9 @@ generateConfigHs = do
         , ""
         , "cProjectUnitId :: String"
         , "cProjectUnitId = " ++ show cProjectUnitId
+        , ""
+        , "cGhcInternalUnitId :: String"
+        , "cGhcInternalUnitId = " ++ show cGhcInternalUnitId
         ]
   where
     stageString (Stage0 InTreeLibs) = "1"

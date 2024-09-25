@@ -3463,6 +3463,7 @@ compilerInfo dflags
        ("Project Patch Level1",        cProjectPatchLevel1),
        ("Project Patch Level2",        cProjectPatchLevel2),
        ("Project Unit Id",             cProjectUnitId),
+       ("ghc-internal Unit Id",        cGhcInternalUnitId), -- See Note [Special unit-ids]
        ("Booter version",              cBooterVersion),
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),
@@ -3515,6 +3516,26 @@ compilerInfo dflags
     useInplaceMinGW = toolSettings_useInplaceMinGW $ toolSettings dflags
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
     expandDirectories topd mtoold = expandToolDir useInplaceMinGW mtoold . expandTopDir topd
+
+-- Note [Special unit-ids]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
+-- Certain units are special to the compiler:
+-- - Wired-in identifiers reference a specific unit-id of `ghc-internal`.
+-- - GHC plugins must be linked against a specific unit-id of `ghc`,
+--   namely the same one as the compiler.
+-- - When using Template Haskell, the result of executing splices refer to
+--   the Template Haskell ASTs created using constructors from `ghc-internal`,
+--   and must be linked against the same `ghc-internal` unit-id as the compiler.
+--
+-- We therefore expose the unit-id of `ghc-internal` ("ghc-internal Unit Id") and
+-- ghc ("Project Unit Id") through `ghc --info`.
+--
+-- This allows build tools to act accordingly, eg, if a user wishes to build a
+-- GHC plugin, `cabal-install` might force them to use the exact `ghc` unit
+-- that the compiler was linked against.
+-- See:
+--  - https://github.com/haskell/cabal/issues/10087
+--  - https://github.com/commercialhaskell/stack/issues/6749
 
 {- -----------------------------------------------------------------------------
 Note [DynFlags consistency]

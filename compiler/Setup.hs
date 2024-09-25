@@ -11,6 +11,7 @@ import Distribution.Verbosity
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
 import Distribution.Simple.Setup
+import Distribution.Simple.PackageIndex
 
 import System.IO
 import System.Process
@@ -56,7 +57,7 @@ primopIncls =
     ]
 
 ghcAutogen :: Verbosity -> LocalBuildInfo -> IO ()
-ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameMap}
+ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameMap,installedPkgs}
   = do
   -- Get compiler/ root directory from the cabal file
   let Just compilerRoot = takeDirectory <$> pkgDescrFile
@@ -96,9 +97,14 @@ ghcAutogen verbosity lbi@LocalBuildInfo{pkgDescrFile,withPrograms,componentNameM
                          Just [LibComponentLocalBuildInfo{componentUnitId}] -> unUnitId componentUnitId
                          _ -> error "Couldn't find unique cabal library when building ghc"
 
+  let cGhcInternalUnitId = case lookupPackageName installedPkgs (mkPackageName "ghc-internal")  of
+          -- We assume there is exactly one copy of `ghc-internal` in our dependency closure
+        [(_,[packageInfo])] -> unUnitId $ installedUnitId packageInfo
+        _ -> error "Couldn't find unique ghc-internal library when building ghc"
+
   -- Write GHC.Settings.Config
       configHsPath = autogenPackageModulesDir lbi </> "GHC/Settings/Config.hs"
-      configHs = generateConfigHs cProjectUnitId settings
+      configHs = generateConfigHs cProjectUnitId cGhcInternalUnitId settings
   createDirectoryIfMissingVerbose verbosity True (takeDirectory configHsPath)
   rewriteFileEx verbosity configHsPath configHs
 
@@ -110,8 +116,9 @@ getSetting settings kh kr = go settings kr
       Just v -> Right v
 
 generateConfigHs :: String -- ^ ghc's cabal-generated unit-id, which matches its package-id/key
+                 -> String -- ^ ghc-internal's cabal-generated unit-id, which matches its package-id/key
                  -> [(String,String)] -> String
-generateConfigHs cProjectUnitId settings = either error id $ do
+generateConfigHs cProjectUnitId cGhcInternalUnitId settings = either error id $ do
     let getSetting' = getSetting $ (("cStage","2"):) settings
     buildPlatform  <- getSetting' "cBuildPlatformString" "Host platform"
     hostPlatform   <- getSetting' "cHostPlatformString" "Target platform"
@@ -127,6 +134,7 @@ generateConfigHs cProjectUnitId settings = either error id $ do
         , "  , cBooterVersion"
         , "  , cStage"
         , "  , cProjectUnitId"
+        , "  , cGhcInternalUnitId"
         , "  ) where"
         , ""
         , "import GHC.Prelude.Basic"
@@ -150,4 +158,7 @@ generateConfigHs cProjectUnitId settings = either error id $ do
         , ""
         , "cProjectUnitId :: String"
         , "cProjectUnitId = " ++ show cProjectUnitId
+        , ""
+        , "cGhcInternalUnitId :: String"
+        , "cGhcInternalUnitId = " ++ show cGhcInternalUnitId
         ]
