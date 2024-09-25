@@ -242,6 +242,9 @@ type instance XIPVar         GhcRn = NoExtField
 type instance XIPVar         GhcTc = DataConCantHappen
 type instance XOverLitE      (GhcPass _) = NoExtField
 type instance XLitE          (GhcPass _) = NoExtField
+type instance XInterString   (GhcPass _) = NoExtField
+type instance XInterStringRaw (GhcPass _) = NoExtField
+type instance XInterStringExp (GhcPass _) = NoExtField
 type instance XLam           (GhcPass _) = [AddEpAnn]
 type instance XApp           (GhcPass _) = NoExtField
 

@@ -729,6 +729,11 @@ are the most common patterns, rewritten as regular expressions for clarity:
  CHAR           { L _ (ITchar   _ _) }
  STRING         { L _ (ITstring _ _ StringTypeSingle) }
  STRING_MULTI   { L _ (ITstring _ _ StringTypeMulti) }
+ STRING_INTER_BEGIN     { L _ (ITstringInterBegin _) }
+ STRING_INTER_RAW       { L _ (ITstringInterRaw _ _) }
+ STRING_INTER_EXP_OPEN  { L _ ITstringInterExpOpen }
+ STRING_INTER_EXP_CLOSE { L _ ITstringInterExpClose }
+ STRING_INTER_END       { L _ (ITstringInterEnd _) }
  INTEGER        { L _ (ITinteger _) }
  RATIONAL       { L _ (ITrational _) }
 
@@ -3080,6 +3085,8 @@ aexp2   :: { ECP }
 -- into HsOverLit when -XOverloadedStrings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
 --                                       (getSTRING $1) noExtField) }
+        | stringInter                   {% fmap ecpFromExp
+                                           (ams1 $1 (HsInterString NoExtField $! unLoc $1)) }
         | INTEGER   { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsIntegral   (getINTEGER  $1)) }
         | RATIONAL  { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsFractional (getRATIONAL $1)) }
 
@@ -3676,6 +3683,14 @@ ipvar   :: { Located HsIPName }
 
 overloaded_label :: { Located (SourceText, FastString) }
         : LABELVARID          { sL1 $1 (getLABELVARIDs $1, getLABELVARID $1) }
+
+-----------------------------------------------------------------------------
+-- Interpolated strings
+-- See Note [Interpolated strings] in GHC.Parser.String
+
+stringInter :: { [Either FastString (LHsExpr GhcPs)] }
+        -- TODO(bchinn): break out recursive stringInterPart rule
+        : STRING_INTER_BEGIN (STRING_INTER_RAW | STRING_INTER_EXP_OPEN exp STRING_INTER_EXP_CLOSE)* STRING_INTER_END { undefined }
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations

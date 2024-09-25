@@ -350,7 +350,6 @@ data HsExpr p
                              --   erroring expression will be written after
                              --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
-
   | HsRecSel  (XRecSel p)
               (FieldOcc p) -- ^ Variable pointing to record selector
                            -- See Note [Non-overloaded record field selectors] and
@@ -361,11 +360,18 @@ data HsExpr p
 
   | HsIPVar   (XIPVar p)
               HsIPName   -- ^ Implicit parameter (not in use after typechecking)
+
   | HsOverLit (XOverLitE p)
               (HsOverLit p)  -- ^ Overloaded literals
 
   | HsLit     (XLitE p)
               (HsLit p)      -- ^ Simple (non-overloaded) literals
+
+  | -- | See Note [Interpolated strings]
+    HsInterString
+      (XInterString p)
+      HsStringType
+      [Either FastString (LHsExpr p)]
 
   -- | Lambda, Lambda-case, and Lambda-cases
   --
