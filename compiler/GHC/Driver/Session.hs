@@ -3450,6 +3450,7 @@ compilerInfo dflags
        ("Project Patch Level1",        cProjectPatchLevel1),
        ("Project Patch Level2",        cProjectPatchLevel2),
        ("Project Unit Id",             cProjectUnitId),
+       ("ghc-internal Unit Id",        ghcInternalUnitId), -- TODO(TC): write up a NOTE!
        ("Booter version",              cBooterVersion),
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),
