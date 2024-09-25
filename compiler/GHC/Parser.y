@@ -728,7 +728,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
 
  CHAR           { L _ (ITchar   _ _) }
  STRING         { L _ (ITstring _ _) }
- MULTILINESTRING { L _ (ITmultilinestring _ _) }
+ STRING_MULTI   { L _ (ITstringMulti _ _) }
  INTEGER        { L _ (ITinteger _) }
  RATIONAL       { L _ (ITrational _) }
 
@@ -2357,8 +2357,8 @@ atype :: { LHsType GhcPs }
                                                                         (getCHAR $1) }
         | STRING               { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
-        | MULTILINESTRING      { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getMULTILINESTRINGs $1)
-                                                                     (getMULTILINESTRING  $1) }
+        | STRING_MULTI         { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGMULTIs $1)
+                                                                     (getSTRINGMULTI  $1) }
         | '_'                  { sL1a $1 $ mkAnonWildCardTy }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
@@ -4047,8 +4047,8 @@ literal :: { Located (HsLit GhcPs) }
         : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
         | STRING            { sL1 $1 $ HsString     (getSTRINGs $1)
                                                     $ getSTRING $1 }
-        | MULTILINESTRING   { sL1 $1 $ HsMultilineString (getMULTILINESTRINGs $1)
-                                                    $ getMULTILINESTRING $1 }
+        | STRING_MULTI      { sL1 $1 $ HsMultilineString (getSTRINGMULTIs $1)
+                                                    $ getSTRINGMULTI $1 }
         | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
                                                     $ getPRIMINTEGER $1 }
         | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
@@ -4154,7 +4154,7 @@ getIPDUPVARID     (L _ (ITdupipvarid   x)) = x
 getLABELVARID     (L _ (ITlabelvarid _ x)) = x
 getCHAR           (L _ (ITchar   _ x)) = x
 getSTRING         (L _ (ITstring _ x)) = x
-getMULTILINESTRING (L _ (ITmultilinestring _ x)) = x
+getSTRINGMULTI    (L _ (ITstringMulti _ x)) = x
 getINTEGER        (L _ (ITinteger x))  = x
 getRATIONAL       (L _ (ITrational x)) = x
 getPRIMCHAR       (L _ (ITprimchar _ x)) = x
@@ -4180,7 +4180,7 @@ getVOCURLY        (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 getINTEGERs       (L _ (ITinteger (IL src _ _))) = src
 getCHARs          (L _ (ITchar       src _)) = src
 getSTRINGs        (L _ (ITstring     src _)) = src
-getMULTILINESTRINGs (L _ (ITmultilinestring src _)) = src
+getSTRINGMULTIs   (L _ (ITstringMulti src _)) = src
 getPRIMCHARs      (L _ (ITprimchar   src _)) = src
 getPRIMSTRINGs    (L _ (ITprimstring src _)) = src
 getPRIMINTEGERs   (L _ (ITprimint    src _)) = src

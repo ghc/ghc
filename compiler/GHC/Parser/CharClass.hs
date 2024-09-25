@@ -36,14 +36,14 @@ cDigit  = 64
 
 {-# INLINABLE is_ctype #-}
 is_ctype :: Word8 -> Char -> Bool
-is_ctype mask c = (charType c .&. mask) /= 0
+is_ctype mask c = c <= '\127' && (charType c .&. mask) /= 0
 
 is_ident, is_symbol, is_any, is_space, is_lower, is_upper, is_digit,
     is_alphanum :: Char -> Bool
 is_ident  = is_ctype cIdent
 is_symbol = is_ctype cSymbol
 is_any    = is_ctype cAny
-is_space  = \c -> c <= '\x7f' && is_ctype cSpace c -- is_space only works for <= '\x7f' (#3751, #5425)
+is_space  = is_ctype cSpace
 is_lower  = is_ctype cLower
 is_upper  = is_ctype cUpper
 is_digit  = is_ctype cDigit

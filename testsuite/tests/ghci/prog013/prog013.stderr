@@ -1,17 +1,12 @@
+Bad.hs:3:7: error: [GHC-21231] lexical error at character '\n'
 
-Bad.hs:3:8: error: [GHC-21231]
-    lexical error in string/character literal at character '\n'
+Bad.hs:3:7: error: [GHC-21231] lexical error at character '\n'
 
-Bad.hs:3:8: error: [GHC-21231]
-    lexical error in string/character literal at character '\n'
-
-Bad.hs:3:8: error: [GHC-21231]
-    lexical error in string/character literal at character '\n'
+Bad.hs:3:7: error: [GHC-21231] lexical error at character '\n'
 
 <interactive>:9:1: error: [GHC-58481] parse error on input ‘+’
 
-Bad.hs:3:8: error: [GHC-21231]
-    lexical error in string/character literal at character '\n'
+Bad.hs:3:7: error: [GHC-21231] lexical error at character '\n'
 
-Bad.hs:3:8: error: [GHC-21231]
-    lexical error in string/character literal at character '\n'
+Bad.hs:3:7: error: [GHC-21231] lexical error at character '\n'
+
