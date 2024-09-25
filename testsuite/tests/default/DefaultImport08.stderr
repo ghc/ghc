@@ -1,0 +1,10 @@
+[1 of 3] Compiling ExportMonoidProduct ( ExportMonoidProduct.hs, ExportMonoidProduct.o )
+[2 of 3] Compiling Main             ( DefaultImport08.hs, DefaultImport08.o )
+DefaultImport08.hs:1:1: warning: [GHC-77007] [-Wtype-defaults (in -Wall)]
+    Imported defaults for class ‘Monoid’:
+      (Product Integer) imported from ExportMonoidProduct
+    are not subsumed by the local `default` declaration (Sum Integer)
+    Suggested fix:
+      Consider declaring default Monoid (Sum Integer, Product Integer)
+
+[3 of 3] Linking DefaultImport08

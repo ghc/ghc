@@ -1,0 +1,330 @@
+cabal-version:  3.0
+
+-- WARNING: ghc-experimental.cabal is automatically generated from ghc-experimental.cabal.in
+-- Make sure you are editing ghc-experimental.cabal.in, not ghc-experimental.cabal
+
+name:           base
+version:        4.20.0.0
+-- NOTE: Don't forget to update ./changelog.md
+
+license:        BSD-3-Clause
+license-file:   LICENSE
+maintainer:     Core Libraries Committee <core-libraries-committee@haskell.org>
+bug-reports:    https://github.com/haskell/core-libraries-committee/issues
+synopsis:       Core data structures and operations
+category:       Prelude
+build-type:     Simple
+description:    Haskell's base library provides, among other things, core types (e.g. [Bool]("Data.Bool") and [Int]("Data.Int")),
+                data structures (e.g. [List]("Data.List"), [Tuple]("Data.Tuple") and [Maybe]("Data.Maybe")),
+                the [Exception]("Control.Exception") mechanism, and the [IO]("System.IO") & [Concurrency]("Control.Concurrent") operations.
+                The "Prelude" module, which is imported by default, exposes a curated set of types and functions from other modules.
+
+                Other data structures like [Map](https://hackage.haskell.org/package/containers/docs/Data-Map.html),
+                [Set](https://hackage.haskell.org/package/containers/docs/Data-Set.html) are available in the [containers](https://hackage.haskell.org/package/containers) library.
+                To work with textual data, use the [text](https://hackage.haskell.org/package/text/docs/Data-Text.html) library.
+
+extra-doc-files:
+    changelog.md
+
+Library
+    default-language: Haskell2010
+    default-extensions: NoImplicitPrelude
+    build-depends:
+        ghc-internal == @ProjectVersionForLib@.*,
+        ghc-prim,
+
+    exposed-modules:
+          Control.Applicative
+        , Control.Concurrent
+        , Control.Concurrent.Chan
+        , Control.Concurrent.QSem
+        , Control.Concurrent.QSemN
+        , Control.Monad.IO.Class
+        , Control.Monad.Zip
+        , Data.Array.Byte
+        , Data.Bifoldable
+        , Data.Bifoldable1
+        , Data.Bifunctor
+        , Data.Bitraversable
+        , Data.Char
+        , Data.Complex
+        , Data.Fixed
+        , Data.Foldable1
+        , Data.Functor.Classes
+        , Data.Functor.Compose
+        , Data.Functor.Contravariant
+        , Data.Functor.Sum
+        , Data.Functor.Product
+        , Data.List.NonEmpty
+        , Data.Ratio
+        , Data.STRef.Lazy
+        , Data.Semigroup
+        , Prelude
+        , Text.Printf
+        , System.CPUTime
+        , System.Console.GetOpt
+        , System.IO.Unsafe
+        , System.Info
+        , System.Mem.Weak
+        , System.Timeout
+
+    exposed-modules:
+        , Control.Arrow
+        , Control.Category
+        , Control.Concurrent.MVar
+        , Control.Exception
+        , Control.Exception.Annotation
+        , Control.Exception.Backtrace
+        , Control.Exception.Base
+        , Control.Exception.Context
+        , Control.Monad
+        , Control.Monad.Fail
+        , Control.Monad.Fix
+        , Control.Monad.Instances
+        , Control.Monad.ST
+        , Control.Monad.ST.Lazy
+        , Control.Monad.ST.Lazy.Safe
+        , Control.Monad.ST.Lazy.Unsafe
+        , Control.Monad.ST.Safe
+        , Control.Monad.ST.Strict
+        , Control.Monad.ST.Unsafe
+        , Data.Bits
+        , Data.Bool
+        , Data.Coerce
+        , Data.Data
+        , Data.Dynamic
+        , Data.Either
+        , Data.Eq
+        , Data.Enum
+        , Data.Foldable
+        , Data.Function
+        , Data.Functor
+        , Data.Functor.Const
+        , Data.Functor.Identity
+        , Data.IORef
+        , Data.Int
+        , Data.Ix
+        , Data.Kind
+        , Data.List
+        , Data.Maybe
+        , Data.Monoid
+        , Data.Ord
+        , Data.Proxy
+        , Data.STRef
+        , Data.STRef.Strict
+        , Data.String
+        , Data.Traversable
+        , Data.Tuple
+        , Data.Type.Bool
+        , Data.Type.Coercion
+        , Data.Type.Equality
+        , Data.Type.Ord
+        , Data.Typeable
+        , Data.Unique
+        , Data.Version
+        , Data.Void
+        , Data.Word
+        , Debug.Trace
+        , Foreign
+        , Foreign.C
+        , Foreign.C.ConstPtr
+        , Foreign.C.Error
+        , Foreign.C.String
+        , Foreign.C.Types
+        , Foreign.Concurrent
+        , Foreign.ForeignPtr
+        , Foreign.ForeignPtr.Safe
+        , Foreign.ForeignPtr.Unsafe
+        , Foreign.Marshal
+        , Foreign.Marshal.Alloc
+        , Foreign.Marshal.Array
+        , Foreign.Marshal.Error
+        , Foreign.Marshal.Pool
+        , Foreign.Marshal.Safe
+        , Foreign.Marshal.Unsafe
+        , Foreign.Marshal.Utils
+        , Foreign.Ptr
+        , Foreign.Safe
+        , Foreign.StablePtr
+        , Foreign.Storable
+        , GHC.Arr
+        , GHC.ArrayArray
+        , GHC.Base
+        , GHC.Bits
+        , GHC.ByteOrder
+        , GHC.Char
+        , GHC.Clock
+        , GHC.Conc
+        , GHC.Conc.IO
+        , GHC.Conc.Signal
+        , GHC.Conc.Sync
+        , GHC.ConsoleHandler
+        , GHC.Constants
+        , GHC.Desugar
+        , GHC.Encoding.UTF8
+        , GHC.Enum
+        , GHC.Environment
+        , GHC.Err
+        , GHC.Event.TimeOut
+        , GHC.Exception
+        , GHC.Exception.Type
+        , GHC.ExecutionStack
+        , GHC.ExecutionStack.Internal
+        , GHC.Exts
+        , GHC.Fingerprint
+        , GHC.Fingerprint.Type
+        , GHC.Float
+        , GHC.Float.ConversionUtils
+        , GHC.Float.RealFracMethods
+        , GHC.Foreign
+        , GHC.ForeignPtr
+        , GHC.GHCi
+        , GHC.GHCi.Helpers
+        , GHC.Generics
+        , GHC.InfoProv
+        , GHC.IO
+        , GHC.IO.Buffer
+        , GHC.IO.BufferedIO
+        , GHC.IO.Device
+        , GHC.IO.Encoding
+        , GHC.IO.Encoding.CodePage
+        , GHC.IO.Encoding.Failure
+        , GHC.IO.Encoding.Iconv
+        , GHC.IO.Encoding.Latin1
+        , GHC.IO.Encoding.Types
+        , GHC.IO.Encoding.UTF16
+        , GHC.IO.Encoding.UTF32
+        , GHC.IO.Encoding.UTF8
+        , GHC.IO.Exception
+        , GHC.IO.FD
+        , GHC.IO.Handle
+        , GHC.IO.Handle.FD
+        , GHC.IO.Handle.Internals
+        , GHC.IO.Handle.Lock
+        , GHC.IO.Handle.Text
+        , GHC.IO.Handle.Types
+        , GHC.IO.IOMode
+        , GHC.IO.Unsafe
+        , GHC.IO.StdHandles
+        , GHC.IO.SubSystem
+        , GHC.IOArray
+        , GHC.IORef
+        , GHC.Int
+        , GHC.Integer
+        , GHC.Integer.Logarithms
+        , GHC.IsList
+        , GHC.Ix
+        , GHC.List
+        , GHC.Maybe
+        , GHC.MVar
+        , GHC.Natural
+        , GHC.Num
+        , GHC.OldList
+        , GHC.OverloadedLabels
+        , GHC.Profiling
+        , GHC.Ptr
+        , GHC.Read
+        , GHC.Real
+        , GHC.Records
+        , GHC.ResponseFile
+        , GHC.RTS.Flags
+        , GHC.ST
+        , GHC.Stack.CloneStack
+        , GHC.StaticPtr
+        , GHC.STRef
+        , GHC.Show
+        , GHC.Stable
+        , GHC.StableName
+        , GHC.Stack
+        , GHC.Stack.CCS
+        , GHC.Stack.Types
+        , GHC.Stats
+        , GHC.Storable
+        , GHC.TopHandler
+        , GHC.TypeError
+        , GHC.TypeLits
+        , GHC.TypeLits.Internal
+        , GHC.TypeNats
+        , GHC.TypeNats.Internal
+        , GHC.Unicode
+        , GHC.Weak
+        , GHC.Weak.Finalize
+        , GHC.Word
+        , Numeric
+        , Numeric.Natural
+        , System.Environment
+        , System.Environment.Blank
+        , System.Exit
+        , System.IO
+        , System.IO.Error
+        , System.Mem
+        , System.Mem.StableName
+        , System.Posix.Internals
+        , System.Posix.Types
+        , Text.ParserCombinators.ReadP
+        , Text.ParserCombinators.ReadPrec
+        , Text.Read
+        , Text.Read.Lex
+        , Text.Show
+        , Text.Show.Functions
+        , Type.Reflection
+        , Type.Reflection.Unsafe
+        , Unsafe.Coerce
+          -- TODO: remove
+        , GHC.IOPort
+
+    reexported-modules:
+          GHC.Num.Integer
+        , GHC.Num.Natural
+        , GHC.Num.BigNat
+
+    if os(windows)
+        exposed-modules:
+              GHC.IO.Encoding.CodePage.API
+            , GHC.IO.Encoding.CodePage.Table
+            , GHC.Conc.Windows
+            , GHC.Conc.WinIO
+            , GHC.Conc.POSIX
+            , GHC.Conc.POSIX.Const
+            , GHC.Windows
+            , GHC.Event.Windows
+            , GHC.Event.Windows.Clock
+            , GHC.Event.Windows.ConsoleEvent
+            , GHC.Event.Windows.FFI
+            , GHC.Event.Windows.ManagedThreadPool
+            , GHC.Event.Windows.Thread
+            , GHC.IO.Handle.Windows
+            , GHC.IO.Windows.Handle
+            , GHC.IO.Windows.Encoding
+            , GHC.IO.Windows.Paths
+    else
+        exposed-modules:
+            GHC.Event
+
+    if arch(javascript)
+        exposed-modules:
+              GHC.JS.Prim
+            , GHC.JS.Prim.Internal
+            , GHC.JS.Prim.Internal.Build
+            , GHC.JS.Foreign.Callback
+
+    other-modules:
+        System.CPUTime.Unsupported
+        System.CPUTime.Utils
+    if os(windows)
+      other-modules:
+        System.CPUTime.Windows
+    elif arch(javascript)
+      other-modules:
+        System.CPUTime.Javascript
+    else
+      other-modules:
+        System.CPUTime.Posix.ClockGetTime
+        System.CPUTime.Posix.Times
+        System.CPUTime.Posix.RUsage
+
+    -- We need to set the unit id to base (without a version number)
+    -- as it's magic.
+    ghc-options: -this-unit-id base
+
+    hs-source-dirs: src

@@ -125,6 +125,8 @@ import GHC.Types.SourceFile
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
+import GHC.Types.DefaultEnv ( DefaultEnv, ClassDefaults(..),
+                              defaultEnv, emptyDefaultEnv, lookupDefaultEnv, unitDefaultEnv )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name.Reader
@@ -278,7 +280,7 @@ tcLookupConLike name = do
     thing <- tcLookupGlobal name
     case thing of
         AConLike cl -> return cl
-        ATyCon tc   -> failIllegalTyCon WL_Constructor tc
+        ATyCon  {}  -> failIllegalTyCon WL_Constructor name
         _           -> wrongThingErr WrongThingConLike (AGlobal thing) name
 
 tcLookupRecSelParent :: HsRecUpdParent GhcRn -> TcM RecSelParent
@@ -351,19 +353,20 @@ instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
     lookupThing = tcLookupGlobal
 
 -- Illegal term-level use of type things
-failIllegalTyCon :: WhatLooking -> TyCon -> TcM a
+failIllegalTyCon :: WhatLooking -> Name -> TcM a
 failIllegalTyVal :: Name -> TcM a
 (failIllegalTyCon, failIllegalTyVal) = (fail_tycon, fail_tyvar)
   where
-    fail_tycon what_looking tc = do
+    fail_tycon what_looking tc_nm = do
       gre <- getGlobalRdrEnv
-      let nm = tyConName tc
-          pprov = case lookupGRE_Name gre nm of
+      let mb_gre = lookupGRE_Name gre tc_nm
+          pprov = case mb_gre of
                       Just gre -> nest 2 (pprNameProvenance gre)
                       Nothing  -> empty
-          err | isClassTyCon tc = ClassTE
-              | otherwise       = TyConTE
-      fail_with_msg what_looking dataName nm pprov err
+          err = case greInfo <$> mb_gre of
+            Just (IAmTyCon ClassFlavour) -> ClassTE
+            _ -> TyConTE
+      fail_with_msg what_looking dataName tc_nm pprov err
 
     fail_tyvar nm =
       let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc nm))
@@ -896,35 +899,75 @@ isBrackStage _other     = False
 ************************************************************************
 -}
 
-tcGetDefaultTys :: TcM ([Type], -- Default types
-                        (Bool,  -- True <=> Use overloaded strings
-                         Bool)) -- True <=> Use extended defaulting rules
+{- Note [Default class defaults]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In absence of user-defined `default` declarations, the set of class defaults in
+effect (i.e. `DefaultEnv`) is determined by the absence or
+presence of the `ExtendedDefaultRules` and `OverloadedStrings` extensions. In their
+absence, the only rule in effect is `default Num (Integer, Double)` as specified by
+Haskell Language Report.
+
+In GHC's internal packages `DefaultEnv` is empty to minimize cross-module dependencies:
+the `Num` class or `Integer` type may not even be available in low-level modules. If
+you don't do this, attempted defaulting in package ghc-prim causes an actual crash
+(attempting to look up the `Integer` type).
+
+A user-defined `default` declaration overrides the defaults for the specified class,
+and only for that class.
+-}
+
+tcGetDefaultTys :: TcM (DefaultEnv,  -- Default classes and types
+                        Bool)        -- True <=> Use extended defaulting rules
 tcGetDefaultTys
   = do  { dflags <- getDynFlags
         ; let ovl_strings = xopt LangExt.OverloadedStrings dflags
               extended_defaults = xopt LangExt.ExtendedDefaultRules dflags
                                         -- See also #1974
-              flags = (ovl_strings, extended_defaults)
+              builtinDefaults cls tys = ClassDefaults{ cd_class = cls
+                                                     , cd_types = tys
+                                                     , cd_module = Nothing
+                                                     , cd_warn = Nothing }
 
-        ; mb_defaults <- getDeclaredDefaultTys
-        ; case mb_defaults of {
-           Just tys -> return (tys, flags) ;
-                                -- User-supplied defaults
-           Nothing  -> do
-
-        -- No user-supplied default
-        -- Use [Integer, Double], plus modifications
-        { integer_ty <- tcMetaTy integerTyConName
-        ; list_ty <- tcMetaTy listTyConName
-        ; checkWiredInTyCon doubleTyCon
-        ; let deflt_tys = opt_deflt extended_defaults [unitTy, list_ty]
-                          -- Note [Extended defaults]
-                          ++ [integer_ty, doubleTy]
-                          ++ opt_deflt ovl_strings [stringTy]
-        ; return (deflt_tys, flags) } } }
-  where
-    opt_deflt True  xs = xs
-    opt_deflt False _  = []
+        -- see Note [Named default declarations] in GHC.Tc.Gen.Default
+        ; defaults <- getDeclaredDefaultTys -- User-supplied defaults
+        ; this_module <- tcg_mod <$> getGblEnv
+        ; let this_unit = moduleUnit this_module
+              is_internal_unit = this_unit `elem` [bignumUnit, ghcInternalUnit, primUnit]
+        ; if is_internal_unit
+             -- see Note [Default class defaults]
+          then return (defaults, extended_defaults)
+          else do
+              -- not one of the built-in units
+              -- @default Num (Integer, Double)@, plus extensions
+              { extDef <- if extended_defaults
+                          then do { list_ty <- tcMetaTy listTyConName
+                                  ; integer_ty <- tcMetaTy integerTyConName
+                                  ; foldableCls <- tcLookupTyCon foldableClassName
+                                  ; showCls <- tcLookupTyCon showClassName
+                                  ; eqCls <- tcLookupTyCon eqClassName
+                                  ; pure $ defaultEnv
+                                    [ builtinDefaults foldableCls [list_ty]
+                                    , builtinDefaults showCls [unitTy, integer_ty, doubleTy]
+                                    , builtinDefaults eqCls [unitTy, integer_ty, doubleTy]
+                                    ]
+                                  }
+                                  -- Note [Extended defaults]
+                          else pure emptyDefaultEnv
+              ; ovlStr <- if ovl_strings
+                          then do { isStringCls <- tcLookupTyCon isStringClassName
+                                  ; pure $ unitDefaultEnv $ builtinDefaults isStringCls [stringTy]
+                                  }
+                          else pure emptyDefaultEnv
+              ; checkWiredInTyCon doubleTyCon
+              ; numDef <- case lookupDefaultEnv defaults numClassName of
+                   Nothing -> do { numCls <- tcLookupTyCon numClassName
+                                 ; integer_ty <- tcMetaTy integerTyConName
+                                 ; pure $ unitDefaultEnv $ builtinDefaults numCls [integer_ty, doubleTy]
+                                 }
+                   -- The Num class is already user-defaulted, no need to construct the builtin default
+                   _ -> pure emptyDefaultEnv
+              ; let deflt_tys = mconcat [ extDef, numDef, ovlStr, defaults ]
+              ; return (deflt_tys, extended_defaults) } }
 
 {-
 Note [Extended defaults]

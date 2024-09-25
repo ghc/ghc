@@ -1,27 +1,4 @@
 
-T21338.hs:38:24: error: [GHC-83865]
-    • Couldn't match type ‘flds0’ with ‘flds’
-      Expected: NP (K String) flds
-        Actual: NP (K String) flds0
-      ‘flds0’ is untouchable
-        inside the constraints: All flds0
-        bound by a pattern with constructor:
-                   Record :: forall (xs :: [*]).
-                             All xs =>
-                             NP (K String) xs -> ConstructorInfo xs,
-                 in a case alternative
-        at T21338.hs:38:3-11
-      ‘flds’ is a rigid type variable bound by
-        the type signature for:
-          fieldNames :: forall a (flds :: [*]). NP (K String) flds
-        at T21338.hs:36:1-57
-    • In the second argument of ‘hmap’, namely ‘np’
-      In the expression: hmap id np
-      In a case alternative: Record np -> hmap id np
-    • Relevant bindings include
-        np :: NP (K String) flds0 (bound at T21338.hs:38:10)
-        fieldNames :: NP (K String) flds (bound at T21338.hs:37:1)
-
 T21338.hs:39:8: error: [GHC-95781]
     • Cannot apply expression of type ‘h0 f0 xs0 -> h0 g0 xs0’
       to a visible type argument ‘flds’

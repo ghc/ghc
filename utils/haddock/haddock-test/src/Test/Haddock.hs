@@ -10,6 +10,7 @@ module Test.Haddock
 import Control.Monad
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Map.Strict as Map
+import Data.Foldable (for_)
 import Data.Maybe
 import GHC.ResponseFile
 import System.Directory
@@ -74,6 +75,7 @@ maybeDiff cfg@(Config{cfgDiffTool = (Just diff)}) files = do
 runHaddock :: Config c -> IO Bool
 runHaddock cfg@(Config{..}) = do
   createEmptyDirectory $ cfgOutDir cfg
+  createEmptyDirectory $ cfgNoCompilationOutDir cfg
   createEmptyDirectory $ cfgOneShotOutDir cfg
 
   putStrLn "Generating documentation..."
@@ -93,40 +95,64 @@ runHaddock cfg@(Config{..}) = do
     succeeded <- waitForSuccess msg stdout =<< runProcess' cfgHaddockPath pc
     unless succeeded $ removeDirectoryRecursive (outDir cfgDirConfig tpkg)
 
-    if cfgSkipOneShot then pure succeeded else do
-      let oneShotDir = oneshotOutDir cfgDirConfig tpkg
-          hiDir = oneShotDir </> "hi"
-          hieDir = oneShotDir </> "hie"
+    let noCompilationDir = noCompilationOutDir cfgDirConfig tpkg
+        hiDir = noCompilationDir </> "hi"
+        hieDir = noCompilationDir </> "hie"
+
+    createEmptyDirectory noCompilationDir
+    createEmptyDirectory hiDir
+    createEmptyDirectory hieDir
+
+    -- Build .hi files
+    let pc =
+          processConfig
+            { pcArgs =
+                concat
+                  [
+                    [ "--make"
+                    , "-haddock"
+                    , "-fwrite-interface"
+                    , "-fwrite-ide-info"
+                    , "-no-keep-o-files"
+                    , "-hidir=" ++ hiDir
+                    , "-hiedir=" ++ hieDir
+                    ]
+                  , tpkgFiles tpkg
+                  ]
+            , pcEnv = Just cfgEnv
+            }
+    let msg = "Failed to run GHC on test package '" ++ tpkgName tpkg ++ "'"
+    _ <- waitForSuccess msg stdout =<< runProcess' cfgGhcPath pc
+
+    -- Generate documentation with no-compilation flag
+    let pc =
+          processConfig
+            { pcArgs =
+                concat
+                  [ cfgHaddockArgs
+                  , [ "--odir=" ++ noCompilationDir
+                    , "--optghc=-hidir=" ++ hiDir
+                    , "--optghc=-hiedir=" ++ hieDir
+                    , "--no-compilation"
+                    ]
+                  , tpkgFiles tpkg
+                  ]
+            , pcEnv = Just cfgEnv
+            }
+
+    let msg = "Failed to run Haddock in no-compilation mode on test package '" ++ tpkgName tpkg ++ "'"
+    succeededNC <- waitForSuccess msg stdout =<< runProcess' cfgHaddockPath pc
+
+    -- Generate documentation incrementally
+    if cfgSkipOneShot then pure (succeeded && succeededNC) else do
+      let oneShotDir = oneShotOutDir cfgDirConfig tpkg
           responseFile = hiDir </> "response-file"
       createEmptyDirectory oneShotDir
-      createEmptyDirectory hiDir
-      createEmptyDirectory hieDir
       writeFile responseFile $ escapeArgs
         [ "--odir=" ++ oneShotDir
         , "--optghc=-hidir=" ++ hiDir
         , "--optghc=-hiedir=" ++ hieDir
         ]
-
-      -- Build .hi files
-      let pc' =
-            processConfig
-              { pcArgs =
-                  concat
-                    [
-                      [ "--make"
-                      , "-haddock"
-                      , "-fwrite-interface"
-                      , "-fwrite-ide-info"
-                      , "-no-keep-o-files"
-                      , "-hidir=" ++ hiDir
-                      , "-hiedir=" ++ hieDir
-                      ]
-                    , tpkgFiles tpkg
-                    ]
-              , pcEnv = Just cfgEnv
-              }
-      let msg = "Failed to run GHC on test package '" ++ tpkgName tpkg ++ "'"
-      _ <- waitForSuccess msg stdout =<< runProcess' cfgGhcPath pc'
 
       files <- filter ((== ".hi") . takeExtension) <$> listDirectory hiDir
       -- Use the output order of GHC as a simple dependency order
@@ -157,37 +183,30 @@ runHaddock cfg@(Config{..}) = do
                   escapeArgs [ "--read-interface=" ++ srcRef ++ haddockFile ]
                 loop files
               else pure False
-      succeeded2 <- loop filesSorted
-      when succeeded2 $ do
+      succeededOS <- loop filesSorted
+      when (succeededNC && succeededOS) $ do
         removeDirectoryRecursive hiDir
         removeDirectoryRecursive hieDir
-      pure succeeded2
+      pure (succeeded && succeededNC && succeededOS)
 
   let somethingFailed = any not successes
   pure somethingFailed
 
 checkFile :: Config c -> FilePath -> IO CheckResult
 checkFile cfg file = do
-  hasRef <- doesFileExist $ refFile dcfg file
-  if hasRef
-    then do
-      mout <- readOut cfg file
-      mref <- readRef cfg file
-      case (mout, mref) of
-        (Just out, Just ref)
-          | ccfgEqual ccfg out ref ->
-              if cfgSkipOneShot cfg || dcfgCheckIgnoreOneShot (cfgDirConfig cfg) file
-                then return Pass
-                else do
-                  mOneShotOut <- readOneShotOut cfg file
-                  return $ case mOneShotOut of
-                    Just oneShotOut
-                      | ccfgEqual ccfg oneShotOut out -> Pass
-                      | otherwise -> Fail
-                    Nothing -> Error "Failed to parse one-shot input file"
-          | otherwise -> return Fail
-        _ -> return $ Error "Failed to parse input files"
-    else return NoRef
+  mref <- readRef cfg file
+  case mref of
+    Just ref -> do
+      let checkStep dcfgDir = ccfgEqual ccfg ref <$> readOut cfg dcfgDir file
+      result <- checkStep dcfgOutDir
+      resultNC <- if dcfgCheckIgnoreNoCompilation (cfgDirConfig cfg) file
+        then pure True
+        else checkStep dcfgNoCompilationOutDir
+      resultOS <- if cfgSkipOneShot cfg || dcfgCheckIgnoreOneShot (cfgDirConfig cfg) file
+        then pure True
+        else checkStep dcfgOneShotOutDir
+      pure $ if and [result, resultNC, resultOS] then Pass else Fail
+    Nothing -> return NoRef
   where
     ccfg = cfgCheckConfig cfg
     dcfg = cfgDirConfig cfg
@@ -207,59 +226,50 @@ readRef cfg file =
     dcfg = cfgDirConfig cfg
 
 -- | Read (and clean) the test output artifact for a test
-readOut :: Config c -> FilePath -> IO (Maybe c)
-readOut cfg file =
-  fmap (ccfgClean ccfg file) . ccfgRead ccfg . BS.unpack
-    <$> BS.readFile (outFile dcfg file)
+readOut :: Config c -> (DirConfig -> FilePath) -> FilePath -> IO c
+readOut cfg dcfgDir file = do
+  res <- fmap (ccfgClean ccfg file) . ccfgRead ccfg . BS.unpack
+    <$> BS.readFile outFile
+  case res of
+    Just out -> return out
+    Nothing -> error $ "Failed to parse output file: " ++ outFile
   where
     ccfg = cfgCheckConfig cfg
     dcfg = cfgDirConfig cfg
-
-readOneShotOut :: Config c -> FilePath -> IO (Maybe c)
-readOneShotOut cfg file =
-  fmap (ccfgClean ccfg file) . ccfgRead ccfg . BS.unpack
-    <$> BS.readFile (oneShotOutFile dcfg file)
-  where
-    ccfg = cfgCheckConfig cfg
-    dcfg = cfgDirConfig cfg
+    outFile = dcfgDir dcfg </> file
 
 diffFile :: Config c -> FilePath -> FilePath -> IO ()
 diffFile cfg diff file = do
-  Just out <- readOut cfg file
-  Just oneShotOut <- readOneShotOut cfg file
   Just ref <- readRef cfg file
-  writeFile outFile' $ ccfgDump ccfg out
-  writeFile oneShotOutFile' $ ccfgDump ccfg oneShotOut
-  writeFile refFile' $ ccfgDump ccfg ref
+  out <- readOut cfg dcfgOutDir file
+  noCompilationOut <- readOut cfg dcfgNoCompilationOutDir file
+  oneShotOut <- readOut cfg dcfgOneShotOutDir file
+  writeFile (dumpFile "ref") $ ccfgDump ccfg ref
+  writeFile (dumpFile "out") $ ccfgDump ccfg out
+  writeFile (dumpFile "oneShot") $ ccfgDump ccfg oneShotOut
+  writeFile (dumpFile "noCompilation") $ ccfgDump ccfg oneShotOut
 
-  putStrLn $ "Diff for file \"" ++ file ++ "\":"
-  hFlush stdout
-  handle <-
-    runProcess' diff $
-      processConfig
-        { pcArgs = [outFile', refFile']
-        , pcStdOut = Just stdout
-        }
-  void $ waitForProcess handle
-  handle' <-
-    runProcess' diff $
-      processConfig
-        { pcArgs = [oneShotOutFile', outFile']
-        , pcStdOut = Just stdout
-        }
-  void $ waitForProcess handle'
-  return ()
+  for_ ["out", "oneShot", "noCompilation"] $ \nm -> do
+    let outFile = dumpFile nm
+        refFile = dumpFile "ref"
+    putStrLn $ "Diff for file \"" ++ outFile ++ "\":"
+    hFlush stdout
+    handle <-
+      runProcess' diff $
+        processConfig
+          { pcArgs = [outFile, refFile]
+          , pcStdOut = Just stdout
+          }
+    void $ waitForProcess handle
   where
     dcfg = cfgDirConfig cfg
     ccfg = cfgCheckConfig cfg
-    outFile' = outFile dcfg file <.> "dump"
-    oneShotOutFile' = oneShotOutFile dcfg file <.> "dump"
-    refFile' = outFile dcfg file <.> "ref" <.> "dump"
+    dumpFile nm = dcfgOutDir dcfg </> file <.> nm <.> "dump"
 
 maybeAcceptFile :: Config c -> FilePath -> CheckResult -> IO CheckResult
 maybeAcceptFile cfg file result
   | cfgAccept cfg && result `elem` [NoRef, Fail] = do
-      Just out <- readOut cfg file
+      out <- readOut cfg dcfgOutDir file
       let ref = refFile dcfg file
       createDirectoryIfMissing True (takeDirectory ref)
       writeFile ref $ ccfgDump ccfg out
@@ -272,14 +282,11 @@ maybeAcceptFile _ _ result = pure result
 outDir :: DirConfig -> TestPackage -> FilePath
 outDir dcfg tpkg = dcfgOutDir dcfg </> tpkgName tpkg
 
-oneshotOutDir :: DirConfig -> TestPackage -> FilePath
-oneshotOutDir dcfg tpkg = dcfgOneShotOutDir dcfg </> tpkgName tpkg
+oneShotOutDir :: DirConfig -> TestPackage -> FilePath
+oneShotOutDir dcfg tpkg = dcfgOneShotOutDir dcfg </> tpkgName tpkg
 
-outFile :: DirConfig -> FilePath -> FilePath
-outFile dcfg file = dcfgOutDir dcfg </> file
-
-oneShotOutFile :: DirConfig -> FilePath -> FilePath
-oneShotOutFile dcfg file = dcfgOneShotOutDir dcfg </> file
+noCompilationOutDir :: DirConfig -> TestPackage -> FilePath
+noCompilationOutDir dcfg tpkg = dcfgNoCompilationOutDir dcfg </> tpkgName tpkg
 
 refFile :: DirConfig -> FilePath -> FilePath
 refFile dcfg file = dcfgRefDir dcfg </> file

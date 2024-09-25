@@ -333,7 +333,7 @@ We expect to add to this list as we deal with more patterns via the expansion
 mechanism.
 
 Note [Desugaring overloaded list patterns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If OverloadedLists is enabled, we desugar a list pattern to a view pattern:
 
   [p1, p2, p3]
@@ -350,11 +350,12 @@ See Note [Invertible view patterns] in GHC.Tc.TyCl.PatSyn for details.
 == Wrinkle ==
 
 This is all fine, except in one very specific case:
-  - when RebindableSyntax is off,
-  - and the type being matched on is already a list type.
-
-In this case, it is undesirable to desugar an overloaded list pattern into
-a view pattern. To illustrate, consider the following program:
+When the type being matched on is already a list type, so that the
+pattern looks like
+     toList @[ty] dict -> pat
+then we know for certain that `toList` is an identity function, so we can
+behave exactly as if the pattern was just `pat`.  This is important when
+we have `OverloadedLists`.  For example (#14547, #25257)
 
 > {-# LANGUAGE OverloadedLists #-}
 >
@@ -375,6 +376,8 @@ as it isn't able to look through view patterns.
 We can see that this is silly: as we are matching on a list, `toList` doesn't
 actually do anything. So we ignore it, and desugar the pattern to an explicit
 list pattern, instead of a view pattern.
+(NB: Because of -XRebindableSyntax we have to check that the `toList` we see is
+actually resolved to `GHC.Exts.toList`.)
 
 Note however that this is not necessarily sound, because it is possible to have
 a list `l` such that `toList l` is not the same as `l`.
@@ -504,11 +507,11 @@ rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
 rnLArgPatAndThen :: NameMaker -> LocatedA (Pat GhcPs) -> CpsRn (LocatedA (Pat GhcRn))
 rnLArgPatAndThen mk = wrapSrcSpanCps rnArgPatAndThen where
 
-  rnArgPatAndThen (InvisPat _ tp) = do
+  rnArgPatAndThen (InvisPat (_, spec) tp) = do
     liftCps $ unlessXOptM LangExt.TypeAbstractions $
       addErr (TcRnIllegalInvisibleTypePattern tp)
     tp' <- rnHsTyPat HsTypePatCtx tp
-    pure (InvisPat noExtField tp')
+    pure (InvisPat spec tp')
   rnArgPatAndThen p = rnPatAndThen mk p
 
 -- ----------- Entry point 3: rnLPatAndThen -------------------
@@ -674,12 +677,12 @@ rnPatAndThen mk (SplicePat _ splice)
 rnPatAndThen _ (EmbTyPat _ tp)
   = do { tp' <- rnHsTyPat HsTypePatCtx tp
        ; return (EmbTyPat noExtField tp') }
-rnPatAndThen _ (InvisPat _ tp)
+rnPatAndThen _ (InvisPat (_, spec) tp)
   = do { liftCps $ addErr (TcRnMisplacedInvisPat tp)
          -- Invisible patterns are handled in `rnLArgPatAndThen`
          -- so unconditionally emit error here
        ; tp' <- rnHsTyPat HsTypePatCtx tp
-       ; return (InvisPat noExtField tp')
+       ; return (InvisPat spec tp')
        }
 
 --------------------
@@ -776,7 +779,7 @@ rnHsRecPatsAndThen mk (L _ con)
                                             hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
        ; check_unused_wildcard (lHsRecFieldsImplicits flds' <$> unLoc <$> dd)
-       ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
+       ; return (HsRecFields { rec_ext = noExtField, rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat l n = VarPat noExtField (L (noAnnSrcSpan l) n)
     rn_field (L l fld, n') =

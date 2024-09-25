@@ -2007,6 +2007,12 @@ uWordTyConKey   = mkPreludeTyConUnique 163
 unsatisfiableClassNameKey :: Unique
 unsatisfiableClassNameKey = mkPreludeTyConUnique 170
 
+anyTyConKey :: Unique
+anyTyConKey = mkPreludeTyConUnique 171
+
+zonkAnyTyConKey :: Unique
+zonkAnyTyConKey = mkPreludeTyConUnique 172
+
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique
 errorMessageTypeErrorFamKey = mkPreludeTyConUnique 181
@@ -2019,9 +2025,6 @@ proxyPrimTyConKey = mkPreludeTyConUnique 184
 
 specTyConKey :: Unique
 specTyConKey = mkPreludeTyConUnique 185
-
-anyTyConKey :: Unique
-anyTyConKey = mkPreludeTyConUnique 186
 
 smallArrayPrimTyConKey        = mkPreludeTyConUnique  187
 smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  188

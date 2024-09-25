@@ -189,11 +189,23 @@ solveCallStack ev ev_cs
   -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
   = do { cs_tm <- evCallStack ev_cs
        ; let ev_tm = mkEvCast cs_tm (wrapIP (ctEvPred ev))
-       ; setEvBindIfWanted ev True ev_tm }
+       ; setEvBindIfWanted ev EvCanonical ev_tm }
+         -- EvCanonical: see Note [CallStack and ExecptionContext hack]
 
+{- Note [CallStack and ExecptionContext hack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It isn't really right that we treat CallStack and ExceptionContext dictionaries
+as canonical, in the sense of Note [Coherence and specialisation: overview].
+They definitely are not!
 
-{- Note [Shadowing of implicit parameters]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+But if we use EvNonCanonical here we get lots of
+    nospec (error @Int) dict  string
+(since `error` takes a HasCallStack dict), and that isn't bottomng  (at least not
+without extra work)  So, hackily, we just say that HasCallStack and ExceptionContext
+are canonical, even though they aren't really.
+
+Note [Shadowing of implicit parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we add a new /given/ implicit parameter to the inert set, it /replaces/
 any existing givens for the same implicit parameter.  This makes a difference
 in two places:
@@ -411,7 +423,7 @@ solveEqualityDict ev cls tys
        ; (co, _, _) <- wrapUnifierTcS ev role $ \uenv ->
                        uType uenv t1 t2
          -- Set  d :: (t1~t2) = Eq# co
-       ; setWantedEvTerm dest True $
+       ; setWantedEvTerm dest EvCanonical $
          evDataConApp data_con tys [Coercion co]
        ; stopWith ev "Solved wanted lifted equality" }
 
@@ -732,10 +744,10 @@ try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys
          -- the inert from the work-item or vice-versa.
        ; case solveOneFromTheOther (CDictCan dict_i) (CDictCan dict_w) of
            KeepInert -> do { traceTcS "lookupInertDict:KeepInert" (ppr dict_w)
-                           ; setEvBindIfWanted ev_w True (ctEvTerm ev_i)
+                           ; setEvBindIfWanted ev_w EvCanonical (ctEvTerm ev_i)
                            ; return $ Stop ev_w (text "Dict equal" <+> ppr dict_w) }
            KeepWork  -> do { traceTcS "lookupInertDict:KeepWork" (ppr dict_w)
-                           ; setEvBindIfWanted ev_i True (ctEvTerm ev_w)
+                           ; setEvBindIfWanted ev_i EvCanonical (ctEvTerm ev_w)
                            ; updInertCans (updDicts $ delDict dict_w)
                            ; continueWith () } } }
 
@@ -868,7 +880,7 @@ try_instances inerts work_item@(DictCt { di_ev = ev, di_cls = cls
      -- See Note [No Given/Given fundeps]
 
   | Just solved_ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
-  = do { setEvBindIfWanted ev True (ctEvTerm solved_ev)
+  = do { setEvBindIfWanted ev EvCanonical (ctEvTerm solved_ev)
        ; stopWith ev "Dict/Top (cached)" }
 
   | otherwise  -- Wanted, but not cached
@@ -1143,7 +1155,7 @@ matchLocalInst pred loc
             ->
             do { let result = OneInst { cir_new_theta   = theta
                                       , cir_mk_ev       = evDFunApp dfun_id tys
-                                      , cir_canonical   = True
+                                      , cir_canonical   = EvCanonical
                                       , cir_what        = LocalInstance }
                ; traceTcS "Best local instance found:" $
                   vcat [ text "pred:" <+> ppr pred

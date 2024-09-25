@@ -54,7 +54,6 @@ module GHC.Stg.Syntax (
 
         -- utils
         stgRhsArity, freeVarsOfRhs,
-        isDllConApp,
         stgArgType,
         stgArgRep,
         stgArgRep1,
@@ -87,17 +86,14 @@ import GHC.Core.Ppr( {- instances -} )
 
 import GHC.Types.ForeignCall ( ForeignCall )
 import GHC.Types.Id
-import GHC.Types.Name        ( isDynLinkName )
 import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
 import GHC.Types.RepType ( typePrimRep, typePrimRep1, typePrimRepU, typePrimRep_maybe )
 
-import GHC.Unit.Module       ( Module )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 
-import GHC.Platform
 import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
 
 import Data.ByteString ( ByteString )
@@ -137,51 +133,6 @@ StgArg
 data StgArg
   = StgVarArg  Id
   | StgLitArg  Literal
-
--- | Does this constructor application refer to anything in a different
--- *Windows* DLL?
--- If so, we can't allocate it statically
-isDllConApp
-  :: Platform
-  -> Bool          -- is Opt_ExternalDynamicRefs enabled?
-  -> Module
-  -> DataCon
-  -> [StgArg]
-  -> Bool
-isDllConApp platform ext_dyn_refs this_mod con args
- | not ext_dyn_refs    = False
- | platformOS platform == OSMinGW32
-    = isDynLinkName platform this_mod (dataConName con) || any is_dll_arg args
- | otherwise = False
-  where
-    -- NB: typePrimRep1 is legit because any free variables won't have
-    -- unlifted type (there are no unlifted things at top level)
-    is_dll_arg :: StgArg -> Bool
-    is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep1 (idType v))
-                             && isDynLinkName platform this_mod (idName v)
-    is_dll_arg _             = False
-
--- True of machine addresses; these are the things that don't work across DLLs.
--- The key point here is that VoidRep comes out False, so that a top level
--- nullary GADT constructor is False for isDllConApp
---
---    data T a where
---      T1 :: T Int
---
--- gives
---
---    T1 :: forall a. (a~Int) -> T a
---
--- and hence the top-level binding
---
---    $WT1 :: T Int
---    $WT1 = T1 Int (Coercion (Refl Int))
---
--- The coercion argument here gets VoidRep
-isAddrRep :: PrimOrVoidRep -> Bool
-isAddrRep (NVRep AddrRep)      = True
-isAddrRep (NVRep (BoxedRep _)) = True -- FIXME: not true for JavaScript
-isAddrRep _                    = False
 
 -- | Type of an @StgArg@
 --
@@ -721,24 +672,35 @@ UpdateFlag
 
 This is also used in @LambdaFormInfo@ in the @ClosureInfo@ module.
 
-A @ReEntrant@ closure may be entered multiple times, but should not be updated
-or blackholed. An @Updatable@ closure should be updated after evaluation (and
-may be blackholed during evaluation). A @SingleEntry@ closure will only be
-entered once, and so need not be updated but may safely be blackholed.
 -}
 
-data UpdateFlag = ReEntrant | Updatable | SingleEntry
+data UpdateFlag
+  = ReEntrant
+      -- ^ A @ReEntrant@ closure may be entered multiple times, but should not
+      -- be updated or blackholed.
+  | Updatable
+      -- ^ An @Updatable@ closure should be updated after evaluation (and may be
+      -- blackholed during evaluation).
+  | SingleEntry
+      -- ^ A @SingleEntry@ closure will only be entered once, and so need not be
+      -- updated but may safely be blackholed.
+  | JumpedTo
+      -- ^ A @JumpedTo@ (join-point) closure is entered once or multiple times
+      -- but has no heap-allocated associated closure.
+  deriving (Show,Eq)
 
 instance Outputable UpdateFlag where
     ppr u = char $ case u of
                        ReEntrant   -> 'r'
                        Updatable   -> 'u'
                        SingleEntry -> 's'
+                       JumpedTo    -> 'j'
 
 isUpdatable :: UpdateFlag -> Bool
 isUpdatable ReEntrant   = False
 isUpdatable SingleEntry = False
 isUpdatable Updatable   = True
+isUpdatable JumpedTo    = False
 
 {-
 ************************************************************************

@@ -193,7 +193,7 @@ void create_any_bco_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgWord bcoSizeWords =
       sizeofW(StgBCO) + sizeofW(StgLargeBitmap) + sizeofW(StgWord);
   StgBCO *bco = (StgBCO *)allocate(cap, bcoSizeWords);
-  SET_HDR(bco, &stg_BCO_info, CCS_MAIN);
+  SET_HDR(bco, (StgInfoTable*) &stg_BCO_info, CCS_MAIN);
   c->payload[0] = (StgClosure *)bco;
 
   bco->size = bcoSizeWords;

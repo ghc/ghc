@@ -72,6 +72,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Logger as Logger
 import qualified GHC.Utils.Error as Err
 
+import GHC.Types.DefaultEnv ( emptyDefaultEnv )
 import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -185,6 +186,7 @@ mkBootModDetailsTc logger
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
     return (ModDetails { md_types            = type_env'
+                       , md_defaults         = emptyDefaultEnv
                        , md_insts            = insts'
                        , md_fam_insts        = fam_insts
                        , md_rules            = []
@@ -394,6 +396,7 @@ tidyProgram :: TidyOpts -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram opts (ModGuts { mg_module           = mod
                           , mg_exports          = exports
                           , mg_tcs              = tcs
+                          , mg_defaults         = cls_defaults
                           , mg_insts            = cls_insts
                           , mg_fam_insts        = fam_insts
                           , mg_binds            = binds
@@ -483,6 +486,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                  }
          , ModDetails { md_types            = tidy_type_env
                       , md_rules            = tidy_rules
+                      , md_defaults         = cls_defaults
                       , md_insts            = tidy_cls_insts
                       , md_fam_insts        = fam_insts
                       , md_exports          = exports

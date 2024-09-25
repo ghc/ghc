@@ -8,6 +8,7 @@ Type signatures
 
     explicit_forall
     ambiguous_types
+    named_defaults
     kind_signatures
     scoped_type_variables
     implicit_parameters

@@ -1,6 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.21.0.0 *TBA*
+  * `GHC.Desugar` has been deprecated and should be removed in GHC 9.14. ([CLC proposal #216](https://github.com/haskell/core-libraries-committee/issues/216))
   * Add a `readTixFile` field to the `HpcFlags` record in `GHC.RTS.Flags` ([CLC proposal #276](https://github.com/haskell/core-libraries-committee/issues/276))
   * Add `compareLength` to `Data.List` and `Data.List.NonEmpty` ([CLC proposal #257](https://github.com/haskell/core-libraries-committee/issues/257))
   * Add `INLINE[1]` to `compareInt` / `compareWord` ([CLC proposal #179](https://github.com/haskell/core-libraries-committee/issues/179))
@@ -14,6 +15,12 @@
   * Add `inits1` and `tails1` to `Data.List`, factored from the corresponding functions in `Data.List.NonEmpty` ([CLC proposal #252](https://github.com/haskell/core-libraries-committee/issues/252))
   * Add `firstA` and `secondA` to `Data.Bitraversable`. ([CLC proposal #172](https://github.com/haskell/core-libraries-committee/issues/172))
   * Deprecate `GHC.TypeNats.Internal`, `GHC.TypeLits.Internal`, `GHC.ExecutionStack.Internal` ([CLC proposal #217](https://github.com/haskell/core-libraries-committee/issues/217))
+  * Define `Eq1`, `Ord1`, `Show1` and `Read1` instances for basic `Generic` representation types. ([CLC proposal #273](https://github.com/haskell/core-libraries-committee/issues/273))
+  * `setNonBlockingMode` will no longer throw an exception when called on a FD associated with a unknown device type. ([CLC proposal #282](https://github.com/haskell/core-libraries-committee/issues/282))
+  * Add exception type metadata to default exception handler output.
+    ([CLC proposal #231](https://github.com/haskell/core-libraries-committee/issues/231)
+    and [CLC proposal #261](https://github.com/haskell/core-libraries-committee/issues/261))
+  * The [deprecation process of GHC.Pack](https://gitlab.haskell.org/ghc/ghc/-/issues/21461) has come its term. The module has now been removed from `base`.
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1

@@ -117,7 +117,7 @@ asyncCallback :: IO ()              -- ^ the action that the callback runs
 asyncCallback x = js_asyncCallback (unsafeCoerce x)
 
 asyncCallback1 :: (JSVal -> IO ())            -- ^ the function that the callback calls
-               -> IO (Callback (JSVal -> IO ())) -- ^ the calback
+               -> IO (Callback (JSVal -> IO ())) -- ^ the callback
 asyncCallback1 x = js_asyncCallbackApply 1 (unsafeCoerce x)
 
 asyncCallback2 :: (JSVal -> JSVal -> IO ())            -- ^ the Haskell function that the callback calls

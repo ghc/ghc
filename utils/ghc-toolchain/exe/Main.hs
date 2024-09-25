@@ -374,6 +374,7 @@ archHasNativeAdjustors :: Arch -> Bool
 archHasNativeAdjustors = \case
   ArchX86    -> True
   ArchX86_64 -> True
+  ArchJavaScript -> True
   _          -> False
 
 

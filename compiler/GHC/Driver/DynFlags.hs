@@ -42,6 +42,8 @@ module GHC.Driver.DynFlags (
 
         targetProfile,
 
+        ReexportedModule(..),
+
         -- ** Manipulating DynFlags
         defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
@@ -250,7 +252,7 @@ data DynFlags = DynFlags {
   workingDirectory      :: Maybe FilePath,
   thisPackageName       :: Maybe String, -- ^ What the package is called, use with multiple home units
   hiddenModules         :: Set.Set ModuleName,
-  reexportedModules     :: Set.Set ModuleName,
+  reexportedModules     :: [ReexportedModule],
 
   -- ways
   targetWays_           :: Ways,         -- ^ Target way flags from the command line
@@ -578,7 +580,7 @@ defaultDynFlags mySettings =
         workingDirectory        = Nothing,
         thisPackageName         = Nothing,
         hiddenModules           = Set.empty,
-        reexportedModules       = Set.empty,
+        reexportedModules       = [],
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -958,6 +960,17 @@ flattenIncludes specs =
     includePathsQuoteImplicit specs ++
     includePathsGlobal specs
 
+
+-- An argument to --reexported-module which can optionally specify a module renaming.
+data ReexportedModule = ReexportedModule { reexportFrom :: ModuleName
+                                         , reexportTo   :: ModuleName
+                                         }
+
+instance Outputable ReexportedModule where
+  ppr (ReexportedModule from to) =
+    if from == to then ppr from
+                  else ppr from <+> text "as" <+> ppr to
+
 {- Note [Implicit include paths]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   The compile driver adds the path to the folder containing the source file being
@@ -1294,6 +1307,7 @@ default_PIC platform =
     (OSDarwin,  ArchAArch64) -> [Opt_PIC]
     (OSLinux,   ArchAArch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]
     (OSLinux,   ArchARM {})  -> [Opt_PIC, Opt_ExternalDynamicRefs]
+    (OSLinux,   ArchRISCV64 {}) -> [Opt_PIC, Opt_ExternalDynamicRefs]
     (OSOpenBSD, ArchX86_64)  -> [Opt_PIC] -- Due to PIE support in
                                          -- OpenBSD since 5.3 release
                                          -- (1 May 2013) we need to

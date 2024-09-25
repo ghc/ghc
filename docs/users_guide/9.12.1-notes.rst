@@ -13,6 +13,24 @@ Language
 
 - New language extension: :extension:`OrPatterns` implements `GHC Proposal #522
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0522-or-patterns.rst>`_).
+- GHC Proposal `#569 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0569-multiline-strings.rst>`_
+  "Multiline string literals" has been implemented.
+  The following code is now accepted by GHC::
+
+    {-# LANGUAGE MultilineStrings #-}
+
+    x :: String
+    x =
+      """
+      This is a
+      multiline
+
+          string
+
+      literal
+      """
+
+  This feature is guarded behind :extension:`MultilineStrings`.
 
 - The ordering of variables used for visible type application has been changed in two cases.
   It is supposed to be left-to-right, but due to an oversight, it was wrong:
@@ -37,8 +55,21 @@ Language
 - :extension:`UnliftedFFITypes`: GHC will now accept FFI types like: ``(# #) -> T`` where ``(# #)``
   is used as the one and only function argument.
 
+- The venerable ``default`` declarations have been generalized. They can now name a class
+  other than ``Num`` and the class defaults can be exported. The functionality is guarded
+  by the new ``NamedDefaults`` language extension. See the `GHC proposal
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0409-exportable-named-default.rst>`__
+  for details.
+
 - GHC now takes COMPLETE pragmas into consideration when deciding whether
   pattern matches in do notation are fallible.
+
+- As part of `GHC Proposal #281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
+  GHC now accepts type syntax in expressions, namely function type arrow ``a -> b``,
+  constraint arrow ``a => b``, and ``forall`` telescopes: ::
+
+    g = f (forall a. Show a => a -> String)
+      where f :: forall a -> ...
 
 Compiler
 ~~~~~~~~
@@ -78,12 +109,21 @@ Compiler
   <https://gitlab.haskell.org/ghc/ghc/-/issues/24921>`_). This does
   not affect existing support of apple systems on x86_64/aarch64.
 
-- The flag :ghc-flag:`-fignore-asserts` will now also enable the 
+- The flag :ghc-flag:`-fignore-asserts` will now also enable the
   :extension:`CPP` macro ``__GLASGOW_HASKELL_ASSERTS_IGNORED__`` (`#24967
   <https://gitlab.haskell.org/ghc/ghc/-/issues/24967>`_).
   This enables people to write their own custom assertion functions.
   See :ref:`assertions`.
-  
+
+- The flag :ghc-flag:`-fkeep-auto-rules` that forces GHC to keep auto generated
+  specialization rules was added. It was actually added ghc-9.10.1 already but
+  mistakenly not mentioned in the 9.10.1 changelog.
+
+- Fixed a bug that caused GHC to panic when using the aarch64 ncg and -fregs-graph
+  on certain programs. (#24941)
+
+- A new warning :ghc-flag:`-Wview-pattern-signatures` is introduced to notify users about
+  future changes in parsing of view patterns in combination with pattern signatures
 
 GHCi
 ~~~~
@@ -110,11 +150,25 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Add exception type metadata to SomeException's displayException and
+  "Exception:" header to the default handler
+  (i.e. ``GHC.Conc.Sync.uncaughtExceptionHandler``):
+
+  https://github.com/haskell/core-libraries-committee/issues/231
+  https://github.com/haskell/core-libraries-committee/issues/261
+
+- The `deprecation process of GHC.Pack <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>` has come its term. The module has now been removed from ``base``.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
 - Usage of deprecated primops is now correctly reported (#19629).
+- New primops `isMutableByteArrayWeaklyPinned#` and `isByteArrayWeaklyPinned#`
+  to allow users to avoid copying large arrays safely when dealing with ffi.
+  See the users guide for more details on the different kinds of
+  pinned arrays in 9.12.
+
+  This need for this distinction originally surfaced in https://gitlab.haskell.org/ghc/ghc/-/issues/22255
 
 
 ``ghc`` library
@@ -138,38 +192,41 @@ for further change information.
 
 .. ghc-package-list::
 
-    libraries/array/array.cabal:             Dependency of ``ghc`` library
-    libraries/base/base.cabal:               Core library
-    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
-    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
-    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
-    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
-    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
-    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
-    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
-    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
-    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
-    compiler/ghc.cabal:                      The compiler itself
-    libraries/ghci/ghci.cabal:               The REPL interface
-    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
-    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
-    libraries/ghc-compact/ghc-compact.cabal: Core library
-    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
-    libraries/ghc-prim/ghc-prim.cabal:       Core library
-    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
-    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
-    libraries/integer-gmp/integer-gmp.cabal: Core library
-    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
-    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
-    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
-    libraries/process/process.cabal:         Dependency of ``ghc`` library
-    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
-    libraries/template-haskell/template-haskell.cabal: Core library
-    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
-    libraries/text/text.cabal:               Dependency of ``Cabal`` library
-    libraries/time/time.cabal:               Dependency of ``ghc`` library
-    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
-    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
-    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
-    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
-    libraries/os-string/os-string.cabal:     Dependency of ``filepath`` library
+    libraries/array/array.cabal:                         Dependency of ``ghc`` library
+    libraries/base/base.cabal:                           Core library
+    libraries/binary/binary.cabal:                       Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:               Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:                   Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:     Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:    Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:                     Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:                 Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:               Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:                   Dependency of ``ghc`` library
+    compiler/ghc.cabal:                                  The compiler itself
+    libraries/ghci/ghci.cabal:                           The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:                   Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal:             Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal:             Core library
+    libraries/ghc-heap/ghc-heap.cabal:                   GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:                   Core library
+    utils/haddock/haddock-api/haddock-api.cabal:         Dependency of ``haddock`` executable
+    utils/haddock/haddock-library/haddock-library.cabal: Dependency of ``haddock`` executable
+    libraries/haskeline/haskeline.cabal:                 Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                             Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal:             Core library
+    libraries/mtl/mtl.cabal:                             Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:                       Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:                       Dependency of ``ghc`` library
+    libraries/process/process.cabal:                     Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                             Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:   Core library
+    libraries/terminfo/terminfo.cabal:                   Dependency of ``haskeline`` library
+    libraries/text/text.cabal:                           Dependency of ``Cabal`` library
+    libraries/time/time.cabal:                           Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal:           Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:                           Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:                         Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:                         Dependency of ``haddock`` executable
+    libraries/os-string/os-string.cabal:                 Dependency of ``filepath`` library
+    libraries/file-io/file-io.cabal:                     Dependency of ``directory`` library

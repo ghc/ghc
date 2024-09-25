@@ -3487,10 +3487,48 @@ dynamically-linked) from GHC itself.  So for example:
 This feature is experimental in GHC 8.0.x, but it may become the
 default in future releases.
 
+Building an external interpreter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The source code for the external interpreter program is in `utils/iserv`. It is
+very simple because most of the heavy lifting code is from the `ghci` library.
+
+It is sometimes desirable to customize the external interpreter program. For
+example, it is possible to add symbols to the RTS linker used by the external
+interpreter. This is done simply at link time by linking an additional `.o` that
+defines a `rtsExtraSyms` function returning the extra symbols. Doing it this way
+avoids the need to recompile the RTS with symbols added to its built-in list.
+A typical C file would look like this:
+
+.. code:: C
+
+  #include <RtsSymbols.h>
+
+  #define CODE_SYM(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+                        (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+  #define DATA_SYM(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+                        (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
+
+  RtsSymbolVal my_iserv_syms[] = {
+      CODE_SYM(malloc)
+      CODE_SYM(getauxval)
+      CODE_SYM(posix_spawn_file_actions_init)
+      ...
+      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+  };
+
+  RtsSymbolVal* rtsExtraSyms() {
+      return my_iserv_syms;
+  }
+
+For more information, read the Note [Extra RTS symbols] in the RTS.
+
+
+
 .. _external-interpreter-proxy:
 
 Running the interpreter on a different host
--------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When using the flag :ghc-flag:`-fexternal-interpreter` GHC will
 spawn and communicate with the separate process using pipes.  There
@@ -3519,6 +3557,7 @@ There are some limitations when using this. File and process IO
 will be executed on the target. As such packages like ``git-embed``,
 ``file-embed`` and others might not behave as expected if the target
 and host do not share the same filesystem.
+
 
 .. _building-ghci-libraries:
 

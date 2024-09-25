@@ -35,6 +35,7 @@ Thumbs.db
 __pycache__
 .mypy_cache
 *.SYMDEF*
+a.out
 
 log
 tags
@@ -62,6 +63,7 @@ _*
 .hadrian_ghci
 .hadrian_ghci_multi/
 .hie-bios
+hadrian/bootstrap/jq-bin
 
 # -----------------------------------------------------------------------------
 # Ignore any overlapped darcs repos and back up files
@@ -169,6 +171,9 @@ _darcs/
 /libraries/ghc-boot-th-next/ghc-boot-th-next.cabal
 /libraries/ghc-boot-th/ghc.mk
 /libraries/ghc-heap/ghc-heap.cabal
+/libraries/ghc-internal/ghc-internal.cabal
+/libraries/ghc-experimental/ghc-experimental.cabal
+/libraries/base/base.cabal
 /libraries/ghci/GNUmakefile
 /libraries/ghci/ghci.cabal
 /libraries/ghci/ghc.mk

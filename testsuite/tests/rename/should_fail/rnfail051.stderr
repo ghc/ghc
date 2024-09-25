@@ -1,3 +1,5 @@
+rnfail051.hs:14:17: error: [GHC-31244]
+    Unexpected function type arrow (->)
+    Suggested fix:
+      Perhaps you intended to use the ‘RequiredTypeArguments’ extension
 
-rnfail051.hs:7:17: error: [GHC-66228]
-    View pattern in expression context: _ -> putStrLn "_"

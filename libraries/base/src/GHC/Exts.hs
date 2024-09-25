@@ -23,6 +23,12 @@ module GHC.Exts
      -- **  Legacy interface for arrays of arrays
      module GHC.Internal.ArrayArray,
      -- *  Primitive operations
+     {-# DEPRECATED ["The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14", "These symbols should be imported from ghc-internal instead if needed."] #-}
+     Prim.BCO,
+     {-# DEPRECATED ["The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14", "These symbols should be imported from ghc-internal instead if needed."] #-}
+     Prim.mkApUpd0#,
+     {-# DEPRECATED ["The BCO, mkApUpd0#, and newBCO# re-exports from GHC.Exts have been deprecated and will be removed in 9.14", "These symbols should be imported from ghc-internal instead if needed."] #-}
+     Prim.newBCO#,
      module GHC.Prim,
      module GHC.Prim.Ext,
      -- **  Running 'RealWorld' state thread
@@ -112,7 +118,12 @@ module GHC.Exts
 
 import GHC.Internal.Exts
 import GHC.Internal.ArrayArray
-import GHC.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
+import GHC.Prim hiding (
+  coerce, dataToTagSmall#, dataToTagLarge#, whereFrom#,
+  isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned#,
+  -- Deprecated
+  BCO, mkApUpd0#, newBCO# )
+import qualified GHC.Prim as Prim ( BCO, mkApUpd0#, newBCO# )
   -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
   -- be exposed from base (not even GHC.Exts)

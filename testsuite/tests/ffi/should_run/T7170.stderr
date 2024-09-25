@@ -1,4 +1,11 @@
-T7170: thread blocked indefinitely in an MVar operation
+T7170: Exception:
+
+thread blocked indefinitely in an MVar operation
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: BlockedIndefinitelyOnMVar
+
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO

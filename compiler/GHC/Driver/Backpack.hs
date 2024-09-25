@@ -346,8 +346,7 @@ buildUnit session cid insts lunit = do
             linkables = map (expectJust "bkp link" . homeModInfoObject)
                       . filter ((==HsSrcFile) . mi_hsc_src . hm_iface)
                       $ home_mod_infos
-            getOfiles LM{ linkableUnlinked = us } = map nameOfObject (filter isObject us)
-            obj_files = concatMap getOfiles linkables
+            obj_files = concatMap linkableFiles linkables
             state     = hsc_units hsc_env
 
         let compat_fs = unitIdFS cid
@@ -782,7 +781,7 @@ summariseRequirement pn mod_name = do
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
     let fc = hsc_FC hsc_env
-    mod <- liftIO $ addHomeModuleToFinder fc home_unit mod_name location
+    mod <- liftIO $ addHomeModuleToFinder fc home_unit (notBoot mod_name) location
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -894,7 +893,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
     this_mod <- liftIO $ do
       let home_unit = hsc_home_unit hsc_env
       let fc        = hsc_FC hsc_env
-      addHomeModuleToFinder fc home_unit modname location
+      addHomeModuleToFinder fc home_unit (GWIB modname (hscSourceToIsBoot hsc_src)) location
     let ms = ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,

@@ -194,6 +194,7 @@ instance (OutputableBndrId p
 -}
 
 type instance XIEName    (GhcPass _) = NoExtField
+type instance XIEDefault (GhcPass _) = EpaLocation
 type instance XIEPattern (GhcPass _) = EpaLocation
 type instance XIEType    (GhcPass _) = EpaLocation
 type instance XXIEWrappedName (GhcPass _) = DataConCantHappen
@@ -279,6 +280,7 @@ ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
     ie_deprecation _ _ = Nothing
 
 ieWrappedLName :: IEWrappedName (GhcPass p) -> LIdP (GhcPass p)
+ieWrappedLName (IEDefault _ (L l n)) = L l n
 ieWrappedLName (IEName    _ (L l n)) = L l n
 ieWrappedLName (IEPattern _ (L l n)) = L l n
 ieWrappedLName (IEType    _ (L l n)) = L l n
@@ -294,6 +296,7 @@ ieLWrappedName :: LIEWrappedName (GhcPass p) -> LIdP (GhcPass p)
 ieLWrappedName (L _ n) = ieWrappedLName n
 
 replaceWrappedName :: IEWrappedName GhcPs -> IdP GhcRn -> IEWrappedName GhcRn
+replaceWrappedName (IEDefault r (L l _)) n = IEDefault r (L l n)
 replaceWrappedName (IEName    x (L l _)) n = IEName    x (L l n)
 replaceWrappedName (IEPattern r (L l _)) n = IEPattern r (L l n)
 replaceWrappedName (IEType    r (L l _)) n = IEType    r (L l n)
@@ -349,6 +352,7 @@ instance OutputableBndrId p => OutputableBndr (IEWrappedName (GhcPass p)) where
   pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
 
 instance OutputableBndrId p => Outputable (IEWrappedName (GhcPass p)) where
+  ppr (IEDefault _ (L _ n)) = text "default" <+> pprPrefixOcc n
   ppr (IEName    _ (L _ n)) = pprPrefixOcc n
   ppr (IEPattern _ (L _ n)) = text "pattern" <+> pprPrefixOcc n
   ppr (IEType    _ (L _ n)) = text "type"    <+> pprPrefixOcc n

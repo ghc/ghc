@@ -240,7 +240,7 @@ computeAddend(Section * section, Elf_Rel * rel,
                 /* check if we already have that stub */
                 if(findStub(section, (void**)&S, 0)) {
                     /* did not find it. Crete a new stub. */
-                    if(makeStub(section, (void**)&S, 0)) {
+                    if(makeStub(section, (void**)&S, NULL, 0)) {
                         abort(/* could not find or make stub */);
                     }
                 }
@@ -294,10 +294,13 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
         for (unsigned i = 0; i < relTab->n_relocations; i++) {
             Elf_Rel *rel = &relTab->relocations[i];
 
+            if(ELF64_R_TYPE(rel->r_info) == COMPAT_R_AARCH64_NONE)
+              continue;
+
             ElfSymbol *symbol =
                     findSymbol(oc,
                                relTab->sectionHeader->sh_link,
-                               ELF64_R_SYM((Elf64_Xword)rel->r_info));
+                               ELF64_R_SYM(rel->r_info));
 
             CHECK(0x0 != symbol);
 
@@ -320,13 +323,17 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
 
             Elf_Rela *rel = &relaTab->relocations[i];
 
+            if(ELF64_R_TYPE(rel->r_info) == COMPAT_R_AARCH64_NONE)
+              continue;
+
             ElfSymbol *symbol =
                     findSymbol(oc,
                                relaTab->sectionHeader->sh_link,
-                               ELF64_R_SYM((Elf64_Xword)rel->r_info));
+                               ELF64_R_SYM(rel->r_info));
 
             CHECK(0x0 != symbol);
-            CHECK(0x0 != symbol->addr);
+            if(0x0 == symbol->addr)
+                barf("0x0 address for %s + %ld of type %ld in %s for relocation %d in section %d of kind: %d\n", symbol->name, rel->r_addend, ELF64_R_TYPE((Elf64_Xword)rel->r_info), OC_INFORMATIVE_FILENAME(oc), i, relaTab->targetSectionIndex, oc->sections[relaTab->targetSectionIndex].kind);
 
             /* take explicit addend */
             int64_t addend = rel->r_addend;
@@ -337,6 +344,11 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
         }
     }
     return EXIT_SUCCESS;
+}
+
+void flushInstructionCacheAarch64(ObjectCode * oc STG_UNUSED) {
+  // Looks like we don't need this on Aarch64.
+  /* no-op */
 }
 
 #endif /* OBJECTFORMAT_ELF */

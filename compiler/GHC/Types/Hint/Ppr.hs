@@ -270,6 +270,9 @@ instance Outputable GhcHint where
     SuggestBindTyVarExplicitly tv
       -> text "bind" <+> quotes (ppr tv)
          <+> text "explicitly with" <+> quotes (char '@' <> ppr tv)
+    SuggestDefaultDeclaration cls tys
+      -> hang (text "Consider declaring")
+            2 (text "default" <+> ppr cls <+> parens (pprWithCommas ppr tys))
     SuggestExplicitDerivingClauseStrategies assumed_derivings ->
       hang
         (text "Use explicit deriving strategies:")
@@ -283,6 +286,8 @@ instance Outputable GhcHint where
         (text "Use an explicit deriving strategy:")
         2
         (hsep [text "deriving", ppr strat, text "instance", ppr deriv_sig])
+    SuggestParenthesizePatternRHS
+      -> text "Parenthesize the RHS of the view pattern"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

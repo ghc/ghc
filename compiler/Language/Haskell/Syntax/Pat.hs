@@ -25,7 +25,7 @@ module Language.Haskell.Syntax.Pat (
 
         HsConPatDetails, hsConPatArgs, hsConPatTyArgs,
         HsConPatTyArg(..), XConPatTyArg,
-        HsRecFields(..), HsFieldBind(..), LHsFieldBind,
+        HsRecFields(..), XHsRecFields, HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
         RecFieldsDotDot(..),
@@ -287,10 +287,13 @@ hsConPatTyArgs (InfixCon _ _)       = []
 data HsRecFields p arg         -- A bunch of record fields
                                 --      { x = 3, y = True }
         -- Used for both expressions and patterns
-  = HsRecFields { rec_flds   :: [LHsRecField p arg],
+  = HsRecFields { rec_ext    :: !(XHsRecFields p),
+                  rec_flds   :: [LHsRecField p arg],
                   rec_dotdot :: Maybe (XRec p RecFieldsDotDot) }  -- Note [DotDot fields]
   -- AZ:The XRec for LHsRecField makes the derivings fail.
   -- deriving (Functor, Foldable, Traversable)
+
+type family XHsRecFields p
 
 -- | Newtype to be able to have a specific XRec instance for the Int in `rec_dotdot`
 newtype RecFieldsDotDot = RecFieldsDotDot { unRecFieldsDotDot :: Int }

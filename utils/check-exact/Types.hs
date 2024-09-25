@@ -21,10 +21,6 @@ type Pos = (Int,Int)
 
 -- ---------------------------------------------------------------------
 
-data Rigidity = NormalLayout | RigidLayout deriving (Eq, Ord, Show)
-
--- ---------------------------------------------------------------------
-
 -- | A Haskell comment. The @AnnKeywordId@ is present if it has been converted
 -- from an @AnnKeywordId@ because the annotation must be interleaved into the
 -- stream and does not have a well-defined position

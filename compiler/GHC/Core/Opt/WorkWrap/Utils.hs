@@ -29,6 +29,7 @@ import GHC.Core.Subst
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
+import GHC.Core.Predicate( isDictTy )
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCon
@@ -1007,21 +1008,25 @@ unbox_one_arg opts arg_var
 -- same type as @id@. Otherwise, no suitable filler could be found.
 mkAbsentFiller :: WwOpts -> Id -> StrictnessMark -> Maybe CoreExpr
 mkAbsentFiller opts arg str
-  -- The lifted case: Bind 'absentError' for a nice panic message if we are
-  -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
+  -- The lifted case: bind 'absentError'. See (AF1) in Note [Absent fillers]
+  -- We want to use this case if possible, because we get a nice runtime panic message
+  -- if we are wrong (like we were in #11126).  Otherwise we fall through to the
+  -- less-desirable mkLitRubbish case.
   | mightBeLiftedType arg_ty
-  , not is_strict
-  , not (isMarkedStrict str) -- See (2) in Note [Absent fillers]
+  , not (isDictTy arg_ty)                 -- See (AF4) in Note [Absent fillers]
+  , not (isStrictDmd (idDemandInfo arg))  -- See (AF2)
+  , not (isMarkedStrict str)              --    in Note [Absent fillers]
   = Just (mkAbsentErrorApp arg_ty msg)
 
   -- The default case for mono rep: Bind `RUBBISH[rr] arg_ty`
-  -- See Note [Absent fillers], the main part
+  -- See Note [Absent fillers]
+  -- (AF3): mkLitRubbish returns Nothing if the representation is not
+  --        monomorphic, in which case we can't make a filler
   | otherwise
   = mkLitRubbish arg_ty
 
   where
-    arg_ty    = idType arg
-    is_strict = isStrictDmd (idDemandInfo arg)
+    arg_ty = idType arg
 
     msg = renderWithContext
             (defaultSDocContext { sdocSuppressUniques = True })
@@ -1184,7 +1189,7 @@ conjure filler values at any type (and any representation or levity!).
 
 Needless to say, there are some wrinkles:
 
-  1. In case we have a absent, /lazy/, and /lifted/ arg, we use an error-thunk
+(AF1) In case we have a absent, /lazy/, and /lifted/ arg, we use an error-thunk
      instead. If absence analysis was wrong (e.g., #11126) and the binding
      in fact is used, then we get a nice panic message instead of undefined
      runtime behavior (See Modes of failure from Note [Rubbish literals]).
@@ -1192,7 +1197,7 @@ Needless to say, there are some wrinkles:
      Obviously, we can't use an error-thunk if the value is of unlifted rep
      (like 'Int#' or 'MutVar#'), because we'd immediately evaluate the panic.
 
-  2. We also mustn't put an error-thunk (that fills in for an absent value of
+(AF2) We also mustn't put an error-thunk (that fills in for an absent value of
      lifted rep) in a strict field, because #16970 establishes the invariant
      that strict fields are always evaluated, by possibly (re-)evaluating what is put in
      a strict field. That's the reason why 'zs' binds a rubbish literal instead
@@ -1217,8 +1222,8 @@ Needless to say, there are some wrinkles:
      in place on top of threading through the marks from the constructor. It's a *really* cheap
      and easy check to make anyway.
 
-  3. We can only emit a LitRubbish if the arg's type @arg_ty@ is mono-rep, e.g.
-     of the form @TYPE rep@ where @rep@ is not (and doesn't contain) a variable.
+(AF3) We can only emit a LitRubbish if the arg's type `arg_ty` is mono-rep, e.g.
+     of the form `TYPE rep` where `rep` is not (and doesn't contain) a variable.
      Why? Because if we don't know its representation (e.g. size in memory,
      register class), we don't know what or how much rubbish to emit in codegen.
      'mkLitRubbish' returns 'Nothing' in this case and we simply fall
@@ -1228,8 +1233,30 @@ Needless to say, there are some wrinkles:
      have to be representation monomorphic. But in the future, we might allow
      levity polymorphism, e.g. a polymorphic levity variable in 'BoxedRep'.
 
-While (1) and (2) are simply an optimisation in terms of compiler debugging
-experience, (3) should be irrelevant in most programs, if not all.
+(AF4) Consider (#24934)
+         f :: (a~b) => blah {-# INLINE f #-}
+         f d x = case eq_sel d of co -> body
+     In #24934 it turned out that `co` was unused; and we discarded the
+     entire case-scrutinisation via the `exprOkToDiscard` test in
+     `GHC.Core.Opt.Simplify.Iteration.rebuildCase`.  So now `d` is absent.
+     But in the /unfolding/ for some reason we did not discard the `case`;
+     so when we inline `f` we end up evaluating that `d` argument.  So we had
+     better not replace it with an error thunk!
+
+     The root of it is this: `exprOkToDiscard` assumes that a dictionary is
+     non-bottom (Note [exprOkForSpeculation and type classes]); but then we replace
+     the (a~b) dictionary with an error thunk, breaking the invariant that every
+     dictionary is non-bottom.  (If -XDictsStrict is on, the invariant is even
+     more important.)
+
+     Simple solution: never use an error thunk for a dictionary; instead fall
+     through to mkRubbishLit.  (The only downside is that we lose the compiler
+     debugging advantages of (AF1).)
+
+     This is quite delicate.
+
+While (AF1) and (AF2) are simply an optimisation in terms of compiler debugging
+experience, (AF3) should be irrelevant in most programs, if not all.
 
 Historical note: I did try the experiment of using an error thunk for unlifted
 things too, relying on the simplifier to drop it as dead code.  But this is

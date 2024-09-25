@@ -200,6 +200,15 @@ test('static-plugins',
      compile_and_run,
      ['-package ghc -isimple-plugin/ -j1'])
 
+test('T25217',
+     [extra_files(['static-plugins-module.hs']),
+      unless(config.have_RTS_linker, skip),
+      expect_broken_for(16803, prof_ways),
+      extra_run_opts('"' + config.libdir + '"'),
+      ],
+     compile_and_run,
+     ['-package ghc -j1'])
+
 test('T15858',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
 #

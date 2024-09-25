@@ -1068,7 +1068,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
-      contextify_rec (HsRecFields fds a) = HsRecFields (map go scoped_fds) a
+      contextify_rec (HsRecFields x fds a) = HsRecFields x (map go scoped_fds) a
         where
           go :: RScoped (LocatedA (HsFieldBind id a1))
                       -> LocatedA (HsFieldBind id (PScoped a1)) -- AZ
@@ -1284,6 +1284,22 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsEmbTy _ ty ->
         [ toHie $ TS (ResolvedScopes []) ty
         ]
+      HsQual _ ctx body ->
+        [ toHie ctx
+        , toHie body
+        ]
+      HsForAll x tele body -> case hiePass @p of
+        HieRn ->
+          [ toHieForAllTele tele (getLocA body)
+          ]
+        HieTc -> dataConCantHappen x
+      HsFunArr x mult arg res -> case hiePass @p of
+        HieRn ->
+          [ toHie (arrowToHsExpr mult)
+          , toHie arg
+          , toHie res
+          ]
+        HieTc -> dataConCantHappen x
       HsTypedBracket xbracket b -> case hiePass @p of
         HieRn ->
           [ toHie b
@@ -1312,7 +1328,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       XExpr x
         | HieTc <- hiePass @p
         -> case x of
-             WrapExpr (HsWrap w a)
+             WrapExpr w a
                -> [ toHie $ L mspan a
                   , toHie (L mspan w) ]
              ExpandedThingTc _ e
@@ -1448,7 +1464,7 @@ instance HiePass p => ToHie (RScoped (NHsValBindsLR (GhcPass p))) where
 
 instance ( ToHie arg , HasLoc arg , Data arg
          , HiePass p ) => ToHie (RContext (HsRecFields (GhcPass p) arg)) where
-  toHie (RC c (HsRecFields fields _)) = toHie $ map (RC c) fields
+  toHie (RC c (HsRecFields _ fields _)) = toHie $ map (RC c) fields
 
 instance ( ToHie (RFContext label)
          , ToHie arg, HasLoc arg, Data arg
@@ -1510,7 +1526,7 @@ instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
         [ toHie a
         , toHie b
         ]
-      HsCmdArrForm _ a _ _ cmdtops ->
+      HsCmdArrForm _ a _ cmdtops ->
         [ toHie a
         , toHie cmdtops
         ]
@@ -1837,15 +1853,16 @@ instance Data flag => ToHie (TVScoped (HsOuterTyVarBndrs flag GhcRn)) where
     HsOuterImplicit xs -> bindingsOnly $ map (C $ TyVarBind sc tsc) xs
     HsOuterExplicit _ xs -> toHie $ tvScopes tsc sc xs
 
+toHieForAllTele ::  HsForAllTelescope GhcRn -> SrcSpan -> HieM [HieAST Type]
+toHieForAllTele (HsForAllVis { hsf_vis_bndrs = bndrs }) loc =
+  toHie $ tvScopes (ResolvedScopes []) (mkScope loc) bndrs
+toHieForAllTele (HsForAllInvis { hsf_invis_bndrs = bndrs }) loc =
+  toHie $ tvScopes (ResolvedScopes []) (mkScope loc) bndrs
+
 instance ToHie (LocatedA (HsType GhcRn)) where
   toHie (L span t) = concatM $ makeNode t (locA span) : case t of
       HsForAllTy _ tele body ->
-        let scope = mkScope $ getLocA body in
-        [ case tele of
-            HsForAllVis { hsf_vis_bndrs = bndrs } ->
-              toHie $ tvScopes (ResolvedScopes []) scope bndrs
-            HsForAllInvis { hsf_invis_bndrs = bndrs } ->
-              toHie $ tvScopes (ResolvedScopes []) scope bndrs
+        [ toHieForAllTele tele (getLocA body)
         , toHie body
         ]
       HsQualTy _ ctx body ->
@@ -1946,6 +1963,12 @@ instance ToHie (LocatedC [LocatedA (HsType GhcRn)]) where
       [ locOnly (locA span)
       , toHie tys
       ]
+
+instance HiePass p => ToHie (LocatedC [LocatedA (HsExpr (GhcPass p))]) where
+  toHie (L span exprs) = concatM $
+    [ locOnly (locA span)
+    , toHie exprs
+    ]
 
 instance ToHie (LocatedA (ConDeclField GhcRn)) where
   toHie (L span field) = concatM $ makeNode field (locA span) : case field of
@@ -2082,8 +2105,9 @@ instance ToHie (LocatedA (FixitySig GhcRn)) where
 
 instance ToHie (LocatedA (DefaultDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      DefaultDecl _ typs ->
-        [ toHie typs
+      DefaultDecl _ cl typs ->
+        [ maybe (pure []) (toHie . C Use) cl
+        , toHie typs
         ]
 
 instance ToHie (LocatedA (ForeignDecl GhcRn)) where
@@ -2210,6 +2234,9 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
 
 instance ToHie (IEContext (LocatedA (IEWrappedName GhcRn))) where
   toHie (IEC c (L span iewn)) = concatM $ makeNodeA iewn span : case iewn of
+      IEDefault _ (L l p) ->
+        [ toHie $ C (IEThing c) (L l p)
+        ]
       IEName _ (L l n) ->
         [ toHie $ C (IEThing c) (L l n)
         ]

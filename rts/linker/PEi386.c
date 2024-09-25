@@ -456,10 +456,12 @@ static OpenedDLL* opened_dlls = NULL;
 /* Adds a DLL instance to the list of DLLs in which to search for symbols. */
 static void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
 
+    IF_DEBUG(linker, debugBelch("addDLLHandle(%" PATH_FMT ")...\n", dll_name));
     /* At this point, we actually know what was loaded.
        So bail out if it's already been loaded.  */
     if (checkIfDllLoaded(instance))
     {
+        IF_DEBUG(linker, debugBelch("already loaded: addDLLHandle(%" PATH_FMT ")\n", dll_name));
         return;
     }
 
@@ -505,6 +507,7 @@ static void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
         stgFree(module);
         imports++;
     } while (imports->Name);
+    IF_DEBUG(linker, debugBelch("done: addDLLHandle(%" PATH_FMT ")\n", dll_name));
 }
 
 static OpenedDLL* findLoadedDll(HINSTANCE instance)
@@ -1888,6 +1891,9 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           sname[size-start]='\0';
           stgFree(tmp);
           sname = strdup (sname);
+          if(secNumber == IMAGE_SYM_UNDEFINED)
+            type |= SYM_TYPE_HIDDEN;
+
           if (!ghciInsertSymbolTable(oc->fileName, symhash, sname,
                                      addr, false, type, oc))
                return false;
@@ -1902,6 +1908,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          && (!section || (section && section->kind != SECTIONKIND_IMPORT))) {
          /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
          sname = strdup (sname);
+         if(secNumber == IMAGE_SYM_UNDEFINED)
+           type |= SYM_TYPE_HIDDEN;
          IF_DEBUG(linker_verbose, debugBelch("addSymbol %p `%s'\n", addr, sname));
          ASSERT(i < (uint32_t)oc->n_symbols);
          oc->symbols[i].name = sname;
@@ -1933,7 +1941,7 @@ static size_t
 makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index STG_UNUSED, size_t s, char* symbol STG_UNUSED, SymType type )
 {
     SymbolExtra *extra;
-    switch(type & ~SYM_TYPE_DUP_DISCARD) {
+    switch(type & ~(SYM_TYPE_DUP_DISCARD | SYM_TYPE_HIDDEN)) {
         case SYM_TYPE_CODE: {
             // jmp *-14(%rip)
             extra = m32_alloc(oc->rx_m32, sizeof(SymbolExtra), 8);
@@ -2094,6 +2102,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
                        }
                    }
                    *(uint32_t *)pP = (uint32_t)v;
+                   break;
+               }
+            case 14: /* R_X86_64_PC64 (ELF constant 24) - IMAGE_REL_AMD64_SREL32 (PE constant 14) */
+               {
+                   /* mingw will emit this for a pc-rel 64 relocation */
+                   uint64_t A;
+                   checkProddableBlock(oc, pP, 8);
+                   A = *(uint64_t*)pP;
+                   *(uint64_t *)pP = S + A - (intptr_t)pP;
                    break;
                }
             case 4: /* R_X86_64_PC32 (ELF constant 2) - IMAGE_REL_AMD64_REL32 (PE constant 4) */

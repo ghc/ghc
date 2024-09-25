@@ -232,11 +232,11 @@ static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
 static const char *
 symbolTypeString (SymType type)
 {
-    switch (type & ~SYM_TYPE_DUP_DISCARD) {
+    switch (type & ~(SYM_TYPE_DUP_DISCARD | SYM_TYPE_HIDDEN)) {
         case SYM_TYPE_CODE: return "code";
         case SYM_TYPE_DATA: return "data";
         case SYM_TYPE_INDIRECT_DATA: return "indirect-data";
-        default: barf("symbolTypeString: unknown symbol type");
+        default: barf("symbolTypeString: unknown symbol type (%d)", type);
     }
 }
 
@@ -283,10 +283,19 @@ int ghciInsertSymbolTable(
    }
    else if (pinfo->type ^ type)
    {
-       /* We were asked to discard the symbol on duplicates, do so quietly.  */
-       if (!(type & SYM_TYPE_DUP_DISCARD))
+       if(pinfo->type & SYM_TYPE_HIDDEN)
        {
-         debugBelch("Symbol type mismatch.\n");
+            /* The existing symbol is hidden, let's replace it */
+            pinfo->value = data;
+            pinfo->owner = owner;
+            pinfo->strength = strength;
+            pinfo->type = type;
+            return 1;
+       }
+       /* We were asked to discard the symbol on duplicates, do so quietly.  */
+       if (!(type & (SYM_TYPE_DUP_DISCARD | SYM_TYPE_HIDDEN)))
+       {
+         debugBelch("Symbol type mismatch (existing %d, new %d).\n", pinfo->type, type);
          debugBelch("Symbol %s was defined by %" PATH_FMT " to be a %s symbol.\n",
                     key, obj_name, symbolTypeString(type));
          debugBelch("      yet was defined by %" PATH_FMT " to be a %s symbol.\n",
@@ -463,14 +472,35 @@ initLinker_ (int retain_cafs)
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
+    IF_DEBUG(linker, debugBelch("populating linker symbol table with built-in RTS symbols\n"));
     for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
+        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
         if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
                                     symhash, sym->lbl, sym->addr,
                                     sym->strength, sym->type, NULL)) {
             barf("ghciInsertSymbolTable failed");
         }
-        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
     }
+    IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
+
+    /* Add extra symbols. rtsExtraSyms() is a weakly defined symbol in the rts,
+     * that can be overrided by linking in an object with a corresponding
+     * definition later. This is useful to build an external-interpreter or some
+     * other process with extra symbols (mostly libc, or similar).
+     * See Note [Extra RTS symbols]
+     */
+    IF_DEBUG(linker, debugBelch("populating linker symbol table with extra RTS symbols\n"));
+    if(rtsExtraSyms && rtsExtraSyms() != NULL) {
+        for(RtsSymbolVal *sym = rtsExtraSyms(); sym->lbl != NULL; sym++) {
+            IF_DEBUG(linker, debugBelch("initLinker: inserting extra rts symbol %s, %p\n", sym->lbl, sym->addr));
+            if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
+                                        symhash, sym->lbl, sym->addr,
+                                        sym->strength, sym->type, NULL)) {
+                barf("ghciInsertSymbolTable failed");
+            }
+        }
+    }
+    IF_DEBUG(linker, debugBelch("done with extra RTS symbols\n"));
 
     // Redirect newCAF to newRetainedCAF if retain_cafs is true.
     if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,

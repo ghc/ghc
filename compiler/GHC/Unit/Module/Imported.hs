@@ -13,10 +13,13 @@ import GHC.Unit.Module
 import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
 import GHC.Types.SrcLoc
+import Data.Map (Map)
 
 -- | Records the modules directly imported by a module for extracting e.g.
 -- usage information, and also to give better error message
-type ImportedMods = ModuleEnv [ImportedBy]
+type ImportedMods = Map Module [ImportedBy]
+  -- We don't want to use a `ModuleEnv` since it would leak a non-deterministic
+  -- order to the interface files when passed as a list to `mkUsageInfo`.
 
 -- | If a module was "imported" by the user, we associate it with
 -- more detailed usage information 'ImportedModsVal'; a module

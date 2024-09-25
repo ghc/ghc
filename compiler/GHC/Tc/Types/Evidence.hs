@@ -39,7 +39,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
-  TcMCoercion, TcMCoercionN, TcMCoercionR,
+  TcMCoercion, TcMCoercionN, TcMCoercionR, MultiplicityCheckCoercions,
   Role(..), LeftOrRight(..), pickLR,
   maybeSymCo,
   unwrapIP, wrapIP,
@@ -70,7 +70,7 @@ import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
-import GHC.Core.InstEnv ( Canonical )
+import GHC.Core.InstEnv ( CanonicalEvidence(..) )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -109,6 +109,11 @@ type TcCoercionP  = CoercionP    -- a phantom coercion
 type TcMCoercion  = MCoercion
 type TcMCoercionN = MCoercionN  -- nominal
 type TcMCoercionR = MCoercionR  -- representational
+
+type MultiplicityCheckCoercions = [TcCoercion]
+-- Coercions which must all be reflexivity after zonking.
+-- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+
 
 -- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
 maybeSymCo :: SwapFlag -> TcCoercion -> TcCoercion
@@ -174,7 +179,7 @@ data HsWrapper
 
   | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
                                 -- error in the desugarer. See GHC.Tc.Utils.Unify
-                                -- Note [Wrapper returned from tcSubMult]
+                                -- Note [Coercions returned from tcSubMult]
   deriving Data.Data
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
@@ -466,7 +471,7 @@ instance Outputable EvBindMap where
 data EvBindInfo
   = EvBindGiven { -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
     }
-  | EvBindWanted { ebi_canonical :: Canonical -- See Note [Desugaring non-canonical evidence]
+  | EvBindWanted { ebi_canonical :: CanonicalEvidence -- See Note [Desugaring non-canonical evidence]
     }
 
 -----------------
@@ -480,7 +485,7 @@ data EvBind
 evBindVar :: EvBind -> EvVar
 evBindVar = eb_lhs
 
-mkWantedEvBind :: EvVar -> Canonical -> EvTerm -> EvBind
+mkWantedEvBind :: EvVar -> CanonicalEvidence -> EvTerm -> EvBind
 mkWantedEvBind ev c tm = EvBind { eb_info = EvBindWanted c, eb_lhs = ev, eb_rhs = tm }
 
 -- EvTypeable are never given, so we can work with EvExpr here instead of EvTerm

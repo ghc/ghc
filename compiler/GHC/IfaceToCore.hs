@@ -22,7 +22,7 @@ module GHC.IfaceToCore (
         typecheckWholeCoreBindings,
         typecheckIfacesForMerging,
         typecheckIfaceForInstantiate,
-        tcIfaceDecl, tcIfaceDecls,
+        tcIfaceDecl, tcIfaceDecls, tcIfaceDefaults,
         tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteMatches,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
@@ -115,6 +115,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
+import GHC.Types.DefaultEnv ( ClassDefaults(..), defaultEnv )
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Id.Info
@@ -131,6 +132,9 @@ import GHC.Driver.Env.KnotVars
 import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
+import Data.Function ( on )
+import Data.List.NonEmpty ( NonEmpty )
+import qualified Data.List.NonEmpty as NE
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
 import GHC.Iface.Errors.Types
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
@@ -208,7 +212,8 @@ knots are tied through the EPS.  No problem!
 typecheckIface :: ModIface      -- Get the decls from here
                -> IfG ModDetails
 typecheckIface iface
-  = initIfaceLcl (mi_semantic_module iface) (text "typecheckIface") (mi_boot iface) $ do
+  | let iface_mod = mi_semantic_module iface
+  = initIfaceLcl iface_mod (text "typecheckIface") (mi_boot iface) $ do
         {       -- Get the right set of decls and rules.  If we are compiling without -O
                 -- we discard pragmas before typechecking, so that we don't "see"
                 -- information that we shouldn't.  From a versioning point of view
@@ -223,6 +228,7 @@ typecheckIface iface
         ; let type_env = mkNameEnv names_w_things
 
                 -- Now do those rules, instances and annotations
+        ; defaults  <- mapM (tcIfaceDefault iface_mod) (mi_defaults iface)
         ; insts     <- mapM tcIfaceInst (mi_insts iface)
         ; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         ; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
@@ -241,6 +247,7 @@ typecheckIface iface
                          -- an example where this would cause non-termination.
                          text "Type envt:" <+> ppr (map fst names_w_things)])
         ; return $ ModDetails { md_types     = type_env
+                              , md_defaults  = defaultEnv defaults
                               , md_insts     = mkInstEnv insts
                               , md_fam_insts = fam_insts
                               , md_rules     = rules
@@ -251,9 +258,9 @@ typecheckIface iface
     }
 
 typecheckWholeCoreBindings :: IORef TypeEnv ->  WholeCoreBindings -> IfG [CoreBind]
-typecheckWholeCoreBindings type_var (WholeCoreBindings tidy_bindings this_mod _) =
-  initIfaceLcl this_mod (text "typecheckWholeCoreBindings") NotBoot $ do
-    tcTopIfaceBindings type_var tidy_bindings
+typecheckWholeCoreBindings type_var WholeCoreBindings {wcb_bindings, wcb_module} =
+  initIfaceLcl wcb_module (text "typecheckWholeCoreBindings") NotBoot $ do
+    tcTopIfaceBindings type_var wcb_bindings
 
 
 {-
@@ -448,6 +455,7 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
         setImplicitEnvM type_env $ do
+        defaults  <- mapM (tcIfaceDefault $ mi_semantic_module iface) (mi_defaults iface)
         insts     <- mapM tcIfaceInst (mi_insts iface)
         fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         rules     <- tcIfaceRules ignore_prags (mi_rules iface)
@@ -455,6 +463,7 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
         exports   <- ifaceExportNames (mi_exports iface)
         complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
         return $ ModDetails { md_types     = type_env
+                            , md_defaults  = defaultEnv defaults
                             , md_insts     = mkInstEnv insts
                             , md_fam_insts = fam_insts
                             , md_rules     = rules
@@ -475,10 +484,11 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
 -- provided them with a reexport, and (2) we have to deal with
 -- DFun silliness (see Note [rnIfaceNeverExported])
 typecheckIfaceForInstantiate :: NameShape -> ModIface -> IfM lcl ModDetails
-typecheckIfaceForInstantiate nsubst iface =
-  initIfaceLclWithSubst (mi_semantic_module iface)
-                        (text "typecheckIfaceForInstantiate")
-                        (mi_boot iface) nsubst $ do
+typecheckIfaceForInstantiate nsubst iface
+  | let iface_mod = mi_semantic_module iface
+  = initIfaceLclWithSubst iface_mod
+                          (text "typecheckIfaceForInstantiate")
+                          (mi_boot iface) nsubst $ do
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
     type_env <- fixM $ \type_env ->
@@ -487,6 +497,7 @@ typecheckIfaceForInstantiate nsubst iface =
             return (mkNameEnv decls)
     -- See Note [rnIfaceNeverExported]
     setImplicitEnvM type_env $ do
+    defaults  <- mapM (tcIfaceDefault iface_mod) (mi_defaults iface)
     insts     <- mapM tcIfaceInst (mi_insts iface)
     fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
     rules     <- tcIfaceRules ignore_prags (mi_rules iface)
@@ -494,6 +505,7 @@ typecheckIfaceForInstantiate nsubst iface =
     exports   <- ifaceExportNames (mi_exports iface)
     complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
     return $ ModDetails { md_types     = type_env
+                        , md_defaults  = defaultEnv defaults
                         , md_insts     = mkInstEnv insts
                         , md_fam_insts = fam_insts
                         , md_rules     = rules
@@ -1229,6 +1241,24 @@ tcRoughTyCon :: Maybe IfaceTyCon -> RoughMatchTc
 tcRoughTyCon (Just tc) = RM_KnownTc (ifaceTyConName tc)
 tcRoughTyCon Nothing   = RM_WildCard
 
+tcIfaceDefaults :: Module -> [(Module, IfaceDefault)] -> IfG [NonEmpty ClassDefaults]
+tcIfaceDefaults this_mod defaults
+  = initIfaceLcl this_mod (text "Import defaults") NotBoot
+    $ NE.groupBy ((==) `on` cd_class)
+    <$> mapM (uncurry tcIfaceDefault) defaults
+
+tcIfaceDefault :: Module -> IfaceDefault -> IfL ClassDefaults
+tcIfaceDefault this_mod IfaceDefault { ifDefaultCls = clsCon
+                                     , ifDefaultTys = tys
+                                     , ifDefaultWarn = iface_warn }
+  = do { clsCon' <- tcIfaceTyCon clsCon
+       ; tys' <- traverse tcIfaceType tys
+       ; let warn = fmap fromIfaceWarningTxt iface_warn
+       ; return ClassDefaults { cd_class = clsCon'
+                              , cd_types = tys'
+                              , cd_module = Just this_mod
+                              , cd_warn = warn } }
+
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
 tcIfaceInst (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs
@@ -1639,7 +1669,7 @@ tcIfaceLit lit = return lit
 tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
            -> IfaceAlt
            -> IfL CoreAlt
-tcIfaceAlt _ _ _ (IfaceAlt IfaceDefault names rhs)
+tcIfaceAlt _ _ _ (IfaceAlt IfaceDefaultAlt names rhs)
   = assert (null names) $ do
     rhs' <- tcIfaceExpr rhs
     return (Alt DEFAULT [] rhs')

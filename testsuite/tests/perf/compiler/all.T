@@ -8,7 +8,7 @@ test('T1969',
       extra_run_opts('+RTS -A64k -RTS'),
           # The default RESIDENCY_OPTS is 256k and we need higher sampling
           # frequency. Incurs a slow-down by about 2.
-      collect_compiler_stats('bytes allocated', 1),
+      collect_compiler_runtime(1),
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static'),
@@ -32,14 +32,14 @@ else:
 
 test('T3294',
      [collect_compiler_residency(15),
-      collect_compiler_stats('bytes allocated', 1),
+      collect_compiler_runtime(1),
       conf_3294,
       ],
      compile,
      [''])
 
 test('T4801',
-     [collect_compiler_stats('bytes allocated',2),
+     [collect_compiler_runtime(2),
       only_ways(['normal']),
       extra_hc_opts('-static'),
       when(arch('wasm32') and unregisterised(), fragile(23290))
@@ -49,7 +49,7 @@ test('T4801',
 
 test('T3064',
      [collect_compiler_residency(20),
-      collect_compiler_stats('bytes allocated',2),
+      collect_compiler_runtime(2),
       only_ways(['normal']),
       ],
      compile,
@@ -59,7 +59,7 @@ test('T3064',
 test('T4007', normal, makefile_test, ['T4007'])
 
 test('T5030',
-     [collect_compiler_stats('bytes allocated', 2),
+     [collect_compiler_runtime(2),
 
        only_ways(['normal'])
       ],
@@ -67,14 +67,14 @@ test('T5030',
      ['-freduction-depth=300'])
 
 test('T5631',
-     [collect_compiler_stats('bytes allocated',2),
+     [collect_compiler_runtime(2),
       only_ways(['normal'])
       ],
      compile,
      [''])
 
 test('parsing001',
-     [collect_compiler_stats('bytes allocated',2),
+     [collect_compiler_runtime(2),
        only_ways(['normal']),
       ],
      compile_fail, [''])
@@ -82,27 +82,27 @@ test('parsing001',
 
 test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
-      collect_compiler_stats('bytes allocated',2),
+      collect_compiler_runtime(2),
       extra_hc_opts('-static')
       ],
       compile,[''])
 
 test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
-       collect_compiler_stats('bytes allocated',2)
+       collect_compiler_runtime(2),
       ],
       compile,[''])
 
 test('T5321FD',
      [ only_ways(['normal']),  # no optimisation for this one
-      collect_compiler_stats('bytes allocated',2)
+      collect_compiler_runtime(2),
       ],
       compile,[''])
 
 test('T5642',
      [ only_ways(['normal']),
        normal,
-       collect_compiler_stats('bytes allocated',2)
+       collect_compiler_runtime(2),
       ],
       compile,['-O'])
 
@@ -114,7 +114,7 @@ test('T5837',
 
 test('T6048',
      [ only_ways(['optasm']),
-      collect_compiler_stats('bytes allocated',2)
+      collect_compiler_runtime(2),
       ],
       compile,[''])
 
@@ -134,7 +134,7 @@ test('T9675',
 
 test('T9872a',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1),
+       collect_compiler_runtime(1),
        high_memory_usage
       ],
      compile_fail,
@@ -142,28 +142,28 @@ test('T9872a',
 
 test('T9872b',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1),
+       collect_compiler_runtime(1),
        high_memory_usage
       ],
      compile_fail,
      [''])
 test('T9872b_defer',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1),
+       collect_compiler_runtime(1),
        high_memory_usage
       ],
      compile,
      ['-fdefer-type-errors'])
 test('T9872c',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1),
+       collect_compiler_runtime(1),
        high_memory_usage
       ],
      compile_fail,
      [''])
 test('T9872d',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_runtime(1)
       ],
      compile,
      [''])
@@ -227,14 +227,14 @@ test ('LargeRecord',
 
 test('T9961',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_runtime(1)
       ],
      compile,
      ['-O'])
 
 test('T9233',
     [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated', 1)
+      collect_compiler_runtime(1)
     ],
     multimod_compile,
     ['T9233', '-v0 -O2 -fno-spec-constr'])
@@ -249,14 +249,14 @@ test('T10370',
 test('T11068', normal, makefile_test, ['T11068'])
 
 test('T10547',
-     [ collect_compiler_stats('bytes allocated', 4),
+     [ collect_compiler_runtime(4),
      ],
      compile_fail,
      ['-fprint-expanded-synonyms'])
 
 test('T12227',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_runtime(1)
      ],
      compile,
      # Use `-M1G` to prevent memory thrashing with ghc-8.0.1.
@@ -264,14 +264,14 @@ test('T12227',
 
 test('T12425',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_runtime(1)
      ],
      compile,
      [''])
 
 test('T12234',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated', 2),
+       collect_compiler_runtime(2),
      ],
      compile,
      [''])
@@ -279,14 +279,14 @@ test('T12234',
 # See Note [Sensitivity to unique increment] in T12545.hs; spread was 4.8%
 test('T12545',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 10), #
+       collect_compiler_runtime(10), #
      ],
      multimod_compile,
      ['T12545', '-v0'] )
 
 test('T13035',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1),
+       collect_compiler_runtime(1),
      ],
      compile,
      [''] )
@@ -299,7 +299,7 @@ test('T13056',
      ['-O1'])
 
 test('T12707',
-     [ collect_compiler_stats('bytes allocated', 1),
+     [ collect_compiler_runtime(1),
      ],
      compile,
      [''])
@@ -311,7 +311,7 @@ test('T12707',
 # to avoid spurious errors.
 test('T12150',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated', 2)
+       collect_compiler_runtime(2)
      ],
     compile,
      [''])
@@ -483,7 +483,7 @@ test('MultiLayerModulesNoCode',
      ['MultiLayerModulesNoCode.script'])
 
 test('MultiComponentModulesRecomp',
-     [ collect_compiler_stats('bytes allocated', 2),
+     [ collect_compiler_runtime(2),
        pre_cmd('$MAKE -s --no-print-directory MultiComponentModulesRecomp'),
        extra_files(['genMultiComp.py']),
        compile_timeout_multiplier(5)
@@ -492,7 +492,7 @@ test('MultiComponentModulesRecomp',
      [['unitp%d' % n for n in range(20)], '-fno-code -fwrite-interface -v0'])
 
 test('MultiComponentModules',
-     [ collect_compiler_stats('bytes allocated', 2),
+     [ collect_compiler_runtime(2),
        pre_cmd('$PYTHON ./genMultiComp.py'),
        extra_files(['genMultiComp.py']),
        compile_timeout_multiplier(5)
@@ -565,7 +565,7 @@ test('T14683',
 
 test ('T9630',
       [ collect_compiler_residency(15),
-        collect_compiler_stats('bytes allocated', 2),
+        collect_compiler_runtime(2),
       ],
       multimod_compile,
       ['T9630', '-v0 -O'])
@@ -611,7 +611,7 @@ test ('T16473',
       ['-O2 -flate-specialise'])
 
 test('T17516',
-      [ collect_compiler_stats('bytes allocated', 5),
+      [ collect_compiler_runtime(5),
       ],
       multimod_compile,
       ['T17516', '-O -v0'])
@@ -635,13 +635,13 @@ test ('T18140',
       ['-v0 -O'])
 test('T10421',
     [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated', 1)
+      collect_compiler_runtime(1)
     ],
     multimod_compile,
     ['T10421', '-v0 -O'])
 test('T10421a',
     [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated', 10)
+      collect_compiler_runtime(10)
     ],
     multimod_compile,
     ['T10421a', '-v0 -O'])
@@ -700,13 +700,13 @@ test ('T19695',
       ['-v0 -O2'])
 
 test('hard_hole_fits', # Testing multiple hole-fits with lots in scope for #16875
-     collect_compiler_stats('bytes allocated', 2), # 1 is 300s, 0.010 is 3s. Without  hole-fits it takes 1s
+     collect_compiler_runtime(2), # 1 is 300s, 0.010 is 3s. Without  hole-fits it takes 1s
      compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
 
 test('T16875',  # Testing one hole-fit with a lot in scope for #16875
      # This test is very sensitive to environmental differences.. we should fix
      # that but for now the failure threshold is 4% (see #21557)
-     collect_compiler_stats('bytes allocated', 4),
+     collect_compiler_runtime(4),
      compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
 
 test ('T20261',
@@ -720,7 +720,7 @@ test ('T20261',
 # a compile-time and a run-time performance test
 test('T21839c',
     [   collect_compiler_stats('all', 10),
-        collect_compiler_stats('bytes allocated', 1),
+        collect_compiler_runtime(1),
         only_ways(['normal'])],
     compile,
     ['-O'])
@@ -762,3 +762,16 @@ test ('T24582',
       [ collect_compiler_stats('bytes allocated',5) ],
       compile,
       ['-O'])
+
+test ('MultilineStringsPerf',
+      [ collect_compiler_stats('peak_megabytes_allocated', 20),
+        collect_compiler_stats('bytes allocated', 5),
+      ],
+      compile,
+      ['-O'])
+
+test ('T24984',
+      [ collect_compiler_stats('bytes allocated',5) ],
+      compile,
+      ['-O'])
+

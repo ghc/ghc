@@ -1,1 +1,7 @@
-T2783: <<loop>>
+T2783: Exception:
+
+<<loop>>
+
+Package: ghc-internal
+Module: GHC.Internal.Control.Exception.Base
+Type: NonTermination

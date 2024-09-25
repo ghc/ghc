@@ -237,16 +237,25 @@ instance H.Builder Builder where
           -- changes (#18001).
           _bootGhcVersion <- setting GhcVersion
           pure []
-        Ghc {} -> do
+        Ghc _ st -> do
             root <- buildRoot
             unlitPath  <- builderPath Unlit
             distro_mingw <- settingsFileSetting ToolchainSetting_DistroMinGW
+            libffi_adjustors <- useLibffiForAdjustors
+            use_system_ffi <- flag UseSystemFfi
 
             return $ [ unlitPath ]
                   ++ [ root -/- mingwStamp | windowsHost, distro_mingw == "NO" ]
                      -- proxy for the entire mingw toolchain that
                      -- we have in inplace/mingw initially, and then at
                      -- root -/- mingw.
+                  -- ffi.h needed by the compiler when using libffi_adjustors (#24864)
+                  -- It would be nicer to not duplicate this logic between here
+                  -- and needRtsLibffiTargets and libffiHeaderFiles but this doesn't change
+                  -- very often.
+                  ++ [ root -/- buildDir (rtsContext st) -/- "include" -/- header
+                     | header <- ["ffi.h", "ffitarget.h"]
+                     , libffi_adjustors && not use_system_ffi ]
 
         Hsc2Hs stage -> (\p -> [p]) <$> templateHscPath stage
         Make dir  -> return [dir -/- "Makefile"]

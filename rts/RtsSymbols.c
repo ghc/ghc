@@ -656,6 +656,8 @@ extern char **environ;
       SymI_HasDataProto(stg_newAlignedPinnedByteArrayzh)                    \
       SymI_HasDataProto(stg_isByteArrayPinnedzh)                            \
       SymI_HasDataProto(stg_isMutableByteArrayPinnedzh)                     \
+      SymI_HasDataProto(stg_isByteArrayWeaklyPinnedzh)                      \
+      SymI_HasDataProto(stg_isMutableByteArrayWeaklyPinnedzh)               \
       SymI_HasDataProto(stg_shrinkMutableByteArrayzh)                       \
       SymI_HasDataProto(stg_resizzeMutableByteArrayzh)                      \
       SymI_HasDataProto(stg_shrinkSmallMutableArrayzh)                       \
@@ -952,6 +954,7 @@ extern char **environ;
       SymI_HasDataProto(stg_castDoubleToWord64zh)                       \
       SymI_HasDataProto(stg_castWord32ToFloatzh)                        \
       SymI_HasDataProto(stg_castFloatToWord32zh)                        \
+      SymI_HasProto(closure_sizeW_)                                     \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
@@ -973,6 +976,17 @@ extern char **environ;
       SymI_NeedsProto(__umodti3)
 #else
 #define RTS_LIBGCC_SYMBOLS
+#endif
+
+#if defined(riscv64_HOST_ARCH)
+// See https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html as
+// reference for the following built-ins. __clzdi2 and __ctzdi2 probably relate
+// to __builtin-s in libraries/ghc-prim/cbits/ctz.c.
+#define RTS_ARCH_LIBGCC_SYMBOLS \
+  SymI_NeedsProto(__clzdi2) \
+  SymI_NeedsProto(__ctzdi2)
+#else
+#define RTS_ARCH_LIBGCC_SYMBOLS
 #endif
 
 // Symbols defined by libgcc/compiler-rt for AArch64's outline atomics.
@@ -1027,6 +1041,7 @@ RTS_DARWIN_ONLY_SYMBOLS
 RTS_OPENBSD_ONLY_SYMBOLS
 RTS_LIBC_SYMBOLS
 RTS_LIBGCC_SYMBOLS
+RTS_ARCH_LIBGCC_SYMBOLS
 RTS_FINI_ARRAY_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
@@ -1069,9 +1084,111 @@ RtsSymbolVal rtsSyms[] = {
       RTS_DARWIN_ONLY_SYMBOLS
       RTS_OPENBSD_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
+      RTS_ARCH_LIBGCC_SYMBOLS
       RTS_FINI_ARRAY_SYMBOLS
       RTS_LIBFFI_SYMBOLS
       RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
       SymI_HasDataProto(nonmoving_write_barrier_enabled)
       { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
 };
+
+
+// Note [Extra RTS symbols]
+// ~~~~~~~~~~~~~~~~~~~~~~~~
+// How does the RTS linker know the location of the exposed RTS functions in the
+// current Haskell process? Especially if it is statically linked, there is no
+// dynamic table containing a symbol->address mapping. What we do is that we
+// compile the following static "rtsSyms" array:
+//
+//  RtsSymbolVar rtsSyms[] = {
+//    { "rts_foo", &rts_foo, ...}
+//    ...
+//  };
+//
+// This array associates a predefined set of symbol names (e.g. "rts_foo") to
+// their address (e.g. &rts_foo) as determined by the linker (static or
+// dynamic).
+//
+// Note that also use this mechanism for libraries other than the RTS, e.g.
+// libc.
+//
+// Why do we need this mapping?
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Suppose we have a Haskell program statically linked against the "libfoo"
+// library and using the "foo" symbol. If we try to dynamically link some code
+// using "foo" with the RTS linker, we will load another instance of "libfoo" in
+// memory and use the "foo" symbol in it for the dynamically loaded code.
+// However the statically linked code still uses the statically linked instance
+// of libfoo and its foo symbol.
+//
+// This isn't a problem as long a we use side-effect free functions. However
+// both instances of a "foo" function using global variables may use different
+// global variables!
+//
+// This was a real issue with programs linked against the ghc library and
+// also loading it dynamically: the GHC lib uses global variables (e.g. for the
+// unique counter), and those weren't shared... This wasn't solved by adding
+// GHC's global variables to the rtsSyms list but it could have been (instead a
+// generic mechanism to explicit manage Haskell global variables through the RTS
+// was added and used). However for other libraries, especially foreign ones,
+// the issue remains!
+//
+// Which symbols should go into the list?
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Ideally all problematic symbols (wrt to the double loading issue mentioned
+// above) should go into the list. However:
+//   - we can't easily predict all the symbols that will be problematic/needed
+//   - symbols in the list prevent some dead code elimination! If symbol "foo"
+//   is in the list, even if we never load any code using "foo", we'll carry the
+//   code for "foo" and its dependencies.
+//
+// The second point is particularly problematic if some symbols are only needed
+// to run Template Haskell splices at compilation time: we need them in the RTS
+// used by the interpreter but not in the RTS of the target program!
+//
+// Extra symbols
+// ~~~~~~~~~~~~~
+// Since #25155 we also support specifying a second list of "extra" symbols
+// which is empty by default. By overriding the weak `rtsExtraSyms` function,
+// build tools can extend the list of symbols linked into the RTS. This feature
+// coupled with the external-interpreter feature allows specific external
+// interpreter programs to be built easily with extra symbols supported.
+//
+// As a concrete example, one can build an `iserv-proxy-interpreter` program
+// with the following additional Cabal stanza (see [1]):
+//
+//      if os(linux) && arch(aarch64)
+//         c-sources: cbits/symbols.aarch64-musl.c
+//
+// Where the C file contains (see [2] and [3]):
+//
+//      #include <RtsSymbols.h>
+//
+//      #define CODE_SYM(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+//      #define DATA_SYM(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
+//
+//      RtsSymbolVal my_iserv_syms[] = {
+//          CODE_SYM(malloc)
+//          CODE_SYM(getauxval)
+//          CODE_SYM(posix_spawn_file_actions_init)
+//          ...
+//          { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+//      };
+//
+//      RtsSymbolVal* rtsExtraSyms() {
+//          return my_iserv_syms;
+//      }
+//
+// [1] https://github.com/stable-haskell/iserv-proxy/blob/2ed34002247213fc435d0062350b91bab920626e/iserv-proxy.cabal#L110-L111
+// [2] https://github.com/stable-haskell/iserv-proxy/blob/2ed34002247213fc435d0062350b91bab920626e/cbits/symbols.aarch64-musl.c
+// [3] https://github.com/stable-haskell/iserv-proxy/blob/2ed34002247213fc435d0062350b91bab920626e/cbits/symbols.aarch64-musl.h
+//
+
+static RtsSymbolVal default_extra_syms[] = {
+      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+};
+
+/* Default empty extra RTS symbols. See Note[Extra RTS symbols] */
+RtsSymbolVal* __attribute__((weak)) rtsExtraSyms(void) {
+    return default_extra_syms;
+}

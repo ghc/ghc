@@ -483,6 +483,9 @@ addTickHsExpr e@(HsOverLit {})          = return e
 addTickHsExpr e@(HsOverLabel{})         = return e
 addTickHsExpr e@(HsLit {})              = return e
 addTickHsExpr e@(HsEmbTy {})            = return e
+addTickHsExpr e@(HsQual {})             = return e
+addTickHsExpr e@(HsForAll {})           = return e
+addTickHsExpr e@(HsFunArr {})           = return e
 addTickHsExpr (HsLam x v mg)            = liftM (HsLam x v)
                                                 (addTickMatchGroup True mg)
 addTickHsExpr (HsApp x e1 e2)          = liftM2 (HsApp x) (addTickLHsExprNever e1)
@@ -585,8 +588,8 @@ addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)
                 (addTickLPat pat)
                 (traverse (addTickHsCmdTop) cmdtop)
-addTickHsExpr (XExpr (WrapExpr (HsWrap w e))) =
-        liftM (XExpr . WrapExpr . HsWrap w) $
+addTickHsExpr (XExpr (WrapExpr w e)) =
+        liftM (XExpr . WrapExpr w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
 addTickHsExpr (XExpr (ExpandedThingTc o e)) = addTickHsExpanded o e
 
@@ -882,11 +885,10 @@ addTickHsCmd (HsCmdArrApp  arr_ty e1 e2 ty1 lr) =
                (addTickLHsExpr e2)
                (return ty1)
                (return lr)
-addTickHsCmd (HsCmdArrForm x e f fix cmdtop) =
-        liftM4 (HsCmdArrForm x)
+addTickHsCmd (HsCmdArrForm x e f cmdtop) =
+        liftM3 (HsCmdArrForm x)
                (addTickLHsExpr e)
                (return f)
-               (return fix)
                (mapM (traverse (addTickHsCmdTop)) cmdtop)
 
 addTickHsCmd (XCmd (HsWrap w cmd)) =
@@ -973,9 +975,9 @@ addTickCmdStmt (XStmtLR (ApplicativeStmt{})) =
 addTickCmdStmt stmt  = pprPanic "addTickHsCmd" (ppr stmt)
 
 addTickHsRecordBinds :: HsRecordBinds GhcTc -> TM (HsRecordBinds GhcTc)
-addTickHsRecordBinds (HsRecFields fields dd)
+addTickHsRecordBinds (HsRecFields x fields dd)
   = do  { fields' <- mapM addTickHsRecField fields
-        ; return (HsRecFields fields' dd) }
+        ; return (HsRecFields x fields' dd) }
 
 addTickHsRecField :: LHsFieldBind GhcTc id (LHsExpr GhcTc)
                   -> TM (LHsFieldBind GhcTc id (LHsExpr GhcTc))

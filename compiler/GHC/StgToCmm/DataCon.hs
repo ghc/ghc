@@ -19,6 +19,7 @@ import GHC.Prelude
 
 import GHC.Platform
 
+import GHC.Stg.Utils (allowTopLevelConApp)
 import GHC.Stg.Syntax
 import GHC.Core  ( AltCon(..) )
 
@@ -48,7 +49,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad (mapMaybeM)
 
-import Control.Monad
 import Data.Char
 import GHC.StgToCmm.Config (stgToCmmPlatform)
 import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn)
@@ -90,10 +90,8 @@ cgTopRhsCon cfg id con mn args
    gen_code =
      do { profile <- getProfile
         ; this_mod <- getModuleName
-        ; when (platformOS platform == OSMinGW32) $
-              -- Windows DLLs have a problem with static cross-DLL refs.
-              massert (not (isDllConApp platform (stgToCmmExtDynRefs cfg) this_mod con (map fromNonVoid args)))
-        ; assert (args `lengthIs` countConRepArgs con ) return ()
+        ; massert (allowTopLevelConApp platform (stgToCmmExtDynRefs cfg) this_mod con (map fromNonVoid args))
+        ; massert (args `lengthIs` countConRepArgs con )
         ; checkConArgsStatic (text "TagCheck failed - Top level con") con (map fromNonVoid args)
         -- LAY IT OUT
         ; let

@@ -45,13 +45,28 @@ module GHC.Internal.Exception.Type
        , underflowException
        ) where
 
+import GHC.Internal.Data.OldList (intersperse)
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.Typeable (Typeable, cast)
+import GHC.Internal.Data.Typeable (Typeable, TypeRep, cast)
+import qualified GHC.Internal.Data.Typeable as Typeable
    -- loop: GHC.Internal.Data.Typeable -> GHC.Internal.Err -> GHC.Internal.Exception
 import GHC.Internal.Base
 import GHC.Internal.Show
 import GHC.Internal.Exception.Context
 
+{- |
+A constraint used to propagate 'ExceptionContext's.
+
+GHC will automatically default any unsolved 'HasExceptionContext' constraints to an
+empty exception context, similarly to 'HasCallStack'.
+
+NOTE: The fact that @HasExceptionContext@ is defined as an implicit parameter is
+an implementation detail and __should not__ be considered a part of the API.
+It does however mean that any implicit parameter `?exceptionContext :: ExceptionContext`
+will be subject to defaulting, as described above.
+
+@since base-4.20.0.0
+-}
 type HasExceptionContext = (?exceptionContext :: ExceptionContext)
 
 {- |
@@ -182,6 +197,7 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
+    -- | @since base-4.20.0.0
     backtraceDesired :: e -> Bool
     backtraceDesired _ = True
 
@@ -198,13 +214,31 @@ instance Exception SomeException where
     fromException = Just
     backtraceDesired (SomeException e) = backtraceDesired e
     displayException (SomeException e) =
-        displayException e ++ "\n" ++ displayContext ?exceptionContext
+        case displayContext ?exceptionContext of
+          "" -> msg
+          dc -> msg ++ "\n\n" ++ dc
+        where
+            msg =
+              displayException e
+                ++ displayTypeInfo (Typeable.typeOf e)
+
+            displayTypeInfo :: TypeRep -> String
+            displayTypeInfo rep =
+              mconcat
+                [ "\n\nPackage: ",
+                  Typeable.tyConPackage tyCon,
+                  "\nModule: ",
+                  Typeable.tyConModule tyCon,
+                  "\nType: ",
+                  Typeable.tyConName tyCon
+                ]
+                where
+                  tyCon = Typeable.typeRepTyCon rep
 
 displayContext :: ExceptionContext -> String
-displayContext (ExceptionContext anns0) = go anns0
+displayContext (ExceptionContext anns0) = mconcat $ intersperse "\n" $ map go anns0
   where
-    go (SomeExceptionAnnotation ann : anns) = displayExceptionAnnotation ann ++ "\n" ++ go anns
-    go [] = ""
+    go (SomeExceptionAnnotation ann) = displayExceptionAnnotation ann
 
 newtype NoBacktrace e = NoBacktrace e
     deriving (Show)

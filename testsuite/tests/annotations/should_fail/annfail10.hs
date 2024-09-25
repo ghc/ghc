@@ -6,5 +6,5 @@ module Annfail10 where
 {-# ANN type Foo 1 #-}
 data Foo = Bar
 
-{-# ANN f 1 #-}
+{-# ANN f Nothing #-}
 f x = x

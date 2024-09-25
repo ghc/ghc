@@ -80,8 +80,10 @@ import Packages
 -- "Hadrian.Oracles.TextFile.readPackageData" oracle.
 parsePackageData :: Package -> Action PackageData
 parsePackageData pkg = do
-    gpd <- traced "cabal-read" $
+    gpd' <- traced "cabal-read" $
         C.readGenericPackageDescription C.verbose Nothing (C.makeSymbolicPath (pkgCabalFile pkg))
+    -- We need to make the data dir relative to the package path so that cabal can actually find it
+    let gpd = gpd' { C.packageDescription = (C.packageDescription gpd') { C.dataDir = C.makeSymbolicPath (pkgPath pkg) C.</> C.makeRelativePathEx (C.interpretSymbolicPathCWD (C.dataDir (C.packageDescription gpd'))) } }
     let pd      = C.packageDescription gpd
         pkgId   = C.package pd
         name    = C.unPackageName (C.pkgName pkgId)
@@ -367,7 +369,7 @@ write_inplace_conf pkg_path res_path pd lbi = do
                       prefix = "${pkgroot}/../../../"
               let installedPkgInfo =
 
-                    C.inplaceInstalledPackageInfo (cwd </> pkg_path) (C.makeSymbolicPath build_dir) pd (C.mkAbiHash "inplace") lib lbi clbi
+                    C.inplaceInstalledPackageInfo (C.AbsolutePath $ C.makeSymbolicPath $ cwd </> pkg_path) (C.makeSymbolicPath build_dir) pd (C.mkAbiHash "inplace") lib lbi clbi
 
                   build_dir = "${pkgroot}/../" ++ pkg_path ++ "/build"
                   pkg_name = C.display (C.pkgName (CP.sourcePackageId installedPkgInfo))

@@ -23,6 +23,7 @@ import GHC.Prelude
 
 import GHC.Rename.Utils ( wrapGenSpan, genHsExpApps, genHsApp, genHsLet,
                           genHsLamDoExp, genHsCaseAltDoExp, genWildPat )
+import GHC.Rename.Env ( irrefutableConLikeRn )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 
@@ -196,9 +197,10 @@ expand_do_stmts _ stmts = pprPanic "expand_do_stmts: impossible happened" $ (ppr
 mk_failable_expr :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (LHsExpr GhcRn)
 mk_failable_expr doFlav pat@(L loc _) expr fail_op =
   do { is_strict <- xoptM LangExt.Strict
+     ; hscEnv <- getTopEnv
      ; rdrEnv <- getGlobalRdrEnv
      ; comps <- getCompleteMatchesTcM
-     ; let irrf_pat = isIrrefutableHsPat is_strict (irrefutableConLikeRn rdrEnv comps) pat
+     ; let irrf_pat = isIrrefutableHsPat is_strict (irrefutableConLikeRn hscEnv rdrEnv comps) pat
      ; traceTc "mk_failable_expr" (vcat [ text "pat:" <+> ppr pat
                                         , text "isIrrefutable:" <+> ppr irrf_pat
                                         ])

@@ -16,7 +16,9 @@ import System.Directory (canonicalizePath)
 import System.Environment (lookupEnv)
 import qualified Data.Set as Set
 import Oracles.ModuleFiles
+import Oracles.Setting
 import Utilities
+import Data.Version.Extra
 
 -- | @tool:@ is used by tooling in order to get the arguments necessary
 -- to set up a GHC API session which can compile modules from GHC. When
@@ -85,7 +87,16 @@ multiSetup pkg_s = do
       need (srcs ++ gens)
       let rexp m = ["-reexported-module", m]
       let hidir = root </> "interfaces" </> pkgPath p
-      writeFile' (resp_file root p) (intercalate "\n" (arg_list
+      ghcVersion <- ghcVersionStage stage0InTree
+      let ghc_wired_in = readVersion ghcVersion < makeVersion [9,8,1]
+          ghc_package_id = "-package-id ghc-" ++ ghcVersion
+          normalise_ghc = if ghc_wired_in then normalisePackageIds else id
+          normalisePackageIds :: [String] -> [String]
+          normalisePackageIds ((isPrefixOf ghc_package_id -> True) : xs) = "-package-id" : "ghc" : xs
+          normalisePackageIds (x:xs) = x : normalisePackageIds xs
+          normalisePackageIds [] = []
+
+      writeFile' (resp_file root p) (intercalate "\n" (normalise_ghc arg_list
                                                       ++  modules cd
                                                       ++ concatMap rexp (reexportModules cd)
                                                       ++ ["-outputdir", hidir]))
@@ -138,6 +149,7 @@ toolTargets = [ cabalSyntax
               , directory
               , process
               , filepath
+              , fileio
               , osString
               -- , ghc     -- # depends on ghc library
               -- , runGhc  -- # depends on ghc library
@@ -149,7 +161,9 @@ toolTargets = [ cabalSyntax
               , ghcHeap
               , ghci
               , ghcPkg  -- # executable
-              -- , haddock -- # depends on ghc library
+              , haddock -- # depends on ghc library
+              , haddockApi
+              , haddockLibrary
               , hsc2hs  -- # executable
               , hpc
               , hpcBin  -- # executable

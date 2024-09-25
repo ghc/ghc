@@ -38,6 +38,8 @@ check title expected got
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions =
     [ "OrPatterns"
+    , "NamedDefaults"
+    , "MultilineStrings"
     ]
 
 expectedCabalOnlyExtensions :: [String]

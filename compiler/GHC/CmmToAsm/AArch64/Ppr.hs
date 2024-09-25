@@ -316,6 +316,7 @@ pprReg w r = case r of
          | w == W64 = text "sp"
          | w == W32 = text "wsp"
 
+    -- See Note [AArch64 Register assignments]
     ppr_reg_no w i
          | i < 0, w == W32 = text "wzr"
          | i < 0, w == W64 = text "xzr"
@@ -526,7 +527,8 @@ pprInstr platform instr = case instr of
   LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBISH -> line $ text "\tdmb ish"
+  DMBISH DmbLoadStore -> line $ text "\tdmb ish"
+  DMBISH DmbLoad -> line $ text "\tdmb ishld"
 
   -- 9. Floating Point Instructions --------------------------------------------
   FMOV o1 o2 -> op2 (text "\tfmov") o1 o2

@@ -137,6 +137,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Predicate
 
+import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
@@ -176,6 +177,7 @@ import GHCi.RemoteTypes
 
 import Data.Set      ( Set )
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Data.Dynamic  ( Dynamic )
 import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
@@ -466,8 +468,8 @@ data TcGblEnv
           -- ^ What kind of module (regular Haskell, hs-boot, hsig)
 
         tcg_rdr_env :: GlobalRdrEnv,   -- ^ Top level envt; used during renaming
-        tcg_default :: Maybe [Type],
-          -- ^ Types used for defaulting. @Nothing@ => no @default@ decl
+        tcg_default         :: DefaultEnv,     -- ^ All class defaults in scope in the module
+        tcg_default_exports :: DefaultEnv,     -- ^ All class defaults exported from the module
 
         tcg_fix_env :: FixityEnv,      -- ^ Just for things in this module
 
@@ -564,6 +566,10 @@ data TcGblEnv
 
         tcg_dfun_n  :: TcRef OccSet,
           -- ^ Allows us to choose unique DFun names.
+
+        tcg_zany_n :: TcRef Integer,
+          -- ^ A source of unique identities for ZonkAny instances
+          -- See Note [Any types] in GHC.Builtin.Types, wrinkle (Any4)
 
         tcg_merged :: [(Module, Fingerprint)],
           -- ^ The requirements we merged with; we always have to recompile
@@ -916,7 +922,7 @@ plusModDeps = plusInstalledModuleEnv plus_mod_dep
       -- perf/compiler/MultiLayerModules
 
 emptyImportAvails :: ImportAvails
-emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
+emptyImportAvails = ImportAvails { imp_mods          = M.empty,
                                    imp_direct_dep_mods = emptyInstalledModuleEnv,
                                    imp_dep_direct_pkgs = S.empty,
                                    imp_sig_mods      = [],
@@ -947,7 +953,7 @@ plusImportAvails
                   imp_sig_mods = sig_mods2,
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
-  = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
+  = ImportAvails { imp_mods          = M.unionWith (++) mods1 mods2,
                    imp_direct_dep_mods = ddmods1 `plusModDeps` ddmods2,
                    imp_dep_direct_pkgs      = ddpkgs1 `S.union` ddpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,

@@ -1,6 +1,7 @@
 
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections    #-}
+{-# LANGUAGE MultiWayIf       #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2012
@@ -401,6 +402,7 @@ import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Stg.Utils
+import GHC.Stg.Make
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim (intPrimTy)
 import GHC.Builtin.Types
@@ -442,10 +444,14 @@ import Data.List (mapAccumL)
 -- INVARIANT: OutStgArgs in the range only have NvUnaryTypes
 --            (i.e. no unboxed tuples, sums or voids)
 --
-newtype UnariseEnv = UnariseEnv  { ue_rho :: (VarEnv UnariseVal) }
+data UnariseEnv = UnariseEnv
+  { ue_rho                 :: (VarEnv UnariseVal)
+  , ue_allow_static_conapp :: DataCon -> [StgArg] -> Bool
+  }
 
-initUnariseEnv :: VarEnv UnariseVal -> UnariseEnv
+initUnariseEnv :: VarEnv UnariseVal -> (DataCon -> [StgArg] -> Bool) -> UnariseEnv
 initUnariseEnv = UnariseEnv
+
 data UnariseVal
   = MultiVal [OutStgArg] -- MultiVal to tuple. Can be empty list (void).
   | UnaryVal OutStgArg   -- See Note [Renaming during unarisation].
@@ -477,27 +483,57 @@ lookupRho env v = lookupVarEnv (ue_rho env) v
 
 --------------------------------------------------------------------------------
 
-unarise :: UniqSupply -> [StgTopBinding] -> [StgTopBinding]
-unarise us binds = initUs_ us (mapM (unariseTopBinding (initUnariseEnv emptyVarEnv)) binds)
+unarise :: UniqSupply -> (DataCon -> [StgArg] -> Bool) -> [StgTopBinding] -> [StgTopBinding]
+unarise us is_dll_con_app binds = initUs_ us (mapM (unariseTopBinding (initUnariseEnv emptyVarEnv is_dll_con_app)) binds)
 
 unariseTopBinding :: UnariseEnv -> StgTopBinding -> UniqSM StgTopBinding
 unariseTopBinding rho (StgTopLifted bind)
-  = StgTopLifted <$> unariseBinding rho bind
+  = StgTopLifted <$> unariseBinding rho True bind
 unariseTopBinding _ bind@StgTopStringLit{} = return bind
 
-unariseBinding :: UnariseEnv -> StgBinding -> UniqSM StgBinding
-unariseBinding rho (StgNonRec x rhs)
-  = StgNonRec x <$> unariseRhs rho rhs
-unariseBinding rho (StgRec xrhss)
-  = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs rho rhs) xrhss
+unariseBinding :: UnariseEnv -> Bool -> StgBinding -> UniqSM StgBinding
+unariseBinding rho top_level (StgNonRec x rhs)
+  = StgNonRec x <$> unariseRhs rho top_level rhs
+unariseBinding rho top_level (StgRec xrhss)
+  = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs rho top_level rhs) xrhss
 
-unariseRhs :: UnariseEnv -> StgRhs -> UniqSM StgRhs
-unariseRhs rho (StgRhsClosure ext ccs update_flag args expr typ)
+unariseRhs :: UnariseEnv -> Bool -> StgRhs -> UniqSM StgRhs
+unariseRhs rho top_level (StgRhsClosure ext ccs update_flag args expr typ)
   = do (rho', args1) <- unariseFunArgBinders rho args
        expr' <- unariseExpr rho' expr
-       return (StgRhsClosure ext ccs update_flag args1 expr' typ)
+       -- Unarisation can lead to a StgRhsClosure becoming a StgRhsCon.
+       -- Hence, we call `mk(Top)StgRhsCon_maybe` rather than just building
+       -- another `StgRhsClosure`.
+       --
+       -- For example with unboxed sums (#25166):
+       --
+       --     foo = \u [] case (# | _ | #) [(##)] of tag { __DEFAULT -> D [True tag] }
+       --
+       --  ====> {unarisation}
+       --
+       --     foo = D [True 2#]
+       --
+       -- Transforming an appropriate StgRhsClosure into a StgRhsCon is
+       -- important as top-level StgRhsCon are statically allocated.
+       --
+       let mk_rhs = MkStgRhs
+            { rhs_args = args1
+            , rhs_expr = expr'
+            , rhs_type = typ
+            , rhs_is_join = update_flag == JumpedTo
+            }
+       if | top_level
+          , Just rhs_con <- mkTopStgRhsCon_maybe (ue_allow_static_conapp rho) mk_rhs
+          -> pure rhs_con
 
-unariseRhs rho (StgRhsCon ccs con mu ts args typ)
+          | not top_level
+          , Just rhs_con <- mkStgRhsCon_maybe mk_rhs
+          -> pure rhs_con
+
+          | otherwise
+          -> pure (StgRhsClosure ext ccs update_flag args1 expr' typ)
+
+unariseRhs rho _top (StgRhsCon ccs con mu ts args typ)
   = assert (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
     return (StgRhsCon ccs con mu ts (unariseConArgs rho args) typ)
 
@@ -576,10 +612,10 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
                        -- dead after unarise (checked in GHC.Stg.Lint)
 
 unariseExpr rho (StgLet ext bind e)
-  = StgLet ext <$> unariseBinding rho bind <*> unariseExpr rho e
+  = StgLet ext <$> unariseBinding rho False bind <*> unariseExpr rho e
 
 unariseExpr rho (StgLetNoEscape ext bind e)
-  = StgLetNoEscape ext <$> unariseBinding rho bind <*> unariseExpr rho e
+  = StgLetNoEscape ext <$> unariseBinding rho False bind <*> unariseExpr rho e
 
 unariseExpr rho (StgTick tick e)
   = StgTick tick <$> unariseExpr rho e

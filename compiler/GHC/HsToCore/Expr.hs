@@ -423,10 +423,10 @@ converting to core it must become a CO.
 -}
 
 dsExpr (ExplicitTuple _ tup_args boxity)
-  = do { let go (lam_vars, args) (Missing (Scaled mult ty))
+  = do { let go (lam_vars, args) (Missing st)
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
-               = do { lam_var <- newSysLocalDs mult ty
+               = do { lam_var <- newSysLocalDs st
                     ; return (lam_var : lam_vars, Var lam_var : args) }
              go (lam_vars, args) (Present _ expr)
                     -- Expressions that are present don't generate
@@ -446,6 +446,9 @@ dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
 
 dsExpr (HsEmbTy x _) = dataConCantHappen x
+dsExpr (HsQual x _ _) = dataConCantHappen x
+dsExpr (HsForAll x _ _) = dataConCantHappen x
+dsExpr (HsFunArr x _ _ _) = dataConCantHappen x
 
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
@@ -967,8 +970,8 @@ warnUnusedBindValue fun arg@(L loc _) arg_ty
     fish_var :: LHsExpr GhcTc -> Maybe (SrcSpan , Id)
     fish_var (L l (HsVar _ id)) = return (locA l, unLoc id)
     fish_var (L _ (HsAppType _ e _)) = fish_var e
-    fish_var (L l (XExpr (WrapExpr (HsWrap _ e)))) = do (l, e') <- fish_var (L l e)
-                                                        return (l, e')
+    fish_var (L l (XExpr (WrapExpr _ e))) = do (l, e') <- fish_var (L l e)
+                                               return (l, e')
     fish_var (L l (XExpr (ExpandedThingTc _ e))) = fish_var (L l e)
     fish_var _ = Nothing
 
@@ -1016,7 +1019,7 @@ dsHsWrapped orig_hs_expr
   where
     go wrap (HsPar _ (L _ hs_e))
        = go wrap hs_e
-    go wrap1 (XExpr (WrapExpr (HsWrap wrap2 hs_e)))
+    go wrap1 (XExpr (WrapExpr wrap2 hs_e))
        = go (wrap1 <.> wrap2) hs_e
     go wrap (HsAppType ty (L _ hs_e) _)
        = go (wrap <.> WpTyApp ty) hs_e

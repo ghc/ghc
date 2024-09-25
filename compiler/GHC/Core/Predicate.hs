@@ -192,18 +192,12 @@ getEqPredRole :: PredType -> Role
 -- Precondition: the PredType is (s ~#N t) or (s ~#R t)
 getEqPredRole ty = eqRelRole (predTypeEqRel ty)
 
--- | Get the equality relation relevant for a pred type.
--- Precondition: the PredType is (s ~#N t) or (s ~#R t)
-predTypeEqRel :: HasDebugCallStack => PredType -> EqRel
+-- | Get the equality relation relevant for a pred type
+-- Returns NomEq for dictionary predicates, etc
+predTypeEqRel :: PredType -> EqRel
 predTypeEqRel ty
-  = case splitTyConApp_maybe ty of
-     Just (tc, _) | tc `hasKey` eqReprPrimTyConKey
-                  -> ReprEq
-                  | otherwise
-                  -> assertPpr (tc `hasKey` eqPrimTyConKey) (ppr ty)
-                     NomEq
-     _ -> pprPanic "predTypeEqRel" (ppr ty)
-
+  | isReprEqPrimPred ty = ReprEq
+  | otherwise           = NomEq
 
 {-------------------------------------------
 Predicates on PredType

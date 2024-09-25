@@ -27,10 +27,10 @@ void checkGcRoots(void)
     rts_listThreads(&collectTSOsCallback, NULL);
     for (int i = 0; i < tsoCount; i++)
     {
-        StgTSO *tso = UNTAG_CLOSURE(tsos[i]);
+        StgClosure *tso = UNTAG_CLOSURE((StgClosure*) tsos[i]);
         if (get_itbl(tso)->type != TSO)
         {
-            fprintf(stderr, "tso returned a non-TSO type %zu at index %i\n",
+            fprintf(stderr, "tso returned a non-TSO type %u at index %i\n",
                 tso->header.info->type,
                 i);
             exit(1);
@@ -44,7 +44,7 @@ void checkGcRoots(void)
         StgClosure *root = UNTAG_CLOSURE(miscRoots[i]);
         if (get_itbl(root)->type == TSO)
         {
-            fprintf(stderr, "rts_listThreads unexpectedly returned an TSO type at index %i (TSO=%zu)\n", i, TSO);
+            fprintf(stderr, "rts_listThreads unexpectedly returned an TSO type at index %i (TSO=%d)\n", i, TSO);
             exit(1);
         }
     }

@@ -121,6 +121,7 @@ dsLit l = do
     HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
+    HsMultilineString _ str -> mkStringExprFS str
     HsInteger _ i _  -> return (mkIntegerExpr platform i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     HsRat _ fl ty    -> dsFractionalLitToRational fl ty
@@ -446,7 +447,7 @@ getLHsIntegralLit (L _ e) = go e
     go (XExpr (HsBinTick _ _ e))  = getLHsIntegralLit e
 
     -- The literal might be wrapped in a case with -XOverloadedLists
-    go (XExpr (WrapExpr (HsWrap _ e))) = go e
+    go (XExpr (WrapExpr _ e)) = go e
     go _ = Nothing
 
 -- | If 'Integral', extract the value and type of the overloaded literal.
@@ -474,6 +475,7 @@ getSimpleIntegralLit (HsInteger _ i ty) = Just (i, ty)
 getSimpleIntegralLit HsChar{}           = Nothing
 getSimpleIntegralLit HsCharPrim{}       = Nothing
 getSimpleIntegralLit HsString{}         = Nothing
+getSimpleIntegralLit HsMultilineString{} = Nothing
 getSimpleIntegralLit HsStringPrim{}     = Nothing
 getSimpleIntegralLit HsRat{}            = Nothing
 getSimpleIntegralLit HsFloatPrim{}      = Nothing

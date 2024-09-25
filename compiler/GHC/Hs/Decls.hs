@@ -1105,8 +1105,8 @@ type instance XXDefaultDecl    (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (DefaultDecl (GhcPass p)) where
-    ppr (DefaultDecl _ tys)
-      = text "default" <+> parens (interpp'SP tys)
+    ppr (DefaultDecl _ cl tys)
+      = text "default" <+> maybe id ((<+>) . ppr) cl (parens (interpp'SP tys))
 
 {-
 ************************************************************************

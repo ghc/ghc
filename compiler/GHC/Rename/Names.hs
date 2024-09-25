@@ -51,7 +51,7 @@ import GHC.Tc.Zonk.TcType ( tcInitTidyEnv )
 
 import GHC.Hs
 import GHC.Iface.Load   ( loadSrcInterface )
-import GHC.Iface.Syntax ( fromIfaceWarnings )
+import GHC.Iface.Syntax ( IfaceDefault, fromIfaceWarnings )
 import GHC.Builtin.Names
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Core.Type
@@ -201,7 +201,7 @@ with yes we have gone with no for now.
 -- Note: Do the non SOURCE ones first, so that we get a helpful warning
 -- for SOURCE ones that are unnecessary
 rnImports :: [(LImportDecl GhcPs, SDoc)]
-          -> RnM ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+          -> RnM ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
 rnImports imports = do
     tcg_env <- getGblEnv
     -- NB: want an identity module here, because it's OK for a signature
@@ -212,10 +212,10 @@ rnImports imports = do
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
-    let (decls, imp_user_spec, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
+    let (decls, imp_user_spec, rdr_env, imp_avails, defaults, hpc_usage) = combine (stuff1 ++ stuff2)
     -- Update imp_boot_mods if imp_direct_mods mentions any of them
     let merged_import_avail = clobberSourceImports imp_avails
-    return (decls, imp_user_spec, rdr_env, merged_import_avail, hpc_usage)
+    return (decls, imp_user_spec, rdr_env, merged_import_avail, defaults, hpc_usage)
 
   where
     clobberSourceImports imp_avails =
@@ -228,22 +228,23 @@ rnImports imports = do
         combJ (GWIB _ IsBoot) x = Just x
         combJ r _               = Just r
     -- See Note [Combining ImportAvails]
-    combine :: [(LImportDecl GhcRn,  ImportUserSpec, GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
-            -> ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+    combine :: [(LImportDecl GhcRn,  ImportUserSpec, GlobalRdrEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)]
+            -> ([LImportDecl GhcRn], [ImportUserSpec], GlobalRdrEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
     combine ss =
-      let (decls, imp_user_spec, rdr_env, imp_avails, hpc_usage, finsts) = foldr
+      let (decls, imp_user_spec, rdr_env, imp_avails, defaults, hpc_usage, finsts) = foldr
             plus
-            ([], [], emptyGlobalRdrEnv, emptyImportAvails, False, emptyModuleSet)
+            ([], [], emptyGlobalRdrEnv, emptyImportAvails, [], False, emptyModuleSet)
             ss
       in (decls, imp_user_spec, rdr_env, imp_avails { imp_finsts = moduleSetElts finsts },
-            hpc_usage)
+            defaults, hpc_usage)
 
-    plus (decl,  us, gbl_env1, imp_avails1, hpc_usage1)
-         (decls, uss, gbl_env2, imp_avails2, hpc_usage2, finsts_set)
+    plus (decl,  us, gbl_env1, imp_avails1, defaults1, hpc_usage1)
+         (decls, uss, gbl_env2, imp_avails2, defaults2, hpc_usage2, finsts_set)
       = ( decl:decls,
           us:uss,
           gbl_env1 `plusGlobalRdrEnv` gbl_env2,
           imp_avails1' `plusImportAvails` imp_avails2,
+          defaults1 ++ defaults2,
           hpc_usage1 || hpc_usage2,
           extendModuleSetList finsts_set new_finsts )
       where
@@ -308,7 +309,7 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 --  4. A boolean 'AnyHpcUsage' which is true if the imported module
 --     used HPC.
 rnImportDecl :: Module -> (LImportDecl GhcPs, SDoc)
-             -> RnM (LImportDecl GhcRn, ImportUserSpec , GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+             -> RnM (LImportDecl GhcRn, ImportUserSpec , GlobalRdrEnv, ImportAvails, [(Module, IfaceDefault)], AnyHpcUsage)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
                                      , ideclPkgQual = raw_pkg_qual
@@ -439,7 +440,8 @@ rnImportDecl this_mod
           , ideclImportList = new_imp_details
           }
 
-    return (L loc new_imp_decl, ImpUserSpec imp_spec imp_user_list, gbl_env, imports, mi_hpc iface)
+    return (L loc new_imp_decl, ImpUserSpec imp_spec imp_user_list, gbl_env,
+            imports, (,) (mi_module iface) <$> mi_defaults iface, mi_hpc iface)
 
 
 -- | Rename raw package imports
@@ -573,7 +575,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
 
 
   in ImportAvails {
-          imp_mods       = unitModuleEnv (mi_module iface) [imported_by],
+          imp_mods       = Map.singleton (mi_module iface) [imported_by],
           imp_orphs      = orphans,
           imp_finsts     = finsts,
           imp_sig_mods   = sig_mods,

@@ -1,0 +1,4 @@
+
+default-fail04.hs:8:1: [GHC-73993]
+     ‘C’ is not a unary constraint, as expected by a `default' declaration
+     When checking the types in a default declaration

@@ -27,7 +27,7 @@ import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
 import GHC.Builtin.Types
-import GHC.Builtin.Names (rationalTyConName)
+import GHC.Builtin.Names (rationalTyConName, toListName)
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -37,14 +37,13 @@ import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
-import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar, decideBangHood)
+import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar, decideBangHood, checkMultiplicityCoercions)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Type
 import GHC.Data.Maybe
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.SourceText (FractionalLit(..))
 import Control.Monad (zipWithM, replicateM)
 import Data.List (elemIndex)
@@ -125,21 +124,24 @@ desugarPat x pat = case pat of
   XPat ext -> case ext of
 
     ExpansionPat orig expansion -> do
-      dflags <- getDynFlags
       case orig of
         -- We add special logic for overloaded list patterns. When:
         --   - a ViewPat is the expansion of a ListPat,
-        --   - RebindableSyntax is off,
         --   - the type of the pattern is the built-in list type,
         -- then we assume that the view function, 'toList', is the identity.
         -- This improves pattern-match overload checks, as this will allow
         -- the pattern match checker to directly inspect the inner pattern.
         -- See #14547, and Note [Desugaring overloaded list patterns] (Wrinkle).
         ListPat {}
-          | ViewPat arg_ty _lexpr pat <- expansion
-          , not (xopt LangExt.RebindableSyntax dflags)
+          | ViewPat arg_ty lrhs pat <- expansion
           , Just tc <- tyConAppTyCon_maybe arg_ty
           , tc == listTyCon
+          -- `pat` looks like `coerce toList -> [p1,...,pn]`.
+          -- Now take care of -XRebindableSyntax:
+          , let is_to_list (HsVar _ (L _ to_list)) = idName to_list == toListName
+                is_to_list (XExpr (WrapExpr _ e))  = is_to_list e
+                is_to_list _                       = False
+          , is_to_list (unLoc lrhs)
           -> desugarLPat x pat
 
         _ -> desugarPat x expansion
@@ -271,7 +273,9 @@ desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
 desugarConPatOut x con univ_tys ex_tvs dicts = \case
     PrefixCon _ ps               -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
-    RecCon    (HsRecFields fs _) -> go_field_pats (rec_field_ps fs)
+    RecCon    (HsRecFields mult_cos fs _) -> do
+      checkMultiplicityCoercions mult_cos
+      go_field_pats (rec_field_ps fs)
   where
     -- The actual argument types (instantiated)
     arg_tys     = map scaledThing $ conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)

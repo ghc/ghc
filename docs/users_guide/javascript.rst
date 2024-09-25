@@ -127,17 +127,17 @@ objects or arrays as required.
 There are three categories of functions that create callbacks, with the
 arity-1 type signatures shown here for demonstration:
 
-* ``syncCallback1 :: (JSVal -> IO ()) -> OnBlocked -> IO (Callback (JSVal -> IO ()))``:
+* ``syncCallback1 :: OnBlocked -> (JSVal -> IO ()) -> IO (Callback (JSVal -> IO ()))``:
   Synchronous callbacks that don't return a value. These take an additional
   ``data OnBlocked = ThrowWouldBlock | ContinueAsync`` argument for use in the
   case that the thread becomes blocked on e.g. an ``MVar`` transaction.
 
-* ``syncCallback' :: (JSVal -> IO JSVal) -> IO (Callback (JSVal -> IO ()))``:
+* ``syncCallback1' :: (JSVal -> IO JSVal) -> IO (Callback (JSVal -> IO JSVal))``:
   Synchronous callbacks that return a value. Because of the return value, there
   is no possibility of continuing asynchronously, so no ``OnBlocked`` argument
   is taken.
 
-* ``asyncCallback :: (JSVal -> IO ()) -> IO (Callback (JSVal -> IO ()))``:
+* ``asyncCallback1 :: (JSVal -> IO ()) -> IO (Callback (JSVal -> IO ()))``:
   Asynchronous callbacks that immediately start in a new thread. Cannot return a
   value.
 

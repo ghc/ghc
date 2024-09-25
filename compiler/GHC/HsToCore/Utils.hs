@@ -42,6 +42,9 @@ module GHC.HsToCore.Utils (
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
         mkOptTickBox, mkBinaryTickBox, decideBangHood,
         isTrueLHsExpr,
+
+        -- Multiplicity
+        checkMultiplicityCoercions,
     ) where
 
 import GHC.Prelude
@@ -55,6 +58,7 @@ import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Core
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Errors.Types
 
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -66,6 +70,7 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.TyCo.Rep( Scaled(..) )
 import GHC.Builtin.Types
 import GHC.Core.ConLike
 import GHC.Types.Unique.Set
@@ -82,9 +87,10 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Rename.Env ( irrefutableConLikeTc )
 import GHC.Tc.Types.Evidence
 
-import Control.Monad    ( zipWithM )
+import Control.Monad    ( unless, zipWithM )
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (maybeToList)
 import qualified Data.List.NonEmpty as NEL
@@ -141,7 +147,7 @@ selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
 selectMatchVar _w (AsPat _ var _) = assert (isManyTy _w ) (return (localiseId (unLoc var)))
-selectMatchVar w other_pat        = newSysLocalDs w (hsPatType other_pat)
+selectMatchVar w other_pat        = newSysLocalDs (Scaled w (hsPatType other_pat))
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -749,7 +755,7 @@ mkSelectorBinds ticks pat ctx val_expr
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDs ManyTy pat_ty
+       ; val_var <- newSysLocalMDs pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
@@ -767,7 +773,7 @@ mkSelectorBinds ticks pat ctx val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs ManyTy tuple_ty
+  = do { tuple_var  <- newSysLocalMDs tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr ctx ManyTy pat
                                    local_tuple error_expr
@@ -924,8 +930,8 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to (# #)
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs ManyTy (unboxedUnitTy `mkVisFunTyMany` ty)
-       ; fail_fun_arg <- newSysLocalDs ManyTy unboxedUnitTy
+  = do { fail_fun_var <- newFailLocalMDs (unboxedUnitTy `mkVisFunTyMany` ty)
+       ; fail_fun_arg <- newSysLocalMDs unboxedUnitTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),
                  App (Var fail_fun_var) unboxedUnitExpr) }
@@ -1103,3 +1109,9 @@ isTrueLHsExpr (L _ (XExpr (HsBinTick ixT _ e)))
 
 isTrueLHsExpr (L _ (HsPar _ e)) = isTrueLHsExpr e
 isTrueLHsExpr _                 = Nothing
+
+-- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
+checkMultiplicityCoercions :: MultiplicityCheckCoercions -> DsM ()
+checkMultiplicityCoercions cos =
+  unless (all isReflexiveCo cos) $
+    diagnosticDs DsMultiplicityCoercionsNotSupported

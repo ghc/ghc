@@ -42,6 +42,7 @@ import Data.List (sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.List.NonEmpty as NE
 
 import GHC.Linker.Types
 import GHC.Unit.Finder
@@ -166,19 +167,19 @@ to inject the appropriate dependencies.
 -- modules and direct object files for pkg dependencies
 mkObjectUsage :: PackageIfaceTable -> Plugins -> FinderCache -> HomeUnitGraph-> [Linkable] -> PkgsLoaded -> IO [Usage]
 mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
-      let ls = ordNubOn linkableModule  (th_links_needed ++ plugins_links_needed)
+      let ls = ordNubOn linkableModule (th_links_needed ++ plugins_links_needed)
           ds = concatMap loaded_pkg_hs_objs $ eltsUDFM (plusUDFM th_pkgs_needed plugin_pkgs_needed) -- TODO possibly record loaded_pkg_non_hs_objs as well
           (plugins_links_needed, plugin_pkgs_needed) = loadedPluginDeps plugins
       concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
   where
-    linkableToUsage (LM _ m uls) = mapM (unlinkedToUsage m) uls
+    linkableToUsage (Linkable _ m uls) = mapM (partToUsage m) (NE.toList uls)
 
     msg m = moduleNameString (moduleName m) ++ "[TH] changed"
 
     fing mmsg fn = UsageFile (mkFastString fn) <$> lookupFileCache fc fn <*> pure mmsg
 
-    unlinkedToUsage m ul =
-      case nameOfObject_maybe ul of
+    partToUsage m part =
+      case linkablePartPath part of
         Just fn -> fing (Just (msg m)) fn
         Nothing ->  do
           -- This should only happen for home package things but oneshot puts
@@ -208,7 +209,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
     safe_implicit_imps_req = uc_safe_implicit_imps_req uc
 
     used_mods    = moduleEnvKeys ent_map
-    dir_imp_mods = moduleEnvKeys direct_imports
+    dir_imp_mods = Map.keys direct_imports
     all_mods     = used_mods ++ filter (`notElem` used_mods) dir_imp_mods
     usage_mods   = sortBy stableModuleCmp all_mods
                         -- canonical order is imported, to avoid interface-file
@@ -289,7 +290,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
         by_is_safe (ImportedByUser imv) = imv_is_safe imv
         by_is_safe _ = False
         (is_direct_import, imp_safe)
-            = case lookupModuleEnv direct_imports mod of
+            = case Map.lookup mod direct_imports of
                 -- ezyang: I'm not sure if any is the correct
                 -- metric here. If safety was guaranteed to be uniform
                 -- across all imports, why did the old code only look

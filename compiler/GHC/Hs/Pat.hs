@@ -46,7 +46,7 @@ module GHC.Hs.Pat (
         looksLazyPatBind,
         isBangedLPat,
         gParPat, patNeedsParens, parenthesizePat,
-        isIrrefutableHsPat, irrefutableConLikeRn, irrefutableConLikeTc,
+        isIrrefutableHsPat,
 
         isBoringHsPat,
 
@@ -76,15 +76,10 @@ import GHC.Types.SourceText
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Builtin.Types
-import GHC.Types.CompleteMatch
-import GHC.Types.TyThing (tyThingGREInfo)
-import GHC.Types.Unique.DSet
 import GHC.Types.Var
 import GHC.Types.Name.Reader
-import GHC.Types.GREInfo
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Core.Type
 import GHC.Types.SrcLoc
@@ -142,7 +137,7 @@ type instance XConPat GhcPs = [AddEpAnn]
 type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
-type instance XViewPat GhcPs = [AddEpAnn]
+type instance XViewPat GhcPs = EpUniToken "->" "→"
 type instance XViewPat GhcRn = Maybe (HsExpr GhcRn)
   -- The @HsExpr GhcRn@ gives an inverse to the view function.
   -- This is used for overloaded lists in particular.
@@ -191,10 +186,17 @@ type instance XConPatTyArg GhcPs = EpToken "@"
 type instance XConPatTyArg GhcRn = NoExtField
 type instance XConPatTyArg GhcTc = NoExtField
 
+type instance XHsRecFields GhcPs = NoExtField
+type instance XHsRecFields GhcRn = NoExtField
+type instance XHsRecFields GhcTc = MultiplicityCheckCoercions
+
 type instance XHsFieldBind _ = [AddEpAnn]
 
-type instance XInvisPat GhcPs = EpToken "@"
-type instance XInvisPat GhcRn = NoExtField
+-- The specificity of an invisible pattern from the parser is always
+-- SpecifiedSpec. The specificity field supports code generated when deriving
+-- newtype or via; see Note [Inferred invisible patterns].
+type instance XInvisPat GhcPs = (EpToken "@", Specificity)
+type instance XInvisPat GhcRn = Specificity
 type instance XInvisPat GhcTc = Type
 
 
@@ -475,7 +477,17 @@ pprPat (ConPat { pat_con = con
                        , cpt_binds = binds
                        } = ext
 pprPat (EmbTyPat _ tp) = text "type" <+> ppr tp
-pprPat (InvisPat _ tp) = char '@' <> ppr tp
+pprPat (InvisPat x tp) = char '@' <> delimit (ppr tp)
+  where
+    delimit
+      | inferred     = braces
+      | needs_parens = parens
+      | otherwise    = id
+    inferred = case ghcPass @p of
+      GhcPs -> snd x == InferredSpec
+      GhcRn -> x == InferredSpec
+      GhcTc -> False
+    needs_parens = hsTypeNeedsParens appPrec $ unLoc $ hstp_body tp
 
 pprPat (XPat ext) = case ghcPass @p of
   GhcRn -> case ext of
@@ -691,64 +703,6 @@ isIrrefutableHsPat is_strict irref_conLike pat = go (unLoc pat)
       GhcTc -> case ext of
         CoPat _ pat _ -> go pat
         ExpansionPat _ pat -> go pat
-
--- | Check irrefutability of a 'ConLike' in a 'ConPat GhcRn'
--- (the 'Irref-ConLike' condition of Note [Irrefutability of ConPat]).
-irrefutableConLikeRn :: GlobalRdrEnv
-                     -> CompleteMatches -- ^ in-scope COMPLETE pragmas
-                     -> Name -- ^ the 'Name' of the 'ConLike'
-                     -> Bool
-irrefutableConLikeRn rdr_env comps con_nm =
-  case mbInfo of
-    Just (IAmConLike conInfo) ->
-      case conLikeInfo conInfo of
-        ConIsData { conLikeDataCons = tc_cons } ->
-          length tc_cons == 1
-        ConIsPatSyn ->
-          in_single_complete_match con_nm comps
-    _ -> False
-  where
-    -- Sorry: it's horrible to manually call 'wiredInNameTyThing_maybe' here,
-    -- but import cycles make calling the right function, namely 'lookupGREInfo',
-    -- quite difficult from within this module.
-    mbInfo = case tyThingGREInfo <$> wiredInNameTyThing_maybe con_nm of
-                 Nothing -> greInfo <$> lookupGRE_Name rdr_env con_nm
-                 Just nfo -> Just nfo
-
--- | Check irrefutability of the 'ConLike' in a 'ConPat GhcTc'
--- (the 'Irref-ConLike' condition of Note [Irrefutability of ConPat]),
--- given all in-scope COMPLETE pragmas ('CompleteMatches' in the typechecker,
--- 'DsCompleteMatches' in the desugarer).
-irrefutableConLikeTc :: NamedThing con
-                     => [CompleteMatchX con]
-                         -- ^ in-scope COMPLETE pragmas
-                     -> ConLike
-                     -> Bool
-irrefutableConLikeTc comps con =
-  case con of
-    RealDataCon dc -> length (tyConDataCons (dataConTyCon dc)) == 1
-    PatSynCon {}   -> in_single_complete_match con_nm comps
-  where
-    con_nm = conLikeName con
-
--- | Internal helper function: check whether a 'ConLike' is the single member
--- of a COMPLETE set without a result 'TyCon'.
---
--- Why 'without a result TyCon'? See Wrinkle [Irrefutability and COMPLETE pragma result TyCons]
--- in Note [Irrefutability of ConPat].
-in_single_complete_match :: NamedThing con => Name -> [CompleteMatchX con] -> Bool
-in_single_complete_match con_nm = go
-  where
-    go [] = False
-    go (comp:comps)
-      | Nothing <- cmResultTyCon comp
-        -- conservative, as we don't have enough info to compute
-        -- 'completeMatchAppliesAtType'
-      , let comp_nms = mapUniqDSet getName $ cmConLikes comp
-      , comp_nms == mkUniqDSet [con_nm]
-      = True
-      | otherwise
-      = go comps
 
 -- | Is the pattern any of combination of:
 --

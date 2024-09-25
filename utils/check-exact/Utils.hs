@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -20,9 +21,8 @@ module Utils
   where
 
 import Control.Monad (when)
+import GHC.Utils.Monad.State.Strict
 import Data.Function
-import Data.Maybe (isJust)
-import Data.Ord (comparing)
 
 import GHC.Hs.Dump
 import Lookup
@@ -36,9 +36,10 @@ import GHC.Driver.Ppr
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Base (NonEmpty(..))
+import GHC.Parser.Lexer (allocateComments)
 
 import Data.Data hiding ( Fixity )
-import Data.List (sortBy, elemIndex)
+import Data.List (sortBy, partition)
 import qualified Data.Map.Strict as Map
 
 import Debug.Trace
@@ -60,12 +61,32 @@ debug c s = if debugEnabledFlag
 debugM :: Monad m => String -> m ()
 debugM s = when debugEnabledFlag $ traceM s
 
--- ---------------------------------------------------------------------
-
 warn :: c -> String -> c
 -- warn = flip trace
 warn c _ = c
 
+-- ---------------------------------------------------------------------
+
+captureOrderBinds :: [LHsDecl GhcPs] -> AnnSortKey BindTag
+captureOrderBinds ls = AnnSortKey $ map go ls
+  where
+    go (L _ (ValD _ _))       = BindTag
+    go (L _ (SigD _ _))       = SigDTag
+    go d      = error $ "captureOrderBinds:" ++ showGhc d
+
+-- ---------------------------------------------------------------------
+
+notDocDecl :: LHsDecl GhcPs -> Bool
+notDocDecl (L _ DocD{}) = False
+notDocDecl _ = True
+
+notIEDoc :: LIE GhcPs -> Bool
+notIEDoc (L _ IEGroup {})    = False
+notIEDoc (L _ IEDoc {})      = False
+notIEDoc (L _ IEDocNamed {}) = False
+notIEDoc _ = True
+
+-- ---------------------------------------------------------------------
 -- | A good delta has no negative values.
 isGoodDelta :: DeltaPos -> Bool
 isGoodDelta (SameLine co) = co >= 0
@@ -108,7 +129,6 @@ pos2delta (refl,refc) (l,c) = deltaPos lo co
     lo = l - refl
     co = if lo == 0 then c - refc
                     else c
-                    -- else c - 1
 
 -- | Apply the delta to the current position, taking into account the
 -- current column offset if advancing to a new line
@@ -200,23 +220,6 @@ origDelta pos pp = ss2delta (ss2posEnd pp) pos
 
 -- ---------------------------------------------------------------------
 
--- |Given a list of items and a list of keys, returns a list of items
--- ordered by their position in the list of keys.
-orderByKey :: [(DeclTag,a)] -> [DeclTag] -> [(DeclTag,a)]
-orderByKey keys order
-    -- AZ:TODO: if performance becomes a problem, consider a Map of the order
-    -- SrcSpan to an index, and do a lookup instead of elemIndex.
-
-    -- Items not in the ordering are placed to the start
- = sortBy (comparing (flip elemIndex order . fst)) keys
-
--- ---------------------------------------------------------------------
-
-isListComp :: HsDoFlavour -> Bool
-isListComp = isDoComprehensionContext
-
--- ---------------------------------------------------------------------
-
 needsWhere :: DataDefnCons (LConDecl (GhcPass p)) -> Bool
 needsWhere (NewTypeCon _) = True
 needsWhere (DataTypeCons _ []) = True
@@ -225,21 +228,213 @@ needsWhere _ = False
 
 -- ---------------------------------------------------------------------
 
+-- | Insert the comments at the appropriate places in the AST
 insertCppComments ::  ParsedSource -> [LEpaComment] -> ParsedSource
-insertCppComments (L l p) cs = L l p'
+-- insertCppComments p [] = p
+insertCppComments (L l p) cs0 = insertRemainingCppComments (L l p2) remaining
   where
-    an' = case GHC.hsmodAnn $ GHC.hsmodExt p of
-      (EpAnn a an ocs) -> EpAnn a an cs'
-        where
-          pc = priorComments ocs
-          fc = getFollowingComments ocs
-          cs' = case fc of
-            [] -> EpaComments $ sortEpaComments $ pc ++ fc ++ cs
-            (L ac _:_) -> EpaCommentsBalanced (sortEpaComments $ pc ++ cs_before)
-                                              (sortEpaComments $ fc ++ cs_after)
-                   where
-                     (cs_before,cs_after) = break (\(L ll _) ->   (ss2pos $ anchor ll) < (ss2pos $ anchor ac) ) cs
+    (EpAnn anct ant cst) = hsmodAnn $ hsmodExt p
+    cs = sortEpaComments $ priorComments cst ++ getFollowingComments cst ++ cs0
+    p0 = p { hsmodExt = (hsmodExt p) { hsmodAnn = EpAnn anct ant emptyComments }}
+    -- Comments embedded within spans
+    -- everywhereM is a bottom-up traversal
+    (p1, toplevel) = runState (everywhereM (mkM   addCommentsListItem
+                                           `extM` addCommentsGrhs
+                                           `extM` addCommentsList) p0) cs
+    (p2, remaining) = insertTopLevelCppComments p1 toplevel
+
+    addCommentsListItem :: EpAnn AnnListItem -> State [LEpaComment] (EpAnn AnnListItem)
+    addCommentsListItem = addComments
+
+    addCommentsList :: EpAnn AnnList -> State [LEpaComment] (EpAnn AnnList)
+    addCommentsList = addComments
+
+    addCommentsGrhs :: EpAnn GrhsAnn -> State [LEpaComment] (EpAnn GrhsAnn)
+    addCommentsGrhs = addComments
+
+    addComments :: forall ann. EpAnn ann -> State [LEpaComment] (EpAnn ann)
+    addComments (EpAnn anc an ocs) = do
+      case anc of
+        EpaSpan (RealSrcSpan s _) -> do
+          unAllocated <- get
+          let
+            (rest, these) = GHC.Parser.Lexer.allocateComments s unAllocated
+            cs' = workInComments ocs these
+          put rest
+          return $ EpAnn anc an cs'
+
+        _ -> return $ EpAnn anc an ocs
+
+workInComments :: EpAnnComments -> [LEpaComment] -> EpAnnComments
+workInComments ocs [] = ocs
+workInComments ocs new = cs'
+  where
+    pc = priorComments ocs
+    fc = getFollowingComments ocs
+    cs' = case fc of
+      [] -> EpaComments $ sortEpaComments $ pc ++ fc ++ new
+      (L ac _:_) -> epaCommentsBalanced (sortEpaComments $ pc ++ cs_before)
+                                        (sortEpaComments $ fc ++ cs_after)
+             where
+               (cs_before,cs_after)
+                   = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ anchor ac) )
+                           new
+
+insertTopLevelCppComments ::  HsModule GhcPs -> [LEpaComment] -> (HsModule GhcPs, [LEpaComment])
+insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports imports decls) cs
+  = (HsModule (XModulePs an4 lo mdeprec mbDoc) mmn mexports' imports' decls', cs3)
+    -- `debug` ("insertTopLevelCppComments: (cs2,cs3,hc0,hc1,hc_cs)" ++ showAst (cs2,cs3,hc0,hc1,hc_cs))
+    -- `debug` ("insertTopLevelCppComments: (cs2,cs3,hc0i,hc0,hc1,hc_cs)" ++ showAst (cs2,cs3,hc0i,hc0,hc1,hc_cs))
+  where
+    -- Comments at the top level.
+    (an0, cs0) =
+      case mmn of
+        Nothing -> (an, cs)
+        Just _ ->
+            -- We have a module name. Capture all comments up to the `where`
+            let
+              (these, remaining) = splitOnWhere Before (am_where $ anns an) cs
+              (EpAnn a anno ocs) = an :: EpAnn AnnsModule
+              anm = EpAnn a anno (workInComments ocs these)
+            in
+              (anm, remaining)
+    (an1,cs0a) = case lo of
+        EpExplicitBraces (EpTok (EpaSpan (RealSrcSpan s _))) _close ->
+            let
+                (stay,cs0a') = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ s)) cs0
+                cs' = workInComments (comments an0) stay
+            in (an0 { comments = cs' }, cs0a')
+        _ -> (an0,cs0)
+    -- Deal with possible leading semis
+    (an2, cs0b) = case am_decls $ anns an1 of
+        (AddSemiAnn (EpaSpan (RealSrcSpan s _)):_) -> (an1 {comments = cs'}, cs0b')
+          where
+            (stay,cs0b') = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ s)) cs0a
+            cs' = workInComments (comments an1) stay
+        _ -> (an1,cs0a)
+
+    (mexports', an3, cs1) =
+      case mexports of
+        Nothing -> (Nothing, an2, cs0b)
+        Just (L l exports) -> (Just (L l exports'), an3', cse)
+                         where
+                           hc1' = workInComments (comments an2) csh'
+                           an3' = an2 { comments = hc1' }
+                           (csh', cs0b') = case al_open $ anns l of
+                               Just (AddEpAnn _ (EpaSpan (RealSrcSpan s _))) ->(h, n)
+                                 where
+                                   (h,n) = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos s) )
+                                       cs0b
+
+                               _ -> ([], cs0b)
+                           (exports', cse) = allocPreceding exports cs0b'
+    (imports0, cs2) = allocPreceding imports cs1
+    (imports', hc0i) = balanceFirstLocatedAComments imports0
+
+    (decls0, cs3) = allocPreceding decls cs2
+    (decls', hc0d) = balanceFirstLocatedAComments decls0
+
+    -- Either hc0i or hc0d should have comments. Combine them
+    hc0 = hc0i ++ hc0d
+
+    (hc1,hc_cs) = if NoEpTok == (am_where $ anns an3)
+        then (hc0,[])
+        else splitOnWhere After (am_where $ anns an3)  hc0
+    hc2 = workInComments (comments an3) hc1
+    an4 = an3 { anns = (anns an3) {am_cs = hc_cs}, comments = hc2 }
+
+    allocPreceding :: [LocatedA a] -> [LEpaComment] -> ([LocatedA a], [LEpaComment])
+    allocPreceding [] cs' = ([], cs')
+    allocPreceding (L (EpAnn anc4 an5 cs4) a:xs) cs' = ((L (EpAnn anc4 an5 cs4') a:xs'), rest')
+      where
+        (rest, these) =
+          case anc4 of
+            EpaSpan (RealSrcSpan s _) ->
+                allocatePriorComments (ss2pos s) cs'
+            _ -> (cs', [])
+        cs4' = workInComments cs4 these
+        (xs',rest') = allocPreceding xs rest
+
+data SplitWhere = Before | After
+
+splitOnWhere :: SplitWhere -> EpToken "where" -> [LEpaComment] -> ([LEpaComment], [LEpaComment])
+splitOnWhere w (EpTok (EpaSpan (RealSrcSpan s _))) csIn = (hc, fc)
+  where
+    splitFunc Before anc_pos c_pos = c_pos < anc_pos
+    splitFunc After  anc_pos c_pos = anc_pos < c_pos
+    (hc,fc) = break (\(L ll _) ->  splitFunc w (ss2pos $ anchor ll) (ss2pos s)) csIn
+splitOnWhere _ _ csIn = (csIn,[])
+
+balanceFirstLocatedAComments :: [LocatedA a] -> ([LocatedA a], [LEpaComment])
+balanceFirstLocatedAComments [] = ([],[])
+balanceFirstLocatedAComments ((L (EpAnn anc an csd) a):ds) = (L (EpAnn anc an csd0) a:ds, hc')
+  where
+    (csd0, hc') = case anc of
+        EpaSpan (RealSrcSpan s _) -> (csd', hc)
+               `debug` ("balanceFirstLocatedAComments: (csd,csd',attached,header)=" ++ showAst (csd,csd',attached,header))
+          where
+            (priors, inners) =  break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos s) )
+                                       (priorComments csd)
+            pcds = priorCommentsDeltas' s priors
+            (attached, header) = break (\(d,_c) -> d /= 1) pcds
+            csd' = setPriorComments csd (reverse (map snd attached) ++ inners)
+            hc = reverse (map snd header)
+        _ -> (csd, [])
+
+
+
+priorCommentsDeltas' :: RealSrcSpan -> [LEpaComment]
+                    -> [(Int, LEpaComment)]
+priorCommentsDeltas' r cs = go r (reverse cs)
+  where
+    go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
+    go _   [] = []
+    go _   (la@(L l@(EpaDelta _ dp _) _):las) = (deltaLine dp, la) : go (anchor l) las
+    go rs' (la@(L l _):las) = deltaComment rs' la : go (anchor l) las
+
+    deltaComment :: RealSrcSpan -> LEpaComment -> (Int, LEpaComment)
+    deltaComment rs' (L loc c) = (abs(ll - al), L loc c)
+      where
+        (al,_) = ss2pos rs'
+        (ll,_) = ss2pos (anchor loc)
+
+allocatePriorComments
+  :: Pos
+  -> [LEpaComment]
+  -> ([LEpaComment], [LEpaComment])
+allocatePriorComments ss_loc comment_q =
+  let
+    cmp (L l _) = ss2pos (anchor l) <= ss_loc
+    (newAnns,after) = partition cmp comment_q
+  in
+    (after, newAnns)
+
+insertRemainingCppComments ::  ParsedSource -> [LEpaComment] -> ParsedSource
+insertRemainingCppComments (L l p) cs = L l p'
+    -- `debug` ("insertRemainingCppComments: (cs,an')=" ++ showAst (cs,an'))
+  where
+    (EpAnn a an ocs) = GHC.hsmodAnn $ GHC.hsmodExt p
+    an' = EpAnn a an (addTrailingComments end_loc ocs cs)
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } }
+    end_loc = case GHC.hsmodLayout $ GHC.hsmodExt p of
+        EpExplicitBraces _open close -> case close of
+            EpTok (EpaSpan (RealSrcSpan s _)) -> ss2pos s
+            _ -> (1,1)
+        _ -> (1,1)
+    (new_before, new_after) = break (\(L ll _) -> (ss2pos $ anchor ll) > end_loc ) cs
+
+    addTrailingComments end_loc' cur new = epaCommentsBalanced pc' fc'
+      where
+        pc = priorComments cur
+        fc = getFollowingComments cur
+        (pc', fc') = case reverse pc of
+            [] -> (sortEpaComments $ pc ++ new_before, sortEpaComments $ fc ++ new_after)
+            (L ac _:_) -> (sortEpaComments $ pc ++ cs_before, sortEpaComments $ fc ++ cs_after)
+              where
+               (cs_before,cs_after)
+                   = if (ss2pos $ anchor ac) > end_loc'
+                       then break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ anchor ac) ) new
+                       else (new_before, new_after)
 
 -- ---------------------------------------------------------------------
 
@@ -255,7 +450,7 @@ tokComment t@(L lt c) =
     (GHC.EpaComment (EpaDocComment dc) pt) -> hsDocStringComments (noCommentsToEpaLocation lt) pt dc
     _ -> [mkComment (normaliseCommentText (ghcCommentText t)) lt (ac_prior_tok c)]
 
-hsDocStringComments :: Anchor -> RealSrcSpan -> GHC.HsDocString -> [Comment]
+hsDocStringComments :: EpaLocation -> RealSrcSpan -> GHC.HsDocString -> [Comment]
 hsDocStringComments _ pt (MultiLineDocString dec (x :| xs)) =
   let
     decStr = printDecorator dec
@@ -291,11 +486,16 @@ dedentDocChunkBy  dedent (L (RealSrcSpan l mb) c) = L (RealSrcSpan l' mb) c
 
 dedentDocChunkBy _ x = x
 
+
+epaCommentsBalanced :: [LEpaComment] -> [LEpaComment] -> EpAnnComments
+epaCommentsBalanced priorCs     [] = EpaComments priorCs
+epaCommentsBalanced priorCs postCs = EpaCommentsBalanced priorCs postCs
+
 mkEpaComments :: [Comment] -> [Comment] -> EpAnnComments
 mkEpaComments priorCs []
   = EpaComments (map comment2LEpaComment priorCs)
 mkEpaComments priorCs postCs
-  = EpaCommentsBalanced (map comment2LEpaComment priorCs) (map comment2LEpaComment postCs)
+  = epaCommentsBalanced (map comment2LEpaComment priorCs) (map comment2LEpaComment postCs)
 
 comment2LEpaComment :: Comment -> LEpaComment
 comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
@@ -330,19 +530,12 @@ sortEpaComments cs = sortBy cmp cs
 mkKWComment :: AnnKeywordId -> NoCommentsLocation -> Comment
 mkKWComment kw (EpaSpan (RealSrcSpan ss mb))
   = Comment (keywordToString kw) (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
-mkKWComment kw (EpaSpan ss@(UnhelpfulSpan _))
-  = Comment (keywordToString kw) (EpaDelta ss (SameLine 0) NoComments) placeholderRealSpan (Just kw)
+mkKWComment kw (EpaSpan (UnhelpfulSpan _))
+  = Comment (keywordToString kw) (EpaDelta noSrcSpan (SameLine 0) NoComments) placeholderRealSpan (Just kw)
 mkKWComment kw (EpaDelta ss dp cs)
   = Comment (keywordToString kw) (EpaDelta ss dp cs) placeholderRealSpan (Just kw)
 
--- | Detects a comment which originates from a specific keyword.
-isKWComment :: Comment -> Bool
-isKWComment c = isJust (commentOrigin c)
-
-noKWComments :: [Comment] -> [Comment]
-noKWComments = filter (\c -> not (isKWComment c))
-
-sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
+sortAnchorLocated :: [GenLocated EpaLocation a] -> [GenLocated EpaLocation a]
 sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
 
 -- | Calculates the distance from the start of a string to the end of
@@ -379,11 +572,6 @@ name2String = showPprUnsafe
 
 -- ---------------------------------------------------------------------
 
-locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
-locatedAnAnchor (L (EpAnn a _ _) _) = anchor a
-
--- ---------------------------------------------------------------------
-
 trailingAnnLoc :: TrailingAnn -> EpaLocation
 trailingAnnLoc (AddSemiAnn ss)    = ss
 trailingAnnLoc (AddCommaAnn ss)   = ss
@@ -400,52 +588,6 @@ setTrailingAnnLoc (AddDarrowUAnn _) ss = (AddDarrowUAnn ss)
 
 addEpAnnLoc :: AddEpAnn -> EpaLocation
 addEpAnnLoc (AddEpAnn _ l) = l
-
--- ---------------------------------------------------------------------
-
--- TODO: get rid of this identity function
-anchorToEpaLocation :: Anchor -> EpaLocation
-anchorToEpaLocation a = a
-
--- ---------------------------------------------------------------------
--- Horrible hack for dealing with some things still having a SrcSpan,
--- not an Anchor.
-
-{-
-A SrcSpan is defined as
-
-data SrcSpan =
-    RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
-  | UnhelpfulSpan !UnhelpfulSpanReason
-
-data BufSpan =
-  BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
-  deriving (Eq, Ord, Show)
-
-newtype BufPos = BufPos { bufPos :: Int }
-
-
-We use the BufPos to encode a delta, using bufSpanStart for the line,
-and bufSpanEnd for the col.
-
-To be absolutely sure, we make the delta versions use -ve values.
-
--}
-
-hackSrcSpanToAnchor :: SrcSpan -> Anchor
-hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
-hackSrcSpanToAnchor ss@(RealSrcSpan r mb)
-  = case mb of
-    (Strict.Just (BufSpan (BufPos s) (BufPos e))) ->
-      if s <= 0 && e <= 0
-      then EpaDelta ss (deltaPos (-s) (-e)) []
-        `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
-      else EpaSpan (RealSrcSpan r mb)
-    _ -> EpaSpan (RealSrcSpan r mb)
-
-hackAnchorToSrcSpan :: Anchor -> SrcSpan
-hackAnchorToSrcSpan (EpaSpan s) = s
-hackAnchorToSrcSpan _ = error $ "hackAnchorToSrcSpan"
 
 -- ---------------------------------------------------------------------
 

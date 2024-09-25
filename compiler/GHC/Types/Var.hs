@@ -343,9 +343,12 @@ arbitrary value which will (and must!) be ignored.
 -}
 
 instance Outputable Var where
-  ppr var = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
+  ppr var = docWithStyle ppr_code ppr_normal
+    where
+      -- don't display debug info with Code style (#25255)
+      ppr_code = ppr (varName var)
+      ppr_normal sty = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
             getPprDebug $ \debug ->
-            getPprStyle $ \sty ->
             let
               ppr_var = case var of
                   (TyVar {})

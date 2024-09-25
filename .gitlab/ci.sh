@@ -7,7 +7,7 @@
 set -Eeuo pipefail
 
 # Configuration:
-HACKAGE_INDEX_STATE="2024-05-13T15:04:38Z"
+HACKAGE_INDEX_STATE="2024-09-17T22:56:00Z"
 MIN_HAPPY_VERSION="1.20"
 MIN_ALEX_VERSION="3.2.6"
 
@@ -753,7 +753,7 @@ function check_interfaces(){
 }
 
 function abi_test() {
-  for i in {1..20}; do info "iteration $i"; run_abi_test; done
+  for i in {1..10}; do info "iteration $i"; run_abi_test; done
 }
 
 function run_abi_test() {
@@ -761,8 +761,8 @@ function run_abi_test() {
     fail "HC not set"
   fi
   mkdir -p out
-  OUT="$PWD/out/run1" DIR=$(mktemp -d XXXX-looooooooong) cabal_abi_test -O0
-  OUT="$PWD/out/run2" DIR=$(mktemp -d XXXX-short) cabal_abi_test -O0
+  OUT="$PWD/out/run1" DIR=$(mktemp -d XXXX-looooooooong) cabal_abi_test -O1 -haddock
+  OUT="$PWD/out/run2" DIR=$(mktemp -d XXXX-short) cabal_abi_test -O1 -haddock -dunique-increment=-1 -dinitial-unique=16777215
   check_interfaces out/run1 out/run2 abis "Mismatched ABI hash"
   check_interfaces out/run1 out/run2 interfaces "Mismatched interface hashes"
 }

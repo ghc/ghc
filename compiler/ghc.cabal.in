@@ -306,6 +306,7 @@ Library
         GHC.CmmToAsm.Reg.Linear.FreeRegs
         GHC.CmmToAsm.Reg.Linear.JoinToTargets
         GHC.CmmToAsm.Reg.Linear.PPC
+        GHC.CmmToAsm.Reg.Linear.RV64
         GHC.CmmToAsm.Reg.Linear.StackMap
         GHC.CmmToAsm.Reg.Linear.State
         GHC.CmmToAsm.Reg.Linear.Stats
@@ -314,6 +315,13 @@ Library
         GHC.CmmToAsm.Reg.Liveness
         GHC.CmmToAsm.Reg.Target
         GHC.CmmToAsm.Reg.Utils
+        GHC.CmmToAsm.RV64
+        GHC.CmmToAsm.RV64.CodeGen
+        GHC.CmmToAsm.RV64.Cond
+        GHC.CmmToAsm.RV64.Instr
+        GHC.CmmToAsm.RV64.Ppr
+        GHC.CmmToAsm.RV64.RegInfo
+        GHC.CmmToAsm.RV64.Regs
         GHC.CmmToAsm.Types
         GHC.CmmToAsm.Utils
         GHC.CmmToAsm.X86
@@ -523,6 +531,7 @@ Library
         GHC.Driver.Ppr
         GHC.Driver.Session
         GHC.Hs
+        GHC.Hs.Basic
         GHC.Hs.Binds
         GHC.Hs.Decls
         GHC.Hs.Doc
@@ -636,6 +645,7 @@ Library
         GHC.Parser.HaddockLex
         GHC.Parser.PostProcess
         GHC.Parser.PostProcess.Haddock
+        GHC.Parser.String
         GHC.Parser.Types
         GHC.Parser.Utils
         GHC.Platform
@@ -700,6 +710,7 @@ Library
         GHC.Stg.InferTags.Rewrite
         GHC.Stg.InferTags.TagSig
         GHC.Stg.InferTags.Types
+        GHC.Stg.Make
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.Subst
@@ -853,6 +864,7 @@ Library
         GHC.Types.CostCentre
         GHC.Types.CostCentre.State
         GHC.Types.Cpr
+        GHC.Types.DefaultEnv
         GHC.Types.Demand
         GHC.Types.Error
         GHC.Types.Error.Codes
@@ -887,6 +899,7 @@ Library
         GHC.Types.SourceError
         GHC.Types.SourceFile
         GHC.Types.SourceText
+        GHC.Types.SptEntry
         GHC.Types.SrcLoc
         GHC.Types.Target
         GHC.Types.Tickish

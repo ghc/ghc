@@ -18,6 +18,7 @@ therefore, is almost nothing but re-exporting.
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-} -- For deriving instance Data
+{-# LANGUAGE DataKinds #-}
 
 module GHC.Hs (
         module Language.Haskell.Syntax,
@@ -98,7 +99,9 @@ deriving instance Data (HsModule GhcPs)
 
 data AnnsModule
   = AnnsModule {
-    am_main :: [AddEpAnn],
+    am_sig :: EpToken "signature",
+    am_mod :: EpToken "module",
+    am_where :: EpToken "where",
     am_decls :: [TrailingAnn],                 -- ^ Semis before the start of top decls
     am_cs :: [LEpaComment],                    -- ^ Comments before start of top decl,
                                                --   used in exact printing only
@@ -106,7 +109,7 @@ data AnnsModule
     } deriving (Data, Eq)
 
 instance NoAnn AnnsModule where
-  noAnn = AnnsModule [] [] [] Nothing
+  noAnn = AnnsModule NoEpTok NoEpTok NoEpTok [] [] Nothing
 
 instance Outputable (HsModule GhcPs) where
     ppr (HsModule { hsmodExt = XModulePs { hsmodHaddockModHeader = mbDoc }

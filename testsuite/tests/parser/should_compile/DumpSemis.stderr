@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { DumpSemis.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { DumpSemis.hs:1:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { DumpSemis.hs:1:18-22 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { DumpSemis.hs:1:1-6 }))
+     (EpTok
+      (EpaSpan { DumpSemis.hs:1:18-22 }))
      [(AddSemiAnn
        (EpaSpan { DumpSemis.hs:4:1 }))
      ,(AddSemiAnn

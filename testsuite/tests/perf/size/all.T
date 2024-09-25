@@ -3,7 +3,19 @@ test('size_hello_obj', [collect_size(5, 'size_hello_obj.o')], compile, [''])
 test('size_hello_artifact', [collect_size(5, 'size_hello_artifact' + exe_extension())],
                              compile_artifact, [''])
 
+test('size_hello_artifact_gzip', [extra_files(['./size_hello_artifact.hs']),
+  collect_size(5, 'size_hello_artifact' + exe_extension() + '.gz'),
+  # See Note [Makefile tests are supposed to be run in all ways] in testsuite/driver/testlib.py
+  pre_cmd('$MAKE -s --no-print-directory size_hello_artifact_gzip' + ' exe_extension_from_python="' + exe_extension() + '"'), ignore_stdout, ignore_stderr],
+  multimod_compile, ['size_hello_artifact', ''])
+
 test('size_hello_unicode', [collect_size(5, 'size_hello_unicode' + exe_extension())], compile_artifact, [''])
+
+test('size_hello_unicode_gzip', [extra_files(['./size_hello_unicode.hs']),
+  collect_size(5, 'size_hello_unicode' + exe_extension() + '.gz'),
+  # See Note [Makefile tests are supposed to be run in all ways] in testsuite/driver/testlib.py
+  pre_cmd('$MAKE -s --no-print-directory size_hello_unicode_gzip' + ' exe_extension_from_python="' + exe_extension() + '"'), ignore_stdout, ignore_stderr],
+  multimod_compile, ['size_hello_unicode', ''])
 
 size_acceptance_threshold = 100
 

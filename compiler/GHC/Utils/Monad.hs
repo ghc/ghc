@@ -18,7 +18,7 @@ module GHC.Utils.Monad
         , concatMapM
         , mapMaybeM
         , anyM, allM, orM
-        , foldlM, foldlM_, foldrM
+        , foldlM, foldlM_, foldrM, foldMapM
         , whenM, unlessM
         , filterOutM
         , partitionM
@@ -37,6 +37,7 @@ import Control.Monad.Trans.State.Strict (StateT (..))
 import Data.Foldable (sequenceA_, foldlM, foldrM)
 import Data.List (unzip4, unzip5, zipWith4)
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.Monoid (Ap (Ap, getAp))
 import Data.Tuple (swap)
 
 -------------------------------------------------------------------------------
@@ -227,6 +228,10 @@ andM m1 m2 = m1 >>= \x -> if x then m2 else return False
 -- | Monadic version of foldl that discards its result
 foldlM_ :: (Monad m, Foldable t) => (a -> b -> m a) -> a -> t b -> m ()
 foldlM_ = foldM_
+
+-- | Monadic version of 'foldMap'
+foldMapM :: (Applicative m, Foldable t, Monoid b) => (a -> m b) -> t a -> m b
+foldMapM f = getAp <$> foldMap (Ap . f)
 
 -- | Monadic version of @when@, taking the condition in the monad
 whenM :: Monad m => m Bool -> m () -> m ()

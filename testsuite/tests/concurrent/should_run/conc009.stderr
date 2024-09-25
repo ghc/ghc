@@ -1,1 +1,7 @@
-conc009: hello
+conc009: Exception:
+
+hello
+
+Package: ghc-internal
+Module: GHC.Internal.Exception
+Type: ErrorCall

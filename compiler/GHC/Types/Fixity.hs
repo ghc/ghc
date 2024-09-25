@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS_GHC -Wno-dodgy-exports #-} -- For re-export of GHC.Hs.Basic instances
 
 -- | Fixity
 module GHC.Types.Fixity
@@ -11,61 +12,17 @@ module GHC.Types.Fixity
    , negateFixity
    , funTyFixity
    , compareFixity
+   , module GHC.Hs.Basic
    )
 where
 
 import GHC.Prelude
 
-import GHC.Utils.Outputable
-import GHC.Utils.Binary
-
-import Data.Data hiding (Fixity, Prefix, Infix)
-
-data Fixity = Fixity Int FixityDirection
-  deriving Data
-
-instance Outputable Fixity where
-    ppr (Fixity prec dir) = hcat [ppr dir, space, int prec]
-
-instance Eq Fixity where -- Used to determine if two fixities conflict
-  (Fixity p1 dir1) == (Fixity p2 dir2) = p1==p2 && dir1 == dir2
-
-instance Binary Fixity where
-    put_ bh (Fixity aa ab) = do
-            put_ bh aa
-            put_ bh ab
-    get bh = do
-          aa <- get bh
-          ab <- get bh
-          return (Fixity aa ab)
+import Language.Haskell.Syntax.Basic (LexicalFixity(..), FixityDirection(..), Fixity(..) )
+import GHC.Hs.Basic () -- For instances only
 
 ------------------------
-data FixityDirection
-   = InfixL
-   | InfixR
-   | InfixN
-   deriving (Eq, Data)
 
-instance Outputable FixityDirection where
-    ppr InfixL = text "infixl"
-    ppr InfixR = text "infixr"
-    ppr InfixN = text "infix"
-
-instance Binary FixityDirection where
-    put_ bh InfixL =
-            putByte bh 0
-    put_ bh InfixR =
-            putByte bh 1
-    put_ bh InfixN =
-            putByte bh 2
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return InfixL
-              1 -> return InfixR
-              _ -> return InfixN
-
-------------------------
 maxPrecedence, minPrecedence :: Int
 maxPrecedence = 9
 minPrecedence = 0
@@ -103,12 +60,3 @@ compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
     right        = (False, True)
     left         = (False, False)
     error_please = (True,  False)
-
--- |Captures the fixity of declarations as they are parsed. This is not
--- necessarily the same as the fixity declaration, as the normal fixity may be
--- overridden using parens or backticks.
-data LexicalFixity = Prefix | Infix deriving (Data,Eq)
-
-instance Outputable LexicalFixity where
-  ppr Prefix = text "Prefix"
-  ppr Infix  = text "Infix"

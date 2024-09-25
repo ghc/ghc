@@ -426,7 +426,7 @@ dmdAnalStar env (n :* sd) e
   , n' <- anticipateANF e n
       -- See Note [Anticipating ANF in demand analysis]
       -- and Note [Analysing with absent demand]
-  = (discardArgDmds $ multDmdType n' dmd_ty, e')
+  = (multDmdEnv n' (discardArgDmds dmd_ty), e')
 
 -- Main Demand Analysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
@@ -1039,10 +1039,10 @@ dmdTransform env var sd
       TopLevel
         | isInterestingTopLevelFn var
         -- Top-level things will be used multiple times or not at
-        -- all anyway, hence the multDmd below: It means we don't
+        -- all anyway, hence the `floatifyDmd`: it means we don't
         -- have to track whether @var@ is used strictly or at most
-        -- once, because ultimately it never will.
-        -> addVarDmd fn_ty var (C_0N `multDmd` (C_11 :* sd)) -- discard strictness
+        -- once, because ultimately it never will
+        -> addVarDmd fn_ty var (floatifyDmd (C_11 :* sd))
         | otherwise
         -> fn_ty -- don't bother tracking; just annotate with 'topDmd' later
   -- Everything else:
@@ -1970,10 +1970,10 @@ W/W-transformed /caller of/ 'f' would immediately rebox any unboxed arguments
 that is applied to the wrapper of 'f'. When the wrapper is inlined, that kind of
 reboxing does not happen.
 
-But now we have functions with OPAQUE pragmas, which by definition (See Note
-[OPAQUE pragma]) do not get W/W-transformed. So in order to avoid reboxing
-workers of any W/W-transformed /callers of/ 'f' we need to strip all boxity
-information from 'f' in the demand analysis. This will inform the
+But now we have functions with OPAQUE pragmas, which by definition
+(See Note [OPAQUE pragma]) do not get W/W-transformed. So in order to avoid
+reboxing workers of any W/W-transformed /callers of/ 'f' we need to strip all
+boxity information from 'f' in the demand analysis. This will inform the
 W/W-transformation code that boxed arguments of 'f' must definitely be passed
 along in boxed form and as such dissuade the creation of reboxing workers.
 -}

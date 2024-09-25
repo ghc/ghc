@@ -97,11 +97,11 @@ dnl use either is considered a Feature.
 dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
 
-AC_ARG_VAR(GHC,[Use as the bootstrap GHC. [default=autodetect]])
-AC_CHECK_PROG([GHC], [ghc], [ghc])
+AC_ARG_VAR(GHC,[Use as the full path to GHC. [default=autodetect]])
+AC_PATH_PROG([GHC], [ghc])
 AC_ARG_WITH([ghc],
-        AS_HELP_STRING([--with-ghc=PATH], [Use PATH as the bootstrap ghc (obsolete, use GHC=PATH instead) [default=autodetect]]),
-        AC_MSG_ERROR([--with-ghc=$withval is obsolete (use './configure GHC=$withval' instead)]))
+        AS_HELP_STRING([--with-ghc=PATH], [Use PATH as the full path to ghc (obsolete, use GHC=PATH instead) [default=autodetect]]),
+        AC_MSG_ERROR([--with-ghc=$withval is obsolete (use './configure GHC=$withval' or 'GHC=$withval ./configure' instead)]))
 AC_SUBST(WithGhc,$GHC)
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
@@ -110,6 +110,14 @@ AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
   [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableBootstrapWithDevelSnaphost])],
   [EnableBootstrapWithDevelSnaphost=NO]
 )
+
+AC_ARG_ENABLE(ignore-build-platform-mismatch,
+[AS_HELP_STRING([--ignore-build-platform-mismatch],
+                [Ignore when the target platform reported by the bootstrap compiler doesn''t match the configured build platform. This flag is used to correct mistakes when the target platform is incorrectly reported by the bootstrap (#25200). ])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [IgnoreBuildPlatformMismatch])],
+  [IgnoreBuildPlatformMismatch=NO]
+)
+
 
 AC_ARG_ENABLE(tarballs-autodownload,
 [AS_HELP_STRING([--enable-tarballs-autodownload],
@@ -279,10 +287,13 @@ FP_PROG_SH
 # code for the requested build platform.
 if test "$BuildPlatform" != "$bootstrap_target"
 then
+    if test "$IgnoreBuildPlatformMismatch" = "NO"
+    then
     echo "This GHC (${WithGhc}) does not generate code for the build platform"
     echo "   GHC target platform    : $bootstrap_target"
     echo "   Desired build platform : $BuildPlatform"
     exit 1
+    fi
 fi
 
 dnl ** Do an unregisterised build?

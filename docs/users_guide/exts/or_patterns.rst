@@ -114,8 +114,8 @@ Or-patterns do not employ backtracking when given guarded right hand sides, i.e.
 when one alternative of the or-pattern matches, the others are not tried when
 the guard fails. The following code yields ``"no backtracking"``: ::
 
-  case (True, error "backtracking") of
-    ((True; _); (_; True)) | False -> error "inaccessible"
+  case error "backtracking" of
+    (_; True) | False -> error "inaccessible"
     _ -> error "no backtracking"
 
 (The exact syntax and semantics of or-patterns are found

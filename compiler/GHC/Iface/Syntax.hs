@@ -17,7 +17,7 @@ module GHC.Iface.Syntax (
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceWarnings(..), IfaceWarningTxt(..), IfaceStringLiteral(..),
-        IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
+        IfaceDefault(..), IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
         IfaceClassBody(..), IfaceBooleanFormula(..),
         IfaceBang(..),
         IfaceSrcBang(..), SrcUnpackedness(..), SrcStrictness(..),
@@ -320,6 +320,13 @@ data IfaceBang
 -- | This corresponds to HsSrcBang
 data IfaceSrcBang
   = IfSrcBang SrcUnpackedness SrcStrictness
+
+-- See Note [Named default declarations] in GHC.Tc.Gen.Default
+-- | Exported named defaults
+data IfaceDefault
+  = IfaceDefault { ifDefaultCls  :: IfaceTyCon,            -- Defaulted class
+                   ifDefaultTys  :: [IfaceType],          -- List of defaults
+                   ifDefaultWarn :: Maybe IfaceWarningTxt }
 
 data IfaceClsInst
   = IfaceClsInst { ifInstCls  :: IfExtName,                -- See comments with
@@ -653,7 +660,7 @@ data IfaceAlt = IfaceAlt IfaceConAlt [IfLclName] IfaceExpr
         -- We reconstruct the kind/type of the thing from the context
         -- thus saving bulk in interface files
 
-data IfaceConAlt = IfaceDefault
+data IfaceConAlt = IfaceDefaultAlt
                  | IfaceDataAlt IfExtName
                  | IfaceLitAlt Literal
 
@@ -1410,6 +1417,10 @@ instance Outputable IfaceRule where
     where
       pp_foralls = ppUnless (null bndrs) $ forAllLit <+> pprIfaceBndrs bndrs <> dot
 
+instance Outputable IfaceDefault where
+  ppr (IfaceDefault { ifDefaultCls = cls, ifDefaultTys = tcs })
+    = text "default" <+> ppr cls <+> parens (pprWithCommas ppr tcs)
+
 instance Outputable IfaceClsInst where
   ppr (IfaceClsInst { ifDFun = dfun_id, ifOFlag = flag
                     , ifInstCls = cls, ifInstTys = mb_tcs
@@ -1562,7 +1573,7 @@ pprIfaceApp fun                args = sep (pprParendIfaceExpr fun : args)
 
 ------------------
 instance Outputable IfaceConAlt where
-    ppr IfaceDefault      = text "DEFAULT"
+    ppr IfaceDefaultAlt   = text "DEFAULT"
     ppr (IfaceLitAlt l)   = ppr l
     ppr (IfaceDataAlt d)  = ppr d
 
@@ -1866,7 +1877,7 @@ freeNamesIfExpr (IfaceCase s _ alts)
     -- Depend on the data constructors.  Just one will do!
     -- Note [Tracking data constructors]
     fn_cons []                                     = emptyNameSet
-    fn_cons (IfaceAlt IfaceDefault _ _       : xs) = fn_cons xs
+    fn_cons (IfaceAlt IfaceDefaultAlt    _ _ : xs) = fn_cons xs
     fn_cons (IfaceAlt (IfaceDataAlt con) _ _ : _ ) = unitNameSet con
     fn_cons (_                               : _ ) = emptyNameSet
 
@@ -2289,6 +2300,17 @@ instance Binary IfaceSrcBang where
          a2 <- get bh
          return (IfSrcBang a1 a2)
 
+instance Binary IfaceDefault where
+    put_ bh (IfaceDefault cls tys warn) = do
+        put_ bh cls
+        put_ bh tys
+        put_ bh warn
+    get bh = do
+        cls  <- get bh
+        tys  <- get bh
+        warn <- get bh
+        return (IfaceDefault cls tys warn)
+
 instance Binary IfaceClsInst where
     put_ bh (IfaceClsInst cls tys dfun flag orph warn) = do
         put_ bh cls
@@ -2644,13 +2666,13 @@ instance Binary IfaceTickish where
             _ -> panic ("get IfaceTickish " ++ show h)
 
 instance Binary IfaceConAlt where
-    put_ bh IfaceDefault      = putByte bh 0
+    put_ bh IfaceDefaultAlt   = putByte bh 0
     put_ bh (IfaceDataAlt aa) = putByte bh 1 >> put_ bh aa
     put_ bh (IfaceLitAlt ac)  = putByte bh 2 >> put_ bh ac
     get bh = do
         h <- getByte bh
         case h of
-            0 -> return IfaceDefault
+            0 -> return IfaceDefaultAlt
             1 -> liftM IfaceDataAlt $ get bh
             _ -> liftM IfaceLitAlt  $ get bh
 
@@ -2901,7 +2923,7 @@ instance NFData IfaceTickish where
 
 instance NFData IfaceConAlt where
   rnf = \case
-    IfaceDefault -> ()
+    IfaceDefaultAlt -> ()
     IfaceDataAlt nm -> rnf nm
     IfaceLitAlt lit -> lit `seq` ()
 
@@ -2911,6 +2933,10 @@ instance NFData IfaceCompleteMatch where
 instance NFData IfaceRule where
   rnf (IfaceRule f1 f2 f3 f4 f5 f6 f7 f8) =
     rnf f1 `seq` f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` rnf f7 `seq` f8 `seq` ()
+
+instance NFData IfaceDefault where
+  rnf (IfaceDefault f1 f2 f3) =
+    rnf f1 `seq` rnf f2 `seq` rnf f3
 
 instance NFData IfaceFamInst where
   rnf (IfaceFamInst f1 f2 f3 f4) =

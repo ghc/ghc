@@ -27,7 +27,8 @@ import GHC.Core.DataCon
 
 import GHC.Stg.Syntax
 import GHC.Stg.Debug
-import GHC.Stg.Utils
+import GHC.Stg.Make
+import GHC.Stg.Utils (allowTopLevelConApp)
 
 import GHC.Types.RepType
 import GHC.Types.Id.Make ( coercionTokenId )
@@ -36,16 +37,13 @@ import GHC.Types.Id.Info
 import GHC.Types.CostCentre
 import GHC.Types.Tickish
 import GHC.Types.Var.Env
-import GHC.Types.Name   ( isExternalName, nameModule_maybe )
+import GHC.Types.Name   ( isExternalName )
 import GHC.Types.Basic  ( Arity, TypeOrConstraint(..) )
 import GHC.Types.Literal
 import GHC.Types.ForeignCall
 import GHC.Types.IPE
-import GHC.Types.Demand    ( isAtMostOnceDmd )
-import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 
 import GHC.Unit.Module
-import GHC.Data.FastString
 import GHC.Platform        ( Platform )
 import GHC.Platform.Ways
 import GHC.Builtin.PrimOps
@@ -338,10 +336,12 @@ coreToTopStgRhs
         -> CtsM (CollectedCCs, (Id, StgRhs))
 
 coreToTopStgRhs opts this_mod ccs (bndr, rhs)
-  = do { new_rhs <- coreToPreStgRhs rhs
+  = do { new_rhs <- coreToMkStgRhs bndr rhs
 
        ; let (stg_rhs, ccs') =
-               mkTopStgRhs opts this_mod ccs bndr new_rhs
+               mkTopStgRhs (allowTopLevelConApp (coreToStg_platform opts) (coreToStg_ExternalDynamicRefs opts))
+                           (coreToStg_AutoSccsOnIndividualCafs opts)
+                           this_mod ccs bndr new_rhs
              stg_arity =
                stgRhsArity stg_rhs
 
@@ -372,7 +372,7 @@ coreToTopStgRhs opts this_mod ccs (bndr, rhs)
 
 -- coreToStgExpr panics if the input expression is a value lambda. CorePrep
 -- ensures that value lambdas only exist as the RHS of bindings, which we
--- handle with the function coreToPreStgRhs.
+-- handle with the function coreToMkStgRhs.
 
 coreToStgExpr
         :: HasDebugCallStack => CoreExpr
@@ -685,166 +685,24 @@ coreToStgRhs :: (Id,CoreExpr)
              -> CtsM StgRhs
 
 coreToStgRhs (bndr, rhs) = do
-    new_rhs <- coreToPreStgRhs rhs
+    new_rhs <- coreToMkStgRhs bndr rhs
     return (mkStgRhs bndr new_rhs)
-
--- Represents the RHS of a binding for use with mk(Top)StgRhs.
-data PreStgRhs = PreStgRhs [Id] StgExpr Type -- The [Id] is empty for thunks
 
 -- Convert the RHS of a binding from Core to STG. This is a wrapper around
 -- coreToStgExpr that can handle value lambdas.
-coreToPreStgRhs :: HasDebugCallStack => CoreExpr -> CtsM PreStgRhs
-coreToPreStgRhs expr
-  = extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $
-    do { body' <- coreToStgExpr body
-       ; return (PreStgRhs args' body' (exprType body)) }
-  where
-   (args, body) = myCollectBinders expr
-   args'        = filterStgBinders args
-
--- Generate a top-level RHS. Any new cost centres generated for CAFs will be
--- appended to `CollectedCCs` argument.
-mkTopStgRhs :: CoreToStgOpts -> Module -> CollectedCCs
-            -> Id -> PreStgRhs -> (StgRhs, CollectedCCs)
-
-mkTopStgRhs CoreToStgOpts
-  { coreToStg_platform = platform
-  , coreToStg_ExternalDynamicRefs = opt_ExternalDynamicRefs
-  , coreToStg_AutoSccsOnIndividualCafs = opt_AutoSccsOnIndividualCafs
-  } this_mod ccs bndr (PreStgRhs bndrs rhs typ)
-  | not (null bndrs)
-  = -- The list of arguments is non-empty, so not CAF
-    ( StgRhsClosure noExtFieldSilent
-                    dontCareCCS
-                    ReEntrant
-                    bndrs rhs typ
-    , ccs )
-
-  -- After this point we know that `bndrs` is empty,
-  -- so this is not a function binding
-  | StgConApp con mn args _ <- unticked_rhs
-  , -- Dynamic StgConApps are updatable
-    not (isDllConApp platform opt_ExternalDynamicRefs this_mod con args)
-  = -- CorePrep does this right, but just to make sure
-    assertPpr (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
-              (ppr bndr $$ ppr con $$ ppr args)
-    ( StgRhsCon dontCareCCS con mn ticks args typ, ccs )
-
-  -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
-  | opt_AutoSccsOnIndividualCafs
-  = ( StgRhsClosure noExtFieldSilent
-                    caf_ccs
-                    upd_flag [] rhs typ
-    , collectCC caf_cc caf_ccs ccs )
-
-  | otherwise
-  = ( StgRhsClosure noExtFieldSilent
-                    all_cafs_ccs
-                    upd_flag [] rhs typ
-    , ccs )
-
-  where
-    (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
-
-    upd_flag | isAtMostOnceDmd (idDemandInfo bndr) = SingleEntry
-             | otherwise                           = Updatable
-
-    -- CAF cost centres generated for -fcaf-all
-    caf_cc = mkAutoCC bndr modl
-    caf_ccs = mkSingletonCCS caf_cc
-           -- careful: the binder might be :Main.main,
-           -- which doesn't belong to module mod_name.
-           -- bug #249, tests prof001, prof002
-    modl | Just m <- nameModule_maybe (idName bndr) = m
-         | otherwise = this_mod
-
-    -- default CAF cost centre
-    (_, all_cafs_ccs) = getAllCAFsCC this_mod
-
--- Generate a non-top-level RHS. Cost-centre is always currentCCS,
--- see Note [Cost-centre initialization plan].
-mkStgRhs :: Id -> PreStgRhs -> StgRhs
-mkStgRhs bndr (PreStgRhs bndrs rhs typ)
-  | not (null bndrs)
-  = StgRhsClosure noExtFieldSilent
-                  currentCCS
-                  ReEntrant
-                  bndrs rhs typ
-
-  -- After this point we know that `bndrs` is empty,
-  -- so this is not a function binding
-
-  | isJoinId bndr -- Must be a nullary join point
-  = -- It might have /type/ arguments (T18328),
-    -- so its JoinArity might be >0
-    StgRhsClosure noExtFieldSilent
-                  currentCCS
-                  ReEntrant -- ignored for LNE
-                  [] rhs typ
-
-  | StgConApp con mn args _ <- unticked_rhs
-  = StgRhsCon currentCCS con mn ticks args typ
-
-  | otherwise
-  = StgRhsClosure noExtFieldSilent
-                  currentCCS
-                  upd_flag [] rhs typ
-  where
-    (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
-
-    upd_flag | isAtMostOnceDmd (idDemandInfo bndr) = SingleEntry
-             | otherwise                           = Updatable
-
-  {-
-    SDM: disabled.  Eval/Apply can't handle functions with arity zero very
-    well; and making these into simple non-updatable thunks breaks other
-    assumptions (namely that they will be entered only once).
-
-    upd_flag | isPAP env rhs  = ReEntrant
-             | otherwise      = Updatable
-
--- Detect thunks which will reduce immediately to PAPs, and make them
--- non-updatable.  This has several advantages:
---
---         - the non-updatable thunk behaves exactly like the PAP,
---
---         - the thunk is more efficient to enter, because it is
---           specialised to the task.
---
---         - we save one update frame, one stg_update_PAP, one update
---           and lots of PAP_enters.
---
---         - in the case where the thunk is top-level, we save building
---           a black hole and furthermore the thunk isn't considered to
---           be a CAF any more, so it doesn't appear in any SRTs.
---
--- We do it here, because the arity information is accurate, and we need
--- to do it before the SRT pass to save the SRT entries associated with
--- any top-level PAPs.
-
-isPAP env (StgApp f args) = listLengthCmp args arity == LT -- idArity f > length args
-                              where
-                                 arity = stgArity f (lookupBinding env f)
-isPAP env _               = False
-
--}
-
-{- ToDo:
-          upd = if isOnceDem dem
-                    then (if isNotTop toplev
-                            then SingleEntry    -- HA!  Paydirt for "dem"
-                            else
-                     (if debugIsOn then trace "WARNING: SE CAFs unsupported, forcing UPD instead" else id) $
-                     Updatable)
-                else Updatable
-        -- For now we forbid SingleEntry CAFs; they tickle the
-        -- ASSERT in rts/Storage.c line 215 at newCAF() re mut_link,
-        -- and I don't understand why.  There's only one SE_CAF (well,
-        -- only one that tickled a great gaping bug in an earlier attempt
-        -- at ClosureInfo.getEntryConvention) in the whole of nofib,
-        -- specifically Main.lvl6 in spectral/cryptarithm2.
-        -- So no great loss.  KSW 2000-07.
--}
+coreToMkStgRhs :: HasDebugCallStack => Id -> CoreExpr -> CtsM MkStgRhs
+coreToMkStgRhs bndr expr = do
+  let (args, body) = myCollectBinders expr
+  let args'        = filterStgBinders args
+  extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $ do
+    body' <- coreToStgExpr body
+    let mk_rhs = MkStgRhs
+          { rhs_args = args'
+          , rhs_expr = body'
+          , rhs_type = exprType body
+          , rhs_is_join = isJoinId bndr
+          }
+    pure mk_rhs
 
 -- ---------------------------------------------------------------------------
 -- A monad for the core-to-STG pass
@@ -932,15 +790,6 @@ lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
                         Just xx -> xx
                         Nothing -> assertPpr (isGlobalId v) (ppr v) ImportBound
-
-getAllCAFsCC :: Module -> (CostCentre, CostCentreStack)
-getAllCAFsCC this_mod =
-    let
-      span = mkGeneralSrcSpan (mkFastString "<entire-module>") -- XXX do better
-      all_cafs_cc  = mkAllCafsCC this_mod span
-      all_cafs_ccs = mkSingletonCCS all_cafs_cc
-    in
-      (all_cafs_cc, all_cafs_ccs)
 
 -- Misc.
 

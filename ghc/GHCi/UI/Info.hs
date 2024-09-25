@@ -355,8 +355,8 @@ processAllTypeCheckedModule tcm
         mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
             | otherwise                              = Nothing
 
-        unwrapVar (XExpr (WrapExpr (HsWrap _ var))) = var
-        unwrapVar e'                                = e'
+        unwrapVar (XExpr (WrapExpr _ var)) = var
+        unwrapVar e'                       = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
     getTypeLPat :: LPat GhcTc -> Maybe (Maybe Id,SrcSpan,Type)

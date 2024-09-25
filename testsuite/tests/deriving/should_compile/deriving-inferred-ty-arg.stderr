@@ -1,0 +1,52 @@
+
+==================== Derived instances ====================
+Derived class instances:
+  instance DerivingInferredTyArg.C a =>
+           DerivingInferredTyArg.C (DerivingInferredTyArg.T a) where
+    DerivingInferredTyArg.m @{k} @b
+      = GHC.Prim.coerce
+          @(GHC.Internal.Data.Functor.Const.Const a b)
+          @(GHC.Internal.Data.Functor.Const.Const
+              (DerivingInferredTyArg.T a) b)
+          (DerivingInferredTyArg.m @a)
+  
+  instance DerivingInferredTyArg.C2 a =>
+           DerivingInferredTyArg.C2 (DerivingInferredTyArg.T a) where
+    DerivingInferredTyArg.m2 @{k} @{b}
+      = GHC.Prim.coerce
+          @(GHC.Internal.Data.Functor.Const.Const a b)
+          @(GHC.Internal.Data.Functor.Const.Const
+              (DerivingInferredTyArg.T a) b)
+          (DerivingInferredTyArg.m2 @a)
+  
+  instance DerivingInferredTyArg.C3 a =>
+           DerivingInferredTyArg.C3 (DerivingInferredTyArg.T a) where
+    DerivingInferredTyArg.m3 @{k} @b @{p}
+      = GHC.Prim.coerce
+          @(GHC.Internal.Data.Functor.Const.Const a p)
+          @(GHC.Internal.Data.Functor.Const.Const
+              (DerivingInferredTyArg.T a) p)
+          (DerivingInferredTyArg.m3 @a)
+  
+  instance DerivingInferredTyArg.C4 a =>
+           DerivingInferredTyArg.C4 (DerivingInferredTyArg.T a) where
+    DerivingInferredTyArg.m4 @{k} @b @{p}
+      = GHC.Prim.coerce
+          @(GHC.Internal.Data.Functor.Const.Const a p)
+          @(GHC.Internal.Data.Functor.Const.Const
+              (DerivingInferredTyArg.T a) p)
+          (DerivingInferredTyArg.m4 @a)
+  
+  instance DerivingInferredTyArg.C5 a =>
+           DerivingInferredTyArg.C5 (DerivingInferredTyArg.T a) where
+    DerivingInferredTyArg.m5 @{k}
+      = GHC.Prim.coerce
+          @(GHC.Internal.Data.Proxy.Proxy DerivingInferredTyArg.Any -> a)
+          @(GHC.Internal.Data.Proxy.Proxy DerivingInferredTyArg.Any
+            -> DerivingInferredTyArg.T a)
+          (DerivingInferredTyArg.m5 @a)
+  
+
+Derived type family instances:
+
+

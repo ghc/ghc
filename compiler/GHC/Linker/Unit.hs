@@ -1,7 +1,8 @@
 
 -- | Linking Haskell units
 module GHC.Linker.Unit
-   ( collectLinkOpts
+   ( UnitLinkOpts (..)
+   , collectLinkOpts
    , collectArchives
    , getUnitLinkOpts
    , getLibs
@@ -24,20 +25,27 @@ import Control.Monad
 import System.Directory
 import System.FilePath
 
+-- | Linker flags collected from units
+data UnitLinkOpts = UnitLinkOpts
+  { hsLibs     :: [String] -- ^ Haskell libraries (as a list of "-lHSfoo...")
+  , extraLibs  :: [String] -- ^ External libraries (as a list of "-lfoo...")
+  , otherFlags :: [String] -- ^ Extra linker options
+  }
+  deriving (Show)
+
 -- | Find all the link options in these and the preload packages,
 -- returning (package hs lib options, extra library options, other flags)
-getUnitLinkOpts :: GhcNameVersion -> Ways -> UnitEnv -> [UnitId] -> IO ([String], [String], [String])
+getUnitLinkOpts :: GhcNameVersion -> Ways -> UnitEnv -> [UnitId] -> IO UnitLinkOpts
 getUnitLinkOpts namever ways unit_env pkgs = do
     ps <- mayThrowUnitErr $ preloadUnitsInfo' unit_env pkgs
     return (collectLinkOpts namever ways ps)
 
-collectLinkOpts :: GhcNameVersion -> Ways -> [UnitInfo] -> ([String], [String], [String])
-collectLinkOpts namever ways ps =
-    (
-        concatMap (map ("-l" ++) . unitHsLibs namever ways) ps,
-        concatMap (map ("-l" ++) . map ST.unpack . unitExtDepLibsSys) ps,
-        concatMap (map ST.unpack . unitLinkerOptions) ps
-    )
+collectLinkOpts :: GhcNameVersion -> Ways -> [UnitInfo] -> UnitLinkOpts
+collectLinkOpts namever ways ps = UnitLinkOpts
+  { hsLibs     = concatMap (map ("-l" ++) . unitHsLibs namever ways) ps
+  , extraLibs  = concatMap (map ("-l" ++) . map ST.unpack . unitExtDepLibsSys) ps
+  , otherFlags = concatMap (map ST.unpack . unitLinkerOptions) ps
+  }
 
 collectArchives :: GhcNameVersion -> Ways -> UnitInfo -> IO [FilePath]
 collectArchives namever ways pc =

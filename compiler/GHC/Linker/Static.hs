@@ -156,10 +156,10 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
         = ([],[])
 
     pkg_link_opts <- do
-        (package_hs_libs, extra_libs, other_flags) <- getUnitLinkOpts namever ways_ unit_env dep_units
-        return $ other_flags ++ dead_strip
-                  ++ pre_hs_libs ++ package_hs_libs ++ post_hs_libs
-                  ++ extra_libs
+        unit_link_opts <- getUnitLinkOpts namever ways_ unit_env dep_units
+        return $ otherFlags unit_link_opts ++ dead_strip
+                  ++ pre_hs_libs ++ hsLibs unit_link_opts ++ post_hs_libs
+                  ++ extraLibs unit_link_opts
                  -- -Wl,-u,<sym> contained in other_flags
                  -- needs to be put before -l<package>,
                  -- otherwise Solaris linker fails linking

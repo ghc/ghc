@@ -142,7 +142,7 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
 
 
 test('T7072',
-	[extra_files(['T7072-main.c', 'T7072-obj.c']),
+	[extra_files(['load-object.c', 'T7072.c']),
 		unless(opsys('linux'), skip),
 		req_rts_linker],
 	makefile_test, ['T7072'])
@@ -160,3 +160,19 @@ test('T20918',
 test('T21618',
      [unless(opsys('mingw32'), skip), req_rts_linker],
      makefile_test, ['T21618'])
+
+# test R_AARCH64_NONE relocation support
+test('reloc-none',
+	[extra_files(['load-object.c', 'reloc-none.c']),
+		unless(arch('aarch64'), skip),
+                unless(opsys('linux'), skip),
+		req_rts_linker],
+	makefile_test, ['reloc-none'])
+
+test('T25191',
+     [req_rts_linker,
+      extra_files(['T25191_foo1.c','T25191_foo2.c']),
+      when(opsys('darwin'), expect_broken(25191)), # not supported in the MachO linker yet
+      when(opsys('mingw32'), expect_broken(25191)) # not supported in the PE linker yet
+     ],
+     makefile_test, ['T25191'])

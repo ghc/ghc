@@ -1,5 +1,10 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.23.0.0
+
+  * Extend `Exp` with `ForallE`, `ForallVisE`, `ConstraintedE`,
+    introduce functions `forallE`, `forallVisE`, `constraintedE` (GHC Proposal #281).
+
 ## 2.22.1.0
 
   * `Lift` instances were added for the `template-haskell` AST.

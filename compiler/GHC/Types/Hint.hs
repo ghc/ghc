@@ -475,9 +475,11 @@ data GhcHint
   {-| Suggest explicitly quantifying a type variable instead of relying on implicit quantification -}
   | SuggestExplicitQuantification RdrName
 
-
   {-| Suggest binding explicitly; e.g   data T @k (a :: F k) = .... -}
   | SuggestBindTyVarExplicitly Name
+
+  {-| Suggest a default declaration; e.g @default Cls (Ty1, Ty2)@ -}
+  | SuggestDefaultDeclaration TyCon [Type]
 
   {-| Suggest using explicit deriving strategies for a deriving clause.
 
@@ -498,6 +500,9 @@ data GhcHint
   | SuggestExplicitStandaloneDerivingStrategy
     AssumedDerivingStrategy -- ^ The deriving strategy we assumed
     (LHsSigWcType GhcRn) -- ^ The instance signature (e.g 'Show a => Show (T a)')
+
+  {-| Suggest add parens to pattern `e -> p :: t` -}
+  | SuggestParenthesizePatternRHS
 
 -- | The deriving strategy that was assumed when not explicitly listed in the
 --   source. This is used solely by the missing-deriving-strategies warning.

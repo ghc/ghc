@@ -1,4 +1,6 @@
-T9497a-run: T9497a-run.hs:2:8: error: [GHC-88464]
+T9497a-run: Exception:
+
+T9497a-run.hs:2:8: error: [GHC-88464]
     • Found hole: _main :: IO ()
       Or perhaps ‘_main’ is mis-spelled, or not in scope
     • In an equation for ‘main’: main = _main
@@ -15,6 +17,11 @@ T9497a-run: T9497a-run.hs:2:8: error: [GHC-88464]
           (imported from ‘Prelude’ at T9497a-run.hs:1:1
            (and originally defined in ‘GHC.Internal.Base’))
 (deferred type error)
+
+Package: ghc-internal
+Module: GHC.Internal.Control.Exception.Base
+Type: TypeError
+
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception

@@ -1,0 +1,3 @@
+
+default-fail06.hs:5:28: [GHC-74775]
+    The export item ‘default Monoid’ attempts to export a default class declaration that is not visible here

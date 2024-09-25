@@ -2,10 +2,6 @@
 ==================== Derived instances ====================
 Derived class instances:
   instance GHC.Classes.Eq a => GHC.Classes.Eq (T14579.Glurp a) where
-    (GHC.Classes.==) ::
-      T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool
-    (GHC.Classes./=) ::
-      T14579.Glurp a -> T14579.Glurp a -> GHC.Types.Bool
     (GHC.Classes.==)
       = GHC.Prim.coerce
           @(T14579.Wat 'GHC.Internal.Data.Proxy.Proxy
@@ -22,8 +18,6 @@ Derived class instances:
   instance forall a (x :: GHC.Internal.Data.Proxy.Proxy a).
            GHC.Classes.Eq a =>
            GHC.Classes.Eq (T14579.Wat x) where
-    (GHC.Classes.==) :: T14579.Wat x -> T14579.Wat x -> GHC.Types.Bool
-    (GHC.Classes./=) :: T14579.Wat x -> T14579.Wat x -> GHC.Types.Bool
     (GHC.Classes.==)
       = GHC.Prim.coerce
           @(GHC.Internal.Maybe.Maybe a

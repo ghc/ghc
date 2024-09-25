@@ -320,6 +320,7 @@ classify tok =
     ITlabelvarid{} -> TkUnknown
     ITchar{} -> TkChar
     ITstring{} -> TkString
+    ITmultilinestring{} -> TkString
     ITinteger{} -> TkNumber
     ITrational{} -> TkNumber
     ITprimchar{} -> TkChar

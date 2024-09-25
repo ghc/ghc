@@ -3,6 +3,14 @@
 
  * Add incremental mode to support rendering documentation one module at a time.
 
+ * The flag `--no-compilation` has been added. This flag causes Haddock to avoid
+   recompilation of the code when generating documentation by only reading
+   the `.hi` and `.hie` files, and will throw an error if it can't find them.
+
+ * Fix large margin on top of small headings
+
+ * Include `package_info` with haddock's `--show-interface` option.
+
 ## Changes in 2.28.0
  * `hi-haddock` is integrated, which means docstrings are no longer extracted
    through typchecked module results. Instead, docstrings are taken from Haskell

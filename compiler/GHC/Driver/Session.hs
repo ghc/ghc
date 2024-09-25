@@ -2344,6 +2344,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnDataKindsTC -> warnSpec x
   Opt_WarnDeprecatedTypeAbstractions -> warnSpec x
   Opt_WarnDefaultedExceptionContext -> warnSpec x
+  Opt_WarnViewPatternSignatures -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups
@@ -3087,7 +3088,24 @@ addHiddenModule p =
 
 addReexportedModule :: String -> DynP ()
 addReexportedModule p =
-  upd (\s -> s{ reexportedModules  = Set.insert (mkModuleName p) (reexportedModules s) })
+  upd (\s -> s{ reexportedModules  = (parseReexportedModule p) : (reexportedModules s) })
+
+parseReexportedModule :: String                 -- string to parse
+                      -> ReexportedModule
+parseReexportedModule str
+ = case filter ((=="").snd) (readP_to_S parseItem str) of
+    [(r, "")] -> r
+    _ -> throwGhcException $ CmdLineError ("Can't parse reexported module flag: " ++ str)
+  where
+        parseItem = do
+            orig <- tok $ parseModuleName
+            (do _ <- tok $ string "as"
+                new <- tok $ parseModuleName
+                return (ReexportedModule orig new))
+              +++
+             return (ReexportedModule orig orig)
+
+        tok m = m >>= \x -> skipSpaces >> return x
 
 
 -- If we're linking a binary, then only backends that produce object

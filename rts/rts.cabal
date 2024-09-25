@@ -94,9 +94,6 @@ library
     if arch(javascript)
 
       include-dirs: include
-      -- dummy file to force the build of a .a lib
-      -- FIXME (Luite, 2022-08) do we still need the c-sources file?
-      c-sources: version.c
 
       js-sources:
         js/config.js
@@ -253,7 +250,7 @@ library
       include-dirs: include
       includes: Rts.h
       autogen-includes: ghcautoconf.h ghcplatform.h
-      install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
+      install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h RtsSymbols.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         -- ^ from include
                         DerivedConstants.h
@@ -471,9 +468,11 @@ library
                  linker/elf_got.c
                  linker/elf_plt.c
                  linker/elf_plt_aarch64.c
+                 linker/elf_plt_riscv64.c
                  linker/elf_plt_arm.c
                  linker/elf_reloc.c
                  linker/elf_reloc_aarch64.c
+                 linker/elf_reloc_riscv64.c
                  linker/elf_tlsgd.c
                  linker/elf_util.c
                  sm/BlockAlloc.c

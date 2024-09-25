@@ -132,7 +132,7 @@ data UserTypeCtxt
   | RuleSigCtxt FastString Name    -- LHS of a RULE forall
                         --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
   | ForSigCtxt Name     -- Foreign import or export signature
-  | DefaultDeclCtxt     -- Types in a default declaration
+  | DefaultDeclCtxt     -- Class or types in a default declaration
   | InstDeclCtxt Bool   -- An instance declaration
                         --    True:  stand-alone deriving
                         --    False: vanilla instance declaration
@@ -205,7 +205,7 @@ pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quote
 pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)
 pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
 pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
-pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
+pprUserTypeCtxt DefaultDeclCtxt   = text "a `default' declaration"
 pprUserTypeCtxt (InstDeclCtxt False) = text "an instance declaration"
 pprUserTypeCtxt (InstDeclCtxt True)  = text "a stand-alone deriving instance declaration"
 pprUserTypeCtxt SpecInstCtxt      = text "a SPECIALISE instance pragma"
@@ -623,6 +623,7 @@ data CtOrigin
       ClsInst -- ^ The declared typeclass instance
 
   | NonLinearPatternOrigin NonLinearPatternReason (LPat GhcRn)
+  | OmittedFieldOrigin (Maybe FieldLabel)
   | UsageEnvironmentOf Name
 
   | CycleBreakerOrigin
@@ -751,6 +752,9 @@ exprCtOrigin (HsUntypedSplice {})  = Shouldn'tHappenOrigin "TH untyped splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
+exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
+exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -- See Note [Types in terms]
+exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
 exprCtOrigin (XExpr (ExpandedThingRn thing _)) | OrigExpr a <- thing = exprCtOrigin a
                                                | OrigStmt _ <- thing = DoOrigin
                                                | OrigPat p  <- thing = DoPatOrigin p
@@ -933,6 +937,8 @@ pprCtO ListOrigin            = text "an overloaded list"
 pprCtO IfThenElseOrigin      = text "an if-then-else expression"
 pprCtO StaticOrigin          = text "a static form"
 pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
+pprCtO (OmittedFieldOrigin Nothing) = text "an omitted anonymous field"
+pprCtO (OmittedFieldOrigin (Just fl)) = hsep [text "omitted field" <+> quotes (ppr fl)]
 pprCtO BracketOrigin         = text "a quotation bracket"
 
 -- These ones are handled by pprCtOrigin, but we nevertheless sometimes

@@ -117,7 +117,7 @@ inTreeCompilerArgs stg = do
 
     os          <- queryHostTarget queryOS
     arch        <- queryTargetTarget queryArch
-    let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32"]
+    let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32", "riscv64"]
     let withNativeCodeGen
           | unregisterised = False
           | arch `elem` codegen_arches = True
@@ -139,7 +139,7 @@ inTreeCompilerArgs stg = do
     -- For this information, we need to query ghc --info, however, that would
     -- require building ghc, which we don't want to do here. Therefore, the
     -- logic from `platformHasRTSLinker` is duplicated here.
-    let rtsLinker = not $ arch `elem` ["powerpc", "powerpc64", "powerpc64le", "s390x", "riscv64", "loongarch64", "javascript", "wasm32"]
+    let rtsLinker = not $ arch `elem` ["powerpc", "powerpc64", "powerpc64le", "s390x", "loongarch64", "javascript", "wasm32"]
 
     return TestCompilerArgs{..}
 

@@ -68,6 +68,7 @@ import GHC.Driver.Env
 import GHC.Driver.Config.Finder
 import qualified Data.Set as Set
 import qualified System.OsPath as OsPath
+import qualified Data.List.NonEmpty as NE
 
 type FileExt = OsString -- Filename extension
 type BaseName = OsPath  -- Basename of file
@@ -88,23 +89,23 @@ type BaseName = OsPath  -- Basename of file
 
 initFinderCache :: IO FinderCache
 initFinderCache = do
-  mod_cache <- newIORef emptyInstalledModuleEnv
+  mod_cache <- newIORef emptyInstalledModuleWithIsBootEnv
   file_cache <- newIORef M.empty
   let flushFinderCaches :: UnitEnv -> IO ()
       flushFinderCaches ue = do
-        atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
+        atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleWithIsBootEnv is_ext fm, ())
         atomicModifyIORef' file_cache $ \_ -> (M.empty, ())
        where
-        is_ext mod _ = not (isUnitEnvInstalledModule ue mod)
+        is_ext mod _ = not (isUnitEnvInstalledModule ue (gwib_mod mod))
 
-      addToFinderCache :: InstalledModule -> InstalledFindResult -> IO ()
+      addToFinderCache :: InstalledModuleWithIsBoot -> InstalledFindResult -> IO ()
       addToFinderCache key val =
-        atomicModifyIORef' mod_cache $ \c -> (extendInstalledModuleEnv c key val, ())
+        atomicModifyIORef' mod_cache $ \c -> (extendInstalledModuleWithIsBootEnv c key val, ())
 
-      lookupFinderCache :: InstalledModule -> IO (Maybe InstalledFindResult)
+      lookupFinderCache :: InstalledModuleWithIsBoot -> IO (Maybe InstalledFindResult)
       lookupFinderCache key = do
          c <- readIORef mod_cache
-         return $! lookupInstalledModuleEnv c key
+         return $! lookupInstalledModuleWithIsBootEnv c key
 
       lookupFileCache :: FilePath -> IO Fingerprint
       lookupFileCache key = do
@@ -165,8 +166,8 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
     home_pkg_import (uid, opts)
       -- If the module is reexported, then look for it as if it was from the perspective
       -- of that package which reexports it.
-      | mod_name `Set.member` finder_reexportedModules opts =
-        findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) mod_name NoPkgQual
+      | Just real_mod_name <- mod_name `M.lookup` finder_reexportedModules opts =
+        findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) real_mod_name NoPkgQual
       | mod_name `Set.member` finder_hiddenModules opts =
         return (mkHomeHidden uid)
       | otherwise =
@@ -254,7 +255,7 @@ orIfNotFound this or_this = do
 homeSearchCache :: FinderCache -> UnitId -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
 homeSearchCache fc home_unit mod_name do_this = do
   let mod = mkModule home_unit mod_name
-  modLocationCache fc mod do_this
+  modLocationCache fc (notBoot mod) do_this
 
 findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> PkgQual -> IO FindResult
 findExposedPackageModule fc fopts units mod_name mb_pkg =
@@ -311,7 +312,7 @@ findLookupResult fc fopts r = case r of
                        , fr_unusables = []
                        , fr_suggestions = suggest' })
 
-modLocationCache :: FinderCache -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
+modLocationCache :: FinderCache -> InstalledModuleWithIsBoot -> IO InstalledFindResult -> IO InstalledFindResult
 modLocationCache fc mod do_this = do
   m <- lookupFinderCache fc mod
   case m of
@@ -321,17 +322,17 @@ modLocationCache fc mod do_this = do
         addToFinderCache fc mod result
         return result
 
-addModuleToFinder :: FinderCache -> Module -> ModLocation -> IO ()
+addModuleToFinder :: FinderCache -> ModuleWithIsBoot -> ModLocation -> IO ()
 addModuleToFinder fc mod loc = do
-  let imod = toUnitId <$> mod
-  addToFinderCache fc imod (InstalledFound loc imod)
+  let imod = fmap toUnitId <$> mod
+  addToFinderCache fc imod (InstalledFound loc (gwib_mod imod))
 
 -- This returns a module because it's more convenient for users
-addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleName -> ModLocation -> IO Module
+addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleNameWithIsBoot -> ModLocation -> IO Module
 addHomeModuleToFinder fc home_unit mod_name loc = do
-  let mod = mkHomeInstalledModule home_unit mod_name
-  addToFinderCache fc mod (InstalledFound loc mod)
-  return (mkHomeModule home_unit mod_name)
+  let mod = mkHomeInstalledModule home_unit <$> mod_name
+  addToFinderCache fc mod (InstalledFound loc (gwib_mod mod))
+  return (mkHomeModule home_unit (gwib_mod mod_name))
 
 -- -----------------------------------------------------------------------------
 --      The internal workers
@@ -465,7 +466,7 @@ findPackageModule_ :: FinderCache -> FinderOpts -> InstalledModule -> UnitInfo -
 findPackageModule_ fc fopts mod pkg_conf = do
   massertPpr (moduleUnit mod == unitId pkg_conf)
              (ppr (moduleUnit mod) <+> ppr (unitId pkg_conf))
-  modLocationCache fc mod $
+  modLocationCache fc (notBoot mod) $
 
     -- special case for GHC.Prim; we won't find it in the filesystem.
     if mod `installedModuleEq` gHC_PRIM
@@ -747,7 +748,8 @@ findObjectLinkableMaybe mod locn
 -- Make an object linkable when we know the object file exists, and we know
 -- its modification time.
 findObjectLinkable :: Module -> FilePath -> UTCTime -> IO Linkable
-findObjectLinkable mod obj_fn obj_time = return (LM obj_time mod [DotO obj_fn])
+findObjectLinkable mod obj_fn obj_time =
+  pure (Linkable obj_time mod (NE.singleton (DotO obj_fn ModuleObject)))
   -- We used to look for _stub.o files here, but that was a bug (#706)
   -- Now GHC merges the stub.o into the main .o (#3687)
 

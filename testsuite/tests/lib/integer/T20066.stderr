@@ -1,1 +1,7 @@
-T20066: arithmetic underflow
+T20066: Exception:
+
+arithmetic underflow
+
+Package: ghc-internal
+Module: GHC.Internal.Exception.Type
+Type: ArithException

@@ -107,7 +107,8 @@
 
 #include "elf_got.h"
 
-#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
+#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH) || defined (riscv64_HOST_ARCH)
+#  define NEED_GOT
 #  define NEED_PLT
 #  include "elf_plt.h"
 #  include "elf_reloc.h"
@@ -434,10 +435,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       case EM_AARCH64: IF_DEBUG(linker,debugBelch( "aarch64" )); break;
 #endif
 #if defined(EM_RISCV)
-      case EM_RISCV:  IF_DEBUG(linker,debugBelch( "riscv" ));
-          errorBelch("%s: RTS linker not implemented on riscv",
-                     oc->fileName);
-          return 0;
+      case EM_RISCV:  IF_DEBUG(linker,debugBelch( "riscv" )); break;
 #endif
 #if defined(EM_LOONGARCH)
       case EM_LOONGARCH:  IF_DEBUG(linker,debugBelch( "loongarch64" ));
@@ -1073,6 +1071,9 @@ ocGetNames_ELF ( ObjectCode* oc )
                } else {
                    sym_type = SYM_TYPE_DATA;
                }
+               if(ELF_ST_VISIBILITY(symbol->elf_sym->st_other) == STV_HIDDEN) {
+                   sym_type |= SYM_TYPE_HIDDEN;
+               }
 
                /* And the decision is ... */
 
@@ -1132,9 +1133,10 @@ end:
    return result;
 }
 
-// the aarch64 linker uses relocacteObjectCodeAarch64,
-// see elf_reloc_aarch64.{h,c}
-#if !defined(aarch64_HOST_ARCH)
+// the aarch64 and riscv64 linkers use relocateObjectCodeAarch64() and
+// relocateObjectCodeRISCV64() (respectively), see elf_reloc_aarch64.{h,c} and
+// elf_reloc_riscv64.{h,c}
+#if !defined(aarch64_HOST_ARCH) && !defined(riscv64_HOST_ARCH)
 
 /* Do ELF relocations which lack an explicit addend.  All x86-linux
    and arm-linux relocations appear to be of this form. */
@@ -1361,7 +1363,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                /* try to locate an existing stub for this target */
                if(findStub(&oc->sections[target_shndx], (void**)&S, 0)) {
                    /* didn't find any. Need to create one */
-                   if(makeStub(&oc->sections[target_shndx], (void**)&S, 0)) {
+                   if(makeStub(&oc->sections[target_shndx], (void**)&S, NULL, 0)) {
                        errorBelch("Unable to create veneer for ARM_CALL\n");
                        return 0;
                    }
@@ -1453,7 +1455,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                /* try to locate an existing stub for this target */
                if(findStub(&oc->sections[target_shndx], (void**)&S, 1)) {
                    /* didn't find any. Need to create one */
-                   if(makeStub(&oc->sections[target_shndx], (void**)&S, 1)) {
+                   if(makeStub(&oc->sections[target_shndx], (void**)&S, NULL, 1)) {
                        errorBelch("Unable to create veneer for ARM_THM_CALL\n");
                        return 0;
                    }
@@ -1993,7 +1995,7 @@ ocResolve_ELF ( ObjectCode* oc )
     (void) shnum;
     (void) shdr;
 
-#if defined(aarch64_HOST_ARCH)
+#if defined(aarch64_HOST_ARCH) || defined(riscv64_HOST_ARCH)
     /* use new relocation design */
     if(relocateObjectCode( oc ))
         return 0;
@@ -2016,6 +2018,9 @@ ocResolve_ELF ( ObjectCode* oc )
 
 #if defined(powerpc_HOST_ARCH)
     ocFlushInstructionCache( oc );
+#elif defined(riscv64_HOST_ARCH)
+    /* New-style pseudo-polymorph (by architecture) call */
+    flushInstructionCache( oc );
 #endif
 
     return ocMprotect_Elf(oc);

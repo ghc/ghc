@@ -39,10 +39,10 @@ data CmmCpp = CmmCpp { cmmCppProgram :: Program
                      }
     deriving (Show, Read, Eq, Ord)
 
-checkFlag :: String -> Program -> String -> M ()
-checkFlag conftest cpp flag = checking ("for "++flag++" support") $
+checkFlag :: String -> Program -> String -> [String] ->  M ()
+checkFlag conftest cpp flag extra_args = checking ("for "++flag++" support") $
   -- Werror to ensure that unrecognized warnings result in an error
-  callProgram cpp ["-Werror", flag, conftest]
+  callProgram cpp $ ["-Werror", flag, conftest] ++ extra_args
 -- tryFlag :: String -> Program -> String -> M [String]
 -- tryFlag conftest cpp flag =
 --   ([flag] <$ checkFlag conftest cpp flag) <|> return []
@@ -167,7 +167,7 @@ findCmmCpp progOpt cc = checking "for a Cmm preprocessor" $ do
   cmmCppSupportsG0 <- withTempDir $ \dir -> do
     let conftest = dir </> "conftest.c"
     writeFile conftest "int main(void) {}"
-    True <$ checkFlag conftest cpp "-g0" <|> return False
+    True <$ checkFlag conftest cpp "-g0" ["-o", dir </> "conftest"] <|> return False
 
   -- Always add the -E flag to the CPP, regardless of the user options
   let cmmCppProgram = foldr addFlagIfNew cpp ["-E"]

@@ -1,0 +1,7 @@
+
+default-fail08.hs:12:15: [GHC-10283]
+     Couldn't match representation of type ‘a0’ with that of ‘Int’
+        arising from a use of ‘coerce’
+     In the first argument of ‘print’, namely ‘(coerce (4 :: Int))’
+      In the expression: print (coerce (4 :: Int))
+      In an equation for ‘main’: main = print (coerce (4 :: Int))

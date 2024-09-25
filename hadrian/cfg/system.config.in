@@ -65,6 +65,7 @@ bootstrap-threaded-rts = @GhcThreadedRts@
 project-name           = @ProjectName@
 project-version        = @ProjectVersion@
 project-version-munged = @ProjectVersionMunged@
+project-version-for-lib = @ProjectVersionForLib@
 project-version-int    = @ProjectVersionInt@
 project-patch-level    = @ProjectPatchLevel@
 project-patch-level1   = @ProjectPatchLevel1@

@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { AnnotationNoListTuplePuns.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { AnnotationNoListTuplePuns.hs:3:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { AnnotationNoListTuplePuns.hs:3:34-38 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { AnnotationNoListTuplePuns.hs:3:1-6 }))
+     (EpTok
+      (EpaSpan { AnnotationNoListTuplePuns.hs:3:34-38 }))
      []
      []
      (Just
@@ -188,8 +191,11 @@
    (EpAnn
     (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:34-38 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:1-6 }))
+     (EpTok
+      (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:3:34-38 }))
      []
      []
      (Just

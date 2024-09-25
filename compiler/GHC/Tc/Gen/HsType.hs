@@ -25,7 +25,7 @@ module GHC.Tc.Gen.HsType (
         funsSigCtxt, addSigCtxt, pprSigCtxt,
 
         tcHsClsInstType,
-        tcHsDeriv, tcDerivStrategy,
+        tcHsDefault, tcHsDeriv, tcDerivStrategy,
         tcHsTypeApp,
         UserTypeCtxt(..),
         bindImplicitTKBndrs_Tv, bindImplicitTKBndrs_Skol,
@@ -630,31 +630,52 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
   where
     skol_info_anon = SigTypeSkol ctxt
 
------------------
-tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
--- Like tcHsSigType, but for the ...deriving( C t1 ty2 ) clause
--- Returns the C, [ty1, ty2, and the kinds of C's remaining arguments
+tcClassConstraint :: Type -> TcM (Either (Maybe TyCon) ([TyVar], Class, [Type], [Kind]))
+-- Like tcHsSigType, but for a simple class constraint of form ( C ty1 ty2 )
+-- Returns the C, [ty1, ty2], and the kinds of C's remaining arguments
 -- E.g.    class C (a::*) (b::k->k)
---         data T a b = ... deriving( C Int )
---    returns ([k], C, [k, Int], [k->k])
+--         tcClassConstraint ( C Int ) returns Right ([k], C, [k, Int], [k->k])
 -- Return values are fully zonked
-tcHsDeriv hs_ty
-  = do { ty <- tcTopLHsType DerivClauseCtxt hs_ty
-       ; let (tvs, pred)    = splitForAllTyCoVars ty
+tcClassConstraint ty
+  = do { let (tvs, pred)    = splitForAllTyCoVars ty
              (kind_args, _) = splitFunTys (typeKind pred)
       -- Checking that `pred` a is type class application
        ; case splitTyConApp_maybe pred of
           Just (tyCon, tyConArgs) ->
             case tyConClass_maybe tyCon of
               Just clas ->
-                return (tvs, clas, tyConArgs, map scaledThing kind_args)
-              Nothing -> failWithTc $ TcRnIllegalInstance
-                                    $ IllegalClassInstance
-                                        (TypeThing ty)
-                                    $ IllegalInstanceHead
-                                    $ InstHeadNonClass (Just tyCon)
-          Nothing -> failWithTc $ TcRnIllegalDerivingItem hs_ty
-    }
+                return (Right (tvs, clas, tyConArgs, map scaledThing kind_args))
+              Nothing -> return (Left (Just tyCon))
+          Nothing -> return (Left Nothing) }
+
+tcHsDefault :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
+-- Like tcHsSigType, but for the default ( C ty1 ty2 ) (ty1', ty2', ...) declaration
+-- See Note [Named default declarations] in GHC.Tc.Gen.Default
+tcHsDefault hs_ty
+  = tcTopLHsType DefaultDeclCtxt hs_ty
+    >>= tcClassConstraint
+    >>= either (const $ failWithTc $ TcRnIllegalDefaultClass hs_ty) return
+
+-----------------
+tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
+-- Like tcHsSigType, but for the ...deriving( C ty1 ty2 ) clause
+-- Returns the C, [ty1, ty2], and the kinds of C's remaining arguments
+-- E.g.    class C (a::*) (b::k->k)
+--         data T a b = ... deriving( C Int )
+--    returns ([k], C, [k, Int], [k->k])
+-- Return values are fully zonked
+tcHsDeriv hs_ty
+  = do { ty <- tcTopLHsType DerivClauseCtxt hs_ty
+       ; constrained <- tcClassConstraint ty
+       ; case constrained of
+           Left Nothing -> failWithTc (TcRnIllegalDerivingItem hs_ty)
+           Left (Just tyCon) ->
+             failWithTc $ TcRnIllegalInstance
+                        $ IllegalClassInstance (TypeThing ty)
+                        $ IllegalInstanceHead
+                        $ InstHeadNonClass
+                        $ Just tyCon
+           Right result -> return result }
 
 -- | Typecheck a deriving strategy. For most deriving strategies, this is a
 -- no-op, but for the @via@ strategy, this requires typechecking the @via@ type.
@@ -4705,6 +4726,7 @@ addTyConFlavCtxt name flav
 
 tyLitFromLit :: HsLit GhcRn -> Maybe (HsTyLit GhcRn)
 tyLitFromLit (HsString x str) = Just (HsStrTy x str)
+tyLitFromLit (HsMultilineString x str) = Just (HsStrTy x str)
 tyLitFromLit (HsChar x char) = Just (HsCharTy x char)
 tyLitFromLit _ = Nothing
 

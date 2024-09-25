@@ -171,7 +171,7 @@ module GHC.Core.Type (
 
         anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,
-        expandTypeSynonyms,
+        expandTypeSynonyms, expandSynTyConApp_maybe,
         typeSize, occCheckExpand,
 
         -- ** Closing over kinds
@@ -2315,22 +2315,27 @@ buildSynTyCon name binders res_kind roles rhs
   where
     is_tau       = isTauTy rhs
     is_fam_free  = isFamFreeTy rhs
+    expanded_rhs = expandTypeSynonyms rhs
+
     is_concrete  = uniqSetAll isConcreteTyCon rhs_tycons
-         -- NB: is_concrete is allowed to be conservative, returning False
-         --     more often than it could.  e.g.
+    rhs_tycons   = tyConsOfType expanded_rhs
+         -- NB: we look at expanded_rhs  e.g.
          --       type S a b = b
          --       type family F a
          --       type T a = S (F a) a
-         -- We will mark T as not-concrete, even though (since S ignore its first
-         -- argument, it could be marked concrete.
+         -- We want to mark T as concrete, because S ignores its first argument
 
-    is_forgetful = not (all ((`elemVarSet` rhs_tyvars) . binderVar) binders) ||
-                   uniqSetAny isForgetfulSynTyCon rhs_tycons
-         -- NB: is_forgetful is allowed to be conservative, returning True more often
-         -- than it should. See Note [Forgetful type synonyms] in GHC.Core.TyCon
-
-    rhs_tycons = tyConsOfType   rhs
-    rhs_tyvars = tyCoVarsOfType rhs
+    is_forgetful = not (all ((`elemVarSet` expanded_rhs_tyvars) . binderVar) binders)
+    expanded_rhs_tyvars = tyCoVarsOfType expanded_rhs
+       -- See Note [Forgetful type synonyms] in GHC.Core.TyCon
+       -- To find out if this TyCon is forgetful, expand the synonyms in its RHS
+       -- and check that all of the binders are free in the expanded type.
+       -- We really only need to expand the /forgetful/ synonyms on the RHS,
+       -- but we don't currently have a function to do that.
+       -- Failing to expand the RHS led to #25094, e.g.
+       --    type Bucket a b c = Key (a,b,c)
+       --    type Key x = Any
+       -- Here Bucket is definitely forgetful!
 
 {-
 ************************************************************************

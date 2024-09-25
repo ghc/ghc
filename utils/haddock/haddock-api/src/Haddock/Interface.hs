@@ -78,12 +78,6 @@ import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text)
 import GHC.Utils.Error (withTiming)
 import GHC.Utils.Monad (mapMaybeM)
 
-#if defined(mingw32_HOST_OS)
-import System.IO
-import GHC.IO.Encoding.CodePage (mkLocaleEncoding)
-import GHC.IO.Encoding.Failure (CodingFailureMode(TransliterateCodingFailure))
-#endif
-
 import Haddock.GhcUtils (moduleString, pretty)
 import Haddock.Interface.AttachInstances (attachInstances)
 import Haddock.Interface.Create (createInterface1, createInterface1')
@@ -92,6 +86,7 @@ import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
 import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
+import qualified Haddock.Compat as Compat
 
 -- | Create 'Interface's and a link environment by typechecking the list of
 -- modules using the GHC API and processing the resulting syntax trees.
@@ -104,12 +99,7 @@ processModules
   -> Ghc ([Interface], LinkEnv) -- ^ Resulting list of interfaces and renaming
                                 -- environment
 processModules verbosity modules flags extIfaces = do
-#if defined(mingw32_HOST_OS)
-  -- Avoid internal error: <stderr>: hPutChar: invalid argument (invalid character)' non UTF-8 Windows
-  liftIO $ hSetEncoding stdout $ mkLocaleEncoding TransliterateCodingFailure
-  liftIO $ hSetEncoding stderr $ mkLocaleEncoding TransliterateCodingFailure
-#endif
-
+  liftIO Compat.setEncoding
   dflags <- getDynFlags
 
   -- Map from a module to a corresponding installed interface
@@ -176,19 +166,21 @@ createIfaces verbosity modules flags instIfaceMap = do
   dflags <- getSessionDynFlags
   let dflags' = dflags { ldInputs = map (FileOption "") o_files
                                     ++ ldInputs dflags }
-  _ <- setSessionDynFlags dflags'
+      dflags'' = if Flag_NoCompilation `elem` flags then dflags' { ghcMode = OneShot } else dflags'
+  _ <- setSessionDynFlags dflags''
   targets <- mapM (\(filePath, _) -> guessTarget filePath Nothing Nothing) hs_srcs
   setTargets targets
   (_errs, modGraph) <- depanalE [] False
 
-  liftIO $ traceMarkerIO "Load started"
-  -- Create (if necessary) and load .hi-files.
-  success <- withTimingM "load'" (const ()) $
-               load' noIfaceCache LoadAllTargets mkUnknownDiagnostic (Just batchMsg) modGraph
-  when (failed success) $ do
-    out verbosity normal "load' failed"
-    liftIO exitFailure
-  liftIO $ traceMarkerIO "Load ended"
+  -- Create (if necessary) and load .hi-files. With --no-compilation this happens later.
+  when (Flag_NoCompilation `notElem` flags) $ do
+    liftIO $ traceMarkerIO "Load started"
+    success <- withTimingM "load'" (const ()) $
+                load' noIfaceCache LoadAllTargets mkUnknownDiagnostic (Just batchMsg) modGraph
+    when (failed success) $ do
+      out verbosity normal "load' failed"
+      liftIO exitFailure
+    liftIO $ traceMarkerIO "Load ended"
 
       -- We topologically sort the module graph including boot files,
       -- so it should be acylic (hopefully we failed much earlier if this is not the case)
@@ -260,6 +252,20 @@ dropErr :: MaybeErr e a -> Maybe a
 dropErr (Succeeded a) = Just a
 dropErr (Failed _) = Nothing
 
+loadHiFile :: HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, ([ClsInst], [FamInst]))
+loadHiFile hsc_env doc theModule = initIfaceLoad hsc_env $ do
+
+  mod_iface <- loadSysInterface doc theModule
+
+  insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
+
+    new_eps_insts     <- mapM tcIfaceInst (mi_insts mod_iface)
+    new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts mod_iface)
+
+    pure (new_eps_insts, new_eps_fam_insts)
+
+  pure (mod_iface, insts)
+
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> WarningMap -> Ghc (Maybe Interface)
 processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modSummary) ++ "..."
@@ -267,17 +273,19 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
   hsc_env <- getSession
   dflags <- getDynFlags
   let sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
-  let hmi = case lookupHpt (hsc_HPT hsc_env) (moduleName $ ms_mod modSummary) of
-        Nothing -> error "processModule: All modules should be loaded into the HPT by this point"
-        Just x -> x
-      mod_iface = hm_iface hmi
+      doc = text "processModule"
       unit_state = hsc_units hsc_env
 
-      cls_insts = instEnvElts . md_insts $ hm_details hmi
+  (mod_iface, insts) <- if Flag_NoCompilation `elem` flags
+    then liftIO $ loadHiFile hsc_env doc $ ms_mod modSummary
+    else
+      let hmi = case lookupHpt (hsc_HPT hsc_env) (moduleName $ ms_mod modSummary) of
+            Nothing -> error "processModule: All modules should be loaded into the HPT by this point"
+            Just x -> x
+          cls_insts = instEnvElts . md_insts $ hm_details hmi
+          fam_insts = md_fam_insts $ hm_details hmi
 
-      fam_insts = md_fam_insts $ hm_details hmi
-
-      insts = (cls_insts, fam_insts)
+      in pure (hm_iface hmi, (cls_insts, fam_insts))
 
   !interface <- do
     logger <- getLogger
@@ -363,18 +371,7 @@ createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
   modifySession $ hscSetFlags dflags
   hsc_env <- getSession
 
-  (iface, insts) <- liftIO $ initIfaceLoad hsc_env $ do
-
-    iface <- loadSysInterface doc $ mkMainModule_ moduleNm
-
-    insts <- initIfaceLcl (mi_semantic_module iface) doc (mi_boot iface) $ do
-
-      new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
-      new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-
-      pure (new_eps_insts, new_eps_fam_insts)
-
-    pure (iface, insts)
+  (iface, insts) <- liftIO $ loadHiFile hsc_env doc $ mkMainModule_ moduleNm
 
   -- Update the DynFlags with the extensions from the source file (as stored in the interface file)
   -- This is instead of ms_hspp_opts from ModSummary, which is not available in one-shot mode.

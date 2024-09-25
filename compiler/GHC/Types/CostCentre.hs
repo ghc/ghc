@@ -4,6 +4,7 @@ module GHC.Types.CostCentre (
         CostCentre(..), CcName, CCFlavour,
         mkCafFlavour, mkExprCCFlavour, mkDeclCCFlavour, mkHpcCCFlavour,
         mkLateCCFlavour, mkCallerCCFlavour,
+        getAllCAFsCC,
 
         pprCostCentre,
         CostCentreStack,
@@ -393,3 +394,13 @@ instance Binary CostCentre where
     -- ok, because we only need the SrcSpan when declaring the
     -- CostCentre in the original module, it is not used by importing
     -- modules.
+
+getAllCAFsCC :: Module -> (CostCentre, CostCentreStack)
+getAllCAFsCC this_mod =
+    let
+      span = mkGeneralSrcSpan (mkFastString "<entire-module>") -- XXX do better
+      all_cafs_cc  = mkAllCafsCC this_mod span
+      all_cafs_ccs = mkSingletonCCS all_cafs_cc
+    in
+      (all_cafs_cc, all_cafs_ccs)
+

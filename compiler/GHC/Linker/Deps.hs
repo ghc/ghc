@@ -293,13 +293,14 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
             adjust_linkable lnk
                 | Just new_osuf <- maybe_normal_osuf = do
-                        new_uls <- mapM (adjust_ul new_osuf)
-                                        (linkableUnlinked lnk)
-                        return lnk{ linkableUnlinked=new_uls }
+                        new_parts <- mapM (adjust_part new_osuf)
+                                        (linkableParts lnk)
+                        return lnk{ linkableParts=new_parts }
                 | otherwise =
                         return lnk
 
-            adjust_ul new_osuf (DotO file) = do
+            adjust_part new_osuf part = case part of
+              DotO file ModuleObject -> do
                 massert (osuf `isSuffixOf` file)
                 let file_base = fromJust (stripExtension osuf file)
                     new_file = file_base <.> new_osuf
@@ -308,12 +309,14 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                    then dieWith opts span $
                           text "cannot find object file "
                                 <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file)
-            adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
-            adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
-            adjust_ul _ l@(BCOs {}) = return l
-            adjust_ul _ l@LoadedBCOs{} = return l
-            adjust_ul _ (CoreBindings (WholeCoreBindings _ mod _))     = pprPanic "Unhydrated core bindings" (ppr mod)
+                   else return (DotO new_file ModuleObject)
+              DotO file ForeignObject -> pure (DotO file ForeignObject)
+              DotA fp    -> panic ("adjust_ul DotA " ++ show fp)
+              DotDLL fp  -> panic ("adjust_ul DotDLL " ++ show fp)
+              BCOs {}    -> pure part
+              LazyBCOs{} -> pure part
+              CoreBindings WholeCoreBindings {wcb_module} ->
+                pprPanic "Unhydrated core bindings" (ppr wcb_module)
 
 {-
 Note [Using Byte Code rather than Object Code for Template Haskell]

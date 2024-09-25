@@ -1990,9 +1990,13 @@ genCCall target dest_regs arg_regs = do
         MO_SubIntC    _w -> unsupported mop
 
         -- Memory Ordering
-        MO_AcquireFence     ->  return (unitOL DMBISH)
-        MO_ReleaseFence     ->  return (unitOL DMBISH)
-        MO_SeqCstFence      ->  return (unitOL DMBISH)
+        -- Set flags according to their C pendants (stdatomic.h):
+        -- atomic_thread_fence(memory_order_acquire); // -> dmb ishld
+        MO_AcquireFence     ->  return . unitOL $ DMBISH DmbLoad
+        -- atomic_thread_fence(memory_order_release); // -> dmb ish
+        MO_ReleaseFence     ->  return . unitOL $ DMBISH DmbLoadStore
+        -- atomic_thread_fence(memory_order_seq_cst); // -> dmb ish
+        MO_SeqCstFence      ->  return . unitOL $ DMBISH DmbLoadStore
         MO_Touch            ->  return nilOL -- Keep variables live (when using interior pointers)
         -- Prefetch
         MO_Prefetch_Data _n -> return nilOL -- Prefetch hint.

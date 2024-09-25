@@ -58,6 +58,7 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
+import GHC.Driver.DynFlags (ReexportedModule(..))
 import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
@@ -67,6 +68,7 @@ import GHC.Driver.Main
 import GHC.Driver.MakeSem
 
 import GHC.Parser.Header
+import GHC.ByteCode.Types
 
 import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
@@ -329,9 +331,11 @@ warnMissingHomeModules dflags targets mod_graph =
     -- Note also that we can't always infer the associated module name
     -- directly from the filename argument.  See #13727.
     is_known_module mod =
-      (Map.lookup (moduleName (ms_mod mod)) mod_targets == Just (ms_unitid mod))
+      is_module_target mod
       ||
       maybe False is_file_target (ml_hs_file (ms_location mod))
+
+    is_module_target mod = (moduleName (ms_mod mod), ms_unitid mod) `Set.member` mod_targets
 
     is_file_target file = Set.member (withoutExt file) file_targets
 
@@ -343,7 +347,7 @@ warnMissingHomeModules dflags targets mod_graph =
         TargetFile file _ ->
           Just (withoutExt (augmentByWorkingDirectory dflags file))
 
-    mod_targets = Map.fromList (mod_target <$> targets)
+    mod_targets = Set.fromList (mod_target <$> targets)
 
     mod_target Target {targetUnitId, targetId} =
       case targetId of
@@ -363,7 +367,7 @@ warnMissingHomeModules dflags targets mod_graph =
 -- Check that any modules we want to reexport or hide are actually in the package.
 warnUnknownModules :: HscEnv -> DynFlags -> ModuleGraph -> IO DriverMessages
 warnUnknownModules hsc_env dflags mod_graph = do
-  reexported_warns <- filterM check_reexport (Set.toList reexported_mods)
+  reexported_warns <- filterM check_reexport reexported_mods
   return $ final_msgs hidden_warns reexported_warns
   where
     diag_opts = initDiagOpts dflags
@@ -380,7 +384,7 @@ warnUnknownModules hsc_env dflags mod_graph = do
     lookupModule mn = findImportedModule hsc_env mn NoPkgQual
 
     check_reexport mn = do
-      fr <- lookupModule mn
+      fr <- lookupModule (reexportFrom mn)
       case fr of
         Found _ m -> return (moduleUnitId m == homeUnitId_ dflags)
         _ -> return True
@@ -1319,10 +1323,9 @@ addSptEntries :: HscEnv -> Maybe Linkable -> IO ()
 addSptEntries hsc_env mlinkable =
   hscAddSptEntries hsc_env
      [ spt
-     | Just linkable <- [mlinkable]
-     , unlinked <- linkableUnlinked linkable
-     , BCOs _ spts <- pure unlinked
-     , spt <- spts
+     | linkable <- maybeToList mlinkable
+     , bco <- linkableBCOs linkable
+     , spt <- bc_spt_entries bco
      ]
 
 {- Note [-fno-code mode]
@@ -2041,25 +2044,43 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
         let fopts = initFinderOpts (hsc_dflags hsc_env)
+            src_path = unsafeEncodeUtf src_fn
 
-        -- Make a ModLocation for this file
-        let location = mkHomeModLocation fopts pi_mod_name (unsafeEncodeUtf src_fn)
+            is_boot = case takeExtension src_fn of
+              ".hs-boot" -> IsBoot
+              ".lhs-boot" -> IsBoot
+              _ -> NotBoot
+
+            (path_without_boot, hsc_src)
+              | isHaskellSigFilename src_fn = (src_path, HsigFile)
+              | IsBoot <- is_boot = (removeBootSuffix src_path, HsBootFile)
+              | otherwise = (src_path, HsSrcFile)
+
+            -- Make a ModLocation for the Finder, who only has one entry for
+            -- each @ModuleName@, and therefore needs to use the locations for
+            -- the non-boot files.
+            location_without_boot =
+              mkHomeModLocation fopts pi_mod_name path_without_boot
+
+            -- Make a ModLocation for this file, adding the @-boot@ suffix to
+            -- all paths if the original was a boot file.
+            location
+              | IsBoot <- is_boot
+              = addBootSuffixLocn location_without_boot
+              | otherwise
+              = location_without_boot
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
         mod <- liftIO $ do
           let home_unit = hsc_home_unit hsc_env
           let fc        = hsc_FC hsc_env
-          addHomeModuleToFinder fc home_unit pi_mod_name location
+          addHomeModuleToFinder fc home_unit (GWIB pi_mod_name is_boot) location
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_hash = src_hash
-            , nms_is_boot = NotBoot
-            , nms_hsc_src =
-                if isHaskellSigFilename src_fn
-                   then HsigFile
-                   else HsSrcFile
+            , nms_hsc_src = hsc_src
             , nms_location = location
             , nms_mod = mod
             , nms_preimps = preimps
@@ -2087,9 +2108,10 @@ checkSummaryHash
            -- Also, only add to finder cache for non-boot modules as the finder cache
            -- makes sure to add a boot suffix for boot files.
            _ <- do
-              let fc        = hsc_FC hsc_env
+              let fc = hsc_FC hsc_env
+                  gwib = GWIB (ms_mod old_summary) (isBootSummary old_summary)
               case ms_hsc_src old_summary of
-                HsSrcFile -> addModuleToFinder fc (ms_mod old_summary) location
+                HsSrcFile -> addModuleToFinder fc gwib location
                 _ -> return ()
 
            hi_timestamp <- modificationTimeIfExists (ml_hi_file location)
@@ -2215,9 +2237,9 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
               | isHaskellSigFilename src_fn = HsigFile
               | otherwise                   = HsSrcFile
 
-        when (pi_mod_name /= wanted_mod) $
+        when (pi_mod_name /= moduleName mod) $
                 throwE $ singleMessage $ mkPlainErrorMsgEnvelope pi_mod_name_loc
-                       $ DriverFileModuleNameMismatch pi_mod_name wanted_mod
+                       $ DriverFileModuleNameMismatch pi_mod_name (moduleName mod)
 
         let instantiations = homeUnitInstantiations home_unit
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name instantiations)) $
@@ -2227,7 +2249,6 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_hash = src_hash
-            , nms_is_boot = is_boot
             , nms_hsc_src = hsc_src
             , nms_location = location
             , nms_mod = mod
@@ -2240,7 +2261,6 @@ data MakeNewModSummary
   = MakeNewModSummary
       { nms_src_fn :: FilePath
       , nms_src_hash :: Fingerprint
-      , nms_is_boot :: IsBootInterface
       , nms_hsc_src :: HscSource
       , nms_location :: ModLocation
       , nms_mod :: Module
@@ -2921,19 +2941,22 @@ runParPipelines worker_limit plugin_hsc_env diag_wrapper mHscMessager all_pipeli
     atomically $ writeTVar stopped_var True
     wait_log_thread
 
-withLocalTmpFS :: RunMakeM a -> RunMakeM a
-withLocalTmpFS act = do
+withLocalTmpFS :: TmpFs -> (TmpFs -> IO a) -> IO a
+withLocalTmpFS tmpfs act = do
   let initialiser = do
-        MakeEnv{..} <- ask
-        lcl_tmpfs <- liftIO $ forkTmpFsFrom (hsc_tmpfs hsc_env)
-        return $ hsc_env { hsc_tmpfs  = lcl_tmpfs }
-      finaliser lcl_env = do
-        gbl_env <- ask
-        liftIO $ mergeTmpFsInto (hsc_tmpfs lcl_env) (hsc_tmpfs (hsc_env gbl_env))
+        liftIO $ forkTmpFsFrom tmpfs
+      finaliser tmpfs_local = do
+        liftIO $ mergeTmpFsInto tmpfs_local tmpfs
        -- Add remaining files which weren't cleaned up into local tmp fs for
        -- clean-up later.
        -- Clear the logQueue if this node had it's own log queue
-  MC.bracket initialiser finaliser $ \lcl_hsc_env -> local (\env -> env { hsc_env = lcl_hsc_env}) act
+  MC.bracket initialiser finaliser act
+
+withLocalTmpFSMake :: MakeEnv -> (MakeEnv -> IO a) -> IO a
+withLocalTmpFSMake env k =
+  withLocalTmpFS (hsc_tmpfs (hsc_env env)) $ \lcl_tmpfs
+    -> k (env { hsc_env = (hsc_env env) { hsc_tmpfs = lcl_tmpfs }})
+
 
 -- | Run the given actions and then wait for them all to finish.
 runAllPipelines :: WorkerLimit -> MakeEnv -> [MakeAction] -> IO ()
@@ -2955,16 +2978,18 @@ runAllPipelines worker_limit env acts = do
 runLoop :: (((forall a. IO a -> IO a) -> IO ()) -> IO a) -> MakeEnv -> [MakeAction] -> IO [a]
 runLoop _ _env [] = return []
 runLoop fork_thread env (MakeAction act res_var :acts) = do
-  new_thread <-
+
+  -- withLocalTmpFs has to occur outside of fork to remain deterministic
+  new_thread <- withLocalTmpFSMake env $ \lcl_env ->
     fork_thread $ \unmask -> (do
-            mres <- (unmask $ run_pipeline (withLocalTmpFS act))
+            mres <- (unmask $ run_pipeline lcl_env act)
                       `MC.onException` (putMVar res_var Nothing) -- Defensive: If there's an unhandled exception then still signal the failure.
             putMVar res_var mres)
   threads <- runLoop fork_thread env acts
   return (new_thread : threads)
   where
-      run_pipeline :: RunMakeM a -> IO (Maybe a)
-      run_pipeline p = runMaybeT (runReaderT p env)
+      run_pipeline :: MakeEnv -> RunMakeM a -> IO (Maybe a)
+      run_pipeline env p = runMaybeT (runReaderT p env)
 
 data MakeAction = forall a . MakeAction !(RunMakeM a) !(MVar (Maybe a))
 

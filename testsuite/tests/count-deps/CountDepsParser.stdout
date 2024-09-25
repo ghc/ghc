@@ -94,6 +94,7 @@ GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad
 GHC.Driver.Plugins.External
 GHC.Hs
+GHC.Hs.Basic
 GHC.Hs.Binds
 GHC.Hs.Decls
 GHC.Hs.Doc
@@ -125,6 +126,7 @@ GHC.Parser.HaddockLex
 GHC.Parser.Lexer
 GHC.Parser.PostProcess
 GHC.Parser.PostProcess.Haddock
+GHC.Parser.String
 GHC.Parser.Types
 GHC.Platform
 GHC.Platform.Constants
@@ -163,6 +165,7 @@ GHC.Types.CompleteMatch
 GHC.Types.CostCentre
 GHC.Types.CostCentre.State
 GHC.Types.Cpr
+GHC.Types.DefaultEnv
 GHC.Types.Demand
 GHC.Types.Error
 GHC.Types.Error.Codes
@@ -190,6 +193,7 @@ GHC.Types.RepType
 GHC.Types.SafeHaskell
 GHC.Types.SourceFile
 GHC.Types.SourceText
+GHC.Types.SptEntry
 GHC.Types.SrcLoc
 GHC.Types.Target
 GHC.Types.Tickish
@@ -217,6 +221,7 @@ GHC.Unit.Module.Location
 GHC.Unit.Module.ModIface
 GHC.Unit.Module.ModSummary
 GHC.Unit.Module.Warnings
+GHC.Unit.Module.WholeCoreBindings
 GHC.Unit.Parser
 GHC.Unit.Ppr
 GHC.Unit.State
@@ -239,6 +244,7 @@ GHC.Utils.Lexeme
 GHC.Utils.Logger
 GHC.Utils.Misc
 GHC.Utils.Monad
+GHC.Utils.Monad.State.Strict
 GHC.Utils.Outputable
 GHC.Utils.Panic
 GHC.Utils.Panic.Plain

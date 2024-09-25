@@ -5,7 +5,7 @@ T23156.hs:51:6: warning: [GHC-05617] [-Wdeferred-type-errors (in -Wdefault)]
                    f :: forall r. ADReady r => ()
         at T23156.hs:51:6-33
       Note: ‘BooleanOf2’ is a non-injective type family.
-      The type variables ‘r0’, ‘r0’ are ambiguous
+      The type variable ‘r0’ is ambiguous
     • In the ambiguity check for ‘f’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature: f :: forall r. (ADReady r) => ()
@@ -19,7 +19,7 @@ T23156.hs:56:5: warning: [GHC-18872] [-Wdeferred-type-errors (in -Wdefault)]
                      with: BooleanOf2 r0
         arising from a use of ‘f’
       Note: ‘BooleanOf2’ is a non-injective type family.
-      The type variables ‘r0’, ‘r0’ are ambiguous
+      The type variable ‘r0’ is ambiguous
     • In the expression: f
       In an equation for ‘g’: g = f
 

@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { DumpParsedAstComments.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { DumpParsedAstComments.hs:5:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAstComments.hs:5:30-34 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { DumpParsedAstComments.hs:5:1-6 }))
+     (EpTok
+      (EpaSpan { DumpParsedAstComments.hs:5:30-34 }))
      []
      []
      (Just

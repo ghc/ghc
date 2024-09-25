@@ -4,7 +4,8 @@ Common Errors
 ``parse error on input ‘-- | xxx’``
 -----------------------------------
 
-This is probably caused by the ``-- | xxx`` comment not following a declaration. I.e. use ``-- xxx`` instead. See :ref:`top-level-declaration`.
+This is probably caused by the ``-- | xxx`` comment not being **before** a
+declaration, see :ref:`top-level-declaration`.
 
 ``parse error on input ‘-- $ xxx’``
 -----------------------------------

@@ -32,6 +32,7 @@ import Language.Haskell.Syntax.Expr
 -- friends:
 import GHC.Prelude
 
+import GHC.Hs.Basic() -- import instances
 import GHC.Hs.Decls() -- import instances
 import GHC.Hs.Pat
 import GHC.Hs.Lit
@@ -381,10 +382,25 @@ type instance XEmbTy         GhcTc = DataConCantHappen
   -- A free-standing HsEmbTy is an error.
   -- Valid usages are immediately desugared into Type.
 
+type instance XForAll        GhcPs = NoExtField
+type instance XForAll        GhcRn = NoExtField
+type instance XForAll        GhcTc = DataConCantHappen
+
+type instance XQual          GhcPs = NoExtField
+type instance XQual          GhcRn = NoExtField
+type instance XQual          GhcTc = DataConCantHappen
+
+type instance XFunArr        GhcPs = NoExtField
+type instance XFunArr        GhcRn = NoExtField
+type instance XFunArr        GhcTc = DataConCantHappen
+
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnL
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
+
+arrowToHsExpr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> LocatedA (HsExpr GhcRn)
+arrowToHsExpr = expandHsArrow (HsVar noExtField)
 
 data AnnExplicitSum
   = AnnExplicitSum {
@@ -553,7 +569,7 @@ mkExpandedStmtPopAt loc oStmt eExpr = mkPopErrCtxtExprAt loc $ mkExpandedStmtAt 
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
-      {-# UNPACK #-} !(HsWrap HsExpr)
+      HsWrapper (HsExpr GhcTc)
 
   | ExpandedThingTc                         -- See Note [Rebindable syntax and XXExprGhcRn]
                                             -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
@@ -833,6 +849,21 @@ ppr_expr (HsStatic _ e)
 ppr_expr (HsEmbTy _ ty)
   = hsep [text "type", ppr ty]
 
+ppr_expr (HsQual _ ctxt ty)
+  = sep [ppr_context ctxt, ppr_lexpr ty]
+  where
+    ppr_context (L _ ctxt) =
+      case ctxt of
+        []       -> parens empty             <+> darrow
+        [L _ ty] -> ppr_expr ty              <+> darrow
+        _        -> parens (interpp'SP ctxt) <+> darrow
+
+ppr_expr (HsForAll _ tele ty)
+  = sep [pprHsForAll tele Nothing, ppr_lexpr ty]
+
+ppr_expr (HsFunArr _ arr arg res)
+  = sep [ppr_lexpr arg, pprHsArrow arr <+> ppr_lexpr res]
+
 ppr_expr (XExpr x) = case ghcPass @p of
   GhcRn -> ppr x
   GhcTc -> ppr x
@@ -850,7 +881,7 @@ instance Outputable XXExprGhcRn where
   ppr (PopErrCtxt e)        = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
 
 instance Outputable XXExprGhcTc where
-  ppr (WrapExpr (HsWrap co_fn e))
+  ppr (WrapExpr co_fn e)
     = pprHsWrapper co_fn (\_parens -> pprExpr e)
 
   ppr (ExpandedThingTc o e)
@@ -891,7 +922,7 @@ ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
 ppr_infix_expr_rn (PopErrCtxt (L _ a)) = ppr_infix_expr a
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
-ppr_infix_expr_tc (WrapExpr (HsWrap _ e))    = ppr_infix_expr e
+ppr_infix_expr_tc (WrapExpr _ e)    = ppr_infix_expr e
 ppr_infix_expr_tc (ExpandedThingTc thing _)  = ppr_infix_hs_expansion thing
 ppr_infix_expr_tc (ConLikeTc {})             = Nothing
 ppr_infix_expr_tc (HsTick {})                = Nothing
@@ -986,12 +1017,15 @@ hsExprNeedsParens prec = go
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
     go (HsEmbTy{})                    = prec > topPrec
+    go (HsForAll{})                   = prec >= funPrec
+    go (HsQual{})                     = prec >= funPrec
+    go (HsFunArr{})                   = prec >= funPrec
     go (XExpr x) = case ghcPass @p of
                      GhcTc -> go_x_tc x
                      GhcRn -> go_x_rn x
 
     go_x_tc :: XXExprGhcTc -> Bool
-    go_x_tc (WrapExpr (HsWrap _ e))          = hsExprNeedsParens prec e
+    go_x_tc (WrapExpr _ e)                   = hsExprNeedsParens prec e
     go_x_tc (ExpandedThingTc thing _)        = hsExpandedNeedsParens thing
     go_x_tc (ConLikeTc {})                   = False
     go_x_tc (HsTick _ (L _ e))               = hsExprNeedsParens prec e
@@ -1043,7 +1077,7 @@ isAtomicHsExpr (XExpr x)
   | GhcRn <- ghcPass @p          = go_x_rn x
   where
     go_x_tc :: XXExprGhcTc -> Bool
-    go_x_tc (WrapExpr      (HsWrap _ e))     = isAtomicHsExpr e
+    go_x_tc (WrapExpr _ e)                   = isAtomicHsExpr e
     go_x_tc (ExpandedThingTc thing _)        = isAtomicExpandedThingRn thing
     go_x_tc (ConLikeTc {})                   = True
     go_x_tc (HsTick {}) = False
@@ -1250,8 +1284,10 @@ type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
 type instance XCmdArrForm GhcPs = AnnList
-type instance XCmdArrForm GhcRn = NoExtField
-type instance XCmdArrForm GhcTc = NoExtField
+-- | fixity (filled in by the renamer), for forms that were converted from
+-- OpApp's by the renamer
+type instance XCmdArrForm GhcRn = Maybe Fixity
+type instance XCmdArrForm GhcTc = Maybe Fixity
 
 type instance XCmdApp     (GhcPass _) = NoExtField
 type instance XCmdLam     (GhcPass _) = NoExtField
@@ -1412,7 +1448,7 @@ ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp True)
 ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
-ppr_cmd (HsCmdArrForm _ (L _ op) ps_fix rn_fix args)
+ppr_cmd (HsCmdArrForm rn_fix (L _ op) ps_fix args)
   | HsVar _ (L _ v) <- op
   = ppr_cmd_infix v
   | GhcTc <- ghcPass @p
@@ -1427,7 +1463,10 @@ ppr_cmd (HsCmdArrForm _ (L _ op) ps_fix rn_fix args)
     ppr_cmd_infix :: OutputableBndr v => v -> SDoc
     ppr_cmd_infix v
       | [arg1, arg2] <- args
-      , isJust rn_fix || ps_fix == Infix
+      , case ghcPass @p of
+          GhcPs -> ps_fix == Infix
+          GhcRn -> isJust rn_fix || ps_fix == Infix
+          GhcTc -> isJust rn_fix || ps_fix == Infix
       = hang (pprCmdArg (unLoc arg1))
            4 (sep [ pprInfixOcc v, pprCmdArg (unLoc arg2)])
       | otherwise
@@ -2381,6 +2420,7 @@ instance UnXRec p => Outputable (DotFieldOcc p) where
 -}
 
 type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
+type instance Anno [LocatedA (HsExpr (GhcPass p))] = SrcSpanAnnC
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))))] = SrcSpanAnnL
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr)))))] = SrcSpanAnnL
 

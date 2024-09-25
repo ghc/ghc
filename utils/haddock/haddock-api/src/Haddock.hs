@@ -83,6 +83,7 @@ import Haddock.InterfaceFile
 import Haddock.Options
 import Haddock.Utils
 import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir, getSupportedLanguagesAndExtensions)
+import Haddock.Compat (getProcessID)
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -166,14 +167,14 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   qual <- rightOrThrowE (qualification flags)
   sinceQual <- rightOrThrowE (sinceQualification flags)
 
-  let isOneShotMode = isJust (optOneShot flags)
+  let noCompilation = isJust (optOneShot flags) || Flag_NoCompilation `elem` flags
 
   -- Inject dynamic-too into ghc options if the ghc we are using was built with
-  -- dynamic linking (except when in one-shot mode)
+  -- dynamic linking (except when not doing any compilation)
   flags'' <- ghc flags $ do
         df <- getDynFlags
         case lookup "GHC Dynamic" (compilerInfo df) of
-          Just "YES" | not isOneShotMode -> return $ Flag_OptGhc "-dynamic-too" : flags
+          Just "YES" | not noCompilation -> return $ Flag_OptGhc "-dynamic-too" : flags
           _ -> return flags
 
   -- Inject `-j` into ghc options, if given to Haddock
@@ -191,8 +192,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   -- Output dir needs to be set before calling 'depanal' since 'depanal' uses it
   -- to compute output file names that are stored in the 'DynFlags' of the
   -- resulting 'ModSummary's.
-  let withDir | Flag_NoTmpCompDir `elem` flags = id
-              | isOneShotMode = id
+  let withDir | Flag_NoTmpCompDir `elem` flags || noCompilation = id
               | otherwise = withTempOutputDir
 
   -- Output warnings about potential misuse of some flags

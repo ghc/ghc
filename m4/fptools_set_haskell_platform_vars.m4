@@ -154,12 +154,14 @@ AC_DEFUN([GHC_SUBSECTIONS_VIA_SYMBOLS],
     dnl See Note [autoconf assembler checks and -flto]
     AC_LINK_IFELSE(
         [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
-        [AC_MSG_RESULT(yes)
+        [
          if test x"$TargetArch" = xaarch64; then
             dnl subsections via symbols is busted on arm64
             TargetHasSubsectionsViaSymbols=NO
+            AC_MSG_RESULT([no, subsections-via-symbols are broken on AArch64/Darwin (GHC 24962)])
          else
             TargetHasSubsectionsViaSymbols=YES
+            AC_MSG_RESULT(yes)
          fi
         ],
         [TargetHasSubsectionsViaSymbols=NO

@@ -38,7 +38,7 @@ module GHC.Types.Demand (
     -- *** Demands used in PrimOp signatures
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
-    oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd,
+    oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd, floatifyDmd,
     peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds, strictCallArity,
     mkWorkerDemand, subDemandIfEvaluated,
     -- ** Extracting one-shot information
@@ -51,7 +51,7 @@ module GHC.Types.Demand (
 
     -- * Demand environments
     DmdEnv(..), addVarDmdEnv, mkTermDmdEnv, nopDmdEnv, plusDmdEnv, plusDmdEnvs,
-    reuseEnv,
+    multDmdEnv, reuseEnv,
 
     -- * Demand types
     DmdType(..), dmdTypeDepth,
@@ -606,24 +606,10 @@ multCard (Card a) (Card b)
 --   * How many times a variable is evaluated, via a 'Card'inality, and
 --   * How deep its value was evaluated in turn, via a 'SubDemand'.
 --
--- Examples (using Note [Demand notation]):
+-- See also Note [Demand notation]
+-- and Note [Demand examples].
 --
---   * 'seq' puts demand @1A@ on its first argument: It evaluates the argument
---     strictly (@1@), but not any deeper (@A@).
---   * 'fst' puts demand @1P(1L,A)@ on its argument: It evaluates the argument
---     pair strictly and the first component strictly, but no nested info
---     beyond that (@L@). Its second argument is not used at all.
---   * '$' puts demand @1C(1,L)@ on its first argument: It calls (@C@) the
---     argument function with one argument, exactly once (@1@). No info
---     on how the result of that call is evaluated (@L@).
---   * 'maybe' puts demand @MC(M,L)@ on its second argument: It evaluates
---     the argument function at most once ((M)aybe) and calls it once when
---     it is evaluated.
---   * @fst p + fst p@ puts demand @SP(SL,A)@ on @p@: It's @1P(1L,A)@
---     multiplied by two, so we get @S@ (used at least once, possibly multiple
---     times).
---
--- This data type is quite similar to @'Scaled' 'SubDemand'@, but it's scaled
+-- This data type is quite similar to `'Scaled' 'SubDemand'`, but it's scaled
 -- by 'Card', which is an /interval/ on 'Multiplicity', the upper bound of
 -- which could be used to infer uniqueness types. Also we treat 'AbsDmd' and
 -- 'BotDmd' specially, as the concept of a 'SubDemand' doesn't apply when there
@@ -1012,6 +998,11 @@ strictifyDictDmd _  dmd = dmd
 -- | Make a 'Demand' lazy.
 lazifyDmd :: Demand -> Demand
 lazifyDmd = multDmd C_01
+
+-- | Adjust the demand on a binding that may float outwards
+-- See Note [Floatifying demand info when floating]
+floatifyDmd :: Demand -> Demand
+floatifyDmd = multDmd C_0N
 
 -- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @C(1,d)@.
 mkCalledOnceDmd :: SubDemand -> SubDemand
@@ -1905,10 +1896,11 @@ splitDmdTy ty@DmdType{dt_args=dmd:args} = (dmd, ty{dt_args=args})
 splitDmdTy ty@DmdType{dt_env=env}       = (defaultArgDmd (de_div env), ty)
 
 multDmdType :: Card -> DmdType -> DmdType
-multDmdType n (DmdType fv args)
+multDmdType C_11 dmd_ty = dmd_ty -- a vital optimisation for T25196
+multDmdType n    (DmdType fv args)
   = -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
     DmdType (multDmdEnv n fv)
-            (map (multDmd n) args)
+            (strictMap (multDmd n) args)
 
 peelFV :: DmdType -> Var -> (DmdType, Demand)
 peelFV (DmdType fv ds) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
@@ -2651,7 +2643,8 @@ So, L can denote a 'Card', polymorphic 'SubDemand' or polymorphic 'Demand',
 but it's always clear from context which "overload" is meant. It's like
 return-type inference of e.g. 'read'.
 
-Examples are in the haddock for 'Demand'.
+An example of the demand syntax is 1!P(1!L,A), the demand of fst's argument.
+See Note [Demand examples] for more examples and their semantics.
 
 This is the syntax for demand signatures:
 
@@ -2669,7 +2662,39 @@ This is the syntax for demand signatures:
            (omitted if empty)                     (omitted if
                                                 no information)
 
+Note [Demand examples]
+~~~~~~~~~~~~~~~~~~~~~~
+Here are some examples of the demand notation, specified in Note [Demand notation],
+in action. In each case we give the demand on the variable `x`.
 
+Demand on x    Example            Explanation
+  1!A           seq x y             Evaluates `x` exactly once (`1`), but not
+                                    any deeper (`A`), and discards the box (`!`).
+  S!A           seq x (seq x y)     Twice the previous demand; hence eval'd
+                                    more than once (`S` for strict).
+  1!P(1!L,A)    fst x               Evaluates pair `x` exactly once, first
+                                    component exactly once. No info that (`L`).
+                                    Second component is absent. Discards boxes (`!`).
+  1P(1L,A)      opq_fst x           Like fst, but all boxes are retained.
+  SP(1!L,A)     opq_seq x (fst x)   Two evals of x but exactly one of its first component.
+                                    Box of x retained, but box of first component discarded.
+  1!C(1,L)      x $ 3               Evals x exactly once ( 1 ) and calls it
+                                    exactly once ( C(1,_) ). No info on how the
+                                    result is evaluated ( L ).
+  MC(M,L)       maybe y x           Evals x at most once ( 1 ) and calls it at
+                                    most once ( C(1,_) ). No info on how the
+                                    result is evaluated ( L ).
+  LP(SL,A)      map (+ fst x)       Evals x lazily and multiple times ( L ),
+                                    but when it is evaluated, the first
+                                    component is evaluated (strictly) as well.
+
+In the examples above, `opq_fst` is an opaque wrapper around `fst`, i.e.
+
+  opq_fst = fst
+  {-# OPAQUE opq_fst #-}
+
+Similarly for `seq`. The effect of an OPAQUE pragma is that it discards any
+boxity flags in the demand signature, as described in Note [OPAQUE pragma].
 -}
 
 -- | See Note [Demand notation]

@@ -1,1 +1,7 @@
-T5866: thread blocked indefinitely in an STM transaction
+T5866: Exception:
+
+thread blocked indefinitely in an STM transaction
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: BlockedIndefinitelyOnSTM

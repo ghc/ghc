@@ -4,9 +4,9 @@ module Packages (
     array, base, binary, bytestring, cabal, cabalSyntax, checkPpr,
     checkExact, countDeps,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
-    exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
+    exceptions, filepath, fileio, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
     ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim,
-    ghcToolchain, ghcToolchainBin, haddock, haskeline,
+    ghcToolchain, ghcToolchainBin, haddockApi, haddockLibrary, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, mtl, osString, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout,
@@ -37,10 +37,10 @@ ghcPackages =
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform
     , ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
-    , ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs
+    , ghcToolchain, ghcToolchainBin, haddockApi, haddockLibrary, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl, osString
     , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell
-    , terminfo, text, time, transformers, unlit, unix, win32, xhtml
+    , terminfo, text, time, transformers, unlit, unix, win32, xhtml, fileio
     , timeout
     , lintersCommon
     , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
@@ -54,7 +54,7 @@ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, count
   compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
   ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
-  ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs,
+  ghcToolchain, ghcToolchainBin, haddockLibrary, haddockApi, haddock, haskeline, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
   osString, parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
   terminfo, text, time, transformers, unlit, unix, win32, xhtml,
@@ -79,6 +79,7 @@ directory           = lib  "directory"
 dumpDecls           = util "dump-decls"
 exceptions          = lib  "exceptions"
 filepath            = lib  "filepath"
+fileio              = lib  "file-io"
 genapply            = util "genapply"
 genprimopcode       = util "genprimopcode"
 ghc                 = prg  "ghc-bin"         `setPath` "ghc"
@@ -99,6 +100,8 @@ ghcPkg              = util "ghc-pkg"
 ghcPrim             = lib  "ghc-prim"
 ghcToolchain        = lib  "ghc-toolchain"     `setPath` "utils/ghc-toolchain"
 ghcToolchainBin     = prg  "ghc-toolchain-bin" `setPath` "utils/ghc-toolchain/exe" -- workaround for #23690
+haddockLibrary      = lib "haddock-library" `setPath` "utils/haddock/haddock-library"
+haddockApi          = lib "haddock-api" `setPath` "utils/haddock/haddock-api"
 haddock             = util "haddock"
 haskeline           = lib  "haskeline"
 hsc2hs              = util "hsc2hs"

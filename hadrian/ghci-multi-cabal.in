@@ -8,6 +8,6 @@ if [[ $(printf "9.4.0\n%s\n" $($RUN_GHC --numeric-version) | sort -uV | head -n 
 set -e
 export TOOL_OUTPUT=.hadrian_ghci_multi/ghci_args
 # Replace newlines with spaces, as these otherwise break the ghci invocation on windows.
-CABFLAGS=-v0 "hadrian/build-cabal" multi:ghc --build-root=.hadrian_ghci_multi --flavour=ghc-in-ghci $HADRIAN_ARGS
+CABFLAGS=-v0 "hadrian/build-cabal" multi --build-root=.hadrian_ghci_multi --flavour=ghc-in-ghci $HADRIAN_ARGS
 GHC_FLAGS="$GHC_FLAGS $(cat $TOOL_OUTPUT | tr '\n\r' ' ')"
 $RUN_GHC --interactive $GHC_FLAGS $@ -fno-code -fwrite-interface -O0 +RTS -A128m

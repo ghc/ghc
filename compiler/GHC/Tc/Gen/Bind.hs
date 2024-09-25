@@ -199,7 +199,7 @@ tcTopBinds binds sigs
           -- binders are unrestricted (and `tcSubmult _ ManyTy` returns the
           -- identity wrapper). Therefore it's safe to drop it altogether.
           --
-          -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+          -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; specs <- tcImpPrags sigs   -- SPECIALISE prags for imported Ids
 
 
@@ -229,7 +229,7 @@ tcHsBootSigs binds sigs
 
 ------------------------
 
--- Why an HsWrapper? See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+-- Why an HsWrapper? See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
 tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
              -> TcM (HsLocalBinds GhcTc, HsWrapper, thing)
 
@@ -253,7 +253,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
 
         -- We don't have linear implicit parameters, yet. So the wrapper can be
         -- the identity.
-        -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; return (HsIPBinds x (IPBinds ev_binds ip_binds') , idHsWrapper, result) }
   where
     ips = [ip | (L _ (IPBind _ (L _ ip) _)) <- ip_binds]
@@ -280,7 +280,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
 
--- Why an HsWrapper? See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+-- Why an HsWrapper? See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
 tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
            -> TcM thing
@@ -319,7 +319,7 @@ tcValBinds top_lvl binds sigs thing_inside
 
 ------------------------
 
--- Why an HsWrapper? See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+-- Why an HsWrapper? See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
 tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
              -> [(RecFlag, LHsBinds GhcRn)] -> TcM thing
              -> TcM ([(RecFlag, LHsBinds GhcTc)], HsWrapper, thing)
@@ -778,7 +778,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
     manyIfPat (L loc pat@(PatBind {pat_mult=mult_ann, pat_lhs=lhs, pat_ext =(pat_ty,_)}))
       = do { mult_co_wrap <- tcSubMult (NonLinearPatternOrigin GeneralisedPatternReason nlWildPatName) ManyTy (getTcMultAnn mult_ann)
            -- The wrapper checks for correct multiplicities.
-           -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+           -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.
            ; let lhs' = mkLHsWrapPat mult_co_wrap lhs pat_ty
            ; return $ L loc pat {pat_lhs=lhs'}
            }

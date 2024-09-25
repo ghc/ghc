@@ -35,7 +35,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module
 
-import GHC.Linker.Types ( Linkable(..), isObjectLinkable )
+import GHC.Linker.Types ( Linkable(..), linkableIsNativeCodeOnly )
 
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
@@ -91,17 +91,17 @@ instance Outputable HomeModLinkable where
 
 justBytecode :: Linkable -> HomeModLinkable
 justBytecode lm =
-  assertPpr (not (isObjectLinkable lm)) (ppr lm)
+  assertPpr (not (linkableIsNativeCodeOnly lm)) (ppr lm)
    $ emptyHomeModInfoLinkable { homeMod_bytecode = Just lm }
 
 justObjects :: Linkable -> HomeModLinkable
 justObjects lm =
-  assertPpr (isObjectLinkable lm) (ppr lm)
+  assertPpr (linkableIsNativeCodeOnly lm) (ppr lm)
    $ emptyHomeModInfoLinkable { homeMod_object = Just lm }
 
 bytecodeAndObjects :: Linkable -> Linkable -> HomeModLinkable
 bytecodeAndObjects bc o =
-  assertPpr (not (isObjectLinkable bc) && isObjectLinkable o) (ppr bc $$ ppr o)
+  assertPpr (not (linkableIsNativeCodeOnly bc) && linkableIsNativeCodeOnly o) (ppr bc $$ ppr o)
     (HomeModLinkable (Just bc) (Just o))
 
 

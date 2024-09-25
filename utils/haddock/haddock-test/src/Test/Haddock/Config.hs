@@ -4,7 +4,7 @@
 module Test.Haddock.Config
     ( TestPackage(..), CheckConfig(..), DirConfig(..), Config(..)
     , defaultDirConfig
-    , cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir, cfgOneShotOutDir
+    , cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir, cfgOneShotOutDir, cfgNoCompilationOutDir
     , parseArgs, checkOpt, loadConfig
     ) where
 
@@ -58,9 +58,11 @@ data DirConfig = DirConfig
     , dcfgRefDir :: FilePath
     , dcfgOutDir :: FilePath
     , dcfgOneShotOutDir :: FilePath
+    , dcfgNoCompilationOutDir :: FilePath
     , dcfgResDir :: FilePath
     , dcfgCheckIgnore :: FilePath -> Bool
     , dcfgCheckIgnoreOneShot :: FilePath -> Bool
+    , dcfgCheckIgnoreNoCompilation :: FilePath -> Bool
     }
 
 
@@ -70,9 +72,11 @@ defaultDirConfig baseDir = DirConfig
     , dcfgRefDir = baseDir </> "ref"
     , dcfgOutDir = baseDir </> "out"
     , dcfgOneShotOutDir = baseDir </> "one-shot-out"
+    , dcfgNoCompilationOutDir = baseDir </> "no-compilation-out"
     , dcfgResDir = rootDir </> "resources"
     , dcfgCheckIgnore = const False
     , dcfgCheckIgnoreOneShot = const False
+    , dcfgCheckIgnoreNoCompilation = const False
     }
   where
     rootDir = baseDir </> ".."
@@ -92,12 +96,13 @@ data Config c = Config
     }
 
 
-cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir, cfgOneShotOutDir :: Config c -> FilePath
+cfgSrcDir, cfgRefDir, cfgOutDir, cfgResDir, cfgOneShotOutDir, cfgNoCompilationOutDir :: Config c -> FilePath
 cfgSrcDir = dcfgSrcDir . cfgDirConfig
 cfgRefDir = dcfgRefDir . cfgDirConfig
 cfgOutDir = dcfgOutDir . cfgDirConfig
 cfgResDir = dcfgResDir . cfgDirConfig
 cfgOneShotOutDir = dcfgOneShotOutDir . cfgDirConfig
+cfgNoCompilationOutDir = dcfgNoCompilationOutDir . cfgDirConfig
 
 
 
@@ -252,11 +257,7 @@ baseDependencies ghcPath = do
 
     (comp, _, cfg) <- configure normal (Just ghcPath) Nothing
         defaultProgramDb
-#if MIN_VERSION_Cabal(1,23,0)
     pkgIndex <- getInstalledPackages normal comp [GlobalPackageDB] cfg
-#else
-    pkgIndex <- getInstalledPackages normal [GlobalPackageDB] cfg
-#endif
     let
       pkgs =
         [ "array"

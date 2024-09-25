@@ -44,6 +44,7 @@ module GHC.Tc.Solver.Monad (
 
     -- Evidence creation and transformation
     MaybeNew(..), freshGoals, isFresh, getEvExpr,
+    CanonicalEvidence(..),
 
     newTcEvBinds, newNoTcEvBinds,
     newWantedEq, emitNewWantedEq,
@@ -172,6 +173,7 @@ import GHC.Core.TyCon
 import GHC.Types.Name
 import GHC.Types.TyThing
 import GHC.Types.Name.Reader
+import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
@@ -817,7 +819,8 @@ data TcSEnv
 
       tcs_unified     :: IORef Int,
          -- The number of unification variables we have filled
-         -- The important thing is whether it is non-zero
+         -- The important thing is whether it is non-zero, so it
+         -- could equally well be a Bool instead of an Int.
 
       tcs_unif_lvl  :: IORef (Maybe TcLevel),
          -- The Unification Level Flag
@@ -1310,6 +1313,9 @@ unifyTyVar tv ty
        ; TcM.updTcRef (tcs_unified env) (+1) }
 
 reportUnifications :: TcS a -> TcS (Int, a)
+-- Record how many unifications are done by thing_inside
+-- We could return a Bool instead of an Int;
+-- all that matters is whether it is no-zero
 reportUnifications (TcS thing_inside)
   = TcS $ \ env ->
     do { inner_unified <- TcM.newTcRef 0
@@ -1318,7 +1324,7 @@ reportUnifications (TcS thing_inside)
        ; TcM.updTcRef (tcs_unified env) (+ n_unifs)
        ; return (n_unifs, res) }
 
-getDefaultInfo ::  TcS ([Type], (Bool, Bool))
+getDefaultInfo ::  TcS (DefaultEnv, Bool)
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 
 getWorkList :: TcS WorkList
@@ -1693,7 +1699,7 @@ setWantedEq (HoleDest hole) co
 setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
 
 -- | Good for both equalities and non-equalities
-setWantedEvTerm :: TcEvDest -> Canonical -> EvTerm -> TcS ()
+setWantedEvTerm :: TcEvDest -> CanonicalEvidence -> EvTerm -> TcS ()
 setWantedEvTerm (HoleDest hole) _canonical tm
   | Just co <- evTermCoercion_maybe tm
   = do { useVars (coVarsOfCo co)
@@ -1701,7 +1707,7 @@ setWantedEvTerm (HoleDest hole) _canonical tm
   | otherwise
   = -- See Note [Yukky eq_sel for a HoleDest]
     do { let co_var = coHoleCoVar hole
-       ; setEvBind (mkWantedEvBind co_var True tm)
+       ; setEvBind (mkWantedEvBind co_var EvCanonical tm)
        ; fillCoercionHole hole (mkCoVarCo co_var) }
 
 setWantedEvTerm (EvVarDest ev_id) canonical tm
@@ -1731,7 +1737,7 @@ fillCoercionHole hole co
   = do { wrapTcS $ TcM.fillCoercionHole hole co
        ; kickOutAfterFillingCoercionHole hole }
 
-setEvBindIfWanted :: CtEvidence -> Canonical -> EvTerm -> TcS ()
+setEvBindIfWanted :: CtEvidence -> CanonicalEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev canonical tm
   = case ev of
       CtWanted { ctev_dest = dest } -> setWantedEvTerm dest canonical tm

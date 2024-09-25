@@ -54,7 +54,7 @@ import GHC.Tc.Types.TcRef
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.Env ( tcLookupGlobalOnly )
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Monad ( setSrcSpanA, liftZonkM, traceTc, addErr )
+import GHC.Tc.Utils.Monad ( newZonkAnyType, setSrcSpanA, liftZonkM, traceTc, addErr )
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types
@@ -469,8 +469,9 @@ commitFlexi tv zonked_kind
            -> do { addErr $ TcRnZonkerMessage (ZonkerCannotDefaultConcrete origin)
                  ; return (anyTypeOfKind zonked_kind) }
            | otherwise
-           -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
-                 ; return (anyTypeOfKind zonked_kind) }
+           -> do { traceTc "Defaulting flexi tyvar to ZonkAny:" (pprTyVar tv)
+                   -- See Note [Any types] in GHC.Builtin.Types, esp wrinkle (Any4)
+                 ; newZonkAnyType zonked_kind }
 
          RuntimeUnkFlexi
            -> do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVar tv)
@@ -1075,11 +1076,14 @@ zonkExpr (HsStatic (fvs, ty) expr)
        HsStatic (fvs, new_ty) <$> zonkLExpr expr
 
 zonkExpr (HsEmbTy x _) = dataConCantHappen x
+zonkExpr (HsQual x _ _) = dataConCantHappen x
+zonkExpr (HsForAll x _ _) = dataConCantHappen x
+zonkExpr (HsFunArr x _ _ _) = dataConCantHappen x
 
-zonkExpr (XExpr (WrapExpr (HsWrap co_fn expr)))
+zonkExpr (XExpr (WrapExpr co_fn expr))
   = runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->
     do new_expr <- zonkExpr expr
-       return (XExpr (WrapExpr (HsWrap new_co_fn new_expr)))
+       return (XExpr (WrapExpr new_co_fn new_expr))
 
 zonkExpr (XExpr (ExpandedThingTc thing e))
   = do e' <- zonkExpr e
@@ -1152,10 +1156,10 @@ zonkCmd (HsCmdArrApp ty e1 e2 ho rl)
        new_ty <- zonkTcTypeToTypeX ty
        return (HsCmdArrApp new_ty new_e1 new_e2 ho rl)
 
-zonkCmd (HsCmdArrForm x op f fixity args)
+zonkCmd (HsCmdArrForm x op fixity args)
   = do new_op <- zonkLExpr op
        new_args <- mapM zonkCmdTop args
-       return (HsCmdArrForm x new_op f fixity new_args)
+       return (HsCmdArrForm x new_op fixity new_args)
 
 zonkCmd (HsCmdApp x c e)
   = do new_c <- zonkLCmd c
@@ -1459,9 +1463,9 @@ zonkStmt _zBody (XStmtLR (ApplicativeStmt body_ty args mb_join))
 
 -------------------------------------------------------------------------
 zonkRecFields :: HsRecordBinds GhcTc -> ZonkTcM (HsRecordBinds GhcTc)
-zonkRecFields (HsRecFields flds dd)
+zonkRecFields (HsRecFields x flds dd)
   = do  { flds' <- mapM zonk_rbind flds
-        ; return (HsRecFields flds' dd) }
+        ; return (HsRecFields x flds' dd) }
   where
     zonk_rbind (L l fld)
       = do { new_id   <- wrapLocZonkMA zonkFieldOcc (hfbLHS fld)
@@ -1626,12 +1630,13 @@ zonkConStuff (InfixCon p1 p2)
         ; p2' <- zonkPat p2
         ; return (InfixCon p1' p2') }
 
-zonkConStuff (RecCon (HsRecFields rpats dd))
+zonkConStuff (RecCon (HsRecFields x rpats dd))
   = do  { pats' <- zonkPats (map (hfbRHS . unLoc) rpats)
+        ; x' <- mapM (noBinders . zonkCoToCo) x
         ; let rpats' = zipWith (\(L l rp) p' ->
                                   L l (rp { hfbRHS = p' }))
                                rpats pats'
-        ; return (RecCon (HsRecFields rpats' dd)) }
+        ; return (RecCon (HsRecFields x' rpats' dd)) }
         -- Field selectors have declared types; hence no zonking
 
 ---------------------------

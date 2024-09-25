@@ -43,7 +43,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Ppr
-import GHC.Core.RoughMap( RoughMatchTc(..) )
+import GHC.Core.RoughMap ( RoughMatchTc(..) )
 
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
@@ -53,6 +53,7 @@ import GHC.Driver.Plugins
 
 import GHC.Types.Id
 import GHC.Types.Fixity.Env
+import GHC.Types.ForeignStubs (ForeignStubs (NoStubs))
 import GHC.Types.SafeHaskell
 import GHC.Types.Annotations
 import GHC.Types.Name
@@ -60,6 +61,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.DefaultEnv ( ClassDefaults (..), DefaultEnv, defaultList )
 import GHC.Types.Unique.DSet
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
@@ -87,6 +89,7 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Deps
+import GHC.Unit.Module.WholeCoreBindings (encodeIfaceForeign)
 
 import Data.Function
 import Data.List ( sortBy )
@@ -132,17 +135,20 @@ mkPartialIface hsc_env core_prog mod_details mod_summary import_decls
 -- CmmCgInfos is not available when not generating code (-fno-code), or when not
 -- generating interface pragmas (-fomit-interface-pragmas). See also
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> IO ModIface
-mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe StgCgInfos -> Maybe CmmCgInfos -> ForeignStubs -> [(ForeignSrcLang, FilePath)] -> IO ModIface
+mkFullIface hsc_env partial_iface mb_stg_infos mb_cmm_infos stubs foreign_files = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
           = updateDecl (mi_decls partial_iface) mb_stg_infos mb_cmm_infos
 
+    -- See Note [Foreign stubs and TH bytecode linking]
+    foreign_ <- encodeIfaceForeign (hsc_logger hsc_env) (hsc_dflags hsc_env) stubs foreign_files
+
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env (set_mi_decls decls partial_iface)
+      addFingerprints hsc_env $ set_mi_foreign foreign_ $ set_mi_decls decls partial_iface
 
     -- Debug printing
     let unit_state = hsc_units hsc_env
@@ -273,7 +279,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                    docs mod_summary
                    mod_details
 
-          mkFullIface hsc_env partial_iface Nothing Nothing
+          mkFullIface hsc_env partial_iface Nothing Nothing NoStubs []
 
 mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv -> [ImportUserSpec]
@@ -289,7 +295,8 @@ mkIface_ hsc_env
          this_mod core_prog hsc_src used_th deps rdr_env import_decls fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
          docs mod_summary
-         ModDetails{  md_insts     = insts,
+         ModDetails{  md_defaults  = defaults,
+                      md_insts     = insts,
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
                       md_anns      = anns,
@@ -348,6 +355,8 @@ mkIface_ hsc_env
           & set_mi_usages           usages
           & set_mi_exports          (mkIfaceExports exports)
 
+          & set_mi_defaults         (defaultsToIfaceDefaults defaults)
+
           -- Sort these lexicographically, so that
           -- the result is stable across compilations
           & set_mi_insts            (sortBy cmp_inst     iface_insts)
@@ -398,6 +407,16 @@ mkIface_ hsc_env
 
      ifFamInstTcName = ifFamInstFam
 
+--------------------------
+defaultsToIfaceDefaults :: DefaultEnv -> [IfaceDefault]
+defaultsToIfaceDefaults = map toIface . defaultList
+  where
+    toIface ClassDefaults { cd_class = clsTyCon
+                          , cd_types = tys
+                          , cd_warn = warn }
+      = IfaceDefault { ifDefaultCls = toIfaceTyCon clsTyCon
+                     , ifDefaultTys = map toIfaceType tys
+                     , ifDefaultWarn = fmap toIfaceWarningTxt warn }
 
 --------------------------
 instanceToIfaceInst :: ClsInst -> IfaceClsInst
@@ -500,18 +519,7 @@ mkIfaceImports = map go
     go (ImpUserSpec decl (ImpUserEverythingBut ns)) = IfaceImport decl (ImpIfaceEverythingBut ns)
 
 mkIfaceExports :: [AvailInfo] -> [IfaceExport]  -- Sort to make canonical
-mkIfaceExports exports
-  = sortBy stableAvailCmp (map sort_subs exports)
-  where
-    sort_subs :: AvailInfo -> AvailInfo
-    sort_subs (Avail n) = Avail n
-    sort_subs (AvailTC n []) = AvailTC n []
-    sort_subs (AvailTC n (m:ms))
-       | n == m
-       = AvailTC n (m:sortBy stableNameCmp ms)
-       | otherwise
-       = AvailTC n (sortBy stableNameCmp (m:ms))
-       -- Maintain the AvailTC Invariant
+mkIfaceExports = sortAvails
 
 {-
 Note [Original module]

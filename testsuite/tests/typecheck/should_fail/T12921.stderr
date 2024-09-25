@@ -1,34 +1,3 @@
 
-T12921.hs:4:1: error: [GHC-39999]
-    • Ambiguous type variable ‘a0’ arising from an annotation
-      prevents the constraint ‘(GHC.Internal.Data.Data.Data
-                                  a0)’ from being solved.
-      Probable fix: use a type annotation to specify what ‘a0’ should be.
-      Potentially matching instances:
-        instance (GHC.Internal.Data.Data.Data a,
-                  GHC.Internal.Data.Data.Data b) =>
-                 GHC.Internal.Data.Data.Data (Either a b)
-          -- Defined in ‘GHC.Internal.Data.Data’
-        instance GHC.Internal.Data.Data.Data Ordering
-          -- Defined in ‘GHC.Internal.Data.Data’
-        ...plus 17 others
-        ...plus 49 instances involving out-of-scope types
-        (use -fprint-potential-instances to see them all)
-    • In the annotation:
-        {-# ANN module "HLint: ignore Reduce duplication" #-}
-
-T12921.hs:4:16: error: [GHC-39999]
-    • Ambiguous type variable ‘a0’ arising from the literal ‘"HLint: ignore Reduce duplication"’
-      prevents the constraint ‘(GHC.Internal.Data.String.IsString
-                                  a0)’ from being solved.
-      Probable fix: use a type annotation to specify what ‘a0’ should be.
-      Potentially matching instance:
-        instance (a ~ Char) => GHC.Internal.Data.String.IsString [a]
-          -- Defined in ‘GHC.Internal.Data.String’
-        ...plus two instances involving out-of-scope types
-        (use -fprint-potential-instances to see them all)
-    • In the annotation:
-        {-# ANN module "HLint: ignore Reduce duplication" #-}
-
 T12921.hs:7:8: error: [GHC-88464]
     Variable not in scope: choice :: [a0] -> Int -> Int

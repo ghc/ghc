@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE InstanceSigs         #-}
 {-# LANGUAGE Safe                 #-}
@@ -78,12 +79,13 @@ import Data.List.NonEmpty (NonEmpty(..))
 import GHC.Internal.Data.Ord (Down(Down))
 import Data.Complex (Complex((:+)))
 
-import GHC.Generics (Generic1(..), Generically1(..))
+import GHC.Generics (Generic1(..), Generically1(..), V1, U1(..), Par1(..), Rec1(..), K1(..), M1(..) , (:+:)(..), (:*:)(..), (:.:)(..), URec(..), UAddr, UChar, UDouble, UFloat, UInt, UWord)
 import GHC.Tuple (Solo (..))
-import GHC.Internal.Read (expectP, list, paren)
+import GHC.Internal.Read (expectP, list, paren, readField)
+import GHC.Internal.Show (appPrec)
 
-import GHC.Internal.Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec)
-import GHC.Internal.Text.Read (Read(..), parens, prec, step)
+import GHC.Internal.Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec, pfail)
+import GHC.Internal.Text.Read (Read(..), parens, prec, step, reset)
 import GHC.Internal.Text.Read.Lex (Lexeme(..))
 import GHC.Internal.Text.Show (showListWith)
 import Prelude
@@ -1123,3 +1125,322 @@ and the corresponding 'Show1' instance as
 >         showsBinaryWith sp (liftShowsPrec sp sl) "Two" d x y
 
 -}
+
+-- | @since base-4.21.0.0
+instance Eq1 V1 where
+  liftEq _ = \_ _ -> True
+
+-- | @since base-4.21.0.0
+instance Ord1 V1 where
+  liftCompare _ = \_ _ -> EQ
+
+-- | @since base-4.21.0.0
+instance Show1 V1 where
+  liftShowsPrec _ _ _ = \_ -> showString "V1"
+
+-- | @since base-4.21.0.0
+instance Read1 V1 where
+  liftReadsPrec _ _ = readPrec_to_S pfail
+  liftReadListPrec  = liftReadListPrecDefault
+  liftReadList      = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance Eq1 U1 where
+  liftEq _ = \_ _ -> True
+
+-- | @since base-4.21.0.0
+instance Ord1 U1 where
+  liftCompare _ = \_ _ -> EQ
+
+-- | @since base-4.21.0.0
+instance Show1 U1 where
+  liftShowsPrec _ _ _ = \U1 -> showString "U1"
+
+-- | @since base-4.21.0.0
+instance Read1 U1 where
+  liftReadPrec _ _ =
+    parens (expectP (Ident "U1") *> pure U1)
+
+  liftReadListPrec  = liftReadListPrecDefault
+  liftReadList      = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance Eq1 Par1 where
+  liftEq eq = \(Par1 a) (Par1 a') -> eq a a'
+
+-- | @since base-4.21.0.0
+instance Ord1 Par1 where
+  liftCompare cmp = \(Par1 a) (Par1 a') -> cmp a a'
+
+-- | @since base-4.21.0.0
+instance Show1 Par1 where
+  liftShowsPrec sp _ d = \(Par1 { unPar1 = a }) ->
+    showsSingleFieldRecordWith sp "Par1" "unPar1" d a
+
+-- | @since base-4.21.0.0
+instance Read1 Par1 where
+  liftReadPrec rp _ =
+    readsSingleFieldRecordWith rp "Par1" "unPar1" Par1
+
+  liftReadListPrec  = liftReadListPrecDefault
+  liftReadList      = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance Eq1 f => Eq1 (Rec1 f) where
+  liftEq eq = \(Rec1 a) (Rec1 a') -> liftEq eq a a'
+
+-- | @since base-4.21.0.0
+instance Ord1 f => Ord1 (Rec1 f) where
+  liftCompare cmp = \(Rec1 a) (Rec1 a') -> liftCompare cmp a a'
+
+-- | @since base-4.21.0.0
+instance Show1 f => Show1 (Rec1 f) where
+  liftShowsPrec sp sl d = \(Rec1 { unRec1 = a }) ->
+    showsSingleFieldRecordWith (liftShowsPrec sp sl) "Rec1" "unRec1" d a
+
+-- | @since base-4.21.0.0
+instance Read1 f => Read1 (Rec1 f) where
+  liftReadPrec rp rl =
+    readsSingleFieldRecordWith (liftReadPrec rp rl) "Rec1" "unRec1" Rec1
+
+  liftReadListPrec   = liftReadListPrecDefault
+  liftReadList       = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance Eq c => Eq1 (K1 i c) where
+  liftEq _ = \(K1 a) (K1 a') -> a == a'
+
+-- | @since base-4.21.0.0
+instance Ord c => Ord1 (K1 i c) where
+  liftCompare _ = \(K1 a) (K1 a') -> compare a a'
+
+-- | @since base-4.21.0.0
+instance Show c => Show1 (K1 i c) where
+  liftShowsPrec _ _ d = \(K1 { unK1 = a }) ->
+    showsSingleFieldRecordWith showsPrec "K1" "unK1" d a
+
+-- | @since base-4.21.0.0
+instance Read c => Read1 (K1 i c) where
+  liftReadPrec _ _ = readData $
+    readsSingleFieldRecordWith readPrec "K1" "unK1" K1
+
+  liftReadListPrec  = liftReadListPrecDefault
+  liftReadList      = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance Eq1 f => Eq1 (M1 i c f) where
+  liftEq eq = \(M1 a) (M1 a') -> liftEq eq a a'
+
+-- | @since base-4.21.0.0
+instance Ord1 f => Ord1 (M1 i c f) where
+  liftCompare cmp = \(M1 a) (M1 a') -> liftCompare cmp a a'
+
+-- | @since base-4.21.0.0
+instance Show1 f => Show1 (M1 i c f) where
+  liftShowsPrec sp sl d = \(M1 { unM1 = a }) ->
+    showsSingleFieldRecordWith (liftShowsPrec sp sl) "M1" "unM1" d a
+
+-- | @since base-4.21.0.0
+instance Read1 f => Read1 (M1 i c f) where
+  liftReadPrec rp rl = readData $
+    readsSingleFieldRecordWith (liftReadPrec rp rl) "M1" "unM1" M1
+
+  liftReadListPrec  = liftReadListPrecDefault
+  liftReadList      = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance (Eq1 f, Eq1 g) => Eq1 (f :+: g) where
+  liftEq eq = \lhs rhs -> case (lhs, rhs) of
+    (L1 a, L1 a') -> liftEq eq a a'
+    (R1 b, R1 b') -> liftEq eq b b'
+    _           -> False
+
+-- | @since base-4.21.0.0
+instance (Ord1 f, Ord1 g) => Ord1 (f :+: g) where
+  liftCompare cmp = \lhs rhs -> case (lhs, rhs) of
+    (L1 _, R1 _)  -> LT
+    (R1 _, L1 _)  -> GT
+    (L1 a, L1 a') -> liftCompare cmp a a'
+    (R1 b, R1 b') -> liftCompare cmp b b'
+
+-- | @since base-4.21.0.0
+instance (Show1 f, Show1 g) => Show1 (f :+: g) where
+  liftShowsPrec sp sl d = \x -> case x of
+    L1 a -> showsUnaryWith (liftShowsPrec sp sl) "L1" d a
+    R1 b -> showsUnaryWith (liftShowsPrec sp sl) "R1" d b
+
+-- | @since base-4.21.0.0
+instance (Read1 f, Read1 g) => Read1 (f :+: g) where
+  liftReadPrec rp rl = readData $
+    readUnaryWith (liftReadPrec rp rl) "L1" L1 <|>
+    readUnaryWith (liftReadPrec rp rl) "R1" R1
+
+  liftReadListPrec  = liftReadListPrecDefault
+  liftReadList      = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance (Eq1 f, Eq1 g) => Eq1 (f :*: g) where
+  liftEq eq = \(f :*: g) (f' :*: g') -> liftEq eq f f' && liftEq eq g g'
+
+-- | @since base-4.21.0.0
+instance (Ord1 f, Ord1 g) => Ord1 (f :*: g) where
+  liftCompare cmp = \(f :*: g) (f' :*: g') -> liftCompare cmp f f' <> liftCompare cmp g g'
+
+-- | @since base-4.21.0.0
+instance (Show1 f, Show1 g) => Show1 (f :*: g) where
+  liftShowsPrec sp sl d = \(a :*: b) ->
+    showsBinaryOpWith
+      (liftShowsPrec sp sl)
+      (liftShowsPrec sp sl)
+      7
+      ":*:"
+      d
+      a
+      b
+
+-- | @since base-4.21.0.0
+instance (Read1 f, Read1 g) => Read1 (f :*: g) where
+  liftReadPrec rp rl = parens $ prec 6 $
+    readBinaryOpWith (liftReadPrec rp rl) (liftReadPrec rp rl) ":*:" (:*:)
+
+  liftReadListPrec  = liftReadListPrecDefault
+  liftReadList      = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance (Eq1 f, Eq1 g) => Eq1 (f :.: g) where
+  liftEq eq = \(Comp1 a) (Comp1 a') -> liftEq (liftEq eq) a a'
+
+-- | @since base-4.21.0.0
+instance (Ord1 f, Ord1 g) => Ord1 (f :.: g) where
+  liftCompare cmp = \(Comp1 a) (Comp1 a') -> liftCompare (liftCompare cmp) a a'
+
+-- | @since base-4.21.0.0
+instance (Show1 f, Show1 g) => Show1 (f :.: g) where
+  liftShowsPrec sp sl d = \(Comp1 { unComp1 = a }) ->
+    showsSingleFieldRecordWith
+      (liftShowsPrec (liftShowsPrec sp sl) (liftShowList sp sl))
+      "Comp1"
+      "unComp1"
+      d
+      a
+
+-- | @since base-4.21.0.0
+instance (Read1 f, Read1 g) => Read1 (f :.: g) where
+  liftReadPrec rp rl = readData $
+    readsSingleFieldRecordWith
+      (liftReadPrec (liftReadPrec rp rl) (liftReadListPrec rp rl))
+      "Comp1"
+      "unComp1"
+      Comp1
+
+  liftReadListPrec  = liftReadListPrecDefault
+  liftReadList      = liftReadListDefault
+
+-- | @since base-4.21.0.0
+instance Eq1 UAddr where
+  -- NB cannot use eqAddr# because its module isn't safe
+  liftEq _ = \(UAddr a) (UAddr b) -> UAddr a == UAddr b
+
+-- | @since base-4.21.0.0
+instance Ord1 UAddr where
+  liftCompare _ = \(UAddr a) (UAddr b) -> compare (UAddr a) (UAddr b)
+
+-- | @since base-4.21.0.0
+instance Show1 UAddr where
+  liftShowsPrec _ _ = showsPrec
+
+-- NB no Read1 for URec (Ptr ()) because there's no Read for Ptr.
+
+-- | @since base-4.21.0.0
+instance Eq1 UChar where
+  liftEq _ = \(UChar a) (UChar b) -> UChar a == UChar b
+
+-- | @since base-4.21.0.0
+instance Ord1 UChar where
+  liftCompare _ = \(UChar a) (UChar b) -> compare (UChar a) (UChar b)
+
+-- | @since base-4.21.0.0
+instance Show1 UChar where
+  liftShowsPrec _ _ = showsPrec
+
+-- | @since base-4.21.0.0
+instance Eq1 UDouble where
+  liftEq _ = \(UDouble a) (UDouble b) -> UDouble a == UDouble b
+
+-- | @since base-4.21.0.0
+instance Ord1 UDouble where
+  liftCompare _ = \(UDouble a) (UDouble b) -> compare (UDouble a) (UDouble b)
+
+-- | @since base-4.21.0.0
+instance Show1 UDouble where
+  liftShowsPrec _ _ = showsPrec
+
+-- | @since base-4.21.0.0
+instance Eq1 UFloat where
+  liftEq _ = \(UFloat a) (UFloat b) -> UFloat a == UFloat b
+
+-- | @since base-4.21.0.0
+instance Ord1 UFloat where
+  liftCompare _ = \(UFloat a) (UFloat b) -> compare (UFloat a) (UFloat b)
+
+-- | @since base-4.21.0.0
+instance Show1 UFloat where
+  liftShowsPrec _ _ = showsPrec
+
+-- | @since base-4.21.0.0
+instance Eq1 UInt where
+  liftEq _ = \(UInt a) (UInt b) -> UInt a == UInt b
+
+-- | @since base-4.21.0.0
+instance Ord1 UInt where
+  liftCompare _ = \(UInt a) (UInt b) -> compare (UInt a) (UInt b)
+
+-- | @since base-4.21.0.0
+instance Show1 UInt where
+  liftShowsPrec _ _ = showsPrec
+
+-- | @since base-4.21.0.0
+instance Eq1 UWord where
+  liftEq _ = \(UWord a) (UWord b) -> UWord a == UWord b
+
+-- | @since base-4.21.0.0
+instance Ord1 UWord where
+  liftCompare _ = \(UWord a) (UWord b) -> compare (UWord a) (UWord b)
+
+-- | @since base-4.21.0.0
+instance Show1 UWord where
+  liftShowsPrec _ _ = showsPrec
+
+showsSingleFieldRecordWith :: (Int -> a -> ShowS) -> String -> String -> Int -> a -> ShowS
+showsSingleFieldRecordWith sp name field d x =
+  showParen (d > appPrec) $
+    showString name . showString " {" . showString field . showString " = " . sp 0 x . showChar '}'
+
+readsSingleFieldRecordWith :: ReadPrec a -> String -> String -> (a -> t) -> ReadPrec t
+readsSingleFieldRecordWith rp name field cons = parens $ prec 11 $ do
+  expectP $ Ident name
+  expectP $ Punc "{"
+  x <- readField field $ reset rp
+  expectP $ Punc "}"
+  pure $ cons x
+
+showsBinaryOpWith
+  :: (Int -> a -> ShowS)
+  -> (Int -> b -> ShowS)
+  -> Int
+  -> String
+  -> Int
+  -> a
+  -> b
+  -> ShowS
+showsBinaryOpWith sp1 sp2 opPrec name d x y = showParen (d >= opPrec) $
+  sp1 opPrec x . showChar ' ' . showString name . showChar ' ' . sp2 opPrec y
+
+readBinaryOpWith
+  :: ReadPrec a
+  -> ReadPrec b
+  -> String
+  -> (a -> b -> t)
+  -> ReadPrec t
+readBinaryOpWith rp1 rp2 name cons =
+  cons <$> step rp1 <* expectP (Symbol name) <*> step rp2

@@ -1,0 +1,43 @@
+cabal-version:      3.0
+
+-- WARNING: ghc-experimental.cabal is automatically generated from ghc-experimental.cabal.in
+-- Make sure you are editing ghc-experimental.cabal.in, not ghc-experimental.cabal
+
+name:               ghc-experimental
+version:            0.1.0.0
+synopsis:           Experimental features of GHC's standard library
+description:
+    This package is where experimental GHC standard library interfaces start
+    life and mature. Eventually, stabilized interfaces will be
+    migrated into the @base@ library.
+
+homepage:           https://www.haskell.org/ghc/
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             The GHC Team
+maintainer:         ghc-devs@haskell.org
+copyright:          (c) 2023 The GHC Team
+category:           Development
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:
+      Data.Sum.Experimental
+      Data.Tuple.Experimental
+      GHC.Profiling.Eras
+      GHC.TypeLits.Experimental
+      GHC.TypeNats.Experimental
+      Prelude.Experimental
+    if arch(wasm32)
+        exposed-modules:  GHC.Wasm.Prim
+    other-extensions:
+    build-depends:    base ^>=4.20,
+                      ghc-internal == @ProjectVersionForLib@.*,
+                      ghc-prim >= 0.11 && < 0.12
+    hs-source-dirs:   src
+    default-language: Haskell2010

@@ -61,14 +61,14 @@ occNameMatches pat = go pat . occNameString
 type Parser = P.ReadP
 
 parseNamePattern :: Parser NamePattern
-parseNamePattern = pattern
+parseNamePattern = namePattern
   where
-    pattern = star P.<++ wildcard P.<++ char P.<++ end
-    star = PChar '*' <$ P.string "\\*" <*> pattern
+    namePattern = star P.<++ wildcard P.<++ char P.<++ end
+    star = PChar '*' <$ P.string "\\*" <*> namePattern
     wildcard = do
       void $ P.char '*'
-      PWildcard <$> pattern
-    char = PChar <$> P.get <*> pattern
+      PWildcard <$> namePattern
+    char = PChar <$> P.get <*> namePattern
     end = PEnd <$ P.eof
 
 data CallerCcFilter

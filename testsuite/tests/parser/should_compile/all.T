@@ -202,3 +202,6 @@ test('ListTuplePunsFamilies', [expect_broken(23135), extra_files(['ListTuplePuns
 
 
 test('T22155', normal, compile, ['-dsuppress-uniques -ddump-simpl -dsuppress-all -dno-typeable-binds'])
+
+test('T25132', normal, compile, [''])
+test('T25258', normal, compile, [''])

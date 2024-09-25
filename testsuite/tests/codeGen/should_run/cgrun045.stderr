@@ -1,6 +1,13 @@
-cgrun045: hello world!
+cgrun045: Exception:
+
+hello world!
 CallStack (from HasCallStack):
   error, called at cgrun045.hs:6:13 in main:Main
+
+Package: ghc-internal
+Module: GHC.Internal.Exception
+Type: ErrorCall
+
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:128:3 in ghc-internal:GHC.Internal.Exception

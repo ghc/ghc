@@ -40,6 +40,7 @@ data Extension
    | DeepSubsumption
    | RelaxedPolyRec           -- Deprecated
    | ExtendedDefaultRules     -- Use GHC's extended rules for defaulting
+   | NamedDefaults
    | ForeignFunctionInterface
    | UnliftedFFITypes
    | InterruptibleFFI
@@ -163,6 +164,7 @@ data Extension
    | TypeAbstractions
    | ExtendedLiterals
    | ListTuplePuns
+   | MultilineStrings
    deriving (Eq, Enum, Show, Generic, Bounded)
 -- 'Ord' and 'Bounded' are provided for GHC API users (see discussions
 -- in https://gitlab.haskell.org/ghc/ghc/merge_requests/2707 and

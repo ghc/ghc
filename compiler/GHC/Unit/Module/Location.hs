@@ -142,6 +142,8 @@ mkFileSrcSpan mod_loc
 -- Helpers for backwards compatibility
 -- ----------------------------------------------------------------------------
 
+{-# COMPLETE ModLocation #-}
+
 pattern ModLocation :: Maybe FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> ModLocation
 pattern ModLocation
   { ml_hs_file

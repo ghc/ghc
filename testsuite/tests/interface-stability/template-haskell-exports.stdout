@@ -125,6 +125,9 @@ module Language.Haskell.TH where
     | TypedBracketE Exp
     | TypedSpliceE Exp
     | TypeE Type
+    | ForallE [TyVarBndr Specificity] Exp
+    | ForallVisE [TyVarBndr ()] Exp
+    | ConstrainedE [Exp] Exp
   type ExpQ :: *
   type ExpQ = Q Exp
   type Extension :: *
@@ -139,6 +142,7 @@ module Language.Haskell.TH where
     | DeepSubsumption
     | RelaxedPolyRec
     | ExtendedDefaultRules
+    | NamedDefaults
     | ForeignFunctionInterface
     | UnliftedFFITypes
     | InterruptibleFFI
@@ -260,6 +264,7 @@ module Language.Haskell.TH where
     | TypeAbstractions
     | ExtendedLiterals
     | ListTuplePuns
+    | MultilineStrings
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FamilyResultSigQ :: *
@@ -459,6 +464,7 @@ module Language.Haskell.TH where
   conP :: forall (m :: * -> *). Quote m => Name -> [m Pat] -> m Pat
   conT :: forall (m :: * -> *). Quote m => Name -> m Type
   condE :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp -> m Exp
+  constrainedE :: forall (m :: * -> *). Quote m => [m Exp] -> m Exp -> m Exp
   constraintK :: Kind
   cxt :: forall (m :: * -> *). Quote m => [m Pred] -> m Cxt
   dataD :: forall (m :: * -> *). Quote m => m Cxt -> Name -> [TyVarBndr BndrVis] -> GHC.Internal.Maybe.Maybe Kind -> [m Con] -> [m DerivClause] -> m Dec
@@ -482,7 +488,9 @@ module Language.Haskell.TH where
   floatPrimL :: GHC.Internal.Real.Rational -> Lit
   forImpD :: forall (m :: * -> *). Quote m => Callconv -> Safety -> GHC.Internal.Base.String -> Name -> m Type -> m Dec
   forallC :: forall (m :: * -> *). Quote m => [TyVarBndr Specificity] -> m Cxt -> m Con -> m Con
+  forallE :: forall (m :: * -> *). Quote m => [m (TyVarBndr Specificity)] -> m Exp -> m Exp
   forallT :: forall (m :: * -> *). Quote m => [TyVarBndr Specificity] -> m Cxt -> m Type -> m Type
+  forallVisE :: forall (m :: * -> *). Quote m => [m (TyVarBndr ())] -> m Exp -> m Exp
   forallVisT :: forall (m :: * -> *). Quote m => [m (TyVarBndr ())] -> m Type -> m Type
   fromE :: forall (m :: * -> *). Quote m => m Exp -> m Exp
   fromR :: forall (m :: * -> *). Quote m => m Exp -> m Range
@@ -738,6 +746,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | DeepSubsumption
     | RelaxedPolyRec
     | ExtendedDefaultRules
+    | NamedDefaults
     | ForeignFunctionInterface
     | UnliftedFFITypes
     | InterruptibleFFI
@@ -859,6 +868,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | TypeAbstractions
     | ExtendedLiterals
     | ListTuplePuns
+    | MultilineStrings
 
 module Language.Haskell.TH.Lib where
   -- Safety: Safe
@@ -982,6 +992,7 @@ module Language.Haskell.TH.Lib where
   conP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
   conT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
   condE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  constrainedE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   constraintK :: GHC.Internal.TH.Syntax.Kind
   cxt :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Pred] -> m GHC.Internal.TH.Syntax.Cxt
   dataD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis] -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [m GHC.Internal.TH.Syntax.Con] -> [m DerivClause] -> m GHC.Internal.TH.Syntax.Dec
@@ -1003,7 +1014,9 @@ module Language.Haskell.TH.Lib where
   floatPrimL :: GHC.Internal.Real.Rational -> GHC.Internal.TH.Syntax.Lit
   forImpD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Callconv -> GHC.Internal.TH.Syntax.Safety -> GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
   forallC :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity] -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Con -> m GHC.Internal.TH.Syntax.Con
+  forallE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   forallT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity] -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  forallVisE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   forallVisT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
   fromE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   fromR :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
@@ -1314,6 +1327,7 @@ module Language.Haskell.TH.Lib.Internal where
   conP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.Type] -> [m GHC.Internal.TH.Syntax.Pat] -> m GHC.Internal.TH.Syntax.Pat
   conT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type
   condE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
+  constrainedE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Exp] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   constraintK :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Kind
   cxt :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m GHC.Internal.TH.Syntax.Pred] -> m GHC.Internal.TH.Syntax.Cxt
   dataD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.Syntax.Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (m GHC.Internal.TH.Syntax.Kind) -> [m GHC.Internal.TH.Syntax.Con] -> [m GHC.Internal.TH.Syntax.DerivClause] -> m GHC.Internal.TH.Syntax.Dec
@@ -1336,7 +1350,9 @@ module Language.Haskell.TH.Lib.Internal where
   floatPrimL :: GHC.Internal.Real.Rational -> GHC.Internal.TH.Syntax.Lit
   forImpD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Callconv -> GHC.Internal.TH.Syntax.Safety -> GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
   forallC :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Con -> m GHC.Internal.TH.Syntax.Con
+  forallE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   forallT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
+  forallVisE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   forallVisT :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
   fromE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   fromR :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Range
@@ -1571,6 +1587,7 @@ module Language.Haskell.TH.Ppr where
   pprBndrVis :: GHC.Internal.TH.Syntax.BndrVis -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.PprLib.Doc
   pprBody :: GHC.Types.Bool -> GHC.Internal.TH.Syntax.Body -> GHC.Internal.TH.PprLib.Doc
   pprClause :: GHC.Types.Bool -> GHC.Internal.TH.Syntax.Clause -> GHC.Internal.TH.PprLib.Doc
+  pprCtxWith :: forall a. Ppr a => (Precedence -> a -> GHC.Internal.TH.PprLib.Doc) -> [a] -> GHC.Internal.TH.PprLib.Doc
   pprCxt :: GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.PprLib.Doc
   pprExp :: Precedence -> GHC.Internal.TH.Syntax.Exp -> GHC.Internal.TH.PprLib.Doc
   pprFields :: [(GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)] -> GHC.Internal.TH.PprLib.Doc
@@ -1602,6 +1619,7 @@ module Language.Haskell.TH.Ppr where
   pprVarBangType :: GHC.Internal.TH.Syntax.VarBangType -> GHC.Internal.TH.PprLib.Doc
   pprVarStrictType :: (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Strict, GHC.Internal.TH.Syntax.Type) -> GHC.Internal.TH.PprLib.Doc
   ppr_bndrs :: forall flag. PprFlag flag => GHC.Internal.Maybe.Maybe [GHC.Internal.TH.Syntax.TyVarBndr flag] -> GHC.Internal.TH.PprLib.Doc
+  ppr_ctx_preds_with :: forall a. Ppr a => (Precedence -> a -> GHC.Internal.TH.PprLib.Doc) -> Precedence -> [a] -> GHC.Internal.TH.PprLib.Doc
   ppr_cxt_preds :: Precedence -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.TH.PprLib.Doc
   ppr_data :: GHC.Types.Bool -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.PprLib.Doc -> GHC.Internal.Maybe.Maybe GHC.Internal.TH.Syntax.Kind -> [GHC.Internal.TH.Syntax.Con] -> [GHC.Internal.TH.Syntax.DerivClause] -> GHC.Internal.TH.PprLib.Doc
   ppr_dec :: GHC.Types.Bool -> GHC.Internal.TH.Syntax.Dec -> GHC.Internal.TH.PprLib.Doc
@@ -1792,6 +1810,9 @@ module Language.Haskell.TH.Syntax where
     | TypedBracketE Exp
     | TypedSpliceE Exp
     | TypeE Type
+    | ForallE [TyVarBndr Specificity] Exp
+    | ForallVisE [TyVarBndr ()] Exp
+    | ConstrainedE [Exp] Exp
   type Extension :: *
   data Extension
     = Cpp
@@ -1804,6 +1825,7 @@ module Language.Haskell.TH.Syntax where
     | DeepSubsumption
     | RelaxedPolyRec
     | ExtendedDefaultRules
+    | NamedDefaults
     | ForeignFunctionInterface
     | UnliftedFFITypes
     | InterruptibleFFI
@@ -1925,6 +1947,7 @@ module Language.Haskell.TH.Syntax where
     | TypeAbstractions
     | ExtendedLiterals
     | ListTuplePuns
+    | MultilineStrings
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FieldExp :: *

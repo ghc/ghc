@@ -1,0 +1,460 @@
+cabal-version:  3.0
+-- WARNING: ghc-internal.cabal is automatically generated from ghc-internal.cabal.in by
+-- the top-level ./configure script. Make sure you are editing ghc-internal.cabal.in, not ghc-internal.cabal.
+name:           ghc-internal
+-- The project is ghc's version plus ghc-internal's version suffix.
+-- For example, for ghc=9.10.1, ghc-internal's version will be 9.1001.0.
+version:        @ProjectVersionForLib@.0
+license:        BSD-3-Clause
+license-file:   LICENSE
+maintainer:     The GHC Developers <ghc-devs@haskell.org>
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/-/issues/new
+synopsis:       Basic libraries
+category:       Prelude
+build-type:     Configure
+description:
+    This package contains the implementation of GHC's standard libraries and is
+    not intended for use by end-users.
+    .
+    Users should instead use either the @base@ or @ghc-experimental@ packages
+
+
+extra-tmp-files:
+    autom4te.cache
+    ghc-internal.buildinfo
+    config.log
+    config.status
+    include/EventConfig.h
+    include/HsBaseConfig.h
+
+extra-source-files:
+    aclocal.m4
+    ghc-internal.buildinfo.in
+    CHANGELOG.md
+    configure
+    configure.ac
+    include/CTypes.h
+    include/EventConfig.h.in
+    include/HsBaseConfig.h.in
+    include/ieee-flpt.h
+    include/md5.h
+    include/fs.h
+    include/winio_structs.h
+    install-sh
+
+source-repository head
+    type:     git
+    location: https://gitlab.haskell.org/ghc/ghc.git
+    subdir:   libraries/base
+
+Library
+    default-language: Haskell2010
+    default-extensions:
+        NoImplicitPrelude
+    other-extensions:
+        BangPatterns
+        CApiFFI
+        CPP
+        ConstraintKinds
+        DataKinds
+        DeriveDataTypeable
+        DeriveGeneric
+        ExistentialQuantification
+        ExplicitForAll
+        FlexibleContexts
+        FlexibleInstances
+        FunctionalDependencies
+        GADTs
+        GeneralizedNewtypeDeriving
+        KindSignatures
+        MagicHash
+        MultiParamTypeClasses
+        NegativeLiterals
+        NondecreasingIndentation
+        OverloadedStrings
+        ParallelArrays
+        PolyKinds
+        RankNTypes
+        RecordWildCards
+        RoleAnnotations
+        Safe
+        ScopedTypeVariables
+        StandaloneDeriving
+        Trustworthy
+        TypeFamilies
+        TypeOperators
+        TypeSynonymInstances
+        UnboxedTuples
+        UndecidableInstances
+        UnliftedFFITypes
+        Unsafe
+
+    build-depends:
+        rts == 1.0.*,
+        ghc-prim >= 0.11 && < 0.12,
+        ghc-bignum >= 1.0 && < 2.0
+
+    exposed-modules:
+        GHC.Internal.ClosureTypes
+        GHC.Internal.Control.Arrow
+        GHC.Internal.Control.Category
+        GHC.Internal.Control.Concurrent.MVar
+        GHC.Internal.Control.Exception
+        GHC.Internal.Control.Exception.Base
+        GHC.Internal.Control.Monad
+        GHC.Internal.Control.Monad.Fail
+        GHC.Internal.Control.Monad.Fix
+        GHC.Internal.Control.Monad.IO.Class
+        GHC.Internal.Control.Monad.ST
+        GHC.Internal.Control.Monad.ST.Lazy
+        GHC.Internal.Control.Monad.ST.Imp
+        GHC.Internal.Control.Monad.ST.Lazy.Imp
+        GHC.Internal.Data.Bits
+        GHC.Internal.Data.Bool
+        GHC.Internal.Data.Coerce
+        GHC.Internal.Data.Data
+        GHC.Internal.Data.Dynamic
+        GHC.Internal.Data.Either
+        GHC.Internal.Data.Eq
+        GHC.Internal.Data.Enum
+        GHC.Internal.Data.Foldable
+        GHC.Internal.Data.Function
+        GHC.Internal.Data.Functor
+        GHC.Internal.Data.Functor.Const
+        GHC.Internal.Data.Functor.Identity
+        GHC.Internal.Data.Functor.Utils
+        GHC.Internal.Data.IORef
+        GHC.Internal.Data.Ix
+        GHC.Internal.Data.List
+        GHC.Internal.Data.List.NonEmpty
+        GHC.Internal.Data.Maybe
+        GHC.Internal.Data.Monoid
+        GHC.Internal.Data.OldList
+        GHC.Internal.Data.Ord
+        GHC.Internal.Data.Proxy
+        GHC.Internal.Data.Semigroup.Internal
+        GHC.Internal.Data.STRef
+        GHC.Internal.Data.STRef.Strict
+        GHC.Internal.Data.String
+        GHC.Internal.Data.Traversable
+        GHC.Internal.Data.Tuple
+        GHC.Internal.Data.Type.Bool
+        GHC.Internal.Data.Type.Coercion
+        GHC.Internal.Data.Type.Equality
+        GHC.Internal.Data.Type.Ord
+        GHC.Internal.Data.Typeable
+        GHC.Internal.Data.Unique
+        GHC.Internal.Data.Version
+        GHC.Internal.Data.Void
+        GHC.Internal.Debug.Trace
+        GHC.Internal.Foreign.C.ConstPtr
+        GHC.Internal.Foreign.C.Error
+        GHC.Internal.Foreign.C.String
+        GHC.Internal.Foreign.C.String.Encoding
+        GHC.Internal.Foreign.C.Types
+        GHC.Internal.Foreign.Concurrent
+        GHC.Internal.Foreign.ForeignPtr
+        GHC.Internal.Foreign.ForeignPtr.Imp
+        GHC.Internal.Foreign.ForeignPtr.Unsafe
+        GHC.Internal.Foreign.Marshal.Alloc
+        GHC.Internal.Foreign.Marshal.Array
+        GHC.Internal.Foreign.Marshal.Error
+        GHC.Internal.Foreign.Marshal.Pool
+        GHC.Internal.Foreign.Marshal.Safe
+        GHC.Internal.Foreign.Marshal.Unsafe
+        GHC.Internal.Foreign.Marshal.Utils
+        GHC.Internal.Foreign.Ptr
+        GHC.Internal.Foreign.StablePtr
+        GHC.Internal.Foreign.Storable
+        GHC.Internal.ForeignSrcLang
+        GHC.Internal.Arr
+        GHC.Internal.ArrayArray
+        GHC.Internal.Base
+        GHC.Internal.Bits
+        GHC.Internal.ByteOrder
+        GHC.Internal.Char
+        GHC.Internal.Clock
+        GHC.Internal.Conc.Bound
+        GHC.Internal.Conc.IO
+        GHC.Internal.Conc.Signal
+        GHC.Internal.Conc.Sync
+        GHC.Internal.ConsoleHandler
+        GHC.Internal.Desugar
+        GHC.Internal.Encoding.UTF8
+        GHC.Internal.Enum
+        GHC.Internal.Environment
+        GHC.Internal.Err
+        GHC.Internal.Event.TimeOut
+        GHC.Internal.Exception
+        GHC.Internal.Exception.Backtrace
+        GHC.Internal.Exception.Context
+        GHC.Internal.Exception.Type
+        GHC.Internal.ExecutionStack
+        GHC.Internal.ExecutionStack.Internal
+        GHC.Internal.Exts
+        GHC.Internal.Fingerprint
+        GHC.Internal.Fingerprint.Type
+        GHC.Internal.Float
+        GHC.Internal.Float.ConversionUtils
+        GHC.Internal.Float.RealFracMethods
+        GHC.Internal.ForeignPtr
+        GHC.Internal.Functor.ZipList
+        GHC.Internal.GHCi
+        GHC.Internal.GHCi.Helpers
+        GHC.Internal.Generics
+        GHC.Internal.InfoProv
+        GHC.Internal.InfoProv.Types
+        GHC.Internal.IO
+        GHC.Internal.IO.Buffer
+        GHC.Internal.IO.BufferedIO
+        GHC.Internal.IO.Device
+        GHC.Internal.IO.Encoding
+        GHC.Internal.IO.Encoding.CodePage
+        GHC.Internal.IO.Encoding.Failure
+        GHC.Internal.IO.Encoding.Iconv
+        GHC.Internal.IO.Encoding.Latin1
+        GHC.Internal.IO.Encoding.Types
+        GHC.Internal.IO.Encoding.UTF16
+        GHC.Internal.IO.Encoding.UTF32
+        GHC.Internal.IO.Encoding.UTF8
+        GHC.Internal.IO.Exception
+        GHC.Internal.IO.FD
+        GHC.Internal.IO.Handle
+        GHC.Internal.IO.Handle.FD
+        GHC.Internal.IO.Handle.Internals
+        GHC.Internal.IO.Handle.Lock
+        GHC.Internal.IO.Handle.Text
+        GHC.Internal.IO.Handle.Types
+        GHC.Internal.IO.IOMode
+        GHC.Internal.IO.Unsafe
+        GHC.Internal.IO.StdHandles
+        GHC.Internal.IO.SubSystem
+        GHC.Internal.IOArray
+        GHC.Internal.IORef
+        GHC.Internal.Int
+        GHC.Internal.Integer
+        GHC.Internal.Integer.Logarithms
+        GHC.Internal.IsList
+        GHC.Internal.Ix
+        GHC.Internal.LanguageExtensions
+        GHC.Internal.Lexeme
+        GHC.Internal.List
+        GHC.Internal.Maybe
+        GHC.Internal.MVar
+        GHC.Internal.Natural
+        GHC.Internal.Num
+        GHC.Internal.OverloadedLabels
+        GHC.Internal.Pack
+        GHC.Internal.Profiling
+        GHC.Internal.Ptr
+        GHC.Internal.Read
+        GHC.Internal.Real
+        GHC.Internal.Records
+        GHC.Internal.ResponseFile
+        GHC.Internal.RTS.Flags
+        GHC.Internal.ST
+        GHC.Internal.Stack.CloneStack
+        GHC.Internal.StaticPtr
+        GHC.Internal.STRef
+        GHC.Internal.Show
+        GHC.Internal.Stable
+        GHC.Internal.StableName
+        GHC.Internal.Stack
+        GHC.Internal.Stack.CCS
+        GHC.Internal.Stack.Types
+        GHC.Internal.Stats
+        GHC.Internal.Storable
+        GHC.Internal.TH.Syntax
+        GHC.Internal.TH.Lib
+        GHC.Internal.TH.Lift
+        GHC.Internal.TH.Quote
+        GHC.Internal.TopHandler
+        GHC.Internal.TypeError
+        GHC.Internal.TypeLits
+        GHC.Internal.TypeLits.Internal
+        GHC.Internal.TypeNats
+        GHC.Internal.TypeNats.Internal
+        GHC.Internal.Unicode
+        GHC.Internal.Weak
+        GHC.Internal.Weak.Finalize
+        GHC.Internal.Word
+        GHC.Internal.Numeric
+        GHC.Internal.Numeric.Natural
+        GHC.Internal.System.Environment
+        GHC.Internal.System.Environment.Blank
+        GHC.Internal.System.Exit
+        GHC.Internal.System.IO
+        GHC.Internal.System.IO.Error
+        GHC.Internal.System.Mem
+        GHC.Internal.System.Mem.StableName
+        GHC.Internal.System.Posix.Internals
+        GHC.Internal.System.Posix.Types
+        GHC.Internal.Text.ParserCombinators.ReadP
+        GHC.Internal.Text.ParserCombinators.ReadPrec
+        GHC.Internal.Text.Read
+        GHC.Internal.Text.Read.Lex
+        GHC.Internal.Text.Show
+        GHC.Internal.Type.Reflection
+        GHC.Internal.Type.Reflection.Unsafe
+        GHC.Internal.Unsafe.Coerce
+        -- TODO: remove
+        GHC.Internal.IOPort
+
+    reexported-modules:
+          GHC.Num.Integer
+        , GHC.Num.Natural
+        , GHC.Num.BigNat
+        , GHC.Tuple
+
+    other-modules:
+        GHC.Internal.Data.Typeable.Internal
+        GHC.Internal.IO.Handle.Lock.Common
+        GHC.Internal.IO.Handle.Lock.Flock
+        GHC.Internal.IO.Handle.Lock.LinuxOFD
+        GHC.Internal.IO.Handle.Lock.NoOp
+        GHC.Internal.IO.Handle.Lock.Windows
+        GHC.Internal.StaticPtr.Internal
+        GHC.Internal.Event.Arr
+        GHC.Internal.Event.Array
+        GHC.Internal.Event.Internal
+        GHC.Internal.Event.Internal.Types
+        GHC.Internal.Event.IntTable
+        GHC.Internal.Event.IntVar
+        GHC.Internal.Event.PSQ
+        GHC.Internal.Event.Unique
+        -- GHC.Internal.IOPort -- TODO: hide again after debug
+        GHC.Internal.Unicode.Bits
+        GHC.Internal.Unicode.Char.DerivedCoreProperties
+        GHC.Internal.Unicode.Char.UnicodeData.GeneralCategory
+        GHC.Internal.Unicode.Char.UnicodeData.SimpleLowerCaseMapping
+        GHC.Internal.Unicode.Char.UnicodeData.SimpleTitleCaseMapping
+        GHC.Internal.Unicode.Char.UnicodeData.SimpleUpperCaseMapping
+        GHC.Internal.Unicode.Version
+        GHC.Internal.System.Environment.ExecutablePath
+
+    if !arch(javascript)
+      c-sources:
+          cbits/DarwinUtils.c
+          cbits/PrelIOUtils.c
+          cbits/SetEnv.c
+          cbits/iconv.c
+          cbits/inputReady.c
+          cbits/md5.c
+          cbits/primFloat.c
+          cbits/sysconf.c
+          cbits/fs.c
+          cbits/strerror.c
+
+      cmm-sources:
+          cbits/StackCloningDecoding.cmm
+
+    if arch(javascript)
+      js-sources:
+          -- "platform" must be linked first because it defines global constants
+          -- (e.g. h$isNode)
+          jsbits/platform.js
+          jsbits/base.js
+          jsbits/errno.js
+
+    hs-source-dirs: src
+    include-dirs: include
+    includes:
+        HsBase.h
+    install-includes:
+        HsBase.h
+        consUtils.h
+
+    -- OS Specific
+    if os(windows)
+        -- Windows requires some extra libraries for linking because the RTS
+        -- is no longer re-exporting them.
+        -- mingwex: provides GNU POSIX extensions that aren't provided by ucrt.
+        -- mingw32: Unfortunately required because of a resource leak between
+        --          mingwex and mingw32. the __math_err symbol is defined in
+        --          mingw32 which is required by mingwex.
+        -- shlwapi: provides PathFileExistsW
+        -- ws2_32: provides access to socket types and functions
+        -- ole32: provides UUID functionality.
+        -- rpcrt4: provides RPC UUID creation.
+        -- ntdll: provides access to functions to inspect window handles
+        -- kernel32: provides GetConsoleCP
+        -- advapi32: provides advanced kernel functions
+        extra-libraries:
+            wsock32, user32, shell32, mingw32, kernel32, advapi32,
+            mingwex, ws2_32, shlwapi, ole32, rpcrt4, ntdll
+        -- Minimum supported Windows version.
+        -- These numbers can be found at:
+        --  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
+        -- If we're compiling on windows, enforce that we only support Windows 7+
+        -- Adding this here means it doesn't have to be done in individual .c files
+        -- and also centralizes the versioning.
+        cpp-options: -D_WIN32_WINNT=0x06010000
+        cc-options: -D_WIN32_WINNT=0x06010000
+        exposed-modules:
+            GHC.Internal.IO.Encoding.CodePage.API
+            GHC.Internal.IO.Encoding.CodePage.Table
+            GHC.Internal.Conc.Windows
+            GHC.Internal.Conc.POSIX
+            GHC.Internal.Conc.POSIX.Const
+            GHC.Internal.Windows
+            GHC.Internal.Event.Windows
+            GHC.Internal.Event.Windows.Clock
+            GHC.Internal.Event.Windows.ConsoleEvent
+            GHC.Internal.Event.Windows.FFI
+            GHC.Internal.Event.Windows.ManagedThreadPool
+            GHC.Internal.Event.Windows.Thread
+            GHC.Internal.IO.Handle.Windows
+            GHC.Internal.IO.Windows.Handle
+            GHC.Internal.IO.Windows.Encoding
+            GHC.Internal.IO.Windows.Paths
+        c-sources:
+            cbits/Win32Utils.c
+            cbits/consUtils.c
+            cbits/IOutils.c
+
+    else
+        exposed-modules:
+            GHC.Internal.Event
+        other-modules:
+            GHC.Internal.Event.Control
+            GHC.Internal.Event.EPoll
+            GHC.Internal.Event.KQueue
+            GHC.Internal.Event.Manager
+            GHC.Internal.Event.Poll
+            GHC.Internal.Event.Thread
+            GHC.Internal.Event.TimerManager
+
+
+        if arch(javascript)
+          other-modules:
+
+    -- The Ports framework always passes this flag when building software that
+    -- uses iconv to make iconv from Ports compatible with iconv from the base system
+    -- See /usr/ports/Mk/Uses/iconv.mk
+    if os(freebsd)
+        cc-options: -DLIBICONV_PLUG
+
+    if arch(javascript)
+        exposed-modules:
+            GHC.Internal.JS.Prim
+            GHC.Internal.JS.Prim.Internal
+            GHC.Internal.JS.Prim.Internal.Build
+            GHC.Internal.JS.Foreign.Callback
+
+    if arch(wasm32)
+        exposed-modules:
+            GHC.Internal.Wasm.Prim
+        other-modules:
+            GHC.Internal.Wasm.Prim.Conc
+            GHC.Internal.Wasm.Prim.Conc.Internal
+            GHC.Internal.Wasm.Prim.Exports
+            GHC.Internal.Wasm.Prim.Flag
+            GHC.Internal.Wasm.Prim.Imports
+            GHC.Internal.Wasm.Prim.Types
+
+    -- We need to set the unit id to ghc-internal (without a version number)
+    -- as it's magic.
+    ghc-options: -this-unit-id ghc-internal
+
+    -- Make sure we don't accidentally regress into anti-patterns
+    ghc-options: -Wcompat -Wnoncanonical-monad-instances

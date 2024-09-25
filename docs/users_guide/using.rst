@@ -896,7 +896,7 @@ units easier.
     The main use of this flag is to be able to recreate the difference between
     an exposed and hidden module for installed packages.
 
-.. ghc-flag:: -reexported-module ⟨module name⟩
+.. ghc-flag:: -reexported-module ⟨reexport-spec⟩
     :shortdesc: A module which should be reexported from this unit.
     :type: dynamic
     :category:
@@ -904,6 +904,16 @@ units easier.
     This flag can be supplied multiple times in order to specify which modules
     are not defined in a unit but should be reexported. The effect is that other
     units will see this module as if it was defined in this unit.
+
+    The simple form of the flag allows the reexport of a single module at the
+    same name::
+
+      -reexported-module A
+
+    the complicated version of the flag allows the module to be renamed when
+    reexported::
+
+      -reexported-module "A as B"
 
     The use of this flag is to be able to replicate the reexported modules
     feature of packages with multiple home units.

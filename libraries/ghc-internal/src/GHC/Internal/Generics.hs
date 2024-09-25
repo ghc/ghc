@@ -735,7 +735,7 @@ import GHC.Internal.Data.Maybe      ( Maybe(..), fromMaybe )
 import GHC.Internal.Data.Ord        ( Down(..) )
 import GHC.Num.Integer ( Integer, integerToInt )
 import GHC.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
-import GHC.Internal.Ptr         ( Ptr )
+import GHC.Internal.Ptr         ( Ptr(..) )
 import GHC.Types
 
 -- Needed for instances
@@ -746,7 +746,7 @@ import GHC.Internal.Base    ( Alternative(..), Applicative(..), Functor(..)
 import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Internal.Enum    ( Bounded, Enum )
 import GHC.Internal.Read    ( Read(..) )
-import GHC.Internal.Show    ( Show(..), showString )
+import GHC.Internal.Show    ( Show(..), showString, showChar, showParen, appPrec )
 import GHC.Internal.Stack.Types ( SrcLoc(..) )
 import GHC.Tuple   (Solo (..))
 import GHC.Internal.Unicode ( GeneralCategory(..) )
@@ -1036,6 +1036,14 @@ data instance URec (Ptr ()) (p :: k) = UAddr { uAddr# :: Addr# }
            , Generic  -- ^ @since base-4.9.0.0
            , Generic1 -- ^ @since base-4.9.0.0
            )
+
+-- | @since base-4.21.0.0
+instance Show (UAddr p) where
+  -- This Show instance would be equivalent to what deriving Show would generate,
+  -- but because deriving Show doesn't support Addr# fields we define it manually.
+  showsPrec d (UAddr x) =
+    showParen (d > appPrec)
+      (\y -> showString "UAddr {uAddr# = " (showsPrec 0 (Ptr x) (showChar '}' y)))
 
 -- | Used for marking occurrences of 'Char#'
 --

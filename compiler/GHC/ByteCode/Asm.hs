@@ -28,6 +28,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
 import GHC.Types.Unique.DSet
+import GHC.Types.SptEntry
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -94,8 +95,9 @@ assembleBCOs
   -> [TyCon]
   -> AddrEnv
   -> Maybe ModBreaks
+  -> [SptEntry]
   -> IO CompiledByteCode
-assembleBCOs interp profile proto_bcos tycons top_strs modbreaks = do
+assembleBCOs interp profile proto_bcos tycons top_strs modbreaks spt_entries = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   itblenv <- mkITbls interp profile tycons
@@ -107,6 +109,7 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks = do
     , bc_ffis = concatMap protoBCOFFIs proto_bcos
     , bc_strs = top_strs
     , bc_breaks = modbreaks
+    , bc_spt_entries = spt_entries
     }
 
 -- Note [Allocating string literals]

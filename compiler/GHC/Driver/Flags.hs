@@ -124,6 +124,7 @@ extensionName = \case
   LangExt.DeepSubsumption -> "DeepSubsumption"
   LangExt.RelaxedPolyRec -> "RelaxedPolyRec"           -- Deprecated
   LangExt.ExtendedDefaultRules -> "ExtendedDefaultRules"     -- Use GHC's extended rules for defaulting
+  LangExt.NamedDefaults -> "NamedDefaults"
   LangExt.ForeignFunctionInterface -> "ForeignFunctionInterface"
   LangExt.UnliftedFFITypes -> "UnliftedFFITypes"
   LangExt.InterruptibleFFI -> "InterruptibleFFI"
@@ -245,6 +246,7 @@ extensionName = \case
   LangExt.TypeAbstractions -> "TypeAbstractions"
   LangExt.ExtendedLiterals -> "ExtendedLiterals"
   LangExt.ListTuplePuns -> "ListTuplePuns"
+  LangExt.MultilineStrings -> "MultilineStrings"
 
 -- | Is this extension known by any other names? For example
 -- -XGeneralizedNewtypeDeriving is accepted
@@ -1055,6 +1057,7 @@ data WarningFlag =
    | Opt_WarnDataKindsTC                             -- Since 9.10
    | Opt_WarnDeprecatedTypeAbstractions              -- Since 9.10
    | Opt_WarnDefaultedExceptionContext               -- Since 9.10
+   | Opt_WarnViewPatternSignatures                   -- Since 9.12
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1171,6 +1174,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnDataKindsTC                             -> "data-kinds-tc" :| []
   Opt_WarnDeprecatedTypeAbstractions              -> "deprecated-type-abstractions" :| []
   Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
+  Opt_WarnViewPatternSignatures                   -> "view-pattern-signatures" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1311,7 +1315,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnInconsistentFlags,
         Opt_WarnDataKindsTC,
-        Opt_WarnTypeEqualityOutOfScope
+        Opt_WarnTypeEqualityOutOfScope,
+        Opt_WarnViewPatternSignatures
       ]
 
 -- | Things you get with -W

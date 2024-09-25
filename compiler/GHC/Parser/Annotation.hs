@@ -23,7 +23,7 @@ module GHC.Parser.Annotation (
   TokenLocation(..),
   DeltaPos(..), deltaPos, getDeltaLine,
 
-  EpAnn(..), Anchor,
+  EpAnn(..),
   anchor,
   spanAsAnchor, realSpanAsAnchor,
   noSpanAnchor,
@@ -105,7 +105,7 @@ import Data.Function (on)
 import Data.List (sortBy, foldl1')
 import Data.Semigroup
 import GHC.Data.FastString
-import GHC.TypeLits (Symbol, KnownSymbol)
+import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Hs.DocString
@@ -372,6 +372,9 @@ data EpToken (tok :: Symbol)
   = NoEpTok
   | EpTok !EpaLocation
 
+instance KnownSymbol tok => Outputable (EpToken tok) where
+  ppr _ = text (symbolVal (Proxy @tok))
+
 -- | With @UnicodeSyntax@, there might be multiple ways to write the same
 -- token. For example an arrow could be either @->@ or @→@. This choice must be
 -- recorded in order to exactprint such tokens, so instead of @EpToken "->"@ we
@@ -383,6 +386,11 @@ data EpUniToken (tok :: Symbol) (utok :: Symbol)
 deriving instance Eq (EpToken tok)
 deriving instance KnownSymbol tok => Data (EpToken tok)
 deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (EpUniToken tok utok)
+
+instance (KnownSymbol tok, KnownSymbol utok) => Outputable (EpUniToken tok utok) where
+  ppr NoEpUniTok                 = text $ symbolVal (Proxy @tok)
+  ppr (EpUniTok _ NormalSyntax)  = text $ symbolVal (Proxy @tok)
+  ppr (EpUniTok _ UnicodeSyntax) = text $ symbolVal (Proxy @utok)
 
 getEpTokenSrcSpan :: EpToken tok -> SrcSpan
 getEpTokenSrcSpan NoEpTok = noSrcSpan
@@ -520,7 +528,7 @@ instance Outputable AddEpAnn where
 -- new AST fragments out of old ones, and have them still printed out
 -- in a precise way.
 data EpAnn ann
-  = EpAnn { entry   :: !Anchor
+  = EpAnn { entry   :: !EpaLocation
            -- ^ Base location for the start of the syntactic element
            -- holding the annotations.
            , anns     :: !ann -- ^ Annotations added by the Parser
@@ -530,15 +538,6 @@ data EpAnn ann
            }
         deriving (Data, Eq, Functor)
 -- See Note [XRec and Anno in the AST]
-
--- | An 'Anchor' records the base location for the start of the
--- syntactic element holding the annotations, and is used as the point
--- of reference for calculating delta positions for contained
--- annotations.
--- It is also normally used as the reference point for the spacing of
--- the element relative to its container. If the AST element is moved,
--- that relationship is tracked using the 'EpaDelta' constructor instead.
-type Anchor = EpaLocation -- Transitional
 
 anchor :: (EpaLocation' a) -> RealSrcSpan
 anchor (EpaSpan (RealSrcSpan r _)) = r
@@ -668,7 +667,7 @@ data AnnListItem
 -- keywords such as 'where'.
 data AnnList
   = AnnList {
-      al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
+      al_anchor    :: Maybe EpaLocation, -- ^ start point of a list having layout
       al_open      :: Maybe AddEpAnn,
       al_close     :: Maybe AddEpAnn,
       al_rest      :: [AddEpAnn], -- ^ context, such as 'where' keyword
@@ -1046,6 +1045,13 @@ instance HasLoc EpaLocation where
   getHasLoc (EpaSpan l) = l
   getHasLoc (EpaDelta l _ _) = l
 
+instance HasLoc (EpToken tok) where
+  getHasLoc = getEpTokenSrcSpan
+
+instance HasLoc (EpUniToken tok utok) where
+  getHasLoc NoEpUniTok = noSrcSpan
+  getHasLoc (EpUniTok l _) = getHasLoc l
+
 getHasLocList :: HasLoc a => [a] -> SrcSpan
 getHasLocList [] = noSrcSpan
 getHasLocList xs = foldl1' combineSrcSpans $ map getHasLoc xs
@@ -1128,7 +1134,7 @@ listLocation as = EpaSpan (go noSrcSpan as)
     go acc (L (EpAnn (EpaSpan s) _ _) _:rest) = go (combine acc s) rest
     go acc (_:rest) = go acc rest
 
-widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
+widenAnchor :: EpaLocation -> [AddEpAnn] -> EpaLocation
 widenAnchor (EpaSpan (RealSrcSpan s mb)) as
   = EpaSpan (RealSrcSpan (widenRealSpan s as) (liftA2 combineBufSpans mb  (bufSpanFromAnns as)))
 widenAnchor (EpaSpan us) _ = EpaSpan us
@@ -1136,7 +1142,7 @@ widenAnchor a@EpaDelta{} as = case (realSpanFromAnns as) of
                                     Strict.Nothing -> a
                                     Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
 
-widenAnchorS :: Anchor -> SrcSpan -> Anchor
+widenAnchorS :: EpaLocation -> SrcSpan -> EpaLocation
 widenAnchorS (EpaSpan (RealSrcSpan s mbe)) (RealSrcSpan r mbr)
   = EpaSpan (RealSrcSpan (combineRealSrcSpans s r) (liftA2 combineBufSpans mbe mbr))
 widenAnchorS (EpaSpan us) _ = EpaSpan us

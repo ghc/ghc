@@ -1,0 +1,7 @@
+C
+-package-id u2
+-this-unit-id u3
+-working-dir t25139
+-reexported-module "B as E"
+-i
+-iu3src

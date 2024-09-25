@@ -1,6 +1,13 @@
-T19288: No more bug!
+T19288: Exception:
+
+No more bug!
 CallStack (from HasCallStack):
   error, called at T19288.hs:25:27 in main:Main
+
+Package: ghc-internal
+Module: GHC.Internal.Exception
+Type: ErrorCall
+
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:128:3 in ghc-internal:GHC.Internal.Exception

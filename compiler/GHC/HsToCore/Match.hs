@@ -1175,7 +1175,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp e (HsPar _ (L _ e')) = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
-    exp (XExpr (WrapExpr (HsWrap h e))) (XExpr (WrapExpr (HsWrap  h' e'))) =
+    exp (XExpr (WrapExpr h e)) (XExpr (WrapExpr h' e')) =
       wrap h h' && exp e e'
     exp (XExpr (ExpandedThingTc o x)) (XExpr (ExpandedThingTc o' x'))
       | isHsThingRnExpr o

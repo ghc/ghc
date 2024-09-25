@@ -515,14 +515,6 @@ defined by your local GHC installation, the following trick is useful:
     Only defined when :ghc-flag:`-fignore-asserts` is specified.
     This can be used to create your own assertions, see :ref:`assertions`
 
-``__PARALLEL_HASKELL__``
-    .. index::
-       single: __PARALLEL_HASKELL__
-
-    Only defined when ``-parallel`` is in use! This symbol is defined
-    when pre-processing Haskell (input) and pre-processing C (GHC
-    output).
-
 ``os_HOST_OS=1``
     This define allows conditional compilation based on the Operating
     System, where⟨os⟩ is the name of the current Operating System (eg.
@@ -531,7 +523,7 @@ defined by your local GHC installation, the following trick is useful:
 ``arch_HOST_ARCH=1``
     This define allows conditional compilation based on the host
     architecture, where⟨arch⟩ is the name of the current architecture
-    (eg. ``i386``, ``x86_64``, ``powerpc``, ``sparc``, etc.).
+    (eg. ``i386``, ``x86_64``, ``aarch64``, ``powerpc``, ``sparc``, etc.).
 
 ``VERSION_pkgname``
     This macro is available starting GHC 8.0.  It is defined for every
@@ -546,6 +538,16 @@ defined by your local GHC installation, the following trick is useful:
     conditionals testing if a package version is ``x.y.z`` or
     later.  It is identical in behavior to the ``MIN_VERSION_pkgname``
     macros that Cabal defines.
+
+SIMD macros
+    .. index::
+        single: SIMD Macros
+
+    These are defined conditionally based on the SIMD
+    flags used for compilation:
+
+    ``__SSE__``, ``__SSE2__``, ``__SSE4_2__``, ``__FMA__``,
+    ``__AVX__``, ``__AVX2__``, ``__AVX512CD__``, ``__AVX512ER__``, ``__AVX512F__``, ``__AVX512PF__``,
 
 .. _cpp-string-gaps:
 
@@ -1159,8 +1161,9 @@ for example).
     :shortdesc: Control whether the RTS behaviour can be tweaked via command-line
         flags and the ``GHCRTS`` environment variable. Using ``none``
         means no RTS flags can be given; ``some`` means only a minimum
-        of safe options can be given (the default); ``all`` (or no
-        argument at all) means that all RTS flags are permitted; ``ignore``
+        of safe options can be given (the default, if ``-rtsopts`` is
+        not passed); ``all`` means that all RTS flags are permitted (the
+        default, if ``-rtsopts`` is passed with no argument); ``ignore``
         means RTS flags can be given, but are treated as regular arguments and
         passed to the Haskell program as arguments; ``ignoreAll`` is the same as
         ``ignore``, but ``GHCRTS`` is also ignored. ``-rtsopts`` does not
@@ -1169,11 +1172,12 @@ for example).
     :type: dynamic
     :category: linking
 
-    :default: some
+    :default: ``some``, if ``-rtsopts`` is not passed; ``all``, if ``-rtsopts``
+        is passed with no argument.
 
     This option affects the processing of RTS control options given
     either on the command line or via the :envvar:`GHCRTS` environment
-    variable. There are five possibilities:
+    variable. There are six possibilities:
 
     ``-rtsopts=none``
         Disable all processing of RTS options. If ``+RTS`` appears
@@ -1189,17 +1193,21 @@ for example).
         ``GHCRTS`` options will be processed normally.
 
     ``-rtsopts=ignoreAll``
-        Same as ``ignore`` but also ignores ``GHCRTS``.
+        Same as ``ignore`` with the exception of ``GHCRTS`` options, which are
+        also ignored.
 
     ``-rtsopts=some``
-        [this is the default setting] Enable only the "safe" RTS
-        options: (Currently only ``-?`` and ``--info``.) Any other RTS
-        options on the command line or in the ``GHCRTS`` environment
-        variable causes the program with to abort with an error message.
+        [this is the default setting, if ``-rtsopts`` is not passed] Enable only
+        the "safe" RTS options: (Currently only ``-?`` and ``--info``.) Any
+        other RTS options on the command line or in the ``GHCRTS`` environment
+        variable causes the program to abort with an error message.
 
-    ``-rtsopts=all`` or just ``-rtsopts``
+    ``-rtsopts=all``
         Enable *all* RTS option processing, both on the command line and
         through the ``GHCRTS`` environment variable.
+
+    ``-rtsopts``
+        Equivalent to ``-rtsopts=all``.
 
     In GHC 6.12.3 and earlier, the default was to process all RTS
     options. However, since RTS options can be used to write logging

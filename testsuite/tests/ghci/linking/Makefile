@@ -145,3 +145,8 @@ T15729:
 big-obj:
 	'$(TEST_CC)' -c -Wa,-mbig-obj big-obj-c.c -o big-obj-c.o
 	echo "main" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) big-obj-c.o big-obj.hs
+
+.PHONY: T25155
+T25155:
+	'$(TEST_HC)' T25155_iserv_main.c T25155_iserv.hs -package ghci -no-hs-main -v0 -o T25155_iserv
+	'$(TEST_HC)' -fexternal-interpreter -pgmi ./T25155_iserv -v0 T25155.hs

@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -84,6 +85,7 @@ import Control.Arrow (first)
 import Data.Ord
 import Data.Array
 import qualified Data.List.NonEmpty as NE
+import GHC.Driver.Env (HscEnv)
 
 {- Note [Handling overloaded and rebindable constructs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -366,13 +368,18 @@ rnExpr (HsOverLabel src v)
     hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
                 HsTyLit noExtField (HsStrTy NoSourceText v)
 
-rnExpr (HsLit x lit@(HsString src s))
+rnExpr (HsLit x lit) | Just (src, s) <- stringLike lit
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
        ; if opt_OverloadedStrings then
             rnExpr (HsOverLit x (mkHsIsString src s))
          else do {
             ; rnLit lit
             ; return (HsLit x (convertLit lit), emptyFVs) } }
+  where
+    stringLike = \case
+      HsString src s -> Just (src, s)
+      HsMultilineString src s -> Just (src, s)
+      _ -> Nothing
 
 rnExpr (HsLit x lit)
   = do { rnLit lit
@@ -532,12 +539,12 @@ rnExpr (ExplicitSum _ alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr
        ; return (ExplicitSum noExtField alt arity expr', fvs) }
 
-rnExpr (RecordCon { rcon_con = con_id
+rnExpr (RecordCon { rcon_con = con_rdr
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
-  = do { con_lname@(L _ con_name) <- lookupLocatedOccRnConstr con_id
+  = do { con_lname@(L _ con_name) <- lookupLocatedOccRnConstr con_rdr
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
-       ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
+       ; let rec_binds' = HsRecFields { rec_ext = noExtField, rec_flds = flds', rec_dotdot = dd }
        ; return (RecordCon { rcon_ext = noExtField
                            , rcon_con = con_lname, rcon_flds = rec_binds' }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
@@ -611,7 +618,27 @@ rnExpr (ArithSeq _ _ seq)
 
 rnExpr (HsEmbTy _ ty)
   = do { (ty', fvs) <- rnHsWcType HsTypeCtx ty
+       ; checkTypeSyntaxExtension TypeKeywordSyntax
        ; return (HsEmbTy noExtField ty', fvs) }
+
+rnExpr (HsQual _ (L ann ctxt) ty)
+  = do { (ctxt', fvs_ctxt) <- mapAndUnzipM rnLExpr ctxt
+       ; (ty', fvs_ty) <- rnLExpr ty
+       ; checkTypeSyntaxExtension ContextArrowSyntax
+       ; return (HsQual noExtField (L ann ctxt') ty', plusFVs fvs_ctxt `plusFV` fvs_ty) }
+
+rnExpr (HsForAll _ tele expr)
+  = bindHsForAllTelescope HsTypeCtx tele $ \tele' ->
+    do { (expr', fvs) <- rnLExpr expr
+       ; checkTypeSyntaxExtension ForallTelescopeSyntax
+       ; return (HsForAll noExtField tele' expr', fvs) }
+
+rnExpr (HsFunArr _ mult arg res)
+  = do { (arg', fvs1) <- rnLExpr arg
+       ; (mult', fvs2) <- rnHsArrowWith rnLExpr mult
+       ; (res', fvs3) <- rnLExpr res
+       ; checkTypeSyntaxExtension FunctionArrowSyntax
+       ; return (HsFunArr noExtField mult' arg' res', plusFVs [fvs1, fvs2, fvs3]) }
 
 {-
 ************************************************************************
@@ -656,6 +683,19 @@ rnExpr (HsProc x pat body)
     rnPat (ArrowMatchCtxt ProcExpr) pat $ \ pat' -> do
       { (body',fvBody) <- rnCmdTop body
       ; return (HsProc x pat' body', fvBody) }
+
+
+{-
+************************************************************************
+*                                                                      *
+        Type syntax
+*                                                                      *
+********************************************************************* -}
+
+checkTypeSyntaxExtension :: TypeSyntax -> RnM ()
+checkTypeSyntaxExtension syntax =
+  unlessXOptM (typeSyntaxExtension syntax) $
+  addErr (TcRnUnexpectedTypeSyntaxInTerms syntax)
 
 {-
 ************************************************************************
@@ -905,21 +945,10 @@ rnCmd (HsCmdArrApp _ arrow arg ho rtl)
         -- Local bindings, inside the enclosing proc, are not in scope
         -- inside 'arrow'.  In the higher-order case (-<<), they are.
 
--- infix form
-rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
-  = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
-       ; let L _ (HsVar _ (L _ op_name)) = op'
-       ; (arg1',fv_arg1) <- rnCmdTop arg1
-       ; (arg2',fv_arg2) <- rnCmdTop arg2
-        -- Deal with fixity
-       ; fixity <- lookupFixityRn op_name
-       ; final_e <- mkOpFormRn arg1' op' fixity arg2'
-       ; return (final_e, fv_arg1 `plusFV` fv_op `plusFV` fv_arg2) }
-
-rnCmd (HsCmdArrForm _ op f fixity cmds)
+rnCmd (HsCmdArrForm _ op f cmds)
   = do { (op',fvOp) <- escapeArrowScope (rnLExpr op)
        ; (cmds',fvCmds) <- rnCmdArgs cmds
-       ; return ( HsCmdArrForm noExtField op' f fixity cmds'
+       ; return ( HsCmdArrForm Nothing op' f cmds'
                 , fvOp `plusFV` fvCmds) }
 
 rnCmd (HsCmdApp x fun arg)
@@ -2183,6 +2212,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeBind before after) tail tail_fvs = do
   return (stmts2, fvs1 `plusFV` fvs2)
 
 stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
+   hscEnv <- getTopEnv
    rdrEnv <- getGlobalRdrEnv
    comps <- getCompleteMatchesTcM
    pairs <- mapM (stmtTreeArg ctxt tail_fvs) trees
@@ -2190,7 +2220,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    let (stmts', fvss) = unzip pairs
    let (need_join, tail') =
      -- See Note [ApplicativeDo and refutable patterns]
-         if any (hasRefutablePattern strict rdrEnv comps) stmts'
+         if any (hasRefutablePattern strict hscEnv rdrEnv comps) stmts'
          then (True, tail)
          else needJoin monad_names tail Nothing
 
@@ -2382,13 +2412,14 @@ of a refutable pattern, in order for the types to work out.
 -}
 
 hasRefutablePattern :: Bool -- ^ is -XStrict enabled?
+                    -> HscEnv
                     -> GlobalRdrEnv
                     -> CompleteMatches
                     -> ApplicativeArg GhcRn -> Bool
-hasRefutablePattern is_strict rdr_env comps arg =
+hasRefutablePattern is_strict hsc_env rdr_env comps arg =
   case arg of
     ApplicativeArgOne { app_arg_pattern = pat, is_body_stmt = False}
-      -> not (isIrrefutableHsPat is_strict (irrefutableConLikeRn rdr_env comps) pat)
+      -> not (isIrrefutableHsPat is_strict (irrefutableConLikeRn hsc_env rdr_env comps) pat)
     _ -> False
 
 isLetStmt :: LStmt (GhcPass a) b -> Bool
@@ -2697,11 +2728,12 @@ monadFailOp :: LPat GhcRn
             -> RnM (FailOperator GhcRn, FreeVars)
 monadFailOp pat ctxt = do
     strict <- xoptM LangExt.Strict
+    hscEnv <- getTopEnv
     rdrEnv <- getGlobalRdrEnv
     comps <- getCompleteMatchesTcM
         -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
         -- we should not need to fail.
-    if | isIrrefutableHsPat strict (irrefutableConLikeRn rdrEnv comps) pat
+    if | isIrrefutableHsPat strict (irrefutableConLikeRn hscEnv rdrEnv comps) pat
        -> return (Nothing, emptyFVs)
 
         -- For non-monadic contexts (e.g. guard patterns, list

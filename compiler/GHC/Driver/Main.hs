@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -295,12 +294,12 @@ import Data.Time
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
+import GHC.Platform.Ways
 import GHC.Stg.InferTags.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Cmm.Config (CmmConfig)
-
 
 {- **********************************************************************
 %*                                                                      *
@@ -944,7 +943,7 @@ checkObjects dflags mb_old_linkable summary = do
         | obj_date >= if_date ->
             case mb_old_linkable of
               Just old_linkable
-                | isObjectLinkable old_linkable, linkableTime old_linkable == obj_date
+                | linkableIsNativeCodeOnly old_linkable, linkableTime old_linkable == obj_date
                 -> return $ UpToDateItem old_linkable
               _ -> UpToDateItem <$> findObjectLinkable this_mod obj_fn obj_date
       _ -> return $ outOfDateItemBecause MissingObjectFile Nothing
@@ -956,7 +955,7 @@ checkByteCode :: ModIface -> ModSummary -> Maybe Linkable -> IO (MaybeValidated 
 checkByteCode iface mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
-      | not (isObjectLinkable old_linkable)
+      | not (linkableIsNativeCodeOnly old_linkable)
       -> return $ (UpToDateItem old_linkable)
     _ -> loadByteCode iface mod_sum
 
@@ -968,7 +967,8 @@ loadByteCode iface mod_sum = do
     case mi_extra_decls iface of
       Just extra_decls -> do
           let fi = WholeCoreBindings extra_decls this_mod (ms_location mod_sum)
-          return (UpToDateItem (LM if_date this_mod [CoreBindings fi]))
+                   (mi_foreign iface)
+          return (UpToDateItem (Linkable if_date this_mod (NE.singleton (CoreBindings fi))))
       _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 --------------------------------------------------------------
 -- Compilers
@@ -989,29 +989,67 @@ initModDetails hsc_env iface =
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env' iface
 
--- Hydrate any WholeCoreBindings linkables into BCOs
-initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
-initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM utc_time this_mod <$> mapM go uls
+-- | Modify flags such that objects are compiled for the interpreter's way.
+-- This is necessary when building foreign objects for Template Haskell, since
+-- those are object code built outside of the pipeline, which means they aren't
+-- subject to the mechanism in 'enableCodeGenWhen' that requests dynamic build
+-- outputs for dependencies when the interpreter used for TH is dynamic but the
+-- main outputs aren't.
+-- Furthermore, the HPT only stores one set of objects with different names for
+-- bytecode linking in 'HomeModLinkable', so the usual hack for switching
+-- between ways in 'get_link_deps' doesn't work.
+compile_for_interpreter :: HscEnv -> (HscEnv -> IO a) -> IO a
+compile_for_interpreter hsc_env use =
+  use (hscUpdateFlags update hsc_env)
   where
-    go (CoreBindings fi) = do
-        let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
-                                (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+    update dflags = dflags {
+      targetWays_ = adapt_way interpreterDynamic WayDyn $
+                    adapt_way interpreterProfiled WayProf $
+                    targetWays_ dflags
+      }
+
+    adapt_way want = if want (hscInterp hsc_env) then addWay else removeWay
+
+-- | If the 'Linkable' contains Core bindings loaded from an interface, replace
+-- them with a lazy IO thunk that compiles them to bytecode and foreign objects.
+--
+-- The laziness is necessary because this value is stored purely in a
+-- 'HomeModLinkable' in the home package table, rather than some dedicated
+-- mutable state that would generate bytecode on demand, so we have to call this
+-- function even when we don't know that we'll need the bytecode.
+--
+-- In addition, the laziness has to be hidden inside 'LazyBCOs' because
+-- 'Linkable' is used too generally, so that looking at the constructor to
+-- decide whether to discard it when linking native code would force the thunk
+-- otherwise, incurring a significant performance penalty.
+--
+-- This is sound because generateByteCode just depends on things already loaded
+-- in the interface file.
+initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
+initWholeCoreBindings hsc_env mod_iface details (Linkable utc_time this_mod uls) =
+  Linkable utc_time this_mod <$> mapM go uls
+  where
+    go (CoreBindings wcb@WholeCoreBindings {wcb_foreign, wcb_mod_location}) = do
         types_var <- newIORef (md_types details)
-        let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
-        let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
-        -- The bytecode generation itself is lazy because otherwise even when doing
-        -- recompilation checking the bytecode will be generated (which slows things down a lot)
-        -- the laziness is OK because generateByteCode just depends on things already loaded
-        -- in the interface file.
-        LoadedBCOs <$> (unsafeInterleaveIO $ do
-                  core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
-                  -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
-                  -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
-                  -- reports a bug.
-                  let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
-                  trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
-                  generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
+        let act hpt = addToHpt hpt (moduleName $ mi_module mod_iface)
+                      (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+            kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
+            hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
+        ~(bcos, fos) <- unsafeInterleaveIO $ do
+          core_binds <- initIfaceCheck (text "l") hsc_env' $
+                        typecheckWholeCoreBindings types_var wcb
+          (stubs, foreign_files) <-
+            decodeIfaceForeign logger (hsc_tmpfs hsc_env)
+            (tmpDir (hsc_dflags hsc_env)) wcb_foreign
+          let cgi_guts = CgInteractiveGuts this_mod core_binds
+                         (typeEnvTyCons (md_types details)) stubs foreign_files
+                         Nothing []
+          trace_if logger (text "Generating ByteCode for" <+> ppr this_mod)
+          generateByteCode hsc_env cgi_guts wcb_mod_location
+        pure (LazyBCOs bcos fos)
     go ul = return ul
+
+    logger = hsc_logger hsc_env
 
 {-
 Note [ModDetails and --make mode]
@@ -1489,7 +1527,7 @@ checkSafeImports tcg_env
   where
     impInfo  = tcg_imports tcg_env     -- ImportAvails
     imports  = imp_mods impInfo        -- ImportedMods
-    imports1 = moduleEnvToList imports -- (Module, [ImportedBy])
+    imports1 = M.toList imports -- (Module, [ImportedBy])
     imports' = map (fmap importedByUser) imports1 -- (Module, [ImportedModsVal])
     pkgReqs  = imp_trust_pkgs impInfo  -- [Unit]
 
@@ -1979,18 +2017,19 @@ data CgInteractiveGuts = CgInteractiveGuts { cgi_module :: Module
                                            , cgi_binds  :: CoreProgram
                                            , cgi_tycons :: [TyCon]
                                            , cgi_foreign :: ForeignStubs
+                                           , cgi_foreign_files :: [(ForeignSrcLang, FilePath)]
                                            , cgi_modBreaks ::  Maybe ModBreaks
                                            , cgi_spt_entries :: [SptEntry]
                                            }
 
 mkCgInteractiveGuts :: CgGuts -> CgInteractiveGuts
-mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_modBreaks, cg_spt_entries}
-  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_modBreaks cg_spt_entries
+mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_modBreaks, cg_spt_entries}
+  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_modBreaks cg_spt_entries
 
 hscInteractive :: HscEnv
                -> CgInteractiveGuts
                -> ModLocation
-               -> IO (Maybe FilePath, CompiledByteCode, [SptEntry])
+               -> IO (Maybe FilePath, CompiledByteCode) -- ^ .c stub path (if any) and ByteCode
 hscInteractive hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
@@ -2028,27 +2067,26 @@ hscInteractive hsc_env cgguts location = do
     let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
     -----------------  Generate byte code ------------------
-    comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
+    comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks spt_entries
+
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
         <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
-    return (istub_c_exists, comp_bc, spt_entries)
+    return (istub_c_exists, comp_bc)
 
+-- | Compile Core bindings and foreign inputs that were loaded from an
+-- interface, to produce bytecode and potential foreign objects for the purpose
+-- of linking splices.
 generateByteCode :: HscEnv
   -> CgInteractiveGuts
   -> ModLocation
-  -> IO [Unlinked]
+  -> IO (CompiledByteCode, [FilePath])
 generateByteCode hsc_env cgguts mod_location = do
-  (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
-
-  stub_o <- case hasStub of
-            Nothing -> return []
-            Just stub_c -> do
-                stub_o <- compileForeign hsc_env LangC stub_c
-                return [DotO stub_o]
-
-  let hs_unlinked = [BCOs comp_bc spt_entries]
-  return (hs_unlinked ++ stub_o)
+  (hasStub, comp_bc) <- hscInteractive hsc_env cgguts mod_location
+  compile_for_interpreter hsc_env $ \ i_env -> do
+    stub_o <- traverse (compileForeign i_env LangC) hasStub
+    foreign_files_o <- traverse (uncurry (compileForeign i_env)) (cgi_foreign_files cgguts)
+    pure (comp_bc, maybeToList stub_o ++ foreign_files_o)
 
 generateFreshByteCode :: HscEnv
   -> ModuleName
@@ -2056,10 +2094,12 @@ generateFreshByteCode :: HscEnv
   -> ModLocation
   -> IO Linkable
 generateFreshByteCode hsc_env mod_name cgguts mod_location = do
-  ul <- generateByteCode hsc_env cgguts mod_location
-  unlinked_time <- getCurrentTime
-  let !linkable = LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) ul
-  return linkable
+  bco_time <- getCurrentTime
+  (bcos, fos) <- generateByteCode hsc_env cgguts mod_location
+  return $!
+    Linkable bco_time
+    (mkHomeModule (hsc_home_unit hsc_env) mod_name)
+    (BCOs bcos :| [DotO fo ForeignObject | fo <- fos])
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)
@@ -2381,7 +2421,9 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     let !CgGuts{ cg_module    = this_mod,
                  cg_binds     = core_binds,
                  cg_tycons    = tycons,
-                 cg_modBreaks = mod_breaks } = tidy_cg
+                 cg_modBreaks = mod_breaks,
+                 cg_spt_entries = spt_entries
+                 } = tidy_cg
 
         !ModDetails { md_insts     = cls_insts
                     , md_fam_insts = fam_insts } = mod_details
@@ -2413,7 +2455,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen hsc_env this_mod
-                                stg_binds data_tycons mod_breaks
+                                stg_binds data_tycons mod_breaks spt_entries
 
     let src_span = srcLocSpan interactiveSrcLoc
     _ <- liftIO $ loadDecls interp hsc_env src_span cbc
@@ -2690,7 +2732,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
       bcos <- byteCodeGen hsc_env
                 this_mod
                 stg_binds
-                [] Nothing
+                []
+                Nothing -- modbreaks
+                [] -- spt entries
 
       {- load it -}
       (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan bcos
@@ -2749,10 +2793,9 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     deps <- getLinkDeps link_opts interp pls srcspan needed_mods
     -- We update the LinkerState even if the JS interpreter maintains its linker
     -- state independently to load new objects here.
-    let (objs, _bcos) = partition isObjectLinkable
-                          (concatMap partitionLinkable (ldNeededLinkables deps))
 
-    let (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
+    let objs = mapMaybe linkableFilterNative (ldNeededLinkables deps)
+        (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
 
     -- FIXME: we should make the JS linker load new_objs here, instead of
     -- on-demand.

@@ -30,6 +30,7 @@ import GHC.Utils.Panic
 import Data.Maybe (fromMaybe)
 
 import GHC.Stack
+import GHC.Platform.Reg.Class
 
 -- | LR and FP (8 byte each) are the prologue of each stack frame
 stackFrameHeaderSize :: Int
@@ -134,7 +135,7 @@ regUsageOfInstr platform instr = case instr of
   LDAR _ dst src           -> usage (regOp src, regOp dst)
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBISH                   -> usage ([], [])
+  DMBISH _                 -> usage ([], [])
 
   -- 9. Floating Point Instructions --------------------------------------------
   FMOV dst src             -> usage (regOp src, regOp dst)
@@ -177,6 +178,8 @@ regUsageOfInstr platform instr = case instr of
         interesting _        (RegVirtual _)                 = True
         interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
 
+-- Note [AArch64 Register assignments]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Save caller save registers
 -- This is x0-x18
 --
@@ -199,6 +202,8 @@ regUsageOfInstr platform instr = case instr of
 -- '---------------------------------------------------------------------------------------------------------------------------------------------------------------'
 -- IR: Indirect result location register, IP: Intra-procedure register, PL: Platform register, FP: Frame pointer, LR: Link register, SP: Stack pointer
 -- BR: Base, SL: SpLim
+--
+-- TODO: The zero register is currently mapped to -1 but should get it's own separate number.
 callerSavedRegisters :: [Reg]
 callerSavedRegisters
     = map regSingle [0..18]
@@ -277,7 +282,7 @@ patchRegsOfInstr instr env = case instr of
     LDAR f o1 o2   -> LDAR f (patchOp o1) (patchOp o2)
 
     -- 8. Synchronization Instructions -----------------------------------------
-    DMBISH         -> DMBISH
+    DMBISH c       -> DMBISH c
 
     -- 9. Floating Point Instructions ------------------------------------------
     FMOV o1 o2     -> FMOV (patchOp o1) (patchOp o2)
@@ -450,10 +455,22 @@ isMetaInstr instr
 mkRegRegMoveInstr :: Reg -> Reg -> Instr
 mkRegRegMoveInstr src dst = ANN (text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
 
--- | Take the source and destination from this reg -> reg move instruction
--- or Nothing if it's not one
+-- | Take the source and destination registers from a move instruction of same
+-- register class (`RegClass`).
+--
+-- The idea is to identify moves that can be eliminated by the register
+-- allocator: If the source register serves no special purpose, one could
+-- continue using it; saving one move instruction. For this, the register kinds
+-- (classes) must be the same (no conversion involved.)
 takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
---takeRegRegMoveInstr (MOV (OpReg fmt dst) (OpReg fmt' src)) | fmt == fmt' = Just (src, dst)
+takeRegRegMoveInstr (MOV (OpReg _fmt dst) (OpReg _fmt' src))
+  | classOfReg dst == classOfReg src = pure (src, dst)
+  where
+    classOfReg ::Reg -> RegClass
+    classOfReg reg
+      = case reg of
+        RegVirtual vr -> classOfVirtualReg vr
+        RegReal rr -> classOfRealReg rr
 takeRegRegMoveInstr _ = Nothing
 
 -- | Make an unconditional jump instruction.
@@ -645,7 +662,7 @@ data Instr
     | BCOND Cond Target   -- branch with condition. b.<cond>
 
     -- 8. Synchronization Instructions -----------------------------------------
-    | DMBISH
+    | DMBISH DMBISHFlags
     -- 9. Floating Point Instructions
     -- move to/from general purpose <-> floating, or floating to floating
     | FMOV Operand Operand
@@ -667,6 +684,9 @@ data Instr
     -- - fmsub : d = - r1 * r2 + r3
     -- - fnmadd: d = - r1 * r2 - r3
     | FMA FMASign Operand Operand Operand Operand
+
+data DMBISHFlags = DmbLoad | DmbLoadStore
+  deriving (Eq, Show)
 
 instrCon :: Instr -> String
 instrCon i =

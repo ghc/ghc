@@ -1,0 +1,3 @@
+cmdFail010.hs:5:16: error: [GHC-03790]
+    Parse error in command: forall a. (_ -< _)
+

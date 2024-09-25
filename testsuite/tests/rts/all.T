@@ -64,6 +64,10 @@ test('divbyzero',
       # each devision. Neither gcc, nor llvm do this as of right now.  Microsoft
       # apparently does so though?
       when(arch('aarch64'), skip),
+      # RISCV64 has no exception for this, too. Instead all bits of the result
+      # are set. As with Aarch64 neither GCC nor LLVM translate this result to
+      # an exception.
+      when(arch('riscv64'), skip),
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.

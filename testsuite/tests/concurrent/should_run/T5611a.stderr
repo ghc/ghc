@@ -1,1 +1,7 @@
-T5611a: user error (Exception delivered successfully)
+T5611a: Exception:
+
+user error (Exception delivered successfully)
+
+Package: ghc-internal
+Module: GHC.Internal.IO.Exception
+Type: IOException

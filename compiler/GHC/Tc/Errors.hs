@@ -80,11 +80,10 @@ import qualified GHC.Data.Strict as Strict
 import Control.Monad      ( unless, when, foldM, forM_ )
 import Data.Foldable      ( toList )
 import Data.Function      ( on )
-import Data.List          ( partition, sort, sortBy )
+import Data.List          ( partition, union, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord         ( comparing )
-import qualified Data.Semigroup as S
 
 {-
 ************************************************************************
@@ -1182,6 +1181,7 @@ reportGroup mk_err ctxt items
 -- See Note [No deferring for multiplicity errors]
 nonDeferrableOrigin :: CtOrigin -> Bool
 nonDeferrableOrigin (NonLinearPatternOrigin {}) = True
+nonDeferrableOrigin (OmittedFieldOrigin {}) = True
 nonDeferrableOrigin (UsageEnvironmentOf {}) = True
 nonDeferrableOrigin (FRROrigin {})          = True
 nonDeferrableOrigin _                       = False
@@ -1215,11 +1215,11 @@ addDeferredBinding ctxt err (EI { ei_evdest = Just dest, ei_pred = item_ty
 
        ; case dest of
            EvVarDest evar
-             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar True err_tm
+             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar EvNonCanonical err_tm
            HoleDest hole
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
-                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var True err_tm
+                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var EvNonCanonical err_tm
                    ; fillCoercionHole hole (mkCoVarCo co_var) } }
 addDeferredBinding _ _ _ = return ()    -- Do not set any evidence for Given
 
@@ -1368,7 +1368,7 @@ With #10283, you can now opt out of deferred type error warnings.
 
 Note [No deferring for multiplicity errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As explained in Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify,
+As explained in Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify,
 linear types do not support casts and any nontrivial coercion will raise
 an error during desugaring.
 
@@ -1378,8 +1378,7 @@ by the desugarer would shadow the type mismatch warnings (#20083).
 As a solution, we refuse to defer submultiplicity constraints. Test: T20083.
 
 To determine whether a constraint arose from a submultiplicity check, we
-look at the CtOrigin. All calls to tcSubMult use one of two origins,
-UsageEnvironmentOf and NonLinearPatternOrigin. Those origins are not
+look at the CtOrigin. All calls to tcSubMult use origins which are not
 used outside of linear types.
 
 In the future, we should compile 'WpMultCoercion' to a runtime error with
@@ -1975,12 +1974,17 @@ eqInfoMsgs ty1 ty2
     mb_fun1 = isTyFun_maybe ty1
     mb_fun2 = isTyFun_maybe ty2
 
-      -- if a type isn't headed by a type function, then any ambiguous
-      -- variables need not be reported as such. e.g.: F a ~ t0 -> t0, where a is a skolem
-    ambig_tkvs1 = maybe mempty (\_ -> ambigTkvsOfTy ty1) mb_fun1
-    ambig_tkvs2 = maybe mempty (\_ -> ambigTkvsOfTy ty2) mb_fun2
+    ambig_tkvs1@(kvs1, tvs1) = ambigTkvsOfTy ty1
+    ambig_tkvs2@(kvs2, tvs2) = ambigTkvsOfTy ty2
 
-    ambig_tkvs@(ambig_kvs, ambig_tvs) = ambig_tkvs1 S.<> ambig_tkvs2
+      -- If a type isn't headed by a type function, then any ambiguous
+      -- variables need not be reported as such. e.g.: F a ~ t0 -> t0, where a is a skolem
+    ambig_tkvs@(ambig_kvs, ambig_tvs)
+      = case (mb_fun1, mb_fun2) of
+          (Nothing, Nothing) -> ([], [])
+          (Just {}, Nothing) -> ambig_tkvs1
+          (Nothing, Just {}) -> ambig_tkvs2
+          (Just{},Just{})    -> (kvs1 `union` kvs2, tvs1 `union` tvs2)  -- Avoid dups
 
     ambig_msg | isJust mb_fun1 || isJust mb_fun2
               , not (null ambig_kvs && null ambig_tvs)
@@ -2260,7 +2264,7 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
 
   -- Some matches => overlap errors
   (Just matchesNE, Nothing) -> return $
-    OverlappingInstances item (NE.map fst matchesNE) (getPotentialUnifiers unifiers)
+    OverlappingInstances item (NE.map fst matchesNE) (getCoherentUnifiers unifiers)
 
   (Just (match :| []), Just unsafe_overlappedNE) -> return $
     UnsafeOverlap item (fst match) (NE.map fst unsafe_overlappedNE)
@@ -2330,7 +2334,7 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
     cannot_resolve_msg :: ErrorItem -> [ClsInst] -> RelevantBindings
                        -> [ImportError] -> [GhcHint] -> TcSolverReportMsg
     cannot_resolve_msg item candidate_insts binds imp_errs field_suggestions
-      = CannotResolveInstance item (getPotentialUnifiers unifiers) candidate_insts imp_errs field_suggestions binds
+      = CannotResolveInstance item (getCoherentUnifiers unifiers) candidate_insts imp_errs field_suggestions binds
 
 {- Note [Report candidate instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

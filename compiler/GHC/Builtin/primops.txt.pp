@@ -1925,7 +1925,25 @@ primop  MutableByteArrayIsPinnedOp "isMutableByteArrayPinned#" GenPrimOp
 
 primop  ByteArrayIsPinnedOp "isByteArrayPinned#" GenPrimOp
    ByteArray# -> Int#
-   {Determine whether a 'ByteArray#' is guaranteed not to move during GC.}
+   {Determine whether a 'ByteArray#' is guaranteed not to move.}
+   with out_of_line = True
+
+primop  ByteArrayIsWeaklyPinnedOp "isByteArrayWeaklyPinned#" GenPrimOp
+   ByteArray# -> Int#
+   {Similar to 'isByteArrayPinned#'. Weakly pinned byte arrays are allowed
+    to be copied into compact regions by the user, potentially invalidating
+    the results of earlier calls to 'byteArrayContents#'.
+
+    See the section `Pinned Byte Arrays` in the user guide for more information.
+
+    This function also returns true for regular pinned bytearrays.
+   }
+   with out_of_line = True
+
+primop  MutableByteArrayIsWeaklyPinnedOp "isMutableByteArrayWeaklyPinned#" GenPrimOp
+   MutableByteArray# s -> Int#
+   { 'isByteArrayWeaklyPinned#' but for mutable arrays.
+   }
    with out_of_line = True
 
 primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp

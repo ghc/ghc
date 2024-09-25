@@ -1,4 +1,10 @@
-dsrun007: dsrun007.hs:5:23-25: Missing field in record construction 
+dsrun007: Exception:
+
+dsrun007.hs:5:23-25: Missing field in record construction
+
+Package: ghc-internal
+Module: GHC.Internal.Control.Exception.Base
+Type: RecConError
 
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception

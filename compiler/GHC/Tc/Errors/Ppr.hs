@@ -80,11 +80,12 @@ import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Types.TH
 import GHC.Tc.Utils.TcType
 
+import GHC.Types.DefaultEnv (ClassDefaults(ClassDefaults, cd_types, cd_module))
 import GHC.Types.Error
+import GHC.Types.Error.Codes
 import GHC.Types.Hint
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
 import GHC.Types.Basic
-import GHC.Types.Error.Codes
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name
@@ -551,13 +552,13 @@ instance Diagnostic TcRnMessage where
     TcRnLazyBangOnUnliftedType ty
       -> mkSimpleDecorated $
            text "Lazy flag has no effect on unlifted type" <+> quotes (ppr ty)
-    TcRnMultipleDefaultDeclarations dup_things
+    TcRnMultipleDefaultDeclarations cls dup_things
       -> mkSimpleDecorated $
-           hang (text "Multiple default declarations")
+           hang (text "Multiple default declarations for class" <+> quotes (ppr cls))
               2 (vcat (map pp dup_things))
          where
            pp :: LDefaultDecl GhcRn -> SDoc
-           pp (L locn (DefaultDecl _ _))
+           pp (L locn DefaultDecl {})
              = text "here was another default declaration" <+> ppr (locA locn)
     TcRnBadDefaultType ty deflt_clss
       -> mkSimpleDecorated $
@@ -598,6 +599,11 @@ instance Diagnostic TcRnMessage where
        $ formatExportItemError
            (ppr export_item)
            "attempts to export constructors or class methods that are not visible here"
+    TcRnExportHiddenDefault export_item
+      -> mkSimpleDecorated
+       $ formatExportItemError
+           (ppr export_item)
+           "attempts to export a default class declaration that is not visible here"
     TcRnDuplicateExport gre ie1 ie2
       -> mkSimpleDecorated $
            hsep [ quotes (ppr $ greName gre)
@@ -773,10 +779,11 @@ instance Diagnostic TcRnMessage where
                      , text "Defaulting to the DeriveAnyClass strategy"
                        <+> text "for instantiating" <+> ppr cls
                      ]
-    TcRnNonUnaryTypeclassConstraint ct
+    TcRnNonUnaryTypeclassConstraint ctxt ct
       -> mkSimpleDecorated $
            quotes (ppr ct)
-           <+> text "is not a unary constraint, as expected by a deriving clause"
+           <+> text "is not a unary constraint, as expected by"
+           <+> pprUserTypeCtxt ctxt
     TcRnPartialTypeSignatures _ theta
       -> mkSimpleDecorated $
            text "Found type wildcard" <+> quotes (char '_')
@@ -864,7 +871,17 @@ instance Diagnostic TcRnMessage where
                      , text "in the following constraint" <> plural tidy_wanteds ])
              2
              (pprWithArising tidy_wanteds)
-
+    TcRnWarnClashingDefaultImports cls Nothing imports
+      -> mkSimpleDecorated $
+           hang (text "Clashing imported defaults for class" <+> quotes (ppr cls) <> colon)
+              2 (vcat $ defaultTypesAndImport <$> NE.toList imports)
+    TcRnWarnClashingDefaultImports cls (Just local) imports
+      -> mkSimpleDecorated $
+           sep [ hang (text "Imported defaults for class" <+> quotes (ppr cls) <> colon)
+                    2 (vcat $ defaultTypesAndImport <$> NE.toList imports)
+               , hang (text "are not subsumed by the local `default` declaration")
+                    2 (parens $ pprWithCommas ppr local)
+               ]
 
     TcRnForeignImportPrimExtNotSet _decl
       -> mkSimpleDecorated $
@@ -961,6 +978,11 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalDerivingItem hs_ty
       -> mkSimpleDecorated $
            text "Illegal deriving item" <+> quotes (ppr hs_ty)
+    TcRnIllegalDefaultClass hs_ty
+      -> mkSimpleDecorated $
+           quotes (ppr hs_ty) <+> text "is not a class"
+    TcRnIllegalNamedDefault hs_decl
+      -> mkSimpleDecorated $ text "Illegal use of default class name:" <+> quotes (ppr hs_decl)
     TcRnUnexpectedAnnotation ty bang
       -> mkSimpleDecorated $
            let err = case bang of
@@ -1090,6 +1112,16 @@ instance Diagnostic TcRnMessage where
         sep [ hang (text "In the use of")
                  2 (pprDFunId pwarn_dfunid)
             , ppr pwarn_ctorig
+            , pprWarningTxtForMsg pragma_warning_msg
+         ]
+    TcRnPragmaWarning
+      { pragma_warning_info = PragmaWarningDefault{pwarn_class, pwarn_impmod}
+      , pragma_warning_msg }
+      -> mkSimpleDecorated $
+        sep [ sep [ text "In the use of class"
+                    <+> ppr pwarn_class
+                    <+> text "defaults imported from"
+                    <+> ppr pwarn_impmod <> colon ]
             , pprWarningTxtForMsg pragma_warning_msg
          ]
     TcRnPragmaWarning {pragma_warning_info, pragma_warning_msg}
@@ -1268,10 +1300,10 @@ instance Diagnostic TcRnMessage where
     TcRnIllformedTypeArgument e
       -> mkSimpleDecorated $
           hang (text "Ill-formed type argument:") 2 (ppr e)
-    TcRnIllegalTypeExpr
-      -> mkSimpleDecorated $
-          text "Illegal type expression." $$
-          text "A type expression must be used to instantiate a visible forall."
+    TcRnIllegalTypeExpr syntax -> mkSimpleDecorated $
+      vcat [ text "Illegal" <+> pprTypeSyntaxName syntax
+           , text "Type syntax may only be used in a required type argument,"
+           , text "i.e. to instantiate a visible forall." ]
 
     TcRnCapturedTermName tv_name shadowed_term_names
       -> mkSimpleDecorated $
@@ -1953,6 +1985,9 @@ instance Diagnostic TcRnMessage where
     TcRnMisplacedInvisPat tp -> mkSimpleDecorated $
       text "Invisible type pattern" <+> ppr tp <+> text "is not allowed here"
 
+    TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
+      text "Unexpected" <+> pprTypeSyntaxName syntax
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2124,6 +2159,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnMissingExportList
     TcRnExportHiddenComponents{}
       -> ErrorWithoutFlag
+    TcRnExportHiddenDefault{}
+      -> ErrorWithoutFlag
     TcRnDuplicateExport{}
       -> WarningWithFlag Opt_WarnDuplicateExports
     TcRnExportedParentChildMismatch{}
@@ -2213,6 +2250,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnWarnDefaulting {}
       -> WarningWithFlag Opt_WarnTypeDefaults
+    TcRnWarnClashingDefaultImports {}
+      -> WarningWithFlag Opt_WarnTypeDefaults
     TcRnForeignImportPrimExtNotSet{}
       -> ErrorWithoutFlag
     TcRnForeignImportPrimSafeAnn{}
@@ -2238,6 +2277,10 @@ instance Diagnostic TcRnMessage where
     TcRnPatSynNotBidirectional{}
       -> ErrorWithoutFlag
     TcRnIllegalDerivingItem{}
+      -> ErrorWithoutFlag
+    TcRnIllegalDefaultClass{}
+      -> ErrorWithoutFlag
+    TcRnIllegalNamedDefault{}
       -> ErrorWithoutFlag
     TcRnUnexpectedAnnotation{}
       -> ErrorWithoutFlag
@@ -2593,6 +2636,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnMisplacedInvisPat{}
       -> ErrorWithoutFlag
+    TcRnUnexpectedTypeSyntaxInTerms{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2793,6 +2838,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnExportHiddenComponents{}
       -> noHints
+    TcRnExportHiddenDefault{}
+      -> noHints
     TcRnDuplicateExport{}
       -> noHints
     TcRnExportedParentChildMismatch{}
@@ -2863,6 +2910,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnWarnDefaulting {}
       -> noHints
+    TcRnWarnClashingDefaultImports cls local imports
+      -> suggestDefaultDeclaration cls (fold local) (cd_types <$> NE.toList imports)
     TcRnForeignImportPrimExtNotSet{}
       -> [suggestExtension LangExt.GHCForeignImportPrim]
     TcRnForeignImportPrimSafeAnn{}
@@ -2896,6 +2945,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalDerivingItem{}
       -> noHints
+    TcRnIllegalDefaultClass{}
+      -> noHints
+    TcRnIllegalNamedDefault{}
+      -> [suggestExtension LangExt.NamedDefaults]
     TcRnUnexpectedAnnotation{}
       -> noHints
     TcRnIllegalRecordSyntax{}
@@ -3271,6 +3324,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnMisplacedInvisPat{}
       -> noHints
+    TcRnUnexpectedTypeSyntaxInTerms syntax
+      -> [suggestExtension (typeSyntaxExtension syntax)]
 
   diagnosticCode = constructorCode
 
@@ -5854,6 +5909,22 @@ suggestNonCanonicalDefinition reason =
     doc_monad =
       "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
 
+suggestDefaultDeclaration :: TyCon -> [Type] -> [[Type]] -> [GhcHint]
+suggestDefaultDeclaration cls prefix seqs =
+  [SuggestDefaultDeclaration cls $ supersequence (prefix : seqs)]
+  where
+    -- Not exactly the shortest possible supersequence, but it preserves
+    -- the head sequence as the prefix of the result which is a requirement.
+    supersequence :: [[Type]] -> [Type]
+    supersequence [] = []
+    supersequence ([] : seqs) = supersequence seqs
+    supersequence ((x : xs) : seqs) =
+      x : supersequence (xs : (dropHead x <$> seqs))
+    dropHead x ys@(y : ys')
+      | tcEqType x y = ys'
+      | otherwise = ys
+    dropHead _ [] = []
+
 --------------------------------------------------------------------------------
 -- hs-boot mismatch errors
 
@@ -6883,7 +6954,13 @@ pprPatersonCondFailure  (PCF_TyFam tc) InTyFamEquation _lhs rhs =
   hang (text "Illegal nested use of type family" <+> quotes (ppr tc))
     2 (text "in the arguments of the type-family application" <+> quotes (ppr rhs))
 
+--------------------------------------------------------------------------------
 
+defaultTypesAndImport :: ClassDefaults -> SDoc
+defaultTypesAndImport ClassDefaults{cd_types, cd_module = Just cdm} =
+  hang (parens $ pprWithCommas ppr cd_types)
+     2 (text "imported from" <+> ppr cdm)
+defaultTypesAndImport ClassDefaults{cd_types} = parens (pprWithCommas ppr cd_types)
 
 --------------------------------------------------------------------------------
 
@@ -6903,3 +6980,9 @@ zonkerMessageReason = \case
   ZonkerCannotDefaultConcrete {} -> ErrorWithoutFlag
 
 --------------------------------------------------------------------------------
+
+pprTypeSyntaxName :: TypeSyntax -> SDoc
+pprTypeSyntaxName TypeKeywordSyntax     = "keyword" <+> quotes "type"
+pprTypeSyntaxName ForallTelescopeSyntax = "forall telescope"
+pprTypeSyntaxName ContextArrowSyntax    = "context arrow (=>)"
+pprTypeSyntaxName FunctionArrowSyntax   = "function type arrow (->)"

@@ -92,6 +92,7 @@ test('T20642', normal, compile, [overlapping_incomplete])
 test('T21360', normal, compile, [overlapping_incomplete+'-Wincomplete-record-updates'])
 test('T21360b', normal, compile, [overlapping_incomplete+'-Wincomplete-record-updates'])
 test('T23520', normal, compile, [overlapping_incomplete+'-Wincomplete-record-updates'])
+test('T25164', [extra_files(['T25164_aux.hs']), req_th], multimod_compile, ['T25164', '-v0'])
 
 # Other tests
 test('pmc001', [], compile, [overlapping_incomplete])
@@ -170,3 +171,5 @@ test('DsIncompleteRecSel1', normal, compile, ['-Wincomplete-record-selectors'])
 test('DsIncompleteRecSel2', normal, compile, ['-Wincomplete-record-selectors'])
 test('DsIncompleteRecSel3', [collect_compiler_stats('bytes allocated', 10)], compile, ['-Wincomplete-record-selectors'])
 test('DoubleMatch', normal, compile, [overlapping_incomplete])
+test('T24817', normal, compile, [overlapping_incomplete])
+test('T25257', normal, compile, [overlapping_incomplete])

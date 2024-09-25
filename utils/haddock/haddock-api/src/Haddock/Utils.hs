@@ -62,9 +62,6 @@ module Haddock.Utils
   , verbose
   , deafening
   , out
-
-    -- * System tools
-  , getProcessID
   ) where
 
 import Control.Monad.Catch (MonadMask, bracket_)
@@ -83,10 +80,6 @@ import System.Exit
 import qualified System.FilePath.Posix as HtmlPath
 import System.IO (IOMode (..), hPutStr, hSetEncoding, utf8, withFile)
 import System.IO.Unsafe (unsafePerformIO)
-
-#ifndef mingw32_HOST_OS
-import qualified System.Posix.Internals
-#endif
 
 import Documentation.Haddock.Doc (emptyMetaDoc)
 import Haddock.Types
@@ -345,16 +338,3 @@ spanWith _ [] = ([], [])
 spanWith p xs@(a : as)
   | Just b <- p a = let (bs, cs) = spanWith p as in (b : bs, cs)
   | otherwise = ([], xs)
-
------------------------------------------------------------------------------
-
--- * System tools
-
------------------------------------------------------------------------------
-
-#ifdef mingw32_HOST_OS
-foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
-#else
-getProcessID :: IO Int
-getProcessID = fmap fromIntegral System.Posix.Internals.c_getpid
-#endif

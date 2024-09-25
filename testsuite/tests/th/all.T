@@ -618,3 +618,15 @@ test('T24837', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T24894', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T24911', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T24997', normal, compile_and_run, [''])
+test('T24572a', normal, compile, [''])
+test('T24572b', normal, compile_fail, [''])
+test('T24572c', normal, compile_fail, [''])
+test('T24572d', normal, compile, [''])
+test('T25209', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('TH_MultilineStrings', normal, compile_and_run, [''])
+test('T25252',
+  [extra_files(['T25252B.hs', 'T25252_c.c']),
+   when(arch('i386'), expect_broken_for(25260,['ext-interp'])),
+   req_th,
+   req_c],
+  compile_and_run, ['-fPIC T25252_c.c'])

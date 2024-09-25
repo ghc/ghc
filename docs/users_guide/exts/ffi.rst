@@ -1114,20 +1114,66 @@ Pinned Byte Arrays
 
 A pinned byte array is one that the garbage collector is not allowed
 to move. Consequently, it has a stable address that can be safely
-requested with ``byteArrayContents#``. Not that being pinned doesn't
-prevent the byteArray from being gc'ed in the same fashion a regular
-byte array would be.
+requested with ``byteArrayContents#``. As long as the array remains live
+the address returned by ``byteArrayContents#`` will remain valid. Note that
+being pinned doesn't prevent the byteArray from being gc'ed in the same fashion
+a regular byte array would be if there are no more references to the ``ByteArray#``.
 There are a handful of primitive functions in :base-ref:`GHC.Exts.`
 used to enforce or check for pinnedness: ``isByteArrayPinned#``,
-``isMutableByteArrayPinned#``, and ``newPinnedByteArray#``. A
-byte array can be pinned as a result of three possible causes:
+``isMutableByteArrayPinned#``, ``isByteArrayWeaklyPinned#``,
+``isMutableByteArrayWeaklyPinned#``, and ``newPinnedByteArray#``. A
+byte array can be pinned or weakly pinned as a result of three possible causes:
 
-1. It was allocated by ``newPinnedByteArray#``.
-2. It is large. Currently, GHC defines large object to be one
+1. It was allocated by ``newPinnedByteArray#``. This results in a regular pinned byte array.
+2. It is large, this results in a weakly pinned byte array. Currently, GHC defines large object to be one
    that is at least as large as 80% of a 4KB block (i.e. at
    least 3277 bytes).
-3. It has been copied into a compact region. The documentation
+3. It has been copied into a compact region, resulting in a weakly pinned array. The documentation
    for ``ghc-compact`` and ``compact`` describes this process.
+
+The difference between a pinned array and a weakly pinned array is simply that
+trying to compact a pinned array will result in an exception. Trying to compact
+a weakly pinned array will succeed. However the result of earlier
+calls to ``byteArrayContents#`` is not updated during compaction, which means
+these results will still point to the address where the array was located originally,
+and not to the new address inside the compact region.
+
+This is particularly dangerous when an address to a byte arrays content is stored
+inside a datastructure along with a reference to the byte array.
+If the data structure is compacted later on the pointer won't be updated but the
+reference to the byte array will point to a copy inside the compact region.
+A common data type susceptible to this is `ForeignPtr` when used to represent a ByteArray#.
+
+Here is an example to illustrate this:
+
+.. code-block:: haskell
+
+    workWithArrayContents :: (ByteArray, Ptr Word8) -> (Ptr Word8 -> IO ()) -> IO ()
+    workWithArrayContents (arr@(ByteArray uarr),ptr) worker =
+        case () of
+          _
+            -- Conservative but safe
+            | isByteArrayPinned arr -> keepAliveUnlifted uarr (worker ptr)
+            -- Potentially dangerous, the program needs to ensures the Ptr points into the array.
+            | isByteArrayWeaklyPinned arr -> keepAliveUnlifted uarr (worker ptr)
+            | otherwise -> ... -- Otherwise we can't directly use it for safe FFI calls directly at all.
+
+    main :: IO ()
+    main = do
+        -- We create a large array, which causes it to be implicitly pinned
+        arr <- newByteArray 5000
+        arr@(ByteArray uarr) <- freezeByteArray arr 0 5000 -- Make it immutable
+        let ptr = byteArrayContents arr
+
+        -- Compacting a data structure that contains both an array and a ptr to
+        -- the arrays content's is dangerous and usually the wrong thing to do.
+        let foo = (arr, ptr)
+        foo_compacted <- compact foo
+
+        -- This is fine
+        workWithArrayContents foo do_work
+        -- This is unsound
+        workWithArrayContents (getCompact foo_compacted) do_work
 
 .. [1] Prior to GHC 8.10, when passing an ``ArrayArray#`` argument
   to a foreign function, the foreign function would see a pointer

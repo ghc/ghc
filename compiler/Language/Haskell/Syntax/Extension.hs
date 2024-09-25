@@ -448,6 +448,9 @@ type family XTick           x
 type family XBinTick        x
 type family XPragE          x
 type family XEmbTy          x
+type family XForAll         x
+type family XQual           x
+type family XFunArr         x
 type family XXExpr          x
 
 -- -------------------------------------
@@ -553,6 +556,7 @@ type family XXParStmtBlock x x'
 type family XHsChar x
 type family XHsCharPrim x
 type family XHsString x
+type family XHsMultilineString x
 type family XHsStringPrim x
 type family XHsInt x
 type family XHsIntPrim x
@@ -716,6 +720,7 @@ type family XXIE               x
 -- -------------------------------------
 -- IEWrappedName type families
 type family XIEName p
+type family XIEDefault p
 type family XIEPattern p
 type family XIEType p
 type family XXIEWrappedName p

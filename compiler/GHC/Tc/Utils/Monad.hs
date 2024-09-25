@@ -142,7 +142,7 @@ module GHC.Tc.Utils.Monad(
   getCCIndexM, getCCIndexTcM,
 
   -- * Zonking
-  liftZonkM,
+  liftZonkM, newZonkAnyType,
 
   -- * Complete matches
   localAndImportedCompleteMatches, getCompleteMatchesTcM,
@@ -156,6 +156,7 @@ import GHC.Prelude
 
 
 import GHC.Builtin.Names
+import GHC.Builtin.Types( zonkAnyTyCon )
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types     -- Re-export all
@@ -178,6 +179,7 @@ import GHC.Core.UsageEnv
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import GHC.Core.Type( mkNumLitTy )
 
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -198,6 +200,7 @@ import GHC.Utils.Logger
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Error
+import GHC.Types.DefaultEnv ( DefaultEnv, emptyDefaultEnv )
 import GHC.Types.Fixity.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -257,6 +260,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         infer_var    <- newIORef True ;
         infer_reasons_var <- newIORef emptyMessages ;
         dfun_n_var   <- newIORef emptyOccSet ;
+        zany_n_var   <- newIORef 0 ;
         let { type_env_var = hsc_type_env_vars hsc_env };
 
         dependent_files_var <- newIORef [] ;
@@ -307,10 +311,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_src            = hsc_src,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
-                tcg_default        = if moduleUnit mod == primUnit
-                                     || moduleUnit mod == bignumUnit
-                                     then Just []  -- See Note [Default types]
-                                     else Nothing,
+                tcg_default        = emptyDefaultEnv,
+                tcg_default_exports = emptyDefaultEnv,
                 tcg_type_env       = emptyNameEnv,
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
@@ -349,6 +351,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_patsyns        = [],
                 tcg_merged         = [],
                 tcg_dfun_n         = dfun_n_var,
+                tcg_zany_n         = zany_n_var,
                 tcg_keep           = keep_var,
                 tcg_hdr_info        = (Nothing,Nothing),
                 tcg_hpc            = False,
@@ -435,24 +438,6 @@ initTcInteractive hsc_env thing_inside
            thing_inside
   where
     interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
-
-{- Note [Default types]
-~~~~~~~~~~~~~~~~~~~~~~~
-The Integer type is simply not available in ghc-prim and ghc-bignum packages (it
-is declared in ghc-bignum). So we set the defaulting types to (Just []), meaning
-there are no default types, rather than Nothing, which means "use the default
-default types of Integer, Double".
-
-If you don't do this, attempted defaulting in package ghc-prim causes
-an actual crash (attempting to look up the Integer type).
-
-
-************************************************************************
-*                                                                      *
-                Initialisation
-*                                                                      *
-************************************************************************
--}
 
 initTcRnIf :: Char              -- ^ Tag for unique supply
            -> HscEnv
@@ -946,7 +931,7 @@ extendFixityEnv new_bit
   = updGblEnv (\env@(TcGblEnv { tcg_fix_env = old_fix_env }) ->
                 env {tcg_fix_env = extendNameEnvList old_fix_env new_bit})
 
-getDeclaredDefaultTys :: TcRn (Maybe [Type])
+getDeclaredDefaultTys :: TcRn DefaultEnv
 getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
 
 addDependentFiles :: [FilePath] -> TcRn ()
@@ -1805,6 +1790,18 @@ chooseUniqueOccTc fn =
      ; let occ = fn set
      ; writeTcRef dfun_n_var (extendOccSet set occ)
      ; return occ }
+
+newZonkAnyType :: Kind -> TcM Type
+-- Return a type (ZonkAny @k n), where n is fresh
+-- Recall  ZonkAny :: forall k. Natural -> k
+-- See Note [Any types] in GHC.Builtin.Types, wrinkle (Any4)
+newZonkAnyType kind
+  = do { env <- getGblEnv
+       ; let zany_n_var = tcg_zany_n env
+       ; i <- readTcRef zany_n_var
+       ; let !i2 = i+1
+       ; writeTcRef zany_n_var i2
+       ; return (mkTyConApp zonkAnyTyCon [kind, mkNumLitTy i]) }
 
 getConstraintVar :: TcM (TcRef WantedConstraints)
 getConstraintVar = do { env <- getLclEnv; return (tcl_lie env) }

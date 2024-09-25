@@ -1123,6 +1123,8 @@ pprModIface unit_state iface
         , nest 2 (text "where")
         , text "exports:"
         , nest 2 (vcat (map pprExport (mi_exports iface)))
+        , text "defaults:"
+        , nest 2 (vcat (map ppr (mi_defaults iface)))
         , pprDeps unit_state (mi_deps iface)
         , vcat (map pprUsage (mi_usages iface))
         , vcat (map pprIfaceAnnotation (mi_anns iface))

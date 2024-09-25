@@ -1,0 +1,8 @@
+<interactive>:4:4: error: [GHC-31244]
+    • Unexpected keyword ‘type’
+    • In the untyped splice: $(typeE [t| Int |])
+    Suggested fix:
+      Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+      You may enable this language extension in GHCi with:
+        :set -XExplicitNamespaces
+

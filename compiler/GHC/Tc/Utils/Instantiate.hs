@@ -935,43 +935,53 @@ hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
 ************************************************************************
 -}
 
-getOverlapFlag :: Maybe OverlapMode -> TcM OverlapFlag
+getOverlapFlag :: Maybe OverlapMode   -- User pragma if any
+               -> TcM OverlapFlag
 -- Construct the OverlapFlag from the global module flags,
 -- but if the overlap_mode argument is (Just m),
 --     set the OverlapMode to 'm'
-getOverlapFlag overlap_mode
+--
+-- The overlap_mode argument comes from a user pragma on the instance decl:
+--    Pragma                      overlap_mode_prag
+--    -----------------------------------------
+--    {-# OVERLAPPABLE #-}        Overlappable
+--    {-# OVERLAPPING #-}         Overlapping
+--    {-# OVERLAPS #-}            Overlaps
+--    {-# INCOHERENT #-}          Incoherent   -- if -fspecialise-incoherent (on by default)
+--    {-# INCOHERENT #-}          NonCanonical -- if -fno-specialise-incoherent
+-- See Note [Rules for instance lookup] in GHC.Core.InstEnv
+
+getOverlapFlag overlap_mode_prag
   = do  { dflags <- getDynFlags
         ; let overlap_ok               = xopt LangExt.OverlappingInstances dflags
               incoherent_ok            = xopt LangExt.IncoherentInstances  dflags
               noncanonical_incoherence = not $ gopt Opt_SpecialiseIncoherents dflags
 
-              use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
-                                  , overlapMode   = x }
-              default_oflag | incoherent_ok = use (Incoherent NoSourceText)
-                            | overlap_ok    = use (Overlaps NoSourceText)
-                            | otherwise     = use (NoOverlap NoSourceText)
+              overlap_mode
+                | Just m <- overlap_mode_prag = m
+                | incoherent_ok               = Incoherent NoSourceText
+                | overlap_ok                  = Overlaps   NoSourceText
+                | otherwise                   = NoOverlap  NoSourceText
 
-              oflag = setOverlapModeMaybe default_oflag overlap_mode
-              final_oflag = effective_oflag noncanonical_incoherence oflag
-        ; return final_oflag }
-  where
-    effective_oflag noncanonical_incoherence oflag@OverlapFlag{ overlapMode = overlap_mode }
-      = oflag { overlapMode = effective_overlap_mode noncanonical_incoherence overlap_mode }
+              -- final_overlap_mode: the `-fspecialise-incoherents` flag controls the
+              -- meaning of the `Incoherent` overlap mode: as either an Incoherent overlap
+              -- flag, or a NonCanonical overlap flag.
+              -- See GHC.Core.InstEnv Note [Coherence and specialisation: overview]
+              final_overlap_mode
+                | Incoherent s <- overlap_mode
+                , noncanonical_incoherence       = NonCanonical s
+                | otherwise                      = overlap_mode
 
-    -- The `-fspecialise-incoherents` flag controls the meaning of the
-    -- `Incoherent` overlap mode: as either an Incoherent overlap
-    -- flag, or a NonCanonical overlap flag. See Note [Coherence and specialisation: overview]
-    -- in GHC.Core.InstEnv for why we care about this distinction.
-    effective_overlap_mode noncanonical_incoherence = \case
-        Incoherent s | noncanonical_incoherence -> NonCanonical s
-        overlap_mode -> overlap_mode
+        ; return (OverlapFlag { isSafeOverlap = safeLanguageOn dflags
+                              , overlapMode   = final_overlap_mode }) }
 
 
 tcGetInsts :: TcM [ClsInst]
 -- Gets the local class instances.
 tcGetInsts = fmap tcg_insts getGblEnv
 
-newClsInst :: Maybe OverlapMode -> Name -> [TyVar] -> ThetaType
+newClsInst :: Maybe OverlapMode   -- User pragma
+           -> Name -> [TyVar] -> ThetaType
            -> Class -> [Type] -> Maybe (WarningTxt GhcRn) -> TcM ClsInst
 newClsInst overlap_mode dfun_name tvs theta clas tys warn
   = do { (subst, tvs') <- freshenTyVarBndrs tvs

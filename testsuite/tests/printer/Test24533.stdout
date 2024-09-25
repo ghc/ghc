@@ -8,8 +8,11 @@
    (EpAnn
     (EpaSpan { Test24533.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { Test24533.hs:2:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { Test24533.hs:2:18-22 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { Test24533.hs:2:1-6 }))
+     (EpTok
+      (EpaSpan { Test24533.hs:2:18-22 }))
      []
      []
      (Just
@@ -640,8 +643,11 @@
    (EpAnn
     (EpaSpan { Test24533.ppr.hs:1:1 })
     (AnnsModule
-     [(AddEpAnn AnnModule (EpaSpan { Test24533.ppr.hs:2:1-6 }))
-     ,(AddEpAnn AnnWhere (EpaSpan { Test24533.ppr.hs:2:18-22 }))]
+     (NoEpTok)
+     (EpTok
+      (EpaSpan { Test24533.ppr.hs:2:1-6 }))
+     (EpTok
+      (EpaSpan { Test24533.ppr.hs:2:18-22 }))
      []
      []
      (Just

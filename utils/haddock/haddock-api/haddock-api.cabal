@@ -14,7 +14,7 @@ copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
 
-extra-source-files:
+extra-doc-files:
   CHANGES.md
 
 data-dir:
@@ -63,14 +63,23 @@ common ghc-options
     -fdicts-strict -Wunused-packages -funbox-strict-fields
     -Wnoncanonical-monad-instances -Wmissing-home-modules
 
+flag in-ghc-tree
+  description: Are we in a GHC tree?
+  default: False
+  manual: True
+
 library
   import: extensions
   import: ghc-options
 
+  if flag(in-ghc-tree)
+    cpp-options: -DIN_GHC_TREE
+  else
+    build-depends: ghc-paths       ^>= 0.1.0.12
+
   -- this package typically supports only single major versions
   build-depends: base             >= 4.16 && < 4.21
                , ghc             ^>= 9.11
-               , ghc-paths       ^>= 0.1.0.12
                , haddock-library ^>= 1.11
                , xhtml           ^>= 3000.2.2
                , parsec          ^>= 3.1.13.0
@@ -90,6 +99,16 @@ library
                , transformers
 
   hs-source-dirs: src
+
+  if os(windows)
+    hs-source-dirs: compat/windows/
+    build-depends:
+      Win32
+  else
+    hs-source-dirs: compat/posix/
+    build-depends:
+      unix
+
   exposed-modules:
     Documentation.Haddock
 
@@ -133,6 +152,7 @@ library
     Haddock.Options
     Haddock.GhcUtils
     Haddock.Convert
+    Haddock.Compat
     Paths_haddock_api
 
   autogen-modules:

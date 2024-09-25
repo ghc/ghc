@@ -1,5 +1,5 @@
-
-T22326_fail_ext1.hs:12:16: error: [GHC-47007]
-    Illegal keyword 'type'
+T22326_fail_ext1.hs:12:16: error: [GHC-31244]
+    Unexpected keyword ‘type’
     Suggested fix:
       Perhaps you intended to use the ‘ExplicitNamespaces’ extension (implied by ‘TypeFamilies’ and ‘TypeOperators’)
+

@@ -14,7 +14,7 @@ module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
   tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeDS,
-  tcSubTypeAmbiguity, tcSubMult,
+  tcSubTypeAmbiguity, tcSubMult, tcSubMult',
   checkConstraints, checkTvConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
@@ -1539,22 +1539,33 @@ message) is very conservative:
                           where type instance F [x] t = t
 
 
-Note [Wrapper returned from tcSubMult]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There is no notion of multiplicity coercion in Core, therefore the wrapper
-returned by tcSubMult (and derived functions such as tcCheckUsage and
-checkManyPattern) is quite unlike any other wrapper: it checks whether the
-coercion produced by the constraint solver is trivial, producing a type error
-if it is not. This is implemented via the WpMultCoercion wrapper, as desugared
-by GHC.HsToCore.Binds.dsHsWrapper, which does the reflexivity check.
+Note [Coercions returned from tcSubMult]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment, we insist that all sub-multiplicity tests turn out
+(once the typechecker has finished its work) to be equalities,
+i.e. implementable by ReflCo.  Why?  Because our type system has
+no way to express non-Refl sub-multiplicities.
 
-This wrapper needs to be placed in the term; otherwise, checking of the
-eventual coercion won't be triggered during desugaring. But it can be put
-anywhere, since it doesn't affect the desugared code.
+How can we check that every call to `tcSubMult` returns `Refl`?
+It might not be `Refl` *yet*.
 
-Why do we check this in the desugarer? It's a convenient place, since it's
-right after all the constraints are solved. We need the constraints to be
-solved to check whether they are trivial or not.
+[TODO: add counterexample #25130]
+
+So we take a two-stage approach:
+* Generate a coercion now, and hang it in the HsSyn syntax tree
+* In the desugarer, after zonking, check that it is Refl.
+
+We "hang it in the tree" in two different ways:
+A) In a HsWrapper, in the WpMultCoercion alternative. The
+   desugarer checks that WpMultCoercions are Refl, and then
+   discards them.  See `GHC.HsToCore.Binds.dsHsWrapper`
+B) In an extension field.  For example, in the extension
+   field of `HsRecFields`.  See `check_omitted_fields_multiplicity`
+   in `GHC.Tc.Gen.Pat.tcDataConPat`
+
+The former mechanism (A) seemed convenient at the time, but has
+turned out to add a lot of friction, so we plan to move towards
+(B): see #25128
 
 An alternative would be to have a kind of constraint which can
 only produce trivial evidence. This would allow such checks to happen
@@ -1562,30 +1573,39 @@ in the constraint solver (#18756).
 This would be similar to the existing setup for Concrete, see
   Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete
     (PHASE 1 in particular).
+
 -}
 
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
-tcSubMult origin w_actual w_expected
+tcSubMult' :: CtOrigin -> Mult -> Mult -> TcM MultiplicityCheckCoercions
+tcSubMult origin w_actual w_expected =
+  do { mult_cos <- tcSubMult' origin w_actual w_expected
+     ; return (foldMap WpMultCoercion mult_cos) }
+tcSubMult' origin w_actual w_expected
   | Just (w1, w2) <- isMultMul w_actual =
-  do { w1 <- tcSubMult origin w1 w_expected
-     ; w2 <- tcSubMult origin w2 w_expected
-     ; return (w1 <.> w2) }
+  do { w1 <- tcSubMult' origin w1 w_expected
+     ; w2 <- tcSubMult' origin w2 w_expected
+     ; return (w1 ++ w2) }
   -- Currently, we consider p*q and sup p q to be equal.  Therefore, p*q <= r is
   -- equivalent to p <= r and q <= r.  For other cases, we approximate p <= q by p
   -- ~ q.  This is not complete, but it's sound. See also Note [Overapproximating
   -- multiplicities] in Multiplicity.
-tcSubMult origin w_actual w_expected =
+tcSubMult' origin w_actual w_expected =
   case submult w_actual w_expected of
-    Submult -> return WpHole
-    Unknown -> tcEqMult origin w_actual w_expected
+    Submult -> return []
+    Unknown -> tcEqMult' origin w_actual w_expected
 
 tcEqMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
-tcEqMult origin w_actual w_expected = do
+tcEqMult' :: CtOrigin -> Mult -> Mult -> TcM MultiplicityCheckCoercions
+tcEqMult origin w_actual w_expected =
+  do { mult_cos <- tcEqMult' origin w_actual w_expected
+     ; return (foldMap WpMultCoercion mult_cos) }
+tcEqMult' origin w_actual w_expected = do
   {
   -- Note that here we do not call to `submult`, so we check
   -- for strict equality.
   ; coercion <- unifyTypeAndEmit TypeLevel origin w_actual w_expected
-  ; return $ if isReflCo coercion then WpHole else WpMultCoercion coercion }
+  ; return $ if isReflCo coercion then [] else [coercion] }
 
 
 {- *********************************************************************
@@ -2886,18 +2906,20 @@ data UnifyCheckCaller
   = UC_OnTheFly   -- Called from the on-the-fly unifier
   | UC_QuickLook  -- Called from Quick Look
   | UC_Solver     -- Called from constraint solver
+  | UC_Defaulting -- Called when doing top-level defaulting
 
 simpleUnifyCheck :: UnifyCheckCaller -> TcTyVar -> TcType -> Bool
 -- simpleUnifyCheck does a fast check: True <=> unification is OK
 -- If it says 'False' then unification might still be OK, but
 -- it'll take more work to do -- use the full checkTypeEq
 --
+-- * Rejects if lhs_tv occurs in rhs_ty (occurs check)
 -- * Rejects foralls unless
 --      lhs_tv is RuntimeUnk (used by GHCi debugger)
 --          or is a QL instantiation variable
 -- * Rejects a non-concrete type if lhs_tv is concrete
 -- * Rejects type families unless fam_ok=True
--- * Does a level-check for type variables
+-- * Does a level-check for type variables, to avoid skolem escape
 --
 -- This function is pretty heavily used, so it's optimised not to allocate
 simpleUnifyCheck caller lhs_tv rhs
@@ -2919,9 +2941,10 @@ simpleUnifyCheck caller lhs_tv rhs
     --   families, so we let it through there (not very principled, but let's
     --   see if it bites us)
     fam_ok = case caller of
-               UC_Solver    -> True
-               UC_QuickLook -> True
-               UC_OnTheFly  -> False
+               UC_Solver     -> True
+               UC_QuickLook  -> True
+               UC_OnTheFly   -> False
+               UC_Defaulting -> True
 
     go (TyVarTy tv)
       | lhs_tv == tv                                    = False

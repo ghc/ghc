@@ -155,6 +155,7 @@ data BuildConfig
                 , noSplitSections :: Bool
                 , validateNonmovingGc :: Bool
                 , textWithSIMDUTF :: Bool
+                , testsuiteUsePerf :: Bool
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -216,6 +217,7 @@ vanilla = BuildConfig
   , noSplitSections = False
   , validateNonmovingGc = False
   , textWithSIMDUTF = False
+  , testsuiteUsePerf = False
   }
 
 splitSectionsBroken :: BuildConfig -> BuildConfig
@@ -268,6 +270,9 @@ tsan = vanilla { threadSanitiser = True }
 noTntc :: BuildConfig
 noTntc = vanilla { tablesNextToCode = False }
 
+usePerfProfilingTestsuite :: BuildConfig -> BuildConfig
+usePerfProfilingTestsuite bc = bc { testsuiteUsePerf = True }
+
 -----------------------------------------------------------------------------
 -- Platform specific variables
 -----------------------------------------------------------------------------
@@ -287,6 +292,9 @@ runnerTag _ _ = error "Invalid arch/opsys"
 
 tags :: Arch -> Opsys -> BuildConfig -> [String]
 tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
+
+runnerPerfTag :: Arch -> Opsys -> String
+runnerPerfTag arch sys = runnerTag arch sys ++ "-perf"
 
 -- These names are used to find the docker image so they have to match what is
 -- in the docker registry.
@@ -409,7 +417,7 @@ opsysVariables _ FreeBSD13 = mconcat
   , "GHC_VERSION" =: "9.6.4"
   , "CABAL_INSTALL_VERSION" =: "3.10.2.0"
   ]
-opsysVariables _ (Linux distro) = distroVariables distro
+opsysVariables arch (Linux distro) = distroVariables arch distro
 opsysVariables AArch64 (Darwin {}) =
   mconcat [ "NIX_SYSTEM" =: "aarch64-darwin"
           , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
@@ -441,25 +449,30 @@ opsysVariables _ (Windows {}) =
           , "GHC_VERSION" =: "9.6.4" ]
 opsysVariables _ _ = mempty
 
-alpineVariables = mconcat
+alpineVariables :: Arch -> Variables
+alpineVariables arch = mconcat $
   [ -- Due to #20266
     "CONFIGURE_ARGS" =: "--disable-ld-override"
   , "INSTALL_CONFIGURE_ARGS" =: "--disable-ld-override"
     -- encoding004: due to lack of locale support
     -- T10458, ghcilink002: due to #17869
   , "BROKEN_TESTS" =: "encoding004 T10458"
+  ] ++
+  [-- Bootstrap compiler has incorrectly configured target triple #25200
+    "CONFIGURE_ARGS" =: "--enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux"
+    |  AArch64 <- [arch]
   ]
 
 
-distroVariables :: LinuxDistro -> Variables
-distroVariables Alpine312 = alpineVariables
-distroVariables Alpine318 = alpineVariables
-distroVariables Alpine320 = alpineVariables
-distroVariables Centos7 = mconcat [
+distroVariables :: Arch -> LinuxDistro -> Variables
+distroVariables arch Alpine312 = alpineVariables arch
+distroVariables arch Alpine318 = alpineVariables arch
+distroVariables arch Alpine320 = alpineVariables arch
+distroVariables _ Centos7 = mconcat [
     "HADRIAN_ARGS" =: "--docs=no-sphinx"
   , "BROKEN_TESTS" =: "T22012" -- due to #23979
   ]
-distroVariables Fedora33 = mconcat
+distroVariables _ Fedora33 = mconcat
   -- LLC/OPT do not work for some reason in our fedora images
   -- These tests fail with this error: T11649 T5681 T7571 T8131b
   -- +/opt/llvm/bin/opt: /lib64/libtinfo.so.5: no version information available (required by /opt/llvm/bin/opt)
@@ -467,7 +480,7 @@ distroVariables Fedora33 = mconcat
   [ "LLC" =: "/bin/false"
   , "OPT" =: "/bin/false"
   ]
-distroVariables _ = mempty
+distroVariables _ _ = mempty
 
 -----------------------------------------------------------------------------
 -- Cache settings, what to cache and when can we share the cache
@@ -770,6 +783,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
                 | validateNonmovingGc buildConfig
                 ]
         in "RUNTEST_ARGS" =: unwords runtestArgs
+      , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
       ]
 
     jobArtifacts = Artifacts
@@ -892,6 +906,12 @@ highCompression = addVariable "XZ_OPT" "-9"
 useHashUnitIds :: Job -> Job
 useHashUnitIds = addVariable "HADRIAN_ARGS" "--hash-unit-ids"
 
+-- | Change the tag of the job to make sure the job is scheduled on a
+-- runner that has the necessary capabilties to run the job with 'perf'
+-- profiling counters.
+perfProfilingJobTag :: Arch -> Opsys -> Job -> Job
+perfProfilingJobTag arch opsys j = j { jobTags = [ runnerPerfTag arch opsys ] }
+
 -- | Mark the validate job to run in fast-ci mode
 -- This is default way, to enable all jobs you have to apply the `full-ci` label.
 fastCI :: JobGroup Job -> JobGroup Job
@@ -995,6 +1015,8 @@ debian_x86 =
   , modifyNightlyJobs allowFailure (modifyValidateJobs (allowFailure . manual) tsan_jobs)
   , -- Nightly allowed to fail: #22343
     modifyNightlyJobs allowFailure (modifyValidateJobs manual (validateBuilds Amd64 (Linux validate_debian) noTntc))
+  -- Run the 'perf' profiling nightly job in the release config.
+  , perfProfilingJob Amd64 (Linux Debian12) releaseConfig
 
   , onlyRule LLVMBackend (validateBuilds Amd64 (Linux validate_debian) llvm)
   , addValidateRule TestPrimops (standardBuilds Amd64 (Linux validate_debian))
@@ -1004,6 +1026,12 @@ debian_x86 =
   ]
   where
     validate_debian = Debian12
+
+    perfProfilingJob arch sys buildConfig =
+        -- Rename the job to avoid conflicts
+        rename (<> "-perf")
+          $ modifyJobs (perfProfilingJobTag arch sys)
+          $ disableValidate (validateBuilds arch sys $ usePerfProfilingTestsuite buildConfig)
 
     tsan_jobs =
       modifyJobs

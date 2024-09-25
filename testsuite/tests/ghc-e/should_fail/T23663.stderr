@@ -1,12 +1,18 @@
-<interactive>: unrecognised flag: -XCUSKS
+<interactive>: Exception:
+
+unrecognised flag: -XCUSKS
 did you mean one of:
   -XCUSKs
+
+
+Package: ghc-inplace
+Module: GHC.Utils.Panic
+Type: GhcException
 
 HasCallStack backtrace:
     collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
     toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/IO.hs:260:11 in ghc-internal:GHC.Internal.IO
     throwIO, called at compiler/GHC/Utils/Error.hs:512:19 in ghc-9.9-inplace:GHC.Utils.Error
-
 
 
 1

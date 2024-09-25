@@ -117,6 +117,8 @@ module GHC.Tc.Errors.Types (
   , NonCanonicalDefinition(..)
   , NonCanonical_Monoid(..)
   , NonCanonical_Monad(..)
+  , TypeSyntax(..)
+  , typeSyntaxExtension
 
     -- * Errors for hs-boot and signature files
   , BadBootDecls(..)
@@ -193,6 +195,7 @@ import GHC.Types.TyThing (TyThing)
 import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar, Specificity)
 import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
+import GHC.Types.DefaultEnv (ClassDefaults)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import GHC.Core.Class (Class, ClassMinimalDef, ClassOpItem, ClassATItem)
@@ -1452,15 +1455,28 @@ data TcRnMessage where
   TcRnLazyBangOnUnliftedType :: !Type -> TcRnMessage
 
   {-| TcRnMultipleDefaultDeclarations is an error that occurs when a module has
-      more than one default declaration.
+      more than one default declaration for the same class.
 
       Example:
-      default (Integer, Int)
+      default (Integer, Int)  -- implicitly applies to Num
       default (Double, Float) -- 2nd default declaration not allowed
 
      Text cases: module/mod58
   -}
-  TcRnMultipleDefaultDeclarations :: [LDefaultDecl GhcRn] -> TcRnMessage
+  TcRnMultipleDefaultDeclarations :: TyCon -> [LDefaultDecl GhcRn] -> TcRnMessage
+
+  {-| TcRnWarnClashingDefaultImports is a warning that occurs when a module imports
+      more than one default declaration for the same class, and they are not all
+      subsumed by one of them nor by a local `default` declaration.
+
+      See Note [Named default declarations] in GHC.Tc.Gen.Default
+
+     Test cases: default/Import07.hs
+  -}
+  TcRnWarnClashingDefaultImports :: TyCon -- ^ class
+                                 -> Maybe [Type] -- ^ locally declared defaults
+                                 -> NE.NonEmpty ClassDefaults -- ^ imported defaults
+                                 -> TcRnMessage
 
   {-| TcRnBadDefaultType is an error that occurs when a type used in a default
       declaration does not have an instance for any of the applicable classes.
@@ -1471,7 +1487,7 @@ data TcRnMessage where
 
      Test cases: typecheck/should_fail/T11974b
   -}
-  TcRnBadDefaultType :: Type -> [Class] -> TcRnMessage
+  TcRnBadDefaultType :: Type -> [TyCon] -> TcRnMessage
 
   {-| TcRnPatSynBundledWithNonDataCon is an error that occurs when a module's
       export list bundles a pattern synonym with a type that is not a proper
@@ -1554,6 +1570,15 @@ data TcRnMessage where
      Test cases: None
   -}
   TcRnExportHiddenComponents :: IE GhcPs -> TcRnMessage
+
+  {-| TcRnExportHiddenDefault is an error that occurs when an export contains
+      a class default (with language extension NamedDefaults) that is not visible.
+
+      Example(s): None
+
+     Test cases: default/fail06.hs
+  -}
+  TcRnExportHiddenDefault :: IE GhcPs -> TcRnMessage
 
   {-| TcRnDuplicateExport is a warning (controlled by -Wduplicate-exports) that occurs
       when an identifier appears in an export list more than once.
@@ -1800,7 +1825,7 @@ data TcRnMessage where
                  deriving/should_fail/drvfail009
                  deriving/should_fail/drvfail006
   -}
-  TcRnNonUnaryTypeclassConstraint :: !(LHsSigType GhcRn) -> TcRnMessage
+  TcRnNonUnaryTypeclassConstraint :: !UserTypeCtxt -> !(LHsSigType GhcRn) -> TcRnMessage
 
   {-| TcRnPartialTypeSignatures is a warning (controlled by -Wpartial-type-signatures)
       that occurs when a wildcard '_' is found in place of a type in a signature or a
@@ -2197,6 +2222,26 @@ data TcRnMessage where
     Test cases: deriving/should_fail/T5922
   -}
   TcRnIllegalDerivingItem :: !(LHsSigType GhcRn) -> TcRnMessage
+
+  {-| TcRnIllegalDefaultClass is an error for when something other than a type class
+     appears in a default declaration after the keyword.
+
+     Example(s):
+     default Integer (Int)
+
+    Test cases: default/fail01
+  -}
+  TcRnIllegalDefaultClass :: !(LHsSigType GhcRn) -> TcRnMessage
+
+  {-| TcRnIllegalNamedDefault is an error for specifying an explicit default class name
+     without @-XNamedDefaults@.
+
+     Example(s):
+     default Num (Integer)
+
+    Test cases: default/fail02
+  -}
+  TcRnIllegalNamedDefault :: !(LDefaultDecl GhcRn) -> TcRnMessage
 
   {-| TcRnUnexpectedAnnotation indicates the erroroneous use of an annotation such
      as strictness, laziness, or unpacking.
@@ -4189,20 +4234,28 @@ data TcRnMessage where
   -}
   TcRnIllformedTypeArgument :: !(LHsExpr GhcRn) -> TcRnMessage
 
-  {-| TcRnIllegalTypeExpr is an error raised when an expression constructed
-      with the @type@ keyword occurs in a position that does not correspond
-      to a required type argument (visible forall).
+  {- TcRnIllegalTypeExpr is an error raised when an expression constructed with
+     type syntax (@type@, @->@, @=>@, @forall@) occurs in a position that
+     doesn't correspond to required type argument (visible forall).
 
-      Example:
+     Examples:
 
-        xtop = type Int                  -- not a function argument
-        xarg = length (type Int)         -- `length` does not expect a required type argument
+        -- Not a function argument:
+        xtop1 = type Int
+        xtop2 = (Int -> Int)
+        xtop3 = (forall a. a)
+        xtop4 = ((Show Int, Eq Bool) => Unit)
 
-      Test cases:
+        -- The function does not expect a type argument:
+        xarg1 = length (type Int)
+        xarg2 = show (Int -> Int)
+
+     Test cases:
         T22326_fail_app
         T22326_fail_top
+        T24159_type_syntax_tc_fail
   -}
-  TcRnIllegalTypeExpr :: TcRnMessage
+  TcRnIllegalTypeExpr :: TypeSyntax -> TcRnMessage
 
   {-| TcRnInvalidDefaultedTyVar is an error raised when a
       defaulting plugin proposes to default a type variable that is
@@ -4314,10 +4367,22 @@ data TcRnMessage where
           $(invisP (varT (newName "blah"))) <- aciton1
           ...
 
-     Test cases:
+     Test cases: T24557a T24557b T24557c T24557d
 
   -}
   TcRnMisplacedInvisPat :: HsTyPat GhcPs -> TcRnMessage
+
+  {- TcRnUnexpectedTypeSyntaxInTerms is an error that occurs
+     when type syntax is used in terms without -XRequiredTypeArguments
+     extension enabled
+
+     Examples:
+
+       idVis (forall a. forall b -> (a ~ Int, b ~ Bool) => a -> b)
+
+    Test cases: T24159_type_syntax_rn_fail
+  -}
+  TcRnUnexpectedTypeSyntaxInTerms :: TypeSyntax -> TcRnMessage
   deriving Generic
 
 ----
@@ -5935,6 +6000,8 @@ data PragmaWarningInfo
                         , pwarn_impmod :: ModuleName }
   | PragmaWarningInstance { pwarn_dfunid :: DFunId
                           , pwarn_ctorig :: CtOrigin }
+  | PragmaWarningDefault { pwarn_class :: TyCon
+                         , pwarn_impmod :: ModuleName }
 
 
 -- | The context for an "empty statement group" error.
@@ -6789,3 +6856,18 @@ data TcRnNoDerivStratSpecifiedInfo where
     :: AssumedDerivingStrategy
     -> LHsSigWcType GhcRn -- ^ The instance signature (e.g @Show a => Show (T a)@)
     -> TcRnNoDerivStratSpecifiedInfo
+
+-- | Label for syntax that may occur in terms (expressions) only as part of a
+--   required type argument.
+data TypeSyntax
+  = TypeKeywordSyntax      -- ^ @type t@
+  | ContextArrowSyntax     -- ^ @ctx => t@
+  | FunctionArrowSyntax    -- ^ @t1 -> t2@
+  | ForallTelescopeSyntax  -- ^ @forall tvs. t@
+  deriving Generic
+
+typeSyntaxExtension :: TypeSyntax -> LangExt.Extension
+typeSyntaxExtension TypeKeywordSyntax     = LangExt.ExplicitNamespaces
+typeSyntaxExtension ContextArrowSyntax    = LangExt.RequiredTypeArguments
+typeSyntaxExtension FunctionArrowSyntax   = LangExt.RequiredTypeArguments
+typeSyntaxExtension ForallTelescopeSyntax = LangExt.RequiredTypeArguments

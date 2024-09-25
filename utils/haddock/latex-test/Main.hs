@@ -23,6 +23,7 @@ dirConfig = (defaultDirConfig $ takeDirectory __FILE__)
   { dcfgCheckIgnore = (`elem` ["haddock.sty", "main.tex"]) . takeFileName
   -- Just a discrepancy in output order
   , dcfgCheckIgnoreOneShot = (`elem` ["ConstructorArgs.tex"]) . takeFileName
+  , dcfgCheckIgnoreNoCompilation = (`elem` ["ConstructorArgs.tex"]) . takeFileName
   }
 
 

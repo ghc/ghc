@@ -728,6 +728,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
 
  CHAR           { L _ (ITchar   _ _) }
  STRING         { L _ (ITstring _ _) }
+ MULTILINESTRING { L _ (ITmultilinestring _ _) }
  INTEGER        { L _ (ITinteger _) }
  RATIONAL       { L _ (ITrational _) }
 
@@ -789,8 +790,6 @@ identifier :: { LocatedN RdrName }
         | qcon                          { $1 }
         | qvarop                        { $1 }
         | qconop                        { $1 }
-    | '(' '->' ')'      {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
-                                (NameAnnRArrow (isUnicode $2) (Just $ glAA $1) (glAA $2) (Just $ glAA $3) []) }
     | '->'              {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                 (NameAnnRArrow (isUnicode $1) Nothing (glAA $1) Nothing []) }
 
@@ -912,7 +911,7 @@ signature :: { Located (HsModule GhcPs) }
        : 'signature' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acs loc (\loc cs-> (L loc (HsModule (XModulePs
-                                               (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6) [] Nothing) cs)
+                                               (EpAnn (spanAsAnchor loc) (AnnsModule (epTok $1) NoEpTok (epTok $5) (fstOf3 $6) [] Nothing) cs)
                                                (thdOf3 $6) $3 Nothing)
                                             (Just $2) $4 (fst $ sndOf3 $6)
                                             (snd $ sndOf3 $6)))
@@ -922,7 +921,7 @@ module :: { Located (HsModule GhcPs) }
        : 'module' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                     (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6) [] eof) cs)
+                                                     (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok $1) (epTok $5) (fstOf3 $6) [] eof) cs)
                                                      (thdOf3 $6) $3 Nothing)
                                                   (Just $2) $4 (fst $ sndOf3 $6)
                                                   (snd $ sndOf3 $6))
@@ -930,7 +929,7 @@ module :: { Located (HsModule GhcPs) }
         | body2
                 {% fileSrcSpan >>= \ loc ->
                    acsFinal (\cs eof -> (L loc (HsModule (XModulePs
-                                                        (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1) [] eof) cs)
+                                                        (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok NoEpTok NoEpTok (fstOf3 $1) [] eof) cs)
                                                         (thdOf3 $1) Nothing Nothing)
                                                      Nothing Nothing
                                                      (fst $ sndOf3 $1) (snd $ sndOf3 $1)))) }
@@ -970,14 +969,14 @@ header  :: { Located (HsModule GhcPs) }
         : 'module' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] [] Nothing) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok  $1) (epTok $5) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] [] Nothing) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule NoEpTok (epTok $1) (epTok $5) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
@@ -1046,6 +1045,11 @@ export  :: { LIE GhcPs }
                                                           ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
                                                            in reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) Nothing }
+        | maybe_warning_pragma 'default' qtycon          {% do { let { span = (maybe comb2 comb3 $1) $2 $>
+                                                                   ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
+                                                          ; locImpExp <- return (sL span (IEThingAbs ($1, [mj AnnExport $2]) (sLLa $2 $> (IEDefault (glAA $2) $3)) Nothing))
+                                                          ; return $ reLoc $ locImpExp } }
+
 
 export_subspec :: { Located ([AddEpAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
@@ -1274,8 +1278,7 @@ topdecl :: { LHsDecl GhcPs }
         | inst_decl                             { L (getLoc $1) (InstD noExtField (unLoc $1)) }
         | stand_alone_deriving                  { L (getLoc $1) (DerivD noExtField (unLoc $1)) }
         | role_annot                            { L (getLoc $1) (RoleAnnotD noExtField (unLoc $1)) }
-        | 'default' '(' comma_types0 ')'        {% amsA' (sLL $1 $>
-                                                    (DefD noExtField (DefaultDecl [mj AnnDefault $1,mop $2,mcp $4] $3))) }
+        | default_decl                          { L (getLoc $1) (DefD noExtField (unLoc $1)) }
         | 'foreign' fdecl                       {% amsA' (sLL $1 $> ((snd $ unLoc $2) (mj AnnForeign $1:(fst $ unLoc $2)))) }
         | '{-# DEPRECATED' deprecations '#-}'   {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ([mo $1,mc $3], (getDEPRECATED_PRAGs $1)) (fromOL $2))) }
         | '{-# WARNING' warnings '#-}'          {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ([mo $1,mc $3], (getWARNING_PRAGs $1)) (fromOL $2))) }
@@ -1296,6 +1299,13 @@ cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
                 {% (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4))
                         (mj AnnClass $1:(fst $ unLoc $3)++(fstOf3 $ unLoc $4)) }
+
+-- Default declarations (toplevel)
+--
+default_decl :: { LDefaultDecl GhcPs }
+             : 'default' opt_class '(' comma_types0 ')'
+               {% amsA' (sLL $1 $> (DefaultDecl [mj AnnDefault $1,mop $3,mcp $5] $2 $4)) }
+
 
 -- Type declarations (toplevel)
 --
@@ -1425,6 +1435,11 @@ deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
   | 'newtype'                   {% fmap Just $ amsA' (sL1 $1 (NewtypeStrategy [mj AnnNewtype $1])) }
   | deriv_strategy_via          { Just $1 }
   | {- empty -}                 { Nothing }
+
+-- Optional class reference for default declarations
+opt_class :: { Maybe (LIdP GhcPs) }
+          : {- empty -}         { Nothing }
+          | qtycon              {% fmap Just $ amsA' (reLoc $1) }
 
 -- Injective type families
 
@@ -2208,6 +2223,10 @@ ctype   :: { LHsType GhcPs }
 context :: { LHsContext GhcPs }
         :  btype                        {% checkContext $1 }
 
+expcontext :: {forall b. DisambECP b => PV (LocatedC [LocatedA b])}
+        : infixexp                      { unECP $1 >>= \ $1 ->
+                                          checkContextPV $1 }
+
 {- Note [GADT decl discards annotations]
 ~~~~~~~~~~~~~~~~~~~~~
 The type production for
@@ -2240,6 +2259,10 @@ type :: { LHsType GhcPs }
 
 mult :: { Located (EpUniToken "->" "\8594" -> HsArrow GhcPs) }
         : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy (epTok $1) $2) }
+
+expmult :: { forall b. DisambECP b => PV (Located (EpUniToken "->" "\8594" -> HsArrowOf (LocatedA b) GhcPs)) }
+expmult : PREFIX_PERCENT aexp           { unECP $2 >>= \ $2 ->
+                                          fmap (sLL $1 $>) (mkHsMultPV (epTok $1) $2) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
@@ -2334,6 +2357,8 @@ atype :: { LHsType GhcPs }
                                                                         (getCHAR $1) }
         | STRING               { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
+        | MULTILINESTRING      { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getMULTILINESTRINGs $1)
+                                                                     (getMULTILINESTRING  $1) }
         | '_'                  { sL1a $1 $ mkAnonWildCardTy }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
@@ -2749,41 +2774,83 @@ quasiquote :: { Located (HsUntypedSplice GhcPs) }
                                 ; quoterId = mkQual varName (qual, quoter) }
                             in sL1 $1 (HsQuasiQuote noExtField quoterId (L (noAnnSrcSpan (mkSrcSpanPs quoteSpan)) quote)) }
 
-exp   :: { ECP }
-        : infixexp '::' ctype
+exp  :: { ECP } : exp_gen(infixexp)  { $1 }
+exp2 :: { ECP } : exp_gen(infixexp2) { $1 }
+
+exp_gen(IEXP) :: { ECP }
+        : IEXP '::' ctype
                                 { ECP $
                                    unECP $1 >>= \ $1 ->
                                    rejectPragmaPV $1 >>
                                    mkHsTySigPV (noAnnSrcSpan $ comb2 $1 $>) $1 $3
                                           [(mu AnnDcolon $2)] }
-        | infixexp '-<' exp     {% runPV (unECP $1) >>= \ $1 ->
+        | IEXP '-<' exp_gen(IEXP)
+                                {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
                                    amsA' (sLL $1 $> $ HsCmdArrApp (mu Annlarrowtail $2) $1 $3
                                                         HsFirstOrderApp True) }
-        | infixexp '>-' exp     {% runPV (unECP $1) >>= \ $1 ->
+        | IEXP '>-' exp_gen(IEXP)
+                                {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
                                    amsA' (sLL $1 $> $ HsCmdArrApp (mu Annrarrowtail $2) $3 $1
                                                       HsFirstOrderApp False) }
-        | infixexp '-<<' exp    {% runPV (unECP $1) >>= \ $1 ->
+        | IEXP '-<<' exp_gen(IEXP)
+                                {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
                                    amsA' (sLL $1 $> $ HsCmdArrApp (mu AnnLarrowtail $2) $1 $3
                                                       HsHigherOrderApp True) }
-        | infixexp '>>-' exp    {% runPV (unECP $1) >>= \ $1 ->
+        | IEXP '>>-' exp_gen(IEXP)
+                                {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
                                    amsA' (sLL $1 $> $ HsCmdArrApp (mu AnnRarrowtail $2) $3 $1
                                                       HsHigherOrderApp False) }
         -- See Note [%shift: exp -> infixexp]
-        | infixexp %shift       { $1 }
-        | exp_prag(exp)         { $1 } -- See Note [Pragmas and operator fixity]
+        | IEXP %shift              { $1 }
+        | exp_prag(exp_gen(IEXP))  { $1 } -- See Note [Pragmas and operator fixity]
 
         -- Embed types into expressions and patterns for required type arguments
-        | 'type' atype
-                {% do { requireExplicitNamespaces (getLoc $1)
-                      ; return $ ECP $ mkHsEmbTyPV (comb2 $1 $>) (epTok $1) $2 } }
+        | 'type' atype             { ECP $ mkHsEmbTyPV (comb2 $1 $>) (epTok $1) $2 }
+
+infixexp2 :: { ECP }
+        : infixexp %shift       { $1 }
+
+        -- View patterns and function arrows
+        | infixexp '->' infixexp2
+                                { ECP $
+                                  withArrowParsingMode' $ \mode ->
+                                  unECP $1 >>= \ $1 ->
+                                  unECP $3 >>= \ $3 ->
+                                  let arr = HsUnrestrictedArrow (epUniTok $2)
+                                  in mkHsArrowPV (comb2 $1 $>) mode $1 arr $3 }
+        | infixexp expmult '->'  infixexp2
+                                { ECP $
+                                  unECP $1         >>= \ $1 ->
+                                  $2               >>= \ $2 ->
+                                  unECP $4         >>= \ $4 ->
+                                  hintLinear (getLoc $2) >>
+                                  let arr = (unLoc $2) (epUniTok $3)
+                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
+        | infixexp      '->.' infixexp2
+                                { ECP $
+                                  hintLinear (getLoc $2) >>
+                                  unECP $1 >>= \ $1 ->
+                                  unECP $3 >>= \ $3 ->
+                                  let arr = HsLinearArrow (EpLolly (epTok $2))
+                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $3 }
+        | expcontext    '=>'  infixexp2
+                                { ECP $
+                                        $1 >>= \ $1 ->
+                                  unECP $3 >>= \ $3 ->
+                                  mkQualPV (comb2 $1 $>) (addTrailingDarrowC $1 $2 emptyComments) $3}
+
+        | forall_telescope infixexp2
+                                { ECP $
+                                  unECP $2 >>= \ $2 ->
+                                  mkHsForallPV (comb2 $1 $>) (unLoc $1) $2 }
 
 infixexp :: { ECP }
         : exp10 { $1 }
@@ -3028,7 +3095,7 @@ aexp2   :: { ECP }
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
                                                 [mop $1,mcp $3]}
 
-        | '(' orpats ')'                {% do
+        | '(' orpats(exp2) ')'          {% do
                                               { pat <- hintOrPats (sL1a $2 (OrPat NoExtField (unLoc $2)))
                                               ; fmap ecpFromPat
                                                 (amsA' (sLL $1 $> (ParPat (epTok $1, epTok $>) pat))) }}
@@ -3081,7 +3148,7 @@ aexp2   :: { ECP }
         | '(|' aexp cmdargs '|)'  {% runPV (unECP $2) >>= \ $2 ->
                                       fmap ecpFromCmd $
                                       amsA' (sLL $1 $> $ HsCmdArrForm (AnnList (glRM $1) (Just $ mu AnnOpenB $1) (Just $ mu AnnCloseB $4) [] []) $2 Prefix
-                                                           Nothing (reverse $3)) }
+                                                           (reverse $3)) }
 
 projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
 projection
@@ -3130,7 +3197,7 @@ cvtopdecls0 :: { [LHsDecl GhcPs] }
 -- things that can appear unparenthesized as long as they're
 -- inside parens or delimited by commas
 texp :: { ECP }
-        : exp                { $1 }
+        : exp2               { $1 }
 
         -- Note [Parsing sections]
         -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -3155,21 +3222,15 @@ texp :: { ECP }
                                 $1 >>= \ $1 ->
                                 mkHsSectionR_PV (comb2 $1 $>) (n2l $1) $2 }
 
-       -- View patterns get parenthesized above
-        | exp '->' texp   { ECP $
-                             unECP $1 >>= \ $1 ->
-                             unECP $3 >>= \ $3 ->
-                             mkHsViewPatPV (comb2 $1 $>) $1 $3 [mu AnnRarrow $2] }
-
-orpats :: { Located (NonEmpty (LPat GhcPs)) }
+orpats(EXP) :: { Located (NonEmpty (LPat GhcPs)) }
         -- See Note [%shift: orpats -> exp]
-        : exp %shift         {% do
-                                 { pat <- (checkPattern <=< runPV) (unECP $1)
-                                 ; return (sL1 pat (NE.singleton pat)) }}
-        | exp ';' orpats     {% do
-                                 { pat <- (checkPattern <=< runPV) (unECP $1)
-                                 ; pat <- addTrailingSemiA pat (getLoc $2)
-                                 ; return (sLL pat $> (pat NE.<| unLoc $3)) }}
+        : EXP %shift            {% do
+                                    { pat <- (checkPattern <=< runPV) (unECP $1)
+                                    ; return (sL1 pat (NE.singleton pat)) }}
+        | EXP ';' orpats(EXP)   {% do
+                                    { pat <- (checkPattern <=< runPV) (unECP $1)
+                                    ; pat <- addTrailingSemiA pat (getLoc $2)
+                                    ; return (sLL pat $> (pat NE.<| unLoc $3)) }}
 
 -- Always at least one comma or bar.
 -- Though this can parse just commas (without any expressions), it won't
@@ -3227,17 +3288,17 @@ list :: { forall b. DisambECP b => SrcSpan -> (AddEpAnn, AddEpAnn) -> PV (Locate
         | texp '..'  { \loc (ao,ac) -> unECP $1 >>= \ $1 ->
                                   amsA' (L loc $ ArithSeq [ao,mj AnnDotdot $2,ac] Nothing (From $1))
                                       >>= ecpFromExp' }
-        | texp ',' exp '..' { \loc (ao,ac) ->
+        | texp ',' exp2 '..' { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
                                    amsA' (L loc $ ArithSeq [ao,mj AnnComma $2,mj AnnDotdot $4,ac] Nothing (FromThen $1 $3))
                                        >>= ecpFromExp' }
-        | texp '..' exp  { \loc (ao,ac) ->
+        | texp '..' exp2  { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
                                    amsA' (L loc $ ArithSeq [ao,mj AnnDotdot $2,ac] Nothing (FromTo $1 $3))
                                        >>= ecpFromExp' }
-        | texp ',' exp '..' exp { \loc (ao,ac) ->
+        | texp ',' exp2 '..' exp2 { \loc (ao,ac) ->
                                    unECP $1 >>= \ $1 ->
                                    unECP $3 >>= \ $3 ->
                                    unECP $5 >>= \ $5 ->
@@ -3433,9 +3494,9 @@ pat_syn_pat :: { LPat GhcPs }
 pat_syn_pat :  exp          {% (checkPattern <=< runPV) (unECP $1) }
 
 pat     :: { LPat GhcPs }
-pat     :  orpats      {% case unLoc $1 of
-                            pat :| [] -> return pat
-                            pats      -> hintOrPats (sL1a $1 (OrPat NoExtField pats)) }
+pat     :  orpats(exp)      {% case unLoc $1 of
+                                pat :| [] -> return pat
+                                pats      -> hintOrPats (sL1a $1 (OrPat NoExtField pats)) }
 
 
 -- 'pats1' does the same thing as 'pat', but returns it as a singleton
@@ -3452,7 +3513,7 @@ bindpat :  exp            {% -- See Note [Parser-Validator Details] in GHC.Parse
 
 argpat   :: { LPat GhcPs }
 argpat    : apat                  { $1 }
-          | PREFIX_AT atype       { sLLa $1 $> (InvisPat (epTok $1) (mkHsTyPat $2)) }
+          | PREFIX_AT atype       { sLLa $1 $> (InvisPat (epTok $1, SpecifiedSpec) (mkHsTyPat $2)) }
 
 argpats :: { [LPat GhcPs] }
           : argpat argpats            { $1 : $2 }
@@ -3659,8 +3720,8 @@ name_var : var { $1 }
 -- are parsed differently.
 
 qcon :: { LocatedN RdrName }
-  : gen_qcon              { $1}
-  | sysdcon               { L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
+  : gen_qcon              { $1 }
+  | syscon                { $1 }
 
 gen_qcon :: { LocatedN RdrName }
   : qconid                { $1 }
@@ -3671,7 +3732,7 @@ con     :: { LocatedN RdrName }
         : conid                 { $1 }
         | '(' consym ')'        {% amsr (sLL $1 $> (unLoc $2))
                                         (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
-        | sysdcon               { L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
+        | syscon                { $1 }
 
 con_list :: { Located (NonEmpty (LocatedN RdrName)) }
 con_list : con                  { sL1 $1 (pure $1) }
@@ -3690,11 +3751,16 @@ sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors
         | '(#' commas '#)'      {% amsr (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
                                        (NameAnnCommas NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
 
+syscon :: { LocatedN RdrName }
+        : sysdcon               {  L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
+        | '(' '->' ')'          {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
+                                        (NameAnnRArrow (isUnicode $2) (Just $ glAA $1) (glAA $2) (Just $ glAA $3) []) }
+
 -- See Note [Empty lists] in GHC.Hs.Expr
 sysdcon :: { LocatedN DataCon }
         : sysdcon_nolist                 { $1 }
         | '(' ')'               {% amsr (sLL $1 $> unitDataCon) (NameAnnOnly NameParens (glAA $1) (glAA $2) []) }
-        |  '[' ']'               {% amsr (sLL $1 $> nilDataCon) (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
+        | '[' ']'               {% amsr (sLL $1 $> nilDataCon)  (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
 
 conop :: { LocatedN RdrName }
         : consym                { $1 }
@@ -3981,6 +4047,8 @@ literal :: { Located (HsLit GhcPs) }
         : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
         | STRING            { sL1 $1 $ HsString     (getSTRINGs $1)
                                                     $ getSTRING $1 }
+        | MULTILINESTRING   { sL1 $1 $ HsMultilineString (getMULTILINESTRINGs $1)
+                                                    $ getMULTILINESTRING $1 }
         | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
                                                     $ getPRIMINTEGER $1 }
         | PRIMWORD          { sL1 $1 $ HsWordPrim   (getPRIMWORDs $1)
@@ -4086,6 +4154,7 @@ getIPDUPVARID     (L _ (ITdupipvarid   x)) = x
 getLABELVARID     (L _ (ITlabelvarid _ x)) = x
 getCHAR           (L _ (ITchar   _ x)) = x
 getSTRING         (L _ (ITstring _ x)) = x
+getMULTILINESTRING (L _ (ITmultilinestring _ x)) = x
 getINTEGER        (L _ (ITinteger x))  = x
 getRATIONAL       (L _ (ITrational x)) = x
 getPRIMCHAR       (L _ (ITprimchar _ x)) = x
@@ -4111,6 +4180,7 @@ getVOCURLY        (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 getINTEGERs       (L _ (ITinteger (IL src _ _))) = src
 getCHARs          (L _ (ITchar       src _)) = src
 getSTRINGs        (L _ (ITstring     src _)) = src
+getMULTILINESTRINGs (L _ (ITmultilinestring src _)) = src
 getPRIMCHARs      (L _ (ITprimchar   src _)) = src
 getPRIMSTRINGs    (L _ (ITprimstring src _)) = src
 getPRIMINTEGERs   (L _ (ITprimint    src _)) = src
@@ -4413,13 +4483,13 @@ gl = getLoc
 glA :: HasLoc a => a -> SrcSpan
 glA = getHasLoc
 
-glR :: HasLoc a => a -> Anchor
+glR :: HasLoc a => a -> EpaLocation
 glR !la = EpaSpan (getHasLoc la)
 
-glEE :: (HasLoc a, HasLoc b) => a -> b -> Anchor
+glEE :: (HasLoc a, HasLoc b) => a -> b -> EpaLocation
 glEE !x !y = spanAsAnchor $ comb2 x y
 
-glRM :: Located a -> Maybe Anchor
+glRM :: Located a -> Maybe EpaLocation
 glRM (L !l _) = Just $ spanAsAnchor l
 
 glAA :: HasLoc a => a -> EpaLocation
@@ -4539,11 +4609,11 @@ hsDoAnn :: Located a -> LocatedAn t b -> AnnKeywordId -> AnnList
 hsDoAnn (L l _) (L ll _) kw
   = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddEpAnn kw (srcSpan2e l)] []
 
-listAsAnchor :: [LocatedAn t a] -> Located b -> Anchor
+listAsAnchor :: [LocatedAn t a] -> Located b -> EpaLocation
 listAsAnchor [] (L l _) = spanAsAnchor l
 listAsAnchor (h:_) s = spanAsAnchor (comb2 h s)
 
-listAsAnchorM :: [LocatedAn t a] -> Maybe Anchor
+listAsAnchorM :: [LocatedAn t a] -> Maybe EpaLocation
 listAsAnchorM [] = Nothing
 listAsAnchorM (L l _:_) =
   case locA l of

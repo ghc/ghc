@@ -200,9 +200,9 @@ executablePath = Just (fmap Just getExecutablePath `catch` f)
       | otherwise             = throw e
 
 --------------------------------------------------------------------------------
--- Linux / Solaris
+-- Linux / Solaris / Hurd
 
-#elif defined(linux_HOST_OS) || defined(solaris2_HOST_OS)
+#elif defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(gnu_HOST_OS)
 
 foreign import ccall unsafe "readlink"
     c_readlink :: CString -> CString -> CSize -> IO CInt
@@ -219,7 +219,7 @@ readSymbolicLink file =
                    c_readlink s buf 4096
             peekFilePathLen (buf,fromIntegral len)
 
-#  if defined(linux_HOST_OS)
+#  if defined(linux_HOST_OS) || defined(gnu_HOST_OS)
 getExecutablePath = readSymbolicLink $ "/proc/self/exe"
 
 executablePath = Just (check <$> getExecutablePath) where

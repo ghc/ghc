@@ -32,7 +32,6 @@ module GHC.Linker.Loader
    , rmDupLinkables
    , modifyLoaderState
    , initLinkDepsOpts
-   , partitionLinkable
    )
 where
 
@@ -99,6 +98,7 @@ import Data.List (intercalate, isPrefixOf, nub, partition)
 import Data.Maybe
 import Control.Concurrent.MVar
 import qualified Control.Monad.Catch as MC
+import qualified Data.List.NonEmpty as NE
 
 import System.FilePath
 import System.Directory
@@ -725,8 +725,11 @@ loadModuleLinkables :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (Load
 loadModuleLinkables interp hsc_env pls linkables
   = mask_ $ do  -- don't want to be interrupted by ^C in here
 
-        let (objs, bcos) = partition isObjectLinkable
-                              (concatMap partitionLinkable linkables)
+        debugTraceMsg (hsc_logger hsc_env) 3 $
+          hang (text "Loading module linkables") 2 $ vcat [
+            hang (text "Objects:") 2 (vcat (ppr <$> objs)),
+            hang (text "Bytecode:") 2 (vcat (ppr <$> bcos))
+          ]
 
                 -- Load objects first; they can't depend on BCOs
         (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
@@ -736,19 +739,9 @@ loadModuleLinkables interp hsc_env pls linkables
           else do
                 pls2 <- dynLinkBCOs interp pls1 bcos
                 return (pls2, Succeeded)
+  where
+    (objs, bcos) = partitionLinkables linkables
 
-
--- HACK to support f-x-dynamic in the interpreter; no other purpose
-partitionLinkable :: Linkable -> [Linkable]
-partitionLinkable li
-   = let li_uls = linkableUnlinked li
-         li_uls_obj = filter isObject li_uls
-         li_uls_bco = filter isInterpretable li_uls
-     in
-         case (li_uls_obj, li_uls_bco) of
-            (_:_, _:_) -> [li {linkableUnlinked=li_uls_obj},
-                           li {linkableUnlinked=li_uls_bco}]
-            _ -> [li]
 
 linkableInSet :: Linkable -> LinkableSet -> Bool
 linkableInSet l objs_loaded =
@@ -776,8 +769,7 @@ loadObjects
 loadObjects interp hsc_env pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
-            unlinkeds                = concatMap linkableUnlinked new_objs
-            wanted_objs              = map nameOfObject unlinkeds
+            wanted_objs              = concatMap linkableFiles new_objs
 
         if interpreterDynamic interp
             then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
@@ -893,11 +885,12 @@ dynLinkBCOs interp pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
-            unlinkeds :: [Unlinked]
-            unlinkeds                = concatMap linkableUnlinked new_bcos
+
+            parts :: [LinkablePart]
+            parts = concatMap (NE.toList . linkableParts) new_bcos
 
             cbcs :: [CompiledByteCode]
-            cbcs      = concatMap byteCodeOfObject unlinkeds
+            cbcs = concatMap linkablePartAllBCOs parts
 
 
             le1 = linker_env pls
@@ -1004,7 +997,7 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
   -- we're unloading some code.  -fghci-leak-check with the tests in
   -- testsuite/ghci can detect space leaks here.
 
-  let (objs_to_keep', bcos_to_keep') = partition isObjectLinkable keep_linkables
+  let (objs_to_keep', bcos_to_keep') = partition linkableIsNativeCodeOnly keep_linkables
       objs_to_keep = mkLinkableSet objs_to_keep'
       bcos_to_keep = mkLinkableSet bcos_to_keep'
 
@@ -1045,9 +1038,9 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
         -- not much benefit.
 
       | otherwise
-      = mapM_ (unloadObj interp) [f | DotO f <- linkableUnlinked lnk]
+      = mapM_ (unloadObj interp) (linkableObjs lnk)
                 -- The components of a BCO linkable may contain
-                -- dot-o files.  Which is very confusing.
+                -- dot-o files (generated from C stubs).
                 --
                 -- But the BCO parts can be unlinked just by
                 -- letting go of them (plus of course depopulating
