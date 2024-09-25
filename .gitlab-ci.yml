@@ -1231,10 +1231,17 @@ ghcup-metadata-release:
     UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
     UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
     RELEASE_JOB: "$RELEASE_JOB"
+  # Do not inherit global variables (such as CONFIGURE_ARGS) as these take
+  # precedence over the variables defined in the downstream job.
+  inherit:
+    variables: false
   trigger:
     project: "ghc/ghcup-ci"
     branch: "upstream-testing"
     strategy: "depend"
+    forward:
+        yaml_variables: true
+        pipeline_variables: false
 
 ghcup-metadata-testing-nightly:
   needs:
