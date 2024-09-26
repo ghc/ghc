@@ -424,12 +424,17 @@ bindistRules = do
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
     , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
+    , interpolateVar "BuildPlatform"  $ interp $ queryBuild targetPlatformTriple
+    , interpolateVar "HostPlatform"   $ interp $ queryHost targetPlatformTriple
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
     , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (buildFlag UseLibdw)
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
+    , interpolateVar "TargetPlatformFull" (setting TargetPlatformFull)
+    , interpolateVar "BuildPlatformFull" (setting BuildPlatformFull)
+    , interpolateVar "HostPlatformFull"  (setting HostPlatformFull)
     ]
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
