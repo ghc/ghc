@@ -18,7 +18,6 @@ instance Applicative Parser where
   pure = undefined
   (<*>) = undefined
 instance Monad Parser where
-  return = undefined
   (>>=) = undefined
 
 newtype MyParser a = MkMP (Parser a)

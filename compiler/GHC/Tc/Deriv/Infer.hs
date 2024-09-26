@@ -43,7 +43,7 @@ import GHC.Core.Unify (tcUnifyTy)
 
 import GHC.Data.Pair
 import GHC.Builtin.Names
-import GHC.Builtin.Types (typeToTypeKind)
+import GHC.Builtin.Types (mkConstraintTupleTy, typeToTypeKind)
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -438,13 +438,29 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
       meths = classMethods cls
       coercible_constraints ty
         = [ SimplePredSpec
-              { sps_pred = mkReprPrimEqPred t1 t2
+              { sps_pred = pred
               , sps_origin = DerivOriginCoerce meth t1 t2 sa_wildcard
               , sps_type_or_kind = TypeLevel
               }
           | meth <- meths
           , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
-                                       inst_tys ty meth ]
+                                       inst_tys ty meth
+          , let (tvs1, theta1, tau1) = tcSplitSigmaTy t1
+          , let (tvs2, theta2, tau2) = tcSplitSigmaTy t2
+          , let t1' = mkSpecSigmaTy tvs1 [] tau1
+          , let t2' = mkSpecSigmaTy tvs2 [] tau2
+          , pred <- [ mkReprPrimEqPred t1' t2'
+                      -- The two method types must be coercible, ignoring any
+                      -- constraints. Dictionaries are inferred normally, not
+                      -- coerced.
+
+                    , tcMkDFunSigmaTy tvs1 theta2 $ mkConstraintTupleTy theta1
+                      -- If there are constraints, the constraints provided to
+                      -- the derived method must be sufficient to solve the
+                      -- constraints required by the method being coerced.
+                      -- See Note [Inferred contexts from method constraints]
+                    ]
+          ]
 
   pure (meth_preds rep_ty)
 
@@ -549,6 +565,41 @@ Similarly consider:
 Here there *is* no argument field, but we must nevertheless generate
 a context for the Data instances:
         instance Typeable a => Data (T a) where ...
+
+Note [Inferred contexts from method constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a method type has a constraint, that constraint is not included in the
+coercion between base method type and derived method type, because constraints
+are generally not amenable to coercion. For example, from T20815:
+
+  class Alt f where
+    some :: Applicative f => f a -> f [a]
+
+  newtype L a = L [a] deriving Alt
+
+The derived `Alt L` instance couldn't coerce from `Applicative [] => ...`
+to `Applicative L => ...` because `Applicative` (like all classes) is
+considered to have nominal parameters.
+
+The coercion actually generated is:
+
+  some @a = coerce @([a] -> [[a]]) @(L a -> L [a]) (some @[] @a)
+
+In order for this to typecheck, `some @[] @a` must have its constraint of
+`(Alt [], Applicative [])` solved. `Alt []` is already added to the inferred
+context of the derived instance, but the `Applicative []` constraint needs to
+be added as well.
+
+It isn't relevant in this example, but the method constraint of `some` places
+an instance of `Applicative L` in scope in the body of the derived implementation,
+and in the general case that instance may be needed in order to solve for the
+instance required by the base method. So instead of adding `Applicative []` to
+the inferred instance constraint, we actually add a quantified constraint
+`Applicative L => Applicative []`, to support that possibility.
+
+In general, then, the inferred context for a derived instance must include, for
+each class method with constraints, a quantified constraint mapping the provided
+context for the derived method to the needed context for the base method.
 
 
 ************************************************************************
