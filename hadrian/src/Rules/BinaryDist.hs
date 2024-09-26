@@ -153,9 +153,9 @@ buildBinDistDir root conf@BindistConfig{..} = do
 
     version        <- setting ProjectVersion
     targetPlatform <- setting TargetPlatformFull
-    distDir        <- Context.distDir (vanillaContext Stage1 rts)
+    distDir        <- Context.distDir (vanillaContext library_stage rts)
 
-    let ghcBuildDir      = root -/- stageString Stage1
+    let ghcBuildDir      = root -/- stageString library_stage
         bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
         ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         rtsIncludeDir    = distDir -/- "include"
