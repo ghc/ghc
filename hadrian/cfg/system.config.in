@@ -50,6 +50,8 @@ use-ghc-toolchain    = @EnableGhcToolchain@
 #     And we can reconstruct the platform info using targetPlatformTriple
 # Q: What is TargetPlatformFull?
 target-platform-full  = @TargetPlatformFull@
+build-platform-full   = @BuildPlatformFull@
+host-platform-full    = @HostPlatformFull@
 
 cross-compiling       = @CrossCompiling@
 
