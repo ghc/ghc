@@ -76,4 +76,3 @@ use-lib-bfd       = NO
 use-lib-pthread   = NO
 need-libatomic    = NO
 
-emsdk-version     = @ConfiguredEmsdkVersion@
