@@ -324,7 +324,19 @@ newExecConItbl tables_next_to_code obj con_desc = do
             -- with a 32-bit offset relative to the info table, so if we
             -- allocated the string separately it might be out of range.
 
-    ex_ptr <- fillExecBuffer (sz + fromIntegral lcon_desc) $ \wr_ptr ex_ptr -> do
+        -- Just use plain malloc on platforms without TNTC, since we
+        -- don't need to allocate executable memory anyway. This is
+        -- much faster than mmap(), and is crucial for wasm since it
+        -- doesn't support mmap() at all, not to mention executable
+        -- memory.
+        fill_exec_buffer = if tables_next_to_code
+          then fillExecBuffer
+          else \n cont -> do
+            p <- mallocBytes $ fromIntegral n
+            cont p p
+            pure p
+
+    ex_ptr <- fill_exec_buffer (sz + fromIntegral lcon_desc) $ \wr_ptr ex_ptr -> do
         let cinfo = StgConInfoTable { conDesc = ex_ptr `plusPtr` fromIntegral sz
                                     , infoTable = obj }
         pokeConItbl tables_next_to_code wr_ptr ex_ptr cinfo
