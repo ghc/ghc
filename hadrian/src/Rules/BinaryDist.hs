@@ -227,8 +227,8 @@ buildBinDistDir root conf@BindistConfig{..} = do
     -- (c.f. #20267).
 
     -- Not going to work for cross
-    ghcPkgName <- programName (vanillaContext Stage1 ghcPkg)
-    cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache"]
+    --ghcPkgName <- programName (vanillaContext Stage1 ghcPkg)
+    --cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache"]
 
 
     need ["docs"]
