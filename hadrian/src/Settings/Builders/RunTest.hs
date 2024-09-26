@@ -125,8 +125,8 @@ inTreeCompilerArgs stg = do
     platform    <- queryTargetTarget ghcStage targetPlatformTriple
     wordsize    <- show @Int . (*8) <$> queryTargetTarget ghcStage (wordSize2Bytes . tgtWordSize)
 
-    llc_cmd   <- queryTargetTarget tgtLlc
-    llvm_as_cmd <- queryTargetTarget tgtLlvmAs
+    llc_cmd   <- queryTargetTarget ghcStage tgtLlc
+    llvm_as_cmd <- queryTargetTarget ghcStage tgtLlvmAs
     let have_llvm = allowHaveLLVM arch && all isJust [llc_cmd, llvm_as_cmd]
 
     top         <- topDirectory
