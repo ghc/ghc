@@ -431,7 +431,9 @@ function push_perf_notes() {
     return
   fi
 
-  if [ -n "${CROSS_TARGET:-}" ] && [ "${CROSS_EMULATOR:-}" != "js-emulator" ]; then
+  # TODO: Remove this check, see #25299
+  # It is easy to forget to update this when testing a new cross platform
+  if [[ -n "${CROSS_TARGET:-}" ]] && [[ "${CROSS_TARGET:-}" != *"javascript"* ]] && [[ "${CROSS_TARGET:-}" != *"wasm"* ]]; then
     info "Can't test cross-compiled build."
     return
   fi
