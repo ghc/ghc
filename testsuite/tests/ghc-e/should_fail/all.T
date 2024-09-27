@@ -16,9 +16,7 @@ test('T9930fail',
      [extra_files(['T9930']),
       when(opsys('mingw32'), skip),
       normalise_errmsg_fun(lambda s: normalise_version_("ghc")(s).replace('ghc-<VERSION>-<HASH>','ghc')),
-      # broken for JS until cross-compilers become stage2 compilers (#19174)
-      # or until we bootstrap with a 9.10 compiler
-      js_broken(19174)],
+      ],
      makefile_test, ['T9930fail'])
 
 test('T18441fail0', req_interp, makefile_test, ['T18441fail0'])
