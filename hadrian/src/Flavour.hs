@@ -41,6 +41,7 @@ import Text.Parsec.Combinator as P
 import Text.Parsec.Char as P
 import Control.Monad.Except
 import UserSettings
+import BindistConfig
 
 
 flavourTransformers :: Map String (Flavour -> Flavour)
@@ -318,7 +319,7 @@ useNativeBignum flavour =
 -- | Enable building the @text@ package with @simdutf@ support.
 enableTextWithSIMDUTF :: Flavour -> Flavour
 enableTextWithSIMDUTF flavour = flavour {
-  textWithSIMDUTF = (>= Stage2)
+  textWithSIMDUTF = buildingForTarget
 }
 
 enableHashUnitIds :: Flavour -> Flavour
