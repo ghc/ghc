@@ -63,7 +63,13 @@ main = do
     shakeColor <- shouldUseColor
     let options :: ShakeOptions
         options = shakeOptions
-            { shakeChange   = ChangeModtimeAndDigest
+            { -- Bump shakeVersion whenever a type stored in the Shake oracle
+              -- changes its Binary representation (e.g. fields added/removed
+              -- from PackageData or other oracle value types). This forces
+              -- Shake to wipe the stale database instead of crashing on
+              -- deserialisation.
+              shakeVersion  = "2"
+            , shakeChange   = ChangeModtimeAndDigest
             , shakeFiles    = buildRoot -/- Base.shakeFilesDir
             , shakeProgress = Progress.hadrianProgress cwd
             , shakeRebuild  = rebuild

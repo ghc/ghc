@@ -1,0 +1,22 @@
+section: packaging
+synopsis: Fix Hadrian rules for system-cxx-std-lib package dependency
+issues: #25303
+mrs: !16013
+description: {
+  Hadrian's handling of the `system-cxx-std-lib` virtual package has been
+  fixed and made more uniform.
+
+  Previously, `text` had an ad-hoc rule outside of `configurePackage` to
+  declare a dependency on `system-cxx-std-lib`, the dependency was not
+  discovered from cabal files, and the package database was not recached after
+  the `.conf` file was generated.
+
+  The dependency is now read from cabal files via a new
+  `dependsOnSystemCxxStdLib` field in `PackageData`, and the `.conf` file
+  is needed inside `configurePackage` alongside all other package
+  dependencies, consistent with how every other package is handled.
+
+  `shakeVersion` has been bumped to ensure existing build databases are
+  invalidated when upgrading, preventing binary deserialisation errors due to
+  the changed `PackageData` type.
+}
