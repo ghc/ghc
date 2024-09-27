@@ -518,8 +518,8 @@ mkIfaceImports = map go
     go (ImpUserSpec decl (ImpUserExplicit env)) = IfaceImport decl (ImpIfaceExplicit (forceGlobalRdrEnv env))
     go (ImpUserSpec decl (ImpUserEverythingBut ns)) = IfaceImport decl (ImpIfaceEverythingBut ns)
 
-mkIfaceExports :: [AvailInfo] -> [IfaceExport]  -- Sort to make canonical
-mkIfaceExports = sortAvails
+mkIfaceExports :: [AvailInfo] -> [IfaceExport] -- Sort to make canonical
+mkIfaceExports as = case sortAvails as of DefinitelyDeterministicAvails sas -> sas
 
 {-
 Note [Original module]

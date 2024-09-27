@@ -187,7 +187,7 @@ docs:
          avails:
            [i]
          avails:
-           [WD11{WD11, WD11Bool, WD11Int, WD11Foo}]
+           [WD11{WD11, WD11Bool, WD11Foo, WD11Int}]
          avails:
            [WD13{WD13}]
          avails:
@@ -221,11 +221,11 @@ docs:
          avails:
            [Pretty{Pretty, prettyPrint}]
          avails:
-           [Corge{Corge, runCorge, Corge}]
+           [Corge{Corge, Corge, runCorge}]
          avails:
-           [Quuz{Quuz, quuz1_a, Quuz}]
+           [Quuz{Quuz, Quuz, quuz1_a}]
          avails:
-           [Quux{Quux, Quux2, Quux1}]
+           [Quux{Quux, Quux1, Quux2}]
          avails:
            [Tup2]
          avails:
