@@ -33,3 +33,9 @@ implicitBindistConfig = do
   -- the target.
   cross <- flag CrossCompiling
   return $ if cross then crossBindist else normalBindist
+
+-- | Are we building things in this stage for the final target?
+buildingForTarget ::  Stage -> Action Bool
+buildingForTarget st = do
+  cfg <- implicitBindistConfig
+  return $ st >= (library_stage cfg)
