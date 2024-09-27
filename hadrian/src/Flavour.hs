@@ -318,7 +318,7 @@ useNativeBignum flavour =
 -- | Enable building the @text@ package with @simdutf@ support.
 enableTextWithSIMDUTF :: Flavour -> Flavour
 enableTextWithSIMDUTF flavour = flavour {
-  textWithSIMDUTF = True
+  textWithSIMDUTF = (>= Stage2)
 }
 
 enableHashUnitIds :: Flavour -> Flavour
