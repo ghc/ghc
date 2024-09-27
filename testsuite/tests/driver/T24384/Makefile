@@ -8,3 +8,7 @@ T24384:
 	mv B.hs lib/
 	'$(TEST_HC)' A.hs lib/B.hs C.hs D.hs E.hs F.hs F.hs-boot -M -dep-json dep.json -include-pkg-deps -include-cpp-deps -package-db ./db -hide-all-packages -package base -package containers -package template-haskell -package dep -package dep:pub
 	cat dep.json
+
+T24384b:
+	./setup-b.sh "$(TEST_HC)" "$(GHC_PKG)"
+	'$(TEST_HC)' InternalReexport.hs -v0 -M -dep-json dep.json -package-db ./db -hide-all-packages -package base -package dep

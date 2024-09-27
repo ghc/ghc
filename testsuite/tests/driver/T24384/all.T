@@ -16,3 +16,11 @@ test('T24384',
       ],
      makefile_test,
      [])
+
+test('T24384b',
+     [extra_files([
+         'setup-b.sh',
+         ]),
+      ],
+     makefile_test,
+     [])
