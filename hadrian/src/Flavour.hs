@@ -257,9 +257,9 @@ enableThreadSanitizer instrumentCmm = addArgs $ notStage0 ? mconcat
         ]
     ]
 
--- | Use the LLVM backend in stages 1 and later.
+-- | Use the LLVM backend in target stages
 viaLlvmBackend :: Flavour -> Flavour
-viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
+viaLlvmBackend = addArgs $ staged buildingForTarget ? builder Ghc ? arg "-fllvm"
 
 -- | Build the GHC executable with profiling enabled in stages 2 and later. It
 -- is also recommended that you use this with @'dynamicGhcPrograms' = False@
