@@ -201,7 +201,15 @@ createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces 
   -- See Note [Exporting built-in items]
   let builtinTys = DsiSectionHeading 1 (WithHsDocIdentifiers (mkGeneratedHsDocString "Builtin syntax") [])
       bonus_ds mods
-        | mdl == gHC_PRIM = [builtinTys, DsiExports funAvail] <> mods
+        | mdl == gHC_PRIM =
+            [ builtinTys
+            , DsiExports $
+                {- Haddock does not want to sort avails, the order should be
+                    deterministically /derived from the source/.
+                   In this particular case, sorting funAvail would be a no-op anyway. -}
+                DefinitelyDeterministicAvails
+                  funAvail
+            ] <> mods
         | otherwise = mods
 
   let
@@ -461,11 +469,11 @@ mkExportItems
             Just hsDoc' -> do
               doc <- processDocStringParas parserOpts sDocContext pkgName hsDoc'
               pure [ExportDoc doc]
-        DsiExports avails ->
+        DsiExports (DetOrdAvails avails) ->
           -- TODO: We probably don't need nubAvails here.
           -- mkDocStructureFromExportList already uses it.
           concat <$> traverse availExport (nubAvails avails)
-        DsiModExport mod_names avails -> do
+        DsiModExport mod_names (DetOrdAvails avails) -> do
           -- only consider exporting a module if we are sure we are really
           -- exporting the whole module and not some subset.
           (unrestricted_mods, remaining_avails) <- unrestrictedModExports sDocContext thisMod modMap instIfaceMap avails (NE.toList mod_names)
