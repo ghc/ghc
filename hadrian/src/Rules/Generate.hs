@@ -242,9 +242,6 @@ copyRules = do
         prefix -/- "html/**"           <~ return "utils/haddock/haddock-api/resources"
         prefix -/- "latex/**"          <~ return "utils/haddock/haddock-api/resources"
 
-        forM_ [Inplace, Final] $ \iplace ->
-          root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- systemCxxStdLibConf %> \file -> do
-            copyFile ("mk" -/- "system-cxx-std-lib-1.0.conf") file
 
 generateRules :: Rules ()
 generateRules = do
