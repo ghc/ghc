@@ -111,6 +111,12 @@ registerPackageRules rs stage iplace = do
             target (Context stage compiler vanilla iplace) (GhcPkg Recache stage) [] []
         writeFileLines stamp []
 
+    -- Special rule for registering system-cxx-std-lib
+    root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- systemCxxStdLibConf %> \file -> do
+        copyFile ("mk" -/- "system-cxx-std-lib-1.0.conf") file
+        buildWithResources rs $
+            target (Context stage compiler vanilla iplace) (GhcPkg Recache stage) [] []
+
     -- Register a package.
     root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- "*.conf" %> \conf -> do
         historyDisable
