@@ -192,7 +192,7 @@ packageArgs = do
 
         ---------------------------------- text --------------------------------
         , package text ?
-            ifM (textWithSIMDUTF <$> expr flavour)
+            ifM (compilerStageOption textWithSIMDUTF)
               (builder (Cabal Flags) ? arg "+simdutf")
               (builder (Cabal Flags) ? arg "-simdutf")
 

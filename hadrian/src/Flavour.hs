@@ -301,7 +301,7 @@ useNativeBignum flavour =
 -- | Enable building the @text@ package with @simdutf@ support.
 enableTextWithSIMDUTF :: Flavour -> Flavour
 enableTextWithSIMDUTF flavour = flavour {
-  textWithSIMDUTF = True
+  textWithSIMDUTF = (>= Stage2)
 }
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
