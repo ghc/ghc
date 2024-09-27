@@ -1,5 +1,7 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE PatternSynonyms #-}
 --
 -- (c) The University of Glasgow
 --
@@ -20,6 +22,7 @@ module GHC.Types.Avail (
     filterAvails,
     nubAvails,
     sortAvails,
+    SortedAvails(SortedAvails, UnsafeSortedAvails)
   ) where
 
 import GHC.Prelude
@@ -64,6 +67,20 @@ data AvailInfo
 
 -- | A collection of 'AvailInfo' - several things that are \"available\"
 type Avails = [AvailInfo]
+
+-- | Occurrences of Avails in interface files must be sorted to guarantee
+-- interface file determinism.
+--
+-- To construct 'SortedAvails' using 'UnsafeSortedAvails' you must be sure the
+-- 'Avails' are already sorted. Otherwise, you should use 'sortAvails'.
+newtype SortedAvails = UnsafeSortedAvails Avails
+  deriving newtype (Binary, Outputable, NFData)
+
+-- | Safe matching on 'SortedAvails'
+-- To construct 'SortedAvails' use 'sortAvails'.
+pattern SortedAvails :: Avails -> SortedAvails
+pattern SortedAvails x <- UnsafeSortedAvails x
+{-# COMPLETE SortedAvails #-}
 
 {- Note [Representing pattern synonym fields in AvailInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,8 +150,8 @@ availSubordinateNames avail@(AvailTC _ ns)
   | otherwise              = ns
 
 -- | Sort 'Avails'/'AvailInfo's
-sortAvails :: Avails -> Avails
-sortAvails = sortBy stableAvailCmp . map sort_subs
+sortAvails :: Avails -> SortedAvails
+sortAvails = UnsafeSortedAvails . sortBy stableAvailCmp . map sort_subs
   where
     sort_subs :: AvailInfo -> AvailInfo
     sort_subs (Avail n) = Avail n
