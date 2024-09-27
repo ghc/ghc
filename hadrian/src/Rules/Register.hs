@@ -52,14 +52,6 @@ configurePackageRules = do
           isGmp <- (== "gmp") <$> interpretInContext ctx getBignumBackend
           when isGmp $
             need [buildP -/- "include/ghc-gmp.h"]
-        when (pkg == text) $ do
-          simdutf <- textWithSIMDUTF <$> flavour
-          when simdutf $ do
-            -- This is required, otherwise you get Error: hadrian:
-            -- Encountered missing or private dependencies:
-            -- system-cxx-std-lib ==1.0
-            cxxStdLib <- systemCxxStdLibConfPath $ PackageDbLoc stage Inplace
-            need [cxxStdLib]
         Cabal.configurePackage ctx
 
     root -/- "**/autogen/cabal_macros.h" %> \out -> do
@@ -113,6 +105,12 @@ registerPackageRules rs stage iplace = do
         buildWithResources rs $
             target (Context stage compiler vanilla iplace) (GhcPkg Recache stage) [] []
         writeFileLines stamp []
+
+    -- Special rule for registering system-cxx-std-lib
+    root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- systemCxxStdLibConf %> \file -> do
+        copyFile ("mk" -/- "system-cxx-std-lib-1.0.conf") file
+        buildWithResources rs $
+            target (Context stage compiler vanilla iplace) (GhcPkg Recache stage) [] []
 
     -- Register a package.
     root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- "*.conf" %> \conf -> do
