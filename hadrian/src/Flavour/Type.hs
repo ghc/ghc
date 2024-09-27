@@ -26,7 +26,7 @@ data Flavour = Flavour {
     -- | Build the @text@ package with @simdutf@ support. Disabled by
     -- default due to packaging difficulties described in #20724.
     textWithSIMDUTF :: Stage -- ^ stage of the /built/ compiler
-                    -> Bool,
+                    -> Action Bool,
     -- | Build libraries these ways.
     libraryWays :: Ways,
     -- | Build RTS these ways.
