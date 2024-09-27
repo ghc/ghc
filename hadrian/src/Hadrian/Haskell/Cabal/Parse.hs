@@ -94,10 +94,11 @@ parsePackageData pkg = do
         sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
         depPkgs = mapMaybe findPackageByName deps
+        cxxStdLib = elem "system-cxx-std-lib" deps
     return $ PackageData name version
                          (C.fromShortText (C.synopsis pd))
                          (C.fromShortText (C.description pd))
-                         depPkgs gpd
+                         depPkgs cxxStdLib gpd
   where
     -- Collect an overapproximation of dependencies by ignoring conditionals
     collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
@@ -151,7 +152,9 @@ configurePackage :: Context -> Action ()
 configurePackage context@Context {..} = do
     putProgressInfo $ "| Configure package " ++ quote (pkgName package)
     gpd     <- pkgGenericDescription package
-    depPkgs <- packageDependencies <$> readPackageData package
+    pd <- readPackageData package
+    let depPkgs = packageDependencies pd
+        needSystemCxxStdLib = dependsOnSystemCxxStdLib pd
 
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
@@ -170,7 +173,12 @@ configurePackage context@Context {..} = do
     -- We'll need those packages in our package database.
     deps <- sequence [ pkgConfFile (context { package = pkg, iplace = forceBaseAfterGhcInternal pkg })
                      | pkg <- depPkgs, pkg `elem` stagePkgs ]
-    need $ extraPreConfigureDeps ++ deps
+    -- system-cxx-std-lib is magic.. it doesn't have a cabal file or source code, so we have
+    -- to treat it specially as `pkgConfFile` uses `readPackageData` to compute the version.
+    systemCxxStdLib <- sequence [ systemCxxStdLibConfPath (PackageDbLoc stage iplace) | needSystemCxxStdLib ]
+    need $ extraPreConfigureDeps
+            ++ deps
+            ++ systemCxxStdLib
 
     -- Figure out what hooks we need.
     let configureFile = replaceFileName (pkgCabalFile package) "configure"
