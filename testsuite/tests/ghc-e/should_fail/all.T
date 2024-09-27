@@ -14,10 +14,8 @@ test('ghc-e-fail2', req_interp, makefile_test, ['ghc-e-fail2'])
 # and no failure is induced.
 test('T9930fail',
      [extra_files(['T9930']),
-      when(opsys('mingw32'), skip),
-      # broken for JS until cross-compilers become stage2 compilers (#19174)
-      # or until we bootstrap with a 9.10 compiler
-      js_broken(19174)],
+      when(opsys('mingw32'), skip)
+     ],
      makefile_test, ['T9930fail'])
 
 test('T18441fail0', req_interp, makefile_test, ['T18441fail0'])
