@@ -9,6 +9,7 @@ setTestOpts(when(fast(), skip))
 test('annrun01',
      [extra_files(['Annrun01_Help.hs']),
       req_th,
+      req_process,
       js_broken(23013), # strangely, the workaround for #23013 triggers
                         # a call to an undefined FFI function in bytestring.
                         # Before, it was slow but not failing.

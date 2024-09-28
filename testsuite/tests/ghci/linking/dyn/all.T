@@ -58,6 +58,7 @@ test('T13606', [unless(doing_ghci, skip), unless(opsys('mingw32'), skip),
 test('T3372',
      [unless(doing_ghci, skip),
       req_rts_linker,
+      req_process,
       extra_run_opts('"' + config.libdir + '"'),
       unless(config.have_RTS_linker, skip),
       # Concurrent GHC sessions is fragile on Windows since we must lock the
