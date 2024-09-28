@@ -1382,7 +1382,7 @@ tc_mult mode arr = do
     [m] -> m
     _ -> error "MODS_TODO too many multiplicities"
   where
-    go mods = tc_modifiers mode (acceptModifier1 <$> mods) isMultiplicityTy
+    go mods = tc_modifiers mode mods isMultiplicityTy
 
 tc_modifier :: TcTyMode -> HsModifier GhcRn -> (TcKind -> Bool) -> TcM (Maybe TcType)
 tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
@@ -1397,19 +1397,6 @@ tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
 tc_modifiers :: TcTyMode -> [HsModifier GhcRn] -> (TcKind -> Bool) -> TcM [TcType]
 tc_modifiers mode mods is_expected_kind =
   catMaybes <$> mapM (\m -> tc_modifier mode m is_expected_kind) mods
-
--- | If we see a %1 modifier, treat it the same as %One. Only %1 counts, not
--- e.g. %01. See #18888.
---
--- MODS_TODO: is typechecking the appropriate place to do this? If we want %1 to
--- count as %One in places other than arrows it'll need to be closer to parsing.
--- But in parsing I'm not sure what we'd return that would get reliably
--- renamed+typechecked into One.
-acceptModifier1 :: HsModifier GhcRn -> HsModifier GhcRn
-acceptModifier1 (HsModifier _ (L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))))
-  -- MODS_TODO should we attach a location here?
-  = HsModifier noExtField $ noLocA $ HsTyVar noAnn NotPromoted $ noLocA oneDataConName
-acceptModifier1 m = m
 
 ------------------------------------------
 tc_fun_type :: TcTyMode -> HsArrow GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind

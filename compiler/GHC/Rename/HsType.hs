@@ -4,6 +4,7 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -64,12 +65,14 @@ import GHC.Tc.Utils.Monad
 import GHC.Unit.Module ( getModule )
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
+import GHC.Builtin.Types
 import GHC.Types.Hint ( UntickedPromotedThing(..) )
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
 import GHC.Types.Error
+import GHC.Types.SourceText
 
 import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity
@@ -77,6 +80,7 @@ import GHC.Types.Fixity ( compareFixity, negateFixity
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -451,14 +455,27 @@ isRnKindLevel _                                 = False
 -- rnModifier' is for when we don't have a full env, should we expose mkTyKiEnv
 -- instead? Or have a better name? Or?
 rnModifier' :: HsDocContext -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
-rnModifier' ctxt (HsModifier _ ty) = do
-  (ty', fvs) <- rnLHsType ctxt ty
-  return (HsModifier NoExtField ty', fvs)
+rnModifier' ctxt = rnModifier (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
 rnModifier :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
-rnModifier env (HsModifier _ ty) = do
-  (ty', fvs) <- rnLHsTyKi env ty
-  return (HsModifier NoExtField ty', fvs)
+rnModifier env (HsModifier _ ty) =
+  if isLiteral1
+  then return (HsModifier NoExtField oneType, mempty)
+  else do
+    (ty', fvs) <- rnLHsTyKi env ty
+    return (HsModifier NoExtField ty', fvs)
+  where
+    -- If we see a %1 modifier, treat it the same as %One. Only %1 counts, not
+    -- e.g. %01. See #18888.
+    --
+    -- MODS_TODO only do this if -XLinearTypes is enabled. Doing it here means
+    -- the "unexpected modifier" warning calls it One instead of 1, is that what
+    -- we want? If not, how do we avoid it - put the original in the extension
+    -- field?
+    isLiteral1 = case ty of
+      (L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) -> True
+      _ -> False
+    oneType = noLocA $ HsTyVar noAnn NotPromoted $ noLocA oneDataConName
 
 rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
 rnModifiers env mods = do

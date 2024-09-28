@@ -1439,8 +1439,7 @@ repTy (HsFunTy _ w f a) = do f1   <- repLTy f
                                  repTapps tcon [w1, f1, a1]
   where
     -- MODS_TODO how do we figure out which modifiers are multiplicities and
-    -- warn for the others? Do we need to do `acceptModifier1` here like with
-    -- `tc_mult` in GHC.Tc.Gen.HsType?
+    -- warn for the others?
     mMult = case w of
       HsUnrestrictedArrow _ -> Nothing
       HsLinearArrow _ [] -> Just $ noLocA $ mk_var $ noLocA oneDataConName
