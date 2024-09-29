@@ -490,8 +490,8 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
     ; let plan = decideGeneralisationPlan dflags top_lvl closed sig_fn bind_list
     ; traceTc "Generalisation plan" (ppr plan)
     ; result@(_, scaled_poly_ids) <- case plan of
-         NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
-         InferGen           -> tcPolyInfer rec_tc prag_fn sig_fn bind_list
+         NoGen              -> tcPolyNoGen         rec_tc prag_fn sig_fn bind_list
+         InferGen           -> tcPolyInfer top_lvl rec_tc prag_fn sig_fn bind_list
          CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
 
     ; let poly_ids = map scaledThing scaled_poly_ids
@@ -708,12 +708,13 @@ To address this we to do a few things
 -}
 
 tcPolyInfer
-  :: RecFlag       -- Whether it's recursive after breaking
+  :: TopLevelFlag
+  -> RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> TcPragEnv -> TcSigFun
   -> [LHsBind GhcRn]
   -> TcM (LHsBinds GhcTc, [Scaled TcId])
-tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
+tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
   = do { (tclvl, wanted, (binds', mono_infos))
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
@@ -733,7 +734,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
        ; ((qtvs, givens, ev_binds, insoluble), residual)
-            <- captureConstraints $ simplifyInfer tclvl infer_mode sigs name_taus wanted
+            <- captureConstraints $ simplifyInfer top_lvl tclvl infer_mode sigs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; scaled_exports <- checkNoErrs $

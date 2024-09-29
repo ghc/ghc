@@ -16,7 +16,7 @@ module GHC.Data.Bag (
         mapBag, pprBag,
         elemBag, lengthBag,
         filterBag, partitionBag, partitionBagWith,
-        concatBag, catBagMaybes, foldBag,
+        concatBag, catBagMaybes, foldBag_flip,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
         listToBag, nonEmptyToBag, bagToList, headMaybe, mapAccumBagL,
         concatMapBag, concatMapBagPair, mapMaybeBag, mapMaybeBagM, unzipBag,
@@ -194,24 +194,10 @@ partitionBagWith pred (TwoBags b1 b2)
 partitionBagWith pred (ListBag vs) = (listToBag sats, listToBag fails)
   where (sats, fails) = partitionWith pred (toList vs)
 
-foldBag :: (r -> r -> r) -- Replace TwoBags with this; should be associative
-        -> (a -> r)      -- Replace UnitBag with this
-        -> r             -- Replace EmptyBag with this
-        -> Bag a
-        -> r
-
-{- Standard definition
-foldBag t u e EmptyBag        = e
-foldBag t u e (UnitBag x)     = u x
-foldBag t u e (TwoBags b1 b2) = (foldBag t u e b1) `t` (foldBag t u e b2)
-foldBag t u e (ListBag xs)    = foldr (t.u) e xs
--}
-
--- More tail-recursive definition, exploiting associativity of "t"
-foldBag _ _ e EmptyBag        = e
-foldBag t u e (UnitBag x)     = u x `t` e
-foldBag t u e (TwoBags b1 b2) = foldBag t u (foldBag t u e b2) b1
-foldBag t u e (ListBag xs)    = foldr (t.u) e xs
+foldBag_flip :: (a -> b -> b) -> Bag a -> b -> b
+-- Just foldr with flipped arguments,
+-- so it can be chained more nicely
+foldBag_flip k bag z = foldr k z bag
 
 mapBag :: (a -> b) -> Bag a -> Bag b
 mapBag = fmap

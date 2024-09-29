@@ -1,0 +1,21 @@
+T25266a.hs:10:41: error: [GHC-25897]
+    • Could not deduce ‘p1 ~ p2’
+      from the context: a ~ Int
+        bound by a pattern with constructor: T1 :: T Int,
+                 in a case alternative
+        at T25266a.hs:10:23-24
+      ‘p1’ is a rigid type variable bound by
+        the inferred type of f :: p1 -> p2 -> T a -> Int
+        at T25266a.hs:(9,1)-(11,40)
+      ‘p2’ is a rigid type variable bound by
+        the inferred type of f :: p1 -> p2 -> T a -> Int
+        at T25266a.hs:(9,1)-(11,40)
+    • In the expression: y
+      In the first argument of ‘length’, namely ‘[x, y]’
+      In the expression: length [x, y]
+    • Relevant bindings include
+        y :: p2 (bound at T25266a.hs:9:5)
+        x :: p1 (bound at T25266a.hs:9:3)
+        f :: p1 -> p2 -> T a -> Int (bound at T25266a.hs:9:1)
+    Suggested fix: Consider giving ‘f’ a type signature
+
