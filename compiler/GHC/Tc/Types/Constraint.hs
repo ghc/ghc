@@ -61,7 +61,7 @@ module GHC.Tc.Types.Constraint (
         tyCoVarsOfWC, tyCoVarsOfWCList,
         insolubleWantedCt, insolubleCt, insolubleIrredCt,
         insolubleImplic, nonDefaultableTyVarsOfWC,
-        approximateWC,
+        approximateWCX, approximateWC,
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
@@ -1815,59 +1815,120 @@ At the end, we will hopefully have substituted uf1 := F alpha, and we
 will be able to report a more informative error:
     'Can't construct the infinite type beta ~ F alpha beta'
 
+
 ************************************************************************
 *                                                                      *
-            Invariant checking (debug only)
+                     approximateWC
 *                                                                      *
 ************************************************************************
 -}
 
-approximateWC :: Bool   -- See Wrinkle (W3) in Note [ApproximateWC]
-              -> WantedConstraints
-              -> Cts
--- Second return value is the depleted wc
--- Postcondition: Wanted Cts
+type ApproxWC = ( Bag Ct    -- Free quantifiable constraints
+                , Bag Ct )  -- Free non-quantifiable constraints
+                            -- due to shape, or enclosing equality
+
+approximateWC :: Bool -> WantedConstraints -> Bag Ct
+approximateWC include_non_quantifiable cts
+  | include_non_quantifiable = quant `unionBags` no_quant
+  | otherwise                = quant
+  where
+    (quant, no_quant) = approximateWCX cts
+
+approximateWCX :: WantedConstraints -> ApproxWC
+-- The "X" means "extended";
+--    we return both quantifiable and non-quantifiable constraints
 -- See Note [ApproximateWC]
 -- See Note [floatKindEqualities vs approximateWC]
-approximateWC float_past_equalities wc
-  = float_wc False emptyVarSet wc
+approximateWCX wc
+  = float_wc False emptyVarSet wc (emptyBag, emptyBag)
   where
     float_wc :: Bool           -- True <=> there are enclosing equalities
              -> TcTyCoVarSet   -- Enclosing skolem binders
-             -> WantedConstraints -> Cts
-    float_wc encl_eqs trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
-      = filterBag (is_floatable encl_eqs trapping_tvs) simples `unionBags`
-        concatMapBag (float_implic encl_eqs trapping_tvs) implics
+             -> WantedConstraints
+             -> ApproxWC -> ApproxWC
+    float_wc encl_eqs trapping_tvs (WC { wc_simple = simples, wc_impl = implics }) acc
+      = foldBag_flip (float_ct     encl_eqs trapping_tvs) simples $
+        foldBag_flip (float_implic encl_eqs trapping_tvs) implics $
+        acc
 
-    float_implic :: Bool -> TcTyCoVarSet -> Implication -> Cts
+    float_implic :: Bool -> TcTyCoVarSet -> Implication
+                 -> ApproxWC -> ApproxWC
     float_implic encl_eqs trapping_tvs imp
       = float_wc new_encl_eqs new_trapping_tvs (ic_wanted imp)
       where
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
         new_encl_eqs = encl_eqs || ic_given_eqs imp == MaybeGivenEqs
 
-    is_floatable encl_eqs skol_tvs ct
-       | isGivenCt ct                                = False
-       | insolubleCt ct                              = False
-       | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = False
+    float_ct :: Bool -> TcTyCoVarSet -> Ct
+             -> ApproxWC -> ApproxWC
+    float_ct encl_eqs skol_tvs ct acc@(quant, no_quant)
+       | isGivenCt ct                                = acc
+           -- There can be (insoluble) Given constraints in wc_simple,
+           -- there so that we get error reports for unreachable code
+           -- See `given_insols` in GHC.Tc.Solver.Solve.solveImplication
+       | insolubleCt ct                              = acc
+       | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = acc
        | otherwise
        = case classifyPredType (ctPred ct) of
-           EqPred {}     -> float_past_equalities || not encl_eqs
-                                  -- See Wrinkle (W1)
-           ClassPred {}  -> True  -- See Wrinkle (W2)
-           IrredPred {}  -> True  -- ..both in Note [ApproximateWC]
-           ForAllPred {} -> False
+           -- See the classification in Note [ApproximateWC]
+           EqPred eq_rel ty1 ty2
+             | not encl_eqs      -- See Wrinkle (W1)
+             , quantify_equality eq_rel ty1 ty2
+             -> add_to_quant
+             | otherwise
+             -> add_to_no_quant
+
+           ClassPred cls tys
+             | Just {} <- isCallStackPred cls tys
+               -- NEVER infer a CallStack constraint.  Otherwise we let
+               -- the constraints bubble up to be solved from the outer
+               -- context, or be defaulted when we reach the top-level.
+               -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+             -> add_to_no_quant
+
+             | otherwise
+             -> add_to_quant  -- See Wrinkle (W2)
+
+           IrredPred {}  -> add_to_quant  -- See Wrinkle (W2)
+
+           ForAllPred {} -> add_to_no_quant  -- Never quantify these
+       where
+         add_to_quant    = (ct `consBag` quant, no_quant)
+         add_to_no_quant = (quant, ct `consBag` no_quant)
+
+    -- See Note [Quantifying over equality constraints]
+    quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
+    quantify_equality ReprEq _   _   = True
+
+    quant_fun ty
+      = case tcSplitTyConApp_maybe ty of
+          Just (tc, _) -> isTypeFamilyTyCon tc
+          _              -> False
 
 {- Note [ApproximateWC]
 ~~~~~~~~~~~~~~~~~~~~~~~
 approximateWC takes a constraint, typically arising from the RHS of a
-let-binding whose type we are *inferring*, and extracts from it some
-*simple* constraints that we might plausibly abstract over.  Of course
-the top-level simple constraints are plausible, but we also float constraints
-out from inside, if they are not captured by skolems.
+let-binding whose type we are *inferring*, and extracts from it some *simple*
+constraints that we might plausibly abstract over.  Of course the top-level
+simple constraints are plausible, but we also float constraints out from inside,
+if they are not captured by skolems.
 
 The same function is used when doing type-class defaulting (see the call
 to applyDefaultingRules) to extract constraints that might be defaulted.
+
+We proceed by classifying the constraint:
+  * ClassPred:
+    * Never pick a CallStack constraint.
+      See Note [Overview of implicit CallStacks]
+    * Always pick an implicit-parameter constraint.
+      Note [Inheriting implicit parameters]
+    See wrinkle (W2)
+
+  * EqPred: see Note [Quantifying over equality constraints]
+
+  * IrredPred: we allow anything.
+
+  * ForAllPred: never quantify over these
 
 Wrinkle (W1)
   When inferring most-general types (in simplifyInfer), we
@@ -1884,22 +1945,19 @@ Wrinkle (W1)
   non-principal types.)
 
 Wrinkle (W2)
-  We do allow /class/ constraints to float, even if
-  the implication binds equalities.  This is a subtle point: see #23224.
-  In principle, a class constraint might ultimately be satisfiable from
-  a constraint bound by an implication (see #19106 for an example of this
-  kind), but it's extremely obscure and I was unable to construct a
-  concrete example.  In any case, in super-subtle cases where this might
-  make a difference, you would be much better advised to simply write a
-  type signature.
-
-  I included IrredPred here too, for good measure.  In general,
-  abstracting over more constraints does no harm.
+  We do allow /class/ constraints to float, even if the implication binds
+  equalities.  This is a subtle point: see #23224.  In principle, a class
+  constraint might ultimately be satisfiable from a constraint bound by an
+  implication (see #19106 for an example of this kind), but it's extremely
+  obscure and I was unable to construct a concrete example.  In any case, in
+  super-subtle cases where this might make a difference, you would be much
+  better advised to simply write a type signature.
 
 Wrinkle (W3)
-  In findDefaultableGroups we are not worried about the
-  most-general type; and we /do/ want to float out of equalities
-  (#12797).  Hence the boolean flag to approximateWC.
+  In findDefaultableGroups we are not worried about the most-general type; and
+  we /do/ want to float out of equalities (#12797).  Hence we just union the two
+  returned lists.
+
 
 ------ Historical note -----------
 There used to be a second caveat, driven by #8155
@@ -1925,6 +1983,33 @@ Moreover (#12923), the more complex rule is sometimes NOT what
 you want.  So I simply removed the extra code to implement the
 contamination stuff.  There was zero effect on the testsuite (not even #8155).
 ------ End of historical note -----------
+
+Note [Quantifying over equality constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should we quantify over an equality constraint (s ~ t)
+in pickQuantifiablePreds?
+
+* It is always /sound/ to quantify over a constraint -- those
+  quantified constraints will need to be proved at each call site.
+
+* We definitely don't want to quantify over (Maybe a ~ Bool), to get
+     f :: forall a. (Maybe a ~ Bool) => blah
+  That simply postpones a type error from the function definition site to
+  its call site.  Fortunately we have already filtered out insoluble
+  constraints: see `definite_error` in `simplifyInfer`.
+
+* What about (a ~ T alpha b), where we are about to quantify alpha, `a` and
+  `b` are in-scope skolems, and `T` is a data type.  It's pretty unlikely
+  that this will be soluble at a call site, so we don't quantify over it.
+
+* What about `(F beta ~ Int)` where we are going to quantify `beta`?
+  Should we quantify over the (F beta ~ Int), to get
+     f :: forall b. (F b ~ Int) => blah
+  Aha!  Perhaps yes, because at the call site we will instantiate `b`, and
+  perhaps we have `instance F Bool = Int`. So we *do* quantify over a
+  type-family equality where the arguments mention the quantified variables.
+
+This is all a bit ad-hoc.
 
 
 ************************************************************************

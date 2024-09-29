@@ -1,12 +1,12 @@
 ExtraTcsUntch.hs:23:18: error: [GHC-83865]
     • Couldn't match expected type: F Int
-                  with actual type: [[a0]]
+                  with actual type: [p0]
     • In the first argument of ‘h’, namely ‘[x]’
       In the expression: h [x]
       In an equation for ‘g1’: g1 _ = h [x]
     • Relevant bindings include
-        x :: [a0] (bound at ExtraTcsUntch.hs:21:3)
-        f :: [a0] -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
+        x :: p0 (bound at ExtraTcsUntch.hs:21:3)
+        f :: p0 -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
 
 ExtraTcsUntch.hs:25:38: error: [GHC-83865]
     • Couldn't match expected type: F Int
@@ -14,7 +14,4 @@ ExtraTcsUntch.hs:25:38: error: [GHC-83865]
     • In the first argument of ‘h’, namely ‘[[undefined]]’
       In the expression: h [[undefined]]
       In the expression: (h [[undefined]], op x [y])
-    • Relevant bindings include
-        x :: [a0] (bound at ExtraTcsUntch.hs:21:3)
-        f :: [a0] -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
 
