@@ -1,8 +1,12 @@
 {-# LANGUAGE RecursiveDo #-}
 
 module GHC.Tc.Solver.Solve (
+     simplifyWantedsTcM,
+     solveWanteds,        -- Solves WantedConstraints
      solveSimpleGivens,   -- Solves [Ct]
-     solveSimpleWanteds   -- Solves Cts
+     solveSimpleWanteds,  -- Solves Cts
+
+     setImplicationStatus
   ) where
 
 import GHC.Prelude
@@ -10,7 +14,7 @@ import GHC.Prelude
 import GHC.Tc.Solver.Dict
 import GHC.Tc.Solver.Equality( solveEquality )
 import GHC.Tc.Solver.Irred( solveIrred )
-import GHC.Tc.Solver.Rewrite( rewrite )
+import GHC.Tc.Solver.Rewrite( rewrite, rewriteType )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
@@ -18,14 +22,20 @@ import GHC.Tc.Types.CtLoc( ctLocEnv, ctLocOrigin, setCtLocOrigin )
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.CtLoc( mkGivenLoc )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
+import GHC.Tc.Utils.Monad   as TcM
+import GHC.Tc.Zonk.TcType   as TcM
+import GHC.Tc.Solver.Monad  as TcS
 
 import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
 import GHC.Core.Class( classHasSCs )
 
+import GHC.Types.Id(  idType )
+import GHC.Types.Var( EvVar, tyVarKind )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( IntWithInf, intGtLimit )
@@ -41,10 +51,819 @@ import GHC.Driver.Session
 import Data.List( deleteFirstsBy )
 
 import Control.Monad
-import Data.Semigroup as S
+import qualified Data.Semigroup as S
 import Data.Void( Void )
 
-{-
+{- ********************************************************************************
+*                                                                                 *
+*                                 Main Simplifier                                 *
+*                                                                                 *
+******************************************************************************** -}
+
+simplifyWantedsTcM :: [CtEvidence] -> TcM WantedConstraints
+-- Solve the specified Wanted constraints
+-- Discard the evidence binds
+-- Postcondition: fully zonked
+simplifyWantedsTcM wanted
+  = do { traceTc "simplifyWantedsTcM {" (ppr wanted)
+       ; (result, _) <- runTcS (solveWanteds (mkSimpleWC wanted))
+       ; result <- TcM.liftZonkM $ TcM.zonkWC result
+       ; traceTc "simplifyWantedsTcM }" (ppr result)
+       ; return result }
+
+solveWanteds :: WantedConstraints -> TcS WantedConstraints
+solveWanteds wc@(WC { wc_errors = errs })
+  | isEmptyWC wc  -- Fast path
+  = return wc
+  | otherwise
+  = do { cur_lvl <- TcS.getTcLevel
+       ; traceTcS "solveWanteds {" $
+         vcat [ text "Level =" <+> ppr cur_lvl
+              , ppr wc ]
+
+       ; dflags <- getDynFlags
+       ; solved_wc <- simplify_loop 0 (solverIterations dflags) True wc
+
+       ; errs' <- simplifyDelayedErrors errs
+       ; let final_wc = solved_wc { wc_errors = errs' }
+
+       ; ev_binds_var <- getTcEvBindsVar
+       ; bb <- TcS.getTcEvBindsMap ev_binds_var
+       ; traceTcS "solveWanteds }" $
+                 vcat [ text "final wc =" <+> ppr final_wc
+                      , text "current evbinds  =" <+> ppr (evBindMapBinds bb) ]
+
+       ; return final_wc }
+
+simplify_loop :: Int -> IntWithInf -> Bool
+              -> WantedConstraints -> TcS WantedConstraints
+-- Do a round of solving, and call maybe_simplify_again to iterate
+-- The 'definitely_redo_implications' flags is False if the only reason we
+-- are iterating is that we have added some new Wanted superclasses
+-- hoping for fundeps to help us; see Note [Superclass iteration]
+--
+-- Does not affect wc_holes at all; reason: wc_holes never affects anything
+-- else, so we do them once, at the end in solveWanteds
+simplify_loop n limit definitely_redo_implications
+              wc@(WC { wc_simple = simples, wc_impl = implics })
+  = do { csTraceTcS $
+         text "simplify_loop iteration=" <> int n
+         <+> (parens $ hsep [ text "definitely_redo =" <+> ppr definitely_redo_implications <> comma
+                            , int (lengthBag simples) <+> text "simples to solve" ])
+       ; traceTcS "simplify_loop: wc =" (ppr wc)
+
+       ; (unifs1, wc1) <- reportUnifications $  -- See Note [Superclass iteration]
+                          solveSimpleWanteds simples
+                -- Any insoluble constraints are in 'simples' and so get rewritten
+                -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
+
+       ; wc2 <- if not definitely_redo_implications  -- See Note [Superclass iteration]
+                   && unifs1 == 0                    -- for this conditional
+                   && isEmptyBag (wc_impl wc1)
+                then return (wc { wc_simple = wc_simple wc1 })  -- Short cut
+                else do { implics2 <- solveNestedImplications $
+                                      implics `unionBags` (wc_impl wc1)
+                        ; return (wc { wc_simple = wc_simple wc1
+                                     , wc_impl = implics2 }) }
+
+       ; unif_happened <- resetUnificationFlag
+       ; csTraceTcS $ text "unif_happened" <+> ppr unif_happened
+         -- Note [The Unification Level Flag] in GHC.Tc.Solver.Monad
+       ; maybe_simplify_again (n+1) limit unif_happened wc2 }
+
+maybe_simplify_again :: Int -> IntWithInf -> Bool
+                     -> WantedConstraints -> TcS WantedConstraints
+maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
+  | n `intGtLimit` limit
+  = do { -- Add an error (not a warning) if we blow the limit,
+         -- Typically if we blow the limit we are going to report some other error
+         -- (an unsolved constraint), and we don't want that error to suppress
+         -- the iteration limit warning!
+         addErrTcS $ TcRnSimplifierTooManyIterations simples limit wc
+       ; return wc }
+
+  | unif_happened
+  = simplify_loop n limit True wc
+
+  | superClassesMightHelp wc
+  = -- We still have unsolved goals, and apparently no way to solve them,
+    -- so try expanding superclasses at this level, both Given and Wanted
+    do { pending_given <- getPendingGivenScs
+       ; let (pending_wanted, simples1) = getPendingWantedScs simples
+       ; if null pending_given && null pending_wanted
+           then return wc  -- After all, superclasses did not help
+           else
+    do { new_given  <- makeSuperClasses pending_given
+       ; new_wanted <- makeSuperClasses pending_wanted
+       ; solveSimpleGivens new_given -- Add the new Givens to the inert set
+       ; traceTcS "maybe_simplify_again" (vcat [ text "pending_given" <+> ppr pending_given
+                                               , text "new_given" <+> ppr new_given
+                                               , text "pending_wanted" <+> ppr pending_wanted
+                                               , text "new_wanted" <+> ppr new_wanted ])
+       ; simplify_loop n limit (not (null pending_given)) $
+         wc { wc_simple = simples1 `unionBags` listToBag new_wanted } } }
+         -- (not (null pending_given)): see Note [Superclass iteration]
+
+  | otherwise
+  = return wc
+
+{- Note [Superclass iteration]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this implication constraint
+    forall a.
+       [W] d: C Int beta
+       forall b. blah
+where
+  class D a b | a -> b
+  class D a b => C a b
+We will expand d's superclasses, giving [W] D Int beta, in the hope of geting
+fundeps to unify beta.  Doing so is usually fruitless (no useful fundeps),
+and if so it seems a pity to waste time iterating the implications (forall b. blah)
+(If we add new Given superclasses it's a different matter: it's really worth looking
+at the implications.)
+
+Hence the definitely_redo_implications flag to simplify_loop.  It's usually
+True, but False in the case where the only reason to iterate is new Wanted
+superclasses.  In that case we check whether the new Wanteds actually led to
+any new unifications, and iterate the implications only if so.
+-}
+
+{- Note [Expanding Recursive Superclasses and ExpansionFuel]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the class declaration (T21909)
+
+    class C [a] => C a where
+       foo :: a -> Int
+
+and suppose during type inference we obtain an implication constraint:
+
+    forall a. C a => C [[a]]
+
+To solve this implication constraint, we first expand one layer of the superclass
+of Given constraints, but not for Wanted constraints.
+(See Note [Eagerly expand given superclasses] and Note [Why adding superclasses can help]
+in GHC.Tc.Solver.Dict.) We thus get:
+
+    [G] g1 :: C a
+    [G] g2 :: C [a]    -- new superclass layer from g1
+    [W] w1 :: C [[a]]
+
+Now, we cannot solve `w1` directly from `g1` or `g2` as we may not have
+any instances for C. So we expand a layer of superclasses of each Wanteds and Givens
+that we haven't expanded yet.
+This is done in `maybe_simplify_again`. And we get:
+
+    [G] g1 :: C a
+    [G] g2 :: C [a]
+    [G] g3 :: C [[a]]    -- new superclass layer from g2, can solve w1
+    [W] w1 :: C [[a]]
+    [W] w2 :: C [[[a]]]  -- new superclass layer from w1, not solvable
+
+Now, although we can solve `w1` using `g3` (obtained from expanding `g2`),
+we have a new wanted constraint `w2` (obtained from expanding `w1`) that cannot be solved.
+We thus make another go at solving in `maybe_simplify_again` by expanding more
+layers of superclasses. This looping is futile as Givens will never be able to catch up with Wanteds.
+
+Side Note: In principle we don't actually need to /solve/ `w2`, as it is a superclass of `w1`
+but we only expand it to expose any functional dependencies (see Note [The superclass story])
+But `w2` is a wanted constraint, so we will try to solve it like any other,
+even though ultimately we will discard its evidence.
+
+Solution: Simply bound the maximum number of layers of expansion for
+Givens and Wanteds, with ExpansionFuel.  Give the Givens more fuel
+(say 3 layers) than the Wanteds (say 1 layer). Now the Givens will
+win.  The Wanteds don't need much fuel: we are only expanding at all
+to expose functional dependencies, and wantedFuel=1 means we will
+expand a full recursive layer.  If the superclass hierarchy is
+non-recursive (the normal case) one layer is therefore full expansion.
+
+The default value for wantedFuel = Constants.max_WANTEDS_FUEL = 1.
+The default value for givenFuel  = Constants.max_GIVENS_FUEL = 3.
+Both are configurable via the `-fgivens-fuel` and `-fwanteds-fuel`
+compiler flags.
+
+There are two preconditions for the default fuel values:
+   (1) default givenFuel >= default wantedsFuel
+   (2) default givenFuel < solverIterations
+
+Precondition (1) ensures that we expand givens at least as many times as we expand wanted constraints
+preferably givenFuel > wantedsFuel to avoid issues like T21909 while
+the precondition (2) ensures that we do not reach the solver iteration limit and fail with a
+more meaningful error message (see T19627)
+
+This also applies for quantified constraints; see `-fqcs-fuel` compiler flag and `QCI.qci_pend_sc` field.
+-}
+
+
+solveNestedImplications :: Bag Implication
+                        -> TcS (Bag Implication)
+-- Precondition: the TcS inerts may contain unsolved simples which have
+-- to be converted to givens before we go inside a nested implication.
+solveNestedImplications implics
+  | isEmptyBag implics
+  = return (emptyBag)
+  | otherwise
+  = do { traceTcS "solveNestedImplications starting {" empty
+       ; unsolved_implics <- mapBagM solveImplication implics
+
+       -- ... and we are back in the original TcS inerts
+       -- Notice that the original includes the _insoluble_simples so it was safe to ignore
+       -- them in the beginning of this function.
+       ; traceTcS "solveNestedImplications end }" $
+                  vcat [ text "unsolved_implics =" <+> ppr unsolved_implics ]
+
+       ; return (catBagMaybes unsolved_implics) }
+
+solveImplication :: Implication    -- Wanted
+                 -> TcS (Maybe Implication) -- Simplified implication (empty or singleton)
+-- Precondition: The TcS monad contains an empty worklist and given-only inerts
+-- which after trying to solve this implication we must restore to their original value
+solveImplication imp@(Implic { ic_tclvl  = tclvl
+                             , ic_binds  = ev_binds_var
+                             , ic_given  = given_ids
+                             , ic_wanted = wanteds
+                             , ic_info   = info
+                             , ic_status = status })
+  | isSolvedStatus status
+  = return (Just imp)  -- Do nothing
+
+  | otherwise  -- Even for IC_Insoluble it is worth doing more work
+               -- The insoluble stuff might be in one sub-implication
+               -- and other unsolved goals in another; and we want to
+               -- solve the latter as much as possible
+  = do { inerts <- getInertSet
+       ; traceTcS "solveImplication {" (ppr imp $$ text "Inerts" <+> ppr inerts)
+
+       -- commented out; see `where` clause below
+       -- ; when debugIsOn check_tc_level
+
+         -- Solve the nested constraints
+       ; (has_given_eqs, given_insols, residual_wanted)
+            <- nestImplicTcS ev_binds_var tclvl $
+               do { let loc    = mkGivenLoc tclvl info (ic_env imp)
+                        givens = mkGivens loc given_ids
+                  ; solveSimpleGivens givens
+
+                  ; residual_wanted <- solveWanteds wanteds
+
+                  ; (has_eqs, given_insols) <- getHasGivenEqs tclvl
+                        -- Call getHasGivenEqs /after/ solveWanteds, because
+                        -- solveWanteds can augment the givens, via expandSuperClasses,
+                        -- to reveal given superclass equalities
+
+                  ; return (has_eqs, given_insols, residual_wanted) }
+
+       ; traceTcS "solveImplication 2"
+           (ppr given_insols $$ ppr residual_wanted)
+       ; let final_wanted = residual_wanted `addInsols` given_insols
+             -- Don't lose track of the insoluble givens,
+             -- which signal unreachable code; put them in ic_wanted
+
+       ; res_implic <- setImplicationStatus (imp { ic_given_eqs = has_given_eqs
+                                                 , ic_wanted = final_wanted })
+
+       ; evbinds <- TcS.getTcEvBindsMap ev_binds_var
+       ; tcvs    <- TcS.getTcEvTyCoVars ev_binds_var
+       ; traceTcS "solveImplication end }" $ vcat
+             [ text "has_given_eqs =" <+> ppr has_given_eqs
+             , text "res_implic =" <+> ppr res_implic
+             , text "implication evbinds =" <+> ppr (evBindMapBinds evbinds)
+             , text "implication tvcs =" <+> ppr tcvs ]
+
+       ; return res_implic }
+
+    -- TcLevels must be strictly increasing (see (ImplicInv) in
+    -- Note [TcLevel invariants] in GHC.Tc.Utils.TcType),
+    -- and in fact I think they should always increase one level at a time.
+
+    -- Though sensible, this check causes lots of testsuite failures. It is
+    -- remaining commented out for now.
+    {-
+    check_tc_level = do { cur_lvl <- TcS.getTcLevel
+                        ; massertPpr (tclvl == pushTcLevel cur_lvl)
+                                     (text "Cur lvl =" <+> ppr cur_lvl $$ text "Imp lvl =" <+> ppr tclvl) }
+    -}
+
+----------------------
+setImplicationStatus :: Implication -> TcS (Maybe Implication)
+-- Finalise the implication returned from solveImplication,
+-- setting the ic_status field
+-- Precondition: the ic_status field is not already IC_Solved
+-- Return Nothing if we can discard the implication altogether
+setImplicationStatus implic@(Implic { ic_status     = old_status
+                                    , ic_info       = info
+                                    , ic_wanted     = wc
+                                    , ic_given      = givens })
+ | assertPpr (not (isSolvedStatus old_status)) (ppr info) $
+   -- Precondition: we only set the status if it is not already solved
+   not (isSolvedWC pruned_wc)
+ = do { traceTcS "setImplicationStatus(not-all-solved) {" (ppr implic)
+
+      ; implic <- neededEvVars implic
+
+      ; let new_status | insolubleWC pruned_wc = IC_Insoluble
+                       | otherwise             = IC_Unsolved
+            new_implic = implic { ic_status = new_status
+                                , ic_wanted = pruned_wc }
+
+      ; traceTcS "setImplicationStatus(not-all-solved) }" (ppr new_implic)
+
+      ; return $ Just new_implic }
+
+ | otherwise  -- Everything is solved
+              -- Set status to IC_Solved,
+              -- and compute the dead givens and outer needs
+              -- See Note [Tracking redundant constraints]
+ = do { traceTcS "setImplicationStatus(all-solved) {" (ppr implic)
+
+      ; implic@(Implic { ic_need_inner = need_inner
+                       , ic_need_outer = need_outer }) <- neededEvVars implic
+
+      ; bad_telescope <- checkBadTelescope implic
+
+      ; let warn_givens = findUnnecessaryGivens info need_inner givens
+
+            discard_entire_implication  -- Can we discard the entire implication?
+              =  null warn_givens           -- No warning from this implication
+              && not bad_telescope
+              && isEmptyWC pruned_wc        -- No live children
+              && isEmptyVarSet need_outer   -- No needed vars to pass up to parent
+
+            final_status
+              | bad_telescope = IC_BadTelescope
+              | otherwise     = IC_Solved { ics_dead = warn_givens }
+            final_implic = implic { ic_status = final_status
+                                  , ic_wanted = pruned_wc }
+
+      ; traceTcS "setImplicationStatus(all-solved) }" $
+        vcat [ text "discard:" <+> ppr discard_entire_implication
+             , text "new_implic:" <+> ppr final_implic ]
+
+      ; return $ if discard_entire_implication
+                 then Nothing
+                 else Just final_implic }
+ where
+   WC { wc_simple = simples, wc_impl = implics, wc_errors = errs } = wc
+
+   pruned_implics = filterBag keep_me implics
+   pruned_wc = WC { wc_simple = simples
+                  , wc_impl   = pruned_implics
+                  , wc_errors = errs }   -- do not prune holes; these should be reported
+
+   keep_me :: Implication -> Bool
+   keep_me ic
+     | IC_Solved { ics_dead = dead_givens } <- ic_status ic
+                          -- Fully solved
+     , null dead_givens   -- No redundant givens to report
+     , isEmptyBag (wc_impl (ic_wanted ic))
+           -- And no children that might have things to report
+     = False       -- Tnen we don't need to keep it
+     | otherwise
+     = True        -- Otherwise, keep it
+
+findUnnecessaryGivens :: SkolemInfoAnon -> VarSet -> [EvVar] -> [EvVar]
+findUnnecessaryGivens info need_inner givens
+  | not (warnRedundantGivens info)   -- Don't report redundant constraints at all
+  = []
+
+  | not (null unused_givens)         -- Some givens are literally unused
+  = unused_givens
+
+  | otherwise                       -- All givens are used, but some might
+  = redundant_givens                -- still be redundant e.g. (Eq a, Ord a)
+
+  where
+    in_instance_decl = case info of { InstSkol {} -> True; _ -> False }
+                       -- See Note [Redundant constraints in instance decls]
+
+    unused_givens = filterOut is_used givens
+
+    is_used given =  is_type_error given
+                  || given `elemVarSet` need_inner
+                  || (in_instance_decl && is_improving (idType given))
+
+    minimal_givens = mkMinimalBySCs evVarPred givens
+    is_minimal = (`elemVarSet` mkVarSet minimal_givens)
+    redundant_givens
+      | in_instance_decl = []
+      | otherwise        = filterOut is_minimal givens
+
+    -- See #15232
+    is_type_error id = isTopLevelUserTypeError (idType id)
+
+    is_improving pred -- (transSuperClasses p) does not include p
+      = any isImprovementPred (pred : transSuperClasses pred)
+
+{- Note [Redundant constraints in instance decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instance declarations are special in two ways:
+
+* We don't report unused givens if they can give rise to improvement.
+  Example (#10100):
+    class Add a b ab | a b -> ab, a ab -> b
+    instance Add Zero b b
+    instance Add a b ab => Add (Succ a) b (Succ ab)
+  The context (Add a b ab) for the instance is clearly unused in terms
+  of evidence, since the dictionary has no fields.  But it is still
+  needed!  With the context, a wanted constraint
+     Add (Succ Zero) beta (Succ Zero)
+  we will reduce to (Add Zero beta Zero), and thence we get beta := Zero.
+  But without the context we won't find beta := Zero.
+
+  This only matters in instance declarations.
+
+* We don't report givens that are a superclass of another given. E.g.
+       class Ord r => UserOfRegs r a where ...
+       instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r CmmExpr where
+  The (Ord r) is not redundant, even though it is a superclass of
+  (UserOfRegs r CmmReg).  See Note [Recursive superclasses] in GHC.Tc.TyCl.Instance.
+
+  Again this is specific to instance declarations.
+-}
+
+
+checkBadTelescope :: Implication -> TcS Bool
+-- True <=> the skolems form a bad telescope
+-- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
+checkBadTelescope (Implic { ic_info  = info
+                          , ic_skols = skols })
+  | checkTelescopeSkol info
+  = do{ skols <- mapM TcS.zonkTyCoVarKind skols
+      ; return (go emptyVarSet (reverse skols))}
+
+  | otherwise
+  = return False
+
+  where
+    go :: TyVarSet   -- skolems that appear *later* than the current ones
+       -> [TcTyVar]  -- ordered skolems, in reverse order
+       -> Bool       -- True <=> there is an out-of-order skolem
+    go _ [] = False
+    go later_skols (one_skol : earlier_skols)
+      | tyCoVarsOfType (tyVarKind one_skol) `intersectsVarSet` later_skols
+      = True
+      | otherwise
+      = go (later_skols `extendVarSet` one_skol) earlier_skols
+
+warnRedundantGivens :: SkolemInfoAnon -> Bool
+warnRedundantGivens (SigSkol ctxt _ _)
+  = case ctxt of
+       FunSigCtxt _ rrc -> reportRedundantConstraints rrc
+       ExprSigCtxt rrc  -> reportRedundantConstraints rrc
+       _                -> False
+
+  -- To think about: do we want to report redundant givens for
+  -- pattern synonyms, PatSynSigSkol? c.f #9953, comment:21.
+warnRedundantGivens (InstSkol {}) = True
+warnRedundantGivens _             = False
+
+neededEvVars :: Implication -> TcS Implication
+-- Find all the evidence variables that are "needed",
+-- and delete dead evidence bindings
+--   See Note [Tracking redundant constraints]
+--   See Note [Delete dead Given evidence bindings]
+--
+--   - Start from initial_seeds (from nested implications)
+--
+--   - Add free vars of RHS of all Wanted evidence bindings
+--     and coercion variables accumulated in tcvs (all Wanted)
+--
+--   - Generate 'needed', the needed set of EvVars, by doing transitive
+--     closure through Given bindings
+--     e.g.   Needed {a,b}
+--            Given  a = sc_sel a2
+--            Then a2 is needed too
+--
+--   - Prune out all Given bindings that are not needed
+--
+--   - From the 'needed' set, delete ev_bndrs, the binders of the
+--     evidence bindings, to give the final needed variables
+--
+neededEvVars implic@(Implic { ic_given = givens
+                            , ic_binds = ev_binds_var
+                            , ic_wanted = WC { wc_impl = implics }
+                            , ic_need_inner = old_needs })
+ = do { ev_binds <- TcS.getTcEvBindsMap ev_binds_var
+      ; tcvs     <- TcS.getTcEvTyCoVars ev_binds_var
+
+      ; let seeds1        = foldr add_implic_seeds old_needs implics
+            seeds2        = nonDetStrictFoldEvBindMap add_wanted seeds1 ev_binds
+                            -- It's OK to use a non-deterministic fold here
+                            -- because add_wanted is commutative
+            seeds3        = seeds2 `unionVarSet` tcvs
+            need_inner    = findNeededEvVars ev_binds seeds3
+            live_ev_binds = filterEvBindMap (needed_ev_bind need_inner) ev_binds
+            need_outer    = varSetMinusEvBindMap need_inner live_ev_binds
+                            `delVarSetList` givens
+
+      ; TcS.setTcEvBindsMap ev_binds_var live_ev_binds
+           -- See Note [Delete dead Given evidence bindings]
+
+      ; traceTcS "neededEvVars" $
+        vcat [ text "old_needs:" <+> ppr old_needs
+             , text "seeds3:" <+> ppr seeds3
+             , text "tcvs:" <+> ppr tcvs
+             , text "ev_binds:" <+> ppr ev_binds
+             , text "live_ev_binds:" <+> ppr live_ev_binds ]
+
+      ; return (implic { ic_need_inner = need_inner
+                       , ic_need_outer = need_outer }) }
+ where
+   add_implic_seeds (Implic { ic_need_outer = needs }) acc
+      = needs `unionVarSet` acc
+
+   needed_ev_bind needed (EvBind { eb_lhs = ev_var
+                                 , eb_info = info })
+     | EvBindGiven{} <- info = ev_var `elemVarSet` needed
+     | otherwise = True   -- Keep all wanted bindings
+
+   add_wanted :: EvBind -> VarSet -> VarSet
+   add_wanted (EvBind { eb_info = info, eb_rhs = rhs }) needs
+     | EvBindGiven{} <- info = needs  -- Add the rhs vars of the Wanted bindings only
+     | otherwise = evVarsOfTerm rhs `unionVarSet` needs
+
+-------------------------------------------------
+simplifyDelayedErrors :: Bag DelayedError -> TcS (Bag DelayedError)
+-- Simplify any delayed errors: e.g. type and term holes
+-- NB: At this point we have finished with all the simple
+--     constraints; they are in wc_simple, not in the inert set.
+--     So those Wanteds will not rewrite these delayed errors.
+--     That's probably no bad thing.
+--
+--     However if we have [W] alpha ~ Maybe a, [W] alpha ~ Int
+--     and _ : alpha, then we'll /unify/ alpha with the first of
+--     the Wanteds we get, and thereby report (_ : Maybe a) or
+--     (_ : Int) unpredictably, depending on which we happen to see
+--     first.  Doesn't matter much; there is a type error anyhow.
+--     T17139 is a case in point.
+simplifyDelayedErrors = mapMaybeBagM simpl_err
+  where
+    simpl_err :: DelayedError -> TcS (Maybe DelayedError)
+    simpl_err (DE_Hole hole) = Just . DE_Hole <$> simpl_hole hole
+    simpl_err err@(DE_NotConcrete {}) = return $ Just err
+    simpl_err (DE_Multiplicity mult_co loc)
+      = do { mult_co' <- TcS.zonkCo mult_co
+           ; if isReflexiveCo mult_co' then
+               return Nothing
+             else
+               return $ Just (DE_Multiplicity mult_co' loc) }
+
+    simpl_hole :: Hole -> TcS Hole
+
+     -- See Note [Do not simplify ConstraintHoles]
+    simpl_hole h@(Hole { hole_sort = ConstraintHole }) = return h
+
+     -- other wildcards should be simplified for printing
+     -- we must do so here, and not in the error-message generation
+     -- code, because we have all the givens already set up
+    simpl_hole h@(Hole { hole_ty = ty, hole_loc = loc })
+      = do { ty' <- rewriteType loc ty
+           ; traceTcS "simpl_hole" (ppr ty $$ ppr ty')
+           ; return (h { hole_ty = ty' }) }
+
+{- Note [Delete dead Given evidence bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As a result of superclass expansion, we speculatively
+generate evidence bindings for Givens. E.g.
+   f :: (a ~ b) => a -> b -> Bool
+   f x y = ...
+We'll have
+   [G] d1 :: (a~b)
+and we'll speculatively generate the evidence binding
+   [G] d2 :: (a ~# b) = sc_sel d
+
+Now d2 is available for solving.  But it may not be needed!  Usually
+such dead superclass selections will eventually be dropped as dead
+code, but:
+
+ * It won't always be dropped (#13032).  In the case of an
+   unlifted-equality superclass like d2 above, we generate
+       case heq_sc d1 of d2 -> ...
+   and we can't (in general) drop that case expression in case
+   d1 is bottom.  So it's technically unsound to have added it
+   in the first place.
+
+ * Simply generating all those extra superclasses can generate lots of
+   code that has to be zonked, only to be discarded later.  Better not
+   to generate it in the first place.
+
+   Moreover, if we simplify this implication more than once
+   (e.g. because we can't solve it completely on the first iteration
+   of simpl_loop), we'll generate all the same bindings AGAIN!
+
+Easy solution: take advantage of the work we are doing to track dead
+(unused) Givens, and use it to prune the Given bindings too.  This is
+all done by neededEvVars.
+
+This led to a remarkable 25% overall compiler allocation decrease in
+test T12227.
+
+But we don't get to discard all redundant equality superclasses, alas;
+see #15205.
+
+Note [Do not simplify ConstraintHoles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before printing the inferred value for a type hole (a _ wildcard in
+a partial type signature), we simplify it w.r.t. any Givens. This
+makes for an easier-to-understand diagnostic for the user.
+
+However, we do not wish to do this for extra-constraint holes. Here is
+the example for why (partial-sigs/should_compile/T12844):
+
+  bar :: _ => FooData rngs
+  bar = foo
+
+  data FooData rngs
+
+  class Foo xs where foo :: (Head xs ~ '(r,r')) => FooData xs
+
+  type family Head (xs :: [k]) where Head (x ': xs) = x
+
+GHC correctly infers that the extra-constraints wildcard on `bar`
+should be (Head rngs ~ '(r, r'), Foo rngs). It then adds this
+constraint as a Given on the implication constraint for `bar`. (This
+implication is emitted by emitResidualConstraints.) The Hole for the _
+is stored within the implication's WantedConstraints.  When
+simplifyHoles is called, that constraint is already assumed as a
+Given. Simplifying with respect to it turns it into ('(r, r') ~ '(r,
+r'), Foo rngs), which is disastrous.
+
+Furthermore, there is no need to simplify here: extra-constraints wildcards
+are filled in with the output of the solver, in chooseInferredQuantifiers
+(choose_psig_context), so they are already simplified. (Contrast to normal
+type holes, which are just bound to a meta-variable.) Avoiding the poor output
+is simple: just don't simplify extra-constraints wildcards.
+
+This is the only reason we need to track ConstraintHole separately
+from TypeHole in HoleSort.
+
+See also Note [Extra-constraint holes in partial type signatures]
+in GHC.Tc.Gen.HsType.
+
+Note [Tracking redundant constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With Opt_WarnRedundantConstraints, GHC can report which
+constraints of a type signature (or instance declaration) are
+redundant, and can be omitted.  Here is an overview of how it
+works.
+
+This is all tested in typecheck/should_compile/T20602 (among
+others).
+
+----- What is a redundant constraint?
+
+* The things that can be redundant are precisely the Given
+  constraints of an implication.
+
+* A constraint can be redundant in two different ways:
+  a) It is not needed by the Wanted constraints covered by the
+     implication E.g.
+       f :: Eq a => a -> Bool
+       f x = True  -- Equality not used
+  b) It is implied by other givens.  E.g.
+       f :: (Eq a, Ord a)     => blah   -- Eq a unnecessary
+       g :: (Eq a, a~b, Eq b) => blah   -- Either Eq a or Eq b unnecessary
+
+*  To find (a) we need to know which evidence bindings are 'wanted';
+   hence the eb_is_given field on an EvBind.
+
+*  To find (b), we use mkMinimalBySCs on the Givens to see if any
+   are unnecessary.
+
+----- How tracking works
+
+(RC1) When two Givens are the same, we drop the evidence for the one
+  that requires more superclass selectors. This is done
+  according to 2(c) of Note [Replacement vs keeping] in GHC.Tc.Solver.InertSet.
+
+(RC2) The ic_need fields of an Implic records in-scope (given) evidence
+  variables bound by the context, that were needed to solve this
+  implication (so far).  See the declaration of Implication.
+
+(RC3) setImplicationStatus:
+  When the constraint solver finishes solving all the wanteds in
+  an implication, it sets its status to IC_Solved
+
+  - The ics_dead field, of IC_Solved, records the subset of this
+    implication's ic_given that are redundant (not needed).
+
+  - We compute which evidence variables are needed by an implication
+    in setImplicationStatus.  A variable is needed if
+    a) it is free in the RHS of a Wanted EvBind,
+    b) it is free in the RHS of an EvBind whose LHS is needed, or
+    c) it is in the ics_need of a nested implication.
+
+  - After computing which variables are needed, we then look at the
+    remaining variables for internal redundancies. This is case (b)
+    from above. This is also done in setImplicationStatus.
+    Note that we only look for case (b) if case (a) shows up empty,
+    as exemplified below.
+
+  - We need to be careful not to discard an implication
+    prematurely, even one that is fully solved, because we might
+    thereby forget which variables it needs, and hence wrongly
+    report a constraint as redundant.  But we can discard it once
+    its free vars have been incorporated into its parent; or if it
+    simply has no free vars. This careful discarding is also
+    handled in setImplicationStatus.
+
+(RC4) We do not want to report redundant constraints for implications
+  that come from quantified constraints.  Example #23323:
+     data T a
+     instance Show (T a) where ...  -- No context!
+     foo :: forall f c. (forall a. c a => Show (f a)) => Proxy c -> f Int -> Int
+     bar = foo @T @Eq
+
+  The call to `foo` gives us
+    [W] d : (forall a. Eq a => Show (T a))
+  To solve this, GHC.Tc.Solver.Solve.solveForAll makes an implication constraint:
+    forall a. Eq a =>  [W] ds : Show (T a)
+  and because of the degnerate instance for `Show (T a)`, we don't need the `Eq a`
+  constraint.  But we don't want to report it as redundant!
+
+* Examples:
+
+    f, g, h :: (Eq a, Ord a) => a -> Bool
+    f x = x == x
+    g x = x > x
+    h x = x == x && x > x
+
+    All three will discover that they have two [G] Eq a constraints:
+    one as given and one extracted from the Ord a constraint. They will
+    both discard the latter, as noted above and in
+    Note [Replacement vs keeping] in GHC.Tc.Solver.InertSet.
+
+    The body of f uses the [G] Eq a, but not the [G] Ord a. It will
+    report a redundant Ord a using the logic for case (a).
+
+    The body of g uses the [G] Ord a, but not the [G] Eq a. It will
+    report a redundant Eq a using the logic for case (a).
+
+    The body of h uses both [G] Ord a and [G] Eq a. Case (a) will
+    thus come up with nothing redundant. But then, the case (b)
+    check will discover that Eq a is redundant and report this.
+
+    If we did case (b) even when case (a) reports something, then
+    we would report both constraints as redundant for f, which is
+    terrible.
+
+----- Reporting redundant constraints
+
+* GHC.Tc.Errors does the actual warning, in warnRedundantConstraints.
+
+* We don't report redundant givens for *every* implication; only
+  for those which reply True to GHC.Tc.Solver.warnRedundantGivens:
+
+   - For example, in a class declaration, the default method *can*
+     use the class constraint, but it certainly doesn't *have* to,
+     and we don't want to report an error there.  Ditto instance decls.
+
+   - More subtly, in a function definition
+       f :: (Ord a, Ord a, Ix a) => a -> a
+       f x = rhs
+     we do an ambiguity check on the type (which would find that one
+     of the Ord a constraints was redundant), and then we check that
+     the definition has that type (which might find that both are
+     redundant).  We don't want to report the same error twice, so we
+     disable it for the ambiguity check.  Hence using two different
+     FunSigCtxts, one with the warn-redundant field set True, and the
+     other set False in
+        - GHC.Tc.Gen.Bind.tcSpecPrag
+        - GHC.Tc.Gen.Bind.tcTySig
+
+  This decision is taken in setImplicationStatus, rather than GHC.Tc.Errors
+  so that we can discard implication constraints that we don't need.
+  So ics_dead consists only of the *reportable* redundant givens.
+
+----- Shortcomings
+
+Shortcoming 1.  Consider
+
+  j :: (Eq a, a ~ b) => a -> Bool
+  j x = x == x
+
+  k :: (Eq a, b ~ a) => a -> Bool
+  k x = x == x
+
+Currently (Nov 2021), j issues no warning, while k says that b ~ a
+is redundant. This is because j uses the a ~ b constraint to rewrite
+everything to be in terms of b, while k does none of that. This is
+ridiculous, but I (Richard E) don't see a good fix.
+
+Shortcoming 2.  Removing a redundant constraint can cause clients to fail to
+compile, by making the function more polymoprhic. Consider (#16154)
+
+  f :: (a ~ Bool) => a -> Int
+  f x = 3
+
+  g :: String -> Int
+  g s = f (read s)
+
+The constraint in f's signature is redundant; not used to typecheck
+`f`.  And yet if you remove it, `g` won't compile, because there'll
+be an ambiguous variable in `g`.
+
+
 **********************************************************************
 *                                                                    *
 *                      Main Solver                                   *
@@ -172,7 +991,7 @@ solveOne :: Ct -> TcS ()  -- Solve one constraint
 solveOne workItem
   = do { wl      <- getWorkList
        ; inerts  <- getInertSet
-       ; tclevel <- getTcLevel
+       ; tclevel <- TcS.getTcLevel
        ; traceTcS "----------------------------- " empty
        ; traceTcS "Start solver pipeline {" $
                   vcat [ text "tclevel =" <+> ppr tclevel
@@ -396,7 +1215,7 @@ solveForAll :: CtEvidence -> [TcTyVar] -> TcThetaType -> PredType -> ExpansionFu
 solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc })
             tvs theta pred _fuel
   = -- See Note [Solving a Wanted forall-constraint]
-    setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
+    TcS.setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
     -- This setSrcSpan is important: the emitImplicationTcS uses that
     -- TcLclEnv for the implication, and that in turn sets the location
     -- for the Givens when solving the constraint (#21006)
@@ -609,7 +1428,7 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1 })
        ; if null solvers then return (False, wc) else
 
     do { given <- getInertGivens
-       ; wanted <- zonkSimples simples1    -- Plugin requires zonked inputs
+       ; wanted <- TcS.zonkSimples simples1    -- Plugin requires zonked inputs
 
        ; traceTcS "Running plugins (" (vcat [ text "Given:" <+> ppr given
                                             , text "Watned:" <+> ppr wanted ])
@@ -659,7 +1478,7 @@ data TcPluginProgress = TcPluginProgress
 
 getTcPluginSolvers :: TcS [TcPluginSolver]
 getTcPluginSolvers
-  = do { tcg_env <- getGblEnv; return (tcg_tc_plugin_solvers tcg_env) }
+  = do { tcg_env <- TcS.getGblEnv; return (tcg_tc_plugin_solvers tcg_env) }
 
 -- | Starting from a pair of (given, wanted) constraints,
 -- invoke each of the typechecker constraint-solving plugins in turn and return

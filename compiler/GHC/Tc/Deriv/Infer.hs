@@ -26,7 +26,8 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Solver
+import GHC.Tc.Solver( simplifyTopImplic )
+import GHC.Tc.Solver.Solve( solveWanteds )
 import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor)

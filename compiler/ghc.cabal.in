@@ -821,6 +821,7 @@ Library
         GHC.Tc.Module
         GHC.Tc.Plugin
         GHC.Tc.Solver
+        GHC.Tc.Solver.Default
         GHC.Tc.Solver.Rewrite
         GHC.Tc.Solver.InertSet
         GHC.Tc.Solver.Solve
