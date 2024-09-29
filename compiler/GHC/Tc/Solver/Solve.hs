@@ -73,9 +73,6 @@ simplifyWantedsTcM wanted
 
 solveWanteds :: WantedConstraints -> TcS WantedConstraints
 solveWanteds wc@(WC { wc_errors = errs })
-  | isEmptyWC wc  -- Fast path
-  = return wc
-  | otherwise
   = do { cur_lvl <- TcS.getTcLevel
        ; traceTcS "solveWanteds {" $
          vcat [ text "Level =" <+> ppr cur_lvl
@@ -106,6 +103,9 @@ simplify_loop :: Int -> IntWithInf -> Bool
 -- else, so we do them once, at the end in solveWanteds
 simplify_loop n limit definitely_redo_implications
               wc@(WC { wc_simple = simples, wc_impl = implics })
+  | isSolvedWC wc  -- Fast path
+  = return wc
+  | otherwise
   = do { csTraceTcS $
          text "simplify_loop iteration=" <> int n
          <+> (parens $ hsep [ text "definitely_redo =" <+> ppr definitely_redo_implications <> comma
@@ -145,7 +145,7 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
   | unif_happened
   = simplify_loop n limit True wc
 
-  | superClassesMightHelp wc
+  | superClassesMightHelp wc    -- Returns False quickly if wc is solved
   = -- We still have unsolved goals, and apparently no way to solve them,
     -- so try expanding superclasses at this level, both Given and Wanted
     do { pending_given <- getPendingGivenScs

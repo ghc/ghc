@@ -6,7 +6,7 @@ T18398.hs:13:34: error: [GHC-39999]
       In the expression: case x of MkEx _ -> meth x y
 
 T18398.hs:13:70: error: [GHC-39999]
-    • No instance for ‘C Ex t0’ arising from a use of ‘meth’
+    • No instance for ‘C Ex t1’ arising from a use of ‘meth’
     • In the expression: meth x z
       In a case alternative: MkEx _ -> meth x z
       In the expression: case x of MkEx _ -> meth x z
