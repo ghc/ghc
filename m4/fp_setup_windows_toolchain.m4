@@ -131,6 +131,9 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     OBJDUMP="${mingwbin}llvm-objdump.exe"
     DLLTOOL="${mingwbin}llvm-dlltool.exe"
     WindresCmd="${mingwbin}llvm-windres.exe"
+    LLC="${mingwbin}llc.exe"
+    OPT="${mingwbin}opt.exe"
+    LLVMAS="${mingwbin}clang.exe"
 
     # N.B. LLD does not support -r
     MergeObjsCmd=""

@@ -85,6 +85,11 @@ AC_DEFUN([FP_SETTINGS],
         SettingsWindresCommand="$WindresCmd"
     fi
 
+    # LLVM backend tools
+    SettingsLlcCommand="$LlcCmd"
+    SettingsOptCommand="$OptCmd"
+    SettingsLlvmAsCommand="$LlvmAsCmd"
+
     if test "$EnableDistroToolchain" = "YES"; then
         # If the user specified --enable-distro-toolchain then we just use the
         # executable names, not paths.
@@ -96,6 +101,9 @@ AC_DEFUN([FP_SETTINGS],
         SettingsMergeObjectsCommand="$(basename $SettingsMergeObjectsCommand)"
         SettingsArCommand="$(basename $SettingsArCommand)"
         SettingsWindresCommand="$(basename $SettingsWindresCommand)"
+        SettingsLlcCommand="$(basename $SettingsLlcCommand)"
+        SettingsOptCommand="$(basename $SettingsOptCommand)"
+        SettingsLlvmAsCommand="$(basename $SettingsLlvmAsCommand)"
     fi
 
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"; then
@@ -120,14 +128,10 @@ AC_DEFUN([FP_SETTINGS],
         SUBST_TOOLDIR([SettingsArCommand])
         SUBST_TOOLDIR([SettingsRanlibCommand])
         SUBST_TOOLDIR([SettingsWindresCommand])
+        SUBST_TOOLDIR([SettingsLlcCommand])
+        SUBST_TOOLDIR([SettingsOptCommand])
+        SUBST_TOOLDIR([SettingsLlvmAsCommand])
     fi
-
-    # LLVM backend tools
-    SettingsLlcCommand="$LlcCmd"
-
-    SettingsOptCommand="$OptCmd"
-
-    SettingsLlvmAsCommand="$LlvmAsCmd"
 
     # Mac-only tools
     if test -z "$OtoolCmd"; then
