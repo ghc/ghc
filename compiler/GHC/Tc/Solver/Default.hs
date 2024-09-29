@@ -818,7 +818,11 @@ findDefaultableGroups (default_tys, extended_defaults) wanteds
     , defaultable_tyvar tv
     , defaultable_classes (map (classTyCon . sndOf3) group) ]
   where
-    simples                = approximateWC True wanteds
+    simples  = approximateWC True wanteds
+      -- True: for the purpose of defaulting we don't care
+      --       about shape or enclosing equalities
+      -- See (W3) in Note [ApproximateWC] in GHC.Tc.Types.Constraint
+
     (unaries, non_unaries) = partitionWith find_unary (bagToList simples)
     unary_groups           = equivClasses cmp_tv unaries
 

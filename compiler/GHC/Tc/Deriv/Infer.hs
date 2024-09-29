@@ -763,9 +763,11 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
        -- See [STEP DAC HOIST]
        -- From the simplified constraints extract a subset 'good' that will
        -- become the context 'min_theta' for the derived instance.
-       ; let residual_simple = approximateWC True solved_wanteds
-             head_size       = pSizeClassPred clas inst_tys
-             good = mapMaybeBag get_good residual_simple
+       ; let residual_simple = approximateWC False solved_wanteds
+                -- False: ignore any non-quantifiable constraints,
+                --        including equalities hidden under Given equalities
+             head_size = pSizeClassPred clas inst_tys
+             good      = mapMaybeBag get_good residual_simple
 
              -- Returns @Just p@ (where @p@ is the type of the Ct) if a Ct is
              -- suitable to be inferred in the context of a derived instance.
