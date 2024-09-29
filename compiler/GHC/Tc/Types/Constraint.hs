@@ -61,6 +61,7 @@ module GHC.Tc.Types.Constraint (
         tyCoVarsOfWC, tyCoVarsOfWCList,
         insolubleWantedCt, insolubleCt, insolubleIrredCt,
         insolubleImplic, nonDefaultableTyVarsOfWC,
+        approximateWC,
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
@@ -1813,6 +1814,118 @@ Instead our plan is that we will NOT fail immediately, but:
 At the end, we will hopefully have substituted uf1 := F alpha, and we
 will be able to report a more informative error:
     'Can't construct the infinite type beta ~ F alpha beta'
+
+************************************************************************
+*                                                                      *
+            Invariant checking (debug only)
+*                                                                      *
+************************************************************************
+-}
+
+approximateWC :: Bool   -- See Wrinkle (W3) in Note [ApproximateWC]
+              -> WantedConstraints
+              -> Cts
+-- Second return value is the depleted wc
+-- Postcondition: Wanted Cts
+-- See Note [ApproximateWC]
+-- See Note [floatKindEqualities vs approximateWC]
+approximateWC float_past_equalities wc
+  = float_wc False emptyVarSet wc
+  where
+    float_wc :: Bool           -- True <=> there are enclosing equalities
+             -> TcTyCoVarSet   -- Enclosing skolem binders
+             -> WantedConstraints -> Cts
+    float_wc encl_eqs trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
+      = filterBag (is_floatable encl_eqs trapping_tvs) simples `unionBags`
+        concatMapBag (float_implic encl_eqs trapping_tvs) implics
+
+    float_implic :: Bool -> TcTyCoVarSet -> Implication -> Cts
+    float_implic encl_eqs trapping_tvs imp
+      = float_wc new_encl_eqs new_trapping_tvs (ic_wanted imp)
+      where
+        new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
+        new_encl_eqs = encl_eqs || ic_given_eqs imp == MaybeGivenEqs
+
+    is_floatable encl_eqs skol_tvs ct
+       | isGivenCt ct                                = False
+       | insolubleCt ct                              = False
+       | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = False
+       | otherwise
+       = case classifyPredType (ctPred ct) of
+           EqPred {}     -> float_past_equalities || not encl_eqs
+                                  -- See Wrinkle (W1)
+           ClassPred {}  -> True  -- See Wrinkle (W2)
+           IrredPred {}  -> True  -- ..both in Note [ApproximateWC]
+           ForAllPred {} -> False
+
+{- Note [ApproximateWC]
+~~~~~~~~~~~~~~~~~~~~~~~
+approximateWC takes a constraint, typically arising from the RHS of a
+let-binding whose type we are *inferring*, and extracts from it some
+*simple* constraints that we might plausibly abstract over.  Of course
+the top-level simple constraints are plausible, but we also float constraints
+out from inside, if they are not captured by skolems.
+
+The same function is used when doing type-class defaulting (see the call
+to applyDefaultingRules) to extract constraints that might be defaulted.
+
+Wrinkle (W1)
+  When inferring most-general types (in simplifyInfer), we
+  do *not* float an equality constraint if the implication binds
+  equality constraints, because that defeats the OutsideIn story.
+  Consider data T a where { TInt :: T Int; MkT :: T a }
+         f TInt = 3::Int
+  We get the implication (a ~ Int => res ~ Int), where so far we've decided
+     f :: T a -> res
+  We don't want to float (res~Int) out because then we'll infer
+     f :: T a -> Int
+  which is only on of the possible types. (GHC 7.6 accidentally *did*
+  float out of such implications, which meant it would happily infer
+  non-principal types.)
+
+Wrinkle (W2)
+  We do allow /class/ constraints to float, even if
+  the implication binds equalities.  This is a subtle point: see #23224.
+  In principle, a class constraint might ultimately be satisfiable from
+  a constraint bound by an implication (see #19106 for an example of this
+  kind), but it's extremely obscure and I was unable to construct a
+  concrete example.  In any case, in super-subtle cases where this might
+  make a difference, you would be much better advised to simply write a
+  type signature.
+
+  I included IrredPred here too, for good measure.  In general,
+  abstracting over more constraints does no harm.
+
+Wrinkle (W3)
+  In findDefaultableGroups we are not worried about the
+  most-general type; and we /do/ want to float out of equalities
+  (#12797).  Hence the boolean flag to approximateWC.
+
+------ Historical note -----------
+There used to be a second caveat, driven by #8155
+
+   2. We do not float out an inner constraint that shares a type variable
+      (transitively) with one that is trapped by a skolem.  Eg
+          forall a.  F a ~ beta, Integral beta
+      We don't want to float out (Integral beta).  Doing so would be bad
+      when defaulting, because then we'll default beta:=Integer, and that
+      makes the error message much worse; we'd get
+          Can't solve  F a ~ Integer
+      rather than
+          Can't solve  Integral (F a)
+
+      Moreover, floating out these "contaminated" constraints doesn't help
+      when generalising either. If we generalise over (Integral b), we still
+      can't solve the retained implication (forall a. F a ~ b).  Indeed,
+      arguably that too would be a harder error to understand.
+
+But this transitive closure stuff gives rise to a complex rule for
+when defaulting actually happens, and one that was never documented.
+Moreover (#12923), the more complex rule is sometimes NOT what
+you want.  So I simply removed the extra code to implement the
+contamination stuff.  There was zero effect on the testsuite (not even #8155).
+------ End of historical note -----------
+
 
 ************************************************************************
 *                                                                      *
