@@ -2582,7 +2582,7 @@ tcRnExpr hsc_env mode rdr_expr
     let { fresh_it = itName uniq (getLocA rdr_expr) } ;
     ((qtvs, dicts, _, _), residual)
          <- captureConstraints $
-            simplifyInfer tclvl infer_mode
+            simplifyInfer TopLevel tclvl infer_mode
                           []    {- No sig vars -}
                           [(fresh_it, res_ty)]
                           lie ;

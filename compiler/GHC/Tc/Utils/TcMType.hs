@@ -78,9 +78,8 @@ module GHC.Tc.Utils.TcMType (
   ---------------------------------
   -- Promotion, defaulting, skolemisation
   defaultTyVar, promoteMetaTyVarTo, promoteTyVarSet,
-  quantifyTyVars, isQuantifiableTv,
+  quantifyTyVars, doNotQuantifyTyVars,
   zonkAndSkolemise, skolemiseQuantifiedTyVar,
-  doNotQuantifyTyVars,
 
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
@@ -1788,15 +1787,6 @@ quantifyTyVars skol_info ns_strat dvs
       | otherwise
       = Just <$> skolemiseQuantifiedTyVar skol_info tkv
 
-isQuantifiableTv :: TcLevel   -- Level of the context, outside the quantification
-                 -> TcTyVar
-                 -> Bool
-isQuantifiableTv outer_tclvl tcv
-  | isTcTyVar tcv  -- Might be a CoVar; change this when gather covars separately
-  = tcTyVarLevel tcv `strictlyDeeperThan` outer_tclvl
-  | otherwise
-  = False
-
 zonkAndSkolemise :: SkolemInfo -> TcTyCoVar -> ZonkM TcTyCoVar
 -- A tyvar binder is never a unification variable (TauTv),
 -- rather it is always a skolem. It *might* be a TyVarTv.
@@ -2414,7 +2404,7 @@ promoteMetaTyVarTo :: HasDebugCallStack => TcLevel -> TcTyVar -> TcM Bool
 -- invariant (WantedInv) in Note [TcLevel invariants] in GHC.Tc.Utils.TcType
 -- Return True <=> we did some promotion
 -- Also returns either the original tyvar (no promotion) or the new one
--- See Note [Promoting unification variables]
+-- See Note [Promote monomorphic tyvars] in GHC.Tc.Solver
 promoteMetaTyVarTo tclvl tv
   | assertPpr (isMetaTyVar tv) (ppr tv) $
     tcTyVarLevel tv `strictlyDeeperThan` tclvl

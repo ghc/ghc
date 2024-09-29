@@ -578,11 +578,22 @@ closeWrtFunDeps preds fixed_tvs
        = case classifyPredType pred of
             EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
                -- See Note [Equality superclasses]
-            ClassPred cls tys  -> [ instFD fd cls_tvs tys
-                                  | let (cls_tvs, cls_fds) = classTvsFds cls
-                                  , fd <- cls_fds ]
+
+            ClassPred cls tys | not (isIPClass cls)
+               -- isIPClass: see Note [closeWrtFunDeps ignores implicit parameters]
+                              -> [ instFD fd cls_tvs tys
+                                 | let (cls_tvs, cls_fds) = classTvsFds cls
+                                 , fd <- cls_fds ]
             _ -> []
 
+{- Note [closeWrtFunDeps ignores implicit parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Implicit params don't really determine a type variable (that is, we might have
+IP "c" Bool and IP "c" Int in different places within the same program), and
+skipping this causes implicit params to monomorphise too many variables; see
+Note [Inheriting implicit parameters] in GHC.Tc.Solver.  Skipping causes
+typecheck/should_compile/tc219 to fail.
+-}
 
 {- *********************************************************************
 *                                                                      *

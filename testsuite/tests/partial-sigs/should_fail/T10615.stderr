@@ -1,34 +1,39 @@
 
 T10615.hs:5:7: error: [GHC-88464]
-    • Found type wildcard ‘_’ standing for ‘w1’
-      Where: ‘w1’ is an ambiguous type variable
+    • Found type wildcard ‘_’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of f1 :: w -> f
+               at T10615.hs:6:1-10
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: f1 :: _ -> f
 
 T10615.hs:6:6: error: [GHC-25897]
-    • Couldn't match type ‘f’ with ‘b1 -> w1’
-      Expected: w1 -> f
-        Actual: w1 -> b1 -> w1
+    • Couldn't match type ‘f’ with ‘b1 -> w’
+      Expected: w -> f
+        Actual: w -> b1 -> w
       ‘f’ is a rigid type variable bound by
-        the inferred type of f1 :: w1 -> f
+        the inferred type of f1 :: w -> f
         at T10615.hs:5:1-12
     • In the expression: const
       In an equation for ‘f1’: f1 = const
-    • Relevant bindings include f1 :: w1 -> f (bound at T10615.hs:6:1)
+    • Relevant bindings include f1 :: w -> f (bound at T10615.hs:6:1)
 
 T10615.hs:8:7: error: [GHC-88464]
-    • Found type wildcard ‘_’ standing for ‘w0’
-      Where: ‘w0’ is an ambiguous type variable
+    • Found type wildcard ‘_’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of f2 :: w -> _f
+               at T10615.hs:9:1-10
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: f2 :: _ -> _f
 
 T10615.hs:9:6: error: [GHC-25897]
-    • Couldn't match type ‘_f’ with ‘b0 -> w0’
-      Expected: w0 -> _f
-        Actual: w0 -> b0 -> w0
+    • Couldn't match type ‘_f’ with ‘b0 -> w’
+      Expected: w -> _f
+        Actual: w -> b0 -> w
       ‘_f’ is a rigid type variable bound by
-        the inferred type of f2 :: w0 -> _f
+        the inferred type of f2 :: w -> _f
         at T10615.hs:8:1-13
     • In the expression: const
       In an equation for ‘f2’: f2 = const
-    • Relevant bindings include f2 :: w0 -> _f (bound at T10615.hs:9:1)
+    • Relevant bindings include f2 :: w -> _f (bound at T10615.hs:9:1)
+
