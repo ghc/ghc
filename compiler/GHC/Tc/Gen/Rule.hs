@@ -14,7 +14,7 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Solver
+import GHC.Tc.Solver.Solve( solveWanteds )
 import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
