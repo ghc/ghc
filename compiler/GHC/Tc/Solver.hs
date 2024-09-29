@@ -946,9 +946,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; wanted_transformed <- TcM.liftZonkM $ TcM.zonkWC wanted_transformed
        ; let definite_error = insolubleWC wanted_transformed
                               -- See Note [Quantification with errors]
-             quant_pred_candidates
-               | definite_error = []
-               | otherwise      = ctsPreds (approximateWC False wanted_transformed)
+             wanted_dq | definite_error = emptyWC
+                       | otherwise      = wanted_transformed
 
        -- Decide what type variables and constraints to quantify
        -- NB: quant_pred_candidates is already fully zonked
@@ -959,7 +958,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        --           in GHC.Tc.Utils.TcType
        ; rec { (qtvs, bound_theta, co_vars) <- decideQuantification skol_info infer_mode rhs_tclvl
                                                      name_taus partial_sigs
-                                                     quant_pred_candidates
+                                                     wanted_dq
+
              ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
 
              ; let full_theta = map idType bound_theta_vars
@@ -1283,12 +1283,12 @@ decideQuantification
   -> TcLevel
   -> [(Name, TcTauType)]   -- Variables to be generalised
   -> [TcIdSigInst]         -- Partial type signatures (if any)
-  -> [PredType]            -- Candidate theta; already zonked
+  -> WantedConstraints     -- Candidate theta; already zonked
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
          , [PredType]      -- and this context (fully zonked)
          , CoVarSet)
 -- See Note [Deciding quantification]
-decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
+decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs wanted
   = do { -- Step 1: find the mono_tvs
        ; (candidates, co_vars, mono_tvs0)
              <- decidePromotedTyVars infer_mode name_taus psigs candidates
@@ -1422,6 +1422,10 @@ decidePromotedTyVars :: InferMode
 --   we can't quantify over these, and we must make sure they are in scope
 decidePromotedTyVars infer_mode name_taus psigs candidates
   = do { tc_lvl <- TcM.getTcLevel
+
+       ; let (maybe_quant_cts, no_quant_cts) = approximateWC wanted
+
+
        ; (no_quant, maybe_quant) <- pick infer_mode candidates
 
        -- If possible, we quantify over partial-sig qtvs, so they are
@@ -1851,33 +1855,6 @@ BOTTOM LINE: when *inferring types* you must quantify over implicit
 parameters, *even if* they don't mention the bound type variables.
 Reason: because implicit parameters, uniquely, have local instance
 declarations. See pickQuantifiablePreds.
-
-Note [Quantifying over equality constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Should we quantify over an equality constraint (s ~ t)
-in pickQuantifiablePreds?
-
-* It is always /sound/ to quantify over a constraint -- those
-  quantified constraints will need to be proved at each call site.
-
-* We definitely don't want to quantify over (Maybe a ~ Bool), to get
-     f :: forall a. (Maybe a ~ Bool) => blah
-  That simply postpones a type error from the function definition site to
-  its call site.  Fortunately we have already filtered out insoluble
-  constraints: see `definite_error` in `simplifyInfer`.
-
-* What about (a ~ T alpha b), where we are about to quantify alpha, `a` and
-  `b` are in-scope skolems, and `T` is a data type.  It's pretty unlikely
-  that this will be soluble at a call site, so we don't quantify over it.
-
-* What about `(F beta ~ Int)` where we are going to quantify `beta`?
-  Should we quantify over the (F beta ~ Int), to get
-     f :: forall b. (F b ~ Int) => blah
-  Aha!  Perhaps yes, because at the call site we will instantiate `b`, and
-  perhaps we have `instance F Bool = Int`. So we *do* quantify over a
-  type-family equality where the arguments mention the quantified variables.
-
-This is all a bit ad-hoc.
 
 Note [Do not quantify over constraints that determine a variable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1783,41 +1783,75 @@ will be able to report a more informative error:
 ************************************************************************
 -}
 
-approximateWC :: Bool   -- See Wrinkle (W3) in Note [ApproximateWC]
-              -> WantedConstraints
-              -> Cts
--- Second return value is the depleted wc
--- Postcondition: Wanted Cts
+type ApproxWC = ( Bag Ct    -- Free quantifiable constraints
+                , Bag Ct )  -- Free non-quantifiable constraints
+                            -- due to shape, or enclosing equality
+
+approximateWC :: WantedConstraints -> ApproxWC
 -- See Note [ApproximateWC]
 -- See Note [floatKindEqualities vs approximateWC]
-approximateWC float_past_equalities wc
-  = float_wc False emptyVarSet wc
+approximateWC wc
+  = float_wc False emptyVarSet wc (emptyBag, emptyBag)
   where
     float_wc :: Bool           -- True <=> there are enclosing equalities
              -> TcTyCoVarSet   -- Enclosing skolem binders
-             -> WantedConstraints -> Cts
-    float_wc encl_eqs trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
-      = filterBag (is_floatable encl_eqs trapping_tvs) simples `unionBags`
-        concatMapBag (float_implic encl_eqs trapping_tvs) implics
+             -> WantedConstraints
+             -> ApproxWC -> ApproxWC
+    float_wc encl_eqs trapping_tvs (WC { wc_simple = simples, wc_impl = implics }) acc
+      = foldBag_flip (float_ct     encl_eqs trapping_tvs) simples $
+        foldBag_flip (float_implic encl_eqs trapping_tvs) implics $
+        acc
 
-    float_implic :: Bool -> TcTyCoVarSet -> Implication -> Cts
+    float_implic :: Bool -> TcTyCoVarSet -> Implication
+                 -> ApproxWC -> ApproxWC
     float_implic encl_eqs trapping_tvs imp
       = float_wc new_encl_eqs new_trapping_tvs (ic_wanted imp)
       where
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
         new_encl_eqs = encl_eqs || ic_given_eqs imp == MaybeGivenEqs
 
-    is_floatable encl_eqs skol_tvs ct
-       | isGivenCt ct                                = False
-       | insolubleCt ct                              = False
-       | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = False
+    float_ct :: Bool -> TcTyCoVarSet -> Ct
+             -> ApproxWC -> ApproxWC
+    float_ct encl_eqs skol_tvs ct acc@(quant, no_quant)
+       | isGivenCt ct                                = acc
+       | insolubleCt ct                              = acc
+       | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = acc
        | otherwise
        = case classifyPredType (ctPred ct) of
-           EqPred {}     -> float_past_equalities || not encl_eqs
-                                  -- See Wrinkle (W1)
-           ClassPred {}  -> True  -- See Wrinkle (W2)
-           IrredPred {}  -> True  -- ..both in Note [ApproximateWC]
-           ForAllPred {} -> False
+
+           EqPred eq_rel ty1 ty2
+             | not encl_eqs      -- See Wrinkle (W1)
+             , quantify_equality eq_rel ty1 ty2
+             -> add_to_quant
+             | otherwise
+             -> add_to_no_quant
+
+           ClassPred cls tys
+             | Just {} <- isCallStackPred cls tys
+               -- NEVER infer a CallStack constraint.  Otherwise we let
+               -- the constraints bubble up to be solved from the outer
+               -- context, or be defaulted when we reach the top-level.
+               -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+             -> add_to_no_quant
+
+             | otherwise
+             -> add_to_quant  -- See Wrinkle (W2)
+
+           IrredPred {}  -> add_to_quant  -- See Wrinkle (W2)
+
+           ForAllPred {} -> acc           -- Don't put ForAllPreds in the result at all
+       where
+         add_to_quant    = (ct `consBag` quant, no_quant)
+         add_to_no_quant = (quant, ct `consBag` no_quant)
+
+    -- See Note [Quantifying over equality constraints]
+    quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
+    quantify_equality ReprEq _   _   = True
+
+    quant_fun ty
+      = case tcSplitTyConApp_maybe ty of
+          Just (tc, _) -> isTypeFamilyTyCon tc
+          _              -> False
 
 {- Note [ApproximateWC]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1888,6 +1922,34 @@ Moreover (#12923), the more complex rule is sometimes NOT what
 you want.  So I simply removed the extra code to implement the
 contamination stuff.  There was zero effect on the testsuite (not even #8155).
 ------ End of historical note -----------
+
+
+Note [Quantifying over equality constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should we quantify over an equality constraint (s ~ t)
+in pickQuantifiablePreds?
+
+* It is always /sound/ to quantify over a constraint -- those
+  quantified constraints will need to be proved at each call site.
+
+* We definitely don't want to quantify over (Maybe a ~ Bool), to get
+     f :: forall a. (Maybe a ~ Bool) => blah
+  That simply postpones a type error from the function definition site to
+  its call site.  Fortunately we have already filtered out insoluble
+  constraints: see `definite_error` in `simplifyInfer`.
+
+* What about (a ~ T alpha b), where we are about to quantify alpha, `a` and
+  `b` are in-scope skolems, and `T` is a data type.  It's pretty unlikely
+  that this will be soluble at a call site, so we don't quantify over it.
+
+* What about `(F beta ~ Int)` where we are going to quantify `beta`?
+  Should we quantify over the (F beta ~ Int), to get
+     f :: forall b. (F b ~ Int) => blah
+  Aha!  Perhaps yes, because at the call site we will instantiate `b`, and
+  perhaps we have `instance F Bool = Int`. So we *do* quantify over a
+  type-family equality where the arguments mention the quantified variables.
+
+This is all a bit ad-hoc.
 
 
 ************************************************************************
