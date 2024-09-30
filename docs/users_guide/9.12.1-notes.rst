@@ -191,6 +191,16 @@ Cmm
 
 - The `deprecation process of GHC.Pack <https://gitlab.haskell.org/ghc/ghc/-/issues/21461>` has come its term. The module has now been removed from ``base``.
 
+- Annotate re-thrown exceptions with the backtrace as per `CLC proposal #202 <https://github.com/haskell/core-libraries-committee/issues/202>`
+
+- Introduced ``catchNoPropagate``, ``rethrowIO`` and ``tryWithContext`` as part of
+  `CLC proposal #202 <https://github.com/haskell/core-libraries-committee/issues/202>` to
+  facilitate rethrowing exceptions without adding a ``WhileHandling``
+  context -- if rethrowing ``e``, you don't want to add ``WhileHandling e`` to
+  the context since it will be redundant. These functions are mostly useful
+  for libraries that define exception-handling combinators like ``catch`` and
+  ``onException``, such as ``base``, or the ``exceptions`` package.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
