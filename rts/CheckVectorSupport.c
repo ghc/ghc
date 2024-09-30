@@ -65,12 +65,16 @@ int checkVectorSupport(void) {
 */
 
   #elif defined(__riscv)
-    unsigned long vlenb;
-    asm volatile ("csrr %0, vlenb" : "=r" (vlenb));
+// csrr instruction nott allowed in user-mode qemu emulation of riscv
+// Backend doesn't yet support vector registers, so hard-coded to no vector support
+// for now.
+//
+//    unsigned long vlenb;
+//    asm volatile ("csrr %0, vlenb" : "=r" (vlenb));
     // VLENB gives the length in bytes
-    supports_V16 = vlenb >= 16;
-    supports_V32 = vlenb >= 32;
-    supports_V64 = vlenb >= 64;
+    supports_V16 = 0;
+    supports_V32 = 0;
+    supports_V64 = 0;
 
   #else
     // On other platforms, we conservatively return no vector support.
