@@ -25,7 +25,7 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 module GHC.Hs.Type (
         Mult, HsScaled(..),
         hsMult, hsScaledThing,
-        HsArrow, HsArrowOf(..), {- MODS_TODO arrowToHsType, -} expandHsArrow,
+        HsArrow, HsArrowOf(..), {- MODS_TODO arrowToHsType, expandHsArrow, -}
         EpLinearArrow(..),
         hsLinear, hsUnrestricted, {- MODS_TODO isUnrestricted, -}
         pprHsArrow,
@@ -45,7 +45,7 @@ module GHC.Hs.Type (
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, fromMaybeContext,
-        HsModifier(..),
+        HsModifierOf(..), HsModifier,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs, pprHsArgsApp,
@@ -118,7 +118,7 @@ import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Names ( negateName )
-import GHC.Builtin.Types( manyDataConName, oneDataConName, mkTupleStr )
+import GHC.Builtin.Types( mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
@@ -563,10 +563,10 @@ hsUnrestricted = HsScaled (HsUnrestrictedArrow x)
 -- erases the information of whether the programmer wrote an explicit
 -- multiplicity or a shorthand.
 -- MODS_TODO: this is now only used for expr arrows?
-expandHsArrow :: (LocatedN Name -> t GhcRn) -> HsArrowOf (LocatedA (t GhcRn)) GhcRn -> LocatedA (t GhcRn)
-expandHsArrow mk_var (HsUnrestrictedArrow _) = noLocA (mk_var (noLocA manyDataConName))
-expandHsArrow mk_var (HsLinearArrow _ _) = noLocA (mk_var (noLocA oneDataConName))
-expandHsArrow _mk_var (HsExplicitMult _ p) = p
+-- expandHsArrow :: (LocatedN Name -> t GhcRn) -> HsArrowOf (LocatedA (t GhcRn)) GhcRn -> LocatedA (t GhcRn)
+-- expandHsArrow mk_var (HsUnrestrictedArrow _) = noLocA (mk_var (noLocA manyDataConName))
+-- expandHsArrow mk_var (HsLinearArrow _ _) = noLocA (mk_var (noLocA oneDataConName))
+-- expandHsArrow _mk_var (HsExplicitMult _ p) = p
 
 instance
       (Outputable mult, OutputableBndrId pass) =>
@@ -1190,10 +1190,10 @@ instance Outputable OpName where
 ************************************************************************
 -}
 
-instance OutputableBndrId p => Outputable (HsModifier (GhcPass p)) where
+instance (OutputableBndrId p, Outputable ty) => Outputable (HsModifierOf ty (GhcPass p)) where
   ppr = pprHsModifier
 
-pprHsModifier :: OutputableBndrId p => HsModifier (GhcPass p) -> SDoc
+pprHsModifier :: (OutputableBndrId p, Outputable ty) => HsModifierOf ty (GhcPass p) -> SDoc
 pprHsModifier (HsModifier _ ty) = char '%' <> ppr ty
 
 instance OutputableBndrId p => Outputable (HsBndrVar (GhcPass p)) where

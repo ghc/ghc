@@ -4473,7 +4473,7 @@ instance ExactPrint (FieldOcc GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (HsModifier GhcPs) where
+instance ExactPrint t => ExactPrint (HsModifierOf t GhcPs) where
   getAnnotationEntry = error "MODS_TODO"
   setAnnotationAnchor = error "MODS_TODO"
   exact (HsModifier pct t) = do

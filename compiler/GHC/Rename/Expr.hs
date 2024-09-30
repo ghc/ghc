@@ -49,7 +49,7 @@ import GHC.Rename.Pat
 
 import GHC.Driver.DynFlags
 import GHC.Builtin.Names
-import GHC.Builtin.Types ( nilDataConName )
+import GHC.Builtin.Types ( nilDataConName, oneDataConName )
 import GHC.Unit.Module ( getModule, isInteractiveModule )
 
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
@@ -632,10 +632,18 @@ rnExpr (HsForAll _ tele expr)
 
 rnExpr (HsFunArr _ mult arg res)
   = do { (arg', fvs1) <- rnLExpr arg
-       ; (mult', fvs2) <- rnHsArrowWith rnLExpr mult
+       ; (mult', fvs2) <- rnHsArrowWith rnModifierExpr mult
        ; (res', fvs3) <- rnLExpr res
        ; checkTypeSyntaxExtension FunctionArrowSyntax
        ; return (HsFunArr noExtField mult' arg' res', plusFVs [fvs1, fvs2, fvs3]) }
+  where
+    rnModifierExpr =
+      rnModifierWith (\ex -> if isLiteral1 ex then Just oneType else Nothing)
+                     rnLExpr
+    isLiteral1 ex = case ex of
+      (L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) -> True
+      _ -> False
+    oneType = noLocA $ HsVar noExtField $ noLocA oneDataConName
 
 {-
 ************************************************************************

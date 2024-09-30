@@ -1391,6 +1391,21 @@ modifiers :: {  Located [HsModifier GhcPs] }
   : modifiers1 ';'            { $1 }
   | modifiers0                { $1 }
 
+expModifier :: { forall b. DisambECP b => PV (Located (HsModifierOf (LocatedA b) GhcPs)) }
+expmodifier : PREFIX_PERCENT aexp   { unECP $2 >>= \ $2 ->
+                                      return $ sLL $1 $2 (HsModifier (epTok $1) $2) }
+
+expModifiers0 :: {  forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+  : expModifier expModifiers0       { $1 >>= \ $1 ->
+                                      $2 >>= \ $2 ->
+                                      return $ sLL $1 $2 (unLoc $1 : unLoc $2) }
+  | {- empty -}                     { return $ sL0 [] }
+
+expModifiers1 :: {  forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+  : expModifier expModifiers0       { $1 >>= \ $1 ->
+                                      $2 >>= \ $2 ->
+                                      return $ sLL $1 $2 (unLoc $1 : unLoc $2) }
+
 inst_decl :: { LInstDecl GhcPs }
         : modifiers 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst
        {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $6)
@@ -2291,10 +2306,6 @@ type :: { LHsType GhcPs }
                                           amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (EpLolly (epTok $3)) (unLoc $2)) $1 $4) }
                                               -- [mu AnnLollyU $2] }
 
-expmult :: { forall b. DisambECP b => PV (Located (EpUniToken "->" "\8594" -> HsArrowOf (LocatedA b) GhcPs)) }
-expmult : PREFIX_PERCENT aexp           { unECP $2 >>= \ $2 ->
-                                          fmap (sLL $1 $>) (mkHsMultPV (epTok $1) $2) }
-
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
 
@@ -2876,21 +2887,22 @@ infixexp2 :: { ECP }
                                   unECP $3 >>= \ $3 ->
                                   let arr = HsUnrestrictedArrow (epUniTok $2)
                                   in mkHsArrowPV (comb2 $1 $>) mode $1 arr $3 }
-        | infixexp expmult '->'  infixexp2
+        | infixexp expModifiers1 '->'  infixexp2
                                 { ECP $
                                   unECP $1         >>= \ $1 ->
                                   $2               >>= \ $2 ->
                                   unECP $4         >>= \ $4 ->
                                   hintLinear (getLoc $2) >>
-                                  let arr = (unLoc $2) (epUniTok $3)
-                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
-        | infixexp      '->.' infixexp2
+                                  mkHsMultPV $2 (epUniTok $3) >>= \ arr ->
+                                  mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
+        | infixexp expModifiers0 '->.' infixexp2
                                 { ECP $
-                                  hintLinear (getLoc $2) >>
+                                  hintLinear (getLoc $3) >>
                                   unECP $1 >>= \ $1 ->
-                                  unECP $3 >>= \ $3 ->
-                                  let arr = HsLinearArrow (EpLolly (epTok $2)) undefined -- MODS_TODO
-                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $3 }
+                                  $2       >>= \ $2 ->
+                                  unECP $4 >>= \ $4 ->
+                                  let arr = HsLinearArrow (EpLolly (epTok $3)) (unLoc $2)
+                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
         | expcontext    '=>'  infixexp2
                                 { ECP $
                                         $1 >>= \ $1 ->

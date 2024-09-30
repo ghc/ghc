@@ -13,7 +13,8 @@
 
 module GHC.Rename.HsType (
         -- Type related stuff
-        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext, rnModifier, rnModifier',
+        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
+        rnModifier, rnModifierWith, rnModifier',
         rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsTyLit, rnHsArrowWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
@@ -457,30 +458,44 @@ isRnKindLevel _                                 = False
 rnModifier' :: HsDocContext -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
 rnModifier' ctxt = rnModifier (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
+rnModifierWith :: (mPs -> Maybe mRn)
+               -> (mPs -> RnM (mRn, FreeVars))
+               -> HsModifierOf mPs GhcPs
+               -> RnM (HsModifierOf mRn GhcRn, FreeVars)
+rnModifierWith acceptLiteral1 rn (HsModifier _ ty) =
+  -- If we see a %1 modifier, treat it the same as %One. Only %1 counts, not
+  -- e.g. %01. See #18888.
+  --
+  -- MODS_TODO only do this if -XLinearTypes is enabled. Doing it here means
+  -- the "unexpected modifier" warning calls it One instead of 1, is that what
+  -- we want? If not, how do we avoid it - put the original in the extension
+  -- field?
+  case acceptLiteral1 ty of
+    Just literal1Rn -> return (HsModifier NoExtField literal1Rn, mempty)
+    Nothing -> do
+      (ty', fvs) <- rn ty
+      return (HsModifier NoExtField ty', fvs)
+
 rnModifier :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
-rnModifier env (HsModifier _ ty) =
-  if isLiteral1
-  then return (HsModifier NoExtField oneType, mempty)
-  else do
-    (ty', fvs) <- rnLHsTyKi env ty
-    return (HsModifier NoExtField ty', fvs)
+rnModifier env =
+  rnModifierWith (\ty -> if isLiteral1 ty then Just oneType else Nothing)
+                 (rnLHsTyKi env)
   where
-    -- If we see a %1 modifier, treat it the same as %One. Only %1 counts, not
-    -- e.g. %01. See #18888.
-    --
-    -- MODS_TODO only do this if -XLinearTypes is enabled. Doing it here means
-    -- the "unexpected modifier" warning calls it One instead of 1, is that what
-    -- we want? If not, how do we avoid it - put the original in the extension
-    -- field?
-    isLiteral1 = case ty of
+    isLiteral1 ty = case ty of
       (L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) -> True
       _ -> False
     oneType = noLocA $ HsTyVar noAnn NotPromoted $ noLocA oneDataConName
 
-rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
-rnModifiers env mods = do
-  (mods', fvs) <- unzip <$> traverse (rnModifier env) mods
+rnModifiersWith :: (HsModifierOf mPs GhcPs -> RnM (HsModifierOf mRn GhcRn, FreeVars))
+                -> [HsModifierOf mPs GhcPs]
+                -> RnM ([HsModifierOf mRn GhcRn], FreeVars)
+rnModifiersWith rnSingle mods = do
+  (mods', fvs) <- unzip <$> traverse rnSingle mods
   return (mods', mconcat fvs)
+
+-- MODS_TODO: do we need this?
+_rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+_rnModifiers env = rnModifiersWith (rnModifier env)
 
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
@@ -742,16 +757,19 @@ rnHsTyLit (HsCharTy x c) = pure (HsCharTy x c)
 
 
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
-rnHsArrow env = rnHsArrowWith (rnModifiers env)
+rnHsArrow env = rnHsArrowWith (rnModifier env)
 
-rnHsArrowWith :: (multPs -> RnM (multRn, FreeVars))
+rnHsArrowWith :: (HsModifierOf multPs GhcPs -> RnM (HsModifierOf multRn GhcRn, FreeVars))
               -> HsArrowOf multPs GhcPs
               -> RnM (HsArrowOf multRn GhcRn, FreeVars)
-rnHsArrowWith _rn (HsUnrestrictedArrow _) = pure (HsUnrestrictedArrow noExtField, emptyFVs)
-rnHsArrowWith rn (HsLinearArrow _ p)
-  =  (\(mult, fvs) -> (HsLinearArrow noExtField mult, fvs)) <$> rn p
-rnHsArrowWith rn (HsExplicitMult _ p)
-  =  (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rn p
+rnHsArrowWith rn arr = case arr of
+  HsUnrestrictedArrow _ -> pure (HsUnrestrictedArrow noExtField, emptyFVs)
+  HsLinearArrow _ mods ->
+    (\(mult, fvs) -> (HsLinearArrow noExtField mult, fvs)) <$> rnMods mods
+  HsExplicitMult _ mods ->
+    (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rnMods mods
+  where
+    rnMods = rnModifiersWith rn
 
 {-
 Note [Renaming HsCoreTys]

@@ -980,15 +980,17 @@ expr_to_type earg =
       unwrap_wc t
     go (L l (HsFunArr _ mult arg res)) =
       do { arg' <- go arg
-         ; mult' <- go_arrow mult
+         ; mult' <- go_arrow
          ; res' <- go res
          ; return (L l (HsFunTy noExtField mult' arg' res'))}
          where
-          go_arrow :: HsArrowOf (LHsExpr GhcRn) GhcRn -> TcM (HsArrow GhcRn)
-          go_arrow = undefined -- MODS_TODO
-          -- go_arrow (HsUnrestrictedArrow{}) = pure (HsUnrestrictedArrow noExtField)
-          -- go_arrow (HsLinearArrow{}) = pure (HsLinearArrow noExtField)
-          -- go_arrow (HsExplicitMult _ exp) = HsExplicitMult noExtField <$> go exp
+          -- MODS_TODO seems like no tests cover this? At least we can set
+          -- `go_arrow = undefined` without causing more test failures.
+          go_arrow = case mult of
+            HsUnrestrictedArrow _ -> pure $ HsUnrestrictedArrow noExtField
+            HsLinearArrow _ mods -> HsLinearArrow noExtField <$> mapM go_modifier mods
+            HsExplicitMult _ mods -> HsExplicitMult noExtField <$> mapM go_modifier mods
+          go_modifier (HsModifier _ ty) = HsModifier noExtField <$> go ty
     go (L l (HsForAll _ tele expr)) =
       do { ty <- go expr
          ; return (L l (HsForAllTy noExtField tele ty))}

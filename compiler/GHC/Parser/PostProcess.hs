@@ -1732,7 +1732,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpan -> ArrowParsingMode lhs b -> LocatedA lhs -> HsArrowOf (LocatedA b) GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "%m" to the left of "->" (multiplicity)
   mkHsMultPV
-    :: EpToken "%" -> LocatedA b -> PV (EpUniToken "->" "→" -> HsArrowOf (LocatedA b) GhcPs)
+    :: Located [HsModifierOf (LocatedA b) GhcPs] -> EpUniToken "->" "→" -> PV (HsArrowOf (LocatedA b) GhcPs)
   -- | Disambiguate "forall a. b" and "forall a -> b" (forall telescope)
   mkHsForallPV :: SrcSpan -> HsForAllTelescope GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "(a,b,c)" to the left of "=>" (constraint list)
@@ -1868,9 +1868,9 @@ instance DisambECP (HsCmd GhcPs) where
     case mode of  -- matching on the mode brings Outputable instances into scope
       ArrowIsViewPat -> ppr a <+> pprHsArrow arr <+> ppr b
       ArrowIsFunType -> ppr a <+> pprHsArrow arr <+> ppr b
-  mkHsMultPV pct mult = cmdFail l $
-    ppr pct <> ppr mult
-    where l = getHasLoc pct `combineSrcSpans` getHasLoc mult
+  mkHsMultPV lMods tok = case unLoc lMods of
+    [] -> pure $ HsUnrestrictedArrow tok
+    mods -> cmdFail (getLoc lMods) $ ppr mods
   mkHsForallPV l tele cmd = cmdFail l $
     pprHsForAll tele Nothing <+> ppr cmd
   checkContextPV ctxt = cmdFail (getLocA ctxt) $ ppr ctxt
@@ -1987,8 +1987,9 @@ instance DisambECP (HsExpr GhcPs) where
     exprArrowParsingMode mode $
     return $ L (noAnnSrcSpan l) $
       HsFunArr noExtField arr arg res
-  mkHsMultPV pct t =
-    return $ mkMultExpr pct t
+  mkHsMultPV lMods tok = return $ case unLoc lMods of
+    [] -> HsUnrestrictedArrow tok
+    mods -> HsExplicitMult tok mods
   mkHsForallPV l telescope ty =
     return $ L (noAnnSrcSpan l) $
       HsForAll noExtField (setTelescopeBndrsNameSpace varName telescope) ty
@@ -2078,9 +2079,9 @@ instance DisambECP (PatBuilder GhcPs) where
              panic "mkHsArrowPV ArrowIsViewPat: expected HsUnrestrictedArrow"
   mkHsArrowPV l ArrowIsFunType a arr b =
     patFail l (PsErrTypeSyntaxInPat (PETS_FunctionArrow a arr b))
-  mkHsMultPV tok arg =
-    let l = getHasLoc tok `combineSrcSpans` getLocA arg in
-    patFail l (PsErrTypeSyntaxInPat (PETS_Multiplicity tok arg))
+  mkHsMultPV lMods tok = case unLoc lMods of
+    [] -> pure $ HsUnrestrictedArrow tok
+    mods -> patFail (getLoc lMods) $ PsErrTypeSyntaxInPat $ PETS_Multiplicity mods
   mkHsForallPV l tele body = patFail l (PsErrTypeSyntaxInPat (PETS_ForallTelescope tele body))
   checkContextPV ctx = patFail (getLocA ctx) (PsErrTypeSyntaxInPat (PETS_ConstraintContext ctx))
   mkQualPV _ _ _ =  -- unreachable because mkQualPV is only called on the result
@@ -3488,16 +3489,6 @@ mkLHsOpTy :: PromotionFlag -> LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs
 mkLHsOpTy prom x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
-
-mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> EpUniToken "->" "→" -> HsArrowOf (LHsExpr GhcPs) GhcPs
-mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
-  -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow (EpPct1 pct1 arr) t -- MODS_TODO
-  where
-    -- The location of "%" combined with the location of "1".
-    pct1 :: EpToken "%1"
-    pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultExpr _pct t arr = HsExplicitMult arr t
 
 mkMultAnn :: EpToken "%" -> LHsType GhcPs -> HsMultAnn GhcPs
 mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1)))

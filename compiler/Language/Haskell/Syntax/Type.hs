@@ -40,7 +40,7 @@ module Language.Haskell.Syntax.Type (
         HsTyPat(..), LHsTyPat,
         HsTupleSort(..),
         HsContext, LHsContext,
-        HsModifier(..), XModifier,
+        HsModifierOf(..), HsModifier, XModifier,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
@@ -303,9 +303,12 @@ type LHsContext pass = XRec pass (HsContext pass)
 -- | Haskell Context
 type HsContext pass = [LHsType pass]
 
--- | Modifier
-data HsModifier pass = HsModifier !(XModifier pass) (LHsType pass)
+-- | Modifier. Usually a modifier holds an 'LHsType', but inside expressions, it
+-- has an 'LHsExpr'.
+data HsModifierOf ty pass = HsModifier !(XModifier pass) ty
 type family XModifier pass
+
+type HsModifier pass = HsModifierOf (LHsType pass) pass
 
 -- | Located Haskell Type
 type LHsType pass = XRec pass (HsType pass)
@@ -1022,27 +1025,27 @@ data HsTyLit pass
   | HsCharTy (XCharTy pass) Char
   | XTyLit   !(XXTyLit pass)
 
-type HsArrow pass = HsArrowOf [HsModifier pass] pass
+type HsArrow pass = HsArrowOf (LHsType pass) pass
 
 -- | Denotes the type of arrows in the surface language
 --
 -- MODS_TODO: do we want to keep HsUnrestrictedArrow? Anyway improve comments.
 -- And, do we want a function HsArrow -> [HsModifier] (or [LHsType]), that adds
 -- %One for linear arrows?
-data HsArrowOf mult pass
-  = HsUnrestrictedArrow !(XUnrestrictedArrow mult pass)
+data HsArrowOf ty pass
+  = HsUnrestrictedArrow !(XUnrestrictedArrow ty pass)
     -- ^ a -> b or a → b
 
-  | HsLinearArrow !(XLinearArrow mult pass) !mult
+  | HsLinearArrow !(XLinearArrow ty pass) [HsModifierOf ty pass]
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
 
-  | HsExplicitMult !(XExplicitMult mult pass) !mult
+  | HsExplicitMult !(XExplicitMult ty pass) [HsModifierOf ty pass]
     -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an
     -- `HsType` so as to preserve the syntax as written in the
     -- program.
 
-  | XArrow !(XXArrow mult pass)
+  | XArrow !(XXArrow ty pass)
 
 type family XUnrestrictedArrow mult p
 type family XLinearArrow       mult p

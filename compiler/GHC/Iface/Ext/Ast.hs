@@ -1319,10 +1319,10 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           [ toHieForAllTele tele (getLocA body)
           ]
         HieTc -> dataConCantHappen x
-      HsFunArr x mult arg res -> case hiePass @p of
+      HsFunArr x _mult arg res -> case hiePass @p of
         HieRn ->
-          [ toHie (arrowToHsExpr mult)
-          , toHie arg
+          [ {- toHie (arrowToHsExpr mult) -- MODS_TODO: do we call `toHie` on the types of all modifiers?
+          , -} toHie arg
           , toHie res
           ]
         HieTc -> dataConCantHappen x

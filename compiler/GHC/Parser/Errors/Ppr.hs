@@ -564,7 +564,7 @@ instance Diagnostic PsMessage where
         where
           (what, ctx') = case ctx of
             PETS_FunctionArrow arg arr res -> ("function arrow", ppr arg <+> pprHsArrow arr <+> ppr res)
-            PETS_Multiplicity tok p        -> ("multiplicity annotation", ppr tok <> ppr p)
+            PETS_Multiplicity mods         -> ("multiplicity annotation", ppr mods) -- MODS_TODO this will probably ppr as [%One, %Many] or something
             PETS_ForallTelescope tele body -> ("forall telescope", pprHsForAll tele Nothing <+> ppr body)
             PETS_ConstraintContext ctx     -> ("constraint context", ppr ctx)
 

@@ -557,8 +557,7 @@ data PsErrTypeSyntaxDetails
       !(HsArrowOf (LocatedA (PatBuilder GhcPs)) GhcPs)
       !(LocatedA (PatBuilder GhcPs))
   | PETS_Multiplicity
-      !(EpToken "%")
-      !(LocatedA (PatBuilder GhcPs))
+      ![HsModifierOf (LocatedA (PatBuilder GhcPs)) GhcPs]
   | PETS_ForallTelescope
       !(HsForAllTelescope GhcPs)
       !(LocatedA (PatBuilder GhcPs))

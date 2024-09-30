@@ -1737,11 +1737,21 @@ repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
 
 repFunArr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp))
-repFunArr HsUnrestrictedArrow{} = repConName unrestrictedFunTyConName
-repFunArr mult
-  = do { fun <- repConName fUNTyConName
-       ; mult' <- repLE (arrowToHsExpr mult)
-       ; repApp fun mult' }
+repFunArr arr = case arr of
+  -- MODS_TODO how do we figure out which modifiers are multiplicities and warn
+  -- for the others?
+  HsUnrestrictedArrow _ -> repConName unrestrictedFunTyConName
+  HsLinearArrow _ [] -> do
+    fun <- repConName fUNTyConName
+    mult' <- repLE $ noLocA $ HsVar noExtField $ noLocA oneDataConName
+    repApp fun mult'
+  HsLinearArrow _ _ -> error "MODS_TODO too many modifiers"
+  HsExplicitMult _ [] -> error "MODS_TODO should be impossible"
+  HsExplicitMult _ [HsModifier _ m] -> do
+    fun <- repConName fUNTyConName
+    mult' <- repLE m
+    repApp fun mult'
+  HsExplicitMult _ _ -> error "MODS_TODO too many modifiers"
 
 repConName :: Name -> MetaM (Core (M TH.Exp))
 repConName n = do
