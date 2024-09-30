@@ -1109,6 +1109,8 @@ getRegister' config plat expr =
         MO_F_Mul w -> floatOp w (\d x y -> unitOL $ annExpr expr (MUL d x y))
         MO_F_Quot w -> floatOp w (\d x y -> unitOL $ annExpr expr (DIV d x y))
         -- Floating point comparison
+        MO_F_Min w -> floatOp w (\d x y -> unitOL $ annExpr expr (FMIN d x y))
+        MO_F_Max w -> floatOp w (\d x y -> unitOL $ annExpr expr (FMAX d x y))
         MO_F_Eq w -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y EQ))
         MO_F_Ne w -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y NE))
         MO_F_Ge w -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y FGE))
@@ -2208,6 +2210,8 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       FENCE {} -> 1
       FCVT {} -> 1
       FABS {} -> 1
+      FMIN {} -> 1
+      FMAX {} -> 1
       FMA {} -> 1
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1
