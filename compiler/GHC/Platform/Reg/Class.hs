@@ -49,5 +49,8 @@ registerArch arch =
     ArchPPC       -> Unified
     ArchPPC_64 {} -> Unified
     ArchAArch64   -> Unified
-    ArchRISCV64   -> Separate
+    -- Support for vector registers not yet implemented for RISC-V
+    -- see panic in `getFreeRegs`.
+    --ArchRISCV64   -> Separate
+    ArchRISCV64   -> NoVectors
     _             -> NoVectors
