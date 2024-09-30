@@ -282,8 +282,10 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     -- | a constant function, returning the number of digits of
     -- 'floatRadix' in the significand
     floatDigits         :: a -> Int
-    -- | a constant function, returning the lowest and highest values
-    -- the exponent may assume
+    -- | A constant function, returning the lowest and highest values
+    -- that @'exponent' x@ may assume for a normal @x@.
+    -- The relation to IEEE @emin@ and @emax@ is
+    -- @'floatRange' x = (emin + 1, emax + 1)@.
     floatRange          :: a -> (Int,Int)
     -- | The function 'decodeFloat' applied to a real floating-point
     -- number returns the significand expressed as an 'Integer' and an
