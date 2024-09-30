@@ -666,6 +666,10 @@ pprInstr platform instr = case instr of
       $ line (pprOp platform o1 <> text "->" <> pprOp platform o2)
   FABS o1 o2 | isSingleOp o2 -> op2 (text "\tfabs.s") o1 o2
   FABS o1 o2 | isDoubleOp o2 -> op2 (text "\tfabs.d") o1 o2
+  FMIN o1 o2 o3 | isSingleOp o1 -> op3 (text "\tfmin.s") o1 o2 o3
+                | isDoubleOp o2 -> op3 (text "\tfmin.d") o1 o2 o3
+  FMAX o1 o2 o3 | isSingleOp o1 -> op3 (text "\tfmax.s") o1 o2 o3
+                | isDoubleOp o2 -> op3 (text "\tfmax.d") o1 o2 o3
   FMA variant d r1 r2 r3 ->
     let fma = case variant of
           FMAdd -> text "\tfmadd" <> dot <> floatPrecission d
