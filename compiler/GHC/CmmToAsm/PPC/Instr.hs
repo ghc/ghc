@@ -277,8 +277,6 @@ data Instr
     | FDIV    Format Reg Reg Reg
     | FABS    Reg Reg               -- abs is the same for single and double
     | FNEG    Reg Reg               -- negate is the same for single and double prec.
-    | FMIN    Format Reg Reg Reg
-    | FMAX    Format Reg Reg Reg
 
     -- | Fused multiply-add instructions.
     --
