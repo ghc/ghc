@@ -398,7 +398,7 @@ iselExpr64 expr
      platform <- getPlatform
      pprPanic "iselExpr64(powerpc)" (pdoc platform expr)
 
-
+data MinOrMax = Min | Max
 
 getRegister :: CmmExpr -> NatM Register
 getRegister e = do config <- getConfig
@@ -589,8 +589,9 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_F_Sub w  -> triv_float w FSUB
       MO_F_Mul w  -> triv_float w FMUL
       MO_F_Quot w -> triv_float w FDIV
-      MO_F_Min w  -> triv_float w FMIN
-      MO_F_Max w  -> triv_float w FMAX
+
+      MO_F_Min w -> minmax_float Min w x y
+      MO_F_Max w -> minmax_float Max w x y
 
          -- optimize addition with 32-bit immediate
          -- (needed for PIC)
@@ -695,6 +696,31 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       tmp <- getNewRegNat fmt
       code <- remainderCode rep sgn tmp x y
       return (Any fmt code)
+
+    minmax_float :: MinOrMax -> Width -> CmmExpr -> CmmExpr -> NatM Register
+    minmax_float m w x y =
+      do
+        (src1, src1Code) <- getSomeReg x
+        (src2, src2Code) <- getSomeReg y
+        l1 <- getBlockIdNat
+        l2 <- getBlockIdNat
+        end <- getBlockIdNat
+        let cond = case m of
+                     Min -> LTT
+                     Max -> GTT
+        let code dst = src1Code `appOL` src2Code `appOL`
+                       toOL [ FCMP src1 src2
+                            , BCC cond l1 Nothing
+                            , BCC ALWAYS l2 Nothing
+                            , NEWBLOCK l2
+                            , MR dst src2
+                            , BCC ALWAYS end Nothing
+                            , NEWBLOCK l1
+                            , MR dst src1
+                            , BCC ALWAYS end Nothing
+                            , NEWBLOCK end
+                            ]
+        return (Any (floatFormat w) code)
 
 getRegister' _ _ (CmmMachOp mop [x, y, z]) -- ternary PrimOps
   = case mop of

@@ -941,12 +941,6 @@ pprInstr platform instr = case instr of
    FNEG reg1 reg2
       -> pprUnary (text "fneg") reg1 reg2
 
-   FMIN fmt reg1 reg2 reg3
-      -> pprBinaryF (text "fmin") fmt reg1 reg2 reg3
-
-   FMAX fmt reg1 reg2 reg3
-      -> pprBinaryF (text "fmax") fmt reg1 reg2 reg3
-
    FMADD signs fmt dst ra rc rb
      -> pprTernaryF (pprFMASign signs) fmt dst ra rc rb
 
