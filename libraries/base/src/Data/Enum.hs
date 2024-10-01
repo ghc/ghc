@@ -18,4 +18,4 @@ module Data.Enum
      Enum(..)
      ) where
 
-import GHC.Internal.Data.Enum
+import GHC.Internal.Enum
