@@ -48,7 +48,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Ppr
-import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon )
+import GHC.Core.TyCon    ( TyConBinder )
 
 import GHC.Types.Name
 import GHC.Types.Id
@@ -58,8 +58,9 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Error
 
-import GHC.Utils.Misc
+import GHC.Driver.DynFlags( DynFlags, xopt )
 import GHC.Utils.Panic
+import GHC.Utils.Misc( filterOut )
 import GHC.Utils.Outputable
 
 import GHC.Data.Bag
@@ -975,7 +976,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
-         vcat [ text "quant_pred_candidates =" <+> ppr quant_pred_candidates
+         vcat [ text "wanted_dq ="      <+> ppr wanted_dq
               , text "psig_theta ="     <+> ppr psig_theta
               , text "bound_theta ="    <+> pprCoreBinders bound_theta_vars
               , text "qtvs ="           <+> ppr qtvs
@@ -1290,8 +1291,8 @@ decideQuantification
 -- See Note [Deciding quantification]
 decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs wanted
   = do { -- Step 1: find the mono_tvs
-       ; (candidates, co_vars, mono_tvs0)
-             <- decidePromotedTyVars infer_mode name_taus psigs candidates
+       ; (candidates, co_vars)
+             <- decideAndPromoteTyVars infer_mode name_taus psigs wanted
 
        -- Step 2: default any non-mono tyvars, and re-simplify
        -- This step may do some unification, but result candidates is zonked
@@ -1308,11 +1309,11 @@ decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs wanted
           do { candidates <- TcM.zonkTcTypes candidates
              ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
              ; return (candidates, psig_theta) }
-       ; min_theta  <- pickQuantifiablePreds (mkVarSet qtvs) mono_tvs0 candidates
 
        -- Take account of partial type signatures
        -- See Note [Constraints in partial type signatures]
        ; let min_psig_theta = mkMinimalBySCs id psig_theta
+             min_theta      = pickQuantifiablePreds (mkVarSet qtvs) candidates
        ; theta <- if
            | null psigs -> return min_theta                 -- Case (P3)
            | not (all has_extra_constraints_wildcard psigs) -- Case (P2)
@@ -1396,13 +1397,36 @@ Some rationale and observations
     g :: forall b. Show b => F b -> _ -> b
     g x y = let _ = (f y, show x) in x
   But that's a battle for another day.
+
+Note [Generalising top-level bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  class C a b | a -> b where ..
+  f x = ...[W] C Int beta[1]...
+
+When generalising `f`, closeWrtFunDeps will promote beta[1] to beta[0].
+But we do NOT want to make a top level type
+  f :: C Int beta[0] => blah
+The danger is that beta[0] is defaulted to Any, and that then appears
+in a user error message.  Even the type `blah` mentions beta[0], /and/
+there is a call that fixes beta[0] to (say) Bool, we'll end up with
+[W] C Int Bool, which is insoluble.  Why insoluble? If there was an
+   instance C Int Bool
+then fundeps would have fixed beta:=Bool in the first place.
+
+If the binding of `f` is nested, things are different: we can
+definitely see all the calls.
+
+TODO: this reasoning is incomplete.  Shouldn't it apply to nested
+bindings too, when this promotion happens so it's not because
+beta is already free in the envt???
 -}
 
-decidePromotedTyVars :: InferMode
-                     -> [(Name,TcType)]
-                     -> [TcIdSigInst]
-                     -> [PredType]
-                     -> TcM ([PredType], CoVarSet, TcTyVarSet)
+decideAndPromoteTyVars :: InferMode
+                       -> [(Name,TcType)]
+                       -> [TcIdSigInst]
+                       -> WantedConstraints
+                       -> TcM ([PredType], CoVarSet)
 -- We are about to generalise over type variables at level N
 -- Each must be either
 --    (P) promoted
@@ -1420,13 +1444,9 @@ decidePromotedTyVars :: InferMode
 --
 -- Also return CoVars that appear free in the final quantified types
 --   we can't quantify over these, and we must make sure they are in scope
-decidePromotedTyVars infer_mode name_taus psigs candidates
+decideAndPromoteTyVars infer_mode name_taus psigs wanted
   = do { tc_lvl <- TcM.getTcLevel
-
-       ; let (maybe_quant_cts, no_quant_cts) = approximateWC wanted
-
-
-       ; (no_quant, maybe_quant) <- pick infer_mode candidates
+       ; dflags <- getDynFlags
 
        -- If possible, we quantify over partial-sig qtvs, so they are
        -- not mono. Need to zonk them because they are meta-tyvar TyVarTvs
@@ -1437,110 +1457,112 @@ decidePromotedTyVars infer_mode name_taus psigs candidates
                              concatMap sig_inst_theta psigs
              ; taus <- mapM (TcM.zonkTcType . snd) name_taus
              ; return (psig_qtvs, psig_theta, taus) }
-
        ; let psig_tys = mkTyVarTys psig_qtvs ++ psig_theta
 
-             -- (b) The co_var_tvs are tvs mentioned in the types of covars or
+       ; let (can_quant,     no_quant)    = approximateWC wanted
+             (post_mr_quant, mr_no_quant) = applyMR dflags infer_mode (ctsPreds can_quant)
+
+             -- The co_var_tvs are tvs mentioned in the types of covars or
              -- coercion holes. We can't quantify over these covars, so we
              -- must include the variable in their types in the mono_tvs.
              -- E.g.  If we can't quantify over co :: k~Type, then we can't
              --       quantify over k either!  Hence closeOverKinds
              -- Recall that coVarsOfTypes also returns coercion holes
-             co_vars = coVarsOfTypes (psig_tys ++ taus ++ candidates)
+             co_vars    = coVarsOfTypes (psig_tys ++ taus ++ post_mr_quant)
              co_var_tvs = closeOverKinds co_vars
 
-             mono_tvs0 = filterVarSet (not . isQuantifiableTv tc_lvl) $
-                         tyCoVarsOfTypes candidates
-               -- We need to grab all the non-quantifiable tyvars in the
-               -- types so that we can grow this set to find other
-               -- non-quantifiable tyvars. This can happen with something like
-               --    f x y = ...
-               --      where z = x 3
-               -- The body of z tries to unify the type of x (call it alpha[1])
-               -- with (beta[2] -> gamma[2]). This unification fails because
-               -- alpha is untouchable, leaving [W] alpha[1] ~ (beta[2] -> gamma[2]).
-               -- We need to know not to quantify over beta or gamma, because they
-               -- are in the equality constraint with alpha. Actual test case:
-               -- typecheck/should_compile/tc213
+             -- mono_tvs0 are all the type variables we
+             -- can't quantify over, ignoring the MR
+             mono_tvs0 = outerLevelTyVars tc_lvl (tyCoVarsOfTypes post_mr_quant)
+                         `unionVarSet` tyCoVarsOfTypes (ctsPreds no_quant)
+                         `unionVarSet` co_var_tvs
 
-             mono_tvs1 = mono_tvs0 `unionVarSet` co_var_tvs
+             -- Next, use closeWrtFunDeps to find any other variables that are determined
+             -- by mono_tvs0 + mr_no_quant, by functional dependencies or equalities.
+             -- Example
+             --    f x y = ...
+             --      where z = x 3
+             -- The body of z tries to unify the type of x (call it alpha[1])
+             -- with (beta[2] -> gamma[2]). This unification fails because
+             -- alpha is untouchable, leaving [W] alpha[1] ~ (beta[2] -> gamma[2]).
+             -- We need to know not to quantify over beta or gamma, because they
+             -- are in the equality constraint with alpha. Actual test case:
+             -- typecheck/should_compile/tc213
+             -- See Note [growThetaTyVars vs closeWrtFunDeps]
+             mono_tvs1 = closeWrtFunDeps post_mr_quant $
+                         mono_tvs0 `unionVarSet` tyCoVarsOfTypes mr_no_quant
 
-               -- mono_tvs1 is now the set of variables from an outer scope
-               -- (that's mono_tvs0) and the set of covars, closed over kinds.
-               -- Given this set of variables we know we will not quantify,
-               -- we want to find any other variables that are determined by this
-               -- set, by functional dependencies or equalities. We thus use
-               -- closeWrtFunDeps to find all further variables determined by this root
-               -- set. See Note [growThetaTyVars vs closeWrtFunDeps]
-
-             non_ip_candidates = filterOut isIPLikePred candidates
-               -- implicit params don't really determine a type variable
-               -- (that is, we might have IP "c" Bool and IP "c" Int in different
-               -- places within the same program), and
-               -- skipping this causes implicit params to monomorphise too many
-               -- variables; see Note [Inheriting implicit parameters] in GHC.Tc.Solver.
-               -- Skipping causes typecheck/should_compile/tc219 to fail.
-
-             mono_tvs2 = closeWrtFunDeps non_ip_candidates mono_tvs1
-               -- mono_tvs2 now contains any variable determined by the "root
-               -- set" of monomorphic tyvars in mono_tvs1.
-
-             constrained_tvs = filterVarSet (isQuantifiableTv tc_lvl) $
-                               closeWrtFunDeps non_ip_candidates (tyCoVarsOfTypes no_quant)
-                                `minusVarSet` mono_tvs2
-             -- constrained_tvs: the tyvars that we are not going to
-             -- quantify /solely/ because of the monomorphism restriction
-             --
-             -- (`minusVarSet` mono_tvs2): a type variable is only
-             --   "constrained" (so that the MR bites) if it is not
-             --   free in the environment (#13785) or is determined
-             --   by some variable that is free in the env't
-
-             mono_tvs = (mono_tvs2 `unionVarSet` constrained_tvs)
-                        `delVarSetList` psig_qtvs
-             -- (`delVarSetList` psig_qtvs): if the user has explicitly
-             --   asked for quantification, then that request "wins"
-             --   over the MR.
+             -- Finally, delete psig_qtvs
+             -- If the user has explicitly asked for quantification, then that
+             -- request "wins" over the MR.
              --
              -- What if a psig variable is also free in the environment
              -- (i.e. says "no" to isQuantifiableTv)? That's OK: explanation
              -- in Step 2 of Note [Deciding quantification].
+             mono_tvs = mono_tvs1 `delVarSetList` psig_qtvs
 
-           -- Warn about the monomorphism restriction
-       ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $ do
-           let dia = TcRnMonomorphicBindings (map fst name_taus)
-           diagnosticTc (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus) dia
+       -- Check if the Monomorphism Restriction has bitten
+       ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $
+         do { let mono_tvs_wo_mr = closeWrtFunDeps post_mr_quant mono_tvs0
+                                   `delVarSetList` psig_qtvs
+
+            ; diagnosticTc (not (mono_tvs `subVarSet` mono_tvs_wo_mr)) $
+              TcRnMonomorphicBindings (map fst name_taus) }
+             -- If there is a variable in mono_tvs, but not in mono_tvs_wo_mr
+             -- then the MR has "bitten" and reduced polymorphism.
+
+       -- In /top-level bindings/ do not quantify over any constraints
+       -- that mention a promoted tyvar. See Note [Generalising top-level bindings]
+       ; let final_quant | isTopTcLevel tc_lvl
+                         = filterOut (predMentions mono_tvs) post_mr_quant
+                         | otherwise
+                         = post_mr_quant
 
        -- Promote the mono_tvs: see Note [Promote monomorphic tyvars]
        ; _ <- promoteTyVarSet mono_tvs
 
-       ; traceTc "decidePromotedTyVars" $ vcat
-           [ text "infer_mode =" <+> ppr infer_mode
+       ; traceTc "decideAndPromoteTyVars" $ vcat
+           [ text "tc_lvl =" <+> ppr tc_lvl
+           , text "top =" <+> ppr (isTopTcLevel tc_lvl)
+           , text "infer_mode =" <+> ppr infer_mode
            , text "psigs =" <+> ppr psigs
            , text "psig_qtvs =" <+> ppr psig_qtvs
            , text "mono_tvs0 =" <+> ppr mono_tvs0
+           , text "can_quant =" <+> ppr can_quant
+           , text "post_mr_quant =" <+> ppr post_mr_quant
            , text "no_quant =" <+> ppr no_quant
-           , text "maybe_quant =" <+> ppr maybe_quant
+           , text "mr_no_quant =" <+> ppr mr_no_quant
+           , text "final_quant =" <+> ppr final_quant
            , text "mono_tvs =" <+> ppr mono_tvs
            , text "co_vars =" <+> ppr co_vars ]
 
-       ; return (maybe_quant, co_vars, mono_tvs0) }
-  where
-    pick :: InferMode -> [PredType] -> TcM ([PredType], [PredType])
-    -- Split the candidates into ones we definitely
-    -- won't quantify, and ones that we might
-    pick ApplyMR         cand = return (cand, [])
-    pick NoRestrictions  cand = return ([], cand)
-    pick EagerDefaulting cand = do { os <- xoptM LangExt.OverloadedStrings
-                                   ; return (partition (is_int_ct os) cand) }
+       ; return (final_quant, co_vars) }
 
-    -- is_int_ct returns True for a constraint we should /not/ quantify
+-------------------
+applyMR :: DynFlags -> InferMode -> [PredType]
+        -> ( [PredType]   -- Quantify over these
+           , [PredType] ) -- But not over these
+-- Split the candidates into ones we definitely
+-- won't quantify, and ones that we might
+applyMR _      NoRestrictions  cand = (cand, [])
+applyMR _      ApplyMR         cand = ([], cand)
+applyMR dflags EagerDefaulting cand = partition not_int_ct cand
+  where
+    ovl_strings = xopt LangExt.OverloadedStrings dflags
+
+    -- not_int_ct returns True for a constraint we /can/ quantify
     -- For EagerDefaulting, do not quantify over
     -- over any interactive class constraint
-    is_int_ct ovl_strings pred
+    not_int_ct pred
       = case classifyPredType pred of
-           ClassPred cls _ -> isInteractiveClass ovl_strings cls
-           _               -> False
+           ClassPred cls _ -> not (isInteractiveClass ovl_strings cls)
+           _               -> True
+
+-------------------
+outerLevelTyVars :: TcLevel -> TcTyVarSet -> TcTyVarSet
+-- Find just the tyvars that are bound outside tc_lvl
+outerLevelTyVars tc_lvl tvs
+  = filterVarSet (not . isQuantifiableTv tc_lvl) tvs
 
 -------------------
 defaultTyVarsAndSimplify :: TcLevel
@@ -1637,77 +1659,37 @@ decideQuantifiedTyVars skol_info name_taus psigs candidates
        ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs_plus }
 
 ------------------
+predMentions :: TcTyVarSet -> TcPredType -> Bool
+predMentions qtvs pred = tyCoVarsOfType pred `intersectsVarSet` qtvs
+
 -- | When inferring types, should we quantify over a given predicate?
 -- See Note [pickQuantifiablePreds]
 pickQuantifiablePreds
   :: TyVarSet           -- Quantifying over these
-  -> TcTyVarSet         -- mono_tvs0: variables mentioned a candidate
-                        --   constraint that come from some outer level
   -> TcThetaType        -- Proposed constraints to quantify
-  -> TcM TcThetaType    -- A subset that we can actually quantify
+  -> TcThetaType        -- A subset that we can actually quantify
 -- This function decides whether a particular constraint should be
 -- quantified over, given the type variables that are being quantified
-pickQuantifiablePreds qtvs mono_tvs0 theta
-  = do { tc_lvl <- TcM.getTcLevel
-       ; let is_nested = not (isTopTcLevel tc_lvl)
-       ; return (mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
-                 mapMaybe (pick_me is_nested) theta) }
+pickQuantifiablePreds qtvs theta
+  = mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
+    mapMaybe pick_me theta
   where
-    pick_me is_nested pred
-      = let pred_tvs = tyCoVarsOfType pred
-            mentions_qtvs = pred_tvs `intersectsVarSet` qtvs
-        in case classifyPredType pred of
-
-          ClassPred cls tys
-            | Just {} <- isCallStackPred cls tys
-              -- NEVER infer a CallStack constraint.  Otherwise we let
-              -- the constraints bubble up to be solved from the outer
-              -- context, or be defaulted when we reach the top-level.
-              -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-            -> Nothing
-
+    pick_me pred
+      = case classifyPredType pred of
+          ClassPred cls _
             | isIPClass cls
             -> Just pred -- See Note [Inheriting implicit parameters]
 
-            | not mentions_qtvs
-            -> Nothing   -- Don't quantify over predicates that don't
-                         -- mention any of the quantified type variables
-
-            | is_nested
-            -> Just pred
-
-            -- From here on, we are thinking about top-level defns only
-
-            | pred_tvs `subVarSet` (qtvs `unionVarSet` mono_tvs0)
-              -- See Note [Do not quantify over constraints that determine a variable]
-            -> Just pred
-
-            | otherwise
-            -> Nothing
-
           EqPred eq_rel ty1 ty2
-            | mentions_qtvs
-            , quantify_equality eq_rel ty1 ty2
+            | predMentions qtvs pred
             , Just (cls, tys) <- boxEqPred eq_rel ty1 ty2
               -- boxEqPred: See Note [Lift equality constraints when quantifying]
             -> Just (mkClassPred cls tys)
             | otherwise
             -> Nothing
 
-          IrredPred {} | mentions_qtvs -> Just pred
-                       | otherwise     -> Nothing
-
-          ForAllPred {} -> Nothing
-
-    -- See Note [Quantifying over equality constraints]
-    quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
-    quantify_equality ReprEq _   _   = True
-
-    quant_fun ty
-      = case tcSplitTyConApp_maybe ty of
-          Just (tc, tys) | isTypeFamilyTyCon tc
-                         -> tyCoVarsOfTypes tys `intersectsVarSet` qtvs
-          _ -> False
+          _ | predMentions qtvs pred -> Just pred
+            | otherwise              -> Nothing
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
