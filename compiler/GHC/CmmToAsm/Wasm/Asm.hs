@@ -35,13 +35,13 @@ import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Panic (panic)
 
 -- | Reads current indentation, appends result to state
-newtype WasmAsmM a = WasmAsmM (Bool -> Builder -> State Builder a)
+newtype WasmAsmM a = WasmAsmM (WasmAsmConfig -> Builder -> State Builder a)
   deriving
     ( Functor,
       Applicative,
       Monad
     )
-    via (ReaderT Bool (ReaderT Builder (State Builder)))
+    via (ReaderT WasmAsmConfig (ReaderT Builder (State Builder)))
 
 instance Semigroup a => Semigroup (WasmAsmM a) where
   (<>) = liftA2 (<>)
@@ -49,19 +49,18 @@ instance Semigroup a => Semigroup (WasmAsmM a) where
 instance Monoid a => Monoid (WasmAsmM a) where
   mempty = pure mempty
 
--- | To tail call or not, that is the question
-doTailCall :: WasmAsmM Bool
-doTailCall = WasmAsmM $ \do_tail_call _ -> pure do_tail_call
+getConf :: WasmAsmM WasmAsmConfig
+getConf = WasmAsmM $ \conf _ -> pure conf
 
 -- | Default indent level is none
-execWasmAsmM :: Bool -> WasmAsmM a -> Builder
-execWasmAsmM do_tail_call (WasmAsmM m) =
-  execState (m do_tail_call mempty) mempty
+execWasmAsmM :: WasmAsmConfig -> WasmAsmM a -> Builder
+execWasmAsmM conf (WasmAsmM m) =
+  execState (m conf mempty) mempty
 
 -- | Increase indent level by a tab
 asmWithTab :: WasmAsmM a -> WasmAsmM a
 asmWithTab (WasmAsmM m) =
-  WasmAsmM $ \do_tail_call t -> m do_tail_call $! char7 '\t' <> t
+  WasmAsmM $ \conf t -> m conf $! char7 '\t' <> t
 
 -- | Writes a single line starting with the current indent
 asmTellLine :: Builder -> WasmAsmM ()
@@ -113,7 +112,8 @@ asmFromSymName = shortByteString . coerce fastStringToShortByteString
 
 asmTellDefSym :: SymName -> WasmAsmM ()
 asmTellDefSym sym = do
-  asmTellTabLine $ ".hidden " <> asm_sym
+  WasmAsmConfig {..} <- getConf
+  unless pic $ asmTellTabLine $ ".hidden " <> asm_sym
   asmTellTabLine $ ".globl " <> asm_sym
   where
     asm_sym = asmFromSymName sym
@@ -136,7 +136,7 @@ asmTellDataSectionContent ty_word c = asmTellTabLine $ case c of
       <> ( case compare o 0 of
              EQ -> mempty
              GT -> "+" <> intDec o
-             LT -> intDec o
+             LT -> panic "asmTellDataSectionContent: negative offset"
          )
   DataSkip i -> ".skip " <> intDec i
   DataASCII s
@@ -245,14 +245,27 @@ asmTellWasmInstr ty_word instr = case instr of
   WasmConst TagI32 i -> asmTellLine $ "i32.const " <> integerDec i
   WasmConst TagI64 i -> asmTellLine $ "i64.const " <> integerDec i
   WasmConst {} -> panic "asmTellWasmInstr: unreachable"
-  WasmSymConst sym ->
-    asmTellLine $
-      ( case ty_word of
-          TagI32 -> "i32.const "
-          TagI64 -> "i64.const "
-          _ -> panic "asmTellWasmInstr: unreachable"
-      )
-        <> asmFromSymName sym
+  WasmSymConst sym -> do
+    WasmAsmConfig {..} <- getConf
+    let
+      asm_sym = asmFromSymName sym
+      (ty_const, ty_add) = case ty_word of
+        TagI32 -> ("i32.const ", "i32.add")
+        TagI64 -> ("i64.const ", "i64.add")
+        _ -> panic "asmTellWasmInstr: invalid word type"
+    traverse_ asmTellLine $ if
+      | pic, getUnique sym `memberUniqueSet` mbrelSyms -> [
+          "global.get __memory_base",
+          ty_const <> asm_sym <> "@MBREL",
+          ty_add
+        ]
+      | pic, getUnique sym `memberUniqueSet` tbrelSyms -> [
+          "global.get __table_base",
+          ty_const <> asm_sym <> "@TBREL",
+          ty_add
+        ]
+      | pic -> [ "global.get " <> asm_sym <> "@GOT" ]
+      | otherwise -> [ ty_const <> asm_sym ]
   WasmLoad ty (Just w) s o align ->
     asmTellLine $
       asmFromWasmType ty
@@ -400,12 +413,12 @@ asmTellWasmControl ty_word c = case c of
     asmTellLine $ "br_table {" <> builderCommas intDec (ts <> [t]) <> "}"
   -- See Note [WasmTailCall]
   WasmTailCall (WasmExpr e) -> do
-    do_tail_call <- doTailCall
+    WasmAsmConfig {..} <- getConf
     if
-        | do_tail_call,
+        | tailcall,
           WasmSymConst sym <- e ->
             asmTellLine $ "return_call " <> asmFromSymName sym
-        | do_tail_call ->
+        | tailcall ->
             do
               asmTellWasmInstr ty_word e
               asmTellLine $
@@ -442,13 +455,25 @@ asmTellFunc ty_word def_syms sym (func_ty, FuncBody {..}) = do
 
 asmTellGlobals :: WasmTypeTag w -> WasmAsmM ()
 asmTellGlobals ty_word = do
+  WasmAsmConfig {..} <- getConf
+  when pic $ traverse_ asmTellTabLine [
+      ".globaltype __memory_base, i32, immutable",
+      ".globaltype __table_base, i32, immutable"
+    ]
   for_ supportedCmmGlobalRegs $ \reg ->
-    let (sym, ty) = fromJust $ globalInfoFromCmmGlobalReg ty_word reg
-     in asmTellTabLine $
+    let
+      (sym, ty) = fromJust $ globalInfoFromCmmGlobalReg ty_word reg
+      asm_sym = asmFromSymName sym
+     in do
+      asmTellTabLine $
           ".globaltype "
-            <> asmFromSymName sym
+            <> asm_sym
             <> ", "
             <> asmFromSomeWasmType ty
+      when pic $ traverse_ asmTellTabLine [
+          ".import_module " <> asm_sym <> ", regs",
+          ".import_name " <> asm_sym <> ", " <> asm_sym
+        ]
   asmTellLF
 
 asmTellCtors :: WasmTypeTag w -> [SymName] -> WasmAsmM ()
@@ -496,14 +521,14 @@ asmTellProducers = do
 
 asmTellTargetFeatures :: WasmAsmM ()
 asmTellTargetFeatures = do
-  do_tail_call <- doTailCall
+  WasmAsmConfig {..} <- getConf
   asmTellSectionHeader ".custom_section.target_features"
   asmTellVec
     [ do
         asmTellTabLine ".int8 0x2b"
         asmTellBS feature
       | feature <-
-          ["tail-call" | do_tail_call]
+          ["tail-call" | tailcall]
             <> [ "bulk-memory",
                  "mutable-globals",
                  "nontrapping-fptoint",

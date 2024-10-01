@@ -21,8 +21,7 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgAsmContext            = initSDocContext dflags PprCode
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
-   -- no PIC on wasm32 for now
-   , ncgPIC                   = positionIndependent dflags && not (platformArch (targetPlatform dflags) == ArchWasm32)
+   , ncgPIC                   = positionIndependent dflags
    , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
    , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
    , ncgSplitSections         = gopt Opt_SplitSections dflags
