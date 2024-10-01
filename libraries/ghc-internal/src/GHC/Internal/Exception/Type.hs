@@ -49,7 +49,7 @@ module GHC.Internal.Exception.Type
        , underflowException
        ) where
 
-import GHC.Internal.Data.OldList (intersperse, lines, unlines, null)
+import GHC.Internal.Data.OldList (lines, unlines, null)
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable (Typeable, TypeRep, cast)
 import qualified GHC.Internal.Data.Typeable as Typeable
@@ -252,7 +252,7 @@ instance Exception SomeException where
 -- @since base-4.21
 displayExceptionWithInfo :: SomeException -> String
 displayExceptionWithInfo (SomeException e) =
-    case displayContext ?exceptionContext of
+    case displayExceptionContext ?exceptionContext of
       "" -> msg
       dc -> msg ++ "\n\n" ++ dc
     where
@@ -267,11 +267,6 @@ displayExceptionWithInfo (SomeException e) =
           where
             tyMsg = Typeable.tyConPackage tyCon ++ ":" ++ Typeable.tyConModule tyCon ++ "." ++ Typeable.tyConName tyCon
             tyCon = Typeable.typeRepTyCon rep
-
-displayContext :: ExceptionContext -> String
-displayContext (ExceptionContext anns0) = mconcat $ intersperse "\n" $ map go anns0
-  where
-    go (SomeExceptionAnnotation ann) = displayExceptionAnnotation ann
 
 newtype NoBacktrace e = NoBacktrace e
     deriving (Show)
