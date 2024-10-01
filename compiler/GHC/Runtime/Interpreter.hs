@@ -67,6 +67,7 @@ import GHC.Prelude
 
 import GHC.Runtime.Interpreter.Types
 import GHC.Runtime.Interpreter.JS
+import GHC.Runtime.Interpreter.Wasm
 import GHC.Runtime.Interpreter.Process
 import GHC.Runtime.Utils
 import GHCi.Message
@@ -196,11 +197,13 @@ interpCmd interp msg = case interpInstance interp of
 withExtInterp :: ExceptionMonad m => ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
 withExtInterp ext action = case ext of
   ExtJS    i -> withJSInterp i action
+  ExtWasm  i -> withWasmInterp i action
   ExtIServ i -> withIServ    i action
 
 withExtInterpStatus :: ExtInterp -> (forall d. ExtInterpStatusVar d -> m a) -> m a
 withExtInterpStatus ext action = case ext of
   ExtJS    i -> action (interpStatus i)
+  ExtWasm  i -> action $ interpStatus i
   ExtIServ i -> action (interpStatus i)
 
 -- Note [uninterruptibleMask_ and interpCmd]
@@ -227,6 +230,11 @@ withIServ (ExtInterpState cfg mstate) action = do
 withJSInterp :: ExceptionMonad m => JSInterp -> (ExtInterpInstance JSInterpExtra -> m a) -> m a
 withJSInterp (ExtInterpState cfg mstate) action = do
   inst <- spawnInterpMaybe cfg spawnJSInterp mstate
+  action inst
+
+withWasmInterp :: ExceptionMonad m => WasmInterp -> (ExtInterpInstance () -> m a) -> m a
+withWasmInterp (ExtInterpState cfg mstate) action = do
+  inst <- spawnInterpMaybe cfg spawnWasmInterp mstate
   action inst
 
 -- | Spawn an interpreter if not already running according to the status in the
@@ -452,6 +460,9 @@ lookupSymbol interp str = withSymbolCache interp str $
         uninterruptibleMask_ $
           sendMessage inst (LookupSymbol (unpackFS str))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
+      ExtWasm i -> withWasmInterp i $ \inst -> fmap fromRemotePtr <$> do
+        uninterruptibleMask_ $
+          sendMessage inst (LookupSymbol (unpackFS str))
 
 lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> FastString -> IO (Maybe (Ptr ()))
 lookupSymbolInDLL interp dll str = withSymbolCache interp str $
@@ -464,6 +475,8 @@ lookupSymbolInDLL interp dll str = withSymbolCache interp str $
         uninterruptibleMask_ $
           sendMessage inst (LookupSymbolInDLL dll (unpackFS str))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
+      -- wasm dyld doesn't track which symbol comes from which .so
+      ExtWasm {} -> lookupSymbol interp str
 
 lookupClosure :: Interp -> String -> IO (Maybe HValueRef)
 lookupClosure interp str =
@@ -700,6 +713,7 @@ interpreterProfiled interp = case interpInstance interp of
   ExternalInterp ext -> case ext of
     ExtIServ i -> iservConfProfiled (interpConfig i)
     ExtJS {}   -> False -- we don't support profiling yet in the JS backend
+    ExtWasm i -> wasmInterpProfiled $ interpConfig i
 
 -- | Interpreter uses Dynamic way
 interpreterDynamic :: Interp -> Bool
@@ -710,3 +724,4 @@ interpreterDynamic interp = case interpInstance interp of
   ExternalInterp ext -> case ext of
     ExtIServ i -> iservConfDynamic (interpConfig i)
     ExtJS {}   -> False -- dynamic doesn't make sense for JS
+    ExtWasm {} -> True  -- wasm dyld can only load dynamic code

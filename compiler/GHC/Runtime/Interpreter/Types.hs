@@ -20,6 +20,8 @@ module GHC.Runtime.Interpreter.Types
    , JSState (..)
    , NodeJsSettings (..)
    , defaultNodeJsSettings
+   , WasmInterp
+   , WasmInterpConfig (..)
    )
 where
 
@@ -32,9 +34,11 @@ import GHC.Types.Unique.FM
 import GHC.Data.FastString ( FastString )
 import Foreign
 
+import GHC.Platform
 import GHC.Utils.TmpFs
 import GHC.Utils.Logger
 import GHC.Unit.Env
+import GHC.Unit.State
 import GHC.Unit.Types
 import GHC.StgToJS.Types
 import GHC.StgToJS.Linker.Types
@@ -65,6 +69,7 @@ data InterpInstance
 data ExtInterp
   = ExtIServ !IServ
   | ExtJS !JSInterp
+  | ExtWasm !WasmInterp
 
 -- | External interpreter
 --
@@ -80,6 +85,7 @@ type ExtInterpStatusVar d = MVar (InterpStatus (ExtInterpInstance d))
 
 type IServ    = ExtInterpState IServConfig    ()
 type JSInterp = ExtInterpState JSInterpConfig JSInterpExtra
+type WasmInterp = ExtInterpState WasmInterpConfig ()
 
 data InterpProcess = InterpProcess
   { interpPipe   :: !Pipe           -- ^ Pipe to communicate with the server
@@ -161,3 +167,16 @@ data JSInterpConfig = JSInterpConfig
   , jsInterpFinderCache :: !FinderCache
   }
 
+------------------------
+-- Wasm Stuff
+------------------------
+
+data WasmInterpConfig = WasmInterpConfig
+  { wasmInterpDyLD           :: !FilePath  -- ^ Location of dyld.mjs script
+  , wasmInterpLibDir         ::  FilePath  -- ^ wasi-sdk sysroot libdir containing libc.so, etc
+  , wasmInterpOpts           :: ![String]  -- ^ Additional command line arguments for iserv
+  , wasmInterpTargetPlatform :: !Platform
+  , wasmInterpProfiled       :: !Bool      -- ^ Are we profiling yet?
+  , wasmInterpHsSoSuffix     :: !String    -- ^ Shared lib filename common suffix sans .so, e.g. p-ghc9.13.20241001
+  , wasmInterpUnitState      :: !UnitState
+  }
