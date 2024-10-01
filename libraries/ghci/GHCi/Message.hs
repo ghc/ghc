@@ -40,6 +40,9 @@ import GHC.Fingerprint
 import GHC.Conc (pseq, par)
 import Control.Concurrent
 import Control.Exception
+#if MIN_VERSION_base(4,20,0)
+import Control.Exception.Context
+#endif
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
@@ -442,7 +445,15 @@ toSerializableException :: SomeException -> SerializableException
 toSerializableException ex
   | Just UserInterrupt <- fromException ex  = EUserInterrupt
   | Just (ec::ExitCode) <- fromException ex = (EExitCode ec)
-  | otherwise = EOtherException (show (ex :: SomeException))
+  | otherwise = EOtherException $
+#if MIN_VERSION_base(4,20,0)
+      -- Exception plus backtrace as seen in `displayExceptionWithInfo`
+      case displayExceptionContext (someExceptionContext ex) of
+        "" -> displayException (ex :: SomeException)
+        cx -> displayException (ex :: SomeException) ++ "\n\n" ++ cx
+#else
+      show (ex :: SomeException)
+#endif
 
 fromSerializableException :: SerializableException -> SomeException
 fromSerializableException EUserInterrupt = toException UserInterrupt

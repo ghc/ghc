@@ -212,7 +212,9 @@ data CommandResult
    deriving Show
 
 cmdSuccess :: MonadThrow m => CommandResult -> m (Maybe Bool)
-cmdSuccess CommandComplete{ cmdResult = Left e } = throwM e
+cmdSuccess CommandComplete{ cmdResult = Left e } =
+  {- Don't add a backtrace from ghci/ghc to the exception from the user program! -}
+  throwM (NoBacktrace e)
 cmdSuccess CommandComplete{ cmdResult = Right r } = return r
 cmdSuccess CommandIncomplete = return $ Just True
 
