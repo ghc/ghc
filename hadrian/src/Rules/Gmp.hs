@@ -12,6 +12,7 @@ import Utilities
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Settings.Builders.Common (cArgs, getStagedCCFlags)
+import GHC.Platform.ArchOS
 
 -- | Build in-tree GMP library objects (if GmpInTree flag is set) and return
 -- their paths.
@@ -122,7 +123,13 @@ gmpRules = do
             let gmpBuildP = takeDirectory mk
                 gmpP      = takeDirectory gmpBuildP
             ctx <- makeGmpPathContext gmpP
-            cFlags <- interpretInContext ctx $ mconcat [ cArgs, getStagedCCFlags ]
+            cFlags <-
+                interpretInContext ctx $
+                mconcat
+                    [ cArgs
+                    , getStagedCCFlags
+                    , anyTargetArch [ArchWasm32] ? arg "-fvisibility=default"
+                    ]
             env <- sequence
                      [ builderEnvironment "CC" $ Cc CompileC (stage ctx)
                      , return . AddEnv "CFLAGS" $ unwords cFlags
