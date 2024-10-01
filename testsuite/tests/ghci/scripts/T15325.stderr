@@ -1,4 +1,3 @@
-
 T15325.hs:11:7: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • No instance for ‘PolyList e0’ arising from a use of ‘f’
     • In the expression: f 0
@@ -17,8 +16,15 @@ T15325.hs:11:9: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • In the first argument of ‘f’, namely ‘0’
       In the expression: f 0
       In an equation for ‘plh’: plh = f 0
+
 *** Exception: T15325.hs:11:7: error: [GHC-39999]
     • No instance for ‘PolyList e0’ arising from a use of ‘f’
     • In the expression: f 0
       In an equation for ‘plh’: plh = f 0
 (deferred type error)
+
+HasCallStack backtrace:
+  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:168:13 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:88:42 in ghc-internal:GHC.Internal.Exception
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
+

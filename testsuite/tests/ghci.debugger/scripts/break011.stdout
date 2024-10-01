@@ -1,4 +1,8 @@
 *** Exception: foo
+
+HasCallStack backtrace:
+  error, called at <interactive>:2:1 in interactive:Ghci1
+
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 Stopped in <exception thrown>, <unknown>
@@ -20,8 +24,16 @@ _exception = SomeException (ErrorCall "foo")
 _result :: a = _
 _exception :: SomeException = SomeException (ErrorCall "foo")
 *** Exception: foo
+
+HasCallStack backtrace:
+  error, called at Test7.hs:2:18 in main:Main
+
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 *** Exception: foo
+
+HasCallStack backtrace:
+  error, called at Test7.hs:2:18 in main:Main
+

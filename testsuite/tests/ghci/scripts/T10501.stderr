@@ -1,2 +1,13 @@
 *** Exception: Prelude.head: empty list
+
+HasCallStack backtrace:
+  error, called at libraries/ghc-internal/src/GHC/Internal/List.hs:2036:3 in ghc-internal:GHC.Internal.List
+  errorEmptyList, called at libraries/ghc-internal/src/GHC/Internal/List.hs:96:11 in ghc-internal:GHC.Internal.List
+  badHead, called at libraries/ghc-internal/src/GHC/Internal/List.hs:90:28 in ghc-internal:GHC.Internal.List
+  head, called at <interactive>:1:10 in interactive:Ghci1
+
 *** Exception: Prelude.undefined
+
+HasCallStack backtrace:
+  undefined, called at <interactive>:1:17 in interactive:Ghci1
+
