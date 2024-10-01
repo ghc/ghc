@@ -137,6 +137,8 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
                  , omit_ghci
                  , js_broken(22374)
+                 # RTS linker doesn't work on non-dyn ways on wasm32
+                 , when(arch('wasm32'), skip)
                  ],
      compile_and_run, ['-rdynamic -package ghc'])
 
