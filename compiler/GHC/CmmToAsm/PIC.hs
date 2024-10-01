@@ -142,6 +142,11 @@ cmmMakeDynamicReference config referenceKind lbl
               addImport symbolPtr
               return $ cmmLoadBWord platform (cmmMakePicReference config symbolPtr)
 
+        -- On wasm, always preserve the original CLabel, the backends
+        -- will handle dynamic references properly
+        AccessDirectly | ArchWasm32 <- platformArch platform ->
+              pure $ CmmLit $ CmmLabel lbl
+
         AccessDirectly -> case referenceKind of
                 -- for data, we might have to make some calculations:
               DataReference -> return $ cmmMakePicReference config lbl
@@ -412,6 +417,11 @@ howToAccessLabel config _arch os _kind lbl
         = if ncgLabelDynamic config lbl
             then AccessViaSymbolPtr
             else AccessDirectly
+
+-- On wasm, always keep the original CLabel and let the backend decide
+-- how to handle dynamic references
+howToAccessLabel _ ArchWasm32 _ _ _
+        = AccessDirectly
 
 -- all other platforms
 howToAccessLabel config _arch _os _kind _lbl
