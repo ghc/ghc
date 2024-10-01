@@ -1,2 +1,10 @@
 *** Exception: Prelude.undefined
+
+HasCallStack backtrace:
+  undefined, called at <interactive>:2:12 in interactive:Ghci1
+
 *** Exception: Prelude.undefined
+
+HasCallStack backtrace:
+  undefined, called at <interactive>:3:12 in interactive:Ghci1
+
