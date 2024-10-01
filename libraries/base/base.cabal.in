@@ -46,8 +46,10 @@ Library
         , Data.Bifoldable1
         , Data.Bifunctor
         , Data.Bitraversable
+        , Data.Bounded
         , Data.Char
         , Data.Complex
+        , Data.Enum
         , Data.Fixed
         , Data.Foldable1
         , Data.Functor.Classes
@@ -95,7 +97,6 @@ Library
         , Data.Dynamic
         , Data.Either
         , Data.Eq
-        , Data.Enum
         , Data.Foldable
         , Data.Function
         , Data.Functor
