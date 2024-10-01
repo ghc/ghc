@@ -37,6 +37,7 @@ module Control.Exception
      addExceptionContext,
      someExceptionContext,
      annotateIO,
+     NoBacktrace(..),
      ExceptionWithContext(..),
      WhileHandling(..),
 
