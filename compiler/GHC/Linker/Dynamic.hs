@@ -32,6 +32,7 @@ linkDynLib :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> 
 linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
  = do
     let platform   = ue_platform unit_env
+        arch       = platformArch platform
         os         = platformOS platform
 
         -- This is a rather ugly hack to fix dynamically linked
@@ -80,8 +81,13 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
     --
     --   * if -flink-rts is used, we link with the rts.
     --
+    --   * on wasm we need to ensure libHSrts*.so is listed in
+    --   WASM_DYLINK_NEEDED, otherwise dyld can't load it.
+    --
+    --
     let pkgs_without_rts = filter ((/= rtsUnitId) . unitId) pkgs_with_rts
         pkgs
+         | ArchWasm32 <- arch      = pkgs_with_rts
          | OSMinGW32 <- os         = pkgs_with_rts
          | gopt Opt_LinkRts dflags = pkgs_with_rts
          | otherwise               = pkgs_without_rts
@@ -219,7 +225,8 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                                 -- non-PIC intra-package-relocations for
                                 -- performance (where symbolic linking works)
                                 -- See Note [-Bsymbolic assumptions by GHC]
-                                ["-Wl,-Bsymbolic" | not unregisterised]
+                                -- wasm-ld accepts --Bsymbolic instead
+                                ["-Wl,-Bsymbolic" | not unregisterised && arch /= ArchWasm32 ]
 
             runLink logger tmpfs linker_config (
                     map Option verbFlags
@@ -232,7 +239,29 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  ++ map Option bsymbolicFlag
                     -- Set the library soname. We use -h rather than -soname as
                     -- Solaris 10 doesn't support the latter:
-                 ++ [ Option ("-Wl,-h," ++ takeFileName output_fn) ]
+                    -- wasm-ld only accepts -soname and it's of little use anyway
+                 ++ [ Option ("-Wl,-h," ++ takeFileName output_fn) | arch /= ArchWasm32 ]
+                    -- 1. On wasm, --Bsymbolic is an optimization, not
+                    --    a requirement. We build the wasi-sdk sysroot
+                    --    shared libs as well as all Haskell shared
+                    --    libs with --Bsymbolic, but dyld can handle
+                    --    shared libs without --Bsymbolic at
+                    --    link-time. Though there will be more
+                    --    imports/exports to slow things down.
+                    -- 2. --experimental-pic silences wasm-ld warnings
+                    --    that PIC is experimental.
+                    -- 3. --unresolved-symbols=import-dynamic turns
+                    --    unresolved symbols to GOT.mem/GOT.func/env
+                    --    imports, which can be gracefully handled by
+                    --    dyld as lazy bindings. Ideally we'd only
+                    --    enable this for rts since it forward
+                    --    references ghc-prim/ghc-internal, but too
+                    --    many Haskell packages would be rejected at
+                    --    link-time even if their code refers to
+                    --    something that will not be called at
+                    --    run-time in wasm, so enabling it in the
+                    --    driver is a more pragmatic solution.
+                 ++ [ Option "-Wl,--Bsymbolic,--experimental-pic,--unresolved-symbols=import-dynamic" | arch == ArchWasm32 ]
                  ++ extra_ld_inputs
                  ++ map Option lib_path_opts
                  ++ map Option pkg_lib_path_opts
