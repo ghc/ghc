@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, UnboxedTuples, MagicHash #-}
+{-# LANGUAGE CPP, UnboxedTuples, MagicHash, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -38,6 +38,10 @@ import GHC.Exts
 import System.Posix.Internals ( CFilePath, withFilePath, peekFilePath )
 import System.FilePath  ( dropExtension, normalise )
 
+#if defined(wasm32_HOST_ARCH)
+import Control.Exception (catch, evaluate)
+import GHC.Wasm.Prim
+#endif
 
 -- ---------------------------------------------------------------------------
 -- RTS Linker Interface
@@ -56,6 +60,78 @@ data ShouldRetainCAFs
     -- created by the module initialisation code.  unloadObj
     -- frees these StablePtrs, which will allow the CAFs to
     -- be GC'd and the code to be removed.
+
+#if defined(wasm32_HOST_ARCH)
+
+-- On wasm, retain_cafs flag is ignored, revertCAFs is a no-op
+initObjLinker :: ShouldRetainCAFs -> IO ()
+initObjLinker _ = pure ()
+
+loadDLL :: String -> IO (Either String (Ptr LoadedDLL))
+loadDLL f =
+  m `catch` \(err :: JSException) ->
+    pure $ Left $ "loadDLL failed for " <> f <> ": " <> show err
+  where
+    m = do
+      evaluate =<< js_loadDLL (toJSString f)
+      pure $ Right nullPtr
+
+foreign import javascript safe "__exports.__dyld.loadDLL($1)"
+  js_loadDLL :: JSString -> IO ()
+
+loadArchive :: String -> IO ()
+loadArchive f = throwIO $ ErrorCall $ "loadArchive: unsupported on wasm for " <> f
+
+loadObj :: String -> IO ()
+loadObj f = throwIO $ ErrorCall $ "loadObj: unsupported on wasm for " <> f
+
+unloadObj :: String -> IO ()
+unloadObj f = throwIO $ ErrorCall $ "unloadObj: unsupported on wasm for " <> f
+
+purgeObj :: String -> IO ()
+purgeObj f = throwIO $ ErrorCall $ "purgeObj: unsupported on wasm for " <> f
+
+lookupSymbol :: String -> IO (Maybe (Ptr a))
+lookupSymbol sym = do
+  r <- js_lookupSymbol $ toJSString sym
+  evaluate $ if r == nullPtr then Nothing else Just r
+
+foreign import javascript unsafe "__exports.__dyld.lookupSymbol($1)"
+  js_lookupSymbol :: JSString -> IO (Ptr a)
+
+lookupSymbolInDLL :: Ptr LoadedDLL -> String -> IO (Maybe (Ptr a))
+lookupSymbolInDLL _ sym =
+  throwIO $ ErrorCall $ "lookupSymbolInDLL: unsupported on wasm for " <> sym
+
+resolveObjs :: IO Bool
+resolveObjs = pure True
+
+-- dyld does not maintain unique handles for added search paths, and
+-- removeLibrarySearchPath is simply a no-op, so it's fine to return a
+-- null pointer as a placeholder
+addLibrarySearchPath :: String -> IO (Ptr ())
+addLibrarySearchPath p = do
+  evaluate =<< js_addLibrarySearchPath (toJSString p)
+  pure nullPtr
+
+foreign import javascript safe "__exports.__dyld.addLibrarySearchPath($1)"
+  js_addLibrarySearchPath :: JSString -> IO ()
+
+removeLibrarySearchPath :: Ptr () -> IO Bool
+removeLibrarySearchPath _ = pure True
+
+findSystemLibrary :: String -> IO (Maybe String)
+findSystemLibrary f = m `catch` \(_ :: JSException) -> pure Nothing
+  where
+    m = do
+      p' <- js_findSystemLibrary (toJSString f)
+      p <- evaluate $ fromJSString p'
+      pure $ Just p
+
+foreign import javascript safe "__exports.__dyld.findSystemLibrary($1)"
+  js_findSystemLibrary :: JSString -> IO JSString
+
+#else
 
 initObjLinker :: ShouldRetainCAFs -> IO ()
 initObjLinker RetainCAFs = c_initLinker_ 1
@@ -78,14 +154,6 @@ lookupSymbolInDLL dll str_in = do
      if addr == nullPtr
        then return Nothing
        else return (Just addr)
-
-lookupClosure :: String -> IO (Maybe HValueRef)
-lookupClosure str = do
-  m <- lookupSymbol str
-  case m of
-    Nothing -> return Nothing
-    Just (Ptr addr) -> case addrToAny# addr of
-      (# a #) -> Just <$> mkRemoteRef (HValue a)
 
 prefixUnderscore :: String -> String
 prefixUnderscore
@@ -205,3 +273,13 @@ isWindowsHost = True
 #else
 isWindowsHost = False
 #endif
+
+#endif
+
+lookupClosure :: String -> IO (Maybe HValueRef)
+lookupClosure str = do
+  m <- lookupSymbol str
+  case m of
+    Nothing -> return Nothing
+    Just (Ptr addr) -> case addrToAny# addr of
+      (# a #) -> Just <$> mkRemoteRef (HValue a)

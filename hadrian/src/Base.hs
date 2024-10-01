@@ -153,6 +153,7 @@ ghcLibDeps stage iplace = do
         , "settings"
         , "ghc-usage.txt"
         , "ghci-usage.txt"
+        , "dyld.mjs"
         , "post-link.mjs"
         , "prelude.mjs"
         ]
