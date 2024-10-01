@@ -34,7 +34,8 @@ module GHC.Internal.Exception.Context
     , ExceptionAnnotation(..)
     ) where
 
-import GHC.Internal.Base ((++), return, String, Maybe(..), Semigroup(..), Monoid(..))
+import GHC.Internal.Data.OldList (intersperse)
+import GHC.Internal.Base (($), map, (++), return, String, Maybe(..), Semigroup(..), Monoid(..))
 import GHC.Internal.Show (Show(..))
 import GHC.Internal.Data.Typeable.Internal (Typeable, typeRep, eqTypeRep)
 import GHC.Internal.Data.Type.Equality ( (:~~:)(HRefl) )
@@ -92,10 +93,9 @@ mergeExceptionContext (ExceptionContext a) (ExceptionContext b) = ExceptionConte
 --
 -- @since base-4.20.0.0
 displayExceptionContext :: ExceptionContext -> String
-displayExceptionContext (ExceptionContext anns0) = go anns0
+displayExceptionContext (ExceptionContext anns0) = mconcat $ intersperse "\n" $ map go anns0
   where
-    go (SomeExceptionAnnotation ann : anns) = displayExceptionAnnotation ann ++ "\n" ++ go anns
-    go [] = "\n"
+    go (SomeExceptionAnnotation ann) = displayExceptionAnnotation ann
 
 data SomeExceptionAnnotation = forall a. ExceptionAnnotation a => SomeExceptionAnnotation a
 
