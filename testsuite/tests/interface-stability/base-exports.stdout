@@ -751,6 +751,14 @@ module Data.Bool where
   otherwise :: Bool
   (||) :: Bool -> Bool -> Bool
 
+module Data.Bounded where
+  -- Safety: Safe
+  type Bounded :: * -> Constraint
+  class Bounded a where
+    minBound :: a
+    maxBound :: a
+    {-# MINIMAL minBound, maxBound #-}
+
 module Data.Char where
   -- Safety: Trustworthy
   type Char :: *
