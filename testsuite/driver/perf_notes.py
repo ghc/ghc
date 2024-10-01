@@ -659,7 +659,10 @@ def check_stats_change(actual: PerfStat,
         display('    Upper bound ' + full_name + ' ' + actual.metric + ':', upperBound, '')
         display('    Actual      ' + full_name + ' ' + actual.metric + ':', actual.value, '')
         if actual.value != expected_val:
-            actual_dev = round(((float(actual.value) * 100)/ int(expected_val)) - 100, 1)
+            if expected_val == 0:
+                actual_dev = 100.0
+            else:
+                actual_dev = round(((float(actual.value) * 100)/ int(expected_val)) - 100, 1)
             display('    Deviation   ' + full_name + ' ' + actual.metric + ':', actual_dev, '%')
 
     return (change, result)
