@@ -15,7 +15,7 @@ import util from "node:util";
 // NUL-terminated strings: name, binder, body. We try to parse the
 // body as an expression and fallback to statements, and return the
 // completely parsed arrow function source.
-function parseRecord([name, binder, body]) {
+export function parseRecord([name, binder, body]) {
   for (const src of [`${binder} => (${body})`, `${binder} => {${body}}`]) {
     try {
       new Function(`return ${src};`);
@@ -27,13 +27,13 @@ function parseRecord([name, binder, body]) {
 
 // Parse ghc_wasm_jsffi custom sections in a WebAssembly.Module object
 // and return an array of records.
-function parseSections(mod) {
+export function parseSections(mod) {
   const recs = [];
   const dec = new TextDecoder("utf-8", { fatal: true });
   const importNames = new Set(
     WebAssembly.Module.imports(mod)
       .filter((i) => i.module === "ghc_wasm_jsffi")
-      .map((i) => i.name),
+      .map((i) => i.name)
   );
   for (const buf of WebAssembly.Module.customSections(mod, "ghc_wasm_jsffi")) {
     const ba = new Uint8Array(buf);

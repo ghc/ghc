@@ -234,6 +234,10 @@ copyRules = do
         prefix -/- "ghc-interp.js"     <~ return "."
         prefix -/- "template-hsc.h" <~ return (pkgPath hsc2hs -/- "data")
 
+        prefix -/- "dyld.mjs" %> \file -> do
+            copyFile ("utils/jsffi" -/- makeRelative prefix file) file
+            makeExecutable file
+
         prefix -/- "post-link.mjs" %> \file -> do
             copyFile ("utils/jsffi" -/- makeRelative prefix file) file
             makeExecutable file

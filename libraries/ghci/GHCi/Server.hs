@@ -9,7 +9,9 @@ import Prelude
 import GHCi.Run
 import GHCi.TH
 import GHCi.Message
+#if !defined(wasm32_HOST_ARCH)
 import GHCi.Signals
+#endif
 import GHCi.Utils
 
 import Control.DeepSeq
@@ -120,7 +122,11 @@ defaultServer = do
 
   when verbose $
     printf "GHC iserv starting (in: %s; out: %s)\n" (show inh) (show outh)
+
+#if !defined(wasm32_HOST_ARCH)
   installSignalHandlers
+#endif
+
   lo_ref <- newIORef Nothing
   let pipe = Pipe{pipeRead = inh, pipeWrite = outh, pipeLeftovers = lo_ref}
 
@@ -146,3 +152,8 @@ dieWithUsage = do
     msg = "usage: iserv <write-fd> <read-fd> [-v]"
 #endif
 
+#if defined(wasm32_HOST_ARCH)
+
+foreign export javascript "defaultServer" defaultServer :: IO ()
+
+#endif
