@@ -541,8 +541,8 @@ data OnOffRules = OnOffRules { rule_set :: Rule -- ^ The enabled rules
                              }
 
 -- The initial set of rules, which assumes a Validate pipeline which is run with FullCI.
-emptyRules :: OnOffRules
-emptyRules = OnOffRules (ValidateOnly (S.singleton FullCI)) OnSuccess
+emptyRules :: String -> OnOffRules
+emptyRules jobName = OnOffRules (ValidateOnly jobName (S.fromList [FullCI])) OnSuccess
 
 -- When to run the job
 data ManualFlag = Manual -- ^ Only run the job when explicitly triggered by a user
@@ -559,10 +559,10 @@ onlyValidateRule :: ValidateRule -> OnOffRules -> OnOffRules
 onlyValidateRule r  = modifyValidateRules (const (S.singleton r))
 
 removeValidateRule :: ValidateRule -> OnOffRules -> OnOffRules
-removeValidateRule r = modifyValidateRules (S.delete r)
+removeValidateRule v = modifyValidateRules (S.delete v)
 
 modifyValidateRules :: (S.Set ValidateRule -> S.Set ValidateRule) -> OnOffRules -> OnOffRules
-modifyValidateRules f (OnOffRules (ValidateOnly rs) m) = OnOffRules (ValidateOnly (f rs)) m
+modifyValidateRules f (OnOffRules (ValidateOnly s rs) m) = OnOffRules (ValidateOnly s (f rs)) m
 modifyValidateRules _ r = error $ "Applying validate rule to nightly/release job:" ++ show (rule_set r)
 
 manualRule :: OnOffRules -> OnOffRules
@@ -575,13 +575,13 @@ enumRules :: OnOffRules -> [OnOffRule]
 enumRules (OnOffRules r _) = rulesList
   where
     rulesList = case r of
-                  ValidateOnly rs -> [OnOffRule On (ValidateOnly rs)
+                  ValidateOnly s rs -> [OnOffRule On (ValidateOnly s rs)
                                     , OnOffRule Off ReleaseOnly
                                     , OnOffRule Off Nightly ]
-                  Nightly -> [ OnOffRule Off (ValidateOnly S.empty)
+                  Nightly -> [ OnOffRule Off (ValidateOnly "" S.empty)
                              , OnOffRule Off ReleaseOnly
                              , OnOffRule On Nightly ]
-                  ReleaseOnly -> [ OnOffRule Off (ValidateOnly S.empty)
+                  ReleaseOnly -> [ OnOffRule Off (ValidateOnly "" S.empty)
                                  , OnOffRule On ReleaseOnly
                                  , OnOffRule Off Nightly ]
 
@@ -619,11 +619,12 @@ or_all rs = intercalate " || " (map parens rs)
 -- run the job.
 data Rule = ReleaseOnly  -- ^ Only run this job in a release pipeline
           | Nightly      -- ^ Only run this job in the nightly pipeline
-          | ValidateOnly (S.Set ValidateRule) -- ^ Only run this job in a validate pipeline, when any of these rules are enabled.
+          | ValidateOnly String (S.Set ValidateRule) -- ^ Only run this job in a validate pipeline, when any of these rules are enabled.
           deriving (Show, Ord, Eq)
 
 data ValidateRule =
             FullCI       -- ^ Run this job when the "full-ci" label is present.
+          | FastCI       -- ^ Run this job on every validation pipeline
           | LLVMBackend  -- ^ Run this job when the "LLVM backend" label is present
           | JSBackend    -- ^ Run this job when the "javascript" label is present
           | WasmBackend  -- ^ Run this job when the "wasm" label is present
@@ -631,7 +632,8 @@ data ValidateRule =
           | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
           | IpeData      -- ^ Run this job when the "IPE" label is set
           | TestPrimops  -- ^ Run this job when "test-primops" label is set
-          deriving (Show, Enum, Bounded, Ord, Eq)
+          | OnlyJob String -- ^ Run this job when ONLY_JOB is set to this string
+          deriving (Show, Ord, Eq)
 
 -- A constant evaluating to True because gitlab doesn't support "true" in the
 -- expression language.
@@ -644,24 +646,29 @@ _false = "\"disabled\" != \"disabled\""
 
 -- Convert the state of the rule into a string that gitlab understand.
 ruleString :: OnOff -> Rule -> String
-ruleString On (ValidateOnly vs) =
+ruleString On (ValidateOnly only_job_name vs) =
   case S.toList vs of
-    [] -> true
-    conds -> or_all (map validateRuleString conds)
+    conds -> or_all (map validateRuleString (OnlyJob only_job_name : conds))
 ruleString Off (ValidateOnly {}) = true
 ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
 ruleString On Nightly = "$NIGHTLY"
-ruleString Off Nightly = "$NIGHTLY == null"
+ruleString Off Nightly = envVarNull "NIGHTLY"
 
 labelString :: String -> String
 labelString s =  "$CI_MERGE_REQUEST_LABELS =~ /.*" ++ s ++ ".*/"
 
 branchStringExact :: String -> String
-branchStringExact s = "$CI_COMMIT_BRANCH == \"" ++ s ++ "\""
+branchStringExact s = envVarString "CI_COMMIT_BRANCH" s
 
 branchStringLike :: String -> String
 branchStringLike s = "$CI_COMMIT_BRANCH =~ /" ++ s ++ "/"
+
+envVarString :: String -> String -> String
+envVarString var s = "$" ++ var ++ " == \"" ++ s ++ "\""
+
+envVarNull :: String ->  String
+envVarNull var = "$" ++ var ++ " == null"
 
 
 validateRuleString :: ValidateRule -> String
@@ -670,6 +677,7 @@ validateRuleString FullCI = or_all ([ labelString "full-ci"
                                     , branchStringExact "master"
                                     , branchStringLike "ghc-[0-9]+\\.[0-9]+"
                                     ])
+validateRuleString FastCI = true
 
 validateRuleString LLVMBackend  = labelString "LLVM backend"
 validateRuleString JSBackend    = labelString "javascript"
@@ -678,6 +686,7 @@ validateRuleString FreeBSDLabel = labelString "FreeBSD"
 validateRuleString NonmovingGc  = labelString "non-moving GC"
 validateRuleString IpeData      = labelString "IPE"
 validateRuleString TestPrimops  = labelString "test-primops"
+validateRuleString (OnlyJob s)  = envVarString "ONLY_JOB" s
 
 -- | A 'Job' is the description of a single job in a gitlab pipeline. The
 -- job contains all the information about how to do the build but can be further
@@ -725,7 +734,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
   where
     jobPlatform = (arch, opsys)
 
-    jobRules = emptyRules
+    jobRules = emptyRules jobName
 
     jobName = testEnv arch opsys buildConfig
 
@@ -917,7 +926,7 @@ perfProfilingJobTag arch opsys j = j { jobTags = [ runnerPerfTag arch opsys ] }
 -- | Mark the validate job to run in fast-ci mode
 -- This is default way, to enable all jobs you have to apply the `full-ci` label.
 fastCI :: JobGroup Job -> JobGroup Job
-fastCI = modifyValidateJobs (removeValidateJobRule FullCI)
+fastCI = onlyRule FastCI
 
 -- | Mark a group of jobs as allowed to fail.
 allowFailureGroup :: JobGroup Job -> JobGroup Job
@@ -934,8 +943,10 @@ onlyRule t = modifyValidateJobs (onlyValidateJobRule t)
 
 -- | Don't run the validate job, normally used to alleviate CI load by marking
 -- jobs which are unlikely to fail (ie different linux distros)
+--
+-- These jobs can still be triggered by using the ONLY_JOB environemnt variable
 disableValidate :: JobGroup Job -> JobGroup Job
-disableValidate st = st { v = Nothing }
+disableValidate = modifyValidateJobs (removeValidateJobRule FastCI . removeValidateJobRule FullCI)
 
 data NamedJob a = NamedJob { name :: String, jobInfo :: a } deriving (Show, Functor)
 
