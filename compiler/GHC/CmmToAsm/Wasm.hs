@@ -40,12 +40,11 @@ ncgWasm ::
 ncgWasm ncg_config logger platform ts loc h cmms = do
   (r, s) <- streamCmmGroups ncg_config platform cmms
   outputWasm $ "# " <> string7 (fromJust $ ml_hs_file loc) <> "\n\n"
-  outputWasm $ execWasmAsmM do_tail_call $ asmTellEverything TagI32 s
+  -- See Note [WasmTailCall]
+  let cfg = (defaultWasmAsmConfig s) { pic = ncgPIC ncg_config, tailcall = doTailCall ts }
+  outputWasm $ execWasmAsmM cfg $ asmTellEverything TagI32 s
   pure r
   where
-    -- See Note [WasmTailCall]
-    do_tail_call = doTailCall ts
-
     outputWasm builder = liftIO $ do
       putDumpFileMaybe
         logger
