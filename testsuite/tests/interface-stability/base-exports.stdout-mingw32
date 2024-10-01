@@ -249,6 +249,8 @@ module Control.Exception where
   data MaskingState = Unmasked | MaskedInterruptible | MaskedUninterruptible
   type NestedAtomically :: *
   data NestedAtomically = NestedAtomically
+  type NoBacktrace :: * -> *
+  newtype NoBacktrace e = NoBacktrace e
   type NoMethodError :: *
   newtype NoMethodError = NoMethodError GHC.Internal.Base.String
   type NonTermination :: *
