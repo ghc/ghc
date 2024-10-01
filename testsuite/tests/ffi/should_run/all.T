@@ -82,7 +82,7 @@ test('ffi018_ghci',
      [extra_files(['ffi018.h']),
       only_ways(['ghci']),
       when(unregisterised(), fragile(16085)),
-      pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup'),
+      pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup ghciWayFlags=' + config.ghci_way_flags),
       req_c],
      compile_and_run, ['ffi018_ghci_c.o'])
 
@@ -95,12 +95,12 @@ test('T1288', [req_c], compile_and_run, ['T1288_c.c'])
 test('T1288_ghci',
      [only_ghci,
       when(unregisterised(), fragile(16085)),
-      pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup')],
+      pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup ghciWayFlags=' + config.ghci_way_flags)],
      compile_and_run, ['T1288_ghci_c.o'])
 
 test('T2276', [req_c], compile_and_run, ['T2276_c.c'])
 test('T2276_ghci', [ only_ghci,
-                     pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup') ],
+                     pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup ghciWayFlags=' + config.ghci_way_flags) ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
 test('T2469', normal, compile_and_run, ['-optc-std=gnu99'])

@@ -7,5 +7,5 @@ void printx() {
   printf("x: %d\n", x);
   x = 1;
   printf("x: %d\n", x);
+  fflush(stdout);
 }
-

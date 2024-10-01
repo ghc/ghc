@@ -286,17 +286,17 @@ endif
 # See #11495 and TEST=TH_spliceE5_prof for a complication: trying to compile
 # code that uses TemplateHaskell with -prof, while GhcDynamic=YES.
 ifeq "$(GhcDynamic)" "YES"
-ghcThWayFlags     = -dynamic
-ghciWayFlags      = -dynamic
-ghcPluginWayFlags = -dynamic
+ghcThWayFlags     ?= -dynamic
+ghciWayFlags      ?= -dynamic
+ghcPluginWayFlags ?= -dynamic
 else ifeq "$(GhcProfiled)" "YES"
-ghcThWayFlags     = -prof
-ghciWayFlags      = -prof
-ghcPluginWayFlags = -prof
+ghcThWayFlags     ?= -prof
+ghciWayFlags      ?= -prof
+ghcPluginWayFlags ?= -prof
 else
-ghcThWayFlags     = -static
-ghciWayFlags      = -static
-ghcPluginWayFlags = -static
+ghcThWayFlags     ?= -static
+ghciWayFlags      ?= -static
+ghcPluginWayFlags ?= -static
 endif
 
 # -----------------------------------------------------------------------------
