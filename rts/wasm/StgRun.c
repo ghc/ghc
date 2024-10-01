@@ -1,5 +1,7 @@
 #include "Rts.h"
 
+#if !defined(USE_MINIINTERPRETER)
+
 // We directly return the same BaseReg as passed to StgRun. This is
 // fine on wasm which doesn't have SMP.
 //
@@ -19,3 +21,5 @@ StgFunPtr StgReturn(void)
 {
     return 0;
 }
+
+#endif
