@@ -1144,6 +1144,8 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: nightly-x86_64-linux-centos7-validate
       artifacts: false
+    - job: nightly-x86_64-linux-ubuntu22_04-validate
+      artifacts: false
     - job: nightly-x86_64-linux-ubuntu20_04-validate
       artifacts: false
     - job: nightly-x86_64-linux-ubuntu18_04-validate
