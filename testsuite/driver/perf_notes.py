@@ -165,6 +165,9 @@ class RelativeMetricAcceptanceWindow(MetricAcceptanceWindow):
 
 def parse_perf_stat(stat_str: str) -> PerfStat:
     field_vals = stat_str.strip('\t').split('\t')
+    if len(field_vals) != 5:
+        raise ValueError(f'Invalid stat line: {field_vals}')
+
     stat = PerfStat(*field_vals) # type: ignore
     if stat.test_env.startswith('"') and stat.test_env.endswith('"'):
         # Due to a bug, in historical data sometimes the test_env
@@ -183,11 +186,14 @@ def get_perf_stats(commit: Union[GitRef, GitHash]=GitRef('HEAD'),
     except subprocess.CalledProcessError:
         return []
 
-    return \
-        [ parse_perf_stat(stat_str)
-          for stat_str in log.strip('\n').split('\n')
-          if stat_str != ''
-        ]
+    try:
+        return \
+            [ parse_perf_stat(stat_str)
+              for stat_str in log.strip('\n').split('\n')
+              if stat_str != ''
+            ]
+    except ValueError as e:
+        raise ValueError(f'Invalid stat line for commit {commit}')
 
 # Check if a str is in a 40 character git commit hash.
 _commit_hash_re = re.compile('[0-9a-f]' * 40)
