@@ -18,7 +18,7 @@ import GHC.Generics (Generic)
 import GHC.Internal.Base
 import GHC.Internal.Show
 import GHC.Internal.Generics
-import GHC.Internal.Data.Enum
+import GHC.Internal.Enum
 #endif
 
 -- | The language extensions known to GHC.
