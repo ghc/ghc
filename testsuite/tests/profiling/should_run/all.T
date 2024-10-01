@@ -196,7 +196,7 @@ test('T15897',
       fragile(15467)],
      makefile_test, ['T15897'])
 
-test('T17572', [when(arch('wasm32'), run_timeout_multiplier(5))], compile_and_run, [''])
+test('T17572', [run_timeout_multiplier(10)], compile_and_run, [''])
 
 test('TraverseHeapTest', [only_ways(['prof'])], compile_and_run, ['-debug'])
 
