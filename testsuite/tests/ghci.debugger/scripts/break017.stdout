@@ -11,5 +11,9 @@ Printing 1
 as = 'b' : 'c' : (_t1::[Char])
 Forcing
 *** Exception: Prelude.undefined
+
+HasCallStack backtrace:
+  undefined, called at <interactive>:3:17 in interactive:Ghci1
+
 Printing 2
 as = 'b' : 'c' : (_t2::[Char])

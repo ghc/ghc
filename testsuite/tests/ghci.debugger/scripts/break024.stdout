@@ -6,6 +6,10 @@ _exception = SomeException
                   Nothing GHC.Internal.IO.Exception.UserError [] "error" Nothing
                   Nothing)
 *** Exception: user error (error)
+
+HasCallStack backtrace:
+  ioError, called at break024.hs:3:22 in main:Main
+
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
 _exception = SomeException
