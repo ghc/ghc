@@ -8,6 +8,7 @@
 
 ## 4.21.0.0 *TBA*
   * Introduce `Data.Bounded` module exporting the `Bounded` typeclass (finishing [CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
+  * Deprecate export of `Bounded` class from `Data.Enum` ([CLC proposal #208](https://github.com/haskell/core-libraries-committee/issues/208))
   * `GHC.Desugar` has been deprecated and should be removed in GHC 9.14. ([CLC proposal #216](https://github.com/haskell/core-libraries-committee/issues/216))
   * Add a `readTixFile` field to the `HpcFlags` record in `GHC.RTS.Flags` ([CLC proposal #276](https://github.com/haskell/core-libraries-committee/issues/276))
   * Add `compareLength` to `Data.List` and `Data.List.NonEmpty` ([CLC proposal #257](https://github.com/haskell/core-libraries-committee/issues/257))
