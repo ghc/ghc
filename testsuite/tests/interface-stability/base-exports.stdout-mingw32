@@ -11800,10 +11800,6 @@ instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Bits.Iff a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Bits.Ior a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Bits.Xor a) -- Defined in ‘GHC.Internal.Data.Bits’
-instance GHC.Internal.Enum.Bounded GHC.Internal.Unicode.GeneralCategory -- Defined in ‘GHC.Internal.Unicode’
-instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Internal.Enum.Bounded (a GHC.Internal.Data.Type.Equality.:~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
-instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Internal.Enum.Bounded (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
-instance forall k (t :: k). GHC.Internal.Enum.Bounded (GHC.Internal.Data.Proxy.Proxy t) -- Defined in ‘GHC.Internal.Data.Proxy’
 instance GHC.Internal.Enum.Bounded GHC.Types.Bool -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Bounded GHC.Types.Char -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Bounded GHC.Types.Int -- Defined in ‘GHC.Internal.Enum’
@@ -11828,6 +11824,10 @@ instance GHC.Internal.Enum.Bounded () -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Bounded GHC.Types.VecCount -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Bounded GHC.Types.VecElem -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Bounded GHC.Types.Word -- Defined in ‘GHC.Internal.Enum’
+instance GHC.Internal.Enum.Bounded GHC.Internal.Unicode.GeneralCategory -- Defined in ‘GHC.Internal.Unicode’
+instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Internal.Enum.Bounded (a GHC.Internal.Data.Type.Equality.:~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
+instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Internal.Enum.Bounded (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
+instance forall k (t :: k). GHC.Internal.Enum.Bounded (GHC.Internal.Data.Proxy.Proxy t) -- Defined in ‘GHC.Internal.Data.Proxy’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Enum.Bounded (f (g a)) => GHC.Internal.Enum.Bounded (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.Int’
@@ -11882,10 +11882,6 @@ instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Inter
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Internal.Data.Bits.Iff a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Internal.Data.Bits.Ior a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Internal.Data.Bits.Xor a) -- Defined in ‘GHC.Internal.Data.Bits’
-instance GHC.Internal.Enum.Enum GHC.Internal.Unicode.GeneralCategory -- Defined in ‘GHC.Internal.Unicode’
-instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Internal.Enum.Enum (a GHC.Internal.Data.Type.Equality.:~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
-instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Internal.Enum.Enum (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
-instance forall k (s :: k). GHC.Internal.Enum.Enum (GHC.Internal.Data.Proxy.Proxy s) -- Defined in ‘GHC.Internal.Data.Proxy’
 instance GHC.Internal.Enum.Enum GHC.Types.Bool -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.Char -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.Int -- Defined in ‘GHC.Internal.Enum’
@@ -11898,6 +11894,10 @@ instance GHC.Internal.Enum.Enum () -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.VecCount -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.VecElem -- Defined in ‘GHC.Internal.Enum’
 instance GHC.Internal.Enum.Enum GHC.Types.Word -- Defined in ‘GHC.Internal.Enum’
+instance GHC.Internal.Enum.Enum GHC.Internal.Unicode.GeneralCategory -- Defined in ‘GHC.Internal.Unicode’
+instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Internal.Enum.Enum (a GHC.Internal.Data.Type.Equality.:~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
+instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Internal.Enum.Enum (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
+instance forall k (s :: k). GHC.Internal.Enum.Enum (GHC.Internal.Data.Proxy.Proxy s) -- Defined in ‘GHC.Internal.Data.Proxy’
 instance forall k (a :: k). GHC.Internal.Enum.Enum (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Enum.Enum (f (g a)) => GHC.Internal.Enum.Enum (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’

@@ -117,7 +117,6 @@ Library
         GHC.Internal.Data.Dynamic
         GHC.Internal.Data.Either
         GHC.Internal.Data.Eq
-        GHC.Internal.Data.Enum
         GHC.Internal.Data.Foldable
         GHC.Internal.Data.Function
         GHC.Internal.Data.Functor
