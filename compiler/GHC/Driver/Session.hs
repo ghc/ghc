@@ -3341,7 +3341,17 @@ picCCOpts dflags =
       -- objects, but can't without -fPIC.  See
       -- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/position-independent-code
        | gopt Opt_PIC dflags || ways dflags `hasWay` WayDyn ->
-          ["-fPIC", "-U__PIC__", "-D__PIC__"]
+          ["-fPIC", "-U__PIC__", "-D__PIC__"] ++
+          -- Clang defaults to -fvisibility=hidden for wasm targets,
+          -- but we need these compile-time flags to generate PIC
+          -- objects that can be properly linked by wasm-ld using
+          -- --export-dynamic; without these flags we would need
+          -- -Wl,--export-all at .so link-time which will export
+          -- internal symbols as well, and that severely pollutes the
+          -- global symbol namespace.
+          (if platformArch (targetPlatform dflags) == ArchWasm32
+            then [ "-fvisibility=default", "-fvisibility-inlines-hidden" ]
+            else [])
       -- gcc may be configured to have PIC on by default, let's be
       -- explicit here, see #15847
        | otherwise -> ["-fno-PIC"]
