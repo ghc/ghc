@@ -112,6 +112,7 @@ data LinuxDistro
   | Debian9
   | Fedora33
   | Fedora38
+  | Ubuntu2204
   | Ubuntu2004
   | Ubuntu1804
   | Centos7
@@ -308,6 +309,7 @@ distroName Fedora33   = "fedora33"
 distroName Fedora38   = "fedora38"
 distroName Ubuntu1804 = "ubuntu18_04"
 distroName Ubuntu2004 = "ubuntu20_04"
+distroName Ubuntu2204 = "ubuntu22_04"
 distroName Centos7    = "centos7"
 distroName Alpine312  = "alpine3_12"
 distroName Alpine318  = "alpine3_18"
@@ -1060,6 +1062,7 @@ ubuntu_x86 :: [JobGroup Job]
 ubuntu_x86 =
   [ disableValidate (standardBuilds Amd64 (Linux Ubuntu1804))
   , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
+  , disableValidate (standardBuilds Amd64 (Linux Ubuntu2204))
   ]
 
 rhel_x86 :: [JobGroup Job]
