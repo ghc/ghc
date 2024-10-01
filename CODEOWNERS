@@ -56,6 +56,7 @@
 /compiler/GHC/Wasm/                @nrnrnr
 /compiler/GHC/JS/                  @luite @doyougnu @hsyl20 @JoshMeredith
 /compiler/GHC/StgToJS/             @luite @doyougnu @hsyl20 @JoshMeredith
+/compiler/GHC/Runtime/Interpreter/Wasm.hs @TerrorJack
 
 [Core libraries]
 /libraries/base/                  @hvr

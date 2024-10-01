@@ -432,6 +432,7 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
+import GHC.Settings
 
 import Control.Applicative ((<|>))
 import Control.Concurrent
@@ -704,6 +705,35 @@ setTopSessionDynFlags dflags = do
 
   -- Interpreter
   interp <- if
+    -- Wasm dynamic linker
+    | ArchWasm32 <- platformArch $ targetPlatform dflags
+    -> do
+        s <- liftIO $ newMVar InterpPending
+        loader <- liftIO Loader.uninitializedLoader
+        dyld <- liftIO $ makeAbsolute $ topDir dflags </> "dyld.mjs"
+#if defined(wasm32_HOST_ARCH)
+        let libdir = sorry "cannot spawn child process on wasm"
+#else
+        libdir <- liftIO $ do
+          libdirs <- Loader.getGccSearchDirectory logger dflags "libraries"
+          case libdirs of
+            [_, libdir] -> pure libdir
+            _ -> panic "corrupted wasi-sdk installation"
+#endif
+        let profiled = ways dflags `hasWay` WayProf
+            way_tag = if profiled then "_p" else ""
+        let cfg =
+              WasmInterpConfig
+                { wasmInterpDyLD = dyld,
+                  wasmInterpLibDir = libdir,
+                  wasmInterpOpts = getOpts dflags opt_i,
+                  wasmInterpTargetPlatform = targetPlatform dflags,
+                  wasmInterpProfiled = profiled,
+                  wasmInterpHsSoSuffix = way_tag ++ dynLibSuffix (ghcNameVersion dflags),
+                  wasmInterpUnitState = ue_units $ hsc_unit_env hsc_env
+                }
+        pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache
+
     -- JavaScript interpreter
     | ArchJavaScript <- platformArch (targetPlatform dflags)
     -> do
