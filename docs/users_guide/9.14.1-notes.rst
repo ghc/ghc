@@ -58,6 +58,16 @@ Cmm
 ``ghc-experimental`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- ``ghc-experimental`` now exposes ``GHC.RTS.Flags`` and ``GHC.Stats`` as
+  ``GHC.RTS.Flags.Experimental`` and ``GHC.Stats.Experimental``. These are
+  *also* exposed in ``base``, however the ``base`` versions will be deprecated as
+  part of the split base project. See `CLC proposal 289
+  <https://github.com/haskell/core-libraries-committee/issues/289>`__.
+  Downstream consumers of these flags are encouraged to migrate to the
+  ``ghc-experimental`` versions.
+
+
+
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

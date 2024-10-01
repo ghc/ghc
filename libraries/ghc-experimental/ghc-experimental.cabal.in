@@ -35,6 +35,8 @@ library
       GHC.Profiling.Eras
       GHC.TypeLits.Experimental
       GHC.TypeNats.Experimental
+      GHC.RTS.Flags.Experimental
+      GHC.Stats.Experimental
       Prelude.Experimental
     if arch(wasm32)
         exposed-modules:  GHC.Wasm.Prim

@@ -6155,6 +6155,157 @@ module GHC.Profiling.Eras where
   incrementUserEra :: GHC.Types.Word -> GHC.Types.IO GHC.Types.Word
   setUserEra :: GHC.Types.Word -> GHC.Types.IO ()
 
+module GHC.RTS.Flags.Experimental where
+  -- Safety: None
+  type CCFlags :: *
+  data CCFlags = CCFlags {doCostCentres :: DoCostCentres, profilerTicks :: GHC.Types.Int, msecsPerTick :: GHC.Types.Int}
+  type ConcFlags :: *
+  data ConcFlags = ConcFlags {ctxtSwitchTime :: RtsTime, ctxtSwitchTicks :: GHC.Types.Int}
+  type DebugFlags :: *
+  data DebugFlags = DebugFlags {scheduler :: GHC.Types.Bool, interpreter :: GHC.Types.Bool, weak :: GHC.Types.Bool, gccafs :: GHC.Types.Bool, gc :: GHC.Types.Bool, nonmoving_gc :: GHC.Types.Bool, block_alloc :: GHC.Types.Bool, sanity :: GHC.Types.Bool, stable :: GHC.Types.Bool, prof :: GHC.Types.Bool, linker :: GHC.Types.Bool, apply :: GHC.Types.Bool, stm :: GHC.Types.Bool, squeeze :: GHC.Types.Bool, hpc :: GHC.Types.Bool, sparks :: GHC.Types.Bool}
+  type DoCostCentres :: *
+  data DoCostCentres = CostCentresNone | CostCentresSummary | CostCentresVerbose | CostCentresAll | CostCentresJSON
+  type DoHeapProfile :: *
+  data DoHeapProfile = NoHeapProfiling | HeapByCCS | HeapByMod | HeapByDescr | HeapByType | HeapByRetainer | HeapByLDV | HeapByClosureType | HeapByInfoTable | HeapByEra
+  type DoTrace :: *
+  data DoTrace = TraceNone | TraceEventLog | TraceStderr
+  type GCFlags :: *
+  data GCFlags
+    = GCFlags {statsFile :: GHC.Internal.Maybe.Maybe GHC.Internal.IO.FilePath,
+               giveStats :: GiveGCStats,
+               maxStkSize :: GHC.Internal.Word.Word32,
+               initialStkSize :: GHC.Internal.Word.Word32,
+               stkChunkSize :: GHC.Internal.Word.Word32,
+               stkChunkBufferSize :: GHC.Internal.Word.Word32,
+               maxHeapSize :: GHC.Internal.Word.Word32,
+               minAllocAreaSize :: GHC.Internal.Word.Word32,
+               largeAllocLim :: GHC.Internal.Word.Word32,
+               nurseryChunkSize :: GHC.Internal.Word.Word32,
+               minOldGenSize :: GHC.Internal.Word.Word32,
+               heapSizeSuggestion :: GHC.Internal.Word.Word32,
+               heapSizeSuggestionAuto :: GHC.Types.Bool,
+               oldGenFactor :: GHC.Types.Double,
+               returnDecayFactor :: GHC.Types.Double,
+               pcFreeHeap :: GHC.Types.Double,
+               generations :: GHC.Internal.Word.Word32,
+               squeezeUpdFrames :: GHC.Types.Bool,
+               compact :: GHC.Types.Bool,
+               compactThreshold :: GHC.Types.Double,
+               sweep :: GHC.Types.Bool,
+               ringBell :: GHC.Types.Bool,
+               idleGCDelayTime :: RtsTime,
+               doIdleGC :: GHC.Types.Bool,
+               heapBase :: GHC.Types.Word,
+               allocLimitGrace :: GHC.Types.Word,
+               numa :: GHC.Types.Bool,
+               numaMask :: GHC.Types.Word}
+  type GiveGCStats :: *
+  data GiveGCStats = NoGCStats | CollectGCStats | OneLineGCStats | SummaryGCStats | VerboseGCStats
+  type HpcFlags :: *
+  data HpcFlags = HpcFlags {readTixFile :: GHC.Types.Bool, writeTixFile :: GHC.Types.Bool}
+  type IoManagerFlag :: *
+  data IoManagerFlag = IoManagerFlagAuto | IoManagerFlagSelect | IoManagerFlagMIO | IoManagerFlagWinIO | IoManagerFlagWin32Legacy
+  type IoSubSystem :: *
+  data IoSubSystem = IoPOSIX | IoNative
+  type MiscFlags :: *
+  data MiscFlags = MiscFlags {tickInterval :: RtsTime, installSignalHandlers :: GHC.Types.Bool, installSEHHandlers :: GHC.Types.Bool, generateCrashDumpFile :: GHC.Types.Bool, generateStackTrace :: GHC.Types.Bool, machineReadable :: GHC.Types.Bool, disableDelayedOsMemoryReturn :: GHC.Types.Bool, internalCounters :: GHC.Types.Bool, linkerAlwaysPic :: GHC.Types.Bool, linkerMemBase :: GHC.Types.Word, ioManager :: IoManagerFlag, numIoWorkerThreads :: GHC.Internal.Word.Word32}
+  type ParFlags :: *
+  data ParFlags = ParFlags {nCapabilities :: GHC.Internal.Word.Word32, migrate :: GHC.Types.Bool, maxLocalSparks :: GHC.Internal.Word.Word32, parGcEnabled :: GHC.Types.Bool, parGcGen :: GHC.Internal.Word.Word32, parGcLoadBalancingEnabled :: GHC.Types.Bool, parGcLoadBalancingGen :: GHC.Internal.Word.Word32, parGcNoSyncWithIdle :: GHC.Internal.Word.Word32, parGcThreads :: GHC.Internal.Word.Word32, setAffinity :: GHC.Types.Bool}
+  type ProfFlags :: *
+  data ProfFlags
+    = ProfFlags {doHeapProfile :: DoHeapProfile,
+                 heapProfileInterval :: RtsTime,
+                 heapProfileIntervalTicks :: GHC.Types.Word,
+                 startHeapProfileAtStartup :: GHC.Types.Bool,
+                 startTimeProfileAtStartup :: GHC.Types.Bool,
+                 showCCSOnException :: GHC.Types.Bool,
+                 automaticEraIncrement :: GHC.Types.Bool,
+                 maxRetainerSetSize :: GHC.Types.Word,
+                 ccsLength :: GHC.Types.Word,
+                 modSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 descrSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 typeSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 ccSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 ccsSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 retainerSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 bioSelector :: GHC.Internal.Maybe.Maybe GHC.Internal.Base.String,
+                 eraSelector :: GHC.Types.Word}
+  type RTSFlags :: *
+  data RTSFlags = RTSFlags {gcFlags :: GCFlags, concurrentFlags :: ConcFlags, miscFlags :: MiscFlags, debugFlags :: DebugFlags, costCentreFlags :: CCFlags, profilingFlags :: ProfFlags, traceFlags :: TraceFlags, tickyFlags :: TickyFlags, parFlags :: ParFlags, hpcFlags :: HpcFlags}
+  type RtsTime :: *
+  type RtsTime = GHC.Internal.Word.Word64
+  type TickyFlags :: *
+  data TickyFlags = TickyFlags {showTickyStats :: GHC.Types.Bool, tickyFile :: GHC.Internal.Maybe.Maybe GHC.Internal.IO.FilePath}
+  type TraceFlags :: *
+  data TraceFlags = TraceFlags {tracing :: DoTrace, timestamp :: GHC.Types.Bool, traceScheduler :: GHC.Types.Bool, traceGc :: GHC.Types.Bool, traceNonmovingGc :: GHC.Types.Bool, sparksSampled :: GHC.Types.Bool, sparksFull :: GHC.Types.Bool, user :: GHC.Types.Bool}
+  getCCFlags :: GHC.Types.IO CCFlags
+  getConcFlags :: GHC.Types.IO ConcFlags
+  getDebugFlags :: GHC.Types.IO DebugFlags
+  getGCFlags :: GHC.Types.IO GCFlags
+  getHpcFlags :: GHC.Types.IO HpcFlags
+  getMiscFlags :: GHC.Types.IO MiscFlags
+  getParFlags :: GHC.Types.IO ParFlags
+  getProfFlags :: GHC.Types.IO ProfFlags
+  getRTSFlags :: GHC.Types.IO RTSFlags
+  getTickyFlags :: GHC.Types.IO TickyFlags
+  getTraceFlags :: GHC.Types.IO TraceFlags
+
+module GHC.Stats.Experimental where
+  -- Safety: Safe
+  type GCDetails :: *
+  data GCDetails
+    = GCDetails {gcdetails_gen :: GHC.Internal.Word.Word32,
+                 gcdetails_threads :: GHC.Internal.Word.Word32,
+                 gcdetails_allocated_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_live_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_large_objects_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_compact_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_slop_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_mem_in_use_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_copied_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_par_max_copied_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_par_balanced_copied_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_block_fragmentation_bytes :: GHC.Internal.Word.Word64,
+                 gcdetails_sync_elapsed_ns :: RtsTime,
+                 gcdetails_cpu_ns :: RtsTime,
+                 gcdetails_elapsed_ns :: RtsTime,
+                 gcdetails_nonmoving_gc_sync_cpu_ns :: RtsTime,
+                 gcdetails_nonmoving_gc_sync_elapsed_ns :: RtsTime}
+  type RTSStats :: *
+  data RTSStats
+    = RTSStats {gcs :: GHC.Internal.Word.Word32,
+                major_gcs :: GHC.Internal.Word.Word32,
+                allocated_bytes :: GHC.Internal.Word.Word64,
+                max_live_bytes :: GHC.Internal.Word.Word64,
+                max_large_objects_bytes :: GHC.Internal.Word.Word64,
+                max_compact_bytes :: GHC.Internal.Word.Word64,
+                max_slop_bytes :: GHC.Internal.Word.Word64,
+                max_mem_in_use_bytes :: GHC.Internal.Word.Word64,
+                cumulative_live_bytes :: GHC.Internal.Word.Word64,
+                copied_bytes :: GHC.Internal.Word.Word64,
+                par_copied_bytes :: GHC.Internal.Word.Word64,
+                cumulative_par_max_copied_bytes :: GHC.Internal.Word.Word64,
+                cumulative_par_balanced_copied_bytes :: GHC.Internal.Word.Word64,
+                init_cpu_ns :: RtsTime,
+                init_elapsed_ns :: RtsTime,
+                mutator_cpu_ns :: RtsTime,
+                mutator_elapsed_ns :: RtsTime,
+                gc_cpu_ns :: RtsTime,
+                gc_elapsed_ns :: RtsTime,
+                cpu_ns :: RtsTime,
+                elapsed_ns :: RtsTime,
+                nonmoving_gc_sync_cpu_ns :: RtsTime,
+                nonmoving_gc_sync_elapsed_ns :: RtsTime,
+                nonmoving_gc_sync_max_elapsed_ns :: RtsTime,
+                nonmoving_gc_cpu_ns :: RtsTime,
+                nonmoving_gc_elapsed_ns :: RtsTime,
+                nonmoving_gc_max_elapsed_ns :: RtsTime,
+                gc :: GCDetails}
+  type RtsTime :: *
+  type RtsTime = GHC.Internal.Int.Int64
+  getRTSStats :: GHC.Types.IO RTSStats
+  getRTSStatsEnabled :: GHC.Types.IO GHC.Types.Bool
+
 module GHC.TypeLits.Experimental where
   -- Safety: Safe-Inferred
   appendSSymbol :: forall (a :: GHC.Types.Symbol) (b :: GHC.Types.Symbol). GHC.Internal.TypeLits.SSymbol a -> GHC.Internal.TypeLits.SSymbol b -> GHC.Internal.TypeLits.SSymbol (GHC.Internal.TypeLits.AppendSymbol a b)
@@ -10558,9 +10709,31 @@ instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.Stri
 instance forall a. (a ~ GHC.Types.Char) => GHC.Internal.Data.String.IsString [a] -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. (GHC.Internal.Enum.Enum a, GHC.Internal.Enum.Bounded a, GHC.Classes.Eq a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance forall a. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.CCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.ConcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DebugFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.GCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.HpcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.MiscFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.ParFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.ProfFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.RTSFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.TickyFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.TraceFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
+instance GHC.Internal.Generics.Generic GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Internal.IsList.IsList GHC.Internal.Stack.Types.CallStack -- Defined in ‘GHC.Internal.IsList’
 instance forall a. GHC.Internal.IsList.IsList [a] -- Defined in ‘GHC.Internal.IsList’
 instance forall a. GHC.Internal.IsList.IsList (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.IsList’
@@ -10569,6 +10742,8 @@ instance forall a. GHC.Internal.IsList.IsList (GHC.Internal.Functor.ZipList.ZipL
 instance forall a. GHC.Internal.Ix.Ix a => GHC.Internal.Ix.Ix (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance GHC.Internal.Read.Read GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
+instance GHC.Internal.Read.Read GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
 instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
@@ -10576,6 +10751,24 @@ instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Inter
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Ptr.FunPtr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
 instance GHC.Internal.Show.Show GHC.Internal.IO.MaskingState -- Defined in ‘GHC.Internal.IO’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.CCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ConcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DebugFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.GCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.HpcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.MiscFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ParFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ProfFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.RTSFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TickyFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TraceFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
+instance GHC.Internal.Show.Show GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Classes.Eq GHC.Types.Bool -- Defined in ‘GHC.Classes’
 instance GHC.Classes.Eq GHC.Types.Char -- Defined in ‘GHC.Classes’
 instance GHC.Classes.Eq GHC.Types.Double -- Defined in ‘GHC.Classes’
@@ -10610,6 +10803,8 @@ instance forall a. GHC.Classes.Eq (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.
 instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Classes.Eq GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
 instance GHC.Classes.Eq GHC.Internal.IO.MaskingState -- Defined in ‘GHC.Internal.IO’
+instance GHC.Classes.Eq GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Classes.Eq GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance GHC.Classes.Ord GHC.Types.Bool -- Defined in ‘GHC.Classes’
 instance GHC.Classes.Ord GHC.Types.Char -- Defined in ‘GHC.Classes’
 instance GHC.Classes.Ord GHC.Types.Double -- Defined in ‘GHC.Classes’
