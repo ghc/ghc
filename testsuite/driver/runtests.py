@@ -404,7 +404,12 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
             return ""
         val0 = x.baseline.perfStat.value
         val1 = x.stat.value
-        return "{:+2.1f}%".format(100 * (val1 - val0) / val0)
+        if val0 == 0 and val1 == 0:
+            return "0.0%"
+        elif val0 == 0:
+            return "NaN%"
+        else:
+            return "{:+2.1f}%".format(100 * (val1 - val0) / val0)
     dataRows = [row((
         "{}({})".format(x.stat.test, x.stat.way),
         shorten_metric_name(x.stat.metric),
@@ -425,6 +430,7 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
         x.stat.value / x.baseline.perfStat.value
         for x in metrics
         if x.baseline is not None
+        if x.baseline.perfStat.value != 0
     ]
     minimum = 0.0
     maximum = 0.0
