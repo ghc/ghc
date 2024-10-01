@@ -191,6 +191,7 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
 
     ubuntu1804 = mk(ubuntu("18_04"))
     ubuntu2004 = mk(ubuntu("20_04"))
+    ubuntu2204 = mk(ubuntu("22_04"))
     rocky8 = mk(rocky("8"))
     # Here are all the bindists we can distribute
     centos7 = mk(centos(7))
@@ -216,7 +217,10 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
                            , ">= 11": deb11
                            , "unknown_versioning": deb11 }
           , "Linux_Ubuntu" : { "unknown_versioning": ubuntu2004
-                             , "( >= 16 && < 19 )": ubuntu1804
+                             , "( >= 16 && < 18 )": deb9
+                             , "( >= 18 && < 19 )": ubuntu1804
+                             , "( >= 19 && < 21 )": ubuntu2004
+                             , "( >= 21 )": ubuntu2204
                              }
           , "Linux_Mint"   : { "< 20": ubuntu1804
                              , ">= 20": ubuntu2004 }
