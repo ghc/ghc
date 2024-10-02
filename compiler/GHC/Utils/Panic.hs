@@ -27,6 +27,7 @@ module GHC.Utils.Panic
    , panicDoc
    , sorryDoc
    , pgmErrorDoc
+
      -- ** Assertions
    , assertPprPanic
    , assertPpr

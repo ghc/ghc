@@ -39,7 +39,6 @@ module GHC.Hs.Pat (
         RecFieldsDotDot(..),
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
         hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
-
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
         isSimplePat, isPatSyn,
@@ -85,7 +84,9 @@ import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Types.Name
+
 import Data.Data
+import qualified Data.List( map )
 
 import qualified Data.List.NonEmpty as NE
 
@@ -337,6 +338,16 @@ data ConPatTc
       --   ignored for data cons
       cpt_wrap  :: HsWrapper
     }
+
+
+hsRecFields :: HsRecFields (GhcPass p) arg -> [XCFieldOcc (GhcPass p)]
+hsRecFields rbinds = Data.List.map (hsRecFieldSel . unLoc) (rec_flds rbinds)
+
+hsRecFieldsArgs :: HsRecFields (GhcPass p) arg -> [arg]
+hsRecFieldsArgs rbinds = Data.List.map (hfbRHS . unLoc) (rec_flds rbinds)
+
+hsRecFieldSel :: HsRecField (GhcPass p) arg -> XCFieldOcc (GhcPass p)
+hsRecFieldSel = fieldOccExt . unLoc . hfbLHS
 
 hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel

@@ -82,7 +82,7 @@ ppDecl summ links (L loc decl) pats (mbDoc, fnArgsDoc) instances fixities subdoc
       (locA loc)
       (mbDoc, fnArgsDoc)
       lnames
-      (dropWildCards lty)
+      (dropWildCardsI lty)
       fixities
       splice
       unicode
@@ -1099,7 +1099,7 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead{..}) md
               noHtml
               (\t -> equals <+> ppType unicode qual HideEmptyContexts t)
               rhs
-    DataInst dd ->
+    DataInst dd@(DataDecl {}) ->
       ( subInstHead iid pdata
       , mdoc
       , [subFamInstDetails iid pdecl mname]
@@ -1109,6 +1109,7 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead{..}) md
         pref = case cons of NewTypeCon _ -> keyword "newtype"; DataTypeCons _ _ -> keyword "data"
         pdata = pref <+> typ
         pdecl = pdata <+> ppShortDataDecl False True dd [] unicode qual
+    DataInst {} -> error "ppInstHead"
   where
     mname = maybe noHtml (\m -> toHtml "Defined in" <+> ppModule m) mdl
     iid = instanceId origin no orphan ihd
@@ -1146,7 +1147,7 @@ ppInstanceSigs
 ppInstanceSigs links splice unicode qual sigs = do
   TypeSig _ lnames typ <- sigs
   let names = map unLoc lnames
-      L _ rtyp = dropWildCards typ
+      L _ rtyp = dropWildCardsI typ
   -- Instance methods signatures are synified and thus don't have a useful
   -- SrcSpan value. Use the methods name location instead.
   let lname =
@@ -1187,7 +1188,7 @@ ppShortDataDecl
   -> Unicode
   -> Qualification
   -> Html
-ppShortDataDecl summary dataInst dataDecl pats unicode qual
+ppShortDataDecl summary dataInst dataDecl@(DataDecl {}) pats unicode qual
   | [] <- toList cons
   , [] <- pats =
       dataHeader
@@ -1224,6 +1225,7 @@ ppShortDataDecl summary dataInst dataDecl pats unicode qual
         ]
       | (SigD _ (PatSynSig _ lnames typ), _) <- pats
       ]
+ppShortDataDecl _ _ _ _ _ _ = error "ppShortDataDecl"
 
 -- | Pretty-print a data declaration
 ppDataDecl
@@ -1239,7 +1241,7 @@ ppDataDecl
   -> Documentation DocName
   -- ^ this decl's documentation
   -> TyClDecl DocNameI
-  -- ^ this decl
+  -- ^ this decl; always a DataDecl
   -> [(HsDecl DocNameI, DocForDecl DocName)]
   -- ^ relevant patterns
   -> Splice
@@ -1255,7 +1257,7 @@ ppDataDecl
   subdocs
   loc
   doc
-  dataDecl
+  dataDecl@(DataDecl {})
   pats
   splice
   unicode
@@ -1325,6 +1327,7 @@ ppDataDecl
           unicode
           pkg
           qual
+ppDataDecl _ _ _ _ _ _ _ _ _ _ _ _ _ = error "ppDataDecl"
 
 ppShortConstr :: Bool -> ConDecl DocNameI -> Unicode -> Qualification -> Html
 ppShortConstr summary con unicode qual = cHead <+> cBody <+> cFoot

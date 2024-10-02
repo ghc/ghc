@@ -30,7 +30,8 @@ module GHC.Core.Rules (
         rulesOfBinds, getRules, pprRulesForUser,
 
         -- * Making rules
-        mkRule, mkSpecRule, roughTopNames
+        mkRule, mkSpecRule, roughTopNames,
+        ruleIsOrphan
 
     ) where
 
@@ -484,6 +485,10 @@ ruleIsVisible _ BuiltinRule{} = True
 ruleIsVisible vis_orphs Rule { ru_orphan = orph, ru_origin = origin }
     = notOrphan orph || origin `elemModuleSet` vis_orphs
 
+ruleIsOrphan :: CoreRule -> Bool
+ruleIsOrphan (BuiltinRule {})            = False
+ruleIsOrphan (Rule { ru_orphan = orph }) = isOrphan orph
+
 {- Note [Where rules are found]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The rules for an Id come from two places:
@@ -568,7 +573,7 @@ lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
       = go ((r,mkTicks ticks e):ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
-        --   ppr [ (arg_id, unfoldingTemplate unf)
+        --   ppr [ (arg_id, maybeUnfoldingTemplate unf)
         --       | Var arg_id <- args
         --       , let unf = idUnfolding arg_id
         --       , isCheapUnfolding unf] )

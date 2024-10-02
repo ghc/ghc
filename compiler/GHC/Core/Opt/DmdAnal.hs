@@ -1015,7 +1015,7 @@ dmdTransform env var sd
   = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr con $$ ppr sd $$ ppr ty) $
     dmdTransformDataConSig (dataConRepStrictness con) sd
   -- See Note [DmdAnal for DataCon wrappers]
-  | isDataConWrapId var, let rhs = uf_tmpl (realIdUnfolding var)
+  | Just rhs <- dataConWrapUnfolding_maybe var
   , WithDmdType dmd_ty _rhs' <- dmdAnal env sd rhs
   = dmd_ty
   -- Dictionary component selectors

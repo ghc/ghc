@@ -2840,8 +2840,11 @@ isValue env (Var v)
                -- but that doesn't take account of which branch of a
                -- case we are in, which is the whole point
 
-  | not (isLocalId v) && isCheapUnfolding unf
-  = isValue env (unfoldingTemplate unf)
+  | not (isLocalId v)
+  , isCheapUnfolding unf
+  , Just rhs <- maybeUnfoldingTemplate unf  -- Succeds if isCheapUnfolding does
+  = isValue env rhs   -- Can't use isEvaldUnfolding because
+                      -- we want to consult the `env`
   where
     unf = idUnfolding v
         -- However we do want to consult the unfolding

@@ -71,7 +71,7 @@ module GHC.Types.Id (
         isPrimOpId, isPrimOpId_maybe,
         isFCallId, isFCallId_maybe,
         isDataConWorkId, isDataConWorkId_maybe,
-        isDataConWrapId, isDataConWrapId_maybe,
+        isDataConWrapId, isDataConWrapId_maybe, dataConWrapUnfolding_maybe,
         isDataConId, isDataConId_maybe,
         idDataCon,
         isConLikeId, isWorkerLikeId, isDeadEndId, idIsFrom,
@@ -129,10 +129,6 @@ module GHC.Types.Id (
 
 import GHC.Prelude
 
-import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding
-                , isCompulsoryUnfolding, Unfolding( NoUnfolding )
-                , IdUnfoldingFun, isEvaldUnfolding, hasSomeUnfolding, noUnfolding )
-
 import GHC.Types.Id.Info
 import GHC.Types.Basic
 
@@ -140,11 +136,14 @@ import GHC.Types.Basic
 import GHC.Types.Var( Id, CoVar, JoinId,
             InId,  InVar,
             OutId, OutVar,
-            idInfo, idDetails, setIdDetails, globaliseId,
+            idInfo, idDetails, setIdDetails, globaliseId, idMult,
             isId, isLocalId, isGlobalId, isExportedId,
             setIdMult, updateIdTypeAndMult, updateIdTypeButNotMult, updateIdTypeAndMultM)
 import qualified GHC.Types.Var as Var
 
+import GHC.Core ( CoreExpr, CoreRule, Unfolding(..), IdUnfoldingFun
+                , isStableUnfolding, isCompulsoryUnfolding, isEvaldUnfolding
+                , hasSomeUnfolding, noUnfolding, evaldUnfolding )
 import GHC.Core.Type
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.DataCon
@@ -210,9 +209,6 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
-idMult :: Id -> Mult
-idMult = Var.varMult
-
 idScaledType :: Id -> Scaled Type
 idScaledType id = Scaled (idMult id) (idType id)
 
@@ -250,7 +246,7 @@ localiseId id
   | assert (isId id) $ isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varMult id) (idType id) (idInfo id)
+  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.idMult id) (idType id) (idInfo id)
   where
     name = idName id
 
@@ -543,6 +539,14 @@ isDataConWrapId id = case Var.idDetails id of
 isDataConWrapId_maybe id = case Var.idDetails id of
                         DataConWrapId con -> Just con
                         _                 -> Nothing
+
+dataConWrapUnfolding_maybe :: Id -> Maybe CoreExpr
+dataConWrapUnfolding_maybe id
+  | DataConWrapId {} <- idDetails id
+  , CoreUnfolding { uf_tmpl = unf } <- realIdUnfolding id
+  = Just unf
+  | otherwise
+  = Nothing
 
 isDataConId_maybe :: Id -> Maybe DataCon
 isDataConId_maybe id = case Var.idDetails id of

@@ -1314,6 +1314,7 @@ warnIncompleteRecSel dflags sel_id ct_loc
   | not (isGetFieldOrigin (ctLocOrigin ct_loc))
       -- isGetFieldOrigin: see (IRS7) in
       -- Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+  , RecSelId { sel_cons = RSI { rsi_undef = fallible_cons } } <- idDetails sel_id
   , not (null fallible_cons)
   = addDiagnostic $
     TcRnHasFieldResolvedIncomplete (idName sel_id) fallible_cons maxCons
@@ -1322,7 +1323,6 @@ warnIncompleteRecSel dflags sel_id ct_loc
   = return ()
   where
     maxCons = maxUncoveredPatterns dflags
-    fallible_cons = rsi_undef $ sel_cons $ idDetails sel_id
 
     -- GHC.Tc.Gen.App.tcInstFun arranges that the CtOrigin of (r.x) is GetFieldOrigin,
     -- despite the expansion to (getField @"x" r)

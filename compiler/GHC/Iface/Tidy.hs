@@ -530,7 +530,6 @@ collectCostCentres mod_name binds rules
 
     do_binder cs b = maybe cs (go cs) (get_unf b)
 
-
     -- Unfoldings may have cost centres that in the original definion are
     -- optimized away, see #5889.
     get_unf = maybeUnfoldingTemplate . realIdUnfolding
@@ -652,7 +651,14 @@ getImplicitBinds tc = cls_binds ++ getTyConImplicitBinds tc
 
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc
-  | isDataTyCon tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
+  | isDataTyCon tc = [ NonRec wrap_id rhs
+                     | dc <- tyConDataCons tc
+                     , let wrap_id = dataConWrapId dc
+                         -- For data cons with no wrapper, this wrap_id
+                         -- is in fact a DataConWorkId, and hence
+                         -- dataConWrapUnfolding_maybe returns Nothing
+                     , Just rhs <- [dataConWrapUnfolding_maybe wrap_id] ]
+
   | otherwise      = []
     -- The 'otherwise' includes family TyCons of course, but also (less obviously)
     --  * Newtypes: see Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
@@ -662,9 +668,6 @@ getClassImplicitBinds :: Class -> [CoreBind]
 getClassImplicitBinds cls
   = [ NonRec op (mkDictSelRhs cls val_index)
     | (op, val_index) <- classAllSelIds cls `zip` [0..] ]
-
-get_defn :: Id -> CoreBind
-get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))
 
 {-
 ************************************************************************

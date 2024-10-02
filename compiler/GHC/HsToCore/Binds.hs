@@ -907,7 +907,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
 dsWarnOrphanRule :: CoreRule -> DsM ()
 dsWarnOrphanRule rule
-  = when (isOrphan (ru_orphan rule)) $
+  = when (ruleIsOrphan rule) $
     diagnosticDs (DsOrphanRule rule)
 
 {- Note [SPECIALISE on INLINE functions]

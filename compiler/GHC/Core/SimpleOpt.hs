@@ -339,10 +339,12 @@ simple_app env (Var v) as
   = simple_app (soeSetInScope (soeInScope env) env') e as
 
   | let unf = idUnfolding v
-  , isCompulsoryUnfolding (idUnfolding v)
+  , isCompulsoryUnfolding unf
   , isAlwaysActive (idInlineActivation v)
     -- See Note [Unfold compulsory unfoldings in RULE LHSs]
-  = simple_app (soeZapSubst env) (unfoldingTemplate unf) as
+  , Just rhs <- maybeUnfoldingTemplate unf
+    -- Always succeeds if isCompulsoryUnfolding does
+  = simple_app (soeZapSubst env) rhs as
 
   | otherwise
   , let out_fn = lookupIdSubst (soe_subst env) v
@@ -1338,8 +1340,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         -- [Activation for data constructor wrappers]) but we want to do
         -- case-of-known-constructor optimisation eagerly (see Note
         -- [exprIsConApp_maybe on data constructors with wrappers]).
-        | isDataConWrapId fun
-        , let rhs = uf_tmpl (realIdUnfolding fun)
+        | Just rhs <- dataConWrapUnfolding_maybe fun
         = go (Left in_scope) floats rhs cont
 
         -- Look through dictionary functions; see Note [Unfolding DFuns]

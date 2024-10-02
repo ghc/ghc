@@ -1,6 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 module GHC.Tc.Errors.Hole.FitTypes (
-  TypedHole (..), HoleFit (..), HoleFitCandidate (..),
+  TypedHole (..), HoleFit (..), TcHoleFit(..), HoleFitCandidate (..),
   hfIsLcl, pprHoleFitCand
   ) where
 
@@ -77,7 +77,7 @@ instance Ord HoleFitCandidate where
 -- element that was checked, the Id of that element as found by `tcLookup`,
 -- and the refinement level of the fit, which is the number of extra argument
 -- holes that this fit uses (e.g. if hfRefLvl is 2, the fit is for `Id _ _`).
-data HoleFit =
+data TcHoleFit =
   HoleFit { hfId   :: Id       -- ^ The elements id in the TcM
           , hfCand :: HoleFitCandidate  -- ^ The candidate that was checked.
           , hfType :: TcType -- ^ The type of the id, possibly zonked.
@@ -88,16 +88,22 @@ data HoleFit =
           , hfDoc :: Maybe [HsDocString]
           -- ^ Documentation of this HoleFit, if available.
           }
- | RawHoleFit SDoc
- -- ^ A fit that is just displayed as is. Here so thatHoleFitPlugins
+
+data HoleFit
+  = TcHoleFit  TcHoleFit
+  | RawHoleFit SDoc
+ -- ^ A fit that is just displayed as is. Here so that HoleFitPlugins
  --   can inject any fit they want.
 
 -- We define an Eq and Ord instance to be able to build a graph.
-instance Eq HoleFit where
+instance Eq TcHoleFit where
    (==) = (==) `on` hfId
 
 instance Outputable HoleFit where
+  ppr (TcHoleFit hf)  = ppr hf
   ppr (RawHoleFit sd) = sd
+
+instance Outputable TcHoleFit where
   ppr (HoleFit _ cand ty _ _ mtchs _) =
     hang (name <+> holes) 2 (text "where" <+> name <+> dcolon <+> (ppr ty))
     where name = ppr $ getName cand
@@ -107,20 +113,19 @@ instance Outputable HoleFit where
 -- want our tests to be affected by the non-determinism of `nonDetCmpVar`,
 -- which is used to compare Ids. When comparing, we want HoleFits with a lower
 -- refinement level to come first.
-instance Ord HoleFit where
-  compare (RawHoleFit _) (RawHoleFit _) = EQ
-  compare (RawHoleFit _) _ = LT
-  compare _ (RawHoleFit _) = GT
+instance Ord TcHoleFit where
+--  compare (RawHoleFit _) (RawHoleFit _) = EQ
+--  compare (RawHoleFit _) _ = LT
+--  compare _ (RawHoleFit _) = GT
   compare a@(HoleFit {}) b@(HoleFit {}) = cmp a b
     where cmp  = if hfRefLvl a == hfRefLvl b
                  then compare `on` (getName . hfCand)
                  else compare `on` hfRefLvl
 
-hfIsLcl :: HoleFit -> Bool
+hfIsLcl :: TcHoleFit -> Bool
 hfIsLcl hf@(HoleFit {}) = case hfCand hf of
                             IdHFCand _    -> True
                             NameHFCand _  -> False
                             GreHFCand gre -> gre_lcl gre
-hfIsLcl _ = False
 
 

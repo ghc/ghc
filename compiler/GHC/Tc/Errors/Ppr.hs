@@ -680,8 +680,8 @@ instance Diagnostic TcRnMessage where
                              , nest 2 (pprNameProvenance gre) ]
           pprGRE gre = case greInfo gre of
             IAmRecField {}
-              -> let parent = par_is $ greParent gre
-                 in text "record field" <+> fld <+> text "of" <+> quotes (ppr parent)
+              | ParentIs { par_is = parent } <- greParent gre
+              -> text "record field" <+> fld <+> text "of" <+> quotes (ppr parent)
             _ -> text "variable" <+> fld
     TcRnAmbiguousRecordUpdate _rupd tc
       -> mkSimpleDecorated $

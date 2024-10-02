@@ -72,7 +72,7 @@ modSortP _ ref hole hfs = do
   where orderByModule :: [HoleFit] -> [HoleFit]
         orderByModule = sortOn (fmap fromModule . mbHFCand)
         mbHFCand :: HoleFit -> Maybe HoleFitCandidate
-        mbHFCand HoleFit {hfCand = c} = Just c
+        mbHFCand (TcHoleFit (HoleFit {hfCand = c})) = Just c
         mbHFCand _ = Nothing
         msg = "Error: Too many holes were checked, and the search aborted for"
             <> "this hole. Try again with a higher limit."

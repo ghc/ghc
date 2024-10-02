@@ -182,7 +182,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
         -- Divide into sub-groups; see Note [Record patterns]
         ; let groups :: NonEmpty (NonEmpty (ConArgPats, EquationInfoNE))
               groups = NE.groupBy1 compatible_pats
-                     $ fmap (\eqn -> (pat_args (firstPat eqn), eqn)) (eqn1 :| eqns)
+                     $ fmap (\eqn -> (con_pat_args (firstPat eqn), eqn)) (eqn1 :| eqns)
 
         ; match_results <- mapM (match_group arg_vars) groups
 
@@ -191,6 +191,10 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
+    con_pat_args :: Pat GhcTc -> HsConPatDetails GhcTc
+    con_pat_args (ConPat { pat_args = args }) = args
+    con_pat_args p = pprPanic "matchOneConLike" (ppr p)  -- All patterns are ConPats
+
     ConPat { pat_con = L _ con1
            , pat_args = args1
            , pat_con_ext = ConPatTc

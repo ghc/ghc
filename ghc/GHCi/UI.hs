@@ -931,6 +931,7 @@ getInfoForPrompt = do
 
         rev_imports = reverse imports -- rightmost are the most recent
 
+        myIdeclName :: ImportDecl GhcPs -> ModuleName
         myIdeclName d | Just m <- ideclAs d = unLoc m
                       | otherwise           = unLoc (ideclName d)
 

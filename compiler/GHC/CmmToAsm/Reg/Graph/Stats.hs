@@ -219,11 +219,10 @@ pprStatsSpills
 
 pprStatsSpills stats
  = let
-        finals  = [ s   | s@RegAllocStatsColored{} <- stats]
+        finals  = [srms | RegAllocStatsColored{ raSRMs = srms } <- stats]
 
         -- sum up how many stores\/loads\/reg-reg-moves were left in the code
-        total   = foldl' addSRM (0, 0, 0)
-                $ map raSRMs finals
+        total   = foldl' addSRM (0, 0, 0) finals
 
     in  (  text "-- spills-added-total"
         $$ text "--    (stores, loads, reg_reg_moves_remaining)"
@@ -237,8 +236,7 @@ pprStatsLifetimes
 
 pprStatsLifetimes stats
  = let  info            = foldl' plusSpillCostInfo zeroSpillCostInfo
-                                [ raSpillCosts s
-                                        | s@RegAllocStatsStart{} <- stats ]
+                          [ sc | RegAllocStatsStart{ raSpillCosts = sc } <- stats ]
 
         lifeBins        = binLifetimeCount $ lifeMapFromSpillCostInfo info
 
@@ -287,7 +285,7 @@ pprStatsLifeConflict
 pprStatsLifeConflict stats graph
  = let  lifeMap = lifeMapFromSpillCostInfo
                 $ foldl' plusSpillCostInfo zeroSpillCostInfo
-                $ [ raSpillCosts s | s@RegAllocStatsStart{} <- stats ]
+                $ [ sc | RegAllocStatsStart{ raSpillCosts = sc } <- stats ]
 
         scatter = map   (\r ->  let lifetime  = case lookupUFM lifeMap r of
                                                       Just (_, l) -> l

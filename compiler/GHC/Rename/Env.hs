@@ -563,7 +563,7 @@ lookupRecFieldOcc mb_con rdr_name
           ; Just nm -> return nm } }
 
   | otherwise  -- Can't use the data constructor to disambiguate
-  = lookupGlobalOccRn' (RelevantGREsFOS WantField) rdr_name
+  = lookupGlobalOccRn' WantField rdr_name
     -- This use of Global is right as we are looking up a selector,
     -- which can only be defined at the top level.
 
@@ -1405,20 +1405,23 @@ lookupGlobalOccRn :: RdrName -> RnM Name
 -- environment.
 --
 -- Used by exports_from_avail
-lookupGlobalOccRn = lookupGlobalOccRn' (RelevantGREsFOS WantNormal)
+lookupGlobalOccRn = lookupGlobalOccRn' WantNormal
 
-lookupGlobalOccRn' :: WhichGREs GREInfo -> RdrName -> RnM Name
-lookupGlobalOccRn' which_gres rdr_name =
-  lookupExactOrOrig rdr_name greName $ do
-    mb_gre <- lookupGlobalOccRn_base which_gres rdr_name
-    case mb_gre of
-      Just gre -> return (greName gre)
-      Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
-                    ; unboundName (LF which_suggest WL_Global) rdr_name }
-        where which_suggest = case includeFieldSelectors which_gres of
-                WantBoth   -> WL_RecField
-                WantField  -> WL_RecField
-                WantNormal -> WL_Anything
+lookupGlobalOccRn' :: FieldsOrSelectors -> RdrName -> RnM Name
+lookupGlobalOccRn' fos rdr_name
+  = lookupExactOrOrig rdr_name greName $
+    do { mb_gre <- lookupGlobalOccRn_base which_gres rdr_name
+       ; case mb_gre of
+           Just gre -> return (greName gre)
+           Nothing  -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
+                          ; unboundName looking_for rdr_name } }
+  where
+    which_gres   = RelevantGREsFOS fos
+    looking_for  = LF { lf_which = what_looking, lf_where =  WL_Global }
+    what_looking = case fos of
+                      WantBoth   -> WL_RecField
+                      WantField  -> WL_RecField
+                      WantNormal -> WL_Anything
 
 -- Looks up a RdrName occurrence in the GlobalRdrEnv and with
 -- lookupQualifiedNameGHCi. Does not try to find an Exact or Orig name first.

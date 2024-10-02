@@ -482,7 +482,7 @@ substIdType subst@(Subst _ _ tv_env cv_env) id
         -- in a Note in the id's type itself
   where
     old_ty = idType id
-    old_w  = varMult id
+    old_w  = idMult id
 
 ------------------
 -- | Substitute into some 'IdInfo' with regard to the supplied new 'Id'.

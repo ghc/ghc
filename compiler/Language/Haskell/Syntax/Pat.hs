@@ -28,8 +28,7 @@ module Language.Haskell.Syntax.Pat (
         HsRecFields(..), XHsRecFields, HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
-        RecFieldsDotDot(..),
-        hsRecFields, hsRecFieldSel, hsRecFieldsArgs,
+        RecFieldsDotDot(..)
     ) where
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (SyntaxExpr, LHsExpr, HsUntypedSplice)
@@ -394,12 +393,3 @@ data HsFieldBind lhs rhs = HsFieldBind {
 --     hfbLHS = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
 --
 -- See also Note [Disambiguating record updates] in GHC.Rename.Pat.
-
-hsRecFields :: forall p arg.UnXRec p => HsRecFields p arg -> [XCFieldOcc p]
-hsRecFields rbinds = Data.List.map (hsRecFieldSel . unXRec @p) (rec_flds rbinds)
-
-hsRecFieldsArgs :: forall p arg. UnXRec p => HsRecFields p arg -> [arg]
-hsRecFieldsArgs rbinds = Data.List.map (hfbRHS . unXRec @p) (rec_flds rbinds)
-
-hsRecFieldSel :: forall p arg. UnXRec p => HsRecField p arg -> XCFieldOcc p
-hsRecFieldSel = foExt . unXRec @p . hfbLHS

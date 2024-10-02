@@ -60,7 +60,7 @@ module GHC.Hs.Type (
 
         HsConDetails(..), noTypeArgs,
 
-        FieldOcc(..), LFieldOcc, mkFieldOcc,
+        FieldOcc(..), LFieldOcc, mkFieldOcc, fieldOccExt,
         AmbiguousFieldOcc(..), LAmbiguousFieldOcc, mkAmbiguousFieldOcc,
         ambiguousFieldOccRdrName, ambiguousFieldOccLRdrName,
         selectorAmbiguousFieldOcc,
@@ -305,10 +305,14 @@ type instance XXHsTyPat      (GhcPass _) = DataConCantHappen
 type instance XHsSig (GhcPass _) = NoExtField
 type instance XXHsSigType (GhcPass _) = DataConCantHappen
 
-hsSigWcType :: forall p. UnXRec p => LHsSigWcType p -> LHsType p
-hsSigWcType = sig_body . unXRec @p . hswc_body
 
-dropWildCards :: LHsSigWcType pass -> LHsSigType pass
+hsPatSigType :: HsPatSigType (GhcPass p) -> LHsType (GhcPass p)
+hsPatSigType (HsPS { hsps_body = ty }) = ty
+
+hsSigWcType :: LHsSigWcType (GhcPass p) -> LHsType (GhcPass p)
+hsSigWcType = sig_body . unLoc . hswc_body
+
+dropWildCards :: LHsSigWcType (GhcPass p) -> LHsSigType (GhcPass p)
 -- Drop the wildcard part of a LHsSigWcType
 dropWildCards sig_ty = hswc_body sig_ty
 
@@ -1099,6 +1103,8 @@ type instance XXFieldOcc (GhcPass _) = DataConCantHappen
 mkFieldOcc :: LocatedN RdrName -> FieldOcc GhcPs
 mkFieldOcc rdr = FieldOcc noExtField rdr
 
+fieldOccExt :: FieldOcc (GhcPass p) -> XCFieldOcc (GhcPass p)
+fieldOccExt (FieldOcc { foExt = ext }) = ext
 
 type instance XUnambiguous GhcPs = NoExtField
 type instance XUnambiguous GhcRn = Name
@@ -1270,14 +1276,16 @@ instance (Outputable tyarg, Outputable arg, Outputable rec)
   ppr (RecCon rec)            = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
 
-instance Outputable (XRec pass RdrName) => Outputable (FieldOcc pass) where
+instance Outputable (FieldOcc (GhcPass pass)) where
   ppr = ppr . foLabel
 
-instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (FieldOcc pass) where
-  pprInfixOcc  = pprInfixOcc . unXRec @pass . foLabel
-  pprPrefixOcc = pprPrefixOcc . unXRec @pass . foLabel
+instance (OutputableBndr (XRec (GhcPass p) RdrName))
+      => OutputableBndr (FieldOcc (GhcPass pass)) where
+  pprInfixOcc  = pprInfixOcc . unLoc . foLabel
+  pprPrefixOcc = pprPrefixOcc . unLoc . foLabel
 
-instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
+instance (OutputableBndr (XRec (GhcPass p) RdrName))
+      => OutputableBndr (GenLocated SrcSpan (FieldOcc (GhcPass p))) where
   pprInfixOcc  = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
 

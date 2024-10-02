@@ -1722,7 +1722,7 @@ mkFunResCo role id res_co
   = mkFunCoNoFTF role mult arg_co res_co
   where
     arg_co = mkReflCo role (varType id)
-    mult   = multToCo (varMult id)
+    mult   = multToCo (idMult id)
 
 -- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
 -- The first coercion might be lifted or unlifted; thus the ~? above

@@ -134,9 +134,8 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     spec_info (Just (Exactly, _)) = (0,0,0,0,0,1,0)
     spec_info (Just (EverythingBut, _))  = (0,0,0,0,0,0,1)
 
-    data_info (DataDecl { tcdDataDefn = HsDataDefn
-                                          { dd_cons = cs
-                                          , dd_derivs = derivs}})
+    data_info (DataDecl { tcdDataDefn = dd :: HsDataDefn GhcPs })
+        | HsDataDefn { dd_cons = cs, dd_derivs = derivs} <- dd
         = ( length cs
           , foldl' (\s dc -> length (deriv_clause_tys $ unLoc dc) + s)
                    0 derivs )

@@ -45,7 +45,7 @@ module GHC.Types.Var (
 
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
-        varMult, varMultMaybe,
+        varMultMaybe, idMult,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType,
@@ -416,6 +416,10 @@ varUnique var = realUnique var
 varMultMaybe :: Id -> Maybe Mult
 varMultMaybe (Id { varMult = mult }) = Just mult
 varMultMaybe _ = Nothing
+
+idMult :: HasDebugCallStack => Id -> Mult
+idMult (Id { varMult = mult }) = mult
+idMult non_id                  = pprPanic "idMult" (ppr non_id)
 
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var uniq

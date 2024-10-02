@@ -70,6 +70,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
+import GHC.Utils.Fingerprint( Fingerprint )
 
 import GHC.Settings.Constants
 
@@ -1186,13 +1187,15 @@ pprExport avail@(AvailTC n _) =
     pp_export names = braces (hsep (map ppr names))
 
 pprUsage :: Usage -> SDoc
-pprUsage usage@UsagePackageModule{}
-  = pprUsageImport usage usg_mod
-pprUsage usage@UsageHomeModule{}
-  = pprUsageImport usage (\u -> mkModule (usg_unit_id u) (usg_mod_name u)) $$
+pprUsage UsagePackageModule{ usg_mod = mod, usg_mod_hash = hash, usg_safe = safe }
+  = pprUsageImport mod hash safe
+pprUsage UsageHomeModule{ usg_unit_id = unit_id, usg_mod_name = mod_name
+                              , usg_mod_hash = hash, usg_safe = safe
+                              , usg_exports = exports, usg_entities = entities }
+  = pprUsageImport (mkModule unit_id mod_name) hash safe $$
     nest 2 (
-        maybe Outputable.empty (\v -> text "exports: " <> ppr v) (usg_exports usage) $$
-        vcat [ ppr n <+> ppr v | (n,v) <- usg_entities usage ]
+        maybe Outputable.empty (\v -> text "exports: " <> ppr v) exports $$
+        vcat [ ppr n <+> ppr v | (n,v) <- entities ]
         )
 pprUsage usage@UsageFile{}
   = hsep [text "addDependentFile",
@@ -1205,13 +1208,13 @@ pprUsage usage@UsageHomeModuleInterface{}
                                , ppr (usg_unit_id usage)
                                , ppr (usg_iface_hash usage)]
 
-pprUsageImport :: Outputable a => Usage -> (Usage -> a) -> SDoc
-pprUsageImport usage usg_mod'
-  = hsep [text "import", safe, ppr (usg_mod' usage),
-                       ppr (usg_mod_hash usage)]
+pprUsageImport :: Outputable mod => mod -> Fingerprint -> IsSafeImport -> SDoc
+pprUsageImport mod hash safe
+  = hsep [ text "import", pp_safe, ppr mod
+         , ppr hash ]
     where
-        safe | usg_safe usage = text "safe"
-             | otherwise      = text " -/ "
+        pp_safe | safe      = text "safe"
+                | otherwise = text " -/ "
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = Outputable.empty

@@ -339,7 +339,7 @@ cprTransform env id args
   | isLocalId id
   = assertPpr (isDataStructure id) (ppr id) topCprType
   -- See Note [CPR for DataCon wrappers]
-  | isDataConWrapId id, let rhs = uf_tmpl (realIdUnfolding id)
+  | Just rhs <- dataConWrapUnfolding_maybe id
   = fst $ cprAnalApp env rhs args
   -- DataCon worker
   | Just con <- isDataConWorkId_maybe id

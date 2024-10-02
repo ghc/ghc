@@ -156,6 +156,7 @@ data EquationInfo
 
 type EquationInfoNE = EquationInfo
 -- An EquationInfo which has at least one pattern
+--   i.e. it's an EqnMatch, not EqnDone
 
 prependPats :: [LPat GhcTc] -> EquationInfo -> EquationInfo
 prependPats [] eqn = eqn

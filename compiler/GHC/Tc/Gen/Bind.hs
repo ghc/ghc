@@ -597,7 +597,7 @@ tcPolyCheck prag_fn
        ; (wrap_gen, (wrap_res, matches'))
              <- tcSkolemiseCompleteSig sig $ \invis_pat_tys rho_ty ->
 
-                let mono_id = mkLocalId mono_name (varMult poly_id) rho_ty in
+                let mono_id = mkLocalId mono_name (idMult poly_id) rho_ty in
                 tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
                 -- Why mono_id in the BinderStack?
                 -- See Note [Relevant bindings and the binder stack]
