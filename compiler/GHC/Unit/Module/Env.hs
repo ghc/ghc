@@ -33,17 +33,6 @@ module GHC.Unit.Module.Env
    , mergeInstalledModuleEnv
    , plusInstalledModuleEnv
    , installedModuleEnvElts
-
-     -- * InstalledModuleWithIsBootEnv
-   , InstalledModuleWithIsBootEnv
-   , emptyInstalledModuleWithIsBootEnv
-   , lookupInstalledModuleWithIsBootEnv
-   , extendInstalledModuleWithIsBootEnv
-   , filterInstalledModuleWithIsBootEnv
-   , delInstalledModuleWithIsBootEnv
-   , mergeInstalledModuleWithIsBootEnv
-   , plusInstalledModuleWithIsBootEnv
-   , installedModuleWithIsBootEnvElts
    )
 where
 
@@ -293,57 +282,4 @@ plusInstalledModuleEnv :: (elt -> elt -> elt)
   -> InstalledModuleEnv elt
 plusInstalledModuleEnv f (InstalledModuleEnv xm) (InstalledModuleEnv ym) =
   InstalledModuleEnv $ Map.unionWith f xm ym
-
-
-
---------------------------------------------------------------------
--- InstalledModuleWithIsBootEnv
---------------------------------------------------------------------
-
--- | A map keyed off of 'InstalledModuleWithIsBoot'
-newtype InstalledModuleWithIsBootEnv elt = InstalledModuleWithIsBootEnv (Map InstalledModuleWithIsBoot elt)
-
-instance Outputable elt => Outputable (InstalledModuleWithIsBootEnv elt) where
-  ppr (InstalledModuleWithIsBootEnv env) = ppr env
-
-
-emptyInstalledModuleWithIsBootEnv :: InstalledModuleWithIsBootEnv a
-emptyInstalledModuleWithIsBootEnv = InstalledModuleWithIsBootEnv Map.empty
-
-lookupInstalledModuleWithIsBootEnv :: InstalledModuleWithIsBootEnv a -> InstalledModuleWithIsBoot -> Maybe a
-lookupInstalledModuleWithIsBootEnv (InstalledModuleWithIsBootEnv e) m = Map.lookup m e
-
-extendInstalledModuleWithIsBootEnv :: InstalledModuleWithIsBootEnv a -> InstalledModuleWithIsBoot -> a -> InstalledModuleWithIsBootEnv a
-extendInstalledModuleWithIsBootEnv (InstalledModuleWithIsBootEnv e) m x = InstalledModuleWithIsBootEnv (Map.insert m x e)
-
-filterInstalledModuleWithIsBootEnv :: (InstalledModuleWithIsBoot -> a -> Bool) -> InstalledModuleWithIsBootEnv a -> InstalledModuleWithIsBootEnv a
-filterInstalledModuleWithIsBootEnv f (InstalledModuleWithIsBootEnv e) =
-  InstalledModuleWithIsBootEnv (Map.filterWithKey f e)
-
-delInstalledModuleWithIsBootEnv :: InstalledModuleWithIsBootEnv a -> InstalledModuleWithIsBoot -> InstalledModuleWithIsBootEnv a
-delInstalledModuleWithIsBootEnv (InstalledModuleWithIsBootEnv e) m = InstalledModuleWithIsBootEnv (Map.delete m e)
-
-installedModuleWithIsBootEnvElts :: InstalledModuleWithIsBootEnv a -> [(InstalledModuleWithIsBoot, a)]
-installedModuleWithIsBootEnvElts (InstalledModuleWithIsBootEnv e) = Map.assocs e
-
-mergeInstalledModuleWithIsBootEnv
-  :: (elta -> eltb -> Maybe eltc)
-  -> (InstalledModuleWithIsBootEnv elta -> InstalledModuleWithIsBootEnv eltc)  -- map X
-  -> (InstalledModuleWithIsBootEnv eltb -> InstalledModuleWithIsBootEnv eltc) -- map Y
-  -> InstalledModuleWithIsBootEnv elta
-  -> InstalledModuleWithIsBootEnv eltb
-  -> InstalledModuleWithIsBootEnv eltc
-mergeInstalledModuleWithIsBootEnv f g h (InstalledModuleWithIsBootEnv xm) (InstalledModuleWithIsBootEnv ym)
-  = InstalledModuleWithIsBootEnv $ Map.mergeWithKey
-      (\_ x y -> (x `f` y))
-      (coerce g)
-      (coerce h)
-      xm ym
-
-plusInstalledModuleWithIsBootEnv :: (elt -> elt -> elt)
-  -> InstalledModuleWithIsBootEnv elt
-  -> InstalledModuleWithIsBootEnv elt
-  -> InstalledModuleWithIsBootEnv elt
-plusInstalledModuleWithIsBootEnv f (InstalledModuleWithIsBootEnv xm) (InstalledModuleWithIsBootEnv ym) =
-  InstalledModuleWithIsBootEnv $ Map.unionWith f xm ym
 
