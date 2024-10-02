@@ -2131,7 +2131,7 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
         mod <- liftIO $ do
           let home_unit = hsc_home_unit hsc_env
           let fc        = hsc_FC hsc_env
-          addHomeModuleToFinder fc home_unit pi_mod_name location
+          addHomeModuleToFinder fc home_unit pi_mod_name location hsc_src
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2166,13 +2166,10 @@ checkSummaryHash
            -- and it was likely flushed in depanal. This is not technically
            -- needed when we're called from sumariseModule but it shouldn't
            -- hurt.
-           -- Also, only add to finder cache for non-boot modules as the finder cache
-           -- makes sure to add a boot suffix for boot files.
-           _ <- do
-              let fc        = hsc_FC hsc_env
-              case ms_hsc_src old_summary of
-                HsSrcFile -> addModuleToFinder fc (ms_mod old_summary) location
-                _ -> return ()
+           let fc      = hsc_FC hsc_env
+               mod     = ms_mod old_summary
+               hsc_src = ms_hsc_src old_summary
+           addModuleToFinder fc mod location hsc_src
 
            hi_timestamp <- modificationTimeIfExists (ml_hi_file location)
            hie_timestamp <- modificationTimeIfExists (ml_hie_file location)

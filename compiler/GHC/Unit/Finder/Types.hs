@@ -30,7 +30,7 @@ data FinderCache = FinderCache { fcModuleCache :: (IORef FinderCacheState)
                                }
 
 data InstalledFindResult
-  = InstalledFound ModLocation InstalledModule
+  = InstalledFound ModLocation
   | InstalledNoPackage UnitId
   | InstalledNotFound [OsPath] (Maybe UnitId)
 
