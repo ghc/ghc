@@ -663,7 +663,7 @@ initLinkDepsOpts hsc_env = opts
         Maybe.Failed err -> pure (Maybe.Failed err)
         Maybe.Succeeded iface ->
           find_location mod <&> \case
-            InstalledFound loc _ -> Maybe.Succeeded (iface, loc)
+            InstalledFound loc -> Maybe.Succeeded (iface, loc)
             err -> Maybe.Failed $
                    cannotFindInterface unit_state home_unit
                    (targetProfile dflags) (moduleName mod) err
@@ -672,8 +672,7 @@ initLinkDepsOpts hsc_env = opts
       liftIO $
       findExactModule (hsc_FC hsc_env) (initFinderOpts dflags)
       (initFinderOpts . homeUnitEnv_dflags <$> hsc_HUG hsc_env)
-      unit_state home_unit
-      (toUnitId <$> mod)
+      unit_state home_unit (toUnitId <$> mod) NotBoot
 
     unit_state = hsc_units hsc_env
 
