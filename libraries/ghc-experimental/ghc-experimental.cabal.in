@@ -4,7 +4,9 @@ cabal-version:      3.0
 -- Make sure you are editing ghc-experimental.cabal.in, not ghc-experimental.cabal
 
 name:               ghc-experimental
-version:            0.1.0.0
+-- The project is ghc's version plus ghc-experimental's version suffix.
+-- For example, for ghc=9.10.1, ghc-experimental's version will be 9.1001.0.
+version:            @ProjectVersionForLib@.0
 synopsis:           Experimental features of GHC's standard library
 description:
     This package is where experimental GHC standard library interfaces start
