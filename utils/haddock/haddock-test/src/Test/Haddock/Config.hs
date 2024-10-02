@@ -18,7 +18,7 @@ import Data.Maybe
 import Distribution.Text
 import Distribution.Types.PackageName
 import Distribution.InstalledPackageInfo
-import Distribution.Simple.Compiler (PackageDB(..))
+import Distribution.Simple.Compiler (PackageDB(..), PackageDBX( GlobalPackageDB ))
 import Distribution.Simple.GHC
 import Distribution.Simple.PackageIndex
 import Distribution.Simple.Program
@@ -257,7 +257,7 @@ baseDependencies ghcPath = do
 
     (comp, _, cfg) <- configure normal (Just ghcPath) Nothing
         defaultProgramDb
-    pkgIndex <- getInstalledPackages normal comp [GlobalPackageDB] cfg
+    pkgIndex <- getInstalledPackages normal comp Nothing [GlobalPackageDB] cfg
     let
       pkgs =
         [ "array"
