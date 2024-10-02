@@ -139,8 +139,8 @@ binaryInterfaceMagic = 0xD0Cface
 -- (2) set `binaryInterfaceVersionCompatibility` to [binaryInterfaceVersion]
 --
 binaryInterfaceVersion :: Word16
-#if MIN_VERSION_ghc(9,9,0) && !MIN_VERSION_ghc(9,12,0)
-binaryInterfaceVersion = 44
+#if MIN_VERSION_ghc(9,12,0) && !MIN_VERSION_ghc(9,13,0)
+binaryInterfaceVersion = 45
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
