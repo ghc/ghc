@@ -898,7 +898,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
           -- Look for the file
           mb_found <- liftIO (findExactModule fc fopts other_fopts unit_state mhome_unit mod)
           case mb_found of
-              InstalledFound (addBootSuffixLocn_maybe hi_boot_file -> loc) mod -> do
+              InstalledFound (addBootSuffixLocn_maybe hi_boot_file -> loc) -> do
                   -- See Note [Home module load error]
                   case mhome_unit of
                     Just home_unit
