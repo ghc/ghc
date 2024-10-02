@@ -663,9 +663,8 @@ pprTicks pp_no_debug pp_when_debug
          then pp_when_debug
          else pp_no_debug
 
-instance Outputable (XRec pass (IdP pass)) => Outputable (RecordPatSynField pass) where
+instance Outputable (XRecGhc (IdGhcP p)) => Outputable (RecordPatSynField (GhcPass p)) where
     ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
-
 
 {-
 ************************************************************************

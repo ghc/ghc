@@ -208,7 +208,7 @@ rnImports imports = do
     -- module to import from its implementor
     let this_mod = tcg_mod tcg_env
     let (source, ordinary) = partition (is_source_import . fst) imports
-        is_source_import d = ideclSource (unLoc d) == IsBoot
+        is_source_import (d::LImportDecl GhcPs) = ideclSource (unLoc d) == IsBoot
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]

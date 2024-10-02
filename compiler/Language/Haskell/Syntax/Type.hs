@@ -58,8 +58,7 @@ module Language.Haskell.Syntax.Type (
 
         mapHsOuterImplicit,
         hsQTvExplicit,
-        isHsKindedTyVar,
-        hsPatSigType,
+        isHsKindedTyVar
     ) where
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
@@ -71,6 +70,7 @@ import Language.Haskell.Syntax.Specificity
 
 import GHC.Hs.Doc (LHsDoc)
 import GHC.Data.FastString (FastString)
+import GHC.Utils.Panic( panic )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Void
@@ -353,7 +353,8 @@ data LHsQTyVars pass   -- See Note [HsType binders]
   | XLHsQTyVars !(XXLHsQTyVars pass)
 
 hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr (HsBndrVis pass) pass]
-hsQTvExplicit = hsq_explicit
+hsQTvExplicit (HsQTvs { hsq_explicit = explicit_tvs }) = explicit_tvs
+hsQTvExplicit (XLHsQTyVars {})                         = panic "hsQTvExplicit"
 
 ------------------------------------------------
 --            HsOuterTyVarBndrs
@@ -468,9 +469,6 @@ data HsSigType pass
           , sig_body  :: LHsType pass
           }
   | XHsSigType !(XXHsSigType pass)
-
-hsPatSigType :: HsPatSigType pass -> LHsType pass
-hsPatSigType = hsps_body
 
 {-
 Note [forall-or-nothing rule]

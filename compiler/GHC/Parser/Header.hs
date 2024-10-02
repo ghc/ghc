@@ -109,7 +109,8 @@ getImports popts implicit_prelude buf filename source_filename = do
 
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
-                convImport (L _ i) = (ideclPkgQual i, reLoc $ ideclName i)
+                convImport (L _ (i::ImportDecl GhcPs))
+                  = (ideclPkgQual i, reLoc $ ideclName i)
               in
               return (map convImport src_idecls
                      , map convImport (implicit_imports ++ ordinary_imps)
@@ -134,7 +135,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
   where
       explicit_prelude_import = any is_prelude_import import_decls
 
-      is_prelude_import (L _ decl) =
+      is_prelude_import (L _ (decl::ImportDecl GhcPs)) =
         unLoc (ideclName decl) == pRELUDE_NAME
         -- See #17045, package qualified imports are never counted as
         -- explicit prelude imports

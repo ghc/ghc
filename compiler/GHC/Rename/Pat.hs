@@ -1053,8 +1053,9 @@ getFieldIds flds = map (hsRecFieldSel . unLoc) flds
 getFieldRdrs :: [LHsRecField GhcRn arg] -> [RdrName]
 getFieldRdrs flds = map (foExt . unXRec @GhcRn . hfbLHS . unLoc) flds
 
-getFieldLbls :: forall p arg . UnXRec p => [LHsRecField p arg] -> [IdP p]
-getFieldLbls = map (unXRec @p . foLabel . unXRec @p . hfbLHS . unXRec @p)
+getFieldLbls :: [LHsRecField (GhcPass p) arg] -> [IdGhcP p]
+getFieldLbls flds
+  = map (unLoc . foLabel . unLoc . hfbLHS . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> TcRnMessage
 needFlagDotDot = TcRnIllegalWildcardsInRecord . toRecordFieldPart

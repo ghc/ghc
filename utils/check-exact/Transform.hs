@@ -564,7 +564,7 @@ priorCommentsDeltas r cs = go r (sortEpaComments cs)
   where
     go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
     go _   [] = []
-    go _   (la@(L l@(EpaDelta _ dp _) _):las) = (deltaLine dp, la) : go (anchor l) las
+    go _   (la@(L l@(EpaDelta _ dp _) _):las) = (getDeltaLine dp, la) : go (anchor l) las
     go rs' (la@(L l _):las) = deltaComment rs' la : go (anchor l) las
 
     deltaComment :: RealSrcSpan -> LEpaComment -> (Int, LEpaComment)

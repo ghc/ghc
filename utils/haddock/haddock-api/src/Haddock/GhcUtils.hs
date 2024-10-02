@@ -149,6 +149,10 @@ getConNamesI ConDeclGADT{con_names = names} = names
 hsSigTypeI :: LHsSigType DocNameI -> LHsType DocNameI
 hsSigTypeI = sig_body . unLoc
 
+dropWildCardsI :: LHsSigWcType DocNameI -> LHsSigType DocNameI
+-- Drop the wildcard part of a LHsSigWcType
+dropWildCardsI sig_ty = hswc_body sig_ty
+
 mkEmptySigType :: LHsType GhcRn -> LHsSigType GhcRn
 -- Dubious, because the implicit binders are empty even
 -- though the type might have free variables
@@ -312,17 +316,12 @@ lHsQTyVarsToTypes tvs =
 restrictTo :: [Name] -> LHsDecl GhcRn -> LHsDecl GhcRn
 restrictTo names (L loc decl) = L loc $ case decl of
   TyClD x d
-    | isDataDecl d ->
-        TyClD x (d{tcdDataDefn = restrictDataDefn names (tcdDataDefn d)})
+    | DataDecl { tcdDataDefn = dd } <- d
+    -> TyClD x (d {tcdDataDefn = restrictDataDefn names dd})
   TyClD x d
-    | isClassDecl d ->
-        TyClD
-          x
-          ( d
-              { tcdSigs = restrictDecls names (tcdSigs d)
-              , tcdATs = restrictATs names (tcdATs d)
-              }
-          )
+    | ClassDecl { tcdSigs = sigs, tcdATs = ats } <- d
+    -> TyClD x (d { tcdSigs = restrictDecls names sigs
+                  , tcdATs = restrictATs names ats } )
   _ -> decl
 
 restrictDataDefn :: [Name] -> HsDataDefn GhcRn -> HsDataDefn GhcRn
@@ -557,13 +556,12 @@ instance Parent (ConDecl GhcRn) where
 
 instance Parent (TyClDecl GhcRn) where
   children d
-    | isDataDecl d =
-        map unLoc $
-          concatMap (toList . getConNames . unLoc) $
-            (dd_cons . tcdDataDefn) d
-    | isClassDecl d =
-        map (unLoc . fdLName . unLoc) (tcdATs d)
-          ++ [unLoc n | L _ (TypeSig _ ns _) <- tcdSigs d, n <- ns]
+    | DataDecl { tcdDataDefn = dd } <- d
+    = map unLoc $
+      concatMap (toList . getConNames . unLoc) (dd_cons dd)
+    | ClassDecl{ tcdSigs = sigs, tcdATs = ats } <- d
+    = map (unLoc . fdLName . unLoc) ats
+      ++ [unLoc n | L _ (TypeSig _ ns _) <- sigs, n <- ns]
     | otherwise = []
 
 -- | A parent and its children
@@ -577,9 +575,9 @@ familyConDecl d = zip (toList $ unLoc <$> getConNames d) (repeat $ children d)
 -- child to its grand-children, recursively.
 families :: TyClDecl GhcRn -> [(Name, [Name])]
 families d
-  | isDataDecl d = family d : concatMap (familyConDecl . unLoc) (dd_cons (tcdDataDefn d))
-  | isClassDecl d = [family d]
-  | otherwise = []
+  | DataDecl {}  <- d = family d : concatMap (familyConDecl . unLoc) (dd_cons (tcdDataDefn d))
+  | ClassDecl {} <- d = [family d]
+  | otherwise         = []
 
 -- | A mapping from child to parent
 parentMap :: TyClDecl GhcRn -> [(Name, Name)]

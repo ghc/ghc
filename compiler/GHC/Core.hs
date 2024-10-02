@@ -59,7 +59,7 @@ module GHC.Core (
         unSaturatedOk, needSaturated, boringCxtOk, boringCxtNotOk,
 
         -- ** Predicates and deconstruction on 'Unfolding'
-        unfoldingTemplate, expandUnfolding_maybe,
+        expandUnfolding_maybe,
         maybeUnfoldingTemplate, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
@@ -1287,7 +1287,8 @@ ruleIdName :: CoreRule -> Name
 ruleIdName = ru_fn
 
 isLocalRule :: CoreRule -> Bool
-isLocalRule = ru_local
+isLocalRule (BuiltinRule {})               = False
+isLocalRule (Rule { ru_local = is_local }) = is_local
 
 -- | Set the 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
@@ -1512,10 +1513,6 @@ bootUnfolding = BootUnfolding
 
 mkOtherCon :: [AltCon] -> Unfolding
 mkOtherCon = OtherCon
-
--- | Retrieves the template of an unfolding: panics if none is known
-unfoldingTemplate :: Unfolding -> CoreExpr
-unfoldingTemplate = uf_tmpl
 
 -- | Retrieves the template of an unfolding if possible
 -- maybeUnfoldingTemplate is used mainly when specialising, and we do

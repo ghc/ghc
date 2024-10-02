@@ -635,7 +635,9 @@ item.
 
 So
 
-  type instance XRec (GhcPass p) a = GenLocated (Anno a) a
+  type instance XRec (GhcPass p) a = XRecGhc a
+  type XRecGhc a = GenLocated (Anno a) a
+
   type instance Anno RdrName = SrcSpanAnnN
   type LocatedN = GenLocated SrcSpanAnnN
 

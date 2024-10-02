@@ -244,7 +244,7 @@ isSimpleSig
           }
         )
     )
-    | Map.null argDocs = Just (map unLoc lnames, unLoc (dropWildCards t))
+    | Map.null argDocs = Just (map unLoc lnames, unLoc (dropWildCardsI t))
 isSimpleSig _ = Nothing
 
 isExportModule :: ExportItem DocNameI -> Maybe Module
@@ -327,7 +327,7 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
   TyClD _ d@DataDecl{} -> ppDataDecl pats instances subdocs (Just doc) d unicode
   TyClD _ d@SynDecl{} -> ppTySyn (doc, fnArgsDoc) d unicode
   TyClD _ d@ClassDecl{} -> ppClassDecl instances doc subdocs d unicode
-  SigD _ (TypeSig _ lnames ty) -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (dropWildCards ty) unicode
+  SigD _ (TypeSig _ lnames ty) -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (dropWildCardsI ty) unicode
   SigD _ (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
   ForD _ d -> ppFor (doc, fnArgsDoc) d unicode
   InstD _ _ -> empty
@@ -362,7 +362,7 @@ ppFamDecl
   -> Bool
   -- ^ unicode
   -> LaTeX
-ppFamDecl associated doc instances decl unicode =
+ppFamDecl associated doc instances decl@(FamDecl{}) unicode =
   declWithDoc
     (ppFamHeader (tcdFam decl) unicode associated <+> whereBit)
     (if null body then Nothing else Just (vcat body))
@@ -400,6 +400,9 @@ ppFamDecl associated doc instances decl unicode =
           ]
 
     instancesBit = ppDocInstances unicode instances
+
+ppFamDecl _ _ _ _ _ = error "ppFamDecl"
+  -- Should never be called on a non-FamDecl
 
 -- | Print the LHS of a type\/data family declaration.
 ppFamHeader
@@ -811,10 +814,11 @@ ppInstDecl :: Bool -> InstHead DocNameI -> LaTeX
 ppInstDecl unicode (InstHead{..}) = case ihdInstType of
   ClassInst ctx _ _ _ -> keyword "instance" <+> ppContextNoLocs ctx unicode <+> typ
   TypeInst rhs -> keyword "type" <+> keyword "instance" <+> typ <+> tibody rhs
-  DataInst dd ->
+  DataInst dd@(DataDecl {}) ->
     let cons = dd_cons (tcdDataDefn dd)
         pref = case cons of NewTypeCon _ -> keyword "newtype"; DataTypeCons _ _ -> keyword "data"
      in pref <+> keyword "instance" <+> typ
+  DataInst _ -> error "ppInstDecl"
   where
     typ = ppAppNameTypes ihdClsName ihdTypes unicode
     tibody = maybe empty (\t -> equals <+> ppType unicode t)
@@ -849,7 +853,7 @@ ppDataDecl
   -> Bool
   -- ^ unicode
   -> LaTeX
-ppDataDecl pats instances subdocs doc dataDecl unicode =
+ppDataDecl pats instances subdocs doc dataDecl@(DataDecl {}) unicode =
   declWithDoc
     (ppDataHeader dataDecl unicode <+> whereBit)
     (if null body then Nothing else Just (vcat body))
@@ -890,6 +894,8 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
               $$ text "\\end{tabulary}\\par"
 
     instancesBit = ppDocInstances unicode instances
+ppDataDecl _ _ _ _ _ _ = error "ppDataDecl"
+  -- Should never be called on a non-DataDecl
 
 -- ppConstrHdr is for (non-GADT) existentials constructors' syntax
 ppConstrHdr

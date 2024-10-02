@@ -199,7 +199,10 @@ firstPat (EqnDone {}) = error "firstPat: no patterns"
 
 shiftEqns :: Functor f => f EquationInfoNE -> f EquationInfo
 -- Drop the first pattern in each equation
-shiftEqns = fmap eqn_rest
+shiftEqns = fmap shift
+  where
+    shift (EqnMatch { eqn_rest = rest }) = rest
+    shift eqn@(EqnDone {}) = pprPanic "shiftEqns" (ppr eqn)
 
 combineEqnRhss :: NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 combineEqnRhss eqns = return $ foldr1 combineMatchResults $ map eqnMatchResult (NEL.toList eqns)

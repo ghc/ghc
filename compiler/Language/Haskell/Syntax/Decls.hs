@@ -36,12 +36,9 @@ module Language.Haskell.Syntax.Decls (
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl,
   TyClGroup(..),
-  tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
-  tyClGroupKindSigs,
   isClassDecl, isDataDecl, isSynDecl,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
-  tyClDeclTyVars,
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
@@ -86,7 +83,7 @@ module Language.Haskell.Syntax.Decls (
   FamilyResultSig(..), LFamilyResultSig, InjectivityAnn(..), LInjectivityAnn,
 
   -- * Grouping
-  HsGroup(..), hsGroupInstDecls,
+  HsGroup(..)
     ) where
 
 -- friends:
@@ -115,12 +112,10 @@ import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Void
 import Data.Maybe
 import Data.String
-import Data.Function
 import Data.Eq
 import Data.Int
 import Data.Bool
 import Prelude (Show)
-import qualified Data.List
 import Data.Foldable
 import Data.Traversable
 import Data.List.NonEmpty (NonEmpty (..))
@@ -239,9 +234,6 @@ data HsGroup p
     }
   | XHsGroup !(XXHsGroup p)
 
-
-hsGroupInstDecls :: HsGroup id -> [LInstDecl id]
-hsGroupInstDecls = (=<<) group_instds . hs_tyclds
 
 -- | Located Splice Declaration
 type LSpliceDecl pass = XRec pass (SpliceDecl pass)
@@ -567,11 +559,6 @@ isDataFamilyDecl _other      = False
 
 -- Dealing with names
 
-tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass
-tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
-tyClDeclTyVars d = tcdTyVars d
-
-
 {- Note [CUSKs: complete user-supplied kind signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We kind-check declarations differently if they have a complete, user-supplied
@@ -700,19 +687,6 @@ data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
               , group_kisigs :: [LStandaloneKindSig pass]
               , group_instds :: [LInstDecl pass] }
   | XTyClGroup !(XXTyClGroup pass)
-
-
-tyClGroupTyClDecls :: [TyClGroup pass] -> [LTyClDecl pass]
-tyClGroupTyClDecls = Data.List.concatMap group_tyclds
-
-tyClGroupInstDecls :: [TyClGroup pass] -> [LInstDecl pass]
-tyClGroupInstDecls = Data.List.concatMap group_instds
-
-tyClGroupRoleDecls :: [TyClGroup pass] -> [LRoleAnnotDecl pass]
-tyClGroupRoleDecls = Data.List.concatMap group_roles
-
-tyClGroupKindSigs :: [TyClGroup pass] -> [LStandaloneKindSig pass]
-tyClGroupKindSigs = Data.List.concatMap group_kisigs
 
 
 {- *********************************************************************

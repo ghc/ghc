@@ -180,7 +180,7 @@ mkLamType v body_ty
    = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
 
    | otherwise
-   = mkFunctionType (varMult v) (varType v) body_ty
+   = mkFunctionType (idMult v) (idType v) body_ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 

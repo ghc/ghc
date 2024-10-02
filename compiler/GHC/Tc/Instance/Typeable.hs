@@ -221,17 +221,20 @@ data TypeableTyCon
       , tycon_rep_id :: !Id
       }
 
--- | A group of 'TyCon's in need of type-rep bindings.
 data TypeRepTodo
-    = TypeRepTodo
-      { mod_rep_expr    :: LHsExpr GhcTc    -- ^ Module's typerep binding
-      , pkg_fingerprint :: !Fingerprint     -- ^ Package name fingerprint
-      , mod_fingerprint :: !Fingerprint     -- ^ Module name fingerprint
-      , todo_tycons     :: [TypeableTyCon]
-        -- ^ The 'TyCon's in need of bindings kinds
-      }
-    | ExportedKindRepsTodo [(Kind, Id)]
+  = TyConTodo TyConTodo
+  | ExportedKindRepsTodo [(Kind, Id)]
       -- ^ Build exported 'KindRep' bindings for the given set of kinds.
+
+
+-- | A group of 'TyCon's in need of type-rep bindings.
+data TyConTodo
+    = TCTD { mod_rep_expr    :: LHsExpr GhcTc    -- ^ Module's typerep binding
+           , pkg_fingerprint :: !Fingerprint     -- ^ Package name fingerprint
+           , mod_fingerprint :: !Fingerprint     -- ^ Module name fingerprint
+           , todo_tycons     :: [TypeableTyCon]
+                -- ^ The 'TyCon's in need of bindings kinds
+           }
 
 todoForTyCons :: Module -> Id -> [TyCon] -> TcM TypeRepTodo
 todoForTyCons mod mod_id tycons = do
@@ -255,11 +258,11 @@ todoForTyCons mod mod_id tycons = do
             , Just rep_name <- pure $ tyConRepName_maybe tc''
             , tyConIsTypeable tc''
             ]
-    return TypeRepTodo { mod_rep_expr    = nlHsVar mod_id
-                       , pkg_fingerprint = pkg_fpr
-                       , mod_fingerprint = mod_fpr
-                       , todo_tycons     = typeable_tycons
-                       }
+    return $ TyConTodo $
+             TCTD { mod_rep_expr    = nlHsVar mod_id
+                  , pkg_fingerprint = pkg_fpr
+                  , mod_fingerprint = mod_fpr
+                  , todo_tycons     = typeable_tycons }
   where
     mod_fpr = fingerprintString $ moduleNameString $ moduleName mod
     pkg_fpr = fingerprintString $ unitString $ moduleUnit mod
@@ -283,8 +286,8 @@ mkTypeRepTodoBinds todos
          -- TyCon associated with the applied type constructor).
        ; let produced_bndrs :: [Id]
              produced_bndrs = [ tycon_rep_id
-                              | todo@(TypeRepTodo{}) <- todos
-                              , TypeableTyCon {..} <- todo_tycons todo
+                              | TyConTodo (TCTD { todo_tycons = tcs }) <- todos
+                              , TypeableTyCon {..} <- tcs
                               ] ++
                               [ rep_id
                               | ExportedKindRepsTodo kinds <- todos
@@ -293,8 +296,8 @@ mkTypeRepTodoBinds todos
        ; gbl_env <- tcExtendGlobalValEnv produced_bndrs getGblEnv
 
        ; let mk_binds :: TypeRepTodo -> KindRepM [LHsBinds GhcTc]
-             mk_binds todo@(TypeRepTodo {}) =
-                 mapM (mkTyConRepBinds stuff todo) (todo_tycons todo)
+             mk_binds (TyConTodo (todo@(TCTD { todo_tycons = tcs }))) =
+                 mapM (mkTyConRepBinds stuff todo) tcs
              mk_binds (ExportedKindRepsTodo kinds) =
                  mkExportedKindReps stuff kinds >> return []
 
@@ -413,7 +416,7 @@ mkTrNameLit = do
     return trNameLit
 
 -- | Make Typeable bindings for the given 'TyCon'.
-mkTyConRepBinds :: TypeableStuff -> TypeRepTodo
+mkTyConRepBinds :: TypeableStuff -> TyConTodo
                 -> TypeableTyCon -> KindRepM (LHsBinds GhcTc)
 mkTyConRepBinds stuff todo (TypeableTyCon {..})
   = do -- Make a KindRep
@@ -649,7 +652,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
       = pprPanic "mkTyConKindRepBinds.go(coercion)" (ppr co)
 
 -- | Produce the right-hand-side of a @TyCon@ representation.
-mkTyConRepTyConRHS :: TypeableStuff -> TypeRepTodo
+mkTyConRepTyConRHS :: TypeableStuff -> TyConTodo
                    -> TyCon      -- ^ the 'TyCon' we are producing a binding for
                    -> LHsExpr GhcTc -- ^ its 'KindRep'
                    -> LHsExpr GhcTc

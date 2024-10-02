@@ -247,7 +247,7 @@ addTickLHsBind (L pos (XHsBindsLR bind@(AbsBinds { abs_binds = binds
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , isInlinePragma (idInlinePragma pid) ] }
 
-addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
+addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches }))) = do
   let name = getOccString id
   decl_path <- getPathEntry
   density <- getDensity
@@ -264,7 +264,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
   (fvs, mg) <-
         getFreeVars $
         addPathEntry name $
-        addTickMatchGroup False (fun_matches funBind)
+        addTickMatchGroup False matches
 
   blackListed <- isBlackListed (locA pos)
   exported_names <- liftM exports getEnv
@@ -272,7 +272,9 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
   -- We don't want to generate code for blacklisted positions
   -- We don't want redundant ticks on simple pattern bindings
   -- We don't want to tick non-exported bindings in TickExportedFunctions
-  let simple = isSimplePatBind funBind
+  let simple = matchGroupArity matches == 0
+                  -- A binding is a "simple pattern binding" if it is a
+                  -- funbind with zero patterns
       toplev = null decl_path
       exported = idName id `elemNameSet` exported_names
 
@@ -288,15 +290,10 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
                            , fun_ext = second (tick `mbCons`) (fun_ext funBind) }
   }
 
-   where
-   -- a binding is a simple pattern binding if it is a funbind with
-   -- zero patterns
-   isSimplePatBind :: HsBind GhcTc -> Bool
-   isSimplePatBind funBind = matchGroupArity (fun_matches funBind) == 0
-
 -- TODO: Revisit this
 addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
-                                    , pat_rhs = rhs }))) = do
+                                    , pat_rhs = rhs
+                                    , pat_ext = (grhs_ty, initial_ticks)}))) = do
 
   let simplePatId = isSimplePat lhs
 
@@ -314,14 +311,12 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
     then return (L pos pat')
     else do
 
-    let mbCons = maybe id (:)
-
-    let (initial_rhs_ticks, initial_patvar_tickss) = snd $ pat_ext pat'
-
     -- Allocate the ticks
-
     rhs_tick <- bindTick density name (locA pos) fvs
-    let rhs_ticks = rhs_tick `mbCons` initial_rhs_ticks
+
+    let mbCons = maybe id (:)
+        (initial_rhs_ticks, initial_patvar_tickss) = initial_ticks
+        rhs_ticks = rhs_tick `mbCons` initial_rhs_ticks
 
     patvar_tickss <- case simplePatId of
       Just{} -> return initial_patvar_tickss
@@ -332,7 +327,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
           (zipWith mbCons patvar_ticks
                           (initial_patvar_tickss ++ repeat []))
 
-    return $ L pos $ pat' { pat_ext = second (const (rhs_ticks, patvar_tickss)) (pat_ext pat') }
+    return $ L pos $ pat' { pat_ext = (grhs_ty, (rhs_ticks, patvar_tickss)) }
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind

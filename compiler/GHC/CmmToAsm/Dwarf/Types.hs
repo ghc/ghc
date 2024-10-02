@@ -150,14 +150,14 @@ pprAbbrevDecls platform haveDebugLine =
 pprDwarfInfo :: IsDoc doc => Platform -> Bool -> DwarfInfo -> doc
 pprDwarfInfo platform haveSrc d
   = case d of
-      DwarfCompileUnit {}  -> hasChildren
-      DwarfSubprogram {}   -> hasChildren
-      DwarfBlock {}        -> hasChildren
-      DwarfSrcNote {}      -> noChildren
+      DwarfCompileUnit {dwChildren = kids} -> hasChildren kids
+      DwarfSubprogram  {dwChildren = kids} -> hasChildren kids
+      DwarfBlock       {dwChildren = kids} -> hasChildren kids
+      DwarfSrcNote {}                      -> noChildren
   where
-    hasChildren =
+    hasChildren kids =
         pprDwarfInfoOpen platform haveSrc d $$
-        vcat (map (pprDwarfInfo platform haveSrc) (dwChildren d)) $$
+        vcat (map (pprDwarfInfo platform haveSrc) kids) $$
         pprDwarfInfoClose
     noChildren = pprDwarfInfoOpen platform haveSrc d
 {-# SPECIALIZE pprDwarfInfo :: Platform -> Bool -> DwarfInfo -> SDoc #-}

@@ -300,10 +300,14 @@ type instance XXHsTyPat      (GhcPass _) = DataConCantHappen
 type instance XHsSig (GhcPass _) = NoExtField
 type instance XXHsSigType (GhcPass _) = DataConCantHappen
 
-hsSigWcType :: forall p. UnXRec p => LHsSigWcType p -> LHsType p
-hsSigWcType = sig_body . unXRec @p . hswc_body
 
-dropWildCards :: LHsSigWcType pass -> LHsSigType pass
+hsPatSigType :: HsPatSigType (GhcPass p) -> LHsType (GhcPass p)
+hsPatSigType (HsPS { hsps_body = ty }) = ty
+
+hsSigWcType :: LHsSigWcType (GhcPass p) -> LHsType (GhcPass p)
+hsSigWcType = sig_body . unLoc . hswc_body
+
+dropWildCards :: LHsSigWcType (GhcPass p) -> LHsSigType (GhcPass p)
 -- Drop the wildcard part of a LHsSigWcType
 dropWildCards sig_ty = hswc_body sig_ty
 
@@ -1124,9 +1128,7 @@ type instance XCFieldOcc GhcPs = NoExtField -- RdrName is stored in the proper I
 type instance XCFieldOcc GhcRn = RdrName
 type instance XCFieldOcc GhcTc = RdrName
 
-type instance XXFieldOcc GhcPs = DataConCantHappen
-type instance XXFieldOcc GhcRn = DataConCantHappen
-type instance XXFieldOcc GhcTc = DataConCantHappen
+type instance XXFieldOcc (GhcPass p) = DataConCantHappen
 
 --------------------------------------------------------------------------------
 
@@ -1138,6 +1140,10 @@ fieldOccRdrName fo = case ghcPass @p of
   GhcPs -> unLoc $ foLabel fo
   GhcRn -> foExt fo
   GhcTc -> foExt fo
+
+-- ToDo SPJ: remove
+--fieldOccExt :: FieldOcc (GhcPass p) -> XCFieldOcc (GhcPass p)
+--fieldOccExt (FieldOcc { foExt = ext }) = ext
 
 fieldOccLRdrName :: forall p. IsPass p => FieldOcc (GhcPass p) -> LocatedN RdrName
 fieldOccLRdrName fo = case ghcPass @p of
@@ -1279,7 +1285,8 @@ instance (Outputable tyarg, Outputable arg, Outputable rec)
   ppr (RecCon rec)            = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
 
-instance Outputable (XRec pass (IdP pass)) => Outputable (FieldOcc pass) where
+instance Outputable (XRecGhc (IdGhcP p)) =>
+       Outputable (FieldOcc (GhcPass p)) where
   ppr = ppr . foLabel
 
 instance (OutputableBndrId pass) => OutputableBndr (FieldOcc (GhcPass pass)) where
@@ -1289,8 +1296,6 @@ instance (OutputableBndrId pass) => OutputableBndr (FieldOcc (GhcPass pass)) whe
 instance (OutputableBndrId pass) => OutputableBndr (GenLocated SrcSpan (FieldOcc (GhcPass pass))) where
   pprInfixOcc  = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
-
-
 
 ppr_tylit :: (HsTyLit (GhcPass p)) -> SDoc
 ppr_tylit (HsNumTy source i) = pprWithSourceText source (integer i)

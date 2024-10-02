@@ -1099,11 +1099,6 @@ annotations
 -}
 
 
-isInfixMatch :: Match id body -> Bool
-isInfixMatch match = case m_ctxt match of
-  FunRhs {mc_fixity = Infix} -> True
-  _                          -> False
-
 -- | Guarded Right-Hand Sides
 --
 -- GRHSs are used both for pattern bindings and for Matches

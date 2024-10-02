@@ -1577,6 +1577,11 @@ matchGroupArity (MG { mg_alts = alts })
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = L _ pats })) = pats
 
+isInfixMatch :: Match (GhcPass p) body -> Bool
+isInfixMatch match = case m_ctxt match of
+  FunRhs {mc_fixity = Infix} -> True
+  _                          -> False
+
 -- We keep the type checker happy by providing EpAnnComments.  They
 -- can only be used if they follow a `where` keyword with no binds,
 -- but in that case the comment is attached to the following parsed

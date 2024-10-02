@@ -514,7 +514,7 @@ data InstType name
   | -- | Body (right-hand side)
     TypeInst (Maybe (HsType name))
   | -- | Data constructors
-    DataInst (TyClDecl name)
+    DataInst (TyClDecl name)   -- Always a DataDecl
 
 instance
   OutputableBndrId p
@@ -941,10 +941,12 @@ type instance XClassDecl DocNameI = NoExtField
 type instance XDataDecl DocNameI = NoExtField
 type instance XSynDecl DocNameI = NoExtField
 type instance XFamDecl DocNameI = NoExtField
+type instance XXHsDataDefn DocNameI = DataConCantHappen
 type instance XXFamilyDecl DocNameI = DataConCantHappen
 type instance XXTyClDecl DocNameI = DataConCantHappen
 
 type instance XHsWC DocNameI _ = NoExtField
+type instance XXHsWildCardBndrs DocNameI _ = DataConCantHappen
 
 type instance XHsOuterExplicit DocNameI _ = NoExtField
 type instance XHsOuterImplicit DocNameI = NoExtField
@@ -954,6 +956,8 @@ type instance XHsSig DocNameI = NoExtField
 type instance XXHsSigType DocNameI = DataConCantHappen
 
 type instance XHsQTvs DocNameI = NoExtField
+type instance XXLHsQTyVars DocNameI = DataConCantHappen
+
 type instance XConDeclField DocNameI = NoExtField
 type instance XXConDeclField DocNameI = DataConCantHappen
 

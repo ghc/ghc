@@ -1,5 +1,16 @@
 {-# LANGUAGE MagicHash #-}
 
+{-# LANGUAGE CPP #-}
+
+#if __GLASGOW_HASKELL__ > 912
+{-# OPTIONS_GHC -Wwarn=incomplete-record-selectors #-}
+-- This module has a bunch of uses of incomplete record selectors
+-- and it is FAR from obvious that they won't cause crashes.
+-- But I don't want them to kill CI, so the above flag turns
+-- them into warnings
+#endif
+
+
 -----------------------------------------------------------------------------
 --
 -- GHC Interactive support for inspecting arbitrary closures at runtime

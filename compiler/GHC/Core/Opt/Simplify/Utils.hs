@@ -2819,8 +2819,9 @@ mkCase3 _mode scrut bndr alts_ty alts
 isExitJoinId :: Var -> Bool
 isExitJoinId id
   = isJoinId id
-  && isOneOcc (idOccInfo id)
-  && occ_in_lam (idOccInfo id) == IsInsideLam
+  && case idOccInfo id of
+        OneOcc { occ_in_lam = IsInsideLam } -> True
+        _                                   -> False
 
 {-
 Note [Dead binders]

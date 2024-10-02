@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.HsToCore.Docs where
 
@@ -29,7 +30,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import Data.Maybe
-import Data.Semigroup
+import qualified Data.Semigroup as S
 import GHC.IORef (readIORef)
 import GHC.Unit.Types
 import GHC.Hs
@@ -41,6 +42,8 @@ import GHC.Driver.DynFlags
 import GHC.Types.TypeEnv
 import GHC.Types.Id
 import GHC.Types.Unique.Map
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- | Extract docs from renamer output.
 -- This is monadic since we need to be able to read documentation added from
@@ -180,7 +183,7 @@ mkDocStructureFromExportList mdl import_avails export_list =
     -- Map from aliases to true module names.
     aliasMap :: Map ModuleName (NonEmpty ModuleName)
     aliasMap =
-        M.fromListWith (<>) $
+        M.fromListWith (S.<>) $
           (this_mdl_name, this_mdl_name :| [])
           : (flip concatMap (M.toList imported) $ \(mdl, imvs) ->
               [(imv_name imv, moduleName mdl :| []) | imv <- imvs])
@@ -253,7 +256,7 @@ mkMaps :: OccEnv Name
        -> (UniqMap Name [HsDoc GhcRn], UniqMap Name (IntMap (HsDoc GhcRn)))
 mkMaps env instances decls =
     ( listsToMapWith (++) (map (nubByName fst) decls')
-    , listsToMapWith (<>) (filterMapping (not . IM.null) args)
+    , listsToMapWith (S.<>) (filterMapping (not . IM.null) args)
     )
   where
     (decls', args) = unzip (map mappings decls)
@@ -373,8 +376,8 @@ subordinates env instMap decl = case decl of
 
   InstD _ (DataFamInstD _ (DataFamInstDecl d))
     -> dataSubs (feqn_rhs d)
-  TyClD _ d | isClassDecl d -> classSubs d
-            | isDataDecl  d -> dataSubs (tcdDataDefn d)
+  TyClD _ d | ClassDecl{} <- d -> classSubs d
+            | DataDecl{} <- d  -> dataSubs (tcdDataDefn d)
   _ -> []
   where
     classSubs dd = [ (name, doc, declTypeDocs d)
@@ -446,14 +449,20 @@ isValD _ = False
 
 -- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.
-classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDoc GhcRn])]
-classDecls class_ = filterDecls . collectDocs . sortLocatedA $ decls
-  where
-    decls = docs ++ defs ++ sigs ++ ats
-    docs  = mkDecls tcdDocs (DocD noExtField) class_
-    defs  = mkDecls tcdMeths (ValD noExtField) class_
-    sigs  = mkDecls tcdSigs (SigD noExtField) class_
-    ats   = mkDecls tcdATs (TyClD noExtField . FamDecl noExtField) class_
+classDecls :: TyClDecl GhcRn  -- Always a ClassDecl
+           -> [(LHsDecl GhcRn, [HsDoc GhcRn])]
+classDecls decl
+  | ClassDecl { .. } <- decl
+  , let decls = docs ++ defs ++ sigs ++ ats
+        docs  = mkDecls (DocD noExtField) tcdDocs
+        defs  = mkDecls (ValD noExtField) tcdMeths
+        sigs  = mkDecls (SigD noExtField) tcdSigs
+        ats   = mkDecls (TyClD noExtField . FamDecl noExtField) tcdATs
+
+  = filterDecls . collectDocs . sortLocatedA $ decls
+
+  | otherwise
+  = pprPanic "classDecls" (ppr decl)
 
 -- | Extract function argument docs from inside top-level decls.
 declTypeDocs :: HsDecl GhcRn -> IntMap (HsDoc GhcRn)
@@ -499,15 +508,15 @@ topDecls = filterClasses . filterDecls . collectDocs . sortLocatedA . ungroup
 
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
-ungroup group_ =
-  mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
-  mkDecls hs_derivds             (DerivD noExtField) group_ ++
-  mkDecls hs_defds               (DefD noExtField)   group_ ++
-  mkDecls hs_fords               (ForD noExtField)   group_ ++
-  mkDecls hs_docs                (DocD noExtField)   group_ ++
-  mkDecls (tyClGroupInstDecls . hs_tyclds) (InstD noExtField)  group_ ++
-  mkDecls (typesigs . hs_valds)  (SigD noExtField)   group_ ++
-  mkDecls (valbinds . hs_valds)  (ValD noExtField)   group_
+ungroup (HsGroup {..}) =
+  mkDecls (TyClD noExtField) (tyClGroupTyClDecls hs_tyclds)  ++
+  mkDecls (DerivD noExtField) hs_derivds ++
+  mkDecls (DefD noExtField)   hs_defds ++
+  mkDecls (ForD noExtField)   hs_fords ++
+  mkDecls (DocD noExtField)   hs_docs ++
+  mkDecls (InstD noExtField)  (tyClGroupInstDecls hs_tyclds) ++
+  mkDecls (SigD noExtField)   (typesigs  hs_valds) ++
+  mkDecls (ValD noExtField)   (valbinds hs_valds)
   where
     typesigs :: HsValBinds GhcRn -> [LSig GhcRn]
     typesigs (XValBindsLR (NValBinds _ sig)) = filter (isUserSig . unLoc) sig
@@ -569,11 +578,10 @@ isUserSig _             = False
 
 -- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
-mkDecls :: (struct -> [GenLocated l decl])
-        -> (decl -> hsDecl)
-        -> struct
+mkDecls :: (decl -> hsDecl)
+        -> [GenLocated l decl]
         -> [GenLocated l hsDecl]
-mkDecls field con = map (fmap con) . field
+mkDecls con = map (fmap con)
 
 -- | Extracts out individual maps of documentation added via Template Haskell's
 -- @putDoc@.

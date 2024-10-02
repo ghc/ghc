@@ -131,6 +131,7 @@ import GHC.Unit.Module.Warnings
 
 import GHC.Data.Maybe
 import Data.Data (Data)
+import Data.List (concatMap)
 import Data.Foldable (toList)
 
 {-
@@ -221,6 +222,21 @@ hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
                 | L _ ClassDecl{tcdSigs = sigs} <- tyClGroupTyClDecls tyclds
                 , L loc (FixSig _ sig) <- sigs
                 ]
+
+hsGroupInstDecls :: HsGroup (GhcPass p) -> [LInstDecl (GhcPass p)]
+hsGroupInstDecls = (=<<) group_instds . hs_tyclds
+
+tyClGroupTyClDecls :: [TyClGroup (GhcPass p)] -> [LTyClDecl (GhcPass p)]
+tyClGroupTyClDecls = Data.List.concatMap group_tyclds
+
+tyClGroupInstDecls :: [TyClGroup (GhcPass p)] -> [LInstDecl (GhcPass p)]
+tyClGroupInstDecls = Data.List.concatMap group_instds
+
+tyClGroupRoleDecls :: [TyClGroup (GhcPass p)] -> [LRoleAnnotDecl (GhcPass p)]
+tyClGroupRoleDecls = Data.List.concatMap group_roles
+
+tyClGroupKindSigs :: [TyClGroup (GhcPass p)] -> [LStandaloneKindSig (GhcPass p)]
+tyClGroupKindSigs = Data.List.concatMap group_kisigs
 
 appendGroups :: HsGroup (GhcPass p) -> HsGroup (GhcPass p)
              -> HsGroup (GhcPass p)
@@ -393,6 +409,10 @@ tyClDeclLName (SynDecl { tcdLName = ln })   = ln
 tyClDeclLName (DataDecl { tcdLName = ln })  = ln
 tyClDeclLName (ClassDecl { tcdLName = ln }) = ln
 
+tyClDeclTyVars :: TyClDecl (GhcPass p) -> LHsQTyVars (GhcPass p)
+tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
+tyClDeclTyVars d = tcdTyVars d
+
 countTyClDecls :: [TyClDecl pass] -> (Int, Int, Int, Int, Int)
         -- class, synonym decls, data, newtype, family decls
 countTyClDecls decls
@@ -479,7 +499,7 @@ instance OutputableBndrId p
       ppr instds
 
 pp_vanilla_decl_head :: (OutputableBndrId p)
-   => XRec (GhcPass p) (IdP (GhcPass p))
+   => XRecGhc (IdGhcP p)
    -> LHsQTyVars (GhcPass p)
    -> LexicalFixity
    -> Maybe (LHsContext (GhcPass p))
@@ -551,7 +571,7 @@ type instance XXFamilyDecl    (GhcPass _) = DataConCantHappen
 
 ------------- Functions over FamilyDecls -----------
 
-familyDeclLName :: FamilyDecl (GhcPass p) -> XRec (GhcPass p) (IdP (GhcPass p))
+familyDeclLName :: FamilyDecl (GhcPass p) -> XRecGhc (IdGhcP p)
 familyDeclLName (FamilyDecl { fdLName = n }) = n
 
 familyDeclName :: FamilyDecl (GhcPass p) -> IdP (GhcPass p)

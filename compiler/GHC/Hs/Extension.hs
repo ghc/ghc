@@ -98,7 +98,11 @@ saying that NoGhcTcPass is idempotent.
 -}
 
 -- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
-type instance XRec (GhcPass p) a = GenLocated (Anno a) a
+type instance XRec (GhcPass p) a = XRecGhc a
+
+-- (XRecGhc tree) wraps `tree` in a GHC-specific,
+-- but pass-independent, source location
+type XRecGhc a = GenLocated (Anno a) a
 
 type instance Anno RdrName = SrcSpanAnnN
 type instance Anno Name    = SrcSpanAnnN
@@ -203,6 +207,8 @@ type family IdGhcP pass where
   IdGhcP 'Renamed     = Name
   IdGhcP 'Typechecked = Id
 
+type LIdGhcP p = XRecGhc (IdGhcP p)
+
 -- | Marks that a field uses the GhcRn variant even when the pass
 -- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because
 -- HsType GhcTc should never occur.
@@ -220,8 +226,8 @@ type family NoGhcTcPass (p :: Pass) :: Pass where
 type OutputableBndrId pass =
   ( OutputableBndr (IdGhcP pass)
   , OutputableBndr (IdGhcP (NoGhcTcPass pass))
-  , Outputable (GenLocated (Anno (IdGhcP pass)) (IdGhcP pass))
-  , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
+  , Outputable (LIdGhcP pass)
+  , Outputable (LIdGhcP (NoGhcTcPass pass))
   , IsPass pass
   )
 

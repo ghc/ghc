@@ -16,6 +16,8 @@ import GHC.Prelude
 import GHC.Serialized   ( Serialized )
 
 import GHC.Hs
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 
 -- | The supported metaprogramming result types
@@ -28,11 +30,42 @@ data MetaRequest
 
 -- | data constructors not exported to ensure correct result type
 data MetaResult
-  = MetaResE  { unMetaResE  :: LHsExpr GhcPs   }
-  | MetaResP  { unMetaResP  :: LPat GhcPs      }
-  | MetaResT  { unMetaResT  :: LHsType GhcPs   }
-  | MetaResD  { unMetaResD  :: [LHsDecl GhcPs] }
-  | MetaResAW { unMetaResAW :: Serialized      }
+  = MetaResE  (LHsExpr GhcPs)
+  | MetaResP  (LPat GhcPs)
+  | MetaResT  (LHsType GhcPs)
+  | MetaResD  [LHsDecl GhcPs]
+  | MetaResAW Serialized
+
+instance Outputable MetaResult where
+    ppr (MetaResE e)   = text "MetaResE"  <> braces (ppr e)
+    ppr (MetaResP p)   = text "MetaResP"  <> braces (ppr p)
+    ppr (MetaResT t)   = text "MetaResT"  <> braces (ppr t)
+    ppr (MetaResD d)   = text "MetaResD"  <> braces (ppr d)
+    ppr (MetaResAW aw) = text "MetaResAW" <> braces (ppr aw)
+
+-- These unMetaResE ext panics will triger if the MetaHook doesn't
+-- take an expression to an expression, pattern to pattern etc.
+--
+-- ToDo: surely this could be expressed in the type system?
+unMetaResE :: MetaResult -> LHsExpr GhcPs
+unMetaResE (MetaResE e) = e
+unMetaResE mr           = pprPanic "unMetaResE" (ppr mr)
+
+unMetaResP :: MetaResult -> LPat GhcPs
+unMetaResP (MetaResP p) = p
+unMetaResP mr           = pprPanic "unMetaResP" (ppr mr)
+
+unMetaResT :: MetaResult -> LHsType GhcPs
+unMetaResT (MetaResT t) = t
+unMetaResT mr           = pprPanic "unMetaResT" (ppr mr)
+
+unMetaResD :: MetaResult -> [LHsDecl GhcPs]
+unMetaResD (MetaResD d) = d
+unMetaResD mr           = pprPanic "unMetaResD" (ppr mr)
+
+unMetaResAW :: MetaResult -> Serialized
+unMetaResAW (MetaResAW aw) = aw
+unMetaResAW mr             = pprPanic "unMetaResAW" (ppr mr)
 
 type MetaHook f = MetaRequest -> LHsExpr GhcTc -> f MetaResult
 

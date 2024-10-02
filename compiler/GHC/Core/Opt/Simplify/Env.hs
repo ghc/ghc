@@ -1307,4 +1307,4 @@ substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
     no_free_vars = noFreeVarsOfType old_ty && noFreeVarsOfType old_w
     subst = Subst in_scope emptyIdSubstEnv tv_env cv_env
     old_ty = idType id
-    old_w  = varMult id
+    old_w  = idMult id

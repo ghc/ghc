@@ -859,9 +859,9 @@ mkPatSynBind name details lpat dir anns = PatSynBind noExtField psb
 
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
-isInfixFunBind :: forall id1 id2. UnXRec id2 => HsBindLR id1 id2 -> Bool
+isInfixFunBind :: HsBindLR (GhcPass p1) (GhcPass p2) -> Bool
 isInfixFunBind (FunBind { fun_matches = MG _ matches })
-  = any (isInfixMatch . unXRec @id2) (unXRec @id2 matches)
+  = any (isInfixMatch . unLoc) (unLoc matches)
 isInfixFunBind _ = False
 
 -- |Return the 'SrcSpan' encompassing the contents of any enclosed binds
@@ -1861,5 +1861,5 @@ rec_field_expl_impl rec_flds (RecFieldsDotDot { .. })
   where (explicit_binds, implicit_binds) = splitAt unRecFieldsDotDot rec_flds
         implicit_field_binders (L _ (HsFieldBind { hfbLHS = L _ fld, hfbRHS = rhs }))
           = ImplicitFieldBinders
-              { implFlBndr_field   = unLoc $ foLabel fld
+              { implFlBndr_field   = unLoc $ foLabel (fld :: FieldOcc GhcRn)
               , implFlBndr_binders = collectPatBinders CollNoDictBinders rhs }

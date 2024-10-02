@@ -84,7 +84,9 @@ import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Types.Name
+
 import Data.Data
+import qualified Data.List( map )
 
 import qualified Data.List.NonEmpty as NE
 
@@ -336,6 +338,16 @@ data ConPatTc
       --   ignored for data cons
       cpt_wrap  :: HsWrapper
     }
+
+
+hsRecFields :: HsRecFields (GhcPass p) arg -> [IdGhcP p]
+hsRecFields rbinds = Data.List.map (hsRecFieldSel . unLoc) (rec_flds rbinds)
+
+hsRecFieldsArgs :: HsRecFields (GhcPass p) arg -> [arg]
+hsRecFieldsArgs rbinds = Data.List.map (hfbRHS . unLoc) (rec_flds rbinds)
+
+hsRecFieldSel :: HsRecField (GhcPass p) arg -> IdGhcP p
+hsRecFieldSel = unLoc . foLabel . unLoc . hfbLHS
 
 hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel

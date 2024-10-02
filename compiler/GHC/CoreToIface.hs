@@ -785,9 +785,9 @@ In order to implement this sharing:
 
 * When creating the interface, check the criteria above and don't serialise the RHS
   if such a case.
-  See
-* When reading an interface, look at the realIdUnfolding, and then the unfoldingTemplate.
-  See `tc_iface_binding` for where this happens.
+
+* When reading an interface, look at the realIdUnfolding, and then the
+  maybeUnfoldingTemplate.  See `tc_iface_binding` for where this happens.
 
 There are two main reasons why the mi_extra_decls field exists rather than shoe-horning
 all the core bindings
