@@ -734,7 +734,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   mod <- do
     let home_unit = hsc_home_unit hsc_env
     let fc        = hsc_FC hsc_env
-    addHomeModuleToFinder fc home_unit (GWIB mod_name (hscSourceToIsBoot src_flavour)) location
+    addHomeModuleToFinder fc home_unit mod_name location src_flavour
 
   -- Make the ModSummary to hand to hscMain
   let
