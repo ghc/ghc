@@ -312,13 +312,13 @@ data LinkableUnit = LinkableUnit
 
 -- | one toplevel block in the object file
 data ObjBlock = ObjBlock
-  { oiSymbols  :: ![FastString]   -- ^ toplevel symbols (stored in index)
-  , oiClInfo   :: ![ClosureInfo]  -- ^ closure information of all closures in block
-  , oiStatic   :: ![StaticInfo]   -- ^ static closure data
+  { oiSymbols  :: [FastString]   -- ^ toplevel symbols (stored in index)
+  , oiClInfo   :: [ClosureInfo]  -- ^ closure information of all closures in block
+  , oiStatic   :: [StaticInfo]   -- ^ static closure data
   , oiStat     :: Sat.JStat       -- ^ the code
-  , oiRaw      :: !BS.ByteString  -- ^ raw JS code
-  , oiFExports :: ![ExpFun]
-  , oiFImports :: ![ForeignJSRef]
+  , oiRaw      :: BS.ByteString  -- ^ raw JS code
+  , oiFExports :: [ExpFun]
+  , oiFImports :: [ForeignJSRef]
   }
 
 data ExpFun = ExpFun

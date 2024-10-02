@@ -255,23 +255,23 @@ instance Outputable ExportedFun where
 -- index
 putObjBlock :: WriteBinHandle -> ObjBlock -> IO ()
 putObjBlock bh (ObjBlock _syms b c d e f g) = do
-    put_ bh b
-    put_ bh c
+    lazyPut bh b
+    lazyPut bh c
     lazyPut bh d
-    put_ bh e
-    put_ bh f
-    put_ bh g
+    lazyPut bh e
+    lazyPut bh f
+    lazyPut bh g
 
 -- | Read an ObjBlock and associate it to the given symbols (that must have been
 -- read from the index)
 getObjBlock :: [FastString] -> ReadBinHandle -> IO ObjBlock
 getObjBlock syms bh = do
-    b <- get bh
-    c <- get bh
+    b <- lazyGet bh
+    c <- lazyGet bh
     d <- lazyGet bh
-    e <- get bh
-    f <- get bh
-    g <- get bh
+    e <- lazyGet bh
+    f <- lazyGet bh
+    g <- lazyGet bh
     pure $ ObjBlock
       { oiSymbols  = syms
       , oiClInfo   = b
