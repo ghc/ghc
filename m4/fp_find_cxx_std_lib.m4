@@ -61,10 +61,11 @@ EOF
         try_libs() {
             dnl Try to link a plain object with CC manually
             AC_MSG_CHECKING([for linkage against '${3}'])
-            if "$CC" -o actest actest.o ${1} 2>/dev/null; then
+            dnl Ensures that CC uses same library path of CXX.
+            p="`"$CXX" --print-file-name ${2}`"
+            d="`dirname "$p"`"
+            if "$CC" -o actest actest.o ${1} -L"$d" 2>/dev/null; then
                 CXX_STD_LIB_LIBS="${3}"
-                p="`"$CXX" --print-file-name ${2}`"
-                d="`dirname "$p"`"
                 dnl On some platforms (e.g. Windows) the C++ standard library
                 dnl can be found in the system search path. In this case $CXX
                 dnl --print-file-name will simply print the filename without a
