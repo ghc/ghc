@@ -446,10 +446,8 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
           , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
                                        inst_tys ty meth
           , let (tvs1, theta1, tau1) = tcSplitSigmaTy t1
-          , let (tvs2, theta2, tau2) = tcSplitSigmaTy t2
-          , let t1' = mkSpecSigmaTy tvs1 [] tau1
-          , let t2' = mkSpecSigmaTy tvs2 [] tau2
-          , pred <- [ mkReprPrimEqPred t1' t2'
+          , let (_tvs2, theta2, tau2) = tcSplitSigmaTy t2
+          , pred <- [ tcMkDFunSigmaTy tvs1 [] $ mkReprPrimEqPred tau1 tau2
                       -- The two method types must be coercible, ignoring any
                       -- constraints. Dictionaries are inferred normally, not
                       -- coerced.
