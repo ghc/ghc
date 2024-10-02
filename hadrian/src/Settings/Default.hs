@@ -204,7 +204,7 @@ defaultLibraryWays = do
       mconcat
       [ pure [vanilla]
       , notStage0 ? pure [profiling]
-      , notStage0 ? targetSupportsGhciObjects stage ? pure [profilingDynamic, dynamic]
+      , notStage0 ? targetSupportsSharedLibs stage ? pure [profilingDynamic, dynamic]
       ]
 
 -- | Default build ways for the RTS.
