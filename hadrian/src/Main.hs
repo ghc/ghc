@@ -27,6 +27,7 @@ import qualified Rules.Selftest
 import qualified Rules.SourceDist
 import qualified Rules.Test
 import qualified UserSettings
+import qualified Progress
 
 main :: IO ()
 main = do
@@ -56,7 +57,7 @@ main = do
         options = shakeOptions
             { shakeChange   = ChangeModtimeAndDigest
             , shakeFiles    = buildRoot -/- Base.shakeFilesDir
-            , shakeProgress = progressSimple
+            , shakeProgress = Progress.hadrianProgress cwd
             , shakeRebuild  = rebuild
             , shakeTimings  = False
             , shakeColor    = shakeColor
