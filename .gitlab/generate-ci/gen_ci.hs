@@ -631,6 +631,7 @@ data ValidateRule =
           | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
           | IpeData      -- ^ Run this job when the "IPE" label is set
           | TestPrimops  -- ^ Run this job when "test-primops" label is set
+          | I386Backend  -- ^ Run this job when the "i386" label is set
           deriving (Show, Enum, Bounded, Ord, Eq)
 
 -- A constant evaluating to True because gitlab doesn't support "true" in the
@@ -678,6 +679,7 @@ validateRuleString FreeBSDLabel = labelString "FreeBSD"
 validateRuleString NonmovingGc  = labelString "non-moving GC"
 validateRuleString IpeData      = labelString "IPE"
 validateRuleString TestPrimops  = labelString "test-primops"
+validateRuleString I386Backend  = labelString "i386"
 
 -- | A 'Job' is the description of a single job in a gitlab pipeline. The
 -- job contains all the information about how to do the build but can be further
@@ -1055,7 +1057,7 @@ debian_aarch64 =
 debian_i386 :: [JobGroup Job]
 debian_i386 =
   [ disableValidate (standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla))
-  , standardBuildsWithConfig I386 (Linux Debian12) (splitSectionsBroken vanilla)
+  , addValidateRule I386Backend (standardBuildsWithConfig I386 (Linux Debian12) (splitSectionsBroken vanilla))
   ]
 
 ubuntu_x86 :: [JobGroup Job]
