@@ -256,7 +256,6 @@ platformHasRTSLinker p = case archOS_arch (platformArchOS p) of
   ArchS390X         -> False
   ArchLoongArch64   -> False
   ArchJavaScript    -> False
-  ArchWasm32        -> False
   _                 -> True
 
 
