@@ -14,7 +14,6 @@
 :p mempty
 :p mappend
 
-:set -Wno-compat-unqualified-imports
 :m + Data.List
 :p foldl'
 

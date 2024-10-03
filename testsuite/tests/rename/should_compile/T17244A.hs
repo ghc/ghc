@@ -2,7 +2,8 @@
 
 module T17244A (hello) where
 
--- This should warn with -Wcompat-unqualified-imports.
+-- This used to warn with -Wcompat-unqualified-imports.
+-- Now it shows the flag is deprecated.
 import Data.List
 
 hello :: [Int] -> Int

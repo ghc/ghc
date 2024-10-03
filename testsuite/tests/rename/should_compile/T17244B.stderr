@@ -1,0 +1,3 @@
+T17244B.hs:1:17: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -Wcompat-unqualified-imports is deprecated: This warning no longer does anything; see GHC #24904
+

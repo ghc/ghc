@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
 {-# LANGUAGE OverloadedLists, TypeFamilies, RebindableSyntax #-}
 
 import Prelude

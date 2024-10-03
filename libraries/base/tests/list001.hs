@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
 module Main where
 
 import Data.List
