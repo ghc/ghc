@@ -2,7 +2,6 @@ setTestOpts(js_skip) # JS backend doesn't support profiling yet
 
 prun_ways = (['prof'] if have_profiling() else []) + (['profdyn'] if have_dynamic_prof() else [])
 
-print(prun_ways)
 # Options to use when comparing .prof files
 test_opts_dot_prof = [ only_ways(['prof', 'profdyn'])
             , extra_ways(prun_ways) if prun_ways else skip]
