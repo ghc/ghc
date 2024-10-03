@@ -74,6 +74,7 @@ executable hadrian
                        , Oracles.ModuleFiles
                        , Oracles.TestSettings
                        , Packages
+                       , Progress
                        , Rules
                        , Rules.BinaryDist
                        , Rules.CabalReinstall
