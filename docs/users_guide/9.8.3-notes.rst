@@ -17,3 +17,12 @@ Compiler
 - Fixed a bug that caused GHC to panic when using the AArch64 ncg and :ghc-flag:`-fregs-graph`
   on certain programs (:ghc-ticket:`24941`).
 
+Runtime system
+--------------
+
+- Internal fragmentation incurred by the non-moving GC's allocator has been reduced for small objects.
+  In one real-world application, this has reduced resident set size by about 20% and modestly improved run-time.
+  See :ghc-ticket:`23340`.
+  :rts-flag:`--nonmoving-dense-allocator-count=⟨count⟩` has been added to fine-tune this behaviour.
+
+
