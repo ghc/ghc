@@ -144,7 +144,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                 [ arg "-dynamic"
                 -- TODO what about windows?
                 , isLibrary pkg ? pure [ "-shared", "-dynload", "deploy" ]
-                , hostSupportsRPaths ? mconcat
+                , notStage0 ? targetSupportsRPaths ? mconcat
                       [ arg ("-optl-Wl,-rpath," ++ rpath)
                       , isProgram pkg ? arg ("-optl-Wl,-rpath," ++ bindistRpath)
                       -- The darwin and Windows linkers don't support/require the -zorigin option

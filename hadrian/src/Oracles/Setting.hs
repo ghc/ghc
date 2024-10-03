@@ -5,7 +5,7 @@ module Oracles.Setting (
     ToolchainSetting (..), settingsFileSetting,
 
     -- * Helpers
-    ghcCanonVersion, cmdLineLengthLimit, hostSupportsRPaths, topDirectory,
+    ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
     libsuf, ghcVersionStage, bashPath, targetStage,
 
     -- ** Target platform things
@@ -184,15 +184,15 @@ anyTargetOs oss = (`elem` oss) <$> queryTargetTarget (archOS_OS . tgtArchOs)
 isElfTarget :: Action Bool
 isElfTarget = queryTargetTarget (osElfTarget . archOS_OS . tgtArchOs)
 
--- | Check whether the host OS supports the @-rpath@ linker option when
+-- | Check whether the target OS supports the @-rpath@ linker option when
 -- using dynamic linking.
 --
 -- ROMES:TODO: Whether supports -rpath should be determined by ghc-toolchain
 --
 -- TODO: Windows supports lazy binding (but GHC doesn't currently support
 --       dynamic way on Windows anyways).
-hostSupportsRPaths :: Action Bool
-hostSupportsRPaths = queryHostTarget (\t -> let os = archOS_OS (tgtArchOs t)
+targetSupportsRPaths :: Action Bool
+targetSupportsRPaths = queryTargetTarget (\t -> let os = archOS_OS (tgtArchOs t)
                                              in osElfTarget os || osMachOTarget os)
 
 -- | Check whether the target supports GHCi.
@@ -265,4 +265,3 @@ targetStage (Stage0 {}) = getHostTarget
 targetStage (Stage1 {}) = getTargetTarget
 targetStage (Stage2 {}) = getTargetTarget -- the last two only make sense if the target can be executed locally
 targetStage (Stage3 {}) = getTargetTarget
-
