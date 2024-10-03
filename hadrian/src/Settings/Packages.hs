@@ -77,7 +77,15 @@ packageArgs = do
             , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
+            -- For the ghc library, internal-interpreter only makes
+            -- sense when we're not cross compiling. For cross GHC,
+            -- external interpreter is used for loading target code
+            -- and internal interpreter is supposed to load native
+            -- code for plugins (!7377), however it's unfinished work
+            -- (#14335) and completely untested in CI for cross
+            -- backends at the moment, so we might as well disable it
+            -- for cross GHC.
+            [ andM [expr ghcWithInterpreter, notStage0, notCross] `cabalFlag` "internal-interpreter"
             , notM cross `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , flag UseLibzstd `cabalFlag` "with-libzstd"
