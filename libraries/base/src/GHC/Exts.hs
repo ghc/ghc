@@ -129,7 +129,6 @@ import GHC.Prim hiding
   , dataToTagSmall#, dataToTagLarge#
   -- whereFrom# is similarly internal.
   , whereFrom#
-  , isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned#
 
   -- deprecated
   , BCO, mkApUpd0#, newBCO#
