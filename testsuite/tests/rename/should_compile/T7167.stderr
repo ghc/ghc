@@ -1,3 +1,3 @@
-
-T7167.hs:6:26: warning: [GHC-61689] [-Wdodgy-imports (in -Wextra)]
+T7167.hs:5:26: warning: [GHC-61689] [-Wdodgy-imports (in -Wextra)]
     Module ‘Data.List’ does not export ‘foo’.
+

@@ -1,4 +1,3 @@
-:set -Wno-compat-unqualified-imports
 import Data.List (nub)
 :t nubBy
 import Data.List (nubBy)

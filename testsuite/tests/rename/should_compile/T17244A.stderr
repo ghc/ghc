@@ -1,0 +1,6 @@
+on the commandline: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -Wno-error=compat-unqualified-imports is deprecated: This warning no longer does anything; see GHC #24904
+
+T17244A.hs:1:17: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -Wcompat-unqualified-imports is deprecated: This warning no longer does anything; see GHC #24904
+

@@ -2,7 +2,8 @@
 
 module T17244C (hello) where
 
--- This should not warn with -Wcompat-unqualified-imports.
+-- This would not warn with -Wcompat-unqualified-imports.
+-- The flag is deprecated now.
 import Data.List (sum)
 
 hello :: [Int] -> Int
