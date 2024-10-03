@@ -1,7 +1,16 @@
+import re
+
 # Args to vtc are: extra compile flags
 
 def f( name, opts ):
   opts.extra_hc_opts = '-fno-warn-incomplete-patterns'
+
+def normalise_type_vars(s):
+  """
+  Normalise away the trailing digits from type variable OccNames
+  in hole fits error messages as these tend to be non-deterministic.
+  """
+  return re.sub(r'([a-z])[0-9]+', r'\1', s)
 
 setTestOpts(f)
 
@@ -392,7 +401,7 @@ test('local_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-ho
 test('subsumption_sort_hole_fits', normalise_version('ghc-internal', 'base'), compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fsort-by-subsumption-hole-fits'])
 test('valid_hole_fits_interactions', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits'])
 test('refinement_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2'])
-test('abstract_refinement_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2 -fabstract-refinement-hole-fits -funclutter-valid-hole-fits'])
+test('abstract_refinement_hole_fits', normalise_errmsg_fun(normalise_type_vars), compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2 -fabstract-refinement-hole-fits -funclutter-valid-hole-fits'])
 test('free_monad_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2 -funclutter-valid-hole-fits'])
 test('constraint_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2 -funclutter-valid-hole-fits'])
 test('type_in_type_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits'])
