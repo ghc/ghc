@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
-
 -- !!! Default export list isn't the same as (module M)
 -- This should succeed, exporting only the local 'sort',
 -- and not being confused by the 'sort' from 'List'.

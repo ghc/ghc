@@ -1370,8 +1370,7 @@ minusWeverythingOpts = [ toEnum 0 .. ]
 -- code future compatible to fix issues before they even generate warnings.
 minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
-    = [ Opt_WarnCompatUnqualifiedImports
-      , Opt_WarnImplicitRhsQuantification
+    = [ Opt_WarnImplicitRhsQuantification
       , Opt_WarnDeprecatedTypeAbstractions
       ]
 

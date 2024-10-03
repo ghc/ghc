@@ -1,12 +1,12 @@
-
-T16875.hs:13:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+T16875.hs:12:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: p
       Where: ‘p’ is a rigid type variable bound by
                the inferred type of a :: p
-               at T16875.hs:13:1-5
+               at T16875.hs:12:1-5
     • In an equation for ‘a’: a = _
-    • Relevant bindings include a :: p (bound at T16875.hs:13:1)
+    • Relevant bindings include a :: p (bound at T16875.hs:12:1)
       Valid hole fits include
         a :: forall {p}. p
           with a
-          (defined at T16875.hs:13:1)
+          (defined at T16875.hs:12:1)
+

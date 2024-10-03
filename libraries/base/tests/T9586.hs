@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
-
 module XPrelude (module X) where
 
 import Control.Monad    as X
