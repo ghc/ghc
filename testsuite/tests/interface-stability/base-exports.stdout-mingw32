@@ -1486,7 +1486,7 @@ module Data.List.NonEmpty where
   uncons :: forall a. NonEmpty a -> (a, GHC.Internal.Maybe.Maybe (NonEmpty a))
   unfold :: forall a b. (a -> (b, GHC.Internal.Maybe.Maybe a)) -> a -> NonEmpty b
   unfoldr :: forall a b. (a -> (b, GHC.Internal.Maybe.Maybe a)) -> a -> NonEmpty b
-  unzip :: forall (f :: * -> *) a b. GHC.Internal.Base.Functor f => f (a, b) -> (f a, f b)
+  unzip :: forall a b. NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)
   xor :: NonEmpty GHC.Types.Bool -> GHC.Types.Bool
   zip :: forall a b. NonEmpty a -> NonEmpty b -> NonEmpty (a, b)
   zipWith :: forall a b c. (a -> b -> c) -> NonEmpty a -> NonEmpty b -> NonEmpty c

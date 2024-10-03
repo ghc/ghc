@@ -537,11 +537,9 @@ isPrefixOf (y:ys) (x :| xs) = (y == x) && List.isPrefixOf ys xs
   | otherwise = error "NonEmpty.!! negative index"
 infixl 9 !!
 
-
 -- | The 'unzip' function is the inverse of the 'zip' function.
-unzip :: Functor f => f (a,b) -> (f a, f b)
+unzip :: NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)
 unzip xs = (fst <$> xs, snd <$> xs)
-{-# WARNING in "x-data-list-nonempty-unzip" unzip "This function will be made monomorphic in base-4.22, consider switching to Data.Functor.unzip" #-}
 
 -- | The 'nub' function removes duplicate elements from a list. In
 -- particular, it keeps only the first occurrence of each element.

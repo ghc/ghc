@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.22.0.0 *TBA*
+  * Restrict `Data.List.NonEmpty.unzip` to `NonEmpty (a, b) -> (NonEmpty a, NonEmpty b)`. ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+
 ## 4.21.0.0 *TBA*
   * `GHC.Desugar` has been deprecated and should be removed in GHC 9.14. ([CLC proposal #216](https://github.com/haskell/core-libraries-committee/issues/216))
   * Add a `readTixFile` field to the `HpcFlags` record in `GHC.RTS.Flags` ([CLC proposal #276](https://github.com/haskell/core-libraries-committee/issues/276))
