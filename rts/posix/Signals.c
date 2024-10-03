@@ -27,7 +27,7 @@
 
 #if defined(alpha_HOST_ARCH)
 # if defined(linux_HOST_OS)
-#  include <asm/fpu.h>
+#  include <fenv.h>
 # else
 #  include <machine/fpu.h>
 # endif
@@ -721,7 +721,11 @@ initDefaultHandlers(void)
 #endif
 
 #if defined(alpha_HOST_ARCH)
+# if defined(linux_HOST_OS)
+    __ieee_set_fp_control(0);
+# else
     ieee_set_fp_control(0);
+# endif
 #endif
 
     // ignore SIGPIPE; see #1619
