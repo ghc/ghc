@@ -10,4 +10,4 @@ test('T14028',
       only_ways([config.ghc_th_way]),
       unless(config.have_ext_interp, skip),
       when(opsys('freebsd'), expect_broken(19723))],
-     makefile_test, ['T14028'])
+     makefile_test, ['T14028 ghcThWayFlags=' + config.ghc_th_way_flags])
