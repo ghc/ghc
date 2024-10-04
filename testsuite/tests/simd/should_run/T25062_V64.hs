@@ -10,7 +10,7 @@ main =
   case foo ( \ x y -> plusDoubleX8# x y ) of
     v -> case unpackDoubleX8# v of
       (# d1, d2, d3, d4, d5, d6, d7, d8 #) ->
-        print [ D# d1, D# d2, D# d3, D# d4, D# d5, D# d6, D# d7, D# d8s ]
+        print [ D# d1, D# d2, D# d3, D# d4, D# d5, D# d6, D# d7, D# d8 ]
 
 {-# NOINLINE foo #-}
 foo :: ( DoubleX8# -> DoubleX8# -> DoubleX8# ) -> DoubleX8#

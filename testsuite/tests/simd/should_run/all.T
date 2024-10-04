@@ -58,13 +58,26 @@ test('simd014',
 test('T22187', [],compile,[''])
 test('T22187_run', [],compile_and_run,[''])
 test('T25062_V16', [], compile_and_run, [''])
-test('T25062_V32', [ unless(have_cpu_feature('avx2'), skip)
-                   , only_ways(llvm_ways) # SIMD NCG TODO: support 256 bit wide vectors
-                   ]
-                 , compile_and_run, [''])
-test('T25062_V64', [ unless(have_cpu_feature('avx512f'), skip)
-                   , only_ways(llvm_ways) # SIMD NCG TODO: support 512 bit wide vectors
-                   ]
-                 , compile_and_run, [''])
+
+# Even if the CPU we run on doesn't support *executing* those tests we should try to
+# compile them.
+# Currently even for compilation we only support 256+ bit on x86
+only_V32_plus_compilation_support = unless(arch('x86_64'), skip)
+
+test('T25062_V32'
+    ,   [ extra_hc_opts('-mavx2')
+        , only_ways(llvm_ways) # SIMD NCG TODO: support 256+ bit wide vectors
+        , only_V32_plus_compilation_support
+        ]
+    , compile_and_run if have_cpu_feature('avx2') else compile
+    , [''])
+
+test('T25062_V64'
+    ,   [ extra_hc_opts('-mavx512f')
+        , only_ways(llvm_ways) # SIMD NCG TODO: support 256+ bit wide vectors
+        , only_V32_plus_compilation_support
+        ]
+    , compile_and_run if have_cpu_feature('avx512f') else compile
+    , [''])
 
 test('T25169', [], compile_and_run, [''])
