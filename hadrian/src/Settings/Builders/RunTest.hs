@@ -68,6 +68,7 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   withNativeCodeGen :: Bool
  ,   withInterpreter   :: Bool
  ,   cross             :: Bool
+ ,   interpForceDyn    :: Bool
  ,   unregisterised    :: Bool
  ,   tables_next_to_code :: Bool
  ,   targetWithSMP       :: Bool  -- does the target support SMP
@@ -103,6 +104,7 @@ inTreeCompilerArgs stg = do
     -- have different values? Currently not possible to express.
     leadingUnderscore   <- queryTargetTarget tgtSymbolsHaveLeadingUnderscore
     withInterpreter     <- ghcWithInterpreter
+    interpForceDyn      <- targetRTSLinkerOnlySupportsSharedLibs
     unregisterised      <- queryTargetTarget tgtUnregisterised
     tables_next_to_code <- queryTargetTarget tgtTablesNextToCode
     targetWithSMP       <- targetSupportsSMP
@@ -161,6 +163,7 @@ outOfTreeCompilerArgs = do
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     cross               <- getBooleanSetting TestGhcCrossCompiling
+    interpForceDyn      <- getBooleanSetting TestRTSLinkerForceDyn
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     tables_next_to_code <- getBooleanSetting TestGhcTablesNextToCode
     targetWithSMP       <- targetSupportsSMP
@@ -278,6 +281,7 @@ runTestBuilderArgs = builder Testsuite ? do
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
             , arg "-e", arg $ "config.cross=" ++ show cross
+            , arg "-e", arg $ "config.interp_force_dyn=" ++ show interpForceDyn
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
             , arg "-e", arg $ "config.tables_next_to_code=" ++ show tables_next_to_code
 

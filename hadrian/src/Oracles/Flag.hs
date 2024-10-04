@@ -4,6 +4,7 @@ module Oracles.Flag (
     Flag (..), flag, getFlag,
     platformSupportsSharedLibs,
     platformSupportsGhciObjects,
+    targetRTSLinkerOnlySupportsSharedLibs,
     targetSupportsThreadedRts,
     targetSupportsSMP,
     useLibffiForAdjustors,
@@ -76,7 +77,28 @@ getFlag = expr . flag
 -- when appropriate).
 platformSupportsGhciObjects :: Action Bool
 -- FIXME: The name of the function is not entirely clear about which platform, it would be better named targetSupportsGhciObjects
-platformSupportsGhciObjects = isJust <$> queryTargetTarget tgtMergeObjs
+platformSupportsGhciObjects = do
+    has_merge_objs <- isJust <$> queryTargetTarget tgtMergeObjs
+    only_shared_libs <- targetRTSLinkerOnlySupportsSharedLibs
+    pure $ has_merge_objs && not only_shared_libs
+
+-- | Does the target RTS linker only support loading shared libraries?
+-- If true, this has several implications:
+-- 1. The GHC driver must not do loadArchive/loadObj etc and must
+--    always do loadDLL, regardless of whether host GHC is dynamic or
+--    not.
+-- 2. The GHC driver will always enable -dynamic-too when compiling
+--    vanilla way with TH codegen requirement.
+-- 3. ghci will always enforce dynamic ways even if -dynamic or
+--    -dynamic-too is not explicitly passed.
+-- 4. Cabal must not build ghci objects since it's not supported by
+--    the target.
+-- 5. The testsuite driver will use dyn way for TH/ghci tests even
+--    when host GHC is static.
+-- 6. TH/ghci doesn't work if stage1 is built without shared libraries
+--    (e.g. quickest/fully_static).
+targetRTSLinkerOnlySupportsSharedLibs :: Action Bool
+targetRTSLinkerOnlySupportsSharedLibs = anyTargetArch [ ArchWasm32 ]
 
 arSupportsDashL :: Stage -> Action Bool
 arSupportsDashL stage = Toolchain.arSupportsDashL . tgtAr <$> targetStage stage

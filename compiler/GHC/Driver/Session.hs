@@ -130,6 +130,7 @@ module GHC.Driver.Session (
         sTargetPlatformString,
         sGhcWithInterpreter,
         sLibFFI,
+        sTargetRTSLinkerOnlySupportsSharedLibs,
         GhcNameVersion(..),
         FileSettings(..),
         PlatformMisc(..),

@@ -65,6 +65,7 @@ module GHC.Settings
   , sTargetPlatformString
   , sGhcWithInterpreter
   , sLibFFI
+  , sTargetRTSLinkerOnlySupportsSharedLibs
   ) where
 
 import GHC.Prelude
@@ -304,3 +305,6 @@ sGhcWithInterpreter :: Settings -> Bool
 sGhcWithInterpreter = platformMisc_ghcWithInterpreter . sPlatformMisc
 sLibFFI :: Settings -> Bool
 sLibFFI = platformMisc_libFFI . sPlatformMisc
+
+sTargetRTSLinkerOnlySupportsSharedLibs :: Settings -> Bool
+sTargetRTSLinkerOnlySupportsSharedLibs = platformMisc_targetRTSLinkerOnlySupportsSharedLibs . sPlatformMisc

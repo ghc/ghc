@@ -170,6 +170,7 @@ initSettings top_dir = do
 
   let iserv_prog = libexec "ghc-iserv"
 
+  targetRTSLinkerOnlySupportsSharedLibs <- getBooleanSetting "target RTS linker only supports shared libraries"
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
   useLibFFI <- getBooleanSetting "Use LibFFI"
 
@@ -246,6 +247,7 @@ initSettings top_dir = do
       , platformMisc_ghcWithInterpreter = ghcWithInterpreter
       , platformMisc_libFFI = useLibFFI
       , platformMisc_llvmTarget = llvmTarget
+      , platformMisc_targetRTSLinkerOnlySupportsSharedLibs = targetRTSLinkerOnlySupportsSharedLibs
       }
 
     , sRawSettings    = settingsList

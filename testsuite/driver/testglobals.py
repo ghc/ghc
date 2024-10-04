@@ -138,6 +138,9 @@ class TestConfig:
 
         # Are we cross-compiling?
         self.cross = False
+        
+        # Does the RTS linker only support loading shared libraries?
+        self.interp_force_dyn = False
 
         # Do we have RTS linker?
         self.have_RTS_linker = False
