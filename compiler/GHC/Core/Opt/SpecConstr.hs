@@ -2512,13 +2512,11 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
     partitionByWorkerSize worker_size pats = go pats [] []
       where
         go [] small warnings = (small, warnings)
-        go (p:ps) small warnings
-          | WorkerSmallEnough <- worker_size p
-          = go ps (p:small) warnings
-          | WorkerTooLarge <- worker_size p
-          = go ps small warnings
-          | WorkerTooLargeForced name <- worker_size p
-          = go ps small (SpecFailForcedArgCount name : warnings)
+        go (p:ps) small warnings =
+          case worker_size p of
+            WorkerSmallEnough -> go ps (p:small) warnings
+            WorkerTooLarge -> go ps small warnings
+            WorkerTooLargeForced name -> go ps small (SpecFailForcedArgCount name : warnings)
 
 
 trim_pats :: ScEnv -> Id -> SpecInfo -> [CallPat] -> (Bool, [CallPat])
