@@ -10,6 +10,6 @@ T4150:
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c T4150.hs
 
 T14028:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T14028Quote.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -fPIC -c T14028C.c
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -fexternal-interpreter T14028 T14028C.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 T14028Quote.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -c T14028C.c -o T14028C.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 -fexternal-interpreter T14028 T14028C.o

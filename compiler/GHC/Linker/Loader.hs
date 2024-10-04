@@ -566,7 +566,7 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
     preload_statics _paths names
        = do b <- or <$> mapM doesFileExist names
             if not b then return (False, pls)
-                     else if hostIsDynamic
+                     else if interpreterDynamic interp
                              then  do pls1 <- dynLoadObjs interp hsc_env pls names
                                       return (True, pls1)
                              else  do mapM_ (loadObj interp) names
@@ -575,7 +575,7 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
     preload_static_archive _paths name
        = do b <- doesFileExist name
             if not b then return False
-                     else do if hostIsDynamic
+                     else do if interpreterDynamic interp
                                  then throwGhcExceptionIO $
                                       CmdLineError dynamic_msg
                                  else loadArchive interp name
