@@ -639,6 +639,7 @@ initLinkDepsOpts hsc_env = opts
   where
     opts = LinkDepsOpts
             { ldObjSuffix   = objectSuf dflags
+            , ldForceDyn    = sTargetRTSLinkerOnlySupportsSharedLibs $ settings dflags
             , ldOneShotMode = isOneShot (ghcMode dflags)
             , ldModuleGraph = hsc_mod_graph hsc_env
             , ldUnitEnv     = hsc_unit_env hsc_env
