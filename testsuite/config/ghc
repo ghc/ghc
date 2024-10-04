@@ -289,7 +289,7 @@ def get_compiler_info():
         ghc_env['HAVE_PROFILING'] = 'YES'
 
     # See Note [WayFlags]
-    if config.ghc_dynamic:
+    if config.interp_force_dyn or config.ghc_dynamic:
         config.ghc_th_way_flags = "-dynamic"
         config.ghci_way_flags   = "-dynamic"
         config.plugin_way_flags = "-dynamic"
