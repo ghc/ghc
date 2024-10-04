@@ -326,7 +326,7 @@ addInertForAll new_qci
        -- Update given equalities. C.f updateGivenEqs
        ; tclvl <- getTcLevel
        ; let pred         = qci_pred new_qci
-             not_equality = isClassPred pred && not (isEqPred pred)
+             not_equality = isClassPred pred && not (isEqClassPred pred)
                   -- True <=> definitely not an equality
                   -- A qci_pred like (f a) might be an equality
 
@@ -1070,7 +1070,7 @@ checkForCyclicBinds ev_binds_map
     cycles = [c | CyclicSCC c <- stronglyConnCompFromEdgedVerticesUniq edges]
 
     coercion_cycles = [c | c <- cycles, any is_co_bind c]
-    is_co_bind (EvBind { eb_lhs = b }) = isEqPrimPred (varType b)
+    is_co_bind (EvBind { eb_lhs = b }) = isEqPred (varType b)
 
     edges :: [ Node EvVar EvBind ]
     edges = [ DigraphNode bind bndr (nonDetEltsUniqSet (evVarsOfTerm rhs))
@@ -1781,7 +1781,7 @@ emitNewGivens :: CtLoc -> [(Role,TcCoercion)] -> TcS ()
 emitNewGivens loc pts
   = do { traceTcS "emitNewGivens" (ppr pts)
        ; evs <- mapM (newGivenEvVar loc) $
-                [ (mkPrimEqPredRole role ty1 ty2, evCoercion co)
+                [ (mkEqPredRole role ty1 ty2, evCoercion co)
                 | (role, co) <- pts
                 , let Pair ty1 ty2 = coercionKind co
                 , not (ty1 `tcEqType` ty2) ] -- Kill reflexive Givens at birth
@@ -1806,7 +1806,7 @@ newWantedEq loc rewriters role ty1 ty2
                            , ctev_rewriters = rewriters }
                 , mkHoleCo hole ) }
   where
-    pty = mkPrimEqPredRole role ty1 ty2
+    pty = mkEqPredRole role ty1 ty2
 
 -- | Create a new Wanted constraint holding an evidence variable.
 --
@@ -1815,7 +1815,8 @@ newWantedEvVarNC :: CtLoc -> RewriterSet
                  -> TcPredType -> TcS CtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
 newWantedEvVarNC loc rewriters pty
-  = do { new_ev <- newEvVar pty
+  = assertPpr (not (isEqPred pty)) (ppr pty) $
+    do { new_ev <- newEvVar pty
        ; traceTcS "Emitting new wanted" (ppr new_ev <+> dcolon <+> ppr pty $$
                                          pprCtLoc loc)
        ; return (CtWanted { ctev_pred      = pty
@@ -1833,7 +1834,7 @@ newWantedEvVar :: CtLoc -> RewriterSet
                -> TcPredType -> TcS MaybeNew
 -- For anything except ClassPred, this is the same as newWantedEvVarNC
 newWantedEvVar loc rewriters pty
-  = assertPpr (not (isEqPrimPred pty))
+  = assertPpr (not (isEqPred pty))
       (vcat [ text "newWantedEvVar: HoleDestPred"
             , text "pty:" <+> ppr pty ]) $
     do { mb_ct <- lookupInInerts loc pty
@@ -2161,7 +2162,7 @@ checkTouchableTyVarEq ev lhs_tv rhs
                   TcM.newConcreteTyVarTyAtLevel conc_info lhs_tv_lvl fam_app_kind
                 _ -> TcM.newMetaTyVarTyAtLevel lhs_tv_lvl fam_app_kind
 
-           ; let pty = mkPrimEqPredRole Nominal fam_app new_tv_ty
+           ; let pty = mkNomEqPred fam_app new_tv_ty
            ; hole <- TcM.newVanillaCoercionHole pty
            ; let new_ev = CtWanted { ctev_pred      = pty
                                    , ctev_dest      = HoleDest hole
@@ -2242,7 +2243,7 @@ checkTypeEq ev eq_rel lhs rhs
       = mkNonCanonical <$> newGivenEvVar cb_loc (given_pred, given_term)
       where
         new_ty     = mkTyVarTy new_tv
-        given_pred = mkPrimEqPred fam_app new_ty
+        given_pred = mkNomEqPred fam_app new_ty
         given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
 
     -- See Detail (7) of the Note

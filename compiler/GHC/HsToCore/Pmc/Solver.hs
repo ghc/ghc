@@ -64,7 +64,7 @@ import GHC.Core
 import GHC.Core.FVs         (exprFreeVars)
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
-import GHC.Core.Predicate (typeDeterminesValue)
+import GHC.Core.Predicate (typeDeterminesValue, mkNomEqPred)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
 import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr)
@@ -803,7 +803,7 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
 
 equateTys :: [Type] -> [Type] -> [PhiCt]
 equateTys ts us =
-  [ PhiTyCt (mkPrimEqPred t u)
+  [ PhiTyCt (mkNomEqPred t u)
   | (t, u) <- zipEqual "equateTys" ts us
   -- The following line filters out trivial Refl constraints, so that we don't
   -- need to initialise the type oracle that often

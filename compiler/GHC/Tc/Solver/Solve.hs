@@ -1092,13 +1092,12 @@ solveNC ev
 
     -- Do rewriting on the constraint, especially zonking
     do { ev <- rewriteEvidence ev
-       ; let irred = IrredCt { ir_ev = ev, ir_reason = IrredShapeReason }
 
     -- And then re-classify
        ; case classifyPredType (ctEvPred ev) of
            ClassPred cls tys     -> solveDictNC ev cls tys
            ForAllPred tvs th p   -> Stage $ solveForAllNC ev tvs th p
-           IrredPred {}          -> solveIrred irred
+           IrredPred {}          -> solveIrred (IrredCt { ir_ev = ev, ir_reason = IrredShapeReason })
            EqPred eq_rel ty1 ty2 -> solveEquality ev eq_rel ty1 ty2
               -- This case only happens if (say) `c` is unified with `a ~# b`,
               -- but that is rare becuase it requires c :: CONSTRAINT UnliftedRep

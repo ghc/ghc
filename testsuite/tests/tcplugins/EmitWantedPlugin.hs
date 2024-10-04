@@ -14,11 +14,13 @@ import GHC.Core
 import GHC.Core.Class
   ( Class(..) )
 import GHC.Core.Coercion
-  ( mkSymCo, mkSubCo, mkPrimEqPred )
+  ( mkSymCo, mkSubCo )
 import GHC.Core.DataCon
   ( classDataCon )
 import GHC.Core.Make
   ( mkCoreConApps, unitExpr )
+import GHC.Core.Predicate
+  ( mkNomEqPred )
 import GHC.Core.TyCo.Compare
   ( eqType )
 import GHC.Core.Utils
@@ -65,7 +67,7 @@ solveCt ( PluginDefs {..} ) ct@( CDictCan (DictCt { di_cls, di_tys } ))
   | className di_cls == className myClass
   , [tyArg] <- di_tys
   = do
-      new_wanted_ctev <- newWanted (ctLoc ct) (mkPrimEqPred tyArg unitTy)
+      new_wanted_ctev <- newWanted (ctLoc ct) (mkNomEqPred tyArg unitTy)
       let
         -- co :: tyArg ~# ()
         co = ctEvCoercion new_wanted_ctev

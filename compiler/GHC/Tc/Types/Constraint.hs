@@ -771,8 +771,8 @@ wantedEvId_maybe ct
 mkTcEqPredLikeEv :: CtEvidence -> TcType -> TcType -> TcType
 mkTcEqPredLikeEv ev
   = case predTypeEqRel pred of
-      NomEq  -> mkPrimEqPred
-      ReprEq -> mkReprPrimEqPred
+      NomEq  -> mkNomEqPred
+      ReprEq -> mkReprEqPred
   where
     pred = ctEvPred ev
 
