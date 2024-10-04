@@ -70,6 +70,7 @@ import GHC.Core.TyCo.FVs( isInjectiveInType )
 import GHC.Core.TyCo.Ppr( debugPprType {- pprTyVar -} )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
+import GHC.Core.Predicate( mkEqPredRole )
 import GHC.Core.Multiplicity
 import GHC.Core.Reduction
 
@@ -2135,7 +2136,7 @@ uType, uType_defer
 uType_defer (UE { u_loc = loc, u_defer = ref
                 , u_role = role, u_rewriters = rewriters })
             ty1 ty2  -- ty1 is "actual", ty2 is "expected"
-  = do { let pred_ty = mkPrimEqPredRole role ty1 ty2
+  = do { let pred_ty = mkEqPredRole role ty1 ty2
        ; hole <- newCoercionHole loc pred_ty
        ; let ct = mkNonCanonical $
                   CtWanted { ctev_pred      = pred_ty

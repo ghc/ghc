@@ -4690,7 +4690,7 @@ checkValidDataCon dflags existential_ok tc con
           -- See Note [Type data declarations] in GHC.Rename.Module,
           -- restriction (R4).
         ; when (isTypeDataCon con) $
-          checkTc (all isEqPred (dataConOtherTheta con))
+          checkTc (all isEqClassPred (dataConOtherTheta con))
                   (TcRnConstraintInKind (dataConRepType con))
 
         ; hsc_env <- getTopEnv

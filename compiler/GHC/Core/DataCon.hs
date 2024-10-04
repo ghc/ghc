@@ -901,7 +901,7 @@ eqSpecPair :: EqSpec -> (TyVar, Type)
 eqSpecPair (EqSpec tv ty) = (tv, ty)
 
 eqSpecPreds :: [EqSpec] -> ThetaType
-eqSpecPreds spec = [ mkPrimEqPred (mkTyVarTy tv) ty
+eqSpecPreds spec = [ mkNomEqPred (mkTyVarTy tv) ty
                    | EqSpec tv ty <- spec ]
 
 instance Outputable EqSpec where

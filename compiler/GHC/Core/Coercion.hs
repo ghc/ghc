@@ -50,9 +50,6 @@ module GHC.Core.Coercion (
         mkKindCo,
         castCoercionKind, castCoercionKind1, castCoercionKind2,
 
-        mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
-        mkNomPrimEqPred,
-
         -- ** Decomposition
         instNewTyCon_maybe,
 
@@ -140,6 +137,7 @@ import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.Compare
 import GHC.Core.Type
+import GHC.Core.Predicate( mkNomEqPred, mkReprEqPred )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.Coercion.Axiom
@@ -2647,44 +2645,13 @@ coercionRole = go
 -- | Makes a coercion type from two types: the types whose equality
 -- is proven by the relevant 'Coercion'
 mkCoercionType :: Role -> Type -> Type -> Type
-mkCoercionType Nominal          = mkPrimEqPred
-mkCoercionType Representational = mkReprPrimEqPred
+mkCoercionType Nominal          = mkNomEqPred
+mkCoercionType Representational = mkReprEqPred
 mkCoercionType Phantom          = \ty1 ty2 ->
   let ki1 = typeKind ty1
       ki2 = typeKind ty2
   in
   TyConApp eqPhantPrimTyCon [ki1, ki2, ty1, ty2]
-
--- | Creates a primitive nominal type equality predicate.
---      t1 ~# t2
--- Invariant: the types are not Coercions
-mkPrimEqPred :: Type -> Type -> Type
-mkPrimEqPred ty1 ty2
-  = mkTyConApp eqPrimTyCon [k1, k2, ty1, ty2]
-  where
-    k1 = typeKind ty1
-    k2 = typeKind ty2
-
--- | Creates a primitive representational type equality predicate.
---      t1 ~R# t2
--- Invariant: the types are not Coercions
-mkReprPrimEqPred :: Type -> Type -> Type
-mkReprPrimEqPred ty1  ty2
-  = mkTyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
-  where
-    k1 = typeKind ty1
-    k2 = typeKind ty2
-
--- | Makes a lifted equality predicate at the given role
-mkPrimEqPredRole :: Role -> Type -> Type -> PredType
-mkPrimEqPredRole Nominal          = mkPrimEqPred
-mkPrimEqPredRole Representational = mkReprPrimEqPred
-mkPrimEqPredRole Phantom          = panic "mkPrimEqPredRole phantom"
-
--- | Creates a primitive nominal type equality predicate with an explicit
---   (but homogeneous) kind: (~#) k k ty1 ty2
-mkNomPrimEqPred :: Kind -> Type -> Type -> Type
-mkNomPrimEqPred k ty1 ty2 = mkTyConApp eqPrimTyCon [k, k, ty1, ty2]
 
 -- | Assuming that two types are the same, ignoring coercions, find
 -- a nominal coercion between the types. This is useful when optimizing

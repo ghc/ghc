@@ -1334,7 +1334,7 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
                    ; setWantedEq dest co }
 
            CtGiven { ctev_evar = evar }
-             | let pred_ty = mkPrimEqPredRole (eqRelRole eq_rel) ty1 ty2
+             | let pred_ty = mkEqPred eq_rel ty1 ty2
                    ev_co   = mkCoVarCo (setVarType evar pred_ty)
                    -- setVarType: satisfy Note [mkSelCo precondition] in Coercion.hs
                    -- Remember: ty1/ty2 may be more fully zonked than evar
@@ -1392,7 +1392,7 @@ canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
                    ; setWantedEq dest co }
 
            CtGiven { ctev_evar = evar }
-             | let pred_ty = mkPrimEqPredRole (eqRelRole eq_rel) ty1 ty2
+             | let pred_ty = mkEqPred eq_rel ty1 ty2
                    ev_co   = mkCoVarCo (setVarType evar pred_ty)
                    -- setVarType: satisfy Note [mkSelCo precondition] in Coercion.hs
                    -- Remember: ty1/ty2 may be more fully zonked than evar
@@ -1645,7 +1645,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
     mk_kind_eq = case ev of
       CtGiven { ctev_evar = evar }
         -> do { let kind_co  = mkKindCo (mkCoVarCo evar)
-                    pred_ty  = unSwap swapped (mkNomPrimEqPred liftedTypeKind) ki1 ki2
+                    pred_ty  = unSwap swapped mkNomEqPred ki1 ki2
                     kind_loc = mkKindEqLoc xi1 xi2 (ctev_loc ev)
               ; kind_ev <- newGivenEvVar kind_loc (pred_ty, evCoercion kind_co)
               ; emitWorkNC [kind_ev]

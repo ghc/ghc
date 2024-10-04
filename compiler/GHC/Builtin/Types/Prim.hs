@@ -1017,7 +1017,7 @@ Let's take these one at a time:
     --------------------------
 This is The Type Of Equality in GHC. It classifies nominal coercions.
 This type is used in the solver for recording equality constraints.
-It responds "yes" to Type.isEqPrimPred and classifies as an EqPred in
+It responds "yes" to Type.isEqPred and classifies as an EqPred in
 Type.classifyPredType.
 
 All wanted constraints of this type are built with coercion holes.

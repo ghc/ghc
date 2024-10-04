@@ -472,7 +472,7 @@ matchWithDict [cls, mty]
                             [cls, mty] [evWithDict (evTermCoercion (EvExpr c))]
              mk_ev e   = pprPanic "matchWithDict" (ppr e)
 
-       ; return $ OneInst { cir_new_theta   = [mkPrimEqPred mty inst_meth_ty]
+       ; return $ OneInst { cir_new_theta   = [mkNomEqPred mty inst_meth_ty]
                           , cir_mk_ev       = mk_ev
                           , cir_canonical   = EvNonCanonical -- See (WD6) in Note [withDict]
                           , cir_what        = BuiltinInstance }
@@ -1268,7 +1268,7 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                          -- typically be empty, but if the datatype has a
                          -- "stupid theta" then we have to include it here.
                    ; let tvs   = mkTyVarTys (map snd tv_prs)
-                         theta = mkPrimEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
+                         theta = mkNomEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use the newtype coercion to cast
