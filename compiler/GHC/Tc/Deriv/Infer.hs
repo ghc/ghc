@@ -296,7 +296,7 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
               = map $ \ty -> let ki = typeKind ty in
                              ( [ mk_cls_pred orig t_or_k cls ty
                                , SimplePredSpec
-                                   { sps_pred = mkPrimEqPred ki typeToTypeKind
+                                   { sps_pred = mkNomEqPred ki typeToTypeKind
                                    , sps_origin = orig
                                    , sps_type_or_kind = KindLevel
                                    }
@@ -411,16 +411,16 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
            , denv_cls      = cls
            , denv_inst_tys = inst_tys } <- ask
   sa_wildcard <- isStandaloneWildcardDeriv
-  let -- The following functions are polymorphic over the representation
-      -- type, since we might either give it the underlying type of a
-      -- newtype (for GeneralizedNewtypeDeriving) or a @via@ type
-      -- (for DerivingVia).
-      rep_tys ty  = cls_tys ++ [ty]
-      rep_pred ty = mkClassPred cls (rep_tys ty)
-      rep_pred_o ty = SimplePredSpec { sps_pred = rep_pred ty
-                                     , sps_origin = deriv_origin
-                                     , sps_type_or_kind = TypeLevel
-                                     }
+  let -- rep_ty might come from:
+      --   GeneralizedNewtypeDeriving / DerivSpecNewtype:
+      --       the underlying type of the newtype ()
+      --   DerivingVia / DerivSpecVia
+      --       the `via` type
+
+      rep_pred_o = SimplePredSpec { sps_pred         = mkClassPred cls (cls_tys ++ [rep_ty])
+                                  , sps_origin       = deriv_origin
+                                  , sps_type_or_kind = TypeLevel
+                                  }
               -- rep_pred is the representation dictionary, from where
               -- we are going to get all the methods for the final
               -- dictionary
@@ -430,13 +430,12 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
       -- If there are no methods, we don't need any constraints
       -- Otherwise we need (C rep_ty), for the representation methods,
       -- and constraints to coerce each individual method
-      meth_preds :: Type -> ThetaSpec
-      meth_preds ty
-        | null meths = [] -- No methods => no constraints
-                          -- (#12814)
-        | otherwise = rep_pred_o ty : coercible_constraints ty
+      meth_preds :: ThetaSpec
+      meth_preds | null meths = [] -- No methods => no constraints (#12814)
+                 | otherwise = rep_pred_o : coercible_constraints
       meths = classMethods cls
-      coercible_constraints ty
+
+      coercible_constraints
         = [ SimplePredSpec
               { sps_pred = pred
               , sps_origin = DerivOriginCoerce meth t1 t2 sa_wildcard
@@ -444,15 +443,24 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
               }
           | meth <- meths
           , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
-                                       inst_tys ty meth
-          , let (tvs1, theta1, tau1) = tcSplitSigmaTy t1
+                                       inst_tys rep_ty meth
+              -- If we have class C a b c where { op :: op_ty }
+              -- and inst_tys = [t1, t2, t3]
+              -- then t1 = op_ty{t1,t2,rep_ty/a,b,c]
+              --      t2 = op_ty{t1,t2,t3/a,b,c]
+          , let (tvs1,  theta1, tau1) = tcSplitSigmaTy t1
           , let (_tvs2, theta2, tau2) = tcSplitSigmaTy t2
-          , pred <- [ tcMkDFunSigmaTy tvs1 [] $ mkReprPrimEqPred tau1 tau2
-                      -- The two method types must be coercible, ignoring any
-                      -- constraints. Dictionaries are inferred normally, not
-                      -- coerced.
+          , assertPpr (tvs1 == _tvs2) (ppr t1 $$ ppr t2) True
+               -- assert: mkCoerceClassMethEqn returns two
+               -- foralls with the very same forall-binders
 
-                    , tcMkDFunSigmaTy tvs1 theta2 $ mkConstraintTupleTy theta1
+          , pred <- [ tcMkDFunSigmaTy tvs1 theta1 $ mkReprEqPred tau1 tau2
+                      -- The two method types must be coercible
+                      -- We put this in a separate implication constraint only
+                      -- because we can't make a constraint-tuple with both boxed
+                      -- and unboxed constraints
+
+                    , tcMkDFunSigmaTy tvs1 theta1 $ mkConstraintTupleTy theta2
                       -- If there are constraints, the constraints provided to
                       -- the derived method must be sufficient to solve the
                       -- constraints required by the method being coerced.
@@ -460,7 +468,7 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
                     ]
           ]
 
-  pure (meth_preds rep_ty)
+  pure meth_preds
 
 {- Note [Inferring the instance context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

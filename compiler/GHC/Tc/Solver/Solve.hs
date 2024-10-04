@@ -273,15 +273,14 @@ solveNC ev
 
     -- Do rewriting on the constraint, especially zonking
     do { ev <- rewriteEvidence ev
-       ; let irred = IrredCt { ir_ev = ev, ir_reason = IrredShapeReason }
 
     -- And then re-classify
        ; case classifyPredType (ctEvPred ev) of
            ClassPred cls tys     -> solveDictNC ev cls tys
            ForAllPred tvs th p   -> Stage $ solveForAllNC ev tvs th p
-           IrredPred {}          -> solveIrred irred
+           IrredPred {}          -> solveIrred (IrredCt { ir_ev = ev, ir_reason = IrredShapeReason })
            EqPred eq_rel ty1 ty2 -> solveEquality ev eq_rel ty1 ty2
-              -- This case only happens if (say) `c` is unified with `a ~# b`,
+              -- EqPred only happens if (say) `c` is unified with `a ~# b`,
               -- but that is rare becuase it requires c :: CONSTRAINT UnliftedRep
 
     }}
@@ -420,10 +419,12 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
                          -- Set the thing to prove to have a ScOrigin, so we are
                          -- careful about its termination checks.
                          -- See (QC-INV) in Note [Solving a Wanted forall-constraint]
-                   ; wanted_ev <- newWantedEvVarNC loc' rewriters inst_pred
+                   ; wanted_ev <- newWantedNC loc' rewriters inst_pred
+                         -- NB: inst_pred can be an equality
                    ; return ( ctEvEvId wanted_ev
                             , unitBag (mkNonCanonical wanted_ev)) }
 
+      ; traceTcS "solveForAll" (ppr given_ev_vars $$ ppr wanteds $$ ppr w_id)
       ; ev_binds <- emitImplicationTcS lvl skol_info_anon skol_tvs given_ev_vars wanteds
 
       ; setWantedEvTerm dest EvCanonical $
