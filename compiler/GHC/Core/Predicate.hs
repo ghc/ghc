@@ -12,11 +12,10 @@ module GHC.Core.Predicate (
 
   -- Equality predicates
   EqRel(..), eqRelRole,
-  isEqPrimPred, isNomEqPred, isReprEqPrimPred, isEqPred, isCoVarType,
+  isEqPred, isReprEqPred, isEqClassPred, isCoVarType,
   getEqPredTys, getEqPredTys_maybe, getEqPredRole,
   predTypeEqRel,
-  mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
-  mkNomPrimEqPred,
+  mkNomEqPred, mkReprEqPred, mkEqPred, mkEqPredRole,
 
   -- Class predicates
   mkClassPred, isDictTy, typeDeterminesValue,
@@ -43,10 +42,10 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Var
-import GHC.Core.Coercion
 import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -171,6 +170,37 @@ eqRelRole :: EqRel -> Role
 eqRelRole NomEq  = Nominal
 eqRelRole ReprEq = Representational
 
+-- | Creates a primitive nominal type equality predicate.
+--      t1 ~# t2
+-- Invariant: the types are not Coercions
+mkNomEqPred :: Type -> Type -> Type
+mkNomEqPred ty1 ty2
+  = mkTyConApp eqPrimTyCon [k1, k2, ty1, ty2]
+  where
+    k1 = typeKind ty1
+    k2 = typeKind ty2
+
+-- | Creates a primitive representational type equality predicate.
+--      t1 ~R# t2
+-- Invariant: the types are not Coercions
+mkReprEqPred :: Type -> Type -> Type
+mkReprEqPred ty1  ty2
+  = mkTyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
+  where
+    k1 = typeKind ty1
+    k2 = typeKind ty2
+
+-- | Makes a lifted equality predicate at the given role
+mkEqPred :: EqRel -> Type -> Type -> PredType
+mkEqPred NomEq  = mkNomEqPred
+mkEqPred ReprEq = mkReprEqPred
+
+-- | Makes a lifted equality predicate at the given role
+mkEqPredRole :: Role -> Type -> Type -> PredType
+mkEqPredRole Nominal          = mkNomEqPred
+mkEqPredRole Representational = mkReprEqPred
+mkEqPredRole Phantom          = panic "mkEqPred phantom"
+
 getEqPredTys :: PredType -> (Type, Type)
 getEqPredTys ty
   = case splitTyConApp_maybe ty of
@@ -196,8 +226,8 @@ getEqPredRole ty = eqRelRole (predTypeEqRel ty)
 -- Returns NomEq for dictionary predicates, etc
 predTypeEqRel :: PredType -> EqRel
 predTypeEqRel ty
-  | isReprEqPrimPred ty = ReprEq
-  | otherwise           = NomEq
+  | isReprEqPred ty = ReprEq
+  | otherwise       = NomEq
 
 {-------------------------------------------
 Predicates on PredType
@@ -224,7 +254,7 @@ in GHC.Tc.Solver.Dict.
 -- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
 isCoVarType :: Type -> Bool
   -- ToDo: should we check saturation?
-isCoVarType ty = isEqPrimPred ty
+isCoVarType ty = isEqPred ty
 
 isEvVarType :: Type -> Bool
 -- True of (a) predicates, of kind Constraint, such as (Eq t), and (s ~ t)
@@ -233,26 +263,20 @@ isEvVarType :: Type -> Bool
 -- See Note [Evidence for quantified constraints]
 isEvVarType ty = isCoVarType ty || isPredTy ty
 
-isEqPrimPred :: PredType -> Bool
+isEqPred :: PredType -> Bool
 -- True of (s ~# t) (s ~R# t)
-isEqPrimPred ty
+-- NB: but NOT true of (s ~ t) or (s ~~ t) or (Coecible s t)
+isEqPred ty
   | Just tc <- tyConAppTyCon_maybe ty
   = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
   | otherwise
   = False
 
-isReprEqPrimPred :: PredType -> Bool
-isReprEqPrimPred ty
+isReprEqPred :: PredType -> Bool
+-- True of (s ~R# t)
+isReprEqPred ty
   | Just tc <- tyConAppTyCon_maybe ty
   = tc `hasKey` eqReprPrimTyConKey
-  | otherwise
-  = False
-
-isNomEqPred :: PredType -> Bool
--- A nominal equality, primitive or not  (s ~# t), (s ~ t), or (s ~~ t)
-isNomEqPred ty
-  | Just tc <- tyConAppTyCon_maybe ty
-  = tc `hasKey` eqPrimTyConKey || tc `hasKey` heqTyConKey || tc `hasKey` eqTyConKey
   | otherwise
   = False
 
@@ -261,9 +285,9 @@ isClassPred ty = case tyConAppTyCon_maybe ty of
     Just tc -> isClassTyCon tc
     _       -> False
 
-isEqPred :: PredType -> Bool
-isEqPred ty  -- True of (s ~ t) and (s ~~ t)
-             -- ToDo: should we check saturation?
+isEqClassPred :: PredType -> Bool
+isEqClassPred ty  -- True of (s ~ t) and (s ~~ t)
+                  -- ToDo: should we check saturation?
   | Just tc <- tyConAppTyCon_maybe ty
   , Just cls <- tyConClass_maybe tc
   = isEqualityClass cls

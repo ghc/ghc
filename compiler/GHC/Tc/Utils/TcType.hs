@@ -155,7 +155,7 @@ module GHC.Tc.Utils.TcType (
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
 
-  isClassPred, isEqPrimPred, isIPLikePred, isEqPred,
+  isClassPred, isEqPred, isIPLikePred, isEqClassPred,
   isEqualityClass, mkClassPred,
   tcSplitQuantPredTy, tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isFixedRuntimeRepKind,
@@ -1873,7 +1873,7 @@ mkMinimalBySCs get_pred xs = go preds_with_scs []
    -- These can arise when dealing with partial type signatures (e.g. T14715)
    eq_extras pred
      = case classifyPredType pred of
-         EqPred r t1 t2               -> [mkPrimEqPredRole (eqRelRole r) t2 t1]
+         EqPred r t1 t2               -> [mkEqPred r t2 t1]
          ClassPred cls [k1,k2,t1,t2]
            | cls `hasKey` heqTyConKey -> [mkClassPred cls [k2, k1, t2, t1]]
          ClassPred cls [k,t1,t2]

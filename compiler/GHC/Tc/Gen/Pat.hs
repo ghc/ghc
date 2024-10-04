@@ -1244,7 +1244,7 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
                            -- order is *important* as we generate the list of
                            -- dictionary binders from theta'
 
-        ; when (not (null eq_spec) || any isEqPred theta) warnMonoLocalBinds
+        ; when (not (null eq_spec) || any isEqClassPred theta) warnMonoLocalBinds
 
         ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
@@ -1296,7 +1296,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
               req_theta'  = substTheta tenv req_theta
               con_like    = PatSynCon pat_syn
 
-        ; when (any isEqPred prov_theta) warnMonoLocalBinds
+        ; when (any isEqClassPred prov_theta) warnMonoLocalBinds
 
         ; mult_wrap <- checkManyPattern PatternSynonymReason nlWildPatName pat_ty
             -- See Note [Coercions returned from tcSubMult] in GHC.Tc.Utils.Unify.

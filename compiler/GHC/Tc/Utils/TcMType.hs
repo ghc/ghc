@@ -227,7 +227,7 @@ newWanteds orig = mapM (newWanted orig Nothing)
 
 cloneWantedCtEv :: CtEvidence -> TcM CtEvidence
 cloneWantedCtEv ctev@(CtWanted { ctev_pred = pty, ctev_dest = HoleDest _, ctev_loc = loc })
-  | isEqPrimPred pty
+  | isEqPred pty
   = do { co_hole <- newCoercionHole loc pty
        ; return (ctev { ctev_dest = HoleDest co_hole }) }
   | otherwise
@@ -285,7 +285,7 @@ emitWantedEq origin t_or_k role ty1 ty2
                   , ctev_rewriters = emptyRewriterSet }
        ; return (HoleCo hole) }
   where
-    pty = mkPrimEqPredRole role ty1 ty2
+    pty = mkEqPredRole role ty1 ty2
 
 -- | Creates a new EvVar and immediately emits it as a Wanted.
 -- No equality predicates here.

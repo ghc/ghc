@@ -54,6 +54,7 @@ import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
 import GHC.Core.Coercion
+import GHC.Core.Predicate( mkNomEqPred )
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
@@ -762,7 +763,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
              unsafe_equality k a b
                = ( mkTyApps (Var unsafe_equality_proof_id) [k,b,a]
                  , mkTyConApp unsafe_equality_tc [k,b,a]
-                 , mkNomPrimEqPred k a b
+                 , mkNomEqPred a b
                  )
              -- NB: UnsafeRefl :: (b ~# a) -> UnsafeEquality a b, so we have to
              -- carefully swap the arguments above

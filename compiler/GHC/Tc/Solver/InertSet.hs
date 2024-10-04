@@ -63,6 +63,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Unique( hasKey )
 import GHC.Types.Basic( SwapFlag(..) )
 
 import GHC.Core.Reduction
@@ -73,7 +74,7 @@ import GHC.Core.Class( Class )
 import GHC.Core.TyCon
 import GHC.Core.Class( classTyCon )
 import GHC.Core.Unify
-
+import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey )
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -197,6 +198,16 @@ data WorkList
        , wl_implics :: Bag Implication  -- See Note [Residual implications]
     }
 
+isNominalEqualityCt :: Ct -> Bool
+-- A nominal equality, primitive or not,
+--                     canonoical or not
+--     (s ~# t), (s ~ t), or (s ~~ t)
+isNominalEqualityCt ct
+  | Just tc <- tcTyConAppTyCon_maybe (ctPred ct)
+  = tc `hasKey` eqPrimTyConKey || tc `hasKey` heqTyConKey || tc `hasKey` eqTyConKey
+  | otherwise
+  = False
+
 appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
     (WL { wl_eqs_N = eqs1_N, wl_eqs_X = eqs1_X, wl_rw_eqs = rw_eqs1
@@ -219,7 +230,7 @@ extendWorkListEq rewriters ct
   | isEmptyRewriterSet rewriters      -- A wanted that has not been rewritten
     -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
     --                         in GHC.Tc.Types.Constraint
-  = if isNomEqPred (ctPred ct)
+  = if isNominalEqualityCt ct
     then wl { wl_eqs_N = ct : eqs_N }
     else wl { wl_eqs_X = ct : eqs_X }
 
@@ -238,7 +249,7 @@ extendWorkListEqs rewriters new_eqs
   | isEmptyRewriterSet rewriters
     -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
     --                         in GHC.Tc.Types.Constraint
-  = case partitionBag is_nominal new_eqs of
+  = case partitionBag isNominalEqualityCt new_eqs of
        (new_eqs_N, new_eqs_X)
           | isEmptyBag new_eqs_N -> wl { wl_eqs_X = new_eqs_X `push_on_front` eqs_X }
           | isEmptyBag new_eqs_X -> wl { wl_eqs_N = new_eqs_N `push_on_front` eqs_N }
@@ -253,8 +264,6 @@ extendWorkListEqs rewriters new_eqs
     push_on_front :: Bag Ct -> [Ct] -> [Ct]
     -- push_on_front puts the new equlities on the front of the queue
     push_on_front new_eqs eqs = foldr (:) eqs new_eqs
-
-    is_nominal ct = isNomEqPred (ctPred ct)
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
