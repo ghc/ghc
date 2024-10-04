@@ -580,22 +580,20 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     tidy_errs = bagToList (mapBag (tidyDelayedError env) errs)
 
     partition_errors :: [DelayedError] -> ([Hole], [Hole], [NotConcreteError], [(TcCoercion, CtLoc)])
-    partition_errors = go [] [] [] []
-      where
-        go out_of_scope other_holes syn_eqs mult_co_errs []
-          = (out_of_scope, other_holes, syn_eqs, mult_co_errs)
-        go es1 es2 es3 es4 (err:errs)
-          | (es1, es2, es3, es4) <- go es1 es2 es3 es4 errs
-          = case err of
-              DE_Hole hole
-                | isOutOfScopeHole hole
-                -> (hole : es1, es2, es3, es4)
-                | otherwise
-                -> (es1, hole : es2, es3, es4)
-              DE_NotConcrete err
-                -> (es1, es2, err : es3, es4)
-              DE_Multiplicity mult_co loc
-                -> (es1, es2, es3, (mult_co, loc):es4)
+    partition_errors []
+      = ([], [], [], [])
+    partition_errors (err:errs)
+      | (es1, es2, es3, es4) <- partition_errors errs
+      = case err of
+          DE_Hole hole
+            | isOutOfScopeHole hole
+            -> (hole : es1, es2, es3, es4)
+            | otherwise
+            -> (es1, hole : es2, es3, es4)
+          DE_NotConcrete err
+            -> (es1, es2, err : es3, es4)
+          DE_Multiplicity mult_co loc
+            -> (es1, es2, es3, (mult_co, loc):es4)
 
       -- See Note [Suppressing confusing errors]
     suppress :: ErrorItem -> Bool
