@@ -647,7 +647,7 @@ nlHsTyConApp :: forall p a. IsSrcSpanAnn p a
 nlHsTyConApp prom fixity tycon tys
   | Infix <- fixity
   , HsValArg _ ty1 : HsValArg _ ty2 : rest <- tys
-  = foldl' mk_app (noLocA $ HsOpTy noAnn prom ty1 (noLocA tycon) ty2) rest
+  = foldl' mk_app (noLocA $ HsOpTy noExtField prom ty1 (noLocA tycon) ty2) rest
   | otherwise
   = foldl' mk_app (nlHsTyVar prom tycon) tys
   where
@@ -857,7 +857,7 @@ mkVarBind var rhs = L (getLoc rhs) $
                               var_id = var, var_rhs = rhs }
 
 mkPatSynBind :: LocatedN RdrName -> HsPatSynDetails GhcPs
-             -> LPat GhcPs -> HsPatSynDir GhcPs -> [AddEpAnn] -> HsBind GhcPs
+             -> LPat GhcPs -> HsPatSynDir GhcPs -> AnnPSB -> HsBind GhcPs
 mkPatSynBind name details lpat dir anns = PatSynBind noExtField psb
   where
     psb = PSB{ psb_ext = anns

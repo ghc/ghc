@@ -202,17 +202,18 @@ captureLineSpacing ds = map (\(_,_,x) -> x) $ go (map to ds)
 -- ---------------------------------------------------------------------
 
 captureTypeSigSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
-captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig dc rs') ns (HsWC xw ty))))
-  = (L l (SigD x (TypeSig (AnnSig dc' rs') ns (HsWC xw ty'))))
+captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig NoEpUniTok mp md) ns (HsWC xw ty))))
+  = (L l (SigD x (TypeSig (AnnSig NoEpUniTok mp md) ns (HsWC xw ty))))
+captureTypeSigSpacing (L l (SigD x (TypeSig (AnnSig (EpUniTok dca u) mp md) ns (HsWC xw ty))))
+  = (L l (SigD x (TypeSig (AnnSig (EpUniTok dca' u) mp md) ns (HsWC xw ty'))))
   where
     -- we want DPs for the distance from the end of the ns to the
     -- AnnDColon, and to the start of the ty
-    AddEpAnn kw dca = dc
     rd = case last ns of
-      L (EpAnn anc' _ _) _ -> anchor anc' -- TODO MovedAnchor?
-    dc' = case dca of
-      EpaSpan ss@(RealSrcSpan r _) -> AddEpAnn kw (EpaDelta ss (ss2delta (ss2posEnd rd) r) [])
-      _                            -> AddEpAnn kw dca
+      L (EpAnn anc' _ _) _ -> anchor anc'
+    dca' = case dca of
+          EpaSpan ss@(RealSrcSpan r _) -> (EpaDelta ss (ss2delta (ss2posEnd rd) r) [])
+          _                            -> dca
 
     -- ---------------------------------
 

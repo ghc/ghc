@@ -66,8 +66,11 @@
      (NoExtField)
      (TypeSig
       (AnnSig
-       (AddEpAnn AnnDcolon (EpaSpan { T23315.hsig:3:3-4 }))
-       [])
+       (EpUniTok
+        (EpaSpan { T23315.hsig:3:3-4 })
+        (NormalSyntax))
+       (Nothing)
+       (Nothing))
       [(L
         (EpAnn
          (EpaSpan { T23315.hsig:3:1 })

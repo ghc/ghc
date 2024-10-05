@@ -32,7 +32,7 @@ module GHC.Hs.Type (
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), EpAnnForallTy,
-        HsTyVarBndr(..), LHsTyVarBndr,
+        HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
         HsBndrVar(..),
         HsBndrVis(..), isHsBndrInvisible,
@@ -359,7 +359,7 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 
 --------------------------------------------------
 
-type instance XTyVarBndr    (GhcPass _) = [AddEpAnn]
+type instance XTyVarBndr    (GhcPass _) = AnnTyVarBndr
 type instance XXTyVarBndr   (GhcPass _) = DataConCantHappen
 
 type instance XBndrKind   (GhcPass p) = NoExtField
@@ -369,6 +369,17 @@ type instance XXBndrKind  (GhcPass p) = DataConCantHappen
 type instance XBndrVar (GhcPass p) = NoExtField
 type instance XBndrWildCard (GhcPass p) = NoExtField
 type instance XXBndrVar (GhcPass p) = DataConCantHappen
+
+data AnnTyVarBndr
+  = AnnTyVarBndr {
+    atv_opens  :: [EpaLocation], -- all "(" or all "{"
+    atv_closes :: [EpaLocation], -- all ")" or all "}"
+    atv_tv     :: EpToken "'",
+    atv_dcolon :: TokDcolon
+  } deriving Data
+
+instance NoAnn AnnTyVarBndr where
+  noAnn = AnnTyVarBndr noAnn noAnn noAnn noAnn
 
 -- | Return the attached flag
 hsTyVarBndrFlag :: HsTyVarBndr flag (GhcPass pass) -> flag
@@ -445,17 +456,17 @@ except the `forall _.` example is rejected by checkForAllTelescopeWildcardBndrs.
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
-type instance XTyVar           (GhcPass _) = [AddEpAnn]
+type instance XTyVar           (GhcPass _) = EpToken "'"
 type instance XAppTy           (GhcPass _) = NoExtField
 type instance XFunTy           (GhcPass _) = NoExtField
 type instance XListTy          (GhcPass _) = AnnParen
 type instance XTupleTy         (GhcPass _) = AnnParen
 type instance XSumTy           (GhcPass _) = AnnParen
-type instance XOpTy            (GhcPass _) = [AddEpAnn]
+type instance XOpTy            (GhcPass _) = NoExtField
 type instance XParTy           (GhcPass _) = AnnParen
-type instance XIParamTy        (GhcPass _) = [AddEpAnn]
+type instance XIParamTy        (GhcPass _) = TokDcolon
 type instance XStarTy          (GhcPass _) = NoExtField
-type instance XKindSig         (GhcPass _) = [AddEpAnn]
+type instance XKindSig         (GhcPass _) = TokDcolon
 
 type instance XAppKindTy       GhcPs = EpToken "@"
 type instance XAppKindTy       GhcRn = NoExtField
@@ -672,7 +683,7 @@ mkHsOpTy :: (Anno (IdGhcP p) ~ SrcSpanAnnN)
          => PromotionFlag
          -> LHsType (GhcPass p) -> LocatedN (IdP (GhcPass p))
          -> LHsType (GhcPass p) -> HsType (GhcPass p)
-mkHsOpTy prom ty1 op ty2 = HsOpTy noAnn prom ty1 op ty2
+mkHsOpTy prom ty1 op ty2 = HsOpTy noExtField prom ty1 op ty2
 
 mkHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 mkHsAppTy t1 t2 = addCLocA t1 t2 (HsAppTy noExtField t1 t2)
