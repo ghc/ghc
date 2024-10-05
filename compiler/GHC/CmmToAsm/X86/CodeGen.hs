@@ -104,30 +104,32 @@ is32BitPlatform = do
     platform <- getPlatform
     return $ target32Bit platform
 
+-- These flags may be implied by other flags like -mfma or -mavx512f.
+-- See Note [Implications between X86 CPU feature flags] for details.
 ssse3Enabled :: NatM Bool
 ssse3Enabled = do
   config <- getConfig
-  return (ncgSseVersion config >= Just SSSE3)
+  return (ncgSseAvxVersion config >= Just SSSE3)
 
 sse4_1Enabled :: NatM Bool
 sse4_1Enabled = do
   config <- getConfig
-  return (ncgSseVersion config >= Just SSE4)
+  return (ncgSseAvxVersion config >= Just SSE4)
 
 sse4_2Enabled :: NatM Bool
 sse4_2Enabled = do
   config <- getConfig
-  return (ncgSseVersion config >= Just SSE42)
+  return (ncgSseAvxVersion config >= Just SSE42)
 
 avxEnabled :: NatM Bool
 avxEnabled = do
   config <- getConfig
-  return (ncgAvxEnabled config)
+  return (ncgSseAvxVersion config >= Just AVX1)
 
 avx2Enabled :: NatM Bool
 avx2Enabled = do
   config <- getConfig
-  return (ncgAvx2Enabled config)
+  return (ncgSseAvxVersion config >= Just AVX2)
 
 cmmTopCodeGen
         :: RawCmmDecl

@@ -28,6 +28,16 @@ Compiler
   bound to variables. The very similar pattern ``Foo{bar = Bar{baz = 42}}``
   will will not yet mark ``bar`` or ``baz`` as covered.
 
+- When multiple ``-msse*`` flags are given, the maximum version takes effect.
+  For example, ``-msse4.2 -msse2`` is now equivalent to ``-msse4.2``.
+  Previously, only the last flag took effect.
+
+- Some x86 architecture flags now imply other flags.
+  For example, :ghc-flag:`-mavx` now implies :ghc-flag:`-msse4.2`,
+  and :ghc-flag:`-mavx512f` now implies :ghc-flag:`-mfma`
+  in addition to :ghc-flag:`-mavx2`.
+  Refer to the users' guide for more details about each individual flag.
+
 GHCi
 ~~~~
 

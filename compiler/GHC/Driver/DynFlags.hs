@@ -447,10 +447,8 @@ data DynFlags = DynFlags {
   interactivePrint      :: Maybe String,
 
   -- | Machine dependent flags (-m\<blah> stuff)
-  sseVersion            :: Maybe SseVersion,
+  sseAvxVersion         :: Maybe SseAvxVersion,
   bmiVersion            :: Maybe BmiVersion,
-  avx                   :: Bool,
-  avx2                  :: Bool,
   avx512cd              :: Bool, -- Enable AVX-512 Conflict Detection Instructions.
   avx512er              :: Bool, -- Enable AVX-512 Exponential and Reciprocal Instructions.
   avx512f               :: Bool, -- Enable AVX-512 instructions.
@@ -731,10 +729,8 @@ defaultDynFlags mySettings =
         profAuto = NoProfAuto,
         callerCcFilters = [],
         interactivePrint = Nothing,
-        sseVersion = Nothing,
+        sseAvxVersion = Nothing,
         bmiVersion = Nothing,
-        avx = False,
-        avx2 = False,
         avx512cd = False,
         avx512er = False,
         avx512f = False,
@@ -1548,22 +1544,28 @@ initPromotionTickContext dflags =
 -- SSE, AVX, FMA
 
 isSse3Enabled :: DynFlags -> Bool
-isSse3Enabled dflags = sseVersion dflags >= Just SSE3
+isSse3Enabled dflags = sseAvxVersion dflags >= Just SSE3 || isAvxEnabled dflags
 
 isSsse3Enabled :: DynFlags -> Bool
-isSsse3Enabled dflags = sseVersion dflags >= Just SSSE3
+isSsse3Enabled dflags = sseAvxVersion dflags >= Just SSSE3 || isAvxEnabled dflags
 
 isSse4_1Enabled :: DynFlags -> Bool
-isSse4_1Enabled dflags = sseVersion dflags >= Just SSE4
+isSse4_1Enabled dflags = sseAvxVersion dflags >= Just SSE4 || isAvxEnabled dflags
 
 isSse4_2Enabled :: DynFlags -> Bool
-isSse4_2Enabled dflags = sseVersion dflags >= Just SSE42
+isSse4_2Enabled dflags = sseAvxVersion dflags >= Just SSE42 || isAvxEnabled dflags
 
 isAvxEnabled :: DynFlags -> Bool
-isAvxEnabled dflags = avx dflags || avx2 dflags || avx512f dflags
+isAvxEnabled dflags = sseAvxVersion dflags >= Just AVX1 || (isX86 && fma dflags) || isAvx512fEnabled dflags
+  where
+    -- -mfma can be used on multiple platforms, but -mavx is x86-only
+    isX86 = case platformArch (targetPlatform dflags) of
+      ArchX86_64 -> True
+      ArchX86    -> True
+      _          -> False
 
 isAvx2Enabled :: DynFlags -> Bool
-isAvx2Enabled dflags = avx2 dflags || avx512f dflags
+isAvx2Enabled dflags = sseAvxVersion dflags >= Just AVX2 || isAvx512fEnabled dflags
 
 isAvx512cdEnabled :: DynFlags -> Bool
 isAvx512cdEnabled dflags = avx512cd dflags
@@ -1572,13 +1574,49 @@ isAvx512erEnabled :: DynFlags -> Bool
 isAvx512erEnabled dflags = avx512er dflags
 
 isAvx512fEnabled :: DynFlags -> Bool
-isAvx512fEnabled dflags = avx512f dflags
+isAvx512fEnabled dflags = avx512f dflags || avx512cd dflags || avx512er dflags || avx512pf dflags
 
 isAvx512pfEnabled :: DynFlags -> Bool
 isAvx512pfEnabled dflags = avx512pf dflags
 
 isFmaEnabled :: DynFlags -> Bool
-isFmaEnabled dflags = fma dflags
+isFmaEnabled dflags = fma dflags || (isX86 && isAvx512fEnabled dflags)
+  where
+    -- -mfma is used on multiple platforms, but -mavx512f is x86-only
+    isX86 = case platformArch (targetPlatform dflags) of
+      ArchX86_64 -> True
+      ArchX86    -> True
+      _          -> False
+
+{- Note [Implications between X86 CPU feature flags]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Many X86 CPU feature flags (such as -mavx, -mfma or -msse4) imply other
+feature flags. In particular, there are straightforward linear implication
+structures:
+
+  1. AVX2 -> AVX -> SSE4.2 -> SSE4 -> SSSE3 -> SSE3 -> SSE2 -> SSE1
+  2. BMI2 -> BMI1
+
+together with other implications such as
+
+  3. FMA -> AVX
+  4. AVX512{CD,ED,PF} -> AVX512F -> AVX2
+
+
+We handle this as follows:
+
+  A. When parsing command line options into `DynFlags`, we record:
+    - an `SseAvxVersion` which gives the SSE/AVX level supported in
+      the total order (1),
+    - a `BmiVersion` for (2),
+    - whether FMA is enabled,
+    - various AVX512 flags saying which AVX512 extensions are supported
+
+  B. When converting these "raw" `DynFlags` into a `CmmConfig` for use
+     in code generator backends, we handle the remaining implications (3) (4),
+     e.g. if the user passed -mavx512f then we also set the `SseAvxVersion`
+     to `AVX2`.
+-}
 
 -- -----------------------------------------------------------------------------
 -- BMI2

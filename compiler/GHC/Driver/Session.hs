@@ -1684,25 +1684,28 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_faststrings)
 
         ------ Machine dependent (-m<blah>) stuff ---------------------------
+        -- See Note [Implications between X86 CPU feature flags]
 
   , make_ord_flag defGhcFlag "msse"         (noArg (\d ->
-                                                  d { sseVersion = Just SSE1 }))
+                                                  d { sseAvxVersion = max (Just SSE1) (sseAvxVersion d) }))
   , make_ord_flag defGhcFlag "msse2"        (noArg (\d ->
-                                                  d { sseVersion = Just SSE2 }))
+                                                  d { sseAvxVersion = max (Just SSE2) (sseAvxVersion d) }))
   , make_ord_flag defGhcFlag "msse3"        (noArg (\d ->
-                                                  d { sseVersion = Just SSE3 }))
+                                                  d { sseAvxVersion = max (Just SSE3) (sseAvxVersion d) }))
   , make_ord_flag defGhcFlag "mssse3"       (noArg (\d ->
-                                                  d { sseVersion = Just SSSE3 }))
+                                                  d { sseAvxVersion = max (Just SSSE3) (sseAvxVersion d) }))
   , make_ord_flag defGhcFlag "msse4"        (noArg (\d ->
-                                                  d { sseVersion = Just SSE4 }))
+                                                  d { sseAvxVersion = max (Just SSE4) (sseAvxVersion d) }))
   , make_ord_flag defGhcFlag "msse4.2"      (noArg (\d ->
-                                                 d { sseVersion = Just SSE42 }))
+                                                 d { sseAvxVersion = max (Just SSE42) (sseAvxVersion d) }))
   , make_ord_flag defGhcFlag "mbmi"         (noArg (\d ->
-                                                 d { bmiVersion = Just BMI1 }))
+                                                 d { bmiVersion = max (Just BMI1) (bmiVersion d) }))
   , make_ord_flag defGhcFlag "mbmi2"        (noArg (\d ->
                                                  d { bmiVersion = Just BMI2 }))
-  , make_ord_flag defGhcFlag "mavx"         (noArg (\d -> d { avx = True }))
-  , make_ord_flag defGhcFlag "mavx2"        (noArg (\d -> d { avx2 = True }))
+  , make_ord_flag defGhcFlag "mavx"         (noArg (\d ->
+                                                 d { sseAvxVersion = max (Just AVX1) (sseAvxVersion d) }))
+  , make_ord_flag defGhcFlag "mavx2"        (noArg (\d ->
+                                                 d { sseAvxVersion = max (Just AVX2) (sseAvxVersion d) }))
   , make_ord_flag defGhcFlag "mavx512cd"    (noArg (\d ->
                                                          d { avx512cd = True }))
   , make_ord_flag defGhcFlag "mavx512er"    (noArg (\d ->

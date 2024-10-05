@@ -1594,6 +1594,8 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
+    :implies: :ghc-flag:`-msse4.2`
+
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX instructions.
 
@@ -1601,6 +1603,8 @@ Some flags only make sense for particular target platforms.
     :shortdesc: (x86 only) Enable support for AVX2 SIMD extensions
     :type: dynamic
     :category: platform-options
+
+    :implies: :ghc-flag:`-mavx`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX2 instructions.
@@ -1610,6 +1614,8 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
+    :implies: :ghc-flag:`-mavx512f`
+
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-CD instructions.
 
@@ -1617,6 +1623,8 @@ Some flags only make sense for particular target platforms.
     :shortdesc: (x86 only) Enable support for AVX512-ER SIMD extensions
     :type: dynamic
     :category: platform-options
+
+    :implies: :ghc-flag:`-mavx512f`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-ER instructions.
@@ -1626,6 +1634,8 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
+    :implies: :ghc-flag:`-mavx2`, :ghc-flag:`-mfma`
+
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-F instructions.
 
@@ -1633,6 +1643,8 @@ Some flags only make sense for particular target platforms.
     :shortdesc: (x86 only) Enable support for AVX512-PF SIMD extensions
     :type: dynamic
     :category: platform-options
+
+    :implies: :ghc-flag:`-mavx512f`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-PF instructions.
@@ -1690,6 +1702,7 @@ Some flags only make sense for particular target platforms.
     :category: platform-options
 
     :since: 9.14.1
+    :implies: :ghc-flag:`-msse3`
 
     (x86 only) Use the SSSE3 instruction set to
     implement some vector operations
@@ -1701,6 +1714,8 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
+    :implies: :ghc-flag:`-mssse3`
+
     (x86 only) Use the SSE4 instruction set to
     implement some floating point and bit operations(whether using the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`).
@@ -1709,6 +1724,8 @@ Some flags only make sense for particular target platforms.
     :shortdesc: (x86 only) Use SSE4.2 for floating-point operations
     :type: dynamic
     :category: platform-options
+
+    :implies: :ghc-flag:`-msse4`
 
     (x86 only, added in GHC 7.4.1) Use the SSE4.2 instruction set to
     implement some floating point and bit operations,
@@ -1747,6 +1764,7 @@ Some flags only make sense for particular target platforms.
     :default: off by default, except for Aarch64 where it's on by default.
 
     :since: 9.8.1
+    :implies: (on x86) :ghc-flag:`-mavx`
 
     Use native FMA instructions to implement the fused multiply-add floating-point
     operations of the form ``x * y + z``.

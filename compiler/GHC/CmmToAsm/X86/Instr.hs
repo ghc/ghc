@@ -1121,8 +1121,8 @@ movInstr config fmt =
       = f
 
     plat    = ncgPlatform config
-    avx     = ncgAvxEnabled config
-    avx2    = ncgAvx2Enabled config
+    avx     = ncgSseAvxVersion config >= Just AVX1
+    avx2    = ncgSseAvxVersion config >= Just AVX2
     avx512f = ncgAvx512fEnabled config
     avx_move sFmt =
       if isFloatScalarFormat sFmt

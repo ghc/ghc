@@ -52,15 +52,18 @@ initNCGConfig dflags this_mod = NCGConfig
      -- operations would change the precision and final result of what
      -- would otherwise be the same expressions with respect to single or
      -- double precision IEEE floating point computations.
-   , ncgSseVersion =
-      let v | sseVersion dflags < Just SSE2 = Just SSE2
-            | otherwise                     = sseVersion dflags
+
+     -- ncgSseAvxVersion is set to the actual SSE/AVX version.
+     -- For example, -mfma does not set DynFlags's sseAvxVersion, but makes ncgSseAvxVersion >= AVX1.
+     -- See also Note [Implications between X86 CPU feature flags]
+   , ncgSseAvxVersion =
+      let v | isAvx2Enabled dflags = Just AVX2 -- -mavx512f does not set sseAvxVersion, but makes isAvx2Enabled true
+            | isAvxEnabled dflags  = Just AVX1 -- -mfma does not set sseAvxVersion, but makes isAvxEnabled true
+            | otherwise            = max (Just SSE2) (sseAvxVersion dflags)
       in case platformArch (targetPlatform dflags) of
             ArchX86_64 -> v
             ArchX86    -> v
             _          -> Nothing
-   , ncgAvxEnabled = isAvxEnabled dflags
-   , ncgAvx2Enabled = isAvx2Enabled dflags
    , ncgAvx512fEnabled = isAvx512fEnabled dflags
 
    , ncgDwarfEnabled        = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0 && platformArch (targetPlatform dflags) /= ArchAArch64

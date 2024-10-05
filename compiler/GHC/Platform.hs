@@ -32,7 +32,7 @@ module GHC.Platform
    , platformCConvNeedsExtension
    , platformHasRTSLinker
    , PlatformMisc(..)
-   , SseVersion (..)
+   , SseAvxVersion (..)
    , BmiVersion (..)
    , wordAlignment
    -- * SSE and AVX
@@ -264,14 +264,16 @@ platformHasRTSLinker p = case archOS_arch (platformArchOS p) of
 -- Instruction sets
 --------------------------------------------------
 
--- | x86 SSE instructions
-data SseVersion
+-- | x86 SSE and AVX instructions
+data SseAvxVersion
    = SSE1
    | SSE2
    | SSE3
    | SSSE3
    | SSE4
    | SSE42
+   | AVX1
+   | AVX2
    deriving (Eq, Ord)
 
 -- | x86 BMI (bit manipulation) instructions
