@@ -68,9 +68,13 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:5:14 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:5:21 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:5:17-18 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { T20452.hs:5:14 })]
+           [(EpaSpan { T20452.hs:5:21 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { T20452.hs:5:17-18 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -94,7 +98,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -170,11 +174,15 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:6:13 }))
-          ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:6:14 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:6:21 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:6:22 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:6:17-18 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { T20452.hs:6:13 })
+           ,(EpaSpan { T20452.hs:6:14 })]
+           [(EpaSpan { T20452.hs:6:21 })
+           ,(EpaSpan { T20452.hs:6:22 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { T20452.hs:6:17-18 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -198,7 +206,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -259,10 +267,8 @@
        ,(AddEpAnn AnnOpenC (EpaSpan { T20452.hs:8:84 }))
        ,(AddEpAnn AnnCloseC (EpaSpan { T20452.hs:8:85 }))]
        (EpExplicitBraces
-        (EpTok
-         (EpaSpan { T20452.hs:8:84 }))
-        (EpTok
-         (EpaSpan { T20452.hs:8:85 })))
+        (EpTok (EpaSpan { T20452.hs:8:84 }))
+        (EpTok (EpaSpan { T20452.hs:8:85 })))
        (NoAnnSortKey))
       (Nothing)
       (L
@@ -284,9 +290,13 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:8:15 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:8:26 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:8:20-21 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { T20452.hs:8:15 })]
+           [(EpaSpan { T20452.hs:8:26 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { T20452.hs:8:20-21 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -310,7 +320,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -329,9 +339,13 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:8:30 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:8:45 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:8:36-37 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { T20452.hs:8:30 })]
+           [(EpaSpan { T20452.hs:8:45 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { T20452.hs:8:36-37 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -355,7 +369,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -374,9 +388,13 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:8:49 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:8:75 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:8:54-55 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { T20452.hs:8:49 })]
+           [(EpaSpan { T20452.hs:8:75 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { T20452.hs:8:54-55 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -426,7 +444,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -445,7 +463,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -479,10 +497,8 @@
        ,(AddEpAnn AnnOpenC (EpaSpan { T20452.hs:9:84 }))
        ,(AddEpAnn AnnCloseC (EpaSpan { T20452.hs:9:85 }))]
        (EpExplicitBraces
-        (EpTok
-         (EpaSpan { T20452.hs:9:84 }))
-        (EpTok
-         (EpaSpan { T20452.hs:9:85 })))
+        (EpTok (EpaSpan { T20452.hs:9:84 }))
+        (EpTok (EpaSpan { T20452.hs:9:85 })))
        (NoAnnSortKey))
       (Nothing)
       (L
@@ -504,11 +520,15 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:14 }))
-          ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:15 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:26 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:27 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:9:20-21 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { T20452.hs:9:14 })
+           ,(EpaSpan { T20452.hs:9:15 })]
+           [(EpaSpan { T20452.hs:9:26 })
+           ,(EpaSpan { T20452.hs:9:27 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { T20452.hs:9:20-21 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -532,7 +552,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -551,11 +571,15 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:29 }))
-          ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:30 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:45 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:46 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:9:36-37 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { T20452.hs:9:29 })
+           ,(EpaSpan { T20452.hs:9:30 })]
+           [(EpaSpan { T20452.hs:9:45 })
+           ,(EpaSpan { T20452.hs:9:46 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { T20452.hs:9:36-37 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -579,7 +603,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -598,11 +622,15 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:48 }))
-          ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:49 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:75 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:76 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:9:54-55 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { T20452.hs:9:48 })
+           ,(EpaSpan { T20452.hs:9:49 })]
+           [(EpaSpan { T20452.hs:9:75 })
+           ,(EpaSpan { T20452.hs:9:76 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { T20452.hs:9:54-55 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -652,7 +680,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -671,7 +699,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
