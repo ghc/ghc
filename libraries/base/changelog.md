@@ -31,6 +31,7 @@
       the context since it will be redundant. These functions are mostly useful
       for libraries that define exception-handling combinators like `catch` and
       `onException`, such as `base`, or the `exceptions` package.
+  * Move `Lift ByteArray` and `Lift Fixed` instances into `base` from `template-haskell`. See [CLC proposal #287](https://github.com/haskell/core-libraries-committee/issues/287).
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1
