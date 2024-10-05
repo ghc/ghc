@@ -62,7 +62,7 @@ module GHC.Hs.Decls (
   XViaStrategyPs(..),
   -- ** @RULE@ declarations
   LRuleDecls,RuleDecls(..),RuleDecl(..),LRuleDecl,HsRuleRn(..),
-  HsRuleAnn(..),
+  HsRuleAnn(..), ActivationAnn(..),
   RuleBndr(..),LRuleBndr,
   collectRuleBndrSigTys,
   flattenRuleDecls, pprFullRuleName,
@@ -1208,17 +1208,18 @@ data HsRuleAnn
        , ra_tmanns :: Maybe (AddEpAnn, AddEpAnn)
                  -- ^ The locations of 'forall' and '.' for forall'd term vars
                  -- Using AddEpAnn to capture possible unicode variants
-       , ra_rest :: [AddEpAnn]
+       , ra_equal  :: EpToken "="
+       , ra_rest :: ActivationAnn
        } deriving (Data, Eq)
 
 instance NoAnn HsRuleAnn where
-  noAnn = HsRuleAnn Nothing Nothing []
+  noAnn = HsRuleAnn Nothing Nothing noAnn noAnn
 
 flattenRuleDecls :: [LRuleDecls (GhcPass p)] -> [LRuleDecl (GhcPass p)]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
 
-type instance XCRuleBndr    (GhcPass _) = [AddEpAnn]
-type instance XRuleBndrSig  (GhcPass _) = [AddEpAnn]
+type instance XCRuleBndr    (GhcPass _) = AnnTyVarBndr
+type instance XRuleBndrSig  (GhcPass _) = AnnTyVarBndr
 type instance XXRuleBndr    (GhcPass _) = DataConCantHappen
 
 instance (OutputableBndrId p) => Outputable (RuleDecls (GhcPass p)) where

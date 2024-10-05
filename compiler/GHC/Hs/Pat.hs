@@ -94,7 +94,7 @@ type instance XWildPat GhcTc = Type
 
 type instance XVarPat  (GhcPass _) = NoExtField
 
-type instance XLazyPat GhcPs = [AddEpAnn] -- For '~'
+type instance XLazyPat GhcPs = EpToken "~"
 type instance XLazyPat GhcRn = NoExtField
 type instance XLazyPat GhcTc = NoExtField
 
@@ -132,7 +132,7 @@ type instance XSumPat GhcPs = EpAnnSumPat
 type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
 
-type instance XConPat GhcPs = [AddEpAnn]
+type instance XConPat GhcPs = (Maybe (EpToken "{"), Maybe (EpToken "}"))
 type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
@@ -189,7 +189,7 @@ type instance XHsRecFields GhcPs = NoExtField
 type instance XHsRecFields GhcRn = NoExtField
 type instance XHsRecFields GhcTc = NoExtField
 
-type instance XHsFieldBind _ = [AddEpAnn]
+type instance XHsFieldBind _ = Maybe (EpToken "=")
 
 -- The specificity of an invisible pattern from the parser is always
 -- SpecifiedSpec. The specificity field supports code generated when deriving

@@ -1354,7 +1354,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
         IEThingWith (deprecation, ann) ltc@(L l rdr_tc) wc rdr_ns _ -> do
            ImpOccItem { imp_item = gre, imp_bundled = subnames }
-               <- lookup_parent (IEThingAbs (Nothing, noAnn) ltc noDocstring) (ieWrappedName rdr_tc)
+               <- lookup_parent (IEThingAbs Nothing ltc noDocstring) (ieWrappedName rdr_tc)
            let name = greName gre
 
            -- Look up the children in the sub-names of the parent
@@ -1386,7 +1386,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
       where
         mkIEThingAbs tc l gre
-          = (IEThingAbs (Nothing, noAnn) (L l (replaceWrappedName tc n)) noDocstring, [gre])
+          = (IEThingAbs Nothing (L l (replaceWrappedName tc n)) noDocstring, [gre])
           where n = greName gre
 
         -- N.B. imports never have docstrings
@@ -2028,7 +2028,7 @@ getMinimalImports ie_decls
            ; return $ [IEVar Nothing (to_ie_post_rn $ noLocA $ greName gre) Nothing] }
     to_ie _ _ avail@(AvailTC n [_])  -- Exporting the main decl and nothing else
       | availExportsDecl avail
-      = return [IEThingAbs (Nothing, noAnn) (to_ie_post_rn $ noLocA n) Nothing]
+      = return [IEThingAbs Nothing (to_ie_post_rn $ noLocA n) Nothing]
     to_ie rdr_env iface (AvailTC n cs) =
       case [ xs | avail@(AvailTC x xs) <- mi_exports iface
            , x == n

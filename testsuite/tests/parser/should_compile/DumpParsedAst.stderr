@@ -166,7 +166,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -244,7 +244,7 @@
               (EpaComments
                []))
              (HsTyVar
-              []
+              (NoEpTok)
               (NotPromoted)
               (L
                (EpAnn
@@ -263,7 +263,7 @@
             (EpaComments
              []))
            (HsTyVar
-            []
+            (NoEpTok)
             (NotPromoted)
             (L
              (EpAnn
@@ -334,7 +334,7 @@
                   (EpaComments
                    []))
                  (HsOpTy
-                  []
+                  (NoExtField)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -344,7 +344,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -372,7 +372,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -401,7 +401,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -441,7 +441,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -460,7 +460,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -515,7 +515,7 @@
               (EpaComments
                []))
              (HsTyVar
-              []
+              (NoEpTok)
               (NotPromoted)
               (L
                (EpAnn
@@ -546,9 +546,13 @@
            (EpaComments
             []))
           (HsTvb
-           [(AddEpAnn AnnOpenP (EpaSpan { DumpParsedAst.hs:10:20 }))
-           ,(AddEpAnn AnnCloseP (EpaSpan { DumpParsedAst.hs:10:30 }))
-           ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:10:24-25 }))]
+           (AnnTyVarBndr
+            [(EpaSpan { DumpParsedAst.hs:10:20 })]
+            [(EpaSpan { DumpParsedAst.hs:10:30 })]
+            (NoEpTok)
+            (EpUniTok
+             (EpaSpan { DumpParsedAst.hs:10:24-25 })
+             (NormalSyntax)))
            (HsBndrRequired
             (NoExtField))
            (HsBndrVar
@@ -584,7 +588,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -612,7 +616,7 @@
            (EpaComments
             []))
           (HsTyVar
-           []
+           (NoEpTok)
            (NotPromoted)
            (L
             (EpAnn
@@ -655,7 +659,11 @@
           (EpaComments
            []))
          (HsTvb
-          []
+          (AnnTyVarBndr
+           []
+           []
+           (NoEpTok)
+           (NoEpUniTok))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -679,9 +687,13 @@
           (EpaComments
            []))
          (HsTvb
-          [(AddEpAnn AnnOpenP (EpaSpan { DumpParsedAst.hs:15:10 }))
-          ,(AddEpAnn AnnCloseP (EpaSpan { DumpParsedAst.hs:15:17 }))
-          ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:15:13-14 }))]
+          (AnnTyVarBndr
+           [(EpaSpan { DumpParsedAst.hs:15:10 })]
+           [(EpaSpan { DumpParsedAst.hs:15:17 })]
+           (NoEpTok)
+           (EpUniTok
+            (EpaSpan { DumpParsedAst.hs:15:13-14 })
+            (NormalSyntax)))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -705,7 +717,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -781,7 +793,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -800,7 +812,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -866,7 +878,7 @@
             (EpaComments
              []))
            (HsTyVar
-            []
+            (NoEpTok)
             (NotPromoted)
             (L
              (EpAnn
@@ -923,7 +935,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -942,7 +954,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -961,7 +973,7 @@
               (EpaComments
                []))
              (HsTyVar
-              []
+              (NoEpTok)
               (NotPromoted)
               (L
                (EpAnn
@@ -1021,7 +1033,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1042,7 +1054,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1063,7 +1075,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1111,7 +1123,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -1130,7 +1142,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -1149,7 +1161,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1168,7 +1180,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1199,9 +1211,13 @@
            (EpaComments
             []))
           (HsTvb
-           [(AddEpAnn AnnOpenP (EpaSpan { DumpParsedAst.hs:18:16 }))
-           ,(AddEpAnn AnnCloseP (EpaSpan { DumpParsedAst.hs:18:23 }))
-           ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:18:19-20 }))]
+           (AnnTyVarBndr
+            [(EpaSpan { DumpParsedAst.hs:18:16 })]
+            [(EpaSpan { DumpParsedAst.hs:18:23 })]
+            (NoEpTok)
+            (EpUniTok
+             (EpaSpan { DumpParsedAst.hs:18:19-20 })
+             (NormalSyntax)))
            (HsBndrRequired
             (NoExtField))
            (HsBndrVar
@@ -1225,7 +1241,7 @@
               (EpaComments
                []))
              (HsTyVar
-              []
+              (NoEpTok)
               (NotPromoted)
               (L
                (EpAnn
@@ -1244,9 +1260,13 @@
            (EpaComments
             []))
           (HsTvb
-           [(AddEpAnn AnnOpenP (EpaSpan { DumpParsedAst.hs:18:25 }))
-           ,(AddEpAnn AnnCloseP (EpaSpan { DumpParsedAst.hs:18:40 }))
-           ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:18:28-29 }))]
+           (AnnTyVarBndr
+            [(EpaSpan { DumpParsedAst.hs:18:25 })]
+            [(EpaSpan { DumpParsedAst.hs:18:40 })]
+            (NoEpTok)
+            (EpUniTok
+             (EpaSpan { DumpParsedAst.hs:18:28-29 })
+             (NormalSyntax)))
            (HsBndrRequired
             (NoExtField))
            (HsBndrVar
@@ -1283,7 +1303,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1302,7 +1322,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1330,7 +1350,7 @@
            (EpaComments
             []))
           (HsTyVar
-           []
+           (NoEpTok)
            (NotPromoted)
            (L
             (EpAnn
@@ -1401,7 +1421,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -1433,7 +1453,7 @@
                (EpaComments
                 []))
               (HsTyVar
-               []
+               (NoEpTok)
                (NotPromoted)
                (L
                 (EpAnn
@@ -1452,7 +1472,7 @@
                (EpaComments
                 []))
               (HsTyVar
-               []
+               (NoEpTok)
                (NotPromoted)
                (L
                 (EpAnn
@@ -1514,7 +1534,9 @@
               (EpaComments
                []))
              (HsKindSig
-              [(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:22:25-26 }))]
+              (EpUniTok
+               (EpaSpan { DumpParsedAst.hs:22:25-26 })
+               (NormalSyntax))
               (L
                (EpAnn
                 (EpaSpan { DumpParsedAst.hs:22:23 })
@@ -1523,7 +1545,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -1555,7 +1577,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1574,7 +1596,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1637,7 +1659,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1656,7 +1678,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1675,7 +1697,7 @@
               (EpaComments
                []))
              (HsTyVar
-              []
+              (NoEpTok)
               (NotPromoted)
               (L
                (EpAnn
@@ -1765,7 +1787,11 @@
                        (EpaComments
                         []))
                       (HsTvb
-                       []
+                       (AnnTyVarBndr
+                        []
+                        []
+                        (NoEpTok)
+                        (NoEpUniTok))
                        (SpecifiedSpec)
                        (HsBndrVar
                         (NoExtField)
@@ -1810,7 +1836,7 @@
                          (EpaComments
                           []))
                         (HsTyVar
-                         []
+                         (NoEpTok)
                          (NotPromoted)
                          (L
                           (EpAnn
@@ -1829,7 +1855,7 @@
                          (EpaComments
                           []))
                         (HsTyVar
-                         []
+                         (NoEpTok)
                          (NotPromoted)
                          (L
                           (EpAnn
@@ -1857,7 +1883,7 @@
                          (EpaComments
                           []))
                         (HsTyVar
-                         []
+                         (NoEpTok)
                          (NotPromoted)
                          (L
                           (EpAnn
@@ -1876,7 +1902,7 @@
                          (EpaComments
                           []))
                         (HsTyVar
-                         []
+                         (NoEpTok)
                          (NotPromoted)
                          (L
                           (EpAnn
@@ -1913,7 +1939,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1932,7 +1958,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1951,7 +1977,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn

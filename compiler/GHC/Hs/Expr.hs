@@ -321,11 +321,11 @@ type instance XExplicitList  GhcTc = Type
 -- See Note [Handling overloaded and rebindable constructs]
 -- in  GHC.Rename.Expr
 
-type instance XRecordCon     GhcPs = [AddEpAnn]
+type instance XRecordCon     GhcPs = (Maybe (EpToken "{"), Maybe (EpToken "}"))
 type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor function
 
-type instance XRecordUpd     GhcPs = [AddEpAnn]
+type instance XRecordUpd     GhcPs = (Maybe (EpToken "{"), Maybe (EpToken "}"))
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = DataConCantHappen
   -- We desugar record updates in the typechecker.

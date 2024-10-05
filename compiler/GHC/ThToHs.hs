@@ -1836,7 +1836,7 @@ cvtTypeKind typeOrKind ty
                    let px = parenthesizeHsType opPrec x'
                        py = parenthesizeHsType opPrec y'
                    in do { eq_tc <- returnLA eqTyCon_RDR
-                         ; returnLA (HsOpTy noAnn NotPromoted px eq_tc py) }
+                         ; returnLA (HsOpTy noExtField NotPromoted px eq_tc py) }
                -- The long-term goal is to remove the above case entirely and
                -- subsume it under the case for InfixT. See #15815, comment:6,
                -- for more details.

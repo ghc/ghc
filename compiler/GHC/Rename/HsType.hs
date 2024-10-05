@@ -1388,7 +1388,7 @@ mkHsOpTyRn prom1 op1 fix1 ty1 (L loc2 (HsOpTy _ prom2 ty2a op2 ty2b))
         ; mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2 }
 
 mkHsOpTyRn prom1 op1 _ ty1 ty2              -- Default case, no rearrangement
-  = return (HsOpTy noAnn prom1 ty1 op1 ty2)
+  = return (HsOpTy noExtField prom1 ty1 op1 ty2)
 
 ---------------
 mk_hs_op_ty :: PromotionFlag -> LocatedN Name -> Fixity -> LHsType GhcRn
@@ -1404,8 +1404,8 @@ mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2
                            new_ty <- mkHsOpTyRn prom1 op1 fix1 ty1 ty2a
                          ; return (noLocA new_ty `op2ty` ty2b) }
   where
-    lhs `op1ty` rhs = HsOpTy noAnn prom1 lhs op1 rhs
-    lhs `op2ty` rhs = HsOpTy noAnn prom2 lhs op2 rhs
+    lhs `op1ty` rhs = HsOpTy noExtField prom1 lhs op1 rhs
+    lhs `op2ty` rhs = HsOpTy noExtField prom2 lhs op2 rhs
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 

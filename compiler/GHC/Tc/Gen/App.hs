@@ -1012,7 +1012,7 @@ expr_to_type earg =
          ; op'  <- go op
          ; rhs' <- go rhs
          ; op_id <- unwrap_op_tv op'
-         ; return (L l (HsOpTy noAnn NotPromoted lhs' op_id rhs')) }
+         ; return (L l (HsOpTy noExtField NotPromoted lhs' op_id rhs')) }
       where
         unwrap_op_tv (L _ (HsTyVar _ _ op_id)) = return op_id
         unwrap_op_tv _ = failWith $ TcRnIllformedTypeArgument (L l e)
@@ -2269,4 +2269,3 @@ rejectRepPolyNewtypes (fun,_) app_res_rho = case fun of
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 ann) = HsPragSCC x1 ann
-

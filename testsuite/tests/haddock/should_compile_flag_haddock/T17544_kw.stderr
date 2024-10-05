@@ -126,7 +126,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
@@ -245,7 +245,7 @@
             (EpaComments
              []))
            (HsTyVar
-            []
+            (NoEpTok)
             (NotPromoted)
             (L
              (EpAnn
@@ -306,7 +306,11 @@
           (EpaComments
            []))
          (HsTvb
-          []
+          (AnnTyVarBndr
+           []
+           []
+           (NoEpTok)
+           (NoEpUniTok))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -333,8 +337,11 @@
           []))
         (ClassOpSig
          (AnnSig
-          (AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:24:15-16 }))
-          [])
+          (EpUniTok
+           (EpaSpan { T17544_kw.hs:24:15-16 })
+           (NormalSyntax))
+          (Nothing)
+          (Nothing))
          (False)
          [(L
            (EpAnn
@@ -364,7 +371,7 @@
              (EpaComments
               []))
             (HsTyVar
-             []
+             (NoEpTok)
              (NotPromoted)
              (L
               (EpAnn
