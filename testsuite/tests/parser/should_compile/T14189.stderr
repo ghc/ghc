@@ -77,7 +77,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -183,7 +183,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -255,8 +255,13 @@
       (IEThingWith
        ((,)
         (Nothing)
-        [(AddEpAnn AnnOpenP (EpaSpan { T14189.hs:3:10 }))
-        ,(AddEpAnn AnnCloseP (EpaSpan { T14189.hs:3:15 }))])
+        ((,,,)
+         (EpTok
+          (EpaSpan { T14189.hs:3:10 }))
+         (NoEpTok)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { T14189.hs:3:15 }))))
        (L
         (EpAnn
          (EpaSpan { T14189.hs:3:3-8 })

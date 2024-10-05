@@ -48,6 +48,7 @@
 {-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE UnliftedNewtypes #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE DataKinds #-}
 
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -71,6 +72,7 @@ module GHC.Parser.Lexer (
    disableHaddock,
    lexTokenStream,
    mkParensEpAnn,
+   mkParensLocs,
    getCommentsFor, getPriorCommentsFor, getFinalCommentsFor,
    getEofPos,
    commentToAnnotation,
@@ -3633,6 +3635,21 @@ warn_unknown_prag prags span buf len buf2 = do
 mkParensEpAnn :: RealSrcSpan -> (AddEpAnn, AddEpAnn)
 mkParensEpAnn ss = (AddEpAnn AnnOpenP (EpaSpan (RealSrcSpan lo Strict.Nothing)),
                     AddEpAnn AnnCloseP (EpaSpan (RealSrcSpan lc Strict.Nothing)))
+  where
+    f = srcSpanFile ss
+    sl = srcSpanStartLine ss
+    sc = srcSpanStartCol ss
+    el = srcSpanEndLine ss
+    ec = srcSpanEndCol ss
+    lo = mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))
+    lc = mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss)
+
+-- |Given a 'RealSrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
+-- 'EpaLocation' values for the opening and closing bordering on the start
+-- and end of the span
+mkParensLocs :: RealSrcSpan -> (EpaLocation, EpaLocation)
+mkParensLocs ss = (EpaSpan (RealSrcSpan lo Strict.Nothing),
+                    EpaSpan (RealSrcSpan lc Strict.Nothing))
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss

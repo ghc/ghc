@@ -464,7 +464,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
-          } (L loc ie@(IEThingAbs (warn_txt_ps, ann) l doc))
+          } (L loc ie@(IEThingAbs warn_txt_ps l doc))
         = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
@@ -492,7 +492,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
-                      , L loc (IEThingAbs (warn_txt_rn, ann) (replaceLWrappedName l name) doc')
+                      , L loc (IEThingAbs warn_txt_rn (replaceLWrappedName l name) doc')
                       , avail' )
 
     lookup_ie expacc@ExportAccum{

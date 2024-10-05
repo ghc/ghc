@@ -48,7 +48,9 @@
      (NoExtField)
      (FixSig
       ((,)
-       [(AddEpAnn AnnInfix (EpaSpan { T20846.hs:3:1-6 }))]
+       ((,)
+        (EpaSpan { T20846.hs:3:1-6 })
+        (Nothing))
        (NoSourceText))
       (FixitySig
        (NoNamespaceSpecifier)

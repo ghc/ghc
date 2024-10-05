@@ -213,28 +213,30 @@ type instance XIEVar       GhcTc = NoExtField
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingAbs  GhcPs = (Maybe (LWarningTxt GhcPs), [AddEpAnn])
-type instance XIEThingAbs  GhcRn = (Maybe (LWarningTxt GhcRn), [AddEpAnn])
-type instance XIEThingAbs  GhcTc = [AddEpAnn]
+type instance XIEThingAbs  GhcPs = Maybe (LWarningTxt GhcPs)
+type instance XIEThingAbs  GhcRn = Maybe (LWarningTxt GhcRn)
+type instance XIEThingAbs  GhcTc = ()
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingAll  GhcPs = (Maybe (LWarningTxt GhcPs), [AddEpAnn])
-type instance XIEThingAll  GhcRn = (Maybe (LWarningTxt GhcRn), [AddEpAnn])
-type instance XIEThingAll  GhcTc = [AddEpAnn]
+type instance XIEThingAll  GhcPs = (Maybe (LWarningTxt GhcPs), (EpToken "(", EpToken "..", EpToken ")"))
+type instance XIEThingAll  GhcRn = (Maybe (LWarningTxt GhcRn), (EpToken "(", EpToken "..", EpToken ")"))
+type instance XIEThingAll  GhcTc = (EpToken "(", EpToken "..", EpToken ")")
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingWith GhcPs = (Maybe (LWarningTxt GhcPs), [AddEpAnn])
-type instance XIEThingWith GhcRn = (Maybe (LWarningTxt GhcRn), [AddEpAnn])
-type instance XIEThingWith GhcTc = [AddEpAnn]
+type instance XIEThingWith GhcPs = (Maybe (LWarningTxt GhcPs), IEThingWithAnns)
+type instance XIEThingWith GhcRn = (Maybe (LWarningTxt GhcRn), IEThingWithAnns)
+type instance XIEThingWith GhcTc = IEThingWithAnns
+
+type IEThingWithAnns = (EpToken "(", EpToken "..", EpToken ",", EpToken ")")
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEModuleContents  GhcPs = (Maybe (LWarningTxt GhcPs), [AddEpAnn])
+type instance XIEModuleContents  GhcPs = (Maybe (LWarningTxt GhcPs), EpToken "module")
 type instance XIEModuleContents  GhcRn = Maybe (LWarningTxt GhcRn)
 type instance XIEModuleContents  GhcTc = NoExtField
 
@@ -268,12 +270,12 @@ ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
   where
     ie_deprecation :: GhcPass p -> IE (GhcPass p) -> Maybe (LWarningTxt (GhcPass p))
     ie_deprecation GhcPs (IEVar xie _ _) = xie
-    ie_deprecation GhcPs (IEThingAbs (xie, _) _ _) = xie
+    ie_deprecation GhcPs (IEThingAbs xie _ _) = xie
     ie_deprecation GhcPs (IEThingAll (xie, _) _ _) = xie
     ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _ _) = xie
     ie_deprecation GhcPs (IEModuleContents (xie, _) _) = xie
     ie_deprecation GhcRn (IEVar xie _ _) = xie
-    ie_deprecation GhcRn (IEThingAbs (xie, _) _ _) = xie
+    ie_deprecation GhcRn (IEThingAbs xie _ _) = xie
     ie_deprecation GhcRn (IEThingAll (xie, _) _ _) = xie
     ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _ _) = xie
     ie_deprecation GhcRn (IEModuleContents xie _) = xie

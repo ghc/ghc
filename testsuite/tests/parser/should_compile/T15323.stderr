@@ -68,7 +68,11 @@
           (EpaComments
            []))
          (HsTvb
-          []
+          (AnnTyVarBndr
+           []
+           []
+           (NoEpTok)
+           (NoEpUniTok))
           (HsBndrRequired
            (NoExtField))
           (HsBndrVar
@@ -139,7 +143,11 @@
                 (EpaComments
                  []))
                (HsTvb
-                []
+                (AnnTyVarBndr
+                 []
+                 []
+                 (NoEpTok)
+                 (NoEpUniTok))
                 (SpecifiedSpec)
                 (HsBndrVar
                  (NoExtField)
@@ -196,7 +204,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -215,7 +223,7 @@
                     (EpaComments
                      []))
                    (HsTyVar
-                    []
+                    (NoEpTok)
                     (NotPromoted)
                     (L
                      (EpAnn
@@ -246,7 +254,7 @@
                (EpaComments
                 []))
               (HsTyVar
-               []
+               (NoEpTok)
                (NotPromoted)
                (L
                 (EpAnn
@@ -265,7 +273,7 @@
                (EpaComments
                 []))
               (HsTyVar
-               []
+               (NoEpTok)
                (NotPromoted)
                (L
                 (EpAnn

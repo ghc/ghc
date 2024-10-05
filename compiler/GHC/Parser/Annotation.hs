@@ -10,7 +10,8 @@ module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   AnnKeywordId(..),
   EpToken(..), EpUniToken(..),
-  getEpTokenSrcSpan,
+  getEpTokenSrcSpan, getEpTokenLocs,
+  TokDcolon,
   EpLayout(..),
   EpaComment(..), EpaCommentTok(..),
   IsUnicodeSyntax(..),
@@ -66,7 +67,8 @@ module GHC.Parser.Annotation (
 
   -- ** Building up annotations
   reAnnL, reAnnC,
-  addAnns, addAnnsA, widenSpan, widenAnchor, widenAnchorS, widenLocatedAn,
+  addAnns, addAnnsA, widenSpan, widenSpanL, widenAnchor, widenAnchorS,
+  widenLocatedAn, widenLocatedAnL,
   listLocation,
 
   -- ** Querying annotations
@@ -384,6 +386,7 @@ data EpUniToken (tok :: Symbol) (utok :: Symbol)
   | EpUniTok !EpaLocation !IsUnicodeSyntax
 
 deriving instance Eq (EpToken tok)
+deriving instance Eq (EpUniToken tok utok)
 deriving instance KnownSymbol tok => Data (EpToken tok)
 deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (EpUniToken tok utok)
 
@@ -396,6 +399,14 @@ getEpTokenSrcSpan :: EpToken tok -> SrcSpan
 getEpTokenSrcSpan NoEpTok = noSrcSpan
 getEpTokenSrcSpan (EpTok EpaDelta{}) = noSrcSpan
 getEpTokenSrcSpan (EpTok (EpaSpan span)) = span
+
+getEpTokenLocs :: [EpToken tok] -> [EpaLocation]
+getEpTokenLocs ls = concatMap go ls
+  where
+    go NoEpTok   = []
+    go (EpTok l) = [l]
+
+type TokDcolon = EpUniToken "::" "∷"
 
 -- | Layout information for declarations.
 data EpLayout =
@@ -1101,6 +1112,16 @@ widenSpan s as = foldl combineSrcSpans s (go as)
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
+widenSpanL :: SrcSpan -> [EpaLocation] -> SrcSpan
+widenSpanL s as = foldl combineSrcSpans s (go as)
+  where
+    go [] = []
+    go ((EpaSpan (RealSrcSpan s mb):rest)) = RealSrcSpan s mb : go rest
+    go ((EpaSpan _):rest) = go rest
+    go ((EpaDelta _ _ _):rest) = go rest
+
+-- | The annotations need to all come after the anchor.  Make sure
+-- this is the case.
 widenRealSpan :: RealSrcSpan -> [AddEpAnn] -> RealSrcSpan
 widenRealSpan s as = foldl combineRealSrcSpans s (go as)
   where
@@ -1157,6 +1178,12 @@ widenLocatedAn (EpAnn (EpaSpan l) a cs) as = EpAnn (spanAsAnchor l') a cs
   where
     l' = widenSpan l as
 widenLocatedAn (EpAnn anc a cs) _as = EpAnn anc a cs
+
+widenLocatedAnL :: EpAnn an -> [EpaLocation] -> EpAnn an
+widenLocatedAnL (EpAnn (EpaSpan l) a cs) as = EpAnn (spanAsAnchor l') a cs
+  where
+    l' = widenSpanL l as
+widenLocatedAnL (EpAnn anc a cs) _as = EpAnn anc a cs
 
 annParen2AddEpAnn :: AnnParen -> [AddEpAnn]
 annParen2AddEpAnn (AnnParen pt o c)
@@ -1342,6 +1369,9 @@ instance (NoAnn a, NoAnn b) => NoAnn (a, b) where
 
 instance (NoAnn a, NoAnn b, NoAnn c) => NoAnn (a, b, c) where
   noAnn = (noAnn, noAnn, noAnn)
+
+instance (NoAnn a, NoAnn b, NoAnn c, NoAnn d) => NoAnn (a, b, c, d) where
+  noAnn = (noAnn, noAnn, noAnn, noAnn)
 
 instance NoAnn Bool where
   noAnn = False

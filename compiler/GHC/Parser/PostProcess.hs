@@ -733,13 +733,12 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
        ; return $ mkMatchGroup FromSource (L ld matches) }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
-                                 -- AZ: where should these anns come from?
-                         pat@(L _ (ConPat conAnn ln@(L _ name) details))
+                         pat@(L _ (ConPat _conAnn ln@(L _ name) details))
                                _ rhs))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr (locA loc) decl
            -- conAnn should only be AnnOpenP, AnnCloseP, so the rest should be empty
-           ; let (ann_fun, rest) = mk_ann_funrhs conAnn
+           ; let (ann_fun, rest) = mk_ann_funrhs []
            ; unless (null rest) $ return $ panic "mkPatSynMatchGroup: unexpected anns"
            ; match <- case details of
                PrefixCon _ pats -> return $ Match { m_ext = noExtField
@@ -955,49 +954,49 @@ checkTyVars pp_what equals_or_where tc tparms
     check (HsArgPar sp) = addFatalError $ mkPlainErrorMsgEnvelope sp $
                             (PsErrMalformedDecl pp_what (unLoc tc))
         -- Keep around an action for adjusting the annotations of extra parens
-    chkParens :: [AddEpAnn] -> [AddEpAnn] -> HsBndrVis GhcPs -> LHsType GhcPs
+    chkParens :: [EpaLocation] -> [EpaLocation] -> HsBndrVis GhcPs -> LHsType GhcPs
               -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
     chkParens ops cps bvis (L l (HsParTy _ (L lt ty)))
       = let
-          (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
+          (o,c) = mkParensLocs (realSrcSpan $ locA l)
           (_,lt') = transferCommentsOnlyA l lt
         in
           chkParens (o:ops) (c:cps) bvis (L lt' ty)
     chkParens ops cps bvis ty = chk ops cps bvis ty
 
         -- Check that the name space is correct!
-    chk :: [AddEpAnn] -> [AddEpAnn] -> HsBndrVis GhcPs -> LHsType GhcPs -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
-    chk ops cps bvis (L l (HsKindSig annk (L annt t) k))
+    chk :: [EpaLocation] -> [EpaLocation] -> HsBndrVis GhcPs -> LHsType GhcPs -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
+    chk ops cps bvis (L l (HsKindSig tok_dc (L annt t) k))
         | Just (ann, bvar) <- match_bndr_var t
             = let
                 bkind = HsBndrKind noExtField k
                 an = (reverse ops) ++ cps
               in
-                return (L (widenLocatedAn (l Semi.<> annt) (for_widening bvis:an))
-                       (HsTvb (an ++ annk ++ ann) bvis bvar bkind))
+                return (L (widenLocatedAnL (l Semi.<> annt) (for_widening bvis:an))
+                       (HsTvb (AnnTyVarBndr (reverse ops) cps ann tok_dc) bvis bvar bkind))
     chk ops cps bvis (L l t)
         | Just (ann, bvar) <- match_bndr_var t
             = let
                 bkind = HsBndrNoKind noExtField
                 an = (reverse ops) ++ cps
               in
-                return (L (widenLocatedAn l (for_widening bvis:an))
-                                     (HsTvb (an ++ ann) bvis bvar bkind))
+                return (L (widenLocatedAnL l (for_widening bvis:an))
+                                     (HsTvb (AnnTyVarBndr (reverse ops) cps ann noAnn) bvis bvar bkind))
     chk _ _ _ t@(L loc _)
         = addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
             (PsErrUnexpectedTypeInDecl t pp_what (unLoc tc) tparms equals_or_where)
 
-    match_bndr_var :: HsType GhcPs -> Maybe ([AddEpAnn], HsBndrVar GhcPs)
+    match_bndr_var :: HsType GhcPs -> Maybe (EpToken "'", HsBndrVar GhcPs)
     match_bndr_var (HsTyVar ann _ tv) | isRdrTyVar (unLoc tv)
       = Just (ann, HsBndrVar noExtField tv)
     match_bndr_var (HsWildCardTy _)
-      = Just ([], HsBndrWildCard noExtField)
+      = Just (noAnn, HsBndrWildCard noExtField)
     match_bndr_var _ = Nothing
 
     -- Return an AddEpAnn for use in widenLocatedAn. The AnnKeywordId is not used.
-    for_widening :: HsBndrVis GhcPs -> AddEpAnn
-    for_widening (HsBndrInvisible (EpTok loc)) = AddEpAnn AnnAnyclass loc
-    for_widening  _                            = AddEpAnn AnnAnyclass noAnn
+    for_widening :: HsBndrVis GhcPs -> EpaLocation
+    for_widening (HsBndrInvisible (EpTok loc)) = loc
+    for_widening  _                            = noAnn
 
 
 whereDots, equalsDots :: SDoc
@@ -1013,7 +1012,7 @@ checkDatatypeContext (Just c)
                                        (PsErrIllegalDataTypeContext c)
 
 type LRuleTyTmVar = LocatedAn NoEpAnns RuleTyTmVar
-data RuleTyTmVar = RuleTyTmVar [AddEpAnn] (LocatedN RdrName) (Maybe (LHsType GhcPs))
+data RuleTyTmVar = RuleTyTmVar AnnTyVarBndr (LocatedN RdrName) (Maybe (LHsType GhcPs))
 -- ^ Essentially a wrapper for a @RuleBndr GhcPs@
 
 -- turns RuleTyTmVars into RuleBnrs - this is straightforward
@@ -1337,7 +1336,7 @@ checkAPat loc e0 = do
          l <- checkLPat l
          r <- checkLPat r
          return $ ConPat
-           { pat_con_ext = anns
+           { pat_con_ext = mk_ann_conpat anns
            , pat_con = L cl c
            , pat_args = InfixCon l r
            }
@@ -1414,6 +1413,19 @@ mk_ann_funrhs ann = (AnnFunRhs strict (map to_tok opens) (map to_tok closes), re
     strict = case bangs of
                (AddEpAnn _ s:_) -> EpTok s
                _ -> NoEpTok
+    to_tok (AddEpAnn _ s) = EpTok s
+
+mk_ann_conpat :: [AddEpAnn] -> (Maybe (EpToken "{"), Maybe (EpToken "}"))
+mk_ann_conpat ann = (open, close)
+  where
+    (opens, ra0) = partition (\(AddEpAnn kw _) -> kw == AnnOpenC) ann
+    (closes, _ra1) = partition (\(AddEpAnn kw _) -> kw == AnnCloseC) ra0
+    open = case opens of
+      (o:_) -> Just (to_tok o)
+      _ -> Nothing
+    close = case closes of
+      (o:_) -> Just (to_tok o)
+      _ -> Nothing
     to_tok (AddEpAnn _ s) = EpTok s
 
 checkFunBind :: SrcSpan
@@ -1668,7 +1680,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Return a pattern without ambiguity, or fail in a non-pattern context.
   ecpFromPat' :: LPat GhcPs -> PV (LocatedA b)
   mkHsProjUpdatePV :: SrcSpan -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
-    -> LocatedA b -> Bool -> [AddEpAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
+    -> LocatedA b -> Bool -> Maybe (EpToken "=") -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "let ... in ..."
   mkHsLetPV
     :: SrcSpan
@@ -1742,7 +1754,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     SrcSpan ->
     LocatedA b ->
     ([Fbind b], Maybe SrcSpan) ->
-    [AddEpAnn] ->
+    (Maybe (EpToken "{"), Maybe (EpToken "}")) ->
     PV (LocatedA b)
   -- | Disambiguate "-a" (negation)
   mkHsNegAppPV :: SrcSpan -> LocatedA b -> EpToken "-" -> PV (LocatedA b)
@@ -1765,7 +1777,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsAsPatPV
     :: SrcSpan -> LocatedN RdrName -> EpToken "@" -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "~a" (lazy pattern)
-  mkHsLazyPatPV :: SrcSpan -> LocatedA b -> [AddEpAnn] -> PV (LocatedA b)
+  mkHsLazyPatPV :: SrcSpan -> LocatedA b -> EpToken "~" -> PV (LocatedA b)
   -- | Disambiguate "!a" (bang pattern)
   mkHsBangPatPV :: SrcSpan -> LocatedA b -> EpToken "!" -> PV (LocatedA b)
   -- | Disambiguate tuple sections and unboxed sums
@@ -2300,7 +2312,7 @@ checkUnboxedLitPat (L loc lit) =
 mkPatRec ::
   LocatedA (PatBuilder GhcPs) ->
   HsRecFields GhcPs (LocatedA (PatBuilder GhcPs)) ->
-  [AddEpAnn] ->
+  (Maybe (EpToken "{"), Maybe (EpToken "}")) ->
   PV (PatBuilder GhcPs)
 mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields x fs dd) anns
   | isRdrDataCon (unLoc c)
@@ -2890,7 +2902,7 @@ mkRecConstrOrUpdate
         -> LHsExpr GhcPs
         -> SrcSpan
         -> ([Fbind (HsExpr GhcPs)], Maybe SrcSpan)
-        -> [AddEpAnn]
+        -> (Maybe (EpToken "{"), Maybe (EpToken "}"))
         -> PV (HsExpr GhcPs)
 mkRecConstrOrUpdate _ (L _ (HsVar _ (L l c))) _lrec (fbinds,dd) anns
   | isRdrDataCon c
@@ -2905,7 +2917,8 @@ mkRecConstrOrUpdate overloaded_update exp _ (fs,dd) anns
                                           PsErrDotsInRecordUpdate
   | otherwise = mkRdrRecordUpd overloaded_update exp fs anns
 
-mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> [AddEpAnn] -> PV (HsExpr GhcPs)
+mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> (Maybe (EpToken "{"), Maybe (EpToken "}"))
+  -> PV (HsExpr GhcPs)
 mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
   -- We do not need to know if OverloadedRecordDot is in effect. We do
   -- however need to know if OverloadedRecordUpdate (passed in
@@ -2966,7 +2979,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
           punnedVar f  = if not pun then arg else noLocA . HsVar noExtField . noLocA . mkRdrUnqual . mkVarOccFS $ f
 
 mkRdrRecordCon
-  :: LocatedN RdrName -> HsRecordBinds GhcPs -> [AddEpAnn] -> HsExpr GhcPs
+  :: LocatedN RdrName -> HsRecordBinds GhcPs -> (Maybe (EpToken "{"), Maybe (EpToken "}")) -> HsExpr GhcPs
 mkRdrRecordCon con flds anns
   = RecordCon { rcon_ext = anns, rcon_con = con, rcon_flds = flds }
 
@@ -3173,26 +3186,26 @@ mkExtName rdrNm = occNameFS (rdrNameOcc rdrNm)
 -- Help with module system imports/exports
 
 data ImpExpSubSpec = ImpExpAbs
-                   | ImpExpAll
+                   | ImpExpAll (EpToken "..")
                    | ImpExpList [LocatedA ImpExpQcSpec]
                    | ImpExpAllWith [LocatedA ImpExpQcSpec]
 
 data ImpExpQcSpec = ImpExpQcName (LocatedN RdrName)
                   | ImpExpQcType EpaLocation (LocatedN RdrName)
-                  | ImpExpQcWildcard
+                  | ImpExpQcWildcard (EpToken "..") (EpToken ",")
 
-mkModuleImpExp :: Maybe (LWarningTxt GhcPs) -> [AddEpAnn] -> LocatedA ImpExpQcSpec
+mkModuleImpExp :: Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec
                -> ImpExpSubSpec -> P (IE GhcPs)
-mkModuleImpExp warning anns (L l specname) subs = do
+mkModuleImpExp warning (top, tcp) (L l specname) subs = do
   case subs of
     ImpExpAbs
       | isVarNameSpace (rdrNameSpace name)
                        -> return $ IEVar warning
                            (L l (ieNameFromSpec specname)) Nothing
-      | otherwise      -> IEThingAbs (warning, anns) . L l <$> nameT <*> pure noExportDoc
-    ImpExpAll          -> IEThingAll (warning, anns) . L l <$> nameT <*> pure noExportDoc
+      | otherwise      -> IEThingAbs warning . L l <$> nameT <*> pure noExportDoc
+    ImpExpAll tok      -> IEThingAll (warning, (top, tok, tcp)) . L l <$> nameT <*> pure noExportDoc
     ImpExpList xs      ->
-      (\newName -> IEThingWith (warning, anns) (L l newName)
+      (\newName -> IEThingWith (warning, (top,NoEpTok,NoEpTok,tcp)) (L l newName)
         NoIEWildcard (wrapped xs)) <$> nameT <*> pure noExportDoc
     ImpExpAllWith xs                       ->
       do allowed <- getBit PatternSynonymsBit
@@ -3201,10 +3214,13 @@ mkModuleImpExp warning anns (L l specname) subs = do
             let withs = map unLoc xs
                 pos   = maybe NoIEWildcard IEWildcard
                           (findIndex isImpExpQcWildcard withs)
+                (td,tc) = case find isImpExpQcWildcard withs of
+                  Just (ImpExpQcWildcard td tc) -> (td,tc)
+                  _ -> (NoEpTok, NoEpTok)
                 ies :: [LocatedA (IEWrappedName GhcPs)]
                 ies   = wrapped $ filter (not . isImpExpQcWildcard . unLoc) xs
             in (\newName
-                        -> IEThingWith (warning, anns) (L l newName) pos ies)
+                        -> IEThingWith (warning, (top,td,tc,tcp)) (L l newName) pos ies)
                <$> nameT <*> pure noExportDoc
           else addFatalError $ mkPlainErrorMsgEnvelope (locA l) $
                  PsErrIllegalPatSynExport
@@ -3221,12 +3237,12 @@ mkModuleImpExp warning anns (L l specname) subs = do
 
     ieNameVal (ImpExpQcName ln)   = unLoc ln
     ieNameVal (ImpExpQcType _ ln) = unLoc ln
-    ieNameVal (ImpExpQcWildcard)  = panic "ieNameVal got wildcard"
+    ieNameVal ImpExpQcWildcard{}  = panic "ieNameVal got wildcard"
 
     ieNameFromSpec :: ImpExpQcSpec -> IEWrappedName GhcPs
     ieNameFromSpec (ImpExpQcName   (L l n)) = IEName noExtField (L l n)
     ieNameFromSpec (ImpExpQcType r (L l n)) = IEType r (L l n)
-    ieNameFromSpec (ImpExpQcWildcard)  = panic "ieName got wildcard"
+    ieNameFromSpec ImpExpQcWildcard{}       = panic "ieName got wildcard"
 
     wrapped = map (fmap ieNameFromSpec)
 
@@ -3246,18 +3262,18 @@ checkImportSpec ie@(L _ specs) =
       addFatalError $ mkPlainErrorMsgEnvelope l PsErrIllegalImportBundleForm
 
 -- In the correct order
-mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P ([AddEpAnn], ImpExpSubSpec)
-mkImpExpSubSpec [] = return ([], ImpExpList [])
-mkImpExpSubSpec [L la ImpExpQcWildcard] =
-  return ([AddEpAnn AnnDotdot (entry la)], ImpExpAll)
+mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P ImpExpSubSpec
+mkImpExpSubSpec [] = return (ImpExpList [])
+mkImpExpSubSpec [L _ (ImpExpQcWildcard td _tc)] =
+  return (ImpExpAll td)
 mkImpExpSubSpec xs =
   if (any (isImpExpQcWildcard . unLoc) xs)
-    then return $ ([], ImpExpAllWith xs)
-    else return $ ([], ImpExpList xs)
+    then return $ (ImpExpAllWith xs)
+    else return $ (ImpExpList xs)
 
 isImpExpQcWildcard :: ImpExpQcSpec -> Bool
-isImpExpQcWildcard ImpExpQcWildcard = True
-isImpExpQcWildcard _                = False
+isImpExpQcWildcard (ImpExpQcWildcard _ _) = True
+isImpExpQcWildcard _                      = False
 
 -----------------------------------------------------------------------------
 -- Warnings and failures
@@ -3575,7 +3591,7 @@ mkRdrProjection flds anns =
     }
 
 mkRdrProjUpdate :: SrcSpanAnnA -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
-                -> LHsExpr GhcPs -> Bool -> [AddEpAnn]
+                -> LHsExpr GhcPs -> Bool -> Maybe (EpToken "=")
                 -> LHsRecProj GhcPs (LHsExpr GhcPs)
 mkRdrProjUpdate _ (L _ []) _ _ _ = panic "mkRdrProjUpdate: The impossible has happened!"
 mkRdrProjUpdate loc (L l flds) arg isPun anns =

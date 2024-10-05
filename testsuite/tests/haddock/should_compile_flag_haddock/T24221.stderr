@@ -106,7 +106,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -167,7 +167,7 @@
                 (EpaComments
                  []))
                (HsTyVar
-                []
+                (NoEpTok)
                 (NotPromoted)
                 (L
                  (EpAnn
@@ -226,7 +226,7 @@
                (EpaComments
                 []))
               (HsTyVar
-               []
+               (NoEpTok)
                (NotPromoted)
                (L
                 (EpAnn
@@ -250,7 +250,7 @@
                (EpaComments
                 []))
               (HsTyVar
-               []
+               (NoEpTok)
                (NotPromoted)
                (L
                 (EpAnn
@@ -342,7 +342,7 @@
                (EpaComments
                 []))
               (HsTyVar
-               []
+               (NoEpTok)
                (NotPromoted)
                (L
                 (EpAnn
@@ -366,7 +366,7 @@
                (EpaComments
                 []))
               (HsTyVar
-               []
+               (NoEpTok)
                (NotPromoted)
                (L
                 (EpAnn
@@ -467,7 +467,7 @@
                  (EpaComments
                   []))
                 (HsTyVar
-                 []
+                 (NoEpTok)
                  (NotPromoted)
                  (L
                   (EpAnn
@@ -512,7 +512,7 @@
                  (EpaComments
                   []))
                 (HsTyVar
-                 []
+                 (NoEpTok)
                  (NotPromoted)
                  (L
                   (EpAnn
@@ -625,7 +625,7 @@
                  (EpaComments
                   []))
                 (HsTyVar
-                 []
+                 (NoEpTok)
                  (NotPromoted)
                  (L
                   (EpAnn
@@ -670,7 +670,7 @@
                  (EpaComments
                   []))
                 (HsTyVar
-                 []
+                 (NoEpTok)
                  (NotPromoted)
                  (L
                   (EpAnn
@@ -811,7 +811,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -870,7 +870,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1000,7 +1000,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1059,7 +1059,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1201,7 +1201,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -1260,7 +1260,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  []
+                  (NoEpTok)
                   (NotPromoted)
                   (L
                    (EpAnn

@@ -60,6 +60,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
       generic
               `ext1Q` list
               `extQ` list_addEpAnn
+              `extQ` list_epaLocation
               `extQ` string `extQ` fastString `extQ` srcSpan `extQ` realSrcSpan
               `extQ` annotationModule
               `extQ` annotationGrhsAnn
@@ -73,7 +74,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
               `extQ` deltaPos
-              `extQ` epaAnchor
+              `extQ` epaLocation
+              `extQ` maybe_epaLocation
               `extQ` bytestring
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
               `extQ` dataCon
@@ -104,6 +106,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             list_addEpAnn ls = case ba of
               BlankEpAnnotations -> parens
                                        $ text "blanked:" <+> text "[AddEpAnn]"
+              NoBlankEpAnnotations -> list ls
+
+            list_epaLocation :: [EpaLocation] -> SDoc
+            list_epaLocation ls = case ba of
+              BlankEpAnnotations -> parens
+                                       $ text "blanked:" <+> text "[EpaLocation]"
               NoBlankEpAnnotations -> list ls
 
             list []    = brackets empty
@@ -149,11 +157,18 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               BlankSrcSpan     -> parens $ text "SourceText" <+> text "blanked"
               _                -> parens $ text "SourceText" <+> ftext src
 
-            epaAnchor :: EpaLocation -> SDoc
-            epaAnchor (EpaSpan s) = parens $ text "EpaSpan" <+> srcSpan s
-            epaAnchor (EpaDelta s d cs) = case ba of
+            epaLocation :: EpaLocation -> SDoc
+            epaLocation (EpaSpan s) = parens $ text "EpaSpan" <+> srcSpan s
+            epaLocation (EpaDelta s d cs) = case ba of
               NoBlankEpAnnotations -> parens $ text "EpaDelta" <+> srcSpan s <+> deltaPos d <+> showAstData' cs
               BlankEpAnnotations -> parens $ text "EpaDelta" <+> srcSpan s <+> deltaPos d <+> text "blanked"
+
+            maybe_epaLocation :: Maybe EpaLocation -> SDoc
+            maybe_epaLocation ml = case ba of
+              NoBlankEpAnnotations -> case ml of
+                Nothing -> parens $ text "Nothing"
+                Just l -> parens (text "Just" $$ showAstData' l)
+              BlankEpAnnotations -> parens $ text "Maybe EpaLocation:" <+> text "blanked"
 
             deltaPos :: DeltaPos -> SDoc
             deltaPos (SameLine c) = parens $ text "SameLine" <+> ppr c
@@ -186,14 +201,14 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnParen"
              NoBlankEpAnnotations ->
               parens $ text "AnnParen"
-                        $$ vcat [ppr a, epaAnchor o, epaAnchor c]
+                        $$ vcat [ppr a, epaLocation o, epaLocation c]
 
             addEpAnn :: AddEpAnn -> SDoc
             addEpAnn (AddEpAnn a s) = case ba of
              BlankEpAnnotations -> parens
                                       $ text "blanked:" <+> text "AddEpAnn"
              NoBlankEpAnnotations ->
-              parens $ text "AddEpAnn" <+> ppr a <+> epaAnchor s
+              parens $ text "AddEpAnn" <+> ppr a <+> epaLocation s
 
             epTokenOC :: EpToken "{" -> SDoc
             epTokenOC  = epToken'
@@ -206,7 +221,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              BlankEpAnnotations -> parens
                                       $ text "blanked:" <+> text "EpToken"
              NoBlankEpAnnotations ->
-              parens $ text "EpTok" <+> epaAnchor s
+              parens $ text "EpTok" <+> epaLocation s
             epToken' NoEpTok = case ba of
              BlankEpAnnotations -> parens
                                       $ text "blanked:" <+> text "EpToken"

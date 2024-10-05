@@ -133,7 +133,7 @@ type instance XXHsBindsLR GhcPs pR = DataConCantHappen
 type instance XXHsBindsLR GhcRn pR = DataConCantHappen
 type instance XXHsBindsLR GhcTc pR = AbsBinds
 
-type instance XPSB         (GhcPass idL) GhcPs = [AddEpAnn]
+type instance XPSB         (GhcPass idL) GhcPs = AnnPSB
 type instance XPSB         (GhcPass idL) GhcRn = NameSet -- Post renaming, FVs. See Note [Bind free vars]
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
@@ -152,6 +152,18 @@ type instance XMultAnn   GhcRn = NoExtField
 type instance XMultAnn   GhcTc = Mult
 
 type instance XXMultAnn  (GhcPass _) = DataConCantHappen
+
+data AnnPSB
+  = AnnPSB {
+      ap_pattern :: EpToken "pattern",
+      ap_openc   :: Maybe (EpToken "{"),
+      ap_closec  :: Maybe (EpToken "}"),
+      ap_larrow  :: Maybe (EpUniToken "<-" "←"),
+      ap_equal   :: Maybe (EpToken "=")
+    } deriving Data
+
+instance NoAnn AnnPSB where
+  noAnn = AnnPSB noAnn noAnn noAnn noAnn noAnn
 
 setTcMultAnn :: Mult -> HsMultAnn GhcRn -> HsMultAnn GhcTc
 setTcMultAnn mult (HsPct1Ann _)   = HsPct1Ann mult
@@ -679,7 +691,7 @@ isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
 -- EPA annotations in GhcPs, dictionary Id in GhcTc
-type instance XCIPBind GhcPs = [AddEpAnn]
+type instance XCIPBind GhcPs = EpToken "="
 type instance XCIPBind GhcRn = NoExtField
 type instance XCIPBind GhcTc = Id
 type instance XXIPBind    (GhcPass p) = DataConCantHappen
@@ -707,13 +719,13 @@ instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
 type instance XTypeSig          (GhcPass p) = AnnSig
 type instance XPatSynSig        (GhcPass p) = AnnSig
 type instance XClassOpSig       (GhcPass p) = AnnSig
-type instance XFixSig           (GhcPass p) = ([AddEpAnn], SourceText)
-type instance XInlineSig        (GhcPass p) = [AddEpAnn]
-type instance XSpecSig          (GhcPass p) = [AddEpAnn]
-type instance XSpecInstSig      (GhcPass p) = ([AddEpAnn], SourceText)
-type instance XMinimalSig       (GhcPass p) = ([AddEpAnn], SourceText)
-type instance XSCCFunSig        (GhcPass p) = ([AddEpAnn], SourceText)
-type instance XCompleteMatchSig (GhcPass p) = ([AddEpAnn], SourceText)
+type instance XFixSig           (GhcPass p) = ((EpaLocation, Maybe EpaLocation), SourceText)
+type instance XInlineSig        (GhcPass p) = (EpaLocation, EpaLocation, ActivationAnn)
+type instance XSpecSig          (GhcPass p) = AnnSpecSig
+type instance XSpecInstSig      (GhcPass p) = ((EpaLocation, EpToken "instance", EpaLocation), SourceText)
+type instance XMinimalSig       (GhcPass p) = ((EpaLocation, EpaLocation), SourceText)
+type instance XSCCFunSig        (GhcPass p) = ((EpaLocation, EpaLocation), SourceText)
+type instance XCompleteMatchSig (GhcPass p) = ((EpaLocation, Maybe (EpUniToken "::" "∷"), EpaLocation), SourceText)
     -- SourceText: See Note [Pragma source text] in "GHC.Types.SourceText"
 type instance XXSig             GhcPs = DataConCantHappen
 type instance XXSig             GhcRn = IdSig
@@ -723,6 +735,29 @@ type instance XFixitySig  GhcPs = NamespaceSpecifier
 type instance XFixitySig  GhcRn = NamespaceSpecifier
 type instance XFixitySig  GhcTc = NoExtField
 type instance XXFixitySig (GhcPass p) = DataConCantHappen
+
+data AnnSpecSig
+  = AnnSpecSig {
+      ass_open   :: EpaLocation,
+      ass_close  :: EpaLocation,
+      ass_dcolon :: EpUniToken "::" "∷",
+      ass_act    :: ActivationAnn
+    } deriving Data
+
+instance NoAnn AnnSpecSig where
+  noAnn = AnnSpecSig noAnn noAnn noAnn noAnn
+
+data ActivationAnn
+  = ActivationAnn {
+      aa_openc  :: EpToken "[",
+      aa_closec :: EpToken "]",
+      aa_tilde  :: Maybe (EpToken "~"),
+      aa_val    :: Maybe EpaLocation
+    } deriving (Data, Eq)
+
+instance NoAnn ActivationAnn where
+  noAnn = ActivationAnn noAnn noAnn noAnn noAnn
+
 
 -- | Optional namespace specifier for fixity signatures,
 --  WARNINIG and DEPRECATED pragmas.
@@ -774,12 +809,13 @@ newtype IdSig = IdSig { unIdSig :: Id }
 
 data AnnSig
   = AnnSig {
-      asDcolon :: AddEpAnn, -- Not an EpaAnchor to capture unicode option
-      asRest   :: [AddEpAnn]
+      asDcolon  :: EpUniToken "::" "∷",
+      asPattern :: Maybe (EpToken "pattern"),
+      asDefault :: Maybe (EpToken "default")
       } deriving Data
 
 instance NoAnn AnnSig where
-  noAnn = AnnSig noAnn noAnn
+  noAnn = AnnSig noAnn noAnn noAnn
 
 -- | Type checker Specialisation Pragmas
 --
