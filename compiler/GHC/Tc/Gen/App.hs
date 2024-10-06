@@ -903,6 +903,7 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
                      addErrCtxt (funAppCtxt fun arg arg_no) $
                      thing_inside
 
+{-
            VAExpansion (OrigStmt (L _ stmt@(BindStmt {})) flav) _ loc
              | isGeneratedSrcSpan (locA arg_loc) -- This arg is the second argument to generated (>>=)
              -> setSrcSpan loc $
@@ -918,7 +919,7 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
              -> setSrcSpanA loc $
                   addStmtCtxt stmt flav $
                   thing_inside
-
+-}
            _ -> setSrcSpanA arg_loc $
                   addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
                   thing_inside }
