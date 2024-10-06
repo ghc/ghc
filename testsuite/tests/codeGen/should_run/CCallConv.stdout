@@ -7,8 +7,8 @@ a4: 0xffffffff -1
 a5: 0xffffffff -1
 a6: 0xffffffff -1
 a7: 0xffffffff -1
-s0: 0xffffffff -1
-s1: 0xff 255
+s0: 0xff 255
+s1: 0xffffffff -1
 "fun8 result:502"
 fun16:
 a0: 0xffffffff -1
@@ -19,8 +19,8 @@ a4: 0xffffffff -1
 a5: 0xffffffff -1
 a6: 0xffffffff -1
 a7: 0xffffffff -1
-s0: 0xffffffff -1
-s1: 0xffff 65535
+s0: 0xffff 65535
+s1: 0xffffffff -1
 "fun16 result:131062"
 fun32:
 a0: 0xffffffff -1
@@ -31,8 +31,8 @@ a4: 0xffffffff -1
 a5: 0xffffffff -1
 a6: 0xffffffff -1
 a7: 0xffffffff -1
-s0: 0xffffffff -1
-s1: 0xffffffff 4294967295
+s0: 0xffffffff 4294967295
+s1: 0xffffffff -1
 "fun32 result:8589934582"
 funFloat:
 a0: 1.000000
