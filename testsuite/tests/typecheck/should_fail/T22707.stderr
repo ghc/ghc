@@ -14,3 +14,8 @@ T22707.hs:6:37: error: [GHC-18872]
         ‘\ ati1tti2
            -> (runCont c)
                 (ati1tti2 $ \ a -> evalCont (t1 c) >>== \ ati1 -> ...)’
+
+T22707.hs:11:10: [GHC-39999]
+     No instance for ‘Applicative (Cont p p)’
+        arising from the superclasses of an instance declaration
+     In the instance declaration for ‘Monad (Cont p p)’
