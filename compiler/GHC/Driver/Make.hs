@@ -1,5 +1,5 @@
 {-# LANGUAGE NondecreasingIndentation #-}
-
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE ApplicativeDo #-}
@@ -2901,11 +2901,17 @@ runNjobsAbstractSem n_jobs action = do
   MC.bracket_ updNumCapabilities resetNumCapabilities $ action asem
 
 runWorkerLimit :: WorkerLimit -> (AbstractSem -> IO a) -> IO a
+#if defined(wasm32_HOST_ARCH)
+runWorkerLimit _ action = do
+  lock <- newMVar ()
+  action $ AbstractSem (takeMVar lock) (putMVar lock ())
+#else
 runWorkerLimit worker_limit action = case worker_limit of
     NumProcessorsLimit n_jobs ->
       runNjobsAbstractSem n_jobs action
     JSemLimit sem ->
       runJSemAbstractSem sem action
+#endif
 
 -- | Build and run a pipeline
 runParPipelines :: WorkerLimit -- ^ How to limit work parallelism
