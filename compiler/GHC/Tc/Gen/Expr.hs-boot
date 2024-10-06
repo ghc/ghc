@@ -1,6 +1,6 @@
 module GHC.Tc.Gen.Expr where
 import GHC.Hs              ( HsExpr, LHsExpr, SyntaxExprRn
-                           , SyntaxExprTc )
+                           , SyntaxExprTc, HsThingRn )
 import GHC.Tc.Utils.TcType ( TcRhoType, TcSigmaType, TcSigmaTypeFRR
                            , SyntaxOpType
                            , ExpType, ExpRhoType, ExpSigmaType )
@@ -9,7 +9,7 @@ import GHC.Tc.Types.BasicTypes( TcCompleteSig )
 import GHC.Tc.Types.Origin ( CtOrigin )
 import GHC.Core.Type ( Mult )
 import GHC.Hs.Extension ( GhcRn, GhcTc )
-
+import GHC.Prelude ( Maybe )
 tcCheckPolyExpr, tcCheckPolyExprNC ::
           LHsExpr GhcRn
        -> TcSigmaType
@@ -28,7 +28,7 @@ tcPolyLExpr    :: LHsExpr GhcRn -> ExpSigmaType -> TcM (LHsExpr GhcTc)
 tcPolyLExprSig :: LHsExpr GhcRn -> TcCompleteSig -> TcM (LHsExpr GhcTc)
 
 tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
-tcExpr     :: HsExpr GhcRn -> ExpRhoType   -> TcM (HsExpr GhcTc)
+tcExpr     :: Maybe HsThingRn -> HsExpr GhcRn -> ExpRhoType   -> TcM (HsExpr GhcTc)
 
 tcInferRho, tcInferRhoNC ::
           LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
