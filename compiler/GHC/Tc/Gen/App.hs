@@ -178,7 +178,7 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 tcInferSigma inst (L loc rn_expr)
   = addExprCtxt rn_expr $
     setSrcSpanA loc     $
-    do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
+    do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps Nothing rn_expr
        ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, fun_ctxt) fun_sigma rn_args
@@ -387,13 +387,14 @@ Unify result type /before/ typechecking the args
 The latter is much better. That is why we call checkResultType before tcValArgs.
 -}
 
-tcApp :: HsExpr GhcRn
+tcApp :: Maybe HsThingRn -- Just x <=> Expr is a compiler generated expression for x
+      -> HsExpr GhcRn
       -> ExpRhoType   -- When checking, -XDeepSubsumption <=> deeply skolemised
       -> TcM (HsExpr GhcTc)
 -- See Note [tcApp: typechecking applications]
-tcApp rn_expr exp_res_ty
+tcApp mb_oexpr rn_expr exp_res_ty
   = do { -- Step 1: Split the application chain
-         (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps rn_expr
+         (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps mb_oexpr rn_expr
        ; traceTc "tcApp {" $
            vcat [ text "rn_expr:" <+> ppr rn_expr
                 , text "rn_fun:" <+> ppr rn_fun
@@ -418,6 +419,7 @@ tcApp rn_expr exp_res_ty
                          -- See Note [Unify with expected type before typechecking arguments]
                        ; res_wrap <- checkResultTy rn_expr tc_head inst_args
                                                    app_res_rho exp_res_ty
+
                          -- Step 4.2: typecheck the  arguments
                        ; tc_args <- tcValArgs NoQL inst_args
                          -- Step 4.3: wrap up
@@ -539,12 +541,7 @@ tcValArg do_ql (EValArg { ea_ctxt   = ctxt
                         , ea_arg    = larg@(L arg_loc arg)
                         , ea_arg_ty = sc_arg_ty })
   = addArgCtxt ctxt larg $
-    do { traceTc "tcValArg" $
-         vcat [ ppr ctxt
-              , text "arg type:" <+> ppr sc_arg_ty
-              , text "arg:" <+> ppr larg ]
-
-         -- Crucial step: expose QL results before checking exp_arg_ty
+    do { -- Crucial step: expose QL results before checking exp_arg_ty
          -- So far as the paper is concerned, this step applies
          -- the poly-substitution Theta, learned by QL, so that we
          -- "see" the polymorphism in that argument type. E.g.
@@ -553,14 +550,21 @@ tcValArg do_ql (EValArg { ea_ctxt   = ctxt
          -- Then Theta = [p :-> forall a. a->a], and we want
          -- to check 'e' with expected type (forall a. a->a)
          -- See Note [Instantiation variables are short lived]
-       ; Scaled mult exp_arg_ty <- case do_ql of
+         Scaled mult exp_arg_ty <- case do_ql of
               DoQL -> liftZonkM $ zonkScaledTcType sc_arg_ty
               NoQL -> return sc_arg_ty
+       ; traceTc "tcValArg {" $
+         vcat [ text "ctxt:" <+> ppr ctxt
+              , text "sigma_type" <+> ppr (mkCheckExpType exp_arg_ty)
+              , text "arg:" <+> ppr larg
+              ]
+
 
          -- Now check the argument
        ; arg' <- tcScalingUsage mult $
                  tcPolyExpr arg (mkCheckExpType exp_arg_ty)
-
+       ; traceTc "tcValArg" $ vcat [ ppr arg'
+                                   , text "}" ]
        ; return (EValArg { ea_ctxt = ctxt
                          , ea_arg = L arg_loc arg'
                          , ea_arg_ty = noExtField }) }
@@ -656,10 +660,10 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
        ; go 1 [] fun_sigma rn_args }
   where
     fun_orig = case fun_ctxt of
-      VAExpansion (OrigStmt{}) _ _    -> DoOrigin
-      VAExpansion (OrigPat pat _) _ _ -> DoPatOrigin pat
-      VAExpansion (OrigExpr e) _ _    -> exprCtOrigin e
-      VACall e _ _                    -> exprCtOrigin e
+      VAExpansion (OrigStmt{}) _    -> DoOrigin
+      VAExpansion (OrigPat pat _) _ -> DoPatOrigin pat
+      VAExpansion (OrigExpr e) _    -> exprCtOrigin e
+      VACall e _ _                  -> exprCtOrigin e
 
     -- These are the type variables which must be instantiated to concrete
     -- types. See Note [Representation-polymorphic Ids with no binding]
@@ -821,9 +825,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     -- Rule IARG from Fig 4 of the QL paper:
     go1 pos acc fun_ty
         (EValArg { ea_arg = arg, ea_ctxt = ctxt } : rest_args)
-      = do { let herald = case fun_ctxt of
-                             VAExpansion (OrigStmt{}) _ _ -> ExpectedFunTySyntaxOp DoOrigin tc_fun
-                             _ ->  ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
+      = do { let herald = ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg)
            ; (wrap, arg_ty, res_ty) <-
                 -- NB: matchActualFunTy does the rep-poly check.
                 -- For example, suppose we have f :: forall r (a::TYPE r). a -> Int
@@ -880,7 +882,7 @@ looks_like_type_arg _ = False
 
 addArgCtxt :: AppCtxt -> LHsExpr GhcRn
            -> TcM a -> TcM a
--- There are four cases:
+-- There are 3 cases:
 -- 1. In the normal case, we add an informative context
 --          "In the third argument of f, namely blah"
 -- 2. If we are deep inside generated code (`isGeneratedCode` is `True`)
@@ -889,41 +891,24 @@ addArgCtxt :: AppCtxt -> LHsExpr GhcRn
 --          "In the expression: arg"
 --   Unless the arg is also a generated thing, in which case do nothing.
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
--- 3. We are in an expanded `do`-block's non-bind statement
---    we simply add the statement context
---       "In the statement of the `do`-block .."
--- 4. We are in an expanded do block's bind statement
---    a. Then either we are typechecking the first argument of the bind which is user located
---       so we set the location to be that of the argument
---    b. Or, we are typechecking the second argument which would be a generated lambda
---       so we set the location to be whatever the location in the context is
+-- 3. We are in an expanded `do`-block statement
+--      Do nothing as we have already added the error
+--      context in GHC.Tc.Do.tcXExpr
 --  See Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
--- For future: we need a cleaner way of doing this bit of adding the right error context.
--- There is a delicate dance of looking at source locations and reconstructing
--- whether the piece of code is a `do`-expanded code or some other expanded code.
 addArgCtxt ctxt (L arg_loc arg) thing_inside
   = do { in_generated_code <- inGeneratedCode
+       ; traceTc "addArgCtxt" (vcat [ text "generated:" <+> ppr in_generated_code
+                                    , text "arg: " <+> ppr arg
+                                    , text "arg_loc" <+> ppr arg_loc])
        ; case ctxt of
            VACall fun arg_no _ | not in_generated_code
              -> do setSrcSpanA arg_loc                    $
                      addErrCtxt (FunAppCtxt (FunAppCtxtExpr fun arg) arg_no) $
                      thing_inside
 
-           VAExpansion (OrigStmt (L _ stmt@(BindStmt {})) flav) _ loc
-             | isGeneratedSrcSpan (locA arg_loc) -- This arg is the second argument to generated (>>=)
-             -> setSrcSpan loc $
-                  addStmtCtxt stmt flav $
-                  thing_inside
-             | otherwise                         -- This arg is the first argument to generated (>>=)
+           VAExpansion (OrigStmt{}) _
              -> setSrcSpanA arg_loc $
-                  addStmtCtxt stmt flav $
-                  thing_inside
-           VAExpansion (OrigStmt (L _ (XStmtLR (ApplicativeStmt{}))) _) _ _
-             -> thing_inside
-           VAExpansion (OrigStmt (L loc stmt) flav) _ _
-             -> setSrcSpanA loc $
-                  addStmtCtxt stmt flav $
-                  thing_inside
+                thing_inside -- Do nothing as we have pushed "In the stmt of .."
 
            _ -> setSrcSpanA arg_loc $
                   addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
@@ -1737,7 +1722,7 @@ quickLookArg1 :: AppCtxt -> LHsExpr GhcRn
 quickLookArg1 ctxt larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_rho)
   = addArgCtxt ctxt larg $ -- Context needed for constraints
                            -- generated by calls in arg
-    do { ((rn_fun, fun_ctxt), rn_args) <- splitHsApps arg
+    do { ((rn_fun, fun_ctxt), rn_args) <- splitHsApps Nothing arg
 
        -- Step 1: get the type of the head of the argument
        ; (fun_ue, mb_fun_ty) <- tcCollectingUsage $ tcInferAppHead_maybe rn_fun
