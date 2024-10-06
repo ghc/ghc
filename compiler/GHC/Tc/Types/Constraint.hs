@@ -76,7 +76,7 @@ module GHC.Tc.Types.Constraint (
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         ctEvRewriters, ctEvUnique, tcEvDestUnique,
-        ctEvRewriteRole, ctEvRewriteEqRel, setCtEvPredType, setCtEvLoc, arisesFromGivens,
+        ctEvRewriteRole, ctEvRewriteEqRel, setCtEvPredType, setCtEvLoc,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
 
         -- RewriterSet
@@ -1317,25 +1317,51 @@ nonDefaultableTyVarsOfWC (WC { wc_simple = simples, wc_impl = implics, wc_errors
 insolubleWC :: WantedConstraints -> Bool
 insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
   =  anyBag insolubleWantedCt simples
+       -- insolubleWantedCt: wanteds only: see Note [Given insolubles]
   || anyBag insolubleImplic implics
   || anyBag is_insoluble errors
-
-    where
+  where
       is_insoluble (DE_Hole hole) = isOutOfScopeHole hole -- See Note [Insoluble holes]
       is_insoluble (DE_NotConcrete {}) = True
 
 insolubleWantedCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints
 -- Namely:
---   a) an insoluble constraint as per 'insolubleCt', i.e. either
+--   a) an insoluble constraint as per 'insolubleirredCt', i.e. either
 --        - an insoluble equality constraint (e.g. Int ~ Bool), or
 --        - a custom type error constraint, TypeError msg :: Constraint
 --   b) that does not arise from a Given or a Wanted/Wanted fundep interaction
+-- See Note [Insoluble Wanteds]
+insolubleWantedCt ct
+  | CIrredCan ir_ct <- ct
+      -- CIrredCan: see (IW1) in Note [Insoluble Wanteds]
+  , IrredCt { ir_ev = ev } <- ir_ct
+  , CtWanted { ctev_loc = loc, ctev_rewriters = rewriters }  <- ev
+      -- It's a Wanted
+  , insolubleIrredCt ir_ct
+      -- It's insoluble
+  , isEmptyRewriterSet rewriters
+      -- rewriters; see (IW2) in Note [Insoluble Wanteds]
+  , not (isGivenLoc loc)
+      -- isGivenLoc: see (IW3) in Note [Insoluble Wanteds]
+  , not (isWantedWantedFunDepOrigin (ctLocOrigin loc))
+      -- origin check: see (IW4) in Note [Insoluble Wanteds]
+  = True
+
+  | otherwise
+  = False
+
+-- | Returns True of constraints that are definitely insoluble,
+--   as well as TypeError constraints.
+-- Can return 'True' for Given constraints, unlike 'insolubleWantedCt'.
 --
--- See Note [Given insolubles].
-insolubleWantedCt ct = insolubleCt ct &&
-                       not (arisesFromGivens ct) &&
-                       not (isWantedWantedFunDepOrigin (ctOrigin ct))
+-- The function is tuned for application /after/ constraint solving
+--       i.e. assuming canonicalisation has been done
+-- That's why it looks only for IrredCt; all insoluble constraints
+-- are put into CIrredCan
+insolubleCt :: Ct -> Bool
+insolubleCt (CIrredCan ir_ct) = insolubleIrredCt ir_ct
+insolubleCt _                 = False
 
 insolubleIrredCt :: IrredCt -> Bool
 -- Returns True of Irred constraints that are /definitely/ insoluble
@@ -1364,18 +1390,6 @@ insolubleIrredCt (IrredCt { ir_ev = ev, ir_reason = reason })
   -- > type family Assert check errMsg where
   -- >   Assert 'True  _errMsg = ()
   -- >   Assert _check errMsg  = errMsg
-
--- | Returns True of constraints that are definitely insoluble,
---   as well as TypeError constraints.
--- Can return 'True' for Given constraints, unlike 'insolubleWantedCt'.
---
--- The function is tuned for application /after/ constraint solving
---       i.e. assuming canonicalisation has been done
--- That's why it looks only for IrredCt; all insoluble constraints
--- are put into CIrredCan
-insolubleCt :: Ct -> Bool
-insolubleCt (CIrredCan ir_ct) = insolubleIrredCt ir_ct
-insolubleCt _                 = False
 
 -- | Does this hole represent an "out of scope" error?
 -- See Note [Insoluble holes]
@@ -1419,6 +1433,31 @@ in GHC.Tc.Errors), so we may fail to report anything at all!  Yikes.
 
 Bottom line: insolubleWC (called in GHC.Tc.Solver.setImplicationStatus)
              should ignore givens even if they are insoluble.
+
+Note [Insoluble Wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~
+insolubleWantedCt returns True of a Wanted constraint that definitely
+can't be solved.  But not quite all such constraints; see wrinkles.
+
+(IW1) insolubleWantedCt is tuned for application /after/ constraint
+   solving i.e. assuming canonicalisation has been done.  That's why
+   it looks only for IrredCt; all insoluble constraints oare put into
+   CIrredCan
+
+(IW2) We only treat it as insoluble if it has an empty rewriter set.
+   Otherwise #25325 happens: a Wanted constraint A that is /not/ insoluble
+   rewrites some other Wanted constraint B, so B has A in its rewriter
+   set.  Now B looks insoluble.  The danger is that we'll suppress reporting
+   B becuase of its empty rewriter set; and suppress reporting A because
+   there is an insoluble B lying around.  (This suppression happens in
+   GHC.Tc.Errors.)  Solution: don't treat B as insoluble.
+
+(IW3) If the Wanted arises from a Given (how can that happen?), don't
+   treat it as a Wanted insoluble (obviously).
+
+(IW4) If the Wanted came from a  Wanted/Wanted fundep interaction, don't
+   treat the constraint as insoluble. See Note [Suppressing confusing errors]
+   in GHC.Tc.Errors
 
 Note [Insoluble holes]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -2079,9 +2118,6 @@ tcEvDestUnique (HoleDest co_hole) = varUnique (coHoleCoVar co_hole)
 
 setCtEvLoc :: CtEvidence -> CtLoc -> CtEvidence
 setCtEvLoc ctev loc = ctev { ctev_loc = loc }
-
-arisesFromGivens :: Ct -> Bool
-arisesFromGivens ct = isGivenCt ct || isGivenLoc (ctLoc ct)
 
 -- | Set the type of CtEvidence.
 --
