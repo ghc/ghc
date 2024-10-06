@@ -234,7 +234,7 @@ catchAny !(IO io) handler = IO $ catch# io handler'
 -- | Execute an 'IO' action, adding the given 'ExceptionContext'
 -- to any thrown synchronous exceptions.
 --
--- @since base-2.20.0.0
+-- @since base-4.20.0.0
 annotateIO :: forall e a. ExceptionAnnotation e => e -> IO a -> IO a
 annotateIO ann (IO io) = IO (catch# io handler)
   where
