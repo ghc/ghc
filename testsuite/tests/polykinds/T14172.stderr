@@ -1,10 +1,7 @@
-
 T14172.hs:7:46: error: [GHC-88464]
-    • Found type wildcard ‘_’ standing for ‘a'’
-      Where: ‘a'’ is a rigid type variable bound by
-               the inferred type of
-                 traverseCompose :: (a -> f b) -> g a -> f (h a')
-               at T14172.hs:8:1-46
+    • Found type wildcard ‘_’ standing for ‘a'1 :: k0’
+      Where: ‘k0’ is an ambiguous type variable
+             ‘a'1’ is an ambiguous type variable
       To use the inferred type, enable PartialTypeSignatures
     • In the first argument of ‘h’, namely ‘_’
       In the first argument of ‘f’, namely ‘(h _)’
@@ -13,17 +10,19 @@ T14172.hs:7:46: error: [GHC-88464]
 
 T14172.hs:8:19: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘g'1 a'0’
-      Expected: (f'0 a -> f (f'0 b)) -> g a -> f (h a')
-        Actual: (Unwrapped (Compose f'0 g'1 a'0) -> f (Unwrapped (h a')))
-                -> Compose f'0 g'1 a'0 -> f (h a')
+      Expected: (f'0 a -> f (f'0 b)) -> g a -> f (h a'1)
+        Actual: (Unwrapped (Compose f'0 g'1 a'0)
+                 -> f (Unwrapped (h a'1)))
+                -> Compose f'0 g'1 a'0 -> f (h a'1)
       ‘a’ is a rigid type variable bound by
         the inferred type of
-          traverseCompose :: (a -> f b) -> g a -> f (h a')
+          traverseCompose :: (a -> f b) -> g a -> f (h a'1)
         at T14172.hs:7:1-47
     • In the first argument of ‘(.)’, namely ‘_Wrapping Compose’
       In the expression: _Wrapping Compose . traverse
       In an equation for ‘traverseCompose’:
           traverseCompose = _Wrapping Compose . traverse
     • Relevant bindings include
-        traverseCompose :: (a -> f b) -> g a -> f (h a')
+        traverseCompose :: (a -> f b) -> g a -> f (h a'1)
           (bound at T14172.hs:8:1)
+
