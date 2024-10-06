@@ -717,6 +717,7 @@ tcXExpr (PopErrCtxt (L loc e)) res_ty
       setSrcSpanA loc $
       tcExpr e res_ty
 
+{-
 tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc s) flav <- o
   , HsLet x binds e <- e'
@@ -736,6 +737,7 @@ tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc _) flav <- o
   = setSrcSpanA loc $
     mkExpandedStmtTc ls flav <$> tcApp (XExpr xe) res_ty
+-}
 
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 
