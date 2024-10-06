@@ -702,3 +702,4 @@ test('T22684', normal, compile_fail, [''])
 test('T23776', normal, compile, ['']) # to become an error in GHC 9.12
 test('T17940', normal, compile_fail, [''])
 test('T24279', normal, compile_fail, [''])
+test('T25325', normal, compile_fail, [''])
