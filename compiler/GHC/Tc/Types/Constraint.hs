@@ -1327,7 +1327,7 @@ insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
 insolubleWantedCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints
 -- Namely:
---   a) an insoluble constraint as per 'insolubleirredCt', i.e. either
+--   a) an insoluble constraint as per 'insolubleIrredCt', i.e. either
 --        - an insoluble equality constraint (e.g. Int ~ Bool), or
 --        - a custom type error constraint, TypeError msg :: Constraint
 --   b) that does not arise from a Given or a Wanted/Wanted fundep interaction
@@ -1341,7 +1341,7 @@ insolubleWantedCt ct
   , insolubleIrredCt ir_ct
       -- It's insoluble
   , isEmptyRewriterSet rewriters
-      -- rewriters; see (IW2) in Note [Insoluble Wanteds]
+      -- It has no rewriters; see (IW2) in Note [Insoluble Wanteds]
   , not (isGivenLoc loc)
       -- isGivenLoc: see (IW3) in Note [Insoluble Wanteds]
   , not (isWantedWantedFunDepOrigin (ctLocOrigin loc))
@@ -1441,14 +1441,14 @@ can't be solved.  But not quite all such constraints; see wrinkles.
 
 (IW1) insolubleWantedCt is tuned for application /after/ constraint
    solving i.e. assuming canonicalisation has been done.  That's why
-   it looks only for IrredCt; all insoluble constraints oare put into
+   it looks only for IrredCt; all insoluble constraints are put into
    CIrredCan
 
 (IW2) We only treat it as insoluble if it has an empty rewriter set.  (See Note
    [Wanteds rewrite Wanteds].)  Otherwise #25325 happens: a Wanted constraint A
    that is /not/ insoluble rewrites some other Wanted constraint B, so B has A
    in its rewriter set.  Now B looks insoluble.  The danger is that we'll
-   suppress reporting B becuase of its empty rewriter set; and suppress
+   suppress reporting B because of its empty rewriter set; and suppress
    reporting A because there is an insoluble B lying around.  (This suppression
    happens in GHC.Tc.Errors.mkErrorItem.)  Solution: don't treat B as insoluble.
 
