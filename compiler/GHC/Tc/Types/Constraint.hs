@@ -1439,13 +1439,13 @@ can't be solved.  But not quite all such constraints; see wrinkles.
    it looks only for IrredCt; all insoluble constraints oare put into
    CIrredCan
 
-(IW2) We only treat it as insoluble if it has an empty rewriter set.
-   Otherwise #25325 happens: a Wanted constraint A that is /not/ insoluble
-   rewrites some other Wanted constraint B, so B has A in its rewriter
-   set.  Now B looks insoluble.  The danger is that we'll suppress reporting
-   B becuase of its empty rewriter set; and suppress reporting A because
-   there is an insoluble B lying around.  (This suppression happens in
-   GHC.Tc.Errors.)  Solution: don't treat B as insoluble.
+(IW2) We only treat it as insoluble if it has an empty rewriter set.  (See Note
+   [Wanteds rewrite Wanteds].)  Otherwise #25325 happens: a Wanted constraint A
+   that is /not/ insoluble rewrites some other Wanted constraint B, so B has A
+   in its rewriter set.  Now B looks insoluble.  The danger is that we'll
+   suppress reporting B becuase of its empty rewriter set; and suppress
+   reporting A because there is an insoluble B lying around.  (This suppression
+   happens in GHC.Tc.Errors.mkErrorItem.)  Solution: don't treat B as insoluble.
 
 (IW3) If the Wanted arises from a Given (how can that happen?), don't
    treat it as a Wanted insoluble (obviously).
