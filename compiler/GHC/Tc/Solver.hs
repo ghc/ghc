@@ -1473,9 +1473,28 @@ decideAndPromoteTyVars infer_mode name_taus psigs wanted
 
              -- mono_tvs0 are all the type variables we
              -- can't quantify over, ignoring the MR
-             mono_tvs0 = outerLevelTyVars tc_lvl (tyCoVarsOfTypes post_mr_quant)
-                         `unionVarSet` tyCoVarsOfTypes (ctsPreds no_quant)
-                         `unionVarSet` co_var_tvs
+
+             -- At top level: we want to promote tyvars that are
+             --  (a) free in envt (already promoted)
+             --  (b) will be defaulted
+             --  (c) determined by (a) or (b)
+             mono_tvs0
+               | isTopTcLevel tc_lvl
+               = outerLevelTyVars tc_lvl (tyCoVarsOfTypes (ctsPreds post_mr_quant))
+                 `unionVarSet` tyCoVarsOfTypes mr_no_quant
+
+               | otherwise
+
+               = outerLevelTyVars tc_lvl (tyCoVarsOfTypes post_mr_quant)
+                     -- outerLevelTyVars are free in the envt, so can't quantify them
+                 `unionVarSet` tyCoVarsOfTypes (ctsPreds no_quant)
+                 `unionVarSet` tyCoVarsOfTypes mr_no_quant
+                 `unionVarSet` co_var_tvs
+                     -- If we don't quantify over a constraint in no_quant, we
+                     -- can either not-quantify its free vars (hoping that call
+                     -- sites will fix them) or just ignore it for the purposes
+                     -- of mono_tvs0 (leaving behind a perhaps insoluble residual
+                     -- constraint)
 
              -- Next, use closeWrtFunDeps to find any other variables that are determined
              -- by mono_tvs0 + mr_no_quant, by functional dependencies or equalities.
@@ -1513,10 +1532,13 @@ decideAndPromoteTyVars infer_mode name_taus psigs wanted
 
        -- In /top-level bindings/ do not quantify over any constraints
        -- that mention a promoted tyvar. See Note [Generalising top-level bindings]
+{-
        ; let final_quant | isTopTcLevel tc_lvl
                          = filterOut (predMentions mono_tvs) post_mr_quant
                          | otherwise
                          = post_mr_quant
+-}
+       ; let final_quant = post_mr_quant
 
        -- Promote the mono_tvs: see Note [Promote monomorphic tyvars]
        ; _ <- promoteTyVarSet mono_tvs
