@@ -1516,6 +1516,8 @@ dynamic_flags_deps = [
         "Use `-ddump-stg-from-core` or `-ddump-stg-final` instead"
   , make_ord_flag defGhcFlag "ddump-stg-tags"
         (setDumpFlag Opt_D_dump_stg_tags)
+  , make_ord_flag defGhcFlag "ddump-stg-from-js-sinker"
+        (setDumpFlag Opt_D_dump_stg_from_js_sinker)
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"

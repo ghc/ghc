@@ -548,6 +548,16 @@ data ModuleCode = ModuleCode
   , mc_frefs    :: ![ForeignJSRef]
   }
 
+instance Outputable ModuleCode where
+  ppr m = hang (text "ModuleCode") 2 $ vcat
+            [ hcat [text "Module: ", ppr (mc_module m)]
+            , hcat [text "JS Code:", pretty True (mc_js_code m)]
+            , hcat [text "JS Exports:", pprHsBytes (mc_exports m)]
+            , hang (text "JS Closures::") 2 (vcat (fmap (text . show) (mc_closures m)))
+            , hang (text "JS Statics::") 2 (vcat (fmap (text . show) (mc_statics m)))
+            , hang (text "JS ForeignRefs::") 2 (vcat (fmap (text . show) (mc_frefs m)))
+            ]
+
 -- | ModuleCode after link with other modules.
 --
 -- It contains less information than ModuleCode because they have been commoned

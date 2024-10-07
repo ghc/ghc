@@ -560,6 +560,11 @@ These flags dump various phases of GHC's STG pipeline.
     Alias for :ghc-flag:`-ddump-stg-from-core`. Deprecated in favor of more explicit
     flags: :ghc-flag:`-ddump-stg-from-core`, :ghc-flag:`-ddump-stg-final`, etc.
 
+.. ghc-flag:: -ddump-stg-from-js-sinker
+    :shortdesc: Show JavaScript sinker output
+    :type: dynamic
+
+    Show the output of JavaScript Sinker pass.
 
 C-\\- representation
 ~~~~~~~~~~~~~~~~~~~~

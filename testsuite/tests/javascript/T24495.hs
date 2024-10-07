@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash #-}
-{-# OPTIONS_GHC -O1 #-}
 -- -O1 required to make "rest" thunk SingleEntry
+-- -O2 shows that it still do one optimization
 
 module Main where
 

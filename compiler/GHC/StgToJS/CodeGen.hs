@@ -11,7 +11,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Flags (DumpFlag (Opt_D_dump_js))
+import GHC.Driver.Flags (DumpFlag (Opt_D_dump_js, Opt_D_dump_stg_from_js_sinker))
 
 import GHC.JS.Ppr
 import GHC.JS.JStg.Syntax
@@ -21,7 +21,7 @@ import GHC.JS.Transform
 import GHC.JS.Optimizer
 
 import GHC.StgToJS.Arg
-import GHC.StgToJS.Sinker
+import GHC.StgToJS.Sinker.Sinker
 import GHC.StgToJS.Types
 import qualified GHC.StgToJS.Object as Object
 import GHC.StgToJS.Utils
@@ -81,7 +81,8 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
     -- TODO: avoid top level lifting in core-2-core when the JS backend is
     -- enabled instead of undoing it here
 
-    -- TODO: add dump pass for optimized STG ast for JS
+  putDumpFileMaybe logger Opt_D_dump_stg_from_js_sinker "STG Optimized JS Sinker:" FormatSTG
+    (pprGenStgTopBindings (StgPprOpts False) stg_binds)
 
   (deps,lus) <- runG config this_mod unfloated_binds $ do
     ifProfilingM $ initCostCentres cccs

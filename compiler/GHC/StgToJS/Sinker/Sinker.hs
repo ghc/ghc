@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase #-}
 
-module GHC.StgToJS.Sinker (sinkPgm) where
+module GHC.StgToJS.Sinker.Sinker (sinkPgm) where
 
 import GHC.Prelude
 import GHC.Types.Unique.Set
@@ -14,6 +14,8 @@ import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Types.Literal
 import GHC.Data.Graph.Directed
+import GHC.StgToJS.Sinker.Collect
+import GHC.StgToJS.Sinker.StringsUnfloat
 
 import GHC.Utils.Misc (partitionWith)
 import GHC.StgToJS.Utils
@@ -21,7 +23,7 @@ import GHC.StgToJS.Utils
 import Data.Char
 import Data.List (partition)
 import Data.Maybe
-
+import Data.ByteString (ByteString)
 
 -- | Unfloat some top-level unexported things
 --
@@ -34,27 +36,43 @@ import Data.Maybe
 sinkPgm :: Module
         -> [CgStgTopBinding]
         -> (UniqFM Id CgStgExpr, [CgStgTopBinding])
-sinkPgm m pgm = (sunk, map StgTopLifted pgm'' ++ stringLits)
+sinkPgm m pgm
+  = (sunk, map StgTopLifted pgm''' ++ stringLits)
   where
-    selectLifted (StgTopLifted b) = Left b
-    selectLifted x                = Right x
-    (pgm', stringLits) = partitionWith selectLifted pgm
-    (sunk, pgm'')      = sinkPgm' m pgm'
+    selectLifted :: CgStgTopBinding -> Either CgStgBinding (Id, ByteString)
+    selectLifted (StgTopLifted b)      = Left b
+    selectLifted (StgTopStringLit i b) = Right (i, b)
+
+    (pgm', allStringLits) = partitionWith selectLifted pgm
+    usedOnceIds = selectUsedOnce $ concatMap collectArgs pgm'
+
+    stringLitsUFM = listToUFM $ (\(i, b) -> (idName i, (i, b))) <$> allStringLits
+    (pgm'', _actuallyUnfloatedStringLitNames) =
+      unfloatStringLits
+        (idName `mapUniqSet` usedOnceIds)
+        (snd `mapUFM` stringLitsUFM)
+        pgm'
+
+    stringLits = uncurry StgTopStringLit <$> allStringLits
+
+    (sunk, pgm''') = sinkPgm' m usedOnceIds pgm''
 
 sinkPgm'
   :: Module
        -- ^ the module, since we treat definitions from the current module
        -- differently
+  -> IdSet
+       -- ^ the set of used once ids
   -> [CgStgBinding]
        -- ^ the bindings
   -> (UniqFM Id CgStgExpr, [CgStgBinding])
        -- ^ a map with sunken replacements for nodes, for where the replacement
        -- does not fit in the 'StgBinding' AST and the new bindings
-sinkPgm' m pgm =
-  let usedOnce = collectUsedOnce pgm
+sinkPgm' m usedOnceIds pgm =
+  let usedOnce = collectTopLevelUsedOnce usedOnceIds pgm
       sinkables = listToUFM $
           concatMap alwaysSinkable pgm ++
-          filter ((`elementOfUniqSet` usedOnce) . fst) (concatMap (onceSinkable m) pgm)
+          concatMap (filter ((`elementOfUniqSet` usedOnce) . fst) . onceSinkable m) pgm
       isSunkBind (StgNonRec b _e) | elemUFM b sinkables = True
       isSunkBind _                                      = False
   in (sinkables, filter (not . isSunkBind) $ topSortDecls m pgm)
@@ -95,66 +113,10 @@ onceSinkable _ _ = []
 
 -- | collect all idents used only once in an argument at the top level
 --   and never anywhere else
-collectUsedOnce :: [CgStgBinding] -> IdSet
-collectUsedOnce binds = intersectUniqSets (usedOnce args) (usedOnce top_args)
+collectTopLevelUsedOnce :: IdSet -> [CgStgBinding] -> IdSet
+collectTopLevelUsedOnce usedOnceIds binds = intersectUniqSets usedOnceIds (selectUsedOnce top_args)
   where
     top_args = concatMap collectArgsTop binds
-    args     = concatMap collectArgs    binds
-    usedOnce = fst . foldr g (emptyUniqSet, emptyUniqSet)
-    g i t@(once, mult)
-      | i `elementOfUniqSet` mult = t
-      | i `elementOfUniqSet` once
-        = (delOneFromUniqSet once i, addOneToUniqSet mult i)
-      | otherwise = (addOneToUniqSet once i, mult)
-
--- | fold over all id in StgArg used at the top level in an StgRhsCon
-collectArgsTop :: CgStgBinding -> [Id]
-collectArgsTop = \case
-  StgNonRec _b r -> collectArgsTopRhs r
-  StgRec bs      -> concatMap (collectArgsTopRhs . snd) bs
-
-collectArgsTopRhs :: CgStgRhs -> [Id]
-collectArgsTopRhs = \case
-  StgRhsCon _ccs _dc _mu _ticks args _typ -> concatMap collectArgsA args
-  StgRhsClosure {}                        -> []
-
--- | fold over all Id in StgArg in the AST
-collectArgs :: CgStgBinding -> [Id]
-collectArgs = \case
-  StgNonRec _b r -> collectArgsR r
-  StgRec bs      -> concatMap (collectArgsR . snd) bs
-
-collectArgsR :: CgStgRhs -> [Id]
-collectArgsR = \case
-  StgRhsClosure _x0 _x1 _x2 _x3 e _typ     -> collectArgsE e
-  StgRhsCon _ccs _con _mu _ticks args _typ -> concatMap collectArgsA args
-
-collectArgsAlt :: CgStgAlt -> [Id]
-collectArgsAlt alt = collectArgsE (alt_rhs alt)
-
-collectArgsE :: CgStgExpr -> [Id]
-collectArgsE = \case
-  StgApp x args
-    -> x : concatMap collectArgsA args
-  StgConApp _con _mn args _ts
-    -> concatMap collectArgsA args
-  StgOpApp _x args _t
-    -> concatMap collectArgsA args
-  StgCase e _b _a alts
-    -> collectArgsE e ++ concatMap collectArgsAlt alts
-  StgLet _x b e
-    -> collectArgs b ++ collectArgsE e
-  StgLetNoEscape _x b e
-    -> collectArgs b ++ collectArgsE e
-  StgTick _i e
-    -> collectArgsE e
-  StgLit _
-    -> []
-
-collectArgsA :: StgArg -> [Id]
-collectArgsA = \case
-  StgVarArg i -> [i]
-  StgLitArg _ -> []
 
 isLocal :: Id -> Bool
 isLocal i = isNothing (nameModule_maybe . idName $ i) && not (isExportedId i)

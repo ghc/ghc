@@ -522,6 +522,8 @@ basicKnownKeyNames
         , unsafeEqualityTyConName
         , unsafeReflDataConName
         , unsafeCoercePrimName
+
+        , unsafeUnpackJSStringUtf8ShShName
     ]
 
 genericTyConNames :: [Name]
@@ -590,7 +592,8 @@ gHC_INTERNAL_BASE, gHC_INTERNAL_ENUM,
     gHC_INTERNAL_ARROW, gHC_INTERNAL_DESUGAR, gHC_INTERNAL_RANDOM, gHC_INTERNAL_EXTS, gHC_INTERNAL_IS_LIST,
     gHC_INTERNAL_CONTROL_EXCEPTION_BASE, gHC_INTERNAL_TYPEERROR, gHC_INTERNAL_TYPELITS, gHC_INTERNAL_TYPELITS_INTERNAL,
     gHC_INTERNAL_TYPENATS, gHC_INTERNAL_TYPENATS_INTERNAL,
-    gHC_INTERNAL_DATA_COERCE, gHC_INTERNAL_DEBUG_TRACE, gHC_INTERNAL_UNSAFE_COERCE, gHC_INTERNAL_FOREIGN_C_CONSTPTR :: Module
+    gHC_INTERNAL_DATA_COERCE, gHC_INTERNAL_DEBUG_TRACE, gHC_INTERNAL_UNSAFE_COERCE, gHC_INTERNAL_FOREIGN_C_CONSTPTR,
+    gHC_INTERNAL_JS_PRIM, gHC_INTERNAL_WASM_PRIM_TYPES :: Module
 gHC_INTERNAL_BASE                   = mkGhcInternalModule (fsLit "GHC.Internal.Base")
 gHC_INTERNAL_ENUM                   = mkGhcInternalModule (fsLit "GHC.Internal.Enum")
 gHC_INTERNAL_GHCI                   = mkGhcInternalModule (fsLit "GHC.Internal.GHCi")
@@ -633,7 +636,7 @@ gHC_INTERNAL_RANDOM                 = mkGhcInternalModule (fsLit "GHC.Internal.S
 gHC_INTERNAL_EXTS                   = mkGhcInternalModule (fsLit "GHC.Internal.Exts")
 gHC_INTERNAL_IS_LIST                = mkGhcInternalModule (fsLit "GHC.Internal.IsList")
 gHC_INTERNAL_CONTROL_EXCEPTION_BASE = mkGhcInternalModule (fsLit "GHC.Internal.Control.Exception.Base")
-gHC_INTERNAL_EXCEPTION_CONTEXT = mkGhcInternalModule (fsLit "GHC.Internal.Exception.Context")
+gHC_INTERNAL_EXCEPTION_CONTEXT      = mkGhcInternalModule (fsLit "GHC.Internal.Exception.Context")
 gHC_INTERNAL_GENERICS               = mkGhcInternalModule (fsLit "GHC.Internal.Generics")
 gHC_INTERNAL_TYPEERROR              = mkGhcInternalModule (fsLit "GHC.Internal.TypeError")
 gHC_INTERNAL_TYPELITS               = mkGhcInternalModule (fsLit "GHC.Internal.TypeLits")
@@ -644,6 +647,8 @@ gHC_INTERNAL_DATA_COERCE            = mkGhcInternalModule (fsLit "GHC.Internal.D
 gHC_INTERNAL_DEBUG_TRACE            = mkGhcInternalModule (fsLit "GHC.Internal.Debug.Trace")
 gHC_INTERNAL_UNSAFE_COERCE          = mkGhcInternalModule (fsLit "GHC.Internal.Unsafe.Coerce")
 gHC_INTERNAL_FOREIGN_C_CONSTPTR     = mkGhcInternalModule (fsLit "GHC.Internal.Foreign.C.ConstPtr")
+gHC_INTERNAL_JS_PRIM                = mkGhcInternalModule (fsLit "GHC.Internal.JS.Prim")
+gHC_INTERNAL_WASM_PRIM_TYPES        = mkGhcInternalModule (fsLit "GHC.Internal.Wasm.Prim.Types")
 
 gHC_INTERNAL_SRCLOC :: Module
 gHC_INTERNAL_SRCLOC = mkGhcInternalModule (fsLit "GHC.Internal.SrcLoc")
@@ -1676,7 +1681,10 @@ constPtrConName =
     tcQual gHC_INTERNAL_FOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
 
 jsvalTyConName :: Name
-jsvalTyConName = tcQual (mkGhcInternalModule (fsLit "GHC.Internal.Wasm.Prim.Types")) (fsLit "JSVal") jsvalTyConKey
+jsvalTyConName = tcQual gHC_INTERNAL_WASM_PRIM_TYPES (fsLit "JSVal") jsvalTyConKey
+
+unsafeUnpackJSStringUtf8ShShName :: Name
+unsafeUnpackJSStringUtf8ShShName = varQual gHC_INTERNAL_JS_PRIM (fsLit "unsafeUnpackJSStringUtf8##") unsafeUnpackJSStringUtf8ShShKey
 
 {-
 ************************************************************************
@@ -2082,6 +2090,7 @@ typeSymbolKindConNameKey, typeCharKindConNameKey,
   , typeNatLogTyFamNameKey
   , typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey
   , typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey
+  , exceptionContextTyConKey, unsafeUnpackJSStringUtf8ShShKey
   :: Unique
 typeSymbolKindConNameKey  = mkPreludeTyConUnique 400
 typeCharKindConNameKey    = mkPreludeTyConUnique 401
@@ -2104,8 +2113,9 @@ constPtrTyConKey = mkPreludeTyConUnique 417
 
 jsvalTyConKey = mkPreludeTyConUnique 418
 
-exceptionContextTyConKey :: Unique
 exceptionContextTyConKey = mkPreludeTyConUnique 420
+
+unsafeUnpackJSStringUtf8ShShKey  = mkPreludeMiscIdUnique 805
 
 {-
 ************************************************************************

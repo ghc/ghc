@@ -612,6 +612,7 @@ function h$toHsString(str) {
   var i = str.length - 1;
   var r = HS_NIL;
   while(i>=0) {
+    // Used at h$appendToHsString as well
     var cp = str.charCodeAt(i);
     if(cp >= 0xDC00 && cp <= 0xDFFF && i > 0) {
       --i;
@@ -658,6 +659,30 @@ function h$toHsStringA(str) {
 	--i;
     }
     return r;
+}
+
+// unpack utf8 string, append to existing Haskell string
+#ifdef GHCJS_PROF
+function h$appendToHsString(str, appendTo, cc) {
+#else
+function h$appendToHsString(str, appendTo) {
+#endif
+  var i = str.length - 1;
+  // we need to make an updatable thunk here
+  // if we embed the given closure in a CONS cell.
+  // (#24495)
+  var r = i == 0 ? appendTo : MK_UPD_THUNK(appendTo);
+  while(i>=0) {
+    // Copied from h$toHsString
+    var cp = str.charCodeAt(i);
+    if(cp >= 0xDC00 && cp <= 0xDFFF && i > 0) {
+      --i;
+      cp = (cp - 0xDC00) + (str.charCodeAt(i) - 0xD800) * 1024 + 0x10000;
+    }
+    r = MK_CONS_CC(cp, r, cc);
+    --i;
+  }
+  return r;
 }
 
 // convert array with modified UTF-8 encoded text

@@ -766,7 +766,9 @@ Library
         GHC.StgToJS.Regs
         GHC.StgToJS.Rts.Types
         GHC.StgToJS.Rts.Rts
-        GHC.StgToJS.Sinker
+        GHC.StgToJS.Sinker.Collect
+        GHC.StgToJS.Sinker.StringsUnfloat
+        GHC.StgToJS.Sinker.Sinker
         GHC.StgToJS.Stack
         GHC.StgToJS.StaticPtr
         GHC.StgToJS.Symbols

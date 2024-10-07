@@ -156,7 +156,7 @@ data CCallConv
   | StdCallConv
   | PrimCallConv
   | JavaScriptCallConv
-  deriving (Eq, Data, Enum)
+  deriving (Show, Eq, Data, Enum)
 
 instance Outputable CCallConv where
   ppr StdCallConv = text "stdcall"
