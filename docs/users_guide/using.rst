@@ -1590,78 +1590,48 @@ Some flags only make sense for particular target platforms.
     :type: dynamic
     :category: platform-options
 
-    (x86 only) These SIMD instructions are currently not supported by
-    the :ref:`native code generator <native-code-gen>`. Enabling this flag
-    has no effect and is only present for future extensions.
-
-    The :ref:`LLVM backend <llvm-code-gen>` may use AVX if your
-    processor supports it, but detects this automatically, so no flag is
-    required.
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX instructions.
 
 .. ghc-flag:: -mavx2
     :shortdesc: (x86 only) Enable support for AVX2 SIMD extensions
     :type: dynamic
     :category: platform-options
 
-    (x86 only) These SIMD instructions are currently not supported by
-    the :ref:`native code generator <native-code-gen>`. Enabling this flag
-    has no effect and is only present for future extensions.
-
-    The :ref:`LLVM backend <llvm-code-gen>` may use AVX2 if your
-    processor supports it, but detects this automatically, so no flag is
-    required.
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX2 instructions.
 
 .. ghc-flag:: -mavx512cd
     :shortdesc: (x86 only) Enable support for AVX512-CD SIMD extensions
     :type: dynamic
     :category: platform-options
 
-    (x86 only) These SIMD instructions are currently not supported by
-    the :ref:`native code generator <native-code-gen>`. Enabling this flag
-    has no effect and is only present for future extensions.
-
-    The :ref:`LLVM backend <llvm-code-gen>` may use AVX512 if your
-    processor supports it, but detects this automatically, so no flag is
-    required.
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-CD instructions.
 
 .. ghc-flag:: -mavx512er
     :shortdesc: (x86 only) Enable support for AVX512-ER SIMD extensions
     :type: dynamic
     :category: platform-options
 
-    (x86 only) These SIMD instructions are currently not supported by
-    the :ref:`native code generator <native-code-gen>`. Enabling this flag
-    has no effect and is only present for future extensions.
-
-    The :ref:`LLVM backend <llvm-code-gen>` may use AVX512 if your
-    processor supports it, but detects this automatically, so no flag is
-    required.
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-ER instructions.
 
 .. ghc-flag:: -mavx512f
     :shortdesc: (x86 only) Enable support for AVX512-F SIMD extensions
     :type: dynamic
     :category: platform-options
 
-    (x86 only) These SIMD instructions are currently not supported by
-    the :ref:`native code generator <native-code-gen>`. Enabling this flag
-    has no effect and is only present for future extensions.
-
-    The :ref:`LLVM backend <llvm-code-gen>` may use AVX512 if your
-    processor supports it, but detects this automatically, so no flag is
-    required.
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-F instructions.
 
 .. ghc-flag:: -mavx512pf
     :shortdesc: (x86 only) Enable support for AVX512-PF SIMD extensions
     :type: dynamic
     :category: platform-options
 
-    (x86 only) These SIMD instructions are currently not supported by
-    the :ref:`native code generator <native-code-gen>`. Enabling this flag
-    has no effect and is only present for future extensions.
-
-    The :ref:`LLVM backend <llvm-code-gen>` may use AVX512 if your
-    processor supports it, but detects this automatically, so no flag is
-    required.
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-PF instructions.
 
 .. ghc-flag:: -msse
     :shortdesc: (x86 only) Use SSE for floating-point operations
@@ -1706,15 +1676,9 @@ Some flags only make sense for particular target platforms.
     :category: platform-options
 
     (x86 only) Use the SSE3 instruction set to
-    implement some floating point and bit operations when using the
-    :ref:`native code generator <native-code-gen>`.
-
-    Note that the current version does not use SSE3 specific instructions
-    and only requires SSE2 processor support.
-
-    The :ref:`LLVM backend <llvm-code-gen>` will also use
-    SSE3 if your processor supports it but detects this automatically
-    so no flag is required.
+    implement some floating point and bit operations
+    (whether using the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`).
 
 .. ghc-flag:: -msse4
     :shortdesc: (x86 only) Use SSE4 for floating-point operations
@@ -1722,15 +1686,8 @@ Some flags only make sense for particular target platforms.
     :category: platform-options
 
     (x86 only) Use the SSE4 instruction set to
-    implement some floating point and bit operations when using the
-    :ref:`native code generator <native-code-gen>`.
-
-    Note that the current version does not use SSE4 specific instructions
-    and only requires SSE2 processor support.
-
-    The :ref:`LLVM backend <llvm-code-gen>` will also use
-    SSE4 if your processor supports it but detects this automatically
-    so no flag is required.
+    implement some floating point and bit operations(whether using the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`).
 
 .. ghc-flag:: -msse4.2
     :shortdesc: (x86 only) Use SSE4.2 for floating-point operations
@@ -1738,23 +1695,21 @@ Some flags only make sense for particular target platforms.
     :category: platform-options
 
     (x86 only, added in GHC 7.4.1) Use the SSE4.2 instruction set to
-    implement some floating point and bit operations when using the
-    :ref:`native code generator <native-code-gen>`. The resulting compiled
+    implement some floating point and bit operations,
+    whether using the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`. The resulting compiled
     code will only run on processors that support SSE4.2 (Intel Core i7
-    and later). The :ref:`LLVM backend <llvm-code-gen>` will also use
-    SSE4.2 if your processor supports it but detects this automatically
-    so no flag is required.
+    and later).
 
 .. ghc-flag:: -mbmi
     :shortdesc: (x86 only) Use BMI1 for bit manipulation operations
     :type: dynamic
     :category: platform-options
 
-    (x86 only) Use the BMI1 instruction set to implement some bit operations
-    when using the :ref:`native code generator <native-code-gen>`.
+    (x86 only) Use the BMI1 instruction set to implement some bit operations.
 
-    Note that the current version does not use BMI specific instructions,
-    so using this flag has no effect.
+    Note that GHC currently does not use BMI specific instructions,
+    so this flag has no effect when used with the :ref:`native code generator <native-code-gen>`.
 
 .. ghc-flag:: -mbmi2
     :shortdesc: (x86 only) Use BMI2 for bit manipulation operations
@@ -1762,9 +1717,11 @@ Some flags only make sense for particular target platforms.
     :category: platform-options
 
     (x86 only, added in GHC 7.4.1) Use the BMI2 instruction set to
-    implement some bit operations when using the
-    :ref:`native code generator <native-code-gen>`. The resulting compiled
-    code will only run on processors that support BMI2 (Intel Haswell and newer, AMD Excavator, Zen and newer).
+    implement some bit operations, whether using the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`.
+
+    The resulting compiled code will only run on processors that support BMI2
+    (Intel Haswell and newer, AMD Excavator, Zen and newer).
 
 .. ghc-flag:: -mfma
     :shortdesc: Use native FMA instructions for fused multiply-add floating-point operations
