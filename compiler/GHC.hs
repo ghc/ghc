@@ -704,6 +704,24 @@ setTopSessionDynFlags dflags = do
 
   -- Interpreter
   interp <- if
+    -- JavaScript interpreter
+    | ArchJavaScript <- platformArch (targetPlatform dflags)
+    -> do
+         s <- liftIO $ newMVar InterpPending
+         loader <- liftIO Loader.uninitializedLoader
+         let cfg = JSInterpConfig
+              { jsInterpNodeConfig  = defaultNodeJsSettings
+              , jsInterpScript      = topDir dflags </> "ghc-interp.js"
+              , jsInterpTmpFs       = hsc_tmpfs hsc_env
+              , jsInterpTmpDir      = tmpDir dflags
+              , jsInterpLogger      = hsc_logger hsc_env
+              , jsInterpCodegenCfg  = initStgToJSConfig dflags
+              , jsInterpUnitEnv     = hsc_unit_env hsc_env
+              , jsInterpFinderOpts  = initFinderOpts dflags
+              , jsInterpFinderCache = hsc_FC hsc_env
+              }
+         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache))
+
     -- external interpreter
     | gopt Opt_ExternalInterpreter dflags
     -> do
@@ -732,24 +750,6 @@ setTopSessionDynFlags dflags = do
          s <- liftIO $ newMVar InterpPending
          loader <- liftIO Loader.uninitializedLoader
          return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader lookup_cache))
-
-    -- JavaScript interpreter
-    | ArchJavaScript <- platformArch (targetPlatform dflags)
-    -> do
-         s <- liftIO $ newMVar InterpPending
-         loader <- liftIO Loader.uninitializedLoader
-         let cfg = JSInterpConfig
-              { jsInterpNodeConfig  = defaultNodeJsSettings
-              , jsInterpScript      = topDir dflags </> "ghc-interp.js"
-              , jsInterpTmpFs       = hsc_tmpfs hsc_env
-              , jsInterpTmpDir      = tmpDir dflags
-              , jsInterpLogger      = hsc_logger hsc_env
-              , jsInterpCodegenCfg  = initStgToJSConfig dflags
-              , jsInterpUnitEnv     = hsc_unit_env hsc_env
-              , jsInterpFinderOpts  = initFinderOpts dflags
-              , jsInterpFinderCache = hsc_FC hsc_env
-              }
-         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache))
 
     -- Internal interpreter
     | otherwise
