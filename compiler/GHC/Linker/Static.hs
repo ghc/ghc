@@ -77,7 +77,17 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
         arch_os   = platformArchOS platform
         output_fn = exeFileName arch_os staticLink (outputFile_ dflags)
         namever   = ghcNameVersion dflags
-        ways_     = ways dflags
+        -- For the wasm target, when ghc is invoked with -dynamic,
+        -- when linking the final .wasm binary we must still ensure
+        -- the static archives are selected. Otherwise wasm-ld would
+        -- fail to find and link the .so library dependencies. wasm-ld
+        -- can link PIC objects into static .wasm binaries fine, so we
+        -- only adjust the ways in the final linking step, and only
+        -- when linking .wasm binary (which is supposed to be fully
+        -- static), not when linking .so shared libraries.
+        ways_
+          | ArchWasm32 <- platformArch platform = removeWay WayDyn $ targetWays_ dflags
+          | otherwise = ways dflags
 
     full_output_fn <- if isAbsolute output_fn
                       then return output_fn
