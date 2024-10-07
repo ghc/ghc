@@ -5,7 +5,6 @@ module Rules.Generate (
     ) where
 
 import Development.Shake.FilePath
-import qualified Data.Set as Set
 import Base
 import qualified Context
 import Expression
@@ -25,7 +24,6 @@ import BindistConfig
 
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
-import GHC.ResponseFile (escapeArgs)
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -430,7 +428,7 @@ bindistRules = do
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
-    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (\s -> interp (queryTarget s (isJust . tgtRTSWithLibdw)))
+    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (fmap (isJust . tgtRTSWithLibdw) . targetStage)
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
     , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
@@ -490,7 +488,12 @@ generateSettings settingsFile = do
     -- ("cross compiling", expr $ yesNo <$> crossStage (predStage stage))
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = predStage stage })))
         , ("Use interpreter", expr $ yesNo <$> Oracles.Setting.ghcWithInterpreter stage)
-        , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
+        -- Hard-coded as Cabal queries these to determine way support and we
+        -- need to always advertise all ways when bootstrapping.
+        -- The settings file is generated at install time when installing a bindist.
+        , ("RTS ways", return "v p p p_dyn")
+        -- ROMES:TODO: This is what we had previously? Double check we want this hardcoded list.
+        -- , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
         ]
