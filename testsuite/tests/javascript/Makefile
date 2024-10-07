@@ -7,3 +7,9 @@ T24495:
 	./T24495
 	# check that the optimization occurred
 	grep -c appendToHsStringA T24495.dump-js
+
+T23479:
+	'$(TEST_HC)' $(TEST_HC_OPTS) T23479.hs -v0 -O1 -dsuppress-uniques -ddump-js -ddump-to-file
+	./T23479
+	# check that the optimization occurred
+	grep -c " h\$$decodeUtf8z" T23479.dump-js

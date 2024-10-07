@@ -1215,3 +1215,7 @@ hdStiStr = fsLit "h$sti"
 
 hdStrStr :: FastString
 hdStrStr = fsLit "h$str"
+------------------------------ Pack/Unpack --------------------------------------------
+
+hdDecodeUtf8Z :: FastString
+hdDecodeUtf8Z = fsLit "h$decodeUtf8z"

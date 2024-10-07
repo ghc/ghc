@@ -297,6 +297,7 @@ data ForeignJSRef = ForeignJSRef
   , foreignRefArgs     :: ![FastString]
   , foreignRefResult   :: !FastString
   }
+  deriving (Show)
 
 -- | data used to generate one ObjBlock in our object file
 data LinkableUnit = LinkableUnit
