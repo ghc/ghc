@@ -334,6 +334,20 @@ def req_th( name, opts ):
     if ghc_dynamic():
         return _omit_ways(name, opts, ['profasm', 'profthreaded'])
 
+def req_plugins( name, opts ):
+    """
+    Mark a test as requiring GHC plugins. In additional to having
+    interpreter support, currently we don't run the test for cross
+    GHCs, since plugin support for cross GHC (!7377) is unfinished
+    work (#14335) and completely untested in CI, and we don't enable
+    the internal-interpreter flag for the ghc library for cross GHC
+    anyway.
+    """
+    req_interp(name, opts)
+
+    if config.cross:
+        opts.skip = True
+
 def req_ghc_smp( name, opts ):
     """
     Mark a test as requiring GHC to be linked with an RTS that supports smp.
