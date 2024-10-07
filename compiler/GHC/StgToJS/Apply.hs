@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -46,11 +47,13 @@ import GHC.StgToJS.Stack
 import GHC.StgToJS.Symbols
 import GHC.StgToJS.Types
 import GHC.StgToJS.Utils
+import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
 import GHC.Types.RepType (mightBeFunTy)
+import GHC.Types.Literal
 
 import GHC.Stg.Syntax
 
@@ -86,7 +89,6 @@ rtsApply cfg = jBlock
      , moveRegs2
      ]
 
-
 -- | Generate an application of some args to an Id.
 --
 -- The case where args is null is common as it's used to generate the evaluation
@@ -98,6 +100,62 @@ genApp
   -> [StgArg]
   -> G (JStgStat, ExprResult)
 genApp ctx i args
+    -- Test case T23479_2
+    -- See: https://github.com/ghcjs/ghcjs/blob/b7711fbca7c3f43a61f1dba526e6f2a2656ef44c/src/Gen2/Generator.hs#L876
+    -- Comment by Luite Stegeman <luite.stegeman@iohk.io>
+    -- Special cases for JSString literals.
+    -- We could handle unpackNBytes# here, but that's probably not common
+    -- enough to warrant a special case.
+    -- See: https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10588/#note_503978
+    -- Comment by Jeffrey Young  <jeffrey.young@iohk.io>
+    -- We detect if the Id is unsafeUnpackJSStringUtf8## applied to a string literal,
+    -- if so then we convert the unsafeUnpack to a call to h$decode.
+    | [StgVarArg v] <- args
+    , idName i == unsafeUnpackJSStringUtf8ShShName
+    -- See: https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10588
+    -- Comment by Josh Meredith  <josh.meredith@iohk.io>
+    -- `typex_expr` can throw an error for certain bindings so it's important
+    -- that this condition comes after matching on the function name
+    , [top] <- concatMap typex_expr (ctxTarget ctx)
+    = (,ExprInline) . (|=) top . app hdDecodeUtf8Z <$> varsForId v
+
+    -- Test case T23479_1
+    | [StgLitArg (LitString bs)] <- args
+    , Just d <- decodeModifiedUTF8 bs
+    , idName i == unsafeUnpackJSStringUtf8ShShName
+    , [top] <- concatMap typex_expr (ctxTarget ctx)
+    = return . (,ExprInline) $ top |= toJExpr d
+
+    -- Test case T24495 with single occurrence at -02 and third occurrence at -01
+    -- Moved back from removal at https://gitlab.haskell.org/ghc/ghc/-/merge_requests/12308
+    -- See commit hash b36ee57bfbecc628b7f0919e1e59b7066495034f
+    --
+    -- Case: unpackCStringAppend# "some string"# str
+    --
+    -- Generates h$appendToHsStringA(str, "some string"), which has a faster
+    -- decoding loop.
+    | [StgLitArg (LitString bs), x] <- args
+    , Just d <- decodeModifiedUTF8 bs
+    , getUnique i == unpackCStringAppendIdKey
+    , [top] <- concatMap typex_expr (ctxTarget ctx)
+    = do
+        prof <- csProf <$> getSettings
+        let profArg = if prof then [jCafCCS] else []
+        a <- genArg x
+        return ( top |= app "h$appendToHsStringA" (toJExpr d : a ++ profArg)
+               , ExprInline
+               )
+    | [StgLitArg (LitString bs), x] <- args
+    , Just d <- decodeModifiedUTF8 bs
+    , getUnique i == unpackCStringAppendUtf8IdKey
+    , [top] <- concatMap typex_expr (ctxTarget ctx)
+    = do
+        prof <- csProf <$> getSettings
+        let profArg = if prof then [jCafCCS] else []
+        a <- genArg x
+        return ( top |= app "h$appendToHsString" (toJExpr d : a ++ profArg)
+               , ExprInline
+               )
 
     -- let-no-escape
     | Just n <- ctxLneBindingStackSize ctx i

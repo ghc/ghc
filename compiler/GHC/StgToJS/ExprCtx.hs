@@ -86,6 +86,16 @@ data ExprCtx = ExprCtx
 
   }
 
+instance Outputable ExprCtx where
+  ppr g = hang (text "ExprCtx") 2 $ vcat
+            [ hcat [text "ctxTop: ", ppr (ctxTop g)]
+            , hcat [text "ctxTarget:", ppr (ctxTarget g)]
+            , hcat [text "ctxSrcSpan:", ppr (ctxSrcSpan g)]
+            , hcat [text "ctxLneFrameBs:", ppr (ctxLneFrameBs g)]
+            , hcat [text "ctxLneFrameVars:", ppr (ctxLneFrameVars g)]
+            , hcat [text "ctxLneFrameSize:", ppr (ctxLneFrameSize g)]
+            ]
+
 -- | Initialize an expression context in the context of the given top-level
 -- binding Id
 initExprCtx :: Id -> ExprCtx

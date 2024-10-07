@@ -54,6 +54,7 @@ import GHC.StgToJS.Stack
 import GHC.StgToJS.Symbols
 import GHC.StgToJS.Types
 import GHC.StgToJS.Utils
+import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 
 import GHC.Types.CostCentre
 import GHC.Types.Tickish
@@ -76,7 +77,6 @@ import GHC.Core.Opt.Arity (isOneShotBndr)
 import GHC.Core.Type hiding (typeSize)
 
 import GHC.Utils.Misc
-import GHC.Utils.Encoding
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Outputable (ppr, renderWithContext, defaultSDocContext)
@@ -581,13 +581,28 @@ genCase ctx bnd e at alts l
   , getUnique i == unpackCStringAppendIdKey
   , [StgVarArg b',x] <- args
   , bnd == b'
-  , d <- utf8DecodeByteString bs
+  , Just d <- decodeModifiedUTF8 bs
   , [top] <- concatMap typex_expr (ctxTarget ctx)
   = do
       prof <- csProf <$> getSettings
       let profArg = if prof then [jCafCCS] else []
       a <- genArg x
       return ( top |= app "h$appendToHsStringA" (toJExpr d : a ++ profArg)
+             , ExprInline
+             )
+  | StgLit (LitString bs) <- e
+  , [GenStgAlt DEFAULT _ rhs] <- alts
+  , StgApp i args <- rhs
+  , getUnique i == unpackCStringAppendUtf8IdKey
+  , [StgVarArg b',x] <- args
+  , bnd == b'
+  , Just d <- decodeModifiedUTF8 bs
+  , [top] <- concatMap typex_expr (ctxTarget ctx)
+  = do
+      prof <- csProf <$> getSettings
+      let profArg = if prof then [jCafCCS] else []
+      a <- genArg x
+      return ( top |= app "h$appendToHsString" (toJExpr d : a ++ profArg)
              , ExprInline
              )
 

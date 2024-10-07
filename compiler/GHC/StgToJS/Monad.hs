@@ -31,6 +31,7 @@ import GHC.JS.Transform
 import GHC.StgToJS.Types
 
 import GHC.Unit.Module
+import GHC.Utils.Outputable
 import GHC.Stg.Syntax
 
 import GHC.Types.SrcLoc
@@ -158,6 +159,13 @@ data GlobalOcc = GlobalOcc
   , global_id    :: !Id
   , global_count :: !Word
   }
+
+instance Outputable GlobalOcc where
+  ppr g = hang (text "GlobalOcc") 2 $ vcat
+            [ hcat [text "Ident: ", ppr (global_ident g)]
+            , hcat [text "Id:", ppr (global_id g)]
+            , hcat [text "Count:", ppr (global_count g)]
+            ]
 
 -- | Return number of occurrences of every global id used in the given JStgStat.
 -- Sort by increasing occurrence count.
