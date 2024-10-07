@@ -126,7 +126,7 @@ test('static001', [extra_files(['Static001.hs']),
      makefile_test, ['static001'])
 
 test('dynHelloWorld',
-     [only_ways(['dyn']), when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+     [only_ways(['dyn']), when(opsys('linux') and not ghc_dynamic() and not arch('wasm32'), expect_broken(20706))],
      compile_and_run,
      [''])
 
