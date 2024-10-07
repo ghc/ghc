@@ -136,6 +136,9 @@ class TestConfig:
         # Do we have interpreter support?
         self.have_interp = False
 
+        # Are we cross-compiling?
+        self.cross = False
+
         # Do we have RTS linker?
         self.have_RTS_linker = False
 
