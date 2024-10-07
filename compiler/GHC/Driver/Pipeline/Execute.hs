@@ -964,7 +964,7 @@ llvmOptions llvm_config dflags =
 
         attrs :: String
         attrs = intercalate "," $ mattr
-              ++ ["+sse42"   | isSse4_2Enabled dflags   ]
+              ++ ["+sse4.2"  | isSse4_2Enabled dflags   ]
               ++ ["+sse2"    | isSse2Enabled platform   ]
               ++ ["+sse"     | isSseEnabled platform    ]
               ++ ["+avx512f" | isAvx512fEnabled dflags  ]
