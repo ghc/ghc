@@ -1,5 +1,5 @@
 setTestOpts([
-    req_interp,
+    req_plugins,
     # Plugins aren't supported with the JS backend so we get unexpected passes
     # for tests that expected to fail... Just skipping them for now until #14335
     # is fixed
