@@ -284,8 +284,8 @@ instance ToJExpr StaticLit where
   toJExpr (IntLit i)            = toJExpr i
   toJExpr NullLit               = null_
   toJExpr (DoubleLit d)         = toJExpr (unSaneDouble d)
-  toJExpr (StringLit t)         = app hdStrStr [toJExpr t]
-  toJExpr (BinLit b)            = app hdRawStr [toJExpr (map toInteger (BS.unpack b))]
+  toJExpr (StringLit t)         = app hdEncodeModifiedUtf8Str [toJExpr t]
+  toJExpr (BinLit b)            = app hdRawStringDataStr      [toJExpr (map toInteger (BS.unpack b))]
   toJExpr (LabelLit _isFun lbl) = global lbl
 
 -- | A foreign reference to some JS code
@@ -297,6 +297,7 @@ data ForeignJSRef = ForeignJSRef
   , foreignRefArgs     :: ![FastString]
   , foreignRefResult   :: !FastString
   }
+  deriving (Show)
 
 -- | data used to generate one ObjBlock in our object file
 data LinkableUnit = LinkableUnit

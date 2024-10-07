@@ -18,8 +18,8 @@ import GHC.StgToJS.Ids
 import GHC.StgToJS.Monad
 import GHC.StgToJS.Symbols
 import GHC.StgToJS.Types
+import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 
-import GHC.Data.FastString
 import GHC.Types.Literal
 import GHC.Types.Basic
 import GHC.Types.RepType
@@ -95,9 +95,10 @@ genLit = \case
 genStaticLit :: Literal -> G [StaticLit]
 genStaticLit = \case
   LitChar c                -> return [ IntLit (fromIntegral $ ord c) ]
-  LitString str
-    | True                 -> return [ StringLit (mkFastStringByteString str), IntLit 0]
-    -- \|  invalid UTF8         -> return [ BinLit str, IntLit 0]
+  LitString str -> case decodeModifiedUTF8 str of
+    Just t                 -> return [ StringLit t, IntLit 0]
+    -- invalid UTF8
+    Nothing                -> return [ BinLit str, IntLit 0]
   LitNullAddr              -> return [ NullLit, IntLit 0 ]
   LitNumber nt v           -> case nt of
     LitNumInt     -> return [ IntLit v ]
