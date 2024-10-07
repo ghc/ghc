@@ -29,6 +29,10 @@ GHCi
 Runtime system
 ~~~~~~~~~~~~~~
 
+- Add new runtime flag :rts-flag:`--optimistic-linking` which instructs the
+  runtime linker to continue in the presence of unknown symbols. By default this
+  flag is not passed, preserving previous behavior.
+
 Cmm
 ~~~
 
