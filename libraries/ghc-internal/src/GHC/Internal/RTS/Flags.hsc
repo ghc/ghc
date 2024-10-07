@@ -162,7 +162,8 @@ data MiscFlags = MiscFlags
     , disableDelayedOsMemoryReturn :: Bool
     , internalCounters      :: Bool
     , linkerAlwaysPic       :: Bool
-    , linkerOptimistic      :: Bool
+    -- TODO: #25354 uncomment to expose this flag to base.
+    -- , linkerOptimistic      :: Bool
     , linkerMemBase         :: Word
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
     , ioManager             :: IoManagerFlag
