@@ -67,6 +67,7 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   leadingUnderscore :: Bool
  ,   withNativeCodeGen :: Bool
  ,   withInterpreter   :: Bool
+ ,   cross             :: Bool
  ,   unregisterised    :: Bool
  ,   tables_next_to_code :: Bool
  ,   targetWithSMP       :: Bool  -- does the target support SMP
@@ -159,6 +160,7 @@ outOfTreeCompilerArgs = do
     leadingUnderscore   <- getBooleanSetting TestLeadingUnderscore
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
+    cross               <- getBooleanSetting TestGhcCrossCompiling
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     tables_next_to_code <- getBooleanSetting TestGhcTablesNextToCode
     targetWithSMP       <- targetSupportsSMP
@@ -275,6 +277,7 @@ runTestBuilderArgs = builder Testsuite ? do
 
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
+            , arg "-e", arg $ "config.cross=" ++ show cross
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
             , arg "-e", arg $ "config.tables_next_to_code=" ++ show tables_next_to_code
 

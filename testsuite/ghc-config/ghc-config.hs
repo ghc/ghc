@@ -22,6 +22,7 @@ main = do
   getGhcFieldOrFail fields "GhcDebugAssertions" "Debug on"
   getGhcFieldOrFail fields "GhcWithNativeCodeGen" "Have native code generator"
   getGhcFieldOrFail fields "GhcWithInterpreter" "Have interpreter"
+  getGhcFieldOrFail fields "CrossCompiling" "cross compiling"
   getGhcFieldOrFail fields "GhcWithRtsLinker" "target has RTS linker"
   getGhcFieldOrFail fields "GhcUnregisterised" "Unregisterised"
   getGhcFieldOrFail fields "GhcWithSMP" "Support SMP"
