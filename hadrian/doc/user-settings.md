@@ -33,9 +33,6 @@ data Flavour = Flavour {
     rtsWays :: Ways,
     -- | Build dynamic GHC programs.
     dynamicGhcPrograms :: Action Bool,
-    -- | Enable GHCi debugger.
-    ghciWithDebugger :: Stage -- ^ stage of the /built/ compiler
-                     -> Bool,
     -- | Build profiled GHC.
     ghcProfiled :: Stage -- ^ stage of the /built/ compiler
                 -> Bool,
