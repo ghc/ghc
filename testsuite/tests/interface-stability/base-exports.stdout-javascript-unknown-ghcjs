@@ -5285,7 +5285,7 @@ module GHC.Exception where
   type SomeException :: *
   data SomeException = forall e. (Exception e, GHC.Internal.Exception.Type.HasExceptionContext) => SomeException e
   type SrcLoc :: *
-  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: GHC.Types.Int, srcLocStartCol :: GHC.Types.Int, srcLocEndLine :: GHC.Types.Int, srcLocEndCol :: GHC.Types.Int}
+  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-}GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-}GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-}GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-}GHC.Types.Int}
   divZeroException :: SomeException
   errorCallException :: GHC.Internal.Base.String -> SomeException
   errorCallWithCallStackException :: GHC.Internal.Base.String -> CallStack -> SomeException
@@ -12392,7 +12392,7 @@ module GHC.Stack where
   type HasCallStack :: Constraint
   type HasCallStack = ?callStack::CallStack :: Constraint
   type SrcLoc :: *
-  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: GHC.Types.Int, srcLocStartCol :: GHC.Types.Int, srcLocEndLine :: GHC.Types.Int, srcLocEndCol :: GHC.Types.Int}
+  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-}GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-}GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-}GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-}GHC.Types.Int}
   callStack :: HasCallStack => CallStack
   ccLabel :: GHC.Internal.Ptr.Ptr CostCentre -> GHC.Types.IO GHC.Internal.Foreign.C.String.Encoding.CString
   ccModule :: GHC.Internal.Ptr.Ptr CostCentre -> GHC.Types.IO GHC.Internal.Foreign.C.String.Encoding.CString
@@ -12453,7 +12453,7 @@ module GHC.Stack.Types where
   type HasCallStack :: Constraint
   type HasCallStack = ?callStack::CallStack :: Constraint
   type SrcLoc :: *
-  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: GHC.Types.Int, srcLocStartCol :: GHC.Types.Int, srcLocEndLine :: GHC.Types.Int, srcLocEndCol :: GHC.Types.Int}
+  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: {-# UNPACK #-}GHC.Types.Int, srcLocStartCol :: {-# UNPACK #-}GHC.Types.Int, srcLocEndLine :: {-# UNPACK #-}GHC.Types.Int, srcLocEndCol :: {-# UNPACK #-}GHC.Types.Int}
   emptyCallStack :: CallStack
   freezeCallStack :: CallStack -> CallStack
   fromCallSiteList :: [([GHC.Types.Char], SrcLoc)] -> CallStack

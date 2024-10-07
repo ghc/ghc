@@ -45,7 +45,7 @@ evCallStack (EvCsPushCall fs loc tm) = do
   let platform = targetPlatform df
   m             <- getModule
   srcLocDataCon <- lookupDataCon srcLocDataConName
-  let mkSrcLoc l = mkCoreConApps srcLocDataCon <$>
+  let mkSrcLoc l = mkCoreConWrapApps srcLocDataCon <$>
                sequence [ mkStringExprFS (unitFS $ moduleUnit m)
                         , mkStringExprFS (moduleNameFS $ moduleName m)
                         , mkStringExprFS (srcSpanFile l)

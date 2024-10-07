@@ -217,8 +217,8 @@ data SrcLoc = SrcLoc
   { srcLocPackage   :: [Char]
   , srcLocModule    :: [Char]
   , srcLocFile      :: [Char]
-  , srcLocStartLine :: Int
-  , srcLocStartCol  :: Int
-  , srcLocEndLine   :: Int
-  , srcLocEndCol    :: Int
+  , srcLocStartLine :: !Int
+  , srcLocStartCol  :: !Int
+  , srcLocEndLine   :: !Int
+  , srcLocEndCol    :: !Int
   } deriving Eq -- ^ @since base-4.9.0.0

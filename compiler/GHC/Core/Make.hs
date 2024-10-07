@@ -4,7 +4,7 @@
 module GHC.Core.Make (
         -- * Constructing normal syntax
         mkCoreLet, mkCoreLets,
-        mkCoreApp, mkCoreApps, mkCoreConApps,
+        mkCoreApp, mkCoreApps, mkCoreConApps, mkCoreConWrapApps,
         mkCoreLams, mkWildCase, mkIfThenElse,
         mkWildValBinder,
         mkSingleAltCase,
@@ -70,7 +70,7 @@ import GHC.Core.Type
 import GHC.Core.Predicate    ( isCoVarType )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Coercion     ( isCoVar )
-import GHC.Core.DataCon      ( DataCon, dataConWorkId )
+import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
 import GHC.Core.Multiplicity
 
 import GHC.Builtin.Types
@@ -132,6 +132,13 @@ mkCoreLets binds body = foldr mkCoreLet body binds
 -- in the list is applied first
 mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
 mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
+
+-- | A variant of 'mkCoreConApps' constructs an expression which represents the
+-- application of a number of expressions to that of a data constructor
+-- expression using the wrapper, not the worker, of the data constructor. The
+-- leftmost expression in the list is applied first
+mkCoreConWrapApps :: DataCon -> [CoreExpr] -> CoreExpr
+mkCoreConWrapApps con args = mkCoreApps (Var (dataConWrapId con)) args
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
