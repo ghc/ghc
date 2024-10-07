@@ -6,7 +6,6 @@ module Rules.Generate (
 
 import Development.Shake.FilePath
 import Data.Char (isSpace)
-import qualified Data.Set as Set
 import Base
 import qualified Context
 import Expression
@@ -537,7 +536,10 @@ generateSettings settingsFile = do
         , ("target RTS linker only supports shared libraries", expr $ yesNo <$> targetRTSLinkerOnlySupportsSharedLibs stage)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter stage)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP stage)
-        , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
+        -- Hard-coded as Cabal queries these to determine way support and we
+        -- need to always advertise all ways when bootstrapping.
+        -- The settings file is generated at install time when installing a bindist.
+        , ("RTS ways", return "v p p p_dyn")
         , ("Tables next to code", queryTarget stage (yesNo . tgtTablesNextToCode))
         , ("Leading underscore",  queryTarget stage (yesNo . tgtSymbolsHaveLeadingUnderscore))
         , ("Use LibFFI", expr $ yesNo <$> targetUseLibffiForAdjustors stage)
