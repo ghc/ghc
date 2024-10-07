@@ -11,7 +11,14 @@ $(do
    -- could reuse FP_LEADING_UNDERSCORE from aclocal.m4 for this
    -- somehow, but this hopefully is OK for now.
    addForeignSource LangAsm $ unlines
-#if defined(darwin_HOST_OS) || (defined(mingw32_HOST_OS) && WORD_SIZE_IN_BITS == 32)
+#if defined(wasm32_HOST_ARCH)
+      [ ".section .rodata.mydata,\"\",@"
+      , ".globl mydata"
+      , "mydata:"
+      , ".asciz \"Hello world\""
+      , ".size mydata, 12"
+      ]
+#elif defined(darwin_HOST_OS) || (defined(mingw32_HOST_OS) && WORD_SIZE_IN_BITS == 32)
       [ ".global \"_mydata\""
       , "_mydata:"
       , ".ascii \"Hello world\\0\""
