@@ -21,3 +21,4 @@ test('T8131b', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, 
 test('T11649', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, [''])
 test('T17920fail', cmm_src, compile_fail, ['-no-hs-main'])
 test('T25019', unless((arch('x86_64') or arch('i386')) and have_cpu_feature('sse4_2'),skip), compile, ['-msse4.2'])
+test('T25353', unless((arch('x86_64') or arch('i386')) and have_cpu_feature('sse4_2'),skip), compile_grep_asm, ['hs', True, '-msse4.2'])
