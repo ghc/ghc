@@ -1000,6 +1000,10 @@ llvmOptions llvm_config dflags =
         attrs :: String
         attrs = intercalate "," $ mattr
               ++ ["+sse4.2"  | isSse4_2Enabled dflags   ]
+              ++ ["+popcnt"  | isSse4_2Enabled dflags   ]
+                   -- LLVM gates POPCNT instructions behind the popcnt flag,
+                   -- while the GHC NCG (as well as GCC, Clang) gates it
+                   -- behind SSE4.2 instead.
               ++ ["+sse2"    | isSse2Enabled platform   ]
               ++ ["+sse"     | isSseEnabled platform    ]
               ++ ["+avx512f" | isAvx512fEnabled dflags  ]
