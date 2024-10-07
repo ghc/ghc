@@ -81,7 +81,6 @@ if not config.arch == "javascript":
 
 if config.arch == "wasm32":
     config.have_process = False
-    config.supports_dynamic_libs = False
 
 config.way_flags = {
     'normal'       : [],

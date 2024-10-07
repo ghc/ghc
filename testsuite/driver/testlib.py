@@ -256,11 +256,8 @@ def req_dynamic_ghc( name, opts ):
         skip(name,opts)
 
 def req_interp( name, opts ):
-    if not config.have_interp or needsTargetWrapper():
+    if not config.have_interp:
         opts.expect = 'fail'
-    # skip on wasm32, otherwise they show up as unexpected passes
-    if arch('wasm32'):
-        skip(name, opts)
 
 def req_bco( name, opts ):
     '''
