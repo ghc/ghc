@@ -470,6 +470,8 @@ mkErrorItem ct
              flav = ctFlavour ct
 
        ; (suppress, m_evdest) <- case ctEvidence ct of
+         -- For this `suppress` stuff
+         -- see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
            CtGiven {} -> return (False, Nothing)
            CtWanted { ctev_rewriters = rewriters, ctev_dest = dest }
              -> do { rewriters' <- zonkRewriterSet rewriters
