@@ -17,6 +17,9 @@ SUPPORTED_CPU_FEATURES = {
 cpu_feature_cache = None
 
 def get_cpu_features():
+    # Don't use host cpu features when testing cross ghc.
+    if config.cross:
+        return []
     try:
         # This import might fail, e.g. if "ctypes" is not available,
         # in which case we report the empty set of features.
