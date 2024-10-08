@@ -1478,13 +1478,15 @@ decideAndPromoteTyVars infer_mode name_taus psigs wanted
              --  (a) free in envt (already promoted)
              --  (b) will be defaulted
              --  (c) determined by (a) or (b)
+             -- ToDO: fix this comment: In /top-level bindings/ do not quantify over any constraints
+             -- that mention a promoted tyvar. See Note [Generalising top-level bindings]
+
              mono_tvs0
                | isTopTcLevel tc_lvl
-               = outerLevelTyVars tc_lvl (tyCoVarsOfTypes (ctsPreds post_mr_quant))
+               = outerLevelTyVars tc_lvl (tyCoVarsOfTypes post_mr_quant)
                  `unionVarSet` tyCoVarsOfTypes mr_no_quant
 
                | otherwise
-
                = outerLevelTyVars tc_lvl (tyCoVarsOfTypes post_mr_quant)
                      -- outerLevelTyVars are free in the envt, so can't quantify them
                  `unionVarSet` tyCoVarsOfTypes (ctsPreds no_quant)
@@ -1530,16 +1532,6 @@ decideAndPromoteTyVars infer_mode name_taus psigs wanted
              -- If there is a variable in mono_tvs, but not in mono_tvs_wo_mr
              -- then the MR has "bitten" and reduced polymorphism.
 
-       -- In /top-level bindings/ do not quantify over any constraints
-       -- that mention a promoted tyvar. See Note [Generalising top-level bindings]
-{-
-       ; let final_quant | isTopTcLevel tc_lvl
-                         = filterOut (predMentions mono_tvs) post_mr_quant
-                         | otherwise
-                         = post_mr_quant
--}
-       ; let final_quant = post_mr_quant
-
        -- Promote the mono_tvs: see Note [Promote monomorphic tyvars]
        ; _ <- promoteTyVarSet mono_tvs
 
@@ -1554,11 +1546,10 @@ decideAndPromoteTyVars infer_mode name_taus psigs wanted
            , text "post_mr_quant =" <+> ppr post_mr_quant
            , text "no_quant =" <+> ppr no_quant
            , text "mr_no_quant =" <+> ppr mr_no_quant
-           , text "final_quant =" <+> ppr final_quant
            , text "mono_tvs =" <+> ppr mono_tvs
            , text "co_vars =" <+> ppr co_vars ]
 
-       ; return (final_quant, co_vars) }
+       ; return (post_mr_quant, co_vars) }
 
 -------------------
 applyMR :: DynFlags -> InferMode -> [PredType]
