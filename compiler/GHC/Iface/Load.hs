@@ -317,7 +317,7 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
   = do hsc_env <- getTopEnv
-       res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
+       res <- liftIO $ findImportedModuleWithIsBoot hsc_env (GWIB mod want_boot) maybe_pkg
        case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good
@@ -895,9 +895,9 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
       else do
           let fopts = initFinderOpts dflags
           -- Look for the file
-          mb_found <- liftIO (findExactModule fc fopts other_fopts unit_state mhome_unit mod)
+          mb_found <- liftIO (findExactModule fc fopts other_fopts unit_state mhome_unit (GWIB mod hi_boot_file))
           case mb_found of
-              InstalledFound (addBootSuffixLocn_maybe hi_boot_file -> loc) mod -> do
+              InstalledFound loc -> do
                   -- See Note [Home module load error]
                   case mhome_unit of
                     Just home_unit

@@ -13,10 +13,6 @@ module GHC.Unit.Module.Location
     )
    , pattern ModLocation
    , addBootSuffix
-   , addBootSuffix_maybe
-   , addBootSuffixLocn_maybe
-   , addBootSuffixLocn
-   , addBootSuffixLocnOut
    , removeBootSuffix
    , mkFileSrcSpan
    )
@@ -25,7 +21,6 @@ where
 import GHC.Prelude
 
 import GHC.Data.OsPath
-import GHC.Unit.Types
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.FastString (mkFastString)
@@ -98,38 +93,6 @@ removeBootSuffix pathWithBootSuffix =
   case OsString.stripSuffix (os "-boot") pathWithBootSuffix of
     Just path -> path
     Nothing -> error "removeBootSuffix: no -boot suffix"
-
--- | Add the @-boot@ suffix if the @Bool@ argument is @True@
-addBootSuffix_maybe :: IsBootInterface -> OsPath -> OsPath
-addBootSuffix_maybe is_boot path = case is_boot of
-  IsBoot -> addBootSuffix path
-  NotBoot -> path
-
-addBootSuffixLocn_maybe :: IsBootInterface -> ModLocation -> ModLocation
-addBootSuffixLocn_maybe is_boot locn = case is_boot of
-  IsBoot -> addBootSuffixLocn locn
-  _ -> locn
-
--- | Add the @-boot@ suffix to all file paths associated with the module
-addBootSuffixLocn :: ModLocation -> ModLocation
-addBootSuffixLocn locn
-  = locn { ml_hs_file_ospath = fmap addBootSuffix (ml_hs_file_ospath locn)
-         , ml_hi_file_ospath  = addBootSuffix (ml_hi_file_ospath locn)
-         , ml_dyn_hi_file_ospath = addBootSuffix (ml_dyn_hi_file_ospath locn)
-         , ml_obj_file_ospath = addBootSuffix (ml_obj_file_ospath locn)
-         , ml_dyn_obj_file_ospath = addBootSuffix (ml_dyn_obj_file_ospath locn)
-         , ml_hie_file_ospath = addBootSuffix (ml_hie_file_ospath locn) }
-
--- | Add the @-boot@ suffix to all output file paths associated with the
--- module, not including the input file itself
-addBootSuffixLocnOut :: ModLocation -> ModLocation
-addBootSuffixLocnOut locn
-  = locn { ml_hi_file_ospath = addBootSuffix (ml_hi_file_ospath locn)
-         , ml_dyn_hi_file_ospath = addBootSuffix (ml_dyn_hi_file_ospath locn)
-         , ml_obj_file_ospath = addBootSuffix (ml_obj_file_ospath locn)
-         , ml_dyn_obj_file_ospath = addBootSuffix (ml_dyn_obj_file_ospath locn)
-         , ml_hie_file_ospath = addBootSuffix (ml_hie_file_ospath locn)
-         }
 
 -- | Compute a 'SrcSpan' from a 'ModLocation'.
 mkFileSrcSpan :: ModLocation -> SrcSpan

@@ -2126,31 +2126,21 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
               ".lhs-boot" -> IsBoot
               _ -> NotBoot
 
-            (path_without_boot, hsc_src)
-              | isHaskellSigFilename src_fn = (src_path, HsigFile)
-              | IsBoot <- is_boot = (removeBootSuffix src_path, HsBootFile)
-              | otherwise = (src_path, HsSrcFile)
+            modWithIsBoot = GWIB pi_mod_name is_boot
 
-            -- Make a ModLocation for the Finder, who only has one entry for
-            -- each @ModuleName@, and therefore needs to use the locations for
-            -- the non-boot files.
-            location_without_boot =
-              mkHomeModLocation fopts pi_mod_name path_without_boot
+            hsc_src
+              | IsBoot <- is_boot = HsBootFile
+              | isHaskellSigFilename src_fn = HsigFile
+              | otherwise = HsSrcFile
 
-            -- Make a ModLocation for this file, adding the @-boot@ suffix to
-            -- all paths if the original was a boot file.
-            location
-              | IsBoot <- is_boot
-              = addBootSuffixLocn location_without_boot
-              | otherwise
-              = location_without_boot
+            location = mkHomeModLocation fopts modWithIsBoot src_path
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
         mod <- liftIO $ do
           let home_unit = hsc_home_unit hsc_env
           let fc        = hsc_FC hsc_env
-          addHomeModuleToFinder fc home_unit (GWIB pi_mod_name is_boot) location
+          addHomeModuleToFinder fc home_unit modWithIsBoot location
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2180,14 +2170,10 @@ checkSummaryHash
            -- and it was likely flushed in depanal. This is not technically
            -- needed when we're called from sumariseModule but it shouldn't
            -- hurt.
-           -- Also, only add to finder cache for non-boot modules as the finder cache
-           -- makes sure to add a boot suffix for boot files.
            _ <- do
               let fc = hsc_FC hsc_env
                   gwib = GWIB (ms_mod old_summary) (isBootSummary old_summary)
-              case ms_hsc_src old_summary of
-                HsSrcFile -> addModuleToFinder fc gwib location
-                _ -> return ()
+              addModuleToFinder fc gwib location
 
            hi_timestamp <- modificationTimeIfExists (ml_hi_file location)
            hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
@@ -2239,7 +2225,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
     find_it :: IO SummariseResult
 
     find_it = do
-        found <- findImportedModule hsc_env wanted_mod mb_pkg
+        found <- findImportedModuleWithIsBoot hsc_env (GWIB wanted_mod is_boot) mb_pkg
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->
@@ -2257,10 +2243,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
     just_found location mod = do
                 -- Adjust location to point to the hs-boot source file,
                 -- hi file, object file, when is_boot says so
-        let location' = case is_boot of
-              IsBoot -> addBootSuffixLocn location
-              NotBoot -> location
-            src_fn = expectJust "summarise2" (ml_hs_file location')
+        let src_fn = expectJust "summarise2" (ml_hs_file location)
 
                 -- Check that it exists
                 -- It might have been deleted since the Finder last found it
@@ -2270,7 +2253,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
           -- .hs-boot file doesn't exist.
           Nothing -> return NotThere
           Just h  -> do
-            fresult <- new_summary_cache_check location' mod src_fn h
+            fresult <- new_summary_cache_check location mod src_fn h
             return $ case fresult of
               Left err -> FoundHomeWithError (moduleUnitId mod, err)
               Right ms -> FoundHome ms
