@@ -45,6 +45,7 @@ import GHC.Builtin.Types
   , promotedNilDataCon
   , unitTy
   )
+
 import GHC.Builtin.Types.Prim (alphaTyVars)
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
@@ -176,7 +177,7 @@ tyThingToLHsDecl prr t = case t of
                       $ snd
                       $ classTvsFds cl
                 , tcdSigs =
-                    noLocA (MinimalSig (noAnn, NoSourceText) . noLocA . fmap noLocA $ classMinimalDef cl)
+                    noLocA (MinimalSig (noAnn, NoSourceText) . noLocA $ classMinimalDef cl)
                       : [ noLocA tcdSig
                         | clsOp <- classOpItems cl
                         , tcdSig <- synifyTcIdSig vs clsOp

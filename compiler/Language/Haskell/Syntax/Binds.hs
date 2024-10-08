@@ -28,6 +28,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   , GRHSs )
 import {-# SOURCE #-} Language.Haskell.Syntax.Pat
   ( LPat )
+import Language.Haskell.Syntax.BooleanFormula (LBooleanFormula)
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
@@ -35,7 +36,6 @@ import Language.Haskell.Syntax.Type
 import GHC.Types.Fixity (Fixity)
 import GHC.Types.Basic (InlinePragma)
 
-import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Types.SourceText (StringLiteral)
 
 import Data.Void
@@ -465,7 +465,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | MinimalSig (XMinimalSig pass) (LBooleanFormula (LIdP pass))
+  | MinimalSig (XMinimalSig pass) (LBooleanFormula pass)
 
         -- | A "set cost centre" pragma for declarations
         --
