@@ -1,0 +1,8 @@
+C.hs:3:1: [GHC-87110]
+    Could not find module ‘D’.
+    Use -v to see a list of the files searched for.
+  |
+3 | import {-# source #-} D
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+
+gmake: *** [Makefile:11: boot4] Error 1

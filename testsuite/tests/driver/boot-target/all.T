@@ -8,3 +8,9 @@ def test_boot(name):
 test_boot('boot1')
 test_boot('boot2')
 test_boot('boot3')
+
+test('boot4',
+     [extra_files(['C.hs', 'D.hs']),
+      exit_code(2)],
+     makefile_test,
+     [])

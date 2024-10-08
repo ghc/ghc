@@ -6,3 +6,6 @@ boot2:
 
 boot3:
 	$(TEST_HC) A.hs-boot B.hs -v0
+
+boot4:
+	$(TEST_HC) C.hs -v0

@@ -771,7 +771,7 @@ summariseRequirement pn mod_name = do
     let fopts = initFinderOpts dflags
 
     let PackageName pn_fs = pn
-    let location = mkHomeModLocation2 fopts mod_name
+    let location = mkHomeModLocation2 fopts (notBoot mod_name)
                     (unsafeEncodeUtf $ unpackFS pn_fs </> moduleNameSlashes mod_name) (os "hsig")
 
     env <- getBkpEnv
@@ -848,23 +848,20 @@ hsModuleToModSummary home_keys pn hsc_src modname
     let PackageName unit_fs = pn
         dflags = hsc_dflags hsc_env
         fopts = initFinderOpts dflags
+        modWithIsBoot = GWIB modname (hscSourceToIsBoot hsc_src)
     -- Unfortunately, we have to define a "fake" location in
     -- order to appease the various code which uses the file
     -- name to figure out where to put, e.g. object files.
     -- To add insult to injury, we don't even actually use
     -- these filenames to figure out where the hi files go.
     -- A travesty!
-    let location0 = mkHomeModLocation2 fopts modname
+    let location = mkHomeModLocation2 fopts modWithIsBoot
                              (unsafeEncodeUtf $ unpackFS unit_fs </>
                               moduleNameSlashes modname)
                               (case hsc_src of
                                 HsigFile   -> os "hsig"
                                 HsBootFile -> os "hs-boot"
                                 HsSrcFile  -> os "hs")
-    -- DANGEROUS: bootifying can POISON the module finder cache
-    let location = case hsc_src of
-                        HsBootFile -> addBootSuffixLocnOut location0
-                        _ -> location0
     -- This duplicates a pile of logic in GHC.Driver.Make
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
@@ -893,7 +890,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
     this_mod <- liftIO $ do
       let home_unit = hsc_home_unit hsc_env
       let fc        = hsc_FC hsc_env
-      addHomeModuleToFinder fc home_unit (GWIB modname (hscSourceToIsBoot hsc_src)) location
+      addHomeModuleToFinder fc home_unit modWithIsBoot location
     let ms = ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,

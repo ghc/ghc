@@ -40,7 +40,7 @@ data FinderCache = FinderCache { flushFinderCaches :: UnitEnv -> IO ()
                                }
 
 data InstalledFindResult
-  = InstalledFound ModLocation InstalledModule
+  = InstalledFound ModLocation
   | InstalledNoPackage UnitId
   | InstalledNotFound [OsPath] (Maybe UnitId)
 
