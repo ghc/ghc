@@ -303,7 +303,7 @@ import qualified GHC.LanguageExtensions as LangExt
 -- users guide (docs/users_guide) whenever you add or change a flag.
 -- Please make sure you add ":since:" information to new flags.
 --
--- MODS_TODO: need to do this.
+-- MODS_TODO: need to do this, for -Wunknown-modifiers and -XModifiers.
 
 -- Note [Supporting CLI completion]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

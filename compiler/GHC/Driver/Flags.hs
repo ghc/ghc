@@ -169,6 +169,7 @@ extensionName = \case
   LangExt.TypeData -> "TypeData"                 -- allow @type data@ definitions
   LangExt.InstanceSigs -> "InstanceSigs"
   LangExt.ApplicativeDo -> "ApplicativeDo"
+  LangExt.Modifiers -> "Modifiers"
   LangExt.LinearTypes -> "LinearTypes"
   LangExt.RequiredTypeArguments -> "RequiredTypeArguments"    -- Visible forall (VDQ) in types of terms
   LangExt.StandaloneDeriving -> "StandaloneDeriving"
@@ -341,6 +342,7 @@ impliedXFlags
 
     -- See Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind
     , (LangExt.LinearTypes, turnOn, LangExt.MonoLocalBinds)
+    , (LangExt.LinearTypes, turnOn, LangExt.Modifiers)
   ]
 
 

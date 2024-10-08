@@ -1369,20 +1369,37 @@ Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo
 -}
 
 ------------------------------------------
--- MODS_TODO how do we figure out which modifiers are multiplicities and warn
--- for the others?
+
 tc_mult :: TcTyMode -> HsArrow GhcRn -> TcM Mult
 tc_mult mode arr = do
-  mults <- case arr of
-    HsUnrestrictedArrow _ -> pure []
-    HsLinearArrow _ ms -> (oneDataConTy :) <$> go ms
-    HsExplicitMult _ ms -> go ms
-  return $ case mults of
-    [] -> manyDataConTy
-    [m] -> m
-    _ -> error "MODS_TODO too many multiplicities"
+  modifiers <- xoptM LangExt.Modifiers
+  linearTypes <- xoptM LangExt.LinearTypes
+  case (modifiers, linearTypes) of
+    -- With -XNoModifiers, we only allow modifiers of kind Multiplicity. Note
+    -- HsLinearArrow can show up even with -XNoLinearTypes.
+    (False, _) -> go_check
+
+    (True, False) -> go_infer (const False) -- MODS_TODO should we suggest enabling -XLinearTypes if there are any modifiers? Or maybe only if there are Multiplicity modifiers?
+    (True, True) -> go_infer isMultiplicityTy
   where
-    go mods = tc_modifiers mode mods isMultiplicityTy
+    go_infer is_mult = do
+      mults <- case arr of
+        HsUnrestrictedArrow _ -> pure []
+        HsLinearArrow _ ms -> (oneDataConTy :) <$> infer_mod is_mult ms
+        HsExplicitMult _ ms -> infer_mod is_mult ms
+      return $ case mults of
+        [] -> manyDataConTy
+        [m] -> m
+        _ -> error "MODS_TODO too many multiplicities"
+    infer_mod is_mult mods = tc_modifiers mode mods is_mult
+
+    go_check = case arr of
+      HsUnrestrictedArrow _ -> pure manyDataConTy
+      HsLinearArrow _ [] -> pure oneDataConTy
+      HsLinearArrow _ _ -> error "MODS_TODO too many multiplicities"
+      HsExplicitMult _ [] -> error "MODS_TODO should be impossible"
+      HsExplicitMult _ [HsModifier _ m] -> tc_check_lhs_type mode m multiplicityTy
+      HsExplicitMult _ _ -> error "MODS_TODO too many multiplicities"
 
 tc_modifier :: TcTyMode -> HsModifier GhcRn -> (TcKind -> Bool) -> TcM (Maybe TcType)
 tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do

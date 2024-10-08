@@ -4430,11 +4430,18 @@ fileSrcSpan = do
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
 
--- Hint about linear types
+-- Hint about linear types. These can be parsed given either -XLinearTypes or
+-- -XModifiers.
+--
+-- MODS_TODO: should other uses of modifiers be parsed with -XLinearTypes
+-- -XNoModifiers and rejected later, or just not parsed?
 hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
+  modifiersEnabled <- getBit ModifiersBit
   linearEnabled <- getBit LinearTypesBit
-  unless linearEnabled $ addError $ mkPlainErrorMsgEnvelope span $ PsErrLinearFunction
+  unless (modifiersEnabled || linearEnabled) $
+    -- MODS_TODO this error needs to be generalized to modifiers
+    addError $ mkPlainErrorMsgEnvelope span $ PsErrLinearFunction
 
 -- Does this look like (a %m)?
 looksLikeMult :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> Bool

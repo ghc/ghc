@@ -86,6 +86,7 @@ data Extension
    | InstanceSigs
    | ApplicativeDo
    | LinearTypes
+   | Modifiers
    | RequiredTypeArguments    -- Visible forall (VDQ) in types of terms
 
    | StandaloneDeriving
