@@ -989,6 +989,7 @@ Library
         Language.Haskell.Syntax
         Language.Haskell.Syntax.Basic
         Language.Haskell.Syntax.Binds
+        Language.Haskell.Syntax.BooleanFormula
         Language.Haskell.Syntax.Decls
         Language.Haskell.Syntax.Expr
         Language.Haskell.Syntax.Extension

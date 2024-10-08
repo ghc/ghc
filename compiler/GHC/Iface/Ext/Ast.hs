@@ -35,7 +35,7 @@ import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.ConLike           ( conLikeName )
 import GHC.Core.FVs
 import GHC.Core.DataCon           ( dataConNonlinearType )
-import GHC.Types.FieldLabel
+import GHC.Types.FieldLabel ( FieldLabel(flSelector) )
 import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
@@ -2041,8 +2041,22 @@ instance ToHie PendingRnSplice where
 instance ToHie PendingTcSplice where
   toHie (PendingTcSplice _ e) = toHie e
 
-instance ToHie (LBooleanFormula (LocatedN Name)) where
-  toHie (L span form) = concatM $ makeNode form (locA span) : case form of
+instance HiePass p => ToHie (GenLocated SrcSpanAnnL (BooleanFormula (GhcPass p))) where
+  toHie (L span form) = case hiePass @p of
+    HieRn -> concatM $ makeNode form (locA span) : case form of
+      Var a ->
+        [ toHie $ C Use a
+        ]
+      And forms ->
+        [ toHie forms
+        ]
+      Or forms ->
+        [ toHie forms
+        ]
+      Parens f ->
+        [ toHie f
+        ]
+    HieTc -> concatM $ makeNode form (locA span) : case form of
       Var a ->
         [ toHie $ C Use a
         ]

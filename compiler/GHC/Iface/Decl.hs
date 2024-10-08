@@ -14,6 +14,10 @@ module GHC.Iface.Decl
    ( coAxiomToIfaceDecl
    , tyThingToIfaceDecl -- Converting things to their Iface equivalents
    , toIfaceBooleanFormula
+
+   -- converting back
+   , fromIfaceBooleanFormula
+   , traverseIfaceBooleanFormula
    )
 where
 
@@ -33,7 +37,7 @@ import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 
-
+import GHC.Hs.Extension ( GhcPass )
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Var
@@ -42,6 +46,8 @@ import GHC.Types.Basic
 import GHC.Types.TyThing
 import GHC.Types.SrcLoc
 
+import GHC.Parser.Annotation (noLocA)
+
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
@@ -49,6 +55,7 @@ import GHC.Data.Maybe
 import GHC.Data.BooleanFormula
 
 import Data.List ( findIndex, mapAccumL )
+import Language.Haskell.Syntax.Extension (LIdP)
 
 {-
 ************************************************************************
@@ -287,7 +294,7 @@ classToIfaceDecl env clas
                 ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
                 ifATs    = map toIfaceAT clas_ats,
                 ifSigs   = map toIfaceClassOp op_stuff,
-                ifMinDef = toIfaceBooleanFormula $ fmap (mkIfLclName . getOccFS) (classMinimalDef clas)
+                ifMinDef = toIfaceBooleanFormula (mkIfLclName . getOccFS . unLoc) (classMinimalDef clas)
             }
 
     (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
@@ -336,9 +343,29 @@ tidyTyConBinders = mapAccumL tidyTyConBinder
 tidyTyVar :: TidyEnv -> TyVar -> IfLclName
 tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
 
-toIfaceBooleanFormula :: BooleanFormula IfLclName -> IfaceBooleanFormula
-toIfaceBooleanFormula = \case
-    Var nm    -> IfVar    nm
-    And bfs   -> IfAnd    (map (toIfaceBooleanFormula . unLoc) bfs)
-    Or bfs    -> IfOr     (map (toIfaceBooleanFormula . unLoc) bfs)
-    Parens bf -> IfParens (toIfaceBooleanFormula . unLoc $ bf)
+toIfaceBooleanFormula :: (LIdP (GhcPass p) -> IfLclName) ->  BooleanFormula (GhcPass p)  -> IfaceBooleanFormula
+toIfaceBooleanFormula f = go
+  where
+    go (Var nm   ) = IfVar    (f nm)
+    go (And bfs  ) = IfAnd    (map (go . unLoc) bfs)
+    go (Or bfs   ) = IfOr     (map (go . unLoc) bfs)
+    go (Parens bf) = IfParens (go . unLoc $ bf)
+
+fromIfaceBooleanFormula :: (IfLclName -> LIdP (GhcPass p))  -> IfaceBooleanFormula -> BooleanFormula (GhcPass p)
+fromIfaceBooleanFormula f = go
+  where
+    go (IfVar nm    ) = Var    $ f nm
+    go (IfAnd ibfs  ) = And    $ map (noLocA . go) ibfs
+    go (IfOr ibfs   ) = Or     $ map (noLocA . go) ibfs
+    go (IfParens ibf) = Parens $ (noLocA . go) ibf
+
+traverseIfaceBooleanFormula :: Applicative f
+                            => (IfLclName -> f (LIdP (GhcPass p)))
+                            -> IfaceBooleanFormula
+                            -> f (BooleanFormula (GhcPass p))
+traverseIfaceBooleanFormula f = go
+  where
+    go (IfVar nm    ) = Var     <$> f nm
+    go (IfAnd ibfs  ) = And     <$> traverse (fmap noLocA . go) ibfs
+    go (IfOr ibfs   ) = Or      <$> traverse (fmap noLocA . go) ibfs
+    go (IfParens ibf) = Parens  <$> (fmap noLocA . go) ibf

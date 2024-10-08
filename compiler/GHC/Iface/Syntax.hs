@@ -35,7 +35,6 @@ module GHC.Iface.Syntax (
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
         ifaceDeclFingerprints,
-        fromIfaceBooleanFormula,
         fromIfaceWarnings,
         fromIfaceWarningTxt,
 
@@ -75,7 +74,6 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
-import GHC.Data.BooleanFormula ( BooleanFormula(..), pprBooleanFormula, isTrue )
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
@@ -98,6 +96,7 @@ import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
 import Data.Proxy
+import Data.List ( intersperse )
 
 infixl 3 &&&
 
@@ -218,13 +217,7 @@ data IfaceBooleanFormula
   | IfAnd [IfaceBooleanFormula]
   | IfOr [IfaceBooleanFormula]
   | IfParens IfaceBooleanFormula
-
-fromIfaceBooleanFormula :: IfaceBooleanFormula -> BooleanFormula IfLclName
-fromIfaceBooleanFormula = \case
-    IfVar nm     -> Var    nm
-    IfAnd ibfs   -> And    (map (noLocA . fromIfaceBooleanFormula) ibfs)
-    IfOr ibfs    -> Or     (map (noLocA . fromIfaceBooleanFormula) ibfs)
-    IfParens ibf -> Parens (noLocA . fromIfaceBooleanFormula $ ibf)
+  deriving Eq
 
 data IfaceTyConParent
   = IfNoParent
@@ -1022,7 +1015,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
          , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
          , text "class" <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
-                        , ppShowAllSubs ss (pprMinDef $ fromIfaceBooleanFormula minDef)])]
+                        , ppShowAllSubs ss (pprMinDef minDef)])]
     where
       pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (text "where")
 
@@ -1039,12 +1032,29 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
         | showSub ss sg = Just $  pprIfaceClassOp ss sg
         | otherwise     = Nothing
 
-      pprMinDef :: BooleanFormula IfLclName -> SDoc
-      pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
+      pprMinDef :: IfaceBooleanFormula -> SDoc
+      pprMinDef minDef = ppUnless (ifLclIsTrue minDef) $ -- hide empty definitions
         text "{-# MINIMAL" <+>
-        pprBooleanFormula
-          (\_ def -> cparen (isLexSym def) (ppr def)) 0 (fmap ifLclNameFS minDef) <+>
+        pprifLclBooleanFormula
+          (\_ def -> let fs = ifLclNameFS def in cparen (isLexSym fs) (ppr fs)) 0 minDef <+>
         text "#-}"
+
+      ifLclIsTrue :: IfaceBooleanFormula -> Bool
+      ifLclIsTrue (IfAnd []) = True
+      ifLclIsTrue _          = False
+
+      pprifLclBooleanFormula  :: (Rational -> IfLclName -> SDoc)
+                              -> Rational -> IfaceBooleanFormula -> SDoc
+      pprifLclBooleanFormula pprVar = go
+        where
+        go p (IfVar x)  = pprVar p x
+        go p (IfAnd []) = cparen (p > 0) empty
+        go p (IfAnd xs) = pprAnd p (map (go 3) xs)
+        go _ (IfOr  []) = keyword $ text "FALSE"
+        go p (IfOr  xs) = pprOr p (map (go 2) xs)
+        go p (IfParens x) = go p x
+        pprAnd p = cparen (p > 3) . fsep . punctuate comma
+        pprOr  p = cparen (p > 2) . fsep . intersperse vbar
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
       suppress_bndr_sig = SuppressBndrSig True

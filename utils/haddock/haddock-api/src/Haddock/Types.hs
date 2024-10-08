@@ -52,6 +52,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC
 import qualified GHC.Data.Strict as Strict
+import GHC.Data.BooleanFormula (BooleanFormula)
 import GHC.Driver.Session (Language)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.InstEnv (is_dfun_name)
@@ -818,6 +819,7 @@ type instance Anno (HsDecl DocNameI) = SrcSpanAnnA
 type instance Anno (FamilyResultSig DocNameI) = EpAnn NoEpAnns
 type instance Anno (HsOuterTyVarBndrs Specificity DocNameI) = SrcSpanAnnA
 type instance Anno (HsSigType DocNameI) = SrcSpanAnnA
+type instance Anno (BooleanFormula DocNameI) = SrcSpanAnnL
 
 type XRecCond a =
   ( XParTy a ~ AnnParen
