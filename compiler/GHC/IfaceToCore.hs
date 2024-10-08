@@ -32,6 +32,7 @@ module GHC.IfaceToCore (
         hydrateCgBreakInfo
  ) where
 
+
 import GHC.Prelude
 
 import GHC.ByteCode.Types
@@ -43,7 +44,7 @@ import GHC.Driver.Config.Core.Lint ( initLintConfig )
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Builtin.Types
 
-import GHC.Iface.Decl (toIfaceBooleanFormula)
+import GHC.Iface.Decl (traverseIfaceBooleanFormula)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
@@ -124,7 +125,6 @@ import GHC.Types.TyThing
 import GHC.Types.Error
 
 import GHC.Fingerprint
-import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
 import GHC.Parser.Annotation
@@ -133,6 +133,7 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.Function ( on )
+import Data.List (nub)
 import Data.List.NonEmpty ( NonEmpty )
 import qualified Data.List.NonEmpty as NE
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
@@ -297,9 +298,21 @@ mergeIfaceDecl d1 d2
                   plusNameEnv_C mergeIfaceClassOp
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops1 ])
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
+
+          -- specialized version of BooleanFormula's MkOr.
+          mkOr :: [IfaceBooleanFormula] -> IfaceBooleanFormula
+          mkOr = maybe (IfAnd []) (mkOr' . nub . concat) . mapM fromOr
+            where
+            fromOr bf = case bf of
+              (IfOr xs)  -> Just xs
+              (IfAnd []) -> Nothing
+              _        -> Just [bf]
+            mkOr' [x] = x
+            mkOr' xs = IfOr xs
+
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = toIfaceBooleanFormula . BF.mkOr . map (noLocA . fromIfaceBooleanFormula) $ [bf1, bf2]
+                ifMinDef = mkOr [bf1, bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when
@@ -795,8 +808,7 @@ tc_iface_decl _parent ignore_prags
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
     ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
-    ; let mindef_occ = fromIfaceBooleanFormula if_mindef
-    ; mindef <- traverse (lookupIfaceTop . mkVarOccFS . ifLclNameFS) mindef_occ
+    ; mindef <- traverseIfaceBooleanFormula (fmap noLocA . lookupIfaceTop . mkVarOccFS . ifLclNameFS) if_mindef
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_name)

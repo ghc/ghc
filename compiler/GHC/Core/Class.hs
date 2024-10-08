@@ -26,6 +26,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, PredType )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
+import GHC.Hs.Extension (GhcRn)
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -35,7 +36,7 @@ import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import GHC.Utils.Outputable
-import GHC.Data.BooleanFormula (BooleanFormula, mkTrue)
+import Language.Haskell.Syntax.BooleanFormula ( BooleanFormula, mkTrue )
 
 import qualified Data.Data as Data
 
@@ -135,7 +136,7 @@ data TyFamEqnValidityInfo
       -- Note [Type-checking default assoc decls] in GHC.Tc.TyCl.
     }
 
-type ClassMinimalDef = BooleanFormula Name -- Required methods
+type ClassMinimalDef = BooleanFormula GhcRn -- Required methods
 
 data ClassBody
   = AbstractClass

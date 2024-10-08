@@ -34,6 +34,7 @@ import GHC.Types.Basic (Boxity (..), TopLevelFlag (..), TupleSort (..))
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName (Exact))
 import Prelude hiding (mapM)
+import Language.Haskell.Syntax.BooleanFormula (bfExplTraverse)
 
 import Haddock.Backends.Hoogle (ppExportD)
 import Haddock.GhcUtils
@@ -770,7 +771,7 @@ renameSig sig = case sig of
     lnames' <- mapM renameNameL lnames
     return $ FixSig noExtField (FixitySig noExtField lnames' fixity)
   MinimalSig _ (L l s) -> do
-    s' <- traverse (traverse lookupRn) s
+    s' <- bfExplTraverse traverse (traverse lookupRn) s
     return $ MinimalSig noExtField (L l s')
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
