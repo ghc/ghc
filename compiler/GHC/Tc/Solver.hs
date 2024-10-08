@@ -60,7 +60,6 @@ import GHC.Types.Error
 
 import GHC.Driver.DynFlags( DynFlags, xopt )
 import GHC.Utils.Panic
-import GHC.Utils.Misc( filterOut )
 import GHC.Utils.Outputable
 
 import GHC.Data.Bag
@@ -1450,14 +1449,7 @@ decideAndPromoteTyVars infer_mode name_taus psigs wanted
 
        -- If possible, we quantify over partial-sig qtvs, so they are
        -- not mono. Need to zonk them because they are meta-tyvar TyVarTvs
-       ; (psig_qtvs, psig_theta, taus) <- TcM.liftZonkM $
-          do { psig_qtvs <- zonkTcTyVarsToTcTyVars $ binderVars $
-                            concatMap (map snd . sig_inst_skols) psigs
-             ; psig_theta <- mapM TcM.zonkTcType $
-                             concatMap sig_inst_theta psigs
-             ; taus <- mapM (TcM.zonkTcType . snd) name_taus
-             ; return (psig_qtvs, psig_theta, taus) }
-       ; let psig_tys = mkTyVarTys psig_qtvs ++ psig_theta
+       ; (psig_qtvs, seed_tys) <- getSeedTys name_taus psigs
 
        ; let (can_quant,     no_quant)    = approximateWC wanted
              (post_mr_quant, mr_no_quant) = applyMR dflags infer_mode (ctsPreds can_quant)
@@ -1468,7 +1460,7 @@ decideAndPromoteTyVars infer_mode name_taus psigs wanted
              -- E.g.  If we can't quantify over co :: k~Type, then we can't
              --       quantify over k either!  Hence closeOverKinds
              -- Recall that coVarsOfTypes also returns coercion holes
-             co_vars    = coVarsOfTypes (psig_tys ++ taus ++ post_mr_quant)
+             co_vars    = coVarsOfTypes (seed_tys ++ post_mr_quant)
              co_var_tvs = closeOverKinds co_vars
 
              -- mono_tvs0 are all the type variables we
@@ -1631,45 +1623,47 @@ decideQuantifiedTyVars skol_info name_taus psigs candidates
   = do {     -- Why psig_tys? We try to quantify over everything free in here
              -- See Note [Quantification and partial signatures]
              --     Wrinkles 2 and 3
-       ; (psig_tv_tys, psig_theta, tau_tys) <- TcM.liftZonkM $
-         do { psig_tv_tys <- mapM TcM.zonkTcTyVar [ tv | sig <- psigs
-                                                       , (_,Bndr tv _) <- sig_inst_skols sig ]
-            ; psig_theta  <- mapM TcM.zonkTcType [ pred | sig <- psigs
-                                                        , pred <- sig_inst_theta sig ]
-            ; tau_tys     <- mapM (TcM.zonkTcType . snd) name_taus
-            ; return (psig_tv_tys, psig_theta, tau_tys) }
+         (_, seed_tys) <- getSeedTys name_taus psigs
 
-       ; let -- Try to quantify over variables free in these types
-             psig_tys = psig_tv_tys ++ psig_theta
-             seed_tys = psig_tys ++ tau_tys
-
-             -- Now "grow" those seeds to find ones reachable via 'candidates'
+       ; let -- "Grow" those seeds to find ones reachable via 'candidates'
              -- See Note [growThetaTyVars vs closeWrtFunDeps]
              grown_tcvs = growThetaTyVars candidates (tyCoVarsOfTypes seed_tys)
 
        -- Now we have to classify them into kind variables and type variables
        -- (sigh) just for the benefit of -XNoPolyKinds; see quantifyTyVars
        --
-       -- Keep the psig_tys first, so that candidateQTyVarsOfTypes produces
-       -- them in that order, so that the final qtvs quantifies in the same
+       -- The psig_tys are first in seed_tys, so that candidateQTyVarsOfTypes
+       -- produces them in that order, so that the final qtvs quantifies in the same
        -- order as the partial signatures do (#13524)
        ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes $
-                                                         psig_tys ++ candidates ++ tau_tys
+                                                         seed_tys ++ candidates
        ; let pick     = (`dVarSetIntersectVarSet` grown_tcvs)
              dvs_plus = dv { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
        ; traceTc "decideQuantifiedTyVars" (vcat
-           [ text "tau_tys =" <+> ppr tau_tys
-           , text "candidates =" <+> ppr candidates
+           [ text "candidates =" <+> ppr candidates
            , text "cand_kvs =" <+> ppr cand_kvs
            , text "cand_tvs =" <+> ppr cand_tvs
-           , text "tau_tys =" <+> ppr tau_tys
            , text "seed_tys =" <+> ppr seed_tys
            , text "seed_tcvs =" <+> ppr (tyCoVarsOfTypes seed_tys)
            , text "grown_tcvs =" <+> ppr grown_tcvs
            , text "dvs =" <+> ppr dvs_plus])
 
        ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs_plus }
+
+------------------
+getSeedTys :: [(Name,TcType)] -> [TcIdSigInst]
+           -> TcM ( [TcTyVar]    -- Zonked partial-sig quantified tyvars
+                  , [TcType] )   -- Seed types for "growing", from partial sigs and taus
+getSeedTys name_taus psigs
+  = TcM.liftZonkM $
+    do { psig_tv_tys <- mapM TcM.zonkTcTyVar [ tv | TISI{ sig_inst_skols = skols } <- psigs
+                                                  , (_, Bndr tv _) <- skols ]
+       ; psig_theta  <- mapM TcM.zonkTcType [ pred | TISI{ sig_inst_theta = theta } <- psigs
+                                                   , pred <- theta ]
+       ; tau_tys     <- mapM (TcM.zonkTcType . snd) name_taus
+       ; return ( map getTyVar psig_tv_tys
+                , psig_tv_tys ++ psig_theta ++ tau_tys) }
 
 ------------------
 predMentions :: TcTyVarSet -> TcPredType -> Bool
@@ -1691,7 +1685,8 @@ pickQuantifiablePreds qtvs theta
       = case classifyPredType pred of
           ClassPred cls _
             | isIPClass cls
-            -> Just pred -- See Note [Inheriting implicit parameters]
+            -> Just pred -- Pick, say, (?x::Int) whether or not it mentions qtvs
+                         -- See Note [Inheriting implicit parameters]
 
           EqPred eq_rel ty1 ty2
             | predMentions qtvs pred
