@@ -1842,7 +1842,7 @@ instance ExactPrint (ImportDecl GhcPs) where
         _ -> return ann1
     ann3 <-
       case mpkg of
-       RawPkgQual (StringLiteral src' v _) ->
+       RawPkgQual (SL src' v _) ->
          printStringAtMLocL ann2 limportDeclAnnPackage (sourceTextToString src' (show v))
        _ -> return ann2
     modname' <- markAnnotated modname
@@ -2175,14 +2175,14 @@ exactNsSpec (DataNamespaceSpecifier data_) = do
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint StringLiteral where
+instance ExactPrint StringLit where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (StringLiteral src fs mcomma) = do
+  exact (SL src fs mcomma) = do
     printSourceTextAA src (show (unpackFS fs))
     mcomma' <- mapM (\r -> printStringAtNC r ",") mcomma
-    return (StringLiteral src fs mcomma')
+    return (SL src fs mcomma')
 
 -- ---------------------------------------------------------------------
 
@@ -3079,7 +3079,7 @@ instance ExactPrint (HsExpr GhcPs) where
     let str = case ol_val ol of
                 HsIntegral   (IL src _ _) -> src
                 HsFractional (FL { fl_text = src }) -> src
-                HsIsString src _          -> src
+                HsIsString   (SL { sl_st = src }) -> src
     case str of
       SourceText s -> printStringAdvance (unpackFS s) >> return ()
       NoSourceText -> withPpr x >> return ()
@@ -4932,7 +4932,7 @@ instance ExactPrint (HsOverLit GhcPs) where
     let str = case ol_val ol of
                 HsIntegral   (IL src _ _) -> src
                 HsFractional (FL{ fl_text = src }) -> src
-                HsIsString src _ -> src
+                HsIsString   (SL{ sl_st = src }) -> src
     in
       case str of
         SourceText s -> printStringAdvance (unpackFS s) >> return ol
