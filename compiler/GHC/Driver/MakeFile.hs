@@ -292,12 +292,12 @@ findDependency  :: HscEnv
 findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
-  r <- findImportedModule hsc_env imp pkg
+  r <- findImportedModuleWithIsBoot hsc_env (GWIB imp is_boot) pkg
   case r of
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
         | isJust (ml_hs_file loc) || include_pkg_deps
-        -> return (Just (unsafeDecodeUtf $ addBootSuffix_maybe is_boot (ml_hi_file_ospath loc)))
+        -> return (Just (unsafeDecodeUtf $ ml_hi_file_ospath loc))
 
         -- Not in this package: we don't need a dependency
         | otherwise
