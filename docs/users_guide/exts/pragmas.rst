@@ -959,6 +959,35 @@ effect of adding ``{-# UNPACK #-}`` to every strict constructor field which is
 of a single-constructor data type. Sum types won't be unpacked automatically
 by this though, only with the explicit pragma.
 
+Also note that GHC will coalesce adjacent sub-word size fields into
+words. For instance, consider ::
+
+    data T = T {-# UNPACK #-} !Word32 {-# UNPACK #-} !Word32
+
+As ``Word16`` is represented by the unlifted 32-bit ``Word32#`` type, the ``T``
+constructor will be represent its two ``Word32`` fields using only a single
+64-bit word.
+
+Note that during coalescence padding will be inserted to ensure that each field
+remains naturally aligned. For instance, on a 32-bit platform ::
+
+    data T = T {-# UNPACK #-} !Word16
+               {-# UNPACK #-} !Word8
+               {-# UNPACK #-} !Word16
+
+will require two words since padding is necessary after the ``Word8`` to
+ensure that the subsequent ``Word32`` is naturally aligned:
+
+.. code-block:: none
+
+     ┌───────────────────────────────────┐
+     │ Header                            │
+     ├─────────────────┬────────┬────────┤
+     │ Word16          │ Word8  │ padding│
+     ├─────────────────┴────────┴────────┤
+     │ Word16                            │
+     └───────────────────────────────────┘
+
 .. [1]
    In fact, :pragma:`UNPACK` has no effect without :ghc-flag:`-O`, for technical
    reasons (see :ghc-ticket:`5252`).
