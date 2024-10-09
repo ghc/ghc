@@ -1601,6 +1601,10 @@ breakpoint on a let expression, but there will always be a breakpoint on
 its body, because we are usually interested in inspecting the values of
 the variables bound by the let.
 
+While stopped at a breakpoint one can show the current evaluation
+stack with the :ghci-cmd:`:where` command.
+
+
 Managing breakpoints
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -3080,6 +3084,10 @@ commonly used commands.
     an identifier in editors and IDEs.
 
     The :ghci-cmd:`:uses` command requires :ghci-cmd:`:set +c` to be set.
+
+.. ghci-cmd:: :where
+
+   Show the current evaluation stack while stopped at a breakpoint.
 
 .. ghci-cmd:: :: ⟨builtin-command⟩
 
