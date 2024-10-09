@@ -206,11 +206,13 @@ tail (_ :| as) = as
 
 -- | Extract the last element of the stream.
 last :: NonEmpty a -> a
-last ~(a :| as) = List.last (a : as)
+last (a :| []) = a
+last (_ :| (a : as)) = last (a :| as)
 
 -- | Extract everything except the last element of the stream.
 init :: NonEmpty a -> [a]
-init ~(a :| as) = List.init (a : as)
+init (_ :| []) = []
+init (a1 :| (a2 : as)) = a1 : init (a2 :| as)
 
 -- | Construct a 'NonEmpty' list from a single element.
 --
@@ -324,7 +326,7 @@ tails = fromList . List.tails . Foldable.toList
 --
 -- @since 4.18
 tails1 :: NonEmpty a -> NonEmpty (NonEmpty a)
-tails1 = fromList . List.tails1 . Foldable.toList
+tails1 xs = xs :| List.tails1 (tail xs)
 
 -- | @'insert' x xs@ inserts @x@ into the last position in @xs@ where it
 -- is still less than or equal to the next element. In particular, if the
