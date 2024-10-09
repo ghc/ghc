@@ -120,7 +120,7 @@ multiplicity if:
 - The binding is a pattern binding (including a simple variable)
   ``p=e`` (you can't write ``let %1 f x = u``, instead write ``let %1
   f = \x -> u``)
-- Either ``p`` is strict (see infra) or ``p`` is a variable. In
+- Either ``p`` is strict (see :ref:`strict-patterns-for-linear` below) or ``p`` is a variable. In
   particular neither ``x@y`` nor ``(x)`` are covered by “is a
   variable”
 
@@ -143,6 +143,8 @@ When ``-XMonoLocalBinds`` is off, the following also holds:
   ``let %1 !(x,y) = rhs``) are never generalised.
 - Non-variable pattern bindings which are inferred as polymorphic or
   qualified are inferred as having multiplicity ``Many``.
+
+.. _strict-patterns-for-linear:
 
 Strict patterns
 ~~~~~~~~~~~~~~~
@@ -189,6 +191,7 @@ Without ``-XStrict``::
    case u of ~(x, y) -> …
 
 With ``-XStrict``::
+
    -- good
    let %1 x = u in …
 
