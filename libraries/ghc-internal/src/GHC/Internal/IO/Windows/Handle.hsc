@@ -468,7 +468,10 @@ hwndReadNonBlocking hwnd ptr offset bytes
        val <- withOverlappedEx mngr "hwndReadNonBlocking" (toHANDLE hwnd)
                                (isAsynchronous hwnd) offset (startCB ptr)
                                completionCB
-       return $ ioValue val
+       return $ case val of
+                   IOSuccess mb_v  -> mb_v
+                   IOFailed mb_err -> error ("hwndReadNonBlocking " ++ show mb_err)
+                       -- ToDo: this unhandled errror case seems bad
   where
     startCB inputBuf lpOverlapped = do
       debugIO ":: hwndReadNonBlocking"
@@ -514,7 +517,11 @@ hwndWriteNonBlocking hwnd ptr offset bytes
        val <- withOverlappedEx mngr "hwndReadNonBlocking" (toHANDLE hwnd)
                                (isAsynchronous hwnd) offset (startCB ptr)
                                completionCB
-       return $ fromIntegral $ ioValue val
+       return $ fromIntegral $
+         case val of
+            IOSuccess res   -> res
+            IOFailed mb_err -> error ("hwndWriteNonBlocking " ++ show mb_err)
+                -- ToDo: this unhandled errror case seems bad
   where
     startCB :: Ptr a -> LPOVERLAPPED -> IO (Mgr.CbResult a1)
     startCB outBuf lpOverlapped = do
