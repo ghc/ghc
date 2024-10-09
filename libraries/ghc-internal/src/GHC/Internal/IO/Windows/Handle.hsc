@@ -77,7 +77,7 @@ import GHC.Internal.IO.Windows.Encoding (withGhcInternalToUTF16, withUTF16ToGhcI
 import GHC.Internal.IO.Windows.Paths (getDevicePath)
 import GHC.Internal.IO.Handle.Internals (debugIO)
 import GHC.Internal.IORef
-import GHC.Internal.Event.Windows (LPOVERLAPPED, withOverlappedEx, IOResult(..))
+import GHC.Internal.Event.Windows (LPOVERLAPPED, withOverlappedEx)
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.Error
@@ -465,10 +465,10 @@ hwndReadNonBlocking :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int
                     -> IO (Maybe Int)
 hwndReadNonBlocking hwnd ptr offset bytes
   = do mngr <- Mgr.getSystemManager
-       val <- withOverlappedEx mngr "hwndReadNonBlocking" (toHANDLE hwnd)
+       Mgr.withException "hwndReadNonBlocking" $
+              withOverlappedEx mngr "hwndReadNonBlocking" (toHANDLE hwnd)
                                (isAsynchronous hwnd) offset (startCB ptr)
                                completionCB
-       return $ ioValue val
   where
     startCB inputBuf lpOverlapped = do
       debugIO ":: hwndReadNonBlocking"
@@ -511,10 +511,11 @@ hwndWrite hwnd ptr offset bytes
 hwndWriteNonBlocking :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int -> IO Int
 hwndWriteNonBlocking hwnd ptr offset bytes
   = do mngr <- Mgr.getSystemManager
-       val <- withOverlappedEx mngr "hwndReadNonBlocking" (toHANDLE hwnd)
-                               (isAsynchronous hwnd) offset (startCB ptr)
-                               completionCB
-       return $ fromIntegral $ ioValue val
+       fmap fromIntegral $
+           Mgr.withException "hwndWriteNonBlocking" $
+           withOverlappedEx mngr "hwndWriteNonBlocking" (toHANDLE hwnd)
+                            (isAsynchronous hwnd) offset (startCB ptr)
+                            completionCB
   where
     startCB :: Ptr a -> LPOVERLAPPED -> IO (Mgr.CbResult a1)
     startCB outBuf lpOverlapped = do
