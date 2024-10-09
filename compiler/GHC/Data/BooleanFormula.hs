@@ -26,7 +26,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc (unLoc)
 import GHC.Utils.Outputable
 import GHC.Parser.Annotation ( SrcSpanAnnL )
-import GHC.Hs.Extension (GhcPass (..), GhcPs, GhcRn, OutputableBndrId)
+import GHC.Hs.Extension (GhcPass (..), OutputableBndrId)
 import Language.Haskell.Syntax.Extension (Anno, LIdP, IdP)
 import Language.Haskell.Syntax.BooleanFormula
 
