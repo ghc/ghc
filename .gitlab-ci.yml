@@ -1007,8 +1007,6 @@ perf:
 ############################################################
 
 abi-test:
-  # see #12935 for remaining work
-  allow_failure: true
   stage: testing
   needs:
     - job: x86_64-linux-fedora33-release
