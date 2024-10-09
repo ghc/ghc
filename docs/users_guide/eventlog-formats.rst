@@ -79,14 +79,59 @@ There are two classes of event types:
 Runtime system diagnostics
 --------------------------
 
+The documentation below will refer to the following datatypes
+
  * ``ThreadId ~ Word32``
  * ``CapNo ~ Word16``
  * ``CapSetId ~ Word32``
 
+
 Capability sets
 ~~~~~~~~~~~~~~~
 
-TODO
+These events describe sets of capabilities which describe the
+structure of the program being run.
+
+Currently the following capability sets are defined:
+
+ * ``CAPSET_TYPE_CUSTOM == 1``: reserved for end-user applications
+ * ``CAPSET_TYPE_OSPROCESS == 2``: capabilities belonging to the same OS process
+ * ``CAPSET_TYPE_CLOCKDOMAIN == 3``: capabilities sharing a local clock
+
+.. event-type:: CAPSET_CREATE
+
+   :tag: 25
+   :length: fixed
+   :field CapSetId: Capability set
+   :field CapSetType: The type of the capability set
+
+   Create a capability set.
+
+.. event-type:: CAPSET_DELETE
+
+   :tag: 26
+   :length: fixed
+   :field CapSetId: Capability set
+
+   Delete a capability set.
+
+.. event-type:: CAPSET_ASSIGN_CAP
+
+   :tag: 27
+   :length: fixed
+   :field CapSetId: Capability set
+   :field CapNo: The Capability to be added.
+
+   Add a capability to a capability set.
+
+.. event-type:: CAPSET_REMOVE_CAP
+
+   :tag: 28
+   :length: fixed
+   :field CapSetId: Capability set
+   :field CapNo: The Capability to be added.
+
+   Remove a capability from a capability set.
 
 Environment information
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -118,7 +163,8 @@ environment which the program is being run in.
    :tag: 31
    :length: variable
    :field CapSetId: Capability set
-   :field [String]: The environment variable name/value pairs. (TODO: encoding?)
+   :field [String]: The environment variable name/value pairs.
+     This string is encoded using the platform's native string encoding.
 
    Describes the environment variables present in the program's environment.
 
@@ -359,7 +405,11 @@ in :ref:`nonmoving-gc-events`.
    :tag: 54
    :length: fixed
 
-   TODO
+   This event the moment in GC where all HECs are between
+   a stop-the-world GC and all other HECs should be between
+   their :event-type:`GC_START` and :event-type:`GC_END` events.
+   This allows one to match the GC pauses across HECs
+   to a particular global GC.
 
 .. event-type:: MEM_RETURN
 
@@ -458,14 +508,15 @@ Spark events
    :tag: 36
    :length: fixed
 
-   TODO
+   An attempt was made to spark a computation on a thunk that was already evaluated.
 
 .. event-type:: SPARK_OVERFLOW
 
    :tag: 37
    :length: fixed
 
-   TODO
+   An attempt was made to spark a computation while the spark pool
+   is at capacity.
 
 .. event-type:: SPARK_RUN
 
@@ -804,8 +855,12 @@ A variable-length packet encoding a profile sample.
 .. event-type:: BIO_PROF_SAMPLE_BEGIN
 
    :tag: 166
+   :length: fixed
+   :field Word64: sample era
+   :field Word64: time
 
-   TODO
+   Marks the beginning of a biographical profile sample.
+
 
 .. _nonmoving-gc-events:
 
