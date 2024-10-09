@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 
 --------------------------------------------------------------------------------
@@ -36,17 +37,35 @@ import Language.Haskell.Syntax.BooleanFormula
 
 type instance Anno (BooleanFormula (GhcPass p)) = SrcSpanAnnL
 
--- the other part of jury rigging some fake instances for booleanformula
--- using the genlocated instances of Functor and Traversable.
+-- if we had Functor/Traversable (LbooleanFormula p) we could use that
+-- as a constraint and we wouldn't need to specialize to just GhcPass p,
+-- but becuase LBooleanFormula is a type synonym such a constraint is
+-- impossible.
+
+-- BooleanFormula can't be an instance of functor because it can't lift
+-- arbitrary functions `a -> b`, only functions of type `LIdP a -> LIdP b`
+-- ditto for Traversable.
 bfMap :: (LIdP (GhcPass p) -> LIdP (GhcPass p'))
       -> BooleanFormula (GhcPass p) -> BooleanFormula (GhcPass p')
-bfMap f = bfExplMap fmap f
+bfMap f = go
+  where
+    go (Var    a  ) = Var     $ f a
+    go (And    bfs) = And     $ map (fmap go) bfs
+    go (Or     bfs) = Or      $ map (fmap go) bfs
+    go (Parens bf ) = Parens  $ fmap go bf
 
 bfTraverse  :: Applicative f
             => (LIdP (GhcPass p) -> f (LIdP (GhcPass p')))
             -> BooleanFormula (GhcPass p)
             -> f (BooleanFormula (GhcPass p'))
-bfTraverse f = bfExplTraverse traverse f
+bfTraverse f = go
+  where
+    go (Var    a  ) = Var    <$> f a
+    go (And    bfs) = And    <$> traverse @[] (traverse go) bfs
+    go (Or     bfs) = Or     <$> traverse @[] (traverse go) bfs
+    go (Parens bf ) = Parens <$> traverse go bf
+
+
 
 {-
 Note [Simplification of BooleanFormulas]
@@ -208,9 +227,7 @@ pprBooleanFormulaNice = pprBooleanFormula' pprVar pprAnd pprOr 0
   pprAnd' (x:xs) = fsep (punctuate comma (init (x:|xs))) <> text ", and" <+> last (x:|xs)
   pprOr p xs = cparen (p > 1) $ text "either" <+> sep (intersperse (text "or") xs)
 
-instance Outputable (BooleanFormula GhcPs) where
-  ppr = pprBooleanFormulaNormal
-instance Outputable (BooleanFormula GhcRn) where
+instance OutputableBndrId p => Outputable (BooleanFormula (GhcPass p)) where
   ppr = pprBooleanFormulaNormal
 
 pprBooleanFormulaNormal :: OutputableBndrId p => BooleanFormula (GhcPass p) -> SDoc

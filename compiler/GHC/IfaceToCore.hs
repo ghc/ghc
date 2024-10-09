@@ -299,20 +299,23 @@ mergeIfaceDecl d1 d2
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops1 ])
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
 
-          -- specialized version of BooleanFormula's MkOr.
-          mkOr :: [IfaceBooleanFormula] -> IfaceBooleanFormula
-          mkOr = maybe (IfAnd []) (mkOr' . nub . concat) . mapM fromOr
+          -- same as BooleanFormula's mkOr, but specialized to IfaceBooleanFormula,
+          -- which can be taught of as being (BooleanFormula IfacePass) morally.
+          -- In practice, however, its a seperate type so it needs its own function
+          -- It makes an Or and does some super basic simplification.
+          mkIfaceOr :: [IfaceBooleanFormula] -> IfaceBooleanFormula
+          mkIfaceOr = maybe (IfAnd []) (mkIfaceOr' . nub . concat) . mapM fromOr
             where
             fromOr bf = case bf of
               (IfOr xs)  -> Just xs
               (IfAnd []) -> Nothing
               _        -> Just [bf]
-            mkOr' [x] = x
-            mkOr' xs = IfOr xs
+            mkIfaceOr' [x] = x
+            mkIfaceOr' xs = IfOr xs
 
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = mkOr [bf1, bf2]
+                ifMinDef = mkIfaceOr [bf1, bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when

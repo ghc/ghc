@@ -4,8 +4,8 @@
 
 module Language.Haskell.Syntax.BooleanFormula(
   BooleanFormula(..), LBooleanFormula,
-  mkVar, mkFalse, mkTrue, mkBool, mkAnd, mkOr,
-  bfExplMap, bfExplTraverse) where
+  mkVar, mkFalse, mkTrue, mkBool, mkAnd, mkOr
+  ) where
 
 import Prelude hiding ( init, last )
 import Data.List ( nub )
@@ -19,31 +19,6 @@ data BooleanFormula p = Var (LIdP p) | And [LBooleanFormula p] | Or [LBooleanFor
 
 -- instances
 deriving instance (Eq (LIdP p), Eq (LBooleanFormula p)) => Eq (BooleanFormula p)
-
--- jury rigged map and traverse functions.
--- if we had Functor/Traversable (LbooleanFormula p) we could use as a constraint
--- we wouldn't neeed the first higher order argument, but because LBooleanformula
--- is a type synonym that's no can do.
-bfExplMap :: ((BooleanFormula p -> BooleanFormula p') -> LBooleanFormula p -> LBooleanFormula p')
-          -> (LIdP p -> LIdP p')
-          -> BooleanFormula p -> BooleanFormula p'
-bfExplMap lbfMap f = go
-  where
-    go (Var    a  ) = Var     $ f a
-    go (And    bfs) = And     $ map (lbfMap go) bfs
-    go (Or     bfs) = Or      $ map (lbfMap go) bfs
-    go (Parens bf ) = Parens  $ lbfMap go bf
-
-bfExplTraverse  :: Applicative f
-                => ((BooleanFormula p -> f (BooleanFormula p')) -> LBooleanFormula p -> f (LBooleanFormula p'))
-                -> (LIdP p -> f (LIdP p'))
-                -> BooleanFormula p -> f (BooleanFormula p')
-bfExplTraverse lbfTraverse f  = go
-  where
-    go (Var    a  ) = Var    <$> f a
-    go (And    bfs) = And    <$> traverse @[] (lbfTraverse go) bfs
-    go (Or     bfs) = Or     <$> traverse @[] (lbfTraverse go) bfs
-    go (Parens bf ) = Parens <$> lbfTraverse go bf
 
 -- smart constructors
 -- see note [Simplification of BooleanFormulas]
