@@ -181,7 +181,7 @@ rnUntypedBracket e br_body
        }
 
 rn_utbracket :: ThStage -> HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
-rn_utbracket outer_stage br@(VarBr x flg rdr_name)
+rn_utbracket outer_stage br@(VarBr _ flg rdr_name)
   = do { name <- lookupOccRn (unLoc rdr_name)
        ; check_namespace flg name
        ; this_mod <- getModule
@@ -204,18 +204,18 @@ rn_utbracket outer_stage br@(VarBr x flg rdr_name)
                                       TcRnTHError $ THNameError $ QuotedNameWrongStage br }
                         }
                     }
-       ; return (VarBr x flg (noLocA name), unitFV name) }
+       ; return (VarBr noExtField flg (noLocA name), unitFV name) }
 
-rn_utbracket _ (ExpBr x e) = do { (e', fvs) <- rnLExpr e
-                                ; return (ExpBr x e', fvs) }
+rn_utbracket _ (ExpBr _ e) = do { (e', fvs) <- rnLExpr e
+                                ; return (ExpBr noExtField e', fvs) }
 
-rn_utbracket _ (PatBr x p)
-  = rnPat ThPatQuote p $ \ p' -> return (PatBr x p', emptyFVs)
+rn_utbracket _ (PatBr _ p)
+  = rnPat ThPatQuote p $ \ p' -> return (PatBr noExtField p', emptyFVs)
 
-rn_utbracket _ (TypBr x t) = do { (t', fvs) <- rnLHsType TypBrCtx t
-                                ; return (TypBr x t', fvs) }
+rn_utbracket _ (TypBr _ t) = do { (t', fvs) <- rnLHsType TypBrCtx t
+                                ; return (TypBr noExtField t', fvs) }
 
-rn_utbracket _ (DecBrL x decls)
+rn_utbracket _ (DecBrL _ decls)
   = do { group <- groupDecls decls
        ; gbl_env  <- getGblEnv
        ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
@@ -227,7 +227,7 @@ rn_utbracket _ (DecBrL x decls)
               -- Discard the tcg_env; it contains only extra info about fixity
         ; traceRn "rn_utbracket dec" (ppr (tcg_dus tcg_env) $$
                    ppr (duUses (tcg_dus tcg_env)))
-        ; return (DecBrG x group', duUses (tcg_dus tcg_env)) }
+        ; return (DecBrG noExtField group', duUses (tcg_dus tcg_env)) }
   where
     groupDecls :: [LHsDecl GhcPs] -> RnM (HsGroup GhcPs)
     groupDecls decls

@@ -240,8 +240,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:15:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:15:12 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:15:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:15:12 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:15:6-8 })
@@ -452,8 +457,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:16:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:16:13 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:16:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:16:13 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:16:6-9 })
@@ -664,8 +674,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:19:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:19:10 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:19:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:19:10 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:19:6-8 })
@@ -1069,8 +1084,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:26:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:26:11 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:26:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:26:11 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:26:6-9 })
@@ -1092,9 +1112,13 @@
         (EpaComments
          []))
        (HsExplicitListTy
-        [(AddEpAnn AnnSimpleQuote (EpaSpan { KindSigs.hs:26:13 }))
-        ,(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:26:14 }))
-        ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:26:29 }))]
+        ((,,)
+         (EpTok
+          (EpaSpan { KindSigs.hs:26:13 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:26:14 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:26:29 })))
         (IsPromoted)
         [(L
           (EpAnn
@@ -1155,8 +1179,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:27:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:27:12 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:27:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:27:12 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:27:6-10 })
@@ -1178,8 +1207,12 @@
         (EpaComments
          []))
        (HsExplicitListTy
-        [(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:27:14 }))
-        ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:27:45 }))]
+        ((,,)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { KindSigs.hs:27:14 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:27:45 })))
         (NotPromoted)
         [(L
           (EpAnn
@@ -1290,8 +1323,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:28:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:28:14 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:28:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:28:14 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:28:6-10 })
@@ -1340,9 +1378,13 @@
         (EpaComments
          []))
        (HsExplicitTupleTy
-        [(AddEpAnn AnnSimpleQuote (EpaSpan { KindSigs.hs:28:16 }))
-        ,(AddEpAnn AnnOpenP (EpaSpan { KindSigs.hs:28:17 }))
-        ,(AddEpAnn AnnCloseP (EpaSpan { KindSigs.hs:28:44 }))]
+        ((,,)
+         (EpTok
+          (EpaSpan { KindSigs.hs:28:16 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:28:17 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:28:44 })))
         [(L
           (EpAnn
            (EpaSpan { KindSigs.hs:28:19-39 })
@@ -1363,8 +1405,12 @@
              (EpaComments
               []))
             (HsExplicitListTy
-             [(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:28:19 }))
-             ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:28:29 }))]
+             ((,,)
+              (NoEpTok)
+              (EpTok
+               (EpaSpan { KindSigs.hs:28:19 }))
+              (EpTok
+               (EpaSpan { KindSigs.hs:28:29 })))
              (NotPromoted)
              [(L
                (EpAnn
@@ -1465,8 +1511,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:31:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:31:19 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:31:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:31:19 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:31:6-17 })
