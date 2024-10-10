@@ -3271,12 +3271,13 @@ instance ExactPrint (HsExpr GhcPs) where
     return (ArithSeq (AnnArithSeq o' mc' dd' c') s seqInfo')
 
 
-  exact (HsTypedBracket an e) = do
-    an0 <- markEpAnnLMS'' an lidl AnnOpen (Just "[||")
-    an1 <- markEpAnnLMS'' an0 lidl AnnOpenE (Just "[e||")
+  exact (HsTypedBracket (o,c) e) = do
+    o' <- case o of
+      BracketNoE t -> BracketNoE <$> markEpToken t
+      BracketHasE t -> BracketHasE <$> markEpToken t
     e' <- markAnnotated e
-    an2 <- markEpAnnLMS'' an1 lidl AnnClose (Just "||]")
-    return (HsTypedBracket an2 e')
+    c' <- markEpToken c
+    return (HsTypedBracket (o',c') e')
 
   exact (HsUntypedBracket an (ExpBr a e)) = do
     an0 <- markEpAnnL an  lidl AnnOpenEQ -- "[|"

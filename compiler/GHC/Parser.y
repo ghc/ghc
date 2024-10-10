@@ -3150,7 +3150,7 @@ aexp2   :: { ECP }
                                                                                          else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) (ExpBr noExtField $2)) }
         | '[||' exp '||]'     {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 amsA' (sLL $1 $> $ HsTypedBracket (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) $2) }
+                                 amsA' (sLL $1 $> $ HsTypedBracket (if (hasE $1) then (BracketHasE (epTok $1),epTok $3) else (BracketNoE (epTok $1),epTok $3)) $2) }
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
                                  amsA' (sLL $1 $> $ HsUntypedBracket [mo $1,mu AnnCloseQ $3] (TypBr noExtField $2)) }
         | '[p|' infixexp '|]' {% (checkPattern <=< runPV) (unECP $2) >>= \p ->
