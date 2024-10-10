@@ -557,15 +557,6 @@ data XXExprGhcRn
                            -- Note [Record selectors in the AST]
 
 
-
--- | Wrap a located expression with a `PopErrCtxt`
-mkPopErrCtxtExpr :: LHsExpr GhcRn -> HsExpr GhcRn
-mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
-
--- | Wrap a located expression with a PopSrcExpr with an appropriate location
-mkPopErrCtxtExprAt :: SrcSpanAnnA ->  LHsExpr GhcRn -> LHsExpr GhcRn
-mkPopErrCtxtExprAt loc a = L loc $ mkPopErrCtxtExpr a
-
 -- | Build an expression using the extension constructor `XExpr`,
 --   and the two components of the expansion: original expression and
 --   expanded expressions.
