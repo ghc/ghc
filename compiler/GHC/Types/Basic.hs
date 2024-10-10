@@ -127,6 +127,19 @@ import GHC.Prelude
 import GHC.ForeignSrcLang
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+    ( SDoc,
+      Outputable(..),
+      IsLine((<+>), sep, ftext, fsep, char, text, (<>)),
+      IsOutput(empty),
+      JoinPointHood(..),
+      parens,
+      vbar,
+      brackets,
+      ifPprDebug,
+      doubleQuotes,
+      int,
+      isJoinPoint,
+      OutputableP(..) )
 import GHC.Utils.Panic
 import GHC.Utils.Binary
 import GHC.Types.SourceText

@@ -990,10 +990,10 @@ ppClassDecl
           ]
 
       -- Minimal complete definition
-      minimalBit = case [s | MinimalSig _ (L _ s) <- sigs] of
+      minimalBit = case [s | MinimalSig _ s <- sigs] of
         -- Miminal complete definition = every shown method
         And xs : _
-          | sort [getName n | L _ (Var (L _ n)) <- xs]
+          | sort [getName n | (Var (L _ n)) <- xs]
               == sort [getName n | ClassOpSig _ _ ns _ <- sigs, L _ n <- ns] ->
               noHtml
         -- Minimal complete definition = the only shown method
@@ -1007,11 +1007,11 @@ ppClassDecl
         _ -> noHtml
 
       ppMinimal _ (Var (L _ n)) = ppDocName qual Prefix True n
-      ppMinimal _ (And fs) = foldr1 (\a b -> a +++ ", " +++ b) $ map (ppMinimal True . unLoc) fs
-      ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a +++ " | " +++ b) $ map (ppMinimal False . unLoc) fs
+      ppMinimal _ (And fs) = foldr1 (\a b -> a +++ ", " +++ b) $ map (ppMinimal True) fs
+      ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a +++ " | " +++ b) $ map (ppMinimal False ) fs
         where
           wrap | p = parens | otherwise = id
-      ppMinimal p (Parens x) = ppMinimal p (unLoc x)
+      ppMinimal p (Parens x) = ppMinimal p x
 
       -- Instances
       instancesBit =
