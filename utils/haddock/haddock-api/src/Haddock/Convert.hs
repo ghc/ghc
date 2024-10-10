@@ -506,7 +506,7 @@ synifyDataCon use_gadt_syntax dc =
       noLocA $
         ConDeclField
           noAnn
-          [noLocA $ FieldOcc (flSelector fl) (noLocA $ mkVarUnqual $ field_label $ flLabel fl)]
+          [noLocA $ FieldOcc (mkVarUnqual $ field_label $ flLabel fl) (noLocA  (flSelector fl))]
           synTy
           Nothing
 

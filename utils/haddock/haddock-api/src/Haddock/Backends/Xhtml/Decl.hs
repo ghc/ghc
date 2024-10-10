@@ -1536,7 +1536,7 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
           comma
           [ ppBinder False (rdrNameOcc field)
           | L _ name <- names
-          , let field = (unLoc . foLabel) name
+          , let field = (foExt) name
           ]
       )
       <+> dcolon unicode
@@ -1547,14 +1547,14 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (foExt $ unLoc declName) subdocs >>= combineDocumentation . fst
+    mbDoc = lookup (unLoc . foLabel $ unLoc declName) subdocs >>= combineDocumentation . fst
     declName = case Maybe.listToMaybe names of
       Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
       Just hd -> hd
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
 ppShortField summary unicode qual (ConDeclField _ names ltype _) =
-  hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . unLoc . foLabel . unLoc) names))
+  hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . foExt . unLoc) names))
     <+> dcolon unicode
     <+> ppLType unicode qual HideEmptyContexts ltype
 

@@ -942,8 +942,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     rec_field  = noLocA (HsFieldBind
                         { hfbAnn = noAnn
                         , hfbLHS
-                           = L locc (FieldOcc sel_name
-                                      (L locn $ mkRdrUnqual (nameOccName sel_name)))
+                           = L locc (FieldOcc (mkRdrUnqual $ nameOccName sel_name) (L locn sel_name))
                         , hfbRHS
                            = L loc' (VarPat noExtField (L locn field_var))
                         , hfbPun = False })

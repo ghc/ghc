@@ -319,14 +319,14 @@ type LHsFieldBind p id arg = XRec p (HsFieldBind id arg)
 -- | Located Haskell Record Field
 type LHsRecField  p arg = XRec p (HsRecField  p arg)
 
--- | Located Haskell Record Update Field
-type LHsRecUpdField p q = XRec p (HsRecUpdField p q)
-
 -- | Haskell Record Field
 type HsRecField p arg   = HsFieldBind (LFieldOcc p) arg
 
+-- | Located Haskell Record Update Field
+type LHsRecUpdField p q = XRec p (HsRecUpdField p q)
+
 -- | Haskell Record Update Field
-type HsRecUpdField p q  = HsFieldBind (LAmbiguousFieldOcc p) (LHsExpr q)
+type HsRecUpdField p q  = HsFieldBind (LFieldOcc p) (LHsExpr q)
 
 -- | Haskell Field Binding
 --
@@ -395,11 +395,11 @@ data HsFieldBind lhs rhs = HsFieldBind {
 --
 -- See also Note [Disambiguating record updates] in GHC.Rename.Pat.
 
-hsRecFields :: forall p arg.UnXRec p => HsRecFields p arg -> [XCFieldOcc p]
+hsRecFields :: forall p arg.UnXRec p => HsRecFields p arg -> [IdP p]
 hsRecFields rbinds = Data.List.map (hsRecFieldSel . unXRec @p) (rec_flds rbinds)
 
 hsRecFieldsArgs :: forall p arg. UnXRec p => HsRecFields p arg -> [arg]
 hsRecFieldsArgs rbinds = Data.List.map (hfbRHS . unXRec @p) (rec_flds rbinds)
 
-hsRecFieldSel :: forall p arg. UnXRec p => HsRecField p arg -> XCFieldOcc p
-hsRecFieldSel = foExt . unXRec @p . hfbLHS
+hsRecFieldSel :: forall p arg. UnXRec p => HsRecField p arg -> IdP p
+hsRecFieldSel = unXRec @p . foLabel . unXRec @p . hfbLHS

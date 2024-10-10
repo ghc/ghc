@@ -558,12 +558,6 @@ deriving instance Data (FieldOcc GhcPs)
 deriving instance Data (FieldOcc GhcRn)
 deriving instance Data (FieldOcc GhcTc)
 
--- deriving instance DataId p       => Data (AmbiguousFieldOcc p)
-deriving instance Data (AmbiguousFieldOcc GhcPs)
-deriving instance Data (AmbiguousFieldOcc GhcRn)
-deriving instance Data (AmbiguousFieldOcc GhcTc)
-
-
 -- deriving instance (DataId name) => Data (ImportDecl name)
 deriving instance Data (ImportDecl GhcPs)
 deriving instance Data (ImportDecl GhcRn)

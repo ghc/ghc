@@ -567,7 +567,7 @@ tcInferAppHead_maybe :: HsExpr GhcRn
 tcInferAppHead_maybe fun
   = case fun of
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
-      HsRecSel _ f              -> Just <$> tcInferRecSelId f
+      XExpr (HsRecSelRn f)      -> Just <$> tcInferRecSelId f
       ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
       _                         -> return Nothing
@@ -596,16 +596,15 @@ addHeadCtxt fun_ctxt thing_inside
 ********************************************************************* -}
 
 tcInferRecSelId :: FieldOcc GhcRn
-                -> TcM (HsExpr GhcTc, TcSigmaType)
-tcInferRecSelId (FieldOcc sel_name lbl)
-   = do { sel_id <- tc_rec_sel_id
-        ; let expr = HsRecSel noExtField (FieldOcc sel_id lbl)
-        ; return (expr, idType sel_id)
+                -> TcM ( (HsExpr GhcTc, TcSigmaType))
+tcInferRecSelId (FieldOcc lbl (L l sel_name))
+     = do { sel_id <- tc_rec_sel_id
+        ; let expr = XExpr (HsRecSelTc (FieldOcc lbl (L l sel_id)))
+        ; return $ (expr, idType sel_id)
         }
      where
        occ :: OccName
-       occ = rdrNameOcc (unLoc lbl)
-
+       occ = nameOccName sel_name
        tc_rec_sel_id :: TcM TcId
        -- Like tc_infer_id, but returns an Id not a HsExpr,
        -- so we can wrap it back up into a HsRecSel

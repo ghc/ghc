@@ -394,7 +394,7 @@ subordinates env instMap decl = case decl of
                     , maybeToList $ fmap unLoc $ con_doc c
                     , conArgDocs c)
                   | c <- toList cons, cname <- getConNames c ]
-        fields  = [ (foExt n, maybeToList $ fmap unLoc doc, IM.empty)
+        fields  = [ (unLoc $ foLabel n, maybeToList $ fmap unLoc doc, IM.empty)
                   | Just flds <- toList $ fmap getRecConArgs_maybe cons
                   , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
                   , (L _ n) <- ns ]

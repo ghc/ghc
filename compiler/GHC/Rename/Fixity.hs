@@ -202,4 +202,4 @@ lookupTyFixityRn :: LocatedN Name -> RnM Fixity
 lookupTyFixityRn = lookupFixityRn . unLoc
 
 lookupFieldFixityRn :: FieldOcc GhcRn -> RnM Fixity
-lookupFieldFixityRn (FieldOcc n _) = lookupFixityRn n
+lookupFieldFixityRn (FieldOcc _ n) = lookupFixityRn (unLoc n)

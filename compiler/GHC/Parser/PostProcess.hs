@@ -2913,7 +2913,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
     True -> do
       let qualifiedFields =
             [ L l lbl | L _ (HsFieldBind _ (L l lbl) _ _) <- fs'
-                      , isQual . ambiguousFieldOccRdrName $ lbl
+                      , isQual . fieldOccRdrName $ lbl
             ]
       case qualifiedFields of
           qf:_ -> addFatalError $ mkPlainErrorMsgEnvelope (getLocA qf) $
@@ -2959,7 +2959,7 @@ mk_rec_fields fs (Just s)  = HsRecFields { rec_ext = noExtField, rec_flds = fs
 
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs GhcPs
 mk_rec_upd_field (HsFieldBind noAnn (L loc (FieldOcc _ rdr)) arg pun)
-  = HsFieldBind noAnn (L loc (Unambiguous noExtField rdr)) arg pun
+  = HsFieldBind noAnn (L loc (FieldOcc noExtField rdr)) arg pun
 
 mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
@@ -3558,7 +3558,7 @@ mkRdrProjection :: NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs)) -> AnnProje
 mkRdrProjection flds anns =
   HsProjection {
       proj_ext = anns
-    , proj_flds = flds
+    , proj_flds = fmap unLoc flds
     }
 
 mkRdrProjUpdate :: SrcSpanAnnA -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]

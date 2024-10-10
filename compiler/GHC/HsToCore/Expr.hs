@@ -261,36 +261,6 @@ dsLExpr (L loc e) = putSrcSpanDsA loc $ dsExpr e
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
 
-{- Record selectors are warned about if they are not
-present in all of the parent data type's constructor,
-or always in case of pattern synonym record selectors
-(regulated by a flag). However, this only produces
-a warning if it's not a part of a record selector
-application. For example:
-
-        data T = T1 | T2 {s :: Bool}
-        f x = s x -- the warning from this case will be supressed
-
-See the `HsApp` case for where it is filtered out
--}
-dsExpr (HsRecSel _ (FieldOcc id _))
-  = do { let name = getName id
-             RecSelId {sel_cons = (_, cons_wo_field)}
-                  = idDetails id
-       ; cons_trimmed <- trim_cons cons_wo_field
-       ; unless (null cons_wo_field) $ diagnosticDs
-             $ DsIncompleteRecordSelector name cons_trimmed (cons_trimmed /= cons_wo_field)
-                 -- This only produces a warning if it's not a part of a
-                 -- record selector application (e.g. `s a` where `s` is a selector)
-                 -- See the `HsApp` case for where it is filtered out
-       ; dsHsVar id }
-  where
-    trim_cons :: [ConLike] -> DsM [ConLike]
-    trim_cons cons_wo_field = do
-      dflags <- getDynFlags
-      let maxConstructors = maxUncoveredPatterns dflags
-      return $ take maxConstructors cons_wo_field
-
 
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
@@ -336,6 +306,35 @@ dsExpr e@(XExpr ext_expr_tc)
         do { assert (exprType e2 `eqType` boolTy)
             mkBinaryTickBox ixT ixF e2
           }
+        {- Record selectors are warned about if they are not
+        present in all of the parent data type's constructor,
+        or always in case of pattern synonym record selectors
+        (regulated by a flag). However, this only produces
+        a warning if it's not a part of a record selector
+        application. For example:
+
+                data T = T1 | T2 {s :: Bool}
+                f x = s x -- the warning from this case will be supressed
+
+        See the `HsApp` case for where it is filtered out
+        -}
+      (HsRecSelTc (FieldOcc _ (L _ id))) ->
+        do { let  name = getName id
+                  RecSelId {sel_cons = (_, cons_wo_field)} = idDetails id
+            ; cons_trimmed <- trim_cons cons_wo_field
+            ; unless (null cons_wo_field) $ diagnosticDs
+                  $ DsIncompleteRecordSelector name cons_trimmed (cons_trimmed /= cons_wo_field)
+                      -- This only produces a warning if it's not a part of a
+                      -- record selector application (e.g. `s a` where `s` is a selector)
+                      -- See the `HsApp` case for where it is filtered out
+            ; dsHsVar id }
+          where
+            trim_cons :: [ConLike] -> DsM [ConLike]
+            trim_cons cons_wo_field = do
+              dflags <- getDynFlags
+              let maxConstructors = maxUncoveredPatterns dflags
+              return $ take maxConstructors cons_wo_field
+
 
 -- Strip ticks due to #21701, need to be invariant about warnings we produce whether
 -- this is enabled or not.

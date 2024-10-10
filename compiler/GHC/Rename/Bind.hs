@@ -824,7 +824,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                           , psb_ext = fvs' }
               selector_names = case details' of
                                  RecCon names ->
-                                  map (foExt . recordPatSynField) names
+                                      map (unLoc . foLabel . recordPatSynField) names
                                  _ -> []
 
         ; fvs' `seq` -- See Note [Free-variable space leak]

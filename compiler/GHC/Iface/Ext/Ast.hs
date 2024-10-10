@@ -828,7 +828,6 @@ class ( HiePass (NoGhcTcPass p)
       , Data (Stmt  (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))
       , Data (HsExpr (GhcPass p))
       , Data (HsCmd  (GhcPass p))
-      , Data (AmbiguousFieldOcc (GhcPass p))
       , Data (HsCmdTop (GhcPass p))
       , Data (GRHS (GhcPass p) (LocatedA (HsCmd (GhcPass p))))
       , Data (HsUntypedSplice (GhcPass p))
@@ -1205,9 +1204,6 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
              -- Patch up var location since typechecker removes it
         ]
       HsUnboundVar _ _ -> []  -- there is an unbound name here, but that causes trouble
-      HsRecSel _ fld ->
-        [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
-        ]
       HsOverLabel {} -> []
       HsIPVar _ _ -> []
       HsOverLit _ o ->
@@ -1285,7 +1281,9 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       RecordUpd { rupd_expr = expr
                 , rupd_flds = RegularRecUpdFields { recUpdFields = upds } }->
         [ toHie expr
-        , toHie $ map (RC RecFieldAssign) upds
+        , case hiePass @p of
+          HieRn -> toHie $ map (RC RecFieldAssign) upds
+          HieTc -> toHie $ map (RC RecFieldAssign) upds
         ]
       RecordUpd { rupd_expr = expr
                 , rupd_flds = OverloadedRecUpdFields {} }->
@@ -1353,23 +1351,29 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       HsGetField {} -> []
       HsProjection {} -> []
-      XExpr x
-        | HieTc <- hiePass @p
-        -> case x of
-             WrapExpr w a
-               -> [ toHie $ L mspan a
-                  , toHie (L mspan w) ]
-             ExpandedThingTc _ e
-               -> [ toHie (L mspan e) ]
-             ConLikeTc con _ _
-               -> [ toHie $ C Use $ L mspan $ conLikeName con ]
-             HsTick _ expr
-               -> [ toHie expr
-                  ]
-             HsBinTick _ _ expr
-               -> [ toHie expr
-                  ]
-        | otherwise -> []
+      XExpr x -> case hiePass @p of
+        HieTc -> case x of
+          WrapExpr w a
+            -> [ toHie $ L mspan a
+               , toHie (L mspan w) ]
+          ExpandedThingTc _ e
+            -> [ toHie (L mspan e) ]
+          ConLikeTc con _ _
+            -> [ toHie $ C Use $ L mspan $ conLikeName con ]
+          HsTick _ expr
+            -> [ toHie expr
+               ]
+          HsBinTick _ _ expr
+            -> [ toHie expr
+               ]
+          HsRecSelTc fld
+            -> [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
+               ]
+        HieRn -> case x of
+          HsRecSelRn fld
+            -> [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
+               ]
+          _ -> []
 
 -- NOTE: no longer have the location
 instance HiePass p => ToHie (HsTupArg (GhcPass p)) where
@@ -1505,23 +1509,17 @@ instance ( ToHie (RFContext label)
       ]
 
 instance HiePass p => ToHie (RFContext (LocatedA (FieldOcc (GhcPass p)))) where
-  toHie (RFC c rhs (L nspan f)) = concatM $ case f of
-    FieldOcc fld _ ->
-      case hiePass @p of
-        HieRn -> [toHie $ C (RecField c rhs) (L (locA nspan) fld)]
-        HieTc -> [toHie $ C (RecField c rhs) (L (locA nspan) fld)]
+  toHie (RFC c rhs (L nspan f)) = concatM $
+    case hiePass @p of
+      HieRn ->
+        case f of
+          FieldOcc _ fld ->
+            [toHie $ C (RecField c rhs) (L (locA nspan) $ unLoc fld)]
+      HieTc ->
+        case f of
+          FieldOcc _ fld ->
+            [toHie $ C (RecField c rhs) (L (locA nspan) $ unLoc fld)]
 
-instance HiePass p => ToHie (RFContext (LocatedA (AmbiguousFieldOcc (GhcPass p)))) where
-
-  toHie (RFC c rhs (L nspan afo)) = concatM $ case afo of
-    Unambiguous fld _ ->
-      case hiePass @p of
-        HieRn -> [toHie $ C (RecField c rhs) $ L (locA nspan) fld]
-        HieTc -> [toHie $ C (RecField c rhs) $ L (locA nspan) fld]
-    Ambiguous fld _ ->
-      case hiePass @p of
-        HieRn -> []
-        HieTc -> [ toHie $ C (RecField c rhs) (L (locA nspan) fld) ]
 
 instance HiePass p => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
   toHie (RS sc (ApplicativeArgOne _ pat expr _)) = concatM
@@ -2107,10 +2105,10 @@ instance ToHie (LocatedA (DataFamInstDecl GhcRn)) where
 instance ToHie (LocatedA (TyFamInstDecl GhcRn)) where
   toHie (L sp (TyFamInstDecl _ d)) = toHie $ TS (ResolvedScopes [mkScope sp]) d
 
+
 instance HiePass p => ToHie (Context (FieldOcc (GhcPass p))) where
-  toHie (C c (FieldOcc n (L l _))) = case hiePass @p of
-    HieTc -> toHie (C c (L l n))
-    HieRn -> toHie (C c (L l n))
+  toHie (C c (FieldOcc _ l)) = toHie (C c l)
+  toHie (C _ (XFieldOcc _))  = concatM []
 
 instance HiePass p => ToHie (PatSynFieldContext (RecordPatSynField (GhcPass p))) where
   toHie (PSC sp (RecordPatSynField a b)) = concatM $

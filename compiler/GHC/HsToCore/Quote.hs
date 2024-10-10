@@ -284,7 +284,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_docs    = docs })
  = do { let { bndrs  = hsScopedTvBinders valds
                        ++ hsGroupBinders group
-                       ++ map foExt (hsPatSynSelectors valds)
+                       ++ map (unLoc . foLabel) (hsPatSynSelectors valds)
             ; instds = tyclds >>= group_instds } ;
         ss <- mkGenSyms bndrs ;
 
@@ -1544,7 +1544,6 @@ repE (HsVar _ (L _ x)) =
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ s) = repOverLabel s
 
-repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
@@ -1686,7 +1685,7 @@ repE (HsUnboundVar _ uv)   = do
 repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
   repGetField e1 f
-repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel . unLoc) xs)
+repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel) xs)
 repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]
@@ -1719,6 +1718,8 @@ repE e@(XExpr (ExpandedThingRn o x))
   = notHandled (ThExpressionForm e)
 
 repE (XExpr (PopErrCtxt (L _ e))) = repE e
+repE (XExpr (HsRecSelRn (FieldOcc _ (L _ x)))) = repE (HsVar noExtField (noLocA x))
+
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
@@ -1821,11 +1822,19 @@ repUpdFields :: [LHsRecUpdField GhcRn GhcRn] -> MetaM (Core [M TH.FieldExp])
 repUpdFields = repListM fieldExpTyConName rep_fld
   where
     rep_fld :: LHsRecUpdField GhcRn GhcRn -> MetaM (Core (M TH.FieldExp))
-    rep_fld (L l fld) = case unLoc (hfbLHS fld) of
-      Unambiguous sel_name _ -> do { fn <- lookupLOcc (L l sel_name)
-                                   ; e  <- repLE (hfbRHS fld)
-                                   ; repFieldExp fn e }
-      Ambiguous{}            -> notHandled (ThAmbiguousRecordUpdates fld)
+    rep_fld (L l fld) =
+      let (FieldOcc _ (L _ sel_name)) = unLoc (hfbLHS fld)
+      -- If we have an unbountName in the sel_name, that means we failed to
+      -- disambiguate during the Rename stage of Ghc. Now if we continued
+      -- onwards to type checking that might be fine, as explained in
+      -- Note [Ambiguous FieldOcc in record updates], but if instead we
+      -- are within the context of Template Haskell, we just fail immediately.
+      in if  isUnboundName sel_name
+       then  notHandled (ThAmbiguousRecordUpdates fld)
+       else  do  { fn <- lookupLOcc (L l sel_name)
+                 ; e  <- repLE (hfbRHS fld)
+                 ; repFieldExp fn e
+                 }
 
 
 
@@ -2028,7 +2037,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
     mkGenArgSyms (InfixCon arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
     mkGenArgSyms (RecCon fields)
       = do { let pats = map (unLoc . recordPatSynPatVar) fields
-                 sels = map (foExt . recordPatSynField) fields
+                 sels = map (unLoc . foLabel . recordPatSynField) fields
            ; ss <- mkGenSyms sels
            ; return $ replaceNames (zip sels pats) ss }
 
@@ -2060,7 +2069,7 @@ repPatSynArgs (InfixCon arg1 arg2)
        ; arg2' <- lookupLOcc arg2
        ; repInfixPatSynArgs arg1' arg2' }
 repPatSynArgs (RecCon fields)
-  = do { sels' <- repList nameTyConName (lookupOcc . foExt) sels
+  = do { sels' <- repList nameTyConName (lookupOcc . unLoc . foLabel) sels
        ; repRecordPatSynArgs sels' }
   where sels = map recordPatSynField fields
 
@@ -2883,7 +2892,7 @@ repRecConArgs ips = do
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
 
       rep_one_ip :: LBangType GhcRn -> LFieldOcc GhcRn -> MetaM (Core (M TH.VarBangType))
-      rep_one_ip t n = do { MkC v  <- lookupOcc (foExt $ unLoc n)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (unLoc . foLabel $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varBangTypeName [v,ty] }
 
