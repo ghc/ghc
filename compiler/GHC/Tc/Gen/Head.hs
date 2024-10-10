@@ -57,7 +57,7 @@ import GHC.Tc.Zonk.TcType
 
 
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
-import GHC.Core.UsageEnv      ( singleUsageUE )
+import GHC.Core.UsageEnv      ( singleUsageUE, UsageEnv )
 import GHC.Core.PatSyn( PatSyn, patSynName )
 import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
@@ -178,6 +178,7 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
                , eaql_larg    :: LHsExpr GhcRn       -- Original application, for
                                                      -- location and error msgs
                , eaql_tc_fun  :: (HsExpr GhcTc, AppCtxt) -- Typechecked head
+               , eaql_fun_ue  :: UsageEnv -- Usage environment of the typechecked head (QLA5)
                , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
                , eaql_wanted  :: WantedConstraints
                , eaql_encl    :: Bool                  -- True <=> we have already qlUnified

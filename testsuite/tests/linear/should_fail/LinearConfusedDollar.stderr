@@ -1,3 +1,7 @@
+LinearConfusedDollar.hs:12:3: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘g’: g x = f $ x
 
 LinearConfusedDollar.hs:12:7: error: [GHC-83865]
     • Couldn't match type ‘One’ with ‘Many’
@@ -6,3 +10,4 @@ LinearConfusedDollar.hs:12:7: error: [GHC-83865]
     • In the first argument of ‘($)’, namely ‘f’
       In the expression: f $ x
       In an equation for ‘g’: g x = f $ x
+
