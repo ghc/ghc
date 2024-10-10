@@ -837,21 +837,6 @@ markEpAnnLMS'' a l kw (Just str) = do
 
 -- -------------------------------------
 
-markEpAnnMS' :: (Monad m, Monoid w)
-  => [AddEpAnn] -> AnnKeywordId -> Maybe String -> EP w m [AddEpAnn]
-markEpAnnMS' anns kw Nothing = mark anns kw
-markEpAnnMS' anns kw (Just str) = do
-  mapM go anns
-  where
-    go :: (Monad m, Monoid w) => AddEpAnn -> EP w m AddEpAnn
-    go (AddEpAnn kw' r)
-      | kw' == kw = do
-          r' <- printStringAtAA r str
-          return (AddEpAnn kw' r')
-      | otherwise = return (AddEpAnn kw' r)
-
--- -------------------------------------
-
 markEpAnnLMS' :: (Monad m, Monoid w)
   => EpAnn a -> Lens a AddEpAnn -> AnnKeywordId -> Maybe String -> EP w m (EpAnn a)
 markEpAnnLMS' an l kw ms = markEpAnnLMS0 an (lepa . l) kw ms
@@ -4202,23 +4187,22 @@ instance ExactPrint (HsType GhcPs) where
   exact (HsDocTy an ty doc) = do
     ty' <- markAnnotated ty
     return (HsDocTy an ty' doc)
-  exact (HsBangTy (an, mt) (HsBang up str) ty) = do
-    an0 <-
+  exact (HsBangTy ((o,c,tk), mt) (HsBang up str) ty) = do
+    (o',c') <-
       case mt of
-        NoSourceText -> return an
+        NoSourceText -> return (o,c)
         SourceText src -> do
           debugM $ "HsBangTy: src=" ++ showAst src
-          an0 <- markEpAnnMS' an AnnOpen  (Just $ unpackFS src)
-          an1 <- markEpAnnMS' an0 AnnClose (Just "#-}")
-          debugM $ "HsBangTy: done unpackedness"
-          return an1
-    an1 <-
+          o' <- printStringAtAA o (unpackFS src)
+          c' <- printStringAtAA c "#-}"
+          return (o',c')
+    tk' <-
       case str of
-        SrcLazy     -> mark an0 AnnTilde
-        SrcStrict   -> mark an0 AnnBang
-        NoSrcStrict -> return an0
+        SrcLazy     -> printStringAtAA tk "~"
+        SrcStrict   -> printStringAtAA tk "!"
+        NoSrcStrict -> return tk
     ty' <- markAnnotated ty
-    return (HsBangTy (an1, mt) (HsBang up str) ty')
+    return (HsBangTy ((o',c',tk'), mt) (HsBang up str) ty')
   exact (HsExplicitListTy an prom tys) = do
     an0 <- if (isPromoted prom)
              then mark an AnnSimpleQuote

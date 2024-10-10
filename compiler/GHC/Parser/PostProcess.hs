@@ -1570,13 +1570,13 @@ instance Outputable (ArgPatBuilder GhcPs) where
   ppr (ArgPatBuilderVisPat p) = ppr p
   ppr (ArgPatBuilderArgPat p) = ppr p
 
-mkBangTy :: [AddEpAnn] -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
-mkBangTy anns strictness =
-  HsBangTy (anns, NoSourceText) (HsBang NoSrcUnpack strictness)
+mkBangTy :: EpaLocation -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
+mkBangTy tok_loc strictness =
+  HsBangTy ((noAnn, noAnn, tok_loc), NoSourceText) (HsBang NoSrcUnpack strictness)
 
 -- | Result of parsing @{-\# UNPACK \#-}@ or @{-\# NOUNPACK \#-}@.
 data UnpackednessPragma =
-  UnpackednessPragma [AddEpAnn] SourceText SrcUnpackedness
+  UnpackednessPragma (EpaLocation, EpaLocation) SourceText SrcUnpackedness
 
 -- | Annotate a type with either an @{-\# UNPACK \#-}@ or a @{-\# NOUNPACK \#-}@ pragma.
 addUnpackednessP :: MonadP m => Located UnpackednessPragma -> LHsType GhcPs -> m (LHsType GhcPs)
@@ -1589,11 +1589,11 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
     -- such as ~T or !T, then add the pragma to the existing HsBangTy.
     --
     -- Otherwise, wrap the type in a new HsBangTy constructor.
-    addUnpackedness an (L _ (HsBangTy (anns, NoSourceText) bang t))
+    addUnpackedness (o,c) (L _ (HsBangTy ((_,_,tl), NoSourceText) bang t))
       | HsBang NoSrcUnpack strictness <- bang
-      = HsBangTy (an Semi.<> anns, prag) (HsBang unpk strictness) t
-    addUnpackedness an t
-      = HsBangTy (an, prag) (HsBang unpk NoSrcStrict) t
+      = HsBangTy ((o,c,tl), prag) (HsBang unpk strictness) t
+    addUnpackedness (o,c) t
+      = HsBangTy ((o,c,noAnn), prag) (HsBang unpk NoSrcStrict) t
 
 ---------------------------------------------------------------------------
 -- | Check for monad comprehensions

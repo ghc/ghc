@@ -2177,8 +2177,8 @@ sigtypes1 :: { OrdList (LHsSigType GhcPs) }
 -- Types
 
 unpackedness :: { Located UnpackednessPragma }
-        : '{-# UNPACK' '#-}'   { sLL $1 $> (UnpackednessPragma [mo $1, mc $2] (getUNPACK_PRAGs $1) SrcUnpack) }
-        | '{-# NOUNPACK' '#-}' { sLL $1 $> (UnpackednessPragma [mo $1, mc $2] (getNOUNPACK_PRAGs $1) SrcNoUnpack) }
+        : '{-# UNPACK' '#-}'   { sLL $1 $> (UnpackednessPragma (glR $1, glR $2) (getUNPACK_PRAGs $1) SrcUnpack) }
+        | '{-# NOUNPACK' '#-}' { sLL $1 $> (UnpackednessPragma (glR $1, glR $2) (getNOUNPACK_PRAGs $1) SrcNoUnpack) }
 
 forall_telescope :: { Located (HsForAllTelescope GhcPs) }
         : 'forall' tv_bndrs '.'  {% do { hintExplicitForall $1
@@ -2304,8 +2304,8 @@ atype :: { LHsType GhcPs }
                                                ; return $ sL1a $1 (HsStarTy noExtField (isUnicode $1)) } }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
-        | PREFIX_TILDE atype             {% amsA' (sLL $1 $> (mkBangTy [mj AnnTilde $1] SrcLazy $2)) }
-        | PREFIX_BANG  atype             {% amsA' (sLL $1 $> (mkBangTy [mj AnnBang $1] SrcStrict $2)) }
+        | PREFIX_TILDE atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcLazy $2)) }
+        | PREFIX_BANG  atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcStrict $2)) }
 
         | '{' fielddecls '}'             {% do { decls <- amsA' (sLL $1 $> $ HsRecTy (AnnList (listAsAnchorM $2) (Just $ moc $1) (Just $ mcc $3) [] []) $2)
                                                ; checkRecordSyntax decls }}
