@@ -122,6 +122,7 @@ import GHC.Internal.MVar
 import GHC.Internal.Ptr
 import GHC.Internal.Real         ( fromIntegral )
 import GHC.Internal.Show         ( Show(..), showParen, showString )
+import GHC.Internal.Stack ( HasCallStack )
 import GHC.Internal.Weak
 import GHC.Internal.Word
 
@@ -821,8 +822,13 @@ orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 -- raise an exception within the 'STM' monad because it guarantees
 -- ordering with respect to other 'STM' operations, whereas 'throw'
 -- does not.
-throwSTM :: Exception e => e -> STM a
-throwSTM e = STM $ raiseIO# (toException e)
+throwSTM :: HasCallStack => Exception e => e -> STM a
+throwSTM e = do
+    -- N.B. Typically use of unsafeIOToSTM is very much frowned upon as this
+    -- is an easy way to end up with nested transactions. However, we can be
+    -- certain that toExceptionWithBacktrace will not initiate a transaction.
+    se <- unsafeIOToSTM (toExceptionWithBacktrace e)
+    STM $ raiseIO# se
 
 -- | Exception handling within STM actions.
 --
