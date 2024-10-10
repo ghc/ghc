@@ -10,7 +10,7 @@ module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   AnnKeywordId(..),
   EpToken(..), EpUniToken(..),
-  getEpTokenSrcSpan, getEpTokenLocs,
+  getEpTokenSrcSpan, getEpTokenLocs, getEpTokenLoc,
   TokDcolon,
   EpLayout(..),
   EpaComment(..), EpaCommentTok(..),
@@ -405,6 +405,10 @@ getEpTokenLocs ls = concatMap go ls
   where
     go NoEpTok   = []
     go (EpTok l) = [l]
+
+getEpTokenLoc :: EpToken tok -> EpaLocation
+getEpTokenLoc NoEpTok   = noAnn
+getEpTokenLoc (EpTok l) = l
 
 type TokDcolon = EpUniToken "::" "∷"
 

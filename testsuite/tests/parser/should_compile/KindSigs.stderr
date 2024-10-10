@@ -1348,9 +1348,13 @@
         (EpaComments
          []))
        (HsExplicitTupleTy
-        [(AddEpAnn AnnSimpleQuote (EpaSpan { KindSigs.hs:28:16 }))
-        ,(AddEpAnn AnnOpenP (EpaSpan { KindSigs.hs:28:17 }))
-        ,(AddEpAnn AnnCloseP (EpaSpan { KindSigs.hs:28:44 }))]
+        ((,,)
+         (EpTok
+          (EpaSpan { KindSigs.hs:28:16 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:28:17 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:28:44 })))
         [(L
           (EpAnn
            (EpaSpan { KindSigs.hs:28:19-39 })

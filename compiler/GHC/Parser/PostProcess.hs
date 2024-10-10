@@ -1170,15 +1170,16 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   -- With NoListTuplePuns, contexts are parsed as data constructors, which causes failure
   -- downstream.
   -- This converts them just like when they are parsed as types in the punned case.
-  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy anns ts))
+  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy (q,o,c) ts))
     = punsAllowed >>= \case
       True -> unprocessed
       False -> do
         let
-          (op, cp) = case anns of
-            [o, c] -> ([o], [c])
-            [q, _, c] -> ([q], [c])
-            _ -> ([], [])
+          ol = AddEpAnn AnnOpenP (getEpTokenLoc o)
+          cl = AddEpAnn AnnCloseP (getEpTokenLoc c)
+          (op, cp) = case q of
+            EpTok ql -> ([AddEpAnn AnnSimpleQuote ql], [cl])
+            _        -> ([ol], [cl])
         mkCTuple (oparens ++ (addLoc <$> op), (addLoc <$> cp) ++ cparens, cs) ts
   check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
@@ -3658,7 +3659,7 @@ mkTupleSyntaxTy parOpen args parClose =
       HsExplicitTupleTy annsKeyword args
 
     annParen = AnnParen AnnParens parOpen parClose
-    annsKeyword = [AddEpAnn AnnOpenP parOpen, AddEpAnn AnnCloseP parClose]
+    annsKeyword = (NoEpTok, EpTok parOpen, EpTok parClose)
 
 -- | Decide whether to parse tuple con syntax @(,)@ in a type as a
 -- type or data constructor, based on the extension @ListTuplePuns@.

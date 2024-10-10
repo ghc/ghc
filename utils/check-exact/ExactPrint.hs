@@ -4211,12 +4211,12 @@ instance ExactPrint (HsType GhcPs) where
     tys' <- markAnnotated tys
     c' <- markEpToken c
     return (HsExplicitListTy (sq',o',c') prom tys')
-  exact (HsExplicitTupleTy an tys) = do
-    an0 <- mark an AnnSimpleQuote
-    an1 <- mark an0 AnnOpenP
+  exact (HsExplicitTupleTy (sq, o, c) tys) = do
+    sq' <- markEpToken sq
+    o' <- markEpToken o
     tys' <- markAnnotated tys
-    an2 <- mark an1 AnnCloseP
-    return (HsExplicitTupleTy an2 tys')
+    c' <- markEpToken c
+    return (HsExplicitTupleTy (sq', o', c') tys')
   exact (HsTyLit a lit) = do
     case lit of
       (HsNumTy src v) -> printSourceText src (show v)
