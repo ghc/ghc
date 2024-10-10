@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, MultiWayIf #-}
 {-# OPTIONS_GHC -O2 -fno-warn-name-shadowing #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -88,14 +89,47 @@ type EncodedString = String     -- Encoded form
 
 
 zEncodeString :: UserString -> EncodedString
-zEncodeString cs = case maybe_tuple cs of
-                Just n  -> n            -- Tuples go to Z2T etc
-                Nothing -> go cs
-          where
-                go []     = []
-                go (c:cs) = encode_digit_ch c ++ go' cs
-                go' []     = []
-                go' (c:cs) = encode_ch c ++ go' cs
+zEncodeString = \case
+  []     -> []
+  (c:cs)
+    -- If a digit is at the start of a symbol then we need to encode it.
+    -- Otherwise package names like 9pH-0.1 give linker errors.
+    | c >= '0' && c <= '9' -> encode_as_unicode_char c ++ go cs
+    | otherwise            -> go (c:cs)
+  where
+    go = \case
+      [] -> []
+      -- encode boxed/unboxed tuples respectively as ZnT/ZnH (e.g. Z3T/Z3H for
+      -- 3-tuples). Note that the arity corresponds to the number of
+      -- commas+1. No comma means 0-arity, i.e. Z0T/Z0H.
+      --
+      -- The 1-arity unboxed tuple "(# #)" (notice the space between the '#'s)
+      -- isn't special-cased, i.e. it is encoded as "ZLzhz20UzhZR". There is no
+      -- 1-arity boxed tuple (we use Solo/MkSolo instead).
+      --
+      -- arity        boxed       z-name        unboxed       z-name
+      -- 0            ()          Z0T           (##)          Z0H
+      -- 1            N/A         N/A           (# #)         ZLzhz20UzhZR
+      -- 2            (,)         Z2T           (#,#)         Z2H
+      -- 3            (,,)        Z3T           (#,,#)        Z3H
+      -- ...
+      --
+      '(':'#':'#':')':cs -> "Z0H" ++ go cs
+      '(':')':cs         -> "Z0T" ++ go cs
+      '(':'#':cs
+        | (n, '#':')':cs') <- count_commas cs
+        -> 'Z' : shows (n+1) ('H': go cs')
+      '(':cs
+        | (n, ')':cs') <- count_commas cs
+        -> 'Z' : shows (n+1) ('T': go cs')
+      c:cs -> encode_ch c ++ go cs
+
+count_commas :: String -> (Int, String)
+count_commas = go 0
+  where
+    go !n = \case
+      ',':cs -> go (n+1) cs
+      cs     -> (n,cs)
 
 unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
 unencodedChar 'Z' = False
@@ -103,12 +137,6 @@ unencodedChar 'z' = False
 unencodedChar c   =  c >= 'a' && c <= 'z'
                   || c >= 'A' && c <= 'Z'
                   || c >= '0' && c <= '9'
-
--- If a digit is at the start of a symbol then we need to encode it.
--- Otherwise package names like 9pH-0.1 give linker errors.
-encode_digit_ch :: Char -> EncodedString
-encode_digit_ch c | c >= '0' && c <= '9' = encode_as_unicode_char c
-encode_digit_ch c | otherwise            = encode_ch c
 
 encode_ch :: Char -> EncodedString
 encode_ch c | unencodedChar c = [c]     -- Common case first
@@ -214,34 +242,6 @@ decode_tuple d rest
     go n ('T':rest)     = '(' : replicate (n-1) ',' ++ ")" ++ zDecodeString rest
     go n ('H':rest)     = '(' : '#' : replicate (n-1) ',' ++ "#)" ++ zDecodeString rest
     go n other = error ("decode_tuple: " ++ show n ++ ' ':other)
-
-{-
-Tuples are encoded as
-        Z3T or Z3H
-for 3-tuples or unboxed 3-tuples respectively.  No other encoding starts
-        Z<digit>
-
-* "(##)" is the tycon for an unboxed 0-tuple
-
-* "()" is the tycon for a boxed 0-tuple
--}
-
-maybe_tuple :: UserString -> Maybe EncodedString
-
-maybe_tuple "(##)" = Just("Z0H")
-maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
-                                 (n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
-                                 _                  -> Nothing
-maybe_tuple "()" = Just("Z0T")
-maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
-                                 (n, ')' : _) -> Just ('Z' : shows (n+1) "T")
-                                 _            -> Nothing
-maybe_tuple _                = Nothing
-
-count_commas :: Int -> String -> (Int, String)
-count_commas n (',' : cs) = count_commas (n+1) cs
-count_commas n cs         = (n,cs)
-
 
 {-
 ************************************************************************
