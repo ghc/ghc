@@ -563,3 +563,32 @@ It stores the original statement (with location) and the expanded expression
   We hence use a tag `GenReason` in `Ghc.Tc.Origin`. When typechecking a `HsLam` in `Tc.Gen.Expr.tcExpr`
   the `match_ctxt` is set to a `StmtCtxt` if `GenOrigin` is a `DoExpansionOrigin`.
 -}
+
+
+-- | Wrap a located expression with a `PopErrCtxt`
+mkPopErrCtxtExpr :: LHsExpr GhcRn -> HsExpr GhcRn
+mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
+
+-- | Wrap a located expression with a PopSrcExpr with an appropriate location
+mkPopErrCtxtExprAt :: SrcSpanAnnA ->  LHsExpr GhcRn -> LHsExpr GhcRn
+mkPopErrCtxtExprAt _loc a = wrapGenSpan $ mkPopErrCtxtExpr a
+
+
+genPopErrCtxtExpr :: LHsExpr GhcRn -> LHsExpr GhcRn
+genPopErrCtxtExpr a = wrapGenSpan $ mkPopErrCtxtExpr a
+
+-- | Build an expression using the extension constructor `XExpr`,
+--   and the two components of the expansion: original do stmt and
+--   expanded expression and associate it with a provided location
+mkExpandedStmtAt
+  :: Bool                 -- ^ Wrap this expansion with a pop?
+  -> SrcSpanAnnA          -- ^ Location for the expansion expression
+  -> ExprLStmt GhcRn      -- ^ source statement
+  -> HsDoFlavour          -- ^ the flavour of the statement
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> LHsExpr GhcRn        -- ^ suitably wrapped located 'XXExprGhcRn'
+mkExpandedStmtAt addPop _loc oStmt flav eExpr
+  | addPop
+  = mkPopErrCtxtExprAt _loc (wrapGenSpan $ mkExpandedStmt oStmt flav eExpr)
+  | otherwise
+  = wrapGenSpan $ mkExpandedStmt oStmt flav eExpr
