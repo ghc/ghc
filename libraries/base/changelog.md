@@ -18,6 +18,7 @@
   * Add `nubOrd` / `nubOrdBy` to `Data.List` and `Data.List.NonEmpty`. ([CLC proposal #336](https://github.com/haskell/core-libraries-committee/issues/336))
   * Add `Semigroup` and `Monoid` instances for `Control.Monad.ST.Lazy`. ([CLC proposal #374](https://github.com/haskell/core-libraries-committee/issues/374))
   * `GHC.Conc.throwSTM` and `GHC.Conc.Sync.throwSTM` now carry a `HasCallStack` constraint and attach a `Backtrace` annotation to the thrown exception. ([GHC #25365](https://gitlab.haskell.org/ghc/ghc/-/issues/25365))
+  * `GHC.Conc.catchSTM` and `GHC.Conc.Sync.catchSTM` now attach `WhileHandling` annotation to exceptions thrown from the handler. ([GHC #25365](https://gitlab.haskell.org/ghc/ghc/-/issues/25365))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1
