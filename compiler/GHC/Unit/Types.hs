@@ -110,7 +110,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
 import Language.Haskell.Syntax.Module.Name
-import {-# SOURCE #-} Language.Haskell.Syntax.ImpExp (IsBootInterface(..))
+import Language.Haskell.Syntax.ImpExp (IsBootInterface(..))
 
 ---------------------------------------------------------------------
 -- MODULES
