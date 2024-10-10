@@ -117,6 +117,8 @@ import GHC.Internal.Int
 import GHC.Internal.IO
 import GHC.Internal.IO.Exception
 import GHC.Internal.Exception
+import GHC.Internal.Exception.Context ( ExceptionAnnotation )
+import GHC.Internal.Exception.Type ( WhileHandling(..) )
 import GHC.Internal.IORef
 import GHC.Internal.MVar
 import GHC.Internal.Ptr
@@ -840,8 +842,15 @@ catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
 catchSTM (STM m) handler = STM $ catchSTM# m handler'
     where
       handler' e = case fromException e of
-                     Just e' -> unSTM (handler e')
+                     Just e' -> unSTM (annotateSTM (WhileHandling e) (handler e'))
                      Nothing -> raiseIO# e
+
+-- | Execute an 'STM' action, adding the given 'ExceptionContext'
+-- to any thrown synchronous exceptions.
+annotateSTM :: forall e a. ExceptionAnnotation e => e -> STM a -> STM a
+annotateSTM ann (STM io) = STM (catch# io handler)
+  where
+    handler se = raiseIO# (addExceptionContext ann se)
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)
