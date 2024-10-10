@@ -25,8 +25,10 @@ module GHC.Internal.STM
         ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Exception (Exception, toException, fromException)
-import GHC.Internal.Stack
+import GHC.Internal.Exception (Exception, toExceptionWithBacktrace, fromException, addExceptionContext)
+import GHC.Internal.Exception.Context (ExceptionAnnotation)
+import GHC.Internal.Exception.Type (WhileHandling(..))
+import GHC.Internal.Stack (HasCallStack)
 
 -- TVars are shared memory locations which support atomic memory
 -- transactions.
@@ -198,8 +200,15 @@ catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
 catchSTM (STM m) handler = STM $ catchSTM# m handler'
     where
       handler' e = case fromException e of
-                     Just e' -> unSTM (handler e')
+                     Just e' -> unSTM (annotateSTM (WhileHandling e) (handler e'))
                      Nothing -> raiseIO# e
+
+-- | Execute an 'STM' action, adding the given 'ExceptionContext'
+-- to any thrown synchronous exceptions.
+annotateSTM :: forall e a. ExceptionAnnotation e => e -> STM a -> STM a
+annotateSTM ann (STM io) = STM (catch# io handler)
+  where
+    handler se = raiseIO# (addExceptionContext ann se)
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)
