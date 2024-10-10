@@ -55,8 +55,9 @@ archiveSourceTree prepare fname = do
   runBuilderWithCmdOptions
       [Cwd $ sourceDistRoot -/- dirName]
       (Tar Create)
-      ["chJf", ".." -/- tarName,  baseName]
-      ["chJf", ".." -/- tarName] [baseName]
+      -- See https://github.com/haskell/cabal/issues/10442 for why we exclude this file.
+      ["--exclude=cabal.project.symlink.broken","-chJf", ".." -/- tarName,  baseName]
+      ["--exclude=cabal.project.symlink.broken","-chJf", ".." -/- tarName] [baseName]
 
 
 -- | This creates a symlink to the 'source' at 'target'
