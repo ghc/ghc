@@ -2335,7 +2335,7 @@ atype :: { LHsType GhcPs }
                                    ; amsA' (sLL $1 $> $ HsExplicitTupleTy [mj AnnSimpleQuote $1,mop $2,mcp $6] (h : $5)) }}
         | '[' ']'               {% withCombinedComments $1 $> (mkListSyntaxTy0 (glR $1) (glR $2)) }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
-                                                      ; amsA' (sLL $1 $> $ HsExplicitListTy [mj AnnSimpleQuote $1,mos $2,mcs $4] IsPromoted $3) }}
+                                                      ; amsA' (sLL $1 $> $ HsExplicitListTy (epTok $1, epTok $2, epTok $4) IsPromoted $3) }}
         | SIMPLEQUOTE var                       {% amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted $2) }
 
         | quasiquote                  { mapLocA (HsSpliceTy noExtField) $1 }
@@ -2346,7 +2346,7 @@ atype :: { LHsType GhcPs }
         -- (One means a list type, zero means the list type constructor,
         -- so you have to quote those.)
         | '[' ktype ',' comma_types1 ']'  {% do { h <- addTrailingCommaA $2 (gl $3)
-                                                ; amsA' (sLL $1 $> $ HsExplicitListTy [mos $1,mcs $5] NotPromoted (h:$4)) }}
+                                                ; amsA' (sLL $1 $> $ HsExplicitListTy (NoEpTok,epTok $1,epTok $5) NotPromoted (h:$4)) }}
         | INTEGER              { sLLa $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
                                                            (il_value (getINTEGER $1)) }
         | CHAR                 { sLLa $1 $> $ HsTyLit noExtField $ HsCharTy (getCHARs $1)

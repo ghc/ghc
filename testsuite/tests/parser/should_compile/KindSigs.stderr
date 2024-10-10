@@ -1092,9 +1092,13 @@
         (EpaComments
          []))
        (HsExplicitListTy
-        [(AddEpAnn AnnSimpleQuote (EpaSpan { KindSigs.hs:26:13 }))
-        ,(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:26:14 }))
-        ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:26:29 }))]
+        ((,,)
+         (EpTok
+          (EpaSpan { KindSigs.hs:26:13 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:26:14 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:26:29 })))
         (IsPromoted)
         [(L
           (EpAnn
@@ -1178,8 +1182,12 @@
         (EpaComments
          []))
        (HsExplicitListTy
-        [(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:27:14 }))
-        ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:27:45 }))]
+        ((,,)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { KindSigs.hs:27:14 }))
+         (EpTok
+          (EpaSpan { KindSigs.hs:27:45 })))
         (NotPromoted)
         [(L
           (EpAnn
@@ -1363,8 +1371,12 @@
              (EpaComments
               []))
             (HsExplicitListTy
-             [(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:28:19 }))
-             ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:28:29 }))]
+             ((,,)
+              (NoEpTok)
+              (EpTok
+               (EpaSpan { KindSigs.hs:28:19 }))
+              (EpTok
+               (EpaSpan { KindSigs.hs:28:29 })))
              (NotPromoted)
              [(L
                (EpAnn

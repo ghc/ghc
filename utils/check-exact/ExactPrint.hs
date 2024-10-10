@@ -4203,14 +4203,14 @@ instance ExactPrint (HsType GhcPs) where
         NoSrcStrict -> return tk
     ty' <- markAnnotated ty
     return (HsBangTy ((o',c',tk'), mt) (HsBang up str) ty')
-  exact (HsExplicitListTy an prom tys) = do
-    an0 <- if (isPromoted prom)
-             then mark an AnnSimpleQuote
-             else return an
-    an1 <- mark an0 AnnOpenS
+  exact (HsExplicitListTy (sq,o,c) prom tys) = do
+    sq' <- if (isPromoted prom)
+             then markEpToken sq
+             else return sq
+    o' <- markEpToken o
     tys' <- markAnnotated tys
-    an2 <- mark an1 AnnCloseS
-    return (HsExplicitListTy an2 prom tys')
+    c' <- markEpToken c
+    return (HsExplicitListTy (sq',o',c') prom tys')
   exact (HsExplicitTupleTy an tys) = do
     an0 <- mark an AnnSimpleQuote
     an1 <- mark an0 AnnOpenP

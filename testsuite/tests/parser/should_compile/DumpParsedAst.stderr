@@ -501,9 +501,13 @@
                 (EpaComments
                  []))
                (HsExplicitListTy
-                [(AddEpAnn AnnSimpleQuote (EpaSpan { DumpParsedAst.hs:12:10 }))
-                ,(AddEpAnn AnnOpenS (EpaSpan { DumpParsedAst.hs:12:11 }))
-                ,(AddEpAnn AnnCloseS (EpaSpan { DumpParsedAst.hs:12:12 }))]
+                ((,,)
+                 (EpTok
+                  (EpaSpan { DumpParsedAst.hs:12:10 }))
+                 (EpTok
+                  (EpaSpan { DumpParsedAst.hs:12:11 }))
+                 (EpTok
+                  (EpaSpan { DumpParsedAst.hs:12:12 })))
                 (IsPromoted)
                 [])))]
             (Prefix)

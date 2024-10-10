@@ -101,8 +101,12 @@
              "-- comment inside A")
             { AnnotationNoListTuplePuns.hs:7:3 }))]))
        (HsExplicitListTy
-        [(AddEpAnn AnnOpenS (EpaSpan { AnnotationNoListTuplePuns.hs:7:3 }))
-        ,(AddEpAnn AnnCloseS (EpaSpan { AnnotationNoListTuplePuns.hs:9:3 }))]
+        ((,,)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { AnnotationNoListTuplePuns.hs:7:3 }))
+         (EpTok
+          (EpaSpan { AnnotationNoListTuplePuns.hs:9:3 })))
         (NotPromoted)
         [])))))
   ,(L
@@ -157,8 +161,12 @@
              "-- comment inside B")
             { AnnotationNoListTuplePuns.hs:14:3 }))]))
        (HsExplicitListTy
-        [(AddEpAnn AnnOpenS (EpaSpan { AnnotationNoListTuplePuns.hs:14:3 }))
-        ,(AddEpAnn AnnCloseS (EpaSpan { AnnotationNoListTuplePuns.hs:17:3 }))]
+        ((,,)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { AnnotationNoListTuplePuns.hs:14:3 }))
+         (EpTok
+          (EpaSpan { AnnotationNoListTuplePuns.hs:17:3 })))
         (NotPromoted)
         [(L
           (EpAnn
@@ -266,8 +274,12 @@
         (EpaComments
          []))
        (HsExplicitListTy
-        [(AddEpAnn AnnOpenS (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:4:10 }))
-        ,(AddEpAnn AnnCloseS (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:4:11 }))]
+        ((,,)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:4:10 }))
+         (EpTok
+          (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:4:11 })))
         (NotPromoted)
         [])))))
   ,(L
@@ -303,8 +315,12 @@
         (EpaComments
          []))
        (HsExplicitListTy
-        [(AddEpAnn AnnOpenS (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:5:10 }))
-        ,(AddEpAnn AnnCloseS (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:5:15 }))]
+        ((,,)
+         (NoEpTok)
+         (EpTok
+          (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:5:10 }))
+         (EpTok
+          (EpaSpan { AnnotationNoListTuplePuns.ppr.hs:5:15 })))
         (NotPromoted)
         [(L
           (EpAnn

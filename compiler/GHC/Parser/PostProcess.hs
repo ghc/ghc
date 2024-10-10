@@ -3690,7 +3690,7 @@ mkListSyntaxTy0 brkOpen brkClose span =
       HsExplicitListTy annsKeyword NotPromoted []
 
     rdrNameAnn = NameAnnOnly NameSquare brkOpen brkClose []
-    annsKeyword = [AddEpAnn AnnOpenS brkOpen, AddEpAnn AnnCloseS brkClose]
+    annsKeyword = (NoEpTok, EpTok brkOpen, EpTok brkClose)
     fullLoc = EpaSpan span
 
 -- | Decide whether to parse list type syntax @[Int]@ in a type as a
@@ -3709,5 +3709,5 @@ mkListSyntaxTy1 brkOpen t brkClose =
     disabled =
       HsExplicitListTy annsKeyword NotPromoted [t]
 
-    annsKeyword = [AddEpAnn AnnOpenS brkOpen, AddEpAnn AnnCloseS brkClose]
+    annsKeyword = (NoEpTok, EpTok brkOpen, EpTok brkClose)
     annParen = AnnParen AnnParensSquare brkOpen brkClose
