@@ -2368,7 +2368,7 @@ shortCutLit platform val res_ty
       | isWordTy res_ty && platformInWordRange platform i
       = Just (mkLit wordDataCon (HsWordPrim src i))
       | isIntegerTy res_ty
-      = Just (HsLit noExtField (HsInteger src i res_ty))
+      = Just (HsLit noExtField (XLit $ HsInteger src i res_ty))
       | otherwise
       = go_fractional (integralFractionalLit neg i)
         -- The 'otherwise' case is important

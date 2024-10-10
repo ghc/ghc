@@ -940,9 +940,9 @@ zonkExpr (HsIPVar x _) = dataConCantHappen x
 
 zonkExpr (HsOverLabel x _) = dataConCantHappen x
 
-zonkExpr (HsLit x (HsRat e f ty))
+zonkExpr (HsLit x (XLit (HsRat f ty)))
   = do new_ty <- zonkTcTypeToTypeX ty
-       return (HsLit x (HsRat e f new_ty))
+       return (HsLit x (XLit $ HsRat f new_ty))
 
 zonkExpr (HsLit x lit)
   = return (HsLit x lit)

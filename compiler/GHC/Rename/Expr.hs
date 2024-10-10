@@ -383,7 +383,7 @@ rnExpr (HsLit x lit) | Just (src, s) <- stringLike lit
 
 rnExpr (HsLit x lit)
   = do { rnLit lit
-       ; return (HsLit x(convertLit lit), emptyFVs) }
+       ; return (HsLit x (convertLit lit), emptyFVs) }
 
 rnExpr (HsOverLit x lit)
   = do { ((lit', mb_neg), fvs) <- rnOverLit lit -- See Note [Negative zero]

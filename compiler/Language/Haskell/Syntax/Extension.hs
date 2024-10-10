@@ -566,8 +566,6 @@ type family XHsWord8Prim x
 type family XHsWord16Prim x
 type family XHsWord32Prim x
 type family XHsWord64Prim x
-type family XHsInteger x
-type family XHsRat x
 type family XHsFloatPrim x
 type family XHsDoublePrim x
 type family XXLit x
