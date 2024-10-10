@@ -319,7 +319,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
                     , tcdATs = fams', tcdATDefs = at_defs', tcdDocs = [] }
-                              -- no docs in TH ^^
+                                                     -- no docs in TH ^^
         }
 
 cvtDec (InstanceD o ctxt ty decs)

@@ -1655,7 +1655,7 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
     liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp unsafeCodeCoerce_Expr . nlHsApp pure_Expr)
                                  (map (pats_etc mk_typed_bracket mk_tsplice liftTypedName) data_cons)
 
-    mk_untyped_bracket = HsUntypedBracket noAnn . ExpBr noExtField
+    mk_untyped_bracket = HsUntypedBracket noExtField . ExpBr noAnn
     mk_typed_bracket = HsTypedBracket noAnn
 
     mk_tsplice = HsTypedSplice noAnn

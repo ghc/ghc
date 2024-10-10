@@ -186,14 +186,22 @@ data HsBracketTc = HsBracketTc
                                         -- pasted back in by the desugarer
   }
 
-type instance XTypedBracket GhcPs = [AddEpAnn]
+type instance XTypedBracket GhcPs = (BracketAnn (EpToken "[||") (EpToken "[e||"), EpToken "||]")
 type instance XTypedBracket GhcRn = NoExtField
 type instance XTypedBracket GhcTc = HsBracketTc
-type instance XUntypedBracket GhcPs = [AddEpAnn]
+type instance XUntypedBracket GhcPs = NoExtField
 type instance XUntypedBracket GhcRn = [PendingRnSplice] -- See Note [Pending Splices]
                                                         -- Output of the renamer is the *original* renamed expression,
                                                         -- plus _renamed_ splices to be type checked
 type instance XUntypedBracket GhcTc = HsBracketTc
+
+data BracketAnn noE hasE
+  = BracketNoE noE
+  | BracketHasE hasE
+  deriving Data
+
+instance (NoAnn n, NoAnn h) => NoAnn (BracketAnn n h) where
+  noAnn = BracketNoE noAnn
 
 -- ---------------------------------------------------------------------
 
@@ -2125,12 +2133,12 @@ ppr_splice herald mn e
     <> ppr e
 
 
-type instance XExpBr  GhcPs       = NoExtField
-type instance XPatBr  GhcPs       = NoExtField
-type instance XDecBrL GhcPs       = NoExtField
+type instance XExpBr  GhcPs       = (BracketAnn (EpUniToken "[|" "⟦") (EpToken "[e|"), EpUniToken "|]" "⟧")
+type instance XPatBr  GhcPs       = (EpToken "[p|", EpUniToken "|]" "⟧")
+type instance XDecBrL GhcPs       = (EpToken "[d|", EpUniToken "|]" "⟧", (EpToken "{", EpToken "}"))
 type instance XDecBrG GhcPs       = NoExtField
-type instance XTypBr  GhcPs       = NoExtField
-type instance XVarBr  GhcPs       = NoExtField
+type instance XTypBr  GhcPs       = (EpToken "[t|", EpUniToken "|]" "⟧")
+type instance XVarBr  GhcPs       = EpaLocation
 type instance XXQuote GhcPs       = DataConCantHappen
 
 type instance XExpBr  GhcRn       = NoExtField

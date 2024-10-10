@@ -308,7 +308,16 @@
      (NoExtField)
      (ClassDecl
       ((,,)
-       [(AddEpAnn AnnClass (EpaSpan { Test24533.hs:11:1-5 }))]
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { Test24533.hs:11:1-5 }))
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        [])
        (EpNoLayout)
        (NoAnnSortKey))
       (Nothing)
@@ -933,7 +942,16 @@
      (NoExtField)
      (ClassDecl
       ((,,)
-       [(AddEpAnn AnnClass (EpaSpan { Test24533.ppr.hs:4:1-5 }))]
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { Test24533.ppr.hs:4:1-5 }))
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        [])
        (EpNoLayout)
        (NoAnnSortKey))
       (Nothing)

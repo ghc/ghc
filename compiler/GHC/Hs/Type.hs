@@ -476,18 +476,18 @@ type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
 type instance XSpliceTy        GhcTc = Kind
 
-type instance XDocTy           (GhcPass _) = [AddEpAnn]
-type instance XBangTy          (GhcPass _) = ([AddEpAnn], SourceText)
+type instance XDocTy           (GhcPass _) = NoExtField
+type instance XBangTy          (GhcPass _) = ((EpaLocation, EpaLocation, EpaLocation), SourceText)
 
 type instance XRecTy           GhcPs = AnnList
 type instance XRecTy           GhcRn = NoExtField
 type instance XRecTy           GhcTc = NoExtField
 
-type instance XExplicitListTy  GhcPs = [AddEpAnn]
+type instance XExplicitListTy  GhcPs = (EpToken "'", EpToken "[", EpToken "]")
 type instance XExplicitListTy  GhcRn = NoExtField
 type instance XExplicitListTy  GhcTc = Kind
 
-type instance XExplicitTupleTy GhcPs = [AddEpAnn]
+type instance XExplicitTupleTy GhcPs = (EpToken "'", EpToken "(", EpToken ")")
 type instance XExplicitTupleTy GhcRn = NoExtField
 type instance XExplicitTupleTy GhcTc = [Kind]
 

@@ -57,7 +57,7 @@ data PatBuilder p
   | PatBuilderApp (LocatedA (PatBuilder p)) (LocatedA (PatBuilder p))
   | PatBuilderAppType (LocatedA (PatBuilder p)) (EpToken "@") (HsTyPat GhcPs)
   | PatBuilderOpApp (LocatedA (PatBuilder p)) (LocatedN RdrName)
-                    (LocatedA (PatBuilder p)) [AddEpAnn]
+                    (LocatedA (PatBuilder p)) ([EpToken "("], [EpToken ")"])
   | PatBuilderVar (LocatedN RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
 

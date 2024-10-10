@@ -1292,8 +1292,9 @@ topdecl :: { LHsDecl GhcPs }
 --
 cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
-                {% (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4))
-                        (mj AnnClass $1:(fst $ unLoc $3)++(fstOf3 $ unLoc $4)) }
+                {% do { let {(wtok, (oc,semis,cc)) = fstOf3 $ unLoc $4}
+                      ; mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4)
+                        (AnnClassDecl (epTok $1) [] [] (fst $ unLoc $3) wtok oc cc semis) }}
 
 -- Default declarations (toplevel)
 --
@@ -1314,7 +1315,7 @@ ty_decl :: { LTyClDecl GhcPs }
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% mkTySynonym (comb2 $1 $4) $2 $4 [mj AnnType $1,mj AnnEqual $3] }
+                {% mkTySynonym (comb2 $1 $4) $2 $4 (epTok $1) (epTok $3) }
 
            -- type family declarations
         | 'type' 'family' type opt_tyfam_kind_sig opt_injective_info
@@ -1749,9 +1750,9 @@ decl_cls  : at_decl_cls                 { $1 }
                                       quotes (ppr $2)
                           ; amsA' (sLL $1 $> $ SigD noExtField $ ClassOpSig (AnnSig (epUniTok $3) Nothing (Just (epTok $1))) True [v] $4) }}
 
-decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
+decls_cls :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }  -- Reversed
           : decls_cls ';' decl_cls      {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                             then return (sLL $1 $> ((fst $ unLoc $1) ++ [mzEpTok $2]
                                                                     , unitOL $3))
                                             else case (snd $ unLoc $1) of
                                               SnocOL hs t -> do
@@ -1759,7 +1760,7 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
                                                  return (sLL $1 $> (fst $ unLoc $1
                                                                 , snocOL hs t' `appOL` unitOL $3)) }
           | decls_cls ';'               {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLZ $1 $> ( (fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                             then return (sLZ $1 $> ( (fst $ unLoc $1) ++ [mzEpTok $2]
                                                                                    ,snd $ unLoc $1))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
@@ -1770,24 +1771,24 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
           | {- empty -}                 { noLoc ([],nilOL) }
 
 decllist_cls
-        :: { Located ([AddEpAnn]
+        :: { Located ((EpToken "{", [EpToken ";"], EpToken "}")
                      , OrdList (LHsDecl GhcPs)
                      , EpLayout) }      -- Reversed
-        : '{'         decls_cls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
+        : '{'         decls_cls '}'     { sLL $1 $> ((epTok $1, fst $ unLoc $2, epTok $3)
                                              ,snd $ unLoc $2, epExplicitBraces $1 $3) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
-                                           in L l (anns, decls, EpVirtualBraces (getVOCURLY $1)) }
+                                           in L l ((NoEpTok, anns, NoEpTok), decls, EpVirtualBraces (getVOCURLY $1)) }
 
 -- Class body
 --
-where_cls :: { Located ([AddEpAnn]
+where_cls :: { Located ((EpToken "where", (EpToken "{", [EpToken ";"], EpToken "}"))
                        ,(OrdList (LHsDecl GhcPs))    -- Reversed
                        ,EpLayout) }
                                 -- No implicit parameters
                                 -- May have type declarations
-        : 'where' decllist_cls          { sLL $1 $> (mj AnnWhere $1:(fstOf3 $ unLoc $2)
+        : 'where' decllist_cls          { sLL $1 $> ((epTok $1,fstOf3 $ unLoc $2)
                                              ,sndOf3 $ unLoc $2,thdOf3 $ unLoc $2) }
-        | {- empty -}                   { noLoc ([],nilOL,EpNoLayout) }
+        | {- empty -}                   { noLoc ((noAnn, noAnn),nilOL,EpNoLayout) }
 
 -- Declarations in instance bodies
 --
@@ -2177,8 +2178,8 @@ sigtypes1 :: { OrdList (LHsSigType GhcPs) }
 -- Types
 
 unpackedness :: { Located UnpackednessPragma }
-        : '{-# UNPACK' '#-}'   { sLL $1 $> (UnpackednessPragma [mo $1, mc $2] (getUNPACK_PRAGs $1) SrcUnpack) }
-        | '{-# NOUNPACK' '#-}' { sLL $1 $> (UnpackednessPragma [mo $1, mc $2] (getNOUNPACK_PRAGs $1) SrcNoUnpack) }
+        : '{-# UNPACK' '#-}'   { sLL $1 $> (UnpackednessPragma (glR $1, glR $2) (getUNPACK_PRAGs $1) SrcUnpack) }
+        | '{-# NOUNPACK' '#-}' { sLL $1 $> (UnpackednessPragma (glR $1, glR $2) (getNOUNPACK_PRAGs $1) SrcNoUnpack) }
 
 forall_telescope :: { Located (HsForAllTelescope GhcPs) }
         : 'forall' tv_bndrs '.'  {% do { hintExplicitForall $1
@@ -2304,8 +2305,8 @@ atype :: { LHsType GhcPs }
                                                ; return $ sL1a $1 (HsStarTy noExtField (isUnicode $1)) } }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
-        | PREFIX_TILDE atype             {% amsA' (sLL $1 $> (mkBangTy [mj AnnTilde $1] SrcLazy $2)) }
-        | PREFIX_BANG  atype             {% amsA' (sLL $1 $> (mkBangTy [mj AnnBang $1] SrcStrict $2)) }
+        | PREFIX_TILDE atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcLazy $2)) }
+        | PREFIX_BANG  atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcStrict $2)) }
 
         | '{' fielddecls '}'             {% do { decls <- amsA' (sLL $1 $> $ HsRecTy (AnnList (listAsAnchorM $2) (Just $ moc $1) (Just $ mcc $3) [] []) $2)
                                                ; checkRecordSyntax decls }}
@@ -2325,17 +2326,17 @@ atype :: { LHsType GhcPs }
         | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy  (AnnParen AnnParens       (glR $1) (glR $3)) $2) }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE '(' ')'         {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
-                                            ; amsA' (sLL $1 $> $ HsExplicitTupleTy [mj AnnSimpleQuote $1,mop $2,mcp $3] []) }}
+                                            ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $3) []) }}
         | SIMPLEQUOTE gen_qcon {% amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted $2) }
         | SIMPLEQUOTE sysdcon_nolist {% do { requireLTPuns PEP_QuoteDisambiguation $1 (reLoc $>)
                                            ; amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted (L (getLoc $2) $ nameRdrName (dataConName (unLoc $2)))) }}
         | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
                              {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
                                    ; h <- addTrailingCommaA $3 (gl $4)
-                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy [mj AnnSimpleQuote $1,mop $2,mcp $6] (h : $5)) }}
+                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $6) (h : $5)) }}
         | '[' ']'               {% withCombinedComments $1 $> (mkListSyntaxTy0 (glR $1) (glR $2)) }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
-                                                      ; amsA' (sLL $1 $> $ HsExplicitListTy [mj AnnSimpleQuote $1,mos $2,mcs $4] IsPromoted $3) }}
+                                                      ; amsA' (sLL $1 $> $ HsExplicitListTy (epTok $1, epTok $2, epTok $4) IsPromoted $3) }}
         | SIMPLEQUOTE var                       {% amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted $2) }
 
         | quasiquote                  { mapLocA (HsSpliceTy noExtField) $1 }
@@ -2346,7 +2347,7 @@ atype :: { LHsType GhcPs }
         -- (One means a list type, zero means the list type constructor,
         -- so you have to quote those.)
         | '[' ktype ',' comma_types1 ']'  {% do { h <- addTrailingCommaA $2 (gl $3)
-                                                ; amsA' (sLL $1 $> $ HsExplicitListTy [mos $1,mcs $5] NotPromoted (h:$4)) }}
+                                                ; amsA' (sLL $1 $> $ HsExplicitListTy (NoEpTok,epTok $1,epTok $5) NotPromoted (h:$4)) }}
         | INTEGER              { sLLa $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
                                                            (il_value (getINTEGER $1)) }
         | CHAR                 { sLLa $1 $> $ HsTyLit noExtField $ HsCharTy (getCHARs $1)
@@ -2420,10 +2421,9 @@ tyvar_wc :: { Located (HsBndrVar GhcPs) }
         : tyvar                         { sL1 $1 (HsBndrVar noExtField $1) }
         | '_'                           { sL1 $1 (HsBndrWildCard noExtField) }
 
-fds :: { Located ([AddEpAnn],[LHsFunDep GhcPs]) }
-        : {- empty -}                   { noLoc ([],[]) }
-        | '|' fds1                      { (sLL $1 $> ([mj AnnVbar $1]
-                                                 ,reverse (unLoc $2))) }
+fds :: { Located (EpToken "|",[LHsFunDep GhcPs]) }
+        : {- empty -}                   { noLoc (NoEpTok,[]) }
+        | '|' fds1                      { (sLL $1 $> (epTok $1 ,reverse (unLoc $2))) }
 
 fds1 :: { Located [LHsFunDep GhcPs] }
         : fds1 ',' fd   {%
@@ -3138,26 +3138,26 @@ aexp2   :: { ECP }
         | splice_untyped { ECP $ mkHsSplicePV $1 }
         | splice_typed   { ecpFromExp $ fmap (uncurry HsTypedSplice) (reLoc $1) }
 
-        | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket [mj AnnSimpleQuote $1] (VarBr noExtField True  $2)) }
-        | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket [mj AnnSimpleQuote $1] (VarBr noExtField True  $2)) }
-        | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket [mj AnnThTyQuote $1  ] (VarBr noExtField False $2)) }
-        | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket [mj AnnThTyQuote $1  ] (VarBr noExtField False $2)) }
+        | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) True  $2)) }
+        | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) True  $2)) }
+        | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) False $2)) }
+        | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) False $2)) }
         -- See Note [%shift: aexp2 -> TH_TY_QUOTE]
         | TH_TY_QUOTE %shift    {% reportEmptyDoubleQuotes (getLoc $1) }
         | '[|' exp '|]'       {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 amsA' (sLL $1 $> $ HsUntypedBracket (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
-                                                                                         else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) (ExpBr noExtField $2)) }
+                                 amsA' (sLL $1 $> $ HsUntypedBracket noExtField (ExpBr (if (hasE $1) then (BracketHasE (epTok $1),   epUniTok $3)
+                                                                                                     else (BracketNoE (epUniTok $1), epUniTok $3)) $2)) }
         | '[||' exp '||]'     {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 amsA' (sLL $1 $> $ HsTypedBracket (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) $2) }
+                                 amsA' (sLL $1 $> $ HsTypedBracket (if (hasE $1) then (BracketHasE (epTok $1),epTok $3) else (BracketNoE (epTok $1),epTok $3)) $2) }
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
-                                 amsA' (sLL $1 $> $ HsUntypedBracket [mo $1,mu AnnCloseQ $3] (TypBr noExtField $2)) }
+                                 amsA' (sLL $1 $> $ HsUntypedBracket noExtField (TypBr (epTok $1,epUniTok $3) $2)) }
         | '[p|' infixexp '|]' {% (checkPattern <=< runPV) (unECP $2) >>= \p ->
                                       fmap ecpFromExp $
-                                      amsA' (sLL $1 $> $ HsUntypedBracket [mo $1,mu AnnCloseQ $3] (PatBr noExtField p)) }
+                                      amsA' (sLL $1 $> $ HsUntypedBracket noExtField (PatBr (epTok $1,epUniTok $3) p)) }
         | '[d|' cvtopbody '|]' {% fmap ecpFromExp $
-                                  amsA' (sLL $1 $> $ HsUntypedBracket (mo $1:mu AnnCloseQ $3:fst $2) (DecBrL noExtField (snd $2))) }
+                                  amsA' (sLL $1 $> $ HsUntypedBracket noExtField (DecBrL (epTok $1,epUniTok $3, fst $2) (snd $2))) }
         | quasiquote          { ECP $ mkHsSplicePV $1 }
 
         -- arrow notation extension
@@ -3197,10 +3197,9 @@ acmd    :: { LHsCmdTop GhcPs }
                                    runPV (checkCmdBlockArguments cmd) >>= \ _ ->
                                    return (sL1a cmd $ HsCmdTop noExtField cmd) }
 
-cvtopbody :: { ([AddEpAnn],[LHsDecl GhcPs]) }
-        :  '{'            cvtopdecls0 '}'      { ([mj AnnOpenC $1
-                                                  ,mj AnnCloseC $3],$2) }
-        |      vocurly    cvtopdecls0 close    { ([],$2) }
+cvtopbody :: { ((EpToken "{", EpToken "}"),[LHsDecl GhcPs]) }
+        :  '{'            cvtopdecls0 '}'      { ((epTok $1 ,epTok $3),$2) }
+        |      vocurly    cvtopdecls0 close    { ((NoEpTok, NoEpTok),$2) }
 
 cvtopdecls0 :: { [LHsDecl GhcPs] }
         : topdecls_semi         { cvTopDecls $1 }
@@ -4640,6 +4639,10 @@ epUniTok :: Located Token -> EpUniToken tok utok
 epUniTok t@(L !l _) = EpUniTok (EpaSpan l) u
   where
     u = if isUnicode t then UnicodeSyntax else NormalSyntax
+
+-- |Construct an EpToken from the location of the token, provided the span is not zero width
+mzEpTok :: Located Token -> EpToken tok
+mzEpTok !l = if isZeroWidthSpan (gl l) then NoEpTok else (epTok l)
 
 epExplicitBraces :: Located Token -> Located Token -> EpLayout
 epExplicitBraces !t1 !t2 = EpExplicitBraces (epTok t1) (epTok t2)
