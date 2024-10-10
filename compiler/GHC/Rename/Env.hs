@@ -1525,8 +1525,8 @@ lookupGlobalOccRn_overloaded rdr_name =
               addNameClashErrRn rdr_name gres
               return (Just gre) }
 
-getFieldUpdLbl :: LHsRecUpdField (GhcPass p) q -> LocatedN RdrName
-getFieldUpdLbl = ambiguousFieldOccLRdrName . unLoc . hfbLHS . unLoc
+getFieldUpdLbl :: IsPass p => LHsRecUpdField (GhcPass p) q -> LocatedN RdrName
+getFieldUpdLbl = fieldOccLRdrName . unLoc . hfbLHS . unLoc
 
 -- | Returns all possible collections of field labels for the given
 -- record update.
@@ -1620,10 +1620,10 @@ lookupRecUpdFields flds
 *                                                                      *
 **********************************************************************-}
 
-getUpdFieldLbls :: forall p q. UnXRec (GhcPass p)
+getUpdFieldLbls :: forall p q. IsPass p
                 => [LHsRecUpdField (GhcPass p) q] -> [RdrName]
 getUpdFieldLbls
-  = map $ ambiguousFieldOccRdrName
+  = map $ fieldOccRdrName
         . unXRec @(GhcPass p)
         . hfbLHS
         . unXRec @(GhcPass p)

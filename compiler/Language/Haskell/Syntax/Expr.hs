@@ -351,10 +351,6 @@ data HsExpr p
                              --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
 
-  | HsRecSel  (XRecSel p)
-              (FieldOcc p) -- ^ Variable pointing to record selector
-                           -- See Note [Non-overloaded record field selectors] and
-                           -- Note [Record selectors in the AST]
 
   | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
@@ -573,7 +569,7 @@ data HsExpr p
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: NonEmpty (XRec p (DotFieldOcc p))
+      , proj_flds :: NonEmpty (DotFieldOcc p)
       }
 
   -- | Expression with an explicit type signature. @e :: type@

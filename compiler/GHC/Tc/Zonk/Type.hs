@@ -608,8 +608,8 @@ zonkTopBndrs :: [TcId] -> TcM [Id]
 zonkTopBndrs ids = initZonkEnv DefaultFlexi $ zonkIdBndrs ids
 
 zonkFieldOcc :: FieldOcc GhcTc -> ZonkTcM (FieldOcc GhcTc)
-zonkFieldOcc (FieldOcc sel lbl)
-  = fmap ((flip FieldOcc) lbl) $ zonkIdBndr sel
+zonkFieldOcc (FieldOcc lbl (L l sel))
+  = FieldOcc lbl . L l <$> zonkIdBndr sel
 
 zonkEvBndrsX :: [EvVar] -> ZonkBndrTcM [EvVar]
 zonkEvBndrsX = traverse zonkEvBndrX
@@ -935,9 +935,6 @@ zonkExpr (HsUnboundVar her occ)
            ty'  <- zonkTcTypeToTypeX ty
            return (HER ref ty' u)
 
-zonkExpr (HsRecSel _ (FieldOcc v occ))
-  = do { v' <- zonkIdOcc v
-       ; return (HsRecSel noExtField (FieldOcc v' occ)) }
 
 zonkExpr (HsIPVar x _) = dataConCantHappen x
 
@@ -1097,6 +1094,10 @@ zonkExpr (XExpr (ConLikeTc con tvs tys))
     -- Only the multiplicity can contain unification variables
     -- The tvs come straight from the data-con, and so are strictly redundant
     -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
+
+zonkExpr (XExpr (HsRecSelTc (FieldOcc occ (L l v))))
+  = do { v' <- zonkIdOcc v
+       ; return (XExpr (HsRecSelTc (FieldOcc occ (L l v')))) }
 
 zonkExpr (RecordUpd x _ _)  = dataConCantHappen x
 zonkExpr (HsGetField x _ _) = dataConCantHappen x

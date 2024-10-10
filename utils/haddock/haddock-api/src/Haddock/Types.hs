@@ -885,8 +885,8 @@ type instance XBndrKind DocNameI = NoExtField
 type instance XBndrNoKind DocNameI = NoExtField
 type instance XXBndrKind DocNameI = DataConCantHappen
 
-type instance XCFieldOcc DocNameI = DocName
-type instance XXFieldOcc DocNameI = NoExtField
+type instance XCFieldOcc DocNameI = RdrName
+type instance XXFieldOcc DocNameI = DataConCantHappen
 
 type instance XFixitySig DocNameI = NoExtField
 type instance XFixSig DocNameI = NoExtField

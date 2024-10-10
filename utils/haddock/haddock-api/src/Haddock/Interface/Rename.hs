@@ -748,9 +748,9 @@ renameConDeclFieldField (L l (ConDeclField _ names t doc)) = do
   return $ L (locA l) (ConDeclField noExtField names' t' doc')
 
 renameLFieldOcc :: LFieldOcc GhcRn -> RnM (LFieldOcc DocNameI)
-renameLFieldOcc (L l (FieldOcc sel lbl)) = do
+renameLFieldOcc (L l (FieldOcc rdr (L n sel))) = do
   sel' <- renameName sel
-  return $ L l (FieldOcc sel' lbl)
+  return $ L l (FieldOcc rdr (L n sel'))
 
 renameSig :: Sig GhcRn -> RnM (Sig DocNameI)
 renameSig sig = case sig of

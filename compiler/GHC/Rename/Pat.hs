@@ -10,6 +10,8 @@
 {-# LANGUAGE MultiWayIf                 #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -880,7 +882,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; return $ L l $
                HsFieldBind
                  { hfbAnn = noAnn
-                 , hfbLHS = L loc (FieldOcc sel (L ll arg_rdr))
+                 , hfbLHS = L loc (FieldOcc arg_rdr (L ll sel))
                  , hfbRHS = arg'
                  , hfbPun = pun } }
 
@@ -888,7 +890,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
               -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn (LocatedA arg)] -- Explicit fields
-              -> RnM ([LHsRecField GhcRn (LocatedA arg)])   -- Field Labels we need to fill in
+              -> RnM [LHsRecField GhcRn (LocatedA arg)]   -- Field Labels we need to fill in
     rn_dotdot (Just (L loc_e (RecFieldsDotDot n))) (Just con) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
@@ -900,7 +902,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; conInfo <- lookupConstructorInfo con
            ; when (conFieldInfo conInfo == ConHasPositionalArgs) (addErr (TcRnIllegalWildcardsInConstructor con))
-           ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldLbls flds)
+           ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldRdrs flds)
 
                    -- For constructor uses (but not patterns)
                    -- the arg should be in scope locally;
@@ -926,7 +928,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; return [ L (noAnnSrcSpan loc) (HsFieldBind
                         { hfbAnn = noAnn
                         , hfbLHS
-                           = L (noAnnSrcSpan loc) (FieldOcc sel (L (noAnnSrcSpan loc) arg_rdr))
+                           = L (noAnnSrcSpan loc) (FieldOcc arg_rdr (L (noAnnSrcSpan loc) sel))
                         , hfbRHS = L locn (mk_arg loc arg_rdr)
                         , hfbPun = False })
                     | fl <- dot_dot_fields
@@ -1016,10 +1018,10 @@ rnHsRecUpdFields flds
               -> RnM ([LHsRecUpdField GhcRn GhcRn], FreeVars)
       rn_flds _ _ [] = return ([], emptyFVs)
       rn_flds pun_ok mb_unambig_lbls
-              ((L l (HsFieldBind { hfbLHS = L loc f
+              ((L l (HsFieldBind { hfbLHS = L loc (FieldOcc _ f)
                                  , hfbRHS = arg
                                  , hfbPun = pun })):flds)
-        = do { let lbl = ambiguousFieldOccRdrName f
+        = do { let lbl = unLoc f
              ; (arg' :: LHsExpr GhcPs) <- if pun
                        then do { setSrcSpanA loc $
                                  checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
@@ -1028,15 +1030,18 @@ rnHsRecUpdFields flds
                                ; return (L (l2l loc) (HsVar noExtField (L (l2l loc) arg_rdr))) }
                        else return arg
              ; (arg'', fvs) <- rnLExpr arg'
-             ; let lbl' :: AmbiguousFieldOcc GhcRn
+             ; let lbl' :: FieldOcc GhcRn
                    lbl' = case mb_unambig_lbls of
                             { Just (fl:_) ->
                                 let sel_name = flSelector fl
-                                in Unambiguous sel_name   (L (l2l loc) lbl)
-                            ; _ ->   Ambiguous noExtField (L (l2l loc) lbl) }
+                                in FieldOcc lbl (L (l2l loc) sel_name)
+                                -- We have one last chance to be disambiguated during type checking.
+                                -- At least, until type-directed disambiguation stops being supported.
+                                -- see note [Ambiguous FieldOcc in record updates] for more info.
+                            ; _ -> FieldOcc lbl (L (l2l loc) (mkUnboundName $ rdrNameOcc lbl)) }
                    fld' :: LHsRecUpdField GhcRn GhcRn
                    fld' = L l (HsFieldBind { hfbAnn = noAnn
-                                           , hfbLHS = L loc lbl'
+                                           , hfbLHS = L (l2l loc) lbl'
                                            , hfbRHS = arg''
                                            , hfbPun = pun })
              ; (flds', fvs') <- rn_flds pun_ok (tail <$> mb_unambig_lbls) flds
@@ -1045,9 +1050,11 @@ rnHsRecUpdFields flds
 getFieldIds :: [LHsRecField GhcRn arg] -> [Name]
 getFieldIds flds = map (hsRecFieldSel . unLoc) flds
 
-getFieldLbls :: forall p arg . UnXRec p => [LHsRecField p arg] -> [RdrName]
-getFieldLbls flds
-  = map (unXRec @p . foLabel . unXRec @p . hfbLHS . unXRec @p) flds
+getFieldRdrs :: [LHsRecField GhcRn arg] -> [RdrName]
+getFieldRdrs flds = map (foExt . unXRec @GhcRn . hfbLHS . unLoc) flds
+
+getFieldLbls :: forall p arg . UnXRec p => [LHsRecField p arg] -> [IdP p]
+getFieldLbls = map (unXRec @p . foLabel . unXRec @p . hfbLHS . unXRec @p)
 
 needFlagDotDot :: HsRecFieldContext -> TcRnMessage
 needFlagDotDot = TcRnIllegalWildcardsInRecord . toRecordFieldPart

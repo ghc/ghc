@@ -1441,7 +1441,7 @@ hsTyClForeignBinders tycl_decls foreign_decls
          (foldMap (foldMap hsLInstDeclBinders . group_instds) tycl_decls))
   where
     getSelectorNames :: ([LocatedA Name], [LFieldOcc GhcRn]) -> [Name]
-    getSelectorNames (ns, fs) = map unLoc ns ++ map (foExt . unLoc) fs
+    getSelectorNames (ns, fs) = map unLoc ns ++ map (unLoc . foLabel . unLoc) fs
 
 -------------------
 
@@ -1683,7 +1683,7 @@ emptyFieldIndices =
                , fieldIndices = Map.empty
                , newInt       = 0 }
 
-insertField :: LFieldOcc (GhcPass p) -> FieldIndices p -> (Located Int, FieldIndices p)
+insertField :: IsPass p => LFieldOcc (GhcPass p) -> FieldIndices p -> (Located Int, FieldIndices p)
 insertField new_fld fi@(FieldIndices flds idxs new_idx)
   | Just i <- Map.lookup rdr idxs
   = (L loc i, fi)
@@ -1694,7 +1694,7 @@ insertField new_fld fi@(FieldIndices flds idxs new_idx)
                    (new_idx + 1))
   where
     loc = getLocA new_fld
-    rdr = unLoc . foLabel . unLoc $ new_fld
+    rdr = fieldOccRdrName . unLoc $ new_fld
 
 {-
 
@@ -1870,5 +1870,5 @@ rec_field_expl_impl rec_flds (RecFieldsDotDot { .. })
   where (explicit_binds, implicit_binds) = splitAt unRecFieldsDotDot rec_flds
         implicit_field_binders (L _ (HsFieldBind { hfbLHS = L _ fld, hfbRHS = rhs }))
           = ImplicitFieldBinders
-              { implFlBndr_field   = foExt fld
+              { implFlBndr_field   = unLoc $ foLabel fld
               , implFlBndr_binders = collectPatBinders CollNoDictBinders rhs }

@@ -293,7 +293,6 @@ tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
-tcExpr e@(HsRecSel {})           res_ty = tcApp e res_ty
 
 tcExpr (XExpr e)                 res_ty = tcXExpr e res_ty
 
@@ -736,7 +735,6 @@ tcXExpr xe@(ExpandedThingRn o e') res_ty
   | OrigStmt ls@(L loc _) <- o
   = setSrcSpanA loc $
        mkExpandedStmtTc ls <$> tcApp (XExpr xe) res_ty
-
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
 
 {-
@@ -1298,11 +1296,10 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
        -- See Note [Disambiguating record updates] in GHC.Rename.Pat.
        ; (cons, rbinds)
            <- disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
-       ; let upd_flds = map (unLoc . hfbLHS . unLoc) rbinds
-             sel_ids      = map selectorAmbiguousFieldOcc upd_flds
+       ; let sel_ids       = map (unLoc . foLabel . unLoc . hfbLHS . unLoc) rbinds
              upd_fld_names = map idName sel_ids
              relevant_cons = nonDetEltsUniqSet cons
-             relevant_con = head relevant_cons
+             relevant_con  = head relevant_cons
 
       -- STEP 2: expand the record update.
       --
@@ -1582,7 +1579,7 @@ disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
                 -> TcM (LHsRecUpdField GhcTc GhcRn)
     lookupField fld_gre (L l upd)
       = do { let L loc af = hfbLHS upd
-                 lbl      = ambiguousFieldOccRdrName af
+                 lbl      = fieldOccRdrName af
                  mb_gre   = pickGREs lbl [fld_gre]
                       -- NB: this GRE can be 'Nothing' when in GHCi.
                       -- See test T10439.
@@ -1594,7 +1591,7 @@ disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
            ; sel <- tcLookupId (greName fld_gre)
            ; return $ L l HsFieldBind
                { hfbAnn = hfbAnn upd
-               , hfbLHS = L (l2l loc) $ Unambiguous sel (L (l2l loc) lbl)
+               , hfbLHS = L (l2l loc) (FieldOcc lbl  (L (l2l loc) sel))
                , hfbRHS = hfbRHS upd
                , hfbPun = hfbPun upd
                } }
@@ -1667,11 +1664,11 @@ fieldCtxt field_name
 tcRecordField :: ConLike -> Assoc Name Type
               -> LFieldOcc GhcRn -> LHsExpr GhcRn
               -> TcM (Maybe (LFieldOcc GhcTc, LHsExpr GhcTc))
-tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
+tcRecordField con_like flds_w_tys (L loc (FieldOcc rdr (L l sel_name))) rhs
   | Just field_ty <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcCheckPolyExprNC rhs field_ty
-           ; hasFixedRuntimeRep_syntactic (FRRRecordCon (unLoc lbl) (unLoc rhs'))
+           ; hasFixedRuntimeRep_syntactic (FRRRecordCon rdr (unLoc rhs'))
                 field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
@@ -1680,12 +1677,12 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS
                 --          (so the expansion knows the type of local binder to make)
-           ; return (Just (L loc (FieldOcc field_id lbl), rhs')) }
+           ; return (Just (L loc (FieldOcc rdr (L l field_id)), rhs')) }
       | otherwise
       = do { addErrTc (badFieldConErr (getName con_like) field_lbl)
            ; return Nothing }
   where
-        field_lbl = FieldLabelString $ occNameFS $ rdrNameOcc (unLoc lbl)
+        field_lbl = FieldLabelString $ occNameFS $ rdrNameOcc rdr
 
 
 checkMissingFields ::  ConLike -> HsRecordBinds GhcRn -> [Scaled TcType] -> TcM ()

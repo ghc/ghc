@@ -927,7 +927,7 @@ extractDecl prr dflags sDocContext name decl
                     Just rec <- toList $ getRecConArgs_maybe . unLoc <$> dd_cons (feqn_rhs d)
                     , ConDeclField{cd_fld_names = ns} <- map unLoc (unLoc rec)
                     , L _ n <- ns
-                    , foExt n == name
+                    , unLoc (foLabel n) == name
                     ]
                in case matches of
                     [d0] -> extractDecl prr dflags sDocContext name (noLocA . InstD noExtField $ DataFamInstD noExtField d0)
@@ -996,7 +996,7 @@ extractRecSel nm t tvs (L _ con : rest) =
   where
     matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
     matching_fields flds =
-      [ (locA l, f) | f@(L _ (ConDeclField _ ns _ _)) <- flds, L l n <- ns, foExt n == nm
+      [ (locA l, f) | f@(L _ (ConDeclField _ ns _ _)) <- flds, L l n <- ns, unLoc (foLabel n) == nm
       ]
     data_ty
       -- ResTyGADT _ ty <- con_res con = ty

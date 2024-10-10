@@ -360,7 +360,7 @@ restrictCons names decls = [L p d | L p (Just d) <- fmap keep <$> decls]
 
         field_avail :: LConDeclField GhcRn -> Bool
         field_avail (L _ (ConDeclField _ fs _ _)) =
-          all (\f -> foExt (unLoc f) `elem` names) fs
+          all (\f -> (unLoc . foLabel . unLoc $ f) `elem` names) fs
 
         field_types flds = [hsUnrestricted t | L _ (ConDeclField _ _ t _) <- flds]
     keep _ = Nothing
@@ -553,7 +553,7 @@ instance Parent (ConDecl GhcRn) where
   children con =
     case getRecConArgs_maybe con of
       Nothing -> []
-      Just flds -> map (foExt . unLoc) $ concatMap (cd_fld_names . unLoc) (unLoc flds)
+      Just flds -> map (unLoc . foLabel . unLoc) $ concatMap (cd_fld_names . unLoc) (unLoc flds)
 
 instance Parent (TyClDecl GhcRn) where
   children d
