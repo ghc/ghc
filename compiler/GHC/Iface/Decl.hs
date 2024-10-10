@@ -45,8 +45,6 @@ import GHC.Types.Basic
 import GHC.Types.TyThing
 import GHC.Types.SrcLoc
 
-import GHC.Parser.Annotation (noLocA)
-
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
