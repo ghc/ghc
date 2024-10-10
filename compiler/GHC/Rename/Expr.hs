@@ -339,7 +339,7 @@ rnExpr (HsVar _ (L l v))
                   ; this_mod <- getModule
                   ; when (nameIsLocalOrFrom this_mod sel_name) $
                       checkThLocalName sel_name
-                  ; return (HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name)
+                  ; return (XExpr (HsRecSelRn (FieldOcc v  (L l sel_name))), unitFV sel_name)
                   }
             | nm == nilDataConName
               -- Treat [] as an ExplicitList, so that
@@ -416,8 +416,8 @@ rnExpr (OpApp _ e1 op e2)
         -- more, so I've removed the test.  Adding HsPars in GHC.Tc.Deriv.Generate
         -- should prevent bad things happening.
         ; fixity <- case op' of
-              L _ (HsVar _ (L _ n)) -> lookupFixityRn n
-              L _ (HsRecSel _ f)    -> lookupFieldFixityRn f
+              L _ (HsVar _ (L _ n))      -> lookupFixityRn n
+              L _ (XExpr (HsRecSelRn f)) -> lookupFieldFixityRn f
               _ -> return (Fixity minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 
@@ -439,7 +439,7 @@ rnExpr (NegApp _ e _)
 rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
       ; (e, fv_e) <- rnLExpr e
-      ; let f' = rnDotFieldOcc f
+      ; let f' = rnDotFieldOcc <$> f
       ; return ( mkExpandedExpr
                    (HsGetField noExtField e f')
                    (mkGetField getField e (fmap (unLoc . dfoLabel) f'))
@@ -448,10 +448,10 @@ rnExpr (HsGetField _ e f)
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
        ; circ <- lookupOccRn compose_RDR
-       ; let fs' = fmap rnDotFieldOcc fs
+       ; let fs' = NE.map rnDotFieldOcc fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')
-                    (mkProjection getField circ (fmap (fmap (unLoc . dfoLabel)) fs'))
+                    (mkProjection getField circ $ NE.map (unLoc . dfoLabel) fs')
                 , unitFV circ `plusFV` fv_getField) }
 
 ------------------------------------------
@@ -588,7 +588,6 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
                          (mkRecordDotUpd getField setField (L l e) us)
                         , plusFVs [fv_getField, fv_setField, fv_e, fv_us] ) }
 
-rnExpr (HsRecSel x _) = dataConCantHappen x
 
 rnExpr (ExprWithTySig _ expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
@@ -890,11 +889,11 @@ However we can still defer this error completely, and we do defer it if
 ************************************************************************
 -}
 
-rnDotFieldOcc :: LocatedAn NoEpAnns (DotFieldOcc GhcPs) -> LocatedAn NoEpAnns (DotFieldOcc GhcRn)
-rnDotFieldOcc (L l (DotFieldOcc x label)) = L l (DotFieldOcc x label)
+rnDotFieldOcc :: DotFieldOcc GhcPs ->  DotFieldOcc GhcRn
+rnDotFieldOcc (DotFieldOcc x label) = DotFieldOcc x label
 
 rnFieldLabelStrings :: FieldLabelStrings GhcPs -> FieldLabelStrings GhcRn
-rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (map rnDotFieldOcc fls)
+rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (map (fmap rnDotFieldOcc) fls)
 
 {-
 ************************************************************************
@@ -2864,14 +2863,14 @@ mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
 -- mkProjection fields calculates a projection.
 -- e.g. .x = mkProjection [x] = getField @"x"
 --      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
-mkProjection :: Name -> Name -> NonEmpty (LocatedAn NoEpAnns FieldLabelString) -> HsExpr GhcRn
+mkProjection :: Name -> Name -> NonEmpty FieldLabelString -> HsExpr GhcRn
 mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fields
   where
-    f :: HsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
+    f :: HsExpr GhcRn -> FieldLabelString -> HsExpr GhcRn
     f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
 
-    proj :: LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
-    proj (L _ (FieldLabelString f)) = genHsVar getFieldName `genAppType` genHsTyLit f
+    proj :: FieldLabelString -> HsExpr GhcRn
+    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit f
 
 -- mkProjUpdateSetField calculates functions representing dot notation record updates.
 -- e.g. Suppose an update like foo.bar = 1.

@@ -1159,7 +1159,7 @@ cvtl e = wrapLA (cvt e)
                               ; return $ mkRdrRecordCon c' (HsRecFields noExtField flds' Nothing) noAnn }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
                               ; flds'
-                                  <- mapM (cvtFld (wrapParLA mkAmbiguousFieldOcc))
+                                  <- mapM (cvtFld (wrapParLA mkFieldOcc))
                                            flds
                               ; return $ RecordUpd noAnn e' $
                                          RegularRecUpdFields
@@ -1177,7 +1177,7 @@ cvtl e = wrapLA (cvt e)
                                ; return $ HsGetField noExtField e'
                                          (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (FieldLabelString (fsLit f))))) }
     cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap
-                                         (L noSrcSpanA . DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
+                                         (DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
     cvt (TypedSpliceE e) = do { e' <- parenthesizeHsExpr appPrec <$> cvtl e
                               ; return $ HsTypedSplice noAnn e' }
     cvt (TypedBracketE e) = do { e' <- cvtl e

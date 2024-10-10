@@ -1027,7 +1027,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocNameI -> LaTeX
 ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
   decltt
-    ( cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . foLabel . unLoc) names))
+    ( cat (punctuate comma (map (ppBinder . rdrNameOcc . foExt . unLoc) names))
         <+> dcolon unicode
         <+> ppLType unicode ltype
     )
@@ -1035,7 +1035,7 @@ ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (foExt $ unLoc name) subdocs >>= fmap _doc . combineDocumentation . fst
+    mbDoc = lookup (unLoc . foLabel . unLoc $ name) subdocs >>= fmap _doc . combineDocumentation . fst
     name =
       case Maybe.listToMaybe names of
         Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"

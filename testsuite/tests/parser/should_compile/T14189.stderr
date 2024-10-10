@@ -165,7 +165,8 @@
                      (EpaComments
                       []))
                     (FieldOcc
-                     {Name: T14189.f}
+                     (Unqual
+                      {OccName: f})
                      (L
                       (EpAnn
                        (EpaSpan { T14189.hs:6:33 })
@@ -173,8 +174,7 @@
                         [])
                        (EpaComments
                         []))
-                      (Unqual
-                       {OccName: f}))))]
+                      {Name: T14189.f})))]
                   (L
                    (EpAnn
                     (EpaSpan { T14189.hs:6:38-40 })

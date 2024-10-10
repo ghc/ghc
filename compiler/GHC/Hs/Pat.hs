@@ -38,7 +38,6 @@ module GHC.Hs.Pat (
         HsRecUpdField, LHsRecUpdField,
         RecFieldsDotDot(..),
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
-        hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -340,16 +339,6 @@ data ConPatTc
 
 hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel
-
-hsRecUpdFieldRdr :: HsRecUpdField (GhcPass p) q -> Located RdrName
-hsRecUpdFieldRdr = fmap ambiguousFieldOccRdrName . reLoc . hfbLHS
-
-hsRecUpdFieldId :: HsFieldBind (LAmbiguousFieldOcc GhcTc) arg -> Located Id
-hsRecUpdFieldId = fmap foExt . reLoc . hsRecUpdFieldOcc
-
-hsRecUpdFieldOcc :: HsFieldBind (LAmbiguousFieldOcc GhcTc) arg -> LFieldOcc GhcTc
-hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
-
 
 {-
 ************************************************************************

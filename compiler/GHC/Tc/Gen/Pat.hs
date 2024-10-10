@@ -1630,14 +1630,14 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
     where
       tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                           (LHsRecField GhcTc (LPat GhcTc))
-      tc_field penv
-               (L l (HsFieldBind ann (L loc (FieldOcc sel (L lr rdr))) pat pun))
-               thing_inside
+      tc_field  penv
+                (L l (HsFieldBind ann (L loc (FieldOcc rdr (L lr sel))) pat pun))
+                thing_inside
         = do { sel'   <- tcLookupId sel
              ; pat_ty <- setSrcSpanA loc $ find_field_ty sel
                                             (occNameFS $ rdrNameOcc rdr)
              ; (pat', res) <- tcConArg penv (pat, pat_ty) thing_inside
-             ; return (L l (HsFieldBind ann (L loc (FieldOcc sel' (L lr rdr))) pat'
+             ; return (L l (HsFieldBind ann (L loc (FieldOcc rdr (L lr sel'))) pat'
                                                                         pun), res) }
       -- See Note [Omitted record fields and linearity]
       check_omitted_fields_multiplicity :: TcM ()
@@ -1666,7 +1666,7 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
       (bound_field_tys, omitted_field_tys) = partition is_bound all_field_tys
 
       is_bound :: (Maybe FieldLabel, Scaled TcType) -> Bool
-      is_bound (Just fl, _) = elem (flSelector fl) (map (\(L _ (HsFieldBind _ (L _ (FieldOcc sel _ )) _ _)) -> sel) rpats)
+      is_bound (Just fl, _) = elem (flSelector fl) (map (\(L _ (HsFieldBind _ (L _ (FieldOcc _ sel )) _ _)) -> unLoc sel) rpats)
       is_bound _ = False
 
       all_field_tys :: [(Maybe FieldLabel, Scaled TcType)]

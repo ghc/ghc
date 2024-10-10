@@ -3523,22 +3523,6 @@ instance (ExactPrint body)
 
 -- ---------------------------------------------------------------------
 
-instance (ExactPrint (LocatedA body))
-    => ExactPrint (HsFieldBind (LocatedA (AmbiguousFieldOcc GhcPs)) (LocatedA body)) where
-  getAnnotationEntry _ = NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-
-  exact (HsFieldBind an f arg isPun) = do
-    debugM $ "HsRecUpdField"
-    f' <- markAnnotated f
-    an0 <- if isPun then return an
-             else markEpAnnL an lidl AnnEqual
-    arg' <- if isPun
-              then return arg
-              else markAnnotated arg
-    return (HsFieldBind an0 f' arg' isPun)
-
--- ---------------------------------------------------------------------
 instance ExactPrint (LHsRecUpdFields GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
@@ -4603,14 +4587,6 @@ instance ExactPrint (FieldOcc GhcPs) where
   exact (FieldOcc x n) = do
       n' <- markAnnotated n
       return (FieldOcc x n')
-
--- ---------------------------------------------------------------------
-
-instance ExactPrint (AmbiguousFieldOcc GhcPs) where
-  getAnnotationEntry = const NoEntryVal
-  setAnnotationAnchor a _ _ _ = a
-  exact f@(Unambiguous _ n) = markAnnotated n >> return f
-  exact f@(Ambiguous   _ n) = markAnnotated n >> return f
 
 -- ---------------------------------------------------------------------
 

@@ -467,13 +467,6 @@ type family XXDotFieldOcc  x
 type family XSCC            x
 type family XXPragE         x
 
-
--- -------------------------------------
--- AmbiguousFieldOcc type families
-type family XUnambiguous        x
-type family XAmbiguous          x
-type family XXAmbiguousFieldOcc x
-
 -- -------------------------------------
 -- HsTupArg type families
 type family XPresent  x

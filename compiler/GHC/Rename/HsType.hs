@@ -1341,7 +1341,7 @@ rnField fl_env env (L l (ConDeclField _ names ty haddock_doc))
 
 lookupField :: FastStringEnv FieldLabel -> FieldOcc GhcPs -> FieldOcc GhcRn
 lookupField fl_env (FieldOcc _ (L lr rdr)) =
-    FieldOcc sel (L lr $ mkRdrUnqual $ occName sel)
+    FieldOcc (mkRdrUnqual $ occName sel) (L lr sel)
   where
     lbl = occNameFS $ rdrNameOcc rdr
     sel = flSelector
@@ -1467,10 +1467,10 @@ data NegationHandling = ReassociateNegation | KeepNegationIntact
 get_op :: LHsExpr GhcRn -> OpName
 -- An unbound name could be either HsVar or HsUnboundVar
 -- See GHC.Rename.Expr.rnUnboundVar
-get_op (L _ (HsVar _ n))         = NormalOp (unLoc n)
-get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
-get_op (L _ (HsRecSel _ fld))    = RecFldOp fld
-get_op other                     = pprPanic "get_op" (ppr other)
+get_op (L _ (HsVar _ n))                 = NormalOp (unLoc n)
+get_op (L _ (HsUnboundVar _ uv))         = UnboundOp uv
+get_op (L _ (XExpr (HsRecSelRn fld)))    = RecFldOp fld
+get_op other                             = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
 -- derived instances may have correctly-associated things to
@@ -1609,7 +1609,6 @@ lookupFixityOp (NormalOp n)  = lookupFixityRn n
 lookupFixityOp NegateOp      = lookupFixityRn negateName
 lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName (occName u))
 lookupFixityOp (RecFldOp f)  = lookupFieldFixityRn f
-
 
 -- Precedence-related error messages
 

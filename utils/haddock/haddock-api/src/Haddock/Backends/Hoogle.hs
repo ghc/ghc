@@ -300,7 +300,7 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
     f (RecCon (L _ recs)) =
       f (PrefixCon [] $ map (hsLinear . cd_fld_type . unLoc) recs)
         ++ concat
-          [ (concatMap (lookupCon sDocContext subdocs . noLocA . foExt . unLoc) (cd_fld_names r))
+          [ (concatMap (lookupCon sDocContext subdocs . noLocA . unLoc . foLabel . unLoc) (cd_fld_names r))
             ++ [out sDocContext (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
           | r <- map unLoc recs
           ]

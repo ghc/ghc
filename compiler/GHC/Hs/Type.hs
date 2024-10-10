@@ -59,12 +59,8 @@ module GHC.Hs.Type (
         ConDeclField(..), LConDeclField, pprConDeclFields,
 
         HsConDetails(..), noTypeArgs,
-
         FieldOcc(..), LFieldOcc, mkFieldOcc,
-        AmbiguousFieldOcc(..), LAmbiguousFieldOcc, mkAmbiguousFieldOcc,
-        ambiguousFieldOccRdrName, ambiguousFieldOccLRdrName,
-        selectorAmbiguousFieldOcc,
-        unambiguousFieldOcc, ambiguousFieldOcc,
+        fieldOccRdrName, fieldOccLRdrName,
 
         OpName(..),
 
@@ -115,7 +111,6 @@ import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
 import GHC.Types.Fixity ( LexicalFixity(..) )
-import GHC.Types.Id ( Id )
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName )
@@ -1088,59 +1083,62 @@ also forbids them in types involved with `deriving`:
                 FieldOcc
 *                                                                      *
 ************************************************************************
+
+Note [Ambiguous FieldOcc in record updates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When renaming a "record field update" (`some_record{ field = expr }`), the field
+occurrence may be ambiguous if there are multiple record types with that same
+field label in scope. Instead of failing, we may attempt to do type-directed
+disambiguation: if we typecheck the record field update, we can disambiguate
+the `field` based on the record and field type.
+
+In practice, this means an identifier of a field occurrence
+(`FieldOcc`) may have to go straight from `RdrName` to `Id`, since field
+ambiguity makes it impossible to construct a `Name` for the field.
+
+Since type-directed disambiguation is a GHC property rather than a property of
+the GHC-Haskell AST, we still parameterise a `FieldOcc` occurrence by `IdP p`,
+but in the case of the ambiguity we do the unthinkable and insert a mkUnboundName
+in the name. Very bad, yes, but since type-directed disambiguation is on the way
+out (see proposal https://github.com/ghc-proposals/ghc-proposals/pull/366),
+we consider this acceptable for now.
+
+see also Wrinkle [Disambiguating fields] and note [Type-directed record disambiguation]
+
+NB: FieldOcc preserves the RdrName throughout its lifecycle for
+exact printing purposes.
 -}
 
-type instance XCFieldOcc GhcPs = NoExtField
-type instance XCFieldOcc GhcRn = Name
-type instance XCFieldOcc GhcTc = Id
+type instance XCFieldOcc GhcPs = NoExtField -- RdrName is stored in the proper IdP field
+type instance XCFieldOcc GhcRn = RdrName
+type instance XCFieldOcc GhcTc = RdrName
 
-type instance XXFieldOcc (GhcPass _) = DataConCantHappen
+type instance XXFieldOcc GhcPs = DataConCantHappen
+type instance XXFieldOcc GhcRn = DataConCantHappen
+type instance XXFieldOcc GhcTc = DataConCantHappen
+
+--------------------------------------------------------------------------------
 
 mkFieldOcc :: LocatedN RdrName -> FieldOcc GhcPs
 mkFieldOcc rdr = FieldOcc noExtField rdr
 
+fieldOccRdrName :: forall p. IsPass p => FieldOcc (GhcPass p) -> RdrName
+fieldOccRdrName fo = case ghcPass @p of
+  GhcPs -> unLoc $ foLabel fo
+  GhcRn -> foExt fo
+  GhcTc -> foExt fo
 
-type instance XUnambiguous GhcPs = NoExtField
-type instance XUnambiguous GhcRn = Name
-type instance XUnambiguous GhcTc = Id
+fieldOccLRdrName :: forall p. IsPass p => FieldOcc (GhcPass p) -> LocatedN RdrName
+fieldOccLRdrName fo = case ghcPass @p of
+  GhcPs -> foLabel fo
+  GhcRn -> case fo of
+    FieldOcc rdr sel ->
+      let (L l _) = sel
+       in L l rdr
+  GhcTc ->
+    let (L l _) = foLabel fo
+     in L l (foExt fo)
 
-type instance XAmbiguous GhcPs = NoExtField
-type instance XAmbiguous GhcRn = NoExtField
-type instance XAmbiguous GhcTc = Id
-
-type instance XXAmbiguousFieldOcc (GhcPass _) = DataConCantHappen
-
-instance Outputable (AmbiguousFieldOcc (GhcPass p)) where
-  ppr = ppr . ambiguousFieldOccRdrName
-
-instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
-  pprInfixOcc  = pprInfixOcc . ambiguousFieldOccRdrName
-  pprPrefixOcc = pprPrefixOcc . ambiguousFieldOccRdrName
-
-instance OutputableBndr (Located (AmbiguousFieldOcc (GhcPass p))) where
-  pprInfixOcc  = pprInfixOcc . unLoc
-  pprPrefixOcc = pprPrefixOcc . unLoc
-
-mkAmbiguousFieldOcc :: LocatedN RdrName -> AmbiguousFieldOcc GhcPs
-mkAmbiguousFieldOcc rdr = Unambiguous noExtField rdr
-
-ambiguousFieldOccRdrName :: AmbiguousFieldOcc (GhcPass p) -> RdrName
-ambiguousFieldOccRdrName = unLoc . ambiguousFieldOccLRdrName
-
-ambiguousFieldOccLRdrName :: AmbiguousFieldOcc (GhcPass p) -> LocatedN RdrName
-ambiguousFieldOccLRdrName (Unambiguous _ rdr) = rdr
-ambiguousFieldOccLRdrName (Ambiguous   _ rdr) = rdr
-
-selectorAmbiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> Id
-selectorAmbiguousFieldOcc (Unambiguous sel _) = sel
-selectorAmbiguousFieldOcc (Ambiguous   sel _) = sel
-
-unambiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> FieldOcc GhcTc
-unambiguousFieldOcc (Unambiguous rdr sel) = FieldOcc rdr sel
-unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
-
-ambiguousFieldOcc :: FieldOcc GhcTc -> AmbiguousFieldOcc GhcTc
-ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
 
 {-
 ************************************************************************
@@ -1270,16 +1268,17 @@ instance (Outputable tyarg, Outputable arg, Outputable rec)
   ppr (RecCon rec)            = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
 
-instance Outputable (XRec pass RdrName) => Outputable (FieldOcc pass) where
+instance Outputable (XRec pass (IdP pass)) => Outputable (FieldOcc pass) where
   ppr = ppr . foLabel
 
-instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (FieldOcc pass) where
-  pprInfixOcc  = pprInfixOcc . unXRec @pass . foLabel
-  pprPrefixOcc = pprPrefixOcc . unXRec @pass . foLabel
+instance (OutputableBndrId pass) => OutputableBndr (FieldOcc (GhcPass pass)) where
+  pprInfixOcc  = pprInfixOcc . unXRec @(GhcPass pass) . foLabel
+  pprPrefixOcc = pprPrefixOcc . unXRec @(GhcPass pass) . foLabel
 
-instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
+instance (OutputableBndrId pass) => OutputableBndr (GenLocated SrcSpan (FieldOcc (GhcPass pass))) where
   pprInfixOcc  = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
+
 
 
 ppr_tylit :: (HsTyLit (GhcPass p)) -> SDoc
@@ -1342,7 +1341,7 @@ pprLHsContextAlways (L _ ctxt)
       [L _ ty] -> ppr_mono_ty ty           <+> darrow
       _        -> parens (interpp'SP ctxt) <+> darrow
 
-pprConDeclFields :: OutputableBndrId p
+pprConDeclFields :: forall p. OutputableBndrId p
                  => [LConDeclField (GhcPass p)] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
@@ -1350,7 +1349,7 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
                                  cd_fld_doc = doc }))
         = pprMaybeWithDoc doc (ppr_names ns <+> dcolon <+> ppr ty)
 
-    ppr_names :: [LFieldOcc (GhcPass p)] -> SDoc
+    ppr_names :: forall p. OutputableBndrId p => [LFieldOcc (GhcPass p)] -> SDoc
     ppr_names [n] = pprPrefixOcc n
     ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
 
@@ -1578,4 +1577,3 @@ type instance Anno HsIPName = EpAnnCO
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpanAnnA
-type instance Anno (AmbiguousFieldOcc (GhcPass p)) = SrcSpanAnnA

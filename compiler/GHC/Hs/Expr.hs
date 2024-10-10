@@ -546,6 +546,10 @@ data XXExprGhcRn
                                                    -- Does not presist post renaming phase
                                                    -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
                                                    -- in `GHC.Tc.Gen.Do`
+  | HsRecSelRn  (FieldOcc GhcRn)   -- ^ Variable pointing to record selector
+                           -- See Note [Non-overloaded record field selectors] and
+                           -- Note [Record selectors in the AST]
+
 
 
 -- | Wrap a located expression with a `PopErrCtxt`
@@ -627,6 +631,11 @@ data XXExprGhcTc
      Int                                -- module-local tick number for False
      (LHsExpr GhcTc)                    -- sub-expression
 
+  | HsRecSelTc  (FieldOcc GhcTc) -- ^ Variable pointing to record selector
+                             -- See Note [Non-overloaded record field selectors] and
+                             -- Note [Record selectors in the AST]
+
+
 -- | Build a 'XXExprGhcRn' out of an extension constructor,
 --   and the two components of the expansion: original and
 --   expanded typechecked expressions.
@@ -687,7 +696,6 @@ ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
 ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
-ppr_expr (HsRecSel _ f)      = pprPrefixOcc f
 ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel s l) = case ghcPass @p of
                GhcPs -> helper s
@@ -906,11 +914,13 @@ instance Outputable HsThingRn where
         OrigExpr x -> ppr_builder "<OrigExpr>:" x
         OrigStmt x -> ppr_builder "<OrigStmt>:" x
         OrigPat x  -> ppr_builder "<OrigPat>:" x
+
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where
   ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [ppr o, ppr e]) (ppr o)
   ppr (PopErrCtxt e)        = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
+  ppr (HsRecSelRn f)        = pprPrefixOcc f
 
 instance Outputable XXExprGhcTc where
   ppr (WrapExpr co_fn e)
@@ -939,10 +949,11 @@ instance Outputable XXExprGhcTc where
             ppr tickIdFalse,
             text ">(",
             ppr exp, text ")"]
+  ppr (HsRecSelTc f)      = pprPrefixOcc f
+
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
-ppr_infix_expr (HsRecSel _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)            = case ghcPass @p of
                                         GhcRn -> ppr_infix_expr_rn x
@@ -951,7 +962,8 @@ ppr_infix_expr _ = Nothing
 
 ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
 ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
-ppr_infix_expr_rn (PopErrCtxt (L _ a)) = ppr_infix_expr a
+ppr_infix_expr_rn (PopErrCtxt (L _ a))      = ppr_infix_expr a
+ppr_infix_expr_rn (HsRecSelRn f)            = Just (pprInfixOcc f)
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
 ppr_infix_expr_tc (WrapExpr _ e)    = ppr_infix_expr e
@@ -959,6 +971,8 @@ ppr_infix_expr_tc (ExpandedThingTc thing _)  = ppr_infix_hs_expansion thing
 ppr_infix_expr_tc (ConLikeTc {})             = Nothing
 ppr_infix_expr_tc (HsTick {})                = Nothing
 ppr_infix_expr_tc (HsBinTick {})             = Nothing
+ppr_infix_expr_tc (HsRecSelTc f)            = Just (pprInfixOcc f)
+
 
 ppr_infix_hs_expansion :: HsThingRn -> Maybe SDoc
 ppr_infix_hs_expansion (OrigExpr e) = ppr_infix_expr e
@@ -1045,7 +1059,6 @@ hsExprNeedsParens prec = go
     go (HsProc{})                     = prec > topPrec
     go (HsStatic{})                   = prec >= appPrec
     go (RecordCon{})                  = False
-    go (HsRecSel{})                   = False
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
     go (HsEmbTy{})                    = prec > topPrec
@@ -1062,10 +1075,12 @@ hsExprNeedsParens prec = go
     go_x_tc (ConLikeTc {})                   = False
     go_x_tc (HsTick _ (L _ e))               = hsExprNeedsParens prec e
     go_x_tc (HsBinTick _ _ (L _ e))          = hsExprNeedsParens prec e
+    go_x_tc (HsRecSelTc{})                   = False
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn thing _)    = hsExpandedNeedsParens thing
     go_x_rn (PopErrCtxt (L _ a))         = hsExprNeedsParens prec a
+    go_x_rn (HsRecSelRn{})               = False
 
     hsExpandedNeedsParens :: HsThingRn -> Bool
     hsExpandedNeedsParens (OrigExpr e) = hsExprNeedsParens prec e
@@ -1103,21 +1118,22 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsRecSel{})      = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = go_x_tc x
   | GhcRn <- ghcPass @p          = go_x_rn x
   where
     go_x_tc :: XXExprGhcTc -> Bool
-    go_x_tc (WrapExpr _ e)                   = isAtomicHsExpr e
-    go_x_tc (ExpandedThingTc thing _)        = isAtomicExpandedThingRn thing
-    go_x_tc (ConLikeTc {})                   = True
-    go_x_tc (HsTick {}) = False
-    go_x_tc (HsBinTick {}) = False
+    go_x_tc (WrapExpr _ e)            = isAtomicHsExpr e
+    go_x_tc (ExpandedThingTc thing _) = isAtomicExpandedThingRn thing
+    go_x_tc (ConLikeTc {})            = True
+    go_x_tc (HsTick {})               = False
+    go_x_tc (HsBinTick {})            = False
+    go_x_tc (HsRecSelTc{})            = True
 
     go_x_rn :: XXExprGhcRn -> Bool
-    go_x_rn (ExpandedThingRn thing _)    = isAtomicExpandedThingRn thing
-    go_x_rn (PopErrCtxt (L _ a))         = isAtomicHsExpr a
+    go_x_rn (ExpandedThingRn thing _) = isAtomicExpandedThingRn thing
+    go_x_rn (PopErrCtxt (L _ a))      = isAtomicHsExpr a
+    go_x_rn (HsRecSelRn{})            = True
 
     isAtomicExpandedThingRn :: HsThingRn -> Bool
     isAtomicExpandedThingRn (OrigExpr e) = isAtomicHsExpr e
