@@ -569,6 +569,7 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
                       , eaql_arg_ty  = sc_arg_ty
                       , eaql_larg    = larg@(L arg_loc rn_expr)
                       , eaql_tc_fun  = tc_head
+                      , eaql_fun_ue  = head_ue
                       , eaql_args    = inst_args
                       , eaql_encl    = arg_influences_enclosing_call
                       , eaql_res_rho = app_res_rho })
@@ -578,7 +579,8 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
 
        ; traceTc "tcEValArgQL {" (vcat [ text "app_res_rho:" <+> ppr app_res_rho
                                        , text "exp_arg_ty:" <+> ppr exp_arg_ty
-                                       , text "args:" <+> ppr inst_args ])
+                                       , text "args:" <+> ppr inst_args
+                                       , text "mult:" <+> ppr mult])
 
        ; ds_flag <- getDeepSubsumptionFlag
        ; (wrap, arg')
@@ -587,6 +589,9 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
                do { -- Emit saved-up constraints, /under/ the tcSkolemise
                     -- See (QLA4) in Note [Quick Look at value arguments]
                     emitConstraints wanted
+                    -- Emit saved-up usages /under/ the tcScalingUsage.
+                    -- See (QLA5) in Note [Quick Look at value arguments]
+                  ; tcEmitBindingUsage head_ue
 
                     -- Unify with context if we have not already done so
                     -- See (QLA4) in Note [Quick Look at value arguments]
@@ -1630,6 +1635,41 @@ This turned out to be more subtle than I expected.  Wrinkles:
     (kappa = [forall a. a->a]).  Now we resume typechecking argument [], and
     we must take advantage of what we have now discovered about `kappa`,
     to typecheck   [] :: [forall a. a->a]
+
+(QLA5) In the quicklook pass, we don't scale multiplicities. Since arguments
+    aren't typechecked yet, we don't know their free variable usages
+    anyway. But, in a nested call, the head of an application chain is fully
+    typechecked.
+
+    In order for the multiplicities in the head to be properly scaled, we store
+    the head's usage environment in the eaql_fun_ue field. Then, when we do the
+    full-typechecking pass, we can emit the head's usage environment where we
+    would have typechecked the head in a naive algorithm.
+
+(QLA6) `quickLookArg` is supposed to capture the result of partially typechecking
+   the argument, so it can be resumed later.  "Capturing" should include all
+   generated type-class/equality constraints and Linear-Haskell usage info. There
+   are two calls in `quickLookArg1` that might generate such constraints:
+
+     - `tcInferAppHead_maybe`.  This can generat Linear-Haskell usage info, via
+       the call to `tcEmitBindingUsage` in `check_local_id`, which is called
+       indirectly by `tcInferAppHead_maybe`.
+
+       In contrast, `tcInferAppHead_maybe` does not generate any type-class or
+       equality constraints, because it doesn't instantiate any functions.  [But
+       see #25493 and #25494 for why this isn't quite true today.]
+
+    - `tcInstFun` generates lots of type-class and equality constraints, as it
+      instantiates the function.  But it generates no usage info, because that
+      comes only from the call to `check_local_id`, whose usage info is captured
+      in the call to `tcInferAppHead_maybe` in `quickLookArg1`.
+
+  Conclusion: in quickLookArg1:
+    - capture usage information (but not constraints)
+        for the call to `tcInferAppHead_maybe`
+    - capture constraints (but not usage information)
+        for the call to `tcInstFun`
+
 -}
 
 quickLookArg :: QLFlag -> AppCtxt
@@ -1697,7 +1737,12 @@ quickLookArg1 ctxt larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_rho)
     do { ((rn_fun, fun_ctxt), rn_args) <- splitHsApps arg
 
        -- Step 1: get the type of the head of the argument
-       ; mb_fun_ty <- tcInferAppHead_maybe rn_fun
+       ; (fun_ue, mb_fun_ty) <- tcCollectingUsage $ tcInferAppHead_maybe rn_fun
+         -- tcCollectingUsage: the use of an Id at the head generates usage-info
+         -- See the call to `tcEmitBindingUsage` in `check_local_id`.  So we must
+         -- capture and save it in the `EValArgQL`.  See (QLA6) in
+         -- Note [Quick Look at value arguments]
+
        ; traceTc "quickLookArg {" $
          vcat [ text "arg:" <+> ppr arg
               , text "orig_arg_rho:" <+> ppr orig_arg_rho
@@ -1714,6 +1759,9 @@ quickLookArg1 ctxt larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_rho)
        ; ((inst_args, app_res_rho), wanted)
              <- captureConstraints $
                 tcInstFun do_ql True tc_head fun_sigma rn_args
+                -- We must capture type-class and equality constraints here, but
+                -- not equality constraints.  See (QLA6) in Note [Quick Look at
+                -- value arguments]
 
        ; traceTc "quickLookArg 2" $
          vcat [ text "arg:" <+> ppr arg
@@ -1746,6 +1794,7 @@ quickLookArg1 ctxt larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_rho)
                            , eaql_arg_ty  = sc_arg_ty
                            , eaql_larg    = larg
                            , eaql_tc_fun  = tc_head
+                           , eaql_fun_ue  = fun_ue
                            , eaql_args    = inst_args
                            , eaql_wanted  = wanted
                            , eaql_encl    = arg_influences_enclosing_call
