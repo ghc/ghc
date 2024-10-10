@@ -432,6 +432,8 @@ deriving instance Data XBindStmtTc
 -- deriving instance (DataId p) => Data (HsLit p)
 deriving instance Data (HsLit GhcPs)
 deriving instance Data (HsLit GhcRn)
+
+deriving instance Data HsLitTc
 deriving instance Data (HsLit GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (HsOverLit p)

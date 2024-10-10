@@ -807,15 +807,14 @@ newNonTrivialOverloadedLit
     orig = LiteralOrigin lit
 
 ------------
-mkOverLit :: OverLitVal -> TcM (HsLit (GhcPass p))
+mkOverLit :: OverLitVal -> TcM (HsLit GhcTc)
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
-        ; return (HsInteger (il_text i)
-                            (il_value i) integer_ty) }
+        ; return (XLit $ HsInteger  (il_text i) (il_value i) integer_ty) }
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
-        ; return (HsRat noExtField r rat_ty) }
+        ; return (XLit $ HsRat r rat_ty) }
 
 mkOverLit (HsIsString src s) = return (HsString src s)
 

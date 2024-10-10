@@ -225,7 +225,7 @@ desugarPat x pat = case pat of
     mkPmLitGrds x lit'
 
   LitPat _ lit -> do
-    core_expr <- dsLit (convertLit lit)
+    core_expr <- dsLit lit
     let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
     mkPmLitGrds x lit
 

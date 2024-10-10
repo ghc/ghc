@@ -64,8 +64,6 @@ testOneFile libdir fileName = do
        = ["HsInt64Prim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsWord64Prim (SourceText src) c)
        = ["HsWord64Prim [" ++ unpackFS src ++ "] " ++ show c]
-     doHsLit (HsInteger  (SourceText src) c _)
-       = ["HsInteger [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit _ = []
 
      doOverLit :: OverLitVal -> [String]

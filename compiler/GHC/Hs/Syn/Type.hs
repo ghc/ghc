@@ -7,8 +7,7 @@ module GHC.Hs.Syn.Type (
     -- * Extracting types from HsExpr
     lhsExprType, hsExprType, hsWrapperType,
     -- * Extracting types from HsSyn
-    hsLitType, hsPatType, hsLPatType
-
+    hsLitType, hsPatType, hsLPatType,
   ) where
 
 import GHC.Prelude
@@ -72,7 +71,7 @@ hsPatType (XPat ext) =
     ExpansionPat _ pat -> hsPatType pat
 hsPatType (SplicePat v _)               = dataConCantHappen v
 
-hsLitType :: HsLit (GhcPass p) -> Type
+hsLitType :: forall p. IsPass p => HsLit (GhcPass p) -> Type
 hsLitType (HsChar _ _)       = charTy
 hsLitType (HsCharPrim _ _)   = charPrimTy
 hsLitType (HsString _ _)     = stringTy
@@ -89,10 +88,12 @@ hsLitType (HsWord8Prim _ _)  = word8PrimTy
 hsLitType (HsWord16Prim _ _) = word16PrimTy
 hsLitType (HsWord32Prim _ _) = word32PrimTy
 hsLitType (HsWord64Prim _ _) = word64PrimTy
-hsLitType (HsInteger _ _ ty) = ty
-hsLitType (HsRat _ _ ty)     = ty
 hsLitType (HsFloatPrim _ _)  = floatPrimTy
 hsLitType (HsDoublePrim _ _) = doublePrimTy
+hsLitType (XLit x)           = case ghcPass @p of
+      GhcTc -> case x of
+         (HsInteger _ _ ty) -> ty
+         (HsRat  _ ty)      -> ty
 
 
 -- | Compute the 'Type' of an @'LHsExpr' 'GhcTc'@ in a pure fashion.

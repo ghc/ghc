@@ -97,7 +97,7 @@ For numeric literals, we try to detect there use at a standard type
 See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 -}
 
-dsLit :: HsLit GhcRn -> DsM CoreExpr
+dsLit :: forall p. IsPass p => HsLit (GhcPass p) -> DsM CoreExpr
 dsLit l = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
@@ -122,9 +122,11 @@ dsLit l = do
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
     HsMultilineString _ str -> mkStringExprFS str
-    HsInteger _ i _  -> return (mkIntegerExpr platform i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
-    HsRat _ fl ty    -> dsFractionalLitToRational fl ty
+    XLit x           -> case ghcPass @p of
+      GhcTc          -> case x of
+        HsInteger _ i _  -> return (mkIntegerExpr platform i)
+        HsRat fl ty      -> dsFractionalLitToRational fl ty
 
 {-
 Note [FractionalLit representation]
@@ -460,24 +462,24 @@ getIntegralLit _ = Nothing
 -- | If 'Integral', extract the value and type of the non-overloaded literal.
 getSimpleIntegralLit :: HsLit GhcTc -> Maybe (Integer, Type)
 getSimpleIntegralLit (HsInt _ IL{ il_value = i }) = Just (i, intTy)
-getSimpleIntegralLit (HsIntPrim _ i)    = Just (i, intPrimTy)
-getSimpleIntegralLit (HsWordPrim _ i)   = Just (i, wordPrimTy)
-getSimpleIntegralLit (HsInt8Prim _ i)   = Just (i, int8PrimTy)
-getSimpleIntegralLit (HsInt16Prim _ i)  = Just (i, int16PrimTy)
-getSimpleIntegralLit (HsInt32Prim _ i)  = Just (i, int32PrimTy)
-getSimpleIntegralLit (HsInt64Prim _ i)  = Just (i, int64PrimTy)
-getSimpleIntegralLit (HsWord8Prim _ i)  = Just (i, word8PrimTy)
-getSimpleIntegralLit (HsWord16Prim _ i) = Just (i, word16PrimTy)
-getSimpleIntegralLit (HsWord32Prim _ i) = Just (i, word32PrimTy)
-getSimpleIntegralLit (HsWord64Prim _ i) = Just (i, word64PrimTy)
-getSimpleIntegralLit (HsInteger _ i ty) = Just (i, ty)
+getSimpleIntegralLit (HsIntPrim _ i)            = Just (i, intPrimTy)
+getSimpleIntegralLit (HsWordPrim _ i)           = Just (i, wordPrimTy)
+getSimpleIntegralLit (HsInt8Prim _ i)           = Just (i, int8PrimTy)
+getSimpleIntegralLit (HsInt16Prim _ i)          = Just (i, int16PrimTy)
+getSimpleIntegralLit (HsInt32Prim _ i)          = Just (i, int32PrimTy)
+getSimpleIntegralLit (HsInt64Prim _ i)          = Just (i, int64PrimTy)
+getSimpleIntegralLit (HsWord8Prim _ i)          = Just (i, word8PrimTy)
+getSimpleIntegralLit (HsWord16Prim _ i)         = Just (i, word16PrimTy)
+getSimpleIntegralLit (HsWord32Prim _ i)         = Just (i, word32PrimTy)
+getSimpleIntegralLit (HsWord64Prim _ i)         = Just (i, word64PrimTy)
+getSimpleIntegralLit (XLit (HsInteger _ i ty))  = Just (i, ty)
 
 getSimpleIntegralLit HsChar{}           = Nothing
 getSimpleIntegralLit HsCharPrim{}       = Nothing
 getSimpleIntegralLit HsString{}         = Nothing
 getSimpleIntegralLit HsMultilineString{} = Nothing
 getSimpleIntegralLit HsStringPrim{}     = Nothing
-getSimpleIntegralLit HsRat{}            = Nothing
+getSimpleIntegralLit (XLit (HsRat{}))   = Nothing
 getSimpleIntegralLit HsFloatPrim{}      = Nothing
 getSimpleIntegralLit HsDoublePrim{}     = Nothing
 

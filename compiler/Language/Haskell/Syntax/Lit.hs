@@ -21,7 +21,6 @@ module Language.Haskell.Syntax.Lit where
 import Language.Haskell.Syntax.Extension
 
 import GHC.Types.SourceText (IntegralLit, FractionalLit, SourceText)
-import GHC.Core.Type (Type)
 
 import GHC.Data.FastString (FastString, lexicalCompareFS)
 
@@ -80,22 +79,13 @@ data HsLit x
       -- ^ literal @Word32#@
   | HsWord64Prim (XHsWord64Prim x) {- SourceText -} Integer
       -- ^ literal @Word64#@
-  | HsInteger (XHsInteger x) {- SourceText -} Integer Type
-      -- ^ Genuinely an integer; arises only
-      -- from TRANSLATION (overloaded
-      -- literals are done with HsOverLit)
-  | HsRat (XHsRat x)  FractionalLit Type
-      -- ^ Genuinely a rational; arises only from
-      -- TRANSLATION (overloaded literals are
-      -- done with HsOverLit)
   | HsFloatPrim (XHsFloatPrim x)   FractionalLit
       -- ^ Unboxed Float
   | HsDoublePrim (XHsDoublePrim x) FractionalLit
       -- ^ Unboxed Double
-
   | XLit !(XXLit x)
 
-instance Eq (HsLit x) where
+instance (Eq (XXLit x)) => Eq (HsLit x) where
   (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
   (HsCharPrim _ x1)   == (HsCharPrim _ x2)   = x1==x2
   (HsString _ x1)     == (HsString _ x2)     = x1==x2
@@ -105,10 +95,9 @@ instance Eq (HsLit x) where
   (HsWordPrim _ x1)   == (HsWordPrim _ x2)   = x1==x2
   (HsInt64Prim _ x1)  == (HsInt64Prim _ x2)  = x1==x2
   (HsWord64Prim _ x1) == (HsWord64Prim _ x2) = x1==x2
-  (HsInteger _ x1 _)  == (HsInteger _ x2 _)  = x1==x2
-  (HsRat _ x1 _)      == (HsRat _ x2 _)      = x1==x2
   (HsFloatPrim _ x1)  == (HsFloatPrim _ x2)  = x1==x2
   (HsDoublePrim _ x1) == (HsDoublePrim _ x2) = x1==x2
+  (XLit x1)           == (XLit x2)           = x1==x2
   _                   == _                   = False
 
 -- | Haskell Overloaded Literal
