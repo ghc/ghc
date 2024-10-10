@@ -74,7 +74,9 @@ copyFileSourceDist source target = do
       error ("source-dist: tried to create non-relative symlink in source dist: " ++ show link_target)
     putProgressInfo =<< renderAction ("Create symlink (" ++ link_target ++ ")") source target
     isDirectory <- liftIO $ IO.doesDirectoryExist source
-    when (not isDirectory) $
+    -- We don't want to call `need` on broken symlinks
+    linkTargetExists <- liftIO $ IO.doesPathExist link_target
+    when (not isDirectory && linkTargetExists) $
       need [source]
     let createLink src tgt
           | isDirectory = liftIO $ IO.createDirectoryLink src tgt
