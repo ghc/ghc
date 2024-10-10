@@ -475,7 +475,7 @@ type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
 type instance XSpliceTy        GhcTc = Kind
 
-type instance XDocTy           (GhcPass _) = [AddEpAnn]
+type instance XDocTy           (GhcPass _) = NoExtField
 type instance XBangTy          (GhcPass _) = ([AddEpAnn], SourceText)
 
 type instance XRecTy           GhcPs = AnnList

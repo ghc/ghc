@@ -458,7 +458,7 @@
                (EpaComments
                 []))
               (HsDocTy
-               []
+               (NoExtField)
                (L
                 (EpAnn
                  (EpaSpan { T24221.hs:15:3-5 })
@@ -503,7 +503,7 @@
                (EpaComments
                 []))
               (HsDocTy
-               []
+               (NoExtField)
                (L
                 (EpAnn
                  (EpaSpan { T24221.hs:17:3-6 })
@@ -616,7 +616,7 @@
                (EpaComments
                 []))
               (HsDocTy
-               []
+               (NoExtField)
                (L
                 (EpAnn
                  (EpaSpan { T24221.hs:21:3-5 })
@@ -661,7 +661,7 @@
                (EpaComments
                 []))
               (HsDocTy
-               []
+               (NoExtField)
                (L
                 (EpAnn
                  (EpaSpan { T24221.hs:25:3-6 })

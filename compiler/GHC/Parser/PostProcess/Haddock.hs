@@ -1460,7 +1460,7 @@ instance Monoid ColumnBound where
 
 mkLHsDocTy :: LHsType GhcPs -> Maybe (Located HsDocString) -> LHsType GhcPs
 mkLHsDocTy t Nothing = t
-mkLHsDocTy t (Just doc) = L (getLoc t) (HsDocTy noAnn t $ lexLHsDocString doc)
+mkLHsDocTy t (Just doc) = L (getLoc t) (HsDocTy noExtField t $ lexLHsDocString doc)
 
 getForAllTeleLoc :: HsForAllTelescope GhcPs -> SrcSpan
 getForAllTeleLoc tele =

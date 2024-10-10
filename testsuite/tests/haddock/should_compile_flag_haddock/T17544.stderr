@@ -170,7 +170,7 @@
                (EpaComments
                 []))
               (HsDocTy
-               []
+               (NoExtField)
                (L
                 (EpAnn
                  (EpaSpan { T17544.hs:6:14-16 })
