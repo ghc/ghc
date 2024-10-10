@@ -67,10 +67,14 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationAnnList
               `extQ` annotationEpAnnImportDecl
               `extQ` annotationNoEpAnns
+              `extQ` annotationExprBracket
+              `extQ` annotationTypedBracket
               `extQ` addEpAnn
               `extQ` epTokenOC
               `extQ` epTokenCC
               `extQ` annParen
+              `extQ` annClassDecl
+              `extQ` annSynDecl
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
               `extQ` deltaPos
@@ -203,12 +207,45 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               parens $ text "AnnParen"
                         $$ vcat [ppr a, epaLocation o, epaLocation c]
 
+            annClassDecl :: AnnClassDecl -> SDoc
+            annClassDecl (AnnClassDecl c ops cps v w oc cc s) = case ba of
+             BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnClassDecl"
+             NoBlankEpAnnotations ->
+              parens $ text "AnnClassDecl"
+                        $$ vcat [showAstData' c, showAstData' ops, showAstData' cps,
+                                 showAstData' v, showAstData' w, showAstData' oc,
+                                 showAstData' cc, showAstData' s]
+
+            annSynDecl :: AnnSynDecl -> SDoc
+            annSynDecl (AnnSynDecl ops cps t e) = case ba of
+             BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnSynDecl"
+             NoBlankEpAnnotations ->
+              parens $ text "AnnSynDecl"
+                        $$ vcat [showAstData' ops, showAstData' cps,
+                                 showAstData' t, showAstData' e]
+
             addEpAnn :: AddEpAnn -> SDoc
             addEpAnn (AddEpAnn a s) = case ba of
              BlankEpAnnotations -> parens
                                       $ text "blanked:" <+> text "AddEpAnn"
              NoBlankEpAnnotations ->
               parens $ text "AddEpAnn" <+> ppr a <+> epaLocation s
+
+            annotationExprBracket :: BracketAnn (EpUniToken "[|" "⟦") (EpToken "[e|") -> SDoc
+            annotationExprBracket = annotationBracket
+
+            annotationTypedBracket :: BracketAnn (EpToken "[||") (EpToken "[e||") -> SDoc
+            annotationTypedBracket = annotationBracket
+
+            annotationBracket ::forall n h .(Data n, Data h, Typeable n, Typeable h)
+              => BracketAnn n h -> SDoc
+            annotationBracket a = case ba of
+             BlankEpAnnotations -> parens
+                                      $ text "blanked:" <+> text "BracketAnn"
+             NoBlankEpAnnotations ->
+              parens $ case a of
+                BracketNoE  t -> text "BracketNoE"  <+> showAstData' t
+                BracketHasE t -> text "BracketHasE" <+> showAstData' t
 
             epTokenOC :: EpToken "{" -> SDoc
             epTokenOC  = epToken'

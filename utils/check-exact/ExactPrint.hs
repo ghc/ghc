@@ -837,21 +837,6 @@ markEpAnnLMS'' a l kw (Just str) = do
 
 -- -------------------------------------
 
-markEpAnnMS' :: (Monad m, Monoid w)
-  => [AddEpAnn] -> AnnKeywordId -> Maybe String -> EP w m [AddEpAnn]
-markEpAnnMS' anns kw Nothing = mark anns kw
-markEpAnnMS' anns kw (Just str) = do
-  mapM go anns
-  where
-    go :: (Monad m, Monoid w) => AddEpAnn -> EP w m AddEpAnn
-    go (AddEpAnn kw' r)
-      | kw' == kw = do
-          r' <- printStringAtAA r str
-          return (AddEpAnn kw' r')
-      | otherwise = return (AddEpAnn kw' r)
-
--- -------------------------------------
-
 markEpAnnLMS' :: (Monad m, Monoid w)
   => EpAnn a -> Lens a AddEpAnn -> AnnKeywordId -> Maybe String -> EP w m (EpAnn a)
 markEpAnnLMS' an l kw ms = markEpAnnLMS0 an (lepa . l) kw ms
@@ -3286,51 +3271,53 @@ instance ExactPrint (HsExpr GhcPs) where
     return (ArithSeq (AnnArithSeq o' mc' dd' c') s seqInfo')
 
 
-  exact (HsTypedBracket an e) = do
-    an0 <- markEpAnnLMS'' an lidl AnnOpen (Just "[||")
-    an1 <- markEpAnnLMS'' an0 lidl AnnOpenE (Just "[e||")
+  exact (HsTypedBracket (o,c) e) = do
+    o' <- case o of
+      BracketNoE  t -> BracketNoE  <$> markEpToken t
+      BracketHasE t -> BracketHasE <$> markEpToken t
     e' <- markAnnotated e
-    an2 <- markEpAnnLMS'' an1 lidl AnnClose (Just "||]")
-    return (HsTypedBracket an2 e')
+    c' <- markEpToken c
+    return (HsTypedBracket (o',c') e')
 
-  exact (HsUntypedBracket an (ExpBr a e)) = do
-    an0 <- markEpAnnL an  lidl AnnOpenEQ -- "[|"
-    an1 <- markEpAnnL an0 lidl AnnOpenE  -- "[e|" -- optional
+  exact (HsUntypedBracket a (ExpBr (o,c) e)) = do
+    o' <- case o of
+      BracketNoE  t -> BracketNoE  <$> markEpUniToken t
+      BracketHasE t -> BracketHasE <$> markEpToken t
     e' <- markAnnotated e
-    an2 <- markEpAnnL an1 lidl AnnCloseQ -- "|]"
-    return (HsUntypedBracket an2 (ExpBr a e'))
+    c' <- markEpUniToken c
+    return (HsUntypedBracket a (ExpBr (o',c') e'))
 
-  exact (HsUntypedBracket an (PatBr a e)) = do
-    an0 <- markEpAnnLMS'' an lidl AnnOpen (Just "[p|")
+  exact (HsUntypedBracket a (PatBr (o,c) e)) = do
+    o' <- markEpToken o
     e' <- markAnnotated e
-    an1 <- markEpAnnL an0 lidl AnnCloseQ -- "|]"
-    return (HsUntypedBracket an1 (PatBr a e'))
+    c' <- markEpUniToken c
+    return (HsUntypedBracket a (PatBr (o',c') e'))
 
-  exact (HsUntypedBracket an (DecBrL a e)) = do
-    an0 <- markEpAnnLMS'' an lidl AnnOpen (Just "[d|")
-    an1 <- markEpAnnL an0 lidl AnnOpenC
+  exact (HsUntypedBracket a (DecBrL (o,c, (oc,cc)) e)) = do
+    o' <- markEpToken o
+    oc' <- markEpToken oc
     e' <- markAnnotated e
-    an2 <- markEpAnnL an1 lidl AnnCloseC
-    an3 <- markEpAnnL an2 lidl AnnCloseQ -- "|]"
-    return (HsUntypedBracket an3 (DecBrL a e'))
+    cc' <- markEpToken cc
+    c' <- markEpUniToken c
+    return (HsUntypedBracket a (DecBrL (o',c',(oc',cc')) e'))
 
-  exact (HsUntypedBracket an (TypBr a e)) = do
-    an0 <- markEpAnnLMS'' an lidl AnnOpen (Just "[t|")
+  exact (HsUntypedBracket a (TypBr (o,c) e)) = do
+    o' <- markEpToken o
     e' <- markAnnotated e
-    an1 <- markEpAnnL an0 lidl AnnCloseQ -- "|]"
-    return (HsUntypedBracket an1 (TypBr a e'))
+    c' <- markEpUniToken c
+    return (HsUntypedBracket a (TypBr (o',c') e'))
 
-  exact (HsUntypedBracket an (VarBr a b e)) = do
+  exact (HsUntypedBracket a (VarBr an b e)) = do
     (an0, e') <- if b
       then do
-        an' <- markEpAnnL an lidl AnnSimpleQuote
+        an' <- printStringAtAA an "'"
         e' <- markAnnotated e
         return (an', e')
       else do
-        an' <- markEpAnnL an lidl AnnThTyQuote
+        an' <- printStringAtAA an "''"
         e' <- markAnnotated e
         return (an', e')
-    return (HsUntypedBracket an0 (VarBr a b e'))
+    return (HsUntypedBracket a (VarBr an0 b e'))
 
   exact (HsTypedSplice an s)   = do
     an0 <- markEpToken an
@@ -3768,24 +3755,24 @@ instance ExactPrint (TyClDecl GhcPs) where
     decl' <- markAnnotated decl
     return (FamDecl a decl')
 
-  exact (SynDecl { tcdSExt = an
+  exact (SynDecl { tcdSExt = AnnSynDecl ops cps t eq
                  , tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
                  , tcdRhs = rhs }) = do
     -- There may be arbitrary parens around parts of the constructor
     -- that are infix.  Turn these into comments so that they feed
     -- into the right place automatically
     -- TODO: no longer sorting on insert. What now?
-    an0 <- annotationsToComments an lidl [AnnOpenP,AnnCloseP]
-    an1 <- markEpAnnL an0 lidl AnnType
+    epTokensToComments AnnOpenP ops
+    epTokensToComments AnnCloseP cps
+    t' <- markEpToken t
 
     (_anx, ltycon', tyvars',_,_) <- exactVanillaDeclHead ltycon tyvars fixity Nothing
-    an2 <- markEpAnnL an1 lidl AnnEqual
+    eq' <- markEpToken eq
     rhs' <- markAnnotated rhs
-    return (SynDecl { tcdSExt = an2
+    return (SynDecl { tcdSExt = AnnSynDecl [] [] t' eq'
                     , tcdLName = ltycon', tcdTyVars = tyvars', tcdFixity = fixity
                     , tcdRhs = rhs' })
 
-  -- TODO: add a workaround for https://gitlab.haskell.org/ghc/ghc/-/issues/20452
   exact (DataDecl { tcdDExt = an, tcdLName = ltycon, tcdTyVars = tyvars
                   , tcdFixity = fixity, tcdDataDefn = defn }) = do
     (_, an', ltycon', tyvars', _, defn') <-
@@ -3795,7 +3782,7 @@ instance ExactPrint (TyClDecl GhcPs) where
 
   -- -----------------------------------
 
-  exact (ClassDecl {tcdCExt = (an, lo, sortKey),
+  exact (ClassDecl {tcdCExt = (AnnClassDecl c ops cps vb w oc cc semis, lo, sortKey),
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
@@ -3805,10 +3792,10 @@ instance ExactPrint (TyClDecl GhcPs) where
       -- TODO: add a test that demonstrates tcdDocs
       | null sigs && null methods && null ats && null at_defs -- No "where" part
       = do
-          (an0, fds', lclas', tyvars',context') <- top_matter
-          an1 <- markEpAnnL an0 lidl AnnOpenC
-          an2 <- markEpAnnL an1 lidl AnnCloseC
-          return (ClassDecl {tcdCExt = (an2, lo, sortKey),
+          (c', w', vb', fds', lclas', tyvars',context') <- top_matter
+          oc' <- markEpToken oc
+          cc' <- markEpToken cc
+          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' oc' cc' semis, lo, sortKey),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
@@ -3818,9 +3805,9 @@ instance ExactPrint (TyClDecl GhcPs) where
 
       | otherwise       -- Laid out
       = do
-          (an0, fds', lclas', tyvars',context') <- top_matter
-          an1 <- markEpAnnL    an0 lidl AnnOpenC
-          an2 <- markEpAnnAllL' an1 lidl AnnSemi
+          (c', w', vb', fds', lclas', tyvars',context') <- top_matter
+          oc' <- markEpToken oc
+          semis' <- mapM markEpToken semis
           (sortKey', ds) <- withSortKey sortKey
                                [(ClsSigTag, prepareListAnnotationA sigs),
                                 (ClsMethodTag, prepareListAnnotationA methods),
@@ -3828,13 +3815,13 @@ instance ExactPrint (TyClDecl GhcPs) where
                                 (ClsAtdTag, prepareListAnnotationA at_defs)
                              -- ++ prepareListAnnotation docs
                                ]
-          an3 <- markEpAnnL an2 lidl AnnCloseC
+          cc' <- markEpToken cc
           let
             sigs'    = undynamic ds
             methods' = undynamic ds
             ats'     = undynamic ds
             at_defs' = undynamic ds
-          return (ClassDecl {tcdCExt = (an3, lo, sortKey'),
+          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' oc' cc' semis', lo, sortKey'),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
@@ -3843,17 +3830,18 @@ instance ExactPrint (TyClDecl GhcPs) where
                              tcdDocs = _docs})
       where
         top_matter = do
-          an' <- annotationsToComments an lidl  [AnnOpenP, AnnCloseP]
-          an0 <- markEpAnnL an' lidl AnnClass
+          epTokensToComments AnnOpenP ops
+          epTokensToComments AnnCloseP cps
+          c' <- markEpToken c
           (_, lclas', tyvars',_,context') <-  exactVanillaDeclHead lclas tyvars fixity context
-          (an1, fds') <- if (null fds)
-            then return (an0, fds)
+          (vb', fds') <- if (null fds)
+            then return (vb, fds)
             else do
-              an1 <- markEpAnnL an0 lidl AnnVbar
+              vb' <- markEpToken vb
               fds' <- markAnnotated fds
-              return (an1, fds')
-          an2 <- markEpAnnL an1 lidl AnnWhere
-          return (an2, fds', lclas', tyvars',context')
+              return (vb', fds')
+          w' <- markEpToken w
+          return (c', w', vb', fds', lclas', tyvars',context')
 
 
 -- ---------------------------------------------------------------------
@@ -4202,37 +4190,36 @@ instance ExactPrint (HsType GhcPs) where
   exact (HsDocTy an ty doc) = do
     ty' <- markAnnotated ty
     return (HsDocTy an ty' doc)
-  exact (HsBangTy (an, mt) (HsBang up str) ty) = do
-    an0 <-
+  exact (HsBangTy ((o,c,tk), mt) (HsBang up str) ty) = do
+    (o',c') <-
       case mt of
-        NoSourceText -> return an
+        NoSourceText -> return (o,c)
         SourceText src -> do
           debugM $ "HsBangTy: src=" ++ showAst src
-          an0 <- markEpAnnMS' an AnnOpen  (Just $ unpackFS src)
-          an1 <- markEpAnnMS' an0 AnnClose (Just "#-}")
-          debugM $ "HsBangTy: done unpackedness"
-          return an1
-    an1 <-
+          o' <- printStringAtAA o (unpackFS src)
+          c' <- printStringAtAA c "#-}"
+          return (o',c')
+    tk' <-
       case str of
-        SrcLazy     -> mark an0 AnnTilde
-        SrcStrict   -> mark an0 AnnBang
-        NoSrcStrict -> return an0
+        SrcLazy     -> printStringAtAA tk "~"
+        SrcStrict   -> printStringAtAA tk "!"
+        NoSrcStrict -> return tk
     ty' <- markAnnotated ty
-    return (HsBangTy (an1, mt) (HsBang up str) ty')
-  exact (HsExplicitListTy an prom tys) = do
-    an0 <- if (isPromoted prom)
-             then mark an AnnSimpleQuote
-             else return an
-    an1 <- mark an0 AnnOpenS
+    return (HsBangTy ((o',c',tk'), mt) (HsBang up str) ty')
+  exact (HsExplicitListTy (sq,o,c) prom tys) = do
+    sq' <- if (isPromoted prom)
+             then markEpToken sq
+             else return sq
+    o' <- markEpToken o
     tys' <- markAnnotated tys
-    an2 <- mark an1 AnnCloseS
-    return (HsExplicitListTy an2 prom tys')
-  exact (HsExplicitTupleTy an tys) = do
-    an0 <- mark an AnnSimpleQuote
-    an1 <- mark an0 AnnOpenP
+    c' <- markEpToken c
+    return (HsExplicitListTy (sq',o',c') prom tys')
+  exact (HsExplicitTupleTy (sq, o, c) tys) = do
+    sq' <- markEpToken sq
+    o' <- markEpToken o
     tys' <- markAnnotated tys
-    an2 <- mark an1 AnnCloseP
-    return (HsExplicitTupleTy an2 tys')
+    c' <- markEpToken c
+    return (HsExplicitTupleTy (sq', o', c') tys')
   exact (HsTyLit a lit) = do
     case lit of
       (HsNumTy src v) -> printSourceText src (show v)

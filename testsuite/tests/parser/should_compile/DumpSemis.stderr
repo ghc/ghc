@@ -1302,8 +1302,17 @@
      (NoExtField)
      (ClassDecl
       ((,,)
-       [(AddEpAnn AnnClass (EpaSpan { DumpSemis.hs:28:1-5 }))
-       ,(AddEpAnn AnnWhere (EpaSpan { DumpSemis.hs:28:40-44 }))]
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { DumpSemis.hs:28:1-5 }))
+        []
+        []
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { DumpSemis.hs:28:40-44 }))
+        (NoEpTok)
+        (NoEpTok)
+        [])
        (EpVirtualBraces
         (3))
        (NoAnnSortKey))

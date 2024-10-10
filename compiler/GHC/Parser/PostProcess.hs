@@ -161,7 +161,7 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
 import Data.Either
-import Data.List        ( findIndex, partition )
+import Data.List        ( findIndex )
 import Data.Foldable
 import qualified Data.Semigroup as Semi
 import GHC.Unit.Module.Warnings
@@ -204,14 +204,14 @@ mkClassDecl :: SrcSpan
             -> Located (a,[LHsFunDep GhcPs])
             -> OrdList (LHsDecl GhcPs)
             -> EpLayout
-            -> [AddEpAnn]
+            -> AnnClassDecl
             -> P (LTyClDecl GhcPs)
 
 mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
   = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
-       ; (cls, tparams, fixity, ann, cs) <- checkTyClHdr True tycl_hdr
+       ; (cls, tparams, fixity, ops, cps, cs) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
-       ; let anns' = annsIn Semi.<> ann
+       ; let anns' = annsIn { acd_openp = ops, acd_closep = cps}
        ; let loc = EpAnn (spanAsAnchor loc') noAnn cs
        ; return (L loc (ClassDecl { tcdCExt = (anns', layout, NoAnnSortKey)
                                   , tcdCtxt = mcxt
@@ -235,9 +235,10 @@ mkTyData :: SrcSpan
          -> P (LTyClDecl GhcPs)
 mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
          ksig data_cons (L _ maybe_deriv) annsIn
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False tycl_hdr
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
-       ; let anns' = annsIn Semi.<> ann
+       ; let anns' = annsIn Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; data_cons <- checkNewOrData loc' (unLoc tc) is_type_data new_or_data data_cons
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; !cs' <- getCommentsFor loc'
@@ -246,6 +247,15 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn })) }
+
+-- TODO:AZ:temporary
+openParen2AddEpAnn :: EpToken "(" -> [AddEpAnn]
+openParen2AddEpAnn (EpTok l) = [AddEpAnn AnnOpenP l]
+openParen2AddEpAnn NoEpTok = []
+
+closeParen2AddEpAnn :: EpToken ")" -> [AddEpAnn]
+closeParen2AddEpAnn (EpTok l) = [AddEpAnn AnnCloseP l]
+closeParen2AddEpAnn NoEpTok = []
 
 mkDataDefn :: Maybe (LocatedP CType)
            -> Maybe (LHsContext GhcPs)
@@ -265,14 +275,15 @@ mkDataDefn cType mcxt ksig data_cons maybe_deriv
 mkTySynonym :: SrcSpan
             -> LHsType GhcPs  -- LHS
             -> LHsType GhcPs  -- RHS
-            -> [AddEpAnn]
+            -> EpToken "type"
+            -> EpToken "="
             -> P (LTyClDecl GhcPs)
-mkTySynonym loc lhs rhs annsIn
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False lhs
+mkTySynonym loc lhs rhs antype aneq
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (text "type") equalsDots tc tparams
-       ; let anns' = annsIn Semi.<> ann
+       ; let anns = AnnSynDecl ops cps antype aneq
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
-       ; return (L loc' (SynDecl { tcdSExt = anns'
+       ; return (L loc' (SynDecl { tcdSExt = anns
                                  , tcdLName = tc, tcdTyVars = tyvars
                                  , tcdFixity = fixity
                                  , tcdRhs = rhs })) }
@@ -308,10 +319,12 @@ mkTyFamInstEqn :: SrcSpan
                -> [AddEpAnn]
                -> P (LTyFamInstEqn GhcPs)
 mkTyFamInstEqn loc bndrs lhs rhs anns
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False lhs
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
+       ; let anns' = anns Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; return (L loc' $ FamEqn
-                        { feqn_ext    = anns `mappend` ann
+                        { feqn_ext    = anns'
                         , feqn_tycon  = tc
                         , feqn_bndrs  = bndrs
                         , feqn_pats   = tparams
@@ -330,31 +343,19 @@ mkDataFamInst :: SrcSpan
               -> P (LInstDecl GhcPs)
 mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons (L _ maybe_deriv) anns
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False tycl_hdr
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; data_cons <- checkNewOrData loc (unLoc tc) False new_or_data data_cons
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
+       ; let anns' = anns Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; return (L loc' (DataFamInstD noExtField (DataFamInstDecl
-                  (FamEqn { feqn_ext    = ann Semi.<> anns
+                  (FamEqn { feqn_ext    = anns'
                           , feqn_tycon  = tc
                           , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams
                           , feqn_fixity = fixity
                           , feqn_rhs    = defn })))) }
-
--- mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
---               ksig data_cons (L _ maybe_deriv) anns
---   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
---        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
---        ; let anns' = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
---        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
---        ; return (L (noAnnSrcSpan loc) (DataFamInstD anns' (DataFamInstDecl
---                   (FamEqn { feqn_ext    = anns'
---                           , feqn_tycon  = tc
---                           , feqn_bndrs  = bndrs
---                           , feqn_pats   = tparams
---                           , feqn_fixity = fixity
---                           , feqn_rhs    = defn })))) }
 
 
 
@@ -375,11 +376,13 @@ mkFamDecl :: SrcSpan
           -> [AddEpAnn]
           -> P (LTyClDecl GhcPs)
 mkFamDecl loc info topLevel lhs ksig injAnn annsIn
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False lhs
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (ppr info) equals_or_where tc tparams
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
+       ; let anns' = annsIn Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; return (L loc' (FamDecl noExtField (FamilyDecl
-                                           { fdExt       = annsIn Semi.<> ann
+                                           { fdExt       = anns'
                                            , fdTopLevel  = topLevel
                                            , fdInfo      = info, fdLName = tc
                                            , fdTyVars    = tyvars
@@ -738,8 +741,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr (locA loc) decl
            -- conAnn should only be AnnOpenP, AnnCloseP, so the rest should be empty
-           ; let (ann_fun, rest) = mk_ann_funrhs []
-           ; unless (null rest) $ return $ panic "mkPatSynMatchGroup: unexpected anns"
+           ; let ann_fun = mk_ann_funrhs [] []
            ; match <- case details of
                PrefixCon _ pats -> return $ Match { m_ext = noExtField
                                                   , m_ctxt = ctxt, m_pats = L l pats
@@ -1063,8 +1065,8 @@ checkTyClHdr :: Bool               -- True  <=> class header
              -> P (LocatedN RdrName,     -- the head symbol (type or class name)
                    [LHsTypeArg GhcPs],   -- parameters of head symbol
                    LexicalFixity,        -- the declaration is in infix format
-                   [AddEpAnn],           -- API Annotation for HsParTy
-                                         -- when stripping parens
+                   [EpToken "("],        -- API Annotation for HsParTy
+                   [EpToken ")"],        -- when stripping parens
                    EpAnnComments)        -- Accumulated comments from re-arranging
 -- Well-formedness check and decomposition of type and class heads.
 -- Decomposes   T ty1 .. tyn   into    (T, [ty1, ..., tyn])
@@ -1081,22 +1083,22 @@ checkTyClHdr is_cls ty
            ; let name = mkOccNameFS tcClsName (starSym isUni)
            ; let a' = newAnns ll l an
            ; return (L a' (Unqual name), acc, fix
-                    , (reverse ops') ++ cps', cs) }
+                    , (reverse ops'), cps', cs) }
 
     go cs l (HsTyVar _ _ ltc@(L _ tc)) acc ops cps fix
-      | isRdrTc tc               = return (ltc, acc, fix, (reverse ops) ++ cps, cs Semi.<> comments l)
+      | isRdrTc tc               = return (ltc, acc, fix, (reverse ops), cps, cs Semi.<> comments l)
     go cs l (HsOpTy _ _ t1 ltc@(L _ tc) t2) acc ops cps _fix
-      | isRdrTc tc               = return (ltc, lhs:rhs:acc, Infix, (reverse ops) ++ cps, cs Semi.<> comments l)
+      | isRdrTc tc               = return (ltc, lhs:rhs:acc, Infix, (reverse ops), cps, cs Semi.<> comments l)
       where lhs = HsValArg noExtField t1
             rhs = HsValArg noExtField t2
     go cs l (HsParTy _ ty)    acc ops cps fix = goL (cs Semi.<> comments l) ty acc (o:ops) (c:cps) fix
       where
-        (o,c) = mkParensEpAnn (realSrcSpan (locA l))
+        (o,c) = mkParensEpToks (realSrcSpan (locA l))
     go cs l (HsAppTy _ t1 t2) acc ops cps fix = goL (cs Semi.<> comments l) t1 (HsValArg noExtField t2:acc) ops cps fix
     go cs l (HsAppKindTy at ty ki) acc ops cps fix = goL (cs Semi.<> comments l) ty (HsTypeArg at ki:acc) ops cps fix
     go cs l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ops cps fix
       = return (L (l2l l) (nameRdrName tup_name)
-               , map (HsValArg noExtField) ts, fix, (reverse ops)++cps, cs Semi.<> comments l)
+               , map (HsValArg noExtField) ts, fix, (reverse ops), cps, cs Semi.<> comments l)
       where
         arity = length ts
         tup_name | is_cls    = cTupleTyConName arity
@@ -1170,15 +1172,16 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   -- With NoListTuplePuns, contexts are parsed as data constructors, which causes failure
   -- downstream.
   -- This converts them just like when they are parsed as types in the punned case.
-  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy anns ts))
+  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy (q,o,c) ts))
     = punsAllowed >>= \case
       True -> unprocessed
       False -> do
         let
-          (op, cp) = case anns of
-            [o, c] -> ([o], [c])
-            [q, _, c] -> ([q], [c])
-            _ -> ([], [])
+          ol = AddEpAnn AnnOpenP (getEpTokenLoc o)
+          cl = AddEpAnn AnnCloseP (getEpTokenLoc c)
+          (op, cp) = case q of
+            EpTok ql -> ([AddEpAnn AnnSimpleQuote ql], [cl])
+            _        -> ([ol], [cl])
         mkCTuple (oparens ++ (addLoc <$> op), (addLoc <$> cp) ++ cparens, cs) ts
   check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
@@ -1331,12 +1334,12 @@ checkAPat loc e0 = do
      addError $ mkPlainErrorMsgEnvelope (getLocA op) PsErrAtInPatPos
      return (WildPat noExtField)
 
-   PatBuilderOpApp l (L cl c) r anns
+   PatBuilderOpApp l (L cl c) r (_os,_cs)
      | isRdrDataCon c || isRdrTc c -> do
          l <- checkLPat l
          r <- checkLPat r
          return $ ConPat
-           { pat_con_ext = mk_ann_conpat anns
+           { pat_con_ext = noAnn
            , pat_con = L cl c
            , pat_args = InfixCon l r
            }
@@ -1389,9 +1392,8 @@ checkValDef loc lhs (mult_ann, Nothing) grhss
   | HsNoMultAnn{} <- mult_ann
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
-            Just (fun, is_infix, pats, ann) -> do
-              let (ann_fun, ann_rest) = mk_ann_funrhs ann
-              unless (null ann_rest) $ panic "checkValDef: unexpected anns"
+            Just (fun, is_infix, pats, ops, cps) -> do
+              let ann_fun = mk_ann_funrhs ops cps
               let l = listLocation pats
               checkFunBind loc ann_fun
                            fun is_infix (L l pats) grhss
@@ -1404,29 +1406,8 @@ checkValDef loc lhs (mult_ann, Nothing) ghrss
   = do lhs' <- checkPattern lhs
        checkPatBind loc lhs' ghrss mult_ann
 
-mk_ann_funrhs :: [AddEpAnn] -> (AnnFunRhs, [AddEpAnn])
-mk_ann_funrhs ann = (AnnFunRhs strict (map to_tok opens) (map to_tok closes), rest)
-  where
-    (opens, ra0) = partition (\(AddEpAnn kw _) -> kw == AnnOpenP) ann
-    (closes, ra1) = partition (\(AddEpAnn kw _) -> kw == AnnCloseP) ra0
-    (bangs, rest) = partition (\(AddEpAnn kw _) -> kw == AnnBang) ra1
-    strict = case bangs of
-               (AddEpAnn _ s:_) -> EpTok s
-               _ -> NoEpTok
-    to_tok (AddEpAnn _ s) = EpTok s
-
-mk_ann_conpat :: [AddEpAnn] -> (Maybe (EpToken "{"), Maybe (EpToken "}"))
-mk_ann_conpat ann = (open, close)
-  where
-    (opens, ra0) = partition (\(AddEpAnn kw _) -> kw == AnnOpenC) ann
-    (closes, _ra1) = partition (\(AddEpAnn kw _) -> kw == AnnCloseC) ra0
-    open = case opens of
-      (o:_) -> Just (to_tok o)
-      _ -> Nothing
-    close = case closes of
-      (o:_) -> Just (to_tok o)
-      _ -> Nothing
-    to_tok (AddEpAnn _ s) = EpTok s
+mk_ann_funrhs :: [EpToken "("] -> [EpToken ")"] -> AnnFunRhs
+mk_ann_funrhs ops cps = AnnFunRhs NoEpTok ops cps
 
 checkFunBind :: SrcSpan
              -> AnnFunRhs
@@ -1468,10 +1449,10 @@ checkPatBind :: SrcSpan
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> HsMultAnn GhcPs
              -> P (HsBind GhcPs)
-checkPatBind loc (L _ (BangPat ans (L _ (VarPat _ v))))
+checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
                         (L _match_span grhss) (HsNoMultAnn _)
       = return (makeFunBind v (L (noAnnSrcSpan loc)
-                [L (noAnnSrcSpan loc) (m ans v)]))
+                [L (noAnnSrcSpan loc) (m an v)]))
   where
     m a v = Match { m_ext = noExtField
                   , m_ctxt = FunRhs { mc_fun    = v
@@ -1517,7 +1498,7 @@ checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
 
 isFunLhs :: LocatedA (PatBuilder GhcPs)
       -> P (Maybe (LocatedN RdrName, LexicalFixity,
-                   [LocatedA (ArgPatBuilder GhcPs)],[AddEpAnn]))
+                   [LocatedA (ArgPatBuilder GhcPs)],[EpToken "("],[EpToken ")"]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 isFunLhs e = go e [] [] []
@@ -1527,7 +1508,7 @@ isFunLhs e = go e [] [] []
    go (L l (PatBuilderVar (L loc f))) es ops cps
        | not (isRdrDataCon f)        = do
            let (_l, loc') = transferCommentsOnlyA l loc
-           return (Just (L loc' f, Prefix, es, (reverse ops) ++ cps))
+           return (Just (L loc' f, Prefix, es, (reverse ops), cps))
    go (L l (PatBuilderApp (L lf f) e))   es       ops cps = do
      let (_l, lf') = transferCommentsOnlyA l lf
      go (L lf' f) (mk e:es) ops cps
@@ -1537,21 +1518,21 @@ isFunLhs e = go e [] [] []
       -- of funlhs.
      where
        (_l, le') = transferCommentsOnlyA l le
-       (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
-   go (L loc (PatBuilderOpApp (L ll l) (L loc' op) r anns)) es ops cps
+       (o,c) = mkParensEpToks (realSrcSpan $ locA l)
+   go (L loc (PatBuilderOpApp (L ll l) (L loc' op) r (os,cs))) es ops cps
       | not (isRdrDataCon op)         -- We have found the function!
       = do { let (_l, ll') = transferCommentsOnlyA loc ll
-           ; return (Just (L loc' op, Infix, (mk (L ll' l):mk r:es), (anns ++ reverse ops ++ cps))) }
+           ; return (Just (L loc' op, Infix, (mk (L ll' l):mk r:es), (os ++ reverse ops), (cs ++ cps))) }
       | otherwise                     -- Infix data con; keep going
       = do { let (_l, ll') = transferCommentsOnlyA loc ll
            ; mb_l <- go (L ll' l) es ops cps
            ; return (reassociate =<< mb_l) }
         where
-          reassociate (op', Infix, j : L k_loc (ArgPatBuilderVisPat k) : es', anns')
-            = Just (op', Infix, j : op_app : es', anns')
+          reassociate (op', Infix, j : L k_loc (ArgPatBuilderVisPat k) : es', ops', cps')
+            = Just (op', Infix, j : op_app : es', ops', cps')
             where
               op_app = mk $ L loc (PatBuilderOpApp (L k_loc k)
-                                    (L loc' op) r (reverse ops ++ cps))
+                                    (L loc' op) r (reverse ops, cps))
           reassociate _other = Nothing
    go (L l (PatBuilderAppType (L lp pat) tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
              = go (L lp' pat) (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
@@ -1570,13 +1551,13 @@ instance Outputable (ArgPatBuilder GhcPs) where
   ppr (ArgPatBuilderVisPat p) = ppr p
   ppr (ArgPatBuilderArgPat p) = ppr p
 
-mkBangTy :: [AddEpAnn] -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
-mkBangTy anns strictness =
-  HsBangTy (anns, NoSourceText) (HsBang NoSrcUnpack strictness)
+mkBangTy :: EpaLocation -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
+mkBangTy tok_loc strictness =
+  HsBangTy ((noAnn, noAnn, tok_loc), NoSourceText) (HsBang NoSrcUnpack strictness)
 
 -- | Result of parsing @{-\# UNPACK \#-}@ or @{-\# NOUNPACK \#-}@.
 data UnpackednessPragma =
-  UnpackednessPragma [AddEpAnn] SourceText SrcUnpackedness
+  UnpackednessPragma (EpaLocation, EpaLocation) SourceText SrcUnpackedness
 
 -- | Annotate a type with either an @{-\# UNPACK \#-}@ or a @{-\# NOUNPACK \#-}@ pragma.
 addUnpackednessP :: MonadP m => Located UnpackednessPragma -> LHsType GhcPs -> m (LHsType GhcPs)
@@ -1589,11 +1570,11 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
     -- such as ~T or !T, then add the pragma to the existing HsBangTy.
     --
     -- Otherwise, wrap the type in a new HsBangTy constructor.
-    addUnpackedness an (L _ (HsBangTy (anns, NoSourceText) bang t))
+    addUnpackedness (o,c) (L _ (HsBangTy ((_,_,tl), NoSourceText) bang t))
       | HsBang NoSrcUnpack strictness <- bang
-      = HsBangTy (an Semi.<> anns, prag) (HsBang unpk strictness) t
-    addUnpackedness an t
-      = HsBangTy (an, prag) (HsBang unpk NoSrcStrict) t
+      = HsBangTy ((o,c,tl), prag) (HsBang unpk strictness) t
+    addUnpackedness (o,c) t
+      = HsBangTy ((o,c,noAnn), prag) (HsBang unpk NoSrcStrict) t
 
 ---------------------------------------------------------------------------
 -- | Check for monad comprehensions
@@ -2051,7 +2032,7 @@ instance DisambECP (PatBuilder GhcPs) where
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ PatBuilderOpApp p1 op p2 []
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ PatBuilderOpApp p1 op p2 ([],[])
 
   mkHsLamPV l lam_variant _ _     = addFatalError $ mkPlainErrorMsgEnvelope l (PsErrLambdaInPat lam_variant)
 
@@ -3658,7 +3639,7 @@ mkTupleSyntaxTy parOpen args parClose =
       HsExplicitTupleTy annsKeyword args
 
     annParen = AnnParen AnnParens parOpen parClose
-    annsKeyword = [AddEpAnn AnnOpenP parOpen, AddEpAnn AnnCloseP parClose]
+    annsKeyword = (NoEpTok, EpTok parOpen, EpTok parClose)
 
 -- | Decide whether to parse tuple con syntax @(,)@ in a type as a
 -- type or data constructor, based on the extension @ListTuplePuns@.
@@ -3690,7 +3671,7 @@ mkListSyntaxTy0 brkOpen brkClose span =
       HsExplicitListTy annsKeyword NotPromoted []
 
     rdrNameAnn = NameAnnOnly NameSquare brkOpen brkClose []
-    annsKeyword = [AddEpAnn AnnOpenS brkOpen, AddEpAnn AnnCloseS brkClose]
+    annsKeyword = (NoEpTok, EpTok brkOpen, EpTok brkClose)
     fullLoc = EpaSpan span
 
 -- | Decide whether to parse list type syntax @[Int]@ in a type as a
@@ -3709,5 +3690,5 @@ mkListSyntaxTy1 brkOpen t brkClose =
     disabled =
       HsExplicitListTy annsKeyword NotPromoted [t]
 
-    annsKeyword = [AddEpAnn AnnOpenS brkOpen, AddEpAnn AnnCloseS brkClose]
+    annsKeyword = (NoEpTok, EpTok brkOpen, EpTok brkClose)
     annParen = AnnParen AnnParensSquare brkOpen brkClose

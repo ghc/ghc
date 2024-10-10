@@ -31,6 +31,8 @@ module GHC.Hs.Decls (
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  AnnClassDecl(..),
+  AnnSynDecl(..),
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   tyClGroupKindSigs,
@@ -353,7 +355,7 @@ instance Outputable SpliceDecoration where
 
 type instance XFamDecl      (GhcPass _) = NoExtField
 
-type instance XSynDecl      GhcPs = [AddEpAnn]
+type instance XSynDecl      GhcPs = AnnSynDecl
 type instance XSynDecl      GhcRn = NameSet -- FVs
 type instance XSynDecl      GhcTc = NameSet -- FVs
 
@@ -368,7 +370,7 @@ data DataDeclRn = DataDeclRn
   deriving Data
 
 type instance XClassDecl    GhcPs =
-  ( [AddEpAnn]
+  ( AnnClassDecl
   , EpLayout              -- See Note [Class EpLayout]
   , AnnSortKey DeclTag )  -- TODO:AZ:tidy up AnnSortKey
 
@@ -379,6 +381,32 @@ type instance XXTyClDecl    (GhcPass _) = DataConCantHappen
 
 type instance XCTyFamInstDecl (GhcPass _) = [AddEpAnn]
 type instance XXTyFamInstDecl (GhcPass _) = DataConCantHappen
+
+data AnnClassDecl
+  = AnnClassDecl {
+      acd_class  :: EpToken "class",
+      acd_openp  :: [EpToken "("],
+      acd_closep :: [EpToken ")"],
+      acd_vbar   :: EpToken "|",
+      acd_where  :: EpToken "where",
+      acd_openc  :: EpToken "{",
+      acd_closec :: EpToken "}",
+      acd_semis  :: [EpToken ";"]
+  } deriving Data
+
+instance NoAnn AnnClassDecl where
+  noAnn = AnnClassDecl noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
+
+data AnnSynDecl
+  = AnnSynDecl {
+    asd_opens  :: [EpToken "("],
+    asd_closes :: [EpToken ")"],
+    asd_type   :: EpToken "type",
+    asd_equal  :: EpToken "="
+  } deriving Data
+
+instance NoAnn AnnSynDecl where
+  noAnn = AnnSynDecl noAnn noAnn noAnn noAnn
 
 ------------- Pretty printing FamilyDecls -----------
 
