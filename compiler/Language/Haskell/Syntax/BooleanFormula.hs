@@ -9,16 +9,16 @@ module Language.Haskell.Syntax.BooleanFormula(
 
 import Prelude hiding ( init, last )
 import Data.List ( nub )
-import Language.Haskell.Syntax.Extension (XRec, UnXRec (..), LIdP)
+import Language.Haskell.Syntax.Extension (XRec, LIdP)
 
 
 -- types
 type LBooleanFormula p = XRec p (BooleanFormula p)
-data BooleanFormula p = Var (LIdP p) | And [LBooleanFormula p] | Or [LBooleanFormula p]
-                      | Parens (LBooleanFormula p)
+data BooleanFormula p = Var (LIdP p) | And [BooleanFormula p] | Or [BooleanFormula p]
+                      | Parens (BooleanFormula p)
 
 -- instances
-deriving instance (Eq (LIdP p), Eq (LBooleanFormula p)) => Eq (BooleanFormula p)
+deriving instance Eq (LIdP p) => Eq (BooleanFormula p)
 
 -- smart constructors
 -- see note [Simplification of BooleanFormulas]
@@ -35,28 +35,28 @@ mkBool False = mkFalse
 mkBool True  = mkTrue
 
 -- Make a conjunction, and try to simplify
-mkAnd :: forall p. (UnXRec p, Eq (LIdP p), Eq (LBooleanFormula p)) => [LBooleanFormula p] -> BooleanFormula p
+mkAnd :: Eq (LIdP p) => [BooleanFormula p] -> BooleanFormula p
 mkAnd = maybe mkFalse (mkAnd' . nub . concat) . mapM fromAnd
   where
   -- See Note [Simplification of BooleanFormulas]
-  fromAnd :: LBooleanFormula p -> Maybe [LBooleanFormula p]
-  fromAnd bf = case unXRec @p bf of
+  fromAnd :: BooleanFormula p -> Maybe [BooleanFormula p]
+  fromAnd bf = case bf of
     (And xs) -> Just xs
      -- assume that xs are already simplified
      -- otherwise we would need: fromAnd (And xs) = concat <$> traverse fromAnd xs
     (Or [])  -> Nothing
      -- in case of False we bail out, And [..,mkFalse,..] == mkFalse
     _        -> Just [bf]
-  mkAnd' [x] = unXRec @p x
+  mkAnd' [x] = x
   mkAnd' xs = And xs
 
-mkOr :: forall p. (UnXRec p, Eq (LIdP p), Eq (LBooleanFormula p)) => [LBooleanFormula p] -> BooleanFormula p
+mkOr :: Eq (LIdP p) => [BooleanFormula p] -> BooleanFormula p
 mkOr = maybe mkTrue (mkOr' . nub . concat) . mapM fromOr
   where
   -- See Note [Simplification of BooleanFormulas]
-  fromOr bf = case unXRec @p bf of
+  fromOr bf = case  bf of
     (Or xs)  -> Just xs
     (And []) -> Nothing
     _        -> Just [bf]
-  mkOr' [x] = unXRec @p x
-  mkOr' xs = Or xs
+  mkOr' [x] = x
+  mkOr' xs  = Or xs

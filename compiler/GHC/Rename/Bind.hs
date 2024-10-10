@@ -1137,9 +1137,9 @@ renameSig ctxt (FixSig _ fsig)
   = do  { new_fsig <- rnSrcFixityDecl ctxt fsig
         ; return (FixSig noAnn new_fsig, emptyFVs) }
 
-renameSig ctxt sig@(MinimalSig (_, s) (L l bf))
+renameSig ctxt sig@(MinimalSig (_, s) bf)
   = do new_bf <- bfTraverse (lookupSigOccRnN ctxt sig) bf
-       return (MinimalSig (noAnn, s) (L l new_bf), emptyFVs)
+       return (MinimalSig (noAnn, s) new_bf, emptyFVs)
 
 renameSig ctxt sig@(PatSynSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRnN ctxt sig) vs

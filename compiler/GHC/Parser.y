@@ -3701,30 +3701,26 @@ overloaded_label :: { Located (SourceText, FastString) }
 -----------------------------------------------------------------------------
 -- Warnings and deprecations
 
-name_boolformula_opt :: { LBooleanFormula GhcPs }
+name_boolformula_opt :: { BooleanFormula GhcPs }
         : name_boolformula          { $1 }
-        | {- empty -}               { noLocA mkTrue }
+        | {- empty -}               { mkTrue }
 
-name_boolformula :: { LBooleanFormula GhcPs }
-        : name_boolformula_and                      { $1 }
+name_boolformula :: { BooleanFormula GhcPs }
+        : name_boolformula_and       { $1 }
         | name_boolformula_and '|' name_boolformula
-                           {% do { h <- addTrailingVbarL $1 (gl $2)
-                                 ; return (sLLa $1 $> (Or [h,$3])) } }
+                           { (Or [$1, $3]) }
 
-name_boolformula_and :: { LBooleanFormula GhcPs }
-        : name_boolformula_and_list
-                  { sLLa (head $1) (last $1) (And ($1)) }
+name_boolformula_and :: { BooleanFormula GhcPs }
+        : name_boolformula_and_list { (And ($1)) }
 
-name_boolformula_and_list :: { [LBooleanFormula GhcPs] }
-        : name_boolformula_atom                               { [$1] }
+name_boolformula_and_list :: { [BooleanFormula GhcPs] }
+        : name_boolformula_atom  { [$1] }
         | name_boolformula_atom ',' name_boolformula_and_list
-            {% do { h <- addTrailingCommaL $1 (gl $2)
-                  ; return (h : $3) } }
+                                 {  ($1 : $3) }
 
-name_boolformula_atom :: { LBooleanFormula GhcPs }
-        : '(' name_boolformula ')'  {% amsr (sLL $1 $> (Parens $2))
-                                      (AnnList Nothing (Just (mop $1)) (Just (mcp $3)) [] []) }
-        | name_var                  { sL1a $1 (Var $1) }
+name_boolformula_atom :: { BooleanFormula GhcPs }
+        : '(' name_boolformula ')'  {  (Parens $2) }
+        | name_var                  {  (Var $1) }
 
 namelist :: { Located [LocatedN RdrName] }
 namelist : name_var              { sL1 $1 [$1] }

@@ -36,7 +36,7 @@ import Language.Haskell.Syntax.Binds
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprFunBind, pprPatBind )
 import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
-import GHC.Data.BooleanFormula ( LBooleanFormula, pprBooleanFormulaNormal )
+import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormulaNormal )
 import GHC.Types.Tickish
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
@@ -933,8 +933,8 @@ instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
     = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
 
-pprMinimalSig :: OutputableBndrId p  => LBooleanFormula (GhcPass p) -> SDoc
-pprMinimalSig (L _ bf) = pprBooleanFormulaNormal bf
+pprMinimalSig :: OutputableBndrId p  => BooleanFormula (GhcPass p) -> SDoc
+pprMinimalSig = pprBooleanFormulaNormal
 
 {-
 ************************************************************************
