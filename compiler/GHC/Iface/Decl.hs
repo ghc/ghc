@@ -342,13 +342,14 @@ tidyTyConBinders = mapAccumL tidyTyConBinder
 tidyTyVar :: TidyEnv -> TyVar -> IfLclName
 tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
 
-toIfaceBooleanFormula ::  NamedThing (IdP (GhcPass p)) => BooleanFormula (GhcPass p)  -> IfaceBooleanFormula
+toIfaceBooleanFormula ::  NamedThing (IdP (GhcPass p))
+                      => BooleanFormula (GhcPass p)  -> IfaceBooleanFormula
 toIfaceBooleanFormula = go
   where
     go (Var nm   ) = IfVar    $ mkIfLclName . getOccFS . unLoc $ nm
-    go (And bfs  ) = IfAnd    $ map (go . unLoc) bfs
-    go (Or bfs   ) = IfOr     $ map (go . unLoc) bfs
-    go (Parens bf) = IfParens $ go . unLoc $ bf
+    go (And bfs  ) = IfAnd    $ map go bfs
+    go (Or bfs   ) = IfOr     $ map go bfs
+    go (Parens bf) = IfParens $     go bf
 
 traverseIfaceBooleanFormula :: Applicative f
                             => (IfLclName -> f (LIdP (GhcPass p)))
@@ -357,6 +358,6 @@ traverseIfaceBooleanFormula :: Applicative f
 traverseIfaceBooleanFormula f = go
   where
     go (IfVar nm    ) = Var     <$> f nm
-    go (IfAnd ibfs  ) = And     <$> traverse (fmap noLocA . go) ibfs
-    go (IfOr ibfs   ) = Or      <$> traverse (fmap noLocA . go) ibfs
-    go (IfParens ibf) = Parens  <$> (fmap noLocA . go) ibf
+    go (IfAnd ibfs  ) = And     <$> traverse go ibfs
+    go (IfOr ibfs   ) = Or      <$> traverse go ibfs
+    go (IfParens ibf) = Parens  <$> go ibf
