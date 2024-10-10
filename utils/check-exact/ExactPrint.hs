@@ -4950,8 +4950,6 @@ hsLit2String lit =
     HsWord16Prim src v   -> toSourceTextWithSuffix src v ""
     HsWord32Prim src v   -> toSourceTextWithSuffix src v ""
     HsWord64Prim src v   -> toSourceTextWithSuffix src v ""
-    HsInteger    src v _ -> toSourceTextWithSuffix src v ""
-    HsRat        _ fl@(FL{fl_text = src }) _ -> toSourceTextWithSuffix src fl ""
     HsFloatPrim  _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "#"
     HsDoublePrim _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "##"
 

@@ -62,11 +62,26 @@ type instance XHsWord8Prim  (GhcPass _) = SourceText
 type instance XHsWord16Prim (GhcPass _) = SourceText
 type instance XHsWord32Prim (GhcPass _) = SourceText
 type instance XHsWord64Prim (GhcPass _) = SourceText
-type instance XHsInteger    (GhcPass _) = SourceText
-type instance XHsRat        (GhcPass _) = NoExtField
 type instance XHsFloatPrim  (GhcPass _) = NoExtField
 type instance XHsDoublePrim (GhcPass _) = NoExtField
-type instance XXLit         (GhcPass _) = DataConCantHappen
+
+type instance XXLit         GhcPs = DataConCantHappen
+type instance XXLit         GhcRn = DataConCantHappen
+type instance XXLit         GhcTc = HsLitTc
+
+data HsLitTc
+  = HsInteger SourceText Integer Type
+      -- ^ Genuinely an integer; arises only
+      -- from TRANSLATION (overloaded
+      -- literals are done with HsOverLit)
+  | HsRat FractionalLit Type
+      -- ^ Genuinely a rational; arises only from
+      -- TRANSLATION (overloaded literals are
+      -- done with HsOverLit)
+instance Eq HsLitTc where
+  (HsInteger _ x _) == (HsInteger _ y _) = x==y
+  (HsRat x _)       == (HsRat y _)       = x==y
+  _                 == _                 = False
 
 data OverLitRn
   = OverLitRn {
@@ -130,7 +145,7 @@ hsOverLitNeedsParens _ (XOverLit { }) = False
 --
 -- See Note [Printing of literals in Core] in GHC.Types.Literal
 -- for the reasoning.
-hsLitNeedsParens :: PprPrec -> HsLit x -> Bool
+hsLitNeedsParens :: forall x. IsPass x => PprPrec -> HsLit (GhcPass x) -> Bool
 hsLitNeedsParens p = go
   where
     go (HsChar {})        = False
@@ -139,8 +154,6 @@ hsLitNeedsParens p = go
     go (HsMultilineString {}) = False
     go (HsStringPrim {})  = False
     go (HsInt _ x)        = p > topPrec && il_neg x
-    go (HsInteger _ x _)  = p > topPrec && x < 0
-    go (HsRat _ x _)      = p > topPrec && fl_neg x
     go (HsFloatPrim {})   = False
     go (HsDoublePrim {})  = False
     go (HsIntPrim {})     = False
@@ -153,10 +166,18 @@ hsLitNeedsParens p = go
     go (HsWord16Prim {})  = False
     go (HsWord64Prim {})  = False
     go (HsWord32Prim {})  = False
-    go (XLit _)           = False
+    go (XLit x)           = case ghcPass @x of
+      GhcTc -> case x of
+         (HsInteger _ x _) -> p > topPrec && x < 0
+         (HsRat  x _)      -> p > topPrec && fl_neg x
 
--- | Convert a literal from one index type to another
-convertLit :: HsLit (GhcPass p1) -> HsLit (GhcPass p2)
+
+-- | Convert a literal from one index type to another.
+-- The constraint XXLit (GhcPass p)~DataConCantHappen means that once the
+-- XLit constructor is inhabited, we can no longer go back to the case where
+-- its not. In practice it just means you can't just convertLit to go from
+-- (HsLit GhcTc) -> (HsLit GhcPs/GhcRn), while all other conversions are fine.
+convertLit :: XXLit (GhcPass p)~DataConCantHappen => HsLit (GhcPass p) -> HsLit (GhcPass p')
 convertLit (HsChar a x)       = HsChar a x
 convertLit (HsCharPrim a x)   = HsCharPrim a x
 convertLit (HsString a x)     = HsString a x
@@ -173,8 +194,6 @@ convertLit (HsWord8Prim a x)  = HsWord8Prim a x
 convertLit (HsWord16Prim a x) = HsWord16Prim a x
 convertLit (HsWord32Prim a x) = HsWord32Prim a x
 convertLit (HsWord64Prim a x) = HsWord64Prim a x
-convertLit (HsInteger a x b)  = HsInteger a x b
-convertLit (HsRat a x b)      = HsRat a x b
 convertLit (HsFloatPrim a x)  = HsFloatPrim a x
 convertLit (HsDoublePrim a x) = HsDoublePrim a x
 
@@ -194,7 +213,7 @@ Equivalently it's True if
 -}
 
 -- Instance specific to GhcPs, need the SourceText
-instance Outputable (HsLit (GhcPass p)) where
+instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
     ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
@@ -205,8 +224,6 @@ instance Outputable (HsLit (GhcPass p)) where
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))
-    ppr (HsInteger st i _)  = pprWithSourceText st (integer i)
-    ppr (HsRat _ f _)       = ppr f
     ppr (HsFloatPrim _ f)   = ppr f <> primFloatSuffix
     ppr (HsDoublePrim _ d)  = ppr d <> primDoubleSuffix
     ppr (HsIntPrim st i)    = pprWithSourceText st (pprPrimInt i)
@@ -219,6 +236,10 @@ instance Outputable (HsLit (GhcPass p)) where
     ppr (HsWord16Prim st w) = pprWithSourceText st (pprPrimWord16 w)
     ppr (HsWord32Prim st w) = pprWithSourceText st (pprPrimWord32 w)
     ppr (HsWord64Prim st w) = pprWithSourceText st (pprPrimWord64 w)
+    ppr (XLit x)            = case ghcPass @p of
+      GhcTc -> case x of
+         (HsInteger st i _) -> pprWithSourceText st (integer i)
+         (HsRat  f _)       -> ppr f
 
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndrId p
@@ -237,7 +258,7 @@ instance Outputable OverLitVal where
 -- mainly for too reasons:
 --  * We do not want to expose their internal representation
 --  * The warnings become too messy
-pmPprHsLit :: HsLit (GhcPass x) -> SDoc
+pmPprHsLit :: forall p. IsPass p => HsLit (GhcPass p) -> SDoc
 pmPprHsLit (HsChar _ c)       = pprHsChar c
 pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
 pmPprHsLit (HsString st s)    = pprWithSourceText st (pprHsString s)
@@ -254,10 +275,12 @@ pmPprHsLit (HsWord8Prim _ w)  = integer w
 pmPprHsLit (HsWord16Prim _ w) = integer w
 pmPprHsLit (HsWord32Prim _ w) = integer w
 pmPprHsLit (HsWord64Prim _ w) = integer w
-pmPprHsLit (HsInteger _ i _)  = integer i
-pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
+pmPprHsLit (XLit x)           = case ghcPass @p of
+  GhcTc -> case x of
+   (HsInteger _ i _)  -> integer i
+   (HsRat f _)        -> ppr f
 
 negateOverLitVal :: OverLitVal -> OverLitVal
 negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)

@@ -3010,7 +3010,7 @@ repTyVarSig (MkC bndr) = rep2 tyVarSigName [bndr]
 ----------------------------------------------------------
 --              Literals
 
-repLiteral :: HsLit GhcRn -> MetaM (Core TH.Lit)
+repLiteral ::  HsLit GhcRn -> MetaM (Core TH.Lit)
 repLiteral (HsStringPrim _ bs)
   = do word8_ty <- lookupType word8TyConName
        let w8s = unpack bs
@@ -3019,20 +3019,19 @@ repLiteral (HsStringPrim _ bs)
        rep2_nw stringPrimLName [mkListExpr word8_ty w8s_expr]
 repLiteral lit
   = do lit' <- case lit of
-                   HsIntPrim _ i    -> mk_integer i
-                   HsWordPrim _ w   -> mk_integer w
-                   HsInt _ i        -> mk_integer (il_value i)
-                   HsFloatPrim _ r  -> mk_rational r
-                   HsDoublePrim _ r -> mk_rational r
-                   HsCharPrim _ c   -> mk_char c
-                   _ -> return lit
-       lit_expr <- lift $ dsLit lit'
+                   HsIntPrim _ i    -> lift . dsLit <$> mk_integer i
+                   HsWordPrim _ w   -> lift . dsLit <$> mk_integer w
+                   HsInt _ i        -> lift . dsLit <$> mk_integer (il_value i)
+                   HsFloatPrim _ r  -> lift . dsLit <$> mk_rational r
+                   HsDoublePrim _ r -> lift . dsLit <$> mk_rational r
+                   HsCharPrim _ c   -> lift . dsLit <$> mk_char c
+                   _                -> return . lift . dsLit $ lit
+       lit_expr <- lit'
        case mb_lit_name of
           Just lit_name -> rep2_nw lit_name [lit_expr]
           Nothing -> notHandled (ThExoticLiteral lit)
   where
     mb_lit_name = case lit of
-                 HsInteger _ _ _  -> Just integerLName
                  HsInt _ _        -> Just integerLName
                  HsIntPrim _ _    -> Just intPrimLName
                  HsWordPrim _ _   -> Just wordPrimLName
@@ -3042,15 +3041,15 @@ repLiteral lit
                  HsCharPrim _ _   -> Just charPrimLName
                  HsString _ _     -> Just stringLName
                  HsMultilineString _ _ -> Just stringLName
-                 HsRat _ _ _      -> Just rationalLName
                  _                -> Nothing
 
-mk_integer :: Integer -> MetaM (HsLit GhcRn)
-mk_integer  i = return $ HsInteger NoSourceText i integerTy
+mk_integer :: Integer -> MetaM (HsLit GhcTc)
+mk_integer  i = return $ XLit $ HsInteger NoSourceText i integerTy
 
-mk_rational :: FractionalLit -> MetaM (HsLit GhcRn)
+mk_rational :: FractionalLit -> MetaM (HsLit GhcTc)
 mk_rational r = do rat_ty <- lookupType rationalTyConName
-                   return $ HsRat noExtField r rat_ty
+                   return $ XLit $ HsRat r rat_ty
+
 mk_string :: FastString -> MetaM (HsLit GhcRn)
 mk_string s = return $ HsString NoSourceText s
 
@@ -3059,15 +3058,25 @@ mk_char c = return $ HsChar NoSourceText c
 
 repOverloadedLiteral :: HsOverLit GhcRn -> MetaM (Core TH.Lit)
 repOverloadedLiteral (OverLit { ol_val = val})
-  = do { lit <- mk_lit val; repLiteral lit }
-        -- The type Rational will be in the environment, because
-        -- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
-        -- and rationalL is sucked in when any TH stuff is used
+  = repOverLiteralVal val
+    -- The type Rational will be in the environment, because
+    -- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
+    -- and rationalL is sucked in when any TH stuff is used
 
-mk_lit :: OverLitVal -> MetaM (HsLit GhcRn)
-mk_lit (HsIntegral i)     = mk_integer  (il_value i)
-mk_lit (HsFractional f)   = mk_rational f
-mk_lit (HsIsString _ s)   = mk_string   s
+repOverLiteralVal ::  OverLitVal -> MetaM (Core TH.Lit)
+repOverLiteralVal lit = do
+  lit' <- case lit of
+        (HsIntegral i)   -> lift . dsLit <$> mk_integer  (il_value i)
+        (HsFractional f) -> lift . dsLit <$> mk_rational f
+        (HsIsString _ s) -> lift . dsLit <$> mk_string   s
+  lit_expr <- lit'
+
+  let lit_name = case lit of
+        (HsIntegral _  ) -> integerLName
+        (HsFractional _) -> rationalLName
+        (HsIsString _ _) -> stringLName
+
+  rep2_nw lit_name [lit_expr]
 
 repRdrName :: RdrName -> MetaM (Core TH.Name)
 repRdrName rdr_name = do

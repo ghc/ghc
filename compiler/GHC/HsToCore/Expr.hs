@@ -275,7 +275,7 @@ dsExpr (HsProjection x _)     = dataConCantHappen x
 
 dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit
-       ; dsLit (convertLit lit) }
+       ; dsLit lit }
 
 dsExpr (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
