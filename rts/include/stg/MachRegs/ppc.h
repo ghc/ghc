@@ -60,6 +60,3 @@
 #define REG_SpLim       r25
 #define REG_Hp          r26
 #define REG_Base        r27
-
-#define MAX_REAL_FLOAT_REG   6
-#define MAX_REAL_DOUBLE_REG  6
