@@ -308,7 +308,7 @@ type HsContext pass = [LHsType pass]
 data HsModifierOf ty pass = HsModifier !(XModifier pass) ty
 type family XModifier pass
 
-type HsModifier pass = HsModifierOf (LHsType pass) pass
+type HsModifier pass = HsModifierOf (LHsType (NoGhcTc pass)) (NoGhcTc pass)
 
 -- | Located Haskell Type
 type LHsType pass = XRec pass (HsType pass)
