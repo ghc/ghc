@@ -3011,7 +3011,7 @@ instance ExactPrint (AnnDecl GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (BF.BooleanFormula GhcPs) where
+instance ExactPrint (BF.BooleanFormula RdrName) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
@@ -4697,7 +4697,7 @@ instance ExactPrint (LocatedL [LocatedA (ConDeclField GhcPs)]) where
     (an', fs') <- markAnnList an (markAnnotated fs)
     return (L an' fs')
 
-instance ExactPrint (LocatedL (BF.BooleanFormula GhcPs)) where
+instance ExactPrint (LocatedL (BF.BooleanFormula RdrName)) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
   exact (L an bf) = do
