@@ -38,7 +38,7 @@ import Language.Haskell.Syntax.Binds
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprFunBind, pprPatBind )
 import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
-import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormulaNormal )
+import GHC.Data.BooleanFormula ( BooleanFormula )
 import GHC.Types.Tickish
 import GHC.Hs.Extension
 import GHC.Parser.Annotation

@@ -126,13 +126,11 @@ import GHC.Types.Error
 import GHC.Fingerprint
 
 import Control.Monad
-import GHC.Parser.Annotation
 import GHC.Driver.Env.KnotVars
 import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.Function ( on )
-import Data.List (nub)
 import Data.List.NonEmpty ( NonEmpty )
 import qualified Data.List.NonEmpty as NE
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)

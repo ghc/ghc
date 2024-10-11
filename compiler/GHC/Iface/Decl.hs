@@ -32,23 +32,19 @@ import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 
-import GHC.Hs.Extension ( GhcPass )
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.TyThing
-import GHC.Types.SrcLoc
 
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import GHC.Data.Maybe
-import GHC.Data.BooleanFormula
 
 import Data.List ( findIndex, mapAccumL )
-import Language.Haskell.Syntax.Extension (IdP, LIdP)
 
 {-
 ************************************************************************

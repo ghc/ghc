@@ -34,7 +34,6 @@ import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
 import GHC.Data.BooleanFormula (BooleanFormula(..))
-import Language.Haskell.Syntax.Extension (Anno)
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------

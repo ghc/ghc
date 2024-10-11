@@ -19,7 +19,7 @@ module GHC.Iface.Syntax (
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceWarnings(..), IfaceWarningTxt(..), IfaceStringLiteral(..),
         IfaceDefault(..), IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
-        IfaceClassBody(..), IfaceBooleanFormula(..),
+        IfaceClassBody(..), IfaceBooleanFormula,
         IfaceBang(..),
         IfaceSrcBang(..), SrcUnpackedness(..), SrcStrictness(..),
         IfaceAxBranch(..),
@@ -100,7 +100,6 @@ import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
 import Data.Proxy
-import Data.List ( intersperse )
 
 infixl 3 &&&
 
