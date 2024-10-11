@@ -115,7 +115,7 @@ Library
 
     build-depends:
         rts == 1.0.*,
-        ghc-prim >= 0.11 && < 0.12,
+        ghc-prim >= 0.11 && < 0.14,
 
     exposed-modules:
         GHC.Internal.ClosureTypes

@@ -49,7 +49,7 @@ Library
             GHC.Lexeme
 
     build-depends:
-        base       >= 4.7 && < 4.21,
+        base       >= 4.7 && < 4.22,
         ghc-prim,
         pretty      == 1.1.*
 

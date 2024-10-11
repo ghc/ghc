@@ -47,6 +47,7 @@ ghcWarningsArgs = do
         , package directory    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" -- https://gitlab.haskell.org/ghc/ghc/-/issues/24240
                                       ]
+        , package fileio       ? pure [ "-Wno-unused-imports" ] -- https://github.com/haskell/file-io/issues/30
         , package ghc          ? pure [ "-Wcpp-undef"
                                       , "-Wincomplete-uni-patterns"
                                       , "-Wincomplete-record-updates"
@@ -71,7 +72,7 @@ ghcWarningsArgs = do
                                       , "-Wno-unused-imports" ]
         , package terminfo     ? pure [ "-Wno-unused-imports", "-Wno-deriving-typeable" ]
         , package stm          ? pure [ "-Wno-deriving-typeable" ]
-        , package osString     ? pure [ "-Wno-deriving-typeable" ]
+        , package osString     ? pure [ "-Wno-deriving-typeable", "-Wno-unused-imports" ]
         , package parsec       ? pure [ "-Wno-deriving-typeable" ]
 
         , package cabal        ? pure [ "-Wno-deriving-typeable", "-Wno-incomplete-record-selectors" ]

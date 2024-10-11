@@ -3,7 +3,7 @@
 -- template-haskell.cabal.
 
 name:           template-haskell
-version:        2.22.1.0
+version:        2.23.0.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE
@@ -52,7 +52,7 @@ Library
         Language.Haskell.TH.CodeDo
 
     build-depends:
-        base        >= 4.11 && < 4.21,
+        base        >= 4.11 && < 4.22,
         ghc-boot-th == @ProjectVersionMunged@
 
     other-modules:
