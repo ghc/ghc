@@ -316,6 +316,10 @@ mkTick t orig_expr = mkTick' id id orig_expr
           -> CoreExpr               -- current expression
           -> CoreExpr
   mkTick' top rest expr = case expr of
+    -- Float ticks into unsafe coerce.
+    Case scrut bndr ty alts@[Alt ac abs _rhs]
+      | Just rhs <- isUnsafeEqualityCase scrut bndr alts
+      -> mkTick' (\e -> Case scrut bndr ty [Alt ac abs e]) rest rhs
 
     -- Cost centre ticks should never be reordered relative to each
     -- other. Therefore we can stop whenever two collide.
@@ -1251,7 +1255,7 @@ Note [Tick trivial]
 Ticks are only trivial if they are pure annotations. If we treat
 "tick<n> x" as trivial, it will be inlined inside lambdas and the
 entry count will be skewed, for example.  Furthermore "scc<n> x" will
-turn into just "x" in mkTick.
+turn into just "x" in mkTick. At least if `x` is not a function.
 
 Note [Empty case is trivial]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

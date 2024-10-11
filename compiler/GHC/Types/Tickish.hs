@@ -295,13 +295,15 @@ tickishCanSplit _  = False
 mkNoCount :: GenTickish pass -> GenTickish pass
 mkNoCount n | not (tickishCounts n)   = n
             | not (tickishCanSplit n) = panic "mkNoCount: Cannot split!"
-mkNoCount n@ProfNote{}                = n {profNoteCount = False}
+mkNoCount n@ProfNote{}                = let n' = n {profNoteCount = False}
+                                        in assert (profNoteCount n) n'
 mkNoCount _                           = panic "mkNoCount: Undefined split!"
 
 mkNoScope :: GenTickish pass -> GenTickish pass
 mkNoScope n | tickishScoped n == NoScope  = n
             | not (tickishCanSplit n)     = panic "mkNoScope: Cannot split!"
-mkNoScope n@ProfNote{}                    = n {profNoteScope = False}
+mkNoScope n@ProfNote{}                    = let n' = n {profNoteScope = False}
+                                            in assert (profNoteCount n) n'
 mkNoScope _                               = panic "mkNoScope: Undefined split!"
 
 -- | Return @True@ if this source annotation compiles to some backend
