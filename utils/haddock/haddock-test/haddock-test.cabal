@@ -16,7 +16,7 @@ library
   default-language: Haskell2010
   ghc-options: -Wall
   hs-source-dirs:   src
-  build-depends:    base >= 4.3 && < 4.21, bytestring, directory, process, filepath, Cabal
+  build-depends:    base >= 4.3 && < 4.22, bytestring, directory, process, filepath, Cabal
 
   exposed-modules:
     Test.Haddock
