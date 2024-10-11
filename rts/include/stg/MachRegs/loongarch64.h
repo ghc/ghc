@@ -46,6 +46,3 @@
 #define REG_D2          fs5
 #define REG_D3          fs6
 #define REG_D4          fs7
-
-#define MAX_REAL_FLOAT_REG   4
-#define MAX_REAL_DOUBLE_REG  4
