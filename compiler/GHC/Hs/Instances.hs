@@ -591,5 +591,5 @@ deriving instance Data XViaStrategyPs
 
 -- ---------------------------------------------------------------------
 
-deriving instance (Typeable p, Data (Anno (IdGhcP p)), Data (IdGhcP p)) => Data (BooleanFormula (GhcPass p))
+deriving instance Data a => Data (BooleanFormula a)
 ---------------------------------------------------------------------

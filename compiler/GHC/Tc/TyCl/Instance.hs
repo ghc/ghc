@@ -1889,7 +1889,7 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
         --
         -- See Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors,
         -- point (D).
-        whenIsJust (isUnsatisfied (methodExists . unLoc) (classMinimalDef clas)) $
+        whenIsJust (isUnsatisfied methodExists (classMinimalDef clas)) $
         warnUnsatisfiedMinimalDefinition
 
     methodExists meth = isJust (findMethodBind meth binds prag_fn)

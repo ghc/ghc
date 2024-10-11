@@ -43,6 +43,7 @@ module GHC.CoreToIface
     , toIfaceVar
       -- * Other stuff
     , toIfaceLFInfo
+    , toIfaceBooleanFormula
       -- * CgBreakInfo
     , dehydrateCgBreakInfo
     ) where
@@ -88,6 +89,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Data.Maybe ( isNothing, catMaybes )
+import Language.Haskell.Syntax.BooleanFormula (BooleanFormula)
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -688,6 +690,10 @@ toIfaceLFInfo nm lfi = case lfi of
       IfLFUnlifted
     LFLetNoEscape ->
       panic "toIfaceLFInfo: LFLetNoEscape"
+
+toIfaceBooleanFormula :: NamedThing a
+                      => BooleanFormula a -> IfaceBooleanFormula
+toIfaceBooleanFormula = fmap (mkIfLclName . getOccFS)
 
 -- Dehydrating CgBreakInfo
 

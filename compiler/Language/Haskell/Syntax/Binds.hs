@@ -465,7 +465,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | MinimalSig (XMinimalSig pass) (BooleanFormula pass)
+  | MinimalSig (XMinimalSig pass) (BooleanFormula (LIdP pass))
 
         -- | A "set cost centre" pragma for declarations
         --

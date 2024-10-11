@@ -80,7 +80,6 @@ import Control.Monad
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import GHC.Types.Unique.DSet (mkUniqDSet)
-import GHC.Data.BooleanFormula (bfTraverse)
 
 {-
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -1138,7 +1137,7 @@ renameSig ctxt (FixSig _ fsig)
         ; return (FixSig noAnn new_fsig, emptyFVs) }
 
 renameSig ctxt sig@(MinimalSig (_, s) bf)
-  = do new_bf <- bfTraverse (lookupSigOccRnN ctxt sig) bf
+  = do new_bf <- traverse (lookupSigOccRnN ctxt sig) bf
        return (MinimalSig (noAnn, s) new_bf, emptyFVs)
 
 renameSig ctxt sig@(PatSynSig _ vs ty)

@@ -344,7 +344,7 @@ tcClassMinimalDef _clas sigs op_info
   where
     -- By default require all methods without a default implementation
     defMindef :: ClassMinimalDef
-    defMindef = mkAnd [ mkVar (noLocA name)
+    defMindef = mkAnd [ mkVar name
                       | (name, _, Nothing) <- op_info ]
 
 instantiateMethod :: Class -> TcId -> [TcType] -> TcType
@@ -402,8 +402,8 @@ findMinimalDef :: [LSig GhcRn] -> Maybe ClassMinimalDef
 findMinimalDef = firstJusts . map toMinimalDef
   where
     toMinimalDef :: LSig GhcRn -> Maybe ClassMinimalDef
-    toMinimalDef (L _ (MinimalSig _ bf)) = Just bf
-    toMinimalDef _                             = Nothing
+    toMinimalDef (L _ (MinimalSig _ bf)) = Just $ fmap unLoc bf
+    toMinimalDef _                       = Nothing
 
 {-
 Note [Polymorphic methods]

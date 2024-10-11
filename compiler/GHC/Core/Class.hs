@@ -26,7 +26,6 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, PredType )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
-import GHC.Hs.Extension (GhcRn)
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -136,7 +135,7 @@ data TyFamEqnValidityInfo
       -- Note [Type-checking default assoc decls] in GHC.Tc.TyCl.
     }
 
-type ClassMinimalDef = BooleanFormula GhcRn -- Required methods
+type ClassMinimalDef = BooleanFormula Name -- Required methods
 
 data ClassBody
   = AbstractClass

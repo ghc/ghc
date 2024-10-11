@@ -13,6 +13,8 @@
                                       -- in module Language.Haskell.Syntax.Extension
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -933,8 +935,9 @@ instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
     = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
 
-pprMinimalSig :: OutputableBndrId p  => BooleanFormula (GhcPass p) -> SDoc
-pprMinimalSig = pprBooleanFormulaNormal
+pprMinimalSig :: (OutputableBndr name)
+              => BooleanFormula (GenLocated l name) -> SDoc
+pprMinimalSig bf = ppr (fmap unLoc bf)
 
 {-
 ************************************************************************

@@ -177,7 +177,7 @@ tyThingToLHsDecl prr t = case t of
                       $ snd
                       $ classTvsFds cl
                 , tcdSigs =
-                    noLocA (MinimalSig (noAnn, NoSourceText) $ classMinimalDef cl)
+                    noLocA (MinimalSig (noAnn, NoSourceText) . fmap noLocA $ classMinimalDef cl)
                       : [ noLocA tcdSig
                         | clsOp <- classOpItems cl
                         , tcdSig <- synifyTcIdSig vs clsOp

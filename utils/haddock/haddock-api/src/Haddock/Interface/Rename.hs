@@ -773,21 +773,12 @@ renameSig sig = case sig of
     lnames' <- mapM renameNameL lnames
     return $ FixSig noExtField (FixitySig noExtField lnames' fixity)
   MinimalSig _ s -> do
-    s' <- bfTraverse (traverse lookupRn) s
+    s' <- traverse (traverse lookupRn) s
     return $ MinimalSig noExtField s'
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
 
-bfTraverse  :: Applicative f
-            => (LIdP (GhcPass p) -> f (LIdP DocNameI))
-            -> BooleanFormula (GhcPass p)
-            -> f (BooleanFormula DocNameI)
-bfTraverse f = go 
-  where 
-    go (Var    a  ) = Var    <$> f a
-    go (And    bfs) = And    <$> traverse @[] go bfs
-    go (Or     bfs) = Or     <$> traverse @[] go bfs
-    go (Parens bf ) = Parens <$>              go bf
+
 
 renameForD :: ForeignDecl GhcRn -> RnM (ForeignDecl DocNameI)
 renameForD (ForeignImport _ lname ltype x) = do

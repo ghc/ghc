@@ -6,6 +6,7 @@
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module GHC.Iface.Syntax (
         module GHC.Iface.Type,
@@ -91,6 +92,9 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
+
+import Language.Haskell.Syntax.BooleanFormula (BooleanFormula(..))
+import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
 
 import Control.Monad
 import System.IO.Unsafe
@@ -212,12 +216,7 @@ data IfaceClassBody
      ifMinDef    :: IfaceBooleanFormula       -- Minimal complete definition
     }
 
-data IfaceBooleanFormula
-  = IfVar IfLclName
-  | IfAnd [IfaceBooleanFormula]
-  | IfOr [IfaceBooleanFormula]
-  | IfParens IfaceBooleanFormula
-  deriving Eq
+type IfaceBooleanFormula = BooleanFormula IfLclName
 
 data IfaceTyConParent
   = IfNoParent
@@ -1033,28 +1032,11 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
         | otherwise     = Nothing
 
       pprMinDef :: IfaceBooleanFormula -> SDoc
-      pprMinDef minDef = ppUnless (ifLclIsTrue minDef) $ -- hide empty definitions
+      pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
         text "{-# MINIMAL" <+>
-        pprifLclBooleanFormula
+        pprBooleanFormula
           (\_ def -> let fs = ifLclNameFS def in cparen (isLexSym fs) (ppr fs)) 0 minDef <+>
         text "#-}"
-
-      ifLclIsTrue :: IfaceBooleanFormula -> Bool
-      ifLclIsTrue (IfAnd []) = True
-      ifLclIsTrue _          = False
-
-      pprifLclBooleanFormula  :: (Rational -> IfLclName -> SDoc)
-                              -> Rational -> IfaceBooleanFormula -> SDoc
-      pprifLclBooleanFormula pprVar = go
-        where
-        go p (IfVar x)  = pprVar p x
-        go p (IfAnd []) = cparen (p > 0) empty
-        go p (IfAnd xs) = pprAnd p (map (go 3) xs)
-        go _ (IfOr  []) = keyword $ text "FALSE"
-        go p (IfOr  xs) = pprOr p (map (go 2) xs)
-        go p (IfParens x) = go p x
-        pprAnd p = cparen (p > 3) . fsep . punctuate comma
-        pprOr  p = cparen (p > 2) . fsep . intersperse vbar
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
       suppress_bndr_sig = SuppressBndrSig True
@@ -2146,17 +2128,17 @@ instance Binary IfaceDecl where
 
 instance Binary IfaceBooleanFormula where
     put_ bh = \case
-        IfVar a1    -> putByte bh 0 >> put_ bh a1
-        IfAnd a1    -> putByte bh 1 >> put_ bh a1
-        IfOr a1     -> putByte bh 2 >> put_ bh a1
-        IfParens a1 -> putByte bh 3 >> put_ bh a1
+        Var a1    -> putByte bh 0 >> put_ bh a1
+        And a1    -> putByte bh 1 >> put_ bh a1
+        Or a1     -> putByte bh 2 >> put_ bh a1
+        Parens a1 -> putByte bh 3 >> put_ bh a1
 
     get bh = do
         getByte bh >>= \case
-            0 -> IfVar    <$> get bh
-            1 -> IfAnd    <$> get bh
-            2 -> IfOr     <$> get bh
-            _ -> IfParens <$> get bh
+            0 -> Var    <$> get bh
+            1 -> And    <$> get bh
+            2 -> Or     <$> get bh
+            _ -> Parens <$> get bh
 
 {- Note [Lazy deserialization of IfaceId]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2813,10 +2795,10 @@ instance NFData IfaceClassBody where
 
 instance NFData IfaceBooleanFormula where
   rnf = \case
-      IfVar f1    -> rnf f1
-      IfAnd f1    -> rnf f1
-      IfOr f1     -> rnf f1
-      IfParens f1 -> rnf f1
+      Var f1    -> rnf f1
+      And f1    -> rnf f1
+      Or f1     -> rnf f1
+      Parens f1 -> rnf f1
 
 instance NFData IfaceAT where
   rnf (IfaceAT f1 f2) = rnf f1 `seq` rnf f2
