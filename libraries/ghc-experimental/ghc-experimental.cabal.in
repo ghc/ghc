@@ -39,7 +39,7 @@ library
     if arch(wasm32)
         exposed-modules:  GHC.Wasm.Prim
     other-extensions:
-    build-depends:    base ^>=4.20,
+    build-depends:    base >=4.20 && < 4.22,
                       ghc-internal == @ProjectVersionForLib@.*,
                       ghc-prim >= 0.11 && < 0.12
     hs-source-dirs:   src

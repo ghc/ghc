@@ -52,7 +52,7 @@ Library
         Language.Haskell.TH.CodeDo
 
     build-depends:
-        base        >= 4.11 && < 4.21,
+        base        >= 4.11 && < 4.22,
         ghc-boot-th == @ProjectVersionMunged@
 
     other-modules:
