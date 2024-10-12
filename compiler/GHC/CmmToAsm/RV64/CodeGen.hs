@@ -614,6 +614,21 @@ getRegister' config plat expr =
                 )
             )
         CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (pdoc plat expr)
+
+        CmmVec lits |
+          VecFormat l sFmt <- cmmTypeFormat $ cmmLitType plat lit
+          , (f:fs) <- lits
+          , all (== f) fs ->  do
+              -- All vector elements are equal literals -> broadcast (splat)
+              let w = scalarWidth sFmt
+                  broadcast = if isFloatScalarFormat sFmt
+                              then MO_VF_Broadcast l w
+                              else MO_V_Broadcast l w
+                  fmt = cmmTypeFormat $ cmmLitType plat lit
+              (reg, format,code) <- getSomeReg $ CmmMachOp broadcast [CmmLit f]
+              return $ Any fmt (\dst -> code `snocOL` annExpr expr
+                                          (MOV (OpReg w dst) (OpReg (formatToWidth format) reg)))
+
         CmmVec _lits -> pprPanic "getRegister' (CmmLit:CmmVec): " (pdoc plat expr)
         CmmLabel lbl -> do
           let op = OpImm (ImmCLbl lbl)
@@ -795,6 +810,23 @@ getRegister' config plat expr =
         MO_AlignmentCheck align wordWidth -> do
           reg <- getRegister' config plat e
           addAlignmentCheck align wordWidth reg
+
+        --TODO: MO_V_Broadcast with immediate: If the right value is a literal,
+        -- it may use vmv.v.i (simpler)
+        MO_V_Broadcast _length w -> do
+          (reg_idx, format_idx, code_idx) <- getSomeReg e
+          let w_idx = formatToWidth format_idx
+          pure $ Any (intFormat w) $ \dst ->
+            code_idx `snocOL`
+            annExpr expr (VMV (OpReg w dst) (OpReg w_idx reg_idx))
+
+        MO_VF_Broadcast _length w -> do
+          (reg_idx, format_idx, code_idx) <- getSomeReg e
+          let w_idx = formatToWidth format_idx
+          pure $ Any (intFormat w) $ \dst ->
+            code_idx `snocOL`
+            annExpr expr (VMV (OpReg w dst) (OpReg w_idx reg_idx))
+
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
         -- In the case of 16- or 8-bit values we need to sign-extend to 32-bits
@@ -1125,7 +1157,53 @@ getRegister' config plat expr =
         MO_Shl w -> intOp False w (\d x y -> unitOL $ annExpr expr (SLL d x y))
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (SRL d x y))
         MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (SRA d x y))
-        op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ pprMachOp op <+> text "in" <+> pdoc plat expr
+
+        MO_VF_Extract length w -> do
+          (reg_v, format_v, code_v) <- getSomeReg x
+          (reg_idx, format_idx, code_idx) <- getSomeReg y
+          let tmpFormat = VecFormat length (floatScalarFormat w)
+              width_v = formatToWidth format_v
+          tmp <- getNewRegNat tmpFormat
+          pure $ Any (floatFormat w) $ \dst ->
+            code_v `appOL`
+            code_idx `snocOL`
+            -- Setup
+            -- vsetivli zero, 1, e32, m1, ta, ma
+            annExpr expr (VSETIVLI zeroReg 1 W32 M1 TA MA) `snocOL`
+            -- Move selected element to index 0
+            -- vslidedown.vi v8, v9, 2
+            VSLIDEDOWN (OpReg width_v tmp) (OpReg width_v reg_v) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
+            -- Move to float register
+            -- vmv.x.s a0, v8
+            VMV (OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
+
+        _e -> panic $ "Missing operation " ++ show expr
+
+        -- Vectors
+
+        --TODO: MO_V_Broadcast with immediate: If the right value is a literal,
+        -- it may use vmv.v.i (simpler)
+--        MO_V_Broadcast _length w -> do
+--          (reg_v, format_v, code_v) <- getSomeReg x
+--          (reg_idx, format_idx, code_idx) <- getSomeReg y
+--          let w_v = formatToWidth format_v
+--              w_idx = formatToWidth format_idx
+--          pure $ Any (intFormat w) $ \dst ->
+--            code_v `appOL`
+--            code_idx `snocOL`
+--            annExpr expr (VMV (OpReg w_v reg_v) (OpReg w_idx reg_idx)) `snocOL`
+--            MOV (OpReg w dst) (OpReg w_v reg_v)
+--
+--        MO_VF_Broadcast _length w -> do
+--          (reg_v, format_v, code_v) <- getSomeReg x
+--          (reg_idx, format_idx, code_idx) <- getSomeReg y
+--          let w_v = formatToWidth format_v
+--              w_idx = formatToWidth format_idx
+--          pure $ Any (intFormat w) $ \dst ->
+--            code_v `appOL`
+--            code_idx `snocOL`
+--            annExpr expr (VMV (OpReg w_v reg_v) (OpReg w_idx reg_idx)) `snocOL`
+--            MOV (OpReg w dst) (OpReg w_v reg_v)
 
     -- Generic ternary case.
     CmmMachOp op [x, y, z] ->
@@ -1145,6 +1223,30 @@ getRegister' config plat expr =
                 FNMSub -> float3Op w (\d n m a -> unitOL $ FMA FNMAdd d n m a)
           | otherwise
           -> sorry "The RISCV64 backend does not (yet) support vectors."
+        -- TODO: Implement length as immediate
+        MO_VF_Insert length w ->
+          do
+            (reg_v, format_v, code_v) <- getSomeReg x
+            (reg_f, format_f, code_f) <- getFloatReg y
+            (reg_idx, format_idx, code_idx) <- getSomeReg z
+            (reg_l, format_l, code_l) <- getSomeReg (CmmLit (CmmInt (toInteger length) W64))
+            tmp <- getNewRegNat (VecFormat length (floatScalarFormat w))
+            -- TODO: FmtInt8 should be FmtInt1 (which does not exist yet, so we're lying here)
+            reg_mask <- getNewRegNat (VecFormat length FmtInt8)
+            let targetFormat = VecFormat length (floatScalarFormat w)
+            pure $ Any targetFormat $ \dst ->
+              code_v `appOL`
+              code_f `appOL`
+              code_idx `appOL`
+              code_l `snocOL`
+              -- Build mask for index
+              -- 1. fill elements with index numbers
+              -- TODO: The Width is made up
+              annExpr expr (VID (OpReg W8 reg_mask) (OpReg (formatToWidth format_l) reg_l)) `snocOL`
+              -- Merge with mask -> set element at index
+              VMSEQ (OpReg W8 reg_mask) (OpReg W8 reg_mask) (OpReg (formatToWidth format_f) reg_f) `snocOL`
+              VMERGE (OpReg (formatToWidth format_v) dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg (formatToWidth format_f) reg_f) (OpReg W8 reg_mask)
+
         _ ->
           pprPanic "getRegister' (unhandled ternary CmmMachOp): "
             $ pprMachOp op
@@ -2213,6 +2315,12 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       FMIN {} -> 1
       FMAX {} -> 1
       FMA {} -> 1
+      VMV {} -> 1
+      VID {} -> 1
+      VMSEQ {} -> 1
+      VMERGE {} -> 1
+      VSLIDEDOWN {} -> 1
+      VSETIVLI {} -> 1
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1
       BCOND {} -> long_bc_jump_size

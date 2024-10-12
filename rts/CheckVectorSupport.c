@@ -64,18 +64,20 @@ int checkVectorSupport(void) {
     supports_V32 = hwcap & PPC_FEATURE_HAS_VSX;
 */
 
-  #elif defined(__riscv)
-// csrr instruction nott allowed in user-mode qemu emulation of riscv
-// Backend doesn't yet support vector registers, so hard-coded to no vector support
-// for now.
-//
-//    unsigned long vlenb;
-//    asm volatile ("csrr %0, vlenb" : "=r" (vlenb));
-    // VLENB gives the length in bytes
-    supports_V16 = 0;
-    supports_V32 = 0;
-    supports_V64 = 0;
+  #elif defined(__riscv_v) && defined(__riscv_v_intrinsic)
+    // __riscv_v ensures we only get here when the compiler target (arch)
+    // supports vectors.
 
+    // TODO: Check the machine supports V extension 1.0. Or, implement the older
+    // comman versions.
+    #include <riscv_vector.h>
+
+    unsigned vlenb = __riscv_vlenb();
+
+    // VLENB gives the length in bytes
+    supports_V16 = vlenb >= 16;
+    supports_V32 = vlenb >= 32;
+    supports_V64 = vlenb >= 64;
   #else
     // On other platforms, we conservatively return no vector support.
     supports_V16 = 0;

@@ -677,6 +677,13 @@ pprInstr platform instr = case instr of
           FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
           FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
      in op4 fma d r1 r2 r3
+  VMV o1 o2 -> op2 (text "\tvmv.v.x") o1 o2
+  VID o1 o2 -> op2 (text "\tvid.v") o1 o2
+  VMSEQ o1 o2 o3 -> op3 (text "\tvmseq.v.x") o1 o2 o3
+  VMERGE o1 o2 o3 o4 -> op4 (text "\tvmerge.vxm") o1 o2 o3 o4
+  VSLIDEDOWN o1 o2 o3 -> op3 (text "\tvslidedown.vx") o1 o2 o3
+  VSETIVLI dst len width grouping ta ma -> line $
+    text "\tvsetivli" <+> pprReg W64 dst <> comma <+> (text.show) len <> comma <+> pprVWidth width <> comma <+> pprGrouping grouping <> comma <+> pprTA ta <> comma <+> pprMasking ma
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op2 op o1 o2 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
@@ -689,6 +696,27 @@ pprInstr platform instr = case instr of
       | isSingleOp o = text "s"
       | isDoubleOp o = text "d"
       | otherwise = pprPanic "Impossible floating point precission: " (pprOp platform o)
+
+    pprTA TA = text "ta"
+    pprTA TU = text "tu"
+
+    pprVWidth :: IsLine doc => Width -> doc
+    pprVWidth W8 = text "e8"
+    pprVWidth W16 = text "e16"
+    pprVWidth W32 = text "e32"
+    pprVWidth W64 = text "e64"
+    pprVWidth w = panic $ "Unsupported vector element size: " ++ show w
+
+    pprGrouping MF2 = text "mf2"
+    pprGrouping MF4 = text "mf4"
+    pprGrouping MF8 = text "mf8"
+    pprGrouping M1 = text "m1"
+    pprGrouping M2 = text "m2"
+    pprGrouping M4 = text "m4"
+    pprGrouping M8 = text "m8"
+
+    pprMasking MA = text "ma"
+    pprMasking MU = text "mu"
 
 floatOpPrecision :: Platform -> Operand -> Operand -> String
 floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingleOp r = "s" -- single precision
