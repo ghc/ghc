@@ -5,5 +5,4 @@
 test('recomp007', [ extra_files(['Setup.hs', 'a1/', 'a2/', 'b/'])
                   , when(fast(), skip)
                   , normalise_slashes
-                  , js_broken(22349)
                   ], makefile_test, [])
