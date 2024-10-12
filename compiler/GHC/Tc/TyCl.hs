@@ -3946,8 +3946,9 @@ tcRecConDeclFields exp_kind fields
     (_,btys) = unzip exploded
 
 tcDataConMult :: HsArrow GhcRn -> TcM Mult
-tcDataConMult arr@(HsUnrestrictedArrow _) = do
+tcDataConMult arr@(HsStandardArrow _ []) = do
   -- See Note [Function arrows in GADT constructors]
+  -- MODS_TODO this means something with non-multiplicity modifiers is treated different than something with no modifiers. Maybe use `tcMult` and handle Nothing as One given -XNoLinearTypes?
   linearEnabled <- xoptM LangExt.LinearTypes
   if linearEnabled then tcArrow arr else return oneDataConTy
 tcDataConMult arr = tcArrow arr

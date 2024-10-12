@@ -1312,9 +1312,8 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u =
   where
     -- MODS_TODO: need to ppr modifiers
     arr = case mult of
+      HsStandardArrow _ _ -> arrow u
       HsLinearArrow _ _ -> lollipop u
-      HsUnrestrictedArrow _ -> arrow u
-      HsExplicitMult _ _ -> arrow u
 ppr_mono_ty (HsBangTy _ b ty) u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
 ppr_mono_ty (HsTyVar _ IsPromoted (L _ name)) _ = char '\'' <> ppDocName name

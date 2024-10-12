@@ -22,7 +22,7 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 module Language.Haskell.Syntax.Type (
         HsScaled(..),
         hsMult, hsScaledThing,
-        HsArrow, HsArrowOf(..), XUnrestrictedArrow, XLinearArrow, XExplicitMult, XXArrow,
+        HsArrow, HsArrowOf(..), XStandardArrow, XLinearArrow, XXArrow,
 
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
@@ -1028,29 +1028,19 @@ data HsTyLit pass
 type HsArrow pass = HsArrowOf (LHsType pass) pass
 
 -- | Denotes the type of arrows in the surface language
---
--- MODS_TODO: do we want to keep HsUnrestrictedArrow? Anyway improve comments.
--- And, do we want a function HsArrow -> [HsModifier] (or [LHsType]), that adds
--- %One for linear arrows?
 data HsArrowOf ty pass
-  = HsUnrestrictedArrow !(XUnrestrictedArrow ty pass)
-    -- ^ a -> b or a → b
+  = HsStandardArrow !(XStandardArrow ty pass) [HsModifierOf ty pass]
+    -- ^ a -> b or a → b, optionally with modifiers (including a %1 -> b).
 
   | HsLinearArrow !(XLinearArrow ty pass) [HsModifierOf ty pass]
-    -- ^ a %1 -> b or a %1 → b, or a ⊸ b
-
-  | HsExplicitMult !(XExplicitMult ty pass) [HsModifierOf ty pass]
-    -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
-    -- This is how the programmer wrote it). It is stored as an
-    -- `HsType` so as to preserve the syntax as written in the
-    -- program.
+    -- ^ a ⊸ b, optionally with modifiers. Can also show up in places where no
+    -- arrow is written explicitly.
 
   | XArrow !(XXArrow ty pass)
 
-type family XUnrestrictedArrow mult p
-type family XLinearArrow       mult p
-type family XExplicitMult      mult p
-type family XXArrow            mult p
+type family XStandardArrow mult p
+type family XLinearArrow   mult p
+type family XXArrow        mult p
 
 -- | This is used in the syntax. In constructor declaration. It must keep the
 -- arrow representation.

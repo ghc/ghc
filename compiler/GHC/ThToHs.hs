@@ -1693,7 +1693,7 @@ cvtTypeKind typeOrKind ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnLA (HsFunTy noExtField (HsUnrestrictedArrow noAnn) x'' y'')
+                 returnLA (HsFunTy noExtField (HsStandardArrow noAnn []) x'' y'')
              | otherwise
              -> do { fun_tc <- returnLA $ getRdrName unrestrictedFunTyCon
                    ; mk_apps (HsTyVar noAnn NotPromoted fun_tc) tys' }
@@ -1860,8 +1860,8 @@ hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs
 hsTypeToArrow w = case unLoc w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
                         | n == oneDataConName -> HsLinearArrow noAnn []
-                        | n == manyDataConName -> HsUnrestrictedArrow noAnn
-                     _ -> HsExplicitMult noAnn [HsModifier noAnn w]
+                        | n == manyDataConName -> HsStandardArrow noAnn []
+                     _ -> HsStandardArrow noAnn [HsModifier noAnn w]
 
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only

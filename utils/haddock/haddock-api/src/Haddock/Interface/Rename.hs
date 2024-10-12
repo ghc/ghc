@@ -344,9 +344,8 @@ renameModifiers :: [HsModifier GhcRn] -> RnM [HsModifier DocNameI]
 renameModifiers = mapM renameModifier
 
 renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
-renameArrow (HsUnrestrictedArrow _) = return (HsUnrestrictedArrow noExtField)
+renameArrow (HsStandardArrow _ p) = HsStandardArrow noExtField <$> renameModifiers p
 renameArrow (HsLinearArrow _ p) = HsLinearArrow noExtField <$> renameModifiers p
-renameArrow (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameModifiers p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of

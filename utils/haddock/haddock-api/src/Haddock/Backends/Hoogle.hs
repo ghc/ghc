@@ -305,7 +305,7 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
           | r <- map unLoc recs
           ]
 
-    funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsUnrestrictedArrow noExtField) x y)
+    funs = foldr1 (\x y -> reL $ HsFunTy noExtField (HsStandardArrow noExtField []) x y)
     apps = foldl1 (\x y -> reL $ HsAppTy noExtField x y)
 
     typeSig nm flds =
@@ -357,7 +357,7 @@ ppCtor
             case args of
               PrefixConGADT _ pos_args -> map hsScaledThing pos_args
               RecConGADT _ (L _ flds) -> map (cd_fld_type . unL) flds
-          mkFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) a b)
+          mkFunTy a b = noLocA (HsFunTy noExtField (HsStandardArrow noExtField []) a b)
 
 ppFixity :: SDocContext -> (Name, Fixity) -> [String]
 ppFixity sDocContext (name, fixity) = [out sDocContext ((FixitySig NoNamespaceSpecifier [noLocA name] fixity) :: FixitySig GhcRn)]

@@ -276,9 +276,8 @@ no_anon_wc_ty lty = go lty
       HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go_arrow w
         where
           go_arrow w = case w of
-            HsUnrestrictedArrow _ -> True
+            HsStandardArrow _ mods -> all go_mod mods
             HsLinearArrow _ mods -> all go_mod mods
-            HsExplicitMult _ mods -> all go_mod mods
           go_mod (HsModifier _ ty) = go ty
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys

@@ -839,9 +839,8 @@ type instance XXBndrVis DocNameI = DataConCantHappen
 
 type instance XModifier DocNameI = NoExtField
 
-type instance XUnrestrictedArrow _ DocNameI = NoExtField
+type instance XStandardArrow _ DocNameI = NoExtField
 type instance XLinearArrow _ DocNameI = NoExtField
-type instance XExplicitMult _ DocNameI = NoExtField
 type instance XXArrow _ DocNameI = DataConCantHappen
 
 type instance XForAllTy DocNameI = EpAnn NoEpAnns

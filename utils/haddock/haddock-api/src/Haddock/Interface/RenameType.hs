@@ -128,9 +128,8 @@ renameModifiers :: [HsModifier GhcRn] -> Rename (IdP GhcRn) [HsModifier GhcRn]
 renameModifiers = mapM renameModifier
 
 renameHsArrow :: HsArrow GhcRn -> Rename (IdP GhcRn) (HsArrow GhcRn)
-renameHsArrow arr@(HsUnrestrictedArrow _) = pure arr
+renameHsArrow (HsStandardArrow x p) = HsStandardArrow x <$> renameModifiers p
 renameHsArrow (HsLinearArrow x p) = HsLinearArrow x <$> renameModifiers p
-renameHsArrow (HsExplicitMult x p) = HsExplicitMult x <$> renameModifiers p
 
 renameLType :: LHsType GhcRn -> Rename (IdP GhcRn) (LHsType GhcRn)
 renameLType = located renameType

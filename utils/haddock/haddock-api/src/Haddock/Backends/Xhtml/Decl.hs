@@ -1817,9 +1817,8 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u q e =
   where
     -- MODS_TODO: need to ppr modifiers
     arr = case mult of
+      HsStandardArrow _ _ -> arrow u
       HsLinearArrow _ _ -> lollipop u
-      HsUnrestrictedArrow _ -> arrow u
-      HsExplicitMult _ _ -> arrow u
 ppr_mono_ty (HsTupleTy _ con tys) u q _ =
   tupleParens con (map (ppLType u q HideEmptyContexts) tys)
 ppr_mono_ty (HsSumTy _ tys) u q _ =

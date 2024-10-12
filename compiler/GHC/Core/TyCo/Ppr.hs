@@ -238,11 +238,11 @@ debug_ppr_ty prec (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = re
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
   where
-    arr = pprArrowWithMultiplicity af $
+    arr = uncurry (pprArrowWithMultiplicity af) $
           case mult of
-            OneTy  -> Left True
-            ManyTy -> Left False
-            _      -> Right (debug_ppr_ty appPrec mult)
+            OneTy  -> (True, empty)
+            ManyTy -> (False, empty)
+            _      -> (False, text "%" <> debug_ppr_ty appPrec mult)
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc

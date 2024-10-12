@@ -381,19 +381,13 @@ submult OneTy OneTy  = Submult
 submult OneTy _    = Submult
 submult _     _    = Unknown
 
-pprArrowWithMultiplicity :: FunTyFlag -> Either Bool SDoc -> SDoc
--- Pretty-print a multiplicity arrow.  The multiplicity itself
--- is described by the (Either Bool SDoc)
---    Left False   -- Many
---    Left True    -- One
---    Right doc    -- Something else
--- In the Right case, the doc is in parens if not atomic
-pprArrowWithMultiplicity af pp_mult
+-- | Pretty-print a multiplicity arrow. The arrow symbol is described by the
+-- 'Bool' (True for a lollypop, False for a regular arrow). The multiplicity and
+-- any other modifiers are described by the 'SDoc'.
+pprArrowWithMultiplicity :: FunTyFlag -> Bool -> SDoc -> SDoc
+pprArrowWithMultiplicity af is_lollipop pp_mult
   | isFUNArg af
-  = case pp_mult of
-      Left False -> arrow
-      Left True  -> lollipop
-      Right doc  -> text "%" <> doc <+> arrow
+  = pp_mult <+> if is_lollipop then lollipop else arrow
   | otherwise
   = ppr (funTyFlagTyCon af)
 

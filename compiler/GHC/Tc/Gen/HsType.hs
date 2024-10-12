@@ -1129,7 +1129,7 @@ tcHsType mode (HsFunTy _ mult ty1 ty2) exp_kind
 
 tcHsType mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` unrestrictedFunTyConKey
-  = tc_fun_type mode (HsUnrestrictedArrow noExtField) ty1 ty2 exp_kind
+  = tc_fun_type mode (HsStandardArrow noExtField []) ty1 ty2 exp_kind
 
 --------- Foralls
 tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
@@ -1404,13 +1404,12 @@ tc_mult mode mods = do
 
 tc_arrow :: TcTyMode -> HsArrow GhcRn -> TcM Mult
 tc_arrow mode arr = case arr of
-  HsUnrestrictedArrow _ -> pure manyDataConTy
+  HsStandardArrow _ ms -> fromMaybe manyDataConTy <$> tc_mult mode ms
   HsLinearArrow _ ms -> do
     mMult <- tc_mult mode ms
     case mMult of
       Just _ -> error "MODS_TODO too many multiplicities"
       Nothing -> pure oneDataConTy
-  HsExplicitMult _ ms -> fromMaybe manyDataConTy <$> tc_mult mode ms
 
 tc_modifier :: TcTyMode -> HsModifier GhcRn -> (TcKind -> Bool) -> TcM (Maybe TcType)
 tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do

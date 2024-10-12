@@ -2294,16 +2294,14 @@ type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
         | btype '->' ctype             {% amsA' (sLL $1 $>
-                                            $ HsFunTy noExtField (HsUnrestrictedArrow (epUniTok $2)) $1 $3) }
+                                            $ HsFunTy noExtField (HsStandardArrow (epUniTok $2) []) $1 $3) }
 
         | btype modifiers1 '->' ctype  {% hintLinear (getLoc $2)
-                                       >> let arr = case unLoc $2 of
-                                                [] -> HsUnrestrictedArrow (epUniTok $3)
-                                                ms -> HsExplicitMult (epUniTok $3) ms
+                                       >> let arr = HsStandardArrow (epUniTok $3) (unLoc $2)
                                           in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
 
         | btype modifiers0 '->.' ctype {% hintLinear (getLoc $2) >>
-                                          amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (EpLolly (epTok $3)) (unLoc $2)) $1 $4) }
+                                          amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (epTok $3) (unLoc $2)) $1 $4) }
                                               -- [mu AnnLollyU $2] }
 
 btype :: { LHsType GhcPs }
@@ -2886,7 +2884,7 @@ infixexp2 :: { ECP }
                                   withArrowParsingMode' $ \mode ->
                                   unECP $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
-                                  let arr = HsUnrestrictedArrow (epUniTok $2)
+                                  let arr = HsStandardArrow (epUniTok $2) []
                                   in mkHsArrowPV (comb2 $1 $>) mode $1 arr $3 }
         | infixexp expModifiers1 '->'  infixexp2
                                 { ECP $
@@ -2902,7 +2900,7 @@ infixexp2 :: { ECP }
                                   unECP $1 >>= \ $1 ->
                                   $2       >>= \ $2 ->
                                   unECP $4 >>= \ $4 ->
-                                  let arr = HsLinearArrow (EpLolly (epTok $3)) (unLoc $2)
+                                  let arr = HsLinearArrow (epTok $3) (unLoc $2)
                                   in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
         | expcontext    '=>'  infixexp2
                                 { ECP $

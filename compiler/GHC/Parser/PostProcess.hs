@@ -805,7 +805,7 @@ mkGadtDecl loc names dcol ty = do
     case body_ty of
      L ll (HsFunTy _ hsArr (L (EpAnn anc _ cs) (HsRecTy an rf)) res_ty) -> do
        arr <- case hsArr of
-         HsUnrestrictedArrow arr -> return arr
+         HsStandardArrow arr [] -> return arr
          _ -> do addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
                                  (PsErrIllegalGadtRecordMultiplicity hsArr)
                  return noAnn
@@ -1870,7 +1870,7 @@ instance DisambECP (HsCmd GhcPs) where
       ArrowIsViewPat -> ppr a <+> pprHsArrow arr <+> ppr b
       ArrowIsFunType -> ppr a <+> pprHsArrow arr <+> ppr b
   mkHsMultPV lMods tok = case unLoc lMods of
-    [] -> pure $ HsUnrestrictedArrow tok
+    [] -> pure $ HsStandardArrow tok []
     mods -> cmdFail (getLoc lMods) $ ppr mods
   mkHsForallPV l tele cmd = cmdFail l $
     pprHsForAll tele Nothing <+> ppr cmd
@@ -1988,9 +1988,7 @@ instance DisambECP (HsExpr GhcPs) where
     exprArrowParsingMode mode $
     return $ L (noAnnSrcSpan l) $
       HsFunArr noExtField arr arg res
-  mkHsMultPV lMods tok = return $ case unLoc lMods of
-    [] -> HsUnrestrictedArrow tok
-    mods -> HsExplicitMult tok mods
+  mkHsMultPV lMods tok = return $ HsStandardArrow tok (unLoc lMods)
   mkHsForallPV l telescope ty =
     return $ L (noAnnSrcSpan l) $
       HsForAll noExtField (setTelescopeBndrsNameSpace varName telescope) ty
@@ -2074,14 +2072,14 @@ instance DisambECP (PatBuilder GhcPs) where
     where
       tok :: EpUniToken "->" "→"
       tok = case arr of
-        HsUnrestrictedArrow x -> x
+        HsStandardArrow x [] -> x
         _ -> -- unreachable case because in Parser.y the reduction rules for
              -- (a %m -> b) and (a ->. b) use ArrowIsFunType
-             panic "mkHsArrowPV ArrowIsViewPat: expected HsUnrestrictedArrow"
+             panic "mkHsArrowPV ArrowIsViewPat: expected HsStandardArrow _ []"
   mkHsArrowPV l ArrowIsFunType a arr b =
     patFail l (PsErrTypeSyntaxInPat (PETS_FunctionArrow a arr b))
   mkHsMultPV lMods tok = case unLoc lMods of
-    [] -> pure $ HsUnrestrictedArrow tok
+    [] -> pure $ HsStandardArrow tok []
     mods -> patFail (getLoc lMods) $ PsErrTypeSyntaxInPat $ PETS_Multiplicity mods
   mkHsForallPV l tele body = patFail l (PsErrTypeSyntaxInPat (PETS_ForallTelescope tele body))
   checkContextPV ctx = patFail (getLocA ctx) (PsErrTypeSyntaxInPat (PETS_ConstraintContext ctx))

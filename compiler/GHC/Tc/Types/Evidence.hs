@@ -982,7 +982,7 @@ instance Outputable EvTypeable where
   ppr (EvTypeableTyLit t1)       = text "TyLit" <> ppr t1
   ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
     where
-      arr = pprArrowWithMultiplicity visArgTypeLike (Right (ppr tm))
+      arr = pprArrowWithMultiplicity visArgTypeLike False (text "%" <> ppr tm)
 
 
 ----------------------------------------------------------------------

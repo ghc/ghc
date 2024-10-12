@@ -223,7 +223,7 @@ getGADTConType
         PrefixConGADT _ pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
 
       mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
-      mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noExtField) a b)
+      mkFunTy a b = noLocA (HsFunTy noAnn (HsStandardArrow noExtField []) a b)
 getGADTConType (ConDeclH98{}) = panic "getGADTConType"
 
 -- Should only be called on ConDeclGADT

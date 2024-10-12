@@ -1441,12 +1441,11 @@ repTy (HsFunTy _ w f a) = do f1   <- repLTy f
     -- MODS_TODO how do we figure out which modifiers are multiplicities and
     -- warn for the others?
     mMult = case w of
-      HsUnrestrictedArrow _ -> Nothing
+      HsStandardArrow _ [] -> Nothing
+      HsStandardArrow _ [HsModifier _ m] -> Just m
+      HsStandardArrow _ _ -> error "MODS_TODO too many modifiers"
       HsLinearArrow _ [] -> Just $ noLocA $ mk_var $ noLocA oneDataConName
       HsLinearArrow _ _ -> error "MODS_TODO too many modifiers"
-      HsExplicitMult _ [] -> error "MODS_TODO should be impossible"
-      HsExplicitMult _ [HsModifier _ m] -> Just m
-      HsExplicitMult _ _ -> error "MODS_TODO too many modifiers"
     mk_var = HsTyVar noAnn NotPromoted
 repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
@@ -1740,18 +1739,17 @@ repFunArr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> MetaM (Core (M TH.Exp)
 repFunArr arr = case arr of
   -- MODS_TODO how do we figure out which modifiers are multiplicities and warn
   -- for the others?
-  HsUnrestrictedArrow _ -> repConName unrestrictedFunTyConName
+  HsStandardArrow _ [] -> repConName unrestrictedFunTyConName
+  HsStandardArrow _ [HsModifier _ m] -> do
+    fun <- repConName fUNTyConName
+    mult' <- repLE m
+    repApp fun mult'
+  HsStandardArrow _ _ -> error "MODS_TODO too many modifiers"
   HsLinearArrow _ [] -> do
     fun <- repConName fUNTyConName
     mult' <- repLE $ noLocA $ HsVar noExtField $ noLocA oneDataConName
     repApp fun mult'
   HsLinearArrow _ _ -> error "MODS_TODO too many modifiers"
-  HsExplicitMult _ [] -> error "MODS_TODO should be impossible"
-  HsExplicitMult _ [HsModifier _ m] -> do
-    fun <- repConName fUNTyConName
-    mult' <- repLE m
-    repApp fun mult'
-  HsExplicitMult _ _ -> error "MODS_TODO too many modifiers"
 
 repConName :: Name -> MetaM (Core (M TH.Exp))
 repConName n = do
@@ -2891,10 +2889,12 @@ repGadtDataCons cons details res_ty
 verifyLinearFields :: [HsScaled GhcRn (LHsType GhcRn)] -> MetaM ()
 verifyLinearFields ps = do
   linear <- lift $ xoptM LangExt.LinearTypes
+  -- MODS_TODO this seems like maybe it breaks data declarations in some cases?
+  -- Try writing a GADT with explicit modifiers.
   let allGood = all (\st -> case hsMult st of
-                              HsUnrestrictedArrow _ -> not linear
-                              HsLinearArrow _ _     -> True
-                              _                     -> False) ps
+                              HsStandardArrow _ [] -> not linear
+                              HsLinearArrow _ _    -> True
+                              _                    -> False) ps
   unless allGood $ notHandled ThNonLinearDataCon
 
 -- Desugar the arguments in a data constructor declared with prefix syntax.

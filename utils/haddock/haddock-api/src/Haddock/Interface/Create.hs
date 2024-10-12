@@ -977,7 +977,7 @@ extractPatternSyn nm t tvs cons =
        in PatSynSig noAnn [noLocA nm] (mkEmptySigType typ'')
 
     longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
-    longArrow inputs output = foldr (\x y -> noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) x y)) output inputs
+    longArrow inputs output = foldr (\x y -> noLocA (HsFunTy noExtField (HsStandardArrow noExtField []) x y)) output inputs
 
     data_ty con
       | ConDeclGADT{} <- con = con_res_ty con
@@ -999,7 +999,7 @@ extractRecSel nm t tvs (L _ con : rest) =
   case getRecConArgs_maybe con of
     Just (L _ fields)
       | ((l, L _ (ConDeclField _ _nn ty _)) : _) <- matching_fields fields ->
-          pure (L (noAnnSrcSpan l) (TypeSig noAnn [noLocA nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) data_ty (getBangType ty))))))
+          pure (L (noAnnSrcSpan l) (TypeSig noAnn [noLocA nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLocA (HsFunTy noExtField (HsStandardArrow noExtField []) data_ty (getBangType ty))))))
     _ -> extractRecSel nm t tvs rest
   where
     matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]

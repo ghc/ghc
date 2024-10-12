@@ -623,7 +623,7 @@ nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f t)
 nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA x))
-nlHsFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow x) a b)
+nlHsFunTy a b = noLocA (HsFunTy noExtField (HsStandardArrow x []) a b)
   where
     x = case ghcPass @p of
       GhcPs -> noAnn

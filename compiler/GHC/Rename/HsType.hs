@@ -763,11 +763,10 @@ rnHsArrowWith :: (HsModifierOf multPs GhcPs -> RnM (HsModifierOf multRn GhcRn, F
               -> HsArrowOf multPs GhcPs
               -> RnM (HsArrowOf multRn GhcRn, FreeVars)
 rnHsArrowWith rn arr = case arr of
-  HsUnrestrictedArrow _ -> pure (HsUnrestrictedArrow noExtField, emptyFVs)
+  HsStandardArrow _ mods ->
+    (\(mult, fvs) -> (HsStandardArrow noExtField mult, fvs)) <$> rnMods mods
   HsLinearArrow _ mods ->
     (\(mult, fvs) -> (HsLinearArrow noExtField mult, fvs)) <$> rnMods mods
-  HsExplicitMult _ mods ->
-    (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rnMods mods
   where
     rnMods = rnModifiersWith rn
 
@@ -2177,11 +2176,9 @@ extract_hs_modifier (HsModifier _ ty) acc = extract_lty ty acc
 extract_hs_modifiers :: [HsModifier GhcPs] -> FreeKiTyVars -> FreeKiTyVars
 extract_hs_modifiers mods acc = foldr extract_hs_modifier acc mods
 
-extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
-                   FreeKiTyVars
-extract_hs_arrow (HsUnrestrictedArrow _) acc = acc
+extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_hs_arrow (HsStandardArrow _ p) acc = extract_hs_modifiers p acc
 extract_hs_arrow (HsLinearArrow _ p) acc = extract_hs_modifiers p acc
-extract_hs_arrow (HsExplicitMult _ p) acc = extract_hs_modifiers p acc
 
 extract_hs_for_all_telescope :: HsForAllTelescope GhcPs
                              -> FreeKiTyVars -- Accumulator
