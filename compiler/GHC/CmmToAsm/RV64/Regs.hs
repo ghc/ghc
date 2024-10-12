@@ -72,6 +72,12 @@ fa7RegNo, d17RegNo :: RegNo
 d17RegNo = 49
 fa7RegNo = d17RegNo
 
+v0RegNo ::RegNo
+v0RegNo = 64
+
+v31RegNo :: RegNo
+v31RegNo = 95
+
 -- Note [The made-up RISCV64 TMP (IP) register]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -98,6 +104,9 @@ raReg = regSingle 1
 spMachReg = regSingle 2
 
 tmpReg = regSingle tmpRegNo
+
+v0Reg :: Reg
+v0Reg = regSingle v0RegNo
 
 -- | All machine register numbers.
 allMachRegNos :: [RegNo]
