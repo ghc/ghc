@@ -2,7 +2,7 @@ setTestOpts(
   # Currently, the only GHC backends to support SIMD are:
   #   - the X86 NCG
   #   - LLVM (any architecture)
-  [ unless(arch('x86_64'), only_ways(llvm_ways))
+  [ unless(arch('x86_64') or arch('riscv64'), only_ways(llvm_ways))
 
   # Architectures which support at least 128 bit wide SIMD vectors:
   #  - X86 with SSE4.1

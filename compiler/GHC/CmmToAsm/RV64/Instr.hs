@@ -109,6 +109,12 @@ regUsageOfInstr platform instr = case instr of
   FABS dst src -> usage (regOp src, regOp dst)
   FMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VMV dst src1 -> usage (regOp src1, regOp dst)
+  VID dst src1 -> usage (regOp src1, regOp dst)
+  VMSEQ dst src op -> usage (regOp src ++ regOp op, regOp dst)
+  VMERGE dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
+  VSLIDEDOWN dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
+  VSETIVLI dst _ _ _ _ _ -> usage ([], [dst])
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
@@ -207,6 +213,12 @@ patchRegsOfInstr instr env = case instr of
   FABS o1 o2 -> FABS (patchOp o1) (patchOp o2)
   FMIN o1 o2 o3 -> FMIN (patchOp o1) (patchOp o2) (patchOp o3)
   FMAX o1 o2 o3 -> FMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VMV o1 o2 -> VMV (patchOp o1) (patchOp o2)
+  VID o1 o2 -> VID (patchOp o1) (patchOp o2)
+  VMSEQ o1 o2 o3 -> VMSEQ (patchOp o1) (patchOp o2) (patchOp o3)
+  VMERGE o1 o2 o3 o4 -> VMERGE (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
+  VSLIDEDOWN o1 o2 o3 -> VSLIDEDOWN (patchOp o1) (patchOp o2) (patchOp o3)
+  VSETIVLI o1 o2 o3 o4 o5 o6 -> VSETIVLI (env o1) o2 o3 o4 o5 o6
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   _ -> panic $ "patchRegsOfInstr: " ++ instrCon instr
@@ -622,11 +634,33 @@ data Instr
     -- - fnmadd: d = - r1 * r2 - r3
     FMA FMASign Operand Operand Operand Operand
 
+  -- TODO: Care about the variants (<instr>.x.y) -> sum type
+  | VMV Operand Operand
+  | VID Operand Operand
+  | VMSEQ Operand Operand Operand
+  | VMERGE Operand Operand Operand Operand
+  | VSLIDEDOWN Operand Operand Operand
+  | VSETIVLI Reg Word Width VectorGrouping TailAgnosticFlag MaskAgnosticFlag
+
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
 data FenceType = FenceRead | FenceWrite | FenceReadWrite
 
 -- | Variant of a floating point conversion instruction
 data FcvtVariant = FloatToFloat | IntToFloat | FloatToInt
+
+data VectorGrouping = MF8 | MF4 | MF2 | M1 | M2 | M4 | M8
+
+data TailAgnosticFlag
+  = -- | Tail-agnostic
+    TA
+  | -- | Tail-undisturbed
+    TU
+
+data MaskAgnosticFlag
+  = -- | Mask-agnostic
+    MA
+  | -- | Mask-undisturbed
+    MU
 
 instrCon :: Instr -> String
 instrCon i =
@@ -671,6 +705,12 @@ instrCon i =
     FABS {} -> "FABS"
     FMIN {} -> "FMIN"
     FMAX {} -> "FMAX"
+    VMV {} -> "VMV"
+    VID {} -> "VID"
+    VMSEQ {} -> "VMSEQ"
+    VMERGE {} -> "VMERGE"
+    VSLIDEDOWN {} -> "VSLIDEDOWN"
+    VSETIVLI {} -> "VSETIVLI"
     FMA variant _ _ _ _ ->
       case variant of
         FMAdd -> "FMADD"
