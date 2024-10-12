@@ -1287,10 +1287,10 @@ topdecl :: { LHsDecl GhcPs }
 -- Type classes
 --
 cl_decl :: { LTyClDecl GhcPs }
-        : 'class' tycl_hdr fds where_cls
-                {% do { let {(wtok, (oc,semis,cc)) = fstOf3 $ unLoc $4}
-                      ; mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4)
-                        (AnnClassDecl (epTok $1) [] [] (fst $ unLoc $3) wtok oc cc semis) }}
+        : modifiers 'class' tycl_hdr fds where_cls
+                {% do { let {(wtok, (oc,semis,cc)) = fstOf3 $ unLoc $5}
+                      ; mkClassDecl (comb5 $1 $2 $3 $4 $5) (unLoc $1) $3 $4 (sndOf3 $ unLoc $5) (thdOf3 $ unLoc $5)
+                        (AnnClassDecl (epTok $2) [] [] (fst $ unLoc $4) wtok oc cc semis) }}
 
 -- Default declarations (toplevel)
 --

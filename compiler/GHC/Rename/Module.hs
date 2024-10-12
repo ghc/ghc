@@ -1759,7 +1759,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
                         tcdFDs = fds, tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
-                        tcdDocs = docs})
+                        tcdDocs = docs, tcdModifiers = modifiers})
   = do  { lcls' <- lookupLocatedTopConstructorRnN lcls
         ; let cls' = unLoc lcls'
               kvs = []  -- No scoped kind vars except those in
@@ -1809,11 +1809,13 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; docs' <- traverse rnLDocDecl docs
+        -- MODS_TODO do we care about free vars in modifiers?
+        ; modifiers' <- mapM (fmap fst . rnModifier' cls_doc) modifiers
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
-                              tcdDocs = docs', tcdCExt = all_fvs },
+                              tcdDocs = docs', tcdCExt = all_fvs, tcdModifiers = modifiers' },
                   all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls

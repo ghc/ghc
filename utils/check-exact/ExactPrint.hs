@@ -3675,7 +3675,8 @@ instance ExactPrint (TyClDecl GhcPs) where
                     tcdFDs  = fds,
                     tcdSigs = sigs, tcdMeths = methods,
                     tcdATs = ats, tcdATDefs = at_defs,
-                    tcdDocs = _docs})
+                    tcdDocs = _docs,
+                    tcdModifiers = mods})
       -- TODO: add a test that demonstrates tcdDocs
       | null sigs && null methods && null ats && null at_defs -- No "where" part
       = do
@@ -3688,7 +3689,8 @@ instance ExactPrint (TyClDecl GhcPs) where
                              tcdFDs  = fds',
                              tcdSigs = sigs, tcdMeths = methods,
                              tcdATs = ats, tcdATDefs = at_defs,
-                             tcdDocs = _docs})
+                             tcdDocs = _docs,
+                             tcdModifiers = mods})
 
       | otherwise       -- Laid out
       = do
@@ -3714,7 +3716,8 @@ instance ExactPrint (TyClDecl GhcPs) where
                              tcdFDs  = fds',
                              tcdSigs = sigs', tcdMeths = methods',
                              tcdATs = ats', tcdATDefs = at_defs',
-                             tcdDocs = _docs})
+                             tcdDocs = _docs,
+                             tcdModifiers = mods})
       where
         top_matter = do
           epTokensToComments AnnOpenP ops

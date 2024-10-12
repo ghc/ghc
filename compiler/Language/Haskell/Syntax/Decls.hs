@@ -457,7 +457,8 @@ data TyClDecl pass
                 tcdMeths   :: LHsBinds pass,            -- ^ Default methods
                 tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
                 tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
-                tcdDocs    :: [LDocDecl pass]           -- ^ Haddock docs
+                tcdDocs    :: [LDocDecl pass],          -- ^ Haddock docs
+                tcdModifiers :: [HsModifier pass]       -- ^ Modifiers
     }
   | XTyClDecl !(XXTyClDecl pass)
 

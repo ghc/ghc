@@ -573,6 +573,7 @@ renameTyClD d = case d of
     , tcdSigs = lsigs
     , tcdATs = ats
     , tcdATDefs = at_defs
+    , tcdModifiers = mods
     } -> do
       lcontext' <- traverse renameLContext lcontext
       lname' <- renameNameL lname
@@ -581,6 +582,7 @@ renameTyClD d = case d of
       lsigs' <- mapM renameLSig lsigs
       ats' <- mapM (renameLThing renameFamilyDecl) ats
       at_defs' <- mapM (mapM renameTyFamDefltD) at_defs
+      mods' <- renameModifiers mods
       -- we don't need the default methods or the already collected doc entities
       return
         ( ClassDecl
@@ -595,6 +597,7 @@ renameTyClD d = case d of
             , tcdATs = ats'
             , tcdATDefs = at_defs'
             , tcdDocs = []
+            , tcdModifiers = mods'
             }
         )
   where

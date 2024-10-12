@@ -187,6 +187,7 @@ tyThingToLHsDecl prr t = case t of
                 , tcdATDefs = catMaybes atDefFamDecls
                 , tcdDocs = [] -- we don't have any docs at this point
                 , tcdCExt = emptyNameSet
+                , tcdModifiers = [] -- MODS_TODO can we put any modifiers here?
                 }
     | otherwise ->
         synifyTyCon prr Nothing tc >>= allOK . TyClD noExtField

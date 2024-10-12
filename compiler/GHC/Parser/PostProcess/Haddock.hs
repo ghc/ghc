@@ -507,7 +507,7 @@ instance HasHaddock (HsDecl GhcPs) where
   addHaddock (TyClD _ decl)
     | ClassDecl { tcdCExt = (x, layout, NoAnnSortKey),
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
-                  tcdSigs, tcdMeths, tcdATs, tcdATDefs } <- decl
+                  tcdSigs, tcdMeths, tcdATs, tcdATDefs, tcdModifiers } <- decl
     = do
         registerHdkA tcdLName
         -- todo: register keyword location of 'where', see Note [Register keyword location]
@@ -522,7 +522,7 @@ instance HasHaddock (HsDecl GhcPs) where
                                 , tcdMeths = tcdMeths'
                                 , tcdATs = tcdATs'
                                 , tcdATDefs = tcdATDefs'
-                                , tcdDocs }
+                                , tcdDocs, tcdModifiers }
           in TyClD noExtField decl'
 
   -- Data family instances:

@@ -318,8 +318,9 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                     , tcdFixity = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
-                    , tcdATs = fams', tcdATDefs = at_defs', tcdDocs = [] }
-                                                     -- no docs in TH ^^
+                    , tcdATs = fams', tcdATDefs = at_defs'
+                    , tcdDocs = [] -- no docs in TH
+                    , tcdModifiers = [] } -- MODS_TODO: add to ClassD?
         }
 
 cvtDec (InstanceD o ctxt ty decs)
