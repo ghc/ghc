@@ -230,7 +230,7 @@ cvtDec (TH.ValD pat body ds)
           PatBind { pat_lhs = pat'
                   , pat_rhs = GRHSs emptyComments body' ds'
                   , pat_ext = noExtField
-                  , pat_mult = HsNoMultAnn noExtField
+                  , pat_mult = HsMultAnn noExtField []
                   } }
 
 cvtDec (TH.FunD nm cls)

@@ -742,13 +742,11 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyMiniFixityEnv decls
       DataNamespaceSpecifier{} -> env { mfe_data_level_names = (extendFsEnv mfe_data_level_names fs fix_item)}
 
 
--- | Multiplicity annotations are a simple wrapper around types. As such,
--- renaming them is a straightforward wrapper around 'rnLHsType'.
+-- | Multiplicity annotations are a simple wrapper around modifiers. As such,
+-- renaming them is a straightforward wrapper around 'rnModifiersContext'.
 rnHsMultAnn :: HsMultAnn GhcPs -> RnM (HsMultAnn GhcRn, FreeVars)
-rnHsMultAnn (HsNoMultAnn _) = return (HsNoMultAnn noExtField, emptyFVs)
-rnHsMultAnn (HsPct1Ann _) = return (HsPct1Ann noExtField, emptyFVs)
 rnHsMultAnn (HsMultAnn _ p) = do
-  (p', freeVars') <- rnLHsType PatCtx p
+  (p', freeVars') <- rnModifiersContext PatCtx p
   return $ (HsMultAnn noExtField p', freeVars')
 
 {- *********************************************************************

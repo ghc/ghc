@@ -631,7 +631,7 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                                 `plusFV` inst_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
        -- MODS_TODO do I care about free vars in modifiers here?
-       ; modifiers' <- mapM (fmap fst . rnModifier' ctxt) modifiers
+       ; (modifiers', _) <- rnModifiersContext ctxt modifiers
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
@@ -1810,7 +1810,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; docs' <- traverse rnLDocDecl docs
         -- MODS_TODO do we care about free vars in modifiers?
-        ; modifiers' <- mapM (fmap fst . rnModifier' cls_doc) modifiers
+        ; (modifiers', _) <- rnModifiersContext cls_doc modifiers
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',

@@ -69,7 +69,6 @@ module GHC.Parser.PostProcess (
         addFatalError, hintBangPat,
         mkBangTy,
         UnpackednessPragma(..),
-        mkMultAnn,
 
         -- Token location
         mkTokenLocation,
@@ -1377,7 +1376,7 @@ checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
        checkPatBind loc lhs' grhss mult
 
 checkValDef loc lhs (mult_ann, Nothing) grhss
-  | HsNoMultAnn{} <- mult_ann
+  | HsMultAnn _ [] <- mult_ann
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ops, cps) -> do
@@ -1438,7 +1437,7 @@ checkPatBind :: SrcSpan
              -> HsMultAnn GhcPs
              -> P (HsBind GhcPs)
 checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
-                        (L _match_span grhss) (HsNoMultAnn _)
+                        (L _match_span grhss) (HsMultAnn _ [])
       = return (makeFunBind v (L (noAnnSrcSpan loc)
                 [L (noAnnSrcSpan loc) (m an v)]))
   where
@@ -3492,28 +3491,9 @@ mkLHsOpTy prom x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
-mkMultAnn :: EpToken "%" -> LHsType GhcPs -> HsMultAnn GhcPs
-mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1)))
-  -- See #18888 for the use of (SourceText "1") above
-  = HsPct1Ann pct1
-  where
-    -- The location of "%" combined with the location of "1".
-    pct1 :: EpToken "%1"
-    pct1 = epTokenWidenR pct (locA (getLoc t))
-mkMultAnn pct t = HsMultAnn pct t
-
 mkTokenLocation :: SrcSpan -> TokenLocation
 mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc
 mkTokenLocation (RealSrcSpan r mb) = TokenLoc (EpaSpan (RealSrcSpan r mb))
-
--- Precondition: the EpToken has EpaSpan, never EpaDelta.
-epTokenWidenR :: EpToken tok -> SrcSpan -> EpToken tok'
-epTokenWidenR NoEpTok _ = NoEpTok
-epTokenWidenR (EpTok l) (UnhelpfulSpan _) = EpTok l
-epTokenWidenR (EpTok (EpaSpan s1)) s2 = EpTok (EpaSpan (combineSrcSpans s1 s2))
-epTokenWidenR (EpTok EpaDelta{}) _ =
-  -- Never happens because the parser does not produce EpaDelta.
-  panic "epTokenWidenR: EpaDelta"
 
 -----------------------------------------------------------------------------
 -- Token symbols

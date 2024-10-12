@@ -815,15 +815,9 @@ zonk_bind (PatSynBind x bind@(PSB { psb_id   = L loc id
                        , psb_dir  = dir' } } }
 
 zonkMultAnn :: HsMultAnn GhcTc -> ZonkTcM (HsMultAnn GhcTc)
-zonkMultAnn (HsNoMultAnn mult)
+zonkMultAnn (HsMultAnn mult mods)
   = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsNoMultAnn mult') }
-zonkMultAnn (HsPct1Ann mult)
-  = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsPct1Ann mult') }
-zonkMultAnn (HsMultAnn mult hs_ty)
-  = do { mult' <- zonkTcTypeToTypeX mult
-       ; return (HsMultAnn mult' hs_ty) }
+       ; return (HsMultAnn mult' mods) }
 
 zonkPatSynDetails :: HsPatSynDetails GhcTc
                   -> ZonkTcM (HsPatSynDetails GhcTc)

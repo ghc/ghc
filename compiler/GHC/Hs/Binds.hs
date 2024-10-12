@@ -138,19 +138,9 @@ type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
 type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = DataConCantHappen
 
-type instance XNoMultAnn GhcPs = NoExtField
-type instance XNoMultAnn GhcRn = NoExtField
-type instance XNoMultAnn GhcTc = Mult
-
-type instance XPct1Ann   GhcPs = EpToken "%1"
-type instance XPct1Ann   GhcRn = NoExtField
-type instance XPct1Ann   GhcTc = Mult
-
-type instance XMultAnn   GhcPs = EpToken "%"
+type instance XMultAnn   GhcPs = NoExtField
 type instance XMultAnn   GhcRn = NoExtField
 type instance XMultAnn   GhcTc = Mult
-
-type instance XXMultAnn  (GhcPass _) = DataConCantHappen
 
 data AnnPSB
   = AnnPSB {
@@ -165,14 +155,10 @@ instance NoAnn AnnPSB where
   noAnn = AnnPSB noAnn noAnn noAnn noAnn noAnn
 
 setTcMultAnn :: Mult -> HsMultAnn GhcRn -> HsMultAnn GhcTc
-setTcMultAnn mult (HsPct1Ann _)   = HsPct1Ann mult
 setTcMultAnn mult (HsMultAnn _ p) = HsMultAnn mult p
-setTcMultAnn mult (HsNoMultAnn _) = HsNoMultAnn mult
 
 getTcMultAnn :: HsMultAnn GhcTc -> Mult
-getTcMultAnn (HsPct1Ann mult)   = mult
 getTcMultAnn (HsMultAnn mult _) = mult
-getTcMultAnn (HsNoMultAnn mult) = mult
 
 -- ---------------------------------------------------------------------
 
@@ -547,9 +533,7 @@ plusHsValBinds _ _
 -- Used to print, for instance, let bindings:
 --   let %1 x = …
 pprHsMultAnn :: forall id. OutputableBndrId id => HsMultAnn (GhcPass id) -> SDoc
-pprHsMultAnn (HsNoMultAnn _) = empty
-pprHsMultAnn (HsPct1Ann _) = text "%1"
-pprHsMultAnn (HsMultAnn _ p) = text "%" <> ppr p
+pprHsMultAnn (HsMultAnn _ p) = ppr p -- MODS_TODO fix
 
 instance (OutputableBndrId pl, OutputableBndrId pr)
          => Outputable (HsBindLR (GhcPass pl) (GhcPass pr)) where
@@ -560,7 +544,7 @@ ppr_monobind :: forall idL idR.
              => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_mult = mult_ann, pat_rhs = grhss })
-  = pprHsMultAnn @idL mult_ann
+  = pprHsMultAnn mult_ann
     <+> pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
   = sep [pprBndr CasePatBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]

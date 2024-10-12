@@ -164,6 +164,8 @@ other interesting cases. Namely,
 
 Note [Multiplicity annotations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MODS_TODO needs updating
+
 Multiplicity annotations are stored in the pat_mult field on PatBinds,
 represented by the HsMultAnn data type
 
@@ -285,17 +287,11 @@ data PatSynBind idL idR
 
 -- | Multiplicity annotations, on binders, are always resolved (to a unification
 -- variable if there is no annotation) during type-checking. The resolved
--- multiplicity is stored in the extension fields.
+-- multiplicity is stored in the extension field.
 data HsMultAnn pass
-  = HsNoMultAnn !(XNoMultAnn pass)
-  | HsPct1Ann   !(XPct1Ann pass)
-  | HsMultAnn   !(XMultAnn pass) (LHsType (NoGhcTc pass))
-  | XMultAnn    !(XXMultAnn pass)
+  = HsMultAnn !(XMultAnn pass) [HsModifier pass]
 
-type family XNoMultAnn p
-type family XPct1Ann   p
-type family XMultAnn   p
-type family XXMultAnn  p
+type family XMultAnn p
 
 {-
 ************************************************************************

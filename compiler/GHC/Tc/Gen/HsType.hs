@@ -66,7 +66,7 @@ module GHC.Tc.Gen.HsType (
         checkClassKindSig,
 
         -- Multiplicity
-        tcMult,
+        tcArrow, tcMult,
 
         -- Pattern type signatures
         tcHsPatSigType, tcHsTyPat,
@@ -943,7 +943,10 @@ concern things that the renamer can't handle.
 
 -}
 
-tcMult :: HsArrow GhcRn -> TcM Mult
+tcArrow :: HsArrow GhcRn -> TcM Mult
+tcArrow hc = tc_arrow typeLevelMode hc
+
+tcMult :: [HsModifier GhcRn] -> TcM (Maybe Mult)
 tcMult hc = tc_mult typeLevelMode hc
 
 -- | Info about the context in which we're checking a type. Currently,
@@ -1370,36 +1373,44 @@ Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo
 
 ------------------------------------------
 
-tc_mult :: TcTyMode -> HsArrow GhcRn -> TcM Mult
-tc_mult mode arr = do
+-- | Extract the optional Multiplicity modifier from a list. Nothing if none of
+-- them are Multiplicities, error if more than one is. Non-Multiplicity
+-- modifiers generate warnings but are otherwise ignored.
+--
+-- With -XNoLinearTypes, no modifiers count as Multiplicities. With
+-- -XLinearTypes -XNoModifiers, there must be at most one modifier, and we check
+-- that it's a Multiplicity rather than inferring (so less need for kind
+-- annotations).
+tc_mult :: TcTyMode -> [HsModifier GhcRn] -> TcM (Maybe Mult)
+tc_mult mode mods = do
   modifiers <- xoptM LangExt.Modifiers
   linearTypes <- xoptM LangExt.LinearTypes
-  case (modifiers, linearTypes) of
-    -- With -XNoModifiers, we only allow modifiers of kind Multiplicity. Note
-    -- HsLinearArrow can show up even with -XNoLinearTypes.
-    (False, _) -> go_check
-
-    (True, False) -> go_infer (const False) -- MODS_TODO should we suggest enabling -XLinearTypes if there are any modifiers? Or maybe only if there are Multiplicity modifiers?
+  case (linearTypes, modifiers) of
+    (False, _) -> go_infer (const False) -- MODS_TODO should we suggest enabling -XLinearTypes if there are any modifiers? Or maybe only if there are Multiplicity modifiers?
+    (True, False) -> go_check
     (True, True) -> go_infer isMultiplicityTy
   where
     go_infer is_mult = do
-      mults <- case arr of
-        HsUnrestrictedArrow _ -> pure []
-        HsLinearArrow _ ms -> (oneDataConTy :) <$> infer_mod is_mult ms
-        HsExplicitMult _ ms -> infer_mod is_mult ms
+      mults <- tc_modifiers mode mods is_mult
       return $ case mults of
-        [] -> manyDataConTy
-        [m] -> m
+        [] -> Nothing
+        [m] -> Just m
         _ -> error "MODS_TODO too many multiplicities"
-    infer_mod is_mult mods = tc_modifiers mode mods is_mult
 
-    go_check = case arr of
-      HsUnrestrictedArrow _ -> pure manyDataConTy
-      HsLinearArrow _ [] -> pure oneDataConTy
-      HsLinearArrow _ _ -> error "MODS_TODO too many multiplicities"
-      HsExplicitMult _ [] -> error "MODS_TODO should be impossible"
-      HsExplicitMult _ [HsModifier _ m] -> tc_check_lhs_type mode m multiplicityTy
-      HsExplicitMult _ _ -> error "MODS_TODO too many multiplicities"
+    go_check = case mods of
+      [] -> pure Nothing
+      [HsModifier _ m] -> Just <$> tc_check_lhs_type mode m multiplicityTy
+      _ -> error "MODS_TODO too many multiplicities"
+
+tc_arrow :: TcTyMode -> HsArrow GhcRn -> TcM Mult
+tc_arrow mode arr = case arr of
+  HsUnrestrictedArrow _ -> pure manyDataConTy
+  HsLinearArrow _ ms -> do
+    mMult <- tc_mult mode ms
+    case mMult of
+      Just _ -> error "MODS_TODO too many multiplicities"
+      Nothing -> pure oneDataConTy
+  HsExplicitMult _ ms -> fromMaybe manyDataConTy <$> tc_mult mode ms
 
 tc_modifier :: TcTyMode -> HsModifier GhcRn -> (TcKind -> Bool) -> TcM (Maybe TcType)
 tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
@@ -1425,14 +1436,14 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
        ; res_k <- newOpenTypeKind
        ; ty1'  <- tc_check_lhs_type mode ty1 arg_k
        ; ty2'  <- tc_check_lhs_type mode ty2 res_k
-       ; mult' <- tc_mult mode mult
+       ; mult' <- tc_arrow mode mult
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')
                       liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1'  <- tc_check_lhs_type mode ty1 liftedTypeKind
        ; ty2'  <- tc_check_lhs_type mode ty2 liftedTypeKind
-       ; mult' <- tc_mult mode mult
+       ; mult' <- tc_arrow mode mult
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')
                       liftedTypeKind exp_kind }

@@ -1803,7 +1803,7 @@ kcConArgTys :: NewOrData -> TcKind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
 kcConArgTys new_or_data res_kind arg_tys = do
   { let exp_kind = getArgExpKind new_or_data res_kind
   ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsTypeInContext (getBangType ty) exp_kind
-                                             tcMult mult)
+                                             tcArrow mult)
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
   }
 
@@ -3949,8 +3949,8 @@ tcDataConMult :: HsArrow GhcRn -> TcM Mult
 tcDataConMult arr@(HsUnrestrictedArrow _) = do
   -- See Note [Function arrows in GADT constructors]
   linearEnabled <- xoptM LangExt.LinearTypes
-  if linearEnabled then tcMult arr else return oneDataConTy
-tcDataConMult arr = tcMult arr
+  if linearEnabled then tcArrow arr else return oneDataConTy
+tcDataConMult arr = tcArrow arr
 
 {-
 Note [Function arrows in GADT constructors]

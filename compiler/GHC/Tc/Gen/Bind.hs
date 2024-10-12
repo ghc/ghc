@@ -62,7 +62,7 @@ import GHC.Core.Coercion( mkSymCo )
 import GHC.Core.Type (mkStrLitTy, tidyOpenTypeX, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 
-import GHC.Builtin.Types ( mkConstraintTupleTy, multiplicityTy, oneDataConTy  )
+import GHC.Builtin.Types ( mkConstraintTupleTy, multiplicityTy )
 import GHC.Builtin.Types.Prim
 import GHC.Unit.Module
 
@@ -593,7 +593,7 @@ tcPolyCheck prag_fn
        -- the BinderStack, whence it shows up in "Relevant bindings.."
        ; mono_name <- newNameAt (nameOccName name) (locA nm_loc)
 
-       ; mult <- tcMultAnn (HsNoMultAnn noExtField)
+       ; mult <- tcMultAnn (HsMultAnn noExtField [])
        ; (wrap_gen, (wrap_res, matches'))
              <- tcSkolemiseCompleteSig sig $ \invis_pat_tys rho_ty ->
 
@@ -1317,7 +1317,7 @@ tcMonoBinds is_rec sig_fn no_gen
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
   = setSrcSpanA b_loc    $
-    do  { mult <- tcMultAnn (HsNoMultAnn noExtField)
+    do  { mult <- tcMultAnn (HsMultAnn noExtField [])
 
         ; ((co_fn, matches'), rhs_ty')
             <- tcInferFRR (FRRBinder name) $ \ exp_ty ->
@@ -1513,12 +1513,12 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
     --           Just g = ...f...
     -- Hence always typechecked with InferGen
     do { mono_info <- tcLhsSigId no_gen (name, sig)
-       ; mult <- tcMultAnn (HsNoMultAnn noExtField)
+       ; mult <- tcMultAnn (HsMultAnn noExtField [])
        ; return (TcFunBind mono_info (locA nm_loc) mult matches) }
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mult <- tcMultAnn (HsNoMultAnn noExtField)
+       ; mult <- tcMultAnn (HsMultAnn noExtField [])
        ; mono_id <- newLetBndr no_gen name mult mono_ty
        ; let mono_info = MBI { mbi_poly_name = name
                              , mbi_sig       = Nothing
@@ -1632,9 +1632,9 @@ tcRhs (TcPatBind infos pat' mult mult_ann grhss pat_ty)
 -- present the multiplicity is returned, otherwise a fresh unification variable
 -- is generated so that multiplicity can be inferred.
 tcMultAnn :: HsMultAnn GhcRn -> TcM Mult
-tcMultAnn (HsPct1Ann _) = return oneDataConTy
-tcMultAnn (HsMultAnn _ p) = tcCheckLHsTypeInContext p (TheKind multiplicityTy)
-tcMultAnn (HsNoMultAnn _) = newFlexiTyVarTy multiplicityTy
+tcMultAnn (HsMultAnn _ mods) = do
+  mult <- tcMult mods
+  maybe (newFlexiTyVarTy multiplicityTy) pure mult
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvForRhs Nothing thing_inside
@@ -1853,7 +1853,7 @@ decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
       Just (TcIdSig (TcPartialSig {})) -> True
       _                                -> False
     has_mult_anns_and_pats = any has_mult_ann_and_pat lbinds
-    has_mult_ann_and_pat (L _ (PatBind{pat_mult=HsNoMultAnn{}})) = False
+    has_mult_ann_and_pat (L _ (PatBind{pat_mult=HsMultAnn _ []})) = False
     has_mult_ann_and_pat (L _ (PatBind{pat_lhs=(L _ (VarPat{}))})) = False
     has_mult_ann_and_pat (L _ (PatBind{})) = True
     has_mult_ann_and_pat _ = False

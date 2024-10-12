@@ -2417,14 +2417,10 @@ instance ExactPrint (HsMultAnn GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (HsNoMultAnn x) = return (HsNoMultAnn x)
-  exact (HsPct1Ann tok) = do
-      tok' <- markEpToken tok
-      return (HsPct1Ann tok')
-  exact (HsMultAnn tok ty) = do
-      tok' <- markEpToken tok
-      ty' <- markAnnotated ty
-      return (HsMultAnn tok' ty')
+  -- MODS_TODO is this right?
+  exact (HsMultAnn x mods) = do
+    mods' <- markAnnotated mods
+    return (HsMultAnn x mods')
 
 -- ---------------------------------------------------------------------
 

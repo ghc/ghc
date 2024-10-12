@@ -14,7 +14,7 @@
 module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
-        rnModifier, rnModifierWith, rnModifier',
+        rnModifier, rnModifierWith, rnModifiersContext,
         rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsTyLit, rnHsArrowWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
@@ -452,11 +452,8 @@ isRnKindLevel _                                 = False
 -- MODS_TODO will any callers of these functions care about free vars in
 -- modifiers? Probably yes, since they currently care about free vars in
 -- HsExplicitMult arrows.
---
--- rnModifier' is for when we don't have a full env, should we expose mkTyKiEnv
--- instead? Or have a better name? Or?
-rnModifier' :: HsDocContext -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
-rnModifier' ctxt = rnModifier (mkTyKiEnv ctxt TypeLevel RnTypeBody)
+rnModifiersContext :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiersContext ctxt = rnModifiers (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
 rnModifierWith :: (mPs -> Maybe mRn)
                -> (mPs -> RnM (mRn, FreeVars))
@@ -497,9 +494,8 @@ rnModifiersWith rnSingle mods = do
   (mods', fvs) <- unzip <$> traverse rnSingle mods
   return (mods', mconcat fvs)
 
--- MODS_TODO: do we need this?
-_rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
-_rnModifiers env = rnModifiersWith (rnModifier env)
+rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiers env = rnModifiersWith (rnModifier env)
 
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
