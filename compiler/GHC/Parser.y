@@ -3138,26 +3138,26 @@ aexp2   :: { ECP }
         | splice_untyped { ECP $ mkHsSplicePV $1 }
         | splice_typed   { ecpFromExp $ fmap (uncurry HsTypedSplice) (reLoc $1) }
 
-        | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket [mj AnnSimpleQuote $1] (VarBr noExtField True  $2)) }
-        | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket [mj AnnSimpleQuote $1] (VarBr noExtField True  $2)) }
-        | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket [mj AnnThTyQuote $1  ] (VarBr noExtField False $2)) }
-        | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket [mj AnnThTyQuote $1  ] (VarBr noExtField False $2)) }
+        | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) True  $2)) }
+        | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) True  $2)) }
+        | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) False $2)) }
+        | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ amsA' (sLL $1 $> $ HsUntypedBracket noExtField (VarBr (glR $1) False $2)) }
         -- See Note [%shift: aexp2 -> TH_TY_QUOTE]
         | TH_TY_QUOTE %shift    {% reportEmptyDoubleQuotes (getLoc $1) }
         | '[|' exp '|]'       {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 amsA' (sLL $1 $> $ HsUntypedBracket (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
-                                                                                         else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) (ExpBr noExtField $2)) }
+                                 amsA' (sLL $1 $> $ HsUntypedBracket noExtField (ExpBr (if (hasE $1) then (BracketHasE (epTok $1),   epUniTok $3)
+                                                                                                     else (BracketNoE (epUniTok $1), epUniTok $3)) $2)) }
         | '[||' exp '||]'     {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
                                  amsA' (sLL $1 $> $ HsTypedBracket (if (hasE $1) then (BracketHasE (epTok $1),epTok $3) else (BracketNoE (epTok $1),epTok $3)) $2) }
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
-                                 amsA' (sLL $1 $> $ HsUntypedBracket [mo $1,mu AnnCloseQ $3] (TypBr noExtField $2)) }
+                                 amsA' (sLL $1 $> $ HsUntypedBracket noExtField (TypBr (epTok $1,epUniTok $3) $2)) }
         | '[p|' infixexp '|]' {% (checkPattern <=< runPV) (unECP $2) >>= \p ->
                                       fmap ecpFromExp $
-                                      amsA' (sLL $1 $> $ HsUntypedBracket [mo $1,mu AnnCloseQ $3] (PatBr noExtField p)) }
+                                      amsA' (sLL $1 $> $ HsUntypedBracket noExtField (PatBr (epTok $1,epUniTok $3) p)) }
         | '[d|' cvtopbody '|]' {% fmap ecpFromExp $
-                                  amsA' (sLL $1 $> $ HsUntypedBracket (mo $1:mu AnnCloseQ $3:fst $2) (DecBrL noExtField (snd $2))) }
+                                  amsA' (sLL $1 $> $ HsUntypedBracket noExtField (DecBrL (epTok $1,epUniTok $3, fst $2) (snd $2))) }
         | quasiquote          { ECP $ mkHsSplicePV $1 }
 
         -- arrow notation extension
@@ -3197,10 +3197,9 @@ acmd    :: { LHsCmdTop GhcPs }
                                    runPV (checkCmdBlockArguments cmd) >>= \ _ ->
                                    return (sL1a cmd $ HsCmdTop noExtField cmd) }
 
-cvtopbody :: { ([AddEpAnn],[LHsDecl GhcPs]) }
-        :  '{'            cvtopdecls0 '}'      { ([mj AnnOpenC $1
-                                                  ,mj AnnCloseC $3],$2) }
-        |      vocurly    cvtopdecls0 close    { ([],$2) }
+cvtopbody :: { ((EpToken "{", EpToken "}"),[LHsDecl GhcPs]) }
+        :  '{'            cvtopdecls0 '}'      { ((epTok $1 ,epTok $3),$2) }
+        |      vocurly    cvtopdecls0 close    { ((NoEpTok, NoEpTok),$2) }
 
 cvtopdecls0 :: { [LHsDecl GhcPs] }
         : topdecls_semi         { cvTopDecls $1 }

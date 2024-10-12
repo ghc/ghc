@@ -67,6 +67,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationAnnList
               `extQ` annotationEpAnnImportDecl
               `extQ` annotationNoEpAnns
+              `extQ` annotationExprBracket
               `extQ` annotationTypedBracket
               `extQ` addEpAnn
               `extQ` epTokenOC
@@ -211,7 +212,10 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              NoBlankEpAnnotations ->
               parens $ text "AddEpAnn" <+> ppr a <+> epaLocation s
 
-            annotationTypedBracket :: BracketAnn (EpToken "[||") (EpToken  "[e||") -> SDoc
+            annotationExprBracket :: BracketAnn (EpUniToken "[|" "⟦") (EpToken "[e|") -> SDoc
+            annotationExprBracket = annotationBracket
+
+            annotationTypedBracket :: BracketAnn (EpToken "[||") (EpToken "[e||") -> SDoc
             annotationTypedBracket = annotationBracket
 
             annotationBracket ::forall n h .(Data n, Data h, Typeable n, Typeable h)
@@ -221,7 +225,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                       $ text "blanked:" <+> text "BracketAnn"
              NoBlankEpAnnotations ->
               parens $ case a of
-                BracketNoE t -> text "BracketNoE" <+> showAstData' t
+                BracketNoE  t -> text "BracketNoE"  <+> showAstData' t
                 BracketHasE t -> text "BracketHasE" <+> showAstData' t
 
             epTokenOC :: EpToken "{" -> SDoc

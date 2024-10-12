@@ -3273,50 +3273,51 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsTypedBracket (o,c) e) = do
     o' <- case o of
-      BracketNoE t -> BracketNoE <$> markEpToken t
+      BracketNoE  t -> BracketNoE  <$> markEpToken t
       BracketHasE t -> BracketHasE <$> markEpToken t
     e' <- markAnnotated e
     c' <- markEpToken c
     return (HsTypedBracket (o',c') e')
 
-  exact (HsUntypedBracket an (ExpBr a e)) = do
-    an0 <- markEpAnnL an  lidl AnnOpenEQ -- "[|"
-    an1 <- markEpAnnL an0 lidl AnnOpenE  -- "[e|" -- optional
+  exact (HsUntypedBracket a (ExpBr (o,c) e)) = do
+    o' <- case o of
+      BracketNoE  t -> BracketNoE  <$> markEpUniToken t
+      BracketHasE t -> BracketHasE <$> markEpToken t
     e' <- markAnnotated e
-    an2 <- markEpAnnL an1 lidl AnnCloseQ -- "|]"
-    return (HsUntypedBracket an2 (ExpBr a e'))
+    c' <- markEpUniToken c
+    return (HsUntypedBracket a (ExpBr (o',c') e'))
 
-  exact (HsUntypedBracket an (PatBr a e)) = do
-    an0 <- markEpAnnLMS'' an lidl AnnOpen (Just "[p|")
+  exact (HsUntypedBracket a (PatBr (o,c) e)) = do
+    o' <- markEpToken o
     e' <- markAnnotated e
-    an1 <- markEpAnnL an0 lidl AnnCloseQ -- "|]"
-    return (HsUntypedBracket an1 (PatBr a e'))
+    c' <- markEpUniToken c
+    return (HsUntypedBracket a (PatBr (o',c') e'))
 
-  exact (HsUntypedBracket an (DecBrL a e)) = do
-    an0 <- markEpAnnLMS'' an lidl AnnOpen (Just "[d|")
-    an1 <- markEpAnnL an0 lidl AnnOpenC
+  exact (HsUntypedBracket a (DecBrL (o,c, (oc,cc)) e)) = do
+    o' <- markEpToken o
+    oc' <- markEpToken oc
     e' <- markAnnotated e
-    an2 <- markEpAnnL an1 lidl AnnCloseC
-    an3 <- markEpAnnL an2 lidl AnnCloseQ -- "|]"
-    return (HsUntypedBracket an3 (DecBrL a e'))
+    cc' <- markEpToken cc
+    c' <- markEpUniToken c
+    return (HsUntypedBracket a (DecBrL (o',c',(oc',cc')) e'))
 
-  exact (HsUntypedBracket an (TypBr a e)) = do
-    an0 <- markEpAnnLMS'' an lidl AnnOpen (Just "[t|")
+  exact (HsUntypedBracket a (TypBr (o,c) e)) = do
+    o' <- markEpToken o
     e' <- markAnnotated e
-    an1 <- markEpAnnL an0 lidl AnnCloseQ -- "|]"
-    return (HsUntypedBracket an1 (TypBr a e'))
+    c' <- markEpUniToken c
+    return (HsUntypedBracket a (TypBr (o',c') e'))
 
-  exact (HsUntypedBracket an (VarBr a b e)) = do
+  exact (HsUntypedBracket a (VarBr an b e)) = do
     (an0, e') <- if b
       then do
-        an' <- markEpAnnL an lidl AnnSimpleQuote
+        an' <- printStringAtAA an "'"
         e' <- markAnnotated e
         return (an', e')
       else do
-        an' <- markEpAnnL an lidl AnnThTyQuote
+        an' <- printStringAtAA an "''"
         e' <- markAnnotated e
         return (an', e')
-    return (HsUntypedBracket an0 (VarBr a b e'))
+    return (HsUntypedBracket a (VarBr an0 b e'))
 
   exact (HsTypedSplice an s)   = do
     an0 <- markEpToken an

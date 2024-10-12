@@ -166,7 +166,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/T18052a.hs" Nothing
  -- "../../testsuite/tests/printer/T18247a.hs" Nothing
  -- "../../testsuite/tests/printer/Test10268.hs" Nothing
- "../../testsuite/tests/printer/Test10269.hs" Nothing
+ -- "../../testsuite/tests/printer/Test10269.hs" Nothing
  -- "../../testsuite/tests/printer/Test10276.hs" Nothing
  -- "../../testsuite/tests/printer/Test10278.hs" Nothing
  -- "../../testsuite/tests/printer/Test10312.hs" Nothing
@@ -209,6 +209,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/PprParenFunBind.hs" Nothing
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
  -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
+ "../../testsuite/tests/printer/Test21355.hs" Nothing
 --  "../../testsuite/tests/printer/Test22765.hs" Nothing
  -- "../../testsuite/tests/printer/Test22771.hs" Nothing
  -- "../../testsuite/tests/printer/Test23465.hs" Nothing
