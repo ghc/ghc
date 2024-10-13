@@ -27,7 +27,7 @@ module GHC.Hs.Type (
         hsMult, hsScaledThing,
         HsArrow, HsArrowOf(..),
         hsLinear, hsUnrestricted,
-        pprHsArrow, pprHsModifiers,
+        pprHsArrow, pprHsModifier, pprHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,

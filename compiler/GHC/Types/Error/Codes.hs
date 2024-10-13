@@ -619,6 +619,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalTypeExpr"                           = 35499
   GhcDiagnosticCode "TcRnUnexpectedTypeSyntaxInTerms"               = 31244
   GhcDiagnosticCode "TcRnUnknownModifier"                           = 49969
+  GhcDiagnosticCode "TcRnUnknownModifierKind"                       = 38026
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482

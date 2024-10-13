@@ -1416,10 +1416,17 @@ tc_modifier mode mod@(HsModifier _ ty) is_expected_kind = do
   (inf_ty, inf_kind) <- tc_infer_lhs_type mode ty
   if is_expected_kind inf_kind
     then return $ Just inf_ty
-    else do
-      warn_unknown <- woptM Opt_WarnUnknownModifiers
-      diagnosticTc warn_unknown $ TcRnUnknownModifier mod
-      pure Nothing
+    else case inf_kind of
+      -- MODS_TODO the point of this is to check for a modifier of unknown kind.
+      -- Seems hacky, presumably there's a standard way to do it? This only
+      -- affects modifiers that get typechecked, but rename-only modifiers
+      -- attached to class/instance declarations get an error if a modifier uses
+      -- a type var not in scope, so maybe unknown kinds are impossible?
+      TyVarTy _ -> failWithTc $ TcRnUnknownModifierKind mod
+      _ -> do
+        warn_unknown <- woptM Opt_WarnUnknownModifiers
+        diagnosticTc warn_unknown $ TcRnUnknownModifier mod
+        pure Nothing
 
 tc_modifiers :: TcTyMode -> [HsModifier GhcRn] -> (TcKind -> Bool) -> TcM [TcType]
 tc_modifiers mode mods is_expected_kind =

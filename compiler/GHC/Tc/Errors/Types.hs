@@ -4409,6 +4409,16 @@ data TcRnMessage where
   -}
   -- MODS_TODO should this be GhcTc?
   TcRnUnknownModifier :: HsModifier GhcRn -> TcRnMessage
+
+  {- | TcRnUnknownModifierKind is an error raised when a modifier is used with
+       unknown kind.
+
+       Examples:
+
+         foo :: a %m -> b
+  -}
+  -- MODS_TODO should this be GhcTc?
+  TcRnUnknownModifierKind :: HsModifier GhcRn -> TcRnMessage
   deriving Generic
 
 ----
