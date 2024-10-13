@@ -231,41 +231,32 @@ mkTyData :: SrcSpan
          -> Maybe (LHsKind GhcPs)
          -> [LConDecl GhcPs]
          -> Located (HsDeriving GhcPs)
-         -> [AddEpAnn]
+         -> AnnDataDefn
          -> P (LTyClDecl GhcPs)
 mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
          ksig data_cons (L _ maybe_deriv) annsIn
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
-       ; let anns' = annsIn Semi.<>
-                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
+       ; let anns = annsIn {andd_openp = ops, andd_closep = cps}
        ; data_cons <- checkNewOrData loc' (unLoc tc) is_type_data new_or_data data_cons
-       ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
+       ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv anns
        ; !cs' <- getCommentsFor loc'
        ; let loc = EpAnn (spanAsAnchor loc') noAnn (cs' Semi.<> cs)
-       ; return (L loc (DataDecl { tcdDExt = anns',
+       ; return (L loc (DataDecl { tcdDExt = noExtField,
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn })) }
-
--- TODO:AZ:temporary
-openParen2AddEpAnn :: EpToken "(" -> [AddEpAnn]
-openParen2AddEpAnn (EpTok l) = [AddEpAnn AnnOpenP l]
-openParen2AddEpAnn NoEpTok = []
-
-closeParen2AddEpAnn :: EpToken ")" -> [AddEpAnn]
-closeParen2AddEpAnn (EpTok l) = [AddEpAnn AnnCloseP l]
-closeParen2AddEpAnn NoEpTok = []
 
 mkDataDefn :: Maybe (LocatedP CType)
            -> Maybe (LHsContext GhcPs)
            -> Maybe (LHsKind GhcPs)
            -> DataDefnCons (LConDecl GhcPs)
            -> HsDeriving GhcPs
+           -> AnnDataDefn
            -> P (HsDataDefn GhcPs)
-mkDataDefn cType mcxt ksig data_cons maybe_deriv
+mkDataDefn cType mcxt ksig data_cons maybe_deriv anns
   = do { checkDatatypeContext mcxt
-       ; return (HsDataDefn { dd_ext = noExtField
+       ; return (HsDataDefn { dd_ext = anns
                             , dd_cType = cType
                             , dd_ctxt = mcxt
                             , dd_cons = data_cons
@@ -316,15 +307,13 @@ mkTyFamInstEqn :: SrcSpan
                -> HsOuterFamEqnTyVarBndrs GhcPs
                -> LHsType GhcPs
                -> LHsType GhcPs
-               -> [AddEpAnn]
+               -> EpToken "="
                -> P (LTyFamInstEqn GhcPs)
-mkTyFamInstEqn loc bndrs lhs rhs anns
+mkTyFamInstEqn loc bndrs lhs rhs annEq
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
-       ; let anns' = anns Semi.<>
-                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; return (L loc' $ FamEqn
-                        { feqn_ext    = anns'
+                        { feqn_ext    = (ops, cps, annEq)
                         , feqn_tycon  = tc
                         , feqn_bndrs  = bndrs
                         , feqn_pats   = tparams
@@ -339,18 +328,17 @@ mkDataFamInst :: SrcSpan
               -> Maybe (LHsKind GhcPs)
               -> [LConDecl GhcPs]
               -> Located (HsDeriving GhcPs)
-              -> [AddEpAnn]
+              -> AnnDataDefn
               -> P (LInstDecl GhcPs)
 mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons (L _ maybe_deriv) anns
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; data_cons <- checkNewOrData loc (unLoc tc) False new_or_data data_cons
-       ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
+       ; let anns' = anns {andd_openp = ops, andd_closep = cps}
+       ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv anns'
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
-       ; let anns' = anns Semi.<>
-                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; return (L loc' (DataFamInstD noExtField (DataFamInstDecl
-                  (FamEqn { feqn_ext    = anns'
+                  (FamEqn { feqn_ext    = ([], [], NoEpTok)
                           , feqn_tycon  = tc
                           , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams
@@ -361,11 +349,12 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
 
 mkTyFamInst :: SrcSpan
             -> TyFamInstEqn GhcPs
-            -> [AddEpAnn]
+            -> EpToken "type"
+            -> EpToken "instance"
             -> P (LInstDecl GhcPs)
-mkTyFamInst loc eqn anns = do
+mkTyFamInst loc eqn t i = do
   return (L (noAnnSrcSpan loc) (TyFamInstD noExtField
-              (TyFamInstDecl anns eqn)))
+              (TyFamInstDecl (t,i) eqn)))
 
 mkFamDecl :: SrcSpan
           -> FamilyInfo GhcPs
@@ -373,14 +362,13 @@ mkFamDecl :: SrcSpan
           -> LHsType GhcPs                   -- LHS
           -> LFamilyResultSig GhcPs          -- Optional result signature
           -> Maybe (LInjectivityAnn GhcPs)   -- Injectivity annotation
-          -> [AddEpAnn]
+          -> AnnFamilyDecl
           -> P (LTyClDecl GhcPs)
 mkFamDecl loc info topLevel lhs ksig injAnn annsIn
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (ppr info) equals_or_where tc tparams
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
-       ; let anns' = annsIn Semi.<>
-                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
+       ; let anns' = annsIn { afd_openp = ops, afd_closep = cps }
        ; return (L loc' (FamDecl noExtField (FamilyDecl
                                            { fdExt       = anns'
                                            , fdTopLevel  = topLevel
@@ -1050,8 +1038,8 @@ checkRecordSyntax lr@(L loc r)
 
 -- | Check if the gadt_constrlist is empty. Only raise parse error for
 -- `data T where` to avoid affecting existing error message, see #8258.
-checkEmptyGADTs :: Located ([AddEpAnn], [LConDecl GhcPs])
-                -> P (Located ([AddEpAnn], [LConDecl GhcPs]))
+checkEmptyGADTs :: Located ((EpToken "where", EpToken "{", EpToken "}"), [LConDecl GhcPs])
+                -> P (Located ((EpToken "where", EpToken "{", EpToken "}"), [LConDecl GhcPs]))
 checkEmptyGADTs gadts@(L span (_, []))           -- Empty GADT declaration.
     = do gadtSyntax <- getBit GadtSyntaxBit   -- GADTs implies GADTSyntax
          unless gadtSyntax $ addError $ mkPlainErrorMsgEnvelope span $
