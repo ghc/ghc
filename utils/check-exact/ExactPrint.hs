@@ -3755,24 +3755,24 @@ instance ExactPrint (TyClDecl GhcPs) where
     decl' <- markAnnotated decl
     return (FamDecl a decl')
 
-  exact (SynDecl { tcdSExt = an
+  exact (SynDecl { tcdSExt = AnnSynDecl ops cps t eq
                  , tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
                  , tcdRhs = rhs }) = do
     -- There may be arbitrary parens around parts of the constructor
     -- that are infix.  Turn these into comments so that they feed
     -- into the right place automatically
     -- TODO: no longer sorting on insert. What now?
-    an0 <- annotationsToComments an lidl [AnnOpenP,AnnCloseP]
-    an1 <- markEpAnnL an0 lidl AnnType
+    epTokensToComments AnnOpenP ops
+    epTokensToComments AnnCloseP cps
+    t' <- markEpToken t
 
     (_anx, ltycon', tyvars',_,_) <- exactVanillaDeclHead ltycon tyvars fixity Nothing
-    an2 <- markEpAnnL an1 lidl AnnEqual
+    eq' <- markEpToken eq
     rhs' <- markAnnotated rhs
-    return (SynDecl { tcdSExt = an2
+    return (SynDecl { tcdSExt = AnnSynDecl [] [] t' eq'
                     , tcdLName = ltycon', tcdTyVars = tyvars', tcdFixity = fixity
                     , tcdRhs = rhs' })
 
-  -- TODO: add a workaround for https://gitlab.haskell.org/ghc/ghc/-/issues/20452
   exact (DataDecl { tcdDExt = an, tcdLName = ltycon, tcdTyVars = tyvars
                   , tcdFixity = fixity, tcdDataDefn = defn }) = do
     (_, an', ltycon', tyvars', _, defn') <-

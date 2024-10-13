@@ -240,8 +240,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:15:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:15:12 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:15:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:15:12 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:15:6-8 })
@@ -452,8 +457,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:16:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:16:13 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:16:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:16:13 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:16:6-9 })
@@ -664,8 +674,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:19:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:19:10 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:19:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:19:10 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:19:6-8 })
@@ -1069,8 +1084,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:26:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:26:11 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:26:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:26:11 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:26:6-9 })
@@ -1159,8 +1179,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:27:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:27:12 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:27:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:27:12 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:27:6-10 })
@@ -1298,8 +1323,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:28:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:28:14 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:28:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:28:14 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:28:6-10 })
@@ -1481,8 +1511,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:31:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:31:19 }))]
+      (AnnSynDecl
+       []
+       []
+       (EpTok
+        (EpaSpan { KindSigs.hs:31:1-4 }))
+       (EpTok
+        (EpaSpan { KindSigs.hs:31:19 })))
       (L
        (EpAnn
         (EpaSpan { KindSigs.hs:31:6-17 })

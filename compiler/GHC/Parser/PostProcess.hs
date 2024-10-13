@@ -275,15 +275,15 @@ mkDataDefn cType mcxt ksig data_cons maybe_deriv
 mkTySynonym :: SrcSpan
             -> LHsType GhcPs  -- LHS
             -> LHsType GhcPs  -- RHS
-            -> [AddEpAnn]
+            -> EpToken "type"
+            -> EpToken "="
             -> P (LTyClDecl GhcPs)
-mkTySynonym loc lhs rhs annsIn
+mkTySynonym loc lhs rhs antype aneq
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (text "type") equalsDots tc tparams
-       ; let anns' = annsIn Semi.<>
-                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
+       ; let anns = AnnSynDecl ops cps antype aneq
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
-       ; return (L loc' (SynDecl { tcdSExt = anns'
+       ; return (L loc' (SynDecl { tcdSExt = anns
                                  , tcdLName = tc, tcdTyVars = tyvars
                                  , tcdFixity = fixity
                                  , tcdRhs = rhs })) }

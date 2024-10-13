@@ -1315,7 +1315,7 @@ ty_decl :: { LTyClDecl GhcPs }
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% mkTySynonym (comb2 $1 $4) $2 $4 [mj AnnType $1,mj AnnEqual $3] }
+                {% mkTySynonym (comb2 $1 $4) $2 $4 (epTok $1) (epTok $3) }
 
            -- type family declarations
         | 'type' 'family' type opt_tyfam_kind_sig opt_injective_info
