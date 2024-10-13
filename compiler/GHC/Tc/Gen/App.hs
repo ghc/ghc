@@ -984,8 +984,6 @@ expr_to_type earg =
          ; res' <- go res
          ; return (L l (HsFunTy noExtField mult' arg' res'))}
          where
-          -- MODS_TODO seems like no tests cover this? At least we can set
-          -- `go_arrow = undefined` without causing more test failures.
           go_arrow = case mult of
             HsStandardArrow _ mods -> HsStandardArrow noExtField <$> mapM go_modifier mods
             HsLinearArrow _ mods -> HsLinearArrow noExtField <$> mapM go_modifier mods

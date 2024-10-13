@@ -542,22 +542,6 @@ hsUnrestricted = HsScaled (HsStandardArrow x [])
       GhcRn -> noExtField
       GhcTc -> noExtField
 
--- isUnrestricted :: HsArrow GhcRn -> Bool
--- isUnrestricted (arrowToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == manyDataConName
--- isUnrestricted _ = False
-
--- arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
--- arrowToHsType = expandHsArrow (HsTyVar noAnn NotPromoted)
-
--- | Convert an arrow into its corresponding multiplicity. In essence this
--- erases the information of whether the programmer wrote an explicit
--- multiplicity or a shorthand.
--- MODS_TODO: this is now only used for expr arrows?
--- expandHsArrow :: (LocatedN Name -> t GhcRn) -> HsArrowOf (LocatedA (t GhcRn)) GhcRn -> LocatedA (t GhcRn)
--- expandHsArrow mk_var (HsUnrestrictedArrow _) = noLocA (mk_var (noLocA manyDataConName))
--- expandHsArrow mk_var (HsLinearArrow _ _) = noLocA (mk_var (noLocA oneDataConName))
--- expandHsArrow _mk_var (HsExplicitMult _ p) = p
-
 instance
       (Outputable mult, OutputableBndrId pass) =>
       Outputable (HsArrowOf mult (GhcPass pass)) where
