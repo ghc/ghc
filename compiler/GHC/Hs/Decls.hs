@@ -31,8 +31,10 @@ module GHC.Hs.Decls (
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  AnnDataDefn(..),
   AnnClassDecl(..),
   AnnSynDecl(..),
+  AnnFamilyDecl(..),
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   tyClGroupKindSigs,
@@ -343,7 +345,7 @@ type instance XSynDecl      GhcPs = AnnSynDecl
 type instance XSynDecl      GhcRn = NameSet -- FVs
 type instance XSynDecl      GhcTc = NameSet -- FVs
 
-type instance XDataDecl     GhcPs = [AddEpAnn]
+type instance XDataDecl     GhcPs = NoExtField
 type instance XDataDecl     GhcRn = DataDeclRn
 type instance XDataDecl     GhcTc = DataDeclRn
 
@@ -363,8 +365,26 @@ type instance XClassDecl    GhcTc = NameSet -- FVs
 
 type instance XXTyClDecl    (GhcPass _) = DataConCantHappen
 
-type instance XCTyFamInstDecl (GhcPass _) = [AddEpAnn]
+type instance XCTyFamInstDecl (GhcPass _) = (EpToken "type", EpToken "instance")
 type instance XXTyFamInstDecl (GhcPass _) = DataConCantHappen
+
+data AnnDataDefn
+  = AnnDataDefn {
+      andd_openp    :: [EpToken "("],
+      andd_closep   :: [EpToken ")"],
+      andd_type     :: EpToken "type",
+      andd_newtype  :: EpToken "newtype",
+      andd_data     :: EpToken "data",
+      andd_instance :: EpToken "instance",
+      andd_dcolon   :: TokDcolon,
+      andd_where    :: EpToken "where",
+      andd_openc    :: EpToken "{",
+      andd_closec   :: EpToken "}",
+      andd_equal    :: EpToken "="
+  } deriving Data
+
+instance NoAnn AnnDataDefn where
+  noAnn = AnnDataDefn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 data AnnClassDecl
   = AnnClassDecl {
@@ -539,7 +559,7 @@ pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = nd } })
 instance OutputableBndrId p => Outputable (FunDep (GhcPass p)) where
   ppr = pprFunDep
 
-type instance XCFunDep    (GhcPass _) = [AddEpAnn]
+type instance XCFunDep    (GhcPass _) = TokRarrow
 type instance XXFunDep    (GhcPass _) = DataConCantHappen
 
 pprFundeps :: OutputableBndrId p => [FunDep (GhcPass p)] -> SDoc
@@ -573,9 +593,27 @@ type instance XCKindSig         (GhcPass _) = NoExtField
 type instance XTyVarSig         (GhcPass _) = NoExtField
 type instance XXFamilyResultSig (GhcPass _) = DataConCantHappen
 
-type instance XCFamilyDecl    (GhcPass _) = [AddEpAnn]
+type instance XCFamilyDecl    (GhcPass _) = AnnFamilyDecl
 type instance XXFamilyDecl    (GhcPass _) = DataConCantHappen
 
+data AnnFamilyDecl
+  = AnnFamilyDecl {
+      afd_openp  :: [EpToken "("],
+      afd_closep :: [EpToken ")"],
+      afd_type   :: EpToken "type",
+      afd_data   :: EpToken "data",
+      afd_family :: EpToken "family",
+      afd_dcolon :: TokDcolon,
+      afd_equal  :: EpToken "=",
+      afd_vbar   :: EpToken "|",
+      afd_where  :: EpToken "where",
+      afd_openc  :: EpToken "{",
+      afd_dotdot :: EpToken "..",
+      afd_closec :: EpToken "}"
+  } deriving Data
+
+instance NoAnn AnnFamilyDecl where
+  noAnn = AnnFamilyDecl noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 ------------- Functions over FamilyDecls -----------
 
@@ -600,7 +638,7 @@ resultVariableName _                = Nothing
 
 ------------- Pretty printing FamilyDecls -----------
 
-type instance XCInjectivityAnn  (GhcPass _) = [AddEpAnn]
+type instance XCInjectivityAnn  (GhcPass _) = TokRarrow
 type instance XXInjectivityAnn  (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
@@ -644,7 +682,7 @@ instance OutputableBndrId p
 *                                                                      *
 ********************************************************************* -}
 
-type instance XCHsDataDefn    (GhcPass _) = NoExtField
+type instance XCHsDataDefn    (GhcPass _) = AnnDataDefn
 type instance XXHsDataDefn    (GhcPass _) = DataConCantHappen
 
 type instance XCHsDerivingClause    (GhcPass _) = [AddEpAnn]
@@ -834,7 +872,7 @@ ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
 ************************************************************************
 -}
 
-type instance XCFamEqn    (GhcPass _) r = [AddEpAnn]
+type instance XCFamEqn    (GhcPass _) r = ([EpToken "("], [EpToken ")"], EpToken "=")
 type instance XXFamEqn    (GhcPass _) r = DataConCantHappen
 
 ----------------- Class instances -------------
@@ -1125,7 +1163,7 @@ mapDerivStrategy f ds = foldDerivStrategy ds (ViaStrategy . f) ds
 ************************************************************************
 -}
 
-type instance XCDefaultDecl    GhcPs = [AddEpAnn]
+type instance XCDefaultDecl    GhcPs = (EpToken "default", EpToken "(", EpToken ")")
 type instance XCDefaultDecl    GhcRn = NoExtField
 type instance XCDefaultDecl    GhcTc = NoExtField
 
@@ -1213,7 +1251,7 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XCRuleDecls    GhcPs = ([AddEpAnn], SourceText)
+type instance XCRuleDecls    GhcPs = ((EpaLocation, EpaLocation), SourceText)
 type instance XCRuleDecls    GhcRn = SourceText
 type instance XCRuleDecls    GhcTc = SourceText
 
@@ -1298,7 +1336,7 @@ pprFullRuleName st (L _ n) = pprWithSourceText st (doubleQuotes $ ftext n)
 ************************************************************************
 -}
 
-type instance XWarnings      GhcPs = ([AddEpAnn], SourceText)
+type instance XWarnings      GhcPs = ((EpaLocation, EpaLocation), SourceText)
 type instance XWarnings      GhcRn = SourceText
 type instance XWarnings      GhcTc = SourceText
 

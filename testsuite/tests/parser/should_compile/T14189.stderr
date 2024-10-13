@@ -37,7 +37,18 @@
          [])
         (Prefix)
         (HsDataDefn
-         (NoExtField)
+         (AnnDataDefn
+          []
+          []
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (Nothing)
          (Nothing)
          (Nothing)

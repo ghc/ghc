@@ -291,14 +291,14 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
         ; ksig' <- cvtKind `traverse` ksig
         ; con' <- cvtDataDefnCons False ksig $ NewTypeCon constr
         ; derivs' <- cvtDerivs derivs
-        ; let defn = HsDataDefn { dd_ext = noExtField
+        ; let defn = HsDataDefn { dd_ext = noAnn
                                 , dd_cType = Nothing
                                 , dd_ctxt = mkHsContextMaybe ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = con'
                                 , dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
-          DataDecl { tcdDExt = noAnn
+          DataDecl { tcdDExt = noExtField
                    , tcdLName = tc', tcdTyVars = tvs'
                    , tcdFixity = Prefix
                    , tcdDataDefn = defn } }
@@ -363,7 +363,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
        ; ksig' <- cvtKind `traverse` ksig
        ; cons' <- cvtDataDefnCons False ksig $ DataTypeCons False constrs
        ; derivs' <- cvtDerivs derivs
-       ; let defn = HsDataDefn { dd_ext = noExtField
+       ; let defn = HsDataDefn { dd_ext = noAnn
                                , dd_cType = Nothing
                                , dd_ctxt = mkHsContextMaybe ctxt'
                                , dd_kindSig = ksig'
@@ -385,7 +385,7 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
        ; ksig' <- cvtKind `traverse` ksig
        ; con' <- cvtDataDefnCons False ksig $ NewTypeCon constr
        ; derivs' <- cvtDerivs derivs
-       ; let defn = HsDataDefn { dd_ext = noExtField
+       ; let defn = HsDataDefn { dd_ext = noAnn
                                , dd_cType = Nothing
                                , dd_ctxt = mkHsContextMaybe ctxt'
                                , dd_kindSig = ksig'
@@ -504,14 +504,14 @@ cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
         ; cons' <- cvtDataDefnCons type_data ksig $
                    DataTypeCons type_data constrs
         ; derivs' <- cvtDerivs derivs
-        ; let defn = HsDataDefn { dd_ext = noExtField
+        ; let defn = HsDataDefn { dd_ext = noAnn
                                 , dd_cType = Nothing
                                 , dd_ctxt = mkHsContextMaybe ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = cons'
                                 , dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
-          DataDecl { tcdDExt = noAnn
+          DataDecl { tcdDExt = noExtField
                    , tcdLName = tc', tcdTyVars = tvs'
                    , tcdFixity = Prefix
                    , tcdDataDefn = defn } }

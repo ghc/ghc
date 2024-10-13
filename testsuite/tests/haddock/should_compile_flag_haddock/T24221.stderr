@@ -47,8 +47,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { T24221.hs:3:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { T24221.hs:5:3 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { T24221.hs:3:6-9 })
@@ -63,7 +62,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:3:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:5:3 })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -285,8 +297,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { T24221.hs:11:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { T24221.hs:11:11 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { T24221.hs:11:6-9 })
@@ -301,7 +312,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:11:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:11:11 })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -401,8 +425,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { T24221.hs:14:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { T24221.hs:14:11 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { T24221.hs:14:6-9 })
@@ -417,7 +440,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:14:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:14:11 })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -559,8 +595,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { T24221.hs:19:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { T24221.hs:19:11 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { T24221.hs:19:6-9 })
@@ -575,7 +610,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:19:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:19:11 })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -717,8 +765,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { T24221.hs:27:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { T24221.hs:27:11 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { T24221.hs:27:6-9 })
@@ -733,7 +780,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:27:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:27:11 })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -906,8 +966,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { T24221.hs:31:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { T24221.hs:31:11 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { T24221.hs:31:6-9 })
@@ -922,7 +981,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:31:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:31:11 })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -1107,8 +1179,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { T24221.hs:36:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { T24221.hs:36:11 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { T24221.hs:36:6-9 })
@@ -1123,7 +1194,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:36:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T24221.hs:36:11 })))
        (Nothing)
        (Nothing)
        (Nothing)
