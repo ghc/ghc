@@ -31,6 +31,7 @@ module GHC.Hs.Decls (
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  AnnDataDefn(..),
   AnnClassDecl(..),
   AnnSynDecl(..),
   TyClGroup(..),
@@ -359,7 +360,7 @@ type instance XSynDecl      GhcPs = AnnSynDecl
 type instance XSynDecl      GhcRn = NameSet -- FVs
 type instance XSynDecl      GhcTc = NameSet -- FVs
 
-type instance XDataDecl     GhcPs = [AddEpAnn]
+type instance XDataDecl     GhcPs = NoExtField
 type instance XDataDecl     GhcRn = DataDeclRn
 type instance XDataDecl     GhcTc = DataDeclRn
 
@@ -379,8 +380,26 @@ type instance XClassDecl    GhcTc = NameSet -- FVs
 
 type instance XXTyClDecl    (GhcPass _) = DataConCantHappen
 
-type instance XCTyFamInstDecl (GhcPass _) = [AddEpAnn]
+type instance XCTyFamInstDecl (GhcPass _) = (EpToken "type", EpToken "instance")
 type instance XXTyFamInstDecl (GhcPass _) = DataConCantHappen
+
+data AnnDataDefn
+  = AnnDataDefn {
+      andd_openp    :: [EpToken "("],
+      andd_closep   :: [EpToken ")"],
+      andd_type     :: EpToken "type",
+      andd_newtype  :: EpToken "newtype",
+      andd_data     :: EpToken "data",
+      andd_instance :: EpToken "instance",
+      andd_dcolon   :: TokDcolon,
+      andd_where    :: EpToken "where",
+      andd_openc    :: EpToken "{",
+      andd_closec   :: EpToken "}",
+      andd_equal    :: EpToken "="
+  } deriving Data
+
+instance NoAnn AnnDataDefn where
+  noAnn = AnnDataDefn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 data AnnClassDecl
   = AnnClassDecl {
@@ -664,7 +683,7 @@ instance OutputableBndrId p
 *                                                                      *
 ********************************************************************* -}
 
-type instance XCHsDataDefn    (GhcPass _) = NoExtField
+type instance XCHsDataDefn    (GhcPass _) = AnnDataDefn
 type instance XXHsDataDefn    (GhcPass _) = DataConCantHappen
 
 type instance XCHsDerivingClause    (GhcPass _) = [AddEpAnn]
@@ -854,7 +873,7 @@ ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
 ************************************************************************
 -}
 
-type instance XCFamEqn    (GhcPass _) r = [AddEpAnn]
+type instance XCFamEqn    (GhcPass _) r = ([EpToken "("], [EpToken ")"], EpToken "=")
 type instance XXFamEqn    (GhcPass _) r = DataConCantHappen
 
 ----------------- Class instances -------------

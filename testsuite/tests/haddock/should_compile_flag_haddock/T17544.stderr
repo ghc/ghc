@@ -1032,8 +1032,10 @@
            []))
          (DataFamInstDecl
           (FamEqn
-           [(AddEpAnn AnnData (EpaSpan { T17544.hs:24:3-6 }))
-           ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:24:15-19 }))]
+           ((,,)
+            []
+            []
+            (NoEpTok))
            (L
             (EpAnn
              (EpaSpan { T17544.hs:24:8-9 })
@@ -1068,7 +1070,20 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (NoExtField)
+            (AnnDataDefn
+             []
+             []
+             (NoEpTok)
+             (NoEpTok)
+             (EpTok
+              (EpaSpan { T17544.hs:24:3-6 }))
+             (NoEpTok)
+             (NoEpUniTok)
+             (EpTok
+              (EpaSpan { T17544.hs:24:15-19 }))
+             (NoEpTok)
+             (NoEpTok)
+             (NoEpTok))
             (Nothing)
             (Nothing)
             (Nothing)
@@ -1380,8 +1395,10 @@
            []))
          (DataFamInstDecl
           (FamEqn
-           [(AddEpAnn AnnData (EpaSpan { T17544.hs:30:3-6 }))
-           ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:30:15-19 }))]
+           ((,,)
+            []
+            []
+            (NoEpTok))
            (L
             (EpAnn
              (EpaSpan { T17544.hs:30:8-9 })
@@ -1416,7 +1433,20 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (NoExtField)
+            (AnnDataDefn
+             []
+             []
+             (NoEpTok)
+             (NoEpTok)
+             (EpTok
+              (EpaSpan { T17544.hs:30:3-6 }))
+             (NoEpTok)
+             (NoEpUniTok)
+             (EpTok
+              (EpaSpan { T17544.hs:30:15-19 }))
+             (NoEpTok)
+             (NoEpTok)
+             (NoEpTok))
             (Nothing)
             (Nothing)
             (Nothing)
@@ -1728,8 +1758,10 @@
            []))
          (DataFamInstDecl
           (FamEqn
-           [(AddEpAnn AnnData (EpaSpan { T17544.hs:36:3-6 }))
-           ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:36:15-19 }))]
+           ((,,)
+            []
+            []
+            (NoEpTok))
            (L
             (EpAnn
              (EpaSpan { T17544.hs:36:8-9 })
@@ -1764,7 +1796,20 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (NoExtField)
+            (AnnDataDefn
+             []
+             []
+             (NoEpTok)
+             (NoEpTok)
+             (EpTok
+              (EpaSpan { T17544.hs:36:3-6 }))
+             (NoEpTok)
+             (NoEpUniTok)
+             (EpTok
+              (EpaSpan { T17544.hs:36:15-19 }))
+             (NoEpTok)
+             (NoEpTok)
+             (NoEpTok))
             (Nothing)
             (Nothing)
             (Nothing)
@@ -2076,8 +2121,10 @@
            []))
          (DataFamInstDecl
           (FamEqn
-           [(AddEpAnn AnnData (EpaSpan { T17544.hs:42:3-6 }))
-           ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:42:15-19 }))]
+           ((,,)
+            []
+            []
+            (NoEpTok))
            (L
             (EpAnn
              (EpaSpan { T17544.hs:42:8-9 })
@@ -2112,7 +2159,20 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (NoExtField)
+            (AnnDataDefn
+             []
+             []
+             (NoEpTok)
+             (NoEpTok)
+             (EpTok
+              (EpaSpan { T17544.hs:42:3-6 }))
+             (NoEpTok)
+             (NoEpUniTok)
+             (EpTok
+              (EpaSpan { T17544.hs:42:15-19 }))
+             (NoEpTok)
+             (NoEpTok)
+             (NoEpTok))
             (Nothing)
             (Nothing)
             (Nothing)
@@ -2424,8 +2484,10 @@
            []))
          (DataFamInstDecl
           (FamEqn
-           [(AddEpAnn AnnData (EpaSpan { T17544.hs:48:3-6 }))
-           ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:48:15-19 }))]
+           ((,,)
+            []
+            []
+            (NoEpTok))
            (L
             (EpAnn
              (EpaSpan { T17544.hs:48:8-9 })
@@ -2460,7 +2522,20 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (NoExtField)
+            (AnnDataDefn
+             []
+             []
+             (NoEpTok)
+             (NoEpTok)
+             (EpTok
+              (EpaSpan { T17544.hs:48:3-6 }))
+             (NoEpTok)
+             (NoEpUniTok)
+             (EpTok
+              (EpaSpan { T17544.hs:48:15-19 }))
+             (NoEpTok)
+             (NoEpTok)
+             (NoEpTok))
             (Nothing)
             (Nothing)
             (Nothing)
@@ -2772,8 +2847,10 @@
            []))
          (DataFamInstDecl
           (FamEqn
-           [(AddEpAnn AnnData (EpaSpan { T17544.hs:54:3-6 }))
-           ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:54:16-20 }))]
+           ((,,)
+            []
+            []
+            (NoEpTok))
            (L
             (EpAnn
              (EpaSpan { T17544.hs:54:8-10 })
@@ -2808,7 +2885,20 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (NoExtField)
+            (AnnDataDefn
+             []
+             []
+             (NoEpTok)
+             (NoEpTok)
+             (EpTok
+              (EpaSpan { T17544.hs:54:3-6 }))
+             (NoEpTok)
+             (NoEpUniTok)
+             (EpTok
+              (EpaSpan { T17544.hs:54:16-20 }))
+             (NoEpTok)
+             (NoEpTok)
+             (NoEpTok))
             (Nothing)
             (Nothing)
             (Nothing)

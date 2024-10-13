@@ -82,8 +82,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { DumpParsedAst.hs:7:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:7:12 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { DumpParsedAst.hs:7:6-10 })
@@ -98,7 +97,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { DumpParsedAst.hs:7:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { DumpParsedAst.hs:7:12 })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -300,7 +312,11 @@
             (EpaComments
              []))
            (FamEqn
-            [(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:11:19 }))]
+            ((,,)
+             []
+             []
+             (EpTok
+              (EpaSpan { DumpParsedAst.hs:11:19 })))
             (L
              (EpAnn
               (EpaSpan { DumpParsedAst.hs:11:3-8 })
@@ -479,7 +495,11 @@
             (EpaComments
              []))
            (FamEqn
-            [(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:12:19 }))]
+            ((,,)
+             []
+             []
+             (EpTok
+              (EpaSpan { DumpParsedAst.hs:12:19 })))
             (L
              (EpAnn
               (EpaSpan { DumpParsedAst.hs:12:3-8 })
@@ -642,8 +662,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { DumpParsedAst.hs:15:1-4 }))
-      ,(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:15:19 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { DumpParsedAst.hs:15:6 })
@@ -734,7 +753,20 @@
                {OccName: k})))))))])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { DumpParsedAst.hs:15:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { DumpParsedAst.hs:15:19 })))
        (Nothing)
        (Nothing)
        (Nothing)
@@ -1014,7 +1046,11 @@
             (EpaComments
              []))
            (FamEqn
-            [(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:19:17 }))]
+            ((,,)
+             []
+             []
+             (EpTok
+              (EpaSpan { DumpParsedAst.hs:19:17 })))
             (L
              (EpAnn
               (EpaSpan { DumpParsedAst.hs:19:3-4 })
@@ -1501,10 +1537,10 @@
       (NoExtField)
       (DataFamInstDecl
        (FamEqn
-        [(AddEpAnn AnnNewtype (EpaSpan { DumpParsedAst.hs:22:1-7 }))
-        ,(AddEpAnn AnnInstance (EpaSpan { DumpParsedAst.hs:22:9-16 }))
-        ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:22:39-40 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:22:62-66 }))]
+        ((,,)
+         []
+         []
+         (NoEpTok))
         (L
          (EpAnn
           (EpaSpan { DumpParsedAst.hs:22:18-20 })
@@ -1613,7 +1649,22 @@
                     {OccName: Type})))))))))))]
         (Prefix)
         (HsDataDefn
-         (NoExtField)
+         (AnnDataDefn
+          []
+          []
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { DumpParsedAst.hs:22:1-7 }))
+          (NoEpTok)
+          (EpTok (EpaSpan { DumpParsedAst.hs:22:9-16 }))
+          (EpUniTok
+           (EpaSpan { DumpParsedAst.hs:22:39-40 })
+           (NormalSyntax))
+          (EpTok
+           (EpaSpan { DumpParsedAst.hs:22:62-66 }))
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (Nothing)
          (Nothing)
          (Just
@@ -1779,8 +1830,9 @@
                     (EpAnn
                      (EpaSpan { DumpParsedAst.hs:23:11-20 })
                      ((,)
-                      (AddEpAnn AnnForall (EpaSpan { DumpParsedAst.hs:23:11-16 }))
-                      (AddEpAnn AnnDot (EpaSpan { DumpParsedAst.hs:23:20 })))
+                      (EpUniTok (EpaSpan { DumpParsedAst.hs:23:11-16 }) NormalSyntax)
+                      (EpTok
+                       (EpaSpan { DumpParsedAst.hs:23:20 })))
                      (EpaComments
                       []))
                     [(L

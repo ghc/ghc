@@ -154,7 +154,18 @@
          [])
         (Prefix)
         (HsDataDefn
-         (NoExtField)
+         (AnnDataDefn
+          []
+          []
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (Nothing)
          (Nothing)
          (Nothing)
@@ -256,7 +267,10 @@
               (EpaComments
                []))
              (FamEqn
-              []
+              ((,,)
+               []
+               []
+               (NoEpTok))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:13:3-8 })
@@ -429,7 +443,10 @@
               (EpaComments
                []))
              (FamEqn
-              []
+              ((,,)
+               []
+               []
+               (NoEpTok))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:14:3-8 })
@@ -784,7 +801,10 @@
         (NoExtField)
         (DataFamInstDecl
          (FamEqn
-          []
+          ((,,)
+           []
+           []
+           (NoEpTok))
           (L
            (EpAnn
             (EpaSpan { DumpRenamedAst.hs:19:18-20 })
@@ -888,7 +908,18 @@
                      {Name: GHC.Types.Type}))))))))))]
           (Prefix)
           (HsDataDefn
-           (NoExtField)
+           (AnnDataDefn
+            []
+            []
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpUniTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok))
            (Nothing)
            (Nothing)
            (Just
@@ -1041,8 +1072,8 @@
                       (EpAnn
                        (EpaDelta { <no location info> } (SameLine 0) [])
                        ((,)
-                        (AddEpAnn Annlarrowtail (EpaDelta { <no location info> } (SameLine 0) []))
-                        (AddEpAnn Annlarrowtail (EpaDelta { <no location info> } (SameLine 0) [])))
+                        (NoEpUniTok)
+                        (NoEpTok))
                        (EpaComments
                         []))
                       [(L
@@ -1347,7 +1378,18 @@
                 {Name: k}))))))])
         (Prefix)
         (HsDataDefn
-         (NoExtField)
+         (AnnDataDefn
+          []
+          []
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (Nothing)
          (Nothing)
          (Nothing)
@@ -1463,7 +1505,10 @@
               (EpaComments
                []))
              (FamEqn
-              []
+              ((,,)
+               []
+               []
+               (NoEpTok))
               (L
                (EpAnn
                 (EpaSpan { DumpRenamedAst.hs:26:3-4 })
@@ -2176,9 +2221,15 @@
             (EpaComments
              []))
            (TyFamInstDecl
-            [(AddEpAnn AnnType (EpaSpan { DumpRenamedAst.hs:32:3-6 }))]
+            ((,)
+             (EpTok
+              (EpaSpan { DumpRenamedAst.hs:32:3-6 }))
+             (NoEpTok))
             (FamEqn
-             []
+             ((,,)
+              []
+              []
+              (NoEpTok))
              (L
               (EpAnn
                (EpaSpan { DumpRenamedAst.hs:32:8 })

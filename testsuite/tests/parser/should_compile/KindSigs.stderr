@@ -97,7 +97,11 @@
             (EpaComments
              []))
            (FamEqn
-            [(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:12:9 }))]
+            ((,,)
+             []
+             []
+             (EpTok
+              (EpaSpan { KindSigs.hs:12:9 })))
             (L
              (EpAnn
               (EpaSpan { KindSigs.hs:12:3-5 })

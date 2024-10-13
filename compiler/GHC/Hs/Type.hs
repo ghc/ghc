@@ -31,7 +31,7 @@ module GHC.Hs.Type (
         pprHsArrow,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsForAllTelescope(..), EpAnnForallTy,
+        HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
         HsBndrVar(..),
@@ -163,16 +163,15 @@ getBangStrictness _ = (mkHsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 fromMaybeContext :: Maybe (LHsContext (GhcPass p)) -> HsContext (GhcPass p)
 fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA []) mctxt
 
-type instance XHsForAllVis   (GhcPass _) = EpAnnForallTy
+type instance XHsForAllVis   (GhcPass _) = EpAnn (EpUniToken "forall" "∀", EpUniToken "->" "→")
                                            -- Location of 'forall' and '->'
-type instance XHsForAllInvis (GhcPass _) = EpAnnForallTy
+type instance XHsForAllInvis (GhcPass _) = EpAnn (EpUniToken "forall" "∀", EpToken ".")
                                            -- Location of 'forall' and '.'
 
 type instance XXHsForAllTelescope (GhcPass _) = DataConCantHappen
 
-type EpAnnForallTy = EpAnn (AddEpAnn, AddEpAnn)
-  -- ^ Location of 'forall' and '->' for HsForAllVis
-  -- Location of 'forall' and '.' for HsForAllInvis
+type EpAnnForallVis   = EpAnn (EpUniToken "forall" "∀", EpUniToken "->" "→")
+type EpAnnForallInvis = EpAnn (EpUniToken "forall" "∀", EpToken ".")
 
 type HsQTvsRn = [Name]  -- Implicit variables
   -- For example, in   data T (a :: k1 -> k2) = ...
@@ -184,12 +183,12 @@ type instance XHsQTvs GhcTc = HsQTvsRn
 
 type instance XXLHsQTyVars  (GhcPass _) = DataConCantHappen
 
-mkHsForAllVisTele ::EpAnnForallTy ->
+mkHsForAllVisTele ::EpAnnForallVis ->
   [LHsTyVarBndr () (GhcPass p)] -> HsForAllTelescope (GhcPass p)
 mkHsForAllVisTele an vis_bndrs =
   HsForAllVis { hsf_xvis = an, hsf_vis_bndrs = vis_bndrs }
 
-mkHsForAllInvisTele :: EpAnnForallTy
+mkHsForAllInvisTele :: EpAnnForallInvis
   -> [LHsTyVarBndr Specificity (GhcPass p)] -> HsForAllTelescope (GhcPass p)
 mkHsForAllInvisTele an invis_bndrs =
   HsForAllInvis { hsf_xinvis = an, hsf_invis_bndrs = invis_bndrs }
@@ -207,7 +206,7 @@ type instance XHsOuterImplicit GhcPs = NoExtField
 type instance XHsOuterImplicit GhcRn = [Name]
 type instance XHsOuterImplicit GhcTc = [TyVar]
 
-type instance XHsOuterExplicit GhcPs _    = EpAnnForallTy
+type instance XHsOuterExplicit GhcPs _    = EpAnnForallInvis
 type instance XHsOuterExplicit GhcRn _    = NoExtField
 type instance XHsOuterExplicit GhcTc flag = [VarBndr TyVar flag]
 
@@ -323,7 +322,7 @@ hsOuterExplicitBndrs (HsOuterImplicit{})                  = []
 mkHsOuterImplicit :: HsOuterTyVarBndrs flag GhcPs
 mkHsOuterImplicit = HsOuterImplicit{hso_ximplicit = noExtField}
 
-mkHsOuterExplicit :: EpAnnForallTy -> [LHsTyVarBndr flag GhcPs]
+mkHsOuterExplicit :: EpAnnForallInvis -> [LHsTyVarBndr flag GhcPs]
                   -> HsOuterTyVarBndrs flag GhcPs
 mkHsOuterExplicit an bndrs = HsOuterExplicit { hso_xexplicit = an
                                              , hso_bndrs     = bndrs }
@@ -333,7 +332,7 @@ mkHsImplicitSigType body =
   HsSig { sig_ext   = noExtField
         , sig_bndrs = mkHsOuterImplicit, sig_body = body }
 
-mkHsExplicitSigType :: EpAnnForallTy
+mkHsExplicitSigType :: EpAnnForallInvis
                     -> [LHsTyVarBndr Specificity GhcPs] -> LHsType GhcPs
                     -> HsSigType GhcPs
 mkHsExplicitSigType an bndrs body =

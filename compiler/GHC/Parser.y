@@ -1329,10 +1329,13 @@ ty_decl :: { LTyClDecl GhcPs }
 
           -- ordinary data type or newtype declaration
         | type_data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
-                {% mkTyData (comb4 $1 $3 $4 $5) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
+            {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $1}
+                  ; let { tequal = fst $ unLoc $4 }
+                  ; mkTyData (comb4 $1 $3 $4 $5) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                            Nothing (reverse (snd $ unLoc $4))
                                    (fmap reverse $5)
-                           ((fstOf3 $ unLoc $1)++(fst $ unLoc $4)) }
+                           (AnnDataDefn [] [] ttype tnewtype tdata NoEpTok NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)
+                             }}
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
 
@@ -1340,10 +1343,13 @@ ty_decl :: { LTyClDecl GhcPs }
         | type_data_or_newtype capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
-            {% mkTyData (comb5 $1 $3 $4 $5 $6) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
+            {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $1}
+                  ; let { tdcolon = fst $ unLoc $4 }
+                  ; let { (twhere, oc, cc) = fst $ unLoc $5 }
+                  ; mkTyData (comb5 $1 $3 $4 $5 $6) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                             (snd $ unLoc $4) (snd $ unLoc $5)
                             (fmap reverse $6)
-                            ((fstOf3 $ unLoc $1)++(fst $ unLoc $4)++(fst $ unLoc $5)) }
+                            (AnnDataDefn [] [] ttype tnewtype tdata NoEpTok tdcolon twhere oc cc NoEpTok)}}
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
 
@@ -1386,25 +1392,29 @@ inst_decl :: { LInstDecl GhcPs }
            -- type instance declarations
         | 'type' 'instance' ty_fam_inst_eqn
                 {% mkTyFamInst (comb2 $1 $3) (unLoc $3)
-                        (mj AnnType $1:mj AnnInstance $2:[]) }
+                        (epTok $1) (epTok $2) }
 
           -- data/newtype instance declaration
         | data_or_newtype 'instance' capi_ctype datafam_inst_hdr constrs
                           maybe_derivings
-            {% mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
+            {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
+                  ; let { tequal = fst $ unLoc $5 }
+                  ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
                                       Nothing (reverse (snd  $ unLoc $5))
                                               (fmap reverse $6)
-                      ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $5)) }
+                            (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $2) NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)}}
 
           -- GADT instance declaration
         | data_or_newtype 'instance' capi_ctype datafam_inst_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
-            {% mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 (unLoc $4)
+            {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
+                  ; let { dcolon = fst $ unLoc $5 }
+                  ; let { (twhere, oc, cc) = fst $ unLoc $6 }
+                  ; mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 (unLoc $4)
                                    (snd $ unLoc $5) (snd $ unLoc $6)
                                    (fmap reverse $7)
-                     ((fst $ unLoc $1):mj AnnInstance $2
-                       :(fst $ unLoc $5)++(fst $ unLoc $6)) }
+                            (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $2) dcolon twhere oc cc NoEpTok)}}
 
 overlap_pragma :: { Maybe (LocatedP OverlapMode) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
@@ -1492,9 +1502,9 @@ ty_fam_inst_eqn :: { LTyFamInstEqn GhcPs }
                     ; tvbs <- fromSpecTyVarBndrs $2
                     ; let loc = comb2 $1 $>
                     ; !cs <- getCommentsFor loc
-                    ; mkTyFamInstEqn loc (mkHsOuterExplicit (EpAnn (glEE $1 $3) (mu AnnForall $1, mj AnnDot $3) cs) tvbs) $4 $6 [mj AnnEqual $5] }}
+                    ; mkTyFamInstEqn loc (mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3) cs) tvbs) $4 $6 (epTok $5) }}
         | type '=' ktype
-              {% mkTyFamInstEqn (comb2 $1 $>) mkHsOuterImplicit $1 $3 (mj AnnEqual $2:[]) }
+              {% mkTyFamInstEqn (comb2 $1 $>) mkHsOuterImplicit $1 $3 (epTok $2) }
               -- Note the use of type for the head; this allows
               -- infix type constructors and type patterns
 
@@ -1532,18 +1542,18 @@ at_decl_cls :: { LHsDecl GhcPs }
            -- default type instances, with optional 'instance' keyword
         | 'type' ty_fam_inst_eqn
                 {% liftM mkInstD (mkTyFamInst (comb2 $1 $2) (unLoc $2)
-                          [mj AnnType $1]) }
+                          (epTok $1) NoEpTok) }
         | 'type' 'instance' ty_fam_inst_eqn
                 {% liftM mkInstD (mkTyFamInst (comb2 $1 $3) (unLoc $3)
-                              (mj AnnType $1:mj AnnInstance $2:[]) )}
+                              (epTok $1) (epTok $2) )}
 
 opt_family   :: { [AddEpAnn] }
               : {- empty -}   { [] }
               | 'family'      { [mj AnnFamily $1] }
 
-opt_instance :: { [AddEpAnn] }
-              : {- empty -} { [] }
-              | 'instance'  { [mj AnnInstance $1] }
+opt_instance :: { EpToken "instance" }
+              : {- empty -} { NoEpTok }
+              | 'instance'  { epTok $1 }
 
 -- Associated type instances
 --
@@ -1553,38 +1563,44 @@ at_decl_inst :: { LInstDecl GhcPs }
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
                 {% mkTyFamInst (comb2 $1 $3) (unLoc $3)
-                          (mj AnnType $1:$2) }
+                          (epTok $1) $2 }
 
         -- data/newtype instance declaration, with optional 'instance' keyword
         | data_or_newtype opt_instance capi_ctype datafam_inst_hdr constrs maybe_derivings
-               {% mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
+            {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
+                  ; let { tequal = fst $ unLoc $5 }
+                  ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
                                     Nothing (reverse (snd $ unLoc $5))
-                                            (fmap reverse $6)
-                        ((fst $ unLoc $1):$2++(fst $ unLoc $5)) }
+                                             (fmap reverse $6)
+                            (AnnDataDefn [] [] NoEpTok tnewtype tdata $2 NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)}}
 
         -- GADT instance declaration, with optional 'instance' keyword
         | data_or_newtype opt_instance capi_ctype datafam_inst_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
-                {% mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
+             {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
+                   ; let { dcolon = fst $ unLoc $5 }
+                   ; let { (twhere, oc, cc) = fst $ unLoc $6 }
+                   ; mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
                                 (unLoc $4) (snd $ unLoc $5) (snd $ unLoc $6)
                                 (fmap reverse $7)
-                        ((fst $ unLoc $1):$2++(fst $ unLoc $5)++(fst $ unLoc $6)) }
+                            (AnnDataDefn [] [] NoEpTok tnewtype tdata $2 dcolon twhere oc cc NoEpTok)}}
 
-type_data_or_newtype :: { Located ([AddEpAnn], Bool, NewOrData) }
-        : 'data'        { sL1 $1 ([mj AnnData    $1],            False,DataType) }
-        | 'newtype'     { sL1 $1 ([mj AnnNewtype $1],            False,NewType) }
-        | 'type' 'data' { sL1 $1 ([mj AnnType $1, mj AnnData $2],True ,DataType) }
+type_data_or_newtype :: { Located ((EpToken "data", EpToken "newtype", EpToken "type")
+                                   , Bool, NewOrData) }
+        : 'data'        { sL1 $1 ((epTok $1, NoEpTok,  NoEpTok),  False,DataType) }
+        | 'newtype'     { sL1 $1 ((NoEpTok,  epTok $1, NoEpTok),  False,NewType) }
+        | 'type' 'data' { sL1 $1 ((epTok $2, NoEpTok,  epTok $1), True ,DataType) }
 
-data_or_newtype :: { Located (AddEpAnn, NewOrData) }
-        : 'data'        { sL1 $1 (mj AnnData    $1,DataType) }
-        | 'newtype'     { sL1 $1 (mj AnnNewtype $1,NewType) }
+data_or_newtype :: { Located ((EpToken "data", EpToken "newtype"), NewOrData) }
+        : 'data'        { sL1 $1 ((epTok $1, NoEpTok), DataType) }
+        | 'newtype'     { sL1 $1 ((NoEpTok,  epTok $1),NewType) }
 
 -- Family result/return kind signatures
 
-opt_kind_sig :: { Located ([AddEpAnn], Maybe (LHsKind GhcPs)) }
-        :               { noLoc     ([]               , Nothing) }
-        | '::' kind     { sLL $1 $> ([mu AnnDcolon $1], Just $2) }
+opt_kind_sig :: { Located (TokDcolon, Maybe (LHsKind GhcPs)) }
+        :               { noLoc     (NoEpUniTok , Nothing) }
+        | '::' kind     { sLL $1 $> (epUniTok $1, Just $2) }
 
 opt_datafam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
         :               { noLoc     ([]               , noLocA (NoSig noExtField)         )}
@@ -1623,13 +1639,13 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
                                                          >>= \tvbs ->
                                                              (acs (comb2 $1 $>) (\loc cs -> (L loc
                                                                                   (Just ( addTrailingDarrowC $4 $5 cs)
-                                                                                        , mkHsOuterExplicit (EpAnn (glEE $1 $3) (mu AnnForall $1, mj AnnDot $3) emptyComments) tvbs, $6))))
+                                                                                        , mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3) emptyComments) tvbs, $6))))
                                                     }
         | 'forall' tv_bndrs '.' type   {% do { hintExplicitForall $1
                                              ; tvbs <- fromSpecTyVarBndrs $2
                                              ; let loc = comb2 $1 $>
                                              ; !cs <- getCommentsFor loc
-                                             ; return (sL loc (Nothing, mkHsOuterExplicit (EpAnn (glEE $1 $3) (mu AnnForall $1, mj AnnDot $3) cs) tvbs, $4))
+                                             ; return (sL loc (Nothing, mkHsOuterExplicit (EpAnn (glEE $1 $3) (epUniTok $1, epTok $3) cs) tvbs, $4))
                                        } }
         | context '=>' type         {% acs (comb2 $1 $>) (\loc cs -> (L loc (Just (addTrailingDarrowC $1 $2 cs), mkHsOuterImplicit, $3))) }
         | type                      { sL1 $1 (Nothing, mkHsOuterImplicit, $1) }
@@ -2184,11 +2200,11 @@ unpackedness :: { Located UnpackednessPragma }
 forall_telescope :: { Located (HsForAllTelescope GhcPs) }
         : 'forall' tv_bndrs '.'  {% do { hintExplicitForall $1
                                        ; acs (comb2 $1 $>) (\loc cs -> (L loc $
-                                           mkHsForAllInvisTele (EpAnn (glEE $1 $>) (mu AnnForall $1,mu AnnDot $3) cs) $2 )) }}
+                                           mkHsForAllInvisTele (EpAnn (glEE $1 $>) (epUniTok $1,epTok $3) cs) $2 )) }}
         | 'forall' tv_bndrs '->' {% do { hintExplicitForall $1
                                        ; req_tvbs <- fromSpecTyVarBndrs $2
                                        ; acs (comb2 $1 $>) (\loc cs -> (L loc $
-                                           mkHsForAllVisTele (EpAnn (glEE $1 $>) (mu AnnForall $1,mu AnnRarrow $3) cs) req_tvbs )) }}
+                                           mkHsForAllVisTele (EpAnn (glEE $1 $>) (epUniTok $1,epUniTok $3) cs) req_tvbs )) }}
 
 -- A ktype is a ctype, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
@@ -2478,20 +2494,20 @@ constructors.
 -----------------------------------------------------------------------------
 -- Datatype declarations
 
-gadt_constrlist :: { Located ([AddEpAnn]
+gadt_constrlist :: { Located ((EpToken "where", EpToken "{", EpToken "}")
                           ,[LConDecl GhcPs]) } -- Returned in order
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
                                                       L (comb2 $1 $4)
-                                                        ([mj AnnWhere $1
-                                                         ,moc $2
-                                                         ,mcc $4]
+                                                        ((epTok $1
+                                                         ,epTok $2
+                                                         ,epTok $4)
                                                         , unLoc $3) }
         | 'where' vocurly    gadt_constrs close  {% checkEmptyGADTs $
                                                       L (comb2 $1 $3)
-                                                        ([mj AnnWhere $1]
+                                                        ((epTok $1, NoEpTok, NoEpTok)
                                                         , unLoc $3) }
-        | {- empty -}                            { noLoc ([],[]) }
+        | {- empty -}                            { noLoc (noAnn,[]) }
 
 gadt_constrs :: { Located [LConDecl GhcPs] }
         : gadt_constr ';' gadt_constrs
@@ -2525,8 +2541,8 @@ consequence, GADT constructor names are restricted (names like '(*)' are
 allowed in usual data constructors, but not in GADTs).
 -}
 
-constrs :: { Located ([AddEpAnn],[LConDecl GhcPs]) }
-        : '=' constrs1    { sLL $1 $2 ([mj AnnEqual $1],unLoc $2)}
+constrs :: { Located (EpToken "=",[LConDecl GhcPs]) }
+        : '=' constrs1    { sLL $1 $2 (epTok $1,unLoc $2)}
 
 constrs1 :: { Located [LConDecl GhcPs] }
         : constrs1 '|' constr

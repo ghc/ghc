@@ -76,9 +76,10 @@
       (NoExtField)
       (DataFamInstDecl
        (FamEqn
-        [(AddEpAnn AnnData (EpaSpan { Test20239.hs:5:1-4 }))
-        ,(AddEpAnn AnnInstance (EpaSpan { Test20239.hs:5:6-13 }))
-        ,(AddEpAnn AnnEqual (EpaSpan { Test20239.hs:5:34 }))]
+        ((,,)
+         []
+         []
+         (NoEpTok))
         (L
          (EpAnn
           (EpaSpan { Test20239.hs:5:15-20 })
@@ -113,7 +114,20 @@
               {OccName: PGMigration})))))]
         (Prefix)
         (HsDataDefn
-         (NoExtField)
+         (AnnDataDefn
+          []
+          []
+          (NoEpTok)
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { Test20239.hs:5:1-4 }))
+          (EpTok (EpaSpan { Test20239.hs:5:6-13 }))
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { Test20239.hs:5:34 })))
          (Nothing)
          (Nothing)
          (Nothing)
