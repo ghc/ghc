@@ -1,6 +1,6 @@
-
 T7148.hs:27:40: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘Tagged a b’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘iso2’
           from type ‘forall b1. SameType b1 () -> SameType b1 b’
             to type ‘forall b1. SameType b1 () -> SameType b1 (Tagged a b)’
@@ -11,6 +11,7 @@ T7148.hs:27:40: error: [GHC-25897]
 
 T7148.hs:27:40: error: [GHC-25897]
     • Couldn't match type ‘b’ with ‘Tagged a b’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘iso1’
           from type ‘forall b1. SameType () b1 -> SameType b b1’
             to type ‘forall b1. SameType () b1 -> SameType (Tagged a b) b1’
@@ -18,3 +19,4 @@ T7148.hs:27:40: error: [GHC-25897]
         the deriving clause for ‘IsoUnit (Tagged a b)’
         at T7148.hs:27:40-46
     • When deriving the instance for (IsoUnit (Tagged a b))
+
