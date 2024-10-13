@@ -630,7 +630,10 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
        ; let all_fvs = meth_fvs `plusFV` more_fvs
                                 `plusFV` inst_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       -- MODS_TODO do I care about free vars in modifiers here?
+       -- MODS_TODO do we care about free vars in modifiers here? Actually it
+       -- seems like they throw errors. And in
+       --     %a instance Foo a where
+       -- a is out of scope.
        ; (modifiers', _) <- rnModifiersContext ctxt modifiers
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
@@ -1809,7 +1812,10 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; docs' <- traverse rnLDocDecl docs
-        -- MODS_TODO do we care about free vars in modifiers?
+        -- MODS_TODO do we care about free vars in modifiers here? Actually it
+        -- seems like they throw errors. And in
+        --     %a class Foo a where
+        -- a is out of scope.
         ; (modifiers', _) <- rnModifiersContext cls_doc modifiers
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
