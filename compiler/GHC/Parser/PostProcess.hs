@@ -161,7 +161,7 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
 import Data.Either
-import Data.List        ( findIndex, partition )
+import Data.List        ( findIndex )
 import Data.Foldable
 import qualified Data.Semigroup as Semi
 import GHC.Unit.Module.Warnings
@@ -738,8 +738,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr (locA loc) decl
            -- conAnn should only be AnnOpenP, AnnCloseP, so the rest should be empty
-           ; let (ann_fun, rest) = mk_ann_funrhs []
-           ; unless (null rest) $ return $ panic "mkPatSynMatchGroup: unexpected anns"
+           ; let ann_fun = mk_ann_funrhs [] []
            ; match <- case details of
                PrefixCon _ pats -> return $ Match { m_ext = noExtField
                                                   , m_ctxt = ctxt, m_pats = L l pats
@@ -1332,12 +1331,12 @@ checkAPat loc e0 = do
      addError $ mkPlainErrorMsgEnvelope (getLocA op) PsErrAtInPatPos
      return (WildPat noExtField)
 
-   PatBuilderOpApp l (L cl c) r anns
+   PatBuilderOpApp l (L cl c) r (_os,_cs)
      | isRdrDataCon c || isRdrTc c -> do
          l <- checkLPat l
          r <- checkLPat r
          return $ ConPat
-           { pat_con_ext = mk_ann_conpat anns
+           { pat_con_ext = noAnn
            , pat_con = L cl c
            , pat_args = InfixCon l r
            }
@@ -1390,9 +1389,8 @@ checkValDef loc lhs (mult_ann, Nothing) grhss
   | HsNoMultAnn{} <- mult_ann
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
-            Just (fun, is_infix, pats, ann) -> do
-              let (ann_fun, ann_rest) = mk_ann_funrhs ann
-              unless (null ann_rest) $ panic "checkValDef: unexpected anns"
+            Just (fun, is_infix, pats, ops, cps) -> do
+              let ann_fun = mk_ann_funrhs ops cps
               let l = listLocation pats
               checkFunBind loc ann_fun
                            fun is_infix (L l pats) grhss
@@ -1405,29 +1403,8 @@ checkValDef loc lhs (mult_ann, Nothing) ghrss
   = do lhs' <- checkPattern lhs
        checkPatBind loc lhs' ghrss mult_ann
 
-mk_ann_funrhs :: [AddEpAnn] -> (AnnFunRhs, [AddEpAnn])
-mk_ann_funrhs ann = (AnnFunRhs strict (map to_tok opens) (map to_tok closes), rest)
-  where
-    (opens, ra0) = partition (\(AddEpAnn kw _) -> kw == AnnOpenP) ann
-    (closes, ra1) = partition (\(AddEpAnn kw _) -> kw == AnnCloseP) ra0
-    (bangs, rest) = partition (\(AddEpAnn kw _) -> kw == AnnBang) ra1
-    strict = case bangs of
-               (AddEpAnn _ s:_) -> EpTok s
-               _ -> NoEpTok
-    to_tok (AddEpAnn _ s) = EpTok s
-
-mk_ann_conpat :: [AddEpAnn] -> (Maybe (EpToken "{"), Maybe (EpToken "}"))
-mk_ann_conpat ann = (open, close)
-  where
-    (opens, ra0) = partition (\(AddEpAnn kw _) -> kw == AnnOpenC) ann
-    (closes, _ra1) = partition (\(AddEpAnn kw _) -> kw == AnnCloseC) ra0
-    open = case opens of
-      (o:_) -> Just (to_tok o)
-      _ -> Nothing
-    close = case closes of
-      (o:_) -> Just (to_tok o)
-      _ -> Nothing
-    to_tok (AddEpAnn _ s) = EpTok s
+mk_ann_funrhs :: [EpToken "("] -> [EpToken ")"] -> AnnFunRhs
+mk_ann_funrhs ops cps = AnnFunRhs NoEpTok ops cps
 
 checkFunBind :: SrcSpan
              -> AnnFunRhs
@@ -1469,10 +1446,10 @@ checkPatBind :: SrcSpan
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> HsMultAnn GhcPs
              -> P (HsBind GhcPs)
-checkPatBind loc (L _ (BangPat ans (L _ (VarPat _ v))))
+checkPatBind loc (L _ (BangPat an (L _ (VarPat _ v))))
                         (L _match_span grhss) (HsNoMultAnn _)
       = return (makeFunBind v (L (noAnnSrcSpan loc)
-                [L (noAnnSrcSpan loc) (m ans v)]))
+                [L (noAnnSrcSpan loc) (m an v)]))
   where
     m a v = Match { m_ext = noExtField
                   , m_ctxt = FunRhs { mc_fun    = v
@@ -1518,7 +1495,7 @@ checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
 
 isFunLhs :: LocatedA (PatBuilder GhcPs)
       -> P (Maybe (LocatedN RdrName, LexicalFixity,
-                   [LocatedA (ArgPatBuilder GhcPs)],[AddEpAnn]))
+                   [LocatedA (ArgPatBuilder GhcPs)],[EpToken "("],[EpToken ")"]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 isFunLhs e = go e [] [] []
@@ -1528,7 +1505,7 @@ isFunLhs e = go e [] [] []
    go (L l (PatBuilderVar (L loc f))) es ops cps
        | not (isRdrDataCon f)        = do
            let (_l, loc') = transferCommentsOnlyA l loc
-           return (Just (L loc' f, Prefix, es, (reverse ops) ++ cps))
+           return (Just (L loc' f, Prefix, es, (reverse ops), cps))
    go (L l (PatBuilderApp (L lf f) e))   es       ops cps = do
      let (_l, lf') = transferCommentsOnlyA l lf
      go (L lf' f) (mk e:es) ops cps
@@ -1538,21 +1515,21 @@ isFunLhs e = go e [] [] []
       -- of funlhs.
      where
        (_l, le') = transferCommentsOnlyA l le
-       (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
-   go (L loc (PatBuilderOpApp (L ll l) (L loc' op) r anns)) es ops cps
+       (o,c) = mkParensEpToks (realSrcSpan $ locA l)
+   go (L loc (PatBuilderOpApp (L ll l) (L loc' op) r (os,cs))) es ops cps
       | not (isRdrDataCon op)         -- We have found the function!
       = do { let (_l, ll') = transferCommentsOnlyA loc ll
-           ; return (Just (L loc' op, Infix, (mk (L ll' l):mk r:es), (anns ++ reverse ops ++ cps))) }
+           ; return (Just (L loc' op, Infix, (mk (L ll' l):mk r:es), (os ++ reverse ops), (cs ++ cps))) }
       | otherwise                     -- Infix data con; keep going
       = do { let (_l, ll') = transferCommentsOnlyA loc ll
            ; mb_l <- go (L ll' l) es ops cps
            ; return (reassociate =<< mb_l) }
         where
-          reassociate (op', Infix, j : L k_loc (ArgPatBuilderVisPat k) : es', anns')
-            = Just (op', Infix, j : op_app : es', anns')
+          reassociate (op', Infix, j : L k_loc (ArgPatBuilderVisPat k) : es', ops', cps')
+            = Just (op', Infix, j : op_app : es', ops', cps')
             where
               op_app = mk $ L loc (PatBuilderOpApp (L k_loc k)
-                                    (L loc' op) r (reverse ops ++ cps))
+                                    (L loc' op) r (reverse ops, cps))
           reassociate _other = Nothing
    go (L l (PatBuilderAppType (L lp pat) tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
              = go (L lp' pat) (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
@@ -2052,7 +2029,7 @@ instance DisambECP (PatBuilder GhcPs) where
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ PatBuilderOpApp p1 op p2 []
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ PatBuilderOpApp p1 op p2 ([],[])
 
   mkHsLamPV l lam_variant _ _     = addFatalError $ mkPlainErrorMsgEnvelope l (PsErrLambdaInPat lam_variant)
 

@@ -72,6 +72,7 @@ module GHC.Parser.Lexer (
    disableHaddock,
    lexTokenStream,
    mkParensEpAnn,
+   mkParensEpToks,
    mkParensLocs,
    getCommentsFor, getPriorCommentsFor, getFinalCommentsFor,
    getEofPos,
@@ -3628,6 +3629,7 @@ warn_unknown_prag prags span buf len buf2 = do
 %************************************************************************
 -}
 
+-- TODO:AZ: we should have only mkParensEpToks. Delee mkParensEpAnn, mkParensLocs
 
 -- |Given a 'RealSrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
 -- 'AddEpAnn' values for the opening and closing bordering on the start
@@ -3643,6 +3645,22 @@ mkParensEpAnn ss = (AddEpAnn AnnOpenP (EpaSpan (RealSrcSpan lo Strict.Nothing)),
     ec = srcSpanEndCol ss
     lo = mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))
     lc = mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss)
+
+-- |Given a 'RealSrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
+-- 'AddEpAnn' values for the opening and closing bordering on the start
+-- and end of the span
+mkParensEpToks :: RealSrcSpan -> (EpToken "(", EpToken ")")
+mkParensEpToks ss = (EpTok (EpaSpan (RealSrcSpan lo Strict.Nothing)),
+                    EpTok (EpaSpan (RealSrcSpan lc Strict.Nothing)))
+  where
+    f = srcSpanFile ss
+    sl = srcSpanStartLine ss
+    sc = srcSpanStartCol ss
+    el = srcSpanEndLine ss
+    ec = srcSpanEndCol ss
+    lo = mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))
+    lc = mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss)
+
 
 -- |Given a 'RealSrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
 -- 'EpaLocation' values for the opening and closing bordering on the start
