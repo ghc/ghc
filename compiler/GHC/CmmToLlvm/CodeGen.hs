@@ -2107,9 +2107,16 @@ genLit opt (CmmInt i w)
         --                 ]
     in return (mkIntLit width i, nilOL, [])
 
-genLit _ (CmmFloat r w)
-  = return (LMLitVar $ LMFloatLit (fromRational r) (widthToLlvmFloat w),
+genLit _ (CmmFloat r W32)
+  = return (LMLitVar $ LMFloatLit (widenFp (fromRational r :: Float)) (widthToLlvmFloat W32),
               nilOL, [])
+
+genLit _ (CmmFloat r W64)
+  = return (LMLitVar $ LMFloatLit (fromRational r :: Double) (widthToLlvmFloat W64),
+              nilOL, [])
+
+genLit _ (CmmFloat _r _w)
+  = panic "genLit (CmmLit:CmmFloat), unsupported float lit"
 
 genLit opt (CmmVec ls)
   = do llvmLits <- mapM toLlvmLit ls

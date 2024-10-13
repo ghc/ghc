@@ -10,6 +10,7 @@ module GHC.CmmToLlvm.Data (
 import GHC.Prelude
 
 import GHC.Llvm
+import GHC.Llvm.Types (widenFp)
 import GHC.CmmToLlvm.Base
 import GHC.CmmToLlvm.Config
 
@@ -193,8 +194,14 @@ genStaticLit :: CmmLit -> LlvmM LlvmStatic
 genStaticLit (CmmInt i w)
     = return $ LMStaticLit (LMIntLit i (LMInt $ widthInBits w))
 
-genStaticLit (CmmFloat r w)
-    = return $ LMStaticLit (LMFloatLit (fromRational r) (widthToLlvmFloat w))
+genStaticLit (CmmFloat r W32)
+    = return $ LMStaticLit (LMFloatLit (widenFp (fromRational r :: Float)) (widthToLlvmFloat W32))
+
+genStaticLit (CmmFloat r W64)
+    = return $ LMStaticLit (LMFloatLit (fromRational r :: Double) (widthToLlvmFloat W64))
+
+genStaticLit (CmmFloat _r _w)
+    = panic "genStaticLit (CmmLit:CmmFloat), unsupported float lit"
 
 genStaticLit (CmmVec ls)
     = do sls <- mapM toLlvmLit ls
