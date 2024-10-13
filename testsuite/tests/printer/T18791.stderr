@@ -47,8 +47,7 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      [(AddEpAnn AnnData (EpaSpan { T18791.hs:4:1-4 }))
-      ,(AddEpAnn AnnWhere (EpaSpan { T18791.hs:4:8-12 }))]
+      (NoExtField)
       (L
        (EpAnn
         (EpaSpan { T18791.hs:4:6 })
@@ -63,7 +62,20 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
+       (AnnDataDefn
+        []
+        []
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T18791.hs:4:1-4 }))
+        (NoEpTok)
+        (NoEpUniTok)
+        (EpTok
+         (EpaSpan { T18791.hs:4:8-12 }))
+        (NoEpTok)
+        (NoEpTok)
+        (NoEpTok))
        (Nothing)
        (Nothing)
        (Nothing)

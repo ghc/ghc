@@ -61,6 +61,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `ext1Q` list
               `extQ` list_addEpAnn
               `extQ` list_epaLocation
+              `extQ` list_epTokenOpenP
+              `extQ` list_epTokenCloseP
               `extQ` string `extQ` fastString `extQ` srcSpan `extQ` realSrcSpan
               `extQ` annotationModule
               `extQ` annotationGrhsAnn
@@ -72,9 +74,13 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` addEpAnn
               `extQ` epTokenOC
               `extQ` epTokenCC
+              `extQ` epTokenInstance
+              `extQ` epTokenForall
               `extQ` annParen
               `extQ` annClassDecl
               `extQ` annSynDecl
+              `extQ` annDataDefn
+              `extQ` annFamilyDecl
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
               `extQ` deltaPos
@@ -116,6 +122,18 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             list_epaLocation ls = case ba of
               BlankEpAnnotations -> parens
                                        $ text "blanked:" <+> text "[EpaLocation]"
+              NoBlankEpAnnotations -> list ls
+
+            list_epTokenOpenP :: [EpToken "("] -> SDoc
+            list_epTokenOpenP ls = case ba of
+              BlankEpAnnotations -> parens
+                                       $ text "blanked:" <+> text "[EpToken \"(\"]"
+              NoBlankEpAnnotations -> list ls
+
+            list_epTokenCloseP :: [EpToken ")"] -> SDoc
+            list_epTokenCloseP ls = case ba of
+              BlankEpAnnotations -> parens
+                                       $ text "blanked:" <+> text "[EpToken \"(\"]"
               NoBlankEpAnnotations -> list ls
 
             list []    = brackets empty
@@ -224,6 +242,26 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                         $$ vcat [showAstData' ops, showAstData' cps,
                                  showAstData' t, showAstData' e]
 
+            annDataDefn :: AnnDataDefn -> SDoc
+            annDataDefn (AnnDataDefn a b c d e f g h i j k) = case ba of
+             BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnDataDefn"
+             NoBlankEpAnnotations ->
+              parens $ text "AnnDataDefn"
+                        $$ vcat [showAstData' a, showAstData' b, showAstData' c,
+                                 showAstData' d, showAstData' e, showAstData' f,
+                                 showAstData' g, showAstData' h, showAstData' i,
+                                 showAstData' j, showAstData' k]
+
+            annFamilyDecl :: AnnFamilyDecl -> SDoc
+            annFamilyDecl (AnnFamilyDecl a b c d e f g h i j k l) = case ba of
+             BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnFamilyDecl"
+             NoBlankEpAnnotations ->
+              parens $ text "AnnFamilyDecl"
+                        $$ vcat [showAstData' a, showAstData' b, showAstData' c,
+                                 showAstData' d, showAstData' e, showAstData' f,
+                                 showAstData' g, showAstData' h, showAstData' i,
+                                 showAstData' j, showAstData' k, showAstData' l]
+
             addEpAnn :: AddEpAnn -> SDoc
             addEpAnn (AddEpAnn a s) = case ba of
              BlankEpAnnotations -> parens
@@ -253,6 +291,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             epTokenCC :: EpToken "}" -> SDoc
             epTokenCC = epToken'
 
+            epTokenInstance :: EpToken "instance" -> SDoc
+            epTokenInstance = epToken'
+
+            epTokenForall :: EpUniToken "forall" "∀" -> SDoc
+            epTokenForall = epUniToken'
+
             epToken' :: KnownSymbol sym => EpToken sym -> SDoc
             epToken' (EpTok s) = case ba of
              BlankEpAnnotations -> parens
@@ -264,6 +308,18 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                       $ text "blanked:" <+> text "EpToken"
              NoBlankEpAnnotations ->
               parens $ text "NoEpTok"
+
+            epUniToken' :: EpUniToken sym1 sym2 -> SDoc
+            epUniToken' (EpUniTok s f) = case ba of
+             BlankEpAnnotations -> parens
+                                      $ text "blanked:" <+> text "EpUniToken"
+             NoBlankEpAnnotations ->
+              parens $ text "EpUniTok" <+> epaLocation s <+> ppr f
+            epUniToken' NoEpUniTok = case ba of
+             BlankEpAnnotations -> parens
+                                      $ text "blanked:" <+> text "EpUniToken"
+             NoBlankEpAnnotations ->
+              parens $ text "NoEpUniTok"
 
 
             var  :: Var -> SDoc

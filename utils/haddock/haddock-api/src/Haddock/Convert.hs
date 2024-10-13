@@ -269,7 +269,7 @@ synifyTyCon prr _coax tc
           , tcdFixity = synifyFixity tc
           , tcdDataDefn =
               HsDataDefn
-                { dd_ext = noExtField
+                { dd_ext = noAnn
                 , dd_cons = DataTypeCons False [] -- No constructors; arbitrary lie, they are neither
                 -- algebraic data nor newtype:
                 , dd_ctxt = Nothing
@@ -401,7 +401,7 @@ synifyTyCon _prr coax tc
         alg_deriv = []
         defn =
           HsDataDefn
-            { dd_ext = noExtField
+            { dd_ext = noAnn
             , dd_ctxt = alg_ctx
             , dd_cType = Nothing
             , dd_kindSig = kindSig
