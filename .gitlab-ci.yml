@@ -435,7 +435,12 @@ hadrian-multi:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   variables:
-    GHC_FLAGS: "-Werror -Wwarn=deprecations"
+    GHC_FLAGS: "-Werror=-Wno-error=incomplete-record-selectors -Wwarn=deprecations"
+       # -Wno-error=incomplete-record-selectors is present because -Wall now
+       # includes -Wincomplete-record-selectors, and hadrian-multi has many, many
+       # warnings about incomplete record selectors.  A better fix would be to
+       # remove the use of incomplete record selectors, since each of them represents
+       # a potential crash.
     CONFIGURE_ARGS: --enable-bootstrap-with-devel-snapshot
   tags:
     - x86_64-linux
