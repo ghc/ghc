@@ -27,7 +27,7 @@ module GHC.Hs.Type (
         hsMult, hsScaledThing,
         HsArrow, HsArrowOf(..),
         hsLinear, hsUnrestricted,
-        pprHsArrow,
+        pprHsArrow, pprHsModifiers,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
@@ -561,8 +561,8 @@ instance
 
 -- See #18846
 pprHsArrow :: (Outputable mult, OutputableBndrId pass) => HsArrowOf mult (GhcPass pass) -> SDoc
-pprHsArrow (HsStandardArrow _ p) = pprArrowWithMultiplicity visArgTypeLike False (ppr p)
-pprHsArrow (HsLinearArrow _ p)   = pprArrowWithMultiplicity visArgTypeLike True (ppr p)
+pprHsArrow (HsStandardArrow _ p) = pprArrowWithMultiplicity visArgTypeLike False (pprHsModifiers p)
+pprHsArrow (HsLinearArrow _ p)   = pprArrowWithMultiplicity visArgTypeLike True (pprHsModifiers p)
 
 type instance XConDeclField  (GhcPass _) = TokDcolon
 type instance XXConDeclField (GhcPass _) = DataConCantHappen
@@ -1175,11 +1175,14 @@ instance Outputable OpName where
 ************************************************************************
 -}
 
-instance (OutputableBndrId p, Outputable ty) => Outputable (HsModifierOf ty (GhcPass p)) where
-  ppr = pprHsModifier
-
+-- | There's no 'Outputable' instance for 'HsModifierOf', because it's rare to
+-- want to ppr just one of them. For a list, 'pprHsModifiers' gives the expected
+-- output: @%a %b@ rather than @[%a, %b]@.
 pprHsModifier :: (OutputableBndrId p, Outputable ty) => HsModifierOf ty (GhcPass p) -> SDoc
 pprHsModifier (HsModifier _ ty) = char '%' <> ppr ty
+
+pprHsModifiers :: (OutputableBndrId p, Outputable ty) => [HsModifierOf ty (GhcPass p)] -> SDoc
+pprHsModifiers mods = hsep $ pprHsModifier <$> mods
 
 instance OutputableBndrId p => Outputable (HsBndrVar (GhcPass p)) where
   ppr (HsBndrVar _ name) = ppr name

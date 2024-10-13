@@ -1871,7 +1871,7 @@ instance DisambECP (HsCmd GhcPs) where
       ArrowIsFunType -> ppr a <+> pprHsArrow arr <+> ppr b
   mkHsMultPV lMods tok = case unLoc lMods of
     [] -> pure $ HsStandardArrow tok []
-    mods -> cmdFail (getLoc lMods) $ ppr mods
+    mods -> cmdFail (getLoc lMods) $ pprHsModifiers mods
   mkHsForallPV l tele cmd = cmdFail l $
     pprHsForAll tele Nothing <+> ppr cmd
   checkContextPV ctxt = cmdFail (getLocA ctxt) $ ppr ctxt

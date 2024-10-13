@@ -533,7 +533,7 @@ plusHsValBinds _ _
 -- Used to print, for instance, let bindings:
 --   let %1 x = …
 pprHsMultAnn :: forall id. OutputableBndrId id => HsMultAnn (GhcPass id) -> SDoc
-pprHsMultAnn (HsMultAnn _ p) = ppr p -- MODS_TODO fix
+pprHsMultAnn (HsMultAnn _ p) = pprHsModifiers p
 
 instance (OutputableBndrId pl, OutputableBndrId pr)
          => Outputable (HsBindLR (GhcPass pl) (GhcPass pr)) where

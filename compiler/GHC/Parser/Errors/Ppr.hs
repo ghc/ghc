@@ -31,7 +31,7 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Data.Maybe (catMaybes)
 import GHC.Hs.Expr (prependQualified, HsExpr(..), HsLamVariant(..), lamCaseKeyword)
-import GHC.Hs.Type (pprLHsContext, pprHsArrow, pprHsForAll)
+import GHC.Hs.Type (pprLHsContext, pprHsArrow, pprHsForAll, pprHsModifiers)
 import GHC.Builtin.Names (allNameStringList)
 import GHC.Builtin.Types (filterCTuple)
 import qualified GHC.LanguageExtensions as LangExt
@@ -564,7 +564,7 @@ instance Diagnostic PsMessage where
         where
           (what, ctx') = case ctx of
             PETS_FunctionArrow arg arr res -> ("function arrow", ppr arg <+> pprHsArrow arr <+> ppr res)
-            PETS_Multiplicity mods         -> ("multiplicity annotation", ppr mods) -- MODS_TODO this will probably ppr as [%One, %Many] or something
+            PETS_Multiplicity mods         -> ("multiplicity annotation", pprHsModifiers mods)
             PETS_ForallTelescope tele body -> ("forall telescope", pprHsForAll tele Nothing <+> ppr body)
             PETS_ConstraintContext ctx     -> ("constraint context", ppr ctx)
 
