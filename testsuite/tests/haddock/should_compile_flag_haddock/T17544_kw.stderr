@@ -281,8 +281,10 @@
      (NoExtField)
      (ClassDecl
       ((,,)
-       [(AddEpAnn AnnClass (EpaSpan { T17544_kw.hs:21:1-5 }))
-       ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
+       ((,)
+        [(AddEpAnn AnnClass (EpaSpan { T17544_kw.hs:21:1-5 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
+        (NoEpTok))
        (EpVirtualBraces
         (5))
        (NoAnnSortKey))

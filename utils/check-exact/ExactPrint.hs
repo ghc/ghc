@@ -3782,7 +3782,7 @@ instance ExactPrint (TyClDecl GhcPs) where
 
   -- -----------------------------------
 
-  exact (ClassDecl {tcdCExt = (an, lo, sortKey),
+  exact (ClassDecl {tcdCExt = ((an, vb), lo, sortKey),
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
@@ -3792,10 +3792,10 @@ instance ExactPrint (TyClDecl GhcPs) where
       -- TODO: add a test that demonstrates tcdDocs
       | null sigs && null methods && null ats && null at_defs -- No "where" part
       = do
-          (an0, fds', lclas', tyvars',context') <- top_matter
+          (an0, vb', fds', lclas', tyvars',context') <- top_matter
           an1 <- markEpAnnL an0 lidl AnnOpenC
           an2 <- markEpAnnL an1 lidl AnnCloseC
-          return (ClassDecl {tcdCExt = (an2, lo, sortKey),
+          return (ClassDecl {tcdCExt = ((an2, vb'), lo, sortKey),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
@@ -3805,7 +3805,7 @@ instance ExactPrint (TyClDecl GhcPs) where
 
       | otherwise       -- Laid out
       = do
-          (an0, fds', lclas', tyvars',context') <- top_matter
+          (an0, vb', fds', lclas', tyvars',context') <- top_matter
           an1 <- markEpAnnL    an0 lidl AnnOpenC
           an2 <- markEpAnnAllL' an1 lidl AnnSemi
           (sortKey', ds) <- withSortKey sortKey
@@ -3821,7 +3821,7 @@ instance ExactPrint (TyClDecl GhcPs) where
             methods' = undynamic ds
             ats'     = undynamic ds
             at_defs' = undynamic ds
-          return (ClassDecl {tcdCExt = (an3, lo, sortKey'),
+          return (ClassDecl {tcdCExt = ((an3, vb'), lo, sortKey'),
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
@@ -3833,14 +3833,14 @@ instance ExactPrint (TyClDecl GhcPs) where
           an' <- annotationsToComments an lidl  [AnnOpenP, AnnCloseP]
           an0 <- markEpAnnL an' lidl AnnClass
           (_, lclas', tyvars',_,context') <-  exactVanillaDeclHead lclas tyvars fixity context
-          (an1, fds') <- if (null fds)
-            then return (an0, fds)
+          (vb', fds') <- if (null fds)
+            then return (vb, fds)
             else do
-              an1 <- markEpAnnL an0 lidl AnnVbar
+              vb' <- markEpToken vb
               fds' <- markAnnotated fds
-              return (an1, fds')
-          an2 <- markEpAnnL an1 lidl AnnWhere
-          return (an2, fds', lclas', tyvars',context')
+              return (vb', fds')
+          an1 <- markEpAnnL an0 lidl AnnWhere
+          return (an1, vb', fds', lclas', tyvars',context')
 
 
 -- ---------------------------------------------------------------------

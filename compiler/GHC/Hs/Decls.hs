@@ -368,7 +368,7 @@ data DataDeclRn = DataDeclRn
   deriving Data
 
 type instance XClassDecl    GhcPs =
-  ( [AddEpAnn]
+  ( ([AddEpAnn], EpToken "|")
   , EpLayout              -- See Note [Class EpLayout]
   , AnnSortKey DeclTag )  -- TODO:AZ:tidy up AnnSortKey
 

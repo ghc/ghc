@@ -205,15 +205,16 @@ mkClassDecl :: SrcSpan
             -> OrdList (LHsDecl GhcPs)
             -> EpLayout
             -> [AddEpAnn]
+            -> EpToken "|" -- For Fundeps
             -> P (LTyClDecl GhcPs)
 
-mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
+mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn fdAnn
   = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
        ; (cls, tparams, fixity, ann, cs) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
        ; let anns' = annsIn Semi.<> ann
        ; let loc = EpAnn (spanAsAnchor loc') noAnn cs
-       ; return (L loc (ClassDecl { tcdCExt = (anns', layout, NoAnnSortKey)
+       ; return (L loc (ClassDecl { tcdCExt = ((anns', fdAnn), layout, NoAnnSortKey)
                                   , tcdCtxt = mcxt
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity

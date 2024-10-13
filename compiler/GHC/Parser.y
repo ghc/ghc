@@ -1293,7 +1293,7 @@ topdecl :: { LHsDecl GhcPs }
 cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
                 {% (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4))
-                        (mj AnnClass $1:(fst $ unLoc $3)++(fstOf3 $ unLoc $4)) }
+                        (mj AnnClass $1:(fstOf3 $ unLoc $4)) (fst $ unLoc $3) }
 
 -- Default declarations (toplevel)
 --
@@ -2420,10 +2420,9 @@ tyvar_wc :: { Located (HsBndrVar GhcPs) }
         : tyvar                         { sL1 $1 (HsBndrVar noExtField $1) }
         | '_'                           { sL1 $1 (HsBndrWildCard noExtField) }
 
-fds :: { Located ([AddEpAnn],[LHsFunDep GhcPs]) }
-        : {- empty -}                   { noLoc ([],[]) }
-        | '|' fds1                      { (sLL $1 $> ([mj AnnVbar $1]
-                                                 ,reverse (unLoc $2))) }
+fds :: { Located (EpToken "|",[LHsFunDep GhcPs]) }
+        : {- empty -}                   { noLoc (NoEpTok,[]) }
+        | '|' fds1                      { (sLL $1 $> (epTok $1 ,reverse (unLoc $2))) }
 
 fds1 :: { Located [LHsFunDep GhcPs] }
         : fds1 ',' fd   {%
