@@ -44,7 +44,7 @@ module GHC.Hs.Type (
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, fromMaybeContext,
-        HsModifierOf(..), HsModifier,
+        HsModifierOf(..), HsModifier, ModifierPrintsAs(..),
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs, pprHsArgsApp,
@@ -452,9 +452,13 @@ and the same principle could be applied to foralls:
 except the `forall _.` example is rejected by checkForAllTelescopeWildcardBndrs.
 -}
 
+-- | The modifier %1 is (with -XLinearTypes) renamed to %One, but we still want
+-- it to print as %1 if that's what it was written as.
+data ModifierPrintsAs = ModifierPrintsAs1 | ModifierPrintsAsSelf
+
 type instance XModifier GhcPs = EpToken "%"
-type instance XModifier GhcRn = NoExtField
-type instance XModifier GhcTc = NoExtField
+type instance XModifier GhcRn = ModifierPrintsAs
+type instance XModifier GhcTc = ModifierPrintsAs
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
@@ -1178,8 +1182,14 @@ instance Outputable OpName where
 -- | There's no 'Outputable' instance for 'HsModifierOf', because it's rare to
 -- want to ppr just one of them. For a list, 'pprHsModifiers' gives the expected
 -- output: @%a %b@ rather than @[%a, %b]@.
-pprHsModifier :: (OutputableBndrId p, Outputable ty) => HsModifierOf ty (GhcPass p) -> SDoc
-pprHsModifier (HsModifier _ ty) = char '%' <> ppr ty
+pprHsModifier :: forall p ty . (OutputableBndrId p, Outputable ty) => HsModifierOf ty (GhcPass p) -> SDoc
+pprHsModifier (HsModifier x ty) = char '%' <> case ghcPass @p of
+  GhcPs -> ppr ty
+  GhcRn -> maybe_as_1 x ty
+  GhcTc -> maybe_as_1 x ty
+  where
+    maybe_as_1 ModifierPrintsAs1 _ = char '1'
+    maybe_as_1 ModifierPrintsAsSelf ty = ppr ty
 
 pprHsModifiers :: (OutputableBndrId p, Outputable ty) => [HsModifierOf ty (GhcPass p)] -> SDoc
 pprHsModifiers mods = hsep $ pprHsModifier <$> mods

@@ -989,8 +989,10 @@ noKindTyVars _ _ = emptyVarSet
 synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
 synifyMult vs t = case t of
   ManyTy -> HsStandardArrow noExtField []
-  -- We turn OneTy into `%1 ->`, not into `⊸`.
-  _ -> HsStandardArrow noExtField [HsModifier noExtField $ synifyType WithinType vs t]
+  -- We turn OneTy into `%1 ->`, not into `⊸` or `%One ->`.
+  OneTy -> HsStandardArrow noExtField [HsModifier ModifierPrintsAs1 synified]
+  _ -> HsStandardArrow noExtField [HsModifier ModifierPrintsAsSelf synified]
+  where synified = synifyType WithinType vs t
 
 synifyPatSynType :: PatSyn -> LHsType GhcRn
 synifyPatSynType ps =

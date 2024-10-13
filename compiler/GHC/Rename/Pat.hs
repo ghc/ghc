@@ -1431,8 +1431,9 @@ rn_ty_pat ty@(XHsType{}) = do
   ctxt <- askDocContext
   liftRnFV $ rnHsType ctxt ty
 
+-- MODS_TODO does this need to handle %1?
 rn_modifier_pat :: HsModifier GhcPs -> TPRnM (HsModifier GhcRn)
-rn_modifier_pat (HsModifier _ ty) = HsModifier noExtField <$> rn_lty_pat ty
+rn_modifier_pat (HsModifier _ ty) = HsModifier ModifierPrintsAsSelf <$> rn_lty_pat ty
 
 rn_modifiers_pat :: [HsModifier GhcPs] -> TPRnM [HsModifier GhcRn]
 rn_modifiers_pat mods = traverse rn_modifier_pat mods

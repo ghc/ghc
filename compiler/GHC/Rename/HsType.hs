@@ -463,19 +463,15 @@ rnModifierWith acceptLiteral1 rn (HsModifier _ ty) = do
   -- If we see a %1 modifier, treat it the same as %One. Only %1 counts, not
   -- e.g. %01. See #18888.
   --
-  -- MODS_TODO only do this if -XLinearTypes is enabled. Doing it here means
-  -- the "unexpected modifier" warning calls it One instead of 1, is that what
-  -- we want? If not, how do we avoid it - put the original in the extension
-  -- field?
-  --
-  -- With -XNoLiteralTypes, we likely want a warning for literal 1. Maybe only
-  -- if DataKinds is disabled? Maybe attached to the DataKinds error message?
+  -- MODS_TODO: With -XNoLiteralTypes, we likely want a warning for literal 1.
+  -- Maybe only if DataKinds is disabled? Maybe attached to the DataKinds error
+  -- message?
   linearEnabled <- xoptM LangExt.LinearTypes
   case guard linearEnabled >> acceptLiteral1 ty of
-    Just literal1Rn -> return (HsModifier NoExtField literal1Rn, mempty)
+    Just literal1Rn -> return (HsModifier ModifierPrintsAs1 literal1Rn, mempty)
     Nothing -> do
       (ty', fvs) <- rn ty
-      return (HsModifier NoExtField ty', fvs)
+      return (HsModifier ModifierPrintsAsSelf ty', fvs)
 
 rnModifier :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
 rnModifier env =
