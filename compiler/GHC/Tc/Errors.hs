@@ -1562,12 +1562,13 @@ maybeAddDeferredBindings :: SolverReportErrCtxt
                          -> TcM ()
 maybeAddDeferredBindings ctxt hole report = do
   case hole_sort hole of
-    ExprHole (HER ref ref_id) -> do
+    ExprHole (HER ref) -> do
       -- Only add bindings for holes in expressions
       -- not for holes in partial type signatures
       -- cf. addDeferredBinding
       when (deferringAnyBindings ctxt) $ do
-        err_tm <- mkErrorTerm ctxt (hole_loc hole) (idType ref_id) report
+        -- TODO: is (hole_ty hole) the right Type? Before it used the Type from the HER, but were these actually the same, or was it an error to replace it with `hole_ty hole`?
+        err_tm <- mkErrorTerm ctxt (hole_loc hole) (hole_ty hole) report 
           -- FIXME: verify this comment makes sense after HER change
           -- NB: ref_id, not hole_id. hole_id might be rewritten.
           -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint

@@ -305,15 +305,14 @@ emitWantedEvVars orig = mapM (emitWantedEvVar orig)
 -- | Emit a new wanted expression hole
 emitNewExprHole :: Id -> TcM HoleExprRef
 emitNewExprHole id
-  = do { ref <- newTcRef (pprPanic "unfilled unbound-variable evidence" (ppr (idUnique id)))
-       ; let her = HER ref id
+  = do { her <- HER <$> newTcRef (pprPanic "unfilled unbound-variable evidence" (ppr (idUnique id)))
        ; let rdrName = getRdrName id
        ; loc <- getCtLocM (ExprHoleOrigin (Just rdrName)) (Just TypeLevel)
-       ; let hole = Hole { hole_sort = ExprHole her
+       -- TODO: Could Hole just contain an Id?
+       ; emitHole $ Hole { hole_sort = ExprHole her
                          , hole_occ  = rdrName
                          , hole_ty   = idType id
                          , hole_loc  = loc }
-       ; emitHole hole
        ; return her }
 
 newDict :: Class -> [TcType] -> TcM DictId

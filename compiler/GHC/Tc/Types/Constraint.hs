@@ -408,19 +408,19 @@ data HoleSort = ExprHole HoleExprRef
                  -- Differentiated from TypeHole because a ConstraintHole
                  -- is simplified differently. See
                  -- Note [Do not simplify ConstraintHoles] in GHC.Tc.Solver.
-
 instance Outputable Hole where
   ppr (Hole { hole_sort = ExprHole ref
             , hole_occ  = occ
             , hole_ty   = ty })
-    = parens $ (braces $ ppr occ <> colon <> ppr ref) <+> dcolon <+> ppr ty
+    = parens $ (braces $ ppr occ <> colon -- TODO: this used to print the HER Unique but we don't have it anymore: problem? <> ppr ref
+               ) <+> dcolon <+> ppr ty
   ppr (Hole { hole_sort = _other
             , hole_occ  = occ
             , hole_ty   = ty })
     = braces $ ppr occ <> colon <> ppr ty
 
 instance Outputable HoleSort where
-  ppr (ExprHole ref) = text "ExprHole:" <+> ppr ref
+  ppr (ExprHole ref) = text "ExprHole" -- TODO: this used to print the HER Unique but we don't have it anymore: <+> ppr ref
   ppr TypeHole       = text "TypeHole"
   ppr ConstraintHole = text "ConstraintHole"
 

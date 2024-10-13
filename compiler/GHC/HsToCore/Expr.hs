@@ -260,9 +260,9 @@ dsLExpr (L loc e) = putSrcSpanDsA loc $ dsExpr e
 -- | Desugar a typechecked expression.
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    Bound (L _ id))                 = dsHsVar id
-dsExpr (HsVar    (Unbound (HER ref _)) _) =
+dsExpr (HsVar    (Unbound (HER ref)) _) =
   dsEvTerm =<< readMutVar ref
-dsExpr (HsHole (HER ref _) _) = dsEvTerm =<< readMutVar ref
+dsExpr (HsHole (HER ref) _) = dsEvTerm =<< readMutVar ref
 
     -- TODO: check this note:
       -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint.

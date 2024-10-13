@@ -925,12 +925,12 @@ zonkExpr (HsVar Bound (L l id))
   do { id' <- zonkIdOcc id
      ; return (HsVar Bound (L l id')) }
 
-zonkExpr (HsVar (Unbound her) occ)
-  = do her' <- zonk_her her
-       return (HsVar (Unbound her') occ)
-zonkExpr (HsHole her occ)
-  = do her' <- zonk_her her
-       return (HsHole her' occ)
+zonkExpr (HsVar (Unbound her) (L l occ))
+  = do (her', occ') <- zonk_her her occ
+       return (HsVar (Unbound her') (L l occ'))
+zonkExpr (HsHole her (L l occ))
+  = do (her', occ') <- zonk_her her occ
+       return (HsHole her' (L l occ'))
 
 zonkExpr (HsRecSel _ (FieldOcc v occ))
   = do { v' <- zonkIdOcc v
@@ -1138,11 +1138,11 @@ zonkSyntaxExpr NoSyntaxExprTc = return NoSyntaxExprTc
 
 -------------------------------------------------------------------------
 
-zonk_her :: HoleExprRef -> ZonkTcM HoleExprRef
-zonk_her (HER ref id)
+zonk_her :: HoleExprRef -> Id -> ZonkTcM (HoleExprRef, Id)
+zonk_her (HER ref) id
   = do updTcRefM ref zonkEvTerm
        id'  <- zonkIdOcc id
-       return (HER ref id')
+       return (HER ref, id')
 
 -------------------------------------------------------------------------
 
