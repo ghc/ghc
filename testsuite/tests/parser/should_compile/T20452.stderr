@@ -262,12 +262,17 @@
      (NoExtField)
      (ClassDecl
       ((,,)
-       ((,)
-        [(AddEpAnn AnnClass (EpaSpan { T20452.hs:8:1-5 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T20452.hs:8:78-82 }))
-        ,(AddEpAnn AnnOpenC (EpaSpan { T20452.hs:8:84 }))
-        ,(AddEpAnn AnnCloseC (EpaSpan { T20452.hs:8:85 }))]
-        (NoEpTok))
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { T20452.hs:8:1-5 }))
+        []
+        []
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T20452.hs:8:78-82 }))
+        (EpTok (EpaSpan { T20452.hs:8:84 }))
+        (EpTok (EpaSpan { T20452.hs:8:85 }))
+        [])
        (EpExplicitBraces
         (EpTok (EpaSpan { T20452.hs:8:84 }))
         (EpTok (EpaSpan { T20452.hs:8:85 })))
@@ -494,12 +499,17 @@
      (NoExtField)
      (ClassDecl
       ((,,)
-       ((,)
-        [(AddEpAnn AnnClass (EpaSpan { T20452.hs:9:1-5 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T20452.hs:9:78-82 }))
-        ,(AddEpAnn AnnOpenC (EpaSpan { T20452.hs:9:84 }))
-        ,(AddEpAnn AnnCloseC (EpaSpan { T20452.hs:9:85 }))]
-        (NoEpTok))
+       (AnnClassDecl
+        (EpTok
+         (EpaSpan { T20452.hs:9:1-5 }))
+        []
+        []
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T20452.hs:9:78-82 }))
+        (EpTok (EpaSpan { T20452.hs:9:84 }))
+        (EpTok (EpaSpan { T20452.hs:9:85 }))
+        [])
        (EpExplicitBraces
         (EpTok (EpaSpan { T20452.hs:9:84 }))
         (EpTok (EpaSpan { T20452.hs:9:85 })))

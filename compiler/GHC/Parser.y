@@ -1292,8 +1292,9 @@ topdecl :: { LHsDecl GhcPs }
 --
 cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
-                {% (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4))
-                        (mj AnnClass $1:(fstOf3 $ unLoc $4)) (fst $ unLoc $3) }
+                {% do { let {(wtok, (oc,semis,cc)) = fstOf3 $ unLoc $4}
+                      ; mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4)
+                        (AnnClassDecl (epTok $1) [] [] (fst $ unLoc $3) wtok oc cc semis) }}
 
 -- Default declarations (toplevel)
 --
@@ -1749,9 +1750,9 @@ decl_cls  : at_decl_cls                 { $1 }
                                       quotes (ppr $2)
                           ; amsA' (sLL $1 $> $ SigD noExtField $ ClassOpSig (AnnSig (epUniTok $3) Nothing (Just (epTok $1))) True [v] $4) }}
 
-decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
+decls_cls :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }  -- Reversed
           : decls_cls ';' decl_cls      {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                             then return (sLL $1 $> ((fst $ unLoc $1) ++ [mzEpTok $2]
                                                                     , unitOL $3))
                                             else case (snd $ unLoc $1) of
                                               SnocOL hs t -> do
@@ -1759,7 +1760,7 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
                                                  return (sLL $1 $> (fst $ unLoc $1
                                                                 , snocOL hs t' `appOL` unitOL $3)) }
           | decls_cls ';'               {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLZ $1 $> ( (fst $ unLoc $1) ++ (mz AnnSemi $2)
+                                             then return (sLZ $1 $> ( (fst $ unLoc $1) ++ [mzEpTok $2]
                                                                                    ,snd $ unLoc $1))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
@@ -1770,24 +1771,24 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
           | {- empty -}                 { noLoc ([],nilOL) }
 
 decllist_cls
-        :: { Located ([AddEpAnn]
+        :: { Located ((EpToken "{", [EpToken ";"], EpToken "}")
                      , OrdList (LHsDecl GhcPs)
                      , EpLayout) }      -- Reversed
-        : '{'         decls_cls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
+        : '{'         decls_cls '}'     { sLL $1 $> ((epTok $1, fst $ unLoc $2, epTok $3)
                                              ,snd $ unLoc $2, epExplicitBraces $1 $3) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
-                                           in L l (anns, decls, EpVirtualBraces (getVOCURLY $1)) }
+                                           in L l ((NoEpTok, anns, NoEpTok), decls, EpVirtualBraces (getVOCURLY $1)) }
 
 -- Class body
 --
-where_cls :: { Located ([AddEpAnn]
+where_cls :: { Located ((EpToken "where", (EpToken "{", [EpToken ";"], EpToken "}"))
                        ,(OrdList (LHsDecl GhcPs))    -- Reversed
                        ,EpLayout) }
                                 -- No implicit parameters
                                 -- May have type declarations
-        : 'where' decllist_cls          { sLL $1 $> (mj AnnWhere $1:(fstOf3 $ unLoc $2)
+        : 'where' decllist_cls          { sLL $1 $> ((epTok $1,fstOf3 $ unLoc $2)
                                              ,sndOf3 $ unLoc $2,thdOf3 $ unLoc $2) }
-        | {- empty -}                   { noLoc ([],nilOL,EpNoLayout) }
+        | {- empty -}                   { noLoc ((noAnn, noAnn),nilOL,EpNoLayout) }
 
 -- Declarations in instance bodies
 --
@@ -4638,6 +4639,10 @@ epUniTok :: Located Token -> EpUniToken tok utok
 epUniTok t@(L !l _) = EpUniTok (EpaSpan l) u
   where
     u = if isUnicode t then UnicodeSyntax else NormalSyntax
+
+-- |Construct an EpToken from the location of the token, provided the span is not zero width
+mzEpTok :: Located Token -> EpToken tok
+mzEpTok !l = if isZeroWidthSpan (gl l) then NoEpTok else (epTok l)
 
 epExplicitBraces :: Located Token -> Located Token -> EpLayout
 epExplicitBraces !t1 !t2 = EpExplicitBraces (epTok t1) (epTok t2)

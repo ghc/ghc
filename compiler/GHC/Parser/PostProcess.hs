@@ -204,17 +204,16 @@ mkClassDecl :: SrcSpan
             -> Located (a,[LHsFunDep GhcPs])
             -> OrdList (LHsDecl GhcPs)
             -> EpLayout
-            -> [AddEpAnn]
-            -> EpToken "|" -- For Fundeps
+            -> AnnClassDecl
             -> P (LTyClDecl GhcPs)
 
-mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn fdAnn
+mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
   = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
-       ; (cls, tparams, fixity, ann, cs) <- checkTyClHdr True tycl_hdr
+       ; (cls, tparams, fixity, ops, cps, cs) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
-       ; let anns' = annsIn Semi.<> ann
+       ; let anns' = annsIn { acd_openp = ops, acd_closep = cps}
        ; let loc = EpAnn (spanAsAnchor loc') noAnn cs
-       ; return (L loc (ClassDecl { tcdCExt = ((anns', fdAnn), layout, NoAnnSortKey)
+       ; return (L loc (ClassDecl { tcdCExt = (anns', layout, NoAnnSortKey)
                                   , tcdCtxt = mcxt
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity
@@ -236,9 +235,10 @@ mkTyData :: SrcSpan
          -> P (LTyClDecl GhcPs)
 mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
          ksig data_cons (L _ maybe_deriv) annsIn
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False tycl_hdr
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
-       ; let anns' = annsIn Semi.<> ann
+       ; let anns' = annsIn Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; data_cons <- checkNewOrData loc' (unLoc tc) is_type_data new_or_data data_cons
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; !cs' <- getCommentsFor loc'
@@ -247,6 +247,15 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn })) }
+
+-- TODO:AZ:temporary
+openParen2AddEpAnn :: EpToken "(" -> [AddEpAnn]
+openParen2AddEpAnn (EpTok l) = [AddEpAnn AnnOpenP l]
+openParen2AddEpAnn NoEpTok = []
+
+closeParen2AddEpAnn :: EpToken ")" -> [AddEpAnn]
+closeParen2AddEpAnn (EpTok l) = [AddEpAnn AnnCloseP l]
+closeParen2AddEpAnn NoEpTok = []
 
 mkDataDefn :: Maybe (LocatedP CType)
            -> Maybe (LHsContext GhcPs)
@@ -269,9 +278,10 @@ mkTySynonym :: SrcSpan
             -> [AddEpAnn]
             -> P (LTyClDecl GhcPs)
 mkTySynonym loc lhs rhs annsIn
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False lhs
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (text "type") equalsDots tc tparams
-       ; let anns' = annsIn Semi.<> ann
+       ; let anns' = annsIn Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
        ; return (L loc' (SynDecl { tcdSExt = anns'
                                  , tcdLName = tc, tcdTyVars = tyvars
@@ -309,10 +319,12 @@ mkTyFamInstEqn :: SrcSpan
                -> [AddEpAnn]
                -> P (LTyFamInstEqn GhcPs)
 mkTyFamInstEqn loc bndrs lhs rhs anns
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False lhs
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
+       ; let anns' = anns Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; return (L loc' $ FamEqn
-                        { feqn_ext    = anns `mappend` ann
+                        { feqn_ext    = anns'
                         , feqn_tycon  = tc
                         , feqn_bndrs  = bndrs
                         , feqn_pats   = tparams
@@ -331,31 +343,19 @@ mkDataFamInst :: SrcSpan
               -> P (LInstDecl GhcPs)
 mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons (L _ maybe_deriv) anns
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False tycl_hdr
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; data_cons <- checkNewOrData loc (unLoc tc) False new_or_data data_cons
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
+       ; let anns' = anns Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; return (L loc' (DataFamInstD noExtField (DataFamInstDecl
-                  (FamEqn { feqn_ext    = ann Semi.<> anns
+                  (FamEqn { feqn_ext    = anns'
                           , feqn_tycon  = tc
                           , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams
                           , feqn_fixity = fixity
                           , feqn_rhs    = defn })))) }
-
--- mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
---               ksig data_cons (L _ maybe_deriv) anns
---   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
---        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
---        ; let anns' = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
---        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
---        ; return (L (noAnnSrcSpan loc) (DataFamInstD anns' (DataFamInstDecl
---                   (FamEqn { feqn_ext    = anns'
---                           , feqn_tycon  = tc
---                           , feqn_bndrs  = bndrs
---                           , feqn_pats   = tparams
---                           , feqn_fixity = fixity
---                           , feqn_rhs    = defn })))) }
 
 
 
@@ -376,11 +376,13 @@ mkFamDecl :: SrcSpan
           -> [AddEpAnn]
           -> P (LTyClDecl GhcPs)
 mkFamDecl loc info topLevel lhs ksig injAnn annsIn
-  = do { (tc, tparams, fixity, ann, cs) <- checkTyClHdr False lhs
+  = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (ppr info) equals_or_where tc tparams
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
+       ; let anns' = annsIn Semi.<>
+                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
        ; return (L loc' (FamDecl noExtField (FamilyDecl
-                                           { fdExt       = annsIn Semi.<> ann
+                                           { fdExt       = anns'
                                            , fdTopLevel  = topLevel
                                            , fdInfo      = info, fdLName = tc
                                            , fdTyVars    = tyvars
@@ -1063,8 +1065,8 @@ checkTyClHdr :: Bool               -- True  <=> class header
              -> P (LocatedN RdrName,     -- the head symbol (type or class name)
                    [LHsTypeArg GhcPs],   -- parameters of head symbol
                    LexicalFixity,        -- the declaration is in infix format
-                   [AddEpAnn],           -- API Annotation for HsParTy
-                                         -- when stripping parens
+                   [EpToken "("],        -- API Annotation for HsParTy
+                   [EpToken ")"],        -- when stripping parens
                    EpAnnComments)        -- Accumulated comments from re-arranging
 -- Well-formedness check and decomposition of type and class heads.
 -- Decomposes   T ty1 .. tyn   into    (T, [ty1, ..., tyn])
@@ -1081,22 +1083,22 @@ checkTyClHdr is_cls ty
            ; let name = mkOccNameFS tcClsName (starSym isUni)
            ; let a' = newAnns ll l an
            ; return (L a' (Unqual name), acc, fix
-                    , (reverse ops') ++ cps', cs) }
+                    , (reverse ops'), cps', cs) }
 
     go cs l (HsTyVar _ _ ltc@(L _ tc)) acc ops cps fix
-      | isRdrTc tc               = return (ltc, acc, fix, (reverse ops) ++ cps, cs Semi.<> comments l)
+      | isRdrTc tc               = return (ltc, acc, fix, (reverse ops), cps, cs Semi.<> comments l)
     go cs l (HsOpTy _ _ t1 ltc@(L _ tc) t2) acc ops cps _fix
-      | isRdrTc tc               = return (ltc, lhs:rhs:acc, Infix, (reverse ops) ++ cps, cs Semi.<> comments l)
+      | isRdrTc tc               = return (ltc, lhs:rhs:acc, Infix, (reverse ops), cps, cs Semi.<> comments l)
       where lhs = HsValArg noExtField t1
             rhs = HsValArg noExtField t2
     go cs l (HsParTy _ ty)    acc ops cps fix = goL (cs Semi.<> comments l) ty acc (o:ops) (c:cps) fix
       where
-        (o,c) = mkParensEpAnn (realSrcSpan (locA l))
+        (o,c) = mkParensEpToks (realSrcSpan (locA l))
     go cs l (HsAppTy _ t1 t2) acc ops cps fix = goL (cs Semi.<> comments l) t1 (HsValArg noExtField t2:acc) ops cps fix
     go cs l (HsAppKindTy at ty ki) acc ops cps fix = goL (cs Semi.<> comments l) ty (HsTypeArg at ki:acc) ops cps fix
     go cs l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ops cps fix
       = return (L (l2l l) (nameRdrName tup_name)
-               , map (HsValArg noExtField) ts, fix, (reverse ops)++cps, cs Semi.<> comments l)
+               , map (HsValArg noExtField) ts, fix, (reverse ops), cps, cs Semi.<> comments l)
       where
         arity = length ts
         tup_name | is_cls    = cTupleTyConName arity

@@ -73,6 +73,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` epTokenOC
               `extQ` epTokenCC
               `extQ` annParen
+              `extQ` annClassDecl
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
               `extQ` deltaPos
@@ -204,6 +205,15 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              NoBlankEpAnnotations ->
               parens $ text "AnnParen"
                         $$ vcat [ppr a, epaLocation o, epaLocation c]
+
+            annClassDecl :: AnnClassDecl -> SDoc
+            annClassDecl (AnnClassDecl c ops cps v w oc cc s) = case ba of
+             BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnClassDecl"
+             NoBlankEpAnnotations ->
+              parens $ text "AnnClassDecl"
+                        $$ vcat [showAstData' c, showAstData' ops, showAstData' cps,
+                                 showAstData' v, showAstData' w, showAstData' oc,
+                                 showAstData' cc, showAstData' s]
 
             addEpAnn :: AddEpAnn -> SDoc
             addEpAnn (AddEpAnn a s) = case ba of

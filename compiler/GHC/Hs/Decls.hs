@@ -31,6 +31,7 @@ module GHC.Hs.Decls (
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
+  AnnClassDecl(..),
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   tyClGroupKindSigs,
@@ -368,7 +369,7 @@ data DataDeclRn = DataDeclRn
   deriving Data
 
 type instance XClassDecl    GhcPs =
-  ( ([AddEpAnn], EpToken "|")
+  ( AnnClassDecl
   , EpLayout              -- See Note [Class EpLayout]
   , AnnSortKey DeclTag )  -- TODO:AZ:tidy up AnnSortKey
 
@@ -379,6 +380,21 @@ type instance XXTyClDecl    (GhcPass _) = DataConCantHappen
 
 type instance XCTyFamInstDecl (GhcPass _) = [AddEpAnn]
 type instance XXTyFamInstDecl (GhcPass _) = DataConCantHappen
+
+data AnnClassDecl
+  = AnnClassDecl {
+      acd_class  :: EpToken "class",
+      acd_openp  :: [EpToken "("],
+      acd_closep :: [EpToken ")"],
+      acd_vbar   :: EpToken "|",
+      acd_where  :: EpToken "where",
+      acd_openc  :: EpToken "{",
+      acd_closec :: EpToken "}",
+      acd_semis  :: [EpToken ";"]
+  } deriving Data
+
+instance NoAnn AnnClassDecl where
+  noAnn = AnnClassDecl noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 ------------- Pretty printing FamilyDecls -----------
 
