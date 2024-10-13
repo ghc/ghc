@@ -733,10 +733,12 @@ def _find_so(lib, directory, in_place):
 
     # produce the suffix for the CI operating system
     suffix = "so"
-    if config.os == "mingw32":
-        suffix = "dll"
-    elif config.os == "darwin":
-        suffix = "dylib"
+    # config.os is host os
+    if not config.cross:
+        if config.os == "mingw32":
+            suffix = "dll"
+        elif config.os == "darwin":
+            suffix = "dylib"
 
     # Most artfacts are of the form foo-inplace, or foo-<hash> for release
     # builds, except for the rts.
