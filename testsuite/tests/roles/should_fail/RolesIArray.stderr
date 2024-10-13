@@ -1,6 +1,6 @@
-
 RolesIArray.hs:10:13: error: [GHC-18872]
     • Couldn't match type ‘Word64’ with ‘N’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘Data.Array.Base.unsafeAccumArray’
           from type ‘forall i e'.
                      Ix i =>
@@ -13,6 +13,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
 
 RolesIArray.hs:10:13: error: [GHC-18872]
     • Couldn't match type ‘Word64’ with ‘N’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘Data.Array.Base.unsafeAccum’
           from type ‘forall i e'.
                      Ix i =>
@@ -25,6 +26,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
 
 RolesIArray.hs:10:13: error: [GHC-18872]
     • Couldn't match type ‘Word64’ with ‘N’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘Data.Array.Base.unsafeReplace’
           from type ‘forall i.
                      Ix i =>
@@ -34,6 +36,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
 
 RolesIArray.hs:10:13: error: [GHC-18872]
     • Couldn't match type ‘Word64’ with ‘N’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘Data.Array.Base.unsafeAt’
           from type ‘forall i. Ix i => UArray i Word64 -> Int -> Word64’
             to type ‘forall i. Ix i => UArray i N -> Int -> N’
@@ -41,6 +44,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
 
 RolesIArray.hs:10:13: error: [GHC-18872]
     • Couldn't match type ‘Word64’ with ‘N’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘Data.Array.Base.unsafeArray’
           from type ‘forall i.
                      Ix i =>
@@ -50,6 +54,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
 
 RolesIArray.hs:10:13: error: [GHC-18872]
     • Couldn't match type ‘Word64’ with ‘N’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘Data.Array.Base.numElements’
           from type ‘forall i. Ix i => UArray i Word64 -> Int’
             to type ‘forall i. Ix i => UArray i N -> Int’
@@ -57,7 +62,9 @@ RolesIArray.hs:10:13: error: [GHC-18872]
 
 RolesIArray.hs:10:13: error: [GHC-18872]
     • Couldn't match type ‘Word64’ with ‘N’
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘bounds’
           from type ‘forall i. Ix i => UArray i Word64 -> (i, i)’
             to type ‘forall i. Ix i => UArray i N -> (i, i)’
     • When deriving the instance for (IArray UArray N)
+

@@ -1,6 +1,7 @@
 T5498.hs:30:39: error: [GHC-18872]
     • Couldn't match representation of type: c a
                                with that of: c (Down a)
+        arising from the head of a quantified constraint
         arising from the coercion of the method ‘intIso’
           from type ‘forall (c :: * -> *). c a -> c Int’
             to type ‘forall (c :: * -> *). c (Down a) -> c Int’

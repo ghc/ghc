@@ -1,0 +1,10 @@
+T12768.hs:9:33: error: [GHC-39999]
+    • Could not deduce ‘D [a]’
+        arising from the head of a quantified constraint
+        arising from the coercion of the method ‘op’
+          from type ‘D [a] => [a] -> [a]’ to type ‘D (N a) => N a -> N a’
+      from the context: C a
+        bound by the deriving clause for ‘C (N a)’ at T12768.hs:9:33
+      or from: D (N a) bound by a quantified context at T12768.hs:9:33
+    • When deriving the instance for (C (N a))
+
