@@ -1883,7 +1883,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
 
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
-        ; return ( HsDataDefn { dd_ext = noExtField, dd_cType = cType
+        ; return ( HsDataDefn { dd_ext = noAnn, dd_cType = cType
                               , dd_ctxt = context', dd_kindSig = m_sig'
                               , dd_cons = condecls'
                               , dd_derivs = derivs' }
