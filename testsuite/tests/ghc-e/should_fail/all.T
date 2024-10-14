@@ -15,7 +15,7 @@ test('ghc-e-fail2', req_interp, makefile_test, ['ghc-e-fail2'])
 test('T9930fail',
      [extra_files(['T9930']),
       when(opsys('mingw32'), skip),
-      normalise_version('ghc'),
+      normalise_errmsg_fun(lambda s: normalise_version_("ghc")(s).replace('ghc-<VERSION>-<HASH>','ghc')),
       # broken for JS until cross-compilers become stage2 compilers (#19174)
       # or until we bootstrap with a 9.10 compiler
       js_broken(19174)],
