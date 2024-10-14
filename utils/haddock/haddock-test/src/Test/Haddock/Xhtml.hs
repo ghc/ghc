@@ -8,6 +8,7 @@ module Test.Haddock.Xhtml
   , stripIdsWhen
   , stripFooter
   , fixAttrValueWhen
+  , stripVersions
   ) where
 
 {-
@@ -22,7 +23,7 @@ and since the `xhtml` library already handles the pretty-printing aspect,
 this would appear to be a reasonable compromise for now.
 -}
 
-import Data.Char (isSpace)
+import Data.Char (isSpace, isAlphaNum)
 import Data.List (isPrefixOf, stripPrefix)
 
 -- | Simple wrapper around the pretty-printed HTML source
@@ -142,3 +143,18 @@ stripFooter (Xml body) = Xml (findDiv body)
           Just valRest''
       | otherwise =
           dropToDiv cs
+
+-- | Strip strings of the form <pkg>-<version>-<hash>
+-- to just <pkg>
+stripVersions :: [String] -> Xml -> Xml
+stripVersions xs (Xml body) = Xml $ foldr id body $ map go xs
+  where
+    go pkg "" = ""
+    go pkg body@(x:body') = case stripPrefix pkg body of
+      Just ('-':rest)
+        | (version,'-':rest') <- span (/= '-') rest
+        , all (`elem` ('.':['0'..'9'])) version
+        , let (hash, rest'') = span isAlphaNum rest'
+        -> pkg ++ go pkg rest''
+      _ -> x:go pkg body'
+
