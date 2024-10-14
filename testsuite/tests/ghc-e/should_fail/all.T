@@ -15,6 +15,7 @@ test('ghc-e-fail2', req_interp, makefile_test, ['ghc-e-fail2'])
 test('T9930fail',
      [extra_files(['T9930']),
       when(opsys('mingw32'), skip),
+      normalise_version('ghc'),
       # broken for JS until cross-compilers become stage2 compilers (#19174)
       # or until we bootstrap with a 9.10 compiler
       js_broken(19174)],
@@ -24,7 +25,7 @@ test('T18441fail0', req_interp, makefile_test, ['T18441fail0'])
 
 test('T18441fail1', req_interp, makefile_test, ['T18441fail1'])
 
-test('T18441fail2', req_interp, makefile_test, ['T18441fail2'])
+test('T18441fail2', [req_interp, normalise_version('ghc')], makefile_test, ['T18441fail2'])
 
 test('T18441fail3', [ignore_stderr, exit_code(1)], run_command, ['{compiler} -e ":! abcde"'])
 
@@ -34,9 +35,9 @@ test('T18441fail5', req_interp, makefile_test, ['T18441fail5'])
 
 test('T18441fail6', req_interp, makefile_test, ['T18441fail6'])
 
-test('T18441fail7', req_interp, makefile_test, ['T18441fail7'])
+test('T18441fail7', [req_interp, normalise_version('ghc')], makefile_test, ['T18441fail7'])
 
-test('T18441fail8', req_interp, makefile_test, ['T18441fail8'])
+test('T18441fail8', [req_interp, normalise_version('ghc')], makefile_test, ['T18441fail8'])
 
 test('T18441fail9', req_interp, makefile_test, ['T18441fail9'])
 
@@ -60,6 +61,6 @@ test('T18441fail18', req_interp, makefile_test, ['T18441fail18'])
 
 test('T18441fail19', [ignore_stderr, exit_code(1)], run_command, ['{compiler} -e ":cd abcd"'])
 
-test('T23663', req_interp, makefile_test, ['T23663'])
+test('T23663', [req_interp, normalise_version('ghc')], makefile_test, ['T23663'])
 
 test('T24172', normal, compile_fail, ['-fdiagnostics-color=always'])
