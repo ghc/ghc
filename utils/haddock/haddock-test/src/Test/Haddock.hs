@@ -156,7 +156,7 @@ runHaddock cfg@(Config{..}) = do
 
       files <- filter ((== ".hi") . takeExtension) <$> listDirectory hiDir
       -- Use the output order of GHC as a simple dependency order
-      filesSorted <- Map.elems . Map.fromList <$> traverse (\file -> (,file) <$> getModificationTime (hiDir </> file)) files
+      filesSorted <- Map.elems . Map.fromList <$> traverse (\file -> (\mt -> ((mt,file),file)) <$> getModificationTime (hiDir </> file)) files
       let srcRef = if "--hyperlinked-source" `elem` cfgHaddockArgs then ",src,visible," else ""
           loop [] = pure True
           loop (file : files) = do
