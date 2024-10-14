@@ -247,5 +247,3 @@ test('T23034', req_c, compile_and_run, ['-O2 T23034_c.c'])
 test('T24664a', normal, compile_and_run, ['-O'])
 test('T24664b', normal, compile_and_run, ['-O'])
 
-test('T24507', [req_cmm], multi_compile_and_run,
-                 ['T24507', [('T24507_cmm.cmm', '')], '-O2'])

@@ -679,16 +679,13 @@ canFallthroughTo insn bid
 
 jumpDestsOfInstr
         :: Instr
-        -> [Maybe BlockId]
+        -> [BlockId]
 
 jumpDestsOfInstr insn
   = case insn of
-        JXX _ id        -> [Just id]
-        JMP_TBL _ ids _ _ -> [(mkDest dest) | Just dest <- ids]
+        JXX _ id        -> [id]
+        JMP_TBL _ ids _ _ -> [id | Just (DestBlockId id) <- ids]
         _               -> []
-    where
-      mkDest (DestBlockId id) = Just id
-      mkDest _ = Nothing
 
 
 patchJumpInstr
