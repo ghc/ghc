@@ -14,11 +14,11 @@
     },
     {
       "package": "base",
-      "version": "4.18.0.0"
+      "version": "4.18.2.1"
     },
     {
       "package": "array",
-      "version": "0.5.5.0"
+      "version": "0.5.6.0"
     },
     {
       "package": "deepseq",
@@ -26,7 +26,7 @@
     },
     {
       "package": "ghc-boot-th",
-      "version": "9.6.1"
+      "version": "9.6.5"
     },
     {
       "package": "pretty",
@@ -38,7 +38,7 @@
     },
     {
       "package": "bytestring",
-      "version": "0.11.4.0"
+      "version": "0.11.5.3"
     },
     {
       "package": "containers",
@@ -66,7 +66,7 @@
     },
     {
       "package": "filepath",
-      "version": "1.4.100.1"
+      "version": "1.4.300.1"
     },
     {
       "package": "time",
@@ -74,11 +74,11 @@
     },
     {
       "package": "unix",
-      "version": "2.8.1.0"
+      "version": "2.8.4.0"
     },
     {
       "package": "directory",
-      "version": "1.3.8.1"
+      "version": "1.3.8.4"
     },
     {
       "package": "text",
@@ -90,15 +90,15 @@
     },
     {
       "package": "Cabal-syntax",
-      "version": "3.10.1.0"
+      "version": "3.10.3.0"
     },
     {
       "package": "process",
-      "version": "1.6.17.0"
+      "version": "1.6.19.0"
     },
     {
       "package": "Cabal",
-      "version": "3.10.1.0"
+      "version": "3.10.3.0"
     }
   ],
   "dependencies": [

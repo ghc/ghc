@@ -6,7 +6,7 @@
     },
     {
       "package": "ghc-prim",
-      "version": "0.10.0"
+      "version": "0.11.0"
     },
     {
       "package": "ghc-bignum",
@@ -14,19 +14,19 @@
     },
     {
       "package": "base",
-      "version": "4.18.0.0"
+      "version": "4.19.1.0"
     },
     {
       "package": "array",
-      "version": "0.5.5.0"
+      "version": "0.5.6.0"
     },
     {
       "package": "deepseq",
-      "version": "1.4.8.1"
+      "version": "1.5.0.0"
     },
     {
       "package": "ghc-boot-th",
-      "version": "9.6.1"
+      "version": "9.8.2"
     },
     {
       "package": "pretty",
@@ -34,15 +34,15 @@
     },
     {
       "package": "template-haskell",
-      "version": "2.20.0.0"
+      "version": "2.21.0.0"
     },
     {
       "package": "bytestring",
-      "version": "0.11.4.0"
+      "version": "0.12.1.0"
     },
     {
       "package": "containers",
-      "version": "0.6.7"
+      "version": "0.6.8"
     },
     {
       "package": "binary",
@@ -58,7 +58,7 @@
     },
     {
       "package": "stm",
-      "version": "2.5.1.0"
+      "version": "2.5.2.1"
     },
     {
       "package": "exceptions",
@@ -66,7 +66,7 @@
     },
     {
       "package": "filepath",
-      "version": "1.4.100.1"
+      "version": "1.4.200.1"
     },
     {
       "package": "time",
@@ -74,7 +74,7 @@
     },
     {
       "package": "unix",
-      "version": "2.8.1.0"
+      "version": "2.8.4.0"
     },
     {
       "package": "directory",
@@ -82,23 +82,23 @@
     },
     {
       "package": "text",
-      "version": "2.0.2"
+      "version": "2.1.1"
     },
     {
       "package": "parsec",
-      "version": "3.1.16.1"
+      "version": "3.1.17.0"
     },
     {
       "package": "Cabal-syntax",
-      "version": "3.10.1.0"
+      "version": "3.10.2.0"
     },
     {
       "package": "process",
-      "version": "1.6.17.0"
+      "version": "1.6.18.0"
     },
     {
       "package": "Cabal",
-      "version": "3.10.1.0"
+      "version": "3.10.2.0"
     }
   ],
   "dependencies": [
