@@ -11,6 +11,7 @@ module GHC.Stg.Utils
     , mkUnarisedId, mkUnarisedIds
 
     , allowTopLevelConApp
+    , hasNoNonZeroWidthArgs
     ) where
 
 import GHC.Prelude
@@ -19,6 +20,7 @@ import GHC.Platform
 import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.TyCon
+import GHC.Core.Multiplicity     ( scaledThing )
 import GHC.Core.DataCon
 import GHC.Core ( AltCon(..) )
 import GHC.Types.Tickish
@@ -34,6 +36,13 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Data.FastString
+
+-- | Returns whether there are any arguments with a non-zero-width runtime
+-- representation.
+--
+-- Returns True if the datacon has no or /just/ zero-width arguments.
+hasNoNonZeroWidthArgs :: DataCon -> Bool
+hasNoNonZeroWidthArgs = all (isZeroBitTy . scaledThing) . dataConRepArgTys
 
 mkUnarisedIds :: MonadUnique m => FastString -> [NvUnaryType] -> m [Id]
 mkUnarisedIds fs tys = mapM (mkUnarisedId fs) tys
