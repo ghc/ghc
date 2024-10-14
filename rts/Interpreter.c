@@ -1689,7 +1689,6 @@ run_BCO:
             // n_nptrs=1, n_ptrs=0.
             ASSERT(n_ptrs + n_nptrs == n_words || (n_nptrs == 1 && n_ptrs == 0));
             ASSERT(n_ptrs + n_nptrs > 0);
-            //ASSERT(n_words > 0); // We shouldn't ever need to allocate nullary constructors
             for (W_ i = 0; i < n_words; i++) {
                 con->payload[i] = (StgClosure*)SpW(i);
             }
