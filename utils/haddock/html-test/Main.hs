@@ -42,7 +42,7 @@ main = do
 
 stripIfRequired :: String -> Xml -> Xml
 stripIfRequired mdl =
-    stripLinks' . stripFooter
+    stripLinks' . stripFooter . stripVersions ["base"]
   where
     stripLinks'
         | mdl `elem` preserveLinksModules = id
