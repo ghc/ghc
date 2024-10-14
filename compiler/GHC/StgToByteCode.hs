@@ -1834,19 +1834,18 @@ pushAtom d p (StgVarArg var)
         -- PUSH_G doesn't tag constructors. So we use PACK here
         -- if we are dealing with nullary constructor.
         case isDataConWorkId_maybe var of
-          Just con -> do
-            massert (isNullaryRepDataCon con)
-            return (unitOL (PACK con 0), szb)
+          Just con
+            -- See Note [LFInfo of DataCon workers and wrappers] in GHC.Types.Id.Make.
+            | isNullaryRepDataCon con -> do
+              return (unitOL (PACK con 0), szb)
 
-          Nothing
             -- see Note [Generating code for top-level string literal bindings]
-            | isUnliftedType (idType var) -> do
+          _ | isUnliftedType (idType var) -> do
               massert (idType var `eqType` addrPrimTy)
               return (unitOL (PUSH_ADDR (getName var)), szb)
 
             | otherwise -> do
               return (unitOL (PUSH_G (getName var)), szb)
-
 
 pushAtom _ _ (StgLitArg lit) = pushLiteral True lit
 
