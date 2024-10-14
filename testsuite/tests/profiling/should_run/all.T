@@ -145,11 +145,13 @@ test('T7275', test_opts_dot_prof, makefile_test, [])
 test('callstack001',
      # unoptimised results are different w.r.t. CAF attribution
      [test_opts_dot_prof # produces a different stack
+     ,normalise_fun(lambda s: re.sub(r"(?<!('|‘))\\", '/', s).replace("//","/"))
      ], compile_and_run,
      ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
 test('callstack002',
      [ test_opts_dot_prof # produces a different stack
+     , normalise_fun(lambda s: re.sub(r"(?<!('|‘))\\", '/', s))
      ],
      compile_and_run,
      ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
