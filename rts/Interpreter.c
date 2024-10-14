@@ -1751,7 +1751,7 @@ run_BCO:
                                                itbl->layout.payload.nptrs );
             StgClosure* con = (StgClosure*)allocate_NONUPD(cap,request);
             ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
-            for (i = 0; i < n_words; i++) {
+            for (W_ i = 0; i < n_words; i++) {
                 con->payload[i] = (StgClosure*)SpW(i);
             }
             Sp_addW(n_words);
