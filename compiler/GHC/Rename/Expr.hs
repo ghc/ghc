@@ -317,12 +317,18 @@ finishHsVar (L l name)
 
 rnUnboundVar :: LocatedN RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar (L l v) = do
-  deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
   uniq <- newUnique
   let id = mkInternalName uniq (occName v) (locA l)
-  -- See Note [Reporting unbound names] for difference between qualified and unqualified names.
-  unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
-  return (HsVar (Unbound ()) (L l id), emptyFVs)
+  wildcards_enabled <- xoptM LangExt.NamedWildCards
+  if wildcards_enabled && startsWithUnderscore (occName v)
+    -- With NamedWildCards enabled we know this can be turned into an HsHole
+    -- even in a Type context.
+    then pure (HsHole noExtField (L l id), emptyFVs)
+    else do
+      deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
+      -- See Note [Reporting unbound names] for difference between qualified and unqualified names.
+      unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
+      return (HsVar (Unbound ()) (L l id), emptyFVs)
 
 rnExpr (HsVar _ locatedRdrName@(L l v))
   = do { dflags <- getDynFlags

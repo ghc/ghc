@@ -294,6 +294,7 @@ extraConstraintWildCardsAllowed env
       StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in "GHC.Hs.Decls"
       _                   -> False
 
+-- TODO: Is this still needed after HsHole work?
 -- | When the NamedWildCards extension is enabled, partition_nwcs
 -- removes type variables that start with an underscore from the
 -- FreeKiTyVars in the argument and returns them in a separate list.

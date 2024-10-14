@@ -1000,26 +1000,11 @@ expr_to_type earg =
       -- as per #281: variables and constructors (regardless of their namespace)
       -- are mapped directly, without modification.
       return (L l (HsTyVar noAnn NotPromoted lname))
-    go (L _ (HsVar (Unbound ()) (L _ rdr)))
-      -- TODO: It would be nice to push underscore prefix checking to the
-      -- parser/renamer and transform these to HsHole at that point?  The thing
-      -- I don't know is, can we turn any an unbound HsVar with underscore
-      -- prefix into HsHole if NamedWildCards is enabled, or does the renamer
-      -- need to know if they are in a type context?
-      | startsWithUnderscore occ =
-          -- See Note [Wildcards in the T2T translation]
-          do { wildcards_enabled <- xoptM LangExt.NamedWildCards
-             ; if wildcards_enabled
-               -- TODO: I'm confused about this bit in general, read the note. Why is this an illegal wildcard?
-               then illegal_wc (getRdrName rdr)
-               else not_in_scope }
-      | otherwise = not_in_scope
-      where occ = occName (getRdrName rdr)
-            not_in_scope = failWith $ mkTcRnNotInScope (getRdrName rdr) NotInScope
-    go (L l (HsHole NoExtField lname@(L _ rdr)))
+    go (L _ (HsVar (Unbound ()) (L _ rdr))) =
+      failWith $ mkTcRnNotInScope (getRdrName rdr) NotInScope
+    go (L l (HsHole NoExtField (L _ rdr)))
       | isUnderscore occ = return (L l (HsWildCardTy noExtField))
-      -- TODO: see above and to see if we can avoid the "_holeOrMaybeNot" check.
-      | otherwise = go (L l (HsVar (Unbound ()) lname))
+      | otherwise = illegal_wc (getRdrName rdr)
       where occ = occName (getRdrName rdr)
     go (L l (HsApp _ lhs rhs)) =
       do { lhs' <- go lhs
