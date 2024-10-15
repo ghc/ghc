@@ -3864,7 +3864,7 @@ instance ExactPrint (FunDep GhcPs) where
 
   exact (FunDep an ls rs') = do
     ls' <- markAnnotated ls
-    an0 <- markEpAnnL an lidl AnnRarrow
+    an0 <- markEpUniToken an
     rs'' <- markAnnotated rs'
     return (FunDep an0 ls' rs'')
 

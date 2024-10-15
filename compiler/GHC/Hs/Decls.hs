@@ -578,7 +578,7 @@ pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = nd } })
 instance OutputableBndrId p => Outputable (FunDep (GhcPass p)) where
   ppr = pprFunDep
 
-type instance XCFunDep    (GhcPass _) = [AddEpAnn]
+type instance XCFunDep    (GhcPass _) = TokRarrow
 type instance XXFunDep    (GhcPass _) = DataConCantHappen
 
 pprFundeps :: OutputableBndrId p => [FunDep (GhcPass p)] -> SDoc

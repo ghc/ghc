@@ -11,7 +11,7 @@ module GHC.Parser.Annotation (
   AnnKeywordId(..),
   EpToken(..), EpUniToken(..),
   getEpTokenSrcSpan, getEpTokenLocs, getEpTokenLoc,
-  TokDcolon,
+  TokDcolon, TokRarrow,
   EpLayout(..),
   EpaComment(..), EpaCommentTok(..),
   IsUnicodeSyntax(..),
@@ -411,6 +411,7 @@ getEpTokenLoc NoEpTok   = noAnn
 getEpTokenLoc (EpTok l) = l
 
 type TokDcolon = EpUniToken "::" "∷"
+type TokRarrow = EpUniToken "->" "→"
 
 -- | Layout information for declarations.
 data EpLayout =

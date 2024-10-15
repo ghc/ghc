@@ -2450,7 +2450,7 @@ fds1 :: { Located [LHsFunDep GhcPs] }
 
 fd :: { LHsFunDep GhcPs }
         : varids0 '->' varids0  {% amsA' (L (comb3 $1 $2 $3)
-                                       (FunDep [mu AnnRarrow $2]
+                                       (FunDep (epUniTok $2)
                                                (reverse (unLoc $1))
                                                (reverse (unLoc $3)))) }
 
