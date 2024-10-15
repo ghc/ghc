@@ -11,6 +11,15 @@ for specific guidance on migrating programs to this release.
 Language
 ~~~~~~~~
 
+* ``-Wincomplete-record-selectors`` is now part of `-Wall`, as specified
+  by `GHC Proposal 516: add warning for incomplete record selectors <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0516-incomplete-record-selectors.rst>_`.
+  Hence, if a library is compiled with ``-Werror``, compilation may now fail. Solution: fix the library.
+  Workaround: add ``-Werror=no-incomplete-record-selectors``.
+
+  Note that this warning is at least
+  as serious as a warning about missing patterns from a function definition, perhaps even
+  more so, since it is invisible in the source program.
+
 Compiler
 ~~~~~~~~
 
