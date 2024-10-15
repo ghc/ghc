@@ -5,9 +5,6 @@
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
--- Remove this after cmmToRawCmmHook removal
-{-# OPTIONS_GHC -Wno-deprecations #-}
-
 -------------------------------------------------------------------------------
 --
 -- | Main API for compiling plain Haskell source code.
