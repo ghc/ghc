@@ -49,6 +49,26 @@ infixr 1 >>>, <<<
 --   f . g = \\x -> f (g x)
 -- @
 --
+-- Isomorphisms form a category as well:
+--
+-- @
+-- data Iso a b = Iso (a -> b) (b -> a)
+--
+-- instance Category Iso where
+--   id = Iso id id
+--   Iso f1 g1 . Iso f2 g2 = Iso (f1 . f2) (g2 . g1)
+-- @
+--
+-- Natural transformations are another important example:
+--
+-- @
+-- newtype f ~> g = NatTransform (forall x. f x -> g x)
+--
+-- instance Category (~>) where
+--   id = NatTransform id
+--   NatTransform f . NatTransform g = NatTransform (f . g)
+-- @
+--
 -- Using the `TypeData` language extension, we can also make a category where `k` isn't
 -- `Type`, but a custom kind `Door` instead:
 --
