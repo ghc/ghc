@@ -159,11 +159,11 @@ tag functions as tag inference currently doesn't rely on those being properly ta
    cap->r.rRet = (retcode);                             \
    return cap;
 
-#define Sp_plusB(n)  ((void *)(((StgWord8*)Sp) + (n)))
-#define Sp_minusB(n) ((void *)(((StgWord8*)Sp) - (n)))
+#define Sp_plusB(n)  ((void *)((StgWord8*)Sp + (ptrdiff_t)(n)))
+#define Sp_minusB(n) ((void *)((StgWord8*)Sp - (ptrdiff_t)(n)))
 
-#define Sp_plusW(n)  (Sp_plusB((n) * sizeof(W_)))
-#define Sp_minusW(n) (Sp_minusB((n) * sizeof(W_)))
+#define Sp_plusW(n)  (Sp_plusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
+#define Sp_minusW(n) (Sp_minusB((ptrdiff_t)(n) * (ptrdiff_t)sizeof(W_)))
 
 #define Sp_addB(n)   (Sp = Sp_plusB(n))
 #define Sp_subB(n)   (Sp = Sp_minusB(n))
