@@ -642,6 +642,7 @@ Library
         GHC.Parser.Errors.Ppr
         GHC.Parser.Errors.Types
         GHC.Parser.Header
+        GHC.Parser.Layouter
         GHC.Parser.Lexer
         GHC.Parser.HaddockLex
         GHC.Parser.PostProcess

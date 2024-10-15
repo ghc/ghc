@@ -28,6 +28,7 @@ import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw e
 
 import GHC.Parser.Errors.Types
 import GHC.Parser           ( parseHeader )
+import GHC.Parser.Layouter
 import GHC.Parser.Lexer
 
 import GHC.Hs
@@ -203,7 +204,7 @@ lazyGetToks popts filename handle = do
 
   lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
   lazyLexBuf handle state eof size =
-    case unP (lexer False return) state of
+    case unP (layouter (lexer False) return) state of
       POk state' t -> do
         -- pprTrace "lazyLexBuf" (text (show (buffer state'))) (return ())
         if atEnd (buffer state') && not eof
@@ -238,7 +239,7 @@ getToks popts filename buf = lexAll pstate
   pstate = initPragState popts buf loc
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
-  lexAll state = case unP (lexer False return) state of
+  lexAll state = case unP (layouter (lexer False) return) state of
                    POk _      t@(L _ ITeof) -> [t]
                    POk state' t -> t : lexAll state'
                    _ -> [L (mkSrcSpanPs (last_loc state)) ITeof]

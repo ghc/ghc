@@ -60,7 +60,7 @@ module GHC.Parser.Lexer (
    P(..), ParseResult(POk, PFailed),
    allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..), getBit,
-   getRealSrcLoc, getPState,
+   getRealSrcLoc, getPState, getLastLoc,
    failMsgP, failLocMsgP, srcParseFail,
    getPsErrorMessages, getPsMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
@@ -93,6 +93,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Word
 import Debug.Trace (trace)
+import {-# SOURCE #-} GHC.Parser.Layouter
 
 import GHC.Data.EnumSet as EnumSet
 
@@ -1999,15 +2000,15 @@ do_bol span _str _len _buf2 = do
         if b then return (L span ITcomment_line_prag) else do
           (pos, gen_semic) <- getOffside
           case pos of
-              LT -> do
-                  --trace "layout: inserting '}'" $ do
-                  popContext
-                  -- do NOT pop the lex state, we might have a ';' to insert
-                  return (L span ITvccurly)
-              EQ | gen_semic -> do
-                  --trace "layout: inserting ';'" $ do
-                  _ <- popLexState
-                  return (L span ITsemi)
+--              LT -> do
+--                  --trace "layout: inserting '}'" $ do
+--                  popContext
+--                  -- do NOT pop the lex state, we might have a ';' to insert
+--                  return (L span ITvccurly)
+--              EQ | gen_semic -> do
+--                  --trace "layout: inserting ';'" $ do
+--                  _ <- popLexState
+--                  return (L span ITsemi)
               _ -> do
                   _ <- popLexState
                   lexToken
@@ -2024,15 +2025,15 @@ maybe_layout t = do -- If the alternative layout rule is enabled then
                     -- context.
                     alr <- getBit AlternativeLayoutRuleBit
                     unless alr $ f t
-    where f (ITdo _)    = pushLexState layout_do
-          f (ITmdo _)   = pushLexState layout_do
-          f ITof        = pushLexState layout
-          f ITlcase     = pushLexState layout
-          f ITlcases    = pushLexState layout
-          f ITlet       = pushLexState layout
-          f ITwhere     = pushLexState layout
-          f ITrec       = pushLexState layout
-          f ITif        = pushLexState layout_if
+    where f (ITdo _)    = return () -- pushLexState layout_do
+          f (ITmdo _)   = return () -- pushLexState layout_do
+          f ITof        = return () -- pushLexState layout
+          f ITlcase     = return () -- pushLexState layout
+          f ITlcases    = return () -- pushLexState layout
+          f ITlet       = return () -- pushLexState layout
+          f ITwhere     = return () -- pushLexState layout
+          f ITrec       = return () -- pushLexState layout
+          f ITif        = return () -- pushLexState layout_if
           f _           = return ()
 
 -- Pushing a new implicit layout context.  If the indentation of the
@@ -2468,6 +2469,8 @@ data PState = PState {
         -- Have we just had the '}' for a let block? If so, than an 'in'
         -- token doesn't need to close anything:
         alr_justClosedExplicitLetBlock :: Bool,
+
+        lay_state :: LayState,
 
         -- The next three are used to implement Annotations giving the
         -- locations of 'noise' tokens in the source, so that users of
@@ -3009,6 +3012,7 @@ initParserState options buf loc =
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
+      lay_state = initLayState,
       eof_pos = Strict.Nothing,
       header_comments = Strict.Nothing,
       comment_q = [],
@@ -3236,7 +3240,7 @@ lexError e = do
 -- This is the top-level function: called from the parser each time a
 -- new token is to be read from the input.
 
-lexer, lexerDbg :: Bool -> (Located Token -> P a) -> P a
+lexer, lexerDbg :: Bool -> (PsLocated Token -> P a) -> P a
 
 lexer queueComments cont = do
   alr <- getBit AlternativeLayoutRuleBit
@@ -3246,7 +3250,7 @@ lexer queueComments cont = do
 
   if (queueComments && isComment tok)
     then queueComment (L (psRealSpan span) tok) >> lexer queueComments cont
-    else cont (L (mkSrcSpanPs span) tok)
+    else cont (L span tok)
 
 -- Use this instead of 'lexer' in GHC.Parser to dump the tokens for debugging.
 lexerDbg queueComments cont = lexer queueComments contDbg
@@ -3526,7 +3530,7 @@ lexTokenStream opts buf loc = unP go initState{ options = opts' }
       ltok <- lexer False return
       case ltok of
         L _ ITeof -> return []
-        _ -> liftM (ltok:) go
+        L span tk -> liftM (L (mkSrcSpanPs span) tk:) go
 
 linePrags = Map.singleton "line" linePrag
 

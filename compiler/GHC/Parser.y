@@ -83,6 +83,7 @@ import GHC.Core.DataCon ( DataCon, dataConName )
 
 import GHC.Parser.PostProcess
 import GHC.Parser.PostProcess.Haddock
+import GHC.Parser.Layouter
 import GHC.Parser.Lexer
 import GHC.Parser.HaddockLex
 import GHC.Parser.Annotation
@@ -762,7 +763,7 @@ TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 %monad { P } { >>= } { return }
-%lexer { (lexer True) } { L _ ITeof }
+%lexer { layouter (lexer True) } { L _ ITeof }
   -- Replace 'lexer' above with 'lexerDbg'
   -- to dump the tokens fed to the parser.
 %tokentype { (Located Token) }
@@ -797,7 +798,7 @@ identifier :: { LocatedN RdrName }
 -- Backpack stuff
 
 backpack :: { [LHsUnit PackageName] }
-         : implicit_top units close { fromOL $2 }
+         : implicit_top units vccurly { fromOL $2 }
          | '{' units '}'            { fromOL $2 }
 
 units :: { OrdList (LHsUnit PackageName) }
@@ -867,7 +868,7 @@ rn :: { LRenaming }
 
 unitbody :: { OrdList (LHsUnitDecl PackageName) }
         : '{'     unitdecls '}'   { $2 }
-        | vocurly unitdecls close { $2 }
+        | vocurly unitdecls vccurly { $2 }
 
 unitdecls :: { OrdList (LHsUnitDecl PackageName) }
         : unitdecls ';' unitdecl { $1 `appOL` unitOL $3 }
@@ -944,13 +945,13 @@ body    :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
              ,EpLayout) }
         :  '{'            top '}'      { (fst $2, snd $2, epExplicitBraces $1 $3) }
-        |      vocurly    top close    { (fst $2, snd $2, EpVirtualBraces (getVOCURLY $1)) }
+        |      vocurly    top vccurly    { (fst $2, snd $2, EpVirtualBraces (getVOCURLY $1)) }
 
 body2   :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
              ,EpLayout) }
         :  '{' top '}'                          { (fst $2, snd $2, epExplicitBraces $1 $3) }
-        |  missing_module_keyword top close     { ([], snd $2, EpVirtualBraces leftmostColumn) }
+        |  missing_module_keyword top vccurly     { ([], snd $2, EpVirtualBraces leftmostColumn) }
 
 
 top     :: { ([TrailingAnn]
@@ -1467,11 +1468,11 @@ where_type_family :: { Located ([AddEpAnn],FamilyInfo GhcPs) }
 ty_fam_inst_eqn_list :: { Located ([AddEpAnn],Maybe [LTyFamInstEqn GhcPs]) }
         :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ([moc $1,mcc $3]
                                                 ,Just (unLoc $2)) }
-        | vocurly ty_fam_inst_eqns close   { let (L loc _) = $2 in
+        | vocurly ty_fam_inst_eqns vccurly   { let (L loc _) = $2 in
                                              L loc ([],Just (unLoc $2)) }
         |     '{' '..' '}'                 { sLL $1 $> ([moc $1,mj AnnDotdot $2
                                                  ,mcc $3],Nothing) }
-        | vocurly '..' close               { let (L loc _) = $2 in
+        | vocurly '..' vccurly               { let (L loc _) = $2 in
                                              L loc ([mj AnnDotdot $2],Nothing) }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
@@ -1724,7 +1725,7 @@ cvars1 :: { [RecordPatSynField GhcPs] }
 where_decls :: { LocatedL (OrdList (LHsDecl GhcPs)) }
         : 'where' '{' decls '}'       {% amsr (sLL $1 $> (snd $ unLoc $3))
                                               (AnnList (Just $ glR $3) (Just $ moc $2) (Just $ mcc $4) (mj AnnWhere $1: (fst $ unLoc $3)) []) }
-        | 'where' vocurly decls close {% amsr (sLL $1 $3 (snd $ unLoc $3))
+        | 'where' vocurly decls vccurly {% amsr (sLL $1 $3 (snd $ unLoc $3))
                                               (AnnList (Just $ glR $3) Nothing Nothing (mj AnnWhere $1: (fst $ unLoc $3)) []) }
 
 pattern_synonym_sig :: { LSig GhcPs }
@@ -1780,7 +1781,7 @@ decllist_cls
                      , EpLayout) }      -- Reversed
         : '{'         decls_cls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
                                              ,snd $ unLoc $2, epExplicitBraces $1 $3) }
-        |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
+        |     vocurly decls_cls vccurly   { let { L l (anns, decls) = $2 }
                                            in L l (anns, decls, EpVirtualBraces (getVOCURLY $1)) }
 
 -- Class body
@@ -1824,7 +1825,7 @@ decllist_inst
         :: { Located ([AddEpAnn]
                      , OrdList (LHsDecl GhcPs)) }      -- Reversed
         : '{'         decls_inst '}'    { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2),snd $ unLoc $2) }
-        |     vocurly decls_inst close  { L (gl $2) (unLoc $2) }
+        |     vocurly decls_inst vccurly  { L (gl $2) (unLoc $2) }
 
 -- Instance body
 --
@@ -1864,7 +1865,7 @@ decls   :: { Located ([AddEpAnn], OrdList (LHsDecl GhcPs)) }
 decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
         : '{'            decls '}'     { sLL $1 $> (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3)  (fst $ unLoc $2) []
                                                    ,sL1 $2 $ snd $ unLoc $2) }
-        |     vocurly    decls close   { L (gl $2) (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []
+        |     vocurly    decls vccurly   { L (gl $2) (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []
                                                    ,sL1 $2 $ snd $ unLoc $2) }
 
 -- Binding groups other than those of class and instance declarations
@@ -1879,7 +1880,7 @@ binds   ::  { Located (HsLocalBinds GhcPs) }
         | '{'            dbinds '}'     {% acs (comb3 $1 $2 $3) (\loc cs -> (L loc
                                              $ HsIPBinds (EpAnn (spanAsAnchor (comb3 $1 $2 $3)) (AnnList (Just$ glR $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) (IPBinds noExtField (reverse $ unLoc $2)))) }
 
-        |     vocurly    dbinds close   {% acs (gl $2) (\loc cs -> (L loc
+        |     vocurly    dbinds vccurly   {% acs (gl $2) (\loc cs -> (L loc
                                              $ HsIPBinds (EpAnn (glR $1) (AnnList (Just $ glR $2) Nothing Nothing [] []) cs) (IPBinds noExtField (reverse $ unLoc $2)))) }
 
 
@@ -2492,7 +2493,7 @@ gadt_constrlist :: { Located ([AddEpAnn]
                                                          ,moc $2
                                                          ,mcc $4]
                                                         , unLoc $3) }
-        | 'where' vocurly    gadt_constrs close  {% checkEmptyGADTs $
+        | 'where' vocurly    gadt_constrs vccurly  {% checkEmptyGADTs $
                                                       L (comb2 $1 $3)
                                                         ([mj AnnWhere $1]
                                                         , unLoc $3) }
@@ -3205,7 +3206,7 @@ acmd    :: { LHsCmdTop GhcPs }
 cvtopbody :: { ([AddEpAnn],[LHsDecl GhcPs]) }
         :  '{'            cvtopdecls0 '}'      { ([mj AnnOpenC $1
                                                   ,mj AnnCloseC $3],$2) }
-        |      vocurly    cvtopdecls0 close    { ([],$2) }
+        |      vocurly    cvtopdecls0 vccurly    { ([],$2) }
 
 cvtopdecls0 :: { [LHsDecl GhcPs] }
         : topdecls_semi         { cvTopDecls $1 }
@@ -3436,11 +3437,11 @@ altslist(PATS) :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (Located
         : '{'        alts(PATS) '}'    { $2 >>= \ $2 -> amsr
                                            (sLL $1 $> (reverse (snd $ unLoc $2)))
                                            (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fst $ unLoc $2) []) }
-        | vocurly    alts(PATS)  close { $2 >>= \ $2 -> amsr
+        | vocurly    alts(PATS)  vccurly { $2 >>= \ $2 -> amsr
                                            (L (getLoc $2) (reverse (snd $ unLoc $2)))
                                            (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []) }
         | '{'              '}'   { amsr (sLL $1 $> []) (AnnList Nothing (Just $ moc $1) (Just $ mcc $2) [] []) }
-        | vocurly          close { return $ noLocA [] }
+        | vocurly          vccurly { return $ noLocA [] }
 
 alts(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
         : alts1(PATS)              { $1 >>= \ $1 -> return $
@@ -3492,14 +3493,11 @@ gdpats :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
                          return $ sLL gdpats gdpat (gdpat : unLoc gdpats) }
         | gdpat        { $1 >>= \gdpat -> return $ sL1 gdpat [gdpat] }
 
--- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
--- generate the open brace in addition to the vertical bar in the lexer, and
--- we don't need it.
 ifgdpats :: { Located ((EpToken "{", EpToken "}"), [LGRHS GhcPs (LHsExpr GhcPs)]) }
-         : '{' gdpats '}'                 {% runPV $2 >>= \ $2 ->
+         : '{'     gdpats '}'             {% runPV $2 >>= \ $2 ->
                                              return $ sLL $1 $> ((epTok $1,epTok $3),unLoc $2)  }
-         |     gdpats close               {% runPV $1 >>= \ $1 ->
-                                             return $ sL1 $1 ((NoEpTok, NoEpTok),unLoc $1) }
+         | vocurly gdpats vccurly         {% runPV $2 >>= \ $2 ->
+                                             return $ sL1 $1 ((NoEpTok, NoEpTok),unLoc $2) }
 
 gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
         : '|' guardquals '->' exp
@@ -3550,7 +3548,7 @@ apat    : aexp                  {% (checkPattern <=< runPV) (unECP $1) }
 stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (LocatedA b))]) }
         : '{'           stmts '}'       { $2 >>= \ $2 ->
                                           amsr (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (stmtsAnchor $2) (Just $ moc $1) (Just $ mcc $3) (fromOL $ fst $ unLoc $2) []) }
-        |     vocurly   stmts close     { $2 >>= \ $2 -> amsr
+        |     vocurly   stmts vccurly   { $2 >>= \ $2 -> amsr
                                           (L (stmtsLoc $2) (reverse $ snd $ unLoc $2)) (AnnList (stmtsAnchor $2) Nothing Nothing (fromOL $ fst $ unLoc $2) []) }
 
 --      do { ;; s ; s ; ; s ;; }
@@ -4133,7 +4131,7 @@ unrelated tokens.
 -}
 close :: { () }
         : vccurly               { () } -- context popped in lexer.
-        | error                 {% popContext } -- See Note [Layout and error]
+--        | error                 {% popContext } -- See Note [Layout and error]
 
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)

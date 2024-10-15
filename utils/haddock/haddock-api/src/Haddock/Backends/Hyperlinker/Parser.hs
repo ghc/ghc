@@ -13,6 +13,7 @@ import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (mkFastString)
 import GHC.Data.StringBuffer (StringBuffer, atEnd)
 import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.Layouter as Layouter
 import GHC.Parser.Lexer as Lexer
   ( P (..)
   , PState (..)
@@ -76,7 +77,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
 
     -- \| Like 'Lexer.lexer', but slower, with a better API, and filtering out empty tokens
     wrappedLexer :: P (RealLocated Lexer.Token)
-    wrappedLexer = Lexer.lexer False andThen
+    wrappedLexer = Layouter.layouter (Lexer.lexer False) andThen
       where
         andThen (L (RealSrcSpan s _) t)
           | srcSpanStartLine s /= srcSpanEndLine s
@@ -104,7 +105,7 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
     parsePlainTok :: Bool -> MaybeT P ([T.Token], Bool) -- return list is only ever 0-2 elements
     parsePlainTok inPrag = do
       (bInit, lInit) <- lift getInput
-      L sp tok <- tryP (Lexer.lexer False return)
+      L sp tok <- tryP (Layouter.layouter (Lexer.lexer False) return)
       (bEnd, _) <- lift getInput
       case sp of
         UnhelpfulSpan _ -> pure ([], False) -- pretend the token never existed
