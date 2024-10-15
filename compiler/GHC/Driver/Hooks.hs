@@ -154,8 +154,6 @@ data Hooks = Hooks
                                  -> IO (Stream IO RawCmmGroup a)))
   }
 
-{-# DEPRECATED cmmToRawCmmHook "cmmToRawCmmHook is being deprecated. If you do use it in your project, please raise a GHC issue!" #-}
-
 class HasHooks m where
     getHooks :: m Hooks
 
