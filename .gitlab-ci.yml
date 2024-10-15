@@ -84,7 +84,7 @@ workflow:
   matrix:
     - GHC_VERSION: 9.4.3
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-    - GHC_VERSION: 9.6.5
+    - GHC_VERSION: 9.6.2
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10-ghc9_6:$DOCKER_REV"
 
 # Allow linters to fail on draft MRs.
