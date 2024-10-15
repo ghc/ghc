@@ -781,7 +781,7 @@ summariseRequirement pn mod_name = do
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
     let fc = hsc_FC hsc_env
-    mod <- liftIO $ addHomeModuleToFinder fc home_unit (notBoot mod_name) location
+    mod <- liftIO $ addHomeModuleToFinder fc home_unit mod_name location
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -893,7 +893,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
     this_mod <- liftIO $ do
       let home_unit = hsc_home_unit hsc_env
       let fc        = hsc_FC hsc_env
-      addHomeModuleToFinder fc home_unit (GWIB modname (hscSourceToIsBoot hsc_src)) location
+      addHomeModuleToFinder fc home_unit modname location
     let ms = ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,

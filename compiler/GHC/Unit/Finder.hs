@@ -89,7 +89,7 @@ type BaseName = String  -- Basename of file
 
 
 initFinderCache :: IO FinderCache
-initFinderCache = FinderCache <$> newIORef emptyInstalledModuleWithIsBootEnv
+initFinderCache = FinderCache <$> newIORef emptyInstalledModuleEnv
                               <*> newIORef M.empty
 
 -- remove all the home modules from the cache; package modules are
@@ -97,23 +97,23 @@ initFinderCache = FinderCache <$> newIORef emptyInstalledModuleWithIsBootEnv
 -- cache
 flushFinderCaches :: FinderCache -> UnitEnv -> IO ()
 flushFinderCaches (FinderCache ref file_ref) ue = do
-  atomicModifyIORef' ref $ \fm -> (filterInstalledModuleWithIsBootEnv is_ext fm, ())
+  atomicModifyIORef' ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
   atomicModifyIORef' file_ref $ \_ -> (M.empty, ())
  where
-  is_ext mod _ = not (isUnitEnvInstalledModule ue (gwib_mod mod))
+  is_ext mod _ = not (isUnitEnvInstalledModule ue mod)
 
-addToFinderCache :: FinderCache -> InstalledModuleWithIsBoot -> InstalledFindResult -> IO ()
+addToFinderCache :: FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
 addToFinderCache (FinderCache ref _) key val =
-  atomicModifyIORef' ref $ \c -> (extendInstalledModuleWithIsBootEnv c key val, ())
+  atomicModifyIORef' ref $ \c -> (extendInstalledModuleEnv c key val, ())
 
-removeFromFinderCache :: FinderCache -> InstalledModuleWithIsBoot -> IO ()
+removeFromFinderCache :: FinderCache -> InstalledModule -> IO ()
 removeFromFinderCache (FinderCache ref _) key =
-  atomicModifyIORef' ref $ \c -> (delInstalledModuleWithIsBootEnv c key, ())
+  atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key, ())
 
-lookupFinderCache :: FinderCache -> InstalledModuleWithIsBoot -> IO (Maybe InstalledFindResult)
+lookupFinderCache :: FinderCache -> InstalledModule -> IO (Maybe InstalledFindResult)
 lookupFinderCache (FinderCache ref _) key = do
    c <- readIORef ref
-   return $! lookupInstalledModuleWithIsBootEnv c key
+   return $! lookupInstalledModuleEnv c key
 
 lookupFileCache :: FinderCache -> FilePath -> IO Fingerprint
 lookupFileCache (FinderCache _ ref) key = do
@@ -262,7 +262,7 @@ orIfNotFound this or_this = do
 homeSearchCache :: FinderCache -> UnitId -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
 homeSearchCache fc home_unit mod_name do_this = do
   let mod = mkModule home_unit mod_name
-  modLocationCache fc (notBoot mod) do_this
+  modLocationCache fc mod do_this
 
 findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> PkgQual -> IO FindResult
 findExposedPackageModule fc fopts units mod_name mb_pkg =
@@ -319,7 +319,7 @@ findLookupResult fc fopts r = case r of
                        , fr_unusables = []
                        , fr_suggestions = suggest' })
 
-modLocationCache :: FinderCache -> InstalledModuleWithIsBoot -> IO InstalledFindResult -> IO InstalledFindResult
+modLocationCache :: FinderCache -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
 modLocationCache fc mod do_this = do
   m <- lookupFinderCache fc mod
   case m of
@@ -329,23 +329,22 @@ modLocationCache fc mod do_this = do
         addToFinderCache fc mod result
         return result
 
-addModuleToFinder :: FinderCache -> ModuleWithIsBoot -> ModLocation -> IO ()
+addModuleToFinder :: FinderCache -> Module -> ModLocation -> IO ()
 addModuleToFinder fc mod loc = do
-  let imod = fmap toUnitId <$> mod
-  addToFinderCache fc imod (InstalledFound loc (gwib_mod imod))
+  let imod = toUnitId <$> mod
+  addToFinderCache fc imod (InstalledFound loc imod)
 
 -- This returns a module because it's more convenient for users
-addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleNameWithIsBoot -> ModLocation -> IO Module
+addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleName -> ModLocation -> IO Module
 addHomeModuleToFinder fc home_unit mod_name loc = do
-  let mod = mkHomeInstalledModule home_unit <$> mod_name
-  addToFinderCache fc mod (InstalledFound loc (gwib_mod mod))
-  return (mkHomeModule home_unit (gwib_mod mod_name))
+  let mod = mkHomeInstalledModule home_unit mod_name
+  addToFinderCache fc mod (InstalledFound loc mod)
+  return (mkHomeModule home_unit mod_name)
 
-uncacheModule :: FinderCache -> HomeUnit -> ModuleNameWithIsBoot -> IO ()
+uncacheModule :: FinderCache -> HomeUnit -> ModuleName -> IO ()
 uncacheModule fc home_unit mod_name = do
-  let mod = mkHomeInstalledModule home_unit (gwib_mod mod_name)
-  removeFromFinderCache fc (GWIB mod (gwib_isBoot mod_name))
-
+  let mod = mkHomeInstalledModule home_unit mod_name
+  removeFromFinderCache fc mod
 
 -- -----------------------------------------------------------------------------
 --      The internal workers
@@ -478,7 +477,7 @@ findPackageModule_ :: FinderCache -> FinderOpts -> InstalledModule -> UnitInfo -
 findPackageModule_ fc fopts mod pkg_conf = do
   massertPpr (moduleUnit mod == unitId pkg_conf)
              (ppr (moduleUnit mod) <+> ppr (unitId pkg_conf))
-  modLocationCache fc (notBoot mod) $
+  modLocationCache fc mod $
 
     -- special case for GHC.Prim; we won't find it in the filesystem.
     if mod `installedModuleEq` gHC_PRIM
