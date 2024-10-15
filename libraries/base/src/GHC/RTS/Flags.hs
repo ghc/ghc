@@ -20,7 +20,7 @@
 --
 -- @since 4.8.0.0
 --
--- DYG todo
+-- This module is a compatibility layer. It is meant to be temporary to allow for the eventual deprecation of these declarations as described in [CLC proposal #289](https://github.com/haskell/core-libraries-committee/issues/289). These declarations are now instead available from the @ghc-experimental@ package.
 
 module GHC.RTS.Flags
   ( RtsTime
@@ -61,12 +61,12 @@ import GHC.Generics (Generic)
 import qualified GHC.Internal.RTS.Flags as Internal
 import GHC.Internal.IO.SubSystem (IoSubSystem(..))
 
-import Data.Word (Word32,Word)
+import Data.Word (Word32,Word64,Word)
 
 -- | 'RtsTime' is defined as a @StgWord64@ in @stg/Types.h@
 --
 -- @since base-4.8.2.0
-type RtsTime = Internal.RtsTime
+type RtsTime = Word64
 
 -- | Should we produce a summary of the garbage collector statistics after the
 -- program has exited?

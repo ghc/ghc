@@ -14761,7 +14761,7 @@ instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Integer.Integer -- Defined 
 instance GHC.Internal.Classes.Eq GHC.Internal.JS.Foreign.Callback.OnBlocked -- Defined in ‘GHC.Internal.JS.Foreign.Callback’
 instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
 instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
-instance GHC.Internal.Classes.Eq GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Classes.Eq GHC.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.RTS.Flags’
 instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.StableName.StableName a) -- Defined in ‘GHC.Internal.StableName’
 instance GHC.Internal.Classes.Eq GHC.Internal.Stack.CloneStack.StackEntry -- Defined in ‘GHC.Internal.Stack.CloneStack’
 instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Classes.Eq (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
@@ -15346,11 +15346,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.Generics.SourceUnpackedness -- Defi
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
-instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Enum.Enum GHC.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Exception.Context.ExceptionAnnotation GHC.Internal.Exception.Type.WhileHandling -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Exception.Context.ExceptionAnnotation GHC.Internal.Exception.Backtrace.Backtraces -- Defined in ‘GHC.Internal.Exception.Backtrace’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.AllocationLimitExceeded -- Defined in ‘GHC.Internal.IO.Exception’
@@ -15538,23 +15534,23 @@ instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics
 instance GHC.Internal.Generics.Generic () -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.CCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.ConcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DebugFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.GCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.HpcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.MiscFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.ParFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.ProfFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.RTSFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.TickyFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.TraceFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Generics.Generic GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
-instance GHC.Internal.Generics.Generic GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.CCFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.ConcFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.DebugFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.DoCostCentres -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.DoTrace -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.GCFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.GiveGCStats -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.HpcFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.MiscFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.ParFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.ProfFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.RTSFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.TickyFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Generics.Generic GHC.RTS.Flags.TraceFlags -- Defined in ‘GHC.RTS.Flags’
+instance [safe] GHC.Internal.Generics.Generic GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
+instance [safe] GHC.Internal.Generics.Generic GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
 instance forall (a :: * -> * -> *) b. GHC.Internal.Generics.Generic1 (Control.Applicative.WrappedArrow a b) -- Defined in ‘Control.Applicative’
 instance forall (m :: * -> *). GHC.Internal.Generics.Generic1 (Control.Applicative.WrappedMonad m) -- Defined in ‘Control.Applicative’
 instance GHC.Internal.Generics.Generic1 GHC.Internal.Functor.ZipList.ZipList -- Defined in ‘GHC.Internal.Functor.ZipList’
@@ -15896,8 +15892,8 @@ instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.BufferMode -- Defin
 instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Internal.Read.Read GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
-instance GHC.Internal.Read.Read GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
-instance GHC.Internal.Read.Read GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
+instance [safe] GHC.Internal.Read.Read GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
+instance [safe] GHC.Internal.Read.Read GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
 instance GHC.Internal.Read.Read GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
@@ -16209,26 +16205,26 @@ instance GHC.Internal.Show.Show GHC.Internal.IOPort.IOPortException -- Defined i
 instance GHC.Internal.Show.Show GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
 instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.JSException -- Defined in ‘GHC.Internal.JS.Prim’
 instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.WouldBlockException -- Defined in ‘GHC.Internal.JS.Prim’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.CCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ConcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DebugFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.GCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.HpcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.MiscFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ParFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.ProfFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.RTSFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TickyFlags -- Defined in ‘GHC.Internal.RTS.Flags’
-instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TraceFlags -- Defined in ‘GHC.Internal.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.CCFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.ConcFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.DebugFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.DoCostCentres -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.DoTrace -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.GCFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.GiveGCStats -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.HpcFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.MiscFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.ParFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.ProfFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.RTSFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.TickyFlags -- Defined in ‘GHC.RTS.Flags’
+instance GHC.Internal.Show.Show GHC.RTS.Flags.TraceFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.Stack.CloneStack.StackEntry -- Defined in ‘GHC.Internal.Stack.CloneStack’
 instance GHC.Internal.Show.Show GHC.Internal.StaticPtr.StaticPtrInfo -- Defined in ‘GHC.Internal.StaticPtr’
-instance GHC.Internal.Show.Show GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
-instance GHC.Internal.Show.Show GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
+instance [safe] GHC.Internal.Show.Show GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
+instance [safe] GHC.Internal.Show.Show GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
 instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Show.Show (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Show.Show GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Show.Show (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’
