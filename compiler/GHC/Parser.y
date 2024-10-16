@@ -1300,7 +1300,7 @@ cl_decl :: { LTyClDecl GhcPs }
 --
 default_decl :: { LDefaultDecl GhcPs }
              : 'default' opt_class '(' comma_types0 ')'
-               {% amsA' (sLL $1 $> (DefaultDecl [mj AnnDefault $1,mop $3,mcp $5] $2 $4)) }
+               {% amsA' (sLL $1 $> (DefaultDecl (epTok $1,epTok $3,epTok $5) $2 $4)) }
 
 
 -- Type declarations (toplevel)

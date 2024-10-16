@@ -2979,13 +2979,13 @@ instance ExactPrint (DefaultDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (DefaultDecl an cl tys) = do
-    an0 <- markEpAnnL an lidl AnnDefault
-    an1 <- markEpAnnL an0 lidl AnnOpenP
+  exact (DefaultDecl (d,op,cp) cl tys) = do
+    d' <- markEpToken d
+    op' <- markEpToken op
     cl' <- markAnnotated cl
     tys' <- markAnnotated tys
-    an2 <- markEpAnnL an1 lidl AnnCloseP
-    return (DefaultDecl an2 cl' tys')
+    cp' <- markEpToken cp
+    return (DefaultDecl (d',op',cp') cl' tys')
 
 -- ---------------------------------------------------------------------
 

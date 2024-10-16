@@ -1183,7 +1183,7 @@ mapDerivStrategy f ds = foldDerivStrategy ds (ViaStrategy . f) ds
 ************************************************************************
 -}
 
-type instance XCDefaultDecl    GhcPs = [AddEpAnn]
+type instance XCDefaultDecl    GhcPs = (EpToken "default", EpToken "(", EpToken ")")
 type instance XCDefaultDecl    GhcRn = NoExtField
 type instance XCDefaultDecl    GhcTc = NoExtField
 
