@@ -1356,7 +1356,7 @@ pprFullRuleName st (L _ n) = pprWithSourceText st (doubleQuotes $ ftext n)
 ************************************************************************
 -}
 
-type instance XWarnings      GhcPs = ([AddEpAnn], SourceText)
+type instance XWarnings      GhcPs = ((EpaLocation, EpaLocation), SourceText)
 type instance XWarnings      GhcRn = SourceText
 type instance XWarnings      GhcTc = SourceText
 

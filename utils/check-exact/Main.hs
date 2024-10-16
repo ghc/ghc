@@ -94,7 +94,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr002.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr002a.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr003.hs" Nothing
- "../../testsuite/tests/printer/Ppr004.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr004.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr005.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr006.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr007.hs" Nothing
@@ -212,7 +212,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test21355.hs" Nothing
 --  "../../testsuite/tests/printer/Test22765.hs" Nothing
  -- "../../testsuite/tests/printer/Test22771.hs" Nothing
- -- "../../testsuite/tests/printer/Test23465.hs" Nothing
+ "../../testsuite/tests/printer/Test23465.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 

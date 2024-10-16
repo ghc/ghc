@@ -2154,11 +2154,11 @@ instance ExactPrint (WarnDecls GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (Warnings (an,src) warns) = do
-    an0 <- markAnnOpen an src "{-# WARNING" -- Note: might be {-# DEPRECATED
+  exact (Warnings ((o,c),src) warns) = do
+    o' <- markAnnOpen'' o src "{-# WARNING" -- Note: might be {-# DEPRECATED
     warns' <- markAnnotated warns
-    an1 <- markEpAnnLMS'' an0 lidl AnnClose (Just "#-}")
-    return (Warnings (an1,src) warns')
+    c' <- printStringAtAA c "#-}"
+    return (Warnings ((o',c'),src) warns')
 
 -- ---------------------------------------------------------------------
 
