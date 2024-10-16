@@ -891,7 +891,20 @@
          (EpaComments
           []))
         (FamilyDecl
-         [(AddEpAnn AnnData (EpaSpan { T17544.hs:22:20-23 }))]
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { T17544.hs:22:20-23 }))
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -1254,7 +1267,20 @@
          (EpaComments
           []))
         (FamilyDecl
-         [(AddEpAnn AnnData (EpaSpan { T17544.hs:28:20-23 }))]
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { T17544.hs:28:20-23 }))
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -1617,7 +1643,20 @@
          (EpaComments
           []))
         (FamilyDecl
-         [(AddEpAnn AnnData (EpaSpan { T17544.hs:34:20-23 }))]
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { T17544.hs:34:20-23 }))
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -1980,7 +2019,20 @@
          (EpaComments
           []))
         (FamilyDecl
-         [(AddEpAnn AnnData (EpaSpan { T17544.hs:40:20-23 }))]
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { T17544.hs:40:20-23 }))
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -2343,7 +2395,20 @@
          (EpaComments
           []))
         (FamilyDecl
-         [(AddEpAnn AnnData (EpaSpan { T17544.hs:46:20-23 }))]
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { T17544.hs:46:20-23 }))
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -2706,7 +2771,20 @@
          (EpaComments
           []))
         (FamilyDecl
-         [(AddEpAnn AnnData (EpaSpan { T17544.hs:52:21-24 }))]
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (EpTok
+           (EpaSpan { T17544.hs:52:21-24 }))
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (DataFamily)
          (NotTopLevel)
          (L

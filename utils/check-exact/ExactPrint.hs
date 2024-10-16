@@ -3874,7 +3874,7 @@ instance ExactPrint (FamilyDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (FamilyDecl { fdExt = an
+  exact (FamilyDecl { fdExt = AnnFamilyDecl ops cps t d f dc eq vb w oc dd cc
                     , fdInfo = info
                     , fdTopLevel = top_level
                     , fdLName = ltycon
@@ -3882,35 +3882,37 @@ instance ExactPrint (FamilyDecl GhcPs) where
                     , fdFixity = fixity
                     , fdResultSig = L lr result
                     , fdInjectivityAnn = mb_inj }) = do
-    an0 <- exactFlavour an info
-    an1 <- exact_top_level an0
-    an2 <- annotationsToComments an1 lidl [AnnOpenP,AnnCloseP]
+    (d',t') <- exactFlavour (d,t) info
+    f' <- exact_top_level f
+
+    epTokensToComments AnnOpenP ops
+    epTokensToComments AnnCloseP cps
     (_, ltycon', tyvars',_,_) <- exactVanillaDeclHead ltycon tyvars fixity Nothing
-    (an3, result') <- exact_kind an2
-    (an4, mb_inj') <-
+    (dc', eq', result') <- exact_kind (dc, eq)
+    (vb', mb_inj') <-
       case mb_inj of
-        Nothing -> return (an3, mb_inj)
+        Nothing -> return (vb, mb_inj)
         Just inj -> do
-          an4 <- markEpAnnL an3 lidl AnnVbar
+          vb' <- markEpToken vb
           inj' <- markAnnotated inj
-          return (an4, Just inj')
-    (an5, info') <-
+          return (vb', Just inj')
+    (w', oc', dd', cc', info') <-
              case info of
                ClosedTypeFamily mb_eqns -> do
-                 an5 <- markEpAnnL an4 lidl AnnWhere
-                 an6 <- markEpAnnL an5 lidl AnnOpenC
-                 (an7, mb_eqns') <-
+                 w' <- markEpToken w
+                 oc' <- markEpToken oc
+                 (dd', mb_eqns') <-
                    case mb_eqns of
                      Nothing -> do
-                       an7 <- markEpAnnL an6 lidl AnnDotdot
-                       return (an7, mb_eqns)
+                       dd' <- markEpToken dd
+                       return (dd', mb_eqns)
                      Just eqns -> do
                        eqns' <- markAnnotated eqns
-                       return (an6, Just eqns')
-                 an8 <- markEpAnnL an7 lidl AnnCloseC
-                 return (an8, ClosedTypeFamily mb_eqns')
-               _ -> return (an4, info)
-    return (FamilyDecl { fdExt = an5
+                       return (dd, Just eqns')
+                 cc' <- markEpToken cc
+                 return (w',oc',dd',cc', ClosedTypeFamily mb_eqns')
+               _ -> return (w,oc,dd,cc, info)
+    return (FamilyDecl { fdExt = AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' oc' dd' cc'
                        , fdInfo = info'
                        , fdTopLevel = top_level
                        , fdLName = ltycon'
@@ -3919,32 +3921,32 @@ instance ExactPrint (FamilyDecl GhcPs) where
                        , fdResultSig = L lr result'
                        , fdInjectivityAnn = mb_inj' })
     where
-      exact_top_level an' =
+      exact_top_level tfamily =
         case top_level of
-          TopLevel    -> markEpAnnL an' lidl AnnFamily
+          TopLevel    -> markEpToken tfamily
           NotTopLevel -> do
             -- It seems that in some kind of legacy
             -- mode the 'family' keyword is still
             -- accepted.
-            markEpAnnL an' lidl AnnFamily
+            markEpToken tfamily
 
-      exact_kind an' =
+      exact_kind (tdcolon, tequal) =
         case result of
-          NoSig    _         -> return (an', result)
+          NoSig    _         -> return (tdcolon, tequal, result)
           KindSig  x kind    -> do
-            an0 <- markEpAnnL an' lidl AnnDcolon
+            tdcolon' <- markEpUniToken tdcolon
             kind' <- markAnnotated kind
-            return (an0, KindSig  x kind')
+            return (tdcolon', tequal, KindSig  x kind')
           TyVarSig x tv_bndr -> do
-            an0 <- markEpAnnL an' lidl AnnEqual
+            tequal' <- markEpToken tequal
             tv_bndr' <- markAnnotated tv_bndr
-            return (an0, TyVarSig x tv_bndr')
+            return (tdcolon, tequal', TyVarSig x tv_bndr')
 
 
-exactFlavour :: (Monad m, Monoid w) => [AddEpAnn] -> FamilyInfo GhcPs -> EP w m [AddEpAnn]
-exactFlavour an DataFamily            = markEpAnnL an lidl AnnData
-exactFlavour an OpenTypeFamily        = markEpAnnL an lidl AnnType
-exactFlavour an (ClosedTypeFamily {}) = markEpAnnL an lidl AnnType
+exactFlavour :: (Monad m, Monoid w) => (EpToken "data", EpToken "type") -> FamilyInfo GhcPs -> EP w m (EpToken "data", EpToken "type")
+exactFlavour (td,tt) DataFamily            = (\td' -> (td',tt)) <$> markEpToken td
+exactFlavour (td,tt) OpenTypeFamily        = (td,)              <$> markEpToken tt
+exactFlavour (td,tt) (ClosedTypeFamily {}) = (td,)              <$> markEpToken tt
 
 -- ---------------------------------------------------------------------
 

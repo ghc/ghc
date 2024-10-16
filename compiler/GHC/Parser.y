@@ -1322,10 +1322,12 @@ ty_decl :: { LTyClDecl GhcPs }
                           where_type_family
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% mkFamDecl (comb5 $1 $3 $4 $5 $6) (snd $ unLoc $6) TopLevel $3
+             {% do { let { (tdcolon, tequal) = fst $ unLoc $4 }
+                   ; let { tvbar = fst $ unLoc $5 }
+                   ; let { (twhere, (toc, tdd, tcc)) = fst $ unLoc $6  }
+                   ; mkFamDecl (comb5 $1 $3 $4 $5 $6) (snd $ unLoc $6) TopLevel $3
                                    (snd $ unLoc $4) (snd $ unLoc $5)
-                           (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)
-                           ++ (fst $ unLoc $5) ++ (fst $ unLoc $6))  }
+                           (AnnFamilyDecl [] [] (epTok $1) noAnn (epTok $2) tdcolon tequal tvbar twhere toc tdd tcc) }}
 
           -- ordinary data type or newtype declaration
         | type_data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
@@ -1355,9 +1357,10 @@ ty_decl :: { LTyClDecl GhcPs }
 
           -- data/newtype family
         | 'data' 'family' type opt_datafam_kind_sig
-                {% mkFamDecl (comb4 $1 $2 $3 $4) DataFamily TopLevel $3
+             {% do { let { tdcolon = fst $ unLoc $4 }
+                   ; mkFamDecl (comb4 $1 $2 $3 $4) DataFamily TopLevel $3
                                    (snd $ unLoc $4) Nothing
-                          (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
+                           (AnnFamilyDecl [] [] noAnn (epTok $1) (epTok $2) tdcolon noAnn noAnn noAnn noAnn noAnn noAnn) }}
 
 -- standalone kind signature
 standalone_kind_sig :: { LStandaloneKindSig GhcPs }
@@ -1449,9 +1452,9 @@ opt_class :: { Maybe (LIdP GhcPs) }
 
 -- Injective type families
 
-opt_injective_info :: { Located ([AddEpAnn], Maybe (LInjectivityAnn GhcPs)) }
-        : {- empty -}               { noLoc ([], Nothing) }
-        | '|' injectivity_cond      { sLL $1 $> ([mj AnnVbar $1]
+opt_injective_info :: { Located (EpToken "|", Maybe (LInjectivityAnn GhcPs)) }
+        : {- empty -}               { noLoc (noAnn, Nothing) }
+        | '|' injectivity_cond      { sLL $1 $> ((epTok $1)
                                                 , Just ($2)) }
 
 injectivity_cond :: { LInjectivityAnn GhcPs }
@@ -1464,21 +1467,20 @@ inj_varids :: { Located [LocatedN RdrName] }
 
 -- Closed type families
 
-where_type_family :: { Located ([AddEpAnn],FamilyInfo GhcPs) }
-        : {- empty -}                      { noLoc ([],OpenTypeFamily) }
+where_type_family :: { Located ((EpToken "where", (EpToken "{", EpToken "..", EpToken "}")),FamilyInfo GhcPs) }
+        : {- empty -}                      { noLoc (noAnn,OpenTypeFamily) }
         | 'where' ty_fam_inst_eqn_list
-               { sLL $1 $> (mj AnnWhere $1:(fst $ unLoc $2)
+               { sLL $1 $> ((epTok $1,(fst $ unLoc $2))
                     ,ClosedTypeFamily (fmap reverse $ snd $ unLoc $2)) }
 
-ty_fam_inst_eqn_list :: { Located ([AddEpAnn],Maybe [LTyFamInstEqn GhcPs]) }
-        :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ([moc $1,mcc $3]
+ty_fam_inst_eqn_list :: { Located ((EpToken "{", EpToken "..", EpToken "}"),Maybe [LTyFamInstEqn GhcPs]) }
+        :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ((epTok $1,noAnn, epTok $3)
                                                 ,Just (unLoc $2)) }
         | vocurly ty_fam_inst_eqns close   { let (L loc _) = $2 in
-                                             L loc ([],Just (unLoc $2)) }
-        |     '{' '..' '}'                 { sLL $1 $> ([moc $1,mj AnnDotdot $2
-                                                 ,mcc $3],Nothing) }
+                                             L loc (noAnn,Just (unLoc $2)) }
+        |     '{' '..' '}'                 { sLL $1 $> ((epTok $1,epTok $2 ,epTok $3),Nothing) }
         | vocurly '..' close               { let (L loc _) = $2 in
-                                             L loc ([mj AnnDotdot $2],Nothing) }
+                                             L loc ((noAnn,epTok $2, noAnn),Nothing) }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
@@ -1520,25 +1522,27 @@ ty_fam_inst_eqn :: { LTyFamInstEqn GhcPs }
 at_decl_cls :: { LHsDecl GhcPs }
         :  -- data family declarations, with optional 'family' keyword
           'data' opt_family type opt_datafam_kind_sig
-                {% liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily NotTopLevel $3
+             {% do { let { tdcolon = fst $ unLoc $4 }
+                   ; liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily NotTopLevel $3
                                                   (snd $ unLoc $4) Nothing
-                        (mj AnnData $1:$2++(fst $ unLoc $4))) }
+                           (AnnFamilyDecl [] [] noAnn (epTok $1) $2 tdcolon noAnn noAnn noAnn noAnn noAnn noAnn)) }}
 
            -- type family declarations, with optional 'family' keyword
            -- (can't use opt_instance because you get shift/reduce errors
         | 'type' type opt_at_kind_inj_sig
-               {% liftM mkTyClD
+            {% do { let { (tdcolon, tequal, tvbar) = fst $ unLoc $3 }
+                  ; liftM mkTyClD
                         (mkFamDecl (comb3 $1 $2 $3) OpenTypeFamily NotTopLevel $2
                                    (fst . snd $ unLoc $3)
                                    (snd . snd $ unLoc $3)
-                         (mj AnnType $1:(fst $ unLoc $3)) )}
+                         (AnnFamilyDecl [] [] (epTok $1) noAnn noAnn tdcolon tequal tvbar noAnn noAnn noAnn noAnn)) }}
         | 'type' 'family' type opt_at_kind_inj_sig
-               {% liftM mkTyClD
+            {% do { let { (tdcolon, tequal, tvbar) = fst $ unLoc $4 }
+                  ; liftM mkTyClD
                         (mkFamDecl (comb3 $1 $3 $4) OpenTypeFamily NotTopLevel $3
                                    (fst . snd $ unLoc $4)
                                    (snd . snd $ unLoc $4)
-                         (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)))}
-
+                           (AnnFamilyDecl [] [] (epTok $1) noAnn (epTok $2) tdcolon tequal tvbar noAnn noAnn noAnn noAnn)) }}
            -- default type instances, with optional 'instance' keyword
         | 'type' ty_fam_inst_eqn
                 {% liftM mkInstD (mkTyFamInst (comb2 $1 $2) (unLoc $2)
@@ -1547,9 +1551,9 @@ at_decl_cls :: { LHsDecl GhcPs }
                 {% liftM mkInstD (mkTyFamInst (comb2 $1 $3) (unLoc $3)
                               (epTok $1) (epTok $2) )}
 
-opt_family   :: { [AddEpAnn] }
-              : {- empty -}   { [] }
-              | 'family'      { [mj AnnFamily $1] }
+opt_family   :: { EpToken "family" }
+              : {- empty -}   { noAnn }
+              | 'family'      { (epTok $1) }
 
 opt_instance :: { EpToken "instance" }
               : {- empty -} { NoEpTok }
@@ -1602,24 +1606,24 @@ opt_kind_sig :: { Located (TokDcolon, Maybe (LHsKind GhcPs)) }
         :               { noLoc     (NoEpUniTok , Nothing) }
         | '::' kind     { sLL $1 $> (epUniTok $1, Just $2) }
 
-opt_datafam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
-        :               { noLoc     ([]               , noLocA (NoSig noExtField)         )}
-        | '::' kind     { sLL $1 $> ([mu AnnDcolon $1], sLLa $1 $> (KindSig noExtField $2))}
+opt_datafam_kind_sig :: { Located (TokDcolon, LFamilyResultSig GhcPs) }
+        :               { noLoc     (noAnn,       noLocA (NoSig noExtField)         )}
+        | '::' kind     { sLL $1 $> (epUniTok $1, sLLa $1 $> (KindSig noExtField $2))}
 
-opt_tyfam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
-        :              { noLoc     ([]               , noLocA     (NoSig    noExtField)   )}
-        | '::' kind    { sLL $1 $> ([mu AnnDcolon $1], sLLa $1 $> (KindSig  noExtField $2))}
+opt_tyfam_kind_sig :: { Located ((TokDcolon, EpToken "="), LFamilyResultSig GhcPs) }
+        :              { noLoc     (noAnn               , noLocA     (NoSig    noExtField)   )}
+        | '::' kind    { sLL $1 $> ((epUniTok $1, noAnn), sLLa $1 $> (KindSig  noExtField $2))}
         | '='  tv_bndr {% do { tvb <- fromSpecTyVarBndr $2
-                             ; return $ sLL $1 $> ([mj AnnEqual $1], sLLa $1 $> (TyVarSig noExtField tvb))} }
+                             ; return $ sLL $1 $> ((noAnn, epTok $1), sLLa $1 $> (TyVarSig noExtField tvb))} }
 
-opt_at_kind_inj_sig :: { Located ([AddEpAnn], ( LFamilyResultSig GhcPs
+opt_at_kind_inj_sig :: { Located ((TokDcolon, EpToken "=", EpToken "|"), ( LFamilyResultSig GhcPs
                                             , Maybe (LInjectivityAnn GhcPs)))}
-        :            { noLoc ([], (noLocA (NoSig noExtField), Nothing)) }
-        | '::' kind  { sLL $1 $> ( [mu AnnDcolon $1]
+        :            { noLoc (noAnn, (noLocA (NoSig noExtField), Nothing)) }
+        | '::' kind  { sLL $1 $> ( (epUniTok $1, noAnn, noAnn)
                                  , (sL1a $> (KindSig noExtField $2), Nothing)) }
         | '='  tv_bndr_no_braces '|' injectivity_cond
                 {% do { tvb <- fromSpecTyVarBndr $2
-                      ; return $ sLL $1 $> ([mj AnnEqual $1, mj AnnVbar $3]
+                      ; return $ sLL $1 $> ((noAnn, epTok $1, epTok $3)
                                            , (sLLa $1 $2 (TyVarSig noExtField tvb), Just $4))} }
 
 -- tycl_hdr parses the header of a class or data type decl,

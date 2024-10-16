@@ -247,15 +247,6 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn })) }
 
--- TODO:AZ:temporary
-openParen2AddEpAnn :: EpToken "(" -> [AddEpAnn]
-openParen2AddEpAnn (EpTok l) = [AddEpAnn AnnOpenP l]
-openParen2AddEpAnn NoEpTok = []
-
-closeParen2AddEpAnn :: EpToken ")" -> [AddEpAnn]
-closeParen2AddEpAnn (EpTok l) = [AddEpAnn AnnCloseP l]
-closeParen2AddEpAnn NoEpTok = []
-
 mkDataDefn :: Maybe (LocatedP CType)
            -> Maybe (LHsContext GhcPs)
            -> Maybe (LHsKind GhcPs)
@@ -371,14 +362,13 @@ mkFamDecl :: SrcSpan
           -> LHsType GhcPs                   -- LHS
           -> LFamilyResultSig GhcPs          -- Optional result signature
           -> Maybe (LInjectivityAnn GhcPs)   -- Injectivity annotation
-          -> [AddEpAnn]
+          -> AnnFamilyDecl
           -> P (LTyClDecl GhcPs)
 mkFamDecl loc info topLevel lhs ksig injAnn annsIn
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False lhs
        ; tyvars <- checkTyVars (ppr info) equals_or_where tc tparams
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
-       ; let anns' = annsIn Semi.<>
-                     concatMap openParen2AddEpAnn ops Semi.<> concatMap closeParen2AddEpAnn cps
+       ; let anns' = annsIn { afd_openp = ops, afd_closep = cps }
        ; return (L loc' (FamDecl noExtField (FamilyDecl
                                            { fdExt       = anns'
                                            , fdTopLevel  = topLevel

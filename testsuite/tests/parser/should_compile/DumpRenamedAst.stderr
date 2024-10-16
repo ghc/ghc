@@ -256,7 +256,19 @@
        (FamDecl
         (NoExtField)
         (FamilyDecl
-         []
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (ClosedTypeFamily
           (Just
            [(L
@@ -688,7 +700,19 @@
        (FamDecl
         (NoExtField)
         (FamilyDecl
-         []
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (DataFamily)
          (TopLevel)
          (L
@@ -1494,7 +1518,19 @@
        (FamDecl
         (NoExtField)
         (FamilyDecl
-         []
+         (AnnFamilyDecl
+          []
+          []
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpUniTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok)
+          (NoEpTok))
          (ClosedTypeFamily
           (Just
            [(L
@@ -2051,7 +2087,19 @@
            (EpaComments
             []))
           (FamilyDecl
-           []
+           (AnnFamilyDecl
+            []
+            []
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpUniTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok)
+            (NoEpTok))
            (OpenTypeFamily)
            (NotTopLevel)
            (L

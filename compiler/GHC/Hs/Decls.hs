@@ -34,6 +34,7 @@ module GHC.Hs.Decls (
   AnnDataDefn(..),
   AnnClassDecl(..),
   AnnSynDecl(..),
+  AnnFamilyDecl(..),
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   tyClGroupKindSigs,
@@ -612,9 +613,27 @@ type instance XCKindSig         (GhcPass _) = NoExtField
 type instance XTyVarSig         (GhcPass _) = NoExtField
 type instance XXFamilyResultSig (GhcPass _) = DataConCantHappen
 
-type instance XCFamilyDecl    (GhcPass _) = [AddEpAnn]
+type instance XCFamilyDecl    (GhcPass _) = AnnFamilyDecl
 type instance XXFamilyDecl    (GhcPass _) = DataConCantHappen
 
+data AnnFamilyDecl
+  = AnnFamilyDecl {
+      afd_openp  :: [EpToken "("],
+      afd_closep :: [EpToken ")"],
+      afd_type   :: EpToken "type",
+      afd_data   :: EpToken "data",
+      afd_family :: EpToken "family",
+      afd_dcolon :: TokDcolon,
+      afd_equal  :: EpToken "=",
+      afd_vbar   :: EpToken "|",
+      afd_where  :: EpToken "where",
+      afd_openc  :: EpToken "{",
+      afd_dotdot :: EpToken "..",
+      afd_closec :: EpToken "}"
+  } deriving Data
+
+instance NoAnn AnnFamilyDecl where
+  noAnn = AnnFamilyDecl noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 ------------- Functions over FamilyDecls -----------
 
