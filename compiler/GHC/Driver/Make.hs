@@ -21,7 +21,10 @@
 module GHC.Driver.Make (
         depanal, depanalE, depanalPartial, checkHomeUnitsClosed,
         load, loadWithCache, load', AnyGhcDiagnostic, LoadHowMuch(..), ModIfaceCache(..), noIfaceCache, newIfaceCache,
+        ModuleGraphNodeWithBootFile(..),
+        BuildPlan(..),
         computeBuildPlan,
+        speculateIface,
         instantiationNodes,
 
         downsweep,
@@ -75,6 +78,7 @@ import GHC.Driver.MakeSem
 import GHC.Parser.Header
 import GHC.ByteCode.Types
 
+import GHC.Iface.Binary
 import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Iface.Recomp    ( RecompileRequired(..), CompileReason(..) )
@@ -495,6 +499,19 @@ computeBuildPlan = do
     guessOutputFile
 
     liftIO $ evaluate $ createBuildPlan mod_graph Nothing
+
+speculateIface :: GhcMonad m => ModSummary -> m (Maybe ModIface)
+speculateIface ms = withSession $ \hsc_env -> liftIO $ do
+  let dflags = hsc_dflags hsc_env
+      profile = targetProfile dflags
+      name_cache = hsc_NC hsc_env
+      file_path
+        | ways dflags `hasWay` WayDyn = msDynHiFilePath ms
+        | otherwise = msHiFilePath ms
+  res <- tryMost $ readBinIface profile name_cache CheckHiWay QuietBinIFace file_path
+  pure $ case res of
+    Right iface -> Just iface
+    _ -> Nothing
 
 mkBatchMsg :: HscEnv -> Messager
 mkBatchMsg hsc_env =

@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
@@ -17,7 +18,7 @@ module Main (main) where
 -- The official GHC API
 import qualified GHC
 import GHC              (parseTargetFiles,  Ghc, GhcMonad(..),
-                          LoadHowMuch(..) )
+                          LoadHowMuch(..), moduleName, moduleNameString )
 
 import GHC.Driver.Backend
 import GHC.Driver.CmdLine
@@ -28,7 +29,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
-import GHC.Driver.Make ( computeBuildPlan )
+import GHC.Driver.Make ( ModuleGraphNodeWithBootFile(..), BuildPlan(..), computeBuildPlan, speculateIface )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
@@ -50,11 +51,14 @@ import GHC.Unit (UnitId)
 import GHC.Unit.Home.PackageTable
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Module ( ModuleName, mkModuleName )
+import GHC.Unit.Module.Deps
+import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State  ( pprUnits, pprUnitsSimple, emptyUnitState )
+import GHC.Unit.Module.ModSummary
 import GHC.Unit.Finder ( findImportedModule, FindResult(..) )
 import qualified GHC.Unit.State as State
-import GHC.Unit.Types  ( IsBootInterface(..) )
+import GHC.Unit.Types  ( IsBootInterface(..), unitIdString )
 
 import GHC.Types.Basic     ( failed )
 import GHC.Types.SrcLoc
@@ -96,6 +100,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.Char
+import Data.Foldable
 import Data.List ( isPrefixOf, partition, intercalate, (\\) )
 import qualified Data.Set as Set
 import Prelude
@@ -789,8 +794,24 @@ doBuildPlan out units targets = do
       targets' <- mapM (\(src, uid, phase) -> GHC.guessTarget src uid phase) hs_srcs
       GHC.setTargets targets'
       computeBuildPlan
+  let on_usage ms (UsageFile {usg_file_path, usg_file_nonhs = True}) acc = JSObject [("unit_id", JSString $ unitIdString $ ms_unitid ms), ("module_name", JSString $ moduleNameString $ moduleName $ ms_mod ms), ("usage_file", JSString $ unpackFS usg_file_path)] : acc
+      on_usage _ _ acc = acc
+
+      on_mod_summary ms acc = do
+        maybe_iface <- speculateIface ms
+        pure $ case maybe_iface of
+          Just iface | Just usages <- mi_usages iface -> foldr (on_usage ms) acc usages
+          Nothing -> acc
+
+      on_node (ModuleNode _ ms) acc = on_mod_summary ms acc
+      on_node _ acc = pure acc
+
+      on_buildplan (SingleModule node) acc = on_node node acc
+      on_buildplan (ResolvedCycle nodes) acc = foldrM on_node acc $ map (either id (\(ModuleGraphNodeWithBootFile node _) -> node)) nodes
+      on_buildplan (UnresolvedCycle nodes) acc = foldrM on_node acc nodes
+  usage_files <- foldrM on_buildplan [] build_plan
   liftIO $ withBinaryFile out WriteMode $ \h ->
-    printSDoc defaultSDocContext Ppr.OneLineMode h $ renderJSON $ JSArray $ map json build_plan
+    printSDoc defaultSDocContext Ppr.OneLineMode h $ renderJSON $ JSObject [("build_plan", JSArray $ map json build_plan), ("usage_files", JSArray usage_files)]
 
 initMake :: [(String,Maybe Phase)] -> Ghc [(String, Maybe Phase)]
 initMake srcs  = do
