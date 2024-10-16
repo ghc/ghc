@@ -305,7 +305,6 @@ mkTick t orig_expr = mkTick' id id orig_expr
   -- Some ticks (cost-centres) can be split in two, with the
   -- non-counting part having laxer placement properties.
   canSplit = tickishCanSplit t && tickishPlace (mkNoCount t) /= tickishPlace t
-
   -- mkTick' handles floating of ticks *into* the expression.
   -- In this function, `top` is applied after adding the tick, and `rest` before.
   -- This will result in applications that look like (top $ Tick t $ rest expr).
@@ -316,10 +315,10 @@ mkTick t orig_expr = mkTick' id id orig_expr
           -> CoreExpr               -- current expression
           -> CoreExpr
   mkTick' top rest expr = case expr of
-    -- Float ticks into unsafe coerce.
+    -- Float ticks into unsafe coerce the same way we would do with a cast.
     Case scrut bndr ty alts@[Alt ac abs _rhs]
       | Just rhs <- isUnsafeEqualityCase scrut bndr alts
-      -> mkTick' (\e -> Case scrut bndr ty [Alt ac abs e]) rest rhs
+      -> top $ mkTick' (\e -> Case scrut bndr ty [Alt ac abs e]) rest rhs
 
     -- Cost centre ticks should never be reordered relative to each
     -- other. Therefore we can stop whenever two collide.
