@@ -706,15 +706,75 @@ stg_block_throwto (P_ tso, P_ exception)
 }
 
 #if defined(mingw32_HOST_OS)
+#define ERROR_OPERATION_ABORTED 0x3e3
+
+/*
+ * Note [Resuming interrupted asynchronous IO operations]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The stg_block_async stack frames must account for the possibility
+ * that they will be entered without their associated I/O having
+ * been completed. This can happen due to evaluation suspension due to
+ * exception unwinding (see Note []) and manifests as the `ares` field
+ * not being initialized.
+ *
+ * One case where this was noticed is #25377, which involved the testsuite
+ * test `T25300`:
+ *
+ *     x :: Int
+ *     x = unsafePerformIO $ do
+ *       putStrLn "entered x"
+ *       threadDelay 1000000000
+ *       putStrLn "leaving x"
+ *       return 42
+ *
+ *     main :: IO ()
+ *     main = do
+ *       t <- forkIO $ evaluate x >> return ()
+ *       threadDelay 1000 -- ensure that the forked thread hits the `threadDelay` in `x`
+ *       killThread t
+ *       evaluate x
+ *
+ * The failure develops as follows:
+
+ *   1. TSO1 enter main and forks `evaluate x` (TSO2)
+ *   2. TSO2 enters `x`, pushing an update frame
+ *   3. TSO2 blocks due to threadDelay, which pushes a `stg_block_async_void` frame
+ *      to its stack and yields to the scheduler
+ *   4. TSO1 continues, `killThread` throws an asynchronous `KillThread`
+ *      exception to TSO2
+ *   5. TSO2 unwinds its stack up to the update frame, suspending the unwound
+ *      stack in an `AP_STACK` and updating `x` to resume from the suspended stack
+ *   6. TSO2 dies
+ *   7. TSO1 continues execution with `evaluate x`
+ *   8. TSO1 enters `x`
+ *   9. TSO1 resumes at the head of the suspended stack (the
+ *      `stg_block_async_void` frame) despite the fact that the `StgAsyncIOResult`
+ *      field was never initialized.
+ *   10. stg_block_async_void attempted to `free()` an invalid `StgAsyncIOResult*`
+ *
+ * Fixing this in stg_block_async_void is quite straightforward as it is only used by
+ * threadDelay: simply don't attempt to `free()` a NULL `StgAsyncIOResult*`.
+ * However, we need to be more careful in the case of `stg_block_async` which is used
+ * for asynchronous IO; we don't want to mislead the caller into believing that their IO
+ * operation succeeded. For this reason we take care to return an error
+ * (`ERROR_OPERATION_ABORTED`) in this case.
+ *
+ */
+
 INFO_TABLE_RET ( stg_block_async, RET_SMALL, W_ info_ptr, W_ ares )
     return ()
 {
     W_ len, errC;
 
-    ASSERT(ares != 0);
-    len = TO_W_(StgAsyncIOResult_len(ares));
-    errC = TO_W_(StgAsyncIOResult_errCode(ares));
-    ccall free(ares "ptr");
+    if (ares != 0) {
+        len = TO_W_(StgAsyncIOResult_len(ares));
+        errC = TO_W_(StgAsyncIOResult_errCode(ares));
+        ccall free(ares "ptr");
+    } else {
+        // See Note [Resuming interrupted asynchronous IO operations]
+        len = 0;
+        errC = ERROR_OPERATION_ABORTED;
+    }
     return (len, errC);
 }
 
@@ -731,8 +791,10 @@ stg_block_async
 INFO_TABLE_RET ( stg_block_async_void, RET_SMALL, W_ info_ptr, W_ ares )
     return ()
 {
-    ASSERT(ares != 0);
-    ccall free(ares "ptr");
+    if (ares != 0) {
+        // See Note [Resuming interrupted asynchronous IO operations]
+        ccall free(ares "ptr");
+    }
     return ();
 }
 
