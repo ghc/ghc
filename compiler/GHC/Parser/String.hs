@@ -262,6 +262,7 @@ lexMultilineString = lexStringWith processChars processChars
     processChars =
           collapseGaps             -- Step 1
       >>> expandLeadingTabs        -- Step 3
+      >>> normalizeEOL
       >>> rmCommonWhitespacePrefix -- Step 4
       >>> collapseOnlyWsLines      -- Step 5
       >>> rmFirstNewline           -- Step 7a
@@ -279,6 +280,18 @@ lexMultilineString = lexStringWith processChars processChars
             c : cs -> c : go (if getChar c == '\n' then 0 else col + 1) cs
             [] -> []
        in go 0
+
+    -- Normalize line endings to LF. The spec dictates that lines should be
+    -- split on EOL and rejoined with LF always, even if originally CRLF. But
+    -- because we aren't actually splitting/rejoining, we'll manually convert
+    -- CRLF here
+    normalizeEOL :: HasChar c => [c] -> [c]
+    normalizeEOL =
+      let go = \case
+            Char '\r' : c@(Char '\n') : cs -> c : go cs
+            c : cs -> c : go cs
+            [] -> []
+       in go
 
     rmCommonWhitespacePrefix :: HasChar c => [c] -> [c]
     rmCommonWhitespacePrefix cs0 =
@@ -354,14 +367,14 @@ the same behavior as HsString, which contains the normalized string
 
 The canonical steps for post processing a multiline string are:
 1. Collapse string gaps
-2. Split the string by newlines
+2. Split the string by EOL
 3. Convert leading tabs into spaces
     * In each line, any tabs preceding non-whitespace characters are replaced with spaces up to the next tab stop
 4. Remove common whitespace prefix in every line except the first (see below)
 5. If a line contains only whitespace, remove all of the whitespace
 6. Join the string back with `\n` delimiters
-7a. If the first character of the string is a newline, remove it
-7b. If the last character of the string is a newline, remove it
+7a. If the first character of the string is an EOL, remove it
+7b. If the last character of the string is an EOL, remove it
 8. Interpret escaped characters
 
 The common whitespace prefix can be informally defined as "The longest
@@ -372,7 +385,7 @@ It's more precisely defined with the following algorithm:
 
 1. Take a list representing the lines in the string
 2. Ignore the following elements in the list:
-    * The first line (we want to ignore everything before the first newline)
+    * The first line (we want to ignore everything before the first EOL)
     * Empty lines
     * Lines with only whitespace characters
 3. Calculate the longest prefix of whitespace shared by all lines in the remaining list

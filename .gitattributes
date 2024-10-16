@@ -2,3 +2,4 @@
 # don't convert anything on checkout
 * text=auto eol=lf
 mk/win32-tarballs.md5sum text=auto eol=LF
+testsuite/tests/parser/should_run/T25375.hs text=auto eol=crlf
