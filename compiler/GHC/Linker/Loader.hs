@@ -32,6 +32,7 @@ module GHC.Linker.Loader
    , rmDupLinkables
    , modifyLoaderState
    , initLinkDepsOpts
+   , getGccSearchDirectory
    )
 where
 
@@ -1496,12 +1497,11 @@ searchForLibUsingGcc logger dflags so dirs = do
 --   libraries and components. See Note [Fork/Exec Windows].
 getGCCPaths :: Logger -> DynFlags -> OS -> IO [FilePath]
 getGCCPaths logger dflags os
-  = case os of
-      OSMinGW32 ->
+  | os == OSMinGW32 || platformArch (targetPlatform dflags) == ArchWasm32 =
         do gcc_dirs <- getGccSearchDirectory logger dflags "libraries"
            sys_dirs <- getSystemDirectories
            return $ nub $ gcc_dirs ++ sys_dirs
-      _         -> return []
+  | otherwise = return []
 
 -- | Cache for the GCC search directories as this can't easily change
 --   during an invocation of GHC. (Maybe with some env. variable but we'll)
@@ -1534,7 +1534,7 @@ getGccSearchDirectory logger dflags key = do
                   modifyIORef' gccSearchDirCache ((key, dirs):)
                   return val
       where split :: FilePath -> [FilePath]
-            split r = case break (==';') r of
+            split r = case break (`elem` [';', ':']) r of
                         (s, []    ) -> [s]
                         (s, (_:xs)) -> s : split xs
 
