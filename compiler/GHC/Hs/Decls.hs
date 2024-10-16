@@ -1271,7 +1271,7 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XCRuleDecls    GhcPs = ([AddEpAnn], SourceText)
+type instance XCRuleDecls    GhcPs = ((EpaLocation, EpaLocation), SourceText)
 type instance XCRuleDecls    GhcRn = SourceText
 type instance XCRuleDecls    GhcTc = SourceText
 

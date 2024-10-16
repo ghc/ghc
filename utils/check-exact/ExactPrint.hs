@@ -2220,14 +2220,14 @@ instance ExactPrint FastString where
 instance ExactPrint (RuleDecls GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (HsRules (an, src) rules) = do
-    an0 <-
+  exact (HsRules ((o,c), src) rules) = do
+    o' <-
       case src of
-        NoSourceText      -> markEpAnnLMS'' an lidl AnnOpen  (Just "{-# RULES")
-        SourceText srcTxt -> markEpAnnLMS'' an lidl AnnOpen  (Just $ unpackFS srcTxt)
+        NoSourceText      -> printStringAtAA o "{-# RULES"
+        SourceText srcTxt -> printStringAtAA o (unpackFS srcTxt)
     rules' <- markAnnotated rules
-    an1 <- markEpAnnLMS'' an0 lidl AnnClose (Just "#-}")
-    return (HsRules (an1,src) rules')
+    c' <- printStringAtAA c "#-}"
+    return (HsRules ((o',c'),src) rules')
 
 -- ---------------------------------------------------------------------
 
