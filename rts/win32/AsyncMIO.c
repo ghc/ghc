@@ -203,6 +203,22 @@ shutdownAsyncIO(bool wait_threads)
     OS_CLOSE_LOCK(&queue_lock);
 }
 
+static void
+assertValidBlockAsyncFrame(StgPtr sp) {
+#if defined(DEBUG)
+    StgInfoTable *info = ((StgInfoTable**) sp) [0];
+    if (info != &stg_block_async_void_info &&
+        info != &stg_block_async_info) {
+        barf("assertValidAsyncFrame: invalid frame type");
+    }
+    if (sp[1] != 0) {
+        barf("assertValidAsyncFrame: non-null StgAsyncIOResult");
+    }
+#else
+    (void) sp;
+#endif
+}
+
 /*
  * Function: awaitRequests(wait)
  *
@@ -326,6 +342,7 @@ start:
                         // stg_block_async_info stack frame, because
                         // the block_info field will be overwritten by
                         // pushOnRunQueue().
+                        assertValidBlockAsyncFrame(tso->stackobj->sp);
                         tso->stackobj->sp[1] = (W_)tso->block_info.async_result;
                         pushOnRunQueue(&MainCapability, tso);
                         break;
