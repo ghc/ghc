@@ -711,6 +711,7 @@ INFO_TABLE_RET ( stg_block_async, RET_SMALL, W_ info_ptr, W_ ares )
 {
     W_ len, errC;
 
+    ASSERT(ares != 0);
     len = TO_W_(StgAsyncIOResult_len(ares));
     errC = TO_W_(StgAsyncIOResult_errCode(ares));
     ccall free(ares "ptr");
@@ -730,6 +731,7 @@ stg_block_async
 INFO_TABLE_RET ( stg_block_async_void, RET_SMALL, W_ info_ptr, W_ ares )
     return ()
 {
+    ASSERT(ares != 0);
     ccall free(ares "ptr");
     return ();
 }
@@ -738,6 +740,7 @@ stg_block_async_void
 {
     Sp_adj(-2);
     Sp(0) = stg_block_async_void_info;
+    Sp(1) = 0;  // this is the StgAsyncIOResult, which will be filled in by awaitRequests.
     BLOCK_GENERIC;
 }
 
