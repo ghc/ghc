@@ -14,7 +14,9 @@ With this extension, GHC now recognizes multiline string literals with ``"""`` d
 
 Normal string literals are lexed, then string gaps are collapsed, then escape characters are resolved. Multiline string literals add the following post-processing steps between collapsing string gaps and resolving escape characters:
 
-#. Split the string by newlines
+#. Split the string by newline characters
+
+      * Includes ``\r\n``, ``\r``, ``\n``, ``\f``
 
 #. Replace leading tabs with spaces up to the next tab stop
 
@@ -24,7 +26,9 @@ Normal string literals are lexed, then string gaps are collapsed, then escape ch
 
 #. Join the string back with ``\n`` delimiters
 
-#. If the first character of the string is a newline, remove it
+#. If the first character of the string is ``\n``, remove it
+
+#. If the last character of the string is ``\n``, remove it
 
 Examples
 ~~~~~~~~
