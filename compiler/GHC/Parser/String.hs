@@ -261,12 +261,26 @@ lexMultilineString = lexStringWith processChars processChars
     processChars :: HasChar c => [c] -> Either (c, LexErr) [c]
     processChars =
           collapseGaps             -- Step 1
+      >>> normalizeEOL
       >>> expandLeadingTabs        -- Step 3
       >>> rmCommonWhitespacePrefix -- Step 4
       >>> collapseOnlyWsLines      -- Step 5
       >>> rmFirstNewline           -- Step 7a
       >>> rmLastNewline            -- Step 7b
       >>> resolveEscapes           -- Step 8
+
+    -- Normalize line endings to LF. The spec dictates that lines should be
+    -- split on newline characters and rejoined with ``\n``. But because we
+    -- aren't actually splitting/rejoining, we'll manually normalize here
+    normalizeEOL :: HasChar c => [c] -> [c]
+    normalizeEOL =
+      let go = \case
+            Char '\r' : c@(Char '\n') : cs -> c : go cs
+            c@(Char '\r') : cs -> setChar '\n' c : go cs
+            c@(Char '\f') : cs -> setChar '\n' c : go cs
+            c : cs -> c : go cs
+            [] -> []
+       in go
 
     -- expands all tabs, since the lexer will verify that tabs can only appear
     -- as leading indentation
