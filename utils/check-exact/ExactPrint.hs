@@ -4051,12 +4051,11 @@ exactVanillaDeclHead thing tvs@(HsQTvs { hsq_explicit = tyvars }) fixity context
 instance ExactPrint (InjectivityAnn GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (InjectivityAnn an lhs rhs) = do
-    an0 <- markEpAnnL an lidl AnnVbar
+  exact (InjectivityAnn rarrow lhs rhs) = do
     lhs' <- markAnnotated lhs
-    an1 <- markEpAnnL an0 lidl AnnRarrow
+    rarrow' <- markEpUniToken rarrow
     rhs' <- mapM markAnnotated rhs
-    return (InjectivityAnn an1 lhs' rhs')
+    return (InjectivityAnn rarrow' lhs' rhs')
 
 -- ---------------------------------------------------------------------
 

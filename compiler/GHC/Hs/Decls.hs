@@ -658,7 +658,7 @@ resultVariableName _                = Nothing
 
 ------------- Pretty printing FamilyDecls -----------
 
-type instance XCInjectivityAnn  (GhcPass _) = [AddEpAnn]
+type instance XCInjectivityAnn  (GhcPass _) = TokRarrow
 type instance XXInjectivityAnn  (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p

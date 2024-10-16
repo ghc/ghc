@@ -1459,7 +1459,7 @@ opt_injective_info :: { Located (EpToken "|", Maybe (LInjectivityAnn GhcPs)) }
 
 injectivity_cond :: { LInjectivityAnn GhcPs }
         : tyvarid '->' inj_varids
-           {% amsA' (sLL $1 $> (InjectivityAnn [mu AnnRarrow $2] $1 (reverse (unLoc $3)))) }
+           {% amsA' (sLL $1 $> (InjectivityAnn (epUniTok $2) $1 (reverse (unLoc $3)))) }
 
 inj_varids :: { Located [LocatedN RdrName] }
         : inj_varids tyvarid  { sLL $1 $> ($2 : unLoc $1) }
