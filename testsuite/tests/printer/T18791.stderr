@@ -89,11 +89,12 @@
            (EpaComments
             []))
           (ConDeclGADT
-           ((,)
+           (AnnConDeclGADT
+            []
+            []
             (EpUniTok
              (EpaSpan { T18791.hs:5:7-8 })
-             (NormalSyntax))
-            [])
+             (NormalSyntax)))
            (:|
             (L
              (EpAnn

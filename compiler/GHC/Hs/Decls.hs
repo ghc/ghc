@@ -35,6 +35,7 @@ module GHC.Hs.Decls (
   AnnClassDecl(..),
   AnnSynDecl(..),
   AnnFamilyDecl(..),
+  AnnClsInstDecl(..),
   TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   tyClGroupKindSigs,
@@ -59,7 +60,7 @@ module GHC.Hs.Decls (
   LClsInstDecl, ClsInstDecl(..),
 
   -- ** Standalone deriving declarations
-  DerivDecl(..), LDerivDecl,
+  DerivDecl(..), LDerivDecl, AnnDerivDecl,
   -- ** Deriving strategies
   DerivStrategy(..), LDerivStrategy,
   derivStrategyName, foldDerivStrategy, mapDerivStrategy,
@@ -80,7 +81,9 @@ module GHC.Hs.Decls (
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
-  HsConDeclH98Details, HsConDeclGADTDetails(..), hsConDeclTheta,
+  HsConDeclH98Details, HsConDeclGADTDetails(..),
+  AnnConDeclH98(..), AnnConDeclGADT(..),
+  hsConDeclTheta,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -705,7 +708,7 @@ instance OutputableBndrId p
 type instance XCHsDataDefn    (GhcPass _) = AnnDataDefn
 type instance XXHsDataDefn    (GhcPass _) = DataConCantHappen
 
-type instance XCHsDerivingClause    (GhcPass _) = [AddEpAnn]
+type instance XCHsDerivingClause    (GhcPass _) = EpToken "deriving"
 type instance XXHsDerivingClause    (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
@@ -741,7 +744,7 @@ instance OutputableBndrId p => Outputable (DerivClauseTys (GhcPass p)) where
   ppr (DctSingle _ ty) = ppr ty
   ppr (DctMulti _ tys) = parens (interpp'SP tys)
 
-type instance XStandaloneKindSig GhcPs = [AddEpAnn]
+type instance XStandaloneKindSig GhcPs = (EpToken "type", TokDcolon)
 type instance XStandaloneKindSig GhcRn = NoExtField
 type instance XStandaloneKindSig GhcTc = NoExtField
 
@@ -750,11 +753,11 @@ type instance XXStandaloneKindSig (GhcPass p) = DataConCantHappen
 standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
 standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
 
-type instance XConDeclGADT GhcPs = (EpUniToken "::" "∷", [AddEpAnn])
+type instance XConDeclGADT GhcPs = AnnConDeclGADT
 type instance XConDeclGADT GhcRn = NoExtField
 type instance XConDeclGADT GhcTc = NoExtField
 
-type instance XConDeclH98  GhcPs = [AddEpAnn]
+type instance XConDeclH98  GhcPs = AnnConDeclH98
 type instance XConDeclH98  GhcRn = NoExtField
 type instance XConDeclH98  GhcTc = NoExtField
 
@@ -767,6 +770,26 @@ type instance XRecConGADT          GhcRn = NoExtField
 type instance XRecConGADT          GhcTc = NoExtField
 
 type instance XXConDeclGADTDetails (GhcPass _) = DataConCantHappen
+
+data AnnConDeclH98
+  = AnnConDeclH98 {
+    acdh_forall  :: TokForall,
+    acdh_dot :: EpToken ".",
+    acdh_darrow :: TokDarrow
+  } deriving Data
+
+instance NoAnn AnnConDeclH98 where
+  noAnn = AnnConDeclH98 noAnn noAnn noAnn
+
+data AnnConDeclGADT
+  = AnnConDeclGADT {
+    acdg_openp  :: [EpToken "("],
+    acdg_closep :: [EpToken ")"],
+    acdg_dcolon :: TokDcolon
+  } deriving Data
+
+instance NoAnn AnnConDeclGADT where
+  noAnn = AnnConDeclGADT noAnn noAnn noAnn
 
 -- Codomain could be 'NonEmpty', but at the moment all users need a list.
 getConNames :: ConDecl GhcRn -> [LocatedN Name]
@@ -901,7 +924,7 @@ type instance XCClsInstDecl    GhcPs = ( Maybe (LWarningTxt GhcPs)
                                              -- The warning of the deprecated instance
                                              -- See Note [Implementation of deprecated instances]
                                              -- in GHC.Tc.Solver.Dict
-                                       , [AddEpAnn]
+                                       , AnnClsInstDecl
                                        , AnnSortKey DeclTag) -- For sorting the additional annotations
                                         -- TODO:AZ:tidy up
 type instance XCClsInstDecl    GhcRn = Maybe (LWarningTxt GhcRn)
@@ -923,6 +946,18 @@ type instance XTyFamInstD   GhcRn = NoExtField
 type instance XTyFamInstD   GhcTc = NoExtField
 
 type instance XXInstDecl    (GhcPass _) = DataConCantHappen
+
+data AnnClsInstDecl
+  = AnnClsInstDecl {
+    acid_instance :: EpToken "instance",
+    acid_where    :: EpToken "where",
+    acid_openc    :: EpToken "{",
+    acid_semis    :: [EpToken ";"],
+    acid_closec   :: EpToken "}"
+  } deriving Data
+
+instance NoAnn AnnClsInstDecl where
+  noAnn = AnnClsInstDecl noAnn noAnn noAnn noAnn noAnn
 
 cidDeprecation :: forall p. IsPass p
                => ClsInstDecl (GhcPass p)
@@ -1086,14 +1121,16 @@ type instance XCDerivDecl    GhcPs = ( Maybe (LWarningTxt GhcPs)
                                            -- The warning of the deprecated derivation
                                            -- See Note [Implementation of deprecated instances]
                                            -- in GHC.Tc.Solver.Dict
-                                     , [AddEpAnn] )
+                                     , AnnDerivDecl )
 type instance XCDerivDecl    GhcRn = ( Maybe (LWarningTxt GhcRn)
                                            -- The warning of the deprecated derivation
                                            -- See Note [Implementation of deprecated instances]
                                            -- in GHC.Tc.Solver.Dict
-                                     , [AddEpAnn] )
-type instance XCDerivDecl    GhcTc = [AddEpAnn]
+                                     , AnnDerivDecl )
+type instance XCDerivDecl    GhcTc = AnnDerivDecl
 type instance XXDerivDecl    (GhcPass _) = DataConCantHappen
+
+type AnnDerivDecl = (EpToken "deriving", EpToken "instance")
 
 derivDeprecation :: forall p. IsPass p
                => DerivDecl (GhcPass p)
@@ -1128,15 +1165,15 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XStockStrategy    GhcPs = [AddEpAnn]
+type instance XStockStrategy    GhcPs = EpToken "stock"
 type instance XStockStrategy    GhcRn = NoExtField
 type instance XStockStrategy    GhcTc = NoExtField
 
-type instance XAnyClassStrategy GhcPs = [AddEpAnn]
+type instance XAnyClassStrategy GhcPs = EpToken "anyclass"
 type instance XAnyClassStrategy GhcRn = NoExtField
 type instance XAnyClassStrategy GhcTc = NoExtField
 
-type instance XNewtypeStrategy  GhcPs = [AddEpAnn]
+type instance XNewtypeStrategy  GhcPs = EpToken "newtype"
 type instance XNewtypeStrategy  GhcRn = NoExtField
 type instance XNewtypeStrategy  GhcTc = NoExtField
 
@@ -1144,7 +1181,7 @@ type instance XViaStrategy GhcPs = XViaStrategyPs
 type instance XViaStrategy GhcRn = LHsSigType GhcRn
 type instance XViaStrategy GhcTc = Type
 
-data XViaStrategyPs = XViaStrategyPs [AddEpAnn] (LHsSigType GhcPs)
+data XViaStrategyPs = XViaStrategyPs (EpToken "via") (LHsSigType GhcPs)
 
 instance OutputableBndrId p
         => Outputable (DerivStrategy (GhcPass p)) where
@@ -1202,11 +1239,11 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XForeignImport   GhcPs = [AddEpAnn]
+type instance XForeignImport   GhcPs = (EpToken "foreign", EpToken "import", TokDcolon)
 type instance XForeignImport   GhcRn = NoExtField
 type instance XForeignImport   GhcTc = Coercion
 
-type instance XForeignExport   GhcPs = [AddEpAnn]
+type instance XForeignExport   GhcPs = (EpToken "foreign", EpToken "export", TokDcolon)
 type instance XForeignExport   GhcRn = NoExtField
 type instance XForeignExport   GhcTc = Coercion
 
@@ -1217,6 +1254,7 @@ type instance XXForeignImport  (GhcPass _) = DataConCantHappen
 
 type instance XCExport (GhcPass _) = LocatedE SourceText -- original source text for the C entity
 type instance XXForeignExport  (GhcPass _) = DataConCantHappen
+
 
 -- pretty printing of foreign declarations
 
@@ -1362,7 +1400,7 @@ type instance XWarnings      GhcTc = SourceText
 
 type instance XXWarnDecls    (GhcPass _) = DataConCantHappen
 
-type instance XWarning      (GhcPass _) = (NamespaceSpecifier, [AddEpAnn])
+type instance XWarning      (GhcPass _) = (NamespaceSpecifier, (EpToken "[", EpToken "]"))
 type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 
 
@@ -1418,7 +1456,7 @@ pprAnnProvenance (TypeAnnProvenance (L _ name))
 ************************************************************************
 -}
 
-type instance XCRoleAnnotDecl GhcPs = [AddEpAnn]
+type instance XCRoleAnnotDecl GhcPs = (EpToken "type", EpToken "role")
 type instance XCRoleAnnotDecl GhcRn = NoExtField
 type instance XCRoleAnnotDecl GhcTc = NoExtField
 

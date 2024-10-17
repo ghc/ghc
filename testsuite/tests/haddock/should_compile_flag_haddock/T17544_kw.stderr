@@ -101,11 +101,12 @@
            (EpaComments
             []))
           (ConDeclGADT
-           ((,)
+           (AnnConDeclGADT
+            []
+            []
             (EpUniTok
              (EpaSpan { T17544_kw.hs:16:15-16 })
-             (NormalSyntax))
-            [])
+             (NormalSyntax)))
            (:|
             (L
              (EpAnn
@@ -214,11 +215,12 @@
           (EpaComments
            []))
          (ConDeclGADT
-          ((,)
+          (AnnConDeclGADT
+           []
+           []
            (EpUniTok
             (EpaSpan { T17544_kw.hs:19:15-16 })
-            (NormalSyntax))
-           [])
+            (NormalSyntax)))
           (:|
            (L
             (EpAnn

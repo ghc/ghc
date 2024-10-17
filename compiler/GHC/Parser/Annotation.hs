@@ -11,7 +11,7 @@ module GHC.Parser.Annotation (
   AnnKeywordId(..),
   EpToken(..), EpUniToken(..),
   getEpTokenSrcSpan, getEpTokenLocs, getEpTokenLoc,
-  TokDcolon, TokRarrow,
+  TokDcolon, TokDarrow, TokRarrow, TokForall,
   EpLayout(..),
   EpaComment(..), EpaCommentTok(..),
   IsUnicodeSyntax(..),
@@ -410,8 +410,11 @@ getEpTokenLoc :: EpToken tok -> EpaLocation
 getEpTokenLoc NoEpTok   = noAnn
 getEpTokenLoc (EpTok l) = l
 
+-- TODO:AZ: check we have all of the unicode tokens
 type TokDcolon = EpUniToken "::" "∷"
+type TokDarrow = EpUniToken "=>"  "⇒"
 type TokRarrow = EpUniToken "->" "→"
+type TokForall = EpUniToken "forall" "∀"
 
 -- | Layout information for declarations.
 data EpLayout =
@@ -813,9 +816,13 @@ data NameAdornment
 -- annotations in pragmas.
 data AnnPragma
   = AnnPragma {
-      apr_open      :: AddEpAnn,
-      apr_close     :: AddEpAnn,
-      apr_rest      :: [AddEpAnn]
+      apr_open      :: EpaLocation,
+      apr_close     :: EpaLocation,
+      apr_squares   :: (EpToken "[", EpToken "]"),
+      apr_loc1      :: EpaLocation,
+      apr_loc2      :: EpaLocation,
+      apr_type      :: EpToken "type",
+      apr_module    :: EpToken "module"
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
@@ -1402,7 +1409,7 @@ instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []
 
 instance NoAnn AnnPragma where
-  noAnn = AnnPragma noAnn noAnn []
+  noAnn = AnnPragma noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 instance NoAnn AnnParen where
   noAnn = AnnParen AnnParens noAnn noAnn
@@ -1496,4 +1503,6 @@ instance Outputable AnnList where
     = text "AnnList" <+> ppr a <+> ppr o <+> ppr c <+> ppr r <+> ppr t
 
 instance Outputable AnnPragma where
-  ppr (AnnPragma o c r) = text "AnnPragma" <+> ppr o <+> ppr c <+> ppr r
+  ppr (AnnPragma o c s l ca t m)
+    = text "AnnPragma" <+> ppr o <+> ppr c <+> ppr s <+> ppr l
+                       <+> ppr ca <+> ppr ca <+> ppr t <+> ppr m

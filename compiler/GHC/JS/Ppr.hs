@@ -33,7 +33,7 @@
 -- * Design
 --
 --     This module follows the architecture and style of the other backends in
---     GHC: it intances Outputable for the relevant types, creates a class that
+--     GHC: it instances Outputable for the relevant types, creates a class that
 --     describes a morphism from the IR domain to JavaScript concrete Syntax and
 --     then generates that syntax on a case by case basis.
 --
