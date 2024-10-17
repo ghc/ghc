@@ -586,22 +586,6 @@ mkExpandedPatRn
 mkExpandedPatRn oPat flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigPat oPat flav
                                                          , xrn_expanded = eExpr })
 
--- | Build an expression using the extension constructor `XExpr`,
---   and the two components of the expansion: original do stmt and
---   expanded expression and associate it with a provided location
-mkExpandedStmtAt
-  :: Bool                 -- ^ Wrap this expansion with a pop?
-  -> SrcSpanAnnA          -- ^ Location for the expansion expression
-  -> ExprLStmt GhcRn      -- ^ source statement
-  -> HsDoFlavour          -- ^ the flavour of the statement
-  -> HsExpr GhcRn         -- ^ expanded expression
-  -> LHsExpr GhcRn        -- ^ suitably wrapped located 'XXExprGhcRn'
-mkExpandedStmtAt addPop loc oStmt flav eExpr
-  | addPop
-  = mkPopErrCtxtExprAt loc (L loc $ mkExpandedStmt oStmt flav eExpr)
-  | otherwise
-  = L loc $ mkExpandedStmt oStmt flav eExpr
-
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
       HsWrapper (HsExpr GhcTc)
