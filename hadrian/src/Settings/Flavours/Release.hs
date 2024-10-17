@@ -8,4 +8,7 @@ releaseFlavour =
   -- 1. These interface files will be distributed and the source files never recompiled.
   disableSelfRecompInfo
   -- 2. Include documentation in the interface for tools such as haddock and HLS to use
-  $ enableHaddock performanceFlavour { name = "release" }
+  $ enableHaddock
+  -- 3. Include unit id hashes
+  $ enableHashUnitIds
+  $ performanceFlavour { name = "release" }

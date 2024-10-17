@@ -8,6 +8,7 @@ module Flavour
   , splitSections
   , enableThreadSanitizer
   , enableLateCCS
+  , enableHashUnitIds
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
   , enableProfiledGhc
@@ -73,6 +74,7 @@ flavourTransformers = M.fromList
     , "late_ccs"         =: enableLateCCS
     , "boot_nonmoving_gc" =: enableBootNonmovingGc
     , "dump_stg"         =: enableDumpStg
+    , "hash_unit_ids"    =: enableHashUnitIds
     ]
   where (=:) = (,)
 
@@ -317,6 +319,9 @@ enableTextWithSIMDUTF :: Flavour -> Flavour
 enableTextWithSIMDUTF flavour = flavour {
   textWithSIMDUTF = True
 }
+
+enableHashUnitIds :: Flavour -> Flavour
+enableHashUnitIds flavour = flavour { hashUnitIds = True }
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.

@@ -986,10 +986,8 @@ release arch opsys bc =
               , jobInfo = releaseRule
                         . keepArtifacts "1 year"
                         . ignorePerfFailures
-                        . useHashUnitIds
                         . highCompression $ j
               }
-
 ---------------------------------------------------------------------
 -- Specific job modification functions
 ---------------------------------------------------------------------
@@ -1014,9 +1012,6 @@ ignorePerfFailures = addVariable "IGNORE_PERF_FAILURES" "all"
 -- smaller results)
 highCompression :: Job -> Job
 highCompression = addVariable "XZ_OPT" "-9"
-
-useHashUnitIds :: Job -> Job
-useHashUnitIds = addVariable "HADRIAN_ARGS" "--hash-unit-ids"
 
 -- | Change the tag of the job to make sure the job is scheduled on a
 -- runner that has the necessary capabilties to run the job with 'perf'

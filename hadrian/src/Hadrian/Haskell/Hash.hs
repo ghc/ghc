@@ -33,7 +33,6 @@ import Development.Shake.Classes
 import Control.Monad
 import Base
 import System.Directory.Extra (listFilesRecursive)
-import CommandLine
 import Control.Arrow (first)
 
 
@@ -42,7 +41,7 @@ import Control.Arrow (first)
 pkgUnitId :: Stage -> Package -> Action String
 pkgUnitId stg pkg = do
   pid   <- pkgSimpleIdentifier pkg
-  use_hash <- cmdUnitIdHash
+  use_hash <- hashUnitIds <$> flavour
   if pkgName pkg == "rts"
      -- The unit-id will change depending on the way, we need to treat the rts separately
      then pure pid
