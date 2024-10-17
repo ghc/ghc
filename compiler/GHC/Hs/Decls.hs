@@ -741,7 +741,7 @@ instance OutputableBndrId p => Outputable (DerivClauseTys (GhcPass p)) where
   ppr (DctSingle _ ty) = ppr ty
   ppr (DctMulti _ tys) = parens (interpp'SP tys)
 
-type instance XStandaloneKindSig GhcPs = [AddEpAnn]
+type instance XStandaloneKindSig GhcPs = (EpToken "type", TokDcolon)
 type instance XStandaloneKindSig GhcRn = NoExtField
 type instance XStandaloneKindSig GhcTc = NoExtField
 
@@ -750,7 +750,7 @@ type instance XXStandaloneKindSig (GhcPass p) = DataConCantHappen
 standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
 standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
 
-type instance XConDeclGADT GhcPs = (EpUniToken "::" "∷", [AddEpAnn])
+type instance XConDeclGADT GhcPs = (TokDcolon, [AddEpAnn])
 type instance XConDeclGADT GhcRn = NoExtField
 type instance XConDeclGADT GhcTc = NoExtField
 

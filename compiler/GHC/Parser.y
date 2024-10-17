@@ -1366,7 +1366,7 @@ ty_decl :: { LTyClDecl GhcPs }
 standalone_kind_sig :: { LStandaloneKindSig GhcPs }
   : 'type' sks_vars '::' sigktype
       {% mkStandaloneKindSig (comb2 $1 $4) (L (gl $2) $ unLoc $2) $4
-               [mj AnnType $1,mu AnnDcolon $3]}
+               (epTok $1,epUniTok $3)}
 
 -- See also: sig_vars
 sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order

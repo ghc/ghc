@@ -2907,12 +2907,12 @@ instance ExactPrint (StandaloneKindSig GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (StandaloneKindSig an vars sig) = do
-    an0 <- markEpAnnL an lidl AnnType
+  exact (StandaloneKindSig (tt,td) vars sig) = do
+    tt' <- markEpToken tt
     vars' <- markAnnotated vars
-    an1 <- markEpAnnL an0 lidl AnnDcolon
+    td' <- markEpUniToken td
     sig' <- markAnnotated sig
-    return (StandaloneKindSig an1 vars' sig')
+    return (StandaloneKindSig (tt',td') vars' sig')
 
 -- ---------------------------------------------------------------------
 

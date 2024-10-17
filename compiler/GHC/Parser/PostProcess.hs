@@ -283,7 +283,7 @@ mkStandaloneKindSig
   :: SrcSpan
   -> Located [LocatedN RdrName]   -- LHS
   -> LHsSigType GhcPs             -- RHS
-  -> [AddEpAnn]
+  -> (EpToken "type", TokDcolon)
   -> P (LStandaloneKindSig GhcPs)
 mkStandaloneKindSig loc lhs rhs anns =
   do { vs <- mapM check_lhs_name (unLoc lhs)

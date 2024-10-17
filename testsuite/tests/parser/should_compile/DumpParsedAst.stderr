@@ -201,8 +201,12 @@
     (KindSigD
      (NoExtField)
      (StandaloneKindSig
-      [(AddEpAnn AnnType (EpaSpan { DumpParsedAst.hs:9:1-4 }))
-      ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:9:13-14 }))]
+      ((,)
+       (EpTok
+        (EpaSpan { DumpParsedAst.hs:9:1-4 }))
+       (EpUniTok
+        (EpaSpan { DumpParsedAst.hs:9:13-14 })
+        (NormalSyntax)))
       (L
        (EpAnn
         (EpaSpan { DumpParsedAst.hs:9:6-11 })
@@ -885,8 +889,12 @@
     (KindSigD
      (NoExtField)
      (StandaloneKindSig
-      [(AddEpAnn AnnType (EpaSpan { DumpParsedAst.hs:17:1-4 }))
-      ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:17:9-10 }))]
+      ((,)
+       (EpTok
+        (EpaSpan { DumpParsedAst.hs:17:1-4 }))
+       (EpUniTok
+        (EpaSpan { DumpParsedAst.hs:17:9-10 })
+        (NormalSyntax)))
       (L
        (EpAnn
         (EpaSpan { DumpParsedAst.hs:17:6-7 })
