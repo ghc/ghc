@@ -202,7 +202,8 @@ haddockWithGhc ghc args = handleTopExceptions $ do
     when noChecks $
       hPutStrLn stderr noCheckWarning
 
-  ghc flags' $ withDir $ do
+  unless ("ghc-prim" `elem` ghcFlags flags')
+   $ ghc flags' $ withDir $ do
     dflags' <- getDynFlags
     let unicode = Flag_UseUnicode `elem` flags
     let dflags
