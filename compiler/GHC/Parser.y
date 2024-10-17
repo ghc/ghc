@@ -1421,13 +1421,13 @@ inst_decl :: { LInstDecl GhcPs }
 
 overlap_pragma :: { Maybe (LocatedP OverlapMode) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
-                                       (AnnPragma (mo $1) (mc $2) []) }
+                                       (AnnPragma (glR $1) (glR $2) noAnn noAnn noAnn noAnn noAnn) }
   | '{-# OVERLAPPING'     '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlapping (getOVERLAPPING_PRAGs $1)))
-                                       (AnnPragma (mo $1) (mc $2) []) }
+                                       (AnnPragma (glR $1) (glR $2) noAnn noAnn noAnn noAnn noAnn) }
   | '{-# OVERLAPS'        '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlaps (getOVERLAPS_PRAGs $1)))
-                                       (AnnPragma (mo $1) (mc $2) []) }
+                                       (AnnPragma (glR $1) (glR $2) noAnn noAnn noAnn noAnn noAnn) }
   | '{-# INCOHERENT'      '#-}' {% fmap Just $ amsr (sLL $1 $> (Incoherent (getINCOHERENT_PRAGs $1)))
-                                       (AnnPragma (mo $1) (mc $2) []) }
+                                       (AnnPragma (glR $1) (glR $2) noAnn noAnn noAnn noAnn noAnn) }
   | {- empty -}                 { Nothing }
 
 deriv_strategy_no_via :: { LDerivStrategy GhcPs }
@@ -1659,11 +1659,11 @@ capi_ctype :: { Maybe (LocatedP CType) }
 capi_ctype : '{-# CTYPE' STRING STRING '#-}'
                        {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (getSTRING $2)))
                                         (getSTRINGs $3,getSTRING $3)))
-                              (AnnPragma (mo $1) (mc $4) [mj AnnHeader $2,mj AnnVal $3]) }
+                              (AnnPragma (glR $1) (glR $4) noAnn (glR $2) (glR $3) noAnn noAnn) }
 
            | '{-# CTYPE'        STRING '#-}'
                        {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) Nothing (getSTRINGs $2, getSTRING $2)))
-                              (AnnPragma (mo $1) (mc $3) [mj AnnVal $2]) }
+                              (AnnPragma (glR $1) (glR $3) noAnn noAnn (glR $2) noAnn noAnn) }
 
            |           { Nothing }
 
@@ -2019,10 +2019,10 @@ to varid (used for rule_vars), 'checkRuleTyVarBndrNames' must be updated.
 maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
         : '{-# DEPRECATED' strings '#-}'
                             {% fmap Just $ amsr (sLL $1 $> $ DeprecatedTxt (getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
-                                (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2)) }
+                                (AnnPragma (glR $1) (glR $3) (fst $ unLoc $2) noAnn noAnn noAnn noAnn) }
         | '{-# WARNING' warning_category strings '#-}'
                             {% fmap Just $ amsr (sLL $1 $> $ WarningTxt $2 (getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
-                                (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
+                                (AnnPragma (glR $1) (glR $4) (fst $ unLoc $3) noAnn noAnn noAnn noAnn)}
         |  {- empty -}      { Nothing }
 
 warning_category :: { Maybe (LocatedE InWarningCategory) }
@@ -2081,9 +2081,9 @@ deprecation :: { OrdList (LWarnDecl GhcPs) }
              {% fmap unitOL $ amsA' (sL (comb3 $1 $2 $>) $ (Warning (unLoc $1, fst $ unLoc $3) (unLoc $2)
                                           (DeprecatedTxt NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
-strings :: { Located ([AddEpAnn],[Located StringLiteral]) }
-    : STRING { sL1 $1 ([],[L (gl $1) (getStringLiteral $1)]) }
-    | '[' stringlist ']' { sLL $1 $> $ ([mos $1,mcs $3],fromOL (unLoc $2)) }
+strings :: { Located ((EpToken "[", EpToken "]"),[Located StringLiteral]) }
+    : STRING             { sL1 $1 (noAnn,[L (gl $1) (getStringLiteral $1)]) }
+    | '[' stringlist ']' { sLL $1 $> $ ((epTok $1,epTok $3),fromOL (unLoc $2)) }
 
 stringlist :: { Located (OrdList (Located StringLiteral)) }
     : stringlist ',' STRING {% if isNilOL (unLoc $1)
@@ -2104,19 +2104,19 @@ stringlist :: { Located (OrdList (Located StringLiteral)) }
 annotation :: { LHsDecl GhcPs }
     : '{-# ANN' name_var aexp '#-}'      {% runPV (unECP $3) >>= \ $3 ->
                                             amsA' (sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                            (AnnPragma (mo $1) (mc $4) [],
+                                            (AnnPragma (glR $1) (glR $4) noAnn noAnn noAnn noAnn noAnn,
                                             (getANN_PRAGs $1))
                                             (ValueAnnProvenance $2) $3)) }
 
     | '{-# ANN' 'type' otycon aexp '#-}' {% runPV (unECP $4) >>= \ $4 ->
                                             amsA' (sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                            (AnnPragma (mo $1) (mc $5) [mj AnnType $2],
+                                            (AnnPragma (glR $1) (glR $5) noAnn noAnn noAnn (epTok $2) noAnn,
                                             (getANN_PRAGs $1))
                                             (TypeAnnProvenance $3) $4)) }
 
     | '{-# ANN' 'module' aexp '#-}'      {% runPV (unECP $3) >>= \ $3 ->
                                             amsA' (sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                                (AnnPragma (mo $1) (mc $4) [mj AnnModule $2],
+                                                (AnnPragma (glR $1) (glR $4) noAnn noAnn noAnn noAnn (epTok $2),
                                                 (getANN_PRAGs $1))
                                                  ModuleAnnProvenance $3)) }
 
@@ -2971,12 +2971,12 @@ prag_e :: { Located (HsPragE GhcPs) }
       : '{-# SCC' STRING '#-}'      {% do { scc <- getSCC $2
                                           ; return (sLL $1 $>
                                              (HsPragSCC
-                                                (AnnPragma (mo $1) (mc $3) [mj AnnValStr $2],
+                                                (AnnPragma (glR $1) (glR $3) noAnn (glR $2) noAnn noAnn noAnn,
                                                 (getSCC_PRAGs $1))
                                                 (StringLiteral (getSTRINGs $2) scc Nothing)))} }
       | '{-# SCC' VARID  '#-}'      { sLL $1 $>
                                              (HsPragSCC
-                                               (AnnPragma (mo $1) (mc $3) [mj AnnVal $2],
+                                               (AnnPragma (glR $1) (glR $3) noAnn (glR $2) noAnn noAnn noAnn,
                                                (getSCC_PRAGs $1))
                                                (StringLiteral NoSourceText (getVARID $2) Nothing)) }
 
