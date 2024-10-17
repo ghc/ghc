@@ -408,7 +408,7 @@ mkSpliceDecl lexpr@(L loc expr)
 mkRoleAnnotDecl :: SrcSpan
                 -> LocatedN RdrName                -- type being annotated
                 -> [Located (Maybe FastString)]    -- roles
-                -> [AddEpAnn]
+                -> (EpToken "type", EpToken "role")
                 -> P (LRoleAnnotDecl GhcPs)
 mkRoleAnnotDecl loc tycon roles anns
   = do { roles' <- mapM parse_role roles

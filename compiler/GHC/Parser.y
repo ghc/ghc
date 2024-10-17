@@ -1684,7 +1684,7 @@ stand_alone_deriving :: { LDerivDecl GhcPs }
 role_annot :: { LRoleAnnotDecl GhcPs }
 role_annot : 'type' 'role' oqtycon maybe_roles
           {% mkRoleAnnotDecl (comb3 $1 $4 $3) $3 (reverse (unLoc $4))
-                   [mj AnnType $1,mj AnnRole $2] }
+                   (epTok $1,epTok $2) }
 
 -- Reversed!
 maybe_roles :: { Located [Located (Maybe FastString)] }

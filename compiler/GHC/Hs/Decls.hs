@@ -1419,7 +1419,7 @@ pprAnnProvenance (TypeAnnProvenance (L _ name))
 ************************************************************************
 -}
 
-type instance XCRoleAnnotDecl GhcPs = [AddEpAnn]
+type instance XCRoleAnnotDecl GhcPs = (EpToken "type", EpToken "role")
 type instance XCRoleAnnotDecl GhcRn = NoExtField
 type instance XCRoleAnnotDecl GhcTc = NoExtField
 

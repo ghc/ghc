@@ -2251,9 +2251,9 @@ instance ExactPrint (RoleAnnotDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (RoleAnnotDecl an ltycon roles) = do
-    an0 <- markEpAnnL an lidl AnnType
-    an1 <- markEpAnnL an0 lidl AnnRole
+  exact (RoleAnnotDecl (tt,tr) ltycon roles) = do
+    tt' <- markEpToken tt
+    tr' <- markEpToken tr
     ltycon' <- markAnnotated ltycon
     let markRole (L l (Just r)) = do
           (L l' r') <- markAnnotated (L l r)
@@ -2262,7 +2262,7 @@ instance ExactPrint (RoleAnnotDecl GhcPs) where
           e' <- printStringAtAA  (entry l) "_"
           return (L (l { entry = e'}) Nothing)
     roles' <- mapM markRole roles
-    return (RoleAnnotDecl an1 ltycon' roles')
+    return (RoleAnnotDecl (tt',tr') ltycon' roles')
 
 -- ---------------------------------------------------------------------
 
