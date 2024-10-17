@@ -283,7 +283,7 @@ mkStandaloneKindSig
   :: SrcSpan
   -> Located [LocatedN RdrName]   -- LHS
   -> LHsSigType GhcPs             -- RHS
-  -> [AddEpAnn]
+  -> (EpToken "type", TokDcolon)
   -> P (LStandaloneKindSig GhcPs)
 mkStandaloneKindSig loc lhs rhs anns =
   do { vs <- mapM check_lhs_name (unLoc lhs)
@@ -408,7 +408,7 @@ mkSpliceDecl lexpr@(L loc expr)
 mkRoleAnnotDecl :: SrcSpan
                 -> LocatedN RdrName                -- type being annotated
                 -> [Located (Maybe FastString)]    -- roles
-                -> [AddEpAnn]
+                -> (EpToken "type", EpToken "role")
                 -> P (LRoleAnnotDecl GhcPs)
 mkRoleAnnotDecl loc tycon roles anns
   = do { roles' <- mapM parse_role roles
@@ -773,12 +773,12 @@ recordPatSynErr loc pat =
     addFatalError $ mkPlainErrorMsgEnvelope loc $
       (PsErrRecordSyntaxInPatSynDecl pat)
 
-mkConDeclH98 :: [AddEpAnn] -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
+mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
                 -> Maybe (LHsContext GhcPs) -> HsConDeclH98Details GhcPs
                 -> ConDecl GhcPs
 
-mkConDeclH98 ann name mb_forall mb_cxt args
-  = ConDeclH98 { con_ext    = ann
+mkConDeclH98 (tdarrow, (tforall,tdot)) name mb_forall mb_cxt args
+  = ConDeclH98 { con_ext    = AnnConDeclH98 tforall tdot tdarrow
                , con_name   = name
                , con_forall = isJust mb_forall
                , con_ex_tvs = mb_forall `orElse` []
@@ -795,12 +795,12 @@ mkConDeclH98 ann name mb_forall mb_cxt args
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
 mkGadtDecl :: SrcSpan
            -> NonEmpty (LocatedN RdrName)
-           -> EpUniToken "::" "∷"
+           -> TokDcolon
            -> LHsSigType GhcPs
            -> P (LConDecl GhcPs)
 mkGadtDecl loc names dcol ty = do
 
-  (args, res_ty, annsa, csa) <-
+  (args, res_ty, (ops, cps), csa) <-
     case body_ty of
      L ll (HsFunTy _ hsArr (L (EpAnn anc _ cs) (HsRecTy an rf)) res_ty) -> do
        arr <- case hsArr of
@@ -810,10 +810,10 @@ mkGadtDecl loc names dcol ty = do
                  return noAnn
 
        return ( RecConGADT arr (L (EpAnn anc an cs) rf), res_ty
-              , [], epAnnComments ll)
+              , ([], []), epAnnComments ll)
      _ -> do
-       let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
-       return (PrefixConGADT noExtField arg_types, res_type, anns, cs)
+       let ((ops, cps), cs, arg_types, res_type) = splitHsFunType body_ty
+       return (PrefixConGADT noExtField arg_types, res_type, (ops,cps), cs)
 
   let bndrs_loc = case outer_bndrs of
         HsOuterImplicit{} -> getLoc ty
@@ -822,7 +822,7 @@ mkGadtDecl loc names dcol ty = do
   let l = EpAnn (spanAsAnchor loc) noAnn csa
 
   pure $ L l ConDeclGADT
-                     { con_g_ext  = (dcol, annsa)
+                     { con_g_ext  = AnnConDeclGADT ops cps dcol
                      , con_names  = names
                      , con_bndrs  = L bndrs_loc outer_bndrs
                      , con_mb_cxt = mcxt
@@ -1079,9 +1079,7 @@ checkTyClHdr is_cls ty
       | isRdrTc tc               = return (ltc, lhs:rhs:acc, Infix, (reverse ops), cps, cs Semi.<> comments l)
       where lhs = HsValArg noExtField t1
             rhs = HsValArg noExtField t2
-    go cs l (HsParTy _ ty)    acc ops cps fix = goL (cs Semi.<> comments l) ty acc (o:ops) (c:cps) fix
-      where
-        (o,c) = mkParensEpToks (realSrcSpan (locA l))
+    go cs l (HsParTy (o,c) ty)    acc ops cps fix = goL (cs Semi.<> comments l) ty acc (o:ops) (c:cps) fix
     go cs l (HsAppTy _ t1 t2) acc ops cps fix = goL (cs Semi.<> comments l) t1 (HsValArg noExtField t2:acc) ops cps fix
     go cs l (HsAppKindTy at ty ki) acc ops cps fix = goL (cs Semi.<> comments l) ty (HsTypeArg at ki:acc) ops cps fix
     go cs l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ops cps fix
@@ -1098,12 +1096,12 @@ checkTyClHdr is_cls ty
 
     -- Combine the annotations from the HsParTy and HsStarTy into a
     -- new one for the LocatedN RdrName
-    newAnns :: SrcSpanAnnA -> SrcSpanAnnA -> AnnParen -> SrcSpanAnnN
-    newAnns l@(EpAnn _ (AnnListItem _) csp0) l1@(EpAnn ap (AnnListItem ta) csp) (AnnParen _ o c) =
+    newAnns :: SrcSpanAnnA -> SrcSpanAnnA -> (EpToken "(", EpToken ")") -> SrcSpanAnnN
+    newAnns l@(EpAnn _ (AnnListItem _) csp0) l1@(EpAnn ap (AnnListItem ta) csp) (o,c) =
       let
         lr = combineSrcSpans (locA l1) (locA l)
       in
-        EpAnn (EpaSpan lr) (NameAnn NameParens o ap c ta) (csp0 Semi.<> csp)
+        EpAnn (EpaSpan lr) (NameAnn NameParens (getEpTokenLoc o) ap (getEpTokenLoc c) ta) (csp0 Semi.<> csp)
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
@@ -1171,9 +1169,9 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
             EpTok ql -> ([AddEpAnn AnnSimpleQuote ql], [cl])
             _        -> ([ol], [cl])
         mkCTuple (oparens ++ (addLoc <$> op), (addLoc <$> cp) ++ cparens, cs) ts
-  check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
-                                  -- to be sure HsParTy doesn't get into the way
-    = check (ap_open ann':opi, ap_close ann':cpi, csi) ty
+  check (opi,cpi,csi) (L _lp1 (HsParTy (o,c) ty))
+                                             -- to be sure HsParTy doesn't get into the way
+    = check (getEpTokenLoc o:opi, getEpTokenLoc c:cpi, csi) ty
 
   -- No need for anns, returning original
   check (_opi,_cpi,_csi) _t = unprocessed
@@ -3023,8 +3021,9 @@ checkNewOrData span name is_type_data = curry $ \ case
 mkImport :: Located CCallConv
          -> Located Safety
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
-         -> P ([AddEpAnn] -> HsDecl GhcPs)
-mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
+         -> (EpToken "import", TokDcolon)
+         -> P (EpToken "foreign" -> HsDecl GhcPs)
+mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td) =
     case unLoc cconv of
       CCallConv          -> returnSpec =<< mkCImport
       CApiConv           -> do
@@ -3060,8 +3059,8 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
         importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
-    returnSpec spec = return $ \ann -> ForD noExtField $ ForeignImport
-          { fd_i_ext  = ann
+    returnSpec spec = return $ \tforeign -> ForD noExtField $ ForeignImport
+          { fd_i_ext  = (tforeign, timport, td)
           , fd_name   = v
           , fd_sig_ty = ty
           , fd_fi     = spec
@@ -3133,10 +3132,11 @@ parseCImport cconv safety nm str sourceText =
 --
 mkExport :: Located CCallConv
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
-         -> P ([AddEpAnn] -> HsDecl GhcPs)
-mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty)
- = return $ \ann -> ForD noExtField $
-   ForeignExport { fd_e_ext = ann, fd_name = v, fd_sig_ty = ty
+         -> ( EpToken "export", TokDcolon)
+         -> P (EpToken "foreign" -> HsDecl GhcPs)
+mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
+ = return $ \tforeign -> ForD noExtField $
+   ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
                  , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
   where
     entity' | nullFS entity = mkExtName (unLoc v)

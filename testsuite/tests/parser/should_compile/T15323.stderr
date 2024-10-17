@@ -116,11 +116,12 @@
            (EpaComments
             []))
           (ConDeclGADT
-           ((,)
+           (AnnConDeclGADT
+            []
+            []
             (EpUniTok
              (EpaSpan { T15323.hs:6:17-18 })
-             (NormalSyntax))
-            [])
+             (NormalSyntax)))
            (:|
             (L
              (EpAnn
@@ -196,10 +197,11 @@
                 (EpaComments
                  []))
                (HsParTy
-                (AnnParen
-                 AnnParens
-                 (EpaSpan { T15323.hs:6:31 })
-                 (EpaSpan { T15323.hs:6:36 }))
+                ((,)
+                 (EpTok
+                  (EpaSpan { T15323.hs:6:31 }))
+                 (EpTok
+                  (EpaSpan { T15323.hs:6:36 })))
                 (L
                  (EpAnn
                   (EpaSpan { T15323.hs:6:32-35 })

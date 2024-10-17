@@ -137,7 +137,10 @@
            (EpaComments
             []))
           (ConDeclH98
-           []
+           (AnnConDeclH98
+            (NoEpUniTok)
+            (NoEpTok)
+            (NoEpUniTok))
            (L
             (EpAnn
              (EpaSpan { T20452.hs:5:26-31 })
@@ -257,7 +260,10 @@
            (EpaComments
             []))
           (ConDeclH98
-           []
+           (AnnConDeclH98
+            (NoEpUniTok)
+            (NoEpTok)
+            (NoEpUniTok))
            (L
             (EpAnn
              (EpaSpan { T20452.hs:6:26-31 })

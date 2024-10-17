@@ -57,7 +57,12 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { Test24533.hs:4:1-8 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { Test24533.hs:4:1-8 }))
+         (NoEpTok)
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -449,8 +454,13 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { Test24533.hs:14:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { Test24533.hs:14:17-21 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { Test24533.hs:14:1-8 }))
+         (EpTok
+          (EpaSpan { Test24533.hs:14:17-21 }))
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -717,7 +727,12 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { Test24533.ppr.hs:3:1-8 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { Test24533.ppr.hs:3:1-8 }))
+         (NoEpTok)
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -1036,8 +1051,13 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { Test24533.ppr.hs:5:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { Test24533.ppr.hs:5:17-21 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { Test24533.ppr.hs:5:1-8 }))
+         (EpTok
+          (EpaSpan { Test24533.ppr.hs:5:17-21 }))
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn

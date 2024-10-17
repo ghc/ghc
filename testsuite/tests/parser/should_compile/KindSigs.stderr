@@ -831,10 +831,11 @@
              (EpaComments
               []))
             (HsParTy
-             (AnnParen
-              AnnParens
-              (EpaSpan { KindSigs.hs:22:8 })
-              (EpaSpan { KindSigs.hs:22:20 }))
+             ((,)
+              (EpTok
+               (EpaSpan { KindSigs.hs:22:8 }))
+              (EpTok
+               (EpaSpan { KindSigs.hs:22:20 })))
              (L
               (EpAnn
                (EpaSpan { KindSigs.hs:22:9-19 })
@@ -924,10 +925,11 @@
                (EpaComments
                 []))
               (HsParTy
-               (AnnParen
-                AnnParens
-                (EpaSpan { KindSigs.hs:22:33 })
-                (EpaSpan { KindSigs.hs:22:44 }))
+               ((,)
+                (EpTok
+                 (EpaSpan { KindSigs.hs:22:33 }))
+                (EpTok
+                 (EpaSpan { KindSigs.hs:22:44 })))
                (L
                 (EpAnn
                  (EpaSpan { KindSigs.hs:22:34-43 })
@@ -1643,10 +1645,11 @@
            (EpaComments
             []))
           (HsParTy
-           (AnnParen
-            AnnParens
-            (EpaSpan { KindSigs.hs:34:9 })
-            (EpaSpan { KindSigs.hs:34:22 }))
+           ((,)
+            (EpTok
+             (EpaSpan { KindSigs.hs:34:9 }))
+            (EpTok
+             (EpaSpan { KindSigs.hs:34:22 })))
            (L
             (EpAnn
              (EpaSpan { KindSigs.hs:34:10-21 })

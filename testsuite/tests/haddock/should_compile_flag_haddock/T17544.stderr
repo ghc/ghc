@@ -972,8 +972,13 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:23:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:23:17-21 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { T17544.hs:23:1-8 }))
+         (EpTok
+          (EpaSpan { T17544.hs:23:17-21 }))
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -1110,11 +1115,12 @@
                 (EpaComments
                  []))
                (ConDeclGADT
-                ((,)
+                (AnnConDeclGADT
+                 []
+                 []
                  (EpUniTok
                   (EpaSpan { T17544.hs:25:10-11 })
-                  (NormalSyntax))
-                 [])
+                  (NormalSyntax)))
                 (:|
                  (L
                   (EpAnn
@@ -1348,8 +1354,13 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:29:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:29:17-21 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { T17544.hs:29:1-8 }))
+         (EpTok
+          (EpaSpan { T17544.hs:29:17-21 }))
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -1486,11 +1497,12 @@
                 (EpaComments
                  []))
                (ConDeclGADT
-                ((,)
+                (AnnConDeclGADT
+                 []
+                 []
                  (EpUniTok
                   (EpaSpan { T17544.hs:31:10-11 })
-                  (NormalSyntax))
-                 [])
+                  (NormalSyntax)))
                 (:|
                  (L
                   (EpAnn
@@ -1724,8 +1736,13 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:35:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:35:17-21 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { T17544.hs:35:1-8 }))
+         (EpTok
+          (EpaSpan { T17544.hs:35:17-21 }))
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -1862,11 +1879,12 @@
                 (EpaComments
                  []))
                (ConDeclGADT
-                ((,)
+                (AnnConDeclGADT
+                 []
+                 []
                  (EpUniTok
                   (EpaSpan { T17544.hs:37:10-11 })
-                  (NormalSyntax))
-                 [])
+                  (NormalSyntax)))
                 (:|
                  (L
                   (EpAnn
@@ -2100,8 +2118,13 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:41:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:41:17-21 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { T17544.hs:41:1-8 }))
+         (EpTok
+          (EpaSpan { T17544.hs:41:17-21 }))
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -2238,11 +2261,12 @@
                 (EpaComments
                  []))
                (ConDeclGADT
-                ((,)
+                (AnnConDeclGADT
+                 []
+                 []
                  (EpUniTok
                   (EpaSpan { T17544.hs:43:10-11 })
-                  (NormalSyntax))
-                 [])
+                  (NormalSyntax)))
                 (:|
                  (L
                   (EpAnn
@@ -2476,8 +2500,13 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:47:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:47:17-21 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { T17544.hs:47:1-8 }))
+         (EpTok
+          (EpaSpan { T17544.hs:47:17-21 }))
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -2614,11 +2643,12 @@
                 (EpaComments
                  []))
                (ConDeclGADT
-                ((,)
+                (AnnConDeclGADT
+                 []
+                 []
                  (EpUniTok
                   (EpaSpan { T17544.hs:49:10-11 })
-                  (NormalSyntax))
-                 [])
+                  (NormalSyntax)))
                 (:|
                  (L
                   (EpAnn
@@ -2852,8 +2882,13 @@
       (ClsInstDecl
        ((,,)
         (Nothing)
-        [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:53:1-8 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:53:18-22 }))]
+        (AnnClsInstDecl
+         (EpTok (EpaSpan { T17544.hs:53:1-8 }))
+         (EpTok
+          (EpaSpan { T17544.hs:53:18-22 }))
+         (NoEpTok)
+         []
+         (NoEpTok))
         (NoAnnSortKey))
        (L
         (EpAnn
@@ -2990,11 +3025,12 @@
                 (EpaComments
                  []))
                (ConDeclGADT
-                ((,)
+                (AnnConDeclGADT
+                 []
+                 []
                  (EpUniTok
                   (EpaSpan { T17544.hs:55:11-12 })
-                  (NormalSyntax))
-                 [])
+                  (NormalSyntax)))
                 (:|
                  (L
                   (EpAnn
