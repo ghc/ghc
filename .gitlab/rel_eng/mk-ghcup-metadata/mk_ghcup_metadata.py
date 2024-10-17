@@ -67,6 +67,7 @@ class Artifact(NamedTuple):
     download_name: str
     output_name: str
     subdir: str
+    anchor_name: str
 
 # Platform spec provides a specification which is agnostic to Job
 # PlatformSpecs are converted into Artifacts by looking in the jobs-metadata.json file.
@@ -77,11 +78,13 @@ class PlatformSpec(NamedTuple):
 source_artifact = Artifact('source-tarball'
                           , 'ghc-{version}-src.tar.xz'
                           , 'ghc-{version}-src.tar.xz'
-                          , 'ghc-{version}' )
+                          , 'ghc-{version}'
+                          , 'ghc{version}-src')
 test_artifact = Artifact('source-tarball'
                         , 'ghc-{version}-testsuite.tar.xz'
                         , 'ghc-{version}-testsuite.tar.xz'
-                        , 'ghc-{version}/testsuite' )
+                        , 'ghc-{version}/testsuite'
+                        , 'ghc{version}-testsuite')
 
 def debian(arch, n):
     return linux_platform(arch, "{arch}-linux-deb{n}".format(arch=arch, n=n))
@@ -133,6 +136,8 @@ def download_and_hash(url):
     hash_cache[url] = digest
     return digest
 
+uri_to_anchor_cache=dict()
+
 # Make the metadata for one platform.
 def mk_one_metadata(release_mode, version, job_map, artifact):
     job_id = job_map[artifact.job_name].id
@@ -170,6 +175,9 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
         res["dlOutput"] = output
 
     eprint(res)
+
+    # add the uri to the anchor name cache so we can lookup an anchor for this uri
+    uri_to_anchor_cache[final_url] = artifact.anchor_name
     return res
 
 # Turns a platform into an Artifact respecting pipeline_type
@@ -180,7 +188,8 @@ def mk_from_platform(pipeline_type, platform):
     return Artifact(info['name']
                    , f"{info['jobInfo']['bindistName']}.tar.xz"
                    , "ghc-{version}-{pn}.tar.xz".format(version="{version}", pn=platform.name)
-                   , platform.subdir)
+                   , platform.subdir
+                   , f"ghc{{version}}-{platform.name}")
 
 
 # Generate the new metadata for a specific GHC mode etc
@@ -271,6 +280,21 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
         }
 
 
+def mk_dumper(version):
+  class CustomAliasDumper(yaml.Dumper):
+      def __init__(self, *args, **kwargs):
+          super().__init__(*args, **kwargs)
+
+      def generate_anchor(self, node):
+          if isinstance(node, yaml.MappingNode):
+            node_dict = { k.value : v.value for (k,v) in node.value }
+            if 'dlUri' in node_dict:
+              return uri_to_anchor_cache[node_dict['dlUri']].format(version=version.replace('.',''))
+          return super().generate_anchor(node)
+
+  return CustomAliasDumper
+
+
 def main() -> None:
     import argparse
 
@@ -303,7 +327,7 @@ def main() -> None:
 
     new_yaml = mk_new_yaml(args.release_mode, args.version, pipeline_type, job_map)
     if args.fragment:
-        print(yaml.dump({ args.version : new_yaml }))
+        print(yaml.dump({ args.version : new_yaml }, Dumper=mk_dumper(args.version)))
 
     else:
         with open(args.metadata, 'r') as file:
