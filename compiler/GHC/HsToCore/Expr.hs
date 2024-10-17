@@ -259,7 +259,12 @@ dsLExpr (L loc e) = putSrcSpanDsA loc $ dsExpr e
 
 -- | Desugar a typechecked expression.
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
-dsExpr (HsVar    _ (L _ id))           = dsHsVar id
+dsExpr (HsVar    Bound (L _ id))                 = dsHsVar id
+dsExpr (HsVar    (Unbound (HER ref _)) _) =
+  dsEvTerm =<< readMutVar ref
+
+    -- TODO: check this note:
+      -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint.
 
 {- Record selectors are warned about if they are not
 present in all of the parent data type's constructor,
@@ -291,9 +296,6 @@ dsExpr (HsRecSel _ (FieldOcc id _))
       let maxConstructors = maxUncoveredPatterns dflags
       return $ take maxConstructors cons_wo_field
 
-
-dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
-        -- See Note [Holes] in GHC.Tc.Types.Constraint
 
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e

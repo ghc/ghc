@@ -131,7 +131,6 @@ import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.UsageEnv
 
-import GHC.Types.Var
 import GHC.Types.Id as Id
 import GHC.Types.Name
 import GHC.Types.SourceText
@@ -157,7 +156,7 @@ import Data.IORef
 import GHC.Data.Maybe
 import qualified Data.Semigroup as Semi
 import GHC.Types.Name.Reader
-
+import GHC.Types.Var
 {-
 ************************************************************************
 *                                                                      *
@@ -304,18 +303,15 @@ emitWantedEvVars :: CtOrigin -> [TcPredType] -> TcM [EvVar]
 emitWantedEvVars orig = mapM (emitWantedEvVar orig)
 
 -- | Emit a new wanted expression hole
-emitNewExprHole :: RdrName         -- of the hole
-                -> Type -> TcM HoleExprRef
-emitNewExprHole occ ty
-  = do { u <- newUnique
-       ; ref <- newTcRef (pprPanic "unfilled unbound-variable evidence" (ppr u))
-       ; let her = HER ref ty u
-
-       ; loc <- getCtLocM (ExprHoleOrigin (Just occ)) (Just TypeLevel)
-
+emitNewExprHole :: Id -> TcM HoleExprRef
+emitNewExprHole id
+  = do { ref <- newTcRef (pprPanic "unfilled unbound-variable evidence" (ppr (idUnique id)))
+       ; let her = HER ref id
+       ; let rdrName = getRdrName id
+       ; loc <- getCtLocM (ExprHoleOrigin (Just rdrName)) (Just TypeLevel)
        ; let hole = Hole { hole_sort = ExprHole her
-                         , hole_occ  = occ
-                         , hole_ty   = ty
+                         , hole_occ  = rdrName
+                         , hole_ty   = idType id
                          , hole_loc  = loc }
        ; emitHole hole
        ; return her }

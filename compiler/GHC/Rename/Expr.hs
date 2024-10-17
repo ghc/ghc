@@ -313,20 +313,28 @@ finishHsVar (L l name)
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-      ; return (HsVar noExtField (L (l2l l) name), unitFV name) }
+      ; return (HsVar Bound (L (l2l l) name), unitFV name) }
 
-rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
-rnUnboundVar v = do
+rnUnboundVar :: LocatedN RdrName -> RnM (HsExpr GhcRn, FreeVars)
+rnUnboundVar (L l v) = do
   deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
+  uniq <- newUnique
+  let id = mkInternalName uniq (occName v) (locA l)
   -- See Note [Reporting unbound names] for difference between qualified and unqualified names.
   unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
-  return (HsUnboundVar noExtField v, emptyFVs)
+  return (HsVar (Unbound ()) (L l id), emptyFVs)
 
 rnExpr (HsVar _ (L l v))
+  | isUnderscore (rdrNameOcc v)
+  = do
+      uniq <- newUnique
+      return (HsVar (Unbound ()) (L l (mkInternalName uniq (occName v) (locA l))), emptyFVs)
+rnExpr (HsVar _ locatedRdrName@(L l v))
+  | otherwise
   = do { dflags <- getDynFlags
        ; mb_gre <- lookupExprOccRn v
        ; case mb_gre of {
-           Nothing -> rnUnboundVar v ;
+           Nothing -> rnUnboundVar locatedRdrName ;
            Just gre ->
     do { let nm   = greName gre
              info = greInfo gre
@@ -339,7 +347,7 @@ rnExpr (HsVar _ (L l v))
                   ; this_mod <- getModule
                   ; when (nameIsLocalOrFrom this_mod sel_name) $
                       checkThLocalName sel_name
-                  ; return (HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name)
+                  ; return (HsRecSel noExtField (FieldOcc sel_name locatedRdrName), unitFV sel_name)
                   }
             | nm == nilDataConName
               -- Treat [] as an ExplicitList, so that
@@ -354,9 +362,6 @@ rnExpr (HsVar _ (L l v))
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
-
-rnExpr (HsUnboundVar _ v)
-  = return (HsUnboundVar noExtField v, emptyFVs)
 
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel src v)
@@ -862,8 +867,8 @@ See #18151.
 Note [Reporting unbound names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Faced with an out-of-scope `RdrName` there are two courses of action
-A. Report an error immediately (and return a HsUnboundVar). This will halt GHC after the renamer is complete
-B. Return a HsUnboundVar without reporting an error.  That will allow the typechecker to run, which in turn
+A. Report an error immediately (and return a HsUnboundVarRn). This will halt GHC after the renamer is complete
+B. Return a HsUnboundVarRn without reporting an error.  That will allow the typechecker to run, which in turn
    can give a better error message, notably giving the type of the variable via the "typed holes" mechanism.
 
 When `-fdefer-out-of-scope-variables` is on we follow plan B.
@@ -1431,12 +1436,12 @@ lookupStmtNamePoly ctxt name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do { fm <- lookupOccRn (nameRdrName name)
-                 ; return (HsVar noExtField (noLocA fm), unitFV fm) }
+                 ; return (HsVar Bound (noLocA fm), unitFV fm) }
          else not_rebindable }
   | otherwise
   = not_rebindable
   where
-    not_rebindable = return (HsVar noExtField (noLocA name), emptyFVs)
+    not_rebindable = return (HsVar Bound (noLocA name), emptyFVs)
 
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp are never rebindable

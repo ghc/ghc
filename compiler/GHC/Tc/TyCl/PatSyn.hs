@@ -1004,7 +1004,7 @@ tcPatToExpr args pat = go pat
                     -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; let con = L (l2l loc) (HsVar noExtField lcon)
+           ; let con = L (l2l loc) (HsVar Bound lcon)
            ; return (unLoc $ mkHsApps con exprs)
            }
 
@@ -1032,7 +1032,7 @@ tcPatToExpr args pat = go pat
 
     go1 (VarPat _ (L l var))
         | var `elemNameSet` lhsVars
-        = return $ HsVar noExtField (L l var)
+        = return $ HsVar Bound (L l var)
         | otherwise
         = Left (PatSynUnboundVar var)
     go1 (ParPat _ pat) = fmap (HsPar noExtField) (go pat)
