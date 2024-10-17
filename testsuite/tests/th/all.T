@@ -630,3 +630,4 @@ test('T25252',
    req_th,
    req_c],
   compile_and_run, ['-fPIC T25252_c.c'])
+test('T25083', [extra_files(['T25083_A.hs', 'T25083_B.hs'])], multimod_compile_and_run, ['T25083', '-v0 -j'])

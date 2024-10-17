@@ -130,10 +130,12 @@ startTHRunnerProcess interp_js settings = do
   std_in <- readIORef interp_in
 
   lo_ref <- newIORef Nothing
+  lock <- newMVar ()
   let pipe = Pipe { pipeRead = rh, pipeWrite = wh, pipeLeftovers = lo_ref }
   let proc = InterpProcess
               { interpHandle = hdl
               , interpPipe   = pipe
+              , interpLock   = lock
               }
   pure (std_in, proc)
 
