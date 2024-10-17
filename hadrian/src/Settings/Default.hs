@@ -282,7 +282,8 @@ defaultFlavour = Flavour
     , ghcThreaded        = const True
     , ghcDebugAssertions = const False
     , ghcSplitSections   = False
-    , ghcDocs            = cmdDocsArgs }
+    , ghcDocs            = cmdDocsArgs
+    , hashUnitIds        = False }
 
 -- | Default logic for determining whether to build
 --   dynamic GHC programs.

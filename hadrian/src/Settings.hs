@@ -82,13 +82,17 @@ flavour = do
     let flavours = hadrianFlavours ++ userFlavours
         (settingErrs, tweak) = applySettings kvs
 
+    -- This used to be a command line argument, and is now a flavour transformer.
+    uid_hash_cmd <- cmdUnitIdHash
+    let flagsTweak = if uid_hash_cmd then enableHashUnitIds else id
+
     when (not $ null settingErrs) $ fail
       $ "failed to apply key-value settings:\n\t" ++ unlines (map (" - " ++) settingErrs) ++
         "\t   Entries should look something like \"stage1.containers.ghc.hs.opts += -Werror\""
 
     case parseFlavour flavours flavourTransformers flavourName of
       Left err -> fail err
-      Right f -> return $ tweak f
+      Right f -> return $ flagsTweak (tweak f)
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.

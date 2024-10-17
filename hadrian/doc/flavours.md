@@ -107,7 +107,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O2</td>
   </tr>
   <tr>
-    <th>release (same as perf with -haddock and +no_self_recomp)</td>
+    <th>release (same as perf with -haddock and +no_self_recomp+hash_unit_ids)</td>
     <td></td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
@@ -332,6 +332,8 @@ The supported transformers are listed below:
     <tr>
         <td><code>no_self_recomp</code></td>
         <td>Disable including self-recompilation information in interface files via <code>-fno-write-if-self-recomp</code>. If you are building a distribution you can enable this flag to produce more deterministic interface files.</td>
+        <td><code>hash_unit_ids</code></td>
+        <td>Include a package hash in the unit id of built packages</td>
     </tr>
 </table>
 
