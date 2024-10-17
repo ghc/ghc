@@ -163,15 +163,15 @@ getBangStrictness _ = (mkHsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 fromMaybeContext :: Maybe (LHsContext (GhcPass p)) -> HsContext (GhcPass p)
 fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA []) mctxt
 
-type instance XHsForAllVis   (GhcPass _) = EpAnn (EpUniToken "forall" "∀", EpUniToken "->" "→")
+type instance XHsForAllVis   (GhcPass _) = EpAnn (TokForall, EpUniToken "->" "→")
                                            -- Location of 'forall' and '->'
-type instance XHsForAllInvis (GhcPass _) = EpAnn (EpUniToken "forall" "∀", EpToken ".")
+type instance XHsForAllInvis (GhcPass _) = EpAnn (TokForall, EpToken ".")
                                            -- Location of 'forall' and '.'
 
 type instance XXHsForAllTelescope (GhcPass _) = DataConCantHappen
 
-type EpAnnForallVis   = EpAnn (EpUniToken "forall" "∀", EpUniToken "->" "→")
-type EpAnnForallInvis = EpAnn (EpUniToken "forall" "∀", EpToken ".")
+type EpAnnForallVis   = EpAnn (TokForall, TokRarrow)
+type EpAnnForallInvis = EpAnn (TokForall, EpToken ".")
 
 type HsQTvsRn = [Name]  -- Implicit variables
   -- For example, in   data T (a :: k1 -> k2) = ...
@@ -461,7 +461,7 @@ type instance XListTy          (GhcPass _) = AnnParen
 type instance XTupleTy         (GhcPass _) = AnnParen
 type instance XSumTy           (GhcPass _) = AnnParen
 type instance XOpTy            (GhcPass _) = NoExtField
-type instance XParTy           (GhcPass _) = AnnParen
+type instance XParTy           (GhcPass _) = (EpToken "(", EpToken ")")
 type instance XIParamTy        (GhcPass _) = TokDcolon
 type instance XStarTy          (GhcPass _) = NoExtField
 type instance XKindSig         (GhcPass _) = TokDcolon
@@ -572,7 +572,7 @@ pprHsArrow (HsUnrestrictedArrow _) = pprArrowWithMultiplicity visArgTypeLike (Le
 pprHsArrow (HsLinearArrow _)       = pprArrowWithMultiplicity visArgTypeLike (Left True)
 pprHsArrow (HsExplicitMult _ p)    = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))
 
-type instance XConDeclField  (GhcPass _) = [AddEpAnn]
+type instance XConDeclField  (GhcPass _) = TokDcolon
 type instance XXConDeclField (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
@@ -710,23 +710,22 @@ mkHsAppKindTy at ty k = addCLocA ty k (HsAppKindTy at ty k)
 -- It returns API Annotations for any parens removed
 splitHsFunType ::
      LHsType (GhcPass p)
-  -> ( [AddEpAnn], EpAnnComments -- The locations of any parens and
+  -> ( ([EpToken "("], [EpToken ")"]) , EpAnnComments -- The locations of any parens and
                                   -- comments discarded
      , [HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
 splitHsFunType ty = go ty
   where
-    go (L l (HsParTy an ty))
+    go (L l (HsParTy (op,cp) ty))
       = let
-          (anns, cs, args, res) = splitHsFunType ty
-          anns' = anns ++ annParen2AddEpAnn an
+          ((ops, cps), cs, args, res) = splitHsFunType ty
           cs' = cs S.<> epAnnComments l
-        in (anns', cs', args, res)
+        in ((ops++[op], cps ++ [cp]), cs', args, res)
 
     go (L ll (HsFunTy _ mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
       = (anns, csy S.<> epAnnComments ll, HsScaled mult x:args, res)
 
-    go other = ([], emptyComments, [], other)
+    go other = (noAnn, emptyComments, [], other)
 
 -- | Retrieve the name of the \"head\" of a nested type application.
 -- This is somewhat like @GHC.Tc.Gen.HsType.splitHsAppTys@, but a little more

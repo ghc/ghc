@@ -81,6 +81,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annSynDecl
               `extQ` annDataDefn
               `extQ` annFamilyDecl
+              `extQ` annClsInstDecl
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
               `extQ` deltaPos
@@ -262,6 +263,15 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                  showAstData' g, showAstData' h, showAstData' i,
                                  showAstData' j, showAstData' k, showAstData' l]
 
+            annClsInstDecl :: AnnClsInstDecl -> SDoc
+            annClsInstDecl (AnnClsInstDecl a b c d e) = case ba of
+             BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnFamilyDecl"
+             NoBlankEpAnnotations ->
+              parens $ text "AnnClsInstDecl"
+                        $$ vcat [showAstData' a, showAstData' b, showAstData' c,
+                                 showAstData' d, showAstData' e]
+
+
             addEpAnn :: AddEpAnn -> SDoc
             addEpAnn (AddEpAnn a s) = case ba of
              BlankEpAnnotations -> parens
@@ -294,7 +304,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             epTokenInstance :: EpToken "instance" -> SDoc
             epTokenInstance = epToken'
 
-            epTokenForall :: EpUniToken "forall" "∀" -> SDoc
+            epTokenForall :: TokForall -> SDoc
             epTokenForall = epUniToken'
 
             epToken' :: KnownSymbol sym => EpToken sym -> SDoc

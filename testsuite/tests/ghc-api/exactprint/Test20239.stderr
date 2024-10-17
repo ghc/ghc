@@ -142,7 +142,10 @@
              (EpaComments
               []))
             (ConDeclH98
-             []
+             (AnnConDeclH98
+              (NoEpUniTok)
+              (NoEpTok)
+              (NoEpUniTok))
              (L
               (EpAnn
                (EpaSpan { Test20239.hs:5:36-49 })
@@ -190,7 +193,10 @@
              (EpaComments
               []))
             (ConDeclH98
-             []
+             (AnnConDeclH98
+              (NoEpUniTok)
+              (NoEpTok)
+              (NoEpUniTok))
              (L
               (EpAnn
                (EpaSpan { Test20239.hs:7:36-48 })
@@ -218,10 +224,11 @@
                   (EpaComments
                    []))
                  (HsParTy
-                  (AnnParen
-                   AnnParens
-                   (EpaSpan { Test20239.hs:7:50 })
-                   (EpaSpan { Test20239.hs:7:86 }))
+                  ((,)
+                   (EpTok
+                    (EpaSpan { Test20239.hs:7:50 }))
+                   (EpTok
+                    (EpaSpan { Test20239.hs:7:86 })))
                   (L
                    (EpAnn
                     (EpaSpan { Test20239.hs:7:51-85 })
@@ -290,10 +297,11 @@
                         (EpaComments
                          []))
                        (HsParTy
-                        (AnnParen
-                         AnnParens
-                         (EpaSpan { Test20239.hs:7:68 })
-                         (EpaSpan { Test20239.hs:7:85 }))
+                        ((,)
+                         (EpTok
+                          (EpaSpan { Test20239.hs:7:68 }))
+                         (EpTok
+                          (EpaSpan { Test20239.hs:7:85 })))
                         (L
                          (EpAnn
                           (EpaSpan { Test20239.hs:7:69-84 })

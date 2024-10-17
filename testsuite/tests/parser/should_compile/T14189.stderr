@@ -167,7 +167,7 @@
                   (EpaComments
                    []))
                  (ConDeclField
-                  []
+                  (NoEpUniTok)
                   [(L
                     (EpAnn
                      (EpaSpan { T14189.hs:6:33 })
