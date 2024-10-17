@@ -90,6 +90,7 @@ type WasmInterp = ExtInterpState WasmInterpConfig ()
 data InterpProcess = InterpProcess
   { interpPipe   :: !Pipe           -- ^ Pipe to communicate with the server
   , interpHandle :: !ProcessHandle  -- ^ Process handle of the server
+  , interpLock   :: !(MVar ())      -- ^ Lock to prevent concurrent access to the stream
   }
 
 -- | Status of an external interpreter

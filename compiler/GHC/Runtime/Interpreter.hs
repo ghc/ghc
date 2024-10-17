@@ -578,10 +578,12 @@ spawnIServ conf = do
                                           []
                                           (iservConfOpts    conf)
   lo_ref <- newIORef Nothing
+  lock <- newMVar ()
   let pipe = Pipe { pipeRead = rh, pipeWrite = wh, pipeLeftovers = lo_ref }
   let process = InterpProcess
                   { interpHandle = ph
                   , interpPipe   = pipe
+                  , interpLock   = lock
                   }
 
   pending_frees <- newMVar []
