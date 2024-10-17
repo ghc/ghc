@@ -1274,7 +1274,7 @@ topdecl :: { LHsDecl GhcPs }
         | stand_alone_deriving                  { L (getLoc $1) (DerivD noExtField (unLoc $1)) }
         | role_annot                            { L (getLoc $1) (RoleAnnotD noExtField (unLoc $1)) }
         | default_decl                          { L (getLoc $1) (DefD noExtField (unLoc $1)) }
-        | 'foreign' fdecl                       {% amsA' (sLL $1 $> ((snd $ unLoc $2) (mj AnnForeign $1:(fst $ unLoc $2)))) }
+        | 'foreign' fdecl                       {% amsA' (sLL $1 $> ((unLoc $2) (epTok $1))) }
         | '{-# DEPRECATED' deprecations '#-}'   {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,glR $3), (getDEPRECATED_PRAGs $1)) (fromOL $2))) }
         | '{-# WARNING' warnings '#-}'          {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,glR $3), (getWARNING_PRAGs $1)) (fromOL $2))) }
         | '{-# RULES' rules '#-}'               {% amsA' (sLL $1 $> $ RuleD noExtField (HsRules ((glR $1,glR $3), (getRULES_PRAGs $1)) (reverse $2))) }
@@ -2123,16 +2123,16 @@ annotation :: { LHsDecl GhcPs }
 -----------------------------------------------------------------------------
 -- Foreign import and export declarations
 
-fdecl :: { Located ([AddEpAnn], [AddEpAnn] -> HsDecl GhcPs) }
+fdecl :: { Located (EpToken "foreign" -> HsDecl GhcPs) }
 fdecl : 'import' callconv safety fspec
-               {% mkImport $2 $3 (snd $ unLoc $4) >>= \i ->
-                 return (sLL $1 $> (mj AnnImport $1 : (fst $ unLoc $4),i))  }
+               {% mkImport $2 $3 (snd $ unLoc $4) (epTok $1, fst $ unLoc $4) >>= \i ->
+                 return (sLL $1 $> i)  }
       | 'import' callconv        fspec
-               {% do { d <- mkImport $2 (noLoc PlaySafe) (snd $ unLoc $3);
-                    return (sLL $1 $> (mj AnnImport $1 : (fst $ unLoc $3),d)) }}
+               {% do { d <- mkImport $2 (noLoc PlaySafe) (snd $ unLoc $3) (epTok $1, fst $ unLoc $3);
+                    return (sLL $1 $> d) }}
       | 'export' callconv fspec
-               {% mkExport $2 (snd $ unLoc $3) >>= \i ->
-                  return (sLL $1 $> (mj AnnExport $1 : (fst $ unLoc $3),i) ) }
+               {% mkExport $2 (snd $ unLoc $3) (epTok $1, fst $ unLoc $3) >>= \i ->
+                  return (sLL $1 $> i ) }
 
 callconv :: { Located CCallConv }
           : 'stdcall'                   { sLL $1 $> StdCallConv }
@@ -2146,12 +2146,12 @@ safety :: { Located Safety }
         | 'safe'                        { sLL $1 $> PlaySafe }
         | 'interruptible'               { sLL $1 $> PlayInterruptible }
 
-fspec :: { Located ([AddEpAnn]
+fspec :: { Located (TokDcolon
                     ,(Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)) }
-       : STRING var '::' sigtype        { sLL $1 $> ([mu AnnDcolon $3]
+       : STRING var '::' sigtype        { sLL $1 $> (epUniTok $3
                                              ,(L (getLoc $1)
                                                     (getStringLiteral $1), $2, $4)) }
-       |        var '::' sigtype        { sLL $1 $> ([mu AnnDcolon $2]
+       |        var '::' sigtype        { sLL $1 $> (epUniTok $2
                                              ,(noLoc (StringLiteral NoSourceText nilFS Nothing), $1, $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling

@@ -3023,8 +3023,9 @@ checkNewOrData span name is_type_data = curry $ \ case
 mkImport :: Located CCallConv
          -> Located Safety
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
-         -> P ([AddEpAnn] -> HsDecl GhcPs)
-mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
+         -> (EpToken "import", TokDcolon)
+         -> P (EpToken "foreign" -> HsDecl GhcPs)
+mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td) =
     case unLoc cconv of
       CCallConv          -> returnSpec =<< mkCImport
       CApiConv           -> do
@@ -3060,8 +3061,8 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
         importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
-    returnSpec spec = return $ \ann -> ForD noExtField $ ForeignImport
-          { fd_i_ext  = ann
+    returnSpec spec = return $ \tforeign -> ForD noExtField $ ForeignImport
+          { fd_i_ext  = (tforeign, timport, td)
           , fd_name   = v
           , fd_sig_ty = ty
           , fd_fi     = spec
@@ -3133,10 +3134,11 @@ parseCImport cconv safety nm str sourceText =
 --
 mkExport :: Located CCallConv
          -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
-         -> P ([AddEpAnn] -> HsDecl GhcPs)
-mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty)
- = return $ \ann -> ForD noExtField $
-   ForeignExport { fd_e_ext = ann, fd_name = v, fd_sig_ty = ty
+         -> ( EpToken "export", TokDcolon)
+         -> P (EpToken "foreign" -> HsDecl GhcPs)
+mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
+ = return $ \tforeign -> ForD noExtField $
+   ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
                  , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
   where
     entity' | nullFS entity = mkExtName (unLoc v)

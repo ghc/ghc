@@ -1202,11 +1202,11 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XForeignImport   GhcPs = [AddEpAnn]
+type instance XForeignImport   GhcPs = (EpToken "foreign", EpToken "import", TokDcolon)
 type instance XForeignImport   GhcRn = NoExtField
 type instance XForeignImport   GhcTc = Coercion
 
-type instance XForeignExport   GhcPs = [AddEpAnn]
+type instance XForeignExport   GhcPs = (EpToken "foreign", EpToken "export", TokDcolon)
 type instance XForeignExport   GhcRn = NoExtField
 type instance XForeignExport   GhcTc = Coercion
 
@@ -1217,6 +1217,7 @@ type instance XXForeignImport  (GhcPass _) = DataConCantHappen
 
 type instance XCExport (GhcPass _) = LocatedE SourceText -- original source text for the C entity
 type instance XXForeignExport  (GhcPass _) = DataConCantHappen
+
 
 -- pretty printing of foreign declarations
 
