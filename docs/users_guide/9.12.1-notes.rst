@@ -201,6 +201,10 @@ Cmm
   for libraries that define exception-handling combinators like ``catch`` and
   ``onException``, such as ``base``, or the ``exceptions`` package.
 
+- GHC will no longer implicitly link against ``base`` when invoked as linker.
+  In some uncommon workflows this can result in ``undefined reference`` linker errors
+  if ``base`` is not explicitly given as package to link against using ``-package base``.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
