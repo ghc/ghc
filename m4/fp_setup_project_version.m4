@@ -2,6 +2,9 @@
 # ---------------------
 AC_DEFUN([FP_SETUP_PROJECT_VERSION],
 [
+    # number of version number components
+    NumVersionComponents="$(( $(echo "$PACKAGE_VERSION" | tr -cd . | wc -c) + 1 ))"
+
     if test "$RELEASE" = "NO"; then
         AC_MSG_CHECKING([for GHC version date])
         if test -f VERSION_DATE; then
@@ -61,6 +64,22 @@ AC_DEFUN([FP_SETUP_PROJECT_VERSION],
     VERSION_TMP=`echo $PACKAGE_VERSION | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3'/`
     VERSION_MINOR=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1'/`
     ProjectPatchLevel=`echo $VERSION_TMP | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3'/`
+
+    # Verify that the version number has three components if a release version
+    # (that is, even minor version number).
+    AC_MSG_CHECKING([package version validity])
+    StableRelease="$(( ($VERSION_MINOR & 1) == 0))"
+    if test "$StableRelease" = "1" -a "$NumVersionComponents" != "3"; then
+        AC_MSG_ERROR([Stable (even) version numbers must have three components])
+    elif test "$StableRelease" = "0" -a "$NumVersionComponents" != "2"; then
+        AC_MSG_ERROR([Unstable (odd) version numbers must have two components])
+    elif test "$RELEASE" = "YES" -a "$StableRelease" = "0"; then
+        AC_MSG_ERROR([RELEASE=YES despite having an unstable odd minor version number])
+    elif test "$StableRelease" = "1"; then
+        AC_MSG_RESULT([okay stable branch version])
+    else
+        AC_MSG_RESULT([okay unstable branch version])
+    fi
 
     # Calculate project version as an integer, using 2 digits for minor version
     case $VERSION_MINOR in
