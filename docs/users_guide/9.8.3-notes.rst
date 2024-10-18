@@ -50,6 +50,7 @@ JavaScript backend
 ``base``
 --------
 
+- Bump version to 4.19.2.0
 - Fix spurious closing of file descriptors after ``fork`` on platforms using the KQueue event manager backend (:ghc-ticket:`24672`)
 
 Haddock

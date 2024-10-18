@@ -9,4 +9,4 @@ DATA CONSTRUCTORS
          (x ~ y, c ~ [x], Ord x) =>
          x -> y -> T (x, y) b c
 Dependent modules: []
-Dependent packages: [base-4.19.1.0]
+Dependent packages: [base-4.19.2.0]

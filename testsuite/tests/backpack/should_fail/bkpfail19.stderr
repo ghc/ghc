@@ -1,12 +1,10 @@
 [1 of 2] Processing p
-  [1 of 1] Compiling ShouldFail[sig]  ( p\ShouldFail.hsig, nothing )
+  [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, nothing )
 [2 of 2] Processing q
   Instantiating q
-  [1 of 1] Including p[ShouldFail=base-4.18.0.0:Data.STRef]
-    Instantiating p[ShouldFail=base-4.18.0.0:Data.STRef]
-    [1 of 1] Compiling ShouldFail[sig]  ( p\ShouldFail.hsig, bkpfail19.out\p\p-CfyUIAu1JTRCDuXEyGszXN\ShouldFail.o )
+  [1 of 1] Including p[ShouldFail=base-4.19.1.0:Data.STRef]
+    Instantiating p[ShouldFail=base-4.19.1.0:Data.STRef]
+    [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, bkpfail19.out/p/p-Ak3HDozWrn3BPHIdYYNht5/ShouldFail.o )
 
-<no location info>: error: [GHC-12424]
-    • The hsig file (re)exports ‘Data.STRef.Lazy.newSTRef’
-      but the implementing module exports a different identifier ‘GHC.STRef.newSTRef’
-    • While checking that ‘Data.STRef’ implements signature ‘ShouldFail’ in ‘p[ShouldFail=Data.STRef]’.
+<no location info>: error:
+    Something is amiss; requested module  base-4.19.1.0-inplace:Data.STRef differs from name found in the interface file base:Data.STRef (if these names look the same, try again with -dppr-debug)

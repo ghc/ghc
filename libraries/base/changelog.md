@@ -1,5 +1,10 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.19.2.0 *October 2024*
+  * Shipped with GHC 9.8.3
+  * Improve documentation of various functions
+  * Fix interaction between `fork` and the `kqueue`-based IO manager ([#24672](https://gitlab.haskell.org/ghc/ghc/-/issues/24672))
+
 ## 4.19.1.0 *October 2023*
   * Shipped with GHC 9.8.2
   * Improve documentation of various functions
