@@ -119,6 +119,7 @@ module GHC.Internal.Control.Exception (
   ) where
 
 import GHC.Internal.Control.Exception.Base
+import GHC.Internal.Exception.Type (ExceptionWithContext(..), whileHandling)
 
 import GHC.Internal.Base
 import GHC.Internal.IO (interruptible)
@@ -149,13 +150,15 @@ Instead, we provide a function 'catches', which would be used thus:
 >                     Handler (\ (ex :: IOException)    -> handleIO    ex)]
 -}
 catches :: IO a -> [Handler a] -> IO a
-catches io handlers = io `catch` catchesHandler handlers
+catches io handlers = io `catchNoPropagate` catchesHandler handlers
 
-catchesHandler :: [Handler a] -> SomeException -> IO a
-catchesHandler handlers e = foldr tryHandler (throw e) handlers
-    where tryHandler (Handler handler) res
-              = case fromException e of
-                Just e' -> handler e'
+catchesHandler :: [Handler a] -> ExceptionWithContext SomeException -> IO a
+catchesHandler handlers ec@(ExceptionWithContext _ e) =
+    foldr tryHandler (rethrowIO ec) handlers
+    where
+        tryHandler (Handler handler) res =
+            case fromException e of
+                Just e' -> annotateIO (whileHandling ec) (handler e')
                 Nothing -> res
 
 -- -----------------------------------------------------------------------------
