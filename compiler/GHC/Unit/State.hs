@@ -857,6 +857,62 @@ mungeDynLibFields pkg =
          ds -> ds
     }
 
+-- | Add the @base@ package as an implicit @-package@ flag if @-hide-all-packages@
+-- was not given to ensure that Haskell 2010 programs build and link, even if the user
+-- does not provide an explicit @-package base@ flag.
+--
+-- See #25382 and Note [Injecting implicit packages].
+addImplicitPkgs :: UnitConfig -> [PackageFlag] -> [PackageFlag]
+addImplicitPkgs cfg
+  | unitConfigHideAll cfg = id
+  | otherwise             = (implicitBaseArg:)
+  where
+    implicitBaseArg =
+      ExposePackage "<implicit base>" (PackageArg "base") (ModRenaming True [])
+
+{-
+Note [Injecting implicit packages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC, being a Haskell 2010 compiler, is expected to compile Haskell 2010 modules
+without additional compilation flags. Consequently, GHC has long implicitly
+linked against the `base` package, which defines `Prelude` and the other
+modules defined by the Haskell 2010 Report.
+
+However, since the unwiring of `base` in !13200 GHC only links implicitly
+against `ghc-internal`. This leads to the awkward situation where
+
+```haskell
+main = print "hello"
+```
+
+compiles with a plain `ghc` invocation yet
+
+```haskell
+import Data.Complex
+main = print (1 :+ 1)
+```
+
+does not as the latter depends upon `Data.Complex`, which is defined in `base`.
+
+This is a surprising change in a long-standing precedent which will very likely
+break user workflows, both experienced and inexperienced alike. For this
+reason, I'm reluctant to accept this change without additional communication
+with the community.
+
+Here we approximate the previous behavior, injecting an implicit `-package
+base` flag when `-hide-all-packages` is not in use. This ensures that users
+using the compiler directly do not see the change.
+
+My initial approach to implementing this was to instead unconditionally inject
+this flag in `defaultDynFlags`. However this broke bootstrapping as the stage1
+compiler would fail to find `base` while building the RTS (as `base` has not
+yet been built). Consequently, we have the current approach of a well-contained
+hack in `mkUnitState`.
+
+Fixes #25300.
+
+-}
+
 -- -----------------------------------------------------------------------------
 -- Modify our copy of the unit database based on trust flags,
 -- -trust and -distrust.
@@ -1609,8 +1665,8 @@ mkUnitState logger cfg = do
   --
   vis_map2 <- mayThrowUnitErr
                 $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
-                        (unitConfigHideAll cfg) pkgs1)
-                            vis_map1 other_flags
+                           (unitConfigHideAll cfg) pkgs1)
+                            vis_map1 (addImplicitPkgs cfg other_flags)
 
   --
   -- Sort out which packages are wired in. This has to be done last, since
