@@ -14,7 +14,7 @@
 module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
-        rnModifier, rnModifierWith, rnModifiersContext,
+        rnModifier, rnModifierWith, rnModifiersContext, rnModifiersContextAndWarn,
         rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsTyLit, rnHsArrowWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
@@ -51,6 +51,7 @@ import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName )
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
+import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Rename.Env
 import GHC.Rename.Doc
@@ -455,6 +456,9 @@ isRnKindLevel _                                 = False
 rnModifiersContext :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
 rnModifiersContext ctxt = rnModifiers (mkTyKiEnv ctxt TypeLevel RnTypeBody)
 
+rnModifiersContextAndWarn :: HsDocContext -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiersContextAndWarn ctxt = rnModifiersAndWarn (mkTyKiEnv ctxt TypeLevel RnTypeBody)
+
 rnModifierWith :: (mPs -> Maybe mRn)
                -> (mPs -> RnM (mRn, FreeVars))
                -> HsModifierOf mPs GhcPs
@@ -483,6 +487,13 @@ rnModifier env =
       _ -> False
     oneType = noLocA $ HsTyVar noAnn NotPromoted $ noLocA oneDataConName
 
+rnModifierAndWarn :: RnTyKiEnv -> HsModifier GhcPs -> RnM (HsModifier GhcRn, FreeVars)
+rnModifierAndWarn env mod = do
+  (mod', fvs) <- rnModifier env mod
+  warn_unknown <- woptM Opt_WarnUnknownModifiers
+  diagnosticTc warn_unknown $ TcRnUnknownModifier mod'
+  return (mod', fvs)
+
 rnModifiersWith :: (HsModifierOf mPs GhcPs -> RnM (HsModifierOf mRn GhcRn, FreeVars))
                 -> [HsModifierOf mPs GhcPs]
                 -> RnM ([HsModifierOf mRn GhcRn], FreeVars)
@@ -492,6 +503,9 @@ rnModifiersWith rnSingle mods = do
 
 rnModifiers :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
 rnModifiers env = rnModifiersWith (rnModifier env)
+
+rnModifiersAndWarn :: RnTyKiEnv -> [HsModifier GhcPs] -> RnM ([HsModifier GhcRn], FreeVars)
+rnModifiersAndWarn env = rnModifiersWith (rnModifierAndWarn env)
 
 rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty

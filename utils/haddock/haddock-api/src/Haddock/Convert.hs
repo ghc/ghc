@@ -280,6 +280,7 @@ synifyTyCon prr _coax tc
                   dd_derivs = []
                 }
           , tcdDExt = DataDeclRn False emptyNameSet
+          , tcdModifiers = [] -- MODS_TODO should we have these?
           }
   where
     -- tyConTyVars doesn't work on fun/prim, but we can make them up:
@@ -416,6 +417,7 @@ synifyTyCon _prr coax tc
           , tcdFixity = synifyFixity name
           , tcdDataDefn = defn
           , tcdDExt = DataDeclRn False emptyNameSet
+          , tcdModifiers = [] -- MODS_TODO should we have these?
           }
 
 -- | In this module, every TyCon being considered has come from an interface

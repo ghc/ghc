@@ -301,7 +301,8 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
           DataDecl { tcdDExt = noExtField
                    , tcdLName = tc', tcdTyVars = tvs'
                    , tcdFixity = Prefix
-                   , tcdDataDefn = defn } }
+                   , tcdDataDefn = defn
+                   , tcdModifiers = [] } } -- MODS_TODO I think this means "no way for TH to specify modifiers", seems right?
 
 cvtDec (TypeDataD tc tvs ksig constrs)
   = cvtTypeDataDec tc tvs ksig constrs
@@ -517,7 +518,8 @@ cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
           DataDecl { tcdDExt = noExtField
                    , tcdLName = tc', tcdTyVars = tvs'
                    , tcdFixity = Prefix
-                   , tcdDataDefn = defn } }
+                   , tcdDataDefn = defn
+                   , tcdModifiers = [] } } -- MODS_TODO I think this means "no way for TH to specify modifiers", seems right?
 
 -- Convert a set of data constructors.
 cvtDataDefnCons ::

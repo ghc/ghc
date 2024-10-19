@@ -223,6 +223,7 @@ mkClassDecl loc' mods (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
                                   , tcdModifiers = mods })) }
 
 mkTyData :: SrcSpan
+         -> [HsModifier GhcPs]
          -> Bool
          -> NewOrData
          -> Maybe (LocatedP CType)
@@ -232,7 +233,7 @@ mkTyData :: SrcSpan
          -> Located (HsDeriving GhcPs)
          -> AnnDataDefn
          -> P (LTyClDecl GhcPs)
-mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
+mkTyData loc' mods is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
          ksig data_cons (L _ maybe_deriv) annsIn
   = do { (tc, tparams, fixity, ops, cps, cs) <- checkTyClHdr False tycl_hdr
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
@@ -244,7 +245,8 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
        ; return (L loc (DataDecl { tcdDExt = noExtField,
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
-                                   tcdDataDefn = defn })) }
+                                   tcdDataDefn = defn,
+                                   tcdModifiers = mods })) }
 
 mkDataDefn :: Maybe (LocatedP CType)
            -> Maybe (LHsContext GhcPs)

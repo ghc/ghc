@@ -3649,11 +3649,12 @@ instance ExactPrint (TyClDecl GhcPs) where
                     , tcdRhs = rhs' })
 
   exact (DataDecl { tcdDExt = x, tcdLName = ltycon, tcdTyVars = tyvars
-                  , tcdFixity = fixity, tcdDataDefn = defn }) = do
+                  , tcdFixity = fixity, tcdDataDefn = defn, tcdModifiers = mods }) = do
     (_, ltycon', tyvars', _, defn') <-
       exactDataDefn (exactVanillaDeclHead ltycon tyvars fixity) defn
+    mods' <- mapM markAnnotated mods
     return (DataDecl { tcdDExt = x, tcdLName = ltycon', tcdTyVars = tyvars'
-                     , tcdFixity = fixity, tcdDataDefn = defn' })
+                     , tcdFixity = fixity, tcdDataDefn = defn', tcdModifiers = mods' })
 
   -- -----------------------------------
 

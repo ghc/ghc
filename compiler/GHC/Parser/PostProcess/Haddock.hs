@@ -486,7 +486,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --     deriving newtype (Ord {- ^ Comment on Ord N -})
   --
   addHaddock (TyClD x decl)
-    | DataDecl { tcdDExt, tcdLName, tcdTyVars, tcdFixity, tcdDataDefn = defn } <- decl
+    | DataDecl { tcdDExt, tcdLName, tcdTyVars, tcdFixity, tcdDataDefn = defn, tcdModifiers } <- decl
     = do
         registerHdkA tcdLName
         defn' <- addHaddock defn
@@ -494,7 +494,7 @@ instance HasHaddock (HsDecl GhcPs) where
           TyClD x (DataDecl {
             tcdDExt,
             tcdLName, tcdTyVars, tcdFixity,
-            tcdDataDefn = defn' })
+            tcdDataDefn = defn', tcdModifiers })
 
   -- Class declarations:
   --

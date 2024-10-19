@@ -550,10 +550,11 @@ renameTyClD d = case d of
           , tcdRhs = rhs'
           }
       )
-  DataDecl{tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdDataDefn = defn} -> do
+  DataDecl{tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdDataDefn = defn, tcdModifiers = mods} -> do
     lname' <- renameNameL lname
     tyvars' <- renameLHsQTyVars tyvars
     defn' <- renameDataDefn defn
+    mods' <- renameModifiers mods
     return
       ( DataDecl
           { tcdDExt = noExtField
@@ -561,6 +562,7 @@ renameTyClD d = case d of
           , tcdTyVars = tyvars'
           , tcdFixity = fixity
           , tcdDataDefn = defn'
+          , tcdModifiers = mods'
           }
       )
   ClassDecl

@@ -1303,7 +1303,7 @@ default_decl :: { LDefaultDecl GhcPs }
 --
 ty_decl :: { LTyClDecl GhcPs }
            -- ordinary type synonyms
-        : 'type' type '=' ktype
+        : modifiers 'type' type '=' ktype
                 -- Note ktype, not sigtype, on the right of '='
                 -- We allow an explicit for-all but we don't insert one
                 -- in   type Foo a = (b,b)
@@ -1311,58 +1311,62 @@ ty_decl :: { LTyClDecl GhcPs }
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% mkTySynonym (comb2 $1 $4) $2 $4 (epTok $1) (epTok $3) }
+                {% forbidModifiers $1
+                >> mkTySynonym (comb2 $2 $5) $3 $5 (epTok $2) (epTok $4) }
 
            -- type family declarations
-        | 'type' 'family' type opt_tyfam_kind_sig opt_injective_info
+        | modifiers 'type' 'family' type opt_tyfam_kind_sig opt_injective_info
                           where_type_family
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-             {% do { let { (tdcolon, tequal) = fst $ unLoc $4 }
-                   ; let { tvbar = fst $ unLoc $5 }
-                   ; let { (twhere, (toc, tdd, tcc)) = fst $ unLoc $6  }
-                   ; mkFamDecl (comb5 $1 $3 $4 $5 $6) (snd $ unLoc $6) TopLevel $3
-                                   (snd $ unLoc $4) (snd $ unLoc $5)
-                           (AnnFamilyDecl [] [] (epTok $1) noAnn (epTok $2) tdcolon tequal tvbar twhere toc tdd tcc) }}
+             {% do { forbidModifiers $1
+                   ; let { (tdcolon, tequal) = fst $ unLoc $5 }
+                   ; let { tvbar = fst $ unLoc $6 }
+                   ; let { (twhere, (toc, tdd, tcc)) = fst $ unLoc $7  }
+                   ; mkFamDecl (comb5 $2 $4 $5 $6 $7) (snd $ unLoc $7) TopLevel $4
+                                   (snd $ unLoc $5) (snd $ unLoc $6)
+                           (AnnFamilyDecl [] [] (epTok $2) noAnn (epTok $3) tdcolon tequal tvbar twhere toc tdd tcc) }}
 
           -- ordinary data type or newtype declaration
-        | type_data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
-            {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $1}
-                  ; let { tequal = fst $ unLoc $4 }
-                  ; mkTyData (comb4 $1 $3 $4 $5) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
-                           Nothing (reverse (snd $ unLoc $4))
-                                   (fmap reverse $5)
+        | modifiers type_data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
+            {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $2}
+                  ; let { tequal = fst $ unLoc $5 }
+                  ; mkTyData (comb5 $1 $2 $4 $5 $6) (unLoc $1) (sndOf3 $ unLoc $2) (thdOf3 $ unLoc $2) $3 $4
+                           Nothing (reverse (snd $ unLoc $5))
+                                   (fmap reverse $6)
                            (AnnDataDefn [] [] ttype tnewtype tdata NoEpTok NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)
                              }}
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
 
           -- ordinary GADT declaration
-        | type_data_or_newtype capi_ctype tycl_hdr opt_kind_sig
+        | modifiers type_data_or_newtype capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
-            {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $1}
-                  ; let { tdcolon = fst $ unLoc $4 }
-                  ; let { (twhere, oc, cc) = fst $ unLoc $5 }
-                  ; mkTyData (comb5 $1 $3 $4 $5 $6) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
-                            (snd $ unLoc $4) (snd $ unLoc $5)
-                            (fmap reverse $6)
+            {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $2}
+                  ; let { tdcolon = fst $ unLoc $5 }
+                  ; let { (twhere, oc, cc) = fst $ unLoc $6 }
+                  ; mkTyData (comb6 $1 $2 $4 $5 $6 $7) (unLoc $1) (sndOf3 $ unLoc $2) (thdOf3 $ unLoc $2) $3 $4
+                            (snd $ unLoc $5) (snd $ unLoc $6)
+                            (fmap reverse $7)
                             (AnnDataDefn [] [] ttype tnewtype tdata NoEpTok tdcolon twhere oc cc NoEpTok)}}
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
 
           -- data/newtype family
-        | 'data' 'family' type opt_datafam_kind_sig
-             {% do { let { tdcolon = fst $ unLoc $4 }
-                   ; mkFamDecl (comb4 $1 $2 $3 $4) DataFamily TopLevel $3
-                                   (snd $ unLoc $4) Nothing
-                           (AnnFamilyDecl [] [] noAnn (epTok $1) (epTok $2) tdcolon noAnn noAnn noAnn noAnn noAnn noAnn) }}
+        | modifiers 'data' 'family' type opt_datafam_kind_sig
+             {% do { forbidModifiers $1
+                   ; let { tdcolon = fst $ unLoc $5 }
+                   ; mkFamDecl (comb4 $2 $3 $4 $5) DataFamily TopLevel $4
+                                   (snd $ unLoc $5) Nothing
+                           (AnnFamilyDecl [] [] noAnn (epTok $2) (epTok $3) tdcolon noAnn noAnn noAnn noAnn noAnn noAnn) }}
 
 -- standalone kind signature
 standalone_kind_sig :: { LStandaloneKindSig GhcPs }
-  : 'type' sks_vars '::' sigktype
-      {% mkStandaloneKindSig (comb2 $1 $4) (L (gl $2) $ unLoc $2) $4
-               (epTok $1,epUniTok $3)}
+  : modifiers 'type' sks_vars '::' sigktype
+      {% forbidModifiers $1
+      >> mkStandaloneKindSig (comb2 $2 $5) (L (gl $3) $ unLoc $3) $5
+               (epTok $2,epUniTok $4)}
 
 -- See also: sig_vars
 sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
@@ -1424,31 +1428,34 @@ inst_decl :: { LInstDecl GhcPs }
                    } }
 
            -- type instance declarations
-        | 'type' 'instance' ty_fam_inst_eqn
-                {% mkTyFamInst (comb2 $1 $3) (unLoc $3)
-                        (epTok $1) (epTok $2) }
+        | modifiers 'type' 'instance' ty_fam_inst_eqn
+                {% forbidModifiers $1
+                >> mkTyFamInst (comb2 $2 $4) (unLoc $4)
+                        (epTok $2) (epTok $3) }
 
           -- data/newtype instance declaration
-        | data_or_newtype 'instance' capi_ctype datafam_inst_hdr constrs
+        | modifiers data_or_newtype 'instance' capi_ctype datafam_inst_hdr constrs
                           maybe_derivings
-            {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
-                  ; let { tequal = fst $ unLoc $5 }
-                  ; mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
-                                      Nothing (reverse (snd  $ unLoc $5))
-                                              (fmap reverse $6)
-                            (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $2) NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)}}
+            {% do { forbidModifiers $1
+                  ; let { (tdata, tnewtype) = fst $ unLoc $2 }
+                  ; let { tequal = fst $ unLoc $6 }
+                  ; mkDataFamInst (comb4 $2 $5 $6 $7) (snd $ unLoc $2) $4 (unLoc $5)
+                                      Nothing (reverse (snd  $ unLoc $6))
+                                              (fmap reverse $7)
+                            (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $3) NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)}}
 
           -- GADT instance declaration
-        | data_or_newtype 'instance' capi_ctype datafam_inst_hdr opt_kind_sig
+        | modifiers data_or_newtype 'instance' capi_ctype datafam_inst_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
-            {% do { let { (tdata, tnewtype) = fst $ unLoc $1 }
-                  ; let { dcolon = fst $ unLoc $5 }
-                  ; let { (twhere, oc, cc) = fst $ unLoc $6 }
-                  ; mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 (unLoc $4)
-                                   (snd $ unLoc $5) (snd $ unLoc $6)
-                                   (fmap reverse $7)
-                            (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $2) dcolon twhere oc cc NoEpTok)}}
+            {% do { forbidModifiers $1
+                  ; let { (tdata, tnewtype) = fst $ unLoc $2 }
+                  ; let { dcolon = fst $ unLoc $6 }
+                  ; let { (twhere, oc, cc) = fst $ unLoc $7 }
+                  ; mkDataFamInst (comb4 $2 $5 $7 $8) (snd $ unLoc $2) $4 (unLoc $5)
+                                   (snd $ unLoc $6) (snd $ unLoc $7)
+                                   (fmap reverse $8)
+                            (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $3) dcolon twhere oc cc NoEpTok)}}
 
 overlap_pragma :: { Maybe (LocatedP OverlapMode) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
@@ -1713,9 +1720,10 @@ stand_alone_deriving :: { LDerivDecl GhcPs }
 -- Role annotations
 
 role_annot :: { LRoleAnnotDecl GhcPs }
-role_annot : 'type' 'role' oqtycon maybe_roles
-          {% mkRoleAnnotDecl (comb3 $1 $4 $3) $3 (reverse (unLoc $4))
-                   (epTok $1,epTok $2) }
+role_annot : modifiers 'type' 'role' oqtycon maybe_roles
+          {% forbidModifiers $1
+          >> mkRoleAnnotDecl (comb3 $2 $5 $4) $4 (reverse (unLoc $5))
+                   (epTok $2,epTok $3) }
 
 -- Reversed!
 maybe_roles :: { Located [Located (Maybe FastString)] }
@@ -4333,6 +4341,14 @@ comb5 !a !b !c !d !e =
     combineSrcSpans (getHasLoc c) $
     combineSrcSpans (getHasLoc d) (getHasLoc e)
 
+comb6 :: (HasLoc a, HasLoc b, HasLoc c, HasLoc d, HasLoc e, HasLoc f) => a -> b -> c -> d -> e -> f -> SrcSpan
+comb6 !a !b !c !d !e !f =
+    combineSrcSpans (getHasLoc a) $
+    combineSrcSpans (getHasLoc b) $
+    combineSrcSpans (getHasLoc c) $
+    combineSrcSpans (getHasLoc d) $
+    combineSrcSpans (getHasLoc e) (getHasLoc f)
+
 -- strict constructor version:
 {-# INLINE sL #-}
 sL :: l -> a -> GenLocated l a
@@ -4428,6 +4444,22 @@ fileSrcSpan = do
   l <- getRealSrcLoc;
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
+
+-- There are places where we don't allow modifiers, but happy needs them to be
+-- possible to avoid shift/reduce errors. Use this function to forbid them.
+--
+-- The problem is: suppose we expect either of
+--
+--     modifiers 'type' 'data' ...
+--     'type' 'role' ...
+--
+-- When we've seen no modifiers and the next token is 'type', a shift locks us
+-- out of the first option and a reduce locks us out of the second.
+--
+-- MODS_TODO: is that description accurate?
+forbidModifiers :: MonadP m => Located [HsModifier GhcPs] -> m ()
+forbidModifiers mods = unless (null $ unLoc mods) $ do
+  addError $ error "modifiers forbidden here" -- MODS_TODO need an actual error message
 
 -- Hint about linear types. These can be parsed given either -XLinearTypes or
 -- -XModifiers.

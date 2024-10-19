@@ -1740,7 +1740,8 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
 rnTyClDecl (DataDecl
     { tcdLName = tycon, tcdTyVars = tyvars,
       tcdFixity = fixity,
-      tcdDataDefn = defn@HsDataDefn{ dd_cons = cons, dd_kindSig = kind_sig} })
+      tcdDataDefn = defn@HsDataDefn{ dd_cons = cons, dd_kindSig = kind_sig},
+      tcdModifiers = mods })
   = do { tycon' <- lookupLocatedTopConstructorRnN tycon
        ; let kvs = extractDataDefnKindVars defn
              doc = TyDataCtx tycon
@@ -1752,11 +1753,16 @@ rnTyClDecl (DataDecl
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr free_rhs_kvs)
+       -- MODS_TODO do we care about free vars here? Like classes and instances
+       -- they throw errors, but unlike those, `a` is in scope in
+       --     %a data Foo a
+       ; (mods', _) <- rnModifiersContextAndWarn doc mods
        ; return (DataDecl { tcdLName    = tycon'
                           , tcdTyVars   = tyvars'
                           , tcdFixity   = fixity
                           , tcdDataDefn = defn'
-                          , tcdDExt     = rn_info }, fvs) } }
+                          , tcdDExt     = rn_info
+                          , tcdModifiers = mods' }, fvs) } }
 
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,

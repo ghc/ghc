@@ -438,7 +438,8 @@ data TyClDecl pass
              , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
                               -- See Note [TyVar binders for associated decls]
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
-             , tcdDataDefn :: HsDataDefn pass }
+             , tcdDataDefn :: HsDataDefn pass
+             , tcdModifiers :: [HsModifier pass] }
 
     -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnClass',
     --           'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen',
