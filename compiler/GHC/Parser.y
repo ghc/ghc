@@ -2160,11 +2160,11 @@ fspec :: { Located ([AddEpAnn]
 -----------------------------------------------------------------------------
 -- Type signatures
 
-opt_sig :: { Maybe (EpUniToken "::" "∷", LHsType GhcPs) }
+opt_sig :: { Maybe (EpUniToken "::" "\8759", LHsType GhcPs) }
         : {- empty -}                   { Nothing }
         | '::' ctype                    { Just (epUniTok $1, $2) }
 
-opt_tyconsig :: { (Maybe (EpUniToken "::" "∷"), Maybe (LocatedN RdrName)) }
+opt_tyconsig :: { (Maybe (EpUniToken "::" "\8759"), Maybe (LocatedN RdrName)) }
              : {- empty -}              { (Nothing, Nothing) }
              | '::' gtycon              { (Just (epUniTok $1), Just $2) }
 
