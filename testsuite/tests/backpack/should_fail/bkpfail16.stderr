@@ -1,10 +1,4 @@
-[1 of 2] Processing p
-  [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, nothing )
-[2 of 2] Processing q
-  Instantiating q
-  [1 of 1] Including p[ShouldFail=base-4.19.1.0:Data.Bool]
-    Instantiating p[ShouldFail=base-4.19.1.0:Data.Bool]
-    [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, bkpfail16.out/p/p-IWIH695NuFKHfA9JCzN8tU/ShouldFail.o )
 
-<no location info>: error:
-    Something is amiss; requested module  base-4.19.1.0-inplace:Data.Bool differs from name found in the interface file base:Data.Bool (if these names look the same, try again with -dppr-debug)
+bkpfail16.out/p/p-1OqLaT7dAn947wScQQKCw5/../ShouldFail.hi:1:1: error: [GHC-93011]
+    • ‘Booly’ is exported by the hsig file, but not exported by the implementing module ‘Data.Bool’
+    • While checking that ‘Data.Bool’ implements signature ‘ShouldFail’ in ‘p[ShouldFail=Data.Bool]’.
