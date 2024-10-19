@@ -849,9 +849,6 @@ unknown = fsLit "<unknown>"
 typeof :: FastString
 typeof = fsLit "typeof"
 
-hdRawStr :: FastString
-hdRawStr = fsLit "h$rstr"
-
 throwStr :: FastString
 throwStr = fsLit "throw"
 
@@ -1213,8 +1210,6 @@ hdStlStr = fsLit "h$stl"
 hdStiStr :: FastString
 hdStiStr = fsLit "h$sti"
 
-hdStrStr :: FastString
-hdStrStr = fsLit "h$str"
 ------------------------------ Pack/Unpack --------------------------------------------
 
 hdDecodeUtf8Z :: FastString

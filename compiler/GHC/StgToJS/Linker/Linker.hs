@@ -24,8 +24,6 @@ module GHC.StgToJS.Linker.Linker
   ( jsLinkBinary
   , jsLink
   , embedJsFile
-  , staticInitStat
-  , staticDeclStat
   , mkExportedFuns
   , mkExportedModFuns
   , computeLinkDependencies
@@ -1253,27 +1251,22 @@ staticInitStat :: StaticInfo -> JS.JStat
 staticInitStat (StaticInfo i sv mcc) =
   jStgStatToJS $
   case sv of
-    StaticData con args         -> appS hdStiStr $ add_cc_arg
-                                    [ global i
-                                    , global con
-                                    , jsStaticArgs args
-                                    ]
-    StaticFun  f   args         -> appS hdStiStr $ add_cc_arg
-                                    [ global i
-                                    , global f
-                                    , jsStaticArgs args
-                                    ]
-    StaticList args mt          -> appS hdStlStr $ add_cc_arg
-                                    [ global i
-                                    , jsStaticArgs args
-                                    , toJExpr $ maybe null_ (toJExpr . TxtI) mt
-                                    ]
-    StaticThunk (Just (f,args)) -> appS hdStcStr $ add_cc_arg
-                                    [ global i
-                                    , global f
-                                    , jsStaticArgs args
-                                    ]
-    _                           -> mempty
+    (StaticApp k app args) -> appS
+                              (if k == SAKThunk then hdStcStr else hdStiStr)
+                              $ add_cc_arg
+                                [ global i
+                                , global app
+                                , jsStaticArgs args
+                                ]
+
+    StaticList args mt     -> appS hdStlStr
+                              $ add_cc_arg
+                              [ global i
+                              , jsStaticArgs args
+                              , toJExpr $ maybe null_ (toJExpr . TxtI) mt
+                              ]
+
+    StaticUnboxed _             -> mempty
   where
     -- add optional cost-center argument
     add_cc_arg as = case mcc of
@@ -1286,20 +1279,15 @@ staticDeclStat (StaticInfo global_name static_value _) = jStgStatToJS decl
   where
     global_ident = name global_name
     decl_init v  = global_ident ||= v
-    decl_no_init = appS hdDiStr [toJExpr global_ident]
 
     decl = case static_value of
       StaticUnboxed u     -> decl_init (unboxed_expr u)
-      StaticThunk Nothing -> decl_no_init -- CAF initialized in an alternative way
       _                   -> decl_init (app hdDStr [])
 
     unboxed_expr = \case
       StaticUnboxedBool b          -> app hdPStr [toJExpr b]
       StaticUnboxedInt i           -> app hdPStr [toJExpr i]
       StaticUnboxedDouble d        -> app hdPStr [toJExpr (unSaneDouble d)]
-      -- GHCJS used a function wrapper for this:
-      -- StaticUnboxedString str      -> ApplExpr (initStr str) []
-      -- But we are defining it statically for now.
       StaticUnboxedString str      -> initStr str
       StaticUnboxedStringOffset {} -> 0
 

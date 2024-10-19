@@ -22,9 +22,6 @@ module GHC.StgToJS.Arg
   , genIdArgI
   , genIdStackArgI
   , allocConStatic
-  , allocUnboxedConStatic
-  , allocateStaticList
-  , jsStaticArg
   , jsStaticArgs
   )
 where
@@ -215,7 +212,7 @@ allocConStatic (identFS -> to) cc con args = do
            emitStatic to (StaticUnboxed $ StaticUnboxedBool True) cc'
       | otherwise = do
            e <- identFS <$> identForDataConWorker con
-           emitStatic to (StaticData e []) cc'
+           emitStatic to (StaticApp SAKData e []) cc'
     allocConStatic' cc' [x]
       | isUnboxableCon con =
         case x of
@@ -234,7 +231,7 @@ allocConStatic (identFS -> to) cc con args = do
                 _         -> panic "allocConStatic: invalid args for consDataCon"
               else do
                 e <- identFS <$> identForDataConWorker con
-                emitStatic to (StaticData e xs) cc'
+                emitStatic to (StaticApp SAKData e xs) cc'
 
 -- | Allocate unboxed constructors
 allocUnboxedConStatic :: DataCon -> [StaticArg] -> StaticArg

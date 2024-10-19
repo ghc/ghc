@@ -231,18 +231,22 @@ data StaticInfo = StaticInfo
   , siCC     :: !(Maybe Ident) -- ^ optional CCS name
   } deriving stock (Eq, Show)
 
+data StaticAppKind
+  = SAKFun
+  -- ^ heap object for function
+  | SAKThunk
+  -- ^ heap object for CAF
+  | SAKData
+  -- ^ regular datacon app
+  deriving stock (Eq, Show)
+
 data StaticVal
-  = StaticFun     !FastString [StaticArg]
-    -- ^ heap object for function
-  | StaticThunk   !(Maybe (FastString,[StaticArg]))
-    -- ^ heap object for CAF (field is Nothing when thunk is initialized in an
-    -- alternative way, like string thunks through h$str)
-  | StaticUnboxed !StaticUnboxed
+  = StaticUnboxed !StaticUnboxed
     -- ^ unboxed constructor (Bool, Int, Double etc)
-  | StaticData    !FastString [StaticArg]
-    -- ^ regular datacon app
   | StaticList    [StaticArg] (Maybe FastString)
     -- ^ list initializer (with optional tail)
+  | StaticApp StaticAppKind !FastString [StaticArg]
+    -- ^ static application of static args. Can be a CAF, a FUN, or a CON app.
   deriving stock (Eq, Show)
 
 data StaticUnboxed

@@ -337,15 +337,15 @@ genToplevelRhs i rhs = case rhs of
         sr   = CIStaticRefs sri
     et <- genEntryType args
     ll <- loadLiveFun lids
-    (static, regs, upd) <-
+    (appK, regs, upd) <-
       if et == CIThunk
         then do
           r <- updateThunk
-          pure (StaticThunk (Just (eidt, map StaticObjArg lidents')), CIRegs 0 [PtrV],r)
-        else return (StaticFun eidt (map StaticObjArg lidents'),
-                    (if null lidents then CIRegs 1 (concatMap idJSRep args)
-                                     else CIRegs 0 (PtrV : concatMap idJSRep args))
-                      , mempty)
+          pure (SAKThunk, CIRegs 0 [PtrV], r)
+        else
+          let regs = if null lidents then CIRegs 1 (concatMap idJSRep args)
+                                     else CIRegs 0 (PtrV : concatMap idJSRep args)
+          in pure (SAKFun, regs, mempty)
     setcc <- ifProfiling $
                if et == CIThunk
                  then enterCostCentreThunk
@@ -359,5 +359,5 @@ genToplevelRhs i rhs = case rhs of
       , ciStatic = sr
       }
     ccId <- costCentreStackLbl cc
-    emitStatic idt static ccId
+    emitStatic idt (StaticApp appK eidt $ map StaticObjArg lidents') ccId
     return $ (FuncStat eid [] (ll <> upd <> setcc <> body))

@@ -615,16 +615,16 @@ instance Binary StaticInfo where
   get bh = StaticInfo <$> get bh <*> get bh <*> get bh
 
 instance Binary StaticVal where
-  put_ bh (StaticFun f args)   = putByte bh 1 >> put_ bh f  >> put_ bh args
-  put_ bh (StaticThunk t)      = putByte bh 2 >> put_ bh t
-  put_ bh (StaticUnboxed u)    = putByte bh 3 >> put_ bh u
-  put_ bh (StaticData dc args) = putByte bh 4 >> put_ bh dc >> put_ bh args
-  put_ bh (StaticList xs t)    = putByte bh 5 >> put_ bh xs >> put_ bh t
+  put_ bh (StaticApp SAKFun   f  args)   = putByte bh 1 >> put_ bh f  >> put_ bh args
+  put_ bh (StaticApp SAKThunk f  args)   = putByte bh 2 >> put_ bh f  >> put_ bh args
+  put_ bh (StaticUnboxed u)              = putByte bh 3 >> put_ bh u
+  put_ bh (StaticApp SAKData  dc args)   = putByte bh 4 >> put_ bh dc >> put_ bh args
+  put_ bh (StaticList xs t)              = putByte bh 5 >> put_ bh xs >> put_ bh t
   get bh = getByte bh >>= \case
-    1 -> StaticFun     <$> get bh <*> get bh
-    2 -> StaticThunk   <$> get bh
+    1 -> StaticApp SAKFun <$> get bh <*> get bh
+    2 -> StaticApp SAKThunk <$> get bh <*> get bh
     3 -> StaticUnboxed <$> get bh
-    4 -> StaticData    <$> get bh <*> get bh
+    4 -> StaticApp SAKData <$> get bh <*> get bh
     5 -> StaticList    <$> get bh <*> get bh
     n -> error ("Binary get bh StaticVal: invalid tag " ++ show n)
 

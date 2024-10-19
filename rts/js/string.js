@@ -1,53 +1,5 @@
 //#OPTIONS: CPP
 
-// encode a string constant
-function h$str(s) {
-  var enc = null;
-  return function() {
-    if(enc === null) {
-      enc = h$encodeModifiedUtf8(s);
-    }
-    return enc;
-  }
-}
-
-// encode a packed string
-// since \0 is used to separate strings (and a common occurrence)
-// we add the following mapping:
-//   - \0  -> \cz\0
-//   - \cz -> \cz\cz
-//
-// decoding to bytes, the following is produced:
-//   - \cz\0  -> C0 80
-//   - \cz\cz -> 1A
-//
-// additionally, for dealing with raw binary data we have an escape sequence
-// to pack base64 encoded runs:
-//
-//   - \cz\xNN -> followed by NN-0x1f (31 decimal) bytes of base64 encoded
-//                data. supported range: 0x20 .. 0x9f (1-128 bytes data)
-//
-
-function h$pstr(s) {
-  var enc = null;
-  return function() {
-    if(enc === null) {
-      enc = h$encodePackedUtf8(s);
-    }
-    return enc;
-  }
-}
-// encode a raw string from bytes
-function h$rstr(d) {
-  var enc = null;
-  return function() {
-    if(enc === null) {
-      enc = h$rawStringData(d);
-    }
-    return enc;
-  }
-}
-
 // these aren't added to the CAFs, so the list stays in mem indefinitely, is that a problem?
 #ifdef GHCJS_PROF
 function h$strt(str, cc) { return MK_LAZY_CC(function() { return h$toHsString(str, cc); }, cc); }
@@ -265,10 +217,27 @@ function h$encodeUtf8(str) {
   return h$encodeUtf8Internal(str, false, false);
 }
 
+// encode a string constant
 function h$encodeModifiedUtf8(str) {
   return h$encodeUtf8Internal(str, true, false);
 }
 
+// encode a packed string
+// since \0 is used to separate strings (and a common occurrence)
+// we add the following mapping:
+//   - \0  -> \cz\0
+//   - \cz -> \cz\cz
+//
+// decoding to bytes, the following is produced:
+//   - \cz\0  -> C0 80
+//   - \cz\cz -> 1A
+//
+// additionally, for dealing with raw binary data we have an escape sequence
+// to pack base64 encoded runs:
+//
+//   - \cz\xNN -> followed by NN-0x1f (31 decimal) bytes of base64 encoded
+//                data. supported range: 0x20 .. 0x9f (1-128 bytes data)
+//
 function h$encodePackedUtf8(str) {
   return h$encodeUtf8Internal(str, false, true);
 }
