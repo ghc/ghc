@@ -136,7 +136,10 @@ regUsageOfInstr platform instr = case instr of
         fmt = case cls of
                 RcInteger -> II64
                 RcFloat   -> FF64
-                RcVector  -> sorry "The RISCV64 NCG does not (yet) support vectors; please use -fllvm."
+                -- TODO: We're expecting 128bit vector registers here. This
+                -- needs to be calculated from real format. Probably, we need to
+                -- hand around the format instead of the width for vector regs.
+                RcVector -> VecFormat 2 FmtInt64
         cls = case r of
                 RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
                 RegReal rr -> classOfRealReg rr
@@ -887,13 +890,27 @@ isEncodeableInWidth :: Width -> Integer -> Bool
 isEncodeableInWidth = isNbitEncodeable . widthInBits
 
 isIntOp :: Operand -> Bool
-isIntOp = not . isFloatOp
+isIntOp o = not (isFloatOp o || isVectorOp o)
 
 isFloatOp :: Operand -> Bool
 isFloatOp (OpReg _ reg) | isFloatReg reg = True
 isFloatOp _ = False
 
+isVectorOp :: Operand -> Bool
+isVectorOp (OpReg _ reg) | isVectorReg reg = True
+isVectorOp _ = False
+
 isFloatReg :: Reg -> Bool
-isFloatReg (RegReal (RealRegSingle i)) | i > 31 = True
+isFloatReg (RegReal (RealRegSingle i)) | isFloatRegNo i = True
 isFloatReg (RegVirtual (VirtualRegD _)) = True
 isFloatReg _ = False
+
+isIntReg :: Reg -> Bool
+isIntReg (RegReal (RealRegSingle i)) | isIntRegNo i = True
+isIntReg (RegVirtual (VirtualRegD _)) = True
+isIntReg _ = False
+
+isVectorReg :: Reg -> Bool
+isVectorReg (RegReal (RealRegSingle i)) | isVectorRegNo i = True
+isVectorReg (RegVirtual (VirtualRegD _)) = True
+isVectorReg _ = False

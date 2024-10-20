@@ -1,0 +1,33 @@
+diff --git a/testsuite/driver/cpuinfo.py b/testsuite/driver/cpuinfo.py
+index 4617b04a4c..841ec9dfdc 100644
+--- a/testsuite/driver/cpuinfo.py
++++ b/testsuite/driver/cpuinfo.py
+@@ -2151,6 +2152,10 @@ def _get_cpu_info_from_riscv_isa():
+                                seen.add(item)
+                return unique_list
+
++    # Big endian is easier to head, but RISC-V is little endian
++       def bigToLittleEndian(w):
++               return int.from_bytes(w, byteorder='big').to_bytes(4, byteorder='little')
++
+        g_trace.header('Tying to get info from device-tree ...')
+
+        try:
+@@ -2175,16 +2180,17 @@ def _get_cpu_info_from_riscv_isa():
+
+                        if arch_string.startswith('rv32'):
+                                vlen = run_asm(
+-                                       b"\xc2\x20\x25\x73", # csrr a0, 0xc22
+-                                       b"\x00\x00\x80\x67"  # ret
++                                       bigToLittleEndian(b"\xc2\x20\x25\x73"), # csrr a0, 0xc22
++                                       bigToLittleEndian(b"\x00\x00\x80\x67")  # ret
+                                )
+                        elif arch_string.startswith('rv64'):
+                                vlen = run_asm(
+-                                       b"\xc2\x20\x25\x73", # csrr     a0, 0xc22
+-                                       b"\x00\x05\x05\x1b", # sext.w a0, a0
+-                                       b"\x00\x00\x80\x67"  # ret
++                                       bigToLittleEndian(b"\xc2\x20\x25\x73"), # csrr  a0, 0xc22
++                                       bigToLittleEndian(b"\x00\x05\x05\x1b"), # sext.w a0, a0
++                                       bigToLittleEndian(b"\x00\x00\x80\x67")  # ret
+                                )
