@@ -418,3 +418,12 @@ void emitTickyCounterSamples(void)
 }
 
 #endif /* TICKY_TICKY */
+
+void requestTickyCounterSamples(void)
+{
+#if defined(TICKY_TICKY) && defined(TRACING)
+    if (RtsFlags.TraceFlags.ticky) {
+        emitTickyCounterSamples();
+    }
+#endif
+}

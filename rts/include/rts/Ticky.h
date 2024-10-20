@@ -32,3 +32,5 @@ typedef struct _StgEntCounter {
     StgInt      allocs;         /* number of allocations by this fun */
     struct _StgEntCounter *link;/* link to chain them all together */
 } StgEntCounter;
+
+void requestTickyCounterSamples(void);

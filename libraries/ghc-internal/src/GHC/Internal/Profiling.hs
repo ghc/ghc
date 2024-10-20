@@ -9,6 +9,8 @@ module GHC.Internal.Profiling ( -- * Cost Centre Profiling
                      , startHeapProfTimer
                      , stopHeapProfTimer
                      , requestHeapCensus
+                       -- * Ticky counters (eventlog)
+                     , requestTickyCounterSamples
                      )where
 
 import GHC.Internal.Base
@@ -51,3 +53,11 @@ foreign import ccall startHeapProfTimer :: IO ()
 -- @since base-4.16.0.0
 foreign import ccall stopHeapProfTimer :: IO ()
 
+-- | Request ticky counter samples to be written to the eventlog.
+--
+-- Note: This won't do anything unless you have specified RTS options on
+-- the command line to log ticky samples to the eventlog.
+--
+-- @since base-4.20.0.0
+
+foreign import ccall requestTickyCounterSamples :: IO ()

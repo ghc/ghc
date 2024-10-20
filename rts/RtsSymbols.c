@@ -922,6 +922,7 @@ extern char **environ;
       SymI_HasProto(stopProfTimer)                                      \
       SymI_HasProto(startHeapProfTimer)                                 \
       SymI_HasProto(stopHeapProfTimer)                                  \
+      SymI_HasProto(requestTickyCounterSamples)                         \
       SymI_HasProto(setUserEra)                                         \
       SymI_HasProto(incrementUserEra)                                   \
       SymI_HasProto(getUserEra)                                         \
