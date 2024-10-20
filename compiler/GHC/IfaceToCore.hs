@@ -123,6 +123,10 @@ import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.Error
 
+import GHC.Parser.Annotation (noLocA)
+
+import GHC.Hs.Extension ( GhcRn )
+
 import GHC.Fingerprint
 
 import Control.Monad
@@ -136,7 +140,8 @@ import qualified Data.List.NonEmpty as NE
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
 import GHC.Iface.Errors.Types
 
-import Language.Haskell.Syntax.BooleanFormula (mkOr)
+import Language.Haskell.Syntax.BooleanFormula (mkOr, BooleanFormula)
+import Language.Haskell.Syntax.BooleanFormula qualified as BF(BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
 
 {-
@@ -298,14 +303,9 @@ mergeIfaceDecl d1 d2
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops1 ])
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
 
-          -- same as BooleanFormula's mkOr, but specialized to IfaceBooleanFormula,
-          -- which can be taught of as being (BooleanFormula IfacePass) morally.
-          -- In practice, however, its a seperate type so it needs its own function
-          -- It makes an Or and does some super basic simplification.
-
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = toIfaceBooleanFormula . mkOr $ map fromIfaceBooleanFormula [ bf1, bf2]
+                ifMinDef = toIfaceBooleanFormula . mkOr . map fromIfaceBooleanFormula $ [ bf1, bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when
@@ -801,7 +801,7 @@ tc_iface_decl _parent ignore_prags
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
     ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
-    ; let mindef = fromIfaceBooleanFormula if_mindef
+    ; mindef <- tc_boolean_formula if_mindef
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
@@ -849,6 +849,13 @@ tc_iface_decl _parent ignore_prags
                   -- the type constructor being defined here
                   -- e.g.   type AT a; type AT b = AT [b]   #8002
           return (ATI tc mb_def)
+
+   tc_boolean_formula :: IfaceBooleanFormula -> IfL (BooleanFormula GhcRn)
+   tc_boolean_formula (IfVar nm    ) = BF.Var . noLocA <$>
+    (lookupIfaceTop . mkVarOccFS . ifLclNameFS) nm
+   tc_boolean_formula (IfAnd ibfs  ) = BF.And    <$> traverse tc_boolean_formula ibfs
+   tc_boolean_formula (IfOr ibfs   ) = BF.Or     <$> traverse tc_boolean_formula ibfs
+   tc_boolean_formula (IfParens ibf) = BF.Parens <$> tc_boolean_formula ibf
 
    mk_sc_doc pred = text "Superclass" <+> ppr pred
    mk_at_doc tc = text "Associated type" <+> ppr tc

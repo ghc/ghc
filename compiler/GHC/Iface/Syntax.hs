@@ -50,6 +50,7 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
+import GHC.Builtin.Names(mkUnboundName)
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
 
@@ -63,9 +64,9 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.Class
 import GHC.Types.FieldLabel
-import GHC.Types.Name.Set
 import GHC.Core.Coercion.Axiom ( BranchIndex )
 import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.CostCentre
 import GHC.Types.Literal
@@ -216,7 +217,7 @@ data IfaceClassBody
     }
 
 data IfaceBooleanFormula
-  = IfVar IfaceTopBndr
+  = IfVar IfLclName
   | IfAnd [IfaceBooleanFormula]
   | IfOr [IfaceBooleanFormula]
   | IfParens IfaceBooleanFormula
@@ -224,15 +225,17 @@ data IfaceBooleanFormula
 toIfaceBooleanFormula :: BooleanFormula GhcRn -> IfaceBooleanFormula
 toIfaceBooleanFormula = go
   where
-    go (Var nm   ) = IfVar    $ unLoc  nm
+    go (Var nm   ) = IfVar    $ mkIfLclName . getOccFS . unLoc $  nm
     go (And bfs  ) = IfAnd    $ map go bfs
     go (Or bfs   ) = IfOr     $ map go bfs
     go (Parens bf) = IfParens $     go bf
 
+-- | note that this makes unbound names, so if you actually want
+-- proper Names, you'll need to properly Rename it (lookupIfaceTop).
 fromIfaceBooleanFormula :: IfaceBooleanFormula -> BooleanFormula GhcRn
 fromIfaceBooleanFormula = go
   where
-   go (IfVar nm   ) = Var    $ noLocA nm
+   go (IfVar nm   ) = Var    $ noLocA . mkUnboundName . mkVarOccFS . ifLclNameFS $ nm
    go (IfAnd bfs  ) = And    $ map go bfs
    go (IfOr bfs   ) = Or     $ map go bfs
    go (IfParens bf) = Parens $     go bf
@@ -2149,14 +2152,14 @@ instance Binary IfaceDecl where
 
 instance Binary IfaceBooleanFormula where
     put_ bh = \case
-        IfVar a1    -> putByte bh 0 >> putIfaceTopBndr bh a1
+        IfVar a1    -> putByte bh 0 >> put_ bh a1
         IfAnd a1    -> putByte bh 1 >> put_ bh a1
         IfOr a1     -> putByte bh 2 >> put_ bh a1
         IfParens a1 -> putByte bh 3 >> put_ bh a1
 
     get bh = do
         getByte bh >>= \case
-            0 -> IfVar    <$> getIfaceTopBndr bh
+            0 -> IfVar    <$> get bh
             1 -> IfAnd    <$> get bh
             2 -> IfOr     <$> get bh
             _ -> IfParens <$> get bh
