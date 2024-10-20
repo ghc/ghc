@@ -78,6 +78,15 @@ v0RegNo = 64
 v31RegNo :: RegNo
 v31RegNo = 95
 
+isVectorRegNo :: RegNo -> Bool
+isVectorRegNo r = v0RegNo <= r && r <= v31RegNo
+
+isFloatRegNo :: RegNo -> Bool
+isFloatRegNo r = d0RegNo <= r && r <= d31RegNo
+
+isIntRegNo :: RegNo -> Bool
+isIntRegNo r = x0RegNo <= r && r <= x31RegNo
+
 -- Note [The made-up RISCV64 TMP (IP) register]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -110,10 +119,12 @@ v0Reg = regSingle v0RegNo
 
 -- | All machine register numbers.
 allMachRegNos :: [RegNo]
-allMachRegNos = intRegs ++ fpRegs
+allMachRegNos = intRegs ++ fpRegs ++ vRegs
   where
     intRegs = [x0RegNo .. x31RegNo]
     fpRegs = [d0RegNo .. d31RegNo]
+    -- TODO: If Vector extension is turned off, this should become the empty list
+    vRegs = [v0RegNo .. v31RegNo]
 
 -- | Registers available to the register allocator.
 --
@@ -210,41 +221,33 @@ realRegSqueeze cls rr =
     RcInteger ->
       case rr of
         RealRegSingle regNo
-          | regNo < d0RegNo
-          -> 1
-          | otherwise
-          -> 0
+          | regNo <= x31RegNo -> 1
+          | otherwise -> 0
     RcFloat ->
       case rr of
         RealRegSingle regNo
-          |  regNo < d0RegNo
-          || regNo > d31RegNo
-          -> 0
-          | otherwise
-          -> 1
+          | regNo <= d31RegNo -> 1
+          | otherwise -> 0
     RcVector ->
       case rr of
         RealRegSingle regNo
-          | regNo > d31RegNo
-          -> 1
-          | otherwise
-          -> 0
+          | regNo <= v31RegNo -> 1
+          | otherwise -> 0
 
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
-  | not (isFloatFormat format) = VirtualRegI u
-  | otherwise =
-      case format of
-        FF32 -> VirtualRegD u
-        FF64 -> VirtualRegD u
-        _ -> panic "RV64.mkVirtualReg"
+  | isIntFormat format = VirtualRegI u
+  | isFloatFormat format = VirtualRegD u
+  | isVecFormat format = VirtualRegV128 u
+  | otherwise = panic $ "RV64.mkVirtualReg: No virtual register type for " ++ show format
 
 {-# INLINE classOfRealReg #-}
 classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
-  | i < d0RegNo = RcInteger
-  | i > d31RegNo = RcVector
-  | otherwise = RcFloat
+  | i <= x31RegNo = RcInteger
+  | i <= d31RegNo = RcFloat
+  | i <= v31RegNo = RcVector
+  | otherwise = panic $ "RV64.classOfRealReg: Unknown register number: " ++ show i
 
 regDotColor :: RealReg -> SDoc
 regDotColor reg =

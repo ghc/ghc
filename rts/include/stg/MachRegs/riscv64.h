@@ -56,3 +56,10 @@
 #define REG_D4          fs9
 #define REG_D5          fs10
 #define REG_D6          fs11
+
+#define REG_XMM1        v1
+#define REG_XMM2        v2
+#define REG_XMM3        v3
+#define REG_XMM4        v4
+#define REG_XMM5        v5
+#define REG_XMM6        v6

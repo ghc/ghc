@@ -144,7 +144,7 @@ allocatableRegs arch rc =
     ArchMipsel    -> panic "trivColorable ArchMipsel"
     ArchS390X     -> panic "trivColorable ArchS390X"
     ArchRISCV64   -> case rc of
-      -- TODO for Sven Tennie
+      -- TODO: for Sven Tennie
       Separate.RcInteger -> 14
       Separate.RcFloat   -> 20
       Separate.RcVector  -> 20

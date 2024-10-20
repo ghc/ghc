@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include "CheckVectorSupport.h"
 
+#if defined(__riscv_v) && defined(__riscv_v_intrinsic)
+  #include <riscv_vector.h>
+#endif
+
 // Check support for vector registers (conservative).
 //
 // 0: no support for vector registers
@@ -69,8 +73,7 @@ int checkVectorSupport(void) {
     // supports vectors.
 
     // TODO: Check the machine supports V extension 1.0. Or, implement the older
-    // comman versions.
-    #include <riscv_vector.h>
+    // command versions.
 
     unsigned vlenb = __riscv_vlenb();
 
