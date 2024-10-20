@@ -243,7 +243,7 @@ install_wrappers: install_bin_libdir install_hsc2hs_wrapper
 .PHONY: install_hsc2hs_wrapper
 install_hsc2hs_wrapper:
 	@echo Copying hsc2hs wrapper
-	cp mk/hsc2hs wrappers/hsc2hs-ghc-$(ProjectVersion)
+	cp mk/hsc2hs wrappers/$(CrossCompilePrefix)hsc2hs-ghc-$(ProjectVersion)
 
 PKG_CONFS = $(shell find "$(DESTDIR)$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed "s:   :\0xxx\0:g")
 .PHONY: update_package_db

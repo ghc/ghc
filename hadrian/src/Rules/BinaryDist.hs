@@ -437,13 +437,14 @@ pkgToWrappers pkg = do
       | otherwise     -> pure []
 
 wrapper :: FilePath -> Action String
-wrapper "ghc"         = ghcWrapper
-wrapper "ghc-pkg"     = ghcPkgWrapper
-wrapper "ghci" = ghciScriptWrapper
-wrapper "haddock"     = haddockWrapper
-wrapper "hsc2hs"      = hsc2hsWrapper
-wrapper "runghc"      = runGhcWrapper
-wrapper "runhaskell"  = runGhcWrapper
+wrapper wrapper_name
+  | "runghc"     `isSuffixOf` wrapper_name = runGhcWrapper
+  | "ghc"        `isSuffixOf` wrapper_name = ghcWrapper
+  | "ghc-pkg"    `isSuffixOf` wrapper_name = ghcPkgWrapper
+  | "ghci"       `isSuffixOf` wrapper_name = ghciScriptWrapper
+  | "haddock"    `isSuffixOf` wrapper_name = haddockWrapper
+  | "hsc2hs"     `isSuffixOf` wrapper_name = hsc2hsWrapper
+  | "runhaskell" `isSuffixOf` wrapper_name = runGhcWrapper
 wrapper _             = commonWrapper
 
 -- | Wrapper scripts for different programs. Common is default wrapper.
@@ -473,9 +474,10 @@ runGhcWrapper = pure $ "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\
 -- | --interactive flag.
 ghciScriptWrapper :: Action String
 ghciScriptWrapper = do
+  prefix <- crossPrefix
   version <- setting ProjectVersion
   pure $ unlines
-    [ "executable=\"$bindir/ghc-" ++ version ++ "\""
+    [ "executable=\"$bindir/" ++ prefix ++ "ghc-" ++ version ++ "\""
     , "exec $executable --interactive \"$@\"" ]
 
 -- | When not on Windows, we want to ship the 3 flavours of the iserv program
@@ -548,4 +550,3 @@ createGhcii outDir = do
       [ "#!/bin/sh"
       , "exec \"$(dirname \"$0\")\"/ghc --interactive \"$@\""
       ]
-
