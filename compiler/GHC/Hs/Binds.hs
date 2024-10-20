@@ -71,8 +71,8 @@ Global bindings (where clauses)
 -- the ...LR datatypes are parameterized by two id types,
 -- one for the left and one for the right.
 
-type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = EpAnn AnnList
-type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = EpAnn AnnList
+type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = EpAnn (AnnList (EpToken "where"))
+type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = EpAnn (AnnList (EpToken "where"))
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 

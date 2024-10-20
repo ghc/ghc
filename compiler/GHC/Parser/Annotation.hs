@@ -39,7 +39,9 @@ module GHC.Parser.Annotation (
 
   -- ** Annotations in 'GenLocated'
   LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
+  LocatedLC, LocatedLS, LocatedLW, LocatedLI,
   SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN,
+  SrcSpanAnnLC, SrcSpanAnnLW, SrcSpanAnnLS, SrcSpanAnnLI,
   LocatedE,
 
   -- ** Annotation data types used in 'GenLocated'
@@ -67,7 +69,7 @@ module GHC.Parser.Annotation (
 
   -- ** Building up annotations
   reAnnL, reAnnC,
-  addAnns, addAnnsA, widenSpan, widenSpanL, widenAnchor, widenAnchorS,
+  addAnns, addAnnsA, widenSpan, widenSpanL, widenSpanT, widenAnchor, widenAnchorT, widenAnchorS,
   widenLocatedAn, widenLocatedAnL,
   listLocation,
 
@@ -603,13 +605,21 @@ type LocatedA = GenLocated SrcSpanAnnA
 type LocatedN = GenLocated SrcSpanAnnN
 
 type LocatedL = GenLocated SrcSpanAnnL
+type LocatedLC = GenLocated SrcSpanAnnLC
+type LocatedLS = GenLocated SrcSpanAnnLS
+type LocatedLW = GenLocated SrcSpanAnnLW
+type LocatedLI = GenLocated SrcSpanAnnLI
 type LocatedP = GenLocated SrcSpanAnnP
 type LocatedC = GenLocated SrcSpanAnnC
 
 type SrcSpanAnnA = EpAnn AnnListItem
 type SrcSpanAnnN = EpAnn NameAnn
 
-type SrcSpanAnnL = EpAnn AnnList
+type SrcSpanAnnL = EpAnn (AnnList ())
+type SrcSpanAnnLC = EpAnn (AnnList [EpToken ","])
+type SrcSpanAnnLS = EpAnn (AnnList ())
+type SrcSpanAnnLW = EpAnn (AnnList (EpToken "where"))
+type SrcSpanAnnLI = EpAnn (AnnList (EpToken "hiding", [EpToken ","]))
 type SrcSpanAnnP = EpAnn AnnPragma
 type SrcSpanAnnC = EpAnn AnnContext
 
@@ -689,15 +699,16 @@ data AnnListItem
 -- | Annotation for the "container" of a list. This captures
 -- surrounding items such as braces if present, and introductory
 -- keywords such as 'where'.
-data AnnList
+data AnnList a
   = AnnList {
-      al_anchor    :: Maybe EpaLocation, -- ^ start point of a list having layout
-      al_open      :: Maybe AddEpAnn,
-      al_close     :: Maybe AddEpAnn,
-      al_rest      :: [AddEpAnn], -- ^ context, such as 'where' keyword
-      al_trailing  :: [TrailingAnn] -- ^ items appearing after the
-                                    -- list, such as '=>' for a
-                                    -- context
+      al_anchor    :: !(Maybe EpaLocation), -- ^ start point of a list having layout
+      al_open      :: !(Maybe AddEpAnn),
+      al_close     :: !(Maybe AddEpAnn),
+      al_semis     :: [EpToken ";"], -- decls
+      al_rest      :: !a,
+      al_trailing  :: ![TrailingAnn] -- ^ items appearing after the
+                                     -- list, such as '=>' for a
+                                     -- context
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
@@ -952,7 +963,7 @@ trailingAnnToAddEpAnn (AddDarrowAnn ss)  = AddEpAnn AnnDarrow ss
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
 addTrailingAnnToL :: TrailingAnn -> EpAnnComments
-                  -> EpAnn AnnList -> EpAnn AnnList
+                  -> EpAnn (AnnList a) -> EpAnn (AnnList a)
 addTrailingAnnToL t cs n = n { anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
@@ -1134,6 +1145,10 @@ widenSpanL s as = foldl combineSrcSpans s (go as)
     go ((EpaSpan _):rest) = go rest
     go ((EpaDelta _ _ _):rest) = go rest
 
+widenSpanT :: SrcSpan -> EpToken tok -> SrcSpan
+widenSpanT l (EpTok loc) = widenSpanL l [loc]
+widenSpanT l NoEpTok = l
+
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
 widenRealSpan :: RealSrcSpan -> [AddEpAnn] -> RealSrcSpan
@@ -1179,6 +1194,10 @@ widenAnchor (EpaSpan us) _ = EpaSpan us
 widenAnchor a@EpaDelta{} as = case (realSpanFromAnns as) of
                                     Strict.Nothing -> a
                                     Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
+
+widenAnchorT :: EpaLocation -> EpToken tok -> EpaLocation
+widenAnchorT (EpaSpan ss) (EpTok l) = widenAnchorS l ss
+widenAnchorT ss _ = ss
 
 widenAnchorS :: EpaLocation -> SrcSpan -> EpaLocation
 widenAnchorS (EpaSpan (RealSrcSpan s mbe)) (RealSrcSpan r mbr)
@@ -1390,6 +1409,9 @@ instance (NoAnn a, NoAnn b, NoAnn c, NoAnn d) => NoAnn (a, b, c, d) where
 instance NoAnn Bool where
   noAnn = False
 
+instance NoAnn () where
+  noAnn = ()
+
 instance (NoAnn ann) => NoAnn (EpAnn ann) where
   noAnn = EpAnn noSpanAnchor noAnn emptyComments
 
@@ -1402,8 +1424,8 @@ instance NoAnn AnnListItem where
 instance NoAnn AnnContext where
   noAnn = AnnContext Nothing [] []
 
-instance NoAnn AnnList where
-  noAnn = AnnList Nothing Nothing Nothing [] []
+instance NoAnn a => NoAnn (AnnList a) where
+  noAnn = AnnList Nothing Nothing Nothing noAnn noAnn []
 
 instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []
@@ -1498,9 +1520,9 @@ instance Outputable NameAnn where
   ppr (NameAnnTrailing t)
     = text "NameAnnTrailing" <+> ppr t
 
-instance Outputable AnnList where
-  ppr (AnnList a o c r t)
-    = text "AnnList" <+> ppr a <+> ppr o <+> ppr c <+> ppr r <+> ppr t
+instance (Outputable a) => Outputable (AnnList a) where
+  ppr (AnnList anc o c s a t)
+    = text "AnnList" <+> ppr anc <+> ppr o <+> ppr c <+> ppr s <+> ppr a <+> ppr t
 
 instance Outputable AnnPragma where
   ppr (AnnPragma o c s l ca t m)

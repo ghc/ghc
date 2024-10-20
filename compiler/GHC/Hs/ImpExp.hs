@@ -96,7 +96,7 @@ data XImportDeclPass = XImportDeclPass
 type instance XXImportDecl  (GhcPass _) = DataConCantHappen
 
 type instance Anno ModuleName = SrcSpanAnnA
-type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
+type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnLI
 
 deriving instance Data (IEWrappedName GhcPs)
 deriving instance Data (IEWrappedName GhcRn)

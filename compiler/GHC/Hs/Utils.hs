@@ -212,13 +212,13 @@ unguardedRHS an loc rhs = [L (noAnnSrcSpan loc) (GRHS an [] rhs)]
 
 type AnnoBody p body
   = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ Origin
-    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))] ~ SrcSpanAnnL
+    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))] ~ SrcSpanAnnLW
     , Anno (Match (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
     )
 
 mkMatchGroup :: AnnoBody p body
              => Origin
-             -> LocatedL [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+             -> LocatedLW [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
              -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
 mkMatchGroup origin matches = MG { mg_ext = origin
                                  , mg_alts = matches }
@@ -226,7 +226,7 @@ mkMatchGroup origin matches = MG { mg_ext = origin
 mkLamCaseMatchGroup :: AnnoBody p body
                     => Origin
                     -> HsLamVariant
-                    -> LocatedL [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+                    -> LocatedLW [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
                     -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
 mkLamCaseMatchGroup origin lam_variant (L l matches)
   = mkMatchGroup origin (L l $ map fixCtxt matches)
@@ -330,12 +330,12 @@ nlParPat p = noLocA (gParPat p)
 mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
-mkHsDo         :: HsDoFlavour -> LocatedL [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsDoAnns     :: HsDoFlavour -> LocatedL [ExprLStmt GhcPs] -> AnnList -> HsExpr GhcPs
+mkHsDo         :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> HsExpr GhcPs
+mkHsDoAnns     :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> AnnList EpaLocation -> HsExpr GhcPs
 mkHsComp       :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
 mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
-               -> AnnList
+               -> AnnList EpaLocation
                -> HsExpr GhcPs
 
 mkNPat      :: LocatedAn NoEpAnns (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpToken "-"
@@ -359,12 +359,12 @@ mkTcBindStmt :: LPat GhcTc -> LocatedA (bodyR GhcTc)
 emptyRecStmt     :: (Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
-                        ~ SrcSpanAnnL)
+                        ~ SrcSpanAnnLW)
                  => StmtLR (GhcPass idL) GhcPs bodyR
 emptyRecStmtName :: (Anno [GenLocated
                              (Anno (StmtLR GhcRn GhcRn bodyR))
                              (StmtLR GhcRn GhcRn bodyR)]
-                        ~ SrcSpanAnnL)
+                        ~ SrcSpanAnnLW)
                  => StmtLR GhcRn GhcRn bodyR
 emptyRecStmtId   :: Stmt GhcTc (LocatedA (HsCmd GhcTc))
 
@@ -372,9 +372,9 @@ mkRecStmt :: forall (idL :: Pass) bodyR.
                     (Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
-                        ~ SrcSpanAnnL)
-                 => AnnList
-                 -> LocatedL [LStmtLR (GhcPass idL) GhcPs bodyR]
+                        ~ SrcSpanAnnLW)
+                 => AnnList (EpToken "rec")
+                 -> LocatedLW [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
 mkRecStmt anns stmts  = (emptyRecStmt' anns :: StmtLR (GhcPass idL) GhcPs bodyR)
                              { recS_stmts = stmts }

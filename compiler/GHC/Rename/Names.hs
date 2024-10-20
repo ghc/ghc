@@ -1170,9 +1170,9 @@ filterImports
     -> ModIface
     -> ImpDeclSpec
          -- ^ Import spec
-    -> Maybe (ImportListInterpretation, LocatedL [LIE GhcPs])
+    -> Maybe (ImportListInterpretation, LocatedLI [LIE GhcPs])
          -- ^ Whether this is a "hiding" import list
-    -> RnM (Maybe (ImportListInterpretation, LocatedL [LIE GhcRn]), -- Import spec w/ Names
+    -> RnM (Maybe (ImportListInterpretation, LocatedLI [LIE GhcRn]), -- Import spec w/ Names
             ImpUserList,                      -- same, but designed for storage in interfaces
             GlobalRdrEnv)                   -- Same again, but in GRE form
 filterImports hsc_env iface decl_spec Nothing
