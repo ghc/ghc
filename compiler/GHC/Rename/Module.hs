@@ -2209,7 +2209,7 @@ rnFamDecl :: Maybe (Name, [Name])
           -> FamilyDecl GhcPs
           -> RnM (FamilyDecl GhcRn, FreeVars)
 rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
-                             , fdTopLevel = toplevel
+                             , fdExt = (_, toplevel)
                              , fdFixity = fixity
                              , fdInfo = info, fdResultSig = res_sig
                              , fdInjectivityAnn = injectivity })
@@ -2222,9 +2222,8 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                                           injectivity
                ; return ( (tyvars', res_sig', injectivity') , fv_kind ) }
        ; (info', fv2) <- rn_info info
-       ; return (FamilyDecl { fdExt = noAnn
+       ; return (FamilyDecl { fdExt = (noAnn, toplevel)
                             , fdLName = tycon', fdTyVars = tyvars'
-                            , fdTopLevel = toplevel
                             , fdFixity = fixity
                             , fdInfo = info', fdResultSig = res_sig'
                             , fdInjectivityAnn = injectivity' }

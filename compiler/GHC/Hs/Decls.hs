@@ -613,7 +613,7 @@ type instance XCKindSig         (GhcPass _) = NoExtField
 type instance XTyVarSig         (GhcPass _) = NoExtField
 type instance XXFamilyResultSig (GhcPass _) = DataConCantHappen
 
-type instance XCFamilyDecl    (GhcPass _) = AnnFamilyDecl
+type instance XCFamilyDecl    (GhcPass _) = (AnnFamilyDecl, TopLevelFlag)
 type instance XXFamilyDecl    (GhcPass _) = DataConCantHappen
 
 data AnnFamilyDecl
@@ -664,7 +664,7 @@ type instance XXInjectivityAnn  (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
        => Outputable (FamilyDecl (GhcPass p)) where
   ppr (FamilyDecl { fdInfo = info, fdLName = ltycon
-                  , fdTopLevel = top_level
+                  , fdExt = (_, top_level)
                   , fdTyVars = tyvars
                   , fdFixity = fixity
                   , fdResultSig = L _ result

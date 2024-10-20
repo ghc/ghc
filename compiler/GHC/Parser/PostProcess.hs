@@ -370,8 +370,7 @@ mkFamDecl loc info topLevel lhs ksig injAnn annsIn
        ; let loc' = EpAnn (spanAsAnchor loc) noAnn cs
        ; let anns' = annsIn { afd_openp = ops, afd_closep = cps }
        ; return (L loc' (FamDecl noExtField (FamilyDecl
-                                           { fdExt       = anns'
-                                           , fdTopLevel  = topLevel
+                                           { fdExt       = (anns', topLevel)
                                            , fdInfo      = info, fdLName = tc
                                            , fdTyVars    = tyvars
                                            , fdFixity    = fixity

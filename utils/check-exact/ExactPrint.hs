@@ -3870,9 +3870,8 @@ instance ExactPrint (FamilyDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (FamilyDecl { fdExt = AnnFamilyDecl ops cps t d f dc eq vb w oc dd cc
+  exact (FamilyDecl { fdExt = (AnnFamilyDecl ops cps t d f dc eq vb w oc dd cc, top_level)
                     , fdInfo = info
-                    , fdTopLevel = top_level
                     , fdLName = ltycon
                     , fdTyVars = tyvars
                     , fdFixity = fixity
@@ -3908,9 +3907,8 @@ instance ExactPrint (FamilyDecl GhcPs) where
                  cc' <- markEpToken cc
                  return (w',oc',dd',cc', ClosedTypeFamily mb_eqns')
                _ -> return (w,oc,dd,cc, info)
-    return (FamilyDecl { fdExt = AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' oc' dd' cc'
+    return (FamilyDecl { fdExt = (AnnFamilyDecl [] [] t' d' f' dc' eq' vb' w' oc' dd' cc', top_level)
                        , fdInfo = info'
-                       , fdTopLevel = top_level
                        , fdLName = ltycon'
                        , fdTyVars = tyvars'
                        , fdFixity = fixity

@@ -228,7 +228,7 @@ ppClass sDocContext decl@(ClassDecl{}) subdocs =
               ]
 
     pprTyFam :: LFamilyDecl GhcRn -> SDoc
-    pprTyFam (L _ at) =
+    pprTyFam (L _ at@(FamilyDecl{fdExt = (ann, _)})) =
       vcat' $
         map text $
           mkSubdocN
@@ -237,7 +237,7 @@ ppClass sDocContext decl@(ClassDecl{}) subdocs =
             subdocs
             -- Associated type families should not be printed as top-level
             -- (avoid printing the `family` keyword)
-            (ppFam sDocContext at{fdTopLevel = NotTopLevel})
+            (ppFam sDocContext at{fdExt = (ann, NotTopLevel)})
 
     whereWrapper elems =
       vcat'

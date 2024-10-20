@@ -620,11 +620,10 @@ renameFamilyDecl
       ( FamilyDecl
           { fdExt = noExtField
           , fdInfo = info'
-          , fdTopLevel = TopLevel
           , fdLName = lname'
           , fdTyVars = ltyvars'
           , fdFixity = fixity
-          , fdResultSig = result'
+          , fdResultSig = result' 
           , fdInjectivityAnn = injectivity'
           }
       )

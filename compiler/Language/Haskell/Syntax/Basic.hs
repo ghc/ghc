@@ -9,6 +9,7 @@ import Data.Bool
 import Data.Int (Int)
 
 import GHC.Data.FastString (FastString)
+import GHC.Prelude (Functor, Maybe(..))
 import Control.DeepSeq
 
 {-
@@ -136,3 +137,40 @@ data FixityDirection
 
 data Fixity = Fixity Int FixityDirection
   deriving (Eq, Data)
+
+
+
+{- *********************************************************************
+*                                                                      *
+                          TyConFlavour
+*                                                                      *
+********************************************************************* -}
+
+-- | Paints a picture of what a 'TyCon' represents, in broad strokes.
+-- This is used towards more informative error messages.
+data TyConFlavour tc
+  = ClassFlavour
+  | TupleFlavour Boxity
+  | SumFlavour
+  | DataTypeFlavour
+  | NewtypeFlavour
+  | AbstractTypeFlavour
+  | OpenFamilyFlavour TypeOrData (Maybe tc) -- Just tc <=> (tc == associated class)
+  | ClosedTypeFamilyFlavour
+  | TypeSynonymFlavour
+  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
+  | PromotedDataConFlavour
+  deriving (Eq, Data, Functor)
+
+
+-- | Whether something is a type or a data declaration,
+-- e.g. a type family or a data family.
+data TypeOrData
+  = IAmData
+  | IAmType
+  deriving (Eq, Data)
+
+-- | Get the enclosing class TyCon (if there is one) for the given TyConFlavour
+tyConFlavourAssoc_maybe :: TyConFlavour tc -> Maybe tc
+tyConFlavourAssoc_maybe (OpenFamilyFlavour _ mb_parent) = mb_parent
+tyConFlavourAssoc_maybe _                               = Nothing

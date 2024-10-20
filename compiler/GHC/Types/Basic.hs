@@ -127,12 +127,12 @@ import GHC.Prelude
 import GHC.ForeignSrcLang
 import GHC.Data.FastString
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic ( panic )
 import GHC.Utils.Binary
 import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
-import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
+import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag, TyConFlavour(..), TypeOrData(..), tyConFlavourAssoc_maybe)
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
 
 import Control.DeepSeq ( NFData(..) )
@@ -2166,22 +2166,6 @@ data TypeOrConstraint
 *                                                                      *
 ********************************************************************* -}
 
--- | Paints a picture of what a 'TyCon' represents, in broad strokes.
--- This is used towards more informative error messages.
-data TyConFlavour tc
-  = ClassFlavour
-  | TupleFlavour Boxity
-  | SumFlavour
-  | DataTypeFlavour
-  | NewtypeFlavour
-  | AbstractTypeFlavour
-  | OpenFamilyFlavour TypeOrData (Maybe tc) -- Just tc <=> (tc == associated class)
-  | ClosedTypeFamilyFlavour
-  | TypeSynonymFlavour
-  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
-  | PromotedDataConFlavour
-  deriving (Eq, Data, Functor)
-
 instance Outputable (TyConFlavour tc) where
   ppr = text . go
     where
@@ -2214,18 +2198,6 @@ instance NFData tc => NFData (TyConFlavour tc) where
   rnf TypeSynonymFlavour = ()
   rnf BuiltInTypeFlavour = ()
   rnf PromotedDataConFlavour = ()
-
--- | Get the enclosing class TyCon (if there is one) for the given TyConFlavour
-tyConFlavourAssoc_maybe :: TyConFlavour tc -> Maybe tc
-tyConFlavourAssoc_maybe (OpenFamilyFlavour _ mb_parent) = mb_parent
-tyConFlavourAssoc_maybe _                               = Nothing
-
--- | Whether something is a type or a data declaration,
--- e.g. a type family or a data family.
-data TypeOrData
-  = IAmData
-  | IAmType
-  deriving (Eq, Data)
 
 instance Outputable TypeOrData where
   ppr IAmData = text "data"

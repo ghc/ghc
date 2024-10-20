@@ -316,9 +316,8 @@ synifyTyCon _prr _coax tc
       return $
         FamDecl noExtField $
           FamilyDecl
-            { fdExt = noAnn
+            { fdExt = (noAnn, TopLevel)
             , fdInfo = i
-            , fdTopLevel = TopLevel
             , fdLName = synifyNameN tc
             , fdTyVars = synifyTyVars (tyConVisibleTyVars tc)
             , fdFixity = synifyFixity tc

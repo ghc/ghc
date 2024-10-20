@@ -39,10 +39,10 @@ module Language.Haskell.Syntax.Decls (
   isClassDecl, isDataDecl, isSynDecl,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
-  FamilyDecl(..), LFamilyDecl,
+  FamilyDecl(..), LFamilyDecl, familyInfoTyConFlavour,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, FamilyInfo(..), familyInfoTyConFlavour,
+  InstDecl(..), LInstDecl, FamilyInfo(..),
   TyFamInstDecl(..), LTyFamInstDecl,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
@@ -86,6 +86,7 @@ module Language.Haskell.Syntax.Decls (
   HsGroup(..)
     ) where
 
+
 -- friends:
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( HsExpr, HsUntypedSplice )
@@ -94,11 +95,10 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
+import Language.Haskell.Syntax.Basic (Role, LexicalFixity, TyConFlavour(..), TypeOrData(..))
 import Language.Haskell.Syntax.Specificity (Specificity)
 
-import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation
-                       ,TyConFlavour(..), TypeOrData(..))
+import GHC.Types.Basic (OverlapMode, RuleName, Activation)
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
 import GHC.Unit.Module.Warnings (WarningTxt)
@@ -790,7 +790,6 @@ type LFamilyDecl pass = XRec pass (FamilyDecl pass)
 data FamilyDecl pass = FamilyDecl
   { fdExt            :: XCFamilyDecl pass
   , fdInfo           :: FamilyInfo pass              -- type/data, closed/open
-  , fdTopLevel       :: TopLevelFlag                 -- used for printing only
   , fdLName          :: LIdP pass                    -- type constructor
   , fdTyVars         :: LHsQTyVars pass              -- type variables
                        -- See Note [TyVar binders for associated decls]

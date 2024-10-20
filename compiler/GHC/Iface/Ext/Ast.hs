@@ -1644,7 +1644,7 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
 
 instance ToHie (LocatedA (FamilyDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
-      FamilyDecl _ info _ name vars _ sig inj ->
+      FamilyDecl _ info name vars _ sig inj ->
         [ toHie $ C (Decl FamDec $ getRealSpanA span) name
         , toHie $ TS (ResolvedScopes [rhsSpan]) vars
         , toHie info
