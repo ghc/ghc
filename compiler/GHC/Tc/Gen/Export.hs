@@ -177,7 +177,7 @@ type ExportOccMap = OccEnv (Name, IE GhcPs)
         --   that have the same occurrence name
 
 rnExports :: Bool       -- False => no 'module M(..) where' header at all
-          -> Maybe (LocatedL [LIE GhcPs]) -- Nothing => no explicit export list
+          -> Maybe (LocatedLI [LIE GhcPs]) -- Nothing => no explicit export list
           -> RnM TcGblEnv
 
         -- Complains if two distinct exports have same OccName
@@ -287,7 +287,7 @@ the default export. In the latter case the warning text is stored in the
 of a user-defined warning on default.
 -}
 
-exports_from_avail :: Maybe (LocatedL [LIE GhcPs])
+exports_from_avail :: Maybe (LocatedLI [LIE GhcPs])
                          -- ^ 'Nothing' means no explicit export list
                    -> GlobalRdrEnv
                    -> ImportAvails

@@ -1293,8 +1293,8 @@ localCompletePragmas sigs = mapMaybe (getCompleteSig . unLoc) $ reverse sigs
 -}
 
 type AnnoBody body
-  = ( Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
-    , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnL
+  = ( Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnLW
+    , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnLW
     , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
     , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ EpAnnCO

@@ -304,7 +304,7 @@ lexLHsDocString = fmap lexHsDocString
 --    import I (a, b, c)         -- do not use here!
 --
 -- Imports cannot have documentation comments anyway.
-instance HasHaddock (LocatedL [LocatedA (IE GhcPs)]) where
+instance HasHaddock (LocatedLI [LocatedA (IE GhcPs)]) where
   addHaddock (L l_exports exports) =
     extendHdkA (locA l_exports) $ do
       exports' <- addHaddockInterleaveItems EpNoLayout mkDocIE exports

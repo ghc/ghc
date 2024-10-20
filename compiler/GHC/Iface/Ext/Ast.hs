@@ -855,7 +855,7 @@ type AnnoBody p body
   = ( Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                    ~ SrcSpanAnnA
     , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
-                   ~ SrcSpanAnnL
+                   ~ SrcSpanAnnLW
     , Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                    ~ EpAnn NoEpAnns
     , Anno (StmtLR (GhcPass p) (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA

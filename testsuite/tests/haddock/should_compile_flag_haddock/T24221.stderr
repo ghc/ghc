@@ -853,6 +853,7 @@
                (Just
                 (AddEpAnn AnnCloseC (EpaSpan { T24221.hs:29:22 })))
                []
+               (())
                [])
               (EpaComments
                []))
@@ -1061,6 +1062,7 @@
                (Just
                 (AddEpAnn AnnCloseC (EpaSpan { T24221.hs:34:17 })))
                []
+               (())
                [])
               (EpaComments
                []))
@@ -1281,6 +1283,7 @@
                (Just
                 (AddEpAnn AnnCloseC (EpaSpan { T24221.hs:43:3 })))
                []
+               (())
                [])
               (EpaComments
                []))

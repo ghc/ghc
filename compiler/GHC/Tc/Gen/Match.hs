@@ -213,8 +213,8 @@ type AnnoBody body
   = ( Outputable (body GhcRn)
     , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (Match GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
-    , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
-    , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnL
+    , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnLW
+    , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnLW
     , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ EpAnnCO
     , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnCO
     , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
@@ -342,7 +342,7 @@ tcGRHSList ctxt tc_body grhss res_ty
 -}
 
 tcDoStmts :: HsDoFlavour
-          -> LocatedL [LStmt GhcRn (LHsExpr GhcRn)]
+          -> LocatedLW [LStmt GhcRn (LHsExpr GhcRn)]
           -> ExpRhoType
           -> TcM (HsExpr GhcTc)          -- Returns a HsDo
 tcDoStmts ListComp (L l stmts) res_ty

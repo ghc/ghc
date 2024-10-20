@@ -100,6 +100,9 @@
           (Just
            (AddEpAnn AnnCloseP (EpaSpan { DumpSemis.hs:5:19 })))
           []
+          ((,)
+           (NoEpTok)
+           [])
           [])
          (EpaComments
           []))
@@ -260,6 +263,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -322,7 +326,8 @@
                    (EpaSpan { DumpSemis.hs:(11,3)-(12,3) }))
                   (Nothing)
                   (Nothing)
-                  [(AddEpAnn AnnDo (EpaSpan { DumpSemis.hs:10:7-8 }))]
+                  []
+                  (EpaSpan { DumpSemis.hs:10:7-8 })
                   [])
                  (DoExpr
                   (Nothing))
@@ -335,6 +340,7 @@
                     (Nothing)
                     (Nothing)
                     []
+                    (NoEpTok)
                     [])
                    (EpaComments
                     []))
@@ -360,7 +366,8 @@
                          (EpaSpan { DumpSemis.hs:11:6-15 }))
                         (Nothing)
                         (Nothing)
-                        [(AddEpAnn AnnDo (EpaSpan { DumpSemis.hs:11:3-4 }))]
+                        []
+                        (EpaSpan { DumpSemis.hs:11:3-4 })
                         [])
                        (DoExpr
                         (Nothing))
@@ -374,10 +381,15 @@
                            (AddEpAnn AnnOpenC (EpaSpan { DumpSemis.hs:11:6 })))
                           (Just
                            (AddEpAnn AnnCloseC (EpaSpan { DumpSemis.hs:11:15 })))
-                          [(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:11:8 }))
-                          ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:11:9 }))
-                          ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:11:10 }))
-                          ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:11:11 }))]
+                          [(EpTok
+                            (EpaSpan { DumpSemis.hs:11:8 }))
+                          ,(EpTok
+                            (EpaSpan { DumpSemis.hs:11:9 }))
+                          ,(EpTok
+                            (EpaSpan { DumpSemis.hs:11:10 }))
+                          ,(EpTok
+                            (EpaSpan { DumpSemis.hs:11:11 }))]
+                          (NoEpTok)
                           [])
                          (EpaComments
                           []))
@@ -560,6 +572,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -622,7 +635,8 @@
                    (EpaSpan { DumpSemis.hs:(16,3)-(19,3) }))
                   (Nothing)
                   (Nothing)
-                  [(AddEpAnn AnnDo (EpaSpan { DumpSemis.hs:15:7-8 }))]
+                  []
+                  (EpaSpan { DumpSemis.hs:15:7-8 })
                   [])
                  (DoExpr
                   (Nothing))
@@ -636,8 +650,11 @@
                      (AddEpAnn AnnOpenC (EpaSpan { DumpSemis.hs:16:3 })))
                     (Just
                      (AddEpAnn AnnCloseC (EpaSpan { DumpSemis.hs:19:3 })))
-                    [(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:16:5 }))
-                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:16:8 }))]
+                    [(EpTok
+                      (EpaSpan { DumpSemis.hs:16:5 }))
+                    ,(EpTok
+                      (EpaSpan { DumpSemis.hs:16:8 }))]
+                    (NoEpTok)
                     [])
                    (EpaComments
                     []))
@@ -815,6 +832,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -877,7 +895,8 @@
                    (EpaSpan { DumpSemis.hs:22:10-30 }))
                   (Nothing)
                   (Nothing)
-                  [(AddEpAnn AnnDo (EpaSpan { DumpSemis.hs:22:7-8 }))]
+                  []
+                  (EpaSpan { DumpSemis.hs:22:7-8 })
                   [])
                  (DoExpr
                   (Nothing))
@@ -891,8 +910,11 @@
                      (AddEpAnn AnnOpenC (EpaSpan { DumpSemis.hs:22:10 })))
                     (Just
                      (AddEpAnn AnnCloseC (EpaSpan { DumpSemis.hs:22:30 })))
-                    [(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:22:12 }))
-                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:22:13 }))]
+                    [(EpTok
+                      (EpaSpan { DumpSemis.hs:22:12 }))
+                    ,(EpTok
+                      (EpaSpan { DumpSemis.hs:22:13 }))]
+                    (NoEpTok)
                     [])
                    (EpaComments
                     []))
@@ -1022,6 +1044,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -1121,6 +1144,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -1221,6 +1245,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -1713,6 +1738,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -1832,6 +1858,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -1904,11 +1931,17 @@
                      (AddEpAnn AnnOpenC (EpaSpan { DumpSemis.hs:34:13 })))
                     (Just
                      (AddEpAnn AnnCloseC (EpaSpan { DumpSemis.hs:34:31 })))
-                    [(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:14 }))
-                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:15 }))
-                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:16 }))
-                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:17 }))
-                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:18 }))]
+                    [(EpTok
+                      (EpaSpan { DumpSemis.hs:34:14 }))
+                    ,(EpTok
+                      (EpaSpan { DumpSemis.hs:34:15 }))
+                    ,(EpTok
+                      (EpaSpan { DumpSemis.hs:34:16 }))
+                    ,(EpTok
+                      (EpaSpan { DumpSemis.hs:34:17 }))
+                    ,(EpTok
+                      (EpaSpan { DumpSemis.hs:34:18 }))]
+                    (NoEpTok)
                     [])
                    (EpaComments
                     []))
@@ -1945,6 +1978,7 @@
                           (Nothing)
                           (Nothing)
                           []
+                          (NoEpTok)
                           [])
                          (EpaComments
                           []))
@@ -2047,6 +2081,7 @@
                           (Nothing)
                           (Nothing)
                           []
+                          (NoEpTok)
                           [])
                          (EpaComments
                           []))
@@ -2166,6 +2201,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -2273,9 +2309,13 @@
                       (AddEpAnn AnnOpenC (EpaSpan { DumpSemis.hs:38:4 })))
                      (Just
                       (AddEpAnn AnnCloseC (EpaSpan { DumpSemis.hs:44:4 })))
-                     [(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:38:6 }))
-                     ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:38:7 }))
-                     ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:38:8 }))]
+                     [(EpTok
+                       (EpaSpan { DumpSemis.hs:38:6 }))
+                     ,(EpTok
+                       (EpaSpan { DumpSemis.hs:38:7 }))
+                     ,(EpTok
+                       (EpaSpan { DumpSemis.hs:38:8 }))]
+                     (NoEpTok)
                      [])
                     (EpaComments
                      []))

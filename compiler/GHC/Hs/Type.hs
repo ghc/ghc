@@ -478,7 +478,7 @@ type instance XSpliceTy        GhcTc = Kind
 type instance XDocTy           (GhcPass _) = NoExtField
 type instance XBangTy          (GhcPass _) = ((EpaLocation, EpaLocation, EpaLocation), SourceText)
 
-type instance XRecTy           GhcPs = AnnList
+type instance XRecTy           GhcPs = AnnList ()
 type instance XRecTy           GhcRn = NoExtField
 type instance XRecTy           GhcTc = NoExtField
 

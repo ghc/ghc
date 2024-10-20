@@ -73,6 +73,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -154,7 +155,9 @@
                 (EpaSpan { <no location info> }))
                (Nothing)
                (Nothing)
-               [(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:7:3-7 }))]
+               []
+               (EpTok
+                (EpaSpan { Test20297.hs:7:3-7 }))
                [])
               (EpaComments
                []))
@@ -198,6 +201,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -273,7 +277,9 @@
                 (EpaSpan { Test20297.hs:11:9-26 }))
                (Nothing)
                (Nothing)
-               [(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:10:3-7 }))]
+               []
+               (EpTok
+                (EpaSpan { Test20297.hs:10:3-7 }))
                [])
               (EpaComments
                [(L
@@ -313,6 +319,7 @@
                      (Nothing)
                      (Nothing)
                      []
+                     (NoEpTok)
                      [])
                     (EpaComments
                      []))
@@ -375,7 +382,8 @@
                               (EpaSpan { Test20297.hs:11:22-26 }))
                              (Nothing)
                              (Nothing)
-                             [(AddEpAnn AnnDo (EpaSpan { Test20297.hs:11:19-20 }))]
+                             []
+                             (EpaSpan { Test20297.hs:11:19-20 })
                              [])
                             (DoExpr
                              (Nothing))
@@ -388,6 +396,7 @@
                                (Nothing)
                                (Nothing)
                                []
+                               (NoEpTok)
                                [])
                               (EpaComments
                                []))
@@ -500,6 +509,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -575,7 +585,9 @@
                 (EpaSpan { <no location info> }))
                (Nothing)
                (Nothing)
-               [(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:5:3-7 }))]
+               []
+               (EpTok
+                (EpaSpan { Test20297.ppr.hs:5:3-7 }))
                [])
               (EpaComments
                []))
@@ -613,6 +625,7 @@
           (Nothing)
           (Nothing)
           []
+          (NoEpTok)
           [])
          (EpaComments
           []))
@@ -688,7 +701,9 @@
                 (EpaSpan { Test20297.ppr.hs:9:7-24 }))
                (Nothing)
                (Nothing)
-               [(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:8:3-7 }))]
+               []
+               (EpTok
+                (EpaSpan { Test20297.ppr.hs:8:3-7 }))
                [])
               (EpaComments
                []))
@@ -722,6 +737,7 @@
                      (Nothing)
                      (Nothing)
                      []
+                     (NoEpTok)
                      [])
                     (EpaComments
                      []))
@@ -784,7 +800,8 @@
                               (EpaSpan { Test20297.ppr.hs:9:20-24 }))
                              (Nothing)
                              (Nothing)
-                             [(AddEpAnn AnnDo (EpaSpan { Test20297.ppr.hs:9:17-18 }))]
+                             []
+                             (EpaSpan { Test20297.ppr.hs:9:17-18 })
                              [])
                             (DoExpr
                              (Nothing))
@@ -797,6 +814,7 @@
                                (Nothing)
                                (Nothing)
                                []
+                               (NoEpTok)
                                [])
                               (EpaComments
                                []))

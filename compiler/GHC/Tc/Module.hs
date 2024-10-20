@@ -529,7 +529,7 @@ tcRnImports hsc_env import_decls
 -}
 
 tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
-             -> Maybe (LocatedL [LIE GhcPs])
+             -> Maybe (LocatedLI [LIE GhcPs])
              -> [LHsDecl GhcPs]               -- Declarations
              -> TcM TcGblEnv
 tcRnSrcDecls explicit_mod_hdr export_ies decls
@@ -1847,7 +1847,7 @@ checkMainType tcg_env
        ; return lie } } } }
 
 checkMain :: Bool  -- False => no 'module M(..) where' header at all
-          -> Maybe (LocatedL [LIE GhcPs])  -- Export specs of Main module
+          -> Maybe (LocatedLI [LIE GhcPs])  -- Export specs of Main module
           -> TcM TcGblEnv
 -- If we are in module Main, check that 'main' is exported,
 -- and generate the runMainIO binding that calls it
