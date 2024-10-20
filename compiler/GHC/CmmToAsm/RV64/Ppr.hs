@@ -403,11 +403,43 @@ pprReg w r = case r of
     ppr_reg_no 61 = text "ft9"
     ppr_reg_no 62 = text "ft10"
     ppr_reg_no 63 = text "ft11"
+    ppr_reg_no 64 = text "v0"
+    ppr_reg_no 65 = text "v1"
+    ppr_reg_no 66 = text "v2"
+    ppr_reg_no 67 = text "v3"
+    ppr_reg_no 68 = text "v4"
+    ppr_reg_no 69 = text "v5"
+    ppr_reg_no 70 = text "v6"
+    ppr_reg_no 71 = text "v7"
+    ppr_reg_no 72 = text "v8"
+    ppr_reg_no 73 = text "v9"
+    ppr_reg_no 74 = text "v10"
+    ppr_reg_no 75 = text "v11"
+    ppr_reg_no 76 = text "v12"
+    ppr_reg_no 77 = text "v13"
+    ppr_reg_no 78 = text "v14"
+    ppr_reg_no 79 = text "v15"
+    ppr_reg_no 80 = text "v16"
+    ppr_reg_no 81 = text "v17"
+    ppr_reg_no 82 = text "v18"
+    ppr_reg_no 83 = text "v19"
+    ppr_reg_no 84 = text "v20"
+    ppr_reg_no 85 = text "v21"
+    ppr_reg_no 86 = text "v22"
+    ppr_reg_no 87 = text "v23"
+    ppr_reg_no 88 = text "v24"
+    ppr_reg_no 89 = text "v25"
+    ppr_reg_no 90 = text "v26"
+    ppr_reg_no 91 = text "v27"
+    ppr_reg_no 92 = text "v28"
+    ppr_reg_no 93 = text "v29"
+    ppr_reg_no 94 = text "v30"
+    ppr_reg_no 95 = text "v31"
     ppr_reg_no i
       | i < 0 = pprPanic "Unexpected register number (min is 0)" (ppr w <+> int i)
-      | i > 63 = pprPanic "Unexpected register number (max is 63)" (ppr w <+> int i)
+      | i > 95 = pprPanic "Unexpected register number (max is 95)" (ppr w <+> int i)
       -- no support for widths > W64.
-      | otherwise = pprPanic "Unsupported width in register (max is 64)" (ppr w <+> int i)
+      | otherwise = pprPanic "Unsupported width in register (max is 95)" (ppr w <+> int i)
 
 -- | Single precission `Operand` (floating-point)
 isSingleOp :: Operand -> Bool
@@ -621,6 +653,9 @@ pprInstr platform instr = case instr of
   STR II64 o1 o2 -> op2 (text "\tsd") o1 o2
   STR FF32 o1 o2 -> op2 (text "\tfsw") o1 o2
   STR FF64 o1 o2 -> op2 (text "\tfsd") o1 o2
+  STR (VecFormat 2 FmtFloat) o1 o2@(OpAddr _) -> op2 (text "\tvse32.v") o1 o2
+  STR (VecFormat 2 FmtDouble) o1 o2@(OpAddr _) -> op2 (text "\tvse64.v") o1 o2
+  STR f o1 o2 -> pprPanic "Unsupported store" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     lines_
       [ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl,
@@ -643,6 +678,9 @@ pprInstr platform instr = case instr of
   LDRU FF32 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tflw") o1 o2
   LDRU FF64 o1 o2@(OpAddr (AddrReg _)) -> op2 (text "\tfld") o1 o2
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
+  -- vectors
+  LDRU (VecFormat 2 FmtFloat) o1 o2@(OpAddr _) -> op2 (text "\tvle32.v") o1 o2
+  LDRU (VecFormat 2 FmtDouble) o1 o2@(OpAddr _) -> op2 (text "\tvle64.v") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
   FCVT FloatToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
@@ -677,7 +715,10 @@ pprInstr platform instr = case instr of
           FNMAdd -> text "\tfnmadd" <> dot <> floatPrecission d
           FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
      in op4 fma d r1 r2 r3
-  VMV o1 o2 -> op2 (text "\tvmv.v.x") o1 o2
+
+  VMV o1@(OpReg w _) o2 | isFloatOp o2 -> op2 (text "\tvfmv" <> dot <> text "f" <> dot <> floatWidthSuffix w) o1 o2
+  VMV o1@(OpReg w _) o2 | isFloatOp o1 -> op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> floatWidthSuffix w) o1 o2
+  VMV o1 o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> opToVInstrSuffix o2) o1 o2
   VID o1 o2 -> op2 (text "\tvid.v") o1 o2
   VMSEQ o1 o2 o3 -> op3 (text "\tvmseq.v.x") o1 o2 o3
   VMERGE o1 o2 o3 o4 -> op4 (text "\tvmerge.vxm") o1 o2 o3 o4
@@ -717,6 +758,17 @@ pprInstr platform instr = case instr of
 
     pprMasking MA = text "ma"
     pprMasking MU = text "mu"
+
+    opToVInstrSuffix :: IsLine doc => Operand -> doc
+    opToVInstrSuffix op | isIntOp op = text "x"
+    opToVInstrSuffix op | isFloatOp op = text "f"
+    opToVInstrSuffix op | isVectorOp op = text "v"
+    opToVInstrSuffix op = pprPanic "Unsupported operand for vector instruction" (pprOp platform op)
+
+    floatWidthSuffix :: IsLine doc => Width -> doc
+    floatWidthSuffix W32 = text "s"
+    floatWidthSuffix W64 = text "d"
+    floatWidthSuffix w = pprPanic "Unsupported floating point vector operation width" (ppr w)
 
 floatOpPrecision :: Platform -> Operand -> Operand -> String
 floatOpPrecision _p l r | isFloatOp l && isFloatOp r && isSingleOp l && isSingleOp r = "s" -- single precision

@@ -71,6 +71,7 @@ flavourTransformers = M.fromList
     , "late_ccs"         =: enableLateCCS
     , "boot_nonmoving_gc" =: enableBootNonmovingGc
     , "dump_stg"         =: enableDumpStg
+    , "vectors"          =: enableVectorSupport
     ]
   where (=:) = (,)
 
@@ -162,6 +163,15 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
     , builder (Cc CompileC) ? arg "-g3"
     , builder (Cabal Setup) ? arg "--disable-library-stripping"
     , builder (Cabal Setup) ? arg "--disable-executable-stripping"
+    ]
+
+-- TODO: A bit hand-wavy; this likely needs to be part of autoconf
+enableVectorSupport :: Flavour -> Flavour
+enableVectorSupport = addArgs $ notStage0 ? mconcat
+    [ builder (Ghc CompileHs) ? pure ["-optc=-march=rv64gv", "-opta=-march=rv64gv"]
+    , builder (Ghc CompileCWithGhc) ? pure ["-optc=-march=rv64gv", "-opta=-march=rv64gv"]
+    , builder (Ghc ToolArgs) ? pure ["-optc=-march=rv64gv", "-opta=-march=rv64gv"]
+    , builder (Cc CompileC) ? pure ["-optc=-march=rv64gv", "-opta=-march=rv64gv"]
     ]
 
 -- | Enable the ticky-ticky profiler in stage2 GHC
