@@ -61,7 +61,8 @@ setTestOpts(
   , when(have_cpu_feature('avx512f'), extra_hc_opts('-mavx512f'))
   ])
 
-test('simd000', [], compile_and_run, [''])
+# TODO: Revert debug trace dumps
+test('simd000', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
 test('simd001', [], compile_and_run, [''])
 test('simd002', [], compile_and_run, [''])
 test('simd003', [], compile_and_run, [''])

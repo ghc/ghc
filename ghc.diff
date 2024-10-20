@@ -1,0 +1,74 @@
+diff --git a/compiler/CodeGen.Platform.h b/compiler/CodeGen.Platform.h
+index 6f85686030..f91fee07fe 100644
+--- a/compiler/CodeGen.Platform.h
++++ b/compiler/CodeGen.Platform.h
+@@ -1274,44 +1274,6 @@ freeReg REG_XMM5    = False
+ freeReg REG_XMM6    = False
+ # endif
+ 
+-# if defined(REG_YMM1)
+-freeReg REG_YMM1    = False
+-# endif
+-# if defined(REG_YMM2)
+-freeReg REG_YMM2    = False
+-# endif
+-# if defined(REG_YMM3)
+-freeReg REG_YMM3    = False
+-# endif
+-# if defined(REG_YMM4)
+-freeReg REG_YMM4    = False
+-# endif
+-# if defined(REG_YMM5)
+-freeReg REG_YMM5    = False
+-# endif
+-# if defined(REG_YMM6)
+-freeReg REG_YMM6    = False
+-# endif
+-
+-# if defined(REG_ZMM1)
+-freeReg REG_ZMM1    = False
+-# endif
+-# if defined(REG_ZMM2)
+-freeReg REG_ZMM2    = False
+-# endif
+-# if defined(REG_ZMM3)
+-freeReg REG_ZMM3    = False
+-# endif
+-# if defined(REG_ZMM4)
+-freeReg REG_ZMM4    = False
+-# endif
+-# if defined(REG_ZMM5)
+-freeReg REG_ZMM5    = False
+-# endif
+-# if defined(REG_ZMM6)
+-freeReg REG_ZMM6    = False
+-# endif
+-
+ freeReg _ = True
+ 
+ #else
+diff --git a/compiler/GHC/CmmToAsm/RV64/Instr.hs b/compiler/GHC/CmmToAsm/RV64/Instr.hs
+index bb4e0ba61c..ec00d5ef68 100644
+--- a/compiler/GHC/CmmToAsm/RV64/Instr.hs
++++ b/compiler/GHC/CmmToAsm/RV64/Instr.hs
+@@ -20,7 +20,6 @@ import GHC.CmmToAsm.Utils
+ import GHC.Data.FastString (LexicalFastString)
+ import GHC.Platform
+ import GHC.Platform.Reg
+-import GHC.Platform.Reg.Class.Separate
+ import GHC.Platform.Regs
+ import GHC.Prelude
+ import GHC.Stack
+diff --git a/compiler/GHC/CmmToAsm/RV64/Ppr.hs b/compiler/GHC/CmmToAsm/RV64/Ppr.hs
+index 75cbcf2da6..2735bb5bef 100644
+--- a/compiler/GHC/CmmToAsm/RV64/Ppr.hs
++++ b/compiler/GHC/CmmToAsm/RV64/Ppr.hs
+@@ -797,7 +797,7 @@ pprInstr platform instr = case instr of
+               FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
+          in op4 fma d r1 r2 r3
+   VFMA variant o1@(OpReg fmt _reg) o2 o3
+-    | VecFormat l fmt' <- fmt ->
++    | VecFormat _l fmt' <- fmt ->
+         let formatString = if (isFloatFormat . scalarFormatFormat) fmt' then text "f" else text ""
+             prefix = text "v" <> formatString
+             suffix = text "vv"
