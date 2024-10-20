@@ -16,7 +16,7 @@ module GHC.Parser.PostProcess (
         mkRdrGetField, mkRdrProjection, Fbind, -- RecordDot
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
-        mkHsDo, mkSpliceDecl,
+        mkHsDo, mkMDo, mkSpliceDecl,
         mkRoleAnnotDecl,
         mkClassDecl,
         mkTyData, mkDataFamInst,
@@ -33,7 +33,6 @@ module GHC.Parser.PostProcess (
         setRdrNameSpace,
         fromSpecTyVarBndr, fromSpecTyVarBndrs,
         annBinds,
-        fixValbindsAnn,
         stmtsAnchor, stmtsLoc,
 
         cvBindGroup,
@@ -431,6 +430,10 @@ mkRoleAnnotDecl loc tycon roles anns
             addFatalError $ mkPlainErrorMsgEnvelope loc_role $
               (PsErrIllegalRoleName role nearby)
 
+mkMDo :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> EpaLocation -> EpaLocation -> HsExpr GhcPs
+mkMDo ctxt stmts tok loc
+  = mkHsDoAnns ctxt stmts (AnnList (Just loc) Nothing Nothing [] tok [])
+
 -- | Converts a list of 'LHsTyVarBndr's annotated with their 'Specificity' to
 -- binders without annotations. Only accepts specified variables, and errors if
 -- any of the provided binders has an 'InferredSpec' annotation.
@@ -449,20 +452,22 @@ fromSpecTyVarBndr (L loc (HsTvb xtv flag idp k)) = do
   return $ L loc (HsTvb xtv () idp k)
 
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
-annBinds :: AddEpAnn -> EpAnnComments -> HsLocalBinds GhcPs
+annBinds :: EpToken "where" -> EpAnnComments -> HsLocalBinds GhcPs
   -> (HsLocalBinds GhcPs, Maybe EpAnnComments)
-annBinds a cs (HsValBinds an bs)  = (HsValBinds (add_where a an cs) bs, Nothing)
-annBinds a cs (HsIPBinds an bs)   = (HsIPBinds (add_where a an cs) bs, Nothing)
+annBinds w cs (HsValBinds an bs)  = (HsValBinds (add_where w an cs) bs, Nothing)
+annBinds w cs (HsIPBinds an bs)   = (HsIPBinds (add_where w an cs) bs, Nothing)
 annBinds _ cs  (EmptyLocalBinds x) = (EmptyLocalBinds x, Just cs)
 
-add_where :: AddEpAnn -> EpAnn AnnList -> EpAnnComments -> EpAnn AnnList
-add_where an@(AddEpAnn _ (EpaSpan (RealSrcSpan rs _))) (EpAnn a (AnnList anc o c r t) cs) cs2
+add_where :: EpToken "where" -> EpAnn (AnnList (EpToken "where")) -> EpAnnComments -> EpAnn (AnnList (EpToken "where"))
+add_where w@(EpTok (EpaSpan (RealSrcSpan rs _))) (EpAnn a al cs) cs2
   | valid_anchor a
-  = EpAnn (widenAnchor a [an]) (AnnList anc o c (an:r) t) (cs Semi.<> cs2)
+  = EpAnn (widenAnchorT a w) (al { al_rest = w}) (cs Semi.<> cs2)
   | otherwise
   = EpAnn (patch_anchor rs a)
-          (AnnList (fmap (patch_anchor rs) anc) o c (an:r) t) (cs Semi.<> cs2)
-add_where (AddEpAnn _ _) _ _ = panic "add_where"
+          (al { al_anchor = (fmap (patch_anchor rs) (al_anchor al))
+              , al_rest = w})
+          (cs Semi.<> cs2)
+add_where _ _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
 valid_anchor :: EpaLocation -> Bool
@@ -478,21 +483,17 @@ patch_anchor r1 (EpaSpan (RealSrcSpan r0 mb)) = EpaSpan (RealSrcSpan r mb)
     r = if srcSpanStartLine r0 < 0 then r1 else r0
 patch_anchor _ (EpaSpan ss) = EpaSpan ss
 
-fixValbindsAnn :: EpAnn AnnList -> EpAnn AnnList
-fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
-  = (EpAnn (widenAnchor anchor (r ++ map trailingAnnToAddEpAnn t)) (AnnList ma o c r t) cs)
-
 -- | The anchor for a stmtlist is based on either the location or
 -- the first semicolon annotion.
-stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Maybe EpaLocation
-stmtsAnchor (L (RealSrcSpan l mb) ((ConsOL (AddEpAnn _ (EpaSpan (RealSrcSpan r rb))) _), _))
+stmtsAnchor :: Located (OrdList (EpToken tok),a) -> Maybe EpaLocation
+stmtsAnchor (L (RealSrcSpan l mb) ((ConsOL (EpTok (EpaSpan (RealSrcSpan r rb))) _), _))
   = Just $ widenAnchorS (EpaSpan (RealSrcSpan l mb)) (RealSrcSpan r rb)
 stmtsAnchor (L (RealSrcSpan l mb) _) = Just $ EpaSpan (RealSrcSpan l mb)
 stmtsAnchor _ = Nothing
 
-stmtsLoc :: Located (OrdList AddEpAnn,a) -> SrcSpan
+stmtsLoc :: Located (OrdList (EpToken tok),a) -> SrcSpan
 stmtsLoc (L l ((ConsOL aa _), _))
-  = widenSpan l [aa]
+  = widenSpanT l aa
 stmtsLoc (L l _) = l
 
 {- **********************************************************************
@@ -716,7 +717,7 @@ tyConToDataCon (L loc tc)
     occ = rdrNameOcc tc
 
 mkPatSynMatchGroup :: LocatedN RdrName
-                   -> LocatedL (OrdList (LHsDecl GhcPs))
+                   -> LocatedLW (OrdList (LHsDecl GhcPs))
                    -> P (MatchGroup GhcPs (LHsExpr GhcPs))
 mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     do { matches <- mapM fromDecl (fromOL decls)
@@ -1421,7 +1422,7 @@ checkFunBind locF ann_fun (L lf fun) is_infix (L lp pats) (L _ grhss)
       | Infix <- is_infix = ParseContext (Just fun) NoIncompleteDoBlock
       | otherwise         = noParseContext
 
-makeFunBind :: LocatedN RdrName -> LocatedL [LMatch GhcPs (LHsExpr GhcPs)]
+makeFunBind :: LocatedN RdrName -> LocatedLW [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
 -- Like GHC.Hs.Utils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn ms
@@ -1627,11 +1628,11 @@ instance DisambInfixOp RdrName where
 
 type AnnoBody b
   = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ EpAnnCO
-    , Anno [LocatedA (Match GhcPs (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnL
+    , Anno [LocatedA (Match GhcPs (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnLW
     , Anno (Match GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcPs GhcPs (LocatedA (Body (Body b GhcPs) GhcPs))) ~ SrcSpanAnnA
     , Anno [LocatedA (StmtLR GhcPs GhcPs
-                       (LocatedA (Body (Body (Body b GhcPs) GhcPs) GhcPs)))] ~ SrcSpanAnnL
+                       (LocatedA (Body (Body (Body b GhcPs) GhcPs) GhcPs)))] ~ SrcSpanAnnLW
     )
 
 -- | Disambiguate constructs that may appear when we do not know ahead of time whether we are
@@ -1666,11 +1667,11 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsOpAppPV :: SrcSpan -> LocatedA b -> LocatedN (InfixOp b) -> LocatedA b
               -> PV (LocatedA b)
   -- | Disambiguate "case ... of ..."
-  mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> (LocatedL [LMatch GhcPs (LocatedA b)])
+  mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> (LocatedLW [LMatch GhcPs (LocatedA b)])
              -> EpAnnHsCase -> PV (LocatedA b)
   -- | Disambiguate "\... -> ..." (lambda), "\case" and "\cases"
   mkHsLamPV :: SrcSpan -> HsLamVariant
-            -> (LocatedL [LMatch GhcPs (LocatedA b)]) -> EpAnnLam
+            -> (LocatedLW [LMatch GhcPs (LocatedA b)]) -> EpAnnLam
             -> PV (LocatedA b)
   -- | Function argument representation
   type FunArg b
@@ -1694,8 +1695,9 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsDoPV ::
     SrcSpan ->
     Maybe ModuleName ->
-    LocatedL [LStmt GhcPs (LocatedA b)] ->
-    AnnList ->
+    LocatedLW [LStmt GhcPs (LocatedA b)] ->
+    EpaLocation -> -- Token
+    EpaLocation -> -- Anchor
     PV (LocatedA b)
   -- | Disambiguate "( ... )" (parentheses)
   mkHsParPV :: SrcSpan -> EpToken "(" -> LocatedA b -> EpToken ")" -> PV (LocatedA b)
@@ -1711,7 +1713,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsTySigPV
     :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> EpUniToken "::" "∷" -> PV (LocatedA b)
   -- | Disambiguate "[a,b,c]" (list syntax)
-  mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> AnnList -> PV (LocatedA b)
+  mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> AnnList () -> PV (LocatedA b)
   -- | Disambiguate "$(...)" and "[quasi|...|]" (TH splices)
   mkHsSplicePV :: Located (HsUntypedSplice GhcPs) -> PV (LocatedA b)
   -- | Disambiguate "f { a = b, ... }" syntax (record construction and record updates)
@@ -1822,7 +1824,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsOpAppPV l c1 op c2 = do
     let cmdArg c = L (l2l $ getLoc c) $ HsCmdTop noExtField c
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ HsCmdArrForm (AnnList Nothing Nothing Nothing [] []) (reLoc op) Infix [cmdArg c1, cmdArg c2]
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) $ HsCmdArrForm noAnn (reLoc op) Infix [cmdArg c1, cmdArg c2]
 
   mkHsCasePV l c (L lm m) anns = do
     !cs <- getCommentsFor l
@@ -1840,10 +1842,10 @@ instance DisambECP (HsCmd GhcPs) where
     checkDoAndIfThenElse PsErrSemiColonsInCondCmd c semi1 a semi2 b
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsCmdIf c a b anns)
-  mkHsDoPV l Nothing stmts anns = do
+  mkHsDoPV l Nothing stmts tok_loc anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo anns stmts)
-  mkHsDoPV l (Just m)    _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrQualifiedDoInCmd m
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) Nothing Nothing [] tok_loc []) stmts)
+  mkHsDoPV l (Just m)    _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrQualifiedDoInCmd m
   mkHsParPV l lpar c rpar = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdPar (lpar, rpar) c)
@@ -1937,9 +1939,9 @@ instance DisambECP (HsExpr GhcPs) where
     checkDoAndIfThenElse PsErrSemiColonsInCondExpr c semi1 a semi2 b
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsIf c a b anns)
-  mkHsDoPV l mod stmts anns = do
+  mkHsDoPV l mod stmts loc_tok anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo anns (DoExpr mod) stmts)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) Nothing Nothing [] loc_tok []) (DoExpr mod) stmts)
   mkHsParPV l lpar e rpar = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsPar (lpar, rpar) e)
@@ -2030,7 +2032,7 @@ instance DisambECP (PatBuilder GhcPs) where
     !cs <- getCommentsFor (locA l)
     return $ L (addCommentsToEpAnn l cs) (PatBuilderAppType p at (mkHsTyPat t))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
-  mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
+  mkHsDoPV l _ _ _ _    = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
   mkHsVarPV v@(getLoc -> l) = return $ L (l2l l) (PatBuilderVar v)
   mkHsLitPV lit@(L l a) = do
@@ -3221,7 +3223,7 @@ mkTypeImpExp name =
   do requireExplicitNamespaces (getLocA name)
      return (fmap (`setRdrNameSpace` tcClsName) name)
 
-checkImportSpec :: LocatedL [LIE GhcPs] -> P (LocatedL [LIE GhcPs])
+checkImportSpec :: LocatedLI [LIE GhcPs] -> P (LocatedLI [LIE GhcPs])
 checkImportSpec ie@(L _ specs) =
     case [l | (L l (IEThingWith _ _ (IEWildcard _) _ _)) <- specs] of
       [] -> return ie

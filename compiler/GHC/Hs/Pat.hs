@@ -112,7 +112,7 @@ type instance XBangPat GhcPs = EpToken "!"
 type instance XBangPat GhcRn = NoExtField
 type instance XBangPat GhcTc = NoExtField
 
-type instance XListPat GhcPs = AnnList
+type instance XListPat GhcPs = AnnList ()
   -- After parsing, ListPat can refer to a built-in Haskell list pattern
   -- or an overloaded list pattern.
 type instance XListPat GhcRn = NoExtField

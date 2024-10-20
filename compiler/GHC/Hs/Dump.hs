@@ -67,6 +67,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationModule
               `extQ` annotationGrhsAnn
               `extQ` annotationAnnList
+              `extQ` annotationAnnListWhere
+              `extQ` annotationAnnListCommas
+              `extQ` annotationAnnListIE
               `extQ` annotationEpAnnImportDecl
               `extQ` annotationNoEpAnns
               `extQ` annotationExprBracket
@@ -371,8 +374,17 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             annotationGrhsAnn :: EpAnn GrhsAnn -> SDoc
             annotationGrhsAnn = annotation' (text "EpAnn GrhsAnn")
 
-            annotationAnnList :: EpAnn AnnList -> SDoc
-            annotationAnnList = annotation' (text "EpAnn AnnList")
+            annotationAnnList :: EpAnn (AnnList ()) -> SDoc
+            annotationAnnList = annotation' (text "EpAnn (AnnList ())")
+
+            annotationAnnListWhere :: EpAnn (AnnList (EpToken "where")) -> SDoc
+            annotationAnnListWhere = annotation' (text "EpAnn (AnnList (EpToken \"where\"))")
+
+            annotationAnnListCommas :: EpAnn (AnnList [EpToken ","]) -> SDoc
+            annotationAnnListCommas = annotation' (text "EpAnn (AnnList [EpToken \",\"])")
+
+            annotationAnnListIE :: EpAnn (AnnList (EpToken "hiding", [EpToken ","])) -> SDoc
+            annotationAnnListIE = annotation' (text "EpAnn (AnnList (EpToken \"hiding\", [EpToken \",\"]))")
 
             annotationEpAnnImportDecl :: EpAnn EpAnnImportDecl -> SDoc
             annotationEpAnnImportDecl = annotation' (text "EpAnn EpAnnImportDecl")
@@ -392,7 +404,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             srcSpanAnnA :: EpAnn AnnListItem -> SDoc
             srcSpanAnnA = locatedAnn'' (text "SrcSpanAnnA")
 
-            srcSpanAnnL :: EpAnn AnnList -> SDoc
+            srcSpanAnnL :: EpAnn (AnnList ()) -> SDoc
             srcSpanAnnL = locatedAnn'' (text "SrcSpanAnnL")
 
             srcSpanAnnP :: EpAnn AnnPragma -> SDoc

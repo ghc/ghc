@@ -36,9 +36,9 @@ import GHC.Data.FastString
 
 _tt :: IO ()
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
-_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
+-- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
--- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
+_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
 
  -- "../../testsuite/tests/ghc-api/exactprint/RenameCase1.hs" (Just changeRenameCase1)
  -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet2.hs" (Just changeLayoutLet2)
@@ -105,7 +105,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr012.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr013.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr014.hs" Nothing
- "../../testsuite/tests/printer/Ppr015.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr015.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr016.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr017.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr018.hs" Nothing
@@ -199,8 +199,11 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test19834.hs" Nothing
  -- "../../testsuite/tests/printer/Test19840.hs" Nothing
  -- "../../testsuite/tests/printer/Test19850.hs" Nothing
+ "../../testsuite/tests/printer/Test20247.hs" Nothing
  -- "../../testsuite/tests/printer/Test20258.hs" Nothing
+ -- "../../testsuite/tests/printer/Test20297.hs" Nothing
  -- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing
+ -- "../../testsuite/tests/printer/PprRecordSemi.hs" Nothing
  -- "../../testsuite/tests/printer/PprSemis.hs" Nothing
  -- "../../testsuite/tests/printer/PprEmptyMostly.hs" Nothing
  -- "../../testsuite/tests/parser/should_compile/DumpSemis.hs" Nothing
@@ -527,10 +530,8 @@ changeLocalDecls libdir (L l p) = do
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP os (DifferentLine 2 0)
         let sortKey = captureOrderBinds decls
-        let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (EpaDelta noSrcSpan (DifferentLine 1 5) [])) a b c dd) cs)
-        -- let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
-        -- let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
+        let (EpAnn anc (AnnList (Just _) a b c dd e) cs) = van
+        let van' = (EpAnn anc (AnnList (Just (EpaDelta noSrcSpan (DifferentLine 1 5) [])) a b c dd e) cs)
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (decl':oldBinds)
                                           (sig':os':oldSigs)))
@@ -558,7 +559,9 @@ changeLocalDecls2 libdir (L l p) = do
         let anc2 = (EpaDelta noSrcSpan (DifferentLine 1 5) [])
         let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
-                                 [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])] [])
+                                 []
+                                 (EpTok (EpaDelta noSrcSpan (SameLine 0) []))
+                                 [])
                         emptyComments
         let decls = [s,d]
         let sortKey = captureOrderBinds decls
@@ -884,7 +887,8 @@ addHiding1 _libdir (L l p) = do
                                (AnnList Nothing
                                         (Just (AddEpAnn AnnOpenP  d1))
                                         (Just (AddEpAnn AnnCloseP d0))
-                                        [(AddEpAnn AnnHiding d1)]
+                                        []
+                                        (EpTok d1,[])
                                         [])
                                  emptyComments) [v1,v2]
           imp1' = imp1 { ideclImportList = Just (EverythingBut,impHiding)}
@@ -909,7 +913,8 @@ addHiding2 _libdir top = do
                        (AnnList Nothing
                                 (Just (AddEpAnn AnnOpenP  d1))
                                 (Just (AddEpAnn AnnCloseP d0))
-                                [(AddEpAnn AnnHiding d1)]
+                                []
+                                (EpTok d1, [])
                                 [])
                          emptyComments)
           n1 = L (noAnnSrcSpanDP0) (mkVarUnqual (mkFastString "n1"))

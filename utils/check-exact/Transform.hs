@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -1081,33 +1082,34 @@ replaceDeclsValbinds w (EmptyLocalBinds _) new
         sortKey = captureOrderBinds new
       in (HsValBinds an (ValBinds sortKey decs sigs))
 
-oldWhereAnnotation :: EpAnn AnnList -> WithWhere -> RealSrcSpan -> (EpAnn AnnList)
+oldWhereAnnotation :: EpAnn (AnnList (EpToken "where"))
+  -> WithWhere -> RealSrcSpan -> (EpAnn (AnnList (EpToken "where")))
 oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = an'
   -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation,
   -- change the AnnList anchor to have the correct DP too
   where
-    (AnnList ancl o c _r t) = an
+    (AnnList ancl o c s _r t) = an
     w = case ww of
-      WithWhere -> [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])]
-      WithoutWhere -> []
+      WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
+      WithoutWhere -> NoEpTok
     (anc', ancl') =
           case ww of
             WithWhere -> (anc, ancl)
             WithoutWhere -> (anc, ancl)
     an' = EpAnn anc'
-                (AnnList ancl' o c w t)
+                (AnnList ancl' o c s w t)
                 cs
 
-newWhereAnnotation :: WithWhere -> (EpAnn AnnList)
+newWhereAnnotation :: WithWhere -> (EpAnn (AnnList (EpToken "where")))
 newWhereAnnotation ww = an
   where
   anc  = EpaDelta noSrcSpan (DifferentLine 1 3) []
   anc2 = EpaDelta noSrcSpan (DifferentLine 1 5) []
   w = case ww of
-    WithWhere -> [AddEpAnn AnnWhere (EpaDelta noSrcSpan (SameLine 0) [])]
-    WithoutWhere -> []
+    WithWhere -> EpTok (EpaDelta noSrcSpan (SameLine 0) [])
+    WithoutWhere -> NoEpTok
   an = EpAnn anc
-              (AnnList (Just anc2) Nothing Nothing w [])
+              (AnnList (Just anc2) Nothing Nothing [] w [])
               emptyComments
 
 -- ---------------------------------------------------------------------

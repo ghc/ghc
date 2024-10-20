@@ -37,6 +37,7 @@
               (Nothing)
               (Nothing)
               []
+              (NoEpTok)
               [])
              (EpaComments
               []))
@@ -2536,6 +2537,9 @@
           (Just
            (AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:7:23 })))
           []
+          ((,)
+           (NoEpTok)
+           [])
           [])
          (EpaComments
           []))

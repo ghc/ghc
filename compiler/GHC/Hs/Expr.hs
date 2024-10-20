@@ -309,11 +309,11 @@ type instance XLet           GhcPs = (EpToken "let", EpToken "in")
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
-type instance XDo            GhcPs = AnnList
+type instance XDo            GhcPs = AnnList EpaLocation
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
-type instance XExplicitList  GhcPs = AnnList
+type instance XExplicitList  GhcPs = AnnList ()
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
@@ -410,7 +410,7 @@ type instance XPragE         (GhcPass _) = NoExtField
 
 type instance XFunRhs  = AnnFunRhs
 
-type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnL
+type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnLW
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
 
 arrowToHsExpr :: HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn -> LocatedA (HsExpr GhcRn)
@@ -1334,7 +1334,7 @@ type instance XCmdArrApp  GhcPs = AddEpAnn
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm GhcPs = AnnList
+type instance XCmdArrForm GhcPs = AnnList ()
 -- | fixity (filled in by the renamer), for forms that were converted from
 -- OpApp's by the renamer
 type instance XCmdArrForm GhcRn = Maybe Fixity
@@ -1361,7 +1361,7 @@ type instance XCmdLet     GhcPs = (EpToken "let", EpToken "in")
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 
-type instance XCmdDo      GhcPs = AnnList
+type instance XCmdDo      GhcPs = AnnList EpaLocation
 type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 
@@ -1781,7 +1781,7 @@ type instance XTransStmt       (GhcPass _) GhcPs b = AnnTransStmt
 type instance XTransStmt       (GhcPass _) GhcRn b = NoExtField
 type instance XTransStmt       (GhcPass _) GhcTc b = Type
 
-type instance XRecStmt         (GhcPass _) GhcPs b = AnnList
+type instance XRecStmt         (GhcPass _) GhcPs b = AnnList (EpToken "rec")
 type instance XRecStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 
@@ -2489,16 +2489,14 @@ instance UnXRec p => Outputable (DotFieldOcc p) where
 
 type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
 type instance Anno [LocatedA (HsExpr (GhcPass p))] = SrcSpanAnnC
-type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))))] = SrcSpanAnnL
-type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr)))))] = SrcSpanAnnL
+type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnLW
+type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))] = SrcSpanAnnLW
 
 type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
-  = SrcSpanAnnL
 type instance Anno (HsCmdTop (GhcPass p)) = EpAnnCO
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnLW
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnLW
 type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
 type instance Anno [LocatedA (Pat (GhcPass p))] = EpaLocation
@@ -2508,7 +2506,7 @@ type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr
 
 type instance Anno (HsUntypedSplice (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr))))] = SrcSpanAnnL
+type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr))))] = SrcSpanAnnLW
 
 type instance Anno (FieldLabelStrings (GhcPass p)) = EpAnnCO
 type instance Anno FieldLabelString                = SrcSpanAnnN
