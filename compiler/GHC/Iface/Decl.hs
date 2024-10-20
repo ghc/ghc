@@ -13,10 +13,6 @@
 module GHC.Iface.Decl
    ( coAxiomToIfaceDecl
    , tyThingToIfaceDecl -- Converting things to their Iface equivalents
-   , toIfaceBooleanFormula
-
-   -- converting back
-   , traverseIfaceBooleanFormula
    )
 where
 
@@ -36,23 +32,18 @@ import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 
-import GHC.Hs.Extension ( GhcPass )
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.TyThing
-import GHC.Types.SrcLoc
 
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import GHC.Data.Maybe
-import GHC.Data.BooleanFormula
-
 import Data.List ( findIndex, mapAccumL )
-import Language.Haskell.Syntax.Extension (IdP, LIdP)
 
 {-
 ************************************************************************
@@ -339,23 +330,3 @@ tidyTyConBinders = mapAccumL tidyTyConBinder
 
 tidyTyVar :: TidyEnv -> TyVar -> IfLclName
 tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
-
-toIfaceBooleanFormula ::  NamedThing (IdP (GhcPass p))
-                      => BooleanFormula (GhcPass p)  -> IfaceBooleanFormula
-toIfaceBooleanFormula = go
-  where
-    go (Var nm   ) = IfVar    $ mkIfLclName . getOccFS . unLoc $ nm
-    go (And bfs  ) = IfAnd    $ map go bfs
-    go (Or bfs   ) = IfOr     $ map go bfs
-    go (Parens bf) = IfParens $     go bf
-
-traverseIfaceBooleanFormula :: Applicative f
-                            => (IfLclName -> f (LIdP (GhcPass p)))
-                            -> IfaceBooleanFormula
-                            -> f (BooleanFormula (GhcPass p))
-traverseIfaceBooleanFormula f = go
-  where
-    go (IfVar nm    ) = Var     <$> f nm
-    go (IfAnd ibfs  ) = And     <$> traverse go ibfs
-    go (IfOr ibfs   ) = Or      <$> traverse go ibfs
-    go (IfParens ibf) = Parens  <$> go ibf

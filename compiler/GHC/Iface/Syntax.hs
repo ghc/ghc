@@ -37,7 +37,7 @@ module GHC.Iface.Syntax (
         ifaceDeclFingerprints,
         fromIfaceWarnings,
         fromIfaceWarningTxt,
-
+        toIfaceBooleanFormula, fromIfaceBooleanFormula,
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
         freeNamesIfConDecls,
@@ -51,6 +51,8 @@ module GHC.Iface.Syntax (
 import GHC.Prelude
 
 import GHC.Data.FastString
+import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
+
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
                            constraintKindTyConKey )
 import GHC.Types.Unique ( hasKey )
@@ -92,11 +94,12 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
 
+import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
+
 import Control.Monad
 import System.IO.Unsafe
 import Control.DeepSeq
 import Data.Proxy
-import Data.List ( intersperse )
 
 infixl 3 &&&
 
@@ -213,11 +216,26 @@ data IfaceClassBody
     }
 
 data IfaceBooleanFormula
-  = IfVar IfLclName
+  = IfVar IfaceTopBndr
   | IfAnd [IfaceBooleanFormula]
   | IfOr [IfaceBooleanFormula]
   | IfParens IfaceBooleanFormula
-  deriving Eq
+
+toIfaceBooleanFormula :: BooleanFormula GhcRn -> IfaceBooleanFormula
+toIfaceBooleanFormula = go
+  where
+    go (Var nm   ) = IfVar    $ unLoc  nm
+    go (And bfs  ) = IfAnd    $ map go bfs
+    go (Or bfs   ) = IfOr     $ map go bfs
+    go (Parens bf) = IfParens $     go bf
+
+fromIfaceBooleanFormula :: IfaceBooleanFormula -> BooleanFormula GhcRn
+fromIfaceBooleanFormula = go
+  where
+   go (IfVar nm   ) = Var    $ noLocA nm
+   go (IfAnd bfs  ) = And    $ map go bfs
+   go (IfOr bfs   ) = Or     $ map go bfs
+   go (IfParens bf) = Parens $     go bf
 
 data IfaceTyConParent
   = IfNoParent
@@ -1015,7 +1033,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
          , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
          , text "class" <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
-                        , ppShowAllSubs ss (pprMinDef minDef)])]
+                        , ppShowAllSubs ss (pprMinDef $ fromIfaceBooleanFormula minDef)])]
     where
       pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (text "where")
 
@@ -1032,29 +1050,14 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
         | showSub ss sg = Just $  pprIfaceClassOp ss sg
         | otherwise     = Nothing
 
-      pprMinDef :: IfaceBooleanFormula -> SDoc
-      pprMinDef minDef = ppUnless (ifLclIsTrue minDef) $ -- hide empty definitions
+      pprMinDef :: BooleanFormula GhcRn -> SDoc
+      pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
         text "{-# MINIMAL" <+>
-        pprifLclBooleanFormula
-          (\_ def -> let fs = ifLclNameFS def in cparen (isLexSym fs) (ppr fs)) 0 minDef <+>
+        pprBooleanFormula
+          (\_ def -> let fs = getOccFS def in cparen (isLexSym fs) (ppr fs)) 0 minDef <+>
         text "#-}"
 
-      ifLclIsTrue :: IfaceBooleanFormula -> Bool
-      ifLclIsTrue (IfAnd []) = True
-      ifLclIsTrue _          = False
 
-      pprifLclBooleanFormula  :: (Rational -> IfLclName -> SDoc)
-                              -> Rational -> IfaceBooleanFormula -> SDoc
-      pprifLclBooleanFormula pprVar = go
-        where
-        go p (IfVar x)  = pprVar p x
-        go p (IfAnd []) = cparen (p > 0) empty
-        go p (IfAnd xs) = pprAnd p (map (go 3) xs)
-        go _ (IfOr  []) = keyword $ text "FALSE"
-        go p (IfOr  xs) = pprOr p (map (go 2) xs)
-        go p (IfParens x) = go p x
-        pprAnd p = cparen (p > 3) . fsep . punctuate comma
-        pprOr  p = cparen (p > 2) . fsep . intersperse vbar
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
       suppress_bndr_sig = SuppressBndrSig True
@@ -2146,14 +2149,14 @@ instance Binary IfaceDecl where
 
 instance Binary IfaceBooleanFormula where
     put_ bh = \case
-        IfVar a1    -> putByte bh 0 >> put_ bh a1
+        IfVar a1    -> putByte bh 0 >> putIfaceTopBndr bh a1
         IfAnd a1    -> putByte bh 1 >> put_ bh a1
         IfOr a1     -> putByte bh 2 >> put_ bh a1
         IfParens a1 -> putByte bh 3 >> put_ bh a1
 
     get bh = do
         getByte bh >>= \case
-            0 -> IfVar    <$> get bh
+            0 -> IfVar    <$> getIfaceTopBndr bh
             1 -> IfAnd    <$> get bh
             2 -> IfOr     <$> get bh
             _ -> IfParens <$> get bh

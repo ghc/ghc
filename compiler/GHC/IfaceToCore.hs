@@ -44,7 +44,6 @@ import GHC.Driver.Config.Core.Lint ( initLintConfig )
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Builtin.Types
 
-import GHC.Iface.Decl (traverseIfaceBooleanFormula)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
@@ -127,17 +126,17 @@ import GHC.Types.Error
 import GHC.Fingerprint
 
 import Control.Monad
-import GHC.Parser.Annotation
 import GHC.Driver.Env.KnotVars
 import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.Function ( on )
-import Data.List (nub)
 import Data.List.NonEmpty ( NonEmpty )
 import qualified Data.List.NonEmpty as NE
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
 import GHC.Iface.Errors.Types
+
+import Language.Haskell.Syntax.BooleanFormula (mkOr)
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
 
 {-
@@ -303,19 +302,10 @@ mergeIfaceDecl d1 d2
           -- which can be taught of as being (BooleanFormula IfacePass) morally.
           -- In practice, however, its a seperate type so it needs its own function
           -- It makes an Or and does some super basic simplification.
-          mkIfaceOr :: [IfaceBooleanFormula] -> IfaceBooleanFormula
-          mkIfaceOr = maybe (IfAnd []) (mkIfaceOr' . nub . concat) . mapM fromOr
-            where
-            fromOr bf = case bf of
-              (IfOr xs)  -> Just xs
-              (IfAnd []) -> Nothing
-              _        -> Just [bf]
-            mkIfaceOr' [x] = x
-            mkIfaceOr' xs = IfOr xs
 
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = mkIfaceOr [bf1, bf2]
+                ifMinDef = toIfaceBooleanFormula . mkOr $ map fromIfaceBooleanFormula [ bf1, bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when
@@ -811,7 +801,7 @@ tc_iface_decl _parent ignore_prags
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
     ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
-    ; mindef <- traverseIfaceBooleanFormula (fmap noLocA . lookupIfaceTop . mkVarOccFS . ifLclNameFS) if_mindef
+    ; let mindef = fromIfaceBooleanFormula if_mindef
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
