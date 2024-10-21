@@ -551,6 +551,8 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && not (isFloatOp o2) && isDoubleOp o1 -> op2 (text "\tfmv.d.x") o1 o2
     | not (isFloatOp o1) && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
     | not (isFloatOp o1) && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
+    -- TODO: Why does this NOP (reg1 == reg2) happen?
+    | isVectorOp o1 && isVectorOp o2 -> op2 (text "\tvmv.v.v") o1 o2
     | (OpImm (ImmInteger i)) <- o2,
       fitsIn12bitImm i ->
         lines_ [text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <> comma <+> pprOp platform o2]
@@ -716,8 +718,8 @@ pprInstr platform instr = case instr of
           FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
      in op4 fma d r1 r2 r3
 
-  VMV o1@(OpReg w _) o2 | isFloatOp o2 -> op2 (text "\tvfmv" <> dot <> text "f" <> dot <> floatWidthSuffix w) o1 o2
-  VMV o1@(OpReg w _) o2 | isFloatOp o1 -> op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> floatWidthSuffix w) o1 o2
+  VMV o1@(OpReg w _) o2 | isFloatOp o1 -> op2 (text "\tvfmv" <> dot <> text "f" <> dot <> floatWidthSuffix w) o1 o2
+  VMV o1@(OpReg _w _) o2 | isFloatOp o2 -> op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
   VMV o1 o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> opToVInstrSuffix o2) o1 o2
   VID o1 o2 -> op2 (text "\tvid.v") o1 o2
   VMSEQ o1 o2 o3 -> op3 (text "\tvmseq.v.x") o1 o2 o3
