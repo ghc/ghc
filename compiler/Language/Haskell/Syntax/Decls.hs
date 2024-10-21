@@ -39,7 +39,7 @@ module Language.Haskell.Syntax.Decls (
   isClassDecl, isDataDecl, isSynDecl,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
-  FamilyDecl(..), LFamilyDecl, familyInfoTyConFlavour,
+  FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
   InstDecl(..), LInstDecl, FamilyInfo(..),
@@ -95,7 +95,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic (Role, LexicalFixity, TyConFlavour(..), TypeOrData(..), RuleName)
+import Language.Haskell.Syntax.Basic (Role, LexicalFixity, RuleName)
 import Language.Haskell.Syntax.Specificity (Specificity)
 import Language.Haskell.Syntax.InlinePragma(Activation)
 import Language.Haskell.Syntax.OverlapPragma(LOverlapMode)
@@ -106,7 +106,6 @@ import GHC.Unit.Module.Warnings (WarningTxt)
 import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
 import Control.Monad
-import Control.Exception (assert)
 import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Void
 import Data.Maybe
@@ -835,17 +834,6 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
-familyInfoTyConFlavour
-  :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
-  -> FamilyInfo pass
-  -> TyConFlavour tc
-familyInfoTyConFlavour mb_parent_tycon info =
-  case info of
-    DataFamily         -> OpenFamilyFlavour IAmData mb_parent_tycon
-    OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
-    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
-                          -- See Note [Closed type family mb_parent_tycon]
-                          ClosedTypeFamilyFlavour
 
 {- Note [Closed type family mb_parent_tycon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

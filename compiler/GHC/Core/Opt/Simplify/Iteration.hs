@@ -663,9 +663,9 @@ mkCastWrapperInlinePrag :: InlinePragma (GhcPass p) -> InlinePragma (GhcPass p)
 mkCastWrapperInlinePrag  (XCInlinePragma impossible) = dataConCantHappen impossible
 -- See Note [Cast worker/wrapper]
 mkCastWrapperInlinePrag (InlinePragma { inl_inline = fn_inl, inl_act = fn_act, inl_rule = rule_info })
-  = InlinePragma { inl_ext    = SourceText $ fsLit "{-# INLINE"
+  = InlinePragma { inl_ext    = InlExt (SourceText $ fsLit "{-# INLINE") Nothing
                  , inl_inline = fn_inl       -- See Note [Worker/wrapper for INLINABLE functions]
-                 , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
+                                             --     in GHC.Core.Opt.WorkWrap
                  , inl_act    = wrap_act     -- See Note [Wrapper activation]
                  , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap
                                 -- RuleMatchInfo is (and must be) unaffected

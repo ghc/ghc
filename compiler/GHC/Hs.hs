@@ -22,6 +22,7 @@ therefore, is almost nothing but re-exporting.
 
 module GHC.Hs (
         module Language.Haskell.Syntax,
+        module GHC.Hs.Basic,
         module GHC.Hs.Binds,
         module GHC.Hs.Decls,
         module GHC.Hs.Expr,
@@ -44,6 +45,7 @@ module GHC.Hs (
 -- friends:
 import GHC.Prelude
 
+import GHC.Hs.Basic
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr

@@ -2,24 +2,28 @@ module Language.Haskell.Syntax.InlinePragma where
 
 import GHC.Prelude
 
-import Language.Haskell.Syntax.Basic(Arity)
 import Language.Haskell.Syntax.Extension
+    ( XActiveAfter,
+      XActiveBefore,
+      XAlwaysActive,
+      XFinalActive,
+      XInlinable,
+      XInline,
+      XInlinePragma,
+      XNeverActive,
+      XNoInline,
+      XNoUserInlinePrag,
+      XOpaque,
+      XXActivation,
+      XXCInlinePragma,
+      XXInlineSpec )
 
-data InlinePragma p           -- Note [InlinePragma] in GHC.Hs.InlinePragma
+data InlinePragma p -- Note [InlinePragma] in GHC.Hs.InlinePragma
   = InlinePragma
-      { inl_ext    :: XInlinePragma p -- See Note [Pragma source text]
+      { inl_ext    :: XInlinePragma p
       , inl_inline :: InlineSpec p    -- See Note [inl_inline and inl_act] in GHC.Hs.InlinePragma
-
-      , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n
-                                     --            explicit (non-type, non-dictionary) args
-                                     --   That is, inl_sat describes the number of *source-code*
-                                     --   arguments the thing must be applied to.  We add on the
-                                     --   number of implicit, dictionary arguments when making
-                                     --   the Unfolding, and don't look at inl_sat further
-
       , inl_act    :: Activation p    -- Says during which phases inlining is allowed
                                       -- See Note [inl_inline and inl_act] in GHC.Hs.InlinePragma
-
       , inl_rule   :: RuleMatchInfo   -- Should the function be treated like a constructor?
     }
   | XCInlinePragma (XXCInlinePragma p)
@@ -65,5 +69,3 @@ isConLike _       = False
 isFunLike :: RuleMatchInfo -> Bool
 isFunLike FunLike = True
 isFunLike _       = False
-
-

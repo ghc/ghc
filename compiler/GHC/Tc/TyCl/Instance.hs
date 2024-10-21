@@ -70,7 +70,6 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Data.Bag
 import GHC.Types.Basic
-import GHC.Types.Fixity
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Utils.Logger
@@ -1379,7 +1378,7 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 addDFunPrags dfun_id sc_meth_ids
  | is_newtype
   = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity defaultSimpleOpts StableSystemSrc 0 con_app
-            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+            `setInlinePragma` (alwaysInlinePragma `set_pragma_sat` Just 0)
  | otherwise
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
            `setInlinePragma` dfunInlinePragma

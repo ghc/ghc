@@ -608,6 +608,7 @@ deriving instance Data (InlineSpec GhcPs)
 deriving instance Data (InlineSpec GhcRn)
 deriving instance Data (InlineSpec GhcTc)
 
+deriving instance Data  InlinePragmaExt
 deriving instance Data (InlinePragma GhcPs)
 deriving instance Data (InlinePragma GhcRn)
 deriving instance Data (InlinePragma GhcTc)

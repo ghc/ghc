@@ -38,7 +38,6 @@ import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( fUNTyCon )
 import GHC.Types.Basic as Hs
-import GHC.Types.Fixity as Hs
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.SourceText
@@ -46,8 +45,6 @@ import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Panic
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
@@ -875,22 +872,20 @@ cvtPragmaD (InlineP nm inline rm phases)
        ; let src TH.NoInline  = fsLit "{-# NOINLINE"
              src TH.Inline    = fsLit "{-# INLINE"
              src TH.Inlinable = fsLit "{-# INLINABLE"
-       ; let ip   = InlinePragma { inl_ext    = toSrcTxt inline
+       ; let ip   = InlinePragma { inl_ext    = InlExt (toSrcTxt inline) Nothing
                                  , inl_inline = cvtInline inline (toSrcTxt inline)
                                  , inl_rule   = cvtRuleMatch rm
-                                 , inl_act    = cvtPhases phases dflt
-                                 , inl_sat    = Nothing }
+                                 , inl_act    = cvtPhases phases dflt }
                     where
                      toSrcTxt a = SourceText $ src a
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
 
 cvtPragmaD (OpaqueP nm)
   = do { nm' <- vNameN nm
-       ; let ip = InlinePragma { inl_ext    = srcTxt
+       ; let ip = InlinePragma { inl_ext    = InlExt srcTxt Nothing
                                , inl_inline = Opaque srcTxt
                                , inl_rule   = Hs.FunLike
-                               , inl_act    = NeverActive noExtField
-                               , inl_sat    = Nothing }
+                               , inl_act    = NeverActive noExtField }
                   where
                     srcTxt = SourceText $ fsLit "{-# OPAQUE"
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
@@ -908,11 +903,10 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
                                 SourceText $ fsLit "{-# SPECIALISE")
                where
                 toSrcTxt a = SourceText $ src a
-       ; let ip = InlinePragma { inl_ext    = srcText
+       ; let ip = InlinePragma { inl_ext    = InlExt srcText Nothing
                                , inl_inline = inline'
                                , inl_rule   = Hs.FunLike
-                               , inl_act    = cvtPhases phases dflt
-                               , inl_sat    = Nothing }
+                               , inl_act    = cvtPhases phases dflt }
        ; returnJustLA $ Hs.SigD noExtField $ SpecSig noAnn nm' [ty'] ip }
 
 cvtPragmaD (SpecialiseInstP ty)

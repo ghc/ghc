@@ -589,7 +589,7 @@ addInlinePragArity _ sig = sig
 add_inl_arity :: Arity -> InlinePragma (GhcPass p) -> InlinePragma (GhcPass p)
 add_inl_arity ar prag@(InlinePragma { inl_inline = inl_spec })
   | Inline {} <- inl_spec  -- Add arity only for real INLINE pragmas, not INLINABLE
-  = prag { inl_sat = Just ar }
+  = set_pragma_sat prag (Just ar)
   | otherwise
   = prag
 

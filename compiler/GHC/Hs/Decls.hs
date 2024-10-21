@@ -51,7 +51,7 @@ module GHC.Hs.Decls (
   pp_vanilla_decl_head,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, FamilyInfo(..),
+  InstDecl(..), LInstDecl, FamilyInfo(..), familyInfoTyConFlavour,
   TyFamInstDecl(..), LTyFamInstDecl, instDeclDataFamInsts,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
@@ -114,6 +114,7 @@ import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprUntypedSplice )
 
 import GHC.Hs.Binds
 import GHC.Hs.Type
+import GHC.Hs.Basic
 import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Core.Coercion
@@ -122,7 +123,6 @@ import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Fixity
 
 -- others:
 import GHC.Utils.Misc (count)
@@ -430,7 +430,19 @@ data AnnSynDecl
 instance NoAnn AnnSynDecl where
   noAnn = AnnSynDecl noAnn noAnn noAnn noAnn
 
-------------- Pretty printing FamilyDecls -----------
+------------- FamilyInfo -----------
+
+familyInfoTyConFlavour
+  :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
+  -> FamilyInfo pass
+  -> TyConFlavour tc
+familyInfoTyConFlavour mb_parent_tycon info =
+  case info of
+    DataFamily         -> OpenFamilyFlavour IAmData mb_parent_tycon
+    OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
+    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
+                          -- See Note [Closed type family mb_parent_tycon]
+                          ClosedTypeFamilyFlavour
 
 pprFlavour :: FamilyInfo pass -> SDoc
 pprFlavour DataFamily            = text "data"

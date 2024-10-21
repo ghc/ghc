@@ -834,9 +834,8 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                    NoInline _  -> inl_act fn_inl_prag
                    _           -> inl_act wrap_prag
 
-    work_prag = InlinePragma { inl_ext = SourceText $ fsLit "{-# INLINE"
+    work_prag = InlinePragma { inl_ext = InlExt (SourceText $ fsLit "{-# INLINE") Nothing
                              , inl_inline = fn_inline_spec
-                             , inl_sat    = Nothing
                              , inl_act    = work_act
                              , inl_rule   = FunLike }
       -- inl_inline: copy from fn_id; see Note [Worker/wrapper for INLINABLE functions]
@@ -903,9 +902,7 @@ mkStrWrapperInlinePrag (XCInlinePragma impossible) _ = dataConCantHappen impossi
 mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
                                      , inl_act    = fn_act
                                      , inl_rule   = rule_info }) rules
-  = InlinePragma { inl_ext    = SourceText $ fsLit "{-# INLINE"
-                 , inl_sat    = Nothing
-
+  = InlinePragma { inl_ext    = InlExt (SourceText $ fsLit "{-# INLINE") Nothing
                  , inl_inline = fn_inl
                       -- See Note [Worker/wrapper for INLINABLE functions]
 

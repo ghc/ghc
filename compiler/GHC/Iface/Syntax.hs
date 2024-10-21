@@ -454,7 +454,7 @@ data IfaceInlinePragma
 
 fromIfaceInlinePragma :: IfaceInlinePragma -> InlinePragma (GhcPass p)
 fromIfaceInlinePragma (IfInlinePragma s a b c d)
-  = InlinePragma s (fromIfaceInlineSpec a) b (fromIfaceActivation c) d
+  = InlinePragma (InlExt s b) (fromIfaceInlineSpec a) (fromIfaceActivation c) d
 
 data IfaceInfoItem
   = HsArity         Arity

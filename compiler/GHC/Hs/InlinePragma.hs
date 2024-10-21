@@ -4,6 +4,8 @@
 {-# HLINT ignore "Use camelCase" #-}
 module GHC.Hs.InlinePragma(
         module Language.Haskell.Syntax.InlinePragma,
+        InlinePragmaExt(..),
+        inl_src, inl_sat,
         CompilerPhase(..), beginPhase, nextPhase, laterPhase,
 
         Activation(..), isActive, competesWith,
@@ -25,16 +27,17 @@ module GHC.Hs.InlinePragma(
         pprInline, pprInlineDebug,
         convertInlinePragma, convertInlineSpec, convertActivation,
 
-        set_pragma_inline, set_pragma_activation, set_pragma_rule
+        set_pragma_inline, set_pragma_activation, set_pragma_rule, set_pragma_sat
 ) where
 
 import GHC.Prelude
 import GHC.Types.SourceText(SourceText (..), pprWithSourceText)
 import GHC.Hs.Extension(GhcPass)
+import GHC.Types.Basic(Arity)
+
 import GHC.Utils.Outputable (Outputable, SDoc
   ,ppr,  (<>), (<+>), empty, parens, brackets, text, int, char)
 
-import Language.Haskell.Syntax.Basic(Arity)
 import Language.Haskell.Syntax.InlinePragma
 import Language.Haskell.Syntax.Extension
 import GHC.Data.FastString (fsLit)
@@ -49,7 +52,7 @@ import GHC.Utils.Binary (Binary, put_, get, putByte, getByte)
 -}
 
 --InlinePragma
-type instance XInlinePragma   (GhcPass p) = SourceText
+type instance XInlinePragma   (GhcPass p) = InlinePragmaExt
 type instance XXCInlinePragma (GhcPass p) = DataConCantHappen
 
 deriving instance Eq (InlinePragma (GhcPass p))
@@ -208,9 +211,28 @@ update the list of moving parts referenced in this note.
 
 -}
 
+data InlinePragmaExt = InlExt
+  { inl_txt    :: SourceText     -- See Note [Pragma source text]
+  , inl_arr    :: Maybe Arity    -- Just n <=> Inline only when applied to n
+                                     --            explicit (non-type, non-dictionary) args
+                                     --   That is, inl_sat describes the number of *source-code*
+                                     --   arguments the thing must be applied to.  We add on the
+                                     --   number of implicit, dictionary arguments when making
+                                     --   the Unfolding, and don't look at inl_sat further
+  }
+  deriving Eq
+
+inl_src  :: InlinePragma (GhcPass p) -> SourceText
+inl_src (XCInlinePragma impossible) = dataConCantHappen impossible
+inl_src (InlinePragma s _ _ _)      = inl_txt s
+
+inl_sat  :: InlinePragma (GhcPass p) -> Maybe Arity
+inl_sat (XCInlinePragma impossible) = dataConCantHappen impossible
+inl_sat (InlinePragma s _ _ _)      = inl_arr s
+
 convertInlinePragma :: InlinePragma (GhcPass p) -> InlinePragma (GhcPass p')
 convertInlinePragma (XCInlinePragma impossible) = XCInlinePragma impossible
-convertInlinePragma (InlinePragma s a b c d)    = InlinePragma s (convertInlineSpec a) b (convertActivation c) d
+convertInlinePragma (InlinePragma s a b c)    = InlinePragma s (convertInlineSpec a) (convertActivation b) c
 
 convertInlineSpec :: InlineSpec (GhcPass p) -> InlineSpec (GhcPass p')
 convertInlineSpec (Inline    ext)        = Inline    ext
@@ -226,11 +248,11 @@ noUserInlineSpec _                = False
 
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma (GhcPass p)
-defaultInlinePragma = InlinePragma { inl_ext = SourceText $ fsLit "{-# INLINE"
+defaultInlinePragma = InlinePragma { inl_ext = InlExt (SourceText $ fsLit "{-# INLINE") Nothing
                                    , inl_act = AlwaysActive noExtField
                                    , inl_rule = FunLike
                                    , inl_inline = NoUserInlinePrag noExtField
-                                   , inl_sat = Nothing }
+                                   }
 
 set_pragma_inline :: InlinePragma (GhcPass p) -> InlineSpec (GhcPass p) -> InlinePragma (GhcPass p)
 set_pragma_inline inl@(InlinePragma{}) spec = inl{ inl_inline = spec}
@@ -244,6 +266,9 @@ set_pragma_rule :: InlinePragma (GhcPass p) -> RuleMatchInfo -> InlinePragma (Gh
 set_pragma_rule inl@(InlinePragma{}) act = inl{ inl_rule = act}
 set_pragma_rule (XCInlinePragma imp) _    = dataConCantHappen imp
 
+set_pragma_sat :: InlinePragma (GhcPass p) -> Maybe Arity -> InlinePragma (GhcPass p)
+set_pragma_sat inl@(InlinePragma{ inl_ext = ext}) sat = inl{ inl_ext = ext{inl_arr = sat} }
+set_pragma_sat (XCInlinePragma imp) _    = dataConCantHappen imp
 
 alwaysInlinePragma = set_pragma_inline defaultInlinePragma $ Inline (inlinePragmaSource defaultInlinePragma)
 
@@ -566,10 +591,11 @@ pprInline' :: Bool           -- True <=> do not display the inl_inline field
            -> InlinePragma (GhcPass p)
            -> SDoc
 pprInline' emptyInline (InlinePragma
-                        { inl_inline = inline,
+                        { inl_ext    = InlExt _ mb_arity,
+                          inl_inline = inline,
                           inl_act = activation,
-                          inl_rule = info,
-                          inl_sat = mb_arity })
+                          inl_rule = info
+                        })
     = pp_inl inline <> pp_act inline activation <+> pp_sat <+> pp_info
     where
       pp_inl x = if emptyInline then empty else inlinePragmaName x

@@ -689,8 +689,8 @@ toIfaceInlineSpec (NoUserInlinePrag _)     = IfNoUserInlinePrag
 toIfaceInlineSpec (XInlineSpec impossible) = dataConCantHappen impossible
 
 toIfaceInlinePragma :: InlinePragma (GhcPass p) -> IfaceInlinePragma
-toIfaceInlinePragma (InlinePragma s a b c d)
-  = (IfInlinePragma s (toIfaceInlineSpec a) b (toIfaceActivation c) d)
+toIfaceInlinePragma (InlinePragma s a b c)
+  = IfInlinePragma (inl_txt s) (toIfaceInlineSpec a) (inl_arr s) (toIfaceActivation b) c
 toIfaceInlinePragma (XCInlinePragma impossible) = dataConCantHappen impossible
 
 ---------------------

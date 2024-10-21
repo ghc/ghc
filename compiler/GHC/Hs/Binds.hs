@@ -862,8 +862,8 @@ ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
                                              (interpp'SP ty) inl)
     where
       pragmaSrc = case spec of
-        NoUserInlinePrag _ -> "{-# " ++ extractSpecPragName (inl_ext inl)
-        _                  -> "{-# " ++ extractSpecPragName (inl_ext inl)  ++ "_INLINE"
+        NoUserInlinePrag _ -> "{-# " ++ extractSpecPragName (inl_src inl)
+        _                  -> "{-# " ++ extractSpecPragName (inl_src inl)  ++ "_INLINE"
 ppr_sig (InlineSig _ var inl)
   = ppr_pfx <+> pprInline inl <+> pprPrefixOcc (unLoc var) <+> text "#-}"
     where
@@ -896,6 +896,7 @@ ppr_sig (CompleteMatchSig (_, src) cs mty)
 ppr_sig (XSig x) = case ghcPass @p of
                       GhcRn | IdSig id <- x -> pprVarSig [id] (ppr (varType id))
                       GhcTc | IdSig id <- x -> pprVarSig [id] (ppr (varType id))
+ppr_sig (SpecSig _ _ _ (XCInlinePragma impossible)) = dataConCantHappen impossible
 
 hsSigDoc :: forall p. IsPass p => Sig (GhcPass p) -> SDoc
 hsSigDoc (TypeSig {})           = text "type signature"
@@ -965,7 +966,7 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
-    = text (extractSpecPragName $ inl_ext inl) <+> pprSpec var (text "<type>") inl
+    = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
 
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (GenLocated l name) -> SDoc

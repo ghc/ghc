@@ -124,6 +124,7 @@ import GHC.Hs.Lit
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
+import GHC.Hs.Basic
 import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence
@@ -164,6 +165,7 @@ import Data.IntMap ( IntMap )
 import qualified Data.IntMap.Strict as IntMap
 import Data.Map ( Map )
 import qualified Data.Map.Strict as Map
+import GHC.Core.TyCon (TyConFlavour)
 
 {-
 ************************************************************************

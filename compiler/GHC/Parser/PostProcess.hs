@@ -167,9 +167,6 @@ import qualified Data.Semigroup as Semi
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
@@ -2965,9 +2962,8 @@ mkInlinePragma :: SourceText -> (InlineSpec GhcPs, RuleMatchInfo) -> Maybe (Acti
 -- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
 mkInlinePragma src (inl, match_info) mb_act
-  = InlinePragma { inl_ext = src -- See Note [Pragma source text] in "GHC.Types.SourceText"
+  = InlinePragma { inl_ext = InlExt src Nothing-- See Note [Pragma source text] in "GHC.Types.SourceText"
                  , inl_inline = inl
-                 , inl_sat    = Nothing
                  , inl_act    = act
                  , inl_rule   = match_info }
   where
@@ -2981,9 +2977,8 @@ mkInlinePragma src (inl, match_info) mb_act
 
 mkOpaquePragma :: SourceText -> InlinePragma GhcPs
 mkOpaquePragma src
-  = InlinePragma { inl_ext    = src
+  = InlinePragma { inl_ext    = InlExt src Nothing
                  , inl_inline = Opaque src
-                 , inl_sat    = Nothing
                  -- By marking the OPAQUE pragma NeverActive we stop
                  -- (constructor) specialisation on OPAQUE things.
                  --
