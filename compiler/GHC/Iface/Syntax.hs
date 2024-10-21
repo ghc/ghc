@@ -1689,14 +1689,6 @@ instance Binary IfaceActivation where
                       ab <- get bh
                       return (IfActiveAfter src ab)
 
-instance Binary RuleMatchInfo where
-    put_ bh FunLike = putByte bh 0
-    put_ bh ConLike = putByte bh 1
-    get bh = do
-            h <- getByte bh
-            if h == 1 then return ConLike
-                      else return FunLike
-
 instance Binary IfaceInlineSpec where
     put_ bh  IfNoUserInlinePrag  = putByte bh 0
     put_ bh (IfInline s)         = do putByte bh 1

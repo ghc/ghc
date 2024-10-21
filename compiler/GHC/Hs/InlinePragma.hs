@@ -38,6 +38,7 @@ import Language.Haskell.Syntax.Basic(Arity)
 import Language.Haskell.Syntax.InlinePragma
 import Language.Haskell.Syntax.Extension
 import GHC.Data.FastString (fsLit)
+import GHC.Utils.Binary (Binary, put_, get, putByte, getByte)
 
 {-
 ************************************************************************
@@ -583,3 +584,11 @@ pprInline' emptyInline (InlinePragma
       pp_info | isFunLike info = empty
               | otherwise      = ppr info
 pprInline' _ (XCInlinePragma impossible) = dataConCantHappen impossible
+
+instance Binary RuleMatchInfo where
+    put_ bh FunLike = putByte bh 0
+    put_ bh ConLike = putByte bh 1
+    get bh = do
+            h <- getByte bh
+            if h == 1 then return ConLike
+                      else return FunLike

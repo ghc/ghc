@@ -13,12 +13,14 @@ module GHC.Hs.OverlapPragma(
   , convertOverlapMode
 ) where
 
-import Language.Haskell.Syntax.OverlapPragma
-import Language.Haskell.Syntax.Extension 
-
 import GHC.Prelude
-import GHC.Types.SourceText 
+
+import Language.Haskell.Syntax.OverlapPragma
+import Language.Haskell.Syntax.Extension
+
 import GHC.Hs.Extension (GhcPass, GhcTc)
+
+import GHC.Types.SourceText
 
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -47,7 +49,7 @@ newtype NonCanonical = NonCanonical SourceText
 
 
 -----------------------
--- converting 
+-- converting
 convertOverlapMode :: OverlapMode (GhcPass p) -> OverlapMode (GhcPass p')
 convertOverlapMode = \case
   NoOverlap s    -> NoOverlap s
@@ -110,8 +112,9 @@ instance Binary OverlapFlag where
         b <- get bh
         return OverlapFlag { overlapMode = h, isSafeOverlap = b }
 
+
 ------------------------
--- helper functions 
+-- helper functions
 hasIncoherentFlag :: OverlapMode (GhcPass p) -> Bool
 hasIncoherentFlag = \case
   Incoherent   _                -> True
@@ -127,7 +130,7 @@ hasOverlappableFlag = \case
   _                             -> False
 
 hasOverlappingFlag :: OverlapMode (GhcPass p) -> Bool
-hasOverlappingFlag = \case 
+hasOverlappingFlag = \case
   Overlapping  _                -> True
   Overlaps     _                -> True
   Incoherent   _                -> True
