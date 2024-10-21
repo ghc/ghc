@@ -12,10 +12,9 @@ import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
-import Rules.Generate (ghcPrimDependencies)
 import Base
 import Context
-import Expression (getContextData, interpretInContext, (?), package)
+import Expression (getContextData, interpretInContext)
 import Flavour
 import Oracles.ModuleFiles
 import Oracles.Setting (topDirectory)
@@ -287,14 +286,7 @@ buildPackageDocumentation = do
         dep_pkgs <- sequence [pkgConfFile (context { way = haddockWay, Context.package = p})
                              | (p, _) <- haddocks]
 
-        -- `ghc-prim` has a source file for 'GHC.Prim' which is generated just
-        -- for Haddock. We need to 'union' (instead of '++') to avoid passing
-        -- 'GHC.PrimopWrappers' (which unfortunately shows up in both
-        -- `generatedSrcs` and `vanillaSrcs`) to Haddock twice.
-        generatedSrcs <- interpretInContext context (Expression.package ghcPrim ? ghcPrimDependencies)
-        vanillaSrcs <- hsSources context
-        let srcs = vanillaSrcs `union` generatedSrcs
-
+        srcs <- hsSources context
         need $ srcs ++ (map snd haddocks) ++ dep_pkgs
 
         statsFilesDir <- haddockStatsFilesDir

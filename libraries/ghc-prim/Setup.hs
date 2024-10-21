@@ -19,42 +19,13 @@ import System.Directory
 
 main :: IO ()
 main = do let hooks = simpleUserHooks {
-                  regHook = addPrimModule
-                          $ regHook simpleUserHooks,
                   buildHook = build_primitive_sources
                             $ buildHook simpleUserHooks,
-                  haddockHook = addPrimModuleForHaddock
-                              $ build_primitive_sources
+                  haddockHook = build_primitive_sources
                               $ haddockHook simpleUserHooks }
           defaultMainWithHooks hooks
 
 type Hook a = PackageDescription -> LocalBuildInfo -> UserHooks -> a -> IO ()
-
-addPrimModule :: Hook a -> Hook a
-addPrimModule f pd lbi uhs x =
-    do let -- I'm not sure which one of these we actually need to change.
-           -- It seems bad that there are two.
-           pd' = addPrimModuleToPD pd
-           lpd = addPrimModuleToPD (localPkgDescr lbi)
-           lbi' = lbi { localPkgDescr = lpd }
-       f pd' lbi' uhs x
-
-addPrimModuleForHaddock :: Hook a -> Hook a
-addPrimModuleForHaddock f pd lbi uhs x =
-    do let pc = withPrograms lbi
-           pc' = userSpecifyArgs "haddock" ["GHC/Prim.hs"] pc
-           lbi' = lbi { withPrograms = pc' }
-       f pd lbi' uhs x
-
-addPrimModuleToPD :: PackageDescription -> PackageDescription
-addPrimModuleToPD pd =
-    case library pd of
-    Just lib ->
-        let ems = fromJust (simpleParse "GHC.Prim") : exposedModules lib
-            lib' = lib { exposedModules = ems }
-        in pd { library = Just lib' }
-    Nothing ->
-        error "Expected a library, but none found"
 
 build_primitive_sources :: Hook a -> Hook a
 build_primitive_sources f pd lbi uhs x

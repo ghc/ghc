@@ -1215,12 +1215,17 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
   --
   -- We usually desugar even when we are not generating code, otherwise we
   -- would miss errors thrown by the desugaring (see #10600). The only
-  -- exceptions are when the Module is Ghc.Prim or when it is not a
-  -- HsSrcFile Module.
-  mb_desugar <-
-      if ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
-      then Just <$> hscDesugar' (ms_location summary) tc_result
-      else pure Nothing
+  -- exception is when it is not a HsSrcFile module.
+  mb_desugar <- if
+    | hsc_src /= HsSrcFile       -> pure Nothing
+    -- Desugar an empty ghc-prim:GHC.Prim module by filtering out all its
+    -- bindings: the reason is that some of them are invalid (such as top-level
+    -- unlifted ones like void# or proxy#) and cause HsToCore failures.
+    --
+    -- We still need to desugar *something* because the driver and the linkers
+    -- expect a valid object file (.o) to be generated for this module.
+    | ms_mod summary == gHC_PRIM -> Just <$> hscDesugar' (ms_location summary) (tc_result { tcg_binds = [] })
+    | otherwise                  -> Just <$> hscDesugar' (ms_location summary) tc_result
 
   -- Report the warnings from both typechecking and desugar together
   w <- getDiagnostics

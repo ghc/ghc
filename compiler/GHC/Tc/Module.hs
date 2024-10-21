@@ -975,6 +975,13 @@ checkHiBootIface'
   = do  { traceTc "checkHiBootIface" $ vcat
              [ ppr boot_type_env, ppr boot_exports ]
 
+        ; mod <- tcg_mod <$> getGblEnv
+
+        -- don't perform type-checking for ghc-prim:GHC.Prim module.
+        -- The interface (see ghcPrimIface in GHC.Iface.Load) exports entities
+        -- not found in the module code.
+        ; if mod == gHC_PRIM then pure [] else do {
+
         ; gre_env <- getGlobalRdrEnv
 
                 -- Check the exports of the boot module, one by one
@@ -994,7 +1001,7 @@ checkHiBootIface'
 
         ; failIfErrsM
 
-        ; return (fld_prs ++ dfun_prs) }
+        ; return (fld_prs ++ dfun_prs) }}
 
   where
     boot_dfun_names = map idName boot_dfuns
