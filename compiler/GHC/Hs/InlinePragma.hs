@@ -24,7 +24,7 @@ module GHC.Hs.InlinePragma(
         pprInline, pprInlineDebug,
         convertInlinePragma, convertInlineSpec, convertActivation
 
-) where 
+) where
 
 import GHC.Prelude
 import GHC.Types.SourceText(SourceText (..), pprWithSourceText)
@@ -59,7 +59,7 @@ type instance XOpaque    (GhcPass _) = SourceText
 type instance XNoUserInlinePrag (GhcPass _) = NoExtField
 type instance XXInlineSpec      (GhcPass _) = DataConCantHappen
 
-deriving instance Eq (InlineSpec (GhcPass p))  
+deriving instance Eq (InlineSpec (GhcPass p))
 
 instance Show (InlineSpec (GhcPass p)) where
   show (Inline s)    = "Inline "    ++ show s
@@ -77,7 +77,7 @@ type instance XFinalActive  (GhcPass _) = NoExtField
 type instance XNeverActive  (GhcPass _) = NoExtField
 type instance XXActivation  (GhcPass _) = DataConCantHappen
 
-deriving instance Eq (Activation (GhcPass p))  
+deriving instance Eq (Activation (GhcPass p))
     -- Eq used in comparing rules in GHC.Hs.Decls
 
 
@@ -274,7 +274,7 @@ inlineSpecSource spec = case spec of
 -- exprIsConApp_maybe can "see" its unfolding
 -- (However, its actual Unfolding is a DFunUnfolding, which is
 --  never inlined other than via exprIsConApp_maybe.)
-dfunInlinePragma = let 
+dfunInlinePragma = let
   always_active         = set_pragma_activation defaultInlinePragma (AlwaysActive noExtField)
   always_active_conlike = set_pragma_rule always_active ConLike
   in always_active_conlike
@@ -284,7 +284,7 @@ isDefaultInlinePragma (InlinePragma { inl_act = activation
                                     , inl_rule = match_info
                                     , inl_inline = inline })
   = noUserInlineSpec inline && isAlwaysActive activation && isFunLike match_info
-isDefaultInlinePragma (XCInlinePragma impossible) = dataConCantHappen impossible 
+isDefaultInlinePragma (XCInlinePragma impossible) = dataConCantHappen impossible
 
 isInlinePragma :: InlinePragma (GhcPass p) -> Bool
 isInlinePragma prag@(InlinePragma{}) = case inl_inline prag of
@@ -538,7 +538,7 @@ inlinePragmaName (Inlinable         _)  = text "INLINABLE"
 inlinePragmaName (NoInline          _)  = text "NOINLINE"
 inlinePragmaName (Opaque            _)  = text "OPAQUE"
 inlinePragmaName (NoUserInlinePrag  _)   = empty
-inlinePragmaName (XInlineSpec impossible) = dataConCantHappen impossible 
+inlinePragmaName (XInlineSpec impossible) = dataConCantHappen impossible
 
 -- | Pretty-print without displaying the user-specified 'InlineSpec'.
 pprInline :: InlinePragma (GhcPass p) -> SDoc

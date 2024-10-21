@@ -1,7 +1,7 @@
-module Language.Haskell.Syntax.InlinePragma where 
+module Language.Haskell.Syntax.InlinePragma where
 
 import GHC.Prelude
-import Data.Data 
+
 import Language.Haskell.Syntax.Basic(Arity)
 import Language.Haskell.Syntax.Extension
 
@@ -21,7 +21,7 @@ data InlinePragma p           -- Note [InlinePragma] in GHC.Hs.InlinePragma
                                       -- See Note [inl_inline and inl_act] in GHC.Hs.InlinePragma
 
       , inl_rule   :: RuleMatchInfo   -- Should the function be treated like a constructor?
-    } 
+    }
   | XCInlinePragma (XXCInlinePragma p)
 
 
@@ -33,7 +33,7 @@ data InlineSpec p   -- What the user's INLINE pragma looked like
   | Opaque    (XOpaque    p)       -- User wrote OPAQUE
                                -- Each of the above keywords is accompanied with
                                -- a string of type SourceText written by the user
-  | NoUserInlinePrag (XNoUserInlinePrag p) 
+  | NoUserInlinePrag (XNoUserInlinePrag p)
                      -- User did not write any of INLINE/INLINABLE/NOINLINE
                      -- e.g. in `defaultInlinePragma` or when created by CSE
   | XInlineSpec (XXInlineSpec p)
