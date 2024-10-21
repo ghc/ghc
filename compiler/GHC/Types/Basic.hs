@@ -102,16 +102,15 @@ module GHC.Types.Basic (
 import GHC.Prelude
 
 import GHC.ForeignSrcLang
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic ( panic )
 import GHC.Utils.Binary
-import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic  (Boxity(..), isBoxed, ConTag, TyConFlavour(..)
                                       , TypeOrData(..), tyConFlavourAssoc_maybe
-                                      , Arity, VisArity, RepArity, JoinArity, FullArgCount,
+                                      , Arity, VisArity, RepArity, JoinArity, FullArgCount
+                                      , RuleName
                                       )
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
@@ -404,7 +403,6 @@ instance Binary FunctionOrData where
 ************************************************************************
 -}
 
-type RuleName = FastString
 
 pprRuleName :: RuleName -> SDoc
 pprRuleName rn = doubleQuotes (ftext rn)
