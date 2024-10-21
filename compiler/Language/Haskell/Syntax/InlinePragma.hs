@@ -55,7 +55,7 @@ type PhaseNum = Int  -- Compilation phase
 -- | Rule Match Information
 data RuleMatchInfo = ConLike -- See Note [CONLIKE pragma] in GHC.Hs.InlinePragma
                    | FunLike
-                   deriving( Eq, Data, Show )
+                   deriving( Eq, Show )
   -- Show needed for GHC.Parser.Lexer
 
 isConLike :: RuleMatchInfo -> Bool

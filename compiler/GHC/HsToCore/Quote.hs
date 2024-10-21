@@ -2707,18 +2707,18 @@ repNewtypeStrategy = rep2 newtypeStrategyName []
 repViaStrategy :: Core (M TH.Type) -> MetaM (Core (M TH.DerivStrategy))
 repViaStrategy (MkC t) = rep2 viaStrategyName [t]
 
-repOverlap :: Maybe OverlapMode -> MetaM (Core (Maybe TH.Overlap))
+repOverlap :: Maybe (OverlapMode (GhcPass p)) -> MetaM (Core (Maybe TH.Overlap))
 repOverlap mb =
   case mb of
     Nothing -> nothing
     Just o ->
       case o of
-        NoOverlap _    -> nothing
-        Overlappable _ -> just =<< dataCon overlappableDataConName
-        Overlapping _  -> just =<< dataCon overlappingDataConName
-        Overlaps _     -> just =<< dataCon overlapsDataConName
-        Incoherent _   -> just =<< dataCon incoherentDataConName
-        NonCanonical _ -> just =<< dataCon incoherentDataConName
+        NoOverlap _                   -> nothing
+        Overlappable _                -> just =<< dataCon overlappableDataConName
+        Overlapping _                 -> just =<< dataCon overlappingDataConName
+        Overlaps _                    -> just =<< dataCon overlapsDataConName
+        Incoherent _                  -> just =<< dataCon incoherentDataConName
+        XOverlapMode (NonCanonical _) -> just =<< dataCon incoherentDataConName
   where
   nothing = coreNothing overlapTyConName
   just    = coreJust overlapTyConName

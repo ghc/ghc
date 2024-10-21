@@ -32,8 +32,11 @@ import GHC.Hs.Lit
 import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
+import GHC.Hs.OverlapPragma
+import GHC.Hs.InlinePragma
+
 import GHC.Parser.Annotation
-import Language.Haskell.Syntax.InlinePragma
+--import GHC.Core.InstEnv (ClsInst)
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -595,6 +598,7 @@ deriving instance Data XXPatGhcTc
 deriving instance Data XViaStrategyPs
 
 -- ---------------------------------------------------------------------
+-- Data derivations from GHC.Hs.InlinePragma ---------------------------
 
 deriving instance Data (Activation GhcPs)
 deriving instance Data (Activation GhcRn)
@@ -607,3 +611,13 @@ deriving instance Data (InlineSpec GhcTc)
 deriving instance Data (InlinePragma GhcPs)
 deriving instance Data (InlinePragma GhcRn)
 deriving instance Data (InlinePragma GhcTc)
+
+deriving instance Data RuleMatchInfo
+
+-- ---------------------------------------------------------------------
+-- Data derivations from GHC.Hs.OverlapPragma --------------------------
+deriving instance Data (OverlapMode GhcPs)
+deriving instance Data (OverlapMode GhcRn)
+deriving instance Data (OverlapMode GhcTc)
+deriving instance Data NonCanonical
+deriving instance Data OverlapFlag

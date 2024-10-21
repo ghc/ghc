@@ -632,7 +632,8 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
-                             , cid_overlap_mode = oflag
+                             , cid_overlap_mode = fmap (fmap convertOverlapMode) oflag
+                                  --double fmap to pierce through the Maybe and the Located wrapper
                              , cid_datafam_insts = adts' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
@@ -1139,7 +1140,9 @@ rnSrcDerivDecl (DerivDecl (inst_warn_ps, ann) ty mds overlap)
            NFC_StandaloneDerivedInstanceHead
            (getLHsInstDeclHead $ dropWildCards ty')
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' overlap, fvs) }
+       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' (fmap (fmap convertOverlapMode) overlap), fvs) }
+                                         --double fmap to pierce through the Maybe and the Located wrapper
+
   where
     ctxt    = DerivDeclCtx
     nowc_ty = dropWildCards ty

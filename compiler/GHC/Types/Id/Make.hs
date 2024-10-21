@@ -612,7 +612,7 @@ mkDataConWorkId wkr_name data_con
                    `setLFInfo`             wkr_lf_info
           -- No strictness: see Note [Data-con worker strictness] in GHC.Core.DataCon
 
-    wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
+    wkr_inline_prag = set_pragma_rule defaultInlinePragma ConLike
     wkr_arity = dataConRepArity data_con
 
     -- See Note [LFInfo of DataCon workers and wrappers]

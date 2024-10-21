@@ -735,13 +735,24 @@ type family XOpaque    p
 type family XNoUserInlinePrag p
 type family XXInlineSpec   p
 
--- Activaiton
+-- Activation
 type family XAlwaysActive p
 type family XActiveBefore p
 type family XActiveAfter  p
 type family XFinalActive  p
 type family XNeverActive  p
 type family XXActivation  p
+
+
+-- -------------------------------------
+-- Overlap pragma
+
+type family XNoOverlap p
+type family XOverlappable p
+type family XOverlapping p
+type family XOverlaps p
+type family XIncoherent p
+type family XXOverlapMode p
 
 -- =====================================================================
 -- Misc

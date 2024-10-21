@@ -47,6 +47,8 @@ import GHC.Types.PkgQual
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Var
+import GHC.Hs.OverlapPragma
+import GHC.Hs.InlinePragma
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
@@ -2487,7 +2489,7 @@ instance ExactPrint (TyFamInstDecl GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedP OverlapMode) where
+instance ExactPrint (LOverlapMode (GhcPass p)) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
 

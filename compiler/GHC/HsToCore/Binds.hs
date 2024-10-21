@@ -442,12 +442,15 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding' simpl_opts rhs, rhs)
 
   | otherwise
-  = case inlinePragmaSpec inline_prag of
+  = case inline_prag of
+      XCInlinePragma imp              -> dataConCantHappen imp
+      InlinePragma{inl_inline = spec} -> case spec of
           NoUserInlinePrag{} -> (gbl_id, rhs)
           NoInline  {}       -> (gbl_id, rhs)
           Opaque    {}       -> (gbl_id, rhs)
           Inlinable {}       -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
           Inline    {}       -> inline_pair
+          XInlineSpec i      -> dataConCantHappen i
   where
     simpl_opts    = initSimpleOpts dflags
     inline_prag   = idInlinePragma gbl_id

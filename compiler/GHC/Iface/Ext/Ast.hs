@@ -1742,7 +1742,7 @@ instance ToHie (RScoped (LocatedAn NoEpAnns (DerivStrategy GhcRn))) where
       NewtypeStrategy _ -> []
       ViaStrategy s -> [ toHie (TS (ResolvedScopes [sc]) s) ]
 
-instance ToHie (LocatedP OverlapMode) where
+instance ToHie (LocatedP (OverlapMode (GhcPass p))) where
   toHie (L span _) = locOnly (locA span)
 
 instance ToHie a => ToHie (HsScaled GhcRn a) where

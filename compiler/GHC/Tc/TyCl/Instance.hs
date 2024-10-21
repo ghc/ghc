@@ -543,7 +543,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
                 -- Dfun location is that of instance *header*
 
         ; let warn = fmap unLoc lwarn
-        ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name
+        ; ispec <- newClsInst (fmap (convertOverlapMode . unLoc) overlap_mode) dfun_name
                               tyvars theta clas inst_tys warn
 
         ; let inst_binds = InstBindings

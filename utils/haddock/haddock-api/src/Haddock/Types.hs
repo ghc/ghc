@@ -972,6 +972,15 @@ type instance XCFunDep DocNameI = NoExtField
 
 type instance XCTyFamInstDecl DocNameI = NoExtField
 
+type instance Anno (OverlapMode DocNameI) = SrcSpanAnnP
+type instance XNoOverlap    DocNameI = NoExtField
+type instance XOverlappable DocNameI = NoExtField
+type instance XOverlapping  DocNameI = NoExtField
+type instance XOverlaps     DocNameI = NoExtField
+type instance XIncoherent   DocNameI = NoExtField
+type instance XXOverlapMode DocNameI = NonCanon
+data NonCanon = NonCanon -- no longer need the source text :relieved:
+
 -----------------------------------------------------------------------------
 
 -- * NFData instances for GHC types

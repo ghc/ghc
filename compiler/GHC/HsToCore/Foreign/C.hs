@@ -39,7 +39,6 @@ import GHC.Types.Name
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
 import GHC.Types.Basic
-import GHC.Hs.InlinePragma ( Activation(..) )
 import GHC.Unit.Module
 
 import GHC.Driver.DynFlags
@@ -60,7 +59,6 @@ import GHC.Utils.Encoding
 
 import Data.Maybe
 import Data.List (nub)
-import Language.Haskell.Syntax (noExtField)
 
 dsCFExport:: Id                 -- Either the exported Id,
                                 -- or the foreign-export-dynamic constructor

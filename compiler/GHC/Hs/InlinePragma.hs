@@ -3,13 +3,14 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 module GHC.Hs.InlinePragma(
-        CompilerPhase(..), PhaseNum, beginPhase, nextPhase, laterPhase,
+        module Language.Haskell.Syntax.InlinePragma,
+        CompilerPhase(..), beginPhase, nextPhase, laterPhase,
 
         Activation(..), isActive, competesWith,
         isNeverActive, isAlwaysActive, activeInFinalPhase,
         activateAfterInitial, activateDuringFinal, activeAfter,
 
-        RuleMatchInfo(..), isConLike, isFunLike,
+        RuleMatchInfo(..),
         InlineSpec(..), noUserInlineSpec,
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
         neverInlinePragma, dfunInlinePragma,
@@ -22,8 +23,9 @@ module GHC.Hs.InlinePragma(
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
         pprInline, pprInlineDebug,
-        convertInlinePragma, convertInlineSpec, convertActivation
+        convertInlinePragma, convertInlineSpec, convertActivation,
 
+        set_pragma_inline, set_pragma_activation, set_pragma_rule
 ) where
 
 import GHC.Prelude
@@ -46,18 +48,18 @@ import GHC.Data.FastString (fsLit)
 -}
 
 --InlinePragma
-type instance XInlinePragma   (GhcPass _) = SourceText
-type instance XXCInlinePragma (GhcPass _) = DataConCantHappen
+type instance XInlinePragma   (GhcPass p) = SourceText
+type instance XXCInlinePragma (GhcPass p) = DataConCantHappen
 
 deriving instance Eq (InlinePragma (GhcPass p))
 
 --InlineSpec
-type instance XInline    (GhcPass _) = SourceText
-type instance XInlinable (GhcPass _) = SourceText
-type instance XNoInline  (GhcPass _) = SourceText
-type instance XOpaque    (GhcPass _) = SourceText
-type instance XNoUserInlinePrag (GhcPass _) = NoExtField
-type instance XXInlineSpec      (GhcPass _) = DataConCantHappen
+type instance XInline    (GhcPass p) = SourceText
+type instance XInlinable (GhcPass p) = SourceText
+type instance XNoInline  (GhcPass p) = SourceText
+type instance XOpaque    (GhcPass p) = SourceText
+type instance XNoUserInlinePrag (GhcPass p) = NoExtField
+type instance XXInlineSpec      (GhcPass p) = DataConCantHappen
 
 deriving instance Eq (InlineSpec (GhcPass p))
 
@@ -250,9 +252,11 @@ alwaysInlineConLikePragma :: InlinePragma (GhcPass p)
 alwaysInlineConLikePragma = set_pragma_rule alwaysInlinePragma ConLike
 
 inlinePragmaSpec :: InlinePragma (GhcPass p) -> InlineSpec (GhcPass p)
-inlinePragmaSpec = inl_inline
+inlinePragmaSpec inl@(InlinePragma{}) = inl_inline inl
+inlinePragmaSpec (XCInlinePragma imp) = dataConCantHappen imp
 
 inlinePragmaSource :: InlinePragma (GhcPass p) -> SourceText
+inlinePragmaSource (XCInlinePragma imp) = dataConCantHappen imp
 inlinePragmaSource prag = case inl_inline prag of
                             Inline    x        -> x
                             Inlinable y        -> y
@@ -293,29 +297,38 @@ isInlinePragma prag@(InlinePragma{}) = case inl_inline prag of
 isInlinePragma (XCInlinePragma imp) = dataConCantHappen imp
 
 isInlinablePragma :: InlinePragma (GhcPass p) -> Bool
-isInlinablePragma prag = case inl_inline prag of
-                           Inlinable _  -> True
-                           _            -> False
+isInlinablePragma prag@(InlinePragma{}) =
+  case inl_inline prag of
+    Inlinable _  -> True
+    _            -> False
+isInlinablePragma (XCInlinePragma imp) = dataConCantHappen imp
 
 isNoInlinePragma :: InlinePragma (GhcPass p) -> Bool
-isNoInlinePragma prag = case inl_inline prag of
-                          NoInline _   -> True
-                          _            -> False
+isNoInlinePragma prag@(InlinePragma{}) =
+  case inl_inline prag of
+    NoInline _   -> True
+    _            -> False
+isNoInlinePragma (XCInlinePragma imp) = dataConCantHappen imp
 
 isAnyInlinePragma :: InlinePragma (GhcPass p) -> Bool
 -- INLINE or INLINABLE
-isAnyInlinePragma prag = case inl_inline prag of
-                        Inline    _   -> True
-                        Inlinable _   -> True
-                        _             -> False
+isAnyInlinePragma prag@(InlinePragma{}) =
+  case inl_inline prag of
+    Inline    _   -> True
+    Inlinable _   -> True
+    _             -> False
+isAnyInlinePragma (XCInlinePragma imp)  = dataConCantHappen imp
 
 isOpaquePragma :: InlinePragma (GhcPass p) -> Bool
-isOpaquePragma prag = case inl_inline prag of
-                        Opaque _ -> True
-                        _        -> False
+isOpaquePragma prag@(InlinePragma{}) =
+  case inl_inline prag of
+    Opaque _ -> True
+    _        -> False
+isOpaquePragma (XCInlinePragma imp)  = dataConCantHappen imp
 
 inlinePragmaSat :: InlinePragma (GhcPass p) -> Maybe Arity
-inlinePragmaSat = inl_sat
+inlinePragmaSat prag@(InlinePragma{}) = inl_sat prag
+inlinePragmaSat (XCInlinePragma imp)  = dataConCantHappen imp
 
 inlinePragmaActivation :: InlinePragma (GhcPass p) -> Activation (GhcPass p)
 inlinePragmaActivation (InlinePragma { inl_act = activation }) = activation

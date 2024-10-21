@@ -801,6 +801,15 @@ renameInstD (DataFamInstD{dfid_inst = d}) = do
   d' <- renameDataFamInstD d
   return (DataFamInstD{dfid_ext = noExtField, dfid_inst = d'})
 
+convert_overlap_mode :: OverlapMode (GhcPass p) -> OverlapMode DocNameI
+convert_overlap_mode = \case
+  NoOverlap    _                -> NoOverlap noExtField
+  Overlappable _                -> Overlappable noExtField
+  Overlapping  _                -> Overlapping noExtField
+  Overlaps     _                -> Overlaps noExtField
+  Incoherent   _                -> Incoherent noExtField
+  XOverlapMode (NonCanonical _) -> XOverlapMode NonCanon
+
 renameDerivD :: DerivDecl GhcRn -> RnM (DerivDecl DocNameI)
 renameDerivD
   ( DerivDecl
@@ -816,9 +825,9 @@ renameDerivD
           { deriv_ext = noExtField
           , deriv_type = ty'
           , deriv_strategy = strat'
-          , deriv_overlap_mode = omode
+          , deriv_overlap_mode = fmap (fmap convert_overlap_mode) omode
           }
-      )
+      ) 
 
 renameDerivStrategy :: DerivStrategy GhcRn -> RnM (DerivStrategy DocNameI)
 renameDerivStrategy (StockStrategy a) = pure (StockStrategy a)
@@ -841,7 +850,7 @@ renameClsInstD
     return
       ( ClsInstDecl
           { cid_ext = noExtField
-          , cid_overlap_mode = omode
+          , cid_overlap_mode = fmap (fmap convert_overlap_mode)  omode
           , cid_poly_ty = ltype'
           , cid_binds = []
           , cid_sigs = []

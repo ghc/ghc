@@ -95,7 +95,6 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            listTyCon_RDR, consDataCon_RDR,
                            unrestrictedFunTyCon )
 
-import Language.Haskell.Syntax.InlinePragma(InlinePragma(..))
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Semigroup as Semi
@@ -1420,7 +1419,7 @@ inst_decl :: { LInstDecl GhcPs }
                                    (fmap reverse $7)
                             (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $2) dcolon twhere oc cc NoEpTok)}}
 
-overlap_pragma :: { Maybe (LocatedP OverlapMode) }
+overlap_pragma :: { Maybe (LOverlapMode GhcPs) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
                                        (AnnPragma (mo $1) (mc $2) []) }
   | '{-# OVERLAPPING'     '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlapping (getOVERLAPPING_PRAGs $1)))

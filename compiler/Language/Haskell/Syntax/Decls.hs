@@ -98,8 +98,8 @@ import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic (Role, LexicalFixity, TyConFlavour(..), TypeOrData(..))
 import Language.Haskell.Syntax.Specificity (Specificity)
 import Language.Haskell.Syntax.InlinePragma(Activation)
-
-import GHC.Types.Basic (OverlapMode, RuleName)
+import Language.Haskell.Syntax.OverlapPragma(LOverlapMode)
+import GHC.Types.Basic (RuleName)
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
 import GHC.Unit.Module.Warnings (WarningTxt)
@@ -1383,7 +1383,7 @@ data ClsInstDecl pass
       , cid_sigs          :: [LSig pass]         -- User-supplied pragmatic info
       , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
       , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
-      , cid_overlap_mode  :: Maybe (XRec pass OverlapMode)
+      , cid_overlap_mode  :: Maybe (LOverlapMode pass)
          -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
          --                                    'GHC.Parser.Annotation.AnnClose',
 
@@ -1436,7 +1436,7 @@ data DerivDecl pass = DerivDecl
           -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer.
 
         , deriv_strategy     :: Maybe (LDerivStrategy pass)
-        , deriv_overlap_mode :: Maybe (XRec pass OverlapMode)
+        , deriv_overlap_mode :: Maybe (LOverlapMode pass)
          -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDeriving',
          --        'GHC.Parser.Annotation.AnnInstance', 'GHC.Parser.Annotation.AnnStock',
          --        'GHC.Parser.Annotation.AnnAnyClass', 'GHC.Parser.Annotation.AnnNewtype',

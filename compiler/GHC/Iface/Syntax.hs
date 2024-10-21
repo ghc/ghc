@@ -86,7 +86,11 @@ import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.InferTags.TagSig
 import GHC.Parser.Annotation (noLocA)
+
 import GHC.Hs.Extension ( GhcRn, GhcPass )
+import GHC.Hs.OverlapPragma
+import GHC.Hs.InlinePragma
+
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 
 import GHC.Utils.Lexeme (isLexSym)
@@ -98,7 +102,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
 
-import Language.Haskell.Syntax.InlinePragma
 import Language.Haskell.Syntax.Extension(noExtField)
 
 import Control.Monad
@@ -1685,6 +1688,7 @@ instance Binary IfaceActivation where
               _ -> do src <- get bh
                       ab <- get bh
                       return (IfActiveAfter src ab)
+
 instance Binary RuleMatchInfo where
     put_ bh FunLike = putByte bh 0
     put_ bh ConLike = putByte bh 1
