@@ -578,5 +578,5 @@ mkExpandedStmtAt
   -> HsDoFlavour          -- ^ the flavour of the statement
   -> HsExpr GhcRn         -- ^ expanded expression
   -> LHsExpr GhcRn        -- ^ suitably wrapped located 'XXExprGhcRn'
-mkExpandedStmtAt oStmt flav eExpr
-  = wrapGenSpan $ mkExpandedStmt oStmt flav eExpr
+mkExpandedStmtAt oStmt@(L loc _) flav eExpr
+  = L loc $ mkExpandedStmt oStmt flav eExpr
