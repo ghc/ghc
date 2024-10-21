@@ -37,6 +37,7 @@ import GHC.Types.Var.Set
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType ( ConcreteTvOrigin(..), ConcreteTyVars, TcType )
 
+import GHC.Hs.InlinePragma(InlinePragma(..), neverInlinePragma )
 import GHC.Data.SmallArray
 
 import Data.Maybe ( mapMaybe, listToMaybe, catMaybes, maybeToList )

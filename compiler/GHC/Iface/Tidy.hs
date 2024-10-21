@@ -90,6 +90,8 @@ import GHC.Types.Tickish
 import GHC.Types.TypeEnv
 import GHC.Tc.Utils.TcType (tcSplitNestedSigmaTys)
 
+import GHC.Hs.InlinePragma(isNeverActive, inlinePragmaActivation)
+
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModDetails

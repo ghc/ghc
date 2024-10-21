@@ -35,11 +35,12 @@ import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Basic
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Tickish
 import GHC.Types.Unique.FM
+
+import GHC.Hs.InlinePragma(isDefaultInlinePragma, defaultInlinePragma)
 
 import Control.Monad
 import Data.Foldable ( for_ )

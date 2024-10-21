@@ -60,6 +60,8 @@ import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
+import GHC.Hs.InlinePragma
+import GHC.Hs.Extension(GhcPass)
 
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
@@ -70,6 +72,8 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger
 import GHC.Utils.Misc
+
+import Language.Haskell.Syntax.Extension (dataConCantHappen)
 
 import Control.Monad
 
@@ -655,10 +659,11 @@ tryCastWorkerWrapper env _ _ bndr rhs  -- All other bindings
                                    , text "rhs:" <+> ppr rhs ])
         ; return (mkFloatBind env (NonRec bndr rhs)) }
 
-mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
+mkCastWrapperInlinePrag :: InlinePragma (GhcPass p) -> InlinePragma (GhcPass p)
+mkCastWrapperInlinePrag  (XCInlinePragma impossible) = dataConCantHappen impossible
 -- See Note [Cast worker/wrapper]
 mkCastWrapperInlinePrag (InlinePragma { inl_inline = fn_inl, inl_act = fn_act, inl_rule = rule_info })
-  = InlinePragma { inl_src    = SourceText $ fsLit "{-# INLINE"
+  = InlinePragma { inl_ext    = SourceText $ fsLit "{-# INLINE"
                  , inl_inline = fn_inl       -- See Note [Worker/wrapper for INLINABLE functions]
                  , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
                  , inl_act    = wrap_act     -- See Note [Wrapper activation]

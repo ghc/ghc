@@ -1325,7 +1325,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                    ; return (bndrs', args', rhs') }
         ; let mb_tcs = map ifTopFreeName args
         ; this_mod <- getIfModule
-        ; return (Rule { ru_name = name, ru_fn = fn, ru_act = act,
+        ; return (Rule { ru_name = name, ru_fn = fn, ru_act = fromIfaceActivation act,
                           ru_bndrs = bndrs', ru_args = args',
                           ru_rhs = occurAnalyseExpr rhs',
                           ru_rough = mb_tcs,
@@ -1753,7 +1753,7 @@ tcIdInfo ignore_prags toplvl name ty info = do
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)
     tcPrag info (HsDmdSig str)     = return (info `setDmdSigInfo` str)
     tcPrag info (HsCprSig cpr)     = return (info `setCprSigInfo` cpr)
-    tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
+    tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` fromIfaceInlinePragma prag)
     tcPrag info (HsLFInfo lf_info) = do
       lf_info <- tcLFInfo lf_info
       return (info `setLFInfo` lf_info)

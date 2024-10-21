@@ -547,6 +547,7 @@ Library
         GHC.Hs.Pat
         GHC.Hs.Specificity
         GHC.Hs.Stats
+        GHC.Hs.InlinePragma
         GHC.HsToCore
         GHC.HsToCore.Arrows
         GHC.HsToCore.Binds
@@ -999,6 +1000,7 @@ Library
         Language.Haskell.Syntax.Pat
         Language.Haskell.Syntax.Specificity
         Language.Haskell.Syntax.Type
+        Language.Haskell.Syntax.InlinePragma
 
     autogen-modules: GHC.Platform.Constants
                      GHC.Settings.Config

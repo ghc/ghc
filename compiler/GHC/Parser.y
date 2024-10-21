@@ -95,6 +95,7 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            listTyCon_RDR, consDataCon_RDR,
                            unrestrictedFunTyCon )
 
+import Language.Haskell.Syntax.InlinePragma(InlinePragma(..))
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Semigroup as Semi
@@ -1931,12 +1932,12 @@ rule    :: { LRuleDecl GhcPs }
            amsA' (sLL $1 $> $ HsRule
                                    { rd_ext =(((fstOf3 $3) (epTok $5) (fst $2)), getSTRINGs $1)
                                    , rd_name = L (noAnnSrcSpan $ gl $1) (getSTRING $1)
-                                   , rd_act = (snd $2) `orElse` AlwaysActive
+                                   , rd_act = (snd $2) `orElse` (AlwaysActive noExtField)
                                    , rd_tyvs = sndOf3 $3, rd_tmvs = thdOf3 $3
                                    , rd_lhs = $4, rd_rhs = $6 }) }
 
 -- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
-rule_activation :: { (ActivationAnn, Maybe Activation) }
+rule_activation :: { (ActivationAnn, Maybe (Activation GhcPs)) }
         -- See Note [%shift: rule_activation -> {- empty -}]
         : {- empty -} %shift                    { (noAnn, Nothing) }
         | rule_explicit_activation              { (fst $1,Just (snd $1)) }
@@ -1958,7 +1959,7 @@ rule_activation_marker :: { (Maybe (EpToken "~")) }
                            ; return Nothing } }
 
 rule_explicit_activation :: { ( ActivationAnn
-                              , Activation) }  -- In brackets
+                              , Activation GhcPs) }  -- In brackets
         : '[' INTEGER ']'       { ( ActivationAnn (epTok $1) (epTok $3) Nothing (Just (glR $2))
                                   , ActiveAfter  (getINTEGERs $2) (fromInteger (il_value (getINTEGER $2)))) }
         | '[' rule_activation_marker INTEGER ']'
@@ -1966,7 +1967,7 @@ rule_explicit_activation :: { ( ActivationAnn
                                   , ActiveBefore (getINTEGERs $3) (fromInteger (il_value (getINTEGER $3)))) }
         | '[' rule_activation_marker ']'
                                 { ( ActivationAnn (epTok $1) (epTok $3) $2 Nothing
-                                  , NeverActive) }
+                                  , NeverActive noExtField) }
 
 rule_foralls :: { (EpToken "=" -> ActivationAnn -> HsRuleAnn, Maybe [LHsTyVarBndr () GhcPs], [LRuleBndr GhcPs]) }
         : 'forall' rule_vars '.' 'forall' rule_vars '.'    {% let tyvs = mkRuleTyVarBndrs $2
@@ -2769,7 +2770,7 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% amsA' (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
-                                             (NoUserInlinePrag, FunLike) (snd $2)
+                                             (NoUserInlinePrag noExtField, FunLike) (snd $2)
                   in sLL $1 $> $ SigD noExtField (SpecSig (AnnSpecSig (glR $1) (glR $6) (epUniTok $4) (fst $2)) $3 (fromOL $5) inl_prag)) }
 
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
@@ -2784,12 +2785,12 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# MINIMAL' name_boolformula_opt '#-}'
             {% amsA' (sLL $1 $> $ SigD noExtField (MinimalSig ((glR $1,glR $3), (getMINIMAL_PRAGs $1)) $2)) }
 
-activation :: { (ActivationAnn,Maybe Activation) }
+activation :: { (ActivationAnn, Maybe (Activation GhcPs)) }
         -- See Note [%shift: activation -> {- empty -}]
         : {- empty -} %shift                    { (noAnn ,Nothing) }
         | explicit_activation                   { (fst $1,Just (snd $1)) }
 
-explicit_activation :: { (ActivationAnn, Activation) }  -- In brackets
+explicit_activation :: { (ActivationAnn, Activation GhcPs) }  -- In brackets
         : '[' INTEGER ']'       { (ActivationAnn (epTok $1) (epTok  $3) Nothing (Just (glR $2))
                                   ,ActiveAfter  (getINTEGERs $2) (fromInteger (il_value (getINTEGER $2)))) }
         | '[' rule_activation_marker INTEGER ']'

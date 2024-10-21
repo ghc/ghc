@@ -32,11 +32,15 @@ import GHC.Types.Cpr
 import GHC.Types.SourceText
 import GHC.Types.Unique
 
+import GHC.Hs.InlinePragma
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
 import GHC.Core.DataCon
+import GHC.Hs.Extension (GhcTc)
+import Language.Haskell.Syntax.Extension (dataConCantHappen)
 
 {-
 We take Core bindings whose binders have:
@@ -830,7 +834,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                    NoInline _  -> inl_act fn_inl_prag
                    _           -> inl_act wrap_prag
 
-    work_prag = InlinePragma { inl_src = SourceText $ fsLit "{-# INLINE"
+    work_prag = InlinePragma { inl_ext = SourceText $ fsLit "{-# INLINE"
                              , inl_inline = fn_inline_spec
                              , inl_sat    = Nothing
                              , inl_act    = work_act
@@ -894,11 +898,12 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
     fn_unfolding    = realUnfoldingInfo fn_info
     fn_rules        = ruleInfoRules (ruleInfo fn_info)
 
-mkStrWrapperInlinePrag :: InlinePragma -> [CoreRule] -> InlinePragma
+mkStrWrapperInlinePrag :: InlinePragma GhcTc -> [CoreRule] -> InlinePragma GhcTc
+mkStrWrapperInlinePrag (XCInlinePragma impossible) _ = dataConCantHappen impossible
 mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
                                      , inl_act    = fn_act
                                      , inl_rule   = rule_info }) rules
-  = InlinePragma { inl_src    = SourceText $ fsLit "{-# INLINE"
+  = InlinePragma { inl_ext    = SourceText $ fsLit "{-# INLINE"
                  , inl_sat    = Nothing
 
                  , inl_inline = fn_inl

@@ -46,6 +46,8 @@ import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
 import GHC.Types.Tickish
 import GHC.Types.Basic
 
+import GHC.Hs.InlinePragma( isAlwaysActive )
+
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 

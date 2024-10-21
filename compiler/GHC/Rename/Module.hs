@@ -1179,7 +1179,7 @@ rnHsRuleDecl (HsRule { rd_ext  = (_, st)
        ; checkValidRule (unLoc rule_name) names lhs' fv_lhs'
        ; return (HsRule { rd_ext  = (HsRuleRn fv_lhs' fv_rhs', st)
                         , rd_name = rule_name
-                        , rd_act  = act
+                        , rd_act  = convertActivation act
                         , rd_tyvs = tyvs'
                         , rd_tmvs = tmvs'
                         , rd_lhs  = lhs'

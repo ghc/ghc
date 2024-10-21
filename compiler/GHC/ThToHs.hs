@@ -875,7 +875,7 @@ cvtPragmaD (InlineP nm inline rm phases)
        ; let src TH.NoInline  = fsLit "{-# NOINLINE"
              src TH.Inline    = fsLit "{-# INLINE"
              src TH.Inlinable = fsLit "{-# INLINABLE"
-       ; let ip   = InlinePragma { inl_src    = toSrcTxt inline
+       ; let ip   = InlinePragma { inl_ext    = toSrcTxt inline
                                  , inl_inline = cvtInline inline (toSrcTxt inline)
                                  , inl_rule   = cvtRuleMatch rm
                                  , inl_act    = cvtPhases phases dflt
@@ -886,10 +886,10 @@ cvtPragmaD (InlineP nm inline rm phases)
 
 cvtPragmaD (OpaqueP nm)
   = do { nm' <- vNameN nm
-       ; let ip = InlinePragma { inl_src    = srcTxt
+       ; let ip = InlinePragma { inl_ext    = srcTxt
                                , inl_inline = Opaque srcTxt
                                , inl_rule   = Hs.FunLike
-                               , inl_act    = NeverActive
+                               , inl_act    = NeverActive noExtField
                                , inl_sat    = Nothing }
                   where
                     srcTxt = SourceText $ fsLit "{-# OPAQUE"
@@ -904,11 +904,11 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
        ; let (inline', dflt, srcText) = case inline of
                Just inline1 -> (cvtInline inline1 (toSrcTxt inline1), dfltActivation inline1,
                                 toSrcTxt inline1)
-               Nothing      -> (NoUserInlinePrag,   AlwaysActive,
+               Nothing      -> (NoUserInlinePrag noExtField,   AlwaysActive noExtField,
                                 SourceText $ fsLit "{-# SPECIALISE")
                where
                 toSrcTxt a = SourceText $ src a
-       ; let ip = InlinePragma { inl_src    = srcText
+       ; let ip = InlinePragma { inl_ext    = srcText
                                , inl_inline = inline'
                                , inl_rule   = Hs.FunLike
                                , inl_act    = cvtPhases phases dflt
@@ -923,7 +923,7 @@ cvtPragmaD (SpecialiseInstP ty)
 cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
        ; rd_name' <- returnLA nm'
-       ; let act = cvtPhases phases AlwaysActive
+       ; let act = cvtPhases phases $ AlwaysActive noExtField
        ; ty_bndrs' <- traverse cvtTvs ty_bndrs
        ; tm_bndrs' <- mapM cvtRuleBndr tm_bndrs
        ; lhs'   <- cvtl lhs
@@ -974,11 +974,11 @@ cvtPragmaD (SCCP nm str) = do
   returnJustLA $ Hs.SigD noExtField
     $ SCCFunSig (noAnn, SourceText $ fsLit "{-# SCC") nm' str'
 
-dfltActivation :: TH.Inline -> Activation
-dfltActivation TH.NoInline = NeverActive
-dfltActivation _           = AlwaysActive
+dfltActivation :: TH.Inline -> Activation (GhcPass p)
+dfltActivation TH.NoInline = NeverActive noExtField
+dfltActivation _           = AlwaysActive noExtField
 
-cvtInline :: TH.Inline  -> SourceText -> Hs.InlineSpec
+cvtInline :: TH.Inline  -> SourceText -> Hs.InlineSpec (GhcPass p)
 cvtInline TH.NoInline   srcText  = Hs.NoInline  srcText
 cvtInline TH.Inline     srcText  = Hs.Inline    srcText
 cvtInline TH.Inlinable  srcText  = Hs.Inlinable srcText
@@ -987,7 +987,7 @@ cvtRuleMatch :: TH.RuleMatch -> RuleMatchInfo
 cvtRuleMatch TH.ConLike = Hs.ConLike
 cvtRuleMatch TH.FunLike = Hs.FunLike
 
-cvtPhases :: TH.Phases -> Activation -> Activation
+cvtPhases :: TH.Phases -> Activation (GhcPass p) -> Activation (GhcPass p)
 cvtPhases AllPhases       dflt = dflt
 cvtPhases (FromPhase i)   _    = ActiveAfter NoSourceText i
 cvtPhases (BeforePhase i) _    = ActiveBefore NoSourceText i

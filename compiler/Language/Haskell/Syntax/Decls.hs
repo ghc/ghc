@@ -97,8 +97,9 @@ import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic (Role, LexicalFixity, TyConFlavour(..), TypeOrData(..))
 import Language.Haskell.Syntax.Specificity (Specificity)
+import Language.Haskell.Syntax.InlinePragma(Activation)
 
-import GHC.Types.Basic (OverlapMode, RuleName, Activation)
+import GHC.Types.Basic (OverlapMode, RuleName)
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
 import GHC.Unit.Module.Warnings (WarningTxt)
@@ -1607,7 +1608,7 @@ data RuleDecl pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: XRec pass RuleName
            -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
-       , rd_act  :: Activation
+       , rd_act  :: Activation pass
        , rd_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
            -- ^ Forall'd type vars
        , rd_tmvs :: [LRuleBndr pass]

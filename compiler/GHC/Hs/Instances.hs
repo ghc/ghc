@@ -33,6 +33,7 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+import Language.Haskell.Syntax.InlinePragma
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -111,6 +112,10 @@ deriving instance Data (HsPatSynDir GhcTc)
 deriving instance Data (HsMultAnn GhcPs)
 deriving instance Data (HsMultAnn GhcRn)
 deriving instance Data (HsMultAnn GhcTc)
+
+deriving instance Data TcSpecPrag
+deriving instance Data TcSpecPrags
+
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Decls ----------------------------------
 
@@ -590,3 +595,15 @@ deriving instance Data XXPatGhcTc
 deriving instance Data XViaStrategyPs
 
 -- ---------------------------------------------------------------------
+
+deriving instance Data (Activation GhcPs)
+deriving instance Data (Activation GhcRn)
+deriving instance Data (Activation GhcTc)
+
+deriving instance Data (InlineSpec GhcPs)
+deriving instance Data (InlineSpec GhcRn)
+deriving instance Data (InlineSpec GhcTc)
+
+deriving instance Data (InlinePragma GhcPs)
+deriving instance Data (InlinePragma GhcRn)
+deriving instance Data (InlinePragma GhcTc)

@@ -23,6 +23,7 @@ import GHC.Types.Tickish
 import GHC.Core.Map.Expr
 import GHC.Utils.Misc   ( filterOut, equalLength )
 import GHC.Utils.Panic
+import GHC.Hs.InlinePragma
 import Data.Functor.Identity ( Identity (..) )
 import Data.List        ( mapAccumL )
 

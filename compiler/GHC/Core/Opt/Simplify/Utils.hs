@@ -74,6 +74,9 @@ import GHC.Types.Demand
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 
+import GHC.Hs.InlinePragma
+import GHC.Hs.Extension(GhcPass)
+
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
 
@@ -1086,7 +1089,7 @@ Reason for (b): we want to inline integerCompare here
 ************************************************************************
 -}
 
-updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
+updModeForStableUnfoldings :: Activation (GhcPass p) -> SimplMode -> SimplMode
 -- See Note [The environments of the Simplify pass]
 updModeForStableUnfoldings unf_act current_mode
   = current_mode { sm_phase      = phaseFromActivation unf_act
@@ -1316,7 +1319,7 @@ getUnfoldingInRuleMatch env
      -- but that seems wrong (#20941)
 
 ----------------------
-activeRule :: SimplMode -> Activation -> Bool
+activeRule :: SimplMode -> Activation (GhcPass p) -> Bool
 -- Nothing => No rules at all
 activeRule mode
   | not (sm_rules mode) = \_ -> False     -- Rewriting is off

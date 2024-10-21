@@ -1076,7 +1076,7 @@ rep_wc_ty_sig mk_sig loc sig_ty nm
   = rep_ty_sig mk_sig loc (hswc_body sig_ty) nm
 
 rep_inline :: LocatedN Name
-           -> InlinePragma      -- Never defaultInlinePragma
+           -> InlinePragma (GhcPass p)      -- Never defaultInlinePragma
            -> SrcSpan
            -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_inline nm ispec loc
@@ -1095,7 +1095,7 @@ rep_inline nm ispec loc
        ; return [(loc, pragma)]
        }
 
-rep_specialise :: LocatedN Name -> LHsSigType GhcRn -> InlinePragma
+rep_specialise :: LocatedN Name -> LHsSigType GhcRn -> InlinePragma (GhcPass p)
                -> SrcSpan
                -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_specialise nm ty ispec loc
@@ -1134,7 +1134,7 @@ rep_sccFun nm (Just (L _ str)) loc = do
   scc <- repPragSCCFunNamed nm1 str1
   return [(loc, scc)]
 
-repInline :: InlineSpec -> MetaM (Core TH.Inline)
+repInline :: InlineSpec (GhcPass p) -> MetaM (Core TH.Inline)
 repInline (NoInline          _ )   = dataCon noInlineDataConName
 -- There is a mismatch between the TH and GHC representation because
 -- OPAQUE pragmas can't have phase activation annotations (which is
@@ -1143,13 +1143,13 @@ repInline (NoInline          _ )   = dataCon noInlineDataConName
 repInline (Opaque            _ )   = panic "repInline: Opaque"
 repInline (Inline            _ )   = dataCon inlineDataConName
 repInline (Inlinable         _ )   = dataCon inlinableDataConName
-repInline NoUserInlinePrag        = notHandled ThNoUserInline
+repInline (NoUserInlinePrag  _ )   = notHandled ThNoUserInline
 
 repRuleMatch :: RuleMatchInfo -> MetaM (Core TH.RuleMatch)
 repRuleMatch ConLike = dataCon conLikeDataConName
 repRuleMatch FunLike = dataCon funLikeDataConName
 
-repPhases :: Activation -> MetaM (Core TH.Phases)
+repPhases :: Activation (GhcPass p) -> MetaM (Core TH.Phases)
 repPhases (ActiveBefore _ i) = do { MkC arg <- coreIntLit i
                                   ; dataCon' beforePhaseDataConName [arg] }
 repPhases (ActiveAfter _ i)  = do { MkC arg <- coreIntLit i

@@ -2568,8 +2568,8 @@ data TcRnMessage where
   -}
   TcRnMultipleInlinePragmas
     :: !Id -- ^ Target of the pragmas
-    -> !(LocatedA InlinePragma) -- ^ The first pragma
-    -> !(NE.NonEmpty (LocatedA InlinePragma)) -- ^ Other pragmas
+    -> !(LocatedA (InlinePragma GhcTc)) -- ^ The first pragma
+    -> !(NE.NonEmpty (LocatedA (InlinePragma GhcTc))) -- ^ Other pragmas
     -> TcRnMessage
 
   {-| TcRnUnexpectedPragmas is a warning that occurs when unexpected pragmas appear

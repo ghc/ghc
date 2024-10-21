@@ -32,6 +32,7 @@ module GHC.Hs (
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
+        module GHC.Hs.InlinePragma,
         module GHC.Parser.Annotation,
         Fixity,
 
@@ -54,6 +55,7 @@ import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Utils
 import GHC.Hs.Doc
+import GHC.Hs.InlinePragma
 import GHC.Hs.Instances () -- For Data instances
 
 -- others:

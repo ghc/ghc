@@ -55,6 +55,8 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Error
 
+import GHC.Hs.InlinePragma
+
 import GHC.Utils.Error ( mkMCDiagnostic )
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc

@@ -2884,14 +2884,14 @@ instance ExactPrint (Sig GhcPs) where
     return (FixSig ((af',ma'),src) (FixitySig ns' names' (Fixity v fdir)))
 
   exact (InlineSig (o,c,act) ln inl) = do
-    o' <- markAnnOpen'' o (inl_src inl) "{-# INLINE"
+    o' <- markAnnOpen'' o (inl_ext inl) "{-# INLINE"
     act' <- markActivation act (inl_act inl)
     ln' <- markAnnotated ln
     c' <- printStringAtAA c "#-}"
     return (InlineSig (o', c', act') ln' inl)
 
   exact (SpecSig (AnnSpecSig o c dc act) ln typs inl) = do
-    o' <- markAnnOpen'' o (inl_src inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
+    o' <- markAnnOpen'' o (inl_ext inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
     act' <- markActivation act (inl_act inl)
     ln' <- markAnnotated ln
     dc' <- markEpUniToken dc

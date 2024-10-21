@@ -720,6 +720,28 @@ type family XIEType p
 type family XXIEWrappedName p
 
 
+-- -------------------------------------
+-- InlinePragma and allies
+
+-- InlinePragma
+type family XInlinePragma p
+type family XXCInlinePragma p
+
+--InlineSpec
+type family XInline    p
+type family XInlinable p
+type family XNoInline  p
+type family XOpaque    p
+type family XNoUserInlinePrag p
+type family XXInlineSpec   p
+
+-- Activaiton
+type family XAlwaysActive p
+type family XActiveBefore p
+type family XActiveAfter  p
+type family XFinalActive  p
+type family XNeverActive  p
+type family XXActivation  p
 
 -- =====================================================================
 -- Misc

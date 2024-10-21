@@ -2960,12 +2960,12 @@ mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs GhcP
 mk_rec_upd_field (HsFieldBind noAnn (L loc (FieldOcc _ rdr)) arg pun)
   = HsFieldBind noAnn (L loc (FieldOcc noExtField rdr)) arg pun
 
-mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
-               -> InlinePragma
+mkInlinePragma :: SourceText -> (InlineSpec GhcPs, RuleMatchInfo) -> Maybe (Activation GhcPs)
+               -> InlinePragma GhcPs
 -- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
 mkInlinePragma src (inl, match_info) mb_act
-  = InlinePragma { inl_src = src -- See Note [Pragma source text] in "GHC.Types.SourceText"
+  = InlinePragma { inl_ext = src -- See Note [Pragma source text] in "GHC.Types.SourceText"
                  , inl_inline = inl
                  , inl_sat    = Nothing
                  , inl_act    = act
@@ -2975,20 +2975,20 @@ mkInlinePragma src (inl, match_info) mb_act
             Just act -> act
             Nothing  -> -- No phase specified
                         case inl of
-                          NoInline _  -> NeverActive
-                          Opaque _    -> NeverActive
-                          _other      -> AlwaysActive
+                          NoInline _  -> NeverActive noExtField
+                          Opaque _    -> NeverActive noExtField
+                          _other      -> AlwaysActive noExtField
 
-mkOpaquePragma :: SourceText -> InlinePragma
+mkOpaquePragma :: SourceText -> InlinePragma GhcPs
 mkOpaquePragma src
-  = InlinePragma { inl_src    = src
+  = InlinePragma { inl_ext    = src
                  , inl_inline = Opaque src
                  , inl_sat    = Nothing
                  -- By marking the OPAQUE pragma NeverActive we stop
                  -- (constructor) specialisation on OPAQUE things.
                  --
                  -- See Note [OPAQUE pragma]
-                 , inl_act    = NeverActive
+                 , inl_act    = NeverActive noExtField
                  , inl_rule   = FunLike
                  }
 

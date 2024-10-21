@@ -39,7 +39,7 @@ import GHC.Types.Name
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
 import GHC.Types.Basic
-
+import GHC.Hs.InlinePragma ( Activation(..) )
 import GHC.Unit.Module
 
 import GHC.Driver.DynFlags
@@ -60,6 +60,7 @@ import GHC.Utils.Encoding
 
 import Data.Maybe
 import Data.List (nub)
+import Language.Haskell.Syntax (noExtField)
 
 dsCFExport:: Id                 -- Either the exported Id,
                                 -- or the foreign-export-dynamic constructor
@@ -212,7 +213,7 @@ dsCFExportDynamic id co0 cconv = do
                         , Lam stbl_value ccall_adj
                         ]
 
-        fed = (id `setInlineActivation` NeverActive, Cast io_app co0)
+        fed = (id `setInlineActivation` NeverActive noExtField, Cast io_app co0)
                -- Never inline the f.e.d. function, because the litlit
                -- might not be in scope in other modules.
 

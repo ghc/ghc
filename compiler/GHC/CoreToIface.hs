@@ -41,6 +41,10 @@ module GHC.CoreToIface
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+    -- * InlinePragma
+    , toIfaceActivation
+    , toIfaceInlineSpec
+    , toIfaceInlinePragma
       -- * Other stuff
     , toIfaceLFInfo
       -- * CgBreakInfo
@@ -83,9 +87,14 @@ import GHC.Types.Tickish
 import GHC.Types.Demand ( isNopSig )
 import GHC.Types.Cpr ( topCprSig )
 
+import GHC.Hs.Extension ( GhcPass )
+import GHC.Hs.InlinePragma
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+
+import Language.Haskell.Syntax.Extension(dataConCantHappen)
 
 import Data.Maybe ( isNothing, catMaybes )
 
@@ -501,7 +510,7 @@ toIfaceIdInfo id_info
     ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info
     inline_hsinfo | isDefaultInlinePragma inline_prag = Nothing
-                  | otherwise = Just (HsInline inline_prag)
+                  | otherwise = Just (HsInline $ toIfaceInlinePragma inline_prag)
 
 --------------------------
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
@@ -662,7 +671,27 @@ toIfaceVar v
     noinline_id | isConstraintKind (typeKind ty) = noinlineConstraintIdName
                 | otherwise                      = noinlineIdName
 
+--------------------
+toIfaceActivation :: Activation (GhcPass p) -> IfaceActivation
+toIfaceActivation (AlwaysActive _         ) = IfAlwaysActive
+toIfaceActivation (ActiveBefore src phase ) = IfActiveBefore src phase
+toIfaceActivation (ActiveAfter  src phase)  = IfActiveAfter src phase
+toIfaceActivation (FinalActive  _         ) = IfFinalActive
+toIfaceActivation (NeverActive  _         ) = IfNeverActive
+toIfaceActivation (XActivation  impossible) = dataConCantHappen impossible
 
+toIfaceInlineSpec :: InlineSpec (GhcPass p) -> IfaceInlineSpec
+toIfaceInlineSpec (Inline    src)          = IfInline    src
+toIfaceInlineSpec (Inlinable src)          = IfInlinable src
+toIfaceInlineSpec (NoInline  src)          = IfNoInline  src
+toIfaceInlineSpec (Opaque    src)          = IfOpaque    src
+toIfaceInlineSpec (NoUserInlinePrag _)     = IfNoUserInlinePrag
+toIfaceInlineSpec (XInlineSpec impossible) = dataConCantHappen impossible
+
+toIfaceInlinePragma :: InlinePragma (GhcPass p) -> IfaceInlinePragma
+toIfaceInlinePragma (InlinePragma s a b c d)
+  = (IfInlinePragma s (toIfaceInlineSpec a) b (toIfaceActivation c) d)
+toIfaceInlinePragma (XCInlinePragma impossible) = dataConCantHappen impossible
 
 ---------------------
 toIfaceLFInfo :: Name -> LambdaFormInfo -> IfaceLFInfo

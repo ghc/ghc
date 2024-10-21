@@ -83,6 +83,9 @@ import GHC.Types.Var (VarBndr(Bndr), visArgConstraintLike, tyVarName)
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 
+import GHC.Hs.Extension(GhcTc)
+import GHC.Hs.InlinePragma
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -970,7 +973,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
            ; return (unbox_fn expr) }
 
 
-dataConWrapperInlinePragma :: InlinePragma
+dataConWrapperInlinePragma :: InlinePragma GhcTc
 -- See Note [DataCon wrappers are conlike]
 dataConWrapperInlinePragma =  alwaysInlineConLikePragma
 
@@ -1002,7 +1005,7 @@ DataCon workers are clearly ConLike --- they are the “Con” in
 be marked ConLike, too?
 
 Yes, absolutely! As described in Note [CONLIKE pragma] in
-GHC.Types.Basic, isConLike influences GHC.Core.Utils.exprIsExpandable,
+GHC.Hs.InlinePragma, isConLike influences GHC.Core.Utils.exprIsExpandable,
 which is used by both RULE matching and the case-of-known-constructor
 optimization. It’s crucial that both of those things can see
 applications of DataCon wrappers:

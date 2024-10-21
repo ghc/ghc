@@ -2207,7 +2207,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
               inline_prags | isAnyInlinePragma inline_prag
-                           = [noLocA (InlineSig noAnn fn inline_prag)]
+                           = [noLocA (InlineSig noAnn fn $ convertInlinePragma inline_prag)]
                            | otherwise
                            = []
                  -- Copy the inline pragma (if any) from the default method

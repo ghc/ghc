@@ -443,11 +443,11 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
-          NoUserInlinePrag -> (gbl_id, rhs)
-          NoInline  {}     -> (gbl_id, rhs)
-          Opaque    {}     -> (gbl_id, rhs)
-          Inlinable {}     -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
-          Inline    {}     -> inline_pair
+          NoUserInlinePrag{} -> (gbl_id, rhs)
+          NoInline  {}       -> (gbl_id, rhs)
+          Opaque    {}       -> (gbl_id, rhs)
+          Inlinable {}       -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          Inline    {}       -> inline_pair
   where
     simpl_opts    = initSimpleOpts dflags
     inline_prag   = idInlinePragma gbl_id

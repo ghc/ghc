@@ -32,8 +32,8 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic ( Fixity )
+import Language.Haskell.Syntax.InlinePragma ( InlinePragma )
 
-import GHC.Types.Basic (InlinePragma)
 import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Types.SourceText (StringLiteral)
 
@@ -420,8 +420,8 @@ data Sig pass
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | InlineSig   (XInlineSig pass)
-                (LIdP pass)        -- Function name
-                InlinePragma       -- Never defaultInlinePragma
+                (LIdP pass)         -- Function name
+                (InlinePragma pass) -- Never defaultInlinePragma
 
         -- | A specialisation pragma
         --
@@ -436,11 +436,11 @@ data Sig pass
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
-                (LIdP pass)        -- Specialise a function or datatype  ...
-                [LHsSigType pass]  -- ... to these types
-                InlinePragma       -- The pragma on SPECIALISE_INLINE form.
-                                   -- If it's just defaultInlinePragma, then we said
-                                   --    SPECIALISE, not SPECIALISE_INLINE
+                (LIdP pass)         -- Specialise a function or datatype  ...
+                [LHsSigType pass]   -- ... to these types
+                (InlinePragma pass) -- The pragma on SPECIALISE_INLINE form.
+                                    -- If it's just defaultInlinePragma, then we said
+                                    --    SPECIALISE, not SPECIALISE_INLINE
 
         -- | A specialisation pragma for instance declarations only
         --

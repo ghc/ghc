@@ -38,6 +38,7 @@ import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
 import GHC.Types.Tickish
 import GHC.Hs.Extension
+import GHC.Hs.InlinePragma
 import GHC.Parser.Annotation
 import GHC.Hs.Type
 import GHC.Tc.Types.Evidence
@@ -822,7 +823,6 @@ data TcSpecPrags
   = IsDefaultMethod     -- ^ Super-specialised: a default method should
                         -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
-  deriving Data
 
 -- | Located Type checker Specification Pragmas
 type LTcSpecPrag = Located TcSpecPrag
@@ -832,10 +832,9 @@ data TcSpecPrag
   = SpecPrag
         Id
         HsWrapper
-        InlinePragma
+        (InlinePragma GhcTc)
   -- ^ The Id to be specialised, a wrapper that specialises the
   -- polymorphic function, and inlining spec for the specialised function
-  deriving Data
 
 noSpecPrags :: TcSpecPrags
 noSpecPrags = SpecPrags []
@@ -863,8 +862,8 @@ ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
                                              (interpp'SP ty) inl)
     where
       pragmaSrc = case spec of
-        NoUserInlinePrag -> "{-# " ++ extractSpecPragName (inl_src inl)
-        _                -> "{-# " ++ extractSpecPragName (inl_src inl)  ++ "_INLINE"
+        NoUserInlinePrag _ -> "{-# " ++ extractSpecPragName (inl_ext inl)
+        _                  -> "{-# " ++ extractSpecPragName (inl_ext inl)  ++ "_INLINE"
 ppr_sig (InlineSig _ var inl)
   = ppr_pfx <+> pprInline inl <+> pprPrefixOcc (unLoc var) <+> text "#-}"
     where
@@ -954,7 +953,7 @@ pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
   where
     pprvars = hsep $ punctuate comma (map pprPrefixOcc vars)
 
-pprSpec :: (OutputableBndr id) => id -> SDoc -> InlinePragma -> SDoc
+pprSpec :: (OutputableBndr id) => id -> SDoc -> InlinePragma (GhcPass p) -> SDoc
 pprSpec var pp_ty inl = pp_inl <+> pprVarSig [var] pp_ty
   where
     pp_inl | isDefaultInlinePragma inl = empty
@@ -966,7 +965,7 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
-    = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
+    = text (extractSpecPragName $ inl_ext inl) <+> pprSpec var (text "<type>") inl
 
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (GenLocated l name) -> SDoc

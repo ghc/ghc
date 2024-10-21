@@ -93,6 +93,9 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 
+import GHC.Hs.InlinePragma(Activation, CompilerPhase, isActive)
+import GHC.Hs.Extension(GhcTc)
+
 import Data.List (sortBy, mapAccumL, isPrefixOf)
 import Data.Function    ( on )
 import Control.Monad    ( guard )
@@ -187,7 +190,7 @@ to apply the specialised function to, are handled by the fact that the
 Rule contains a template for the result of the specialisation.
 -}
 
-mkRule :: Module -> Bool -> Bool -> RuleName -> Activation
+mkRule :: Module -> Bool -> Bool -> RuleName -> Activation GhcTc
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being
 -- compiled. See also 'GHC.Core.CoreRule'
@@ -218,7 +221,7 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
     orph = chooseOrphanAnchor local_lhs_names
 
 --------------
-mkSpecRule :: DynFlags -> Module -> Bool -> Activation -> SDoc
+mkSpecRule :: DynFlags -> Module -> Bool -> Activation GhcTc -> SDoc
            -> Id -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- Make a specialisation rule, for Specialise or SpecConstr
 mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
@@ -544,7 +547,7 @@ map.
 -- context, returning the rule applied and the resulting expression if
 -- successful.
 lookupRule :: RuleOpts -> InScopeEnv
-           -> (Activation -> Bool)      -- When rule is active
+           -> (Activation GhcTc -> Bool)      -- When rule is active
            -> Id -- Function head
            -> [CoreExpr] -- Args
            -> [CoreRule] -- Rules
@@ -617,7 +620,7 @@ isMoreSpecific in_scope (Rule { ru_bndrs = bndrs1, ru_args = args1 })
    in_scope_env  = ISE full_in_scope noUnfoldingFun
                    -- noUnfoldingFun: don't expand in templates
 
-noBlackList :: Activation -> Bool
+noBlackList :: Activation GhcTc -> Bool
 noBlackList _ = False           -- Nothing is black listed
 
 {- Note [isMoreSpecific]
@@ -665,7 +668,7 @@ start, in general eta expansion wastes work.  SLPJ July 99
 -}
 
 ------------------------------------
-matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
+matchRule :: RuleOpts -> InScopeEnv -> (Activation GhcTc -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
 
@@ -1908,7 +1911,7 @@ ruleCheckProgram ropts phase rule_pat rules binds
                           in ds `unionBags` go env' binds
 
 data RuleCheckEnv = RuleCheckEnv
-    { rc_is_active :: Activation -> Bool
+    { rc_is_active :: Activation GhcTc -> Bool
     , rc_id_unf    :: IdUnfoldingFun
     , rc_pattern   :: String
     , rc_rules     :: Id -> [CoreRule]

@@ -30,6 +30,7 @@ import GHC.Core
 import GHC.Core.Seq
 import GHC.Core.Opt.WorkWrap.Utils
 
+import GHC.Hs.InlinePragma(isOpaquePragma, activeInFinalPhase)
 import GHC.Data.Graph.UnVar -- for UnVarSet
 
 import GHC.Utils.Outputable

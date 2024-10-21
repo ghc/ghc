@@ -586,7 +586,7 @@ addInlinePragArity ar (L l (InlineSig x nm inl))  = L l (InlineSig x nm (add_inl
 addInlinePragArity ar (L l (SpecSig x nm ty inl)) = L l (SpecSig x nm ty (add_inl_arity ar inl))
 addInlinePragArity _ sig = sig
 
-add_inl_arity :: Arity -> InlinePragma -> InlinePragma
+add_inl_arity :: Arity -> InlinePragma (GhcPass p) -> InlinePragma (GhcPass p)
 add_inl_arity ar prag@(InlinePragma { inl_inline = inl_spec })
   | Inline {} <- inl_spec  -- Add arity only for real INLINE pragmas, not INLINABLE
   = prag { inl_sat = Just ar }
@@ -609,7 +609,7 @@ addInlinePrags poly_id prags_for_me
   | otherwise
   = return poly_id
   where
-    inl_prags = [L loc prag | L loc (InlineSig _ _ prag) <- prags_for_me]
+    inl_prags = [L loc (convertInlinePragma prag) | L loc (InlineSig _ _ prag) <- prags_for_me]
 
     warn_multiple_inlines _ [] = return ()
 
@@ -797,7 +797,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name NoRRC) hs_ty
            ; wrap    <- tcSpecWrapper (FunSigCtxt name (lhsSigTypeContextSpan hs_ty)) poly_ty spec_ty
-           ; return (SpecPrag poly_id wrap inl) }
+           ; return (SpecPrag poly_id wrap (convertInlinePragma inl)) }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 
