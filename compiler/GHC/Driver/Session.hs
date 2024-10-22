@@ -1291,8 +1291,6 @@ dynamic_flags_deps = [
         (NoArg (unSetGeneralFlag Opt_KeepOFiles))
 
         ------- Miscellaneous ----------------------------------------------
-  , make_ord_flag defGhcFlag "fobject-determinism"
-        (NoArg (setGeneralFlag Opt_ObjectDeterminism))
   , make_ord_flag defGhcFlag "no-auto-link-packages"
         (NoArg (unSetGeneralFlag Opt_AutoLinkPackages))
   , make_ord_flag defGhcFlag "no-hs-main"
@@ -2543,6 +2541,7 @@ fFlagsDeps = [
   flagSpec "link-rts"                         Opt_LinkRts,
   flagSpec "byte-code-and-object-code"        Opt_ByteCodeAndObjectCode,
   flagSpec "prefer-byte-code"                 Opt_UseBytecodeRatherThanObjects,
+  flagSpec "object-determinism"               Opt_ObjectDeterminism,
   flagSpec' "compact-unwind"                  Opt_CompactUnwind
       (\turn_on -> updM (\dflags -> do
         unless (platformOS (targetPlatform dflags) == OSDarwin && turn_on)
