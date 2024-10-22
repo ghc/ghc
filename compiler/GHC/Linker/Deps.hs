@@ -458,7 +458,7 @@ external_deps_loop opts (job@LinkExternal {le_module = mod, ..} : mods) acc = do
     -- Otherwise, link all package deps as libraries.
     package_deps iface
       | package_bc
-      = ([], [LinkExternal LinkAllDeps usg_mod | UsagePackageModule {usg_mod} <- mi_usages iface])
+      = ([], [LinkExternal LinkAllDeps m | m <- Set.toList (dep_direct_pkg_mods (mi_deps iface))])
       | otherwise
       = ([(u, LinkLibrary u) | u <- Set.toList (dep_direct_pkgs (mi_deps iface))], [])
 
