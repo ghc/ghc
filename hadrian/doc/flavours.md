@@ -107,7 +107,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O2</td>
   </tr>
   <tr>
-    <th>release (same as perf with -haddock and +late-ccs)</td>
+    <th>release (same as perf with -haddock)</td>
     <td></td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
@@ -323,7 +323,7 @@ The supported transformers are listed below:
     </tr>
     <tr>
         <td><code>late_ccs</code></td>
-        <td>Enable <code>-fprof-late</code> in profiled libraries.</td>
+        <td>Enable <code>-fprof-late</code> in profiled libraries. Enabled in <code>perf</code> and <code>release</code> flavours.</td>
     </tr>
     <tr>
         <td><code>dump_stg</code></td>

@@ -6,7 +6,7 @@ import {-# SOURCE #-} Settings.Default
 
 -- Please update doc/flavours.md when changing this file.
 performanceFlavour :: Flavour
-performanceFlavour = splitSections $ defaultFlavour
+performanceFlavour = splitSections $ enableLateCCS $ defaultFlavour
     { name = "perf"
     , extraArgs = performanceArgs <> defaultHaddockExtraArgs }
 
