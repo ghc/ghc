@@ -4,6 +4,7 @@ module GHC.Unit.Module.Deps
    , mkDependencies
    , noDependencies
    , dep_direct_mods
+   , dep_direct_pkg_mods
    , dep_direct_pkgs
    , dep_sig_mods
    , dep_trusted_pkgs
@@ -35,6 +36,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 
+import qualified Data.Map.Strict as Map
 import Data.List (sortBy, sort, partition)
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -99,6 +101,9 @@ data Dependencies = Deps
       -- does NOT include us, unlike 'imp_finsts'. See Note
       -- [The type family instance consistency story].
 
+   -- TODO strict?
+   , dep_direct_pkg_mods :: Set Module
+
    }
    deriving( Eq )
         -- Equality used only for old/new comparison in GHC.Iface.Recomp.addFingerprints
@@ -145,6 +150,8 @@ mkDependencies home_unit mod imports plugin_mods =
 
       sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
 
+      dep_direct_pkg_mods = Set.filter ((homeUnitAsUnit home_unit /=) . moduleUnit) (Map.keysSet (imp_mods imports))
+
   in Deps { dep_direct_mods  = direct_mods
           , dep_direct_pkgs  = direct_pkgs
           , dep_plugin_pkgs  = plugin_units
@@ -155,6 +162,7 @@ mkDependencies home_unit mod imports plugin_mods =
           , dep_finsts       = sortBy stableModuleCmp (imp_finsts imports)
             -- sort to get into canonical order
             -- NB. remember to use lexicographic ordering
+          , dep_direct_pkg_mods
           }
 
 -- | Update module dependencies containing orphans (used by Backpack)
@@ -179,6 +187,7 @@ instance Binary Dependencies where
                       put_ bh (dep_boot_mods deps)
                       put_ bh (dep_orphs deps)
                       put_ bh (dep_finsts deps)
+                      put_ bh (dep_direct_pkg_mods deps)
 
     get bh = do dms <- get bh
                 dps <- get bh
@@ -188,14 +197,16 @@ instance Binary Dependencies where
                 sms <- get bh
                 os <- get bh
                 fis <- get bh
+                dep_direct_pkg_mods <- get bh
                 return (Deps { dep_direct_mods = dms
                              , dep_direct_pkgs = dps
                              , dep_plugin_pkgs = plugin_pkgs
                              , dep_sig_mods = hsigms
                              , dep_boot_mods = sms
                              , dep_trusted_pkgs = tps
-                             , dep_orphs = os,
-                               dep_finsts = fis })
+                             , dep_orphs = os
+                             , dep_finsts = fis
+                             , dep_direct_pkg_mods })
 
 noDependencies :: Dependencies
 noDependencies = Deps
@@ -207,6 +218,7 @@ noDependencies = Deps
   , dep_trusted_pkgs = Set.empty
   , dep_orphs        = []
   , dep_finsts       = []
+  , dep_direct_pkg_mods = Set.empty
   }
 
 -- | Pretty-print unit dependencies
