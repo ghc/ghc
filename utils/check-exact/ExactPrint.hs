@@ -268,10 +268,6 @@ instance HasTrailing AddEpAnn where
   trailing _ = []
   setTrailing a _ = a
 
-instance HasTrailing [AddEpAnn] where
-  trailing _ = []
-  setTrailing a _ = a
-
 instance HasTrailing (AddEpAnn, AddEpAnn) where
   trailing _ = []
   setTrailing a _ = a
@@ -1025,10 +1021,6 @@ lal_rest k parent = fmap (\new -> parent { al_rest = new })
 
 -- -------------------------------------
 
-lidl :: Lens [AddEpAnn] [AddEpAnn]
-lidl k parent = fmap (\new -> new)
-                     (k parent)
-
 lid :: Lens a a
 lid k parent = fmap (\new -> new)
                     (k parent)
@@ -1311,14 +1303,6 @@ markLensTok' a l = do
   return (set l new a)
 
 -- ---------------------------------------------------------------------
-
-markEpAnnL :: (Monad m, Monoid w)
-  => ann -> Lens ann [AddEpAnn] -> AnnKeywordId -> EP w m ann
-markEpAnnL a l kw = do
-  anns <- mark (view l a) kw
-  return (set l anns a)
-
--- -------------------------------------
 
 markLensFun' :: (Monad m, Monoid w)
   => EpAnn ann -> Lens ann t -> (t -> EP w m t) -> EP w m (EpAnn ann)
@@ -1895,46 +1879,36 @@ instance ExactPrint (InstDecl GhcPs) where
     cid' <- markAnnotated cid
     return (ClsInstD     a  cid')
   exact (DataFamInstD a decl) = do
-    d' <- markAnnotated (DataFamInstDeclWithContext noAnn TopLevel decl)
-    return (DataFamInstD a (dc_d d'))
+    decl' <- markAnnotated decl
+    return (DataFamInstD a decl')
   exact (TyFamInstD a eqn) = do
     eqn' <- markAnnotated eqn
     return (TyFamInstD a eqn')
 
 -- ---------------------------------------------------------------------
 
-data DataFamInstDeclWithContext
-  = DataFamInstDeclWithContext
-    { _dc_a :: [AddEpAnn]
-    , _dc_f :: TopLevelFlag
-    , dc_d :: DataFamInstDecl GhcPs
-    }
-
-instance ExactPrint DataFamInstDeclWithContext where
+instance ExactPrint (DataFamInstDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (DataFamInstDeclWithContext an c d) = do
-    debugM $ "starting DataFamInstDeclWithContext:an=" ++ showAst an
-    (an', d') <- exactDataFamInstDecl an c d
-    return (DataFamInstDeclWithContext an' c d')
+  exact d = do
+    d' <- exactDataFamInstDecl d
+    return d'
 
 -- ---------------------------------------------------------------------
 
 exactDataFamInstDecl :: (Monad m, Monoid w)
-                     => [AddEpAnn] -> TopLevelFlag -> DataFamInstDecl GhcPs
-                     -> EP w m ([AddEpAnn], DataFamInstDecl GhcPs)
-exactDataFamInstDecl an top_lvl
+                     => DataFamInstDecl GhcPs
+                     -> EP w m (DataFamInstDecl GhcPs)
+exactDataFamInstDecl
   (DataFamInstDecl (FamEqn { feqn_ext    = (ops, cps, eq)
                            , feqn_tycon  = tycon
                            , feqn_bndrs  = bndrs
                            , feqn_pats   = pats
                            , feqn_fixity = fixity
                            , feqn_rhs    = defn })) = do
-    ((ops', cps', an'), tycon', bndrs', pats', defn') <- exactDataDefn pp_hdr defn
-                                          -- See Note [an and an2 in exactDataFamInstDecl]
+    ((ops', cps'), tycon', bndrs', pats', defn') <- exactDataDefn pp_hdr defn
     return
-      (an',
-       DataFamInstDecl ( FamEqn { feqn_ext    = (ops', cps', eq)
+      (DataFamInstDecl ( FamEqn { feqn_ext    = (ops', cps', eq)
                                 , feqn_tycon  = tycon'
                                 , feqn_bndrs  = bndrs'
                                 , feqn_pats   = pats'
@@ -1944,28 +1918,12 @@ exactDataFamInstDecl an top_lvl
   where
     pp_hdr :: (Monad m, Monoid w)
            => Maybe (LHsContext GhcPs)
-           -> EP w m ( ([EpToken "("], [EpToken ")"], [AddEpAnn])
+           -> EP w m ( ([EpToken "("], [EpToken ")"] )
                      , LocatedN RdrName
                      , HsOuterTyVarBndrs () GhcPs
                      , HsFamEqnPats GhcPs
                      , Maybe (LHsContext GhcPs))
-    pp_hdr mctxt = do
-      an0 <- case top_lvl of
-               TopLevel -> markEpAnnL an lidl AnnInstance -- TODO: maybe in toplevel
-               NotTopLevel -> return an
-      exactHsFamInstLHS ops cps an0 tycon bndrs pats fixity mctxt
-
-{-
-Note [an and an2 in exactDataFamInstDecl]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The exactDataFamInstDecl function is called to render a
-DataFamInstDecl within its surrounding context. This context is
-rendered via the 'pp_hdr' function, which uses the exact print
-annotations from that context, named 'an'.  The EPAs used for
-rendering the DataDefn are contained in the FamEqn, and are called
-'an2'.
-
--}
+    pp_hdr mctxt = exactHsFamInstLHS ops cps tycon bndrs pats fixity mctxt
 
 -- ---------------------------------------------------------------------
 
@@ -2268,10 +2226,10 @@ instance (ExactPrint body) => ExactPrint (FamEqn GhcPs body) where
                 , feqn_pats   = pats
                 , feqn_fixity = fixity
                 , feqn_rhs    = rhs }) = do
-    (_an0, tycon', bndrs', pats', _) <- exactHsFamInstLHS ops cps [] tycon bndrs pats fixity Nothing
+    ((ops', cps'), tycon', bndrs', pats',_) <- exactHsFamInstLHS ops cps tycon bndrs pats fixity Nothing
     eq' <- markEpToken eq
     rhs' <- markAnnotated rhs
-    return (FamEqn { feqn_ext    = ([], [], eq')
+    return (FamEqn { feqn_ext    = (ops', cps', eq')
                    , feqn_tycon  = tycon'
                    , feqn_bndrs  = bndrs'
                    , feqn_pats   = pats'
@@ -2284,24 +2242,23 @@ exactHsFamInstLHS ::
       (Monad m, Monoid w)
    => [EpToken "("]
    -> [EpToken ")"]
-   -> [AddEpAnn]
    -> LocatedN RdrName
    -> HsOuterTyVarBndrs () GhcPs
    -> HsFamEqnPats GhcPs
    -> LexicalFixity
    -> Maybe (LHsContext GhcPs)
-   -> EP w m ( ([EpToken "("], [EpToken ")"], [AddEpAnn])
+   -> EP w m ( ([EpToken "("], [EpToken ")"])
              , LocatedN RdrName
              , HsOuterTyVarBndrs () GhcPs
              , HsFamEqnPats GhcPs, Maybe (LHsContext GhcPs))
-exactHsFamInstLHS ops cps an thing bndrs typats fixity mb_ctxt = do
+exactHsFamInstLHS ops cps thing bndrs typats fixity mb_ctxt = do
   -- TODO:AZ: do these ans exist? They are in the binders now
-  an0 <- markEpAnnL an lidl AnnForall
+  -- an0 <- markEpAnnL an lidl AnnForall
   bndrs' <- markAnnotated bndrs
-  an1 <- markEpAnnL an0 lidl AnnDot
+  -- an1 <- markEpAnnL an0 lidl AnnDot
   mb_ctxt' <- mapM markAnnotated mb_ctxt
   (ops', cps', thing', typats') <- exact_pats ops cps typats
-  return ((ops', cps', an1), thing', bndrs', typats', mb_ctxt')
+  return ((ops', cps'), thing', bndrs', typats', mb_ctxt')
   where
     exact_pats :: (Monad m, Monoid w)
       => [EpToken "("] -> [EpToken ")"] -> HsFamEqnPats GhcPs
@@ -2730,8 +2687,8 @@ prepareListAnnotationF :: (Monad m, Monoid w) =>
 prepareListAnnotationF ls = map (\b -> (realSrcSpan $ getLocA b, go b)) ls
   where
     go (L l a) = do
-      (L l' d') <- markAnnotated (L l (DataFamInstDeclWithContext noAnn NotTopLevel a))
-      return (toDyn (L l' (dc_d d')))
+      (L l' d') <- markAnnotated (L l a)
+      return (toDyn (L l' d'))
 
 prepareListAnnotationA :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
   => [LocatedAn an a] -> [(RealSrcSpan,EP w m Dynamic)]
@@ -3891,7 +3848,7 @@ exactDataDefn exactHdr
       nt' <- markEpToken nt
       return (t, nt', d)
 
-  i' <- markEpToken i -- optional
+  i' <- markEpToken i -- optional 'instance'
   mb_ct' <- mapM markAnnotated mb_ct
   (anx, ln', tvs', b, mctxt') <- exactHdr context
   (dc', mb_sig') <- case mb_sig of
