@@ -95,8 +95,8 @@ expand_do_stmts doFlavour (stmt@(L _loc (LetStmt _ bs)) : lstmts) =
 --    ------------------------------------------------
 --       let x = e ; stmts ~~> let x = e in stmts'
   do expand_stmts <- expand_do_stmts doFlavour lstmts
-     let expansion = genPopErrCtxtExpr (wrapGenSpan $ genHsLet bs expand_stmts)
-     return $ mkExpandedStmtAt stmt doFlavour (unLoc expansion)
+     let expansion = genHsLet bs (genPopErrCtxtExpr expand_stmts)
+     return $ mkExpandedStmtAt stmt doFlavour expansion
 
 expand_do_stmts doFlavour (stmt@(L _loc (BindStmt xbsrn pat e)): lstmts)
   | SyntaxExprRn bind_op <- xbsrn_bindOp xbsrn
@@ -107,8 +107,8 @@ expand_do_stmts doFlavour (stmt@(L _loc (BindStmt xbsrn pat e)): lstmts)
 --                                   _   -> fail "Pattern match failure .."
 --    -------------------------------------------------------
 --       pat <- e ; stmts   ~~> (>>=) e f
-  = do expand_stmts <- genPopErrCtxtExpr <$> expand_do_stmts doFlavour lstmts
-       failable_expr <- mk_failable_expr doFlavour pat expand_stmts fail_op
+  = do expand_stmts <- expand_do_stmts doFlavour lstmts
+       failable_expr <- mk_failable_expr doFlavour pat (genPopErrCtxtExpr expand_stmts) fail_op
        let expansion = genHsExpApps bind_op  -- (>>=)
                        [ e
                        , failable_expr ]
@@ -254,10 +254,7 @@ mk_failable_expr doFlav lpat@(L loc pat) expr@(L _exprloc _) fail_op =
                                         ])
      ; if irrf_pat -- don't wrap with fail block if
                    -- the pattern is irrefutable
-       then case pat of
-              (WildPat{}) -> return $ genHsLamDoExp doFlav [L noSrcSpanA pat] expr
-              _ -> return $ genHsLamDoExp doFlav [lpat] expr
-
+       then return $ genHsLamDoExp doFlav [lpat] expr
        else L loc <$> mk_fail_block doFlav lpat expr fail_op
      }
 
