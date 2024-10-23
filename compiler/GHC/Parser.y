@@ -838,14 +838,10 @@ litpkgname_segment :: { Located FastString }
 
 -- Parse a minus sign regardless of whether -XLexicalNegation is turned on or off.
 -- See Note [Minus tokens] in GHC.Parser.Lexer
-HYPHEN :: { [AddEpAnn] }
-      : '-'          { [mj AnnMinus $1 ] }
-      | PREFIX_MINUS { [mj AnnMinus $1 ] }
-      | VARSYM  {% if (getVARSYM $1 == fsLit "-")
-                   then return [mj AnnMinus $1]
-                   else do { addError $ mkPlainErrorMsgEnvelope (getLoc $1) $ PsErrExpectedHyphen
-                           ; return [] } }
-
+HYPHEN :: { () }
+      : '-'          { () }
+      | PREFIX_MINUS { () }
+      | VARSYM       { () }
 
 litpkgname :: { Located FastString }
         : litpkgname_segment { $1 }
