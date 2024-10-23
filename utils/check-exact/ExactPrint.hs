@@ -3445,18 +3445,34 @@ instance ExactPrint (HsCmd GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (HsCmdArrApp an arr arg o isRightToLeft) = do
-    if isRightToLeft
-      then do
-        arr' <- markAnnotated arr
-        an0 <- markKw an
-        arg' <- markAnnotated arg
-        return (HsCmdArrApp an0 arr' arg' o isRightToLeft)
-      else do
-        arg' <- markAnnotated arg
-        an0 <- markKw an
-        arr' <- markAnnotated arr
-        return (HsCmdArrApp an0 arr' arg' o isRightToLeft)
+  exact (HsCmdArrApp (isU, l) arr arg HsFirstOrderApp True) = do
+    arr' <- markAnnotated arr
+    l' <- case isU of
+      UnicodeSyntax -> printStringAtAA l  "⤙"
+      NormalSyntax -> printStringAtAA l  "-<"
+    arg' <- markAnnotated arg
+    return (HsCmdArrApp (isU, l') arr' arg' HsFirstOrderApp True)
+  exact (HsCmdArrApp (isU, l) arr arg HsFirstOrderApp False) = do
+    arg' <- markAnnotated arg
+    l' <- case isU of
+      UnicodeSyntax -> printStringAtAA l  "⤚"
+      NormalSyntax -> printStringAtAA l  ">-"
+    arr' <- markAnnotated arr
+    return (HsCmdArrApp (isU, l') arr' arg' HsFirstOrderApp False)
+  exact (HsCmdArrApp (isU, l) arr arg HsHigherOrderApp True) = do
+    arr' <- markAnnotated arr
+    l' <- case isU of
+      UnicodeSyntax -> printStringAtAA l  "⤛"
+      NormalSyntax -> printStringAtAA l  "-<<"
+    arg' <- markAnnotated arg
+    return (HsCmdArrApp (isU, l') arr' arg' HsHigherOrderApp True)
+  exact (HsCmdArrApp (isU, l) arr arg HsHigherOrderApp False) = do
+    arg' <- markAnnotated arg
+    l' <- case isU of
+      UnicodeSyntax -> printStringAtAA l  "⤜"
+      NormalSyntax -> printStringAtAA l  ">>-"
+    arr' <- markAnnotated arr
+    return (HsCmdArrApp (isU, l') arr' arg' HsHigherOrderApp False)
 
   exact (HsCmdArrForm an e fixity cs) = do
     an0 <- markLensMAA' an lal_open

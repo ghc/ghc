@@ -2820,25 +2820,25 @@ exp_gen(IEXP) :: { ECP }
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   amsA' (sLL $1 $> $ HsCmdArrApp (mu Annlarrowtail $2) $1 $3
+                                   amsA' (sLL $1 $> $ HsCmdArrApp (isUnicodeSyntax $2, glR $2) $1 $3
                                                         HsFirstOrderApp True) }
         | IEXP '>-' exp_gen(IEXP)
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   amsA' (sLL $1 $> $ HsCmdArrApp (mu Annrarrowtail $2) $3 $1
+                                   amsA' (sLL $1 $> $ HsCmdArrApp (isUnicodeSyntax $2, glR $2) $3 $1
                                                       HsFirstOrderApp False) }
         | IEXP '-<<' exp_gen(IEXP)
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   amsA' (sLL $1 $> $ HsCmdArrApp (mu AnnLarrowtail $2) $1 $3
+                                   amsA' (sLL $1 $> $ HsCmdArrApp (isUnicodeSyntax $2, glR $2) $1 $3
                                                       HsHigherOrderApp True) }
         | IEXP '>>-' exp_gen(IEXP)
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   amsA' (sLL $1 $> $ HsCmdArrApp (mu AnnRarrowtail $2) $3 $1
+                                   amsA' (sLL $1 $> $ HsCmdArrApp (isUnicodeSyntax $2, glR $2) $3 $1
                                                       HsHigherOrderApp False) }
         -- See Note [%shift: exp -> infixexp]
         | IEXP %shift              { $1 }
@@ -4733,6 +4733,9 @@ addTrailingDarrowC (L (EpAnn lr (AnnContext _ o c) csc) a) lt cs =
   in L (EpAnn lr (AnnContext (Just (u,glR lt)) o c) (cs Semi.<> csc)) a
 
 -- -------------------------------------
+
+isUnicodeSyntax :: Located Token -> IsUnicodeSyntax
+isUnicodeSyntax lt = if isUnicode lt then UnicodeSyntax else NormalSyntax
 
 -- We need a location for the where binds, when computing the SrcSpan
 -- for the AST element using them.  Where there is a span, we return
