@@ -838,14 +838,10 @@ litpkgname_segment :: { Located FastString }
 
 -- Parse a minus sign regardless of whether -XLexicalNegation is turned on or off.
 -- See Note [Minus tokens] in GHC.Parser.Lexer
-HYPHEN :: { [AddEpAnn] }
-      : '-'          { [mj AnnMinus $1 ] }
-      | PREFIX_MINUS { [mj AnnMinus $1 ] }
-      | VARSYM  {% if (getVARSYM $1 == fsLit "-")
-                   then return [mj AnnMinus $1]
-                   else do { addError $ mkPlainErrorMsgEnvelope (getLoc $1) $ PsErrExpectedHyphen
-                           ; return [] } }
-
+HYPHEN :: { () }
+      : '-'          { () }
+      | PREFIX_MINUS { () }
+      | VARSYM       { () }
 
 litpkgname :: { Located FastString }
         : litpkgname_segment { $1 }
@@ -1974,11 +1970,11 @@ rule_foralls :: { (EpToken "=" -> ActivationAnn -> HsRuleAnn, Maybe [LHsTyVarBnd
                                                               in hintExplicitForall $1
                                                               >> checkRuleTyVarBndrNames (mkRuleTyVarBndrs $2)
                                                               >> return (\an_eq an_act -> HsRuleAnn
-                                                                          (Just (mu AnnForall $1,mj AnnDot $3))
-                                                                          (Just (mu AnnForall $4,mj AnnDot $6))
+                                                                          (Just (epUniTok $1,epTok $3))
+                                                                          (Just (epUniTok $4,epTok $6))
                                                                           an_eq an_act,
                                                                          Just (mkRuleTyVarBndrs $2), mkRuleBndrs $5) }
-        | 'forall' rule_vars '.'                           { (\an_eq an_act -> HsRuleAnn Nothing (Just (mu AnnForall $1,mj AnnDot $3)) an_eq an_act,
+        | 'forall' rule_vars '.'                           { (\an_eq an_act -> HsRuleAnn Nothing (Just (epUniTok $1,epTok $3)) an_eq an_act,
                                                               Nothing, mkRuleBndrs $2) }
         -- See Note [%shift: rule_foralls -> {- empty -}]
         | {- empty -}            %shift                    { (\an_eq an_act -> HsRuleAnn Nothing Nothing an_eq an_act, Nothing, []) }
@@ -2824,25 +2820,25 @@ exp_gen(IEXP) :: { ECP }
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   amsA' (sLL $1 $> $ HsCmdArrApp (mu Annlarrowtail $2) $1 $3
+                                   amsA' (sLL $1 $> $ HsCmdArrApp (isUnicodeSyntax $2, glR $2) $1 $3
                                                         HsFirstOrderApp True) }
         | IEXP '>-' exp_gen(IEXP)
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   amsA' (sLL $1 $> $ HsCmdArrApp (mu Annrarrowtail $2) $3 $1
+                                   amsA' (sLL $1 $> $ HsCmdArrApp (isUnicodeSyntax $2, glR $2) $3 $1
                                                       HsFirstOrderApp False) }
         | IEXP '-<<' exp_gen(IEXP)
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   amsA' (sLL $1 $> $ HsCmdArrApp (mu AnnLarrowtail $2) $1 $3
+                                   amsA' (sLL $1 $> $ HsCmdArrApp (isUnicodeSyntax $2, glR $2) $1 $3
                                                       HsHigherOrderApp True) }
         | IEXP '>>-' exp_gen(IEXP)
                                 {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   amsA' (sLL $1 $> $ HsCmdArrApp (mu AnnRarrowtail $2) $3 $1
+                                   amsA' (sLL $1 $> $ HsCmdArrApp (isUnicodeSyntax $2, glR $2) $3 $1
                                                       HsHigherOrderApp False) }
         -- See Note [%shift: exp -> infixexp]
         | IEXP %shift              { $1 }
@@ -4726,7 +4722,7 @@ addTrailingCommaN (L anns a) span = do
 
 addTrailingCommaS :: Located StringLiteral -> EpaLocation -> Located StringLiteral
 addTrailingCommaS (L l sl) span
-    = L (widenSpan l [AddEpAnn AnnComma span]) (sl { sl_tc = Just (epaToNoCommentsLocation span) })
+    = L (widenSpanL l [span]) (sl { sl_tc = Just (epaToNoCommentsLocation span) })
 
 -- -------------------------------------
 
@@ -4737,6 +4733,9 @@ addTrailingDarrowC (L (EpAnn lr (AnnContext _ o c) csc) a) lt cs =
   in L (EpAnn lr (AnnContext (Just (u,glR lt)) o c) (cs Semi.<> csc)) a
 
 -- -------------------------------------
+
+isUnicodeSyntax :: Located Token -> IsUnicodeSyntax
+isUnicodeSyntax lt = if isUnicode lt then UnicodeSyntax else NormalSyntax
 
 -- We need a location for the where binds, when computing the SrcSpan
 -- for the AST element using them.  Where there is a span, we return
