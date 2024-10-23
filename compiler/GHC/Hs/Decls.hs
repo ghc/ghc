@@ -1326,12 +1326,8 @@ type instance XXRuleDecl    (GhcPass _) = DataConCantHappen
 
 data HsRuleAnn
   = HsRuleAnn
-       { ra_tyanns :: Maybe (AddEpAnn, AddEpAnn)
-                 -- ^ The locations of 'forall' and '.' for forall'd type vars
-                 -- Using AddEpAnn to capture possible unicode variants
-       , ra_tmanns :: Maybe (AddEpAnn, AddEpAnn)
-                 -- ^ The locations of 'forall' and '.' for forall'd term vars
-                 -- Using AddEpAnn to capture possible unicode variants
+       { ra_tyanns :: Maybe (TokForall, EpToken ".")
+       , ra_tmanns :: Maybe (TokForall, EpToken ".")
        , ra_equal  :: EpToken "="
        , ra_rest :: ActivationAnn
        } deriving (Data, Eq)

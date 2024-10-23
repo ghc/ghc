@@ -984,7 +984,7 @@ checkTyVars pp_what equals_or_where tc tparms
       = Just (noAnn, HsBndrWildCard noExtField)
     match_bndr_var _ = Nothing
 
-    -- Return an AddEpAnn for use in widenLocatedAn. The AnnKeywordId is not used.
+    -- Return an AddEpAnn for use in widenLocatedAnL. The AnnKeywordId is not used.
     for_widening :: HsBndrVis GhcPs -> EpaLocation
     for_widening (HsBndrInvisible (EpTok loc)) = loc
     for_widening  _                            = noAnn
@@ -1524,9 +1524,7 @@ isFunLhs e = go e [] [] []
    go (L l (PatBuilderAppType (L lp pat) tok ty_pat@(HsTP _ (L (EpAnn anc ann cs) _)))) es ops cps
              = go (L lp' pat) (L (EpAnn anc' ann cs) (ArgPatBuilderArgPat invis_pat) : es) ops cps
              where invis_pat = InvisPat (tok, SpecifiedSpec) ty_pat
-                   anc' = case tok of
-                     NoEpTok -> anc
-                     EpTok l -> widenAnchor anc [AddEpAnn AnnAnyclass l]
+                   anc' = widenAnchorT anc tok
                    (_l, lp') = transferCommentsOnlyA l lp
    go _ _ _ _ = return Nothing
 
