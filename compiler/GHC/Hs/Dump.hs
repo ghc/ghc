@@ -59,7 +59,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
     showAstData' =
       generic
               `ext1Q` list
-              `extQ` list_addEpAnn
               `extQ` list_epaLocation
               `extQ` list_epTokenOpenP
               `extQ` list_epTokenCloseP
@@ -115,12 +114,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             bytestring :: B.ByteString -> SDoc
             bytestring = text . normalize_newlines . show
-
-            list_addEpAnn :: [AddEpAnn] -> SDoc
-            list_addEpAnn ls = case ba of
-              BlankEpAnnotations -> parens
-                                       $ text "blanked:" <+> text "[AddEpAnn]"
-              NoBlankEpAnnotations -> list ls
 
             list_epaLocation :: [EpaLocation] -> SDoc
             list_epaLocation ls = case ba of
