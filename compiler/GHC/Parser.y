@@ -1970,11 +1970,11 @@ rule_foralls :: { (EpToken "=" -> ActivationAnn -> HsRuleAnn, Maybe [LHsTyVarBnd
                                                               in hintExplicitForall $1
                                                               >> checkRuleTyVarBndrNames (mkRuleTyVarBndrs $2)
                                                               >> return (\an_eq an_act -> HsRuleAnn
-                                                                          (Just (mu AnnForall $1,mj AnnDot $3))
-                                                                          (Just (mu AnnForall $4,mj AnnDot $6))
+                                                                          (Just (epUniTok $1,epTok $3))
+                                                                          (Just (epUniTok $4,epTok $6))
                                                                           an_eq an_act,
                                                                          Just (mkRuleTyVarBndrs $2), mkRuleBndrs $5) }
-        | 'forall' rule_vars '.'                           { (\an_eq an_act -> HsRuleAnn Nothing (Just (mu AnnForall $1,mj AnnDot $3)) an_eq an_act,
+        | 'forall' rule_vars '.'                           { (\an_eq an_act -> HsRuleAnn Nothing (Just (epUniTok $1,epTok $3)) an_eq an_act,
                                                               Nothing, mkRuleBndrs $2) }
         -- See Note [%shift: rule_foralls -> {- empty -}]
         | {- empty -}            %shift                    { (\an_eq an_act -> HsRuleAnn Nothing Nothing an_eq an_act, Nothing, []) }

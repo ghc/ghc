@@ -1148,17 +1148,13 @@ lhsCaseAnnOf k parent = fmap (\new -> parent { hsCaseAnnOf = new })
 
 -- data HsRuleAnn
 --   = HsRuleAnn
---        { ra_tyanns :: Maybe (AddEpAnn, AddEpAnn)
---                  -- ^ The locations of 'forall' and '.' for forall'd type vars
---                  -- Using AddEpAnn to capture possible unicode variants
---        , ra_tmanns :: Maybe (AddEpAnn, AddEpAnn)
---                  -- ^ The locations of 'forall' and '.' for forall'd term vars
---                  -- Using AddEpAnn to capture possible unicode variants
+--        { ra_tyanns :: Maybe (TokForall, EpToken ".")
+--        , ra_tmanns :: Maybe (TokForall, EpToken ".")
 --        , ra_equal  :: EpToken "="
 --        , ra_rest :: ActivationAnn
 --        } deriving (Data, Eq)
 
-lra_tyanns :: Lens HsRuleAnn (Maybe (AddEpAnn, AddEpAnn))
+lra_tyanns :: Lens HsRuleAnn (Maybe (TokForall, EpToken "."))
 lra_tyanns k parent = fmap (\new -> parent { ra_tyanns = new })
                                (k (ra_tyanns parent))
 
@@ -1177,20 +1173,20 @@ lff k parent = fmap (\new -> gg new)
                     (k (ff parent))
 
 -- (.) :: Lens' a b -> Lens' b c -> Lens' a c
-lra_tyanns_fst :: Lens HsRuleAnn (Maybe AddEpAnn)
+lra_tyanns_fst :: Lens HsRuleAnn (Maybe TokForall)
 lra_tyanns_fst = lra_tyanns . lff . lfst
 
-lra_tyanns_snd :: Lens HsRuleAnn (Maybe AddEpAnn)
+lra_tyanns_snd :: Lens HsRuleAnn (Maybe (EpToken "."))
 lra_tyanns_snd = lra_tyanns . lff . lsnd
 
-lra_tmanns :: Lens HsRuleAnn (Maybe (AddEpAnn, AddEpAnn))
+lra_tmanns :: Lens HsRuleAnn (Maybe (TokForall, EpToken "."))
 lra_tmanns k parent = fmap (\new -> parent { ra_tmanns = new })
                                (k (ra_tmanns parent))
 
-lra_tmanns_fst :: Lens HsRuleAnn (Maybe AddEpAnn)
+lra_tmanns_fst :: Lens HsRuleAnn (Maybe TokForall)
 lra_tmanns_fst = lra_tmanns . lff . lfst
 
-lra_tmanns_snd :: Lens HsRuleAnn (Maybe AddEpAnn)
+lra_tmanns_snd :: Lens HsRuleAnn (Maybe (EpToken "."))
 lra_tmanns_snd = lra_tmanns . lff . lsnd
 
 lra_equal :: Lens HsRuleAnn (EpToken "=")
@@ -1295,12 +1291,6 @@ markLensTok :: (Monad m, Monoid w, KnownSymbol sym)
 markLensTok (EpAnn anc a cs) l = do
   new <- markEpToken (view l a)
   return (EpAnn anc (set l new a) cs)
-
-markLensTok' :: (Monad m, Monoid w, KnownSymbol sym)
-  => a -> Lens a (EpToken sym) -> EP w m a
-markLensTok' a l = do
-  new <- markEpToken (view l a)
-  return (set l new a)
 
 -- ---------------------------------------------------------------------
 
@@ -2110,17 +2100,17 @@ instance ExactPrint (RuleDecl GhcPs) where
       case mtybndrs of
         Nothing -> return (an0, Nothing)
         Just bndrs -> do
-          an1 <-  markLensMAA' an0 lra_tyanns_fst  -- AnnForall
+          an1 <-  markLensFun an0 lra_tyanns_fst (\mt -> mapM markEpUniToken mt)  -- AnnForall
           bndrs' <- mapM markAnnotated bndrs
-          an2 <- markLensMAA' an1 lra_tyanns_snd  -- AnnDot
+          an2 <- markLensFun an1 lra_tyanns_snd (\mt -> mapM markEpToken mt)  -- AnnDot
           return (an2, Just bndrs')
 
-    an2 <- markLensMAA' an1 lra_tmanns_fst  -- AnnForall
+    an2 <- markLensFun an1 lra_tmanns_fst (\mt -> mapM markEpUniToken mt) -- AnnForall
     termbndrs' <- mapM markAnnotated termbndrs
-    an3 <- markLensMAA' an2 lra_tmanns_snd  -- AnnDot
+    an3 <- markLensFun an2 lra_tmanns_snd (\mt -> mapM markEpToken mt)  -- AnnDot
 
     lhs' <- markAnnotated lhs
-    an4 <- markLensTok' an3 lra_equal
+    an4 <- markLensFun an3 lra_equal markEpToken
     rhs' <- markAnnotated rhs
     return (HsRule (an4,nsrc) (L ln' n) act mtybndrs' termbndrs' lhs' rhs')
 
