@@ -1335,7 +1335,7 @@ names 'getField' and 'setField' are whatever in-scope names they are.
 ************************************************************************
 -}
 
-type instance XCmdArrApp  GhcPs = AddEpAnn
+type instance XCmdArrApp  GhcPs = (IsUnicodeSyntax, EpaLocation)
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 

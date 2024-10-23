@@ -69,13 +69,12 @@ module GHC.Parser.Annotation (
 
   -- ** Building up annotations
   reAnnL, reAnnC,
-  addAnns, addAnnsA, widenSpan, widenSpanL, widenSpanT, widenAnchor, widenAnchorT, widenAnchorS,
-  widenLocatedAn, widenLocatedAnL,
+  addAnnsA, widenSpanL, widenSpanT, widenAnchorT, widenAnchorS,
+  widenLocatedAnL,
   listLocation,
 
   -- ** Querying annotations
   getLocAnn,
-  annParen2AddEpAnn,
   epAnnComments,
 
   -- ** Working with locations of annotations
@@ -1114,24 +1113,10 @@ reAnnL anns cs (L l a) = L (EpAnn (spanAsAnchor l) anns cs) a
 getLocAnn :: Located a  -> SrcSpanAnnA
 getLocAnn (L l _) = noAnnSrcSpan l
 
-addAnns :: EpAnn [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> EpAnn [AddEpAnn]
-addAnns (EpAnn l as1 cs) as2 cs2
-  = EpAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
-
 -- AZ:TODO use widenSpan here too
 addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> EpAnnComments -> SrcSpanAnnA
 addAnnsA (EpAnn l as1 cs) as2 cs2
   = EpAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2)
-
--- | The annotations need to all come after the anchor.  Make sure
--- this is the case.
-widenSpan :: SrcSpan -> [AddEpAnn] -> SrcSpan
-widenSpan s as = foldl combineSrcSpans s (go as)
-  where
-    go [] = []
-    go (AddEpAnn _ (EpaSpan (RealSrcSpan s mb)):rest) = RealSrcSpan s mb : go rest
-    go (AddEpAnn _ (EpaSpan _):rest) = go rest
-    go (AddEpAnn _ (EpaDelta _ _ _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
@@ -1147,35 +1132,6 @@ widenSpanT :: SrcSpan -> EpToken tok -> SrcSpan
 widenSpanT l (EpTok loc) = widenSpanL l [loc]
 widenSpanT l NoEpTok = l
 
--- | The annotations need to all come after the anchor.  Make sure
--- this is the case.
-widenRealSpan :: RealSrcSpan -> [AddEpAnn] -> RealSrcSpan
-widenRealSpan s as = foldl combineRealSrcSpans s (go as)
-  where
-    go [] = []
-    go (AddEpAnn _ (EpaSpan (RealSrcSpan s _)):rest) = s : go rest
-    go (AddEpAnn _ _:rest) = go rest
-
-realSpanFromAnns :: [AddEpAnn] -> Strict.Maybe RealSrcSpan
-realSpanFromAnns as = go Strict.Nothing as
-  where
-    combine Strict.Nothing r  = Strict.Just r
-    combine (Strict.Just l) r = Strict.Just $ combineRealSrcSpans l r
-
-    go acc [] = acc
-    go acc (AddEpAnn _ (EpaSpan (RealSrcSpan s _b)):rest) = go (combine acc s) rest
-    go acc (AddEpAnn _ _             :rest) = go acc rest
-
-bufSpanFromAnns :: [AddEpAnn] -> Strict.Maybe BufSpan
-bufSpanFromAnns as =  go Strict.Nothing as
-  where
-    combine Strict.Nothing r  = Strict.Just r
-    combine (Strict.Just l) r = Strict.Just $ combineBufSpans l r
-
-    go acc [] = acc
-    go acc (AddEpAnn _ (EpaSpan (RealSrcSpan _ (Strict.Just mb))):rest) = go (combine acc mb) rest
-    go acc (AddEpAnn _ _:rest) = go acc rest
-
 listLocation :: [LocatedAn an a] -> EpaLocation
 listLocation as = EpaSpan (go noSrcSpan as)
   where
@@ -1184,14 +1140,6 @@ listLocation as = EpaSpan (go noSrcSpan as)
     go acc [] = acc
     go acc (L (EpAnn (EpaSpan s) _ _) _:rest) = go (combine acc s) rest
     go acc (_:rest) = go acc rest
-
-widenAnchor :: EpaLocation -> [AddEpAnn] -> EpaLocation
-widenAnchor (EpaSpan (RealSrcSpan s mb)) as
-  = EpaSpan (RealSrcSpan (widenRealSpan s as) (liftA2 combineBufSpans mb  (bufSpanFromAnns as)))
-widenAnchor (EpaSpan us) _ = EpaSpan us
-widenAnchor a@EpaDelta{} as = case (realSpanFromAnns as) of
-                                    Strict.Nothing -> a
-                                    Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
 
 widenAnchorT :: EpaLocation -> EpToken tok -> EpaLocation
 widenAnchorT (EpaSpan ss) (EpTok l) = widenAnchorS l ss
@@ -1204,23 +1152,11 @@ widenAnchorS (EpaSpan us) _ = EpaSpan us
 widenAnchorS EpaDelta{} (RealSrcSpan r mb) = EpaSpan (RealSrcSpan r mb)
 widenAnchorS anc _ = anc
 
-widenLocatedAn :: EpAnn an -> [AddEpAnn] -> EpAnn an
-widenLocatedAn (EpAnn (EpaSpan l) a cs) as = EpAnn (spanAsAnchor l') a cs
-  where
-    l' = widenSpan l as
-widenLocatedAn (EpAnn anc a cs) _as = EpAnn anc a cs
-
 widenLocatedAnL :: EpAnn an -> [EpaLocation] -> EpAnn an
 widenLocatedAnL (EpAnn (EpaSpan l) a cs) as = EpAnn (spanAsAnchor l') a cs
   where
     l' = widenSpanL l as
 widenLocatedAnL (EpAnn anc a cs) _as = EpAnn anc a cs
-
-annParen2AddEpAnn :: AnnParen -> [AddEpAnn]
-annParen2AddEpAnn (AnnParen pt o c)
-  = [AddEpAnn ai o, AddEpAnn ac c]
-  where
-    (ai,ac) = parenTypeKws pt
 
 epAnnComments :: EpAnn an -> EpAnnComments
 epAnnComments (EpAnn _ _ cs) = cs
