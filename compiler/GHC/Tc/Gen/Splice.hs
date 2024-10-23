@@ -133,7 +133,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.Utils.Exception (throwIO, ErrorCall(..))
 
-import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
+import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..), getTempDir )
 
 import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
@@ -161,6 +161,7 @@ import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
 import Data.IORef
+import Data.List ( isPrefixOf )
 import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
@@ -1449,6 +1450,10 @@ instance TH.Quasi TcM where
     writeTcRef ref (fp:dep_files)
 
   qAddTempFile suffix = do
+    -- In case this gets changed in the future, qAddForeignFilePath
+    -- also needs to be changed so to preserve the invariant that
+    -- files added by qAddTempFile are not tracked by recompilation
+    -- checker, otherwise they are tracked.
     dflags <- getDynFlags
     logger <- getLogger
     tmpfs  <- hsc_tmpfs <$> getTopEnv
@@ -1489,6 +1494,15 @@ instance TH.Quasi TcM where
   qAddForeignFilePath lang fp = do
     var <- fmap tcg_th_foreign_files getGblEnv
     updTcRef var ((lang, fp) :)
+    -- If a file in the current session's temporary directory is added
+    -- (e.g. via addTempFile which is called by addForeignSource), it
+    -- shouldn't be tracked by the recompilation checker. Otherwise it
+    -- should, see #25413.
+    dflags <- getDynFlags
+    logger <- getLogger
+    tmpfs  <- hsc_tmpfs <$> getTopEnv
+    d <- liftIO $ getTempDir logger tmpfs (tmpDir dflags)
+    unless (d `isPrefixOf` fp) $ TH.qAddDependentFile fp
 
   qAddModFinalizer fin = do
       r <- liftIO $ mkRemoteRef fin

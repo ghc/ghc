@@ -21,6 +21,7 @@ module GHC.Utils.TmpFs
     , newTempSubDir
     , withSystemTempDirectory
     , withTempDirectory
+    , getTempDir
     )
 where
 
