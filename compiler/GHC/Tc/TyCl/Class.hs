@@ -191,33 +191,10 @@ tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
              -> TcM (LHsBinds GhcTc)
 
 tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
-                                tcdMeths = default_binds, tcdModifiers = modifiers}))
+                                tcdMeths = default_binds}))
   = recoverM (return emptyLHsBinds) $
     setSrcSpan (getLocA class_name) $
-        -- MODS_TODO: the context for this warning is just the name of the
-        -- class, on a line that might not include the modifier in question.
-        -- E.g.
-        --
-        --     %() %True
-        --     class MyShow a
-        --
-        --     test.hs:20:7: warning: [GHC-49969] [-Wunknown-modifiers]
-        --         Unknown modifier %True
-        --        |
-        --     20 | class MyShow a
-        --        |       ^^^^^^
-        --
-        --     test.hs:20:7: warning: [GHC-49969] [-Wunknown-modifiers]
-        --         Unknown modifier %()
-        --        |
-        --     20 | class MyShow a
-        --        |       ^^^^^^
-        --
-        -- They're also in opposite order than I'd expect.
-    do  { warn_unknown <- woptM Opt_WarnUnknownModifiers
-        ; mapM_ (diagnosticTc warn_unknown . TcRnUnknownModifier) modifiers
-
-        ; clas <- tcLookupLocatedClass (la2la class_name)
+    do  { clas <- tcLookupLocatedClass (la2la class_name)
 
         -- We make a separate binding for each default method.
         -- At one time I used a single AbsBinds for all of them, thus

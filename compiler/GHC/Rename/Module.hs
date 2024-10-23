@@ -634,7 +634,7 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
        -- seems like they throw errors. And in
        --     %a instance Foo a where
        -- a is out of scope.
-       ; (modifiers', _) <- rnModifiersContext ctxt modifiers
+       ; (modifiers', _) <- rnModifiersContextAndWarn ctxt modifiers
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
@@ -1822,7 +1822,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         -- seems like they throw errors. And in
         --     %a class Foo a where
         -- a is out of scope.
-        ; (modifiers', _) <- rnModifiersContext cls_doc modifiers
+        ; (modifiers', _) <- rnModifiersContextAndWarn cls_doc modifiers
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
