@@ -143,6 +143,12 @@ Compiler
   flag doesn't yet ensure determinism across all compilation configurations; we
   anticipate these cases will be addressed in future updates (:ghc-ticket:`12935`).
 
+- GHC now includes a new flag, :ghc-flag:`-fwrite-if-compression=⟨n⟩`,
+  which controls the level of compression used when writing interface files to disk.
+  While we think the majority of users will be well served by the default setting,
+  the flag allows users to pick their own tradeoff between memory footprint and
+  compilation time when needed.
+
 GHCi
 ~~~~
 

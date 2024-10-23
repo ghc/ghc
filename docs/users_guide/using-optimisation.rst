@@ -1850,6 +1850,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :category: optimization
 
     :default: 2
+    :since: 9.12.1
 
     This flag defines the level of compression of interface files when writing to disk.
     The higher the flag, the more we deduplicate the interface file, at the cost of a higher compilation time.
