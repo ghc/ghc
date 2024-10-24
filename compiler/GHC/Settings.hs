@@ -5,6 +5,7 @@ module GHC.Settings
   ( Settings (..)
   , ToolSettings (..)
   , FileSettings (..)
+  , UnitSettings(..)
   , GhcNameVersion (..)
   , Platform (..)
   , PlatformMisc (..)
@@ -73,6 +74,7 @@ import GHC.Prelude
 import GHC.Utils.CliOption
 import GHC.Utils.Fingerprint
 import GHC.Platform
+import GHC.Unit.Types
 
 data Settings = Settings
   { sGhcNameVersion    :: {-# UNPACk #-} !GhcNameVersion
@@ -80,11 +82,14 @@ data Settings = Settings
   , sTargetPlatform    :: Platform       -- Filled in by SysTools
   , sToolSettings      :: {-# UNPACK #-} !ToolSettings
   , sPlatformMisc      :: {-# UNPACK #-} !PlatformMisc
+  , sUnitSettings      :: !UnitSettings
 
   -- You shouldn't need to look things up in rawSettings directly.
   -- They should have their own fields instead.
   , sRawSettings       :: [(String, String)]
   }
+
+data UnitSettings = UnitSettings { unitSettings_baseUnitId :: !UnitId }
 
 -- | Settings for other executables GHC calls.
 --

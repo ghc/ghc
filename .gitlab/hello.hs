@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wall -Wno-missing-fields #-}
 
+import GHC.Unit.Types (stringToUnitId)
 import GHC hiding (parseModule)
 import GHC.Data.StringBuffer
 import GHC.Driver.Config.Parser
@@ -26,7 +27,8 @@ fakeSettings =
       sToolSettings = ToolSettings {},
       sTargetPlatform =
         genericPlatform,
-      sPlatformMisc = PlatformMisc {}
+      sPlatformMisc = PlatformMisc {},
+      sUnitSettings = UnitSettings { unitSettings_baseUnitId = stringToUnitId "base" }
     }
 
 fakeDynFlags :: DynFlags

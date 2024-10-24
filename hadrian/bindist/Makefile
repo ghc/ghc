@@ -142,6 +142,7 @@ lib/settings : config.mk
 	@echo ',("Use LibFFI", "$(UseLibffiForAdjustors)")' >> $@
 	@echo ',("RTS expects libdw", "$(GhcRtsWithLibdw)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
+	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
 	@echo "]" >> $@
 
 # We need to install binaries relative to libraries.

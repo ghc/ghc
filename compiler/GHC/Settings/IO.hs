@@ -19,6 +19,7 @@ import GHC.Utils.Panic
 import GHC.ResponseFile
 import GHC.Settings
 import GHC.SysTools.BaseDir
+import GHC.Unit.Types
 
 import Data.Char
 import Control.Monad.Trans.Except
@@ -174,6 +175,8 @@ initSettings top_dir = do
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
   useLibFFI <- getBooleanSetting "Use LibFFI"
 
+  baseUnitId <- getSetting "base unit-id"
+
   return $ Settings
     { sGhcNameVersion = GhcNameVersion
       { ghcNameVersion_programName = "ghc"
@@ -186,6 +189,11 @@ initSettings top_dir = do
       , fileSettings_toolDir        = mtool_dir
       , fileSettings_topDir         = top_dir
       , fileSettings_globalPackageDatabase = globalpkgdb_path
+      }
+
+    , sUnitSettings = UnitSettings
+      {
+        unitSettings_baseUnitId = stringToUnitId baseUnitId
       }
 
     , sToolSettings = ToolSettings
