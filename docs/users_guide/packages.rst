@@ -239,8 +239,26 @@ The GHC command line options that control packages are:
     :type: dynamic
     :category:
 
-    By default, GHC will automatically link in the ``base`` and ``rts``
+    By default, GHC will automatically link in the ``base``, ``ghc-internal`` and ``rts``
     packages. This flag disables that behaviour.
+
+    The unit-id of the ``base`` package which is automatically linked can be set using
+    the :ghc-flag:`-base-unit-id ⟨unit-id⟩` flag.
+
+.. ghc-flag:: -base-unit-id ⟨unit-id⟩
+    :shortdesc: The unit-id of the "base" package, which will be automatically linked.
+    :type: dynamic
+    :category:
+
+    By default the compiler will link against the ``base``, ``ghc-internal``,
+    and ``rts`` package, this flag controls what the ``base`` package linked
+    against is.
+
+    You should only need to pass this flag if you really know what you are doing.
+    Distributors can set a default unit-id for base at install time by specifying
+    the ``BASE_UNIT_ID`` environment variable.
+
+
 
 .. ghc-flag:: -this-unit-id ⟨unit-id⟩
     :shortdesc: Compile to be part of unit (i.e. package)
