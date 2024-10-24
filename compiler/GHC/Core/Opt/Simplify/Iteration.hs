@@ -54,9 +54,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar )
 import GHC.Types.Var    ( isTyCoVar, setTyVarUnfolding )
-import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
 
@@ -391,7 +389,7 @@ simplTypeBind top_lvl (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
   = assert (isTyVar bndr) $
     pprTrace "simplTypeBind" (ppr bndr $$ ppr bndr1) $
     do { let !rhs_env = rhs_se `setInScopeFromE` env
-       ; (rhs_env1, tvs') <- {-#SCC "simplBinders" #-} simplBinders rhs_env []
+       ; (rhs_env1, _tvs') <- {-#SCC "simplBinders" #-} simplBinders rhs_env []
                -- See Note [Floating and type abstraction] in GHC.Core.Opt.Simplify.Utils
        ; body <- simplType rhs_env rhs
        ; (rhs_floats, expr_rhs') <- {-#SCC "prepareBinding" #-}
@@ -4610,6 +4608,7 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
         -> do { expr' <- case bind_cxt of
+                  BC_Type {} -> pprPanic "simplStableUnfolding:BC_Type" (ppr id)
                   BC_Join _ cont    -> -- Binder is a join point
                                        -- See Note [Rules and unfolding for join points]
                                        simplJoinRhs unf_env id expr cont
@@ -4767,6 +4766,7 @@ simplRules env mb_new_id rules bind_cxt
       = do { (env', bndrs') <- simplBinders env bndrs
            ; let rhs_ty = substTy env' (exprType rhs)
                  rhs_cont = case bind_cxt of  -- See Note [Rules and unfolding for join points]
+                                BC_Type {}     -> pprPanic "simplRules:BC_Type" (ppr mb_new_id)
                                 BC_Let {}      -> mkBoringStop rhs_ty
                                 BC_Join _ cont -> assertPpr join_ok bad_join_msg cont
                  lhs_env = updMode updModeForRules env'

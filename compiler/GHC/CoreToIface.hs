@@ -439,7 +439,7 @@ toIfaceSrcBang (HsSrcBang _ (HsBang unpk bang)) = IfSrcBang unpk bang
 
 toIfaceLetBndr :: Var -> IfaceLetBndr
 toIfaceLetBndr tv
-  | isTyVar tv = IfTypeLetBndr (occNameFS (getOccName (tyVarName tv)))
+  | isTyVar tv = IfTypeLetBndr (mkIfLclName (occNameFS (getOccName tv)))
                                (toIfaceKind (tyVarKind tv))
                                info
   where

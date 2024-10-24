@@ -97,6 +97,7 @@ stage0Packages = do
              , haddockApi
              , haddockLibrary
              , haddock
+             , haskeline
              , hp2ps
              , hpc
              , hpcBin
