@@ -1,0 +1,26 @@
+Modifiers.hs:8:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:10:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %True
+
+Modifiers.hs:10:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:13:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %True
+
+Modifiers.hs:13:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:17:32: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %m
+    • In the type signature: l1 :: forall (m :: Bool) a b. a %m -> b
+
+Modifiers.hs:34:21: warning: [GHC-49969] [-Wunknown-modifiers]
+    • Unknown modifier %()
+    • In the type ‘Int %() -> Int’
+      In the expression: idt (Int %() -> Int) (+ 1)
+      In an equation for ‘visForallApp’:
+          visForallApp = idt (Int %() -> Int) (+ 1)
+
