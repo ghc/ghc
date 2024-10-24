@@ -777,24 +777,18 @@ mkOneShotModLocation :: PipeEnv -> DynFlags -> HscSource -> ModuleName -> IO Mod
 mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
     let PipeEnv{ src_basename=basename,
              src_suffix=suff } = pipe_env
-    let location1 = mkHomeModLocation2 fopts mod_name (unsafeEncodeUtf basename) (unsafeEncodeUtf suff)
-
-    -- Boot-ify it if necessary
-    let location2
-          | HsBootFile <- src_flavour = addBootSuffixLocnOut location1
-          | otherwise                 = location1
-
+    let location1 = mkHomeModLocation fopts mod_name (unsafeEncodeUtf basename) (unsafeEncodeUtf suff) src_flavour
 
     -- Take -ohi into account if present
     -- This can't be done in mkHomeModuleLocation because
     -- it only applies to the module being compiles
     let ohi = outputHi dflags
-        location3 | Just fn <- ohi = location2{ ml_hi_file_ospath = unsafeEncodeUtf  fn }
-                  | otherwise      = location2
+        location2 | Just fn <- ohi = location1{ ml_hi_file_ospath = unsafeEncodeUtf fn }
+                  | otherwise      = location1
 
     let dynohi = dynOutputHi dflags
-        location4 | Just fn <- dynohi = location3{ ml_dyn_hi_file_ospath = unsafeEncodeUtf fn }
-                  | otherwise         = location3
+        location3 | Just fn <- dynohi = location2{ ml_dyn_hi_file_ospath = unsafeEncodeUtf fn }
+                  | otherwise         = location2
 
     -- Take -o into account if present
     -- Very like -ohi, but we must *only* do this if we aren't linking
@@ -807,11 +801,11 @@ mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
         location5 | Just ofile <- expl_o_file
                   , let dyn_ofile = fromMaybe (ofile -<.> dynObjectSuf_ dflags) expl_dyn_o_file
                   , isNoLink (ghcLink dflags)
-                  = location4 { ml_obj_file_ospath = unsafeEncodeUtf ofile
+                  = location3 { ml_obj_file_ospath = unsafeEncodeUtf ofile
                               , ml_dyn_obj_file_ospath = unsafeEncodeUtf dyn_ofile }
                   | Just dyn_ofile <- expl_dyn_o_file
-                  = location4 { ml_dyn_obj_file_ospath = unsafeEncodeUtf dyn_ofile }
-                  | otherwise = location4
+                  = location3 { ml_dyn_obj_file_ospath = unsafeEncodeUtf dyn_ofile }
+                  | otherwise = location3
     return location5
     where
       fopts = initFinderOpts dflags
