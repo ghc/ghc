@@ -79,4 +79,4 @@ T17648:
 		grep -F 'f :: T GHC.Types.Int -> ()  [TagSig' >/dev/null
 
 T25166:
-	'$(TEST_HC)' -O2 -dno-typeable-binds -ddump-cmm T25166.hs | awk '/foo_closure/{flag=1}/}]/{flag=0}flag'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O2 -dno-typeable-binds -ddump-cmm T25166.hs | awk '/foo_closure/{flag=1}/}]/{flag=0}flag'
