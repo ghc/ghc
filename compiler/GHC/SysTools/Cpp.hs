@@ -72,17 +72,28 @@ Haskell source. This avoids the following situations:
 
   * Errors due to an ANSI C preprocessor lexing the source and failing on
     names with single quotes (TH quotes, ticked promoted constructors,
-    names with primes in them).
+    names with primes in them);
 
-  Both of those cases may be subtle: gcc and clang permit C++-style //
-  comments in C code, and Data.Array and Data.Vector both export a //
-  operator whose type is such that a removed "comment" may leave code that
-  typechecks but does the wrong thing. Another example is that, since ANSI
-  C permits long character constants, an expression involving multiple
-  functions with primes in their names may not expand macros properly when
-  they occur between the primed functions.
+  * Errors due to ANSI "stringizing" (https://gcc.gnu.org/onlinedocs/cpp/Stringizing.html)
+    and token pasting (https://gcc.gnu.org/onlinedocs/cpp/Concatenation.html)
+    semantics, which are triggered by "#" characters (which affects code
+    using -XMagicHash).
 
-Third special type of preprocessor for JavaScript was added laterly due to
+All of those cases may be subtle: gcc and clang permit C++-style //
+comments in C code, and Data.Array and Data.Vector both export a //
+operator whose type is such that a removed "comment" may leave code that
+typechecks but does the wrong thing. Another example is that, since ANSI
+C permits long character constants, an expression involving multiple
+functions with primes in their names may not expand macros properly when
+they occur between the primed functions. Token pasting means # characters
+may be stripped and surrounding identifiers combined into single words.
+
+It should be noted that clang's -traditional doesn't disable // or token
+pasting; as a result, the ghc runtime installer tries very hard to find a
+gcc in order to use its preprocessor. If one can't be found, a programmer's
+only recourse is to use "-pgmP cpphs" (cpphs is on Hackage).
+
+A third special type of preprocessor for JavaScript was added later, due to
 needing to keep JSDoc comments and multiline comments. Various third party
 minifying software (for example, Google Closure Compiler) uses JSDoc
 information to apply more strict rules to code reduction which results in
