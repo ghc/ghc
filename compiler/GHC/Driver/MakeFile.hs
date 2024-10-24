@@ -302,7 +302,7 @@ findDependency  :: HscEnv
 findDependency hsc_env srcloc pkg imp dep_boot = do
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
-  findImportedModule hsc_env imp pkg >>= \case
+  findImportedModuleWithIsBoot hsc_env imp dep_boot pkg >>= \case
     Found loc dep_mod ->
       pure DepHi {
         dep_mod,

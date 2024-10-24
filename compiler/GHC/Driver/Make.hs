@@ -2119,31 +2119,16 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
         let fopts = initFinderOpts (hsc_dflags hsc_env)
-            src_path = unsafeEncodeUtf src_fn
+            (basename, extension) = splitExtension src_fn
 
-            is_boot = case takeExtension src_fn of
-              ".hs-boot" -> IsBoot
-              ".lhs-boot" -> IsBoot
-              _ -> NotBoot
-
-            (path_without_boot, hsc_src)
-              | isHaskellSigFilename src_fn = (src_path, HsigFile)
-              | IsBoot <- is_boot = (removeBootSuffix src_path, HsBootFile)
-              | otherwise = (src_path, HsSrcFile)
-
-            -- Make a ModLocation for the Finder, who only has one entry for
-            -- each @ModuleName@, and therefore needs to use the locations for
-            -- the non-boot files.
-            location_without_boot =
-              mkHomeModLocation fopts pi_mod_name path_without_boot
+            hsc_src
+              | isHaskellSigSuffix (drop 1 extension) = HsigFile
+              | isHaskellBootSuffix (drop 1 extension) = HsBootFile
+              | otherwise = HsSrcFile
 
             -- Make a ModLocation for this file, adding the @-boot@ suffix to
             -- all paths if the original was a boot file.
-            location
-              | IsBoot <- is_boot
-              = addBootSuffixLocn location_without_boot
-              | otherwise
-              = location_without_boot
+            location = mkHomeModLocation fopts pi_mod_name (unsafeEncodeUtf basename) (unsafeEncodeUtf extension) hsc_src
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
@@ -2236,7 +2221,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
     find_it :: IO SummariseResult
 
     find_it = do
-        found <- findImportedModule hsc_env wanted_mod mb_pkg
+        found <- findImportedModuleWithIsBoot hsc_env wanted_mod is_boot mb_pkg
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->
@@ -2254,10 +2239,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
     just_found location mod = do
                 -- Adjust location to point to the hs-boot source file,
                 -- hi file, object file, when is_boot says so
-        let location' = case is_boot of
-              IsBoot -> addBootSuffixLocn location
-              NotBoot -> location
-            src_fn = expectJust "summarise2" (ml_hs_file location')
+        let src_fn = expectJust "summarise2" (ml_hs_file location)
 
                 -- Check that it exists
                 -- It might have been deleted since the Finder last found it
@@ -2267,7 +2249,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
           -- .hs-boot file doesn't exist.
           Nothing -> return NotThere
           Just h  -> do
-            fresult <- new_summary_cache_check location' mod src_fn h
+            fresult <- new_summary_cache_check location mod src_fn h
             return $ case fresult of
               Left err -> FoundHomeWithError (moduleUnitId mod, err)
               Right ms -> FoundHome ms

@@ -15,6 +15,7 @@ module GHC.Unit.Finder (
     FinderCache(..),
     initFinderCache,
     findImportedModule,
+    findImportedModuleWithIsBoot,
     findPluginModule,
     findExactModule,
     findHomeModule,
@@ -157,6 +158,13 @@ findImportedModule hsc_env mod pkg_qual =
   in do
     findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) mhome_unit mod pkg_qual
 
+findImportedModuleWithIsBoot :: HscEnv -> ModuleName -> IsBootInterface -> PkgQual -> IO FindResult
+findImportedModuleWithIsBoot hsc_env mod is_boot pkg_qual = do
+  res <- findImportedModule hsc_env mod pkg_qual
+  case (res, is_boot) of
+    (Found loc mod, IsBoot) -> return (Found (addBootSuffixLocn loc) mod)
+    _ -> return res
+
 findImportedModuleNoHsc
   :: FinderCache
   -> FinderOpts
@@ -229,15 +237,19 @@ findPluginModule fc fopts units Nothing mod_name =
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
 
-findExactModule :: FinderCache -> FinderOpts ->  UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IO InstalledFindResult
-findExactModule fc fopts other_fopts unit_state mhome_unit mod = do
-  case mhome_unit of
+findExactModule :: FinderCache -> FinderOpts ->  UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModule fc fopts other_fopts unit_state mhome_unit mod is_boot = do
+  res <- case mhome_unit of
     Just home_unit
      | isHomeInstalledModule home_unit mod
         -> findInstalledHomeModule fc fopts (homeUnitId home_unit) (moduleName mod)
      | Just home_fopts <- unitEnv_lookup_maybe (moduleUnit mod) other_fopts
         -> findInstalledHomeModule fc home_fopts (moduleUnit mod) (moduleName mod)
     _ -> findPackageModule fc unit_state fopts mod
+  case (res, is_boot) of
+    (InstalledFound loc, IsBoot) -> return (InstalledFound (addBootSuffixLocn loc))
+    _ -> return res
+
 
 -- -----------------------------------------------------------------------------
 -- Helpers
@@ -592,10 +604,12 @@ mkHomeModLocationSearched fopts mod suff path basename =
 -- ext
 --      The filename extension of the source file (usually "hs" or "lhs").
 
-mkHomeModLocation :: FinderOpts -> ModuleName -> OsPath -> ModLocation
-mkHomeModLocation dflags mod src_filename =
-   let (basename,extension) = OsPath.splitExtension src_filename
-   in mkHomeModLocation2 dflags mod basename extension
+mkHomeModLocation :: FinderOpts -> ModuleName -> OsPath -> FileExt -> HscSource -> ModLocation
+mkHomeModLocation dflags mod src_basename ext hsc_src =
+   let loc = mkHomeModLocation2 dflags mod src_basename ext
+   in case hsc_src of
+     HsBootFile -> addBootSuffixLocnOut loc
+     _ -> loc
 
 mkHomeModLocation2 :: FinderOpts
                    -> ModuleName
