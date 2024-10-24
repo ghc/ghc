@@ -283,7 +283,7 @@ data Usage
         usg_file_hash  :: Fingerprint,
         -- ^ 'Fingerprint' of the file contents.
 
-        usg_file_label :: Maybe String
+        usg_file_label :: Maybe String,
         -- ^ An optional string which is used in recompilation messages if
         -- file in question has changed.
 
@@ -291,6 +291,8 @@ data Usage
         -- here, because there's no reason to recompile if the actual
         -- contents don't change.  This previously lead to odd
         -- recompilation behaviors; see #8114
+
+        usg_file_nonhs :: !Bool
   }
   | UsageHomeModuleInterface {
         usg_mod_name :: ModuleName
@@ -347,6 +349,7 @@ instance Binary Usage where
         put_ bh (usg_file_path usg)
         put_ bh (usg_file_hash usg)
         put_ bh (usg_file_label usg)
+        put_ bh (usg_file_nonhs usg)
 
     put_ bh usg@UsageMergedRequirement{} = do
         putByte bh 3
@@ -380,7 +383,8 @@ instance Binary Usage where
             fp   <- get bh
             hash <- get bh
             label <- get bh
-            return UsageFile { usg_file_path = fp, usg_file_hash = hash, usg_file_label = label }
+            nonhs <- get bh
+            return UsageFile { usg_file_path = fp, usg_file_hash = hash, usg_file_label = label, usg_file_nonhs = nonhs }
           3 -> do
             mod <- get bh
             hash <- get bh
