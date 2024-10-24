@@ -80,7 +80,7 @@ module GHC.Types.Basic (
         EP(..),
 
         DefMethSpec(..),
-        SwapFlag(..), flipSwap, unSwap, isSwapped,
+        SwapFlag(..), flipSwap, unSwap, notSwapped, isSwapped, pickSwap,
 
         CompilerPhase(..), PhaseNum, beginPhase, nextPhase, laterPhase,
 
@@ -456,6 +456,7 @@ instance Outputable OneShotInfo where
 data SwapFlag
   = NotSwapped  -- Args are: actual,   expected
   | IsSwapped   -- Args are: expected, actual
+  deriving( Eq )
 
 instance Outputable SwapFlag where
   ppr IsSwapped  = text "Is-swapped"
@@ -468,6 +469,14 @@ flipSwap NotSwapped = IsSwapped
 isSwapped :: SwapFlag -> Bool
 isSwapped IsSwapped  = True
 isSwapped NotSwapped = False
+
+notSwapped :: SwapFlag -> Bool
+notSwapped NotSwapped = True
+notSwapped IsSwapped  = False
+
+pickSwap :: SwapFlag -> a -> a -> a
+pickSwap NotSwapped a _ = a
+pickSwap IsSwapped  _ b = b
 
 unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
 unSwap NotSwapped f a b = f a b
