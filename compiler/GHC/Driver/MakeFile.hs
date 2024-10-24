@@ -313,7 +313,7 @@ findDependency  :: HscEnv
 findDependency hsc_env srcloc pkg imp dep_boot = do
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
-  findImportedModule hsc_env imp pkg >>= \case
+  findImportedModuleWithIsBoot hsc_env imp dep_boot pkg >>= \case
     Found loc dep_mod ->
       pure $ Right (DepHi {
         dep_mod,
@@ -362,10 +362,9 @@ writeDependencies include_pkgs root hdl suffixes node deps =
     -- e.g.         A.o   : B.hi
     --              A.x_o : B.x_hi
     import_dep = \case
-      DepHi {dep_path, dep_boot, dep_unit}
+      DepHi {dep_path, dep_unit}
         | isNothing dep_unit || include_pkgs
-        , let path = addBootSuffix_maybe dep_boot dep_path
-        -> [([obj], hi) | (obj, hi) <- zip obj_files (suffixed path)]
+        -> [([obj], hi) | (obj, hi) <- zip obj_files (suffixed dep_path)]
 
         | otherwise
         -> []
