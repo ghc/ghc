@@ -1534,9 +1534,11 @@ data Info
   The @Maybe Dec@ field contains @Just@ the declaration which
   defined the variable - including the RHS of the declaration -
   or else @Nothing@, in the case where the RHS is unavailable to
-  the compiler. At present, this value is /always/ @Nothing@:
-  returning the RHS has not yet been implemented because of
-  lack of interest.
+  the compiler.
+
+  At present, this value is /always/ @Nothing@:
+  returning the RHS has not yet been implemented and is tracked by
+  [GHC #14474](https://gitlab.haskell.org/ghc/ghc/-/issues/14474).
   -}
   | VarI
        Name
