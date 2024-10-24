@@ -30,7 +30,7 @@ module GHC.Core.Coercion (
         coercionRole, coercionKindRole,
 
         -- ** Constructing coercions
-        mkGReflCo, mkReflCo, mkRepReflCo, mkNomReflCo,
+        mkGReflCo, mkGReflMCo, mkReflCo, mkRepReflCo, mkNomReflCo,
         mkCoVarCo, mkCoVarCos,
         mkAxInstCo, mkUnbranchedAxInstCo,
         mkAxInstRHS, mkUnbranchedAxInstRHS,
@@ -334,8 +334,23 @@ isGReflMCo _ = False
 mkGReflCo :: Role -> Type -> MCoercionN -> Coercion
 mkGReflCo r ty mco
   | isGReflMCo mco = if r == Nominal then Refl ty
-                     else GRefl r ty MRefl
-  | otherwise    = GRefl r ty mco
+                                     else GRefl r ty MRefl
+  | otherwise
+  = -- I'd like to have this assert, but sadly it's not true during type
+    -- inference because the types are not fully zonked
+    -- assertPpr (case mco of
+    --              MCo co -> typeKind ty `eqType` coercionLKind co
+    --              MRefl  -> True)
+    --          (vcat [ text "ty" <+> ppr ty <+> dcolon <+> ppr (typeKind ty)
+    --                , case mco of
+    --                     MCo co -> text "co" <+> ppr co
+    --                                  <+> dcolon <+> ppr (coercionKind co)
+    --                     MRefl  -> text "MRefl"
+    --                , callStackDoc ]) $
+    GRefl r ty mco
+
+mkGReflMCo :: HasDebugCallStack => Role -> Type -> CoercionN -> Coercion
+mkGReflMCo r ty co = mkGReflCo r ty (MCo co)
 
 -- | Compose two MCoercions via transitivity
 mkTransMCo :: MCoercion -> MCoercion -> MCoercion
@@ -1129,14 +1144,19 @@ mkSymCo co@(ForAllCo { fco_kind = kco, fco_body = body_co })
   | isReflCo kco           = co { fco_body = mkSymCo body_co }
 mkSymCo co                 = SymCo co
 
--- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
---   (co1 ; co2)
-mkTransCo :: Coercion -> Coercion -> Coercion
-mkTransCo co1 co2 | isReflCo co1 = co2
-                  | isReflCo co2 = co1
-mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
-  = GRefl r t1 (MCo $ mkTransCo co1 co2)
-mkTransCo co1 co2                = TransCo co1 co2
+-- | mkTransCo creates a new 'Coercion' by composing the two
+--   given 'Coercion's transitively: (co1 ; co2)
+mkTransCo :: HasDebugCallStack => Coercion -> Coercion -> Coercion
+mkTransCo co1 co2
+   | isReflCo co1 = co2
+   | isReflCo co2 = co1
+
+   | GRefl r t1 (MCo kco1) <- co1
+   , GRefl _ _  (MCo kco2) <- co2
+   = GRefl r t1 (MCo $ mkTransCo kco1 kco2)
+
+   | otherwise
+   = TransCo co1 co2
 
 --------------------
 {- Note [mkSelCo precondition]
@@ -1296,7 +1316,7 @@ mkGReflRightCo r ty co
   | isGReflCo co = mkReflCo r ty
     -- the kinds of @k1@ and @k2@ are the same, thus @isGReflCo@
     -- instead of @isReflCo@
-  | otherwise = GRefl r ty (MCo co)
+  | otherwise = mkGReflMCo r ty co
 
 -- | Given @r@, @ty :: k1@, and @co :: k1 ~N k2@,
 -- produces @co' :: (ty |> co) ~r ty@
@@ -1305,7 +1325,7 @@ mkGReflLeftCo r ty co
   | isGReflCo co = mkReflCo r ty
     -- the kinds of @k1@ and @k2@ are the same, thus @isGReflCo@
     -- instead of @isReflCo@
-  | otherwise    = mkSymCo $ GRefl r ty (MCo co)
+  | otherwise    = mkSymCo $ mkGReflMCo r ty co
 
 -- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty ~r ty'@,
 -- produces @co' :: (ty |> co) ~r ty'
@@ -1314,16 +1334,16 @@ mkGReflLeftCo r ty co
 mkCoherenceLeftCo :: Role -> Type -> CoercionN -> Coercion -> Coercion
 mkCoherenceLeftCo r ty co co2
   | isGReflCo co = co2
-  | otherwise    = (mkSymCo $ GRefl r ty (MCo co)) `mkTransCo` co2
+  | otherwise    = (mkSymCo $ mkGReflMCo r ty co) `mkTransCo` co2
 
 -- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty' ~r ty@,
 -- produces @co' :: ty' ~r (ty |> co)
 -- It is not only a utility function, but it saves allocation when co
 -- is a GRefl coercion.
-mkCoherenceRightCo :: Role -> Type -> CoercionN -> Coercion -> Coercion
+mkCoherenceRightCo :: HasDebugCallStack => Role -> Type -> CoercionN -> Coercion -> Coercion
 mkCoherenceRightCo r ty co co2
   | isGReflCo co = co2
-  | otherwise    = co2 `mkTransCo` GRefl r ty (MCo co)
+  | otherwise    = co2 `mkTransCo` mkGReflMCo r ty co
 
 -- | Given @co :: (a :: k) ~ (b :: k')@ produce @co' :: k ~ k'@.
 mkKindCo :: Coercion -> Coercion
@@ -1682,8 +1702,8 @@ castCoercionKind1 g r t1 t2 h
                  mkNomReflCo (mkCastTy t2 h)
       GRefl _ _ mco -> case mco of
            MRefl       -> mkReflCo r (mkCastTy t2 h)
-           MCo kind_co -> GRefl r (mkCastTy t1 h) $
-                          MCo (mkSymCo h `mkTransCo` kind_co `mkTransCo` h)
+           MCo kind_co -> mkGReflMCo r (mkCastTy t1 h)
+                               (mkSymCo h `mkTransCo` kind_co `mkTransCo` h)
       _ -> castCoercionKind2 g r t1 t2 h h
 
 -- | Creates a new coercion with both of its types casted by different casts
@@ -2110,10 +2130,10 @@ zapLiftingContext :: LiftingContext -> LiftingContext
 zapLiftingContext (LC subst _) = LC (zapSubst subst) emptyVarEnv
 
 -- | Like 'substForAllCoBndr', but works on a lifting context
-substForAllCoBndrUsingLC :: Bool
-                            -> (Coercion -> Coercion)
-                            -> LiftingContext -> TyCoVar -> Coercion
-                            -> (LiftingContext, TyCoVar, Coercion)
+substForAllCoBndrUsingLC :: SwapFlag
+                         -> (Coercion -> Coercion)
+                         -> LiftingContext -> TyCoVar -> Coercion
+                         -> (LiftingContext, TyCoVar, Coercion)
 substForAllCoBndrUsingLC sym sco (LC subst lc_env) tv co
   = (LC subst' lc_env, tv', co')
   where
@@ -2691,7 +2711,7 @@ mkNomPrimEqPred k ty1 ty2 = mkTyConApp eqPrimTyCon [k, k, ty1, ty2]
 -- transitivity over coercion applications, where splitting two
 -- AppCos might yield different kinds. See Note [EtaAppCo] in
 -- "GHC.Core.Coercion.Opt".
-buildCoercion :: Type -> Type -> CoercionN
+buildCoercion :: HasDebugCallStack => Type -> Type -> CoercionN
 buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
   where
     go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
@@ -2719,7 +2739,10 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
         mkFunCo Nominal af1 (go w1 w2) (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)
-      = assert (tc1 == tc2) $
+      = assertPpr (tc1 == tc2) (vcat [ ppr tc1 <+> ppr tc2
+                                     , text "orig_ty1:" <+> ppr orig_ty1
+                                     , text "orig_ty2:" <+> ppr orig_ty2
+                                     ]) $
         mkTyConAppCo Nominal tc1 (zipWith go args1 args2)
 
     go (AppTy ty1a ty1b) ty2

@@ -783,7 +783,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
              alpha_co = mkTyConAppCo Nominal tYPETyCon [mkCoVarCo rr_cv]
 
              -- x_co :: alpha ~R# beta
-             x_co = mkGReflCo Representational openAlphaTy (MCo alpha_co) `mkTransCo`
+             x_co = mkGReflMCo Representational openAlphaTy alpha_co `mkTransCo`
                     mkSubCo (mkCoVarCo ab_cv)
 
 

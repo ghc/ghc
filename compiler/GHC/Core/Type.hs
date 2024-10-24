@@ -579,7 +579,7 @@ expandTypeSynonyms ty
       -- substForAllCoBndrUsing, which is general enough to
       -- handle coercion optimization (which sometimes swaps the
       -- order of a coercion)
-    go_cobndr subst = substForAllCoBndrUsing False (go_co subst) subst
+    go_cobndr subst = substForAllCoBndrUsing NotSwapped (go_co subst) subst
 
 {- Notes on type synonyms
 ~~~~~~~~~~~~~~~~~~~~~~~~~
