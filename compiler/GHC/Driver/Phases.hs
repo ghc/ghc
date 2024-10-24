@@ -23,6 +23,7 @@ module GHC.Driver.Phases (
    isDynLibSuffix,
    isHaskellUserSrcSuffix,
    isHaskellSigSuffix,
+   isHaskellBootSuffix,
    isSourceSuffix,
 
    isHaskellishTarget,
@@ -234,7 +235,7 @@ phaseInputExt Js                  = "js"
 phaseInputExt StopLn              = "o"
 
 haskellish_src_suffixes, backpackish_suffixes, haskellish_suffixes, cish_suffixes,
-    js_suffixes, haskellish_user_src_suffixes, haskellish_sig_suffixes
+    js_suffixes, haskellish_user_src_suffixes, haskellish_sig_suffixes, haskellish_boot_suffixes
  :: [String]
 -- When a file with an extension in the haskellish_src_suffixes group is
 -- loaded in --make mode, its imports will be loaded too.
@@ -247,7 +248,8 @@ js_suffixes                  = [ "js" ]
 
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes =
-  haskellish_sig_suffixes ++ [ "hs", "lhs", "hs-boot", "lhs-boot" ]
+  haskellish_sig_suffixes ++ haskellish_boot_suffixes ++ [ "hs", "lhs" ]
+haskellish_boot_suffixes     = [ "hs-boot", "lhs-boot" ]
 haskellish_sig_suffixes      = [ "hsig", "lhsig" ]
 backpackish_suffixes         = [ "bkp" ]
 
@@ -265,11 +267,12 @@ dynlib_suffixes platform = case platformOS platform of
   _         -> ["so"]
 
 isHaskellishSuffix, isBackpackishSuffix, isHaskellSrcSuffix, isCishSuffix,
-    isHaskellUserSrcSuffix, isJsSuffix, isHaskellSigSuffix
+    isHaskellUserSrcSuffix, isJsSuffix, isHaskellSigSuffix, isHaskellBootSuffix
  :: String -> Bool
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
 isBackpackishSuffix    s = s `elem` backpackish_suffixes
 isHaskellSigSuffix     s = s `elem` haskellish_sig_suffixes
+isHaskellBootSuffix    s = s `elem` haskellish_boot_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
 isJsSuffix             s = s `elem` js_suffixes
