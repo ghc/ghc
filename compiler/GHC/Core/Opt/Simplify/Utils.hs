@@ -2228,7 +2228,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
-    body_floats = letFloatBinds (sfLetFloats floats) ++ typeFloatBinds (sfTypeFloats floats)
+    body_floats = letFloatBinds (sfLetFloats floats)
     empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats)
 
     -- See wrinkle (AB5) in Note [Which type variables to abstract over]

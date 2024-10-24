@@ -2702,7 +2702,7 @@ instance Binary IfaceInfoItem where
 instance Binary IfaceTyVarInfoItem where
     put_ bh (HsTypeUnfold ad) = putByte bh 0 >> put_ bh ad
 
-    get :: BinHandle -> IO IfaceTyVarInfoItem
+    get :: ReadBinHandle -> IO IfaceTyVarInfoItem
     get bh = do
         h <- getByte bh
         case h of

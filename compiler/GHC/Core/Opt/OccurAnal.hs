@@ -2527,12 +2527,12 @@ occAnalCo env (CoVarCo cv)
     in WUD occ (mkCoVarCo cv)
 occAnalCo _ (HoleCo hole)
   = pprPanic "occAnalCo:HoleCo" (ppr hole)
-occAnalCo env (UnivCo p r t1 t2)
-  = let WUD p_usage p' = occAnalProv env p
-        WUD t1_usage t1' = occAnalTy env t1
+occAnalCo env (UnivCo p r t1 t2 cos)
+  = let WUD t1_usage t1' = occAnalTy env t1
         WUD t2_usage t2' = occAnalTy env t2
-        total_usage = p_usage `andUDs` t1_usage `andUDs` t2_usage
-   in WUD total_usage (mkUnivCo p' r t1' t2')
+        WUD cos_usage cos' = occAnalCos env cos
+        total_usage = cos_usage `andUDs` t1_usage `andUDs` t2_usage
+   in WUD total_usage (UnivCo p r t1' t2' cos')
 occAnalCo env (SymCo co)
   = let WUD usage co' = occAnalCo env co
     in WUD usage (mkSymCo co')
@@ -2540,9 +2540,9 @@ occAnalCo env (TransCo co1 co2)
   = let WUD usage1 co1' = occAnalCo env co1
         WUD usage2 co2' = occAnalCo env co2
     in WUD (usage1 `andUDs` usage2) (mkTransCo co1' co2')
-occAnalCo env (AxiomRuleCo r cos)
+occAnalCo env (AxiomCo r cos)
   = let WUD usage cos' = occAnalCos env cos
-    in WUD usage (AxiomRuleCo r cos')
+    in WUD usage (AxiomCo r cos')
 occAnalCo env (SelCo i co)
   = let WUD usage co' = occAnalCo env co
     in WUD usage (mkSelCo i co')
@@ -2559,9 +2559,6 @@ occAnalCo env (KindCo co)
 occAnalCo env (SubCo co)
   = let WUD usage co' = occAnalCo env co
     in WUD usage (mkSubCo co')
-occAnalCo env (AxiomInstCo ax i cos)
-  = let WUD usage cos' = occAnalCos env cos
-    in WUD usage (mkAxiomInstCo ax i cos')
 occAnalCo env co@(TyConAppCo r tc cos)
   | null cos
   = WUD emptyDetails co
@@ -2574,15 +2571,6 @@ occAnalCo env (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
   = let WUD usage1 kind_co' = occAnalCo env kind_co
         WUD usage2 co' = occAnalCo env co
     in WUD (usage1 `andUDs` usage2) (mkForAllCo tv visL visR kind_co' co')
-
-occAnalProv :: OccEnv -> UnivCoProvenance -> WithUsageDetails UnivCoProvenance
-occAnalProv env (PhantomProv co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (PhantomProv co')
-occAnalProv env (ProofIrrelProv co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (ProofIrrelProv co')
-occAnalProv _ p@(PluginProv _) = WUD emptyDetails p
 
 occAnal :: OccEnv
         -> CoreExpr
