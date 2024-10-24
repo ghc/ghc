@@ -87,7 +87,8 @@ mkUsageInfo uc plugins fc unit_env this_mod dir_imp_mods used_names dependent_fi
                                        dir_imp_mods used_names
     let usages = mod_usages ++ [ UsageFile { usg_file_path = mkFastString f
                                            , usg_file_hash = hash
-                                           , usg_file_label = Nothing }
+                                           , usg_file_label = Nothing
+                                           , usg_file_nonhs = True }
                                | (f, hash) <- zip dependent_files hashes ]
                             ++ [ UsageMergedRequirement
                                     { usg_mod = mod,
@@ -173,7 +174,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
 
     msg m = moduleNameString (moduleName m) ++ "[TH] changed"
 
-    fing mmsg fn = UsageFile (mkFastString fn) <$> lookupFileCache fc fn <*> pure mmsg
+    fing mmsg fn = UsageFile (mkFastString fn) <$> lookupFileCache fc fn <*> pure mmsg <*> pure False
 
     partToUsage m part =
       case linkablePartPath part of
