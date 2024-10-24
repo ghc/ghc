@@ -23,6 +23,7 @@ module GHC.Linker.Loader
    , loadModule
    , loadCmdLineLibs
    , loadName
+   , loadObjects
    , unload
    -- * LoadedEnv
    , withExtendedLoadedEnv
@@ -30,6 +31,7 @@ module GHC.Linker.Loader
    , deleteFromLoadedEnv
    -- * Internals
    , rmDupLinkables
+   , modifyLoaderState_
    , modifyLoaderState
    , initLinkDepsOpts
    , getGccSearchDirectory
