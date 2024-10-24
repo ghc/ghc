@@ -854,16 +854,14 @@ hsModuleToModSummary home_keys pn hsc_src modname
     -- To add insult to injury, we don't even actually use
     -- these filenames to figure out where the hi files go.
     -- A travesty!
-    let location0 = mkHomeModLocation2 fopts modname
+    let location = mkHomeModLocation fopts modname
                              (unsafeEncodeUtf $ unpackFS unit_fs </>
                               moduleNameSlashes modname)
-                              (case hsc_src of
+                             (case hsc_src of
                                 HsigFile   -> os "hsig"
                                 HsBootFile -> os "hs-boot"
                                 HsSrcFile  -> os "hs")
-    let location = case hsc_src of
-                        HsBootFile -> addBootSuffixLocnOut location0
-                        _ -> location0
+                             hsc_src
     -- This duplicates a pile of logic in GHC.Driver.Make
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
