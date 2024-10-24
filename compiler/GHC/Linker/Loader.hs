@@ -666,32 +666,40 @@ initLinkDepsOpts hsc_env = opts
 
   ********************************************************************* -}
 
-loadDecls :: Interp -> HscEnv -> SrcSpan -> CompiledByteCode -> IO ([(Name, ForeignHValue)], [Linkable], PkgsLoaded)
-loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
+loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([(Name, ForeignHValue)], [Linkable], PkgsLoaded)
+loadDecls interp hsc_env span linkable = do
     -- Initialise the linker (if it's not been done already)
     initLoaderState interp hsc_env
 
     -- Take lock for the actual work.
     modifyLoaderState interp $ \pls0 -> do
+      -- Link the foreign objects first; BCOs in linkable are ignored here.
+      (pls1, objs_ok) <- loadObjects interp hsc_env pls0 [linkable]
+      when (failed objs_ok) $ throwGhcExceptionIO $ ProgramError "loadDecls: failed to load foreign objects"
+
       -- Link the packages and modules required
-      (pls, ok, links_needed, units_needed) <- loadDependencies interp hsc_env pls0 span needed_mods
+      (pls, ok, links_needed, units_needed) <- loadDependencies interp hsc_env pls1 span needed_mods
       if failed ok
         then throwGhcExceptionIO (ProgramError "")
         else do
           -- Link the expression itself
           let le  = linker_env pls
-              le2 = le { itbl_env = plusNameEnv (itbl_env le) bc_itbls
-                       , addr_env = plusNameEnv (addr_env le) bc_strs }
+              le2 = le { itbl_env = foldl' (\acc cbc -> plusNameEnv acc (bc_itbls cbc)) (itbl_env le) cbcs
+                       , addr_env = foldl' (\acc cbc -> plusNameEnv acc (bc_strs cbc)) (addr_env le) cbcs }
 
           -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs interp (pkgs_loaded pls) le2 [cbc]
+          new_bindings <- linkSomeBCOs interp (pkgs_loaded pls) le2 cbcs
           nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
           let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
               !pls2 = pls { linker_env = le2 { closure_env = ce2 } }
           return (pls2, (nms_fhvs, links_needed, units_needed))
   where
+    cbcs = linkableBCOs linkable
+
     free_names = uniqDSetToList $
-      foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet bc_bcos
+      foldl'
+        (\acc cbc -> foldl' (\acc' bco -> bcoFreeNames bco `unionUniqDSets` acc') acc (bc_bcos cbc))
+        emptyUniqDSet cbcs
 
     needed_mods :: [Module]
     needed_mods = [ nameModule n | n <- free_names,
