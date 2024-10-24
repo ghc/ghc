@@ -1,0 +1,6 @@
+:set -XCApiFFI
+import Foreign
+import Foreign.C
+foreign import capi unsafe "stdlib.h malloc" c_malloc :: CSize -> IO (Ptr ())
+foreign import capi unsafe "stdlib.h free" c_free :: Ptr () -> IO ()
+c_free =<< c_malloc 16
