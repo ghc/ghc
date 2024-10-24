@@ -1654,7 +1654,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfTypeLetBndr fs ki info) rhs) body)
   = case rhs of
       IfaceType ty ->
-        do  { name    <- newIfaceName (mkVarOccFS fs)
+        do  { name    <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
             ; ki'     <- tcIfaceType ki
             ; mb_unf  <- extract_unf info
             ; let tv | Just unf <- mb_unf = mkTyVarWithUnfolding name ki' unf
