@@ -366,6 +366,16 @@ if test "x$UseLibdw" = "xYES" ; then
 fi
 AC_SUBST(UseLibdw)
 
+dnl What is the version of the base library which we are going to use?
+dnl The user can use BASE_UNIT_ID at install time to point the compiler to
+dnl use a different base if they are going to guarantee it is available.
+BaseUnitId=@BaseUnitId@
+if test -n "$BASE_UNIT_ID"; then
+  BaseUnitId="$BASE_UNIT_ID"
+fi
+
+AC_SUBST(BaseUnitId)
+
 FP_SETTINGS
 
 # We get caught by

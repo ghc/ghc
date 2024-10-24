@@ -330,3 +330,4 @@ test('T23944', [unless(have_dynamic(), skip), extra_files(['T23944A.hs'])], mult
 test('T24286', [cxx_src, unless(have_profiling(), skip), extra_files(['T24286.cpp'])], compile, ['-prof -no-hs-main'])
 test('T24839', [unless(arch('x86_64') or arch('aarch64'), skip), extra_files(["t24839_sub.S"])], compile_and_run, ['t24839_sub.S'])
 test('t25150', [extra_files(["t25150"])], multimod_compile, ['Main.hs', '-v0 -working-dir t25150/dir a.c'])
+test('T25382', normal, makefile_test, [])

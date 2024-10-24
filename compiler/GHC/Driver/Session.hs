@@ -80,6 +80,9 @@ module GHC.Driver.Session (
         safeDirectImpsReq, safeImplicitImpsReq,
         unsafeFlags, unsafeFlagsForInfer,
 
+        -- ** base
+        baseUnitId,
+
         -- ** System tool settings and locations
         Settings(..),
         sProgramName,
@@ -390,6 +393,7 @@ settings :: DynFlags -> Settings
 settings dflags = Settings
   { sGhcNameVersion = ghcNameVersion dflags
   , sFileSettings = fileSettings dflags
+  , sUnitSettings = unitSettings dflags
   , sTargetPlatform = targetPlatform dflags
   , sToolSettings = toolSettings dflags
   , sPlatformMisc = platformMisc dflags
@@ -487,6 +491,10 @@ opt_las               :: DynFlags -> [String]
 opt_las dflags = toolSettings_opt_las $ toolSettings dflags
 opt_i                 :: DynFlags -> [String]
 opt_i dflags= toolSettings_opt_i $ toolSettings dflags
+
+
+setBaseUnitId :: String -> DynP ()
+setBaseUnitId s = upd $ \d -> d { unitSettings = UnitSettings (stringToUnitId s) }
 
 -----------------------------------------------------------------------------
 
@@ -2053,6 +2061,7 @@ package_flags_deps = [
       (NoArg (setGeneralFlag Opt_DistrustAllPackages))
   , make_ord_flag defFlag "trust"                 (HasArg trustPackage)
   , make_ord_flag defFlag "distrust"              (HasArg distrustPackage)
+  , make_ord_flag defFlag "base-unit-id"          (HasArg setBaseUnitId)
   ]
   where
     setPackageEnv env = upd $ \s -> s { packageEnv = Just env }

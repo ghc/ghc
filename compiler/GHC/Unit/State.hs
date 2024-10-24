@@ -364,9 +364,13 @@ initUnitConfig dflags cached_dbs home_units =
 
        autoLink
          | not (gopt Opt_AutoLinkPackages dflags) = []
-         -- By default we add ghc-internal & rts to the preload units (when they are
+         -- By default we add base, ghc-internal and rts to the preload units (when they are
          -- found in the unit database) except when we are building them
-         | otherwise = filter (hu_id /=) [ghcInternalUnitId, rtsUnitId]
+         --
+         -- Since "base" is not wired in, then the unit-id is discovered
+         -- from the settings file by default, but can be overriden by power-users
+         -- by specifying `-base-unit-id` flag.
+         | otherwise = filter (hu_id /=) [baseUnitId dflags, ghcInternalUnitId, rtsUnitId]
 
        -- if the home unit is indefinite, it means we are type-checking it only
        -- (not producing any code). Hence we can use virtual units instantiated

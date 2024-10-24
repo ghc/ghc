@@ -62,6 +62,10 @@ module GHC.Driver.DynFlags (
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
 
+        --
+        baseUnitId,
+
+
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
         addImplicitQuoteInclude,
@@ -165,6 +169,8 @@ data DynFlags = DynFlags {
   -- formerly Settings
   ghcNameVersion    :: {-# UNPACK #-} !GhcNameVersion,
   fileSettings      :: {-# UNPACK #-} !FileSettings,
+  unitSettings      :: {-# UNPACK #-} !UnitSettings,
+
   targetPlatform    :: Platform,       -- Filled in by SysTools
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
   platformMisc      :: {-# UNPACK #-} !PlatformMisc,
@@ -634,6 +640,7 @@ defaultDynFlags mySettings =
         splitInfo               = Nothing,
 
         ghcNameVersion = sGhcNameVersion mySettings,
+        unitSettings   = sUnitSettings mySettings,
         fileSettings = sFileSettings mySettings,
         toolSettings = sToolSettings mySettings,
         targetPlatform = sTargetPlatform mySettings,
@@ -1483,6 +1490,11 @@ versionedAppDir appname platform = do
 
 versionedFilePath :: ArchOS -> FilePath
 versionedFilePath platform = uniqueSubdir platform
+
+-- | Access the unit-id of the version of `base` which we will automatically link
+-- against.
+baseUnitId :: DynFlags -> UnitId
+baseUnitId dflags = unitSettings_baseUnitId (unitSettings dflags)
 
 -- SDoc
 -------------------------------------------

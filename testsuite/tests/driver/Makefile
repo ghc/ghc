@@ -808,3 +808,8 @@ T23339B:
 	"$(TEST_HC)" -tmpdir "$(PWD)/tmp" $(TEST_HC_OPTS) -v0 T23339B.hs -finfo-table-map
 	# Check that the file is kept and is the right one
 	find . -name "*.c" -exec cat {} \; | grep "init__ip_init"
+
+# Test that base is linked against implicitly
+T25382:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c T25382.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) T25382.o -o main

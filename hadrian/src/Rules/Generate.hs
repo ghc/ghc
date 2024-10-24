@@ -435,6 +435,7 @@ bindistRules = do
     , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ getFlag UseLibdw
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP
+    , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
     ]
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
@@ -470,6 +471,14 @@ generateSettings settingsFile = do
         Stage1 -> get_pkg_db Stage1
         Stage2 -> get_pkg_db Stage1
         Stage3 -> get_pkg_db Stage2
+
+    -- The unit-id of the base package which is always linked against (#25382)
+    base_unit_id <- expr $ do
+      case stage of
+        Stage0 {} -> error "Unable to generate settings for stage0"
+        Stage1 -> pkgUnitId Stage1 base
+        Stage2 -> pkgUnitId Stage1 base
+        Stage3 -> pkgUnitId Stage2 base
 
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
 
@@ -531,6 +540,7 @@ generateSettings settingsFile = do
         , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
         , ("RTS expects libdw", yesNo <$> getFlag UseLibdw)
         , ("Relative Global Package DB", pure rel_pkg_db)
+        , ("base unit-id", pure base_unit_id)
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of
