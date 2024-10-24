@@ -67,31 +67,43 @@ opt_co2.
 Note [Optimising InstCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 (1) tv is a type variable
-When we have (InstCo (ForAllCo tv h g) g2), we want to optimise.
+we want to optimise
+  InstCo (ForAllCo tv kco g) g2  --> g{some substitution}
 
 Let's look at the typing rules.
 
-h : k1 ~ k2
-tv:k1 |- g : t1 ~ t2
------------------------------
-ForAllCo tv h g : (all tv:k1.t1) ~ (all tv:k2.t2[tv |-> tv |> sym h])
+    kco : k1 ~ k2
+    tv:k1 |- g : t1 ~ t2
+    -----------------------------
+    ForAllCo tv kco g : (all tv:k1.t1) ~ (all tv:k2.t2[tv |-> tv |> sym kco])
 
-g1 : (all tv:k1.t1') ~ (all tv:k2.t2')
-g2 : s1 ~ s2
---------------------
-InstCo g1 g2 : t1'[tv |-> s1] ~ t2'[tv |-> s2]
+    g1 : (all tv:k1.t1') ~ (all tv:k2.t2')
+    g2 : (s1:k1) ~ (s2:k2)
+    --------------------
+    InstCo g1 g2 : t1'[tv |-> s1] ~ t2'[tv |-> s2]
 
-We thus want some coercion proving this:
+Putting these two together
 
-  (t1[tv |-> s1]) ~ (t2[tv |-> s2 |> sym h])
+    kco : k1 ~ k2
+    tv:k1 |- g : t1 ~ t2
+    g2 : (s1:k1) ~ (s2:k2)
+    --------------------
+    InstCo (ForAllCo tv kco g) g2 : t1[tv |-> s1] ~ t2[tv |-> s2 |> sym kco]
 
-If we substitute the *type* tv for the *coercion*
-(g2 ; t2 ~ t2 |> sym h) in g, we'll get this result exactly.
-This is bizarre,
-though, because we're substituting a type variable with a coercion. However,
-this operation already exists: it's called *lifting*, and defined in GHC.Core.Coercion.
-We just need to enhance the lifting operation to be able to deal with
-an ambient substitution, which is why a LiftingContext stores a TCvSubst.
+We thus want g{some substitution} to have kind
+
+  (t1[tv |-> s1]) ~ (t2[tv |-> s2 |> sym kco])
+
+So we want
+       g{ tv :-> tv_co }
+where
+       tv_co : s1 ~ (s2 |> sym kco)
+
+This looks bizarre, because we're substituting a /type variable/ with a
+/coercion/. However, this operation already exists: it's called *lifting*, and
+defined in GHC.Core.Coercion.  We just need to enhance the lifting operation to
+be able to deal with an ambient substitution, which is why a LiftingContext
+stores a TCvSubst.
 
 (2) cv is a coercion variable
 Now consider we have (InstCo (ForAllCo cv h g) g2), we want to optimise.
@@ -252,19 +264,19 @@ opt_co4_wrap env sym rep r co
              | otherwise = r
 -}
 
-opt_co4 env _   rep r (Refl ty)
+opt_co4 env sym rep r (Refl ty)
   = assertPpr (r == Nominal)
               (text "Expected role:" <+> ppr r    $$
                text "Found role:" <+> ppr Nominal $$
                text "Type:" <+> ppr ty) $
-    liftCoSubst (chooseRole rep r) env ty
+    wrapSym sym $ liftCoSubst (chooseRole rep r) env ty
 
-opt_co4 env _   rep r (GRefl _r ty MRefl)
+opt_co4 env sym rep r (GRefl _r ty MRefl)
   = assertPpr (r == _r)
               (text "Expected role:" <+> ppr r $$
                text "Found role:" <+> ppr _r   $$
                text "Type:" <+> ppr ty) $
-    liftCoSubst (chooseRole rep r) env ty
+    wrapSym sym $ liftCoSubst (chooseRole rep r) env ty
 
 opt_co4 env sym  rep r (GRefl _r ty (MCo co))
   = assertPpr (r == _r)
@@ -272,8 +284,13 @@ opt_co4 env sym  rep r (GRefl _r ty (MCo co))
                text "Found role:" <+> ppr _r   $$
                text "Type:" <+> ppr ty) $
     if isGReflCo co || isGReflCo co'
-    then liftCoSubst r' env ty
-    else wrapSym sym $ mkCoherenceRightCo r' ty' co' (liftCoSubst r' env ty)
+    then wrapSym sym $ liftCoSubst r' env ty
+    else -- pprTrace "opt_co4:GRefl" (
+         --  vcat [ text "ty" <+> ppr ty <+> dcolon <+> ppr (typeKind ty)
+         --       , text "ty'" <+> ppr ty'  <+> dcolon <+> ppr (typeKind ty)
+         --       , text "co" <+> ppr co <+> dcolon <+> ppr (coercionKind co)
+         --       , text "co'" <+> ppr co' <+> dcolon <+> ppr (coercionKind co') ]) $
+         wrapSym sym $ mkCoherenceRightCo r' ty' co' (liftCoSubst r' env ty)
   where
     r'  = chooseRole rep r
     ty' = substTy (lcSubstLeft env) ty
@@ -331,7 +348,8 @@ opt_co4 env sym rep r (FunCo _r afl afr cow co1 co2)
 opt_co4 env sym rep r (CoVarCo cv)
   | Just co <- lcLookupCoVar env cv   -- see Note [Forall over coercion] for why
                                       -- this is the right thing here
-  = opt_co4_wrap (zapLiftingContext env) sym rep r co
+  = -- pprTrace "CoVarCo" (ppr cv $$ ppr co) $
+    opt_co4_wrap (zapLiftingContext env) sym rep r co
 
   | ty1 `eqType` ty2   -- See Note [Optimise CoVarCo to Refl]
   = mkReflCo (chooseRole rep r) ty1
@@ -447,51 +465,61 @@ So we extend the environment binding cv to arg's left-hand type.
 -- See Note [Optimising InstCo]
 opt_co4 env sym rep r (InstCo co1 arg)
     -- forall over type...
-  | Just (tv, _visL, _visR, kind_co, co_body) <- splitForAllCo_ty_maybe co1
-  = opt_co4_wrap (extendLiftingContext env tv
-                    (mkCoherenceRightCo Nominal t2 (mkSymCo kind_co) sym_arg))
-                   -- mkSymCo kind_co :: k1 ~ k2
-                   -- sym_arg :: (t1 :: k1) ~ (t2 :: k2)
-                   -- tv |-> (t1 :: k1) ~ (((t2 :: k2) |> (sym kind_co)) :: k1)
-                 sym rep r co_body
+  | Just (tv, _visL, _visR, k_co, body_co) <- splitForAllCo_ty_maybe co1
+    -- tv   :: k1
+    -- k_co :: k1 ~ k2
+    -- co_body :: t1 ~ t2
+    -- arg     :: (s1:k1) ~ (s2:k2)
+  , let arg'  = opt_co4_wrap env False False Nominal arg
+                  -- Do not push Sym into the arg
+        k_co' = opt_co4_wrap env False False Nominal k_co
+        s2'   = coercionRKind arg'
+        tv_co = mkCoherenceRightCo Nominal s2' (mkSymCo k_co') arg'
+                   -- mkSymCo kind_co :: k2 ~ k1
+                   -- tv_co   :: (s1 :: k1) ~ (((s2 :: k2) |> (sym kind_co)) :: k1)
+  = opt_co4_wrap (extendLiftingContext env tv tv_co) sym rep r body_co
 
     -- See Note [Forall over coercion]
   | Just (cv, _visL, _visR, _kind_co, co_body) <- splitForAllCo_co_maybe co1
-  , CoercionTy h1 <- t1
-  = opt_co4_wrap (extendLiftingContextCvSubst env cv h1) sym rep r co_body
+  , CoercionTy h1 <- coercionLKind arg
+  , let h1' = opt_co4_wrap env False False Nominal h1
+  = opt_co4_wrap (extendLiftingContextCvSubst env cv h1') sym rep r co_body
 
-    -- See if it is a forall after optimization
+    -- See if it is a forall /after/ optimization
     -- If so, do an inefficient one-variable substitution, then re-optimize
 
     -- forall over type...
-  | Just (tv', _visL, _visR, kind_co', co_body') <- splitForAllCo_ty_maybe co1'
-  = opt_co4_wrap (extendLiftingContext (zapLiftingContext env) tv'
-                    (mkCoherenceRightCo Nominal t2' (mkSymCo kind_co') arg'))
-            False False r' co_body'
+  | Just (tv', _visL, _visR, k_co', co_body') <- splitForAllCo_ty_maybe co1'
+  , let arg'  = opt_co4_wrap env False False Nominal arg
+        s2'   = coercionRKind arg'
+        tv_co = mkCoherenceRightCo Nominal s2' (mkSymCo k_co') arg'
+  = opt_co4_wrap (extendLiftingContext (zapLiftingContext env) tv' tv_co)
+                 False False r' co_body'
 
     -- See Note [Forall over coercion]
   | Just (cv', _visL, _visR, _kind_co', co_body') <- splitForAllCo_co_maybe co1'
-  , CoercionTy h1' <- t1'
+  , let arg'  = opt_co4_wrap env False False Nominal arg
+  , CoercionTy h1' <- coercionLKind arg'
   = opt_co4_wrap (extendLiftingContextCvSubst (zapLiftingContext env) cv' h1')
-                    False False r' co_body'
+                 False False r' co_body'
 
-  | otherwise = InstCo co1' arg'
+  | otherwise
+  = -- Push Sym into both function and argument
+    InstCo co1' (opt_co4_wrap env sym False Nominal arg)
   where
-    co1'    = opt_co4_wrap env sym rep r co1
-    r'      = chooseRole rep r
+    co1' = opt_co4_wrap env sym rep r co1
+    r'   = chooseRole rep r
+
+{-
     arg'    = opt_co4_wrap env sym False Nominal arg
     sym_arg = wrapSym sym arg'
 
-    -- Performance note: don't be alarmed by the two calls to coercionKind
-    -- here, as only one call to coercionKind is actually demanded per guard.
-    -- t1/t2 are used when checking if co1 is a forall, and t1'/t2' are used
-    -- when checking if co1' (i.e., co1 post-optimization) is a forall.
-    --
-    -- t1/t2 must come from sym_arg, not arg', since it's possible that arg'
+    -- s1/s2 must come from sym_arg, not arg', since it's possible that arg'
     -- might have an extra Sym at the front (after being optimized) that co1
     -- lacks, so we need to use sym_arg to balance the number of Syms. (#15725)
-    Pair t1  t2  = coercionKind sym_arg
-    Pair t1' t2' = coercionKind arg'
+    Pair s1  s2  = coercionKind sym_arg
+    Pair s1' s2' = coercionKind arg'
+-}
 
 opt_co4 env sym _rep r (KindCo co)
   = assert (r == Nominal) $
@@ -640,11 +668,19 @@ opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> 
 opt_transList is = zipWithEqual "opt_transList" (opt_trans is)
   -- The input lists must have identical length.
 
-opt_trans, opt_trans' :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
+opt_trans :: HasDebugCallStack => InScopeSet -> NormalCo -> NormalCo -> NormalCo
 
 -- opt_trans just allows us to add some debug tracing
 -- Usually it just goes to opt_trans'
-opt_trans is co1 co2 = opt_trans' is co1 co2
+opt_trans is co1 co2
+  = -- (if coercionRKind co1 `eqType` coercionLKind co2
+    --  then (\x -> x) else
+    --  pprTrace "opt_trans" (vcat [ text "co1" <+> ppr co1
+    --                             , text "co2" <+> ppr co2
+    --                             , text "co1 kind" <+> ppr (coercionKind co1)
+    --                             , text "co2 kind" <+> ppr (coercionKind co2)
+    --                             , callStackDoc ])) $
+    opt_trans' is co1 co2
 
 {-
 opt_trans is co1 co2
@@ -658,6 +694,7 @@ opt_trans is co1 co2
     r2 = coercionRole co1
 -}
 
+opt_trans' :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
 opt_trans' is co1 co2
   | isReflCo co1 = co2
     -- optimize when co1 is a Refl Co
@@ -691,10 +728,25 @@ opt_trans2 _ co1 co2
 
 ------
 -- Optimize coercions with a top-level use of transitivity.
-opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
+opt_trans_rule :: HasDebugCallStack => InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
 
-opt_trans_rule is in_co1@(GRefl r1 t1 (MCo co1)) in_co2@(GRefl r2 _ (MCo co2))
+opt_trans_rule is in_co1@(GRefl r1 t1 (MCo co1)) in_co2@(GRefl r2 _t2 (MCo co2))
   = assert (r1 == r2) $
+    -- (if coercionRKind in_co1 `eqType` coercionLKind in_co2
+    --  then (\x -> x) else
+    --   pprTrace "opt_trans_rule"
+    --                      (vcat [ text "in_co1" <+> ppr in_co1
+    --                            , text "in_co2" <+> ppr in_co2
+    --                            , text "in_co1 kind" <+> ppr (coercionKind in_co1)
+    --                            , text "in_co2 kind" <+> ppr (coercionKind in_co2)
+    --                            , text "t1" <+> ppr t1 <+> dcolon <+> ppr (typeKind t1)
+    --                            , text "t2" <+> ppr _t2 <+> dcolon <+> ppr (typeKind _t2)
+    --                            , text "co2" <+> ppr co2
+    --                            , text "co1" <+> ppr co1
+    --                            , text "co2" <+> ppr co2
+    --                            , text "co1 kind" <+> ppr (coercionKind co1)
+    --                            , text "co2 kind" <+> ppr (coercionKind co2)
+    --                            , callStackDoc ])) $
     fireTransRule "GRefl" in_co1 in_co2 $
     mkGReflRightCo r1 t1 (opt_trans is co1 co2)
 

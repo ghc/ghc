@@ -24,11 +24,11 @@ mkCoVarCo :: CoVar -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion
 mkUnivCo :: UnivCoProvenance -> [Coercion] -> Role -> Type -> Type -> Coercion
 mkSymCo :: Coercion -> Coercion
-mkTransCo :: Coercion -> Coercion -> Coercion
+mkTransCo :: HasDebugCallStack => Coercion -> Coercion -> Coercion
 mkSelCo :: HasDebugCallStack => CoSel -> Coercion -> Coercion
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkInstCo :: Coercion -> Coercion -> Coercion
-mkGReflCo :: Role -> Type -> MCoercionN -> Coercion
+mkGReflCo :: HasDebugCallStack => Role -> Type -> MCoercionN -> Coercion
 mkNomReflCo :: Type -> Coercion
 mkKindCo :: Coercion -> Coercion
 mkSubCo :: HasDebugCallStack => Coercion -> Coercion
