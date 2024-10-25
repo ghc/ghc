@@ -2528,20 +2528,21 @@ showParen_Expr
 showParen_Expr e1 e2 = nlHsApp (nlHsApp (nlHsVar showParen_RDR) e1) e2
 
 nested_compose_Expr :: [LHsExpr GhcPs] -> LHsExpr GhcPs
-
-nested_compose_Expr []  = panic "nested_compose_expr"   -- Arg is always non-empty
-nested_compose_Expr [e] = parenify e
-nested_compose_Expr (e:es)
-  = nlHsApp (nlHsApp (nlHsVar compose_RDR) (parenify e)) (nested_compose_Expr es)
+nested_compose_Expr =
+  nlHsLam . mkSimpleMatch (LamAlt LamSingle) (noLocA [z_Pat]) . go
+  where
+    -- Previously we used (`.`), but inlining its definition improves compiler
+    -- performance significantly since we no longer need to typecheck lots of
+    -- (.) applications (each which needed three type applications, all @String)
+    -- (See #25453 for why this is especially slow currently)
+    go []  = panic "nested_compose_expr"   -- Arg is always non-empty
+    go [e] = nlHsApp e z_Expr
+    go (e:es) = nlHsApp e (go es)
 
 -- impossible_Expr is used in case RHSs that should never happen.
 -- We generate these to keep the desugarer from complaining that they *might* happen!
 error_Expr :: FastString -> LHsExpr GhcPs
 error_Expr string = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsStringFS string))
-
-parenify :: LHsExpr GhcPs -> LHsExpr GhcPs
-parenify e@(L _ (HsVar _ _)) = e
-parenify e                   = mkHsPar e
 
 -- genOpApp wraps brackets round the operator application, so that the
 -- renamer won't subsequently try to re-associate it.
