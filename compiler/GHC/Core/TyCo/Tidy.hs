@@ -336,16 +336,18 @@ tidyCo env co
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
     go (ForAllCo tv visL visR h co)
       = ((((ForAllCo $! tvp) $! visL) $! visR) $! (go h)) $! (tidyCo envp co)
-                               where (envp, tvp) = tidyVarBndr env tv
+      where (envp, tvp) = tidyVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
     go (FunCo r afl afr w co1 co2) = ((FunCo r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = CoVarCo $! go_cv cv
     go (HoleCo h)            = HoleCo $! go_hole h
     go (AxiomCo ax cos)      = AxiomCo ax $ strictMap go cos
-    go co@(UnivCo { uco_lty  = t1, uco_rty = t2 })
-                             = co { uco_lty = tidyType env t1, uco_rty = tidyType env t2 }
-                               -- Don't bother to tidy the uco_deps field
+    go (UnivCo prov role t1 t2 cos)
+                             = ((UnivCo prov role
+                                $! tidyType env t1)
+                                $! tidyType env t2)
+                                $! strictMap go cos
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
     go (SelCo d co)          = SelCo d $! go co
