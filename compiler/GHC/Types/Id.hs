@@ -925,7 +925,7 @@ setIdLFInfo id lf = modifyIdInfo (`setLFInfo` lf) id
 
         ---------------------------------
         -- Occurrence INFO
-idOccInfo :: Id -> OccInfo
+idOccInfo :: HasDebugCallStack => Id -> OccInfo
 idOccInfo id = occInfo (idInfo id)
 
 setIdOccInfo :: Id -> OccInfo -> Id
