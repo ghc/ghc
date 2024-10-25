@@ -1,4 +1,3 @@
-
 T15883d.hs:14:1: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘showsPrec’
       prevents the constraint ‘(Show a0)’ from being solved.
@@ -9,11 +8,12 @@ T15883d.hs:14:1: error: [GHC-39999]
         ...plus 29 others
         ...plus 10 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
-    • In the second argument of ‘(.)’, namely ‘(showsPrec 11 b1)’
+    • In the second argument of ‘showString’, namely
+        ‘(showsPrec 11 b1 z)’
+      In the expression: showString "MkFoo " (showsPrec 11 b1 z)
       In the second argument of ‘showParen’, namely
-        ‘((.) (showString "MkFoo ") (showsPrec 11 b1))’
-      In the expression:
-        showParen (a >= 11) ((.) (showString "MkFoo ") (showsPrec 11 b1))
+        ‘(\ z -> showString "MkFoo " (showsPrec 11 b1 z))’
       When typechecking the code for ‘showsPrec’
         in a derived instance for ‘Show (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
+
