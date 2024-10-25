@@ -207,7 +207,7 @@ in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this featur
   returns a substituted type.
 
 * When we encounter a binder (like x::a) we must apply the substitution
-  to the type of the binding variable.  lintBinders does this.
+  to the type of the binding variable.  lintLocalBinders does this.
 
 * Clearly we need to clone tyvar binders as we go.
 
@@ -553,7 +553,7 @@ Check a core binding, returning the list of variables bound.
 lintRecBindings :: TopLevelFlag -> [(Id, CoreExpr)]
                 -> ([OutId] -> LintM a) -> LintM (a, [UsageEnv])
 lintRecBindings top_lvl pairs thing_inside
-  = lintIdBndrs top_lvl bndrs $ \ bndrs' ->
+  = lintBinders top_lvl LetBind bndrs $ \ bndrs' ->
     do { ues <- zipWithM lint_pair bndrs' rhss
        ; a <- thing_inside bndrs'
        ; return (a, ues) }
@@ -576,6 +576,11 @@ lintLetBind :: TopLevelFlag -> RecFlag -> OutId
 -- Binder's type, and the RHS, have already been linted
 -- This function checks other invariants
 lintLetBind top_lvl rec_flag binder rhs rhs_ty
+  | isTyVar binder
+  = pprTrace "lintLetBind: fill in" (ppr binder) $
+    return ()  -- Fill in!
+
+  | otherwise
   = do { let binder_ty = idType binder
        ; ensureEqTys binder_ty rhs_ty (mkRhsMsg binder (text "RHS") rhs_ty)
 
@@ -667,10 +672,14 @@ lintRhs :: Id -> CoreExpr -> LintM (OutType, UsageEnv)
 -- NB: the Id can be Linted or not -- it's only used for
 --     its OccInfo and join-pointer-hood
 lintRhs bndr rhs
-    | JoinPoint arity <- idJoinPointHood bndr
-    = lintJoinLams arity (Just bndr) rhs
-    | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
-    = lintJoinLams arity Nothing rhs
+  | isTyVar bndr
+  = pprTrace "lintRhs:fill in" (ppr bndr) $
+    return (varType bndr, zeroUE)  -- ToDo: fill in
+
+  | JoinPoint arity <- idJoinPointHood bndr
+  = lintJoinLams arity (Just bndr) rhs
+  | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
+  = lintJoinLams arity Nothing rhs
 
 -- Allow applications of the data constructor @StaticPtr@ at the top
 -- but produce errors otherwise.
@@ -920,7 +929,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
 
           -- See Note [Multiplicity of let binders] in Var
          -- Now lint the binder
-       ; lintBinder LetBind bndr $ \bndr' ->
+       ; lintLocalBinder LetBind bndr $ \bndr' ->
     do { lintLetBind NotTopLevel NonRecursive bndr' rhs rhs_ty
        ; addAliasUE bndr' let_ue $
          lintLetBody (BodyOfLet bndr') [bndr'] body } }
@@ -1076,7 +1085,7 @@ lintCoreFun expr nargs
 lintLambda :: Var -> LintM (Type, UsageEnv) -> LintM (Type, UsageEnv)
 lintLambda var lintBody =
     addLoc (LambdaBodyOf var) $
-    lintBinder LambdaBind var $ \ var' ->
+    lintLocalBinder LambdaBind var $ \ var' ->
     do { (body_ty, ue) <- lintBody
        ; ue' <- checkLinearity ue var'
        ; return (mkLamType var' body_ty, ue') }
@@ -1593,7 +1602,7 @@ lintCaseExpr scrut case_bndr alt_ty alts
 
        -- Lint the case-binder. Must do this after linting the scrutinee
        -- because the case-binder isn't in scope in the scrutineex
-       ; lintBinder CaseBind case_bndr $ \case_bndr' ->
+       ; lintLocalBinder CaseBind case_bndr $ \case_bndr' ->
       -- Don't use lintIdBndr on case_bndr, because unboxed tuple is legitimate
 
     do { let case_bndr_ty' = idType case_bndr'
@@ -1734,7 +1743,7 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
           ; multiplicities = map binderMult $ fst $ splitPiTys con_payload_ty }
 
         -- And now bring the new binders into scope
-    ; lintBinders CasePatBind args $ \ args' -> do
+    ; lintLocalBinders CasePatBind args $ \ args' -> do
       { rhs_ue <- lintAltExpr rhs alt_ty
       ; rhs_ue' <- addLoc (CasePat alt) $
                    lintAltBinders rhs_ue case_bndr scrut_ty con_payload_ty
@@ -1779,22 +1788,32 @@ lintLinearBinder doc actual_usage described_usage
 ************************************************************************
 -}
 
+lintLocalBinders :: BindingSite -> [Var] -> ([Var] -> LintM a) -> LintM a
+lintLocalBinders = lintBinders NotTopLevel
+
+lintLocalBinder :: BindingSite -> Var -> (Var -> LintM a) -> LintM a
+lintLocalBinder = lintBinder NotTopLevel
+
+lintBinders :: TopLevelFlag -> BindingSite -> [InVar] -> ([OutVar] -> LintM a) -> LintM a
 -- When we lint binders, we (one at a time and in order):
 --  1. Lint var types or kinds (possibly substituting)
 --  2. Add the binder to the in scope set, and if its a coercion var,
 --     we may extend the substitution to reflect its (possibly) new kind
-lintBinders :: HasDebugCallStack => BindingSite -> [InVar] -> ([OutVar] -> LintM a) -> LintM a
-lintBinders _    []         linterF = linterF []
-lintBinders site (var:vars) linterF = lintBinder site var $ \var' ->
-                                      lintBinders site vars $ \ vars' ->
-                                      linterF (var':vars')
+lintBinders top_lvl site vars thing_inside
+  = go vars thing_inside
+  where
+    go :: [Var] -> ([Var] -> LintM a) -> LintM a
+    go []       thing_inside = thing_inside []
+    go (var:vars) thing_inside = lintBinder top_lvl site var $ \var' ->
+                                 go vars                     $ \vars' ->
+                                 thing_inside (var' : vars')
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintBinder :: HasDebugCallStack => BindingSite -> InVar -> (OutVar -> LintM a) -> LintM a
-lintBinder site var linterF
+lintBinder :: TopLevelFlag -> BindingSite -> InVar -> (OutVar -> LintM a) -> LintM a
+lintBinder top_lvl site var linterF
   | isTyCoVar var = lintTyCoBndr var linterF
-  | otherwise     = lintIdBndr NotTopLevel site var linterF
+  | otherwise     = lintIdBndr top_lvl site var linterF
 
 lintTyCoBndr :: HasDebugCallStack => TyCoVar -> (OutTyCoVar -> LintM a) -> LintM a
 lintTyCoBndr tcv thing_inside
@@ -1813,16 +1832,6 @@ lintTyCoBndr tcv thing_inside
               text "CoVar with non-coercion type:" <+> pprTyVar tcv
 
        ; addInScopeTyCoVar tcv tcv_type' thing_inside }
-
-lintIdBndrs :: forall a. TopLevelFlag -> [InId] -> ([OutId] -> LintM a) -> LintM a
-lintIdBndrs top_lvl ids thing_inside
-  = go ids thing_inside
-  where
-    go :: [Id] -> ([Id] -> LintM a) -> LintM a
-    go []       thing_inside = thing_inside []
-    go (id:ids) thing_inside = lintIdBndr top_lvl LetBind id  $ \id' ->
-                               go ids                         $ \ids' ->
-                               thing_inside (id' : ids')
 
 lintIdBndr :: TopLevelFlag -> BindingSite
            -> InVar -> (OutVar -> LintM a) -> LintM a
@@ -2217,7 +2226,7 @@ lintCoreRule _ _ (BuiltinRule {})
 
 lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
-  = lintBinders LambdaBind bndrs $ \ _ ->
+  = lintLocalBinders LambdaBind bndrs $ \ _ ->
     do { (lhs_ty, _) <- lintCoreArgs (fun_ty, zeroUE) args
        ; (rhs_ty, _) <- case idJoinPointHood fun of
                      JoinPoint join_arity
@@ -2873,7 +2882,7 @@ lint_axiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches
 lint_branch :: TyCon -> CoAxBranch -> LintM ()
 lint_branch ax_tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
                               , cab_lhs = lhs_args, cab_rhs = rhs })
-  = lintBinders LambdaBind (tvs ++ cvs) $ \_ ->
+  = lintLocalBinders LambdaBind (tvs ++ cvs) $ \_ ->
     do { let lhs = mkTyConApp ax_tc lhs_args
        ; lintType lhs
        ; lintType rhs
