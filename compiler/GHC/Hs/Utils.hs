@@ -56,7 +56,7 @@ module GHC.Hs.Utils(
   nlHsTyApp, nlHsTyApps, nlHsVar, nlHsDataCon,
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
   nlHsIntLit, nlHsVarApps,
-  nlHsDo, nlHsOpApp, nlHsPar, nlHsIf, nlHsCase, nlList,
+  nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
   mkLocatedList, nlAscribe,
 
@@ -598,10 +598,14 @@ nlHsDo ctxt stmts = noLocA (mkHsDo ctxt (noLocA stmts))
 nlHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsOpApp e1 op e2 = noLocA (mkHsOpApp e1 op e2)
 
+nlHsLam  :: LMatch GhcPs (LHsExpr GhcPs) -> LHsExpr GhcPs
 nlHsPar  :: IsPass p => LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
          -> LHsExpr GhcPs
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
+
+nlHsLam match = noLocA $ HsLam noAnn LamSingle
+                  $ mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA [match])
 
 nlHsPar e     = noLocA (gHsPar e)
 

@@ -2,18 +2,16 @@ T9576: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.TypeE
 
 T9576.hs:6:31: error: [GHC-39999]
     • No instance for ‘Show Foo’ arising from a use of ‘showsPrec’
-    • In the second argument of ‘(.)’, namely ‘(showsPrec 11 b1)’
+    • In the second argument of ‘showString’, namely
+        ‘(showsPrec 11 b1 z)’
+      In the expression: showString "MkBar " (showsPrec 11 b1 z)
       In the second argument of ‘showParen’, namely
-        ‘((.) (showString "MkBar ") (showsPrec 11 b1))’
-      In the expression:
-        showParen (a >= 11) ((.) (showString "MkBar ") (showsPrec 11 b1))
+        ‘(\ z -> showString "MkBar " (showsPrec 11 b1 z))’
       When typechecking the code for ‘showsPrec’
         in a derived instance for ‘Show Bar’:
         To see the code I am typechecking, use -ddump-deriv
 (deferred type error)
 
 HasCallStack backtrace:
-  collectBacktraces, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:92:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:84:32 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
