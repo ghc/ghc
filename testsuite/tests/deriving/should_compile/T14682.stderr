@@ -5,12 +5,13 @@ Derived class instances:
     GHC.Internal.Show.showsPrec a (T14682.Foo b1 b2)
       = GHC.Internal.Show.showParen
           (a GHC.Classes.>= 11)
-          ((GHC.Internal.Base..)
-             (GHC.Internal.Show.showString "Foo ")
-             ((GHC.Internal.Base..)
-                (GHC.Internal.Show.showsPrec 11 b1)
-                ((GHC.Internal.Base..)
-                   GHC.Internal.Show.showSpace (GHC.Internal.Show.showsPrec 11 b2))))
+          (\ z
+             -> GHC.Internal.Show.showString
+                  "Foo "
+                  (GHC.Internal.Show.showsPrec
+                     11 b1
+                     (GHC.Internal.Show.showSpace
+                        (GHC.Internal.Show.showsPrec 11 b2 z))))
   
   instance GHC.Internal.TH.Lift.Lift T14682.Foo where
     GHC.Internal.TH.Lift.lift (T14682.Foo a1 a2)
