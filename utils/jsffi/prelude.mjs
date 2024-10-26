@@ -58,9 +58,9 @@ const setImmediate = await (async () => {
   }
 
   // deno
-  try {
+  if (globalThis.Deno) {
     return (await import("node:timers")).setImmediate;
-  } catch {}
+  }
 
   // https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask
   if (globalThis.scheduler) {
