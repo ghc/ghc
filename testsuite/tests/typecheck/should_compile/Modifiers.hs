@@ -8,11 +8,11 @@ import GHC.Types (Multiplicity(..))
 %() data A
 
 %() %True
-  class B a
+class B a
 
 %()
-  %True
-  instance B A
+%True
+instance B A
 
 l1 :: forall (m :: Bool) a b . a %m -> b
 l1 = undefined

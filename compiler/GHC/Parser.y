@@ -1287,7 +1287,7 @@ topdecl :: { LHsDecl GhcPs }
 -- Type classes
 --
 cl_decl :: { LTyClDecl GhcPs }
-        : modifiers 'class' tycl_hdr fds where_cls
+        : declModifiers 'class' tycl_hdr fds where_cls
                 {% do { let {(wtok, (oc,semis,cc)) = fstOf3 $ unLoc $5}
                       ; mkClassDecl (comb5 $1 $2 $3 $4 $5) (unLoc $1) $3 $4 (sndOf3 $ unLoc $5) (thdOf3 $ unLoc $5)
                         (AnnClassDecl (epTok $2) [] [] (fst $ unLoc $4) wtok oc cc semis) }}
@@ -1303,7 +1303,7 @@ default_decl :: { LDefaultDecl GhcPs }
 --
 ty_decl :: { LTyClDecl GhcPs }
            -- ordinary type synonyms
-        : modifiers 'type' type '=' ktype
+        : declModifiers 'type' type '=' ktype
                 -- Note ktype, not sigtype, on the right of '='
                 -- We allow an explicit for-all but we don't insert one
                 -- in   type Foo a = (b,b)
@@ -1315,7 +1315,7 @@ ty_decl :: { LTyClDecl GhcPs }
                 >> mkTySynonym (comb2 $2 $5) $3 $5 (epTok $2) (epTok $4) }
 
            -- type family declarations
-        | modifiers 'type' 'family' type opt_tyfam_kind_sig opt_injective_info
+        | declModifiers 'type' 'family' type opt_tyfam_kind_sig opt_injective_info
                           where_type_family
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
@@ -1328,7 +1328,7 @@ ty_decl :: { LTyClDecl GhcPs }
                            (AnnFamilyDecl [] [] (epTok $2) noAnn (epTok $3) tdcolon tequal tvbar twhere toc tdd tcc) }}
 
           -- ordinary data type or newtype declaration
-        | modifiers type_data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
+        | declModifiers type_data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
             {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $2}
                   ; let { tequal = fst $ unLoc $5 }
                   ; mkTyData (comb5 $1 $2 $4 $5 $6) (unLoc $1) (sndOf3 $ unLoc $2) (thdOf3 $ unLoc $2) $3 $4
@@ -1340,7 +1340,7 @@ ty_decl :: { LTyClDecl GhcPs }
                                    -- constrs and deriving are both empty
 
           -- ordinary GADT declaration
-        | modifiers type_data_or_newtype capi_ctype tycl_hdr opt_kind_sig
+        | declModifiers type_data_or_newtype capi_ctype tycl_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
             {% do { let { (tdata, tnewtype, ttype) = fstOf3 $ unLoc $2}
@@ -1354,7 +1354,7 @@ ty_decl :: { LTyClDecl GhcPs }
                                    -- constrs and deriving are both empty
 
           -- data/newtype family
-        | modifiers 'data' 'family' type opt_datafam_kind_sig
+        | declModifiers 'data' 'family' type opt_datafam_kind_sig
              {% do { forbidModifiers $1
                    ; let { tdcolon = fst $ unLoc $5 }
                    ; mkFamDecl (comb4 $2 $3 $4 $5) DataFamily TopLevel $4
@@ -1363,7 +1363,7 @@ ty_decl :: { LTyClDecl GhcPs }
 
 -- standalone kind signature
 standalone_kind_sig :: { LStandaloneKindSig GhcPs }
-  : modifiers 'type' sks_vars '::' sigktype
+  : declModifiers 'type' sks_vars '::' sigktype
       {% forbidModifiers $1
       >> mkStandaloneKindSig (comb2 $2 $5) (L (gl $3) $ unLoc $3) $5
                (epTok $2,epUniTok $4)}
@@ -1378,40 +1378,46 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
   | oqtycon { sL1 $1 [$1] }
 
 modifier :: { Located (HsModifier GhcPs) }
-modifier
-  : PREFIX_PERCENT atype     { sLL $1 $2 (HsModifier (epTok $1) $2) }
+  : PREFIX_PERCENT atype            { sLL $1 $2 (HsModifier (epTok $1) $2) }
 
-modifiers0 :: { Located [HsModifier GhcPs] }
-  : modifier modifiers0       { sLL $1 $2 (unLoc $1 : unLoc $2) }
-  | {- empty -}               { sL0 [] }
+-- | Modifiers attached in most places.
+modifiers :: { Located [HsModifier GhcPs] }
+  : modifier modifiers              { sLL $1 $2 (unLoc $1 : unLoc $2) }
+  | {- empty -}                     { sL0 [] }
 
 modifiers1 :: { Located [HsModifier GhcPs] }
-  : modifier modifiers0       { sLL $1 $2 (unLoc $1 : unLoc $2) }
+  : modifier modifiers              { sLL $1 $2 (unLoc $1 : unLoc $2) }
 
-modifiers :: {  Located [HsModifier GhcPs] }
-  -- MODS_TODO: are multiple semis allowed here? Do we need annotations for
-  -- exact printing in case they're literal semis? See `semis`, `semis1`. I
-  -- think we don't need the location of the semi.
-  : modifiers1 ';'            { $1 }
-  | modifiers0                { $1 }
+-- | Modifiers attached to a declaration, where semis are optional after each.
+--
+-- MODS_TODO if we only want one optional semi after all modifiers, then this
+-- probably works:
+--
+--   : modifiers1 ';'                  { $1 }
+--   | modifiers                       { $1 }
+declModifiers :: { Located [HsModifier GhcPs] }
+  : modifier     declModifiers      { sLL $1 $2 (unLoc $1 : unLoc $2) }
+  | modifier ';' declModifiers      { sLL $1 $3 (unLoc $1 : unLoc $3) }
+  | {- empty -}                     { sL0 [] }
 
 expModifier :: { forall b. DisambECP b => PV (Located (HsModifierOf (LocatedA b) GhcPs)) }
 expmodifier : PREFIX_PERCENT aexp   { unECP $2 >>= \ $2 ->
                                       return $ sLL $1 $2 (HsModifier (epTok $1) $2) }
 
-expModifiers0 :: {  forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
-  : expModifier expModifiers0       { $1 >>= \ $1 ->
+-- | Modifiers that hold Exprs instead of Types (attached to expression arrows).
+expModifiers :: { forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+  : expModifier expModifiers        { $1 >>= \ $1 ->
                                       $2 >>= \ $2 ->
                                       return $ sLL $1 $2 (unLoc $1 : unLoc $2) }
   | {- empty -}                     { return $ sL0 [] }
 
-expModifiers1 :: {  forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
-  : expModifier expModifiers0       { $1 >>= \ $1 ->
+expModifiers1 :: { forall b. DisambECP b => PV (Located [HsModifierOf (LocatedA b) GhcPs]) }
+  : expModifier expModifiers        { $1 >>= \ $1 ->
                                       $2 >>= \ $2 ->
                                       return $ sLL $1 $2 (unLoc $1 : unLoc $2) }
 
 inst_decl :: { LInstDecl GhcPs }
-        : modifiers 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst
+        : declModifiers 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst
        {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $6)
              ; let (twhere, (openc, closec, semis)) = fst $ unLoc $6
              ; let anns = AnnClsInstDecl (epTok $2) twhere openc semis closec
@@ -1428,13 +1434,13 @@ inst_decl :: { LInstDecl GhcPs }
                    } }
 
            -- type instance declarations
-        | modifiers 'type' 'instance' ty_fam_inst_eqn
+        | declModifiers 'type' 'instance' ty_fam_inst_eqn
                 {% forbidModifiers $1
                 >> mkTyFamInst (comb2 $2 $4) (unLoc $4)
                         (epTok $2) (epTok $3) }
 
           -- data/newtype instance declaration
-        | modifiers data_or_newtype 'instance' capi_ctype datafam_inst_hdr constrs
+        | declModifiers data_or_newtype 'instance' capi_ctype datafam_inst_hdr constrs
                           maybe_derivings
             {% do { forbidModifiers $1
                   ; let { (tdata, tnewtype) = fst $ unLoc $2 }
@@ -1445,7 +1451,7 @@ inst_decl :: { LInstDecl GhcPs }
                             (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $3) NoEpUniTok NoEpTok NoEpTok NoEpTok tequal)}}
 
           -- GADT instance declaration
-        | modifiers data_or_newtype 'instance' capi_ctype datafam_inst_hdr opt_kind_sig
+        | declModifiers data_or_newtype 'instance' capi_ctype datafam_inst_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
             {% do { forbidModifiers $1
@@ -1720,7 +1726,7 @@ stand_alone_deriving :: { LDerivDecl GhcPs }
 -- Role annotations
 
 role_annot :: { LRoleAnnotDecl GhcPs }
-role_annot : modifiers 'type' 'role' oqtycon maybe_roles
+role_annot : declModifiers 'type' 'role' oqtycon maybe_roles
           {% forbidModifiers $1
           >> mkRoleAnnotDecl (comb3 $2 $5 $4) $4 (reverse (unLoc $5))
                    (epTok $2,epTok $3) }
@@ -2308,7 +2314,7 @@ type :: { LHsType GhcPs }
                                        >> let arr = HsStandardArrow (epUniTok $3) (unLoc $2)
                                           in amsA' (sLL $1 $> $ HsFunTy noExtField arr $1 $4) }
 
-        | btype modifiers0 '->.' ctype {% hintLinear (getLoc $2) >>
+        | btype modifiers '->.' ctype {% hintLinear (getLoc $2) >>
                                           amsA' (sLL $1 $> $ HsFunTy noExtField (HsLinearArrow (epTok $3) (unLoc $2)) $1 $4) }
                                               -- [mu AnnLollyU $2] }
 
@@ -2902,7 +2908,7 @@ infixexp2 :: { ECP }
                                   hintLinear (getLoc $2) >>
                                   mkHsMultPV $2 (epUniTok $3) >>= \ arr ->
                                   mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
-        | infixexp expModifiers0 '->.' infixexp2
+        | infixexp expModifiers '->.' infixexp2
                                 { ECP $
                                   hintLinear (getLoc $3) >>
                                   unECP $1 >>= \ $1 ->
