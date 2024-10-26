@@ -26,9 +26,8 @@ Derived class instances:
   
   instance GHC.Internal.Data.Data.Data T14682.Foo where
     GHC.Internal.Data.Data.gfoldl k z (T14682.Foo a1 a2)
-      = ((z (\ a1 a2 -> T14682.Foo a1 a2) `k` a1) `k` a2)
-    GHC.Internal.Data.Data.gunfold k z _
-      = k (k (z (\ a1 a2 -> T14682.Foo a1 a2)))
+      = ((z T14682.Foo `k` a1) `k` a2)
+    GHC.Internal.Data.Data.gunfold k z _ = k (k (z T14682.Foo))
     GHC.Internal.Data.Data.toConstr (T14682.Foo _ _) = $cFoo
     GHC.Internal.Data.Data.dataTypeOf _ = $tFoo
   
