@@ -540,6 +540,7 @@ synifyDataCon use_gadt_syntax dc =
               , con_mb_cxt = ctx
               , con_g_args = hat
               , con_res_ty = synifyType WithinType [] res_ty
+              , con_modifiers = [] -- MODS_TODO should there be any here?
               , con_doc = Nothing
               }
       else do
@@ -553,6 +554,7 @@ synifyDataCon use_gadt_syntax dc =
               , con_ex_tvs = map (synifyTyVarBndr . (mkForAllTyBinder InferredSpec)) ex_tvs
               , con_mb_cxt = ctx
               , con_args = hat
+              , con_modifiers = [] -- MODS_TODO should there be any here?
               , con_doc = Nothing
               }
 

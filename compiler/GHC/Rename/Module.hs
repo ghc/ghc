@@ -2414,7 +2414,8 @@ rnConDecls = mapFvRn (wrapLocFstMA rnConDecl)
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
-                           , con_doc = mb_doc, con_forall = forall_ })
+                           , con_doc = mb_doc, con_forall = forall_
+                           , con_modifiers = mods })
   = do  { _        <- addLocM checkConName name
         ; new_name <- lookupLocatedTopConstructorRnN name
 
@@ -2438,11 +2439,13 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
              , text "new_ex_dqtvs':" <+> ppr new_ex_tvs ])
 
         ; mb_doc' <- traverse rnLHsDoc mb_doc
+        ; (mods', _) <- rnModifiersContextAndWarn ctxt mods
         ; return (decl { con_ext = noExtField
                        , con_name = new_name, con_ex_tvs = new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
                        , con_doc = mb_doc'
-                       , con_forall = forall_ }, -- Remove when #18311 is fixed
+                       , con_forall = forall_ -- Remove when #18311 is fixed
+                       , con_modifiers = mods' },
                   all_fvs) }}
 
 rnConDecl (ConDeclGADT { con_names   = names
@@ -2450,6 +2453,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                        , con_mb_cxt  = mcxt
                        , con_g_args  = args
                        , con_res_ty  = res_ty
+                       , con_modifiers = mods
                        , con_doc     = mb_doc })
   = do  { mapM_ (addLocM checkConName) names
         ; new_names <- mapM (lookupLocatedTopConstructorRnN) names
@@ -2483,10 +2487,11 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; traceRn "rnConDecl (ConDeclGADT)"
             (ppr names $$ ppr outer_bndrs')
         ; new_mb_doc <- traverse rnLHsDoc mb_doc
+        ; (mods', _) <- rnModifiersContextAndWarn ctxt mods
         ; return (ConDeclGADT { con_g_ext = noExtField, con_names = new_names
                               , con_bndrs = L l outer_bndrs', con_mb_cxt = new_cxt
                               , con_g_args = new_args, con_res_ty = new_res_ty
-                              , con_doc = new_mb_doc },
+                              , con_doc = new_mb_doc, con_modifiers = mods' },
                   all_fvs) } }
 
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)

@@ -4345,6 +4345,7 @@ instance ExactPrint (ConDecl GhcPs) where
                     , con_ex_tvs = ex_tvs
                     , con_mb_cxt = mcxt
                     , con_args = args
+                    , con_modifiers = mods
                     , con_doc = doc }) = do
     tforall' <- if has_forall
       then markEpUniToken tforall
@@ -4357,6 +4358,7 @@ instance ExactPrint (ConDecl GhcPs) where
     tdarrow' <- if (isJust mcxt)
       then markEpUniToken tdarrow
       else return tdarrow
+    mods' <- mapM markAnnotated mods
 
     (con', args') <- exact_details args
     return (ConDeclH98 { con_ext = AnnConDeclH98 tforall' tdot' tdarrow'
@@ -4365,6 +4367,7 @@ instance ExactPrint (ConDecl GhcPs) where
                        , con_ex_tvs = ex_tvs'
                        , con_mb_cxt = mcxt'
                        , con_args = args'
+                       , con_modifiers = mods'
                        , con_doc = doc })
 
     where
@@ -4391,6 +4394,7 @@ instance ExactPrint (ConDecl GhcPs) where
                      , con_names = cons
                      , con_bndrs = bndrs
                      , con_mb_cxt = mcxt, con_g_args = args
+                     , con_modifiers = mods
                      , con_res_ty = res_ty, con_doc = doc }) = do
     cons' <- mapM markAnnotated cons
     dcol' <- markEpUniToken dcol
@@ -4413,10 +4417,12 @@ instance ExactPrint (ConDecl GhcPs) where
             rarr' <- markEpUniToken rarr
             return (RecConGADT rarr' fields')
     res_ty' <- markAnnotated res_ty
+    mods' <- mapM markAnnotated mods
     return (ConDeclGADT { con_g_ext = AnnConDeclGADT [] [] dcol'
                         , con_names = cons'
                         , con_bndrs = bndrs'
                         , con_mb_cxt = mcxt', con_g_args = args'
+                        , con_modifiers = mods'
                         , con_res_ty = res_ty', con_doc = doc })
 
 -- ---------------------------------------------------------------------

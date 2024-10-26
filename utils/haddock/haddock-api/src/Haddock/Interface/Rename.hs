@@ -680,12 +680,14 @@ renameCon
           , con_args = details
           , con_doc = mbldoc
           , con_forall = forall_
+          , con_modifiers = mods
           }
         ) = do
     lname' <- renameNameL lname
     ltyvars' <- mapM (renameLTyVarBndr return) ltyvars
     lcontext' <- traverse renameLContext lcontext
     details' <- renameH98Details details
+    mods' <- renameModifiers mods
     mbldoc' <- mapM (renameLDocHsSyn) mbldoc
     return
       ( decl
@@ -695,6 +697,7 @@ renameCon
           , con_mb_cxt = lcontext'
           , con_forall = forall_ -- Remove when #18311 is fixed
           , con_args = details'
+          , con_modifiers = mods'
           , con_doc = mbldoc'
           }
       )
@@ -705,6 +708,7 @@ renameCon
     , con_mb_cxt = lcontext
     , con_g_args = details
     , con_res_ty = res_ty
+    , con_modifiers = mods
     , con_doc = mbldoc
     } = do
     lnames' <- mapM renameNameL lnames
@@ -712,6 +716,7 @@ renameCon
     lcontext' <- traverse renameLContext lcontext
     details' <- renameGADTDetails details
     res_ty' <- renameLType res_ty
+    mods' <- renameModifiers mods
     mbldoc' <- mapM renameLDocHsSyn mbldoc
     return
       ( ConDeclGADT
@@ -721,6 +726,7 @@ renameCon
           , con_mb_cxt = lcontext'
           , con_g_args = details'
           , con_res_ty = res_ty'
+          , con_modifiers = mods'
           , con_doc = mbldoc'
           }
       )

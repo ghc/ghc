@@ -1063,6 +1063,7 @@ data ConDecl pass
       , con_mb_cxt  :: Maybe (LHsContext pass)   -- ^ User-written context (if any)
       , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
       , con_res_ty  :: LHsType pass              -- ^ Result type
+      , con_modifiers :: [HsModifier pass]
 
       , con_doc     :: Maybe (LHsDoc pass) -- ^ A possible Haddock
                                                  -- comment.
@@ -1080,6 +1081,7 @@ data ConDecl pass
       , con_ex_tvs :: [LHsTyVarBndr Specificity pass] -- ^ Existentials only
       , con_mb_cxt :: Maybe (LHsContext pass)         -- ^ User-written context (if any)
       , con_args   :: HsConDeclH98Details pass        -- ^ Arguments; can be infix
+      , con_modifiers :: [HsModifier pass]
 
       , con_doc    :: Maybe (LHsDoc pass) -- ^ A possible Haddock comment.
       }

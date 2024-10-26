@@ -2568,8 +2568,8 @@ gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
     -- TODO:AZ capture the optSemi. Why leading?
-        : optSemi con_list '::' sigtype
-                {% mkGadtDecl (comb2 $2 $>) (unLoc $2) (epUniTok $3) $4 }
+        : optSemi modifiers con_list '::' sigtype
+                {% mkGadtDecl (comb3 $2 $3 $>) (unLoc $2) (unLoc $3) (epUniTok $4) $5 }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2594,19 +2594,21 @@ constrs1 :: { Located [LConDecl GhcPs] }
         | constr                         { sL1 $1 [$1] }
 
 constr :: { LConDecl GhcPs }
-        : forall context '=>' constr_stuff
-                {% amsA' (let (con,details) = unLoc $4 in
-                  (L (comb4 $1 $2 $3 $4) (mkConDeclH98
-                                                       (epUniTok $3,(fst $ unLoc $1))
+        : modifiers forall context '=>' constr_stuff
+                {% amsA' (let (con,details) = unLoc $5 in
+                  (L (comb4 $2 $3 $4 $5) (mkConDeclH98
+                                                       (epUniTok $4,(fst $ unLoc $2))
+                                                       (unLoc $1)
                                                        con
-                                                       (snd $ unLoc $1)
-                                                       (Just $2)
+                                                       (snd $ unLoc $2)
+                                                       (Just $3)
                                                        details))) }
-        | forall constr_stuff
-                {% amsA' (let (con,details) = unLoc $2 in
-                  (L (comb2 $1 $2) (mkConDeclH98 (noAnn, fst $ unLoc $1)
+        | modifiers forall constr_stuff
+                {% amsA' (let (con,details) = unLoc $3 in
+                  (L (comb2 $2 $3) (mkConDeclH98 (noAnn, fst $ unLoc $2)
+                                                      (unLoc $1)
                                                       con
-                                                      (snd $ unLoc $1)
+                                                      (snd $ unLoc $2)
                                                       Nothing   -- No context
                                                       details))) }
 

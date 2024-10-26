@@ -694,19 +694,19 @@ cvtConstr :: TH.Name -- ^ name of first constructor of parent type
 cvtConstr _ do_con_name (NormalC c strtys)
   = do  { c'   <- do_con_name c
         ; tys' <- mapM cvt_arg strtys
-        ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing (PrefixCon noTypeArgs (map hsLinear tys')) }
+        ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing (PrefixCon noTypeArgs (map hsLinear tys')) }
 
 cvtConstr parent_con do_con_name (RecC c varstrtys)
   = do  { c'    <- do_con_name c
         ; args' <- mapM (cvt_id_arg parent_con) varstrtys
-        ; con_decl <- wrapParLA (mkConDeclH98 noAnn c' Nothing Nothing . RecCon) args'
+        ; con_decl <- wrapParLA (mkConDeclH98 noAnn [] c' Nothing Nothing . RecCon) args'
         ; returnLA con_decl }
 
 cvtConstr _ do_con_name (InfixC st1 c st2)
   = do  { c'   <- do_con_name c
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
-        ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing
+        ; returnLA $ mkConDeclH98 noAnn [] c' Nothing Nothing
                        (InfixCon (hsLinear st1') (hsLinear st2')) }
 
 cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
@@ -768,6 +768,7 @@ mk_gadt_decl names args res_ty
                    , con_mb_cxt = Nothing
                    , con_g_args = args
                    , con_res_ty = res_ty
+                   , con_modifiers = []
                    , con_doc    = Nothing }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness

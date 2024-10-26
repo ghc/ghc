@@ -776,17 +776,19 @@ recordPatSynErr loc pat =
     addFatalError $ mkPlainErrorMsgEnvelope loc $
       (PsErrRecordSyntaxInPatSynDecl pat)
 
-mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
+mkConDeclH98 :: (TokDarrow, (TokForall, EpToken ".")) -> [HsModifier GhcPs]
+             -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
                 -> Maybe (LHsContext GhcPs) -> HsConDeclH98Details GhcPs
                 -> ConDecl GhcPs
 
-mkConDeclH98 (tdarrow, (tforall,tdot)) name mb_forall mb_cxt args
+mkConDeclH98 (tdarrow, (tforall,tdot)) mods name mb_forall mb_cxt args
   = ConDeclH98 { con_ext    = AnnConDeclH98 tforall tdot tdarrow
                , con_name   = name
                , con_forall = isJust mb_forall
                , con_ex_tvs = mb_forall `orElse` []
                , con_mb_cxt = mb_cxt
                , con_args   = args
+               , con_modifiers = mods
                , con_doc    = Nothing }
 
 -- | Construct a GADT-style data constructor from the constructor names and
@@ -797,11 +799,12 @@ mkConDeclH98 (tdarrow, (tforall,tdot)) name mb_forall mb_cxt args
 --   records whether this is a prefix or record GADT constructor. See
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
 mkGadtDecl :: SrcSpan
+           -> [HsModifier GhcPs]
            -> NonEmpty (LocatedN RdrName)
            -> TokDcolon
            -> LHsSigType GhcPs
            -> P (LConDecl GhcPs)
-mkGadtDecl loc names dcol ty = do
+mkGadtDecl loc mods names dcol ty = do
 
   (args, res_ty, (ops, cps), csa) <-
     case body_ty of
@@ -831,6 +834,7 @@ mkGadtDecl loc names dcol ty = do
                      , con_mb_cxt = mcxt
                      , con_g_args = args
                      , con_res_ty = res_ty
+                     , con_modifiers = mods
                      , con_doc    = Nothing }
   where
     (outer_bndrs, mcxt, body_ty) = splitLHsGadtTy ty
