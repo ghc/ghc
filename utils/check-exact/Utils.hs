@@ -34,7 +34,6 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
 import GHC.Data.FastString
-import qualified GHC.Data.Strict as Strict
 import GHC.Base (NonEmpty(..))
 import GHC.Parser.Lexer (allocateComments)
 
@@ -139,13 +138,6 @@ undelta (l,_) (DifferentLine dl dc) (LayoutStartCol co) = (fl,fc)
     -- Note: invariant: dl > 0
     fl = l + dl
     fc = co + dc
-
-undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
-undeltaSpan anc kw dp = AddEpAnn kw (EpaSpan (RealSrcSpan sp Strict.Nothing))
-  where
-    (l,c) = undelta (ss2pos anc) dp (LayoutStartCol 0)
-    len = length (keywordToString kw)
-    sp = range2rs ((l,c),(l,c+len))
 
 -- ---------------------------------------------------------------------
 
@@ -320,8 +312,8 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
                          where
                            hc1' = workInComments (comments an2) csh'
                            an3' = an2 { comments = hc1' }
-                           (csh', cs0b') = case al_open $ anns l of
-                               Just (AddEpAnn _ (EpaSpan (RealSrcSpan s _))) ->(h, n)
+                           (csh', cs0b') = case annListBracketsLocs $ al_brackets $ anns l of
+                               (EpaSpan (RealSrcSpan s _),_) ->(h, n)
                                  where
                                    (h,n) = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos s) )
                                        cs0b
@@ -354,6 +346,14 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
             _ -> (cs', [])
         cs4' = workInComments cs4 these
         (xs',rest') = allocPreceding xs rest
+
+annListBracketsLocs :: AnnListBrackets -> (EpaLocation,EpaLocation)
+annListBracketsLocs (ListParens o c) = (getEpTokenLoc o,    getEpTokenLoc c)
+annListBracketsLocs (ListBraces o c) = (getEpTokenLoc o,    getEpTokenLoc c)
+annListBracketsLocs (ListSquare o c) = (getEpTokenLoc o,    getEpTokenLoc c)
+annListBracketsLocs (ListBanana o c) = (getEpUniTokenLoc o, getEpUniTokenLoc c)
+annListBracketsLocs ListNone         = (noAnn,              noAnn)
+
 
 data SplitWhere = Before | After
 
@@ -585,9 +585,6 @@ setTrailingAnnLoc (AddCommaAnn _)   ss = (AddCommaAnn ss)
 setTrailingAnnLoc (AddVbarAnn _)    ss = (AddVbarAnn ss)
 setTrailingAnnLoc (AddDarrowAnn _)  ss = (AddDarrowAnn ss)
 setTrailingAnnLoc (AddDarrowUAnn _) ss = (AddDarrowUAnn ss)
-
-addEpAnnLoc :: AddEpAnn -> EpaLocation
-addEpAnnLoc (AddEpAnn _ l) = l
 
 -- ---------------------------------------------------------------------
 

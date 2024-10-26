@@ -10,7 +10,8 @@ module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   AnnKeywordId(..),
   EpToken(..), EpUniToken(..),
-  getEpTokenSrcSpan, getEpTokenLocs, getEpTokenLoc,
+  getEpTokenSrcSpan,
+  getEpTokenLocs, getEpTokenLoc, getEpUniTokenLoc,
   TokDcolon, TokDarrow, TokRarrow, TokForall,
   EpLayout(..),
   EpaComment(..), EpaCommentTok(..),
@@ -19,7 +20,6 @@ module GHC.Parser.Annotation (
   HasE(..),
 
   -- * In-tree Exact Print Annotations
-  AddEpAnn(..), addEpAnnLoc,
   EpaLocation, EpaLocation'(..), epaLocationRealSrcSpan,
   TokenLocation(..),
   DeltaPos(..), deltaPos, getDeltaLine,
@@ -46,8 +46,8 @@ module GHC.Parser.Annotation (
 
   -- ** Annotation data types used in 'GenLocated'
 
-  AnnListItem(..), AnnList(..),
-  AnnParen(..), ParenType(..), parenTypeKws,
+  AnnListItem(..), AnnList(..), AnnListBrackets(..),
+  AnnParen(..),
   AnnPragma(..),
   AnnContext(..),
   NameAnn(..), NameAdornment(..),
@@ -55,7 +55,7 @@ module GHC.Parser.Annotation (
   AnnSortKey(..), DeclTag(..), BindTag(..),
 
   -- ** Trailing annotations in lists
-  TrailingAnn(..), trailingAnnToAddEpAnn,
+  TrailingAnn(..),
   addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
   noTrailingN,
 
@@ -411,6 +411,10 @@ getEpTokenLoc :: EpToken tok -> EpaLocation
 getEpTokenLoc NoEpTok   = noAnn
 getEpTokenLoc (EpTok l) = l
 
+getEpUniTokenLoc :: EpUniToken tok toku -> EpaLocation
+getEpUniTokenLoc NoEpUniTok     = noAnn
+getEpUniTokenLoc (EpUniTok l _) = l
+
 -- TODO:AZ: check we have all of the unicode tokens
 type TokDcolon = EpUniToken "::" "∷"
 type TokDarrow = EpUniToken "=>"  "⇒"
@@ -472,20 +476,6 @@ instance Outputable EpaComment where
 
 -- ---------------------------------------------------------------------
 
--- | Captures an annotation, storing the @'AnnKeywordId'@ and its
--- location.  The parser only ever inserts @'EpaLocation'@ fields with a
--- RealSrcSpan being the original location of the annotation in the
--- source file.
--- The @'EpaLocation'@ can also store a delta position if the AST has been
--- modified and needs to be pretty printed again.
--- The usual way an 'AddEpAnn' is created is using the 'mj' ("make
--- jump") function, and then it can be inserted into the appropriate
--- annotation.
-data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
-
-addEpAnnLoc :: AddEpAnn -> EpaLocation
-addEpAnnLoc (AddEpAnn _ l) = l
-
 type EpaLocation = EpaLocation' [LEpaComment]
 
 epaToNoCommentsLocation :: EpaLocation -> NoCommentsLocation
@@ -511,9 +501,6 @@ instance Outputable a => Outputable (GenLocated TokenLocation a) where
 epaLocationRealSrcSpan :: EpaLocation -> RealSrcSpan
 epaLocationRealSrcSpan (EpaSpan (RealSrcSpan r _)) = r
 epaLocationRealSrcSpan _ = panic "epaLocationRealSrcSpan"
-
-instance Outputable AddEpAnn where
-  ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
 
 -- ---------------------------------------------------------------------
 
@@ -699,14 +686,21 @@ data AnnListItem
 data AnnList a
   = AnnList {
       al_anchor    :: !(Maybe EpaLocation), -- ^ start point of a list having layout
-      al_open      :: !(Maybe AddEpAnn),
-      al_close     :: !(Maybe AddEpAnn),
+      al_brackets  :: !AnnListBrackets,
       al_semis     :: [EpToken ";"], -- decls
       al_rest      :: !a,
       al_trailing  :: ![TrailingAnn] -- ^ items appearing after the
                                      -- list, such as '=>' for a
                                      -- context
       } deriving (Data,Eq)
+
+data AnnListBrackets
+  = ListParens (EpToken "(")         (EpToken ")")
+  | ListBraces (EpToken "{")         (EpToken "}")
+  | ListSquare (EpToken "[")         (EpToken "]")
+  | ListBanana (EpUniToken "(|" "⦇") (EpUniToken "|)"  "⦈")
+  | ListNone
+  deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
 -- Annotations for parenthesised elements, such as tuples, lists
@@ -715,35 +709,20 @@ data AnnList a
 -- | exact print annotation for an item having surrounding "brackets", such as
 -- tuples or lists
 data AnnParen
-  = AnnParen {
-      ap_adornment :: ParenType,
-      ap_open      :: EpaLocation,
-      ap_close     :: EpaLocation
-      } deriving (Data)
-
--- | Detail of the "brackets" used in an 'AnnParen' exact print annotation.
-data ParenType
-  = AnnParens       -- ^ '(', ')'
-  | AnnParensHash   -- ^ '(#', '#)'
-  | AnnParensSquare -- ^ '[', ']'
-  deriving (Eq, Ord, Data, Show)
-
--- | Maps the 'ParenType' to the related opening and closing
--- AnnKeywordId. Used when actually printing the item.
-parenTypeKws :: ParenType -> (AnnKeywordId, AnnKeywordId)
-parenTypeKws AnnParens       = (AnnOpenP, AnnCloseP)
-parenTypeKws AnnParensHash   = (AnnOpenPH, AnnClosePH)
-parenTypeKws AnnParensSquare = (AnnOpenS, AnnCloseS)
+  = AnnParens       (EpToken "(")  (EpToken ")")  -- ^ '(', ')'
+  | AnnParensHash   (EpToken "(#") (EpToken "#)") -- ^ '(#', '#)'
+  | AnnParensSquare (EpToken "[")  (EpToken "]")  -- ^ '[', ']'
+  deriving Data
 
 -- ---------------------------------------------------------------------
 
 -- | Exact print annotation for the 'Context' data type.
 data AnnContext
   = AnnContext {
-      ac_darrow    :: Maybe (IsUnicodeSyntax, EpaLocation),
-                      -- ^ location and encoding of the '=>', if present.
-      ac_open      :: [EpaLocation], -- ^ zero or more opening parentheses.
-      ac_close     :: [EpaLocation]  -- ^ zero or more closing parentheses.
+      ac_darrow    :: Maybe TokDarrow,
+                      -- ^ location of the '=>', if present.
+      ac_open      :: [EpToken "("], -- ^ zero or more opening parentheses.
+      ac_close     :: [EpToken ")"]  -- ^ zero or more closing parentheses.
       } deriving (Data)
 
 
@@ -758,46 +737,37 @@ data NameAnn
   -- | Used for a name with an adornment, so '`foo`', '(bar)'
   = NameAnn {
       nann_adornment :: NameAdornment,
-      nann_open      :: EpaLocation,
       nann_name      :: EpaLocation,
-      nann_close     :: EpaLocation,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @(,,,)@, or @(#,,,#)@
   | NameAnnCommas {
       nann_adornment :: NameAdornment,
-      nann_open      :: EpaLocation,
       nann_commas    :: [EpaLocation],
-      nann_close     :: EpaLocation,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @(# | | #)@
   | NameAnnBars {
-      nann_adornment :: NameAdornment,
-      nann_open      :: EpaLocation,
+      nann_parensh   :: (EpToken "(#", EpToken "#)"),
       nann_bars      :: [EpaLocation],
-      nann_close     :: EpaLocation,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @()@, @(##)@, @[]@
   | NameAnnOnly {
       nann_adornment :: NameAdornment,
-      nann_open      :: EpaLocation,
-      nann_close     :: EpaLocation,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @->@, as an identifier
   | NameAnnRArrow {
-      nann_unicode   :: Bool,
-      nann_mopen     :: Maybe EpaLocation,
-      nann_name      :: EpaLocation,
-      nann_mclose    :: Maybe EpaLocation,
+      nann_mopen     :: Maybe (EpToken "("),
+      nann_arrow     :: TokRarrow,
+      nann_mclose    :: Maybe (EpToken ")"),
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for an item with a leading @'@. The annotation for
   -- unquoted item is stored in 'nann_quoted'.
   | NameAnnQuote {
-      nann_quote     :: EpaLocation,
+      nann_quote     :: EpToken "'",
       nann_quoted    :: SrcSpanAnnN,
       nann_trailing  :: [TrailingAnn]
       }
@@ -812,11 +782,13 @@ data NameAnn
 -- such as parens or backquotes. This data type identifies what
 -- particular pair are being used.
 data NameAdornment
-  = NameParens -- ^ '(' ')'
-  | NameParensHash -- ^ '(#' '#)'
-  | NameBackquotes -- ^ '`'
-  | NameSquare -- ^ '[' ']'
-  deriving (Eq, Ord, Data)
+  = NameParens     (EpToken "(")  (EpToken ")") -- ^ '(' ')'
+  | NameParensHash (EpToken "(#") (EpToken "#)")-- ^ '(#' '#)'
+  | NameBackquotes (EpToken "`")  (EpToken "`")-- ^ '`'
+  | NameSquare     (EpToken "[")  (EpToken "]")-- ^ '[' ']'
+  | NameNoAdornment
+  deriving (Eq, Data)
+
 
 -- ---------------------------------------------------------------------
 
@@ -948,14 +920,6 @@ different lists we must manage. For this we use DeclTag.
 -}
 
 -- ---------------------------------------------------------------------
-
--- | Convert a 'TrailingAnn' to an 'AddEpAnn'
-trailingAnnToAddEpAnn :: TrailingAnn -> AddEpAnn
-trailingAnnToAddEpAnn (AddSemiAnn ss)    = AddEpAnn AnnSemi ss
-trailingAnnToAddEpAnn (AddCommaAnn ss)   = AddEpAnn AnnComma ss
-trailingAnnToAddEpAnn (AddVbarAnn ss)    = AddEpAnn AnnVbar ss
-trailingAnnToAddEpAnn (AddDarrowUAnn ss) = AddEpAnn AnnDarrowU ss
-trailingAnnToAddEpAnn (AddDarrowAnn ss)  = AddEpAnn AnnDarrow ss
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
@@ -1322,14 +1286,14 @@ instance NoAnn EpaLocation where
 instance NoAnn AnnKeywordId where
   noAnn = Annlarrowtail  {- gotta pick one -}
 
-instance NoAnn AddEpAnn where
-  noAnn = AddEpAnn noAnn noAnn
-
 instance NoAnn [a] where
   noAnn = []
 
 instance NoAnn (Maybe a) where
   noAnn = Nothing
+
+instance NoAnn a => NoAnn (Either a b) where
+  noAnn = Left noAnn
 
 instance (NoAnn a, NoAnn b) => NoAnn (a, b) where
   noAnn = (noAnn, noAnn)
@@ -1359,7 +1323,7 @@ instance NoAnn AnnContext where
   noAnn = AnnContext Nothing [] []
 
 instance NoAnn a => NoAnn (AnnList a) where
-  noAnn = AnnList Nothing Nothing Nothing noAnn noAnn []
+  noAnn = AnnList Nothing ListNone noAnn noAnn []
 
 instance NoAnn NameAnn where
   noAnn = NameAnnTrailing []
@@ -1368,7 +1332,7 @@ instance NoAnn AnnPragma where
   noAnn = AnnPragma noAnn noAnn noAnn noAnn noAnn noAnn noAnn
 
 instance NoAnn AnnParen where
-  noAnn = AnnParen AnnParens noAnn noAnn
+  noAnn = AnnParens noAnn noAnn
 
 instance NoAnn (EpToken s) where
   noAnn = NoEpTok
@@ -1426,37 +1390,47 @@ instance (Outputable e)
      => Outputable (GenLocated EpaLocation e) where
   ppr = pprLocated
 
-instance Outputable ParenType where
-  ppr t = text (show t)
+instance Outputable AnnParen where
+  ppr (AnnParens       o c) = text "AnnParens" <+> ppr o <+> ppr c
+  ppr (AnnParensHash   o c) = text "AnnParensHash" <+> ppr o <+> ppr c
+  ppr (AnnParensSquare o c) = text "AnnParensSquare" <+> ppr o <+> ppr c
 
 instance Outputable AnnListItem where
   ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts
 
 instance Outputable NameAdornment where
-  ppr NameParens     = text "NameParens"
-  ppr NameParensHash = text "NameParensHash"
-  ppr NameBackquotes = text "NameBackquotes"
-  ppr NameSquare     = text "NameSquare"
+  ppr (NameParens     o c) = text "NameParens" <+> ppr o <+> ppr c
+  ppr (NameParensHash o c) = text "NameParensHash" <+> ppr o <+> ppr c
+  ppr (NameBackquotes o c) = text "NameBackquotes" <+> ppr o <+> ppr c
+  ppr (NameSquare     o c) = text "NameSquare" <+> ppr o <+> ppr c
+  ppr NameNoAdornment      = text "NameNoAdornment"
 
 instance Outputable NameAnn where
-  ppr (NameAnn a o n c t)
-    = text "NameAnn" <+> ppr a <+> ppr o <+> ppr n <+> ppr c <+> ppr t
-  ppr (NameAnnCommas a o n c t)
-    = text "NameAnnCommas" <+> ppr a <+> ppr o <+> ppr n <+> ppr c <+> ppr t
-  ppr (NameAnnBars a o n b t)
-    = text "NameAnnBars" <+> ppr a <+> ppr o <+> ppr n <+> ppr b <+> ppr t
-  ppr (NameAnnOnly a o c t)
-    = text "NameAnnOnly" <+> ppr a <+> ppr o <+> ppr c <+> ppr t
-  ppr (NameAnnRArrow u o n c t)
-    = text "NameAnnRArrow" <+> ppr u <+> ppr o <+> ppr n <+> ppr c <+> ppr t
+  ppr (NameAnn a n t)
+    = text "NameAnn" <+> ppr a <+> ppr n <+> ppr t
+  ppr (NameAnnCommas a n t)
+    = text "NameAnnCommas" <+> ppr a <+> ppr n <+> ppr t
+  ppr (NameAnnBars a n t)
+    = text "NameAnnBars" <+> ppr a <+> ppr n <+> ppr t
+  ppr (NameAnnOnly a t)
+    = text "NameAnnOnly" <+> ppr a <+> ppr t
+  ppr (NameAnnRArrow o n c t)
+    = text "NameAnnRArrow" <+> ppr o <+> ppr n <+> ppr c <+> ppr t
   ppr (NameAnnQuote q n t)
     = text "NameAnnQuote" <+> ppr q <+> ppr n <+> ppr t
   ppr (NameAnnTrailing t)
     = text "NameAnnTrailing" <+> ppr t
 
 instance (Outputable a) => Outputable (AnnList a) where
-  ppr (AnnList anc o c s a t)
-    = text "AnnList" <+> ppr anc <+> ppr o <+> ppr c <+> ppr s <+> ppr a <+> ppr t
+  ppr (AnnList anc p s a t)
+    = text "AnnList" <+> ppr anc <+> ppr p <+> ppr s <+> ppr a <+> ppr t
+
+instance Outputable AnnListBrackets where
+  ppr (ListParens o c) = text "ListParens" <+> ppr o <+> ppr c
+  ppr (ListBraces o c) = text "ListBraces" <+> ppr o <+> ppr c
+  ppr (ListSquare o c) = text "ListSquare" <+> ppr o <+> ppr c
+  ppr (ListBanana o c) = text "ListBanana" <+> ppr o <+> ppr c
+  ppr ListNone         = text "ListNone"
 
 instance Outputable AnnPragma where
   ppr (AnnPragma o c s l ca t m)

@@ -70,8 +70,7 @@
          (EpaSpan { T22919.hs:2:1-9 })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -119,7 +118,9 @@
                 (EpaSpan { T22919.hs:2:5-9 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { T22919.hs:2:5 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { T22919.hs:2:5 }))))
                 (EpaComments
                  []))
                []

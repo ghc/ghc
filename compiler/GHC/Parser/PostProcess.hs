@@ -432,7 +432,7 @@ mkRoleAnnotDecl loc tycon roles anns
 
 mkMDo :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> EpaLocation -> EpaLocation -> HsExpr GhcPs
 mkMDo ctxt stmts tok loc
-  = mkHsDoAnns ctxt stmts (AnnList (Just loc) Nothing Nothing [] tok [])
+  = mkHsDoAnns ctxt stmts (AnnList (Just loc) ListNone [] tok [])
 
 -- | Converts a list of 'LHsTyVarBndr's annotated with their 'Specificity' to
 -- binders without annotations. Only accepts specified variables, and errors if
@@ -984,7 +984,7 @@ checkTyVars pp_what equals_or_where tc tparms
       = Just (noAnn, HsBndrWildCard noExtField)
     match_bndr_var _ = Nothing
 
-    -- Return an AddEpAnn for use in widenLocatedAnL. The AnnKeywordId is not used.
+    -- Return a EpaLocation for use in widenLocatedAnL.
     for_widening :: HsBndrVis GhcPs -> EpaLocation
     for_widening (HsBndrInvisible (EpTok loc)) = loc
     for_widening  _                            = noAnn
@@ -1102,7 +1102,7 @@ checkTyClHdr is_cls ty
       let
         lr = combineSrcSpans (locA l1) (locA l)
       in
-        EpAnn (EpaSpan lr) (NameAnn NameParens (getEpTokenLoc o) ap (getEpTokenLoc c) ta) (csp0 Semi.<> csp)
+        EpAnn (EpaSpan lr) (NameAnn (NameParens o c) ap ta) (csp0 Semi.<> csp)
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
@@ -1148,13 +1148,13 @@ checkContext :: LHsType GhcPs -> P (LHsContext GhcPs)
 checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   check ([],[],cs) orig_t
  where
-  check :: ([EpaLocation],[EpaLocation],EpAnnComments)
+  check :: ([EpToken "("],[EpToken ")"],EpAnnComments)
         -> LHsType GhcPs -> P (LHsContext GhcPs)
-  check (oparens,cparens,cs) (L _l (HsTupleTy ann' HsBoxedOrConstraintTuple ts))
+  check (oparens,cparens,cs) (L _l (HsTupleTy (AnnParens o c) HsBoxedOrConstraintTuple ts))
     -- (Eq a, Ord b) shows up as a tuple type. Only boxed tuples can
     -- be used as context constraints.
     -- Ditto ()
-    = mkCTuple (oparens ++ [ap_open ann'], ap_close ann' : cparens, cs) ts
+    = mkCTuple (oparens ++ [o], c : cparens, cs) ts
 
   -- With NoListTuplePuns, contexts are parsed as data constructors, which causes failure
   -- downstream.
@@ -1164,15 +1164,13 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
       True -> unprocessed
       False -> do
         let
-          ol = AddEpAnn AnnOpenP (getEpTokenLoc o)
-          cl = AddEpAnn AnnCloseP (getEpTokenLoc c)
           (op, cp) = case q of
-            EpTok ql -> ([AddEpAnn AnnSimpleQuote ql], [cl])
-            _        -> ([ol], [cl])
-        mkCTuple (oparens ++ (addLoc <$> op), (addLoc <$> cp) ++ cparens, cs) ts
+            EpTok ql -> ([EpTok ql], [c])
+            _        -> ([o], [c])
+        mkCTuple (oparens ++ op, cp ++ cparens, cs) ts
   check (opi,cpi,csi) (L _lp1 (HsParTy (o,c) ty))
                                              -- to be sure HsParTy doesn't get into the way
-    = check (getEpTokenLoc o:opi, getEpTokenLoc c:cpi, csi) ty
+    = check (o:opi, c:cpi, csi) ty
 
   -- No need for anns, returning original
   check (_opi,_cpi,_csi) _t = unprocessed
@@ -1180,7 +1178,6 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   unprocessed =
     return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_t])
 
-  addLoc (AddEpAnn _ l) = l
 
   mkCTuple (oparens, cparens, cs) ts =
     -- Append parens so that the original order in the source is maintained
@@ -1201,16 +1198,16 @@ checkContextExpr :: LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
 checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
   check ([],[], cs) orig_expr
   where
-    check :: ([EpaLocation],[EpaLocation],EpAnnComments)
+    check :: ([EpToken "("],[EpToken ")"],EpAnnComments)
         -> LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
     check (oparens,cparens,cs) (L _ (ExplicitTuple (ap_open, ap_close) tup_args boxity))
              -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be a context
       | isBoxed boxity
       , Just es <- tupArgsPresent_maybe tup_args
-      = mkCTuple (oparens ++ [ap_open], ap_close : cparens, cs) es
-    check (opi, cpi, csi) (L _ (HsPar (EpTok open_tok, EpTok close_tok) expr))
+      = mkCTuple (oparens ++ [EpTok ap_open], EpTok ap_close : cparens, cs) es
+    check (opi, cpi, csi) (L _ (HsPar (open_tok, close_tok) expr))
       = check (opi ++ [open_tok], close_tok : cpi, csi) expr
-    check (oparens,cparens,cs) (L _ (HsVar _ (L (EpAnn _ (NameAnnOnly NameParens open closed []) _) name)))
+    check (oparens,cparens,cs) (L _ (HsVar _ (L (EpAnn _ (NameAnnOnly (NameParens open closed) []) _) name)))
       | name == nameRdrName (dataConName unitDataCon)
       = mkCTuple (oparens ++ [open], closed : cparens, cs) []
     check _ _ = unprocessed
@@ -1842,7 +1839,7 @@ instance DisambECP (HsCmd GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsCmdIf c a b anns)
   mkHsDoPV l Nothing stmts tok_loc anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) Nothing Nothing [] tok_loc []) stmts)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsCmdDo (AnnList (Just anc) ListNone [] tok_loc []) stmts)
   mkHsDoPV l (Just m)    _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrQualifiedDoInCmd m
   mkHsParPV l lpar c rpar = do
     !cs <- getCommentsFor l
@@ -1939,7 +1936,7 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (mkHsIf c a b anns)
   mkHsDoPV l mod stmts loc_tok anc = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) Nothing Nothing [] loc_tok []) (DoExpr mod) stmts)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsDo (AnnList (Just anc) ListNone [] loc_tok []) (DoExpr mod) stmts)
   mkHsParPV l lpar e rpar = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsPar (lpar, rpar) e)
@@ -3614,9 +3611,9 @@ withCombinedComments start end use = do
 -- type or data constructor, based on the extension @ListTuplePuns@.
 -- The case with an explicit promotion quote, @'(Int, Double)@, is handled
 -- by 'mkExplicitTupleTy'.
-mkTupleSyntaxTy :: EpaLocation
+mkTupleSyntaxTy :: EpToken "("
                 -> [LocatedA (HsType GhcPs)]
-                -> EpaLocation
+                -> EpToken ")"
                 -> P (HsType GhcPs)
 mkTupleSyntaxTy parOpen args parClose =
   punsIfElse enabled disabled
@@ -3626,8 +3623,8 @@ mkTupleSyntaxTy parOpen args parClose =
     disabled =
       HsExplicitTupleTy annsKeyword args
 
-    annParen = AnnParen AnnParens parOpen parClose
-    annsKeyword = (NoEpTok, EpTok parOpen, EpTok parClose)
+    annParen = AnnParens parOpen parClose
+    annsKeyword = (NoEpTok, parOpen, parClose)
 
 -- | Decide whether to parse tuple con syntax @(,)@ in a type as a
 -- type or data constructor, based on the extension @ListTuplePuns@.
@@ -3643,8 +3640,8 @@ mkTupleSyntaxTycon boxity n =
 -- constructor, based on the extension @ListTuplePuns@.
 -- The case with an explicit promotion quote, @'[]@, is handled by
 -- 'mkExplicitListTy'.
-mkListSyntaxTy0 :: EpaLocation
-                -> EpaLocation
+mkListSyntaxTy0 :: EpToken "["
+                -> EpToken "]"
                 -> SrcSpan
                 -> P (HsType GhcPs)
 mkListSyntaxTy0 brkOpen brkClose span =
@@ -3658,17 +3655,17 @@ mkListSyntaxTy0 brkOpen brkClose span =
     disabled =
       HsExplicitListTy annsKeyword NotPromoted []
 
-    rdrNameAnn = NameAnnOnly NameSquare brkOpen brkClose []
-    annsKeyword = (NoEpTok, EpTok brkOpen, EpTok brkClose)
+    rdrNameAnn = NameAnnOnly (NameSquare brkOpen brkClose) []
+    annsKeyword = (NoEpTok, brkOpen, brkClose)
     fullLoc = EpaSpan span
 
 -- | Decide whether to parse list type syntax @[Int]@ in a type as a
 -- type or data constructor, based on the extension @ListTuplePuns@.
 -- The case with an explicit promotion quote, @'[Int]@, is handled
 -- by 'mkExplicitListTy'.
-mkListSyntaxTy1 :: EpaLocation
+mkListSyntaxTy1 :: EpToken "["
                 -> LocatedA (HsType GhcPs)
-                -> EpaLocation
+                -> EpToken "]"
                 -> P (HsType GhcPs)
 mkListSyntaxTy1 brkOpen t brkClose =
   punsIfElse enabled disabled
@@ -3678,5 +3675,5 @@ mkListSyntaxTy1 brkOpen t brkClose =
     disabled =
       HsExplicitListTy annsKeyword NotPromoted [t]
 
-    annsKeyword = (NoEpTok, EpTok brkOpen, EpTok brkClose)
-    annParen = AnnParen AnnParensSquare brkOpen brkClose
+    annsKeyword = (NoEpTok, brkOpen, brkClose)
+    annParen = AnnParensSquare brkOpen brkClose

@@ -151,10 +151,9 @@
                 (AnnList
                  (Just
                   (EpaSpan { T14189.hs:6:33-40 }))
-                 (Just
-                  (AddEpAnn AnnOpenC (EpaSpan { T14189.hs:6:31 })))
-                 (Just
-                  (AddEpAnn AnnCloseC (EpaSpan { T14189.hs:6:42 })))
+                 (ListBraces
+                  (EpTok (EpaSpan { T14189.hs:6:31 }))
+                  (EpTok (EpaSpan { T14189.hs:6:42 })))
                  []
                  (())
                  [])

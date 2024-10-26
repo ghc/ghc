@@ -182,9 +182,9 @@
               (EpaSpan { T15323.hs:6:31-36 })
               (AnnContext
                (Just
-                ((,)
-                 (NormalSyntax)
-                 (EpaSpan { T15323.hs:6:38-39 })))
+                (EpUniTok
+                 (EpaSpan { T15323.hs:6:38-39 })
+                 (NormalSyntax)))
                []
                [])
               (EpaComments
