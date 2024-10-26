@@ -51,3 +51,18 @@ Modifiers.hs:42:21: warning: [GHC-49969] [-Wunknown-modifiers]
       In an equation for ‘visForallApp’:
           visForallApp = idt (Int %() -> Int) (+ 1)
 
+Modifiers.hs:50:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %a
+
+Modifiers.hs:52:14: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %a
+
+Modifiers.hs:57:14: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %a
+
+Modifiers.hs:63:12: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %a
+
+Modifiers.hs:66:3: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %a
+
