@@ -101,10 +101,11 @@
            (EpaComments
             []))
           (HsTupleTy
-           (AnnParen
-            AnnParens
-            (EpaSpan { T23315.hsig:3:6 })
-            (EpaSpan { T23315.hsig:3:7 }))
+           (AnnParens
+            (EpTok
+             (EpaSpan { T23315.hsig:3:6 }))
+            (EpTok
+             (EpaSpan { T23315.hsig:3:7 })))
            (HsBoxedOrConstraintTuple)
            []))))))))
   ,(L

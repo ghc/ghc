@@ -82,8 +82,7 @@
          (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -131,7 +130,9 @@
                 (EpaSpan { ZeroWidthSemi.hs:6:3-5 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { ZeroWidthSemi.hs:6:3 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { ZeroWidthSemi.hs:6:3 }))))
                 (EpaComments
                  []))
                []

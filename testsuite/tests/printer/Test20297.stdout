@@ -70,8 +70,7 @@
          (EpaSpan { Test20297.hs:(5,1)-(7,7) })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -119,7 +118,9 @@
                 (EpaSpan { Test20297.hs:5:5-7 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:5:5 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { Test20297.hs:5:5 }))))
                 (EpaComments
                  [(L
                    (EpaSpan
@@ -153,8 +154,7 @@
               (AnnList
                (Just
                 (EpaSpan { <no location info> }))
-               (Nothing)
-               (Nothing)
+               (ListNone)
                []
                (EpTok
                 (EpaSpan { Test20297.hs:7:3-7 }))
@@ -198,8 +198,7 @@
          (EpaSpan { Test20297.hs:(9,1)-(11,26) })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -247,7 +246,9 @@
                 (EpaSpan { Test20297.hs:9:5-7 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:9:5 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { Test20297.hs:9:5 }))))
                 (EpaComments
                  []))
                []
@@ -275,8 +276,7 @@
               (AnnList
                (Just
                 (EpaSpan { Test20297.hs:11:9-26 }))
-               (Nothing)
-               (Nothing)
+               (ListNone)
                []
                (EpTok
                 (EpaSpan { Test20297.hs:10:3-7 }))
@@ -316,8 +316,7 @@
                     (EpaSpan { Test20297.hs:11:9-26 })
                     (AnnList
                      (Nothing)
-                     (Nothing)
-                     (Nothing)
+                     (ListNone)
                      []
                      (NoEpTok)
                      [])
@@ -365,7 +364,9 @@
                            (EpaSpan { Test20297.hs:11:17-26 })
                            (GrhsAnn
                             (Nothing)
-                            (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:11:17 })))
+                            (Left
+                             (EpTok
+                              (EpaSpan { Test20297.hs:11:17 }))))
                            (EpaComments
                             []))
                           []
@@ -380,8 +381,7 @@
                             (AnnList
                              (Just
                               (EpaSpan { Test20297.hs:11:22-26 }))
-                             (Nothing)
-                             (Nothing)
+                             (ListNone)
                              []
                              (EpaSpan { Test20297.hs:11:19-20 })
                              [])
@@ -393,8 +393,7 @@
                               (AnnList
                                (Just
                                 (EpaSpan { Test20297.hs:11:22-26 }))
-                               (Nothing)
-                               (Nothing)
+                               (ListNone)
                                []
                                (NoEpTok)
                                [])
@@ -506,8 +505,7 @@
          (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -555,7 +553,9 @@
                 (EpaSpan { Test20297.ppr.hs:4:3-5 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { Test20297.ppr.hs:4:3 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { Test20297.ppr.hs:4:3 }))))
                 (EpaComments
                  []))
                []
@@ -583,8 +583,7 @@
               (AnnList
                (Just
                 (EpaSpan { <no location info> }))
-               (Nothing)
-               (Nothing)
+               (ListNone)
                []
                (EpTok
                 (EpaSpan { Test20297.ppr.hs:5:3-7 }))
@@ -622,8 +621,7 @@
          (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -671,7 +669,9 @@
                 (EpaSpan { Test20297.ppr.hs:7:3-5 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { Test20297.ppr.hs:7:3 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { Test20297.ppr.hs:7:3 }))))
                 (EpaComments
                  []))
                []
@@ -699,8 +699,7 @@
               (AnnList
                (Just
                 (EpaSpan { Test20297.ppr.hs:9:7-24 }))
-               (Nothing)
-               (Nothing)
+               (ListNone)
                []
                (EpTok
                 (EpaSpan { Test20297.ppr.hs:8:3-7 }))
@@ -734,8 +733,7 @@
                     (EpaSpan { Test20297.ppr.hs:9:7-24 })
                     (AnnList
                      (Nothing)
-                     (Nothing)
-                     (Nothing)
+                     (ListNone)
                      []
                      (NoEpTok)
                      [])
@@ -783,7 +781,9 @@
                            (EpaSpan { Test20297.ppr.hs:9:15-24 })
                            (GrhsAnn
                             (Nothing)
-                            (AddEpAnn AnnEqual (EpaSpan { Test20297.ppr.hs:9:15 })))
+                            (Left
+                             (EpTok
+                              (EpaSpan { Test20297.ppr.hs:9:15 }))))
                            (EpaComments
                             []))
                           []
@@ -798,8 +798,7 @@
                             (AnnList
                              (Just
                               (EpaSpan { Test20297.ppr.hs:9:20-24 }))
-                             (Nothing)
-                             (Nothing)
+                             (ListNone)
                              []
                              (EpaSpan { Test20297.ppr.hs:9:17-18 })
                              [])
@@ -811,8 +810,7 @@
                               (AnnList
                                (Just
                                 (EpaSpan { Test20297.ppr.hs:9:20-24 }))
-                               (Nothing)
-                               (Nothing)
+                               (ListNone)
                                []
                                (NoEpTok)
                                [])

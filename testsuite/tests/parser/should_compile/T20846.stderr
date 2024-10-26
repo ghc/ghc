@@ -93,8 +93,7 @@
          (EpaSpan { T20846.hs:4:1-18 })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -114,10 +113,12 @@
              (EpAnn
               (EpaSpan { T20846.hs:4:1-6 })
               (NameAnn
-               (NameParens)
-               (EpaSpan { T20846.hs:4:1 })
+               (NameParens
+                (EpTok
+                 (EpaSpan { T20846.hs:4:1 }))
+                (EpTok
+                 (EpaSpan { T20846.hs:4:6 })))
                (EpaSpan { T20846.hs:4:2-5 })
-               (EpaSpan { T20846.hs:4:6 })
                [])
               (EpaComments
                []))
@@ -146,7 +147,9 @@
                 (EpaSpan { T20846.hs:4:8-18 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { T20846.hs:4:8 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { T20846.hs:4:8 }))))
                 (EpaComments
                  []))
                []

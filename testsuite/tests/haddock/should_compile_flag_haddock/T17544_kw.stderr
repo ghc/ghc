@@ -257,10 +257,11 @@
                (EpaComments
                 []))
               (HsTupleTy
-               (AnnParen
-                AnnParens
-                (EpaSpan { T17544_kw.hs:19:18 })
-                (EpaSpan { T17544_kw.hs:19:19 }))
+               (AnnParens
+                (EpTok
+                 (EpaSpan { T17544_kw.hs:19:18 }))
+                (EpTok
+                 (EpaSpan { T17544_kw.hs:19:19 })))
                (HsBoxedOrConstraintTuple)
                [])))])
           (L

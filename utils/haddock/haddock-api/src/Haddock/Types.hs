@@ -994,40 +994,31 @@ instance NFData (EpAnn NameAnn) where
   rnf (EpAnn en ann cs) = en `deepseq` ann `deepseq` cs `deepseq` ()
 
 instance NFData NameAnn where
-  rnf (NameAnn a b c d e) =
+  rnf (NameAnn a b c) =
     a `deepseq`
       b `deepseq`
         c `deepseq`
-          d `deepseq`
-            e `deepseq`
-              ()
-  rnf (NameAnnCommas a b c d e) =
+           ()
+  rnf (NameAnnCommas a b c) =
     a `deepseq`
       b `deepseq`
         c `deepseq`
-          d `deepseq`
-            e `deepseq`
-              ()
-  rnf (NameAnnBars a b c d e) =
+          ()
+  rnf (NameAnnBars a b c) =
     a `deepseq`
       b `deepseq`
         c `deepseq`
-          d `deepseq`
-            e `deepseq`
-              ()
-  rnf (NameAnnOnly a b c d) =
+          ()
+  rnf (NameAnnOnly a b) =
+    a `deepseq`
+      b `deepseq`
+        ()
+  rnf (NameAnnRArrow a b c d) =
     a `deepseq`
       b `deepseq`
         c `deepseq`
           d `deepseq`
             ()
-  rnf (NameAnnRArrow a b c d e) =
-    a `deepseq`
-      b `deepseq`
-        c `deepseq`
-          d `deepseq`
-            e `deepseq`
-              ()
   rnf (NameAnnQuote a b c) =
     a `deepseq`
       b `deepseq`
@@ -1043,10 +1034,11 @@ instance NFData TrailingAnn where
   rnf (AddDarrowUAnn epaL) = rnf epaL
 
 instance NFData NameAdornment where
-  rnf NameParens = ()
-  rnf NameParensHash = ()
-  rnf NameBackquotes = ()
-  rnf NameSquare = ()
+  rnf (NameParens  o c) =  o `deepseq` c `seq` ()
+  rnf (NameParensHash o c) =  o `deepseq` c `seq` ()
+  rnf (NameBackquotes o c) =  o `deepseq` c `seq` ()
+  rnf (NameSquare o c) =  o `deepseq` c `seq` ()
+  rnf NameNoAdornment = ()
 
 instance NFData NoComments where
   rnf NoComments = ()
@@ -1081,3 +1073,15 @@ instance NFData BufPos where
 instance NFData DeltaPos where
   rnf (SameLine n) = rnf n
   rnf (DifferentLine n m) = n `deepseq` m `deepseq` ()
+
+instance NFData (EpToken tok) where
+  rnf (EpTok l) = rnf l
+  rnf NoEpTok = ()
+
+instance NFData (EpUniToken tok toku) where
+  rnf (EpUniTok l s) = l `deepseq` s `deepseq` ()
+  rnf NoEpUniTok = ()
+
+instance NFData IsUnicodeSyntax where
+  rnf NormalSyntax = ()
+  rnf UnicodeSyntax = ()
