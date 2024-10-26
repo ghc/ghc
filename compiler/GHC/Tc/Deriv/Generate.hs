@@ -339,7 +339,7 @@ Several special cases:
   See function unliftedOrdOp
 
 Note [Game plan for deriving Ord]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's a bad idea to define only 'compare', and build the other binary
 comparisons on top of it; see #2130, #4019.  Reason: we don't
 want to laboriously make a three-way comparison, only to extract a
@@ -350,16 +350,22 @@ binary result, something like this:
                                        True  -> False
                                        False -> True
 
-This being said, we can get away with generating full code only for
-'compare' and '<' thus saving us generation of other three operators.
-Other operators can be cheaply expressed through '<':
-a <= b = not $ b < a
-a > b = b < a
-a >= b = not $ a < b
-
 So for sufficiently small types (few constructors, or all nullary)
 we generate all methods; for large ones we just use 'compare'.
 
+This being said, we can get away with generating full code only for
+'compare' and '<=' thus saving us generation of other three operators.
+Other operators can be cheaply expressed through '<=' -- indeed, that's what
+the default implementations of >, <, and >= do.
+
+Historically, derived instances defined '<' and the remaining operators as
+cheap expressions in function of it:
+  a <= b = not $ b < a
+  a > b = b < a
+  a >= b = not $ a < b
+but since the CLC proposal #24 (see 8f174e06185143674d6cbfee75c30e68805d85b8),
+it suffices to derive '<=' and rely on the
+default implementation for the others.
 -}
 
 data OrdOp = OrdCompare | OrdLT | OrdLE | OrdGE | OrdGT
@@ -417,18 +423,9 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     other_ops
       | (last_tag - first_tag) <= 2     -- 1-3 constructors
         || null non_nullary_cons        -- Or it's an enumeration
-      = [mkOrdOp OrdLT, lE, gT, gE]
+      = [mkOrdOp OrdLE]
       | otherwise
       = []
-
-    negate_expr = nlHsApp (nlHsVar not_RDR)
-    pats = noLocA [a_Pat, b_Pat]
-    lE = mkSimpleGeneratedFunBind loc le_RDR pats $
-        negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr)
-    gT = mkSimpleGeneratedFunBind loc gt_RDR pats $
-        nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr
-    gE = mkSimpleGeneratedFunBind loc ge_RDR pats $
-        negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) a_Expr) b_Expr)
 
     get_tag con = dataConTag con - fIRST_TAG
         -- We want *zero-based* tags, because that's what
@@ -2570,10 +2567,9 @@ as_RDRs         = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) ..
 bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
-a_Expr, b_Expr, c_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
+a_Expr, c_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
     true_Expr, pure_Expr, unsafeCodeCoerce_Expr :: LHsExpr GhcPs
 a_Expr                = nlHsVar a_RDR
-b_Expr                = nlHsVar b_RDR
 c_Expr                = nlHsVar c_RDR
 z_Expr                = nlHsVar z_RDR
 ltTag_Expr            = nlHsVar ltTag_RDR
