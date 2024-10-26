@@ -66,7 +66,9 @@ ghcWarningsArgs = do
         , package primitive    ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" ]
         , package rts          ? pure [ "-Wcpp-undef" ]
-        , package text         ? pure [ "-Wno-deprecations", "-Wno-deriving-typeable" ]
+        , package text         ? pure [ "-Wno-deprecations"
+                                      , "-Wno-deriving-typeable"
+                                      , "-Wno-unused-imports" ]
         , package terminfo     ? pure [ "-Wno-unused-imports", "-Wno-deriving-typeable" ]
         , package stm          ? pure [ "-Wno-deriving-typeable" ]
         , package osString     ? pure [ "-Wno-deriving-typeable" ]
