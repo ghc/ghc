@@ -511,6 +511,7 @@ synifyDataCon use_gadt_syntax dc =
           noAnn
           [noLocA $ FieldOcc (mkVarUnqual $ field_label $ flLabel fl) (noLocA  (flSelector fl))]
           synTy
+          [] -- MODS_TODO should there be any modifiers here?
           Nothing
 
     mk_h98_arg_tys :: Either String (HsConDeclH98Details GhcRn)

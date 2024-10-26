@@ -358,10 +358,10 @@ restrictCons names decls = [L p d | L p (Just d) <- fmap keep <$> decls]
         -- see above
 
         field_avail :: LConDeclField GhcRn -> Bool
-        field_avail (L _ (ConDeclField _ fs _ _)) =
+        field_avail (L _ (ConDeclField _ fs _ _ _)) =
           all (\f -> (unLoc . foLabel . unLoc $ f) `elem` names) fs
 
-        field_types flds = [hsUnrestricted t | L _ (ConDeclField _ _ t _) <- flds]
+        field_types flds = [hsUnrestricted t | L _ (ConDeclField _ _ t _ _) <- flds]
     keep _ = Nothing
 
 restrictDecls :: [Name] -> [LSig GhcRn] -> [LSig GhcRn]
@@ -511,8 +511,9 @@ reparenBndrKind (HsBndrKind x k) = HsBndrKind x (reparenLType k)
 reparenBndrKind v@XBndrKind{} = v
 
 -- | Add parenthesis around the types in a 'ConDeclField' (see 'reparenTypePrec')
+-- MODS_TODO do we need to reparen the modifier types?
 reparenConDeclField :: XRecCond a => ConDeclField a -> ConDeclField a
-reparenConDeclField (ConDeclField x n t d) = ConDeclField x n (reparenLType t) d
+reparenConDeclField (ConDeclField x n t m d) = ConDeclField x n (reparenLType t) m d
 reparenConDeclField c@XConDeclField{} = c
 
 -------------------------------------------------------------------------------

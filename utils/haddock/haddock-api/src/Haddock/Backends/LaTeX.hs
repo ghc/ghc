@@ -1031,7 +1031,8 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 
 -- | Pretty-print a record field
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocNameI -> LaTeX
-ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
+ppSideBySideField subdocs unicode (ConDeclField _ names ltype _ _) =
+  -- MODS_TODO need to pprint modifiers
   decltt
     ( cat (punctuate comma (map (ppBinder . rdrNameOcc . foExt . unLoc) names))
         <+> dcolon unicode

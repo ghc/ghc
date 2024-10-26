@@ -557,7 +557,8 @@ type instance XXConDeclField (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (ConDeclField (GhcPass p)) where
-  ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
+  ppr (ConDeclField _ fld_n fld_ty fld_mods _) =
+    ppr fld_n <+> pprHsModifiers fld_mods <+> dcolon <+> ppr fld_ty
 
 ---------------------
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
@@ -1355,8 +1356,8 @@ pprConDeclFields :: forall p. OutputableBndrId p
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
     ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
-                                 cd_fld_doc = doc }))
-        = pprMaybeWithDoc doc (ppr_names ns <+> dcolon <+> ppr ty)
+                                 cd_fld_modifiers = mods, cd_fld_doc = doc }))
+        = pprMaybeWithDoc doc (ppr_names ns <+> pprHsModifiers mods <+> dcolon <+> ppr ty)
 
     ppr_names :: forall p. OutputableBndrId p => [LFieldOcc (GhcPass p)] -> SDoc
     ppr_names [n] = pprPrefixOcc n

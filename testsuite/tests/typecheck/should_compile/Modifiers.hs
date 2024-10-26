@@ -5,11 +5,15 @@ module Modifiers where
 
 import GHC.Types (Multiplicity(..))
 
-%() data A = %() A1 Int | %True A2 String
+%() data A
+  = %() A1 Int
+  | %True A2 String
+  | %False A3 { a3 %() :: () }
 
 %() data A_Gadt where
   %() A1_Gadt :: Int -> A_Gadt
   %True A2_Gadt :: String -> A_Gadt
+  %False A3_Gadt :: { a3Gadt %() :: () } -> A_Gadt
 
 %() %True
 class B a

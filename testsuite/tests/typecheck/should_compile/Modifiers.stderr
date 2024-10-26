@@ -1,38 +1,50 @@
 Modifiers.hs:8:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:8:14: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:9:5: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:8:27: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:10:5: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:10:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:11:5: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %False
+
+Modifiers.hs:11:5: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:11:3: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:13:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:12:3: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:14:3: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:15:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:14:1: warning: [GHC-49969] [-Wunknown-modifiers]
-    Unknown modifier %True
+Modifiers.hs:16:3: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %False
 
-Modifiers.hs:14:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:16:3: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:17:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:18:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:17:1: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:18:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:21:32: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:21:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %True
+
+Modifiers.hs:21:1: warning: [GHC-49969] [-Wunknown-modifiers]
+    Unknown modifier %()
+
+Modifiers.hs:25:32: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %m
     • In the type signature: l1 :: forall (m :: Bool) a b. a %m -> b
 
-Modifiers.hs:38:21: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:42:21: warning: [GHC-49969] [-Wunknown-modifiers]
     • Unknown modifier %()
     • In the type ‘Int %() -> Int’
       In the expression: idt (Int %() -> Int) (+ 1)

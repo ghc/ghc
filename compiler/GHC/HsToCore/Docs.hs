@@ -399,7 +399,7 @@ subordinates env instMap decl = case decl of
                   | c <- toList cons, cname <- getConNames c ]
         fields  = [ (unLoc $ foLabel n, maybeToList $ fmap unLoc doc, IM.empty)
                   | Just flds <- toList $ fmap getRecConArgs_maybe cons
-                  , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
+                  , (L _ (ConDeclField _ ns _ _ doc)) <- (unLoc flds)
                   , (L _ n) <- ns ]
         derivs  = [ (instName, [unLoc doc], IM.empty)
                   | (l, doc) <- concatMap (extract_deriv_clause_tys .

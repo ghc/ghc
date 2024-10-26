@@ -4454,11 +4454,12 @@ instance ExactPrint (ConDeclField GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (ConDeclField td names ftype mdoc) = do
+  exact (ConDeclField td names ftype mods mdoc) = do
     names' <- markAnnotated names
     td' <- markEpUniToken td
     ftype' <- markAnnotated ftype
-    return (ConDeclField td' names' ftype' mdoc)
+    mods' <- markAnnotated mods
+    return (ConDeclField td' names' ftype' mods' mdoc)
 
 -- ---------------------------------------------------------------------
 

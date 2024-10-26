@@ -1533,7 +1533,8 @@ ppSideBySideField
   -> Qualification
   -> ConDeclField DocNameI
   -> SubDecl
-ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
+ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _ _) =
+  -- MODS_TODO need to pprint modifiers
   ( hsep
       ( punctuate
           comma
@@ -1556,7 +1557,8 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
       Just hd -> hd
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
-ppShortField summary unicode qual (ConDeclField _ names ltype _) =
+ppShortField summary unicode qual (ConDeclField _ names ltype _ _) =
+  -- MODS_TODO need to pprint modifiers
   hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . foExt . unLoc) names))
     <+> dcolon unicode
     <+> ppLType unicode qual HideEmptyContexts ltype

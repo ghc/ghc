@@ -1160,6 +1160,7 @@ data ConDeclField pass  -- Record fields have Haddock docs on them
                    cd_fld_names :: [LFieldOcc pass],
                                    -- ^ See Note [ConDeclField pass]
                    cd_fld_type :: LBangType pass,
+                   cd_fld_modifiers :: [HsModifier pass],
                    cd_fld_doc  :: Maybe (LHsDoc pass)}
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 

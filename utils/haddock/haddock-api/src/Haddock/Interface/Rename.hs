@@ -757,11 +757,12 @@ renameGADTDetails (RecConGADT _ (L l fields)) = do
 renameGADTDetails (PrefixConGADT _ ps) = PrefixConGADT noExtField <$> mapM renameHsScaled ps
 
 renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)
-renameConDeclFieldField (L l (ConDeclField _ names t doc)) = do
+renameConDeclFieldField (L l (ConDeclField _ names t mods doc)) = do
   names' <- mapM renameLFieldOcc names
   t' <- renameLType t
+  mods' <- renameModifiers mods
   doc' <- mapM renameLDocHsSyn doc
-  return $ L (locA l) (ConDeclField noExtField names' t' doc')
+  return $ L (locA l) (ConDeclField noExtField names' t' mods' doc')
 
 renameLFieldOcc :: LFieldOcc GhcRn -> RnM (LFieldOcc DocNameI)
 renameLFieldOcc (L l (FieldOcc rdr (L n sel))) = do

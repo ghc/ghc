@@ -799,6 +799,7 @@ cvt_id_arg parent_con (i, str, ty)
                           , cd_fld_names
                               = [L (l2l li) $ FieldOcc noExtField (L li i')]
                           , cd_fld_type =  ty'
+                          , cd_fld_modifiers = []
                           , cd_fld_doc = Nothing} }
 
 cvtDerivs :: [TH.DerivClause] -> CvtM (HsDeriving GhcPs)

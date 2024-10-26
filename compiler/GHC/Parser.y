@@ -2637,11 +2637,14 @@ fielddecls1 :: { [LConDeclField GhcPs] }
 
 fielddecl :: { LConDeclField GhcPs }
                                               -- A list because of   f,g :: Int
-        : sig_vars '::' ctype
-            {% amsA' (L (comb2 $1 $3)
-                      (ConDeclField (epUniTok $2)
+        : sig_vars modifiers '::' ctype
+            {% amsA' (L (comb2 $1 $4)
+                      (ConDeclField (epUniTok $3)
                                     (reverse (map (\ln@(L l n)
-                                               -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1))) $3 Nothing))}
+                                               -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1)))
+                                    $4
+                                    (unLoc $2)
+                                    Nothing))}
 
 -- Reversed!
 maybe_derivings :: { Located (HsDeriving GhcPs) }
