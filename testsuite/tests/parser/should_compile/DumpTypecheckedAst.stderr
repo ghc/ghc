@@ -1930,8 +1930,7 @@
           (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
           (AnnList
            (Nothing)
-           (Nothing)
-           (Nothing)
+           (ListNone)
            []
            (NoEpTok)
            [])
@@ -1978,7 +1977,8 @@
                  (EpaDelta { <no location info> } (SameLine 0) [])
                  (GrhsAnn
                   (Nothing)
-                  (AddEpAnn Annlarrowtail (EpaDelta { <no location info> } (SameLine 0) [])))
+                  (Left
+                   (NoEpTok)))
                  (EpaComments
                   []))
                 []

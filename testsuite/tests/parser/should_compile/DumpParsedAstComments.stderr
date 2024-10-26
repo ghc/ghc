@@ -90,8 +90,7 @@
          (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -139,7 +138,9 @@
                 (EpaSpan { DumpParsedAstComments.hs:9:5-7 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { DumpParsedAstComments.hs:9:5 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { DumpParsedAstComments.hs:9:5 }))))
                 (EpaComments
                  []))
                []
@@ -208,8 +209,7 @@
          (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -257,7 +257,9 @@
                 (EpaSpan { DumpParsedAstComments.hs:(14,5)-(16,3) })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { DumpParsedAstComments.hs:14:5 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { DumpParsedAstComments.hs:14:5 }))))
                 (EpaComments
                  []))
                []
@@ -278,8 +280,7 @@
                  (AnnList
                   (Just
                    (EpaSpan { DumpParsedAstComments.hs:16:3 }))
-                  (Nothing)
-                  (Nothing)
+                  (ListNone)
                   []
                   (EpaSpan { DumpParsedAstComments.hs:14:7-8 })
                   [])
@@ -291,8 +292,7 @@
                    (AnnList
                     (Just
                      (EpaSpan { DumpParsedAstComments.hs:16:3 }))
-                    (Nothing)
-                    (Nothing)
+                    (ListNone)
                     []
                     (NoEpTok)
                     [])
@@ -360,8 +360,7 @@
          (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
          (AnnList
           (Nothing)
-          (Nothing)
-          (Nothing)
+          (ListNone)
           []
           (NoEpTok)
           [])
@@ -409,7 +408,9 @@
                 (EpaSpan { DumpParsedAstComments.hs:19:6-23 })
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (EpaSpan { DumpParsedAstComments.hs:19:6 })))
+                 (Left
+                  (EpTok
+                   (EpaSpan { DumpParsedAstComments.hs:19:6 }))))
                 (EpaComments
                  []))
                []

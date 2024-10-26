@@ -89,11 +89,13 @@
              (EpaSpan { Test24533.hs:(5,3)-(7,3) })
              (AnnContext
               (Just
-               ((,)
-                (NormalSyntax)
-                (EpaSpan { Test24533.hs:7:5-6 })))
-              [(EpaSpan { Test24533.hs:5:3 })]
-              [(EpaSpan { Test24533.hs:7:3 })])
+               (EpUniTok
+                (EpaSpan { Test24533.hs:7:5-6 })
+                (NormalSyntax)))
+              [(EpTok
+                (EpaSpan { Test24533.hs:5:3 }))]
+              [(EpTok
+                (EpaSpan { Test24533.hs:7:3 }))])
              (EpaComments
               [(L
                 (EpaSpan
@@ -233,10 +235,11 @@
                (EpaComments
                 []))
               (HsTupleTy
-               (AnnParen
-                AnnParens
-                (EpaSpan { Test24533.hs:8:8 })
-                (EpaSpan { Test24533.hs:8:13 }))
+               (AnnParens
+                (EpTok
+                 (EpaSpan { Test24533.hs:8:8 }))
+                (EpTok
+                 (EpaSpan { Test24533.hs:8:13 })))
                (HsBoxedOrConstraintTuple)
                [(L
                  (EpAnn
@@ -545,8 +548,7 @@
              (EpaSpan { Test24533.hs:16:3-19 })
              (AnnList
               (Nothing)
-              (Nothing)
-              (Nothing)
+              (ListNone)
               []
               (NoEpTok)
               [])
@@ -639,7 +641,9 @@
                     (EpaSpan { Test24533.hs:16:14-19 })
                     (GrhsAnn
                      (Nothing)
-                     (AddEpAnn AnnEqual (EpaSpan { Test24533.hs:16:14 })))
+                     (Left
+                      (EpTok
+                       (EpaSpan { Test24533.hs:16:14 }))))
                     (EpaComments
                      []))
                    []
@@ -760,11 +764,13 @@
              (EpaSpan { Test24533.ppr.hs:3:10-25 })
              (AnnContext
               (Just
-               ((,)
-                (NormalSyntax)
-                (EpaSpan { Test24533.ppr.hs:3:27-28 })))
-              [(EpaSpan { Test24533.ppr.hs:3:10 })]
-              [(EpaSpan { Test24533.ppr.hs:3:25 })])
+               (EpUniTok
+                (EpaSpan { Test24533.ppr.hs:3:27-28 })
+                (NormalSyntax)))
+              [(EpTok
+                (EpaSpan { Test24533.ppr.hs:3:10 }))]
+              [(EpTok
+                (EpaSpan { Test24533.ppr.hs:3:25 }))])
              (EpaComments
               []))
             [(L
@@ -898,10 +904,11 @@
                (EpaComments
                 []))
               (HsTupleTy
-               (AnnParen
-                AnnParens
-                (EpaSpan { Test24533.ppr.hs:3:35 })
-                (EpaSpan { Test24533.ppr.hs:3:40 }))
+               (AnnParens
+                (EpTok
+                 (EpaSpan { Test24533.ppr.hs:3:35 }))
+                (EpTok
+                 (EpaSpan { Test24533.ppr.hs:3:40 })))
                (HsBoxedOrConstraintTuple)
                [(L
                  (EpAnn
@@ -1143,8 +1150,7 @@
              (EpaSpan { Test24533.ppr.hs:6:3-19 })
              (AnnList
               (Nothing)
-              (Nothing)
-              (Nothing)
+              (ListNone)
               []
               (NoEpTok)
               [])
@@ -1237,7 +1243,9 @@
                     (EpaSpan { Test24533.ppr.hs:6:14-19 })
                     (GrhsAnn
                      (Nothing)
-                     (AddEpAnn AnnEqual (EpaSpan { Test24533.ppr.hs:6:14 })))
+                     (Left
+                      (EpTok
+                       (EpaSpan { Test24533.ppr.hs:6:14 }))))
                     (EpaComments
                      []))
                    []

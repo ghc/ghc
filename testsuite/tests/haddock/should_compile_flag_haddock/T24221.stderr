@@ -848,10 +848,9 @@
               (AnnList
                (Just
                 (EpaSpan { T24221.hs:28:12-20 }))
-               (Just
-                (AddEpAnn AnnOpenC (EpaSpan { T24221.hs:28:10 })))
-               (Just
-                (AddEpAnn AnnCloseC (EpaSpan { T24221.hs:29:22 })))
+               (ListBraces
+                (EpTok (EpaSpan { T24221.hs:28:10 }))
+                (EpTok (EpaSpan { T24221.hs:29:22 })))
                []
                (())
                [])
@@ -1057,10 +1056,9 @@
               (AnnList
                (Just
                 (EpaSpan { T24221.hs:33:7-15 }))
-               (Just
-                (AddEpAnn AnnOpenC (EpaSpan { T24221.hs:33:5 })))
-               (Just
-                (AddEpAnn AnnCloseC (EpaSpan { T24221.hs:34:17 })))
+               (ListBraces
+                (EpTok (EpaSpan { T24221.hs:33:5 }))
+                (EpTok (EpaSpan { T24221.hs:34:17 })))
                []
                (())
                [])
@@ -1278,10 +1276,9 @@
               (AnnList
                (Just
                 (EpaSpan { T24221.hs:40:5-13 }))
-               (Just
-                (AddEpAnn AnnOpenC (EpaSpan { T24221.hs:38:10 })))
-               (Just
-                (AddEpAnn AnnCloseC (EpaSpan { T24221.hs:43:3 })))
+               (ListBraces
+                (EpTok (EpaSpan { T24221.hs:38:10 }))
+                (EpTok (EpaSpan { T24221.hs:43:3 })))
                []
                (())
                [])

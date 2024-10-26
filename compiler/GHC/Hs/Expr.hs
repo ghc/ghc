@@ -1600,8 +1600,8 @@ type instance XXGRHSs (GhcPass _) _ = DataConCantHappen
 
 data GrhsAnn
   = GrhsAnn {
-      ga_vbar :: Maybe EpaLocation, -- TODO:AZ do we need this?
-      ga_sep  :: AddEpAnn -- ^ Match separator location
+      ga_vbar :: Maybe (EpToken "|"),
+      ga_sep  :: Either (EpToken "=") TokRarrow -- ^ Match separator location, `=` or `->`
       } deriving (Data)
 
 instance NoAnn GrhsAnn where

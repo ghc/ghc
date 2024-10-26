@@ -366,10 +366,11 @@
                             (EpaComments
                              []))
                            (HsTupleTy
-                            (AnnParen
-                             AnnParens
-                             (EpaSpan { Test20239.hs:7:83 })
-                             (EpaSpan { Test20239.hs:7:84 }))
+                            (AnnParens
+                             (EpTok
+                              (EpaSpan { Test20239.hs:7:83 }))
+                             (EpTok
+                              (EpaSpan { Test20239.hs:7:84 })))
                             (HsBoxedOrConstraintTuple)
                             [])))))))))))))])
              (Nothing)))])

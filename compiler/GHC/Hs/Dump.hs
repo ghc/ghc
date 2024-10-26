@@ -73,7 +73,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationNoEpAnns
               `extQ` annotationExprBracket
               `extQ` annotationTypedBracket
-              `extQ` addEpAnn
               `extQ` epTokenOC
               `extQ` epTokenCC
               `extQ` epTokenInstance
@@ -216,11 +215,13 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              BlankSrcSpanFile -> braces $ char ' ' <> (pprUserRealSpan False ss) <> char ' '
 
             annParen :: AnnParen -> SDoc
-            annParen (AnnParen a o c) = case ba of
+            annParen ap = case ba of
              BlankEpAnnotations -> parens $ text "blanked:" <+> text "AnnParen"
-             NoBlankEpAnnotations ->
-              parens $ text "AnnParen"
-                        $$ vcat [ppr a, epaLocation o, epaLocation c]
+             NoBlankEpAnnotations -> parens (case ap of
+                                      (AnnParens       o c) -> text "AnnParens"       $$ vcat [showAstData' o, showAstData' c]
+                                      (AnnParensHash   o c) -> text "AnnParensHash"   $$ vcat [showAstData' o, showAstData' c]
+                                      (AnnParensSquare o c) -> text "AnnParensSquare" $$ vcat [showAstData' o, showAstData' c]
+                                      )
 
             annClassDecl :: AnnClassDecl -> SDoc
             annClassDecl (AnnClassDecl c ops cps v w oc cc s) = case ba of
@@ -267,13 +268,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                         $$ vcat [showAstData' a, showAstData' b, showAstData' c,
                                  showAstData' d, showAstData' e]
 
-
-            addEpAnn :: AddEpAnn -> SDoc
-            addEpAnn (AddEpAnn a s) = case ba of
-             BlankEpAnnotations -> parens
-                                      $ text "blanked:" <+> text "AddEpAnn"
-             NoBlankEpAnnotations ->
-              parens $ text "AddEpAnn" <+> ppr a <+> epaLocation s
 
             annotationExprBracket :: BracketAnn (EpUniToken "[|" "⟦") (EpToken "[e|") -> SDoc
             annotationExprBracket = annotationBracket
