@@ -61,7 +61,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkInstCo, mkLRCo, mkTyConAppCo
    , mkCoercionType
    , coercionKind, coercionLKind, coVarTypesRole )
-import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVarWithKind )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
 import {-# SOURCE #-} GHC.Core ( CoreExpr )
 
@@ -1045,7 +1045,7 @@ substTyVarBndrUsing
   :: (Subst -> Type -> Type)  -- ^ Use this to substitute in the kind
   -> Subst -> TyVar -> (Subst, TyVar)
 substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
-  = assertPpr _no_capture (pprTyVar old_var $$ pprTyVar new_var $$ ppr subst) $
+  = assertPpr _no_capture (pprTyVarWithKind old_var $$ pprTyVarWithKind new_var $$ ppr subst) $
     assert (isTyVar old_var )
     (Subst (in_scope `extendInScopeSet` new_var) idenv new_env cenv, new_var)
   where
@@ -1109,17 +1109,17 @@ cloneTyVarBndr subst@(Subst in_scope id_env tv_env cv_env) tv uniq
             cv_env
     , tv')
   where
-    old_ki = tyVarKind tv
+    old_ki  = tyVarKind tv
     old_unf = tyVarUnfolding tv
-    no_kind_change = noFreeVarsOfType old_ki -- verify that kind is closed
-    no_unf_change = maybe True noFreeVarsOfType old_unf -- verify that kind is closed
 
-    tv1 | no_kind_change = tv
-        | otherwise      = setTyVarKind tv (substTy subst old_ki)
+    tv1 | not (noFreeVarsOfType old_ki)   -- Kind is not closed
+        = setTyVarKind tv (substTy subst old_ki)
+        | otherwise
+        = tv
 
-    tv2 | Just unf <- tyVarUnfolding tv1
-        , not no_unf_change
-        = tv2 `setTyVarUnfolding` substTy subst unf
+    tv2 | Just unf <- old_unf
+        , not (noFreeVarsOfType unf)  -- Unfolding is not closed
+        = tv1 `setTyVarUnfolding` substTy subst unf
 
         | otherwise
         = tv1

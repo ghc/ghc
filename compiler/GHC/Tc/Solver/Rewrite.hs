@@ -5,7 +5,7 @@ module GHC.Tc.Solver.Rewrite(
 
 import GHC.Prelude
 
-import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCo.Ppr ( pprTyVarWithKind )
 import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
                       TcPluginRewriter, TcPluginRewriteResult(..),
                       RewriteEnv(..),
@@ -1004,7 +1004,7 @@ rewrite_tyvar1 tv
                          ; role <- getRole
                          ; return $ RTRFollowed $
                              mkReflRedn role ty }
-           Nothing -> do { traceRewriteM "Unfilled tyvar" (pprTyVar tv)
+           Nothing -> do { traceRewriteM "Unfilled tyvar" (pprTyVarWithKind tv)
                          ; fr <- getFlavourRole
                          ; rewrite_tyvar2 tv fr } }
 

@@ -30,7 +30,7 @@ module GHC.Core.Subst (
 
         -- ** Substituting and cloning binders
         substBndr, substBndrs, substRecBndrs, substTyVarBndr, substCoVarBndr,
-        cloneBndr, cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
+        cloneBndr, cloneBndrs, cloneRecIdBndrs,
         cloneBndrsM, cloneRecIdBndrsM,
 
     ) where
@@ -405,21 +405,7 @@ Now a variant that unconditionally allocates a new unique.
 It also unconditionally zaps the OccInfo.
 -}
 
--- | Very similar to 'substBndr', but it always allocates a new 'Unique' for
--- each variable in its output.  It substitutes the IdInfo though.
--- Discards non-Stable unfoldings
-cloneIdBndr :: Subst -> UniqSupply -> Id -> (Subst, Id)
-cloneIdBndr subst us old_id
-  = clone_id subst subst (old_id, uniqFromSupply us)
-
--- | Applies 'cloneIdBndr' to a number of 'Id's, accumulating a final
--- substitution from left to right
--- Discards non-Stable unfoldings
-cloneIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
-cloneIdBndrs subst us ids
-  = mapAccumL (clone_id subst) subst (ids `zip` uniqsFromSupply us)
-
-cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var])
+cloneBndrs :: MonadUnique m => Subst -> [Var] -> m (Subst, [Var])
 -- Works for all kinds of variables (typically case binders)
 -- not just Ids
 cloneBndrs subst us vs

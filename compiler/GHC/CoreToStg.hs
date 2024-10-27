@@ -302,8 +302,7 @@ coreTopBindToStg opts@CoreToStgOpts
 
         (ccs', (id', stg_rhs)) =
             initCts platform env $
-              pprTrace "coreTopBindToStg" (ppr id $$ ppr rhs) $
-              coreToTopStgRhs opts this_mod ccs (id,rhs)
+            coreToTopStgRhs opts this_mod ccs (id,rhs)
 
         bind = StgTopLifted $ StgNonRec id' stg_rhs
     in
