@@ -35,7 +35,7 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Floats
         SimplFloats(..), emptyFloats, isEmptyFloats, mkRecFloats,
-        mkFloatBind, addLetFloats, addJoinFloats, addFloats,
+        mkFloatBind, mkTyVarFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
         isEmptyJoinFloats, isEmptyLetFloats,
         doFloatFromRhs, getTopFloatBinds,
@@ -799,6 +799,16 @@ unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
 unitJoinFloat :: OutBind -> JoinFloats
 unitJoinFloat bind = assert (all isJoinId (bindersOf bind)) $
                      unitOL bind
+
+mkTyVarFloatBind :: SimplEnv -> InTyVar -> OutTyVar -> OutType -> (SimplFloats, SimplEnv)
+mkTyVarFloatBind env@(SimplEnv { seTvSubst = tv_subst, seInScope = in_scope })  old_tv new_tv rhs_ty
+  = (floats, env { seTvSubst = tv_subst' })
+  where
+    floats = SimplFloats { sfLetFloats = unitLetFloat (NonRec new_tv_w_unf (Type rhs_ty))
+                         , sfJoinFloats = emptyJoinFloats
+                         , sfInScope    = in_scope }
+    tv_subst' = extendVarEnv tv_subst old_tv (mkTyVarTy new_tv_w_unf)
+    new_tv_w_unf = new_tv `setTyVarUnfolding` rhs_ty
 
 mkFloatBind :: SimplEnv -> OutBind -> (SimplFloats, SimplEnv)
 -- Make a singleton SimplFloats, and

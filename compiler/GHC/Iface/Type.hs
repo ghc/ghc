@@ -1139,12 +1139,19 @@ pprArrow (mb_conc, ppr_mult) af mult
   | otherwise
   = ppr (funTyFlagTyCon af)
 
+ppr_tv_occ :: TyVar -> SDoc
+ppr_tv_occ tv
+  = sdocOption sdocPrintTyVarUnfoldings $ \print_unf ->
+    ppr tv <> case tyVarUnfolding tv of
+                Just ty | print_unf -> braces (ppr ty)
+                _                   -> empty
+
 ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty ctxt_prec ty
   | not (isIfaceRhoType ty)             = ppr_sigma ShowForAllMust ctxt_prec ty
 ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceRhoType
-ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
-ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
+ppr_ty _         (IfaceFreeTyVar tyvar) = ppr_tv_occ tyvar -- This is the main reason for IfaceFreeTyVar!
+ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar        -- See Note [Free TyVars and CoVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = ppr_tuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n

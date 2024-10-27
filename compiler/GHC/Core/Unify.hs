@@ -1519,13 +1519,18 @@ unify_ty :: UMEnv
 -- See Note [Computing equality on types] in GHC.Core.Type
 
 -- See Note [Comparing nullary type synonyms and type variables] in GHC.Core.TyCo.Compare
-unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
-  -- See Note [Unifying type synonyms] to account for type variables
+unify_ty env (TyConApp tc1 tys1) (TyConApp tc2 tys2) _kco
+  -- See Note [Unifying type synonyms]
   | tc1 == tc2
-  = return ()
-unify_ty _env (TyVarTy tv1) (TyVarTy tv2) _kco
-  | tv1 == tv2
-  = return ()
+  , not (isForgetfulSynTyCon tc1)
+  , isFamFreeTyCon tc1
+  = unify_tc_app env tc1 tys1 tys2
+
+unify_ty env (TyVarTy tv1) (TyVarTy tv2) _kco
+  | um_unif env, tv1 == tv2
+  = return () -- When unifying a=a, succeeds, regardless of a's (perhaps large)
+              -- unfolding. But only when unifying!  When matching these are
+              -- unrelated variables
 
 unify_ty env ty1 ty2 kco
     -- Now handle the cases we can "look through": synonyms and casts.

@@ -471,7 +471,7 @@ pprTypedLetBinder binder
 pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
 pprKindedTyVarBndr tyvar
-  = text "@" <> pprTyVar tyvar
+  = text "@" <> pprTyVarWithKind tyvar
 
 -- pprId x prints x :: ty
 pprId :: Id -> SDoc
