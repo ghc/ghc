@@ -298,14 +298,8 @@ data TermFlag -- Better than using a Bool
 exprTerminates :: CoreExpr -> TermFlag
 -- ^ A /very/ simple termination analysis.
 exprTerminates e
-  | exprIsHNF e            = Terminates
   | exprOkForSpeculation e = Terminates
   | otherwise              = MightDiverge
-  -- Annoyingly, we have to check both for HNF and ok-for-spec.
-  --   * `I# (x# *# 2#)` is ok-for-spec, but not in HNF. Still worth CPR'ing!
-  --   * `lvl` is an HNF if its unfolding is evaluated
-  --     (perhaps `lvl = I# 0#` at top-level). But, tiresomely, it is never
-  --     ok-for-spec due to Note [exprOkForSpeculation and evaluated variables].
 
 cprAnalApp :: AnalEnv -> CoreExpr -> [(CprType, CoreArg)] -> (CprType, CoreExpr)
 -- Main function that takes care of /nested/ CPR. See Note [Nested CPR]

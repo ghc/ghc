@@ -30,24 +30,28 @@ import Data.List        ( mapAccumL )
                         Simple common sub-expression
                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we see
-        x1 = C a b
-        x2 = C x1 b
-we build up a reverse mapping:   C a b  -> x1
-                                 C x1 b -> x2
+  x1 = C a b
+  x2 = C x1 b
+we build up a reverse mapping:
+  C a b  :-> x1
+  C x1 b :-> x2
 and apply that to the rest of the program.
 
 When we then see
-        y1 = C a b
-        y2 = C y1 b
+  y1 = C a b
+  y2 = C y1 b
 we replace the C a b with x1.  But then we *don't* want to
 add   x1 -> y1  to the mapping.  Rather, we want the reverse, y1 -> x1
 so that a subsequent binding
         y2 = C y1 b
 will get transformed to C x1 b, and then to x2.
 
-So we carry an extra var->var substitution which we apply *before* looking up in the
-reverse mapping.
+So we carry an extra var->var substitution cs_canon which we apply *before*
+looking up in the reverse mapping. We call this step "canonicalisation", because
+it makes α-equivalent expressions /syntactically/ equal by choosing the names
+consistently.
 
+Note [CSE for bindings] explains both cases (EXTEND and CANONICALISE) in detail.
 
 Note [Shadowing in CSE]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,7 +63,6 @@ For example, consider
 
 Here we must *not* do CSE on the inner x+x!  The simplifier used to guarantee no
 shadowing, but it doesn't any more (it proved too hard), so we clone as we go.
-We can simply add clones to the substitution already described.
 
 A similar tricky situation is this, with x_123 and y_123 sharing the same unique:
 
@@ -80,18 +83,31 @@ why we have to substitute binders as we go so we will properly get:
     let x2 = e2 in
     let foo = x1
 
+It may be tempting to do the cloning using the same substitution cs_canon that
+does the canonicalisation.
+We may not do so; see Note [Canonicalisation reverts binder swap transformation].
+
+Hence we maintain two substitutions: cs_subst to implement cloning, and cs_canon
+to implement the var->var substitution for canonicalising keys prior to lookup
+in the reverse mapping.
+
 Note [CSE for bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Let-bindings have two cases, implemented by extendCSEnvWithBinding.
 
-* SUBSTITUTE: applies when the RHS is a variable
+* CANONICALISE: applies when the RHS is a variable
 
      let x = y in ...(h x)....
 
-  Here we want to extend the /substitution/ with x -> y, so that the
-  (h x) in the body might CSE with an enclosing (let v = h y in ...).
-  NB: the substitution maps InIds, so we extend the substitution with
-      a binding for the original InId 'x'
+  Here we want to extend the canon. substitution cs_canon with x :-> y, so that
+  the (h x) in the body might CSE with an enclosing (let v = h y in ...).
+
+  NB: cs_canon is distinct from cs_subst, which clones InIds into OutIds in
+      order to handle Note [Shadowing in CSE].
+      cs_canon maps from OutIds to a subset of OutIds, so it uses the same
+      InScopeSet as cs_subst.
+  Couldn't we merge cs_subst and cs_canon? In theory yes, in practice no;
+  see Note [Canonicalisation reverts binder swap transformation].
 
   How can we have a variable on the RHS? Doesn't the simplifier inline them?
 
@@ -102,11 +118,14 @@ Let-bindings have two cases, implemented by extendCSEnvWithBinding.
          x2 = C x1 b
          y1 = C a b
          y2 = C y1 b
-      Here we CSE y1's rhs to 'x1', and then we must add (y1->x1) to
+      Here we CSE y1's rhs to 'x1', and then we must add (y1:->x1) to
       the substitution so that we can CSE the binding for y2.
 
     - Second, we use extendCSEnvWithBinding for case expression scrutinees too;
-      see Note [CSE for case expressions]
+      see Note [CSE for case expressions].
+
+  Do note that adding a mapping (x:->y) to cs_canon by itself does not
+  substitute any occurrence of x in the program.
 
 * EXTEND THE REVERSE MAPPING: applies in all other cases
 
@@ -123,22 +142,8 @@ Let-bindings have two cases, implemented by extendCSEnvWithBinding.
   Here we want to common-up the two uses of (f @ Int) so we can
   remove one of the case expressions.
 
-  See also Note [Corner case for case expressions] for another
-  reason not to use SUBSTITUTE for all trivial expressions.
-
-Notice that
-  - The SUBSTITUTE situation extends the substitution (cs_subst)
+  - The CANONICALISE situation extends the canon. substitution (cs_canon)
   - The EXTEND situation extends the reverse mapping (cs_map)
-
-Notice also that in the SUBSTITUTE case we leave behind a binding
-  x = y
-even though we /also/ carry a substitution x -> y.  Can we just drop
-the binding instead?  Well, not at top level! See Note [Top level and
-postInlineUnconditionally] in GHC.Core.Opt.Simplify.Utils; and in any
-case CSE applies only to the /bindings/ of the program, and we leave
-it to the simplifier to propagate effects to the RULES. Finally, it
-doesn't seem worth the effort to discard the nested bindings because
-the simplifier will do it next.
 
 Note [CSE for case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -270,31 +275,13 @@ Wrinkles
   where the unfolding was added by strictness analysis, say.  Then
   CSE goes ahead, so we get
      bar = foo
-  and probably use SUBSTITUTE that will make 'bar' dead.  But just
-  possibly not -- see Note [Dealing with ticks].  In that case we might
-  be left with
+  or possibly (due to Note [Dealing with ticks])
      bar = tick t1 (tick t2 foo)
-  in which case we would really like to get rid of the stable unfolding
-  (generated by the strictness analyser, say).
+  in both cases we would really like to get rid of the stable unfolding so
+  that the Simplifier inlines the possibly trivial RHS rather than the stable
+  unfolding, which would in turn keep alive other bindings.
 
-  Hence the zapStableUnfolding in cse_bind.  Not a big deal, and only
-  makes a difference when ticks get into the picture.
-
-Note [Corner case for case expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here is another reason that we do not use SUBSTITUTE for
-all trivial expressions. Consider
-   case x |> co of (y::Array# Int) { ... }
-
-We do not want to extend the substitution with (y -> x |> co); since y
-is of unlifted type, this would destroy the let-can-float invariant if
-(x |> co) was not ok-for-speculation.
-
-But surely (x |> co) is ok-for-speculation, because it's a trivial
-expression, and x's type is also unlifted, presumably.  Well, maybe
-not if you are using unsafe casts.  I actually found a case where we
-had
-   (x :: HValue) |> (UnsafeCo :: HValue ~ Array# Int)
+  Hence the zapStableUnfolding in cse_bind.  Not a big deal.
 
 Note [CSE for join points?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -371,6 +358,39 @@ To fix this we pass two different cse envs to cse_bind. One we use the cse the r
 And one we update with the result of cseing the rhs which we then use going forward for the
 body/rest of the module.
 
+Note [Canonicalisation reverts binder swap transformation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The CSEnv maintains two substitutions:
+
+  * cs_subst clones every binder so that CSE does not need to worry about
+    shadowing. See Note [Shadowing in CSE].
+  * cs_canon implements the CANONICALISE case of Note [CSE for bindings], but
+    is never used to actually substitute an expression in the resulting program.
+
+These substitutions must stay distinct. Consider
+
+  data T a :: UnliftedType where MkT :: !a -> T a
+  case x of x' { __DEFAULT -> let y = MkT x' in ... }
+
+Note that the RHS of y satisfies the Note [Core let-can-float invariant] because
+x' is a case binder and thus evaluated.
+Note that the scrutinee x is trivial; hence case CANONICALISE applies and we
+extend cs_canon with
+
+  x' :-> x
+
+Now, /if/ we were to merge cs_canon into cs_subst, then we would apply this
+"reverse binder swap" substitution to the final program and we'd get
+
+  case x of x' { __DEFAULT -> let y = MkT x in ... }
+
+now `MkT x` is no longer ok-for-spec and the program violates the let-can-float
+invariant. This is only temporary, because the next run of the occurrence
+analyser will perform a Note [Binder swap] again, however it will trip up
+CoreLint nonetheless.
+Hence cs_canon is distinct from cs_subst, and the former is only applied before
+looking up a canonicalised key in the reverse mapping.
+
 ************************************************************************
 *                                                                      *
 \section{Common subexpression}
@@ -398,7 +418,7 @@ cseBind toplevel env (Rec [(in_id, rhs)])
   , let previous' = mkTicks ticks previous
         out_id'   = delayInlining toplevel out_id
   = -- We have a hit in the recursive-binding cache
-    (extendCSSubst env1 in_id previous', NonRec out_id' previous')
+    (env1, NonRec out_id' previous')
 
   | otherwise
   = (extendCSRecEnv env1 out_id rhs'' id_expr', Rec [(zapped_id, rhs')])
@@ -427,7 +447,7 @@ cseBind toplevel env (Rec pairs)
 -- We use a different env for cse on the rhs and for extendCSEnvWithBinding
 -- for reasons explain in See Note [Separate envs for let rhs and body]
 cse_bind :: TopLevelFlag -> CSEnv -> CSEnv -> (InId, InExpr) -> OutId -> (CSEnv, (OutId, OutExpr))
-cse_bind toplevel env_rhs env_body (in_id, in_rhs) out_id
+cse_bind toplevel env_rhs env_body (_in_id, in_rhs) out_id
   | isTopLevel toplevel, exprIsTickedString in_rhs
       -- See Note [Take care with literal strings]
   = (env_body', (out_id', in_rhs))
@@ -442,7 +462,7 @@ cse_bind toplevel env_rhs env_body (in_id, in_rhs) out_id
   | otherwise
   = (env_body', (out_id'', out_rhs))
   where
-    (env_body', out_id') = extendCSEnvWithBinding env_body  in_id out_id out_rhs cse_done
+    (env_body', out_id') = extendCSEnvWithBinding env_body out_id out_rhs cse_done
     (cse_done, out_rhs)  = try_for_cse env_rhs in_rhs
     out_id'' | cse_done  = zapStableUnfolding $
                            delayInlining toplevel out_id'
@@ -464,28 +484,28 @@ delayInlining top_lvl bndr
   = bndr
 
 extendCSEnvWithBinding
-           :: CSEnv            -- Includes InId->OutId cloning
-           -> InVar            -- Could be a let-bound type
-           -> OutId -> OutExpr -- Processed binding
-           -> Bool             -- True <=> RHS was CSE'd and is a variable
-                               --          or maybe (Tick t variable)
-           -> (CSEnv, OutId)   -- Final env, final bndr
+           :: CSEnv             -- Includes InId->OutId cloning
+           -> OutVar -> OutExpr -- Processed binding
+           -> Bool              -- True <=> RHS was CSE'd and is a variable
+                                --          or maybe (Tick t variable)
+           -> (CSEnv, OutVar)    -- Final env, final bndr
 -- Extend the CSE env with a mapping [rhs -> out-id]
--- unless we can instead just substitute [in-id -> rhs]
+-- unless we can instead just canonicalise [out-id -> rhs-id]
 --
 -- It's possible for the binder to be a type variable,
--- in which case we can just substitute.
+-- in which case we can just CANONICALISE.
 -- See Note [CSE for bindings]
-extendCSEnvWithBinding env in_id out_id rhs' cse_done
-  | not (isId out_id) = (extendCSSubst env in_id rhs',     out_id)
-  | noCSE out_id      = (env,                              out_id)
-  | use_subst         = (extendCSSubst env in_id rhs',     out_id)
-  | cse_done          = (env,                              out_id)
-                       -- See Note [Dealing with ticks]
-  | otherwise         = (extendCSEnv env rhs' id_expr', zapped_id)
+extendCSEnvWithBinding env v rhs' cse_done
+  -- Should we use CANONICALISE or EXTEND? See Note [CSE for bindings]
+  | not (isId v)   = (extendCSCanon env v rhs', v)              -- CANONICALISE
+  | noCSE v        = (env,                      v)
+  | Var{} <- rhs'  = (extendCSCanon env v rhs', v)              -- CANONICALISE
+  | cse_done       = (env,                      v)
+                    -- See Note [Dealing with ticks]
+  | otherwise      = (extendCSEnv env rhs' id_expr', zapped_id) -- EXTEND
   where
-    id_expr'  = varToCoreExpr out_id
-    zapped_id = zapIdUsageInfo out_id
+    id_expr'  = varToCoreExpr v
+    zapped_id = zapIdUsageInfo v
        -- Putting the Id into the cs_map makes it possible that
        -- it'll become shared more than it is now, which would
        -- invalidate (the usage part of) its demand info.
@@ -495,11 +515,6 @@ extendCSEnvWithBinding env in_id out_id rhs' cse_done
        -- the strictness info; it's not necessary to do so, and losing
        -- it is bad for performance if you don't do late demand
        -- analysis
-
-    -- Should we use SUBSTITUTE or EXTEND?
-    -- See Note [CSE for bindings]
-    use_subst | Var {} <- rhs' = True
-              | otherwise      = False
 
 -- | Given a binder `let x = e`, this function
 -- determines whether we should add `e -> x` to the cs_map
@@ -544,7 +559,7 @@ the original RHS unmodified. This produces:
 Now 'y' will be discarded as dead code, and we are done.
 
 The net effect is that for the y-binding we want to
-  - Use SUBSTITUTE, by extending the substitution with  y :-> x
+  - Use CANONICALISE, by extending the canon. substitution with  y :-> x
   - but leave the original binding for y undisturbed
 
 This is done by cse_bind.  I got it wrong the first time (#13367).
@@ -587,7 +602,7 @@ with
 where 'y' is the variable that 'e' maps to.  Now consider extendCSEnvWithBinding for
 the binding for 'x':
 
-* We can't use SUBSTITUTE because those ticks might not be trivial (we
+* We can't use CANONICALISE because those ticks might not be trivial (we
   use tickishIsCode in exprIsTrivial)
 
 * We should not use EXTEND, because we definitely don't want to
@@ -721,7 +736,7 @@ cseCase env scrut bndr ty alts
       -- in cse_alt may mean that a dead case binder
       -- becomes alive, and Lint rejects that
     (env1, bndr2)    = addBinder env bndr1
-    (alt_env, bndr3) = extendCSEnvWithBinding env1 bndr bndr2 scrut1 cse_done
+    (alt_env, bndr3) = extendCSEnvWithBinding env1 bndr2 scrut1 cse_done
          -- extendCSEnvWithBinding: see Note [CSE for case expressions]
 
     con_target :: OutExpr
@@ -844,15 +859,21 @@ the case binder is alive; see Note [DataAlt occ info] in GHC.Core.Opt.Simplify.
 
 data CSEnv
   = CS { cs_subst :: Subst  -- Maps InBndrs to OutExprs
-            -- The substitution variables to
+            -- The cloning substitution; maps variables to
             -- /trivial/ OutExprs, not arbitrary expressions
+
+       , cs_canon :: Subst  -- Maps OutBndrs to OutExprs
+            -- The canonicalising substitution to apply before applying the
+            -- reverse mapping cs_subst.
+            -- Maps to /trivial/ OutExprs.
 
        , cs_map   :: CoreMap OutExpr
             -- The "reverse" mapping.
             -- Maps a OutExpr to a /trivial/ OutExpr
-            -- The key of cs_map is stripped of all Ticks
+            -- The key of cs_subst is stripped of all Ticks
             -- It maps arbitrary expressions to trivial expressions
             -- representing the same value. E.g @C a b@ to @x1@.
+            -- Canonicalise key with cs_canon before looking up in here.
 
        , cs_rec_map :: CoreMap OutExpr
             -- See Note [CSE for recursive bindings]
@@ -860,18 +881,18 @@ data CSEnv
 
 emptyCSEnv :: CSEnv
 emptyCSEnv = CS { cs_map = emptyCoreMap, cs_rec_map = emptyCoreMap
-                , cs_subst = emptySubst }
+                , cs_subst = emptySubst, cs_canon = emptySubst }
 
 lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
-lookupCSEnv (CS { cs_map = csmap }) expr
-  = lookupCoreMap csmap expr
+lookupCSEnv cse expr
+  = lookupCoreMap (cs_map cse) (canonCSEnv cse expr)
 
 -- | @extendCSEnv env e triv_expr@ will replace any occurrence of @e@ with @triv_expr@ going forward.
 extendCSEnv :: CSEnv -> OutExpr -> OutExpr -> CSEnv
 extendCSEnv cse expr triv_expr
   = cse { cs_map = extendCoreMap (cs_map cse) sexpr triv_expr }
   where
-    sexpr = stripTicksE tickishFloatable expr
+    sexpr = canonCSEnv cse $ stripTicksE tickishFloatable expr
 
 extendCSRecEnv :: CSEnv -> OutId -> OutExpr -> OutExpr -> CSEnv
 -- See Note [CSE for recursive bindings]
@@ -889,8 +910,17 @@ csEnvSubst = cs_subst
 lookupSubst :: CSEnv -> Id -> OutExpr
 lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst sub x
 
-extendCSSubst :: CSEnv -> Id  -> CoreExpr -> CSEnv
-extendCSSubst cse x rhs = cse { cs_subst = extendSubst (cs_subst cse) x rhs }
+extendCSCanon :: CSEnv -> OutVar -> OutExpr -> CSEnv
+extendCSCanon cse x y = cse { cs_canon = extendSubst (cs_canon cse) x y' }
+  where
+    y' = canonCSEnv cse y -- canonicalise y first!
+
+canonCSEnv :: CSEnv -> OutExpr -> OutExpr
+canonCSEnv cse@(CS { cs_canon = sub }) e = substExpr (sub `setInScope` is) e
+  where
+    is = getSubstInScope (cs_subst cse)
+    -- We do not separately maintain the in-scope set of cs_canon; it's just
+    -- the one from the substitution used for cloning.
 
 -- | Add clones to the substitution to deal with shadowing.  See
 -- Note [Shadowing in CSE] for more details.  You should call this whenever

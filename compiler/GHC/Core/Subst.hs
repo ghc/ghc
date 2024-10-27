@@ -519,7 +519,9 @@ substUnfolding subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
   -- Retain stable unfoldings
   | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
-  = NoUnfolding
+  = if isEvaldUnfolding unf
+    then evaldUnfolding
+    else NoUnfolding
   | otherwise                 -- But keep a stable one!
   = seqExpr new_tmpl `seq`
     unf { uf_tmpl = new_tmpl }

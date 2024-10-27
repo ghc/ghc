@@ -74,9 +74,11 @@ import GHC.Core.Ppr
 import GHC.Core.FVs( bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
+import GHC.Core.TyCo.Rep as Type
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCo.Compare( eqType, eqTypeX )
+import GHC.Core.TyCo.Subst
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
@@ -1714,7 +1716,8 @@ it's applied only to dictionaries.
 
 -----------------------------
 -- | To a first approximation, 'exprOkForSpeculation' returns True of
--- an expression that is:
+-- an expression that is nearly a value (i.e., it implies 'exprIsHNF').
+-- That is, the expression is
 --
 --  * Safe to evaluate even if normal order eval might not
 --    evaluate the expression at all, and
@@ -1740,29 +1743,19 @@ it's applied only to dictionaries.
 -- But in fact both functions are a bit more conservative than the above,
 -- in at least the following ways:
 --
---  * W1: We do not take advantage of already-evaluated lifted variables.
---        As a result, 'exprIsHNF' DOES NOT imply 'exprOkForSpeculation';
---        if @y@ is a case-binder of lifted type, then @exprIsHNF y@ is
---        'True', while @exprOkForSpeculation y@ is 'False'.
---        See Note [exprOkForSpeculation and evaluated variables] for why.
---  * W2: Read-effects on mutable variables are currently also included.
+--  * W1: Read-effects on mutable variables are currently also included.
 --        See Note [Classifying primop effects] "GHC.Builtin.PrimOps".
---  * W3: Currently, 'exprOkForSpeculation' always returns 'False' for
---        let-expressions.  Lets can be stacked deeply, so we just give up.
---        In any case, the argument of 'exprOkForSpeculation' is usually in
---        a strict context, so any lets will have been floated away.
---
 --
 -- As an example of the considerations in this test, consider:
 --
 -- > let x = case y# +# 1# of { r# -> I# r# }
--- > in E
+-- > in e
 --
 -- being translated to:
 --
 -- > case y# +# 1# of { r# ->
 -- >    let x = I# r#
--- >    in E
+-- >    in e
 -- > }
 --
 -- We can only do this if the @y# +# 1#@ is ok for speculation: it has no
@@ -1811,14 +1804,12 @@ expr_ok fun_ok primop_ok (Tick tickish e)
    | tickishCounts tickish = False
    | otherwise             = expr_ok fun_ok primop_ok e
 
-expr_ok _ _ (Let {}) = False
--- See W3 in the Haddock comment for exprOkForSpeculation
+expr_ok fun_ok primop_ok (Let _ e) = expr_ok fun_ok primop_ok e
+  -- Ignore binds becaue of Note [Core let-can-float invariant] in GHC.Core
 
-expr_ok fun_ok primop_ok (Case scrut bndr _ alts)
+expr_ok fun_ok primop_ok (Case scrut _ _ alts)
   =  -- See Note [exprOkForSpeculation: case expressions]
      expr_ok fun_ok primop_ok scrut
-  && isUnliftedType (idType bndr)
-      -- OK to call isUnliftedType: binders always have a fixed RuntimeRep
   && all (\(Alt _ _ rhs) -> expr_ok fun_ok primop_ok rhs) alts
   && altsAreExhaustive alts
 
@@ -1847,7 +1838,7 @@ app_ok fun_ok primop_ok fun args
 
   | idArity fun > n_val_args
   -- Partial application: just check passing the arguments is OK
-  = args_ok
+  = args_ok notCBV
 
   | otherwise
   = case idDetails fun of
@@ -1857,9 +1848,10 @@ app_ok fun_ok primop_ok fun args
 
       DataConWorkId dc
         | isLazyDataConRep dc
-        -> args_ok
+        -> args_ok notCBV
         | otherwise
-        -> fields_ok (dataConRepStrictness dc)
+        -> args_ok (dataConRepStrictness dc)
+            -- See (SFC1) of Note [Strict fields in Core]
 
       ClassOpId _ is_terminating_result
         | is_terminating_result -- See Note [exprOkForSpeculation and type classes]
@@ -1881,7 +1873,7 @@ app_ok fun_ok primop_ok fun args
               -- Often there is a literal divisor, and this
               -- can get rid of a thunk in an inner loop
 
-        | otherwise -> primop_ok op && args_ok
+        | otherwise -> primop_ok op && args_ok notCBV
 
       _other  -- Unlifted and terminating types;
               -- Also c.f. the Var case of exprIsHNF
@@ -1898,37 +1890,54 @@ app_ok fun_ok primop_ok fun args
          -- See (U12) of Note [Implementing unsafeCoerce]
          | fun `hasKey` unsafeEqualityProofIdKey -> True
 
-         | otherwise -> False
-             -- NB: even in the nullary case, do /not/ check
-             --     for evaluated-ness of the fun;
-             --     see Note [exprOkForSpeculation and evaluated variables]
+         | 0 <- n_val_args
+         , isEvaldUnfolding (idUnfolding fun)
+         -> -- pprTrace "yes" (ppr fun)
+            True
+
+         | otherwise -> -- pprTrace "no" (ppr fun <+> ppr args)
+                        False
   where
     fun_ty       = idType fun
     n_val_args   = valArgCount args
-    (arg_tys, _) = splitPiTys fun_ty
 
     -- Even if a function call itself is OK, any unlifted
-    -- args are still evaluated eagerly and must be checked
-    args_ok = all2Prefix arg_ok arg_tys args
-    arg_ok :: PiTyVarBinder -> CoreExpr -> Bool
-    arg_ok (Named _) _ = True   -- A type argument
-    arg_ok (Anon ty _) arg      -- A term argument
-       | definitelyLiftedType (scaledThing ty)
-       = True -- lifted args are not evaluated eagerly
+    -- args are still evaluated eagerly and must be checked.
+    -- Furthermore, for saturated calls, we must check CBV args (strict fields
+    -- of DataCons!)
+    args_ok str_marks = relevantAppArgsSatisfy arg_ok fun_ty args str_marks
+    arg_ok :: Type -> CoreExpr -> StrictnessMark -> Bool
+    arg_ok ty arg str
+       | NotMarkedStrict <- str   -- iff it's not a CBV arg
+       , definitelyLiftedType ty  -- and its type is lifted
+       = True                     -- then the worker app does not eval
        | otherwise
        = expr_ok fun_ok primop_ok arg
 
-    -- Used for strict DataCon worker arguments
-    -- See (SFC1) of Note [Strict fields in Core]
-    fields_ok str_marks = all3Prefix field_ok arg_tys str_marks args
-    field_ok :: PiTyVarBinder -> StrictnessMark -> CoreExpr -> Bool
-    field_ok (Named _)   _   _ = True
-    field_ok (Anon ty _) str arg
-       | NotMarkedStrict <- str                 -- iff it's a lazy field
-       , definitelyLiftedType (scaledThing ty)  -- and its type is lifted
-       = True                                   -- then the worker app does not eval
-       | otherwise
-       = expr_ok fun_ok primop_ok arg
+notCBV :: [StrictnessMark]
+notCBV = repeat NotMarkedStrict
+
+relevantAppArgsSatisfy :: (Type -> CoreExpr -> StrictnessMark -> Bool) -> Type -> [CoreExpr] -> [StrictnessMark] -> Bool
+-- This calls the predicate on every non-Type CoreExpr arg.
+-- We could just do `exprType arg` for every such arg, but carrying around a
+-- substitution is much more efficient.
+-- The obvious definition regresses T16577 by 30% so we don't do it.
+relevantAppArgsSatisfy p ty = go (mkEmptySubst in_scope) ty
+  where
+    in_scope = mkInScopeSet (tyCoVarsOfType ty)
+    go subst (ForAllTy b res) (Type ty : args) strs
+      = go (extendTvSubstAndInScope subst (binderVar b) ty) res args strs
+    go subst (ForAllTy b res) (Coercion co : args) strs
+      = go (extendCvSubstAndInScope subst (binderVar b) co) res args strs
+    go subst (FunTy { ft_arg = arg, ft_res = res }) (e : args) (str : strs)
+      = p (substTy subst arg) e str && go subst res args strs
+    go subst ty args@(_:_) strs@(_:_)
+      | Just ty' <- coreView (substTy subst ty)
+      = go (mkEmptySubst (getSubstInScope subst)) ty' args strs
+      | otherwise
+      = pprPanic "Should see more argument tys" (ppr ty $$ ppr subst $$ ppr args $$ ppr (take 10 strs))
+    go _ _ _ _ = True
+{-# INLINE relevantAppArgsSatisfy #-}
 
 -----------------------------
 altsAreExhaustive :: [Alt b] -> Bool
@@ -1985,6 +1994,8 @@ GHC.Types.Id.Make.mkDictSelId for where this field is initialised.
 
 Note [exprOkForSpeculation: case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+SG: I don't get what is so "very special" about this case. I find it very reasonable.
+
 exprOkForSpeculation accepts very special case expressions.
 Reason: (a ==# b) is ok-for-speculation, but the litEq rules
 in GHC.Core.Opt.ConstantFold convert it (a ==# 3#) to
@@ -1994,39 +2005,22 @@ for excellent reasons described in
 So, annoyingly, we want that case expression to be
 ok-for-speculation too. Bother.
 
-But we restrict it sharply:
+SG: Again, I don't see why we need to list a specific example.
+Clearly, we want to detect as many expressions as ok-for-spec as possible!
 
-* We restrict it to unlifted scrutinees. Consider this:
-     case x of y {
-       DEFAULT -> ... (let v::Int# = case y of { True  -> e1
-                                               ; False -> e2 }
-                       in ...) ...
+But we restrict it to exhaustive alternatives. A non-exhaustive
+case manifestly isn't ok-for-speculation. For example,
+this is a valid program (albeit a slightly dodgy one)
+  let v = case x of { B -> ...; C -> ... }
+  in case x of
+       A -> ...
+       _ ->  ...v...v....
+Should v be considered ok-for-speculation?  Its scrutinee may be
+evaluated, but the alternatives are incomplete so we should not
+evaluate it strictly.
 
-  Does the RHS of v satisfy the let-can-float invariant?  Previously we said
-  yes, on the grounds that y is evaluated.  But the binder-swap done
-  by GHC.Core.Opt.SetLevels would transform the inner alternative to
-     DEFAULT -> ... (let v::Int# = case x of { ... }
-                     in ...) ....
-  which does /not/ satisfy the let-can-float invariant, because x is
-  not evaluated. See Note [Binder-swap during float-out]
-  in GHC.Core.Opt.SetLevels.  To avoid this awkwardness it seems simpler
-  to stick to unlifted scrutinees where the issue does not
-  arise.
-
-* We restrict it to exhaustive alternatives. A non-exhaustive
-  case manifestly isn't ok-for-speculation. for example,
-  this is a valid program (albeit a slightly dodgy one)
-    let v = case x of { B -> ...; C -> ... }
-    in case x of
-         A -> ...
-         _ ->  ...v...v....
-  Should v be considered ok-for-speculation?  Its scrutinee may be
-  evaluated, but the alternatives are incomplete so we should not
-  evaluate it strictly.
-
-  Now, all this is for lifted types, but it'd be the same for any
-  finite unlifted type. We don't have many of them, but we might
-  add unlifted algebraic types in due course.
+Now, all this is for lifted types, but it'd be the same for any
+finite unlifted type.
 
 
 ----- Historical note: #15696: --------
@@ -2072,37 +2066,6 @@ ok-for-speculation, even though it has /lifted/ type.  But now join
 points do the job nicely.
 ------- End of historical note ------------
 
-
-Note [exprOkForSpeculation and evaluated variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider these examples:
- * case x of y { DEFAULT -> ....y.... }
-   Should 'y' (alone) be considered ok-for-speculation?
-
- * case x of y { DEFAULT -> ....let z = dataToTagLarge# y... }
-   Should (dataToTagLarge# y) be considered ok-for-spec? Recall that
-     dataToTagLarge# :: forall a. a -> Int#
-   must always evaluate its argument. (See also Note [DataToTag overview].)
-
-You could argue 'yes', because in the case alternative we know that
-'y' is evaluated.  But the binder-swap transformation, which is
-extremely useful for float-out, changes these expressions to
-   case x of y { DEFAULT -> ....x.... }
-   case x of y { DEFAULT -> ....let z = dataToTagLarge# x... }
-
-And now the expression does not obey the let-can-float invariant!  Yikes!
-Moreover we really might float (dataToTagLarge# x) outside the case,
-and then it really, really doesn't obey the let-can-float invariant.
-
-The solution is simple: exprOkForSpeculation does not try to take
-advantage of the evaluated-ness of (lifted) variables.  And it returns
-False (always) for primops that perform evaluation.  We achieve the latter
-by marking the relevant primops as "ThrowsException" or
-"ReadWriteEffect"; see also Note [Classifying primop effects] in
-GHC.Builtin.PrimOps.
-
-Note that exprIsHNF /can/ and does take advantage of evaluated-ness;
-it doesn't have the trickiness of the let-can-float invariant to worry about.
 
 ************************************************************************
 *                                                                      *
@@ -2166,7 +2129,6 @@ exprIsHNFlike is_con is_con_unf e
       || is_con_unf (idUnfolding v)
         -- Check the thing's unfolding; it might be bound to a value
         --   or to a guaranteed-evaluated variable (isEvaldUnfolding)
-        --   Contrast with Note [exprOkForSpeculation and evaluated variables]
         -- We don't look through loop breakers here, which is a bit conservative
         -- but otherwise I worry that if an Id's unfolding is just itself,
         -- we could get an infinite loop
@@ -2185,66 +2147,59 @@ exprIsHNFlike is_con is_con_unf e
                                    && is_hnf_like e
                                       -- See Note [exprIsHNF Tick]
     is_hnf_like (Cast e _)       = is_hnf_like e
-    is_hnf_like (App e a)
-      | isValArg a               = app_is_value e [a]
-      | otherwise                = is_hnf_like e
     is_hnf_like (Let _ e)        = is_hnf_like e  -- Lazy let(rec)s don't affect us
     is_hnf_like (Case e b _ as)
       | Just rhs <- isUnsafeEqualityCase e b as
       = is_hnf_like rhs
-    is_hnf_like _                = False
+    is_hnf_like e
+      | (fun, args) <- collectArgs e
+      = case stripTicksTopE (not . tickishCounts) fun of
+            Var f -> id_app_is_value f args
 
-    -- Collect arguments through Casts and Ticks and call id_app_is_value
-    app_is_value :: CoreExpr -> [CoreArg] -> Bool
-    app_is_value (Var f)    as = id_app_is_value f as
-    app_is_value (Tick _ f) as = app_is_value f as
-    app_is_value (Cast f _) as = app_is_value f as
-    app_is_value (App f a)  as | isValArg a = app_is_value f (a:as)
-                               | otherwise  = app_is_value f as
-    app_is_value _          _  = False
+            -- 'LitRubbish' is the only literal that can occur in the head of an
+            -- application and will not be matched by the above case (Var /= Lit).
+            -- See Note [How a rubbish literal can be the head of an application]
+            -- in GHC.Types.Literal
+            Lit lit | debugIsOn, not (isLitRubbish lit)
+                     -> pprPanic "Non-rubbish lit in app head" (ppr lit)
+                     | otherwise
+                     -> True
 
-    id_app_is_value id val_args =
+            _ -> False
+
+    id_app_is_value id args =
       -- See Note [exprIsHNF for function applications]
       --   for the specification and examples
-      case compare (idArity id) (length val_args) of
+      case compare (idArity id) n_val_args of
         EQ | is_con id ->      -- Saturated app of a DataCon/CONLIKE Id
           case mb_str_marks id of
             Just str_marks ->  -- with strict fields; see (SFC1) of Note [Strict fields in Core]
-              assert (val_args `equalLength` str_marks) $
-              fields_hnf str_marks
+              args_hnf str_marks
             Nothing ->         -- without strict fields: like PAP
-              args_hnf         -- NB: CONLIKEs are lazy!
+              args_hnf notCBV  -- NB: CONLIKEs are lazy!
 
-        GT ->                  -- PAP: Check unlifted val_args
-          args_hnf
+        GT ->                  -- PAP: Check unlifted args
+          args_hnf notCBV
 
         _  -> False
 
       where
-        -- Saturated, Strict DataCon: Check unlifted val_args and strict fields
-        fields_hnf str_marks = all3Prefix check_field val_arg_tys str_marks val_args
-
-        -- PAP: Check unlifted val_args
-        args_hnf             = all2Prefix check_arg   val_arg_tys           val_args
-
         fun_ty = idType id
-        val_arg_tys = mapMaybe anonPiTyBinderType_maybe (collectPiTyBinders fun_ty)
-          -- val_arg_tys = map exprType val_args, but much less costly.
-          -- The obvious definition regresses T16577 by 30% so we don't do it.
-
-        check_arg a_ty a
+        n_val_args   = valArgCount args
+        -- Check the args for HNFness.
+        args_hnf str_marks = relevantAppArgsSatisfy check_arg fun_ty args str_marks
+        --   * Unlifted args must always be HNF
+        --   * CBV args (strict fields!) must be HNF for saturated calls,
+        --     indicated by str_marks
+        check_arg a_ty a str
           | mightBeUnliftedType a_ty = is_hnf_like a
+          | isMarkedStrict str       = is_hnf_like a
           | otherwise                = True
          -- Check unliftedness; for example f (x /# 12#) where f has arity two,
          -- and the first argument is unboxed. This is not a value!
          -- But  f 34#  is a value, so check args for HNFs.
          -- NB: We check arity (and CONLIKEness) first because it's cheaper
          --     and we reject quickly on saturated apps.
-        check_field a_ty str a
-          | mightBeUnliftedType a_ty = is_hnf_like a
-          | isMarkedStrict str       = is_hnf_like a
-          | otherwise                = True
-          -- isMarkedStrict: Respect Note [Strict fields in Core]
 
         mb_str_marks id
           | Just dc <- isDataConWorkId_maybe id

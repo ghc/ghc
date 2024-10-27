@@ -1,0 +1,41 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 24, types: 75, coercions: 0, joins: 0/1}
+
+-- RHS size: {terms: 9, types: 39, coercions: 0, joins: 0/1}
+f :: Int -> Int -> (# (# Int, Int #), (# Int, Int #) #)
+[GblId, Arity=2, Str=<L><L>, Cpr=1(1, 1), Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)}]
+f = \ (x :: Int) (y :: Int) ->
+      let {
+        p :: (# Int, Int #)
+        [LclId, Unf=OtherCon []]
+        p = (# x, y #) } in
+      (# p, p #)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T25423.$trModule4 :: GHC.Prim.Addr#
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T25423.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T25423.$trModule3 :: GHC.Types.TrName
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T25423.$trModule3 = GHC.Types.TrNameS T25423.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T25423.$trModule2 :: GHC.Prim.Addr#
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T25423.$trModule2 = "T25423"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T25423.$trModule1 :: GHC.Types.TrName
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T25423.$trModule1 = GHC.Types.TrNameS T25423.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T25423.$trModule :: GHC.Types.Module
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T25423.$trModule = GHC.Types.Module T25423.$trModule3 T25423.$trModule1
+
+
+

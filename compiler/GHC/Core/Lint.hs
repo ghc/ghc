@@ -592,7 +592,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
                || isDataConWorkId binder || isDataConWrapId binder -- until #17521 is fixed
                || exprIsTickedString rhs)
-           (badBndrTyMsg binder (text "unlifted"))
+           (badUnliftedBndrTyMsg binder rhs)
 
         -- Check that if the binder is at the top level and has type Addr#,
         -- that it is a string literal.
@@ -3741,10 +3741,11 @@ mkRhsMsg binder what ty
      hsep [text "Binder's type:", ppr (idType binder)],
      hsep [text "Rhs type:", ppr ty]]
 
-badBndrTyMsg :: Id -> SDoc -> SDoc
-badBndrTyMsg binder what
-  = vcat [ text "The type of this binder is" <+> what <> colon <+> ppr binder
-         , text "Binder's type:" <+> ppr (idType binder) ]
+badUnliftedBndrTyMsg :: Id -> CoreExpr -> SDoc
+badUnliftedBndrTyMsg bndr rhs
+  = vcat [ text "The let binder" <+> ppr bndr <+> text "does not satisfy the let-can-float invariant"
+         , text "Type:" <+> ppr (idType bndr)
+         , text "RHS:" <+> ppr rhs ]
 
 mkNonTopExportedMsg :: Id -> SDoc
 mkNonTopExportedMsg binder

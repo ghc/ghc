@@ -22,6 +22,7 @@ module GHC.Core.TyCo.Subst
         extendCvSubst, extendCvSubstWithClone,
         extendTvSubst, extendTvSubstWithClone,
         extendTvSubstList, extendTvSubstAndInScope,
+        extendCvSubstAndInScope,
         extendTCvSubstList,
         unionSubst, zipTyEnv, zipCoEnv,
         zipTvSubst, zipCvSubst,
@@ -408,6 +409,14 @@ extendTvSubstAndInScope (Subst in_scope ids tenv cenv) tv ty
              ids
              (extendVarEnv tenv tv ty)
              cenv
+
+extendCvSubstAndInScope :: Subst -> CoVar -> Coercion -> Subst
+-- Also extends the in-scope set
+extendCvSubstAndInScope (Subst in_scope ids tenv cenv) cv co
+  = Subst (in_scope `extendInScopeSetSet` tyCoVarsOfCo co)
+             ids
+             tenv
+             (extendVarEnv cenv cv co)
 
 -- | Adds multiple 'TyVar' substitutions to the 'Subst': see also 'extendTvSubst'
 extendTvSubstList :: Subst -> [(TyVar,Type)] -> Subst

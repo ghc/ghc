@@ -38,39 +38,58 @@
    We do *not* clone top-level bindings, because some of them must not change,
    but we *do* clone bindings that are heading for the top level
 
-4. Note [Binder-swap during float-out]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+4. Note [Duplicate evals into float]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    In the expression
-        case x of wild { p -> ...wild... }
-   we substitute x for wild in the RHS of the case alternatives:
-        case x of wild { p -> ...x... }
-   This means that a sub-expression involving x is not "trapped" inside the RHS
-   (i.e. it can now be floated out, whereas if it mentioned wild it could not).
-   And it's not inconvenient because we already have a substitution.
+        case x of wild { p -> ...f wild... }
+   the sub-expression `f wild` appears "trapped" inside the Case.
+   (i.e. it cannot be floated out because it mentions wild).
+   In order to "free" it, we float out the expression
+   `case x of wild { __DEFAULT -> f wild }`, thus duplicating the eval.
 
    For example, consider:
 
       f x = letrec go y = case x of z { (a,b) -> ...(expensive z)... }
               in ...
 
-   If we do the reverse binder-swap we get
+   If we dup the eval we get
 
-      f x = letrec go y = case x of z { (a,b) -> ...(expensive x)... }
+      f x = letrec go y = case x of z { (a,b) -> ...(case x of z { __DEFAULT -> expensive z })... }
               in ...
 
    and now we can float out:
 
-      f x = let t = expensive x
-              in letrec go y = case x of z { (a,b) -> ...(t)... }
+      f x = let t = case x of wild { __DEFAULT -> expensive wild }
+              in letrec go y = case x of wild { (a,b) -> ...(t)... }
               in ...
 
-   Now (expensive x) is computed once, rather than once each time around the 'go' loop.
+   Now (expensive wild) is computed once, rather than once each time around the 'go' loop.
 
-   Note that this is EXACTLY BACKWARDS from the what the simplifier does.
-   The simplifier tries to get rid of occurrences of x, in favour of wild,
-   in the hope that there will only be one remaining occurrence of x, namely
-   the scrutinee of the case, and we can inline it.
+   Implementation:
 
+     1. When entering an eval `case x of wild { __DEFAULT -> ...}`, remember
+        that `wild` is the result of evaluating `x`.
+
+     2. After figuring out the variables over which the expression needs to be
+        abstracted in order to float (abstractVars), go over these variables
+        once more to see if `wild` occurs among them. If so, and if the
+        scrutinee variable `x` is bound at a lower level than the destination
+        level of the float, then remove `wild` as an abs_var and record the
+        obligation to eval `x` into `wild` instead (i.e., add a new `eval_vars`
+        pairing). This is implemented in eliminateAbsCaseBndrs.
+        Of course, it only makes sense to duplicate the eval if we end up
+        with a thunk in doing so; hence eliminateAbsCaseBndrs checks whether
+        the abs_vars become empty after duplicating evals.
+
+
+   Historically, we implemented a reverse binder-swap
+   (see Note [The binder-swap substitution] for the forward direction),
+   which would float `expensive x` and thus drop the eval on `x`. This caused
+   trouble for expressions such as
+     case x of wild { __DEFAULT -> let y = dataToTagLarge# wild in ... }
+   When the case binder `wild` is swapped for the unevaluated scrutinee
+   `x`, `dataToTagLarge# x` no longer is ok-for-spec and thus the unlifted let
+   violates the let-can-float invariant. Hence we duplicate the eval nowadays.
 -}
 
 module GHC.Core.Opt.SetLevels (
@@ -127,6 +146,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Maybe
+import Data.Either
 
 {-
 ************************************************************************
@@ -452,14 +472,14 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
   =     -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
     do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
-       ; let rhs_env = extendCaseBndrEnv env1 case_bndr scrut'
+       ; let rhs_env = rememberEval env1 case_bndr' scrut'
        ; body' <- lvlMFE rhs_env True body
        ; let alt' = Alt con (map (stayPut dest_lvl) bs') body'
        ; return (Case scrut' (TB case_bndr' (FloatMe dest_lvl)) ty' [alt']) }
 
   | otherwise     -- Stays put
-  = do { let (alts_env1, [case_bndr']) = substAndLvlBndrs NonRecursive env incd_lvl [case_bndr]
-             alts_env = extendCaseBndrEnv alts_env1 case_bndr scrut'
+  = do { let (alts_env1, [case_bndr'@(TB case_bndrr _)]) = substAndLvlBndrs NonRecursive env incd_lvl [case_bndr]
+             alts_env = rememberEval alts_env1 case_bndrr scrut'
        ; alts' <- mapM (lvl_alt alts_env) alts
        ; return (Case scrut' case_bndr' ty' alts') }
   where
@@ -632,7 +652,7 @@ lvlMFE env strict_ctxt ann_expr
   |  float_is_new_lam || exprIsTopLevelBindable expr expr_ty
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
-  = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
+  = do { expr1 <- lvlFloatRhs abs_vars eval_vars dest_lvl rhs_env NonRecursive
                               is_bot_lam NotJoinPoint ann_expr
                   -- Treat the expr just like a right-hand side
        ; var <- newLvlVar expr1 NotJoinPoint is_mk_static
@@ -653,6 +673,7 @@ lvlMFE env strict_ctxt ann_expr
   = do { expr1 <- lvlExpr rhs_env ann_expr
        ; let l1r       = incMinorLvlFrom rhs_env
              float_rhs = mkLams abs_vars_w_lvls $
+                         flip (foldr (wrapEval l1r)) eval_vars $
                          Case expr1 (stayPut l1r ubx_bndr) box_ty
                              [Alt DEFAULT [] (App boxing_expr (Var ubx_bndr))]
 
@@ -678,7 +699,8 @@ lvlMFE env strict_ctxt ann_expr
                            -- See Note [Bottoming floats]
                            -- esp Bottoming floats (2)
     expr_ok_for_spec = exprOkForSpeculation expr
-    abs_vars = abstractVars dest_lvl env fvs
+    (abs_vars, eval_vars) = eliminateAbsCaseBndrs dest_lvl env $
+                            abstractVars dest_lvl env fvs
     dest_lvl = destLevel env fvs fvs_ty is_function is_bot_lam
                -- NB: is_bot_lam not is_bot; see (3) in
                --     Note [Bottoming floats]
@@ -1233,7 +1255,7 @@ lvlBind env (AnnNonRec bndr rhs)
   -- Otherwise we are going to float
   | null abs_vars
   = do {  -- No type abstraction; clone existing binder
-         rhs' <- lvlFloatRhs [] dest_lvl env NonRecursive
+         rhs' <- lvlFloatRhs [] [] dest_lvl env NonRecursive
                              is_bot_lam NotJoinPoint rhs
        ; (env', [bndr']) <- cloneLetVars NonRecursive env dest_lvl [bndr]
        ; let bndr2 = annotateBotStr bndr' 0 mb_bot_str
@@ -1241,7 +1263,7 @@ lvlBind env (AnnNonRec bndr rhs)
 
   | otherwise
   = do {  -- Yes, type abstraction; create a new binder, extend substitution, etc
-         rhs' <- lvlFloatRhs abs_vars dest_lvl env NonRecursive
+         rhs' <- lvlFloatRhs abs_vars eval_vars dest_lvl env NonRecursive
                              is_bot_lam NotJoinPoint rhs
        ; (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr]
        ; let bndr2 = annotateBotStr bndr' n_extra mb_bot_str
@@ -1252,7 +1274,8 @@ lvlBind env (AnnNonRec bndr rhs)
     ty_fvs     = tyCoVarsOfType bndr_ty
     rhs_fvs    = freeVarsOf rhs
     bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
-    abs_vars   = abstractVars dest_lvl env bind_fvs
+    (abs_vars, eval_vars) = eliminateAbsCaseBndrs dest_lvl env $
+                            abstractVars dest_lvl env bind_fvs
     dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot_lam
 
     deann_rhs  = deAnnotate rhs
@@ -1332,9 +1355,8 @@ lvlBind env (AnnRec pairs)
                       -- function in a Rec, and we don't much care what
                       -- happens to it.  False is simple!
 
-    do_rhs env (_,rhs) = lvlFloatRhs abs_vars dest_lvl env Recursive
-                                     is_bot NotJoinPoint
-                                     rhs
+    do_rhs env (_,rhs) = lvlFloatRhs abs_vars eval_vars dest_lvl env Recursive
+                                     is_bot NotJoinPoint rhs
 
         -- Finding the free vars of the binding group is annoying
     bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
@@ -1346,7 +1368,8 @@ lvlBind env (AnnRec pairs)
 
     ty_fvs   = foldr (unionVarSet . tyCoVarsOfType . idType) emptyVarSet bndrs
     dest_lvl = destLevel env bind_fvs ty_fvs is_fun is_bot
-    abs_vars = abstractVars dest_lvl env bind_fvs
+    (abs_vars, eval_vars) = eliminateAbsCaseBndrs dest_lvl env $
+                            abstractVars dest_lvl env bind_fvs
 
     is_top_bindable = not (any (mightBeUnliftedType . idType) bndrs)
        -- This mightBeUnliftedType stuff is the same test as in the non-rec case
@@ -1396,21 +1419,28 @@ lvlRhs :: LevelEnv
        -> CoreExprWithFVs
        -> LvlM LevelledExpr
 lvlRhs env rec_flag is_bot mb_join_arity expr
-  = lvlFloatRhs [] (le_ctxt_lvl env) env
+  = lvlFloatRhs [] [] (le_ctxt_lvl env) env
                 rec_flag is_bot mb_join_arity expr
 
-lvlFloatRhs :: [OutVar] -> Level -> LevelEnv -> RecFlag
+wrapEval :: Level -> (OutId, OutId) -> Expr LevelledBndr -> Expr LevelledBndr
+-- A bit like GHC.Core.Utils.mkDefaultCase, but `Expr LevelledBndr`
+wrapEval dest_lvl (scrut_v, case_bndr) body
+  = Case (Var scrut_v) (TB case_bndr (StayPut dest_lvl))
+         (exprType $ deTagExpr body) [Alt DEFAULT [] body]
+
+lvlFloatRhs :: [OutVar] -> [(OutId,OutId)] -> Level -> LevelEnv -> RecFlag
             -> Bool   -- Binding is for a bottoming function
             -> JoinPointHood
             -> CoreExprWithFVs
             -> LvlM (Expr LevelledBndr)
 -- Ignores the le_ctxt_lvl in env; treats dest_lvl as the baseline
-lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
-  = do { body' <- if not is_bot  -- See Note [Floating from a RHS]
+lvlFloatRhs abs_vars eval_vars dest_lvl env rec is_bot mb_join_arity rhs
+  = do { body1 <- if not is_bot  -- See Note [Floating from a RHS]
                      && any isId bndrs
                   then lvlMFE  body_env True body
                   else lvlExpr body_env      body
-       ; return (mkLams bndrs' body') }
+       ; let body2 = foldr (wrapEval dest_lvl) body1 eval_vars
+       ; return (mkLams bndrs' body2) }
   where
     (bndrs, body)     | JoinPoint join_arity <- mb_join_arity
                       = collectNAnnBndrs join_arity rhs
@@ -1633,14 +1663,20 @@ countFreeIds = nonDetStrictFoldUDFM add 0 . getUniqDSet
 
 data LevelEnv
   = LE { le_switches :: FloatOutSwitches
-       , le_ctxt_lvl :: Level           -- The current level
-       , le_lvl_env  :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
+       , le_ctxt_lvl :: Level
+       -- ^ The current level
+       , le_lvl_env  :: VarEnv (Level, Maybe OutId)
+       -- ^ Domain is *post-cloned* TyVars and Ids.
+       -- If `Just scrut`, then the var mapping belongs to a case binder with
+       -- variable scrutinee `scrut`.
+       -- This is to support Note [Duplicate evals into float].
 
        -- See Note [le_subst and le_env]
-       , le_subst    :: Subst           -- Domain is pre-cloned TyVars and Ids
-                                        -- The Id -> CoreExpr in the Subst is ignored
-                                        -- (since we want to substitute a LevelledExpr for
-                                        -- an Id via le_env) but we do use the Co/TyVar substs
+       , le_subst    :: Subst
+       -- ^ Domain is pre-cloned TyVars and Ids.
+       -- The Id -> CoreExpr in the Subst is ignored
+       -- (since we want to substitute a LevelledExpr for
+       -- an Id via le_env) but we do use the Co/TyVar substs
        , le_env      :: IdEnv ([OutVar], LevelledExpr)  -- Domain is pre-cloned Ids
     }
 
@@ -1690,10 +1726,10 @@ initialEnv float_lams binds
       -- to a later one.  So here we put all the top-level binders in scope before
       -- we start, to satisfy the lookupIdSubst invariants (#20200 and #20294)
 
-addLvl :: Level -> VarEnv Level -> OutVar -> VarEnv Level
-addLvl dest_lvl env v' = extendVarEnv env v' dest_lvl
+addLvl :: Level -> VarEnv (Level, Maybe OutId) -> OutVar -> VarEnv (Level, Maybe OutId)
+addLvl dest_lvl env v' = extendVarEnv env v' (dest_lvl, Nothing)
 
-addLvls :: Level -> VarEnv Level -> [OutVar] -> VarEnv Level
+addLvls :: Level -> VarEnv (Level, Maybe OutId) -> [OutVar] -> VarEnv (Level, Maybe OutId)
 addLvls dest_lvl env vs = foldl' (addLvl dest_lvl) env vs
 
 floatLams :: LevelEnv -> Maybe Int
@@ -1711,20 +1747,19 @@ floatTopLvlOnly le = floatToTopLevelOnly (le_switches le)
 incMinorLvlFrom :: LevelEnv -> Level
 incMinorLvlFrom env = incMinorLvl (le_ctxt_lvl env)
 
--- extendCaseBndrEnv adds the mapping case-bndr->scrut-var if it can
--- See Note [Binder-swap during float-out]
-extendCaseBndrEnv :: LevelEnv
-                  -> Id                 -- Pre-cloned case binder
-                  -> Expr LevelledBndr  -- Post-cloned scrutinee
-                  -> LevelEnv
-extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
+-- rememberEval adds the mapping case-bndr->scrut-var if it can
+-- See Note [Duplicate evals into float]
+rememberEval :: LevelEnv
+             -> OutId              -- Post-cloned case binder
+             -> Expr LevelledBndr  -- Post-cloned scrutinee
+             -> LevelEnv
+rememberEval le@(LE { le_lvl_env = lvl_env })
                   case_bndr (Var scrut_var)
   -- We could use OccurAnal. scrutOkForBinderSwap here, and perhaps
   -- get a bit more floating.  But we didn't in the past and it's
   -- an unforced change, so I'm leaving it.
-  = le { le_subst   = extendSubstWithVar subst case_bndr scrut_var
-       , le_env     = add_id id_env (case_bndr, scrut_var) }
-extendCaseBndrEnv env _ _ = env
+  = le { le_lvl_env = modifyVarEnv (\(lvl,_) -> (lvl, Just scrut_var)) lvl_env case_bndr }
+rememberEval env _ _ = env
 
 maxFvLevel :: (Var -> Bool) -> LevelEnv -> DVarSet -> Level
 maxFvLevel max_me env var_set
@@ -1745,8 +1780,8 @@ maxIn max_me (LE { le_lvl_env = lvl_env, le_env = id_env }) in_var lvl
   where
     max_out out_var lvl
         | max_me out_var = case lookupVarEnv lvl_env out_var of
-                                Just lvl' -> maxLvl lvl' lvl
-                                Nothing   -> lvl
+                                Just (lvl',_) -> maxLvl lvl' lvl
+                                Nothing       -> lvl
         | otherwise = lvl       -- Ignore some vars depending on max_me
 
 lookupVar :: LevelEnv -> Id -> LevelledExpr
@@ -1765,20 +1800,16 @@ abstractVars :: Level -> LevelEnv -> DVarSet -> [OutVar]
         -- variable computation and deterministic sort.
         -- See Note [Unique Determinism] in GHC.Types.Unique for explanation of why
         -- Uniques are not deterministic.
-abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
+abstractVars dest_lvl le@(LE { le_subst = subst }) in_fvs
   =  -- NB: sortQuantVars might not put duplicates next to each other
-    map zap $ sortQuantVars $
-    filter abstract_me      $
-    dVarSetElems            $
-    closeOverKindsDSet      $
+    map zap $ sortQuantVars         $
+    filter (abstractMe dest_lvl le) $
+    dVarSetElems                    $
+    closeOverKindsDSet              $
     substDVarSet subst in_fvs
         -- NB: it's important to call abstract_me only on the OutIds the
         -- come from substDVarSet (not on fv, which is an InId)
   where
-    abstract_me v = case lookupVarEnv lvl_env v of
-                        Just lvl -> dest_lvl `ltLvl` lvl
-                        Nothing  -> False
-
         -- We are going to lambda-abstract, so nuke any IdInfo,
         -- and add the tyvars of the Id (if necessary)
     zap v | isId v = warnPprTrace (isStableUnfolding (idUnfolding v) ||
@@ -1786,6 +1817,31 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
                            "absVarsOf: discarding info on" (ppr v) $
                      setIdInfo v vanillaIdInfo
           | otherwise = v
+
+abstractMe :: Level -> LevelEnv -> Var -> Bool
+abstractMe dest_lvl (LE { le_lvl_env = lvl_env }) v
+  | Just (lvl, _) <- lookupVarEnv lvl_env v
+  = dest_lvl `ltLvl` lvl
+  | otherwise
+  = False
+
+eliminateAbsCaseBndrs :: Level -> LevelEnv -> [OutVar] -> ([OutVar], [(OutId,OutId)])
+-- Try turning all runtime abs_vars into evals.
+-- See Note [Duplicate evals into float]
+eliminateAbsCaseBndrs dest_lvl le@(LE { le_lvl_env = lvl_env }) abs_vars
+  | enables_thunking -- otherwise we do not get to safe work anyway!
+  = res
+  | otherwise
+  = (abs_vars, [])
+  where
+    res@(abs_vars',_eval_vars') = partitionEithers (map try_elim abs_vars)
+    enables_thunking = not (any isRuntimeVar abs_vars')
+
+    try_elim v = case lookupVarEnv lvl_env v of
+      Just (_, Just scrut_id)
+        | not (abstractMe dest_lvl le scrut_id) -- would not abstract scrut_id
+        -> Right (scrut_id, v) -- turn abs_var v into an eval on scrut_id!
+      _ -> Left v              -- retain as an abs_var
 
 type LvlM result = UniqSM result
 
@@ -1835,9 +1891,12 @@ newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> LvlM Id
 newLvlVar lvld_rhs join_arity_maybe is_mk_static
   = do { uniq <- getUniqueM
-       ; return (add_join_info (mk_id uniq rhs_ty))
+       ; return (add_evald $ add_join_info $ mk_id uniq rhs_ty)
        }
   where
+    add_evald var
+      | exprIsHNF de_tagged_rhs = var `setIdUnfolding` evaldUnfolding
+      | otherwise               = var
     add_join_info var = var `asJoinId_maybe` join_arity_maybe
     de_tagged_rhs = deTagExpr lvld_rhs
     rhs_ty        = exprType de_tagged_rhs
