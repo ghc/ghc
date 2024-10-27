@@ -7,7 +7,12 @@ expectations. Also please answer the following question in your MR description:*
 
 Please take a few moments to address the following points:
 
- * [ ] if your MR may break existing programs (e.g. touches `base` or causes the
+ * [ ] if your MR touches `base` (or touches parts of `ghc-internal` used
+   or re-exported by `base`) more substantially than just amending comments
+   or documentation, you likely need to raise a
+   [CLC proposal](https://github.com/haskell/core-libraries-committee#base-package)
+   before merging it.
+ * [ ] if your MR may break existing programs (e.g. causes the
    compiler to reject programs), please describe the expected breakage and add
    the ~"user-facing" label. This will run ghc/head.hackage> to characterise
    the effect of your change on Hackage.
