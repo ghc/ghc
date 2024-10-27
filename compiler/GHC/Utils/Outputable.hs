@@ -412,6 +412,7 @@ data SDocContext = SDC
   , sdocPrintExplicitForalls        :: !Bool
   , sdocPrintPotentialInstances     :: !Bool
   , sdocPrintEqualityRelations      :: !Bool
+  , sdocPrintTyVarUnfoldings        :: !Bool
   , sdocSuppressTicks               :: !Bool
   , sdocSuppressTypeSignatures      :: !Bool
   , sdocSuppressTypeApplications    :: !Bool
@@ -474,6 +475,7 @@ defaultSDocContext = SDC
   , sdocPrintExplicitForalls        = False
   , sdocPrintPotentialInstances     = False
   , sdocPrintEqualityRelations      = False
+  , sdocPrintTyVarUnfoldings        = False
   , sdocSuppressTicks               = False
   , sdocSuppressTypeSignatures      = False
   , sdocSuppressTypeApplications    = False

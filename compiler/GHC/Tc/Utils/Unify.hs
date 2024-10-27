@@ -84,7 +84,7 @@ import GHC.Tc.Solver.InertSet
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs( isInjectiveInType )
-import GHC.Core.TyCo.Ppr( debugPprType {- pprTyVar -} )
+import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Unify

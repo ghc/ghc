@@ -937,7 +937,7 @@ The inline pragma tells us to be very keen to inline this Id, but it's still
 OK not to if optimisation is switched off.
 -}
 
-idInlinePragma :: Id -> InlinePragma
+idInlinePragma :: HasDebugCallStack => Id -> InlinePragma
 idInlinePragma id = inlinePragInfo (idInfo id)
 
 setInlinePragma :: Id -> InlinePragma -> Id
