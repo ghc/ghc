@@ -44,7 +44,7 @@ import GHC.Prelude
 
 import GHC.Builtin.Types
 
-import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCo.Ppr ( pprTyVarWithKind )
 
 import GHC.Hs
 
@@ -457,24 +457,24 @@ commitFlexi tv zonked_kind
              -- We need *some* known RuntimeRep for the x and undefined, but no one
              -- will choose it until we get here, in the zonker.
            | isRuntimeRepTy zonked_kind
-           -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
+           -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVarWithKind tv)
                  ; return liftedRepTy }
            | isLevityTy zonked_kind
-           -> do { traceTc "Defaulting flexi tyvar to Lifted:" (pprTyVar tv)
+           -> do { traceTc "Defaulting flexi tyvar to Lifted:" (pprTyVarWithKind tv)
                  ; return liftedDataConTy }
            | isMultiplicityTy zonked_kind
-           -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
+           -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVarWithKind tv)
                  ; return manyDataConTy }
            | Just (ConcreteFRR origin) <- isConcreteTyVar_maybe tv
            -> do { addErr $ TcRnZonkerMessage (ZonkerCannotDefaultConcrete origin)
                  ; return (anyTypeOfKind zonked_kind) }
            | otherwise
-           -> do { traceTc "Defaulting flexi tyvar to ZonkAny:" (pprTyVar tv)
+           -> do { traceTc "Defaulting flexi tyvar to ZonkAny:" (pprTyVarWithKind tv)
                    -- See Note [Any types] in GHC.Builtin.Types, esp wrinkle (Any4)
                  ; newZonkAnyType zonked_kind }
 
          RuntimeUnkFlexi
-           -> do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVar tv)
+           -> do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVarWithKind tv)
                  ; return (mkTyVarTy (mkTcTyVar name zonked_kind RuntimeUnk)) }
                            -- This is where RuntimeUnks are born:
                            -- otherwise-unconstrained unification variables are
@@ -1086,12 +1086,11 @@ zonkExpr (XExpr (ExpandedThingTc thing e))
   = do e' <- zonkExpr e
        return $ XExpr (ExpandedThingTc thing e')
 
-
 zonkExpr (XExpr (ConLikeTc con tvs tys))
-  = XExpr . ConLikeTc con tvs <$> mapM zonk_scale tys
-  where
-    zonk_scale (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX m <*> pure ty
-    -- Only the multiplicity can contain unification variables
+  = runZonkBndrT (zonkTyBndrsX tvs) $ \ tvs' ->
+    do { tys' <- mapM zonkScaledTcTypeToTypeX tys
+       ; pprTrace "zok-conl" (ppr tvs') $
+         return (XExpr (ConLikeTc con tvs' tys')) }
     -- The tvs come straight from the data-con, and so are strictly redundant
     -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
 

@@ -1700,26 +1700,25 @@ rank (r, _, _) = r
 makeNode :: OccEnv -> ImpRuleEdges -> VarSet
          -> (Var, CoreExpr) -> LetrecNode
 -- See Note [Recursive bindings: the grand plan]
-makeNode !env _imp_rule_edges bndr_set (bndr, Type rhs)
-  = assert (isTyVar bndr) $
+makeNode !env _imp_rule_edges bndr_set (bndr, rhs@(Type rhs_ty))
+  = -- The RHS is of form (Type rhs_ty)
+    assert (isTyVar bndr) $
     DigraphNode { node_payload      = details
                 , node_key          = varUnique bndr
                 , node_dependencies = nonDetKeysUniqSet inl_fvs }
   where
-    details = ND { nd_bndr            = bndr'
-                 , nd_rhs             = WTUD (TUD 0 inl_uds) (Type rhs')
+    details = ND { nd_bndr            = bndr
+                 , nd_rhs             = WTUD (TUD 0 inl_uds) rhs
                  , nd_inl             = inl_fvs
                  , nd_simple          = True
                  , nd_weak_fvs        = emptyVarSet
                  , nd_active_rule_fvs = emptyVarSet }
 
-    bndr' = bndr `setTyVarUnfolding` rhs'
-
     rhs_env = setNonTailCtxt OccRhs env
     -- WUD unf_uds mb_unf'
     --   | Just unf <- tyVarUnfolding bndr = Just <$> occAnalTy rhs_env unf
     --   | otherwise                       = WUD emptyUDs Nothing
-    WUD rhs_uds rhs' = occAnalTy rhs_env rhs
+    rhs_uds = occAnalTy rhs_env rhs_ty
 
     inl_uds   = rhs_uds -- `andUDs` unf_uds
     inl_fvs   = udFreeVars bndr_set inl_uds
@@ -2229,7 +2228,7 @@ occ_anal_lam_tail env expr@(Lam {})
 occ_anal_lam_tail env (Cast expr co)
   = let  WUD expr_uds expr' = occ_anal_lam_tail env expr
          -- usage1: see Note [Gather occurrences of coercion variables]
-         WUD co_uds co' = occAnalCo env co
+         co_uds = occAnalCo env co
 
          -- usage2: see Note [Occ-anal and cast worker/wrapper]
          co_uds' = case expr of
@@ -2238,7 +2237,7 @@ occ_anal_lam_tail env (Cast expr co)
 
          uds = markAllNonTail (expr_uds `andUDs` co_uds')
 
-    in WUD uds (Cast expr' co')
+    in WUD uds (Cast expr' co)
 
 occ_anal_lam_tail env expr  -- Not Lam, not Cast
   = occAnal env expr
@@ -2449,128 +2448,50 @@ occAnalList env (e:es) = let
                           (WUD uds1 e') = occAnal env e
                           (WUD uds2 es') = occAnalList env es
                          in WUD (uds1 `andUDs` uds2) (e' : es')
-occAnalTys :: OccEnv -> [Type] -> WithUsageDetails [Type]
-occAnalTys !_   []    = WUD emptyDetails []
-occAnalTys env (t:ts) = let
-                          (WUD uds1 t') = occAnalTy env t
-                          (WUD uds2 ts') = occAnalTys env ts
-                         in WUD (uds1 `andUDs` uds2) (t' : ts')
 
-occAnalTy :: OccEnv
-          -> Type
-          -> WithUsageDetails Type
-occAnalTy env (TyVarTy tv)
-  = let tv_usage = mkOneTyVarOcc env tv
-        -- WUD ki_usage tv_ki' = occAnalTy env ()
-    in WUD tv_usage (TyVarTy tv)
-occAnalTy env (AppTy t1 t2)
-  = let WUD t1_usage t1' = occAnalTy env t1
-        WUD t2_usage t2' = occAnalTy env t2
-    in WUD (t1_usage `andUDs` t2_usage) (mkAppTy t1' t2')
-occAnalTy _   ty@(LitTy {})   = WUD emptyDetails ty
-occAnalTy env (CastTy ty co)
-  = let WUD ty_usage ty' = occAnalTy env ty
-        WUD co_usage co' = occAnalCo env co
-    in WUD (ty_usage `andUDs` co_usage) (mkCastTy ty' co')
-occAnalTy env (CoercionTy co)
-  = let WUD co_usage co' = occAnalCo env co
-    in WUD co_usage (CoercionTy co')
-occAnalTy env fun@(FunTy _ w arg res)
-  = let WUD w_usage w' = occAnalTy env w
-        WUD arg_usage arg' = occAnalTy env arg
-        WUD res_usage res' = occAnalTy env res
-        all_usage = w_usage `andUDs` arg_usage `andUDs` res_usage
-    in WUD all_usage (fun { ft_mult = w', ft_arg = arg', ft_res = res' })
-occAnalTy env ty@(TyConApp tc tys)
-  | null tys
-  = WUD emptyDetails ty
+occAnalTys :: OccEnv -> [Type] -> UsageDetails
+occAnalTys env tys = foldr (andUDs . occAnalTy env) emptyDetails tys
 
-  | let WUD tys_usage tys' = occAnalTys env tys
-  = WUD tys_usage (mkTyConApp tc tys')
-occAnalTy env (ForAllTy (Bndr tv vis) inner)
-  = let WUD usage inner' = occAnalTy env inner
-    in WUD usage (ForAllTy (Bndr tv vis) inner')
+occAnalTy :: OccEnv -> Type -> UsageDetails
+-- No need to return a modified type, unlike expressions
+occAnalTy env (TyVarTy tv)              = mkOneTyVarOcc env tv
+occAnalTy _   (LitTy {})                = emptyDetails
+occAnalTy env (AppTy t1 t2)             = occAnalTy env t1 `andUDs` occAnalTy env t2
+occAnalTy env (CastTy ty co)            = occAnalTy env ty `andUDs` occAnalCo env co
+occAnalTy env (CoercionTy co)           = occAnalCo env co
+occAnalTy env (TyConApp _ tys)          = occAnalTys env tys
+occAnalTy env (ForAllTy (Bndr tv _) ty) = delBndrsFromUDs [tv] (occAnalTy env ty)
+occAnalTy env (FunTy { ft_mult = w, ft_arg = arg, ft_res = res })
+  = occAnalTy env w `andUDs` occAnalTy env arg `andUDs` occAnalTy env res
 
-occAnalCos :: OccEnv -> [Coercion] -> WithUsageDetails [Coercion]
-occAnalCos _   []       = WUD emptyDetails []
-occAnalCos env (co:cos)
-  = let WUD uds1 co'  = occAnalCo env co
-        WUD uds2 cos' = occAnalCos env cos
-    in WUD (uds1 `andUDs` uds2) (co' : cos')
+occAnalCos :: OccEnv -> [Coercion] -> UsageDetails
+occAnalCos env cos = foldr (andUDs . occAnalCo env) emptyDetails cos
 
-occAnalMCo :: OccEnv -> MCoercion -> WithUsageDetails MCoercion
-occAnalMCo _   MRefl    = WUD emptyDetails MRefl
-occAnalMCo env (MCo co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (MCo co')
+occAnalMCo :: OccEnv -> MCoercion -> UsageDetails
+occAnalMCo _   MRefl    = emptyDetails
+occAnalMCo env (MCo co) = occAnalCo env co
 
-occAnalCo :: OccEnv -> Coercion -> WithUsageDetails Coercion
-occAnalCo !env (Refl ty)
-  = let WUD usage ty' = occAnalTy env ty
-    in WUD usage (Refl ty')
-occAnalCo !env (GRefl r ty mco)
-  = let WUD usage1 ty' = occAnalTy env ty
-        WUD usage2 mco' = occAnalMCo env mco
-    in WUD (usage1 `andUDs` usage2) (mkGReflCo r ty' mco')
-occAnalCo !env (AppCo co1 co2)
-  = let WUD usage1 co1' = occAnalCo env co1
-        WUD usage2 co2' = occAnalCo env co2
-    in WUD (usage1 `andUDs` usage2) (mkAppCo co1' co2')
-occAnalCo !env (FunCo r afl afr cw c1 c2)
-  = let WUD cw_usage cw' = occAnalCo env cw
-        WUD c1_usage c1' = occAnalCo env c1
-        WUD c2_usage c2' = occAnalCo env c2
-        total_usage = cw_usage `andUDs` c1_usage `andUDs` c2_usage
-    in WUD total_usage (mkFunCo2 r afl afr cw' c1' c2')
-occAnalCo env (CoVarCo cv)
-  = let occ = mkOneIdOcc env cv NotInteresting 0
-    in WUD occ (mkCoVarCo cv)
-occAnalCo _ (HoleCo hole)
-  = pprPanic "occAnalCo:HoleCo" (ppr hole)
-occAnalCo env (UnivCo p r t1 t2 cos)
-  = let WUD t1_usage t1' = occAnalTy env t1
-        WUD t2_usage t2' = occAnalTy env t2
-        WUD cos_usage cos' = occAnalCos env cos
-        total_usage = cos_usage `andUDs` t1_usage `andUDs` t2_usage
-   in WUD total_usage (UnivCo p r t1' t2' cos')
-occAnalCo env (SymCo co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (mkSymCo co')
-occAnalCo env (TransCo co1 co2)
-  = let WUD usage1 co1' = occAnalCo env co1
-        WUD usage2 co2' = occAnalCo env co2
-    in WUD (usage1 `andUDs` usage2) (mkTransCo co1' co2')
-occAnalCo env (AxiomCo r cos)
-  = let WUD usage cos' = occAnalCos env cos
-    in WUD usage (AxiomCo r cos')
-occAnalCo env (SelCo i co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (mkSelCo i co')
-occAnalCo env (LRCo lr co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (mkLRCo lr co')
-occAnalCo env (InstCo co arg)
-  = let WUD usage1 co' = occAnalCo env co
-        WUD usage2 arg' = occAnalCo env arg
-    in WUD (usage1 `andUDs` usage2) (mkInstCo co' arg')
-occAnalCo env (KindCo co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (mkKindCo co')
-occAnalCo env (SubCo co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (mkSubCo co')
-occAnalCo env co@(TyConAppCo r tc cos)
-  | null cos
-  = WUD emptyDetails co
-
-  | otherwise
-  = let WUD usage cos' = occAnalCos env cos
-    in WUD usage (mkTyConAppCo r tc cos')
-occAnalCo env (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
-                        , fco_kind = kind_co, fco_body = co })
-  = let WUD usage1 kind_co' = occAnalCo env kind_co
-        WUD usage2 co' = occAnalCo env co
-    in WUD (usage1 `andUDs` usage2) (mkForAllCo tv visL visR kind_co' co')
+occAnalCo :: OccEnv -> Coercion -> UsageDetails
+occAnalCo !env (Refl ty)           = occAnalTy env ty
+occAnalCo !env (GRefl _ ty mco)    = occAnalTy env ty `andUDs` occAnalMCo env mco
+occAnalCo !env (AppCo co1 co2)     = occAnalCo env co1 `andUDs` occAnalCo env co2
+occAnalCo env (CoVarCo cv)         = mkOneIdOcc env cv NotInteresting 0
+occAnalCo _ (HoleCo hole)          = pprPanic "occAnalCo:HoleCo" (ppr hole)
+occAnalCo env (SymCo co)           = occAnalCo env co
+occAnalCo env (TransCo co1 co2)    = occAnalCo env co1 `andUDs` occAnalCo env co2
+occAnalCo env (AxiomCo _ cos)      = occAnalCos env cos
+occAnalCo env (SelCo _ co)         = occAnalCo env co
+occAnalCo env (LRCo _ co)          = occAnalCo env co
+occAnalCo env (InstCo co arg)      = occAnalCo env co `andUDs` occAnalCo env arg
+occAnalCo env (KindCo co)          = occAnalCo env co
+occAnalCo env (SubCo co)           = occAnalCo env co
+occAnalCo env (TyConAppCo _ _ cos) = occAnalCos env cos
+occAnalCo !env (FunCo { fco_mult = cw, fco_arg = c1, fco_res = c2 })
+  = occAnalCo env cw `andUDs` occAnalCo env c1 `andUDs` occAnalCo env c2
+occAnalCo env (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = cos })
+  = occAnalTy env t1 `andUDs` occAnalTy env t2 `andUDs` occAnalCos env cos
+occAnalCo env (ForAllCo { fco_tcv = tv, fco_kind = kind_co, fco_body = co })
+  = occAnalCo env kind_co `andUDs` delBndrsFromUDs [tv] (occAnalCo env co)
 
 occAnal :: OccEnv
         -> CoreExpr
@@ -2586,12 +2507,8 @@ occAnal env expr@(Var _) = occAnalApp env (expr, [], [])
     -- rules in them, so the *specialised* versions looked as if they
     -- weren't used at all.
 
-occAnal env (Type ty)
-  = let WUD usage ty' = occAnalTy env ty
-    in WUD usage (Type ty')
-occAnal env (Coercion co)
-  = let WUD usage co' = occAnalCo env co
-    in WUD usage (Coercion co')
+occAnal env (Type ty)     = WUD (occAnalTy env ty) (Type ty)
+occAnal env (Coercion co) = WUD (occAnalCo env co) (Coercion co)
 
 {- Note [Gather occurrences of coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2669,11 +2586,11 @@ occAnal env (Tick tickish body)
 
 occAnal env (Cast expr co)
   = let  (WUD expr_uds expr') = occAnal env expr
-         WUD co_uds co' = occAnalCo env co
+         co_uds = occAnalCo env co
              -- co_uds: see Note [Gather occurrences of coercion variables]
          uds = markAllNonTail (expr_uds `andUDs` co_uds)
              -- co_uds': calls inside expr aren't tail calls any more
-    in WUD uds (Cast expr' co')
+    in WUD uds (Cast expr' co)
 
 occAnal env app@(App _ _)
   = occAnalApp env (collectArgsTicks tickishFloatable app)
