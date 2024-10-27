@@ -1599,23 +1599,23 @@ otherCons :: Unfolding -> [AltCon]
 otherCons (OtherCon cons) = cons
 otherCons _               = []
 
--- | Determines if it is certainly the case that the unfolding will
--- yield a value (something in HNF): returns @False@ if unsure
+-- | Determines if the unfolding is a value (something in HNF).
+-- The form of the value is statically known, e.g., a lambda or
+-- a fixed data constructor.
+-- Returns @False@ if unsure.
 isValueUnfolding :: Unfolding -> Bool
         -- Returns False for OtherCon
 isValueUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_value cache
 isValueUnfolding (DFunUnfolding {})                   = True
 isValueUnfolding _                                    = False
 
--- | Determines if it possibly the case that the unfolding will
--- yield a value. Unlike 'isValueUnfolding' it returns @True@
--- for 'OtherCon'
+-- | Determines if the unfolding is a value (something in HNF).
+-- Returns @False@ if unsure.
+-- Unlike 'isValueUnfolding' it returns @True@ for 'OtherCon'
+-- which does not tell you much about the form of value.
 isEvaldUnfolding :: Unfolding -> Bool
-        -- Returns True for OtherCon
-isEvaldUnfolding (OtherCon _)                         = True
-isEvaldUnfolding (DFunUnfolding {})                   = True
-isEvaldUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_value cache
-isEvaldUnfolding _                                    = False
+isEvaldUnfolding (OtherCon _) = True
+isEvaldUnfolding unf          = isValueUnfolding unf
 
 -- | @True@ if the unfolding is a constructor application, the application
 -- of a CONLIKE function or 'OtherCon'
