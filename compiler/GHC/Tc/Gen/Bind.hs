@@ -60,7 +60,7 @@ import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
 import GHC.Core.Type (mkStrLitTy, tidyOpenTypeX, mkCastTy)
-import GHC.Core.TyCo.Ppr( pprTyVars )
+import GHC.Core.TyCo.Ppr( pprTyVarsWithKind )
 
 import GHC.Builtin.Types ( mkConstraintTupleTy, multiplicityTy, oneDataConTy  )
 import GHC.Builtin.Types.Prim
@@ -1049,7 +1049,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                               -- NB: qtvs is already in dependency order
 
        ; traceTc "chooseInferredQuantifiers" $
-         vcat [ text "qtvs" <+> pprTyVars qtvs
+         vcat [ text "qtvs" <+> pprTyVarsWithKind qtvs
               , text "psig_qtv_bndrs" <+> ppr psig_qtv_bndrs
               , text "free_tvs" <+> ppr free_tvs
               , text "final_tvs" <+> ppr final_qtvs ]

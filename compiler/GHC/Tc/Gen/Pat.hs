@@ -45,7 +45,7 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Zonk.TcType
-import GHC.Core.TyCo.Ppr ( pprTyVars )
+import GHC.Core.TyCo.Ppr ( pprTyVarsWithKind )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Gen.HsType
@@ -1195,11 +1195,11 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
         ; checkFixedRuntimeRep data_con arg_tys'
 
         ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
-                                   , text "univ_tvs:" <+> pprTyVars univ_tvs
-                                   , text "ex_tvs:" <+> pprTyVars ex_tvs
+                                   , text "univ_tvs:" <+> pprTyVarsWithKind univ_tvs
+                                   , text "ex_tvs:" <+> pprTyVarsWithKind ex_tvs
                                    , text "eq_spec:" <+> ppr eq_spec
                                    , text "theta:" <+> ppr theta
-                                   , text "ex_tvs':" <+> pprTyVars ex_tvs'
+                                   , text "ex_tvs':" <+> pprTyVarsWithKind ex_tvs'
                                    , text "ctxt_res_tys:" <+> ppr ctxt_res_tys
                                    , text "pat_ty:" <+> ppr pat_ty
                                    , text "arg_tys':" <+> ppr arg_tys'
@@ -1295,7 +1295,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
           vcat [ text "Pat syn:" <+> ppr pat_syn
                , text "Expected type:" <+> ppr pat_ty
                , text "Pat res ty:" <+> ppr ty'
-               , text "ex_tvs':" <+> pprTyVars ex_tvs'
+               , text "ex_tvs':" <+> pprTyVarsWithKind ex_tvs'
                , text "prov_theta':" <+> ppr prov_theta'
                , text "req_theta':" <+> ppr req_theta'
                , text "arg_tys':" <+> ppr arg_tys'

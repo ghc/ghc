@@ -67,7 +67,7 @@ import GHC.Tc.Zonk.TcType
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs( isInjectiveInType )
-import GHC.Core.TyCo.Ppr( debugPprType {- pprTyVar -} )
+import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Predicate( mkEqPredRole )
