@@ -518,6 +518,15 @@ bindings are:
   (a) inside the scrutinee
   (b) inside one of the alternatives/default (default FVs always /first/!).
 
+Note [Floating type-lets inwards]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When floating a type-let inwards we must be careful of the variables
+mentiond in the idType of the case-binder.  For example
+    \(x :: Maybe b) -> let a = Maybe b in
+                       case x of (cb :: a) of { Just y -> ... }
+We must not float the `a = Maybe b` into the case alternatives, because
+it is mentioned in the type of `cb`.  Hence we add fvs(idType(cb)) into the
+"here-binders" when doing `sepBindsByDropPoint`.
 -}
 
 fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs])
@@ -558,7 +567,11 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
 
     scrut_fvs = freeVarsOf scrut
 
-    all_alt_bndrs = foldr (unionDVarSet . ann_alt_bndrs) (unitDVarSet case_bndr) alts
+    -- all_alt_bndrs: see Note [Shadowing and name capture]
+    -- dVarTypeTyCoVars: see Note [Floating type-lets inwards]
+    case_bndr_bndrs = dVarTypeTyCoVars case_bndr `extendDVarSet` case_bndr
+    all_alt_bndrs   = foldr (unionDVarSet . ann_alt_bndrs) case_bndr_bndrs alts
+
     ann_alt_bndrs (AnnAlt _ bndrs _) = mkDVarSet bndrs
 
     alts_fvs :: [DVarSet]
