@@ -72,7 +72,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Tickish
 import GHC.Types.Demand
 import GHC.Types.Var.Set
-import GHC.Types.Var ( tyVarOccInfo, tyVarUnfolding )
+import GHC.Types.Var ( tyVarOccInfo )
 import GHC.Types.Basic
 
 import GHC.Data.OrdList ( isNilOL )
@@ -85,6 +85,7 @@ import GHC.Utils.Panic
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
+import Data.Maybe       ( catMaybes )
 import GHC.Types.Name.Env
 import Data.Graph
 
@@ -99,26 +100,20 @@ data BindContext
   = BC_Let                 -- A regular let-binding
       TopLevelFlag RecFlag
 
-  | BC_Type
-      TopLevelFlag
-
   | BC_Join                -- A join point with continuation k
       RecFlag              -- See Note [Rules and unfolding for join points]
       SimplCont            -- in GHC.Core.Opt.Simplify
 
 bindContextLevel :: BindContext -> TopLevelFlag
 bindContextLevel (BC_Let top_lvl _) = top_lvl
-bindContextLevel (BC_Type top_lvl)  = top_lvl
 bindContextLevel (BC_Join {})       = NotTopLevel
 
 bindContextRec :: BindContext -> RecFlag
 bindContextRec (BC_Let _ rec_flag)  = rec_flag
-bindContextRec (BC_Type _) = NonRecursive
 bindContextRec (BC_Join rec_flag _) = rec_flag
 
 isJoinBC :: BindContext -> Bool
 isJoinBC (BC_Let {})  = False
-isJoinBC (BC_Type {}) = False
 isJoinBC (BC_Join {}) = True
 
 
@@ -1469,10 +1464,17 @@ preInlineUnconditionally
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
+
+  -- First deal with type variables; inline unconditionally
+  -- if it occurs exactly once, inside a lambda or not
+  -- No work is wasted by substituting inside a lambda, although
+  -- if the lambea is inlined a lot, we migth dupliate the type.
   | isTyVar bndr
-  , not (one_occ (tyVarOccInfo bndr))        = Nothing
-  | isTyVar bndr
-  , Just unf <- tyVarUnfolding bndr          = Just $! (extend_tv_subst_with unf)
+  = case (tyVarOccInfo bndr, rhs) of
+      (OneOcc{ occ_n_br = 1 }, Type ty) -> Just $! (extend_tv_subst_with ty)
+      _                                 -> Nothing
+
+  -- Now we are onto Ids
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
@@ -1609,7 +1611,6 @@ postInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 postInlineUnconditionally env bind_cxt old_bndr bndr rhs
-  | BC_Type {} <- bind_cxt      = False
   | not active                  = False
   | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
                                         -- because it might be referred to "earlier"
@@ -2224,8 +2225,8 @@ abstractFloats uf_opts top_lvl main_tvs floats body
   = assert (notNull body_floats) $
     assert (isNilOL (sfJoinFloats floats)) $
     do  { let sccs = concatMap to_sccs body_floats
-        ; (subst, float_binds) <- mapAccumLM abstract empty_subst sccs
-        ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
+        ; (subst, mb_float_binds) <- mapAccumLM abstract empty_subst sccs
+        ; return (catMaybes mb_float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
     body_floats = letFloatBinds (sfLetFloats floats)
@@ -2242,15 +2243,17 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                        (\(_v,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
                        (zip3 vars rhss (map exprFreeVars rhss))
 
-    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet) -> SimplM (GHC.Core.Subst.Subst, OutBind)
+    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet)
+             -> SimplM (GHC.Core.Subst.Subst, Maybe OutBind)
     abstract subst (AcyclicSCC (tv, rhs, _empty_var_set))
-      | isTyVar tv
-      = return (subst, NonRec tv rhs)
+      | isTyVar tv, Type rhs_ty <- rhs
+      = return (GHC.Core.Subst.extendTvSubst subst tv rhs_ty, Nothing)
+
     abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
       = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
                  !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
-           ; return (subst', NonRec poly_id2 poly_rhs) }
+           ; return (subst', Just (NonRec poly_id2 poly_rhs)) }
       where
         rhs' = GHC.Core.Subst.substExpr subst rhs
 
@@ -2263,7 +2266,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                  poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
                               | (poly_id, rhs) <- poly_ids `zip` rhss
                               , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
-           ; return (subst', Rec poly_pairs) }
+           ; return (subst', Just (Rec poly_pairs)) }
       where
         (ids,rhss,_fvss) = unzip3 trpls
 

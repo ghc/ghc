@@ -25,7 +25,7 @@ module GHC.Core.FVs (
 
         -- * Free variables of Rules, Vars and Ids
         varTypeTyCoVars,
-        varTypeTyCoFVs,
+        varTypeTyCoFVs, dVarTypeTyCoVars,
         idUnfoldingVars, idFreeVars, dIdFreeVars,
         bndrRuleAndUnfoldingVarsDSet,
         bndrRuleAndUnfoldingIds,
@@ -604,7 +604,7 @@ varTypeTyCoFVs var
                  Just mult -> tyCoFVsOfType mult
                  Nothing   -> emptyFV
 
-idFreeVars :: Id -> VarSet
+idFreeVars :: HasDebugCallStack => Id -> VarSet
 idFreeVars id = assert (isId id) $ fvVarSet $ idFVs id
 
 dIdFreeVars :: Id -> DVarSet

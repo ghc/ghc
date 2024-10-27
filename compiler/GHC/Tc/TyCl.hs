@@ -67,7 +67,7 @@ import GHC.Core.FamInstEnv ( mkBranchedCoAxiom, mkCoAxBranch )
 import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep   -- for checkValidRoles
-import GHC.Core.TyCo.Ppr( pprTyVars )
+import GHC.Core.TyCo.Ppr( pprTyVarsWithKind )
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCon
@@ -1031,7 +1031,7 @@ swizzleTcTyConBndrs tc_infos
     no_swizzle :: (Name,TyVar) -> Bool
     no_swizzle (nm, tv) = nm == tyVarName tv
 
-    ppr_infos infos = vcat [ ppr tc <+> pprTyVars (map snd prs)
+    ppr_infos infos = vcat [ ppr tc <+> pprTyVarsWithKind (map snd prs)
                            | (tc, _, prs, _) <- infos ]
 
     -------------- The swizzler ------------
@@ -1102,10 +1102,10 @@ generaliseTcTyCon (tc, skol_info, scoped_prs, tc_res_kind)
 
        ; traceTc "generaliseTcTyCon: pre zonk"
            (vcat [ text "tycon =" <+> ppr tc
-                 , text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
+                 , text "spec_req_tvs =" <+> pprTyVarsWithKind spec_req_tvs
                  , text "tc_res_kind =" <+> ppr tc_res_kind
                  , text "dvs1 =" <+> ppr dvs1
-                 , text "inferred =" <+> pprTyVars inferred ])
+                 , text "inferred =" <+> pprTyVarsWithKind inferred ])
 
        -- Step 3: Final zonk: quantifyTyVars may have done some defaulting
        ; (inferred, sorted_spec_tvs,req_tvs,tc_res_kind) <- liftZonkM $
@@ -1117,9 +1117,9 @@ generaliseTcTyCon (tc, skol_info, scoped_prs, tc_res_kind)
 
        ; traceTc "generaliseTcTyCon: post zonk" $
          vcat [ text "tycon =" <+> ppr tc
-              , text "inferred =" <+> pprTyVars inferred
-              , text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
-              , text "sorted_spec_tvs =" <+> pprTyVars sorted_spec_tvs
+              , text "inferred =" <+> pprTyVarsWithKind inferred
+              , text "spec_req_tvs =" <+> pprTyVarsWithKind spec_req_tvs
+              , text "sorted_spec_tvs =" <+> pprTyVarsWithKind sorted_spec_tvs
               , text "req_tvs =" <+> ppr req_tvs ]
 
        -- Step 4: Make the TyConBinders.
@@ -3220,10 +3220,11 @@ tcTyFamInstEqn fam_tc mb_clsinfo
   = setSrcSpanA loc $
     do { traceTc "tcTyFamInstEqn" $
          vcat [ ppr loc, ppr fam_tc <+> ppr hs_pats
-              , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
+              , text "fam tc bndrs" <+> pprTyVarsWithKind (tyConTyVars fam_tc)
               , case mb_clsinfo of
                   NotAssociated {} -> empty
-                  InClsInst { ai_class = cls } -> text "class" <+> ppr cls <+> pprTyVars (classTyVars cls) ]
+                  InClsInst { ai_class = cls } -> text "class" <+> ppr cls
+                                                  <+> pprTyVarsWithKind (classTyVars cls) ]
 
        ; checkTyFamInstEqn fam_tc eqn_tc_name hs_pats
 
@@ -3357,7 +3358,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        ; let outer_tvs = outerTyVars outer_bndrs
        ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
 
-       ; traceTc "tcTyFamInstEqnGuts 1" (pprTyVars outer_tvs $$ ppr skol_info)
+       ; traceTc "tcTyFamInstEqnGuts 1" (pprTyVarsWithKind outer_tvs $$ ppr skol_info)
 
        -- This code (and the stuff immediately above) is very similar
        -- to that in tcDataFamInstHeader.  Maybe we should abstract the
@@ -3376,7 +3377,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        ; traceTc "tcTyFamInstEqnGuts 2" $
          vcat [ ppr fam_tc
               , text "lhs_ty:"    <+> ppr lhs_ty
-              , text "final_tvs:" <+> pprTyVars final_tvs ]
+              , text "final_tvs:" <+> pprTyVarsWithKind final_tvs ]
 
        -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
        -- Example: typecheck/should_fail/T17301
@@ -3398,7 +3399,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
              -- so that any strange coercions inside lhs_ty
              -- have been solved before we attempt to unravel it
 
-       ; traceTc "tcTyFamInstEqnGuts }" (vcat [ ppr fam_tc, pprTyVars final_tvs ])
+       ; traceTc "tcTyFamInstEqnGuts }" (vcat [ ppr fam_tc, pprTyVarsWithKind final_tvs ])
                  -- Don't try to print 'pats' here, because lhs_ty involves
                  -- a knot-tied type constructor, so we get a black hole
 

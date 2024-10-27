@@ -34,7 +34,7 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Core.FamInstEnv
 import GHC.Tc.Gen.HsType
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr ( pprTyVars )
+import GHC.Core.TyCo.Ppr ( pprTyVarsWithKind )
 import GHC.Unit.Module.Warnings
 
 import GHC.Rename.Bind
@@ -910,8 +910,8 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
               _ -> pure (tkvs', cls_tys', tc_args', mb_deriv_strat')
 
         ; traceTc "deriveTyData 1" $ vcat
-            [ ppr final_mb_deriv_strat, pprTyVars deriv_tvs, ppr tc, ppr tc_args
-            , pprTyVars (tyCoVarsOfTypesList tc_args)
+            [ ppr final_mb_deriv_strat, pprTyVarsWithKind deriv_tvs, ppr tc, ppr tc_args
+            , pprTyVarsWithKind (tyCoVarsOfTypesList tc_args)
             , ppr n_args_to_keep, ppr n_args_to_drop
             , ppr inst_ty_kind, ppr cls_arg_kind, ppr mb_match
             , ppr final_tc_args, ppr final_cls_tys ]

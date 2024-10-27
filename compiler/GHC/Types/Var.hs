@@ -354,34 +354,37 @@ instance Outputable Var where
     where
       -- don't display debug info with Code style (#25255)
       ppr_code = ppr (varName var)
-      ppr_normal sty = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
+      ppr_normal sty
+          = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
             getPprDebug $ \debug ->
             let
-              ppr_var = case var of
-                  (TyVar { tv_unfolding = Just ty })
+              pp_info = case var of
+                  TyVar { tv_unfolding = Just ty }
                      | debug
-                     -> brackets (text "unf =" <+> ppr ty)
+                     -> brackets (text "unf=" <> ppr ty)
 
-                  (TyVar {})
+                  TyVar {}
                      | debug
                      -> brackets (text "tv")
 
-                  (TcTyVar {tc_tv_details = d})
+                  TcTyVar {tc_tv_details = d}
                      | dumpStyle sty || debug
                      -> brackets (pprTcTyVarDetails d)
 
-                  (Id { idScope = s, id_details = d })
+                  Id { idScope = s, id_details = d }
                      | debug
                      -> brackets (ppr_id_scope s <> pprIdDetails d)
 
                   _  -> empty
+              pp_mult = case varMultMaybe var of
+                          Just m  -> text "mult=" <> ppr m
+                          Nothing -> empty
             in if
-               |  debug && (not supp_var_kinds)
-                 -> parens (ppr (varName var) <+> ppr (varMultMaybe var)
-                                              <+> ppr_var <+>
-                          dcolon <+> pprKind (tyVarKind var))
+               |  debug && not supp_var_kinds
+               -> parens (hang (ppr (varName var) <+> pp_info <+> pp_mult)
+                             2 (dcolon <+> pprKind (tyVarKind var)))
                |  otherwise
-                 -> ppr (varName var) <> ppr_var
+                 -> ppr (varName var) <> pp_info
 
 ppr_id_scope :: IdScope -> SDoc
 ppr_id_scope GlobalId              = text "gid"
@@ -1034,8 +1037,9 @@ setTyVarName   = setVarName
 setTyVarKind :: TyVar -> Kind -> TyVar
 setTyVarKind tv k = tv {varType = k}
 
-setTyVarUnfolding :: TyVar -> Type -> TyVar
-setTyVarUnfolding tv unf = tv {tv_unfolding = Just unf}
+setTyVarUnfolding :: HasDebugCallStack => TyVar -> Type -> TyVar
+setTyVarUnfolding tv unf = assertPpr (isTyVar tv && not (isTcTyVar tv)) (ppr tv) $
+                           tv {tv_unfolding = Just unf}
 
 setTyVarOccInfo :: TyVar -> OccInfo -> TyVar
 -- TODO: Surprisingly, TcTyVar's can occur after zonking, why?

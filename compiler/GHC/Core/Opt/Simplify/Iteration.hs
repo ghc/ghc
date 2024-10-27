@@ -54,7 +54,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar, setTyVarUnfolding )
+import GHC.Types.Var    ( isTyCoVar )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
 
@@ -225,11 +225,6 @@ simplTopBinds env0 binds0
     simpl_bind env (Rec pairs)
       = simplRecBind env (BC_Let TopLevel Recursive) pairs
     simpl_bind env (NonRec b r)
-      | isTyVar b
-      = do { let bind_cxt = BC_Type TopLevel
-           ; (env', b') <- return (env, b) -- addBndrRules env b (lookupRecBndr env b) bind_cxt
-           ; simplRecOrTopPair env' bind_cxt b b' r }
-      | otherwise
       = do { let bind_cxt = BC_Let TopLevel NonRecursive
            ; (env', b') <- addBndrRules env b (lookupRecBndr env b) bind_cxt
            ; simplRecOrTopPair env' bind_cxt b b' r }
@@ -290,17 +285,16 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
     do { tick (PreInlineUnconditionally old_bndr)
        ; return ( emptyFloats env, env' ) }
 
+  | Type ty <- rhs
+  = do { ty' <- simplType env ty
+       ; return (mkTyVarFloatBind env old_bndr new_bndr ty') }
+
   | otherwise
-  = case bind_cxt of
+  = assertPpr (isId old_bndr) (ppr old_bndr) $
+    case bind_cxt of
       BC_Join is_rec cont -> simplTrace "SimplBind:join" (ppr old_bndr) $
                              simplJoinBind is_rec cont
                                            (old_bndr,env) (new_bndr,env) (rhs,env)
-
-      BC_Type top_lvl
-        | Type rhs_ty <- rhs -> simplTrace "SimplBind:type" (ppr old_bndr) $
-                                simplTypeBind top_lvl
-                                              (old_bndr,env) (new_bndr,env) (rhs_ty,env)
-        | otherwise -> pprPanic "simplRecOrTopPair:Type" (ppr rhs)
 
       BC_Let top_lvl is_rec -> simplTrace "SimplBind:normal" (ppr old_bndr) $
                                simplLazyBind top_lvl is_rec
@@ -378,27 +372,6 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
         ; rhs' <- rebuildLam env1 tvs' body3 rhs_cont
         ; (bind_float, env2) <- completeBind (BC_Let top_lvl is_rec) (bndr,unf_se) (bndr1,rhs',env1)
         ; return (rhs_floats `addFloats` bind_float, env2) }
-
---------------------------
-simplTypeBind :: TopLevelFlag
-              -> (InTyVar, SimplEnv)
-              -> (OutTyVar, SimplEnv)
-              -> (InType, SimplEnv)
-              -> SimplM (SimplFloats, SimplEnv)
-simplTypeBind top_lvl (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
-  = assert (isTyVar bndr) $
-    pprTrace "simplTypeBind" (ppr bndr $$ ppr bndr1) $
-    do { let !rhs_env = rhs_se `setInScopeFromE` env
-       ; (rhs_env1, _tvs') <- {-#SCC "simplBinders" #-} simplBinders rhs_env []
-               -- See Note [Floating and type abstraction] in GHC.Core.Opt.Simplify.Utils
-       ; body <- simplType rhs_env rhs
-       ; (rhs_floats, expr_rhs') <- {-#SCC "prepareBinding" #-}
-                                     prepareBinding env top_lvl NonRecursive
-                                                    False
-                                                    bndr1 (emptyFloats rhs_env1) (Type body)
-       ; let env1 = env `setInScopeFromF` rhs_floats
-       ; (bind_float, env2) <- completeBind (BC_Type top_lvl) (bndr,unf_se) (bndr1,expr_rhs',env1)
-       ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
 simplJoinBind :: RecFlag
@@ -948,10 +921,6 @@ completeBind :: BindContext
 -- Binder /can/ be a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
 completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
- | Type new_ty <- new_rhs
- = assert (isTyVar old_bndr) $
-   return (mkFloatBind env (NonRec (new_bndr `setTyVarUnfolding` new_ty) new_rhs))
-
  | isCoVar old_bndr
  = case new_rhs of
      Coercion co -> return (emptyFloats env, extendCvSubst env old_bndr co)
@@ -1279,21 +1248,6 @@ simplExprF1 env (Let (Rec pairs) body) cont
   = {-#SCC "simplRecE" #-} simplRecE env pairs body cont
 
 simplExprF1 env (Let (NonRec bndr rhs) body) cont
-  -- | Type ty <- rhs    -- First deal with type lets (let a = Type ty in e)
-  -- = {-#SCC "simplExprF1-NonRecLet-Type" #-}
-  --   assert (isTyVar bndr) $
-  --   do { (env1, bndr1) <- simplNonRecBndr env bndr
-  --      ; (floats1, env2) <- simplTypeBind NotTopLevel (bndr,env) (bndr1,env1) (ty,env1)
-  --      ; (floats2, expr') <- simplNonRecBody env2 FromLet body cont
-  --      ; return (floats1 `addFloats` floats2, expr') }
-  -- | Coercion _co <- rhs
-  -- = {-#SCC "simplExprF1-NonRecLet-Coercion" #-}
-  --   assert (isCoVar bndr) $
-  --   do { (env1, bndr1) <- simplNonRecBndr env bndr
-  --      ; (floats1, env2) <- simplLazyBind NotTopLevel NonRecursive (bndr,env) (bndr1,env1) (rhs,env1)
-  --      ; (floats2, expr') <- simplNonRecBody env2 FromLet body cont
-  --      ; return (floats1 `addFloats` floats2, expr') }
-
   | Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
     -- Because of the let-can-float invariant, it's ok to
     -- inline freely, or to drop the binding if it is dead.
@@ -1919,7 +1873,7 @@ simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
 simplNonRecE :: HasDebugCallStack
              => SimplEnv
              -> FromWhat
-             -> InId               -- The binder, always an Id
+             -> InVar              -- The binder, may be a TyVar
                                    -- Never a join point
                                    -- The static env for its unfolding (if any) is the first parameter
              -> (InExpr, SimplEnv) -- Rhs of binding (or arg of lambda)
@@ -1944,9 +1898,9 @@ simplNonRecE :: HasDebugCallStack
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
   | Type ty <- rhs
   = assert (isTyVar bndr) $
-    do { (env1, bndr1)    <- simplNonRecBndr env bndr
-       ; ty' <- simplType env ty
-       ; let (floats1, env2) = mkFloatBind env1 (NonRec (bndr1 `setTyVarUnfolding` ty') (Type ty'))
+    do { (env1, bndr1) <- simplNonRecBndr env bndr
+       ; ty'           <- simplType env ty
+       ; let (floats1, env2) = mkTyVarFloatBind env1 bndr bndr1 ty'
        ; (floats2, expr') <- simplNonRecBody env2 from_what body cont
        ; return (floats1 `addFloats` floats2, expr') }
 
@@ -4608,7 +4562,6 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
         -> do { expr' <- case bind_cxt of
-                  BC_Type {} -> pprPanic "simplStableUnfolding:BC_Type" (ppr id)
                   BC_Join _ cont    -> -- Binder is a join point
                                        -- See Note [Rules and unfolding for join points]
                                        simplJoinRhs unf_env id expr cont
@@ -4733,11 +4686,13 @@ to apply in that function's own right-hand side.
 See Note [Forming Rec groups] in "GHC.Core.Opt.OccurAnal"
 -}
 
-addBndrRules :: SimplEnv -> InBndr -> OutBndr
+addBndrRules :: SimplEnv -> InVar -> OutVar
              -> BindContext
              -> SimplM (SimplEnv, OutBndr)
 -- Rules are added back into the bin
 addBndrRules env in_id out_id bind_cxt
+  | isTyVar in_id
+  = return (env, out_id)
   | null old_rules
   = return (env, out_id)
   | otherwise
@@ -4766,7 +4721,6 @@ simplRules env mb_new_id rules bind_cxt
       = do { (env', bndrs') <- simplBinders env bndrs
            ; let rhs_ty = substTy env' (exprType rhs)
                  rhs_cont = case bind_cxt of  -- See Note [Rules and unfolding for join points]
-                                BC_Type {}     -> pprPanic "simplRules:BC_Type" (ppr mb_new_id)
                                 BC_Let {}      -> mkBoringStop rhs_ty
                                 BC_Join _ cont -> assertPpr join_ok bad_join_msg cont
                  lhs_env = updMode updModeForRules env'

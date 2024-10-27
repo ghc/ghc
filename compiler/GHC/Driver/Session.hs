@@ -2500,6 +2500,7 @@ fFlagsDeps = [
   flagSpec "print-potential-instances"        Opt_PrintPotentialInstances,
   flagSpec "print-redundant-promotion-ticks"  Opt_PrintRedundantPromotionTicks,
   flagSpec "print-typechecker-elaboration"    Opt_PrintTypecheckerElaboration,
+  flagSpec "print-tyvar-unfoldings"           Opt_PrintTyVarUnfoldings,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
   flagSpec "prof-late"                        Opt_ProfLateCcs,

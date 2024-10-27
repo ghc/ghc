@@ -936,6 +936,11 @@ type BindWrapper = CoreExpr -> CoreExpr
   -- See Notes [Matching lets] and [Matching cases]
   -- we represent the floated bindings as a core-to-core function
 
+instance Outputable RuleSubst where
+  ppr (RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst })
+    = text "RS" <> braces (sep [ text "tv_subst =" <+> ppr tv_subst
+                               , text "id_subst =" <+> ppr id_subst ])
+
 emptyRuleSubst :: RuleSubst
 emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
                     , rs_binds = \e -> e, rs_bndrs = [] }

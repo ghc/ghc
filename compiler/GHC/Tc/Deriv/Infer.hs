@@ -37,7 +37,7 @@ import GHC.Tc.Zonk.Env ( ZonkFlexi(..), initZonkEnv )
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Core.TyCo.Ppr (pprTyVars)
+import GHC.Core.TyCo.Ppr (pprTyVarsWithKind)
 import GHC.Core.Type
 import GHC.Core.Predicate
 import GHC.Core.Unify (tcUnifyTy)
@@ -829,7 +829,7 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
        ; (tc_lvl, wanteds) <- captureThetaSpecConstraints user_ctxt deriv_rhs
 
        ; traceTc "simplifyDeriv inputs" $
-         vcat [ pprTyVars tvs $$ ppr deriv_rhs $$ ppr wanteds, ppr skol_info ]
+         vcat [ pprTyVarsWithKind tvs $$ ppr deriv_rhs $$ ppr wanteds, ppr skol_info ]
 
        -- See [STEP DAC SOLVE]
        -- Simplify the constraints, starting at the same level at which

@@ -9,4 +9,4 @@ debugPprType :: Type -> SDoc
 pprKind :: Kind -> SDoc
 pprCo :: Coercion -> SDoc
 pprTyLit :: TyLit -> SDoc
-pprTyVar :: TyVar -> SDoc
+pprTyVarWithKind :: TyVar -> SDoc

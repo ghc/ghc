@@ -1149,13 +1149,18 @@ unify_ty :: UMEnv
 -- See Note [Computing equality on types] in GHC.Core.Type
 
 -- See Note [Comparing nullary type synonyms and type variables] in GHC.Core.TyCo.Compare
-unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
-  -- See Note [Unifying type synonyms] to account for type variables
+unify_ty env (TyConApp tc1 tys1) (TyConApp tc2 tys2) _kco
+  -- See Note [Unifying type synonyms]
   | tc1 == tc2
-  = return ()
-unify_ty _env (TyVarTy tv1) (TyVarTy tv2) _kco
-  | tv1 == tv2
-  = return ()
+  , not (isForgetfulSynTyCon tc1)
+  , isFamFreeTyCon tc1
+  = unify_tc_app env tc1 tys1 tys2
+
+unify_ty env (TyVarTy tv1) (TyVarTy tv2) _kco
+  | um_unif env, tv1 == tv2
+  = return () -- When unifying a=a, succeeds, regardless of a's (perhaps large)
+              -- unfolding. But only when unifying!  When matching these are
+              -- unrelated variables
 
 unify_ty env ty1 ty2 kco
     -- Now handle the cases we can "look through": synonyms and casts.
@@ -1231,7 +1236,7 @@ unify_ty env ty1 ty2 _kco
   , Just (tc2, tys2) <- mb_tc_app2
   , tc1 == tc2
   = do { massertPpr (isInjectiveTyCon tc1 Nominal) (ppr tc1)
-       ; unify_tc_app tc1 tys1 tys2
+       ; unify_tc_app env tc1 tys1 tys2
        }
 
   -- TYPE and CONSTRAINT are not Apart
@@ -1261,21 +1266,6 @@ unify_ty env ty1 ty2 _kco
   where
     mb_tc_app1 = splitTyConApp_maybe ty1
     mb_tc_app2 = splitTyConApp_maybe ty2
-
-    unify_tc_app tc tys1 tys2
-      | tc == fUNTyCon
-      , IgnoreMultiplicities <- um_arr_mult env
-      , (_mult1 : no_mult_tys1) <- tys1
-      , (_mult2 : no_mult_tys2) <- tys2
-      = -- We're comparing function arrow types here (not constraint arrow
-        -- types!), and they have at least one argument, which is the arrow's
-        -- multiplicity annotation. The flag `um_arr_mult` instructs us to
-        -- ignore multiplicities in this very case. This is a little tricky: see
-        -- point (3) in Note [Rewrite rules ignore multiplicities in FunTy].
-         unify_tys env no_mult_tys1 no_mult_tys2
-
-      | otherwise
-      = unify_tys env tys1 tys2
 
         -- Applications need a bit of care!
         -- They can match FunTy and TyConApp, so use splitAppTy_maybe
@@ -1333,6 +1323,22 @@ unify_ty_app env ty1 ty1args ty2 ty2args
                  -- Very important: 'ki2' not 'ki1'
                  -- See Note [Matching in the presence of casts (2)]
        ; unify_tys env ty1args ty2args }
+
+unify_tc_app :: UMEnv -> TyCon -> [Type] -> [Type] -> UM ()
+unify_tc_app env tc tys1 tys2
+  | tc == fUNTyCon
+  , IgnoreMultiplicities <- um_arr_mult env
+  , (_mult1 : no_mult_tys1) <- tys1
+  , (_mult2 : no_mult_tys2) <- tys2
+  = -- We're comparing function arrow types here (not constraint arrow
+    -- types!), and they have at least one argument, which is the arrow's
+    -- multiplicity annotation. The flag `um_arr_mult` instructs us to
+    -- ignore multiplicities in this very case. This is a little tricky: see
+    -- point (3) in Note [Rewrite rules ignore multiplicities in FunTy].
+     unify_tys env no_mult_tys1 no_mult_tys2
+
+  | otherwise
+  = unify_tys env tys1 tys2
 
 unify_tys :: UMEnv -> [Type] -> [Type] -> UM ()
 -- Precondition: see (Unification Kind Invariant)

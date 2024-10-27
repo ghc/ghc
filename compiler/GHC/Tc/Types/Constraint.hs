@@ -1643,7 +1643,7 @@ instance Outputable Implication where
               , ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
-               , text "Skolems =" <+> pprTyVars skols
+               , text "Skolems =" <+> pprTyVarsWithKind skols
                , text "Given-eqs =" <+> ppr given_eqs
                , text "Status =" <+> ppr status
                , hang (text "Given =")  2 (pprEvVars given)

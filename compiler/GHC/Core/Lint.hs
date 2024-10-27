@@ -577,7 +577,7 @@ lintLetBind :: TopLevelFlag -> RecFlag -> OutId
 -- This function checks other invariants
 lintLetBind top_lvl rec_flag binder rhs rhs_ty
   | isTyVar binder
-  = pprTrace "lintLetBind: fill in" (ppr binder) $
+  = -- pprTrace "lintLetBind: fill in" (ppr binder) $
     return ()  -- Fill in!
 
   | otherwise
@@ -673,7 +673,7 @@ lintRhs :: Id -> CoreExpr -> LintM (OutType, UsageEnv)
 --     its OccInfo and join-pointer-hood
 lintRhs bndr rhs
   | isTyVar bndr
-  = pprTrace "lintRhs:fill in" (ppr bndr) $
+  = -- pprTrace "lintRhs:fill in" (ppr bndr) $
     return (varType bndr, zeroUE)  -- ToDo: fill in
 
   | JoinPoint arity <- idJoinPointHood bndr
@@ -1829,7 +1829,7 @@ lintTyCoBndr tcv thing_inside
          else -- Check that in (forall (cv::ty). blah),
               -- then ty looks like (t1 ~# t2)
               lintL (isCoVarType tcv_type') $
-              text "CoVar with non-coercion type:" <+> pprTyVar tcv
+              text "CoVar with non-coercion type:" <+> pprTyVarWithKind tcv
 
        ; addInScopeTyCoVar tcv tcv_type' thing_inside }
 
@@ -2945,10 +2945,10 @@ lint_axiom_pair tc (ax1, ax2)
   = lintL (compatibleBranches br1 br2) $
     vcat [ hsep [ text "Axioms", ppr ax1, text "and", ppr ax2
                 , text "are incompatible" ]
-         , text "tvs1 =" <+> pprTyVars tvs1
+         , text "tvs1 =" <+> pprTyVarsWithKind tvs1
          , text "lhs1 =" <+> ppr (mkTyConApp tc lhs1)
          , text "rhs1 =" <+> ppr rhs1
-         , text "tvs2 =" <+> pprTyVars tvs2
+         , text "tvs2 =" <+> pprTyVarsWithKind tvs2
          , text "lhs2 =" <+> ppr (mkTyConApp tc lhs2)
          , text "rhs2 =" <+> ppr rhs2 ]
 

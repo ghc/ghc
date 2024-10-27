@@ -61,7 +61,7 @@ import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithInvisibleBitsWhen, pprSourceTyCon,
-                          pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType)
+                          pprTyVarsWithKind, pprWithTYPE, pprTyVarWithKind, pprTidiedType)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -1496,18 +1496,18 @@ instance Diagnostic TcRnMessage where
       pprWithInvisibleBitsWhen True $
       vcat [ text "Uninferrable type variable"
               <> plural tidied_tvs
-              <+> pprWithCommas pprTyVar tidied_tvs
+              <+> pprWithCommas pprTyVarWithKind tidied_tvs
               <+> text "in"
             , pprUninferrableTyVarCtx context ]
     TcRnSkolemEscape escapees tv orig_ty ->
       mkSimpleDecorated $
       pprWithInvisibleBitsWhen True $
       vcat [ sep [ text "Cannot generalise type; skolem" <> plural escapees
-                , quotes $ pprTyVars escapees
+                , quotes $ pprTyVarsWithKind escapees
                 , text "would escape" <+> itsOrTheir escapees <+> text "scope"
                 ]
           , sep [ text "if I tried to quantify"
-                , pprTyVar tv
+                , pprTyVarWithKind tv
                 , text "in this type:"
                 ]
           , nest 2 (pprTidiedType orig_ty)
@@ -1581,7 +1581,7 @@ instance Diagnostic TcRnMessage where
                 2 pp_tc_kind
            , extra
            , hang (text "Perhaps try this order instead:")
-                2 (pprTyVars sorted_tvs) ]
+                2 (pprTyVarsWithKind sorted_tvs) ]
       where
         pp_tc_kind = text "Inferred kind:" <+> ppr tc <+> dcolon <+> ppr_untidy (tyConKind tc)
         ppr_untidy ty = pprIfaceType (toIfaceType ty)
@@ -1613,8 +1613,8 @@ instance Diagnostic TcRnMessage where
 
         inf_always_first = "Inferred variables" <+> pp_inf $$ "always come first"
 
-        pp_inf  = parens (text "namely:" <+> pprTyVars inferred_tvs)
-        pp_spec = parens (text "namely:" <+> pprTyVars specified_tvs)
+        pp_inf  = parens (text "namely:" <+> pprTyVarsWithKind inferred_tvs)
+        pp_spec = parens (text "namely:" <+> pprTyVarsWithKind specified_tvs)
     TcRnTyFamResultDisabled tc_name tvb -> mkSimpleDecorated $
       text "Illegal result type variable" <+> ppr tvb <+> text "for" <+> quotes (ppr tc_name)
     TcRnRoleValidationFailed role reason -> mkSimpleDecorated $
@@ -3788,7 +3788,7 @@ pprTcSolverReportMsg :: SolverReportErrCtxt -> TcSolverReportMsg -> SDoc
 pprTcSolverReportMsg _ (BadTelescope telescope skols) =
   hang (text "These kind and type variables:" <+> ppr telescope $$
        text "are out of dependency order. Perhaps try this ordering:")
-    2 (pprTyVars sorted_tvs)
+    2 (pprTyVarsWithKind sorted_tvs)
   where
     sorted_tvs = scopedSort skols
 pprTcSolverReportMsg _ (UserTypeError ty) =

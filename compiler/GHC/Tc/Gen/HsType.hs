@@ -2490,9 +2490,9 @@ kcCheckDeclHeader_cusk name flav
               , text "kv_ns" <+> ppr kv_ns
               , text "hs_tvs" <+> ppr hs_tvs
               , text "scoped_kvs" <+> ppr scoped_kvs
-              , text "spec_req_tvs" <+> pprTyVars spec_req_tkvs
+              , text "spec_req_tvs" <+> pprTyVarsWithKind spec_req_tkvs
               , text "all_kinds" <+> ppr all_kinds
-              , text "tc_tvs" <+> pprTyVars (binderVars tc_bndrs)
+              , text "tc_tvs" <+> pprTyVarsWithKind (binderVars tc_bndrs)
               , text "res_kind" <+> ppr res_kind
               , text "inferred" <+> ppr inferred
               , text "specified" <+> ppr specified
@@ -2689,8 +2689,8 @@ kcCheckDeclHeader_sig sig_kind name flav
           [ text "sig_tcbs ="       <+> ppr sig_tcbs
           , text "implicit_prs ="   <+> ppr implicit_prs
           , text "hs_tv_bndrs ="    <+> ppr hs_tv_bndrs
-          , text "all_tcbs ="       <+> pprTyVars (binderVars all_tcbs)
-          , text "swizzled_tcbs ="  <+> pprTyVars (binderVars swizzled_tcbs)
+          , text "all_tcbs ="       <+> pprTyVarsWithKind (binderVars all_tcbs)
+          , text "swizzled_tcbs ="  <+> pprTyVarsWithKind (binderVars swizzled_tcbs)
           , text "tycon_res_kind =" <+> ppr tycon_res_kind
           , text "swizzled_kind ="  <+> ppr swizzled_kind ]
 

@@ -690,7 +690,8 @@ ds_app (XExpr (ConLikeTc con tvs tys)) _hs_args core_args
        ; let core_fun = mkLams tvs $ mkLams ids $
                         ds_con `mkTyApps` mkTyVarTys tvs
                                `mkVarApps` ids
-       ; return (mkApps core_fun core_args) }
+       ; pprTrace "ds_conl" (ppr tvs) $
+         return (mkApps core_fun core_args) }
 
 ds_app (XExpr (HsRecSelTc (FieldOcc { foLabel = L _ sel_id }))) _hs_args core_args
   = ds_app_rec_sel sel_id sel_id core_args

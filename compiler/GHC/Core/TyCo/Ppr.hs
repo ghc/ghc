@@ -11,7 +11,7 @@ module GHC.Core.TyCo.Ppr
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
         pprSigmaType,
         pprTheta, pprParendTheta, pprForAll, pprUserForAll,
-        pprTyVar, pprTyVars,
+        pprTyVarWithKind, pprTyVarsWithKind,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
         pprDataCons, pprWithInvisibleBitsWhen,
@@ -177,17 +177,17 @@ pprTCvBndrs :: [ForAllTyBinder] -> SDoc
 pprTCvBndrs tvs = sep (map pprTCvBndr tvs)
 
 pprTCvBndr :: ForAllTyBinder -> SDoc
-pprTCvBndr = pprTyVar . binderVar
+pprTCvBndr = pprTyVarWithKind . binderVar
 
-pprTyVars :: [TyVar] -> SDoc
-pprTyVars tvs = sep (map pprTyVar tvs)
+pprTyVarsWithKind :: [TyVar] -> SDoc
+pprTyVarsWithKind tvs = sep (map pprTyVarWithKind tvs)
 
-pprTyVar :: TyVar -> SDoc
+pprTyVarWithKind :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
 -- Here we do not go via IfaceType, because the duplication with
 -- pprIfaceTvBndr is minimal, and the loss of uniques etc in
 -- debug printing is disastrous
-pprTyVar tv
+pprTyVarWithKind tv
   | pickyIsLiftedTypeKind kind = ppr tv  -- See Note [Suppressing * kinds]
   | otherwise                  = parens (ppr tv <+> dcolon <+> ppr kind)
   where
