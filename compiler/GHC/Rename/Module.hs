@@ -627,14 +627,11 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                    ; (adts', adt_fvs) <- rnATInstDecls rnDataFamInstDecl cls ktv_names adts
                    ; return ( (ats', adts'), at_fvs `plusFV` adt_fvs) }
 
+       ; (modifiers', mods_fvs) <- rnModifiersContextAndWarn ctxt modifiers
        ; let all_fvs = meth_fvs `plusFV` more_fvs
                                 `plusFV` inst_fvs
+                                `plusFV` mods_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       -- MODS_TODO do we care about free vars in modifiers here? Actually it
-       -- seems like they throw errors. And in
-       --     %a instance Foo a where
-       -- a is out of scope.
-       ; (modifiers', _) <- rnModifiersContextAndWarn ctxt modifiers
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
@@ -1753,16 +1750,13 @@ rnTyClDecl (DataDecl
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr free_rhs_kvs)
-       -- MODS_TODO do we care about free vars here? Like classes and instances
-       -- they throw errors, but unlike those, `a` is in scope in
-       --     %a data Foo a
-       ; (mods', _) <- rnModifiersContextAndWarn doc mods
+       ; (mods', mods_fvs) <- rnModifiersContextAndWarn doc mods
        ; return (DataDecl { tcdLName    = tycon'
                           , tcdTyVars   = tyvars'
                           , tcdFixity   = fixity
                           , tcdDataDefn = defn'
                           , tcdDExt     = rn_info
-                          , tcdModifiers = mods' }, fvs) } }
+                          , tcdModifiers = mods' }, fvs `plusFV` mods_fvs) } }
 
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
@@ -1816,13 +1810,9 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
                 -- and the methods are already in scope
 
-        ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
+        ; (modifiers', mods_fvs) <- rnModifiersContextAndWarn cls_doc modifiers
+        ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs `plusFV` mods_fvs
         ; docs' <- traverse rnLDocDecl docs
-        -- MODS_TODO do we care about free vars in modifiers here? Actually it
-        -- seems like they throw errors. And in
-        --     %a class Foo a where
-        -- a is out of scope.
-        ; (modifiers', _) <- rnModifiersContextAndWarn cls_doc modifiers
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
@@ -2433,13 +2423,13 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                             Nothing ex_tvs $ \ new_ex_tvs ->
     do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
         ; (new_args,    fvs2) <- rnConDeclH98Details (unLoc new_name) ctxt args
-        ; let all_fvs  = fvs1 `plusFV` fvs2
+        ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
+        ; let all_fvs  = fvs1 `plusFV` fvs2 `plusFV` mods_fvs
         ; traceRn "rnConDecl (ConDeclH98)" (ppr name <+> vcat
              [ text "ex_tvs:" <+> ppr ex_tvs
              , text "new_ex_dqtvs':" <+> ppr new_ex_tvs ])
 
         ; mb_doc' <- traverse rnLHsDoc mb_doc
-        ; (mods', _) <- rnModifiersContextAndWarn ctxt mods
         ; return (decl { con_ext = noExtField
                        , con_name = new_name, con_ex_tvs = new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
@@ -2475,6 +2465,7 @@ rnConDecl (ConDeclGADT { con_names   = names
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+        ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
 
          -- Ensure that there are no nested `forall`s or contexts, per
          -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
@@ -2482,12 +2473,11 @@ rnConDecl (ConDeclGADT { con_names   = names
        ; addNoNestedForallsContextsErr ctxt
            NFC_GadtConSig new_res_ty
 
-        ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
+        ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` mods_fvs
 
         ; traceRn "rnConDecl (ConDeclGADT)"
             (ppr names $$ ppr outer_bndrs')
         ; new_mb_doc <- traverse rnLHsDoc mb_doc
-        ; (mods', _) <- rnModifiersContextAndWarn ctxt mods
         ; return (ConDeclGADT { con_g_ext = noExtField, con_names = new_names
                               , con_bndrs = L l outer_bndrs', con_mb_cxt = new_cxt
                               , con_g_args = new_args, con_res_ty = new_res_ty

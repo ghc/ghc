@@ -1401,10 +1401,10 @@ rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LConDeclField GhcPs
 rnField fl_env env (L l (ConDeclField _ names ty mods haddock_doc))
   = do { let new_names = map (fmap (lookupField fl_env)) names
        ; (new_ty, fvs) <- rnLHsTyKi env ty
-       ; (mods', _) <- rnModifiersAndWarn env mods -- MODS_TODO do we care about free vars?
+       ; (mods', mods_fvs) <- rnModifiersAndWarn env mods
        ; haddock_doc' <- traverse rnLHsDoc haddock_doc
        ; return (L l (ConDeclField noAnn new_names new_ty mods' haddock_doc')
-                , fvs) }
+                , fvs `plusFV` mods_fvs) }
 
 lookupField :: FastStringEnv FieldLabel -> FieldOcc GhcPs -> FieldOcc GhcRn
 lookupField fl_env (FieldOcc _ (L lr rdr)) =
