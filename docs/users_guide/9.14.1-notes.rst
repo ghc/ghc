@@ -44,6 +44,11 @@ Cmm
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 
+* The functions `getClosureInfoTbl_maybe`, `getClosureInfoTbl`,
+ `getClosurePtrArgs` and `getClosurePtrArgs_maybe` have been added to allow
+  reading of the relevant Closure attributes without reliance on incomplete
+  selectors.
+
 ``ghc-experimental`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

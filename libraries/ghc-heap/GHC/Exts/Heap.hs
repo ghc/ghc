@@ -29,6 +29,10 @@ module GHC.Exts.Heap (
     , WhyBlocked(..)
     , TsoFlags(..)
     , HasHeapRep(getClosureData)
+    , getClosureInfoTbl
+    , getClosureInfoTbl_maybe
+    , getClosurePtrArgs
+    , getClosurePtrArgs_maybe
     , getClosureDataFromHeapRep
     , getClosureDataFromHeapRepPrim
 
