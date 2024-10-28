@@ -163,7 +163,7 @@ getBangStrictness _ = (mkHsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 fromMaybeContext :: Maybe (LHsContext (GhcPass p)) -> HsContext (GhcPass p)
 fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA []) mctxt
 
-type instance XHsForAllVis   (GhcPass _) = EpAnn (TokForall, EpUniToken "->" "→")
+type instance XHsForAllVis   (GhcPass _) = EpAnn (TokForall, TokRarrow)
                                            -- Location of 'forall' and '->'
 type instance XHsForAllInvis (GhcPass _) = EpAnn (TokForall, EpToken ".")
                                            -- Location of 'forall' and '.'
@@ -471,7 +471,7 @@ type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
 type instance XSpliceTy        GhcTc = Kind
 
 type instance XDocTy           (GhcPass _) = NoExtField
-type instance XBangTy          (GhcPass _) = ((EpaLocation, EpaLocation, EpaLocation), SourceText)
+type instance XBangTy          (GhcPass _) = ((EpaLocation, EpToken "#-}", EpaLocation), SourceText)
 
 type instance XRecTy           GhcPs = AnnList ()
 type instance XRecTy           GhcRn = NoExtField
@@ -505,14 +505,14 @@ type instance XCharTy        (GhcPass _) = SourceText
 type instance XXTyLit        (GhcPass _) = DataConCantHappen
 
 data EpLinearArrow
-  = EpPct1 !(EpToken "%1") !(EpUniToken "->" "→")
+  = EpPct1 !(EpToken "%1") !(TokRarrow)
   | EpLolly !(EpToken "⊸")
   deriving Data
 
 instance NoAnn EpLinearArrow where
   noAnn = EpPct1 noAnn noAnn
 
-type instance XUnrestrictedArrow _ GhcPs = EpUniToken "->" "→"
+type instance XUnrestrictedArrow _ GhcPs = TokRarrow
 type instance XUnrestrictedArrow _ GhcRn = NoExtField
 type instance XUnrestrictedArrow _ GhcTc = NoExtField
 
@@ -520,7 +520,7 @@ type instance XLinearArrow       _ GhcPs = EpLinearArrow
 type instance XLinearArrow       _ GhcRn = NoExtField
 type instance XLinearArrow       _ GhcTc = NoExtField
 
-type instance XExplicitMult      _ GhcPs = (EpToken "%", EpUniToken "->" "→")
+type instance XExplicitMult      _ GhcPs = (EpToken "%", TokRarrow)
 type instance XExplicitMult      _ GhcRn = NoExtField
 type instance XExplicitMult      _ GhcTc = NoExtField
 

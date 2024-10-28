@@ -25,7 +25,6 @@ import GHC.Utils.Monad.State.Strict
 import Data.Function
 
 import GHC.Hs.Dump
-import Lookup
 
 import GHC hiding (EpaComment)
 import qualified GHC
@@ -299,7 +298,7 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
         _ -> (an0,cs0)
     -- Deal with possible leading semis
     (an2, cs0b) = case am_decls $ anns an1 of
-        (AddSemiAnn (EpaSpan (RealSrcSpan s _)):_) -> (an1 {comments = cs'}, cs0b')
+        (AddSemiAnn (EpTok (EpaSpan (RealSrcSpan s _))):_) -> (an1 {comments = cs'}, cs0b')
           where
             (stay,cs0b') = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ s)) cs0a
             cs' = workInComments (comments an1) stay
@@ -527,13 +526,10 @@ sortEpaComments cs = sortBy cmp cs
     cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
 
 -- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> NoCommentsLocation -> Comment
-mkKWComment kw (EpaSpan (RealSrcSpan ss mb))
-  = Comment (keywordToString kw) (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
-mkKWComment kw (EpaSpan (UnhelpfulSpan _))
-  = Comment (keywordToString kw) (EpaDelta noSrcSpan (SameLine 0) NoComments) placeholderRealSpan (Just kw)
-mkKWComment kw (EpaDelta ss dp cs)
-  = Comment (keywordToString kw) (EpaDelta ss dp cs) placeholderRealSpan (Just kw)
+mkKWComment :: String -> NoCommentsLocation -> Comment
+mkKWComment kw (EpaSpan (RealSrcSpan ss mb)) = Comment kw (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
+mkKWComment kw (EpaSpan (UnhelpfulSpan _))   = Comment kw (EpaDelta noSrcSpan (SameLine 0) NoComments) placeholderRealSpan (Just kw)
+mkKWComment kw (EpaDelta ss dp cs)           = Comment kw (EpaDelta ss dp cs) placeholderRealSpan (Just kw)
 
 sortAnchorLocated :: [GenLocated EpaLocation a] -> [GenLocated EpaLocation a]
 sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
@@ -569,22 +565,6 @@ rdrName2String r =
 
 name2String :: Name -> String
 name2String = showPprUnsafe
-
--- ---------------------------------------------------------------------
-
-trailingAnnLoc :: TrailingAnn -> EpaLocation
-trailingAnnLoc (AddSemiAnn ss)    = ss
-trailingAnnLoc (AddCommaAnn ss)   = ss
-trailingAnnLoc (AddVbarAnn ss)    = ss
-trailingAnnLoc (AddDarrowAnn ss)  = ss
-trailingAnnLoc (AddDarrowUAnn ss) = ss
-
-setTrailingAnnLoc :: TrailingAnn -> EpaLocation -> TrailingAnn
-setTrailingAnnLoc (AddSemiAnn _)    ss = (AddSemiAnn ss)
-setTrailingAnnLoc (AddCommaAnn _)   ss = (AddCommaAnn ss)
-setTrailingAnnLoc (AddVbarAnn _)    ss = (AddVbarAnn ss)
-setTrailingAnnLoc (AddDarrowAnn _)  ss = (AddDarrowAnn ss)
-setTrailingAnnLoc (AddDarrowUAnn _) ss = (AddDarrowUAnn ss)
 
 -- ---------------------------------------------------------------------
 

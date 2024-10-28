@@ -1031,7 +1031,6 @@ instance NFData TrailingAnn where
   rnf (AddCommaAnn epaL) = rnf epaL
   rnf (AddVbarAnn epaL) = rnf epaL
   rnf (AddDarrowAnn epaL) = rnf epaL
-  rnf (AddDarrowUAnn epaL) = rnf epaL
 
 instance NFData NameAdornment where
   rnf (NameParens  o c) =  o `deepseq` c `seq` ()

@@ -719,12 +719,12 @@ type instance XTypeSig          (GhcPass p) = AnnSig
 type instance XPatSynSig        (GhcPass p) = AnnSig
 type instance XClassOpSig       (GhcPass p) = AnnSig
 type instance XFixSig           (GhcPass p) = ((EpaLocation, Maybe EpaLocation), SourceText)
-type instance XInlineSig        (GhcPass p) = (EpaLocation, EpaLocation, ActivationAnn)
+type instance XInlineSig        (GhcPass p) = (EpaLocation, EpToken "#-}", ActivationAnn)
 type instance XSpecSig          (GhcPass p) = AnnSpecSig
-type instance XSpecInstSig      (GhcPass p) = ((EpaLocation, EpToken "instance", EpaLocation), SourceText)
-type instance XMinimalSig       (GhcPass p) = ((EpaLocation, EpaLocation), SourceText)
-type instance XSCCFunSig        (GhcPass p) = ((EpaLocation, EpaLocation), SourceText)
-type instance XCompleteMatchSig (GhcPass p) = ((EpaLocation, Maybe (EpUniToken "::" "∷"), EpaLocation), SourceText)
+type instance XSpecInstSig      (GhcPass p) = ((EpaLocation, EpToken "instance", EpToken "#-}"), SourceText)
+type instance XMinimalSig       (GhcPass p) = ((EpaLocation, EpToken "#-}"), SourceText)
+type instance XSCCFunSig        (GhcPass p) = ((EpaLocation, EpToken "#-}"), SourceText)
+type instance XCompleteMatchSig (GhcPass p) = ((EpaLocation, Maybe TokDcolon, EpToken "#-}"), SourceText)
     -- SourceText: See Note [Pragma source text] in "GHC.Types.SourceText"
 type instance XXSig             GhcPs = DataConCantHappen
 type instance XXSig             GhcRn = IdSig
@@ -738,8 +738,8 @@ type instance XXFixitySig (GhcPass p) = DataConCantHappen
 data AnnSpecSig
   = AnnSpecSig {
       ass_open   :: EpaLocation,
-      ass_close  :: EpaLocation,
-      ass_dcolon :: EpUniToken "::" "∷",
+      ass_close  :: EpToken "#-}",
+      ass_dcolon :: TokDcolon,
       ass_act    :: ActivationAnn
     } deriving Data
 

@@ -8,7 +8,6 @@
 
 module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
-  AnnKeywordId(..),
   EpToken(..), EpUniToken(..),
   getEpTokenSrcSpan,
   getEpTokenLocs, getEpTokenLoc, getEpUniTokenLoc,
@@ -16,7 +15,6 @@ module GHC.Parser.Annotation (
   EpLayout(..),
   EpaComment(..), EpaCommentTok(..),
   IsUnicodeSyntax(..),
-  unicodeAnn,
   HasE(..),
 
   -- * In-tree Exact Print Annotations
@@ -55,7 +53,7 @@ module GHC.Parser.Annotation (
   AnnSortKey(..), DeclTag(..), BindTag(..),
 
   -- ** Trailing annotations in lists
-  TrailingAnn(..),
+  TrailingAnn(..), ta_location,
   addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
   noTrailingN,
 
@@ -204,156 +202,12 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 
 -- --------------------------------------------------------------------
 
--- | Exact print annotations exist so that tools can perform source to
--- source conversions of Haskell code. They are used to keep track of
--- the various syntactic keywords that are not otherwise captured in the
--- AST.
---
--- The wiki page describing this feature is
--- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
--- https://gitlab.haskell.org/ghc/ghc/-/wikis/implementing-trees-that-grow/in-tree-api-annotations
---
--- Note: in general the names of these are taken from the
--- corresponding token, unless otherwise noted
--- See Note [exact print annotations] above for details of the usage
-data AnnKeywordId
-    = AnnAnyclass
-    | AnnAs
-    | AnnBang  -- ^ '!'
-    | AnnBackquote -- ^ '`'
-    | AnnBy
-    | AnnCase -- ^ case or lambda case
-    | AnnCases -- ^ lambda cases
-    | AnnClass
-    | AnnClose -- ^  '\#)' or '\#-}'  etc
-    | AnnCloseB -- ^ '|)'
-    | AnnCloseBU -- ^ '|)', unicode variant
-    | AnnCloseC -- ^ '}'
-    | AnnCloseQ  -- ^ '|]'
-    | AnnCloseQU -- ^ '|]', unicode variant
-    | AnnCloseP -- ^ ')'
-    | AnnClosePH -- ^ '\#)'
-    | AnnCloseS -- ^ ']'
-    | AnnColon
-    | AnnComma -- ^ as a list separator
-    | AnnCommaTuple -- ^ in a RdrName for a tuple
-    | AnnDarrow -- ^ '=>'
-    | AnnDarrowU -- ^ '=>', unicode variant
-    | AnnData
-    | AnnDcolon -- ^ '::'
-    | AnnDcolonU -- ^ '::', unicode variant
-    | AnnDefault
-    | AnnDeriving
-    | AnnDo
-    | AnnDot    -- ^ '.'
-    | AnnDotdot -- ^ '..'
-    | AnnElse
-    | AnnEqual
-    | AnnExport
-    | AnnFamily
-    | AnnForall
-    | AnnForallU -- ^ Unicode variant
-    | AnnForeign
-    | AnnFunId -- ^ for function name in matches where there are
-               -- multiple equations for the function.
-    | AnnGroup
-    | AnnHeader -- ^ for CType
-    | AnnHiding
-    | AnnIf
-    | AnnImport
-    | AnnIn
-    | AnnInfix -- ^ 'infix' or 'infixl' or 'infixr'
-    | AnnInstance
-    | AnnLam
-    | AnnLarrow     -- ^ '<-'
-    | AnnLarrowU    -- ^ '<-', unicode variant
-    | AnnLet
-    | AnnLollyU     -- ^ The '⊸' unicode arrow
-    | AnnMdo
-    | AnnMinus -- ^ '-'
-    | AnnModule
-    | AnnNewtype
-    | AnnName -- ^ where a name loses its location in the AST, this carries it
-    | AnnOf
-    | AnnOpen    -- ^ '{-\# DEPRECATED' etc. Opening of pragmas where
-                 -- the capitalisation of the string can be changed by
-                 -- the user. The actual text used is stored in a
-                 -- 'SourceText' on the relevant pragma item.
-    | AnnOpenB   -- ^ '(|'
-    | AnnOpenBU  -- ^ '(|', unicode variant
-    | AnnOpenC   -- ^ '{'
-    | AnnOpenE   -- ^ '[e|' or '[e||'
-    | AnnOpenEQ  -- ^ '[|'
-    | AnnOpenEQU -- ^ '[|', unicode variant
-    | AnnOpenP   -- ^ '('
-    | AnnOpenS   -- ^ '['
-    | AnnOpenPH  -- ^ '(\#'
-    | AnnDollar          -- ^ prefix '$'   -- TemplateHaskell
-    | AnnDollarDollar    -- ^ prefix '$$'  -- TemplateHaskell
-    | AnnPackageName
-    | AnnPattern
-    | AnnPercent    -- ^ '%'  -- for HsExplicitMult
-    | AnnPercentOne -- ^ '%1' -- for HsLinearArrow
-    | AnnProc
-    | AnnQualified
-    | AnnRarrow -- ^ '->'
-    | AnnRarrowU -- ^ '->', unicode variant
-    | AnnRec
-    | AnnRole
-    | AnnSafe
-    | AnnSemi -- ^ ';'
-    | AnnSimpleQuote -- ^ '''
-    | AnnSignature
-    | AnnStatic -- ^ 'static'
-    | AnnStock
-    | AnnThen
-    | AnnThTyQuote -- ^ double '''
-    | AnnTilde -- ^ '~'
-    | AnnType
-    | AnnUnit -- ^ '()' for types
-    | AnnUsing
-    | AnnVal  -- ^ e.g. INTEGER
-    | AnnValStr  -- ^ String value, will need quotes when output
-    | AnnVbar -- ^ '|'
-    | AnnVia -- ^ 'via'
-    | AnnWhere
-    | Annlarrowtail -- ^ '-<'
-    | AnnlarrowtailU -- ^ '-<', unicode variant
-    | Annrarrowtail -- ^ '->'
-    | AnnrarrowtailU -- ^ '->', unicode variant
-    | AnnLarrowtail -- ^ '-<<'
-    | AnnLarrowtailU -- ^ '-<<', unicode variant
-    | AnnRarrowtail -- ^ '>>-'
-    | AnnRarrowtailU -- ^ '>>-', unicode variant
-    deriving (Eq, Ord, Data, Show)
-
-instance Outputable AnnKeywordId where
-  ppr x = text (show x)
-
 -- | Certain tokens can have alternate representations when unicode syntax is
 -- enabled. This flag is attached to those tokens in the lexer so that the
 -- original source representation can be reproduced in the corresponding
 -- 'EpAnnotation'
 data IsUnicodeSyntax = UnicodeSyntax | NormalSyntax
     deriving (Eq, Ord, Data, Show)
-
--- | Convert a normal annotation into its unicode equivalent one
-unicodeAnn :: AnnKeywordId -> AnnKeywordId
-unicodeAnn AnnForall     = AnnForallU
-unicodeAnn AnnDcolon     = AnnDcolonU
-unicodeAnn AnnLarrow     = AnnLarrowU
-unicodeAnn AnnRarrow     = AnnRarrowU
-unicodeAnn AnnDarrow     = AnnDarrowU
-unicodeAnn Annlarrowtail = AnnlarrowtailU
-unicodeAnn Annrarrowtail = AnnrarrowtailU
-unicodeAnn AnnLarrowtail = AnnLarrowtailU
-unicodeAnn AnnRarrowtail = AnnRarrowtailU
-unicodeAnn AnnOpenB      = AnnOpenBU
-unicodeAnn AnnCloseB     = AnnCloseBU
-unicodeAnn AnnOpenEQ     = AnnOpenEQU
-unicodeAnn AnnCloseQ     = AnnCloseQU
-unicodeAnn ann           = ann
-
 
 -- | Some template haskell tokens have two variants, one with an `e` the other
 -- not:
@@ -654,19 +508,24 @@ meaning we can have type LocatedN RdrName
 -- | Captures the location of punctuation occurring between items,
 -- normally in a list.  It is captured as a trailing annotation.
 data TrailingAnn
-  = AddSemiAnn    { ta_location :: EpaLocation }  -- ^ Trailing ';'
-  | AddCommaAnn   { ta_location :: EpaLocation }  -- ^ Trailing ','
-  | AddVbarAnn    { ta_location :: EpaLocation }  -- ^ Trailing '|'
-  | AddDarrowAnn  { ta_location :: EpaLocation }  -- ^ Trailing '=>'
-  | AddDarrowUAnn { ta_location :: EpaLocation }  -- ^ Trailing '⇒'
+  = AddSemiAnn    (EpToken ";") -- ^ Trailing ';'
+  | AddCommaAnn   (EpToken ",") -- ^ Trailing ','
+  | AddVbarAnn    (EpToken "|") -- ^ Trailing '|'
+  | AddDarrowAnn  TokDarrow     -- ^ Trailing '=>' / '⇒'
   deriving (Data, Eq)
 
+ta_location :: TrailingAnn -> EpaLocation
+ta_location (AddSemiAnn    tok) = getEpTokenLoc tok
+ta_location (AddCommaAnn   tok) = getEpTokenLoc tok
+ta_location (AddVbarAnn    tok) = getEpTokenLoc tok
+ta_location (AddDarrowAnn  tok) = getEpUniTokenLoc tok
+
+
 instance Outputable TrailingAnn where
-  ppr (AddSemiAnn ss)    = text "AddSemiAnn"    <+> ppr ss
-  ppr (AddCommaAnn ss)   = text "AddCommaAnn"   <+> ppr ss
-  ppr (AddVbarAnn ss)    = text "AddVbarAnn"    <+> ppr ss
-  ppr (AddDarrowAnn ss)  = text "AddDarrowAnn"  <+> ppr ss
-  ppr (AddDarrowUAnn ss) = text "AddDarrowUAnn" <+> ppr ss
+  ppr (AddSemiAnn tok)    = text "AddSemiAnn"    <+> ppr tok
+  ppr (AddCommaAnn tok)   = text "AddCommaAnn"   <+> ppr tok
+  ppr (AddVbarAnn tok)    = text "AddVbarAnn"    <+> ppr tok
+  ppr (AddDarrowAnn tok)  = text "AddDarrowAnn"  <+> ppr tok
 
 -- | Annotation for items appearing in a list. They can have one or
 -- more trailing punctuations items, such as commas or semicolons.
@@ -797,7 +656,7 @@ data NameAdornment
 data AnnPragma
   = AnnPragma {
       apr_open      :: EpaLocation,
-      apr_close     :: EpaLocation,
+      apr_close     :: EpToken "#-}",
       apr_squares   :: (EpToken "[", EpToken "]"),
       apr_loc1      :: EpaLocation,
       apr_loc2      :: EpaLocation,
@@ -948,7 +807,7 @@ addTrailingCommaToN  n l = n { anns = addTrailing (anns n) l }
   where
     -- See Note [list append in addTrailing*]
     addTrailing :: NameAnn -> EpaLocation -> NameAnn
-    addTrailing n l = n { nann_trailing = nann_trailing n ++ [AddCommaAnn l]}
+    addTrailing n l = n { nann_trailing = nann_trailing n ++ [AddCommaAnn (EpTok l)]}
 
 noTrailingN :: SrcSpanAnnN -> SrcSpanAnnN
 noTrailingN s = s { anns = (anns s) { nann_trailing = [] } }
@@ -1282,9 +1141,6 @@ instance Monoid (AnnSortKey tag) where
 
 instance NoAnn EpaLocation where
   noAnn = EpaDelta noSrcSpan (SameLine 0) []
-
-instance NoAnn AnnKeywordId where
-  noAnn = Annlarrowtail  {- gotta pick one -}
 
 instance NoAnn [a] where
   noAnn = []

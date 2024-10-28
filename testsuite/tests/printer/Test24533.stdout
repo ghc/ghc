@@ -109,7 +109,8 @@
                (EpaSpan { Test24533.hs:5:5-10 })
                (AnnListItem
                 [(AddCommaAnn
-                  (EpaSpan { Test24533.hs:5:11 }))])
+                  (EpTok
+                   (EpaSpan { Test24533.hs:5:11 })))])
                (EpaComments
                 []))
               (HsAppTy
@@ -246,7 +247,8 @@
                   (EpaSpan { Test24533.hs:8:9 })
                   (AnnListItem
                    [(AddCommaAnn
-                     (EpaSpan { Test24533.hs:8:10 }))])
+                     (EpTok
+                      (EpaSpan { Test24533.hs:8:10 })))])
                   (EpaComments
                    []))
                  (HsTyVar
@@ -778,7 +780,8 @@
                (EpaSpan { Test24533.ppr.hs:3:11-16 })
                (AnnListItem
                 [(AddCommaAnn
-                  (EpaSpan { Test24533.ppr.hs:3:17 }))])
+                  (EpTok
+                   (EpaSpan { Test24533.ppr.hs:3:17 })))])
                (EpaComments
                 []))
               (HsAppTy
@@ -915,7 +918,8 @@
                   (EpaSpan { Test24533.ppr.hs:3:36 })
                   (AnnListItem
                    [(AddCommaAnn
-                     (EpaSpan { Test24533.ppr.hs:3:37 }))])
+                     (EpTok
+                      (EpaSpan { Test24533.ppr.hs:3:37 })))])
                   (EpaComments
                    []))
                  (HsTyVar

@@ -74,19 +74,8 @@ data XModulePs
         -- For incomplete modules (e.g. the output of parseHeader), it is EpNoLayout.
       hsmodDeprecMessage :: Maybe (LWarningTxt GhcPs),
         -- ^ reason\/explanation for warning/deprecation of this module
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
-        --                                   ,'GHC.Parser.Annotation.AnnClose'
-        --
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
       hsmodHaddockModHeader :: Maybe (LHsDoc GhcPs)
         -- ^ Haddock module info and description, unparsed
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
-        --                                   ,'GHC.Parser.Annotation.AnnClose'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
    }
    deriving Data
 

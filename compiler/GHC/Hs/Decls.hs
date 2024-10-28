@@ -745,7 +745,7 @@ type instance XXConDecl (GhcPass _) = DataConCantHappen
 
 type instance XPrefixConGADT       (GhcPass _) = NoExtField
 
-type instance XRecConGADT          GhcPs = EpUniToken "->" "→"
+type instance XRecConGADT          GhcPs = TokRarrow
 type instance XRecConGADT          GhcRn = NoExtField
 type instance XRecConGADT          GhcTc = NoExtField
 
@@ -1289,7 +1289,7 @@ instance OutputableBndrId p
 ************************************************************************
 -}
 
-type instance XCRuleDecls    GhcPs = ((EpaLocation, EpaLocation), SourceText)
+type instance XCRuleDecls    GhcPs = ((EpaLocation, EpToken "#-}"), SourceText)
 type instance XCRuleDecls    GhcRn = SourceText
 type instance XCRuleDecls    GhcTc = SourceText
 
@@ -1370,7 +1370,7 @@ pprFullRuleName st (L _ n) = pprWithSourceText st (doubleQuotes $ ftext n)
 ************************************************************************
 -}
 
-type instance XWarnings      GhcPs = ((EpaLocation, EpaLocation), SourceText)
+type instance XWarnings      GhcPs = ((EpaLocation, EpToken "#-}"), SourceText)
 type instance XWarnings      GhcRn = SourceText
 type instance XWarnings      GhcTc = SourceText
 

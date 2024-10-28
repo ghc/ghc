@@ -163,14 +163,6 @@ import System.IO.Unsafe ( unsafePerformIO )
 -- > `bar`
 -- > ( ~ )
 --
--- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnType',
---           'GHC.Parser.Annotation.AnnOpen'  @'('@ or @'['@ or @'[:'@,
---           'GHC.Parser.Annotation.AnnClose' @')'@ or @']'@ or @':]'@,,
---           'GHC.Parser.Annotation.AnnBackquote' @'`'@,
---           'GHC.Parser.Annotation.AnnVal'
---           'GHC.Parser.Annotation.AnnTilde',
-
--- For details on above see Note [exact print annotations] in "GHC.Parser.Annotation"
 data RdrName
   = Unqual OccName
         -- ^ Unqualified  name

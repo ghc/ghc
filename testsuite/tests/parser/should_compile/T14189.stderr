@@ -59,7 +59,8 @@
              (EpaSpan { T14189.hs:6:15-20 })
              (AnnListItem
               [(AddVbarAnn
-                (EpaSpan { T14189.hs:6:22 }))])
+                (EpTok
+                 (EpaSpan { T14189.hs:6:22 })))])
              (EpaComments
               []))
             (ConDeclH98
@@ -104,7 +105,8 @@
              (EpaSpan { T14189.hs:6:24-25 })
              (AnnListItem
               [(AddVbarAnn
-                (EpaSpan { T14189.hs:6:27 }))])
+                (EpTok
+                 (EpaSpan { T14189.hs:6:27 })))])
              (EpaComments
               []))
             (ConDeclH98
@@ -230,7 +232,7 @@
       (EpAnn
        (EpaDelta { <no location info> } (SameLine 0) [])
        (EpAnnImportDecl
-        (EpaDelta { <no location info> } (SameLine 0) [])
+        (NoEpTok)
         (Nothing)
         (Nothing)
         (Nothing)
@@ -296,7 +298,8 @@
           (EpaSpan { T14189.hs:3:11 })
           (AnnListItem
            [(AddCommaAnn
-             (EpaSpan { T14189.hs:3:12 }))])
+             (EpTok
+              (EpaSpan { T14189.hs:3:12 })))])
           (EpaComments
            []))
          (IEName
