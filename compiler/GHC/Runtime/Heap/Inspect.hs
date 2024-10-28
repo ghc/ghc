@@ -128,6 +128,11 @@ isFullyEvaluatedTerm NewtypeWrap{wrapped_term=t} = isFullyEvaluatedTerm t
 isFullyEvaluatedTerm RefWrap{wrapped_term=t}     = isFullyEvaluatedTerm t
 isFullyEvaluatedTerm _                  = False
 
+-- | Gives an error if the term doesn't have subterms
+expectSubTerms :: Term -> [Term]
+expectSubTerms (Term { subTerms = subTerms} ) = subTerms
+expectSubTerms _                              = panic "expectSubTerms"
+
 instance Outputable (Term) where
  ppr t | Just doc <- cPprTerm cPprTermBase t = doc
        | otherwise = panic "Outputable Term instance"
@@ -332,8 +337,8 @@ cPprTermBase :: forall m. Monad m => CustomTermPrinter m
 cPprTermBase y =
   [ ifTerm (isTupleTy.ty) (\_p -> liftM (parens . hcat . punctuate comma)
                                       . mapM (y (-1))
-                                      . subTerms)
-  , ifTerm (\t -> isTyCon listTyCon (ty t) && subTerms t `lengthIs` 2)
+                                      . expectSubTerms)
+  , ifTerm (\t -> isTyCon listTyCon (ty t) && expectSubTerms t `lengthIs` 2)
            ppr_list
   , ifTerm' (isTyCon intTyCon     . ty) ppr_int
   , ifTerm' (isTyCon charTyCon    . ty) ppr_char
@@ -768,7 +773,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
     traceTR (text "Gave up reconstructing a term after" <>
                   int max_depth <> text " steps")
     clos <- trIO $ GHCi.getClosure interp a
-    return (Suspension (tipe (info clos)) my_ty a Nothing)
+    return (Suspension (tipe (getClosureInfoTbl clos)) my_ty a Nothing)
   go !max_depth my_ty old_ty a = do
     let monomorphic = not(isTyVarTy my_ty)
     -- This ^^^ is a convention. The ancestor tests for
@@ -864,7 +869,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
       _ -> do
          traceTR (text "Unknown closure:" <+>
                   text (show (fmap (const ()) clos)))
-         return (Suspension (tipe (info clos)) my_ty a Nothing)
+         return (Suspension (tipe (getClosureInfoTbl clos)) my_ty a Nothing)
 
   -- insert NewtypeWraps around newtypes
   expandNewtypes = foldTerm idTermFold { fTerm = worker } where
@@ -918,7 +923,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
 
     go_rep ptr_i arr_i ty rep
       | isGcPtrRep rep = do
-          t <- recurse ty $ (ptrArgs clos)!!ptr_i
+          t <- recurse ty $ (getClosurePtrArgs clos)!!ptr_i
           return (ptr_i + 1, arr_i, t)
       | otherwise = do
           -- This is a bit involved since we allow packing multiple fields

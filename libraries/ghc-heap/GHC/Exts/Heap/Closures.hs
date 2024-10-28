@@ -8,12 +8,18 @@
 {-# LANGUAGE DeriveTraversable #-}
 -- Late cost centres introduce a thunk in the asBox function, which leads to
 -- an additional wrapper being added to any value placed inside a box.
+-- This can be removed once our boot compiler is no longer affected by #25212
 {-# OPTIONS_GHC -fno-prof-late  #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module GHC.Exts.Heap.Closures (
     -- * Closures
       Closure
     , GenClosure(..)
+    , getClosureInfoTbl
+    , getClosureInfoTbl_maybe
+    , getClosurePtrArgs
+    , getClosurePtrArgs_maybe
     , PrimType(..)
     , WhatNext(..)
     , WhyBlocked(..)
@@ -67,6 +73,7 @@ import Data.Word
 import GHC.Exts
 import GHC.Generics
 import Numeric
+import GHC.Stack (HasCallStack)
 
 ------------------------------------------------------------------------
 -- Boxes
@@ -381,6 +388,104 @@ data GenClosure b
   |  UnknownTypeWordSizedPrimitive
         { wordVal :: !Word }
   deriving (Show, Generic, Functor, Foldable, Traversable)
+
+-- | Get the info table for a heap closure, or Nothing for a prim value
+--
+-- @since 9.14.1
+getClosureInfoTbl_maybe :: GenClosure b -> Maybe StgInfoTable
+{-# INLINE getClosureInfoTbl_maybe #-} -- Ensure we can get rid of the just box
+getClosureInfoTbl_maybe closure = case closure of
+  ConstrClosure{info} ->Just info
+  FunClosure{info} ->Just info
+  ThunkClosure{info} ->Just info
+  SelectorClosure{info} ->Just info
+  PAPClosure{info} ->Just info
+  APClosure{info} ->Just info
+  APStackClosure{info} ->Just info
+  IndClosure{info} ->Just info
+  BCOClosure{info} ->Just info
+  BlackholeClosure{info} ->Just info
+  ArrWordsClosure{info} ->Just info
+  MutArrClosure{info} ->Just info
+  SmallMutArrClosure{info} ->Just info
+  MVarClosure{info} ->Just info
+  IOPortClosure{info} ->Just info
+  MutVarClosure{info} ->Just info
+  BlockingQueueClosure{info} ->Just info
+  WeakClosure{info} ->Just info
+  TSOClosure{info} ->Just info
+  StackClosure{info} ->Just info
+
+  IntClosure{} -> Nothing
+  WordClosure{} -> Nothing
+  Int64Closure{} -> Nothing
+  Word64Closure{} -> Nothing
+  AddrClosure{} -> Nothing
+  FloatClosure{} -> Nothing
+  DoubleClosure{} -> Nothing
+
+  OtherClosure{info} -> Just info
+  UnsupportedClosure {info} -> Just info
+
+  UnknownTypeWordSizedPrimitive{} -> Nothing
+
+-- | Partial version of getClosureInfoTbl_maybe for when we know we deal with a
+-- heap closure.
+--
+-- @since 9.14.1
+getClosureInfoTbl :: HasCallStack => GenClosure b -> StgInfoTable
+getClosureInfoTbl closure = case getClosureInfoTbl_maybe closure of
+  Just info -> info
+  Nothing -> error "getClosureInfoTbl - Closure without info table"
+
+-- | Get the info table for a heap closure, or Nothing for a prim value
+--
+-- @since 9.14.1
+getClosurePtrArgs_maybe :: GenClosure b -> Maybe [b]
+{-# INLINE getClosurePtrArgs_maybe #-} -- Ensure we can get rid of the just box
+getClosurePtrArgs_maybe closure = case closure of
+  ConstrClosure{ptrArgs} -> Just ptrArgs
+  FunClosure{ptrArgs} -> Just ptrArgs
+  ThunkClosure{ptrArgs} -> Just ptrArgs
+  SelectorClosure{} -> Nothing
+  PAPClosure{} -> Nothing
+  APClosure{} -> Nothing
+  APStackClosure{} -> Nothing
+  IndClosure{} -> Nothing
+  BCOClosure{} -> Nothing
+  BlackholeClosure{} -> Nothing
+  ArrWordsClosure{} -> Nothing
+  MutArrClosure{} -> Nothing
+  SmallMutArrClosure{} -> Nothing
+  MVarClosure{} -> Nothing
+  IOPortClosure{} -> Nothing
+  MutVarClosure{} -> Nothing
+  BlockingQueueClosure{} -> Nothing
+  WeakClosure{} -> Nothing
+  TSOClosure{} -> Nothing
+  StackClosure{} -> Nothing
+
+  IntClosure{} -> Nothing
+  WordClosure{} -> Nothing
+  Int64Closure{} -> Nothing
+  Word64Closure{} -> Nothing
+  AddrClosure{} -> Nothing
+  FloatClosure{} -> Nothing
+  DoubleClosure{} -> Nothing
+
+  OtherClosure{} -> Nothing
+  UnsupportedClosure{} -> Nothing
+
+  UnknownTypeWordSizedPrimitive{} -> Nothing
+
+-- | Partial version of getClosureInfoTbl_maybe for when we know we deal with a
+-- heap closure.
+--
+-- @since 9.14.1
+getClosurePtrArgs :: HasCallStack => GenClosure b -> [b]
+getClosurePtrArgs closure = case getClosurePtrArgs_maybe closure of
+  Just ptrs -> ptrs
+  Nothing -> error "getClosurePtrArgs - Closure without ptrArgs field"
 
 type StgStackClosure = GenStgStackClosure Box
 
