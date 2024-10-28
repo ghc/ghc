@@ -32,5 +32,5 @@ rnd
     null (MkT _) = False
   
   instance Traversable T where
-    traverse f (MkT a1) = fmap (\ b1 -> MkT b1) (f a1)
+    traverse f (MkT a1) = fmap MkT (f a1)
 

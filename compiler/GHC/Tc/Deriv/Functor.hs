@@ -689,9 +689,18 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
         con_expr
           | null asWithTyVar = nlHsApps con_name asWithoutTyVar
           | otherwise =
-              let bs   = filterByList  argTysTyVarInfo bs_RDRs
-                  vars = filterByLists argTysTyVarInfo bs_Vars as_Vars
-              in mkHsLam (noLocA (map nlVarPat bs)) (nlHsApps con_name vars)
+              let -- All trailing b-args can be eta-reduced:
+                  -- (\b1 b2 b3 -> A b1 a2 b2 b3) ==> (\b1 -> A b1 a2)
+                  -- This improves the number of allocations needed to compile
+                  -- the generated code (it is not relevant for correctness)
+                  -- We do this by counting the n of args to keep
+                  keep_n = length $ dropWhileEndLE (== True) argTysTyVarInfo
+                  bs   = filterByList (take keep_n argTysTyVarInfo) bs_RDRs
+                  vars = take keep_n $
+                         filterByLists argTysTyVarInfo bs_Vars as_Vars
+               in if keep_n == 0
+                    then nlHsVar con_name
+                    else mkHsLam (noLocA (map nlVarPat bs)) (nlHsApps con_name vars)
 
     rhs <- fold con_expr exps
     return $ mkMatch ctxt (noLocA (extra_pats ++ [pat])) rhs emptyLocalBinds
