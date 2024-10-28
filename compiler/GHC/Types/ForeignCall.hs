@@ -230,12 +230,6 @@ instance Outputable Header where
     ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
 
 -- | A C type, used in CAPI FFI calls
---
---  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{-\# CTYPE'@,
---        'GHC.Parser.Annotation.AnnHeader','GHC.Parser.Annotation.AnnVal',
---        'GHC.Parser.Annotation.AnnClose' @'\#-}'@,
-
--- For details on above see Note [exact print annotations] in "GHC.Parser.Annotation"
 data CType = CType SourceText -- See Note [Pragma source text] in "GHC.Types.SourceText"
                    (Maybe Header) -- header to include for this type
                    (SourceText,FastString) -- the type itself

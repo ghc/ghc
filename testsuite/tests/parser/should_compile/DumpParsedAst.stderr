@@ -48,7 +48,8 @@
       (EpAnn
        (EpaSpan { DumpParsedAst.hs:5:1-16 })
        (EpAnnImportDecl
-        (EpaSpan { DumpParsedAst.hs:5:1-6 })
+        (EpTok
+         (EpaSpan { DumpParsedAst.hs:5:1-6 }))
         (Nothing)
         (Nothing)
         (Nothing)
@@ -121,7 +122,8 @@
            (EpaSpan { DumpParsedAst.hs:7:14-17 })
            (AnnListItem
             [(AddVbarAnn
-              (EpaSpan { DumpParsedAst.hs:7:19 }))])
+              (EpTok
+               (EpaSpan { DumpParsedAst.hs:7:19 })))])
            (EpaComments
             []))
           (ConDeclH98

@@ -69,55 +69,26 @@ data Pat p
   | LazyPat     (XLazyPat p)
                 (LPat p)
     -- ^ Lazy Pattern, e.g. @~x@
-    --
-    -- exactprint: the location of @~@ is captured using 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnTilde'
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-
   | AsPat       (XAsPat p)
                 (LIdP p)
                 (LPat p)
     -- ^ As pattern, e.g. @x\@pat@
-    --
-    -- exactprint: the location of @\@@ is captured using 'GHC.Parser.Annotation.EpToken' @"\@"@
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-
   | ParPat      (XParPat p)
                 (LPat p)
     -- ^ Parenthesised pattern, e.g. @(x)@
-    --
-    -- exactprint: the location of parentheses is captured using 'GHC.Parser.Annotation.EpToken' @"("@ and 'GHC.Parser.Annotation.EpToken' @")"@
 
     -- See Note [Parens in HsSyn] in GHC.Hs.Expr
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | BangPat     (XBangPat p)
                 (LPat p)
     -- ^ Bang pattern, e.g. @!x@
-    --
-    -- exactprint: the location of @!@ is captured using 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
         ------------ Lists, tuples, arrays ---------------
   | ListPat     (XListPat p)
                 [LPat p]
     -- ^ Syntactic List, e.g. @[x]@ or @[x,y]@.
     -- Note that @[]@ and @(x:xs)@ patterns are both represented using 'ConPat'.
-    --
-    -- exactprint: the location of brackets is captured using 'GHC.Parser.Annotation.AnnKeywordId' :
-    -- 'GHC.Parser.Annotation.AnnOpenS' and 'GHC.Parser.Annotation.AnnCloseS' respectively.
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | -- | Tuple pattern, e.g. @(x, y)@ (boxed tuples) or @(# x, y #)@ (requires @-XUnboxedTuples@)
-    --
-    -- exactprint: the location of parens is captured using 'GHC.Parser.Annotation.AnnKeywordId' :
-    -- 'GHC.Parser.Annotation.AnnOpenP' and 'GHC.Parser.Annotation.AnnCloseP' in case of boxed tuples
-    -- or 'GHC.Parser.Annotation.AnnOpenPH' and 'GHC.Parser.Annotation.AnnClosePH' in case of unboxed tuples.
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
     TuplePat    (XTuplePat p)    -- ^ After typechecking, holds the types of the tuple components
                 [LPat p]         -- ^ Tuple sub-patterns
                 Boxity
@@ -151,11 +122,6 @@ data Pat p
                 SumWidth           -- Arity (INVARIANT: ≥ 2)
 
     -- ^ Anonymous sum pattern, e.g. @(# x | #)@. Used by @-XUnboxedSums@
-    --
-    -- exactprint: the location of @(#@ and @#)@ is captured using 'GHC.Parser.Annotation.AnnKeywordId' :
-    -- 'GHC.Parser.Annotation.AnnOpenPH' and 'GHC.Parser.Annotation.AnnClosePH' respectively.
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
         ------------ Constructor patterns ---------------
   | ConPat {
@@ -171,10 +137,6 @@ data Pat p
                   (LHsExpr p)
                   (LPat p)
     -- ^ View Pattern, e.g. @someFun -> pat@. Used by @-XViewPatterns@
-    --
-    -- exactprint: the location of @->@ is captured using 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
         ------------ Pattern splices ---------------
 
@@ -201,10 +163,6 @@ data Pat p
 
   -- ^ Natural Pattern, used for all overloaded literals, including overloaded Strings
   -- with @-XOverloadedStrings@
-  --
-  -- exactprint: the location of @-@ (for negative literals) is captured using 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnMinus'
-
-  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | -- | n+k pattern, e.g. @n+1@, used by @-XNPlusKPatterns@
    NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
@@ -225,23 +183,15 @@ data Pat p
                                                --  kind and type vars
 
    -- ^ Pattern with a type signature, e.g. @x :: Int@
-   --
-   -- exactprint: the location of @::@ is captured using 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
-
-  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | -- | Embed the syntax of types into patterns, e.g. @fn (type t) = rhs@.
     -- Enabled by @-XExplicitNamespaces@ in conjunction with @-XRequiredTypeArguments@.
-    --
-    -- exactprint: the location of the @type@ keyword is captured using 'GHC.Parser.Annotation.EpToken' @"type"@
     EmbTyPat        (XEmbTyPat p)
                     (HsTyPat (NoGhcTc p))
 
   | InvisPat (XInvisPat p) (HsTyPat (NoGhcTc p))
   -- ^ Type abstraction which brings into scope type variables associated with invisible forall.
   -- E.g. @fn \@t ... = rhs@. Used by @-XTypeAbstractions@.
-  --
-  -- exactprint: the location of @\@@ is captured by 'GHC.Parser.Annotation.EpToken' @"\@"@
 
   -- See Note [Invisible binders in functions] in GHC.Hs.Pat
 
@@ -328,10 +278,6 @@ type LHsRecUpdField p q = XRec p (HsRecUpdField p q)
 type HsRecUpdField p q  = HsFieldBind (LFieldOcc p) (LHsExpr q)
 
 -- | Haskell Field Binding
---
--- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual'
---
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data HsFieldBind lhs rhs = HsFieldBind {
         hfbAnn :: XHsFieldBind lhs,
         hfbLHS :: lhs,

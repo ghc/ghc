@@ -203,15 +203,15 @@ instance (NoAnn n, NoAnn h) => NoAnn (BracketAnn n h) where
 -- API Annotations types
 
 data EpAnnHsCase = EpAnnHsCase
-      { hsCaseAnnCase :: EpaLocation
-      , hsCaseAnnOf   :: EpaLocation
+      { hsCaseAnnCase :: EpToken "case"
+      , hsCaseAnnOf   :: EpToken "of"
       } deriving Data
 
 instance NoAnn EpAnnHsCase where
   noAnn = EpAnnHsCase noAnn noAnn
 
 data EpAnnLam = EpAnnLam
-      { epl_lambda :: EpaLocation -- ^ Location of '\' keyword
+      { epl_lambda :: EpToken "\\"      -- ^ Location of '\' keyword
       , epl_case   :: Maybe EpaLocation -- ^ Location of 'case' or
                                         -- 'cases' keyword, depending
                                         -- on related 'HsLamVariant'.
@@ -221,8 +221,8 @@ instance NoAnn EpAnnLam where
   noAnn = EpAnnLam noAnn noAnn
 
 data EpAnnUnboundVar = EpAnnUnboundVar
-     { hsUnboundBackquotes :: (EpaLocation, EpaLocation)
-     , hsUnboundHole       :: EpaLocation
+     { hsUnboundBackquotes :: (EpToken "`", EpToken "`")
+     , hsUnboundHole       :: EpToken "_"
      } deriving Data
 
 -- Record selectors at parse time are HsVar; they convert to HsRecSel
@@ -372,7 +372,7 @@ type instance XProjection     GhcTc = DataConCantHappen
 -- HsProjection is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XExprWithTySig GhcPs = EpUniToken "::" "∷"
+type instance XExprWithTySig GhcPs = TokDcolon
 type instance XExprWithTySig GhcRn = NoExtField
 type instance XExprWithTySig GhcTc = NoExtField
 
@@ -380,7 +380,7 @@ type instance XArithSeq      GhcPs = AnnArithSeq
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XProc          (GhcPass _) = (EpToken "proc", EpUniToken "->" "→")
+type instance XProc          (GhcPass _) = (EpToken "proc", TokRarrow)
 
 type instance XStatic        GhcPs = EpToken "static"
 type instance XStatic        GhcRn = NameSet
@@ -429,7 +429,7 @@ instance NoAnn AnnExplicitSum where
 
 data AnnFieldLabel
   = AnnFieldLabel {
-      afDot :: Maybe EpaLocation
+      afDot :: Maybe (EpToken ".")
       } deriving Data
 
 instance NoAnn AnnFieldLabel where
@@ -437,8 +437,8 @@ instance NoAnn AnnFieldLabel where
 
 data AnnProjection
   = AnnProjection {
-      apOpen  :: EpaLocation, -- ^ '('
-      apClose :: EpaLocation  -- ^ ')'
+      apOpen  :: EpToken "(",
+      apClose :: EpToken ")"
       } deriving Data
 
 instance NoAnn AnnProjection where
@@ -457,11 +457,11 @@ instance NoAnn AnnArithSeq where
 
 data AnnsIf
   = AnnsIf {
-      aiIf       :: EpaLocation,
-      aiThen     :: EpaLocation,
-      aiElse     :: EpaLocation,
-      aiThenSemi :: Maybe EpaLocation,
-      aiElseSemi :: Maybe EpaLocation
+      aiIf       :: EpToken "if",
+      aiThen     :: EpToken "then",
+      aiElse     :: EpToken "else",
+      aiThenSemi :: Maybe (EpToken ";"),
+      aiElseSemi :: Maybe (EpToken ";")
       } deriving Data
 
 instance NoAnn AnnsIf where

@@ -138,7 +138,7 @@ type instance XConPat GhcPs = (Maybe (EpToken "{"), Maybe (EpToken "}"))
 type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
-type instance XViewPat GhcPs = EpUniToken "->" "→"
+type instance XViewPat GhcPs = TokRarrow
 type instance XViewPat GhcRn = Maybe (HsExpr GhcRn)
   -- The @HsExpr GhcRn@ gives an inverse to the view function.
   -- This is used for overloaded lists in particular.
@@ -162,7 +162,7 @@ type instance XNPlusKPat GhcPs = EpaLocation -- Of the "+"
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = EpUniToken "::" "∷"
+type instance XSigPat GhcPs = TokDcolon
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 

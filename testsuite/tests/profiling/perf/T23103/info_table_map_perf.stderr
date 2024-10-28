@@ -1,4 +1,3 @@
-[1 of 4] Compiling Types            ( Types.hs, Types.o )
-[2 of 4] Compiling Lookup           ( Lookup.hs, Lookup.o )
-[3 of 4] Compiling Utils            ( Utils.hs, Utils.o )
-[4 of 4] Compiling ExactPrint       ( ExactPrint.hs, ExactPrint.o )
+[1 of 3] Compiling Types            ( Types.hs, Types.o )
+[2 of 3] Compiling Utils            ( Utils.hs, Utils.o )
+[3 of 3] Compiling ExactPrint       ( ExactPrint.hs, ExactPrint.o )

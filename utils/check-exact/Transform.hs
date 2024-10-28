@@ -741,7 +741,7 @@ dn n = EpaDelta noSrcSpan (SameLine n) []
 
 addComma :: SrcSpanAnnA -> SrcSpanAnnA
 addComma (EpAnn anc (AnnListItem as) cs)
-  = EpAnn anc (AnnListItem (AddCommaAnn d0:as)) cs
+  = EpAnn anc (AnnListItem (AddCommaAnn (EpTok d0):as)) cs
 
 -- ---------------------------------------------------------------------
 

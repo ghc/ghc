@@ -1010,7 +1010,7 @@ exportlist :: { ([EpToken ","], OrdList (LIE GhcPs)) }
         -- trailing comma:
         | exportlist1 ',' {% case $1 of
                                SnocOL hs t -> do
-                                 t' <- addTrailingCommaA t (gl $2)
+                                 t' <- addTrailingCommaA t (epTok $2)
                                  return ([], snocOL hs t')}
         | ','             { ([epTok $1], nilOL) }
 
@@ -1021,7 +1021,7 @@ exportlist1 :: { OrdList (LIE GhcPs) }
                                   then return (ls `appOL` $3)
                                   else case ls of
                                          SnocOL hs t -> do
-                                           t' <- addTrailingCommaA t (gl $2)
+                                           t' <- addTrailingCommaA t (epTok $2)
                                            return (snocOL hs t' `appOL` $3)}
         | export_cs       { $1 }
 
@@ -1061,7 +1061,7 @@ qcnames1 :: { [LocatedA ImpExpQcSpec] }     -- A reversed list
                                                     ((L la (ImpExpQcWildcard tok _)):t) ->
                                                        do { return ($3 : L la (ImpExpQcWildcard tok (epTok $2)) : t) }
                                                     (l:t) ->
-                                                       do { l' <- addTrailingCommaA l (gl $2)
+                                                       do { l' <- addTrailingCommaA l (epTok $2)
                                                           ; return ($3 : l' : t)} }
 
         -- Annotations re-added in mkImpExpSubSpec
@@ -1092,14 +1092,14 @@ qcname  :: { LocatedN RdrName }  -- Variable or type constructor
 
 -- One or more semicolons
 semis1  :: { Located [TrailingAnn] }
-semis1  : semis1 ';'  { if isZeroWidthSpan (gl $2) then (sL1 $1 $ unLoc $1) else (sLL $1 $> $ AddSemiAnn (glR $2) : (unLoc $1)) }
+semis1  : semis1 ';'  { if isZeroWidthSpan (gl $2) then (sL1 $1 $ unLoc $1) else (sLL $1 $> $ AddSemiAnn (epTok $2) : (unLoc $1)) }
         | ';'         { case msemi $1 of
                           [] -> noLoc []
                           ms -> sL1 $1 $ ms }
 
 -- Zero or more semicolons
 semis   :: { [TrailingAnn] }
-semis   : semis ';'   { if isZeroWidthSpan (gl $2) then $1 else (AddSemiAnn (glR $2) : $1) }
+semis   : semis ';'   { if isZeroWidthSpan (gl $2) then $1 else (AddSemiAnn (epTok $2) : $1) }
         | {- empty -} { [] }
 
 -- No trailing semicolons, non-empty
@@ -1124,7 +1124,7 @@ importdecl :: { LImportDecl GhcPs }
                   ; checkImportDecl mPreQual mPostQual
                   ; let anns
                          = EpAnnImportDecl
-                             { importDeclAnnImport    = glR $1
+                             { importDeclAnnImport    = epTok $1
                              , importDeclAnnPragma    = fst $ fst $2
                              , importDeclAnnSafe      = fst $3
                              , importDeclAnnQualified = fst $ importDeclQualifiedStyle mPreQual mPostQual
@@ -1143,13 +1143,13 @@ importdecl :: { LImportDecl GhcPs }
                 }
 
 
-maybe_src :: { ((Maybe (EpaLocation,EpaLocation),SourceText),IsBootInterface) }
-        : '{-# SOURCE' '#-}'        { ((Just (glR $1,glR $2),getSOURCE_PRAGs $1)
+maybe_src :: { ((Maybe (EpaLocation,EpToken "#-}"),SourceText),IsBootInterface) }
+        : '{-# SOURCE' '#-}'        { ((Just (glR $1,epTok $2),getSOURCE_PRAGs $1)
                                       , IsBoot) }
         | {- empty -}               { ((Nothing,NoSourceText),NotBoot) }
 
-maybe_safe :: { (Maybe EpaLocation,Bool) }
-        : 'safe'                                { (Just (glR $1),True) }
+maybe_safe :: { (Maybe (EpToken "safe"),Bool) }
+        : 'safe'                                { (Just (epTok $1),True) }
         | {- empty -}                           { (Nothing,      False) }
 
 maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
@@ -1160,12 +1160,12 @@ maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
                         ; return (Just (glR $1), RawPkgQual (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
         | {- empty -}                           { (Nothing,NoRawPkgQual) }
 
-optqualified :: { Located (Maybe EpaLocation) }
-        : 'qualified'                           { sL1 $1 (Just (glR $1)) }
+optqualified :: { Located (Maybe (EpToken "qualified")) }
+        : 'qualified'                           { sL1 $1 (Just (epTok $1)) }
         | {- empty -}                           { noLoc Nothing }
 
-maybeas :: { (Maybe EpaLocation,Located (Maybe (LocatedA ModuleName))) }
-        : 'as' modid                           { (Just (glR $1)
+maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA ModuleName))) }
+        : 'as' modid                           { (Just (epTok $1)
                                                  ,sLL $1 $> (Just $2)) }
         | {- empty -}                          { (Nothing,noLoc Nothing) }
 
@@ -1191,7 +1191,7 @@ importlist :: { ([EpToken ","], OrdList (LIE GhcPs)) }
         -- trailing comma:
         | importlist1 ',' {% case $1 of
                                SnocOL hs t -> do
-                                 t' <- addTrailingCommaA t (gl $2)
+                                 t' <- addTrailingCommaA t (epTok $2)
                                  return ([], snocOL hs t')}
         | ','             { ([epTok $1], nilOL) }
 
@@ -1202,7 +1202,7 @@ importlist1 :: { OrdList (LIE GhcPs) }
                                   then return (ls `appOL` $3)
                                   else case ls of
                                          SnocOL hs t -> do
-                                           t' <- addTrailingCommaA t (gl $2)
+                                           t' <- addTrailingCommaA t (epTok $2)
                                            return (snocOL hs t' `appOL` $3)}
         | import          { $1 }
 
@@ -1271,9 +1271,9 @@ topdecl :: { LHsDecl GhcPs }
         | role_annot                            { L (getLoc $1) (RoleAnnotD noExtField (unLoc $1)) }
         | default_decl                          { L (getLoc $1) (DefD noExtField (unLoc $1)) }
         | 'foreign' fdecl                       {% amsA' (sLL $1 $> ((unLoc $2) (epTok $1))) }
-        | '{-# DEPRECATED' deprecations '#-}'   {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,glR $3), (getDEPRECATED_PRAGs $1)) (fromOL $2))) }
-        | '{-# WARNING' warnings '#-}'          {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,glR $3), (getWARNING_PRAGs $1)) (fromOL $2))) }
-        | '{-# RULES' rules '#-}'               {% amsA' (sLL $1 $> $ RuleD noExtField (HsRules ((glR $1,glR $3), (getRULES_PRAGs $1)) (reverse $2))) }
+        | '{-# DEPRECATED' deprecations '#-}'   {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,epTok $3), (getDEPRECATED_PRAGs $1)) (fromOL $2))) }
+        | '{-# WARNING' warnings '#-}'          {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,epTok $3), (getWARNING_PRAGs $1)) (fromOL $2))) }
+        | '{-# RULES' rules '#-}'               {% amsA' (sLL $1 $> $ RuleD noExtField (HsRules ((glR $1,epTok $3), (getRULES_PRAGs $1)) (reverse $2))) }
         | annotation { $1 }
         | decl_no_th                            { $1 }
 
@@ -1418,13 +1418,13 @@ inst_decl :: { LInstDecl GhcPs }
 
 overlap_pragma :: { Maybe (LocatedP OverlapMode) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
-                                       (AnnPragma (glR $1) (glR $2) noAnn noAnn noAnn noAnn noAnn) }
+                                       (AnnPragma (glR $1) (epTok $2) noAnn noAnn noAnn noAnn noAnn) }
   | '{-# OVERLAPPING'     '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlapping (getOVERLAPPING_PRAGs $1)))
-                                       (AnnPragma (glR $1) (glR $2) noAnn noAnn noAnn noAnn noAnn) }
+                                       (AnnPragma (glR $1) (epTok $2) noAnn noAnn noAnn noAnn noAnn) }
   | '{-# OVERLAPS'        '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlaps (getOVERLAPS_PRAGs $1)))
-                                       (AnnPragma (glR $1) (glR $2) noAnn noAnn noAnn noAnn noAnn) }
+                                       (AnnPragma (glR $1) (epTok $2) noAnn noAnn noAnn noAnn noAnn) }
   | '{-# INCOHERENT'      '#-}' {% fmap Just $ amsr (sLL $1 $> (Incoherent (getINCOHERENT_PRAGs $1)))
-                                       (AnnPragma (glR $1) (glR $2) noAnn noAnn noAnn noAnn noAnn) }
+                                       (AnnPragma (glR $1) (epTok $2) noAnn noAnn noAnn noAnn noAnn) }
   | {- empty -}                 { Nothing }
 
 deriv_strategy_no_via :: { LDerivStrategy GhcPs }
@@ -1485,12 +1485,12 @@ ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
                                          case unLoc $1 of
                                            [] -> return (sLL $1 $> (L loc eqn : unLoc $1))
                                            (h:t) -> do
-                                             h' <- addTrailingSemiA h (gl $2)
+                                             h' <- addTrailingSemiA h (epTok $2)
                                              return (sLL $1 $> ($3 : h' : t)) }
         | ty_fam_inst_eqns ';'        {% case unLoc $1 of
                                            [] -> return (sLZ $1 $> (unLoc $1))
                                            (h:t) -> do
-                                             h' <- addTrailingSemiA h (gl $2)
+                                             h' <- addTrailingSemiA h (epTok $2)
                                              return (sLZ $1 $>  (h':t)) }
         | ty_fam_inst_eqn             { sLL $1 $> [$1] }
         | {- empty -}                 { noLoc [] }
@@ -1656,11 +1656,11 @@ capi_ctype :: { Maybe (LocatedP CType) }
 capi_ctype : '{-# CTYPE' STRING STRING '#-}'
                        {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (getSTRING $2)))
                                         (getSTRINGs $3,getSTRING $3)))
-                              (AnnPragma (glR $1) (glR $4) noAnn (glR $2) (glR $3) noAnn noAnn) }
+                              (AnnPragma (glR $1) (epTok $4) noAnn (glR $2) (glR $3) noAnn noAnn) }
 
            | '{-# CTYPE'        STRING '#-}'
                        {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) Nothing (getSTRINGs $2, getSTRING $2)))
-                              (AnnPragma (glR $1) (glR $3) noAnn noAnn (glR $2) noAnn noAnn) }
+                              (AnnPragma (glR $1) (epTok $3) noAnn noAnn (glR $2) noAnn noAnn) }
 
            |           { Nothing }
 
@@ -1773,7 +1773,7 @@ decls_cls :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }  -- Reversed
                                                                     , unitOL $3))
                                             else case (snd $ unLoc $1) of
                                               SnocOL hs t -> do
-                                                 t' <- addTrailingSemiA t (gl $2)
+                                                 t' <- addTrailingSemiA t (epTok $2)
                                                  return (sLL $1 $> (fst $ unLoc $1
                                                                 , snocOL hs t' `appOL` unitOL $3)) }
           | decls_cls ';'               {% if isNilOL (snd $ unLoc $1)
@@ -1781,7 +1781,7 @@ decls_cls :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }  -- Reversed
                                                                                    ,snd $ unLoc $1))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
-                                                  t' <- addTrailingSemiA t (gl $2)
+                                                  t' <- addTrailingSemiA t (epTok $2)
                                                   return (sLZ $1 $> (fst $ unLoc $1
                                                                  , snocOL hs t')) }
           | decl_cls                    { sL1 $1 ([], unitOL $1) }
@@ -1819,7 +1819,7 @@ decls_inst :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }   -- Reversed
                                                                     , unLoc $3))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
-                                                  t' <- addTrailingSemiA t (gl $2)
+                                                  t' <- addTrailingSemiA t (epTok $2)
                                                   return (sLL $1 $> (fst $ unLoc $1
                                                                  , snocOL hs t' `appOL` unLoc $3)) }
            | decls_inst ';'             {% if isNilOL (snd $ unLoc $1)
@@ -1827,7 +1827,7 @@ decls_inst :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }   -- Reversed
                                                                                    ,snd $ unLoc $1))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
-                                                  t' <- addTrailingSemiA t (gl $2)
+                                                  t' <- addTrailingSemiA t (epTok $2)
                                                   return (sLZ $1 $> (fst $ unLoc $1
                                                                  , snocOL hs t')) }
            | decl_inst                  { sL1 $1 ([],unLoc $1) }
@@ -1857,7 +1857,7 @@ decls   :: { Located (EpaLocation, [EpToken ";"], OrdList (LHsDecl GhcPs)) }
                                                         , unitOL $3))
                                  else case (thdOf3 $ unLoc $1) of
                                    SnocOL hs t -> do
-                                      t' <- addTrailingSemiA t (gl $2)
+                                      t' <- addTrailingSemiA t (epTok $2)
                                       let { this = unitOL $3;
                                             rest = snocOL hs t';
                                             these = rest `appOL` this }
@@ -1868,7 +1868,7 @@ decls   :: { Located (EpaLocation, [EpToken ";"], OrdList (LHsDecl GhcPs)) }
                                                           ,thdOf3 $ unLoc $1))
                                   else case (thdOf3 $ unLoc $1) of
                                     SnocOL hs t -> do
-                                       t' <- addTrailingSemiA t (gl $2)
+                                       t' <- addTrailingSemiA t (epTok $2)
                                        return (sLZ $1 $> (glEEz $1 $2, sndOf3 $ unLoc $1, snocOL hs t')) }
         | decl                          { sL1 $1 (glR $1,  [], unitOL $1) }
         | {- empty -}                   { noLoc (noAnn, [],nilOL) }
@@ -1911,12 +1911,12 @@ rules   :: { [LRuleDecl GhcPs] } -- Reversed
         :  rules ';' rule              {% case $1 of
                                             [] -> return ($3:$1)
                                             (h:t) -> do
-                                              h' <- addTrailingSemiA h (gl $2)
+                                              h' <- addTrailingSemiA h (epTok $2)
                                               return ($3:h':t) }
         |  rules ';'                   {% case $1 of
                                             [] -> return $1
                                             (h:t) -> do
-                                              h' <- addTrailingSemiA h (gl $2)
+                                              h' <- addTrailingSemiA h (epTok $2)
                                               return (h':t) }
         |  rule                        { [$1] }
         |  {- empty -}                 { [] }
@@ -2016,10 +2016,10 @@ to varid (used for rule_vars), 'checkRuleTyVarBndrNames' must be updated.
 maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
         : '{-# DEPRECATED' strings '#-}'
                             {% fmap Just $ amsr (sLL $1 $> $ DeprecatedTxt (getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
-                                (AnnPragma (glR $1) (glR $3) (fst $ unLoc $2) noAnn noAnn noAnn noAnn) }
+                                (AnnPragma (glR $1) (epTok $3) (fst $ unLoc $2) noAnn noAnn noAnn noAnn) }
         | '{-# WARNING' warning_category strings '#-}'
                             {% fmap Just $ amsr (sLL $1 $> $ WarningTxt $2 (getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
-                                (AnnPragma (glR $1) (glR $4) (fst $ unLoc $3) noAnn noAnn noAnn noAnn)}
+                                (AnnPragma (glR $1) (epTok $4) (fst $ unLoc $3) noAnn noAnn noAnn noAnn)}
         |  {- empty -}      { Nothing }
 
 warning_category :: { Maybe (LocatedE InWarningCategory) }
@@ -2032,13 +2032,13 @@ warnings :: { OrdList (LWarnDecl GhcPs) }
                                            then return ($1 `appOL` $3)
                                            else case $1 of
                                              SnocOL hs t -> do
-                                              t' <- addTrailingSemiA t (gl $2)
+                                              t' <- addTrailingSemiA t (epTok $2)
                                               return (snocOL hs t' `appOL` $3) }
         | warnings ';'                 {% if isNilOL $1
                                            then return $1
                                            else case $1 of
                                              SnocOL hs t -> do
-                                              t' <- addTrailingSemiA t (gl $2)
+                                              t' <- addTrailingSemiA t (epTok $2)
                                               return (snocOL hs t') }
         | warning                      { $1 }
         | {- empty -}                  { nilOL }
@@ -2061,13 +2061,13 @@ deprecations :: { OrdList (LWarnDecl GhcPs) }
                                            then return ($1 `appOL` $3)
                                            else case $1 of
                                              SnocOL hs t -> do
-                                              t' <- addTrailingSemiA t (gl $2)
+                                              t' <- addTrailingSemiA t (epTok $2)
                                               return (snocOL hs t' `appOL` $3) }
         | deprecations ';'             {% if isNilOL $1
                                            then return $1
                                            else case $1 of
                                              SnocOL hs t -> do
-                                              t' <- addTrailingSemiA t (gl $2)
+                                              t' <- addTrailingSemiA t (epTok $2)
                                               return (snocOL hs t') }
         | deprecation                  { $1 }
         | {- empty -}                  { nilOL }
@@ -2101,19 +2101,19 @@ stringlist :: { Located (OrdList (Located StringLiteral)) }
 annotation :: { LHsDecl GhcPs }
     : '{-# ANN' name_var aexp '#-}'      {% runPV (unECP $3) >>= \ $3 ->
                                             amsA' (sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                            (AnnPragma (glR $1) (glR $4) noAnn noAnn noAnn noAnn noAnn,
+                                            (AnnPragma (glR $1) (epTok $4) noAnn noAnn noAnn noAnn noAnn,
                                             (getANN_PRAGs $1))
                                             (ValueAnnProvenance $2) $3)) }
 
     | '{-# ANN' 'type' otycon aexp '#-}' {% runPV (unECP $4) >>= \ $4 ->
                                             amsA' (sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                            (AnnPragma (glR $1) (glR $5) noAnn noAnn noAnn (epTok $2) noAnn,
+                                            (AnnPragma (glR $1) (epTok $5) noAnn noAnn noAnn (epTok $2) noAnn,
                                             (getANN_PRAGs $1))
                                             (TypeAnnProvenance $3) $4)) }
 
     | '{-# ANN' 'module' aexp '#-}'      {% runPV (unECP $3) >>= \ $3 ->
                                             amsA' (sLL $1 $> (AnnD noExtField $ HsAnnotation
-                                                (AnnPragma (glR $1) (glR $4) noAnn noAnn noAnn noAnn (epTok $2),
+                                                (AnnPragma (glR $1) (epTok $4) noAnn noAnn noAnn noAnn (epTok $2),
                                                 (getANN_PRAGs $1))
                                                  ModuleAnnProvenance $3)) }
 
@@ -2189,14 +2189,14 @@ sig_vars :: { Located [LocatedN RdrName] }    -- Returned in reversed order
 
 sigtypes1 :: { OrdList (LHsSigType GhcPs) }
    : sigtype                 { unitOL $1 }
-   | sigtype ',' sigtypes1   {% do { st <- addTrailingCommaA $1 (gl $2)
+   | sigtype ',' sigtypes1   {% do { st <- addTrailingCommaA $1 (epTok $2)
                                    ; return $ unitOL st `appOL` $3 } }
 -----------------------------------------------------------------------------
 -- Types
 
 unpackedness :: { Located UnpackednessPragma }
-        : '{-# UNPACK' '#-}'   { sLL $1 $> (UnpackednessPragma (glR $1, glR $2) (getUNPACK_PRAGs $1) SrcUnpack) }
-        | '{-# NOUNPACK' '#-}' { sLL $1 $> (UnpackednessPragma (glR $1, glR $2) (getNOUNPACK_PRAGs $1) SrcNoUnpack) }
+        : '{-# UNPACK' '#-}'   { sLL $1 $> (UnpackednessPragma (glR $1, epTok $2) (getUNPACK_PRAGs $1) SrcUnpack) }
+        | '{-# NOUNPACK' '#-}' { sLL $1 $> (UnpackednessPragma (glR $1, epTok $2) (getNOUNPACK_PRAGs $1) SrcNoUnpack) }
 
 forall_telescope :: { Located (HsForAllTelescope GhcPs) }
         : 'forall' tv_bndrs '.'  {% do { hintExplicitForall $1
@@ -2330,7 +2330,7 @@ atype :: { LHsType GhcPs }
 
         -- List and tuple syntax whose interpretation depends on the extension ListTuplePuns.
         | '(' ')'                        {% amsA' . sLL $1 $> =<< (mkTupleSyntaxTy (epTok $1) [] (epTok $>)) }
-        | '(' ktype ',' comma_types1 ')' {% do { h <- addTrailingCommaA $2 (gl $3)
+        | '(' ktype ',' comma_types1 ')' {% do { h <- addTrailingCommaA $2 (epTok $3)
                                                ; amsA' . sLL $1 $> =<< (mkTupleSyntaxTy (epTok $1) (h : $4) (epTok $>)) }}
         | '(#' '#)'                   {% do { requireLTPuns PEP_TupleSyntaxType $1 $>
                                             ; amsA' (sLL $1 $> $ HsTupleTy (AnnParensHash (epTok $1) (epTok $2)) HsUnboxedTuple []) } }
@@ -2348,7 +2348,7 @@ atype :: { LHsType GhcPs }
                                            ; amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted (L (getLoc $2) $ nameRdrName (dataConName (unLoc $2)))) }}
         | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
                              {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
-                                   ; h <- addTrailingCommaA $3 (gl $4)
+                                   ; h <- addTrailingCommaA $3 (epTok $4)
                                    ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $6) (h : $5)) }}
         | '[' ']'               {% withCombinedComments $1 $> (mkListSyntaxTy0 (epTok $1) (epTok $2)) }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
@@ -2362,7 +2362,7 @@ atype :: { LHsType GhcPs }
         -- if you had written '[ty, ty, ty]
         -- (One means a list type, zero means the list type constructor,
         -- so you have to quote those.)
-        | '[' ktype ',' comma_types1 ']'  {% do { h <- addTrailingCommaA $2 (gl $3)
+        | '[' ktype ',' comma_types1 ']'  {% do { h <- addTrailingCommaA $2 (epTok $3)
                                                 ; amsA' (sLL $1 $> $ HsExplicitListTy (NoEpTok,epTok $1,epTok $5) NotPromoted (h:$4)) }}
         | INTEGER              { sLLa $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
                                                            (il_value (getINTEGER $1)) }
@@ -2386,7 +2386,7 @@ inst_type :: { LHsSigType GhcPs }
 deriv_types :: { [LHsSigType GhcPs] }
         : sigktype                      { [$1] }
 
-        | sigktype ',' deriv_types      {% do { h <- addTrailingCommaA $1 (gl $2)
+        | sigktype ',' deriv_types      {% do { h <- addTrailingCommaA $1 (epTok $2)
                                            ; return (h : $3) } }
 
 comma_types0  :: { [LHsType GhcPs] }  -- Zero or more:  ty,ty,ty
@@ -2395,13 +2395,13 @@ comma_types0  :: { [LHsType GhcPs] }  -- Zero or more:  ty,ty,ty
 
 comma_types1    :: { [LHsType GhcPs] }  -- One or more:  ty,ty,ty
         : ktype                        { [$1] }
-        | ktype  ',' comma_types1      {% do { h <- addTrailingCommaA $1 (gl $2)
+        | ktype  ',' comma_types1      {% do { h <- addTrailingCommaA $1 (epTok $2)
                                              ; return (h : $3) }}
 
 bar_types2    :: { [LHsType GhcPs] }  -- Two or more:  ty|ty|ty
-        : ktype  '|' ktype             {% do { h <- addTrailingVbarA $1 (gl $2)
+        : ktype  '|' ktype             {% do { h <- addTrailingVbarA $1 (epTok $2)
                                              ; return [h,$3] }}
-        | ktype  '|' bar_types2        {% do { h <- addTrailingVbarA $1 (gl $2)
+        | ktype  '|' bar_types2        {% do { h <- addTrailingVbarA $1 (epTok $2)
                                              ; return (h : $3) }}
 
 tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
@@ -2444,7 +2444,7 @@ fds :: { Located (EpToken "|",[LHsFunDep GhcPs]) }
 fds1 :: { Located [LHsFunDep GhcPs] }
         : fds1 ',' fd   {%
                            do { let (h:t) = unLoc $1 -- Safe from fds1 rules
-                              ; h' <- addTrailingCommaA h (gl $2)
+                              ; h' <- addTrailingCommaA h (epTok $2)
                               ; return (sLL $1 $> ($3 : h' : t)) }}
         | fd            { sL1 $1 [$1] }
 
@@ -2511,7 +2511,7 @@ gadt_constrlist :: { Located ((EpToken "where", EpToken "{", EpToken "}")
 
 gadt_constrs :: { Located [LConDecl GhcPs] }
         : gadt_constr ';' gadt_constrs
-                  {% do { h <- addTrailingSemiA $1 (gl $2)
+                  {% do { h <- addTrailingSemiA $1 (epTok $2)
                         ; return (L (comb2 $1 $3) (h : unLoc $3)) }}
         | gadt_constr                   { L (glA $1) [$1] }
         | {- empty -}                   { noLoc [] }
@@ -2547,7 +2547,7 @@ constrs :: { Located (EpToken "=",[LConDecl GhcPs]) }
 constrs1 :: { Located [LConDecl GhcPs] }
         : constrs1 '|' constr
             {% do { let (h:t) = unLoc $1
-                  ; h' <- addTrailingVbarA h (gl $2)
+                  ; h' <- addTrailingVbarA h (epTok $2)
                   ; return (sLL $1 $> ($3 : h' : t)) }}
         | constr                         { sL1 $1 [$1] }
 
@@ -2587,7 +2587,7 @@ fielddecls :: { [LConDeclField GhcPs] }
 
 fielddecls1 :: { [LConDeclField GhcPs] }
         : fielddecl ',' fielddecls1
-            {% do { h <- addTrailingCommaA $1 (gl $2)
+            {% do { h <- addTrailingCommaA $1 (epTok $2)
                   ; return (h : $3) }}
         | fielddecl   { [$1] }
 
@@ -2744,41 +2744,41 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# COMPLETE' qcon_list opt_tyconsig  '#-}'
                 {% let (dcolon, tc) = $3
                    in amsA' (sLL $1 $>
-                         (SigD noExtField (CompleteMatchSig ((glR $1,dcolon,glR $4), (getCOMPLETE_PRAGs $1)) $2 tc))) }
+                         (SigD noExtField (CompleteMatchSig ((glR $1,dcolon,epTok $4), (getCOMPLETE_PRAGs $1)) $2 tc))) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
         | '{-# INLINE' activation qvarcon '#-}'
-                {% amsA' (sLL $1 $> $ SigD noExtField (InlineSig (glR $1, glR $4, fst $2) $3
+                {% amsA' (sLL $1 $> $ SigD noExtField (InlineSig (glR $1, epTok $4, fst $2) $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))) }
         | '{-# OPAQUE' qvar '#-}'
-                {% amsA' (sLL $1 $> $ SigD noExtField (InlineSig (glR $1, glR $3, noAnn) $2
+                {% amsA' (sLL $1 $> $ SigD noExtField (InlineSig (glR $1, epTok $3, noAnn) $2
                             (mkOpaquePragma (getOPAQUE_PRAGs $1)))) }
         | '{-# SCC' qvar '#-}'
-          {% amsA' (sLL $1 $> (SigD noExtField (SCCFunSig ((glR $1, glR $3), (getSCC_PRAGs $1)) $2 Nothing))) }
+          {% amsA' (sLL $1 $> (SigD noExtField (SCCFunSig ((glR $1, epTok $3), (getSCC_PRAGs $1)) $2 Nothing))) }
 
         | '{-# SCC' qvar STRING '#-}'
           {% do { scc <- getSCC $3
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc Nothing
-                ; amsA' (sLL $1 $> (SigD noExtField (SCCFunSig ((glR $1, glR $4), (getSCC_PRAGs $1)) $2 (Just ( sL1a $3 str_lit))))) }}
+                ; amsA' (sLL $1 $> (SigD noExtField (SCCFunSig ((glR $1, epTok $4), (getSCC_PRAGs $1)) $2 (Just ( sL1a $3 str_lit))))) }}
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% amsA' (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
                                              (NoUserInlinePrag, FunLike) (snd $2)
-                  in sLL $1 $> $ SigD noExtField (SpecSig (AnnSpecSig (glR $1) (glR $6) (epUniTok $4) (fst $2)) $3 (fromOL $5) inl_prag)) }
+                  in sLL $1 $> $ SigD noExtField (SpecSig (AnnSpecSig (glR $1) (epTok $6) (epUniTok $4) (fst $2)) $3 (fromOL $5) inl_prag)) }
 
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
-             {% amsA' (sLL $1 $> $ SigD noExtField (SpecSig (AnnSpecSig (glR $1) (glR $6) (epUniTok $4) (fst $2)) $3 (fromOL $5)
+             {% amsA' (sLL $1 $> $ SigD noExtField (SpecSig (AnnSpecSig (glR $1) (epTok $6) (epUniTok $4) (fst $2)) $3 (fromOL $5)
                                (mkInlinePragma (getSPEC_INLINE_PRAGs $1)
                                                (getSPEC_INLINE $1) (snd $2)))) }
 
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
-                {% amsA' (sLL $1 $> $ SigD noExtField (SpecInstSig ((glR $1,epTok $2,glR $4), (getSPEC_PRAGs $1)) $3)) }
+                {% amsA' (sLL $1 $> $ SigD noExtField (SpecInstSig ((glR $1,epTok $2,epTok $4), (getSPEC_PRAGs $1)) $3)) }
 
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
-            {% amsA' (sLL $1 $> $ SigD noExtField (MinimalSig ((glR $1,glR $3), (getMINIMAL_PRAGs $1)) $2)) }
+            {% amsA' (sLL $1 $> $ SigD noExtField (MinimalSig ((glR $1,epTok $3), (getMINIMAL_PRAGs $1)) $2)) }
 
 activation :: { (ActivationAnn,Maybe Activation) }
         -- See Note [%shift: activation -> {- empty -}]
@@ -2914,7 +2914,7 @@ exp10 :: { ECP }
         -- See Note [%shift: exp10 -> fexp]
         | fexp %shift                  { $1 }
 
-optSemi :: { (Maybe EpaLocation,Bool) }
+optSemi :: { (Maybe (EpToken ";"),Bool) }
         : ';'         { (msemim $1,True) }
         | {- empty -} { (Nothing,False) }
 
@@ -2967,12 +2967,12 @@ prag_e :: { Located (HsPragE GhcPs) }
       : '{-# SCC' STRING '#-}'      {% do { scc <- getSCC $2
                                           ; return (sLL $1 $>
                                              (HsPragSCC
-                                                (AnnPragma (glR $1) (glR $3) noAnn (glR $2) noAnn noAnn noAnn,
+                                                (AnnPragma (glR $1) (epTok $3) noAnn (glR $2) noAnn noAnn noAnn,
                                                 (getSCC_PRAGs $1))
                                                 (StringLiteral (getSTRINGs $2) scc Nothing)))} }
       | '{-# SCC' VARID  '#-}'      { sLL $1 $>
                                              (HsPragSCC
-                                               (AnnPragma (glR $1) (glR $3) noAnn (glR $2) noAnn noAnn noAnn,
+                                               (AnnPragma (glR $1) (epTok $3) noAnn (glR $2) noAnn noAnn noAnn,
                                                (getSCC_PRAGs $1))
                                                (StringLiteral NoSourceText (getVARID $2) Nothing)) }
 
@@ -3025,13 +3025,13 @@ aexp    :: { ECP }
                                                  , m_ctxt = LamAlt LamSingle
                                                  , m_pats = L (listLocation $2) $2
                                                  , m_grhss = unguardedGRHSs (comb2 $3 $4) $4 (EpAnn (glR $3) (GrhsAnn Nothing (Right $ epUniTok $3)) emptyComments) }])
-                            (EpAnnLam (glR $1) Nothing) }
+                            (EpAnnLam (epTok $1) Nothing) }
         | '\\' 'lcase' altslist(pats1)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamPV (comb3 $1 $2 $>) LamCase $3 (EpAnnLam (glR $1) (Just (glR $2))) }
+                 mkHsLamPV (comb3 $1 $2 $>) LamCase $3 (EpAnnLam (epTok $1) (Just (glR $2))) }
         | '\\' 'lcases' altslist(argpats)
             {  ECP $ $3 >>= \ $3 ->
-                 mkHsLamPV (comb3 $1 $2 $>) LamCases $3 (EpAnnLam (glR $1) (Just (glR $2))) }
+                 mkHsLamPV (comb3 $1 $2 $>) LamCases $3 (EpAnnLam (epTok $1) (Just (glR $2))) }
         | 'if' exp optSemi 'then' exp optSemi 'else' exp
                          {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                             return $ ECP $
@@ -3039,9 +3039,9 @@ aexp    :: { ECP }
                               unECP $8 >>= \ $8 ->
                               mkHsIfPV (comb2 $1 $>) $2 (snd $3) $5 (snd $6) $8
                                     (AnnsIf
-                                      { aiIf = glR $1
-                                      , aiThen = glR $4
-                                      , aiElse = glR $7
+                                      { aiIf = epTok $1
+                                      , aiThen = epTok $4
+                                      , aiElse = epTok $7
                                       , aiThenSemi = fst $3
                                       , aiElseSemi = fst $6})}
 
@@ -3054,7 +3054,7 @@ aexp    :: { ECP }
                                              return $ ECP $
                                                $4 >>= \ $4 ->
                                                mkHsCasePV (comb3 $1 $3 $4) $2 $4
-                                                    (EpAnnHsCase (glR $1) (glR $3)) }
+                                                    (EpAnnHsCase (epTok $1) (epTok $3)) }
         -- QualifiedDo.
         | DO  stmtlist               {% do
                                       hintQualifiedDo $1
@@ -3093,7 +3093,7 @@ aexp1   :: { ECP }
         | aexp1 TIGHT_INFIX_PROJ field
             {% runPV (unECP $1) >>= \ $1 ->
                fmap ecpFromExp $ amsA' (
-                 let fl = sLLa $2 $> (DotFieldOcc (AnnFieldLabel (Just $ glR $2)) $3) in
+                 let fl = sLLa $2 $> (DotFieldOcc (AnnFieldLabel (Just $ epTok $2)) $3) in
                sLL $1 $> $ mkRdrGetField $1 fl)  }
 
 
@@ -3135,7 +3135,7 @@ aexp2   :: { ECP }
 
         -- This case is only possible when 'OverloadedRecordDotBit' is enabled.
         | '(' projection ')'            { ECP $
-                                            amsA' (sLL $1 $> $ mkRdrProjection (NE.reverse (unLoc $2)) (AnnProjection (glR $1) (glR $3)) )
+                                            amsA' (sLL $1 $> $ mkRdrProjection (NE.reverse (unLoc $2)) (AnnProjection (epTok $1) (epTok $3)) )
                                             >>= ecpFromExp'
                                         }
 
@@ -3187,8 +3187,8 @@ projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-                             { sLL $1 $> ((sLLa $2 $> $ DotFieldOcc (AnnFieldLabel (Just $ glR $2)) $3) `NE.cons` unLoc $1) }
-        | PREFIX_PROJ field  { sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (AnnFieldLabel (Just $ glR $1)) $2) :| [])}
+                             { sLL $1 $> ((sLLa $2 $> $ DotFieldOcc (AnnFieldLabel (Just $ epTok $2)) $3) `NE.cons` unLoc $1) }
+        | PREFIX_PROJ field  { sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (AnnFieldLabel (Just $ epTok $1)) $2) :| [])}
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { fmap (HsUntypedSplice noExtField) (reLoc $1) }
@@ -3261,7 +3261,7 @@ orpats(EXP) :: { Located (NonEmpty (LPat GhcPs)) }
                                     ; return (sL1 pat (NE.singleton pat)) }}
         | EXP ';' orpats(EXP)   {% do
                                     { pat <- (checkPattern <=< runPV) (unECP $1)
-                                    ; pat <- addTrailingSemiA pat (getLoc $2)
+                                    ; pat <- addTrailingSemiA pat (epTok $2)
                                     ; return (sLL pat $> (pat NE.<| unLoc $3)) }}
 
 -- Always at least one comma or bar.
@@ -3272,7 +3272,7 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
            : texp commas_tup_tail
                            { unECP $1 >>= \ $1 ->
                              $2 >>= \ $2 ->
-                             do { t <- amsA $1 [AddCommaAnn (srcSpan2e $ fst $2)]
+                             do { t <- amsA $1 [AddCommaAnn (EpTok $ srcSpan2e $ fst $2)]
                                 ; return (Tuple (Right t : snd $2)) } }
            | commas tup_tail
                  { $2 >>= \ $2 ->
@@ -3299,7 +3299,7 @@ commas_tup_tail : commas tup_tail
 tup_tail :: { forall b. DisambECP b => PV [Either (EpAnn Bool) (LocatedA b)] }
           : texp commas_tup_tail { unECP $1 >>= \ $1 ->
                                    $2 >>= \ $2 ->
-                                   do { t <- amsA $1 [AddCommaAnn (srcSpan2e $ fst $2)]
+                                   do { t <- amsA $1 [AddCommaAnn (EpTok $ srcSpan2e $ fst $2)]
                                       ; return (Right t : snd $2) } }
           | texp                 { unECP $1 >>= \ $1 ->
                                    return [Right $1] }
@@ -3339,7 +3339,7 @@ list :: { forall b. DisambECP b => SrcSpan -> (EpaLocation, EpaLocation) -> PV (
         | texp '|' flattenedpquals
              { \loc (ao,ac) ->
                 checkMonadComp >>= \ ctxt ->
-                unECP $1 >>= \ $1 -> do { t <- addTrailingVbarA $1 (gl $2)
+                unECP $1 >>= \ $1 -> do { t <- addTrailingVbarA $1 (epTok $2)
                 ; amsA' (L loc $ mkHsCompAnns ctxt (unLoc $3) t (AnnList Nothing (ListSquare (EpTok ao) (EpTok ac)) [] noAnn []))
                     >>= ecpFromExp' } }
 
@@ -3348,11 +3348,11 @@ lexps :: { forall b. DisambECP b => PV [LocatedA b] }
                                      unECP $3 >>= \ $3 ->
                                      case $1 of
                                        (h:t) -> do
-                                         h' <- addTrailingCommaA h (gl $2)
+                                         h' <- addTrailingCommaA h (epTok $2)
                                          return (((:) $! $3) $! (h':t)) }
         | texp ',' texp             { unECP $1 >>= \ $1 ->
                                       unECP $3 >>= \ $3 ->
-                                      do { h <- addTrailingCommaA $1 (gl $2)
+                                      do { h <- addTrailingCommaA $1 (epTok $2)
                                          ; return [$3,h] }}
 
 -----------------------------------------------------------------------------
@@ -3375,7 +3375,7 @@ pquals :: { Located [[LStmt GhcPs (LHsExpr GhcPs)]] }
     : squals '|' pquals
                      {% case unLoc $1 of
                           (h:t) -> do
-                            h' <- addTrailingVbarA h (gl $2)
+                            h' <- addTrailingVbarA h (epTok $2)
                             return (sLL $1 $> (reverse (h':t) : unLoc $3)) }
     | squals         { L (getLoc $1) [reverse (unLoc $1)] }
 
@@ -3384,13 +3384,13 @@ squals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }   -- In reverse order, becau
     : squals ',' transformqual
              {% case unLoc $1 of
                   (h:t) -> do
-                    h' <- addTrailingCommaA h (gl $2)
+                    h' <- addTrailingCommaA h (epTok $2)
                     return (sLL $1 $> [sLLa $1 $> ((unLoc $3) (reverse (h':t)))]) }
     | squals ',' qual
              {% runPV $3 >>= \ $3 ->
                 case unLoc $1 of
                   (h:t) -> do
-                    h' <- addTrailingCommaA h (gl $2)
+                    h' <- addTrailingCommaA h (epTok $2)
                     return (sLL $1 $> ($3 : (h':t))) }
     | transformqual        { sLL $1 $> [L (getLocAnn $1) ((unLoc $1) [])] }
     | qual                               {% runPV $1 >>= \ $1 ->
@@ -3435,7 +3435,7 @@ guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
     : guardquals1 ',' qual  {% runPV $3 >>= \ $3 ->
                                case unLoc $1 of
                                  (h:t) -> do
-                                   h' <- addTrailingCommaA h (gl $2)
+                                   h' <- addTrailingCommaA h (epTok $2)
                                    return (sLL $1 $> ($3 : (h':t))) }
     | qual                  {% runPV $1 >>= \ $1 ->
                                return $ sL1 $1 [$1] }
@@ -3467,14 +3467,14 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([EpToken ";"],[LMatch Ghc
                                             [] -> return (sLL $1 $> ((fst $ unLoc $1) ++ [mzEpTok $2]
                                                                             ,[$3]))
                                             (h:t) -> do
-                                              h' <- addTrailingSemiA h (gl $2)
+                                              h' <- addTrailingSemiA h (epTok $2)
                                               return (sLL $1 $> (fst $ unLoc $1,$3 : h' : t)) }
         | alts1(PATS) ';'           {  $1 >>= \ $1 ->
                                          case snd $ unLoc $1 of
                                            [] -> return (sLZ $1 $> ((fst $ unLoc $1) ++ [mzEpTok $2]
                                                                            ,[]))
                                            (h:t) -> do
-                                             h' <- addTrailingSemiA h (gl $2)
+                                             h' <- addTrailingSemiA h (epTok $2)
                                              return (sLZ $1 $> (fst $ unLoc $1, h' : t)) }
         | alt(PATS)                 { $1 >>= \ $1 -> return $ sL1 $1 ([],[$1]) }
 
@@ -3577,14 +3577,14 @@ stmts :: { forall b. DisambECP b => PV (Located (OrdList (EpToken ";"),[LStmt Gh
                               [] -> return (sLL $1 $> ( (fst $ unLoc $1) `snocOL` (epTok $2)
                                                       , $3 : (snd $ unLoc $1)))
                               (h:t) -> do
-                               { h' <- addTrailingSemiA h (gl $2)
+                               { h' <- addTrailingSemiA h (epTok $2)
                                ; return $ sLL $1 $> (fst $ unLoc $1,$3 :(h':t)) }}
 
         | stmts ';'     {  $1 >>= \ $1 ->
                            case (snd $ unLoc $1) of
                              [] -> return (sLZ $1 $> ((fst $ unLoc $1) `snocOL` (epTok $2),snd $ unLoc $1))
                              (h:t) -> do
-                               { h' <- addTrailingSemiA h (gl $2)
+                               { h' <- addTrailingSemiA h (epTok $2)
                                ; return $ sLZ $1 $> (fst $ unLoc $1,h':t) }}
         | stmt                   { $1 >>= \ $1 ->
                                    return $ sL1 $1 (nilOL,[$1]) }
@@ -3624,7 +3624,7 @@ fbinds1 :: { forall b. DisambECP b => PV ([Fbind b], Maybe SrcSpan) }
         : fbind ',' fbinds1
                  { $1 >>= \ $1 ->
                    $3 >>= \ $3 -> do
-                   h <- addTrailingCommaFBind $1 (gl $2)
+                   h <- addTrailingCommaFBind $1 (epTok $2)
                    return (case $3 of (flds, dd) -> (h : flds, dd)) }
         | fbind                         { $1 >>= \ $1 ->
                                           return ([$1], Nothing) }
@@ -3649,7 +3649,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                             let top = sL1a $1 $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (L lf ())
-                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ glR $2))  f) : t
+                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ epTok $2))  f) : t
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = False
@@ -3665,7 +3665,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                             let top =  sL1a $1 $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (L lf ())
-                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ glR $2)) f) : t
+                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ epTok $2)) f) : t
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = True
@@ -3676,7 +3676,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
 fieldToUpdate :: { Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] }
 fieldToUpdate
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
-        : fieldToUpdate TIGHT_INFIX_PROJ field   { sLL $1 $> ((sLLa $2 $> (DotFieldOcc (AnnFieldLabel $ Just $ glR $2) $3)) : unLoc $1) }
+        : fieldToUpdate TIGHT_INFIX_PROJ field   { sLL $1 $> ((sLLa $2 $> (DotFieldOcc (AnnFieldLabel $ Just $ epTok $2) $3)) : unLoc $1) }
         | field       { sL1 $1 [sL1a $1 (DotFieldOcc (AnnFieldLabel Nothing) $1)] }
 
 -----------------------------------------------------------------------------
@@ -3686,12 +3686,12 @@ dbinds  :: { Located [LIPBind GhcPs] } -- reversed
         : dbinds ';' dbind
                       {% case unLoc $1 of
                            (h:t) -> do
-                             h' <- addTrailingSemiA h (gl $2)
+                             h' <- addTrailingSemiA h (epTok $2)
                              return (let { this = $3; rest = h':t }
                                 in rest `seq` this `seq` sLL $1 $> (this : rest)) }
         | dbinds ';'  {% case unLoc $1 of
                            (h:t) -> do
-                             h' <- addTrailingSemiA h (gl $2)
+                             h' <- addTrailingSemiA h (epTok $2)
                              return (sLZ $1 $> (h':t)) }
         | dbind                        { let this = $1 in this `seq` (sL1 $1 [this]) }
 --      | {- empty -}                  { [] }
@@ -3719,7 +3719,7 @@ name_boolformula_opt :: { LBooleanFormula (LocatedN RdrName) }
 name_boolformula :: { LBooleanFormula (LocatedN RdrName) }
         : name_boolformula_and                      { $1 }
         | name_boolformula_and '|' name_boolformula
-                           {% do { h <- addTrailingVbarL $1 (gl $2)
+                           {% do { h <- addTrailingVbarL $1 (epTok $2)
                                  ; return (sLLa $1 $> (Or [h,$3])) } }
 
 name_boolformula_and :: { LBooleanFormula (LocatedN RdrName) }
@@ -3729,7 +3729,7 @@ name_boolformula_and :: { LBooleanFormula (LocatedN RdrName) }
 name_boolformula_and_list :: { [LBooleanFormula (LocatedN RdrName)] }
         : name_boolformula_atom                               { [$1] }
         | name_boolformula_atom ',' name_boolformula_and_list
-            {% do { h <- addTrailingCommaL $1 (gl $2)
+            {% do { h <- addTrailingCommaL $1 (epTok $2)
                   ; return (h : $3) } }
 
 name_boolformula_atom :: { LBooleanFormula (LocatedN RdrName) }
@@ -3928,7 +3928,7 @@ qopm    :: { forall b. DisambInfixOp b => PV (LocatedN b) }   -- used in section
         | hole_op               { mkHsInfixHolePV $1 }
 
 hole_op :: { LocatedN (HsExpr GhcPs) }   -- used in sections
-hole_op : '`' '_' '`'           { sLLa $1 $> (hsHoleExpr (Just $ EpAnnUnboundVar (glR $1, glR $3) (glR $2))) }
+hole_op : '`' '_' '`'           { sLLa $1 $> (hsHoleExpr (Just $ EpAnnUnboundVar (epTok $1, epTok $3) (epTok $2))) }
 
 qvarop :: { LocatedN RdrName }
         : qvarsym               { $1 }
@@ -4475,19 +4475,14 @@ in GHC.Parser.Annotation
 
 -}
 
-msemi :: Located e -> [TrailingAnn]
-msemi !l = if isZeroWidthSpan (gl l) then [] else [AddSemiAnn (srcSpan2e $ gl l)]
+msemi :: Located Token -> [TrailingAnn]
+msemi !l = if isZeroWidthSpan (gl l) then [] else [AddSemiAnn (epTok l)]
 
-msemiA :: Located e -> [EpToken ";"]
-msemiA !l = if isZeroWidthSpan (gl l) then [] else [EpTok (srcSpan2e $ gl l)]
+msemiA :: Located Token -> [EpToken ";"]
+msemiA !l = if isZeroWidthSpan (gl l) then [] else [epTok l]
 
-msemim :: Located e -> Maybe EpaLocation
-msemim !l = if isZeroWidthSpan (gl l) then Nothing else Just (srcSpan2e $ gl l)
-
--- | If the 'Token' is using its unicode variant return the unicode variant of
---   the annotation
-toUnicodeAnn :: AnnKeywordId -> Located Token -> AnnKeywordId
-toUnicodeAnn !a !t = if isUnicode t then unicodeAnn a else a
+msemim :: Located Token -> Maybe (EpToken ";")
+msemim !l = if isZeroWidthSpan (gl l) then Nothing else Just (epTok l)
 
 toUnicode :: Located Token -> IsUnicodeSyntax
 toUnicode t = if isUnicode t then UnicodeSyntax else NormalSyntax
@@ -4631,36 +4626,36 @@ epExplicitBraces !t1 !t2 = EpExplicitBraces (epTok t1) (epTok t2)
 
 -- -------------------------------------
 
-addTrailingCommaFBind :: MonadP m => Fbind b -> SrcSpan -> m (Fbind b)
+addTrailingCommaFBind :: MonadP m => Fbind b -> EpToken "," -> m (Fbind b)
 addTrailingCommaFBind (Left b)  l = fmap Left  (addTrailingCommaA b l)
 addTrailingCommaFBind (Right b) l = fmap Right (addTrailingCommaA b l)
 
-addTrailingVbarA :: MonadP m => LocatedA a -> SrcSpan -> m (LocatedA a)
-addTrailingVbarA  la span = addTrailingAnnA la span AddVbarAnn
+addTrailingVbarA :: MonadP m => LocatedA a -> EpToken "|" -> m (LocatedA a)
+addTrailingVbarA  la tok = addTrailingAnnA la tok AddVbarAnn
 
-addTrailingSemiA :: MonadP m => LocatedA a -> SrcSpan -> m (LocatedA a)
+addTrailingSemiA :: MonadP m => LocatedA a -> EpToken ";" -> m (LocatedA a)
 addTrailingSemiA  la span = addTrailingAnnA la span AddSemiAnn
 
-addTrailingCommaA :: MonadP m => LocatedA a -> SrcSpan -> m (LocatedA a)
+addTrailingCommaA :: MonadP m => LocatedA a -> EpToken "," -> m (LocatedA a)
 addTrailingCommaA la span = addTrailingAnnA la span AddCommaAnn
 
-addTrailingAnnA :: MonadP m => LocatedA a -> SrcSpan -> (EpaLocation -> TrailingAnn) -> m (LocatedA a)
-addTrailingAnnA (L anns a) ss ta = do
+addTrailingAnnA :: (MonadP m, HasLoc tok) => LocatedA a -> tok -> (tok -> TrailingAnn) -> m (LocatedA a)
+addTrailingAnnA (L anns a) tok ta = do
   let cs = emptyComments
   -- AZ:TODO: generalise updating comments into an annotation
   let
-    anns' = if isZeroWidthSpan ss
+    anns' = if isZeroWidthSpan (getHasLoc tok)
               then anns
-              else addTrailingAnnToA (ta (srcSpan2e ss)) cs anns
+              else addTrailingAnnToA (ta tok) cs anns
   return (L anns' a)
 
 -- -------------------------------------
 
-addTrailingVbarL :: MonadP m => LocatedL a -> SrcSpan -> m (LocatedL a)
-addTrailingVbarL  la span = addTrailingAnnL la (AddVbarAnn (srcSpan2e span))
+addTrailingVbarL :: MonadP m => LocatedL a -> EpToken "|" -> m (LocatedL a)
+addTrailingVbarL  la tok = addTrailingAnnL la (AddVbarAnn tok)
 
-addTrailingCommaL :: MonadP m => LocatedL a -> SrcSpan -> m (LocatedL a)
-addTrailingCommaL  la span = addTrailingAnnL la (AddCommaAnn (srcSpan2e span))
+addTrailingCommaL :: MonadP m => LocatedL a -> EpToken "," -> m (LocatedL a)
+addTrailingCommaL  la tok = addTrailingAnnL la (AddCommaAnn tok)
 
 addTrailingAnnL :: MonadP m => LocatedL a -> TrailingAnn -> m (LocatedL a)
 addTrailingAnnL (L anns a) ta = do

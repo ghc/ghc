@@ -89,7 +89,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_buil
  -- "../../testsuite/tests/parser/should_compile/T14189.hs" Nothing
 
  -- "../../testsuite/tests/printer/AnnotationLet.hs" Nothing
- -- "../../testsuite/tests/printer/AnnotationTuple.hs" Nothing
+ "../../testsuite/tests/printer/AnnotationTuple.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr001.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr002.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr002a.hs" Nothing
@@ -199,7 +199,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_buil
  -- "../../testsuite/tests/printer/Test19834.hs" Nothing
  -- "../../testsuite/tests/printer/Test19840.hs" Nothing
  -- "../../testsuite/tests/printer/Test19850.hs" Nothing
- "../../testsuite/tests/printer/Test20247.hs" Nothing
+ -- "../../testsuite/tests/printer/Test20247.hs" Nothing
  -- "../../testsuite/tests/printer/Test20258.hs" Nothing
  -- "../../testsuite/tests/printer/Test20297.hs" Nothing
  -- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing

@@ -177,7 +177,8 @@
              (EpaSpan { DumpRenamedAst.hs:9:14-17 })
              (AnnListItem
               [(AddVbarAnn
-                (EpaSpan { DumpRenamedAst.hs:9:19 }))])
+                (EpTok
+                 (EpaSpan { DumpRenamedAst.hs:9:19 })))])
              (EpaComments
               []))
             (ConDeclH98
@@ -2433,7 +2434,7 @@
       (EpAnn
        (EpaDelta { <no location info> } (SameLine 0) [])
        (EpAnnImportDecl
-        (EpaDelta { <no location info> } (SameLine 0) [])
+        (NoEpTok)
         (Nothing)
         (Nothing)
         (Nothing)
@@ -2469,7 +2470,8 @@
       (EpAnn
        (EpaSpan { DumpRenamedAst.hs:5:1-16 })
        (EpAnnImportDecl
-        (EpaSpan { DumpRenamedAst.hs:5:1-6 })
+        (EpTok
+         (EpaSpan { DumpRenamedAst.hs:5:1-6 }))
         (Nothing)
         (Nothing)
         (Nothing)
@@ -2505,7 +2507,8 @@
       (EpAnn
        (EpaSpan { DumpRenamedAst.hs:7:1-23 })
        (EpAnnImportDecl
-        (EpaSpan { DumpRenamedAst.hs:7:1-6 })
+        (EpTok
+         (EpaSpan { DumpRenamedAst.hs:7:1-6 }))
         (Nothing)
         (Nothing)
         (Nothing)

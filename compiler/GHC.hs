@@ -315,7 +315,6 @@ module GHC (
         parser,
 
         -- * API Annotations
-        AnnKeywordId(..),
         EpaComment(..)
   ) where
 

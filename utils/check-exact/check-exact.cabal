@@ -21,7 +21,6 @@ Executable check-exact
     Main-Is: Main.hs
     Ghc-Options: -Wall
     other-modules: ExactPrint
-                   Lookup
                    Parsers
                    Preprocess
                    Transform

@@ -29,7 +29,7 @@ data Comment = Comment
       commentContents   :: !String -- ^ The contents of the comment including separators
     , commentLoc :: !NoCommentsLocation
     , commentPriorTok :: !RealSrcSpan
-    , commentOrigin :: !(Maybe AnnKeywordId) -- ^ We sometimes turn syntax into comments in order to process them properly.
+    , commentOrigin :: !(Maybe String) -- ^ We sometimes turn syntax into comments in order to process them properly.
     }
   deriving (Data, Eq)
 

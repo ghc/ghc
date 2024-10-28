@@ -76,10 +76,6 @@ data Class
 -- >  class C a b c | a b -> c, a c -> b where...
 --
 --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
---
---  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'',
-
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 type FunDep a = ([a],[a])
 
 type ClassOpItem = (Id, DefMethInfo)
