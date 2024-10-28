@@ -66,16 +66,7 @@ https://gitlab.haskell.org/ghc/ghc/-/wikis/implementing-trees-that-grow
 --
 -- All we actually declare here is the top-level structure for a module.
 data HsModule p
-  =  -- | 'GHC.Parser.Annotation.AnnKeywordId's
-     --
-     --  - 'GHC.Parser.Annotation.AnnModule','GHC.Parser.Annotation.AnnWhere'
-     --
-     --  - 'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnSemi',
-     --    'GHC.Parser.Annotation.AnnClose' for explicit braces and semi around
-     --    hsmodImports,hsmodDecls if this style is used.
-
-     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-    HsModule {
+    = HsModule {
       hsmodExt :: XCModule p,
         -- ^ HsModule extension point
       hsmodName :: Maybe (XRec p ModuleName),
@@ -89,15 +80,8 @@ data HsModule p
         --  - @Just []@: export /nothing/
         --
         --  - @Just [...]@: as you would expect...
-        --
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
-        --                                   ,'GHC.Parser.Annotation.AnnClose'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
       hsmodImports :: [LImportDecl p],
       hsmodDecls :: [LHsDecl p]
         -- ^ Type, class, value, and interface signature decls
    }
   | XModule !(XXModule p)
-

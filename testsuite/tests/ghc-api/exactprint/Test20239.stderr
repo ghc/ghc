@@ -138,7 +138,8 @@
              (EpaSpan { Test20239.hs:5:36-55 })
              (AnnListItem
               [(AddVbarAnn
-                (EpaSpan { Test20239.hs:7:34 }))])
+                (EpTok
+                 (EpaSpan { Test20239.hs:7:34 })))])
              (EpaComments
               []))
             (ConDeclH98

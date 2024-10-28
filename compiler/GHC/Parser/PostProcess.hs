@@ -1219,11 +1219,12 @@ checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
       -- Append parens so that the original order in the source is maintained
       return (L (EpAnn l (AnnContext Nothing oparens cparens) cs) ts)
 
-checkImportDecl :: Maybe EpaLocation
-                -> Maybe EpaLocation
+checkImportDecl :: Maybe (EpToken "qualified")
+                -> Maybe (EpToken "qualified")
                 -> P ()
 checkImportDecl mPre mPost = do
   let whenJust mg f = maybe (pure ()) f mg
+      tokenSpan tok = RealSrcSpan (epaLocationRealSrcSpan $ getEpTokenLoc tok) Strict.Nothing
 
   importQualifiedPostEnabled <- getBit ImportQualifiedPostBit
 
@@ -1231,18 +1232,18 @@ checkImportDecl mPre mPost = do
   -- 'ImportQualifiedPost' is not in effect.
   whenJust mPost $ \post ->
     when (not importQualifiedPostEnabled) $
-      failNotEnabledImportQualifiedPost (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
+      failNotEnabledImportQualifiedPost (tokenSpan post)
 
   -- Error if 'qualified' occurs in both pre and postpositive
   -- positions.
   whenJust mPost $ \post ->
     when (isJust mPre) $
-      failImportQualifiedTwice (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
+      failImportQualifiedTwice (tokenSpan post)
 
   -- Warn if 'qualified' found in prepositive position and
   -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
   whenJust mPre $ \pre ->
-    warnPrepositiveQualifiedModule (RealSrcSpan (epaLocationRealSrcSpan pre) Strict.Nothing)
+    warnPrepositiveQualifiedModule (tokenSpan pre)
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -1362,7 +1363,7 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 
 checkValDef :: SrcSpan
             -> LocatedA (PatBuilder GhcPs)
-            -> (HsMultAnn GhcPs, Maybe (EpUniToken "::" "∷", LHsType GhcPs))
+            -> (HsMultAnn GhcPs, Maybe (TokDcolon, LHsType GhcPs))
             -> Located (GRHSs GhcPs (LHsExpr GhcPs))
             -> P (HsBind GhcPs)
 
@@ -1539,7 +1540,7 @@ mkBangTy tok_loc strictness =
 
 -- | Result of parsing @{-\# UNPACK \#-}@ or @{-\# NOUNPACK \#-}@.
 data UnpackednessPragma =
-  UnpackednessPragma (EpaLocation, EpaLocation) SourceText SrcUnpackedness
+  UnpackednessPragma (EpaLocation, EpToken "#-}") SourceText SrcUnpackedness
 
 -- | Annotate a type with either an @{-\# UNPACK \#-}@ or a @{-\# NOUNPACK \#-}@ pragma.
 addUnpackednessP :: MonadP m => Located UnpackednessPragma -> LHsType GhcPs -> m (LHsType GhcPs)
@@ -1706,7 +1707,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsWildCardPV :: (NoAnn a) => SrcSpan -> PV (LocatedAn a b)
   -- | Disambiguate "a :: t" (type annotation)
   mkHsTySigPV
-    :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> EpUniToken "::" "∷" -> PV (LocatedA b)
+    :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> TokDcolon -> PV (LocatedA b)
   -- | Disambiguate "[a,b,c]" (list syntax)
   mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> AnnList () -> PV (LocatedA b)
   -- | Disambiguate "$(...)" and "[quasi|...|]" (TH splices)
@@ -1730,7 +1731,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpan -> ArrowParsingMode lhs b -> LocatedA lhs -> HsArrowOf (LocatedA b) GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "%m" to the left of "->" (multiplicity)
   mkHsMultPV
-    :: EpToken "%" -> LocatedA b -> PV (EpUniToken "->" "→" -> HsArrowOf (LocatedA b) GhcPs)
+    :: EpToken "%" -> LocatedA b -> PV (TokRarrow -> HsArrowOf (LocatedA b) GhcPs)
   -- | Disambiguate "forall a. b" and "forall a -> b" (forall telescope)
   mkHsForallPV :: SrcSpan -> HsForAllTelescope GhcPs -> LocatedA b -> PV (LocatedA b)
   -- | Disambiguate "(a,b,c)" to the left of "=>" (constraint list)
@@ -2068,7 +2069,7 @@ instance DisambECP (PatBuilder GhcPs) where
       !cs <- getCommentsFor l
       return $ L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (ViewPat tok a p))
     where
-      tok :: EpUniToken "->" "→"
+      tok :: TokRarrow
       tok = case arr of
         HsUnrestrictedArrow x -> x
         _ -> -- unreachable case because in Parser.y the reduction rules for
@@ -2114,7 +2115,7 @@ instance DisambECP (PatBuilder GhcPs) where
 -- future parse by default. Until we're ready to make the breaking change,
 -- we need to do some extra work here to push the signature under the view
 -- pattern (and emit a warning).
-addSigPatP :: SrcSpanAnnA -> LPat GhcPs -> HsPatSigType GhcPs -> EpUniToken "::" "∷" -> PV (LPat GhcPs)
+addSigPatP :: SrcSpanAnnA -> LPat GhcPs -> HsPatSigType GhcPs -> TokDcolon -> PV (LPat GhcPs)
 addSigPatP l viewpat@(L _ ViewPat{}) sig anns =
   -- Test case: T24159_viewpat
   do { let futureParse = L l (SigPat anns viewpat sig)
@@ -3487,7 +3488,7 @@ mkLHsOpTy prom x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
   in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
 
-mkMultTy :: EpToken "%" -> LHsType GhcPs -> EpUniToken "->" "→" -> HsArrow GhcPs
+mkMultTy :: EpToken "%" -> LHsType GhcPs -> TokRarrow -> HsArrow GhcPs
 mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearArrow (EpPct1 pct1 arr)
@@ -3497,7 +3498,7 @@ mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
     pct1 = epTokenWidenR pct (locA (getLoc t))
 mkMultTy pct t arr = HsExplicitMult (pct, arr) t
 
-mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> EpUniToken "->" "→" -> HsArrowOf (LHsExpr GhcPs) GhcPs
+mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsArrowOf (LHsExpr GhcPs) GhcPs
 mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearArrow (EpPct1 pct1 arr)

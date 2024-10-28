@@ -60,9 +60,9 @@ type instance Anno (ImportDecl (GhcPass p)) = SrcSpanAnnA
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
 -- 'Nothing'). This is called from "GHC.Parser".
-importDeclQualifiedStyle :: Maybe EpaLocation
-                         -> Maybe EpaLocation
-                         -> (Maybe EpaLocation, ImportDeclQualifiedStyle)
+importDeclQualifiedStyle :: Maybe (EpToken "qualified")
+                         -> Maybe (EpToken "qualified")
+                         -> (Maybe (EpToken "qualified"), ImportDeclQualifiedStyle)
 importDeclQualifiedStyle mPre mPost =
   if isJust mPre then (mPre, QualifiedPre)
   else if isJust mPost then (mPost,QualifiedPost) else (Nothing, NotQualified)
@@ -111,12 +111,12 @@ deriving instance Eq (IEWrappedName GhcTc)
 -- API Annotations types
 
 data EpAnnImportDecl = EpAnnImportDecl
-  { importDeclAnnImport    :: EpaLocation -- ^ The location of the @import@ keyword
-  , importDeclAnnPragma    :: Maybe (EpaLocation, EpaLocation) -- ^ The locations of @{-# SOURCE@ and @#-}@ respectively
-  , importDeclAnnSafe      :: Maybe EpaLocation -- ^ The location of the @safe@ keyword
-  , importDeclAnnQualified :: Maybe EpaLocation -- ^ The location of the @qualified@ keyword
+  { importDeclAnnImport    :: EpToken "import" -- ^ The location of the @import@ keyword
+  , importDeclAnnPragma    :: Maybe (EpaLocation, EpToken "#-}") -- ^ The locations of @{-# SOURCE@ and @#-}@ respectively
+  , importDeclAnnSafe      :: Maybe (EpToken "safe") -- ^ The location of the @safe@ keyword
+  , importDeclAnnQualified :: Maybe (EpToken "qualified") -- ^ The location of the @qualified@ keyword
   , importDeclAnnPackage   :: Maybe EpaLocation -- ^ The location of the package name (when using @-XPackageImports@)
-  , importDeclAnnAs        :: Maybe EpaLocation -- ^ The location of the @as@ keyword
+  , importDeclAnnAs        :: Maybe (EpToken "as") -- ^ The location of the @as@ keyword
   } deriving (Data)
 
 instance NoAnn EpAnnImportDecl where

@@ -76,10 +76,6 @@ instance NFData ImportListInterpretation where
 -- | Located Import or Export
 type LIE pass = XRec pass (IE pass)
         -- ^ When in a list this may have
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | A docstring attached to an export list item.
 type ExportDoc pass = LHsDoc pass
@@ -114,13 +110,7 @@ data IE pass
         -- module Mod ( Test(..) )
         -- import Mod ( Test(..) )
         -- @
-        --
-        -- exactprint: the location of parens and @..@ is captured via 'GHC.Parser.Annotation.AnnKeywordId's :
-        --      'GHC.Parser.Annotation.AnnOpenP',
-        --      'GHC.Parser.Annotation.AnnDotdot',
-        --      'GHC.Parser.Annotation.AnnCloseP'
 
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | IEThingWith (XIEThingWith pass)
                 (LIEWrappedName pass)
@@ -136,22 +126,12 @@ data IE pass
         -- module Mod ( Test(f, g) )
         -- import Mod ( Test(f, g) )
         -- @
-        --
-        -- exactprint: the location of parens is captured via 'GHC.Parser.Annotation.AnnKeywordId's :
-        -- 'GHC.Parser.Annotation.AnnOpenP', 'GHC.Parser.Annotation.AnnCloseP'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
         -- ^ Export of entire module. Can only occur in export list.
         --
         -- @
         -- module Mod ( module Mod2 )
         -- @
-        --
-        -- exactprint: the location of @module@ keyword is capture via 'GHC.Parser.Annotation.AnnKeywordId' :
-        -- 'GHC.Parser.Annotation.AnnModule'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | IEGroup (XIEGroup pass) Int (LHsDoc pass)
         -- ^ A Haddock section in an export list.
         --

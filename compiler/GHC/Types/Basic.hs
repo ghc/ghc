@@ -761,14 +761,7 @@ function (e.g. isMatchContextPmChecked and needToRunPmCheck in GHC.HsToCore.Pmc.
 -- instance. See Note [Safe Haskell isSafeOverlap] in GHC.Core.InstEnv for a
 -- explanation of the `isSafeOverlap` field.
 --
--- - 'GHC.Parser.Annotation.AnnKeywordId' :
---      'GHC.Parser.Annotation.AnnOpen' @'\{-\# OVERLAPPABLE'@ or
---                              @'\{-\# OVERLAPPING'@ or
---                              @'\{-\# OVERLAPS'@ or
---                              @'\{-\# INCOHERENT'@,
---      'GHC.Parser.Annotation.AnnClose' @`\#-\}`@,
 
--- For details on above see Note [exact print annotations] in "GHC.Parser.Annotation"
 data OverlapFlag = OverlapFlag
   { overlapMode   :: OverlapMode
   , isSafeOverlap :: Bool

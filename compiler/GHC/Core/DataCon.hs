@@ -379,11 +379,6 @@ This all happens in GHC.Types.Id.Make.mkDataConRep.
 -}
 
 -- | A data constructor
---
--- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
---             'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnComma'
-
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data DataCon
   = MkData {
         dcName    :: Name,      -- This is the name of the *source data con*

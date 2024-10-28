@@ -203,15 +203,6 @@ data HsBindLR idL idR
     -- Strict bindings have their strictness recorded in the 'SrcStrictness' of their
     -- 'MatchContext'. See Note [FunBind vs PatBind] for
     -- details about the relationship between FunBind and PatBind.
-    --
-    --  'GHC.Parser.Annotation.AnnKeywordId's
-    --
-    --  - 'GHC.Parser.Annotation.AnnFunId', attached to each element of fun_matches
-    --
-    --  - 'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
-    --    'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
     FunBind {
 
         fun_ext :: XFunBind idL idR,
@@ -228,13 +219,6 @@ data HsBindLR idL idR
   -- That case is done by FunBind.
   -- See Note [FunBind vs PatBind] for details about the
   -- relationship between FunBind and PatBind.
-
-  --
-  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang',
-  --       'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
-  --       'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
-
-  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | PatBind {
         pat_ext    :: XPatBind idL idR,
         pat_lhs    :: LPat idL,
@@ -257,22 +241,9 @@ data HsBindLR idL idR
   | PatSynBind
         (XPatSynBind idL idR)
         (PatSynBind idL idR)
-        -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
-        --          'GHC.Parser.Annotation.AnnLarrow','GHC.Parser.Annotation.AnnEqual',
-        --          'GHC.Parser.Annotation.AnnWhere'
-        --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | XHsBindsLR !(XXHsBindsLR idL idR)
 
-
--- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
---             'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnLarrow',
---             'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen' @'{'@,
---             'GHC.Parser.Annotation.AnnClose' @'}'@,
-
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
@@ -318,16 +289,8 @@ data HsIPBinds id
 
 -- | Located Implicit Parameter Binding
 type LIPBind id = XRec id (IPBind id)
--- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when in a
---   list
-
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | Implicit parameter bindings.
---
--- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual'
-
--- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data IPBind id
   = IPBind
         (XCIPBind id)
@@ -364,11 +327,6 @@ data Sig pass
       -- fresh meta vars in the type. Their names are stored in the type
       -- signature that brought them into scope, in this third field to be
       -- more specific.
-      --
-      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon',
-      --          'GHC.Parser.Annotation.AnnComma'
-
-      -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
     TypeSig
        (XTypeSig pass)
        [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
@@ -377,12 +335,6 @@ data Sig pass
       -- | A pattern synonym type signature
       --
       -- > pattern Single :: () => (Show a) => a -> [a]
-      --
-      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
-      --           'GHC.Parser.Annotation.AnnDcolon','GHC.Parser.Annotation.AnnForall'
-      --           'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
-
-      -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | PatSynSig (XPatSynSig pass) [LIdP pass] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
@@ -393,33 +345,16 @@ data Sig pass
       --          op :: a -> a                   -- Ordinary
       --          default op :: Eq a => a -> a   -- Generic default
       -- No wildcards allowed here
-      --
-      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDefault',
-      --           'GHC.Parser.Annotation.AnnDcolon'
   | ClassOpSig (XClassOpSig pass) Bool [LIdP pass] (LHsSigType pass)
 
         -- | An ordinary fixity declaration
         --
         -- >     infixl 8 ***
-        --
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnInfix',
-        --           'GHC.Parser.Annotation.AnnVal'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | FixSig (XFixSig pass) (FixitySig pass)
 
         -- | An inline pragma
         --
         -- > {#- INLINE f #-}
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' :
-        --       'GHC.Parser.Annotation.AnnOpen' @'{-\# INLINE'@ and @'['@,
-        --       'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnOpen',
-        --       'GHC.Parser.Annotation.AnnVal','GHC.Parser.Annotation.AnnTilde',
-        --       'GHC.Parser.Annotation.AnnClose'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | InlineSig   (XInlineSig pass)
                 (LIdP pass)        -- Function name
                 InlinePragma       -- Never defaultInlinePragma
@@ -427,15 +362,6 @@ data Sig pass
         -- | A specialisation pragma
         --
         -- > {-# SPECIALISE f :: Int -> Int #-}
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
-        --      'GHC.Parser.Annotation.AnnOpen' @'{-\# SPECIALISE'@ and @'['@,
-        --      'GHC.Parser.Annotation.AnnTilde',
-        --      'GHC.Parser.Annotation.AnnVal',
-        --      'GHC.Parser.Annotation.AnnClose' @']'@ and @'\#-}'@,
-        --      'GHC.Parser.Annotation.AnnDcolon'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
                 (LIdP pass)        -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
@@ -449,22 +375,11 @@ data Sig pass
         --
         -- (Class tys); should be a specialisation of the
         -- current instance declaration
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
-        --      'GHC.Parser.Annotation.AnnInstance','GHC.Parser.Annotation.AnnClose'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | SpecInstSig (XSpecInstSig pass) (LHsSigType pass)
 
         -- | A minimal complete definition pragma
         --
         -- > {-# MINIMAL a | (b, c | (d | e)) #-}
-        --
-        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
-        --      'GHC.Parser.Annotation.AnnVbar','GHC.Parser.Annotation.AnnComma',
-        --      'GHC.Parser.Annotation.AnnClose'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | MinimalSig (XMinimalSig pass) (LBooleanFormula (LIdP pass))
 
         -- | A "set cost centre" pragma for declarations

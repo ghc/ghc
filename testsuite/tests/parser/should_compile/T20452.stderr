@@ -479,7 +479,8 @@
                   (EpaSpan { T20452.hs:8:59-64 })
                   (AnnListItem
                    [(AddCommaAnn
-                     (EpaSpan { T20452.hs:8:65 }))])
+                     (EpTok
+                      (EpaSpan { T20452.hs:8:65 })))])
                   (EpaComments
                    []))
                  (HsTyVar
@@ -724,7 +725,8 @@
                   (EpaSpan { T20452.hs:9:59-64 })
                   (AnnListItem
                    [(AddCommaAnn
-                     (EpaSpan { T20452.hs:9:65 }))])
+                     (EpTok
+                      (EpaSpan { T20452.hs:9:65 })))])
                   (EpaComments
                    []))
                  (HsTyVar
