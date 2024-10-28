@@ -66,7 +66,6 @@ module GHC.Parser.Annotation (
   srcSpan2e, realSrcSpan,
 
   -- ** Building up annotations
-  reAnnL, reAnnC,
   addAnnsA, widenSpanL, widenSpanT, widenAnchorT, widenAnchorS,
   widenLocatedAnL,
   listLocation,
@@ -94,7 +93,6 @@ module GHC.Parser.Annotation (
   noComments, comment, addCommentsToEpAnn, setCommentsEpAnn,
   transferAnnsA, transferAnnsOnlyA, transferCommentsOnlyA,
   transferPriorCommentsA, transferFollowingA,
-  commentsOnlyA, removeCommentsA,
 
   placeholderRealSpan,
   ) where
@@ -929,12 +927,6 @@ srcSpan2e :: SrcSpan -> EpaLocation
 srcSpan2e ss@(RealSrcSpan _ _) = EpaSpan ss
 srcSpan2e span = EpaSpan (RealSrcSpan (realSrcSpan span) Strict.Nothing)
 
-reAnnC :: AnnContext -> EpAnnComments -> Located a -> LocatedC a
-reAnnC anns cs (L l a) = L (EpAnn (spanAsAnchor l) anns cs) a
-
-reAnnL :: ann -> EpAnnComments -> Located e -> GenLocated (EpAnn ann) e
-reAnnL anns cs (L l a) = L (EpAnn (spanAsAnchor l) anns cs) a
-
 getLocAnn :: Located a  -> SrcSpanAnnA
 getLocAnn (L l _) = noAnnSrcSpan l
 
@@ -1093,16 +1085,6 @@ transferPriorCommentsA (EpAnn a1 an1 cs1) (EpAnn a2 an2 cs2)
     fc = getFollowingComments cs1
     cs1' = setFollowingComments emptyComments fc
     cs2' = setPriorComments cs2 (priorComments cs2 <> pc)
-
-
--- | Remove the exact print annotations payload, leaving only the
--- anchor and comments.
-commentsOnlyA :: NoAnn ann => EpAnn ann -> EpAnn ann
-commentsOnlyA (EpAnn a _ cs) = EpAnn a noAnn cs
-
--- | Remove the comments, leaving the exact print annotations payload
-removeCommentsA :: EpAnn ann -> EpAnn ann
-removeCommentsA (EpAnn a an _) = EpAnn a an emptyComments
 
 -- ---------------------------------------------------------------------
 -- Semigroup instances, to allow easy combination of annotation elements
