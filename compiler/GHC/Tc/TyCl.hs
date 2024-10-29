@@ -3689,7 +3689,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
        ; let bang_opts = SrcBangOpts (initBangOpts dflags)
        ; dc <- buildDataCon fam_envs bang_opts name is_infix rep_nm
                             stricts field_lbls
-                            tc_tvs ex_tvs user_tvbs
+                            (binderVars tc_bndrs) ex_tvs user_tvbs
                             [{- no eq_preds -}] ctxt arg_tys
                             user_res_ty rep_tycon tag_map
                   -- NB:  we put data_tc, the type constructor gotten from the

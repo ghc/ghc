@@ -16,7 +16,7 @@ module GHC.Core.Subst (
         substTyUnchecked, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupIdSubst_maybe, substIdType, substIdOcc,
-        substTickish, substDVarSet, substIdInfo,
+        substTickish, substFreeVars, substIdInfo,
 
         -- ** Operations on substitutions
         emptySubst, mkEmptySubst, mkTCvSubst, mkOpenSubst, isEmptySubst,
@@ -524,9 +524,8 @@ substIdOcc subst v = case lookupIdSubst subst v of
 ------------------
 -- | Substitutes for the 'Id's within the 'RuleInfo' given the new function 'Id'
 substRuleInfo :: Subst -> Id -> RuleInfo -> RuleInfo
-substRuleInfo subst new_id (RuleInfo rules rhs_fvs)
+substRuleInfo subst new_id (RuleInfo rules)
   = RuleInfo (map (substRule subst subst_ru_fn) rules)
-                  (substDVarSet subst rhs_fvs)
   where
     subst_ru_fn = const (idName new_id)
 
@@ -562,9 +561,9 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
     (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
-substDVarSet :: HasDebugCallStack => Subst -> DVarSet -> DVarSet
-substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
-  = mkDVarSet $ fst $ foldr subst_fv ([], emptyVarSet) $ dVarSetElems fvs
+substFreeVars :: HasDebugCallStack => Subst -> [Var] -> [Var]
+substFreeVars subst@(Subst _ _ tv_env cv_env) fvs
+  = fst $ foldr subst_fv ([], emptyVarSet) $ fvs
   where
   subst_fv :: Var -> ([Var], VarSet) -> ([Var], VarSet)
   subst_fv fv acc

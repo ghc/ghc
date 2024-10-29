@@ -1185,7 +1185,7 @@ specVar env@(SE { se_subst = Core.Subst in_scope ids _ _ }) v
   --           probably has little effect, but it's the right thing.
   --           We need zapSubst because `e` is an OutExpr
 
-specExpr :: SpecEnv -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
+specExpr, specExpr' :: SpecEnv -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 
 ---------------- First the easy cases --------------------
 specExpr env e = -- pprTrace "specExpr" (ppr e) $

@@ -1110,14 +1110,13 @@ cloneTyVarBndr subst@(Subst in_scope id_env tv_env cv_env) tv uniq
     , tv')
   where
     old_ki  = tyVarKind tv
-    old_unf = tyVarUnfolding tv
 
     tv1 | not (noFreeVarsOfType old_ki)   -- Kind is not closed
         = setTyVarKind tv (substTy subst old_ki)
         | otherwise
         = tv
 
-    tv2 | Just unf <- old_unf
+    tv2 | Just unf <- tyVarUnfolding_maybe tv
         , not (noFreeVarsOfType unf)  -- Unfolding is not closed
         = tv1 `setTyVarUnfolding` substTy subst unf
 

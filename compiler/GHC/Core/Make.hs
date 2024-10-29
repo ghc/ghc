@@ -8,7 +8,7 @@ module GHC.Core.Make (
         mkCoreLams, mkWildCase, mkIfThenElse,
         mkWildValBinder,
         mkSingleAltCase,
-        sortQuantVars, castBottomExpr,
+        castBottomExpr,
 
         -- * Constructing boxed literals
         mkLitRubbish,
@@ -69,7 +69,6 @@ import GHC.Core.Utils ( exprType, mkSingleAltCase, bindNonRec )
 import GHC.Core.Type
 import GHC.Core.Predicate    ( isCoVarType )
 import GHC.Core.TyCo.Compare ( eqType )
-import GHC.Core.Coercion     ( isCoVar )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
 import GHC.Core.Multiplicity
 
@@ -84,7 +83,6 @@ import GHC.Utils.Panic
 import GHC.Settings.Constants( mAX_TUPLE_SIZE )
 import GHC.Data.FastString
 
-import Data.List        ( partition )
 import Data.Char        ( ord )
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
@@ -99,15 +97,6 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 -- | Sort the variables, putting type and covars first, in scoped order,
 -- and then other Ids
 --
--- It is a deterministic sort, meaning it doesn't look at the values of
--- Uniques. For explanation why it's important See Note [Unique Determinism]
--- in GHC.Types.Unique.
-sortQuantVars :: [Var] -> [Var]
-sortQuantVars vs = sorted_tcvs ++ ids
-  where
-    (tcvs, ids) = partition (isTyVar <||> isCoVar) vs
-    sorted_tcvs = scopedSort tcvs
-
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
 -- appropriate (see "GHC.Core#let_can_float_invariant")
 mkCoreLet :: CoreBind -> CoreExpr -> CoreExpr

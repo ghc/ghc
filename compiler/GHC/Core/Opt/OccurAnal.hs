@@ -1716,8 +1716,8 @@ makeNode !env _imp_rule_edges bndr_set (bndr, rhs@(Type rhs_ty))
 
     rhs_env = setNonTailCtxt OccRhs env
     -- WUD unf_uds mb_unf'
-    --   | Just unf <- tyVarUnfolding bndr = Just <$> occAnalTy rhs_env unf
-    --   | otherwise                       = WUD emptyUDs Nothing
+    --   | Just unf <- tyVarUnfolding_maybe bndr = Just <$> occAnalTy rhs_env unf
+    --   | otherwise                             = WUD emptyUDs Nothing
     rhs_uds = occAnalTy rhs_env rhs_ty
 
     inl_uds   = rhs_uds -- `andUDs` unf_uds
