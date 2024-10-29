@@ -273,8 +273,8 @@ discarded inside tcMatchPats, where we know if visible pattern retained or erase
 
 data EpAnnSumPat = EpAnnSumPat
       { sumPatParens      :: (EpaLocation, EpaLocation)
-      , sumPatVbarsBefore :: [EpaLocation]
-      , sumPatVbarsAfter  :: [EpaLocation]
+      , sumPatVbarsBefore :: [EpToken "|"]
+      , sumPatVbarsAfter  :: [EpToken "|"]
       } deriving Data
 
 instance NoAnn EpAnnSumPat where
