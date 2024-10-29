@@ -89,12 +89,9 @@ import GHC.Core
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
-import GHC.Core.TyCo.FVs    ( tyCoVarsOfTypeDSet, scopedSort )
-import GHC.Core.TyCo.Subst  ( substTy, mkTvSubstPrs )
-import GHC.Core.FVs     -- all of it
+import GHC.Core.FVs
 import GHC.Core.Subst
-import GHC.Core.Type    ( Type, tyCoVarsOfType, mightBeUnliftedType, typeHasFixedRuntimeRep )
-import GHC.Core.Multiplicity     ( pattern ManyTy )
+import GHC.Core.Type
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -1783,10 +1780,9 @@ mkAbsLamTypes abs_vars ty
            , text "res" <+> ppr res ]) res
     -- We can apply the subst at the end there is no shadowing in abs_vars
   where
-    res = substTy subst (mkLamTypes abs_lam_vars ty)
+    res = expandTyVarUnfoldings (mkVarEnv tv_unf_prs) (mkLamTypes abs_lam_vars ty)
     abs_lam_vars   = [ v       | v <- abs_vars, isNothing (tyVarUnfolding_maybe v) ]
     tv_unf_prs = [ (tv,ty) | tv <- abs_vars, Just ty <- [tyVarUnfolding_maybe tv] ]
-    subst = mkTvSubstPrs tv_unf_prs
 
 
 mkAbsVarApps :: Expr LevelledBndr -> AbsVars -> Expr LevelledBndr
