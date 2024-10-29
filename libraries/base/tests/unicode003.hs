@@ -2,7 +2,7 @@
 
 -------------------------------------------------------------------------------
 -- |
--- Description: Test general caterory and simple case mappings for all characters.
+-- Description: Test general category and simple case mappings for all characters.
 --
 -- Checking the exact value of these properties for each character would result
 -- in a CSV-like file of several MiB. Thus we perform only a /sanity check/
