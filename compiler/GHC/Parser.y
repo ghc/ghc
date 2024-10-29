@@ -39,9 +39,9 @@ module GHC.Parser
 where
 
 -- base
-import Control.Monad    ( unless, liftM, when, (<=<) )
+import Control.Monad      ( unless, liftM, when, (<=<) )
 import GHC.Exts
-import Data.Maybe       ( maybeToList )
+import Data.Maybe         ( maybeToList )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
@@ -3710,27 +3710,27 @@ overloaded_label :: { Located (SourceText, FastString) }
 -----------------------------------------------------------------------------
 -- Warnings and deprecations
 
-name_boolformula_opt :: { LBooleanFormula (LocatedN RdrName) }
+name_boolformula_opt :: { LBooleanFormula GhcPs }
         : name_boolformula          { $1 }
         | {- empty -}               { noLocA mkTrue }
 
-name_boolformula :: { LBooleanFormula (LocatedN RdrName) }
-        : name_boolformula_and                      { $1 }
+name_boolformula :: { LBooleanFormula GhcPs }
+        : name_boolformula_and      { $1 }
         | name_boolformula_and '|' name_boolformula
                            {% do { h <- addTrailingVbarL $1 (epTok $2)
                                  ; return (sLLa $1 $> (Or [h,$3])) } }
 
-name_boolformula_and :: { LBooleanFormula (LocatedN RdrName) }
+name_boolformula_and :: { LBooleanFormula GhcPs }
         : name_boolformula_and_list
                   { sLLa (head $1) (last $1) (And ($1)) }
 
-name_boolformula_and_list :: { [LBooleanFormula (LocatedN RdrName)] }
+name_boolformula_and_list :: { [LBooleanFormula GhcPs] }
         : name_boolformula_atom                               { [$1] }
         | name_boolformula_atom ',' name_boolformula_and_list
             {% do { h <- addTrailingCommaL $1 (epTok $2)
                   ; return (h : $3) } }
 
-name_boolformula_atom :: { LBooleanFormula (LocatedN RdrName) }
+name_boolformula_atom :: { LBooleanFormula GhcPs }
         : '(' name_boolformula ')'  {% amsr (sLL $1 $> (Parens $2))
                                       (AnnList Nothing (ListParens (epTok $1) (epTok $3)) [] noAnn []) }
         | name_var                  { sL1a $1 (Var $1) }

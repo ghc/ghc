@@ -26,15 +26,13 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( LHsExpr
   , MatchGroup
   , GRHSs )
-import {-# SOURCE #-} Language.Haskell.Syntax.Pat
-  ( LPat )
-
+import {-# SOURCE #-} Language.Haskell.Syntax.Pat( LPat )
+import Language.Haskell.Syntax.BooleanFormula (LBooleanFormula)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic ( Fixity )
 
 import GHC.Types.Basic (InlinePragma)
-import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Types.SourceText (StringLiteral)
 
 import Data.Void
@@ -379,7 +377,7 @@ data Sig pass
         -- | A minimal complete definition pragma
         --
         -- > {-# MINIMAL a | (b, c | (d | e)) #-}
-  | MinimalSig (XMinimalSig pass) (LBooleanFormula (LIdP pass))
+  | MinimalSig (XMinimalSig pass) (LBooleanFormula pass)
 
         -- | A "set cost centre" pragma for declarations
         --

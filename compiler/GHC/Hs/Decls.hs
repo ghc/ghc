@@ -110,6 +110,7 @@ module GHC.Hs.Decls (
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Extension
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprUntypedSplice )
         -- Because Expr imports Decls via HsBracket
@@ -119,7 +120,7 @@ import GHC.Hs.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Core.Coercion
-import Language.Haskell.Syntax.Extension
+
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Types.Name

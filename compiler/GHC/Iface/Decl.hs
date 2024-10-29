@@ -13,7 +13,6 @@
 module GHC.Iface.Decl
    ( coAxiomToIfaceDecl
    , tyThingToIfaceDecl -- Converting things to their Iface equivalents
-   , toIfaceBooleanFormula
    )
 where
 
@@ -33,21 +32,17 @@ import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 
-
 import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.TyThing
-import GHC.Types.SrcLoc
 
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import GHC.Data.Maybe
-import GHC.Data.BooleanFormula
-
 import Data.List ( findIndex, mapAccumL )
 
 {-
@@ -287,7 +282,7 @@ classToIfaceDecl env clas
                 ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
                 ifATs    = map toIfaceAT clas_ats,
                 ifSigs   = map toIfaceClassOp op_stuff,
-                ifMinDef = toIfaceBooleanFormula $ fmap (mkIfLclName . getOccFS) (classMinimalDef clas)
+                ifMinDef = toIfaceBooleanFormula (classMinimalDef clas)
             }
 
     (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
@@ -335,10 +330,3 @@ tidyTyConBinders = mapAccumL tidyTyConBinder
 
 tidyTyVar :: TidyEnv -> TyVar -> IfLclName
 tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
-
-toIfaceBooleanFormula :: BooleanFormula IfLclName -> IfaceBooleanFormula
-toIfaceBooleanFormula = \case
-    Var nm    -> IfVar    nm
-    And bfs   -> IfAnd    (map (toIfaceBooleanFormula . unLoc) bfs)
-    Or bfs    -> IfOr     (map (toIfaceBooleanFormula . unLoc) bfs)
-    Parens bf -> IfParens (toIfaceBooleanFormula . unLoc $ bf)

@@ -32,6 +32,7 @@ module GHC.IfaceToCore (
         hydrateCgBreakInfo
  ) where
 
+
 import GHC.Prelude
 
 import GHC.ByteCode.Types
@@ -43,7 +44,6 @@ import GHC.Driver.Config.Core.Lint ( initLintConfig )
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Builtin.Types
 
-import GHC.Iface.Decl (toIfaceBooleanFormula)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
@@ -123,20 +123,26 @@ import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.Error
 
+import GHC.Parser.Annotation (noLocA)
+
+import GHC.Hs.Extension ( GhcRn )
+
 import GHC.Fingerprint
-import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
-import GHC.Parser.Annotation
 import GHC.Driver.Env.KnotVars
 import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.Function ( on )
+import Data.List(nub)
 import Data.List.NonEmpty ( NonEmpty )
 import qualified Data.List.NonEmpty as NE
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
 import GHC.Iface.Errors.Types
+
+import Language.Haskell.Syntax.BooleanFormula (BooleanFormula)
+import Language.Haskell.Syntax.BooleanFormula qualified as BF(BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
 
 {-
@@ -297,14 +303,38 @@ mergeIfaceDecl d1 d2
                   plusNameEnv_C mergeIfaceClassOp
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops1 ])
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
+
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = toIfaceBooleanFormula . BF.mkOr . map (noLocA . fromIfaceBooleanFormula) $ [bf1, bf2]
+                ifMinDef = mkOr [ bf1, bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when
     -- we merge, see 'mergeSignatures'
     | otherwise              = d1 `withRolesFrom` d2
+      where
+        -- The reason we need to duplicate mkOr here, instead of
+        -- using BooleanFormula's mkOr and just doing the loop like:
+        -- `toIfaceBooleanFormula . mkOr . fromIfaceBooleanFormula`
+        -- is quite subtle. Say we have the following minimal pragma:
+        -- {-# MINIMAL f | g #-}. If we use fromIfaceBooleanFormula
+        -- first, we will end up doing
+        -- `nub [Var (mkUnboundName f), Var (mkUnboundName g)]`,
+        -- which might seem fine, but Name equallity is decided by
+        -- their Unique, which will be identical since mkUnboundName
+        -- just stuffs the mkUnboundKey unqiue into both.
+        -- So the result will be {-# MINIMAL f #-}, oopsie.
+        -- Duplication it is.
+        mkOr :: [IfaceBooleanFormula] -> IfaceBooleanFormula
+        mkOr = maybe (IfAnd []) (mkOr' . nub . concat) . mapM fromOr
+          where
+          -- See Note [Simplification of BooleanFormulas]
+          fromOr bf = case bf of
+            (IfOr xs)  -> Just xs
+            (IfAnd []) -> Nothing
+            _        -> Just [bf]
+          mkOr' [x] = x
+          mkOr' xs = IfOr xs
 
 -- Note [Role merging]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -795,8 +825,7 @@ tc_iface_decl _parent ignore_prags
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
     ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
-    ; let mindef_occ = fromIfaceBooleanFormula if_mindef
-    ; mindef <- traverse (lookupIfaceTop . mkVarOccFS . ifLclNameFS) mindef_occ
+    ; mindef <- tc_boolean_formula if_mindef
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
@@ -844,6 +873,12 @@ tc_iface_decl _parent ignore_prags
                   -- the type constructor being defined here
                   -- e.g.   type AT a; type AT b = AT [b]   #8002
           return (ATI tc mb_def)
+
+   tc_boolean_formula :: IfaceBooleanFormula -> IfL (BooleanFormula GhcRn)
+   tc_boolean_formula (IfAnd ibfs  ) = BF.And    . map noLocA <$> traverse tc_boolean_formula ibfs
+   tc_boolean_formula (IfOr ibfs   ) = BF.Or     . map noLocA <$> traverse tc_boolean_formula ibfs
+   tc_boolean_formula (IfParens ibf) = BF.Parens .     noLocA <$>          tc_boolean_formula ibf
+   tc_boolean_formula (IfVar nm    ) = BF.Var    .     noLocA <$> (lookupIfaceTop . mkVarOccFS . ifLclNameFS $ nm)
 
    mk_sc_doc pred = text "Superclass" <+> ppr pred
    mk_at_doc tc = text "Associated type" <+> ppr tc

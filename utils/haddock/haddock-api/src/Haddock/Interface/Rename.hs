@@ -19,6 +19,8 @@
 -- Portability :  portable
 module Haddock.Interface.Rename (renameInterface) where
 
+import Prelude hiding (mapM)
+
 import Control.Applicative ()
 import Control.DeepSeq (force)
 import Control.Monad hiding (mapM)
@@ -28,12 +30,13 @@ import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Traversable (mapM)
+
 import GHC hiding (NoLink)
 import GHC.Builtin.Types (eqTyCon_RDR, tupleDataConName, tupleTyConName)
 import GHC.Types.Basic (Boxity (..), TopLevelFlag (..), TupleSort (..))
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName (Exact))
-import Prelude hiding (mapM)
+import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Haddock.Backends.Hoogle (ppExportD)
 import Haddock.GhcUtils
@@ -770,10 +773,21 @@ renameSig sig = case sig of
     lnames' <- mapM renameNameL lnames
     return $ FixSig noExtField (FixitySig noExtField lnames' fixity)
   MinimalSig _ (L l s) -> do
-    s' <- traverse (traverse lookupRn) s
+    s' <- bfTraverse (traverse lookupRn) s
     return $ MinimalSig noExtField (L l s')
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"
+
+bfTraverse  :: Applicative f
+            => (LIdP (GhcPass p) -> f (LIdP DocNameI))
+            -> BooleanFormula (GhcPass p)
+            -> f (BooleanFormula DocNameI)
+bfTraverse f = go
+  where
+    go (Var    a  ) = Var    <$> f a
+    go (And    bfs) = And    <$> traverse @[] (traverse go) bfs
+    go (Or     bfs) = Or     <$> traverse @[] (traverse go) bfs
+    go (Parens bf ) = Parens <$> traverse go bf
 
 renameForD :: ForeignDecl GhcRn -> RnM (ForeignDecl DocNameI)
 renameForD (ForeignImport _ lname ltype x) = do

@@ -35,10 +35,8 @@ module GHC.Iface.Syntax (
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
         ifaceDeclFingerprints,
-        fromIfaceBooleanFormula,
         fromIfaceWarnings,
         fromIfaceWarningTxt,
-
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
         freeNamesIfConDecls,
@@ -51,7 +49,10 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
+import GHC.Builtin.Names(mkUnboundName)
 import GHC.Data.FastString
+import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
+
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
                            constraintKindTyConKey )
 import GHC.Types.Unique ( hasKey )
@@ -62,9 +63,9 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.Class
 import GHC.Types.FieldLabel
-import GHC.Types.Name.Set
 import GHC.Core.Coercion.Axiom ( BranchIndex )
 import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.CostCentre
 import GHC.Types.Literal
@@ -75,7 +76,6 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
-import GHC.Data.BooleanFormula ( BooleanFormula(..), pprBooleanFormula, isTrue )
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
@@ -93,6 +93,8 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
+
+import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Control.Monad
 import System.IO.Unsafe
@@ -213,18 +215,14 @@ data IfaceClassBody
      ifMinDef    :: IfaceBooleanFormula       -- Minimal complete definition
     }
 
+-- See also 'BooleanFormula'
 data IfaceBooleanFormula
   = IfVar IfLclName
   | IfAnd [IfaceBooleanFormula]
   | IfOr [IfaceBooleanFormula]
   | IfParens IfaceBooleanFormula
+  deriving Eq
 
-fromIfaceBooleanFormula :: IfaceBooleanFormula -> BooleanFormula IfLclName
-fromIfaceBooleanFormula = \case
-    IfVar nm     -> Var    nm
-    IfAnd ibfs   -> And    (map (noLocA . fromIfaceBooleanFormula) ibfs)
-    IfOr ibfs    -> Or     (map (noLocA . fromIfaceBooleanFormula) ibfs)
-    IfParens ibf -> Parens (noLocA . fromIfaceBooleanFormula $ ibf)
 
 data IfaceTyConParent
   = IfNoParent
@@ -1039,12 +1037,20 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
         | showSub ss sg = Just $  pprIfaceClassOp ss sg
         | otherwise     = Nothing
 
-      pprMinDef :: BooleanFormula IfLclName -> SDoc
+      pprMinDef :: BooleanFormula GhcRn -> SDoc
       pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
         text "{-# MINIMAL" <+>
         pprBooleanFormula
-          (\_ def -> cparen (isLexSym def) (ppr def)) 0 (fmap ifLclNameFS minDef) <+>
+          (\_ def -> let fs = getOccFS def in cparen (isLexSym fs) (ppr fs)) 0 minDef <+>
         text "#-}"
+
+      fromIfaceBooleanFormula :: IfaceBooleanFormula -> BooleanFormula GhcRn
+      -- `mkUnboundName` here is fine because the Name generated is only used for pretty printing and nothing else.
+      fromIfaceBooleanFormula (IfVar nm   ) = Var    $ noLocA . mkUnboundName . mkVarOccFS . ifLclNameFS $ nm
+      fromIfaceBooleanFormula (IfAnd bfs  ) = And    $ map (noLocA . fromIfaceBooleanFormula) bfs
+      fromIfaceBooleanFormula (IfOr bfs   ) = Or     $ map (noLocA . fromIfaceBooleanFormula) bfs
+      fromIfaceBooleanFormula (IfParens bf) = Parens $     (noLocA . fromIfaceBooleanFormula) bf
+
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
       suppress_bndr_sig = SuppressBndrSig True

@@ -33,6 +33,8 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+import GHC.Data.BooleanFormula (BooleanFormula(..))
+import Language.Haskell.Syntax.Extension (Anno)
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -590,3 +592,6 @@ deriving instance Data XXPatGhcTc
 deriving instance Data XViaStrategyPs
 
 -- ---------------------------------------------------------------------
+
+deriving instance (Typeable p, Data (Anno (IdGhcP p)), Data (IdGhcP p)) => Data (BooleanFormula (GhcPass p))
+---------------------------------------------------------------------

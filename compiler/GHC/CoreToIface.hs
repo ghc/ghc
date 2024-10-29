@@ -43,6 +43,7 @@ module GHC.CoreToIface
     , toIfaceVar
       -- * Other stuff
     , toIfaceLFInfo
+    , toIfaceBooleanFormula
       -- * CgBreakInfo
     , dehydrateCgBreakInfo
     ) where
@@ -69,6 +70,7 @@ import GHC.Builtin.Types ( heqTyCon )
 
 import GHC.Iface.Syntax
 import GHC.Data.FastString
+import GHC.Data.BooleanFormula qualified as BF(BooleanFormula(..))
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -82,10 +84,13 @@ import GHC.Types.Var.Set
 import GHC.Types.Tickish
 import GHC.Types.Demand ( isNopSig )
 import GHC.Types.Cpr ( topCprSig )
+import GHC.Types.SrcLoc (unLoc)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+
+import GHC.Hs.Extension (GhcRn)
 
 import Data.Maybe ( isNothing, catMaybes )
 
@@ -536,6 +541,14 @@ toIfGuidance src guidance
   | UnfWhen arity unsat_ok boring_ok <- guidance
   , isStableSource src = IfWhen arity unsat_ok boring_ok
   | otherwise          = IfNoGuidance
+
+toIfaceBooleanFormula :: BF.BooleanFormula GhcRn -> IfaceBooleanFormula
+toIfaceBooleanFormula = go
+  where
+    go (BF.Var nm   ) = IfVar    $ mkIfLclName . getOccFS . unLoc $  nm
+    go (BF.And bfs  ) = IfAnd    $ map (go . unLoc) bfs
+    go (BF.Or bfs   ) = IfOr     $ map (go . unLoc) bfs
+    go (BF.Parens bf) = IfParens $     (go . unLoc) bf
 
 {-
 ************************************************************************
