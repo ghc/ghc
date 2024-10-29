@@ -3280,13 +3280,11 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
                       ; return (Tuple (cos ++ $2)) } }
 
            | texp bars   { unECP $1 >>= \ $1 -> return $
-                            (Sum 1  (snd $2 + 1) $1 [] (map srcSpan2e $ fst $2)) }
+                            (Sum 1  (snd $2 + 1) $1 [] (fst $2)) }
 
            | bars texp bars0
                 { unECP $2 >>= \ $2 -> return $
-                  (Sum (snd $1 + 1) (snd $1 + snd $3 + 1) $2
-                    (map srcSpan2e $ fst $1)
-                    (map srcSpan2e $ fst $3)) }
+                  (Sum (snd $1 + 1) (snd $1 + snd $3 + 1) $2 (fst $1) (fst $3)) }
 
 -- Always starts with commas; always follows an expr
 commas_tup_tail :: { forall b. DisambECP b => PV (SrcSpan,[Either (EpAnn Bool) (LocatedA b)]) }
@@ -3827,7 +3825,7 @@ ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit
                                       ; amsr (sLL $1 $> n) (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map srcSpan2e (fst $2)) []) }}
         | '(#' bars '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
                                       ; amsr (sLL $1 $> $ (getRdrName (sumTyCon (snd $2 + 1))))
-                                       (NameAnnBars (epTok $1, epTok $3) (map srcSpan2e (fst $2)) []) } }
+                                       (NameAnnBars (epTok $1, epTok $3) (fst $2) []) } }
         | '(' '->' ')'          {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                        (NameAnnRArrow  (Just $ epTok $1) (epUniTok $2) (Just $ epTok $3) []) }
 
@@ -4160,13 +4158,13 @@ commas :: { ([SrcSpan],Int) }   -- One or more commas
         : commas ','             { ((fst $1)++[gl $2],snd $1 + 1) }
         | ','                    { ([gl $1],1) }
 
-bars0 :: { ([SrcSpan],Int) }     -- Zero or more bars
+bars0 :: { ([EpToken "|"],Int) }     -- Zero or more bars
         : bars                   { $1 }
         |                        { ([], 0) }
 
-bars :: { ([SrcSpan],Int) }     -- One or more bars
-        : bars '|'               { ((fst $1)++[gl $2],snd $1 + 1) }
-        | '|'                    { ([gl $1],1) }
+bars :: { ([EpToken "|"],Int) }     -- One or more bars
+        : bars '|'               { ((fst $1)++[epTok $2],snd $1 + 1) }
+        | '|'                    { ([epTok $1],1) }
 
 {
 happyError :: P a

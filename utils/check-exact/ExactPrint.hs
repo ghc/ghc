@@ -1036,8 +1036,8 @@ lsnd k parent = fmap (\new -> (fst parent, new))
 -- data AnnExplicitSum
 --   = AnnExplicitSum {
 --       aesOpen       :: EpaLocation,
---       aesBarsBefore :: [EpaLocation],
---       aesBarsAfter  :: [EpaLocation],
+--       aesBarsBefore :: [EpToken "|"],
+--       aesBarsAfter  :: [EpToken "|"],
 --       aesClose      :: EpaLocation
 --       } deriving Data
 
@@ -1045,11 +1045,11 @@ laesOpen :: Lens AnnExplicitSum EpaLocation
 laesOpen k parent = fmap (\new -> parent { aesOpen = new })
                          (k (aesOpen parent))
 
-laesBarsBefore :: Lens AnnExplicitSum [EpaLocation]
+laesBarsBefore :: Lens AnnExplicitSum [EpToken "|"]
 laesBarsBefore k parent = fmap (\new -> parent { aesBarsBefore = new })
                                (k (aesBarsBefore parent))
 
-laesBarsAfter :: Lens AnnExplicitSum [EpaLocation]
+laesBarsAfter :: Lens AnnExplicitSum [EpToken "|"]
 laesBarsAfter k parent = fmap (\new -> parent { aesBarsAfter = new })
                                (k (aesBarsAfter parent))
 
@@ -1215,19 +1215,19 @@ lga_sep k parent = fmap (\new -> parent { ga_sep = new })
 -- ---------------------------------------------------------------------
 -- data EpAnnSumPat = EpAnnSumPat
 --       { sumPatParens      :: (EpaLocation, EpaLocation)
---       , sumPatVbarsBefore :: [EpaLocation]
---       , sumPatVbarsAfter  :: [EpaLocation]
+--       , sumPatVbarsBefore :: [EpToken "|"]
+--       , sumPatVbarsAfter  :: [EpToken "|"]
 --       } deriving Data
 
 lsumPatParens :: Lens EpAnnSumPat (EpaLocation, EpaLocation)
 lsumPatParens k parent = fmap (\new -> parent { sumPatParens = new })
                               (k (sumPatParens parent))
 
-lsumPatVbarsBefore :: Lens EpAnnSumPat [EpaLocation]
+lsumPatVbarsBefore :: Lens EpAnnSumPat [EpToken "|"]
 lsumPatVbarsBefore k parent = fmap (\new -> parent { sumPatVbarsBefore = new })
                               (k (sumPatVbarsBefore parent))
 
-lsumPatVbarsAfter :: Lens EpAnnSumPat [EpaLocation]
+lsumPatVbarsAfter :: Lens EpAnnSumPat [EpToken "|"]
 lsumPatVbarsAfter k parent = fmap (\new -> parent { sumPatVbarsAfter = new })
                               (k (sumPatVbarsAfter parent))
 
@@ -2985,9 +2985,9 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (ExplicitSum an alt arity expr) = do
     an0 <- markLensFun an laesOpen (\loc -> printStringAtAA loc "(#")
-    an1 <- markLensFun an0 laesBarsBefore (\locs -> mapM (\l -> printStringAtAA l "|") locs)
+    an1 <- markLensFun an0 laesBarsBefore (\locs -> mapM markEpToken locs)
     expr' <- markAnnotated expr
-    an2 <- markLensFun an1 laesBarsAfter (\locs -> mapM (\l -> printStringAtAA l "|") locs)
+    an2 <- markLensFun an1 laesBarsAfter (\locs -> mapM markEpToken locs)
     an3 <- markLensFun an2 laesClose (\loc -> printStringAtAA loc "#)")
     return (ExplicitSum an3 alt arity expr')
 
@@ -4191,7 +4191,7 @@ instance ExactPrint (LocatedN RdrName) where
           return (NameAnnCommas a1 commas' t)
         NameAnnBars (o,c) bars t -> do
           o' <- markEpToken o
-          bars' <- forM bars (\loc -> printStringAtAAC NoCaptureComments loc "|")
+          bars' <- mapM markEpToken bars
           c' <- markEpToken c
           return (NameAnnBars (o',c') bars' t)
         NameAnnOnly a t -> do
@@ -4684,9 +4684,9 @@ instance ExactPrint (Pat GhcPs) where
 
   exact (SumPat an pat alt arity) = do
     an0 <- markLensFun an (lsumPatParens . lfst) (\loc -> printStringAtAA loc "(#")
-    an1 <- markLensFun an0 lsumPatVbarsBefore (\locs -> mapM (\l -> printStringAtAA l "|") locs)
+    an1 <- markLensFun an0 lsumPatVbarsBefore (\locs -> mapM markEpToken locs)
     pat' <- markAnnotated pat
-    an2 <- markLensFun an1 lsumPatVbarsAfter (\locs -> mapM (\l -> printStringAtAA l "|") locs)
+    an2 <- markLensFun an1 lsumPatVbarsAfter (\locs -> mapM markEpToken locs)
     an3 <- markLensFun an2 (lsumPatParens . lsnd)  (\loc -> printStringAtAA loc "#)")
     return (SumPat an3 pat' alt arity)
 
