@@ -3646,11 +3646,10 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
              -- we're only doing this to find the right kind variables to
              -- quantify over, and this type is fine for that purpose.
 
-         -- exp_tvbndrs have explicit, user-written binding sites
-         -- the kvs below are those kind variables entirely unmentioned by the user
-         --   and discovered only by generalization
-
        ; kvs <- kindGeneralizeAll skol_info fake_ty
+             -- exp_tvbndrs have explicit, user-written binding sites
+             -- These `kvs` below are those kind variables entirely unmentioned
+             -- by the user and discovered only by generalization
 
        ; let all_skol_tvs = tc_tvs ++ kvs
        ; reportUnsolvedEqualities skol_info all_skol_tvs tclvl wanted
@@ -3661,7 +3660,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
              -- But that just doesn't seem worth it.
              -- See test dependent/should_fail/T13780a
 
-       -- Zonk to Types
+       -- Zonk to TyvVars and Types, instead of TcTyVars and TcTypes
        ; (tc_bndrs, kvs, exp_tvbndrs, arg_tys, ctxt) <- initZonkEnv NoFlexi $
          runZonkBndrT (zonkTyVarBindersX tc_bndrs   ) $ \ tc_bndrs ->
          runZonkBndrT (zonkTyBndrsX      kvs        ) $ \ kvs ->
