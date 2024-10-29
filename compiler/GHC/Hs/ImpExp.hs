@@ -194,9 +194,9 @@ instance (OutputableBndrId p
 -}
 
 type instance XIEName    (GhcPass _) = NoExtField
-type instance XIEDefault (GhcPass _) = EpaLocation
-type instance XIEPattern (GhcPass _) = EpaLocation
-type instance XIEType    (GhcPass _) = EpaLocation
+type instance XIEDefault (GhcPass _) = EpToken "default"
+type instance XIEPattern (GhcPass _) = EpToken "pattern"
+type instance XIEType    (GhcPass _) = EpToken "type"
 type instance XXIEWrappedName (GhcPass _) = DataConCantHappen
 
 type instance Anno (IEWrappedName (GhcPass _)) = SrcSpanAnnA

@@ -1040,9 +1040,9 @@ export  :: { LIE GhcPs }
                                                           ; locImpExp <- return (sL span (IEModuleContents ($1, (epTok $2)) $3))
                                                           ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
-                                                           in reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glR $2) $3)) Nothing }
+                                                           in reLoc $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (epTok $2) $3)) Nothing }
         | maybe_warning_pragma 'default' qtycon          {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
-                                                          ; locImpExp <- return (sL span (IEThingAbs $1 (sLLa $2 $> (IEDefault (glR $2) $3)) Nothing))
+                                                          ; locImpExp <- return (sL span (IEThingAbs $1 (sLLa $2 $> (IEDefault (epTok $2) $3)) Nothing))
                                                           ; return $ reLoc $ locImpExp } }
 
 
@@ -1076,7 +1076,7 @@ qcname_ext_w_wildcard :: { LocatedA ImpExpQcSpec }
 qcname_ext :: { LocatedA ImpExpQcSpec }
         :  qcname                   { sL1a $1 (ImpExpQcName $1) }
         |  'type' oqtycon           {% do { n <- mkTypeImpExp $2
-                                          ; return $ sLLa $1 $> (ImpExpQcType (glR $1) n) }}
+                                          ; return $ sLLa $1 $> (ImpExpQcType (epTok $1) n) }}
 
 qcname  :: { LocatedN RdrName }  -- Variable or type constructor
         :  qvar                 { $1 } -- Things which look like functions
@@ -1209,7 +1209,7 @@ importlist1 :: { OrdList (LIE GhcPs) }
 import  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImpExp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
         | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, (epTok $1)) $2)) }
-        | 'pattern' qcon            { unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (glR $1) $2)) Nothing }
+        | 'pattern' qcon            { unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (epTok $1) $2)) Nothing }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations
@@ -3776,10 +3776,10 @@ qcon_list : qcon                  { [$1] }
 -- See Note [ExplicitTuple] in GHC.Hs.Expr
 sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors
         : '(' commas ')'        {% amsr (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
-                                       (NameAnnCommas (NameParens (epTok $1) (epTok $3)) (map srcSpan2e (fst $2)) []) }
+                                       (NameAnnCommas (NameParens (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (fst $2)) []) }
         | '(#' '#)'             {% amsr (sLL $1 $> $ unboxedUnitDataCon) (NameAnnOnly (NameParensHash (epTok $1) (epTok $2)) []) }
         | '(#' commas '#)'      {% amsr (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
-                                       (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map srcSpan2e (fst $2)) []) }
+                                       (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (fst $2)) []) }
 
 syscon :: { LocatedN RdrName }
         : sysdcon               {  L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
@@ -3820,9 +3820,9 @@ gtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, including unit t
 ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit tuples
         : oqtycon               { $1 }
         | '(' commas ')'        {% do { n <- mkTupleSyntaxTycon Boxed (snd $2 + 1)
-                                      ; amsr (sLL $1 $> n) (NameAnnCommas (NameParens (epTok $1) (epTok $3)) (map srcSpan2e (fst $2)) []) }}
+                                      ; amsr (sLL $1 $> n) (NameAnnCommas (NameParens (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (fst $2)) []) }}
         | '(#' commas '#)'      {% do { n <- mkTupleSyntaxTycon Unboxed (snd $2 + 1)
-                                      ; amsr (sLL $1 $> n) (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map srcSpan2e (fst $2)) []) }}
+                                      ; amsr (sLL $1 $> n) (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (fst $2)) []) }}
         | '(#' bars '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
                                       ; amsr (sLL $1 $> $ (getRdrName (sumTyCon (snd $2 + 1))))
                                        (NameAnnBars (epTok $1, epTok $3) (fst $2) []) } }

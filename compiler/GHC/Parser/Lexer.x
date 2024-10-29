@@ -3672,8 +3672,8 @@ allocateComments
   -> ([LEpaComment], [LEpaComment])
 allocateComments ss comment_q =
   let
-    (before,rest)  = break (\(L l _) -> isRealSubspanOf (anchor l) ss) comment_q
-    (middle,after) = break (\(L l _) -> not (isRealSubspanOf (anchor l) ss)) rest
+    (before,rest)  = break (\(L l _) -> isRealSubspanOf (epaLocationRealSrcSpan l) ss) comment_q
+    (middle,after) = break (\(L l _) -> not (isRealSubspanOf (epaLocationRealSrcSpan l) ss)) rest
     comment_q' = before ++ after
     newAnns = middle
   in
@@ -3691,14 +3691,14 @@ splitPriorComments ss prior_comments =
     -- And the token preceding the comment is on a different line
     cmp :: RealSrcSpan -> LEpaComment -> Bool
     cmp later (L l c)
-         = srcSpanStartLine later - srcSpanEndLine (anchor l) == 1
-          && srcSpanEndLine (ac_prior_tok c) /= srcSpanStartLine (anchor l)
+         = srcSpanStartLine later - srcSpanEndLine (epaLocationRealSrcSpan l) == 1
+          && srcSpanEndLine (ac_prior_tok c) /= srcSpanStartLine (epaLocationRealSrcSpan l)
 
     go :: [LEpaComment] -> RealSrcSpan -> [LEpaComment]
        -> ([LEpaComment], [LEpaComment])
     go decl_comments _ [] = ([],decl_comments)
     go decl_comments r (c@(L l _):cs) = if cmp r c
-                              then go (c:decl_comments) (anchor l) cs
+                              then go (c:decl_comments) (epaLocationRealSrcSpan l) cs
                               else (reverse (c:cs), decl_comments)
   in
     go [] ss prior_comments
@@ -3710,7 +3710,7 @@ allocatePriorComments
   -> (Strict.Maybe [LEpaComment], [LEpaComment], [LEpaComment])
 allocatePriorComments ss comment_q mheader_comments =
   let
-    cmp (L l _) = anchor l <= ss
+    cmp (L l _) = epaLocationRealSrcSpan l <= ss
     (newAnns,after) = partition cmp comment_q
     comment_q'= after
     (prior_comments, decl_comments) = splitPriorComments ss newAnns

@@ -54,7 +54,7 @@ module Haddock.Backends.Xhtml.Layout
 
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
-import GHC hiding (anchor)
+import GHC
 import GHC.Types.Name (nameOccName)
 import Text.XHtml hiding (name, quote, title)
 

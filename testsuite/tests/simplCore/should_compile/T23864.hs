@@ -49,7 +49,7 @@ insertCommentsByPos ::
   -> (EpAnnComments -> [LEpaComment] -> EpAnnComments)
   -> EpAnn a
   -> WithComments (EpAnn a)
-insertCommentsByPos cond = insertComments (cond . anchor . getLoc)
+insertCommentsByPos cond = insertComments (cond . epaLocationRealSrcSpan . getLoc)
 
 insertComments ::
      (LEpaComment -> Bool)
