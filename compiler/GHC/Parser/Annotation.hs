@@ -23,7 +23,6 @@ module GHC.Parser.Annotation (
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..),
-  anchor,
   spanAsAnchor, realSpanAsAnchor,
   noSpanAnchor,
   NoAnn(..),
@@ -350,7 +349,7 @@ instance Outputable a => Outputable (GenLocated TokenLocation a) where
 -- | Used in the parser only, extract the 'RealSrcSpan' from an
 -- 'EpaLocation'. The parser will never insert a 'DeltaPos', so the
 -- partial function is safe.
-epaLocationRealSrcSpan :: EpaLocation -> RealSrcSpan
+epaLocationRealSrcSpan :: EpaLocation' a -> RealSrcSpan
 epaLocationRealSrcSpan (EpaSpan (RealSrcSpan r _)) = r
 epaLocationRealSrcSpan _ = panic "epaLocationRealSrcSpan"
 
@@ -401,9 +400,6 @@ data EpAnn ann
         deriving (Data, Eq, Functor)
 -- See Note [XRec and Anno in the AST]
 
-anchor :: (EpaLocation' a) -> RealSrcSpan
-anchor (EpaSpan (RealSrcSpan r _)) = r
-anchor _ = panic "anchor"
 
 spanAsAnchor :: SrcSpan -> (EpaLocation' a)
 spanAsAnchor ss  = EpaSpan ss
@@ -600,7 +596,7 @@ data NameAnn
   -- | Used for @(,,,)@, or @(#,,,#)@
   | NameAnnCommas {
       nann_adornment :: NameAdornment,
-      nann_commas    :: [EpaLocation],
+      nann_commas    :: [EpToken ","],
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @(# | | #)@
@@ -639,10 +635,10 @@ data NameAnn
 -- such as parens or backquotes. This data type identifies what
 -- particular pair are being used.
 data NameAdornment
-  = NameParens     (EpToken "(")  (EpToken ")") -- ^ '(' ')'
-  | NameParensHash (EpToken "(#") (EpToken "#)")-- ^ '(#' '#)'
-  | NameBackquotes (EpToken "`")  (EpToken "`")-- ^ '`'
-  | NameSquare     (EpToken "[")  (EpToken "]")-- ^ '[' ']'
+  = NameParens     (EpToken "(")  (EpToken ")")
+  | NameParensHash (EpToken "(#") (EpToken "#)")
+  | NameBackquotes (EpToken "`")  (EpToken "`")
+  | NameSquare     (EpToken "[")  (EpToken "]")
   | NameNoAdornment
   deriving (Eq, Data)
 

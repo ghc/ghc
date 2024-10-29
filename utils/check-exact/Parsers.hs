@@ -289,7 +289,8 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
             let
               pc = GHC.priorComments cs
               fc = GHC.getFollowingComments cs
-              bf (GHC.L anc _) = GHC.anchor anc > ss
+              bf (GHC.L anc _) = GHC.epaLocationRealSrcSpan anc > ss
+
               (prior,f) = break bf fc
               cs'' = GHC.EpaCommentsBalanced (pc <> prior) f
             in cs''
@@ -310,7 +311,7 @@ fixModuleHeaderComments (GHC.L l p) = GHC.L l p'
         -- Move any comments on the decl that occur prior to the location
         pc = GHC.priorComments csd
         fc = GHC.getFollowingComments csd
-        bf (GHC.L anch _) = GHC.anchor anch > r
+        bf (GHC.L anch _) = GHC.epaLocationRealSrcSpan anch > r
         (move,keep) = break bf pc
         csd' = GHC.EpaCommentsBalanced keep fc
 

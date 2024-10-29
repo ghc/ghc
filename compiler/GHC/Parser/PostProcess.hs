@@ -1312,7 +1312,7 @@ checkAPat loc e0 = do
            _
                      | nPlusKPatterns && (plus == plus_RDR)
                      -> return (mkNPlusKPat (L nloc n) (L (l2l lloc) lit)
-                                (entry l))
+                                (EpTok $ entry l))
 
    -- Improve error messages for the @-operator when the user meant an @-pattern
    PatBuilderOpApp _ op _ _ | opIsAt (unLoc op) -> do
@@ -3158,7 +3158,7 @@ data ImpExpSubSpec = ImpExpAbs
                    | ImpExpAllWith [LocatedA ImpExpQcSpec]
 
 data ImpExpQcSpec = ImpExpQcName (LocatedN RdrName)
-                  | ImpExpQcType EpaLocation (LocatedN RdrName)
+                  | ImpExpQcType (EpToken "type") (LocatedN RdrName)
                   | ImpExpQcWildcard (EpToken "..") (EpToken ",")
 
 mkModuleImpExp :: Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec

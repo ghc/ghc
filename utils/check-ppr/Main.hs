@@ -97,7 +97,7 @@ getPragmas (L _ (HsModule { hsmodExt = XModulePs { hsmodAnn = anns' } })) = prag
     tokComment (L _ (EpaComment (EpaLineComment  s) _)) = s
     tokComment _ = ""
 
-    cmp (L l1 _) (L l2 _) = compare (anchor l1) (anchor l2)
+    cmp (L l1 _) (L l2 _) = compare (epaLocationRealSrcSpan l1) (epaLocationRealSrcSpan l2)
     comments' = map tokComment $ sortBy cmp $ priorComments $ epAnnComments anns'
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
     pragmaStr = intercalate "\n" pragmas
