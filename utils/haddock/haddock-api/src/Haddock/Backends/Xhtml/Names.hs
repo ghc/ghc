@@ -31,7 +31,7 @@ module Haddock.Backends.Xhtml.Names
   ) where
 
 import Data.List (stripPrefix)
-import GHC hiding (LexicalFixity (..), anchor)
+import GHC hiding (LexicalFixity (..))
 import GHC.Data.FastString (unpackFS)
 import GHC.Types.Name
 import GHC.Types.Name.Reader

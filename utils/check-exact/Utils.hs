@@ -268,7 +268,7 @@ workInComments ocs new = cs'
                                         (sortEpaComments $ fc ++ cs_after)
              where
                (cs_before,cs_after)
-                   = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ anchor ac) )
+                   = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos $ epaLocationRealSrcSpan ac) )
                            new
 
 insertTopLevelCppComments ::  HsModule GhcPs -> [LEpaComment] -> (HsModule GhcPs, [LEpaComment])
@@ -292,7 +292,7 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
     (an1,cs0a) = case lo of
         EpExplicitBraces (EpTok (EpaSpan (RealSrcSpan s _))) _close ->
             let
-                (stay,cs0a') = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ s)) cs0
+                (stay,cs0a') = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos $ s)) cs0
                 cs' = workInComments (comments an0) stay
             in (an0 { comments = cs' }, cs0a')
         _ -> (an0,cs0)
@@ -300,7 +300,7 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
     (an2, cs0b) = case am_decls $ anns an1 of
         (AddSemiAnn (EpTok (EpaSpan (RealSrcSpan s _))):_) -> (an1 {comments = cs'}, cs0b')
           where
-            (stay,cs0b') = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ s)) cs0a
+            (stay,cs0b') = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos $ s)) cs0a
             cs' = workInComments (comments an1) stay
         _ -> (an1,cs0a)
 
@@ -314,7 +314,7 @@ insertTopLevelCppComments (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports
                            (csh', cs0b') = case annListBracketsLocs $ al_brackets $ anns l of
                                (EpaSpan (RealSrcSpan s _),_) ->(h, n)
                                  where
-                                   (h,n) = break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos s) )
+                                   (h,n) = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos s) )
                                        cs0b
 
                                _ -> ([], cs0b)
@@ -361,7 +361,7 @@ splitOnWhere w (EpTok (EpaSpan (RealSrcSpan s _))) csIn = (hc, fc)
   where
     splitFunc Before anc_pos c_pos = c_pos < anc_pos
     splitFunc After  anc_pos c_pos = anc_pos < c_pos
-    (hc,fc) = break (\(L ll _) ->  splitFunc w (ss2pos $ anchor ll) (ss2pos s)) csIn
+    (hc,fc) = break (\(L ll _) ->  splitFunc w (ss2pos $ epaLocationRealSrcSpan ll) (ss2pos s)) csIn
 splitOnWhere _ _ csIn = (csIn,[])
 
 balanceFirstLocatedAComments :: [LocatedA a] -> ([LocatedA a], [LEpaComment])
@@ -372,7 +372,7 @@ balanceFirstLocatedAComments ((L (EpAnn anc an csd) a):ds) = (L (EpAnn anc an cs
         EpaSpan (RealSrcSpan s _) -> (csd', hc)
                `debug` ("balanceFirstLocatedAComments: (csd,csd',attached,header)=" ++ showAst (csd,csd',attached,header))
           where
-            (priors, inners) =  break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos s) )
+            (priors, inners) =  break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos s) )
                                        (priorComments csd)
             pcds = priorCommentsDeltas' s priors
             (attached, header) = break (\(d,_c) -> d /= 1) pcds
@@ -388,14 +388,14 @@ priorCommentsDeltas' r cs = go r (reverse cs)
   where
     go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
     go _   [] = []
-    go _   (la@(L l@(EpaDelta _ dp _) _):las) = (getDeltaLine dp, la) : go (anchor l) las
-    go rs' (la@(L l _):las) = deltaComment rs' la : go (anchor l) las
+    go _   (la@(L l@(EpaDelta _ dp _) _):las) = (getDeltaLine dp, la) : go (epaLocationRealSrcSpan l) las
+    go rs' (la@(L l _):las) = deltaComment rs' la : go (epaLocationRealSrcSpan l) las
 
     deltaComment :: RealSrcSpan -> LEpaComment -> (Int, LEpaComment)
     deltaComment rs' (L loc c) = (abs(ll - al), L loc c)
       where
         (al,_) = ss2pos rs'
-        (ll,_) = ss2pos (anchor loc)
+        (ll,_) = ss2pos (epaLocationRealSrcSpan loc)
 
 allocatePriorComments
   :: Pos
@@ -403,7 +403,7 @@ allocatePriorComments
   -> ([LEpaComment], [LEpaComment])
 allocatePriorComments ss_loc comment_q =
   let
-    cmp (L l _) = ss2pos (anchor l) <= ss_loc
+    cmp (L l _) = ss2pos (epaLocationRealSrcSpan l) <= ss_loc
     (newAnns,after) = partition cmp comment_q
   in
     (after, newAnns)
@@ -420,7 +420,7 @@ insertRemainingCppComments (L l p) cs = L l p'
             EpTok (EpaSpan (RealSrcSpan s _)) -> ss2pos s
             _ -> (1,1)
         _ -> (1,1)
-    (new_before, new_after) = break (\(L ll _) -> (ss2pos $ anchor ll) > end_loc ) cs
+    (new_before, new_after) = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > end_loc ) cs
 
     addTrailingComments end_loc' cur new = epaCommentsBalanced pc' fc'
       where
@@ -431,8 +431,8 @@ insertRemainingCppComments (L l p) cs = L l p'
             (L ac _:_) -> (sortEpaComments $ pc ++ cs_before, sortEpaComments $ fc ++ cs_after)
               where
                (cs_before,cs_after)
-                   = if (ss2pos $ anchor ac) > end_loc'
-                       then break (\(L ll _) -> (ss2pos $ anchor ll) > (ss2pos $ anchor ac) ) new
+                   = if (ss2pos $ epaLocationRealSrcSpan ac) > end_loc'
+                       then break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > (ss2pos $ epaLocationRealSrcSpan ac) ) new
                        else (new_before, new_after)
 
 -- ---------------------------------------------------------------------
@@ -513,7 +513,7 @@ normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
 -- |Must compare without span filenames, for CPP injected comments with fake filename
 cmpComments :: Comment -> Comment -> Ordering
-cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ epaLocationRealSrcSpan l1) (ss2pos $ epaLocationRealSrcSpan l2)
 
 -- |Sort, comparing without span filenames, for CPP injected comments with fake filename
 sortComments :: [Comment] -> [Comment]
@@ -523,7 +523,7 @@ sortComments cs = sortBy cmpComments cs
 sortEpaComments :: [LEpaComment] -> [LEpaComment]
 sortEpaComments cs = sortBy cmp cs
   where
-    cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+    cmp (L l1 _) (L l2 _) = compare (ss2pos $ epaLocationRealSrcSpan l1) (ss2pos $ epaLocationRealSrcSpan l2)
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: String -> NoCommentsLocation -> Comment
@@ -532,7 +532,7 @@ mkKWComment kw (EpaSpan (UnhelpfulSpan _))   = Comment kw (EpaDelta noSrcSpan (S
 mkKWComment kw (EpaDelta ss dp cs)           = Comment kw (EpaDelta ss dp cs) placeholderRealSpan (Just kw)
 
 sortAnchorLocated :: [GenLocated EpaLocation a] -> [GenLocated EpaLocation a]
-sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
+sortAnchorLocated = sortBy (compare `on` (epaLocationRealSrcSpan . getLoc))
 
 -- | Calculates the distance from the start of a string to the end of
 -- a string.
