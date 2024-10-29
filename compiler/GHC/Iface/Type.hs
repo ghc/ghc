@@ -1142,7 +1142,7 @@ pprArrow (mb_conc, ppr_mult) af mult
 ppr_tv_occ :: TyVar -> SDoc
 ppr_tv_occ tv
   = sdocOption sdocPrintTyVarUnfoldings $ \print_unf ->
-    ppr tv <> case tyVarUnfolding tv of
+    ppr tv <> case tyVarUnfolding_maybe tv of
                 Just ty | print_unf -> braces (ppr ty)
                 _                   -> empty
 

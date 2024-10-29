@@ -443,8 +443,8 @@ toIfaceLetBndr tv
                                (toIfaceKind (tyVarKind tv))
                                info
   where
-    info | Just unf <- tyVarUnfolding tv = [HsTypeUnfold (toIfaceType unf)]
-         | otherwise                     = []
+    info | Just unf <- tyVarUnfolding_maybe tv = [HsTypeUnfold (toIfaceType unf)]
+         | otherwise                           = []
 
 toIfaceLetBndr id  = IfLetBndr (mkIfLclName (occNameFS (getOccName id)))
                                (toIfaceType (idType id))
