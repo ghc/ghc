@@ -73,8 +73,7 @@ module GHC.Types.Id.Info (
         -- ** The RuleInfo type
         RuleInfo(..),
         emptyRuleInfo,
-        isEmptyRuleInfo, ruleInfoFreeVars,
-        ruleInfoRules, setRuleInfoHead,
+        isEmptyRuleInfo, ruleInfoRules, setRuleInfoHead,
         ruleInfo, setRuleInfo, tagSigInfo,
 
         -- ** The CAFInfo type
@@ -98,7 +97,6 @@ import GHC.Core
 import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.Name
-import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -768,33 +766,21 @@ and put in the global list.
 --
 -- Records the specializations of this 'Id' that we know about
 -- in the form of rewrite 'CoreRule's that target them
-data RuleInfo
-  = RuleInfo
-        [CoreRule]
-        DVarSet         -- Locally-defined free vars of *both* LHS and RHS
-                        -- of rules.  I don't think it needs to include the
-                        -- ru_fn though.
-                        -- Note [Rule dependency info] in "GHC.Core.Opt.OccurAnal"
+newtype RuleInfo = RuleInfo [CoreRule]
 
 -- | Assume that no specializations exist: always safe
 emptyRuleInfo :: RuleInfo
-emptyRuleInfo = RuleInfo [] emptyDVarSet
+emptyRuleInfo = RuleInfo []
 
 isEmptyRuleInfo :: RuleInfo -> Bool
-isEmptyRuleInfo (RuleInfo rs _) = null rs
-
--- | Retrieve the locally-defined free variables of both the left and
--- right hand sides of the specialization rules
-ruleInfoFreeVars :: RuleInfo -> DVarSet
-ruleInfoFreeVars (RuleInfo _ fvs) = fvs
+isEmptyRuleInfo (RuleInfo rs) = null rs
 
 ruleInfoRules :: RuleInfo -> [CoreRule]
-ruleInfoRules (RuleInfo rules _) = rules
+ruleInfoRules (RuleInfo rules) = rules
 
 -- | Change the name of the function the rule is keyed on all of the 'CoreRule's
 setRuleInfoHead :: Name -> RuleInfo -> RuleInfo
-setRuleInfoHead fn (RuleInfo rules fvs)
-  = RuleInfo (map (setRuleIdName fn) rules) fvs
+setRuleInfoHead fn (RuleInfo rules) = RuleInfo (map (setRuleIdName fn) rules)
 
 {-
 ************************************************************************

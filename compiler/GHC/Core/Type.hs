@@ -366,7 +366,7 @@ import GHC.List (build)
 unfoldView :: Type -> Maybe Type
 -- Look through type variables, see Note [Type and coercion lets] in GHC.Core
 {-# INLINE unfoldView #-}
-unfoldView (TyVarTy tv) = tyVarUnfolding tv
+unfoldView (TyVarTy tv) = tyVarUnfolding_maybe tv
 unfoldView _ = Nothing
 
 rewriterView :: Type -> Maybe Type
@@ -379,7 +379,7 @@ rewriterView (TyConApp tc tys)
   | isTypeSynonymTyCon tc
   , isForgetfulSynTyCon tc || not (isFamFreeTyCon tc)
   = expandSynTyConApp_maybe tc tys
-rewriterView (TyVarTy tv) = tyVarUnfolding tv
+rewriterView (TyVarTy tv) = tyVarUnfolding_maybe tv
 rewriterView _other
   = Nothing
 
@@ -393,7 +393,7 @@ coreView :: Type -> Maybe Type
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView (TyConApp tc tys) = expandSynTyConApp_maybe tc tys
-coreView (TyVarTy tv)      = tyVarUnfolding tv  -- c.f. unfoldView
+coreView (TyVarTy tv)      = tyVarUnfolding_maybe tv  -- c.f. unfoldView
 coreView _                 = Nothing
 -- See Note [Inlining coreView].
 {-# INLINE coreView #-}
@@ -407,7 +407,7 @@ coreFullView ty@(TyConApp tc _)
   | isTypeSynonymTyCon tc = core_full_view ty
 coreFullView (TyVarTy tv)
   -- c.f. unfoldView
-  | Just ty <- tyVarUnfolding tv = core_full_view ty
+  | Just ty <- tyVarUnfolding_maybe tv = core_full_view ty
 coreFullView ty = ty
 {-# INLINE coreFullView #-}
 
@@ -2743,7 +2743,7 @@ sORTKind_maybe :: Kind -> Maybe (TypeOrConstraint, Type)
 -- This is a "hot" function.  Do not call splitTyConApp_maybe here,
 -- to avoid the faff with FunTy
 sORTKind_maybe (TyVarTy tv)
-  | Just ty <- tyVarUnfolding tv
+  | Just ty <- tyVarUnfolding_maybe tv
   = sORTKind_maybe ty
 sORTKind_maybe (TyConApp tc tys)
   -- First, short-cuts for Type and Constraint that do no allocation
@@ -2894,8 +2894,8 @@ isConcreteTypeWith :: TyVarSet -> Type -> Bool
 isConcreteTypeWith conc_tvs = go
   where
     go (TyVarTy tv)
-      | Just ty <- tyVarUnfolding tv = go ty
-      | otherwise                    = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
+      | Just ty <- tyVarUnfolding_maybe tv = go ty
+      | otherwise                          = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
     go (AppTy ty1 ty2)     = go ty1 && go ty2
     go (TyConApp tc tys)   = go_tc tc tys
     go ForAllTy{}          = False

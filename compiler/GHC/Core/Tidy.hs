@@ -331,7 +331,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) tv
     let
         ki'      = tidyType env (tyVarKind tv)
         name'    = mkInternalName (varUnique tv) occ' noSrcSpan
-        mb_unf   = tyVarUnfolding tv
+        mb_unf   = tyVarUnfolding_maybe tv
         occ_info = tyVarOccInfo tv
         tv' | Just unf <- mb_unf = mkTyVarWithUnfolding name' ki' (tidyType rec_tidy_env unf)
             | otherwise          = mkTyVar name' ki'

@@ -104,7 +104,7 @@ module GHC.Types.Var (
         mkTyVar, mkTyVarWithUnfolding, mkTcTyVar,
 
         -- ** Taking 'TyVar's apart
-        tyVarName, tyVarKind, tyVarUnfolding, tyVarOccInfo, tcTyVarDetails, setTcTyVarDetails,
+        tyVarName, tyVarKind, tyVarUnfolding_maybe, tyVarOccInfo, tcTyVarDetails, setTcTyVarDetails,
 
         -- ** Modifying 'TyVar's
         setTyVarName, setTyVarUnique, setTyVarKind, setTyVarUnfolding, setTyVarOccInfo,
@@ -471,6 +471,7 @@ updateVarTypeM upd var
   where
     result = do { ty' <- upd (varType var)
                 ; return (var { varType = ty' }) }
+
 
 {- *********************************************************************
 *                                                                      *
@@ -1020,9 +1021,9 @@ tyVarName = varName
 tyVarKind :: TyVar -> Kind
 tyVarKind = varType
 
-tyVarUnfolding :: TyVar -> Maybe Type
-tyVarUnfolding (TyVar { tv_unfolding = unf }) = unf
-tyVarUnfolding _ = Nothing
+tyVarUnfolding_maybe :: TyVar -> Maybe Type
+tyVarUnfolding_maybe (TyVar { tv_unfolding = unf }) = unf
+tyVarUnfolding_maybe _ = Nothing
 
 tyVarOccInfo :: TyVar -> OccInfo
 tyVarOccInfo (TcTyVar {}) = noOccInfo
@@ -1059,7 +1060,7 @@ updateTyVarKindM update tv
 
 updateTyVarUnfolding :: (Type -> Type) -> TyVar -> TyVar
 updateTyVarUnfolding update tv
-  | Just unf <- tyVarUnfolding tv
+  | Just unf <- tyVarUnfolding_maybe tv
   = tv {tv_unfolding = Just (update unf)}
 
   | otherwise
@@ -1067,7 +1068,7 @@ updateTyVarUnfolding update tv
 
 updateTyVarUnfoldingM :: (Monad m) => (Type -> m Type) -> TyVar -> m TyVar
 updateTyVarUnfoldingM update tv
-  | Just unf <- tyVarUnfolding tv
+  | Just unf <- tyVarUnfolding_maybe tv
   = do { unf' <- update unf
        ; return $ tv {tv_unfolding = Just unf'} }
 
