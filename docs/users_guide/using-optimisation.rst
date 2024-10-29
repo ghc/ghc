@@ -1851,6 +1851,8 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     :default: 2
 
+    :since: 9.12.1
+
     This flag defines the level of compression of interface files when writing to disk.
     The higher the flag, the more we deduplicate the interface file, at the cost of a higher compilation time.
     Deduplication (when applied to :ghc-flag:`--make` mode and :ghc-flag:`--interactive` mode) decreases the size of interface files as well as reducing
