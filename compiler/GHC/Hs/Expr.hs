@@ -424,8 +424,8 @@ arrowToHsExpr = expandHsArrow (HsVar noExtField)
 data AnnExplicitSum
   = AnnExplicitSum {
       aesOpen       :: EpaLocation,
-      aesBarsBefore :: [EpaLocation],
-      aesBarsAfter  :: [EpaLocation],
+      aesBarsBefore :: [EpToken "|"],
+      aesBarsAfter  :: [EpToken "|"],
       aesClose      :: EpaLocation
       } deriving Data
 
