@@ -1,16 +1,16 @@
 Modifiers.hs:8:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:9:5: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:9:9: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
-Modifiers.hs:10:5: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:10:11: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %True
 
-Modifiers.hs:11:5: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:11:12: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %False
 
-Modifiers.hs:11:5: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:11:12: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %()
 
 Modifiers.hs:13:1: warning: [GHC-49969] [-Wunknown-modifiers]
@@ -54,13 +54,13 @@ Modifiers.hs:42:21: warning: [GHC-49969] [-Wunknown-modifiers]
 Modifiers.hs:50:1: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:52:14: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:52:17: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
 Modifiers.hs:57:14: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
-Modifiers.hs:63:12: warning: [GHC-49969] [-Wunknown-modifiers]
+Modifiers.hs:63:15: warning: [GHC-49969] [-Wunknown-modifiers]
     Unknown modifier %a
 
 Modifiers.hs:66:3: warning: [GHC-49969] [-Wunknown-modifiers]
