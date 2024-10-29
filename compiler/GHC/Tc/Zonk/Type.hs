@@ -1089,8 +1089,7 @@ zonkExpr (XExpr (ExpandedThingTc thing e))
 zonkExpr (XExpr (ConLikeTc con tvs tys))
   = runZonkBndrT (zonkTyBndrsX tvs) $ \ tvs' ->
     do { tys' <- mapM zonkScaledTcTypeToTypeX tys
-       ; pprTrace "zok-conl" (ppr tvs') $
-         return (XExpr (ConLikeTc con tvs' tys')) }
+       ; return (XExpr (ConLikeTc con tvs' tys')) }
     -- The tvs come straight from the data-con, and so are strictly redundant
     -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
 
