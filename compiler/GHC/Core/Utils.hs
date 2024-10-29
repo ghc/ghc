@@ -130,21 +130,27 @@ exprType :: HasDebugCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'GHC.Core.Type' expression as it cannot
 -- really be said to have a type
-exprType (Var var)           = idType var
-exprType (Lit lit)           = literalType lit
-exprType (Coercion co)       = coercionType co
-exprType (Let bind body)
-  | NonRec tv rhs <- bind    -- See Note [Type bindings]
-  , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
-  | otherwise                = exprType body
-exprType (Case _ _ ty _)     = ty
-exprType (Cast _ co)         = coercionRKind co
-exprType (Tick _ e)          = exprType e
-exprType (Lam binder expr)   = mkLamType binder (exprType expr)
-exprType e@(App _ _)
-  = case collectArgs e of
-        (fun, args) -> applyTypeToArgs (exprType fun) args
-exprType (Type ty) = pprPanic "exprType" (ppr ty)
+exprType e = go emptyVarEnv e
+  where
+      -- When we get to a type, expand locally-bound tyvars, if any
+    expand = expandTyVarUnfoldings
+
+    go tvs (Var var)         = expand tvs $ idType var
+    go tvs (Lit lit)         = expand tvs $ literalType lit
+    go tvs (Coercion co)     = expand tvs $ coercionType co
+    go tvs (Let bind body)
+      | NonRec tv rhs <- bind    -- See Note [Type bindings]
+      , Type ty <- rhs       = go (extendVarEnv tvs tv ty) body
+      | otherwise            = go tvs body
+    go tvs (Case _ _ ty _)   = expand tvs ty
+    go tvs (Cast _ co)       = expand tvs $ coercionRKind co
+    go tvs (Tick _ e)        = go tvs e
+    go tvs (Lam binder expr) = mkLamType (updateVarType (expand tvs) binder)
+                                         (go tvs expr)
+    go tvs e@(App _ _)
+      = case collectArgs e of
+            (fun, args) -> expand tvs $ applyTypeToArgs (exprType fun) args
+    go _ (Type ty) = pprPanic "exprType" (ppr ty)
 
 coreAltType :: CoreAlt -> Type
 -- ^ Returns the type of the alternatives right hand side
@@ -1276,6 +1282,9 @@ and that confuses the code generator (#11155). So best to kill
 it off at source.
 -}
 
+coercionIsTrivial :: Coercion -> Bool
+coercionIsTrivial co = coercionSize co < 10    -- Try this out
+
 {-# INLINE trivial_expr_fold #-}
 trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
 -- ^ The worker function for Note [exprIsTrivial] and Note [getIdFromTrivialExpr]
@@ -1297,14 +1306,14 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     -- If you change this function, be sure to change SetLevels.notWorthFloating
     -- as well!
     -- (Or yet better: Come up with a way to share code with this function.)
-    go (Var v)                            = k_id v  -- See Note [Variables are trivial]
-    go (Lit l)    | litIsTrivial l        = k_lit l
-    go (Type _)                           = k_triv
-    go (Coercion _)                       = k_triv
-    go (App f t)  | not (isRuntimeArg t)  = go f
-    go (Lam b e)  | not (isRuntimeVar b)  = go e
-    go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
-    go (Cast e _)                         = go e
+    go (Var v)                              = k_id v  -- See Note [Variables are trivial]
+    go (Lit l)    | litIsTrivial l          = k_lit l
+    go (Type _)                             = k_triv
+    go (Coercion co) | coercionIsTrivial co = k_triv
+    go (App f t)     | not (isRuntimeArg t) = go f
+    go (Lam b e)     | not (isRuntimeVar b) = go e
+    go (Tick t e)    | not (tickishIsCode t)= go e              -- See Note [Tick trivial]
+    go (Cast e co)   | coercionIsTrivial co = go e
     go (Case e b _ as)
       | null as
       = go e     -- See Note [Empty case is trivial]
