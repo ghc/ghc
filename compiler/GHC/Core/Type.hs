@@ -173,7 +173,7 @@ module GHC.Core.Type (
         anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,
         expandTypeSynonyms, expandSynTyConApp_maybe,
-        typeSize, occCheckExpand,
+        typeSize, occCheckExpand, expandTyVarUnfoldings,
 
         -- ** Closing over kinds
         closeOverKindsDSet, closeOverKindsList,
@@ -293,6 +293,7 @@ import GHC.Data.FastString
 
 import GHC.Data.Maybe   ( orElse, isJust, firstJust )
 import GHC.List (build)
+import Data.Functor.Identity
 
 -- $type_classification
 -- #type_classification#
@@ -506,6 +507,28 @@ on its fast path must also be inlined, linked back to this Note.
                 expandTypeSynonyms
 *                                                                      *
 ********************************************************************* -}
+
+expandTyVarUnfoldings :: TyVarEnv Type -> Type -> Type
+-- (expandTyvarUnfoldings tvs ty) replace any occurrences of tvs in ty
+-- with their unfoldings.  There are no substitution or variable-capture
+-- issues: if we have (let @a = ty in body), then at all occurrences of `a`
+-- the free vars of `body` are also in scope, without having been shadowed.
+expandTyVarUnfoldings tvs ty
+  | isEmptyVarEnv tvs = ty
+  | otherwise         = runIdentity (expand ty)
+  where
+    expand :: Type -> Identity Type
+    (expand, _, _, _)
+       = mapTyCo (TyCoMapper { tcm_tyvar = exp_tv, tcm_covar = exp_cv
+                             , tcm_hole = exp_hole, tcm_tycobinder = exp_tcb
+                             , tcm_tycon = pure })
+    exp_tv _ tv = case lookupVarEnv tvs tv of
+                      Just ty -> pure ty
+                      Nothing -> pure (TyVarTy tv)
+    exp_cv _   cv = pure (CoVarCo cv)
+    exp_hole _ cv = pprPanic "expand_tv_unf" (ppr cv)
+    exp_tcb :: () -> TyCoVar -> ForAllTyFlag -> (() -> TyCoVar -> Identity r) -> Identity r
+    exp_tcb _ tcv _ k = k () (updateVarType (runIdentity . expand) tcv)
 
 expandTypeSynonyms :: Type -> Type
 -- ^ Expand out all type synonyms.  Actually, it'd suffice to expand out
