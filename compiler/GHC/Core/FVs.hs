@@ -32,7 +32,7 @@ module GHC.Core.FVs (
         idFVs,
         idRuleVars, stableUnfoldingVars,
         ruleFreeVars, rulesFreeVars,
-        rulesFreeVarsDSet, mkRuleInfo,
+        mkRuleInfo,
         ruleLhsFreeIds, ruleLhsFreeIdsList,
         ruleRhsFreeVars, rulesRhsFreeIds,
 
@@ -472,11 +472,6 @@ ruleLhsFreeIdsList = fvVarList . filterFV isLocalId . ruleFVs LhsOnly
 ruleFreeVars :: CoreRule -> VarSet
 ruleFreeVars = fvVarSet . ruleFVs BothSides
 
--- | Those variables free in the both the left right hand sides of rules
--- returned as a deterministic set
-rulesFreeVarsDSet :: [CoreRule] -> DVarSet
-rulesFreeVarsDSet rules = fvDVarSet $ rulesFVs BothSides rules
-
 -- | Those variables free in both the left right hand sides of several rules
 rulesFreeVars :: [CoreRule] -> VarSet
 rulesFreeVars rules = fvVarSet $ rulesFVs BothSides rules
@@ -484,7 +479,7 @@ rulesFreeVars rules = fvVarSet $ rulesFVs BothSides rules
 -- | Make a 'RuleInfo' containing a number of 'CoreRule's, suitable
 -- for putting into an 'IdInfo'
 mkRuleInfo :: [CoreRule] -> RuleInfo
-mkRuleInfo rules = RuleInfo rules (rulesFreeVarsDSet rules)
+mkRuleInfo rules = RuleInfo rules
 
 {-
 Note [Rule free var hack]  (Not a hack any more)
@@ -632,7 +627,9 @@ idRuleVars id = fvVarSet $ idRuleFVs id
 
 idRuleFVs :: Id -> FV
 idRuleFVs id = assert (isId id) $
-  FV.mkFVs (dVarSetElems $ ruleInfoFreeVars (idSpecialisation id))
+               rulesFVs BothSides $
+               ruleInfoRules (idSpecialisation id)
+  -- BothSides: see Note [Rule dependency info] in OccurAnal
 
 idUnfoldingVars :: Id -> VarSet
 -- Produce free vars for an unfolding, but NOT for an ordinary

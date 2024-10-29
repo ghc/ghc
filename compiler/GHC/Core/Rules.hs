@@ -49,7 +49,7 @@ import GHC.Core         -- All of it
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, bindFreeVars
-                          , rulesFreeVarsDSet, orphNamesOfExprs )
+                          , orphNamesOfExprs )
 import GHC.Core.Utils     ( exprType, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
                           , isJoinBind, mkCastMCo )
@@ -336,12 +336,10 @@ pprRulesForUser rules
 -}
 
 extendRuleInfo :: RuleInfo -> [CoreRule] -> RuleInfo
-extendRuleInfo (RuleInfo rs1 fvs1) rs2
-  = RuleInfo (rs2 ++ rs1) (rulesFreeVarsDSet rs2 `unionDVarSet` fvs1)
+extendRuleInfo (RuleInfo rs1) rs2 = RuleInfo (rs2 ++ rs1)
 
 addRuleInfo :: RuleInfo -> RuleInfo -> RuleInfo
-addRuleInfo (RuleInfo rs1 fvs1) (RuleInfo rs2 fvs2)
-  = RuleInfo (rs1 ++ rs2) (fvs1 `unionDVarSet` fvs2)
+addRuleInfo (RuleInfo rs1) (RuleInfo rs2) = RuleInfo (rs1 ++ rs2)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
 addIdSpecialisations id rules

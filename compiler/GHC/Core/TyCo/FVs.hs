@@ -983,7 +983,6 @@ noFreeVarsOfCo :: Coercion -> Bool
 noFreeVarsOfCo co = not $ DM.getAny (f co)
   where (_, _, f, _) = foldTyCo (afvFolder (const True)) emptyVarSet
 
-
 {-
 ************************************************************************
 *                                                                      *

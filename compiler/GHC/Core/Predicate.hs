@@ -666,7 +666,13 @@ scopedSort = go [] []
       | otherwise  -- Put `v` at the front
       = (v:a:as, fvs `unionVarSet` fv_v : fvs : fvss)
       where
-        fv_v = tyCoVarsOfType (varType v)
+        -- If tv has an unfolding, expand it instead of looking at its kind
+        fv_v | isTyVar v
+             = case tyVarUnfolding_maybe v of
+                   Just ty -> tyCoVarsOfType ty
+                   Nothing -> tyCoVarsOfType (tyVarKind v)
+             | otherwise
+             = tyCoVarsOfType (varType v)
 
        -- lists not in correspondence
     insert _ _ _ = panic "scopedSort"
