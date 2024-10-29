@@ -158,7 +158,7 @@ type instance XNPat GhcPs = EpToken "-"
 type instance XNPat GhcRn = EpToken "-"
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = EpaLocation -- Of the "+"
+type instance XNPlusKPat GhcPs = EpToken "+"
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 

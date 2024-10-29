@@ -24,7 +24,7 @@ module Haddock.Backends.Xhtml.DocMarkup
 
 import Data.List (intersperse)
 import Data.Maybe (fromMaybe)
-import GHC hiding (anchor)
+import GHC
 import GHC.Types.Name
 import Text.XHtml hiding (name, p, quote)
 

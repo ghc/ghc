@@ -41,7 +41,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Ord (comparing)
 import qualified Data.Set as Set hiding (Set)
-import GHC hiding (LexicalFixity (..), NoLink, anchor, moduleInfo)
+import GHC hiding (LexicalFixity (..), NoLink, moduleInfo)
 import GHC.Types.Name
 import GHC.Unit.State
 import System.Directory

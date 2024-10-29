@@ -570,7 +570,7 @@ splitAfterTrailingAnns tas cs = (before, after)
         (s:_) -> (b,a)
           where
             s_pos = ss2pos s
-            (b,a) = break (\(L ll _) -> (ss2pos $ anchor ll) > s_pos)
+            (b,a) = break (\(L ll _) -> (ss2pos $ epaLocationRealSrcSpan ll) > s_pos)
                           cs
 
 -- ---------------------------------------------------------------------
@@ -730,12 +730,6 @@ printStringAtNC :: (Monad m, Monoid w) => NoCommentsLocation -> String -> EP w m
 printStringAtNC el str = do
   el' <- printStringAtAAC NoCaptureComments (noCommentsToEpaLocation el) str
   return (epaToNoCommentsLocation el')
-
-printStringAtAAL :: (Monad m, Monoid w)
-  => a -> Lens a EpaLocation -> String -> EP w m a
-printStringAtAAL an l str = do
-  r <- printStringAtAAC CaptureComments (view l an) str
-  return (set l r an)
 
 printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
@@ -1019,10 +1013,6 @@ lal_rest k parent = fmap (\new -> parent { al_rest = new })
                            (k (al_rest parent))
 
 -- -------------------------------------
-
-lid :: Lens a a
-lid k parent = fmap (\new -> new)
-                    (k parent)
 
 lfst :: Lens (a,b) a
 lfst k parent = fmap (\new -> (new, snd parent))
@@ -4186,7 +4176,7 @@ instance ExactPrint (LocatedN RdrName) where
             _ -> error "ExactPrint (LocatedN RdrName)"
         NameAnnCommas a commas t -> do
           a0 <- markNameAdornmentO a
-          commas' <- forM commas (\loc -> printStringAtAAC NoCaptureComments loc ",")
+          commas' <- forM commas markEpToken
           a1 <- markNameAdornmentC a0
           return (NameAnnCommas a1 commas' t)
         NameAnnBars (o,c) bars t -> do
@@ -4247,7 +4237,7 @@ printUnicode :: (Monad m, Monoid w) => EpaLocation -> RdrName -> EP w m EpaLocat
 printUnicode anc n = do
   let str = case (showPprUnsafe n) of
             -- TODO: unicode support?
-              "forall" -> if spanLength (anchor anc) == 1 then "∀" else "forall"
+              "forall" -> if spanLength (epaLocationRealSrcSpan anc) == 1 then "∀" else "forall"
               s -> s
   loc <- printStringAtAAC NoCaptureComments (EpaDelta noSrcSpan (SameLine 0) []) str
   case loc of
@@ -4617,15 +4607,15 @@ instance ExactPrint (IEWrappedName GhcPs) where
     n' <- markAnnotated n
     return (IEName x n')
   exact (IEDefault r n) = do
-    r' <- printStringAtAA r "default"
+    r' <- markEpToken r
     n' <- markAnnotated n
     return (IEDefault r' n')
   exact (IEPattern r n) = do
-    r' <- printStringAtAA r "pattern"
+    r' <- markEpToken r
     n' <- markAnnotated n
     return (IEPattern r' n')
   exact (IEType r n) = do
-    r' <- printStringAtAA r "type"
+    r' <- markEpToken r
     n' <- markAnnotated n
     return (IEType r' n')
 
@@ -4715,7 +4705,7 @@ instance ExactPrint (Pat GhcPs) where
 
   exact (NPlusKPat an n k lit2 a b) = do
     n' <- markAnnotated n
-    an' <- printStringAtAAL an lid "+"
+    an' <- markEpToken an
     k' <- markAnnotated k
     return (NPlusKPat an' n' k' lit2 a b)
 
