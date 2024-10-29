@@ -608,7 +608,7 @@ data NameAnn
   -- | Used for @(# | | #)@
   | NameAnnBars {
       nann_parensh   :: (EpToken "(#", EpToken "#)"),
-      nann_bars      :: [EpaLocation],
+      nann_bars      :: [EpToken "|"],
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @()@, @(##)@, @[]@

@@ -27,7 +27,7 @@ import GHC.Parser.Annotation
 import Language.Haskell.Syntax
 
 data SumOrTuple b
-  = Sum ConTag Arity (LocatedA b) [EpaLocation] [EpaLocation]
+  = Sum ConTag Arity (LocatedA b) [EpToken "|"] [EpToken "|"]
   -- ^ Last two are the locations of the '|' before and after the payload
   | Tuple [Either (EpAnn Bool) (LocatedA b)]
 
