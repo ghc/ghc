@@ -672,20 +672,20 @@ freeVarsBind (NonRec binder rhs) body_fvs
   = ( AnnNonRec binder rhs2
     , freeVarsOf rhs2 `unionFVs` body_fvs2 )
     where
-      rhs2      = freeVarsRhs rhs
+      rhs2      = freeVarsRhs (binder, rhs)
       body_fvs2 = binder `delBinderFV` body_fvs
 
 freeVarsBind (Rec binds) body_fvs
   = ( AnnRec (binders `zip` rhss2)
     , delBindersFV binders all_fvs )
   where
-    (binders, rhss) = unzip binds
-    rhss2           = map freeVarsRhs rhss
-    all_fvs         = foldr (unionFVs . freeVarsOf) body_fvs rhss2
+    binders = map fst binds
+    rhss2   = map freeVarsRhs binds
+    all_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
             -- The "delBinderFV" happens after adding the idSpecVars,
             -- since the latter may add some of the binders as fvs
 
-freeVarsRhs :: Var -> CoreExpr -> CoreExprWithFVs
+freeVarsRhs :: (Var, CoreExpr) -> CoreExprWithFVs
 -- Decorate the RHS with its free vars,
 -- PLUS the free vars of:
 --    - rules
@@ -693,7 +693,7 @@ freeVarsRhs :: Var -> CoreExpr -> CoreExprWithFVs
 --    - type
 -- The free vars of the type matters because of type-lets;
 -- they may be free in the RHS itself
-freeVarsRhs bndr rhs
+freeVarsRhs (bndr, rhs)
   = (rhs_fvs `unionFVs` extra_fvs, rhs')
   where
     (rhs_fvs, rhs') = freeVars rhs
