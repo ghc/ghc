@@ -561,21 +561,21 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
     (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
-substFreeVars :: HasDebugCallStack => Subst -> [Var] -> [Var]
+substFreeVars :: HasDebugCallStack => Subst -> [InVar] -> [OutVar]
 substFreeVars subst@(Subst _ _ tv_env cv_env) fvs
   = fst $ foldr subst_fv ([], emptyVarSet) $ fvs
   where
-  subst_fv :: Var -> ([Var], VarSet) -> ([Var], VarSet)
-  subst_fv fv acc
-     | isTyVar fv
-     , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv
-     = tyCoFVsOfType fv_ty (const True) emptyVarSet $! acc
-     | isCoVar fv
-     , let fv_co = lookupVarEnv cv_env fv `orElse` mkCoVarCo fv
-     = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
-     | otherwise
-     , let fv_expr = lookupIdSubst subst fv
-     = exprFVs fv_expr (const True) emptyVarSet $! acc
+    subst_fv :: Var -> ([Var], VarSet) -> ([Var], VarSet)
+    subst_fv fv acc
+       | isTyVar fv
+       , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv
+       = tyCoFVsOfType fv_ty (const True) emptyVarSet $! acc
+       | isCoVar fv
+       , let fv_co = lookupVarEnv cv_env fv `orElse` mkCoVarCo fv
+       = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
+       | otherwise
+       , let fv_expr = lookupIdSubst subst fv
+       = exprFVs fv_expr (const True) emptyVarSet $! acc
 
 ------------------
 -- | Drop free vars from the breakpoint if they have a non-variable substitution.

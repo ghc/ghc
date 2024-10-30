@@ -2219,7 +2219,9 @@ new binding is abstracted.  Several points worth noting
       manifestly a literal string.
 -}
 
-abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
+abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar]
+              -> SimplFloats   -- Precondition: no join-floats in here
+                               -- And (for now) no let-floats or covar floats
               -> OutExpr -> SimplM ([OutBind], OutExpr)
 abstractFloats uf_opts top_lvl main_tvs floats body
   = assert (notNull body_floats) $
@@ -2245,10 +2247,6 @@ abstractFloats uf_opts top_lvl main_tvs floats body
 
     abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet)
              -> SimplM (GHC.Core.Subst.Subst, Maybe OutBind)
-    abstract subst (AcyclicSCC (tv, rhs, _empty_var_set))
-      | isTyVar tv, Type rhs_ty <- rhs
-      = return (GHC.Core.Subst.extendTvSubst subst tv rhs_ty, Nothing)
-
     abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
       = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'

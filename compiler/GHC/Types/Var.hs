@@ -49,7 +49,7 @@ module GHC.Types.Var (
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType,
-        updateVarType, updateVarTypeM,
+        updateTyCoVarType, updateVarType,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
@@ -447,31 +447,21 @@ setVarName var new_name
 setVarType :: Var -> Type -> Var
 setVarType id ty = id { varType = ty }
 
--- | Update a 'Var's type. Does not update the /multiplicity/
--- stored in an 'Id', if any. Because of the possibility for
--- abuse, ASSERTs that there is no multiplicity to update.
+-- | Update a 'TyCoVar's type. Does not update the /multiplicity/
+-- stored in an 'Id' -- CoVars don't have a multiplicity
+updateTyCoVarType :: (Type -> Type) -> TyCoVar -> TyCoVar
+updateTyCoVarType upd var
+  = assertPpr (isTyCoVar var) (ppr var) $
+    var { varType = upd (varType var) }
+
+-- | Update a 'Var's type and multiplicity
 updateVarType :: (Type -> Type) -> Var -> Var
 updateVarType upd var
   = case var of
-      Id { id_details = details } -> assert (isCoVarDetails details) $
-                                     result
-      _ -> result
-  where
-    result = var { varType = upd (varType var) }
-
--- | Update a 'Var's type monadically. Does not update the /multiplicity/
--- stored in an 'Id', if any. Because of the possibility for
--- abuse, ASSERTs that there is no multiplicity to update.
-updateVarTypeM :: Monad m => (Type -> m Type) -> Var -> m Var
-updateVarTypeM upd var
-  = case var of
-      Id { id_details = details } -> assert (isCoVarDetails details) $
-                                     result
-      _ -> result
-  where
-    result = do { ty' <- upd (varType var)
-                ; return (var { varType = ty' }) }
-
+      Id { varType = ty, varMult = mult }
+             -> var { varType = upd ty, varMult = upd mult }
+      TyVar   { varType = kind } -> var { varType = upd kind }
+      TcTyVar { varType = kind } -> var { varType = upd kind }
 
 {- *********************************************************************
 *                                                                      *
@@ -1127,7 +1117,7 @@ idInfo :: HasDebugCallStack => Id -> IdInfo
 idInfo (Id { id_info = info }) = info
 idInfo other                   = pprPanic "idInfo" (ppr other)
 
-idDetails :: Id -> IdDetails
+idDetails :: HasDebugCallStack => Id -> IdDetails
 idDetails (Id { id_details = details }) = details
 idDetails other                         = pprPanic "idDetails" (ppr other)
 

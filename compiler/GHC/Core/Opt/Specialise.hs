@@ -1325,7 +1325,7 @@ specCase env scrut' case_bndr [Alt con args rhs]
     sc_args' = filter is_flt_sc_arg args'
 
     clone_me bndr = do { uniq <- getUniqueM
-                       ; return (mkUserLocalOrCoVar occ uniq wght ty loc) }
+                       ; return (mkUserLocal occ uniq wght ty loc) }
        where
          name = idName bndr
          wght = idMult bndr

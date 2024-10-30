@@ -1750,7 +1750,8 @@ lookupVar le v = case lookupVarEnv (le_env le) v of
                     Just (_, expr) -> expr
                     _              -> Var v
 
-type AbsVars = [Var]
+type AbsVars         = [OutVar]
+type LevelledAbsVars = [LevelledBndr]
   -- A list of variables to abstract, in the correct dependency order
   -- May include type variables with unfoldings:
   --    when abstracting, use a let
@@ -1761,7 +1762,7 @@ type AbsVars = [Var]
   -- and at an application site say
   --    f @ty arg
 
-mkAbsLams :: [LevelledBndr]  -> Expr LevelledBndr -> Expr LevelledBndr
+mkAbsLams :: LevelledAbsVars -> Expr LevelledBndr -> Expr LevelledBndr
 mkAbsLams [] body = body
 mkAbsLams (bndr@(TB v _) : bndrs) body
   | Just ty <- tyVarUnfolding_maybe v
@@ -1771,19 +1772,18 @@ mkAbsLams (bndr@(TB v _) : bndrs) body
 
 mkAbsLamTypes :: AbsVars -> Type -> Type
 mkAbsLamTypes abs_vars ty
-  = pprTrace "mkAbsLamTypes" (
-      vcat [ text "abs_vars" <+> ppr abs_vars
-           , text "abs_lam_vars" <+> ppr abs_lam_vars
-           , text "tv_unf_prs" <+> ppr tv_unf_prs
-           , text "ty" <+> ppr ty
-           , text "mkLam" <+> ppr (mkLamTypes abs_lam_vars ty)
-           , text "res" <+> ppr res ]) res
-    -- We can apply the subst at the end there is no shadowing in abs_vars
+  = -- pprTrace "mkAbsLamTypes" (
+    --  vcat [ text "abs_vars" <+> ppr abs_vars
+    --       , text "abs_lam_vars" <+> ppr abs_lam_vars
+    --       , text "tv_unf_prs" <+> ppr tv_unf_prs
+    --       , text "ty" <+> ppr ty
+    --       , text "mkLam" <+> ppr (mkLamTypes abs_lam_vars ty)
+    --       , text "res" <+> ppr res ])
+      res
   where
     res = expandTyVarUnfoldings (mkVarEnv tv_unf_prs) (mkLamTypes abs_lam_vars ty)
-    abs_lam_vars   = [ v       | v <- abs_vars, isNothing (tyVarUnfolding_maybe v) ]
-    tv_unf_prs = [ (tv,ty) | tv <- abs_vars, Just ty <- [tyVarUnfolding_maybe tv] ]
-
+    abs_lam_vars = [ v       | v  <- abs_vars, isNothing (tyVarUnfolding_maybe v) ]
+    tv_unf_prs   = [ (tv,ty) | tv <- abs_vars, Just ty <- [tyVarUnfolding_maybe tv] ]
 
 mkAbsVarApps :: Expr LevelledBndr -> AbsVars -> Expr LevelledBndr
 mkAbsVarApps fun [] = fun
@@ -1817,7 +1817,6 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
     abstract_me v = case lookupVarEnv lvl_env v of
                         Just lvl -> dest_lvl `ltLvl` lvl
                         Nothing  -> False
-
 
     zap :: Var -> Var
     -- zap: We are going to lambda-abstract, so nuke any IdInfo
@@ -1859,18 +1858,22 @@ newPolyBndrs dest_lvl
       ; let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
             bndr_prs  = bndrs `zip` new_bndrs
             env' = env { le_lvl_env = addLvls dest_lvl lvl_env new_bndrs
+                       , le_subst   = foldl' add_subst subst   bndr_prs
                        , le_env     = foldl' add_id    id_env  bndr_prs }
       ; return (env', new_bndrs) }
   where
-    add_id env (v, v') = extendVarEnv env v ((v':abs_vars), mkAbsVarApps (Var v') abs_vars)
+    -- See Note [le_subst and le_env]
+    add_subst env (v, v') = extendIdSubst env v (mkVarApps (Var v') abs_vars)
+    add_id env (v, v')    = extendVarEnv env v ((v':abs_vars), mkAbsVarApps (Var v') abs_vars)
 
-    mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
-                             transfer_join_info bndr $
-                             mkSysLocal str uniq (idMult bndr) poly_ty
-                           where
-                             str     = fsLit "poly_" `appendFS` occNameFS (getOccName bndr)
-                             poly_ty = mkAbsLamTypes abs_vars            $
-                                       substTyUnchecked subst (idType bndr)
+    mk_poly_bndr bndr uniq
+      = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
+        transfer_join_info bndr $
+        mkSysLocal str uniq (idMult bndr) poly_ty
+      where
+        str     = fsLit "poly_" `appendFS` occNameFS (getOccName bndr)
+        poly_ty = mkAbsLamTypes abs_vars            $
+                  substTyUnchecked subst (idType bndr)
 
     -- If we are floating a join point to top level, it stops being
     -- a join point.  Otherwise it continues to be a join point,

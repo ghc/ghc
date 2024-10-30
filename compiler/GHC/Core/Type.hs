@@ -528,7 +528,7 @@ expandTyVarUnfoldings tvs ty
     exp_cv _   cv = pure (CoVarCo cv)
     exp_hole _ cv = pprPanic "expand_tv_unf" (ppr cv)
     exp_tcb :: () -> TyCoVar -> ForAllTyFlag -> (() -> TyCoVar -> Identity r) -> Identity r
-    exp_tcb _ tcv _ k = k () (updateVarType (runIdentity . expand) tcv)
+    exp_tcb _ tcv _ k = k () (updateTyCoVarType (runIdentity . expand) tcv)
 
 expandTypeSynonyms :: Type -> Type
 -- ^ Expand out all type synonyms.  Actually, it'd suffice to expand out
@@ -1124,6 +1124,8 @@ mkAppTy (CastTy fun_ty co) arg_ty
   | ([arg_co], res_co) <- decomposePiCos co (coercionKind co) [arg_ty]
   = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
 
+mkAppTy (TyVarTy tv) arg_ty
+  | Just ty <- tyVarUnfolding_maybe tv = mkAppTy ty arg_ty
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
 mkAppTy ty1               ty2 = AppTy ty1 ty2
         -- Note that the TyConApp could be an
