@@ -2306,8 +2306,10 @@ ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ })
 ctEvExpr ev = evId (ctEvEvId ev)
 
 ctEvCoercion :: HasDebugCallStack => CtEvidence -> TcCoercion
-ctEvCoercion (CtGiven { ctev_evar = ev_id })
-  = mkCoVarCo ev_id
+ctEvCoercion _given@(CtGiven { ctev_evar = ev_id })
+  = assertPpr (isCoVar ev_id)
+    (text "ctEvCoercion used on non-equality Given constraint:" <+> ppr _given)
+  $ mkCoVarCo ev_id
 ctEvCoercion (CtWanted { ctev_dest = dest })
   | HoleDest hole <- dest
   = -- ctEvCoercion is only called on type equalities
