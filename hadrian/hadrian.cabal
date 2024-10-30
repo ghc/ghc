@@ -156,7 +156,9 @@ executable hadrian
                        , base                 >= 4.11    && < 5
                        , bytestring           >= 0.10    && < 0.13
                        , containers           >= 0.5     && < 0.8
-                       , directory            >= 1.3.1.0 && < 1.4
+                         -- N.B. directory >=1.3.9 as earlier versions are
+                         -- afflicted by #24382.
+                       , directory            >= 1.3.9.0 && < 1.4
                        , extra                >= 1.4.7
                        , filepath
                        , time
