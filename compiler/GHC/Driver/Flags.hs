@@ -1035,6 +1035,7 @@ data WarningFlag =
    | Opt_WarnUnusedPackages                          -- Since 8.10
    | Opt_WarnInferredSafeImports                     -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode                  -- Since 8.10
+   | Opt_WarnSafeErrors                              -- Since 8.10
    | Opt_WarnCompatUnqualifiedImports                -- Since 8.10
    | Opt_WarnDerivingDefaults
    | Opt_WarnInvalidHaddock                          -- Since 9.0
@@ -1122,6 +1123,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnSafe                                    -> "safe" :| []
   Opt_WarnTrustworthySafe                         -> "trustworthy-safe" :| []
   Opt_WarnInferredSafeImports                     -> "inferred-safe-imports" :| []
+  Opt_WarnSafeErrors                              -> "safe-errors" :| []
   Opt_WarnMissingSafeHaskellMode                  -> "missing-safe-haskell-mode" :| []
   Opt_WarnTabs                                    -> "tabs" :| []
   Opt_WarnTypeDefaults                            -> "type-defaults" :| []
@@ -1321,7 +1323,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnInconsistentFlags,
         Opt_WarnDataKindsTC,
         Opt_WarnTypeEqualityOutOfScope,
-        Opt_WarnViewPatternSignatures
+        Opt_WarnViewPatternSignatures,
+        Opt_WarnSafeErrors
       ]
 
 -- | Things you get with -W

@@ -2290,6 +2290,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnMissedSpecs -> warnSpec x
   Opt_WarnAllMissedSpecs -> warnSpec x
   Opt_WarnSafe -> warnSpec' x setWarnSafe
+  Opt_WarnSafeErrors -> warnSpec x
   Opt_WarnTrustworthySafe -> warnSpec x
   Opt_WarnInferredSafeImports -> warnSpec x
   Opt_WarnMissingSafeHaskellMode -> warnSpec x

@@ -1737,10 +1737,10 @@ hscCheckSafe' m l = do
                         $ mkMsgEnvelope diag_opts l (pkgQual state)
                         $ GhcDriverMessage $ DriverInferredSafeImport m
                     pkgTrustErr = singleMessage
-                      $ mkErrorMsgEnvelope l (pkgQual state)
+                      $ mkMsgEnvelope diag_opts l (pkgQual state)
                       $ GhcDriverMessage $ DriverCannotImportFromUntrustedPackage state m
                     modTrustErr = singleMessage
-                      $ mkErrorMsgEnvelope l (pkgQual state)
+                      $ mkMsgEnvelope diag_opts l (pkgQual state)
                       $ GhcDriverMessage $ DriverCannotImportUnsafeModule m
 
     -- Check the package a module resides in is trusted. Safe compiled

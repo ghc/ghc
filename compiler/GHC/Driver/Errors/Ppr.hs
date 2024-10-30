@@ -320,13 +320,13 @@ instance Diagnostic DriverMessage where
     DriverInferredSafeImport{}
       -> WarningWithFlag Opt_WarnInferredSafeImports
     DriverCannotImportUnsafeModule{}
-      -> ErrorWithoutFlag
+      -> WarningWithFlag Opt_WarnSafeErrors
     DriverMissingSafeHaskellMode{}
       -> WarningWithFlag Opt_WarnMissingSafeHaskellMode
     DriverPackageNotTrusted{}
       -> ErrorWithoutFlag
     DriverCannotImportFromUntrustedPackage{}
-      -> ErrorWithoutFlag
+      -> WarningWithFlag Opt_WarnSafeErrors
     DriverRedirectedNoMain {}
       -> ErrorWithoutFlag
     DriverHomePackagesNotClosed {}
