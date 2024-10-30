@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables,
+{-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables,
              MagicHash, BangPatterns #-}
 
 -----------------------------------------------------------------------------
@@ -370,9 +370,6 @@ findIndex p     = listToMaybe . findIndices p
 -- >>> findIndices (\l -> length l > 3) ["a", "bcde", "fgh", "ijklmnop"]
 -- [1,3]
 findIndices      :: (a -> Bool) -> [a] -> [Int]
-#if defined(USE_REPORT_PRELUDE)
-findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
-#else
 -- Efficient definition, adapted from Data.Sequence
 -- (Note that making this INLINABLE instead of INLINE allows
 -- 'findIndex' to fuse, fixing #15426.)
@@ -381,7 +378,6 @@ findIndices p ls = build $ \c n ->
   let go x r k | p x       = I# k `c` r (k +# 1#)
                | otherwise = r (k +# 1#)
   in foldr go (\_ -> n) ls 0#
-#endif  /* USE_REPORT_PRELUDE */
 
 -- | \(\mathcal{O}(\min(m,n))\). The 'isPrefixOf' function takes two lists and
 -- returns 'True' iff the first list is a prefix of the second.
@@ -540,10 +536,6 @@ nub                     =  nubBy (==)
 -- >>> nubBy (>) [1, 2, 3, 2, 1, 5, 4, 5, 3, 2]
 -- [1,2,3,5,5]
 nubBy                   :: (a -> a -> Bool) -> [a] -> [a]
-#if defined(USE_REPORT_PRELUDE)
-nubBy eq []             =  []
-nubBy eq (x:xs)         =  x : nubBy eq (filter (\ y -> not (eq x y)) xs)
-#else
 -- stolen from HBC
 nubBy eq l              = nubBy' l []
   where
@@ -562,7 +554,6 @@ nubBy eq l              = nubBy' l []
 elem_by :: (a -> a -> Bool) -> a -> [a] -> Bool
 elem_by _  _ []         =  False
 elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
-#endif
 
 
 -- | \(\mathcal{O}(n)\). 'delete' @x@ removes the first occurrence of @x@ from
@@ -1627,10 +1618,6 @@ sort :: (Ord a) => [a] -> [a]
 -- [(1,"Hello"),(2,"world"),(4,"!")]
 sortBy :: (a -> a -> Ordering) -> [a] -> [a]
 
-#if defined(USE_REPORT_PRELUDE)
-sort = sortBy compare
-sortBy cmp = foldr (insertBy cmp) []
-#else
 
 {-
 GHC's mergesort replaced by a better implementation, 24/12/2009.
@@ -1840,8 +1827,6 @@ rqpart cmp x (y:ys) rle rgt r =
         _  -> rqpart cmp x ys (y:rle) rgt r
 -}
 
-#endif /* USE_REPORT_PRELUDE */
-
 -- | Sort a list by comparing the results of a key function applied to each
 -- element.  @'sortOn' f@ is equivalent to @'sortBy' ('comparing' f)@, but has the
 -- performance advantage of only evaluating @f@ once for each element in the
@@ -2027,14 +2012,10 @@ lines s                 =  cons (case break (== '\n') s of
 -- >>> unlines . lines $ "foo\nbar"
 -- "foo\nbar\n"
 unlines                 :: [String] -> String
-#if defined(USE_REPORT_PRELUDE)
-unlines                 =  concatMap (++ "\n")
-#else
 -- HBC version (stolen)
 -- here's a more efficient version
 unlines [] = []
 unlines (l:ls) = l ++ '\n' : unlines ls
-#endif
 
 -- | 'words' breaks a string up into a list of words, which were delimited
 -- by white space (as defined by 'isSpace'). This function trims any white spaces
@@ -2085,10 +2066,6 @@ wordsFB c n = go
 -- >>> unwords ["foo", "bar", "", "baz"]
 -- "foo bar  baz"
 unwords                 :: [String] -> String
-#if defined(USE_REPORT_PRELUDE)
-unwords []              =  ""
-unwords ws              =  foldr1 (\w s -> w ++ ' ':s) ws
-#else
 -- Here's a lazier version that can get the last element of a
 -- _|_-terminated list.
 {-# NOINLINE [1] unwords #-}
@@ -2118,7 +2095,6 @@ tailUnwords (_:xs)    = xs
 {-# INLINE [0] unwordsFB #-}
 unwordsFB               :: String -> String -> String
 unwordsFB w r           = ' ' : w ++ r
-#endif
 
 {- A "SnocBuilder" is a version of Chris Okasaki's banker's queue that supports
 toListSB instead of uncons. In single-threaded use, its performance

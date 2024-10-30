@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -208,11 +208,6 @@ tail []                 =  errorEmptyList "tail"
 -- >>> last []
 -- *** Exception: Prelude.last: empty list
 last                    :: HasCallStack => [a] -> a
-#if defined(USE_REPORT_PRELUDE)
-last [x]                =  x
-last (_:xs)             =  last xs
-last []                 =  errorEmptyList "last"
-#else
 -- Use foldl to make last a good consumer.
 -- This will compile to good code for the actual GHC.Internal.List.last.
 -- (At least as long it is eta-expanded, otherwise it does not, #10260.)
@@ -222,7 +217,6 @@ last xs = foldl (\_ x -> x) lastError xs
 -- foldl.
 lastError :: HasCallStack => a
 lastError = errorEmptyList "last"
-#endif
 
 -- | \(\mathcal{O}(n)\). Return all the elements of a list except the last one.
 -- The list must be non-empty.
@@ -240,17 +234,11 @@ lastError = errorEmptyList "last"
 -- >>> init []
 -- *** Exception: Prelude.init: empty list
 init                    :: HasCallStack => [a] -> [a]
-#if defined(USE_REPORT_PRELUDE)
-init [x]                =  []
-init (x:xs)             =  x : init xs
-init []                 =  errorEmptyList "init"
-#else
 -- eliminate repeated cases
 init []                 =  errorEmptyList "init"
 init (x:xs)             =  init' x xs
   where init' _ []     = []
         init' y (z:zs) = y : init' z zs
-#endif
 
 -- | \(\mathcal{O}(1)\). Test whether a list is empty.
 --
@@ -1091,11 +1079,6 @@ dropWhile p xs@(x:xs')
 -- >>> take 0 [1,2]
 -- []
 take                   :: Int -> [a] -> [a]
-#if defined(USE_REPORT_PRELUDE)
-take n _      | n <= 0 =  []
-take _ []              =  []
-take n (x:xs)          =  x : take (n-1) xs
-#else
 
 {- We always want to inline this to take advantage of a known length argument
 sign. Note, however, that it's important for the RULES to grab take, rather
@@ -1141,7 +1124,6 @@ takeFB c n x xs
   = \ m -> case m of
             1 -> x `c` n
             _ -> x `c` xs (m - 1)
-#endif
 
 -- | 'drop' @n xs@ returns the suffix of @xs@
 -- after the first @n@ elements, or @[]@ if @n >= 'length' xs@.
@@ -1169,11 +1151,6 @@ takeFB c n x xs
 -- >>> drop 0 [1,2]
 -- [1,2]
 drop                   :: Int -> [a] -> [a]
-#if defined(USE_REPORT_PRELUDE)
-drop n xs     | n <= 0 =  xs
-drop _ []              =  []
-drop n (_:xs)          =  drop (n-1) xs
-#else /* hack away */
 {-# INLINE drop #-}
 drop n ls
   | n <= 0     = ls
@@ -1185,7 +1162,6 @@ drop n ls
     unsafeDrop !_ []     = []
     unsafeDrop 1  (_:xs) = xs
     unsafeDrop m  (_:xs) = unsafeDrop (m - 1) xs
-#endif
 
 -- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of
 -- length @n@ and second element is the remainder of the list:
@@ -1231,9 +1207,6 @@ drop n ls
 -- ([],[1,2,3])
 splitAt                :: Int -> [a] -> ([a],[a])
 
-#if defined(USE_REPORT_PRELUDE)
-splitAt n xs           =  (take n xs, drop n xs)
-#else
 splitAt n ls
   | n <= 0 = ([], ls)
   | otherwise          = splitAt' n ls
@@ -1244,7 +1217,6 @@ splitAt n ls
         splitAt' m  (x:xs) = (x:xs', xs'')
           where
             (xs', xs'') = splitAt' (m - 1) xs
-#endif /* USE_REPORT_PRELUDE */
 
 -- | 'span', applied to a predicate @p@ and a list @xs@, returns a tuple where
 -- first element is the longest prefix (possibly empty) of @xs@ of elements that
@@ -1322,15 +1294,11 @@ span p xs@(x:xs')
 -- >>> break (> 9) [1,2,3]
 -- ([1,2,3],[])
 break                   :: (a -> Bool) -> [a] -> ([a],[a])
-#if defined(USE_REPORT_PRELUDE)
-break p                 =  span (not . p)
-#else
 -- HBC version (stolen)
 break _ xs@[]           =  (xs, xs)
 break p xs@(x:xs')
            | p x        =  ([],xs)
            | otherwise  =  let (ys,zs) = break p xs' in (x:ys,zs)
-#endif
 
 -- | \(\mathcal{O}(n)\). 'reverse' @xs@ returns the elements of @xs@ in reverse order.
 -- @xs@ must be finite.
@@ -1359,14 +1327,10 @@ break p xs@(x:xs')
 -- >>> reverse [1..]
 -- * Hangs forever *
 reverse                 :: [a] -> [a]
-#if defined(USE_REPORT_PRELUDE)
-reverse                 =  foldl (flip (:)) []
-#else
 reverse l =  rev l []
   where
     rev []     a = a
     rev (x:xs) a = rev xs (x:a)
-#endif
 
 -- | 'and' returns the conjunction of a Boolean list. For the result to be
 -- 'True', the list must be finite; 'False', however, results from a 'False'
@@ -1392,9 +1356,6 @@ reverse l =  rev l []
 -- >>> and (repeat True)
 -- * Hangs forever *
 and                     :: [Bool] -> Bool
-#if defined(USE_REPORT_PRELUDE)
-and                     =  foldr (&&) True
-#else
 and []          =  True
 and (x:xs)      =  x && and xs
 {-# NOINLINE [1] and #-}
@@ -1403,7 +1364,6 @@ and (x:xs)      =  x && and xs
 "and/build"     forall (g::forall b.(Bool->b->b)->b->b) .
                 and (build g) = g (&&) True
  #-}
-#endif
 
 -- | 'or' returns the disjunction of a Boolean list. For the result to be
 -- 'False', the list must be finite; 'True', however, results from a 'True'
@@ -1429,9 +1389,6 @@ and (x:xs)      =  x && and xs
 -- >>> or (repeat False)
 -- * Hangs forever *
 or                      :: [Bool] -> Bool
-#if defined(USE_REPORT_PRELUDE)
-or                      =  foldr (||) False
-#else
 or []           =  False
 or (x:xs)       =  x || or xs
 {-# NOINLINE [1] or #-}
@@ -1440,7 +1397,6 @@ or (x:xs)       =  x || or xs
 "or/build"      forall (g::forall b.(Bool->b->b)->b->b) .
                 or (build g) = g (||) False
  #-}
-#endif
 
 -- | Applied to a predicate and a list, 'any' determines if any element
 -- of the list satisfies the predicate. For the result to be
@@ -1465,9 +1421,6 @@ or (x:xs)       =  x || or xs
 -- >>> any (> 3) [0, -1..]
 -- * Hangs forever *
 any                     :: (a -> Bool) -> [a] -> Bool
-#if defined(USE_REPORT_PRELUDE)
-any p                   =  or . map p
-#else
 any _ []        = False
 any p (x:xs)    = p x || any p xs
 
@@ -1477,7 +1430,6 @@ any p (x:xs)    = p x || any p xs
 "any/build"     forall p (g::forall b.(a->b->b)->b->b) .
                 any p (build g) = g ((||) . p) False
  #-}
-#endif
 
 -- | Applied to a predicate and a list, 'all' determines if all elements
 -- of the list satisfy the predicate. For the result to be
@@ -1502,9 +1454,6 @@ any p (x:xs)    = p x || any p xs
 -- >>> all (> 3) [4..]
 -- * Hangs forever *
 all                     :: (a -> Bool) -> [a] -> Bool
-#if defined(USE_REPORT_PRELUDE)
-all p                   =  and . map p
-#else
 all _ []        =  True
 all p (x:xs)    =  p x && all p xs
 
@@ -1514,7 +1463,6 @@ all p (x:xs)    =  p x && all p xs
 "all/build"     forall p (g::forall b.(a->b->b)->b->b) .
                 all p (build g) = g ((&&) . p) True
  #-}
-#endif
 
 -- | 'elem' is the list membership predicate, usually written in infix form,
 -- e.g., @x \`elem\` xs@.  For the result to be
@@ -1538,9 +1486,6 @@ all p (x:xs)    =  p x && all p xs
 -- >>> 3 `elem` [4..]
 -- * Hangs forever *
 elem                    :: (Eq a) => a -> [a] -> Bool
-#if defined(USE_REPORT_PRELUDE)
-elem x                  =  any (== x)
-#else
 elem _ []       = False
 elem x (y:ys)   = x==y || elem x ys
 {-# NOINLINE [1] elem #-}
@@ -1548,7 +1493,6 @@ elem x (y:ys)   = x==y || elem x ys
 "elem/build"    forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . elem x (build g) = g (\ y r -> (x == y) || r) False
  #-}
-#endif
 
 -- | 'notElem' is the negation of 'elem'.
 --
@@ -1569,9 +1513,6 @@ elem x (y:ys)   = x==y || elem x ys
 -- >>> 3 `notElem` [4..]
 -- * Hangs forever *
 notElem                 :: (Eq a) => a -> [a] -> Bool
-#if defined(USE_REPORT_PRELUDE)
-notElem x               =  all (/= x)
-#else
 notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
 {-# NOINLINE [1] notElem #-}
@@ -1579,7 +1520,6 @@ notElem x (y:ys)=  x /= y && notElem x ys
 "notElem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . notElem x (build g) = g (\ y r -> (x /= y) && r) True
  #-}
-#endif
 
 -- | \(\mathcal{O}(n)\). 'lookup' @key assocs@ looks up a key in an association
 -- list.
@@ -1677,14 +1617,6 @@ concat = foldr (++) []
 --
 -- >>> ['a', 'b', 'c'] !! (-1)
 -- *** Exception: Prelude.!!: negative index
-#if defined(USE_REPORT_PRELUDE)
-(!!)                    :: [a] -> Int -> a
-xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
-[]     !! _         =  errorWithoutStackTrace "Prelude.!!: index too large"
-(x:_)  !! 0         =  x
-(_:xs) !! n         =  xs !! (n-1)
--- Prelude version is without HasCallStack to avoid building linear one
-#else
 (!!)                    :: HasCallStack => [a] -> Int -> a
 
 -- We don't really want the errors to inline with (!!).
@@ -1703,7 +1635,6 @@ xs !! n
   | otherwise = foldr (\x r k -> case k of
                                    0 -> x
                                    _ -> r (k-1)) tooLarge xs n
-#endif
 
 -- | List index (subscript) operator, starting from 0. Returns 'Nothing'
 -- if the index is out of bounds
