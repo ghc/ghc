@@ -1126,10 +1126,7 @@ case of a newtype constructor, we simply hardcode its dcr_bangs field to
 newLocal :: FastString   -- ^ a string which will form part of the 'Var'\'s name
          -> Scaled Type  -- ^ the type of the 'Var'
          -> UniqSM Var
-newLocal name_stem (Scaled w ty) =
-    mkSysLocalOrCoVarM name_stem w ty
-         -- We should not have "OrCoVar" here, this is a bug (#17545)
-
+newLocal name_stem (Scaled w ty) = mkSysLocalM name_stem w ty
 
 -- | Unpack/Strictness decisions from source module.
 --

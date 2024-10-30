@@ -2650,7 +2650,7 @@ cpCloneCoVarBndr env@(CPE { cpe_subst = subst }) covar
   = assertPpr (isCoVar covar) (ppr covar) $
     do { uniq <- getUniqueM
        ; let covar1 = setVarUnique covar uniq
-             covar2 = updateVarType (substTy subst) covar1
+             covar2 = updateTyCoVarType (substTy subst) covar1
              subst1 = extendTCvSubstWithClone subst covar covar2
        ; return (env { cpe_subst = subst1 }, covar2) }
 
@@ -2661,7 +2661,7 @@ cpCloneBndr env@(CPE { cpe_subst = subst }) bndr
   = if isEmptyTCvSubst subst    -- The common case
     then return (env { cpe_subst = extendSubstInScope subst bndr }, bndr)
     else -- No need to clone the Unique; but we must apply the substitution
-         let bndr1  = updateVarType (substTy subst) bndr
+         let bndr1  = updateTyCoVarType (substTy subst) bndr
              subst1 = extendTCvSubstWithClone subst bndr bndr1
          in return (env { cpe_subst = subst1 }, bndr1)
 
@@ -2727,7 +2727,7 @@ fiddleCCall id
 newVar :: CorePrepEnv ->  Type -> UniqSM Id
 newVar env ty
  -- See Note [Binder context]
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit occ) ManyTy ty
+ = seqType ty `seq` mkSysLocalM (fsLit occ) ManyTy ty
    where occ = intercalate "_" (map occNameString $ cpe_context env) ++ "_sat"
 
 {- Note [Binder context]
