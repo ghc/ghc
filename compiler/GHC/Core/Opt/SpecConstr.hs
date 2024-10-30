@@ -2054,7 +2054,7 @@ generaliseDictPats qvars pats
        , let pat_ty = exprType pat
        , typeDeterminesValue pat_ty
        , exprFreeVars pat `disjointVarSet` qvar_set
-       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") ManyTy pat_ty
+       = do { id <- mkSysLocalM (fsLit "dict") ManyTy pat_ty
             ; return (id:extra_qvs, Var id) }
        | otherwise
        = return (extra_qvs, pat)
@@ -2813,7 +2813,7 @@ argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
 wildCardPat ty str
-  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") ManyTy ty
+  = do { id <- mkSysLocalM (fsLit "sc") ManyTy ty
        -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
        ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
 

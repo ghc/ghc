@@ -1626,10 +1626,13 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     let
         scrut_ty   = exprType scrut'
         case_mult  = ManyTy
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name case_mult scrut_ty
-     -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
-     -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
-        tc_app     = splitTyConApp scrut_ty
+
+        case_bndr' = mkLocalId case_bndr_name case_mult scrut_ty
+           -- NB: case_bndr can be a CoVar, since a coercion can be a scrutinee
+           --  with -fdefer-type-errors (e.g. see test T15695).
+           -- Ticket #17291 covers fixing this problem.
+
+        tc_app = splitTyConApp scrut_ty
                 -- NB: Won't always succeed (polymorphic case)
                 --     but won't be demanded in those cases
                 -- NB: not tcSplitTyConApp; we are looking at Core here
@@ -2160,8 +2163,7 @@ bindIfaceId (w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
         ; ty' <- tcIfaceType ty
         ; w' <- tcIfaceType w
-        ; let id = mkLocalIdOrCoVar name w' ty'
-          -- We should not have "OrCoVar" here, this is a bug (#17545)
+        ; let id = mkLocalId name w' ty'
         ; extendIfaceIdEnv [id] (thing_inside id) }
 
 bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a

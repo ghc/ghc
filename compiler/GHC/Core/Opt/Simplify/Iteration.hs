@@ -361,6 +361,12 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
                      {-#SCC "simplLazyBind-simple-floating" #-}
                      return (body_floats2, body2)
 
+                else if any isTyCoVar
+                          (bindersOfBinds $ letFloatBinds $ sfLetFloats body_floats2)
+                then pprTrace "WARNING-TyCo: skipping abstractFloats" (ppr bndr $$ ppr body_floats2) $
+                  -- No Float
+                  return (emptyFloats env, wrapFloats body_floats2 body2)
+
                 else -- Non-empty floats, and non-empty tyvars: do type-abstraction first
                      {-#SCC "simplLazyBind-type-abstraction-first" #-}
                      do { (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl
@@ -843,7 +849,8 @@ makeTrivial env top_lvl dmd occ_fs expr
               bind     = NonRec final_id expr2
 
         ; traceSmpl "makeTrivial" (vcat [text "final_id" <+> ppr final_id, text "rhs" <+> ppr expr2 ])
-        ; return ( floats `addLetFlts` unitLetFloat bind, Var final_id ) }
+        ; return ( floats `addLetFlts` unitLetFloat bind, varToCoreExpr final_id ) }
+                   -- varToCoreExpr: final_id might be a CoVar
   where
     id_info = vanillaIdInfo `setDemandInfo` dmd
     expr_ty = exprType expr

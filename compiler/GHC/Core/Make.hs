@@ -176,9 +176,7 @@ mkCoreAppTyped d (fun, fun_ty) arg
 --
 -- See Note [WildCard binders] in "GHC.Core.Opt.Simplify.Env"
 mkWildValBinder :: Mult -> Type -> Id
-mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
-  -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
-  -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
+mkWildValBinder w ty = mkLocalId wildCardName w ty
 
 -- | Make a case expression whose case binder is unused
 -- The alts and res_ty should not have any occurrences of WildId

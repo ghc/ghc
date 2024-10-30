@@ -350,7 +350,9 @@ instance Outputable SimplFloats where
     = text "SimplFloats"
       <+> braces (vcat [ text "lets: " <+> ppr lf
                        , text "joins:" <+> ppr jf
-                       , text "in_scope:" <+> ppr is ])
+-- in-scope set can be voluminous
+--                       , text "in_scope:" <+> ppr is
+                       ])
 
 emptyFloats :: SimplEnv -> SimplFloats
 emptyFloats env
@@ -548,7 +550,7 @@ reSimplifying :: SimplEnv -> Bool
 reSimplifying (SimplEnv { seInlineDepth = n }) = n>0
 
 ---------------------
-extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
+extendIdSubst :: HasDebugCallStack => SimplEnv -> Id -> SimplSR -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
   = assertPpr (isId var && not (isCoVar var)) (ppr var) $
     env { seIdSubst = extendVarEnv subst var res }
@@ -563,9 +565,10 @@ extendCvSubst env@(SimplEnv {seCvSubst = csubst}) var co
   = assert (isCoVar var) $
     env {seCvSubst = extendVarEnv csubst var co}
 
-extendCvIdSubst :: SimplEnv -> Id -> OutExpr -> SimplEnv
+extendCvIdSubst :: HasDebugCallStack => SimplEnv -> Id -> OutExpr -> SimplEnv
 extendCvIdSubst env bndr (Coercion co) = extendCvSubst env bndr co
-extendCvIdSubst env bndr rhs           = extendIdSubst env bndr (DoneEx rhs NotJoinPoint)
+extendCvIdSubst env bndr rhs           = assertPpr (not (isCoVar bndr)) (ppr bndr $$ ppr rhs) $
+                                         extendIdSubst env bndr (DoneEx rhs NotJoinPoint)
 
 ---------------------
 getInScope :: SimplEnv -> InScopeSet

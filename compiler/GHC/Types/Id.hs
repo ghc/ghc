@@ -35,10 +35,10 @@ module GHC.Types.Id (
 
         -- ** Simple construction
         mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
-        mkLocalId, mkLocalCoVar, mkLocalIdOrCoVar,
+        mkLocalId, mkLocalCoVar,
         mkLocalIdWithInfo, mkExportedLocalId, mkExportedVanillaId,
-        mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
-        mkUserLocal, mkUserLocalOrCoVar,
+        mkSysLocal, mkSysLocalM,
+        mkUserLocal,
         mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
         mkScaledTemplateLocal,
         mkWorkerId,
@@ -309,7 +309,7 @@ mkVanillaGlobalWithInfo nm =
 
 -- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
 mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
-mkLocalId name w ty = mkLocalIdWithInfo name w (assert (not (isCoVarType ty)) ty) vanillaIdInfo
+mkLocalId name w ty = mkLocalIdWithInfo name w ty vanillaIdInfo
 
 -- | Make a local CoVar
 mkLocalCoVar :: HasDebugCallStack => Name -> Type -> CoVar
@@ -317,22 +317,18 @@ mkLocalCoVar name ty
   = assert (isCoVarType ty) $
     Var.mkLocalVar CoVarId name ManyTy ty vanillaIdInfo
 
--- | Like 'mkLocalId', but checks the type to see if it should make a covar
-mkLocalIdOrCoVar :: HasDebugCallStack => Name -> Mult -> Type -> Id
-mkLocalIdOrCoVar name w ty
-  -- We should assert (eqType w Many) in the isCoVarType case.
+mkLocalIdWithInfo :: HasDebugCallStack => Name -> Mult -> Type -> IdInfo -> Id
+-- Non-CoVars only -- CoVars get a different IdDetails
+mkLocalIdWithInfo name w ty info
+  = Var.mkLocalVar details name w ty info   -- Note [Free type variables]
+  where
+    details | isCoVarType ty = CoVarId
+            | otherwise      = VanillaId
+  -- NB: In the CoVarId case we should really assert (w = Many).
   -- However, currently this assertion does not hold.
   -- In tests with -fdefer-type-errors, such as T14584a,
   -- we create a linear 'case' where the scrutinee is a coercion
   -- (see castBottomExpr). This problem is covered by #17291.
-  | isCoVarType ty = mkLocalCoVar name   ty
-  | otherwise      = mkLocalId    name w ty
-
-    -- proper ids only; no covars!
-mkLocalIdWithInfo :: HasDebugCallStack => Name -> Mult -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name w ty info =
-  Var.mkLocalVar VanillaId name w (assert (not (isCoVarType ty)) ty) info
-        -- Note [Free type variables]
 
 -- | Create a local 'Id' that is marked as exported.
 -- This prevents things attached to it from being removed as dead code.
@@ -348,34 +344,19 @@ mkExportedVanillaId name ty =
     Var.mkExportedLocalVar VanillaId name ty vanillaIdInfo
         -- Note [Free type variables]
 
-
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Mult -> Type -> Id
-mkSysLocal fs uniq w ty = assert (not (isCoVarType ty)) $
-                        mkLocalId (mkSystemVarName uniq fs) w ty
-
--- | Like 'mkSysLocal', but checks to see if we have a covar type
-mkSysLocalOrCoVar :: FastString -> Unique -> Mult -> Type -> Id
-mkSysLocalOrCoVar fs uniq w ty
-  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) w ty
+mkSysLocal fs uniq w ty = mkLocalId (mkSystemVarName uniq fs) w ty
 
 mkSysLocalM :: MonadUnique m => FastString -> Mult -> Type -> m Id
 mkSysLocalM fs w ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq w ty))
 
-mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Mult -> Type -> m Id
-mkSysLocalOrCoVarM fs w ty
-  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq w ty))
-
--- | Create a user local 'Id'. These are local 'Id's (see "GHC.Types.Var#globalvslocal") with a name and location that the user might recognize
+-- | Create a user local 'Id'. These are local 'Id's (see "GHC.Types.Var#globalvslocal")
+-- with a name and location that the user might recognize
 mkUserLocal :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
-mkUserLocal occ uniq w ty loc = assert (not (isCoVarType ty)) $
-                                mkLocalId (mkInternalName uniq occ loc) w ty
+mkUserLocal occ uniq w ty loc = mkLocalId (mkInternalName uniq occ loc) w ty
 
--- | Like 'mkUserLocal', but checks if we have a coercion type
-mkUserLocalOrCoVar :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
-mkUserLocalOrCoVar occ uniq w ty loc
-  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) w ty
 
 {-
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -393,9 +374,7 @@ mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkScaledTemplateLocal i (unrestricted ty)
 
 mkScaledTemplateLocal :: Int -> Scaled Type -> Id
-mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) w ty
-   -- "OrCoVar" since this is used in a superclass selector,
-   -- and "~" and "~~" have coercion "superclasses".
+mkScaledTemplateLocal i (Scaled w ty) = mkSysLocal (fsLit "v") (mkBuiltinUnique i) w ty
 
 -- | Create a template local for a series of types
 mkTemplateLocals :: [Type] -> [Id]
@@ -839,7 +818,7 @@ setIdCbvMarks id marks
       -- for more details.
       trimmedMarks = dropWhileEndLE (not . isMarkedCbv) $ take (idArity id) marks
 
-idCbvMarks_maybe :: Id -> Maybe [CbvMark]
+idCbvMarks_maybe :: HasDebugCallStack => Id -> Maybe [CbvMark]
 idCbvMarks_maybe id = case idDetails id of
   WorkerLikeId marks -> Just marks
   JoinId _arity marks  -> marks
@@ -1071,7 +1050,8 @@ arity and strictness info before transferring it.  E.g.
 Notice that g' has an arity one more than the original g
 -}
 
-transferPolyIdInfo :: Id        -- Original Id
+transferPolyIdInfo :: HasDebugCallStack
+                   => Id        -- Original Id
                    -> [Var]     -- Abstract wrt these variables
                    -> Id        -- New Id
                    -> Id

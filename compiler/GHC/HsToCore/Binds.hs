@@ -1034,7 +1034,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                 -- isEvVar: this includes coercions, matching what
                 --          happens in `split_lets` (isDictId, isCoVar)
                 extra_dicts =
-                  [ mkLocalIdOrCoVar (localiseName (idName d)) ManyTy (idType d)
+                  [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
                     | d <- extra_vars, isEvVar d ]
                 extra_vars  =
                   [ v
