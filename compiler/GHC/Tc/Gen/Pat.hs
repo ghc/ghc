@@ -355,10 +355,7 @@ tcPatBndr _ bndr_name pat_ty
   = do { let pat_mult = scaledMult pat_ty
        ; pat_ty <- expTypeToType (scaledThing pat_ty)
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name pat_mult pat_ty) }
-               -- We should not have "OrCoVar" here, this is a bug (#17545)
-               -- Whether or not there is a sig is irrelevant,
-               -- as this is local
+       ; return (idHsWrapper, mkLocalId bndr_name pat_mult pat_ty) }
 
 newLetBndr :: LetBndrSpec -> Name -> Mult -> TcType -> TcM TcId
 -- Make up a suitable Id for the pattern-binder.

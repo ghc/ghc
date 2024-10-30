@@ -3246,8 +3246,6 @@ freshEtaId n subst ty
       = (subst', eta_id')
       where
         Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
-        eta_id' = uniqAway (substInScopeSet subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) mult' ty'
-                  -- "OrCoVar" since this can be used to eta-expand
-                  -- coercion abstractions
+        eta_id' = uniqAway (substInScope subst) $
+                  mkSysLocal (fsLit "eta") (mkBuiltinUnique n) mult' ty'
         subst'  = extendSubstInScope subst eta_id'

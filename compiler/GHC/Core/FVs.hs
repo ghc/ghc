@@ -509,7 +509,7 @@ type FVAnn = DVarSet  -- See Note [The FVAnn invariant]
 
 {- Note [The FVAnn invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Invariant: a FVAnn, say S, is closed:
+Invariant: Every S::FVAnn is closed:
   That is: if v is in S,
            then freevars( v's type/kind ) is also in S
 -}
@@ -670,10 +670,9 @@ freeVarsBind :: CoreBind
              -> (CoreBindWithFVs, DVarSet)  -- Return free vars of binding + scope
 freeVarsBind (NonRec binder rhs) body_fvs
   = ( AnnNonRec binder rhs2
-    , freeVarsOf rhs2 `unionFVs` body_fvs2
-                      `unionFVs` bndrRuleAndUnfoldingVarsDSet binder )
+    , freeVarsOf rhs2 `unionFVs` body_fvs2 )
     where
-      rhs2      = freeVars rhs
+      rhs2      = freeVarsRhs rhs
       body_fvs2 = binder `delBinderFV` body_fvs
 
 freeVarsBind (Rec binds) body_fvs
@@ -681,13 +680,26 @@ freeVarsBind (Rec binds) body_fvs
     , delBindersFV binders all_fvs )
   where
     (binders, rhss) = unzip binds
-    rhss2        = map freeVars rhss
-    rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
-    binders_fvs  = fvDVarSet $ mapUnionFV bndrRuleAndUnfoldingFVs binders
-                   -- See Note [The FVAnn invariant]
-    all_fvs      = rhs_body_fvs `unionFVs` binders_fvs
+    rhss2           = map freeVarsRhs rhss
+    all_fvs         = foldr (unionFVs . freeVarsOf) body_fvs rhss2
             -- The "delBinderFV" happens after adding the idSpecVars,
             -- since the latter may add some of the binders as fvs
+
+freeVarsRhs :: Var -> CoreExpr -> CoreExprWithFVs
+-- Decorate the RHS with its free vars,
+-- PLUS the free vars of:
+--    - rules
+--    - unfolding
+--    - type
+-- The free vars of the type matters because of type-lets;
+-- they may be free in the RHS itself
+freeVarsRhs bndr rhs
+  = (rhs_fvs `unionFVs` extra_fvs, rhs')
+  where
+    (rhs_fvs, rhs') = freeVars rhs
+    extra_fvs = fvDVarSet $
+                bndrRuleAndUnfoldingFVs bndr `unionFV`
+                tyCoFVsOfType (varType bndr)
 
 freeVars :: CoreExpr -> CoreExprWithFVs
 -- ^ Annotate a 'CoreExpr' with its (non-global) free type

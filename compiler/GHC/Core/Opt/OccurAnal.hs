@@ -1701,30 +1701,25 @@ makeNode :: OccEnv -> ImpRuleEdges -> VarSet
          -> (Var, CoreExpr) -> LetrecNode
 -- See Note [Recursive bindings: the grand plan]
 makeNode !env _imp_rule_edges bndr_set (bndr, rhs@(Type rhs_ty))
-  = -- The RHS is of form (Type rhs_ty)
+  = -- This is a type binding, e.g.  let @x = Maybe Int in ...
     assert (isTyVar bndr) $
     DigraphNode { node_payload      = details
                 , node_key          = varUnique bndr
-                , node_dependencies = nonDetKeysUniqSet inl_fvs }
+                , node_dependencies = nonDetKeysUniqSet rhs_fvs }
   where
     details = ND { nd_bndr            = bndr
-                 , nd_rhs             = WTUD (TUD 0 inl_uds) rhs
-                 , nd_inl             = inl_fvs
+                 , nd_rhs             = WTUD (TUD 0 rhs_uds) rhs
+                 , nd_inl             = rhs_fvs
                  , nd_simple          = True
                  , nd_weak_fvs        = emptyVarSet
                  , nd_active_rule_fvs = emptyVarSet }
 
     rhs_env = setNonTailCtxt OccRhs env
-    -- WUD unf_uds mb_unf'
-    --   | Just unf <- tyVarUnfolding_maybe bndr = Just <$> occAnalTy rhs_env unf
-    --   | otherwise                             = WUD emptyUDs Nothing
     rhs_uds = occAnalTy rhs_env rhs_ty
-
-    inl_uds   = rhs_uds -- `andUDs` unf_uds
-    inl_fvs   = udFreeVars bndr_set inl_uds
+    rhs_fvs = udFreeVars bndr_set rhs_uds
 
 makeNode !env imp_rule_edges bndr_set (bndr, rhs)
-  = -- pprTrace "makeNode" (ppr bndr <+> ppr (sizeVarSet bndr_set)) $
+  = -- This is a value binding
     DigraphNode { node_payload      = details
                 , node_key          = varUnique bndr
                 , node_dependencies = nonDetKeysUniqSet scope_fvs }
@@ -2227,17 +2222,20 @@ occ_anal_lam_tail env expr@(Lam {})
 -- See Note [Occurrence analysis for lambda binders]
 occ_anal_lam_tail env (Cast expr co)
   = let  WUD expr_uds expr' = occ_anal_lam_tail env expr
-         -- usage1: see Note [Gather occurrences of coercion variables]
+
+         -- co_uds: see Note [Gather occurrences of coercion variables]
          co_uds = occAnalCo env co
 
+         usage1 = expr_uds `andUDs` co_uds
+
          -- usage2: see Note [Occ-anal and cast worker/wrapper]
-         co_uds' = case expr of
-                     Var {} | isRhsEnv env -> markAllMany co_uds
-                     _ -> co_uds
+         usage2 = case expr of
+                     Var {} | isRhsEnv env -> markAllMany usage1
+                     _ -> usage1
 
-         uds = markAllNonTail (expr_uds `andUDs` co_uds')
+         usage3 = markAllNonTail usage2
 
-    in WUD uds (Cast expr' co)
+    in WUD usage3 (Cast expr' co)
 
 occ_anal_lam_tail env expr  -- Not Lam, not Cast
   = occAnal env expr
@@ -3994,11 +3992,10 @@ tagRecBinders lvl body_uds details_s
 
 setBinderOcc :: OccInfo -> CoreBndr -> CoreBndr
 setBinderOcc occ_info bndr
-  | isTyVar bndr
-  , occ_info == tyVarOccInfo bndr = bndr
-  | isTyVar bndr                  = setTyVarOccInfo bndr occ_info
-  | occ_info == idOccInfo bndr    = bndr
-  | otherwise                     = setIdOccInfo bndr occ_info
+  | isTyVar bndr = if (occ_info == tyVarOccInfo bndr) then bndr
+                   else setTyVarOccInfo bndr occ_info
+  | otherwise    = if (occ_info == idOccInfo bndr) then bndr
+                   else setIdOccInfo bndr occ_info
 
 -- | Decide whether some bindings should be made into join points or not, based
 -- on its occurrences. This is
