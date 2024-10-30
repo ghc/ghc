@@ -13,6 +13,7 @@ module GHC.Core.Opt.Simplify.Utils (
 
         -- Inlining,
         preInlineUnconditionally, postInlineUnconditionally,
+        postInlineTypeUnconditionally,
         activeRule,
         getUnfoldingInRuleMatch,
         updModeForStableUnfoldings, updModeForRules,
@@ -1455,7 +1456,8 @@ the former.
 -}
 
 preInlineUnconditionally
-    :: SimplEnv -> TopLevelFlag -> InId
+    :: SimplEnv -> TopLevelFlag
+    -> InVar                -- Works for TyVar, CoVar, and Id
     -> InExpr -> StaticEnv  -- These two go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let-can-float invariant
@@ -1600,6 +1602,9 @@ NB: unconditional inlining of this sort can introduce ticks in places that
 may seem surprising; for instance, the LHS of rules. See Note [Simplifying
 rules] for details.
 -}
+
+postInlineTypeUnconditionally :: Type -> Bool
+postInlineTypeUnconditionally _ = False
 
 postInlineUnconditionally
     :: SimplEnv -> BindContext
