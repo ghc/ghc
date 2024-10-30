@@ -620,8 +620,9 @@ fiBind platform to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
 
         -- Push rhs_binds into the right hand side of the binding
     rhs'     = fiRhs platform rhs_binds id ann_rhs
-    rhs_fvs' = rhs_fvs `unionDVarSet` floatedBindsFVs rhs_binds `unionDVarSet` rule_fvs
-                        -- Don't forget the rule_fvs; the binding mentions them!
+    rhs_fvs' = rhs_fvs                   `unionDVarSet`
+               floatedBindsFVs rhs_binds `unionDVarSet`
+               rule_fvs -- Don't forget the rule_fvs; the binding mentions them!
 
 fiBind platform to_drop (AnnRec bindings) body_fvs
   = ( shared_binds
