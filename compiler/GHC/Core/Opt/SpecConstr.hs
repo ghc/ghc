@@ -52,6 +52,7 @@ import GHC.Unit.Module.ModGuts
 import GHC.Types.Error (MessageClass(..), Severity(..), DiagnosticReason(WarningWithoutFlag), ResolvedDiagnosticReason (..))
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
+import GHC.Types.Var     ( setTyVarUnfolding )
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Types.Var.Env
@@ -1399,9 +1400,14 @@ scBind :: TopLevelFlag -> ScEnv -> InBind
        -> (ScEnv -> UniqSM (ScUsage, a, [SpecFailWarning]))   -- Specialise the scope of the binding
        -> UniqSM (ScUsage, [OutBind], a, [SpecFailWarning])
 scBind top_lvl env (NonRec bndr rhs) do_body
-  | isTyVar bndr         -- Type-lets may be created by doBeta
-  = do { (final_usage, body', warnings) <- do_body (extendScSubst env bndr rhs)
-       ; return (final_usage, [], body', warnings) }
+  | Type rhs_ty <- rhs
+  = assertPpr (isTyVar bndr) (ppr bndr) $
+    do { let (body_env, bndr') = extendBndr env bndr
+             !(MkSolo rhs_ty') = scSubstTy env rhs_ty
+             bndr'' = setTyVarUnfolding bndr' rhs_ty'
+             body_env' = extendScSubst body_env bndr (Type (mkTyVarTy bndr''))
+       ; (final_usage, body', warnings) <- do_body body_env'
+       ; return (final_usage, [NonRec bndr'' (Type rhs_ty')], body', warnings) }
 
   | not (isTopLevel top_lvl)  -- Nested non-recursive value binding
     -- See Note [Specialising local let bindings]
