@@ -1804,7 +1804,9 @@ simpl_lam :: HasDebugCallStack
 -- Type beta-reduction
 simpl_lam env bndr body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = do { tick (BetaReduction bndr)
-       ; simplLam (extendTvSubst env bndr arg_ty) body cont }
+       ; (floats1, env1)  <- completeTyVarBindX env bndr arg_ty
+       ; (floats2, expr') <- simplLam env1 body cont
+       ; return (floats1 `addFloats` floats2, expr') } 
 
 -- Coercion beta-reduction
 simpl_lam env bndr body (ApplyToVal { sc_arg = Coercion arg_co, sc_env = arg_se
@@ -1905,10 +1907,9 @@ simplNonRecE :: HasDebugCallStack
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
   | Type ty <- rhs
   = assert (isTyVar bndr) $
-    do { (env1, bndr1) <- simplNonRecBndr env bndr
-       ; ty'           <- simplType env ty
-       ; let (floats1, env2) = mkTyVarFloatBind env1 bndr bndr1 ty'
-       ; (floats2, expr') <- simplNonRecBody env2 from_what body cont
+    do { ty'              <- simplType (rhs_se `setInScopeFromE` env) ty
+       ; (floats1, env1)  <- completeTyVarBindX env bndr ty'
+       ; (floats2, expr') <- simplNonRecBody env1 from_what body cont
        ; return (floats1 `addFloats` floats2, expr') }
 
   | assert (isId bndr && not (isJoinId bndr) ) $
@@ -1936,6 +1937,13 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
        -- (FromBeta Lifted) or FromLet: look at the demand info
        _ -> seCaseCase env && isStrUsedDmd (idDemandInfo bndr)
 
+completeTyVarBindX :: SimplEnv -> InTyVar -> OutType -> SimplM (SimplFloats, SimplEnv)
+completeTyVarBindX env tv rhs_ty
+  | postInlineTypeUnconditionally rhs_ty
+  = return (emptyFloats env, extendTvSubst env tv rhs_ty)
+  | otherwise
+  = do { (env1, tv1) <- simplNonRecBndr env tv
+       ; return (mkTyVarFloatBind env1 tv tv1 rhs_ty) }
 
 ------------------
 simplRecE :: SimplEnv
