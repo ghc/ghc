@@ -1,6 +1,6 @@
 # some platforms use spawnp instead of exec in some cases, resulting
 # in spurious error output changes.
-normalise_exec = normalise_fun(lambda s: s.replace('posix_spawnp', 'exec'))
+normalise_exec = normalise_fun(lambda s: s.replace('posix_spawnp', 'exec').replace('execvp','exec'))
 
 test('process001', [req_process], compile_and_run, [''])
 test('process002', [fragile_for(16547, concurrent_ways), req_process], compile_and_run, [''])
