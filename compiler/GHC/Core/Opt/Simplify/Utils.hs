@@ -1492,7 +1492,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   where
     unf = idUnfolding bndr
     extend_id_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
-    extend_tv_subst_with ty      = extendTvSubst env bndr ty
+    extend_tv_subst_with ty      = extendTvSubst env bndr $! (substTy rhs_env ty)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
