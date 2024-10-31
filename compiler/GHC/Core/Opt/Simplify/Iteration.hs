@@ -226,8 +226,9 @@ simplTopBinds env0 binds0
       = simplRecBind env (BC_Let TopLevel Recursive) pairs
     simpl_bind env (NonRec b r)
       = do { let bind_cxt = BC_Let TopLevel NonRecursive
-           ; (env', b') <- addBndrRules env b (lookupRecBndr env b) bind_cxt
-           ; simplRecOrTopPair env' bind_cxt b b' r }
+                 b'       = lookupRecBndr env b
+           ; (env', b') <- addBndrRules env  bind_cxt b b'
+           ; simplRecOrTopPair          env' bind_cxt b b' r }
 
 {-
 ************************************************************************
@@ -253,7 +254,7 @@ simplRecBind env0 bind_cxt pairs0
     add_rules :: SimplEnv -> (InBndr,InExpr) -> SimplM (SimplEnv, (InBndr, OutBndr, InExpr))
         -- Add the (substituted) rules to the binder
     add_rules env (bndr, rhs)
-        = do { (env', bndr') <- addBndrRules env bndr (lookupRecBndr env bndr) bind_cxt
+        = do { (env', bndr') <- addBndrRules env bind_cxt bndr (lookupRecBndr env bndr)
              ; return (env', (bndr, bndr', rhs)) }
 
     go env [] = return (emptyFloats env, env)
@@ -281,7 +282,7 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
   | Just env' <- preInlineUnconditionally env (bindContextLevel bind_cxt)
                                           old_bndr rhs env
   = {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
-    simplTrace "SimplBindr:inline-uncond" (ppr old_bndr) $
+    simplTrace "SimplBindr:inline-uncond" (ppr old_bndr <+> equals <+> ppr rhs) $
     do { tick (PreInlineUnconditionally old_bndr)
        ; return ( emptyFloats env, env' ) }
 
@@ -343,7 +344,10 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
         -- Simplify the RHS
         ; let rhs_cont = mkRhsStop (substTy body_env (exprType body))
                                    is_rec (idDemandInfo bndr)
-        ; (body_floats0, body0) <- {-#SCC "simplExprF" #-} simplExprF body_env body rhs_cont
+        ; (body_floats0, body0) <- {-#SCC "simplExprF" #-}
+                                   simplExprF body_env body rhs_cont
+        ; (if isTopLevel top_lvl then pprTrace "simplLazyBind" (ppr bndr <+> ppr body_floats0 $$ ppr body0) else id) $
+          return ()
 
         -- ANF-ise a constructor or PAP rhs
         ; (body_floats2, body2) <- {-#SCC "prepareBinding" #-}
@@ -356,16 +360,20 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
           -- more renaming than necessary => extra work (see !7777 and test T16577).
           -- Don't need: we wrap tvs' around the RHS anyway.
 
+        ; let float_bndrs2 = bindersOfBinds $ letFloatBinds $ sfLetFloats body_floats2
+              -- float_bndrs2 used only in debugging
+
         ; (rhs_floats, body3)
             <-  if isEmptyFloats body_floats2 || null tvs then   -- Simple floating
                      {-#SCC "simplLazyBind-simple-floating" #-}
                      return (body_floats2, body2)
 
-                else if any isTyCoVar
-                          (bindersOfBinds $ letFloatBinds $ sfLetFloats body_floats2)
-                then pprTrace "WARNING-TyCo: skipping abstractFloats" (ppr bndr $$ ppr body_floats2) $
-                  -- No Float
-                  return (emptyFloats env, wrapFloats body_floats2 body2)
+                else if any isTyCoVar float_bndrs2
+                then (if not (any isId float_bndrs2) then id
+                      else pprTrace "WARNING-TyCo: skipping abstractFloats"
+                                    (ppr bndr $$ ppr body_floats2)) $
+                     -- No Float because of the type bindings
+                     return (emptyFloats env, wrapFloats body_floats2 body2)
 
                 else -- Non-empty floats, and non-empty tyvars: do type-abstraction first
                      {-#SCC "simplLazyBind-type-abstraction-first" #-}
@@ -1576,7 +1584,7 @@ completeBindX env from_what bndr rhs body cont
 
   | otherwise -- Make a let-binding
   = do  { (env1, bndr1) <- simplNonRecBndr env bndr
-        ; (env2, bndr2) <- addBndrRules env1 bndr bndr1 (BC_Let NotTopLevel NonRecursive)
+        ; (env2, bndr2) <- addBndrRules env1 (BC_Let NotTopLevel NonRecursive) bndr bndr1
 
         ; let is_strict = isStrictId bndr2
               -- isStrictId: use simplified binder because the InId bndr might not have
@@ -1921,7 +1929,7 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
 
   | otherwise  -- Evaluate RHS lazily
   = do { (env1, bndr1)    <- simplNonRecBndr env bndr
-       ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Let NotTopLevel NonRecursive)
+       ; (env2, bndr2)    <- addBndrRules env1 (BC_Let NotTopLevel NonRecursive) bndr bndr1
        ; (floats1, env3)  <- simplLazyBind NotTopLevel NonRecursive
                                            (bndr,env) (bndr2,env2) (rhs,rhs_se)
        ; (floats2, expr') <- simplNonRecBody env3 from_what body cont
@@ -2065,7 +2073,7 @@ simplNonRecJoinPoint env bndr rhs body cont
         ; let mult   = contHoleScaling cont
               res_ty = contResultType cont
         ; (env1, bndr1)    <- simplNonRecJoinBndr env bndr mult res_ty
-        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Join NonRecursive cont)
+        ; (env2, bndr2)    <- addBndrRules env1 (BC_Join NonRecursive cont) bndr bndr1
         ; (floats1, env3)  <- simplJoinBind NonRecursive cont (bndr,env) (bndr2,env2) (rhs,env)
         ; (floats2, body') <- simplExprF env3 body cont
         ; return (floats1 `addFloats` floats2, body') }
@@ -4701,11 +4709,11 @@ to apply in that function's own right-hand side.
 See Note [Forming Rec groups] in "GHC.Core.Opt.OccurAnal"
 -}
 
-addBndrRules :: SimplEnv -> InVar -> OutVar
-             -> BindContext
+addBndrRules :: SimplEnv -> BindContext
+             -> InVar -> OutVar
              -> SimplM (SimplEnv, OutBndr)
 -- Rules are added back into the bin
-addBndrRules env in_id out_id bind_cxt
+addBndrRules env bind_cxt in_id out_id
   | isTyVar in_id
   = return (env, out_id)
   | null old_rules

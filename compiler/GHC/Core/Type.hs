@@ -509,10 +509,12 @@ on its fast path must also be inlined, linked back to this Note.
 ********************************************************************* -}
 
 expandTyVarUnfoldings :: TyVarEnv Type -> Type -> Type
--- (expandTyvarUnfoldings tvs ty) replace any occurrences of tvs in ty
--- with their unfoldings.  There are no substitution or variable-capture
--- issues: if we have (let @a = ty in body), then at all occurrences of `a`
--- the free vars of `body` are also in scope, without having been shadowed.
+-- (expandTyvarUnfoldings tvs ty) replace any occurrences of `tvs` in `ty`
+-- with their unfoldings.  The returned type does not mention any of `tvs`.
+--
+-- There are no substitution or variable-capture issues: if we have (let @a = ty
+-- in body), then at all occurrences of `a` the free vars of `body` are also in
+-- scope, without having been shadowed.
 expandTyVarUnfoldings tvs ty
   | isEmptyVarEnv tvs = ty
   | otherwise         = runIdentity (expand ty)
@@ -523,7 +525,7 @@ expandTyVarUnfoldings tvs ty
                              , tcm_hole = exp_hole, tcm_tycobinder = exp_tcb
                              , tcm_tycon = pure })
     exp_tv _ tv = case lookupVarEnv tvs tv of
-                      Just ty -> pure ty
+                      Just ty -> expand ty
                       Nothing -> pure (TyVarTy tv)
     exp_cv _   cv = pure (CoVarCo cv)
     exp_hole _ cv = pprPanic "expand_tv_unf" (ppr cv)

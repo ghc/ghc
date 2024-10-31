@@ -404,7 +404,7 @@ cseBind toplevel env (Rec [(in_id, rhs)])
   = (extendCSRecEnv env1 out_id rhs'' id_expr', Rec [(zapped_id, rhs')])
 
   where
-    (env1, Identity out_id) = addRecBinders env (Identity in_id)
+    (env1, out_id) = addRecBinder env in_id
     rhs'  = cseExpr env1 rhs
     rhs'' = stripTicksE tickishFloatable rhs'
     ticks = stripTicksT tickishFloatable rhs'
@@ -905,8 +905,16 @@ addBinders cse vs = (cse { cs_subst = sub' }, vs')
                 where
                   (sub', vs') = substBndrs (cs_subst cse) vs
 
+
+addRecBinder :: CSEnv -> Id -> (CSEnv, Id)
+{-# INLINE addRecBinder #-}
+addRecBinder env id = (env', id')
+  where
+    (env', Identity id') = addRecBinders env (Identity id)
+
 addRecBinders :: Traversable f => CSEnv -> f Id -> (CSEnv, f Id)
+-- Used with f=[] (for a list) and f=Identity (for a single binder)
+{-# INLINE addRecBinders #-}
 addRecBinders = \ cse vs ->
     let (sub', vs') = substRecBndrs (cs_subst cse) vs
     in (cse { cs_subst = sub' }, vs')
-{-# INLINE addRecBinders #-}
