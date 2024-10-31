@@ -3000,12 +3000,12 @@ def normalise_prof (s: str) -> str:
     # Source locations from internal libraries, remove the source location
     # > libraries/ghc-internal/src/path/Foo.hs:204:1-18
     # => ghc-internal/src/path/Foo.hs
-    s = re.sub('\slibraries/(\S+)(:\S+){2}\s',' \\1 ', s)
+    s = re.sub(r'\slibraries/(\S+)(:\S+){2}\s', r' \1 ', s)
 
     # Source locations from internal libraries, remove the source location
     # > libraries/ghc-internal/src/path/Foo.hs::(2,1)-(5,38)
     # => ghc-internal/src/path/Foo.hs
-    s = re.sub('\slibraries/(\S+)(:\S+){1}\s',' \\1 ', s)
+    s = re.sub(r'\slibraries/(\S+)(:\S+){1}\s', r' \1 ', s)
 
     # We have something like this:
     #
