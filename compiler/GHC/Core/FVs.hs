@@ -613,7 +613,6 @@ idFVs id = assert (isId id) $
 
 bndrRuleAndUnfoldingVarsDSet :: Id -> DVarSet
 bndrRuleAndUnfoldingVarsDSet id = fvDVarSet $ bndrRuleAndUnfoldingFVs id
-
 bndrRuleAndUnfoldingIds :: Id -> IdSet
 bndrRuleAndUnfoldingIds id = fvVarSet $ filterFV isId $ bndrRuleAndUnfoldingFVs id
 
@@ -734,13 +733,16 @@ freeVars = go
 
     go (Case scrut bndr ty alts)
       = ( (bndr `delBinderFV` alts_fvs)
-           `unionFVs` freeVarsOf scrut2
+           `unionFVs` scrut_fvs
            `unionFVs` tyCoVarsOfTypeDSet ty
           -- Don't need to look at (idType bndr)
           -- because that's redundant with scrut
-        , AnnCase scrut2 bndr ty alts2 )
+        , AnnCase (case_head_fvs, scrut2) bndr ty alts2 )
       where
-        scrut2 = go scrut
+        (scrut_fvs, scrut2) = go scrut
+        case_head_fvs = scrut_fvs `unionFVs`
+                        dVarTypeTyCoVars bndr `unionFVs`
+                        tyCoVarsOfTypeDSet ty
 
         (alts_fvs_s, alts2) = mapAndUnzip fv_alt alts
         alts_fvs            = unionFVss alts_fvs_s
