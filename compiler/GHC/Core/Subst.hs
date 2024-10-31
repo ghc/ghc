@@ -354,23 +354,28 @@ substBndrs = mapAccumL substBndr
 {-# INLINE substBndrs #-}
 
 -- | Substitute in a mutually recursive group of 'Id's
-substRecBndrs :: Traversable f => Subst -> f Id -> (Subst, f Id)
+substRecBndrs :: (HasDebugCallStack, Traversable f) => Subst -> f Id -> (Subst, f Id)
+-- Used with f=[] (for a list) and f=Identity (for a single binder)
 substRecBndrs subst bndrs
   = (new_subst, new_bndrs)
   where         -- Here's the reason we need to pass rec_subst to subst_id
     (new_subst, new_bndrs) = mapAccumL (substIdBndr (text "rec-bndr") new_subst) subst bndrs
-{-# SPECIALIZE substRecBndrs :: Subst -> [Id] -> (Subst, [Id]) #-}
-{-# SPECIALIZE substRecBndrs :: Subst -> Identity Id -> (Subst, Identity Id) #-}
+{-# SPECIALIZE substRecBndrs :: HasDebugCallStack => Subst -> [Id] -> (Subst, [Id]) #-}
+{-# SPECIALIZE substRecBndrs :: HasDebugCallStack => Subst -> Identity Id -> (Subst, Identity Id) #-}
 
-substIdBndr :: SDoc
+substIdBndr :: HasDebugCallStack
+            => SDoc
             -> Subst            -- ^ Substitution to use for the IdInfo
             -> Subst -> Id      -- ^ Substitution and Id to transform
             -> (Subst, Id)      -- ^ Transformed pair
                                 -- NB: unfolding may be zapped
 
-substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
-  = -- pprTrace "substIdBndr" (doc $$ ppr old_id $$ ppr in_scope) $
-    (Subst new_in_scope new_env tvs cvs, new_id)
+substIdBndr _doc rec_subst subst old_id
+  = assertPpr (isId old_id) (ppr old_id) $
+    substIdBndr' _doc rec_subst subst old_id
+
+substIdBndr' _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
+  = (Subst new_in_scope new_env tvs cvs, new_id)
   where
     id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
     id2 | no_type_change = id1

@@ -346,7 +346,7 @@ data SimplFloats
       }
 
 instance Outputable SimplFloats where
-  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = is })
+  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = _is })
     = text "SimplFloats"
       <+> braces (vcat [ text "lets: " <+> ppr lf
                        , text "joins:" <+> ppr jf
@@ -706,7 +706,8 @@ type JoinFloats = OrdList JoinFloat
 
 data FloatFlag
   = FltLifted   -- All bindings are lifted and lazy *or*
-                --     consist of a single primitive string literal
+                --     consist of a single primitive string literal *or*
+                --     or are a type binding
                 -- Hence ok to float to top level, or recursive
                 -- NB: consequence: all bindings satisfy let-can-float invariant
 
@@ -805,9 +806,10 @@ unitJoinFloat bind = assert (all isJoinId (bindersOf bind)) $
 
 mkTyVarFloatBind :: SimplEnv -> InTyVar -> OutTyVar -> OutType -> (SimplFloats, SimplEnv)
 mkTyVarFloatBind env@(SimplEnv { seTvSubst = tv_subst, seInScope = in_scope })  old_tv new_tv rhs_ty
-  = (floats, env { seTvSubst = tv_subst' })
+  = assertPpr(isTyVar new_tv) (ppr old_tv $$ ppr new_tv) $
+    (floats, env { seTvSubst = tv_subst' })
   where
-    floats = SimplFloats { sfLetFloats = unitLetFloat (NonRec new_tv_w_unf (Type rhs_ty))
+    floats = SimplFloats { sfLetFloats  = unitLetFloat (NonRec new_tv_w_unf (Type rhs_ty))
                          , sfJoinFloats = emptyJoinFloats
                          , sfInScope    = in_scope }
     tv_subst' = extendVarEnv tv_subst old_tv (mkTyVarTy new_tv_w_unf)
@@ -893,19 +895,24 @@ addJoinFlts = appOL
 mkRecFloats :: SimplFloats -> SimplFloats
 -- Flattens the floats into a single Rec group,
 -- They must either all be lifted LetFloats or all JoinFloats
-mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
-                                , sfJoinFloats = jbs
+-- If any are type bindings they must be non-recursive, so
+-- do not need to be joined into a letrec
+mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs ff
+                                , sfJoinFloats = join_bs
                                 , sfInScope    = in_scope })
-  = assertPpr (isNilOL bs || isNilOL jbs) (ppr floats) $
-    SimplFloats { sfLetFloats  = floats'
-                , sfJoinFloats = jfloats'
+  = assertPpr (isNilOL bs || isNilOL join_bs) (ppr floats) $
+    SimplFloats { sfLetFloats  = LetFloats (type_bs `appOL` val_b) ff
+                , sfJoinFloats = join_b
                 , sfInScope    = in_scope }
   where
+    type_bs, val_bs :: OrdList OutBind
+    (type_bs, val_bs) = partitionOL isTypeBind bs
+
     -- See Note [Bangs in the Simplifier]
-    !floats'  | isNilOL bs  = emptyLetFloats
-              | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
-    !jfloats' | isNilOL jbs = emptyJoinFloats
-              | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
+    !val_b  | isNilOL val_bs  = nilOL
+            | otherwise       = unitOL (Rec (flattenBinds (fromOL val_bs)))
+    !join_b | isNilOL join_bs = nilOL
+            | otherwise       = unitOL (Rec (flattenBinds (fromOL join_bs)))
 
 wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression

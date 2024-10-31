@@ -671,7 +671,7 @@ zonkTopDecls ev_binds binds rules imp_specs fords
      -- Top level is implicitly recursive
   do  { rules' <- zonkRules rules
       ; specs' <- zonkLTcSpecPrags imp_specs
-      ; fords' <- zonkForeignExports fords
+      ; fords' <- zonkForeignDecls fords
       ; ty_env <- zonkEnvIds <$> getZonkEnv
       ; return (ty_env, ev_binds', binds', fords', specs', rules') }
 
@@ -1650,19 +1650,20 @@ zonkPats = traverse zonkPat
 ************************************************************************
 -}
 
-zonkForeignExports :: [LForeignDecl GhcTc]
+zonkForeignDecls :: [LForeignDecl GhcTc]
                    -> ZonkTcM [LForeignDecl GhcTc]
-zonkForeignExports ls = mapM (wrapLocZonkMA zonkForeignExport) ls
+zonkForeignDecls ls = mapM (wrapLocZonkMA zonkForeignDecl) ls
 
-zonkForeignExport :: ForeignDecl GhcTc -> ZonkTcM (ForeignDecl GhcTc)
-zonkForeignExport (ForeignExport { fd_name = i, fd_e_ext = co
-                                 , fd_fe = spec })
-  = do { i' <- zonkLIdOcc i
-       ; return (ForeignExport { fd_name = i'
-                               , fd_sig_ty = undefined, fd_e_ext = co
-                               , fd_fe = spec }) }
-zonkForeignExport for_imp
-  = return for_imp     -- Foreign imports don't need zonking
+zonkForeignDecl :: ForeignDecl GhcTc -> ZonkTcM (ForeignDecl GhcTc)
+-- Zonk foreign decls, even though they are closed, to turn TcTyVars into TyVars
+zonkForeignDecl fd@(ForeignExport { fd_name = i, fd_e_ext = co })
+  = do { i'  <- zonkLIdOcc i
+       ; co' <- zonkCoToCo co
+       ; return (fd { fd_name = i', fd_e_ext = co' }) }
+zonkForeignDecl fd@(ForeignImport { fd_name = i, fd_i_ext = co })
+  = do { i'  <- zonkLIdOcc i
+       ; co' <- zonkCoToCo co
+       ; return (fd { fd_name = i', fd_i_ext = co' }) }
 
 zonkRules :: [LRuleDecl GhcTc] -> ZonkTcM [LRuleDecl GhcTc]
 zonkRules rs = mapM (wrapLocZonkMA zonkRule) rs

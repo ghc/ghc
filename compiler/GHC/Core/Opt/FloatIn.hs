@@ -433,11 +433,19 @@ idFreeVars.
 -}
 
 fiExpr platform to_drop (_,AnnLet bind body)
+  | Just bind' <- is_tyco_bind bind -- See Note [Don't float in type or coercion lets]
+  = Let bind' (fiExpr platform to_drop body)
+  | otherwise
   = fiExpr platform (after ++ new_float : before) body
            -- to_drop is in reverse dependency order
   where
     (before, new_float, after) = fiBind platform to_drop bind body_fvs
-    body_fvs    = freeVarsOf body
+    body_fvs                   = freeVarsOf body
+
+    is_tyco_bind :: CoreBindWithFVs -> Maybe CoreBind
+    is_tyco_bind (AnnNonRec bndr (_, AnnType     ty)) = Just (NonRec bndr (Type ty))
+    is_tyco_bind (AnnNonRec bndr (_, AnnCoercion co)) = Just (NonRec bndr (Coercion co))
+    is_tyco_bind _ = Nothing
 
 {- Note [Floating primops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -568,8 +576,7 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
     scrut_fvs = freeVarsOf scrut
 
     -- all_alt_bndrs: see Note [Shadowing and name capture]
-    -- dVarTypeTyCoVars: see Note [Floating type-lets inwards]
-    case_bndr_bndrs = dVarTypeTyCoVars case_bndr `extendDVarSet` case_bndr
+    case_bndr_bndrs = unitDVarSet case_bndr
     all_alt_bndrs   = foldr (unionDVarSet . ann_alt_bndrs) case_bndr_bndrs alts
 
     ann_alt_bndrs (AnnAlt _ bndrs _) = mkDVarSet bndrs

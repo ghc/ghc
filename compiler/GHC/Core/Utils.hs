@@ -54,8 +54,7 @@ module GHC.Core.Utils (
         collectMakeStaticArgs,
 
         -- * Predicates on binds
-        isJoinBind,
-        isTypeBind,
+        isJoinBind, isTypeBind, isTyCoBind,
 
         -- * Tag inference
         mkStrictFieldSeqs, shouldStrictifyIdForCbv, shouldUseCbvForId,
@@ -2662,6 +2661,17 @@ locBind loc b1 b2 diffs = map addLoc diffs
                 | otherwise = ppr b1 <> char '/' <> ppr b2
 
 
+dumpIdInfoOfProgram :: Bool -> (IdInfo -> SDoc) -> CoreProgram -> SDoc
+dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)
+  where
+  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
+  getIds (NonRec i _) = [ i ]
+  getIds (Rec bs)     = map fst bs
+  -- By default only include full info for exported ids, unless we run in the verbose
+  -- pprDebug mode.
+  printId id | isExportedId id || dump_locals = ppr id <> colon <+> (ppr_id_info (idInfo id))
+             | otherwise       = empty
+
 {- *********************************************************************
 *                                                                      *
 \subsection{Determining non-updatable right-hand-sides}
@@ -2755,32 +2765,26 @@ collectMakeStaticArgs _          = Nothing
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Predicates on binds}
+                  Predicates on binds
 *                                                                      *
 ************************************************************************
 -}
+
+-- | `isTypeBind` is True of type bindings (@a = Type ty)
+isTypeBind :: Bind b -> Bool
+isTypeBind (NonRec _ (Type {})) = True
+isTypeBind _                    = False
+
+-- | `isTypeBind` is True of type bindings (@a = Type ty)
+isTyCoBind :: Bind b -> Bool
+isTyCoBind (NonRec _ (Type     {})) = True
+isTyCoBind (NonRec _ (Coercion {})) = True
+isTyCoBind _                        = False
 
 isJoinBind :: CoreBind -> Bool
 isJoinBind (NonRec b _)       = isJoinId b
 isJoinBind (Rec ((b, _) : _)) = isJoinId b
 isJoinBind _                  = False
-
--- | Does this binding bind a type?
-isTypeBind :: CoreBind -> Bool
--- See Note [Type and coercion lets] in GHC.Core
-isTypeBind (NonRec b (Type _)) = isTyVar b
-isTypeBind _                   = False
-
-dumpIdInfoOfProgram :: Bool -> (IdInfo -> SDoc) -> CoreProgram -> SDoc
-dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)
-  where
-  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
-  getIds (NonRec i _) = [ i ]
-  getIds (Rec bs)     = map fst bs
-  -- By default only include full info for exported ids, unless we run in the verbose
-  -- pprDebug mode.
-  printId id | isExportedId id || dump_locals = ppr id <> colon <+> (ppr_id_info (idInfo id))
-             | otherwise       = empty
 
 {-
 ************************************************************************
