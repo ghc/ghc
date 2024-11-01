@@ -2241,6 +2241,20 @@ decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
   | Lifted   <- lev       = (LetBound, TopLvlFloatable)
       -- And these float freely but can't be speculated, hence LetBound
 
+instance Outputable FloatInfoArgs where
+  ppr FIA{ fia_levity=lev, fia_demand=dmd, fia_is_hnf=hnf, fia_is_triv=triv
+         , fia_is_string=string, fia_is_dc_worker=dcw, fia_ok_for_spec=ok_spec }
+    = brackets (pprWithCommas id traits)
+    where
+      traits = concat $
+        [ [ text "string" | string ]
+        , [ text "DataCon worker binding" | dcw ]
+        , [ text "trivial" | triv ]
+        , [ text "unlifted" | Unlifted <- pure lev ]
+        , [ text "strict" | isStrUsedDmd dmd ]
+        , [ if hnf then text "hnf" else if ok_spec then text "ok-for-spec" else empty ]
+        ]
+
 mkCaseFloat :: Id -> CpeRhs -> FloatingBind
 mkCaseFloat bndr scrut
   = -- pprTrace "mkCaseFloat" (ppr bndr <+> ppr (bound,info)
@@ -2262,13 +2276,12 @@ mkCaseFloat bndr scrut
 mkNonRecFloat :: CorePrepEnv -> Levity -> Id -> CpeRhs -> (FloatingBind, Id)
 mkNonRecFloat env lev bndr rhs
   = -- pprTrace "mkNonRecFloat" (ppr bndr <+> ppr (bound,info)
-    --                             <+> if is_strict then text "strict" else if is_lifted then text "lazy" else text "unlifted"
-    --                             <+> if ok_for_spec then text "ok-for-spec" else empty
-    --                             <+> if evald then text "evald" else empty
+    --                           $$ ppr float_info_args
     --                           $$ ppr rhs) $
     (Float (NonRec bndr' rhs) bound info, bndr')
   where
-    !(bound, info) = decideFloatInfo $ (defFloatInfoArgs bndr rhs)
+    !(bound, info) = decideFloatInfo float_info_args
+    float_info_args = (defFloatInfoArgs bndr rhs)
       { fia_levity = lev
       , fia_is_hnf = is_hnf
       , fia_ok_for_spec = ok_for_spec
