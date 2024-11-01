@@ -112,6 +112,8 @@
 
 #define bci_PRIMCALL                    87
 
+#define bci_BCO_NAME                    88
+
 /* If you need to go past 255 then you will run into the flags */
 
 /* If you need to go below 0x0100 then you will run into the instructions */

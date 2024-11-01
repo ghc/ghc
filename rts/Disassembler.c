@@ -452,6 +452,13 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("RETURN_T\n ");
          break;
 
+      case bci_BCO_NAME: {
+         const char *name = (const char*) literals[instrs[pc]];
+         debugBelch("BCO_NAME    \"%s\"\n ", name);
+         pc += 1;
+         break;
+      }
+
       default:
          barf("disInstr: unknown opcode %u", (unsigned int) instr);
    }
@@ -464,10 +471,9 @@ void disassemble( StgBCO *bco )
    StgWord16*     instrs  = (StgWord16*)(bco->instrs->payload);
    StgMutArrPtrs* ptrs    = bco->ptrs;
    uint32_t       nbcs    = (uint32_t)(bco->instrs->bytes / sizeof(StgWord16));
-   uint32_t       pc      = 1;
+   uint32_t       pc      = 0;
 
    debugBelch("BCO\n" );
-   pc = 0;
    while (pc < nbcs) {
       debugBelch("\t%2d:  ", pc );
       pc = disInstr ( bco, pc );
