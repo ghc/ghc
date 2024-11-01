@@ -465,10 +465,10 @@ lvlCase :: LevelEnv             -- Level of in-scope names/tyvars
 lvlCase env scrut_fvs scrut' case_bndr ty alts
   -- See Note [Floating single-alternative cases]
   | [AnnAlt con@(DataAlt {}) bs body] <- alts
-  , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for exprIsHNF]
-  , not (isTopLvl dest_lvl)       -- Can't have top-level cases
-  , not (floatTopLvlOnly env)     -- Can float anywhere
-  , ManyTy <- idMult case_bndr     -- See Note [Floating linear case]
+  , exprOkForSpeculation (deTagExpr scrut')  -- See Note [Check the output scrutinee for exprOkForSpeculation]
+  , not (isTopLvl dest_lvl)                  -- Can't have top-level cases
+  , not (floatTopLvlOnly env)                -- Can float anywhere
+  , ManyTy <- idMult case_bndr               -- See Note [Floating linear case]
   =     -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
     do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
@@ -517,17 +517,8 @@ the inner loop.
 
 Things to note:
 
- * The test we perform is exprIsHNF, and /not/ exprOkForSpeculation.
-
-     - exprIsHNF catches the key case of an evaluated variable
-
-     - exprOkForSpeculation is /false/ of an evaluated variable;
-       See Note [exprOkForSpeculation and evaluated variables] in GHC.Core.Utils
-       So we'd actually miss the key case!
-
-     - Nothing is gained from the extra generality of exprOkForSpeculation
-       since we only consider floating a case whose single alternative
-       is a DataAlt   K a b -> rhs
+ * The test we perform is exprOkForSpeculation, because speculating the case is
+   exactly what we do.
 
  * We can't float a case to top level
 
@@ -577,8 +568,8 @@ needed to quantify over some of its free variables (e.g. z), resulting
 in shadowing and very confusing Core Lint failures.
 
 
-Note [Check the output scrutinee for exprIsHNF]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Check the output scrutinee for exprOkForSpeculation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this:
   case x of y {
     A -> ....(case y of alts)....
@@ -592,10 +583,10 @@ evaluated), but the former is not -- and indeed we can't float the
 inner case out, at least not unless x is also evaluated at its binding
 site.  See #5453.
 
-That's why we apply exprIsHNF to scrut' and not to scrut.
+That's why we apply exprOkForSpeculation to scrut' and not to scrut.
 
 See Note [Floating single-alternative cases] for why
-we use exprIsHNF in the first place.
+we use exprOkForSpeculation in the first place.
 -}
 
 lvlNonTailMFE :: LevelEnv             -- Level of in-scope names/tyvars
@@ -723,16 +714,16 @@ lvlMFE env strict_ctxt ann_expr
     float_me = saves_work || saves_alloc || is_mk_static
 
     -- See Note [Saving work]
-    saves_work = escapes_value_lam        -- (a)
-                 && not (exprIsHNF expr)  -- (b)
-                 && not float_is_new_lam  -- (c)
+    saves_work = escapes_value_lam                   -- (a)
+                 && not (exprOkForSpeculation expr)  -- (b)
+                 && not float_is_new_lam             -- (c)
     escapes_value_lam = dest_lvl `ltMajLvl` (le_ctxt_lvl env)
 
     -- See Note [Saving allocation] and Note [Floating to the top]
     saves_alloc =  isTopLvl dest_lvl
                 && floatConsts env
                 && (   not strict_ctxt                     -- (a)
-                    || exprIsHNF expr                      -- (b)
+                    || exprOkForSpeculation expr           -- (b)
                     || (is_bot_lam && escapes_value_lam))  -- (c)
 
 hasFreeJoin :: LevelEnv -> DVarSet -> Bool
@@ -752,14 +743,14 @@ But see also Note [Saving allocation].
 
 So we definitely float an expression out if
 (a) It will escape a value lambda (escapes_value_lam)
-(b) The expression is not a head-normal form (exprIsHNF); see (SW1, SW2).
+(b) The expression is not a head-normal form (exprOkForSpeculation); see (SW1, SW2).
 (c) Floating does not require wrapping it in value lambdas (float_is_new_lam).
     See (SW3) below
 
 Wrinkles:
 
 (SW1) Concerning (b) I experimented with using `exprIsCheap` rather than
-      `exprIsHNF` but the latter seems better, according to nofib
+      `exprOkForSpeculation` but the latter seems better, according to nofib
       (`spectral/mate` got 10% worse with exprIsCheap).  It's really a bit of a
       heuristic.
 
@@ -777,7 +768,7 @@ Wrinkles:
       See !12410 for some data comparing the effect of omitting (b) altogether,
       This doesn't apply, though, if we float the thing to the top level; see
       Note [Floating to the top].  Bottom line (data from !12410): adding the
-      not.exprIsHNF test to `saves_work`:
+      not.exprOkForSpeculation test to `saves_work`:
        - Decreases compiler allocations by 0.5%
        - Occasionally decreases runtime allocation (T12996 -2.5%)
        - Slightly mixed effect on nofib: (puzzle -10%, mate -5%, cichelli +5%)
