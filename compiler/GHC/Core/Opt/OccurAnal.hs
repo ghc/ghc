@@ -354,10 +354,11 @@ through RULES.  It only happens for rules whose head is an imported
 function (B.f in the example above).
 
 Solution:
-  - When simplifying, bring all top level identifiers into
-    scope at the start, ignoring the Rec/NonRec structure, so
-    that when 'h' pops up in f's rhs, we find it in the in-scope set
-    (as the simplifier generally expects). This happens in simplTopBinds.
+
+  - When simplifying, bring all top level identifiers into scope at the start,
+    ignoring the Rec/NonRec structure, so that when '$sf' pops up in foo's rhs
+    (during simplification, when applying the RULE), we find it in the in-scope
+    set (as the simplifier generally expects). This happens in simplTopBinds.
 
   - In the occurrence analyser, if there are any out-of-scope
     occurrences that pop out of the top, which will happen after
