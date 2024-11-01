@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -62,11 +61,7 @@
 
 module GHC.Data.Word64Map.Lazy (
     -- * Map type
-#if !defined(TESTING)
     Word64Map, Key          -- instance Eq,Show
-#else
-    Word64Map(..), Key          -- instance Eq,Show
-#endif
 
     -- * Construction
     , empty

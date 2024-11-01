@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 
 -- | Ways
 --
@@ -220,8 +219,6 @@ hostIsDynamic = rtsIsDynamic_ /= 0
 
 foreign import ccall unsafe "rts_isDynamic" rtsIsDynamic_ :: Int
 
--- we need this until the bootstrap GHC is always recent enough
-#if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
 
 -- | Consult the RTS to find whether it is threaded.
 hostIsThreaded :: Bool
@@ -242,18 +239,6 @@ hostIsTracing = rtsIsTracing_ /= 0
 foreign import ccall unsafe "rts_isTracing" rtsIsTracing_ :: Int
 
 
-#else
-
-hostIsThreaded :: Bool
-hostIsThreaded = False
-
-hostIsDebugged :: Bool
-hostIsDebugged = False
-
-hostIsTracing :: Bool
-hostIsTracing = False
-
-#endif
 
 
 -- | Host ways.

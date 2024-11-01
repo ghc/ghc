@@ -16,15 +16,9 @@ import GHC.Exts ( Int(..), Int#, Ptr(..), Word(..)
 import GHC.Word (Word8(..), Word64(..))
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
-#if MIN_VERSION_ghc_prim(0,8,0)
 import GHC.Exts (word8ToWord#)
-#endif
 
-#if __GLASGOW_HASKELL__ >= 904
 import GHC.Exts (byteSwap64#, int64ToInt#, word64ToInt64#, ltWord64#, wordToWord64#)
-#else
-import GHC.Exts (byteSwap#, ltWord#, word2Int#)
-#endif
 
 go_fast_end :: ByteString -> DecodeAction s a -> ST s (SlowPath s a)
 go_fast_end !bs (ConsumeInt32 k) =
@@ -55,17 +49,10 @@ eatTailWord64 xs = withBsPtr grabWord64 (BS.unsafeTail xs)
 {-# INLINE eatTailWord64 #-}
 
 word64ToInt :: Word64 -> Maybe Int
-#if __GLASGOW_HASKELL__ >= 904
 word64ToInt (W64# w#) =
   case isTrue# (w# `ltWord64#` wordToWord64# 0x80000000##) of
     True  -> Just (I# (int64ToInt# (word64ToInt64# w#)))
     False -> Nothing
-#else
-word64ToInt (W64# w#) =
-  case isTrue# (w# `ltWord#` 0x8000000000000000##) of
-    True  -> Just (I# (word2Int# w#))
-    False -> Nothing
-#endif
 {-# INLINE word64ToInt #-}
 
 withBsPtr :: (Ptr b -> a) -> ByteString -> a
@@ -75,17 +62,9 @@ withBsPtr f (BS.PS x off _) =
 {-# INLINE withBsPtr #-}
 
 grabWord64 :: Ptr () -> Word64
-#if __GLASGOW_HASKELL__ >= 904
 grabWord64 (Ptr ip#) = W64# (byteSwap64# (indexWord64OffAddr# ip# 0#))
-#else
-grabWord64 (Ptr ip#) = W64# (byteSwap# (indexWord64OffAddr# ip# 0#))
-#endif
 {-# INLINE grabWord64 #-}
 
 word8ToWord :: Word8 -> Word
-#if MIN_VERSION_ghc_prim(0,8,0)
 word8ToWord (W8# w#) = W# (word8ToWord# w#)
-#else
-word8ToWord (W8# w#) = W# w#
-#endif
 {-# INLINE word8ToWord #-}

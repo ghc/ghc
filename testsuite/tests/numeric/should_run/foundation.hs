@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -27,8 +26,6 @@ import Foreign.Ptr
 import Data.List (intercalate)
 import Data.IORef
 import Unsafe.Coerce
-
-#include "MachDeps.h"
 
 newtype Gen a = Gen { runGen :: (ReaderT LCGGen IO a) }
   deriving newtype (Functor, Applicative, Monad)
@@ -130,27 +127,11 @@ instance Arbitrary Int8 where
     arbitrary = integralDownsize <$> arbitraryInt64
 
 int64ToInt :: Int64 -> Int
-#if WORD_SIZE_IN_BITS == 64
-#if __GLASGOW_HASKELL__ >= 904
 int64ToInt (I64# i) = I# (int64ToInt# i)
-#else
-int64ToInt (I64# i) = I# i
-#endif
-#else
-int64ToInt (I64# i) = I# (int64ToInt# i)
-#endif
 
 
 word64ToWord :: Word64 -> Word
-#if WORD_SIZE_IN_BITS == 64
-#if __GLASGOW_HASKELL__ >= 904
-word64ToWord (W64# i) = W# (GHC.Prim.word64ToWord# i)
-#else
-word64ToWord (W64# i) = W# i
-#endif
-#else
 word64ToWord (W64# i) = W# (word64ToWord# i)
-#endif
 
 
 data RunS = RunS { depth :: Int, rg :: LCGGen  }
@@ -294,4 +275,3 @@ testNumberRefs = Group "ALL"
 
 
 main = runTests testNumberRefs
-

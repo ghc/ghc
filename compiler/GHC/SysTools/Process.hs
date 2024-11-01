@@ -36,20 +36,8 @@ import System.Process
 -- | Enable process jobs support on Windows if it can be expected to work (e.g.
 -- @process >= 1.6.9.0@).
 enableProcessJobs :: CreateProcess -> CreateProcess
-#if defined(MIN_VERSION_process)
 enableProcessJobs opts = opts { use_process_jobs = True }
-#else
-enableProcessJobs opts = opts
-#endif
 
-#if !MIN_VERSION_base(4,15,0)
--- TODO: This can be dropped with GHC 8.16
-hGetContents' :: Handle -> IO String
-hGetContents' hdl = do
-  output  <- hGetContents hdl
-  _ <- evaluate $ length output
-  return output
-#endif
 
 -- Similar to System.Process.readCreateProcessWithExitCode, but stderr is
 -- inherited from the parent process, and output to stderr is not captured.

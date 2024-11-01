@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
@@ -40,11 +39,6 @@ import qualified Data.ByteString as BS
 import GHC.Exts
 import GHC.Word
 
-#if !MIN_VERSION_base(4,16,0)
-word8ToWord# :: Word# -> Word#
-word8ToWord# w = w
-{-# INLINE word8ToWord# #-}
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Converting floating-point literals to integrals for printing

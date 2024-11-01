@@ -21,14 +21,8 @@ touch file = do
     setFileTime hdl Nothing Nothing (Just t)
     closeHandle hdl
 #else
-#if MIN_VERSION_unix(2,8,0)
   let oflags = defaultFileFlags { noctty = True, creat = Just 0o666 }
   fd <- openFd file WriteOnly oflags
-#else
-  let oflags = defaultFileFlags { noctty = True }
-  fd <- openFd file WriteOnly (Just 0o666) oflags
-#endif
   touchFd fd
   closeFd fd
 #endif
-

@@ -2,9 +2,6 @@
 
 #include "MachDeps.h"
 
-#if __GLASGOW_HASKELL__ < 709
-import GHC.Types
-#endif
 
 import StrictPrim
 import Type

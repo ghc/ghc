@@ -62,19 +62,11 @@ import Control.Applicative (Applicative(..))
 import Data.Foldable as X (Foldable(elem, foldMap, foldr, foldl, foldl', foldr1, foldl1, maximum, minimum, product, sum, null, length))
 import GHC.Stack.Types (HasCallStack)
 
-#if MIN_VERSION_base(4,16,0)
 import GHC.Bits as Bits hiding (bit, shiftL, shiftR, setBit, clearBit)
 # if defined(DEBUG)
 import qualified GHC.Bits as Bits (shiftL, shiftR)
 # endif
 
-#else
---base <4.15
-import Data.Bits as Bits hiding (bit, shiftL, shiftR, setBit, clearBit)
-# if defined(DEBUG)
-import qualified Data.Bits as Bits (shiftL, shiftR)
-# endif
-#endif
 
 {- Note [Default to unsafe shifts inside GHC]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

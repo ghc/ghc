@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, GeneralizedNewtypeDeriving, DerivingStrategies, CPP #-}
+{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, GeneralizedNewtypeDeriving, DerivingStrategies #-}
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- gross hack: we maneuvered ourselves into a position where we can't boot GHC with a LLVM based GHC anymore.
 -- LLVM based GHC's fail to compile memcmp ffi calls.  These end up as memcmp$def in the llvm ir, however we
@@ -11,12 +11,6 @@
 -- bootstrap compiler.  This will produce a slower (slightly less optimised) stage1 compiler only.
 --
 -- See issue 18857. hsyl20 deserves credit for coming up with the idea for the solution.
---
--- This can be removed when we exit the boot compiler window. Thus once we drop GHC-9.2 as boot compiler,
--- we can drop this code as well.
-#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
-{-# OPTIONS_GHC -fignore-interface-pragmas #-}
-#endif
 -- |
 -- An Unicode string for internal GHC use. Meant to replace String
 -- in places where being a lazy linked is not very useful and a more

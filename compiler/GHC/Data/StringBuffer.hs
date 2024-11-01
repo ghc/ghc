@@ -6,7 +6,6 @@
 Buffers for scanning string input stored in external arrays.
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE LambdaCase #-}
@@ -77,12 +76,7 @@ import Data.ByteString ( ByteString )
 import GHC.Exts
 
 import Foreign
-#if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr (unsafeWithForeignPtr)
-#else
-unsafeWithForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
-unsafeWithForeignPtr = withForeignPtr
-#endif
 
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type

@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
 -----------------------------------------------------------------------------
 -- |
@@ -24,11 +23,7 @@ import qualified Distribution.ModuleName                       as C
 import qualified Distribution.Package                          as C
 import qualified Distribution.PackageDescription               as C
 import qualified Distribution.PackageDescription.Configuration as C
-#if MIN_VERSION_Cabal(3,8,0)
 import qualified Distribution.Simple.PackageDescription        as C
-#else
-import qualified Distribution.PackageDescription.Parsec        as C
-#endif
 import qualified Distribution.Simple.Compiler                  as C
 import qualified Distribution.Simple.Program.Db                as C
 import qualified Distribution.Simple                           as C
@@ -45,16 +40,8 @@ import qualified Distribution.InstalledPackageInfo             as Installed
 import qualified Distribution.Simple.PackageIndex              as C
 import qualified Distribution.Text                             as C
 import qualified Distribution.Types.MungedPackageId            as C
-#if MIN_VERSION_Cabal(3,5,0)
 import qualified Distribution.Utils.Path                       as C
-#endif
 import qualified Distribution.Utils.ShortText                  as C
-#if !MIN_VERSION_Cabal(3,4,0)
-import qualified Distribution.Types.CondTree                   as C
-#endif
-#if !MIN_VERSION_Cabal(3,5,0)
-import qualified Distribution.Types.ModuleReexport             as C
-#endif
 import qualified Distribution.Verbosity                        as C
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
@@ -319,9 +306,7 @@ resolveContextData context@Context {..} = do
           , otherModules    = map C.display $ C.otherModules buildInfo
           , reexportModules = map C.display (concat rexport_modules)
           , srcDirs         =
-#if MIN_VERSION_Cabal(3,5,0)
                               map C.getSymbolicPath
-#endif
                                   (C.hsSourceDirs buildInfo)
           , depIds          = depIds
           , depNames        = map (C.display . C.mungedName . snd) extDeps
@@ -376,9 +361,7 @@ write_inplace_conf pkg_path res_path pd lbi = do
                   final_ipi = installedPkgInfo {
                                  Installed.includeDirs = concatMap fixupIncludeDir (Installed.includeDirs installedPkgInfo),
                                  Installed.libraryDirs = build_dir: (concatMap fixupIncludeDir (Installed.libraryDirs installedPkgInfo)) ,
-#if MIN_VERSION_Cabal(3,8,0)
                                  Installed.libraryDirsStatic = build_dir: (concatMap fixupIncludeDir (Installed.libraryDirsStatic installedPkgInfo)) ,
-#endif
                                  Installed.libraryDynDirs = build_dir : (concatMap fixupIncludeDir (Installed.libraryDynDirs installedPkgInfo)) ,
                                  Installed.dataDir = "${pkgroot}/../../../../" ++ pkg_path,
                                  Installed.haddockHTMLs = [build_dir ++ "/doc/html/" ++ C.display (CP.sourcePackageId installedPkgInfo)],
@@ -487,4 +470,3 @@ externalPackageDeps lbi =
     -- True if this dependency is an internal one (depends on the library
     -- defined in the same package).
     internal ipkgid = any ((==ipkgid) . C.componentUnitId) (Graph.toList (C.componentGraph lbi))
-

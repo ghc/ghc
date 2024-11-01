@@ -12,6 +12,3 @@
 #if !MIN_VERSION_GLASGOW_HASKELL(9,9,0,0)
 HsWord64 ghc_unique_counter64 = 0;
 #endif
-#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
-HsInt ghc_unique_inc     = 1;
-#endif

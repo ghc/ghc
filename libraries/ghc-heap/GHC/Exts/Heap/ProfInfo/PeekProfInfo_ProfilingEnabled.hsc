@@ -6,7 +6,6 @@ module GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled(
     , peekTopCCS
 ) where
 
-#if __GLASGOW_HASKELL__ >= 811
 
 -- See [hsc and CPP workaround]
 
@@ -158,16 +157,3 @@ peekIndexTable loopBreakers costCenterCacheRef ptr = do
 -- | casts a @Ptr@ to an @Int@
 ptrToInt :: Ptr a -> Int
 ptrToInt (Ptr a##) = I## (addr2Int## a##)
-
-#else
-import Prelude
-import Foreign
-
-import GHC.Exts.Heap.ProfInfo.Types
-
-peekStgTSOProfInfo :: (Ptr b -> IO (Maybe CostCentreStack)) -> Ptr a -> IO (Maybe StgTSOProfInfo)
-peekStgTSOProfInfo _ _ = return Nothing
-
-peekTopCCS :: Ptr a -> IO (Maybe CostCentreStack)
-peekTopCCS _ = return Nothing
-#endif

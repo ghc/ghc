@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, LambdaCase, BangPatterns, MagicHash, TupleSections, ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase, BangPatterns, MagicHash, TupleSections, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -w #-}  -- Suppress warnings for unimplemented methods
 
 ------------- WARNING ---------------------
@@ -22,9 +22,7 @@ module Eval (
 
 import           Control.Applicative
 import           Control.Monad
-#if __GLASGOW_HASKELL__ >= 800
 import           Control.Monad.Fail (MonadFail(fail))
-#endif
 import           Control.Monad.IO.Class (MonadIO (..))
 
 import           Data.Binary
@@ -44,7 +42,7 @@ data THResultType = THExp | THPat | THType | THDec
 
 data Message
   -- | GHCJS compiler to node.js requests
-  = RunTH THResultType ByteString TH.Loc 
+  = RunTH THResultType ByteString TH.Loc
   -- | node.js to GHCJS compiler responses
   | RunTH' THResultType ByteString [TH.Dec] -- ^ serialized AST and additional toplevel declarations
 
@@ -77,10 +75,8 @@ instance Monad GHCJSQ where
        return (a, s'')
   return    = pure
 
-#if __GLASGOW_HASKELL__ >= 800
 instance MonadFail GHCJSQ where
   fail = undefined
-#endif
 
 instance MonadIO GHCJSQ where liftIO m = GHCJSQ $ \s -> fmap (,s) m
 instance TH.Quasi GHCJSQ
@@ -99,7 +95,7 @@ runTH :: THResultType -> Any -> TH.Loc -> GHCJSQ ()
 runTH rt obj loc = do
   res <- case rt of
            THExp  -> runTHCode (unsafeCoerce obj :: TH.Q TH.Exp)
-           THPat  -> runTHCode (unsafeCoerce obj :: TH.Q TH.Pat) 
+           THPat  -> runTHCode (unsafeCoerce obj :: TH.Q TH.Pat)
            THType -> runTHCode (unsafeCoerce obj :: TH.Q TH.Type)
            THDec  -> runTHCode (unsafeCoerce obj :: TH.Q [TH.Dec])
   TH.qRunIO (sendResult $ RunTH' rt res [])
@@ -108,7 +104,7 @@ runTHCode :: {- Binary a => -} TH.Q a -> GHCJSQ ByteString
 runTHCode c = TH.runQ c >> return B.empty
 
 loadTHData :: ByteString -> IO Any
-loadTHData bs = return (unsafeCoerce ()) 
+loadTHData bs = return (unsafeCoerce ())
 
 awaitMessage :: IO Message
 awaitMessage = fmap (runGet get) (return BL.empty)

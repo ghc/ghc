@@ -89,11 +89,7 @@ where
 -- Required for WORDS_BIGENDIAN
 #include <ghcautoconf.h>
 
-#if (__GLASGOW_HASKELL__ < 811)
-import GHC.Magic
-#else
 import GHC.Prim.Exception
-#endif
 
 import GHC.Prim
 import GHC.Types
@@ -630,29 +626,6 @@ raiseUnderflow_Word# :: (# #) -> Word#
 raiseUnderflow_Word# _ = case raiseUnderflow of
    !_ -> 0## -- see Note [ghc-bignum exceptions]
 
-#if (__GLASGOW_HASKELL__ >= 811)
 
 unexpectedValue :: a
 unexpectedValue = raiseOverflow
-
-#else
-
--- Before GHC 8.11 we use the exception trick taken from #14664
-exception :: a
-{-# NOINLINE exception #-}
-exception = runRW# \s ->
-   case atomicLoop s of
-      (# _, a #) -> a
-   where
-      atomicLoop s = atomically# atomicLoop s
-
-raiseUnderflow :: a
-raiseUnderflow = exception
-
-raiseDivZero :: a
-raiseDivZero = exception
-
-unexpectedValue :: a
-unexpectedValue = exception
-
-#endif

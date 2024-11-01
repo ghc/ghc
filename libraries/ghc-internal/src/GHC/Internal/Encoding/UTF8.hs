@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -O2 -fno-warn-name-shadowing #-}
 
@@ -149,11 +148,7 @@ utf8DecodeChar# indexWord8# =
 -- | Decode a single character at the given 'Addr#'.
 utf8DecodeCharAddr# :: Addr# -> Int# -> (# Char#, Int# #)
 utf8DecodeCharAddr# a# off# =
-#if !MIN_VERSION_ghc_prim(0,10,0)
-    utf8DecodeChar# (\i# -> indexWord8OffAddr# a# (i# +# off#))
-#else
     utf8DecodeChar# (\i# -> word8ToWord# (indexWord8OffAddr# a# (i# +# off#)))
-#endif
 
 -- | Decode a single codepoint starting at the given 'Ptr'.
 utf8DecodeCharPtr :: Ptr Word8 -> (Char, Int)
@@ -165,11 +160,7 @@ utf8DecodeCharPtr !(Ptr a#) =
 -- 'ByteArray#'.
 utf8DecodeCharByteArray# :: ByteArray# -> Int# -> (# Char#, Int# #)
 utf8DecodeCharByteArray# ba# off# =
-#if !MIN_VERSION_ghc_prim(0,10,0)
-    utf8DecodeChar# (\i# -> indexWord8Array# ba# (i# +# off#))
-#else
     utf8DecodeChar# (\i# -> word8ToWord# (indexWord8Array# ba# (i# +# off#)))
-#endif
 
 {-# INLINE utf8Decode# #-}
 utf8Decode# :: (IO ()) -> (Int# -> (# Char#, Int# #)) -> Int# -> IO [Char]
@@ -216,29 +207,16 @@ utf8CompareByteArray# a1 a2 = go 0# 0#
          | isTrue# (off1 >=# sz1)                          = LT
          | isTrue# (off2 >=# sz2)                          = GT
          | otherwise =
-#if !MIN_VERSION_ghc_prim(0,10,0)
-               let !b1_1 = indexWord8Array# a1 off1
-                   !b2_1 = indexWord8Array# a2 off2
-#else
                let !b1_1 = word8ToWord# (indexWord8Array# a1 off1)
                    !b2_1 = word8ToWord# (indexWord8Array# a2 off2)
-#endif
                in case b1_1 of
                   0xC0## -> case b2_1 of
                      0xC0## -> go (off1 +# 1#) (off2 +# 1#)
-#if !MIN_VERSION_ghc_prim(0,10,0)
-                     _      -> case indexWord8Array# a1 (off1 +# 1#) of
-#else
                      _      -> case word8ToWord# (indexWord8Array# a1 (off1 +# 1#)) of
-#endif
                         0x80## -> LT
                         _      -> go (off1 +# 1#) (off2 +# 1#)
                   _      -> case b2_1 of
-#if !MIN_VERSION_ghc_prim(0,10,0)
-                     0xC0## -> case indexWord8Array# a2 (off2 +# 1#) of
-#else
                      0xC0## -> case word8ToWord# (indexWord8Array# a2 (off2 +# 1#)) of
-#endif
                         0x80## -> GT
                         _      -> go (off1 +# 1#) (off2 +# 1#)
                      _   | isTrue# (b1_1 `gtWord#` b2_1) -> GT
@@ -284,23 +262,14 @@ utf8EncodeChar write# c =
   where
     {-# INLINE write #-}
     write (I# off#) (W# c#) = ST $ \s ->
-#if !MIN_VERSION_ghc_prim(0,10,0)
-      case write# off# (narrowWord8# c#) s of
-#else
       case write# off# (wordToWord8# c#) s of
-#endif
         s -> (# s, () #)
 
 utf8EncodePtr :: Ptr Word8 -> String -> IO ()
 utf8EncodePtr (Ptr a#) str = go a# str
   where go !_   []   = return ()
         go a# (c:cs) = do
-#if !MIN_VERSION_ghc_prim(0,10,0)
-          -- writeWord8OffAddr# was taking a Word#
-          I# off# <- stToIO $ utf8EncodeChar (\i w -> writeWord8OffAddr# a# i (extendWord8# w)) c
-#else
           I# off# <- stToIO $ utf8EncodeChar (writeWord8OffAddr# a#) c
-#endif
           go (a# `plusAddr#` off#) cs
 
 utf8EncodeByteArray# :: String -> ByteArray#
@@ -314,12 +283,7 @@ utf8EncodeByteArray# str = runRW# $ \s ->
   where
     go _ _ [] = return ()
     go mba# i# (c:cs) = do
-#if !MIN_VERSION_ghc_prim(0,10,0)
-      -- writeWord8Array# was taking a Word#
-      I# off# <- utf8EncodeChar (\j# w -> writeWord8Array# mba# (i# +# j#) (extendWord8# w)) c
-#else
       I# off# <- utf8EncodeChar (\j# -> writeWord8Array# mba# (i# +# j#)) c
-#endif
       go mba# (i# +# off#) cs
 
 utf8EncodedLength :: String -> Int
