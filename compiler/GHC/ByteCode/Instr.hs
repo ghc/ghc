@@ -130,7 +130,18 @@ data BCInstr
    | PUSH_APPLY_PPPPP
    | PUSH_APPLY_PPPPPP
 
-   | SLIDE     !WordOff{-this many-} !WordOff{-down by this much-}
+   -- | Drop entries @(n, n+by]@ entries from the stack. Graphically:
+   -- @
+   -- a_1  ← top
+   -- ...
+   -- a_n
+   -- b_1              =>    a_1  ← top
+   -- ...                    ...
+   -- b_by                   a_n
+   -- k                      k
+   -- @
+   | SLIDE     !WordOff -- ^ n = this many
+               !WordOff -- ^ by = down by this much
 
    -- To do with the heap
    | ALLOC_AP  !HalfWord {- make an AP with this many payload words.
