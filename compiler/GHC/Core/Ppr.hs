@@ -191,7 +191,7 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
-ppr_expr add_par (Var id)      = ppr_id_occ add_par id
+ppr_expr add_par (Var id)      = ppr_id_occ add_par id <> braces (text $ case (maybeUnfoldingTemplate (idUnfolding id)) of { Just{} -> "has-unf" ; Nothing -> "no-unf" })
 ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
 ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
@@ -234,7 +234,7 @@ ppr_expr add_par expr@(App {})
 
                    _ -> parens (hang fun_doc 2 pp_args)
                    where
-                     fun_doc = ppr_id_occ noParens f
+                     fun_doc = ppr_id_occ noParens f <> braces (text $ case (maybeUnfoldingTemplate (idUnfolding f)) of { Just{} -> "has-unf" ; Nothing -> "no-unf" })
 
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
