@@ -2085,6 +2085,10 @@ run_BCO:
             goto do_return_nonpointer;
         }
 
+        case bci_BCO_NAME:
+            bciPtr++;
+            goto nextInsn;
+
         case bci_SWIZZLE: {
             W_ stkoff = BCO_GET_LARGE_ARG;
             StgInt n = BCO_GET_LARGE_ARG;
