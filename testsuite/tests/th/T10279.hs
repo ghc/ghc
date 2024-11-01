@@ -7,4 +7,4 @@ import Language.Haskell.TH.Syntax
 -- error message doesn't recognize it as a source package ID,
 -- (This is OK,  since it will look obviously wrong when they
 -- try to find the package in their package database.)
-blah = $(conE (Name (mkOccName "Foo") (NameG VarName (mkPkgName "rts-1.0.2") (mkModName "A"))))
+blah = $(conE (Name (mkOccName "Foo") (NameG VarName (mkPkgName "rts-1.0.3") (mkModName "A"))))
