@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
@@ -41,7 +40,6 @@ import GHC.Float
   )
 
 
-#include "MachDeps.h"
 
 newtype Gen a = Gen { runGen :: (ReaderT LCGGen IO a) }
   deriving newtype (Functor, Applicative, Monad)
@@ -251,27 +249,11 @@ eval (Min a b) = mini (eval a) (eval b)
 eval (Max a b) = maxi (eval a) (eval b)
 
 int64ToInt :: Int64 -> Int
-#if WORD_SIZE_IN_BITS == 64
-#if __GLASGOW_HASKELL__ >= 904
 int64ToInt (I64# i) = I# (int64ToInt# i)
-#else
-int64ToInt (I64# i) = I# i
-#endif
-#else
-int64ToInt (I64# i) = I# (int64ToInt# i)
-#endif
 
 
 word64ToWord :: Word64 -> Word
-#if WORD_SIZE_IN_BITS == 64
-#if __GLASGOW_HASKELL__ >= 904
-word64ToWord (W64# i) = W# (GHC.Prim.word64ToWord# i)
-#else
-word64ToWord (W64# i) = W# i
-#endif
-#else
 word64ToWord (W64# i) = W# (word64ToWord# i)
-#endif
 
 
 data RunS = RunS { depth :: Int, rg :: LCGGen  }

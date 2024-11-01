@@ -98,9 +98,6 @@ import Data.Kind (Type)
 -- import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO(..))
 
-#if __GLASGOW_HASKELL__ < 808
-import Data.Semigroup (Semigroup(..))
-#endif
 import Prelude hiding (map, mapM, concatMap, Foldable(..))
 
 -- import Streamly.Internal.Data.SVar
@@ -174,13 +171,11 @@ type MonadAsync m = (MonadIO m)
 --
 -- @since 0.8.0
 class
-#if __GLASGOW_HASKELL__ >= 806
     ( forall m a. MonadAsync m => Semigroup (t m a)
     , forall m a. MonadAsync m => Monoid (t m a)
     , forall m. Monad m => Functor (t m)
     , forall m. MonadAsync m => Applicative (t m)
     ) =>
-#endif
       IsStream t where
     toStream :: t m a -> Stream m a
     fromStream :: Stream m a -> t m a

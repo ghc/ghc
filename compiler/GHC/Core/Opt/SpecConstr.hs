@@ -1,7 +1,4 @@
-{-# LANGUAGE CPP, LambdaCase #-}
-#if __GLASGOW_HASKELL__ < 905
-{-# LANGUAGE PatternSynonyms #-}
-#endif
+{-# LANGUAGE LambdaCase #-}
 {-
 ToDo [Oct 2013]
 ~~~~~~~~~~~~~~~
@@ -1042,16 +1039,7 @@ scSubstId :: ScEnv -> InId -> OutExpr
 scSubstId env v = lookupIdSubst (sc_subst env) v
 
 
--- Solo is only defined in base starting from ghc-9.2
-#if !(MIN_VERSION_base(4, 16, 0))
-data Solo a = Solo a
-#endif
 
--- The Solo constructor was renamed to MkSolo in ghc 9.5
-#if __GLASGOW_HASKELL__ < 905
-pattern MkSolo :: a -> Solo a
-pattern MkSolo a = Solo a
-#endif
 
 -- The !subst ensures that we force the selection `(sc_subst env)`, which avoids
 -- retaining all of `env` when we only need `subst`.  The `Solo` means that the

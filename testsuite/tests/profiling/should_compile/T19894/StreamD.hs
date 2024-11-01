@@ -139,9 +139,7 @@ pattern Stream :: (State K.Stream m a -> s -> m (Step s a)) -> s -> Stream m a
 pattern Stream step state <- (unShare -> UnStream step state)
     where Stream = UnStream
 
-#if __GLASGOW_HASKELL__ >= 802
 {-# COMPLETE Stream #-}
-#endif
 
 ------------------------------------------------------------------------------
 -- Primitives
@@ -698,10 +696,8 @@ instance Applicative f => Applicative (Stream f) where
     {-# INLINE (<*>) #-}
     (<*>) = concatAp
 
-#if MIN_VERSION_base(4,10,0)
     {-# INLINE liftA2 #-}
     liftA2 f x = (<*>) (fmap f x)
-#endif
 
     {-# INLINE (*>) #-}
     (*>) = apSequence

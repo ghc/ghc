@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -303,14 +302,12 @@ import qualified GHC.Data.Word64Set.Internal as Word64Set
 import GHC.Utils.Containers.Internal.BitUtil
 import GHC.Utils.Containers.Internal.StrictPair
 
-#ifdef __GLASGOW_HASKELL__
 import Data.Coerce
 import Data.Data (Data(..), Constr, mkConstr, constrIndex, Fixity(Prefix),
                   DataType, mkDataType, gcast1)
 import GHC.Exts (build)
 import qualified GHC.Exts as GHCExts
 import Text.Read
-#endif
 import qualified Control.Category as Category
 import Data.Word
 
@@ -481,7 +478,6 @@ instance NFData a => NFData (Word64Map a) where
     rnf (Tip _ v) = rnf v
     rnf (Bin _ _ l r) = rnf l `seq` rnf r
 
-#if __GLASGOW_HASKELL__
 
 {--------------------------------------------------------------------
   A Data instance
@@ -505,7 +501,6 @@ fromListConstr = mkConstr intMapDataType "fromList" [] Prefix
 intMapDataType :: DataType
 intMapDataType = mkDataType "Data.Word64Map.Internal.Word64Map" [fromListConstr]
 
-#endif
 
 {--------------------------------------------------------------------
   Query
@@ -2394,13 +2389,11 @@ map f = go
     go (Tip k x)     = Tip k (f x)
     go Nil           = Nil
 
-#ifdef __GLASGOW_HASKELL__
 {-# NOINLINE [1] map #-}
 {-# RULES
 "map/map" forall f g xs . map f (map g xs) = map (f . g) xs
 "map/coerce" map coerce = coerce
  #-}
-#endif
 
 -- | \(O(n)\). Map a function over all values in the map.
 --
@@ -2414,7 +2407,6 @@ mapWithKey f t
       Tip k x     -> Tip k (f k x)
       Nil         -> Nil
 
-#ifdef __GLASGOW_HASKELL__
 {-# NOINLINE [1] mapWithKey #-}
 {-# RULES
 "mapWithKey/mapWithKey" forall f g xs . mapWithKey f (mapWithKey g xs) =
@@ -2424,7 +2416,6 @@ mapWithKey f t
 "map/mapWithKey" forall f g xs . map f (mapWithKey g xs) =
   mapWithKey (\k a -> f (g k a)) xs
  #-}
-#endif
 
 -- | \(O(n)\).
 -- @'traverseWithKey' f s == 'fromList' <$> 'traverse' (\(k, v) -> (,) k <$> f k v) ('toList' m)@
@@ -3093,13 +3084,11 @@ fromSet f (Word64Set.Tip kx bm) = buildTree f kx bm (Word64Set.suffixBitMask + 1
   Lists
 --------------------------------------------------------------------}
 
-#ifdef __GLASGOW_HASKELL__
 -- | @since 0.5.6.2
 instance GHCExts.IsList (Word64Map a) where
   type Item (Word64Map a) = (Key,a)
   fromList = fromList
   toList   = toList
-#endif
 
 -- | \(O(n)\). Convert the map to a list of key\/value pairs. Subject to list
 -- fusion.
@@ -3127,7 +3116,6 @@ toDescList :: Word64Map a -> [(Key,a)]
 toDescList = foldlWithKey (\xs k x -> (k,x):xs) []
 
 -- List fusion for the list generating functions.
-#if __GLASGOW_HASKELL__
 -- The foldrFB and foldlFB are fold{r,l}WithKey equivalents, used for list fusion.
 -- They are important to convert unfused methods back, see mapFB in prelude.
 foldrFB :: (Key -> a -> b -> b) -> b -> Word64Map a -> b
@@ -3159,7 +3147,6 @@ foldlFB = foldlWithKey
 {-# RULES "Word64Map.toAscListBack" [1] foldrFB (\k x xs -> (k, x) : xs) [] = toAscList #-}
 {-# RULES "Word64Map.toDescList" [~1] forall m . toDescList m = build (\c n -> foldlFB (\xs k x -> c (k,x) xs) n m) #-}
 {-# RULES "Word64Map.toDescListBack" [1] foldlFB (\xs k x -> (k, x) : xs) [] = toDescList #-}
-#endif
 
 
 -- | \(O(n \min(n,W))\). Create a map from a list of key\/value pairs.
@@ -3349,11 +3336,9 @@ instance Ord1 Word64Map where
 instance Functor Word64Map where
     fmap = map
 
-#ifdef __GLASGOW_HASKELL__
     a <$ Bin p m l r = Bin p m (a <$ l) (a <$ r)
     a <$ Tip k _     = Tip k a
     _ <$ Nil         = Nil
-#endif
 
 {--------------------------------------------------------------------
   Show
@@ -3375,19 +3360,12 @@ instance Show1 Word64Map where
   Read
 --------------------------------------------------------------------}
 instance (Read e) => Read (Word64Map e) where
-#ifdef __GLASGOW_HASKELL__
   readPrec = parens $ prec 10 $ do
     Ident "fromList" <- lexP
     xs <- readPrec
     return (fromList xs)
 
   readListPrec = readListPrecDefault
-#else
-  readsPrec p = readParen (p > 10) $ \ r -> do
-    ("fromList",s) <- lex r
-    (xs,t) <- reads s
-    return (fromList xs,t)
-#endif
 
 -- | @since 0.5.9
 instance Read1 Word64Map where

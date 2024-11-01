@@ -154,18 +154,12 @@ import qualified Type.Reflection as Refl
 import GHC.Real                 ( Ratio(..) )
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-#if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
-#endif
 
 import Unsafe.Coerce (unsafeCoerce)
 
 type BinArray = ForeignPtr Word8
 
-#if !MIN_VERSION_base(4,15,0)
-unsafeWithForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
-unsafeWithForeignPtr = withForeignPtr
-#endif
 
 ---------------------------------------------------------------
 -- BinData

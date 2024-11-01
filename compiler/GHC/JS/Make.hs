@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP               #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -135,9 +134,6 @@ module GHC.JS.Make
   -- * Statement helpers
   , Solo(..)
   , decl
-#if __GLASGOW_HASKELL__ < 905
-  , pattern MkSolo
-#endif
   )
 where
 
@@ -714,12 +710,6 @@ instance Fractional JStgExpr where
     fromRational x = ValExpr (JDouble (realToFrac x))
 
 
--- The Solo constructor was renamed to MkSolo in ghc 9.5
-#if __GLASGOW_HASKELL__ < 905
-pattern MkSolo :: a -> Solo a
-pattern MkSolo a = Solo a
-{-# COMPLETE MkSolo #-}
-#endif
 
 --------------------------------------------------------------------------------
 -- New Identifiers

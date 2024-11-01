@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -127,9 +126,6 @@ import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Char8    as BSC
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short    as SBS
-#if !MIN_VERSION_bytestring(0,11,0)
-import qualified Data.ByteString.Short.Internal as SBS
-#endif
 import GHC.Data.ShortText (ShortText(..))
 import Foreign.C
 import System.IO
@@ -139,9 +135,7 @@ import Data.Semigroup as Semi
 
 import Foreign
 
-#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
 import GHC.Conc.Sync    (sharedCAF)
-#endif
 
 import GHC.Exts
 import GHC.IO
@@ -400,9 +394,6 @@ stringTable = unsafePerformIO $ do
 
   -- use the support wired into the RTS to share this CAF among all images of
   -- libHSghc
-#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
-  return tab
-#else
   sharedCAF tab getOrSetLibHSghcFastStringTable
 
 -- from the 9.3 RTS; the previous RTS before might not have this symbol.  The
@@ -410,7 +401,6 @@ stringTable = unsafePerformIO $ do
 -- or similar rather than use (odd parity) development versions.
 foreign import ccall unsafe "getOrSetLibHSghcFastStringTable"
   getOrSetLibHSghcFastStringTable :: Ptr a -> IO (Ptr a)
-#endif
 
 {-
 
@@ -704,10 +694,6 @@ lengthPS (PtrString _ n) = n
 -- -----------------------------------------------------------------------------
 -- under the carpet
 
-#if !MIN_VERSION_GLASGOW_HASKELL(9,0,0,0)
-foreign import ccall unsafe "strlen"
-  cstringLength# :: Addr# -> Int#
-#endif
 
 ptrStrLength :: Ptr Word8 -> Int
 {-# INLINE ptrStrLength #-}

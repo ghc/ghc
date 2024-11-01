@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -13,11 +12,7 @@ import Data.Typeable
 import Data.Either
 import Control.Applicative
 import Control.DeepSeq
-#if __GLASGOW_HASKELL__ < 709
-import qualified Data.List as L
-#else
 import qualified GHC.List as L
-#endif
 
 data BadElementException = BadFirst | BadLast deriving (Show, Eq)
 instance Exception BadElementException

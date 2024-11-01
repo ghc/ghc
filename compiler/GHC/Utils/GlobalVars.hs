@@ -57,13 +57,6 @@ foreign import ccall unsafe saccessor                          \
 
 
 
-#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
-
-GLOBAL_VAR(v_unsafeHasPprDebug,      False, Bool)
-GLOBAL_VAR(v_unsafeHasNoDebugOutput, False, Bool)
-GLOBAL_VAR(v_unsafeHasNoStateHack,   False, Bool)
-
-#else
 SHARED_GLOBAL_VAR( v_unsafeHasPprDebug
                  , getOrSetLibHSghcGlobalHasPprDebug
                  , "getOrSetLibHSghcGlobalHasPprDebug"
@@ -79,7 +72,6 @@ SHARED_GLOBAL_VAR( v_unsafeHasNoStateHack
                  , "getOrSetLibHSghcGlobalHasNoStateHack"
                  , False
                  , Bool )
-#endif
 
 unsafeHasPprDebug :: Bool
 unsafeHasPprDebug = unsafePerformIO $ readIORef v_unsafeHasPprDebug

@@ -579,30 +579,6 @@ integerMul x        (IS 1#)  = x
 integerMul (IS 1#)  y        = y
 integerMul x        (IS -1#) = integerNegate x
 integerMul (IS -1#) y        = integerNegate y
-#if __GLASGOW_HASKELL__ < 811
-integerMul (IS x)   (IS y)   = case mulIntMayOflo# x y of
-   0# -> IS (x *# y)
-   _  -> case (# isTrue# (x >=# 0#), isTrue# (y >=# 0#) #) of
-      (# False, False #) -> case timesWord2# (int2Word# (negateInt# x))
-                                       (int2Word# (negateInt# y)) of
-          (# 0##,l #) -> integerFromWord# l
-          (# h  ,l #) -> IP (bigNatFromWord2# h l)
-
-      (#  True, False #) -> case timesWord2# (int2Word# x)
-                                       (int2Word# (negateInt# y)) of
-          (# 0##,l #) -> integerFromWordNeg# l
-          (# h  ,l #) -> IN (bigNatFromWord2# h l)
-
-      (# False,  True #) -> case timesWord2# (int2Word# (negateInt# x))
-                                       (int2Word# y) of
-          (# 0##,l #) -> integerFromWordNeg# l
-          (# h  ,l #) -> IN (bigNatFromWord2# h l)
-
-      (#  True,  True #) -> case timesWord2# (int2Word# x)
-                                       (int2Word# y) of
-          (# 0##,l #) -> integerFromWord# l
-          (# h  ,l #) -> IP (bigNatFromWord2# h l)
-#else
 integerMul (IS x)   (IS y)   = case timesInt2# x y of
    (# 0#, _h, l #) -> IS l
    (# _ ,  h, l #)
@@ -616,7 +592,6 @@ integerMul (IS x)   (IS y)   = case timesInt2# x y of
           !(# l',c #) = addWordC# (not# (int2Word# l)) 1##
           !h'         = int2Word# c `plusWord#` not# (int2Word# h)
          in IN (bigNatFromWord2# h' l')
-#endif
 integerMul x@(IS _) y    = integerMul y x
 integerMul (IP x) (IP y) = IP (bigNatMul x y)
 integerMul (IP x) (IN y) = IN (bigNatMul x y)

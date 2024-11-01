@@ -354,7 +354,6 @@ newExecConItbl tables_next_to_code obj con_desc = do
 -- the executable pointer. Returns a pointer to the executable code.
 fillExecBuffer :: CSize -> (Ptr a -> Ptr a -> IO ()) -> IO (Ptr a)
 
-#if MIN_VERSION_rts(1,0,2)
 
 data ExecPage
 
@@ -374,26 +373,6 @@ fillExecBuffer sz cont
         _freezeExecPage pg
         return (castPtr pg)
 
-#elif MIN_VERSION_rts(1,0,1)
-
-foreign import ccall unsafe "allocateExec"
-  _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)
-
-foreign import ccall unsafe "flushExec"
-  _flushExec :: CUInt -> Ptr a -> IO ()
-
-fillExecBuffer sz cont = alloca $ \pcode -> do
-    wr_ptr <- _allocateExec (fromIntegral sz) pcode
-    ex_ptr <- peek pcode
-    cont wr_ptr ex_ptr
-    _flushExec (fromIntegral sz) ex_ptr -- Cache flush (if needed)
-    return (ex_ptr)
-
-#else
-
-#error Sorry, rts versions <= 1.0 are not supported
-
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Constants and config

@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -195,15 +194,11 @@ import Data.Word ( Word64 )
 import GHC.Utils.Containers.Internal.BitUtil
 import GHC.Utils.Containers.Internal.StrictPair
 
-#if __GLASGOW_HASKELL__
 import Data.Data (Data(..), Constr, mkConstr, constrIndex, DataType, mkDataType)
 import qualified Data.Data
 import Text.Read
-#endif
 
-#if __GLASGOW_HASKELL__
 import qualified GHC.Exts
-#endif
 
 import Data.Functor.Identity (Identity(..))
 
@@ -268,7 +263,6 @@ instance Semigroup Word64Set where
     (<>)    = union
     stimes  = stimesIdempotentMonoid
 
-#if __GLASGOW_HASKELL__
 
 {--------------------------------------------------------------------
   A Data instance
@@ -291,7 +285,6 @@ fromListConstr = mkConstr intSetDataType "fromList" [] Data.Data.Prefix
 intSetDataType :: DataType
 intSetDataType = mkDataType "Data.Word64Set.Internal.Word64Set" [fromListConstr]
 
-#endif
 
 {--------------------------------------------------------------------
   Query
@@ -502,15 +495,11 @@ alterF f k s = fmap choose (f member_)
 
     choose True  = inserted
     choose False = deleted
-#ifndef __GLASGOW_HASKELL__
-{-# INLINE alterF #-}
-#else
 {-# INLINABLE [2] alterF #-}
 
 {-# RULES
 "alterF/Const" forall k (f :: Bool -> Const a Bool) . alterF f k = \s -> Const . getConst . f $ member k s
  #-}
-#endif
 
 {-# SPECIALIZE alterF :: (Bool -> Identity Bool) -> Key -> Word64Set -> Identity Word64Set #-}
 
@@ -1128,13 +1117,11 @@ elems
   Lists
 --------------------------------------------------------------------}
 
-#ifdef __GLASGOW_HASKELL__
 -- | @since 0.5.6.2
 instance GHC.Exts.IsList Word64Set where
   type Item Word64Set = Key
   fromList = fromList
   toList   = toList
-#endif
 
 -- | \(O(n)\). Convert the set to a list of elements. Subject to list fusion.
 toList :: Word64Set -> [Key]
@@ -1152,7 +1139,6 @@ toDescList :: Word64Set -> [Key]
 toDescList = foldl (flip (:)) []
 
 -- List fusion for the list generating functions.
-#if __GLASGOW_HASKELL__
 -- The foldrFB and foldlFB are foldr and foldl equivalents, used for list fusion.
 -- They are important to convert unfused to{Asc,Desc}List back, see mapFB in prelude.
 foldrFB :: (Key -> b -> b) -> b -> Word64Set -> b
@@ -1178,7 +1164,6 @@ foldlFB = foldl
 {-# RULES "Word64Set.toAscListBack" [1] foldrFB (:) [] = toAscList #-}
 {-# RULES "Word64Set.toDescList" [~1] forall s . toDescList s = GHC.Exts.build (\c n -> foldlFB (\xs x -> c x xs) n s) #-}
 {-# RULES "Word64Set.toDescListBack" [1] foldlFB (\xs x -> x : xs) [] = toDescList #-}
-#endif
 
 
 -- | \(O(n \min(n,W))\). Create a set from a list of integers.
@@ -1302,19 +1287,12 @@ instance Show Word64Set where
   Read
 --------------------------------------------------------------------}
 instance Read Word64Set where
-#ifdef __GLASGOW_HASKELL__
   readPrec = parens $ prec 10 $ do
     Ident "fromList" <- lexP
     xs <- readPrec
     return (fromList xs)
 
   readListPrec = readListPrecDefault
-#else
-  readsPrec p = readParen (p > 10) $ \ r -> do
-    ("fromList",s) <- lex r
-    (xs,t) <- reads s
-    return (fromList xs,t)
-#endif
 
 {--------------------------------------------------------------------
   NFData
@@ -1536,7 +1514,6 @@ takeWhileAntitoneBits :: Word64 -> (Word64 -> Bool) -> Nat -> Nat
 {-# INLINE foldr'Bits #-}
 {-# INLINE takeWhileAntitoneBits #-}
 
-#if defined(__GLASGOW_HASKELL__)
 indexOfTheOnlyBit :: Nat -> Word64
 {-# INLINE indexOfTheOnlyBit #-}
 indexOfTheOnlyBit bitmask = fromIntegral $ countTrailingZeros bitmask
@@ -1603,63 +1580,6 @@ takeWhileAntitoneBits prefix predicate bitmap =
           else ((1 `shiftLL` b) - 1)
   in bitmap .&. m
 
-#else
-{----------------------------------------------------------------------
-  In general case we use logarithmic implementation of
-  lowestBitSet and highestBitSet, which works up to bit sizes of 64.
-
-  Folds are linear scans.
-----------------------------------------------------------------------}
-
-lowestBitSet n0 =
-    let (n1,b1) = if n0 .&. 0xFFFFFFFF /= 0 then (n0,0)  else (n0 `shiftRL` 32, 32)
-        (n2,b2) = if n1 .&. 0xFFFF /= 0     then (n1,b1) else (n1 `shiftRL` 16, 16+b1)
-        (n3,b3) = if n2 .&. 0xFF /= 0       then (n2,b2) else (n2 `shiftRL` 8,  8+b2)
-        (n4,b4) = if n3 .&. 0xF /= 0        then (n3,b3) else (n3 `shiftRL` 4,  4+b3)
-        (n5,b5) = if n4 .&. 0x3 /= 0        then (n4,b4) else (n4 `shiftRL` 2,  2+b4)
-        b6      = if n5 .&. 0x1 /= 0        then     b5  else                   1+b5
-    in b6
-
-highestBitSet n0 =
-    let (n1,b1) = if n0 .&. 0xFFFFFFFF00000000 /= 0 then (n0 `shiftRL` 32, 32)    else (n0,0)
-        (n2,b2) = if n1 .&. 0xFFFF0000 /= 0         then (n1 `shiftRL` 16, 16+b1) else (n1,b1)
-        (n3,b3) = if n2 .&. 0xFF00 /= 0             then (n2 `shiftRL` 8,  8+b2)  else (n2,b2)
-        (n4,b4) = if n3 .&. 0xF0 /= 0               then (n3 `shiftRL` 4,  4+b3)  else (n3,b3)
-        (n5,b5) = if n4 .&. 0xC /= 0                then (n4 `shiftRL` 2,  2+b4)  else (n4,b4)
-        b6      = if n5 .&. 0x2 /= 0                then                   1+b5   else     b5
-    in b6
-
-foldlBits prefix f z bm = let lb = lowestBitSet bm
-                          in  go (prefix+lb) z (bm `shiftRL` lb)
-  where go !_ acc 0 = acc
-        go bi acc n | n `testBit` 0 = go (bi + 1) (f acc bi) (n `shiftRL` 1)
-                    | otherwise     = go (bi + 1)    acc     (n `shiftRL` 1)
-
-foldl'Bits prefix f z bm = let lb = lowestBitSet bm
-                           in  go (prefix+lb) z (bm `shiftRL` lb)
-  where go !_ !acc 0 = acc
-        go bi acc n | n `testBit` 0 = go (bi + 1) (f acc bi) (n `shiftRL` 1)
-                    | otherwise     = go (bi + 1)    acc     (n `shiftRL` 1)
-
-foldrBits prefix f z bm = let lb = lowestBitSet bm
-                          in  go (prefix+lb) (bm `shiftRL` lb)
-  where go !_ 0 = z
-        go bi n | n `testBit` 0 = f bi (go (bi + 1) (n `shiftRL` 1))
-                | otherwise     =       go (bi + 1) (n `shiftRL` 1)
-
-foldr'Bits prefix f z bm = let lb = lowestBitSet bm
-                           in  go (prefix+lb) (bm `shiftRL` lb)
-  where
-        go !_ 0 = z
-        go bi n | n `testBit` 0 = f bi $! go (bi + 1) (n `shiftRL` 1)
-                | otherwise     =         go (bi + 1) (n `shiftRL` 1)
-
-takeWhileAntitoneBits prefix predicate = foldl'Bits prefix f 0 -- Does not use antitone property
-  where
-    f acc bi | predicate bi = acc .|. bitmapOf bi
-             | otherwise    = acc
-
-#endif
 
 
 {--------------------------------------------------------------------

@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash, NoImplicitPrelude, RankNTypes,
+{-# LANGUAGE BangPatterns, MagicHash, NoImplicitPrelude, RankNTypes,
     TypeFamilies, UnboxedTuples, UnliftedFFITypes #-}
 
 module StrictPrim
@@ -7,9 +7,6 @@ module StrictPrim
     , runStrictPrim
     ) where
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative
-#endif
 
 import GHC.Base
 
@@ -60,9 +57,3 @@ runStrictPrim !st =
 class Monad m => PrimMonad m where
     type PrimState m
     primitive :: (State# (PrimState m) -> (# State# (PrimState m), a #)) -> m a
-
-#if __GLASGOW_HASKELL__ < 709
--- Grab this from Prelude (part of Base) because Base depends on this code.
-($!) :: (a -> b) -> a -> b
-f $! x  = let !vx = x in f vx
-#endif

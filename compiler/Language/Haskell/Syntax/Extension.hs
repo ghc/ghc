@@ -1,5 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes     #-} -- for unXRec, etc.
-{-# LANGUAGE CPP                     #-}
 {-# LANGUAGE ConstraintKinds         #-}
 {-# LANGUAGE DataKinds               #-}
 {-# LANGUAGE DeriveDataTypeable      #-}
@@ -21,9 +20,7 @@ module Language.Haskell.Syntax.Extension where
 -- This module captures the type families to precisely identify the extension
 -- points for GHC.Hs syntax
 
-#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
 import Data.Type.Equality (type (~))
-#endif
 
 import Data.Data hiding ( Fixity )
 import Data.Kind (Type)

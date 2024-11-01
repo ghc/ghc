@@ -88,18 +88,10 @@ class HasHeapRep (a :: TYPE rep) where
         -> IO Closure
         -- ^ Heap representation of the closure.
 
-#if __GLASGOW_HASKELL__ >= 901
 instance HasHeapRep (a :: TYPE ('BoxedRep 'Lifted)) where
-#else
-instance HasHeapRep (a :: TYPE 'LiftedRep) where
-#endif
     getClosureData = getClosureDataFromHeapObject
 
-#if __GLASGOW_HASKELL__ >= 901
 instance HasHeapRep (a :: TYPE ('BoxedRep 'Unlifted)) where
-#else
-instance HasHeapRep (a :: TYPE 'UnliftedRep) where
-#endif
     getClosureData x = getClosureDataFromHeapObject (unsafeCoerce# x)
 
 instance Int# ~ a => HasHeapRep (a :: TYPE 'IntRep) where
@@ -370,9 +362,7 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
                                 { info = itbl
                                 , stack_size = FFIClosures.stack_size fields
                                 , stack_dirty = FFIClosures.stack_dirty fields
-#if __GLASGOW_HASKELL__ >= 811
                                 , stack_marking = FFIClosures.stack_marking fields
-#endif
                                 })
             | otherwise
                 -> fail $ "Expected 0 ptr argument to STACK, found "

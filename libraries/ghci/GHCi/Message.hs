@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
-    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP #-}
+    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards
+    #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -499,7 +499,6 @@ instance Binary (FunPtr a) where
   get = castPtrToFunPtr <$> get
 
 -- Binary instances to support the GetClosure message
-#if MIN_VERSION_ghc_heap(8,11,0)
 instance Binary Heap.StgTSOProfInfo
 instance Binary Heap.CostCentreStack
 instance Binary Heap.CostCentre
@@ -507,7 +506,6 @@ instance Binary Heap.IndexTable
 instance Binary Heap.WhatNext
 instance Binary Heap.WhyBlocked
 instance Binary Heap.TsoFlags
-#endif
 
 instance Binary Heap.StgInfoTable
 instance Binary Heap.ClosureType
