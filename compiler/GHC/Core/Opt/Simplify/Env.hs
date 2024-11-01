@@ -28,7 +28,8 @@ module GHC.Core.Opt.Simplify.Env (
         SimplSR(..), mkContEx, substId, lookupRecBndr,
 
         -- * Simplifying binders
-        simplTopBndrs, simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
+        simplTyVarBndr, simplIdBndr, simplIdBndrs,
+        simplNonRecJoinBndr, simplRecJoinBndrs,
         simplBinder, simplBinders,
         substTy, substTyVar, getSubst,
         substCo, substCoVar,
@@ -740,13 +741,15 @@ andFF FltOkSpec  _          = FltOkSpec
 andFF FltLifted  flt        = flt
 
 
-doFloatFromRhs :: FloatEnable -> TopLevelFlag -> RecFlag -> Bool -> SimplFloats -> OutExpr -> Bool
+doFloatFromRhs :: SimplEnv -> TopLevelFlag -> RecFlag -> Bool
+               -> [OutTyVar] -> SimplFloats -> OutExpr -> Bool
 -- If you change this function look also at FloatIn.noFloatIntoRhs
-doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
-  = floatEnabled lvl fe
-      && not (isNilOL fs)
-      && want_to_float
-      && can_float
+doFloatFromRhs env lvl rec strict_bind tvs (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
+  = not (isNilOL fs)
+    && floatEnabled lvl (seFloatEnable env)
+    && want_to_float
+    && can_float
+    && not cant_float_types
   where
      want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs
                      -- See Note [Float when cheap or expandable]
@@ -760,6 +763,19 @@ doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs 
      floatEnabled _ FloatDisabled = False
      floatEnabled lvl FloatNestedOnly = not (isTopLevel lvl)
      floatEnabled _ FloatEnabled = True
+
+     float_bndrs = bindersOfBinds $ fromOL fs
+
+     -- Currently we sadly can't float if we have
+     --   /\a.  let @b = [a] in blah
+     -- becuase we don't have type-lambda
+     cant_float_types
+       | not (null tvs), any isTyCoVar float_bndrs
+       = (pprTraceWhen (any isId float_bndrs)
+            "WARNING-TyCo: skipping abstractFloats" (ppr fs)) $
+         True
+       | otherwise
+       = False
 
 {-
 Note [Float when cheap or expandable]
@@ -894,9 +910,10 @@ addJoinFlts = appOL
 
 mkRecFloats :: SimplFloats -> SimplFloats
 -- Flattens the floats into a single Rec group,
--- They must either all be lifted LetFloats or all JoinFloats
+--   They must either all be lifted LetFloats or all JoinFloats
 -- If any are type bindings they must be non-recursive, so
--- do not need to be joined into a letrec
+--   do not need to be joined into a letrec; indeed they must not
+--   since Rec{} is not allowed to have type binders
 mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs ff
                                 , sfJoinFloats = join_bs
                                 , sfInScope    = in_scope })
@@ -995,7 +1012,7 @@ refineFromInScope in_scope v
   | otherwise = v
 
 lookupRecBndr :: SimplEnv -> InId -> OutId
--- Look up an Id which has been put into the envt by simplRecBndrs,
+-- Look up an Id which has been put into the envt by simplIdBndrs,
 -- but where we have not yet done its RHS
 -- lookupRecBndr (SimplEnv { seInScope = in_scope, seTvSubst = tvs }) v
 --   | isTyVar v
@@ -1061,44 +1078,40 @@ simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- The substitution is extended only if the variable is cloned, because
 -- we *don't* need to use it to track occurrence info.
 simplBinder !env bndr
-  | isTyVar bndr  = do  { let (env', tv) = substTyVarBndr env bndr
-                        ; seqTyVar tv `seq` return (env', tv) }
-  | otherwise     = do  { let (env', id) = substIdBndr env bndr
-                        ; seqId id `seq` return (env', id) }
+  | isTyVar bndr  = simplTyVarBndr env bndr
+  | otherwise     = simplIdBndr    env bndr
 
 ---------------
-simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
+simplTyVarBndr :: SimplEnv -> InTyVar -> SimplM (SimplEnv, OutTyVar)
+simplTyVarBndr env tv
+  = do  { let (env', tv1) = substTyVarBndr env tv
+        ; seqTyVar tv1 `seq` return (env', tv1) }
+
+---------------
+simplIdBndr :: SimplEnv -> InId -> SimplM (SimplEnv, OutId)
 -- A non-recursive let binder
-simplNonRecBndr !env bndr
+-- The returned Id has no unfolding or rules; we add those later
+simplIdBndr !env id
   -- See Note [Bangs in the Simplifier]
-  = do  { let (!env1, bndr1) = substBndr env bndr
-        ; seqVar bndr1 `seq` return (env1, bndr1) }
+  = do  { let (!env1, id1) = substIdBndr env id
+        ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
-simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
--- Recursive let binders
-simplRecBndrs env@(SimplEnv {}) bndrs
+simplIdBndrs :: SimplEnv -> [InId] -> SimplM SimplEnv
+-- Used for recursive let binders: Ids only
+-- No fancy knot-tying! We simply go through the binders in
+-- (arbitrary) order.  For each:
+--   - applying the substitution to its type
+--   - clone the Unique if it's already in scope
+-- The returned Ids have no unfolding or rules; we add those later
+simplIdBndrs env@(SimplEnv {}) ids
   -- See Note [Bangs in the Simplifier]
-  = assert (all (not . isJoinId) bndrs) $
-    do  { let (!env1, bndrs1) = mapAccumL substIdBndr env bndrs
-        ; seqVars bndrs1 `seq` return env1 }
+  = assert (all (not . isJoinId) ids) $
+    do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
+        ; seqIds ids1 `seq` return env1 }
 
 ---------------
-simplTopBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
-simplTopBndrs env@(SimplEnv {}) bndrs
-  -- See Note [Bangs in the Simplifier]
-  = assert (all (not . isJoinId) bndrs) $
-    do  { let (!env1, bndrs1) = mapAccumL substBndr env bndrs
-        ; seqVars bndrs1 `seq` return env1 }
-
----------------
-substBndr :: HasDebugCallStack => SimplEnv -> InBndr -> (SimplEnv, OutBndr)
-substBndr env bndr
-  | isTyVar bndr = substTyVarBndr env bndr
-  | otherwise    = substIdBndr env bndr
-
----------------
-substIdBndr :: HasDebugCallStack => SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+substIdBndr :: HasDebugCallStack => SimplEnv -> InId -> (SimplEnv, OutId)
 -- Might be a coercion variable
 substIdBndr env bndr
   | isCoVar bndr  = substCoVarBndr env bndr
@@ -1195,15 +1208,6 @@ seqId id = seqType (idType id)  `seq`
 seqIds :: [Id] -> ()
 seqIds []       = ()
 seqIds (id:ids) = seqId id `seq` seqIds ids
-
-seqVar :: Var -> ()
-seqVar var
-  | isTyVar var = seqTyVar var
-  | otherwise   = seqId var
-
-seqVars :: [Var] -> ()
-seqVars []         = ()
-seqVars (var:vars) = seqVar var `seq` seqVars vars
 
 {-
 Note [Arity robustness]

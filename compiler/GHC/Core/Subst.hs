@@ -43,8 +43,7 @@ import GHC.Core.Utils
 
         -- We are defining local versions
 import GHC.Core.Type hiding ( substTy )
-import GHC.Core.Coercion
-    ( tyCoFVsOfCo, mkCoVarCo, substCoVarBndr )
+import GHC.Core.Coercion    ( tyCoFVsOfCo, mkCoVarCo, substCoVarBndr )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env as InScopeSet
@@ -370,11 +369,7 @@ substIdBndr :: HasDebugCallStack
             -> (Subst, Id)      -- ^ Transformed pair
                                 -- NB: unfolding may be zapped
 
-substIdBndr _doc rec_subst subst old_id
-  = assertPpr (isId old_id) (ppr old_id) $
-    substIdBndr' _doc rec_subst subst old_id
-
-substIdBndr' _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
+substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
   = (Subst new_in_scope new_env tvs cvs, new_id)
   where
     id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
