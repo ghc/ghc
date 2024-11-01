@@ -827,19 +827,21 @@ getRegister' config plat expr =
 
         --TODO: MO_V_Broadcast with immediate: If the right value is a literal,
         -- it may use vmv.v.i (simpler)
-        MO_V_Broadcast _length w -> do
+        MO_V_Broadcast length w -> do
           (reg_idx, format_idx, code_idx) <- getSomeReg e
           let w_idx = formatToWidth format_idx
           pure $ Any (intFormat w) $ \dst ->
             code_idx `snocOL`
-            annExpr expr (VMV (OpReg w dst) (OpReg w_idx reg_idx))
+            annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
+            VMV (OpReg w dst) (OpReg w_idx reg_idx)
 
-        MO_VF_Broadcast l w -> do
+        MO_VF_Broadcast length w -> do
           (reg_idx, format_idx, code_idx) <- getSomeReg e
           let w_idx = formatToWidth format_idx
-          pure $ Any (vecFormat (cmmVec l (cmmFloat w))) $ \dst ->
+          pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
             code_idx `snocOL`
-            annExpr expr (VMV (OpReg w dst) (OpReg w_idx reg_idx))
+            annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
+            VMV (OpReg w dst) (OpReg w_idx reg_idx)
 
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
@@ -1183,7 +1185,8 @@ getRegister' config plat expr =
             code_idx `snocOL`
             -- Setup
             -- vsetivli zero, 1, e32, m1, ta, ma
-            annExpr expr (VSETIVLI zeroReg 1 W32 M1 TA MA) `snocOL`
+            -- TODO: Use width
+            annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
             -- Move selected element to index 0
             -- vslidedown.vi v8, v9, 2
             VSLIDEDOWN (OpReg width_v tmp) (OpReg width_v reg_v) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
@@ -1238,6 +1241,16 @@ getRegister' config plat expr =
           | otherwise
           -> sorry "The RISCV64 backend does not (yet) support vectors."
         -- TODO: Implement length as immediate
+
+        -- insert_float_into_vector:
+        --   vsetivli        zero, 4, e32, m1, ta, ma
+        --   vid.v   v8
+        --   vmseq.vi        v0, v8, 2
+        --   vfmv.v.f        v8, fa0
+        --   vmerge.vvm      v8, v8, v8, v0
+        --   ret
+        --
+        -- https://godbolt.org/z/sEG8MrM8P
         MO_VF_Insert length w ->
           do
             (reg_v, format_v, code_v) <- getSomeReg x
@@ -1245,21 +1258,22 @@ getRegister' config plat expr =
             (reg_idx, format_idx, code_idx) <- getSomeReg z
             (reg_l, format_l, code_l) <- getSomeReg (CmmLit (CmmInt (toInteger length) W64))
             tmp <- getNewRegNat (VecFormat length (floatScalarFormat w))
-            -- TODO: FmtInt8 should be FmtInt1 (which does not exist yet, so we're lying here)
-            reg_mask <- getNewRegNat (VecFormat length FmtInt8)
             let targetFormat = VecFormat length (floatScalarFormat w)
             pure $ Any targetFormat $ \dst ->
               code_v `appOL`
               code_f `appOL`
               code_idx `appOL`
               code_l `snocOL`
+              annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
               -- Build mask for index
               -- 1. fill elements with index numbers
               -- TODO: The Width is made up
-              annExpr expr (VID (OpReg W8 reg_mask) (OpReg (formatToWidth format_l) reg_l)) `snocOL`
-              -- Merge with mask -> set element at index
-              VMSEQ (OpReg W8 reg_mask) (OpReg W8 reg_mask) (OpReg (formatToWidth format_f) reg_f) `snocOL`
-              VMERGE (OpReg (formatToWidth format_v) dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg (formatToWidth format_f) reg_f) (OpReg W8 reg_mask)
+              VID (OpReg W8 v0Reg) (OpReg (formatToWidth format_l) reg_l) `snocOL`
+              -- 2. Splat value into tmp vector
+              VMV (OpReg w tmp) (OpReg (formatToWidth format_f) reg_f) `snocOL`
+              -- 3. Merge with mask -> set element at index
+              VMSEQ (OpReg W8 v0Reg) (OpReg W8 v0Reg) (OpReg (formatToWidth format_idx) reg_idx) `snocOL`
+              VMERGE (OpReg w dst) (OpReg (formatToWidth format_v) reg_v)  (OpReg w tmp) (OpReg W8 v0Reg)
 
         _ ->
           pprPanic "getRegister' (unhandled ternary CmmMachOp): "

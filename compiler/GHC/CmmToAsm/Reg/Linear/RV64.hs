@@ -84,7 +84,7 @@ getFreeRegs cls (FreeRegs g f v) =
     -- change often.)
     allocatableIntRegs = [5 .. 7] ++ [10 .. 17] ++ [28 .. 30]
     allocatableDoubleRegs = [0 .. 7] ++ [10 .. 17] ++ [28 .. 31]
-    allocatableVectorRegs = 0 : [7 .. 31]
+    allocatableVectorRegs = 1 : [7 .. 31]
 
 -- | Set corresponding register bit to 0
 allocateReg :: (HasCallStack) => RealReg -> FreeRegs -> FreeRegs
