@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: rts
-version: 1.0.2
+version: 1.0.3
 synopsis: The GHC runtime system
 description:
     The GHC runtime system.

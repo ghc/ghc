@@ -1,4 +1,4 @@
-
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -82,6 +82,9 @@ import GHC.Unit.Home.ModInfo (lookupHpt)
 import Data.Array
 import Data.Coerce (coerce)
 import Data.ByteString (ByteString)
+#if MIN_VERSION_rts(1,0,3)
+import qualified Data.ByteString.Char8 as BS
+#endif
 import Data.Map (Map)
 import Data.IntMap (IntMap)
 import qualified Data.Map as Map
@@ -237,7 +240,10 @@ ppBCEnv p
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
 mkProtoBCO
-   :: Platform
+   :: (Outputable name)
+   => Platform
+   -> Bool      -- ^ True <=> label with @BCO_NAME@ instruction
+                -- see Note [BCO_NAME]
    -> name
    -> BCInstrList
    -> Either  [CgStgAlt] (CgStgRhs)
@@ -248,10 +254,10 @@ mkProtoBCO
    -> Bool      -- ^ True <=> is a return point, rather than a function
    -> [FFIInfo]
    -> ProtoBCO name
-mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
+mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
    = ProtoBCO {
         protoBCOName = nm,
-        protoBCOInstrs = maybe_with_stack_check,
+        protoBCOInstrs = maybe_add_bco_name $ maybe_add_stack_check peep_d,
         protoBCOBitmap = bitmap,
         protoBCOBitmapSize = fromIntegral bitmap_size,
         protoBCOArity = arity,
@@ -259,6 +265,14 @@ mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffi
         protoBCOFFIs = ffis
       }
      where
+#if MIN_VERSION_rts(1,0,3)
+        maybe_add_bco_name instrs
+          | _add_bco_name = BCO_NAME str : instrs
+          where
+            str = BS.pack $ showSDocOneLine defaultSDocContext (ppr nm)
+#endif
+        maybe_add_bco_name instrs = instrs
+
         -- Overestimate the stack usage (in words) of this BCO,
         -- and if >= iNTERP_STACK_CHECK_THRESH, add an explicit
         -- stack check.  (The interpreter always does a stack check
@@ -266,17 +280,17 @@ mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffi
         -- BCO anyway, so we only need to add an explicit one in the
         -- (hopefully rare) cases when the (overestimated) stack use
         -- exceeds iNTERP_STACK_CHECK_THRESH.
-        maybe_with_stack_check
-           | is_ret && stack_usage < fromIntegral (pc_AP_STACK_SPLIM (platformConstants platform)) = peep_d
+        maybe_add_stack_check instrs
+           | is_ret && stack_usage < fromIntegral (pc_AP_STACK_SPLIM (platformConstants platform)) = instrs
                 -- don't do stack checks at return points,
                 -- everything is aggregated up to the top BCO
                 -- (which must be a function).
                 -- That is, unless the stack usage is >= AP_STACK_SPLIM,
                 -- see bug #1466.
            | stack_usage >= fromIntegral iNTERP_STACK_CHECK_THRESH
-           = STKCHECK stack_usage : peep_d
+           = STKCHECK stack_usage : instrs
            | otherwise
-           = peep_d     -- the supposedly common case
+           = instrs     -- the supposedly common case
 
         -- We assume that this sum doesn't wrap
         stack_usage = sum (map bciStackUse peep_d)
@@ -309,6 +323,7 @@ schemeTopBind (id, rhs)
   | Just data_con <- isDataConWorkId_maybe id,
     isNullaryRepDataCon data_con = do
     platform <- profilePlatform <$> getProfile
+    add_bco_name <- shouldAddBcoName
         -- Special case for the worker of a nullary data con.
         -- It'll look like this:        Nil = /\a -> Nil a
         -- If we feed it into schemeR, we'll get
@@ -317,7 +332,8 @@ schemeTopBind (id, rhs)
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
     -- ioToBc (putStrLn $ "top level BCO")
-    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, RETURN P])
+    emitBc (mkProtoBCO platform add_bco_name
+                       (getName id) (toOL [PACK data_con 0, RETURN P])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
@@ -359,6 +375,7 @@ schemeR_wrk
     -> BcM (ProtoBCO Name)
 schemeR_wrk fvs nm original_body (args, body)
    = do
+     add_bco_name <- shouldAddBcoName
      profile <- getProfile
      let
          platform  = profilePlatform profile
@@ -380,7 +397,7 @@ schemeR_wrk fvs nm original_body (args, body)
          bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
-     emitBc (mkProtoBCO platform nm body_code (Right original_body)
+     emitBc (mkProtoBCO platform add_bco_name nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- | Introduce break instructions for ticked expressions.
@@ -1369,9 +1386,10 @@ doCase d s p scrut bndr alts
            | ubx_tuple_frame    = SLIDE 0 2 `consOL` alt_final0
            | otherwise          = alt_final0
 
+     add_bco_name <- shouldAddBcoName
      let
          alt_bco_name = getName bndr
-         alt_bco = mkProtoBCO platform alt_bco_name alt_final (Left alts)
+         alt_bco = mkProtoBCO platform add_bco_name alt_bco_name alt_final (Left alts)
                        0{-no arity-} bitmap_size bitmap True{-is alts-}
      scrut_code <- schemeE (d + ret_frame_size_b + save_ccs_size_b)
                            (d + ret_frame_size_b + save_ccs_size_b)
@@ -1679,7 +1697,7 @@ Note [unboxed tuple bytecodes and tuple_BCO]
 
 tupleBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
 tupleBCO platform args_info args =
-  mkProtoBCO platform invented_name body_code (Left [])
+  mkProtoBCO platform False invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
   where
     {-
@@ -1698,9 +1716,9 @@ tupleBCO platform args_info args =
     body_code = mkSlideW 0 1          -- pop frame header
                 `snocOL` RETURN_TUPLE -- and add it again
 
-primCallBCO ::  Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
+primCallBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
 primCallBCO platform args_info args =
-  mkProtoBCO platform invented_name body_code (Left [])
+  mkProtoBCO platform False invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
   where
     {-
@@ -2641,6 +2659,9 @@ getHscEnv = BcM $ \st -> return (st, bcm_hsc_env st)
 
 getProfile :: BcM Profile
 getProfile = targetProfile <$> getDynFlags
+
+shouldAddBcoName :: BcM Bool
+shouldAddBcoName = gopt Opt_AddBcoName <$> getDynFlags
 
 emitBc :: ([FFIInfo] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
 emitBc bco

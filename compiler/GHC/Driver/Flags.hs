@@ -572,6 +572,7 @@ data GeneralFlag
    | Opt_DoAsmLinting
    | Opt_DoAnnotationLinting
    | Opt_DoBoundsChecking
+   | Opt_AddBcoName
    | Opt_NoLlvmMangler                  -- hidden flag
    | Opt_FastLlvm                       -- hidden flag
    | Opt_NoTypeableBinds

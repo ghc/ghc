@@ -1,11 +1,11 @@
 
 T10279.hs:10:9: error: [GHC-51294]
     • Failed to load interface for ‘A’.
-      no unit id matching ‘rts-1.0.2’ was found
+      no unit id matching ‘rts-1.0.3’ was found
       (This unit ID looks like the source package ID;
        the real unit ID is ‘rts’)
     • In the untyped splice:
         $(conE
             (Name
                (mkOccName "Foo")
-               (NameG VarName (mkPkgName "rts-1.0.2") (mkModName "A"))))
+               (NameG VarName (mkPkgName "rts-1.0.3") (mkModName "A"))))

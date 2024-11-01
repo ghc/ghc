@@ -130,6 +130,7 @@ Library
                    exceptions == 0.10.*,
                    semaphore-compat,
                    stm,
+                   rts,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@

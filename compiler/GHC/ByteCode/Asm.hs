@@ -106,7 +106,7 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks spt_entries = d
   bcos'   <- mallocStrings interp bcos
   return CompiledByteCode
     { bc_bcos = bcos'
-    , bc_itbls =  itblenv
+    , bc_itbls = itblenv
     , bc_ffis = concatMap protoBCOFFIs proto_bcos
     , bc_strs = top_strs
     , bc_breaks = modbreaks
@@ -178,11 +178,12 @@ assembleOneBCO interp profile pbco = do
   return ubco'
 
 assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
-assembleBCO platform (ProtoBCO { protoBCOName       = nm
-                             , protoBCOInstrs     = instrs
-                             , protoBCOBitmap     = bitmap
-                             , protoBCOBitmapSize = bsize
-                             , protoBCOArity      = arity }) = do
+assembleBCO platform
+            (ProtoBCO { protoBCOName       = nm
+                      , protoBCOInstrs     = instrs
+                      , protoBCOBitmap     = bitmap
+                      , protoBCOBitmapSize = bsize
+                      , protoBCOArity      = arity }) = do
   -- pass 1: collect up the offsets of the local labels.
   let asm = mapM_ (assembleI platform) instrs
 
