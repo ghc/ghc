@@ -40,6 +40,8 @@ def get_changed_files(base_commit: str, head_commit: str,
 
 def get_tracked_files(subdir: str = '.'):
     """ Get the files tracked by git in the given subdirectory. """
+    if not Path(subdir).exists():
+        raise Exception("Regex linter executed with nonexistent target directory '{}'".format(subdir))
     cmd = ['git', 'ls-tree', '--name-only', '-r', 'HEAD', subdir]
     files = subprocess.check_output(cmd)
     return files.decode('UTF-8').split('\n')
@@ -77,9 +79,16 @@ class LineLinter(Linter):
     """
     def lint(self, path: Path):
         if path.is_file():
-            with path.open('r') as f:
-                for line_no, line in enumerate(f):
-                    self.lint_line(path, line_no+1, line)
+            try:
+                with path.open('r') as f:
+                    for line_no, line in enumerate(f):
+                        self.lint_line(path, line_no+1, line)
+            # We don't want to explicitly exclude every single binary file in the test suite
+            except UnicodeDecodeError as e:
+                pass
+            except Exception as e:
+                print('Exception occurred while linting file: {}'.format(path))
+                raise e
 
     def lint_line(self, path: Path, line_no: int, line: str):
         raise NotImplementedError
@@ -124,7 +133,7 @@ def run_linters(linters: Sequence[Linter],
 
     linted_files = args.get_linted_files(args)
     for path in linted_files:
-        if path.startswith('linters'):
+        if path.startswith('testsuite/tests/linters'):
             continue
         for linter in linters:
             linter.do_lint(Path(path))

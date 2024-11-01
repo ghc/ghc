@@ -12,16 +12,16 @@ uniques:
 	python3 checkUniques/check-uniques.py $(TOP)/..
 
 makefiles:
-	(cd $(TOP)/tests/linters/ && python3 regex-linters/check-makefiles.py tracked)
+	(cd $(TOP)/.. && python3 testsuite/tests/linters/regex-linters/check-makefiles.py tracked)
 
 version-number:
 	regex-linters/check-version-number.sh ${TOP}/..
 
 cpp:
-	(cd $(TOP)/tests/linters/ && python3 regex-linters/check-cpp.py tracked)
+	(cd $(TOP)/.. && python3 testsuite/tests/linters/regex-linters/check-cpp.py tracked)
 
 rts-includes:
-	(cd $(TOP)/tests/linters/ && python3 regex-linters/check-rts-includes.py tracked)
+	(cd $(TOP)/.. && python3 testsuite/tests/linters/regex-linters/check-rts-includes.py tracked)
 
 changelogs:
 	regex-linters/check-changelogs.sh $(TOP)/..
