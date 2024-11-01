@@ -344,7 +344,7 @@ cprTransform env id args
   -- Other local Ids that respond True to 'isDataStructure' but don't have an
   -- expandable unfolding, such as NOINLINE bindings. They all get a top sig
   | isLocalId id
-  = assertPpr (isDataStructure id) (ppr id) topCprType
+  = assertPpr (isDataStructure id) (ppr id <+> ppr (idArity id) $$ ppr (maybeUnfoldingTemplate (idUnfolding id))) topCprType
   -- See Note [CPR for DataCon wrappers]
   | Just rhs <- dataConWrapUnfolding_maybe id
   = fst $ cprAnalApp env rhs args
@@ -512,9 +512,10 @@ cprAnalBind env id rhs
   = (id,  rhs,  extendSigEnv env id topCprSig)
   -- See Note [CPR for data structures]
   | isDataStructure id -- Data structure => no code => no need to analyse rhs
-  = (id,  rhs,  env)
+  = pprTrace "cprAnalBind" (ppr id <+> ppr (maybeUnfoldingTemplate (idUnfolding id))) $
+    (id,  rhs,  env)
   | otherwise
-  = -- pprTrace "cprAnalBind" (ppr id <+> ppr sig <+> ppr sig')
+  = pprTrace "cprAnalBind2" (ppr id <+> ppr sig <+> ppr sig')
     (id `setIdCprSig` sig',       rhs', env')
   where
     (rhs_ty, rhs')  = cprAnal env rhs
