@@ -1630,7 +1630,11 @@ run_BCO:
         case bci_SLIDE: {
             W_ n  = BCO_GET_LARGE_ARG;
             W_ by = BCO_GET_LARGE_ARG;
-            /* a_1, .. a_n, b_1, .. b_by, s => a_1, .. a_n, s */
+            /*
+             * a_1 ... a_n, b_1 ... b_by, k
+             *           =>
+             * a_1 ... a_n, k
+             */
             while(n-- > 0) {
                 SpW(n+by) = SpW(n);
             }
