@@ -718,17 +718,23 @@ pprInstr platform instr = case instr of
           FNMSub -> text "\tfnmsub" <> dot <> floatPrecission d
      in op4 fma d r1 r2 r3
 
-  VMV o1@(OpReg w _) o2 | isFloatOp o1 -> op2 (text "\tvfmv" <> dot <> text "f" <> dot <> floatWidthSuffix w) o1 o2
+  VMV o1@(OpReg w _) o2 | isFloatOp o1 && isVectorOp o2 -> op2 (text "\tvfmv" <> dot <> text "f" <> dot <> text "s") o1 o2
   VMV o1@(OpReg _w _) o2 | isFloatOp o2 -> op2 (text "\tvfmv" <> dot <> opToVInstrSuffix o1 <> dot <> text "f") o1 o2
   VMV o1 o2 -> op2 (text "\tvmv" <> dot <> opToVInstrSuffix o1 <> dot <> opToVInstrSuffix o2) o1 o2
-  VID o1 o2 -> op2 (text "\tvid.v") o1 o2
-  VMSEQ o1 o2 o3 -> op3 (text "\tvmseq.v.x") o1 o2 o3
-  VMERGE o1 o2 o3 o4 -> op4 (text "\tvmerge.vxm") o1 o2 o3 o4
+  -- TODO: Remove o2 from constructor
+  VID o1 _o2 -> op1 (text "\tvid.v") o1
+  -- TODO: This expects int register as third operand: Generalize by calculating
+  -- the instruction suffix (".vx")
+  VMSEQ o1 o2 o3 -> op3 (text "\tvmseq.vx") o1 o2 o3
+  -- TODO: All operands need to be vector registers. Make this more general or
+  -- validate this constraint.
+  VMERGE o1 o2 o3 o4 -> op4 (text "\tvmerge.vvm") o1 o2 o3 o4
   VSLIDEDOWN o1 o2 o3 -> op3 (text "\tvslidedown.vx") o1 o2 o3
   VSETIVLI dst len width grouping ta ma -> line $
     text "\tvsetivli" <+> pprReg W64 dst <> comma <+> (text.show) len <> comma <+> pprVWidth width <> comma <+> pprGrouping grouping <> comma <+> pprTA ta <> comma <+> pprMasking ma
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
+    op1 op o1 = line $ op <+> pprOp platform o1
     op2 op o1 o2 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
     op3 op o1 o2 o3 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
     op4 op o1 o2 o3 o4 = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
