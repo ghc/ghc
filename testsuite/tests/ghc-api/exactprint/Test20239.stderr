@@ -162,7 +162,7 @@
              (PrefixCon
               []
               [(HsScaled
-                (HsLinearArrow
+                (HsLinearAnn
                  (EpPct1
                   (NoEpTok)
                   (NoEpUniTok)))
@@ -213,7 +213,7 @@
              (PrefixCon
               []
               [(HsScaled
-                (HsLinearArrow
+                (HsLinearAnn
                  (EpPct1
                   (NoEpTok)
                   (NoEpUniTok)))
@@ -239,7 +239,8 @@
                      []))
                    (HsFunTy
                     (NoExtField)
-                    (HsUnrestrictedArrow
+                    (HsUnannotated
+                     (HsUnannMany)
                      (EpUniTok
                       (EpaSpan { Test20239.hs:7:62-63 })
                       (NormalSyntax)))

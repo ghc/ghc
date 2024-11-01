@@ -788,8 +788,8 @@ getConDoc l = extendHdkA l $ liftHdkA $ getPrevNextDoc l
 -- Add documentation comment to a data constructor field.
 -- Used for PrefixCon and InfixCon.
 addHaddockConDeclFieldTy
-  :: HsScaled GhcPs (LHsType GhcPs)
-  -> HdkA (HsScaled GhcPs (LHsType GhcPs))
+  :: HsScaled on GhcPs (LHsType GhcPs)
+  -> HdkA (HsScaled on GhcPs (LHsType GhcPs))
 addHaddockConDeclFieldTy (HsScaled mult (L l t)) =
   extendHdkA (locA l) $ liftHdkA $ do
     mDoc <- getPrevNextDoc (locA l)
@@ -906,7 +906,7 @@ We implement this in two steps:
             including its field types
 -}
 
-instance HasHaddock a => HasHaddock (HsScaled GhcPs a) where
+instance HasHaddock a => HasHaddock (HsScaled on GhcPs a) where
   addHaddock (HsScaled mult a) = HsScaled mult <$> addHaddock a
 
 instance HasHaddock a => HasHaddock (HsWildCardBndrs GhcPs a) where

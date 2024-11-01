@@ -943,7 +943,7 @@ concern things that the renamer can't handle.
 
 -}
 
-tcMult :: HsArrow GhcRn -> TcM Mult
+tcMult :: HsMultAnnOn on (LHsType GhcRn) GhcRn -> TcM Mult
 tcMult hc = tc_mult typeLevelMode hc
 
 -- | Info about the context in which we're checking a type. Currently,
@@ -1369,8 +1369,8 @@ Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo
 -}
 
 ------------------------------------------
-tc_mult :: TcTyMode -> HsArrow GhcRn -> TcM Mult
-tc_mult mode ty = tc_check_lhs_type mode (arrowToHsType ty) multiplicityTy
+tc_mult :: TcTyMode -> HsMultAnnOn on (LHsType GhcRn) GhcRn -> TcM Mult
+tc_mult mode ty = tc_check_lhs_type mode (multAnnToHsType ty) multiplicityTy
 ------------------------------------------
 tc_fun_type :: TcTyMode -> HsArrow GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType

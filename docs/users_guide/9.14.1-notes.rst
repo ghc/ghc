@@ -20,6 +20,15 @@ Language
   as serious as a warning about missing patterns from a function definition, perhaps even
   more so, since it is invisible in the source program.
 
+* With :extension:`LinearTypes` record fields can now be non-linear. This means that
+  the following record declaration is now valid:
+
+  ::
+
+      data Record = Rec { x %'Many :: Int, y :: Char }
+
+  This causes the constructor to have type ``Rec :: Int %'Many -> Char %1 -> Record``.
+
 Compiler
 ~~~~~~~~
 

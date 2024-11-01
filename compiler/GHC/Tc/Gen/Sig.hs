@@ -273,7 +273,7 @@ no_anon_wc_ty lty = go lty
       HsWildCardTy _                 -> False
       HsAppTy _ ty1 ty2              -> go ty1 && go ty2
       HsAppKindTy _ ty ki            -> go ty && go ki
-      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go (arrowToHsType w)
+      HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && go (multAnnToHsType w)
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys
@@ -283,7 +283,7 @@ no_anon_wc_ty lty = go lty
       HsKindSig _ ty kind            -> go ty && go kind
       HsDocTy _ ty _                 -> go ty
       HsBangTy _ _ ty                -> go ty
-      HsRecTy _ flds                 -> gos $ map (cd_fld_type . unLoc) flds
+      HsRecTy _ flds                 -> gos $ concatMap (hsScaledToHsTypes . cd_fld_type . unLoc) flds
       HsExplicitListTy _ _ tys       -> gos tys
       HsExplicitTupleTy _ _ tys      -> gos tys
       HsForAllTy { hst_tele = tele

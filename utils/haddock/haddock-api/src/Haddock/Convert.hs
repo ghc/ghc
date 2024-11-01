@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -493,11 +494,13 @@ synifyDataCon use_gadt_syntax dc =
 
     linear_tys =
       zipWith
-        ( \ty bang ->
-            let tySyn = synifyType WithinType [] (scaledThing ty)
-             in case bang of
+        ( \(Scaled mult ty) bang ->
+            let tySyn = synifyType WithinType [] ty
+                multSyn = synifyMultRec [] mult
+                bangTy = case bang of
                   (HsSrcBang _ (HsBang NoSrcUnpack NoSrcStrict)) -> tySyn
                   (HsSrcBang src bang') -> noLocA $ HsBangTy (noAnn, src) bang' tySyn
+            in HsScaled multSyn bangTy
         )
         arg_tys
         (dataConSrcBangs dc)
@@ -506,8 +509,8 @@ synifyDataCon use_gadt_syntax dc =
     con_decl_field fl synTy =
       noLocA $
         ConDeclField
-          noAnn
-          [noLocA $ FieldOcc (mkVarUnqual $ field_label $ flLabel fl) (noLocA  (flSelector fl))]
+          noExtField
+          [noLocA $ FieldOcc (mkVarUnqual $ field_label $ flLabel fl) (noLocA (flSelector fl))]
           synTy
           Nothing
 
@@ -515,15 +518,15 @@ synifyDataCon use_gadt_syntax dc =
     mk_h98_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
       (True, True) -> Left "synifyDataCon: contradiction!"
       (True, False) -> return $ RecCon (noLocA field_tys)
-      (False, False) -> return $ PrefixCon noTypeArgs (map hsUnrestricted linear_tys)
-      (False, True) -> case linear_tys of
-        [a, b] -> return $ InfixCon (hsUnrestricted a) (hsUnrestricted b)
+      (False, False) -> return $ PrefixCon noTypeArgs (map hsScaledGeneralize linear_tys)
+      (False, True) -> case map hsScaledGeneralize linear_tys of
+        [a, b] -> return $ InfixCon a b
         _ -> Left "synifyDataCon: infix with non-2 args?"
 
     mk_gadt_arg_tys :: HsConDeclGADTDetails GhcRn
     mk_gadt_arg_tys
       | use_named_field_syntax = RecConGADT noExtField (noLocA field_tys)
-      | otherwise = PrefixConGADT noExtField (map hsUnrestricted linear_tys)
+      | otherwise = PrefixConGADT noExtField (map hsScaledGeneralize linear_tys)
    in
     -- finally we get synifyDataCon's result!
     if use_gadt_syntax
@@ -987,8 +990,13 @@ noKindTyVars _ _ = emptyVarSet
 
 synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
 synifyMult vs t = case t of
-  OneTy -> HsLinearArrow noExtField
+  OneTy -> HsLinearAnn noExtField
   ManyTy -> HsUnrestrictedArrow noExtField
+  ty -> HsExplicitMult noExtField (synifyType WithinType vs ty)
+
+synifyMultRec :: [TyVar] -> Mult -> HsMultAnnOn OnRecField (LHsType GhcRn) GhcRn
+synifyMultRec vs t = case t of
+  OneTy -> HsUnannotated HsUnannOne noExtField
   ty -> HsExplicitMult noExtField (synifyType WithinType vs ty)
 
 synifyPatSynType :: PatSyn -> LHsType GhcRn

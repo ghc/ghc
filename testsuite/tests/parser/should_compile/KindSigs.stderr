@@ -827,7 +827,8 @@
             []))
           (HsFunTy
            (NoExtField)
-           (HsUnrestrictedArrow
+           (HsUnannotated
+            (HsUnannMany)
             (EpUniTok
              (EpaSpan { KindSigs.hs:22:22-23 })
              (NormalSyntax)))
@@ -902,7 +903,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { KindSigs.hs:22:30-31 })
                (NormalSyntax)))

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -535,17 +536,20 @@ deriving instance Data (HsTyLit GhcRn)
 deriving instance Data (HsTyLit GhcTc)
 
 -- deriving instance (Data mult, DataIdLR p p) => Data (HsArrowOf mult p)
-deriving instance Data (HsArrowOf (LocatedA (HsType GhcPs)) GhcPs)
-deriving instance Data (HsArrowOf (LocatedA (HsType GhcRn)) GhcRn)
-deriving instance Data (HsArrowOf (LocatedA (HsType GhcTc)) GhcTc)
-deriving instance Data (HsArrowOf (LocatedA (HsExpr GhcPs)) GhcPs)
-deriving instance Data (HsArrowOf (LocatedA (HsExpr GhcRn)) GhcRn)
-deriving instance Data (HsArrowOf (LocatedA (HsExpr GhcTc)) GhcTc)
+deriving instance                Data (HsMultAnnOn OnArrow    (LocatedA (HsType GhcPs)) GhcPs)
+deriving instance                Data (HsMultAnnOn OnRecField (LocatedA (HsType GhcPs)) GhcPs)
+deriving instance Typeable on => Data (HsMultAnnOn on         (LocatedA (HsType GhcRn)) GhcRn)
+deriving instance Typeable on => Data (HsMultAnnOn on         (LocatedA (HsType GhcTc)) GhcTc)
+deriving instance                Data (HsMultAnnOn OnArrow    (LocatedA (HsExpr GhcPs)) GhcPs)
+deriving instance                Data (HsMultAnnOn OnRecField (LocatedA (HsExpr GhcPs)) GhcPs)
+deriving instance Typeable on => Data (HsMultAnnOn on         (LocatedA (HsExpr GhcRn)) GhcRn)
+deriving instance Typeable on => Data (HsMultAnnOn on         (LocatedA (HsExpr GhcTc)) GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (HsScaled p a)
-deriving instance Data thing => Data (HsScaled GhcPs thing)
-deriving instance Data thing => Data (HsScaled GhcRn thing)
-deriving instance Data thing => Data (HsScaled GhcTc thing)
+deriving instance Data thing                => Data (HsScaled OnArrow    GhcPs thing)
+deriving instance Data thing                => Data (HsScaled OnRecField GhcPs thing)
+deriving instance (Data thing, Typeable on) => Data (HsScaled on         GhcRn thing)
+deriving instance (Data thing, Typeable on) => Data (HsScaled on         GhcTc thing)
 
 -- deriving instance (Data a, Data b) => Data (HsArg p a b)
 deriving instance (Data a, Data b) => Data (HsArg GhcPs a b)

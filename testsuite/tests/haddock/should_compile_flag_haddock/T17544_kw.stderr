@@ -245,7 +245,8 @@
           (PrefixConGADT
            (NoExtField)
            [(HsScaled
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { T17544_kw.hs:19:21-22 })
                (NormalSyntax)))

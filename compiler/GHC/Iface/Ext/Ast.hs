@@ -1745,8 +1745,8 @@ instance ToHie (RScoped (LocatedAn NoEpAnns (DerivStrategy GhcRn))) where
 instance ToHie (LocatedP OverlapMode) where
   toHie (L span _) = locOnly (locA span)
 
-instance ToHie a => ToHie (HsScaled GhcRn a) where
-  toHie (HsScaled w t) = concatM [toHie (arrowToHsType w), toHie t]
+instance ToHie a => ToHie (HsScaled on GhcRn a) where
+  toHie (HsScaled w t) = concatM [toHie (multAnnToHsType w), toHie t]
 
 instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
@@ -1789,7 +1789,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             PrefixCon _ xs -> scaled_args_scope xs
             InfixCon a b   -> scaled_args_scope [a, b]
             RecCon x       -> mkScope x
-    where scaled_args_scope :: [HsScaled GhcRn (LHsType GhcRn)] -> Scope
+    where scaled_args_scope :: [HsScaled on GhcRn (LHsType GhcRn)] -> Scope
           scaled_args_scope = foldr combineScopes NoScope . map (mkScope . hsScaledThing)
 
 instance ToHie (LocatedL [LocatedA (ConDeclField GhcRn)]) where
@@ -1907,7 +1907,7 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         , toHie ki
         ]
       HsFunTy _ w a b ->
-        [ toHie (arrowToHsType w)
+        [ toHie (multAnnToHsType w)
         , toHie a
         , toHie b
         ]
@@ -2000,7 +2000,7 @@ instance HiePass p => ToHie (LocatedC [LocatedA (HsExpr (GhcPass p))]) where
 instance ToHie (LocatedA (ConDeclField GhcRn)) where
   toHie (L span field) = concatM $ makeNode field (locA span) : case field of
       ConDeclField _ fields typ doc ->
-        [ toHie $ map (RFC RecFieldDecl (getRealSpan $ getHasLoc typ)) fields
+        [ toHie $ map (RFC RecFieldDecl (getRealSpan $ getHasLoc $ hsScaledThing typ)) fields
         , toHie typ
         , toHie doc
         ]

@@ -340,10 +340,10 @@ renameMaybeInjectivityAnn
   -> RnM (Maybe (LInjectivityAnn DocNameI))
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
-renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
-renameArrow (HsUnrestrictedArrow _) = return (HsUnrestrictedArrow noExtField)
-renameArrow (HsLinearArrow _) = return (HsLinearArrow noExtField)
-renameArrow (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
+renameMultAnnOn :: HsMultAnnOn on (LHsType GhcRn) GhcRn -> RnM (HsMultAnnOn on (LHsType DocNameI) DocNameI)
+renameMultAnnOn (HsUnannotated mult _) = return (HsUnannotated mult noExtField)
+renameMultAnnOn (HsLinearAnn _) = return (HsLinearAnn noExtField)
+renameMultAnnOn (HsExplicitMult _ p) = HsExplicitMult noExtField <$> renameLType p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
@@ -375,7 +375,7 @@ renameType t = case t of
   HsFunTy _ w a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    w' <- renameArrow w
+    w' <- renameMultAnnOn w
     return (HsFunTy noAnn w' a' b')
   HsListTy _ ty -> return . (HsListTy noAnn) =<< renameLType ty
   HsIParamTy _ n ty -> liftM (HsIParamTy noAnn n) (renameLType ty)
@@ -719,9 +719,9 @@ renameCon
       )
 
 renameHsScaled
-  :: HsScaled GhcRn (LHsType GhcRn)
-  -> RnM (HsScaled DocNameI (LHsType DocNameI))
-renameHsScaled (HsScaled w ty) = HsScaled <$> renameArrow w <*> renameLType ty
+  :: HsScaled on GhcRn (LHsType GhcRn)
+  -> RnM (HsScaled on DocNameI (LHsType DocNameI))
+renameHsScaled (HsScaled w ty) = HsScaled <$> renameMultAnnOn w <*> renameLType ty
 
 renameH98Details
   :: HsConDeclH98Details GhcRn
@@ -746,7 +746,7 @@ renameGADTDetails (PrefixConGADT _ ps) = PrefixConGADT noExtField <$> mapM renam
 renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)
 renameConDeclFieldField (L l (ConDeclField _ names t doc)) = do
   names' <- mapM renameLFieldOcc names
-  t' <- renameLType t
+  t' <- renameHsScaled t
   doc' <- mapM renameLDocHsSyn doc
   return $ L (locA l) (ConDeclField noExtField names' t' doc')
 

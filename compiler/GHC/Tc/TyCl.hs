@@ -1799,7 +1799,7 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
-kcConArgTys :: NewOrData -> TcKind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
+kcConArgTys :: NewOrData -> TcKind -> [HsScaled on GhcRn (LHsType GhcRn)] -> TcM ()
 kcConArgTys new_or_data res_kind arg_tys = do
   { let exp_kind = getArgExpKind new_or_data res_kind
   ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsTypeInContext (getBangType ty) exp_kind
@@ -1813,14 +1813,14 @@ kcConH98Args new_or_data res_kind con_args = case con_args of
   PrefixCon _ tys   -> kcConArgTys new_or_data res_kind tys
   InfixCon ty1 ty2  -> kcConArgTys new_or_data res_kind [ty1, ty2]
   RecCon (L _ flds) -> kcConArgTys new_or_data res_kind $
-                       map (hsLinear . cd_fld_type . unLoc) flds
+                       map (cd_fld_type . unLoc) flds
 
 -- Kind-check the types of arguments to a GADT data constructor.
 kcConGADTArgs :: NewOrData -> TcKind -> HsConDeclGADTDetails GhcRn -> TcM ()
 kcConGADTArgs new_or_data res_kind con_args = case con_args of
   PrefixConGADT _ tys     -> kcConArgTys new_or_data res_kind tys
   RecConGADT _ (L _ flds) -> kcConArgTys new_or_data res_kind $
-                             map (hsLinear . cd_fld_type . unLoc) flds
+                             map (cd_fld_type . unLoc) flds
 
 kcConDecls :: Foldable f
            => NewOrData
@@ -3924,7 +3924,7 @@ tcConGADTArgs exp_kind (RecConGADT _ fields)
 
 tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatypes,
                          -- but might be an unlifted type with UnliftedNewtypes
-         -> HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
+         -> HsScaled on GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
 tcConArg exp_kind (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcCheckLHsTypeInContext (getBangType bty) exp_kind
@@ -3939,13 +3939,13 @@ tcRecConDeclFields exp_kind fields
   = mapM (tcConArg exp_kind) btys
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
+    combined = map (\(L _ f) -> (cd_fld_names f, cd_fld_type f))
                    (unLoc fields)
     explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
     (_,btys) = unzip exploded
 
-tcDataConMult :: HsArrow GhcRn -> TcM Mult
+tcDataConMult :: HsMultAnnOn on (LHsType GhcRn) GhcRn -> TcM Mult
 tcDataConMult arr@(HsUnrestrictedArrow _) = do
   -- See Note [Function arrows in GADT constructors]
   linearEnabled <- xoptM LangExt.LinearTypes

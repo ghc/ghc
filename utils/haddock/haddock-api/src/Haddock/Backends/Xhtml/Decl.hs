@@ -1542,8 +1542,8 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
           , let field = (foExt) name
           ]
       )
-      <+> dcolon unicode
-      <+> ppLType unicode qual HideEmptyContexts ltype
+      <+> ppRecFieldMultAnn unicode qual ltype (dcolon unicode)
+      <+> ppLType unicode qual HideEmptyContexts (hsScaledThing ltype)
   , mbDoc
   , []
   )
@@ -1555,11 +1555,17 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
       Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
       Just hd -> hd
 
+ppRecFieldMultAnn :: Unicode -> Qualification -> HsScaled on DocNameI a -> Html -> Html
+ppRecFieldMultAnn unicode qual (HsScaled arr _) following = case arr of
+  HsUnannotated _ _ -> following
+  HsLinearAnn _ -> toHtml "%1" <+> following
+  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode qual HideEmptyContexts <+> following
+
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
 ppShortField summary unicode qual (ConDeclField _ names ltype _) =
   hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . foExt . unLoc) names))
-    <+> dcolon unicode
-    <+> ppLType unicode qual HideEmptyContexts ltype
+    <+> ppRecFieldMultAnn unicode qual ltype (dcolon unicode)
+    <+> ppLType unicode qual HideEmptyContexts (hsScaledThing ltype)
 
 -- | Pretty print an expanded pattern (for bundled patterns)
 ppSideBySidePat
@@ -1816,8 +1822,8 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u q e =
     ]
   where
     arr = case mult of
-      HsLinearArrow _ -> lollipop u
-      HsUnrestrictedArrow _ -> arrow u
+      HsLinearAnn _ -> lollipop u
+      HsUnannotated _ _ -> arrow u
       HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u q e <+> arrow u
 ppr_mono_ty (HsTupleTy _ con tys) u q _ =
   tupleParens con (map (ppLType u q HideEmptyContexts) tys)

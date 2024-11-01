@@ -789,10 +789,10 @@ cvt_id_arg parent_con (i, str, ty)
   = do  { L li i' <- fldNameN (nameBase parent_con) i
         ; ty' <- cvt_arg (str,ty)
         ; returnLA $ ConDeclField
-                          { cd_fld_ext = noAnn
+                          { cd_fld_ext = noExtField
                           , cd_fld_names
                               = [L (l2l li) $ FieldOcc noExtField (L li i')]
-                          , cd_fld_type =  ty'
+                          , cd_fld_type = hsNoMultAnn ty'
                           , cd_fld_doc = Nothing} }
 
 cvtDerivs :: [TH.DerivClause] -> CvtM (HsDeriving GhcPs)
@@ -1856,7 +1856,7 @@ cvtTypeKind typeOrKind ty
 hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs
 hsTypeToArrow w = case unLoc w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
-                        | n == oneDataConName -> HsLinearArrow noAnn
+                        | n == oneDataConName -> HsLinearAnn noAnn
                         | n == manyDataConName -> HsUnrestrictedArrow noAnn
                      _ -> HsExplicitMult noAnn w
 

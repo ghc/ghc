@@ -71,6 +71,7 @@ module GHC.Parser.PostProcess (
         UnpackednessPragma(..),
         mkMultTy,
         mkMultAnn,
+        mkMultField,
 
         -- Token location
         mkTokenLocation,
@@ -3491,7 +3492,7 @@ mkLHsOpTy prom x op y =
 mkMultTy :: EpToken "%" -> LHsType GhcPs -> TokRarrow -> HsArrow GhcPs
 mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
   -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow (EpPct1 pct1 arr)
+  = HsLinearAnn (EpPct1 pct1 arr)
   where
     -- The location of "%" combined with the location of "1".
     pct1 :: EpToken "%1"
@@ -3501,7 +3502,7 @@ mkMultTy pct t arr = HsExplicitMult (pct, arr) t
 mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsArrowOf (LHsExpr GhcPs) GhcPs
 mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr
   -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow (EpPct1 pct1 arr)
+  = HsLinearAnn (EpPct1 pct1 arr)
   where
     -- The location of "%" combined with the location of "1".
     pct1 :: EpToken "%1"
@@ -3517,6 +3518,16 @@ mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1)))
     pct1 :: EpToken "%1"
     pct1 = epTokenWidenR pct (locA (getLoc t))
 mkMultAnn pct t = HsMultAnn pct t
+
+mkMultField :: EpToken "%" -> LHsType GhcPs -> TokDcolon -> LHsType GhcPs -> HsScaled OnRecField GhcPs (LBangType GhcPs)
+mkMultField pct (L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) col t
+  -- See #18888 for the use of (SourceText "1") above
+  = HsScaled (HsLinearAnn (pct1, col)) t
+  where
+    -- The location of "%" combined with the location of "1".
+    pct1 :: EpToken "%1"
+    pct1 = epTokenWidenR pct (locA (getLoc t))
+mkMultField pct mult col t = HsScaled (HsExplicitMult (pct, col) mult) t
 
 mkTokenLocation :: SrcSpan -> TokenLocation
 mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc

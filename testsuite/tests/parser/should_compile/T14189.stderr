@@ -79,7 +79,7 @@
              (PrefixCon
               []
               [(HsScaled
-                (HsLinearArrow
+                (HsLinearAnn
                  (NoExtField))
                 (L
                  (EpAnn
@@ -169,7 +169,7 @@
                   (EpaComments
                    []))
                  (ConDeclField
-                  (NoEpUniTok)
+                  (NoExtField)
                   [(L
                     (EpAnn
                      (EpaSpan { T14189.hs:6:33 })
@@ -188,24 +188,28 @@
                        (EpaComments
                         []))
                       {Name: T14189.f})))]
-                  (L
-                   (EpAnn
-                    (EpaSpan { T14189.hs:6:38-40 })
-                    (AnnListItem
-                     [])
-                    (EpaComments
-                     []))
-                   (HsTyVar
-                    (NoEpTok)
-                    (NotPromoted)
-                    (L
-                     (EpAnn
-                      (EpaSpan { T14189.hs:6:38-40 })
-                      (NameAnnTrailing
-                       [])
-                      (EpaComments
-                       []))
-                     {Name: GHC.Types.Int})))
+                  (HsScaled
+                   (HsUnannotated
+                    (HsUnannOne)
+                    (NoExtField))
+                   (L
+                    (EpAnn
+                     (EpaSpan { T14189.hs:6:38-40 })
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      []))
+                    (HsTyVar
+                     (NoEpTok)
+                     (NotPromoted)
+                     (L
+                      (EpAnn
+                       (EpaSpan { T14189.hs:6:38-40 })
+                       (NameAnnTrailing
+                        [])
+                       (EpaComments
+                        []))
+                      {Name: GHC.Types.Int}))))
                   (Nothing)))]))
              (Nothing)))])
          [])))]

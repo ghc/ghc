@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -360,7 +361,8 @@ restrictCons names decls = [L p d | L p (Just d) <- fmap keep <$> decls]
         field_avail (L _ (ConDeclField _ fs _ _)) =
           all (\f -> (unLoc . foLabel . unLoc $ f) `elem` names) fs
 
-        field_types flds = [hsUnrestricted t | L _ (ConDeclField _ _ t _) <- flds]
+        field_types :: [LConDeclField GhcRn] -> [HsScaled OnArrow GhcRn (LBangType GhcRn)]
+        field_types flds = [hsScaledGeneralize t | L _ (ConDeclField _ _ t _) <- flds]
     keep _ = Nothing
 
 restrictDecls :: [Name] -> [LSig GhcRn] -> [LSig GhcRn]
@@ -511,7 +513,7 @@ reparenBndrKind v@XBndrKind{} = v
 
 -- | Add parenthesis around the types in a 'ConDeclField' (see 'reparenTypePrec')
 reparenConDeclField :: XRecCond a => ConDeclField a -> ConDeclField a
-reparenConDeclField (ConDeclField x n t d) = ConDeclField x n (reparenLType t) d
+reparenConDeclField (ConDeclField x n t d) = ConDeclField x n (fmap reparenLType t) d
 reparenConDeclField c@XConDeclField{} = c
 
 -------------------------------------------------------------------------------

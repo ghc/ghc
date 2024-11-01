@@ -221,7 +221,7 @@
              (PrefixCon
               []
               [(HsScaled
-                (HsLinearArrow
+                (HsLinearAnn
                  (NoExtField))
                 (L
                  (EpAnn
@@ -638,7 +638,8 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
+            (HsUnannotated
+             (HsUnannMany)
              (NoExtField))
             (L
              (EpAnn
@@ -746,7 +747,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (NoExtField))
              (L
               (EpAnn
@@ -775,7 +777,8 @@
                 []))
               (HsFunTy
                (NoExtField)
-               (HsUnrestrictedArrow
+               (HsUnannotated
+                (HsUnannMany)
                 (NoExtField))
                (L
                 (EpAnn
@@ -893,7 +896,8 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
+                  (HsUnannotated
+                   (HsUnannMany)
                    (NoExtField))
                   (L
                    (EpAnn
@@ -957,7 +961,8 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnrestrictedArrow
+              (HsUnannotated
+               (HsUnannMany)
                (NoExtField))
               (L
                (EpAnn
@@ -979,7 +984,8 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
+                  (HsUnannotated
+                   (HsUnannMany)
                    (NoExtField))
                   (L
                    (EpAnn
@@ -1069,7 +1075,8 @@
               (PrefixConGADT
                (NoExtField)
                [(HsScaled
-                 (HsUnrestrictedArrow
+                 (HsUnannotated
+                  (HsUnannMany)
                   (NoExtField))
                  (L
                   (EpAnn
@@ -1134,7 +1141,8 @@
                         []))
                       (HsFunTy
                        (NoExtField)
-                       (HsUnrestrictedArrow
+                       (HsUnannotated
+                        (HsUnannMany)
                         (NoExtField))
                        (L
                         (EpAnn
@@ -1441,7 +1449,7 @@
              (PrefixCon
               []
               [(HsScaled
-                (HsLinearArrow
+                (HsLinearAnn
                  (NoExtField))
                 (L
                  (EpAnn
@@ -1810,7 +1818,8 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
+                (HsUnannotated
+                 (HsUnannMany)
                  (NoExtField))
                 (L
                  (EpAnn
@@ -1914,7 +1923,8 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
+            (HsUnannotated
+             (HsUnannMany)
              (NoExtField))
             (L
              (EpAnn
@@ -1943,7 +1953,8 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnrestrictedArrow
+              (HsUnannotated
+               (HsUnannMany)
                (NoExtField))
               (L
                (EpAnn
@@ -1965,7 +1976,8 @@
                    []))
                  (HsFunTy
                   (NoExtField)
-                  (HsUnrestrictedArrow
+                  (HsUnannotated
+                   (HsUnannMany)
                    (NoExtField))
                   (L
                    (EpAnn

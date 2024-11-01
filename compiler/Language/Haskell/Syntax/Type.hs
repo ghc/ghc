@@ -8,6 +8,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE LambdaCase #-}
                                       -- in module Language.Haskell.Syntax.Extension
 {-
@@ -21,8 +23,10 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Type (
         HsScaled(..),
-        hsMult, hsScaledThing,
-        HsArrow, HsArrowOf(..), XUnrestrictedArrow, XLinearArrow, XExplicitMult, XXArrow,
+        hsMultIsLinear, hsScaledThing, hsScaledGeneralize,
+        HsArrow, HsArrowOf, HsMultAnnOn(..), HsMultAnnOnWhat(..), HsUnannotatedMult(..),
+        pattern HsUnrestrictedArrow,
+        XUnannotated, XLinearAnn, XExplicitMult, XXMultAnnOn,
 
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
@@ -78,8 +82,9 @@ import Data.Maybe
 import Data.Eq
 import Data.Bool
 import Data.Char
-import Prelude (Integer)
+import Prelude (Integer, Functor)
 import Data.Ord (Ord)
+import Unsafe.Coerce (unsafeCoerce)
 
 {-
 ************************************************************************
@@ -938,36 +943,56 @@ data HsTyLit pass
   | XTyLit   !(XXTyLit pass)
 
 type HsArrow pass = HsArrowOf (LHsType pass) pass
+type HsArrowOf = HsMultAnnOn OnArrow
+
+-- HsMultAnnOn is used both to represent function arrows and multiplicity annotations
+-- in the record declaration syntax. But the default multiplicity is different
+-- between the two uses. In record syntax, the default is One, but on arrows, the
+-- default is Many. `HsUnannotatedMult` is used to distinguish between the two uses.
+data HsUnannotatedMult = HsUnannOne | HsUnannMany
+  deriving (Eq, Ord, Data)
+
+pattern HsUnrestrictedArrow :: XUnannotated on mult pass -> HsMultAnnOn on mult pass
+pattern HsUnrestrictedArrow a = HsUnannotated HsUnannMany a
+
+data HsMultAnnOnWhat = OnArrow | OnRecField
 
 -- | Denotes the type of arrows in the surface language
-data HsArrowOf mult pass
-  = HsUnrestrictedArrow !(XUnrestrictedArrow mult pass)
+data HsMultAnnOn (on :: HsMultAnnOnWhat) mult pass
+  = HsUnannotated HsUnannotatedMult !(XUnannotated on mult pass)
     -- ^ a -> b or a → b
 
-  | HsLinearArrow !(XLinearArrow mult pass)
+  | HsLinearAnn !(XLinearAnn on mult pass)
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
 
-  | HsExplicitMult !(XExplicitMult mult pass) !mult
+  | HsExplicitMult !(XExplicitMult on mult pass) !mult
     -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an
     -- `HsType` so as to preserve the syntax as written in the
     -- program.
 
-  | XArrow !(XXArrow mult pass)
+  | XMultAnnOn !(XXMultAnnOn on mult pass)
 
-type family XUnrestrictedArrow mult p
-type family XLinearArrow       mult p
-type family XExplicitMult      mult p
-type family XXArrow            mult p
+type family XUnannotated  (on :: HsMultAnnOnWhat) mult p
+type family XLinearAnn    (on :: HsMultAnnOnWhat) mult p
+type family XExplicitMult (on :: HsMultAnnOnWhat) mult p
+type family XXMultAnnOn   (on :: HsMultAnnOnWhat) mult p
 
 -- | This is used in the syntax. In constructor declaration. It must keep the
 -- arrow representation.
-data HsScaled pass a = HsScaled (HsArrow pass) a
+data HsScaled on pass a = HsScaled (HsMultAnnOn on (LHsType pass) pass) a
+  deriving (Functor)
 
-hsMult :: HsScaled pass a -> HsArrow pass
-hsMult (HsScaled m _) = m
+hsScaledGeneralize :: HsScaled on pass a -> HsScaled on1 pass a
+hsScaledGeneralize = unsafeCoerce
 
-hsScaledThing :: HsScaled pass a -> a
+hsMultIsLinear :: Bool -> HsScaled on pass a -> Bool
+hsMultIsLinear _      (HsScaled (HsUnannotated HsUnannOne _) _) = True
+hsMultIsLinear linear (HsScaled (HsUnannotated HsUnannMany _) _) = not linear
+hsMultIsLinear _      (HsScaled HsLinearAnn{} _) = True
+hsMultIsLinear _      _ = False
+
+hsScaledThing :: HsScaled on pass a -> a
 hsScaledThing (HsScaled _ t) = t
 
 {-
@@ -1073,7 +1098,7 @@ data ConDeclField pass  -- Record fields have Haddock docs on them
   = ConDeclField { cd_fld_ext  :: XConDeclField pass,
                    cd_fld_names :: [LFieldOcc pass],
                                    -- ^ See Note [ConDeclField pass]
-                   cd_fld_type :: LBangType pass,
+                   cd_fld_type :: HsScaled OnRecField pass (LBangType pass),
                    cd_fld_doc  :: Maybe (LHsDoc pass)}
   | XConDeclField !(XXConDeclField pass)
 

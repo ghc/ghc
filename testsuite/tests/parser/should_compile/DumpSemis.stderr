@@ -1483,7 +1483,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { DumpSemis.hs:29:18-19 })
                (NormalSyntax)))
@@ -1699,7 +1700,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { DumpSemis.hs:31:27-28 })
                (NormalSyntax)))

@@ -1,0 +1,10 @@
+LinearRecFieldMany.hs:9:6: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘test’: test x = C x
+
+LinearRecFieldMany.hs:12:7: error: [GHC-18872]
+    • Couldn't match type ‘Many’ with ‘One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘test2’: test2 x = C {urC = x}
+

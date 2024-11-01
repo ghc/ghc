@@ -148,7 +148,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { T17544.hs:6:11-12 })
                (NormalSyntax)))
@@ -326,7 +327,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { T17544.hs:10:11-12 })
                (NormalSyntax)))
@@ -502,7 +504,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { T17544.hs:14:11-12 })
                (NormalSyntax)))
@@ -681,7 +684,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { T17544.hs:18:11-12 })
                (NormalSyntax)))
@@ -767,7 +771,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { T17544.hs:20:11-12 })
                (NormalSyntax)))

@@ -295,13 +295,14 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
   -- AZ:TODO get rid of the concatMap
   concatMap (lookupCon sDocContext subdocs) [con_name con] ++ f con_args'
   where
+    f :: HsConDetails v (HsScaled on GhcRn (LHsType GhcRn)) (LocatedL [LocatedA (ConDeclField GhcRn)]) -> [String]
     f (PrefixCon _ args) = [typeSig name $ (map hsScaledThing args) ++ [resType]]
     f (InfixCon a1 a2) = f $ PrefixCon [] [a1, a2]
     f (RecCon (L _ recs)) =
-      f (PrefixCon [] $ map (hsLinear . cd_fld_type . unLoc) recs)
+      f (PrefixCon [] $ map (cd_fld_type . unLoc) recs)
         ++ concat
           [ (concatMap (lookupCon sDocContext subdocs . noLocA . unLoc . foLabel . unLoc) (cd_fld_names r))
-            ++ [out sDocContext (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
+            ++ [out sDocContext (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, hsScaledThing $ cd_fld_type r]]
           | r <- map unLoc recs
           ]
 
@@ -356,7 +357,7 @@ ppCtor
           tau_ty = foldr mkFunTy res_ty $
             case args of
               PrefixConGADT _ pos_args -> map hsScaledThing pos_args
-              RecConGADT _ (L _ flds) -> map (cd_fld_type . unL) flds
+              RecConGADT _ (L _ flds) -> map (hsScaledThing . cd_fld_type . unL) flds
           mkFunTy a b = noLocA (HsFunTy noExtField (HsUnrestrictedArrow noExtField) a b)
 
 ppFixity :: SDocContext -> (Name, Fixity) -> [String]

@@ -84,7 +84,7 @@
             []))
           (HsFunTy
            (NoExtField)
-           (HsUnrestrictedArrow
+           (HsUnannotated
             (EpUniTok
              (EpaSpan { T15279.hs:5:13-14 })
              (NormalSyntax)))

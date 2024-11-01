@@ -1034,8 +1034,8 @@ ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField Doc
 ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
   decltt
     ( cat (punctuate comma (map (ppBinder . rdrNameOcc . foExt . unLoc) names))
-        <+> dcolon unicode
-        <+> ppLType unicode ltype
+        <+> ppRecFieldMultAnn unicode ltype (dcolon unicode)
+        <+> ppLType unicode (hsScaledThing ltype)
     )
     <-> rDoc mbDoc
   where
@@ -1046,6 +1046,12 @@ ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
       case Maybe.listToMaybe names of
         Nothing -> error "No names. An invariant was broken. Please report this to the Haddock project"
         Just hd -> hd
+
+ppRecFieldMultAnn :: Bool -> HsScaled on DocNameI a -> LaTeX -> LaTeX
+ppRecFieldMultAnn unicode (HsScaled arr _) following = case arr of
+  HsUnannotated _ _ -> following
+  HsLinearAnn _ -> text "%1" <+> following
+  HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode <+> following
 
 -- | Pretty-print a bundled pattern synonym
 ppSideBySidePat
@@ -1311,8 +1317,8 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u =
     ]
   where
     arr = case mult of
-      HsLinearArrow _ -> lollipop u
-      HsUnrestrictedArrow _ -> arrow u
+      HsLinearAnn _ -> lollipop u
+      HsUnannotated _ _ -> arrow u
       HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
 ppr_mono_ty (HsBangTy _ b ty) u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name

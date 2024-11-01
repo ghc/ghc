@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                        -- in module Language.Haskell.Syntax.Extension
 
@@ -24,10 +25,11 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 
 module GHC.Hs.Type (
         Mult, HsScaled(..),
-        hsMult, hsScaledThing,
-        HsArrow, HsArrowOf(..), arrowToHsType, expandHsArrow,
+        hsMultIsLinear, hsScaledThing, hsScaledToHsTypes,
+        HsArrow, HsArrowOf, HsMultAnnOn(..), HsMultAnnOnWhat(..),
+        HsUnannotatedMult(..), pattern HsUnrestrictedArrow, multAnnToHsType, expandHsMultAnnOn,
         EpLinearArrow(..),
-        hsLinear, hsUnrestricted, isUnrestricted,
+        hsLinear, hsNoMultAnn, isUnrestricted,
         pprHsArrow,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
@@ -522,50 +524,47 @@ data EpLinearArrow
 instance NoAnn EpLinearArrow where
   noAnn = EpPct1 noAnn noAnn
 
-type instance XUnrestrictedArrow _ GhcPs = TokRarrow
-type instance XUnrestrictedArrow _ GhcRn = NoExtField
-type instance XUnrestrictedArrow _ GhcTc = NoExtField
+type instance XUnannotated  OnArrow    _ GhcPs = TokRarrow
+type instance XUnannotated  OnRecField _ GhcPs = TokDcolon
+type instance XUnannotated  _          _ GhcRn = NoExtField
+type instance XUnannotated  _          _ GhcTc = NoExtField
 
-type instance XLinearArrow       _ GhcPs = EpLinearArrow
-type instance XLinearArrow       _ GhcRn = NoExtField
-type instance XLinearArrow       _ GhcTc = NoExtField
+type instance XLinearAnn    OnArrow    _ GhcPs = EpLinearArrow
+type instance XLinearAnn    OnRecField _ GhcPs = (EpToken "%1", TokDcolon)
+type instance XLinearAnn    _          _ GhcRn = NoExtField
+type instance XLinearAnn    _          _ GhcTc = NoExtField
 
-type instance XExplicitMult      _ GhcPs = (EpToken "%", TokRarrow)
-type instance XExplicitMult      _ GhcRn = NoExtField
-type instance XExplicitMult      _ GhcTc = NoExtField
+type instance XExplicitMult OnArrow    _ GhcPs = (EpToken "%", TokRarrow)
+type instance XExplicitMult OnRecField _ GhcPs = (EpToken "%", TokDcolon)
+type instance XExplicitMult _          _ GhcRn = NoExtField
+type instance XExplicitMult _          _ GhcTc = NoExtField
 
-type instance XXArrow            _ (GhcPass _) = DataConCantHappen
+type instance XXMultAnnOn   _          _ (GhcPass _) = DataConCantHappen
 
-hsLinear :: forall p a. IsPass p => a -> HsScaled (GhcPass p) a
-hsLinear = HsScaled (HsLinearArrow x)
-  where
-    x = case ghcPass @p of
-      GhcPs -> noAnn
-      GhcRn -> noExtField
-      GhcTc -> noExtField
+hsLinear :: a -> HsScaled OnArrow GhcPs a
+hsLinear = HsScaled (HsLinearAnn noAnn)
 
-hsUnrestricted :: forall p a. IsPass p => a -> HsScaled (GhcPass p) a
-hsUnrestricted = HsScaled (HsUnrestrictedArrow x)
-  where
-    x = case ghcPass @p of
-      GhcPs -> noAnn
-      GhcRn -> noExtField
-      GhcTc -> noExtField
+hsNoMultAnn :: a -> HsScaled OnRecField GhcPs a
+hsNoMultAnn = HsScaled (HsUnannotated HsUnannOne noAnn)
+
+hsScaledToHsTypes :: HsScaled on GhcRn (LHsType GhcRn) -> [LHsType GhcRn]
+hsScaledToHsTypes (HsScaled arr t) = [multAnnToHsType arr, t]
 
 isUnrestricted :: HsArrow GhcRn -> Bool
-isUnrestricted (arrowToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == manyDataConName
+isUnrestricted (multAnnToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == manyDataConName
 isUnrestricted _ = False
 
-arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
-arrowToHsType = expandHsArrow (HsTyVar noAnn NotPromoted)
+multAnnToHsType :: HsMultAnnOn on (LHsType GhcRn) GhcRn -> LHsType GhcRn
+multAnnToHsType = expandHsMultAnnOn (HsTyVar noAnn NotPromoted)
 
--- | Convert an arrow into its corresponding multiplicity. In essence this
--- erases the information of whether the programmer wrote an explicit
+-- | Convert an multiplicity annotation into its corresponding multiplicity.
+-- In essence this erases the information of whether the programmer wrote an explicit
 -- multiplicity or a shorthand.
-expandHsArrow :: (LocatedN Name -> t GhcRn) -> HsArrowOf (LocatedA (t GhcRn)) GhcRn -> LocatedA (t GhcRn)
-expandHsArrow mk_var (HsUnrestrictedArrow _) = noLocA (mk_var (noLocA manyDataConName))
-expandHsArrow mk_var (HsLinearArrow _) = noLocA (mk_var (noLocA oneDataConName))
-expandHsArrow _mk_var (HsExplicitMult _ p) = p
+expandHsMultAnnOn :: (LocatedN Name -> t GhcRn) -> HsMultAnnOn on (LocatedA (t GhcRn)) GhcRn -> LocatedA (t GhcRn)
+expandHsMultAnnOn mk_var (HsUnannotated HsUnannOne _) = noLocA (mk_var (noLocA oneDataConName))
+expandHsMultAnnOn mk_var (HsUnannotated HsUnannMany _) = noLocA (mk_var (noLocA manyDataConName))
+expandHsMultAnnOn mk_var (HsLinearAnn _) = noLocA (mk_var (noLocA oneDataConName))
+expandHsMultAnnOn _mk_var (HsExplicitMult _ p) = p
 
 instance
       (Outputable mult, OutputableBndrId pass) =>
@@ -574,16 +573,25 @@ instance
 
 -- See #18846
 pprHsArrow :: (Outputable mult, OutputableBndrId pass) => HsArrowOf mult (GhcPass pass) -> SDoc
-pprHsArrow (HsUnrestrictedArrow _) = pprArrowWithMultiplicity visArgTypeLike (Left False)
-pprHsArrow (HsLinearArrow _)       = pprArrowWithMultiplicity visArgTypeLike (Left True)
-pprHsArrow (HsExplicitMult _ p)    = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))
+pprHsArrow (HsUnannotated _ _)  = pprArrowWithMultiplicity visArgTypeLike (Left False)
+pprHsArrow (HsLinearAnn _)      = pprArrowWithMultiplicity visArgTypeLike (Left True)
+pprHsArrow (HsExplicitMult _ p) = pprArrowWithMultiplicity visArgTypeLike (Right (ppr p))
 
-type instance XConDeclField  (GhcPass _) = TokDcolon
+type instance XConDeclField  (GhcPass _) = NoExtField
 type instance XXConDeclField (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (ConDeclField (GhcPass p)) where
-  ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
+  ppr (ConDeclField _ fld_n (HsScaled fld_mult fld_ty) _) = ppr_names fld_n <+> ppr_mult <+> ppr fld_ty
+    where
+      ppr_names :: [LFieldOcc (GhcPass p)] -> SDoc
+      ppr_names [n] = pprPrefixOcc n
+      ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
+
+      ppr_mult = case fld_mult of
+        HsUnannotated _ _ -> dcolon
+        HsLinearAnn _ -> text "%1" <+> dcolon
+        HsExplicitMult _ p -> text "%" <> ppr p <+> dcolon
 
 ---------------------
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
@@ -718,7 +726,7 @@ splitHsFunType ::
      LHsType (GhcPass p)
   -> ( ([EpToken "("], [EpToken ")"]) , EpAnnComments -- The locations of any parens and
                                   -- comments discarded
-     , [HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
+     , [HsScaled OnArrow (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
 splitHsFunType ty = go ty
   where
     go (L l (HsParTy (op,cp) ty))
@@ -1365,13 +1373,9 @@ pprConDeclFields :: forall p. OutputableBndrId p
                  => [LConDeclField (GhcPass p)] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
-    ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
-                                 cd_fld_doc = doc }))
-        = pprMaybeWithDoc doc (ppr_names ns <+> dcolon <+> ppr ty)
-
-    ppr_names :: forall p. OutputableBndrId p => [LFieldOcc (GhcPass p)] -> SDoc
-    ppr_names [n] = pprPrefixOcc n
-    ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
+    ppr_fld :: LConDeclField (GhcPass p) -> SDoc
+    ppr_fld (L _ (cdf@ConDeclField { cd_fld_doc = doc }))
+        = pprMaybeWithDoc doc (ppr cdf)
 
 -- Printing works more-or-less as for Types
 

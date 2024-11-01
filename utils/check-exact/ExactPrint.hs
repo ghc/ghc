@@ -73,6 +73,8 @@ import Data.Void
 import Utils
 import Types
 
+import Debug.Trace
+
 -- ---------------------------------------------------------------------
 
 exactPrint :: ExactPrint ast => ast -> String
@@ -724,7 +726,7 @@ printStringAdvanceA :: (Monad m, Monoid w) => String -> EP w m ()
 printStringAdvanceA str = printStringAtAA (EpaDelta noSrcSpan (SameLine 0) []) str >> return ()
 
 printStringAtAA :: (Monad m, Monoid w) => EpaLocation -> String -> EP w m EpaLocation
-printStringAtAA el str = printStringAtAAC CaptureComments el str
+printStringAtAA el str = traceShow (el, str) $ printStringAtAAC CaptureComments el str
 
 printStringAtNC :: (Monad m, Monoid w) => NoCommentsLocation -> String -> EP w m NoCommentsLocation
 printStringAtNC el str = do
@@ -832,21 +834,38 @@ markEpUniToken (EpUniTok aa isUnicode)  = do
 -- ---------------------------------------------------------------------
 
 markArrow :: (Monad m, Monoid w, ExactPrint a) => HsArrowOf a GhcPs -> EP w m (HsArrowOf a GhcPs)
-markArrow (HsUnrestrictedArrow arr) = do
+markArrow (HsUnannotated t arr) = do
   arr' <- markEpUniToken arr
-  return (HsUnrestrictedArrow arr')
-markArrow (HsLinearArrow (EpPct1 pct1 arr)) = do
+  return (HsUnannotated t arr')
+markArrow (HsLinearAnn (EpPct1 pct1 arr)) = do
   pct1' <- markEpToken pct1
   arr' <- markEpUniToken arr
-  return (HsLinearArrow (EpPct1 pct1' arr'))
-markArrow (HsLinearArrow (EpLolly arr)) = do
+  return (HsLinearAnn (EpPct1 pct1' arr'))
+markArrow (HsLinearAnn (EpLolly arr)) = do
   arr' <- markEpToken arr
-  return (HsLinearArrow (EpLolly arr'))
+  return (HsLinearAnn (EpLolly arr'))
 markArrow (HsExplicitMult (pct, arr) t) = do
   pct' <- markEpToken pct
   t' <- markAnnotated t
   arr' <- markEpUniToken arr
   return (HsExplicitMult (pct', arr') t')
+
+markRecFieldMult :: (Monad m, Monoid w, ExactPrint a) => HsMultAnnOn OnRecField a GhcPs -> EP w m (HsMultAnnOn OnRecField a GhcPs)
+markRecFieldMult (HsUnannotated t col) = do
+  traceM $ "markRecFieldMult:HsUnannotated"
+  col' <- markEpUniToken col
+  return (HsUnannotated t col')
+markRecFieldMult (HsLinearAnn (pct1, col)) = do
+  traceM $ "markRecFieldMult:HsLinearAnn"
+  pct1' <- markEpToken pct1
+  col' <- markEpUniToken col
+  return (HsLinearAnn (pct1', col'))
+markRecFieldMult (HsExplicitMult (pct, col) t) = do
+  traceM $ "markRecFieldMult:HsExplicitMult"
+  pct' <- markEpToken pct
+  t' <- markAnnotated t
+  col' <- markEpUniToken col
+  return (HsExplicitMult (pct', col') t')
 
 -- ---------------------------------------------------------------------
 
@@ -4405,11 +4424,10 @@ instance ExactPrint (ConDeclField GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (ConDeclField td names ftype mdoc) = do
+  exact (ConDeclField _ names ftype mdoc) = do
     names' <- markAnnotated names
-    td' <- markEpUniToken td
     ftype' <- markAnnotated ftype
-    return (ConDeclField td' names' ftype' mdoc)
+    return (ConDeclField noExtField names' ftype' mdoc)
 
 -- ---------------------------------------------------------------------
 
@@ -4422,13 +4440,21 @@ instance ExactPrint (FieldOcc GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance (ExactPrint a) => ExactPrint (HsScaled GhcPs a) where
+instance (ExactPrint a) => ExactPrint (HsScaled OnArrow GhcPs a) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
   exact (HsScaled arr t) = do
     t' <- markAnnotated t
     arr' <- markArrow arr
     return (HsScaled arr' t')
+
+instance (ExactPrint a) => ExactPrint (HsScaled OnRecField GhcPs a) where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact (HsScaled mult t) = do
+    mult' <- markRecFieldMult mult
+    t' <- markAnnotated t
+    return (HsScaled mult' t')
 
 -- ---------------------------------------------------------------------
 

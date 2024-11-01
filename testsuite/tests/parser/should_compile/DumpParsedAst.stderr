@@ -174,7 +174,7 @@
            (PrefixCon
             []
             [(HsScaled
-              (HsLinearArrow
+              (HsLinearAnn
                (EpPct1
                 (NoEpTok)
                 (NoEpUniTok)))
@@ -244,7 +244,8 @@
            []))
          (HsFunTy
           (NoExtField)
-          (HsUnrestrictedArrow
+          (HsUnannotated
+           (HsUnannMany)
            (EpUniTok
             (EpaSpan { DumpParsedAst.hs:9:20-21 })
             (NormalSyntax)))
@@ -829,7 +830,7 @@
            (PrefixCon
             []
             [(HsScaled
-              (HsLinearArrow
+              (HsLinearAnn
                (EpPct1
                 (NoEpTok)
                 (NoEpUniTok)))
@@ -940,7 +941,8 @@
            []))
          (HsFunTy
           (NoExtField)
-          (HsUnrestrictedArrow
+          (HsUnannotated
+           (HsUnannMany)
            (EpUniTok
             (EpaSpan { DumpParsedAst.hs:17:14-15 })
             (NormalSyntax)))
@@ -972,7 +974,8 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
+            (HsUnannotated
+             (HsUnannMany)
              (EpUniTok
               (EpaSpan { DumpParsedAst.hs:17:29-30 })
               (NormalSyntax)))
@@ -998,7 +1001,8 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
+                (HsUnannotated
+                 (HsUnannMany)
                  (EpUniTok
                   (EpaSpan { DumpParsedAst.hs:17:20-21 })
                   (NormalSyntax)))
@@ -1384,7 +1388,8 @@
                []))
              (HsFunTy
               (NoExtField)
-              (HsUnrestrictedArrow
+              (HsUnannotated
+               (HsUnannMany)
                (EpUniTok
                 (EpaSpan { DumpParsedAst.hs:18:33-34 })
                 (NormalSyntax)))
@@ -1516,7 +1521,8 @@
             []))
           (HsFunTy
            (NoExtField)
-           (HsUnrestrictedArrow
+           (HsUnannotated
+            (HsUnannMany)
             (EpUniTok
              (EpaSpan { DumpParsedAst.hs:21:22-23 })
              (NormalSyntax)))
@@ -1548,7 +1554,8 @@
               []))
             (HsFunTy
              (NoExtField)
-             (HsUnrestrictedArrow
+             (HsUnannotated
+              (HsUnannMany)
               (EpUniTok
                (EpaSpan { DumpParsedAst.hs:21:27-28 })
                (NormalSyntax)))
@@ -1673,7 +1680,8 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
+                (HsUnannotated
+                 (HsUnannMany)
                  (EpUniTok
                   (EpaSpan { DumpParsedAst.hs:22:30-31 })
                   (NormalSyntax)))
@@ -1745,7 +1753,8 @@
              []))
            (HsFunTy
             (NoExtField)
-            (HsUnrestrictedArrow
+            (HsUnannotated
+             (HsUnannMany)
              (EpUniTok
               (EpaSpan { DumpParsedAst.hs:22:54-55 })
               (NormalSyntax)))
@@ -1771,7 +1780,8 @@
                  []))
                (HsFunTy
                 (NoExtField)
-                (HsUnrestrictedArrow
+                (HsUnannotated
+                 (HsUnannMany)
                  (EpUniTok
                   (EpaSpan { DumpParsedAst.hs:22:45-46 })
                   (NormalSyntax)))
@@ -1871,7 +1881,8 @@
             (PrefixConGADT
              (NoExtField)
              [(HsScaled
-               (HsUnrestrictedArrow
+               (HsUnannotated
+                (HsUnannMany)
                 (EpUniTok
                  (EpaSpan { DumpParsedAst.hs:23:36-37 })
                  (NormalSyntax)))
@@ -1942,7 +1953,8 @@
                       []))
                     (HsFunTy
                      (NoExtField)
-                     (HsUnrestrictedArrow
+                     (HsUnannotated
+                      (HsUnannMany)
                       (EpUniTok
                        (EpaSpan { DumpParsedAst.hs:23:27-28 })
                        (NormalSyntax)))

@@ -1432,8 +1432,8 @@ rn_ty_pat ty@(XHsType{}) = do
   liftRnFV $ rnHsType ctxt ty
 
 rn_ty_pat_arrow :: HsArrow GhcPs -> TPRnM (HsArrow GhcRn)
-rn_ty_pat_arrow (HsUnrestrictedArrow _) = pure (HsUnrestrictedArrow noExtField)
-rn_ty_pat_arrow (HsLinearArrow _) = pure (HsLinearArrow noExtField)
+rn_ty_pat_arrow (HsUnannotated mult _) = pure (HsUnannotated mult noExtField)
+rn_ty_pat_arrow (HsLinearAnn _) = pure (HsLinearAnn noExtField)
 rn_ty_pat_arrow (HsExplicitMult _ p)
   = rn_lty_pat p <&> (\mult -> HsExplicitMult noExtField mult)
 
