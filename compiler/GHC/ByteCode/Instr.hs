@@ -186,7 +186,12 @@ data BCInstr
    -- The Word16 value is a constructor number and therefore
    -- stored in the insn stream rather than as an offset into
    -- the literal pool.
+
+   -- | Test whether the tag of a closure pointer is less than the given value.
+   -- If not, jump to the given label.
    | TESTLT_P  !Word16 LocalLabel
+   -- | Test whether the tag of a closure pointer is equal to the given value.
+   -- If not, jump to the given label.
    | TESTEQ_P  !Word16 LocalLabel
 
    | CASEFAIL
