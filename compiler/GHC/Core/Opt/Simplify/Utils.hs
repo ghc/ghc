@@ -12,8 +12,8 @@ module GHC.Core.Opt.Simplify.Utils (
         tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
-        preInlineUnconditionally, postInlineUnconditionally,
-        postInlineTypeUnconditionally,
+        preInlineUnconditionally, preInlineTypeUnconditionally,
+        postInlineUnconditionally, postInlineTypeUnconditionally,
         activeRule,
         getUnfoldingInRuleMatch,
         updModeForStableUnfoldings, updModeForRules,
@@ -1455,9 +1455,23 @@ is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
 -}
 
+preInlineTypeUnconditionally :: SimplEnv -> InTyVar -> InType -> Maybe SimplEnv
+preInlineTypeUnconditionally env tv rhs_ty
+  | not (sePreInline env)
+  = Nothing
+
+  -- Inline unconditionally if it occurs exactly once, inside a lambda or not.
+  -- No work is wasted by substituting inside a lambda, although if the
+  -- lambda is inlined a lot, we migth duplicate the type.
+  | OneOcc{ occ_n_br = 1 } <- tyVarOccInfo tv
+  = Just $! extendTvSubst env tv $! substTy env rhs_ty
+
+  | otherwise
+  = Nothing
+
 preInlineUnconditionally
     :: SimplEnv -> TopLevelFlag
-    -> InVar                -- Works for TyVar, CoVar, and Id
+    -> InId                 -- Works for CoVar, and Id; not a TyVar
     -> InExpr -> StaticEnv  -- These two go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let-can-float invariant
@@ -1465,18 +1479,8 @@ preInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
-  | not pre_inline_unconditionally           = Nothing
-
-  -- First deal with type variables; inline unconditionally
-  -- if it occurs exactly once, inside a lambda or not
-  -- No work is wasted by substituting inside a lambda, although
-  -- if the lambea is inlined a lot, we migth dupliate the type.
-  | isTyVar bndr
-  = case (tyVarOccInfo bndr, rhs) of
-      (OneOcc{ occ_n_br = 1 }, Type ty) -> Just $! (extend_tv_subst_with ty)
-      _                                 -> Nothing
-
-  -- Now we are onto Ids
+  | assertPpr (isId bndr) (ppr bndr) $
+    not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
@@ -1492,7 +1496,6 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   where
     unf = idUnfolding bndr
     extend_id_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
-    extend_tv_subst_with ty      = extendTvSubst env bndr $! (substTy rhs_env ty)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
@@ -1604,7 +1607,7 @@ rules] for details.
 -}
 
 postInlineTypeUnconditionally :: Type -> Bool
-postInlineTypeUnconditionally _ = False
+postInlineTypeUnconditionally _ = False -- For now
 
 postInlineUnconditionally
     :: SimplEnv -> BindContext

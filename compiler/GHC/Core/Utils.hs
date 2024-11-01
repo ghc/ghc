@@ -54,7 +54,7 @@ module GHC.Core.Utils (
         collectMakeStaticArgs,
 
         -- * Predicates on binds
-        isJoinBind, isTypeBind, isTyCoBind,
+        isJoinBind, isTypeBind, isTypeBind_maybe, isTyCoBind,
 
         -- * Tag inference
         mkStrictFieldSeqs, shouldStrictifyIdForCbv, shouldUseCbvForId,
@@ -2774,6 +2774,10 @@ collectMakeStaticArgs _          = Nothing
 isTypeBind :: Bind b -> Bool
 isTypeBind (NonRec _ (Type {})) = True
 isTypeBind _                    = False
+
+isTypeBind_maybe :: Bind b -> Maybe (b, Type)
+isTypeBind_maybe (NonRec tv (Type rhs_ty)) = Just (tv,rhs_ty)
+isTypeBind_maybe  _                        = Nothing
 
 -- | `isTypeBind` is True of type bindings (@a = Type ty)
 isTyCoBind :: Bind b -> Bool

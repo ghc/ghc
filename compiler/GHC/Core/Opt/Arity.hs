@@ -1618,6 +1618,9 @@ arityType env (Case scrut bndr _ alts)
     alts_type = foldr1 (andArityType env) (map arity_type_alt alts)
 
 arityType env (Let (NonRec b rhs) e)
+  | isTyCoVar b       -- Totally ignore a type-let or coercion-let
+  = arityType env e
+  | otherwise
   = -- See Note [arityType for non-recursive let-bindings]
     floatIn rhs_cost (arityType env' e)
   where
@@ -2667,7 +2670,7 @@ Fix 1: Zap `idArity` when analysing recursive RHSs and re-attach the info when
     (such as dropping of `seq`s when arity > 0) will no longer work in the RHS.
     Plus it requires non-trivial refactorings to both the simple optimiser (in
     the way `subst_opt_bndr` is used) as well as the Simplifier (in the way
-    `simplRecBndrs` and `simplRecJoinBndrs` is used), modifying the SimplEnv's
+    `simplIdBndrs` and `simplRecJoinBndrs` is used), modifying the SimplEnv's
     substitution twice in the process. A very complicated stop-gap.
 
 Fix 2: Pass the set of enclosing recursive binders to `tryEtaReduce`; these are
