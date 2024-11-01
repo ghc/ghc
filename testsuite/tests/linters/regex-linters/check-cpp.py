@@ -29,12 +29,6 @@ for l in linters:
     l.add_path_filter(lambda path: not path.name == 'config.guess')
     # Don't lint files from external xxhash projects
     l.add_path_filter(lambda path: path != Path('rts', 'xxhash.h')),
-    # Don't lint font files
-    l.add_path_filter(lambda path: not path.parent == Path('docs','users_guide',
-        'rtd-theme', 'static', 'fonts'))
-    # Don't lint image files
-    l.add_path_filter(lambda path: not path.parent == Path('docs','users_guide',
-        'images'))
     # Don't lint core spec
     l.add_path_filter(lambda path: not path.name == 'core-spec.pdf')
     # Don't lint the linter itself
