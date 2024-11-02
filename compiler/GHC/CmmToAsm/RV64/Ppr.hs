@@ -737,6 +737,12 @@ pprInstr platform instr = case instr of
   VSUB o1 o2 o3 -> op3 (text "\tvfsub.vv") o1 o2 o3
   VMUL o1 o2 o3 -> op3 (text "\tvfmul.vv") o1 o2 o3
   VQUOT o1 o2 o3 -> op3 (text "\tvfdiv.vv") o1 o2 o3
+  VSMIN o1 o2 o3 -> op3 (text "\tvmin.vv") o1 o2 o3
+  VSMAX o1 o2 o3 -> op3 (text "\tvmax.vv") o1 o2 o3
+  VUMIN o1 o2 o3 -> op3 (text "\tvminu.vv") o1 o2 o3
+  VUMAX o1 o2 o3 -> op3 (text "\tvmaxu.vv") o1 o2 o3
+  VFMIN o1 o2 o3 -> op3 (text "\tvfmin.vv") o1 o2 o3
+  VFMAX o1 o2 o3 -> op3 (text "\tvfmax.vv") o1 o2 o3
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1

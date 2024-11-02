@@ -120,6 +120,12 @@ regUsageOfInstr platform instr = case instr of
   VSUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VMUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   VQUOT dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VUMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VUMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VFMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VFMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
@@ -232,6 +238,12 @@ patchRegsOfInstr instr env = case instr of
   VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
   VMUL o1 o2 o3 -> VMUL (patchOp o1) (patchOp o2) (patchOp o3)
   VQUOT o1 o2 o3 -> VQUOT (patchOp o1) (patchOp o2) (patchOp o3)
+  VSMIN o1 o2 o3 -> VSMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VSMAX o1 o2 o3 -> VSMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VUMIN o1 o2 o3 -> VUMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VUMAX o1 o2 o3 -> VUMAX (patchOp o1) (patchOp o2) (patchOp o3)
+  VFMIN o1 o2 o3 -> VFMIN (patchOp o1) (patchOp o2) (patchOp o3)
+  VFMAX o1 o2 o3 -> VFMAX (patchOp o1) (patchOp o2) (patchOp o3)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   _ -> panic $ "patchRegsOfInstr: " ++ instrCon instr
@@ -659,6 +671,12 @@ data Instr
   | VSUB Operand Operand Operand
   | VMUL Operand Operand Operand
   | VQUOT Operand Operand Operand
+  | VSMIN Operand Operand Operand
+  | VSMAX Operand Operand Operand
+  | VUMIN Operand Operand Operand
+  | VUMAX Operand Operand Operand
+  | VFMIN Operand Operand Operand
+  | VFMAX Operand Operand Operand
 
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
 data FenceType = FenceRead | FenceWrite | FenceReadWrite
@@ -734,6 +752,12 @@ instrCon i =
     VSUB {} -> "VSUB"
     VMUL {} -> "VMUL"
     VQUOT {} -> "VQUOT"
+    VSMIN {} -> "VSMIN"
+    VSMAX {} -> "VSMAX"
+    VUMIN {} -> "VUMIN"
+    VUMAX {} -> "VUMAX"
+    VFMIN {} -> "VFMIN"
+    VFMAX {} -> "VFMAX"
     FMA variant _ _ _ _ ->
       case variant of
         FMAdd -> "FMADD"
