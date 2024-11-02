@@ -47,6 +47,7 @@ test('simd005', [], compile_and_run, [''])
 test('simd006', [], compile_and_run, [''])
 test('simd007', [], compile_and_run, [''])
 test('simd008', [], compile_and_run, [''])
+test('simd001', [], compile_and_run, ['-opta=-march=rv64gv -dppr-debug -ddump-to-file -ddump-asm'])
 test('simd009', [ req_th
                 , extra_files(['Simd009b.hs', 'Simd009c.hs'])
                 , unless(have_cpu_feature('avx'), skip)
