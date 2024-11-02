@@ -364,15 +364,11 @@ stmtToInstrs stmt = do
       genCCall target result_regs args
     CmmComment s -> pure (unitOL (COMMENT (ftext s)))
     CmmTick {} -> pure nilOL
-    CmmAssign reg src
-      | isFloatType ty -> assignReg_FltCode format reg src
-      | otherwise -> assignReg_IntCode format reg src
+    CmmAssign reg src -> assignReg format reg src
       where
         ty = cmmRegType reg
         format = cmmTypeFormat ty
-    CmmStore addr src _alignment
-      | isFloatType ty -> assignMem_FltCode format addr src
-      | otherwise -> assignMem_IntCode format addr src
+    CmmStore addr src _alignment -> assignMem format addr src
       where
         ty = cmmExprType platform src
         format = cmmTypeFormat ty
@@ -662,9 +658,9 @@ getRegister' config plat expr =
       let format = cmmTypeFormat rep
           width = typeWidth rep
       Amode addr addr_code <- getAmode plat width mem
-      case width of
-        w
-          | (w <= W64) || isVecFormat format ->
+      case (width, format) of
+        (w, _f)
+          | (w <= W64) ->
               -- Load without sign-extension. See Note [Signed arithmetic on RISCV64]
               pure
                 ( Any
@@ -672,6 +668,17 @@ getRegister' config plat expr =
                     ( \dst ->
                         addr_code
                           `snocOL` LDRU format (OpReg width dst) (OpAddr addr)
+                    )
+                )
+        (_w, f)
+          | VecFormat l vf <- f ->
+              pure
+                ( Any
+                    format
+                    ( \dst ->
+                        addr_code `snocOL`
+                          annExpr expr (VSETIVLI zeroReg (fromIntegral l) ((formatToWidth . scalarFormatFormat) vf) M1 TA MA) `snocOL`
+                          LDRU format (OpReg width dst) (OpAddr addr)
                     )
                 )
         -- TODO: Load vector - instructions VLW, VLB, VLH, ... Encode in ppr of LDRU?
@@ -1557,11 +1564,8 @@ getAmode _platform _ expr =
 -- fails when the right hand side is forced into a fixed register
 -- (e.g. the result of a call).
 
-assignMem_IntCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
-assignReg_IntCode :: Format -> CmmReg -> CmmExpr -> NatM InstrBlock
-assignMem_FltCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
-assignReg_FltCode :: Format -> CmmReg -> CmmExpr -> NatM InstrBlock
-assignMem_IntCode rep addrE srcE =
+assignMem :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
+assignMem rep addrE srcE =
   do
     (src_reg, _format, code) <- getSomeReg srcE
     platform <- getPlatform
@@ -1570,10 +1574,19 @@ assignMem_IntCode rep addrE srcE =
     return $ COMMENT (text "CmmStore" <+> parens (text (show addrE)) <+> parens (text (show srcE)))
       `consOL` ( code
                    `appOL` addr_code
+                   `appOL` init_vector_code
                    `snocOL` STR rep (OpReg w src_reg) (OpAddr addr)
                )
+  where
+    init_vector_code :: InstrBlock
+    init_vector_code | VecFormat l w <- rep = toOL [
+                         COMMENT (text "Init vector state"),
+                         VSETIVLI zeroReg (fromIntegral l) ((formatToWidth . scalarFormatFormat) w) M1 TA MA
+                         ]
+                      | otherwise = nilOL
 
-assignReg_IntCode _ reg src =
+assignReg :: Format -> CmmReg -> CmmExpr -> NatM InstrBlock
+assignReg _ reg src =
   do
     platform <- getPlatform
     let dst = getRegisterReg platform reg
@@ -1587,12 +1600,6 @@ assignReg_IntCode _ reg src =
           `consOL` ( fcode
                        `snocOL` MOV (OpReg (formatToWidth format) dst) (OpReg (formatToWidth format) freg)
                    )
-
--- Let's treat Floating point stuff
--- as integer code for now. Opaque.
-assignMem_FltCode = assignMem_IntCode
-
-assignReg_FltCode = assignReg_IntCode
 
 -- -----------------------------------------------------------------------------
 -- Jumps
