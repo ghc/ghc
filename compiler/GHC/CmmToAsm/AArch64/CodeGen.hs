@@ -317,15 +317,9 @@ stmtToInstrs stmt = do
       CmmComment s   -> return (unitOL (COMMENT (ftext s)))
       CmmTick {}     -> return nilOL
 
-      CmmAssign reg src
-        | isFloatType ty         -> assignReg_FltCode format reg src
-        | otherwise              -> assignReg_IntCode format reg src
-          where ty = cmmRegType reg
-                format = cmmTypeFormat ty
+      CmmAssign reg src -> assignReg reg src
 
-      CmmStore addr src _alignment
-        | isFloatType ty         -> assignMem_FltCode format addr src
-        | otherwise              -> assignMem_IntCode format addr src
+      CmmStore addr src _alignment -> assignMem format addr src
           where ty = cmmExprType platform src
                 format = cmmTypeFormat ty
 
@@ -1480,13 +1474,8 @@ getAmode _platform _ expr
 -- fails when the right hand side is forced into a fixed register
 -- (e.g. the result of a call).
 
-assignMem_IntCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
-assignReg_IntCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
-
-assignMem_FltCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
-assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
-
-assignMem_IntCode rep addrE srcE
+assignMem :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
+assignMem rep addrE srcE
   = do
     (src_reg, _format, code) <- getSomeReg srcE
     platform <- getPlatform
@@ -1497,19 +1486,17 @@ assignMem_IntCode rep addrE srcE
             `appOL` addr_code
             `snocOL` STR rep (OpReg w src_reg) (OpAddr addr))
 
-assignReg_IntCode _ reg src
+assignReg :: CmmReg  -> CmmExpr -> NatM InstrBlock
+assignReg reg src
   = do
     platform <- getPlatform
     let dst = getRegisterReg platform reg
     r <- getRegister src
     return $ case r of
-      Any _ code              -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` code dst
-      Fixed format freg fcode -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` (fcode `snocOL` MOV (OpReg (formatToWidth format) dst) (OpReg (formatToWidth format) freg))
-
--- Let's treat Floating point stuff
--- as integer code for now. Opaque.
-assignMem_FltCode = assignMem_IntCode
-assignReg_FltCode = assignReg_IntCode
+      Any _ code              -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src)))
+                                `consOL` code dst
+      Fixed format freg fcode -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src)))
+                                `consOL` (fcode `snocOL` MOV (OpReg (formatToWidth format) dst) (OpReg (formatToWidth format) freg))
 
 -- -----------------------------------------------------------------------------
 -- Jumps
