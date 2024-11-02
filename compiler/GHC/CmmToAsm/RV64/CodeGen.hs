@@ -1226,6 +1226,15 @@ getRegister' config plat expr =
         MO_VF_Mul  length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VMUL d x y))
         MO_VF_Quot length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VQUOT d x y))
 
+        -- See https://godbolt.org/z/PvcWKMKoW
+        MO_VS_Min length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VSMIN d x y))
+        MO_VS_Max length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VSMAX d x y))
+        MO_VU_Min length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VUMIN d x y))
+        MO_VU_Max length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VUMAX d x y))
+        MO_VF_Min length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VFMIN d x y))
+        MO_VF_Max length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VFMAX d x y))
+
+
         _e -> panic $ "Missing operation " ++ show expr
 
         -- Vectors
@@ -2386,6 +2395,12 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       VSUB {} -> 1
       VMUL {} -> 1
       VQUOT {} -> 1
+      VSMIN {} -> 1
+      VSMAX {} -> 1
+      VUMIN {} -> 1
+      VUMAX {} -> 1
+      VFMIN {} -> 1
+      VFMAX {} -> 1
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1
       BCOND {} -> long_bc_jump_size
