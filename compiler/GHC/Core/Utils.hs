@@ -1313,6 +1313,7 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Lam b e)     | not (isRuntimeVar b) = go e
     go (Tick t e)    | not (tickishIsCode t)= go e              -- See Note [Tick trivial]
     go (Cast e co)   | coercionIsTrivial co = go e
+    go (Let b e)     | isTyCoBind b         = go e
     go (Case e b _ as)
       | null as
       = go e     -- See Note [Empty case is trivial]

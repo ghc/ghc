@@ -1041,6 +1041,7 @@ substVarBndrUsing subst_fn subst v
 -- | Substitute a tyvar in a binding position, returning an
 -- extended subst and a new tyvar.
 -- Use the supplied function to substitute in the kind
+-- Zap the TyVar unfolding, if any
 substTyVarBndrUsing
   :: (Subst -> Type -> Type)  -- ^ Use this to substitute in the kind
   -> Subst -> TyVar -> (Subst, TyVar)
@@ -1068,10 +1069,12 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
         --      (\x.e) with id_subst = [x |-> e']
         -- Here we must simply zap the substitution for x
 
-    new_var | no_kind_change = uniqAway in_scope old_var
-            | otherwise = uniqAway in_scope $
-                          setTyVarKind old_var (subst_fn subst old_ki)
+    new_var1 | no_kind_change = uniqAway in_scope old_var
+             | otherwise = uniqAway in_scope $
+                           setTyVarKind old_var (subst_fn subst old_ki)
         -- The uniqAway part makes sure the new variable is not already in scope
+
+    new_var = zapTyVarUnfolding new_var1
 
 -- | Substitute a covar in a binding position, returning an
 -- extended subst and a new covar.
