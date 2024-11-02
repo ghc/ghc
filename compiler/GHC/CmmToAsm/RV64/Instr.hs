@@ -115,6 +115,11 @@ regUsageOfInstr platform instr = case instr of
   VMERGE dst op1 op2 opm -> usage (regOp op1 ++ regOp op2 ++ regOp opm, regOp dst)
   VSLIDEDOWN dst op1 op2 -> usage (regOp op1 ++ regOp op2, regOp dst)
   VSETIVLI dst _ _ _ _ _ -> usage ([], [dst])
+  VNEG dst src1 -> usage (regOp src1, regOp dst)
+  VADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VSUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VMUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  VQUOT dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
   FMA _ dst src1 src2 src3 ->
     usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
@@ -222,6 +227,11 @@ patchRegsOfInstr instr env = case instr of
   VMERGE o1 o2 o3 o4 -> VMERGE (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   VSLIDEDOWN o1 o2 o3 -> VSLIDEDOWN (patchOp o1) (patchOp o2) (patchOp o3)
   VSETIVLI o1 o2 o3 o4 o5 o6 -> VSETIVLI (env o1) o2 o3 o4 o5 o6
+  VNEG o1 o2 -> VNEG (patchOp o1) (patchOp o2)
+  VADD o1 o2 o3 -> VADD (patchOp o1) (patchOp o2) (patchOp o3)
+  VSUB o1 o2 o3 -> VSUB (patchOp o1) (patchOp o2) (patchOp o3)
+  VMUL o1 o2 o3 -> VMUL (patchOp o1) (patchOp o2) (patchOp o3)
+  VQUOT o1 o2 o3 -> VQUOT (patchOp o1) (patchOp o2) (patchOp o3)
   FMA s o1 o2 o3 o4 ->
     FMA s (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
   _ -> panic $ "patchRegsOfInstr: " ++ instrCon instr
@@ -644,6 +654,11 @@ data Instr
   | VMERGE Operand Operand Operand Operand
   | VSLIDEDOWN Operand Operand Operand
   | VSETIVLI Reg Word Width VectorGrouping TailAgnosticFlag MaskAgnosticFlag
+  | VNEG Operand Operand
+  | VADD Operand Operand Operand
+  | VSUB Operand Operand Operand
+  | VMUL Operand Operand Operand
+  | VQUOT Operand Operand Operand
 
 -- | Operand of a FENCE instruction (@r@, @w@ or @rw@)
 data FenceType = FenceRead | FenceWrite | FenceReadWrite
@@ -714,6 +729,11 @@ instrCon i =
     VMERGE {} -> "VMERGE"
     VSLIDEDOWN {} -> "VSLIDEDOWN"
     VSETIVLI {} -> "VSETIVLI"
+    VNEG {} -> "VNEG"
+    VADD {} -> "VADD"
+    VSUB {} -> "VSUB"
+    VMUL {} -> "VMUL"
+    VQUOT {} -> "VQUOT"
     FMA variant _ _ _ _ ->
       case variant of
         FMAdd -> "FMADD"

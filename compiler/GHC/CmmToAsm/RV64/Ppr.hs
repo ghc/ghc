@@ -732,6 +732,11 @@ pprInstr platform instr = case instr of
   VSLIDEDOWN o1 o2 o3 -> op3 (text "\tvslidedown.vx") o1 o2 o3
   VSETIVLI dst len width grouping ta ma -> line $
     text "\tvsetivli" <+> pprReg W64 dst <> comma <+> (text.show) len <> comma <+> pprVWidth width <> comma <+> pprGrouping grouping <> comma <+> pprTA ta <> comma <+> pprMasking ma
+  VNEG o1 o2 -> op2 (text "\tvfneg.v") o1 o2
+  VADD o1 o2 o3 -> op3 (text "\tvfadd.vv") o1 o2 o3
+  VSUB o1 o2 o3 -> op3 (text "\tvfsub.vv") o1 o2 o3
+  VMUL o1 o2 o3 -> op3 (text "\tvfmul.vv") o1 o2 o3
+  VQUOT o1 o2 o3 -> op3 (text "\tvfdiv.vv") o1 o2 o3
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ instrCon instr
   where
     op1 op o1 = line $ op <+> pprOp platform o1

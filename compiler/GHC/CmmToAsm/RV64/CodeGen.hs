@@ -835,20 +835,29 @@ getRegister' config plat expr =
         --TODO: MO_V_Broadcast with immediate: If the right value is a literal,
         -- it may use vmv.v.i (simpler)
         MO_V_Broadcast length w -> do
-          (reg_idx, format_idx, code_idx) <- getSomeReg e
-          let w_idx = formatToWidth format_idx
+          (reg_val, format_val, code_val) <- getSomeReg e
+          let w_val = formatToWidth format_val
           pure $ Any (intFormat w) $ \dst ->
-            code_idx `snocOL`
+            code_val `snocOL`
             annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
-            VMV (OpReg w dst) (OpReg w_idx reg_idx)
+            VMV (OpReg w dst) (OpReg w_val reg_val)
 
         MO_VF_Broadcast length w -> do
-          (reg_idx, format_idx, code_idx) <- getSomeReg e
-          let w_idx = formatToWidth format_idx
+          (reg_val, format_val, code_val) <- getSomeReg e
+          let w_val = formatToWidth format_val
           pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
-            code_idx `snocOL`
+            code_val `snocOL`
             annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
-            VMV (OpReg w dst) (OpReg w_idx reg_idx)
+            VMV (OpReg w dst) (OpReg w_val reg_val)
+
+        -- TODO: NO MO_V_Neg? Why?
+        MO_VF_Neg length w -> do
+          (reg_v, format_v, code_v) <- getSomeReg e
+          let w_v = formatToWidth format_v
+          pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
+            code_v `snocOL`
+            annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `snocOL`
+            VNEG (OpReg w dst) (OpReg w_v reg_v)
 
         x -> pprPanic ("getRegister' (monadic CmmMachOp): " ++ show x) (pdoc plat expr)
       where
@@ -1130,6 +1139,17 @@ getRegister' config plat expr =
                       `appOL` op (OpReg w dst) (OpReg w reg_fx) (OpReg w reg_fy)
                 )
 
+          vecOp length w op =  do
+            (reg_x, format_x, code_x) <- getSomeReg x
+            (reg_y, format_y, code_y) <- getSomeReg y
+            massertPpr (isVecFormat format_x && isVecFormat format_y) $
+              text "vecOp: non-vector operand. operands: " <+> ppr format_x <+> ppr format_y
+            pure $ Any (vecFormat (cmmVec length (cmmFloat w))) $ \dst ->
+              code_x `appOL`
+              code_y `snocOL`
+              annExpr expr (VSETIVLI zeroReg (fromIntegral length) w M1 TA MA) `appOL`
+              op (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)
+
       case op of
         -- Integer operations
         -- Add/Sub should only be Integer Options.
@@ -1181,6 +1201,7 @@ getRegister' config plat expr =
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (SRL d x y))
         MO_S_Shr w -> intOp True w (\d x y -> unitOL $ annExpr expr (SRA d x y))
 
+        -- TODO: Use vecOp here
         MO_VF_Extract length w -> do
           (reg_v, format_v, code_v) <- getSomeReg x
           (reg_idx, format_idx, code_idx) <- getSomeReg y
@@ -1200,6 +1221,10 @@ getRegister' config plat expr =
             -- Move to float register
             -- vmv.x.s a0, v8
             VMV (OpReg w dst) (OpReg (formatToWidth tmpFormat) tmp)
+        MO_VF_Add  length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VADD d x y))
+        MO_VF_Sub  length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VSUB d x y))
+        MO_VF_Mul  length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VMUL d x y))
+        MO_VF_Quot length w -> vecOp length w (\d x y -> unitOL $ annExpr expr (VQUOT d x y))
 
         _e -> panic $ "Missing operation " ++ show expr
 
@@ -2356,6 +2381,11 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       VMERGE {} -> 1
       VSLIDEDOWN {} -> 1
       VSETIVLI {} -> 1
+      VNEG {} -> 1
+      VADD {} -> 1
+      VSUB {} -> 1
+      VMUL {} -> 1
+      VQUOT {} -> 1
       -- estimate the subsituted size for jumps to lables
       -- jumps to registers have size 1
       BCOND {} -> long_bc_jump_size
