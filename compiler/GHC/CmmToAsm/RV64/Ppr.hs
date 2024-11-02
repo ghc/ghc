@@ -655,8 +655,8 @@ pprInstr platform instr = case instr of
   STR II64 o1 o2 -> op2 (text "\tsd") o1 o2
   STR FF32 o1 o2 -> op2 (text "\tfsw") o1 o2
   STR FF64 o1 o2 -> op2 (text "\tfsd") o1 o2
-  STR (VecFormat 2 FmtFloat) o1 o2@(OpAddr _) -> op2 (text "\tvse32.v") o1 o2
-  STR (VecFormat 2 FmtDouble) o1 o2@(OpAddr _) -> op2 (text "\tvse64.v") o1 o2
+  STR (VecFormat _ FmtFloat) o1 o2@(OpAddr _) -> op2 (text "\tvse32.v") o1 o2
+  STR (VecFormat _ FmtDouble) o1 o2@(OpAddr _) -> op2 (text "\tvse64.v") o1 o2
   STR f o1 o2 -> pprPanic "Unsupported store" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     lines_
@@ -681,8 +681,8 @@ pprInstr platform instr = case instr of
   LDRU FF64 o1 o2@(OpAddr (AddrReg _)) -> op2 (text "\tfld") o1 o2
   LDRU FF64 o1 o2@(OpAddr (AddrRegImm _ _)) -> op2 (text "\tfld") o1 o2
   -- vectors
-  LDRU (VecFormat 2 FmtFloat) o1 o2@(OpAddr _) -> op2 (text "\tvle32.v") o1 o2
-  LDRU (VecFormat 2 FmtDouble) o1 o2@(OpAddr _) -> op2 (text "\tvle64.v") o1 o2
+  LDRU (VecFormat _ FmtFloat) o1 o2 -> op2 (text "\tvle32.v") o1 o2
+  LDRU (VecFormat _ FmtDouble) o1 o2 -> op2 (text "\tvle64.v") o1 o2
   LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text . show) f <+> pprOp platform o1 <+> pprOp platform o2)
   FENCE r w -> line $ text "\tfence" <+> pprFenceType r <> char ',' <+> pprFenceType w
   FCVT FloatToFloat o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.s.d") o1 o2
