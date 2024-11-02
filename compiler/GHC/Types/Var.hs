@@ -107,7 +107,9 @@ module GHC.Types.Var (
         tyVarName, tyVarKind, tyVarUnfolding_maybe, tyVarOccInfo, tcTyVarDetails, setTcTyVarDetails,
 
         -- ** Modifying 'TyVar's
-        setTyVarName, setTyVarUnique, setTyVarKind, setTyVarUnfolding, setTyVarOccInfo,
+        setTyVarName, setTyVarUnique, setTyVarKind,
+        setTyVarUnfolding, zapTyVarUnfolding,
+        setTyVarOccInfo,
         updateTyVarKind, updateTyVarKindM, updateTyVarUnfolding, updateTyVarUnfoldingM,
         updateTyVarKindAndUnfoldingM,
 
@@ -1032,12 +1034,14 @@ setTyVarUnfolding :: HasDebugCallStack => TyVar -> Type -> TyVar
 setTyVarUnfolding tv unf = assertPpr (isTyVar tv && not (isTcTyVar tv)) (ppr tv) $
                            tv {tv_unfolding = Just unf}
 
+zapTyVarUnfolding :: HasDebugCallStack => TyVar -> TyVar
+zapTyVarUnfolding tv@(TyVar { tv_unfolding = mb_unf })
+  = case mb_unf of
+      Nothing -> tv
+      Just {} -> tv { tv_unfolding = Nothing }
+zapTyVarUnfolding v = pprPanic "zapTyVarUnfolding" (ppr v)
+
 setTyVarOccInfo :: TyVar -> OccInfo -> TyVar
--- TODO: Surprisingly, TcTyVar's can occur after zonking, why?
--- It could be caused by other parts of my changes though, but I wasn't able to find out where.
--- For now, we just ignore them.
--- setTyVarOccInfo tv@(TcTyVar {}) occ_info = pprPanic "setTyVarOccInfo" (ppr tv $$ ppr occ_info)
-setTyVarOccInfo tv@(TcTyVar {}) _occ_info = tv
 setTyVarOccInfo tv occ_info = assertPpr (isTyVar tv) (ppr tv) $ tv {tv_occ_info = occ_info}
 
 updateTyVarKind :: (Kind -> Kind) -> TyVar -> TyVar

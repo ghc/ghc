@@ -25,7 +25,7 @@ module GHC.Core.TyCo.Compare (
 
 import GHC.Prelude
 
-import GHC.Core.Type( typeKind, unfoldView, coreView, tcSplitAppTyNoView_maybe, splitAppTyNoView_maybe
+import GHC.Core.Type( typeKind, coreView, tcSplitAppTyNoView_maybe, splitAppTyNoView_maybe
                     , isLevityTy, isRuntimeRepTy, isMultiplicityTy )
 
 import GHC.Core.TyCo.Rep
