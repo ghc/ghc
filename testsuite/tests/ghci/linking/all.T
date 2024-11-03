@@ -76,4 +76,4 @@ test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
                     unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
      makefile_test, ['big-obj'])
 
-test('T25155', [req_c, req_th, req_interp, extra_files(['T25155_iserv_main.c', 'T25155_iserv.hs', 'T25155_TH.hs'])], makefile_test, [])
+test('T25155', [req_c, req_th, req_interp, req_rts_linker, extra_files(['T25155_iserv_main.c', 'T25155_iserv.hs', 'T25155_TH.hs'])], makefile_test, [])
